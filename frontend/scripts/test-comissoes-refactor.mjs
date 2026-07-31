@@ -64,7 +64,6 @@ for (const literal of [
   "/comissoes/arvore-produtos",
   "/comissoes/configuracoes/funcionario/",
   "/comissoes/configuracoes/duplicar",
-  "/comissoes/funcionarios",
   "/comissoes/configuracoes/batch",
   "/comissoes/configuracoes",
   "Cadastro de Comissões",

@@ -10,6 +10,7 @@ from app.auth.dependencies import get_current_user_and_tenant
 from app.comissoes_demonstrativo_fechamento import fechar_comissoes_pendentes
 from app.comissoes_demonstrativo_schemas import FecharComissoesRequest
 from app.db import get_session
+from app.security.permissions_decorator import require_permission_dependency
 from app.utils.logger import StructuredLogger
 from app.utils.tenant_safe_sql import execute_tenant_safe
 
@@ -24,6 +25,7 @@ __all__ = ["fechar_comissoes", "listar_funcionarios_comissoes", "router"]
 @router.get(
     "/funcionarios",
     summary="Listar funcionarios com comissoes",
+    dependencies=[Depends(require_permission_dependency("comissoes.demonstrativo"))],
     responses={500: {"description": "Erro interno ao consultar funcionarios"}},
 )
 async def listar_funcionarios_comissoes(
@@ -89,7 +91,8 @@ async def listar_funcionarios_comissoes(
 
 @router.post(
     "/fechar",
-    summary="Fechar comissoes (alterar status para pago)",
+    summary="Fechar comissoes sem registrar pagamento",
+    dependencies=[Depends(require_permission_dependency("comissoes.fechamentos"))],
     responses={500: {"description": "Erro interno ao fechar comissoes"}},
 )
 async def fechar_comissoes(
@@ -98,11 +101,11 @@ async def fechar_comissoes(
     user_and_tenant: Annotated[tuple[Any, Any], Depends(get_current_user_and_tenant)],
 ) -> Dict[str, Any]:
     """
-    Fecha comissoes alterando status para 'pago'.
+    Fecha comissoes alterando o status para 'fechada'.
 
     IMPORTANTE:
     - NAO recalcula valores (snapshot imutavel)
-    - Altera APENAS: status, data_pagamento, observacao_pagamento
+    - Altera APENAS: status, data_fechamento, observacao_pagamento
     - So processa comissoes com status='pendente'
     - Ignora silenciosamente comissoes ja pagas/estornadas
 
@@ -144,7 +147,11 @@ async def fechar_comissoes(
             "message": f"{resultado['total_processadas']} comissao(oes) fechada(s) com sucesso",
         }
 
+    except HTTPException:
+        db.rollback()
+        raise
     except Exception as e:
+        db.rollback()
         logger.exception("Erro ao fechar comissoes")
         raise HTTPException(
             status_code=500, detail=f"Erro ao fechar comissoes: {str(e)}"

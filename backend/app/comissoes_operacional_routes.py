@@ -4,14 +4,19 @@ import logging
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.orm import Session
 
 from .auth.dependencies import get_current_user_and_tenant
 from .comissoes_models import ComissoesConfigSistema, ComissoesItens
 from .comissoes_schemas import ConfiguracaoSistemaUpdate
+from .db import get_session
+from .security.permissions_decorator import require_permission_dependency
 from .utils.tenant_safe_sql import execute_tenant_safe
 
 logger = logging.getLogger(__name__)
-router = APIRouter()
+router = APIRouter(
+    dependencies=[Depends(require_permission_dependency("comissoes.configurar"))]
+)
 
 
 @router.get("/itens/pendentes")
@@ -58,13 +63,15 @@ async def listar_itens_pendentes(
 
 @router.get("/config-sistema")
 async def get_configuracoes_sistema(
+    db: Session = Depends(get_session),
     user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     """
     Retorna as configuraÃ§Ãµes globais do sistema de comissÃµes
     """
     try:
-        config = ComissoesConfigSistema.get_config()
+        _current_user, tenant_id = user_and_tenant
+        config = ComissoesConfigSistema.get_config(db, tenant_id)
 
         return {"success": True, "data": config}
 
@@ -79,13 +86,17 @@ async def get_configuracoes_sistema(
 @router.put("/config-sistema")
 async def atualizar_configuracoes_sistema(
     config: ConfiguracaoSistemaUpdate,
+    db: Session = Depends(get_session),
     user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     """
     Atualiza as configuraÃ§Ãµes globais do sistema de comissÃµes
     """
     try:
+        _current_user, tenant_id = user_and_tenant
         success = ComissoesConfigSistema.atualizar_config(
+            db=db,
+            tenant_id=tenant_id,
             gerar_comissao_venda_parcial=config.gerar_comissao_venda_parcial,
             percentual_imposto_padrao=config.percentual_imposto_padrao,
             dias_vencimento_padrao=config.dias_vencimento_padrao,
@@ -100,11 +111,14 @@ async def atualizar_configuracoes_sistema(
                 detail="Nenhuma configuraÃ§Ã£o foi atualizada",
             )
 
+        db.commit()
         return {"success": True, "message": "ConfiguraÃ§Ãµes atualizadas com sucesso"}
 
     except HTTPException:
+        db.rollback()
         raise
     except Exception as e:
+        db.rollback()
         logger.error(f"Erro ao atualizar configuraÃ§Ãµes: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

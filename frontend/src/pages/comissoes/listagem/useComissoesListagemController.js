@@ -62,9 +62,6 @@ export default function useComissoesListagemController() {
   const [formasPagamentoDisponiveis, setFormasPagamentoDisponiveis] = useState([]);
   const [contasBancarias, setContasBancarias] = useState([]);
 
-  // Funcionário fixo para resumo (será parametrizável depois)
-  const FUNCIONARIO_ID = 1;
-
   // Carregar comissões e resumo ao montar o componente
   useEffect(() => {
     console.log("[ComissoesListagem] Iniciando carregamento...");
@@ -151,12 +148,22 @@ export default function useComissoesListagemController() {
     }
   };
 
-  const carregarResumo = async () => {
+  const carregarResumo = async (
+    funcionarioId = filtros.funcionario_id,
+    filtrosAplicados = filtros,
+  ) => {
     try {
       setLoadingResumo(true);
       setErroResumo(null);
 
-      const response = await api.get(`/comissoes/resumo?funcionario_id=${FUNCIONARIO_ID}`);
+      const params = new URLSearchParams();
+      if (funcionarioId) params.append("funcionario_id", funcionarioId);
+      if (filtrosAplicados.data_inicio) {
+        params.append("data_inicio", filtrosAplicados.data_inicio);
+      }
+      if (filtrosAplicados.data_fim) params.append("data_fim", filtrosAplicados.data_fim);
+      const query = params.toString();
+      const response = await api.get(`/comissoes/resumo${query ? `?${query}` : ""}`);
 
       if (response.data.success) {
         setResumo(response.data.resumo);
@@ -224,7 +231,9 @@ export default function useComissoesListagemController() {
     try {
       const response = await api.get("/comissoes/formas-pagamento");
       if (response.data) {
-        setFormasPagamentoDisponiveis(Array.isArray(response.data) ? response.data : []);
+        setFormasPagamentoDisponiveis(
+          Array.isArray(response.data?.formas) ? response.data.formas : [],
+        );
       }
     } catch (error) {
       console.error("[carregarFormasPagamento] Erro:", error);
@@ -248,14 +257,20 @@ export default function useComissoesListagemController() {
 
   // Calcular total das comissões pendentes filtradas (para rodapé)
   const calcularTotalFiltrado = () => {
-    const comissoesPendentes = comissoes.filter((c) => c.status === "pendente");
-    return comissoesPendentes.reduce((sum, c) => sum + (c.valor_comissao_gerada || 0), 0);
+    const comissoesPendentes = comissoes.filter((c) => ["pendente", "fechada"].includes(c.status));
+    return comissoesPendentes.reduce((sum, c) => {
+      const saldo = c.saldo_restante ?? (c.valor_comissao_gerada || 0) - (c.valor_pago || 0);
+      return sum + Math.max(0, saldo);
+    }, 0);
   };
 
   // Calcular total das comissões selecionadas
   const calcularTotalSelecionado = () => {
     const comissoesSel = comissoes.filter((c) => comissoesSelecionadas.includes(c.id));
-    return comissoesSel.reduce((sum, c) => sum + (c.valor_comissao_gerada || 0), 0);
+    return comissoesSel.reduce((sum, c) => {
+      const saldo = c.saldo_restante ?? (c.valor_comissao_gerada || 0) - (c.valor_pago || 0);
+      return sum + Math.max(0, saldo);
+    }, 0);
   };
 
   // Abrir detalhe da comissão
@@ -279,6 +294,7 @@ export default function useComissoesListagemController() {
   // Aplicar filtros
   const aplicarFiltros = () => {
     carregarComissoes();
+    carregarResumo(filtros.funcionario_id);
   };
 
   // Limpar filtros
@@ -318,6 +334,7 @@ export default function useComissoesListagemController() {
         }
       };
       loadSemFiltros();
+      carregarResumo("", {});
     }, 100);
   };
 
@@ -358,13 +375,23 @@ export default function useComissoesListagemController() {
 
   // Toggle seleção de comissão individual
   const toggleSelecaoComissao = (comissaoId, status) => {
-    // Não permitir selecionar comissões já pagas ou estornadas
-    if (status !== "pendente") return;
+    if (!["pendente", "fechada"].includes(status)) return;
 
     setComissoesSelecionadas((prev) => {
       if (prev.includes(comissaoId)) {
         return prev.filter((id) => id !== comissaoId);
       } else {
+        const comissaoAtual = comissoes.find((item) => item.id === comissaoId);
+        const funcionariosSelecionados = new Set(
+          comissoes.filter((item) => prev.includes(item.id)).map((item) => item.funcionario_id),
+        );
+        if (
+          funcionariosSelecionados.size > 0 &&
+          !funcionariosSelecionados.has(comissaoAtual?.funcionario_id)
+        ) {
+          alert("Selecione comissões de apenas um funcionário por vez.");
+          return prev;
+        }
         return [...prev, comissaoId];
       }
     });
@@ -372,7 +399,12 @@ export default function useComissoesListagemController() {
 
   // Selecionar/desselecionar todas as comissões pendentes
   const toggleSelecionarTodas = () => {
-    const comissoesPendentes = comissoes.filter((c) => c.status === "pendente");
+    const comissoesPendentes = comissoes.filter((c) => ["pendente", "fechada"].includes(c.status));
+    const funcionarios = new Set(comissoesPendentes.map((c) => c.funcionario_id));
+    if (funcionarios.size > 1) {
+      alert("Filtre um funcionário antes de selecionar todas as comissões.");
+      return;
+    }
 
     if (comissoesSelecionadas.length === comissoesPendentes.length) {
       // Se todas estão selecionadas, desselecionar
@@ -419,6 +451,24 @@ export default function useComissoesListagemController() {
       return;
     }
 
+    if (
+      tipoPagamento === "sem_pagar" &&
+      comissoes.some(
+        (comissao) => comissoesSelecionadas.includes(comissao.id) && comissao.status === "fechada",
+      )
+    ) {
+      alert("Uma comissão já fechada deve usar a opção 'Fechar e Pagar'.");
+      return;
+    }
+
+    if (
+      tipoPagamento === "com_pagamento" &&
+      (valorTotalEditavel <= 0 || valorTotalEditavel > calcularTotalSelecionado())
+    ) {
+      alert("Informe um valor maior que zero e não superior ao saldo selecionado.");
+      return;
+    }
+
     try {
       setLoadingFechamento(true);
 
@@ -432,27 +482,14 @@ export default function useComissoesListagemController() {
           observacao: observacaoFechamento || null,
         });
       } else {
-        // Fechamento com pagamento (usando endpoint avançado)
-        const params = new URLSearchParams({
-          valor_pago: valorTotalEditavel.toString(),
+        response = await api.post("/comissoes/fechar-com-pagamento", {
+          comissoes_ids: comissoesSelecionadas,
+          valor_pago: valorTotalEditavel,
           forma_pagamento: formaPagamento || "nao_informado",
+          conta_bancaria_id: Number(contaBancariaId),
           data_pagamento: dataPagamento,
+          observacoes: observacaoFechamento || null,
         });
-
-        if (contaBancariaId) {
-          params.append("conta_bancaria_id", contaBancariaId);
-        }
-
-        if (observacaoFechamento) {
-          params.append("observacoes", observacaoFechamento);
-        }
-
-        // Adicionar IDs das comissões
-        comissoesSelecionadas.forEach((id) => {
-          params.append("comissoes_ids", id);
-        });
-
-        response = await api.post(`/comissoes/fechar-com-pagamento?${params.toString()}`);
       }
 
       if (response.data.success) {

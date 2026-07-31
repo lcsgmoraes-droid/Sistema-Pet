@@ -25,6 +25,7 @@ const formatarData = (dataISO) => formatarDataHoraComissao(dataISO);
 const renderizarStatus = (status) => <StatusBadge status={status} />;
 
 const renderizarTipoCalculo = (tipo) => <ComissaoTipoCalculoBadge tipo={tipo} />;
+const comissaoPodeSerSelecionada = (comissao) => ["pendente", "fechada"].includes(comissao.status);
 
 export default function ComissoesListagemTabela({ controller }) {
   const {
@@ -89,10 +90,10 @@ export default function ComissoesListagemTabela({ controller }) {
                     checked={
                       comissoesSelecionadas.length > 0 &&
                       comissoesSelecionadas.length ===
-                        comissoes.filter((c) => c.status === "pendente").length
+                        comissoes.filter(comissaoPodeSerSelecionada).length
                     }
                     onChange={toggleSelecionarTodas}
-                    disabled={comissoes.filter((c) => c.status === "pendente").length === 0}
+                    disabled={comissoes.filter(comissaoPodeSerSelecionada).length === 0}
                     className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 cursor-pointer"
                     title="Selecionar todas pendentes"
                   />
@@ -134,10 +135,10 @@ export default function ComissoesListagemTabela({ controller }) {
                       type="checkbox"
                       checked={comissoesSelecionadas.includes(comissao.id)}
                       onChange={() => toggleSelecaoComissao(comissao.id, comissao.status)}
-                      disabled={comissao.status !== "pendente"}
+                      disabled={!comissaoPodeSerSelecionada(comissao)}
                       className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
                       title={
-                        comissao.status !== "pendente"
+                        !comissaoPodeSerSelecionada(comissao)
                           ? `Comissão ${comissao.status}`
                           : "Selecionar para fechamento"
                       }
@@ -290,8 +291,7 @@ export default function ComissoesListagemTabela({ controller }) {
                   <MoneyCell value={calcularTotalFiltrado()} />
                 </div>
                 <div className="text-[11px] text-indigo-100 mt-0.5 font-medium">
-                  {comissoes.filter((c) => c.status === "pendente").length} comissão(ões)
-                  pendente(s)
+                  {comissoes.filter(comissaoPodeSerSelecionada).length} comissão(ões) pendente(s)
                 </div>
               </div>
             </div>

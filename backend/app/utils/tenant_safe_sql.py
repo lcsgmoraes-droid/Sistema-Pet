@@ -32,6 +32,7 @@ TENANT_SCOPED_TABLES = {
     "cliente_segmentos",
     "clientes",
     "comissoes_configuracao",
+    "comissoes_configuracoes_sistema",
     "comissoes_estornos",
     "comissoes_itens",
     "comissoes_provisoes",

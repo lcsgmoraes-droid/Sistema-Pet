@@ -531,6 +531,7 @@ def provisionar_comissoes_venda(
                 valor=valor_comissao,
                 data_lancamento=data_competencia,
                 tipo_movimentacao="DESPESA",
+                commit=False,
             )
 
             logger.info(

@@ -13,12 +13,18 @@ import io
 from sqlalchemy.orm import Session
 from ..db import get_session
 from ..auth.dependencies import get_current_user_and_tenant
+from ..security.permissions_decorator import require_permission_dependency
 from ..utils.tenant_safe_sql import execute_tenant_safe
 
 router = APIRouter(prefix="/relatorios-comissoes", tags=["Relatórios de Comissões"])
 
 
 # ===== RELATÓRIO 1: MARGEM POR PRODUTO =====
+router.dependencies.append(
+    Depends(require_permission_dependency("comissoes.relatorios"))
+)
+
+
 @router.get("/margem-produto")
 def relatorio_margem_produto(
     data_inicio: Optional[date] = None,
@@ -42,14 +48,17 @@ def relatorio_margem_produto(
             p.id as produto_id,
             p.nome as produto_nome,
             COALESCE(c.nome, 'Sem categoria') as categoria_nome,
-            COUNT(ci.id) as quantidade_vendas,
+            COUNT(DISTINCT ci.venda_id) as quantidade_vendas,
             SUM(ci.valor_base_calculo) as total_venda,
-            SUM(ci.valor_custo) as total_custo,
+            SUM(
+                ci.valor_custo * COALESCE(ci.percentual_aplicado, 100) / 100
+            ) as total_custo,
             SUM(ci.valor_comissao_gerada) as total_comissao
         FROM comissoes_itens ci
         JOIN produtos p ON ci.produto_id = p.id AND p.tenant_id = ci.tenant_id
         LEFT JOIN categorias c ON p.categoria_id = c.id AND c.tenant_id = ci.tenant_id
         WHERE ci.{tenant_filter}
+          AND ci.status <> 'estornado'
     """
 
     params_dict = {}
@@ -208,6 +217,7 @@ def ranking_funcionarios(
         FROM comissoes_itens ci
         JOIN clientes f ON ci.funcionario_id = f.id AND f.tenant_id = ci.tenant_id
         WHERE ci.{tenant_filter}
+          AND ci.status <> 'estornado'
     """
 
     params_dict = {}
@@ -266,12 +276,13 @@ def ranking_produtos(
             p.nome as produto_nome,
             COALESCE(c.nome, 'Sem categoria') as categoria_nome,
             SUM(ci.valor_comissao_gerada) as total_comissao,
-            COUNT(ci.id) as quantidade_vendas,
+            COUNT(DISTINCT ci.venda_id) as quantidade_vendas,
             SUM(ci.valor_base_calculo) as total_venda
         FROM comissoes_itens ci
         JOIN produtos p ON ci.produto_id = p.id AND p.tenant_id = ci.tenant_id
         LEFT JOIN categorias c ON p.categoria_id = c.id AND c.tenant_id = ci.tenant_id
         WHERE ci.{tenant_filter}
+          AND ci.status <> 'estornado'
     """
 
     params_dict = {}
@@ -335,6 +346,7 @@ def ranking_categorias(
         JOIN produtos p ON ci.produto_id = p.id AND p.tenant_id = ci.tenant_id
         JOIN categorias c ON p.categoria_id = c.id AND c.tenant_id = ci.tenant_id
         WHERE ci.{tenant_filter}
+          AND ci.status <> 'estornado'
     """
 
     params_dict = {}
@@ -394,17 +406,19 @@ def visao_dre(
 
     query = """
         SELECT 
-            CAST(strftime('%m', ci.data_venda) AS INTEGER) as mes,
+            EXTRACT(MONTH FROM ci.data_venda)::INTEGER as mes,
             SUM(ci.valor_base_calculo) as receita_bruta,
-            SUM(ci.valor_custo) as custo_total,
+            SUM(
+                ci.valor_custo * COALESCE(ci.percentual_aplicado, 100) / 100
+            ) as custo_total,
             SUM(ci.valor_comissao_gerada) as despesa_comissao,
             COUNT(ci.id) as quantidade_operacoes
         FROM comissoes_itens ci
         WHERE ci.{tenant_filter}
-          AND CAST(strftime('%Y', ci.data_venda) AS INTEGER) = :ano
-          AND CAST(strftime('%m', ci.data_venda) AS INTEGER) BETWEEN :mes_inicio AND :mes_fim
-          AND ci.status IN ('pendente', 'paga')
-        GROUP BY strftime('%m', ci.data_venda)
+          AND EXTRACT(YEAR FROM ci.data_venda)::INTEGER = :ano
+          AND EXTRACT(MONTH FROM ci.data_venda)::INTEGER BETWEEN :mes_inicio AND :mes_fim
+          AND ci.status <> 'estornado'
+        GROUP BY EXTRACT(MONTH FROM ci.data_venda)
         ORDER BY mes
     """
 
@@ -443,10 +457,11 @@ def visao_dre(
         margem_bruta = receita - custo
         margem_liquida = receita - custo - comissao
 
+        mes = int(row[0])
         dados_mensais.append(
             {
-                "mes": row[0],
-                "mes_nome": meses_nomes[row[0]],
+                "mes": mes,
+                "mes_nome": meses_nomes[mes],
                 "receita_bruta": receita,
                 "custo_total": custo,
                 "despesa_comissao": comissao,

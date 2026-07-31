@@ -6,10 +6,13 @@ from fastapi import APIRouter, Depends, HTTPException, status
 
 from .auth.dependencies import get_current_user_and_tenant
 from .comissoes_schema_guard import ensure_comissoes_config_schema
+from .security.permissions_decorator import require_permission_dependency
 from .utils.tenant_safe_sql import execute_tenant_safe
 
 logger = logging.getLogger(__name__)
-router = APIRouter()
+router = APIRouter(
+    dependencies=[Depends(require_permission_dependency("comissoes.configurar"))]
+)
 
 
 @router.get("/funcionarios")

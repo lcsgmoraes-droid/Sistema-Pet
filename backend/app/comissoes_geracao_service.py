@@ -335,9 +335,15 @@ def gerar_comissoes_venda(
                             logger.info(
                                 f"💳 Taxa cartão parcelado ({num_parcelas}x): {float(taxa_percentual)}%"
                             )
-                    except Exception:
-                        pass
+                    except (TypeError, ValueError):
+                        logger.warning(
+                            "Taxas por parcela inválidas para a forma %s", forma_nome
+                        )
 
+                taxa_cartao_percentual = taxa_percentual
+                logger.info(f"💳 Forma de pagamento (fallback): {forma_nome}")
+                logger.info(f"💳 Taxa aplicada: {float(taxa_cartao_percentual)}%")
+            elif pagamento:
                 taxa_cartao_percentual = taxa_percentual
                 logger.info(f"💳 Forma de pagamento (fallback): {forma_nome}")
                 logger.info(f"💳 Taxa aplicada: {float(taxa_cartao_percentual)}%")

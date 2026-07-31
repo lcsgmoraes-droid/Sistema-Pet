@@ -7,12 +7,15 @@ from sqlalchemy import text
 
 from app.auth.dependencies import get_current_user_and_tenant
 from app.db import SessionLocal
+from app.security.permissions_decorator import require_permission_dependency
 from app.utils.logger import StructuredLogger
 from app.utils.tenant_safe_sql import execute_tenant_safe
 
 logger = logging.getLogger(__name__)
 struct_logger = StructuredLogger(__name__)
-router = APIRouter()
+router = APIRouter(
+    dependencies=[Depends(require_permission_dependency("comissoes.fechamentos"))]
+)
 
 
 # ==================== ENDPOINT: HISTÓRICO DE FECHAMENTOS ====================
@@ -77,27 +80,29 @@ def listar_historico_fechamentos(
             SELECT 
                 ci.funcionario_id,
                 c.nome as nome_funcionario,
-                ci.data_pagamento,
+                ci.data_fechamento,
                 ci.observacao_pagamento,
                 COUNT(ci.id) as quantidade_comissoes,
                 SUM(ci.valor_comissao_gerada) as valor_total,
                 MIN(ci.data_venda) as data_venda_mais_antiga,
                 MAX(ci.data_venda) as data_venda_mais_recente,
-                MIN(ci.data_atualizacao) as data_fechamento
+                MIN(ci.data_atualizacao) as data_fechamento_registro
             FROM comissoes_itens ci
             LEFT JOIN clientes c ON ci.funcionario_id = c.id AND c.{tenant_filter}
-            WHERE ci.{tenant_filter} AND ci.status = 'paga'
+            WHERE ci.{tenant_filter}
+              AND ci.status IN ('fechada', 'pago')
+              AND ci.data_fechamento IS NOT NULL
         """
 
         params = {}
 
         # Aplicar filtros
         if data_inicio:
-            query += " AND DATE(ci.data_pagamento) >= :data_inicio"
+            query += " AND ci.data_fechamento >= :data_inicio"
             params["data_inicio"] = str(data_inicio)
 
         if data_fim:
-            query += " AND DATE(ci.data_pagamento) <= :data_fim"
+            query += " AND ci.data_fechamento <= :data_fim"
             params["data_fim"] = str(data_fim)
 
         if funcionario_id is not None:
@@ -106,8 +111,8 @@ def listar_historico_fechamentos(
 
         # Agrupar por funcionário + data_pagamento + observação
         query += """
-            GROUP BY ci.funcionario_id, c.nome, ci.data_pagamento, ci.observacao_pagamento
-            ORDER BY ci.data_pagamento DESC, ci.funcionario_id ASC
+            GROUP BY ci.funcionario_id, c.nome, ci.data_fechamento, ci.observacao_pagamento
+            ORDER BY ci.data_fechamento DESC, ci.funcionario_id ASC
         """
 
         result = execute_tenant_safe(db, query, params)
@@ -245,7 +250,7 @@ def detalhe_fechamento(
                     ci.tipo_calculo,
                     ci.data_pagamento,
                     ci.observacao_pagamento,
-                    ci.data_atualizacao,
+                    ci.data_fechamento,
                     p.nome as nome_produto,
                     v.cliente_id
                 FROM comissoes_itens ci
@@ -253,8 +258,8 @@ def detalhe_fechamento(
                 LEFT JOIN vendas v ON ci.venda_id = v.id AND {tenant_filter_v}
                 WHERE {tenant_filter_ci} 
                   AND ci.funcionario_id = :funcionario_id 
-                  AND ci.data_pagamento = :data_pagamento
-                  AND ci.status = 'paga'
+                  AND ci.data_fechamento = :data_pagamento
+                  AND ci.status IN ('fechada', 'pago')
                 ORDER BY ci.data_venda ASC, ci.id ASC
             """
 

@@ -8,11 +8,14 @@ from datetime import datetime
 from typing import Dict, Any
 import logging
 
+from fastapi import HTTPException
 from sqlalchemy import text, bindparam
+from app.comissoes_financeiro_service import cancelar_provisoes_comissao_venda
 from app.db import SessionLocal
 from app.db.transaction import transactional_session
 from .utils.logger import logger as struct_logger
 from .utils.tenant_safe_sql import execute_tenant_safe
+from .tenancy.context import get_current_tenant_id
 
 # Logger tradicional
 logger = logging.getLogger(__name__)
@@ -71,8 +74,9 @@ def estornar_comissoes_venda(
                 SELECT 
                     id,
                     status,
-                    valor_comissao,
-                    funcionario_id
+                    valor_comissao_gerada,
+                    funcionario_id,
+                    COALESCE(valor_pago, 0) AS valor_pago
                 FROM comissoes_itens
                 WHERE venda_id = :venda_id
                 AND {tenant_filter}
@@ -98,10 +102,20 @@ def estornar_comissoes_venda(
 
             # 2. Verificar se já estão estornadas (idempotência)
             ja_estornadas = [c for c in comissoes if c[1] == "estornado"]
-            pendentes = [c for c in comissoes if c[1] in ("pendente", "gerada")]
-            pagas = [c for c in comissoes if c[1] == "pago"]
+            pendentes = [
+                c
+                for c in comissoes
+                if c[1] in ("pendente", "gerada", "fechada") and float(c[4] or 0) == 0
+            ]
+            pagas = [
+                c
+                for c in comissoes
+                if c[1]
+                in ("pago", "paga", "pago_com_compensacao", "compensado_integralmente")
+                or float(c[4] or 0) > 0
+            ]
 
-            if ja_estornadas and not pendentes:
+            if ja_estornadas and not pendentes and not pagas:
                 struct_logger.warning(
                     event="COMMISSION_ALREADY_REFUNDED",
                     message="Comissões já estavam estornadas (operação idempotente)",
@@ -116,11 +130,14 @@ def estornar_comissoes_venda(
                     "duplicated": True,
                 }
 
-            # 3. Avisar se há comissões pagas (não estorna pagas)
+            # 3. Pagamentos precisam ser estornados antes do cancelamento da venda.
             if pagas:
-                logger.warning(
-                    f"⚠️  Venda #{venda_id} possui {len(pagas)} comissões já PAGAS. "
-                    f"Estas NÃO serão estornadas automaticamente."
+                raise HTTPException(
+                    status_code=409,
+                    detail=(
+                        f"A venda possui {len(pagas)} comissão(ões) paga(s) ou parcialmente "
+                        "paga(s). Estorne o pagamento antes de cancelar a venda."
+                    ),
                 )
 
             # 4. Estornar apenas as pendentes
@@ -133,7 +150,16 @@ def estornar_comissoes_venda(
                     "duplicated": False,
                 }
 
-            # 5. Executar estorno
+            # 5. Cancelar as contas a pagar e reverter a despesa no DRE.
+            tenant_id = get_current_tenant_id()
+            cancelar_provisoes_comissao_venda(
+                db,
+                venda_id=venda_id,
+                tenant_id=tenant_id,
+                motivo=motivo,
+            )
+
+            # 6. Executar estorno dos snapshots.
             ids_para_estornar = [c[0] for c in pendentes]
             valor_total_estornado = sum(float(c[2]) for c in pendentes)
             data_estorno = datetime.now().isoformat()
