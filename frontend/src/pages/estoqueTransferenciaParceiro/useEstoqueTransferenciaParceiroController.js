@@ -79,6 +79,7 @@ export default function useEstoqueTransferenciaParceiroController() {
       filtros: historico.filtrosHistoricoForm,
       atualizarFiltro: historico.atualizarFiltroHistorico,
       pessoaSelecionada: historico.pessoaHistoricoSelecionada,
+      pessoaFiltroAplicada: historico.pessoaFiltroAplicada,
       sugestoesPessoas: historico.sugestoesPessoasHistorico,
       loadingPessoas: historico.loadingPessoasHistorico,
       onAtualizarBuscaPessoa: historico.atualizarBuscaPessoaHistorico,

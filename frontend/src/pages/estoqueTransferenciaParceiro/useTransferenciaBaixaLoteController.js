@@ -22,7 +22,6 @@ export default function useTransferenciaBaixaLoteController({
   historico,
   filtrosHistoricoAplicados,
   pessoaHistoricoSelecionada,
-  parceiroSelecionado,
   contasPagarCompensacao,
   setContasPagarCompensacao,
   carregarContasPagarCompensacao,
@@ -70,15 +69,15 @@ export default function useTransferenciaBaixaLoteController({
   );
 
   const resolverPessoaBaixaLote = () => {
-    if (pessoaHistoricoSelecionada?.id) return pessoaHistoricoSelecionada;
-    if (filtrosHistoricoAplicados?.parceiro_id && filtrosHistoricoAplicados?.busca) {
-      return {
-        id: Number(filtrosHistoricoAplicados.parceiro_id),
-        nome: filtrosHistoricoAplicados.busca,
-      };
+    const parceiroId = filtrosHistoricoAplicados?.parceiro_id;
+    if (!parceiroId) return null;
+    if (String(pessoaHistoricoSelecionada?.id || "") === String(parceiroId)) {
+      return pessoaHistoricoSelecionada;
     }
-    if (parceiroSelecionado?.id) return parceiroSelecionado;
-    return null;
+    return {
+      id: Number(parceiroId),
+      nome: filtrosHistoricoAplicados?.busca || `Pessoa #${parceiroId}`,
+    };
   };
 
   const carregarPreviewBaixaLoteTransferencia = async (overrides = {}) => {
@@ -203,6 +202,10 @@ export default function useTransferenciaBaixaLoteController({
     }
     if (totalAplicadoBaixaLote <= 0) {
       toast.error("Marque ao menos uma transferencia com valor para baixar.");
+      return;
+    }
+    if (formBaixaLote.modo_baixa === "recebimento" && !formBaixaLote.forma_pagamento_id) {
+      toast.error("Selecione a forma de pagamento.");
       return;
     }
 

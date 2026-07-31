@@ -21,6 +21,7 @@ import {
   extrairListaProdutos,
   extrairObservacaoManualTransferencia,
   formatarData,
+  formatarDataHora,
   incrementarItemTransferencia,
   montarCompensacoesBaixaPayload,
   montarCupomTransferencia,
@@ -82,6 +83,8 @@ test("helpers de carga e texto preservam formatos usados na tela", () => {
   assert.deepEqual(extrairListaProdutos({ data: ["a"] }), ["a"]);
   assert.equal(normalizarNumero("12,5"), 12.5);
   assert.equal(formatarData("2026-05-20"), "20/05/2026");
+  assert.equal(formatarDataHora(null), "-");
+  assert.match(formatarDataHora("2026-07-30T20:58:30+00:00"), /2026/);
   assert.equal(
     extrairObservacaoManualTransferencia("Entrega combinada\n\nItens:\nProduto"),
     "Entrega combinada",

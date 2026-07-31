@@ -10,6 +10,7 @@ export default function HistoricoTransferenciaFilters({
   filtros,
   atualizarFiltro,
   pessoaSelecionada,
+  pessoaFiltroAplicada,
   sugestoesPessoas,
   loadingPessoas,
   onAtualizarBuscaPessoa,
@@ -19,7 +20,8 @@ export default function HistoricoTransferenciaFilters({
   onAbrirBaixaLoteTransferencia,
   onSubmit,
 }) {
-  const baixaPorValorDisponivel = Boolean(pessoaSelecionada?.id || filtros.parceiro_id);
+  const baixaPorValorDisponivel = Boolean(pessoaFiltroAplicada);
+  const nomePessoa = pessoaSelecionada?.nome || pessoaSelecionada?.razao_social;
 
   return (
     <>
@@ -60,30 +62,44 @@ export default function HistoricoTransferenciaFilters({
         </div>
       </div>
 
+      {pessoaFiltroAplicada ? (
+        <div className="border-b border-blue-100 bg-blue-50 px-6 py-3 text-sm font-medium text-blue-900">
+          Resumo de {nomePessoa || `Pessoa #${filtros.parceiro_id}`}
+        </div>
+      ) : null}
+
       <div className="grid gap-4 border-b border-gray-100 px-6 py-5 md:grid-cols-2 xl:grid-cols-4">
         <ResumoTransferenciaCard
-          titulo="Transferencias filtradas"
+          titulo={pessoaFiltroAplicada ? "Pedidos da pessoa" : "Transferencias filtradas"}
           valor={String(totais.total_registros || 0)}
-          descricao="Documentos localizados no historico atual."
+          descricao={
+            pessoaFiltroAplicada
+              ? "Somente os pedidos da pessoa selecionada."
+              : "Documentos localizados no historico atual."
+          }
           destaque="slate"
         />
         <ResumoTransferenciaCard
-          titulo="Valor transferido"
+          titulo={pessoaFiltroAplicada ? "Divida lancada" : "Valor transferido"}
           valor={formatarMoeda(totais.valor_total || 0)}
-          descricao="Total em custo enviado para pessoas com ressarcimento."
+          descricao={
+            pessoaFiltroAplicada
+              ? "Total lancado como divida para esta pessoa."
+              : "Total em custo enviado para pessoas com ressarcimento."
+          }
           destaque="blue"
+        />
+        <ResumoTransferenciaCard
+          titulo={pessoaFiltroAplicada ? "Pago" : "Valor recebido"}
+          valor={formatarMoeda(totais.valor_recebido || 0)}
+          descricao={`${totais.recebidas || 0} transferencia(s) ja recebida(s).`}
+          destaque="emerald"
         />
         <ResumoTransferenciaCard
           titulo="Saldo em aberto"
           valor={formatarMoeda(totais.saldo_aberto || 0)}
           descricao={`${totais.pendentes || 0} pendente(s) e ${totais.vencidas || 0} vencida(s).`}
           destaque="amber"
-        />
-        <ResumoTransferenciaCard
-          titulo="Valor recebido"
-          valor={formatarMoeda(totais.valor_recebido || 0)}
-          descricao={`${totais.recebidas || 0} transferencia(s) ja recebida(s).`}
-          destaque="emerald"
         />
       </div>
 
