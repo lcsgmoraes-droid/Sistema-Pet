@@ -383,9 +383,7 @@ def _get_or_create_cliente_for_user(db: Session, user: User) -> Cliente:
             cliente = _select_linked_cliente_fallback(clientes_vinculados)
 
     if not cliente:
-        cliente = _find_operational_cliente_match(
-            db, tenant_id=tenant_id, user=user
-        )
+        cliente = _find_operational_cliente_match(db, tenant_id=tenant_id, user=user)
 
     if not cliente:
         cliente = _find_cliente_match(
