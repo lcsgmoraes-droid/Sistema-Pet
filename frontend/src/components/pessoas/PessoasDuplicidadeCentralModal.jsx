@@ -52,6 +52,7 @@ export default function PessoasDuplicidadeCentralModal({
   onRevisarSugestao,
   onRevisarSelecionadas,
   onFundirAutomaticas,
+  onFundirAssistidasNome,
 }) {
   const [selecionadas, setSelecionadas] = useState(() => new Map());
 
@@ -264,6 +265,18 @@ export default function PessoasDuplicidadeCentralModal({
             </ActionButton>
           </div>
           <div className="flex flex-wrap justify-end gap-2">
+            {totalSugestoes > 0 && (
+              <ActionButton
+                disabled={verificando}
+                icon={ShieldCheck}
+                intent="create"
+                onClick={onFundirAssistidasNome}
+                size="md"
+                tone="soft"
+              >
+                Fundir com evidência segura
+              </ActionButton>
+            )}
             {totalAutomaticas > 0 && (
               <ActionButton
                 disabled={verificando}

@@ -1,4 +1,5 @@
 import os
+from datetime import datetime, timezone
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -9,7 +10,9 @@ from app.services.pessoa_duplicate_service import (
     _paginar_sugestoes,
     avaliar_par_duplicidade_pessoas,
     escolher_pessoa_principal,
+    executar_fusoes_assistidas_pessoas_por_nome,
     normalizar_nome_pessoa,
+    planejar_fusao_assistida_por_nome,
 )
 from app.clientes.duplicidades_routes import router as duplicidades_router
 
@@ -34,6 +37,10 @@ def _pessoa(**kwargs):
         "endereco": None,
         "cidade": None,
         "estado": None,
+        "cep": None,
+        "numero": None,
+        "data_nascimento": None,
+        "created_at": datetime(2026, 1, 1, tzinfo=timezone.utc),
     }
     defaults.update(kwargs)
     return SimpleNamespace(**defaults)
@@ -157,6 +164,162 @@ def test_escolher_pessoa_principal_prefere_ativo_com_historico_e_dados():
     assert principal.id == 1
 
 
+def test_fusao_assistida_usa_telefone_do_cadastro_mais_recente_com_data_igual():
+    antigo = _pessoa(
+        id=10,
+        nome="Andreia Goncalves do Carmo",
+        data_nascimento="1990-05-12",
+        celular="18999990000",
+        created_at=datetime(2025, 1, 1, tzinfo=timezone.utc),
+    )
+    recente = _pessoa(
+        id=20,
+        nome="andreia goncalves do carmo",
+        data_nascimento="1990-05-12",
+        celular="18988880000",
+        created_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
+    )
+
+    plano = planejar_fusao_assistida_por_nome(antigo, recente)
+
+    assert plano.elegivel is True
+    assert plano.pessoa_mais_recente_id == 20
+    assert plano.decisoes_campos["celular"] == "duplicado"
+    assert "data_nascimento" in plano.sinais_confirmacao
+
+
+def test_fusao_assistida_nao_usa_apenas_nome_igual_com_telefones_diferentes():
+    pessoa_a = _pessoa(id=10, nome="Amanda Silva", celular="18999990000")
+    pessoa_b = _pessoa(
+        id=20,
+        nome="Amanda Silva",
+        celular="18988880000",
+        created_at=datetime(2026, 2, 1, tzinfo=timezone.utc),
+    )
+
+    plano = planejar_fusao_assistida_por_nome(pessoa_a, pessoa_b)
+
+    assert plano.elegivel is False
+    assert "sem_evidencia_secundaria_compartilhada" in plano.motivos_bloqueio
+
+
+def test_fusao_assistida_bloqueia_email_e_data_nascimento_conflitantes():
+    pessoa_a = _pessoa(
+        id=10,
+        nome="Pessoa Completa",
+        email="a@example.com",
+        data_nascimento="1990-01-01",
+    )
+    pessoa_b = _pessoa(
+        id=20,
+        nome="Pessoa Completa",
+        email="b@example.com",
+        data_nascimento="1991-01-01",
+    )
+
+    plano = planejar_fusao_assistida_por_nome(pessoa_a, pessoa_b)
+
+    assert plano.elegivel is False
+    assert "email_conflitante" in plano.motivos_bloqueio
+    assert "data_nascimento_conflitante" in plano.motivos_bloqueio
+
+
+def test_fusao_assistida_preserva_telefone_antigo_se_recente_esta_vazio():
+    antigo = _pessoa(
+        id=10,
+        nome="Cliente Evidenciado",
+        email="cliente@example.com",
+        telefone="1833334444",
+        created_at=datetime(2025, 1, 1, tzinfo=timezone.utc),
+    )
+    recente = _pessoa(
+        id=20,
+        nome="Cliente Evidenciado",
+        email="cliente@example.com",
+        created_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
+    )
+
+    plano = planejar_fusao_assistida_por_nome(antigo, recente)
+
+    assert plano.elegivel is True
+    assert "telefone" not in plano.decisoes_campos
+    assert "celular" not in plano.decisoes_campos
+
+
+def test_fusao_assistida_aceita_telefone_compartilhado_entre_campos():
+    antigo = _pessoa(
+        id=10,
+        nome="Contato Cruzado",
+        telefone="18 3333-4444",
+    )
+    recente = _pessoa(
+        id=20,
+        nome="Contato Cruzado",
+        celular="1833334444",
+        created_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
+    )
+
+    plano = planejar_fusao_assistida_por_nome(antigo, recente)
+
+    assert plano.elegivel is True
+    assert "telefone_compartilhado" in plano.sinais_confirmacao
+    assert plano.decisoes_campos["celular"] == "duplicado"
+
+
+def test_simulacao_assistida_nao_altera_dados_e_separa_bloqueadas(monkeypatch):
+    elegivel_antigo = _pessoa(
+        id=10,
+        nome="Cliente Evidenciado",
+        email="cliente@example.com",
+        celular="18999990000",
+        created_at=datetime(2025, 1, 1, tzinfo=timezone.utc),
+    )
+    elegivel_recente = _pessoa(
+        id=20,
+        nome="Cliente Evidenciado",
+        email="cliente@example.com",
+        celular="18988880000",
+        created_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
+    )
+    ambigua_a = _pessoa(id=30, nome="Amanda Silva", celular="18977770000")
+    ambigua_b = _pessoa(id=40, nome="Amanda Silva", celular="18966660000")
+    pessoas = [elegivel_antigo, elegivel_recente, ambigua_a, ambigua_b]
+
+    class QueryFake:
+        def filter(self, *_args, **_kwargs):
+            return self
+
+        def order_by(self, *_args, **_kwargs):
+            return self
+
+        def all(self):
+            return pessoas
+
+    class DbFake:
+        def query(self, *_args, **_kwargs):
+            return QueryFake()
+
+    def falhar_se_fundir(*_args, **_kwargs):
+        raise AssertionError("dry-run nao pode executar fusao")
+
+    monkeypatch.setattr(
+        "app.services.pessoa_duplicate_service.executar_fusao_pessoas",
+        falhar_se_fundir,
+    )
+
+    resultado = executar_fusoes_assistidas_pessoas_por_nome(
+        DbFake(),
+        tenant_id="tenant-teste",
+        user_id=1,
+        confirmar=False,
+    )
+
+    assert resultado["simulacao"] is True
+    assert resultado["total_elegiveis"] == 1
+    assert resultado["total_bloqueadas"] == 1
+    assert resultado["total_fundidas"] == 0
+
+
 def test_clientes_router_expoe_endpoints_de_duplicidade():
     paths = {
         route.path for route in duplicidades_router.routes if hasattr(route, "path")
@@ -164,6 +327,7 @@ def test_clientes_router_expoe_endpoints_de_duplicidade():
 
     assert "/duplicidades/sugestoes" in paths
     assert "/duplicidades/fundir-automaticas" in paths
+    assert "/duplicidades/fundir-assistidas-nome" in paths
     assert "/duplicidades/historico" in paths
 
 

@@ -15,6 +15,7 @@ import PageHeader from "../components/ui/PageHeader";
 import {
   buscarSugestoesDuplicidadePessoas,
   executarFusoesAutomaticasPessoas,
+  executarFusoesAssistidasPessoasPorNome,
 } from "../api/clientes";
 import { useClientesNovoCadastro } from "../hooks/useClientesNovoCadastro";
 import { useClientesNovoListagem } from "../hooks/useClientesNovoListagem";
@@ -296,6 +297,56 @@ const Pessoas = () => {
     }
   };
 
+  const executarFusoesAssistidasNome = async () => {
+    setCentralDuplicidades((prev) => ({ ...prev, verificando: true }));
+    try {
+      const { data: simulacao } = await executarFusoesAssistidasPessoasPorNome({
+        confirmar: false,
+        limit: 200,
+      });
+      const elegiveis = Number(simulacao?.total_elegiveis || 0);
+      const bloqueadas = Number(simulacao?.total_bloqueadas || 0);
+      if (elegiveis === 0) {
+        toast(
+          bloqueadas > 0
+            ? `${bloqueadas} par(es) continuam bloqueados por falta de evidência ou conflito.`
+            : "Nenhuma fusão assistida elegível foi encontrada.",
+        );
+        return;
+      }
+
+      const confirmou = window.confirm(
+        `Foram encontrados ${elegiveis} par(es) elegíveis e ${bloqueadas} bloqueado(s).\n\n` +
+          "A fusão preencherá campos vazios, preservará históricos, créditos e acessos, " +
+          "e usará telefone/celular do cadastro mais recente. Pares sem outra evidência " +
+          "compartilhada ou com conflito de identidade não serão fundidos.\n\nConfirmar agora?",
+      );
+      if (!confirmou) return;
+
+      const { data: resultado } = await executarFusoesAssistidasPessoasPorNome({
+        confirmar: true,
+        limit: 200,
+      });
+      const fundidas = Number(resultado?.total_fundidas || 0);
+      const aindaBloqueadas = Number(resultado?.total_bloqueadas || 0);
+      if (fundidas > 0) {
+        toast.success(
+          `${fundidas} cadastro(s) fundido(s); ${aindaBloqueadas} par(es) mantido(s) para revisão.`,
+        );
+        await loadClientes();
+      } else {
+        toast("Nenhum cadastro passou pelos critérios seguros no momento da confirmação.");
+      }
+      await carregarSugestoesDuplicidade();
+      await carregarPaginaCentralDuplicidades(0);
+    } catch (err) {
+      console.error("Erro ao executar fusões assistidas por nome:", err);
+      toast.error(err?.response?.data?.detail || "Não foi possível executar as fusões assistidas.");
+    } finally {
+      setCentralDuplicidades((prev) => ({ ...prev, verificando: false }));
+    }
+  };
+
   const revisarSugestaoDuplicidade = (sugestao, { fila = [], origemCentral = true } = {}) => {
     if (!sugestao?.principal || !sugestao?.duplicado) {
       toast.error("Esta sugestão não possui os dois cadastros necessários para revisão.");
@@ -520,6 +571,7 @@ const Pessoas = () => {
         }
         onRevisarSelecionadas={revisarSugestoesSelecionadas}
         onFundirAutomaticas={() => executarVarreduraDuplicidade({ silencioso: false })}
+        onFundirAssistidasNome={executarFusoesAssistidasNome}
       />
       <PessoasFusaoModal
         isOpen={modalFusaoAberto}
