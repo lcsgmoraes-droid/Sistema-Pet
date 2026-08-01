@@ -1,7 +1,7 @@
 import { AlertTriangle, CheckCircle2, GitMerge, Loader2, RefreshCw } from "lucide-react";
 import ActionButton from "../ui/ActionButton";
 
-function motivoLabel(motivo) {
+export function motivoDuplicidadeLabel(motivo) {
   const mapa = {
     cpf_conflitante: "CPF diferente",
     cnpj_conflitante: "CNPJ diferente",
@@ -23,7 +23,7 @@ export default function PessoasDuplicidadeBanner({
   verificando = false,
   onVerificar,
   onFundirAutomaticas,
-  onRevisarSugestao,
+  onAbrirCentral,
 }) {
   if (!verificando && !totalAutomaticas && sugestoes.length === 0) return null;
 
@@ -54,7 +54,7 @@ export default function PessoasDuplicidadeBanner({
               <div className="mt-1 truncate text-amber-800">
                 {primeiraSugestao.principal?.nome || "Pessoa"} x{" "}
                 {primeiraSugestao.duplicado?.nome || "duplicado"}:{" "}
-                {(primeiraSugestao.motivos || []).map(motivoLabel).join(", ")}
+                {(primeiraSugestao.motivos || []).map(motivoDuplicidadeLabel).join(", ")}
               </div>
             ) : (
               <div className="mt-1 text-amber-800">
@@ -66,13 +66,8 @@ export default function PessoasDuplicidadeBanner({
 
         <div className="flex flex-wrap gap-2 lg:justify-end">
           {primeiraSugestao && (
-            <ActionButton
-              icon={GitMerge}
-              intent="warning"
-              onClick={() => onRevisarSugestao(primeiraSugestao)}
-              size="md"
-            >
-              Revisar
+            <ActionButton icon={GitMerge} intent="warning" onClick={onAbrirCentral} size="md">
+              Revisar duplicidades
             </ActionButton>
           )}
           {totalAutomaticas > 0 && (

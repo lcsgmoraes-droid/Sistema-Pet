@@ -55,6 +55,7 @@
     "test:vendas-reprocessamento-feedback": "node scripts/test-vendas-reprocessamento-feedback.mjs",
     "test:onboarding-inicial": "node scripts/test-onboarding-inicial-contract.mjs",
     "test:banho-tosa-fluxo": "node scripts/test-banho-tosa-fluxo.mjs",
+    "test:pessoas-duplicidade-central": "node scripts/test-pessoas-duplicidade-central.mjs",
     "preview": "vite preview"
   },
   "dependencies": {

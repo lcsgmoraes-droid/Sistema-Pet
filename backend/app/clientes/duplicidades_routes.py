@@ -262,6 +262,7 @@ def executar_fusao_pessoas_route(
 @router.get("/duplicidades/sugestoes")
 @require_permission("clientes.visualizar")
 def listar_sugestoes_duplicidade_pessoas_route(
+    skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=100),
     db: Session = Depends(get_session),
     user_and_tenant=Depends(get_current_user_and_tenant),
@@ -271,6 +272,7 @@ def listar_sugestoes_duplicidade_pessoas_route(
     return listar_sugestoes_duplicidade_pessoas(
         db,
         tenant_id=tenant_id,
+        skip=skip,
         limit=limit,
     )
 

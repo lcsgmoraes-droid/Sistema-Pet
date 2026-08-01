@@ -6,6 +6,7 @@ from types import SimpleNamespace
 os.environ.setdefault("DATABASE_URL", "sqlite:///./test.db")
 
 from app.services.pessoa_duplicate_service import (
+    _paginar_sugestoes,
     avaliar_par_duplicidade_pessoas,
     escolher_pessoa_principal,
     normalizar_nome_pessoa,
@@ -164,6 +165,14 @@ def test_clientes_router_expoe_endpoints_de_duplicidade():
     assert "/duplicidades/sugestoes" in paths
     assert "/duplicidades/fundir-automaticas" in paths
     assert "/duplicidades/historico" in paths
+
+
+def test_paginar_sugestoes_permite_revisar_todos_os_alertas_em_lotes():
+    sugestoes = list(range(60))
+
+    assert _paginar_sugestoes(sugestoes, skip=0, limit=25) == list(range(25))
+    assert _paginar_sugestoes(sugestoes, skip=25, limit=25) == list(range(25, 50))
+    assert _paginar_sugestoes(sugestoes, skip=50, limit=25) == list(range(50, 60))
 
 
 def test_migration_separa_conta_e_protege_auditoria_por_tenant():
