@@ -302,6 +302,7 @@ const Pessoas = () => {
     try {
       const { data: simulacao } = await executarFusoesAssistidasPessoasPorNome({
         confirmar: false,
+        aceitar_nome_igual: true,
         limit: 200,
       });
       const elegiveis = Number(simulacao?.total_elegiveis || 0);
@@ -309,22 +310,24 @@ const Pessoas = () => {
       if (elegiveis === 0) {
         toast(
           bloqueadas > 0
-            ? `${bloqueadas} par(es) continuam bloqueados por falta de evidência ou conflito.`
-            : "Nenhuma fusão assistida elegível foi encontrada.",
+            ? `${bloqueadas} par(es) continuam bloqueados por conflito objetivo de identidade.`
+            : "Nenhum nome igual foi encontrado para fusão.",
         );
         return;
       }
 
       const confirmou = window.confirm(
         `Foram encontrados ${elegiveis} par(es) elegíveis e ${bloqueadas} bloqueado(s).\n\n` +
+          "Você confirmou que nomes exatamente iguais representam a mesma pessoa. " +
           "A fusão preencherá campos vazios, preservará históricos, créditos e acessos, " +
-          "e usará telefone/celular do cadastro mais recente. Pares sem outra evidência " +
-          "compartilhada ou com conflito de identidade não serão fundidos.\n\nConfirmar agora?",
+          "e usará telefone/celular do cadastro mais recente. Conflitos objetivos de " +
+          "identidade continuarão bloqueados.\n\nConfirmar agora?",
       );
       if (!confirmou) return;
 
       const { data: resultado } = await executarFusoesAssistidasPessoasPorNome({
         confirmar: true,
+        aceitar_nome_igual: true,
         limit: 200,
       });
       const fundidas = Number(resultado?.total_fundidas || 0);

@@ -274,7 +274,7 @@ export default function PessoasDuplicidadeCentralModal({
                 size="md"
                 tone="soft"
               >
-                Fundir com evidência segura
+                Fundir nomes iguais conferidos
               </ActionButton>
             )}
             {totalAutomaticas > 0 && (
