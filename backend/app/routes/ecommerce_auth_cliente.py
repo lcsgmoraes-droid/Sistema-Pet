@@ -3,6 +3,7 @@ import re
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
+from app.clientes.common import gerar_codigo_cliente
 from app.models import Cliente, User
 from app.routes.ecommerce_auth_common import _activate_user_tenant_context
 from app.services.pessoa_merge_service import transferir_referencias_pessoa
@@ -400,6 +401,7 @@ def _get_or_create_cliente_for_user(db: Session, user: User) -> Cliente:
             tenant_id=tenant_id,
             user_id=user.id,
             auth_user_id=user.id,
+            codigo=gerar_codigo_cliente(db, "cliente", "PF", tenant_id),
             nome=user.nome or user.email,
             email=user.email,
             telefone=user.telefone,

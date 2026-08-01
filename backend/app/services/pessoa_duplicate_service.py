@@ -146,6 +146,21 @@ def _chave_recencia_pessoa(pessoa: Any) -> tuple[datetime, int]:
     return criado_em, int(getattr(pessoa, "id", 0) or 0)
 
 
+def _decisoes_contato_mais_recente(principal: Any, duplicado: Any) -> dict[str, str]:
+    pessoa_mais_recente = max((principal, duplicado), key=_chave_recencia_pessoa)
+    origem_recente = (
+        "principal"
+        if int(getattr(pessoa_mais_recente, "id", 0) or 0)
+        == int(getattr(principal, "id", 0) or 0)
+        else "duplicado"
+    )
+    return {
+        campo: origem_recente
+        for campo in ("telefone", "celular")
+        if _valor_preenchido(getattr(pessoa_mais_recente, campo, None))
+    }
+
+
 def _normalizar_texto(valor: Any) -> str:
     texto = unicodedata.normalize("NFKD", str(valor or ""))
     texto = "".join(ch for ch in texto if not unicodedata.combining(ch))
@@ -246,17 +261,7 @@ def planejar_fusao_assistida_por_nome(
         sinais.append("nome_igual_confirmado_pelo_dono")
 
     pessoa_mais_recente = max((principal, duplicado), key=_chave_recencia_pessoa)
-    origem_recente = (
-        "principal"
-        if int(getattr(pessoa_mais_recente, "id", 0) or 0)
-        == int(getattr(principal, "id", 0) or 0)
-        else "duplicado"
-    )
-    decisoes_campos = {
-        campo: origem_recente
-        for campo in ("telefone", "celular")
-        if _valor_preenchido(getattr(pessoa_mais_recente, campo, None))
-    }
+    decisoes_campos = _decisoes_contato_mais_recente(principal, duplicado)
 
     return PlanoFusaoAssistidaNome(
         elegivel=not motivos,
@@ -324,12 +329,21 @@ def avaliar_par_duplicidade_pessoas(
     if not chave_a or chave_a != chave_b:
         motivos.append("nome_diferente")
 
+    conflitos_bloqueantes = {
+        motivo
+        for motivo in motivos
+        if motivo.endswith("_conflitante") or motivo == "contas_app_diferentes"
+    }
+    if "cpf" in sinais:
+        # CPF valido igual identifica a mesma pessoa mesmo quando nome ou contatos
+        # foram atualizados. Outros documentos e contas de app distintas continuam
+        # protegidos para evitar perda de identidade ou de acesso.
+        conflitos_bloqueantes.difference_update(
+            {"email_conflitante", "telefone_conflitante", "celular_conflitante"}
+        )
+
     return DecisaoDuplicidadePessoa(
-        pode_fundir_automaticamente=bool(sinais)
-        and not any(
-            motivo.endswith("_conflitante") or motivo == "contas_app_diferentes"
-            for motivo in motivos
-        ),
+        pode_fundir_automaticamente=bool(sinais) and not conflitos_bloqueantes,
         motivos_bloqueio=motivos,
         chave_nome=chave_a,
         sinais_confirmacao=sinais,
@@ -647,17 +661,30 @@ def executar_fusoes_automaticas_pessoas_duplicadas(
                 continue
 
             try:
+                fusao_por_cpf = "cpf" in decisao.sinais_confirmacao
                 resultado = executar_fusao_pessoas(
                     db,
                     tenant_id=tenant_id,
                     principal_id=principal.id,
                     duplicado_id=duplicado.id,
-                    decisoes_campos={},
+                    decisoes_campos=(
+                        _decisoes_contato_mais_recente(principal, duplicado)
+                        if fusao_por_cpf
+                        else {}
+                    ),
                     user_id=user_id,
                     observacao=(
-                        "Fusao automatica por identidade forte valida e sem conflitos."
+                        "Fusao automatica por CPF valido igual; contato do cadastro "
+                        "mais recente."
+                        if fusao_por_cpf
+                        else "Fusao automatica por identidade forte valida e sem "
+                        "conflitos."
                     ),
-                    modo="automatica_identidade_forte",
+                    modo=(
+                        "automatica_cpf"
+                        if fusao_por_cpf
+                        else "automatica_identidade_forte"
+                    ),
                     motivo=",".join(decisao.sinais_confirmacao),
                 )
                 principal = (
