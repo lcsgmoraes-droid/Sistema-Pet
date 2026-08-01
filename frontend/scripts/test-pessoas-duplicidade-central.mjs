@@ -27,6 +27,7 @@ assert.match(central, /Revisar selecionados/);
 assert.match(central, /onMudarPagina/);
 assert.match(central, /Fundir com evidência segura/);
 assert.match(apiClientes, /fundir-assistidas-nome/);
+assert.match(apiClientes, /timeout:\s*120000/);
 assert.match(fusao, /await onSuccess/);
 assert.match(fusao, /deveFechar/);
 
