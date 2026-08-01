@@ -189,9 +189,12 @@ def _mesmo_endereco(pessoa_a: Any, pessoa_b: Any) -> bool:
 
 
 def planejar_fusao_assistida_por_nome(
-    principal: Any, duplicado: Any
+    principal: Any,
+    duplicado: Any,
+    *,
+    aceitar_nome_igual: bool = False,
 ) -> PlanoFusaoAssistidaNome:
-    """Planeja fusao conservadora: nome igual mais uma evidencia secundaria."""
+    """Planeja fusao por nome, preservando bloqueios objetivos de identidade."""
 
     decisao_base = avaliar_par_duplicidade_pessoas(principal, duplicado)
     motivos = [
@@ -237,8 +240,10 @@ def planejar_fusao_assistida_por_nome(
 
     sinais = list(dict.fromkeys(sinais))
     motivos = list(dict.fromkeys(motivos))
-    if not sinais:
+    if not sinais and not aceitar_nome_igual:
         motivos.append("sem_evidencia_secundaria_compartilhada")
+    elif not sinais:
+        sinais.append("nome_igual_confirmado_pelo_dono")
 
     pessoa_mais_recente = max((principal, duplicado), key=_chave_recencia_pessoa)
     origem_recente = (
@@ -470,9 +475,10 @@ def executar_fusoes_assistidas_pessoas_por_nome(
     tenant_id: Any,
     user_id: int,
     confirmar: bool = False,
+    aceitar_nome_igual: bool = False,
     limit: int = 200,
 ) -> dict[str, Any]:
-    """Simula ou executa fusoes com nome igual e evidencia secundaria segura."""
+    """Simula ou executa fusoes por nome, mantendo conflitos objetivos bloqueados."""
 
     pessoas = (
         db.query(Cliente)
@@ -495,7 +501,11 @@ def executar_fusoes_assistidas_pessoas_por_nome(
         )
 
         for duplicado in duplicados:
-            plano = planejar_fusao_assistida_por_nome(principal, duplicado)
+            plano = planejar_fusao_assistida_por_nome(
+                principal,
+                duplicado,
+                aceitar_nome_igual=aceitar_nome_igual,
+            )
             item = {
                 "chave_nome": chave_nome,
                 "principal": _resumo_sugestao(principal),
@@ -523,10 +533,17 @@ def executar_fusoes_assistidas_pessoas_por_nome(
                     decisoes_campos=plano.decisoes_campos,
                     user_id=user_id,
                     observacao=(
-                        "Fusao assistida por nome normalizado igual e evidencia "
+                        "Fusao em lote por nome normalizado igual, confirmada pelo dono; "
+                        "telefone do cadastro mais recente."
+                        if aceitar_nome_igual
+                        else "Fusao assistida por nome normalizado igual e evidencia "
                         "secundaria compartilhada; telefone do cadastro mais recente."
                     ),
-                    modo="assistida_nome_recente",
+                    modo=(
+                        "nome_igual_confirmado"
+                        if aceitar_nome_igual
+                        else "assistida_nome_recente"
+                    ),
                     motivo=",".join(plano.sinais_confirmacao),
                 )
                 principal = (
@@ -559,6 +576,7 @@ def executar_fusoes_assistidas_pessoas_por_nome(
         "total_elegiveis": len(elegiveis),
         "total_bloqueadas": len(bloqueadas),
         "total_fundidas": len(fusoes),
+        "aceitar_nome_igual": aceitar_nome_igual,
         "limit": limit,
     }
 

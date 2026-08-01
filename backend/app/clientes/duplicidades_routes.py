@@ -345,7 +345,7 @@ def executar_fusoes_assistidas_pessoas_por_nome_route(
     db: Session = Depends(get_session),
     user_and_tenant=Depends(get_current_user_and_tenant),
 ):
-    """Simula ou aplica fusoes por nome com evidencia secundaria e trilha auditavel."""
+    """Simula ou aplica fusoes por nome confirmadas pelo dono, com auditoria."""
     current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
     _exigir_dono_tenant(
         db,
@@ -359,6 +359,7 @@ def executar_fusoes_assistidas_pessoas_por_nome_route(
             tenant_id=tenant_id,
             user_id=current_user.id,
             confirmar=payload.confirmar,
+            aceitar_nome_igual=payload.aceitar_nome_igual,
             limit=payload.limit,
         )
     except Exception as exc:

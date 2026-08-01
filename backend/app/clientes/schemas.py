@@ -545,6 +545,7 @@ class PessoaFusaoExecutarRequest(PessoaFusaoPreviewRequest):
 
 class PessoaFusaoAssistidaNomeRequest(BaseModel):
     confirmar: bool = False
+    aceitar_nome_igual: bool = False
     limit: int = Field(default=200, ge=1, le=200)
 
 

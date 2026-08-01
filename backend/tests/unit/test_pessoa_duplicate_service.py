@@ -203,6 +203,51 @@ def test_fusao_assistida_nao_usa_apenas_nome_igual_com_telefones_diferentes():
     assert "sem_evidencia_secundaria_compartilhada" in plano.motivos_bloqueio
 
 
+def test_fusao_por_nome_confirmada_pelo_dono_aceita_telefones_diferentes():
+    pessoa_a = _pessoa(id=10, nome="Amanda Silva", celular="18999990000")
+    pessoa_b = _pessoa(
+        id=20,
+        nome="Amanda Silva",
+        celular="18988880000",
+        created_at=datetime(2026, 2, 1, tzinfo=timezone.utc),
+    )
+
+    plano = planejar_fusao_assistida_por_nome(
+        pessoa_a,
+        pessoa_b,
+        aceitar_nome_igual=True,
+    )
+
+    assert plano.elegivel is True
+    assert plano.decisoes_campos["celular"] == "duplicado"
+    assert "nome_igual_confirmado_pelo_dono" in plano.sinais_confirmacao
+
+
+def test_fusao_por_nome_confirmada_mantem_conflitos_objetivos_bloqueados():
+    pessoa_a = _pessoa(
+        id=10,
+        nome="Pessoa Completa",
+        cpf="52998224725",
+        auth_user_id=100,
+    )
+    pessoa_b = _pessoa(
+        id=20,
+        nome="Pessoa Completa",
+        cpf="16899535009",
+        auth_user_id=200,
+    )
+
+    plano = planejar_fusao_assistida_por_nome(
+        pessoa_a,
+        pessoa_b,
+        aceitar_nome_igual=True,
+    )
+
+    assert plano.elegivel is False
+    assert "cpf_conflitante" in plano.motivos_bloqueio
+    assert "contas_app_diferentes" in plano.motivos_bloqueio
+
+
 def test_fusao_assistida_bloqueia_email_e_data_nascimento_conflitantes():
     pessoa_a = _pessoa(
         id=10,
