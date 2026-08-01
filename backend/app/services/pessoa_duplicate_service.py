@@ -277,10 +277,17 @@ def _pares_candidatos(pessoas: list[Cliente]) -> list[tuple[Cliente, Cliente]]:
     return list(pares.values())
 
 
+def _paginar_sugestoes(itens: list[Any], *, skip: int, limit: int) -> list[Any]:
+    inicio = max(int(skip or 0), 0)
+    fim = inicio + max(int(limit or 0), 0)
+    return itens[inicio:fim]
+
+
 def listar_sugestoes_duplicidade_pessoas(
     db: Session,
     *,
     tenant_id: Any,
+    skip: int = 0,
     limit: int = 50,
 ) -> dict[str, Any]:
     pessoas = (
@@ -308,11 +315,15 @@ def listar_sugestoes_duplicidade_pessoas(
         else:
             sugestoes.append(item)
 
+    inicio = max(int(skip or 0), 0)
+
     return {
-        "sugestoes": sugestoes[:limit],
+        "sugestoes": _paginar_sugestoes(sugestoes, skip=inicio, limit=limit),
         "total": len(sugestoes),
-        "automaticas": automaticas[:limit],
+        "automaticas": _paginar_sugestoes(automaticas, skip=inicio, limit=limit),
         "total_automaticas": len(automaticas),
+        "skip": inicio,
+        "limit": limit,
     }
 
 

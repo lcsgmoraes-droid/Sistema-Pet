@@ -151,8 +151,8 @@ export default function PessoasFusaoModal({
           ? `Pessoas fundidas com sucesso. Auditoria #${data.merge_log_id}.`
           : "Pessoas fundidas com sucesso.",
       );
-      onSuccess?.();
-      onClose?.();
+      const deveFechar = (await onSuccess?.(data)) !== false;
+      if (deveFechar) onClose?.();
     } catch (error) {
       toast.error(error?.response?.data?.detail || "Erro ao fundir pessoas.");
     } finally {
