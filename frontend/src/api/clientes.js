@@ -78,3 +78,7 @@ export const buscarSugestoesDuplicidadePessoas = (params = {}) => {
 export const executarFusoesAutomaticasPessoas = () => {
   return api.post("/clientes/duplicidades/fundir-automaticas");
 };
+
+export const executarFusoesAssistidasPessoasPorNome = (data = { confirmar: false }) => {
+  return api.post("/clientes/duplicidades/fundir-assistidas-nome", data);
+};

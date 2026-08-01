@@ -543,6 +543,11 @@ class PessoaFusaoExecutarRequest(PessoaFusaoPreviewRequest):
     observacao: Optional[str] = None
 
 
+class PessoaFusaoAssistidaNomeRequest(BaseModel):
+    confirmar: bool = False
+    limit: int = Field(default=200, ge=1, le=200)
+
+
 class ToggleParceiroRequest(BaseModel):
     """Request para ativar/desativar parceiro"""
 

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from typing import Any, Iterable
 import logging
 import re
@@ -44,6 +45,15 @@ class DecisaoDuplicidadePessoa:
     motivos_bloqueio: list[str]
     chave_nome: str
     sinais_confirmacao: list[str]
+
+
+@dataclass(frozen=True)
+class PlanoFusaoAssistidaNome:
+    elegivel: bool
+    motivos_bloqueio: list[str]
+    sinais_confirmacao: list[str]
+    decisoes_campos: dict[str, str]
+    pessoa_mais_recente_id: int
 
 
 def normalizar_nome_pessoa(nome: Any) -> str:
@@ -124,6 +134,132 @@ def _valor_preenchido(valor: Any) -> bool:
     if isinstance(valor, (list, tuple, set, dict)):
         return bool(valor)
     return True
+
+
+def _chave_recencia_pessoa(pessoa: Any) -> tuple[datetime, int]:
+    criado_em = getattr(pessoa, "created_at", None)
+    if isinstance(criado_em, datetime):
+        if criado_em.tzinfo is not None:
+            criado_em = criado_em.astimezone(timezone.utc).replace(tzinfo=None)
+    else:
+        criado_em = datetime.min
+    return criado_em, int(getattr(pessoa, "id", 0) or 0)
+
+
+def _normalizar_texto(valor: Any) -> str:
+    texto = unicodedata.normalize("NFKD", str(valor or ""))
+    texto = "".join(ch for ch in texto if not unicodedata.combining(ch))
+    return " ".join(texto.casefold().split())
+
+
+def _telefones_normalizados(pessoa: Any) -> set[str]:
+    return {
+        valor
+        for campo in ("telefone", "celular")
+        if (valor := _normalizar_valor_identidade(campo, getattr(pessoa, campo, None)))
+    }
+
+
+def _mesma_data_nascimento(pessoa_a: Any, pessoa_b: Any) -> bool:
+    data_a = getattr(pessoa_a, "data_nascimento", None)
+    data_b = getattr(pessoa_b, "data_nascimento", None)
+    return bool(data_a and data_b and str(data_a) == str(data_b))
+
+
+def _mesmo_endereco(pessoa_a: Any, pessoa_b: Any) -> bool:
+    cep_a = _normalizar_valor_identidade("telefone", getattr(pessoa_a, "cep", None))
+    cep_b = _normalizar_valor_identidade("telefone", getattr(pessoa_b, "cep", None))
+    numero_a = _normalizar_texto(getattr(pessoa_a, "numero", None))
+    numero_b = _normalizar_texto(getattr(pessoa_b, "numero", None))
+    if cep_a and cep_a == cep_b and numero_a and numero_a == numero_b:
+        return True
+
+    endereco_a = _normalizar_texto(getattr(pessoa_a, "endereco", None))
+    endereco_b = _normalizar_texto(getattr(pessoa_b, "endereco", None))
+    cidade_a = _normalizar_texto(getattr(pessoa_a, "cidade", None))
+    cidade_b = _normalizar_texto(getattr(pessoa_b, "cidade", None))
+    return bool(
+        endereco_a
+        and endereco_a == endereco_b
+        and numero_a
+        and numero_a == numero_b
+        and cidade_a
+        and cidade_a == cidade_b
+    )
+
+
+def planejar_fusao_assistida_por_nome(
+    principal: Any, duplicado: Any
+) -> PlanoFusaoAssistidaNome:
+    """Planeja fusao conservadora: nome igual mais uma evidencia secundaria."""
+
+    decisao_base = avaliar_par_duplicidade_pessoas(principal, duplicado)
+    motivos = [
+        motivo
+        for motivo in decisao_base.motivos_bloqueio
+        if motivo
+        in {
+            "cpf_conflitante",
+            "cnpj_conflitante",
+            "crmv_conflitante",
+            "email_conflitante",
+            "contas_app_diferentes",
+            "nome_diferente",
+        }
+    ]
+    sinais = list(decisao_base.sinais_confirmacao)
+
+    email_principal = _normalizar_valor_identidade(
+        "email", getattr(principal, "email", None)
+    )
+    email_duplicado = _normalizar_valor_identidade(
+        "email", getattr(duplicado, "email", None)
+    )
+    if email_principal and email_principal == email_duplicado:
+        sinais.append("email")
+
+    if _telefones_normalizados(principal) & _telefones_normalizados(duplicado):
+        sinais.append("telefone_compartilhado")
+
+    data_principal = getattr(principal, "data_nascimento", None)
+    data_duplicado = getattr(duplicado, "data_nascimento", None)
+    if (
+        data_principal
+        and data_duplicado
+        and not _mesma_data_nascimento(principal, duplicado)
+    ):
+        motivos.append("data_nascimento_conflitante")
+    elif _mesma_data_nascimento(principal, duplicado):
+        sinais.append("data_nascimento")
+
+    if _mesmo_endereco(principal, duplicado):
+        sinais.append("endereco")
+
+    sinais = list(dict.fromkeys(sinais))
+    motivos = list(dict.fromkeys(motivos))
+    if not sinais:
+        motivos.append("sem_evidencia_secundaria_compartilhada")
+
+    pessoa_mais_recente = max((principal, duplicado), key=_chave_recencia_pessoa)
+    origem_recente = (
+        "principal"
+        if int(getattr(pessoa_mais_recente, "id", 0) or 0)
+        == int(getattr(principal, "id", 0) or 0)
+        else "duplicado"
+    )
+    decisoes_campos = {
+        campo: origem_recente
+        for campo in ("telefone", "celular")
+        if _valor_preenchido(getattr(pessoa_mais_recente, campo, None))
+    }
+
+    return PlanoFusaoAssistidaNome(
+        elegivel=not motivos,
+        motivos_bloqueio=motivos,
+        sinais_confirmacao=sinais,
+        decisoes_campos=decisoes_campos,
+        pessoa_mais_recente_id=int(getattr(pessoa_mais_recente, "id", 0) or 0),
+    )
 
 
 def _score_completude(pessoa: Any) -> int:
@@ -237,6 +373,7 @@ def _resumo_sugestao(pessoa: Cliente) -> dict[str, Any]:
         "telefone": pessoa.celular or pessoa.telefone,
         "ativo": pessoa.ativo,
         "auth_user_id": getattr(pessoa, "auth_user_id", None),
+        "created_at": getattr(pessoa, "created_at", None),
     }
 
 
@@ -323,6 +460,105 @@ def listar_sugestoes_duplicidade_pessoas(
         "automaticas": _paginar_sugestoes(automaticas, skip=inicio, limit=limit),
         "total_automaticas": len(automaticas),
         "skip": inicio,
+        "limit": limit,
+    }
+
+
+def executar_fusoes_assistidas_pessoas_por_nome(
+    db: Session,
+    *,
+    tenant_id: Any,
+    user_id: int,
+    confirmar: bool = False,
+    limit: int = 200,
+) -> dict[str, Any]:
+    """Simula ou executa fusoes com nome igual e evidencia secundaria segura."""
+
+    pessoas = (
+        db.query(Cliente)
+        .filter(Cliente.tenant_id == tenant_id)
+        .filter(Cliente.ativo.is_not(False))
+        .filter(func.length(func.trim(func.coalesce(Cliente.nome, ""))) > 0)
+        .order_by(Cliente.nome.asc(), Cliente.id.asc())
+        .all()
+    )
+    grupos = _grupos_por_nome_normalizado(pessoas)
+    elegiveis: list[dict[str, Any]] = []
+    bloqueadas: list[dict[str, Any]] = []
+    fusoes: list[dict[str, Any]] = []
+
+    for chave_nome, grupo in grupos.items():
+        principal = escolher_pessoa_principal(grupo)
+        duplicados = sorted(
+            (pessoa for pessoa in grupo if int(pessoa.id) != int(principal.id)),
+            key=_chave_recencia_pessoa,
+        )
+
+        for duplicado in duplicados:
+            plano = planejar_fusao_assistida_por_nome(principal, duplicado)
+            item = {
+                "chave_nome": chave_nome,
+                "principal": _resumo_sugestao(principal),
+                "duplicado": _resumo_sugestao(duplicado),
+                "pessoa_mais_recente_id": plano.pessoa_mais_recente_id,
+                "sinais": plano.sinais_confirmacao,
+                "decisoes_campos": plano.decisoes_campos,
+            }
+            if not plano.elegivel:
+                bloqueadas.append({**item, "motivos": plano.motivos_bloqueio})
+                continue
+            if len(elegiveis) >= limit:
+                continue
+
+            elegiveis.append(item)
+            if not confirmar:
+                continue
+
+            try:
+                resultado = executar_fusao_pessoas(
+                    db,
+                    tenant_id=tenant_id,
+                    principal_id=principal.id,
+                    duplicado_id=duplicado.id,
+                    decisoes_campos=plano.decisoes_campos,
+                    user_id=user_id,
+                    observacao=(
+                        "Fusao assistida por nome normalizado igual e evidencia "
+                        "secundaria compartilhada; telefone do cadastro mais recente."
+                    ),
+                    modo="assistida_nome_recente",
+                    motivo=",".join(plano.sinais_confirmacao),
+                )
+                principal = (
+                    db.query(Cliente)
+                    .filter(
+                        Cliente.tenant_id == tenant_id,
+                        Cliente.id == resultado["principal"]["id"],
+                    )
+                    .first()
+                    or principal
+                )
+                fusoes.append(
+                    {
+                        **item,
+                        "principal": resultado["principal"],
+                        "duplicado_inativado": resultado["duplicado_inativado"],
+                        "merge_log_id": resultado.get("merge_log_id"),
+                    }
+                )
+            except Exception as exc:
+                db.rollback()
+                logger.exception("Erro na fusao assistida de pessoas por nome")
+                bloqueadas.append({**item, "motivos": [f"erro_fusao: {exc}"]})
+
+    return {
+        "simulacao": not confirmar,
+        "elegiveis": elegiveis,
+        "bloqueadas": bloqueadas,
+        "fusoes": fusoes,
+        "total_elegiveis": len(elegiveis),
+        "total_bloqueadas": len(bloqueadas),
+        "total_fundidas": len(fusoes),
         "limit": limit,
     }
 

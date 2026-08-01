@@ -9,11 +9,12 @@ from sqlalchemy.orm import Session
 
 from app.auth.dependencies import get_current_user_and_tenant
 from app.db import get_session
-from app.models import Cliente, PessoaMergeLog
+from app.models import Cliente, PessoaMergeLog, Role, UserTenant
 from app.clientes.common import _somente_digitos_coluna
 from app.security.permissions_decorator import require_permission
 from app.services.pessoa_duplicate_service import (
     executar_fusoes_automaticas_pessoas_duplicadas,
+    executar_fusoes_assistidas_pessoas_por_nome,
     listar_sugestoes_duplicidade_pessoas,
 )
 from app.services.pessoa_merge_service import (
@@ -21,6 +22,7 @@ from app.services.pessoa_merge_service import (
     montar_preview_fusao_pessoas,
 )
 from app.clientes.schemas import (
+    PessoaFusaoAssistidaNomeRequest,
     PessoaFusaoExecutarRequest,
     PessoaFusaoPreviewRequest,
 )
@@ -32,6 +34,30 @@ router = APIRouter()
 def _validar_tenant_e_obter_usuario(user_and_tenant):
     current_user, tenant_id = user_and_tenant
     return current_user, tenant_id
+
+
+def _exigir_dono_tenant(
+    db: Session, *, user_id: int, tenant_id, is_admin: bool = False
+) -> None:
+    if is_admin:
+        return
+    vinculo_dono = (
+        db.query(UserTenant.id)
+        .join(Role, Role.id == UserTenant.role_id)
+        .filter(
+            UserTenant.user_id == user_id,
+            UserTenant.tenant_id == tenant_id,
+            UserTenant.is_active.is_(True),
+            Role.tenant_id == tenant_id,
+            func.lower(Role.name) == "owner",
+        )
+        .first()
+    )
+    if not vinculo_dono:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Somente o dono do sistema pode executar fusoes assistidas em lote.",
+        )
 
 
 def _igual_normalizado(campo, valor: str):
@@ -310,6 +336,38 @@ def listar_historico_fusoes_pessoas_route(
             for item in logs
         ]
     }
+
+
+@router.post("/duplicidades/fundir-assistidas-nome")
+@require_permission("clientes.editar")
+def executar_fusoes_assistidas_pessoas_por_nome_route(
+    payload: PessoaFusaoAssistidaNomeRequest,
+    db: Session = Depends(get_session),
+    user_and_tenant=Depends(get_current_user_and_tenant),
+):
+    """Simula ou aplica fusoes por nome com evidencia secundaria e trilha auditavel."""
+    current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
+    _exigir_dono_tenant(
+        db,
+        user_id=current_user.id,
+        tenant_id=tenant_id,
+        is_admin=bool(getattr(current_user, "is_admin", False)),
+    )
+    try:
+        return executar_fusoes_assistidas_pessoas_por_nome(
+            db,
+            tenant_id=tenant_id,
+            user_id=current_user.id,
+            confirmar=payload.confirmar,
+            limit=payload.limit,
+        )
+    except Exception as exc:
+        db.rollback()
+        logger.exception("Erro na fusao assistida de pessoas por nome")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Erro ao processar fusoes assistidas: {str(exc)}",
+        )
 
 
 @router.post("/duplicidades/fundir-automaticas")
