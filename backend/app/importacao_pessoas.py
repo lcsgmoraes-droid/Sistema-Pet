@@ -8,6 +8,7 @@ from openpyxl import Workbook, load_workbook
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 import io
 
+from .clientes.common import gerar_codigo_cliente
 from .models import Cliente
 from .db import get_session as get_db
 from .auth import get_current_user, get_current_user_and_tenant
@@ -383,9 +384,15 @@ async def importar_pessoas(
                     )
                 else:
                     # Criar novo
+                    codigo_pessoa = str(codigo or "").strip() or gerar_codigo_cliente(
+                        db,
+                        tipo_cadastro,
+                        tipo_pessoa,
+                        tenant_id,
+                    )
                     nova_pessoa = Cliente(
                         tenant_id=tenant_id,
-                        codigo=str(codigo).strip() if codigo else None,
+                        codigo=codigo_pessoa,
                         tipo_cadastro=tipo_cadastro,
                         tipo_pessoa=tipo_pessoa,
                         nome=str(nome).strip(),

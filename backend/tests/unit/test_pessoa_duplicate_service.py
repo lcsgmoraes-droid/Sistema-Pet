@@ -11,6 +11,7 @@ from app.services.pessoa_duplicate_service import (
     avaliar_par_duplicidade_pessoas,
     escolher_pessoa_principal,
     executar_fusoes_assistidas_pessoas_por_nome,
+    executar_fusoes_automaticas_pessoas_duplicadas,
     normalizar_nome_pessoa,
     planejar_fusao_assistida_por_nome,
 )
@@ -73,6 +74,31 @@ def test_avaliar_par_permite_fusao_automatica_com_cpf_valido_igual():
     assert decisao.sinais_confirmacao == ["cpf"]
 
 
+def test_cpf_valido_igual_prevalece_sobre_nome_email_e_telefone_atualizados():
+    principal = _pessoa(
+        id=10,
+        nome="Maria Dileuza da Silva",
+        cpf="032.398.568-83",
+        email="maria-antigo@example.com",
+        telefone="18981661691",
+    )
+    duplicado = _pessoa(
+        id=11,
+        nome="Gleison Luiz da Silva Dias",
+        cpf="03239856883",
+        email="contato-novo@example.com",
+        telefone="18996685632",
+    )
+
+    decisao = avaliar_par_duplicidade_pessoas(principal, duplicado)
+
+    assert decisao.pode_fundir_automaticamente is True
+    assert decisao.sinais_confirmacao == ["cpf"]
+    assert "nome_diferente" in decisao.motivos_bloqueio
+    assert "email_conflitante" in decisao.motivos_bloqueio
+    assert "telefone_conflitante" in decisao.motivos_bloqueio
+
+
 def test_avaliar_par_permite_fusao_automatica_com_cnpj_valido_igual():
     principal = _pessoa(id=10, nome="Fornecedor A", cnpj="11.222.333/0001-81")
     duplicado = _pessoa(id=11, nome="Fornecedor A", cnpj="11222333000181")
@@ -120,6 +146,67 @@ def test_avaliar_par_bloqueia_contas_app_diferentes_mesmo_com_cpf_igual():
 
     assert decisao.pode_fundir_automaticamente is False
     assert "contas_app_diferentes" in decisao.motivos_bloqueio
+
+
+def test_fusao_automatica_por_cpf_usa_contato_do_cadastro_mais_recente(monkeypatch):
+    antigo = _pessoa(
+        id=10,
+        nome="Maria Dileuza da Silva",
+        cpf="032.398.568-83",
+        telefone="18981661691",
+        created_at=datetime(2025, 1, 1, tzinfo=timezone.utc),
+    )
+    recente = _pessoa(
+        id=20,
+        nome="Gleison Luiz da Silva Dias",
+        cpf="03239856883",
+        telefone="18996685632",
+        created_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
+    )
+    chamadas = []
+
+    class QueryFake:
+        def filter(self, *_args, **_kwargs):
+            return self
+
+        def order_by(self, *_args, **_kwargs):
+            return self
+
+        def all(self):
+            return [antigo, recente]
+
+        def first(self):
+            return antigo
+
+    class DbFake:
+        def query(self, *_args, **_kwargs):
+            return QueryFake()
+
+        def rollback(self):
+            raise AssertionError("a fusao segura nao deveria executar rollback")
+
+    def fake_executar_fusao(*_args, **kwargs):
+        chamadas.append(kwargs)
+        return {
+            "principal": {"id": antigo.id},
+            "duplicado_inativado": {"id": recente.id},
+            "merge_log_id": 42,
+        }
+
+    monkeypatch.setattr(
+        "app.services.pessoa_duplicate_service.executar_fusao_pessoas",
+        fake_executar_fusao,
+    )
+
+    resultado = executar_fusoes_automaticas_pessoas_duplicadas(
+        DbFake(),
+        tenant_id="tenant-teste",
+        user_id=7,
+    )
+
+    assert resultado["total_automaticas"] == 1
+    assert chamadas[0]["modo"] == "automatica_cpf"
+    assert chamadas[0]["decisoes_campos"] == {"telefone": "duplicado"}
 
 
 def test_escolher_pessoa_principal_prefere_funcionario_ativo_ao_cliente_ativo():

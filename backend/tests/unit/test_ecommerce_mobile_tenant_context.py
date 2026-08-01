@@ -389,6 +389,95 @@ def test_get_or_create_cliente_for_user_sets_tenant_context_before_query():
     assert get_current_tenant() == tenant_id
 
 
+def test_get_or_create_cliente_for_user_generates_code_for_new_app_customer(
+    monkeypatch,
+):
+    tenant_id = uuid4()
+    user = SimpleNamespace(
+        id=123,
+        tenant_id=tenant_id,
+        is_active=True,
+        cpf_cnpj="52998224725",
+        email="novo-app@example.com",
+        telefone="18999990000",
+        nome="Cliente Novo App",
+    )
+
+    class EmptyDb:
+        def __init__(self):
+            self.added = []
+            self.flushed = False
+
+        def query(self, *_args, **_kwargs):
+            return _Query([])
+
+        def add(self, item):
+            self.added.append(item)
+
+        def flush(self):
+            self.flushed = True
+
+    db = EmptyDb()
+    monkeypatch.setattr(
+        "app.routes.ecommerce_auth_cliente._find_operational_cliente_match",
+        lambda *_args, **_kwargs: None,
+    )
+    monkeypatch.setattr(
+        "app.routes.ecommerce_auth_cliente._find_cliente_match",
+        lambda *_args, **_kwargs: None,
+    )
+    monkeypatch.setattr(
+        "app.routes.ecommerce_auth_cliente.gerar_codigo_cliente",
+        lambda *_args, **_kwargs: "10177",
+    )
+
+    result = _get_or_create_cliente_for_user(db, user)
+
+    assert result.codigo == "10177"
+    assert result.auth_user_id == user.id
+    assert db.added == [result]
+    assert db.flushed is True
+
+
+def test_get_or_create_cliente_for_user_reuses_existing_valid_cpf_with_changed_data():
+    tenant_id = uuid4()
+    user = SimpleNamespace(
+        id=123,
+        tenant_id=tenant_id,
+        is_active=True,
+        cpf_cnpj="03239856883",
+        email="novo-email@example.com",
+        telefone="18999990000",
+        nome="Nome Atualizado",
+    )
+    existing = SimpleNamespace(
+        id=456,
+        codigo="10013",
+        tenant_id=str(tenant_id),
+        user_id=999,
+        auth_user_id=None,
+        cpf="032.398.568-83",
+        email="email-antigo@example.com",
+        telefone="18981661691",
+        celular=None,
+        nome="Nome Antigo",
+        tipo_cadastro="cliente",
+        ativo=True,
+        is_entregador=False,
+    )
+    clear_current_tenant()
+
+    result = _get_or_create_cliente_for_user(
+        _Db([], [], [], [existing]),
+        user,
+    )
+
+    assert result is existing
+    assert result.auth_user_id == user.id
+    assert result.codigo == "10013"
+    assert get_current_tenant() == tenant_id
+
+
 def test_registrar_push_token_sets_tenant_context_before_device_queries():
     tenant_id = uuid4()
     user = SimpleNamespace(
