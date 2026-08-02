@@ -27,6 +27,7 @@ from app.tenancy.context import (
 )
 
 
+# Mantido por compatibilidade com imports antigos; carrinhos nao expiram mais.
 RESERVA_EXPIRACAO_CARRINHO_MINUTOS = 30
 RESERVA_EXPIRACAO_PENDENTE_MINUTOS = 60
 FORMAS_PAGAMENTO_ONLINE = ("pix", "cartao_debito", "cartao_credito")
@@ -253,21 +254,11 @@ def _buscar_itens(db: Session, pedido_id: str) -> list[PedidoItem]:
 
 def _expirar_reservas_automaticamente(db: Session, tenant_id: str) -> None:
     agora = datetime.utcnow()
-    limite_carrinho = agora - timedelta(minutes=RESERVA_EXPIRACAO_CARRINHO_MINUTOS)
     limite_pendente = agora - timedelta(minutes=RESERVA_EXPIRACAO_PENDENTE_MINUTOS)
 
-    carrinhos_expirados = (
-        db.query(Pedido)
-        .filter(
-            Pedido.tenant_id == tenant_id,
-            Pedido.status == "carrinho",
-            Pedido.created_at < limite_carrinho,
-        )
-        .all()
-    )
-    for pedido in carrinhos_expirados:
-        pedido.status = "expirado"
-
+    # Carrinhos nao reservam estoque e devem permanecer disponiveis quando o
+    # cliente fecha e reabre o app. Somente pedidos enviados ao pagamento
+    # possuem expiracao operacional.
     pendentes_expirados = (
         db.query(Pedido)
         .filter(
@@ -280,7 +271,7 @@ def _expirar_reservas_automaticamente(db: Session, tenant_id: str) -> None:
     for pedido in pendentes_expirados:
         pedido.status = "cancelado"
 
-    if carrinhos_expirados or pendentes_expirados:
+    if pendentes_expirados:
         db.flush()
 
 

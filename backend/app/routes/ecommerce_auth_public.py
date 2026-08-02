@@ -3,7 +3,7 @@ import re
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
-from app.auth import create_access_token, hash_password, verify_password
+from app.auth import hash_password, verify_password
 from app.db import get_session
 from app.models import User
 from app.routes.ecommerce_auth_cliente import (
@@ -11,8 +11,10 @@ from app.routes.ecommerce_auth_cliente import (
     _get_or_create_cliente_for_user,
 )
 from app.routes.ecommerce_auth_common import (
+    _create_ecommerce_session_tokens,
     _ensure_active_store_access,
     _extract_tenant_id_from_request,
+    _refresh_ecommerce_session,
 )
 from app.routes.ecommerce_auth_profiles import _serialize_profile
 from app.routes.ecommerce_auth_recovery import (
@@ -23,6 +25,7 @@ from app.routes.ecommerce_auth_recovery import (
 )
 from app.routes.ecommerce_auth_schemas import (
     EcommerceLoginRequest,
+    EcommerceRefreshRequest,
     EcommerceRegisterRequest,
 )
 from app.routes.ecommerce_auth_settings import EMAIL_VERIFICATION_REQUIRED
@@ -151,19 +154,10 @@ def registrar_cliente(
             "user": _serialize_profile(user, cliente, db),
         }
 
-    access_token = create_access_token(
-        data={
-            "sub": str(user.id),
-            "email": user.email,
-            "token_type": "ecommerce_customer",
-        },
-        tenant_id=str(tenant_id),
-        role="customer",
-    )
+    auth_payload = _create_ecommerce_session_tokens(db, user, str(tenant_id), request)
 
     return {
-        "access_token": access_token,
-        "token_type": "bearer",
+        **auth_payload,
         "user": _serialize_profile(user, cliente, db),
     }
 
@@ -211,21 +205,20 @@ def login_cliente(
     register_successful_login(db, user, request)
     db.commit()
 
-    access_token = create_access_token(
-        data={
-            "sub": str(user.id),
-            "email": user.email,
-            "token_type": "ecommerce_customer",
-        },
-        tenant_id=str(tenant_id),
-        role="customer",
-    )
+    auth_payload = _create_ecommerce_session_tokens(db, user, str(tenant_id), request)
 
     cliente = _get_or_create_cliente_for_user(db, user)
     db.commit()
 
     return {
-        "access_token": access_token,
-        "token_type": "bearer",
+        **auth_payload,
         "user": _serialize_profile(user, cliente, db),
     }
+
+
+@router.post("/refresh")
+def refresh_customer_session(
+    payload: EcommerceRefreshRequest,
+    db: Session = Depends(get_session),
+):
+    return _refresh_ecommerce_session(payload.refresh_token, db)
