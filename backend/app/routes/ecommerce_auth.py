@@ -29,6 +29,9 @@ from app.routes.ecommerce_auth_cliente import (
     transferir_referencias_pessoa,
 )
 from app.routes.ecommerce_auth_common import (
+    _create_ecommerce_session_tokens,
+    _create_ecommerce_token_pair,
+    _ecommerce_auth_payload,
     _activate_user_tenant_context,
     _align_reference_datetime,
     _cashback_disponivel_clause,
@@ -40,6 +43,7 @@ from app.routes.ecommerce_auth_common import (
     _is_expired_or_equal,
     _normalize_tenant_uuid,
     _remaining_days_until,
+    _refresh_ecommerce_session,
     _tenant_status_is_active,
     security,
 )
@@ -50,7 +54,11 @@ from app.routes.ecommerce_auth_profiles import (
     obter_perfil,
     selecionar_perfil_app,
 )
-from app.routes.ecommerce_auth_public import login_cliente, registrar_cliente
+from app.routes.ecommerce_auth_public import (
+    login_cliente,
+    refresh_customer_session,
+    registrar_cliente,
+)
 from app.routes.ecommerce_auth_recovery import (
     _build_email_verification_link,
     _build_reset_password_email_for_app,
@@ -73,6 +81,7 @@ from app.routes.ecommerce_auth_schemas import (
     EcommerceForgotPasswordRequest,
     EcommerceLoginRequest,
     EcommerceProfileUpdateRequest,
+    EcommerceRefreshRequest,
     EcommerceRegisterRequest,
     EcommerceResetPasswordRequest,
     EcommerceSelectProfileRequest,
@@ -102,6 +111,7 @@ __all__ = [
     "EcommerceForgotPasswordRequest",
     "EcommerceLoginRequest",
     "EcommerceProfileUpdateRequest",
+    "EcommerceRefreshRequest",
     "EcommerceRegisterRequest",
     "EcommerceResetPasswordRequest",
     "EcommerceSelectProfileRequest",
@@ -112,9 +122,12 @@ __all__ = [
     "_build_reset_password_email_for_site",
     "_build_storefront_reset_link",
     "_cashback_disponivel_clause",
+    "_create_ecommerce_session_tokens",
+    "_create_ecommerce_token_pair",
     "_copy_missing_cliente_fields",
     "_digits_only",
     "_email_verification_block",
+    "_ecommerce_auth_payload",
     "_ensure_active_store_access",
     "_extract_ecommerce_delivery_details",
     "_extract_tenant_id_from_request",
@@ -137,6 +150,7 @@ __all__ = [
     "_now_utc",
     "_password_reset_token_matches",
     "_remaining_days_until",
+    "_refresh_ecommerce_session",
     "_resolve_password_recovery_channel",
     "_select_linked_cliente_fallback",
     "_select_preferred_cliente",
@@ -155,6 +169,7 @@ __all__ = [
     "minha_sugestao_cashback",
     "obter_perfil",
     "registrar_cliente",
+    "refresh_customer_session",
     "resetar_senha",
     "router",
     "security",

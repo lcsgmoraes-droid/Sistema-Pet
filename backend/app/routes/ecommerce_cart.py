@@ -58,6 +58,29 @@ def _activate_cart_tenant_context(identity: EcommerceIdentity) -> str:
     return str(tenant_uuid)
 
 
+def _restore_latest_expired_cart(
+    db: Session,
+    identity: EcommerceIdentity,
+    tenant_id: str,
+) -> Pedido | None:
+    expired_cart = (
+        db.query(Pedido)
+        .filter(
+            Pedido.cliente_id == identity.user_id,
+            Pedido.tenant_id == tenant_id,
+            Pedido.status == "expirado",
+        )
+        .order_by(Pedido.id.desc())
+        .first()
+    )
+    if not expired_cart:
+        return None
+
+    expired_cart.status = "carrinho"
+    db.commit()
+    return expired_cart
+
+
 def _normalize_sales_channel(raw_channel: str | None) -> str:
     return normalize_online_sales_channel(raw_channel)
 
@@ -96,6 +119,10 @@ def _find_or_create_carrinho(db: Session, identity: EcommerceIdentity) -> Pedido
 
     if carrinho:
         return carrinho
+
+    restored_cart = _restore_latest_expired_cart(db, identity, tenant_id)
+    if restored_cart:
+        return restored_cart
 
     carrinho = Pedido(
         pedido_id=str(uuid4()),
@@ -499,6 +526,9 @@ def obter_carrinho(
         .order_by(Pedido.id.desc())
         .first()
     )
+
+    if not carrinho:
+        carrinho = _restore_latest_expired_cart(db, identity, tenant_id)
 
     if not carrinho:
         return {

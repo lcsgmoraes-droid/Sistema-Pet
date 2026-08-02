@@ -1,7 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
+import {
+  clearEcommerceTokens,
+  setEcommerceTokens,
+  subscribeEcommerceSession,
+} from "../../auth/ecommerceTokenStorage";
 import ecommerceApi from "../../services/ecommerceApi";
 import {
-  STORAGE_TOKEN_KEY,
   buildCustomerProfileForm,
   extractApiErrorMessage,
   fetchAddressByCep,
@@ -258,6 +262,16 @@ export default function useEcommerceCustomer({
   }, [customerToken]);
 
   useEffect(() => {
+    return subscribeEcommerceSession((nextAccessToken) => {
+      setCustomerToken(nextAccessToken);
+      if (!nextAccessToken) {
+        setCustomer(null);
+        restoreGuestCart();
+      }
+    });
+  }, []);
+
+  useEffect(() => {
     if (!customer) return;
     setProfileForm(buildCustomerProfileForm(customer));
   }, [customer]);
@@ -274,7 +288,7 @@ export default function useEcommerceCustomer({
   function clearCustomerSession() {
     setCustomer(null);
     setCustomerToken("");
-    localStorage.removeItem(STORAGE_TOKEN_KEY);
+    clearEcommerceTokens();
   }
 
   function clearRegisterFieldError(field) {
@@ -325,7 +339,10 @@ export default function useEcommerceCustomer({
     if (response?.data?.user) {
       setCustomer(response.data.user);
     }
-    localStorage.setItem(STORAGE_TOKEN_KEY, token);
+    setEcommerceTokens({
+      accessToken: token,
+      refreshToken: response?.data?.refresh_token,
+    });
     setCustomerToken(token);
     await syncGuestCartToServer(token);
     clearRegisterUiState();
@@ -646,7 +663,10 @@ export default function useEcommerceCustomer({
       if (response?.data?.user) {
         setCustomer(response.data.user);
       }
-      localStorage.setItem(STORAGE_TOKEN_KEY, token);
+      setEcommerceTokens({
+        accessToken: token,
+        refreshToken: response?.data?.refresh_token,
+      });
       setCustomerToken(token);
       await syncGuestCartToServer(token);
       setLoginForm(EMPTY_LOGIN_FORM);
