@@ -2,6 +2,7 @@ import ConfiguracoesAlertas from "./configuracoes/ConfiguracoesAlertas";
 import ConfiguracoesHeader from "./configuracoes/ConfiguracoesHeader";
 import ConsultoriosSection from "./configuracoes/ConsultoriosSection";
 import LembretesAgendamentoSection from "./configuracoes/LembretesAgendamentoSection";
+import NfseConfigSection from "./configuracoes/NfseConfigSection";
 import ParceiroInfoBox from "./configuracoes/ParceiroInfoBox";
 import ParceirosSection from "./configuracoes/ParceirosSection";
 import { useVetConfiguracoes } from "./configuracoes/useVetConfiguracoes";
@@ -58,6 +59,8 @@ export default function VetConfiguracoes() {
         onSave={salvarLembretes}
         salvando={salvando}
       />
+
+      <NfseConfigSection />
 
       <ParceirosSection
         form={parceiroForm}

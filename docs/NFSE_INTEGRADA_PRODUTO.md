@@ -12,6 +12,17 @@ O adicional não deve ser vendido como emissão própria do CorePet. A comunica�
 
 > Emissão de NFS-e integrada ao CorePet, operada por emissor fiscal parceiro.
 
+## Piloto Maiara / Presidente Prudente
+
+Em 2026-08-03, o primeiro piloto foi definido para o tenant `Clinica Veterinaria Sao Jose`,
+em Presidente Prudente/SP. O integrador escolhido para homologação foi a Focus NFe, com o
+Simpliss como provedor municipal. Detalhes técnicos, pendências fiscais e trava de produção estão
+em `docs/NFSE_MAIARA_PILOTO.md`.
+
+O preço comercial antigo de R$ 59,90 ainda precisa ser revisto antes da contratação: o plano
+publicado pelo fornecedor para um CNPJ com NFS-e está acima desse valor. O piloto técnico não
+autoriza contratar nem subsidiar automaticamente o emissor.
+
 ## Jornada de ativação
 
 1. O cliente encontra o adicional na página de planos ou em **Meu Plano**.

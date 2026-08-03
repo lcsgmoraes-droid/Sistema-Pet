@@ -5,6 +5,7 @@ import ConsultaFinalizadaScreen from "./consultaForm/ConsultaFinalizadaScreen";
 import ConsultaFormModals from "./consultaForm/ConsultaFormModals";
 import ConsultaHeader from "./consultaForm/ConsultaHeader";
 import ConsultaReadonlyNotice from "./consultaForm/ConsultaReadonlyNotice";
+import NfseConsultaPanel from "./consultaForm/NfseConsultaPanel";
 import ConsultaSteps from "./consultaForm/ConsultaSteps";
 import { campo } from "./consultaForm/consultaCampo";
 import { ETAPAS, css } from "./consultaForm/consultaFormUtils";
@@ -26,6 +27,7 @@ export default function VetConsultaForm() {
   if (consulta.finalizado && !consulta.isEdicao) {
     return (
       <ConsultaFinalizadaScreen
+        consultaId={consulta.consultaIdAtual}
         onVerConsultas={() => consulta.navigate("/veterinario/consultas")}
         onNovaConsulta={() => consulta.navigate("/veterinario/consultas/nova")}
       />
@@ -89,6 +91,8 @@ export default function VetConsultaForm() {
           titulo="Extrato da consulta"
         />
       )}
+
+      {consulta.modoSomenteLeitura && <NfseConsultaPanel consultaId={consulta.consultaIdAtual} />}
 
       <ConsultaActionsFooter
         modoSomenteLeitura={consulta.modoSomenteLeitura}

@@ -23,6 +23,12 @@ class Settings(BaseSettings):
     ASAAS_WEBHOOK_TOKEN: str = ""
     ASAAS_WEBHOOK_URL: str = ""
 
+    # NFS-e integrada (Focus NFe)
+    FOCUS_NFE_TOKEN_HOMOLOGACAO: str = ""
+    FOCUS_NFE_TOKEN_PRODUCAO: str = ""
+    FOCUS_NFE_TIMEOUT_SECONDS: int = 30
+    NFSE_PRODUCTION_ENABLED: bool = False
+
     # Imagens de produtos
     PRODUCT_IMAGE_STORAGE_BACKEND: str = "local"  # local | s3
     PRODUCT_IMAGE_LOCAL_BASE_DIR: str = "uploads/produtos"
