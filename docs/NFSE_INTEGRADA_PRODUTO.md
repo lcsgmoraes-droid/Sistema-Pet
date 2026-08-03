@@ -20,8 +20,9 @@ Simpliss como provedor municipal. Detalhes técnicos, pendências fiscais e trav
 em `docs/NFSE_MAIARA_PILOTO.md`.
 
 O preço comercial antigo de R$ 59,90 ainda precisa ser revisto antes da contratação: o plano
-publicado pelo fornecedor para um CNPJ com NFS-e está acima desse valor. O piloto técnico não
-autoriza contratar nem subsidiar automaticamente o emissor.
+Focus Solo, escolhido como a opção pública mais barata confirmada para o piloto, custa R$ 89,90
+por mês para um CNPJ e 100 documentos. O piloto técnico não autoriza contratar nem subsidiar
+automaticamente o emissor.
 
 ## Jornada de ativação
 
@@ -35,6 +36,8 @@ autoriza contratar nem subsidiar automaticamente o emissor.
    - regime tributário;
    - código dos serviços e alíquota de ISS;
    - certificado ou credencial exigida pelo emissor e pelo município.
+   Esses dados ficam na configuração cadastral/fiscal da empresa e são apenas lidos pelo adaptador
+   de NFS-e; não devem existir cópias divergentes dentro da integração.
 5. O CorePet verifica a compatibilidade do município com o emissor parceiro.
 6. A configuração passa por uma emissão de homologação ou validação assistida.
 7. Somente depois da validação o adicional fica com status **Ativo**.
@@ -76,6 +79,11 @@ registrar, por empresa:
 A configuração fiscal precisa ser isolada por `tenant_id` e guardar apenas referências seguras para
 credenciais e certificados. Tokens, senhas e certificados não podem aparecer em respostas da API,
 logs ou telas administrativas.
+
+Se o certificado A1 já estiver no CorePet, a ativação pode oferecer duas escolhas: reutilizar o
+arquivo existente com consentimento explícito e envio direto do backend ao emissor, ou fazer o
+cadastro manual no painel do parceiro. O navegador recebe somente o estado seguro da validação e
+nunca o arquivo, a senha ou credenciais municipais.
 
 ### Camada de integração
 

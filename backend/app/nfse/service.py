@@ -1,14 +1,19 @@
 from __future__ import annotations
 
+import base64
 import hashlib
 import json
 import re
 import unicodedata
 from datetime import datetime, timezone
 from decimal import Decimal
+from pathlib import Path
 from typing import Any
 from zoneinfo import ZoneInfo
 
+from cryptography.hazmat.primitives.serialization import pkcs12
+
+from app.empresa_config_fiscal_models import EmpresaConfigFiscal
 from app.models import Tenant
 from app.models_cadastros import Cliente
 from app.nfse.models import NfseDocument, NfseTenantConfig
@@ -67,7 +72,8 @@ def is_presidente_prudente(city: str | None, state: str | None) -> bool:
 
 def configuration_missing_fields(
     tenant: Tenant,
-    config: NfseTenantConfig,
+    fiscal: EmpresaConfigFiscal,
+    integration: NfseTenantConfig,
     *,
     token_configured: bool,
 ) -> list[str]:
@@ -80,16 +86,112 @@ def configuration_missing_fields(
         missing.append("inscricao municipal da clinica")
     if not is_presidente_prudente(tenant.cidade, tenant.uf):
         missing.append("municipio Presidente Prudente/SP no cadastro da clinica")
-    if config.municipality_code != PRESIDENTE_PRUDENTE_IBGE:
+    if (fiscal.regime_tributario or "").strip() == "":
+        missing.append("regime tributario da empresa")
+    if fiscal.municipio_iss_codigo != PRESIDENTE_PRUDENTE_IBGE:
         missing.append("codigo IBGE 3541406")
-    service_item = (config.service_list_item or "").strip()
+    service_item = (fiscal.nfse_item_lista_servico or "").strip()
     if not re.fullmatch(r"\d{1,2}\.\d{2}", service_item):
         missing.append("item da lista de servicos da LC 116")
-    if config.iss_rate is None:
+    if fiscal.iss_aliquota is None:
         missing.append("aliquota de ISS validada pela contabilidade")
+    if not (fiscal.nfse_regime_especial_tributacao or "").strip():
+        missing.append("regime especial de tributacao da NFS-e")
+    if integration.provider_onboarding_completed_at is None:
+        missing.append("vinculacao da empresa e do certificado com a Focus NFe")
     if not token_configured:
-        missing.append(f"token Focus NFe de {config.environment}")
+        missing.append(f"token Focus NFe de {integration.environment}")
     return missing
+
+
+def fiscal_is_simple_national(fiscal: EmpresaConfigFiscal) -> bool:
+    regime = _normalized_text(fiscal.regime_tributario).strip()
+    return bool(fiscal.simples_ativo) or "simples nacional" in regime or regime == "mei"
+
+
+def validate_certificate_for_cnpj(
+    certificate_path: str | None,
+    certificate_password: str | None,
+    expected_cnpj: str | None,
+) -> tuple[bool, str]:
+    path = Path(certificate_path or "")
+    cnpj = digits(expected_cnpj)
+    if not certificate_path or not path.is_file():
+        return False, "Certificado A1 nao encontrado no armazenamento seguro."
+    if not certificate_password:
+        return False, "Senha do certificado A1 nao configurada."
+    if not _valid_cnpj(cnpj):
+        return False, "CNPJ da empresa invalido para conferir o certificado."
+    try:
+        _key, certificate, _chain = pkcs12.load_key_and_certificates(
+            path.read_bytes(), certificate_password.encode("utf-8")
+        )
+    except Exception:  # noqa: BLE001
+        return False, "Nao foi possivel abrir o certificado A1 com a senha salva."
+    if certificate is None or _key is None:
+        return False, "O arquivo A1 nao contem certificado e chave privada validos."
+
+    now = datetime.now(timezone.utc)
+    not_before = getattr(certificate, "not_valid_before_utc", None)
+    not_after = getattr(certificate, "not_valid_after_utc", None)
+    if not_before is None:
+        not_before = certificate.not_valid_before.replace(tzinfo=timezone.utc)
+    if not_after is None:
+        not_after = certificate.not_valid_after.replace(tzinfo=timezone.utc)
+    if now < not_before:
+        return False, "O certificado A1 ainda nao esta vigente."
+    if now >= not_after:
+        return False, "O certificado A1 esta vencido."
+
+    subject_text = " ".join(attribute.value for attribute in certificate.subject)
+    if cnpj not in digits(subject_text):
+        return False, "O certificado A1 nao pertence ao CNPJ cadastrado da empresa."
+    return True, f"Certificado A1 valido ate {not_after:%d/%m/%Y}."
+
+
+def build_focus_company_payload(
+    *,
+    tenant: Tenant,
+    fiscal: EmpresaConfigFiscal,
+    certificate_path: str,
+    certificate_password: str,
+    municipal_login: str,
+    municipal_password: str,
+) -> dict[str, Any]:
+    regime_text = _normalized_text(fiscal.regime_tributario).strip()
+    if "mei" in regime_text:
+        tax_regime = 4
+    elif fiscal_is_simple_national(fiscal):
+        tax_regime = 1
+    else:
+        tax_regime = 3
+
+    payload: dict[str, Any] = {
+        "nome": (tenant.razao_social or "").strip(),
+        "nome_fantasia": (tenant.name or tenant.razao_social or "").strip(),
+        "cnpj": digits(tenant.cnpj),
+        "inscricao_municipal": (tenant.inscricao_municipal or "").strip(),
+        "regime_tributario": tax_regime,
+        "logradouro": (tenant.endereco or "").strip(),
+        "numero": (tenant.numero or "").strip(),
+        "complemento": (tenant.complemento or "").strip(),
+        "municipio": (tenant.cidade or "").strip(),
+        "bairro": (tenant.bairro or "").strip(),
+        "cep": digits(tenant.cep),
+        "uf": (tenant.uf or "").upper(),
+        "telefone": digits(tenant.telefone),
+        "email": (tenant.email or "").strip(),
+        "habilita_nfse": True,
+        "arquivo_certificado_base64": base64.b64encode(
+            Path(certificate_path).read_bytes()
+        ).decode("ascii"),
+        "senha_certificado": certificate_password,
+        "login_responsavel": municipal_login,
+        "senha_responsavel": municipal_password,
+    }
+    if tenant.inscricao_estadual:
+        payload["inscricao_estadual"] = (tenant.inscricao_estadual or "").strip()
+    return payload
 
 
 def infer_customer_municipality_code(
@@ -137,7 +239,7 @@ def customer_missing_fields(
 def build_focus_payload(
     *,
     tenant: Tenant,
-    config: NfseTenantConfig,
+    fiscal: EmpresaConfigFiscal,
     customer: Cliente,
     customer_municipality_code: str,
     service_amount: Decimal,
@@ -174,28 +276,30 @@ def build_focus_payload(
     service: dict[str, Any] = {
         "discriminacao": description.strip(),
         "valor_servicos": float(service_amount),
-        "aliquota": float(config.iss_rate or 0),
-        "item_lista_servico": (config.service_list_item or "").strip(),
-        "iss_retido": bool(config.iss_withheld),
+        "aliquota": float(fiscal.iss_aliquota or 0),
+        "item_lista_servico": (fiscal.nfse_item_lista_servico or "").strip(),
+        "iss_retido": bool(fiscal.iss_retido),
     }
-    if config.cnae_code:
-        service["codigo_cnae"] = digits(config.cnae_code)
+    if fiscal.cnae_principal:
+        service["codigo_cnae"] = digits(fiscal.cnae_principal)
 
     payload: dict[str, Any] = {
         "data_emissao": issue_time.isoformat(),
-        "natureza_operacao": int(config.operation_nature),
-        "optante_simples_nacional": bool(config.simple_national),
-        "incentivador_cultural": bool(config.cultural_incentive),
+        "natureza_operacao": int(fiscal.nfse_natureza_operacao or "1"),
+        "optante_simples_nacional": fiscal_is_simple_national(fiscal),
+        "incentivador_cultural": bool(fiscal.nfse_incentivador_cultural),
         "prestador": {
             "cnpj": digits(tenant.cnpj),
             "inscricao_municipal": (tenant.inscricao_municipal or "").strip(),
-            "codigo_municipio": int(config.municipality_code),
+            "codigo_municipio": int(fiscal.municipio_iss_codigo),
         },
         "tomador": taker,
         "servico": service,
     }
-    if config.special_tax_regime:
-        payload["regime_especial_tributacao"] = int(config.special_tax_regime)
+    if fiscal.nfse_regime_especial_tributacao:
+        payload["regime_especial_tributacao"] = int(
+            fiscal.nfse_regime_especial_tributacao
+        )
     return payload
 
 

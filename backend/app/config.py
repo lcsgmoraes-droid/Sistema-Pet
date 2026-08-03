@@ -15,6 +15,7 @@ class Settings(BaseSettings):
 
     # Seguranca / Auth
     JWT_SECRET_KEY: str = "CHANGE_ME_IN_ENV"
+    ENCRYPTION_KEY: str = ""
 
     # Integracoes externas
     GOOGLE_MAPS_API_KEY: str = ""
@@ -26,6 +27,7 @@ class Settings(BaseSettings):
     # NFS-e integrada (Focus NFe)
     FOCUS_NFE_TOKEN_HOMOLOGACAO: str = ""
     FOCUS_NFE_TOKEN_PRODUCAO: str = ""
+    FOCUS_NFE_MASTER_TOKEN: str = ""
     FOCUS_NFE_TIMEOUT_SECONDS: int = 30
     NFSE_PRODUCTION_ENABLED: bool = False
 
@@ -88,6 +90,7 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
+ENCRYPTION_KEY = os.getenv("ENCRYPTION_KEY", settings.ENCRYPTION_KEY)
 
 STRICT_RUNTIME_ENVIRONMENTS = {"production", "prod", "staging"}
 

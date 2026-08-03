@@ -41,6 +41,9 @@ export const vetApi = {
   // NFS-e integrada
   obterConfigNfse: () => api.get("/nfse/configuracao"),
   atualizarConfigNfse: (data) => api.put("/nfse/configuracao", data),
+  salvarCredenciaisMunicipaisNfse: (data) => api.put("/nfse/credenciais-municipais", data),
+  salvarCredenciaisFocusNfse: (data) => api.put("/nfse/credenciais-focus", data),
+  vincularEmpresaFocus: (data) => api.post("/nfse/vinculacao-focus", data),
   preValidarConfigNfse: () => api.post("/nfse/configuracao/pre-validar"),
   obterNfseConsulta: (consultaId) => api.get(`/nfse/consultas/${consultaId}`),
   emitirNfseConsulta: (consultaId, data) => api.post(`/nfse/consultas/${consultaId}/emitir`, data),

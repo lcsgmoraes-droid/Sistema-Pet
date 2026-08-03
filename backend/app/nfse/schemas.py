@@ -1,21 +1,33 @@
 from __future__ import annotations
 
 from decimal import Decimal
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
 
 class NfseConfigUpdate(BaseModel):
-    service_list_item: str | None = None
-    cnae_code: str | None = None
-    iss_rate: Decimal | None = Field(default=None, ge=0, le=100)
-    iss_withheld: bool | None = None
-    operation_nature: str | None = None
-    special_tax_regime: str | None = None
-    simple_national: bool | None = None
-    cultural_incentive: bool | None = None
     provider_company_reference: str | None = None
     environment: str | None = None
+
+
+class NfseMunicipalCredentialsUpdate(BaseModel):
+    login: str | None = Field(default=None, min_length=1, max_length=255)
+    password: str | None = Field(default=None, min_length=1, max_length=255)
+    clear: bool = False
+
+
+class NfseFocusCredentialsUpdate(BaseModel):
+    master_token: str | None = Field(default=None, min_length=8, max_length=500)
+    homologation_token: str | None = Field(default=None, min_length=8, max_length=500)
+    production_token: str | None = Field(default=None, min_length=8, max_length=500)
+    clear: bool = False
+
+
+class NfseFocusOnboardingRequest(BaseModel):
+    mode: Literal["reuse_existing", "manual"]
+    confirm: bool
+    manual_setup_completed: bool = False
 
 
 class NfseConsultationIssue(BaseModel):

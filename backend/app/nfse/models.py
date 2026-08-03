@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from sqlalchemy import (
-    Boolean,
     Column,
     DateTime,
     ForeignKey,
@@ -30,17 +29,18 @@ class NfseTenantConfig(BaseTenantModel):
     )
     provider = Column(String(40), nullable=False, default="focus_nfe")
     environment = Column(String(20), nullable=False, default="homologacao")
-    municipality_code = Column(String(7), nullable=False, default="3541406")
-    service_list_item = Column(String(20), nullable=True)
-    cnae_code = Column(String(20), nullable=True)
-    iss_rate = Column(Numeric(7, 4), nullable=True)
-    iss_withheld = Column(Boolean, nullable=False, default=False)
-    operation_nature = Column(String(1), nullable=False, default="1")
-    special_tax_regime = Column(String(1), nullable=True)
-    simple_national = Column(Boolean, nullable=False, default=True)
-    cultural_incentive = Column(Boolean, nullable=False, default=False)
     provider_company_reference = Column(String(120), nullable=True)
-    credentials_reference = Column(String(255), nullable=True)
+    focus_master_token_encrypted = Column(Text, nullable=True)
+    focus_homologation_token_encrypted = Column(Text, nullable=True)
+    focus_production_token_encrypted = Column(Text, nullable=True)
+    municipal_login_encrypted = Column(Text, nullable=True)
+    municipal_password_encrypted = Column(Text, nullable=True)
+    onboarding_method = Column(String(30), nullable=True)
+    certificate_shared_at = Column(DateTime(timezone=True), nullable=True)
+    certificate_shared_by_user_id = Column(
+        Integer, ForeignKey("users.id"), nullable=True
+    )
+    provider_onboarding_completed_at = Column(DateTime(timezone=True), nullable=True)
     last_validation_error = Column(Text, nullable=True)
     validated_at = Column(DateTime(timezone=True), nullable=True)
 

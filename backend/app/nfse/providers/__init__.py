@@ -1,4 +1,4 @@
 from app.nfse.providers.base import NfseProviderError
-from app.nfse.providers.focus_nfe import FocusNfeProvider
+from app.nfse.providers.focus_nfe import FocusNfeCompanyProvider, FocusNfeProvider
 
-__all__ = ["FocusNfeProvider", "NfseProviderError"]
+__all__ = ["FocusNfeCompanyProvider", "FocusNfeProvider", "NfseProviderError"]

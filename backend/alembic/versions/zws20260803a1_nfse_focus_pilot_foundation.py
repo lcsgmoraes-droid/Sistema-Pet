@@ -40,33 +40,20 @@ def upgrade() -> None:
             server_default="homologacao",
             nullable=False,
         ),
-        sa.Column(
-            "municipality_code",
-            sa.String(length=7),
-            server_default="3541406",
-            nullable=False,
-        ),
-        sa.Column("service_list_item", sa.String(length=20), nullable=True),
-        sa.Column("cnae_code", sa.String(length=20), nullable=True),
-        sa.Column("iss_rate", sa.Numeric(precision=7, scale=4), nullable=True),
-        sa.Column(
-            "iss_withheld", sa.Boolean(), server_default=sa.false(), nullable=False
-        ),
-        sa.Column(
-            "operation_nature", sa.String(length=1), server_default="1", nullable=False
-        ),
-        sa.Column("special_tax_regime", sa.String(length=1), nullable=True),
-        sa.Column(
-            "simple_national", sa.Boolean(), server_default=sa.true(), nullable=False
-        ),
-        sa.Column(
-            "cultural_incentive",
-            sa.Boolean(),
-            server_default=sa.false(),
-            nullable=False,
-        ),
         sa.Column("provider_company_reference", sa.String(length=120), nullable=True),
-        sa.Column("credentials_reference", sa.String(length=255), nullable=True),
+        sa.Column("focus_master_token_encrypted", sa.Text(), nullable=True),
+        sa.Column("focus_homologation_token_encrypted", sa.Text(), nullable=True),
+        sa.Column("focus_production_token_encrypted", sa.Text(), nullable=True),
+        sa.Column("municipal_login_encrypted", sa.Text(), nullable=True),
+        sa.Column("municipal_password_encrypted", sa.Text(), nullable=True),
+        sa.Column("onboarding_method", sa.String(length=30), nullable=True),
+        sa.Column("certificate_shared_at", sa.DateTime(timezone=True), nullable=True),
+        sa.Column("certificate_shared_by_user_id", sa.Integer(), nullable=True),
+        sa.Column(
+            "provider_onboarding_completed_at",
+            sa.DateTime(timezone=True),
+            nullable=True,
+        ),
         sa.Column("last_validation_error", sa.Text(), nullable=True),
         sa.Column("validated_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column(
@@ -82,6 +69,10 @@ def upgrade() -> None:
             nullable=False,
         ),
         sa.PrimaryKeyConstraint("id"),
+        sa.ForeignKeyConstraint(
+            ["certificate_shared_by_user_id"],
+            ["users.id"],
+        ),
         sa.UniqueConstraint("tenant_id", name="uq_nfse_tenant_configs_tenant"),
     )
     op.create_index(
