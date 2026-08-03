@@ -1,63 +1,78 @@
-# NFS-e integrada como adicional do CorePet
+# NFS-e integrada ao CorePet por emissor externo
 
 ## Decisão comercial
 
-- Valor: **R$ 59,90 por mês**.
-- Contratação separada do plano principal.
-- Disponível para clientes dos módulos **Veterinário** e **Banho & Tosa**.
-- A emissão será feita por um emissor fiscal parceiro, mas dentro do fluxo do CorePet.
+- Não existe adicional CorePet de **R$ 59,90** para NFS-e.
+- A conta, o plano e o pagamento do emissor fiscal são contratados diretamente pelo cliente.
+- No piloto da Maiara, a Focus NFe cobra diretamente o plano Solo de **R$ 89,90 por mês**.
+- Na oferta pública atual, a integração com emissor fiscal externo aparece somente no plano
+  **Pet Venda Ativa**, sempre com a indicação de contratação separada do emissor.
+- A emissão será feita pelo parceiro, mas poderá acontecer dentro do fluxo do CorePet.
 - O cliente não deverá precisar acessar outro sistema para emitir ou acompanhar a nota.
 
-O adicional não deve ser vendido como emissão própria do CorePet. A comunicação correta é:
+O recurso não deve ser vendido como emissão própria nem como mensalidade fiscal cobrada pelo
+CorePet. A comunicação correta é:
 
-> Emissão de NFS-e integrada ao CorePet, operada por emissor fiscal parceiro.
+> Integração com emissor fiscal externo. Conta e mensalidade do emissor contratadas separadamente.
+
+## Piloto Maiara / Presidente Prudente
+
+Em 2026-08-03, o primeiro piloto foi definido para o tenant `Clinica Veterinaria Sao Jose`,
+em Presidente Prudente/SP. O integrador escolhido para homologação foi a Focus NFe, com o
+Simpliss como provedor municipal. Detalhes técnicos, pendências fiscais e trava de produção estão
+em `docs/NFSE_MAIARA_PILOTO.md`.
+
+O plano Focus Solo custa R$ 89,90 por mês para um CNPJ e 100 documentos. A conta será da Maiara e
+o pagamento será feito diretamente à Focus; o CorePet não cobrará nem subsidiará essa mensalidade.
 
 ## Jornada de ativação
 
-1. O cliente encontra o adicional na página de planos ou em **Meu Plano**.
-2. Clica em **Ativar emissão de NFS-e**.
-3. Confirma o valor de R$ 59,90 por mês.
-4. Preenche ou revisa os dados fiscais necessários:
+1. O cliente acessa a configuração de NFS-e no CorePet.
+2. Abre o link oficial da Focus e cria uma conta própria, com cobrança direta pelo emissor.
+3. No fluxo padrão, cadastra a empresa emitente no painel da Focus, envia o certificado A1 e
+   informa as credenciais municipais.
+4. Obtém no painel da Focus os tokens de homologação e produção e os salva no CorePet.
+5. Preenche ou revisa os dados fiscais necessários:
    - CNPJ e razão social;
    - inscrição municipal;
    - município de emissão;
    - regime tributário;
    - código dos serviços e alíquota de ISS;
    - certificado ou credencial exigida pelo emissor e pelo município.
-5. O CorePet verifica a compatibilidade do município com o emissor parceiro.
-6. A configuração passa por uma emissão de homologação ou validação assistida.
-7. Somente depois da validação o adicional fica com status **Ativo**.
+   Esses dados ficam na configuração cadastral/fiscal da empresa e são apenas lidos pelo adaptador
+   de NFS-e; não devem existir cópias divergentes dentro da integração.
+6. O CorePet verifica a compatibilidade do município com o emissor parceiro.
+7. A configuração passa por uma emissão de homologação ou validação assistida.
+8. Somente depois da validação a integração fica com status **Ativa**.
 
-Enquanto pagamento e homologação ainda forem assistidos, o botão pode abrir o atendimento com
-uma mensagem pronta. Quando a cobrança estiver integrada, a mesma tela deverá iniciar o checkout
-sem alterar a jornada apresentada ao cliente.
+O login na Focus não configura nem avisa o CorePet automaticamente. O vínculo acontece quando o
+cliente informa os tokens no CorePet. Se a Focus disponibilizar o Token Principal de Produção antes
+do cadastro do emitente, o CorePet também pode oferecer cadastro automático via API com autorização
+explícita para compartilhar o A1.
 
-## Estados do adicional
+## Estados da integração
 
-- `inactive`: ainda não contratado;
-- `pending_payment`: aguardando confirmação da contratação;
-- `pending_configuration`: contratado, mas faltam dados fiscais;
+- `pending_configuration`: faltam conta, tokens ou dados fiscais;
 - `validating`: configuração sendo homologada;
 - `active`: emissão liberada;
-- `suspended`: cobrança ou configuração fiscal precisa ser regularizada;
+- `suspended`: conta externa ou configuração fiscal precisa ser regularizada;
 - `unsupported_city`: município ainda não atendido pelo emissor escolhido.
 
-O sistema nunca deve apresentar o recurso como ativo apenas porque o pagamento foi confirmado.
-Município, credenciais e código de serviço também precisam estar validados.
+O sistema nunca deve apresentar o recurso como ativo apenas porque os tokens foram informados.
+Município, credenciais, certificado e código de serviço também precisam estar validados.
 
 ## Estrutura técnica necessária
 
-### Assinatura
+### Vínculo com o emissor externo
 
-Criar um adicional independente do plano principal, identificado por `nfse_integrada`. Ele deve
-registrar, por empresa:
+Registrar, por empresa:
 
 - status;
-- valor contratado;
 - data de ativação;
-- próxima cobrança;
 - emissor parceiro;
-- referência da assinatura no meio de pagamento;
+- modo de onboarding, manual ou automático;
+- estado seguro dos tokens de homologação e produção;
+- referência da empresa no emissor, quando disponível;
 - motivo de bloqueio ou pendência.
 
 ### Configuração por empresa
@@ -65,6 +80,11 @@ registrar, por empresa:
 A configuração fiscal precisa ser isolada por `tenant_id` e guardar apenas referências seguras para
 credenciais e certificados. Tokens, senhas e certificados não podem aparecer em respostas da API,
 logs ou telas administrativas.
+
+Se o certificado A1 já estiver no CorePet, a ativação pode oferecer duas escolhas: reutilizar o
+arquivo existente com consentimento explícito e envio direto do backend ao emissor, ou fazer o
+cadastro manual no painel do parceiro. O navegador recebe somente o estado seguro da validação e
+nunca o arquivo, a senha ou credenciais municipais.
 
 ### Camada de integração
 
@@ -96,8 +116,8 @@ o recebimento antecipado do momento fiscal definido com a contabilidade do clien
 
 ### Operação assistida
 
-Se o adicional não estiver ativo, o CorePet continua registrando normalmente a venda e o atendimento.
-O usuário deve ver a opção de contratar a emissão integrada, sem bloquear agenda, consulta ou PDV.
+Se a integração não estiver ativa, o CorePet continua registrando normalmente a venda e o atendimento.
+O usuário deve ver as pendências de configuração sem bloquear agenda, consulta ou PDV.
 
 ## Segurança e responsabilidade
 
@@ -111,16 +131,15 @@ O usuário deve ver a opção de contratar a emissão integrada, sem bloquear ag
 ## Ordem de implementação
 
 1. Escolher o emissor parceiro e validar cobertura de municípios.
-2. Criar adicional, estados e configuração por empresa.
+2. Criar estados e configuração por empresa.
 3. Implementar homologação de uma empresa e um CNPJ.
 4. Conectar emissão ao Veterinário.
 5. Conectar emissão ao Banho & Tosa.
-6. Adicionar cobrança e ativação automática.
-7. Liberar para novos CNPJs somente após monitorar o primeiro cliente real.
+6. Liberar para novos CNPJs somente após monitorar o primeiro cliente real.
 
 ## Critérios para considerar pronto
 
-- contratação e status visíveis no CorePet;
+- onboarding e status visíveis no CorePet;
 - configuração fiscal isolada por empresa;
 - uma NFS-e emitida sem acessar o portal do parceiro;
 - consulta, PDF, XML e cancelamento disponíveis;

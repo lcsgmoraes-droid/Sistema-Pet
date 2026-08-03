@@ -41,8 +41,13 @@ class EmpresaConfigFiscal(BaseTenantModel):
     cofins_aliquota = Column(Numeric(5, 2))
 
     municipio_iss = Column(String(100))
+    municipio_iss_codigo = Column(String(7))
     iss_aliquota = Column(Numeric(5, 2))
     iss_retido = Column(Boolean, default=False)
+    nfse_item_lista_servico = Column(String(20))
+    nfse_natureza_operacao = Column(String(1), default="1")
+    nfse_regime_especial_tributacao = Column(String(1))
+    nfse_incentivador_cultural = Column(Boolean, default=False)
 
     herdado_do_estado = Column(Boolean, nullable=False, default=True)
 

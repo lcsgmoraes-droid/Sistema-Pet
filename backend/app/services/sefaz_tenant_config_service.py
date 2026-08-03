@@ -8,6 +8,7 @@ from uuid import UUID
 
 from fastapi import HTTPException, UploadFile
 
+from app.encryption import decrypt_data, encrypt_data, is_encryption_enabled
 from app.models import Tenant
 
 
@@ -16,11 +17,16 @@ class SefazTenantConfigService:
 
     BASE_DIR = Path(__file__).resolve().parents[2] / "secrets" / "sefaz"
     CONFIG_FILE = "config.json"
+    SECRET_PREFIX = "fernet:"
 
     @classmethod
     def _tenant_dir(cls, tenant_id: UUID) -> Path:
         tenant_dir = cls.BASE_DIR / str(tenant_id)
         tenant_dir.mkdir(parents=True, exist_ok=True)
+        try:
+            tenant_dir.chmod(0o700)
+        except OSError:
+            pass
         return tenant_dir
 
     @classmethod
@@ -34,7 +40,20 @@ class SefazTenantConfigService:
             return {}
 
         try:
-            return json.loads(path.read_text(encoding="utf-8"))
+            data = json.loads(path.read_text(encoding="utf-8"))
+            stored_password = str(data.get("cert_password") or "")
+            if stored_password.startswith(cls.SECRET_PREFIX):
+                if not is_encryption_enabled():
+                    raise HTTPException(
+                        status_code=500,
+                        detail="ENCRYPTION_KEY indisponivel para abrir o certificado fiscal.",
+                    )
+                data["cert_password"] = decrypt_data(
+                    stored_password.removeprefix(cls.SECRET_PREFIX)
+                )
+            return data
+        except HTTPException:
+            raise
         except Exception as exc:  # noqa: BLE001
             raise HTTPException(
                 status_code=500, detail=f"Falha ao ler configuracao SEFAZ: {exc}"
@@ -43,9 +62,24 @@ class SefazTenantConfigService:
     @classmethod
     def save_config(cls, tenant_id: UUID, config: dict[str, Any]) -> dict[str, Any]:
         path = cls._config_path(tenant_id)
+        stored_config = dict(config)
+        password = str(stored_config.get("cert_password") or "")
+        if password and not password.startswith(cls.SECRET_PREFIX):
+            if not is_encryption_enabled():
+                raise HTTPException(
+                    status_code=503,
+                    detail=(
+                        "Configure ENCRYPTION_KEY antes de salvar a senha do certificado A1."
+                    ),
+                )
+            stored_config["cert_password"] = cls.SECRET_PREFIX + encrypt_data(password)
         path.write_text(
-            json.dumps(config, ensure_ascii=False, indent=2), encoding="utf-8"
+            json.dumps(stored_config, ensure_ascii=False, indent=2), encoding="utf-8"
         )
+        try:
+            path.chmod(0o600)
+        except OSError:
+            pass
         return config
 
     @staticmethod
@@ -56,6 +90,11 @@ class SefazTenantConfigService:
 
     @classmethod
     async def save_certificate(cls, tenant_id: UUID, upload: UploadFile) -> str:
+        if not is_encryption_enabled():
+            raise HTTPException(
+                status_code=503,
+                detail="Configure ENCRYPTION_KEY antes de enviar o certificado A1.",
+            )
         filename = upload.filename or "certificado.pfx"
         ext = Path(filename).suffix.lower()
         if ext != ".pfx":
@@ -76,6 +115,10 @@ class SefazTenantConfigService:
         cert_name = f"cert_{secrets.token_hex(8)}.pfx"
         cert_path = cls._tenant_dir(tenant_id) / cert_name
         cert_path.write_bytes(content)
+        try:
+            cert_path.chmod(0o600)
+        except OSError:
+            pass
         return str(cert_path)
 
     @classmethod

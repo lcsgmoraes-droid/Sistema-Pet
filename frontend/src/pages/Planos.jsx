@@ -1,7 +1,6 @@
 import {
   ArrowRight,
   Check,
-  FileText,
   Grid2X2,
   Scissors,
   ShieldCheck,
@@ -18,7 +17,6 @@ import {
   publicPlans,
   segmentOptions,
   segmentSummaries,
-  serviceInvoiceAddon,
 } from "../data/publicPlans";
 
 const segmentIcons = {
@@ -133,54 +131,6 @@ function AllSegmentsOverview({ onSelect }) {
   );
 }
 
-function ServiceInvoiceAddon() {
-  const contactUrl = buildSalesContactUrl(
-    "Olá! Quero contratar a emissão de NFS-e integrada ao CorePet por R$ 59,90 mensais.",
-  );
-
-  return (
-    <section className="mt-12 overflow-hidden rounded-3xl bg-slate-950 text-white shadow-xl">
-      <div className="grid gap-8 p-7 sm:p-9 lg:grid-cols-[0.8fr_1.2fr] lg:items-center">
-        <div>
-          <span className="inline-flex items-center gap-2 rounded-full bg-amber-300/15 px-3 py-1.5 text-sm font-bold text-amber-200">
-            <FileText className="h-4 w-4" />
-            Adicional opcional
-          </span>
-          <h2 className="mt-5 text-3xl font-black tracking-tight">{serviceInvoiceAddon.name}</h2>
-          <div className="mt-4 flex items-end gap-1">
-            <span className="pb-1 text-lg font-bold">R$</span>
-            <span className="text-4xl font-black">{serviceInvoiceAddon.price}</span>
-            <span className="pb-1 text-sm font-semibold text-slate-400">/mês</span>
-          </div>
-          <p className="mt-4 leading-7 text-slate-300">{serviceInvoiceAddon.description}</p>
-        </div>
-        <div>
-          <ul className="grid gap-3 sm:grid-cols-2">
-            {serviceInvoiceAddon.features.map((feature) => (
-              <li
-                key={feature}
-                className="flex items-start gap-3 rounded-2xl bg-white/5 p-4 text-sm leading-6 text-slate-200"
-              >
-                <Check className="mt-1 h-4 w-4 flex-none text-emerald-300" />
-                <span>{feature}</span>
-              </li>
-            ))}
-          </ul>
-          <a
-            href={contactUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-amber-300 px-5 py-3.5 font-extrabold text-slate-950 transition hover:bg-amber-200 sm:w-auto"
-          >
-            Quero ativar a emissão integrada
-            <ArrowRight className="h-4 w-4" />
-          </a>
-        </div>
-      </div>
-    </section>
-  );
-}
-
 export default function Planos() {
   const [searchParams, setSearchParams] = useSearchParams();
   const requestedSegment = searchParams.get("segment") || "all";
@@ -285,8 +235,6 @@ export default function Planos() {
             ))}
           </div>
         )}
-
-        {(activeSegment === "vet" || activeSegment === "grooming") && <ServiceInvoiceAddon />}
 
         {activeSegment === "all" && (
           <section className="mt-12 rounded-3xl border border-violet-200 bg-violet-50 p-7 sm:p-9">

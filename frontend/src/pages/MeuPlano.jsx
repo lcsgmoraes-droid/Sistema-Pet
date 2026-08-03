@@ -3,7 +3,6 @@ import {
   CheckCircle2,
   Clock3,
   CreditCard,
-  FileText,
   Lock,
   MessageCircle,
   ShieldCheck,
@@ -12,7 +11,7 @@ import {
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { MODULOS_INFO, useModulos } from "../contexts/ModulosContext";
-import { buildSalesContactUrl, publicPlans, serviceInvoiceAddon } from "../data/publicPlans";
+import { publicPlans } from "../data/publicPlans";
 import { api } from "../services/api";
 
 const WHATSAPP_NUMERO = "5518997401641";
@@ -126,7 +125,6 @@ export default function MeuPlano() {
   const {
     assinaturaAtual,
     carregarModulos,
-    modulosAtivos,
     modulosBetaPublicos,
     modulosForaOfertaPublica,
     planoAtual,
@@ -168,13 +166,6 @@ export default function MeuPlano() {
   );
   const msgBeta = encodeURIComponent("Olá! Quero ajuda para escolher meu plano do CorePet.");
   const emTrial = Boolean(assinaturaAtual?.acesso_completo_durante_trial);
-  const podeContratarNfse = ["veterinario", "banho_tosa"].some((modulo) =>
-    (modulosAtivos || []).includes(modulo),
-  );
-  const nfseContactUrl = buildSalesContactUrl(
-    "Olá! Quero ativar a emissão de NFS-e integrada ao CorePet por R$ 59,90 mensais.",
-  );
-
   async function handleSubscribe() {
     if (billing?.checkout_url && trustedAsaasUrl(billing.checkout_url)) {
       window.location.assign(billing.checkout_url);
@@ -375,48 +366,6 @@ export default function MeuPlano() {
             </div>
           </aside>
         </section>
-
-        {podeContratarNfse && (
-          <section className="overflow-hidden rounded-lg border border-amber-200 bg-white shadow-sm">
-            <div className="grid gap-6 p-6 lg:grid-cols-[0.8fr_1.2fr] lg:items-center">
-              <div className="flex items-start gap-3">
-                <div className="rounded-md bg-amber-100 p-3 text-amber-800">
-                  <FileText className="h-5 w-5" />
-                </div>
-                <div>
-                  <p className="text-sm font-bold uppercase text-amber-700">Adicional opcional</p>
-                  <h2 className="mt-1 text-xl font-extrabold text-slate-950">
-                    {serviceInvoiceAddon.name}
-                  </h2>
-                  <p className="mt-2 text-sm leading-6 text-slate-600">
-                    Emissor fiscal parceiro conectado ao fluxo do CorePet.
-                  </p>
-                </div>
-              </div>
-              <div className="flex flex-col gap-4 rounded-lg bg-slate-50 p-5 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  <p className="text-2xl font-extrabold text-slate-950">
-                    R$ {serviceInvoiceAddon.price}
-                    <span className="text-sm font-semibold text-slate-500">/mês</span>
-                  </p>
-                  <p className="mt-1 max-w-xl text-xs leading-5 text-slate-500">
-                    A liberação passa pela validação dos dados fiscais e da compatibilidade do seu
-                    município.
-                  </p>
-                </div>
-                <a
-                  href={nfseContactUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-flex flex-none items-center justify-center gap-2 rounded-md bg-amber-300 px-5 py-3 text-sm font-bold text-slate-950 transition hover:bg-amber-200"
-                >
-                  <MessageCircle className="h-4 w-4" />
-                  Ativar NFS-e
-                </a>
-              </div>
-            </div>
-          </section>
-        )}
 
         <section className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
           <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
