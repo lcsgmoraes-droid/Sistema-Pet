@@ -16,7 +16,7 @@ from cryptography.x509.oid import NameOID
 from app.nfse.models import NfseDocument, NfseTenantConfig
 from app.nfse.providers.base import NfseProviderError
 from app.nfse.providers.focus_nfe import FocusNfeCompanyProvider, FocusNfeProvider
-from app.nfse.routes import router as nfse_router
+from app.nfse.routes import _config_response, router as nfse_router
 from app.nfse.secrets import decrypt_nfse_secret, encrypt_nfse_secret
 from app.nfse.service import (
     PRESIDENTE_PRUDENTE_IBGE,
@@ -44,10 +44,22 @@ def _tenant(**overrides):
 
 def _integration(**overrides):
     data = {
+        "status": "pending_configuration",
+        "provider": "focus_nfe",
         "environment": "homologacao",
+        "provider_company_reference": None,
+        "focus_master_token_encrypted": None,
+        "focus_homologation_token_encrypted": None,
+        "focus_production_token_encrypted": None,
+        "municipal_login_encrypted": None,
+        "municipal_password_encrypted": None,
+        "onboarding_method": None,
+        "certificate_shared_at": None,
         "provider_onboarding_completed_at": datetime.fromisoformat(
             "2026-08-03T10:00:00-03:00"
         ),
+        "last_validation_error": None,
+        "validated_at": None,
     }
     data.update(overrides)
     return SimpleNamespace(**data)
@@ -131,6 +143,42 @@ def test_presidente_prudente_configuration_reports_only_real_pending_fields():
     assert "inscricao municipal da clinica" in missing
     assert "item da lista de servicos da LC 116" in missing
     assert "token Focus NFe de homologacao" in missing
+
+
+def test_configuration_reports_each_focus_token_without_exposing_values(monkeypatch):
+    monkeypatch.delenv("FOCUS_NFE_MASTER_TOKEN", raising=False)
+    monkeypatch.delenv("FOCUS_NFE_TOKEN_HOMOLOGACAO", raising=False)
+    monkeypatch.delenv("FOCUS_NFE_TOKEN_PRODUCAO", raising=False)
+    monkeypatch.setattr(
+        "app.nfse.providers.focus_nfe.settings.FOCUS_NFE_MASTER_TOKEN", ""
+    )
+    monkeypatch.setattr(
+        "app.nfse.providers.focus_nfe.settings.FOCUS_NFE_TOKEN_HOMOLOGACAO", ""
+    )
+    monkeypatch.setattr(
+        "app.nfse.providers.focus_nfe.settings.FOCUS_NFE_TOKEN_PRODUCAO", ""
+    )
+    response = _config_response(
+        _tenant(),
+        _fiscal(),
+        _integration(
+            focus_homologation_token_encrypted="fernet:opaque-homologation",
+            municipal_login_encrypted="fernet:opaque-login",
+            municipal_password_encrypted="fernet:opaque-password",
+        ),
+        certificate={
+            "configured": True,
+            "valid": True,
+            "message": "Certificado valido.",
+        },
+    )
+
+    assert response["homologation_token_configured"] is True
+    assert response["production_token_configured"] is False
+    assert response["master_token_configured"] is False
+    assert response["municipal_credentials_configured"] is True
+    assert response["focus_signup_url"] == "https://focusnfe.com.br/cadastro/"
+    assert "opaque" not in str(response)
 
 
 def test_customer_requires_document_full_address_and_ibge_code():

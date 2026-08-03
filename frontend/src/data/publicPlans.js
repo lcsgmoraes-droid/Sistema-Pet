@@ -115,7 +115,7 @@ export const publicPlans = {
         "Tudo do Pet Gestão",
         "App e e-commerce integrados",
         "Campanhas, recorrência e recompra",
-        "Entregas, rotas e emissão fiscal integrada",
+        "Entregas, rotas e integração com emissor fiscal externo (contratação separada)",
       ],
     },
   ],
@@ -291,7 +291,10 @@ export const publicPlanComparisons = {
     { label: "Financeiro, DRE e ponto de equilíbrio", values: [false, false, true, true] },
     { label: "App e e-commerce integrados", values: [false, false, false, true] },
     { label: "Campanhas, recorrência e recompra", values: [false, false, false, true] },
-    { label: "Entregas, rotas e emissão fiscal integrada", values: [false, false, false, true] },
+    {
+      label: "Entregas, rotas e integração com emissor fiscal externo (contratação separada)",
+      values: [false, false, false, true],
+    },
   ],
   vet: [
     { label: "Agenda, tutores, pets, serviços e preços", values: [true, true, true] },
@@ -312,18 +315,5 @@ export const publicPlanComparisons = {
     { label: "Comissões, financeiro e relatórios", values: [false, true, true] },
     { label: "Custos e margem por serviço", values: [false, false, true] },
     { label: "Campanhas, fidelidade, taxi dog e rotas", values: [false, false, true] },
-  ],
-};
-
-export const serviceInvoiceAddon = {
-  name: "Emissão de NFS-e integrada",
-  price: "59,90",
-  description:
-    "Adicional opcional para Veterinário e Banho & Tosa, operado por emissor fiscal parceiro e conectado ao CorePet.",
-  features: [
-    "Contratação separada do plano principal",
-    "Emissão de nota de serviço dentro do fluxo do CorePet",
-    "Configuração assistida dos dados da empresa e dos serviços",
-    "Disponibilidade sujeita à homologação do município e do emissor parceiro",
   ],
 };

@@ -8,6 +8,7 @@ Atualizado em: 2026-08-03
 - Municipio de emissao: Presidente Prudente/SP, codigo IBGE `3541406`.
 - Provedor municipal: Simpliss.
 - Integrador escolhido para a primeira homologacao: Focus NFe.
+- Conta e cobranca da Focus pertencem diretamente a Maiara; o CorePet nao recebe essa mensalidade.
 - Ambiente inicial obrigatorio: homologacao.
 - O CorePet continua independente do fornecedor por meio de um adaptador.
 - Emissao de producao permanece bloqueada ate a homologacao ser aprovada.
@@ -80,23 +81,27 @@ Nao enviar certificado, senha ou token por chat e nunca salvar esses dados no Gi
 ## Fluxo da primeira nota
 
 1. Preencher os dados cadastrais e os parametros de NFS-e em **Configuracao fiscal da empresa**.
-2. Iniciar os 30 dias de teste em <https://2025.focusnfe.com.br/cadastro/>.
-3. Informar os tokens master e de homologacao na tela segura de ativacao. Como alternativa
-   operacional, configurar `FOCUS_NFE_MASTER_TOKEN` e `FOCUS_NFE_TOKEN_HOMOLOGACAO` fora do
-   repositorio.
-4. Escolher no CorePet entre:
-   - reutilizar o A1 ja configurado, com confirmacao explicita antes do envio servidor a servidor; ou
-   - cadastrar certificado e credenciais manualmente no painel da Focus.
-5. Executar a pre-validacao; o status passa para `validating` somente quando nao houver pendencias.
-6. Finalizar uma consulta de teste com tutor e valor de servico completos.
-7. Emitir a NFS-e de homologacao pelo CorePet.
-8. Sincronizar ate obter autorizacao ou erro claro da prefeitura.
-9. Conferir PDF, XML, valores, item de servico e ISS com a contabilidade.
-10. Testar cancelamento em homologacao.
-11. Somente depois revisar a liberacao para producao.
+2. Iniciar os 30 dias de teste em <https://focusnfe.com.br/cadastro/>. A conta e o pagamento ficam
+   diretamente em nome da Maiara.
+3. No fluxo recomendado, acessar **Empresas > Adicionar Empresa** no painel da Focus, cadastrar o
+   emitente, enviar o A1 e informar as credenciais municipais.
+4. Acessar **Painel API > Tokens** na Focus e informar no CorePet os tokens de homologacao e
+   producao. O login na Focus, sozinho, nao sincroniza nem parametriza o CorePet.
+5. Se a Focus ja tiver disponibilizado o Token Principal de Producao antes do cadastro do emitente,
+   existe a alternativa de informa-lo no CorePet e autorizar o cadastro automatico com o A1 ja
+   armazenado. Esse token e opcional no fluxo manual.
+6. Executar a pre-validacao; o status passa para `validating` somente quando nao houver pendencias.
+7. Finalizar uma consulta de teste com tutor e valor de servico completos.
+8. Emitir a NFS-e de homologacao pelo CorePet.
+9. Sincronizar ate obter autorizacao ou erro claro da prefeitura.
+10. Conferir PDF, XML, valores, item de servico e ISS com a contabilidade.
+11. Testar cancelamento em homologacao.
+12. Somente depois revisar a liberacao para producao.
 
-## Decisao comercial pendente
+## Decisao comercial
 
-O preco antigo do adicional CorePet e `R$ 59,90/mês`. Em 2026-08-03, o plano Solo publicado pela Focus com NFS-e custa `R$ 89,90/mês` para um CNPJ. Portanto, o valor do adicional precisa ser revisto, cobrado junto com o custo do emissor ou o CorePet tera de subsidiar o piloto. Nenhuma contratacao paga foi feita nesta implementacao.
+O adicional CorePet de `R$ 59,90/mês` foi descartado. Em 2026-08-03, o plano Solo publicado pela
+Focus custa `R$ 89,90/mês` para um CNPJ. A Maiara contratara e pagara a Focus diretamente. O
+CorePet fornece a integracao e nao cobra, recebe ou subsidia a assinatura do emissor neste piloto.
 
 Referencia: <https://2025.focusnfe.com.br/precos/>

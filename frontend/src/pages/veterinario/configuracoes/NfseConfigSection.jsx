@@ -48,6 +48,7 @@ export default function NfseConfigSection() {
   const [municipalPassword, setMunicipalPassword] = useState("");
   const [focusMasterToken, setFocusMasterToken] = useState("");
   const [focusHomologationToken, setFocusHomologationToken] = useState("");
+  const [focusProductionToken, setFocusProductionToken] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -107,12 +108,14 @@ export default function NfseConfigSection() {
         vetApi.salvarCredenciaisFocusNfse({
           master_token: focusMasterToken || undefined,
           homologation_token: focusHomologationToken || undefined,
+          production_token: focusProductionToken || undefined,
         }),
       "Tokens da Focus salvos de forma criptografada.",
     );
     if (saved) {
       setFocusMasterToken("");
       setFocusHomologationToken("");
+      setFocusProductionToken("");
     }
   }
 
@@ -201,30 +204,34 @@ export default function NfseConfigSection() {
               </div>
             </div>
 
-            <div className="rounded-lg border border-gray-200 p-4 space-y-3">
+            <div className="rounded-lg border border-gray-200 p-4 space-y-4">
               <div>
-                <h3 className="font-semibold text-gray-900">1. Contratação e tokens</h3>
+                <h3 className="font-semibold text-gray-900">1. Conta própria e tokens da Focus</h3>
                 <p className="mt-1 text-sm text-gray-600">
-                  Plano Focus Solo: R$ 89,90/mês, 1 CNPJ, 100 documentos e 30 dias de teste.
+                  A assinatura é feita e paga diretamente à Focus. O plano Solo custa R$ 89,90/mês
+                  para 1 CNPJ, inclui 100 documentos e oferece 30 dias de teste.
                 </p>
               </div>
+              <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-800">
+                Entrar ou concluir o cadastro na Focus não configura o CorePet automaticamente. No
+                fluxo normal, cadastre a empresa no painel da Focus e depois copie os tokens para
+                esta tela.
+              </div>
+              <ol className="list-decimal space-y-1 pl-5 text-sm text-gray-600">
+                <li>Crie a conta própria da empresa na Focus.</li>
+                <li>No painel da Focus, acesse Empresas e adicione a empresa emitente.</li>
+                <li>Depois acesse Painel API &gt; Tokens.</li>
+                <li>Cole abaixo os tokens de homologação e produção.</li>
+              </ol>
               <a
                 href={config.focus_signup_url}
                 target="_blank"
                 rel="noreferrer"
                 className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700"
               >
-                Iniciar teste na Focus <ExternalLink size={15} />
+                Criar conta própria na Focus <ExternalLink size={15} />
               </a>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <input
-                  type="password"
-                  value={focusMasterToken}
-                  onChange={(event) => setFocusMasterToken(event.target.value)}
-                  autoComplete="new-password"
-                  placeholder="Token master da Focus"
-                  className="rounded-lg border border-gray-300 px-3 py-2 text-sm"
-                />
+              <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
                 <input
                   type="password"
                   value={focusHomologationToken}
@@ -233,21 +240,44 @@ export default function NfseConfigSection() {
                   placeholder="Token de homologação"
                   className="rounded-lg border border-gray-300 px-3 py-2 text-sm"
                 />
+                <input
+                  type="password"
+                  value={focusProductionToken}
+                  onChange={(event) => setFocusProductionToken(event.target.value)}
+                  autoComplete="new-password"
+                  placeholder="Token de produção"
+                  className="rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                />
+                <input
+                  type="password"
+                  value={focusMasterToken}
+                  onChange={(event) => setFocusMasterToken(event.target.value)}
+                  autoComplete="new-password"
+                  placeholder="Token Principal de Produção (opcional)"
+                  className="rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                />
               </div>
               <button
                 type="button"
                 onClick={() => void saveFocusCredentials()}
-                disabled={saving || (!focusMasterToken && !focusHomologationToken)}
+                disabled={
+                  saving || (!focusMasterToken && !focusHomologationToken && !focusProductionToken)
+                }
                 className="inline-flex w-fit items-center gap-2 rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50"
               >
                 <KeyRound size={15} /> Salvar tokens
               </button>
-              <StatusItem ok={config.master_token_configured}>
-                Token master para cadastrar/vincular a empresa
-              </StatusItem>
-              <StatusItem ok={config.token_configured}>
+              <StatusItem ok={config.homologation_token_configured}>
                 Token de homologação para emitir notas de teste
               </StatusItem>
+              <StatusItem ok={config.production_token_configured}>
+                Token de produção para emitir notas com validade fiscal depois da homologação
+              </StatusItem>
+              <p className="text-xs leading-5 text-gray-500">
+                Token Principal de Produção:{" "}
+                {config.master_token_configured ? "configurado" : "não configurado"}. Ele é opcional
+                e só é necessário para o cadastro automático da empresa via API.
+              </p>
             </div>
 
             <div className="rounded-lg border border-gray-200 p-4 space-y-4">
@@ -290,7 +320,9 @@ export default function NfseConfigSection() {
 
             <div className="rounded-lg border border-gray-200 p-4 space-y-4">
               <div>
-                <h3 className="font-semibold text-gray-900">3. Certificado A1</h3>
+                <h3 className="font-semibold text-gray-900">
+                  3. Cadastro da empresa e certificado A1
+                </h3>
                 <p className="mt-1 text-sm text-gray-600">{config.certificate?.message}</p>
               </div>
               <StatusItem ok={config.certificate?.valid}>
@@ -298,42 +330,52 @@ export default function NfseConfigSection() {
               </StatusItem>
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
                 <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3">
-                  <h4 className="font-medium text-emerald-900">Reutilizar certificado</h4>
+                  <h4 className="font-medium text-emerald-900">
+                    Cadastro manual na Focus — recomendado
+                  </h4>
                   <p className="mt-1 text-xs text-emerald-800">
-                    O backend envia o .pfx e a senha diretamente à Focus após confirmação explícita.
-                  </p>
-                  <button
-                    type="button"
-                    onClick={() => void shareExistingCertificate()}
-                    disabled={saving || !shareReady}
-                    className="mt-3 rounded-lg bg-emerald-600 px-3 py-2 text-sm text-white hover:bg-emerald-700 disabled:opacity-50"
-                  >
-                    Autorizar compartilhamento
-                  </button>
-                </div>
-                <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
-                  <h4 className="font-medium text-gray-900">Configurar manualmente</h4>
-                  <p className="mt-1 text-xs text-gray-600">
-                    Faça o upload do A1 e informe as credenciais diretamente no painel da Focus.
+                    Como a conta e a cobrança são da própria empresa, adicione o emitente no painel
+                    da Focus, envie o A1 e informe as credenciais municipais por lá.
                   </p>
                   <div className="mt-3 flex flex-wrap gap-2">
                     <button
                       type="button"
                       onClick={() => void chooseManual(false)}
                       disabled={saving}
-                      className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-white"
+                      className="rounded-lg bg-emerald-600 px-3 py-2 text-sm text-white hover:bg-emerald-700 disabled:opacity-50"
                     >
-                      Escolher manual
+                      Usar cadastro manual
                     </button>
                     <button
                       type="button"
                       onClick={() => void chooseManual(true)}
                       disabled={saving || config.onboarding_method !== "manual"}
-                      className="rounded-lg border border-blue-300 px-3 py-2 text-sm text-blue-700 hover:bg-blue-50 disabled:opacity-50"
+                      className="rounded-lg border border-emerald-300 bg-white px-3 py-2 text-sm text-emerald-700 hover:bg-emerald-100 disabled:opacity-50"
                     >
-                      Já concluí na Focus
+                      Já cadastrei a empresa na Focus
                     </button>
                   </div>
+                </div>
+                <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
+                  <h4 className="font-medium text-gray-900">Cadastro automático — opcional</h4>
+                  <p className="mt-1 text-xs text-gray-600">
+                    Se a Focus já disponibilizou o Token Principal de Produção, o CorePet pode
+                    cadastrar a empresa e enviar o A1 diretamente após sua autorização.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => void shareExistingCertificate()}
+                    disabled={saving || !shareReady}
+                    className="mt-3 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 disabled:opacity-50"
+                  >
+                    Autorizar cadastro automático
+                  </button>
+                  {!shareReady && (
+                    <p className="mt-2 text-xs text-gray-500">
+                      Requer A1 válido no CorePet, credenciais municipais e Token Principal de
+                      Produção.
+                    </p>
+                  )}
                 </div>
               </div>
             </div>

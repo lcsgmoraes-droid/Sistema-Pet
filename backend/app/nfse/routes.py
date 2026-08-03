@@ -148,14 +148,17 @@ def _config_response(
     *,
     certificate: dict,
 ) -> dict:
-    encrypted_environment_token = (
+    homologation_token_configured = nfse_secret_is_configured(
+        config.focus_homologation_token_encrypted
+    ) or focus_token_is_configured("homologacao")
+    production_token_configured = nfse_secret_is_configured(
         config.focus_production_token_encrypted
+    ) or focus_token_is_configured("producao")
+    token_configured = (
+        production_token_configured
         if config.environment == "producao"
-        else config.focus_homologation_token_encrypted
+        else homologation_token_configured
     )
-    token_configured = nfse_secret_is_configured(
-        encrypted_environment_token
-    ) or focus_token_is_configured(config.environment)
     master_token_configured = (
         nfse_secret_is_configured(config.focus_master_token_encrypted)
         or focus_master_token_is_configured()
@@ -186,6 +189,8 @@ def _config_response(
         "cultural_incentive": bool(fiscal.nfse_incentivador_cultural),
         "provider_company_reference": config.provider_company_reference,
         "token_configured": token_configured,
+        "homologation_token_configured": homologation_token_configured,
+        "production_token_configured": production_token_configured,
         "master_token_configured": master_token_configured,
         "municipal_credentials_configured": municipal_credentials_configured,
         "onboarding_method": config.onboarding_method,
@@ -196,7 +201,7 @@ def _config_response(
             "message": certificate["message"],
             "shared_with_provider": bool(config.certificate_shared_at),
         },
-        "focus_signup_url": "https://2025.focusnfe.com.br/cadastro/",
+        "focus_signup_url": "https://focusnfe.com.br/cadastro/",
         "ready_for_homologation": not missing and config.environment == "homologacao",
         "missing_fields": missing,
         "last_validation_error": config.last_validation_error,
