@@ -14,3 +14,10 @@ def test_fluxo_caixa_frontend_tem_preset_proximos_12_meses_mensal():
     assert "proximos_12_meses" in source
     assert "Proximos 12 meses" in source
     assert 'preset === "proximos_12_meses" ? "mes" : filtros.agrupamento' in source
+
+
+def test_fluxo_caixa_atualizar_nao_repassa_evento_de_clique_como_filtros():
+    source = read_repo("frontend/src/components/FluxoCaixa.jsx")
+
+    assert 'onClick={() => carregarFluxoCaixa()}' in source
+    assert "onClick={carregarFluxoCaixa}" not in source
