@@ -455,7 +455,12 @@ const FluxoCaixa = () => {
           </div>
 
           <div className="flex items-end gap-2">
-            <ActionButton onClick={carregarFluxoCaixa} intent="neutral" icon={RefreshCw} size="md">
+            <ActionButton
+              onClick={() => carregarFluxoCaixa()}
+              intent="neutral"
+              icon={RefreshCw}
+              size="md"
+            >
               Atualizar
             </ActionButton>
           </div>
