@@ -1,11 +1,18 @@
 import * as SecureStore from "expo-secure-store";
 import { create } from "zustand";
 import * as AuthService from "../services/auth.service";
-import { AppAccessProfile, AppProfileType, AuthResponse, EcommerceUser } from "../types";
+import {
+  AppAccessProfile,
+  AppProfileType,
+  AuthResponse,
+  EcommerceUser,
+} from "../types";
 
 const ROLE_CACHE_KEY_PREFIX = "ecommerce_role_cache_";
 
-async function clearOperationalRoleCache(user: EcommerceUser | null): Promise<void> {
+async function clearOperationalRoleCache(
+  user: EcommerceUser | null,
+): Promise<void> {
   if (!user?.id) return;
   await SecureStore.deleteItemAsync(`${ROLE_CACHE_KEY_PREFIX}${user.id}`);
 }
@@ -32,7 +39,7 @@ async function cacheOperationalRole(user: EcommerceUser | null): Promise<void> {
           ? "entregador"
           : user.is_funcionario
             ? "funcionario"
-            : user.perfil_operacional ?? "cliente",
+            : (user.perfil_operacional ?? "cliente"),
     }),
   );
 }
@@ -40,7 +47,13 @@ async function cacheOperationalRole(user: EcommerceUser | null): Promise<void> {
 async function applyCachedOperationalRole(
   user: EcommerceUser,
 ): Promise<EcommerceUser> {
-  if (!user?.id || user.is_veterinario || user.is_entregador || user.is_funcionario) return user;
+  if (
+    !user?.id ||
+    user.is_veterinario ||
+    user.is_entregador ||
+    user.is_funcionario
+  )
+    return user;
   if (user.perfil_operacional === "cliente") {
     await clearOperationalRoleCache(user);
     return user;
@@ -59,7 +72,11 @@ async function applyCachedOperationalRole(
       funcionario_id?: number | null;
       perfil_operacional?: AppProfileType;
     };
-    if (cached?.is_veterinario || cached?.is_entregador || cached?.is_funcionario) {
+    if (
+      cached?.is_veterinario ||
+      cached?.is_entregador ||
+      cached?.is_funcionario
+    ) {
       return {
         ...user,
         is_veterinario: cached.is_veterinario ?? user.is_veterinario ?? false,
@@ -67,7 +84,8 @@ async function applyCachedOperationalRole(
         is_entregador: cached.is_entregador ?? user.is_entregador ?? false,
         is_funcionario: cached.is_funcionario ?? user.is_funcionario ?? false,
         funcionario_id: cached.funcionario_id ?? user.funcionario_id ?? null,
-        perfil_operacional: cached.perfil_operacional ?? user.perfil_operacional,
+        perfil_operacional:
+          cached.perfil_operacional ?? user.perfil_operacional,
       };
     }
   } catch {
@@ -147,8 +165,24 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
     });
   },
 
-  register: async (email, password, nome, cpf, telefone, acceptedTerms, acceptedPrivacy) => {
-    const response = await AuthService.register(email, password, nome, cpf, telefone, acceptedTerms, acceptedPrivacy);
+  register: async (
+    email,
+    password,
+    nome,
+    cpf,
+    telefone,
+    acceptedTerms,
+    acceptedPrivacy,
+  ) => {
+    const response = await AuthService.register(
+      email,
+      password,
+      nome,
+      cpf,
+      telefone,
+      acceptedTerms,
+      acceptedPrivacy,
+    );
     const { user } = response;
     if (response.requires_email_verification || !response.access_token) {
       set({
@@ -184,7 +218,12 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
   logout: async () => {
     await clearOperationalRoleCache(get().user);
     await AuthService.logout();
-    set({ isAuthenticated: false, user: null, pendingProfiles: [], needsProfileSelection: false });
+    set({
+      isAuthenticated: false,
+      user: null,
+      pendingProfiles: [],
+      needsProfileSelection: false,
+    });
   },
 
   loadUser: async () => {
@@ -220,6 +259,28 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
         });
       }
     } catch {
+      // Sem rede ou com o backend temporariamente indisponivel, mantem a
+      // sessao local. O interceptor remove a sessao apenas quando o refresh
+      // token for de fato rejeitado pelo backend.
+      const [hasStoredSession, cachedUser] = await Promise.all([
+        AuthService.hasStoredSession().catch(() => false),
+        AuthService.getCachedUser().catch(() => null),
+      ]);
+
+      if (hasStoredSession && cachedUser) {
+        const user = await applyCachedOperationalRole(cachedUser).catch(
+          () => cachedUser,
+        );
+        set({
+          isAuthenticated: true,
+          user,
+          pendingProfiles: [],
+          needsProfileSelection: false,
+          isLoading: false,
+        });
+        return;
+      }
+
       set({
         isAuthenticated: false,
         user: null,

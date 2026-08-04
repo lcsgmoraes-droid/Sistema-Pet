@@ -1,5 +1,5 @@
-import { useNavigation } from "@react-navigation/native";
-import React, { useEffect, useState } from "react";
+import { useFocusEffect, useNavigation } from "@react-navigation/native";
+import React, { useCallback, useState } from "react";
 import { Alert, Linking } from "react-native";
 
 import { finalizarCheckoutAppLoja } from "../../services/shop.service";
@@ -48,9 +48,12 @@ export default function CartScreen() {
   const [estado, setEstado] = useState(enderecoInicial.estado);
   const [buscandoCep, setBuscandoCep] = useState(false);
 
-  useEffect(() => {
-    carregar();
-  }, []);
+  useFocusEffect(
+    useCallback(() => {
+      if (!user?.id || !tenant?.id) return;
+      void carregar({ userId: user.id, tenantId: tenant.id });
+    }, [carregar, tenant?.id, user?.id]),
+  );
 
   async function buscarCep(value: string) {
     const { numeros, cep: cepFormatado } = formatarCep(value);
