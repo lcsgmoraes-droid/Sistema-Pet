@@ -4,6 +4,7 @@
 
 export interface AuthTokens {
   access_token?: string | null;
+  refresh_token?: string | null;
   token_type: string;
 }
 
@@ -13,7 +14,11 @@ export interface AuthResponse extends AuthTokens {
   email_verification_sent?: boolean;
 }
 
-export type AppProfileType = "cliente" | "entregador" | "veterinario" | "funcionario";
+export type AppProfileType =
+  | "cliente"
+  | "entregador"
+  | "veterinario"
+  | "funcionario";
 
 export interface AppAccessProfile {
   type: AppProfileType;
@@ -121,7 +126,11 @@ export interface PetCarteirinha {
   status_vacinal: {
     carteira: VacinaCarteirinha[];
     pendentes: { nome: string; motivo?: string | null }[];
-    vencidas: { nome: string; data_proxima_dose?: string | null; dias_atraso?: number | null }[];
+    vencidas: {
+      nome: string;
+      data_proxima_dose?: string | null;
+      dias_atraso?: number | null;
+    }[];
     resumo: {
       total_aplicadas: number;
       total_pendentes: number;
@@ -150,8 +159,19 @@ export interface PetCarteirinha {
 export interface PushStatus {
   token_registrado: boolean;
   push_token_preview?: string | null;
-  pendencias: { id: number; assunto?: string | null; mensagem?: string | null; scheduled_at?: string | null }[];
-  proximos_agendamentos: { id: number; pet_id: number; data_hora?: string | null; tipo?: string | null; status?: string | null }[];
+  pendencias: {
+    id: number;
+    assunto?: string | null;
+    mensagem?: string | null;
+    scheduled_at?: string | null;
+  }[];
+  proximos_agendamentos: {
+    id: number;
+    pet_id: number;
+    data_hora?: string | null;
+    tipo?: string | null;
+    status?: string | null;
+  }[];
   observacao?: string | null;
 }
 
@@ -246,13 +266,13 @@ export interface Produto {
   descricao?: string | null;
   foto_url?: string | null;
   estoque?: number;
-  estoque_ecommerce?: number | null;   // estoque específico do e-commerce
-  codigo?: string | null;              // SKU / código interno
+  estoque_ecommerce?: number | null; // estoque específico do e-commerce
+  codigo?: string | null; // SKU / código interno
   codigo_barras?: string | null;
   unidade?: string;
   categoria_nome?: string | null;
   marca_nome?: string | null;
-  peso_embalagem_kg?: number | null;   // para calculadora de ração
+  peso_embalagem_kg?: number | null; // para calculadora de ração
   anunciar_app?: boolean | null;
   anunciar_ecommerce?: boolean | null;
   disponivel_app?: boolean | null;
@@ -431,7 +451,11 @@ export interface FuncionarioPdvItemPayload {
   preco_unitario: number;
 }
 
-export type FuncionarioPdvFormaPagamento = "dinheiro" | "pix" | "credito" | "debito";
+export type FuncionarioPdvFormaPagamento =
+  | "dinheiro"
+  | "pix"
+  | "credito"
+  | "debito";
 
 export interface FuncionarioPdvFormaPagamentoOpcao {
   id: number;
@@ -581,7 +605,7 @@ export interface Pedido {
 export interface CalculadoraInput {
   peso_pet_kg: number;
   idade_meses?: number;
-  nivel_atividade: 'baixo' | 'normal' | 'alto';
+  nivel_atividade: "baixo" | "normal" | "alto";
   produto_id?: number;
   peso_embalagem_kg?: number;
   preco?: number;
