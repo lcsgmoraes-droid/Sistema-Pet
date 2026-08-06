@@ -10,6 +10,7 @@ from sqlalchemy import (
     DateTime,
     Float,
     ForeignKey,
+    Index,
     Integer,
     String,
     Text,
@@ -169,7 +170,16 @@ class NotaEntrada(BaseTenantModel):
     """Notas fiscais de entrada (NF-e de fornecedores)"""
 
     __tablename__ = "notas_entrada"
-    __table_args__ = {"extend_existing": True}
+    __table_args__ = (
+        Index("ix_notas_entrada_tenant_data_entrada", "tenant_id", "data_entrada"),
+        Index(
+            "ix_notas_entrada_tenant_status_data_entrada",
+            "tenant_id",
+            "status",
+            "data_entrada",
+        ),
+        {"extend_existing": True},
+    )
 
     id = Column(Integer, primary_key=True, index=True)
     numero_nota = Column(String(20), nullable=False, index=True)

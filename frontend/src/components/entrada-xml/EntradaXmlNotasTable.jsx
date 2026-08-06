@@ -1,7 +1,7 @@
-import { useMemo, useState } from "react";
 import PropTypes from "prop-types";
 import ActionButton from "../ui/ActionButton";
 import DataTable from "../ui/DataTable";
+import PaginationControls from "../ui/PaginationControls";
 import Panel from "../ui/Panel";
 import SegmentedControl from "../ui/SegmentedControl";
 import StatusBadge from "../ui/StatusBadge";
@@ -26,13 +26,6 @@ const FILTROS_CONFERENCIA = [
   { value: "sem_divergencia", label: "Sem divergencia" },
   { value: "com_divergencia", label: "Com divergencia" },
 ];
-
-const normalizarBuscaNota = (valor) =>
-  String(valor || "")
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .trim();
 
 function NotaStatusBadge({ status }) {
   const meta = STATUS_META[status] || {
@@ -96,21 +89,20 @@ export default function EntradaXmlNotasTable({
   conferenciaStatusMeta,
   excluirNota,
   filtroStatus,
+  filtrosNotas,
   formatMoneyBRL,
+  loading,
   notasEntrada,
+  onFiltrosChange,
+  onItemsPerPageChange,
+  onPageChange,
+  paginacao,
   reverterNota,
   setFiltroStatus,
+  totalNotasGlobal,
 }) {
-  const [filtrosNotas, setFiltrosNotas] = useState({
-    fornecedor: "",
-    nf: "",
-    data_inicio: "",
-    data_fim: "",
-    conferencia: "todos",
-  });
-
   const limparFiltrosNotas = () => {
-    setFiltrosNotas({
+    onFiltrosChange({
       fornecedor: "",
       nf: "",
       data_inicio: "",
@@ -119,44 +111,8 @@ export default function EntradaXmlNotasTable({
     });
   };
 
-  const notas = useMemo(() => {
-    const fornecedorBusca = normalizarBuscaNota(filtrosNotas.fornecedor);
-    const nfBusca = normalizarBuscaNota(filtrosNotas.nf);
-
-    return notasEntrada.filter((nota) => {
-      if (filtroStatus !== "todos" && nota.status !== filtroStatus) return false;
-
-      if (fornecedorBusca) {
-        const fornecedorTexto = normalizarBuscaNota(
-          `${nota.fornecedor_nome || ""} ${nota.fornecedor_cnpj || ""}`,
-        );
-        if (!fornecedorTexto.includes(fornecedorBusca)) return false;
-      }
-
-      if (nfBusca) {
-        const nfTexto = normalizarBuscaNota(`${nota.numero_nota || ""} ${nota.chave_acesso || ""}`);
-        if (!nfTexto.includes(nfBusca)) return false;
-      }
-
-      if (filtrosNotas.data_inicio || filtrosNotas.data_fim) {
-        const dataEmissao = String(nota.data_emissao || "").slice(0, 10);
-        if (filtrosNotas.data_inicio && dataEmissao < filtrosNotas.data_inicio) return false;
-        if (filtrosNotas.data_fim && dataEmissao > filtrosNotas.data_fim) return false;
-      }
-
-      if (
-        filtrosNotas.conferencia !== "todos" &&
-        (nota.conferencia_status || "nao_iniciada") !== filtrosNotas.conferencia
-      ) {
-        return false;
-      }
-
-      return true;
-    });
-  }, [filtroStatus, filtrosNotas, notasEntrada]);
-
   const emptyMessage =
-    notasEntrada.length === 0
+    totalNotasGlobal === 0
       ? "Nenhuma nota fiscal importada. Importe um XML ou busque pela SEFAZ."
       : "Nenhuma nota encontrada com os filtros atuais.";
 
@@ -352,7 +308,10 @@ export default function EntradaXmlNotasTable({
               placeholder="Nome ou CNPJ"
               value={filtrosNotas.fornecedor}
               onChange={(event) =>
-                setFiltrosNotas({ ...filtrosNotas, fornecedor: event.target.value })
+                onFiltrosChange((atuais) => ({
+                  ...atuais,
+                  fornecedor: event.target.value,
+                }))
               }
             />
           </div>
@@ -363,7 +322,9 @@ export default function EntradaXmlNotasTable({
               className="w-full rounded border border-slate-300 px-3 py-2"
               placeholder="Numero ou chave"
               value={filtrosNotas.nf}
-              onChange={(event) => setFiltrosNotas({ ...filtrosNotas, nf: event.target.value })}
+              onChange={(event) =>
+                onFiltrosChange((atuais) => ({ ...atuais, nf: event.target.value }))
+              }
             />
           </div>
           <div className="md:col-span-2">
@@ -373,7 +334,10 @@ export default function EntradaXmlNotasTable({
               className="w-full rounded border border-slate-300 px-3 py-2"
               value={filtrosNotas.data_inicio}
               onChange={(event) =>
-                setFiltrosNotas({ ...filtrosNotas, data_inicio: event.target.value })
+                onFiltrosChange((atuais) => ({
+                  ...atuais,
+                  data_inicio: event.target.value,
+                }))
               }
             />
           </div>
@@ -384,7 +348,10 @@ export default function EntradaXmlNotasTable({
               className="w-full rounded border border-slate-300 px-3 py-2"
               value={filtrosNotas.data_fim}
               onChange={(event) =>
-                setFiltrosNotas({ ...filtrosNotas, data_fim: event.target.value })
+                onFiltrosChange((atuais) => ({
+                  ...atuais,
+                  data_fim: event.target.value,
+                }))
               }
             />
           </div>
@@ -394,7 +361,10 @@ export default function EntradaXmlNotasTable({
               className="w-full rounded border border-slate-300 px-3 py-2"
               value={filtrosNotas.conferencia}
               onChange={(event) =>
-                setFiltrosNotas({ ...filtrosNotas, conferencia: event.target.value })
+                onFiltrosChange((atuais) => ({
+                  ...atuais,
+                  conferencia: event.target.value,
+                }))
               }
             >
               {FILTROS_CONFERENCIA.map((filtro) => (
@@ -406,9 +376,7 @@ export default function EntradaXmlNotasTable({
           </div>
         </div>
         <div className="mt-3 flex items-center justify-between gap-3">
-          <span className="text-sm text-slate-500">
-            {notas.length} de {notasEntrada.length} nota(s)
-          </span>
+          <span className="text-sm text-slate-500">{paginacao.total} nota(s) encontrada(s)</span>
           <ActionButton intent="neutral" tone="soft" size="sm" onClick={limparFiltrosNotas}>
             Limpar filtros
           </ActionButton>
@@ -416,12 +384,26 @@ export default function EntradaXmlNotasTable({
       </div>
       <DataTable
         columns={columns}
-        data={notas}
+        data={notasEntrada}
         emptyMessage={emptyMessage}
         getRowKey={(nota) => nota.id}
+        loading={loading}
+        loadingMessage="Carregando notas fiscais..."
         onRowClick={(nota) => abrirVisualizacao(nota.id)}
         rowClassName="hover:bg-blue-50"
         tableClassName="min-w-[960px]"
+      />
+      <PaginationControls
+        currentPage={paginacao.page}
+        disabled={loading}
+        itemName="notas"
+        itemsPerPage={paginacao.page_size}
+        onItemsPerPageChange={onItemsPerPageChange}
+        onPageChange={onPageChange}
+        pageSizeOptions={[10, 20, 50, 100]}
+        totalItems={paginacao.total}
+        totalPages={paginacao.pages}
+        variant="bottom"
       />
     </Panel>
   );
@@ -439,7 +421,15 @@ EntradaXmlNotasTable.propTypes = {
   ).isRequired,
   excluirNota: PropTypes.func.isRequired,
   filtroStatus: PropTypes.string.isRequired,
+  filtrosNotas: PropTypes.shape({
+    fornecedor: PropTypes.string,
+    nf: PropTypes.string,
+    data_inicio: PropTypes.string,
+    data_fim: PropTypes.string,
+    conferencia: PropTypes.string,
+  }).isRequired,
   formatMoneyBRL: PropTypes.func.isRequired,
+  loading: PropTypes.bool.isRequired,
   notasEntrada: PropTypes.arrayOf(
     PropTypes.shape({
       chave_acesso: PropTypes.string,
@@ -457,6 +447,16 @@ EntradaXmlNotasTable.propTypes = {
       valor_total: PropTypes.number,
     }),
   ).isRequired,
+  onFiltrosChange: PropTypes.func.isRequired,
+  onItemsPerPageChange: PropTypes.func.isRequired,
+  onPageChange: PropTypes.func.isRequired,
+  paginacao: PropTypes.shape({
+    page: PropTypes.number,
+    page_size: PropTypes.number,
+    pages: PropTypes.number,
+    total: PropTypes.number,
+  }).isRequired,
   reverterNota: PropTypes.func.isRequired,
   setFiltroStatus: PropTypes.func.isRequired,
+  totalNotasGlobal: PropTypes.number.isRequired,
 };

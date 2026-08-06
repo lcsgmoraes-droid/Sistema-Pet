@@ -35,39 +35,34 @@ FiltroMetricCard.defaultProps = {
   subtitle: undefined,
 };
 
-export default function EntradaXmlMetricas({ formatMoneyBRL, notasEntrada, onFiltroStatus }) {
-  const totalNotas = notasEntrada.length;
-  const pendentes = notasEntrada.filter((nota) => nota.status === "pendente").length;
-  const conciliadas = notasEntrada.filter((nota) => nota.status === "processada");
-  const valorConciliado = conciliadas.reduce((total, nota) => total + (nota.valor_total || 0), 0);
-
+export default function EntradaXmlMetricas({ formatMoneyBRL, metricas, onFiltroStatus }) {
   return (
     <MetricGrid className="mb-6">
       <FiltroMetricCard
         intent="blue"
         label="Total de notas"
-        value={totalNotas}
+        value={metricas.total_notas}
         subtitle="Todas as importacoes"
         onClick={() => onFiltroStatus("todos")}
       />
       <FiltroMetricCard
         intent="amber"
         label="Pendentes"
-        value={pendentes}
+        value={metricas.pendentes}
         subtitle="Aguardando conferencia"
         onClick={() => onFiltroStatus("pendente")}
       />
       <FiltroMetricCard
         intent="emerald"
         label="Conciliadas"
-        value={conciliadas.length}
+        value={metricas.conciliadas}
         subtitle="Entrada ja processada"
         onClick={() => onFiltroStatus("processada")}
       />
       <MetricCard
         intent="violet"
         label="Valor conciliado"
-        value={formatMoneyBRL(valorConciliado)}
+        value={formatMoneyBRL(metricas.valor_conciliado)}
         subtitle="Somente notas conciliadas"
       />
     </MetricGrid>
@@ -76,11 +71,12 @@ export default function EntradaXmlMetricas({ formatMoneyBRL, notasEntrada, onFil
 
 EntradaXmlMetricas.propTypes = {
   formatMoneyBRL: PropTypes.func.isRequired,
-  notasEntrada: PropTypes.arrayOf(
-    PropTypes.shape({
-      status: PropTypes.string,
-      valor_total: PropTypes.number,
-    }),
-  ).isRequired,
+  metricas: PropTypes.shape({
+    total_notas: PropTypes.number,
+    pendentes: PropTypes.number,
+    conciliadas: PropTypes.number,
+    com_erro: PropTypes.number,
+    valor_conciliado: PropTypes.number,
+  }).isRequired,
   onFiltroStatus: PropTypes.func.isRequired,
 };

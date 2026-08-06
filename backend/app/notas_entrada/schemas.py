@@ -26,6 +26,23 @@ class NotaEntradaResponse(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class NotaEntradaListagemMetricas(BaseModel):
+    total_notas: int = 0
+    pendentes: int = 0
+    conciliadas: int = 0
+    com_erro: int = 0
+    valor_conciliado: float = 0
+
+
+class NotaEntradaListagemResponse(BaseModel):
+    items: List[NotaEntradaResponse]
+    total: int
+    page: int
+    page_size: int
+    pages: int
+    metricas: NotaEntradaListagemMetricas
+
+
 class ConferenciaItemPayload(BaseModel):
     item_id: int
     quantidade_conferida: float
