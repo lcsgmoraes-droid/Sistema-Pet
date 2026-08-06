@@ -14,7 +14,7 @@ export default function EstoqueFullNFHistoricoPanel({ controller }) {
     <Panel
       className="space-y-4"
       title="Historico de baixas FULL"
-      subtitle="Lancamentos processados por NF, com canal, estoque e tarifa financeira quando houver."
+      subtitle="Lancamentos processados por documento, com canal, estoque e tarifa quando houver."
       actions={
         <ActionButton
           icon={RefreshCw}
@@ -27,7 +27,7 @@ export default function EstoqueFullNFHistoricoPanel({ controller }) {
       }
     >
       {!carregandoHistorico && !historico.length && (
-        <EmptyState title="Nenhuma baixa FULL por NF encontrada ainda." />
+        <EmptyState title="Nenhuma baixa FULL por documento encontrada ainda." />
       )}
 
       <div className="space-y-3">
@@ -40,7 +40,7 @@ export default function EstoqueFullNFHistoricoPanel({ controller }) {
               <div>
                 <div className="flex flex-wrap items-center gap-2">
                   <h4 className="text-base font-semibold text-slate-900">
-                    NF {lancamento.numero_nf}
+                    Documento {lancamento.numero_nf}
                   </h4>
                   <ChannelBadge
                     channel={lancamento.plataforma}

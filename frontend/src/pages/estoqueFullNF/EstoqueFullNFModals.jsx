@@ -34,13 +34,13 @@ export default function EstoqueFullNFModals({ controller }) {
               <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">
                 Processamento concluido
               </p>
-              <h3 className="mt-1 text-lg font-semibold text-slate-900">Baixa por NF finalizada</h3>
+              <h3 className="mt-1 text-lg font-semibold text-slate-900">Baixa FULL finalizada</h3>
             </div>
 
             <div className="space-y-4 px-5 py-4">
               <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
                 <div>
-                  <p className="text-xs text-slate-500">NF</p>
+                  <p className="text-xs text-slate-500">Documento</p>
                   <p className="text-base font-semibold text-slate-900">
                     {modalConclusao.resultado?.numero_nf}
                   </p>
@@ -85,8 +85,8 @@ export default function EstoqueFullNFModals({ controller }) {
 
               {modalConclusao.resultado?.estoque_ja_baixado && (
                 <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-                  O estoque desta NF ja estava baixado. O sistema nao baixou novamente e executou
-                  apenas o que ainda estava pendente.
+                  O estoque deste documento ja estava baixado. O sistema nao baixou novamente e
+                  executou apenas o que ainda estava pendente.
                 </div>
               )}
 
@@ -132,7 +132,7 @@ export default function EstoqueFullNFModals({ controller }) {
                   Correcao de canal
                 </p>
                 <h3 className="mt-1 text-lg font-semibold text-slate-900">
-                  Editar loja/canal da NF {modalEditarCanal.lancamento?.numero_nf}
+                  Editar loja/canal do documento {modalEditarCanal.lancamento?.numero_nf}
                 </h3>
               </div>
               <IconActionButton
@@ -155,7 +155,8 @@ export default function EstoqueFullNFModals({ controller }) {
                   />
                 </p>
                 <p className="mt-2 text-xs text-slate-500">
-                  A correcao atualiza a baixa de estoque e a conta a pagar da tarifa desta NF.
+                  A correcao atualiza a baixa de estoque e a conta a pagar da tarifa deste
+                  documento.
                 </p>
               </div>
 
@@ -189,7 +190,7 @@ export default function EstoqueFullNFModals({ controller }) {
               {modalEditarCanal.canal &&
                 modalEditarCanal.canal !== modalEditarCanal.lancamento?.plataforma && (
                   <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-                    Vou mover esta NF para{" "}
+                    Vou mover este documento para{" "}
                     <strong>{getChannelConfig(modalEditarCanal.canal).label}</strong>. Confira antes
                     de salvar.
                   </div>

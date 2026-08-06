@@ -16,6 +16,7 @@ import { CANAIS_FULL, formatarQuantidade } from "./estoqueFullNFUtils";
 export default function EstoqueFullNFLancamentoPanel({ controller }) {
   const {
     numeroNF,
+    setNumeroNF,
     plataforma,
     setPlataforma,
     dataVencimentoTarifa,
@@ -23,10 +24,10 @@ export default function EstoqueFullNFLancamentoPanel({ controller }) {
     observacao,
     setObservacao,
     adicionarLinha,
-    xmlInputKey,
-    setArquivoXml,
-    lendoXml,
-    importarItensDoXml,
+    documentoInputKey,
+    setArquivoDocumento,
+    lendoDocumento,
+    importarDocumento,
     problemasEstoque,
     validandoEstoque,
     revalidarEstoque,
@@ -53,15 +54,15 @@ export default function EstoqueFullNFLancamentoPanel({ controller }) {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
             <div className="block text-sm font-medium text-gray-700 mb-1">
-              Numero da NF (automatico via XML)
+              Identificacao do documento *
             </div>
             <input
               id="numero-nf"
-              aria-label="Numero da NF"
+              aria-label="Identificacao do documento"
               type="text"
               value={numeroNF}
-              readOnly
-              placeholder="Selecione um XML para preencher"
+              onChange={(e) => setNumeroNF(e.target.value)}
+              placeholder="NF, frete ML ou remessa Amazon"
               className="w-full border border-amber-300 bg-amber-50 rounded-lg px-3 py-2 text-gray-900"
             />
           </div>
@@ -123,7 +124,7 @@ export default function EstoqueFullNFLancamentoPanel({ controller }) {
 
       <Panel
         className="space-y-3"
-        title="Itens da NF (baixa de estoque)"
+        title="Itens do documento (baixa de estoque)"
         actions={
           <ActionButton icon={Plus} intent="create" onClick={adicionarLinha}>
             Adicionar item
@@ -133,13 +134,14 @@ export default function EstoqueFullNFLancamentoPanel({ controller }) {
         <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-end bg-slate-50 border border-slate-200 rounded-xl p-3 md:p-4">
           <div className="md:col-span-8">
             <div className="block text-sm font-medium text-slate-700 mb-1">
-              Escolher XML da NF (preenche numero e itens)
+              Escolher XML ou PDF (preenche documento e itens)
             </div>
             <input
-              key={xmlInputKey}
+              key={documentoInputKey}
               type="file"
-              accept=".xml,text/xml,application/xml"
-              onChange={(e) => setArquivoXml(e.target.files?.[0] || null)}
+              aria-label="Arquivo XML ou PDF do envio FULL"
+              accept=".xml,.pdf,text/xml,application/xml,application/pdf"
+              onChange={(e) => setArquivoDocumento(e.target.files?.[0] || null)}
               className="w-full border border-slate-300 bg-white rounded-lg px-3 py-2"
             />
           </div>
@@ -148,13 +150,21 @@ export default function EstoqueFullNFLancamentoPanel({ controller }) {
               className="w-full"
               icon={FileText}
               intent="edit"
-              loading={lendoXml}
-              onClick={importarItensDoXml}
+              loading={lendoDocumento}
+              onClick={importarDocumento}
               size="md"
             >
-              Ler XML e preencher
+              Ler arquivo e preencher
             </ActionButton>
           </div>
+        </div>
+
+        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          <p className="font-semibold">Baixe o estoque uma unica vez por envio.</p>
+          <p className="mt-1">
+            Se usar o PDF do inbound agora, nao processe depois o XML ou a DANFE do mesmo lote. O
+            numero do frete ou da remessa fica salvo para bloquear a repeticao do mesmo arquivo.
+          </p>
         </div>
 
         {problemasEstoque.length > 0 && (
@@ -166,7 +176,7 @@ export default function EstoqueFullNFLancamentoPanel({ controller }) {
                 </h3>
                 <p className="mt-1 text-red-800">
                   Corrija o estoque dos produtos marcados em uma nova aba e depois revalide sem
-                  perder esta NF.
+                  perder este documento.
                 </p>
               </div>
               <ActionButton
@@ -200,7 +210,7 @@ export default function EstoqueFullNFLancamentoPanel({ controller }) {
                     <p className="font-semibold">{problema.nome || "Produto nao identificado"}</p>
                     <p className="text-xs text-red-700">
                       SKU {problema.sku || problema.entrada_sku || "-"} | Disponivel:{" "}
-                      {formatarQuantidade(problema.disponivel)} | NF pede:{" "}
+                      {formatarQuantidade(problema.disponivel)} | Documento pede:{" "}
                       {formatarQuantidade(problema.solicitado)} | Falta:{" "}
                       {formatarQuantidade(problema.faltante)}
                     </p>
@@ -362,7 +372,7 @@ export default function EstoqueFullNFLancamentoPanel({ controller }) {
           onClick={() => processar()}
           size="lg"
         >
-          Confirmar baixa por NF
+          Confirmar baixa de estoque
         </ActionButton>
       </div>
     </>
