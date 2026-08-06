@@ -15,10 +15,17 @@ def _source(relative: str) -> str:
 
 
 def test_saida_full_routes_ficam_em_router_dedicado():
-    routes = {
-        (route.path, ",".join(sorted(route.methods)))
-        for route in estoque_saida_full_routes.router.routes
-    }
+    routes = set()
+    for route in estoque_saida_full_routes.router.routes:
+        if hasattr(route, "path"):
+            routes.add((route.path, ",".join(sorted(route.methods))))
+            continue
+
+        prefix = route.include_context.prefix
+        routes.update(
+            (f"{prefix}{nested.path}", ",".join(sorted(nested.methods)))
+            for nested in route.original_router.routes
+        )
 
     assert ("/estoque/saida-full-nf/historico", "GET") in routes
     assert ("/estoque/saida-full-nf/{numero_nf}/canal", "PUT") in routes
@@ -77,10 +84,101 @@ def test_parser_pdf_saida_full_extrai_sku_quantidade_explicitos_e_em_linha():
     ]
 
 
+def test_parser_pdf_saida_full_le_inbound_real_do_mercado_livre():
+    dados = estoque_saida_full_routes._parse_saida_full_pdf(
+        """
+        Frete#73581550
+        Produtos do envio:6|Total de unidades:335
+        Codigo ML: XWPE19854 Codigo universal: 50 Etiquetagem
+        7898401960398 SKU: 013267.1 obrigatoria
+        Codigo ML: AKYR51637 Codigo universal: 7898401961999 100 Etiquetagem
+        SKU: 022860.1 obrigatoria
+        Codigo ML: FWEM52238 Codigo universal: 45 Etiquetagem
+        7898401962019 SKU: 022861.1 obrigatoria
+        Codigo ML: JMAH74400 Codigo universal: 10 Etiquetagem
+        7898929877611 SKU: 013214.1 obrigatoria
+        Codigo ML: MPLC74162 Codigo universal: 120 Etiquetagem
+        7898929878540 SKU: 013248.1 obrigatoria
+        Codigo ML: USIV19655 Codigo universal: 7898401960411 10 Etiquetagem
+        SKU: 013269.1 obrigatoria
+        """
+    )
+
+    assert dados == {
+        "numero_documento": "ML-FRETE-73581550",
+        "numero_nf": "ML-FRETE-73581550",
+        "tipo_documento": "mercado_livre_inbound",
+        "plataforma_sugerida": "mercado_livre",
+        "total_itens": 6,
+        "total_unidades": 335.0,
+        "itens": [
+            {"sku": "013267.1", "quantidade": 50.0},
+            {"sku": "022860.1", "quantidade": 100.0},
+            {"sku": "022861.1", "quantidade": 45.0},
+            {"sku": "013214.1", "quantidade": 10.0},
+            {"sku": "013248.1", "quantidade": 120.0},
+            {"sku": "013269.1", "quantidade": 10.0},
+        ],
+    }
+
+
+def test_parser_pdf_saida_full_le_danfe_de_remessa():
+    dados = estoque_saida_full_routes._parse_saida_full_pdf(
+        """
+        NF-e
+        N 000.016.676
+        DANFE Documento Auxiliar da Nota Fiscal Eletronica
+        DESTINATARIO / REMETENTE
+        EBAZAR.COM.BR LTDA
+        DADOS DO PRODUTO / SERVICOS
+        CODIGO DESCRICAO DOS PRODUTOS / SERVICOS NCM/SH CSOSN CFOP UNID. QTD.
+        013267.1 MGZ EXT PAPAGAIOS REGULAR 600GR 23091000 0400 5949 UNID 50 47,56
+        013214.1 MGZ MIX PAPAGAIOS 350GR 23099010 0400 5949 UNID 10 33,45
+        022861.1 MGZ EXT PORQUINHO-DA-INDIA 1,2 KG 23099010 0400 5949 UNID 45 78,90
+        013248.1 MGZ COELHO ORNAMENTAIS 500GR 23099090 0400 5949 UNID 120 42,86
+        022860.1 MGZ EXT COELHOS ORNAMENTAIS 1,2 KG 23099010 0400 5949 UNID 100 92,80
+        013269.1 MGZ EXT PAPAGAIOS LARGE 600GR 23091000 0400 5949 UNID 10 54,93
+        CALCULO DO ISSQN
+        """
+    )
+
+    assert dados["numero_documento"] == "16676"
+    assert dados["tipo_documento"] == "danfe"
+    assert dados["plataforma_sugerida"] == "mercado_livre"
+    assert dados["total_unidades"] == 335.0
+    assert dados["itens"] == [
+        {"sku": "013267.1", "quantidade": 50.0},
+        {"sku": "013214.1", "quantidade": 10.0},
+        {"sku": "022861.1", "quantidade": 45.0},
+        {"sku": "013248.1", "quantidade": 120.0},
+        {"sku": "022860.1", "quantidade": 100.0},
+        {"sku": "013269.1", "quantidade": 10.0},
+    ]
+
+
+def test_parser_pdf_saida_full_reconhece_campos_de_remessa_amazon():
+    dados = estoque_saida_full_routes._parse_saida_full_pdf(
+        """
+        Amazon FBA - Shipment ID FBA19GQRV5K4
+        MSKU: 013267.1FBA Quantidade: 20
+        MSKU: 013268.1FBA
+        Unidades: 5
+        """
+    )
+
+    assert dados["numero_documento"] == "FBA19GQRV5K4"
+    assert dados["tipo_documento"] == "amazon_inbound"
+    assert dados["plataforma_sugerida"] == "amazon"
+    assert dados["itens"] == [
+        {"sku": "013267.1FBA", "quantidade": 20.0},
+        {"sku": "013268.1FBA", "quantidade": 5.0},
+    ]
+
+
 def test_saida_full_routes_vira_fachada_com_modulos_dedicados():
     fachada = _source("app/estoque_saida_full_routes.py")
 
-    assert len(fachada.splitlines()) <= 140
+    assert len(fachada.splitlines()) <= 145
     assert "from .estoque_saida_full.routes import router" in fachada
     assert "def saida_full_por_nf(" not in fachada
     assert "def parse_saida_full_pdf(" not in fachada
@@ -97,6 +195,7 @@ def test_saida_full_routes_vira_fachada_com_modulos_dedicados():
         assert len(source.splitlines()) <= 700
 
     assert "_parse_saida_full_xml" in _source("app/estoque_saida_full/parsers.py")
+    assert "_parse_saida_full_pdf" in _source("app/estoque_saida_full/parsers.py")
     assert "_criar_conta_pagar_tarifa_full_nf" in _source(
         "app/estoque_saida_full/financeiro.py"
     )

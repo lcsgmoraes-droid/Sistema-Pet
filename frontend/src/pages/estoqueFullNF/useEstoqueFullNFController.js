@@ -33,9 +33,9 @@ export function useEstoqueFullNFController() {
   const [carregandoHistorico, setCarregandoHistorico] = useState(false);
   const [salvando, setSalvando] = useState(false);
   const [salvandoCanal, setSalvandoCanal] = useState(false);
-  const [arquivoXml, setArquivoXml] = useState(null);
-  const [xmlInputKey, setXmlInputKey] = useState(0);
-  const [lendoXml, setLendoXml] = useState(false);
+  const [arquivoDocumento, setArquivoDocumento] = useState(null);
+  const [documentoInputKey, setDocumentoInputKey] = useState(0);
+  const [lendoDocumento, setLendoDocumento] = useState(false);
   const [modalDre, setModalDre] = useState({ aberto: false, categoria: null });
   const [dreSubcategoriasDespesa, setDreSubcategoriasDespesa] = useState([]);
   const [dreSubcategoriaId, setDreSubcategoriaId] = useState("");
@@ -181,57 +181,74 @@ export function useEstoqueFullNFController() {
     setPlataforma("");
     setItens([criarLinha()]);
     setObservacao("");
-    setArquivoXml(null);
-    setXmlInputKey((prev) => prev + 1);
+    setArquivoDocumento(null);
+    setDocumentoInputKey((prev) => prev + 1);
     setTarifaEnvio(0);
     setDataVencimentoTarifa(hojeISO);
     setCategoriaTarifaId("");
   };
 
-  const importarItensDoXml = async () => {
-    if (!arquivoXml) {
-      toast.error("Selecione um arquivo XML primeiro");
+  const importarDocumento = async () => {
+    if (!arquivoDocumento) {
+      toast.error("Selecione um arquivo XML ou PDF primeiro");
+      return;
+    }
+
+    const nomeArquivo = arquivoDocumento.name.toLowerCase();
+    const ehPdf = nomeArquivo.endsWith(".pdf");
+    const ehXml = nomeArquivo.endsWith(".xml");
+    if (!ehPdf && !ehXml) {
+      toast.error("Envie um arquivo XML ou PDF valido");
       return;
     }
 
     try {
-      setLendoXml(true);
+      setLendoDocumento(true);
       const formData = new FormData();
-      formData.append("file", arquivoXml);
+      formData.append("file", arquivoDocumento);
 
-      const response = await api.post("/estoque/saida-full-xml/parse", formData, {
+      const endpoint = ehPdf ? "/estoque/saida-full-pdf/parse" : "/estoque/saida-full-xml/parse";
+      const response = await api.post(endpoint, formData, {
         headers: { "Content-Type": "multipart/form-data" },
       });
 
-      const numeroNfXml = (response?.data?.numero_nf || "").toString().trim();
-      const itensXml = Array.isArray(response?.data?.itens) ? response.data.itens : [];
+      const numeroDocumento = (response?.data?.numero_documento || response?.data?.numero_nf || "")
+        .toString()
+        .trim();
+      const itensDocumento = Array.isArray(response?.data?.itens) ? response.data.itens : [];
 
-      if (!numeroNfXml) {
-        toast.error("Nao foi possivel identificar o numero da NF no XML");
+      if (!itensDocumento.length) {
+        toast.error(`Nenhum item foi identificado no ${ehPdf ? "PDF" : "XML"}`);
         return;
       }
 
-      if (!itensXml.length) {
-        toast.error("Nenhum item foi identificado no XML");
-        return;
-      }
-
-      const linhas = itensXml.map((item) => ({
+      const linhas = itensDocumento.map((item) => ({
         ...criarLinha(),
         sku: item.sku || "",
         quantidade: item.quantidade || "",
       }));
 
-      setNumeroNF(numeroNfXml);
+      setNumeroNF(numeroDocumento);
       setItens(linhas);
       setAlertaEstoque(null);
-      toast.success(`XML lido com sucesso: NF ${numeroNfXml} com ${linhas.length} item(ns)`);
+      if (!plataforma && response?.data?.plataforma_sugerida) {
+        setPlataforma(response.data.plataforma_sugerida);
+      }
+
+      const tipoArquivo = ehPdf ? "PDF" : "XML";
+      const identificacao = numeroDocumento
+        ? `Documento ${numeroDocumento}`
+        : "Documento sem numero";
+      toast.success(`${tipoArquivo} lido: ${identificacao} com ${linhas.length} item(ns)`);
+      if (!numeroDocumento) {
+        toast.error("Informe manualmente a identificacao unica deste envio antes de confirmar.");
+      }
     } catch (error) {
-      console.error("Erro ao ler XML FULL NF:", error);
-      const detalhe = error?.response?.data?.detail || "Erro ao ler XML";
+      console.error("Erro ao ler documento da baixa FULL:", error);
+      const detalhe = error?.response?.data?.detail || "Erro ao ler o arquivo";
       toast.error(detalhe);
     } finally {
-      setLendoXml(false);
+      setLendoDocumento(false);
     }
   };
 
@@ -313,7 +330,7 @@ export function useEstoqueFullNFController() {
 
   const processar = async (categoriaClassificada = categoriaTarifaSelecionada, opcoes = {}) => {
     if (!numeroNF.trim()) {
-      toast.error("Informe o numero da NF");
+      toast.error("Informe a identificacao do documento");
       return;
     }
 
@@ -362,14 +379,14 @@ export function useEstoqueFullNFController() {
       carregarHistorico();
       limparFormulario();
     } catch (error) {
-      console.error("Erro ao processar FULL por NF:", error);
+      console.error("Erro ao processar baixa FULL:", error);
       const detalhe = extrairDetalheErro(error);
       if (ehErroEstoqueFull(detalhe)) {
         setAlertaEstoque(detalhe);
         toast.error(detalhe.message || "Corrija os produtos marcados e tente novamente.");
         return;
       }
-      toast.error(typeof detalhe === "string" ? detalhe : "Erro ao processar baixa por NF");
+      toast.error(typeof detalhe === "string" ? detalhe : "Erro ao processar baixa FULL");
     } finally {
       setSalvando(false);
     }
@@ -386,7 +403,7 @@ export function useEstoqueFullNFController() {
       0,
     );
     const confirmou = confirm(
-      `Lancar a NF mesmo deixando estoque negativo?\n\nItens com falta: ${problemasEstoque.length}\nTotal faltante: ${formatarQuantidade(totalFaltante)}\n\nUse esta opcao apenas para nao travar o fluxo agora. Depois ajuste o estoque dos produtos.`,
+      `Confirmar esta baixa mesmo deixando estoque negativo?\n\nItens com falta: ${problemasEstoque.length}\nTotal faltante: ${formatarQuantidade(totalFaltante)}\n\nUse esta opcao apenas para nao travar o fluxo agora. Depois ajuste o estoque dos produtos.`,
     );
     if (!confirmou) return;
 
@@ -407,7 +424,7 @@ export function useEstoqueFullNFController() {
 
   const abrirModalEditarCanal = (lancamento) => {
     if (!lancamento?.numero_nf) {
-      toast.error("Nao foi possivel identificar a NF para corrigir o canal.");
+      toast.error("Nao foi possivel identificar o documento para corrigir o canal.");
       return;
     }
     setModalEditarCanal({
@@ -434,7 +451,7 @@ export function useEstoqueFullNFController() {
     const lancamento = modalEditarCanal.lancamento;
     const canal = modalEditarCanal.canal;
     if (!lancamento?.numero_nf) {
-      toast.error("Nao foi possivel identificar a NF para corrigir o canal.");
+      toast.error("Nao foi possivel identificar o documento para corrigir o canal.");
       return;
     }
     if (!canal) {
@@ -531,12 +548,12 @@ export function useEstoqueFullNFController() {
     setSalvando,
     salvandoCanal,
     setSalvandoCanal,
-    arquivoXml,
-    setArquivoXml,
-    xmlInputKey,
-    setXmlInputKey,
-    lendoXml,
-    setLendoXml,
+    arquivoDocumento,
+    setArquivoDocumento,
+    documentoInputKey,
+    setDocumentoInputKey,
+    lendoDocumento,
+    setLendoDocumento,
     modalDre,
     setModalDre,
     dreSubcategoriasDespesa,
@@ -563,7 +580,7 @@ export function useEstoqueFullNFController() {
     adicionarLinha,
     removerLinha,
     limparFormulario,
-    importarItensDoXml,
+    importarDocumento,
     validarTarifaEnvio,
     obterItensValidos,
     abrirCorrecaoEstoque,

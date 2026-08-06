@@ -56,7 +56,8 @@ def test_estoque_full_nf_controller_preserves_backend_contracts():
         'api.get("/estoque/saida-full-nf/historico?limit=200")',
         'api.get("/dre/categorias")',
         'api.get("/dre/subcategorias")',
-        'api.post("/estoque/saida-full-xml/parse"',
+        '"/estoque/saida-full-pdf/parse"',
+        '"/estoque/saida-full-xml/parse"',
         'api.post("/estoque/saida-full-nf/validar-estoque"',
         'api.post("/estoque/saida-full-nf"',
         "/estoque/saida-full-nf/${encodeURIComponent(lancamento.numero_nf)}/canal",
@@ -72,12 +73,12 @@ def test_estoque_full_nf_controller_preserves_backend_contracts():
 def test_estoque_full_nf_components_keep_expected_flows():
     expected_tokens = {
         "EstoqueFullNFLancamentoPanel.jsx": [
-            "Numero da NF",
+            "Identificacao do documento",
             "Canal / origem",
-            "Ler XML e preencher",
+            "Ler arquivo e preencher",
             "Estoque insuficiente",
             "Tarifa de envio",
-            "Confirmar baixa por NF",
+            "Confirmar baixa de estoque",
         ],
         "EstoqueFullNFHistoricoPanel.jsx": [
             "Historico de baixas FULL",
@@ -87,9 +88,9 @@ def test_estoque_full_nf_components_keep_expected_flows():
             "DataTable",
         ],
         "EstoqueFullNFModals.jsx": [
-            "Baixa por NF finalizada",
+            "Baixa FULL finalizada",
             "Corrigir canal",
-            "Editar loja/canal da NF",
+            "Editar loja/canal do documento",
             "Vincular categoria a DRE",
             "Vincular e continuar",
         ],
