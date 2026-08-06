@@ -257,6 +257,51 @@ def _extrair_itens_amazon_pdf(texto: str) -> List[dict]:
     return _itens_dict(itens_por_sku)
 
 
+def _eh_id_sku_shopee(candidato: str) -> bool:
+    partes = candidato.split("_", 1)
+    return (
+        len(partes) == 2
+        and len(partes[0]) >= 8
+        and partes[0].isdigit()
+        and partes[1].isdigit()
+    )
+
+
+def _extrair_itens_shopee_pdf(texto: str) -> List[dict]:
+    itens_por_sku = defaultdict(float)
+
+    for raw_line in texto.splitlines():
+        linha = (raw_line or "").strip()
+        partes = linha.split()
+        if len(partes) < 3:
+            continue
+
+        sku = partes[0].strip("|:;")
+        id_sku_shopee = partes[1].strip("|:;")
+        quantidade_texto = partes[-1].strip("|:;()[]")
+        quantidade = _consumir_numero_quantidade(quantidade_texto)
+
+        if (
+            len(sku) >= 3
+            and any(char.isdigit() for char in sku)
+            and all(_char_sku_valido(char) for char in sku)
+            and _eh_id_sku_shopee(id_sku_shopee)
+            and quantidade == quantidade_texto
+        ):
+            _adicionar_item(itens_por_sku, sku, quantidade)
+
+    return _itens_dict(itens_por_sku)
+
+
+def _eh_inbound_shopee(texto_busca: str) -> bool:
+    return (
+        "SHOPEE" in texto_busca
+        and "ASN ID" in texto_busca
+        and "SKU DO" in texto_busca
+        and "QNT." in texto_busca
+    )
+
+
 def _extrair_itens_full_pdf(texto: str) -> List[dict]:
     texto_busca = _texto_busca_sem_acento(texto)
     if "DIGO ML" in texto_busca and "PRODUTOS DO ENVIO" in texto_busca:
@@ -266,6 +311,11 @@ def _extrair_itens_full_pdf(texto: str) -> List[dict]:
 
     if "DANFE" in texto_busca and "DADOS DO PRODUTO / SERVI" in texto_busca:
         itens = _extrair_itens_danfe_pdf(texto)
+        if itens:
+            return itens
+
+    if _eh_inbound_shopee(texto_busca):
+        itens = _extrair_itens_shopee_pdf(texto)
         if itens:
             return itens
 
@@ -331,6 +381,21 @@ def _extrair_id_remessa_amazon(texto: str) -> Optional[str]:
     return None
 
 
+def _extrair_id_inbound_shopee(texto: str) -> Optional[str]:
+    for linha in texto.splitlines():
+        if "ASN ID" not in _texto_busca_sem_acento(linha):
+            continue
+        for parte in linha.split():
+            candidato = parte.strip("#:;|()[]").upper()
+            if (
+                (candidato.startswith("INBR") or candidato.startswith("FBSINBR"))
+                and len(candidato) >= 10
+                and candidato.isalnum()
+            ):
+                return candidato
+    return None
+
+
 def _parse_saida_full_pdf(texto: str) -> dict:
     texto_busca = _texto_busca_sem_acento(texto)
     itens = _extrair_itens_full_pdf(texto)
@@ -352,6 +417,10 @@ def _parse_saida_full_pdf(texto: str) -> dict:
             plataforma_sugerida = "shopee"
         elif "AMAZON" in texto_busca:
             plataforma_sugerida = "amazon"
+    elif _eh_inbound_shopee(texto_busca):
+        numero_documento = _extrair_id_inbound_shopee(texto)
+        tipo_documento = "shopee_inbound"
+        plataforma_sugerida = "shopee"
     elif "MSKU" in texto_busca and ("AMAZON" in texto_busca or "FBA" in texto_busca):
         numero_documento = _extrair_id_remessa_amazon(texto)
         tipo_documento = "amazon_inbound"

@@ -122,6 +122,66 @@ def test_parser_pdf_saida_full_le_inbound_real_do_mercado_livre():
     }
 
 
+def test_parser_pdf_saida_full_le_picking_list_real_da_shopee():
+    dados = estoque_saida_full_routes._parse_saida_full_pdf(
+        """
+        Shopee Picking List - Shopee Fulfillment
+        Informacao de Inbound
+        Data de Inbound ID de Envio (ASN ID) INBRFSP12608050215
+        No. SKU do Shopee SKU ID Nome do Produto Variacao SKU do Qnt.
+        vendedor Armazem Aprovada
+        013251.1 42676789641_4 Produto A Item without 12
+        020301.1 42676789643_4 Produto B Item without 21
+        013209.1 42776789605_2 Produto C 7898929877 11
+        018631.1 42876789640_3 Produto D 1 Unidade Item without 73
+        025847.1/1 43176789635_3 Produto E 1 unidade Item without 31
+        021765.1/1 43376789626_4 Produto F 1 unidade 7898401961 34
+        025848.1/1 44802195781_4 Produto G 1 unidade Item without 22
+        013269.1 51452175811_4 Produto H 7898401960 29
+        022204.1 51452175898_4 Produto I 7898401961 10
+        023983.1/2 51552175880_3 Produto J 2 unidades Item without 13
+        013252.1/1 51852175873_4 Produto K 1 unidade Item without 21
+        013248.1/2 56202166866_3 Produto L 2 unidades Item without 20
+        020299.1 56902161847_4 Produto M 7898401961 13
+        022860.1/1 57202161752_2 Produto N 1 unidade 7895455616 20
+        022860.1/2 57202161752_2 Produto N 2 unidades 7895455616 5
+        013256.1 57202166804_4 Produto O 7898401960 21
+        013215.1 57202166878_1 Produto P 7898929877 15
+        019516.1/1 57702161734_2 Produto Q 1 unidade Item without 14
+        019516.1/2 57702161734_2 Produto Q 2 unidades Item without 13
+        Notas Total 398
+        """
+    )
+
+    assert dados["numero_documento"] == "INBRFSP12608050215"
+    assert dados["numero_nf"] == "INBRFSP12608050215"
+    assert dados["tipo_documento"] == "shopee_inbound"
+    assert dados["plataforma_sugerida"] == "shopee"
+    assert dados["total_itens"] == 19
+    assert dados["total_unidades"] == 398.0
+    assert dados["itens"] == [
+        {"sku": "013251.1", "quantidade": 12.0},
+        {"sku": "020301.1", "quantidade": 21.0},
+        {"sku": "013209.1", "quantidade": 11.0},
+        {"sku": "018631.1", "quantidade": 73.0},
+        {"sku": "025847.1/1", "quantidade": 31.0},
+        {"sku": "021765.1/1", "quantidade": 34.0},
+        {"sku": "025848.1/1", "quantidade": 22.0},
+        {"sku": "013269.1", "quantidade": 29.0},
+        {"sku": "022204.1", "quantidade": 10.0},
+        {"sku": "023983.1/2", "quantidade": 13.0},
+        {"sku": "013252.1/1", "quantidade": 21.0},
+        {"sku": "013248.1/2", "quantidade": 20.0},
+        {"sku": "020299.1", "quantidade": 13.0},
+        {"sku": "022860.1/1", "quantidade": 20.0},
+        {"sku": "022860.1/2", "quantidade": 5.0},
+        {"sku": "013256.1", "quantidade": 21.0},
+        {"sku": "013215.1", "quantidade": 15.0},
+        {"sku": "019516.1/1", "quantidade": 14.0},
+        {"sku": "019516.1/2", "quantidade": 13.0},
+    ]
+
+
 def test_parser_pdf_saida_full_le_danfe_de_remessa():
     dados = estoque_saida_full_routes._parse_saida_full_pdf(
         """
