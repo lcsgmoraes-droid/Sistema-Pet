@@ -15,6 +15,7 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.sql import func
 
+from app.base_models import TenantScoped
 from app.db import Base
 
 
@@ -95,7 +96,7 @@ class EcommerceAIConnection(Base):
     )
 
 
-class EcommerceAIInboundEvent(Base):
+class EcommerceAIInboundEvent(TenantScoped, Base):
     __tablename__ = "ecommerceai_inbound_events"
     __table_args__ = (
         UniqueConstraint(
@@ -116,7 +117,6 @@ class EcommerceAIInboundEvent(Base):
     )
 
     id = Column(EVENT_ID_TYPE, primary_key=True, autoincrement=True)
-    tenant_id = Column(UUID(as_uuid=True), nullable=False, index=True)
     connection_id = Column(
         Integer,
         ForeignKey("ecommerceai_connections.id", ondelete="CASCADE"),

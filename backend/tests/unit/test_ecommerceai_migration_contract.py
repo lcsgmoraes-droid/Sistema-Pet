@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib.util
 from pathlib import Path
+from types import SimpleNamespace
 
 
 class _RecordingOp:
@@ -18,6 +19,9 @@ class _RecordingOp:
 
     def execute(self, statement):
         self.executed.append(str(statement))
+
+    def get_bind(self):
+        return SimpleNamespace(dialect=SimpleNamespace(name="sqlite"))
 
 
 def _load_migration():

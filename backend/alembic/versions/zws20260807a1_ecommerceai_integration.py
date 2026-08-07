@@ -9,6 +9,8 @@ from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
+from app.tenant_rls_migration import apply_tenant_rls
+
 
 revision = "zws20260807a1"
 down_revision = "zwr20260801a1"
@@ -46,10 +48,16 @@ def upgrade() -> None:
         sa.Column("rejected_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("callback_error", sa.Text(), nullable=True),
         sa.Column(
-            "created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.func.now(),
+            nullable=False,
         ),
         sa.Column(
-            "updated_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False
+            "updated_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.func.now(),
+            nullable=False,
         ),
         sa.UniqueConstraint("request_id"),
         sa.UniqueConstraint("request_nonce"),
@@ -100,10 +108,16 @@ def upgrade() -> None:
         sa.Column("last_catalog_read_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("last_error", sa.Text(), nullable=True),
         sa.Column(
-            "created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.func.now(),
+            nullable=False,
         ),
         sa.Column(
-            "updated_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False
+            "updated_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.func.now(),
+            nullable=False,
         ),
         sa.ForeignKeyConstraint(
             ["request_id"],
@@ -163,7 +177,10 @@ def upgrade() -> None:
         ),
         sa.Column("error_message", sa.Text(), nullable=True),
         sa.Column(
-            "received_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False
+            "received_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.func.now(),
+            nullable=False,
         ),
         sa.Column("processed_at", sa.DateTime(timezone=True), nullable=True),
         sa.ForeignKeyConstraint(
@@ -192,9 +209,21 @@ def upgrade() -> None:
         ["tenant_id", "event_type"],
         if_not_exists=True,
     )
+    apply_tenant_rls(
+        op_module=op,
+        sa_module=sa,
+        table_names=("ecommerceai_inbound_events",),
+        enable=True,
+    )
 
 
 def downgrade() -> None:
+    apply_tenant_rls(
+        op_module=op,
+        sa_module=sa,
+        table_names=("ecommerceai_inbound_events",),
+        enable=False,
+    )
     op.execute("DROP TABLE IF EXISTS ecommerceai_inbound_events CASCADE")
     op.execute("DROP TABLE IF EXISTS ecommerceai_connections CASCADE")
     op.execute("DROP TABLE IF EXISTS ecommerceai_connection_requests CASCADE")
