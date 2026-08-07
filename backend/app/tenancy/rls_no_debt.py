@@ -10,6 +10,8 @@ INTENTIONALLY_GLOBAL_NO_RLS_TABLES = frozenset(
     {
         "bling_pedido_webhook_events",
         "campaign_event_queue",
+        "ecommerceai_connection_requests",
+        "ecommerceai_connections",
         "notification_queue",
         "ops_alerts",
         "ops_error_events",

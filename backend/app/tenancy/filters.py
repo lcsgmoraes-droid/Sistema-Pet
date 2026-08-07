@@ -49,6 +49,11 @@ TENANT_WHITELIST_TABLES = {
     "notification_queue",  # fila de notificações: notification_sender claim cross-tenant
     # Indice minimo de capacidade publica: token aleatorio -> tenant/rota.
     "rotas_entrega_rastreio_tokens",
+    # Bootstrap da integração: a solicitação ainda não pertence a um tenant antes
+    # do aceite, e a conexão resolve o token opaco para descobrir o tenant. As
+    # rotas públicas exigem HMAC/token e, após a resolução, estabelecem o contexto.
+    "ecommerceai_connection_requests",
+    "ecommerceai_connections",
 }
 
 
