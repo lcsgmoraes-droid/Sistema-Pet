@@ -46,7 +46,9 @@ class ConnectionRequestPayload(BaseModel):
     account_email: str | None = Field(default=None, max_length=255)
     callback_url: str = Field(min_length=8, max_length=1000)
     state: str = Field(min_length=32, max_length=255)
-    requested_scopes: list[str] = Field(default_factory=lambda: sorted(SUPPORTED_SCOPES))
+    requested_scopes: list[str] = Field(
+        default_factory=lambda: sorted(SUPPORTED_SCOPES)
+    )
 
 
 class InboundEventPayload(BaseModel):
@@ -93,12 +95,18 @@ def _verify_signature(
     try:
         signed_at = int(timestamp_value)
     except ValueError as exc:
-        raise HTTPException(status_code=401, detail="Timestamp da assinatura invalido.") from exc
+        raise HTTPException(
+            status_code=401, detail="Timestamp da assinatura invalido."
+        ) from exc
     if abs(int(time.time()) - signed_at) > SIGNATURE_TOLERANCE_SECONDS:
-        raise HTTPException(status_code=401, detail="Assinatura da integracao expirada.")
+        raise HTTPException(
+            status_code=401, detail="Assinatura da integracao expirada."
+        )
     expected = _signature(_bootstrap_secret(), timestamp_value, nonce, body)
     if not hmac.compare_digest(expected, provided_signature.strip().lower()):
-        raise HTTPException(status_code=401, detail="Assinatura da integracao invalida.")
+        raise HTTPException(
+            status_code=401, detail="Assinatura da integracao invalida."
+        )
     return nonce
 
 
@@ -135,10 +143,14 @@ def _signed_headers(body: bytes) -> dict[str, str]:
     }
 
 
-def _connection_for_token(db: Session, authorization: str | None) -> EcommerceAIConnection:
+def _connection_for_token(
+    db: Session, authorization: str | None
+) -> EcommerceAIConnection:
     scheme, _, raw_token = str(authorization or "").partition(" ")
     if scheme.lower() != "bearer" or not raw_token.startswith("cp_eai_"):
-        raise HTTPException(status_code=401, detail="Token da integracao ausente ou invalido.")
+        raise HTTPException(
+            status_code=401, detail="Token da integracao ausente ou invalido."
+        )
     token_hash = hashlib.sha256(raw_token.encode("utf-8")).hexdigest()
     connection = (
         db.query(EcommerceAIConnection)
@@ -150,7 +162,9 @@ def _connection_for_token(db: Session, authorization: str | None) -> EcommerceAI
         .first()
     )
     if not connection:
-        raise HTTPException(status_code=401, detail="Conexao EcommerceAI invalida ou revogada.")
+        raise HTTPException(
+            status_code=401, detail="Conexao EcommerceAI invalida ou revogada."
+        )
     set_current_tenant(UUID(str(connection.tenant_id)))
     return connection
 
@@ -189,7 +203,9 @@ def _serialize_product(product: Produto, *, include_related: bool) -> dict[str, 
         data["fornecedores_alternativos"] = [
             {
                 **_serialize_columns(item),
-                "fornecedor_nome": getattr(getattr(item, "fornecedor", None), "nome", None),
+                "fornecedor_nome": getattr(
+                    getattr(item, "fornecedor", None), "nome", None
+                ),
             }
             for item in product.fornecedores_alternativos
         ]
@@ -256,9 +272,13 @@ async def create_connection_request(
     except ValidationError as exc:
         raise HTTPException(status_code=422, detail=exc.errors()) from exc
     if payload.client_id != settings.ECOMMERCEAI_INTEGRATION_CLIENT_ID:
-        raise HTTPException(status_code=403, detail="Cliente da integracao nao autorizado.")
+        raise HTTPException(
+            status_code=403, detail="Cliente da integracao nao autorizado."
+        )
     if not _allowed_callback_url(payload.callback_url):
-        raise HTTPException(status_code=400, detail="Callback do EcommerceAI nao autorizado.")
+        raise HTTPException(
+            status_code=400, detail="Callback do EcommerceAI nao autorizado."
+        )
     invalid_scopes = set(payload.requested_scopes) - SUPPORTED_SCOPES
     if invalid_scopes:
         raise HTTPException(
@@ -322,7 +342,9 @@ def integration_status(
             .first()
         )
         if candidate and candidate.tenant_id not in {None, tenant_id}:
-            raise HTTPException(status_code=403, detail="Solicitacao pertence a outra empresa.")
+            raise HTTPException(
+                status_code=403, detail="Solicitacao pertence a outra empresa."
+            )
         pending_request = candidate
 
     events = (
@@ -373,13 +395,19 @@ def approve_connection_request(
     if not item:
         raise HTTPException(status_code=404, detail="Solicitacao nao encontrada.")
     if item.tenant_id not in {None, tenant_id}:
-        raise HTTPException(status_code=403, detail="Solicitacao pertence a outra empresa.")
+        raise HTTPException(
+            status_code=403, detail="Solicitacao pertence a outra empresa."
+        )
     if _aware(item.expires_at) < _utcnow():
         item.status = "expired"
         db.commit()
-        raise HTTPException(status_code=410, detail="Solicitacao expirada. Inicie novamente.")
+        raise HTTPException(
+            status_code=410, detail="Solicitacao expirada. Inicie novamente."
+        )
     if item.status not in {"pending", "callback_failed"}:
-        raise HTTPException(status_code=409, detail=f"Solicitacao ja esta {item.status}.")
+        raise HTTPException(
+            status_code=409, detail=f"Solicitacao ja esta {item.status}."
+        )
 
     tenant = db.query(Tenant).filter(Tenant.id == str(tenant_id)).first()
     raw_token = f"cp_eai_{secrets.token_urlsafe(36)}"
@@ -445,7 +473,9 @@ def approve_connection_request(
         callback_payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False
     ).encode("utf-8")
     try:
-        response = httpx.post(item.callback_url, content=body, headers=_signed_headers(body), timeout=15)
+        response = httpx.post(
+            item.callback_url, content=body, headers=_signed_headers(body), timeout=15
+        )
         response.raise_for_status()
     except (httpx.HTTPError, ValueError) as exc:
         error_message = str(exc)[:2000]
@@ -488,7 +518,9 @@ def reject_connection_request(
     if not item:
         raise HTTPException(status_code=404, detail="Solicitacao nao encontrada.")
     if item.tenant_id not in {None, tenant_id}:
-        raise HTTPException(status_code=403, detail="Solicitacao pertence a outra empresa.")
+        raise HTTPException(
+            status_code=403, detail="Solicitacao pertence a outra empresa."
+        )
     if item.status != "pending":
         raise HTTPException(status_code=409, detail="Solicitacao nao esta pendente.")
     item.status = "rejected"
@@ -513,7 +545,9 @@ def disconnect(
         .all()
     )
     if not connections:
-        raise HTTPException(status_code=404, detail="Integracao EcommerceAI nao encontrada.")
+        raise HTTPException(
+            status_code=404, detail="Integracao EcommerceAI nao encontrada."
+        )
     now = _utcnow()
     for connection in connections:
         connection.status = "revoked"
@@ -584,9 +618,7 @@ def receive_event(
             "period": period,
             "sales_base": consolidated.get("sales_base", 0),
             "contribution_margin": consolidated.get("contribution_margin", 0),
-            "contribution_margin_pct": consolidated.get(
-                "contribution_margin_pct", 0
-            ),
+            "contribution_margin_pct": consolidated.get("contribution_margin_pct", 0),
             "orders": consolidated.get("total_orders", 0),
             "coverage_pct": consolidated.get("coverage_pct", 0),
             "channels": channels,

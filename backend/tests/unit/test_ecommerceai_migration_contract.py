@@ -45,7 +45,9 @@ def test_ecommerceai_migration_is_idempotent_by_contract(monkeypatch):
     migration.downgrade()
 
     assert recorder.create_tables
-    assert all(kwargs.get("if_not_exists") is True for _, kwargs in recorder.create_tables)
+    assert all(
+        kwargs.get("if_not_exists") is True for _, kwargs in recorder.create_tables
+    )
     assert recorder.create_indexes
     assert all(
         kwargs.get("if_not_exists") is True

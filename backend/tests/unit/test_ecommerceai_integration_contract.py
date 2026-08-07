@@ -18,7 +18,9 @@ from app.routes.ecommerceai_integration_routes import _serialize_product, _signa
 TEST_SECRET = "corepet-ecommerceai-test-secret-with-32-chars"
 
 
-def _signed_headers(body: bytes, nonce: str = "nonce-for-contract-test") -> dict[str, str]:
+def _signed_headers(
+    body: bytes, nonce: str = "nonce-for-contract-test"
+) -> dict[str, str]:
     timestamp_value = str(int(time.time()))
     return {
         "X-Integration-Timestamp": timestamp_value,
@@ -30,8 +32,12 @@ def _signed_headers(body: bytes, nonce: str = "nonce-for-contract-test") -> dict
     }
 
 
-def test_connection_request_requires_hmac_and_rejects_replay(client, db_session, monkeypatch):
-    monkeypatch.setattr(settings, "ECOMMERCEAI_INTEGRATION_BOOTSTRAP_SECRET", TEST_SECRET)
+def test_connection_request_requires_hmac_and_rejects_replay(
+    client, db_session, monkeypatch
+):
+    monkeypatch.setattr(
+        settings, "ECOMMERCEAI_INTEGRATION_BOOTSTRAP_SECRET", TEST_SECRET
+    )
     monkeypatch.setattr(
         settings,
         "ECOMMERCEAI_CALLBACK_ALLOWED_ORIGINS",
@@ -55,9 +61,12 @@ def test_connection_request_requires_hmac_and_rejects_replay(client, db_session,
 
     assert response.status_code == 201
     assert response.json()["status"] == "pending"
-    assert db_session.execute(
-        text("SELECT COUNT(*) FROM ecommerceai_connection_requests")
-    ).scalar_one() == 1
+    assert (
+        db_session.execute(
+            text("SELECT COUNT(*) FROM ecommerceai_connection_requests")
+        ).scalar_one()
+        == 1
+    )
 
     replay = client.post(
         "/integracoes/ecommerceai/requests", content=body, headers=headers
@@ -103,9 +112,7 @@ def test_event_delivery_is_idempotent(client, db_session):
     }
     headers = {"Authorization": f"Bearer {raw_token}"}
 
-    first = client.post(
-        "/integracoes/ecommerceai/events", json=event, headers=headers
-    )
+    first = client.post("/integracoes/ecommerceai/events", json=event, headers=headers)
     duplicate = client.post(
         "/integracoes/ecommerceai/events", json=event, headers=headers
     )
@@ -114,9 +121,12 @@ def test_event_delivery_is_idempotent(client, db_session):
     assert first.json()["status"] == "processed"
     assert duplicate.status_code == 202
     assert duplicate.json()["duplicate"] is True
-    assert db_session.execute(
-        text("SELECT COUNT(*) FROM ecommerceai_inbound_events")
-    ).scalar_one() == 1
+    assert (
+        db_session.execute(
+            text("SELECT COUNT(*) FROM ecommerceai_inbound_events")
+        ).scalar_one()
+        == 1
+    )
 
 
 def test_product_payload_includes_cost_supplier_and_kit_composition():
