@@ -171,7 +171,8 @@ export default function EcommerceAIIntegracaoCard() {
             <div className="min-w-0 flex-1">
               <p className="font-medium text-amber-900">O EcommerceAI quer acessar esta empresa</p>
               <p className="mt-1 text-sm text-amber-800">
-                Conta: {pendingRequest.account_name || pendingRequest.account_email || "EcommerceAI"}
+                Conta:{" "}
+                {pendingRequest.account_name || pendingRequest.account_email || "EcommerceAI"}
               </p>
               <p className="mt-1 text-xs text-amber-700">
                 Permissões: leitura do catálogo e envio de eventos. Expira em{" "}
@@ -230,7 +231,9 @@ export default function EcommerceAIIntegracaoCard() {
               </p>
             </div>
             <div className="rounded-xl border border-slate-100 bg-slate-50 p-3">
-              <p className="text-xs uppercase tracking-wide text-slate-500">Última leitura do catálogo</p>
+              <p className="text-xs uppercase tracking-wide text-slate-500">
+                Última leitura do catálogo
+              </p>
               <p className="mt-1 text-sm font-medium text-slate-900">
                 {formatDate(connection?.last_catalog_read_at)}
               </p>
@@ -250,7 +253,9 @@ export default function EcommerceAIIntegracaoCard() {
               <div className="mt-3 grid gap-3 sm:grid-cols-4">
                 <div>
                   <p className="text-xs text-indigo-600">Base de vendas</p>
-                  <p className="font-semibold text-indigo-950">{money.format(overview.sales_base || 0)}</p>
+                  <p className="font-semibold text-indigo-950">
+                    {money.format(overview.sales_base || 0)}
+                  </p>
                 </div>
                 <div>
                   <p className="text-xs text-indigo-600">Margem de contribuição</p>
@@ -325,4 +330,3 @@ export default function EcommerceAIIntegracaoCard() {
     </section>
   );
 }
-
