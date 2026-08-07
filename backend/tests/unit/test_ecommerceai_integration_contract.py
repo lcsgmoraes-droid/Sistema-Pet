@@ -43,9 +43,7 @@ def test_connection_request_requires_hmac_and_rejects_replay(
         "ECOMMERCEAI_CALLBACK_ALLOWED_ORIGINS",
         "https://api.ecommerceai.com.br",
     )
-    monkeypatch.setattr(
-        settings, "COREPET_FRONTEND_URL", "https://www.corepet.com.br"
-    )
+    monkeypatch.setattr(settings, "COREPET_FRONTEND_URL", "https://www.corepet.com.br")
     payload = {
         "client_id": "ecommerceai",
         "ecommerceai_user_id": "42",
