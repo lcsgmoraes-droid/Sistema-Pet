@@ -43,6 +43,9 @@ def test_connection_request_requires_hmac_and_rejects_replay(
         "ECOMMERCEAI_CALLBACK_ALLOWED_ORIGINS",
         "https://api.ecommerceai.com.br",
     )
+    monkeypatch.setattr(
+        settings, "COREPET_FRONTEND_URL", "https://www.corepet.com.br"
+    )
     payload = {
         "client_id": "ecommerceai",
         "ecommerceai_user_id": "42",
@@ -61,6 +64,10 @@ def test_connection_request_requires_hmac_and_rejects_replay(
 
     assert response.status_code == 201
     assert response.json()["status"] == "pending"
+    assert response.json()["approval_url"] == (
+        "https://www.corepet.com.br/configuracoes/integracoes"
+        f"?ecommerceai_request={response.json()['request_id']}"
+    )
     assert (
         db_session.execute(
             text("SELECT COUNT(*) FROM ecommerceai_connection_requests")

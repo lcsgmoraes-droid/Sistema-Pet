@@ -25,7 +25,7 @@ class Settings(BaseSettings):
 
     # EcommerceAI <-> CorePet
     COREPET_PUBLIC_API_URL: str = "https://corepet.com.br/api"
-    COREPET_FRONTEND_URL: str = "https://corepet.com.br"
+    COREPET_FRONTEND_URL: str = "https://www.corepet.com.br"
     ECOMMERCEAI_INTEGRATION_CLIENT_ID: str = "ecommerceai"
     ECOMMERCEAI_INTEGRATION_BOOTSTRAP_SECRET: str = ""
     ECOMMERCEAI_CALLBACK_ALLOWED_ORIGINS: str = (
