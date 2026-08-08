@@ -180,6 +180,19 @@ def _serialize_carrinho(db: Session, carrinho: Pedido) -> dict:
         .all()
     )
 
+    produto_ids = {item.produto_id for item in itens if item.produto_id is not None}
+    produtos_por_id = {}
+    if produto_ids:
+        produtos = (
+            db.query(Produto)
+            .filter(
+                Produto.id.in_(produto_ids),
+                Produto.tenant_id == carrinho.tenant_id,
+            )
+            .all()
+        )
+        produtos_por_id = {produto.id: produto for produto in produtos}
+
     subtotal = round(sum((item.subtotal or 0.0) for item in itens), 2)
     return {
         "pedido_id": carrinho.pedido_id,
@@ -191,6 +204,11 @@ def _serialize_carrinho(db: Session, carrinho: Pedido) -> dict:
                 "quantidade": item.quantidade,
                 "preco_unitario": item.preco_unitario,
                 "subtotal": item.subtotal,
+                "foto_url": (
+                    produtos_por_id[item.produto_id].imagem_principal
+                    if item.produto_id in produtos_por_id
+                    else None
+                ),
             }
             for item in itens
         ],
