@@ -5,6 +5,7 @@
   "scripts": {
     "start": "expo start",
     "start:clear": "expo start --clear",
+    "audit:dependencies": "node scripts/audit-dependencies.mjs",
     "prepare:firebase": "node scripts/prepare-google-services.js",
     "eas-build-post-install": "npm run prepare:firebase",
     "typecheck": "tsc --noEmit",

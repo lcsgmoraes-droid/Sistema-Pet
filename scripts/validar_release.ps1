@@ -143,7 +143,7 @@ Invoke-GateStep 'Backend dependency audit' $auditPython @(
 ) $backend
 
 Invoke-GateStep 'Mobile dependency audit' $npm @(
-    'audit', '--audit-level=moderate'
+    'run', 'audit:dependencies'
 ) $mobile
 Invoke-GateStep 'Mobile typecheck' $npm @('run', 'typecheck') $mobile
 
