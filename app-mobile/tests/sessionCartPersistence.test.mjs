@@ -69,3 +69,12 @@ test("carrinho e reidratado e reconciliado depois de reabrir ou relogar", () => 
   );
   assert.match(cartScreen, /useFocusEffect/);
 });
+
+test("imagem do carrinho recebida do servidor usa URL completa", () => {
+  const shopService = source("src/services/shop.service.ts");
+
+  assert.match(
+    shopService,
+    /foto_url:\s*resolveMediaUrl\(item\.foto_url\s*\?\?\s*item\.imagem_principal\)/,
+  );
+});

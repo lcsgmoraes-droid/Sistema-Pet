@@ -5,6 +5,7 @@
   "scripts": {
     "start": "expo start",
     "start:clear": "expo start --clear",
+    "audit:dependencies": "node scripts/audit-dependencies.mjs",
     "prepare:firebase": "node scripts/prepare-google-services.js",
     "eas-build-post-install": "npm run prepare:firebase",
     "typecheck": "tsc --noEmit",
@@ -70,6 +71,7 @@
     },
     "brace-expansion": "5.0.9",
     "js-yaml": "4.3.1",
+    "nanoid": "3.3.17",
     "postcss": "8.5.25",
     "undici": "6.27.0",
     "uuid": "11.1.1"
