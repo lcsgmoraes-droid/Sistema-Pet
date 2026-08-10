@@ -17,11 +17,15 @@ import FloatingCalculatorButton from "./FloatingCalculatorButton";
 import {
   FAVORITE_DRAG_CLICK_SUPPRESSION_MS,
   buildVisibleMenuFavorites,
+  isTransientMenuFavoritesError,
+  loadMenuFavoritesWithRetry,
   normalizeMenuFavorites,
+  readMenuFavoritesCache,
   reorderMenuFavorites,
   sameFavoritePathOrder,
   shouldBlockFavoriteShortcutClick,
   toggleMenuFavorite,
+  writeMenuFavoritesCache,
 } from "./layout/menuFavorites";
 import LayoutFavoritesBar from "./layout/LayoutFavoritesBar";
 import LayoutSidebar from "./layout/LayoutSidebar";
@@ -390,31 +394,64 @@ const Layout = () => {
   }, [moduloAtivo, modulosAtivos]);
 
   useEffect(() => {
+    if (!user) {
+      setMenuFavorites([]);
+      return undefined;
+    }
+
     let ativo = true;
+    let carregamentoEmAndamento = null;
 
-    const carregarMenuFavorites = async () => {
-      if (!user) {
-        setMenuFavorites([]);
-        return;
-      }
+    const favoritosEmCache = readMenuFavoritesCache(user);
+    setMenuFavorites(favoritosEmCache);
 
-      try {
-        const response = await api.get("/usuarios/me/menu-favoritos");
-        if (ativo) {
-          setMenuFavorites(normalizeMenuFavorites(response?.data?.items || []));
+    const carregarMenuFavorites = () => {
+      if (!ativo || carregamentoEmAndamento) return carregamentoEmAndamento;
+
+      carregamentoEmAndamento = (async () => {
+        try {
+          const favoritos = await loadMenuFavoritesWithRetry(
+            async () => {
+              const response = await api.get("/usuarios/me/menu-favoritos");
+              return response?.data?.items || [];
+            },
+            {
+              shouldContinue: () => ativo,
+              shouldRetry: isTransientMenuFavoritesError,
+            },
+          );
+
+          if (ativo && favoritos !== null) {
+            setMenuFavorites(favoritos);
+            writeMenuFavoritesCache(user, favoritos);
+          }
+        } catch {
+          // Mantem o ultimo cache valido; uma falha temporaria nao deve sumir com a barra.
+        } finally {
+          carregamentoEmAndamento = null;
         }
-      } catch {
-        if (ativo) {
-          setMenuFavorites([]);
-        }
-      }
+      })();
+
+      return carregamentoEmAndamento;
     };
 
     carregarMenuFavorites();
+
+    const recarregarQuandoVisivel = () => {
+      if (document.visibilityState === "visible") {
+        carregarMenuFavorites();
+      }
+    };
+
+    window.addEventListener("online", carregarMenuFavorites);
+    document.addEventListener("visibilitychange", recarregarQuandoVisivel);
+
     return () => {
       ativo = false;
+      window.removeEventListener("online", carregarMenuFavorites);
+      document.removeEventListener("visibilitychange", recarregarQuandoVisivel);
     };
-  }, [user?.id, user?.tenant_id]);
+  }, [user?.id, user?.tenant?.id, user?.tenant_id]);
 
   const allMenuItems = createLayoutMenuItems({ lembretesCount });
 
@@ -481,9 +518,14 @@ const Layout = () => {
       const response = await api.put("/usuarios/me/menu-favoritos", {
         items: proximosFavoritos,
       });
-      setMenuFavorites(normalizeMenuFavorites(response?.data?.items || proximosFavoritos));
+      const favoritosConfirmados = normalizeMenuFavorites(
+        response?.data?.items || proximosFavoritos,
+      );
+      setMenuFavorites(favoritosConfirmados);
+      writeMenuFavoritesCache(user, favoritosConfirmados);
     } catch {
       setMenuFavorites(favoritosAnteriores);
+      writeMenuFavoritesCache(user, favoritosAnteriores);
       toast.error("Nao foi possivel salvar favoritos agora.");
     }
   };
@@ -537,9 +579,14 @@ const Layout = () => {
       const response = await api.put("/usuarios/me/menu-favoritos", {
         items: proximosFavoritos,
       });
-      setMenuFavorites(normalizeMenuFavorites(response?.data?.items || proximosFavoritos));
+      const favoritosConfirmados = normalizeMenuFavorites(
+        response?.data?.items || proximosFavoritos,
+      );
+      setMenuFavorites(favoritosConfirmados);
+      writeMenuFavoritesCache(user, favoritosConfirmados);
     } catch {
       setMenuFavorites(favoritosAnteriores);
+      writeMenuFavoritesCache(user, favoritosAnteriores);
       toast.error("Nao foi possivel salvar a nova ordem dos favoritos.");
     }
   };

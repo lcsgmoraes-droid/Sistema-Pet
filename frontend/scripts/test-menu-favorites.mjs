@@ -3,12 +3,17 @@ import { test } from "node:test";
 
 import {
   MAX_MENU_FAVORITES,
+  buildMenuFavoritesCacheKey,
   buildVisibleMenuFavorites,
   flattenMenuItemsForFavorites,
+  isTransientMenuFavoritesError,
+  loadMenuFavoritesWithRetry,
   normalizeMenuFavorites,
+  readMenuFavoritesCache,
   reorderMenuFavorites,
   shouldBlockFavoriteShortcutClick,
   toggleMenuFavorite,
+  writeMenuFavoritesCache,
 } from "../src/components/layout/menuFavorites.js";
 
 const menuItems = [
@@ -131,4 +136,81 @@ test("normalizeMenuFavorites limpa dados de API e remove duplicados", () => {
     ]),
     [{ path: "/pdv", label: "PDV", icon_key: "shopping-cart" }],
   );
+});
+
+test("cache de favoritos fica separado por usuario e empresa", () => {
+  const data = new Map();
+  const storage = {
+    getItem: (key) => data.get(key) ?? null,
+    setItem: (key, value) => data.set(key, value),
+  };
+  const userA = { id: 7, tenant: { id: "empresa-a" } };
+  const userB = { id: 7, tenant: { id: "empresa-b" } };
+
+  writeMenuFavoritesCache(
+    userA,
+    [{ path: " /pdv ", label: " PDV ", icon_key: " shopping-cart " }],
+    storage,
+  );
+
+  assert.notEqual(buildMenuFavoritesCacheKey(userA), buildMenuFavoritesCacheKey(userB));
+  assert.deepEqual(readMenuFavoritesCache(userA, storage), [
+    { path: "/pdv", label: "PDV", icon_key: "shopping-cart" },
+  ]);
+  assert.deepEqual(readMenuFavoritesCache(userB, storage), []);
+});
+
+test("cache invalido de favoritos e ignorado com seguranca", () => {
+  const user = { id: 8, tenant: { id: "empresa-a" } };
+  const storage = {
+    getItem: () => "{invalido",
+    setItem: () => {},
+  };
+
+  assert.deepEqual(readMenuFavoritesCache(user, storage), []);
+});
+
+test("carregamento de favoritos repete falha temporaria e preserva o resultado", async () => {
+  let chamadas = 0;
+  const esperas = [];
+
+  const favoritos = await loadMenuFavoritesWithRetry(
+    async () => {
+      chamadas += 1;
+      if (chamadas === 1) {
+        throw Object.assign(new Error("indisponivel"), { response: { status: 503 } });
+      }
+      return [{ path: "/pdv", label: "PDV", icon_key: "shopping-cart" }];
+    },
+    {
+      retryDelays: [25],
+      wait: async (delay) => esperas.push(delay),
+      shouldRetry: isTransientMenuFavoritesError,
+    },
+  );
+
+  assert.equal(chamadas, 2);
+  assert.deepEqual(esperas, [25]);
+  assert.deepEqual(favoritos, [{ path: "/pdv", label: "PDV", icon_key: "shopping-cart" }]);
+});
+
+test("carregamento de favoritos nao repete erro permanente", async () => {
+  let chamadas = 0;
+
+  await assert.rejects(
+    loadMenuFavoritesWithRetry(
+      async () => {
+        chamadas += 1;
+        throw Object.assign(new Error("proibido"), { response: { status: 403 } });
+      },
+      {
+        retryDelays: [25],
+        wait: async () => {},
+        shouldRetry: isTransientMenuFavoritesError,
+      },
+    ),
+    /proibido/,
+  );
+
+  assert.equal(chamadas, 1);
 });
