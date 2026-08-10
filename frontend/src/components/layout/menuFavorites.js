@@ -107,10 +107,10 @@ export async function loadMenuFavoritesWithRetry(
     try {
       return normalizeMenuFavorites(await loadFavorites());
     } catch (error) {
-      const retryDelay = retryDelays[retryIndex];
-      if (retryDelay === undefined || !shouldContinue() || !shouldRetry(error)) {
+      if (retryIndex >= retryDelays.length || !shouldContinue() || !shouldRetry(error)) {
         throw error;
       }
+      const retryDelay = retryDelays[retryIndex];
       retryIndex += 1;
       await wait(retryDelay);
     }
