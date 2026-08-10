@@ -1,5 +1,8 @@
 export const MAX_MENU_FAVORITES = 8;
 export const FAVORITE_DRAG_CLICK_SUPPRESSION_MS = 350;
+export const MENU_FAVORITES_RETRY_DELAYS_MS = [500, 1500];
+
+const MENU_FAVORITES_CACHE_PREFIX = "corepet:menu-favorites:v1";
 
 function cleanText(value) {
   return String(value ?? "").trim();
@@ -39,6 +42,81 @@ export function normalizeMenuFavorites(items = []) {
     normalized.push(favorite);
   }
   return normalized;
+}
+
+export function buildMenuFavoritesCacheKey(user) {
+  const userId = cleanText(user?.id);
+  const tenantId = cleanText(user?.tenant?.id ?? user?.tenant_id);
+  if (!userId || !tenantId) return null;
+  return `${MENU_FAVORITES_CACHE_PREFIX}:${tenantId}:${userId}`;
+}
+
+function resolveStorage(storage) {
+  if (storage !== undefined) return storage;
+  try {
+    return globalThis.localStorage || null;
+  } catch {
+    return null;
+  }
+}
+
+export function readMenuFavoritesCache(user, storage) {
+  const cacheKey = buildMenuFavoritesCacheKey(user);
+  const resolvedStorage = resolveStorage(storage);
+  if (!cacheKey || !resolvedStorage) return [];
+
+  try {
+    const cached = resolvedStorage.getItem(cacheKey);
+    return cached ? normalizeMenuFavorites(JSON.parse(cached)) : [];
+  } catch {
+    return [];
+  }
+}
+
+export function writeMenuFavoritesCache(user, favorites, storage) {
+  const normalized = normalizeMenuFavorites(favorites);
+  const cacheKey = buildMenuFavoritesCacheKey(user);
+  const resolvedStorage = resolveStorage(storage);
+  if (!cacheKey || !resolvedStorage) return normalized;
+
+  try {
+    resolvedStorage.setItem(cacheKey, JSON.stringify(normalized));
+  } catch {
+    // O cache local e apenas uma protecao contra falhas temporarias da API.
+  }
+  return normalized;
+}
+
+export function isTransientMenuFavoritesError(error) {
+  const status = Number(error?.response?.status || 0);
+  return !status || status === 408 || status === 425 || status === 429 || status >= 500;
+}
+
+export async function loadMenuFavoritesWithRetry(
+  loadFavorites,
+  {
+    retryDelays = MENU_FAVORITES_RETRY_DELAYS_MS,
+    wait = (delay) => new Promise((resolve) => setTimeout(resolve, delay)),
+    shouldContinue = () => true,
+    shouldRetry = () => true,
+  } = {},
+) {
+  let retryIndex = 0;
+
+  while (shouldContinue()) {
+    try {
+      return normalizeMenuFavorites(await loadFavorites());
+    } catch (error) {
+      const retryDelay = retryDelays[retryIndex];
+      if (retryDelay === undefined || !shouldContinue() || !shouldRetry(error)) {
+        throw error;
+      }
+      retryIndex += 1;
+      await wait(retryDelay);
+    }
+  }
+
+  return null;
 }
 
 export function flattenMenuItemsForFavorites(menuItems = []) {
