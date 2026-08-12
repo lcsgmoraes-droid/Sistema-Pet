@@ -4,7 +4,7 @@ import secrets
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
-from app.auth import create_access_token, hash_password, verify_password
+from app.auth import hash_password, verify_password
 from app.db import get_session
 from app.models import (
     AppAccessProfile,
@@ -28,6 +28,7 @@ from app.routes.ecommerce_auth_cliente import (
 from app.routes.ecommerce_auth_common import (
     _activate_user_tenant_context,
     _get_current_ecommerce_user,
+    _issue_ecommerce_profile_tokens,
 )
 from app.routes.ecommerce_auth_schemas import (
     EcommerceAccountDeletionRequest,
@@ -205,6 +206,7 @@ def obter_perfil(
 @router.post("/select-profile")
 def selecionar_perfil_app(
     payload: EcommerceSelectProfileRequest,
+    request: Request,
     current_user: User = Depends(_get_current_ecommerce_user),
     db: Session = Depends(get_session),
 ):
@@ -226,20 +228,16 @@ def selecionar_perfil_app(
             status_code=status.HTTP_403_FORBIDDEN, detail="Perfil de app nao liberado"
         )
 
-    access_token = create_access_token(
-        data={
-            "sub": str(current_user.id),
-            "email": current_user.email,
-            "token_type": "ecommerce_customer",
-            "active_profile": profile_type,
-        },
-        tenant_id=str(current_user.tenant_id),
-        role="customer",
+    auth_payload = _issue_ecommerce_profile_tokens(
+        db,
+        current_user,
+        str(current_user.tenant_id),
+        request,
+        profile_type,
     )
 
     return {
-        "access_token": access_token,
-        "token_type": "bearer",
+        **auth_payload,
         "user": _serialize_profile(
             current_user, cliente, db, selected_profile=profile_type
         ),
