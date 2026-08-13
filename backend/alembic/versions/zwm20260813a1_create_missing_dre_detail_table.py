@@ -1,7 +1,7 @@
 """create the DRE channel detail table when it is missing
 
 Revision ID: zwm20260813a1
-Revises: zwl20260723a1
+Revises: zws20260807a1
 Create Date: 2026-08-13
 """
 
@@ -15,7 +15,7 @@ from app.tenant_rls_migration import apply_tenant_rls
 
 
 revision = "zwm20260813a1"
-down_revision = "zwl20260723a1"
+down_revision = "zws20260807a1"
 branch_labels = None
 depends_on = None
 
