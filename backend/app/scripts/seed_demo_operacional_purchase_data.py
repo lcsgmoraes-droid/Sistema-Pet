@@ -9,13 +9,14 @@ from typing import Any
 
 
 DEMO_SUPPLIER_CNPJ = "11222333000181"
+DEMO_SUPPLIER_NAME = "Distribuidora Horizonte Pet Demo"
+DEMO_SUPPLIER_LEGAL_NAME = "Distribuidora Horizonte Pet Demo LTDA"
 
 
 def build_demo_purchase_scenarios() -> list[dict[str, Any]]:
     """Return the operational states shown in purchases and supplier pendings."""
 
     return [
-        {"key": "draft", "order_status": "rascunho", "label": "Pedido em montagem"},
         {
             "key": "sent",
             "order_status": "enviado",
@@ -89,7 +90,7 @@ def build_demo_purchase_scenarios() -> list[dict[str, Any]]:
         {
             "key": "live_xml",
             "order_status": "confirmado",
-            "label": "Pedido reservado para importar e confrontar XML ao vivo",
+            "label": "Pedido modelo para refazer e confrontar XML ao vivo",
         },
     ]
 
@@ -133,7 +134,7 @@ def demo_xml(
 <nfeProc xmlns="http://www.portalfiscal.inf.br/nfe" versao="4.00">
   <NFe><infNFe Id="NFe{access_key}" versao="4.00">
     <ide><cUF>33</cUF><cNF>{invoice_number % 100000000:08d}</cNF><natOp>DEMONSTRACAO COREPET</natOp><mod>55</mod><serie>1</serie><nNF>{invoice_number}</nNF><dhEmi>{issued_at.isoformat()}-03:00</dhEmi><tpNF>1</tpNF><idDest>1</idDest><cMunFG>3300100</cMunFG><tpImp>1</tpImp><tpEmis>1</tpEmis><cDV>{invoice_number % 10}</cDV><tpAmb>2</tpAmb><finNFe>1</finNFe><indFinal>0</indFinal><indPres>0</indPres><procEmi>0</procEmi><verProc>COREPET-DEMO</verProc></ide>
-    <emit><CNPJ>{DEMO_SUPPLIER_CNPJ}</CNPJ><xNome>Distribuidora Pet Brasil Demo LTDA</xNome><xFant>Distribuidora Pet Brasil</xFant><enderEmit><xLgr>Rua Demo de Suprimentos</xLgr><nro>100</nro><xBairro>Centro</xBairro><cMun>3300100</cMun><xMun>Angra dos Reis</xMun><UF>RJ</UF><CEP>23900000</CEP></enderEmit><IE>ISENTO</IE><CRT>1</CRT></emit>
+    <emit><CNPJ>{DEMO_SUPPLIER_CNPJ}</CNPJ><xNome>{DEMO_SUPPLIER_LEGAL_NAME}</xNome><xFant>{DEMO_SUPPLIER_NAME}</xFant><enderEmit><xLgr>Rua Demo de Suprimentos</xLgr><nro>100</nro><xBairro>Centro</xBairro><cMun>3300100</cMun><xMun>Angra dos Reis</xMun><UF>RJ</UF><CEP>23900000</CEP></enderEmit><IE>ISENTO</IE><CRT>1</CRT></emit>
     <dest><CNPJ>00000000000000</CNPJ><xNome>COREPET TENANT DEMO</xNome><indIEDest>9</indIEDest></dest>
     <det nItem="1"><prod><cProd>{supplier_code}</cProd><cEAN>{ean}</cEAN><xProd>{product_name}</xProd><NCM>23091000</NCM><CFOP>5102</CFOP><uCom>UN</uCom><qCom>{quantity:.4f}</qCom><vUnCom>{unit_cost:.4f}</vUnCom><vProd>{total:.2f}</vProd><cEANTrib>{ean}</cEANTrib><uTrib>UN</uTrib><qTrib>{quantity:.4f}</qTrib><vUnTrib>{unit_cost:.4f}</vUnTrib><indTot>1</indTot><rastro><nLote>DEMO-LOTE-{invoice_number}</nLote><qLote>{quantity:.3f}</qLote><dFab>2026-07-02</dFab><dVal>2027-07-02</dVal></rastro></prod><imposto><ICMS><ICMSSN102><orig>0</orig><CSOSN>102</CSOSN></ICMSSN102></ICMS><PIS><PISNT><CST>07</CST></PISNT></PIS><COFINS><COFINSNT><CST>07</CST></COFINSNT></COFINS></imposto></det>
     <total><ICMSTot><vBC>0.00</vBC><vICMS>0.00</vICMS><vProd>{total:.2f}</vProd><vFrete>0.00</vFrete><vSeg>0.00</vSeg><vDesc>0.00</vDesc><vII>0.00</vII><vIPI>0.00</vIPI><vPIS>0.00</vPIS><vCOFINS>0.00</vCOFINS><vOutro>0.00</vOutro><vNF>{total:.2f}</vNF></ICMSTot></total>

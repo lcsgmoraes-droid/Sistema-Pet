@@ -194,7 +194,7 @@ def build_demo_scenarios() -> list[SaleScenario]:
 
 
 def build_demo_historical_scenarios(count: int = 48) -> list[SaleScenario]:
-    """Create deterministic sales that make dashboards and the DRE demonstrable.
+    """Create deterministic sales across the 90-day purchase-planning window.
 
     These records use the same insertion path as the six main scenarios, so each
     sale also exercises stock, payment, tax, receivable, bank and commission
@@ -225,7 +225,9 @@ def build_demo_historical_scenarios(count: int = 48) -> list[SaleScenario]:
                     (index % 12, Decimal(str(3 + index % 3))),
                     ((index + 5) % 12, Decimal(str(2 + index % 3))),
                 ),
-                days_ago=1 + index % 12,
+                # 17 e 88 sao coprimos: a sequencia distribui as 48 vendas
+                # em datas distintas por quase toda a janela de 90 dias.
+                days_ago=1 + (index * 17) % 88,
                 due_in_days=30
                 if payment == "credito"
                 else 1
@@ -240,7 +242,7 @@ def build_demo_historical_scenarios(count: int = 48) -> list[SaleScenario]:
                     else None
                 ),
                 commissioned=index % 4 == 0,
-                observations="Historico mensal para indicadores da demonstracao.",
+                observations="Historico retroativo para projecao da sugestao inteligente.",
             )
         )
 

@@ -39,7 +39,11 @@ def test_demo_operacional_scenarios_cover_sales_story():
     assert any(scenario.order_origin == "app" for scenario in scenarios)
     assert any(scenario.order_origin == "web" for scenario in scenarios)
     assert any(getattr(scenario, "commissioned", False) for scenario in scenarios)
-    assert all(1 <= scenario.days_ago <= 12 for scenario in scenarios[6:])
+    historical_days = {scenario.days_ago for scenario in scenarios[6:]}
+    assert all(1 <= day <= 88 for day in historical_days)
+    assert len(historical_days) == 48
+    assert max(historical_days) - min(historical_days) >= 80
+    assert any(day <= 7 for day in historical_days)
 
 
 def test_demo_operacional_fixed_payables_cover_finance_and_break_even():
