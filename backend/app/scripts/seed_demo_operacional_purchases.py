@@ -38,7 +38,9 @@ def _purchase_product(db, *, tenant_id: str) -> dict[str, Any]:
         {"tenant_id": tenant_id},
     )
     if not product:
-        raise ValueError("O tenant Demo precisa ter ao menos um produto para os cenarios de compra.")
+        raise ValueError(
+            "O tenant Demo precisa ter ao menos um produto para os cenarios de compra."
+        )
     return product
 
 
@@ -115,7 +117,10 @@ def _ensure_product_supplier(
 
 
 def _confrontation_status(
-    ordered_qty: Decimal, invoice_qty: Decimal, ordered_cost: Decimal, invoice_cost: Decimal
+    ordered_qty: Decimal,
+    invoice_qty: Decimal,
+    ordered_cost: Decimal,
+    invoice_cost: Decimal,
 ) -> str:
     qty_diff = ordered_qty != invoice_qty
     price_diff = ordered_cost != invoice_cost
@@ -211,7 +216,9 @@ def _insert_invoice(
     total = quantity * unit_cost
     access_key = _invoice_key(tenant_id, invoice_number)
     conference_status = (
-        "sem_divergencia" if received == quantity and damaged == 0 else "com_divergencia"
+        "sem_divergencia"
+        if received == quantity and damaged == 0
+        else "com_divergencia"
     )
     xml = _demo_xml(
         invoice_number=invoice_number,
@@ -302,7 +309,9 @@ def _insert_invoice(
                     else "Quantidade fisica diferente da quantidade informada na NF."
                 ),
                 "suggested_action": (
-                    "sem_acao" if conference_status == "sem_divergencia" else "contatar_fornecedor"
+                    "sem_acao"
+                    if conference_status == "sem_divergencia"
+                    else "contatar_fornecedor"
                 ),
                 "tenant_id": tenant_id,
             },
@@ -462,7 +471,9 @@ def _insert_pending(
             },
         )
     )
-    status_item = "falta_avaria" if missing and damaged else "avaria" if damaged else "falta"
+    status_item = (
+        "falta_avaria" if missing and damaged else "avaria" if damaged else "falta"
+    )
     db.execute(
         text(
             """

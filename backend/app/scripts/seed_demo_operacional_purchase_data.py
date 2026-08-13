@@ -100,7 +100,9 @@ def tenant_suffix(tenant_id: str) -> str:
 
 
 def invoice_key(tenant_id: str, invoice_number: int) -> str:
-    control_number = (zlib.crc32(str(tenant_id).encode("utf-8")) + invoice_number) % 100_000_000
+    control_number = (
+        zlib.crc32(str(tenant_id).encode("utf-8")) + invoice_number
+    ) % 100_000_000
     return (
         "33"
         "2608"

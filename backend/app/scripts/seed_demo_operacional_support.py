@@ -45,9 +45,7 @@ def _ensure_support_data(
         color="#EA580C",
         icon="wallet",
     )
-    card_operator_id = _ensure_card_operator(
-        db, tenant_id=tenant_id, user_id=user_id
-    )
+    card_operator_id = _ensure_card_operator(db, tenant_id=tenant_id, user_id=user_id)
 
     payment_methods = {
         "dinheiro": _ensure_payment_method(

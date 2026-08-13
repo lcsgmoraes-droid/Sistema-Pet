@@ -109,18 +109,22 @@ def conciliar_vendas_stone(
         # Manter exatamente o mesmo universo exibido na lista da Aba 1. Antes,
         # o processamento trazia também vendas em dinheiro/Pix sem NSU e as
         # mostrava como falsas pendências de cartão.
-        query = db.query(Venda).join(VendaPagamento).filter(
-            Venda.tenant_id == tenant_id,
-            VendaPagamento.tenant_id == tenant_id,
-            Venda.status == "finalizada",
-            or_(
-                VendaPagamento.forma_pagamento.ilike("%débito%"),
-                VendaPagamento.forma_pagamento.ilike("%debito%"),
-                VendaPagamento.forma_pagamento.ilike("%crédito%"),
-                VendaPagamento.forma_pagamento.ilike("%credito%"),
-                VendaPagamento.forma_pagamento.ilike("%cartão%"),
-                VendaPagamento.forma_pagamento.ilike("%cartao%"),
-            ),
+        query = (
+            db.query(Venda)
+            .join(VendaPagamento)
+            .filter(
+                Venda.tenant_id == tenant_id,
+                VendaPagamento.tenant_id == tenant_id,
+                Venda.status == "finalizada",
+                or_(
+                    VendaPagamento.forma_pagamento.ilike("%débito%"),
+                    VendaPagamento.forma_pagamento.ilike("%debito%"),
+                    VendaPagamento.forma_pagamento.ilike("%crédito%"),
+                    VendaPagamento.forma_pagamento.ilike("%credito%"),
+                    VendaPagamento.forma_pagamento.ilike("%cartão%"),
+                    VendaPagamento.forma_pagamento.ilike("%cartao%"),
+                ),
+            )
         )
 
         # Se a operadora foi especificada, confrontar somente os pagamentos

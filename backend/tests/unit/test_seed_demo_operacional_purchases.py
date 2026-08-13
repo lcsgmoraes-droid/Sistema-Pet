@@ -76,12 +76,18 @@ def test_demo_purchase_identifiers_and_confrontation_status_are_deterministic():
     assert tenant_suffix(tenant_id) == "8F552F1D"
     assert invoice_key(tenant_id, 900001) == invoice_key(tenant_id, 900001)
     assert invoice_key(tenant_id, 900001) != invoice_key(tenant_id, 900002)
-    assert _confrontation_status(
-        Decimal("10"), Decimal("10"), Decimal("30.94"), Decimal("30.94")
-    ) == "sem_divergencia"
-    assert _confrontation_status(
-        Decimal("10"), Decimal("8"), Decimal("30.94"), Decimal("33.50")
-    ) == "divergencia_mista"
+    assert (
+        _confrontation_status(
+            Decimal("10"), Decimal("10"), Decimal("30.94"), Decimal("30.94")
+        )
+        == "sem_divergencia"
+    )
+    assert (
+        _confrontation_status(
+            Decimal("10"), Decimal("8"), Decimal("30.94"), Decimal("33.50")
+        )
+        == "divergencia_mista"
+    )
 
 
 def test_margin_demo_products_cover_green_yellow_and_red_after_card_costs():
@@ -90,13 +96,14 @@ def test_margin_demo_products_cover_green_yellow_and_red_after_card_costs():
     def margin_percent(code: str) -> Decimal:
         product = by_code[code]
         price = product["price"]
-        net = price - product["cost"] - (price * Decimal("0.07")) - (
-            price * Decimal("0.0349")
+        net = (
+            price
+            - product["cost"]
+            - (price * Decimal("0.07"))
+            - (price * Decimal("0.0349"))
         )
         return (net / price * Decimal("100")).quantize(Decimal("0.01"))
 
     assert margin_percent("DEMO-MARGEM-VERDE") >= Decimal("30.00")
-    assert Decimal("15.00") <= margin_percent("DEMO-MARGEM-AMARELA") < Decimal(
-        "30.00"
-    )
+    assert Decimal("15.00") <= margin_percent("DEMO-MARGEM-AMARELA") < Decimal("30.00")
     assert margin_percent("DEMO-MARGEM-VERMELHA") < Decimal("15.00")

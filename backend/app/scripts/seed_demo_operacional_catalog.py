@@ -143,7 +143,7 @@ def _ensure_demo_stock_alerts(
             )
             SELECT id, nome, :previous, :sold, :result,
                    now() - interval '3 days', :status,
-                   {scenario['resolved_expression']},
+                   {scenario["resolved_expression"]},
                    CASE WHEN :status = 'pendente' THEN NULL ELSE :user_id END,
                    :note, true, :critical, :tenant_id, now(), now()
             FROM produtos
@@ -284,9 +284,7 @@ def _ensure_fallback_products(db, *, tenant_id: str, user_id: int) -> None:
         )
 
 
-def _ensure_margin_demo_products(
-    db, *, tenant_id: str, user_id: int
-) -> dict[str, int]:
+def _ensure_margin_demo_products(db, *, tenant_id: str, user_id: int) -> dict[str, int]:
     """Prepare stable products for the green/yellow/red PDV margin demo."""
 
     category_id = _ensure_demo_product_category(

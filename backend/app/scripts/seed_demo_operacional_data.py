@@ -226,7 +226,11 @@ def build_demo_historical_scenarios(count: int = 48) -> list[SaleScenario]:
                     ((index + 5) % 12, Decimal(str(2 + index % 3))),
                 ),
                 days_ago=1 + index % 12,
-                due_in_days=30 if payment == "credito" else 1 if payment == "debito" else 0,
+                due_in_days=30
+                if payment == "credito"
+                else 1
+                if payment == "debito"
+                else 0,
                 installments=2 if payment == "credito" and index % 8 == 3 else 1,
                 card_brand=(
                     "master"
