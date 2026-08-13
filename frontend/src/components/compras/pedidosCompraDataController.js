@@ -98,25 +98,37 @@ export function createPedidosCompraDataController({
         return;
       }
 
-      const [pedidosRes, fornecedoresRes, gruposRes, envioStatusRes] = await Promise.all([
-        api.get("/pedidos-compra/", { params }),
-        api.get("/clientes/?tipo_cadastro=fornecedor&apenas_ativos=true"),
-        api.get("/fornecedor-grupos/"),
-        api
-          .get("/pedidos-compra/envio/status")
-          .catch(() => ({ data: { email_configurado: false } })),
-      ]);
+      const [pedidosResultado, fornecedoresResultado, gruposResultado, envioStatusResultado] =
+        await Promise.allSettled([
+          api.get("/pedidos-compra/", { params }),
+          api.get("/clientes/?tipo_cadastro=fornecedor&apenas_ativos=true"),
+          api.get("/fornecedor-grupos/"),
+          api.get("/pedidos-compra/envio/status"),
+        ]);
 
-      // Tratar resposta dos pedidos (pode ser array direto ou objeto paginado)
-      aplicarRespostaPedidos(pedidosRes.data, opcoes);
+      if (pedidosResultado.status === "rejected") {
+        throw pedidosResultado.reason;
+      }
 
-      // Tratar resposta dos fornecedores
-      const fornecedoresData = extrairListaResposta(fornecedoresRes.data, ["clientes"]);
-      const gruposData = extrairListaResposta(gruposRes.data, ["grupos"]);
+      // A lista principal nao pode sumir se uma consulta auxiliar falhar.
+      aplicarRespostaPedidos(pedidosResultado.value.data, opcoes);
 
-      setFornecedores(fornecedoresData);
-      setGruposFornecedores(gruposData);
-      setEmailEnvioDisponivel(Boolean(envioStatusRes?.data?.email_configurado));
+      if (fornecedoresResultado.status === "fulfilled") {
+        setFornecedores(extrairListaResposta(fornecedoresResultado.value.data, ["clientes"]));
+      } else {
+        console.warn("Nao foi possivel carregar fornecedores:", fornecedoresResultado.reason);
+      }
+
+      if (gruposResultado.status === "fulfilled") {
+        setGruposFornecedores(extrairListaResposta(gruposResultado.value.data, ["grupos"]));
+      } else {
+        console.warn("Nao foi possivel carregar grupos de fornecedores:", gruposResultado.reason);
+      }
+
+      setEmailEnvioDisponivel(
+        envioStatusResultado.status === "fulfilled" &&
+          Boolean(envioStatusResultado.value?.data?.email_configurado),
+      );
       // NÃO carregar produtos aqui - apenas quando fornecedor for selecionado
     } catch (error) {
       console.error("Erro ao carregar dados:", error);

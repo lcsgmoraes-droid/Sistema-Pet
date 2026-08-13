@@ -116,3 +116,13 @@ def test_listagem_de_pedidos_reduz_acoes_visiveis_e_controla_paginacao():
     assert "Mais" in tabela
     assert "page_size" in data_controller
     assert "alterarPaginaPedidos" in data_controller
+
+
+def test_listagem_de_pedidos_nao_depende_das_consultas_auxiliares():
+    data_controller = _source("compras/pedidosCompraDataController.js")
+
+    assert "Promise.allSettled" in data_controller
+    assert 'pedidosResultado.status === "rejected"' in data_controller
+    assert "aplicarRespostaPedidos(pedidosResultado.value.data" in data_controller
+    assert 'fornecedoresResultado.status === "fulfilled"' in data_controller
+    assert 'gruposResultado.status === "fulfilled"' in data_controller
