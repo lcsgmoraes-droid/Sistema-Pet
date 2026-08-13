@@ -135,13 +135,13 @@ function PetsNavigator() {
   );
 }
 
-// Badge do carrinho
-function CartIcon({ color, size }: { color: string; size: number }) {
+// A aba representa a loja; o badge continua mostrando os itens no carrinho.
+function StoreIcon({ color, size }: { color: string; size: number }) {
   const { totalItens } = useCartStore();
   const count = totalItens();
   return (
     <View>
-      <Ionicons name="cart-outline" size={size} color={color} />
+      <Ionicons name="storefront-outline" size={size} color={color} />
       {count > 0 && (
         <View style={styles.badge}>
           <Text style={styles.badgeText}>{count > 9 ? "9+" : count}</Text>
@@ -262,7 +262,7 @@ function CustomerTabs() {
         options={{
           title: "Loja",
           tabBarIcon: ({ color, size }) => (
-            <CartIcon color={color} size={size} />
+            <StoreIcon color={color} size={size} />
           ),
         }}
       />

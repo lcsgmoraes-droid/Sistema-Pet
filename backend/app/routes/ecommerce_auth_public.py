@@ -219,6 +219,7 @@ def login_cliente(
 @router.post("/refresh")
 def refresh_customer_session(
     payload: EcommerceRefreshRequest,
+    request: Request,
     db: Session = Depends(get_session),
 ):
-    return _refresh_ecommerce_session(payload.refresh_token, db)
+    return _refresh_ecommerce_session(payload.refresh_token, db, request)

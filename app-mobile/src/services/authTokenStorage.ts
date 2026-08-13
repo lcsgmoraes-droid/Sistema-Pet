@@ -15,8 +15,6 @@ export async function storeAuthTokens(tokens: AuthTokens): Promise<void> {
 
   if (refreshToken) {
     await SecureStore.setItemAsync(REFRESH_TOKEN_KEY, refreshToken);
-  } else if (accessToken) {
-    await SecureStore.deleteItemAsync(REFRESH_TOKEN_KEY);
   }
 }
 

@@ -18,6 +18,10 @@ test("app mobile guarda e rotaciona access e refresh tokens", () => {
   assert.match(types, /refresh_token\?:\s*string\s*\|\s*null/);
   assert.match(storage, /auth_refresh_token/);
   assert.match(storage, /storeAuthTokens/);
+  assert.doesNotMatch(
+    storage,
+    /else if \(accessToken\)[^]*deleteItemAsync\(REFRESH_TOKEN_KEY\)/,
+  );
   assert.match(auth, /storeAuthTokens\(data\)/);
 });
 
@@ -29,6 +33,17 @@ test("401 renova a sessao uma vez e repete a requisicao original", () => {
   assert.match(api, /_sessionRefreshRetried/);
   assert.match(api, /return api\.request\(config\)/);
   assert.match(api, /storeAuthTokens/);
+  assert.match(api, /isPublicAuthRequest\(config\?\.url\)/);
+  assert.doesNotMatch(api, /requestUsedAuthentication/);
+});
+
+test("aba Loja usa fachada e preserva badge de itens do carrinho", () => {
+  const navigator = source("src/navigation/MainNavigator.tsx");
+
+  assert.match(navigator, /function StoreIcon/);
+  assert.match(navigator, /name="storefront-outline"/);
+  assert.match(navigator, /const count = totalItens\(\)/);
+  assert.doesNotMatch(navigator, /function CartIcon/);
 });
 
 test("falha temporaria nao apaga a sessao do cliente", () => {
