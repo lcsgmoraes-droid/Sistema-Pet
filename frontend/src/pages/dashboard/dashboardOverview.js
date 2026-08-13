@@ -1,13 +1,15 @@
 export function createEmptyDashboardSummary() {
   return {
     saldo_atual: 0,
-    contas_receber: { total: 0, vencidas: 0 },
-    contas_pagar: { total: 0, vencidas: 0 },
+    contas_receber: { total: 0, vencidas: 0, vence_hoje: 0 },
+    contas_pagar: { total: 0, vencidas: 0, vence_hoje: 0 },
     vendas_periodo: {
       quantidade: 0,
+      unidades: 0,
       valor_total: 0,
       faturamento_bruto: 0,
       valor_recebido: 0,
+      lucro: 0,
       finalizadas: 0,
       ticket_medio: 0,
     },
@@ -41,7 +43,11 @@ export function calculateDashboardIndicators(summary = createEmptyDashboardSumma
   const cashResult = numberValue(summary?.fluxo_periodo?.lucro);
   const overdueReceivable = numberValue(summary?.contas_receber?.vencidas);
   const overduePayable = numberValue(summary?.contas_pagar?.vencidas);
+  const dueTodayReceivable = numberValue(summary?.contas_receber?.vence_hoje);
+  const dueTodayPayable = numberValue(summary?.contas_pagar?.vence_hoje);
   const salesCount = numberValue(summary?.vendas_periodo?.quantidade);
+  const unitsSold = numberValue(summary?.vendas_periodo?.unidades);
+  const salesProfit = numberValue(summary?.vendas_periodo?.lucro);
 
   return {
     inflows,
@@ -49,6 +55,10 @@ export function calculateDashboardIndicators(summary = createEmptyDashboardSumma
     cashResult,
     overdueReceivable,
     overduePayable,
+    dueTodayReceivable,
+    dueTodayPayable,
+    unitsSold,
+    salesProfit,
     cashMargin: inflows > 0 ? (cashResult / inflows) * 100 : null,
     expenseCoverage: outflows > 0 ? (inflows / outflows) * 100 : null,
     hasMovement: salesCount > 0 || inflows !== 0 || outflows !== 0,
