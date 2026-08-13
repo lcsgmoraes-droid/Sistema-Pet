@@ -39,7 +39,7 @@ Resultado validado:
 - Catalogo-base com produtos reais para as demais demonstracoes.
 - 10 produtos ficticios `DEMO-VP-*` exclusivos do fluxo seguro de compras.
 - Custos e precos variados e artificiais no catalogo ficticio.
-- 54 vendas demo com canais ERP/PDV, ecommerce e app, usadas tambem no historico da sugestao inteligente.
+- 54 vendas demo com canais ERP/PDV, ecommerce e app, distribuidas em ate 88 dias para alimentar a projecao da sugestao inteligente.
 - 17 contas a pagar, 6 contas a receber e 5 recebimentos.
 - 3 rotas de entrega com entregador cadastrado.
 - 17 movimentacoes de estoque.

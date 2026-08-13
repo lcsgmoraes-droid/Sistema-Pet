@@ -272,9 +272,7 @@ def ensure_demo_purchase_catalog(
     category_id = _ensure_demo_product_category(
         db, tenant_id=tenant_id, user_id=user_id
     )
-    brand_id = _ensure_demo_purchase_brand(
-        db, tenant_id=tenant_id, user_id=user_id
-    )
+    brand_id = _ensure_demo_purchase_brand(db, tenant_id=tenant_id, user_id=user_id)
 
     # O fornecedor DEMO e exclusivo deste roteiro. Ao recriar a carga, removemos
     # vinculos antigos com itens reais para que nenhum nome real apareca no video.

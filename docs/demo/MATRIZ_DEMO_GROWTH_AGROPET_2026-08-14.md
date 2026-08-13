@@ -12,14 +12,14 @@ Cada lançamento mostrado deve terminar com a conferência dos seus efeitos cola
 
 | Ordem | Tela / história | Ação ao vivo | Efeitos que precisam aparecer | Situação em 12/08 |
 |---|---|---|---|---|
-| 1 | Dashboard | Abrir visão geral em 30 dias | venda bruta, caixa, ticket médio, bancos, contas, produtos e clientes | Pronto, com 54 vendas operacionais |
+| 1 | Dashboard | Abrir visão geral em 30 dias | venda bruta, caixa, ticket médio, bancos, contas, produtos e clientes | Pronto, com 54 vendas operacionais distribuídas em até 88 dias |
 | 2 | PDV — venda simples | Vender produto à vista, sem entrega e sem comissão | baixa de estoque, venda paga, entrada no caixa, receita/CMV/lucro e DRE | Dados existentes; refazer teste final |
 | 3 | PDV — cartão e margem | Vender no cartão os produtos `DEMO-MARGEM-VERDE`, `DEMO-MARGEM-AMARELA` e `DEMO-MARGEM-VERMELHA` | taxa do cartão, conta a receber, margem líquida e alerta verde/amarelo/vermelho | Validado visualmente no DEV em 13/08 |
 | 4 | PDV — comissão | Fazer venda com Beatriz Vendedora Demo | comissão em aberto e redução correta do resultado | Validado: comissões abertas e DRE vinculadas |
 | 5 | PDV — entrega | Fazer venda com Carlos Entregador Demo | entrega aberta, rota, taxa, custo, resultado da entrega e histórico | Pronto, com rotas em 3 estados |
 | 6 | Produtos e estoque | Abrir o produto comprado/vendido | saldo, custo, preço, fornecedor e movimentações | Pronto, com catálogo |
 | 7 | Pedido inteligente | Selecionar Distribuidora Horizonte Pet Demo e gerar o pedido | sugestão, PDF/envio, pedido em rascunho/enviado/recebido/cancelado | Pacote local pronto; aguarda publicação |
-| 8 | Entrada de NF-e | Importar XML sintético sem divergência | fornecedor e produto reconhecidos, pedido vinculado e conferência aprovada | XML validado pelo parser real; pedido 009 reservado |
+| 8 | Entrada de NF-e | Importar a NF sintética `901010` | fornecedor e oito produtos reconhecidos, pedido novo disponível para vínculo e conferência | XML preparado para o pedido gerado pela Sugestão Inteligente |
 | 9 | Confronto com divergência | Importar XML com quantidade e preço diferentes | diferença de quantidade/preço, relatório, novo orçamento e opção de devolução | XML divergente validado + cenários prontos |
 | 10 | Pendências | Alternar Aberta, Aguardando, Tratativa, Resolvida e Cancelada | cards, filtros, histórico e valores por status | Seed local com 5 status; aguarda publicação |
 | 11 | Financeiro | Abrir venda, contas a receber, fluxo, bancos e DRE | rastreabilidade da venda até caixa e resultado | Pronto, com dados |
@@ -28,17 +28,16 @@ Cada lançamento mostrado deve terminar com a conferência dos seus efeitos cola
 
 ## Cenários de compras preparados
 
-O seed do Demo prepara nove pedidos para que a apresentação não dependa de alterar o mesmo registro no meio da reunião:
+O seed do Demo prepara oito pedidos para que a apresentação não dependa de alterar o mesmo registro no meio da reunião. O fornecedor fica sem rascunho aberto, permitindo gravar uma nova Sugestão Inteligente sem aviso de substituição:
 
-1. Rascunho.
-2. Enviado ao fornecedor.
-3. Recebido totalmente, sem divergência.
-4. Recebido com divergência de quantidade e preço.
-5. Pendência aguardando fornecedor.
-6. Pendência em tratativa.
-7. Pendência resolvida.
-8. Pedido cancelado.
-9. Pedido confirmado, reservado exclusivamente para o upload e confronto ao vivo.
+1. Enviado ao fornecedor.
+2. Recebido totalmente, sem divergência.
+3. Recebido com divergência de quantidade e preço.
+4. Pendência aguardando fornecedor.
+5. Pendência em tratativa.
+6. Pendência resolvida.
+7. Pedido cancelado.
+8. Pedido confirmado como modelo para refazer e confrontar o XML ao vivo.
 
 Fornecedor: `Distribuidora Horizonte Pet Demo LTDA` — código `DEMO-FOR-001`.
 Marca: `VivaPata Demo`.
@@ -49,25 +48,22 @@ para preencher a Sugestão Inteligente. O produto principal dos pedidos e XMLs
 
 ## XMLs sintéticos para a demonstração
 
-Os dois XMLs são cenários de homologação, não têm valor fiscal e nunca devem ser usados como documento real.
+O XML `DEMO_NFE_901010_PEDIDO_INTELIGENTE.xml` é um cenário de homologação,
+não tem valor fiscal e nunca deve ser usado como documento real. Ele contém os
+oito itens que a Sugestão Inteligente preenche no pedido, com total de
+R$ 2.507,48.
 
-- `DEMO_NFE_901001_SEM_DIVERGENCIA.xml`: 10 unidades a R$ 30,94, total R$ 309,40.
-- `DEMO_NFE_901002_DIVERGENCIA_QTD_PRECO.xml`: 8 unidades a R$ 33,50, total R$ 268,00.
+Sete itens coincidem com as quantidades e custos do pedido sugerido. O item
+`HORIZONTE-002` traz a divergência controlada: pedido de 39 unidades a
+R$ 22,17 e NF de 37 unidades a R$ 23,10. O número `901010` não colide com as
+seis notas `900001` a `900006` que deixam os demais estados preenchidos.
 
-Os numeros `901001` e `901002` foram reservados para o upload ao vivo. Eles nao
-colidem com as seis notas `900001` a `900006` que ja deixam os estados preenchidos.
-
-Para uma apresentação mais impactante, use o XML divergente `901002` no pedido
-confirmado `...-009`: ele mostra 8 unidades a R$ 33,50 contra o pedido de 10
-unidades a R$ 30,94. O XML `901001` fica como alternativa segura para mostrar
-uma conferência sem divergência. Não envie os dois para o mesmo pedido.
-
-Fluxo do ensaio final pela interface: `Compras > Central NF-e Entradas >
-Importar XML`, escolher o `901002`, abrir `Pedidos de Compra`, localizar o pedido
-confirmado terminado em `009`, clicar em `Confrontar XML` e selecionar a NF
-`901002`. Conferir na tela os dois sinais antes de continuar: quantidade pedida
-10 x recebida 8 e custo pedido R$ 30,94 x NF R$ 33,50. Não processe a entrada no
-ensaio anterior à reunião; encerre antes da etapa que altera estoque e financeiro.
+Fluxo do ensaio final pela interface: criar um novo pedido para a Distribuidora
+Horizonte Pet Demo, abrir a Sugestão Inteligente, selecionar os itens
+preenchidos e salvar o pedido. Depois acessar `Compras > Central NF-e Entradas >
+Importar XML`, escolher a NF `901010`, voltar ao pedido recém-criado, clicar em
+`Confrontar XML` e selecionar a nota. Não processe a entrada no ensaio anterior
+à gravação; encerre antes da etapa que altera estoque e financeiro.
 
 Arquivos locais: `C:\Users\lcs_g\Downloads\CorePet_Demo_XML`.
 
@@ -89,7 +85,7 @@ O teste visual no DEV confirmou os três estados. A auditoria também detectou e
 
 | Módulo | Evidência encontrada no Demo | Conferência ainda necessária |
 |---|---|---|
-| Dashboard | 54 vendas demo, ticket médio, bancos, contas, produtos e clientes | pronto no DEV |
+| Dashboard | 54 vendas demo retroativas, ticket médio, bancos, contas, produtos e clientes | pronto no DEV |
 | PDV | cliente, produto, entrega, comissão, vendas recentes e cartão nas 3 faixas | repetir ensaio final sem concluir as vendas vermelhas |
 | Entregas abertas | entrega disponível para roteirização | diálogo novo após publicação |
 | Rotas | pendente, em rota e concluída | iniciar/reverter sem estragar o cenário principal |
@@ -97,7 +93,7 @@ O teste visual no DEV confirmou os três estados. A auditoria também detectou e
 | Financeiro de entregas | cards de custo e desempenho | cruzar com rota concluída |
 | Produtos | catálogo paginado e fornecedores | conferir produto principal e movimentação |
 | Giro/movimentações | filtros, período e exportação | selecionar produto principal |
-| Vendas | 54 vendas demo; gráficos, taxas, comissão e entrega | pronto no DEV |
+| Vendas | 54 vendas demo distribuídas na janela de 90 dias; gráficos, taxas, comissão e entrega | pronto no DEV |
 | Fluxo de caixa | períodos e lançamentos | abrir detalhes do lançamento do teste |
 | Bancos | Caixa Loja Demo e Conta Banco Demo, com extratos e saldos | selecionar `Caixa Loja Demo`, não o `Caixa` vazio |
 | DRE | R$ 44.165,77 de receita, R$ 27.027,43 de CMV, R$ 4.396,08 de lucro líquido | selecionar Loja Física + E-commerce + App |
@@ -112,8 +108,8 @@ O teste visual no DEV confirmou os três estados. A auditoria também detectou e
 
 | Módulo | Problema encontrado | Solução preparada |
 |---|---|---|
-| Pedidos de compra | preenchido no DEV | 9 cenários; o nono é reservado ao XML ao vivo |
-| Central NF-e Entrada | preenchida no DEV | 6 notas sintéticas + 2 XMLs manuais validados |
+| Pedidos de compra | preenchido no DEV | 8 cenários históricos e nenhum rascunho aberto; o novo pedido será criado ao vivo |
+| Central NF-e Entrada | preenchida no DEV | 6 notas sintéticas + XML manual `901010` validado |
 | Pendências de fornecedor | preenchida no DEV | 5 pendências: aberta, aguardando, tratativa, resolvida e cancelada |
 | Alertas de estoque | produto `DEMO-MARGEM-VERMELHA` fica com 8 unidades e mínimo 12 | card de reposição + alertas persistentes pendente, resolvido e ignorado preparados |
 | Bancos — extrato selecionado | uma conta pode aparecer sem movimentação | selecionar conta movimentada e validar lançamentos |

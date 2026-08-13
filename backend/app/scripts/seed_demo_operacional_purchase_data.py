@@ -17,7 +17,6 @@ def build_demo_purchase_scenarios() -> list[dict[str, Any]]:
     """Return the operational states shown in purchases and supplier pendings."""
 
     return [
-        {"key": "draft", "order_status": "rascunho", "label": "Pedido em montagem"},
         {
             "key": "sent",
             "order_status": "enviado",
@@ -91,7 +90,7 @@ def build_demo_purchase_scenarios() -> list[dict[str, Any]]:
         {
             "key": "live_xml",
             "order_status": "confirmado",
-            "label": "Pedido reservado para importar e confrontar XML ao vivo",
+            "label": "Pedido modelo para refazer e confrontar XML ao vivo",
         },
     ]
 
