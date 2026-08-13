@@ -9,6 +9,13 @@ export default function EcommerceStorePage({
   cartTotal,
   categories,
   category,
+  brands,
+  brand,
+  onlyInStock,
+  onlyWithImage,
+  minPrice,
+  maxPrice,
+  minOrder,
   customerToken,
   filteredProducts,
   hoveredCard,
@@ -23,6 +30,11 @@ export default function EcommerceStorePage({
   wishlist,
   onAddToCart,
   onCategoryChange,
+  onBrandChange,
+  onOnlyInStockChange,
+  onOnlyWithImageChange,
+  onMinPriceChange,
+  onMaxPriceChange,
   onCheckout,
   onClearFilters,
   onHoverProduct,
@@ -49,16 +61,27 @@ export default function EcommerceStorePage({
           padding: isMobile ? "12px 12px 28px" : "16px 20px 28px",
         }}
       >
-        <div>
+        <div style={{ minWidth: 0 }}>
           <EcommerceCatalogControls
             categories={categories}
             category={category}
+            brands={brands}
+            brand={brand}
+            onlyInStock={onlyInStock}
+            onlyWithImage={onlyWithImage}
+            minPrice={minPrice}
+            maxPrice={maxPrice}
             isMobile={isMobile}
             loading={loading}
             order={order}
             search={search}
             styles={S}
             onCategoryChange={onCategoryChange}
+            onBrandChange={onBrandChange}
+            onOnlyInStockChange={onOnlyInStockChange}
+            onOnlyWithImageChange={onOnlyWithImageChange}
+            onMinPriceChange={onMinPriceChange}
+            onMaxPriceChange={onMaxPriceChange}
             onClearFilters={onClearFilters}
             onOrderChange={onOrderChange}
             onRefresh={onRefresh}
@@ -137,6 +160,7 @@ export default function EcommerceStorePage({
           cartTotal={cartTotal}
           customerToken={customerToken}
           isMobile={isMobile}
+          minOrder={minOrder}
           productMap={productMap}
           styles={S}
           onCheckout={onCheckout}

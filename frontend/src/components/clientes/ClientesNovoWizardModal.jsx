@@ -1,5 +1,6 @@
 import { FiAlertCircle, FiArrowLeft, FiArrowRight, FiCheck, FiSave, FiX } from "react-icons/fi";
 import ClientesNovoCadastroStep from "./ClientesNovoCadastroStep";
+import ClientesNovoAcessoAppCard from "./ClientesNovoAcessoAppCard";
 import ClientesNovoComplementaresStep from "./ClientesNovoComplementaresStep";
 import ClientesNovoContatosStep from "./ClientesNovoContatosStep";
 import ClientesNovoDuplicadoWarning from "./ClientesNovoDuplicadoWarning";
@@ -18,18 +19,16 @@ const ClientesNovoWizardModal = ({
   error,
   showDuplicadoWarning,
   clienteDuplicado,
-  clientes,
   isDocumentoUnico,
   loading,
-  cancelarRemocao,
-  confirmarRemocaoEContinuar,
   continuarMesmoDuplicado,
   editarClienteExistente,
   irParaClienteExistente,
-  showConfirmacaoRemocao,
   setShowDuplicadoWarning,
   setClienteDuplicado,
   setFormData,
+  usuariosAcessoApp,
+  loadingUsuariosAcessoApp,
   buscarCep,
   loadingCep,
   cepError,
@@ -119,16 +118,11 @@ const ClientesNovoWizardModal = ({
           {showDuplicadoWarning && clienteDuplicado && (
             <ClientesNovoDuplicadoWarning
               clienteDuplicado={clienteDuplicado}
-              clientes={clientes}
-              editingCliente={editingCliente}
               isDocumentoUnico={isDocumentoUnico}
               loading={loading}
-              onCancelarRemocao={cancelarRemocao}
-              onConfirmarRemocao={confirmarRemocaoEContinuar}
               onContinuarMesmoDuplicado={continuarMesmoDuplicado}
               onEditarClienteExistente={editarClienteExistente}
               onIrParaClienteExistente={irParaClienteExistente}
-              showConfirmacaoRemocao={showConfirmacaoRemocao}
             />
           )}
 
@@ -162,13 +156,21 @@ const ClientesNovoWizardModal = ({
           )}
 
           {currentStep === 4 && (
-            <ClientesNovoComplementaresStep
-              formData={formData}
-              setFormData={setFormData}
-              enderecosAdicionais={enderecosAdicionais}
-              abrirModalEndereco={abrirModalEndereco}
-              removerEndereco={removerEndereco}
-            />
+            <>
+              <ClientesNovoComplementaresStep
+                formData={formData}
+                setFormData={setFormData}
+                enderecosAdicionais={enderecosAdicionais}
+                abrirModalEndereco={abrirModalEndereco}
+                removerEndereco={removerEndereco}
+              />
+              <ClientesNovoAcessoAppCard
+                formData={formData}
+                setFormData={setFormData}
+                usuarios={usuariosAcessoApp}
+                loadingUsuarios={loadingUsuariosAcessoApp}
+              />
+            </>
           )}
 
           {currentStep === 5 && (
@@ -189,7 +191,7 @@ const ClientesNovoWizardModal = ({
           )}
         </div>
 
-        <div className="border-t border-gray-200 p-4 bg-gray-50 flex justify-between">
+        <div className="border-t border-gray-200 p-4 bg-gray-50 flex justify-between gap-3">
           <button
             onClick={prevStep}
             disabled={currentStep === 1}
@@ -198,21 +200,24 @@ const ClientesNovoWizardModal = ({
             <FiArrowLeft /> Voltar
           </button>
 
-          {currentStep < ultimoStep ? (
-            <button
-              onClick={nextStep}
-              className="flex items-center gap-2 px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
-            >
-              Avancar <FiArrowRight />
-            </button>
-          ) : (
+          <div className="flex flex-wrap justify-end gap-2">
             <button
               onClick={handleSubmitFinal}
-              className="flex items-center gap-2 px-6 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors"
+              disabled={loading}
+              className="flex items-center gap-2 px-5 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors disabled:cursor-wait disabled:opacity-60"
             >
-              <FiSave /> Salvar {tipoTituloNovo}
+              <FiSave /> {loading ? "Salvando..." : `Salvar ${tipoTituloNovo}`}
             </button>
-          )}
+            {currentStep < ultimoStep && (
+              <button
+                onClick={nextStep}
+                disabled={loading}
+                className="flex items-center gap-2 px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+              >
+                Avancar <FiArrowRight />
+              </button>
+            )}
+          </div>
         </div>
       </div>
     </div>

@@ -21,7 +21,13 @@ import useEcommerceOrders from "./useEcommerceOrders";
 import useEcommercePaymentReturn from "./useEcommercePaymentReturn";
 import useEcommerceProductModal from "./useEcommerceProductModal";
 import useEcommerceStorefrontRuntime from "./useEcommerceStorefrontRuntime";
-import { trackPageView, trackViewCart } from "../../services/analytics";
+import useEcommerceSeo from "./useEcommerceSeo";
+import {
+  setEcommerceAnalyticsContext,
+  trackPageView,
+  trackSearch,
+  trackViewCart,
+} from "../../services/analytics";
 import {
   DEFAULT_CATALOG_LIMIT,
   STORAGE_TOKEN_KEY,
@@ -31,6 +37,7 @@ import {
   extractApiErrorMessage,
   normalizeCatalogPayload,
   resolveStoreDisplayName,
+  settleCatalogRequests,
 } from "./ecommerceMvpUtils";
 
 export default function EcommerceMVP() {
@@ -51,11 +58,6 @@ export default function EcommerceMVP() {
     setAuthReturnView("");
   }
 
-  // Rastreia no Google Analytics sempre que o cliente muda de tela
-  useEffect(() => {
-    trackPageView(view);
-    if (view === "carrinho") trackViewCart(cart);
-  }, [view]);
   const [bannerSlide, setBannerSlide] = useState(0);
   const [hoveredCard, setHoveredCard] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -72,6 +74,16 @@ export default function EcommerceMVP() {
     setCategoria,
     ordenacaoCatalogo,
     setOrdenacaoCatalogo,
+    marca,
+    setMarca,
+    apenasComEstoque,
+    setApenasComEstoque,
+    apenasComImagem,
+    setApenasComImagem,
+    precoMinimo,
+    setPrecoMinimo,
+    precoMaximo,
+    setPrecoMaximo,
     categorias,
     filteredProducts,
     productMap,
@@ -113,9 +125,29 @@ export default function EcommerceMVP() {
 
   const storefrontRef = tenantContext?.ecommerce_slug || tenantRef || "";
 
+  useEffect(() => {
+    setEcommerceAnalyticsContext({
+      tenant: storefrontRef,
+      channel: "ecommerce",
+    });
+    if (storefrontRef) trackPageView(view);
+  }, [storefrontRef, view]);
+
+  useEffect(() => {
+    if (!search.trim()) return undefined;
+    const timer = window.setTimeout(() => trackSearch(search), 700);
+    return () => window.clearTimeout(timer);
+  }, [search]);
+
   const storeDisplayName = useMemo(() => {
     return resolveStoreDisplayName({ tenantContext, storefrontRef });
   }, [tenantContext, storefrontRef]);
+
+  useEcommerceSeo({
+    tenantContext,
+    storeDisplayName,
+    selectedProduct,
+  });
 
   const catalogPagination = useMemo(() => {
     return buildPaginationWindow({
@@ -124,6 +156,13 @@ export default function EcommerceMVP() {
       page: catalogPage,
     });
   }, [catalogMeta.limit, catalogMeta.total, catalogPage]);
+
+  const selectedProductVariations = useMemo(() => {
+    if (!selectedProduct?.produto_pai_id) return [];
+    return Object.values(productMap).filter(
+      (product) => product.produto_pai_id === selectedProduct.produto_pai_id,
+    );
+  }, [productMap, selectedProduct]);
 
   const handleCatalogSearchChange = (value) => {
     setSearch(value);
@@ -137,6 +176,11 @@ export default function EcommerceMVP() {
 
   const handleCatalogOrderChange = (value) => {
     setOrdenacaoCatalogo(value);
+    setCatalogPage(1);
+  };
+
+  const handleCatalogFilterChange = (setter) => (value) => {
+    setter(value);
     setCatalogPage(1);
   };
 
@@ -164,6 +208,10 @@ export default function EcommerceMVP() {
     onError: setError,
     onSuccess: setSuccess,
   });
+
+  useEffect(() => {
+    if (view === "carrinho") trackViewCart(cart);
+  }, [view]);
 
   const {
     authLoading,
@@ -343,7 +391,18 @@ export default function EcommerceMVP() {
       loadProducts();
     }, 220);
     return () => clearTimeout(timer);
-  }, [tenantRef, search, categoria, ordenacaoCatalogo, catalogPage]);
+  }, [
+    tenantRef,
+    search,
+    categoria,
+    ordenacaoCatalogo,
+    catalogPage,
+    marca,
+    apenasComEstoque,
+    apenasComImagem,
+    precoMinimo,
+    precoMaximo,
+  ]);
 
   // Apos carregar o contexto via painel (sem slug), usar o tenant.id para buscar produtos
   // e redirecionar para a URL real da loja (/{slug})
@@ -369,6 +428,11 @@ export default function EcommerceMVP() {
     categoria,
     ordenacaoCatalogo,
     catalogPage,
+    marca,
+    apenasComEstoque,
+    apenasComImagem,
+    precoMinimo,
+    precoMaximo,
   ]);
 
   useEffect(() => {
@@ -391,7 +455,11 @@ export default function EcommerceMVP() {
       setTenantContext(response?.data || null);
     } catch (err) {
       setTenantContext(null);
-      setError(extractApiErrorMessage(err, "Loja inválida para e-commerce"));
+      if (!tenantRef) {
+        setError("");
+      } else {
+        setError(extractApiErrorMessage(err, "Loja inválida para e-commerce"));
+      }
     }
   }
 
@@ -400,17 +468,40 @@ export default function EcommerceMVP() {
     setLoading(true);
     setError("");
     try {
-      const response = await ecommerceApi.get("/api/ecommerce/produtos", {
-        params: buildCatalogQueryParams({
-          tenant: tenantValue,
-          search,
-          category: categoria,
-          order: ordenacaoCatalogo,
-          page: catalogPage,
-          limit: DEFAULT_CATALOG_LIMIT,
-          channel: "ecommerce",
-        }),
+      let selectedCategory = categoria;
+      if (String(categoria).startsWith("grupo:")) {
+        const selectedGroup = decodeURIComponent(String(categoria).slice("grupo:".length));
+        selectedCategory = categorias
+          .filter((item) => item.group === selectedGroup && item.value !== "todas")
+          .map((item) => item.value);
+      }
+      const queryParams = buildCatalogQueryParams({
+        tenant: tenantValue,
+        search,
+        category: selectedCategory,
+        order: ordenacaoCatalogo,
+        page: catalogPage,
+        limit: DEFAULT_CATALOG_LIMIT,
+        channel: "ecommerce",
+        brand: marca,
+        onlyInStock: apenasComEstoque,
+        onlyWithImage: apenasComImagem,
+        minPrice: precoMinimo,
+        maxPrice: precoMaximo,
       });
+      const { response, filtersResponse } = await settleCatalogRequests(
+        ecommerceApi.get("/api/ecommerce/produtos", {
+          params: queryParams,
+          paramsSerializer: { indexes: null },
+        }),
+        ecommerceApi.get("/api/ecommerce/produtos/filtros", {
+          params: {
+            tenant: tenantValue,
+            busca: search.trim() || undefined,
+            canal: "ecommerce",
+          },
+        }),
+      );
       const payload = normalizeCatalogPayload(response?.data);
       setProducts(payload.items);
       setCatalogMeta({
@@ -418,6 +509,7 @@ export default function EcommerceMVP() {
         offset: payload.offset,
         limit: payload.limit,
         categories: payload.categories,
+        brands: filtersResponse?.data?.marcas || [],
       });
     } catch (err) {
       setProducts([]);
@@ -426,6 +518,7 @@ export default function EcommerceMVP() {
         offset: 0,
         limit: DEFAULT_CATALOG_LIMIT,
         categories: [],
+        brands: [],
       });
       setError(extractApiErrorMessage(err, "Erro ao carregar produtos vendaveis"));
     } finally {
@@ -449,7 +542,62 @@ export default function EcommerceMVP() {
     setSuccess("Sess\u00e3o encerrada.");
   }
 
-  const S = ecommerceMvpStyles;
+  const S = useMemo(() => {
+    const primary = tenantContext?.ecommerce_cor_primaria || "#f97316";
+    const secondary = tenantContext?.ecommerce_cor_secundaria || "#1c1917";
+    const softPrimary = `${primary}18`;
+    const primaryShadow = `${primary}55`;
+    return {
+      ...ecommerceMvpStyles,
+      topbar: { ...ecommerceMvpStyles.topbar, background: primary },
+      cartBtn: { ...ecommerceMvpStyles.cartBtn, background: primary },
+      navTab: (active) => ({
+        ...ecommerceMvpStyles.navTab(active),
+        borderBottom: active ? `2px solid ${primary}` : "2px solid transparent",
+        color: active ? primary : "#78716c",
+      }),
+      addBtn: (out) => ({
+        ...ecommerceMvpStyles.addBtn(out),
+        background: out ? "#f5f5f4" : primary,
+        boxShadow: out ? "none" : `0 2px 8px ${primaryShadow}`,
+      }),
+      sidebarBadge: { ...ecommerceMvpStyles.sidebarBadge, background: primary },
+      checkoutBig: {
+        ...ecommerceMvpStyles.checkoutBig,
+        background: primary,
+        boxShadow: `0 4px 14px ${primaryShadow}`,
+      },
+      viewCartBtn: {
+        ...ecommerceMvpStyles.viewCartBtn,
+        borderColor: primary,
+        color: primary,
+      },
+      radioLabelActive: {
+        ...ecommerceMvpStyles.radioLabelActive,
+        borderColor: primary,
+        background: softPrimary,
+        color: primary,
+      },
+      payBtn: (active) => ({
+        ...ecommerceMvpStyles.payBtn(active),
+        borderColor: active ? primary : "#e7e5e4",
+        background: active ? softPrimary : "#fff",
+        color: active ? primary : "#374151",
+      }),
+      finalizarBtn: (disabled) => ({
+        ...ecommerceMvpStyles.finalizarBtn(disabled),
+        background: disabled ? "#e5e7eb" : primary,
+        boxShadow: disabled ? "none" : `0 4px 14px ${primaryShadow}`,
+      }),
+      rewardBox: {
+        ...ecommerceMvpStyles.rewardBox,
+        background: softPrimary,
+        borderColor: primary,
+      },
+      saveBtn: { ...ecommerceMvpStyles.saveBtn, background: primary },
+      footer: { ...ecommerceMvpStyles.footer, background: secondary },
+    };
+  }, [tenantContext?.ecommerce_cor_primaria, tenantContext?.ecommerce_cor_secundaria]);
 
   return (
     <div style={S.page}>
@@ -474,14 +622,18 @@ export default function EcommerceMVP() {
       {!tenantRef && (
         <div
           style={{
-            background: "#fef2f2",
-            color: "#991b1b",
-            padding: "10px 20px",
-            fontSize: 13,
-            borderBottom: "1px solid #fecaca",
+            maxWidth: 760,
+            margin: "24px auto",
+            background: "#fff7ed",
+            color: "#9a3412",
+            padding: "18px 20px",
+            fontSize: 14,
+            border: "1px solid #fed7aa",
+            borderRadius: 12,
           }}
         >
-          ⚠️ Use a URL no formato: /slug-da-loja
+          <strong>Loja não identificada.</strong> Abra o link público fornecido pela loja. Se você
+          administra esta loja, use a opção <strong>Prévia da loja</strong> no painel.
         </div>
       )}
 
@@ -501,6 +653,13 @@ export default function EcommerceMVP() {
           cartTotal={cartTotal}
           categories={categorias}
           category={categoria}
+          brands={catalogMeta.brands}
+          brand={marca}
+          onlyInStock={apenasComEstoque}
+          onlyWithImage={apenasComImagem}
+          minPrice={precoMinimo}
+          maxPrice={precoMaximo}
+          minOrder={tenantContext?.ecommerce_pedido_minimo}
           customerToken={customerToken}
           filteredProducts={filteredProducts}
           hoveredCard={hoveredCard}
@@ -515,6 +674,11 @@ export default function EcommerceMVP() {
           wishlist={wishlist}
           onAddToCart={addToCart}
           onCategoryChange={handleCatalogCategoryChange}
+          onBrandChange={handleCatalogFilterChange(setMarca)}
+          onOnlyInStockChange={handleCatalogFilterChange(setApenasComEstoque)}
+          onOnlyWithImageChange={handleCatalogFilterChange(setApenasComImagem)}
+          onMinPriceChange={handleCatalogFilterChange(setPrecoMinimo)}
+          onMaxPriceChange={handleCatalogFilterChange(setPrecoMaximo)}
           onCheckout={handleCheckoutFromLoja}
           onClearFilters={clearCatalogFilters}
           onHoverProduct={setHoveredCard}
@@ -534,6 +698,7 @@ export default function EcommerceMVP() {
           activeImage={activeProductImage}
           isMobile={isMobile}
           product={selectedProduct}
+          variations={selectedProductVariations}
           styles={S}
           wishlist={wishlist}
           onAddToCart={addToCart}
@@ -547,6 +712,7 @@ export default function EcommerceMVP() {
           }}
           onImageChange={setActiveProductImage}
           onNotifyMe={registerNotifyMe}
+          onSelectVariation={openProductDetails}
           onToggleWishlist={toggleWishlist}
           onViewCart={() => {
             closeProductModal();
@@ -563,6 +729,7 @@ export default function EcommerceMVP() {
           cupom={cupom}
           cupomResult={cupomResult}
           isMobile={isMobile}
+          minOrder={tenantContext?.ecommerce_pedido_minimo}
           productMap={productMap}
           styles={S}
           onApplyCoupon={applyCupom}

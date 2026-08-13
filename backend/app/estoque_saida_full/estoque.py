@@ -27,12 +27,13 @@ def _resolver_produto_full_nf(
         )
 
     if item.sku:
-        filtros_sku = [Produto.codigo == item.sku]
+        sku = item.sku.strip()
+        filtros_sku = [Produto.codigo == sku]
         # Compatibilidade com modelos legados que ainda possam expor campo "sku".
         if hasattr(Produto, "sku"):
-            filtros_sku.append(getattr(Produto, "sku") == item.sku)
+            filtros_sku.append(getattr(Produto, "sku") == sku)
 
-        return (
+        produto = (
             db.query(Produto)
             .filter(
                 Produto.tenant_id == tenant_id,
@@ -40,6 +41,24 @@ def _resolver_produto_full_nf(
             )
             .first()
         )
+        if produto:
+            return produto
+
+        # A Amazon costuma acrescentar "FBA" ao MSKU. Primeiro tentamos o
+        # codigo exato acima; so depois usamos o SKU-base do cadastro local.
+        if sku.upper().endswith("FBA") and len(sku) > 3:
+            sku_base = sku[:-3]
+            filtros_sku_base = [Produto.codigo == sku_base]
+            if hasattr(Produto, "sku"):
+                filtros_sku_base.append(getattr(Produto, "sku") == sku_base)
+            return (
+                db.query(Produto)
+                .filter(
+                    Produto.tenant_id == tenant_id,
+                    or_(*filtros_sku_base),
+                )
+                .first()
+            )
 
     return None
 

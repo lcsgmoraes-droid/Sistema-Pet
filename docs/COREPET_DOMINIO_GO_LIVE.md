@@ -105,9 +105,9 @@ Rodar os mesmos checks no dominio novo e no legado:
 
 ```bash
 curl -fsS https://corepet.com.br/api/health
-curl -fsS https://corepet.com.br/api/health/watchdog
+curl -fsS https://corepet.com.br/health/watchdog
 curl -fsS https://mlprohub.com.br/api/health
-curl -fsS https://mlprohub.com.br/api/health/watchdog
+curl -fsS https://mlprohub.com.br/health/watchdog
 ```
 
 Validar no navegador:

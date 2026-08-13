@@ -134,11 +134,11 @@ def diagnostico_push_agendamento(
         .first()
     )
     user_tutor = None
-    if cliente and cliente.user_id:
+    if cliente and cliente.auth_user_id:
         user_tutor = (
             db.query(User)
             .filter(
-                User.id == cliente.user_id,
+                User.id == cliente.auth_user_id,
                 User.tenant_id == str(tenant_id),
             )
             .first()

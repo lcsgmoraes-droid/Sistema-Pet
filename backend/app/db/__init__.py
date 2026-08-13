@@ -11,6 +11,7 @@ from app.db.core import Base, DATABASE_URL, SessionLocal, engine, get_session
 # legado app.tenancy.sqlalchemy e garante fail-fast em queries e inserts.
 import app.tenancy.filters  # noqa: E402,F401
 import app.database.orm_guards  # noqa: E402,F401
+import app.services.bling_cost_sync_events  # noqa: E402,F401
 
 __all__ = [
     "Base",

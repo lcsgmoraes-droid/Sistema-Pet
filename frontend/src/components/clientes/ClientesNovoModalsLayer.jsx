@@ -15,18 +15,16 @@ const ClientesNovoModalsLayer = ({
   error,
   showDuplicadoWarning,
   clienteDuplicado,
-  clientes,
   isDocumentoUnico,
   loading,
-  cancelarRemocao,
-  confirmarRemocaoEContinuar,
   continuarMesmoDuplicado,
   editarClienteExistente,
   irParaClienteExistente,
-  showConfirmacaoRemocao,
   setShowDuplicadoWarning,
   setClienteDuplicado,
   setFormData,
+  usuariosAcessoApp,
+  loadingUsuariosAcessoApp,
   buscarCep,
   loadingCep,
   cepError,
@@ -73,18 +71,16 @@ const ClientesNovoModalsLayer = ({
         error={error}
         showDuplicadoWarning={showDuplicadoWarning}
         clienteDuplicado={clienteDuplicado}
-        clientes={clientes}
         isDocumentoUnico={isDocumentoUnico}
         loading={loading}
-        cancelarRemocao={cancelarRemocao}
-        confirmarRemocaoEContinuar={confirmarRemocaoEContinuar}
         continuarMesmoDuplicado={continuarMesmoDuplicado}
         editarClienteExistente={editarClienteExistente}
         irParaClienteExistente={irParaClienteExistente}
-        showConfirmacaoRemocao={showConfirmacaoRemocao}
         setShowDuplicadoWarning={setShowDuplicadoWarning}
         setClienteDuplicado={setClienteDuplicado}
         setFormData={setFormData}
+        usuariosAcessoApp={usuariosAcessoApp}
+        loadingUsuariosAcessoApp={loadingUsuariosAcessoApp}
         buscarCep={buscarCep}
         loadingCep={loadingCep}
         cepError={cepError}

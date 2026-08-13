@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 import time
 
-from sqlalchemy import func, text
+from sqlalchemy import and_, exists, func, or_, text
 from sqlalchemy.orm import Session
 
 from app.pedido_integrado_item_models import PedidoIntegradoItem
@@ -14,7 +14,12 @@ from app.utils.correlation import current_correlation_id, operation_correlation_
 from app.utils.logger import logger
 
 
-_STATUS_PEDIDOS_RECONCILIAVEIS = ("aberto", "confirmado", "expirado")
+_STATUS_PEDIDOS_RECONCILIAVEIS = (
+    "aberto",
+    "confirmado",
+    "expirado",
+    "cancelado",
+)
 _INTERVALO_MINIMO_CONSULTA_SEGUNDOS = 0.45
 _ULTIMA_CONSULTA_PEDIDO_BING_SEGUNDOS = 0.0
 _RATE_LIMIT_DIARIO_BLOQUEADO_ATE: datetime | None = None
@@ -33,6 +38,58 @@ def _limite_data_recentes(dias: int) -> datetime:
     return _utc_now() - timedelta(days=dias_ref)
 
 
+def _pedido_cancelado_requer_acompanhamento(pedido: PedidoIntegrado) -> bool:
+    from app.services.bling_flow_monitor_diagnostics import (
+        _nf_contexto_autorizado,
+        _nf_contexto_cancelado,
+        _ultima_nf,
+    )
+
+    payload = pedido.payload if isinstance(pedido.payload, dict) else {}
+    cancelamento = (
+        payload.get("cancelamento_nf")
+        if isinstance(payload.get("cancelamento_nf"), dict)
+        else {}
+    )
+    retorno = (
+        payload.get("retorno_estoque")
+        if isinstance(payload.get("retorno_estoque"), dict)
+        else {}
+    )
+    if retorno.get("status") in {
+        "pendente",
+        "retornado",
+        "nao_retornado",
+        "sem_movimento",
+    }:
+        return False
+
+    nf = _ultima_nf(payload)
+    return bool(
+        cancelamento.get("status") in {"solicitado", "erro"}
+        or _nf_contexto_autorizado(nf)
+        or _nf_contexto_cancelado(nf)
+    )
+
+
+def _filtro_pedido_regular_requer_reconciliacao():
+    item_pendente = exists().where(
+        and_(
+            PedidoIntegradoItem.pedido_integrado_id == PedidoIntegrado.id,
+            PedidoIntegradoItem.tenant_id == PedidoIntegrado.tenant_id,
+            PedidoIntegradoItem.liberado_em.is_(None),
+            PedidoIntegradoItem.vendido_em.is_(None),
+        )
+    )
+    return or_(
+        PedidoIntegrado.status == "aberto",
+        and_(
+            PedidoIntegrado.status.in_(("confirmado", "expirado")),
+            item_pendente,
+        ),
+    )
+
+
 def _buscar_pedidos_recentes_reconciliaveis(
     db: Session,
     tenant_id,
@@ -40,36 +97,78 @@ def _buscar_pedidos_recentes_reconciliaveis(
     dias: int,
     limite_pedidos: int,
 ) -> list[PedidoIntegrado]:
-    return (
+    filtros_base = (
+        PedidoIntegrado.tenant_id == tenant_id,
+        PedidoIntegrado.pedido_bling_id.isnot(None),
+        func.length(func.trim(PedidoIntegrado.pedido_bling_id)) > 0,
+        PedidoIntegrado.criado_em >= _limite_data_recentes(dias),
+    )
+    pedidos_regulares = (
         db.query(PedidoIntegrado)
         .filter(
-            PedidoIntegrado.tenant_id == tenant_id,
-            PedidoIntegrado.pedido_bling_id.isnot(None),
-            func.length(func.trim(PedidoIntegrado.pedido_bling_id)) > 0,
-            PedidoIntegrado.criado_em >= _limite_data_recentes(dias),
-            PedidoIntegrado.status.in_(_STATUS_PEDIDOS_RECONCILIAVEIS),
+            *filtros_base,
+            _filtro_pedido_regular_requer_reconciliacao(),
         )
         .order_by(PedidoIntegrado.criado_em.desc(), PedidoIntegrado.id.desc())
         .limit(max(int(limite_pedidos or 0), 1))
         .all()
     )
+    candidatos_cancelados = (
+        db.query(PedidoIntegrado)
+        .filter(
+            *filtros_base,
+            PedidoIntegrado.status == "cancelado",
+        )
+        .order_by(PedidoIntegrado.criado_em.desc(), PedidoIntegrado.id.desc())
+        .all()
+    )
+    cancelados_pendentes = [
+        pedido
+        for pedido in candidatos_cancelados
+        if _pedido_cancelado_requer_acompanhamento(pedido)
+    ]
+    pedidos = pedidos_regulares + cancelados_pendentes
+    pedidos.sort(
+        key=lambda pedido: (
+            getattr(pedido, "criado_em", None) or datetime.min,
+            int(getattr(pedido, "id", 0) or 0),
+        ),
+        reverse=True,
+    )
+    return pedidos[: max(int(limite_pedidos or 0), 1)]
 
 
 def _contar_pedidos_recentes_reconciliaveis(
     db: Session, tenant_id, *, dias: int
 ) -> int:
-    total = (
+    filtros_base = (
+        PedidoIntegrado.tenant_id == tenant_id,
+        PedidoIntegrado.pedido_bling_id.isnot(None),
+        func.length(func.trim(PedidoIntegrado.pedido_bling_id)) > 0,
+        PedidoIntegrado.criado_em >= _limite_data_recentes(dias),
+    )
+    total_regular = (
         db.query(func.count(PedidoIntegrado.id))
         .filter(
-            PedidoIntegrado.tenant_id == tenant_id,
-            PedidoIntegrado.pedido_bling_id.isnot(None),
-            func.length(func.trim(PedidoIntegrado.pedido_bling_id)) > 0,
-            PedidoIntegrado.criado_em >= _limite_data_recentes(dias),
-            PedidoIntegrado.status.in_(_STATUS_PEDIDOS_RECONCILIAVEIS),
+            *filtros_base,
+            _filtro_pedido_regular_requer_reconciliacao(),
         )
         .scalar()
     )
-    return int(total or 0)
+    candidatos_cancelados = (
+        db.query(PedidoIntegrado)
+        .filter(
+            *filtros_base,
+            PedidoIntegrado.status == "cancelado",
+        )
+        .all()
+    )
+    total_cancelado = sum(
+        1
+        for pedido in candidatos_cancelados
+        if _pedido_cancelado_requer_acompanhamento(pedido)
+    )
+    return int(total_regular or 0) + total_cancelado
 
 
 def listar_tenants_com_pedidos_reconciliaveis(db: Session, *, dias: int) -> list:
@@ -82,7 +181,7 @@ def listar_tenants_com_pedidos_reconciliaveis(db: Session, *, dias: int) -> list
             WHERE pedido_bling_id IS NOT NULL
               AND length(trim(pedido_bling_id)) > 0
               AND criado_em >= :cutoff
-              AND status IN ('aberto', 'confirmado', 'expirado')
+              AND status IN ('aberto', 'confirmado', 'expirado', 'cancelado')
             """
         ),
         {"dias": dias, "cutoff": _limite_data_recentes(dias)},
@@ -179,7 +278,6 @@ def reconciliar_status_pedido_local(
     from app.integracao_bling_pedido_routes import (
         _SITUACOES_PEDIDO_ATENDIDO,
         _SITUACOES_PEDIDO_CANCELADO,
-        _cancelar_pedido,
         _confirmar_pedido,
         _dict,
         _montar_payload_pedido,
@@ -228,26 +326,21 @@ def reconciliar_status_pedido_local(
     status_anterior = getattr(pedido, "status", None)
 
     if situacao_id and situacao_id in _SITUACOES_PEDIDO_CANCELADO:
-        if pedido.status != "cancelado":
-            _cancelar_pedido(
-                db=db, pedido=pedido, itens=itens, processed_at=processed_at
-            )
-            return {
-                "success": True,
-                "executada": True,
-                "acao": "cancelado",
-                "pedido_integrado_id": pedido.id,
-                "pedido_bling_id": pedido_bling_id,
-                "status_anterior": status_anterior,
-                "status_atual": pedido.status,
-                "nf_numero": _dict(resumo_nf).get("numero"),
-            }
+        from app.services.pedido_nf_reconciliation_service import (
+            reconciliar_pedido_cancelado_atualizado,
+        )
 
-        db.commit()
+        acao = reconciliar_pedido_cancelado_atualizado(
+            db,
+            pedido=pedido,
+            itens=itens,
+            resumo_nf=resumo_nf,
+            processed_at=processed_at,
+        )
         return {
             "success": True,
             "executada": True,
-            "acao": "ja_cancelado",
+            "acao": acao,
             "pedido_integrado_id": pedido.id,
             "pedido_bling_id": pedido_bling_id,
             "status_anterior": status_anterior,
@@ -255,26 +348,26 @@ def reconciliar_status_pedido_local(
             "nf_numero": _dict(resumo_nf).get("numero"),
         }
 
-    if situacao_id and situacao_id in _SITUACOES_PEDIDO_ATENDIDO:
-        acao_nf = _processar_nf_autorizada_vinculada_ao_pedido(
-            db=db,
-            pedido=pedido,
-            itens=itens,
-            resumo_nf=resumo_nf,
-        )
-        if acao_nf:
-            return {
-                "success": True,
-                "executada": True,
-                "acao": acao_nf,
-                "pedido_integrado_id": pedido.id,
-                "pedido_bling_id": pedido_bling_id,
-                "status_anterior": status_anterior,
-                "status_atual": pedido.status,
-                "nf_numero": _dict(resumo_nf).get("numero"),
-                "erros_estoque": [],
-            }
+    acao_nf = _processar_nf_autorizada_vinculada_ao_pedido(
+        db=db,
+        pedido=pedido,
+        itens=itens,
+        resumo_nf=resumo_nf,
+    )
+    if acao_nf:
+        return {
+            "success": True,
+            "executada": True,
+            "acao": acao_nf,
+            "pedido_integrado_id": pedido.id,
+            "pedido_bling_id": pedido_bling_id,
+            "status_anterior": status_anterior,
+            "status_atual": pedido.status,
+            "nf_numero": _dict(resumo_nf).get("numero"),
+            "erros_estoque": [],
+        }
 
+    if situacao_id and situacao_id in _SITUACOES_PEDIDO_ATENDIDO:
         if pedido.status not in {"confirmado", "cancelado"}:
             erros = _confirmar_pedido(
                 db=db,

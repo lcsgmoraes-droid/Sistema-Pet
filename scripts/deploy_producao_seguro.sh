@@ -461,7 +461,8 @@ chmod -R u+rwX,g+rwX \
 
 ops_command_audit_log_path="$APP_DIR/backend/logs/ops_command_events.jsonl"
 touch "$ops_command_audit_log_path" \
-  && chmod 0666 "$ops_command_audit_log_path" \
+  && chown 1000:1000 "$ops_command_audit_log_path" \
+  && chmod 0660 "$ops_command_audit_log_path" \
   || log "Aviso: nao foi possivel ajustar permissao do log de auditoria manual"
 
 mark_step "build_frontend"

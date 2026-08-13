@@ -28,6 +28,7 @@ from app.banho_tosa_api.utils import (
     serializar_etapa,
 )
 from app.banho_tosa_custos import validar_transicao_status
+from app.banho_tosa_custos_reais import recalcular_snapshot_atendimento
 from app.banho_tosa_cancelamento import cancelar_processo_atendimento
 from app.banho_tosa_vendas import gerar_venda_atendimento
 from app.banho_tosa_models import (
@@ -212,8 +213,13 @@ def mover_etapa_atendimento(
         db.add(etapa)
 
     aplicar_status_atendimento(db, tenant_id, atendimento, status_por_etapa(tipo))
+    if tipo == "entregue" and body.observacoes_saida is not None:
+        atendimento.observacoes_saida = body.observacoes_saida.strip() or None
     if tipo == "entregue" and not atendimento.pacote_credito_id:
         gerar_venda_atendimento(db, tenant_id, current_user.id, atendimento.id)
+    if tipo in {"pronto", "entregue"}:
+        db.flush()
+        recalcular_snapshot_atendimento(db, tenant_id, atendimento.id)
     db.commit()
     atendimento = obter_atendimento_ou_404(db, tenant_id, atendimento.id)
     return serializar_atendimento(atendimento, config)

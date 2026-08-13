@@ -78,3 +78,11 @@ export const buscarSugestoesDuplicidadePessoas = (params = {}) => {
 export const executarFusoesAutomaticasPessoas = () => {
   return api.post("/clientes/duplicidades/fundir-automaticas");
 };
+
+export const executarFusoesAssistidasPessoasPorNome = (data = { confirmar: false }) => {
+  return api.post("/clientes/duplicidades/fundir-assistidas-nome", data, {
+    // A aplicação transfere históricos e referências em uma única transação.
+    // Em bases grandes isso pode ultrapassar o timeout global de 20 segundos.
+    timeout: 120000,
+  });
+};

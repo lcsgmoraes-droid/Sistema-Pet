@@ -147,6 +147,8 @@ class ClienteCreate(BaseModel):
     telefone: Optional[str] = None
     celular: Optional[str] = None
     email: Optional[str] = None
+    auth_user_id: Optional[int] = None
+    app_access_profiles: List[str] = Field(default_factory=list)
 
     # Pessoa FÃ­sica
     cpf: Optional[str] = None
@@ -193,11 +195,25 @@ class ClienteCreate(BaseModel):
     valor_por_km: Optional[Decimal] = None
     recebe_comissao_entrega: bool = False
 
+    # ENTREGADOR - configuracao operacional completa
+    entregador_ativo: bool = True
+    controla_rh: bool = False
+    gera_conta_pagar_custo_entrega: bool = False
+    media_entregas_configurada: Optional[int] = None
+    media_entregas_real: Optional[int] = None
+    custo_rh_ajustado: Optional[Decimal] = None
+    modelo_custo_entrega: Optional[str] = None
+    taxa_fixa_entrega: Optional[Decimal] = None
+    valor_por_km_entrega: Optional[Decimal] = None
+    moto_propria: bool = True
+
     # ðŸ“† ACERTO FINANCEIRO (ETAPA 4)
     tipo_acerto_entrega: Optional[str] = None  # semanal | quinzenal | mensal
     dia_semana_acerto: Optional[int] = None  # 1=segunda ... 7=domingo
     dia_mes_acerto: Optional[int] = None  # 1 a 28
     data_ultimo_acerto: Optional[str] = None  # Data do Ãºltimo acerto (YYYY-MM-DD)
+
+    controla_dre: bool = True
 
     observacoes: Optional[str] = None
     alertas_pdv: List[dict] = Field(default_factory=list)
@@ -263,6 +279,8 @@ class ClienteUpdate(BaseModel):
     email: Optional[EmailStr] = None
     telefone: Optional[str] = None
     celular: Optional[str] = None
+    auth_user_id: Optional[int] = None
+    app_access_profiles: Optional[List[str]] = None
 
     # Campos PJ
     cnpj: Optional[str] = None
@@ -382,6 +400,11 @@ class ClienteResponse(BaseModel):
     email: Optional[str] = None
     telefone: Optional[str] = None
     celular: Optional[str] = None
+    auth_user_id: Optional[int] = None
+    auth_user_nome: Optional[str] = None
+    auth_user_email: Optional[str] = None
+    app_access_profiles: List[str] = Field(default_factory=list)
+    merged_into_id: Optional[int] = None
 
     # Campos PJ
     cnpj: Optional[str] = None
@@ -518,6 +541,12 @@ class PessoaFusaoPreviewRequest(BaseModel):
 class PessoaFusaoExecutarRequest(PessoaFusaoPreviewRequest):
     decisoes_campos: Dict[str, str] = Field(default_factory=dict)
     observacao: Optional[str] = None
+
+
+class PessoaFusaoAssistidaNomeRequest(BaseModel):
+    confirmar: bool = False
+    aceitar_nome_igual: bool = False
+    limit: int = Field(default=200, ge=1, le=200)
 
 
 class ToggleParceiroRequest(BaseModel):

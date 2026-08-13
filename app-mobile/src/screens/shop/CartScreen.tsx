@@ -1,10 +1,11 @@
-import { useNavigation } from "@react-navigation/native";
-import React, { useEffect, useState } from "react";
+import { useFocusEffect, useNavigation } from "@react-navigation/native";
+import React, { useCallback, useState } from "react";
 import { Alert, Linking } from "react-native";
 
 import { finalizarCheckoutAppLoja } from "../../services/shop.service";
 import { useAuthStore } from "../../store/auth.store";
 import { useCartStore } from "../../store/cart.store";
+import { useTenantStore } from "../../store/tenant.store";
 import { formatarMoeda } from "../../utils/format";
 import { CartAddressModal } from "./cart/CartAddressModal";
 import { CartContent } from "./cart/CartContent";
@@ -25,6 +26,7 @@ export default function CartScreen() {
   const { itens, subtotal, carregar, atualizar, remover, limpar } =
     useCartStore();
   const { user } = useAuthStore();
+  const tenant = useTenantStore((state) => state.tenant);
   const [finalizando, setFinalizando] = useState(false);
   const [pagamentoTipo, setPagamentoTipo] = useState<PagamentoTipo>("");
   const [pagamentoBandeira, setPagamentoBandeira] = useState("Visa");
@@ -46,9 +48,12 @@ export default function CartScreen() {
   const [estado, setEstado] = useState(enderecoInicial.estado);
   const [buscandoCep, setBuscandoCep] = useState(false);
 
-  useEffect(() => {
-    carregar();
-  }, []);
+  useFocusEffect(
+    useCallback(() => {
+      if (!user?.id || !tenant?.id) return;
+      void carregar({ userId: user.id, tenantId: tenant.id });
+    }, [carregar, tenant?.id, user?.id]),
+  );
 
   async function buscarCep(value: string) {
     const { numeros, cep: cepFormatado } = formatarCep(value);
@@ -180,10 +185,22 @@ export default function CartScreen() {
       pagamentoParcelas,
     );
     const pagLabel = pagamentoTipo ? `\n💳 Pagamento: ${pagamentoLabel}` : "";
+    const enderecoLoja = tenant
+      ? [
+          [tenant.endereco, tenant.numero].filter(Boolean).join(", "),
+          tenant.bairro,
+          [tenant.cidade, tenant.uf].filter(Boolean).join("/"),
+        ]
+          .filter(Boolean)
+          .join(" - ")
+      : "";
+    const lojaLabel = tenant
+      ? `Loja: ${tenant.nome}${enderecoLoja ? `\n${enderecoLoja}` : ""}`
+      : "Loja selecionada no aplicativo";
 
     Alert.alert(
-      "Ir para pagamento",
-      `Total: ${formatarMoeda(subtotal)}\n\n${modoLabel}${pagLabel}\n\nO carrinho ainda nao e pedido. O pedido so sera liberado apos aprovacao do pagamento online.`,
+      "Confirmar compra",
+      `${lojaLabel}\n\nTotal: ${formatarMoeda(subtotal)}\n\n${modoLabel}${pagLabel}\n\nConfirme que esta comprando na loja correta. O pedido sera liberado apos aprovacao do pagamento online.`,
       [
         { text: "Cancelar", style: "cancel" },
         {

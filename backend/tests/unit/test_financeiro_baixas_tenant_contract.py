@@ -31,14 +31,9 @@ def test_lancamentos_da_venda_sao_baixados_no_tenant_correto():
 
 
 def test_pagamento_conta_pagar_atualiza_lancamento_automatico_da_propria_conta():
-    source = _source("app/financeiro/contas_pagar_pagamento_routes.py")
-    registrar = source.split("async def registrar_pagamento(", 1)[1].split(
-        "# ============================================================================\n# DASHBOARD / RESUMO",
-        1,
-    )[0]
-    bloco_lancamento = registrar.split("# Buscar lan", 1)[1].split(
-        "if lancamento:",
-        1,
+    source = _source("app/financeiro/contas_pagar_pagamento_service.py")
+    bloco_lancamento = source.split("def _atualizar_lancamento_previsto(", 1)[1].split(
+        "def _sincronizar_recorrencia_pos_pagamento(", 1
     )[0]
 
     assert "LancamentoManual.tenant_id == tenant_id" in bloco_lancamento

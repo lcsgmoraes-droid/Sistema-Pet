@@ -6,7 +6,7 @@ function numeroSeguro(valor) {
 export const CANAIS_DESTAQUE = ["loja_fisica", "mercado_livre", "shopee", "amazon"];
 
 export const LABELS_CANAIS = {
-  loja_fisica: "Loja FÃ­sica",
+  loja_fisica: "Loja Física",
   mercado_livre: "Mercado Livre",
   shopee: "Shopee",
   amazon: "Amazon",

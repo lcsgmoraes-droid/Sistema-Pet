@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
-import { ArrowRight, GripVertical, RefreshCw, Route } from "lucide-react";
+import { ArrowRight, ClipboardList, Clock3, GripVertical, RefreshCw, Route } from "lucide-react";
 import ActionButton from "../../../components/ui/ActionButton";
 import CustomerIdentity from "../../../components/ui/CustomerIdentity";
 import Panel from "../../../components/ui/Panel";
@@ -9,6 +9,8 @@ import PetIdentity from "../../../components/ui/PetIdentity";
 import StatusBadge from "../../../components/ui/StatusBadge";
 import { banhoTosaApi } from "../banhoTosaApi";
 import { getApiErrorMessage } from "../banhoTosaUtils";
+import BanhoTosaAtendimentoPanel from "./BanhoTosaAtendimentoPanel";
+import BanhoTosaTransicaoPanel from "./BanhoTosaTransicaoPanel";
 import BanhoTosaVetAlertas from "./BanhoTosaVetAlertas";
 
 const DEFAULT_FLUXO = ["chegou", "banho", "secagem", "tosa", "pronto"];
@@ -40,13 +42,16 @@ const ETAPA_POR_STATUS = {
   pronto: "pronto",
 };
 
-export default function BanhoTosaFilaView({ config, onChanged }) {
+export default function BanhoTosaFilaView({ config, funcionarios = [], recursos = [], onChanged }) {
   const [atendimentos, setAtendimentos] = useState([]);
   const [loading, setLoading] = useState(false);
   const [processingId, setProcessingId] = useState(null);
   const [savingFluxo, setSavingFluxo] = useState(false);
   const [draggedFluxoIndex, setDraggedFluxoIndex] = useState(null);
   const [draggedAtendimentoId, setDraggedAtendimentoId] = useState(null);
+  const [etapaMobile, setEtapaMobile] = useState("chegou");
+  const [transicao, setTransicao] = useState(null);
+  const [ficha, setFicha] = useState(null);
   const [fluxoLocal, setFluxoLocal] = useState(() => normalizarFluxo(config?.fluxo_etapas));
 
   useEffect(() => {
@@ -63,6 +68,12 @@ export default function BanhoTosaFilaView({ config, onChanged }) {
       atendimentos.filter((item) => !["entregue", "cancelado", "no_show"].includes(item.status)),
     [atendimentos],
   );
+
+  useEffect(() => {
+    if (!fluxo.includes(etapaMobile)) {
+      setEtapaMobile(fluxo[0] || "chegou");
+    }
+  }, [etapaMobile, fluxo]);
 
   async function carregarFila() {
     setLoading(true);
@@ -105,17 +116,29 @@ export default function BanhoTosaFilaView({ config, onChanged }) {
     salvarFluxo(novoFluxo);
   }
 
-  async function moverEtapa(atendimento, etapa, options = {}) {
+  async function moverEtapa(atendimento, etapa, payload = {}) {
     if (!etapa || processingId) return;
 
     setProcessingId(atendimento.id);
     try {
-      await banhoTosaApi.moverEtapaAtendimento(atendimento.id, {
+      const response = await banhoTosaApi.moverEtapaAtendimento(atendimento.id, {
         tipo: etapa,
-        iniciar_timer: false,
-        resetar_fluxo: Boolean(options.resetarFluxo),
+        iniciar_timer: Boolean(payload.iniciar_timer),
+        responsavel_id: payload.responsavel_id || null,
+        recurso_id: payload.recurso_id || null,
+        observacoes: payload.observacoes || null,
+        resetar_fluxo: Boolean(payload.resetarFluxo),
       });
 
+      setTransicao(null);
+      if (etapa === "pronto") {
+        toast.success(`${atendimento.pet_nome || "Pet"} está pronto para o fechamento.`);
+      } else {
+        toast.success(`Etapa alterada para ${labelEtapa(etapa)}.`);
+      }
+      if (response.data?.pdv_url && etapa === "entregue") {
+        toast.success("Venda vinculada ao atendimento.");
+      }
       await carregarFila();
       await onChanged(true);
     } catch (error) {
@@ -131,7 +154,15 @@ export default function BanhoTosaFilaView({ config, onChanged }) {
     const atendimentoId = event.dataTransfer.getData("text/plain") || draggedAtendimentoId;
     const atendimento = visiveis.find((item) => String(item.id) === String(atendimentoId));
     if (!atendimento || etapaAtual(atendimento) === etapaDestino) return;
-    moverEtapa(atendimento, etapaDestino);
+    prepararMovimento(atendimento, etapaDestino);
+  }
+
+  function prepararMovimento(atendimento, etapa) {
+    if (etapa === "entregue") {
+      setFicha({ id: atendimento.id, tab: "fechamento" });
+      return;
+    }
+    setTransicao({ atendimento, etapa });
   }
 
   return (
@@ -160,60 +191,149 @@ export default function BanhoTosaFilaView({ config, onChanged }) {
           Carregando fila...
         </Panel>
       ) : (
-        <div className="overflow-x-auto pb-2">
-          <div
-            className="grid min-w-[980px] gap-3"
-            style={{ gridTemplateColumns: `repeat(${fluxo.length}, minmax(190px, 1fr))` }}
-          >
-            {fluxo.map((etapa) => {
-              const itens = visiveis.filter((item) => etapaAtual(item) === etapa);
-              const isDropTarget = Boolean(draggedAtendimentoId);
-              return (
-                <section
-                  key={etapa}
-                  onDragOver={(event) => event.preventDefault()}
-                  onDrop={(event) => onDropAtendimento(event, etapa)}
-                  className={[
-                    "min-h-[280px] rounded-lg border border-slate-200 bg-white p-3 shadow-sm transition",
-                    isDropTarget ? "ring-1 ring-blue-100" : "",
-                  ].join(" ")}
-                >
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-sm font-semibold text-slate-900">{labelEtapa(etapa)}</h3>
-                    <span className="rounded-full bg-slate-100 px-2 py-1 text-xs font-medium text-slate-500">
-                      {itens.length}
+        <>
+          <div className="lg:hidden">
+            <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-3">
+              {fluxo.map((etapa) => {
+                const quantidade = visiveis.filter((item) => etapaAtual(item) === etapa).length;
+                return (
+                  <button
+                    key={etapa}
+                    className={[
+                      "inline-flex shrink-0 items-center gap-2 rounded-full border px-3 py-2 text-sm font-semibold",
+                      etapaMobile === etapa
+                        ? "border-blue-600 bg-blue-600 text-white"
+                        : "border-slate-200 bg-white text-slate-600",
+                    ].join(" ")}
+                    type="button"
+                    onClick={() => setEtapaMobile(etapa)}
+                  >
+                    {labelEtapa(etapa)}
+                    <span className={etapaMobile === etapa ? "text-blue-100" : "text-slate-400"}>
+                      {quantidade}
                     </span>
-                  </div>
-
-                  <div className="mt-3 space-y-2">
-                    {itens.map((atendimento) => (
-                      <AtendimentoCard
-                        key={atendimento.id}
-                        atendimento={atendimento}
-                        fluxo={fluxo}
-                        processing={processingId === atendimento.id}
-                        onDragEnd={() => setDraggedAtendimentoId(null)}
-                        onDragStart={(event) => {
-                          setDraggedAtendimentoId(atendimento.id);
-                          event.dataTransfer.effectAllowed = "move";
-                          event.dataTransfer.setData("text/plain", String(atendimento.id));
-                        }}
-                        onMover={moverEtapa}
-                      />
-                    ))}
-                    {itens.length === 0 && (
-                      <div className="rounded-lg border border-dashed border-slate-200 p-4 text-center text-sm text-slate-400">
-                        Sem pets nesta etapa.
-                      </div>
-                    )}
-                  </div>
-                </section>
-              );
-            })}
+                  </button>
+                );
+              })}
+            </div>
+            <FilaColumn
+              etapa={etapaMobile}
+              fluxo={fluxo}
+              itens={visiveis.filter((item) => etapaAtual(item) === etapaMobile)}
+              processingId={processingId}
+              onAbrirFicha={(atendimento) => setFicha({ id: atendimento.id, tab: "resumo" })}
+              onMover={prepararMovimento}
+            />
           </div>
-        </div>
+
+          <div className="hidden overflow-x-auto pb-2 lg:block">
+            <div
+              className="grid min-w-[980px] gap-3"
+              style={{ gridTemplateColumns: `repeat(${fluxo.length}, minmax(190px, 1fr))` }}
+            >
+              {fluxo.map((etapa) => {
+                const itens = visiveis.filter((item) => etapaAtual(item) === etapa);
+                return (
+                  <FilaColumn
+                    key={etapa}
+                    etapa={etapa}
+                    fluxo={fluxo}
+                    itens={itens}
+                    isDropTarget={Boolean(draggedAtendimentoId)}
+                    processingId={processingId}
+                    onAbrirFicha={(atendimento) => setFicha({ id: atendimento.id, tab: "resumo" })}
+                    onDragEnd={() => setDraggedAtendimentoId(null)}
+                    onDragStart={(event, atendimento) => {
+                      setDraggedAtendimentoId(atendimento.id);
+                      event.dataTransfer.effectAllowed = "move";
+                      event.dataTransfer.setData("text/plain", String(atendimento.id));
+                    }}
+                    onDrop={(event) => onDropAtendimento(event, etapa)}
+                    onMover={prepararMovimento}
+                  />
+                );
+              })}
+            </div>
+          </div>
+        </>
+      )}
+
+      {transicao && (
+        <BanhoTosaTransicaoPanel
+          atendimento={transicao.atendimento}
+          etapa={transicao.etapa}
+          funcionarios={funcionarios}
+          processing={processingId === transicao.atendimento.id}
+          recursos={recursos}
+          onClose={() => setTransicao(null)}
+          onConfirm={(payload) => moverEtapa(transicao.atendimento, transicao.etapa, payload)}
+        />
+      )}
+
+      {ficha && (
+        <BanhoTosaAtendimentoPanel
+          atendimentoId={ficha.id}
+          funcionarios={funcionarios}
+          initialTab={ficha.tab}
+          onChanged={async () => {
+            await carregarFila();
+            await onChanged(true);
+          }}
+          onClose={() => setFicha(null)}
+        />
       )}
     </div>
+  );
+}
+
+function FilaColumn({
+  etapa,
+  fluxo,
+  isDropTarget = false,
+  itens,
+  processingId,
+  onAbrirFicha,
+  onDragEnd,
+  onDragStart,
+  onDrop,
+  onMover,
+}) {
+  return (
+    <section
+      className={[
+        "min-h-[280px] rounded-lg border border-slate-200 bg-white p-3 shadow-sm transition",
+        isDropTarget ? "ring-1 ring-blue-100" : "",
+      ].join(" ")}
+      onDragOver={(event) => onDrop && event.preventDefault()}
+      onDrop={onDrop}
+    >
+      <div className="flex items-center justify-between">
+        <h3 className="text-sm font-semibold text-slate-900">{labelEtapa(etapa)}</h3>
+        <span className="rounded-full bg-slate-100 px-2 py-1 text-xs font-medium text-slate-500">
+          {itens.length}
+        </span>
+      </div>
+
+      <div className="mt-3 space-y-2">
+        {itens.map((atendimento) => (
+          <AtendimentoCard
+            key={atendimento.id}
+            atendimento={atendimento}
+            fluxo={fluxo}
+            processing={processingId === atendimento.id}
+            onAbrirFicha={onAbrirFicha}
+            onDragEnd={onDragEnd}
+            onDragStart={(event) => onDragStart?.(event, atendimento)}
+            onMover={onMover}
+          />
+        ))}
+        {itens.length === 0 && (
+          <div className="rounded-lg border border-dashed border-slate-200 p-4 text-center text-sm text-slate-400">
+            Sem pets nesta etapa.
+          </div>
+        )}
+      </div>
+    </section>
   );
 }
 
@@ -263,10 +383,19 @@ function FluxoDraggable({ draggedIndex, fluxo, saving, onDragEnd, onDragStart, o
   );
 }
 
-function AtendimentoCard({ atendimento, fluxo, processing, onDragEnd, onDragStart, onMover }) {
+function AtendimentoCard({
+  atendimento,
+  fluxo,
+  processing,
+  onAbrirFicha,
+  onDragEnd,
+  onDragStart,
+  onMover,
+}) {
   const [openSelector, setOpenSelector] = useState(false);
   const atual = etapaAtual(atendimento);
   const proxima = proximaEtapa(atendimento, fluxo);
+  const aberta = etapaAberta(atendimento);
   const etapasDestino = [...fluxo, "entregue"].filter(
     (etapa, index, lista) => lista.indexOf(etapa) === index,
   );
@@ -325,6 +454,34 @@ function AtendimentoCard({ atendimento, fluxo, processing, onDragEnd, onDragStar
         restricoes={atendimento.restricoes_veterinarias_snapshot}
       />
 
+      {aberta && (
+        <div
+          className={[
+            "mt-3 rounded-lg border px-3 py-2",
+            atendimento.atrasado
+              ? "border-red-200 bg-red-50 text-red-700"
+              : "border-blue-100 bg-blue-50 text-blue-800",
+          ].join(" ")}
+        >
+          <div className="flex items-center justify-between gap-2 text-xs font-semibold">
+            <span className="inline-flex items-center gap-1.5">
+              <Clock3 size={14} />
+              {formatarTempo(atendimento.tempo_decorrido_segundos)}
+            </span>
+            <span>
+              {atendimento.atrasado
+                ? `Atraso ${formatarTempo(atendimento.atraso_segundos)}`
+                : `Prev. ${atendimento.tempo_previsto_minutos || 0} min`}
+            </span>
+          </div>
+          {(aberta.responsavel_nome || aberta.recurso_nome) && (
+            <p className="mt-1 truncate text-[11px]">
+              {[aberta.responsavel_nome, aberta.recurso_nome].filter(Boolean).join(" · ")}
+            </p>
+          )}
+        </div>
+      )}
+
       <div className="mt-3 grid gap-2">
         <ActionButton
           className="w-full"
@@ -335,21 +492,29 @@ function AtendimentoCard({ atendimento, fluxo, processing, onDragEnd, onDragStar
           onClick={() => proxima && onMover(atendimento, proxima)}
           size="sm"
         >
-          Avancar
+          {proxima === "entregue" ? "Fechar e entregar" : `Avançar para ${labelEtapa(proxima)}`}
+        </ActionButton>
+
+        <ActionButton
+          className="w-full"
+          icon={ClipboardList}
+          intent="neutral"
+          onClick={() => onAbrirFicha(atendimento)}
+          size="sm"
+          tone="soft"
+        >
+          Abrir ficha
         </ActionButton>
 
         <div className="relative">
-          <ActionButton
-            className="w-full"
-            icon={Route}
-            intent="neutral"
+          <button
+            className="inline-flex w-full items-center justify-center gap-2 rounded-lg px-3 py-1.5 text-xs font-semibold text-slate-500 transition hover:bg-slate-100 hover:text-slate-800"
+            type="button"
             onClick={() => setOpenSelector((value) => !value)}
-            size="sm"
-            tone="soft"
           >
-            Ir para etapa
-          </ActionButton>
-
+            <Route size={14} />
+            Corrigir etapa
+          </button>
           {openSelector && (
             <div className="absolute left-0 right-0 z-20 mt-2 rounded-lg border border-slate-200 bg-white p-1.5 shadow-xl">
               {etapasDestino.map((etapa) => (
@@ -424,4 +589,12 @@ function proximaEtapa(atendimento, fluxo) {
     return fluxo[index + 1];
   }
   return STATUS_POR_ETAPA[atual] === "pronto" ? "entregue" : null;
+}
+
+function formatarTempo(segundos) {
+  const total = Math.max(0, Number(segundos || 0));
+  const horas = Math.floor(total / 3600);
+  const minutos = Math.floor((total % 3600) / 60);
+  if (horas) return `${horas}h ${minutos}min`;
+  return `${minutos} min`;
 }

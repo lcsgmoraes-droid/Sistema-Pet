@@ -260,6 +260,10 @@ export default function BanhoTosaAgendaView({ recursos = [], servicos, onChanged
   }
 
   async function cancelar(agendamento) {
+    const confirmou = window.confirm(
+      `Cancelar o agendamento de ${agendamento.pet_nome || "este pet"}?`,
+    );
+    if (!confirmou) return;
     try {
       await banhoTosaApi.atualizarStatusAgendamento(agendamento.id, {
         status: "cancelado",

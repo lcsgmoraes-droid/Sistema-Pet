@@ -416,11 +416,37 @@ def _acoes_operacionais_pedido(
     pedido_atual_eh_canonico = bool(duplicidade.get("pedido_atual_eh_canonico"))
     pedidos_seguro_ids = duplicidade.get("pedidos_seguro_ids") or []
     pode_consolidar = bool(pedido_atual_eh_canonico and pedidos_seguro_ids)
+    payload = _dict(getattr(pedido, "payload", None))
+    ultima_nf = _ultima_nf_payload_efetiva(payload)
+    nf_id = _texto(_primeiro_preenchido(ultima_nf.get("id"), ultima_nf.get("nfe_id")))
+    situacao_nf = _primeiro_preenchido(
+        ultima_nf.get("situacao_codigo"),
+        ultima_nf.get("situacao"),
+        ultima_nf.get("status"),
+    )
+    if isinstance(situacao_nf, dict):
+        situacao_nf = _primeiro_preenchido(
+            situacao_nf.get("id"),
+            situacao_nf.get("valor"),
+            situacao_nf.get("descricao"),
+        )
+    nf_cancelada = str(situacao_nf or "").strip() == "4" or (
+        "cancelad" in str(situacao_nf or "").lower()
+    )
+    cancelamento_nf = _dict(payload.get("cancelamento_nf"))
+    retorno_estoque = _dict(payload.get("retorno_estoque"))
 
     return {
         "pode_consolidar_duplicidade": pode_consolidar,
         "pode_reconciliar_fluxo": bool(getattr(pedido, "id", None)),
         "tem_revisao_manual_pendente": bool(duplicidade.get("requer_revisao_manual")),
+        "pode_solicitar_cancelamento_nf": bool(
+            getattr(pedido, "status", None) == "cancelado"
+            and nf_id
+            and not nf_cancelada
+            and cancelamento_nf.get("status") != "confirmado"
+        ),
+        "retorno_estoque_pendente": retorno_estoque.get("status") == "pendente",
     }
 
 
@@ -539,12 +565,21 @@ def _serializar_pedido_bling(
             "situacao": _texto(
                 _primeiro_preenchido(ultima_nf.get("situacao"), ultima_nf.get("status"))
             ),
+            "situacao_codigo": _situacao_codigo_bling(
+                _primeiro_preenchido(
+                    ultima_nf.get("situacao_codigo"),
+                    ultima_nf.get("situacao"),
+                    ultima_nf.get("status"),
+                )
+            ),
             "chave": _texto(
                 _primeiro_preenchido(
                     ultima_nf.get("chaveAcesso"), ultima_nf.get("chave")
                 )
             ),
         },
+        "cancelamento_nf": _dict(payload.get("cancelamento_nf")),
+        "retorno_estoque": _dict(payload.get("retorno_estoque")),
         "observacoes": _texto(
             _primeiro_preenchido(
                 pedido_payload.get("observacoes"),

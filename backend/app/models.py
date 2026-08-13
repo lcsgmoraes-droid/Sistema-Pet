@@ -24,9 +24,10 @@ from sqlalchemy import (
 )
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.sql import func
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship, validates
 from app.db import Base
 from app.base_models import BaseTenantModel, TenantScoped
+from app.tenant_identity import normalize_tenant_name
 import sqlalchemy as sa
 
 
@@ -38,6 +39,7 @@ import sqlalchemy as sa
 from app.models_operacionais import ConfiguracaoEntrega, CreditoLog, FeatureFlag
 from app.models_authz import (
     AppAccessProfile,
+    PessoaMergeLog,
     Permission,
     Role,
     RolePermission,
@@ -547,9 +549,13 @@ class Tenant(Base):
     """Tenant (Empresa/Organização)"""
 
     __tablename__ = "tenants"
+    __table_args__ = (
+        Index("ux_tenants_name_normalized", "name_normalized", unique=True),
+    )
 
     id = Column(String(36), primary_key=True)  # UUID
     name = Column(String(255), nullable=False)  # Nome Fantasia
+    name_normalized = Column(String(255), nullable=False)
     razao_social = Column(String(255), nullable=True)
     cnpj = Column(String(18), nullable=True)
     inscricao_estadual = Column(String(50), nullable=True)
@@ -564,6 +570,8 @@ class Tenant(Base):
     telefone = Column(String(20), nullable=True)
     email = Column(String(255), nullable=True)
     site = Column(String(255), nullable=True)
+    latitude = Column(Float, nullable=True)
+    longitude = Column(Float, nullable=True)
     logo_url = Column(String(500), nullable=True)
     banner_1_url = Column(String(500), nullable=True)
     banner_2_url = Column(String(500), nullable=True)
@@ -603,6 +611,26 @@ class Tenant(Base):
     ecommerce_dias_funcionamento = Column(
         String(200), nullable=True
     )  # ex.: "seg,ter,qua,qui,sex"
+    ecommerce_entrega_ativa = Column(Boolean, nullable=False, server_default="true")
+    ecommerce_retirada_ativa = Column(Boolean, nullable=False, server_default="true")
+    ecommerce_taxa_entrega = Column(Float, nullable=False, server_default="0")
+    ecommerce_frete_gratis_acima = Column(Float, nullable=True)
+    ecommerce_pedido_minimo = Column(Float, nullable=False, server_default="0")
+    ecommerce_prazo_entrega_texto = Column(String(80), nullable=True)
+    ecommerce_usar_estoque_canal = Column(
+        Boolean, nullable=False, server_default="false"
+    )
+    ecommerce_ocultar_sem_estoque = Column(
+        Boolean, nullable=False, server_default="true"
+    )
+    ecommerce_ocultar_sem_imagem = Column(
+        Boolean, nullable=False, server_default="false"
+    )
+    ecommerce_ocultar_servicos = Column(Boolean, nullable=False, server_default="true")
+    ecommerce_cor_primaria = Column(String(7), nullable=False, server_default="#f97316")
+    ecommerce_cor_secundaria = Column(
+        String(7), nullable=False, server_default="#0f766e"
+    )
 
     # Módulos premium ativos — JSON com lista de módulos contratados
     # Ex.: '["entregas", "campanhas"]'
@@ -623,6 +651,14 @@ class Tenant(Base):
 
     def __repr__(self):
         return f"<Tenant(id={self.id}, name={self.name})>"
+
+    @validates("name")
+    def validate_name(self, _key, value):
+        clean_name = str(value or "").strip()
+        if not clean_name:
+            raise ValueError("O nome da loja e obrigatorio.")
+        self.name_normalized = normalize_tenant_name(clean_name)
+        return clean_name
 
 
 class AssinaturaModulo(TenantScoped, Base):

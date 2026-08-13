@@ -237,6 +237,7 @@ export default function ComissoesListagemFiltros({ controller }) {
           >
             <option value="">Todos</option>
             <option value="pendente">Pendente</option>
+            <option value="fechada">Fechada (aguardando saldo)</option>
             <option value="pago">Pago</option>
             <option value="estornado">Estornado</option>
           </select>

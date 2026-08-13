@@ -60,7 +60,7 @@ jobs:
 
       - name: Frontend dependency audit (blocking)
         working-directory: frontend
-        run: npm audit --audit-level=moderate
+        run: npm run audit:dependencies
 
       - name: Frontend core lint (blocking)
         working-directory: frontend

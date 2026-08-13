@@ -84,7 +84,7 @@ integracao fiscal, Bling, webhook ou banco.
 mudanca de codigo junto.
 6. Validar:
    - `https://mlprohub.com.br/api/health`
-   - `https://mlprohub.com.br/api/health/watchdog`
+   - `https://mlprohub.com.br/health/watchdog`
    - login basico
    - fluxo afetado pelo secret
 7. Remover/revogar o secret antigo no provedor.

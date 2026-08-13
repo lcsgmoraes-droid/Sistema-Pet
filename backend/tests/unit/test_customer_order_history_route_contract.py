@@ -15,7 +15,7 @@ def test_checkout_pedidos_route_uses_customer_order_history_service():
 def test_customer_order_history_queries_only_cliente_user_id_scope():
     source = inspect.getsource(customer_order_history.list_customer_order_history)
 
-    assert "Cliente.user_id == user_id" in source
+    assert "Cliente.auth_user_id == user_id" in source
     assert "Pedido.cliente_id == user_id" in source
     assert "Venda.cliente_id.in_(cliente_ids)" in source
     assert "Venda.tenant_id == tenant_id" in source

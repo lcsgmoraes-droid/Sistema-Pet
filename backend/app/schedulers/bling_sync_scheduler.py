@@ -8,6 +8,7 @@ import os
 
 from app.db import SessionLocal
 from app.services.bling_flow_monitor_service import executar_auditoria_background
+from app.services.bling_cost_sync_service import BlingCostSyncService
 from app.services.bling_pedido_webhook_queue_service import (
     process_pending_bling_pedido_webhooks,
 )
@@ -17,6 +18,9 @@ from app.services.nfe_authorized_reconciliation_service import (
 )
 from app.services.nfe_pending_reconciliation_service import (
     executar_reconciliacao_automatica_nfes_pendentes,
+)
+from app.services.bling_pedido_import_reconciliation_service import (
+    reconciliar_importacao_pedidos_bling_recentes,
 )
 from app.services.pedido_duplicate_reconciliation_service import (
     executar_reconciliacao_automatica_duplicidades_pedidos,
@@ -51,6 +55,15 @@ BLING_ORDER_STATUS_RECONCILE_DAYS = int(
 )
 BLING_ORDER_STATUS_RECONCILE_LIMIT = int(
     os.getenv("BLING_ORDER_STATUS_RECONCILE_LIMIT", "15")
+)
+BLING_ORDER_IMPORT_RECONCILE_INTERVAL_MINUTES = int(
+    os.getenv("BLING_ORDER_IMPORT_RECONCILE_INTERVAL_MINUTES", "60")
+)
+BLING_ORDER_IMPORT_RECONCILE_DAYS = int(
+    os.getenv("BLING_ORDER_IMPORT_RECONCILE_DAYS", "7")
+)
+BLING_ORDER_IMPORT_RECONCILE_PAGES = int(
+    os.getenv("BLING_ORDER_IMPORT_RECONCILE_PAGES", "5")
 )
 BLING_DUPLICATES_RECONCILE_INTERVAL_MINUTES = int(
     os.getenv("BLING_DUPLICATES_RECONCILE_INTERVAL_MINUTES", "60")
@@ -132,6 +145,17 @@ class BlingSyncScheduler:
             coalesce=True,
         )
         self.scheduler.add_job(
+            func=self.reconciliar_importacao_pedidos,
+            trigger=IntervalTrigger(
+                minutes=max(BLING_ORDER_IMPORT_RECONCILE_INTERVAL_MINUTES, 5)
+            ),
+            id="bling_order_import_reconcile",
+            name="Bling Order Import Reconcile",
+            replace_existing=True,
+            max_instances=1,
+            coalesce=True,
+        )
+        self.scheduler.add_job(
             func=self.reconciliar_status_pedidos,
             trigger=IntervalTrigger(
                 minutes=max(BLING_ORDER_STATUS_RECONCILE_INTERVAL_MINUTES, 5)
@@ -191,6 +215,10 @@ class BlingSyncScheduler:
             max(BLING_NFE_AUTH_RECONCILE_INTERVAL_MINUTES, 5),
         )
         logger.info(
+            "   - Importacao de pedidos ausentes: a cada %s min",
+            max(BLING_ORDER_IMPORT_RECONCILE_INTERVAL_MINUTES, 5),
+        )
+        logger.info(
             "   - Status de pedidos recentes: a cada %s min",
             max(BLING_ORDER_STATUS_RECONCILE_INTERVAL_MINUTES, 5),
         )
@@ -231,9 +259,16 @@ class BlingSyncScheduler:
             logger.info("[BLING SYNC] Scheduler parado")
 
     def processar_fila(self) -> None:
-        result = BlingSyncService.process_pending_queue(limit=10)
-        if result.get("processados"):
-            logger.info("[BLING SYNC] Fila processada: %s", result)
+        stock_result = BlingSyncService.process_pending_queue(limit=10)
+        if stock_result.get("processados"):
+            logger.info("[BLING SYNC] Fila de estoque processada: %s", stock_result)
+
+        if stock_result.get("rate_limited") or stock_result.get("auth_invalid"):
+            return
+
+        cost_result = BlingCostSyncService.process_pending_queue(limit=10)
+        if cost_result.get("processados"):
+            logger.info("[BLING COST SYNC] Fila de custo processada: %s", cost_result)
 
     def processar_webhooks_pedidos(self) -> None:
         db = SessionLocal()
@@ -306,6 +341,26 @@ class BlingSyncScheduler:
             ):
                 logger.info(
                     "[BLING SYNC] Reconciliacao automatica de status dos pedidos: %s",
+                    result,
+                )
+        finally:
+            db.close()
+
+    def reconciliar_importacao_pedidos(self) -> None:
+        db = SessionLocal()
+        try:
+            result = reconciliar_importacao_pedidos_bling_recentes(
+                db,
+                dias=BLING_ORDER_IMPORT_RECONCILE_DAYS,
+                limite_paginas=BLING_ORDER_IMPORT_RECONCILE_PAGES,
+            )
+            if (
+                result.get("importados")
+                or result.get("atualizados")
+                or result.get("erros")
+            ):
+                logger.info(
+                    "[BLING PEDIDO IMPORT] Reconciliacao de pedidos ausentes: %s",
                     result,
                 )
         finally:

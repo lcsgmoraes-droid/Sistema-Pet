@@ -62,7 +62,7 @@ export default function useAssistenteIAChatHandlers({
         },
       ]);
 
-      if (novaConversaId) {
+      if (novaConversaId && res.data?.historico_salvo) {
         setConversaId(String(novaConversaId));
         await carregarConversas();
         await carregarMensagensConversa(String(novaConversaId));

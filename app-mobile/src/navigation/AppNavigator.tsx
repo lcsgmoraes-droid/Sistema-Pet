@@ -1,21 +1,27 @@
-import { NavigationContainer } from '@react-navigation/native';
-import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import React, { useEffect } from 'react';
-import { ActivityIndicator, View } from 'react-native';
-import { usePushNotifications } from '../hooks/usePushNotifications';
-import { useAuthStore } from '../store/auth.store';
-import { useTenantStore } from '../store/tenant.store';
-import { CORES } from '../theme';
+import { NavigationContainer } from "@react-navigation/native";
+import { createNativeStackNavigator } from "@react-navigation/native-stack";
+import React, { useEffect, useState } from "react";
+import { ActivityIndicator, Alert, View } from "react-native";
+import { usePushNotifications } from "../hooks/usePushNotifications";
+import { registerSessionExpiredHandler } from "../services/sessionExpiration";
+import { useAuthStore } from "../store/auth.store";
+import { useCartStore } from "../store/cart.store";
+import { useTenantStore } from "../store/tenant.store";
+import { CORES } from "../theme";
 
 // Navegadores
-import EntregadorNavigator from './EntregadorNavigator';
-import FuncionarioNavigator from './FuncionarioNavigator';
-import MainNavigator from './MainNavigator';
-import VeterinarioNavigator from './VeterinarioNavigator';
-import { flushPendingNavigation, navigationRef } from './navigationRef';
+import EntregadorNavigator from "./EntregadorNavigator";
+import FuncionarioNavigator from "./FuncionarioNavigator";
+import MainNavigator from "./MainNavigator";
+import VeterinarioNavigator from "./VeterinarioNavigator";
+import {
+  flushPendingNavigation,
+  navigateWhenReady,
+  navigationRef,
+} from "./navigationRef";
 
 // Tela de seleção de loja
-import SelecionarLojaScreen from '../screens/SelecionarLojaScreen';
+import SelecionarLojaScreen from "../screens/SelecionarLojaScreen";
 
 const Stack = createNativeStackNavigator();
 
@@ -53,11 +59,24 @@ const appLinking = {
 };
 
 export default function AppNavigator() {
-  const { isAuthenticated, isLoading: authLoading, loadUser, user } = useAuthStore();
+  const {
+    isAuthenticated,
+    isLoading: authLoading,
+    loadUser,
+    logout,
+    user,
+  } = useAuthStore();
   const { tenant, isLoading: tenantLoading, loadTenant } = useTenantStore();
+  const [sessionExpired, setSessionExpired] = useState(false);
 
-  // Configura push notifications automaticamente após login
-  usePushNotifications(isAuthenticated);
+  useEffect(
+    () =>
+      registerSessionExpiredHandler(async () => {
+        await logout();
+        setSessionExpired(true);
+      }),
+    [logout],
+  );
 
   useEffect(() => {
     // Carrega tenant e usuário em paralelo
@@ -65,10 +84,44 @@ export default function AppNavigator() {
     loadUser();
   }, []);
 
+  useEffect(() => {
+    if (
+      authLoading ||
+      tenantLoading ||
+      !isAuthenticated ||
+      !user?.id ||
+      !tenant?.id
+    ) {
+      return;
+    }
+
+    void useCartStore
+      .getState()
+      .carregar({ userId: user.id, tenantId: tenant.id });
+  }, [authLoading, isAuthenticated, tenant?.id, tenantLoading, user?.id]);
+
+  useEffect(() => {
+    if (!sessionExpired || authLoading || tenantLoading || !tenant) return;
+
+    navigateWhenReady("Login");
+    Alert.alert("Sessao expirada", "Entre novamente para continuar.");
+    setSessionExpired(false);
+  }, [authLoading, sessionExpired, tenant, tenantLoading]);
+
+  // Configura push notifications automaticamente após login
+  usePushNotifications(isAuthenticated);
+
   // Aguarda os dois carregamentos
   if (authLoading || tenantLoading) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: CORES.primario }}>
+      <View
+        style={{
+          flex: 1,
+          justifyContent: "center",
+          alignItems: "center",
+          backgroundColor: CORES.primario,
+        }}
+      >
         <ActivityIndicator size="large" color="#fff" />
       </View>
     );
@@ -79,7 +132,10 @@ export default function AppNavigator() {
     return (
       <NavigationContainer linking={appLinking as any}>
         <Stack.Navigator screenOptions={{ headerShown: false }}>
-          <Stack.Screen name="SelecionarLoja" component={SelecionarLojaScreen} />
+          <Stack.Screen
+            name="SelecionarLoja"
+            component={SelecionarLojaScreen}
+          />
         </Stack.Navigator>
       </NavigationContainer>
     );
@@ -87,11 +143,17 @@ export default function AppNavigator() {
 
   // Loja escolhida → fluxo normal (login ou app)
   let activeNav: React.ReactNode;
-  if (isAuthenticated && (user?.is_veterinario || user?.perfil_operacional === "veterinario")) {
+  if (
+    isAuthenticated &&
+    (user?.is_veterinario || user?.perfil_operacional === "veterinario")
+  ) {
     activeNav = <VeterinarioNavigator />;
   } else if (isAuthenticated && user?.is_entregador) {
     activeNav = <EntregadorNavigator />;
-  } else if (isAuthenticated && (user?.is_funcionario || user?.perfil_operacional === "funcionario")) {
+  } else if (
+    isAuthenticated &&
+    (user?.is_funcionario || user?.perfil_operacional === "funcionario")
+  ) {
     activeNav = <FuncionarioNavigator />;
   } else {
     activeNav = <MainNavigator />;
@@ -107,4 +169,3 @@ export default function AppNavigator() {
     </NavigationContainer>
   );
 }
-

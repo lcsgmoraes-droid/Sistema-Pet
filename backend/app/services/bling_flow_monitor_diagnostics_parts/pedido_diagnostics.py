@@ -4,6 +4,7 @@ from app.services.bling_flow_monitor_diagnostics_parts.context import (
     _canal_pedido_integrado,
     _nf_autorizada,
     _nf_contexto_autorizado,
+    _nf_contexto_cancelado,
     _numero_pedido_loja_pedido,
     _pedido_total,
     _ultima_nf,
@@ -170,6 +171,64 @@ def diagnosticar_pedido_integrado(
                     )
                 )
 
+    if pedido.status == "cancelado" and _nf_contexto_autorizado(nf_auditavel):
+        incidentes.append(
+            _make_incident(
+                "PEDIDO_CANCELADO_COM_NF_ATIVA",
+                severity="critical",
+                title="Pedido cancelado com NF ainda ativa",
+                message=(
+                    "O pedido foi cancelado no canal de venda, mas a NF vinculada "
+                    "continua autorizada."
+                ),
+                suggested_action=(
+                    "Acompanhar o cancelamento automatico no Bling ou reenviar "
+                    "manualmente se houver erro."
+                ),
+                auto_fixable=False,
+                pedido=pedido,
+                nf_bling_id=_text(
+                    _primeiro_preenchido(nf_auditavel.get("id"), nf.get("id"))
+                ),
+                details={"nf_detectada": _json_safe(nf_auditavel)},
+            )
+        )
+
+    retorno_estoque = _dict(_dict(payload).get("retorno_estoque"))
+    retorno_finalizado = retorno_estoque.get("status") in {
+        "retornado",
+        "nao_retornado",
+        "sem_movimento",
+    }
+    if (
+        pedido.status == "cancelado"
+        and _nf_contexto_cancelado(nf)
+        and movimentacoes_saida > 0
+        and not retorno_finalizado
+    ):
+        incidentes.append(
+            _make_incident(
+                "NF_CANCELADA_RETORNO_ESTOQUE_PENDENTE",
+                severity="high",
+                title="NF cancelada aguardando decisao de estoque",
+                message=(
+                    "A NF foi cancelada, mas ainda falta confirmar se os produtos "
+                    "voltaram fisicamente."
+                ),
+                suggested_action=(
+                    "Conferir os produtos e escolher Voltar ao estoque ou Nao retornou."
+                ),
+                auto_fixable=False,
+                pedido=pedido,
+                nf_bling_id=_text(nf.get("id")),
+                details={
+                    "nf_numero": _text(nf.get("numero")),
+                    "movimentacoes_saida": movimentacoes_saida,
+                    "retorno_estoque": retorno_estoque,
+                },
+            )
+        )
+
     if pedido.status in {"aberto", "expirado"}:
         for item in itens_vendidos:
             incidentes.append(
@@ -267,7 +326,10 @@ def diagnosticar_pedido_integrado(
                         )
                     )
 
-    if _nf_autorizada(payload) and pedido.status != "confirmado":
+    if _nf_autorizada(payload) and pedido.status not in {
+        "confirmado",
+        "cancelado",
+    }:
         incidentes.append(
             _make_incident(
                 "NF_AUTORIZADA_PEDIDO_NAO_CONFIRMADO",

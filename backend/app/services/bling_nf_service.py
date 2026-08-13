@@ -40,6 +40,7 @@ from app.services.bling_nf.estoque import (
     produto_usa_composicao_virtual as produto_usa_composicao_virtual,
 )
 from app.services.kit_estoque_service import KitEstoqueService
+from app.services import pedido_nf_reconciliation_service as nf_alert
 from app.utils.logger import logger
 
 
@@ -311,6 +312,7 @@ def processar_nf_autorizada(
     nf_id: str,
 ) -> str:
     pedido, itens = _recarregar_pedido_e_itens_para_nf(db, pedido, itens)
+    pedido_ja_cancelado = pedido.status == "cancelado"
     pedido_bling_id = getattr(pedido, "pedido_bling_id", None)
     nf_numero = _numero_nf_pedido(pedido)
     if not nf_numero and _text(nf_id):
@@ -569,6 +571,8 @@ def processar_nf_autorizada(
             )
             houve_erros = True
 
+    nf_alert.preservar_pedido_cancelado_com_nf_ativa(db, pedido, pedido_ja_cancelado)
+
     db.add(pedido)
     db.commit()
     incidentes_resolvidos = resolver_incidentes_relacionados(
@@ -617,77 +621,13 @@ def processar_nf_cancelada(
     itens: list[PedidoIntegradoItem],
     nf_id: str | None = None,
 ) -> str:
-    from app.estoque.service import EstoqueService
-
-    pedido.status = "cancelado"
-    pedido.cancelado_em = datetime.now(timezone.utc)
-
-    movimentos_ativos = (
-        db.query(EstoqueMovimentacao)
-        .filter(
-            EstoqueMovimentacao.tenant_id == pedido.tenant_id,
-            EstoqueMovimentacao.referencia_tipo == "pedido_integrado",
-            EstoqueMovimentacao.referencia_id == pedido.id,
-            EstoqueMovimentacao.tipo == "saida",
-            EstoqueMovimentacao.status != "cancelado",
-        )
-        .order_by(EstoqueMovimentacao.id.asc())
-        .all()
+    from app.services.pedido_cancelamento_fiscal_estoque_service import (
+        registrar_nf_cancelada_aguardando_decisao,
     )
 
-    usuario_padrao = _obter_usuario_padrao_tenant(db=db, tenant_id=pedido.tenant_id)
-    user_id_execucao = getattr(usuario_padrao, "id", None)
-    houve_estorno = False
-
-    for movimentacao in movimentos_ativos:
-        _restaurar_lotes_consumidos(db, movimentacao)
-
-        user_id_movimentacao = (
-            getattr(movimentacao, "user_id", None) or user_id_execucao
-        )
-        if not user_id_movimentacao:
-            raise ValueError(
-                f"Nenhum usuario valido disponivel para estornar a movimentacao de estoque do pedido {pedido.id}"
-            )
-
-        EstoqueService.estornar_estoque(
-            produto_id=movimentacao.produto_id,
-            quantidade=float(movimentacao.quantidade or 0),
-            motivo="cancelamento_nf_bling",
-            referencia_id=pedido.id,
-            referencia_tipo="pedido_integrado",
-            user_id=user_id_movimentacao,
-            db=db,
-            tenant_id=pedido.tenant_id,
-            documento=pedido.pedido_bling_numero,
-            observacao=(
-                f"Estorno automatico por cancelamento da NF Bling #{nf_id or _numero_nf_pedido(pedido)}"
-            ),
-        )
-        for (
-            kit_id,
-            _estoque_virtual,
-        ) in KitEstoqueService.recalcular_kits_que_usam_produto(
-            db,
-            movimentacao.produto_id,
-        ).items():
-            _sincronizar_cache_estoque_virtual(db, pedido.tenant_id, kit_id)
-        movimentacao.status = "cancelado"
-        observacao_original = (movimentacao.observacao or "").strip()
-        complemento = f"Cancelada pela NF Bling #{nf_id or _numero_nf_pedido(pedido)}"
-        movimentacao.observacao = (
-            f"{observacao_original} | {complemento}"
-            if observacao_original and complemento not in observacao_original
-            else complemento
-        )
-        db.add(movimentacao)
-        houve_estorno = True
-
-    for item in itens:
-        item.vendido_em = None
-        item.liberado_em = item.liberado_em or datetime.utcnow()
-        db.add(item)
-
-    db.add(pedido)
-    db.commit()
-    return "venda_cancelada_com_estorno" if houve_estorno else "venda_cancelada"
+    return registrar_nf_cancelada_aguardando_decisao(
+        db,
+        pedido=pedido,
+        itens=itens,
+        nf_id=nf_id,
+    )

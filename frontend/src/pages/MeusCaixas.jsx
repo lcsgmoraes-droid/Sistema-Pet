@@ -40,7 +40,7 @@ export default function MeusCaixas() {
       setCaixas(response);
     } catch (error) {
       console.error("Erro ao carregar caixas:", error);
-      alert("Erro ao carregar histÃ³rico de caixas");
+      alert("Erro ao carregar histórico de caixas");
     } finally {
       setLoading(false);
     }
@@ -76,7 +76,7 @@ export default function MeusCaixas() {
       // Converter resposta em blob
       const blob = await response.blob();
 
-      // Criar URL temporÃ¡ria e fazer download
+      // Criar URL temporária e fazer download
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
@@ -135,14 +135,14 @@ export default function MeusCaixas() {
       {/* Header */}
       <div className="mb-6">
         <h1 className="text-3xl font-bold text-gray-900">Meus Caixas</h1>
-        <p className="text-gray-600 mt-1">HistÃ³rico e gestÃ£o dos seus caixas</p>
+        <p className="text-gray-600 mt-1">Histórico e gestão dos seus caixas</p>
       </div>
 
       {/* Filtros */}
       <div className="bg-white rounded-lg shadow-sm p-4 mb-6">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Data InÃ­cio</label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Data Início</label>
             <input
               type="date"
               value={filtros.data_inicio}
@@ -305,7 +305,7 @@ export default function MeusCaixas() {
                     )}
                   </div>
 
-                  {/* ObservaÃ§Ãµes */}
+                  {/* Observações */}
                   {(caixa.observacoes_abertura || caixa.observacoes_fechamento) && (
                     <div className="border-t pt-4 mb-4">
                       {caixa.observacoes_abertura && (
@@ -323,7 +323,7 @@ export default function MeusCaixas() {
                     </div>
                   )}
 
-                  {/* AÃ§Ãµes */}
+                  {/* Ações */}
                   {caixa.status === "fechado" && (
                     <div className="border-t pt-4 flex gap-3">
                       <button

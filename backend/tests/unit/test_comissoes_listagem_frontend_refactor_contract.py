@@ -46,16 +46,21 @@ def test_comissoes_listagem_hook_preserva_fluxos_de_api():
 
     for endpoint in [
         '"/comissoes"',
-        "`/comissoes/resumo?funcionario_id=${FUNCIONARIO_ID}`",
+        '"funcionario_id"',
+        '`/comissoes/resumo${query ? `?${query}` : ""}`',
         '"/comissoes/funcionarios"',
         '"/produtos/"',
         '"/categorias-financeiras"',
         '"/comissoes/formas-pagamento"',
         '"/contas-bancarias"',
         '"/comissoes/fechar"',
-        "`/comissoes/fechar-com-pagamento?${params.toString()}`",
+        '"/comissoes/fechar-com-pagamento"',
     ]:
         assert endpoint in source
+
+    assert "FUNCIONARIO_ID" not in source
+    assert "comissoes_ids: comissoesSelecionadas" in source
+    assert "conta_bancaria_id: Number(contaBancariaId)" in source
 
     assert _line_count(source) < 700
 

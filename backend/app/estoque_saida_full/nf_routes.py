@@ -39,7 +39,7 @@ router = APIRouter()
 def _observacao_full_nf(
     numero_nf: str, plataforma: Optional[str], observacao: Optional[str]
 ) -> str:
-    base = f"Saida FULL por NF {numero_nf} | plataforma: {plataforma or 'full'}"
+    base = f"Saida FULL por documento {numero_nf} | plataforma: {plataforma or 'full'}"
     if observacao:
         return f"{base} | {observacao}"
     return base
@@ -203,7 +203,8 @@ def atualizar_canal_saida_full_por_nf(
     baixas = _buscar_baixas_full_nf(db, tenant_id, numero_nf)
     if not baixas:
         raise HTTPException(
-            status_code=404, detail=f"Nenhuma baixa encontrada para a NF {numero_nf}."
+            status_code=404,
+            detail=f"Nenhuma baixa encontrada para o documento {numero_nf}.",
         )
 
     canal_anterior = _canal_saida_full_por_observacao(baixas[0].observacao)
@@ -244,7 +245,7 @@ def atualizar_canal_saida_full_por_nf(
 
     return {
         "success": True,
-        "message": f"Canal da NF {numero_nf} atualizado para {plataforma_label}.",
+        "message": f"Canal do documento {numero_nf} atualizado para {plataforma_label}.",
         "numero_nf": numero_nf,
         "plataforma": canal,
         "plataforma_label": plataforma_label,
@@ -364,7 +365,7 @@ def saida_full_por_nf(
                 return {
                     "success": True,
                     "message": (
-                        f"NF {payload.numero_nf} ja tinha baixa de estoque. "
+                        f"O documento {payload.numero_nf} ja tinha baixa de estoque. "
                         "Apenas a tarifa pendente foi lancada no financeiro."
                     ),
                     "numero_nf": payload.numero_nf,
@@ -401,7 +402,7 @@ def saida_full_por_nf(
             raise HTTPException(
                 status_code=409,
                 detail=(
-                    f"NF {payload.numero_nf} ja possui baixa de estoque registrada. "
+                    f"O documento {payload.numero_nf} ja possui baixa de estoque registrada. "
                     f"O sistema bloqueou o reprocessamento para evitar baixa duplicada.{detalhe_tarifa}"
                 ),
             )
@@ -457,7 +458,7 @@ def saida_full_por_nf(
 
         return {
             "success": True,
-            "message": "Baixa de estoque por NF concluida",
+            "message": "Baixa de estoque FULL concluida",
             "numero_nf": payload.numero_nf,
             "plataforma": payload.plataforma,
             "plataforma_label": _CANAL_LABELS.get(
@@ -482,7 +483,7 @@ def saida_full_por_nf(
         raise
     except Exception as e:
         db.rollback()
-        logger.error(f"Erro na baixa FULL por NF: {e}")
+        logger.error(f"Erro na baixa FULL: {e}")
         raise HTTPException(
-            status_code=500, detail=f"Erro ao processar baixa por NF: {str(e)}"
+            status_code=500, detail=f"Erro ao processar baixa FULL: {str(e)}"
         )

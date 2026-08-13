@@ -23,6 +23,7 @@ from app.auth.dependencies import get_current_user_and_tenant
 from app.models import User
 from app.comissoes_provisao import provisionar_comissoes_venda
 from app.comissoes_service import gerar_comissoes_venda
+from app.security.permissions_decorator import require_permission_dependency
 
 logger = logging.getLogger(__name__)
 
@@ -30,6 +31,11 @@ router = APIRouter(prefix="/comissoes", tags=["Comissões - Diagnóstico"])
 
 
 # ==================== SCHEMAS ====================
+
+
+router.dependencies.append(
+    Depends(require_permission_dependency("comissoes.configurar"))
+)
 
 
 class VendaSemComissaoResponse(BaseModel):

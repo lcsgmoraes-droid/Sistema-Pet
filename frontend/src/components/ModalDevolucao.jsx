@@ -316,6 +316,11 @@ export default function ModalDevolucao({ caixaId, vendaInicial = null, onClose, 
       return;
     }
 
+    if (gerarCredito && !vendaSelecionada?.cliente_id && !vendaSelecionada?.cliente?.id) {
+      setErro("Não é possível gerar crédito para uma venda sem cliente cadastrado");
+      return;
+    }
+
     setLoading(true);
     setErro("");
 

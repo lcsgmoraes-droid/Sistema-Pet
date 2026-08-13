@@ -41,12 +41,13 @@ def test_contas_bancarias_filtram_movimentacoes_por_tenant_e_registram_usuario()
 
 
 def test_pagamento_comissao_filtra_conta_bancaria_por_tenant_e_usa_reais():
-    source = _source("app/comissoes_avancadas/pagamento_routes.py")
-    registrar = source.split("async def fechar_com_pagamento_parcial(", 1)[1]
+    route_source = _source("app/comissoes_avancadas/pagamento_routes.py")
+    service_source = _source("app/financeiro/contas_pagar_pagamento_service.py")
+    registrar = route_source.split("async def fechar_com_pagamento_parcial(", 1)[1]
 
-    assert "ContaBancaria.tenant_id == tenant_id" in registrar
+    assert "validar_conta_bancaria(" in registrar
+    assert "ContaBancaria.tenant_id == tenant_id" in service_source
     assert "valor_centavos" not in registrar
-    assert "valor_liquido_decimal = Decimal(str(valor_liquido))" in registrar
-    assert "valor=valor_liquido_decimal" in registrar
-    assert "conta_bancaria.saldo_atual -= valor_liquido_decimal" in registrar
+    assert "valor=valor_total_pagamento" in service_source
+    assert "conta_bancaria.saldo_atual -= valor_total_pagamento" in service_source
     assert "tenant_id=tenant_id" in registrar

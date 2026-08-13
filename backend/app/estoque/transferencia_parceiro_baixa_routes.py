@@ -162,6 +162,11 @@ def registrar_recebimento_transferencia_parceiro(
     current_user, tenant_id = user_and_tenant
     conta = _buscar_conta_transferencia_parceiro(db, tenant_id, conta_receber_id)
     modo_baixa = _normalizar_modo_baixa_transferencia(payload.modo_baixa)
+    if modo_baixa == "recebimento" and not payload.forma_pagamento_id:
+        raise HTTPException(
+            status_code=400,
+            detail="Selecione a forma de pagamento para registrar o recebimento.",
+        )
     devolver_estoque = bool(getattr(payload, "devolver_estoque", False))
     compensacoes_payload = [
         item

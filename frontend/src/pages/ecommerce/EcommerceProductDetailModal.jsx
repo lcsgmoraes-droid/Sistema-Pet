@@ -14,6 +14,7 @@ export default function EcommerceProductDetailModal({
   activeImage,
   isMobile,
   product,
+  variations = [],
   styles: S,
   wishlist,
   onAddToCart,
@@ -21,6 +22,7 @@ export default function EcommerceProductDetailModal({
   onCopyLink,
   onImageChange,
   onNotifyMe,
+  onSelectVariation,
   onToggleWishlist,
   onViewCart,
 }) {
@@ -183,6 +185,57 @@ export default function EcommerceProductDetailModal({
             </div>
           )}
 
+          {Object.keys(product?.variation_attributes || {}).length > 0 && (
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 7 }}>
+              {Object.entries(product.variation_attributes).map(([key, value]) => (
+                <span
+                  key={key}
+                  style={{
+                    borderRadius: 999,
+                    background: "#f5f3ff",
+                    color: "#6d28d9",
+                    padding: "5px 9px",
+                    fontSize: 11,
+                    fontWeight: 700,
+                  }}
+                >
+                  {key}: {String(value)}
+                </span>
+              ))}
+            </div>
+          )}
+
+          {variations.length > 1 && (
+            <div>
+              <div style={{ marginBottom: 7, fontSize: 12, fontWeight: 800, color: "#57534e" }}>
+                Escolha uma variação
+              </div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 7 }}>
+                {variations.map((variation) => (
+                  <button
+                    key={variation.id}
+                    type="button"
+                    onClick={() => onSelectVariation(variation)}
+                    style={{
+                      border:
+                        variation.id === product.id ? "2px solid #f97316" : "1px solid #d6d3d1",
+                      background: variation.id === product.id ? "#fff7ed" : "#fff",
+                      color: "#44403c",
+                      borderRadius: 8,
+                      padding: "7px 10px",
+                      fontSize: 11,
+                      fontWeight: 700,
+                      cursor: "pointer",
+                    }}
+                  >
+                    {Object.values(variation.variation_attributes || {}).join(" · ") ||
+                      variation.nome}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
           <div
             style={{
               display: "flex",
@@ -224,6 +277,12 @@ export default function EcommerceProductDetailModal({
               )}
             </div>
           </div>
+
+          {product?.descricao && (
+            <div style={{ color: "#57534e", fontSize: 13, lineHeight: 1.65 }}>
+              {product.descricao}
+            </div>
+          )}
 
           <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 4 }}>
             {!outOfStock ? (

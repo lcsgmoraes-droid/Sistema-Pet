@@ -7,6 +7,7 @@ import {
   EcommerceAnalytics,
   EcommerceAparencia,
   EcommerceConfig,
+  EcommercePreview,
   MeusCaixas,
   NFEntrada,
   PDV,
@@ -67,10 +68,22 @@ export function createSalesMarketingRoutes() {
         }
       />
       <Route
+        path="ecommerce/preview"
+        element={
+          <ModuleGate modulo="ecommerce">
+            <ProtectedRoute permission="configuracoes.editar">
+              <EcommercePreview />
+            </ProtectedRoute>
+          </ModuleGate>
+        }
+      />
+      <Route
         path="ecommerce/aparencia"
         element={
           <ModuleGate modulo="ecommerce">
-            <EcommerceAparencia />
+            <ProtectedRoute permission="configuracoes.editar">
+              <EcommerceAparencia />
+            </ProtectedRoute>
           </ModuleGate>
         }
       />
@@ -78,7 +91,9 @@ export function createSalesMarketingRoutes() {
         path="ecommerce/configuracoes"
         element={
           <ModuleGate modulo="ecommerce">
-            <EcommerceConfig />
+            <ProtectedRoute permission="configuracoes.editar">
+              <EcommerceConfig />
+            </ProtectedRoute>
           </ModuleGate>
         }
       />
@@ -86,7 +101,9 @@ export function createSalesMarketingRoutes() {
         path="ecommerce/analytics"
         element={
           <ModuleGate modulo="ecommerce">
-            <EcommerceAnalytics />
+            <ProtectedRoute anyOfPermissions={["relatorios.gerencial", "vendas.visualizar"]}>
+              <EcommerceAnalytics />
+            </ProtectedRoute>
           </ModuleGate>
         }
       />

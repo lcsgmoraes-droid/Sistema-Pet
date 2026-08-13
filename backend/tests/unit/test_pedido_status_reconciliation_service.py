@@ -1,6 +1,8 @@
 from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 
+import pytest
+
 from app.services import pedido_status_reconciliation_service as service
 
 
@@ -45,7 +47,37 @@ def test_rate_limit_diario_ativo_respeita_bloqueio(monkeypatch):
     assert service._rate_limit_diario_ativo() is True
 
 
-def test_reconciliar_status_atendido_com_nf_autorizada_consolida_venda(monkeypatch):
+def test_pedido_cancelado_so_consulta_bling_enquanto_fiscal_esta_pendente():
+    pedido_ativo = SimpleNamespace(
+        payload={"ultima_nf": {"id": "NF-1", "situacao": "Autorizada"}}
+    )
+    pedido_solicitado = SimpleNamespace(
+        payload={
+            "ultima_nf": {"id": "NF-2"},
+            "cancelamento_nf": {"status": "solicitado"},
+        }
+    )
+    pedido_aguardando_estoque = SimpleNamespace(
+        payload={
+            "ultima_nf": {"id": "NF-3", "situacao": "Cancelada"},
+            "cancelamento_nf": {"status": "confirmado"},
+            "retorno_estoque": {"status": "pendente"},
+        }
+    )
+
+    assert service._pedido_cancelado_requer_acompanhamento(pedido_ativo) is True
+    assert service._pedido_cancelado_requer_acompanhamento(pedido_solicitado) is True
+    assert (
+        service._pedido_cancelado_requer_acompanhamento(pedido_aguardando_estoque)
+        is False
+    )
+
+
+@pytest.mark.parametrize("situacao_id", [9, 24])
+def test_reconciliar_status_com_nf_autorizada_consolida_venda(
+    monkeypatch,
+    situacao_id,
+):
     class FakeQuery:
         def __init__(self, all_result=None):
             self.all_result = all_result or []
@@ -82,7 +114,7 @@ def test_reconciliar_status_atendido_com_nf_autorizada_consolida_venda(monkeypat
                 "id": 25997676807,
                 "numero": "15207",
                 "numeroPedidoLoja": "260605AJ6TS27W",
-                "situacao": {"id": 9, "valor": 1},
+                "situacao": {"id": situacao_id, "valor": 1},
                 "notaFiscal": {"id": "26005873647"},
             }
 
@@ -136,3 +168,67 @@ def test_reconciliar_status_atendido_com_nf_autorizada_consolida_venda(monkeypat
     assert chamadas["processou_nf"]["pedido"] is pedido
     assert chamadas["processou_nf"]["itens"] == [item]
     assert chamadas["processou_nf"]["nf_id"] == "26005873647"
+
+
+def test_reconciliar_pedido_cancelado_continua_acompanhando_nf(monkeypatch):
+    class FakeQuery:
+        def filter(self, *args, **kwargs):
+            return self
+
+        def all(self):
+            return [item]
+
+    class FakeDB:
+        def add(self, obj):
+            return None
+
+        def query(self, model):
+            return FakeQuery()
+
+    pedido = SimpleNamespace(
+        id=4679,
+        tenant_id="00000000-0000-0000-0000-000000000001",
+        pedido_bling_id="25997676808",
+        pedido_bling_numero="15208",
+        status="cancelado",
+        payload={"pedido": {"numeroPedidoLoja": "701-0090544-7112242"}},
+    )
+    item = SimpleNamespace(sku="022203.1", quantidade=1, vendido_em="agora")
+    chamadas = {}
+
+    monkeypatch.setattr(
+        service,
+        "_consultar_pedido_bling",
+        lambda pedido_bling_id: {
+            "id": pedido_bling_id,
+            "situacao": {"id": 12},
+            "notaFiscal": {"id": "26005873648"},
+        },
+    )
+    monkeypatch.setattr(
+        "app.integracao_bling_pedido_routes._montar_payload_pedido",
+        lambda **kwargs: pedido.payload,
+    )
+    monkeypatch.setattr(
+        "app.integracao_bling_pedido_routes._sincronizar_nf_do_pedido",
+        lambda **kwargs: {
+            "id": "26005873648",
+            "numero": "003664",
+            "situacao": "Cancelada",
+            "situacao_codigo": 4,
+        },
+    )
+    monkeypatch.setattr(
+        "app.services.pedido_nf_reconciliation_service.reconciliar_pedido_cancelado_atualizado",
+        lambda *args, **kwargs: (
+            chamadas.setdefault("reconciliou", kwargs),
+            "nf_cancelada_retorno_estoque_pendente",
+        )[1],
+    )
+
+    resultado = service.reconciliar_status_pedido_local(FakeDB(), pedido)
+
+    assert "cancelado" in service._STATUS_PEDIDOS_RECONCILIAVEIS
+    assert resultado["acao"] == "nf_cancelada_retorno_estoque_pendente"
+    assert chamadas["reconciliou"]["pedido"] is pedido
+    assert chamadas["reconciliou"]["itens"] == [item]

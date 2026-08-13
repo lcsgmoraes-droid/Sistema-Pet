@@ -89,6 +89,19 @@ def test_validacao_saida_full_usa_estoque_virtual_do_kit(monkeypatch):
     assert problemas == []
 
 
+def test_resolver_produto_amazon_tenta_msku_exato_e_depois_remove_sufixo_fba():
+    produto = _produto(id=55, codigo="013267.1")
+    db = _FakeDB(produtos=[None, produto])
+
+    encontrado = routes._resolver_produto_full_nf(
+        db,
+        tenant_id=10,
+        item=SaidaFullNFItemRequest(sku="013267.1FBA", quantidade=20),
+    )
+
+    assert encontrado is produto
+
+
 def test_processar_saida_full_kit_virtual_baixa_componentes_e_registra_fluxo_virtual(
     monkeypatch,
 ):

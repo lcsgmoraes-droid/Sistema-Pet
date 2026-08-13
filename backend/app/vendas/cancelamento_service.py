@@ -302,8 +302,14 @@ def cancelar_venda(
                     f"  💰 Estornadas {resultado_estorno['comissoes_estornadas']} "
                     f"comissões (R$ {resultado_estorno['valor_estornado']:.2f})"
                 )
+        except HTTPException:
+            raise
         except Exception as e:
-            logger.warning(f"  ⚠️  Erro ao estornar comissões: {str(e)}")
+            logger.exception("Erro ao estornar comissões da venda %s", venda_id)
+            raise HTTPException(
+                status_code=500,
+                detail="Não foi possível estornar as comissões antes de cancelar a venda.",
+            ) from e
 
         # ============================================================
         # ETAPA 8: MARCAR VENDA COMO CANCELADA

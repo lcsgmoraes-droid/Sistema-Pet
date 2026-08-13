@@ -29,6 +29,7 @@ from app.models import (
     UserTenant,
 )
 from app.produtos_models import Produto
+from app.services.default_roles_service import DEFAULT_TENANT_ROLES
 from app.tenancy.context import clear_current_tenant, set_current_tenant
 
 
@@ -287,7 +288,8 @@ def test_auth_multitenant_flow_nao_quebra_com_roles_fora_da_whitelist(
     tenant = auth_db_session.query(Tenant).filter(Tenant.id == str(tenant_id)).one()
     assert calls == [(tenant_id, user.id, False, True)]
     set_current_tenant(tenant_id)
-    role = auth_db_session.query(Role).filter(Role.tenant_id == tenant_id).one()
+    roles = auth_db_session.query(Role).filter(Role.tenant_id == tenant_id).all()
+    admin_role = next(role for role in roles if role.name == "Administrador")
     user_tenant = (
         auth_db_session.query(UserTenant).filter(UserTenant.user_id == user.id).one()
     )
@@ -295,8 +297,13 @@ def test_auth_multitenant_flow_nao_quebra_com_roles_fora_da_whitelist(
     assert user.tenant_id == tenant_id
     assert user.is_admin is False
     assert tenant.plan == "pet-start"
-    assert role.tenant_id == tenant_id
+    assert {role.name for role in roles} == {
+        "Administrador",
+        *DEFAULT_TENANT_ROLES.keys(),
+    }
+    assert admin_role.tenant_id == tenant_id
     assert user_tenant.tenant_id == tenant_id
+    assert user_tenant.role_id == admin_role.id
     assert (
         auth_db_session.query(RolePermission)
         .filter(RolePermission.tenant_id == tenant_id)

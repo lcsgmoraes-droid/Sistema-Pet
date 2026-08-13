@@ -18,6 +18,7 @@ import {
   normalizeCatalogPayload,
   resolvePostAuthView,
   resolveStoreDisplayName,
+  settleCatalogRequests,
 } from "./ecommerceMvpUtils.js";
 
 const products = [
@@ -121,11 +122,23 @@ test("buildCatalogCategoryOptions usa categorias da API com nomes limpos", () =>
       {
         id: "10",
         value: "10",
-        label: "Areia Higi\u00eanicas",
+        label: "Gatos > Higiene > Areia Higi\u00eanicas",
+        leafLabel: "Areia Higi\u00eanicas",
+        group: "Gatos",
+        level: 2,
         rawLabel: "Gatos>>Higiene>>Areia Higi\u00eanicas",
         total: 3,
       },
-      { id: "11", value: "11", label: "Ra\u00e7\u00f5es", rawLabel: "Ra\u00e7\u00f5es", total: 5 },
+      {
+        id: "11",
+        value: "11",
+        label: "Ra\u00e7\u00f5es",
+        leafLabel: "Ra\u00e7\u00f5es",
+        group: "Outros",
+        level: 0,
+        rawLabel: "Ra\u00e7\u00f5es",
+        total: 5,
+      },
     ],
   );
 });
@@ -155,6 +168,13 @@ test("buildCatalogQueryParams combina busca categoria ordenacao e paginacao", ()
     buildCatalogQueryParams({ tenant: "atacadao", order: "relevancia" }).ordenacao,
     "prontos",
   );
+  assert.deepEqual(
+    buildCatalogQueryParams({
+      tenant: "atacadao",
+      category: ["10", 11, "10", "invalida"],
+    }).categoria_ids,
+    [10, 11],
+  );
 });
 
 test("normalizeCatalogPayload padroniza itens, total e limite", () => {
@@ -164,7 +184,29 @@ test("normalizeCatalogPayload padroniza itens, total e limite", () => {
     offset: 24,
     limit: DEFAULT_CATALOG_LIMIT,
     categories: [],
+    brands: [],
   });
+});
+
+test("settleCatalogRequests mantem produtos quando filtros auxiliares falham", async () => {
+  const response = { data: { items: products } };
+  const result = await settleCatalogRequests(
+    Promise.resolve(response),
+    Promise.reject(new Error("filtros indisponiveis")),
+  );
+
+  assert.equal(result.response, response);
+  assert.equal(result.filtersResponse, null);
+});
+
+test("settleCatalogRequests propaga falha do catalogo principal", async () => {
+  await assert.rejects(
+    settleCatalogRequests(
+      Promise.reject(new Error("catalogo indisponivel")),
+      Promise.resolve({ data: { marcas: [] } }),
+    ),
+    /catalogo indisponivel/,
+  );
 });
 
 test("buildPaginationWindow calcula intervalo e paginas proximas", () => {

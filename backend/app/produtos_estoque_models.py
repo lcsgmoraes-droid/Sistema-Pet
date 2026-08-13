@@ -498,3 +498,47 @@ class ProdutoBlingSyncQueue(BaseTenantModel):
 
     produto = relationship("Produto", back_populates="bling_sync_queue_items")
     sync = relationship("ProdutoBlingSync", back_populates="fila")
+
+
+class ProdutoBlingCostSyncQueue(BaseTenantModel):
+    """Estado persistente do envio de custo canonico ao Bling."""
+
+    __tablename__ = "produto_bling_cost_sync_queue"
+    __table_args__ = (
+        UniqueConstraint(
+            "tenant_id",
+            "produto_id",
+            name="uq_produto_bling_cost_sync_tenant_produto",
+        ),
+        Index(
+            "ix_produto_bling_cost_sync_ready",
+            "tenant_id",
+            "status",
+            "proxima_tentativa_em",
+        ),
+        {"extend_existing": True},
+    )
+
+    produto_id = Column(
+        Integer,
+        ForeignKey("produtos.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    preco_custo_novo = Column(Float, nullable=False)
+    bling_produto_fornecedor_id = Column(String(50), nullable=True)
+    motivo = Column(String(80), nullable=True)
+    origem = Column(String(30), nullable=True)
+    status = Column(
+        String(20), default="pendente", nullable=False
+    )  # pendente, processando, sucesso, erro, falha_final
+    forcar_sync = Column(Boolean, default=False, nullable=False)
+    versao = Column(Integer, default=1, nullable=False)
+    tentativas = Column(Integer, default=0, nullable=False)
+    ultima_tentativa_em = Column(DateTime, nullable=True)
+    proxima_tentativa_em = Column(DateTime, nullable=True)
+    processado_em = Column(DateTime, nullable=True)
+    ultimo_custo_enviado = Column(Float, nullable=True)
+    ultimo_erro = Column(Text, nullable=True)
+
+    produto = relationship("Produto")

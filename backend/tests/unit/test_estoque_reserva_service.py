@@ -5,7 +5,11 @@ from app.estoque_reserva_service import EstoqueReservaService
 
 
 def test_skus_produto_inclui_codigo_e_codigo_barras_sem_duplicar():
-    produto = SimpleNamespace(codigo="SKU-1", codigo_barras="789123")
+    produto = SimpleNamespace(
+        codigo="SKU-1",
+        codigo_barras="789123",
+        codigos_barras_alternativos=None,
+    )
 
     skus = EstoqueReservaService._skus_produto(produto)
 
@@ -13,11 +17,27 @@ def test_skus_produto_inclui_codigo_e_codigo_barras_sem_duplicar():
 
 
 def test_skus_produto_remove_alias_vazio_e_duplicado():
-    produto = SimpleNamespace(codigo="SKU-1", codigo_barras="SKU-1")
+    produto = SimpleNamespace(
+        codigo="SKU-1",
+        codigo_barras="SKU-1",
+        codigos_barras_alternativos='["", "sku-1", "ATC647"]',
+    )
 
     skus = EstoqueReservaService._skus_produto(produto)
 
-    assert skus == ["SKU-1"]
+    assert skus == ["SKU-1", "ATC647"]
+
+
+def test_skus_produto_inclui_codigos_alternativos_em_json():
+    produto = SimpleNamespace(
+        codigo="647",
+        codigo_barras="7898349701213",
+        codigos_barras_alternativos='["ATC647", "  marketplace-647  "]',
+    )
+
+    skus = EstoqueReservaService._skus_produto(produto)
+
+    assert skus == ["647", "7898349701213", "ATC647", "marketplace-647"]
 
 
 def test_mapa_reservas_ativas_por_produto_desloca_kit_virtual_para_componentes():
@@ -26,6 +46,7 @@ def test_mapa_reservas_ativas_por_produto_desloca_kit_virtual_para_componentes()
         id=10,
         codigo="KIT-1",
         codigo_barras=None,
+        codigos_barras_alternativos=None,
         tipo_produto="KIT",
         tipo_kit="VIRTUAL",
     )
@@ -59,6 +80,7 @@ def test_reservar_kit_virtual_valida_estoque_no_componente():
         id=10,
         codigo="KIT-1",
         codigo_barras=None,
+        codigos_barras_alternativos=None,
         nome="Kit",
         tipo_produto="KIT",
         tipo_kit="VIRTUAL",
@@ -69,13 +91,14 @@ def test_reservar_kit_virtual_valida_estoque_no_componente():
     item = SimpleNamespace(tenant_id="tenant-1", sku="KIT-1", quantidade=2)
 
     query_produto = Mock()
-    query_produto.filter.return_value.first.side_effect = [
-        produto_kit,
-        produto_componente,
-    ]
+    query_produto.filter.return_value.first.return_value = produto_componente
     db.query.return_value = query_produto
 
     with (
+        patch(
+            "app.estoque_reserva_service.buscar_produto_por_sku",
+            return_value=produto_kit,
+        ),
         patch.object(
             EstoqueReservaService,
             "mapa_reservas_ativas_por_produto",

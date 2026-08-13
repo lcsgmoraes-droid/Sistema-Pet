@@ -17,6 +17,24 @@ const ClientesNovoCadastroStep = ({
   setClienteDuplicado,
   editingCliente,
 }) => {
+  const selecionarTipoCadastro = (tipoCadastro, tipoPessoa) => {
+    setFormData((prev) => {
+      const perfis = new Set(prev.app_access_profiles || []);
+      if (["cliente", "funcionario", "veterinario"].includes(prev.tipo_cadastro)) {
+        perfis.delete(prev.tipo_cadastro);
+      }
+      if (["cliente", "funcionario", "veterinario"].includes(tipoCadastro)) {
+        perfis.add(tipoCadastro);
+      }
+      return {
+        ...prev,
+        tipo_cadastro: tipoCadastro,
+        tipo_pessoa: tipoPessoa || prev.tipo_pessoa,
+        app_access_profiles: Array.from(perfis),
+      };
+    });
+  };
+
   return (
     <div className="space-y-4">
       <h3 className="text-lg font-semibold text-gray-900 mb-4">Informações do cadastro</h3>
@@ -44,14 +62,7 @@ const ClientesNovoCadastroStep = ({
               type="radio"
               value="cliente"
               checked={formData.tipo_cadastro === "cliente"}
-              onChange={(e) => {
-                // Ao selecionar cliente, volta para PF
-                setFormData({
-                  ...formData,
-                  tipo_cadastro: e.target.value,
-                  tipo_pessoa: "PF",
-                });
-              }}
+              onChange={(e) => selecionarTipoCadastro(e.target.value, "PF")}
               className="mr-2"
             />
             <span className="text-sm">Cliente</span>
@@ -61,14 +72,7 @@ const ClientesNovoCadastroStep = ({
               type="radio"
               value="fornecedor"
               checked={formData.tipo_cadastro === "fornecedor"}
-              onChange={(e) => {
-                // Ao selecionar fornecedor, muda automaticamente para PJ
-                setFormData({
-                  ...formData,
-                  tipo_cadastro: e.target.value,
-                  tipo_pessoa: "PJ",
-                });
-              }}
+              onChange={(e) => selecionarTipoCadastro(e.target.value, "PJ")}
               className="mr-2"
             />
             <span className="text-sm">Fornecedor</span>
@@ -78,12 +82,7 @@ const ClientesNovoCadastroStep = ({
               type="radio"
               value="veterinario"
               checked={formData.tipo_cadastro === "veterinario"}
-              onChange={(e) =>
-                setFormData({
-                  ...formData,
-                  tipo_cadastro: e.target.value,
-                })
-              }
+              onChange={(e) => selecionarTipoCadastro(e.target.value)}
               className="mr-2"
             />
             <span className="text-sm">Veterinário</span>
@@ -93,13 +92,7 @@ const ClientesNovoCadastroStep = ({
               type="radio"
               value="funcionario"
               checked={formData.tipo_cadastro === "funcionario"}
-              onChange={(e) =>
-                setFormData({
-                  ...formData,
-                  tipo_cadastro: e.target.value,
-                  tipo_pessoa: "PF",
-                })
-              }
+              onChange={(e) => selecionarTipoCadastro(e.target.value, "PF")}
               className="mr-2"
             />
             <span className="text-sm">Funcionário</span>
@@ -129,12 +122,19 @@ const ClientesNovoCadastroStep = ({
               <input
                 type="checkbox"
                 checked={formData.is_entregador || false}
-                onChange={(e) =>
-                  setFormData({
-                    ...formData,
-                    is_entregador: e.target.checked,
-                  })
-                }
+                onChange={(e) => {
+                  const marcado = e.target.checked;
+                  setFormData((prev) => {
+                    const perfis = new Set(prev.app_access_profiles || []);
+                    if (marcado) perfis.add("entregador");
+                    else perfis.delete("entregador");
+                    return {
+                      ...prev,
+                      is_entregador: marcado,
+                      app_access_profiles: Array.from(perfis),
+                    };
+                  });
+                }}
                 className="sr-only peer"
               />
               <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>

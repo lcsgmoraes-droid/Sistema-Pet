@@ -1,11 +1,14 @@
 from types import SimpleNamespace
 from unittest.mock import Mock
 
+import pytest
+
 from app.integracao_bling_pedido_routes import (
     _baixar_item_pedido,
     _confirmar_pedido,
     _montar_payload_pedido,
     _normalizar_canal,
+    _processar_nf_autorizada_vinculada_ao_pedido,
     _resumir_ultima_nf_do_pedido_bling,
     _resumir_ultima_nf_webhook,
     _resolver_canal_pedido,
@@ -106,6 +109,34 @@ def test_resumir_ultima_nf_do_pedido_bling_ignora_id_zero_sem_chamar_api(monkeyp
     assert resumo["numero"] == "010985"
     assert resumo["valor_total"] == 15.5
     bling_factory.assert_not_called()
+
+
+def test_processar_nf_vinculada_cancelada_estorna_estoque(monkeypatch):
+    pedido = SimpleNamespace(id=10)
+    itens = [SimpleNamespace(sku="SKU-1")]
+    chamadas = {}
+
+    monkeypatch.setattr(
+        "app.services.bling_nf_service.processar_nf_cancelada",
+        lambda **kwargs: chamadas.update(kwargs) or "venda_cancelada_com_estorno",
+    )
+
+    resultado = _processar_nf_autorizada_vinculada_ao_pedido(
+        db="db",
+        pedido=pedido,
+        itens=itens,
+        resumo_nf={
+            "id": "NF-10",
+            "numero": "015910",
+            "situacao_codigo": 4,
+            "situacao": "Cancelada",
+        },
+    )
+
+    assert resultado == "venda_cancelada_com_estorno"
+    assert chamadas["pedido"] is pedido
+    assert chamadas["itens"] == itens
+    assert chamadas["nf_id"] == "NF-10"
 
 
 def test_resolver_canal_pedido_prioriza_loja_id_quando_canal_salvo_era_bling():
@@ -407,6 +438,122 @@ def test_serializar_pedido_bling_expoe_contexto_duplicidade_e_acoes():
     assert serializado["acoes_disponiveis"]["pode_reconciliar_fluxo"] is True
 
 
+def test_serializar_pedido_cancelado_expoe_acoes_fiscais_e_de_estoque():
+    pedido = SimpleNamespace(
+        id=22,
+        pedido_bling_id="25439737685",
+        pedido_bling_numero="11682",
+        canal="amazon",
+        status="cancelado",
+        criado_em=None,
+        expira_em=None,
+        confirmado_em=None,
+        cancelado_em=None,
+        payload={
+            "pedido": {"numeroPedidoLoja": "701-0090544-7112242", "itens": []},
+            "ultima_nf": {
+                "id": "25441651449",
+                "numero": "011090",
+                "situacao": "Autorizada",
+                "situacao_codigo": 5,
+            },
+            "cancelamento_nf": {"status": "erro", "erro": "Falha temporaria"},
+            "retorno_estoque": {"status": "pendente"},
+        },
+    )
+
+    serializado = _serializar_pedido_bling(pedido, [])
+
+    assert serializado["cancelamento_nf"]["status"] == "erro"
+    assert serializado["retorno_estoque"]["status"] == "pendente"
+    assert serializado["acoes_disponiveis"]["pode_solicitar_cancelamento_nf"] is True
+    assert serializado["acoes_disponiveis"]["retorno_estoque_pendente"] is True
+
+
+def test_pedido_ja_cancelado_reconsulta_nf_e_mantem_alerta_fiscal(monkeypatch):
+    class FakeQuery:
+        def filter(self, *args, **kwargs):
+            return self
+
+        def all(self):
+            return [item]
+
+    class FakeDB:
+        def __init__(self):
+            self.commits = 0
+
+        def query(self, model):
+            return FakeQuery()
+
+        def commit(self):
+            self.commits += 1
+
+    pedido = SimpleNamespace(
+        id=81,
+        tenant_id="11111111-1111-1111-1111-111111111111",
+        pedido_bling_id="BL-81",
+        pedido_bling_numero="18081",
+        status="cancelado",
+        payload={"pedido": {"numeroPedidoLoja": "701-0000000-0000001"}},
+    )
+    item = SimpleNamespace(sku="SKU-1")
+    chamadas = {}
+
+    class FakeBling:
+        def consultar_pedido(self, pedido_bling_id):
+            assert pedido_bling_id == "BL-81"
+            return {
+                "id": "BL-81",
+                "situacao": {"id": 12},
+                "notaFiscal": {"id": "NF-81"},
+            }
+
+    monkeypatch.setattr(
+        "app.integracao_bling_pedido_routes._set_bling_request_tenant",
+        lambda: pedido.tenant_id,
+    )
+    monkeypatch.setattr(
+        "app.integracao_bling_pedido_routes.localizar_pedido_por_bling_id",
+        lambda *args, **kwargs: pedido,
+    )
+    monkeypatch.setattr(
+        "app.integracao_bling_pedido_routes.registrar_evento",
+        lambda **kwargs: None,
+    )
+    monkeypatch.setattr(
+        "app.integracao_bling_pedido_routes._sincronizar_nf_do_pedido",
+        lambda **kwargs: {
+            "id": "NF-81",
+            "numero": "015981",
+            "situacao": "Autorizada",
+        },
+    )
+    monkeypatch.setattr(
+        "app.services.pedido_nf_reconciliation_service.processar_nf_vinculada_ao_pedido",
+        lambda *args, **kwargs: chamadas.setdefault("nf", kwargs) or "venda_confirmada",
+    )
+    monkeypatch.setattr("app.bling_integration.BlingAPI", lambda: FakeBling())
+    monkeypatch.setattr(
+        "app.services.pedido_nf_reconciliation_service.registrar_alerta_pedido_cancelado_com_nf_ativa",
+        lambda *args, **kwargs: chamadas.setdefault("alerta", kwargs) or True,
+    )
+
+    db = FakeDB()
+    resultado = processar_pedido_bling_payload(
+        {
+            "event": "order.updated",
+            "data": {"id": "BL-81", "situacao": {"id": 12}},
+        },
+        db,
+    )
+
+    assert resultado["acao"] == "cancelado_por_situacao"
+    assert chamadas["nf"]["pedido"] is pedido
+    assert chamadas["alerta"]["pedido"] is pedido
+    assert pedido.status == "cancelado"
+    assert db.commits == 1
+
+
 def test_confirmar_pedido_so_marca_item_vendido_apos_baixa(monkeypatch):
     db = Mock()
     pedido = SimpleNamespace(
@@ -585,7 +732,11 @@ def test_baixar_item_pedido_vincula_produto_bling_do_payload_por_sku(monkeypatch
     assert vinculos == [(db, "tenant-1", 14002, "16666308523")]
 
 
-def test_order_updated_atendido_com_nf_autorizada_consolida_venda(monkeypatch):
+@pytest.mark.parametrize("situacao_id", [9, 24])
+def test_order_updated_com_nf_autorizada_consolida_venda(
+    monkeypatch,
+    situacao_id,
+):
     class FakeQuery:
         def __init__(self, all_result=None):
             self.all_result = all_result or []
@@ -622,7 +773,7 @@ def test_order_updated_atendido_com_nf_autorizada_consolida_venda(monkeypatch):
                 "id": 25997676807,
                 "numero": "15207",
                 "numeroPedidoLoja": "260605AJ6TS27W",
-                "situacao": {"id": 9, "valor": 1},
+                "situacao": {"id": situacao_id, "valor": 1},
                 "notaFiscal": {"id": "26005873647"},
             }
 
@@ -682,7 +833,7 @@ def test_order_updated_atendido_com_nf_autorizada_consolida_venda(monkeypatch):
             "date": "2026-06-05T12:00:00Z",
             "data": {
                 "id": "25997676807",
-                "situacao": {"id": 9, "valor": 1},
+                "situacao": {"id": situacao_id, "valor": 1},
             },
         },
         db,
@@ -693,3 +844,133 @@ def test_order_updated_atendido_com_nf_autorizada_consolida_venda(monkeypatch):
     assert chamadas["processou_nf"]["pedido"] is pedido
     assert chamadas["processou_nf"]["itens"] == [item]
     assert chamadas["processou_nf"]["nf_id"] == "26005873647"
+
+
+@pytest.mark.parametrize("situacao_id", [9, 24])
+def test_order_created_com_nf_autorizada_consolida_venda(
+    monkeypatch,
+    situacao_id,
+):
+    from app.pedido_integrado_item_models import PedidoIntegradoItem
+    from app.pedido_integrado_models import PedidoIntegrado
+
+    class FakeQuery:
+        def __init__(self, db):
+            self.db = db
+
+        def filter(self, *args, **kwargs):
+            return self
+
+        def all(self):
+            return list(self.db.itens)
+
+    class FakeDB:
+        def __init__(self):
+            self.itens = []
+            self.commit_calls = 0
+
+        def add(self, obj):
+            if isinstance(obj, PedidoIntegrado) and obj.id is None:
+                obj.id = 8080
+            if isinstance(obj, PedidoIntegradoItem) and obj not in self.itens:
+                obj.id = len(self.itens) + 1
+                self.itens.append(obj)
+
+        def commit(self):
+            self.commit_calls += 1
+
+        def refresh(self, obj):
+            return None
+
+        def query(self, model):
+            assert model is PedidoIntegradoItem
+            return FakeQuery(self)
+
+    class FakeBling:
+        def consultar_pedido(self, pedido_bling_id):
+            assert pedido_bling_id == "BL-8080"
+            return {
+                "id": "BL-8080",
+                "numero": "18080",
+                "numeroPedidoLoja": "702-7642395-5222664",
+                "situacao": {"id": situacao_id},
+                "notaFiscal": {"id": "NF-8080"},
+                "itens": [
+                    {
+                        "codigo": "ATC517",
+                        "descricao": "Bifinho Keldog",
+                        "quantidade": 4,
+                    }
+                ],
+            }
+
+        def consultar_nfe(self, nf_id):
+            assert nf_id == "NF-8080"
+            return {
+                "id": "NF-8080",
+                "numero": "015879",
+                "situacao": 5,
+            }
+
+        def consultar_nfce(self, nf_id):
+            raise AssertionError("nao deve consultar NFC-e quando NFe respondeu")
+
+    chamadas = {}
+    db = FakeDB()
+
+    monkeypatch.setattr(
+        "app.integracao_bling_pedido_routes._set_bling_request_tenant",
+        lambda request=None: "11111111-1111-1111-1111-111111111111",
+    )
+    monkeypatch.setattr("app.bling_integration.BlingAPI", lambda: FakeBling())
+    monkeypatch.setattr(
+        "app.integracao_bling_pedido_routes.localizar_pedido_por_bling_id",
+        lambda *args, **kwargs: None,
+    )
+    monkeypatch.setattr(
+        "app.integracao_bling_pedido_routes._consolidar_pedido_duplicado_por_numero_loja",
+        lambda *args, **kwargs: None,
+    )
+    monkeypatch.setattr(
+        "app.integracao_bling_pedido_routes.EstoqueReservaService.reservar",
+        lambda db_arg, item_arg: setattr(item_arg, "reservado_em", "agora"),
+    )
+    monkeypatch.setattr(
+        "app.integracao_bling_pedido_routes.registrar_evento",
+        lambda **kwargs: None,
+    )
+    monkeypatch.setattr(
+        "app.integracao_bling_pedido_routes.registrar_vinculo_nf_pedido",
+        lambda **kwargs: None,
+    )
+    monkeypatch.setattr(
+        "app.integracao_bling_pedido_routes._confirmar_pedido",
+        lambda **kwargs: (_ for _ in ()).throw(
+            AssertionError("nao deve aguardar NF quando ela ja esta autorizada")
+        ),
+    )
+    monkeypatch.setattr(
+        "app.integracao_bling_pedido_routes._processar_nf_autorizada_vinculada_ao_pedido",
+        lambda **kwargs: (
+            chamadas.setdefault("processou_nf", kwargs),
+            "venda_confirmada",
+        )[1],
+    )
+
+    resposta = processar_pedido_bling_payload(
+        {
+            "event": "order.created",
+            "date": "2026-07-28T16:36:51Z",
+            "data": {"id": "BL-8080", "numero": "18080"},
+        },
+        db,
+    )
+
+    assert resposta == {
+        "status": "ok",
+        "pedido_id": 8080,
+        "acao": "venda_confirmada",
+    }
+    assert chamadas["processou_nf"]["itens"] == db.itens
+    assert db.itens[0].sku == "ATC517"
+    assert db.itens[0].quantidade == 4

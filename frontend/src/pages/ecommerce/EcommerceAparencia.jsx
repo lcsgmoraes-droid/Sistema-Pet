@@ -37,7 +37,7 @@ const TIPOS = [
  * Banners: escala para até 1200px de largura mantendo proporção original (sem corte).
  * Logo: centraliza em 400×160 com fundo branco.
  */
-function resizeImage(file, targetW, targetH, quality = 0.9) {
+function resizeImage(file, targetW, targetH, outputType = "image/webp", quality = 0.9) {
   return new Promise((resolve, reject) => {
     const img = new Image();
     const url = URL.createObjectURL(file);
@@ -53,11 +53,9 @@ function resizeImage(file, targetW, targetH, quality = 0.9) {
         canvas.height = Math.round(img.naturalHeight * scale);
         ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
       } else {
-        // Modo logo: cabe em targetW×targetH centralizado, fundo branco
+        // Modo logo: cabe em targetW×targetH e preserva transparência.
         canvas.width = targetW;
         canvas.height = targetH;
-        ctx.fillStyle = "#ffffff";
-        ctx.fillRect(0, 0, targetW, targetH);
         const scale = Math.min(targetW / img.naturalWidth, targetH / img.naturalHeight);
         const drawW = img.naturalWidth * scale;
         const drawH = img.naturalHeight * scale;
@@ -68,7 +66,7 @@ function resizeImage(file, targetW, targetH, quality = 0.9) {
 
       canvas.toBlob(
         (blob) => (blob ? resolve(blob) : reject(new Error("canvas toBlob falhou"))),
-        "image/jpeg",
+        outputType,
         quality,
       );
     };
@@ -128,6 +126,11 @@ export default function EcommerceAparencia() {
   const [slug, setSlug] = useState("");
   const [slugOriginal, setSlugOriginal] = useState("");
   const [salvandoSlug, setSalvandoSlug] = useState(false);
+  const [localizacao, setLocalizacao] = useState({
+    latitude: null,
+    longitude: null,
+  });
+  const [salvandoLocalizacao, setSalvandoLocalizacao] = useState(false);
   const [carregando, setCarregando] = useState(true);
   const [salvando, setSalvando] = useState({});
   const [msg, setMsg] = useState(null);
@@ -144,6 +147,10 @@ export default function EcommerceAparencia() {
       .then((r) => {
         setSlug(r.data.ecommerce_slug || "");
         setSlugOriginal(r.data.ecommerce_slug || "");
+        setLocalizacao({
+          latitude: r.data.latitude ?? null,
+          longitude: r.data.longitude ?? null,
+        });
       })
       .catch(() => {});
     Promise.all([fetchAparencia, fetchSlug]).finally(() => setCarregando(false));
@@ -168,6 +175,44 @@ export default function EcommerceAparencia() {
     }
   }
 
+  function salvarLocalizacaoAtual() {
+    if (!navigator.geolocation) {
+      mostrarMsg("erro", "Este navegador nao oferece acesso a localizacao.");
+      return;
+    }
+
+    setSalvandoLocalizacao(true);
+    navigator.geolocation.getCurrentPosition(
+      async ({ coords }) => {
+        try {
+          const payload = {
+            latitude: coords.latitude,
+            longitude: coords.longitude,
+          };
+          const response = await api.put("/ecommerce-aparencia/localizacao", payload);
+          setLocalizacao(response.data);
+          mostrarMsg("ok", "Localizacao da loja salva com sucesso!");
+        } catch {
+          mostrarMsg("erro", "Nao foi possivel salvar a localizacao da loja.");
+        } finally {
+          setSalvandoLocalizacao(false);
+        }
+      },
+      () => {
+        mostrarMsg(
+          "erro",
+          "Nao foi possivel obter a localizacao. Confira a permissao do navegador.",
+        );
+        setSalvandoLocalizacao(false);
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 15000,
+        maximumAge: 60000,
+      },
+    );
+  }
+
   async function uploadArquivo(tipo, arquivo) {
     setSalvando((s) => ({ ...s, [tipo]: true }));
     try {
@@ -175,9 +220,12 @@ export default function EcommerceAparencia() {
       const tipoConfig = TIPOS.find((t) => t.key === tipo);
       let fileToUpload = arquivo;
       if (tipoConfig && arquivo.type.startsWith("image/")) {
-        const blob = await resizeImage(arquivo, tipoConfig.targetW, tipoConfig.targetH);
-        fileToUpload = new File([blob], arquivo.name.replace(/\.[^.]+$/, ".jpg"), {
-          type: "image/jpeg",
+        const isLogo = tipo === "logo";
+        const outputType = isLogo ? "image/png" : "image/webp";
+        const extension = isLogo ? ".png" : ".webp";
+        const blob = await resizeImage(arquivo, tipoConfig.targetW, tipoConfig.targetH, outputType);
+        fileToUpload = new File([blob], arquivo.name.replace(/\.[^.]+$/, extension), {
+          type: outputType,
         });
       }
       const form = new FormData();
@@ -262,6 +310,9 @@ export default function EcommerceAparencia() {
               corepet.com.br/
             </span>
             <input
+              id="ecommerce-store-slug"
+              name="store_slug"
+              aria-label="Endereço público da loja"
               type="text"
               value={slug}
               onChange={(e) => setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ""))}
@@ -307,6 +358,51 @@ export default function EcommerceAparencia() {
             </div>
           )}
         </div>
+        {/* Coordenadas usadas para ordenar lojas proximas no app */}
+        <div
+          style={{
+            background: "#fff",
+            border: "1px solid #e5e7eb",
+            borderRadius: 12,
+            padding: 24,
+            boxShadow: "0 1px 3px rgba(0,0,0,0.06)",
+          }}
+        >
+          <div style={{ marginBottom: 4 }}>
+            <span style={{ fontWeight: 600, fontSize: 16, color: "#111827" }}>
+              Localizacao da loja
+            </span>
+          </div>
+          <p style={{ fontSize: 13, color: "#6b7280", margin: "0 0 12px" }}>
+            Use este computador na loja e salve a posicao atual. Ela permite que clientes encontrem
+            primeiro as lojas mais proximas no app.
+          </p>
+          <button
+            onClick={salvarLocalizacaoAtual}
+            disabled={salvandoLocalizacao}
+            style={{
+              padding: "9px 18px",
+              background: salvandoLocalizacao ? "#d1d5db" : "#0f766e",
+              color: "#fff",
+              border: "none",
+              borderRadius: 7,
+              fontWeight: 600,
+              cursor: salvandoLocalizacao ? "not-allowed" : "pointer",
+              fontSize: 14,
+            }}
+          >
+            {salvandoLocalizacao
+              ? "Obtendo localizacao..."
+              : localizacao.latitude !== null
+                ? "Atualizar localizacao atual"
+                : "Usar localizacao atual"}
+          </button>
+          {localizacao.latitude !== null && localizacao.longitude !== null && (
+            <div style={{ marginTop: 10, fontSize: 12, color: "#15803d" }}>
+              Localizacao configurada para esta loja.
+            </div>
+          )}
+        </div>
         {TIPOS.map(({ key, label, desc }) => {
           const urlAtual = aparencia[`${key}_url`];
           const ocupado = salvando[key];
@@ -344,6 +440,9 @@ export default function EcommerceAparencia() {
                 }}
               >
                 <input
+                  id={`ecommerce-${key}-upload`}
+                  name={`${key}_upload`}
+                  aria-label={`Selecionar imagem para ${label}`}
                   type="file"
                   accept="image/jpeg,image/png,image/webp,image/gif"
                   style={{ display: "none" }}
@@ -404,7 +503,7 @@ export default function EcommerceAparencia() {
       >
         <strong>💡 Dica:</strong> As imagens são redimensionadas automaticamente ao fazer upload.
         Para ver o resultado, acesse a{" "}
-        <a href="/ecommerce" style={{ color: "#6366f1" }}>
+        <a href="/ecommerce/preview" style={{ color: "#6366f1" }}>
           prévia da loja
         </a>
         .

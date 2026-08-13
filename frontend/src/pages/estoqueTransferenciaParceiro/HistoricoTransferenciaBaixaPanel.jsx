@@ -184,6 +184,7 @@ export default function HistoricoTransferenciaBaixaPanel({
                 Forma de pagamento
               </label>
               <select
+                required
                 value={formBaixa.forma_pagamento_id}
                 onChange={(event) =>
                   setFormBaixa((prev) => ({ ...prev, forma_pagamento_id: event.target.value }))
@@ -191,7 +192,9 @@ export default function HistoricoTransferenciaBaixaPanel({
                 className="w-full rounded-xl border border-emerald-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
               >
                 <option value="">
-                  {loadingFormasPagamento ? "Carregando formas..." : "Sem forma especifica"}
+                  {loadingFormasPagamento
+                    ? "Carregando formas..."
+                    : "Selecione a forma de pagamento"}
                 </option>
                 {formasPagamento.map((forma) => (
                   <option key={forma.id} value={forma.id}>
@@ -200,7 +203,7 @@ export default function HistoricoTransferenciaBaixaPanel({
                 ))}
               </select>
               <p className="mt-2 text-xs text-emerald-800">
-                Opcional. Se nao informar, a baixa fica sem forma vinculada.
+                Obrigatoria para identificar corretamente o recebimento.
               </p>
             </div>
           ) : null}

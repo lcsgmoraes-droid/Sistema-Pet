@@ -7,6 +7,7 @@
     "dev": "vite",
     "build": "vite build --mode production",
     "build:dev": "vite build --mode development",
+    "audit:dependencies": "node scripts/audit-dependencies.mjs",
     "lint:core": "eslint \"src/**/*.{js,jsx,ts,tsx,mjs,cjs}\" scripts --max-warnings=0",
     "format:core:check": "prettier --check \"src/**/*.{js,jsx,ts,tsx,mjs,cjs,css,md}\" scripts",
     "test:theme-preference": "node scripts/test-theme-preference.mjs",
@@ -18,6 +19,7 @@
     "test:corepet-branding": "node scripts/test-corepet-branding.mjs",
     "test:public-plans": "node scripts/test-public-plans.mjs",
     "test:ecommerce-account-validation": "node scripts/test-ecommerce-account-validation.mjs",
+    "test:ecommerce-session": "node scripts/test-ecommerce-session.mjs",
     "test:ecommerce-checkout-conversion-flow": "node scripts/test-ecommerce-checkout-conversion-flow.mjs",
     "test:ecommerce-orders-followup": "node scripts/test-ecommerce-orders-followup.mjs",
     "test:ecommerce-payment-return-flow": "node scripts/test-ecommerce-payment-return-flow.mjs",
@@ -53,6 +55,8 @@
     "test:balanco": "node scripts/test-produtos-balanco-utils.mjs",
     "test:vendas-reprocessamento-feedback": "node scripts/test-vendas-reprocessamento-feedback.mjs",
     "test:onboarding-inicial": "node scripts/test-onboarding-inicial-contract.mjs",
+    "test:banho-tosa-fluxo": "node scripts/test-banho-tosa-fluxo.mjs",
+    "test:pessoas-duplicidade-central": "node scripts/test-pessoas-duplicidade-central.mjs",
     "preview": "vite preview"
   },
   "dependencies": {
@@ -71,7 +75,7 @@
     "react-hot-toast": "^2.6.0",
     "react-icons": "^5.0.0",
     "react-markdown": "^10.1.0",
-    "react-router-dom": "^6.30.4",
+    "react-router-dom": "^7.18.1",
     "recharts": "^3.8.1",
     "remark-gfm": "^4.0.1",
     "socket.io-client": "^4.8.3",
@@ -79,7 +83,10 @@
     "zustand": "^5.0.11"
   },
   "overrides": {
-    "dompurify": "3.4.11",
+    "brace-expansion": "5.0.9",
+    "dompurify": "3.4.13",
+    "nanoid": "3.3.17",
+    "socket.io-parser": "4.2.7",
     "ws": "8.21.0"
   },
   "devDependencies": {
@@ -91,7 +98,7 @@
     "eslint": "^10.5.0",
     "eslint-plugin-react-hooks": "^7.1.1",
     "globals": "^17.6.0",
-    "postcss": "^8.4.32",
+    "postcss": "^8.5.23",
     "prettier": "^3.8.4",
     "tailwindcss": "^3.4.0",
     "typescript": "^6.0.3",

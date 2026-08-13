@@ -23,6 +23,16 @@ class Settings(BaseSettings):
     ASAAS_WEBHOOK_TOKEN: str = ""
     ASAAS_WEBHOOK_URL: str = ""
 
+    # EcommerceAI <-> CorePet
+    COREPET_PUBLIC_API_URL: str = "https://corepet.com.br/api"
+    COREPET_FRONTEND_URL: str = "https://www.corepet.com.br"
+    ECOMMERCEAI_INTEGRATION_CLIENT_ID: str = "ecommerceai"
+    ECOMMERCEAI_INTEGRATION_BOOTSTRAP_SECRET: str = ""
+    ECOMMERCEAI_CALLBACK_ALLOWED_ORIGINS: str = (
+        "https://api.ecommerceai.com.br,http://localhost:8001,http://127.0.0.1:8001"
+    )
+    ECOMMERCEAI_CONNECTION_REQUEST_TTL_MINUTES: int = 15
+
     # Imagens de produtos
     PRODUCT_IMAGE_STORAGE_BACKEND: str = "local"  # local | s3
     PRODUCT_IMAGE_LOCAL_BASE_DIR: str = "uploads/produtos"

@@ -59,3 +59,8 @@ class ExportarProdutosLocaisBlingLoteRequest(BaseModel):
 class ReconciliarBatchRequest(BaseModel):
     limit: int = Field(default=100, ge=1, le=1000)
     minutes: int = Field(default=30, ge=5, le=1440)
+
+
+class SyncCustosMarcaRequest(BaseModel):
+    marca: str = Field(default="Megazoo", min_length=1, max_length=100)
+    confirmar: bool = False

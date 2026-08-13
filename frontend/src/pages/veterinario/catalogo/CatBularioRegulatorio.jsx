@@ -104,15 +104,11 @@ export default function CatBularioRegulatorio() {
               className="rounded-lg border border-gray-200 py-2 pl-9 pr-8 text-sm text-gray-700 focus:border-teal-400 focus:outline-none"
             >
               <option value="ALL">Todas as fontes</option>
-              <option value="US">
-                Estados Unidos ({resultado.jurisdicoes?.US || 0})
-              </option>
+              <option value="US">Estados Unidos ({resultado.jurisdicoes?.US || 0})</option>
               <option value="GB">Reino Unido ({resultado.jurisdicoes?.GB || 0})</option>
             </select>
           </label>
-          <div className="text-sm text-gray-500">
-            {resultado.total || 0} bula(s) veterinária(s)
-          </div>
+          <div className="text-sm text-gray-500">{resultado.total || 0} bula(s) veterinária(s)</div>
         </div>
       </div>
 

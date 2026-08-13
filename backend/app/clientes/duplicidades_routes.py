@@ -4,14 +4,17 @@ import logging
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.auth.dependencies import get_current_user_and_tenant
 from app.db import get_session
-from app.models import Cliente
+from app.models import Cliente, PessoaMergeLog, Role, UserTenant
+from app.clientes.common import _somente_digitos_coluna
 from app.security.permissions_decorator import require_permission
 from app.services.pessoa_duplicate_service import (
     executar_fusoes_automaticas_pessoas_duplicadas,
+    executar_fusoes_assistidas_pessoas_por_nome,
     listar_sugestoes_duplicidade_pessoas,
 )
 from app.services.pessoa_merge_service import (
@@ -19,6 +22,7 @@ from app.services.pessoa_merge_service import (
     montar_preview_fusao_pessoas,
 )
 from app.clientes.schemas import (
+    PessoaFusaoAssistidaNomeRequest,
     PessoaFusaoExecutarRequest,
     PessoaFusaoPreviewRequest,
 )
@@ -30,6 +34,54 @@ router = APIRouter()
 def _validar_tenant_e_obter_usuario(user_and_tenant):
     current_user, tenant_id = user_and_tenant
     return current_user, tenant_id
+
+
+def _exigir_dono_tenant(
+    db: Session, *, user_id: int, tenant_id, is_admin: bool = False
+) -> None:
+    if is_admin:
+        return
+    vinculo_dono = (
+        db.query(UserTenant.id)
+        .join(Role, Role.id == UserTenant.role_id)
+        .filter(
+            UserTenant.user_id == user_id,
+            UserTenant.tenant_id == tenant_id,
+            UserTenant.is_active.is_(True),
+            Role.tenant_id == tenant_id,
+            func.lower(Role.name) == "owner",
+        )
+        .first()
+    )
+    if not vinculo_dono:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Somente o dono do sistema pode executar fusoes assistidas em lote.",
+        )
+
+
+def _igual_normalizado(campo, valor: str):
+    campo_nome = getattr(campo, "key", "")
+    if campo_nome in {"cpf", "cnpj", "telefone", "celular"}:
+        digitos = "".join(ch for ch in str(valor or "") if ch.isdigit())
+        return _somente_digitos_coluna(campo) == digitos
+    if campo_nome == "crmv":
+        normalizado = "".join(ch for ch in str(valor or "").casefold() if ch.isalnum())
+        return (
+            func.lower(
+                func.replace(
+                    func.replace(
+                        func.replace(func.replace(campo, "-", ""), "/", ""),
+                        ".",
+                        "",
+                    ),
+                    " ",
+                    "",
+                )
+            )
+            == normalizado
+        )
+    return campo == valor
 
 
 @router.get("/verificar-duplicata/campo", response_model=dict)
@@ -51,7 +103,9 @@ def verificar_duplicata(
     # Verificar CPF
     if cpf:
         query = db.query(Cliente).filter(
-            Cliente.tenant_id == tenant_id, Cliente.cpf == cpf, Cliente.ativo
+            Cliente.tenant_id == tenant_id,
+            _igual_normalizado(Cliente.cpf, cpf),
+            Cliente.ativo.is_not(False),
         )
         if cliente_id:
             query = query.filter(Cliente.id != cliente_id)
@@ -76,7 +130,9 @@ def verificar_duplicata(
     # Verificar CNPJ
     if cnpj:
         query = db.query(Cliente).filter(
-            Cliente.tenant_id == tenant_id, Cliente.cnpj == cnpj, Cliente.ativo
+            Cliente.tenant_id == tenant_id,
+            _igual_normalizado(Cliente.cnpj, cnpj),
+            Cliente.ativo.is_not(False),
         )
         if cliente_id:
             query = query.filter(Cliente.id != cliente_id)
@@ -102,7 +158,9 @@ def verificar_duplicata(
     # Verificar celular
     if celular:
         query = db.query(Cliente).filter(
-            Cliente.tenant_id == tenant_id, Cliente.celular == celular, Cliente.ativo
+            Cliente.tenant_id == tenant_id,
+            _igual_normalizado(Cliente.celular, celular),
+            Cliente.ativo.is_not(False),
         )
         if cliente_id:
             query = query.filter(Cliente.id != cliente_id)
@@ -125,7 +183,9 @@ def verificar_duplicata(
     # Verificar telefone
     if telefone:
         query = db.query(Cliente).filter(
-            Cliente.tenant_id == tenant_id, Cliente.telefone == telefone, Cliente.ativo
+            Cliente.tenant_id == tenant_id,
+            _igual_normalizado(Cliente.telefone, telefone),
+            Cliente.ativo.is_not(False),
         )
         if cliente_id:
             query = query.filter(Cliente.id != cliente_id)
@@ -148,7 +208,9 @@ def verificar_duplicata(
     # Verificar CRMV
     if crmv:
         query = db.query(Cliente).filter(
-            Cliente.tenant_id == tenant_id, Cliente.crmv == crmv, Cliente.ativo
+            Cliente.tenant_id == tenant_id,
+            _igual_normalizado(Cliente.crmv, crmv),
+            Cliente.ativo.is_not(False),
         )
         if cliente_id:
             query = query.filter(Cliente.id != cliente_id)
@@ -226,6 +288,7 @@ def executar_fusao_pessoas_route(
 @router.get("/duplicidades/sugestoes")
 @require_permission("clientes.visualizar")
 def listar_sugestoes_duplicidade_pessoas_route(
+    skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=100),
     db: Session = Depends(get_session),
     user_and_tenant=Depends(get_current_user_and_tenant),
@@ -235,8 +298,77 @@ def listar_sugestoes_duplicidade_pessoas_route(
     return listar_sugestoes_duplicidade_pessoas(
         db,
         tenant_id=tenant_id,
+        skip=skip,
         limit=limit,
     )
+
+
+@router.get("/duplicidades/historico")
+@require_permission("clientes.visualizar")
+def listar_historico_fusoes_pessoas_route(
+    limit: int = Query(50, ge=1, le=200),
+    db: Session = Depends(get_session),
+    user_and_tenant=Depends(get_current_user_and_tenant),
+):
+    """Lista a trilha auditavel das fusoes realizadas no tenant."""
+    _current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
+    logs = (
+        db.query(PessoaMergeLog)
+        .filter(PessoaMergeLog.tenant_id == tenant_id)
+        .order_by(PessoaMergeLog.created_at.desc(), PessoaMergeLog.id.desc())
+        .limit(limit)
+        .all()
+    )
+    return {
+        "items": [
+            {
+                "id": item.id,
+                "principal_id": item.principal_id,
+                "duplicado_id": item.duplicado_id,
+                "actor_user_id": item.actor_user_id,
+                "modo": item.modo,
+                "motivo": item.motivo,
+                "status": item.status,
+                "resumo_transferencias": item.resumo_transferencias,
+                "observacao": item.observacao,
+                "created_at": item.created_at,
+            }
+            for item in logs
+        ]
+    }
+
+
+@router.post("/duplicidades/fundir-assistidas-nome")
+@require_permission("clientes.editar")
+def executar_fusoes_assistidas_pessoas_por_nome_route(
+    payload: PessoaFusaoAssistidaNomeRequest,
+    db: Session = Depends(get_session),
+    user_and_tenant=Depends(get_current_user_and_tenant),
+):
+    """Simula ou aplica fusoes por nome confirmadas pelo dono, com auditoria."""
+    current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
+    _exigir_dono_tenant(
+        db,
+        user_id=current_user.id,
+        tenant_id=tenant_id,
+        is_admin=bool(getattr(current_user, "is_admin", False)),
+    )
+    try:
+        return executar_fusoes_assistidas_pessoas_por_nome(
+            db,
+            tenant_id=tenant_id,
+            user_id=current_user.id,
+            confirmar=payload.confirmar,
+            aceitar_nome_igual=payload.aceitar_nome_igual,
+            limit=payload.limit,
+        )
+    except Exception as exc:
+        db.rollback()
+        logger.exception("Erro na fusao assistida de pessoas por nome")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Erro ao processar fusoes assistidas: {str(exc)}",
+        )
 
 
 @router.post("/duplicidades/fundir-automaticas")
@@ -245,7 +377,7 @@ def executar_fusoes_automaticas_pessoas_route(
     db: Session = Depends(get_session),
     user_and_tenant=Depends(get_current_user_and_tenant),
 ):
-    """Funde automaticamente duplicidades seguras por nome 100% igual."""
+    """Funde em lote apenas duplicidades com identidade forte valida em comum."""
     current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
     try:
         return executar_fusoes_automaticas_pessoas_duplicadas(

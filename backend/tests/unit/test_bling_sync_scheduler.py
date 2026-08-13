@@ -60,3 +60,79 @@ def test_reconciliar_nfes_autorizadas_usa_janela_configurada(monkeypatch):
     assert capturado["dias"] == 90
     assert capturado["limite_notas_por_tenant"] == 140
     assert db.closed is True
+
+
+def test_processar_fila_prioriza_estoque_e_depois_custo(monkeypatch):
+    calls = []
+    scheduler = scheduler_module.BlingSyncScheduler.__new__(
+        scheduler_module.BlingSyncScheduler
+    )
+
+    monkeypatch.setattr(
+        scheduler_module.BlingSyncService,
+        "process_pending_queue",
+        lambda limit: calls.append(("estoque", limit)) or {"processados": 1},
+    )
+    monkeypatch.setattr(
+        scheduler_module.BlingCostSyncService,
+        "process_pending_queue",
+        lambda limit: calls.append(("custo", limit)) or {"processados": 1},
+    )
+
+    scheduler.processar_fila()
+
+    assert calls == [("estoque", 10), ("custo", 10)]
+
+
+def test_processar_fila_adia_custo_quando_bling_limita_estoque(monkeypatch):
+    calls = []
+    scheduler = scheduler_module.BlingSyncScheduler.__new__(
+        scheduler_module.BlingSyncScheduler
+    )
+
+    monkeypatch.setattr(
+        scheduler_module.BlingSyncService,
+        "process_pending_queue",
+        lambda limit: {
+            "processados": 1,
+            "rate_limited": True,
+        },
+    )
+    monkeypatch.setattr(
+        scheduler_module.BlingCostSyncService,
+        "process_pending_queue",
+        lambda limit: calls.append(("custo", limit)) or {"processados": 1},
+    )
+
+    scheduler.processar_fila()
+
+    assert calls == []
+
+
+def test_reconciliar_importacao_pedidos_usa_janela_configurada(monkeypatch):
+    db = _FakeDB()
+    capturado = {}
+    scheduler = scheduler_module.BlingSyncScheduler.__new__(
+        scheduler_module.BlingSyncScheduler
+    )
+    scheduler._should_defer_secondary_job = lambda job_name: False
+
+    monkeypatch.setattr(scheduler_module, "SessionLocal", lambda: db)
+    monkeypatch.setattr(
+        scheduler_module, "BLING_ORDER_IMPORT_RECONCILE_DAYS", 9, raising=False
+    )
+    monkeypatch.setattr(
+        scheduler_module, "BLING_ORDER_IMPORT_RECONCILE_PAGES", 4, raising=False
+    )
+    monkeypatch.setattr(
+        scheduler_module,
+        "reconciliar_importacao_pedidos_bling_recentes",
+        lambda db_arg, **kwargs: capturado.update({"db": db_arg, **kwargs}) or {},
+    )
+
+    scheduler.reconciliar_importacao_pedidos()
+
+    assert capturado["db"] is db
+    assert capturado["dias"] == 9
+    assert capturado["limite_paginas"] == 4
+    assert db.closed is True

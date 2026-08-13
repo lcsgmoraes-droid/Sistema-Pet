@@ -1,10 +1,11 @@
 {
   "name": "corepet-app",
-  "version": "1.0.1",
+  "version": "1.0.3",
   "main": "index.js",
   "scripts": {
     "start": "expo start",
     "start:clear": "expo start --clear",
+    "audit:dependencies": "node scripts/audit-dependencies.mjs",
     "prepare:firebase": "node scripts/prepare-google-services.js",
     "eas-build-post-install": "npm run prepare:firebase",
     "typecheck": "tsc --noEmit",
@@ -58,12 +59,20 @@
   "devDependencies": {
     "@babel/core": "^7.25.0",
     "@types/react": "~19.2.10",
-    "babel-plugin-module-resolver": "^5.0.2",
+    "babel-plugin-module-resolver": "^5.0.3",
     "babel-preset-expo": "~57.0.0",
     "typescript": "~6.0.3"
   },
   "private": true,
   "overrides": {
+    "babel-plugin-module-resolver": {
+      ".": "$babel-plugin-module-resolver",
+      "glob": "13.0.6"
+    },
+    "brace-expansion": "5.0.9",
+    "js-yaml": "4.3.1",
+    "nanoid": "3.3.17",
+    "postcss": "8.5.25",
     "undici": "6.27.0",
     "uuid": "11.1.1"
   }

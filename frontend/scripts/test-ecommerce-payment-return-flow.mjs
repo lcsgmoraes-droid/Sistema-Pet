@@ -9,8 +9,8 @@ const ordersHookSource = readFileSync(
   resolve(__dirname, "../src/pages/ecommerce/useEcommerceOrders.js"),
   "utf8",
 );
-const ecommerceMvpSource = readFileSync(
-  resolve(__dirname, "../src/pages/ecommerce/EcommerceMVP.jsx"),
+const paymentReturnHookSource = readFileSync(
+  resolve(__dirname, "../src/pages/ecommerce/useEcommercePaymentReturn.js"),
   "utf8",
 );
 
@@ -45,19 +45,19 @@ assert.match(
 );
 
 assert.match(
-  ecommerceMvpSource,
+  paymentReturnHookSource,
   /const\s+handledPaymentReturnSearchRef\s*=\s*useRef\(["']["']\)/,
   "pagina do ecommerce deve lembrar a ultima URL de retorno de pagamento tratada",
 );
 
 assert.match(
-  ecommerceMvpSource,
+  paymentReturnHookSource,
   /if\s*\(\s*handledPaymentReturnSearchRef\.current\s*===\s*location\.search\s*\)\s*return/,
   "mesma URL de retorno do Mercado Pago deve ser processada uma unica vez",
 );
 
 assert.match(
-  ecommerceMvpSource,
+  paymentReturnHookSource,
   /handledPaymentReturnSearchRef\.current\s*=\s*location\.search/,
   "URL de retorno deve ser marcada como tratada antes de mudar estados da tela",
 );

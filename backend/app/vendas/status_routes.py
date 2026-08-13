@@ -80,11 +80,12 @@ def reabrir_venda(
                     count=comissoes_removidas,
                 )
 
-                # Remover comissões
-                _remover_comissoes_venda(db, venda.id, tenant_id)
-
-                # Também remover provisões de comissão em contas_pagar
+                # Cancelar primeiro as provisões e reverter o DRE enquanto os
+                # vínculos com as comissões ainda existem.
                 _remover_provisoes_comissao_venda(db, venda.id, tenant_id)
+
+                # Remover os snapshots somente depois da reversão financeira.
+                _remover_comissoes_venda(db, venda.id, tenant_id)
 
                 struct_logger.info(
                     event="COMMISSION_CANCELLED",
@@ -95,7 +96,11 @@ def reabrir_venda(
             else:
                 logger.info(f"ℹ️  Venda #{venda.id} não tinha comissões para cancelar")
 
+        except HTTPException:
+            db.rollback()
+            raise
         except Exception as e:
+            db.rollback()
             logger.error(
                 f"❌ Erro ao cancelar comissões da venda {venda.id}: {e}", exc_info=True
             )
@@ -105,7 +110,10 @@ def reabrir_venda(
                 venda_id=venda.id,
                 error=str(e),
             )
-            # Prosseguir com reabertura mesmo se falhar cancelamento de comissões
+            raise HTTPException(
+                status_code=500,
+                detail="Não foi possível cancelar as comissões antes de reabrir a venda.",
+            ) from e
 
     # ℹ️  NOTA: NÃO devolvemos estoque ao reabrir!
     # O estoque só é devolvido ao:

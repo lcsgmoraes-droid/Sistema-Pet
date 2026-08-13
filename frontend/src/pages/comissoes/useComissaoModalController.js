@@ -30,7 +30,7 @@ export function useComissaoModalController({ funcionarioId, configuracoes, onSav
 
   const carregarFuncionarios = async () => {
     try {
-      const response = await api.get("/comissoes/funcionarios");
+      const response = await api.get("/comissoes/configuracoes/funcionarios");
       if (response.data.success) {
         setFuncionarios(response.data.data);
 

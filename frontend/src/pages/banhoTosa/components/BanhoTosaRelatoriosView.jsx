@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
-import { AlertTriangle, RefreshCw } from "lucide-react";
+import { AlertTriangle, FileDown, FileSpreadsheet, RefreshCw } from "lucide-react";
 import ActionButton from "../../../components/ui/ActionButton";
 import EmptyState from "../../../components/ui/EmptyState";
 import { TextField } from "../../../components/ui/FormField";
@@ -8,6 +8,7 @@ import MetricCard from "../../../components/ui/MetricCard";
 import MetricGrid from "../../../components/ui/MetricGrid";
 import Panel from "../../../components/ui/Panel";
 import { banhoTosaApi } from "../banhoTosaApi";
+import { exportarRelatorioCsv, exportarRelatorioPdf } from "../banhoTosaRelatorioExport";
 import { formatCurrency, formatNumber, getApiErrorMessage } from "../banhoTosaUtils";
 
 const todayIso = () => new Date().toISOString().slice(0, 10);
@@ -21,6 +22,7 @@ export default function BanhoTosaRelatoriosView() {
   const [dataFim, setDataFim] = useState(todayIso());
   const [relatorio, setRelatorio] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [exportingPdf, setExportingPdf] = useState(false);
 
   async function carregarRelatorio() {
     setLoading(true);
@@ -44,19 +46,53 @@ export default function BanhoTosaRelatoriosView() {
 
   const resumo = relatorio?.resumo || {};
 
+  async function baixarPdf() {
+    if (!relatorio) return;
+    setExportingPdf(true);
+    try {
+      await exportarRelatorioPdf(relatorio, dataInicio, dataFim);
+      toast.success("PDF gerado.");
+    } catch {
+      toast.error("Não foi possível gerar o PDF.");
+    } finally {
+      setExportingPdf(false);
+    }
+  }
+
   return (
     <div className="space-y-4">
       <Panel
         actions={
-          <ActionButton
-            icon={RefreshCw}
-            intent="neutral"
-            loading={loading}
-            onClick={carregarRelatorio}
-            tone="soft"
-          >
-            Atualizar
-          </ActionButton>
+          <>
+            <ActionButton
+              disabled={!relatorio}
+              icon={FileSpreadsheet}
+              intent="neutral"
+              tone="soft"
+              onClick={() => exportarRelatorioCsv(relatorio, dataInicio, dataFim)}
+            >
+              Exportar CSV
+            </ActionButton>
+            <ActionButton
+              disabled={!relatorio}
+              icon={FileDown}
+              intent="info"
+              loading={exportingPdf}
+              tone="soft"
+              onClick={baixarPdf}
+            >
+              Baixar PDF
+            </ActionButton>
+            <ActionButton
+              icon={RefreshCw}
+              intent="neutral"
+              loading={loading}
+              onClick={carregarRelatorio}
+              tone="soft"
+            >
+              Atualizar
+            </ActionButton>
+          </>
         }
         subtitle="Margem, ocupacao, produtividade e desperdicio do Banho & Tosa."
         title="Relatorios operacionais"

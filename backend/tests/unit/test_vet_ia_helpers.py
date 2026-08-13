@@ -4,6 +4,8 @@ from types import SimpleNamespace
 os.environ["DEBUG"] = "false"
 
 from app.veterinario_ia import (
+    _encerrar_transacao_antes_do_provedor,
+    _filtrar_evidencias_citadas,
     _montar_resposta_dose,
     _montar_resposta_interacao,
     _normalizar_modo_ia,
@@ -168,6 +170,49 @@ def test_safety_identifier_is_stable_and_does_not_expose_tenant():
 
     assert first == second
     assert "tenant-secret" not in first
+
+
+def test_encerrar_transacao_antes_do_provedor_libera_conexao():
+    calls = []
+    db = SimpleNamespace(
+        commit=lambda: calls.append("commit"),
+        rollback=lambda: calls.append("rollback"),
+    )
+
+    assert _encerrar_transacao_antes_do_provedor(db) is True
+    assert calls == ["commit"]
+
+
+def test_encerrar_transacao_antes_do_provedor_faz_rollback_em_falha():
+    calls = []
+
+    def fail_commit():
+        calls.append("commit")
+        raise RuntimeError("falha simulada")
+
+    db = SimpleNamespace(
+        commit=fail_commit,
+        rollback=lambda: calls.append("rollback"),
+    )
+
+    assert _encerrar_transacao_antes_do_provedor(db) is False
+    assert calls == ["commit", "rollback"]
+
+
+def test_filtrar_evidencias_citadas_remove_fontes_nao_usadas():
+    fontes = [
+        {"ref": "E1", "titulo": "Estudo renal em caes"},
+        {"ref": "E2", "titulo": "Estudo cardiaco"},
+        {"ref": "E3", "titulo": "Estudo de influenza em celulas MDCK"},
+    ]
+
+    result = _filtrar_evidencias_citadas(
+        "A amostra foi pequena [E1]. A referencia [e2] ajuda na limitacao.",
+        fontes,
+    )
+
+    assert result == fontes[:2]
+    assert _filtrar_evidencias_citadas("Sem citacao bibliografica.", fontes) == []
 
 
 def test_exame_ia_extrai_valores_laboratoriais_do_texto():

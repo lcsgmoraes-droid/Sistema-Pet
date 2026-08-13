@@ -1,5 +1,5 @@
 import { formatarMoeda } from "../../api/produtos";
-import { formatarData, formatarQuantidade } from "./transferenciaParceiroUtils";
+import { formatarData, formatarDataHora, formatarQuantidade } from "./transferenciaParceiroUtils";
 import HistoricoTransferenciaBaixaPanel from "./HistoricoTransferenciaBaixaPanel";
 import { StatusTransferenciaBadge } from "./transferenciaParceiroComponents";
 
@@ -50,6 +50,42 @@ function ItensTransferenciaTable({ registro }) {
           ))}
         </tbody>
       </table>
+    </div>
+  );
+}
+
+function HistoricoBaixasTransferencia({ registro }) {
+  const baixas = Array.isArray(registro.baixas) ? registro.baixas : [];
+  return (
+    <div className="mt-4 rounded-2xl border border-emerald-100 bg-emerald-50 p-4">
+      <h4 className="text-sm font-semibold text-emerald-950">Historico de baixas</h4>
+      {baixas.length ? (
+        <div className="mt-3 space-y-2">
+          {baixas.map((baixa) => (
+            <div
+              key={baixa.recebimento_id}
+              className="flex flex-col gap-2 rounded-xl bg-white px-4 py-3 text-sm shadow-sm md:flex-row md:items-center md:justify-between"
+            >
+              <div>
+                <p className="font-semibold text-emerald-800">
+                  {formatarMoeda(baixa.valor_recebido)} em {formatarData(baixa.data_recebimento)}
+                </p>
+                <p className="mt-1 text-xs text-slate-600">
+                  {baixa.modo_baixa_label || "Recebimento"} | Forma:{" "}
+                  {baixa.forma_pagamento_nome || "nao informada"}
+                </p>
+              </div>
+              <p className="text-xs text-slate-500">
+                {baixa.registrado_em
+                  ? `Registrado em ${formatarDataHora(baixa.registrado_em)}`
+                  : "Horario de registro nao disponivel"}
+              </p>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <p className="mt-2 text-xs text-emerald-800">Nenhuma baixa registrada.</p>
+      )}
     </div>
   );
 }
@@ -245,6 +281,7 @@ function HistoricoTransferenciaCard({
             />
           ) : null}
 
+          <HistoricoBaixasTransferencia registro={registro} />
           <ItensTransferenciaTable registro={registro} />
         </>
       ) : null}

@@ -9,7 +9,7 @@ Fonte oficial para deploy real do MLProHub em producao.
 - Caminho do projeto no servidor: `/opt/petshop`
 - Dominio publico: `https://mlprohub.com.br`
 - Health publico: `https://mlprohub.com.br/api/health`
-- Watchdog publico: `https://mlprohub.com.br/api/health/watchdog`
+- Watchdog publico: `https://mlprohub.com.br/health/watchdog`
 
 Use o IP para SSH. O dominio pode estar atras de Cloudflare e nao deve ser usado como referencia para conexao SSH operacional.
 
@@ -92,6 +92,11 @@ O wrapper exige `--action`, `--reason` e o comando apos `--`. Ele registra
 incluindo usuario, host, commit atual, exit code e comando com redaction basica
 de argumentos sensiveis como `token=...` e `password=...`.
 
+O arquivo fica restrito ao usuario do backend. Quando `petdeploy` nao puder
+gravar diretamente nele, o wrapper usa automaticamente o container `backend`
+para acrescentar o evento no mesmo volume. Se nenhuma das duas gravacoes for
+possivel, o comando solicitado nao e executado sem auditoria.
+
 Nao colocar secrets no `--reason`, no `--label` ou em argumentos quando houver
 alternativa operacional.
 
@@ -135,7 +140,7 @@ ssh -i ~/.ssh/mlprohub_codex_deploy -o IdentitiesOnly=yes -o BatchMode=yes petde
 
 ```bash
 curl -fsS https://mlprohub.com.br/api/health
-curl -fsS https://mlprohub.com.br/api/health/watchdog
+curl -fsS https://mlprohub.com.br/health/watchdog
 ```
 
 Para rollback e registro operacional, usar `docs/PRODUCAO_ROLLBACK_CHECKLIST.md`.

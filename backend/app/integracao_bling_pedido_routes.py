@@ -12,8 +12,6 @@ from app.estoque_reserva_service import EstoqueReservaService
 from app.bling_sync.routes_common import _upsert_sync_vinculo
 from app.integracao_bling_nf_routes import (
     _dict,
-    _nf_id_valido,
-    _primeiro_preenchido,
     _texto,
 )
 from app.integracao_bling_pedido_payload import (
@@ -53,11 +51,11 @@ from app.integracao_bling_pedido_admin_routes import (
     router as pedidos_admin_router,
 )
 from app.services.bling_flow_monitor_service import (
-    _nf_contexto_autorizado,
     abrir_incidente,
     registrar_evento,
     registrar_vinculo_nf_pedido,
 )
+from app.services import pedido_nf_reconciliation_service as nf_reconciliation
 from app.services.pedido_integrado_consolidation_service import (
     listar_pedidos_por_numero_loja,
     localizar_pedido_canonico_por_numero_loja,
@@ -168,20 +166,11 @@ def _processar_nf_autorizada_vinculada_ao_pedido(
     itens: list[PedidoIntegradoItem],
     resumo_nf: dict | None,
 ) -> str | None:
-    resumo_nf = _dict(resumo_nf)
-    nf_id = _nf_id_valido(
-        _primeiro_preenchido(resumo_nf.get("id"), resumo_nf.get("nfe_id"))
-    )
-    if not nf_id or not _nf_contexto_autorizado(resumo_nf):
-        return None
-
-    from app.services.bling_nf_service import processar_nf_autorizada
-
-    return processar_nf_autorizada(
+    return nf_reconciliation.processar_nf_vinculada_ao_pedido(
         db=db,
         pedido=pedido,
         itens=itens,
-        nf_id=nf_id,
+        resumo_nf=resumo_nf,
     )
 
 
@@ -200,9 +189,27 @@ def _sincronizar_itens_pedido_integrado(
         .filter(PedidoIntegradoItem.pedido_integrado_id == pedido.id)
         .all()
     )
-    chaves_existentes: dict[tuple[str | None, int], int] = {}
+    from app.services.produto_sku_service import (
+        buscar_produto_por_sku,
+        normalizar_sku,
+    )
+
+    def chave_item(sku: str | None, quantidade: int) -> tuple[str, str, int]:
+        produto = buscar_produto_por_sku(
+            db,
+            tenant_id=pedido.tenant_id,
+            sku=sku or "",
+        )
+        if produto and getattr(produto, "id", None):
+            return ("produto", str(produto.id), quantidade)
+        return ("sku", normalizar_sku(sku), quantidade)
+
+    chaves_existentes: dict[tuple[str, str, int], int] = {}
     for item in itens_existentes:
-        chave = (_texto(item.sku), int(float(item.quantidade or 0)))
+        chave = chave_item(
+            _texto(item.sku),
+            int(float(item.quantidade or 0)),
+        )
         chaves_existentes[chave] = chaves_existentes.get(chave, 0) + 1
 
     criados = 0
@@ -214,7 +221,7 @@ def _sincronizar_itens_pedido_integrado(
         if not sku or quantidade <= 0:
             continue
 
-        chave = (sku, quantidade)
+        chave = chave_item(sku, quantidade)
         if chaves_existentes.get(chave, 0) > 0:
             chaves_existentes[chave] -= 1
             continue
@@ -628,6 +635,14 @@ def _cancelar_pedido(
     pedido.cancelado_em = datetime.utcnow()
     db.add(pedido)
     db.commit()
+    alerta_fiscal = nf_reconciliation.registrar_alerta_pedido_cancelado_com_nf_ativa(
+        db,
+        pedido=pedido,
+        source="runtime",
+        processed_at=processed_at,
+    )
+    if alerta_fiscal:
+        db.commit()
     registrar_evento(
         tenant_id=pedido.tenant_id,
         source="runtime",

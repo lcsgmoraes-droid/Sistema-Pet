@@ -5,6 +5,7 @@ import { banhoTosaApi } from "./banhoTosaApi";
 import { getApiErrorMessage } from "./banhoTosaUtils";
 import BanhoTosaAgendaView from "./components/BanhoTosaAgendaView";
 import BanhoTosaDashboardView from "./components/BanhoTosaDashboardView";
+import BanhoTosaFechamentosView from "./components/BanhoTosaFechamentosView";
 import BanhoTosaFilaView from "./components/BanhoTosaFilaView";
 import BanhoTosaPacotesView from "./components/BanhoTosaPacotesView";
 import BanhoTosaParametrosView from "./components/BanhoTosaParametrosView";
@@ -21,6 +22,7 @@ const navItems = [
   { view: "recursos", path: "/banho-tosa/recursos", label: "Recursos" },
   { view: "agenda", path: "/banho-tosa/agenda", label: "Agenda" },
   { view: "fila", path: "/banho-tosa/fila", label: "Fila do dia" },
+  { view: "fechamentos", path: "/banho-tosa/fechamentos", label: "Fechamentos" },
   { view: "pacotes", path: "/banho-tosa/pacotes", label: "Pacotes" },
   { view: "retornos", path: "/banho-tosa/retornos", label: "Reagendar" },
   { view: "taxi-dog", path: "/banho-tosa/taxi-dog", label: "Taxi dog" },
@@ -109,6 +111,10 @@ export default function BanhoTosaPage({ view = "dashboard" }) {
           onChanged={carregarDados}
         />
       );
+    }
+
+    if (view === "fechamentos") {
+      return <BanhoTosaFechamentosView onChanged={carregarDados} />;
     }
 
     if (view === "taxi-dog") {

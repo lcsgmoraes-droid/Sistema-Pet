@@ -127,7 +127,8 @@ export default function BanhoTosaPacotesView({ servicos = [], onChanged }) {
         />
         <MetricCard
           intent="violet"
-          label="Receita cadastrada"
+          label="Valor de tabela"
+          subtitle="Soma dos preços dos pacotes"
           value={formatCurrency(resumo.valorPacotes)}
         />
       </MetricGrid>

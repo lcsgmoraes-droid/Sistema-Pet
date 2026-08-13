@@ -71,6 +71,7 @@ const ComissaoDetalhe = ({ comissaoId, onClose }) => {
   const renderizarStatus = (status) => {
     const cores = {
       pendente: "bg-yellow-100 text-yellow-800",
+      fechada: "bg-blue-100 text-blue-800",
       pago: "bg-green-100 text-green-800",
       estornado: "bg-red-100 text-red-800",
     };
@@ -316,11 +317,11 @@ const ComissaoDetalhe = ({ comissaoId, onClose }) => {
                     valor={formatarMoeda(comissao.valores_financeiros.valor_custo)}
                   />
                   <Campo
-                    label="Base Original (Lucro)"
+                    label="Comissão Original"
                     valor={formatarMoeda(comissao.valores_financeiros.valor_base_original)}
                   />
                   <Campo
-                    label="Base Comissionada"
+                    label="Comissão Proporcional"
                     valor={formatarMoeda(comissao.valores_financeiros.valor_base_comissionada)}
                   />
                 </div>

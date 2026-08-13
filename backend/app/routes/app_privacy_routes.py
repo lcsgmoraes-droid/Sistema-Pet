@@ -48,7 +48,7 @@ def _get_cliente_or_404(db: Session, user: User) -> Cliente:
     tenant_id = _activate_user_tenant_context(user)
     cliente = (
         db.query(Cliente)
-        .filter(Cliente.tenant_id == tenant_id, Cliente.user_id == user.id)
+        .filter(Cliente.tenant_id == tenant_id, Cliente.auth_user_id == user.id)
         .first()
     )
     if not cliente:

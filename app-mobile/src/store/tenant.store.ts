@@ -14,6 +14,7 @@ export interface TenantInfo {
   cep?: string | null;
   cidade: string | null;
   uf: string | null;
+  distancia_km?: number | null;
 }
 
 interface TenantState {
@@ -21,7 +22,14 @@ interface TenantState {
   isLoading: boolean;
   loadTenant: () => Promise<void>;
   buscarPorSlug: (slug: string) => Promise<TenantInfo>;
+  buscarPorNome: (nome: string) => Promise<TenantInfo[]>;
   buscarPorLocalidade: (cidade: string, uf?: string | null) => Promise<TenantInfo[]>;
+  buscarProximas: (
+    latitude: number,
+    longitude: number,
+    cidade?: string | null,
+    uf?: string | null,
+  ) => Promise<TenantInfo[]>;
   confirmarTenant: (tenant: TenantInfo) => Promise<void>;
   limparTenant: () => Promise<void>;
 }
@@ -30,6 +38,12 @@ const STORAGE_KEY = 'tenant_info';
 
 function apiPublicBaseUrl(): string {
   return API_BASE_URL.replace(/\/api\/?$/, '').replace(/\/$/, '');
+}
+
+export function resolveTenantAssetUrl(url?: string | null): string | null {
+  if (!url) return null;
+  if (/^https?:\/\//i.test(url)) return url;
+  return `${apiPublicBaseUrl()}${url.startsWith('/') ? '' : '/'}${url}`;
 }
 
 export function extractStoreSlug(input: string): string {
@@ -131,6 +145,20 @@ export const useTenantStore = create<TenantState>()((set) => ({
     return fetchTenantBySlug(slug);
   },
 
+  buscarPorNome: async (nome: string) => {
+    const nomeLimpo = nome.trim();
+    if (nomeLimpo.length < 2) return [];
+
+    const params = new URLSearchParams({ q: nomeLimpo, limit: '20' });
+    const response = await fetch(
+      `${apiPublicBaseUrl()}/api/ecommerce/tenants/buscar?${params.toString()}`,
+    );
+    if (!response.ok) return [];
+
+    const data = await response.json().catch(() => ({ lojas: [] }));
+    return Array.isArray(data.lojas) ? data.lojas : [];
+  },
+
   buscarPorLocalidade: async (cidade: string, uf?: string | null) => {
     const cidadeLimpa = cidade.trim();
     if (!cidadeLimpa) return [];
@@ -139,6 +167,24 @@ export const useTenantStore = create<TenantState>()((set) => ({
     if (uf?.trim()) params.set('uf', uf.trim().slice(0, 2).toUpperCase());
 
     const response = await fetch(`${apiPublicBaseUrl()}/api/ecommerce/tenants/sugerir?${params.toString()}`);
+    if (!response.ok) return [];
+
+    const data = await response.json().catch(() => ({ lojas: [] }));
+    return Array.isArray(data.lojas) ? data.lojas : [];
+  },
+
+  buscarProximas: async (latitude, longitude, cidade, uf) => {
+    const params = new URLSearchParams({
+      latitude: String(latitude),
+      longitude: String(longitude),
+      limit: '8',
+    });
+    if (cidade?.trim()) params.set('cidade', cidade.trim());
+    if (uf?.trim()) params.set('uf', uf.trim().slice(0, 2).toUpperCase());
+
+    const response = await fetch(
+      `${apiPublicBaseUrl()}/api/ecommerce/tenants/sugerir?${params.toString()}`,
+    );
     if (!response.ok) return [];
 
     const data = await response.json().catch(() => ({ lojas: [] }));

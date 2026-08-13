@@ -1,10 +1,6 @@
 import { LibraryBig, Loader2 } from "lucide-react";
 
-export default function ProcedimentosModeloCorePetBanner({
-  importando,
-  onImportar,
-  status,
-}) {
+export default function ProcedimentosModeloCorePetBanner({ importando, onImportar, status }) {
   const quantidade = status?.disponiveis_para_importar || 0;
   if (!status || quantidade <= 0) return null;
 
@@ -17,8 +13,8 @@ export default function ProcedimentosModeloCorePetBanner({
             Há {quantidade} procedimento(s) do modelo CorePet disponíveis
           </p>
           <p className="mt-1 text-xs text-cyan-800">
-            A importação é opcional e não preenche preços nem insumos. Você poderá editar ou
-            excluir qualquer item depois.
+            A importação é opcional e não preenche preços nem insumos. Você poderá editar ou excluir
+            qualquer item depois.
           </p>
         </div>
       </div>

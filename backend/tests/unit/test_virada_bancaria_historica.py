@@ -51,6 +51,7 @@ def _session():
                 valor_recebido NUMERIC(10, 2) NOT NULL,
                 data_vencimento TEXT NOT NULL,
                 data_recebimento TEXT,
+                canal TEXT,
                 forma_pagamento_id INTEGER,
                 user_id INTEGER NOT NULL
             )
@@ -139,14 +140,15 @@ def _session():
             """
             INSERT INTO contas_receber (
                 id, tenant_id, descricao, status, valor_final, valor_recebido,
-                data_vencimento, data_recebimento, forma_pagamento_id, user_id
+                data_vencimento, data_recebimento, canal, forma_pagamento_id, user_id
             )
             VALUES
-              (10, :tenant_alvo, 'CR aberto', 'pendente', 100.00, 0.00, '2026-07-05', NULL, 2, 7),
-              (11, :tenant_alvo, 'CR parcial', 'parcial', 50.00, 20.00, '2026-06-30', NULL, 2, 7),
-              (12, :tenant_alvo, 'CR futuro', 'pendente', 90.00, 0.00, '2026-07-06', NULL, 2, 7),
-              (13, :tenant_alvo, 'CR recebido', 'recebido', 40.00, 40.00, '2026-07-04', '2026-07-04', 2, 7),
-              (14, :tenant_outro, 'CR outro', 'pendente', 999.00, 0.00, '2026-07-05', NULL, 2, 8)
+              (10, :tenant_alvo, 'CR aberto', 'pendente', 100.00, 0.00, '2026-07-05', NULL, 'financeiro', 2, 7),
+              (11, :tenant_alvo, 'CR parcial', 'parcial', 50.00, 20.00, '2026-06-30', NULL, 'financeiro', 2, 7),
+              (12, :tenant_alvo, 'CR futuro', 'pendente', 90.00, 0.00, '2026-07-06', NULL, 'financeiro', 2, 7),
+              (13, :tenant_alvo, 'CR recebido', 'recebido', 40.00, 40.00, '2026-07-04', '2026-07-04', 'financeiro', 2, 7),
+              (14, :tenant_outro, 'CR outro', 'pendente', 999.00, 0.00, '2026-07-05', NULL, 'financeiro', 2, 8),
+              (15, :tenant_alvo, 'Transferencia parceiro', 'pendente', 777.00, 0.00, '2026-07-05', NULL, 'transferencia_parceiro', 2, 7)
             """
         ),
         {"tenant_alvo": TENANT_ALVO, "tenant_outro": TENANT_OUTRO},

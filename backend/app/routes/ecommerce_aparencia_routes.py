@@ -9,12 +9,13 @@ import shutil
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.auth.dependencies import get_current_user_and_tenant
 from app.db import get_session
 from app.models import Tenant
+from app.security.permissions_decorator import require_permission
 
 logger = logging.getLogger(__name__)
 
@@ -62,10 +63,16 @@ class SlugUpdate(BaseModel):
     slug: str | None = None
 
 
+class LocalizacaoUpdate(BaseModel):
+    latitude: float = Field(ge=-90, le=90)
+    longitude: float = Field(ge=-180, le=180)
+
+
 # ─── Endpoints ─────────────────────────────────────────────────────────────
 
 
 @router.get("/tenant-context")
+@require_permission("configuracoes.editar")
 def tenant_context_logado(
     user_and_tenant=Depends(get_current_user_and_tenant),
     db: Session = Depends(get_session),
@@ -87,6 +94,8 @@ def tenant_context_logado(
         "status": tenant.status,
         "cidade": tenant.cidade,
         "uf": tenant.uf,
+        "latitude": tenant.latitude,
+        "longitude": tenant.longitude,
         "logo_url": tenant.logo_url,
         "banner_1_url": tenant.banner_1_url,
         "banner_2_url": tenant.banner_2_url,
@@ -95,6 +104,7 @@ def tenant_context_logado(
 
 
 @router.get("", response_model=AparenciaResponse)
+@require_permission("configuracoes.editar")
 def buscar_aparencia(
     user_and_tenant=Depends(get_current_user_and_tenant),
     db: Session = Depends(get_session),
@@ -112,7 +122,29 @@ def buscar_aparencia(
     )
 
 
+@router.put("/localizacao")
+def atualizar_localizacao(
+    payload: LocalizacaoUpdate,
+    user_and_tenant=Depends(get_current_user_and_tenant),
+    db: Session = Depends(get_session),
+):
+    """Save the physical store coordinates used by nearby-store discovery."""
+    _, tenant_id = user_and_tenant
+    tenant = db.query(Tenant).filter(Tenant.id == tenant_id).first()
+    if not tenant:
+        raise HTTPException(status_code=404, detail="Tenant nao encontrado")
+
+    tenant.latitude = payload.latitude
+    tenant.longitude = payload.longitude
+    db.commit()
+    return {
+        "latitude": tenant.latitude,
+        "longitude": tenant.longitude,
+    }
+
+
 @router.post("/upload/{tipo}", response_model=AparenciaResponse)
+@require_permission("configuracoes.editar")
 async def upload_imagem_aparencia(
     tipo: str,
     file: UploadFile = File(...),
@@ -203,6 +235,7 @@ async def upload_imagem_aparencia(
 
 
 @router.put("", response_model=AparenciaResponse)
+@require_permission("configuracoes.editar")
 def atualizar_aparencia_por_url(
     dados: AparenciaUrlUpdate,
     user_and_tenant=Depends(get_current_user_and_tenant),
@@ -232,6 +265,7 @@ def atualizar_aparencia_por_url(
 
 
 @router.put("/slug")
+@require_permission("configuracoes.editar")
 def atualizar_slug(
     body: SlugUpdate,
     user_and_tenant=Depends(get_current_user_and_tenant),
@@ -284,6 +318,7 @@ def atualizar_slug(
 
 
 @router.delete("/{tipo}", response_model=AparenciaResponse)
+@require_permission("configuracoes.editar")
 def remover_imagem_aparencia(
     tipo: str,
     user_and_tenant=Depends(get_current_user_and_tenant),

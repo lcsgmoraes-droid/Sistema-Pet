@@ -7,16 +7,161 @@ from app.security.jwt_compat import JWTError, jwt
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
-from app.auth.core import ALGORITHM
+from app.auth import create_access_token, create_refresh_token
+from app.auth.core import (
+    ACCESS_TOKEN_EXPIRE_DAYS,
+    ACCESS_TOKEN_EXPIRE_SECONDS,
+    ALGORITHM,
+)
 from app.config import JWT_SECRET_KEY
 from app.db import get_session
 from app.models import Role, Tenant, User, UserTenant
 from app.services.app_access_profile_service import normalize_profile_type
+from app.services.auth_security import get_request_ip
+from app.session_manager import create_session, get_session_by_jti, validate_session
 from app.tenancy.context import set_current_tenant
 from app.tenancy.rls import sync_rls_auth_user
 
 
 security = HTTPBearer()
+
+ECOMMERCE_ACCESS_TOKEN_TYPE = "ecommerce_customer"
+ECOMMERCE_REFRESH_TOKEN_TYPE = "ecommerce_customer_refresh"
+
+
+def _session_expiry_utc(db_session) -> datetime:
+    expires_at = db_session.expires_at
+    if expires_at.tzinfo is None:
+        return expires_at.replace(tzinfo=timezone.utc)
+    return expires_at
+
+
+def _create_ecommerce_token_pair(
+    user: User,
+    tenant_id: str,
+    token_jti: str,
+    expires_at: datetime,
+) -> tuple[str, str]:
+    common_data = {
+        "sub": str(user.id),
+        "email": user.email,
+    }
+    access_token = create_access_token(
+        data={**common_data, "token_type": ECOMMERCE_ACCESS_TOKEN_TYPE},
+        jti=token_jti,
+        tenant_id=tenant_id,
+        role="customer",
+    )
+    refresh_token = create_refresh_token(
+        data={**common_data, "token_type": ECOMMERCE_REFRESH_TOKEN_TYPE},
+        expires_at=expires_at,
+        jti=token_jti,
+        tenant_id=tenant_id,
+        role="customer",
+    )
+    return access_token, refresh_token
+
+
+def _ecommerce_auth_payload(access_token: str, refresh_token: str) -> dict:
+    return {
+        "access_token": access_token,
+        "refresh_token": refresh_token,
+        "token_type": "bearer",
+        "expires_in": ACCESS_TOKEN_EXPIRE_SECONDS,
+    }
+
+
+def _create_ecommerce_session_tokens(
+    db: Session,
+    user: User,
+    tenant_id: str,
+    request: Request,
+) -> dict:
+    db_session = create_session(
+        db=db,
+        user_id=user.id,
+        tenant_id=tenant_id,
+        ip_address=get_request_ip(request),
+        user_agent=request.headers.get("user-agent"),
+        expires_in_days=ACCESS_TOKEN_EXPIRE_DAYS,
+    )
+    access_token, refresh_token = _create_ecommerce_token_pair(
+        user,
+        tenant_id,
+        db_session.token_jti,
+        _session_expiry_utc(db_session),
+    )
+    return _ecommerce_auth_payload(access_token, refresh_token)
+
+
+def _refresh_ecommerce_session(refresh_token: str, db: Session) -> dict:
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Sessao expirada. Faca login novamente.",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+
+    try:
+        payload = jwt.decode(refresh_token, JWT_SECRET_KEY, algorithms=[ALGORITHM])
+        if payload.get("typ") != "refresh":
+            raise credentials_exception
+        if payload.get("token_type") != ECOMMERCE_REFRESH_TOKEN_TYPE:
+            raise credentials_exception
+
+        user_id = int(payload.get("sub"))
+        token_jti = str(payload.get("jti") or "").strip()
+        tenant_id = _normalize_tenant_uuid(payload.get("tenant_id"))
+        if not token_jti or not tenant_id:
+            raise credentials_exception
+    except (JWTError, TypeError, ValueError):
+        raise credentials_exception
+
+    set_current_tenant(tenant_id)
+    sync_rls_auth_user(db, user_id)
+
+    if not validate_session(db, token_jti):
+        raise credentials_exception
+
+    db_session = get_session_by_jti(db, token_jti)
+    if (
+        not db_session
+        or db_session.user_id != user_id
+        or str(db_session.tenant_id or "") != str(tenant_id)
+    ):
+        raise credentials_exception
+
+    user = (
+        db.query(User)
+        .filter(
+            User.id == user_id, User.tenant_id == tenant_id, User.is_active.is_(True)
+        )
+        .first()
+    )
+    user_tenant = (
+        db.query(UserTenant)
+        .filter(
+            UserTenant.user_id == user_id,
+            UserTenant.tenant_id == tenant_id,
+            UserTenant.is_active.is_(True),
+        )
+        .first()
+    )
+    tenant = db.query(Tenant).filter(Tenant.id == str(tenant_id)).first()
+    if (
+        not user
+        or not user_tenant
+        or not tenant
+        or not _tenant_status_is_active(tenant.status)
+    ):
+        raise credentials_exception
+
+    access_token, next_refresh_token = _create_ecommerce_token_pair(
+        user,
+        str(tenant_id),
+        token_jti,
+        _session_expiry_utc(db_session),
+    )
+    return _ecommerce_auth_payload(access_token, next_refresh_token)
 
 
 def _normalize_tenant_uuid(raw_tenant_id: str | None) -> UUID | None:
@@ -110,8 +255,10 @@ def _get_current_ecommerce_user(
         )
         user_id = int(payload.get("sub"))
         token_type = payload.get("token_type")
+        token_kind = payload.get("typ", "access")
+        token_jti = str(payload.get("jti") or "").strip()
         tenant_id = _normalize_tenant_uuid(payload.get("tenant_id"))
-        if token_type != "ecommerce_customer":
+        if token_type != ECOMMERCE_ACCESS_TOKEN_TYPE or token_kind != "access":
             raise credentials_exception
         if not tenant_id:
             raise credentials_exception
@@ -120,6 +267,17 @@ def _get_current_ecommerce_user(
 
     set_current_tenant(tenant_id)
     sync_rls_auth_user(db, user_id)
+
+    if token_jti:
+        if not validate_session(db, token_jti):
+            raise credentials_exception
+        db_session = get_session_by_jti(db, token_jti)
+        if (
+            not db_session
+            or db_session.user_id != user_id
+            or str(db_session.tenant_id or "") != str(tenant_id)
+        ):
+            raise credentials_exception
 
     user = (
         db.query(User).filter(User.id == user_id, User.tenant_id == tenant_id).first()

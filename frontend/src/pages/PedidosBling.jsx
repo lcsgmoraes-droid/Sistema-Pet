@@ -9,6 +9,7 @@ export default function PedidosBling() {
     carregando,
     carregar,
     consolidarDuplicidade,
+    decidirRetornoEstoque,
     mudarStatus,
     pagina,
     paginas,
@@ -16,6 +17,7 @@ export default function PedidosBling() {
     reconciliarFluxo,
     setPagina,
     statusFiltro,
+    solicitarCancelamentoNF,
     total,
   } = usePedidosBlingListagem();
 
@@ -24,8 +26,8 @@ export default function PedidosBling() {
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Pedidos Bling</h1>
         <p className="text-sm text-gray-500 mt-1">
-          Pedidos recebidos via Bling com canal, referencias, cliente, financeiro, itens e vinculo
-          com NF quando disponivel.
+          Pedidos recebidos via Bling, cancelamento fiscal e conferencia manual do retorno fisico
+          antes de qualquer devolucao ao estoque.
         </p>
       </div>
 
@@ -87,7 +89,9 @@ export default function PedidosBling() {
               onConfirmar={carregar}
               onCancelar={carregar}
               onConsolidarDuplicidade={consolidarDuplicidade}
+              onDecidirRetornoEstoque={decidirRetornoEstoque}
               onReconciliarFluxo={reconciliarFluxo}
+              onSolicitarCancelamentoNF={solicitarCancelamentoNF}
             />
           ))}
         </div>

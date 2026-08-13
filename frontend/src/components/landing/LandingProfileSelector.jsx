@@ -209,8 +209,8 @@ function MixedPlanPricing() {
             Quer tudo no nível mais completo? R$ {mixedPlanCompleteOffer.price}/mês.
           </p>
           <p className="mt-1 text-sm leading-6 text-slate-600">
-            Esse valor soma Pet Venda Ativa, Vet Completo e B&amp;T Completo, sem desconto oculto
-            ou surpresa na proposta.
+            Esse valor soma Pet Venda Ativa, Vet Completo e B&amp;T Completo, sem desconto oculto ou
+            surpresa na proposta.
           </p>
         </div>
         <a

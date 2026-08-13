@@ -327,7 +327,11 @@ def test_get_entregador_cliente_uses_validated_ecommerce_user_context():
 def test_obter_rota_entregador_validates_driver_before_delegating(monkeypatch):
     tenant_id = uuid4()
     cliente = SimpleNamespace(
-        id=456, tenant_id=str(tenant_id), user_id=123, is_entregador=True
+        id=456,
+        tenant_id=str(tenant_id),
+        user_id=999,
+        auth_user_id=123,
+        is_entregador=True,
     )
     rota = SimpleNamespace(id=789, tenant_id=str(tenant_id), entregador_id=cliente.id)
     delegated = {}
@@ -351,7 +355,7 @@ def test_obter_rota_entregador_validates_driver_before_delegating(monkeypatch):
     assert result is rota
     assert delegated["args"]["rota_id"] == rota.id
     assert delegated["args"]["db"] is db
-    assert delegated["args"]["actor"].user.id == cliente.user_id
+    assert delegated["args"]["actor"].user.id == cliente.auth_user_id
     assert delegated["args"]["actor"].tenant_id == tenant_id
     assert delegated["args"]["actor"].entregador is cliente
     assert get_current_tenant() == tenant_id
@@ -382,6 +386,95 @@ def test_get_or_create_cliente_for_user_sets_tenant_context_before_query():
     result = _get_or_create_cliente_for_user(_Db([cliente], []), user)
 
     assert result is cliente
+    assert get_current_tenant() == tenant_id
+
+
+def test_get_or_create_cliente_for_user_generates_code_for_new_app_customer(
+    monkeypatch,
+):
+    tenant_id = uuid4()
+    user = SimpleNamespace(
+        id=123,
+        tenant_id=tenant_id,
+        is_active=True,
+        cpf_cnpj="52998224725",
+        email="novo-app@example.com",
+        telefone="18999990000",
+        nome="Cliente Novo App",
+    )
+
+    class EmptyDb:
+        def __init__(self):
+            self.added = []
+            self.flushed = False
+
+        def query(self, *_args, **_kwargs):
+            return _Query([])
+
+        def add(self, item):
+            self.added.append(item)
+
+        def flush(self):
+            self.flushed = True
+
+    db = EmptyDb()
+    monkeypatch.setattr(
+        "app.routes.ecommerce_auth_cliente._find_operational_cliente_match",
+        lambda *_args, **_kwargs: None,
+    )
+    monkeypatch.setattr(
+        "app.routes.ecommerce_auth_cliente._find_cliente_match",
+        lambda *_args, **_kwargs: None,
+    )
+    monkeypatch.setattr(
+        "app.routes.ecommerce_auth_cliente.gerar_codigo_cliente",
+        lambda *_args, **_kwargs: "10177",
+    )
+
+    result = _get_or_create_cliente_for_user(db, user)
+
+    assert result.codigo == "10177"
+    assert result.auth_user_id == user.id
+    assert db.added == [result]
+    assert db.flushed is True
+
+
+def test_get_or_create_cliente_for_user_reuses_existing_valid_cpf_with_changed_data():
+    tenant_id = uuid4()
+    user = SimpleNamespace(
+        id=123,
+        tenant_id=tenant_id,
+        is_active=True,
+        cpf_cnpj="03239856883",
+        email="novo-email@example.com",
+        telefone="18999990000",
+        nome="Nome Atualizado",
+    )
+    existing = SimpleNamespace(
+        id=456,
+        codigo="10013",
+        tenant_id=str(tenant_id),
+        user_id=999,
+        auth_user_id=None,
+        cpf="032.398.568-83",
+        email="email-antigo@example.com",
+        telefone="18981661691",
+        celular=None,
+        nome="Nome Antigo",
+        tipo_cadastro="cliente",
+        ativo=True,
+        is_entregador=False,
+    )
+    clear_current_tenant()
+
+    result = _get_or_create_cliente_for_user(
+        _Db([], [], [], [existing]),
+        user,
+    )
+
+    assert result is existing
+    assert result.auth_user_id == user.id
+    assert result.codigo == "10013"
     assert get_current_tenant() == tenant_id
 
 
@@ -433,7 +526,7 @@ def test_app_mobile_exposes_push_token_opt_out_route():
     assert ("/app/push-token", ("DELETE",)) in route_signatures
 
 
-def test_get_or_create_cliente_for_user_prefers_operational_profile_by_email():
+def test_get_or_create_cliente_for_user_prefers_explicit_link_over_email_match():
     tenant_id = uuid4()
     user = SimpleNamespace(
         id=123,
@@ -455,6 +548,7 @@ def test_get_or_create_cliente_for_user_prefers_operational_profile_by_email():
         tipo_cadastro="cliente",
         ativo=True,
         is_entregador=False,
+        auth_user_id=user.id,
     )
     funcionario_por_email = SimpleNamespace(
         id=789,
@@ -467,6 +561,7 @@ def test_get_or_create_cliente_for_user_prefers_operational_profile_by_email():
         tipo_cadastro="funcionario",
         ativo=True,
         is_entregador=False,
+        auth_user_id=None,
     )
     clear_current_tenant()
 
@@ -474,8 +569,9 @@ def test_get_or_create_cliente_for_user_prefers_operational_profile_by_email():
         _Db([cliente_vinculado], [funcionario_por_email]), user
     )
 
-    assert result is funcionario_por_email
-    assert funcionario_por_email.user_id == user.id
+    assert result is cliente_vinculado
+    assert funcionario_por_email.user_id == 999
+    assert funcionario_por_email.auth_user_id is None
     assert get_current_tenant() == tenant_id
 
 
@@ -626,8 +722,9 @@ def test_ecommerce_profile_merge_transfers_customer_relations_before_detaching_d
 def test_atualizar_perfil_detaches_duplicate_customer_instead_of_deleting_history():
     source = inspect.getsource(atualizar_perfil)
 
-    assert "_transfer_cliente_relations_for_ecommerce_merge" in source
-    assert "previous_cliente.ativo = False" in source
+    assert "executar_fusao_pessoas" in source
+    assert 'modo="ecommerce_perfil"' in source
+    assert "commit=False" in source
     assert "db.delete(previous_cliente)" not in source
 
 

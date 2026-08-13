@@ -58,6 +58,29 @@ def _activate_cart_tenant_context(identity: EcommerceIdentity) -> str:
     return str(tenant_uuid)
 
 
+def _restore_latest_expired_cart(
+    db: Session,
+    identity: EcommerceIdentity,
+    tenant_id: str,
+) -> Pedido | None:
+    expired_cart = (
+        db.query(Pedido)
+        .filter(
+            Pedido.cliente_id == identity.user_id,
+            Pedido.tenant_id == tenant_id,
+            Pedido.status == "expirado",
+        )
+        .order_by(Pedido.id.desc())
+        .first()
+    )
+    if not expired_cart:
+        return None
+
+    expired_cart.status = "carrinho"
+    db.commit()
+    return expired_cart
+
+
 def _normalize_sales_channel(raw_channel: str | None) -> str:
     return normalize_online_sales_channel(raw_channel)
 
@@ -96,6 +119,10 @@ def _find_or_create_carrinho(db: Session, identity: EcommerceIdentity) -> Pedido
 
     if carrinho:
         return carrinho
+
+    restored_cart = _restore_latest_expired_cart(db, identity, tenant_id)
+    if restored_cart:
+        return restored_cart
 
     carrinho = Pedido(
         pedido_id=str(uuid4()),
@@ -153,6 +180,19 @@ def _serialize_carrinho(db: Session, carrinho: Pedido) -> dict:
         .all()
     )
 
+    produto_ids = {item.produto_id for item in itens if item.produto_id is not None}
+    produtos_por_id = {}
+    if produto_ids:
+        produtos = (
+            db.query(Produto)
+            .filter(
+                Produto.id.in_(produto_ids),
+                Produto.tenant_id == carrinho.tenant_id,
+            )
+            .all()
+        )
+        produtos_por_id = {produto.id: produto for produto in produtos}
+
     subtotal = round(sum((item.subtotal or 0.0) for item in itens), 2)
     return {
         "pedido_id": carrinho.pedido_id,
@@ -164,6 +204,11 @@ def _serialize_carrinho(db: Session, carrinho: Pedido) -> dict:
                 "quantidade": item.quantidade,
                 "preco_unitario": item.preco_unitario,
                 "subtotal": item.subtotal,
+                "foto_url": (
+                    produtos_por_id[item.produto_id].imagem_principal
+                    if item.produto_id in produtos_por_id
+                    else None
+                ),
             }
             for item in itens
         ],
@@ -499,6 +544,9 @@ def obter_carrinho(
         .order_by(Pedido.id.desc())
         .first()
     )
+
+    if not carrinho:
+        carrinho = _restore_latest_expired_cart(db, identity, tenant_id)
 
     if not carrinho:
         return {

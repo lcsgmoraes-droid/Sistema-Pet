@@ -37,7 +37,7 @@ Rodadas locais:
 Checagem publica de producao:
 
 - `https://mlprohub.com.br/api/health`: 200, `status=ok`.
-- `https://mlprohub.com.br/api/health/watchdog`: 200, `status=healthy`,
+- `https://mlprohub.com.br/health/watchdog`: 200, `status=healthy`,
   banco conectado.
 - `https://mlprohub.com.br/veterinario`: 200, SPA acessivel publicamente antes
   da autenticacao/gate.

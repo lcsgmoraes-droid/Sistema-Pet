@@ -1,7 +1,7 @@
 import { AlertTriangle, CheckCircle2, GitMerge, Loader2, RefreshCw } from "lucide-react";
 import ActionButton from "../ui/ActionButton";
 
-function motivoLabel(motivo) {
+export function motivoDuplicidadeLabel(motivo) {
   const mapa = {
     cpf_conflitante: "CPF diferente",
     cnpj_conflitante: "CNPJ diferente",
@@ -10,16 +10,20 @@ function motivoLabel(motivo) {
     telefone_conflitante: "telefone diferente",
     celular_conflitante: "celular diferente",
     nome_diferente: "nome diferente",
+    contas_app_diferentes: "contas de app diferentes",
+    sem_identidade_forte_compartilhada: "sem CPF, CNPJ ou CRMV valido em comum",
   };
   return mapa[motivo] || motivo;
 }
 
 export default function PessoasDuplicidadeBanner({
   sugestoes = [],
+  totalSugestoes = sugestoes.length,
   totalAutomaticas = 0,
   verificando = false,
-  onExecutarVarredura,
-  onRevisarSugestao,
+  onVerificar,
+  onFundirAutomaticas,
+  onAbrirCentral,
 }) {
   if (!verificando && !totalAutomaticas && sugestoes.length === 0) return null;
 
@@ -43,14 +47,14 @@ export default function PessoasDuplicidadeBanner({
               {verificando
                 ? "Verificando cadastros duplicados..."
                 : sugestoes.length
-                  ? `${sugestoes.length} possivel(is) duplicidade(s) para revisar`
-                  : `${totalAutomaticas} duplicidade(s) segura(s) fundida(s) automaticamente`}
+                  ? `${totalSugestoes} possivel(is) duplicidade(s) para revisar`
+                  : `${totalAutomaticas} duplicidade(s) segura(s) pronta(s) para fundir`}
             </div>
             {primeiraSugestao ? (
               <div className="mt-1 truncate text-amber-800">
                 {primeiraSugestao.principal?.nome || "Pessoa"} x{" "}
                 {primeiraSugestao.duplicado?.nome || "duplicado"}:{" "}
-                {(primeiraSugestao.motivos || []).map(motivoLabel).join(", ")}
+                {(primeiraSugestao.motivos || []).map(motivoDuplicidadeLabel).join(", ")}
               </div>
             ) : (
               <div className="mt-1 text-amber-800">
@@ -62,24 +66,32 @@ export default function PessoasDuplicidadeBanner({
 
         <div className="flex flex-wrap gap-2 lg:justify-end">
           {primeiraSugestao && (
+            <ActionButton icon={GitMerge} intent="warning" onClick={onAbrirCentral} size="md">
+              Revisar duplicidades
+            </ActionButton>
+          )}
+          {totalAutomaticas > 0 && (
             <ActionButton
+              disabled={verificando}
               icon={GitMerge}
               intent="warning"
-              onClick={() => onRevisarSugestao(primeiraSugestao)}
+              onClick={onFundirAutomaticas}
               size="md"
             >
-              Revisar
+              {totalAutomaticas > 25
+                ? `Fundir 25 de ${totalAutomaticas} seguras`
+                : `Fundir ${totalAutomaticas} segura(s)`}
             </ActionButton>
           )}
           <ActionButton
             disabled={verificando}
             icon={verificando ? Loader2 : RefreshCw}
             intent="neutral"
-            onClick={onExecutarVarredura}
+            onClick={onVerificar}
             size="md"
             tone="soft"
           >
-            Verificar agora
+            Analisar agora
           </ActionButton>
         </div>
       </div>

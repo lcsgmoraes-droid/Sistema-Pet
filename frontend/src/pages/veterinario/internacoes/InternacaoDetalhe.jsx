@@ -10,8 +10,7 @@ export default function InternacaoDetalhe({
   procedimentos,
   procedimentosCatalogo,
 }) {
-  const internacaoAtiva =
-    internacao.status === "ativa" || internacao.status === "internado";
+  const internacaoAtiva = internacao.status === "ativa" || internacao.status === "internado";
 
   return (
     <div className="border-t border-gray-100 bg-gray-50 px-5 py-4">

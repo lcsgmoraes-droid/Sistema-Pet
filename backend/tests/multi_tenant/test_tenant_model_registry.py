@@ -86,6 +86,11 @@ INTENTIONALLY_GLOBAL_TENANT_TABLES = frozenset(
         "notification_queue",
         # Resolve token publico antes de entrar nas tabelas protegidas por RLS.
         "rotas_entrega_rastreio_tokens",
+        # Bootstrap público da integração: request não tem tenant antes do aceite;
+        # connection resolve o token opaco e então estabelece o contexto do tenant.
+        # Espelhado na whitelist do ORM e na catraca PostgreSQL sem RLS.
+        "ecommerceai_connection_requests",
+        "ecommerceai_connections",
     }
 )
 

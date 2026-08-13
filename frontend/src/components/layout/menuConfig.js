@@ -261,19 +261,19 @@ export function createLayoutMenuItems({ lembretesCount = 0 } = {}) {
       permission: "vendas.visualizar",
       submenu: [
         {
-          path: "/ecommerce",
+          path: "/ecommerce/preview",
           label: "🏪 Prévia da Loja",
-          permission: "vendas.visualizar",
+          permission: "configuracoes.editar",
         },
         {
           path: "/ecommerce/aparencia",
           label: "🖼️ Aparência da Loja",
-          permission: "vendas.visualizar",
+          permission: "configuracoes.editar",
         },
         {
           path: "/ecommerce/configuracoes",
           label: "⚙️ Configurações",
-          permission: "vendas.visualizar",
+          permission: "configuracoes.editar",
         },
         {
           path: "/ecommerce/analytics",

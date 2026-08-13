@@ -40,9 +40,14 @@ def test_smoke_ci_blocks_frontend_core_lint_and_format():
 
 def test_smoke_ci_blocks_frontend_dependency_audit():
     source = SMOKE_CI_WORKFLOW.read_text(encoding="utf-8")
+    package = json.loads(FRONTEND_PACKAGE_JSON.read_text(encoding="utf-8"))
 
     assert "Frontend dependency audit (blocking)" in source
-    assert "npm audit --audit-level=moderate" in source
+    assert "npm run audit:dependencies" in source
+    assert (
+        package["scripts"]["audit:dependencies"]
+        == "node scripts/audit-dependencies.mjs"
+    )
 
 
 def test_frontend_package_exposes_core_lint_and_format_scripts():

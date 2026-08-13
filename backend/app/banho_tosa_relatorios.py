@@ -3,12 +3,14 @@
 from collections import defaultdict
 from datetime import date, datetime
 from decimal import Decimal
+from types import SimpleNamespace
 
 from sqlalchemy.orm import Session, joinedload
 
 from app.banho_tosa_api.utils import obter_ou_criar_configuracao
 from app.banho_tosa_avaliacoes_metrics import calcular_nps_periodo
 from app.banho_tosa_custos_helpers import dec, minutos_etapa
+from app.banho_tosa_custos_reais import montar_snapshot_atendimento
 from app.banho_tosa_relatorios_helpers import (
     grupo_margem,
     grupo_ocupacao,
@@ -43,6 +45,7 @@ def gerar_relatorio_operacional(
     atendimentos = _listar_atendimentos(db, tenant_id, inicio, fim)
     agendamentos = _listar_agendamentos(db, tenant_id, inicio, fim)
     snapshots = _snapshots_por_atendimento(db, tenant_id, atendimentos)
+    snapshots = _completar_snapshots_ausentes(db, tenant_id, atendimentos, snapshots)
     recursos = _listar_recursos(db, tenant_id)
 
     margem_servico = _agregar_margem_por_servico(atendimentos, snapshots)
@@ -120,6 +123,20 @@ def _snapshots_por_atendimento(db: Session, tenant_id, atendimentos):
         .all()
     )
     return {item.atendimento_id: item for item in snapshots}
+
+
+def _completar_snapshots_ausentes(db, tenant_id, atendimentos, snapshots):
+    """Calcula uma prévia em memória para históricos ainda sem snapshot persistido."""
+    completos = dict(snapshots)
+    for atendimento in atendimentos:
+        if atendimento.id in completos:
+            continue
+        calculado = montar_snapshot_atendimento(db, tenant_id, atendimento.id)
+        if not calculado:
+            continue
+        _, snapshot, _ = calculado
+        completos[atendimento.id] = SimpleNamespace(**snapshot.as_dict())
+    return completos
 
 
 def _agregar_margem_por_servico(atendimentos, snapshots) -> list[dict]:

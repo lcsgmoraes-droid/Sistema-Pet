@@ -6,7 +6,6 @@ from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
 from app.models import Cliente
-from app.utils.tenant_safe_sql import execute_tenant_safe
 from app.vendas_models import Venda
 
 
@@ -40,16 +39,13 @@ def _obter_cliente_ou_404(db: Session, cliente_id: int, tenant_id: str):
 
 
 def _remover_provisoes_comissao_venda(db: Session, venda_id: int, tenant_id) -> None:
-    execute_tenant_safe(
+    from app.comissoes_financeiro_service import cancelar_provisoes_comissao_venda
+
+    cancelar_provisoes_comissao_venda(
         db,
-        """
-        DELETE FROM contas_pagar
-        WHERE {tenant_filter}
-          AND descricao LIKE :descricao
-          AND status = 'pendente'
-    """,
-        {"descricao": f"%Comissão - Venda #{venda_id}%"},
+        venda_id=venda_id,
         tenant_id=tenant_id,
+        motivo="Venda reaberta",
     )
 
 

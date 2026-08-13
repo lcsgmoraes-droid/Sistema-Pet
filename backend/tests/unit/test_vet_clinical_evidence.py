@@ -194,6 +194,49 @@ def test_retrieval_does_not_use_species_match_as_clinical_relevance(db_session):
     assert result == []
 
 
+def test_retrieval_rejects_mdck_influenza_study_for_canine_kidney_case(db_session):
+    source = _source(db_session)
+    relevant = DocumentoConhecimentoVet(
+        fonte_id=source.id,
+        fonte_documento_id="ckd-dogs",
+        titulo="Chronic kidney disease monitoring in dogs",
+        resumo="Clinical renal monitoring of dogs with chronic kidney disease.",
+        autores=[],
+        url="https://pubmed.ncbi.nlm.nih.gov/10/",
+        temas=["Dogs", "Renal Insufficiency, Chronic", "Kidney disease"],
+        status_revisao="auto_disponivel",
+        hash_conteudo="e" * 64,
+        ativo=True,
+    )
+    irrelevant = DocumentoConhecimentoVet(
+        fonte_id=source.id,
+        fonte_documento_id="mdck-influenza",
+        titulo="Development of an H5N1 influenza vaccine using MDCK cells",
+        resumo=(
+            "A scalable influenza vaccine manufacturing platform using "
+            "Madin Darby canine kidney cells."
+        ),
+        autores=[],
+        url="https://pubmed.ncbi.nlm.nih.gov/11/",
+        temas=["Dogs", "Madin Darby Canine Kidney Cells", "Influenza Vaccines"],
+        status_revisao="auto_disponivel",
+        hash_conteudo="f" * 64,
+        ativo=True,
+    )
+    db_session.add_all([relevant, irrelevant])
+    db_session.flush()
+
+    result = service.buscar_evidencias_clinicas_disponiveis(
+        db_session,
+        pergunta=(
+            "Cao com doenca renal cronica e vomitos. Quais informacoes devo "
+            "avaliar antes de sugerir medicamento?"
+        ),
+    )
+
+    assert [item["fonte_documento_id"] for item in result] == ["ckd-dogs"]
+
+
 def test_content_change_recalculates_automatic_eligibility(db_session, monkeypatch):
     source = _source(db_session)
     original = service.parse_pubmed_xml(PUBMED_XML)[0]

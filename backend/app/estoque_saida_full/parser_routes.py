@@ -7,7 +7,7 @@ import xml.etree.ElementTree as ET
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 
 from ..auth.dependencies import get_current_user_and_tenant
-from .parsers import _extrair_itens_full_pdf, _parse_saida_full_xml
+from .parsers import _parse_saida_full_pdf, _parse_saida_full_xml
 
 
 logger = logging.getLogger(__name__)
@@ -57,8 +57,8 @@ async def parse_saida_full_pdf(
                 status_code=400, detail="Nao foi possivel ler texto do PDF"
             )
 
-        itens = _extrair_itens_full_pdf(texto)
-        if not itens:
+        dados = _parse_saida_full_pdf(texto)
+        if not dados["itens"]:
             raise HTTPException(
                 status_code=400,
                 detail="Nenhum item SKU+quantidade foi identificado no PDF",
@@ -66,9 +66,8 @@ async def parse_saida_full_pdf(
 
         return {
             "success": True,
-            "message": "Itens extraidos do PDF com sucesso",
-            "total_itens": len(itens),
-            "itens": itens,
+            "message": "Documento PDF lido com sucesso",
+            **dados,
         }
     except HTTPException:
         raise

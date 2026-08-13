@@ -242,7 +242,15 @@ export async function obterCarrinho(): Promise<{
   const { data } = await api.get('/carrinho', {
     headers: { 'X-Canal-Venda': 'app' },
   });
-  return data;
+  return {
+    ...data,
+    itens: Array.isArray(data?.itens)
+      ? data.itens.map((item: any) => ({
+          ...item,
+          foto_url: resolveMediaUrl(item.foto_url ?? item.imagem_principal),
+        }))
+      : [],
+  };
 }
 
 export async function adicionarAoCarrinho(produto_id: number, quantidade = 1): Promise<void> {

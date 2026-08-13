@@ -6,7 +6,7 @@ const FOOTER_LINKS = [
 ];
 
 function getTenantName(tenantContext) {
-  return tenantContext?.nome_fantasia || tenantContext?.nome || "Pet Store";
+  return tenantContext?.name || tenantContext?.nome_fantasia || tenantContext?.nome || "Pet Store";
 }
 
 export default function EcommerceFooter({ tenantContext, styles: S, onNavigate }) {
@@ -28,8 +28,8 @@ export default function EcommerceFooter({ tenantContext, styles: S, onNavigate }
             🐾 {tenantName}
           </div>
           <div style={{ fontSize: 13, color: "rgba(255,255,255,0.65)", lineHeight: 1.6 }}>
-            Produtos de qualidade para o seu pet com carinho e dedicação. Compre online com
-            facilidade!
+            {tenantContext?.ecommerce_descricao ||
+              "Produtos de qualidade para o seu pet. Compre online com facilidade!"}
           </div>
         </div>
         <div>
@@ -77,9 +77,11 @@ export default function EcommerceFooter({ tenantContext, styles: S, onNavigate }
           >
             Contato
           </div>
-          {tenantContext?.whatsapp && (
+          {(tenantContext?.whatsapp || tenantContext?.telefone) && (
             <a
-              href={`https://wa.me/55${tenantContext.whatsapp.replace(/\D/g, "")}`}
+              href={`https://wa.me/55${String(
+                tenantContext.whatsapp || tenantContext.telefone,
+              ).replace(/\D/g, "")}`}
               target="_blank"
               rel="noreferrer"
               style={{
@@ -110,6 +112,13 @@ export default function EcommerceFooter({ tenantContext, styles: S, onNavigate }
             <div style={{ color: "rgba(255,255,255,0.5)", fontSize: 12, marginTop: 8 }}>
               📍 {tenantContext.cidade}
               {tenantContext.uf ? `, ${tenantContext.uf}` : ""}
+            </div>
+          )}
+          {(tenantContext?.ecommerce_horario_abertura ||
+            tenantContext?.ecommerce_horario_fechamento) && (
+            <div style={{ color: "rgba(255,255,255,0.5)", fontSize: 12, marginTop: 8 }}>
+              🕒 {tenantContext.ecommerce_horario_abertura || "--:--"} às{" "}
+              {tenantContext.ecommerce_horario_fechamento || "--:--"}
             </div>
           )}
         </div>
