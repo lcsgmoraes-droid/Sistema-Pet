@@ -1,10 +1,16 @@
-from pathlib import Path
+from io import BytesIO
 import os
+from pathlib import Path
+from types import SimpleNamespace
+
+import pytest
+from fastapi import UploadFile
 
 os.environ["DATABASE_URL"] = os.environ.get("DATABASE_URL") or "sqlite:///./test.db"
 os.environ["DEBUG"] = "false"
 
 from app import estoque_saida_full_routes
+from app.estoque_saida_full import parser_routes
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -233,6 +239,132 @@ def test_parser_pdf_saida_full_reconhece_campos_de_remessa_amazon():
         {"sku": "013267.1FBA", "quantidade": 20.0},
         {"sku": "013268.1FBA", "quantidade": 5.0},
     ]
+
+
+def test_parser_pdf_saida_full_le_tabelas_do_danfe_amazon_em_duas_paginas():
+    cabecalho = [
+        "C�DIGO",
+        "DESCRI��O DOS PRODUTOS / SERVI�OS",
+        "NCM/SH",
+        "CSOSN",
+        "CFOP",
+        "UNID",
+        "QUANT.",
+        "VALOR UNIT�RIO",
+    ]
+
+    def linha_item(sku, quantidade):
+        return [
+            sku,
+            "Produto Amazon\nFNSKU:X000TESTE;",
+            "23099010",
+            "0400",
+            "5949",
+            "UN",
+            str(quantidade),
+            "10,00",
+        ]
+
+    itens_pagina_1 = [
+        ("013195.1FBA", 3),
+        ("013210.1FBA", 20),
+        ("013221.1FBA", 20),
+        ("013248.1FBA", 30),
+        ("013250.1FBA", 20),
+        ("013252.1FBAA", 50),
+    ]
+    itens_pagina_2 = [
+        ("013260.1FBA", 20),
+        ("013267.1FBA", 20),
+        ("013270.1FBA", 10),
+        ("013288.1FBA", 20),
+        ("013808.1FBA", 20),
+        ("015006.1FBA", 6),
+        ("018631.1FBA", 150),
+        ("020301.1FBA", 20),
+        ("023983.1FBA", 50),
+        ("024044.1FBA", 30),
+        ("026947.1FBA", 20),
+        ("030035.1FBA", 20),
+    ]
+    tabelas_paginas = [
+        [[cabecalho, *[linha_item(*item) for item in itens_pagina_1]]],
+        [[cabecalho, *[linha_item(*item) for item in itens_pagina_2]]],
+    ]
+
+    dados = estoque_saida_full_routes._parse_saida_full_pdf(
+        """
+        NF-e N 000.020.268
+        DANFE Documento Auxiliar da Nota Fiscal Eletronica
+        AMAZON SERVICOS DE VAREJO DO BRASIL LTDA
+        DADOS DOS PRODUTOS / SERVI�OS
+        DADOS ADICIONAIS
+        DADOS DOS PRODUTOS / SERVI�OS
+        """,
+        tabelas_paginas=tabelas_paginas,
+    )
+
+    assert dados["numero_documento"] == "20268"
+    assert dados["tipo_documento"] == "danfe"
+    assert dados["plataforma_sugerida"] == "amazon"
+    assert dados["total_itens"] == 18
+    assert dados["total_unidades"] == 529.0
+    assert dados["itens"] == [
+        {"sku": sku, "quantidade": float(quantidade)}
+        for sku, quantidade in itens_pagina_1 + itens_pagina_2
+    ]
+
+
+@pytest.mark.asyncio
+async def test_rota_pdf_saida_full_repassa_tabelas_de_todas_as_paginas(
+    monkeypatch,
+):
+    class PaginaFake:
+        def __init__(self, numero):
+            self.numero = numero
+
+        def extract_text(self):
+            return f"DANFE pagina {self.numero}"
+
+        def extract_tables(self):
+            return [[f"tabela-pagina-{self.numero}"]]
+
+    class PdfFake:
+        pages = [PaginaFake(1), PaginaFake(2)]
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return None
+
+    capturado = {}
+
+    def parse_fake(texto, tabelas_paginas=None):
+        capturado["texto"] = texto
+        capturado["tabelas_paginas"] = tabelas_paginas
+        return {"itens": [{"sku": "SKU-1", "quantidade": 1.0}]}
+
+    monkeypatch.setattr(
+        parser_routes,
+        "pdfplumber",
+        SimpleNamespace(open=lambda _arquivo: PdfFake()),
+    )
+    monkeypatch.setattr(parser_routes, "_parse_saida_full_pdf", parse_fake)
+
+    resultado = await parser_routes.parse_saida_full_pdf(
+        UploadFile(filename="danfe.pdf", file=BytesIO(b"%PDF-fake")),
+        _user_and_tenant=None,
+    )
+
+    assert resultado["success"] is True
+    assert capturado == {
+        "texto": "DANFE pagina 1\nDANFE pagina 2",
+        "tabelas_paginas": [
+            [["tabela-pagina-1"]],
+            [["tabela-pagina-2"]],
+        ],
+    }
 
 
 def test_saida_full_routes_vira_fachada_com_modulos_dedicados():
