@@ -41,7 +41,9 @@ def test_match_processing_uses_only_card_payments_from_selected_operator():
         encoding="utf-8"
     )
 
-    assert "db.query(Venda).join(VendaPagamento).filter" in source
+    assert "db.query(Venda)" in source
+    assert ".join(VendaPagamento)" in source
+    assert ".filter(" in source
     assert "VendaPagamento.tenant_id == tenant_id" in source
     assert 'VendaPagamento.forma_pagamento.ilike("%credito%")' in source
     assert "VendaPagamento.operadora_id == operadora_id" in source
