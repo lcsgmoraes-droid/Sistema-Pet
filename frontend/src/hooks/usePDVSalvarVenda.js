@@ -1,5 +1,6 @@
 import api from "../api";
 import { criarVenda } from "../api/vendas";
+import { toast } from "react-hot-toast";
 import { montarPayloadVenda } from "../utils/pdvVendaPayload";
 import { debugLog } from "../utils/debug";
 
@@ -38,12 +39,12 @@ export function usePDVSalvarVenda({
 }) {
   const salvarVenda = async () => {
     if (vendaAtual.itens.length === 0) {
-      alert("Adicione pelo menos um produto ou serviço");
+      toast.error("Adicione pelo menos um produto ou serviço.");
       return;
     }
 
     if (!temCaixaAberto) {
-      alert("❌ Não é possível salvar venda sem caixa aberto. Abra um caixa primeiro.");
+      toast.error("Não é possível salvar uma venda sem caixa aberto. Abra um caixa primeiro.");
       return;
     }
 
@@ -75,7 +76,7 @@ export function usePDVSalvarVenda({
           debugLog(`✅ Status atualizado: ${vendaAtual.status} → ${novoStatus}`);
         }
 
-        alert("Venda atualizada com sucesso!");
+        toast.success("Venda atualizada com sucesso.");
         limparVenda();
       } else {
         debugLog("🚀 CRIANDO VENDA - payload consolidado");
@@ -100,7 +101,7 @@ export function usePDVSalvarVenda({
 
         await criarVenda(payloadVenda);
 
-        alert("Venda salva com sucesso!");
+        toast.success("Venda salva! Ela já aparece em Vendas Recentes.");
         limparVenda();
       }
 
@@ -113,7 +114,7 @@ export function usePDVSalvarVenda({
       const errorDetail =
         error.response?.data?.detail || error.response?.data?.message || "Erro ao salvar venda";
       console.error("❌ Detalhes do erro:", errorDetail);
-      alert(`Erro ao salvar venda: ${errorDetail}`);
+      toast.error(`Erro ao salvar venda: ${errorDetail}`);
     } finally {
       setLoading(false);
     }

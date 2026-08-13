@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from app.auth.dependencies import get_current_user_and_tenant
 from app.db import get_session
 from app.empresa_config_fiscal_models import EmpresaConfigFiscal
+from app.empresa_config_geral_models import EmpresaConfigGeral
 from app.financeiro_models import FormaPagamento
 from app.formas_pagamento_models import ConfiguracaoImposto, FormaPagamentoTaxa
 from app.produtos_models import Produto
@@ -23,6 +24,19 @@ from .schemas import (
 )
 
 router = APIRouter()
+
+
+def _classificar_margem_liquida(
+    margem_liquida: float,
+    *,
+    margem_saudavel: float = 30.0,
+    margem_alerta: float = 15.0,
+) -> str:
+    if margem_liquida >= margem_saudavel:
+        return "verde"
+    if margem_liquida >= margem_alerta:
+        return "amarelo"
+    return "vermelho"
 
 
 @router.post("/analisar-venda", response_model=AnaliseVendaResponse)
@@ -147,16 +161,12 @@ def analisar_venda(
                     except Exception as e:
                         logger.info(f"   ❌ Erro ao processar JSON: {e}")
 
-                # SEGUNDO: Se não encontrou, usar campos taxa_percentual e taxa_fixa
-                if taxa_percentual == 0 and forma_pag.taxa_percentual:
-                    taxa_percentual = float(forma_pag.taxa_percentual)
-                    logger.info(f"   ✅ Taxa percentual: {taxa_percentual}%")
-
                 if forma_pag.taxa_fixa:
                     taxa_fixa = float(forma_pag.taxa_fixa)
                     logger.info(f"   ✅ Taxa fixa: R$ {taxa_fixa:.2f}")
 
-                # TERCEIRO: Buscar na tabela formas_pagamento_taxas
+                # SEGUNDO: a taxa configurada para a parcela e mais especifica
+                # do que a taxa geral da forma de pagamento.
                 if taxa_percentual == 0:
                     taxa_obj = (
                         db.query(FormaPagamentoTaxa)
@@ -172,6 +182,12 @@ def analisar_venda(
                     if taxa_obj:
                         taxa_percentual = float(taxa_obj.taxa_percentual)
                         logger.info(f"   ✅ Taxa da tabela: {taxa_percentual}%")
+
+                # TERCEIRO: usar a taxa geral apenas quando nao houver uma taxa
+                # especifica no JSON nem na tabela de parcelas.
+                if taxa_percentual == 0 and forma_pag.taxa_percentual:
+                    taxa_percentual = float(forma_pag.taxa_percentual)
+                    logger.info(f"   ✅ Taxa percentual: {taxa_percentual}%")
 
                 # Calcular valores das taxas
                 valor_taxa_percentual = forma_pag_item.valor * (taxa_percentual / 100)
@@ -356,13 +372,22 @@ def analisar_venda(
         lucro_liquido = subtotal - total_deducoes
         margem_liquida = (lucro_liquido / subtotal * 100) if subtotal > 0 else 0
 
-        # Definir cor do indicador
-        if margem_liquida >= 20:
-            cor_indicador = "verde"
-        elif margem_liquida >= 10:
-            cor_indicador = "amarelo"
-        else:
-            cor_indicador = "vermelho"
+        config_margem = (
+            db.query(EmpresaConfigGeral)
+            .filter(EmpresaConfigGeral.tenant_id == tenant_id)
+            .first()
+        )
+        margem_saudavel = float(
+            config_margem.margem_saudavel_minima if config_margem else 30.0
+        )
+        margem_alerta = float(
+            config_margem.margem_alerta_minima if config_margem else 15.0
+        )
+        cor_indicador = _classificar_margem_liquida(
+            margem_liquida,
+            margem_saudavel=margem_saudavel,
+            margem_alerta=margem_alerta,
+        )
 
         deducoes = {
             "comissao": {
@@ -390,7 +415,7 @@ def analisar_venda(
         alertas = []
 
         # Alerta de margem
-        if margem_liquida < 10:
+        if cor_indicador == "vermelho":
             alertas.append(
                 AlertaAnalise(
                     tipo="error",
@@ -398,7 +423,7 @@ def analisar_venda(
                     mensagem="Margem baixa - evite mais descontos",
                 )
             )
-        elif margem_liquida >= 20:
+        elif cor_indicador == "verde":
             margem_disponivel = lucro_liquido * 0.3  # Pode usar até 30% da margem
             alertas.append(
                 AlertaAnalise(
@@ -407,7 +432,7 @@ def analisar_venda(
                     mensagem=f"Margem excelente - permite desconto de até R$ {margem_disponivel:.2f}",
                 )
             )
-        elif margem_liquida >= 15:
+        elif cor_indicador == "amarelo":
             alertas.append(
                 AlertaAnalise(
                     tipo="info",

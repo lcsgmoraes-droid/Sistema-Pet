@@ -191,6 +191,26 @@ export default function AlertasEstoque() {
     return cores[criticidade] || cores["MEDIO"];
   };
 
+  const obterCriticidade = (alerta) =>
+    alerta?.criticidade || (alerta?.critico ? "CRITICO" : "MEDIO");
+
+  const obterStatusAlerta = (alerta) => {
+    const status = String(alerta?.status || "pendente").toLowerCase();
+    const labels = {
+      pendente: "Pendente",
+      resolvido: "Resolvido",
+      ignorado: "Ignorado",
+    };
+    return labels[status] || status;
+  };
+
+  const getStatusBadge = (alerta) => {
+    const status = String(alerta?.status || "pendente").toLowerCase();
+    if (status === "resolvido") return "bg-green-100 text-green-800";
+    if (status === "ignorado") return "bg-gray-200 text-gray-800";
+    return "bg-yellow-100 text-yellow-800";
+  };
+
   const formatarData = (dataStr) => {
     const data = new Date(dataStr);
     return data.toLocaleString("pt-BR", {
@@ -449,10 +469,10 @@ export default function AlertasEstoque() {
                           </h3>
                           <span
                             className={`px-3 py-1 rounded-full text-xs font-medium border ${getCriticidadeBadge(
-                              alerta.criticidade,
+                              obterCriticidade(alerta),
                             )}`}
                           >
-                            {alerta.criticidade}
+                            {obterCriticidade(alerta)}
                           </span>
                         </div>
 
@@ -674,10 +694,10 @@ export default function AlertasEstoque() {
                           <td className="px-6 py-4 whitespace-nowrap text-center">
                             <span
                               className={`px-2 py-1 rounded-full text-xs font-medium ${getCriticidadeBadge(
-                                alerta.criticidade,
+                                obterCriticidade(alerta),
                               )}`}
                             >
-                              {alerta.criticidade}
+                              {obterCriticidade(alerta)}
                             </span>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-gray-900">
@@ -688,13 +708,9 @@ export default function AlertasEstoque() {
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-center">
                             <span
-                              className={`px-2 py-1 rounded-full text-xs font-medium ${
-                                alerta.resolvido
-                                  ? "bg-green-100 text-green-800"
-                                  : "bg-yellow-100 text-yellow-800"
-                              }`}
+                              className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusBadge(alerta)}`}
                             >
-                              {alerta.resolvido ? "Resolvido" : "Pendente"}
+                              {obterStatusAlerta(alerta)}
                             </span>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-center text-sm text-blue-600 font-medium">

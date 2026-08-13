@@ -1,5 +1,7 @@
 ﻿import { useEffect, useState } from "react";
+import { toast } from "react-hot-toast";
 import { api } from "../../services/api";
+import { confirmarCorePet } from "../../services/corepetDialog";
 import CustomerIdentity from "../../components/ui/CustomerIdentity";
 import SaleReference from "../../components/ui/SaleReference";
 import "./Entregas.css";
@@ -27,7 +29,7 @@ export default function EntregasAbertas() {
       setConfigEntrega(configRes.data);
     } catch (err) {
       console.error(err);
-      alert("Erro ao carregar vendas pendentes");
+      toast.error("Erro ao carregar vendas pendentes");
       setVendas([]);
     } finally {
       setLoading(false);
@@ -36,24 +38,26 @@ export default function EntregasAbertas() {
 
   async function handleOtimizarRotas() {
     if (vendas.length === 0) {
-      alert("Não há vendas para otimizar");
+      toast("Não há vendas para otimizar");
       return;
     }
 
     if (!configEntrega || !configEntrega.logradouro) {
-      alert("⚠️ Configure o endereço da loja em Configurações > Entregas antes de otimizar rotas");
+      toast.error(
+        "Configure o endereço da loja em Configurações > Entregas antes de otimizar rotas",
+      );
       return;
     }
 
     const custoEstimado = "5 centavos";
-    const confirmar = confirm(
-      `⚠️ ATENÇÃO - ESTA OPERAÇÃO TEM CUSTO!\n\n` +
-        `💵 Custo estimado: ${custoEstimado}\n` +
-        `📍 Entregas a otimizar: ${vendas.length}\n` +
-        `🗺️ Será feita 1 chamada ao Google Maps API\n` +
-        `💾 A ordem será salva no banco (não cobra novamente)\n\n` +
-        `Deseja continuar?`,
-    );
+    const confirmar = await confirmarCorePet({
+      titulo: "Otimizar todas as entregas?",
+      mensagem:
+        `Esta operacao utiliza o Google Maps e tem custo estimado de ${custoEstimado}.\n\n` +
+        `${vendas.length} entrega(s) serao organizadas e a ordem ficara salva para nao gerar nova cobranca.`,
+      confirmarTexto: "Otimizar entregas",
+      variante: "warning",
+    });
 
     if (!confirmar) {
       return;
@@ -65,10 +69,8 @@ export default function EntregasAbertas() {
       const response = await api.post("/rotas-entrega/vendas-pendentes/otimizar");
       console.log("✅ Resposta da otimização:", response.data);
 
-      alert(
-        `✅ ROTAS OTIMIZADAS COM SUCESSO!\n\n` +
-          `${response.data.message}\n\n` +
-          `Total otimizado: ${response.data.total_otimizado || vendas.length} entregas`,
+      toast.success(
+        `${response.data.message} Total otimizado: ${response.data.total_otimizado || vendas.length} entrega(s).`,
       );
 
       await carregarDados();
@@ -78,7 +80,7 @@ export default function EntregasAbertas() {
       const errorMsg =
         err.response?.data?.detail ||
         "Erro ao otimizar rotas. Verifique se o Google Maps está configurado.";
-      alert(`❌ ERRO AO OTIMIZAR ROTAS\n\n${errorMsg}`);
+      toast.error(errorMsg);
     } finally {
       setOtimizando(false);
     }
@@ -86,21 +88,23 @@ export default function EntregasAbertas() {
 
   async function handleOtimizarSelecionadas() {
     if (selecionadas.length === 0) {
-      alert("Selecione pelo menos uma entrega para otimizar");
+      toast("Selecione pelo menos uma entrega para otimizar");
       return;
     }
 
     if (!configEntrega || !configEntrega.logradouro) {
-      alert("⚠️ Configure o endereço da loja em Configurações > Entregas antes de otimizar rotas");
+      toast.error(
+        "Configure o endereço da loja em Configurações > Entregas antes de otimizar rotas",
+      );
       return;
     }
 
-    const confirmar = confirm(
-      `⚠️ Otimizar apenas as ${selecionadas.length} entrega(s) selecionadas?\n\n` +
-        `💵 Custo estimado: 5 centavos\n` +
-        `🗺️ Será feita 1 chamada ao Google Maps API\n\n` +
-        `Deseja continuar?`,
-    );
+    const confirmar = await confirmarCorePet({
+      titulo: "Otimizar entregas selecionadas?",
+      mensagem: `${selecionadas.length} entrega(s) serao organizadas pelo Google Maps. Custo estimado: 5 centavos.`,
+      confirmarTexto: "Otimizar selecionadas",
+      variante: "warning",
+    });
 
     if (!confirmar) return;
 
@@ -109,11 +113,11 @@ export default function EntregasAbertas() {
       const response = await api.post("/rotas-entrega/vendas-pendentes/otimizar-selecionadas", {
         venda_ids: selecionadas,
       });
-      alert(`✅ ${response.data.message}`);
+      toast.success(response.data.message);
       await carregarDados();
     } catch (err) {
       console.error("❌ Erro ao otimizar selecionadas:", err);
-      alert(`❌ ${err.response?.data?.detail || "Erro ao otimizar entregas selecionadas"}`);
+      toast.error(err.response?.data?.detail || "Erro ao otimizar entregas selecionadas");
     } finally {
       setOtimizando(false);
     }
@@ -127,11 +131,18 @@ export default function EntregasAbertas() {
 
   async function handleCriarRota() {
     if (selecionadas.length === 0) {
-      alert("Selecione pelo menos uma entrega");
+      toast("Selecione pelo menos uma entrega");
       return;
     }
 
-    if (!confirm(`Deseja criar uma rota com ${selecionadas.length} entrega(s)?`)) {
+    if (
+      !(await confirmarCorePet({
+        titulo: "Criar rota de entrega?",
+        mensagem: `${selecionadas.length} entrega(s) selecionada(s) serao reunidas em uma nova rota.`,
+        confirmarTexto: "Criar rota",
+        variante: "success",
+      }))
+    ) {
       return;
     }
 
@@ -142,8 +153,8 @@ export default function EntregasAbertas() {
 
       const semEntregador = vendasSelecionadas.filter((v) => !v.entregador_id);
       if (semEntregador.length > 0) {
-        alert(
-          `❌ As seguintes vendas não têm entregador atribuído:\n${semEntregador.map((v) => v.numero_venda).join(", ")}\n\nAtribua um entregador antes de criar a rota.`,
+        toast.error(
+          `Vendas sem entregador: ${semEntregador.map((v) => v.numero_venda).join(", ")}. Atribua um entregador antes de criar a rota.`,
         );
         setLoading(false);
         return;
@@ -155,14 +166,14 @@ export default function EntregasAbertas() {
         moto_da_loja: false,
       });
 
-      alert(
-        `✅ Rota criada com ${selecionadas.length} entrega(s)!\n\nAs entregas foram movidas para "Rotas de Entrega"`,
+      toast.success(
+        `Rota criada com ${selecionadas.length} entrega(s). Ela ja aparece em Rotas de Entrega.`,
       );
       setSelecionadas([]);
       carregarDados();
     } catch (err) {
       console.error(err);
-      alert(
+      toast.error(
         err.response?.data?.detail ||
           "Erro ao criar rota. Verifique se todas as entregas têm entregador atribuído.",
       );

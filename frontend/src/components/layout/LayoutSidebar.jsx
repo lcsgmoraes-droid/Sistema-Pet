@@ -1,4 +1,5 @@
 import { FiCreditCard, FiHelpCircle, FiLogOut, FiMenu, FiX } from "react-icons/fi";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 
 import SidebarMenu from "./SidebarMenu";
@@ -8,6 +9,8 @@ const COREPET_LOGO = "/brand/corepet/corepet-horizontal.png";
 export default function LayoutSidebar({
   isMobile,
   sidebarOpen,
+  sidebarWidth,
+  setSidebarWidth,
   setSidebarOpen,
   setSidebarVisible,
   devControlesAtivos,
@@ -26,6 +29,49 @@ export default function LayoutSidebar({
   onToggleModuloDev,
   logout,
 }) {
+  const resizeRef = useRef(null);
+  const [redimensionando, setRedimensionando] = useState(false);
+
+  useEffect(
+    () => () => {
+      document.body.style.userSelect = "";
+      document.body.style.cursor = "";
+    },
+    [],
+  );
+
+  const iniciarRedimensionamento = (event) => {
+    if (isMobile || !sidebarOpen) return;
+
+    event.preventDefault();
+    resizeRef.current = { xInicial: event.clientX, larguraInicial: sidebarWidth };
+    setRedimensionando(true);
+    document.body.style.userSelect = "none";
+    document.body.style.cursor = "col-resize";
+
+    const mover = (moveEvent) => {
+      const estado = resizeRef.current;
+      if (!estado) return;
+      const proximaLargura = Math.min(
+        440,
+        Math.max(232, estado.larguraInicial + moveEvent.clientX - estado.xInicial),
+      );
+      setSidebarWidth(Math.round(proximaLargura));
+    };
+
+    const finalizar = () => {
+      resizeRef.current = null;
+      setRedimensionando(false);
+      document.body.style.userSelect = "";
+      document.body.style.cursor = "";
+      window.removeEventListener("pointermove", mover);
+      window.removeEventListener("pointerup", finalizar);
+    };
+
+    window.addEventListener("pointermove", mover);
+    window.addEventListener("pointerup", finalizar);
+  };
+
   return (
     <aside
       className={`${
@@ -33,8 +79,16 @@ export default function LayoutSidebar({
           ? `erp-mobile-sidebar fixed inset-y-0 left-0 z-50 w-64 max-w-[calc(100vw-24px)] transform overflow-hidden transition-transform duration-300 ${
               sidebarOpen ? "translate-x-0" : "-translate-x-full"
             }`
-          : `${sidebarOpen ? "w-64" : "w-20"} transition-all duration-300`
-      } erp-sidebar bg-gradient-to-b from-[#f4fbfa] to-[#fff8ea] border-r border-[#d8eee9] flex flex-col shadow-lg dark:border-slate-800 dark:from-slate-950 dark:to-slate-900`}
+          : `${redimensionando ? "" : "transition-[width] duration-200"}`
+      } erp-sidebar relative shrink-0 bg-gradient-to-b from-[#f4fbfa] to-[#fff8ea] border-r border-[#d8eee9] flex flex-col shadow-lg dark:border-slate-800 dark:from-slate-950 dark:to-slate-900`}
+      style={
+        isMobile
+          ? undefined
+          : {
+              width: sidebarOpen ? `${sidebarWidth}px` : "5rem",
+              minWidth: sidebarOpen ? `${sidebarWidth}px` : "5rem",
+            }
+      }
     >
       <div
         className={`p-4 flex items-center border-b border-[#d8eee9] bg-white/70 dark:border-slate-800 dark:bg-slate-950/80 ${!isMobile && !sidebarOpen ? "justify-center" : "justify-between"}`}
@@ -158,6 +212,18 @@ export default function LayoutSidebar({
           {sidebarOpen && <span className="font-medium text-sm">Sair</span>}
         </button>
       </div>
+
+      {!isMobile && sidebarOpen && (
+        <button
+          type="button"
+          onPointerDown={iniciarRedimensionamento}
+          className={`absolute inset-y-0 right-0 z-20 w-1.5 cursor-col-resize touch-none transition-colors hover:bg-[#0f8b8d]/30 focus:bg-[#0f8b8d]/30 focus:outline-none ${
+            redimensionando ? "bg-[#0f8b8d]/40" : "bg-transparent"
+          }`}
+          title="Arraste para ajustar a largura do menu"
+          aria-label="Ajustar largura do menu lateral"
+        />
+      )}
     </aside>
   );
 }

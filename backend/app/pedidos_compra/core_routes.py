@@ -3,6 +3,7 @@
 import logging
 from datetime import datetime, timedelta
 from typing import Optional
+from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import desc, or_
@@ -23,6 +24,16 @@ from .sugestao_queries import _resolver_fornecedores_compra
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
+
+
+def _numero_pedido_temporario() -> str:
+    """Reserva um numero unico ate o banco gerar o ID global do pedido."""
+    return f"TMP-{uuid4().hex}"
+
+
+def _numero_pedido_definitivo(pedido_id: int, ano: Optional[int] = None) -> str:
+    """Monta o numero comercial a partir do ID global, sem colisao entre tenants."""
+    return f"PC{ano or datetime.now().year}{pedido_id:05d}"
 
 
 # ============================================================================
@@ -290,10 +301,6 @@ def criar_pedido(
             )
 
     # Gerar número do pedido
-    ultimo_pedido = db.query(PedidoCompra).order_by(desc(PedidoCompra.id)).first()
-    numero = 1 if not ultimo_pedido else ultimo_pedido.id + 1
-    numero_pedido = f"PC{datetime.now().year}{numero:05d}"
-
     # Calcular totais
     valor_total = sum(
         (item.preco_unitario - item.desconto_item)
@@ -308,7 +315,7 @@ def criar_pedido(
 
     # Criar pedido
     pedido = PedidoCompra(
-        numero_pedido=numero_pedido,
+        numero_pedido=_numero_pedido_temporario(),
         fornecedor_id=request.fornecedor_id,
         status="rascunho",
         valor_total=valor_total,
@@ -327,6 +334,7 @@ def criar_pedido(
 
     db.add(pedido)
     db.flush()  # Para obter o ID
+    pedido.numero_pedido = _numero_pedido_definitivo(pedido.id)
 
     # Criar itens
     for item_req in request.itens:

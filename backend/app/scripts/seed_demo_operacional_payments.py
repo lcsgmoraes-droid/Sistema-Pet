@@ -254,6 +254,74 @@ def _ensure_payment_method(
     return payment_id
 
 
+def _ensure_card_operator(db, *, tenant_id: str, user_id: int) -> int:
+    """Create the operator required by the card payment modal."""
+
+    existing = _scalar(
+        db,
+        """
+        SELECT id FROM operadoras_cartao
+        WHERE tenant_id = :tenant_id AND lower(nome) = lower('Stone Demo')
+        LIMIT 1
+        """,
+        {"tenant_id": tenant_id},
+    )
+    payload = {
+        "tenant_id": tenant_id,
+        "user_id": user_id,
+        "name": "Stone Demo",
+        "code": "STONE-DEMO",
+        "debit_fee": Decimal("1.89"),
+        "credit_fee": Decimal("3.49"),
+        "installment_fee": Decimal("4.90"),
+    }
+    if existing:
+        db.execute(
+            text(
+                """
+                UPDATE operadoras_cartao
+                SET codigo = :code,
+                    max_parcelas = 6,
+                    padrao = true,
+                    ativo = true,
+                    taxa_debito = :debit_fee,
+                    taxa_credito_vista = :credit_fee,
+                    taxa_credito_parcelado = :installment_fee,
+                    api_enabled = false,
+                    cor = '#0F766E',
+                    icone = 'credit-card',
+                    user_id = :user_id,
+                    updated_at = now()
+                WHERE id = :id
+                """
+            ),
+            {**payload, "id": existing},
+        )
+        return int(existing)
+
+    return int(
+        _scalar(
+            db,
+            """
+            INSERT INTO operadoras_cartao (
+                nome, codigo, max_parcelas, padrao, ativo,
+                taxa_debito, taxa_credito_vista, taxa_credito_parcelado,
+                api_enabled, cor, icone, user_id, tenant_id,
+                created_at, updated_at
+            )
+            VALUES (
+                :name, :code, 6, true, true,
+                :debit_fee, :credit_fee, :installment_fee,
+                false, '#0F766E', 'credit-card', :user_id, :tenant_id,
+                now(), now()
+            )
+            RETURNING id
+            """,
+            payload,
+        )
+    )
+
+
 def _ensure_tax_configuration(
     db,
     *,

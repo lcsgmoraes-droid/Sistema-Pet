@@ -12,6 +12,7 @@ from app.scripts.seed_demo_operacional_accounting import _ensure_accounting_setu
 from app.scripts.seed_demo_operacional_db import _scalar
 from app.scripts.seed_demo_operacional_payments import (
     _ensure_bank_account,
+    _ensure_card_operator,
     _ensure_commission_configuration,
     _ensure_payment_method,
     _ensure_tax_configuration,
@@ -22,6 +23,7 @@ def _ensure_support_data(
     db, *, tenant_id: str, user_id: int, base_date: date
 ) -> dict[str, Any]:
     categories = _ensure_accounting_setup(db, tenant_id=tenant_id, user_id=user_id)
+    _ensure_business_margin_configuration(db, tenant_id=tenant_id)
 
     bank_main_id = _ensure_bank_account(
         db,
@@ -43,6 +45,7 @@ def _ensure_support_data(
         color="#EA580C",
         icon="wallet",
     )
+    card_operator_id = _ensure_card_operator(db, tenant_id=tenant_id, user_id=user_id)
 
     payment_methods = {
         "dinheiro": _ensure_payment_method(
@@ -126,7 +129,7 @@ def _ensure_support_data(
             code="DEMO-CLI-001",
             name="Ana Costa",
             kind="cliente",
-            email="ana.demo@sistemapet.local",
+            email="ana@demo.corepet.com.br",
             phone="(11) 90000-1001",
             address="Rua das Palmeiras",
             number="120",
@@ -141,7 +144,7 @@ def _ensure_support_data(
             code="DEMO-CLI-002",
             name="Joao Santos",
             kind="cliente",
-            email="joao.demo@sistemapet.local",
+            email="joao@demo.corepet.com.br",
             phone="(11) 90000-1002",
             address="Av. Pet Shop",
             number="455",
@@ -156,7 +159,7 @@ def _ensure_support_data(
             code="DEMO-CLI-003",
             name="Maria Oliveira",
             kind="cliente",
-            email="maria.demo@sistemapet.local",
+            email="maria@demo.corepet.com.br",
             phone="(11) 90000-1003",
             address="Rua dos Lirios",
             number="87",
@@ -171,13 +174,18 @@ def _ensure_support_data(
             code="DEMO-FOR-001",
             name="Distribuidora Pet Brasil",
             kind="fornecedor",
-            email="compras.demo@sistemapet.local",
+            email="compras.demo@corepet.com.br",
             phone="(11) 3333-0101",
             address="Rodovia dos Petiscos",
             number="1000",
             district="Industrial",
             city="Guarulhos",
             state="SP",
+            cnpj="11.222.333/0001-81",
+            razao_social="Distribuidora Pet Brasil Demo LTDA",
+            nome_fantasia="Distribuidora Pet Brasil",
+            responsavel="Marina Compras Demo",
+            inscricao_estadual="ISENTO",
         ),
         "fornecedor": _ensure_person(
             db,
@@ -186,7 +194,7 @@ def _ensure_support_data(
             code="DEMO-FOR-002",
             name="Fornecedor Demo Financeiro",
             kind="fornecedor",
-            email="financeiro.fornecedor.demo@sistemapet.local",
+            email="financeiro.demo@corepet.com.br",
             phone="(11) 3333-0202",
             address="Rua Financeira",
             number="42",
@@ -201,7 +209,7 @@ def _ensure_support_data(
             code="DEMO-FUNC-001",
             name="Beatriz Vendedora Demo",
             kind="funcionario",
-            email="beatriz.vendas.demo@sistemapet.local",
+            email="beatriz@demo.corepet.com.br",
             phone="(11) 95555-0101",
             address="Rua Equipe CorePet",
             number="10",
@@ -220,7 +228,7 @@ def _ensure_support_data(
             code="DEMO-ENT-001",
             name="Carlos Entregador Demo",
             kind="funcionario",
-            email="carlos.entrega.demo@sistemapet.local",
+            email="carlos@demo.corepet.com.br",
             phone="(11) 95555-0202",
             address="Rua das Rotas",
             number="77",
@@ -252,10 +260,81 @@ def _ensure_support_data(
         "categories": categories,
         "banks": {"main": bank_main_id, "cash": bank_cash_id},
         "payments": payment_methods,
+        "card_operator_id": card_operator_id,
         "people": clients,
         "commission_config_id": commission_config_id,
         "base_date": base_date,
     }
+
+
+def _ensure_business_margin_configuration(db, *, tenant_id: str) -> int:
+    """Keep PDV thresholds and customer-facing margin messages demo-ready."""
+
+    existing = _scalar(
+        db,
+        """
+        SELECT id FROM empresa_config_geral
+        WHERE tenant_id = :tenant_id
+        ORDER BY id
+        LIMIT 1
+        """,
+        {"tenant_id": tenant_id},
+    )
+    payload = {
+        "tenant_id": tenant_id,
+        "healthy": Decimal("30.00"),
+        "warning": Decimal("15.00"),
+        "healthy_message": (
+            "Venda saudavel: a margem continua segura depois dos custos."
+        ),
+        "warning_message": (
+            "Atencao: taxas, desconto ou parcelamento reduziram a margem desta venda."
+        ),
+        "critical_message": (
+            "Margem critica: revise preco, desconto ou parcelamento antes de concluir."
+        ),
+    }
+    if existing:
+        db.execute(
+            text(
+                """
+                UPDATE empresa_config_geral
+                SET margem_saudavel_minima = :healthy,
+                    margem_alerta_minima = :warning,
+                    mensagem_venda_saudavel = :healthy_message,
+                    mensagem_venda_alerta = :warning_message,
+                    mensagem_venda_critica = :critical_message,
+                    aliquota_imposto_padrao = 7.00,
+                    ativo = true,
+                    updated_at = now()
+                WHERE id = :id
+                """
+            ),
+            {**payload, "id": existing},
+        )
+        return int(existing)
+
+    return int(
+        _scalar(
+            db,
+            """
+            INSERT INTO empresa_config_geral (
+                margem_saudavel_minima, margem_alerta_minima,
+                mensagem_venda_saudavel, mensagem_venda_alerta,
+                mensagem_venda_critica, aliquota_imposto_padrao,
+                ativo, tenant_id, created_at, updated_at
+            )
+            VALUES (
+                :healthy, :warning,
+                :healthy_message, :warning_message,
+                :critical_message, 7.00,
+                true, :tenant_id, now(), now()
+            )
+            RETURNING id
+            """,
+            payload,
+        )
+    )
 
 
 def _ensure_cargo(
@@ -340,6 +419,11 @@ def _ensure_person(
     is_entregador: bool = False,
     valor_por_km: Decimal | None = None,
     commission_partner: bool = False,
+    cnpj: str | None = None,
+    razao_social: str | None = None,
+    nome_fantasia: str | None = None,
+    responsavel: str | None = None,
+    inscricao_estadual: str | None = None,
 ) -> int:
     existing = _scalar(
         db,
@@ -350,7 +434,7 @@ def _ensure_person(
         """,
         {"tenant_id": tenant_id, "code": code},
     )
-    tipo_pessoa = "J" if kind == "fornecedor" else "F"
+    tipo_pessoa = "PJ" if kind == "fornecedor" else "PF"
     payload = {
         "tenant_id": tenant_id,
         "user_id": user_id,
@@ -371,6 +455,11 @@ def _ensure_person(
         "is_entregador": is_entregador,
         "valor_por_km": valor_por_km,
         "commission_partner": commission_partner,
+        "cnpj": cnpj,
+        "razao_social": razao_social,
+        "nome_fantasia": nome_fantasia,
+        "responsavel": responsavel,
+        "inscricao_estadual": inscricao_estadual,
     }
     if existing:
         db.execute(
@@ -380,6 +469,11 @@ def _ensure_person(
                 SET tipo_cadastro = :kind,
                     tipo_pessoa = :tipo_pessoa,
                     nome = :name,
+                    cnpj = :cnpj,
+                    razao_social = :razao_social,
+                    nome_fantasia = :nome_fantasia,
+                    responsavel = :responsavel,
+                    inscricao_estadual = :inscricao_estadual,
                     email = :email,
                     telefone = :phone,
                     celular = :phone,
@@ -449,7 +543,9 @@ def _ensure_person(
             db,
             """
             INSERT INTO clientes (
-                user_id, codigo, tipo_cadastro, tipo_pessoa, nome, email,
+                user_id, codigo, tipo_cadastro, tipo_pessoa, nome,
+                cnpj, razao_social, nome_fantasia, responsavel, inscricao_estadual,
+                email,
                 telefone, celular, endereco, endereco_entrega, numero, bairro,
                 cidade, estado, cargo_id, salario_base_override, liquido_combinado,
                 controla_rh, is_entregador, is_terceirizado, recebe_repasse,
@@ -463,7 +559,9 @@ def _ensure_person(
                 moto_propria, ativo, credito, tenant_id, created_at, updated_at
             )
             VALUES (
-                :user_id, :code, :kind, :tipo_pessoa, :name, :email,
+                :user_id, :code, :kind, :tipo_pessoa, :name,
+                :cnpj, :razao_social, :nome_fantasia, :responsavel, :inscricao_estadual,
+                :email,
                 :phone, :phone, :address,
                 :address || ', ' || :number || ' - ' || :district,
                 :number, :district, :city, :state, :cargo_id, :salary, :salary,

@@ -16,6 +16,8 @@ SEED_DEMO_FILES = [
     "backend/app/scripts/seed_demo_operacional_logistics.py",
     "backend/app/scripts/seed_demo_operacional_sales_core.py",
     "backend/app/scripts/seed_demo_operacional_runner.py",
+    "backend/app/scripts/seed_demo_operacional_purchase_data.py",
+    "backend/app/scripts/seed_demo_operacional_purchases.py",
 ]
 
 
@@ -62,6 +64,7 @@ def test_seed_demo_operacional_fatia_54_preserva_exports_compatibilidade():
     assert facade.money is data.money
     assert facade.apply_operational_seed is runner.apply_operational_seed
     assert facade._product_pool is catalog._product_pool
+    assert callable(catalog._ensure_demo_stock_alerts)
     assert facade._ensure_person is support._ensure_person
 
 
