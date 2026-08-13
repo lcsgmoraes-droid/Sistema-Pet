@@ -5,9 +5,9 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-$enderecos = [System.Net.Dns]::GetHostAddresses($Dominio) |
+$enderecos = @([System.Net.Dns]::GetHostAddresses($Dominio) |
     ForEach-Object { $_.IPAddressToString } |
-    Sort-Object -Unique
+    Sort-Object -Unique)
 
 if (-not $enderecos) {
     throw "Deploy bloqueado: o dominio $Dominio nao resolveu para nenhum IP."
