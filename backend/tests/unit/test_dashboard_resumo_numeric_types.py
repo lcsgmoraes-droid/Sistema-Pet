@@ -40,6 +40,11 @@ async def test_resumo_dashboard_normaliza_decimais_antes_dos_calculos():
         desconto_valor=Decimal("10.00"),
         status="finalizada",
         pagamentos=[SimpleNamespace(valor=Decimal("120.00"))],
+        itens=[
+            SimpleNamespace(quantidade=Decimal("2.00")),
+            SimpleNamespace(quantidade=Decimal("0.50")),
+        ],
+        rentabilidade_snapshot={"lucro": 33.75},
     )
     db = _FakeSession(
         [
@@ -47,8 +52,10 @@ async def test_resumo_dashboard_normaliza_decimais_antes_dos_calculos():
             _FakeQuery(scalar=Decimal("125.50")),
             _FakeQuery(scalar=Decimal("200.00")),
             _FakeQuery(scalar=Decimal("10.00")),
+            _FakeQuery(scalar=Decimal("15.00")),
             _FakeQuery(scalar=Decimal("300.00")),
             _FakeQuery(scalar=Decimal("20.00")),
+            _FakeQuery(scalar=Decimal("25.00")),
             _FakeQuery(rows=[venda]),
             _FakeQuery(scalar=Decimal("40.25")),
         ]
@@ -61,8 +68,18 @@ async def test_resumo_dashboard_normaliza_decimais_antes_dos_calculos():
     )
 
     assert resumo["saldo_atual"] == 374.5
-    assert resumo["contas_receber"] == {"total": 200.0, "vencidas": 10.0}
-    assert resumo["contas_pagar"] == {"total": 300.0, "vencidas": 20.0}
+    assert resumo["contas_receber"] == {
+        "total": 200.0,
+        "vencidas": 10.0,
+        "vence_hoje": 15.0,
+    }
+    assert resumo["contas_pagar"] == {
+        "total": 300.0,
+        "vencidas": 20.0,
+        "vence_hoje": 25.0,
+    }
+    assert resumo["vendas_periodo"]["unidades"] == 2.5
+    assert resumo["vendas_periodo"]["lucro"] == 33.75
     assert resumo["fluxo_periodo"] == {
         "entradas": 120.0,
         "saidas": 40.25,

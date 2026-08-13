@@ -8,7 +8,7 @@ Endpoints para dados consolidados do sistema
 from fastapi import APIRouter, HTTPException, Depends, Query
 from sqlalchemy.orm import Session, selectinload
 from sqlalchemy import func, and_, or_
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from typing import Optional
 import logging
 
@@ -18,7 +18,11 @@ from .models import Cliente
 from .vendas_models import Venda, VendaItem
 from .financeiro_models import ContaReceber, ContaPagar
 from .produtos_models import Produto
-from .relatorio_vendas_common import _total_recebido_venda
+from .relatorio_vendas_common import (
+    _snapshot_dict,
+    _total_recebido_venda,
+    _valores_operacionais_venda,
+)
 from .utils.serialization import safe_decimal_to_float_zero
 from .utils.timezone import now_brasilia
 from .utils.tenant_safe_sql import execute_tenant_safe
@@ -70,6 +74,8 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 router.include_router(ponto_equilibrio_router)
 
+DASHBOARD_OPEN_ACCOUNT_STATUSES = ("pendente", "parcial", "vencido", "vencida")
+
 
 def _dashboard_fetchone(db: Session, sql: str, tenant_id, params=None):
     return execute_tenant_safe(db, sql, params or {}, tenant_id=tenant_id).fetchone()
@@ -85,6 +91,25 @@ def _intervalo_dias_calendario(periodo_dias: int, agora: datetime | None = None)
     return inicio_periodo, fim_periodo
 
 
+def _classificar_data_vencimento_dashboard(
+    data_vencimento: date | datetime | None, hoje: date | None = None
+) -> str | None:
+    """Classifica vencimentos por dia civil, sem transformar hoje em atraso."""
+    if data_vencimento is None:
+        return None
+    vencimento = (
+        data_vencimento.date()
+        if isinstance(data_vencimento, datetime)
+        else data_vencimento
+    )
+    referencia = hoje or now_brasilia().date()
+    if vencimento < referencia:
+        return "vencido"
+    if vencimento == referencia:
+        return "vence_hoje"
+    return "a_vencer"
+
+
 @router.get("/dashboard/resumo")
 async def obter_resumo_dashboard(
     periodo_dias: int = Query(30, ge=1, le=366),
@@ -96,8 +121,9 @@ async def obter_resumo_dashboard(
     """
     current_user, tenant_id = user_and_tenant
     try:
-        hoje = now_brasilia()
-        inicio_periodo, fim_periodo = _intervalo_dias_calendario(periodo_dias, hoje)
+        agora = now_brasilia()
+        hoje = agora.date()
+        inicio_periodo, fim_periodo = _intervalo_dias_calendario(periodo_dias, agora)
 
         # ========================================
         # 1. SALDO ATUAL (Baseado em vendas pagas)
@@ -124,7 +150,7 @@ async def obter_resumo_dashboard(
             .filter(
                 and_(
                     ContaReceber.tenant_id == tenant_id,
-                    ContaReceber.status.in_(["pendente", "parcial", "vencida"]),
+                    ContaReceber.status.in_(DASHBOARD_OPEN_ACCOUNT_STATUSES),
                 )
             )
             .scalar()
@@ -136,8 +162,20 @@ async def obter_resumo_dashboard(
             .filter(
                 and_(
                     ContaReceber.tenant_id == tenant_id,
-                    ContaReceber.status.in_(["pendente", "parcial", "vencida"]),
+                    ContaReceber.status.in_(DASHBOARD_OPEN_ACCOUNT_STATUSES),
                     ContaReceber.data_vencimento < hoje,
+                )
+            )
+            .scalar()
+        )
+
+        contas_receber_vence_hoje = safe_decimal_to_float_zero(
+            db.query(func.sum(ContaReceber.valor_final - ContaReceber.valor_recebido))
+            .filter(
+                and_(
+                    ContaReceber.tenant_id == tenant_id,
+                    ContaReceber.status.in_(DASHBOARD_OPEN_ACCOUNT_STATUSES),
+                    ContaReceber.data_vencimento == hoje,
                 )
             )
             .scalar()
@@ -151,7 +189,7 @@ async def obter_resumo_dashboard(
             .filter(
                 and_(
                     ContaPagar.tenant_id == tenant_id,
-                    ContaPagar.status.in_(["pendente", "parcial", "vencida"]),
+                    ContaPagar.status.in_(DASHBOARD_OPEN_ACCOUNT_STATUSES),
                 )
             )
             .scalar()
@@ -163,8 +201,20 @@ async def obter_resumo_dashboard(
             .filter(
                 and_(
                     ContaPagar.tenant_id == tenant_id,
-                    ContaPagar.status.in_(["pendente", "parcial", "vencida"]),
+                    ContaPagar.status.in_(DASHBOARD_OPEN_ACCOUNT_STATUSES),
                     ContaPagar.data_vencimento < hoje,
+                )
+            )
+            .scalar()
+        )
+
+        contas_pagar_vence_hoje = safe_decimal_to_float_zero(
+            db.query(func.sum(ContaPagar.valor_final - ContaPagar.valor_pago))
+            .filter(
+                and_(
+                    ContaPagar.tenant_id == tenant_id,
+                    ContaPagar.status.in_(DASHBOARD_OPEN_ACCOUNT_STATUSES),
+                    ContaPagar.data_vencimento == hoje,
                 )
             )
             .scalar()
@@ -175,7 +225,7 @@ async def obter_resumo_dashboard(
         # ========================================
         vendas_periodo = (
             db.query(Venda)
-            .options(selectinload(Venda.pagamentos))
+            .options(selectinload(Venda.pagamentos), selectinload(Venda.itens))
             .filter(
                 and_(
                     Venda.tenant_id == tenant_id,
@@ -190,11 +240,20 @@ async def obter_resumo_dashboard(
         total_vendas_periodo = sum(float(venda.total or 0) for venda in vendas_periodo)
         quantidade_vendas_periodo = len(vendas_periodo)
         faturamento_bruto_periodo = sum(
-            float(venda.subtotal or 0) + float(venda.desconto_valor or 0)
+            _valores_operacionais_venda(venda)["valor_bruto"]
             for venda in vendas_periodo
         )
         valor_recebido_periodo = sum(
             _total_recebido_venda(venda) for venda in vendas_periodo
+        )
+        unidades_vendidas_periodo = sum(
+            safe_decimal_to_float_zero(getattr(item, "quantidade", 0))
+            for venda in vendas_periodo
+            for item in list(getattr(venda, "itens", []) or [])
+        )
+        lucro_vendas_periodo = sum(
+            safe_decimal_to_float_zero(_snapshot_dict(venda).get("lucro", 0))
+            for venda in vendas_periodo
         )
 
         # Vendas finalizadas
@@ -241,16 +300,20 @@ async def obter_resumo_dashboard(
             "contas_receber": {
                 "total": round(contas_receber_total, 2),
                 "vencidas": round(contas_receber_vencidas, 2),
+                "vence_hoje": round(contas_receber_vence_hoje, 2),
             },
             "contas_pagar": {
                 "total": round(contas_pagar_total, 2),
                 "vencidas": round(contas_pagar_vencidas, 2),
+                "vence_hoje": round(contas_pagar_vence_hoje, 2),
             },
             "vendas_periodo": {
                 "quantidade": quantidade_vendas_periodo,
+                "unidades": round(unidades_vendidas_periodo, 3),
                 "valor_total": round(total_vendas_periodo, 2),
                 "faturamento_bruto": round(float(faturamento_bruto_periodo), 2),
                 "valor_recebido": round(valor_recebido_periodo, 2),
+                "lucro": round(lucro_vendas_periodo, 2),
                 "finalizadas": int(vendas_finalizadas),
                 "ticket_medio": round(ticket_medio, 2),
             },
@@ -424,7 +487,7 @@ async def obter_contas_vencidas(
     current_user, tenant_id = user_and_tenant
 
     try:
-        hoje = datetime.now().date()
+        hoje = now_brasilia().date()
         logger.info("[contas-vencidas] Buscando contas vencidas")
 
         # Contas a receber vencidas
@@ -434,7 +497,7 @@ async def obter_contas_vencidas(
                 .filter(
                     and_(
                         ContaReceber.tenant_id == tenant_id,
-                        ContaReceber.status.in_(["pendente", "parcial", "vencido"]),
+                        ContaReceber.status.in_(DASHBOARD_OPEN_ACCOUNT_STATUSES),
                         ContaReceber.data_vencimento < hoje,
                     )
                 )
@@ -456,7 +519,7 @@ async def obter_contas_vencidas(
                 .filter(
                     and_(
                         ContaPagar.tenant_id == tenant_id,
-                        ContaPagar.status.in_(["pendente", "parcial", "vencido"]),
+                        ContaPagar.status.in_(DASHBOARD_OPEN_ACCOUNT_STATUSES),
                         ContaPagar.data_vencimento < hoje,
                     )
                 )

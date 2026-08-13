@@ -30,7 +30,12 @@ import api from "../api";
 import { useTour } from "../hooks/useTour";
 import { tourDashboard } from "../tours/tourDefinitions";
 import { formatMoneyBRL } from "../utils/formatters";
-import { DashboardLoading, MetricCard, PriorityCard } from "./dashboard/DashboardCards";
+import {
+  CompactMetricCard,
+  DashboardLoading,
+  MetricCard,
+  PriorityCard,
+} from "./dashboard/DashboardCards";
 import {
   calculateDashboardIndicators,
   createEmptyDashboardSummary,
@@ -62,6 +67,10 @@ const STATUS_STYLES = {
 function formatDate(dateValue) {
   if (!dateValue) return "-";
   return new Date(dateValue).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
+}
+
+function formatQuantity(value) {
+  return Number(value || 0).toLocaleString("pt-BR", { maximumFractionDigits: 3 });
 }
 
 export default function DashboardFinanceiro() {
@@ -146,6 +155,9 @@ export default function DashboardFinanceiro() {
   const periodLabel = getPeriodLabel(periodDays);
   const grossSales = Number(summary?.vendas_periodo?.faturamento_bruto || 0);
   const cashResult = Number(summary?.fluxo_periodo?.lucro || 0);
+  const salesCount = Number(summary?.vendas_periodo?.quantidade || 0);
+  const unitsSold = Number(summary?.vendas_periodo?.unidades || 0);
+  const salesProfit = Number(summary?.vendas_periodo?.lucro || 0);
   const displayedBalance = bankBalance ?? Number(summary?.saldo_atual || 0);
   const hasChartMovement = cashFlow.some(
     (item) => Number(item?.entradas || 0) !== 0 || Number(item?.saidas || 0) !== 0,
@@ -163,37 +175,47 @@ export default function DashboardFinanceiro() {
 
   return (
     <div className="min-h-full space-y-5 bg-slate-50 p-4 dark:bg-slate-950 sm:p-6">
-      <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-        <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
-          <div>
-            <div className="mb-2 flex flex-wrap items-center gap-2">
-              <span
-                className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-semibold ${STATUS_STYLES[executiveStatus.tone]}`}
-              >
-                <StatusIcon className="h-3.5 w-3.5" />
-                {executiveStatus.title}
+      <section className="rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+        <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+          <div className="flex flex-wrap items-center gap-2">
+            <h1 className="mr-1 text-xl font-bold text-slate-950 dark:text-white">Dashboard</h1>
+            <span
+              className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-semibold ${STATUS_STYLES[executiveStatus.tone]}`}
+              title={executiveStatus.description}
+            >
+              <StatusIcon className="h-3.5 w-3.5" />
+              {executiveStatus.title}
+            </span>
+            {lastUpdate && (
+              <span className="text-xs text-slate-400">
+                Atualizado às{" "}
+                {lastUpdate.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
               </span>
-              {lastUpdate && (
-                <span className="text-xs text-slate-400">
-                  Atualizado às{" "}
-                  {lastUpdate.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
-                </span>
-              )}
-            </div>
-            <h1 className="text-2xl font-bold text-slate-950 dark:text-white sm:text-3xl">
-              Visão geral do negócio
-            </h1>
-            <p className="mt-1 max-w-2xl text-sm text-slate-600 dark:text-slate-400">
-              {executiveStatus.description} Os valores abaixo separam a posição atual do desempenho
-              do período.
-            </p>
+            )}
           </div>
 
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="mr-1 text-xs font-semibold uppercase tracking-wide text-slate-400">
+              Período
+            </span>
+            {PERIOD_OPTIONS.map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                onClick={() => setPeriodDays(option.value)}
+                className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
+                  periodDays === option.value
+                    ? "bg-[#0f8b8d] text-white shadow-sm"
+                    : "bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
+                }`}
+              >
+                {option.label}
+              </button>
+            ))}
             <button
               type="button"
               onClick={iniciarTour}
-              className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+              className="ml-1 inline-flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
               title="Conhecer o dashboard"
             >
               <HelpCircle className="h-4 w-4" />
@@ -218,26 +240,6 @@ export default function DashboardFinanceiro() {
             </button>
           </div>
         </div>
-
-        <div className="mt-5 flex flex-wrap items-center gap-2 border-t border-slate-100 pt-4 dark:border-slate-800">
-          <span className="mr-1 text-xs font-semibold uppercase tracking-wide text-slate-400">
-            Período
-          </span>
-          {PERIOD_OPTIONS.map((option) => (
-            <button
-              key={option.value}
-              type="button"
-              onClick={() => setPeriodDays(option.value)}
-              className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
-                periodDays === option.value
-                  ? "bg-[#0f8b8d] text-white shadow-sm"
-                  : "bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
-              }`}
-            >
-              {option.label}
-            </button>
-          ))}
-        </div>
       </section>
 
       {failedBlocks.length > 0 && (
@@ -253,123 +255,100 @@ export default function DashboardFinanceiro() {
       <section id="tour-stats">
         <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
           <div>
-            <h2 className="text-lg font-bold text-slate-900 dark:text-white">Desempenho</h2>
+            <h2 className="text-lg font-bold text-slate-900 dark:text-white">
+              Resultado do período
+            </h2>
             <p className="text-sm text-slate-500 dark:text-slate-400">{periodLabel}</p>
           </div>
-          <div className="flex gap-4 text-xs text-slate-500 dark:text-slate-400">
-            <span>
-              Entradas:{" "}
-              <strong className="text-emerald-700 dark:text-emerald-300">
-                {formatMoneyBRL(indicators.inflows)}
-              </strong>
-            </span>
-            <span>
-              Saídas:{" "}
-              <strong className="text-rose-700 dark:text-rose-300">
-                {formatMoneyBRL(indicators.outflows)}
-              </strong>
-            </span>
-          </div>
         </div>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
           <MetricCard
             icon={TrendingUp}
-            label="Venda bruta"
+            label="Faturamento"
             value={formatMoneyBRL(grossSales)}
-            detail="Produtos e serviços antes das deduções"
+            detail={periodLabel}
             tone="violet"
             onClick={() => navigate("/financeiro/vendas")}
           />
           <MetricCard
-            icon={cashResult >= 0 ? TrendingUp : TrendingDown}
-            label="Resultado de caixa"
-            value={formatMoneyBRL(cashResult)}
-            detail={`${formatMoneyBRL(indicators.inflows)} recebido − ${formatMoneyBRL(indicators.outflows)} pago`}
-            tone={cashResult >= 0 ? "emerald" : "rose"}
-            onClick={() => navigate("/financeiro/fluxo-caixa")}
-          />
-          <MetricCard
             icon={ShoppingBag}
-            label="Vendas no período"
-            value={String(summary?.vendas_periodo?.quantidade || 0)}
-            detail="Quantidade de vendas não canceladas"
+            label="Pedidos / unidades"
+            value={`${formatQuantity(salesCount)} / ${formatQuantity(unitsSold)}`}
+            detail="Vendas e itens movimentados"
             tone="cyan"
             onClick={() => navigate("/financeiro/vendas")}
           />
           <MetricCard
             icon={BarChart3}
-            label="Ticket médio"
-            value={formatMoneyBRL(summary?.vendas_periodo?.ticket_medio || 0)}
-            detail="Venda bruta média por venda"
-            tone="blue"
-            onClick={() => navigate("/financeiro/vendas")}
+            label="Lucro das vendas"
+            value={formatMoneyBRL(salesProfit)}
+            detail="Após custos e deduções de cada venda"
+            tone={salesProfit >= 0 ? "emerald" : "rose"}
+            onClick={() => navigate("/financeiro/dre")}
           />
         </div>
       </section>
 
-      <section id="tour-financeiro" className="grid grid-cols-1 gap-4 xl:grid-cols-3">
-        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900 xl:col-span-1">
-          <div className="mb-4">
-            <h2 className="text-lg font-bold text-slate-900 dark:text-white">Posição atual</h2>
+      <section id="tour-financeiro" className="space-y-4">
+        <div>
+          <div className="mb-3">
+            <h2 className="text-lg font-bold text-slate-900 dark:text-white">Posição financeira</h2>
             <p className="text-sm text-slate-500 dark:text-slate-400">
-              Valores acumulados, sem filtro de período
+              Os números essenciais para saber onde a empresa está agora
             </p>
           </div>
-          <div className="space-y-3">
-            <button
-              type="button"
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+            <CompactMetricCard
+              icon={Building2}
+              label={bankBalance === null ? "Saldo estimado" : "Saldo em bancos"}
+              value={formatMoneyBRL(displayedBalance)}
+              detail="Disponibilidade atual"
+              tone="blue"
               onClick={() => navigate("/financeiro/bancos")}
-              className="flex w-full items-center justify-between rounded-xl bg-slate-900 p-4 text-left text-white transition hover:bg-slate-800 dark:bg-cyan-500 dark:text-slate-950 dark:hover:bg-cyan-400"
-            >
-              <span>
-                <span className="block text-xs opacity-70">
-                  {bankBalance === null ? "Saldo estimado" : "Saldo em bancos"}
-                </span>
-                <strong className="mt-1 block text-xl">{formatMoneyBRL(displayedBalance)}</strong>
-              </span>
-              <Building2 className="h-5 w-5 opacity-70" />
-            </button>
-            <button
-              type="button"
+            />
+            <CompactMetricCard
+              icon={cashResult >= 0 ? TrendingUp : TrendingDown}
+              label="Resultado de caixa"
+              value={formatMoneyBRL(cashResult)}
+              detail={`${formatMoneyBRL(indicators.inflows)} entrou · ${formatMoneyBRL(indicators.outflows)} saiu`}
+              tone={cashResult >= 0 ? "emerald" : "rose"}
+              onClick={() => navigate("/financeiro/fluxo-caixa")}
+            />
+            <CompactMetricCard
+              icon={BarChart3}
+              label="Ticket médio"
+              value={formatMoneyBRL(summary?.vendas_periodo?.ticket_medio || 0)}
+              detail={periodLabel}
+              tone="cyan"
+              onClick={() => navigate("/financeiro/vendas")}
+            />
+            <CompactMetricCard
+              icon={TrendingUp}
+              label="Total a receber"
+              value={formatMoneyBRL(summary?.contas_receber?.total || 0)}
+              detail="Valores ainda em aberto"
+              tone="emerald"
               onClick={() => navigate("/financeiro/contas-receber")}
-              className="flex w-full items-center justify-between rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-left transition hover:bg-emerald-100 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:hover:bg-emerald-500/15"
-            >
-              <span>
-                <span className="block text-xs text-emerald-700 dark:text-emerald-300">
-                  Total a receber
-                </span>
-                <strong className="mt-1 block text-lg text-emerald-950 dark:text-emerald-100">
-                  {formatMoneyBRL(summary?.contas_receber?.total || 0)}
-                </strong>
-              </span>
-              <TrendingUp className="h-5 w-5 text-emerald-600" />
-            </button>
-            <button
-              type="button"
+            />
+            <CompactMetricCard
+              icon={TrendingDown}
+              label="Total a pagar"
+              value={formatMoneyBRL(summary?.contas_pagar?.total || 0)}
+              detail="Compromissos ainda em aberto"
+              tone="rose"
               onClick={() => navigate("/financeiro/contas-pagar")}
-              className="flex w-full items-center justify-between rounded-xl border border-rose-200 bg-rose-50 p-4 text-left transition hover:bg-rose-100 dark:border-rose-500/30 dark:bg-rose-500/10 dark:hover:bg-rose-500/15"
-            >
-              <span>
-                <span className="block text-xs text-rose-700 dark:text-rose-300">
-                  Total a pagar
-                </span>
-                <strong className="mt-1 block text-lg text-rose-950 dark:text-rose-100">
-                  {formatMoneyBRL(summary?.contas_pagar?.total || 0)}
-                </strong>
-              </span>
-              <TrendingDown className="h-5 w-5 text-rose-600" />
-            </button>
+            />
           </div>
         </div>
 
-        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900 xl:col-span-2">
+        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
           <div className="mb-4">
             <h2 className="text-lg font-bold text-slate-900 dark:text-white">Atenção agora</h2>
             <p className="text-sm text-slate-500 dark:text-slate-400">
-              Pendências que podem virar ação, sem misturar com indicadores
+              O que está atrasado, vence hoje ou merece acompanhamento
             </p>
           </div>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
             <PriorityCard
               icon={WalletCards}
               label="Recebimentos vencidos"
@@ -392,6 +371,18 @@ export default function DashboardFinanceiro() {
                   : "Nenhum valor vencido"
               }
               hasIssue={indicators.overduePayable > 0}
+              onClick={() => navigate("/financeiro/contas-pagar")}
+            />
+            <PriorityCard
+              icon={Clock3}
+              label="Pagamentos que vencem hoje"
+              value={formatMoneyBRL(indicators.dueTodayPayable)}
+              detail={
+                indicators.dueTodayReceivable > 0
+                  ? `${formatMoneyBRL(indicators.dueTodayReceivable)} a receber hoje`
+                  : "Compromissos do dia, sem marcar como atraso"
+              }
+              hasIssue={indicators.dueTodayPayable > 0}
               onClick={() => navigate("/financeiro/contas-pagar")}
             />
             <PriorityCard
