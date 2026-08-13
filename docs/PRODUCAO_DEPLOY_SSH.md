@@ -4,23 +4,23 @@ Fonte oficial para deploy real do MLProHub em producao.
 
 ## Servidor atual
 
-- Host SSH preferencial: `petdeploy@192.241.150.121`
-- Host SSH de fallback: `root@192.241.150.121`
+- Host SSH preferencial: `petdeploy@corepet.com.br`
+- Host SSH de fallback: `root@corepet.com.br`
 - Caminho do projeto no servidor: `/opt/petshop`
-- Dominio publico: `https://mlprohub.com.br`
-- Health publico: `https://mlprohub.com.br/api/health`
-- Watchdog publico: `https://mlprohub.com.br/health/watchdog`
+- Dominio publico: `https://corepet.com.br`
+- Health publico: `https://corepet.com.br/api/health`
+- Watchdog publico: `https://corepet.com.br/health/watchdog`
 
 Use o IP para SSH. O dominio pode estar atras de Cloudflare e nao deve ser usado como referencia para conexao SSH operacional.
 
-Se algum MCP/conector listar outro IP, valide antes de usar. No ultimo deploy validado, o IP funcional foi `192.241.150.121`.
+O DNS de `corepet.com.br` e a fonte de verdade. Nunca copie um IP antigo para um comando de deploy. O launcher e o servidor comparam o DNS com os IPs locais e bloqueiam qualquer divergencia.
 
 ## Deploy padrao
 
 Rodar a partir da maquina local:
 
 ```bash
-ssh -i ~/.ssh/mlprohub_codex_deploy -o IdentitiesOnly=yes -o BatchMode=yes petdeploy@192.241.150.121 "sudo -n /usr/local/sbin/petshop-deploy-producao"
+powershell -ExecutionPolicy Bypass -File .\scripts\deploy_producao_remoto.ps1
 ```
 
 Antes de rodar o deploy, preencher o checklist e revisar o plano de rollback em `docs/PRODUCAO_ROLLBACK_CHECKLIST.md`.
@@ -33,7 +33,7 @@ root-owned:
 - `/usr/local/sbin/petshop-status-producao`
 - `/usr/local/sbin/petshop-restore-smoke-producao`
 
-Usar `root@192.241.150.121` somente como fallback operacional autorizado.
+Usar `root@corepet.com.br` somente como fallback operacional autorizado.
 
 Rotacao de chaves e secrets: `docs/SEGURANCA_ROTACAO_SSH_SECRETS.md`.
 
@@ -135,12 +135,13 @@ exibir URL secreta de webhook nem destinatarios internos.
 ## Validacao apos deploy
 
 ```bash
-ssh -i ~/.ssh/mlprohub_codex_deploy -o IdentitiesOnly=yes -o BatchMode=yes petdeploy@192.241.150.121 "sudo -n /usr/local/sbin/petshop-status-producao"
+ssh -i ~/.ssh/mlprohub_codex_deploy -o IdentitiesOnly=yes -o BatchMode=yes petdeploy@corepet.com.br "sudo -n /usr/local/sbin/petshop-status-producao"
 ```
 
 ```bash
-curl -fsS https://mlprohub.com.br/api/health
-curl -fsS https://mlprohub.com.br/health/watchdog
+curl -fsS https://corepet.com.br/api/health
+curl -fsS https://corepet.com.br/health/watchdog
+curl -fsS https://corepet.com.br/release-commit.txt
 ```
 
 Para rollback e registro operacional, usar `docs/PRODUCAO_ROLLBACK_CHECKLIST.md`.

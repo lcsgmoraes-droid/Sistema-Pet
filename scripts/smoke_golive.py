@@ -3,7 +3,7 @@
 Smoke test autenticado para go-live.
 
 Uso:
-  $env:GOLIVE_BASE_URL="https://mlprohub.com.br"
+  $env:GOLIVE_BASE_URL="https://corepet.com.br"
   $env:GOLIVE_ERP_EMAIL="admin@..."
   $env:GOLIVE_ERP_PASSWORD="..."
   python scripts/smoke_golive.py
@@ -29,7 +29,7 @@ from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
 
-DEFAULT_BASE_URL = "https://mlprohub.com.br"
+DEFAULT_BASE_URL = "https://corepet.com.br"
 TIMEOUT_SECONDS = int(os.getenv("GOLIVE_TIMEOUT_SECONDS", "20"))
 DEFAULT_USER_AGENT = os.getenv(
     "GOLIVE_USER_AGENT",

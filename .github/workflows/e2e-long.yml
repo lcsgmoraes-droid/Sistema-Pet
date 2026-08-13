@@ -71,7 +71,8 @@ jobs:
               base_url = os.environ["E2E_BASE_URL"].rstrip("/")
               allow_prod = os.getenv("E2E_ALLOW_PRODUCTION", "").strip().lower()
               print("Plano Basico E2E configured for base_url=" + base_url)
-              if "mlprohub.com.br" in base_url and allow_prod not in {
+              production_domains = {"corepet.com.br", "mlprohub.com.br"}
+              if any(domain in base_url for domain in production_domains) and allow_prod not in {
                   "1",
                   "true",
                   "yes",

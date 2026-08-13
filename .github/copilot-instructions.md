@@ -12,7 +12,7 @@ Antes de agir, leia e siga obrigatoriamente:
 
 ## REGRA ABSOLUTA - NUNCA SUBIR PARA PRODUCAO SEM AUTORIZACAO EXPLICITA
 
-**Antes de qualquer `git push origin main` ou qualquer comando SSH no servidor de producao (mlprohub.com.br / 192.241.150.121), o assistente DEVE:**
+**Antes de qualquer `git push origin main` ou qualquer comando SSH no servidor de producao (`corepet.com.br`), o assistente DEVE:**
 
 1. Parar o que esta fazendo
 2. Perguntar em portugues simples: "Posso subir para producao agora? O que vai subir: [lista]"
@@ -42,7 +42,7 @@ Para release/deploy, use a sequencia completa:
 3. `FLUXO_UNICO.bat release-check`
 4. **Se alterou arquivos em `frontend/src`: rodar `npm run build` dentro da pasta `frontend`; nao commitar `frontend/dist`**
 5. Abrir/atualizar Pull Request e juntar pela interface do GitHub quando os checks passarem
-6. **DEPLOY NO SERVIDOR REMOTO (mlprohub.com.br / 192.241.150.121): preferir o usuario operacional `petdeploy` e rodar `ssh -i ~/.ssh/mlprohub_codex_deploy -o IdentitiesOnly=yes -o BatchMode=yes petdeploy@192.241.150.121 "sudo -n /usr/local/sbin/petshop-deploy-producao"`. Esse wrapper root-owned executa o script oficial `scripts/deploy_producao_seguro.sh`, que faz pull, build frontend, rebuild backend/worker, migrations e health. `root@192.241.150.121` fica apenas como fallback operacional autorizado.**
+6. **DEPLOY NO SERVIDOR REMOTO: usar `powershell -ExecutionPolicy Bypass -File .\scripts\deploy_producao_remoto.ps1`. O launcher conecta em `petdeploy@corepet.com.br`; o wrapper e o script oficial validam novamente se o host corresponde ao DNS antes de alterar codigo ou banco. A validacao final confere o commit servido pelo proprio dominio. O usuario `root@corepet.com.br` fica apenas como fallback operacional autorizado.**
 7. `FLUXO_UNICO.bat status` mostra containers locais; para ver estado real da producao, checar via SSH
 
 ## Comunicacao com o usuario
@@ -60,7 +60,7 @@ Para release/deploy, use a sequencia completa:
 - Nao corrigir em producao manualmente sem refletir no Git.
 - **Sempre rodar `npm run build` (na pasta `frontend`) antes de release/deploy quando houver mudancas no frontend. Nao commitar `frontend/dist`; o deploy seguro gera `runtime/frontend/dist` no servidor.**
 - **NUNCA usar `git add -A` sem antes verificar `git status --short` e checar se ha arquivos de infraestrutura sendo deletados (linhas com ` D` ou `D `). Arquivos protegidos: `docker-compose.*.yml`, `.env.*`, `scripts/*.ps1`, `.github/`, `docs/FLUXO_UNICO_DEV_PROD.md`. Se aparecerem como deletados: restaurar com `git checkout HEAD -- <arquivo>` antes de commitar.**
-- **PRODUCAO REAL E REMOTA: `mlprohub.com.br` esta hospedado no servidor DigitalOcean (IP 192.241.150.121). O `prod-up` local NAO afeta a producao real. Para deployar em producao: primeiro o PR deve estar mergeado na `main`; depois usar `petdeploy@192.241.150.121` com `sudo -n /usr/local/sbin/petshop-deploy-producao`. NUNCA usar `git pull` + `docker restart` como deploy de codigo; o backend fica DENTRO DA IMAGEM DOCKER e precisa do script seguro com rebuild.**
+- **PRODUCAO REAL E REMOTA: a fonte de verdade do destino e o DNS de `corepet.com.br`, nunca um IP copiado em documentacao. O `prod-up` local NAO afeta a producao real. Primeiro o PR deve estar mergeado na `main`; depois usar `scripts/deploy_producao_remoto.ps1`. NUNCA usar `git pull` + `docker restart` como deploy de codigo; o backend fica DENTRO DA IMAGEM DOCKER e precisa do script seguro com rebuild.**
 
 ## Padronizacao de numeros e moeda (OBRIGATORIO)
 
