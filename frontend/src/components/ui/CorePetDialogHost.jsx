@@ -106,11 +106,16 @@ export default function CorePetDialogHost() {
         className="w-full max-w-lg overflow-hidden rounded-2xl border border-white/70 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900"
       >
         <div className="flex items-start gap-4 px-6 pb-4 pt-6">
-          <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl ${variante.iconClass}`}>
+          <div
+            className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl ${variante.iconClass}`}
+          >
             <Icone className="h-5 w-5" aria-hidden="true" />
           </div>
           <div className="min-w-0 flex-1">
-            <h2 id="corepet-dialog-title" className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+            <h2
+              id="corepet-dialog-title"
+              className="text-lg font-semibold text-slate-900 dark:text-slate-100"
+            >
               {dialogo.titulo}
             </h2>
             <p
@@ -133,7 +138,10 @@ export default function CorePetDialogHost() {
         {dialogo.tipo === "entrada" && (
           <div className="px-6 pb-2">
             {dialogo.rotulo && (
-              <label htmlFor="corepet-dialog-input" className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-200">
+              <label
+                htmlFor="corepet-dialog-input"
+                className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-200"
+              >
                 {dialogo.rotulo}
               </label>
             )}
@@ -166,7 +174,9 @@ export default function CorePetDialogHost() {
                 className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition focus:border-[#0f8b8d] focus:ring-2 focus:ring-[#0f8b8d]/20 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
               />
             )}
-            {erro && <p className="mt-2 text-sm font-medium text-red-600 dark:text-red-300">{erro}</p>}
+            {erro && (
+              <p className="mt-2 text-sm font-medium text-red-600 dark:text-red-300">{erro}</p>
+            )}
           </div>
         )}
 

@@ -86,7 +86,8 @@ function RotaCard({
         // Entregador digita o km do odômetro manualmente
         const kmDigitado = await perguntarCorePet({
           titulo: "Quilometragem da entrega",
-          mensagem: "Informe a leitura atual do odometro. Voce pode deixar o campo vazio para pular.",
+          mensagem:
+            "Informe a leitura atual do odometro. Voce pode deixar o campo vazio para pular.",
           rotulo: "KM atual",
           placeholder: "Ex.: 12459,4",
           confirmarTexto: "Continuar",

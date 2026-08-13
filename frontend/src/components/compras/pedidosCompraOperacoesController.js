@@ -106,10 +106,10 @@ export function createPedidosCompraOperacoesController({
         error.response?.data?.detail ||
         error.response?.data?.message ||
         (typeof error.response?.data === "string" ? error.response.data : "");
-      const statusServidor = error.response?.status
-        ? ` (codigo ${error.response.status})`
-        : "";
-      toast.error(detalheServidor || `Nao foi possivel criar o pedido${statusServidor}. Tente novamente.`);
+      const statusServidor = error.response?.status ? ` (codigo ${error.response.status})` : "";
+      toast.error(
+        detalheServidor || `Nao foi possivel criar o pedido${statusServidor}. Tente novamente.`,
+      );
     } finally {
       setLoading(false);
     }

@@ -43,7 +43,9 @@ export default function EntregasAbertas() {
     }
 
     if (!configEntrega || !configEntrega.logradouro) {
-      toast.error("Configure o endereço da loja em Configurações > Entregas antes de otimizar rotas");
+      toast.error(
+        "Configure o endereço da loja em Configurações > Entregas antes de otimizar rotas",
+      );
       return;
     }
 
@@ -91,7 +93,9 @@ export default function EntregasAbertas() {
     }
 
     if (!configEntrega || !configEntrega.logradouro) {
-      toast.error("Configure o endereço da loja em Configurações > Entregas antes de otimizar rotas");
+      toast.error(
+        "Configure o endereço da loja em Configurações > Entregas antes de otimizar rotas",
+      );
       return;
     }
 

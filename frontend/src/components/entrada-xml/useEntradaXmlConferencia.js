@@ -141,7 +141,8 @@ export default function useEntradaXmlConferencia({
 
     const confirmou = await confirmarCorePet({
       titulo: "Desfazer conferencia?",
-      mensagem: "A NF voltara para o estado Nao conferida e os dados atuais da conferencia serao removidos.",
+      mensagem:
+        "A NF voltara para o estado Nao conferida e os dados atuais da conferencia serao removidos.",
       confirmarTexto: "Desfazer conferencia",
       variante: "warning",
     });
