@@ -9,6 +9,7 @@ import {
   UsersRound,
 } from "lucide-react";
 import EmptyState from "../ui/EmptyState";
+import CopyableValue from "../ui/CopyableValue";
 import IconActionButton from "../ui/IconActionButton";
 import PaginationControls from "../ui/PaginationControls";
 import Panel from "../ui/Panel";
@@ -58,9 +59,18 @@ function PessoaMobileCard({
 
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-slate-500">
-            <span className="rounded-full bg-slate-100 px-2 py-0.5 font-mono">
-              ID {cliente.codigo || "-"}
-            </span>
+            {cliente.codigo ? (
+              <span className="rounded-full bg-slate-100 px-2 py-0.5 font-mono">
+                <CopyableValue
+                  buttonClassName="rounded-md p-1 hover:bg-slate-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600"
+                  label="ID"
+                  title="Copiar codigo"
+                  value={cliente.codigo}
+                />
+              </span>
+            ) : (
+              <span className="rounded-full bg-slate-100 px-2 py-0.5 font-mono">ID -</span>
+            )}
             {cliente.tipo_pessoa ? (
               <span className="rounded-full bg-slate-100 px-2 py-0.5">{cliente.tipo_pessoa}</span>
             ) : null}
@@ -71,7 +81,13 @@ function PessoaMobileCard({
             ) : null}
           </div>
 
-          <h3 className="mt-2 text-sm font-semibold leading-5 text-slate-950">{cliente.nome}</h3>
+          <h3 className="mt-2 text-sm font-semibold leading-5 text-slate-950">
+            <CopyableValue
+              buttonClassName="rounded-md p-1 hover:bg-slate-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600"
+              title="Copiar nome"
+              value={cliente.nome}
+            />
+          </h3>
           {cliente.tipo_pessoa === "PJ" && cliente.razao_social ? (
             <p className="mt-0.5 text-xs text-slate-500">{cliente.razao_social}</p>
           ) : null}
@@ -99,7 +115,17 @@ function PessoaMobileCard({
         </div>
         <div className="rounded-lg border border-slate-200 bg-slate-50 p-2">
           <dt className="font-semibold uppercase text-slate-500">Celular</dt>
-          <dd className="mt-1 break-words text-slate-800">{cliente.celular || "-"}</dd>
+          <dd className="mt-1 break-words text-slate-800">
+            {cliente.celular ? (
+              <CopyableValue
+                buttonClassName="rounded-md p-1 hover:bg-slate-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600"
+                title="Copiar celular"
+                value={cliente.celular}
+              />
+            ) : (
+              "-"
+            )}
+          </dd>
         </div>
       </dl>
 
@@ -335,13 +361,24 @@ const ClientesNovoTabelaSection = ({
                             />
                           </td>
                           <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900 font-medium">
-                            {cliente.codigo}
+                            {cliente.codigo ? (
+                              <CopyableValue
+                                buttonClassName="rounded-md p-1 hover:bg-slate-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600"
+                                title="Copiar codigo"
+                                value={cliente.codigo}
+                              />
+                            ) : (
+                              "-"
+                            )}
                           </td>
                           <td className="px-4 py-3 whitespace-nowrap">
                             <div className="flex flex-col gap-1">
-                              <span className="text-sm font-medium text-slate-900">
-                                {cliente.nome}
-                              </span>
+                              <CopyableValue
+                                buttonClassName="rounded-md p-1 hover:bg-slate-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600"
+                                title="Copiar nome"
+                                value={cliente.nome}
+                                valueClassName="text-sm font-medium text-slate-900"
+                              />
                               {cliente.tipo_pessoa === "PJ" && cliente.razao_social && (
                                 <span className="text-xs text-slate-500">
                                   {cliente.razao_social}
@@ -371,7 +408,15 @@ const ClientesNovoTabelaSection = ({
                               : cliente.cnpj || "-"}
                           </td>
                           <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700">
-                            {cliente.celular || "-"}
+                            {cliente.celular ? (
+                              <CopyableValue
+                                buttonClassName="rounded-md p-1 hover:bg-slate-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600"
+                                title="Copiar celular"
+                                value={cliente.celular}
+                              />
+                            ) : (
+                              "-"
+                            )}
                           </td>
                           <td
                             className="px-4 py-3 whitespace-nowrap"
