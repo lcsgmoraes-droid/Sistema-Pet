@@ -10,7 +10,6 @@ from app.scripts.seed_demo_operacional_catalog import (
     _cleanup_previous_demo,
     _ensure_demo_stock_alerts,
     _ensure_margin_demo_products,
-    _product_pool,
     _sale_items,
 )
 from app.scripts.seed_demo_operacional_data import (
@@ -31,6 +30,9 @@ from app.scripts.seed_demo_operacional_movements import (
 )
 from app.scripts.seed_demo_operacional_purchase_data import (
     build_demo_purchase_scenarios,
+)
+from app.scripts.seed_demo_operacional_purchase_catalog import (
+    ensure_demo_purchase_catalog,
 )
 from app.scripts.seed_demo_operacional_purchases import insert_demo_purchases
 from app.scripts.seed_demo_operacional_sales_core import _insert_cashier, _insert_sale
@@ -143,7 +145,12 @@ def apply_operational_seed(
     support = _ensure_support_data(
         db, tenant_id=tenant_id, user_id=user_id, base_date=base_date
     )
-    products = _product_pool(db, tenant_id=tenant_id, user_id=user_id)
+    products = ensure_demo_purchase_catalog(
+        db,
+        tenant_id=tenant_id,
+        user_id=user_id,
+        supplier_id=support["people"]["distribuidora"],
+    )
     margin_demo_products = _ensure_margin_demo_products(
         db, tenant_id=tenant_id, user_id=user_id
     )

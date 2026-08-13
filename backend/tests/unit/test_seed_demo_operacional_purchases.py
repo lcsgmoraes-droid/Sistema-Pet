@@ -3,7 +3,12 @@ from decimal import Decimal
 
 from app.notas_entrada.xml_parser import parse_nfe_xml
 from app.scripts.seed_demo_operacional_catalog import DEMO_MARGIN_PRODUCTS
+from app.scripts.seed_demo_operacional_purchase_catalog import (
+    DEMO_PURCHASE_BRAND,
+    DEMO_PURCHASE_PRODUCTS,
+)
 from app.scripts.seed_demo_operacional_purchase_data import (
+    DEMO_SUPPLIER_LEGAL_NAME,
     build_demo_purchase_scenarios,
     demo_xml,
     invoice_key,
@@ -21,7 +26,6 @@ def test_demo_purchase_scenarios_cover_operational_states():
         "order_status": "confirmado",
         "label": "Pedido reservado para importar e confrontar XML ao vivo",
     }
-
     assert {scenario["order_status"] for scenario in scenarios} >= {
         "rascunho",
         "enviado",
@@ -43,6 +47,25 @@ def test_demo_purchase_scenarios_cover_operational_states():
     }
 
 
+def test_demo_purchase_catalog_is_fictional_varied_and_supplier_ready():
+    assert DEMO_PURCHASE_BRAND == "VivaPata Demo"
+    assert len(DEMO_PURCHASE_PRODUCTS) == 10
+    assert len({product["code"] for product in DEMO_PURCHASE_PRODUCTS}) == 10
+    assert len({product["barcode"] for product in DEMO_PURCHASE_PRODUCTS}) == 10
+    assert len({product["cost"] for product in DEMO_PURCHASE_PRODUCTS}) >= 8
+    assert len({product["price"] for product in DEMO_PURCHASE_PRODUCTS}) >= 8
+
+    forbidden_real_names = {"megazoo", "buendia", "special dog", "bionatural"}
+    for product in DEMO_PURCHASE_PRODUCTS:
+        assert product["code"].startswith("DEMO-VP-")
+        assert product["supplier_code"].startswith("HORIZONTE-")
+        assert len(product["barcode"]) <= 14
+        assert product["price"] > product["cost"]
+        assert not any(
+            real_name in product["name"].lower()
+            for real_name in forbidden_real_names
+        )
+
 def test_demo_xml_is_parsed_as_homologation_invoice():
     tenant_id = "8f552f1d-2b88-4fc8-8420-000000000001"
     access_key = invoice_key(tenant_id, 900002)
@@ -50,9 +73,9 @@ def test_demo_xml_is_parsed_as_homologation_invoice():
         invoice_number=900002,
         access_key=access_key,
         issued_at=datetime(2026, 8, 12, 12, 5),
-        supplier_code="BIO-6083",
-        product_name="Racao Bionatural Prime 2,5kg",
-        ean="7898242030076",
+        supplier_code="HORIZONTE-001",
+        product_name="Ração VivaPata Essencial Cães Adultos Frango 10 kg",
+        ean="2999999900001",
         quantity=Decimal("8"),
         unit_cost=Decimal("33.50"),
     )
@@ -64,7 +87,8 @@ def test_demo_xml_is_parsed_as_homologation_invoice():
     assert parsed["chave_acesso"] == access_key
     assert parsed["fornecedor_cnpj"] == "11222333000181"
     assert parsed["valor_total"] == 268.0
-    assert parsed["itens"][0]["codigo_produto"] == "BIO-6083"
+    assert parsed["fornecedor_nome"] == DEMO_SUPPLIER_LEGAL_NAME
+    assert parsed["itens"][0]["codigo_produto"] == "HORIZONTE-001"
     assert parsed["itens"][0]["quantidade"] == 8.0
     assert parsed["itens"][0]["valor_unitario"] == 33.5
     assert "SEM VALOR FISCAL" in xml

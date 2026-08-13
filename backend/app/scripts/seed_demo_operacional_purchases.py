@@ -12,6 +12,8 @@ from sqlalchemy import text
 from app.scripts.seed_demo_operacional_db import _one_mapping, _scalar
 from app.scripts.seed_demo_operacional_purchase_data import (
     DEMO_SUPPLIER_CNPJ,
+    DEMO_SUPPLIER_LEGAL_NAME,
+    DEMO_SUPPLIER_NAME,
     build_demo_purchase_scenarios,
     demo_xml as _demo_xml,
     invoice_key as _invoice_key,
@@ -31,7 +33,7 @@ def _purchase_product(db, *, tenant_id: str) -> dict[str, Any]:
           AND COALESCE(ativo, true) = true
           AND deleted_at IS NULL
           AND COALESCE(tipo_produto, 'SIMPLES') <> 'PAI'
-        ORDER BY CASE WHEN codigo = '6083' OR codigo_barras = '7898242030076' THEN 0 ELSE 1 END,
+        ORDER BY CASE WHEN codigo = 'DEMO-VP-001' THEN 0 ELSE 1 END,
                  nome, id
         LIMIT 1
         """,
@@ -244,7 +246,7 @@ def _insert_invoice(
                 percentual_loja, valor_online, valor_loja, user_id, tenant_id,
                 created_at, updated_at
             ) VALUES (
-                :number, '1', :access_key, :cnpj, 'Distribuidora Pet Brasil Demo LTDA',
+                :number, '1', :access_key, :cnpj, :supplier_legal_name,
                 :supplier_id, :issued_at, :entry_at, :total, 0, 0, :total, :xml,
                 'pendente', :conference_status, :conference_notes, :entry_at,
                 :user_id, 1, 0, false, 'loja', 0, 100, 0, :total,
@@ -255,6 +257,7 @@ def _insert_invoice(
                 "number": str(invoice_number),
                 "access_key": access_key,
                 "cnpj": DEMO_SUPPLIER_CNPJ,
+                "supplier_legal_name": DEMO_SUPPLIER_LEGAL_NAME,
                 "supplier_id": supplier_id,
                 "issued_at": issued_at,
                 "entry_at": issued_at + timedelta(hours=4),
@@ -427,7 +430,7 @@ def _insert_pending(
                 created_at, updated_at
             ) VALUES (
                 :code, :status, 'conferencia_nf', 'divergencia_fornecedor',
-                :supplier_id, 'Distribuidora Pet Brasil', :cnpj, :invoice_id,
+                :supplier_id, :supplier_name, :cnpj, :invoice_id,
                 :order_id, :invoice_number, :order_number, :title, :summary,
                 :due_at, 'compras.demo@corepet.com.br', :subject, :message,
                 CASE WHEN :status IN ('aguardando_fornecedor', 'em_tratativa', 'resolvida') THEN :contact_at ELSE NULL END,
@@ -443,6 +446,7 @@ def _insert_pending(
                 "code": f"DEMO-PEN-{suffix}-{invoice_number}",
                 "status": status,
                 "supplier_id": supplier_id,
+                "supplier_name": DEMO_SUPPLIER_NAME,
                 "cnpj": DEMO_SUPPLIER_CNPJ,
                 "invoice_id": invoice_id,
                 "order_id": order_id,
@@ -456,7 +460,7 @@ def _insert_pending(
                 "due_at": created_at + timedelta(days=7),
                 "subject": f"Divergencia na NF {invoice_number} - pedido {order_number}",
                 "message": (
-                    "Ola, Distribuidora Pet Brasil.\n\n"
+                    f"Olá, {DEMO_SUPPLIER_NAME}.\n\n"
                     f"Na conferencia da NF {invoice_number}, identificamos diferenca no item "
                     f"{product['nome']}. Foram informadas {quantity:g} unidade(s), recebemos "
                     f"{received:g} e registramos {damaged:g} avariada(s).\n\n"

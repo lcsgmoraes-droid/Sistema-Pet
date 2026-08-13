@@ -14,7 +14,7 @@ Arquivos executaveis da base demo:
 - Aplicador dry-run/apply DEV: `scripts/aplicar_seed_base_demo_marketing.py`
 - Contrato do aplicador: `scripts/test_marketing_demo_seed_apply.py`
 
-## Base operacional validada em 2026-06-28
+## Base operacional validada em 2026-08-13
 
 Tenant local de gravacao:
 
@@ -36,10 +36,10 @@ python backend/app/scripts/seed_demo_operacional.py --target-email corepeterp@gm
 
 Resultado validado:
 
-- 50 produtos reais ativos, todos com imagem.
-- 0 produtos fallback `DEMO-*` ativos.
-- 18 faixas de preco, sem preco zerado.
-- 6 vendas demo com canais ERP/PDV, ecommerce e app.
+- Catalogo-base com produtos reais para as demais demonstracoes.
+- 10 produtos ficticios `DEMO-VP-*` exclusivos do fluxo seguro de compras.
+- Custos e precos variados e artificiais no catalogo ficticio.
+- 54 vendas demo com canais ERP/PDV, ecommerce e app, usadas tambem no historico da sugestao inteligente.
 - 17 contas a pagar, 6 contas a receber e 5 recebimentos.
 - 3 rotas de entrega com entregador cadastrado.
 - 17 movimentacoes de estoque.
@@ -50,7 +50,8 @@ Resultado validado:
 Telas ja conferidas para gravacao:
 
 - `/financeiro/vendas`: lista de vendas com margem, CMV, imposto, desconto, taxa de pagamento, campanha e comissao.
-- `/produtos`: 50 produtos reais, imagens e precos plausiveis.
+- `/produtos`: catalogo-base e linha ficticia `VivaPata Demo` para gravacoes publicas.
+- `/compras/pedidos`: sugestao inteligente com 10 itens ficticios do mesmo fornecedor, incluindo prioridades critica, alerta e normal.
 - `/calculadora-racao`: comparativo de racoes funcionando com 10 opcoes e custo por dia.
 - `/comissoes`: Beatriz Vendedora Demo aparece com 1 regra geral.
 - `/comissoes/abertas`: 8 comissoes pendentes, total R$ 60,13.
@@ -112,21 +113,24 @@ A base demo precisa permitir gravar:
 | 6 | Imposto/config fiscal | Tributacao demo | Permite explicar custo, venda e margem |
 | 7 | Cliente | Maria Oliveira | Usado em venda, pet, agendamento e atendimento |
 | 8 | Pet | Thor | Usado em banho e tosa e veterinario |
-| 9 | Fornecedor | Distribuidora Pet Brasil | Usado em compras e XML |
-| 10 | Produto | Racao Adulto 10kg | Usado em estoque, PDV, ecommerce e relatorios |
+| 9 | Fornecedor | Distribuidora Horizonte Pet Demo | Usado em compras e XML |
+| 10 | Produto | Racao VivaPata Essencial Caes Adultos Frango 10 kg | Usado em estoque, PDV, ecommerce e relatorios |
 
 ## Produtos demo
 
-A base validada usa 50 produtos reais importados da base do Lucas, priorizando
-produtos com imagem. Exemplos bons para gravacao:
+Para gravacoes publicas do fluxo de compras, use somente a linha ficticia
+`VivaPata Demo`. A seed cria dez itens vinculados ao mesmo fornecedor, com
+estoques, custos, precos e historicos variados para alimentar a sugestao
+inteligente. Entre eles ha racoes, petiscos, tapetes, areia, shampoo,
+condicionador e brinquedos.
 
-| Produto | Uso visual | Faixa validada |
-|---|---|---|
-| Racao Bob Dog Premium Gourmet 25KG | Comparador de racao | R$ 219,90 |
-| Racao Special Dog Junior 20kg | Comparador de racao | R$ 219,90 |
-| Racao Bionatural Prime Adultos 15kg | Comparador de racao | R$ 169,90 |
-| Racao Special Cat Ultralife 10,1kg | Comparador de racao | R$ 129,90 a R$ 159,90 |
-| Petiscos e snacks com imagem | Tela de produtos/estoque | R$ 19,90 a R$ 59,90 |
+Os codigos internos seguem `DEMO-VP-001` a `DEMO-VP-010`; os codigos do
+fornecedor seguem `HORIZONTE-001` a `HORIZONTE-010`. Todos os nomes, codigos,
+EANs e valores desta linha sao demonstrativos.
+
+O catalogo-base ainda pode conter nomes comerciais publicos para outras
+demonstracoes. Nao o use quando a narrativa atribuir precos, custos ou uma
+relacao comercial a uma marca real.
 
 ## Clientes e pets demo
 
@@ -147,10 +151,11 @@ produtos com imagem. Exemplos bons para gravacao:
 
 ## Compras e XML
 
-Use fornecedor ficticio:
+Use fornecedor e marca ficticios:
 
-- Distribuidora Pet Brasil.
-- Pedido de compra: produtos de racao, shampoo e petisco.
+- Fornecedor: Distribuidora Horizonte Pet Demo.
+- Marca: VivaPata Demo.
+- Pedido de compra: os dez produtos `DEMO-VP-*`.
 - Nota/XML: usar arquivo demonstrativo sem CNPJ real ou mascarado.
 
 Fluxo para deixar pronto:

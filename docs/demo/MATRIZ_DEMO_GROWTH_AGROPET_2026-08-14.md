@@ -18,7 +18,7 @@ Cada lançamento mostrado deve terminar com a conferência dos seus efeitos cola
 | 4 | PDV — comissão | Fazer venda com Beatriz Vendedora Demo | comissão em aberto e redução correta do resultado | Validado: comissões abertas e DRE vinculadas |
 | 5 | PDV — entrega | Fazer venda com Carlos Entregador Demo | entrega aberta, rota, taxa, custo, resultado da entrega e histórico | Pronto, com rotas em 3 estados |
 | 6 | Produtos e estoque | Abrir o produto comprado/vendido | saldo, custo, preço, fornecedor e movimentações | Pronto, com catálogo |
-| 7 | Pedido inteligente | Selecionar Distribuidora Pet Brasil e gerar o pedido | sugestão, PDF/envio, pedido em rascunho/enviado/recebido/cancelado | Pacote local pronto; aguarda publicação |
+| 7 | Pedido inteligente | Selecionar Distribuidora Horizonte Pet Demo e gerar o pedido | sugestão, PDF/envio, pedido em rascunho/enviado/recebido/cancelado | Pacote local pronto; aguarda publicação |
 | 8 | Entrada de NF-e | Importar XML sintético sem divergência | fornecedor e produto reconhecidos, pedido vinculado e conferência aprovada | XML validado pelo parser real; pedido 009 reservado |
 | 9 | Confronto com divergência | Importar XML com quantidade e preço diferentes | diferença de quantidade/preço, relatório, novo orçamento e opção de devolução | XML divergente validado + cenários prontos |
 | 10 | Pendências | Alternar Aberta, Aguardando, Tratativa, Resolvida e Cancelada | cards, filtros, histórico e valores por status | Seed local com 5 status; aguarda publicação |
@@ -40,8 +40,12 @@ O seed do Demo prepara nove pedidos para que a apresentação não dependa de al
 8. Pedido cancelado.
 9. Pedido confirmado, reservado exclusivamente para o upload e confronto ao vivo.
 
-Fornecedor: `Distribuidora Pet Brasil Demo LTDA` — código `DEMO-FOR-001`.  
-Produto principal: `Ração Bionatural Prime Adultos Raças Pequenas Frango 2,5 kg` — EAN `7898242030076`.
+Fornecedor: `Distribuidora Horizonte Pet Demo LTDA` — código `DEMO-FOR-001`.
+Marca: `VivaPata Demo`.
+Catálogo de compras: dez produtos fictícios `DEMO-VP-001` a `DEMO-VP-010`,
+todos ligados ao mesmo fornecedor e com histórico de venda/estoque suficiente
+para preencher a Sugestão Inteligente. O produto principal dos pedidos e XMLs
+é `Ração VivaPata Essencial Cães Adultos Frango 10 kg`.
 
 ## XMLs sintéticos para a demonstração
 
