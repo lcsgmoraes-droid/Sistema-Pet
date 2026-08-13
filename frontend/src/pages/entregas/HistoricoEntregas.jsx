@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { toast } from "react-hot-toast";
 import api from "../../api";
 import CustomerIdentity from "../../components/ui/CustomerIdentity";
 import SaleReference from "../../components/ui/SaleReference";
@@ -101,7 +102,7 @@ export default function HistoricoEntregas() {
       setRotas(Array.isArray(response.data) ? response.data : []);
     } catch (err) {
       console.error("Erro ao carregar histórico:", err);
-      alert("Não foi possível carregar o histórico de entregas.");
+      toast.error("Não foi possível carregar o histórico de entregas.");
     } finally {
       setLoading(false);
     }

@@ -10,7 +10,9 @@ NEXT_RUNTIME_DIST="${NEXT_RUNTIME_DIST:-${RUNTIME_DIST}.next}"
 PREV_RUNTIME_DIST="${PREV_RUNTIME_DIST:-${RUNTIME_DIST}.prev}"
 RUNTIME_RELEASE_MARKER="${RUNTIME_RELEASE_MARKER:-${RUNTIME_DIST}/.release-commit}"
 NEXT_RUNTIME_RELEASE_MARKER="${NEXT_RUNTIME_RELEASE_MARKER:-${NEXT_RUNTIME_DIST}/.release-commit}"
-PUBLIC_HEALTH_URL="${PUBLIC_HEALTH_URL:-https://mlprohub.com.br/api/health}"
+DEPLOY_PUBLIC_DOMAIN="${DEPLOY_PUBLIC_DOMAIN:-corepet.com.br}"
+PUBLIC_HEALTH_URL="${PUBLIC_HEALTH_URL:-https://${DEPLOY_PUBLIC_DOMAIN}/api/health}"
+PUBLIC_RELEASE_URL="${PUBLIC_RELEASE_URL:-https://${DEPLOY_PUBLIC_DOMAIN}/release-commit.txt}"
 DEPLOY_EVENTS_PATH="${DEPLOY_EVENTS_PATH:-backend/logs/deploy_events.jsonl}"
 RELEASE_GATE_GITHUB_REPOSITORY="${RELEASE_GATE_GITHUB_REPOSITORY:-lcsgmoraes-droid/Sistema-Pet}"
 RELEASE_STATUS_PATH="${RELEASE_STATUS_PATH:-backend/logs/release_status.json}"
@@ -27,6 +29,9 @@ backup_dir=""
 db_backup_dir=""
 db_backup_file=""
 DEPLOY_LOCK_FILE="${DEPLOY_LOCK_FILE:-/tmp/petshop-deploy-in-progress}"
+DEPLOY_MUTEX_FILE="${DEPLOY_MUTEX_FILE:-/tmp/petshop-deploy.lock}"
+DEPLOY_LOCK_HELD="${DEPLOY_LOCK_HELD:-0}"
+DEPLOY_OWNS_LOCK="${DEPLOY_OWNS_LOCK:-0}"
 
 log() {
   printf '\n[%s] %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$*"
@@ -181,7 +186,12 @@ on_error() {
 trap 'on_error $LINENO' ERR
 
 cleanup_deploy_lock() {
+  [[ "$DEPLOY_OWNS_LOCK" == "1" ]] || return 0
   rm -f "$DEPLOY_LOCK_FILE" 2>/dev/null || true
+  flock -u 9 2>/dev/null || true
+  exec 9>&- 2>/dev/null || true
+  DEPLOY_LOCK_HELD=0
+  DEPLOY_OWNS_LOCK=0
 }
 
 cleanup_release_candidate() {
@@ -215,6 +225,27 @@ wait_for() {
   fail "Timeout aguardando $label"
 }
 
+validar_commit_publico() {
+  local esperado="$1"
+  local attempts="${2:-12}"
+  local delay="${3:-5}"
+  local publicado=""
+
+  for attempt in $(seq 1 "$attempts"); do
+    publicado="$(curl -fsS --max-time 10 -H 'Cache-Control: no-cache' "${PUBLIC_RELEASE_URL}?t=${esperado}" 2>/dev/null | tr -d '[:space:]' || true)"
+    if [[ "$publicado" == "$esperado" ]]; then
+      log "Versao publica confirmada no dominio: ${publicado:0:8}"
+      return 0
+    fi
+
+    printf 'Aguardando commit publico %s (%s/%s); recebido: %s...\n' \
+      "${esperado:0:8}" "$attempt" "$attempts" "${publicado:-indisponivel}"
+    sleep "$delay"
+  done
+
+  fail "O dominio ${DEPLOY_PUBLIC_DOMAIN} nao publicou o commit esperado ${esperado}."
+}
+
 requires_runtime_deploy() {
   local changed_files="$1"
   local file
@@ -242,9 +273,27 @@ require_cmd docker
 require_cmd npm
 require_cmd curl
 require_cmd python3
+require_cmd flock
 require_node_runtime
 
 cd "$APP_DIR"
+
+if [[ "$DEPLOY_LOCK_HELD" != "1" ]]; then
+  exec 9>"$DEPLOY_MUTEX_FILE"
+  if ! flock -n 9; then
+    fail "Outro deploy ja esta em andamento neste servidor. Aguarde a conclusao antes de tentar novamente."
+  fi
+  DEPLOY_LOCK_HELD=1
+  DEPLOY_OWNS_LOCK=1
+fi
+
+mark_step "validar_destino_publico"
+log "Confirmando que este host atende ${DEPLOY_PUBLIC_DOMAIN}"
+python3 "$APP_DIR/scripts/validate_deploy_target.py" \
+  --domain "$DEPLOY_PUBLIC_DOMAIN" \
+  --health-url "$PUBLIC_HEALTH_URL" \
+  || fail "Validacao do destino publico falhou. Nenhuma alteracao de codigo ou banco foi iniciada."
+
 touch "$DEPLOY_LOCK_FILE" || true
 
 mark_step "validar_repositorio"
@@ -304,11 +353,14 @@ if [[ "$HEAD_BEFORE" != "$HEAD_AFTER" && "$DEPLOY_REEXECUTED" != "1" ]]; then
     NEXT_RUNTIME_DIST="$NEXT_RUNTIME_DIST" PREV_RUNTIME_DIST="$PREV_RUNTIME_DIST" \
     RUNTIME_RELEASE_MARKER="$RUNTIME_RELEASE_MARKER" \
     NEXT_RUNTIME_RELEASE_MARKER="$NEXT_RUNTIME_RELEASE_MARKER" \
-    PUBLIC_HEALTH_URL="$PUBLIC_HEALTH_URL" DEPLOY_EVENTS_PATH="$DEPLOY_EVENTS_PATH" \
+    DEPLOY_PUBLIC_DOMAIN="$DEPLOY_PUBLIC_DOMAIN" \
+    PUBLIC_HEALTH_URL="$PUBLIC_HEALTH_URL" PUBLIC_RELEASE_URL="$PUBLIC_RELEASE_URL" \
+    DEPLOY_EVENTS_PATH="$DEPLOY_EVENTS_PATH" \
     RELEASE_GATE_GITHUB_REPOSITORY="$RELEASE_GATE_GITHUB_REPOSITORY" \
     RELEASE_STATUS_PATH="$RELEASE_STATUS_PATH" \
     RELEASE_STATUS_NEXT_PATH="$RELEASE_STATUS_NEXT_PATH" \
-    DEPLOY_LOCK_FILE="$DEPLOY_LOCK_FILE" \
+    DEPLOY_LOCK_FILE="$DEPLOY_LOCK_FILE" DEPLOY_MUTEX_FILE="$DEPLOY_MUTEX_FILE" \
+    DEPLOY_LOCK_HELD="$DEPLOY_LOCK_HELD" DEPLOY_OWNS_LOCK="$DEPLOY_OWNS_LOCK" \
     bash "$APP_DIR/scripts/deploy_producao_seguro.sh"
 fi
 
@@ -372,6 +424,10 @@ if ! requires_runtime_deploy "$changed_files" && [[ "$runtime_release_mismatch" 
 
   mkdir -p "$(dirname "$RUNTIME_RELEASE_MARKER")"
   printf '%s\n' "$HEAD_AFTER" >"$RUNTIME_RELEASE_MARKER"
+  printf '%s\n' "$HEAD_AFTER" >"$RUNTIME_DIST/release-commit.txt"
+
+  mark_step "validar_commit_publico"
+  validar_commit_publico "$HEAD_AFTER"
 
   git rev-parse HEAD >"$backup_dir/head_after.txt"
   docker compose -f "$COMPOSE_FILE" ps >"$backup_dir/docker_ps_after.txt" || true
@@ -478,6 +534,7 @@ mkdir -p "$NEXT_RUNTIME_DIST"
 
 [[ -s "$NEXT_RUNTIME_DIST/index.html" ]] || fail "Build do frontend nao gerou index.html em $NEXT_RUNTIME_DIST"
 printf '%s\n' "$HEAD_AFTER" >"$NEXT_RUNTIME_RELEASE_MARKER"
+printf '%s\n' "$HEAD_AFTER" >"$NEXT_RUNTIME_DIST/release-commit.txt"
 
 mark_step "validar_compose"
 audit_step "Validando docker compose de producao"
@@ -571,6 +628,10 @@ mark_step "validar_health_publico"
 audit_step "Validando health publico"
 log "Aguardando health publico"
 wait_for "health publico" "curl -fsS --max-time 10 '$PUBLIC_HEALTH_URL'" 12 5
+
+mark_step "validar_commit_publico"
+audit_step "Confirmando que o dominio publico serve o commit implantado"
+validar_commit_publico "$HEAD_AFTER"
 
 mark_step "checar_estado_final"
 audit_step "Checando estado final dos containers"

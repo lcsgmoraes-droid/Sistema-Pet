@@ -1,71 +1,50 @@
+import { FiCheckCircle } from "react-icons/fi";
 import { formatarDataHora } from "./lembretesFormatters";
 
 export default function LembretesBlingAutocadastros({ autocadastrosBling, onAbrirProduto }) {
   if (autocadastrosBling.total <= 0) return null;
 
   return (
-    <div
-      style={{
-        marginBottom: "20px",
-        borderRadius: "12px",
-        border: "1px solid #86efac",
-        overflow: "hidden",
-        background: "#fff",
-      }}
-    >
-      <div
-        style={{
-          background: "#dcfce7",
-          padding: "12px 20px",
-          borderBottom: "1px solid #86efac",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          gap: "10px",
-          flexWrap: "wrap",
-        }}
-      >
-        <span style={{ fontWeight: "700", color: "#166534", fontSize: "14px" }}>
-          Auto cadastro Bling (ultimas 24h)
+    <section className="mb-5 overflow-hidden rounded-2xl border border-emerald-200 bg-white shadow-sm dark:border-emerald-500/30 dark:bg-slate-900">
+      <header className="flex flex-wrap items-center justify-between gap-3 border-b border-emerald-200 bg-emerald-50 px-5 py-4 dark:border-emerald-500/30 dark:bg-emerald-500/10">
+        <div className="flex items-center gap-3">
+          <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-white text-emerald-700 shadow-sm ring-1 ring-emerald-200 dark:bg-slate-900 dark:text-emerald-300 dark:ring-emerald-500/30">
+            <FiCheckCircle aria-hidden="true" />
+          </span>
+          <div>
+            <h2 className="m-0 text-base font-semibold text-slate-900 dark:text-slate-100">
+              Auto cadastro Bling
+            </h2>
+            <p className="mt-0.5 text-xs text-slate-600 dark:text-slate-400">Ultimas 24 horas</p>
+          </div>
+        </div>
+        <span className="rounded-full bg-white px-2.5 py-1 text-xs font-bold text-emerald-800 ring-1 ring-inset ring-emerald-200 dark:bg-slate-900 dark:text-emerald-200 dark:ring-emerald-500/30">
+          {autocadastrosBling.total} itens
         </span>
-        <span style={{ fontWeight: "700", color: "#166534", fontSize: "14px" }}>
-          {autocadastrosBling.total}
-        </span>
-      </div>
-      <div style={{ padding: "12px 20px" }}>
-        <p style={{ margin: "0 0 8px", color: "#065f46", fontSize: "13px" }}>
-          O sistema ja identificou SKU sem cadastro, criou o produto e seguiu com a baixa
-          automaticamente. Este aviso some sozinho apos 1 dia.
+      </header>
+      <div className="p-4 sm:p-5">
+        <p className="mb-3 text-sm leading-5 text-slate-600 dark:text-slate-400">
+          O sistema identificou SKU sem cadastro, criou o produto e seguiu com a baixa
+          automaticamente. Este aviso desaparece apos 1 dia.
         </p>
-        <div style={{ display: "grid", gap: "6px" }}>
+        <div className="grid gap-2">
           {autocadastrosBling.items.slice(0, 8).map((item) => (
             <button
               key={item.produto_id}
               type="button"
-              style={{
-                width: "100%",
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                background: "#f0fdf4",
-                border: "1px solid #bbf7d0",
-                borderRadius: "8px",
-                padding: "8px 10px",
-                cursor: "pointer",
-                textAlign: "left",
-              }}
+              className="flex w-full flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-left text-sm transition hover:border-emerald-300 hover:bg-emerald-50 dark:border-slate-700 dark:bg-slate-900 dark:hover:border-emerald-500/40 dark:hover:bg-emerald-500/10"
               onClick={() => onAbrirProduto(item)}
             >
-              <span style={{ fontSize: "13px", color: "#14532d" }}>
+              <span className="font-medium text-slate-800 dark:text-slate-200">
                 {item.codigo} - {item.nome}
               </span>
-              <span style={{ fontSize: "12px", color: "#166534" }}>
+              <span className="text-xs text-slate-500 dark:text-slate-400">
                 {formatarDataHora(item.created_at)}
               </span>
             </button>
           ))}
         </div>
       </div>
-    </div>
+    </section>
   );
 }

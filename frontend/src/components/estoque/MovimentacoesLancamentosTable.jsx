@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from "react";
 import { Trash2 } from "lucide-react";
 import { formatMoneyBRL } from "../../utils/formatters";
 import ActionButton from "../ui/ActionButton";
@@ -101,6 +102,44 @@ function CanalBadge({ labelsCanais, movimentacao }) {
   );
 }
 
+function MovimentacaoObservacao({ expandida, movimentacaoId, observacao, onAlternar }) {
+  const textoRef = useRef(null);
+  const [temConteudoOculto, setTemConteudoOculto] = useState(false);
+
+  useEffect(() => {
+    if (expandida || !textoRef.current) return undefined;
+
+    const texto = textoRef.current;
+    const medirConteudo = () => {
+      setTemConteudoOculto(texto.scrollHeight > texto.clientHeight + 1);
+    };
+
+    medirConteudo();
+    const observer = globalThis.ResizeObserver ? new ResizeObserver(medirConteudo) : null;
+    observer?.observe(texto);
+
+    return () => observer?.disconnect();
+  }, [expandida, observacao]);
+
+  return (
+    <div className="min-w-0">
+      <p ref={textoRef} className={`break-words leading-5 ${expandida ? "" : "line-clamp-2"}`}>
+        {observacao}
+      </p>
+      {temConteudoOculto || expandida ? (
+        <button
+          type="button"
+          className="mt-1 rounded-md text-xs font-semibold text-teal-700 transition hover:text-teal-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600"
+          aria-expanded={expandida}
+          onClick={(event) => onAlternar(event, movimentacaoId)}
+        >
+          {expandida ? "Ver menos" : "Ver mais"}
+        </button>
+      ) : null}
+    </div>
+  );
+}
+
 export default function MovimentacoesLancamentosTable({
   abrirModal,
   formatarData,
@@ -125,6 +164,20 @@ export default function MovimentacoesLancamentosTable({
   totalMovimentacoes = 0,
 }) {
   const unidadeProduto = produto?.unidade || produto?.unidade_medida || "UN";
+  const [observacoesExpandidas, setObservacoesExpandidas] = useState(() => new Set());
+
+  const alternarObservacao = (event, movimentacaoId) => {
+    event.stopPropagation();
+    setObservacoesExpandidas((atuais) => {
+      const proximas = new Set(atuais);
+      if (proximas.has(movimentacaoId)) {
+        proximas.delete(movimentacaoId);
+      } else {
+        proximas.add(movimentacaoId);
+      }
+      return proximas;
+    });
+  };
 
   return (
     <div className="overflow-hidden rounded-lg bg-white shadow-sm">
@@ -145,7 +198,7 @@ export default function MovimentacoesLancamentosTable({
 
       <div className="overflow-x-auto">
         <table
-          className={`min-w-full divide-y divide-slate-200 transition-opacity ${
+          className={`min-w-[1320px] divide-y divide-slate-200 transition-opacity ${
             loading ? "opacity-50" : "opacity-100"
           }`}
         >
@@ -186,7 +239,7 @@ export default function MovimentacoesLancamentosTable({
               <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">
                 Canal
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">
+              <th className="min-w-[320px] px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">
                 Observacao
               </th>
             </tr>
@@ -209,6 +262,9 @@ export default function MovimentacoesLancamentosTable({
                   movimentacao.referencia_tipo === "venda" &&
                   movAnterior.referencia_tipo === "venda" &&
                   movimentacao.referencia_id === movAnterior.referencia_id;
+                const observacao =
+                  movimentacao.observacao_exibicao || movimentacao.observacao || "";
+                const observacaoExpandida = observacoesExpandidas.has(movimentacao.id);
 
                 return (
                   <tr
@@ -300,17 +356,28 @@ export default function MovimentacoesLancamentosTable({
                     <td className="whitespace-nowrap px-4 py-3 text-sm">
                       <CanalBadge labelsCanais={labelsCanais} movimentacao={movimentacao} />
                     </td>
-                    <td className="px-4 py-3 text-sm text-slate-600">
-                      <div className="flex items-center gap-2">
-                        {movCancelado ? <StatusBadge status="cancelado" /> : null}
-                        {movimentacao.motivo &&
-                        movimentacao.motivo !== "compra" &&
-                        !String(movimentacao.motivo).startsWith("venda") ? (
-                          <StatusBadge intent="info">
-                            {getMotivoLabel(movimentacao.motivo)}
-                          </StatusBadge>
-                        ) : null}
-                        {movimentacao.observacao_exibicao || movimentacao.observacao}
+                    <td className="min-w-[320px] max-w-[440px] px-4 py-3 align-top text-sm text-slate-600">
+                      <div className="flex min-w-0 flex-col gap-2">
+                        <div className="flex flex-wrap items-center gap-2">
+                          {movCancelado ? <StatusBadge status="cancelado" /> : null}
+                          {movimentacao.motivo &&
+                          movimentacao.motivo !== "compra" &&
+                          !String(movimentacao.motivo).startsWith("venda") ? (
+                            <StatusBadge intent="info">
+                              {getMotivoLabel(movimentacao.motivo)}
+                            </StatusBadge>
+                          ) : null}
+                        </div>
+                        {observacao ? (
+                          <MovimentacaoObservacao
+                            expandida={observacaoExpandida}
+                            movimentacaoId={movimentacao.id}
+                            observacao={observacao}
+                            onAlternar={alternarObservacao}
+                          />
+                        ) : (
+                          <span className="text-slate-400">-</span>
+                        )}
                       </div>
                     </td>
                   </tr>

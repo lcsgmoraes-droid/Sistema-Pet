@@ -2,7 +2,9 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 
-const source = readFileSync(new URL("./Lembretes.jsx", import.meta.url), "utf8");
+const source = ["./lembretes/useLembretesController.js", "./lembretes/LembretesValidadeSection.jsx"]
+  .map((relativePath) => readFileSync(new URL(relativePath, import.meta.url), "utf8"))
+  .join("\n");
 
 test("Lembretes consulta configuracao de validade antes de listar pendencias", () => {
   assert.match(source, /api\.get\(["']\/empresa\/config-estoque["']\)/);

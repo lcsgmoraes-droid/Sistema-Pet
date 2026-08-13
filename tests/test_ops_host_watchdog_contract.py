@@ -13,7 +13,7 @@ def test_host_watchdog_uses_public_health_and_keeps_deep_check_internal():
     installer = read("scripts/install_ops_host_watchdog_cron.sh")
     nginx_locations = read("nginx/includes/app-server-locations.conf")
 
-    public_health = "https://mlprohub.com.br/api/health"
+    public_health = "https://corepet.com.br/api/health"
     blocked_public_watchdog = f"{public_health}/watchdog"
 
     assert f"HOST_WATCHDOG_URL:-{public_health}" in watchdog

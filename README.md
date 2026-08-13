@@ -75,7 +75,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\bootstrap_dev_environment.ps1
 Deploy real so pelo caminho seguro documentado:
 
 ```powershell
-ssh -i ~/.ssh/mlprohub_codex_deploy -o IdentitiesOnly=yes -o BatchMode=yes petdeploy@192.241.150.121 "sudo -n /usr/local/sbin/petshop-deploy-producao"
+powershell -ExecutionPolicy Bypass -File .\scripts\deploy_producao_remoto.ps1
 ```
 
 Antes de qualquer deploy real, confirmar escopo, rollback e autorizacao.

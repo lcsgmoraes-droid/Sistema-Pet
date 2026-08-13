@@ -113,6 +113,10 @@ const Layout = () => {
     // Se não tem preferência salva, fecha no PDV por padrão
     return location.pathname !== "/pdv";
   });
+  const [sidebarWidth, setSidebarWidth] = useState(() => {
+    const salvo = Number(localStorage.getItem("sidebar_width"));
+    return Number.isFinite(salvo) && salvo >= 232 && salvo <= 440 ? salvo : 256;
+  });
 
   const [submenusOpen, setSubmenusOpen] = useState({});
 
@@ -293,6 +297,12 @@ const Layout = () => {
       localStorage.setItem("sidebar_open", JSON.stringify(sidebarOpen));
     }
   }, [sidebarOpen, isMobile]);
+
+  useEffect(() => {
+    if (!isMobile) {
+      localStorage.setItem("sidebar_width", String(sidebarWidth));
+    }
+  }, [sidebarWidth, isMobile]);
 
   useEffect(() => {
     if (!isMobile) {
@@ -632,6 +642,8 @@ const Layout = () => {
         <LayoutSidebar
           isMobile={isMobile}
           sidebarOpen={sidebarOpen}
+          sidebarWidth={sidebarWidth}
+          setSidebarWidth={setSidebarWidth}
           setSidebarOpen={setSidebarOpen}
           setSidebarVisible={setSidebarVisible}
           devControlesAtivos={devControlesAtivos}

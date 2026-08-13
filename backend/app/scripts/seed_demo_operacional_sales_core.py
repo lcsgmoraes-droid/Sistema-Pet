@@ -52,6 +52,46 @@ def _insert_cashier(
     opened_at = datetime.combine(
         base_date - timedelta(days=10), time(hour=8, minute=30)
     )
+    existing_id = _scalar(
+        db,
+        """
+        SELECT id
+        FROM caixas
+        WHERE tenant_id = :tenant_id
+          AND observacoes_abertura LIKE 'Demo operacional%'
+        ORDER BY id
+        LIMIT 1
+        """,
+        {"tenant_id": tenant_id},
+    )
+    if existing_id:
+        db.execute(
+            text(
+                """
+                UPDATE caixas
+                SET numero_caixa = 9901, usuario_id = :user_id,
+                    usuario_nome = :user_name, data_abertura = :opened_at,
+                    data_fechamento = NULL, valor_abertura = 600.00,
+                    valor_esperado = NULL, valor_informado = NULL,
+                    diferenca = NULL, status = 'aberto',
+                    conta_origem_id = :bank_cash_id,
+                    conta_origem_nome = 'Caixa Loja Demo',
+                    observacoes_abertura = 'Demo operacional - caixa para videos',
+                    observacoes_fechamento = NULL, updated_at = now()
+                WHERE id = :cashier_id AND tenant_id = :tenant_id
+                """
+            ),
+            {
+                "cashier_id": int(existing_id),
+                "user_id": user_id,
+                "user_name": user_name,
+                "opened_at": opened_at,
+                "bank_cash_id": bank_cash_id,
+                "tenant_id": tenant_id,
+            },
+        )
+        return int(existing_id)
+
     return int(
         _scalar(
             db,
@@ -120,6 +160,7 @@ def _insert_sale(
     )
     sale_status = "finalizada" if scenario.received_ratio >= 1 else "aberta"
     payment_record_value = total if scenario.received_ratio >= 1 else received_amount
+    is_card_payment = scenario.payment_key in {"debito", "credito"}
     channel_category_key = (
         "receita_app"
         if scenario.channel == "app_mobile"
@@ -216,8 +257,11 @@ def _insert_sale(
                 "observations": f"Demo operacional - {scenario.observations}",
                 "cashier_id": cashier_id,
                 "channel": scenario.channel,
-                "conciliado": scenario.received_ratio >= 1,
-                "conciliado_em": sale_dt if scenario.received_ratio >= 1 else None,
+                # Receber a venda e conciliá-la com a operadora são eventos
+                # diferentes. As vendas de cartão do Demo ficam pendentes para
+                # que a tela de conciliação tenha cenários reais a demonstrar.
+                "conciliado": not is_card_payment,
+                "conciliado_em": None if is_card_payment else sale_dt,
                 "sale_status": sale_status,
                 "finalized_at": sale_dt if scenario.received_ratio >= 1 else None,
                 "sale_dt": sale_dt,
@@ -253,13 +297,13 @@ def _insert_sale(
             INSERT INTO venda_pagamentos (
                 venda_id, forma_pagamento, valor, bandeira, numero_parcelas,
                 numero_transacao, numero_autorizacao, nsu_cartao,
-                status_conciliacao, valor_recebido, troco, status,
+                operadora_id, status_conciliacao, valor_recebido, troco, status,
                 data_pagamento, created_at, tenant_id
             )
             VALUES (
                 :sale_id, :payment_label, :payment_record_value, :brand, :installments,
                 :transaction, :authorization, :nsu,
-                :conciliation_status, :received_amount, 0, :payment_status,
+                :operator_id, :conciliation_status, :received_amount, 0, :payment_status,
                 :payment_dt, now(), :tenant_id
             )
             """
@@ -276,9 +320,10 @@ def _insert_sale(
             "nsu": f"DEMO-NSU-{scenario.number[-3:]}"
             if payment["fee_percent"]
             else None,
-            "conciliation_status": "conciliado"
-            if scenario.received_ratio >= 1
-            else "nao_conciliado",
+            "operator_id": support["card_operator_id"] if is_card_payment else None,
+            "conciliation_status": "nao_conciliado"
+            if is_card_payment
+            else "conciliado",
             "received_amount": received_amount,
             "payment_status": "aprovado" if received_amount > 0 else "pendente",
             "payment_dt": sale_dt,

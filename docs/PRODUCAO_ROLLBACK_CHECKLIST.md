@@ -10,11 +10,11 @@ Ele nao autoriza deploy. Qualquer comando no servidor de producao ou push direto
 - Backup e restore smoke: `docs/PRODUCAO_BACKUP_RESTORE_TESTE.md`
 - Fluxo unico DEV -> PROD: `docs/FLUXO_UNICO_DEV_PROD.md`
 - Script oficial de deploy: `scripts/deploy_producao_seguro.sh`
-- Servidor preferencial: `petdeploy@192.241.150.121`
-- Servidor fallback: `root@192.241.150.121`
+- Servidor preferencial: `petdeploy@corepet.com.br`
+- Servidor fallback: `root@corepet.com.br`
 - Projeto no servidor: `/opt/petshop`
-- Health publico: `https://mlprohub.com.br/api/health`
-- Watchdog publico: `https://mlprohub.com.br/health/watchdog`
+- Health publico: `https://corepet.com.br/api/health`
+- Watchdog publico: `https://corepet.com.br/health/watchdog`
 
 ## Responsaveis e tempos alvo
 
@@ -50,7 +50,7 @@ Marcar estes itens antes de rodar qualquer comando no servidor:
 Rodar somente depois da autorizacao explicita:
 
 ```bash
-ssh -i ~/.ssh/mlprohub_codex_deploy -o IdentitiesOnly=yes -o BatchMode=yes petdeploy@192.241.150.121 "sudo -n /usr/local/sbin/petshop-deploy-producao"
+powershell -ExecutionPolicy Bypass -File .\scripts\deploy_producao_remoto.ps1
 ```
 
 Durante o deploy, guardar estes dados:
@@ -68,18 +68,18 @@ Durante o deploy, guardar estes dados:
 Rodar estes checks e guardar o resultado:
 
 ```bash
-curl -fsS https://mlprohub.com.br/api/health
-curl -fsS https://mlprohub.com.br/health/watchdog
+curl -fsS https://corepet.com.br/api/health
+curl -fsS https://corepet.com.br/health/watchdog
 ```
 
 ```bash
-ssh -i ~/.ssh/mlprohub_codex_deploy -o IdentitiesOnly=yes -o BatchMode=yes petdeploy@192.241.150.121 "sudo -n /usr/local/sbin/petshop-status-producao"
+ssh -i ~/.ssh/mlprohub_codex_deploy -o IdentitiesOnly=yes -o BatchMode=yes petdeploy@corepet.com.br "sudo -n /usr/local/sbin/petshop-status-producao"
 ```
 
 Se a mudanca envolver Ops ou observabilidade, validar tambem:
 
-- `https://mlprohub.com.br/ops`
-- `https://mlprohub.com.br/ops/incidentes`
+- `https://corepet.com.br/ops`
+- `https://corepet.com.br/ops/incidentes`
 
 ## Quando acionar rollback
 
@@ -99,14 +99,14 @@ Se houver suspeita de problema no banco, parar e tratar como incidente de dados.
 Usar quando o backend esta saudavel e o problema parece estar somente no frontend.
 
 ```bash
-ssh -o BatchMode=yes root@192.241.150.121 "cd /opt/petshop && test -d runtime/frontend/dist.prev && rm -rf runtime/frontend/dist.bad && mv runtime/frontend/dist runtime/frontend/dist.bad && mv runtime/frontend/dist.prev runtime/frontend/dist && docker compose -f docker-compose.prod.yml up -d --force-recreate --no-deps nginx"
+ssh -o BatchMode=yes root@corepet.com.br "cd /opt/petshop && test -d runtime/frontend/dist.prev && rm -rf runtime/frontend/dist.bad && mv runtime/frontend/dist runtime/frontend/dist.bad && mv runtime/frontend/dist.prev runtime/frontend/dist && docker compose -f docker-compose.prod.yml up -d --force-recreate --no-deps nginx"
 ```
 
 Validar:
 
 ```bash
-curl -fsS https://mlprohub.com.br/api/health
-curl -fsS https://mlprohub.com.br/health/watchdog
+curl -fsS https://corepet.com.br/api/health
+curl -fsS https://corepet.com.br/health/watchdog
 ```
 
 ## Rollback de codigo backend
@@ -117,18 +117,18 @@ Substitua `backups/deploy_YYYYMMDD_HHMMSS` pelo backup operacional mostrado no d
 O comando abaixo usa aspas simples no comando remoto para evitar que a maquina local tente ler `head_before.txt`.
 
 ```bash
-ssh -o BatchMode=yes root@192.241.150.121 'cd /opt/petshop && BACKUP_DIR=backups/deploy_YYYYMMDD_HHMMSS && TARGET_HEAD=$(cat "$BACKUP_DIR/head_before.txt") && git reset --hard "$TARGET_HEAD" && docker compose -f docker-compose.prod.yml build backend && docker compose -f docker-compose.prod.yml up -d backend worker-bling nginx'
+ssh -o BatchMode=yes root@corepet.com.br 'cd /opt/petshop && BACKUP_DIR=backups/deploy_YYYYMMDD_HHMMSS && TARGET_HEAD=$(cat "$BACKUP_DIR/head_before.txt") && git reset --hard "$TARGET_HEAD" && docker compose -f docker-compose.prod.yml build backend && docker compose -f docker-compose.prod.yml up -d backend worker-bling nginx'
 ```
 
 Depois validar:
 
 ```bash
-curl -fsS https://mlprohub.com.br/api/health
-curl -fsS https://mlprohub.com.br/health/watchdog
+curl -fsS https://corepet.com.br/api/health
+curl -fsS https://corepet.com.br/health/watchdog
 ```
 
 ```bash
-ssh -o BatchMode=yes root@192.241.150.121 "cd /opt/petshop && docker compose -f docker-compose.prod.yml ps && docker compose -f docker-compose.prod.yml exec -T backend alembic current"
+ssh -o BatchMode=yes root@corepet.com.br "cd /opt/petshop && docker compose -f docker-compose.prod.yml ps && docker compose -f docker-compose.prod.yml exec -T backend alembic current"
 ```
 
 Atencao: se o deploy executou migration Alembic com mudanca de schema ou dados, nao fazer rollback de codigo sem revisar compatibilidade. O codigo antigo pode nao funcionar com o banco novo.
@@ -165,8 +165,8 @@ Depois do deploy ou rollback, registrar:
 
 ## Estado esperado no fim
 
-- `curl -fsS https://mlprohub.com.br/api/health` passa.
-- `curl -fsS https://mlprohub.com.br/health/watchdog` passa.
+- `curl -fsS https://corepet.com.br/api/health` passa.
+- `curl -fsS https://corepet.com.br/health/watchdog` passa.
 - `docker compose -f docker-compose.prod.yml ps` mostra servicos principais saudaveis.
 - `git status --porcelain` no servidor fica vazio.
 - Evento de deploy ou falha fica registrado em `backend/logs/deploy_events.jsonl`.

@@ -4,6 +4,8 @@ import api from "../api";
 import { getAccessToken } from "../auth/tokenStorage";
 import { useEscapeToClose } from "../utils/modalEscape";
 import { MatchPair, NSUStoneItem, VendaPDVItem } from "./conciliacao/Aba1ConciliacaoCards";
+import { confirmarCorePet } from "../services/corepetDialog";
+import toast from "react-hot-toast";
 
 /**
  * ABA 1 V2: CONCILIAÇÃO DE VENDAS (Duas Colunas)
@@ -174,29 +176,27 @@ export default function Aba1ConciliacaoVendasV2({ onConcluida: _onConcluida, sta
     if (!file) return;
 
     if (!operadoraSelecionada) {
-      alert(
-        "⚠️ Selecione uma operadora primeiro!\n\nAs vendas da planilha serão importadas com a tag da operadora selecionada.\nIsso é importante para o processo de conciliação.",
-      );
+      toast.error("Selecione uma operadora antes de importar a planilha.");
       event.target.value = ""; // Limpar input
       return;
     }
 
     // Bloquear upload para Legacy
     if (operadoraSelecionada.id === "legacy") {
-      alert(
-        '⚠️ Vendas Legacy não têm planilha!\n\nVendas sem operadora devem ter a operadora preenchida manualmente usando o botão "Preencher Operadora".',
+      toast.error(
+        'Vendas Legacy não usam planilha. Preencha a operadora pelo botão "Preencher Operadora".',
       );
       event.target.value = ""; // Limpar input
       return;
     }
 
     // Confirmar operadora antes de subir
-    const confirmar = window.confirm(
-      `🎯 Confirmar Upload\n\n` +
-        `Operadora selecionada: ${operadoraSelecionada.nome}\n\n` +
-        `Todas as vendas da planilha "${file.name}" serão marcadas com esta operadora.\n\n` +
-        `Deseja continuar?`,
-    );
+    const confirmar = await confirmarCorePet({
+      titulo: "Importar planilha da operadora",
+      mensagem: `Operadora: ${operadoraSelecionada.nome}\nArquivo: ${file.name}\n\nAs vendas importadas serão vinculadas a esta operadora.`,
+      confirmarTexto: "Importar planilha",
+      variante: "question",
+    });
 
     if (!confirmar) {
       event.target.value = ""; // Limpar input se cancelar
@@ -221,12 +221,8 @@ export default function Aba1ConciliacaoVendasV2({ onConcluida: _onConcluida, sta
         await carregarNSUsStone();
         await carregarVendasPDV();
 
-        // Mostrar resultado
-        alert(
-          `✅ Planilha importada com sucesso!\n\n` +
-            `📊 ${response.data.total_nsus || 0} NSUs carregados\n` +
-            `Operadora: ${operadoraSelecionada.nome}\n\n` +
-            `Clique em "Processar Matches" para conciliar automaticamente.`,
+        toast.success(
+          `${response.data.total_nsus || 0} NSUs importados para ${operadoraSelecionada.nome}.`,
         );
 
         event.target.value = ""; // Limpar input para permitir novo upload
@@ -269,7 +265,7 @@ export default function Aba1ConciliacaoVendasV2({ onConcluida: _onConcluida, sta
   // Função: Processar matches automáticos (APENAS visualização)
   const handleProcessarMatches = async () => {
     if (!operadoraSelecionada) {
-      alert("Selecione uma operadora primeiro!");
+      toast.error("Selecione uma operadora primeiro.");
       return;
     }
 
@@ -284,15 +280,8 @@ export default function Aba1ConciliacaoVendasV2({ onConcluida: _onConcluida, sta
         setMatches(response.data.matches || []);
         setMostrarConfirmacao(true);
 
-        // Mostrar resumo
-        alert(
-          `🔍 Matches encontrados!\n\n` +
-            `📊 Resumo:\n` +
-            `• ${response.data.conferidas || 0} vendas OK\n` +
-            `• ${response.data.corrigidas || 0} com divergências\n` +
-            `• ${response.data.sem_nsu || 0} sem NSU\n` +
-            `• ${response.data.orfaos || 0} NSUs órfãos\n\n` +
-            `👀 Visualize os matches abaixo e confirme para conciliar.`,
+        toast.success(
+          `${response.data.conferidas || 0} conferidas, ${response.data.corrigidas || 0} divergências e ${response.data.orfaos || 0} órfãos encontrados.`,
         );
       }
     } catch (error) {
@@ -311,9 +300,7 @@ export default function Aba1ConciliacaoVendasV2({ onConcluida: _onConcluida, sta
     const matchesOK = matches.filter((m) => m.status === "ok");
 
     if (matchesOK.length === 0) {
-      alert(
-        "⚠️ Nenhum match OK para confirmar!\n\nApenas matches perfeitos (sem divergências) podem ser conciliados.",
-      );
+      toast.error("Nenhum match perfeito está disponível para confirmação.");
       return;
     }
 
@@ -334,7 +321,7 @@ export default function Aba1ConciliacaoVendasV2({ onConcluida: _onConcluida, sta
       });
 
       if (response.data.success) {
-        alert("✅ " + response.data.message);
+        toast.success(response.data.message || "Matches confirmados com sucesso.");
 
         // Limpar estados e recarregar TUDO
         setMatches([]);
@@ -360,12 +347,12 @@ export default function Aba1ConciliacaoVendasV2({ onConcluida: _onConcluida, sta
 
       if (response.data.success) {
         await carregarVendasPDV(); // Recarrega lista
-        alert(`Operadora atualizada para ${response.data.operadora_nome}`);
+        toast.success(`Operadora atualizada para ${response.data.operadora_nome}.`);
         return true;
       }
     } catch (error) {
       console.error("Erro ao atualizar operadora:", error);
-      alert(error.response?.data?.detail || "Erro ao atualizar operadora");
+      toast.error(error.response?.data?.detail || "Erro ao atualizar operadora.");
       return false;
     }
   };

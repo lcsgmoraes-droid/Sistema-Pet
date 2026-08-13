@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { toast } from "react-hot-toast";
 import api from "../../api";
+import { confirmarCorePet } from "../../services/corepetDialog";
 
 const GRUPO_FORNECEDOR_FORM_INICIAL = {
   id: null,
@@ -107,9 +108,12 @@ export default function usePedidosCompraGruposFornecedores({ fornecedorIdAtual, 
   };
 
   const excluirGrupoFornecedor = async (grupo) => {
-    const confirmar = window.confirm(
-      `Excluir o grupo "${grupo.nome}" e liberar os fornecedores vinculados?`,
-    );
+    const confirmar = await confirmarCorePet({
+      titulo: "Excluir grupo de fornecedores?",
+      mensagem: `O grupo "${grupo.nome}" sera removido e os fornecedores vinculados ficarao livres para novos agrupamentos.`,
+      confirmarTexto: "Excluir grupo",
+      variante: "danger",
+    });
     if (!confirmar) {
       return;
     }

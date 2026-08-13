@@ -1,5 +1,6 @@
 import { toast } from "react-hot-toast";
 import api from "../../api";
+import { confirmarCorePet } from "../../services/corepetDialog";
 import {
   calcularQuantidadeTotalUnidadesPedido,
   normalizarQuantidadePorEmbalagemPedido,
@@ -91,7 +92,7 @@ export function createPedidosCompraItemController({
     }
   };
 
-  const adicionarItem = () => {
+  const adicionarItem = async () => {
     if (!itemForm.produto_id || !itemForm.quantidade_pedida || !itemForm.preco_unitario) {
       toast.error("Preencha todos os campos do item");
       return;
@@ -127,16 +128,15 @@ export function createPedidosCompraItemController({
     if (itemExistenteIndex !== -1) {
       // Produto já existe - perguntar ao usuário
       const itemExistente = formData.itens[itemExistenteIndex];
-      const confirmar = window.confirm(
-        `⚠️ O produto "${produto.nome}" já está no pedido!\n\n` +
-          `Quantidade atual: ${itemExistente.quantidade_pedida}\n` +
-          `Preço atual: R$ ${itemExistente.preco_unitario.toFixed(2)}\n\n` +
-          `Nova quantidade: ${quantidade}\n` +
-          `Novo preço: R$ ${preco.toFixed(2)}\n\n` +
-          `Deseja SOMAR a quantidade ao item existente?\n\n` +
-          `✅ OK = Somar quantidade (${itemExistente.quantidade_pedida} + ${quantidade} = ${itemExistente.quantidade_pedida + quantidade})\n` +
-          `❌ CANCELAR = Não adicionar`,
-      );
+      const confirmar = await confirmarCorePet({
+        titulo: "Produto ja adicionado",
+        mensagem:
+          `${produto.nome} ja possui ${itemExistente.quantidade_pedida} unidade(s) no pedido, a R$ ${itemExistente.preco_unitario.toFixed(2)}.\n\n` +
+          `Somar mais ${quantidade} unidade(s) e atualizar o preco para R$ ${preco.toFixed(2)}?`,
+        confirmarTexto: `Somar e ficar com ${itemExistente.quantidade_pedida + quantidade}`,
+        cancelarTexto: "Nao adicionar",
+        variante: "question",
+      });
 
       if (confirmar) {
         // Somar quantidade ao item existente
