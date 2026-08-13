@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
+import { toast } from "react-hot-toast";
 import api from "../../api";
+import { confirmarCorePet, perguntarCorePet } from "../../services/corepetDialog";
 import RotaCardHeader from "./RotaCardHeader";
 import RotaParadasLista from "./RotaParadasLista";
 
@@ -50,7 +52,7 @@ function RotaCard({
       setVendaDetalhes(response.data);
     } catch (err) {
       console.error("Erro ao carregar detalhes da venda:", err);
-      alert("Erro ao carregar detalhes da venda");
+      toast.error("Erro ao carregar detalhes da venda");
       setParadaDetalhesAberta(null);
     } finally {
       setLoadingDetalhes(false);
@@ -64,9 +66,12 @@ function RotaCard({
 
   async function marcarComoEntregue(paradaId, rotaId) {
     if (
-      !confirm(
-        "✅ Confirmar entrega realizada?\n\nUma mensagem será enviada automaticamente para o próximo cliente da rota.",
-      )
+      !(await confirmarCorePet({
+        titulo: "Confirmar entrega realizada?",
+        mensagem: "A parada sera concluida e o proximo cliente da rota recebera uma mensagem.",
+        confirmarTexto: "Confirmar entrega",
+        variante: "success",
+      }))
     ) {
       return;
     }
@@ -79,9 +84,13 @@ function RotaCard({
 
       if (metodo === "manual") {
         // Entregador digita o km do odômetro manualmente
-        const kmDigitado = prompt(
-          "🏁 Digite o KM atual do odômetro (opcional):\n\nDeixe em branco para pular.",
-        );
+        const kmDigitado = await perguntarCorePet({
+          titulo: "Quilometragem da entrega",
+          mensagem: "Informe a leitura atual do odometro. Voce pode deixar o campo vazio para pular.",
+          rotulo: "KM atual",
+          placeholder: "Ex.: 12459,4",
+          confirmarTexto: "Continuar",
+        });
         if (kmDigitado && !isNaN(kmDigitado) && parseFloat(kmDigitado) > 0) {
           params.km_entrega = parseFloat(kmDigitado);
         }
@@ -121,7 +130,7 @@ function RotaCard({
         null,
         { params },
       );
-      alert("✅ " + response.data.message);
+      toast.success(response.data.message);
 
       // Atualizar estado local da parada
       setParadasOrdenadas((prev) =>
@@ -142,16 +151,22 @@ function RotaCard({
     } catch (err) {
       console.error("Erro ao marcar entrega:", err);
       const mensagem = err.response?.data?.detail || "Erro ao marcar entrega como concluída";
-      alert("❌ " + mensagem);
+      toast.error(mensagem);
     } finally {
       setProcessandoEntrega(null);
     }
   }
 
   async function adicionarObservacao(paradaId, rotaId) {
-    const observacao = prompt(
-      "📋 Digite a observação sobre esta entrega:\n\n(Ex: 'Sempre entregar no vizinho', 'Chamar na casa da frente')",
-    );
+    const observacao = await perguntarCorePet({
+      titulo: "Adicionar observacao",
+      mensagem: "Registre uma orientacao importante para esta entrega.",
+      rotulo: "Observacao",
+      placeholder: "Ex.: chamar na casa da frente",
+      multilinha: true,
+      obrigatorio: true,
+      confirmarTexto: "Salvar observacao",
+    });
 
     if (!observacao || observacao.trim() === "") {
       return;
@@ -162,7 +177,7 @@ function RotaCard({
         params: { observacao: observacao.trim() },
       });
 
-      alert("✅ Observação salva com sucesso!");
+      toast.success("Observacao salva com sucesso");
 
       // Atualizar localmente
       setParadasOrdenadas((prev) =>
@@ -170,23 +185,33 @@ function RotaCard({
       );
     } catch (err) {
       console.error("Erro ao salvar observação:", err);
-      alert("❌ Erro ao salvar observação");
+      toast.error("Erro ao salvar observacao");
     }
   }
 
   async function marcarNaoEntregue(paradaId, rotaId, vendaId) {
-    const motivo = prompt(
-      "⚠️ Por que a entrega não foi realizada?\n\n(Ex: 'Cliente ausente', 'Cartão recusado', 'Endereço não encontrado')",
-    );
+    const motivo = await perguntarCorePet({
+      titulo: "Motivo da entrega nao realizada",
+      mensagem: "Esse registro devolvera a venda para Entregas em aberto.",
+      rotulo: "Motivo",
+      placeholder: "Ex.: cliente ausente",
+      multilinha: true,
+      obrigatorio: true,
+      confirmarTexto: "Continuar",
+      variante: "warning",
+    });
 
     if (!motivo || motivo.trim() === "") {
       return;
     }
 
     if (
-      !confirm(
-        "⚠️ Confirmar que a entrega NÃO foi realizada?\n\nA venda voltará para entregas em aberto.",
-      )
+      !(await confirmarCorePet({
+        titulo: "Confirmar entrega nao realizada?",
+        mensagem: "A venda voltara para Entregas em aberto e o motivo informado ficara registrado.",
+        confirmarTexto: "Confirmar ocorrencia",
+        variante: "warning",
+      }))
     ) {
       return;
     }
@@ -197,15 +222,11 @@ function RotaCard({
         params: { motivo: motivo.trim() },
       });
 
-      alert(
-        "✅ Entrega marcada como não realizada. Venda #" +
-          vendaId +
-          " voltou para entregas em aberto.",
-      );
+      toast.success(`Entrega registrada. A venda #${vendaId} voltou para Entregas em aberto.`);
       window.location.reload();
     } catch (err) {
       console.error("Erro ao marcar como não entregue:", err);
-      alert("❌ Erro ao processar");
+      toast.error("Erro ao processar a ocorrencia");
     } finally {
       setProcessandoNaoEntregue(null);
     }
@@ -233,7 +254,14 @@ function RotaCard({
       msgConfirm = `✅ Finalizar esta rota?\n\n📏 Distância percorrida estimada: ${distanciaRouteTotal.toFixed(2)} km\n\nEsta ação não pode ser desfeita.`;
     }
 
-    if (!confirm(msgConfirm)) {
+    if (
+      !(await confirmarCorePet({
+        titulo: "Finalizar esta rota?",
+        mensagem: msgConfirm.replace("✅ Finalizar esta rota?\n\n", ""),
+        confirmarTexto: "Finalizar rota",
+        variante: "success",
+      }))
+    ) {
       return;
     }
 
@@ -244,9 +272,13 @@ function RotaCard({
 
       if (metodo === "manual") {
         // Entregador digita km final do odômetro
-        const kmFinalDigitado = prompt(
-          "🏁 Digite o KM final do odômetro (opcional):\n\nDeixe em branco para pular.",
-        );
+        const kmFinalDigitado = await perguntarCorePet({
+          titulo: "Quilometragem final",
+          mensagem: "Informe a leitura final do odometro ou deixe vazio para concluir sem ela.",
+          rotulo: "KM final",
+          placeholder: "Ex.: 12468,7",
+          confirmarTexto: "Concluir rota",
+        });
         if (kmFinalDigitado && !isNaN(kmFinalDigitado) && parseFloat(kmFinalDigitado) > 0) {
           payload.km_final = parseFloat(kmFinalDigitado);
           if (kmInicial) {
@@ -271,12 +303,12 @@ function RotaCard({
 
       await api.post(`/rotas-entrega/${rotaId}/fechar`, payload);
 
-      alert("✅ Rota finalizada com sucesso!");
+      toast.success("Rota finalizada com sucesso");
       window.location.reload();
     } catch (err) {
       console.error("Erro ao finalizar rota:", err);
       const mensagem = err.response?.data?.detail || "Erro ao finalizar rota";
-      alert("❌ " + mensagem);
+      toast.error(mensagem);
     } finally {
       setProcessandoFinalizacao(false);
     }

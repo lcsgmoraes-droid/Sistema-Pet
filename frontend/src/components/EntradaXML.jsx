@@ -4,6 +4,7 @@ import api from "../api";
 import { getAccessToken } from "../auth/tokenStorage";
 import { toast } from "react-hot-toast";
 import { formatMoneyBRL } from "../utils/formatters";
+import { confirmarCorePet } from "../services/corepetDialog";
 import EntradaXmlCriarProdutoModal from "./entrada-xml/EntradaXmlCriarProdutoModal";
 import EntradaXmlDetalhesModal from "./entrada-xml/EntradaXmlDetalhesModal";
 import EntradaPdfUploadModal from "./entrada-xml/EntradaPdfUploadModal";
@@ -340,7 +341,14 @@ const EntradaXML = () => {
     }
   };
   const excluirNota = async (notaId, numeroNota) => {
-    if (!confirm(`Tem certeza que deseja excluir a nota ${numeroNota}?`)) {
+    const confirmou = await confirmarCorePet({
+      titulo: "Excluir nota fiscal?",
+      mensagem: `A NF-e ${numeroNota} será excluída da Central de Entradas. Esta ação não pode ser desfeita.`,
+      confirmarTexto: "Excluir nota",
+      variante: "perigo",
+    });
+
+    if (!confirmou) {
       return;
     }
 
@@ -364,11 +372,14 @@ const EntradaXML = () => {
   };
 
   const reverterNota = async (notaId, numeroNota) => {
-    if (
-      !confirm(
-        `?? Tem certeza que deseja REVERTER a entrada da nota ${numeroNota}?\n\nIsso ira:\n• Remover as quantidades do estoque\n• Excluir os lotes criados\n• Estornar as contas a pagar lançadas\n• Restaurar o status da nota para pendente`,
-      )
-    ) {
+    const confirmou = await confirmarCorePet({
+      titulo: "Reverter entrada da NF-e?",
+      mensagem: `A NF-e ${numeroNota} voltará para pendente. O sistema removerá as quantidades do estoque, excluirá os lotes criados e estornará as contas a pagar relacionadas.`,
+      confirmarTexto: "Reverter entrada",
+      variante: "perigo",
+    });
+
+    if (!confirmou) {
       return;
     }
 

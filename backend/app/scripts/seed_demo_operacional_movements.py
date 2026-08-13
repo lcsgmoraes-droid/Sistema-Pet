@@ -223,6 +223,7 @@ def _insert_payable_with_payment(
     due_date: date,
     paid: bool,
     channel: str | None,
+    affects_dre: bool = True,
 ) -> int:
     payable_id = int(
         _scalar(
@@ -243,7 +244,7 @@ def _insert_payable_with_payment(
                 0, :amount, :issue_date, :due_date,
                 :payment_date, :status, false, false, :document,
                 'Demo operacional', :beneficiario, 'demo',
-                true, :online, :loja, :user_id, now(),
+                :affects_dre, :online, :loja, :user_id, now(),
                 now(), :tenant_id
             )
             RETURNING id
@@ -262,6 +263,7 @@ def _insert_payable_with_payment(
                 "status": "pago" if paid else "pendente",
                 "document": document,
                 "beneficiario": description.replace("Demo operacional - ", ""),
+                "affects_dre": affects_dre,
                 "online": 100 if channel in {"app_mobile", "ecommerce"} else 0,
                 "loja": 0 if channel in {"app_mobile", "ecommerce"} else 100,
                 "user_id": user_id,
@@ -386,6 +388,7 @@ def _insert_fixed_payables(
                 due_date=due,
                 paid=payable.paid,
                 channel=payable.channel,
+                affects_dre=payable.affects_dre,
             )
         )
     return result

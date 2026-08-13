@@ -22,6 +22,7 @@ CORREÇÕES CRÍTICAS APLICADAS (Revisão Fase 2):
     5. ✅ Nomenclatura ajustada: "liquidar" → "processar etapa" / "avançar etapa"
 """
 
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 from datetime import datetime, date
 from typing import Dict, List, Optional
@@ -105,16 +106,27 @@ def conciliar_vendas_stone(
         # Filtra por operadora_id OU vendas antigas sem operadora (NULL)
         from .vendas_models import VendaPagamento
 
-        query = db.query(Venda).filter(
-            Venda.tenant_id == tenant_id, Venda.status == "finalizada"
+        # Manter exatamente o mesmo universo exibido na lista da Aba 1. Antes,
+        # o processamento trazia também vendas em dinheiro/Pix sem NSU e as
+        # mostrava como falsas pendências de cartão.
+        query = db.query(Venda).join(VendaPagamento).filter(
+            Venda.tenant_id == tenant_id,
+            VendaPagamento.tenant_id == tenant_id,
+            Venda.status == "finalizada",
+            or_(
+                VendaPagamento.forma_pagamento.ilike("%débito%"),
+                VendaPagamento.forma_pagamento.ilike("%debito%"),
+                VendaPagamento.forma_pagamento.ilike("%crédito%"),
+                VendaPagamento.forma_pagamento.ilike("%credito%"),
+                VendaPagamento.forma_pagamento.ilike("%cartão%"),
+                VendaPagamento.forma_pagamento.ilike("%cartao%"),
+            ),
         )
 
-        # Se operadora foi especificada, filtrar vendas dessa operadora + vendas antigas (NULL)
+        # Se a operadora foi especificada, confrontar somente os pagamentos
+        # vinculados a ela; vendas legadas pertencem ao filtro "Legacy" da UI.
         if operadora_id is not None:
-            query = query.join(VendaPagamento).filter(
-                (VendaPagamento.operadora_id == operadora_id)
-                | (VendaPagamento.operadora_id.is_(None))
-            )
+            query = query.filter(VendaPagamento.operadora_id == operadora_id)
 
         vendas_pdv = query.all()
         logger.info(

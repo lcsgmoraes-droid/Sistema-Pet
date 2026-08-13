@@ -85,11 +85,15 @@ async def listar_vendas_pdv(
             .join(VendaPagamento)
             .filter(
                 Venda.tenant_id == tenant_id,
+                VendaPagamento.tenant_id == tenant_id,
                 Venda.status == "finalizada",
                 or_(
                     VendaPagamento.forma_pagamento.ilike("%débito%"),
+                    VendaPagamento.forma_pagamento.ilike("%debito%"),
                     VendaPagamento.forma_pagamento.ilike("%crédito%"),
+                    VendaPagamento.forma_pagamento.ilike("%credito%"),
                     VendaPagamento.forma_pagamento.ilike("%cartão%"),
+                    VendaPagamento.forma_pagamento.ilike("%cartao%"),
                 ),
             )
         )
@@ -127,11 +131,28 @@ async def listar_vendas_pdv(
                 Venda.data_venda <= datetime.fromisoformat(data_fim).date()
             )
 
-        # Count total
-        total = query.distinct(Venda.id).count()
-
-        # Paginação
-        vendas = query.distinct().offset((page - 1) * limit).limit(limit).all()
+        # Paginar primeiro apenas pelos IDs. O modelo Venda possui snapshot JSON;
+        # aplicar SELECT DISTINCT na entidade inteira faz o PostgreSQL tentar
+        # comparar JSON e falhar com "could not identify an equality operator".
+        # Além disso, a paginação por IDs evita vendas duplicadas quando houver
+        # mais de um pagamento de cartão na mesma venda.
+        id_query = query.with_entities(Venda.id).distinct()
+        total = id_query.count()
+        sale_ids = [
+            row[0]
+            for row in id_query.order_by(Venda.id.desc())
+            .offset((page - 1) * limit)
+            .limit(limit)
+            .all()
+        ]
+        vendas = (
+            db.query(Venda)
+            .filter(Venda.tenant_id == tenant_id, Venda.id.in_(sale_ids))
+            .order_by(Venda.id.desc())
+            .all()
+            if sale_ids
+            else []
+        )
 
         # Serializar vendas (modo compacto)
         resultado = []

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { confirmarCorePet } from "../../services/corepetDialog";
 import {
   CONFERENCIA_STATUS_META,
   calcularConferenciaItem,
@@ -138,9 +139,12 @@ export default function useEntradaXmlConferencia({
   const desfazerConferenciaAtual = async () => {
     if (!notaSelecionada) return false;
 
-    const confirmou = window.confirm(
-      "Deseja desfazer a conferencia desta NF e voltar para o estado nao conferido?",
-    );
+    const confirmou = await confirmarCorePet({
+      titulo: "Desfazer conferencia?",
+      mensagem: "A NF voltara para o estado Nao conferida e os dados atuais da conferencia serao removidos.",
+      confirmarTexto: "Desfazer conferencia",
+      variante: "warning",
+    });
     if (!confirmou) {
       return false;
     }
@@ -211,9 +215,14 @@ export default function useEntradaXmlConferencia({
       const { data } = await api.post(`/compras-pendencias/notas/${notaSelecionada.id}`, {});
       toast.success(`Pendencia ${data?.codigo || ""} criada para acompanhamento`);
 
-      const abrirPendencias = window.confirm(
-        "Pendencia criada com relatorio e texto de e-mail sugerido. Deseja abrir a tela de pendencias agora?",
-      );
+      const abrirPendencias = await confirmarCorePet({
+        titulo: "Pendencia criada",
+        mensagem:
+          "O relatorio e o texto de e-mail sugerido ja estao disponiveis. Deseja abrir o acompanhamento da pendencia agora?",
+        confirmarTexto: "Abrir pendencias",
+        cancelarTexto: "Continuar nesta NF",
+        variante: "success",
+      });
 
       if (abrirPendencias) {
         setMostrarDetalhes(false);

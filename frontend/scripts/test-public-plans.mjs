@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import {
   findPublicPlan,
+  mixedPlanCompleteOffer,
+  mixedPlanStartingOffers,
   planOrganizationTypes,
   publicPlans,
   serviceInvoiceAddon,
@@ -17,6 +19,12 @@ assert.equal(serviceInvoiceAddon.price, "59,90");
 assert.equal(findPublicPlan("basico").id, "pet-basico");
 assert.equal(findPublicPlan("vet-start").segment, "vet");
 assert.equal(planOrganizationTypes.grooming, "grooming");
+assert.deepEqual(
+  mixedPlanStartingOffers.map((offer) => offer.price),
+  ["109,80", "129,80", "139,80", "189,70"],
+);
+assert.equal(mixedPlanCompleteOffer.price, "1.351,00");
+assert.equal(mixedPlanCompleteOffer.priceCents, 135_100);
 
 for (const [segment, plans] of Object.entries(publicPlans)) {
   assert.ok(plans.length >= 3, `${segment} precisa apresentar sua escada de planos`);

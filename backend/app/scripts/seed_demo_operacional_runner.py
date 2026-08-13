@@ -8,6 +8,8 @@ from typing import Any
 
 from app.scripts.seed_demo_operacional_catalog import (
     _cleanup_previous_demo,
+    _ensure_demo_stock_alerts,
+    _ensure_margin_demo_products,
     _product_pool,
     _sale_items,
 )
@@ -27,8 +29,15 @@ from app.scripts.seed_demo_operacional_movements import (
     _insert_fixed_payables,
     _insert_stock_purchase_movements,
 )
+from app.scripts.seed_demo_operacional_purchase_data import (
+    build_demo_purchase_scenarios,
+)
+from app.scripts.seed_demo_operacional_purchases import insert_demo_purchases
 from app.scripts.seed_demo_operacional_sales_core import _insert_cashier, _insert_sale
 from app.scripts.seed_demo_operacional_support import _ensure_support_data
+from app.scripts.seed_demo_operacional_conciliation import (
+    insert_demo_card_conciliation,
+)
 
 
 def _summarize(db, *, tenant_id: str) -> dict[str, Any]:
@@ -66,6 +75,17 @@ def _summarize(db, *, tenant_id: str) -> dict[str, Any]:
         UNION ALL
         SELECT 'fluxo_caixa', count(*)::int
         FROM fluxo_caixa WHERE tenant_id = :tenant_id AND origem_tipo = 'demo_operacional'
+        UNION ALL
+        SELECT 'pedidos_compra', count(*)::int
+        FROM pedidos_compra WHERE tenant_id = :tenant_id AND numero_pedido LIKE 'DEMO-PC-%'
+        UNION ALL
+        SELECT 'notas_entrada', count(*)::int
+        FROM notas_entrada WHERE tenant_id = :tenant_id
+          AND xml_content LIKE '%DOCUMENTO SINTETICO PARA DEMONSTRACAO DO COREPET%'
+        UNION ALL
+        SELECT 'pendencias_fornecedor', count(*)::int
+        FROM compras_pendencias_fornecedor
+        WHERE tenant_id = :tenant_id AND codigo LIKE 'DEMO-PEN-%'
         """,
         {"tenant_id": tenant_id},
     )
@@ -116,6 +136,7 @@ def apply_operational_seed(
             "catalog_import": catalog_result,
             "sales_scenarios": [asdict(s) for s in build_demo_scenarios()],
             "fixed_payables": [asdict(p) for p in build_fixed_payables()],
+            "purchase_scenarios": build_demo_purchase_scenarios(),
         }
 
     _cleanup_previous_demo(db, tenant_id=tenant_id)
@@ -123,6 +144,22 @@ def apply_operational_seed(
         db, tenant_id=tenant_id, user_id=user_id, base_date=base_date
     )
     products = _product_pool(db, tenant_id=tenant_id, user_id=user_id)
+    margin_demo_products = _ensure_margin_demo_products(
+        db, tenant_id=tenant_id, user_id=user_id
+    )
+    stock_alerts = _ensure_demo_stock_alerts(
+        db,
+        tenant_id=tenant_id,
+        user_id=user_id,
+        product_ids=margin_demo_products,
+    )
+    purchases = insert_demo_purchases(
+        db,
+        tenant_id=tenant_id,
+        user_id=user_id,
+        supplier_id=support["people"]["distribuidora"],
+        base_date=base_date,
+    )
     _insert_stock_purchase_movements(
         db, tenant_id=tenant_id, user_id=user_id, products=products, base_date=base_date
     )
@@ -150,6 +187,13 @@ def apply_operational_seed(
             )
         )
 
+    conciliation = insert_demo_card_conciliation(
+        db,
+        tenant_id=tenant_id,
+        user_id=user_id,
+        operator_id=support["card_operator_id"],
+        base_date=base_date,
+    )
     fixed_payable_ids = _insert_fixed_payables(
         db, tenant_id=tenant_id, user_id=user_id, support=support, base_date=base_date
     )
@@ -163,6 +207,10 @@ def apply_operational_seed(
         "tenant_id": tenant_id,
         "catalog_import": catalog_result,
         "sales": sales,
+        "purchases": purchases,
+        "margin_demo_products": margin_demo_products,
+        "stock_alerts": stock_alerts,
+        "card_conciliation": conciliation,
         "fixed_payables": fixed_payable_ids,
         "summary": summary,
     }

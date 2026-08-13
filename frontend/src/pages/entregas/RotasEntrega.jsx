@@ -1,7 +1,9 @@
 ﻿import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { toast } from "react-hot-toast";
 import api from "../../api";
 import { api as apiServices } from "../../services/api";
+import { confirmarCorePet } from "../../services/corepetDialog";
 import MonitoramentoEntregadores from "./MonitoramentoEntregadores";
 import RotaCard from "./RotaCard";
 import {
@@ -43,7 +45,7 @@ export default function RotasEntrega() {
       setRotas(response.data);
     } catch (err) {
       console.error("Erro ao carregar rotas:", err);
-      alert("Erro ao carregar rotas de entrega");
+      toast.error("Erro ao carregar rotas de entrega");
     } finally {
       setLoading(false);
     }
@@ -80,15 +82,22 @@ export default function RotasEntrega() {
         ),
       );
 
-      alert("Ordem das paradas atualizada!");
+      toast.success("Ordem das paradas atualizada");
     } catch (err) {
       console.error("Erro ao reordenar paradas:", err);
-      alert("Erro ao reordenar paradas");
+      toast.error("Erro ao reordenar paradas");
     }
   }
 
   async function iniciarRota(rotaId) {
-    if (!confirm("Deseja iniciar esta rota? Uma mensagem será enviada ao primeiro cliente.")) {
+    if (
+      !(await confirmarCorePet({
+        titulo: "Iniciar esta rota?",
+        mensagem: "A rota passara para Em rota e o primeiro cliente recebera uma mensagem.",
+        confirmarTexto: "Iniciar rota",
+        variante: "success",
+      }))
+    ) {
       return;
     }
 
@@ -96,20 +105,23 @@ export default function RotasEntrega() {
 
     try {
       await api.post(`/rotas-entrega/${rotaId}/iniciar`, null, { params: {} });
-      alert("✅ Rota iniciada! Mensagem enviada ao primeiro cliente.");
+      toast.success("Rota iniciada. Mensagem enviada ao primeiro cliente.");
       carregarRotas();
     } catch (err) {
       console.error("Erro ao iniciar rota:", err);
       const mensagem = err.response?.data?.detail || "Erro ao iniciar rota";
-      alert(`❌ ${mensagem}`);
+      toast.error(mensagem);
     }
   }
 
   async function excluirRota(rotaId) {
     if (
-      !confirm(
-        "⚠️ Tem certeza que deseja excluir esta rota?\n\nAs vendas voltarão para a listagem de entregas pendentes.",
-      )
+      !(await confirmarCorePet({
+        titulo: "Excluir esta rota?",
+        mensagem: "As vendas voltarao para a lista de entregas pendentes.",
+        confirmarTexto: "Excluir rota",
+        variante: "danger",
+      }))
     ) {
       return;
     }
@@ -117,34 +129,35 @@ export default function RotasEntrega() {
     try {
       const response = await api.delete(`/rotas-entrega/${rotaId}`);
       const { total_vendas } = response.data;
-      alert(
-        `✅ Rota excluída com sucesso!\n${total_vendas} venda(s) voltaram para entregas pendentes.`,
-      );
+      toast.success(`Rota excluida. ${total_vendas} venda(s) voltaram para entregas pendentes.`);
       carregarRotas(); // Recarregar lista
     } catch (err) {
       console.error("Erro ao excluir rota:", err);
       const mensagem = err.response?.data?.detail || "Erro ao excluir rota";
-      alert(`❌ ${mensagem}`);
+      toast.error(mensagem);
     }
   }
 
   async function reverterInicioRota(rotaId) {
     if (
-      !confirm(
-        "↩️ Reverter início desta rota?\n\nA rota voltará para status pendente e você poderá adicionar mais entregas.",
-      )
+      !(await confirmarCorePet({
+        titulo: "Reverter inicio da rota?",
+        mensagem: "A rota voltara para Pendente e aceitara novas entregas.",
+        confirmarTexto: "Reverter para pendente",
+        variante: "warning",
+      }))
     ) {
       return;
     }
 
     try {
       await api.post(`/rotas-entrega/${rotaId}/reverter-inicio`);
-      alert("✅ Rota revertida para pendente! Agora você pode adicionar mais entregas.");
+      toast.success("Rota revertida para pendente. Agora voce pode adicionar mais entregas.");
       carregarRotas(); // Recarregar lista
     } catch (err) {
       console.error("Erro ao reverter rota:", err);
       const mensagem = err.response?.data?.detail || "Erro ao reverter início da rota";
-      alert(`❌ ${mensagem}`);
+      toast.error(mensagem);
     }
   }
 
@@ -155,7 +168,7 @@ export default function RotasEntrega() {
       return;
     }
 
-    alert("Esta rota ainda não tem localização ou endereço para abrir no mapa.");
+    toast.error("Esta rota ainda não tem localizacao ou endereco para abrir no mapa.");
   }
 
   const rotasEmAndamento = filtrarRotasEmAndamento(rotas);

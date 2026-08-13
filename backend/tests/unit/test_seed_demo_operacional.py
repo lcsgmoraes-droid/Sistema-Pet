@@ -13,6 +13,9 @@ from app.scripts.seed_demo_operacional import (
 def test_demo_operacional_scenarios_cover_sales_story():
     scenarios = build_demo_scenarios()
 
+    assert len(scenarios) == 54
+    assert len({scenario.number for scenario in scenarios}) == len(scenarios)
+
     assert {scenario.channel for scenario in scenarios} >= {
         "loja_fisica",
         "app_mobile",
@@ -36,6 +39,7 @@ def test_demo_operacional_scenarios_cover_sales_story():
     assert any(scenario.order_origin == "app" for scenario in scenarios)
     assert any(scenario.order_origin == "web" for scenario in scenarios)
     assert any(getattr(scenario, "commissioned", False) for scenario in scenarios)
+    assert all(1 <= scenario.days_ago <= 12 for scenario in scenarios[6:])
 
 
 def test_demo_operacional_fixed_payables_cover_finance_and_break_even():
@@ -53,6 +57,12 @@ def test_demo_operacional_fixed_payables_cover_finance_and_break_even():
     }
     assert any(payable.paid for payable in payables)
     assert any(not payable.paid for payable in payables)
+    assert not next(
+        payable for payable in payables if payable.category_key == "compra_mercadorias"
+    ).affects_dre
+    assert not next(
+        payable for payable in payables if payable.category_key == "impostos"
+    ).affects_dre
 
 
 def test_demo_operacional_has_tax_and_commission_defaults():
@@ -124,7 +134,9 @@ def test_product_pool_deactivates_demo_fallback_when_real_catalog_exists(monkeyp
     )
 
     assert any(
-        "codigo ILIKE 'DEMO-%'" in sql and "ativo = false" in sql
+        "DEMO-RACAO-10KG" in sql
+        and "DEMO-MARGEM-VERDE" not in sql
+        and "ativo = false" in sql
         for sql in executed_queries
     )
 
@@ -250,7 +262,7 @@ def test_ensure_person_can_activate_commission_partner(monkeypatch):
         code="DEMO-FUNC-001",
         name="Beatriz Vendedora Demo",
         kind="funcionario",
-        email="beatriz.demo@sistemapet.local",
+        email="beatriz@demo.corepet.com.br",
         phone="(11) 90000-0000",
         address="Rua Demo",
         number="10",
@@ -266,6 +278,50 @@ def test_ensure_person_can_activate_commission_partner(monkeypatch):
     sql, params = executed[0]
     assert "parceiro_ativo = :commission_partner" in sql
     assert params["commission_partner"] is True
+
+
+def test_ensure_person_persists_supplier_legal_identity(monkeypatch):
+    from app.scripts import seed_demo_operacional_support
+
+    executed = []
+
+    class FakeDb:
+        def execute(self, query, params=None):
+            executed.append((str(query), params or {}))
+
+    monkeypatch.setattr(
+        seed_demo_operacional_support,
+        "_scalar",
+        lambda db, sql, params: 55 if "SELECT id FROM clientes" in sql else None,
+    )
+
+    person_id = seed_demo_operacional_support._ensure_person(
+        FakeDb(),
+        tenant_id="tenant-demo",
+        user_id=10,
+        code="DEMO-FOR-001",
+        name="Distribuidora Pet Brasil",
+        kind="fornecedor",
+        email="compras.demo@corepet.com.br",
+        phone="(11) 3333-0101",
+        address="Rua Demo",
+        number="10",
+        district="Centro",
+        city="Sao Paulo",
+        state="SP",
+        cnpj="11.222.333/0001-81",
+        razao_social="Distribuidora Pet Brasil Demo LTDA",
+        nome_fantasia="Distribuidora Pet Brasil",
+        responsavel="Marina Compras Demo",
+        inscricao_estadual="ISENTO",
+    )
+
+    assert person_id == 55
+    sql, params = executed[0]
+    assert "cnpj = :cnpj" in sql
+    assert params["tipo_pessoa"] == "PJ"
+    assert params["cnpj"] == "11.222.333/0001-81"
+    assert params["responsavel"] == "Marina Compras Demo"
 
 
 def test_demo_operacional_blocks_production_apply_without_override():

@@ -16,7 +16,7 @@ import {
   extrairCorIndicadorMargem,
   montarCupomParaFinalizar,
   montarFallbackSimulacaoParcelamento,
-  montarPagamentoAVista,
+  montarFormasPagamentoAnalise,
   montarPagamentoSimuladoParcelamento,
   montarPagamentosMargem,
   montarPayloadAnaliseMargem,
@@ -299,10 +299,16 @@ export default function useModalPagamentoController({
 
   // 🆕 Função para calcular status de margem operacional (INICIAL - À VISTA)
   const calcularStatusMargemInicial = async () => {
+    if (!formasPagamento.length) return;
+
     setLoadingStatusMargem(true);
     try {
-      // 🎯 SIMULAR pagamento à vista (dinheiro) para análise inicial
-      const pagamentoSimuladoAVista = montarPagamentoAVista(venda.total);
+      // Usa a forma de pagamento à vista cadastrada no tenant, sem assumir ID fixo.
+      const pagamentoSimuladoAVista = montarFormasPagamentoAnalise({
+        pagamentos: [],
+        formasPagamento,
+        valorTotal: venda.total,
+      });
 
       const response = await api.post(
         `/formas-pagamento/analisar-venda`,
@@ -396,11 +402,12 @@ export default function useModalPagamentoController({
       .catch(() => setSugestaoPix(null));
   }, [formaPagamentoSelecionada?.id]);
 
-  // 🆕 PASSO 1️⃣ - Calcular status IMEDIATAMENTE ao abrir o modal
+  // Calcula a margem inicial assim que as formas de pagamento estiverem disponíveis.
   useEffect(() => {
-    console.log("🎬 Modal de pagamento aberto - Calculando status inicial...");
-    calcularStatusMargemInicial();
-  }, []); // Executa apenas uma vez ao montar
+    if (formasPagamento.length > 0) {
+      calcularStatusMargemInicial();
+    }
+  }, [formasPagamento]);
 
   // 🎯 SIMULAR PARCELAMENTOS assim que formas de pagamento forem carregadas
   useEffect(() => {

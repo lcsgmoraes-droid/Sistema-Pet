@@ -2,6 +2,7 @@ import { toast } from "react-hot-toast";
 import api from "../../api";
 import { normalizarColunasDocumentoPedido } from "./pedidoDocumentoColunas";
 import { baixarArquivoResposta } from "./pedidoCompraUtils";
+import { confirmarCorePet, perguntarCorePet } from "../../services/corepetDialog";
 
 function extrairEmailFornecedor(fornecedor) {
   if (!fornecedor) return "";
@@ -100,7 +101,15 @@ export function createPedidosCompraOperacoesController({
       fecharFormularioPedido();
       carregarDados();
     } catch (error) {
-      toast.error(error.response?.data?.detail || "Erro ao criar pedido");
+      console.error("Erro ao criar pedido de compra:", error);
+      const detalheServidor =
+        error.response?.data?.detail ||
+        error.response?.data?.message ||
+        (typeof error.response?.data === "string" ? error.response.data : "");
+      const statusServidor = error.response?.status
+        ? ` (codigo ${error.response.status})`
+        : "";
+      toast.error(detalheServidor || `Nao foi possivel criar o pedido${statusServidor}. Tente novamente.`);
     } finally {
       setLoading(false);
     }
@@ -286,7 +295,14 @@ export function createPedidosCompraOperacoesController({
   };
 
   const reverterStatus = async (id) => {
-    if (!confirm("⚠️ Deseja reverter o status deste pedido para a etapa anterior?")) {
+    if (
+      !(await confirmarCorePet({
+        titulo: "Reverter status do pedido?",
+        mensagem: "O pedido voltara para a etapa anterior do fluxo de compras.",
+        confirmarTexto: "Reverter status",
+        variante: "warning",
+      }))
+    ) {
       return;
     }
     try {
@@ -302,10 +318,17 @@ export function createPedidosCompraOperacoesController({
 
   const cancelarPedido = async (pedido) => {
     const acao = pedido.status === "rascunho" ? "cancelar/excluir" : "cancelar";
-    const motivo = window.prompt(
-      `Informe o motivo para ${acao} o pedido ${pedido.numero_pedido}:`,
-      "Cancelado pelo usuário",
-    );
+    const motivo = await perguntarCorePet({
+      titulo: pedido.status === "rascunho" ? "Excluir rascunho?" : "Cancelar pedido?",
+      mensagem: `Informe o motivo para ${acao} o pedido ${pedido.numero_pedido}. O historico ficara registrado.`,
+      rotulo: "Motivo",
+      valorInicial: "Cancelado pelo usuario",
+      multilinha: true,
+      obrigatorio: true,
+      minimoCaracteres: 10,
+      confirmarTexto: pedido.status === "rascunho" ? "Excluir rascunho" : "Cancelar pedido",
+      variante: "danger",
+    });
 
     if (!motivo) return;
 

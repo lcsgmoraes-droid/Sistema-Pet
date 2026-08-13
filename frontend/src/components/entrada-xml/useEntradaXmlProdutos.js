@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { confirmarCorePet } from "../../services/corepetDialog";
 import { aplicarMultiplicadorPackAoItem, obterCustoAquisicaoItem } from "./entradaXmlUtils";
 
 const FORM_PRODUTO_INICIAL = {
@@ -257,14 +258,18 @@ export default function useEntradaXmlProdutos({
       return;
     }
 
-    const confirmacao = globalThis.confirm(
-      `Criar ${itensNaoVinculados.length} produto(s) automaticamente?\n\n` +
+    const confirmacao = await confirmarCorePet({
+      titulo: "Criar produtos da nota",
+      mensagem:
+        `Criar ${itensNaoVinculados.length} produto(s) automaticamente?\n\n` +
         `Padrões aplicados:\n` +
         `• Estoque mínimo: 10\n` +
         `• Estoque máximo: 100\n` +
         `• Margem de lucro: 50%\n\n` +
         `Você poderá editar os produtos depois no cadastro.`,
-    );
+      confirmarTexto: "Criar produtos",
+      variante: "question",
+    });
 
     if (!confirmacao) return;
 

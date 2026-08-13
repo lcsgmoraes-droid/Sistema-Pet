@@ -655,11 +655,11 @@ test("monta formas de pagamento para analise da venda com restante em dinheiro",
   ]);
 });
 
-test("monta pagamento a vista padrao para margem inicial", () => {
-  assert.deepEqual(montarPagamentoAVista(99.9), [
-    { forma_pagamento_id: 1, valor: 99.9, parcelas: 1 },
-  ]);
-});
+  test("monta pagamento a vista com a forma cadastrada no tenant", () => {
+    assert.deepEqual(montarPagamentoAVista(99.9, 42), [
+      { forma_pagamento_id: 42, valor: 99.9, parcelas: 1 },
+    ]);
+  });
 
 test("valida pagamento antes de adicionar", () => {
   assert.equal(

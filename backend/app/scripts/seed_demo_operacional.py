@@ -79,6 +79,12 @@ from app.scripts.seed_demo_operacional_payments import (  # noqa: E402,F401
     _ensure_payment_method,
     _ensure_tax_configuration,
 )
+from app.scripts.seed_demo_operacional_purchases import (  # noqa: E402,F401
+    insert_demo_purchases,
+)
+from app.scripts.seed_demo_operacional_purchase_data import (  # noqa: E402,F401
+    build_demo_purchase_scenarios,
+)
 from app.scripts.seed_demo_operacional_runner import (  # noqa: E402,F401
     _summarize,
     apply_operational_seed,

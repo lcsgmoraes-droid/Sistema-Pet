@@ -1,6 +1,60 @@
 import { FiChevronDown, FiChevronRight, FiLock, FiStar, FiUnlock } from "react-icons/fi";
+import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Link } from "react-router-dom";
 import TooltipPremium from "../TooltipPremium";
+
+function useSidebarHoverHint(sidebarOpen) {
+  const [hint, setHint] = useState(null);
+  const timerRef = useRef(null);
+
+  useEffect(
+    () => () => {
+      window.clearTimeout(timerRef.current);
+    },
+    [],
+  );
+
+  const show = (event, label) => {
+    window.clearTimeout(timerRef.current);
+    setHint(null);
+
+    const target = event.currentTarget;
+    const text = target.querySelector("[data-sidebar-label]");
+    const textIsTruncated = text && text.scrollWidth > text.clientWidth + 1;
+    if (sidebarOpen && !textIsTruncated) return;
+
+    const rect = target.getBoundingClientRect();
+    timerRef.current = window.setTimeout(() => {
+      setHint({
+        label,
+        left: Math.round(rect.right + 10),
+        top: Math.round(rect.top + rect.height / 2),
+      });
+    }, 140);
+  };
+
+  const hide = () => {
+    window.clearTimeout(timerRef.current);
+    setHint(null);
+  };
+
+  const portal =
+    hint && typeof document !== "undefined"
+      ? createPortal(
+          <div
+            role="tooltip"
+            style={{ left: hint.left, top: hint.top }}
+            className="pointer-events-none fixed z-[140] max-w-sm -translate-y-1/2 rounded-lg border border-slate-700/10 bg-slate-900 px-3 py-2 text-sm font-semibold text-white shadow-xl dark:border-slate-600 dark:bg-slate-100 dark:text-slate-900"
+          >
+            {hint.label}
+          </div>,
+          document.body,
+        )
+      : null;
+
+  return { show, hide, portal };
+}
 
 function ModuloMenuIndicator({
   modulo,
@@ -99,10 +153,13 @@ export default function SidebarMenu({
   moduloAtivo,
   onToggleModuloDev,
 }) {
+  const hoverHint = useSidebarHoverHint(sidebarOpen);
+
   return (
-    <nav className="flex-1 py-2 md:py-4 overflow-y-auto overflow-x-hidden">
-      {Array.isArray(menuItems) &&
-        menuItems.map((item, index) => (
+    <>
+      <nav className="flex-1 py-2 md:py-4 overflow-y-auto overflow-x-hidden">
+        {Array.isArray(menuItems) &&
+          menuItems.map((item, index) => (
           <div key={item.path}>
             {item.section !== menuItems[index - 1]?.section && (
               <div
@@ -124,6 +181,11 @@ export default function SidebarMenu({
               <>
                 <button
                   onClick={() => onToggleSubmenu(item.path)}
+                  onMouseEnter={(event) => hoverHint.show(event, item.label)}
+                  onMouseLeave={hoverHint.hide}
+                  onFocus={(event) => hoverHint.show(event, item.label)}
+                  onBlur={hoverHint.hide}
+                  title={item.label}
                   className={`w-full flex items-center justify-between gap-2 md:gap-3 px-3 md:px-4 py-2.5 md:py-3 mx-1 md:mx-2 rounded-lg transition-all text-sm md:text-base ${
                     currentPath.startsWith(item.path)
                       ? "bg-gradient-to-r from-indigo-100 to-purple-100 text-indigo-700 shadow-sm dark:from-cyan-500/15 dark:to-blue-500/15 dark:text-cyan-200"
@@ -133,7 +195,12 @@ export default function SidebarMenu({
                   <div className="flex items-center gap-2 md:gap-3">
                     <item.icon className="text-base md:text-lg flex-shrink-0" />
                     {sidebarOpen && (
-                      <span className="font-medium text-xs md:text-sm">{item.label}</span>
+                      <span
+                        data-sidebar-label
+                        className="min-w-0 truncate font-medium text-xs md:text-sm"
+                      >
+                        {item.label}
+                      </span>
                     )}
                   </div>
                   {sidebarOpen &&
@@ -167,6 +234,8 @@ export default function SidebarMenu({
                       item.submenu.map((subitem) => (
                         <div
                           key={subitem.path}
+                          onMouseEnter={(event) => hoverHint.show(event, subitem.label)}
+                          onMouseLeave={hoverHint.hide}
                           className={`flex items-center gap-2 md:gap-3 px-3 md:px-4 py-1.5 md:py-2 mx-1 md:mx-2 ml-8 md:ml-12 rounded-lg transition-all text-xs md:text-sm ${
                             isActive(subitem.path)
                               ? "bg-white text-indigo-600 shadow-sm font-medium dark:bg-slate-800 dark:text-cyan-200"
@@ -177,8 +246,13 @@ export default function SidebarMenu({
                             to={subitem.path}
                             onClick={onMenuClick}
                             className="flex min-w-0 flex-1 items-center"
+                            title={subitem.label}
                           >
-                            {sidebarOpen && <span className="truncate">{subitem.label}</span>}
+                            {sidebarOpen && (
+                              <span data-sidebar-label className="truncate">
+                                {subitem.label}
+                              </span>
+                            )}
                             {!sidebarOpen && <span className="sr-only">{subitem.label}</span>}
                           </Link>
                           {subitem.modulo && sidebarOpen && (
@@ -205,6 +279,8 @@ export default function SidebarMenu({
               </>
             ) : (
               <div
+                onMouseEnter={(event) => hoverHint.show(event, item.label)}
+                onMouseLeave={hoverHint.hide}
                 className={`flex items-center gap-2 md:gap-3 px-3 md:px-4 py-2.5 md:py-3 mx-1 md:mx-2 my-0.5 md:my-1 rounded-lg transition-all text-sm md:text-base ${
                   isActive(item.path)
                     ? "bg-gradient-to-r from-indigo-100 to-purple-100 text-indigo-700 shadow-sm dark:from-cyan-500/15 dark:to-blue-500/15 dark:text-cyan-200"
@@ -215,11 +291,16 @@ export default function SidebarMenu({
                   to={item.path}
                   onClick={onMenuClick}
                   className="flex min-w-0 flex-1 items-center gap-2 md:gap-3"
-                  title={!sidebarOpen ? item.label : ""}
+                  title={item.label}
                 >
                   <item.icon className="text-base md:text-lg flex-shrink-0" />
                   {sidebarOpen && (
-                    <span className="truncate font-medium text-xs md:text-sm">{item.label}</span>
+                    <span
+                      data-sidebar-label
+                      className="truncate font-medium text-xs md:text-sm"
+                    >
+                      {item.label}
+                    </span>
                   )}
                 </Link>
                 {sidebarOpen && (
@@ -248,7 +329,9 @@ export default function SidebarMenu({
               </div>
             )}
           </div>
-        ))}
-    </nav>
+          ))}
+      </nav>
+      {hoverHint.portal}
+    </>
   );
 }

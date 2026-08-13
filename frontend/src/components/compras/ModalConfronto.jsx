@@ -3,6 +3,7 @@ import api from "../../api";
 import { toast } from "react-hot-toast";
 import ExportActionButton from "../ui/ExportActionButton";
 import FornecedorIdentity from "../ui/FornecedorIdentity";
+import { confirmarCorePet } from "../../services/corepetDialog";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Helpers
@@ -165,9 +166,13 @@ const ModalConfronto = ({ pedido, onClose, onPedidoComplementarCriado }) => {
 
   const finalizarConfronto = async () => {
     if (
-      !window.confirm(
-        "Finalizar a conferencia? Isso cria um vinculo permanente entre este pedido e as NFs selecionadas. Nao sera possivel revincular depois.",
-      )
+      !(await confirmarCorePet({
+        titulo: "Finalizar confronto do pedido?",
+        mensagem:
+          "O pedido e as notas selecionadas ficarao vinculados de forma permanente. Depois de finalizar, nao sera possivel trocar as NFs.",
+        confirmarTexto: "Finalizar confronto",
+        variante: "warning",
+      }))
     )
       return;
     setLoadingFinalizar(true);

@@ -69,6 +69,7 @@ class FixedPayable:
     paid: bool
     supplier_key: str
     channel: str | None = None
+    affects_dre: bool = True
 
 
 def money(value: Decimal | int | float | str) -> Decimal:
@@ -84,9 +85,9 @@ def decimal_json(value: Any) -> Any:
 
 
 def build_demo_scenarios() -> list[SaleScenario]:
-    """Return the sales path Lucas wants visible in the demo."""
+    """Return the didactic paths plus a credible month of demo sales."""
 
-    return [
+    main_scenarios = [
         SaleScenario(
             number="DEMO-VEN-001",
             channel="loja_fisica",
@@ -189,6 +190,57 @@ def build_demo_scenarios() -> list[SaleScenario]:
             commissioned=True,
         ),
     ]
+    return main_scenarios + build_demo_historical_scenarios()
+
+
+def build_demo_historical_scenarios(count: int = 48) -> list[SaleScenario]:
+    """Create deterministic sales that make dashboards and the DRE demonstrable.
+
+    These records use the same insertion path as the six main scenarios, so each
+    sale also exercises stock, payment, tax, receivable, bank and commission
+    effects. They intentionally avoid deliveries and integrated orders because
+    those states are already represented by the named scenarios above.
+    """
+
+    clients = ("ana", "joao", "maria")
+    payments = ("pix", "dinheiro", "debito", "credito")
+    scenarios: list[SaleScenario] = []
+
+    for index in range(count):
+        payment = payments[index % len(payments)]
+        channel = (
+            "ecommerce"
+            if index % 10 == 0
+            else "app_mobile"
+            if index % 5 == 0
+            else "loja_fisica"
+        )
+        scenarios.append(
+            SaleScenario(
+                number=f"DEMO-VEN-{100 + index:03d}",
+                channel=channel,
+                client_key=clients[index % len(clients)],
+                payment_key=payment,
+                items=(
+                    (index % 12, Decimal(str(3 + index % 3))),
+                    ((index + 5) % 12, Decimal(str(2 + index % 3))),
+                ),
+                days_ago=1 + index % 12,
+                due_in_days=30 if payment == "credito" else 1 if payment == "debito" else 0,
+                installments=2 if payment == "credito" and index % 8 == 3 else 1,
+                card_brand=(
+                    "master"
+                    if payment == "credito"
+                    else "visa"
+                    if payment == "debito"
+                    else None
+                ),
+                commissioned=index % 4 == 0,
+                observations="Historico mensal para indicadores da demonstracao.",
+            )
+        )
+
+    return scenarios
 
 
 def build_fixed_payables() -> list[FixedPayable]:
@@ -202,6 +254,7 @@ def build_fixed_payables() -> list[FixedPayable]:
             due_in_days=0,
             paid=True,
             supplier_key="fornecedor",
+            affects_dre=False,
         ),
         FixedPayable(
             document="DEMO-CP-FOLHA-001",
@@ -243,6 +296,7 @@ def build_fixed_payables() -> list[FixedPayable]:
             due_in_days=8,
             paid=False,
             supplier_key="fornecedor",
+            affects_dre=False,
         ),
         FixedPayable(
             document="DEMO-CP-COMISSAO-BASE",

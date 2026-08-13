@@ -17,6 +17,8 @@ import {
   useSortable,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import { toast } from "react-hot-toast";
+import { confirmarCorePet } from "../../services/corepetDialog";
 
 /**
  * ETAPA 9.4+ - Gera link do Google Maps com rota otimizada e ponto final configurável
@@ -194,7 +196,7 @@ export default function ModalParadasRota({ rota, onClose, onSave, pontoInicial }
       setParadas(res.data || []);
     } catch (err) {
       console.error("Erro ao carregar paradas:", err);
-      alert("Erro ao carregar paradas da rota");
+      toast.error("Erro ao carregar as paradas da rota.");
     } finally {
       setLoading(false);
     }
@@ -224,12 +226,12 @@ export default function ModalParadasRota({ rota, onClose, onSave, pontoInicial }
       const novaOrdem = paradas.map((p) => p.id);
       await api.put(`/rotas-entrega/${rota.id}/paradas/reordenar`, novaOrdem);
 
-      alert("Ordem das paradas atualizada com sucesso!");
+      toast.success("Ordem das paradas atualizada.");
       if (onSave) onSave();
       onClose();
     } catch (err) {
       console.error("Erro ao salvar ordem:", err);
-      alert(err.response?.data?.detail || "Erro ao salvar nova ordem");
+      toast.error(err.response?.data?.detail || "Erro ao salvar a nova ordem.");
     } finally {
       setSaving(false);
     }
@@ -238,11 +240,17 @@ export default function ModalParadasRota({ rota, onClose, onSave, pontoInicial }
   // ETAPA 9.4: Iniciar navegação
   async function iniciarNavegacao() {
     if (!pontoInicial) {
-      alert("Configure o ponto inicial da rota em Configurações antes de iniciar.");
+      toast.error("Configure o ponto inicial da rota antes de iniciar.");
       return;
     }
 
-    if (!confirm("Deseja iniciar a navegação desta rota?")) return;
+    const iniciar = await confirmarCorePet({
+      titulo: "Iniciar rota de entrega",
+      mensagem: "Deseja iniciar a navegação desta rota e abrir o trajeto no Google Maps?",
+      confirmarTexto: "Iniciar rota",
+      variante: "question",
+    });
+    if (!iniciar) return;
 
     setIniciandoRota(true);
     try {
@@ -271,15 +279,15 @@ export default function ModalParadasRota({ rota, onClose, onSave, pontoInicial }
         // Abrir Google Maps
         window.open(linkMaps, "_blank");
 
-        alert("Rota iniciada! Google Maps foi aberto em uma nova aba.");
+        toast.success("Rota iniciada. O Google Maps foi aberto em uma nova aba.");
         if (onSave) onSave();
         onClose();
       } else {
-        alert("Erro ao gerar link do Google Maps");
+        toast.error("Não foi possível gerar o link do Google Maps.");
       }
     } catch (err) {
       console.error("Erro ao iniciar rota:", err);
-      alert(err.response?.data?.detail || "Erro ao iniciar rota");
+      toast.error(err.response?.data?.detail || "Erro ao iniciar a rota.");
     } finally {
       setIniciandoRota(false);
     }
@@ -287,7 +295,13 @@ export default function ModalParadasRota({ rota, onClose, onSave, pontoInicial }
 
   // ETAPA 9.4: Marcar parada como entregue
   async function marcarEntregue(paradaId) {
-    if (!confirm("Confirma que a entrega foi realizada?")) return;
+    const confirmarEntrega = await confirmarCorePet({
+      titulo: "Confirmar entrega",
+      mensagem: "Confirma que esta entrega foi realizada?",
+      confirmarTexto: "Marcar como entregue",
+      variante: "success",
+    });
+    if (!confirmarEntrega) return;
 
     try {
       await api.post(
@@ -300,16 +314,22 @@ export default function ModalParadasRota({ rota, onClose, onSave, pontoInicial }
 
       // Recarregar paradas
       await carregarParadas();
-      alert("Parada marcada como entregue!");
+      toast.success("Parada marcada como entregue.");
     } catch (err) {
       console.error("Erro:", err);
-      alert(err.response?.data?.detail || "Erro ao marcar entrega");
+      toast.error(err.response?.data?.detail || "Erro ao marcar a entrega.");
     }
   }
 
   // ETAPA 9.4: Marcar tentativa (cliente ausente)
   async function marcarTentativa(paradaId) {
-    if (!confirm("Cliente ausente? Registrar tentativa?")) return;
+    const confirmarTentativa = await confirmarCorePet({
+      titulo: "Registrar tentativa",
+      mensagem: "O cliente está ausente? Deseja registrar uma tentativa de entrega?",
+      confirmarTexto: "Registrar tentativa",
+      variante: "warning",
+    });
+    if (!confirmarTentativa) return;
 
     try {
       await api.post(
@@ -322,10 +342,10 @@ export default function ModalParadasRota({ rota, onClose, onSave, pontoInicial }
 
       // Recarregar paradas
       await carregarParadas();
-      alert("Tentativa registrada. Continue para a próxima parada.");
+      toast.success("Tentativa registrada. Continue para a próxima parada.");
     } catch (err) {
       console.error("Erro:", err);
-      alert(err.response?.data?.detail || "Erro ao registrar tentativa");
+      toast.error(err.response?.data?.detail || "Erro ao registrar a tentativa.");
     }
   }
 
