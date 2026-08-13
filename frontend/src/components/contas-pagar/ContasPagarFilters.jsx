@@ -46,6 +46,7 @@ export default function ContasPagarFilters({
               }
             >
               <option value="todos">Todos</option>
+              <option value="em_aberto">Em aberto</option>
               <option value="pendente">Pendente</option>
               <option value="parcial">Parcial</option>
               <option value="pago">Pago</option>

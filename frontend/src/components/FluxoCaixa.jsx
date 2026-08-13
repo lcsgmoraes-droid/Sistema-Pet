@@ -1,5 +1,5 @@
-import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useMemo, useState, useEffect } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import toast from "react-hot-toast";
 import api from "../api";
 import {
@@ -25,6 +25,7 @@ import MoneyCell, { formatMoneyCellValue } from "./ui/MoneyCell";
 import ModuleTabs from "./ui/ModuleTabs";
 import PageHeader from "./ui/PageHeader";
 import StatusBadge from "./ui/StatusBadge";
+import { getDashboardPeriodFromSearch } from "../pages/dashboard/dashboardOverview";
 
 const FLUXO_CAIXA_TABS = [
   {
@@ -60,6 +61,8 @@ const FLUXO_CAIXA_TABS = [
 
 const FluxoCaixa = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const dashboardPeriod = useMemo(() => getDashboardPeriodFromSearch(searchParams), [searchParams]);
   const [loading, setLoading] = useState(false);
   const [dados, setDados] = useState(null);
 
@@ -86,8 +89,8 @@ const FluxoCaixa = () => {
   };
 
   const [filtros, setFiltros] = useState({
-    data_inicio: obterPrimeiroDiaMes(), // Primeiro dia do mês
-    data_fim: obterDataLocal(), // Dia atual
+    data_inicio: dashboardPeriod?.start || obterPrimeiroDiaMes(),
+    data_fim: dashboardPeriod?.end || obterDataLocal(),
     conta_bancaria_id: null,
     agrupamento: "dia", // dia, semana, mes
   });

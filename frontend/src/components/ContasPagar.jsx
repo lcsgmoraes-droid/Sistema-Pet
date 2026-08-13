@@ -1,4 +1,5 @@
 import { useMemo, useState, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
 import api from "../api";
 import { toast } from "react-hot-toast";
 import { safeArray } from "../utils/safeArray";
@@ -9,6 +10,7 @@ import StatusBadge from "./ui/StatusBadge";
 import {
   calcularIntervaloPeriodoRapido,
   calcularValorFinalPagamentoContasPagar,
+  criarFiltrosContasPagarDaUrl,
   criarFiltrosPadraoContasPagar,
   criarFiltrosDespesasCaixaContasPagar,
   criarFiltrosTaxasCartaoContasPagar,
@@ -24,9 +26,10 @@ import {
 } from "./contas-pagar/contasPagarHelpers";
 
 const ContasPagar = () => {
+  const [searchParams] = useSearchParams();
   const [contas, setContas] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [filtros, setFiltros] = useState(criarFiltrosPadraoContasPagar);
+  const [filtros, setFiltros] = useState(() => criarFiltrosContasPagarDaUrl(searchParams));
   const [abaAtivaContasPagar, setAbaAtivaContasPagar] = useState("lancamentos");
 
   const [fornecedores, setFornecedores] = useState([]);

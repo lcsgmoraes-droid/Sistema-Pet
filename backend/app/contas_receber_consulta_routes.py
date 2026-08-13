@@ -12,8 +12,11 @@ from .contas_receber_schemas import ContaReceberResponse
 from .db import get_session
 from .financeiro_models import ContaReceber
 from .models import Cliente
+from .utils.timezone import now_brasilia
 
 router = APIRouter()
+
+STATUS_CONTAS_RECEBER_EM_ABERTO = ("pendente", "parcial", "vencido", "vencida")
 
 
 @router.get("/", response_model=List[ContaReceberResponse])
@@ -35,6 +38,7 @@ def listar_contas_receber(
     Lista contas a receber com filtros
     """
     _current_user, tenant_id = user_and_tenant
+    hoje = now_brasilia().date()
 
     query = (
         db.query(ContaReceber)
@@ -44,7 +48,11 @@ def listar_contas_receber(
 
     # Filtros
     if status:
-        query = query.filter(ContaReceber.status == status)
+        status_normalizado = status.strip().lower()
+        if status_normalizado == "em_aberto":
+            query = query.filter(ContaReceber.status.in_(STATUS_CONTAS_RECEBER_EM_ABERTO))
+        else:
+            query = query.filter(ContaReceber.status == status_normalizado)
     if cliente_id:
         query = query.filter(ContaReceber.cliente_id == cliente_id)
     if categoria_id:
@@ -71,15 +79,15 @@ def listar_contas_receber(
     if apenas_vencidas:
         query = query.filter(
             and_(
-                ContaReceber.status == "pendente",
-                ContaReceber.data_vencimento < date.today(),
+                ContaReceber.status.in_(STATUS_CONTAS_RECEBER_EM_ABERTO),
+                ContaReceber.data_vencimento < hoje,
             )
         )
     if apenas_vencer:
         query = query.filter(
             and_(
-                ContaReceber.status == "pendente",
-                ContaReceber.data_vencimento >= date.today(),
+                ContaReceber.status.in_(STATUS_CONTAS_RECEBER_EM_ABERTO),
+                ContaReceber.data_vencimento >= hoje,
             )
         )
 
@@ -93,7 +101,7 @@ def listar_contas_receber(
         # Calcular dias para vencimento
         dias_venc = None
         if conta.status == "pendente":
-            dias_venc = (conta.data_vencimento - date.today()).days
+            dias_venc = (conta.data_vencimento - hoje).days
 
         # Buscar nome do cliente
         cliente_nome = None

@@ -3,6 +3,8 @@ import { test } from "node:test";
 import {
   calculateDashboardIndicators,
   createEmptyDashboardSummary,
+  getDashboardDetailPath,
+  getDashboardPeriodFromSearch,
   getExecutiveStatus,
   getPeriodLabel,
 } from "../src/pages/dashboard/dashboardOverview.js";
@@ -48,4 +50,37 @@ test("dashboard não chama ausência de dados de operação saudável", () => {
   assert.equal(getExecutiveStatus(empty).tone, "neutral");
   assert.equal(getPeriodLabel(1), "Hoje");
   assert.equal(getPeriodLabel(30), "Últimos 30 dias");
+});
+
+test("dashboard cria links com o filtro detalhado de cada card", () => {
+  assert.equal(
+    getDashboardDetailPath("payableOverdue"),
+    "/financeiro/contas-pagar?filtro=vencidas",
+  );
+  assert.equal(
+    getDashboardDetailPath("payableDueToday"),
+    "/financeiro/contas-pagar?filtro=vence_hoje",
+  );
+  assert.equal(
+    getDashboardDetailPath("receivableOpen"),
+    "/financeiro/contas-receber?filtro=em_aberto",
+  );
+  assert.equal(getDashboardDetailPath("sales", 15), "/financeiro/vendas?periodo_dias=15");
+  assert.equal(getDashboardDetailPath("activeCustomers"), "/clientes?visao=ativos");
+  assert.equal(getDashboardDetailPath("vipAtRisk"), "/clientes?visao=vip_em_risco");
+  assert.equal(getDashboardDetailPath("promisingCustomers"), "/clientes?visao=novos_promissores");
+});
+
+test("tela detalhada recupera o mesmo período selecionado no dashboard", () => {
+  const period = getDashboardPeriodFromSearch(
+    new URLSearchParams("periodo_dias=7"),
+    new Date(2026, 7, 13, 15, 30),
+  );
+
+  assert.deepEqual(period, {
+    days: 7,
+    start: "2026-08-07",
+    end: "2026-08-13",
+    quickFilter: "ultimos_7_dias",
+  });
 });
