@@ -29,6 +29,9 @@ backup_dir=""
 db_backup_dir=""
 db_backup_file=""
 DEPLOY_LOCK_FILE="${DEPLOY_LOCK_FILE:-/tmp/petshop-deploy-in-progress}"
+DEPLOY_MUTEX_FILE="${DEPLOY_MUTEX_FILE:-/tmp/petshop-deploy.lock}"
+DEPLOY_LOCK_HELD="${DEPLOY_LOCK_HELD:-0}"
+DEPLOY_OWNS_LOCK="${DEPLOY_OWNS_LOCK:-0}"
 
 log() {
   printf '\n[%s] %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$*"
@@ -183,7 +186,12 @@ on_error() {
 trap 'on_error $LINENO' ERR
 
 cleanup_deploy_lock() {
+  [[ "$DEPLOY_OWNS_LOCK" == "1" ]] || return 0
   rm -f "$DEPLOY_LOCK_FILE" 2>/dev/null || true
+  flock -u 9 2>/dev/null || true
+  exec 9>&- 2>/dev/null || true
+  DEPLOY_LOCK_HELD=0
+  DEPLOY_OWNS_LOCK=0
 }
 
 cleanup_release_candidate() {
@@ -265,9 +273,19 @@ require_cmd docker
 require_cmd npm
 require_cmd curl
 require_cmd python3
+require_cmd flock
 require_node_runtime
 
 cd "$APP_DIR"
+
+if [[ "$DEPLOY_LOCK_HELD" != "1" ]]; then
+  exec 9>"$DEPLOY_MUTEX_FILE"
+  if ! flock -n 9; then
+    fail "Outro deploy ja esta em andamento neste servidor. Aguarde a conclusao antes de tentar novamente."
+  fi
+  DEPLOY_LOCK_HELD=1
+  DEPLOY_OWNS_LOCK=1
+fi
 
 mark_step "validar_destino_publico"
 log "Confirmando que este host atende ${DEPLOY_PUBLIC_DOMAIN}"
@@ -341,7 +359,8 @@ if [[ "$HEAD_BEFORE" != "$HEAD_AFTER" && "$DEPLOY_REEXECUTED" != "1" ]]; then
     RELEASE_GATE_GITHUB_REPOSITORY="$RELEASE_GATE_GITHUB_REPOSITORY" \
     RELEASE_STATUS_PATH="$RELEASE_STATUS_PATH" \
     RELEASE_STATUS_NEXT_PATH="$RELEASE_STATUS_NEXT_PATH" \
-    DEPLOY_LOCK_FILE="$DEPLOY_LOCK_FILE" \
+    DEPLOY_LOCK_FILE="$DEPLOY_LOCK_FILE" DEPLOY_MUTEX_FILE="$DEPLOY_MUTEX_FILE" \
+    DEPLOY_LOCK_HELD="$DEPLOY_LOCK_HELD" DEPLOY_OWNS_LOCK="$DEPLOY_OWNS_LOCK" \
     bash "$APP_DIR/scripts/deploy_producao_seguro.sh"
 fi
 
