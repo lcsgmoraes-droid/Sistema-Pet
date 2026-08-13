@@ -47,7 +47,7 @@ chave antiga temporariamente.
 4. Validar a nova chave.
 
 ```bash
-ssh -i ~/.ssh/mlprohub_codex_deploy_YYYYMM -o IdentitiesOnly=yes -o BatchMode=yes petdeploy@192.241.150.121 "sudo -n /usr/local/sbin/petshop-status-producao"
+ssh -i ~/.ssh/mlprohub_codex_deploy_YYYYMM -o IdentitiesOnly=yes -o BatchMode=yes petdeploy@corepet.com.br "sudo -n /usr/local/sbin/petshop-status-producao"
 ```
 
 5. Atualizar a referencia local usada pelo fluxo operacional. Preferir manter o
@@ -83,8 +83,8 @@ integracao fiscal, Bling, webhook ou banco.
 5. Reiniciar somente os servicos afetados ou rodar o deploy seguro quando houver
 mudanca de codigo junto.
 6. Validar:
-   - `https://mlprohub.com.br/api/health`
-   - `https://mlprohub.com.br/health/watchdog`
+   - `https://corepet.com.br/api/health`
+   - `https://corepet.com.br/health/watchdog`
    - login basico
    - fluxo afetado pelo secret
 7. Remover/revogar o secret antigo no provedor.

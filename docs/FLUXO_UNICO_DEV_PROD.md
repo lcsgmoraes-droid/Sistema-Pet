@@ -69,10 +69,11 @@ continua na mesma branch e no mesmo computador.
    - Nao versionar `frontend/dist`
    - O build de producao deve gerar os arquivos em `runtime/frontend/dist`
    - Sem esse passo no deploy, a producao continua mostrando o codigo antigo
-5. No servidor: `bash scripts/deploy_producao_seguro.sh`
-   - Producao real via SSH preferencial: `ssh -i ~/.ssh/mlprohub_codex_deploy -o IdentitiesOnly=yes -o BatchMode=yes petdeploy@192.241.150.121 "sudo -n /usr/local/sbin/petshop-deploy-producao"`
-   - `root@192.241.150.121` fica apenas como fallback operacional autorizado.
-   - Guia oficial com IP, health e validacoes: `docs/PRODUCAO_DEPLOY_SSH.md`
+5. Executar: `powershell -ExecutionPolicy Bypass -File .\scripts\deploy_producao_remoto.ps1`
+   - O destino preferencial e sempre `petdeploy@corepet.com.br`; nao copiar IP para comandos operacionais.
+   - O launcher, o wrapper remoto e o script oficial validam o destino antes de alterar codigo ou banco.
+   - `root@corepet.com.br` fica apenas como fallback operacional autorizado.
+   - Guia oficial com dominio, health e validacoes: `docs/PRODUCAO_DEPLOY_SSH.md`
 6. `FLUXO_UNICO.bat status`
 
 ---
@@ -125,7 +126,7 @@ So o frontend e diferente: o nginx serve os arquivos estaticos gerados em `runti
 Para producao real, acessar por SSH direto no IP usando o usuario operacional:
 
 ```
-ssh -i ~/.ssh/mlprohub_codex_deploy -o IdentitiesOnly=yes petdeploy@192.241.150.121
+ssh -i ~/.ssh/mlprohub_codex_deploy -o IdentitiesOnly=yes petdeploy@corepet.com.br
 ```
 
 No servidor de producao, o caminho padrao com root-owned wrapper e:

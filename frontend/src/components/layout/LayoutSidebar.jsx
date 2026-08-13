@@ -216,13 +216,24 @@ export default function LayoutSidebar({
       {!isMobile && sidebarOpen && (
         <button
           type="button"
+          data-sidebar-resize-handle
           onPointerDown={iniciarRedimensionamento}
-          className={`absolute inset-y-0 right-0 z-20 w-1.5 cursor-col-resize touch-none transition-colors hover:bg-[#0f8b8d]/30 focus:bg-[#0f8b8d]/30 focus:outline-none ${
-            redimensionando ? "bg-[#0f8b8d]/40" : "bg-transparent"
+          className={`group absolute inset-y-0 -right-1 z-30 w-3 cursor-col-resize touch-none focus:outline-none ${
+            redimensionando ? "bg-[#0f8b8d]/10" : "bg-transparent"
           }`}
           title="Arraste para ajustar a largura do menu"
           aria-label="Ajustar largura do menu lateral"
-        />
+        >
+          <span
+            aria-hidden="true"
+            className={`absolute left-1/2 top-1/2 h-14 w-1 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#0f8b8d]/45 shadow-sm transition-all group-hover:h-20 group-hover:bg-[#0f8b8d]/80 group-focus:h-20 group-focus:bg-[#0f8b8d]/80 ${
+              redimensionando ? "h-24 bg-[#0f8b8d]" : ""
+            }`}
+          />
+          <span className="pointer-events-none absolute left-4 top-1/2 z-40 hidden -translate-y-1/2 whitespace-nowrap rounded-lg bg-slate-900 px-2.5 py-1.5 text-xs font-medium text-white shadow-lg group-hover:block group-focus:block">
+            Arraste para aumentar ou diminuir
+          </span>
+        </button>
       )}
     </aside>
   );

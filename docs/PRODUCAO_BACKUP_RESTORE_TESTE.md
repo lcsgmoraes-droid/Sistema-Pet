@@ -28,7 +28,7 @@ nao altera o banco de producao.
 Rodar em producao pelo usuario operacional:
 
 ```bash
-ssh -i ~/.ssh/mlprohub_codex_deploy -o IdentitiesOnly=yes -o BatchMode=yes petdeploy@192.241.150.121 "sudo -n /usr/local/sbin/petshop-restore-smoke-producao"
+ssh -i ~/.ssh/mlprohub_codex_deploy -o IdentitiesOnly=yes -o BatchMode=yes petdeploy@corepet.com.br "sudo -n /usr/local/sbin/petshop-restore-smoke-producao"
 ```
 
 O wrapper e root-owned, nao aceita argumentos e registra a operacao no log de

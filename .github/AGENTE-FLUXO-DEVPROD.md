@@ -226,7 +226,7 @@ git status
 Posso subir para produção agora?
 O que vai subir:
   - [listar arquivos modificados]
-  - Ambiente: PRODUÇÃO REAL (mlprohub.com.br)
+  - Ambiente: PRODUÇÃO REAL (corepet.com.br)
 
 Tipo: "sim" ou "pode subir" para continuar.
 ```
@@ -285,7 +285,7 @@ Ao final, entregar resumo como:
    - backend reconstruído
 7. Status: Tudo funcionando
 
-Próximo: Acompanhar em mlprohub.com.br ou fazer mais mudanças.
+Próximo: Acompanhar em corepet.com.br ou fazer mais mudanças.
 ```
 
 ---
