@@ -486,9 +486,7 @@ def atualizar_produto(
         )
 
         if not valido:
-            raise HTTPException(
-                status_code=400, detail=f"Composição inválida: {erro}"
-            )
+            raise HTTPException(status_code=400, detail=f"Composição inválida: {erro}")
 
         # Remover componentes antigos
         db.query(ProdutoKitComponente).filter(

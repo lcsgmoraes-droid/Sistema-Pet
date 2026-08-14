@@ -156,9 +156,9 @@ export default function DashboardFluxoCaixa({ userId }) {
           <>
             <div className="bg-gradient-to-r from-green-50 to-blue-50 border-l-4 border-green-500 p-4 rounded">
               <p className="text-sm text-gray-700">
-                <strong>📊 Visão Geral:</strong> Análise dos últimos <strong>30 dias</strong>{" "}
-                para calcular a saúde do caixa. Mostra quanto tempo você consegue manter o
-                negócio com saldo atual.
+                <strong>📊 Visão Geral:</strong> Análise dos últimos <strong>30 dias</strong> para
+                calcular a saúde do caixa. Mostra quanto tempo você consegue manter o negócio com
+                saldo atual.
               </p>
             </div>
             <IndicesSaudeCards indices={indices} />
@@ -175,8 +175,8 @@ export default function DashboardFluxoCaixa({ userId }) {
               <p className="text-sm text-gray-700">
                 <strong>📈 Projeção 15 Dias:</strong> Previsão usando inteligência artificial
                 (Prophet). Baseada em <strong>30+ dias de histórico</strong> para prever entradas e
-                saídas dos próximos <strong>15 dias</strong>. Quanto mais histórico, mais precisa
-                a previsão.
+                saídas dos próximos <strong>15 dias</strong>. Quanto mais histórico, mais precisa a
+                previsão.
               </p>
             </div>
             <GraficoProjecoes

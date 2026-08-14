@@ -270,9 +270,7 @@ def processar_entrada_estoque(
         # ✅ REATIVAR produto se estiver inativo
         if not produto.ativo:
             produto.ativo = True
-            logger.info(
-                f"  ♻️  Produto reativado: {produto.codigo} - {produto.nome}"
-            )
+            logger.info(f"  ♻️  Produto reativado: {produto.codigo} - {produto.nome}")
 
         # Atualizar dados fiscais do produto com informacoes do XML quando vierem preenchidas.
         # Entradas PDF preservam o cadastro atual, pois o arquivo nao contem dados fiscais reais.

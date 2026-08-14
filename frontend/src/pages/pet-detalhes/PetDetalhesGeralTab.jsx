@@ -76,9 +76,7 @@ export default function PetDetalhesGeralTab({ pet, ultimaAlta, ultimaVacina }) {
         <PetDetalhesInfoField label="Espécie">{pet.especie}</PetDetalhesInfoField>
         <PetDetalhesInfoField label="Raça">{pet.raca}</PetDetalhesInfoField>
         <PetDetalhesInfoField label="Sexo">{pet.sexo}</PetDetalhesInfoField>
-        <PetDetalhesInfoField label="Castrado">
-          {pet.castrado ? "Sim" : "Não"}
-        </PetDetalhesInfoField>
+        <PetDetalhesInfoField label="Castrado">{pet.castrado ? "Sim" : "Não"}</PetDetalhesInfoField>
         <PetDetalhesInfoField label="Data de Nascimento">
           {formatarData(pet.data_nascimento)}
         </PetDetalhesInfoField>

@@ -10,7 +10,8 @@ const allowRecoveryLiterals = new Set([
   "pages/categorias-financeiras/categoriasFinanceirasUtils.js",
   "pages/ecommerce/ecommerceMvpUtils.js",
 ]);
-const brokenEncoding = /Ã[\u0080-\u00bfƒŠŒŽšœžŸ]|ð[\u0080-\u00bfƒŠŒŽšœžŸ]|â[€‚ƒ„…†‡ˆ‰Š‹ŒŽ‘’“”•–—˜™š›œžŸ]|�|\p{L}\?{2,}\p{L}|["'`]\?{2,}/u;
+const brokenEncoding =
+  /Ã[\u0080-\u00bfƒŠŒŽšœžŸ]|ð[\u0080-\u00bfƒŠŒŽšœžŸ]|â[€‚ƒ„…†‡ˆ‰Š‹ŒŽ‘’“”•–—˜™š›œžŸ]|�|\p{L}\?{2,}\p{L}|["'`]\?{2,}/u;
 
 function listFiles(directory) {
   return fs.readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {

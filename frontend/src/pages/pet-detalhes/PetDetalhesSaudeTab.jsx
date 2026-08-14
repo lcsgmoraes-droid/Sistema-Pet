@@ -81,9 +81,7 @@ export default function PetDetalhesSaudeTab({
 
       <div className="space-y-4">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Histórico Clínico
-          </label>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Histórico Clínico</label>
           <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
             <p className="text-gray-900 whitespace-pre-line">
               {pet.historico_clinico || "Nenhum histórico clínico registrado"}
