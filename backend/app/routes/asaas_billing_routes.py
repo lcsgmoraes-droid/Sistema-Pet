@@ -18,12 +18,21 @@ from app.auth.dependencies import get_current_user_and_tenant
 from app.billing_models import BillingWebhookEvent
 from app.config import settings
 from app.db import get_session
+from app.middlewares.request_context import get_request_id
 from app.models import Tenant, User
+from app.security.client_ip import get_client_ip
 from app.services.asaas_billing_service import (
     AsaasBillingError,
     apply_payment_event,
     create_subscription,
     subscription_status,
+)
+from app.services.billing_contract_service import (
+    ContractAcceptanceContext,
+    acceptance_to_public,
+    contract_manifest,
+    latest_current_acceptance,
+    validate_contract_acceptance,
 )
 
 
@@ -33,6 +42,10 @@ router = APIRouter(prefix="/billing/asaas", tags=["Assinaturas Asaas"])
 class SubscriptionCreateRequest(BaseModel):
     plan_code: str
     billing_type: Literal["UNDEFINED", "BOLETO", "PIX"] = "UNDEFINED"
+    accepted: bool = False
+    contract_version: str = ""
+    contract_document_sha256: str = ""
+    client_timezone: str | None = None
 
 
 def _tenant(db: Session, tenant_id: object) -> Tenant:
@@ -59,17 +72,34 @@ def get_billing_status(
     db: Session = Depends(get_session),
 ):
     _user, tenant_id = auth
-    return subscription_status(_tenant(db, tenant_id))
+    tenant = _tenant(db, tenant_id)
+    result = subscription_status(tenant)
+    result["contract"] = contract_manifest()
+    result["contract_acceptance"] = acceptance_to_public(
+        latest_current_acceptance(db, tenant_id=tenant_id, plan_code=tenant.plan)
+    )
+    return result
 
 
 @router.post("/subscriptions")
 def subscribe(
     body: SubscriptionCreateRequest,
+    request: Request,
     auth=Depends(get_current_user_and_tenant),
     db: Session = Depends(get_session),
 ):
     current_user, tenant_id = auth
     _require_billing_admin(current_user)
+    try:
+        validate_contract_acceptance(
+            accepted=body.accepted,
+            contract_version=body.contract_version,
+            contract_document_sha256=body.contract_document_sha256,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except RuntimeError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
     try:
         return create_subscription(
             db,
@@ -77,6 +107,12 @@ def subscribe(
             current_user=current_user,
             plan_code=body.plan_code,
             billing_type=body.billing_type,
+            acceptance_context=ContractAcceptanceContext(
+                ip_address=get_client_ip(request),
+                user_agent=(request.headers.get("user-agent") or "")[:1000] or None,
+                client_timezone=(body.client_timezone or "")[:80] or None,
+                request_id=get_request_id(),
+            ),
         )
     except AsaasBillingError as exc:
         db.rollback()

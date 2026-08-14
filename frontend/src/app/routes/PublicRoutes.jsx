@@ -23,6 +23,7 @@ export function createPublicRoutes() {
       <Route path="/verificar-email" element={<EmailVerification />} />
       <Route path="/termos" element={<LegalPage type="termos" />} />
       <Route path="/privacidade" element={<LegalPage type="privacidade" />} />
+      <Route path="/contrato-assinatura" element={<LegalPage type="contrato" />} />
       <Route path="/landing" element={<LandingPage />} />
       <Route path="/planos" element={<Planos />} />
       <Route path="/rastreio/:token" element={<RastreioPublico />} />

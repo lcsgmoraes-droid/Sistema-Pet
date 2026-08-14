@@ -39,7 +39,7 @@ assert.match(layoutSidebar, /\/brand\/corepet\/corepet-horizontal\.png/);
 assert.match(layout, /\/brand\/corepet\/corepet-icon-64\.png/);
 assert.doesNotMatch(layout + layoutSidebar, /Pet Shop Pro/);
 
-assert.match(legalPage, /atacadaopetpp@gmail\.com/);
+assert.match(legalPage, /lcsgmoraes@gmail\.com/);
 assert.doesNotMatch(legalPage, /admin@mlprohub\.com\.br/);
 assert.doesNotMatch(blingIntegracao, /Sistema Pet/);
 assert.match(blingIntegracao, /CorePet/);

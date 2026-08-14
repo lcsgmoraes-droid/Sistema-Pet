@@ -13,6 +13,11 @@ from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.models import Tenant, User
+from app.services.billing_contract_service import (
+    ContractAcceptanceContext,
+    acceptance_to_public,
+    build_contract_acceptance,
+)
 from app.services.plan_catalog import PlanDefinition, get_plan
 
 
@@ -249,6 +254,7 @@ def create_subscription(
     tenant: Tenant,
     current_user: User,
     plan_code: str,
+    acceptance_context: ContractAcceptanceContext,
     billing_type: str = "UNDEFINED",
 ) -> dict[str, Any]:
     plan = get_plan(plan_code)
@@ -262,6 +268,7 @@ def create_subscription(
 
     client = AsaasClient()
     customer_id = _ensure_customer(client, tenant, current_user)
+    requested_first_due_date = _first_due_date(tenant)
 
     reusable = (
         tenant.billing_provider_subscription_id
@@ -289,7 +296,7 @@ def create_subscription(
             payload={
                 "customer": customer_id,
                 "billingType": normalized_type,
-                "nextDueDate": _first_due_date(tenant).isoformat(),
+                "nextDueDate": requested_first_due_date.isoformat(),
                 "value": float(Decimal(plan.price_cents) / Decimal(100)),
                 "cycle": "MONTHLY",
                 "description": f"CorePet - {plan.name}",
@@ -310,9 +317,22 @@ def create_subscription(
     if not _trial_active(tenant) and tenant.billing_status != "active":
         tenant.billing_status = "pending"
 
+    acceptance = build_contract_acceptance(
+        tenant=tenant,
+        current_user=current_user,
+        plan=plan,
+        billing_type=normalized_type,
+        first_due_date=tenant.billing_next_due_date or requested_first_due_date,
+        provider_environment=client.environment,
+        provider_subscription_id=subscription_id,
+        context=acceptance_context,
+    )
+    db.add(acceptance)
     db.commit()
     db.refresh(tenant)
-    return subscription_status(tenant, plan=plan)
+    result = subscription_status(tenant, plan=plan)
+    result["contract_acceptance"] = acceptance_to_public(acceptance)
+    return result
 
 
 def subscription_status(

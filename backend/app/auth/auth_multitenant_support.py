@@ -22,8 +22,8 @@ EMAIL_VERIFICATION_TOKEN_HOURS = int(os.getenv("EMAIL_VERIFICATION_TOKEN_HOURS",
 EMAIL_VERIFICATION_REQUIRED = os.getenv(
     "EMAIL_VERIFICATION_REQUIRED", "true"
 ).strip().lower() not in {"0", "false", "no"}
-TERMS_VERSION = os.getenv("TERMS_VERSION", "termos-2026-05-08")
-PRIVACY_VERSION = os.getenv("PRIVACY_VERSION", "privacidade-2026-05-08")
+TERMS_VERSION = os.getenv("TERMS_VERSION", "termos-2026-08-14")
+PRIVACY_VERSION = os.getenv("PRIVACY_VERSION", "privacidade-2026-08-14")
 STRICT_EMAIL_ENVS = {"production", "prod", "staging"}
 LOCAL_REQUEST_HOSTS = {"localhost", "127.0.0.1", "::1", "0.0.0.0"}
 ALLOWED_SIGNUP_PLANS = PUBLIC_SIGNUP_PLANS
