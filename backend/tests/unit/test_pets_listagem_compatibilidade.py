@@ -20,7 +20,7 @@ def _pet_legado():
         especie="Cao",
         raca="Sem raca definida",
         sexo="macho",
-        castrado=False,
+        castrado=None,
         data_nascimento=None,
         idade_aproximada=24,
         peso=18.4,
@@ -52,5 +52,6 @@ def test_listagem_de_pets_aceita_datas_nulas_e_listas_clinicas_legadas():
     response = PetResponse.model_validate(payload)
 
     assert response.created_at is None
+    assert response.castrado is False
     assert response.alergias_lista == ["Frango", "Poeira"]
     assert response.restricoes_alimentares_lista == ["Soja", "Lactose"]
