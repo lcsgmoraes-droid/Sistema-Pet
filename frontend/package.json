@@ -17,6 +17,7 @@
     "test:auth-storage": "node scripts/test-token-storage.mjs",
     "test:auth-refresh": "node scripts/test-refresh-manager.mjs",
     "test:corepet-branding": "node scripts/test-corepet-branding.mjs",
+    "test:text-encoding": "node scripts/test-text-encoding.mjs",
     "test:public-plans": "node scripts/test-public-plans.mjs",
     "test:ecommerce-account-validation": "node scripts/test-ecommerce-account-validation.mjs",
     "test:ecommerce-session": "node scripts/test-ecommerce-session.mjs",

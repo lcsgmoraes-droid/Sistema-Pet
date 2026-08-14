@@ -5,10 +5,10 @@ Upload e processamento de NF-e de fornecedores
 
 Funcionalidades:
 - Upload de XML de NF-e
-- Parser automÃ¡tico de XML
-- Matching automÃ¡tico de produtos
-- Entrada automÃ¡tica no estoque
-- GestÃ£o de produtos nÃ£o vinculados
+- Parser automático de XML
+- Matching automático de produtos
+- Entrada automática no estoque
+- Gestão de produtos não vinculados
 """
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query, Form

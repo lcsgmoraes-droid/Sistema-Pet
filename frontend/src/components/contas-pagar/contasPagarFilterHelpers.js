@@ -173,7 +173,7 @@ export function normalizarFormaPagamentoContasPagar(forma) {
     id: forma.id,
     nome: forma.nome,
     tipo: forma.tipo || forma.nome?.toLowerCase()?.replace(/\s+/g, "_") || "outro",
-    icone: forma.icone || "Ã°Å¸â€™Â³",
+    icone: forma.icone || "💳",
     conta_bancaria_destino_id: forma.conta_bancaria_destino_id || null,
   };
 }

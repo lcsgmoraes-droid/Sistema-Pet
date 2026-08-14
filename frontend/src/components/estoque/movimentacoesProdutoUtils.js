@@ -3,10 +3,19 @@ function numeroSeguro(valor) {
   return Number.isFinite(numero) ? numero : 0;
 }
 
-export const CANAIS_DESTAQUE = ["loja_fisica", "mercado_livre", "shopee", "amazon"];
+export const CANAIS_DESTAQUE = [
+  "app",
+  "ecommerce",
+  "loja_fisica",
+  "mercado_livre",
+  "shopee",
+  "amazon",
+];
 
 export const LABELS_CANAIS = {
   loja_fisica: "Loja Física",
+  app: "App",
+  ecommerce: "E-commerce",
   mercado_livre: "Mercado Livre",
   shopee: "Shopee",
   amazon: "Amazon",
@@ -16,6 +25,14 @@ export const LABELS_CANAIS = {
 };
 
 export const ESTILOS_CANAIS = {
+  app: {
+    card: "bg-violet-50 border-violet-200 text-violet-700",
+    bar: "bg-violet-400",
+  },
+  ecommerce: {
+    card: "bg-indigo-50 border-indigo-200 text-indigo-700",
+    bar: "bg-indigo-400",
+  },
   loja_fisica: {
     card: "bg-emerald-50 border-emerald-200 text-emerald-700",
     bar: "bg-emerald-400",

@@ -42,7 +42,7 @@ export default function CategoriaFinanceiraFormFields({
       {formData.tipo === "despesa" && (
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
-            ðŸ’° ClassificaÃ§Ã£o de Custo
+            💰 Classificação de Custo
           </label>
           <div className="flex gap-2">
             {COST_CLASSIFICATION_OPTIONS.map((option) => (
@@ -68,17 +68,17 @@ export default function CategoriaFinanceiraFormFields({
           </div>
           {formData.tipo_custo === "ambos" && (
             <p className="text-xs text-purple-600 mt-1">
-              â†• As subcategorias desta categoria terÃ£o classificaÃ§Ã£o individual
+              ↕ As subcategorias desta categoria terão classificação individual
             </p>
           )}
           {formData.tipo_custo === "fixo" && editando && (
             <p className="text-xs text-orange-600 mt-1">
-              ðŸ”’ Ao salvar, todas as subcategorias serÃ£o classificadas como Fixo
+              🔒 Ao salvar, todas as subcategorias serão classificadas como Fixo
             </p>
           )}
           {formData.tipo_custo === "variavel" && editando && (
             <p className="text-xs text-blue-600 mt-1">
-              ðŸ“ˆ Ao salvar, todas as subcategorias serÃ£o classificadas como VariÃ¡vel
+              📈 Ao salvar, todas as subcategorias serão classificadas como Variável
             </p>
           )}
         </div>
@@ -86,7 +86,7 @@ export default function CategoriaFinanceiraFormFields({
 
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Ãcone</label>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Ícone</label>
           <select
             value={formData.icone}
             onChange={(e) => setFormData({ ...formData, icone: e.target.value })}
@@ -125,7 +125,7 @@ export default function CategoriaFinanceiraFormFields({
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">DescriÃ§Ã£o</label>
+        <label className="block text-sm font-medium text-gray-700 mb-1">Descrição</label>
         <textarea
           value={formData.descricao}
           onChange={(e) => setFormData({ ...formData, descricao: e.target.value })}

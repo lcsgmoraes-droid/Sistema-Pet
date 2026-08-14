@@ -23,20 +23,20 @@ export default function PetDetalhesInternacoesTab({
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-xl font-bold text-gray-900">HistÃ³rico de InternaÃ§Ãµes</h2>
+        <h2 className="text-xl font-bold text-gray-900">Histórico de Internações</h2>
         <button
           onClick={onOpenInternacoes}
           className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors text-sm font-medium"
         >
-          Abrir mÃ³dulo de internaÃ§Ãµes
+          Abrir módulo de internações
         </button>
       </div>
 
       {loadingInternacoes ? (
-        <div className="text-center py-10 text-gray-500">Carregando histÃ³rico...</div>
+        <div className="text-center py-10 text-gray-500">Carregando histórico...</div>
       ) : historicoInternacoes.length === 0 ? (
         <div className="text-center py-12 text-gray-500 border border-gray-200 rounded-lg bg-gray-50">
-          Nenhuma internaÃ§Ã£o registrada para este pet.
+          Nenhuma internação registrada para este pet.
         </div>
       ) : (
         <div className="space-y-4">
@@ -47,8 +47,8 @@ export default function PetDetalhesInternacoesTab({
             >
               <div className="flex items-center justify-between gap-3 mb-2">
                 <p className="font-semibold text-gray-800">
-                  InternaÃ§Ã£o #{internacao.internacao_id}{" "}
-                  {internacao.box ? `â€¢ Baia ${internacao.box}` : "â€¢ Sem baia"}
+                  Internação #{internacao.internacao_id}{" "}
+                  {internacao.box ? `• Baia ${internacao.box}` : "• Sem baia"}
                 </p>
                 <span
                   className={`px-2 py-1 rounded-full text-xs font-medium ${
@@ -76,9 +76,9 @@ export default function PetDetalhesInternacoesTab({
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
                 <InternacaoSubList
-                  title="EvoluÃ§Ãµes"
+                  title="Evoluções"
                   items={internacao.evolucoes || []}
-                  empty="Nenhuma evoluÃ§Ã£o."
+                  empty="Nenhuma evolução."
                   renderItem={(ev) => (
                     <div
                       key={ev.id}
@@ -86,7 +86,7 @@ export default function PetDetalhesInternacoesTab({
                     >
                       <p className="text-gray-500">{formatarDataHora(ev.data_hora)}</p>
                       <p>
-                        Temp: {ev.temperatura || "-"} â€¢ FC: {ev.freq_cardiaca || "-"} â€¢ FR:{" "}
+                        Temp: {ev.temperatura || "-"} • FC: {ev.freq_cardiaca || "-"} • FR:{" "}
                         {ev.freq_respiratoria || "-"}
                       </p>
                       {ev.observacoes && <p className="text-gray-600">{ev.observacoes}</p>}
@@ -114,15 +114,15 @@ export default function PetDetalhesInternacoesTab({
                               : "bg-emerald-100 text-emerald-700"
                           }`}
                         >
-                          {proc.status === "agendado" ? "Agendado" : "ConcluÃ­do"}
+                          {proc.status === "agendado" ? "Agendado" : "Concluído"}
                         </span>
                       </div>
                       <p>Agendado: {formatarDataHora(proc.horario_agendado)}</p>
                       <p>Executado: {formatarDataHora(proc.horario_execucao)}</p>
                       <p>
-                        Dose: {proc.dose || "-"} â€¢ Via: {proc.via || "-"}
+                        Dose: {proc.dose || "-"} • Via: {proc.via || "-"}
                       </p>
-                      <p>ResponsÃ¡vel: {proc.executado_por || "-"}</p>
+                      <p>Responsável: {proc.executado_por || "-"}</p>
                       {proc.observacao_execucao && <p>Obs: {proc.observacao_execucao}</p>}
                     </div>
                   )}

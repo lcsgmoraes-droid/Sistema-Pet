@@ -29,7 +29,7 @@ async def criar_configuracao(
     user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     """
-    Cria ou atualiza uma configuraÃ§Ã£o de comissÃ£o
+    Cria ou atualiza uma configuração de comissão
     """
     try:
         from .db import SessionLocal
@@ -42,7 +42,7 @@ async def criar_configuracao(
 
         db = SessionLocal()
         try:
-            # ðŸ”’ VALIDAR SE Ã‰ PARCEIRO
+            # 🔒 VALIDAR SE É PARCEIRO
             cliente = (
                 db.query(Cliente).filter(Cliente.id == config.funcionario_id).first()
             )
@@ -50,22 +50,22 @@ async def criar_configuracao(
             if not cliente:
                 raise HTTPException(
                     status_code=status.HTTP_404_NOT_FOUND,
-                    detail=f"Pessoa com ID {config.funcionario_id} nÃ£o encontrada",
+                    detail=f"Pessoa com ID {config.funcionario_id} não encontrada",
                 )
 
             if not cliente.parceiro_ativo:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Somente parceiros podem ter comissÃ£o configurada.",
+                    detail="Somente parceiros podem ter comissão configurada.",
                 )
 
             config = _normalizar_configuracao_comissao(config)
 
-            # ValidaÃ§Ãµes
+            # Validações
             if config.tipo not in TIPOS_CONFIGURACAO_COMISSAO:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Tipo invÃ¡lido. Use: categoria, subcategoria, produto ou geral",
+                    detail="Tipo inválido. Use: categoria, subcategoria, produto ou geral",
                 )
 
             if config.percentual < 0 or config.percentual > 100:
@@ -74,7 +74,7 @@ async def criar_configuracao(
                     detail="Percentual deve estar entre 0 e 100",
                 )
 
-            # Verificar se jÃ¡ existe configuraÃ§Ã£o
+            # Verificar se já existe configuração
             result = execute_tenant_safe(
                 db,
                 """
@@ -161,7 +161,7 @@ async def criar_configuracao(
 
             return {
                 "success": True,
-                "message": "ConfiguraÃ§Ã£o salva com sucesso",
+                "message": "Configuração salva com sucesso",
                 "config_id": config_id,
             }
         finally:
@@ -170,10 +170,10 @@ async def criar_configuracao(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Erro ao criar configuraÃ§Ã£o: {e}")
+        logger.error(f"Erro ao criar configuração: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Erro ao salvar configuraÃ§Ã£o: {str(e)}",
+            detail=f"Erro ao salvar configuração: {str(e)}",
         )
 
 
@@ -183,8 +183,8 @@ async def criar_configuracoes_batch(
     user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     """
-    Cria ou atualiza mÃºltiplas configuraÃ§Ãµes de uma vez em uma Ãºnica transaÃ§Ã£o
-    SOLUÃ‡ÃƒO CORRETA: with db.begin() para transaÃ§Ã£o explÃ­cita
+    Cria ou atualiza múltiplas configurações de uma vez em uma única transação
+    SOLUÇÃO CORRETA: with db.begin() para transação explícita
     """
     try:
         from .db import SessionLocal
@@ -198,14 +198,14 @@ async def criar_configuracoes_batch(
         if not batch.configuracoes:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Nenhuma configuraÃ§Ã£o fornecida",
+                detail="Nenhuma configuração fornecida",
             )
 
         db = SessionLocal()
         config_ids = []
 
         try:
-            # ðŸ”¥ VALIDAR SE TODOS OS FUNCIONÃRIOS SÃƒO PARCEIROS
+            # 🔥 VALIDAR SE TODOS OS FUNCIONÁRIOS SÃO PARCEIROS
             funcionarios_ids = list(
                 set([c.funcionario_id for c in batch.configuracoes])
             )
@@ -217,28 +217,28 @@ async def criar_configuracoes_batch(
                 if not cliente:
                     raise HTTPException(
                         status_code=status.HTTP_404_NOT_FOUND,
-                        detail=f"Pessoa com ID {func_id} nÃ£o encontrada",
+                        detail=f"Pessoa com ID {func_id} não encontrada",
                     )
 
                 if not cliente.parceiro_ativo:
                     raise HTTPException(
                         status_code=status.HTTP_400_BAD_REQUEST,
-                        detail="Somente parceiros podem ter comissÃ£o configurada.",
+                        detail="Somente parceiros podem ter comissão configurada.",
                     )
 
-            # Processar todas as configuraÃ§Ãµes (SessionLocal jÃ¡ tem transaÃ§Ã£o ativa)
+            # Processar todas as configurações (SessionLocal já tem transação ativa)
             for config in batch.configuracoes:
                 config = _normalizar_configuracao_comissao(config)
-                # ValidaÃ§Ãµes
+                # Validações
                 if config.tipo not in TIPOS_CONFIGURACAO_COMISSAO:
-                    raise ValueError(f"Tipo invÃ¡lido: {config.tipo}")
+                    raise ValueError(f"Tipo inválido: {config.tipo}")
 
                 if config.percentual < 0 or config.percentual > 100:
                     raise ValueError(
                         f"Percentual deve estar entre 0 e 100: {config.percentual}"
                     )
 
-                # Buscar se jÃ¡ existe
+                # Buscar se já existe
                 result = execute_tenant_safe(
                     db,
                     """
@@ -327,7 +327,7 @@ async def criar_configuracoes_batch(
 
             return {
                 "success": True,
-                "message": f"{len(config_ids)} configuraÃ§Ãµes salvas com sucesso",
+                "message": f"{len(config_ids)} configurações salvas com sucesso",
                 "config_ids": config_ids,
                 "total": len(config_ids),
             }
@@ -349,7 +349,7 @@ async def criar_configuracoes_batch(
         raise
     except Exception as e:
         error_msg = str(e)
-        logger.error(f"Erro ao criar configuraÃ§Ãµes em batch: {error_msg}")
+        logger.error(f"Erro ao criar configurações em batch: {error_msg}")
 
         import traceback
 
@@ -357,7 +357,7 @@ async def criar_configuracoes_batch(
 
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Erro ao salvar configuraÃ§Ãµes: {error_msg}",
+            detail=f"Erro ao salvar configurações: {error_msg}",
         )
 
 
@@ -366,7 +366,7 @@ async def deletar_configuracao(
     config_id: int, user_and_tenant=Depends(get_current_user_and_tenant)
 ):
     """
-    Deleta (desativa) uma configuraÃ§Ã£o de comissÃ£o
+    Deleta (desativa) uma configuração de comissão
     """
     try:
         # Extrair tenant_id e configurar contexto
@@ -380,18 +380,18 @@ async def deletar_configuracao(
         if not success:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="ConfiguraÃ§Ã£o nÃ£o encontrada",
+                detail="Configuração não encontrada",
             )
 
-        return {"success": True, "message": "ConfiguraÃ§Ã£o removida com sucesso"}
+        return {"success": True, "message": "Configuração removida com sucesso"}
 
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Erro ao deletar configuraÃ§Ã£o: {e}")
+        logger.error(f"Erro ao deletar configuração: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Erro ao remover configuraÃ§Ã£o: {str(e)}",
+            detail=f"Erro ao remover configuração: {str(e)}",
         )
 
 
@@ -401,10 +401,10 @@ async def duplicar_configuracao(
     user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     """
-    Duplica todas as configuraÃ§Ãµes de um funcionÃ¡rio para outro
+    Duplica todas as configurações de um funcionário para outro
     """
     try:
-        # ðŸ”’ VALIDAR SE DESTINO Ã‰ PARCEIRO
+        # 🔒 VALIDAR SE DESTINO É PARCEIRO
         from .db import SessionLocal
         from .tenancy.context import set_tenant_context
 
@@ -426,13 +426,13 @@ async def duplicar_configuracao(
         if not pessoa_destino:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Pessoa destino com ID {request.funcionario_destino_id} nÃ£o encontrada",
+                detail=f"Pessoa destino com ID {request.funcionario_destino_id} não encontrada",
             )
 
         if not pessoa_destino[2]:  # parceiro_ativo
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Somente parceiros podem ter comissÃ£o configurada.",
+                detail="Somente parceiros podem ter comissão configurada.",
             )
 
         count = ComissoesConfig.duplicar_configuracao(
@@ -444,17 +444,17 @@ async def duplicar_configuracao(
 
         return {
             "success": True,
-            "message": f"{count} configuraÃ§Ãµes duplicadas com sucesso",
+            "message": f"{count} configurações duplicadas com sucesso",
             "total_duplicadas": count,
         }
 
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Erro ao duplicar configuraÃ§Ã£o: {e}")
+        logger.error(f"Erro ao duplicar configuração: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Erro ao duplicar configuraÃ§Ãµes: {str(e)}",
+            detail=f"Erro ao duplicar configurações: {str(e)}",
         )
 
 
@@ -467,7 +467,7 @@ async def buscar_configuracao_aplicavel(
     user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     """
-    Busca a configuraÃ§Ã£o de comissÃ£o aplicÃ¡vel para um produto especÃ­fico
+    Busca a configuração de comissão aplicável para um produto específico
     Segue hierarquia: Produto > Subcategoria > Categoria
     """
     try:
@@ -488,19 +488,19 @@ async def buscar_configuracao_aplicavel(
             return {
                 "success": True,
                 "data": None,
-                "message": "Nenhuma configuraÃ§Ã£o de comissÃ£o encontrada",
+                "message": "Nenhuma configuração de comissão encontrada",
             }
 
         return {"success": True, "data": config}
 
     except Exception as e:
-        logger.error(f"Erro ao buscar configuraÃ§Ã£o aplicÃ¡vel: {e}")
+        logger.error(f"Erro ao buscar configuração aplicável: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Erro ao buscar configuraÃ§Ã£o: {str(e)}",
+            detail=f"Erro ao buscar configuração: {str(e)}",
         )
 
 
 # ==========================================
-# ENDPOINTS - ITENS DE COMISSÃƒO
+# ENDPOINTS - ITENS DE COMISSÃO
 # ==========================================

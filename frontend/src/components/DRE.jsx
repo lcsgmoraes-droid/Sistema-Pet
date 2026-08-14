@@ -303,7 +303,7 @@ const DRE = () => {
       link.click();
       link.remove();
 
-      toast.success("ðŸ“„ PDF exportado com sucesso!", { id: "pdf" });
+      toast.success("📄 PDF exportado com sucesso!", { id: "pdf" });
     } catch (error) {
       console.error("Erro ao exportar PDF:", error);
       toast.error("Erro ao exportar PDF", { id: "pdf" });
@@ -329,7 +329,7 @@ const DRE = () => {
       link.click();
       link.remove();
 
-      toast.success("ðŸ“Š Excel exportado com sucesso!", { id: "excel" });
+      toast.success("📊 Excel exportado com sucesso!", { id: "excel" });
     } catch (error) {
       console.error("Erro ao exportar Excel:", error);
       toast.error("Erro ao exportar Excel", { id: "excel" });

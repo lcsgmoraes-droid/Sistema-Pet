@@ -15,7 +15,7 @@ class ContaReceberCreate(BaseModel):
     # DRE - CAMPOS OBRIGATORIOS
     # ============================
     dre_subcategoria_id: Optional[int] = (
-        None  # OPCIONAL - serÃ¡ classificado automaticamente se nÃ£o fornecido
+        None  # OPCIONAL - será classificado automaticamente se não fornecido
     )
     canal: str = (
         "loja_fisica"  # OBRIGATORIO - loja_fisica, mercado_livre, shopee, amazon
@@ -32,7 +32,7 @@ class ContaReceberCreate(BaseModel):
     eh_parcelado: bool = False
     total_parcelas: int = 1
 
-    # RecorrÃªncia
+    # Recorrência
     eh_recorrente: bool = False
     tipo_recorrencia: Optional[str] = (
         None  # 'semanal', 'quinzenal', 'mensal', 'personalizado'
@@ -71,10 +71,10 @@ class ContaReceberResponse(BaseModel):
     total_parcelas: Optional[int] = None
     documento: Optional[str] = None
     venda_id: Optional[int] = None
-    numero_venda: Optional[str] = None  # âœ… CAMPO ADICIONADO
+    numero_venda: Optional[str] = None  # ✅ CAMPO ADICIONADO
 
     # ============================
-    # CONCILIAÃ‡ÃƒO DE CARTÃƒO
+    # CONCILIAÇÃO DE CARTÃO
     # ============================
     nsu: Optional[str] = None
     adquirente: Optional[str] = None
@@ -85,5 +85,5 @@ class ContaReceberResponse(BaseModel):
 
 
 # ============================================================================
-# FUNÃ‡ÃƒO HELPER: CALCULAR PRÃ“XIMA DATA DE RECORRÃŠNCIA
+# FUNÇÃO HELPER: CALCULAR PRÓXIMA DATA DE RECORRÊNCIA
 # ============================================================================

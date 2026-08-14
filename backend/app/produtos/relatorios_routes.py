@@ -75,7 +75,7 @@ PRODUTO_SKU_COLUMN = getattr(Produto, "sku", None)
 
 
 # ==========================================
-# ENDPOINTS - RELATÃ“RIOS
+# ENDPOINTS - RELATÓRIOS
 # ==========================================
 
 

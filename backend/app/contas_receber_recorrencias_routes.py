@@ -22,7 +22,7 @@ async def processar_recorrencias_contas_receber(
     user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     """
-    Processa contas recorrentes e cria novas contas quando necessÃ¡rio
+    Processa contas recorrentes e cria novas contas quando necessário
     Esta rota deve ser executada periodicamente (diariamente recomendado)
     """
     current_user, tenant_id = user_and_tenant
@@ -48,9 +48,9 @@ async def processar_recorrencias_contas_receber(
 
     for conta_origem in contas_recorrentes:
         try:
-            # Verificar se jÃ¡ atingiu o nÃºmero mÃ¡ximo de repetiÃ§Ãµes
+            # Verificar se já atingiu o número máximo de repetições
             if conta_origem.numero_repeticoes:
-                # Contar quantas contas jÃ¡ foram geradas
+                # Contar quantas contas já foram geradas
                 count_geradas = (
                     db.query(func.count(ContaReceber.id))
                     .filter(
@@ -62,15 +62,15 @@ async def processar_recorrencias_contas_receber(
 
                 if count_geradas >= conta_origem.numero_repeticoes:
                     logger.info(
-                        f"ðŸ“… Conta #{conta_origem.id} atingiu o nÃºmero mÃ¡ximo de repetiÃ§Ãµes ({conta_origem.numero_repeticoes})"
+                        f"📅 Conta #{conta_origem.id} atingiu o número máximo de repetições ({conta_origem.numero_repeticoes})"
                     )
                     continue
 
-            # Criar nova conta baseada na recorrÃªncia
+            # Criar nova conta baseada na recorrência
             nova_data_vencimento = conta_origem.proxima_recorrencia
 
             nova_conta = ContaReceber(
-                descricao=f"{conta_origem.descricao} (RecorrÃªncia {nova_data_vencimento.strftime('%m/%Y')})",
+                descricao=f"{conta_origem.descricao} (Recorrência {nova_data_vencimento.strftime('%m/%Y')})",
                 cliente_id=conta_origem.cliente_id,
                 categoria_id=conta_origem.categoria_id,
                 dre_subcategoria_id=conta_origem.dre_subcategoria_id,  # Herdar da conta origem
@@ -81,7 +81,7 @@ async def processar_recorrencias_contas_receber(
                 data_vencimento=nova_data_vencimento,
                 status="pendente",
                 documento=conta_origem.documento,
-                observacoes=f"Gerada automaticamente da recorrÃªncia #{conta_origem.id}",
+                observacoes=f"Gerada automaticamente da recorrência #{conta_origem.id}",
                 conta_recorrencia_origem_id=conta_origem.id,
                 user_id=conta_origem.user_id,
                 tenant_id=tenant_id,
@@ -91,14 +91,14 @@ async def processar_recorrencias_contas_receber(
             db.flush()
             contas_criadas.append(nova_conta)
 
-            # Atualizar prÃ³xima recorrÃªncia da conta origem
+            # Atualizar próxima recorrência da conta origem
             conta_origem.proxima_recorrencia = calcular_proxima_recorrencia(
                 nova_data_vencimento,
                 conta_origem.tipo_recorrencia,
                 conta_origem.intervalo_dias,
             )
 
-            # Criar lanÃ§amento no fluxo de caixa
+            # Criar lançamento no fluxo de caixa
             try:
                 lancamento = LancamentoManual(
                     tipo="entrada",
@@ -109,7 +109,7 @@ async def processar_recorrencias_contas_receber(
                     categoria_id=nova_conta.categoria_id,
                     status="previsto",
                     documento=f"CONTA-RECEBER-{nova_conta.id}",
-                    observacoes=f"Gerado automaticamente da recorrÃªncia #{conta_origem.id}",
+                    observacoes=f"Gerado automaticamente da recorrência #{conta_origem.id}",
                     gerado_automaticamente=True,
                     user_id=current_user.id,
                     tenant_id=tenant_id,
@@ -117,16 +117,16 @@ async def processar_recorrencias_contas_receber(
                 db.add(lancamento)
             except Exception as e:
                 logger.warning(
-                    f"âš ï¸  Erro ao criar lanÃ§amento para conta recorrente: {e}"
+                    f"⚠️  Erro ao criar lançamento para conta recorrente: {e}"
                 )
 
             logger.info(
-                f"âœ… Nova conta recorrente criada: #{nova_conta.id} - Vencimento: {nova_data_vencimento}"
+                f"✅ Nova conta recorrente criada: #{nova_conta.id} - Vencimento: {nova_data_vencimento}"
             )
 
         except Exception as e:
             logger.error(
-                f"âŒ Erro ao processar recorrÃªncia da conta #{conta_origem.id}: {e}"
+                f"❌ Erro ao processar recorrência da conta #{conta_origem.id}: {e}"
             )
             continue
 

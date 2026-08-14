@@ -18,7 +18,7 @@ router = APIRouter(
 @router.get("/funcionarios")
 async def listar_funcionarios(user_and_tenant=Depends(get_current_user_and_tenant)):
     """
-    Lista todas as pessoas parceiras ativas que podem receber comissÃµes
+    Lista todas as pessoas parceiras ativas que podem receber comissões
     """
     try:
         from .db import SessionLocal
@@ -68,7 +68,7 @@ async def listar_funcionarios_com_comissao(
     user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     """
-    Lista todas as pessoas parceiras ativas com contagem de configuraÃ§Ãµes
+    Lista todas as pessoas parceiras ativas com contagem de configurações
     """
     try:
         from .db import SessionLocal
@@ -77,13 +77,13 @@ async def listar_funcionarios_com_comissao(
         # Extrair tenant_id do contexto
         _current_user, tenant_id = user_and_tenant
 
-        # ðŸ”’ CRÃTICO: Garantir que contexto estÃ¡ configurado
+        # 🔒 CRÍTICO: Garantir que contexto está configurado
         set_tenant_context(tenant_id)
 
         db = SessionLocal()
         try:
             ensure_comissoes_config_schema(db)
-            # Query que conta as configuraÃ§Ãµes de cada parceiro ativo
+            # Query que conta as configurações de cada parceiro ativo
             result = execute_tenant_safe(
                 db,
                 """
@@ -140,7 +140,7 @@ async def buscar_configuracoes_funcionario(
     funcionario_id: int, user_and_tenant=Depends(get_current_user_and_tenant)
 ):
     """
-    Busca todas as configuraÃ§Ãµes de comissÃ£o de um funcionÃ¡rio especÃ­fico
+    Busca todas as configurações de comissão de um funcionário específico
     """
     try:
         from .db import SessionLocal
@@ -221,8 +221,8 @@ async def buscar_configuracoes_funcionario(
             db.close()
 
     except Exception as e:
-        logger.error(f"Erro ao buscar configuraÃ§Ãµes: {e}")
+        logger.error(f"Erro ao buscar configurações: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Erro ao buscar configuraÃ§Ãµes: {str(e)}",
+            detail=f"Erro ao buscar configurações: {str(e)}",
         )

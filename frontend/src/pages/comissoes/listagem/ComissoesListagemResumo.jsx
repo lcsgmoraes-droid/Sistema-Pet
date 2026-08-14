@@ -1,3 +1,4 @@
+import { AlertTriangle } from "lucide-react";
 import MetricCard from "../../../components/ui/MetricCard";
 import MetricGrid from "../../../components/ui/MetricGrid";
 import MoneyCell from "../../../components/ui/MoneyCell";
@@ -21,8 +22,9 @@ export default function ComissoesListagemResumo({ controller }) {
   if (erroResumo) {
     return (
       <div className="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-        <p className="text-sm text-yellow-800">
-          ?????? N??o foi poss??vel carregar o resumo financeiro
+        <p className="flex items-center gap-2 text-sm text-yellow-800">
+          <AlertTriangle aria-hidden="true" className="h-4 w-4 shrink-0" />
+          Não foi possível carregar o resumo financeiro
         </p>
       </div>
     );

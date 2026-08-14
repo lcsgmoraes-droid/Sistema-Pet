@@ -198,6 +198,85 @@ def build_demo_scenarios() -> list[SaleScenario]:
     return main_scenarios + build_demo_historical_scenarios()
 
 
+def build_demo_showcase_sales_scenarios() -> list[SaleScenario]:
+    """Vendas multicanal do produto principal da vitrine comercial."""
+
+    return [
+        SaleScenario(
+            number="DEMO-VEN-201",
+            channel="app",
+            client_key="ana",
+            payment_key="pix",
+            items=((0, Decimal("2")),),
+            days_ago=5,
+            order_id="DEMO-APP-MULTI-001",
+            order_origin="app",
+            order_status="pago",
+            observations="Venda do produto vitrine pelo App CorePet.",
+        ),
+        SaleScenario(
+            number="DEMO-VEN-202",
+            channel="ecommerce",
+            client_key="joao",
+            payment_key="credito",
+            items=((0, Decimal("1")),),
+            days_ago=4,
+            installments=2,
+            card_brand="visa",
+            order_id="DEMO-ECO-MULTI-001",
+            order_origin="web",
+            order_status="pago",
+            observations="Venda do produto vitrine pelo E-commerce.",
+        ),
+        SaleScenario(
+            number="DEMO-VEN-203",
+            channel="loja_fisica",
+            client_key="maria",
+            payment_key="dinheiro",
+            items=((0, Decimal("2")),),
+            days_ago=3,
+            observations="Venda do produto vitrine no PDV da loja.",
+        ),
+        SaleScenario(
+            number="DEMO-VEN-204",
+            channel="shopee",
+            client_key="ana",
+            payment_key="pix",
+            items=((0, Decimal("1")),),
+            days_ago=2,
+            order_id="DEMO-SHOPEE-001",
+            order_origin="shopee",
+            order_status="pago",
+            observations="Venda do produto vitrine pela Shopee.",
+        ),
+        SaleScenario(
+            number="DEMO-VEN-205",
+            channel="mercado_livre",
+            client_key="joao",
+            payment_key="debito",
+            items=((0, Decimal("2")),),
+            days_ago=1,
+            card_brand="master",
+            order_id="DEMO-ML-001",
+            order_origin="mercado_livre",
+            order_status="pago",
+            observations="Venda do produto vitrine pelo Mercado Livre.",
+        ),
+        SaleScenario(
+            number="DEMO-VEN-206",
+            channel="amazon",
+            client_key="maria",
+            payment_key="pix",
+            items=((0, Decimal("1")),),
+            days_ago=0,
+            order_id="DEMO-AMAZON-001",
+            order_origin="amazon",
+            order_status="pago",
+            observations="Venda do produto vitrine pela Amazon.",
+        ),
+    ]
+
+
 def build_demo_historical_scenarios(count: int = 48) -> list[SaleScenario]:
     """Create deterministic sales across the 90-day purchase-planning window.
 

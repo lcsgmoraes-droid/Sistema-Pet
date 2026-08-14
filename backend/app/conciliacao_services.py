@@ -1,6 +1,6 @@
-"""Fachada compat?vel dos servi?os de concilia??o.
+"""Fachada compatível dos serviços de conciliação.
 
-As implementa??es foram separadas por fluxo para manter este m?dulo est?vel
+As implementações foram separadas por fluxo para manter este módulo estável
 para imports legados usados pelas rotas.
 """
 

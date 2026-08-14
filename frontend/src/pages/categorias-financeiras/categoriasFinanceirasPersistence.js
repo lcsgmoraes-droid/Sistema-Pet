@@ -78,7 +78,7 @@ export function createCategoriasFinanceirasPersistence({
 
     const categoriaDREId = resolverCategoriaDREId(categoriaId);
     if (!categoriaDREId) {
-      toast.error("Categoria DRE nÃ£o encontrada para vincular subcategoria");
+      toast.error("Categoria DRE não encontrada para vincular subcategoria");
       return;
     }
 
@@ -131,7 +131,7 @@ export function createCategoriasFinanceirasPersistence({
     });
     const categoriaDREId = resolverCategoriaDREId(categoriaId);
     if (!categoriaDREId) {
-      toast.error("Categoria DRE nÃ£o encontrada para vincular subcategoria");
+      toast.error("Categoria DRE não encontrada para vincular subcategoria");
     }
 
     let primeiraSubDREId = null;
@@ -172,7 +172,7 @@ export function createCategoriasFinanceirasPersistence({
 
     try {
       await api.delete(`/categorias-financeiras/${id}`);
-      toast.success("Categoria excluÃ­da com sucesso!");
+      toast.success("Categoria excluída com sucesso!");
       carregarDados();
     } catch (error) {
       console.error("Erro ao excluir:", error);
@@ -229,7 +229,7 @@ export function createCategoriasFinanceirasPersistence({
   async function criarSubcategoriaSolta() {
     const categoriaDREId = resolverCategoriaDREId(formSubData.categoria_id);
     if (!categoriaDREId) {
-      toast.error("Categoria DRE nÃ£o encontrada para vincular subcategoria");
+      toast.error("Categoria DRE não encontrada para vincular subcategoria");
       return;
     }
 

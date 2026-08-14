@@ -5,6 +5,7 @@ import pytest
 from app.scripts.seed_demo_operacional import (
     assert_safe_environment,
     build_demo_scenarios,
+    build_demo_showcase_sales_scenarios,
     build_fixed_payables,
     money,
 )
@@ -52,6 +53,33 @@ def test_demo_operacional_scenarios_cover_sales_story():
     assert len(historical_days) == 48
     assert max(historical_days) - min(historical_days) >= 80
     assert any(day <= 7 for day in historical_days)
+
+
+def test_demo_showcase_product_has_six_multichannel_sales():
+    scenarios = build_demo_showcase_sales_scenarios()
+
+    assert [scenario.number for scenario in scenarios] == [
+        "DEMO-VEN-201",
+        "DEMO-VEN-202",
+        "DEMO-VEN-203",
+        "DEMO-VEN-204",
+        "DEMO-VEN-205",
+        "DEMO-VEN-206",
+    ]
+    assert {scenario.channel for scenario in scenarios} == {
+        "app",
+        "ecommerce",
+        "loja_fisica",
+        "shopee",
+        "mercado_livre",
+        "amazon",
+    }
+    assert sum(
+        (scenario.items[0][1] for scenario in scenarios), Decimal("0")
+    ) == Decimal("9")
+    assert all(
+        scenario.order_id for scenario in scenarios if scenario.channel != "loja_fisica"
+    )
 
 
 def test_demo_operacional_fixed_payables_cover_finance_and_break_even():

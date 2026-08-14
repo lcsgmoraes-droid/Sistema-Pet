@@ -27,7 +27,14 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/estoque", tags=["Estoque"])
 
 
-_CANAIS_DESTAQUE = ("loja_fisica", "mercado_livre", "shopee", "amazon")
+_CANAIS_DESTAQUE = (
+    "app",
+    "ecommerce",
+    "loja_fisica",
+    "mercado_livre",
+    "shopee",
+    "amazon",
+)
 
 
 def _filtro_antes_movimentacao(movimentacao):

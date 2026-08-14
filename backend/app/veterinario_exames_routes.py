@@ -155,7 +155,7 @@ def criar_exame(
         if not consulta_ok:
             raise HTTPException(
                 status_code=404,
-                detail="Consulta vinculada nÃ£o encontrada para este pet",
+                detail="Consulta vinculada não encontrada para este pet",
             )
     if body.consulta_id:
         _bloquear_lancamento_em_consulta_finalizada(

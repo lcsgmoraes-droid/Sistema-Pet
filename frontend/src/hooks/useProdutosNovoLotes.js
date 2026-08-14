@@ -23,7 +23,7 @@ export default function useProdutosNovoLotes({ id }) {
 
   const handleEntradaEstoque = async () => {
     if (!entradaData.quantidade || !entradaData.preco_custo) {
-      alert("Preencha quantidade e preÃ§o de custo!");
+      alert("Preencha quantidade e preço de custo!");
       return;
     }
 

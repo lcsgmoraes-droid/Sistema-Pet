@@ -549,9 +549,9 @@ def listar_comissoes_funcionario_para_fechamento(
                     p.nome as nome_produto,
                     v.cliente_id
                 FROM comissoes_itens ci
-                LEFT JOIN produtos p ON ci.produto_id = p.id AND {tenant_filter_p}
-                LEFT JOIN vendas v ON ci.venda_id = v.id AND {tenant_filter_v}
-                WHERE {tenant_filter_ci} AND ci.funcionario_id = :funcionario_id AND ci.status = 'pendente'
+                LEFT JOIN produtos p ON ci.produto_id = p.id AND p.{tenant_filter}
+                LEFT JOIN vendas v ON ci.venda_id = v.id AND v.{tenant_filter}
+                WHERE ci.{tenant_filter} AND ci.funcionario_id = :funcionario_id AND ci.status = 'pendente'
             """
 
             params = {"funcionario_id": funcionario_id}

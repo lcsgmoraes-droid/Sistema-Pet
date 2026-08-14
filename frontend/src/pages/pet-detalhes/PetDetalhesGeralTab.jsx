@@ -27,10 +27,10 @@ export default function PetDetalhesGeralTab({ pet, ultimaAlta, ultimaVacina }) {
 
   return (
     <div className="space-y-6">
-      <h2 className="text-xl font-bold text-gray-900 mb-4">InformaÃ§Ãµes Gerais</h2>
+      <h2 className="text-xl font-bold text-gray-900 mb-4">Informações Gerais</h2>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <ResumoClinicoCard title="Ãšltima vacina" tone="blue">
+        <ResumoClinicoCard title="Última vacina" tone="blue">
           {ultimaVacina ? (
             <>
               <p className="text-sm font-semibold text-blue-900">
@@ -40,7 +40,7 @@ export default function PetDetalhesGeralTab({ pet, ultimaAlta, ultimaVacina }) {
                 Aplicada em: {formatarData(ultimaVacina.data_aplicacao)}
               </p>
               <p className="text-xs text-blue-800">
-                PrÃ³xima dose:{" "}
+                Próxima dose:{" "}
                 {formatarData(ultimaVacina.proxima_dose || ultimaVacina.data_proxima_dose)}
               </p>
             </>
@@ -49,7 +49,7 @@ export default function PetDetalhesGeralTab({ pet, ultimaAlta, ultimaVacina }) {
           )}
         </ResumoClinicoCard>
 
-        <ResumoClinicoCard title="Resumo da Ãºltima alta" tone="green">
+        <ResumoClinicoCard title="Resumo da última alta" tone="green">
           {ultimaAlta ? (
             <>
               <p className="text-xs text-green-800">
@@ -59,7 +59,7 @@ export default function PetDetalhesGeralTab({ pet, ultimaAlta, ultimaVacina }) {
                 Motivo: {ultimaAlta.motivo || "-"}
               </p>
               <p className="text-xs text-green-800 mt-1">
-                ObservaÃ§Ã£o: {ultimaAlta.observacoes_alta || "Sem observaÃ§Ã£o de alta."}
+                Observação: {ultimaAlta.observacoes_alta || "Sem observação de alta."}
               </p>
             </>
           ) : (
@@ -70,15 +70,13 @@ export default function PetDetalhesGeralTab({ pet, ultimaAlta, ultimaVacina }) {
 
       <div className="grid grid-cols-2 gap-6">
         <PetDetalhesInfoField label="Nome">{pet.nome}</PetDetalhesInfoField>
-        <PetDetalhesInfoField label="CÃ³digo" mono>
+        <PetDetalhesInfoField label="Código" mono>
           {pet.codigo}
         </PetDetalhesInfoField>
-        <PetDetalhesInfoField label="EspÃ©cie">{pet.especie}</PetDetalhesInfoField>
-        <PetDetalhesInfoField label="RaÃ§a">{pet.raca}</PetDetalhesInfoField>
+        <PetDetalhesInfoField label="Espécie">{pet.especie}</PetDetalhesInfoField>
+        <PetDetalhesInfoField label="Raça">{pet.raca}</PetDetalhesInfoField>
         <PetDetalhesInfoField label="Sexo">{pet.sexo}</PetDetalhesInfoField>
-        <PetDetalhesInfoField label="Castrado">
-          {pet.castrado ? "Sim" : "NÃ£o"}
-        </PetDetalhesInfoField>
+        <PetDetalhesInfoField label="Castrado">{pet.castrado ? "Sim" : "Não"}</PetDetalhesInfoField>
         <PetDetalhesInfoField label="Data de Nascimento">
           {formatarData(pet.data_nascimento)}
         </PetDetalhesInfoField>
@@ -91,23 +89,23 @@ export default function PetDetalhesGeralTab({ pet, ultimaAlta, ultimaVacina }) {
         <PetDetalhesInfoField label="Microchip" mono>
           {pet.microchip}
         </PetDetalhesInfoField>
-        <PetDetalhesInfoField label="Tipo sanguÃ­neo">{pet.tipo_sanguineo}</PetDetalhesInfoField>
+        <PetDetalhesInfoField label="Tipo sanguíneo">{pet.tipo_sanguineo}</PetDetalhesInfoField>
         <PetDetalhesInfoField label="Pedigree">{pet.pedigree_registro}</PetDetalhesInfoField>
-        <PetDetalhesInfoField label="Data da castraÃ§Ã£o">
+        <PetDetalhesInfoField label="Data da castração">
           {formatarData(pet.castrado_data)}
         </PetDetalhesInfoField>
       </div>
 
       {pet.observacoes && (
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">ObservaÃ§Ãµes</label>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Observações</label>
           <p className="text-gray-900 bg-gray-50 p-3 rounded-lg">{pet.observacoes}</p>
         </div>
       )}
 
       <div className="pt-4 border-t border-gray-200 text-sm text-gray-500">
         <p>Cadastrado em: {formatarData(pet.created_at)}</p>
-        <p>Ãšltima atualizaÃ§Ã£o: {formatarData(pet.updated_at)}</p>
+        <p>Última atualização: {formatarData(pet.updated_at)}</p>
       </div>
     </div>
   );

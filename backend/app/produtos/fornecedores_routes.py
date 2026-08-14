@@ -41,7 +41,7 @@ def vincular_fornecedor(
     """
     Vincular fornecedor a um produto
 
-    - Pode ter mÃºltiplos fornecedores por produto
+    - Pode ter múltiplos fornecedores por produto
     - Apenas 1 pode ser principal
     - Fornecedor deve ser do tipo 'fornecedor' no cadastro de clientes
     """
@@ -52,7 +52,7 @@ def vincular_fornecedor(
             f"[FORNECEDOR] Vinculando fornecedor {dados.fornecedor_id} ao produto {produto_id}"
         )
 
-        # Verificar se produto existe e pertence ao usuÃ¡rio
+        # Verificar se produto existe e pertence ao usuário
         produto = (
             db.query(Produto)
             .filter(
@@ -64,14 +64,14 @@ def vincular_fornecedor(
         )
 
         if not produto:
-            logger.error(f"[FORNECEDOR] Produto {produto_id} nÃ£o encontrado")
+            logger.error(f"[FORNECEDOR] Produto {produto_id} não encontrado")
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, detail="Produto nÃ£o encontrado"
+                status_code=status.HTTP_404_NOT_FOUND, detail="Produto não encontrado"
             )
 
         logger.info(f"[FORNECEDOR] Produto encontrado: {produto.nome}")
 
-        # Verificar se fornecedor existe e pertence ao usuÃ¡rio
+        # Verificar se fornecedor existe e pertence ao usuário
         fornecedor = (
             db.query(Cliente)
             .filter(
@@ -84,16 +84,16 @@ def vincular_fornecedor(
 
         if not fornecedor:
             logger.error(
-                f"[FORNECEDOR] Fornecedor {dados.fornecedor_id} nÃ£o encontrado"
+                f"[FORNECEDOR] Fornecedor {dados.fornecedor_id} não encontrado"
             )
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="Fornecedor nÃ£o encontrado ou nÃ£o Ã© do tipo fornecedor",
+                detail="Fornecedor não encontrado ou não é do tipo fornecedor",
             )
 
         logger.info(f"[FORNECEDOR] Fornecedor encontrado: {fornecedor.nome}")
 
-        # Verificar se jÃ¡ existe vÃ­nculo
+        # Verificar se já existe vínculo
         vinculo_existente = (
             db.query(ProdutoFornecedor)
             .filter(
@@ -104,10 +104,10 @@ def vincular_fornecedor(
         )
 
         if vinculo_existente:
-            logger.error("[FORNECEDOR] VÃ­nculo jÃ¡ existe")
+            logger.error("[FORNECEDOR] Vínculo já existe")
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Fornecedor jÃ¡ vinculado a este produto",
+                detail="Fornecedor já vinculado a este produto",
             )
 
         vinculos_ativos_existentes = (
@@ -133,8 +133,8 @@ def vincular_fornecedor(
             # Atualizar fornecedor_id do produto
             produto.fornecedor_id = dados.fornecedor_id
 
-        # Criar vÃ­nculo
-        logger.info("[FORNECEDOR] Criando vÃ­nculo no banco")
+        # Criar vínculo
+        logger.info("[FORNECEDOR] Criando vínculo no banco")
         novo_vinculo = ProdutoFornecedor(
             produto_id=produto_id,
             fornecedor_id=dados.fornecedor_id,
@@ -152,7 +152,7 @@ def vincular_fornecedor(
         db.commit()
         db.refresh(novo_vinculo)
 
-        logger.info(f"[FORNECEDOR] VÃ­nculo criado com ID {novo_vinculo.id}")
+        logger.info(f"[FORNECEDOR] Vínculo criado com ID {novo_vinculo.id}")
 
         # Montar resposta com dados do fornecedor
         response = FornecedorVinculoResponse(
@@ -175,13 +175,13 @@ def vincular_fornecedor(
             fornecedor_telefone=fornecedor.telefone or fornecedor.celular,
         )
 
-        logger.info("[FORNECEDOR] âœ… VÃ­nculo completado com sucesso")
+        logger.info("[FORNECEDOR] ✅ Vínculo completado com sucesso")
         return response
 
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"[FORNECEDOR] âŒ ERRO: {str(e)}")
+        logger.error(f"[FORNECEDOR] ❌ ERRO: {str(e)}")
         logger.error(f"[FORNECEDOR] Traceback: {traceback.format_exc()}")
         db.rollback()
         raise HTTPException(
@@ -205,7 +205,7 @@ def listar_fornecedores_produto(
     """
     current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
 
-    # Verificar se produto existe e pertence ao usuÃ¡rio
+    # Verificar se produto existe e pertence ao usuário
     produto = (
         db.query(Produto)
         .filter(Produto.id == produto_id, Produto.tenant_id == tenant_id)
@@ -214,7 +214,7 @@ def listar_fornecedores_produto(
 
     if not produto:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Produto nÃ£o encontrado"
+            status_code=status.HTTP_404_NOT_FOUND, detail="Produto não encontrado"
         )
 
     # Buscar fornecedores
@@ -276,11 +276,11 @@ def atualizar_vinculo_fornecedor(
     user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     """
-    Atualizar dados do vÃ­nculo fornecedor-produto
+    Atualizar dados do vínculo fornecedor-produto
     """
     current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
 
-    # Buscar vÃ­nculo e verificar permissÃ£o
+    # Buscar vínculo e verificar permissão
     vinculo = (
         db.query(ProdutoFornecedor)
         .join(Produto)
@@ -290,7 +290,7 @@ def atualizar_vinculo_fornecedor(
 
     if not vinculo:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="VÃ­nculo nÃ£o encontrado"
+            status_code=status.HTTP_404_NOT_FOUND, detail="Vínculo não encontrado"
         )
 
     produto = (
@@ -373,11 +373,11 @@ def desvincular_fornecedor(
 ):
     """
     Desvincular fornecedor de um produto
-    Remove o vÃ­nculo do banco de dados
+    Remove o vínculo do banco de dados
     """
     current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
 
-    # Buscar vÃ­nculo e verificar permissÃ£o
+    # Buscar vínculo e verificar permissão
     vinculo = (
         db.query(ProdutoFornecedor)
         .join(Produto)
@@ -387,7 +387,7 @@ def desvincular_fornecedor(
 
     if not vinculo:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="VÃ­nculo nÃ£o encontrado"
+            status_code=status.HTTP_404_NOT_FOUND, detail="Vínculo não encontrado"
         )
 
     produto_id = vinculo.produto_id
@@ -401,7 +401,7 @@ def desvincular_fornecedor(
         .first()
     )
 
-    # Deletar vÃ­nculo
+    # Deletar vínculo
     db.delete(vinculo)
 
     # Se era principal, tentar promover outro

@@ -10,7 +10,7 @@ export const corrigirTextoQuebrado = (value) => {
   if (value === null || value === undefined) return "";
 
   const textoOriginal = String(value);
-  const scoreQuebrado = (texto) => (texto.match(/[ÃƒÃ‚Ã¢ï¿½]/g) || []).length;
+  const scoreQuebrado = (texto) => (texto.match(/[ÃÂâ�]/g) || []).length;
 
   const tentarTextDecoderUtf8 = (texto) => {
     try {
@@ -39,18 +39,18 @@ export const corrigirTextoQuebrado = (value) => {
   }
 
   return melhor
-    .replaceAll("Ã¢ÂÅ’", "âŒ")
-    .replaceAll("ÃƒÂ§", "Ã§")
-    .replaceAll("ÃƒÂ£", "Ã£")
-    .replaceAll("ÃƒÂµ", "Ãµ")
-    .replaceAll("ÃƒÂ¡", "Ã¡")
-    .replaceAll("ÃƒÂ©", "Ã©")
-    .replaceAll("ÃƒÂª", "Ãª")
-    .replaceAll("ÃƒÂ­", "Ã­")
-    .replaceAll("ÃƒÂ³", "Ã³")
-    .replaceAll("ÃƒÂº", "Ãº")
-    .replaceAll("Ã¢â‚¬â€œ", "-")
-    .replaceAll("Ã‚", "");
+    .replaceAll("âŒ", "❌")
+    .replaceAll("Ã§", "ç")
+    .replaceAll("Ã£", "ã")
+    .replaceAll("Ãµ", "õ")
+    .replaceAll("Ã¡", "á")
+    .replaceAll("Ã©", "é")
+    .replaceAll("Ãª", "ê")
+    .replaceAll("Ã­", "í")
+    .replaceAll("Ã³", "ó")
+    .replaceAll("Ãº", "ú")
+    .replaceAll("â€“", "-")
+    .replaceAll("Â", "");
 };
 
 export const montarMensagemConflitoExclusao = (nomeProduto, detalheServidor) => {

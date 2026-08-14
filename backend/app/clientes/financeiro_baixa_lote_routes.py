@@ -94,7 +94,7 @@ async def baixar_vendas_lote(
     db: Session = Depends(get_session),
     user_and_tenant=Depends(get_current_user_and_tenant),
 ):
-    """DÃ¡ baixa em mÃºltiplas vendas de uma vez, gerando movimentaÃ§Ãµes no caixa e contas a receber"""
+    """Dá baixa em múltiplas vendas de uma vez, gerando movimentações no caixa e contas a receber"""
     try:
         current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
 
@@ -117,7 +117,7 @@ async def baixar_vendas_lote(
         logger.info(f"Valor total: {valor_total}")
         logger.info(f"Forma pagamento: {forma_pagamento}")
 
-        # Validar se hÃ¡ caixa aberto
+        # Validar se há caixa aberto
         caixa_aberto = (
             db.query(Caixa)
             .filter(
@@ -133,7 +133,7 @@ async def baixar_vendas_lote(
         if not caixa_aberto:
             raise HTTPException(
                 status_code=400,
-                detail="NÃ£o hÃ¡ caixa aberto. Abra o caixa antes de dar baixa nas vendas.",
+                detail="Não há caixa aberto. Abra o caixa antes de dar baixa nas vendas.",
             )
 
         # Buscar vendas ordenadas da mais antiga para a mais nova
@@ -157,7 +157,7 @@ async def baixar_vendas_lote(
         if len(vendas) != len(vendas_ids):
             raise HTTPException(
                 status_code=400,
-                detail="Algumas vendas nÃ£o foram encontradas ou nÃ£o estÃ£o em aberto",
+                detail="Algumas vendas não foram encontradas ou não estão em aberto",
             )
 
         # Calcular saldo devedor de cada venda
@@ -176,7 +176,7 @@ async def baixar_vendas_lote(
                 f"Venda {venda.id}: Total={venda.total}, Pago={valor_ja_pago}, Saldo={saldo_devedor}"
             )
 
-            if saldo_devedor > 0.01:  # TolerÃ¢ncia de 1 centavo
+            if saldo_devedor > 0.01:  # Tolerância de 1 centavo
                 vendas_com_saldo.append(
                     {
                         "venda": venda,
@@ -192,7 +192,7 @@ async def baixar_vendas_lote(
 
         if not vendas_com_saldo:
             raise HTTPException(
-                status_code=400, detail="Todas as vendas jÃ¡ estÃ£o quitadas"
+                status_code=400, detail="Todas as vendas já estão quitadas"
             )
 
         if valor_total > total_saldo_devedor + 0.01:
@@ -220,10 +220,10 @@ async def baixar_vendas_lote(
             logger.info(f"Aplicando {valor_aplicar} na venda {venda.id}")
 
             # Criar pagamento
-            # ðŸ”’ ISOLAMENTO MULTI-TENANT: tenant_id obrigatÃ³rio
+            # 🔒 ISOLAMENTO MULTI-TENANT: tenant_id obrigatório
             pagamento = VendaPagamento(
                 venda_id=venda.id,
-                tenant_id=tenant_id,  # âœ… Garantir isolamento entre empresas
+                tenant_id=tenant_id,  # ✅ Garantir isolamento entre empresas
                 forma_pagamento=forma_pagamento,
                 valor=valor_aplicar,
                 numero_transacao=numero_transacao,
@@ -292,17 +292,17 @@ async def baixar_vendas_lote(
                 force_refresh=True,
             )
 
-            # Registrar movimentaÃ§Ã£o no caixa (apenas para formas que movimentam caixa)
+            # Registrar movimentação no caixa (apenas para formas que movimentam caixa)
             formas_que_movimentam_caixa = [
                 "dinheiro",
                 "Dinheiro",
                 "pix",
                 "PIX",
                 "cartao_debito",
-                "CartÃ£o de DÃ©bito",
+                "Cartão de Débito",
             ]
             if forma_pagamento in formas_que_movimentam_caixa:
-                # ðŸ”’ ISOLAMENTO MULTI-TENANT: tenant_id obrigatÃ³rio
+                # 🔒 ISOLAMENTO MULTI-TENANT: tenant_id obrigatório
                 movimentacao = MovimentacaoCaixa(
                     caixa_id=caixa_aberto.id,
                     tipo="venda",
@@ -314,7 +314,7 @@ async def baixar_vendas_lote(
                     usuario_id=current_user.id,
                     usuario_nome=current_user.nome or current_user.email,
                     data_movimento=dt.now(),
-                    tenant_id=tenant_id,  # âœ… Garantir isolamento entre empresas
+                    tenant_id=tenant_id,  # ✅ Garantir isolamento entre empresas
                 )
                 db.add(movimentacao)
 
@@ -350,18 +350,18 @@ async def baixar_vendas_lote(
                 else:
                     conta_receber.status = "baixa_parcial"
 
-                # ðŸ†• Criar registro de recebimento
+                # 🆕 Criar registro de recebimento
                 recebimento = Recebimento(
                     conta_receber_id=conta_receber.id,
                     valor_recebido=valor_aplicar,
                     data_recebimento=dt.now().date(),
                     observacoes=f"Baixa em lote - {forma_pagamento}",
                     user_id=current_user.id,
-                    tenant_id=tenant_id,  # âœ… Garantir isolamento multi-tenant
+                    tenant_id=tenant_id,  # ✅ Garantir isolamento multi-tenant
                 )
                 db.add(recebimento)
 
-                # ðŸ†• CRIAR LANÃ‡AMENTO REALIZADO NO FLUXO DE CAIXA
+                # 🆕 CRIAR LANÇAMENTO REALIZADO NO FLUXO DE CAIXA
                 fluxo_realizado = FluxoCaixa(
                     usuario_id=current_user.id,
                     tipo="entrada",
@@ -377,10 +377,10 @@ async def baixar_vendas_lote(
                 db.add(fluxo_realizado)
 
                 logger.info(
-                    f"âœ… Fluxo de caixa REALIZADO criado: R$ {valor_aplicar:.2f}"
+                    f"✅ Fluxo de caixa REALIZADO criado: R$ {valor_aplicar:.2f}"
                 )
 
-                # ðŸ†• CRIAR LANÃ‡AMENTO PREVISTO NO FLUXO DE CAIXA (se houver saldo restante)
+                # 🆕 CRIAR LANÇAMENTO PREVISTO NO FLUXO DE CAIXA (se houver saldo restante)
                 saldo_conta = float(conta_receber.valor_final) - novo_valor_recebido
                 if saldo_conta > 0.01:  # Se ainda tem saldo
                     data_previsao = dt.now() + timedelta(days=30)  # +30 dias
@@ -400,7 +400,7 @@ async def baixar_vendas_lote(
                     db.add(fluxo_previsto)
 
                     logger.info(
-                        f"âœ… Fluxo de caixa PREVISTO criado: R$ {saldo_conta:.2f} para {data_previsao.strftime('%d/%m/%Y')}"
+                        f"✅ Fluxo de caixa PREVISTO criado: R$ {saldo_conta:.2f} para {data_previsao.strftime('%d/%m/%Y')}"
                     )
 
             valor_restante -= valor_aplicar

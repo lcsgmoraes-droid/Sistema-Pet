@@ -45,8 +45,8 @@ async def upload_imagem_produto(
     - Aceita JPG, PNG, WebP
     - Otimiza automaticamente para WebP
     - Gera miniatura para listagens
-    - Salva em storage local ou S3-compatÃ­vel
-    - Primeira imagem Ã© automaticamente marcada como principal
+    - Salva em storage local ou S3-compatível
+    - Primeira imagem é automaticamente marcada como principal
     """
     try:
         current_user, tenant_id = user_and_tenant
@@ -63,7 +63,7 @@ async def upload_imagem_produto(
         if not produto:
             logger.error("[UPLOAD] Produto nao encontrado para upload de imagem")
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, detail="Produto nÃ£o encontrado"
+                status_code=status.HTTP_404_NOT_FOUND, detail="Produto não encontrado"
             )
 
         logger.info(f"[UPLOAD] Produto encontrado: {produto.nome}")
@@ -74,7 +74,7 @@ async def upload_imagem_produto(
             logger.error("[UPLOAD] Tipo de imagem invalido")
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Formato nÃ£o aceito. Use JPG, PNG ou WebP",
+                detail="Formato não aceito. Use JPG, PNG ou WebP",
             )
 
         file_bytes = await file.read()
@@ -85,7 +85,7 @@ async def upload_imagem_produto(
             logger.error(f"[UPLOAD] Arquivo muito grande: {file_size} bytes")
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Arquivo muito grande. MÃ¡ximo: {max_size // (1024 * 1024)}MB",
+                detail=f"Arquivo muito grande. Máximo: {max_size // (1024 * 1024)}MB",
             )
 
         logger.info(f"[UPLOAD] Arquivo validado: {file_size} bytes")
@@ -104,7 +104,7 @@ async def upload_imagem_produto(
             prepared_image=imagem_preparada,
         )
 
-        # Verificar se jÃ¡ existe imagem principal
+        # Verificar se já existe imagem principal
         tem_principal = (
             db.query(ProdutoImagem)
             .filter(
@@ -115,11 +115,11 @@ async def upload_imagem_produto(
             .first()
         )
 
-        # Primeira imagem Ã© principal automaticamente
+        # Primeira imagem é principal automaticamente
         e_principal = not tem_principal
-        logger.info(f"[UPLOAD] Ã‰ principal: {e_principal}")
+        logger.info(f"[UPLOAD] É principal: {e_principal}")
 
-        # Obter prÃ³xima ordem
+        # Obter próxima ordem
         max_ordem = (
             db.query(func.max(ProdutoImagem.ordem))
             .filter(
@@ -129,7 +129,7 @@ async def upload_imagem_produto(
             .scalar()
             or 0
         )
-        logger.info(f"[UPLOAD] PrÃ³xima ordem: {max_ordem + 1}")
+        logger.info(f"[UPLOAD] Próxima ordem: {max_ordem + 1}")
 
         # Criar registro no banco
         nova_imagem = ProdutoImagem(
@@ -159,7 +159,7 @@ async def upload_imagem_produto(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"[UPLOAD] âŒ ERRO: {str(e)}")
+        logger.error(f"[UPLOAD] ❌ ERRO: {str(e)}")
         logger.error(f"[UPLOAD] Traceback: {traceback.format_exc()}")
         db.rollback()
         raise HTTPException(
@@ -180,7 +180,7 @@ def listar_imagens_produto(
     """
     current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
 
-    # Verificar se produto existe e pertence ao usuÃ¡rio
+    # Verificar se produto existe e pertence ao usuário
     produto = (
         db.query(Produto)
         .filter(Produto.id == produto_id, Produto.tenant_id == tenant_id)
@@ -189,7 +189,7 @@ def listar_imagens_produto(
 
     if not produto:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Produto nÃ£o encontrado"
+            status_code=status.HTTP_404_NOT_FOUND, detail="Produto não encontrado"
         )
 
     imagens = (
@@ -230,7 +230,7 @@ def atualizar_imagem(
 
     if not imagem:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Imagem nÃ£o encontrada"
+            status_code=status.HTTP_404_NOT_FOUND, detail="Imagem não encontrada"
         )
 
     # Se for marcar como principal, desmarcar outras
@@ -285,11 +285,11 @@ def deletar_imagem(
 ):
     """
     Deletar imagem do produto
-    Remove o arquivo fÃ­sico e o registro do banco
+    Remove o arquivo físico e o registro do banco
     """
     current_user, tenant_id = user_and_tenant
 
-    # Buscar imagem e verificar permissÃ£o
+    # Buscar imagem e verificar permissão
     imagem = (
         db.query(ProdutoImagem)
         .join(Produto)
@@ -303,7 +303,7 @@ def deletar_imagem(
 
     if not imagem:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Imagem nÃ£o encontrada"
+            status_code=status.HTTP_404_NOT_FOUND, detail="Imagem não encontrada"
         )
 
     url_removida = imagem.url

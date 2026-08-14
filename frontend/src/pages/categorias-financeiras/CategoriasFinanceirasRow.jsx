@@ -77,10 +77,10 @@ export default function CategoriasFinanceirasRow({
                 }`}
               >
                 {cat.tipo_custo === "fixo"
-                  ? "ðŸ”’ Fixo"
+                  ? "🔒 Fixo"
                   : cat.tipo_custo === "variavel"
-                    ? "ðŸ“ˆ VariÃ¡vel"
-                    : "â†• Ambos"}
+                    ? "📈 Variável"
+                    : "↕ Ambos"}
               </span>
             )}
 

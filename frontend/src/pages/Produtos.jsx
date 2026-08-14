@@ -1,12 +1,12 @@
 // ARQUIVO CRITICO DE PRODUCAO
-// Este arquivo impacta diretamente operaÃ§Ãµes reais (PDV / Financeiro / Estoque).
-// NÃƒO alterar sem:
+// Este arquivo impacta diretamente operações reais (PDV / Financeiro / Estoque).
+// NÃO alterar sem:
 // 1. Entender o fluxo completo
-// 2. Testar cenÃ¡rio real
+// 2. Testar cenário real
 // 3. Validar impacto financeiro
 
 /**
- * PÃ¡gina de Listagem de Produtos - Estilo Bling
+ * Página de Listagem de Produtos - Estilo Bling
  */
 import { useMemo, useState } from "react";
 import toast from "react-hot-toast";

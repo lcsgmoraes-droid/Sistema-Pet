@@ -59,9 +59,9 @@ def criar_lote(
     )
 
     if not produto:
-        raise HTTPException(status_code=404, detail="Produto nÃ£o encontrado")
+        raise HTTPException(status_code=404, detail="Produto não encontrado")
 
-    # Verificar se nÃºmero de lote jÃ¡ existe para este produto
+    # Verificar se número de lote já existe para este produto
     lote_existente = (
         db.query(ProdutoLote)
         .filter(
@@ -74,7 +74,7 @@ def criar_lote(
     if lote_existente:
         raise HTTPException(
             status_code=400,
-            detail=f"Lote '{lote.nome_lote}' jÃ¡ cadastrado para este produto",
+            detail=f"Lote '{lote.nome_lote}' já cadastrado para este produto",
         )
 
     # Criar lote com timestamp para FIFO
@@ -111,7 +111,7 @@ def criar_lote(
 @router.get("/{produto_id}/lotes", response_model=List[LoteResponse])
 def listar_lotes(
     produto_id: int,
-    apenas_disponiveis: bool = False,  # Mostrar todos por padrÃ£o
+    apenas_disponiveis: bool = False,  # Mostrar todos por padrão
     db: Session = Depends(get_session),
     user_and_tenant=Depends(get_current_user_and_tenant),
 ):
@@ -120,7 +120,7 @@ def listar_lotes(
     current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
 
     logger.info(
-        f"ðŸ“¦ Listando lotes do produto {produto_id} - apenas_disponiveis={apenas_disponiveis}"
+        f"📦 Listando lotes do produto {produto_id} - apenas_disponiveis={apenas_disponiveis}"
     )
 
     # Verificar se produto existe
@@ -131,11 +131,11 @@ def listar_lotes(
     )
 
     if not produto:
-        raise HTTPException(status_code=404, detail="Produto nÃ£o encontrado")
+        raise HTTPException(status_code=404, detail="Produto não encontrado")
 
     query = db.query(ProdutoLote).filter(
         ProdutoLote.produto_id == produto_id,
-        ProdutoLote.status != "excluido",  # Apenas lotes nÃ£o excluÃ­dos
+        ProdutoLote.status != "excluido",  # Apenas lotes não excluídos
     )
 
     if apenas_disponiveis:
@@ -144,7 +144,7 @@ def listar_lotes(
     # Ordenar por FIFO (mais antigo primeiro)
     lotes = query.order_by(ProdutoLote.ordem_entrada).all()
 
-    logger.info(f"âœ… Encontrados {len(lotes)} lotes")
+    logger.info(f"✅ Encontrados {len(lotes)} lotes")
 
     return lotes
 
@@ -157,7 +157,7 @@ def atualizar_lote(
     db: Session = Depends(get_session),
     user_and_tenant=Depends(get_current_user_and_tenant),
 ):
-    """Atualiza informaÃ§Ãµes de um lote"""
+    """Atualiza informações de um lote"""
 
     _, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
 
@@ -169,9 +169,9 @@ def atualizar_lote(
     )
 
     if not lote:
-        raise HTTPException(status_code=404, detail="Lote nÃ£o encontrado")
+        raise HTTPException(status_code=404, detail="Lote não encontrado")
 
-    # Verificar se o produto pertence ao usuÃ¡rio
+    # Verificar se o produto pertence ao usuário
     produto = (
         db.query(Produto)
         .filter(Produto.id == produto_id, Produto.tenant_id == tenant_id)
@@ -179,9 +179,9 @@ def atualizar_lote(
     )
 
     if not produto:
-        raise HTTPException(status_code=404, detail="Produto nÃ£o encontrado")
+        raise HTTPException(status_code=404, detail="Produto não encontrado")
 
-    # Calcular diferenÃ§a de quantidade para ajustar estoque
+    # Calcular diferença de quantidade para ajustar estoque
     diferenca_quantidade = lote_data.quantidade_inicial - lote.quantidade_inicial
 
     # Atualizar campos
@@ -230,9 +230,9 @@ def excluir_lote(
     )
 
     if not lote:
-        raise HTTPException(status_code=404, detail="Lote nÃ£o encontrado")
+        raise HTTPException(status_code=404, detail="Lote não encontrado")
 
-    # Verificar se o produto pertence ao usuÃ¡rio
+    # Verificar se o produto pertence ao usuário
     produto = (
         db.query(Produto)
         .filter(Produto.id == produto_id, Produto.tenant_id == tenant_id)
@@ -240,12 +240,12 @@ def excluir_lote(
     )
 
     if not produto:
-        raise HTTPException(status_code=404, detail="Produto nÃ£o encontrado")
+        raise HTTPException(status_code=404, detail="Produto não encontrado")
 
     # Atualizar estoque do produto (remover a quantidade do lote)
     produto.estoque_atual = produto.estoque_atual - lote.quantidade_disponivel
 
-    # Soft delete - marcar como excluÃ­do
+    # Soft delete - marcar como excluído
     lote.status = "excluido"
     lote.updated_at = datetime.utcnow()
 
@@ -261,7 +261,7 @@ def excluir_lote(
     except Exception:
         pass
 
-    return {"message": "Lote excluÃ­do com sucesso"}
+    return {"message": "Lote excluído com sucesso"}
 
 
 @router.post("/{produto_id}/entrada")
@@ -287,16 +287,16 @@ def entrada_estoque(
     )
 
     if not produto:
-        raise HTTPException(status_code=404, detail="Produto nÃ£o encontrado")
+        raise HTTPException(status_code=404, detail="Produto não encontrado")
 
-    # VALIDAÃ‡ÃƒO: Produto PAI nÃ£o pode ter movimentaÃ§Ã£o de estoque
+    # VALIDAÇÃO: Produto PAI não pode ter movimentação de estoque
     if produto.is_parent:
         raise HTTPException(
             status_code=400,
-            detail="Produto pai nÃ£o pode ter entrada de estoque. Realize a entrada nas variaÃ§Ãµes do produto.",
+            detail="Produto pai não pode ter entrada de estoque. Realize a entrada nas variações do produto.",
         )
 
-    # Verificar se lote jÃ¡ existe
+    # Verificar se lote já existe
     lote_existente = (
         db.query(ProdutoLote)
         .filter(
@@ -321,7 +321,7 @@ def entrada_estoque(
             quantidade_disponivel=entrada.quantidade,
             data_fabricacao=entrada.data_fabricacao,
             data_validade=entrada.data_validade
-            or datetime.utcnow() + timedelta(days=365),  # Validade padrÃ£o 1 ano
+            or datetime.utcnow() + timedelta(days=365),  # Validade padrão 1 ano
             custo_unitario=entrada.preco_custo,
             ordem_entrada=int(time.time()),
         )
@@ -332,7 +332,7 @@ def entrada_estoque(
     produto.estoque_atual += entrada.quantidade
     produto.updated_at = datetime.utcnow()
 
-    # Registrar movimentaÃ§Ã£o
+    # Registrar movimentação
     movimentacao = EstoqueMovimentacao(
         produto_id=produto_id,
         tipo="entrada",
@@ -396,7 +396,7 @@ def saida_estoque_fifo(
     user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     """
-    Registra saÃ­da de estoque usando FIFO
+    Registra saída de estoque usando FIFO
     Consome lotes mais antigos primeiro
     """
 
@@ -414,23 +414,23 @@ def saida_estoque_fifo(
     )
 
     if not produto:
-        raise HTTPException(status_code=404, detail="Produto nÃ£o encontrado")
+        raise HTTPException(status_code=404, detail="Produto não encontrado")
 
-    # VALIDAÃ‡ÃƒO: Produto PAI nÃ£o pode ter movimentaÃ§Ã£o de estoque
+    # VALIDAÇÃO: Produto PAI não pode ter movimentação de estoque
     if produto.is_parent:
         raise HTTPException(
             status_code=400,
-            detail="Produto pai nÃ£o pode ter saÃ­da de estoque. Realize a saÃ­da nas variaÃ§Ãµes do produto.",
+            detail="Produto pai não pode ter saída de estoque. Realize a saída nas variações do produto.",
         )
 
-    # Verificar se hÃ¡ estoque suficiente
+    # Verificar se há estoque suficiente
     if produto.estoque_atual < saida.quantidade:
         raise HTTPException(
             status_code=400,
-            detail=f"Estoque insuficiente. DisponÃ­vel: {produto.estoque_atual}, Solicitado: {saida.quantidade}",
+            detail=f"Estoque insuficiente. Disponível: {produto.estoque_atual}, Solicitado: {saida.quantidade}",
         )
 
-    # Buscar lotes disponÃ­veis ordenados por FIFO (mais antigo primeiro)
+    # Buscar lotes disponíveis ordenados por FIFO (mais antigo primeiro)
     lotes = (
         db.query(ProdutoLote)
         .filter(
@@ -441,7 +441,7 @@ def saida_estoque_fifo(
     )
 
     if not lotes:
-        raise HTTPException(status_code=400, detail="Nenhum lote disponÃ­vel")
+        raise HTTPException(status_code=400, detail="Nenhum lote disponível")
 
     # Consumir lotes usando FIFO
     lotes_consumidos = _consumir_lotes_fifo_produto(lotes, saida.quantidade)
@@ -451,7 +451,7 @@ def saida_estoque_fifo(
     produto.estoque_atual -= saida.quantidade
     produto.updated_at = datetime.utcnow()
 
-    # Registrar movimentaÃ§Ã£o
+    # Registrar movimentação
 
     movimentacao = EstoqueMovimentacao(
         produto_id=produto_id,
@@ -480,7 +480,7 @@ def saida_estoque_fifo(
 
     return {
         "sucesso": True,
-        "mensagem": "SaÃ­da registrada com sucesso usando FIFO",
+        "mensagem": "Saída registrada com sucesso usando FIFO",
         "quantidade_saida": saida.quantidade,
         "estoque_anterior": estoque_anterior,
         "estoque_atual": produto.estoque_atual,

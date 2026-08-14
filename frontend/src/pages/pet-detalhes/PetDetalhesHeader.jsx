@@ -43,7 +43,7 @@ export default function PetDetalhesHeader({ onBack, onEdit, onToggleStatus, pet 
                 )}
               </div>
               <p className="text-gray-500 mb-1">
-                {pet.especie} {pet.raca && `â€¢ ${pet.raca}`} {pet.sexo && `â€¢ ${pet.sexo}`}
+                {pet.especie} {pet.raca && `• ${pet.raca}`} {pet.sexo && `• ${pet.sexo}`}
               </p>
               <p className="text-sm text-gray-400">{pet.codigo}</p>
 

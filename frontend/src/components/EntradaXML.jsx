@@ -96,7 +96,7 @@ const EntradaXML = () => {
   };
 
   useEffect(() => {
-    console.log("?? [EntradaXML] Componente montado, iniciando carregamento...");
+    console.log("[EntradaXML] Componente montado, iniciando carregamento...");
     carregarDados();
   }, []);
 
@@ -117,25 +117,25 @@ const EntradaXML = () => {
   }, [searchParams, setSearchParams]);
 
   const carregarDados = async () => {
-    console.log("?? [EntradaXML] Carregando dados...");
+    console.log("[EntradaXML] Carregando dados...");
     try {
       const token = getAccessToken();
-      console.log("?? [EntradaXML] Token obtido:", token ? "SIM" : "NAO");
+      console.log("[EntradaXML] Token obtido:", token ? "SIM" : "NÃO");
       const headers = { Authorization: `Bearer ${token}` };
 
-      console.log("?? [EntradaXML] Fazendo requisicoes para:", {
+      console.log("[EntradaXML] Fazendo requisições para:", {
         notasEntrada: `/notas-entrada/`,
       });
 
       const notasRes = await api.get(`/notas-entrada/`, { headers });
 
-      console.log("? [EntradaXML] Dados carregados:", {
+      console.log("[EntradaXML] Dados carregados:", {
         notasEntrada: notasRes.data?.length || 0,
       });
 
       setNotasEntrada(notasRes.data);
     } catch (error) {
-      console.error("? [EntradaXML] ERRO ao carregar dados:");
+      console.error("[EntradaXML] Erro ao carregar dados:");
       console.error("  - Mensagem:", error.message);
       console.error("  - Response:", error.response?.data);
       console.error("  - Status:", error.response?.status);
@@ -356,7 +356,7 @@ const EntradaXML = () => {
     try {
       await api.delete(`/notas-entrada/${notaId}`);
 
-      toast.success("??? Nota excluída com sucesso!");
+      toast.success("Nota excluída com sucesso!");
 
       if (mostrarDetalhes) {
         setMostrarDetalhes(false);

@@ -68,7 +68,7 @@ for (const literal of [
   "Categorias Financeiras",
   "Nova Categoria",
   "Subcategorias DRE",
-  "ClassificaÃ§Ã£o de Custo",
+  "Classificação de Custo",
   "Nova Subcategoria DRE",
   "Categoria DRE",
 ]) {

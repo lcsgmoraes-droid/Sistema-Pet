@@ -3,11 +3,11 @@ import { FiActivity, FiCalendar, FiClipboard, FiHeart } from "react-icons/fi";
 
 const TABS = [
   { id: "geral", label: "Dados Gerais", icon: FiClipboard },
-  { id: "saude", label: "SaÃºde", icon: FiHeart },
+  { id: "saude", label: "Saúde", icon: FiHeart },
   { id: "vacinas", label: "Vacinas", icon: FiActivity },
   { id: "consultas", label: "Consultas", icon: FiCalendar },
-  { id: "internacoes", label: "InternaÃ§Ãµes", icon: FiActivity },
-  { id: "servicos", label: "ServiÃ§os", icon: PawPrint },
+  { id: "internacoes", label: "Internações", icon: FiActivity },
+  { id: "servicos", label: "Serviços", icon: PawPrint },
 ];
 
 export default function PetDetalhesTabs({ abaAtiva, onChange }) {

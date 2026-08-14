@@ -20,6 +20,7 @@ _CANAL_LABELS = {
     "shopee": "Shopee",
     "amazon": "Amazon",
     "site": "Site",
+    "ecommerce": "E-commerce",
     "app": "App",
     "whatsapp": "WhatsApp",
     "bling": "Bling",

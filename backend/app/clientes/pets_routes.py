@@ -29,7 +29,7 @@ def _obter_cliente_ou_404(db: Session, cliente_id: int, tenant_id: str):
     )
     if not cliente:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Cliente n??o encontrado"
+            status_code=status.HTTP_404_NOT_FOUND, detail="Cliente não encontrado"
         )
     return cliente
 
@@ -96,7 +96,7 @@ def create_pet(
     current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
     cliente = _obter_cliente_ou_404(db, cliente_id, tenant_id)
 
-    # Gerar cÃ³digo Ãºnico para o pet baseado no cÃ³digo do cliente
+    # Gerar código único para o pet baseado no código do cliente
     codigo_pet = f"{cliente.codigo}-PET-{db.query(Pet).filter(Pet.cliente_id == cliente_id).count() + 1:04d}"
     pet_payload = normalize_pet_clinical_payload(pet_data.model_dump())
 
@@ -130,7 +130,7 @@ def listar_todos_pets(
     db: Session = Depends(get_session),
     user_and_tenant=Depends(get_current_user_and_tenant),
 ):
-    """Listar todos os pets do usuÃ¡rio (de todos os clientes)"""
+    """Listar todos os pets do usuário (de todos os clientes)"""
     current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
 
     pets = (
@@ -182,7 +182,7 @@ def get_pet(
 
     if not pet:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Pet nÃ£o encontrado"
+            status_code=status.HTTP_404_NOT_FOUND, detail="Pet não encontrado"
         )
 
     return _pet_response_dict(pet)
@@ -207,7 +207,7 @@ def update_pet(
 
     if not pet:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Pet nÃ£o encontrado"
+            status_code=status.HTTP_404_NOT_FOUND, detail="Pet não encontrado"
         )
 
     # Capturar dados antigos para auditoria
@@ -242,14 +242,14 @@ def update_pet(
         ano_nascimento = hoje.year - anos
         mes_nascimento = hoje.month - meses
 
-        # Ajustar se o mÃªs ficar negativo
+        # Ajustar se o mês ficar negativo
         if mes_nascimento <= 0:
             mes_nascimento += 12
             ano_nascimento -= 1
 
-        # Usar dia 1 como padrÃ£o
+        # Usar dia 1 como padrão
         pet.data_nascimento = dt(ano_nascimento, mes_nascimento, 1)
-        # Remover idade_aproximada do update_data pois jÃ¡ foi processada
+        # Remover idade_aproximada do update_data pois já foi processada
         del update_data["idade_aproximada"]
 
     for field, value in update_data.items():
@@ -283,7 +283,7 @@ def delete_pet(
 
     if not pet:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Pet nÃ£o encontrado"
+            status_code=status.HTTP_404_NOT_FOUND, detail="Pet não encontrado"
         )
 
     # Soft delete

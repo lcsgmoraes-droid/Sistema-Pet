@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  CANAIS_DESTAQUE,
   LABELS_CANAIS,
   resolverEstoqueAtualMovimentacoes,
   resolverSaldoDisponivelMovimentacoes,
@@ -9,6 +10,17 @@ import {
 
 test("movimentacoes exibe o nome correto da loja fisica", () => {
   assert.equal(LABELS_CANAIS.loja_fisica, "Loja Física");
+});
+
+test("movimentacoes destaca os seis canais da demonstracao", () => {
+  assert.deepEqual(CANAIS_DESTAQUE, [
+    "app",
+    "ecommerce",
+    "loja_fisica",
+    "mercado_livre",
+    "shopee",
+    "amazon",
+  ]);
 });
 
 test("movimentacoes usa estoque virtual calculado para kit virtual", () => {

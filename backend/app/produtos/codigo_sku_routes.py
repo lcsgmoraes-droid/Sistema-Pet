@@ -25,12 +25,12 @@ def gerar_codigo_barras(
     user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     """
-    Gera cÃ³digo de barras EAN-13 Ãºnico
+    Gera código de barras EAN-13 único
     Formato: 789-XXXXX-SKUU-C
     - 789: Prefixo Brasil
-    - XXXXX: 5 dÃ­gitos aleatÃ³rios
-    - SKUU: 4 Ãºltimos dÃ­gitos do SKU
-    - C: DÃ­gito verificador
+    - XXXXX: 5 dígitos aleatórios
+    - SKUU: 4 últimos dígitos do SKU
+    - C: Dígito verificador
     """
     current_user, tenant_id = user_and_tenant
 
@@ -38,7 +38,7 @@ def gerar_codigo_barras(
     tentativa = 0
 
     while tentativa < max_tentativas:
-        # Gerar cÃ³digo
+        # Gerar código
         codigo = gerar_codigo_barras_ean13(request.sku)
 
         # Verificar se já existe globalmente (constraint é global, não por tenant)
@@ -56,7 +56,7 @@ def gerar_codigo_barras(
 
     raise HTTPException(
         status_code=500,
-        detail="NÃ£o foi possÃ­vel gerar cÃ³digo de barras Ãºnico apÃ³s mÃºltiplas tentativas",
+        detail="Não foi possível gerar código de barras único após múltiplas tentativas",
     )
 
 
@@ -66,7 +66,7 @@ def validar_codigo_barras(
     db: Session = Depends(get_session),
     user_and_tenant=Depends(get_current_user_and_tenant),
 ):
-    """Valida um cÃ³digo de barras EAN-13"""
+    """Valida um código de barras EAN-13"""
 
     _, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
 
@@ -79,7 +79,7 @@ def validar_codigo_barras(
 
     codigo_limpo = resultado_validacao["codigo_limpo"]
 
-    # Verificar se jÃ¡ existe no banco
+    # Verificar se já existe no banco
     existe = (
         db.query(Produto)
         .filter(Produto.codigo_barras == codigo_limpo, Produto.tenant_id == tenant_id)
@@ -92,13 +92,13 @@ def validar_codigo_barras(
             "existe_no_banco": True,
             "produto_id": existe.id,
             "produto_nome": existe.nome,
-            "aviso": "CÃ³digo de barras jÃ¡ cadastrado para outro produto",
+            "aviso": "Código de barras já cadastrado para outro produto",
         }
 
     return {
         "valido": True,
         "existe_no_banco": False,
-        "mensagem": "CÃ³digo de barras vÃ¡lido e disponÃ­vel",
+        "mensagem": "Código de barras válido e disponível",
     }
 
 
@@ -109,8 +109,8 @@ def gerar_sku(
     user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     """
-    Gera um SKU Ãºnico automaticamente
-    Formato: {PREFIXO}-{NÃšMERO_SEQUENCIAL}
+    Gera um SKU único automaticamente
+    Formato: {PREFIXO}-{NÚMERO_SEQUENCIAL}
     Exemplo: PROD-00001
     """
     _, tenant_id = user_and_tenant

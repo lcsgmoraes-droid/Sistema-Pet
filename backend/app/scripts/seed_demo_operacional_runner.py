@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import asdict
 from datetime import date
+from decimal import Decimal
 from typing import Any
 
 from app.scripts.seed_demo_operacional_catalog import (
@@ -14,7 +15,9 @@ from app.scripts.seed_demo_operacional_catalog import (
 )
 from app.scripts.seed_demo_operacional_data import (
     build_demo_scenarios,
+    build_demo_showcase_sales_scenarios,
     build_fixed_payables,
+    money,
 )
 from app.scripts.seed_demo_operacional_db import (
     _all_mappings,
@@ -26,6 +29,7 @@ from app.scripts.seed_demo_operacional_db import (
 from app.scripts.seed_demo_operacional_movements import (
     _finalize_product_stock,
     _insert_fixed_payables,
+    _insert_showcase_initial_stock_movement,
     _insert_stock_purchase_movements,
 )
 from app.scripts.seed_demo_operacional_purchase_data import (
@@ -156,6 +160,9 @@ def apply_operational_seed(
             "tenant_id": tenant_id,
             "catalog_import": catalog_result,
             "sales_scenarios": [asdict(s) for s in build_demo_scenarios()],
+            "showcase_sales_scenarios": [
+                asdict(s) for s in build_demo_showcase_sales_scenarios()
+            ],
             "fixed_payables": [asdict(p) for p in build_fixed_payables()],
             "purchase_scenarios": build_demo_purchase_scenarios(),
             "showcase_products": [
@@ -166,6 +173,13 @@ def apply_operational_seed(
     _cleanup_previous_demo(db, tenant_id=tenant_id)
     support = _ensure_support_data(
         db, tenant_id=tenant_id, user_id=user_id, base_date=base_date
+    )
+    showcase = ensure_demo_showcase_data(
+        db,
+        tenant_id=tenant_id,
+        user_id=user_id,
+        people=support["people"],
+        base_date=base_date,
     )
     products = ensure_demo_purchase_catalog(
         db,
@@ -216,6 +230,65 @@ def apply_operational_seed(
             )
         )
 
+    showcase_product_row = _one_mapping(
+        db,
+        """
+        SELECT id, nome, preco_custo, preco_venda, estoque_atual
+        FROM produtos
+        WHERE tenant_id = :tenant_id AND codigo = 'DEMO-RACAO-COMP-001'
+        LIMIT 1
+        """,
+        {"tenant_id": tenant_id},
+    )
+    if not showcase_product_row:
+        raise ValueError("Produto principal da vitrine Demo nao encontrado")
+
+    showcase_scenarios = build_demo_showcase_sales_scenarios()
+    showcase_sold_quantity = sum(
+        (scenario.items[0][1] for scenario in showcase_scenarios),
+        Decimal("0"),
+    )
+    showcase_product = {
+        "id": int(showcase_product_row["id"]),
+        "nome": showcase_product_row["nome"],
+        "preco_custo": Decimal(str(showcase_product_row["preco_custo"] or 0)),
+        "preco_venda": Decimal(str(showcase_product_row["preco_venda"] or 0)),
+        "baseline": Decimal(str(showcase_product_row["estoque_atual"] or 0))
+        + showcase_sold_quantity,
+        "sold_qty": Decimal("0"),
+    }
+    _insert_showcase_initial_stock_movement(
+        db,
+        tenant_id=tenant_id,
+        user_id=user_id,
+        product=showcase_product,
+        initial_quantity=showcase_product["baseline"],
+        base_date=base_date,
+    )
+    for scenario in showcase_scenarios:
+        quantity = scenario.items[0][1]
+        unit_price = showcase_product["preco_venda"]
+        sales.append(
+            _insert_sale(
+                db,
+                tenant_id=tenant_id,
+                user_id=user_id,
+                user_name=context["user_name"],
+                scenario=scenario,
+                items=[
+                    {
+                        "product": showcase_product,
+                        "qty": quantity,
+                        "unit_price": unit_price,
+                        "subtotal": money(unit_price * quantity),
+                    }
+                ],
+                support=support,
+                base_date=base_date,
+                cashier_id=cashier_id,
+            )
+        )
+
     conciliation = insert_demo_card_conciliation(
         db,
         tenant_id=tenant_id,
@@ -227,14 +300,6 @@ def apply_operational_seed(
         db, tenant_id=tenant_id, user_id=user_id, support=support, base_date=base_date
     )
     _finalize_product_stock(db, tenant_id=tenant_id, products=products)
-    showcase = ensure_demo_showcase_data(
-        db,
-        tenant_id=tenant_id,
-        user_id=user_id,
-        people=support["people"],
-        base_date=base_date,
-    )
-
     summary = _summarize(db, tenant_id=tenant_id)
     return {
         "ok": True,

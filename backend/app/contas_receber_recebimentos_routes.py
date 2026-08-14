@@ -18,7 +18,7 @@ router = APIRouter()
 
 
 @router.post("/{conta_id}/receber")
-@idempotent()  # ðŸ”’ IDEMPOTÃŠNCIA: evita recebimento duplicado
+@idempotent()  # 🔒 IDEMPOTÊNCIA: evita recebimento duplicado
 async def registrar_recebimento(
     conta_id: int,
     recebimento: RecebimentoCreate,
@@ -40,10 +40,10 @@ async def registrar_recebimento(
     )
 
     if not conta:
-        raise HTTPException(status_code=404, detail="Conta nÃ£o encontrada")
+        raise HTTPException(status_code=404, detail="Conta não encontrada")
 
     if conta.status == "recebido":
-        raise HTTPException(status_code=400, detail="Conta jÃ¡ estÃ¡ recebida")
+        raise HTTPException(status_code=400, detail="Conta já está recebida")
 
     # Atualizar valores
     conta.valor_recebido += Decimal(str(recebimento.valor_recebido))
@@ -74,18 +74,18 @@ async def registrar_recebimento(
         data_recebimento=recebimento.data_recebimento,
         observacoes=recebimento.observacoes,
         user_id=current_user.id,
-        tenant_id=tenant_id,  # âœ… Garantir isolamento multi-tenant
+        tenant_id=tenant_id,  # ✅ Garantir isolamento multi-tenant
     )
     db.add(novo_recebimento)
 
     db.commit()
 
     logger.info(
-        f"âœ… Recebimento registrado: R$ {recebimento.valor_recebido} - Conta {conta_id}"
+        f"✅ Recebimento registrado: R$ {recebimento.valor_recebido} - Conta {conta_id}"
     )
 
     # ============================================================================
-    # ðŸ’° GERAR COMISSÃƒO SE CONTA VINCULADA A VENDA
+    # 💰 GERAR COMISSÃO SE CONTA VINCULADA A VENDA
     # ============================================================================
     comissao_gerada = False
     comissao_info = None
@@ -95,7 +95,7 @@ async def registrar_recebimento(
             from app.comissoes_service import gerar_comissoes_venda
             from app.vendas_models import Venda
 
-            # Buscar venda para verificar se tem funcionÃ¡rio
+            # Buscar venda para verificar se tem funcionário
             venda = (
                 db.query(Venda)
                 .filter(Venda.id == conta.venda_id, Venda.tenant_id == tenant_id)
@@ -104,10 +104,10 @@ async def registrar_recebimento(
 
             if venda and venda.funcionario_id:
                 logger.info(
-                    f"ðŸ’° Gerando comissÃ£o para venda #{venda.numero_venda} (baixa de conta a receber)"
+                    f"💰 Gerando comissão para venda #{venda.numero_venda} (baixa de conta a receber)"
                 )
 
-                # Gerar comissÃ£o proporcional ao valor recebido NESTA baixa
+                # Gerar comissão proporcional ao valor recebido NESTA baixa
                 proxima_parcela = int(
                     execute_tenant_safe(
                         db,
@@ -156,22 +156,20 @@ async def registrar_recebimento(
                         "valor_comissao": resultado.get("total_comissao", 0),
                     }
                     logger.info(
-                        f"âœ… ComissÃ£o gerada com sucesso: R$ {resultado.get('total_comissao', 0):.2f}"
+                        f"✅ Comissão gerada com sucesso: R$ {resultado.get('total_comissao', 0):.2f}"
                     )
                 else:
                     logger.warning(
-                        f"âš ï¸ Falha ao gerar comissÃ£o: {resultado.get('error', 'Erro desconhecido')}"
+                        f"⚠️ Falha ao gerar comissão: {resultado.get('error', 'Erro desconhecido')}"
                     )
             else:
                 logger.info(
-                    f"â„¹ï¸ Venda #{conta.venda_id} sem funcionÃ¡rio configurado, comissÃ£o nÃ£o gerada"
+                    f"ℹ️ Venda #{conta.venda_id} sem funcionário configurado, comissão não gerada"
                 )
 
         except Exception as e:
-            logger.error(
-                f"âŒ Erro ao gerar comissÃ£o para venda #{conta.venda_id}: {e}"
-            )
-            # NÃ£o falha o recebimento por erro na comissÃ£o
+            logger.error(f"❌ Erro ao gerar comissão para venda #{conta.venda_id}: {e}")
+            # Não falha o recebimento por erro na comissão
             pass
 
     response = {

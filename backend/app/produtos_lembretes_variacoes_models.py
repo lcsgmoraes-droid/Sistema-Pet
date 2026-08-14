@@ -20,12 +20,12 @@ from .base_models import BaseTenantModel
 
 
 # ====================
-# LEMBRETES E NOTIFICA��ES
+# LEMBRETES E NOTIFICAÇÕES
 # ====================
 
 
 class Lembrete(BaseTenantModel):
-    """Sistema de lembretes para produtos recorrentes (medicamentos, ra��es, etc)"""
+    """Sistema de lembretes para produtos recorrentes (medicamentos, rações, etc)"""
 
     __tablename__ = "lembretes"
 
@@ -49,7 +49,7 @@ class Lembrete(BaseTenantModel):
     )  # Quando deve tomar/comprar novamente
     data_notificacao_7_dias = Column(
         DateTime, nullable=True
-    )  # Quando enviar notifica��o (7 dias antes)
+    )  # Quando enviar notificação (7 dias antes)
     data_notificacao_enviada = Column(
         DateTime, nullable=True
     )  # Quando foi efetivamente enviado
@@ -71,17 +71,17 @@ class Lembrete(BaseTenantModel):
     confianca_recorrencia = Column(Float, nullable=True)
     amostras_recorrencia = Column(Integer, nullable=False, default=0)
 
-    # Informa��es adicionais
+    # Informações adicionais
     observacoes = Column(Text, nullable=True)
     quantidade_recomendada = Column(Float, nullable=True)  # Quantidade a comprar/usar
-    preco_estimado = Column(Float, nullable=True)  # Pre�o estimado na pr�xima compra
+    preco_estimado = Column(Float, nullable=True)  # Preço estimado na próxima compra
 
     # Controle de doses
-    dose_atual = Column(Integer, default=1)  # Qual dose o cliente est� (1, 2, 3...)
-    dose_total = Column(Integer, nullable=True)  # Total de doses necess�rias (ex: 3)
+    dose_atual = Column(Integer, default=1)  # Qual dose o cliente está (1, 2, 3...)
+    dose_total = Column(Integer, nullable=True)  # Total de doses necessárias (ex: 3)
     historico_doses = Column(
         Text, nullable=True
-    )  # JSON com hist�rico [{dose: 1, data: '2026-01-13', comprou: true}]
+    )  # JSON com histórico [{dose: 1, data: '2026-01-13', comprou: true}]
 
     # Auditoria
     created_at = Column(DateTime, default=datetime.utcnow)
@@ -95,23 +95,23 @@ class Lembrete(BaseTenantModel):
 
 
 # ============================================================================
-# SISTEMA DE ATRIBUTOS E VARIA��ES DE PRODUTOS
+# SISTEMA DE ATRIBUTOS E VARIAÇÕES DE PRODUTOS
 # ============================================================================
 
 
 class ProdutoAtributo(BaseTenantModel):
     """
-    Atributos de produtos PAI que definem suas varia��es
+    Atributos de produtos PAI que definem suas variações
 
     Exemplos:
-    - Produto PAI: "Ra��o Golden Adulto"
-      - Atributo 1: "Peso" (op��es: 1kg, 3kg, 15kg)
-      - Atributo 2: "Sabor" (op��es: Carne, Frango, Cordeiro)
+    - Produto PAI: "Ração Golden Adulto"
+      - Atributo 1: "Peso" (opções: 1kg, 3kg, 15kg)
+      - Atributo 2: "Sabor" (opções: Carne, Frango, Cordeiro)
 
     Regras:
     - Apenas produtos tipo PAI podem ter atributos
-    - Cada atributo pode ter m�ltiplas op��es
-    - Combina��es de op��es geram varia��es
+    - Cada atributo pode ter múltiplas opções
+    - Combinações de opções geram variações
     """
 
     __tablename__ = "produtos_atributos"
@@ -124,8 +124,8 @@ class ProdutoAtributo(BaseTenantModel):
 
     # Dados do atributo
     nome = Column(String(100), nullable=False)  # Ex: "Peso", "Sabor", "Cor", "Tamanho"
-    ordem = Column(Integer, default=0)  # Ordem de exibi��o
-    obrigatorio = Column(Boolean, default=True)  # Se obrigat�rio na cria��o de varia��o
+    ordem = Column(Integer, default=0)  # Ordem de exibição
+    obrigatorio = Column(Boolean, default=True)  # Se obrigatório na criação de variação
 
     # Auditoria
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
@@ -142,7 +142,7 @@ class ProdutoAtributo(BaseTenantModel):
     )
     user = relationship("User")
 
-    # �ndices
+    # Índices
     __table_args__ = (
         Index("idx_atributos_produto_pai", "produto_pai_id"),
         Index("idx_atributos_user", "user_id"),
@@ -152,15 +152,15 @@ class ProdutoAtributo(BaseTenantModel):
 
 class ProdutoAtributoOpcao(BaseTenantModel):
     """
-    Op��es/valores de um atributo de produto
+    Opções/valores de um atributo de produto
 
     Exemplos:
-    - Atributo "Peso" pode ter op��es: "1kg", "3kg", "15kg"
-    - Atributo "Sabor" pode ter op��es: "Carne", "Frango", "Cordeiro"
+    - Atributo "Peso" pode ter opções: "1kg", "3kg", "15kg"
+    - Atributo "Sabor" pode ter opções: "Carne", "Frango", "Cordeiro"
 
     Regras:
-    - Cada op��o pertence a um atributo
-    - Varia��es referenciam combina��es de op��es
+    - Cada opção pertence a um atributo
+    - Variações referenciam combinações de opções
     """
 
     __tablename__ = "produtos_atributos_opcoes"
@@ -171,14 +171,14 @@ class ProdutoAtributoOpcao(BaseTenantModel):
     # Relacionamento com atributo
     atributo_id = Column(Integer, ForeignKey("produtos_atributos.id"), nullable=False)
 
-    # Dados da op��o
+    # Dados da opção
     valor = Column(String(100), nullable=False)  # Ex: "15kg", "Carne", "Vermelho"
-    ordem = Column(Integer, default=0)  # Ordem de exibi��o
-    ajuste_preco = Column(Float, default=0)  # Ajuste de pre�o em rela��o ao produto PAI
+    ordem = Column(Integer, default=0)  # Ordem de exibição
+    ajuste_preco = Column(Float, default=0)  # Ajuste de preço em relação ao produto PAI
     ajuste_preco_tipo = Column(String(20), default="fixo")  # fixo, percentual
     codigo_extra = Column(
         String(50), nullable=True
-    )  # C�digo adicional para varia��o (ex: SKU extra)
+    )  # Código adicional para variação (ex: SKU extra)
 
     # Auditoria
     ativo = Column(Boolean, default=True)
@@ -188,7 +188,7 @@ class ProdutoAtributoOpcao(BaseTenantModel):
     # Relationships
     atributo = relationship("ProdutoAtributo", back_populates="opcoes")
 
-    # �ndices
+    # Índices
     __table_args__ = (
         Index("idx_opcoes_atributo", "atributo_id"),
         {"extend_existing": True},
@@ -197,18 +197,18 @@ class ProdutoAtributoOpcao(BaseTenantModel):
 
 class ProdutoVariacaoAtributo(BaseTenantModel):
     """
-    Tabela de associa��o entre varia��es e op��es de atributos
+    Tabela de associação entre variações e opções de atributos
 
-    Mapeia quais op��es de atributos comp�em uma varia��o espec�fica
+    Mapeia quais opções de atributos compõem uma variação específica
 
     Exemplo:
-    - Varia��o "Ra��o Golden Adulto 15kg Carne"
-      - Atributo "Peso" ? Op��o "15kg"
-      - Atributo "Sabor" ? Op��o "Carne"
+    - Variação "Ração Golden Adulto 15kg Carne"
+      - Atributo "Peso" ? Opção "15kg"
+      - Atributo "Sabor" ? Opção "Carne"
 
     Regras:
     - Apenas produtos tipo VARIACAO podem ter entradas aqui
-    - Cada varia��o deve ter uma op��o de cada atributo obrigat�rio do PAI
+    - Cada variação deve ter uma opção de cada atributo obrigatório do PAI
     """
 
     __tablename__ = "produtos_variacoes_atributos"
@@ -235,12 +235,12 @@ class ProdutoVariacaoAtributo(BaseTenantModel):
     atributo = relationship("ProdutoAtributo")
     opcao = relationship("ProdutoAtributoOpcao")
 
-    # �ndices e constraints
+    # Índices e constraints
     __table_args__ = (
         Index("idx_var_atributos_variacao", "variacao_id"),
         Index("idx_var_atributos_atributo", "atributo_id"),
         Index("idx_var_atributos_opcao", "opcao_id"),
-        # Constraint: Uma varia��o n�o pode ter a mesma op��o de atributo duplicada
+        # Constraint: Uma variação não pode ter a mesma opção de atributo duplicada
         Index("idx_var_atributos_unique", "variacao_id", "atributo_id", unique=True),
         {"extend_existing": True},
     )

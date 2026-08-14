@@ -44,7 +44,7 @@ export default function SubcategoriaDREModal({
           </div>
 
           <div className="mb-4">
-            <label className="block text-sm font-medium text-gray-700 mb-1">DescriÃ§Ã£o</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Descrição</label>
             <textarea
               value={formSubData.descricao}
               onChange={(e) => setFormSubData({ ...formSubData, descricao: e.target.value })}

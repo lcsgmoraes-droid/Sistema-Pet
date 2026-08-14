@@ -48,7 +48,7 @@ def listar_roles(
 
     result = []
     for role in roles:
-        # Buscar permiss�es da role
+        # Buscar permissões da role
         perms = (
             db.query(Permission)
             .join(RolePermission, RolePermission.permission_id == Permission.id)
@@ -87,13 +87,13 @@ def criar_role(
         .first()
     )
     if exists:
-        raise HTTPException(status_code=400, detail="Role j� existe")
+        raise HTTPException(status_code=400, detail="Role já existe")
 
     role = Role(name=payload.nome, tenant_id=tenant_id)
     db.add(role)
     db.flush()
 
-    # Adicionar permiss�es
+    # Adicionar permissões
     for perm_id in payload.permissions:
         db.add(
             RolePermission(tenant_id=tenant_id, role_id=role.id, permission_id=perm_id)
@@ -102,7 +102,7 @@ def criar_role(
     db.commit()
     db.refresh(role)
 
-    # Buscar permiss�es para retornar
+    # Buscar permissões para retornar
     perms = (
         db.query(Permission)
         .join(RolePermission, RolePermission.permission_id == Permission.id)
@@ -136,16 +136,16 @@ def atualizar_role(
         db.query(Role).filter(Role.id == role_id, Role.tenant_id == tenant_id).first()
     )
     if not role:
-        raise HTTPException(status_code=404, detail="Role n�o encontrado")
+        raise HTTPException(status_code=404, detail="Role não encontrado")
 
     role.name = payload.nome
 
-    # Remover permiss�es antigas
+    # Remover permissões antigas
     db.query(RolePermission).filter(
         RolePermission.role_id == role_id, RolePermission.tenant_id == tenant_id
     ).delete()
 
-    # Adicionar novas permiss�es
+    # Adicionar novas permissões
     for perm_id in payload.permissions:
         db.add(
             RolePermission(tenant_id=tenant_id, role_id=role.id, permission_id=perm_id)
@@ -154,7 +154,7 @@ def atualizar_role(
     db.commit()
     db.refresh(role)
 
-    # Buscar permiss�es para retornar
+    # Buscar permissões para retornar
     perms = (
         db.query(Permission)
         .join(RolePermission, RolePermission.permission_id == Permission.id)
@@ -189,13 +189,13 @@ def deletar_role(
         .first()
     )
     if in_use:
-        raise HTTPException(status_code=400, detail="Role est� em uso")
+        raise HTTPException(status_code=400, detail="Role está em uso")
 
     role = (
         db.query(Role).filter(Role.id == role_id, Role.tenant_id == tenant_id).first()
     )
     if not role:
-        raise HTTPException(status_code=404, detail="Role n�o encontrado")
+        raise HTTPException(status_code=404, detail="Role não encontrado")
 
     db.query(RolePermission).filter(
         RolePermission.role_id == role_id, RolePermission.tenant_id == tenant_id
@@ -207,7 +207,7 @@ def deletar_role(
 
 
 # =========================
-# C2 � PERMISS�ES DO ROLE
+# C2 — PERMISSÕES DO ROLE
 # =========================
 
 
@@ -234,7 +234,7 @@ def permissoes_do_role(
         db.query(Role).filter(Role.id == role_id, Role.tenant_id == tenant_id).first()
     )
     if not role:
-        raise HTTPException(status_code=404, detail="Role n�o encontrado")
+        raise HTTPException(status_code=404, detail="Role não encontrado")
 
     rows = (
         db.query(Permission.code)
@@ -262,7 +262,7 @@ def atualizar_permissoes_role(
         db.query(Role).filter(Role.id == role_id, Role.tenant_id == tenant_id).first()
     )
     if not role:
-        raise HTTPException(status_code=404, detail="Role n�o encontrado")
+        raise HTTPException(status_code=404, detail="Role não encontrado")
 
     db.query(RolePermission).filter(
         RolePermission.role_id == role_id,

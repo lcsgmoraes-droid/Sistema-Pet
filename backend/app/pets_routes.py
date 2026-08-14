@@ -15,7 +15,7 @@ import secrets
 from .db import get_session
 from .auth.dependencies import get_current_user_and_tenant
 from .models import Pet, Cliente
-from .pet_clinical_utils import normalize_pet_clinical_payload
+from .pet_clinical_utils import normalize_clinical_list, normalize_pet_clinical_payload
 from app.partner_utils import get_all_accessible_tenant_ids
 
 from pydantic import BaseModel, Field
@@ -83,8 +83,11 @@ class PetResponse(PetBase):
     codigo: str
     cliente_id: int
     user_id: int
-    created_at: dt
-    updated_at: dt
+    # A base inicial permitia timestamps nulos. Mantemos a resposta compatível
+    # com esses registros antigos para que um único pet legado não derrube toda
+    # a listagem.
+    created_at: Optional[dt] = None
+    updated_at: Optional[dt] = None
 
     # Dados do cliente (tutor)
     cliente_nome: Optional[str] = None
@@ -157,12 +160,18 @@ def enriquecer_pet_response(pet: Pet, de_parceiro: bool = False) -> dict:
         "porte": pet.porte,
         "microchip": pet.microchip,
         "alergias": pet.alergias,
-        "alergias_lista": pet.alergias_lista or [],
+        "alergias_lista": normalize_clinical_list(pet.alergias_lista),
         "doencas_cronicas": pet.doencas_cronicas,
-        "condicoes_cronicas_lista": pet.condicoes_cronicas_lista or [],
+        "condicoes_cronicas_lista": normalize_clinical_list(
+            pet.condicoes_cronicas_lista
+        ),
         "medicamentos_continuos": pet.medicamentos_continuos,
-        "medicamentos_continuos_lista": pet.medicamentos_continuos_lista or [],
-        "restricoes_alimentares_lista": pet.restricoes_alimentares_lista or [],
+        "medicamentos_continuos_lista": normalize_clinical_list(
+            pet.medicamentos_continuos_lista
+        ),
+        "restricoes_alimentares_lista": normalize_clinical_list(
+            pet.restricoes_alimentares_lista
+        ),
         "historico_clinico": pet.historico_clinico,
         "tipo_sanguineo": pet.tipo_sanguineo,
         "pedigree_registro": pet.pedigree_registro,

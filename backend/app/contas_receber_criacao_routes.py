@@ -19,7 +19,7 @@ router = APIRouter()
 
 
 @router.post("/", status_code=status.HTTP_201_CREATED)
-@idempotent()  # ðŸ”’ IDEMPOTÃŠNCIA: evita criaÃ§Ã£o duplicada de contas a receber
+@idempotent()  # 🔒 IDEMPOTÊNCIA: evita criação duplicada de contas a receber
 async def criar_conta_receber(
     conta: ContaReceberCreate,
     request: Request,
@@ -27,7 +27,7 @@ async def criar_conta_receber(
     user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     """
-    Cria uma ou mais contas a receber (com parcelamento se necessÃ¡rio)
+    Cria uma ou mais contas a receber (com parcelamento se necessário)
     + ATUALIZA DRE EM TEMPO REAL
     """
     current_user, tenant_id = user_and_tenant
@@ -35,7 +35,7 @@ async def criar_conta_receber(
 
     try:
         # ============================
-        # VALIDAÃ‡ÃƒO DRE - CRÃTICA
+        # VALIDAÇÃO DRE - CRÍTICA
         # ============================
         subcategoria = (
             db.query(DRESubcategoria)
@@ -50,11 +50,11 @@ async def criar_conta_receber(
         if not subcategoria:
             raise HTTPException(
                 status_code=400,
-                detail=f"Subcategoria DRE {conta.dre_subcategoria_id} invÃ¡lida ou nÃ£o pertence a este tenant",
+                detail=f"Subcategoria DRE {conta.dre_subcategoria_id} inválida ou não pertence a este tenant",
             )
 
         # ============================
-        # CRIAÃ‡ÃƒO DE CONTAS
+        # CRIAÇÃO DE CONTAS
         # ============================
         if conta.eh_parcelado and conta.total_parcelas > 1:
             # Criar conta principal (controle)
@@ -134,7 +134,7 @@ async def criar_conta_receber(
                 venda_id=conta.venda_id,
                 documento=conta.documento,
                 observacoes=conta.observacoes,
-                # RecorrÃªncia
+                # Recorrência
                 eh_recorrente=conta.eh_recorrente,
                 tipo_recorrencia=conta.tipo_recorrencia,
                 intervalo_dias=conta.intervalo_dias,
@@ -146,7 +146,7 @@ async def criar_conta_receber(
                 tenant_id=tenant_id,
             )
 
-            # Se Ã© recorrente, calcular prÃ³xima recorrÃªncia
+            # Se é recorrente, calcular próxima recorrência
             if nova_conta.eh_recorrente and nova_conta.tipo_recorrencia:
                 try:
                     nova_conta.proxima_recorrencia = calcular_proxima_recorrencia(
@@ -155,9 +155,7 @@ async def criar_conta_receber(
                         nova_conta.intervalo_dias,
                     )
                 except Exception as e:
-                    logger.warning(
-                        f"âš ï¸  Erro ao calcular prÃ³xima recorrÃªncia: {e}"
-                    )
+                    logger.warning(f"⚠️  Erro ao calcular próxima recorrência: {e}")
 
             db.add(nova_conta)
             contas_criadas.append(nova_conta)
@@ -165,7 +163,7 @@ async def criar_conta_receber(
         db.commit()
 
         # ============================
-        # ATUALIZAÃ‡ÃƒO DRE EM TEMPO REAL
+        # ATUALIZAÇÃO DRE EM TEMPO REAL
         # ============================
         for conta_criada in contas_criadas:
             try:
@@ -176,18 +174,18 @@ async def criar_conta_receber(
                     canal=conta_criada.canal,
                     valor=conta_criada.valor_original,
                     data_lancamento=conta_criada.data_vencimento,
-                    tipo_movimentacao="RECEITA",  # â† Contas a RECEBER = RECEITA
+                    tipo_movimentacao="RECEITA",  # ← Contas a RECEBER = RECEITA
                 )
                 logger.info(
-                    f"âœ… DRE atualizado: ContaReceber #{conta_criada.id} â†’ Subcategoria {conta_criada.dre_subcategoria_id} â†’ Canal {conta_criada.canal}"
+                    f"✅ DRE atualizado: ContaReceber #{conta_criada.id} → Subcategoria {conta_criada.dre_subcategoria_id} → Canal {conta_criada.canal}"
                 )
             except Exception as e:
-                # NÃ£o bloqueia criaÃ§Ã£o se DRE falhar (logging apenas)
+                # Não bloqueia criação se DRE falhar (logging apenas)
                 logger.warning(
-                    f"âš ï¸ Erro ao atualizar DRE para ContaReceber #{conta_criada.id}: {e}"
+                    f"⚠️ Erro ao atualizar DRE para ContaReceber #{conta_criada.id}: {e}"
                 )
 
-        # INTEGRAÃ‡ÃƒO REVERSA: Criar lanÃ§amentos manuais no fluxo de caixa
+        # INTEGRAÇÃO REVERSA: Criar lançamentos manuais no fluxo de caixa
         for conta_criada in contas_criadas:
             try:
                 lancamento = LancamentoManual(
@@ -209,12 +207,12 @@ async def criar_conta_receber(
                 db.add(lancamento)
             except Exception as e:
                 logger.warning(
-                    f"âš ï¸  NÃ£o foi possÃ­vel criar lanÃ§amento para conta #{conta_criada.id}: {e}"
+                    f"⚠️  Não foi possível criar lançamento para conta #{conta_criada.id}: {e}"
                 )
 
         db.commit()
 
-        logger.info(f"âœ… {len(contas_criadas)} conta(s) a receber criada(s)")
+        logger.info(f"✅ {len(contas_criadas)} conta(s) a receber criada(s)")
 
         return {
             "message": "Conta(s) criada(s) com sucesso",
@@ -223,7 +221,7 @@ async def criar_conta_receber(
         }
 
     except Exception as e:
-        logger.error(f"âŒ Erro ao criar conta: {e}")
+        logger.error(f"❌ Erro ao criar conta: {e}")
         db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
 

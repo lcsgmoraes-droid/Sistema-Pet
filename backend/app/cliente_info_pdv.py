@@ -1,5 +1,5 @@
 """
-Endpoint especializado para informaÃ§Ãµes do cliente no PDV
+Endpoint especializado para informações do cliente no PDV
 """
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -30,9 +30,9 @@ def alertas_carrinho_pdv(
 ):
     """
     Analisa o carrinho atual em tempo real e retorna alertas proativos:
-    - RaÃ§Ã£o errada para a fase de vida do pet
-    - ProteÃ­na com alergia registrada
-    - DuraÃ§Ã£o estimada por pet
+    - Ração errada para a fase de vida do pet
+    - Proteína com alergia registrada
+    - Duração estimada por pet
     """
     _, tenant_id = user_and_tenant
 
@@ -45,7 +45,7 @@ def alertas_carrinho_pdv(
             continue
         produto = db.query(Produto).filter(Produto.id == item.produto_id).first()
         if not produto or not produto.peso_embalagem:
-            continue  # sÃ³ analisa raÃ§Ãµes
+            continue  # só analisa rações
 
         for pet in pets:
             pet_nome = pet.nome
@@ -72,13 +72,13 @@ def alertas_carrinho_pdv(
                     fase_pet == "idoso"
                     and "senior" not in fase_racao
                     and "idoso" not in fase_racao
-                    and "sÃªnior" not in fase_racao
+                    and "sênior" not in fase_racao
                 ):
                     alertas.append(
                         {
                             "tipo": "fase_vida",
                             "nivel": "aviso",
-                            "mensagem": f"{pet_nome} Ã© idoso ({idade_anos} anos) â€” raÃ§Ã£o '{produto.nome}' Ã© para '{produto.categoria_racao}'. Recomendar versÃ£o sÃªnior.",
+                            "mensagem": f"{pet_nome} é idoso ({idade_anos} anos) — ração '{produto.nome}' é para '{produto.categoria_racao}'. Recomendar versão sênior.",
                         }
                     )
                 elif fase_pet == "filhote" and "filhote" not in fase_racao:
@@ -86,7 +86,7 @@ def alertas_carrinho_pdv(
                         {
                             "tipo": "fase_vida",
                             "nivel": "aviso",
-                            "mensagem": f"{pet_nome} Ã© filhote â€” raÃ§Ã£o '{produto.nome}' Ã© para '{produto.categoria_racao}'.",
+                            "mensagem": f"{pet_nome} é filhote — ração '{produto.nome}' é para '{produto.categoria_racao}'.",
                         }
                     )
 
@@ -97,11 +97,11 @@ def alertas_carrinho_pdv(
                         {
                             "tipo": "alergia",
                             "nivel": "critico",
-                            "mensagem": f"ðŸš¨ {pet_nome} tem alergia a '{produto.sabor_proteina}' registrada! A raÃ§Ã£o '{produto.nome}' contÃ©m essa proteÃ­na.",
+                            "mensagem": f"🚨 {pet_nome} tem alergia a '{produto.sabor_proteina}' registrada! A ração '{produto.nome}' contém essa proteína.",
                         }
                     )
 
-            # Info: duraÃ§Ã£o estimada
+            # Info: duração estimada
             if pet.peso and float(pet.peso) > 0:
                 try:
                     from app.calculadora_racao import calcular_quantidade_diaria
@@ -124,7 +124,7 @@ def alertas_carrinho_pdv(
                         infos.append(
                             {
                                 "tipo": "duracao",
-                                "mensagem": f"'{produto.nome}' para {pet_nome} ({peso_pet}kg): ~{qtd_diaria_g:.0f}g/dia â†’ dura {duracao_dias} dias (R$ {custo_total / duracao_dias:.2f}/dia)",
+                                "mensagem": f"'{produto.nome}' para {pet_nome} ({peso_pet}kg): ~{qtd_diaria_g:.0f}g/dia → dura {duracao_dias} dias (R$ {custo_total / duracao_dias:.2f}/dia)",
                             }
                         )
                 except Exception:
@@ -140,12 +140,12 @@ def get_cliente_info_pdv(
     db: Session = Depends(get_session),
 ):
     """
-    Retorna informaÃ§Ãµes completas do cliente para exibir no PDV:
-    - Resumo financeiro (total gasto, ticket mÃ©dio, etc)
+    Retorna informações completas do cliente para exibir no PDV:
+    - Resumo financeiro (total gasto, ticket médio, etc)
     - Pets registrados
-    - Ãšltimas compras (histÃ³rico)
+    - Últimas compras (histórico)
     - Oportunidades (produtos que deve reabastecer)
-    - SugestÃµes de produtos baseadas no histÃ³rico
+    - Sugestões de produtos baseadas no histórico
     """
     current_user, tenant_id = user_and_tenant
 
@@ -157,7 +157,7 @@ def get_cliente_info_pdv(
     )
 
     if not cliente:
-        raise HTTPException(status_code=404, detail="Cliente nÃ£o encontrado")
+        raise HTTPException(status_code=404, detail="Cliente não encontrado")
 
     # ========== 1. RESUMO FINANCEIRO ==========
     vendas = (
@@ -178,7 +178,7 @@ def get_cliente_info_pdv(
         max(vendas, key=lambda v: float(v.total), default=None) if vendas else None
     )
 
-    # Ãšltima compra
+    # Última compra
     ultima_venda = (
         sorted(vendas, key=lambda v: v.data_venda, reverse=True)[0] if vendas else None
     )
@@ -213,7 +213,7 @@ def get_cliente_info_pdv(
     for pet in pets:
         idade_anos = None
         if pet.data_nascimento:
-            # Garantir que data_nascimento seja date (nÃ£o datetime)
+            # Garantir que data_nascimento seja date (não datetime)
             data_nasc = (
                 pet.data_nascimento.date()
                 if isinstance(pet.data_nascimento, datetime)
@@ -278,7 +278,7 @@ def get_cliente_info_pdv(
                     "pet_nome": pet.nome,
                     "tipo": "restricao",
                     "nivel": "aviso",
-                    "mensagem": f"{pet.nome}: restriÃ§Ã£o alimentar em {restricao}.",
+                    "mensagem": f"{pet.nome}: restrição alimentar em {restricao}.",
                 }
             )
         for vacina in vacinas_vencidas:
@@ -288,7 +288,7 @@ def get_cliente_info_pdv(
                     "pet_nome": pet.nome,
                     "tipo": "vacina_atrasada",
                     "nivel": "aviso",
-                    "mensagem": f"{pet.nome}: vacina {vacina['nome']} atrasada hÃ¡ {vacina['dias_atraso']} dia(s).",
+                    "mensagem": f"{pet.nome}: vacina {vacina['nome']} atrasada há {vacina['dias_atraso']} dia(s).",
                 }
             )
         if exames_pendentes:
@@ -298,11 +298,11 @@ def get_cliente_info_pdv(
                     "pet_nome": pet.nome,
                     "tipo": "exame_pendente",
                     "nivel": "info",
-                    "mensagem": f"{pet.nome}: {exames_pendentes} exame(s) pendente(s) de revisÃ£o.",
+                    "mensagem": f"{pet.nome}: {exames_pendentes} exame(s) pendente(s) de revisão.",
                 }
             )
 
-    # ========== 3. ÃšLTIMAS COMPRAS (5 mais recentes) ==========
+    # ========== 3. ÚLTIMAS COMPRAS (5 mais recentes) ==========
     ultimas_vendas = sorted(vendas, key=lambda v: v.data_venda, reverse=True)[:5]
 
     ultimas_compras = []
@@ -332,7 +332,7 @@ def get_cliente_info_pdv(
             }
         )
 
-    # ========== 4. ANÃLISE DE PADRÃ•ES (Oportunidades) ==========
+    # ========== 4. ANÁLISE DE PADRÕES (Oportunidades) ==========
     # Pegar produtos mais comprados
     produtos_comprados = {}
     for venda in vendas:
@@ -358,7 +358,7 @@ def get_cliente_info_pdv(
                         venda.data_venda
                     )
 
-    # Calcular intervalo mÃ©dio de compra para produtos recorrentes
+    # Calcular intervalo médio de compra para produtos recorrentes
     oportunidades = []
     for produto_id, info in produtos_comprados.items():
         if info["quantidade_vezes"] >= 2:  # Produto comprado pelo menos 2x
@@ -380,7 +380,7 @@ def get_cliente_info_pdv(
             )
 
             if len(vendas_produto) >= 2:
-                # Calcular intervalo mÃ©dio entre compras
+                # Calcular intervalo médio entre compras
                 intervalos = []
                 for i in range(1, len(vendas_produto)):
                     delta = (
@@ -390,18 +390,18 @@ def get_cliente_info_pdv(
 
                 intervalo_medio = sum(intervalos) / len(intervalos) if intervalos else 0
 
-                # Verificar se estÃ¡ atrasado
+                # Verificar se está atrasado
                 if info["ultima_compra"]:
                     dias_desde_ultima = (datetime.now() - info["ultima_compra"]).days
 
-                    # Se passou do intervalo mÃ©dio + margem de 7 dias
+                    # Se passou do intervalo médio + margem de 7 dias
                     if dias_desde_ultima > (intervalo_medio + 7):
                         oportunidades.append(
                             {
                                 "tipo": "reabastecimento",
                                 "produto_nome": produto.nome,
                                 "produto_id": produto.id,
-                                "mensagem": f"{produto.nome} normalmente a cada {int(intervalo_medio)} dias (Ãºltima: {info['ultima_compra'].strftime('%d/%m/%Y')} - {dias_desde_ultima} dias atrÃ¡s)",
+                                "mensagem": f"{produto.nome} normalmente a cada {int(intervalo_medio)} dias (última: {info['ultima_compra'].strftime('%d/%m/%Y')} - {dias_desde_ultima} dias atrás)",
                                 "urgencia": "alta"
                                 if dias_desde_ultima > (intervalo_medio + 14)
                                 else "media",
@@ -409,7 +409,7 @@ def get_cliente_info_pdv(
                             }
                         )
 
-    # ========== 5. SUGESTÃ•ES (produtos mais comprados) ==========
+    # ========== 5. SUGESTÕES (produtos mais comprados) ==========
     produtos_mais_comprados = sorted(
         produtos_comprados.items(), key=lambda x: x[1]["quantidade_vezes"], reverse=True
     )[:5]
@@ -430,8 +430,8 @@ def get_cliente_info_pdv(
                 }
             )
 
-    # ========== 6. ANÃLISE DE PRODUTOS COMPRADOS JUNTOS ==========
-    # AnÃ¡lise de co-ocorrÃªncia (produtos comprados na mesma venda)
+    # ========== 6. ANÁLISE DE PRODUTOS COMPRADOS JUNTOS ==========
+    # Análise de co-ocorrência (produtos comprados na mesma venda)
     combinacoes = defaultdict(int)
     produtos_por_venda = defaultdict(set)
 
@@ -443,14 +443,14 @@ def get_cliente_info_pdv(
         for p_id in produtos_venda:
             produtos_por_venda[venda.id].add(p_id)
 
-        # Contar combinaÃ§Ãµes (produtos que aparecem juntos)
+        # Contar combinações (produtos que aparecem juntos)
         for i, p1 in enumerate(produtos_venda):
             for p2 in produtos_venda[i + 1 :]:
                 if p1 != p2:
                     par = tuple(sorted([p1, p2]))
                     combinacoes[par] += 1
 
-    # Top 5 combinaÃ§Ãµes mais frequentes
+    # Top 5 combinações mais frequentes
     produtos_relacionados = []
     for (p1_id, p2_id), frequencia in sorted(
         combinacoes.items(), key=lambda x: x[1], reverse=True
@@ -474,15 +474,15 @@ def get_cliente_info_pdv(
                 }
             )
 
-    # ========== 7. ANÃLISE SAZONAL ==========
-    # Agrupar vendas por mÃªs
+    # ========== 7. ANÁLISE SAZONAL ==========
+    # Agrupar vendas por mês
     vendas_por_mes = defaultdict(lambda: {"total": 0, "quantidade": 0})
     for venda in vendas:
         mes_ano = venda.data_venda.strftime("%m/%Y")
         vendas_por_mes[mes_ano]["total"] += float(venda.total)
         vendas_por_mes[mes_ano]["quantidade"] += 1
 
-    # Ãšltimos 6 meses
+    # Últimos 6 meses
     padroes_sazonais = []
     for mes_ano, dados in sorted(vendas_por_mes.items(), reverse=True)[:6]:
         padroes_sazonais.append(

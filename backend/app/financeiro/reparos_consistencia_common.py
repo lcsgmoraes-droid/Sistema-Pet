@@ -132,7 +132,7 @@ def _is_recebimento_imediato(
         return False
     tipo = str((forma or {}).get("tipo") or forma_nome or "").lower()
     nome = str((forma or {}).get("nome") or forma_nome or "").lower()
-    imediatos = {"pix", "dinheiro", "debito", "dÃ©bito", "cartao_debito"}
+    imediatos = {"pix", "dinheiro", "debito", "débito", "cartao_debito"}
     if tipo in imediatos or nome in imediatos:
         return True
     return forma is not None and _prazo_forma(forma) == 0

@@ -11,6 +11,7 @@ import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import api from "../../api";
 import CustomerIdentity from "../../components/ui/CustomerIdentity";
+import { formatMoneyBRL } from "../../utils/formatters";
 
 const ComissoesFechamentoDetalhe = () => {
   const navigate = useNavigate();
@@ -62,10 +63,7 @@ const ComissoesFechamentoDetalhe = () => {
   };
 
   const formatarMoeda = (valor) => {
-    return new Intl.NumberFormat("pt-BR", {
-      style: "currency",
-      currency: "BRL",
-    }).format(valor);
+    return formatMoneyBRL(valor);
   };
 
   const formatarData = (data) => {
@@ -78,6 +76,14 @@ const ComissoesFechamentoDetalhe = () => {
     if (!dataHora) return "-";
     const dataObj = new Date(dataHora);
     return dataObj.toLocaleString("pt-BR");
+  };
+
+  const formatarPeriodoVendas = (periodo) => {
+    if (!periodo) return "-";
+    if (typeof periodo === "string") return periodo;
+    const inicio = formatarData(periodo.data_inicio);
+    const fim = formatarData(periodo.data_fim);
+    return inicio === fim ? inicio : `${inicio} a ${fim}`;
   };
 
   const handleVoltar = () => {
@@ -246,7 +252,9 @@ const ComissoesFechamentoDetalhe = () => {
             {/* Período de Vendas */}
             <div>
               <p className="text-sm text-gray-600 mb-1">Período das Vendas</p>
-              <p className="text-base font-semibold text-gray-900">{fechamento.periodo_vendas}</p>
+              <p className="text-base font-semibold text-gray-900">
+                {formatarPeriodoVendas(fechamento.periodo_vendas)}
+              </p>
             </div>
           </div>
 
@@ -311,13 +319,15 @@ const ComissoesFechamentoDetalhe = () => {
                         {comissao.quantidade}
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap text-right text-sm text-gray-900">
-                        {formatarMoeda(comissao.valor_venda_snapshot)}
+                        {formatarMoeda(
+                          comissao.valor_venda_snapshot ?? comissao.valor_base_calculo,
+                        )}
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap text-center text-sm text-gray-600">
-                        {comissao.percentual_snapshot}%
+                        {comissao.percentual_snapshot ?? comissao.percentual_comissao}%
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap text-right text-sm font-semibold text-green-600">
-                        {formatarMoeda(comissao.valor_comissao)}
+                        {formatarMoeda(comissao.valor_comissao ?? comissao.valor_comissao_gerada)}
                       </td>
                     </tr>
                   ))}
