@@ -401,7 +401,8 @@ const GerenciamentoPets = () => {
                     <img
                       src={pet.foto_url}
                       alt={pet.nome}
-                      className="h-16 w-16 rounded-full border-2 border-slate-200 object-cover"
+                      loading="lazy"
+                      className="h-20 w-20 rounded-2xl border border-slate-200 object-cover shadow-sm"
                     />
                   ) : null
                 }

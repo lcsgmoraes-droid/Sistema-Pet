@@ -21,6 +21,37 @@ from app.scripts.seed_demo_operacional_showcase_data import (
 from app.tenancy.context import tenant_context
 
 
+DEMO_PET_PHOTO_URLS = {
+    "DEMO-PET-001": "/demo/pets/thor-caramelo.webp",
+    "DEMO-PET-002": "/demo/pets/luna-shih-tzu.webp",
+    "DEMO-PET-003": "/demo/pets/mia-gata.webp",
+}
+
+DEMO_EXISTING_PET_PHOTOS = (
+    {
+        "name": "Luna",
+        "species": "Gato",
+        "breed": "SRD",
+        "client": "maria",
+        "photo": "/demo/pets/luna-gata.webp",
+    },
+    {
+        "name": "Mel",
+        "species": "Cao",
+        "breed": "SRD",
+        "client": "joao",
+        "photo": "/demo/pets/mel-cadela.webp",
+    },
+    {
+        "name": "Thor",
+        "species": "Cao",
+        "breed": "SRD",
+        "client": "ana",
+        "photo": "/demo/pets/thor-srd.webp",
+    },
+)
+
+
 def _ensure_named_option(
     db,
     *,
@@ -391,6 +422,7 @@ def _ensure_demo_pets(
             "species": "Cao",
             "breed": "Vira-lata",
             "sex": "macho",
+            "photo": DEMO_PET_PHOTO_URLS["DEMO-PET-001"],
             "weight": 18.4,
             "size": "medio",
             "birth": datetime.combine(base_date - timedelta(days=4 * 365), time(12, 0)),
@@ -403,6 +435,7 @@ def _ensure_demo_pets(
             "species": "Cao",
             "breed": "Shih-tzu",
             "sex": "femea",
+            "photo": DEMO_PET_PHOTO_URLS["DEMO-PET-002"],
             "weight": 7.2,
             "size": "pequeno",
             "birth": datetime.combine(base_date - timedelta(days=2 * 365), time(12, 0)),
@@ -415,6 +448,7 @@ def _ensure_demo_pets(
             "species": "Gato",
             "breed": "Sem raca definida",
             "sex": "femea",
+            "photo": DEMO_PET_PHOTO_URLS["DEMO-PET-003"],
             "weight": 4.8,
             "size": "pequeno",
             "birth": datetime.combine(base_date - timedelta(days=3 * 365), time(12, 0)),
@@ -445,7 +479,8 @@ def _ensure_demo_pets(
                     UPDATE pets
                     SET cliente_id = :client_id, user_id = :user_id,
                         nome = :name, especie = :species, raca = :breed,
-                        sexo = :sex, peso = :weight, porte = :size,
+                        sexo = :sex, foto_url = :photo,
+                        peso = :weight, porte = :size,
                         data_nascimento = :birth, ativo = true, updated_at = now()
                     WHERE tenant_id = :tenant_id AND id = :id
                     """
@@ -460,11 +495,11 @@ def _ensure_demo_pets(
                     """
                     INSERT INTO pets (
                         cliente_id, user_id, codigo, nome, especie, raca, sexo,
-                        peso, porte, data_nascimento, ativo, tenant_id,
+                        foto_url, peso, porte, data_nascimento, ativo, tenant_id,
                         created_at, updated_at
                     ) VALUES (
                         :client_id, :user_id, :code, :name, :species, :breed, :sex,
-                        :weight, :size, :birth, true, :tenant_id, now(), now()
+                        :photo, :weight, :size, :birth, true, :tenant_id, now(), now()
                     )
                     RETURNING id
                     """,
@@ -472,6 +507,26 @@ def _ensure_demo_pets(
                 )
             )
         result[profile["key"]] = {"id": pet_id, "client_id": int(payload["client_id"])}
+
+    for profile in DEMO_EXISTING_PET_PHOTOS:
+        db.execute(
+            text(
+                """
+                UPDATE pets
+                SET foto_url = :photo, updated_at = now()
+                WHERE tenant_id = :tenant_id
+                  AND cliente_id = :client_id
+                  AND lower(nome) = lower(:name)
+                  AND lower(especie) = lower(:species)
+                  AND lower(COALESCE(raca, '')) = lower(:breed)
+                """
+            ),
+            {
+                **profile,
+                "tenant_id": tenant_id,
+                "client_id": people[profile["client"]],
+            },
+        )
 
     return result
 
