@@ -1,11 +1,23 @@
 import json
 
 from app.scripts.seed_demo_operacional_showcase import (
+    DEMO_EXISTING_PET_PHOTOS,
+    DEMO_PET_PHOTO_URLS,
     DEMO_RATION_SHOWCASE_PRODUCTS,
     DEMO_REMINDER_SCENARIOS,
     DEMO_VALIDITY_SCENARIOS,
     _consumption_table,
 )
+
+
+def test_demo_showcase_has_local_photos_for_all_pets():
+    photo_urls = [*DEMO_PET_PHOTO_URLS.values()]
+    photo_urls.extend(item["photo"] for item in DEMO_EXISTING_PET_PHOTOS)
+
+    assert len(photo_urls) == 6
+    assert len(set(photo_urls)) == 6
+    assert all(url.startswith("/demo/pets/") for url in photo_urls)
+    assert all(url.endswith(".webp") for url in photo_urls)
 
 
 def test_demo_showcase_has_complete_rations_for_detailed_comparison():
