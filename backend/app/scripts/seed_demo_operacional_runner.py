@@ -37,6 +37,10 @@ from app.scripts.seed_demo_operacional_purchase_catalog import (
 from app.scripts.seed_demo_operacional_purchases import insert_demo_purchases
 from app.scripts.seed_demo_operacional_sales_core import _insert_cashier, _insert_sale
 from app.scripts.seed_demo_operacional_support import _ensure_support_data
+from app.scripts.seed_demo_operacional_showcase import (
+    DEMO_RATION_SHOWCASE_PRODUCTS,
+    ensure_demo_showcase_data,
+)
 from app.scripts.seed_demo_operacional_conciliation import (
     insert_demo_card_conciliation,
 )
@@ -88,6 +92,21 @@ def _summarize(db, *, tenant_id: str) -> dict[str, Any]:
         SELECT 'pendencias_fornecedor', count(*)::int
         FROM compras_pendencias_fornecedor
         WHERE tenant_id = :tenant_id AND codigo LIKE 'DEMO-PEN-%'
+        UNION ALL
+        SELECT 'lembretes', count(*)::int
+        FROM lembretes
+        WHERE tenant_id = :tenant_id
+          AND observacoes LIKE 'Demo operacional - lembrete recorrente%'
+        UNION ALL
+        SELECT 'validade_pendencias', count(*)::int
+        FROM estoque_validade_bloqueios
+        WHERE tenant_id = :tenant_id AND origem = 'demo_operacional'
+          AND status = 'pendente'
+        UNION ALL
+        SELECT 'racoes_analise', count(*)::int
+        FROM produtos
+        WHERE tenant_id = :tenant_id AND codigo LIKE 'DEMO-RACAO-COMP-%'
+          AND ativo = true
         """,
         {"tenant_id": tenant_id},
     )
@@ -139,6 +158,9 @@ def apply_operational_seed(
             "sales_scenarios": [asdict(s) for s in build_demo_scenarios()],
             "fixed_payables": [asdict(p) for p in build_fixed_payables()],
             "purchase_scenarios": build_demo_purchase_scenarios(),
+            "showcase_products": [
+                item["name"] for item in DEMO_RATION_SHOWCASE_PRODUCTS
+            ],
         }
 
     _cleanup_previous_demo(db, tenant_id=tenant_id)
@@ -205,6 +227,13 @@ def apply_operational_seed(
         db, tenant_id=tenant_id, user_id=user_id, support=support, base_date=base_date
     )
     _finalize_product_stock(db, tenant_id=tenant_id, products=products)
+    showcase = ensure_demo_showcase_data(
+        db,
+        tenant_id=tenant_id,
+        user_id=user_id,
+        people=support["people"],
+        base_date=base_date,
+    )
 
     summary = _summarize(db, tenant_id=tenant_id)
     return {
@@ -219,5 +248,6 @@ def apply_operational_seed(
         "stock_alerts": stock_alerts,
         "card_conciliation": conciliation,
         "fixed_payables": fixed_payable_ids,
+        "showcase": showcase,
         "summary": summary,
     }

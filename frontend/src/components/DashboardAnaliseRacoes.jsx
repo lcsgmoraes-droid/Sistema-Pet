@@ -106,6 +106,11 @@ const DashboardAnaliseRacoes = () => {
       // Carregar resumo (sem filtros de data para overview geral)
       await carregarResumo();
 
+      // A comparacao detalhada e a primeira aba: deixa os produtos visiveis
+      // assim que a tela abre, sem exigir um clique durante a demonstracao.
+      const resProdutos = await api.post("/racoes/analises/produtos-comparacao", filtros);
+      setProdutosComparacao(resProdutos.data);
+
       setLoading(false);
     } catch (error) {
       console.error("❌ [DashboardAnaliseRacoes] Erro ao carregar dados:", {

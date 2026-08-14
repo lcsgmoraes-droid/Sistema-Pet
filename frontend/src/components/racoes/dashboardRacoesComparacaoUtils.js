@@ -1,3 +1,5 @@
+import { formatMoneyBRL } from "../../utils/formatters";
+
 export const calcularMargem = (custo, venda) => {
   if (!venda || venda === 0) return 0;
   return parseFloat((((venda - custo) / venda) * 100).toFixed(2));
@@ -17,10 +19,10 @@ export const calcularROI = (custo, venda) => {
 
 export const formatarPesoCompacto = (peso) => {
   if (!peso && peso !== 0) return "-";
-  return `${String(peso).replace(/\.0+$/, "")}kg`;
+  return `${Number(peso).toLocaleString("pt-BR", { maximumFractionDigits: 3 })} kg`;
 };
 
-export const formatarMoedaCompacta = (valor) => `R$ ${Number(valor || 0).toFixed(2)}`;
+export const formatarMoedaCompacta = (valor) => formatMoneyBRL(valor);
 
 export const getCorValor = (valor, min, max, inverter = false) => {
   if (max === min) return "text-slate-700";
