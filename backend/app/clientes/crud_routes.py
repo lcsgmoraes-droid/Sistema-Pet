@@ -634,7 +634,9 @@ def _montar_query_listagem_clientes(
             .group_by(Venda.cliente_id)
             .subquery()
         )
-        query = query.outerjoin(ultima_venda, ultima_venda.c.cliente_id == Cliente.id).filter(
+        query = query.outerjoin(
+            ultima_venda, ultima_venda.c.cliente_id == Cliente.id
+        ).filter(
             Cliente.tenant_id == tenant_id,
             Cliente.tipo_cadastro == "cliente",
             or_(

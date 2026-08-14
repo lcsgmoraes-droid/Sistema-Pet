@@ -50,7 +50,9 @@ def listar_contas_receber(
     if status:
         status_normalizado = status.strip().lower()
         if status_normalizado == "em_aberto":
-            query = query.filter(ContaReceber.status.in_(STATUS_CONTAS_RECEBER_EM_ABERTO))
+            query = query.filter(
+                ContaReceber.status.in_(STATUS_CONTAS_RECEBER_EM_ABERTO)
+            )
         else:
             query = query.filter(ContaReceber.status == status_normalizado)
     if cliente_id:
