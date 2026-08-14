@@ -1,8 +1,9 @@
+from datetime import date
 from decimal import Decimal
-from typing import List
+from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import and_, extract
+from sqlalchemy import and_
 from sqlalchemy.orm import Session, selectinload
 
 from app.auth.dependencies import get_current_user_and_tenant
@@ -23,8 +24,8 @@ from app.dre_canais.base import (
     _eh_custo_de_venda_ja_vindo_da_venda,
     _filtro_status_venda_dre,
     _normalizar_canal,
-    _periodo_label,
-    _periodo_mes,
+    _periodo_label_intervalo,
+    _periodo_meses,
     _texto_conta,
 )
 from app.dre_canais.folha import (
@@ -85,8 +86,17 @@ def _detalhes_cmv_estimado(
     ano: int,
     tenant_id: str,
     canal: str,
+    mes_inicial: Optional[int] = None,
+    data_final: Optional[date] = None,
 ) -> List[DREDetalheItem]:
-    dados_canais = obter_vendas_por_canal(db, mes, ano, tenant_id)
+    dados_canais = obter_vendas_por_canal(
+        db,
+        mes,
+        ano,
+        tenant_id,
+        mes_inicial=mes_inicial,
+        data_final=data_final,
+    )
     itens = list(dados_canais.get(canal, {}).get("itens_cmv_estimado", []) or [])
     detalhes = []
     for indice, item in enumerate(itens):
@@ -131,11 +141,21 @@ def _detalhes_vendas_campo(
     tenant_id: str,
     canal: str,
     campo: str,
+    mes_inicial: Optional[int] = None,
+    data_final: Optional[date] = None,
 ) -> List[DREDetalheItem]:
     if campo == "cmv_estimado":
-        return _detalhes_cmv_estimado(db, mes, ano, tenant_id, canal)
+        return _detalhes_cmv_estimado(
+            db,
+            mes,
+            ano,
+            tenant_id,
+            canal,
+            mes_inicial=mes_inicial,
+            data_final=data_final,
+        )
 
-    inicio, fim = _periodo_mes(mes, ano)
+    inicio, fim = _periodo_meses(mes_inicial or mes, mes, ano, data_final)
     vendas = (
         db.query(Venda)
         .options(
@@ -211,7 +231,10 @@ def _detalhes_contas_campo(
     tenant_id: str,
     canal: str,
     campo: str,
+    mes_inicial: Optional[int] = None,
+    data_final: Optional[date] = None,
 ) -> List[DREDetalheItem]:
+    inicio, fim = _periodo_meses(mes_inicial or mes, mes, ano, data_final)
     if campo == "fretes_compras":
         if canal != "loja_fisica":
             return []
@@ -231,8 +254,8 @@ def _detalhes_contas_campo(
             .filter(
                 and_(
                     ContaPagar.tenant_id == tenant_id,
-                    extract("month", ContaPagar.data_emissao) == mes,
-                    extract("year", ContaPagar.data_emissao) == ano,
+                    ContaPagar.data_emissao >= inicio,
+                    ContaPagar.data_emissao < fim,
                     ContaPagar.status != "cancelado",
                     ContaPagar.dre_subcategoria_id == subcategoria_frete_compras.id,
                 )
@@ -247,8 +270,8 @@ def _detalhes_contas_campo(
             .filter(
                 and_(
                     ContaPagar.tenant_id == tenant_id,
-                    extract("month", ContaPagar.data_emissao) == mes,
-                    extract("year", ContaPagar.data_emissao) == ano,
+                    ContaPagar.data_emissao >= inicio,
+                    ContaPagar.data_emissao < fim,
                     ContaPagar.status != "cancelado",
                     ContaPagar.afeta_dre.is_(True),
                     ContaPagar.nota_entrada_id.is_(None),
@@ -311,7 +334,14 @@ def _detalhes_contas_campo(
 
     if campo == "despesas_pessoal":
         resumo_folha = calcular_resumo_folha_gerencial(
-            db, mes, ano, tenant_id, contas_base, subcategorias
+            db,
+            mes,
+            ano,
+            tenant_id,
+            contas_base,
+            subcategorias,
+            mes_inicial=mes_inicial,
+            data_final=data_final,
         )
         for provisao in resumo_folha["provisoes"]:
             if canal_provisao_folha(provisao) != canal:
@@ -344,7 +374,7 @@ def _detalhes_contas_campo(
             )
             detalhes.append(
                 DREDetalheItem(
-                    id="folha-gerencial-estimada",
+                    id=f"folha-gerencial-estimada-{ano}-{mes_inicial or mes:02d}-{mes:02d}",
                     origem_tipo="folha_gerencial",
                     origem_label="Cadastro de remuneracao",
                     data=f"{ano:04d}-{mes:02d}-01",
@@ -371,6 +401,12 @@ def _detalhes_contas_campo(
 def detalhar_linha_dre_por_canal(
     ano: int = Query(..., description="Ano do DRE"),
     mes: int = Query(..., description="MÃªs do DRE (1-12)"),
+    mes_inicial: Optional[int] = Query(
+        None, description="MÃªs inicial para perÃ­odo acumulado (1-12)"
+    ),
+    data_final: Optional[date] = Query(
+        None, description="Ãšltimo dia incluÃ­do no perÃ­odo acumulado"
+    ),
     canal: str = Query(..., description="Canal da linha"),
     campo: str = Query(..., description="Campo da DRE"),
     page: int = Query(1, ge=1),
@@ -378,8 +414,23 @@ def detalhar_linha_dre_por_canal(
     db: Session = Depends(get_session),
     user_and_tenant=Depends(get_current_user_and_tenant),
 ):
+    mes_inicial = mes if mes_inicial is None else mes_inicial
     if mes < 1 or mes > 12:
         raise HTTPException(status_code=400, detail="MÃªs deve estar entre 1 e 12")
+    if mes_inicial < 1 or mes_inicial > mes:
+        raise HTTPException(
+            status_code=400,
+            detail="MÃªs inicial deve estar entre 1 e o mÃªs final",
+        )
+    if data_final is not None and (
+        data_final.year != ano
+        or data_final.month < mes_inicial
+        or data_final.month > mes
+    ):
+        raise HTTPException(
+            status_code=400,
+            detail="Data final deve pertencer ao perÃ­odo informado",
+        )
 
     campo = (campo or "").strip()
     canal = _normalizar_canal(canal)
@@ -390,9 +441,27 @@ def detalhar_linha_dre_por_canal(
 
     _, tenant_id = user_and_tenant
     if campo in CAMPOS_DETALHE_VENDAS:
-        detalhes = _detalhes_vendas_campo(db, mes, ano, tenant_id, canal, campo)
+        detalhes = _detalhes_vendas_campo(
+            db,
+            mes,
+            ano,
+            tenant_id,
+            canal,
+            campo,
+            mes_inicial=mes_inicial,
+            data_final=data_final,
+        )
     else:
-        detalhes = _detalhes_contas_campo(db, mes, ano, tenant_id, canal, campo)
+        detalhes = _detalhes_contas_campo(
+            db,
+            mes,
+            ano,
+            tenant_id,
+            canal,
+            campo,
+            mes_inicial=mes_inicial,
+            data_final=data_final,
+        )
 
     total = sum((_decimal(item.valor) for item in detalhes), Decimal("0"))
     pagina_items, page_size_final, pages = _paginar_detalhes(detalhes, page, page_size)
@@ -402,7 +471,7 @@ def detalhar_linha_dre_por_canal(
         campo=campo,
         canal=canal,
         canal_nome=config["nome"],
-        periodo=_periodo_label(mes, ano),
+        periodo=_periodo_label_intervalo(mes_inicial, mes, ano, data_final),
         origem=ORIGENS_DRE.get(campo),
         total=float(total),
         total_itens=len(detalhes),

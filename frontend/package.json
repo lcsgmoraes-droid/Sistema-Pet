@@ -43,6 +43,7 @@
     "test:contas-pagar-vence-hoje": "node scripts/test-contas-pagar-vence-hoje.mjs",
     "test:dashboard-overview": "node scripts/test-dashboard-overview.mjs",
     "test:dashboard-contextual-filters": "node scripts/test-dashboard-contextual-filters.mjs",
+    "test:dre-periodos": "node scripts/test-dre-periodos.mjs",
     "test:dashboard-executive-layout": "node scripts/test-dashboard-executive-layout.mjs",
     "test:final-gui-large-files-refactor": "node scripts/test-final-gui-large-files-refactor.mjs",
     "test:frontend-zero-large-files-refactor": "node scripts/test-frontend-zero-large-files-refactor.mjs",

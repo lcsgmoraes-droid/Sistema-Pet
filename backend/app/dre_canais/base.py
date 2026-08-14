@@ -1,7 +1,7 @@
 import json
 import re
 import unicodedata
-from datetime import date, datetime
+from datetime import date, datetime, time, timedelta
 from decimal import Decimal
 from typing import Any, Dict, Optional
 
@@ -48,8 +48,22 @@ CANAIS_CONFIG = {
 
 
 def _periodo_mes(mes: int, ano: int) -> tuple[datetime, datetime]:
-    inicio = datetime(ano, mes, 1)
-    fim = datetime(ano + 1, 1, 1) if mes == 12 else datetime(ano, mes + 1, 1)
+    return _periodo_meses(mes, mes, ano)
+
+
+def _periodo_meses(
+    mes_inicial: int,
+    mes_final: int,
+    ano: int,
+    data_final: Optional[date] = None,
+) -> tuple[datetime, datetime]:
+    inicio = datetime(ano, mes_inicial, 1)
+    fim = (
+        datetime(ano + 1, 1, 1) if mes_final == 12 else datetime(ano, mes_final + 1, 1)
+    )
+    if data_final is not None:
+        fim_informado = datetime.combine(data_final + timedelta(days=1), time.min)
+        fim = min(fim, fim_informado)
     return inicio, fim
 
 
@@ -366,23 +380,38 @@ ORIGENS_DRE = {
 }
 
 
+MESES_LABEL = [
+    "",
+    "Janeiro",
+    "Fevereiro",
+    "Mar\u00e7o",
+    "Abril",
+    "Maio",
+    "Junho",
+    "Julho",
+    "Agosto",
+    "Setembro",
+    "Outubro",
+    "Novembro",
+    "Dezembro",
+]
+
+
 def _periodo_label(mes: int, ano: int) -> str:
-    meses = [
-        "",
-        "Janeiro",
-        "Fevereiro",
-        "MarÃ§o",
-        "Abril",
-        "Maio",
-        "Junho",
-        "Julho",
-        "Agosto",
-        "Setembro",
-        "Outubro",
-        "Novembro",
-        "Dezembro",
-    ]
-    return f"{meses[mes]}/{ano}" if 1 <= mes <= 12 else f"{mes}/{ano}"
+    return f"{MESES_LABEL[mes]}/{ano}" if 1 <= mes <= 12 else f"{mes}/{ano}"
+
+
+def _periodo_label_intervalo(
+    mes_inicial: int,
+    mes_final: int,
+    ano: int,
+    data_final: Optional[date] = None,
+) -> str:
+    if mes_inicial == mes_final and data_final is None:
+        return _periodo_label(mes_final, ano)
+    if data_final is not None:
+        return f"01/{mes_inicial:02d}/{ano} a {data_final.strftime('%d/%m/%Y')}"
+    return f"{MESES_LABEL[mes_inicial]} a {MESES_LABEL[mes_final]}/{ano}"
 
 
 def _data_iso(valor: Any) -> Optional[str]:

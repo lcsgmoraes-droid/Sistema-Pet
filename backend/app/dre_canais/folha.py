@@ -1,7 +1,7 @@
 from collections import defaultdict
-from datetime import date
+from datetime import date, timedelta
 from decimal import Decimal
-from typing import Dict, Iterable
+from typing import Dict, Iterable, Optional
 
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
@@ -19,9 +19,16 @@ from app.models import Cliente
 from app.services.remuneracao_service import calcular_composicao_remuneracao
 
 
-def _periodo_datas(mes: int, ano: int) -> tuple[date, date]:
-    inicio = date(ano, mes, 1)
+def _periodo_datas(
+    mes: int,
+    ano: int,
+    mes_inicial: Optional[int] = None,
+    data_final: Optional[date] = None,
+) -> tuple[date, date]:
+    inicio = date(ano, mes_inicial or mes, 1)
     fim = date(ano + 1, 1, 1) if mes == 12 else date(ano, mes + 1, 1)
+    if data_final is not None:
+        fim = min(fim, data_final + timedelta(days=1))
     return inicio, fim
 
 
@@ -77,6 +84,8 @@ def calcular_resumo_folha_gerencial(
     tenant_id: str,
     contas: Iterable,
     subcategorias: Dict,
+    mes_inicial: Optional[int] = None,
+    data_final: Optional[date] = None,
 ) -> dict:
     """Concilia contas, provisoes e cadastro de funcionarios sem duplicar valores."""
     folha_lancada_por_canal = defaultdict(lambda: Decimal("0"))
@@ -87,7 +96,7 @@ def calcular_resumo_folha_gerencial(
             canal = _normalizar_canal(getattr(conta, "canal", None))
             folha_lancada_por_canal[canal] += _conta_valor(conta)
 
-    inicio, fim_exclusivo = _periodo_datas(mes, ano)
+    inicio, fim_exclusivo = _periodo_datas(mes, ano, mes_inicial, data_final)
     provisoes = (
         db.query(DREDetalheCanal)
         .filter(
@@ -108,8 +117,10 @@ def calcular_resumo_folha_gerencial(
         )
 
     estimativa = _folha_gerencial_estimada(db, tenant_id)
+    quantidade_meses = mes - (mes_inicial or mes) + 1
+    estimado_periodo = estimativa["total"] * quantidade_meses
     complemento_loja = _calcular_complemento_folha(
-        estimativa["total"],
+        estimado_periodo,
         folha_lancada_por_canal["loja_fisica"],
         provisoes_por_canal["loja_fisica"],
     )
@@ -119,7 +130,7 @@ def calcular_resumo_folha_gerencial(
     )
 
     return {
-        "estimado": estimativa["total"],
+        "estimado": estimado_periodo,
         "quantidade_funcionarios": estimativa["quantidade"],
         "folha_lancada_por_canal": dict(folha_lancada_por_canal),
         "provisoes_por_canal": dict(provisoes_por_canal),

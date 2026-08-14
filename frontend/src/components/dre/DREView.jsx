@@ -42,6 +42,7 @@ export default function DREView({
   fecharDetalhesLinha,
   formatarData,
   formatarPercentual,
+  handlePeriodoChange,
   handlePeriodoPreset,
   linhaDetalhe,
   limparSelecaoCanais,
@@ -49,9 +50,9 @@ export default function DREView({
   loadingDetalhes,
   modalClassificarOpen,
   periodo,
+  periodoAcumulado,
   setChatIAAberto,
   setModalClassificarOpen,
-  setPeriodo,
   setTabAtiva,
   tabAtiva,
   toggleCanal,
@@ -147,14 +148,19 @@ export default function DREView({
 
               <div className="min-w-[260px] flex-1">
                 <label className="mb-1 block text-sm font-medium text-gray-700">
-                  Período (Mês/Ano)
+                  {periodoAcumulado ? "Até (Mês/Ano)" : "Período (Mês/Ano)"}
                 </label>
                 <input
                   type="month"
                   value={periodo}
-                  onChange={(e) => setPeriodo(e.target.value)}
+                  onChange={(e) => handlePeriodoChange(e.target.value)}
                   className="h-[38px] w-full rounded-md border border-gray-300 px-3 py-2"
                 />
+                {periodoAcumulado && (
+                  <p className="mt-1 text-xs font-medium text-blue-700">
+                    Acumulado selecionado: {dados?.periodo || "de janeiro até hoje"}
+                  </p>
+                )}
               </div>
             </div>
           </div>

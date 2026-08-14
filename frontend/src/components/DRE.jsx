@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import toast from "react-hot-toast";
 import api from "../api";
+import { formatarMesLocal, obterPeriodoPresetDRE } from "../utils/drePeriodos";
 import MoneyCell from "./ui/MoneyCell";
 import NumberCell from "./ui/NumberCell";
 import DREView from "./dre/DREView";
@@ -136,20 +137,15 @@ const DRE = () => {
   const [canaisSelecionados, setCanaisSelecionados] = useState(["loja_fisica"]);
 
   // Filtros
-  const obterDataLocal = () => {
-    const hoje = new Date();
-    const ano = hoje.getFullYear();
-    const mes = String(hoje.getMonth() + 1).padStart(2, "0");
-    return `${ano}-${mes}`;
-  };
-
-  const [periodo, setPeriodo] = useState(obterDataLocal());
+  const [periodo, setPeriodo] = useState(formatarMesLocal());
+  const [mesInicial, setMesInicial] = useState(null);
+  const [dataFinal, setDataFinal] = useState(null);
 
   const normalizarPeriodo = (valor) => {
     if (typeof valor === "string" && /^\d{4}-\d{2}$/.test(valor)) {
       return valor;
     }
-    return periodo || obterDataLocal();
+    return periodo || formatarMesLocal();
   };
 
   const carregarDRE = async (periodoAlvo = periodo) => {
@@ -166,7 +162,13 @@ const DRE = () => {
       const canaisParam = canaisSelecionados.join(",");
 
       const response = await api.get(`/financeiro/dre/canais`, {
-        params: { ano, mes, canais: canaisParam },
+        params: {
+          ano,
+          mes,
+          mes_inicial: mesInicial || undefined,
+          data_final: dataFinal || undefined,
+          canais: canaisParam,
+        },
         timeout: DRE_REQUEST_TIMEOUT_MS,
         signal: controller.signal,
       });
@@ -222,6 +224,8 @@ const DRE = () => {
         params: {
           ano,
           mes,
+          mes_inicial: mesInicial || undefined,
+          data_final: dataFinal || undefined,
           canal: linha.canal,
           campo: linha.campo,
           page,
@@ -256,7 +260,7 @@ const DRE = () => {
   useEffect(() => {
     const timer = window.setTimeout(() => carregarDRE(periodo), 300);
     return () => clearTimeout(timer);
-  }, [periodo, canaisSelecionados]);
+  }, [periodo, mesInicial, dataFinal, canaisSelecionados]);
 
   useEffect(
     () => () => {
@@ -266,26 +270,18 @@ const DRE = () => {
   );
 
   const handlePeriodoPreset = (preset) => {
-    const hoje = new Date();
-    let novaData;
+    const novoPeriodo = obterPeriodoPresetDRE(preset);
+    if (!novoPeriodo) return;
 
-    switch (preset) {
-      case "mes_atual":
-        novaData = obterDataLocal();
-        break;
-      case "mes_anterior": {
-        const mesPassado = new Date(hoje.getFullYear(), hoje.getMonth() - 1, 1);
-        novaData = `${mesPassado.getFullYear()}-${String(mesPassado.getMonth() + 1).padStart(2, "0")}`;
-        break;
-      }
-      case "ano_atual":
-        novaData = `${hoje.getFullYear()}-01`;
-        break;
-      default:
-        return;
-    }
+    setPeriodo(novoPeriodo.periodo);
+    setMesInicial(novoPeriodo.mesInicial);
+    setDataFinal(novoPeriodo.dataFinal);
+  };
 
-    setPeriodo(novaData);
+  const handlePeriodoChange = (novoPeriodo) => {
+    setPeriodo(novoPeriodo);
+    setMesInicial(null);
+    setDataFinal(null);
   };
 
   const exportarPDF = async () => {
@@ -358,15 +354,16 @@ const DRE = () => {
       formatarData={formatarData}
       formatarPercentual={formatarPercentual}
       handlePeriodoPreset={handlePeriodoPreset}
+      handlePeriodoChange={handlePeriodoChange}
       linhaDetalhe={linhaDetalhe}
       limparSelecaoCanais={limparSelecaoCanais}
       loading={loading}
       loadingDetalhes={loadingDetalhes}
       modalClassificarOpen={modalClassificarOpen}
       periodo={periodo}
+      periodoAcumulado={mesInicial !== null}
       setChatIAAberto={setChatIAAberto}
       setModalClassificarOpen={setModalClassificarOpen}
-      setPeriodo={setPeriodo}
       setTabAtiva={setTabAtiva}
       tabAtiva={tabAtiva}
       toggleCanal={toggleCanal}

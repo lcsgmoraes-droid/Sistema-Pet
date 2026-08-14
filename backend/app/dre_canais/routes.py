@@ -1,3 +1,6 @@
+from datetime import date
+from typing import Optional
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
@@ -13,6 +16,7 @@ from app.dre_canais.base import (
     _decimal,
     _normalizar_canal,
     _novo_canal,
+    _periodo_label_intervalo,
 )
 from app.dre_canais.detalhes import router as detalhes_router
 from app.dre_canais.linhas import montar_linhas_dre_competencia
@@ -93,6 +97,12 @@ def _montar_alertas_cmv_estimado(dados_canais: dict) -> list[dict]:
 def gerar_dre_por_canais(
     ano: int = Query(..., description="Ano do DRE"),
     mes: int = Query(..., description="Mês do DRE (1-12)"),
+    mes_inicial: Optional[int] = Query(
+        None, description="Mês inicial para período acumulado (1-12)"
+    ),
+    data_final: Optional[date] = Query(
+        None, description="Último dia incluído no período acumulado"
+    ),
     canais: str = Query(
         "",
         description="Canais selecionados separados por vírgula (ex: loja_fisica,mercado_livre)",
@@ -109,8 +119,23 @@ def gerar_dre_por_canais(
     - Valores individuais
     """
 
+    mes_inicial = mes if mes_inicial is None else mes_inicial
     if mes < 1 or mes > 12:
         raise HTTPException(status_code=400, detail="Mês deve estar entre 1 e 12")
+    if mes_inicial < 1 or mes_inicial > mes:
+        raise HTTPException(
+            status_code=400,
+            detail="Mês inicial deve estar entre 1 e o mês final",
+        )
+    if data_final is not None and (
+        data_final.year != ano
+        or data_final.month < mes_inicial
+        or data_final.month > mes
+    ):
+        raise HTTPException(
+            status_code=400,
+            detail="Data final deve pertencer ao período informado",
+        )
 
     # Processar canais selecionados
     canais_selecionados = [
@@ -119,29 +144,37 @@ def gerar_dre_por_canais(
     if not canais_selecionados:
         canais_selecionados = ["loja_fisica"]
 
-    meses = [
-        "",
-        "Janeiro",
-        "Fevereiro",
-        "Março",
-        "Abril",
-        "Maio",
-        "Junho",
-        "Julho",
-        "Agosto",
-        "Setembro",
-        "Outubro",
-        "Novembro",
-        "Dezembro",
-    ]
-    periodo = f"{meses[mes]}/{ano}"
+    periodo = _periodo_label_intervalo(mes_inicial, mes, ano, data_final)
 
     # Extrair user e tenant
     _, tenant_id = user_and_tenant
 
-    dados_canais_calculados = obter_vendas_por_canal(db, mes, ano, tenant_id)
-    agregar_contas_pagar_por_canal(db, mes, ano, tenant_id, dados_canais_calculados)
-    agregar_fretes_sobre_compras(db, mes, ano, tenant_id, dados_canais_calculados)
+    dados_canais_calculados = obter_vendas_por_canal(
+        db,
+        mes,
+        ano,
+        tenant_id,
+        mes_inicial=mes_inicial,
+        data_final=data_final,
+    )
+    agregar_contas_pagar_por_canal(
+        db,
+        mes,
+        ano,
+        tenant_id,
+        dados_canais_calculados,
+        mes_inicial=mes_inicial,
+        data_final=data_final,
+    )
+    agregar_fretes_sobre_compras(
+        db,
+        mes,
+        ano,
+        tenant_id,
+        dados_canais_calculados,
+        mes_inicial=mes_inicial,
+        data_final=data_final,
+    )
 
     dados_canais_resultado = {
         canal_id: dados_canais_calculados.get(canal_id, _novo_canal())
@@ -152,8 +185,10 @@ def gerar_dre_por_canais(
 
     return DREPorCanalResponse(
         periodo=periodo,
+        mes_inicial=mes_inicial,
         mes=mes,
         ano=ano,
+        data_final=data_final,
         linhas=linhas,
         totais=totais,
         canais_encontrados=list(dados_canais_resultado.keys()),
