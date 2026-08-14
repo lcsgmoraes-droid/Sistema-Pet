@@ -54,4 +54,3 @@ def test_listagem_de_pets_aceita_datas_nulas_e_listas_clinicas_legadas():
     assert response.created_at is None
     assert response.alergias_lista == ["Frango", "Poeira"]
     assert response.restricoes_alimentares_lista == ["Soja", "Lactose"]
-

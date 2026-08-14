@@ -74,10 +74,12 @@ def test_demo_showcase_product_has_six_multichannel_sales():
         "mercado_livre",
         "amazon",
     }
-    assert sum((scenario.items[0][1] for scenario in scenarios), Decimal("0")) == Decimal(
-        "9"
+    assert sum(
+        (scenario.items[0][1] for scenario in scenarios), Decimal("0")
+    ) == Decimal("9")
+    assert all(
+        scenario.order_id for scenario in scenarios if scenario.channel != "loja_fisica"
     )
-    assert all(scenario.order_id for scenario in scenarios if scenario.channel != "loja_fisica")
 
 
 def test_demo_operacional_fixed_payables_cover_finance_and_break_even():

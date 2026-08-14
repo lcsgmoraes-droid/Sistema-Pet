@@ -155,9 +155,7 @@ async def criar_conta_receber(
                         nova_conta.intervalo_dias,
                     )
                 except Exception as e:
-                    logger.warning(
-                        f"⚠️  Erro ao calcular próxima recorrência: {e}"
-                    )
+                    logger.warning(f"⚠️  Erro ao calcular próxima recorrência: {e}")
 
             db.add(nova_conta)
             contas_criadas.append(nova_conta)

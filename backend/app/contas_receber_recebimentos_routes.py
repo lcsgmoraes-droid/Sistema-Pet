@@ -168,9 +168,7 @@ async def registrar_recebimento(
                 )
 
         except Exception as e:
-            logger.error(
-                f"❌ Erro ao gerar comissão para venda #{conta.venda_id}: {e}"
-            )
+            logger.error(f"❌ Erro ao gerar comissão para venda #{conta.venda_id}: {e}")
             # Não falha o recebimento por erro na comissão
             pass
 
