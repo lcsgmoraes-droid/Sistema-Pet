@@ -303,7 +303,7 @@ def atualizar_dados_cadastrais(
 
 
 # ============================================================================
-# ENDPOINTS - CONFIGURAÃ‡ÃƒO DE ESTOQUE
+# ENDPOINTS - CONFIGURAÇÃO DE ESTOQUE
 # ============================================================================
 
 
@@ -350,7 +350,7 @@ def buscar_config_estoque(
     db: Session = Depends(get_session),
 ):
     """
-    Busca configuraÃ§Ãµes de estoque do tenant.
+    Busca configurações de estoque do tenant.
     """
     _current_user, tenant_id = user_and_tenant
 
@@ -358,7 +358,7 @@ def buscar_config_estoque(
 
     if not tenant:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Empresa nÃ£o encontrada"
+            status_code=status.HTTP_404_NOT_FOUND, detail="Empresa não encontrada"
         )
 
     return _config_estoque_response(tenant)
@@ -372,11 +372,11 @@ def atualizar_config_estoque(
     db: Session = Depends(get_session),
 ):
     """
-    Atualiza configuraÃ§Ãµes de estoque do tenant.
+    Atualiza configurações de estoque do tenant.
 
     IMPORTANTE:
     - Se permite_estoque_negativo = True: Sistema permite vendas mesmo sem estoque
-    - Se permite_estoque_negativo = False: Sistema bloqueia vendas quando estoque insuficiente (padrÃ£o)
+    - Se permite_estoque_negativo = False: Sistema bloqueia vendas quando estoque insuficiente (padrão)
     """
     _current_user, tenant_id = user_and_tenant
 
@@ -384,10 +384,10 @@ def atualizar_config_estoque(
 
     if not tenant:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Empresa nÃ£o encontrada"
+            status_code=status.HTTP_404_NOT_FOUND, detail="Empresa não encontrada"
         )
 
-    # Atualizar configuraÃ§Ã£o
+    # Atualizar configuração
     tenant.permite_estoque_negativo = config.permite_estoque_negativo
     tenant.protecao_validade_ativa = config.protecao_validade_ativa
     tenant.dias_alerta_validade = max(
@@ -426,7 +426,7 @@ def atualizar_config_estoque(
             )
 
     logger.info(
-        f"âœ… ConfiguraÃ§Ã£o de estoque atualizada - Tenant: {tenant.name}, "
+        f"✅ Configuração de estoque atualizada - Tenant: {tenant.name}, "
         f"Permite Estoque Negativo: {tenant.permite_estoque_negativo}"
     )
 

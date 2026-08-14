@@ -254,9 +254,9 @@ def detalhe_fechamento(
                     p.nome as nome_produto,
                     v.cliente_id
                 FROM comissoes_itens ci
-                LEFT JOIN produtos p ON ci.produto_id = p.id AND {tenant_filter_p}
-                LEFT JOIN vendas v ON ci.venda_id = v.id AND {tenant_filter_v}
-                WHERE {tenant_filter_ci} 
+                LEFT JOIN produtos p ON ci.produto_id = p.id AND p.{tenant_filter}
+                LEFT JOIN vendas v ON ci.venda_id = v.id AND v.{tenant_filter}
+                WHERE ci.{tenant_filter}
                   AND ci.funcionario_id = :funcionario_id 
                   AND ci.data_fechamento = :data_pagamento
                   AND ci.status IN ('fechada', 'pago')
@@ -298,12 +298,15 @@ def detalhe_fechamento(
             valor_total = 0.0
             observacao = None
             data_fechamento = None
+            datas_venda = []
 
             for row in rows:
                 if not observacao:
                     observacao = row[10]
                 if not data_fechamento:
                     data_fechamento = row[11]
+                if row[2]:
+                    datas_venda.append(row[2])
 
                 cliente_nome = (
                     clientes_map.get(row[13], "Cliente não identificado")
@@ -320,8 +323,11 @@ def detalhe_fechamento(
                     "cliente_nome": cliente_nome,
                     "quantidade": float(row[4]) if row[4] else 0.0,
                     "valor_base_calculo": float(row[5]) if row[5] else 0.0,
+                    "valor_venda_snapshot": float(row[5]) if row[5] else 0.0,
                     "percentual_comissao": float(row[6]) if row[6] else 0.0,
+                    "percentual_snapshot": float(row[6]) if row[6] else 0.0,
                     "valor_comissao_gerada": float(row[7]) if row[7] else 0.0,
+                    "valor_comissao": float(row[7]) if row[7] else 0.0,
                     "tipo_calculo": row[8],
                 }
 
@@ -347,8 +353,13 @@ def detalhe_fechamento(
                     "data_pagamento": str(data_pagamento),
                     "data_fechamento": data_fechamento,
                     "observacao": observacao,
+                    "observacao_pagamento": observacao,
                     "quantidade_comissoes": len(comissoes),
                     "valor_total": valor_total,
+                    "periodo_vendas": {
+                        "data_inicio": min(datas_venda) if datas_venda else None,
+                        "data_fim": max(datas_venda) if datas_venda else None,
+                    },
                 },
                 "comissoes": comissoes,
             }

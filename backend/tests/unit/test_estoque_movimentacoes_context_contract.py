@@ -55,3 +55,14 @@ def test_router_de_consulta_importa_helpers_de_contexto_movimentacoes():
     assert "from app.estoque_movimentacoes_context import (" in source
     assert "_contexto_venda_pedido_integrado" in source
     assert "_detalhar_reservas_ativas_produto" in source
+
+
+def test_rotulos_dos_canais_da_vitrine_multicanal():
+    module = importlib.import_module("app.estoque_movimentacoes_context")
+
+    assert module._label_canal_movimentacao("app") == "App"
+    assert module._label_canal_movimentacao("ecommerce") == "E-commerce"
+    assert module._label_canal_movimentacao("loja_fisica") == "Loja Física"
+    assert module._label_canal_movimentacao("mercado_livre") == "Mercado Livre"
+    assert module._label_canal_movimentacao("shopee") == "Shopee"
+    assert module._label_canal_movimentacao("amazon") == "Amazon"

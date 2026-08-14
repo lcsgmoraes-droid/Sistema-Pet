@@ -20,18 +20,18 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-# ==================== CLASSIFICAï¿½ï¿½O INTELIGENTE DE RAï¿½ï¿½ES ====================
+# ==================== CLASSIFICAÇÃO INTELIGENTE DE RAÇÕES ====================
 
 
 @router.post("/{produto_id}/classificar-ia")
 async def classificar_produto_ia(
     produto_id: int,
-    forcar: bool = False,  # Forï¿½a reclassificaï¿½ï¿½o mesmo se auto_classificar_nome = False
+    forcar: bool = False,  # Força reclassificação mesmo se auto_classificar_nome = False
     db: Session = Depends(get_session),
     user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     """
-    Aplica classificaï¿½ï¿½o inteligente via IA em um produto
+    Aplica classificação inteligente via IA em um produto
     Extrai automaticamente: porte, fase, tratamento, sabor e peso do nome
     """
     from app.classificador_racao import classificar_produto
@@ -47,17 +47,17 @@ async def classificar_produto_ia(
 
     if not produto:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Produto nï¿½o encontrado"
+            status_code=status.HTTP_404_NOT_FOUND, detail="Produto não encontrado"
         )
 
     # Verificar se deve classificar
     if not forcar and not produto.auto_classificar_nome:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Auto-classificaï¿½ï¿½o desativada para este produto. Use forcar=true para forï¿½ar.",
+            detail="Auto-classificação desativada para este produto. Use forcar=true para forçar.",
         )
 
-    # Executar classificaï¿½ï¿½o
+    # Executar classificação
     resultado, confianca, metadata = classificar_produto(
         produto.nome, produto.peso_embalagem
     )
@@ -74,15 +74,15 @@ async def classificar_produto_ia(
     # Atualizar produto apenas com campos que foram identificados
     campos_atualizados = []
 
-    # Salvar metadados da classificaï¿½ï¿½o
+    # Salvar metadados da classificação
     produto.classificacao_ia_versao = metadata["versao"]
 
     if resultado["especie_indicada"]:
         # Mapear para formato do banco (dog, cat, both, bird, etc)
         mapa_especies = {
-            "CÃ£es": "dog",
+            "Cães": "dog",
             "Gatos": "cat",
-            "PÃ¡ssaros": "bird",
+            "Pássaros": "bird",
             "Roedores": "rodent",
             "Peixes": "fish",
         }
@@ -145,7 +145,7 @@ async def classificar_produto_ia(
             produto.tipo_tratamento_id = tratamento.id
             campos_atualizados.append("tipo_tratamento_id")
 
-    # Buscar ID do sabor/proteÃ­na baseado no nome retornado pela IA
+    # Buscar ID do sabor/proteína baseado no nome retornado pela IA
     if resultado["sabor_proteina"]:
         sabor = (
             db.query(SaborProteina)
@@ -160,7 +160,7 @@ async def classificar_produto_ia(
             produto.sabor_proteina_id = sabor.id
             campos_atualizados.append("sabor_proteina_id")
 
-    # Buscar ID da linha de raÃ§Ã£o baseado no nome retornado pela IA
+    # Buscar ID da linha de ração baseado no nome retornado pela IA
     if resultado.get("linha_racao"):
         linha = (
             db.query(LinhaRacao)
@@ -175,7 +175,7 @@ async def classificar_produto_ia(
             produto.linha_racao_id = linha.id
             campos_atualizados.append("linha_racao_id")
 
-    # Atualizar peso se retornado pela IA e ainda nÃ£o definido
+    # Atualizar peso se retornado pela IA e ainda não definido
     if resultado["peso_embalagem"] and not produto.peso_embalagem:
         produto.peso_embalagem = resultado["peso_embalagem"]
         campos_atualizados.append("peso_embalagem")
@@ -192,7 +192,7 @@ async def classificar_produto_ia(
         "classificacao": resultado,
         "confianca": confianca,
         "campos_atualizados": campos_atualizados,
-        "mensagem": f"Classificaï¿½ï¿½o aplicada com sucesso. Score: {confianca['score']}%",
+        "mensagem": f"Classificação aplicada com sucesso. Score: {confianca['score']}%",
     }
 
 
@@ -201,13 +201,13 @@ async def classificar_lote_produtos(
     produto_ids: List[
         int
     ] = None,  # Se None, classifica todos ativos com auto_classificar_nome=True
-    apenas_sem_classificacao: bool = True,  # Sï¿½ classifica produtos sem classificaï¿½ï¿½o existente
+    apenas_sem_classificacao: bool = True,  # Só classifica produtos sem classificação existente
     db: Session = Depends(get_session),
     user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     """
-    Classifica mï¿½ltiplos produtos em lote
-    ï¿½til para classificar produtos histï¿½ricos
+    Classifica múltiplos produtos em lote
+    Útil para classificar produtos históricos
     """
     from app.classificador_racao import classificar_produto
 
@@ -220,11 +220,11 @@ async def classificar_lote_produtos(
         Produto.auto_classificar_nome.is_(True),
     )
 
-    # Filtrar por IDs especÃ­ficos se fornecido
+    # Filtrar por IDs específicos se fornecido
     if produto_ids:
         query = query.filter(Produto.id.in_(produto_ids))
 
-    # Filtrar apenas produtos sem classificaÃ§Ã£o completa
+    # Filtrar apenas produtos sem classificação completa
     if apenas_sem_classificacao:
         query = query.filter(
             (Produto.porte_animal.is_(None))
@@ -232,7 +232,7 @@ async def classificar_lote_produtos(
             | (Produto.sabor_proteina.is_(None))
         )
 
-    produtos = query.limit(100).all()  # Limite de seguranÃ§a
+    produtos = query.limit(100).all()  # Limite de segurança
 
     sucesso = []
     erros = []
@@ -248,9 +248,9 @@ async def classificar_lote_produtos(
             if resultado["especie_indicada"] and not produto.especies_indicadas:
                 # Mapear para formato do banco
                 mapa_especies = {
-                    "CÃ£es": "dog",
+                    "Cães": "dog",
                     "Gatos": "cat",
-                    "PÃ¡ssaros": "bird",
+                    "Pássaros": "bird",
                     "Roedores": "rodent",
                     "Peixes": "fish",
                 }
@@ -312,26 +312,26 @@ async def classificar_lote_produtos(
 async def listar_racoes_sem_classificacao(
     limite: int = 50,
     offset: int = 0,
-    especie: Optional[str] = None,  # Filtro por espÃ©cie: dog, cat, bird, rodent, fish
+    especie: Optional[str] = None,  # Filtro por espécie: dog, cat, bird, rodent, fish
     db: Session = Depends(get_session),
     user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     """
-    Lista raï¿½ï¿½es sem classificaï¿½ï¿½o completa para alertas
-    Filtra produtos classificados como raï¿½ï¿½o mas sem informaï¿½ï¿½es importantes
+    Lista rações sem classificação completa para alertas
+    Filtra produtos classificados como ração mas sem informações importantes
 
-    ParÃ¢metros:
-    - especie: Filtro opcional por espÃ©cie (dog, cat, bird, rodent, fish)
+    Parâmetros:
+    - especie: Filtro opcional por espécie (dog, cat, bird, rodent, fish)
     """
     try:
         current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
 
         logger.info("[racao/alertas] Iniciando busca")
 
-        # Buscar raÃ§Ãµes sem classificaÃ§Ã£o completa
-        # Considera "raÃ§Ã£o" se:
-        # 1. classificacao_racao != null AND != 'NÃ£o Ã© raÃ§Ã£o'
-        # 2. OU categoria.nome LIKE '%raÃ§Ã£o%'
+        # Buscar rações sem classificação completa
+        # Considera "ração" se:
+        # 1. classificacao_racao != null AND != 'Não é ração'
+        # 2. OU categoria.nome LIKE '%ração%'
 
         # Usar joinedload para evitar N+1 queries
         query = (
@@ -340,7 +340,7 @@ async def listar_racoes_sem_classificacao(
             .filter(Produto.tenant_id == tenant_id, Produto.ativo.is_(True))
         )
 
-        # Filtro: Ã© raÃ§Ã£o E estÃ¡ incompleta
+        # Filtro: é ração E está incompleta
         query = query.filter(_produto_eh_racao_expr())
 
         # Montar filtros dinamicamente baseado em campos que existem
@@ -353,7 +353,7 @@ async def listar_racoes_sem_classificacao(
             logger.info("[racao/alertas] Campo 'porte_animal_id' encontrado no modelo")
         else:
             logger.warning(
-                "[racao/alertas] Campo 'porte_animal_id' NÃƒO existe no modelo"
+                "[racao/alertas] Campo 'porte_animal_id' NÃO existe no modelo"
             )
 
         if hasattr(Produto, "fase_publico_id"):
@@ -361,7 +361,7 @@ async def listar_racoes_sem_classificacao(
             logger.info("[racao/alertas] Campo 'fase_publico_id' encontrado no modelo")
         else:
             logger.warning(
-                "[racao/alertas] Campo 'fase_publico_id' NÃƒO existe no modelo"
+                "[racao/alertas] Campo 'fase_publico_id' NÃO existe no modelo"
             )
 
         filtros_incompletos.append(Produto.sabor_proteina.is_(None))
@@ -370,7 +370,7 @@ async def listar_racoes_sem_classificacao(
         # Aplicar filtro OR (pelo menos um campo faltando)
         query = query.filter(or_(*filtros_incompletos))
 
-        # Filtrar por espÃ©cie se especificado
+        # Filtrar por espécie se especificado
         if especie:
             query = query.filter(Produto.especies_indicadas == especie)
 
@@ -379,7 +379,7 @@ async def listar_racoes_sem_classificacao(
 
         produtos = query.limit(limite).offset(offset).all()
         logger.info(
-            f"[racao/alertas] Produtos retornados nesta pÃ¡gina: {len(produtos)}"
+            f"[racao/alertas] Produtos retornados nesta página: {len(produtos)}"
         )
 
         resultado = []
@@ -441,7 +441,7 @@ async def listar_racoes_sem_classificacao(
                 continue
 
         logger.info(
-            f"[racao/alertas] Busca concluÃ­da com sucesso. Total de itens no resultado: {len(resultado)}"
+            f"[racao/alertas] Busca concluída com sucesso. Total de itens no resultado: {len(resultado)}"
         )
 
         return {
@@ -453,13 +453,13 @@ async def listar_racoes_sem_classificacao(
         }
 
     except Exception as error:
-        logger.error(f"[racao/alertas] ERRO CRÃTICO: {str(error)}")
+        logger.error(f"[racao/alertas] ERRO CRÍTICO: {str(error)}")
         logger.error(f"[racao/alertas] Stack trace:\n{traceback.format_exc()}")
 
         raise HTTPException(
             status_code=500,
             detail={
-                "message": "Erro ao listar raÃ§Ãµes sem classificaÃ§Ã£o",
+                "message": "Erro ao listar rações sem classificação",
                 "error": str(error),
                 "stack": traceback.format_exc(),
                 "endpoint": "/api/produtos/racao/alertas",

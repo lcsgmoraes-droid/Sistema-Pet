@@ -22,14 +22,14 @@ export default function ComissoesListagemView({ controller }) {
   } = controller;
 
   if (loading) {
-    return <LoadingState className="min-h-screen" label="Carregando comiss??es..." />;
+    return <LoadingState className="min-h-screen" label="Carregando comissões..." />;
   }
 
   if (erro) {
     return (
       <div className="p-6">
         <ErrorState
-          title="Erro ao carregar comiss??es"
+          title="Erro ao carregar comissões"
           description={erro}
           action={
             <ActionButton icon={RotateCcw} intent="delete" onClick={carregarComissoes}>
@@ -44,12 +44,12 @@ export default function ComissoesListagemView({ controller }) {
   if (comissoes.length === 0) {
     return (
       <div className="p-6">
-        <h1 className="text-2xl font-bold text-gray-800 mb-6">Demonstrativo de Comiss??es</h1>
+        <h1 className="text-2xl font-bold text-gray-800 mb-6">Demonstrativo de Comissões</h1>
 
         <EmptyState
-          description="Ainda n??o h?? registros de comiss??es no sistema."
+          description="Ainda não há registros de comissões no sistema."
           icon={FileText}
-          title="Nenhuma comiss??o encontrada"
+          title="Nenhuma comissão encontrada"
         />
       </div>
     );
@@ -59,7 +59,7 @@ export default function ComissoesListagemView({ controller }) {
     <div className="p-6">
       <div className="mb-6 flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-800">Demonstrativo de Comiss??es</h1>
+          <h1 className="text-2xl font-bold text-gray-800">Demonstrativo de Comissões</h1>
           <p className="text-gray-600 mt-1">Total de registros: {comissoes.length}</p>
         </div>
 
@@ -71,7 +71,7 @@ export default function ComissoesListagemView({ controller }) {
             size="md"
             tone="soft"
           >
-            Relat??rios
+            Relatórios
           </ActionButton>
 
           <ActionButton
@@ -81,7 +81,7 @@ export default function ComissoesListagemView({ controller }) {
             size="md"
             tone="soft"
           >
-            Ver Hist??rico
+            Ver Histórico
           </ActionButton>
         </div>
       </div>

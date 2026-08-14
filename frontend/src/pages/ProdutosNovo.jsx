@@ -1,5 +1,5 @@
 /**
- * FormulÃ¡rio de Cadastro/EdiÃ§Ã£o de Produtos - Layout em Abas
+ * Formulário de Cadastro/Edição de Produtos - Layout em Abas
  */
 import { useState, useEffect } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
@@ -43,7 +43,7 @@ export default function ProdutosNovo() {
   // Estado das abas
   const [abaAtiva, setAbaAtiva] = useState(1);
 
-  // Estado do formulÃ¡rio
+  // Estado do formulário
   const [formData, setFormData] = useState({
     // Aba 1: Características
     codigo: "",

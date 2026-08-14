@@ -400,12 +400,12 @@ def _detalhes_contas_campo(
 @router.get("/detalhes", response_model=DREDetalheResponse)
 def detalhar_linha_dre_por_canal(
     ano: int = Query(..., description="Ano do DRE"),
-    mes: int = Query(..., description="MÃªs do DRE (1-12)"),
+    mes: int = Query(..., description="Mês do DRE (1-12)"),
     mes_inicial: Optional[int] = Query(
-        None, description="MÃªs inicial para perÃ­odo acumulado (1-12)"
+        None, description="Mês inicial para período acumulado (1-12)"
     ),
     data_final: Optional[date] = Query(
-        None, description="Ãšltimo dia incluÃ­do no perÃ­odo acumulado"
+        None, description="Último dia incluído no período acumulado"
     ),
     canal: str = Query(..., description="Canal da linha"),
     campo: str = Query(..., description="Campo da DRE"),
@@ -416,11 +416,11 @@ def detalhar_linha_dre_por_canal(
 ):
     mes_inicial = mes if mes_inicial is None else mes_inicial
     if mes < 1 or mes > 12:
-        raise HTTPException(status_code=400, detail="MÃªs deve estar entre 1 e 12")
+        raise HTTPException(status_code=400, detail="Mês deve estar entre 1 e 12")
     if mes_inicial < 1 or mes_inicial > mes:
         raise HTTPException(
             status_code=400,
-            detail="MÃªs inicial deve estar entre 1 e o mÃªs final",
+            detail="Mês inicial deve estar entre 1 e o mês final",
         )
     if data_final is not None and (
         data_final.year != ano
@@ -429,7 +429,7 @@ def detalhar_linha_dre_por_canal(
     ):
         raise HTTPException(
             status_code=400,
-            detail="Data final deve pertencer ao perÃ­odo informado",
+            detail="Data final deve pertencer ao período informado",
         )
 
     campo = (campo or "").strip()

@@ -353,7 +353,7 @@ export default function useProdutosListagem({
 
   const handleSelecionar = (id, event) => {
     if (!id) {
-      console.error("Erro: ID do produto Ã© undefined ou null");
+      console.error("Erro: ID do produto é undefined ou null");
       return;
     }
 

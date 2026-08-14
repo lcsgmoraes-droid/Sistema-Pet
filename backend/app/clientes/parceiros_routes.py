@@ -27,7 +27,7 @@ def _obter_cliente_ou_404(db: Session, cliente_id: int, tenant_id: str):
     )
     if not cliente:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Cliente n??o encontrado"
+            status_code=status.HTTP_404_NOT_FOUND, detail="Cliente não encontrado"
         )
     return cliente
 
@@ -43,34 +43,34 @@ def toggle_parceiro(
     user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     """
-    Ativar ou desativar um cliente como parceiro para receber comissÃµes.
+    Ativar ou desativar um cliente como parceiro para receber comissões.
 
-    Permite que QUALQUER pessoa (cliente, veterinÃ¡rio, funcionÃ¡rio, fornecedor)
+    Permite que QUALQUER pessoa (cliente, veterinário, funcionário, fornecedor)
     seja ativada como parceiro, independente do tipo_cadastro.
     """
     current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
     cliente = _obter_cliente_ou_404(db, cliente_id, tenant_id)
 
-    # Salvar estado anterior para auditoria e lÃ³gica
+    # Salvar estado anterior para auditoria e lógica
     old_status = cliente.parceiro_ativo
     old_parceiro_desde = cliente.parceiro_desde
 
     # ========================================================================
-    # LÃ“GICA DE ATIVAÃ‡ÃƒO/DESATIVAÃ‡ÃƒO COM PRESERVAÃ‡ÃƒO DE HISTÃ“RICO
+    # LÓGICA DE ATIVAÇÃO/DESATIVAÇÃO COM PRESERVAÇÃO DE HISTÓRICO
     # ========================================================================
 
-    # CenÃ¡rio 1: Ativando parceiro (false â†’ true ou None â†’ true)
+    # Cenário 1: Ativando parceiro (false → true ou None → true)
     if request.parceiro_ativo and not old_status:
         cliente.parceiro_ativo = True
 
-        # Se Ã© primeira ativaÃ§Ã£o (nunca foi parceiro antes)
+        # Se é primeira ativação (nunca foi parceiro antes)
         if not old_parceiro_desde:
             cliente.parceiro_desde = dt.utcnow()
             acao = "primeira_ativacao"
-        # Se Ã© reativaÃ§Ã£o (jÃ¡ foi parceiro antes)
+        # Se é reativação (já foi parceiro antes)
         else:
             # Manter data original de parceiro_desde
-            # Adicionar registro de reativaÃ§Ã£o nas observaÃ§Ãµes
+            # Adicionar registro de reativação nas observações
             data_reativacao = dt.utcnow().strftime("%d/%m/%Y")
             observacao_reativacao = f"\n[Reativado como parceiro em {data_reativacao}]"
 
@@ -83,11 +83,11 @@ def toggle_parceiro(
 
             acao = "reativacao"
 
-    # CenÃ¡rio 2: Desativando parceiro (true â†’ false)
+    # Cenário 2: Desativando parceiro (true → false)
     elif not request.parceiro_ativo and old_status:
         cliente.parceiro_ativo = False
-        # NÃƒO limpar parceiro_desde - preservar histÃ³rico
-        # Adicionar registro de desativaÃ§Ã£o nas observaÃ§Ãµes
+        # NÃO limpar parceiro_desde - preservar histórico
+        # Adicionar registro de desativação nas observações
         data_desativacao = dt.utcnow().strftime("%d/%m/%Y")
         observacao_desativacao = f"\n[Desativado como parceiro em {data_desativacao}]"
 
@@ -100,12 +100,12 @@ def toggle_parceiro(
 
         acao = "desativacao"
 
-    # CenÃ¡rio 3: Status nÃ£o mudou (idempotÃªncia)
+    # Cenário 3: Status não mudou (idempotência)
     else:
         acao = "sem_alteracao"
 
-    # Atualizar observaÃ§Ãµes adicionais se fornecidas pelo usuÃ¡rio
-    # (concatena com as automÃ¡ticas)
+    # Atualizar observações adicionais se fornecidas pelo usuário
+    # (concatena com as automáticas)
     if (
         request.parceiro_observacoes is not None
         and request.parceiro_observacoes.strip()
@@ -142,12 +142,12 @@ def toggle_parceiro(
         },
     )
 
-    # Mensagens especÃ­ficas por aÃ§Ã£o
+    # Mensagens específicas por ação
     mensagens = {
         "primeira_ativacao": f"Parceiro ativado pela primeira vez em {cliente.parceiro_desde.strftime('%d/%m/%Y')}",
         "reativacao": f"Parceiro reativado com sucesso (parceiro desde {cliente.parceiro_desde.strftime('%d/%m/%Y')})",
-        "desativacao": f"Parceiro desativado (histÃ³rico preservado desde {cliente.parceiro_desde.strftime('%d/%m/%Y') if cliente.parceiro_desde else 'N/A'})",
-        "sem_alteracao": f"Status de parceiro jÃ¡ estava como {'ativo' if cliente.parceiro_ativo else 'inativo'}",
+        "desativacao": f"Parceiro desativado (histórico preservado desde {cliente.parceiro_desde.strftime('%d/%m/%Y') if cliente.parceiro_desde else 'N/A'})",
+        "sem_alteracao": f"Status de parceiro já estava como {'ativo' if cliente.parceiro_ativo else 'inativo'}",
     }
 
     return {
@@ -179,13 +179,13 @@ def atualizar_controla_dre(
     """
     Atualizar o controle DRE de um cliente/fornecedor.
 
-    - controla_dre=True: LanÃ§amentos deste fornecedor/cliente VÃƒO para DRE (padrÃ£o)
-    - controla_dre=False: LanÃ§amentos NÃƒO vÃ£o para DRE (ex: fornecedor de produtos para revenda como Buendia)
+    - controla_dre=True: Lançamentos deste fornecedor/cliente VÃO para DRE (padrão)
+    - controla_dre=False: Lançamentos NÃO vão para DRE (ex: fornecedor de produtos para revenda como Buendia)
 
-    Quando controla_dre=False, os lanÃ§amentos deste fornecedor/cliente:
-    - NÃƒO aparecem na lista de pendentes de classificaÃ§Ã£o
-    - NÃƒO geram sugestÃµes de classificaÃ§Ã£o DRE
-    - SÃ£o automaticamente ignorados no processo de classificaÃ§Ã£o
+    Quando controla_dre=False, os lançamentos deste fornecedor/cliente:
+    - NÃO aparecem na lista de pendentes de classificação
+    - NÃO geram sugestões de classificação DRE
+    - São automaticamente ignorados no processo de classificação
     """
     current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
     cliente = _obter_cliente_ou_404(db, cliente_id, tenant_id)
@@ -230,14 +230,14 @@ def obter_custo_operacional_entregador(
     Retorna o custo operacional calculado para o entregador.
 
     Para modelo 'rateio_rh':
-    - Calcula custo_por_entrega = custo_rh_ajustado / media_entregas_real (se disponÃ­vel)
-    - SenÃ£o usa media_entregas_configurada como fallback
+    - Calcula custo_por_entrega = custo_rh_ajustado / media_entregas_real (se disponível)
+    - Senão usa media_entregas_configurada como fallback
 
     Para modelo 'taxa_fixa':
     - Retorna taxa_fixa_entrega
 
     Para modelo 'por_km':
-    - Retorna valor_por_km_entrega (frontend precisa multiplicar pela distÃ¢ncia)
+    - Retorna valor_por_km_entrega (frontend precisa multiplicar pela distância)
     """
     current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
 
@@ -254,7 +254,7 @@ def obter_custo_operacional_entregador(
 
     if not entregador:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Entregador nÃ£o encontrado"
+            status_code=status.HTTP_404_NOT_FOUND, detail="Entregador não encontrado"
         )
 
     custo_por_entrega = 0
@@ -262,10 +262,10 @@ def obter_custo_operacional_entregador(
     detalhes = {}
 
     if modelo == "rateio_rh" and entregador.controla_rh:
-        # Usar custo_rh_ajustado se disponÃ­vel
+        # Usar custo_rh_ajustado se disponível
         if entregador.custo_rh_ajustado:
             custo_rh = float(entregador.custo_rh_ajustado)
-            # Usar mÃ©dia real se disponÃ­vel, senÃ£o configurada
+            # Usar média real se disponível, senão configurada
             media_entregas = (
                 entregador.media_entregas_real
                 or entregador.media_entregas_configurada
@@ -283,7 +283,7 @@ def obter_custo_operacional_entregador(
         else:
             # Sem custo RH configurado
             custo_por_entrega = 0
-            detalhes = {"aviso": "Custo RH nÃ£o configurado"}
+            detalhes = {"aviso": "Custo RH não configurado"}
 
     elif modelo == "taxa_fixa":
         custo_por_entrega = float(entregador.taxa_fixa_entrega or 0)
@@ -293,12 +293,12 @@ def obter_custo_operacional_entregador(
         custo_por_entrega = float(entregador.valor_por_km_entrega or 0)
         detalhes = {
             "valor_por_km": custo_por_entrega,
-            "observacao": "Requer cÃ¡lculo de distÃ¢ncia no frontend",
+            "observacao": "Requer cálculo de distância no frontend",
         }
 
     else:
         # Sem modelo configurado
-        detalhes = {"aviso": "Modelo de custo nÃ£o configurado"}
+        detalhes = {"aviso": "Modelo de custo não configurado"}
 
     return {
         "entregador_id": entregador_id,

@@ -36,13 +36,13 @@ def reverter_entrada_estoque(
     user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     """
-    Reverte a entrada no estoque de uma nota jÃ¡ processada
-    Remove estoque, exclui lotes, movimentaÃ§Ãµes e contas a pagar
-    Reverte preÃ§os de custo dos produtos
+    Reverte a entrada no estoque de uma nota já processada
+    Remove estoque, exclui lotes, movimentações e contas a pagar
+    Reverte preços de custo dos produtos
     """
     current_user, tenant_id = user_and_tenant
 
-    logger.info(f"ðŸ”„ Revertendo entrada no estoque - Nota {nota_id}")
+    logger.info(f"🔄 Revertendo entrada no estoque - Nota {nota_id}")
 
     nota = (
         db.query(NotaEntrada)
@@ -52,17 +52,17 @@ def reverter_entrada_estoque(
     )
 
     if not nota:
-        raise HTTPException(status_code=404, detail="Nota nÃ£o encontrada")
+        raise HTTPException(status_code=404, detail="Nota não encontrada")
 
     if not nota.entrada_estoque_realizada and nota.status != "processada":
         raise HTTPException(
-            status_code=400, detail="Esta nota ainda nÃ£o foi processada"
+            status_code=400, detail="Esta nota ainda não foi processada"
         )
 
     acoes_nota = _carregar_acoes_processamento_nota(nota)
 
     # REVERTER CONTAS A PAGAR vinculadas a esta nota
-    logger.info("ðŸ’° Excluindo contas a pagar vinculadas...")
+    logger.info("💰 Excluindo contas a pagar vinculadas...")
     contas_pagar = (
         db.query(ContaPagar)
         .filter(
@@ -77,15 +77,15 @@ def reverter_entrada_estoque(
             db.delete(conta)
             contas_excluidas += 1
             logger.info(
-                f"   âœ… Conta excluÃ­da: {conta.descricao} - R$ {float(conta.valor_final):.2f}"
+                f"   ✅ Conta excluída: {conta.descricao} - R$ {float(conta.valor_final):.2f}"
             )
         else:
             logger.warning(
-                f"   âš ï¸ Conta JÃ PAGA nÃ£o pode ser excluÃ­da: {conta.descricao}"
+                f"   ⚠️ Conta JÁ PAGA não pode ser excluída: {conta.descricao}"
             )
 
     if contas_excluidas > 0:
-        logger.info(f"âœ… Total de contas excluÃ­das: {contas_excluidas}")
+        logger.info(f"✅ Total de contas excluídas: {contas_excluidas}")
 
     itens_revertidos = []
     produtos_precos_revertidos = set()
@@ -293,7 +293,7 @@ def reverter_entrada_estoque(
         except Exception as e_sync:
             logger.warning(f"[BLING-SYNC] Erro ao agendar sync (estorno_nfe): {e_sync}")
 
-        logger.info(f"âœ… Entrada revertida: {len(itens_revertidos)} produtos")
+        logger.info(f"✅ Entrada revertida: {len(itens_revertidos)} produtos")
 
         return {
             "message": "Entrada no estoque revertida com sucesso",
@@ -305,7 +305,7 @@ def reverter_entrada_estoque(
 
     except Exception as e:
         db.rollback()
-        logger.error(f"âŒ Erro ao reverter entrada: {str(e)}")
+        logger.error(f"❌ Erro ao reverter entrada: {str(e)}")
         raise HTTPException(
             status_code=500, detail=f"Erro ao reverter entrada: {str(e)}"
         )

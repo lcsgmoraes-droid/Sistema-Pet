@@ -23,7 +23,7 @@ export default function CategoriaFinanceiraModal({
         <div className="flex justify-between items-center p-6 border-b">
           <h3 className="text-xl font-bold">{editando ? "Editar Categoria" : "Nova Categoria"}</h3>
           <button onClick={closeCategoriaModal} className="text-gray-500 hover:text-gray-700">
-            âœ•
+            ✕
           </button>
         </div>
 

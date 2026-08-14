@@ -697,7 +697,7 @@ export function getProductImages(product) {
 export function isLikelyCorruptedText(value) {
   const text = String(value || "");
   if (!text) return false;
-  return text.includes("??") || text.includes("ï¿½") || /\?{2,}/.test(text);
+  return text.includes("??") || text.includes("�") || /\?{2,}/.test(text);
 }
 
 export function humanizeSlug(slug) {

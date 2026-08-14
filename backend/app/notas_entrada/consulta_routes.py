@@ -5,10 +5,10 @@ Upload e processamento de NF-e de fornecedores
 
 Funcionalidades:
 - Upload de XML de NF-e
-- Parser automÃ¡tico de XML
-- Matching automÃ¡tico de produtos
-- Entrada automÃ¡tica no estoque
-- GestÃ£o de produtos nÃ£o vinculados
+- Parser automático de XML
+- Matching automático de produtos
+- Entrada automática no estoque
+- Gestão de produtos não vinculados
 """
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query, Form
@@ -135,7 +135,7 @@ def listar_notas(
     total = query.count()
     notas = query.offset(offset).limit(limit).all()
 
-    logger.info(f"ðŸ“‹ {len(notas)} notas encontradas (total: {total})")
+    logger.info(f"📋 {len(notas)} notas encontradas (total: {total})")
 
     respostas = []
     for nota in notas:
@@ -187,9 +187,9 @@ def buscar_nota(
     )
 
     if not nota:
-        raise HTTPException(status_code=404, detail="Nota nÃ£o encontrada")
+        raise HTTPException(status_code=404, detail="Nota não encontrada")
 
-    # Verificar se fornecedor foi criado recentemente (Ãºltimas 24h)
+    # Verificar se fornecedor foi criado recentemente (últimas 24h)
     fornecedor_criado_automaticamente = False
     if nota.fornecedor_id:
         fornecedor = db.query(Cliente).filter(Cliente.id == nota.fornecedor_id).first()
@@ -299,13 +299,13 @@ def excluir_nota(
     nota = db.query(NotaEntrada).filter(NotaEntrada.id == nota_id).first()
 
     if not nota:
-        raise HTTPException(status_code=404, detail="Nota nÃ£o encontrada")
+        raise HTTPException(status_code=404, detail="Nota não encontrada")
 
-    # Verificar se jÃ¡ teve entrada no estoque
+    # Verificar se já teve entrada no estoque
     if nota.entrada_estoque_realizada:
         raise HTTPException(
             status_code=400,
-            detail="NÃ£o Ã© possÃ­vel excluir nota que jÃ¡ teve entrada no estoque",
+            detail="Não é possível excluir nota que já teve entrada no estoque",
         )
 
     numero_nota = nota.numero_nota
@@ -334,14 +334,14 @@ def excluir_nota(
 
     if contas_excluidas > 0:
         logger.info(
-            f"ðŸ—‘ï¸ {contas_excluidas} contas a pagar e {pagamentos_excluidos} pagamentos excluÃ­dos junto com a nota"
+            f"🗑️ {contas_excluidas} contas a pagar e {pagamentos_excluidos} pagamentos excluídos junto com a nota"
         )
 
     # Excluir nota (cascade deleta os itens automaticamente)
     db.delete(nota)
     db.commit()
 
-    logger.info(f"ðŸ—‘ï¸ Nota excluÃ­da: {numero_nota} ({total_itens} itens)")
+    logger.info(f"🗑️ Nota excluída: {numero_nota} ({total_itens} itens)")
 
     return {
         "message": "Nota excluída com sucesso",

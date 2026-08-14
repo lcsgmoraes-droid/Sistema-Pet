@@ -387,11 +387,11 @@ export default function DREView({
                 />
               </div>
 
-              {/* Seletor de Canais (removido - nÃ£o necessÃ¡rio com novo endpoint) */}
+              {/* Seletor de Canais (removido - não necessário com novo endpoint) */}
               {canaisSelecionados.length === 0 && (
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                   <p className="text-sm text-blue-800">
-                    ðŸ’¡ A DRE agora mostra automaticamente todos os canais com vendas no perÃ­odo
+                    💡 A DRE agora mostra automaticamente todos os canais com vendas no período
                     selecionado.
                   </p>
                 </div>

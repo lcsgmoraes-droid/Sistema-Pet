@@ -45,6 +45,7 @@ from app.scripts.seed_demo_operacional_data import (  # noqa: E402,F401
     FixedPayable,
     SaleScenario,
     build_demo_scenarios,
+    build_demo_showcase_sales_scenarios,
     build_fixed_payables,
     decimal_json,
     money,
@@ -70,6 +71,7 @@ from app.scripts.seed_demo_operacional_movements import (  # noqa: E402,F401
     _insert_fixed_payables,
     _insert_legacy_cashflow,
     _insert_payable_with_payment,
+    _insert_showcase_initial_stock_movement,
     _insert_stock_purchase_movements,
 )
 from app.scripts.seed_demo_operacional_payments import (  # noqa: E402,F401

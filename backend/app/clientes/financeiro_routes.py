@@ -32,7 +32,7 @@ def _obter_cliente_ou_404(db: Session, cliente_id: int, tenant_id: str):
     )
     if not cliente:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Cliente nÃ£o encontrado"
+            status_code=status.HTTP_404_NOT_FOUND, detail="Cliente não encontrado"
         )
     return cliente
 
@@ -81,7 +81,7 @@ async def get_historico_compras(
     db: Session = Depends(get_session),
     user_and_tenant=Depends(get_current_user_and_tenant),
 ):
-    """Retorna o histÃ³rico de compras do cliente"""
+    """Retorna o histórico de compras do cliente"""
     from app.vendas_models import Venda
     from sqlalchemy import desc
 
@@ -96,23 +96,23 @@ async def get_historico_compras(
         .all()
     )
 
-    # EstatÃ­sticas
+    # Estatísticas
     total_compras = len(vendas)
     total_gasto = sum(float(v.total or 0) for v in vendas if v.status == "finalizada")
     ticket_medio = total_gasto / total_compras if total_compras > 0 else 0
 
-    # Ãšltima compra
+    # Última compra
     ultima_compra = vendas[0].data_venda if vendas else None
 
     return {
         "cliente_id": cliente.id,
         "cliente_nome": cliente.nome,
-        # Campos no nÃ­vel raiz para compatibilidade com frontend
+        # Campos no nível raiz para compatibilidade com frontend
         "total_compras": total_compras,
         "valor_total_gasto": round(total_gasto, 2),
         "ticket_medio": round(ticket_medio, 2),
         "ultima_compra": ultima_compra.isoformat() if ultima_compra else None,
-        # Mantendo estatisticas tambÃ©m para compatibilidade
+        # Mantendo estatisticas também para compatibilidade
         "estatisticas": {
             "total_compras": total_compras,
             "total_gasto": round(total_gasto, 2),
@@ -231,11 +231,11 @@ async def get_vendas_em_aberto(
         if saldo > 0.01:  # Apenas vendas com saldo maior que 1 centavo
             vendas_com_saldo.append(v)
             logger.info(
-                f"  âœ… ID: {v.id} | Status: {v.status} | Total: R$ {v.total} | Pago: R$ {valor_pago} | Saldo: R$ {saldo}"
+                f"  ✅ ID: {v.id} | Status: {v.status} | Total: R$ {v.total} | Pago: R$ {valor_pago} | Saldo: R$ {saldo}"
             )
         else:
             logger.info(
-                f"  âŒ ID: {v.id} | Status: {v.status} | Saldo zerado - EXCLUÃDA"
+                f"  ❌ ID: {v.id} | Status: {v.status} | Saldo zerado - EXCLUÍDA"
             )
 
     # Usar apenas vendas com saldo
@@ -267,7 +267,7 @@ async def get_vendas_em_aberto(
         "vendas": [
             {
                 "id": v.id,
-                "numero_venda": v.numero_venda,  # NÃºmero formatado da venda (ex: 202601190004)
+                "numero_venda": v.numero_venda,  # Número formatado da venda (ex: 202601190004)
                 "data_venda": v.data_venda.isoformat()
                 if hasattr(v.data_venda, "isoformat")
                 else str(v.data_venda),
@@ -296,21 +296,21 @@ async def get_cliente_historico(
     user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     """
-    âš ï¸ **DEPRECATED** - Esta rota serÃ¡ removida em versÃ£o futura
+    ⚠️ **DEPRECATED** - Esta rota será removida em versão futura
 
     **Problemas desta rota:**
-    - âŒ Carrega TODAS as transaÃ§Ãµes em memÃ³ria (sem paginaÃ§Ã£o)
-    - âŒ Performance ruim com histÃ³rico grande (>500 transaÃ§Ãµes)
-    - âŒ Alto consumo de memÃ³ria
-    - âŒ Ordena tudo em Python (deveria ser no banco)
+    - ❌ Carrega TODAS as transações em memória (sem paginação)
+    - ❌ Performance ruim com histórico grande (>500 transações)
+    - ❌ Alto consumo de memória
+    - ❌ Ordena tudo em Python (deveria ser no banco)
 
     **Migre para as novas rotas:**
 
-    1. **Para histÃ³rico completo paginado:**
+    1. **Para histórico completo paginado:**
        ```
        GET /financeiro/cliente/{cliente_id}?page=1&per_page=20
        ```
-       - PaginaÃ§Ã£o obrigatÃ³ria
+       - Paginação obrigatória
        - Filtros: data_inicio, data_fim, tipo, status
        - Performance otimizada
 
@@ -319,29 +319,29 @@ async def get_cliente_historico(
        GET /financeiro/cliente/{cliente_id}/resumo
        ```
        - Apenas dados agregados (COUNT, SUM)
-       - Muito mais rÃ¡pido (~10-50ms vs 500-2000ms)
+       - Muito mais rápido (~10-50ms vs 500-2000ms)
        - Ideal para Step 6 do wizard
 
-    **Data de remoÃ§Ã£o planejada:** Junho/2026
+    **Data de remoção planejada:** Junho/2026
 
     ---
 
-    Retorna o histÃ³rico completo de transaÃ§Ãµes do cliente:
+    Retorna o histórico completo de transações do cliente:
     - Vendas realizadas
-    - DevoluÃ§Ãµes
+    - Devoluções
     - Contas a receber (em aberto e pagas)
     - Recebimentos
     """
     _, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
     cliente = _obter_cliente_ou_404(db, cliente_id, tenant_id)
 
-    # Importar modelos necessÃ¡rios
+    # Importar modelos necessários
     from app.vendas_models import Venda
     from app.financeiro_models import ContaReceber, Recebimento
 
     historico = []
 
-    # 1. Buscar vendas do cliente (excluir canceladas/devolvidas do histÃ³rico principal)
+    # 1. Buscar vendas do cliente (excluir canceladas/devolvidas do histórico principal)
     vendas = (
         db.query(Venda)
         .filter(
@@ -375,7 +375,7 @@ async def get_cliente_historico(
             }
         )
 
-    # 2. Buscar devoluÃ§Ãµes (vendas canceladas/devolvidas)
+    # 2. Buscar devoluções (vendas canceladas/devolvidas)
     devolucoes = (
         db.query(Venda)
         .filter(
@@ -392,7 +392,7 @@ async def get_cliente_historico(
                 "data": devolucao.data_venda.isoformat()
                 if devolucao.data_venda
                 else None,
-                "descricao": f"DevoluÃ§Ã£o - Venda #{devolucao.numero_venda}",
+                "descricao": f"Devolução - Venda #{devolucao.numero_venda}",
                 "valor": -float(devolucao.total),
                 "status": devolucao.status,
                 "detalhes": {
@@ -465,7 +465,7 @@ async def get_cliente_historico(
             }
         )
 
-    # Ordenar histÃ³rico por data (mais recente primeiro)
+    # Ordenar histórico por data (mais recente primeiro)
     historico.sort(key=lambda x: x["data"] if x["data"] else "", reverse=True)
 
     # Calcular totais

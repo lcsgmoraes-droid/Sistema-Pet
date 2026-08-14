@@ -79,7 +79,7 @@ export function usePetDetalhesController() {
       setError("");
     } catch (err) {
       console.error("Erro ao carregar pet:", err);
-      setError("Erro ao carregar informaÃ§Ãµes do pet");
+      setError("Erro ao carregar informações do pet");
     } finally {
       setLoading(false);
     }
@@ -170,7 +170,7 @@ export function usePetDetalhesController() {
       await vetApi.interpretarExameIA(exameId);
       await Promise.all([carregarExames(), carregarResumoClinico()]);
     } catch (err) {
-      alert(err.response?.data?.detail || "NÃ£o foi possÃ­vel interpretar o exame com IA");
+      alert(err.response?.data?.detail || "Não foi possível interpretar o exame com IA");
     }
   }
 

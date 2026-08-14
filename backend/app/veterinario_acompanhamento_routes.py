@@ -109,7 +109,7 @@ def registrar_vacina(
         if not consulta_ok:
             raise HTTPException(
                 status_code=404,
-                detail="Consulta vinculada nÃ£o encontrada para este pet",
+                detail="Consulta vinculada não encontrada para este pet",
             )
 
     if body.consulta_id:

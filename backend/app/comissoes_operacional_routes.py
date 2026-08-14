@@ -27,7 +27,7 @@ async def listar_itens_pendentes(
     user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     """
-    Lista itens de comissÃ£o pendentes (ainda nÃ£o fechados)
+    Lista itens de comissão pendentes (ainda não fechados)
     """
     try:
         itens = ComissoesItens.listar_pendentes(
@@ -57,7 +57,7 @@ async def listar_itens_pendentes(
 
 
 # ==========================================
-# ENDPOINTS - CONFIGURAÃ‡Ã•ES DO SISTEMA
+# ENDPOINTS - CONFIGURAÇÕES DO SISTEMA
 # ==========================================
 
 
@@ -67,7 +67,7 @@ async def get_configuracoes_sistema(
     user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     """
-    Retorna as configuraÃ§Ãµes globais do sistema de comissÃµes
+    Retorna as configurações globais do sistema de comissões
     """
     try:
         _current_user, tenant_id = user_and_tenant
@@ -76,10 +76,10 @@ async def get_configuracoes_sistema(
         return {"success": True, "data": config}
 
     except Exception as e:
-        logger.error(f"Erro ao buscar configuraÃ§Ãµes do sistema: {e}")
+        logger.error(f"Erro ao buscar configurações do sistema: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Erro ao buscar configuraÃ§Ãµes: {str(e)}",
+            detail=f"Erro ao buscar configurações: {str(e)}",
         )
 
 
@@ -90,7 +90,7 @@ async def atualizar_configuracoes_sistema(
     user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     """
-    Atualiza as configuraÃ§Ãµes globais do sistema de comissÃµes
+    Atualiza as configurações globais do sistema de comissões
     """
     try:
         _current_user, tenant_id = user_and_tenant
@@ -108,35 +108,35 @@ async def atualizar_configuracoes_sistema(
         if not success:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Nenhuma configuraÃ§Ã£o foi atualizada",
+                detail="Nenhuma configuração foi atualizada",
             )
 
         db.commit()
-        return {"success": True, "message": "ConfiguraÃ§Ãµes atualizadas com sucesso"}
+        return {"success": True, "message": "Configurações atualizadas com sucesso"}
 
     except HTTPException:
         db.rollback()
         raise
     except Exception as e:
         db.rollback()
-        logger.error(f"Erro ao atualizar configuraÃ§Ãµes: {e}")
+        logger.error(f"Erro ao atualizar configurações: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Erro ao atualizar configuraÃ§Ãµes: {str(e)}",
+            detail=f"Erro ao atualizar configurações: {str(e)}",
         )
 
 
 # ==========================================
-# ENDPOINTS - ÃRVORE DE CATEGORIAS/PRODUTOS
+# ENDPOINTS - ÁRVORE DE CATEGORIAS/PRODUTOS
 # ==========================================
 
 
 @router.get("/arvore-produtos")
 async def get_arvore_produtos(user_and_tenant=Depends(get_current_user_and_tenant)):
     """
-    Retorna uma Ã¡rvore hierÃ¡rquica de categorias > subcategorias > produtos
-    Para uso no modal de configuraÃ§Ã£o de comissÃµes
-    Suporta atÃ© 4 nÃ­veis de hierarquia de categorias
+    Retorna uma árvore hierárquica de categorias > subcategorias > produtos
+    Para uso no modal de configuração de comissões
+    Suporta até 4 níveis de hierarquia de categorias
     """
     try:
         from .db import SessionLocal
@@ -150,11 +150,11 @@ async def get_arvore_produtos(user_and_tenant=Depends(get_current_user_and_tenan
         try:
 
             def construir_arvore_recursiva(categoria_pai_id=None, nivel=1, max_nivel=4):
-                """ConstrÃ³i Ã¡rvore de categorias recursivamente"""
+                """Constrói árvore de categorias recursivamente"""
                 if nivel > max_nivel:
                     return []
 
-                # Buscar categorias deste nÃ­vel
+                # Buscar categorias deste nível
                 if categoria_pai_id is None:
                     result = execute_tenant_safe(
                         db,
@@ -226,7 +226,7 @@ async def get_arvore_produtos(user_and_tenant=Depends(get_current_user_and_tenan
 
                 return categorias
 
-            # Construir Ã¡rvore completa a partir das raÃ­zes
+            # Construir árvore completa a partir das raízes
             arvore = construir_arvore_recursiva(
                 categoria_pai_id=None, nivel=1, max_nivel=4
             )
@@ -236,7 +236,7 @@ async def get_arvore_produtos(user_and_tenant=Depends(get_current_user_and_tenan
             db.close()
 
     except Exception as e:
-        logger.error(f"Erro ao buscar Ã¡rvore de produtos: {e}")
+        logger.error(f"Erro ao buscar árvore de produtos: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Erro ao buscar produtos: {str(e)}",

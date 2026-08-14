@@ -40,7 +40,7 @@ export default function PetDetalhesExamesPanel({
                   <div>
                     <p className="font-medium text-gray-900">{exame.nome}</p>
                     <p className="text-sm text-gray-500">
-                      {exame.tipo || "Exame"} â€¢ {formatarData(exame.data_solicitacao)} â€¢{" "}
+                      {exame.tipo || "Exame"} • {formatarData(exame.data_solicitacao)} •{" "}
                       {exame.status || "-"}
                     </p>
                   </div>
@@ -56,7 +56,7 @@ export default function PetDetalhesExamesPanel({
                   )}
                 </div>
                 {exame.laboratorio && (
-                  <p className="text-sm text-gray-600 mt-2">LaboratÃ³rio: {exame.laboratorio}</p>
+                  <p className="text-sm text-gray-600 mt-2">Laboratório: {exame.laboratorio}</p>
                 )}
                 {exame.interpretacao_ia_resumo && (
                   <div className="mt-2 rounded-lg border border-cyan-200 bg-cyan-50 px-3 py-2">

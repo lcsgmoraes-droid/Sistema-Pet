@@ -150,25 +150,25 @@ class ClienteCreate(BaseModel):
     auth_user_id: Optional[int] = None
     app_access_profiles: List[str] = Field(default_factory=list)
 
-    # Pessoa FÃ­sica
+    # Pessoa Física
     cpf: Optional[str] = None
 
-    # Pessoa JurÃ­dica
+    # Pessoa Jurídica
     cnpj: Optional[str] = None
     inscricao_estadual: Optional[str] = None
     razao_social: Optional[str] = None
     nome_fantasia: Optional[str] = None
     responsavel: Optional[str] = None
 
-    # VeterinÃ¡rio
+    # Veterinário
     crmv: Optional[str] = None
 
-    # Sistema de parceiros (comissÃµes)
+    # Sistema de parceiros (comissões)
     parceiro_ativo: Optional[bool] = False
     parceiro_desde: Optional[str] = None
     parceiro_observacoes: Optional[str] = None
 
-    # EndereÃ§o
+    # Endereço
     cep: Optional[str] = None
     endereco: Optional[str] = None
     numero: Optional[str] = None
@@ -177,14 +177,14 @@ class ClienteCreate(BaseModel):
     cidade: Optional[str] = None
     estado: Optional[str] = None
 
-    # EndereÃ§os de entrega
+    # Endereços de entrega
     endereco_entrega: Optional[str] = None
     endereco_entrega_2: Optional[str] = None
     enderecos_adicionais: Optional[list] = (
-        None  # Array de endereÃ§os com tipo, apelido, etc.
+        None  # Array de endereços com tipo, apelido, etc.
     )
 
-    # ðŸšš ENTREGADOR (SPRINT 1)
+    # 🚚 ENTREGADOR (SPRINT 1)
     is_entregador: bool = False
     entregador_padrao: bool = False
     is_terceirizado: bool = False
@@ -207,11 +207,11 @@ class ClienteCreate(BaseModel):
     valor_por_km_entrega: Optional[Decimal] = None
     moto_propria: bool = True
 
-    # ðŸ“† ACERTO FINANCEIRO (ETAPA 4)
+    # 📆 ACERTO FINANCEIRO (ETAPA 4)
     tipo_acerto_entrega: Optional[str] = None  # semanal | quinzenal | mensal
     dia_semana_acerto: Optional[int] = None  # 1=segunda ... 7=domingo
     dia_mes_acerto: Optional[int] = None  # 1 a 28
-    data_ultimo_acerto: Optional[str] = None  # Data do Ãºltimo acerto (YYYY-MM-DD)
+    data_ultimo_acerto: Optional[str] = None  # Data do último acerto (YYYY-MM-DD)
 
     controla_dre: bool = True
 
@@ -289,10 +289,10 @@ class ClienteUpdate(BaseModel):
     nome_fantasia: Optional[str] = None
     responsavel: Optional[str] = None
 
-    # VeterinÃ¡rio
+    # Veterinário
     crmv: Optional[str] = None
 
-    # Sistema de parceiros (comissÃµes)
+    # Sistema de parceiros (comissões)
     parceiro_ativo: Optional[bool] = None
     parceiro_desde: Optional[str] = None
     parceiro_observacoes: Optional[str] = None
@@ -306,14 +306,14 @@ class ClienteUpdate(BaseModel):
     cidade: Optional[str] = None
     estado: Optional[str] = None
 
-    # EndereÃ§os de entrega
+    # Endereços de entrega
     endereco_entrega: Optional[str] = None
     endereco_entrega_2: Optional[str] = None
     enderecos_adicionais: Optional[list] = (
-        None  # Array de endereÃ§os com tipo, apelido, etc.
+        None  # Array de endereços com tipo, apelido, etc.
     )
 
-    # ðŸšš ENTREGADOR (SPRINT 1)
+    # 🚚 ENTREGADOR (SPRINT 1)
     is_entregador: Optional[bool] = None
     is_terceirizado: Optional[bool] = None
     recebe_repasse: Optional[bool] = None
@@ -323,7 +323,7 @@ class ClienteUpdate(BaseModel):
     valor_por_km: Optional[Decimal] = None
     recebe_comissao_entrega: Optional[bool] = None
 
-    # ðŸšš ENTREGADOR - SISTEMA COMPLETO (FASE 2)
+    # 🚚 ENTREGADOR - SISTEMA COMPLETO (FASE 2)
     entregador_ativo: Optional[bool] = None
     entregador_padrao: Optional[bool] = None
     controla_rh: Optional[bool] = None
@@ -336,15 +336,15 @@ class ClienteUpdate(BaseModel):
     valor_por_km_entrega: Optional[Decimal] = None
     moto_propria: Optional[bool] = None
 
-    # ðŸ“† ACERTO FINANCEIRO (ETAPA 4)
+    # 📆 ACERTO FINANCEIRO (ETAPA 4)
     tipo_acerto_entrega: Optional[str] = None  # semanal | quinzenal | mensal
     dia_semana_acerto: Optional[int] = None  # 1=segunda ... 7=domingo
     dia_mes_acerto: Optional[int] = None  # 1 a 28
-    data_ultimo_acerto: Optional[str] = None  # Data do Ãºltimo acerto (YYYY-MM-DD)
+    data_ultimo_acerto: Optional[str] = None  # Data do último acerto (YYYY-MM-DD)
 
-    # ðŸ“Š DRE - CONTROLE DE CLASSIFICAÃ‡ÃƒO
+    # 📊 DRE - CONTROLE DE CLASSIFICAÇÃO
     controla_dre: Optional[bool] = (
-        None  # True = vai para DRE, False = nÃ£o classifica (produtos p/ revenda)
+        None  # True = vai para DRE, False = não classifica (produtos p/ revenda)
     )
 
     observacoes: Optional[str] = None
@@ -413,10 +413,10 @@ class ClienteResponse(BaseModel):
     nome_fantasia: Optional[str] = None
     responsavel: Optional[str] = None
 
-    # VeterinÃ¡rio
+    # Veterinário
     crmv: Optional[str] = None
 
-    # Sistema de parceiros (comissÃµes)
+    # Sistema de parceiros (comissões)
     parceiro_ativo: bool = False
     parceiro_desde: Optional[dt] = None
     parceiro_observacoes: Optional[str] = None
@@ -430,12 +430,12 @@ class ClienteResponse(BaseModel):
     cidade: Optional[str] = None
     estado: Optional[str] = None
 
-    # EndereÃ§os adicionais
+    # Endereços adicionais
     endereco_entrega: Optional[str] = None
     endereco_entrega_2: Optional[str] = None
     enderecos_adicionais: Optional[list] = None
 
-    # ðŸšš ENTREGADOR (SPRINT 1)
+    # 🚚 ENTREGADOR (SPRINT 1)
     is_entregador: bool = False
     is_terceirizado: bool = False
     recebe_repasse: bool = False
@@ -445,7 +445,7 @@ class ClienteResponse(BaseModel):
     valor_por_km: Optional[Decimal] = None
     recebe_comissao_entrega: bool = False
 
-    # ðŸšš ENTREGADOR - SISTEMA COMPLETO (FASE 2)
+    # 🚚 ENTREGADOR - SISTEMA COMPLETO (FASE 2)
     entregador_ativo: bool = True
     entregador_padrao: bool = False
     controla_rh: bool = False
@@ -458,15 +458,15 @@ class ClienteResponse(BaseModel):
     valor_por_km_entrega: Optional[Decimal] = None
     moto_propria: bool = True
 
-    # ðŸ“† ACERTO FINANCEIRO (ETAPA 4)
+    # 📆 ACERTO FINANCEIRO (ETAPA 4)
     tipo_acerto_entrega: Optional[str] = None  # semanal | quinzenal | mensal
     dia_semana_acerto: Optional[int] = None  # 1=segunda ... 7=domingo
     dia_mes_acerto: Optional[int] = None  # 1 a 28
-    data_ultimo_acerto: Optional[str] = None  # Data do Ãºltimo acerto (YYYY-MM-DD)
+    data_ultimo_acerto: Optional[str] = None  # Data do último acerto (YYYY-MM-DD)
 
-    # ðŸ“Š DRE - CONTROLE DE CLASSIFICAÃ‡ÃƒO
+    # 📊 DRE - CONTROLE DE CLASSIFICAÇÃO
     controla_dre: bool = (
-        True  # True = vai para DRE, False = nÃ£o classifica (produtos p/ revenda)
+        True  # True = vai para DRE, False = não classifica (produtos p/ revenda)
     )
 
     observacoes: Optional[str] = None

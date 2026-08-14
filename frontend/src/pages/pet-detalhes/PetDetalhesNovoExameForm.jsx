@@ -36,14 +36,14 @@ export default function PetDetalhesNovoExameForm({
         type="text"
         value={novoExame.laboratorio}
         onChange={(e) => setNovoExame((prev) => ({ ...prev, laboratorio: e.target.value }))}
-        placeholder="LaboratÃ³rio ou clÃ­nica"
+        placeholder="Laboratório ou clínica"
         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
       />
       <textarea
         value={novoExame.observacoes}
         onChange={(e) => setNovoExame((prev) => ({ ...prev, observacoes: e.target.value }))}
         rows="3"
-        placeholder="ObservaÃ§Ãµes do pedido ou resultado"
+        placeholder="Observações do pedido ou resultado"
         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
       />
       <input

@@ -43,7 +43,7 @@ from .financeiro.cliente_routes import (
 from .financeiro.imobilizado_routes import router as imobilizado_router
 from .financeiro.valor_empresa_routes import router as valor_empresa_router
 
-router = APIRouter(prefix="/financeiro", tags=["Financeiro - Configura??es"])
+router = APIRouter(prefix="/financeiro", tags=["Financeiro - Configurações"])
 router.include_router(config_router)
 router.include_router(fluxo_caixa_router)
 router.include_router(cliente_router)

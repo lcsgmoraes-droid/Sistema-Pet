@@ -104,7 +104,7 @@ def processar_entrada_estoque(
     - custos_override: {"item_id": custo_unitario} para custo manual de sistema
     """
     current_user, tenant_id = user_and_tenant
-    logger.info(f"Ã°Å¸â€œÂ¦ Processando entrada no estoque - Nota {nota_id}")
+    logger.info(f"📦 Processando entrada no estoque - Nota {nota_id}")
 
     nota = (
         db.query(NotaEntrada)
@@ -145,7 +145,7 @@ def processar_entrada_estoque(
     if nota.produtos_nao_vinculados > 0:
         raise HTTPException(
             status_code=400,
-            detail=f"Existem {nota.produtos_nao_vinculados} produtos nÃƒÂ£o vinculados. "
+            detail=f"Existem {nota.produtos_nao_vinculados} produtos não vinculados. "
             "Vincule todos os produtos antes de processar.",
         )
 
@@ -216,7 +216,7 @@ def processar_entrada_estoque(
                 else item.valor_unitario
             )
             logger.info(
-                f"ðŸ“¦ Pack MANUAL no item {item.id}: x{override_mult} (qtd NF {item.quantidade} â†’ qtd entrada {quantidade_entrada})"
+                f"📦 Pack MANUAL no item {item.id}: x{override_mult} (qtd NF {item.quantidade} → qtd entrada {quantidade_entrada})"
             )
         else:
             dados_pack = calcular_quantidade_custo_efetivos(
@@ -235,7 +235,7 @@ def processar_entrada_estoque(
         if custo_unitario_manual is not None and config.atualizar_custo:
             custo_unitario_entrada = custo_unitario_manual
             logger.info(
-                f"ðŸ’° Custo manual aplicado no item {item.id}: "
+                f"💰 Custo manual aplicado no item {item.id}: "
                 f"R$ {custo_unitario_entrada:.4f} por unidade"
             )
 
@@ -253,7 +253,7 @@ def processar_entrada_estoque(
                 }
             )
             logger.info(
-                f"  âš ï¸ {item.produto.nome}: sem entrada em estoque "
+                f"  ⚠️ {item.produto.nome}: sem entrada em estoque "
                 f"(conferida: {quantidade_base_conferida}, avariada: {conferencia_item['quantidade_avariada']}, "
                 f"faltante: {conferencia_item['quantidade_faltante']})"
             )
@@ -267,11 +267,11 @@ def processar_entrada_estoque(
                 atualizar_custo=False,
             )
 
-        # Ã¢Å“â€¦ REATIVAR produto se estiver inativo
+        # ✅ REATIVAR produto se estiver inativo
         if not produto.ativo:
             produto.ativo = True
             logger.info(
-                f"  Ã¢â„¢Â»Ã¯Â¸Â  Produto reativado: {produto.codigo} - {produto.nome}"
+                f"  ♻️  Produto reativado: {produto.codigo} - {produto.nome}"
             )
 
         # Atualizar dados fiscais do produto com informacoes do XML quando vierem preenchidas.
@@ -284,7 +284,7 @@ def processar_entrada_estoque(
 
         _aplicar_codigos_barras_item_no_produto(produto, item)
 
-        # Ã¢Å“â€¦ VINCULAR ao fornecedor da nota
+        # ✅ VINCULAR ao fornecedor da nota
         if nota.fornecedor_id:
             vinculo_existente = (
                 db.query(ProdutoFornecedor)
@@ -306,16 +306,16 @@ def processar_entrada_estoque(
                 )
                 db.add(novo_vinculo)
                 logger.info(
-                    f"  Ã°Å¸â€â€” Produto {produto.codigo} vinculado ao fornecedor {nota.fornecedor_id}"
+                    f"  🔗 Produto {produto.codigo} vinculado ao fornecedor {nota.fornecedor_id}"
                 )
             else:
-                # Reativar vÃƒÂ­nculo se estiver inativo
+                # Reativar vínculo se estiver inativo
                 if not vinculo_existente.ativo:
                     vinculo_existente.ativo = True
                     logger.info(
-                        f"  Ã¢â„¢Â»Ã¯Â¸Â  VÃƒÂ­nculo de fornecedor reativado: {produto.codigo}"
+                        f"  ♻️  Vínculo de fornecedor reativado: {produto.codigo}"
                     )
-                # Atualizar preÃƒÂ§o de custo no vÃƒÂ­nculo
+                # Atualizar preço de custo no vínculo
                 if config.atualizar_custo:
                     vinculo_existente.preco_custo = custo_unitario_entrada
 
@@ -371,7 +371,7 @@ def processar_entrada_estoque(
         estoque_anterior = produto.estoque_atual or 0
         produto.estoque_atual = estoque_anterior + quantidade_entrada
 
-        # Atualizar preÃƒÂ§o de custo e registrar histÃƒÂ³rico
+        # Atualizar preço de custo e registrar histórico
         preco_custo_anterior = produto.preco_custo or 0
         preco_venda_anterior = produto.preco_venda or 0
         margem_anterior = (
@@ -394,7 +394,7 @@ def processar_entrada_estoque(
             else 0
         )
 
-        # Registrar histÃƒÂ³rico de preÃƒÂ§o se houve alteraÃƒÂ§ÃƒÂ£o
+        # Registrar histórico de preço se houve alteração
         if alterou_custo:
             variacao_custo = (
                 (
@@ -415,7 +415,7 @@ def processar_entrada_estoque(
                 margem_anterior=margem_anterior,
                 margem_nova=margem_nova,
                 variacao_custo_percentual=variacao_custo,
-                variacao_venda_percentual=0,  # PreÃƒÂ§o de venda nÃƒÂ£o mudou
+                variacao_venda_percentual=0,  # Preço de venda não mudou
                 motivo="nfe_entrada",
                 nota_entrada_id=nota.id,
                 referencia=f"NF-e {nota.numero_nota}",
@@ -430,8 +430,8 @@ def processar_entrada_estoque(
             db.add(historico)
 
             logger.info(
-                f"  Ã°Å¸â€œÅ  HistÃƒÂ³rico registrado: {produto.nome} - "
-                f"Custo R$ {preco_custo_anterior:.2f} Ã¢â€ â€™ R$ {produto.preco_custo:.2f} "
+                f"  📊 Histórico registrado: {produto.nome} - "
+                f"Custo R$ {preco_custo_anterior:.2f} → R$ {produto.preco_custo:.2f} "
                 f"({variacao_custo:+.2f}%)"
             )
 
@@ -503,15 +503,15 @@ def processar_entrada_estoque(
         )
 
         logger.info(
-            f"  Ã¢Å“â€¦ {produto.nome}: +{quantidade_entrada} unidades "
+            f"  ✅ {produto.nome}: +{quantidade_entrada} unidades "
             f"em {len(lotes_criados)} lote(s) "
-            f"(estoque: {estoque_anterior} Ã¢â€ â€™ {produto.estoque_atual})"
+            f"(estoque: {estoque_anterior} → {produto.estoque_atual})"
         )
 
         if multiplicador_pack > 1:
             logger.info(
-                f"  Ã°Å¸â€œÂ¦ Pack detectado automaticamente no item {item.numero_item}: "
-                f"x{multiplicador_pack} (qtd NF {item.quantidade} Ã¢â€ â€™ qtd entrada {quantidade_entrada})"
+                f"  📦 Pack detectado automaticamente no item {item.numero_item}: "
+                f"x{multiplicador_pack} (qtd NF {item.quantidade} → qtd entrada {quantidade_entrada})"
             )
 
     resumo_conferencia = _resumir_conferencia_nota(nota)
@@ -530,7 +530,7 @@ def processar_entrada_estoque(
     nota.entrada_estoque_realizada = bool(acoes_realizadas_finais["lancar_estoque"])
     nota.processada_em = datetime.utcnow()
 
-    # CRIAR CONTAS A PAGAR apÃƒÂ³s processar estoque
+    # CRIAR CONTAS A PAGAR após processar estoque
     contas_ids = []
     if config.gerar_contas_pagar:
         try:
@@ -539,7 +539,7 @@ def processar_entrada_estoque(
             contas_ids = criar_contas_pagar_da_nota(
                 nota, dados_xml, db, current_user.id, tenant_id
             )
-            logger.info(f"Ã°Å¸â€™Â° {len(contas_ids)} contas a pagar criadas")
+            logger.info(f"💰 {len(contas_ids)} contas a pagar criadas")
         except Exception as exc:
             db.rollback()
             logger.exception("Erro ao criar contas a pagar da NF %s", nota.numero_nota)
@@ -566,7 +566,7 @@ def processar_entrada_estoque(
     except Exception as e_sync:
         logger.warning(f"[BLING-SYNC] Erro ao agendar sync (entrada_nfe): {e_sync}")
 
-    # VERIFICAR E NOTIFICAR PENDÃŠNCIAS DE ESTOQUE
+    # VERIFICAR E NOTIFICAR PENDÊNCIAS DE ESTOQUE
     from app.services.pendencia_estoque_service import verificar_e_notificar_pendencias
 
     try:
@@ -587,9 +587,9 @@ def processar_entrada_estoque(
                 )
     except Exception as e:
         logger.error(f"Erro ao notificar pendencias: {str(e)}")
-        # NÃ£o abortar, apenas logar o erro
+        # Não abortar, apenas logar o erro
 
-    logger.info(f"Ã¢Å“â€¦ Entrada processada: {len(itens_processados)} produtos")
+    logger.info(f"✅ Entrada processada: {len(itens_processados)} produtos")
 
     return {
         "message": "Movimentos da NF processados com sucesso",

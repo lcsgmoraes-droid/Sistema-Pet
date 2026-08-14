@@ -343,14 +343,17 @@ const GerenciamentoPets = () => {
 
       {/* Erro */}
       {error && (
-        <div className="mb-6 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg flex items-center gap-2">
+        <div className="mb-6 flex flex-wrap items-center gap-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-red-700">
           <AlertCircle size={18} />
-          {error}
+          <span className="flex-1">{error}</span>
+          <ActionButton type="button" intent="delete" tone="soft" size="sm" onClick={loadPets}>
+            Tentar novamente
+          </ActionButton>
         </div>
       )}
 
       {/* Lista de pets */}
-      {pets.length === 0 ? (
+      {!error && pets.length === 0 ? (
         <EmptyState
           icon={PawPrint}
           title="Nenhum pet encontrado"
@@ -370,7 +373,7 @@ const GerenciamentoPets = () => {
             </ActionButton>
           }
         />
-      ) : (
+      ) : !error ? (
         <div className="grid auto-rows-fr grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
           {pets.map((pet) => {
             const infoRows = [
@@ -456,7 +459,7 @@ const GerenciamentoPets = () => {
             );
           })}
         </div>
-      )}
+      ) : null}
 
       {/* Resumo */}
       {pets.length > 0 && (

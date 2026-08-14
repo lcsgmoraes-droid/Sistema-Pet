@@ -54,7 +54,7 @@ class ProdutoKitComponente(BaseTenantModel):
     Define quais produtos fazem parte de um KIT e em que quantidade.
     Exemplo: Kit Banho = Shampoo (1un) + Condicionador (1un) + Toalha (2un)
 
-    ?? RESTRI��ES DE DOM�NIO (OBRIGAT�RIAS):
+    ?? RESTRIÇÕES DE DOMÍNIO (OBRIGATÓRIAS):
     ========================================
 
     1. kit_id - DEVE referenciar Produto com tipo_produto='KIT'
@@ -63,25 +63,25 @@ class ProdutoKitComponente(BaseTenantModel):
     2. produto_componente_id - DEVE referenciar:
        ? Produtos com tipo_produto='SIMPLES'
        ? Produtos com tipo_produto='VARIACAO'
-       ? PROIBIDO: tipo_produto='KIT' (KIT n�o pode conter outro KIT)
-       ? PROIBIDO: tipo_produto='PAI' (PAI n�o � vend�vel/utiliz�vel)
+       ? PROIBIDO: tipo_produto='KIT' (KIT não pode conter outro KIT)
+       ❌ PROIBIDO: tipo_produto='PAI' (PAI não é vendável/utilizável)
 
     3. quantidade - DEVE ser maior que 0 (zero)
 
-    4. Produto componente N�O pode ser o pr�prio KIT (evitar recurs�o)
+    4. Produto componente NÃO pode ser o próprio KIT (evitar recursão)
 
     Comportamento por tipo_kit:
     - VIRTUAL: Custo do KIT = soma(componente.preco_custo * quantidade)
-    - FISICO: Custo do KIT = preco_custo do pr�prio KIT (ignora componentes para custo)
+    - FISICO: Custo do KIT = preco_custo do próprio KIT (ignora componentes para custo)
 
-    ?? VALIDA��ES devem ser implementadas na camada de Service (kit_custo_service.py)
+    ?? VALIDAÇÕES devem ser implementadas na camada de Service (kit_custo_service.py)
     """
 
     __tablename__ = "produto_kit_componentes"
     __table_args__ = (
         Index("idx_kit_componentes_kit", "kit_id"),
         Index("idx_kit_componentes_produto", "produto_componente_id"),
-        # Um produto n�o pode ser componente duplicado no mesmo kit
+        # Um produto não pode ser componente duplicado no mesmo kit
         Index(
             "idx_kit_componentes_unique", "kit_id", "produto_componente_id", unique=True
         ),
@@ -90,22 +90,22 @@ class ProdutoKitComponente(BaseTenantModel):
 
     id = Column(Integer, primary_key=True)
 
-    # ?? PROTE��O: kit_id DEVE ser tipo_produto='KIT'
+    # ?? PROTEÇÃO: kit_id DEVE ser tipo_produto='KIT'
     kit_id = Column(
         Integer, ForeignKey("produtos.id", ondelete="CASCADE"), nullable=False
     )
 
-    # ?? PROTE��O: produto_componente_id DEVE ser tipo_produto IN ('SIMPLES', 'VARIACAO')
-    # ? N�O aceitar tipo_produto='KIT' ou 'PAI'
+    # ?? PROTEÇÃO: produto_componente_id DEVE ser tipo_produto IN ('SIMPLES', 'VARIACAO')
+    # ? NÃO aceitar tipo_produto='KIT' ou 'PAI'
     produto_componente_id = Column(Integer, ForeignKey("produtos.id"), nullable=False)
 
     # Quantidade do componente no KIT
     quantidade = Column(Float, nullable=False, default=1.0)
 
-    # Componente � opcional? (para kits customiz�veis no futuro)
+    # Componente é opcional? (para kits customizáveis no futuro)
     opcional = Column(Boolean, default=False)
 
-    # Ordem de exibi��o
+    # Ordem de exibição
     ordem = Column(Integer, default=0)
 
     # Auditoria
@@ -191,9 +191,9 @@ class ProdutoLote(BaseTenantModel):
         Integer, ForeignKey("produtos.id", ondelete="CASCADE"), nullable=False
     )
 
-    # ========== SPRINT 2: SUPORTE A VARIA��ES ==========
-    # CORRIGIDO: N�o existe tabela product_variations separada
-    # Varia��es s�o produtos com tipo_produto='VARIACAO' na tabela produtos
+    # ========== SPRINT 2: SUPORTE A VARIAÇÕES ==========
+    # CORRIGIDO: Não existe tabela product_variations separada
+    # Variações são produtos com tipo_produto='VARIACAO' na tabela produtos
     product_variation_id = Column(
         Integer, nullable=True
     )  # ?? DEPRECATED: usar produto_id
@@ -220,7 +220,7 @@ class ProdutoLote(BaseTenantModel):
     # Relationships
     produto = relationship("Produto", back_populates="lotes")
 
-    # ========== SPRINT 2: SUPORTE A VARIA��ES ==========
+    # ========== SPRINT 2: SUPORTE A VARIAÇÕES ==========
     # ? DESABILITADO: ProductVariation removido - causava conflitos
     # variation = relationship("ProductVariation", backref="lotes")
 
@@ -440,7 +440,7 @@ class EstoqueMovimentacao(BaseTenantModel):
 
 
 class ProdutoBlingSync(BaseTenantModel):
-    """Sincroniza��o de produtos com Bling"""
+    """Sincronização de produtos com Bling"""
 
     __tablename__ = "produto_bling_sync"
     __table_args__ = {"extend_existing": True}

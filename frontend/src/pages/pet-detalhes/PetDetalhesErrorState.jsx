@@ -5,7 +5,7 @@ export default function PetDetalhesErrorState({ error, onBack }) {
     <div className="p-6">
       <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg flex items-center gap-2">
         <FiAlertCircle />
-        {error || "Pet nÃ£o encontrado"}
+        {error || "Pet não encontrado"}
       </div>
       <button
         onClick={onBack}

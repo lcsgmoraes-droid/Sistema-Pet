@@ -65,13 +65,13 @@ def criar_categoria(
             .first()
         )
         if not pai:
-            raise HTTPException(status_code=404, detail="Categoria pai nÃ£o encontrada")
+            raise HTTPException(status_code=404, detail="Categoria pai não encontrada")
 
-        # Verificar nÃ­vel mÃ¡ximo (4 nÃ­veis)
+        # Verificar nível máximo (4 níveis)
         nivel_pai = calcular_nivel(db, categoria.categoria_pai_id)
         if nivel_pai >= 4:
             raise HTTPException(
-                status_code=400, detail="Limite de 4 nÃ­veis de categorias atingido"
+                status_code=400, detail="Limite de 4 níveis de categorias atingido"
             )
 
     # Criar categoria
@@ -95,12 +95,12 @@ def listar_categorias(
     user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     """
-    Lista todas as categorias (o frontend constrÃ³i a hierarquia)
+    Lista todas as categorias (o frontend constrói a hierarquia)
     """
     current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
 
-    # Retornar TODAS as categorias ativas do usuÃ¡rio
-    # O frontend vai construir a Ã¡rvore hierÃ¡rquica
+    # Retornar TODAS as categorias ativas do usuário
+    # O frontend vai construir a árvore hierárquica
     query = db.query(Categoria).filter(
         Categoria.tenant_id == tenant_id, Categoria.ativo.is_(True)
     )
@@ -145,7 +145,7 @@ def listar_categorias(
 
     niveis_por_categoria = _calcular_niveis_categorias(categoria_por_id)
 
-    # Calcular nÃ­vel e contadores para cada categoria sem N+1
+    # Calcular nível e contadores para cada categoria sem N+1
     resultado = []
     for cat in categorias:
         cat_dict = {
@@ -171,7 +171,7 @@ def listar_categorias(
 
 
 def calcular_nivel(db: Session, categoria_id: int, nivel: int = 1) -> int:
-    """Calcula o nÃ­vel de uma categoria na hierarquia"""
+    """Calcula o nível de uma categoria na hierarquia"""
     categoria = db.query(Categoria).filter(Categoria.id == categoria_id).first()
     if not categoria or not categoria.categoria_pai_id:
         return nivel
@@ -184,7 +184,7 @@ def listar_categorias_hierarquia(
     db: Session = Depends(get_session),
     user_and_tenant=Depends(get_current_user_and_tenant),
 ):
-    """Lista todas as categorias em formato de Ã¡rvore hierÃ¡rquica"""
+    """Lista todas as categorias em formato de árvore hierárquica"""
 
     current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
 
@@ -206,7 +206,7 @@ def obter_categoria(
     db: Session = Depends(get_session),
     user_and_tenant=Depends(get_current_user_and_tenant),
 ):
-    """ObtÃ©m detalhes de uma categoria"""
+    """Obtém detalhes de uma categoria"""
 
     current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
 
@@ -221,7 +221,7 @@ def obter_categoria(
     )
 
     if not categoria:
-        raise HTTPException(status_code=404, detail="Categoria nÃ£o encontrada")
+        raise HTTPException(status_code=404, detail="Categoria não encontrada")
 
     return categoria
 
@@ -249,17 +249,17 @@ def atualizar_categoria(
     )
 
     if not categoria:
-        raise HTTPException(status_code=404, detail="Categoria nÃ£o encontrada")
+        raise HTTPException(status_code=404, detail="Categoria não encontrada")
 
     # Verificar se categoria pai existe (se fornecida e diferente)
     if (
         categoria_update.categoria_pai_id
         and categoria_update.categoria_pai_id != categoria.categoria_pai_id
     ):
-        # NÃ£o permitir que categoria seja filha de si mesma
+        # Não permitir que categoria seja filha de si mesma
         if categoria_update.categoria_pai_id == categoria_id:
             raise HTTPException(
-                status_code=400, detail="Categoria nÃ£o pode ser pai de si mesma"
+                status_code=400, detail="Categoria não pode ser pai de si mesma"
             )
 
         pai = (
@@ -272,7 +272,7 @@ def atualizar_categoria(
             .first()
         )
         if not pai:
-            raise HTTPException(status_code=404, detail="Categoria pai nÃ£o encontrada")
+            raise HTTPException(status_code=404, detail="Categoria pai não encontrada")
 
     # Atualizar campos
     for key, value in categoria_update.model_dump(exclude_unset=True).items():
@@ -308,7 +308,7 @@ def deletar_categoria(
     )
 
     if not categoria:
-        raise HTTPException(status_code=404, detail="Categoria nÃ£o encontrada")
+        raise HTTPException(status_code=404, detail="Categoria não encontrada")
 
     # Verificar se categoria tem subcategorias
     subcategorias = (
@@ -411,7 +411,7 @@ def obter_marca(
     db: Session = Depends(get_session),
     user_and_tenant=Depends(get_current_user_and_tenant),
 ):
-    """ObtÃ©m detalhes de uma marca"""
+    """Obtém detalhes de uma marca"""
     current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
     marca = _obter_marca_ou_404(db, marca_id, tenant_id)
     return marca
@@ -430,7 +430,7 @@ def atualizar_marca(
     marca = _obter_marca_ou_404(db, marca_id, tenant_id)
 
     if not marca:
-        raise HTTPException(status_code=404, detail="Marca nÃ£o encontrada")
+        raise HTTPException(status_code=404, detail="Marca não encontrada")
 
     for key, value in marca_update.model_dump(exclude_unset=True).items():
         setattr(marca, key, value)
@@ -462,7 +462,7 @@ def deletar_marca(
     )
 
     if not marca:
-        raise HTTPException(status_code=404, detail="Marca nÃ£o encontrada")
+        raise HTTPException(status_code=404, detail="Marca não encontrada")
 
     # Verificar se marca tem produtos
     produtos_count = (
@@ -553,7 +553,7 @@ def obter_departamento(
     db: Session = Depends(get_session),
     user_and_tenant=Depends(get_current_user_and_tenant),
 ):
-    """ObtÃ©m um departamento por ID"""
+    """Obtém um departamento por ID"""
 
     current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
 
@@ -568,7 +568,7 @@ def obter_departamento(
     )
 
     if not departamento:
-        raise HTTPException(status_code=404, detail="Departamento nÃ£o encontrado")
+        raise HTTPException(status_code=404, detail="Departamento não encontrado")
 
     return departamento
 
@@ -596,7 +596,7 @@ def atualizar_departamento(
     )
 
     if not departamento:
-        raise HTTPException(status_code=404, detail="Departamento nÃ£o encontrado")
+        raise HTTPException(status_code=404, detail="Departamento não encontrado")
 
     for key, value in departamento_update.model_dump(exclude_unset=True).items():
         setattr(departamento, key, value)
@@ -633,7 +633,7 @@ def deletar_departamento(
     )
 
     if not departamento:
-        raise HTTPException(status_code=404, detail="Departamento nÃ£o encontrado")
+        raise HTTPException(status_code=404, detail="Departamento não encontrado")
 
     # Verificar se departamento tem produtos
     produtos_count = (

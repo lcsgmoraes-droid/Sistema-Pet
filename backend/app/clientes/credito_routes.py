@@ -27,7 +27,7 @@ def _obter_cliente_ou_404(db: Session, cliente_id: int, tenant_id: str):
     )
     if not cliente:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Cliente n??o encontrado"
+            status_code=status.HTTP_404_NOT_FOUND, detail="Cliente não encontrado"
         )
     return cliente
 
@@ -45,7 +45,7 @@ def remover_campo_duplicado(
 ):
     """
     Remove campo duplicado (telefone/celular/CPF) de um cliente antigo
-    e adiciona observaÃ§Ã£o sobre a remoÃ§Ã£o.
+    e adiciona observação sobre a remoção.
     """
     current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
 
@@ -53,16 +53,16 @@ def remover_campo_duplicado(
     if campo not in ["telefone", "celular", "cpf", "cnpj"]:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Campo invÃ¡lido. Use: telefone, celular, cpf ou cnpj",
+            detail="Campo inválido. Use: telefone, celular, cpf ou cnpj",
         )
 
     # Buscar cliente antigo
     cliente = _obter_cliente_ou_404(db, cliente_id, tenant_id)
 
-    # Validar que estÃ¡ ativo
+    # Validar que está ativo
     if not cliente.ativo:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Cliente nÃ£o encontrado"
+            status_code=status.HTTP_404_NOT_FOUND, detail="Cliente não encontrado"
         )
 
     # Guardar valor antigo para log
@@ -71,9 +71,9 @@ def remover_campo_duplicado(
     # Remover o campo
     setattr(cliente, campo, None)
 
-    # Adicionar observaÃ§Ã£o
+    # Adicionar observação
     observacao_atual = cliente.observacoes or ""
-    nova_observacao = f"[SISTEMA] {campo.capitalize()} removido (valor anterior: {valor_antigo}) - Transferido para cadastro do cliente cÃ³digo {novo_cliente_codigo}"
+    nova_observacao = f"[SISTEMA] {campo.capitalize()} removido (valor anterior: {valor_antigo}) - Transferido para cadastro do cliente código {novo_cliente_codigo}"
 
     if observacao_atual:
         cliente.observacoes = f"{observacao_atual}\n\n{nova_observacao}"
@@ -102,7 +102,7 @@ def remover_campo_duplicado(
 
 
 # ============================================================================
-# GERENCIAMENTO DE CRÃ‰DITO
+# GERENCIAMENTO DE CRÉDITO
 # ============================================================================
 
 
@@ -113,7 +113,7 @@ def adicionar_credito(
     db: Session = Depends(get_session),
     user_and_tenant=Depends(get_current_user_and_tenant),
 ):
-    """Adiciona crÃ©dito ao saldo do cliente"""
+    """Adiciona crédito ao saldo do cliente"""
     from decimal import Decimal
 
     current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
@@ -121,7 +121,7 @@ def adicionar_credito(
 
     if not cliente.ativo:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Cliente nÃ£o encontrado"
+            status_code=status.HTTP_404_NOT_FOUND, detail="Cliente não encontrado"
         )
 
     if dados.valor <= 0:
@@ -163,7 +163,7 @@ def adicionar_credito(
     )
 
     return {
-        "message": "CrÃ©dito adicionado com sucesso",
+        "message": "Crédito adicionado com sucesso",
         "cliente_id": cliente.id,
         "cliente_nome": cliente.nome,
         "credito_anterior": credito_anterior,
@@ -180,7 +180,7 @@ def remover_credito(
     db: Session = Depends(get_session),
     user_and_tenant=Depends(get_current_user_and_tenant),
 ):
-    """Remove crÃ©dito do saldo do cliente"""
+    """Remove crédito do saldo do cliente"""
     from decimal import Decimal
 
     current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
@@ -188,7 +188,7 @@ def remover_credito(
 
     if not cliente.ativo:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Cliente nÃ£o encontrado"
+            status_code=status.HTTP_404_NOT_FOUND, detail="Cliente não encontrado"
         )
 
     if dados.valor <= 0:
@@ -202,7 +202,7 @@ def remover_credito(
     if dados.valor > credito_atual:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Valor a remover (R$ {dados.valor:.2f}) excede o crÃ©dito disponÃ­vel (R$ {credito_atual:.2f})",
+            detail=f"Valor a remover (R$ {dados.valor:.2f}) excede o crédito disponível (R$ {credito_atual:.2f})",
         )
 
     from app.models import CreditoLog
@@ -238,7 +238,7 @@ def remover_credito(
     )
 
     return {
-        "message": "CrÃ©dito removido com sucesso",
+        "message": "Crédito removido com sucesso",
         "cliente_id": cliente.id,
         "cliente_nome": cliente.nome,
         "credito_anterior": credito_atual,
@@ -249,7 +249,7 @@ def remover_credito(
 
 
 # ============================================================================
-# HISTÃ“RICO DE COMPRAS
+# HISTÓRICO DE COMPRAS
 # ============================================================================
 
 

@@ -33,9 +33,9 @@ def listar_variacoes_produto(
     user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     """
-    Lista todas as variaÃ§Ãµes de um produto PAI
+    Lista todas as variações de um produto PAI
 
-    Sprint 2: Lazy load de variaÃ§Ãµes
+    Sprint 2: Lazy load de variações
     - Usado para expandir produto PAI na listagem
     - Retorna apenas produtos filhos (tipo_produto = 'VARIACAO')
     - Ordenado por nome
@@ -43,7 +43,7 @@ def listar_variacoes_produto(
 
     current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
 
-    # Verificar se produto existe e Ã© PAI
+    # Verificar se produto existe e é PAI
     produto_pai = (
         db.query(Produto)
         .filter(Produto.id == produto_id, Produto.tenant_id == tenant_id)
@@ -51,21 +51,21 @@ def listar_variacoes_produto(
     )
 
     if not produto_pai:
-        raise HTTPException(status_code=404, detail="Produto nÃ£o encontrado")
+        raise HTTPException(status_code=404, detail="Produto não encontrado")
 
     if produto_pai.tipo_produto != "PAI":
         raise HTTPException(
             status_code=400,
-            detail="Produto nÃ£o Ã© do tipo PAI (nÃ£o possui variaÃ§Ãµes)",
+            detail="Produto não é do tipo PAI (não possui variações)",
         )
 
-    # Buscar variaÃ§Ãµes
+    # Buscar variações
     variacoes = (
         db.query(Produto)
         .filter(
             Produto.produto_pai_id == produto_id,
             Produto.tipo_produto == "VARIACAO",
-            Produto.ativo.is_(True),  # Filtrar apenas variaÃ§Ãµes ativas
+            Produto.ativo.is_(True),  # Filtrar apenas variações ativas
             Produto.tenant_id == tenant_id,
         )
         .options(joinedload(Produto.imagens), joinedload(Produto.lotes))
@@ -74,7 +74,7 @@ def listar_variacoes_produto(
     )
 
     logger.info(
-        f"ðŸ“¦ Produto PAI #{produto_id} possui {len(variacoes)} variaÃ§Ãµes ativas"
+        f"📦 Produto PAI #{produto_id} possui {len(variacoes)} variações ativas"
     )
 
     return variacoes
@@ -87,13 +87,13 @@ def listar_variacoes_excluidas(
     user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     """
-    Lista variaÃ§Ãµes excluÃ­das (soft-deleted) de um produto PAI
+    Lista variações excluídas (soft-deleted) de um produto PAI
     Permite visualizar, restaurar ou excluir definitivamente
     """
 
     _, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
 
-    # Verificar se produto existe e Ã© PAI
+    # Verificar se produto existe e é PAI
     produto_pai = (
         db.query(Produto)
         .filter(Produto.id == produto_id, Produto.tenant_id == tenant_id)
@@ -101,21 +101,21 @@ def listar_variacoes_excluidas(
     )
 
     if not produto_pai:
-        raise HTTPException(status_code=404, detail="Produto nÃ£o encontrado")
+        raise HTTPException(status_code=404, detail="Produto não encontrado")
 
     if produto_pai.tipo_produto != "PAI":
         raise HTTPException(
             status_code=400,
-            detail="Produto nÃ£o Ã© do tipo PAI (nÃ£o possui variaÃ§Ãµes)",
+            detail="Produto não é do tipo PAI (não possui variações)",
         )
 
-    # Buscar variaÃ§Ãµes excluÃ­das
+    # Buscar variações excluídas
     variacoes_excluidas = (
         db.query(Produto)
         .filter(
             Produto.produto_pai_id == produto_id,
             Produto.tipo_produto == "VARIACAO",
-            Produto.ativo.is_(False),  # Apenas inativas (excluÃ­das)
+            Produto.ativo.is_(False),  # Apenas inativas (excluídas)
             Produto.tenant_id == tenant_id,
         )
         .options(joinedload(Produto.imagens), joinedload(Produto.lotes))
@@ -124,7 +124,7 @@ def listar_variacoes_excluidas(
     )
 
     logger.info(
-        f"ðŸ—‘ï¸ Produto PAI #{produto_id} possui {len(variacoes_excluidas)} variaÃ§Ãµes excluÃ­das"
+        f"🗑️ Produto PAI #{produto_id} possui {len(variacoes_excluidas)} variações excluídas"
     )
 
     return variacoes_excluidas
@@ -137,7 +137,7 @@ def restaurar_variacao(
     user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     """
-    Restaura uma variaÃ§Ã£o excluÃ­da (reativa)
+    Restaura uma variação excluída (reativa)
     """
 
     _, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
@@ -153,10 +153,10 @@ def restaurar_variacao(
     )
 
     if not produto:
-        raise HTTPException(status_code=404, detail="VariaÃ§Ã£o nÃ£o encontrada")
+        raise HTTPException(status_code=404, detail="Variação não encontrada")
 
     if produto.ativo:
-        raise HTTPException(status_code=400, detail="VariaÃ§Ã£o jÃ¡ estÃ¡ ativa")
+        raise HTTPException(status_code=400, detail="Variação já está ativa")
 
     # Restaurar
     _aplicar_status_ativo_produto(produto, True)
@@ -164,7 +164,7 @@ def restaurar_variacao(
     db.commit()
     db.refresh(produto)
 
-    logger.info(f"â™»ï¸ VariaÃ§Ã£o #{produto_id} restaurada com sucesso")
+    logger.info(f"♻️ Variação #{produto_id} restaurada com sucesso")
 
     return produto
 
@@ -224,8 +224,8 @@ def excluir_variacao_permanentemente(
     user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     """
-    Exclui DEFINITIVAMENTE uma variaÃ§Ã£o do banco de dados
-    ATENÃ‡ÃƒO: Esta aÃ§Ã£o Ã© irreversÃ­vel!
+    Exclui DEFINITIVAMENTE uma variação do banco de dados
+    ATENÇÃO: Esta ação é irreversível!
     """
 
     current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
@@ -241,12 +241,12 @@ def excluir_variacao_permanentemente(
     )
 
     if not produto:
-        raise HTTPException(status_code=404, detail="VariaÃ§Ã£o nÃ£o encontrada")
+        raise HTTPException(status_code=404, detail="Variação não encontrada")
 
     if produto.ativo:
         raise HTTPException(
             status_code=400,
-            detail="NÃ£o Ã© possÃ­vel excluir permanentemente uma variaÃ§Ã£o ativa. Exclua-a primeiro (soft delete).",
+            detail="Não é possível excluir permanentemente uma variação ativa. Exclua-a primeiro (soft delete).",
         )
 
     # Excluir DEFINITIVAMENTE
@@ -254,7 +254,7 @@ def excluir_variacao_permanentemente(
     db.commit()
 
     logger.warning(
-        f"âš ï¸ VariaÃ§Ã£o #{produto_id} EXCLUÃDA PERMANENTEMENTE do banco de dados"
+        f"⚠️ Variação #{produto_id} EXCLUÍDA PERMANENTEMENTE do banco de dados"
     )
 
     return None

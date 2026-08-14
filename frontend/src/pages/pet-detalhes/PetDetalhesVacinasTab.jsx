@@ -30,7 +30,7 @@ export default function PetDetalhesVacinasTab({
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-xl font-bold text-gray-900">Carteira de VacinaÃ§Ã£o</h2>
+        <h2 className="text-xl font-bold text-gray-900">Carteira de Vacinação</h2>
         <button
           onClick={onRegistrarVacina}
           className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors text-sm font-medium"
@@ -79,13 +79,13 @@ export default function PetDetalhesVacinasTab({
           type="text"
           value={filtroVacinas}
           onChange={(e) => setFiltroVacinas(e.target.value)}
-          placeholder="Filtrar por vacina, fabricante, lote ou veterinÃ¡rio..."
+          placeholder="Filtrar por vacina, fabricante, lote ou veterinário..."
           className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
         />
       </div>
 
       {loadingVacinas ? (
-        <div className="text-center py-10 text-gray-500">Carregando histÃ³rico de vacinas...</div>
+        <div className="text-center py-10 text-gray-500">Carregando histórico de vacinas...</div>
       ) : vacinasFiltradas.length === 0 ? (
         <div className="text-center py-12 text-gray-500 border border-gray-200 rounded-lg bg-gray-50">
           Nenhuma vacina encontrada com esse filtro.
@@ -101,10 +101,10 @@ export default function PetDetalhesVacinasTab({
               <p className="text-sm text-gray-600">Fabricante: {vacina.fabricante || "-"}</p>
               <p className="text-sm text-gray-600">Lote: {vacina.lote || "-"}</p>
               <p className="text-sm text-gray-600">
-                PrÃ³xima dose: {formatarData(vacina.proxima_dose || vacina.data_proxima_dose)}
+                Próxima dose: {formatarData(vacina.proxima_dose || vacina.data_proxima_dose)}
               </p>
               <p className="text-sm text-gray-600">
-                VeterinÃ¡rio: {vacina.veterinario_responsavel || vacina.veterinario_nome || "-"}
+                Veterinário: {vacina.veterinario_responsavel || vacina.veterinario_nome || "-"}
               </p>
               {vacina.observacoes && (
                 <p className="text-sm text-gray-700 mt-1">Obs.: {vacina.observacoes}</p>

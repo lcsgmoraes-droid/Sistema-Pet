@@ -2,10 +2,10 @@
  * ABA 5: Dashboard Fluxo de Caixa Preditivo
  *
  * Dashboard principal com:
- * - Cards de Ã­ndices de saÃºde
- * - GrÃ¡fico de projeÃ§Ãµes 15 dias
- * - Alertas automÃ¡ticos
- * - Simulador de cenÃ¡rios
+ * - Cards de índices de saúde
+ * - Gráfico de projeções 15 dias
+ * - Alertas automáticos
+ * - Simulador de cenários
  */
 
 import { useState, useEffect } from "react";
@@ -38,7 +38,7 @@ export default function DashboardFluxoCaixa({ userId }) {
       const token = getAccessToken();
       const headers = { Authorization: `Bearer ${token}` };
 
-      // Carregar Ã­ndices, projeÃ§Ãµes e alertas em paralelo
+      // Carregar índices, projeções e alertas em paralelo
       const [indicesRes, projecoesRes, alertasRes] = await Promise.all([
         api.get(`/ia/fluxo/indices-saude/${userId}`, { headers }),
         api.get(`/ia/fluxo/projecoes/${userId}?dias=15`, { headers }),
@@ -57,18 +57,18 @@ export default function DashboardFluxoCaixa({ userId }) {
   };
 
   const gerarNovaProjecao = async () => {
-    const toastId = toast.loading("Gerando projeÃ§Ã£o com Prophet...");
+    const toastId = toast.loading("Gerando projeção com Prophet...");
     try {
       const token = getAccessToken();
       const headers = { Authorization: `Bearer ${token}` };
 
       await api.post(`/ia/fluxo/projetar-15-dias/${userId}`, {}, { headers });
 
-      toast.success("ProjeÃ§Ã£o gerada com sucesso!", { id: toastId });
+      toast.success("Projeção gerada com sucesso!", { id: toastId });
       carregarDados();
     } catch (error) {
-      console.error("Erro ao gerar projeÃ§Ã£o:", error);
-      toast.error("Erro ao gerar projeÃ§Ã£o", { id: toastId });
+      console.error("Erro ao gerar projeção:", error);
+      toast.error("Erro ao gerar projeção", { id: toastId });
     }
   };
 
@@ -88,8 +88,8 @@ export default function DashboardFluxoCaixa({ userId }) {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">ðŸ¤– Fluxo de Caixa Preditivo</h1>
-          <p className="text-gray-600 mt-1">InteligÃªncia artificial analisando seu caixa</p>
+          <h1 className="text-2xl font-bold text-gray-900">🤖 Fluxo de Caixa Preditivo</h1>
+          <p className="text-gray-600 mt-1">Inteligência artificial analisando seu caixa</p>
         </div>
 
         <button
@@ -97,7 +97,7 @@ export default function DashboardFluxoCaixa({ userId }) {
           className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
         >
           <RefreshCw className="w-4 h-4" />
-          Atualizar ProjeÃ§Ã£o
+          Atualizar Projeção
         </button>
       </div>
 
@@ -111,7 +111,7 @@ export default function DashboardFluxoCaixa({ userId }) {
               : "text-gray-600 hover:text-gray-900"
           }`}
         >
-          VisÃ£o Geral
+          Visão Geral
         </button>
         <button
           onClick={() => setAbaAtiva("projecoes")}
@@ -121,7 +121,7 @@ export default function DashboardFluxoCaixa({ userId }) {
               : "text-gray-600 hover:text-gray-900"
           }`}
         >
-          ProjeÃ§Ãµes 15 Dias
+          Projeções 15 Dias
         </button>
         <button
           onClick={() => setAbaAtiva("alertas")}
@@ -150,20 +150,20 @@ export default function DashboardFluxoCaixa({ userId }) {
         </button>
       </div>
 
-      {/* ConteÃºdo */}
+      {/* Conteúdo */}
       <div className="space-y-6">
         {abaAtiva === "visao-geral" && (
           <>
             <div className="bg-gradient-to-r from-green-50 to-blue-50 border-l-4 border-green-500 p-4 rounded">
               <p className="text-sm text-gray-700">
-                <strong>ðŸ“Š VisÃ£o Geral:</strong> AnÃ¡lise dos Ãºltimos <strong>30 dias</strong>{" "}
-                para calcular a saÃºde do caixa. Mostra quanto tempo vocÃª consegue manter o
-                negÃ³cio com saldo atual.
+                <strong>📊 Visão Geral:</strong> Análise dos últimos <strong>30 dias</strong>{" "}
+                para calcular a saúde do caixa. Mostra quanto tempo você consegue manter o
+                negócio com saldo atual.
               </p>
             </div>
             <IndicesSaudeCards indices={indices} />
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <GraficoProjecoes projecoes={projecoes.slice(0, 7)} titulo="PrÃ³ximos 7 Dias" />
+              <GraficoProjecoes projecoes={projecoes.slice(0, 7)} titulo="Próximos 7 Dias" />
               <AlertasCaixa alertas={alertas.slice(0, 3)} />
             </div>
           </>
@@ -173,15 +173,15 @@ export default function DashboardFluxoCaixa({ userId }) {
           <>
             <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border-l-4 border-blue-500 p-4 rounded">
               <p className="text-sm text-gray-700">
-                <strong>ðŸ“ˆ ProjeÃ§Ã£o 15 Dias:</strong> PrevisÃ£o usando inteligÃªncia artificial
-                (Prophet). Baseada em <strong>30+ dias de histÃ³rico</strong> para prever entradas e
-                saÃ­das dos prÃ³ximos <strong>15 dias</strong>. Quanto mais histÃ³rico, mais precisa
-                a previsÃ£o.
+                <strong>📈 Projeção 15 Dias:</strong> Previsão usando inteligência artificial
+                (Prophet). Baseada em <strong>30+ dias de histórico</strong> para prever entradas e
+                saídas dos próximos <strong>15 dias</strong>. Quanto mais histórico, mais precisa
+                a previsão.
               </p>
             </div>
             <GraficoProjecoes
               projecoes={projecoes}
-              titulo="ProjeÃ§Ã£o 15 Dias com Prophet"
+              titulo="Projeção 15 Dias com Prophet"
               detalhado
             />
           </>
@@ -191,10 +191,10 @@ export default function DashboardFluxoCaixa({ userId }) {
           <>
             <div className="bg-gradient-to-r from-orange-50 to-red-50 border-l-4 border-orange-500 p-4 rounded">
               <p className="text-sm text-gray-700">
-                <strong>Alertas:</strong> Avisos automÃ¡ticos gerados em tempo real.
-                <strong> CrÃ­tico</strong> = menos de 7 dias de caixa (risco iminente).
-                <strong> Alerta</strong> = 7-15 dias (atenÃ§Ã£o necessÃ¡ria).
-                <strong> OK</strong> = mais de 15 dias (situaÃ§Ã£o confortÃ¡vel).
+                <strong>Alertas:</strong> Avisos automáticos gerados em tempo real.
+                <strong> Crítico</strong> = menos de 7 dias de caixa (risco iminente).
+                <strong> Alerta</strong> = 7-15 dias (atenção necessária).
+                <strong> OK</strong> = mais de 15 dias (situação confortável).
               </p>
             </div>
             <AlertasCaixa alertas={alertas} />
@@ -205,12 +205,12 @@ export default function DashboardFluxoCaixa({ userId }) {
           <>
             <div className="bg-gradient-to-r from-purple-50 to-pink-50 border-l-4 border-purple-500 p-4 rounded">
               <p className="text-sm text-gray-700">
-                <strong>ðŸŽ¯ Simulador:</strong> Teste 3 cenÃ¡rios para os{" "}
-                <strong>prÃ³ximos 15 dias</strong>.<strong> Otimista:</strong> +20% receita, -10%
+                <strong>🎯 Simulador:</strong> Teste 3 cenários para os{" "}
+                <strong>próximos 15 dias</strong>.<strong> Otimista:</strong> +20% receita, -10%
                 despesa.
-                <strong> Realista:</strong> sem mudanÃ§as.
+                <strong> Realista:</strong> sem mudanças.
                 <strong> Pessimista:</strong> -20% receita, +10% despesa.
-                <strong>Seus dados reais nÃ£o sÃ£o alterados!</strong>
+                <strong>Seus dados reais não são alterados!</strong>
               </p>
             </div>
             <SimuladorCenarios userId={userId} projecoesBase={projecoes} />

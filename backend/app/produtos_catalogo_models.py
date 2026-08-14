@@ -109,11 +109,11 @@ class Produto(BaseTenantModel):
     tipo = Column(String(20), default="produto")  # produto, servico, produto_servico
     situacao = Column(Boolean, default=True)  # ativo/inativo
 
-    # ========== SPRINT 2: PRODUTOS COM VARIA��O ==========
+    # ========== SPRINT 2: PRODUTOS COM VARIAÇÃO ==========
     # tipo_produto: Define a estrutura do produto
-    # - SIMPLES: Produto tradicional (padr�o)
-    # - PAI: Produto agrupador (n�o vend�vel, sem pre�o/estoque)
-    # - VARIACAO: Produto filho de um PAI (vend�vel, com pre�o/estoque)
+    # - SIMPLES: Produto tradicional (padrão)
+    # - PAI: Produto agrupador (não vendável, sem preço/estoque)
+    # - VARIACAO: Produto filho de um PAI (vendável, com preço/estoque)
     # - KIT: Produto composto por outros produtos
     tipo_produto = Column(
         String(20), default="SIMPLES", nullable=False
@@ -122,15 +122,15 @@ class Produto(BaseTenantModel):
         Integer, ForeignKey("produtos.id"), nullable=True
     )  # FK para produto PAI
 
-    # Flags para controle de varia��o (Sprint 2 - Nova Estrutura)
+    # Flags para controle de variação (Sprint 2 - Nova Estrutura)
     is_parent = Column(
         Boolean, default=False, nullable=False
-    )  # Indica se � produto pai (agrupador)
+    )  # Indica se é produto pai (agrupador)
     is_sellable = Column(
         Boolean, default=True, nullable=False
     )  # Indica se pode ser vendido
 
-    # ========== SPRINT 2: ATRIBUTOS DE VARIA��O ==========
+    # ========== SPRINT 2: ATRIBUTOS DE VARIAÇÃO ==========
     variation_attributes = Column(
         JSON, nullable=True
     )  # Ex: {"cor": "azul", "tamanho": "G"}
@@ -139,9 +139,9 @@ class Produto(BaseTenantModel):
     )  # Ex: "cor:azul|tamanho:G"
 
     # ========== SPRINT 4: PRODUTOS KIT ==========
-    # tipo_kit: Define como o custo/estoque do KIT � tratado
-    # - VIRTUAL: Custo = soma dos componentes, estoque = menor dispon�vel dos componentes
-    # - FISICO: Custo pr�prio, estoque pr�prio (KIT j� montado/pr�-embalado)
+    # tipo_kit: Define como o custo/estoque do KIT é tratado
+    # - VIRTUAL: Custo = soma dos componentes, estoque = menor disponível dos componentes
+    # - FISICO: Custo próprio, estoque próprio (KIT já montado/pré-embalado)
     tipo_kit = Column(
         String(20), nullable=True
     )  # VIRTUAL, FISICO (somente quando produto possui composicao)
@@ -235,7 +235,7 @@ class Produto(BaseTenantModel):
     pis_valor_fixo = Column(Float, nullable=True)
     cofins_valor_fixo = Column(Float, nullable=True)
 
-    # CFOP e Al�quotas (campos adicionais para NF-e)
+    # CFOP e Alíquotas (campos adicionais para NF-e)
     cfop = Column(String(10), nullable=True)
     aliquota_icms = Column(Float, nullable=True)
     aliquota_pis = Column(Float, nullable=True)
@@ -251,44 +251,44 @@ class Produto(BaseTenantModel):
     # Validade
     data_validade = Column(DateTime, nullable=True)
 
-    # ========== RECORR�NCIA E COMPATIBILIDADE (NOVO) ==========
-    # Sistema de lembretes para produtos recorrentes (medicamentos, ra��es, etc)
-    tem_recorrencia = Column(Boolean, default=False)  # Indica se � produto recorrente
+    # ========== RECORRÊNCIA E COMPATIBILIDADE (NOVO) ==========
+    # Sistema de lembretes para produtos recorrentes (medicamentos, rações, etc)
+    tem_recorrencia = Column(Boolean, default=False)  # Indica se é produto recorrente
     tipo_recorrencia = Column(
         String(20), nullable=True
     )  # daily, weekly, monthly, yearly
     intervalo_dias = Column(
         Integer, nullable=True
-    )  # N�mero de dias entre doses/compras
+    )  # Número de dias entre doses/compras
     numero_doses = Column(
         Integer, nullable=True
-    )  # N�mero total de doses no ciclo (ex: 3 para vacina V8)
+    )  # Número total de doses no ciclo (ex: 3 para vacina V8)
     observacoes_recorrencia = Column(
         Text, nullable=True
-    )  # Ex: "Nexgard para c�es 4-10kg, repetir a cada 30 dias"
+    )  # Ex: "Nexgard para cães 4-10kg, repetir a cada 30 dias"
 
-    # ========== RECORR�NCIA E COMPATIBILIDADE (NOVO) ==========
-    # Sistema de lembretes para produtos recorrentes (medicamentos, ra��es, etc)
-    tem_recorrencia = Column(Boolean, default=False)  # Indica se � produto recorrente
+    # ========== RECORRÊNCIA E COMPATIBILIDADE (NOVO) ==========
+    # Sistema de lembretes para produtos recorrentes (medicamentos, rações, etc)
+    tem_recorrencia = Column(Boolean, default=False)  # Indica se é produto recorrente
     tipo_recorrencia = Column(
         String(20), nullable=True
     )  # daily, weekly, monthly, yearly
     intervalo_dias = Column(
         Integer, nullable=True
-    )  # N�mero de dias entre doses/compras
+    )  # Número de dias entre doses/compras
     numero_doses = Column(
         Integer, nullable=True
-    )  # N�mero total de doses no ciclo (ex: 3 para vacina V8)
+    )  # Número total de doses no ciclo (ex: 3 para vacina V8)
     observacoes_recorrencia = Column(
         Text, nullable=True
-    )  # Ex: "Nexgard para c�es 4-10kg, repetir a cada 30 dias"
+    )  # Ex: "Nexgard para cães 4-10kg, repetir a cada 30 dias"
 
-    # Compatibilidade de esp�cie
+    # Compatibilidade de espécie
     especie_compativel = Column(
         String(50), nullable=True
-    )  # dog, cat, both (para ra��es, medicamentos)
+    )  # dog, cat, both (para rações, medicamentos)
 
-    # ========== RA��O - CALCULADORA (FASE 2) ==========
+    # ========== RAÇÃO - CALCULADORA (FASE 2) ==========
     classificacao_racao = Column(
         String(50), nullable=True
     )  # super_premium, premium, especial, standard
@@ -301,28 +301,28 @@ class Produto(BaseTenantModel):
     )  # filhote, adulto, senior, gestante, etc
     especies_indicadas = Column(
         String(100), nullable=True
-    )  # dog, cat, both (espec�fico para ra��es)
+    )  # dog, cat, both (específico para rações)
     tabela_consumo = Column(
         Text, nullable=True
-    )  # JSON com tabela de consumo da embalagem (peso x idade x quantidade di�ria)
+    )  # JSON com tabela de consumo da embalagem (peso x idade x quantidade diária)
 
-    # ========== CLASSIFICA��O INTELIGENTE DE RA��ES (FASE 3 - IA) ==========
-    # Arrays para suportar m�ltiplas classifica��es (ex: "todas as ra�as", "todos os portes")
+    # ========== CLASSIFICAÇÃO INTELIGENTE DE RAÇÕES (FASE 3 - IA) ==========
+    # Arrays para suportar múltiplas classificações (ex: "todas as raças", "todos os portes")
     porte_animal = Column(
         JSONB, nullable=True
-    )  # ["Pequeno", "M�dio", "Grande", "Gigante", "Todos"]
+    )  # ["Pequeno", "Médio", "Grande", "Gigante", "Todos"]
     fase_publico = Column(
         JSONB, nullable=True
     )  # ["Filhote", "Adulto", "Senior", "Gestante", "Todos"]
     tipo_tratamento = Column(
         JSONB, nullable=True
-    )  # ["Obesidade", "Alergia", "Sens�vel", "Digestivo", "Urin�rio", "Renal", "Hipoalerg�nico", "Light"]
+    )  # ["Obesidade", "Alergia", "Sensível", "Digestivo", "Urinário", "Renal", "Hipoalergênico", "Light"]
     sabor_proteina = Column(
         String(100), nullable=True
     )  # Frango, Carne, Peixe, Cordeiro, Soja, Mix, etc.
     auto_classificar_nome = Column(
         Boolean, default=True, nullable=False
-    )  # Ativa auto-classifica��o via IA
+    )  # Ativa auto-classificação via IA
     # ========== OPÇÕES DE RAÇÃO - SISTEMA DINÂMICO (FOREIGN KEYS) ==========
     # Relacionamentos com tabelas de opções dinâmicas configuradas pelo usuário
     # DESABILITADO TEMPORARIAMENTE: Tabelas não existem ainda
@@ -347,7 +347,7 @@ class Produto(BaseTenantModel):
     ativo = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    deleted_at = Column(DateTime, nullable=True)  # Soft delete - data de exclus�o
+    deleted_at = Column(DateTime, nullable=True)  # Soft delete - data de exclusão
 
     # ========== SISTEMA DE PREDECESSOR/SUCESSOR ==========
     # Permite vincular produtos que substituem outros, mantendo histórico consolidado
@@ -399,8 +399,8 @@ class Produto(BaseTenantModel):
     # Acesso: produto.predecessor (produto anterior)
     # Acesso: produto.sucessores (lista de produtos que substituem este)
 
-    # ========== SPRINT 2: VARIA��ES ==========
-    # Relacionamento pai/filhos para produtos com varia��o
+    # ========== SPRINT 2: VARIAÇÕES ==========
+    # Relacionamento pai/filhos para produtos com variação
     produto_pai = relationship(
         "Produto", remote_side=[id], foreign_keys=[produto_pai_id], backref="variacoes"
     )
@@ -431,9 +431,9 @@ class Produto(BaseTenantModel):
 
         return False
 
-    # Acesso via: produto_pai.variacoes (lista de varia��es)
+    # Acesso via: produto_pai.variacoes (lista de variações)
 
-    # ? DESABILITADO: ProductVariation n�o existe mais
+    # ? DESABILITADO: ProductVariation não existe mais
     # variations = relationship(
     #     "ProductVariation",
     #     back_populates="parent",
@@ -455,7 +455,7 @@ class Produto(BaseTenantModel):
         Index("idx_produtos_user", "user_id"),
         Index(
             "idx_produtos_variation_signature", "tenant_id", "variation_signature"
-        ),  # Sprint 2: Varia��es        {'extend_existing': True}
+        ),  # Sprint 2: Variações        {'extend_existing': True}
     )
 
     @property

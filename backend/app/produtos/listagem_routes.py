@@ -51,10 +51,10 @@ def listar_produtos_vendaveis(
     user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     """
-    Lista apenas produtos VENDÃVEIS (SIMPLES, VARIACAO e KIT)
+    Lista apenas produtos VENDÁVEIS (SIMPLES, VARIACAO e KIT)
 
     Usado pelo PDV e carrinho de vendas.
-    Produtos PAI nÃ£o aparecem pois nÃ£o sÃ£o vendÃ¡veis diretamente.
+    Produtos PAI não aparecem pois não são vendáveis diretamente.
     """
     user, tenant_id = user_and_tenant
     page, page_size, offset = _normalizar_paginacao_produtos(
@@ -64,7 +64,7 @@ def listar_produtos_vendaveis(
     )
     termo_busca = (busca or "").strip()
 
-    # QUERY BASE - Produtos vendÃ¡veis (incluindo KIT)
+    # QUERY BASE - Produtos vendáveis (incluindo KIT)
     query = _montar_query_produtos_vendaveis(
         db,
         tenant_id=tenant_id,
@@ -106,7 +106,7 @@ def listar_produtos_vendaveis(
         contar_total=contar_total,
     )
 
-    # OrdenaÃ§Ã£o inteligente: prioriza match exato no cÃ³digo
+    # Ordenação inteligente: prioriza match exato no código
 
     # QUERY FINAL
 
@@ -134,7 +134,7 @@ def listar_produtos_vendaveis(
 @require_permission("produtos.visualizar")
 def listar_produtos(
     page: int = 1,
-    page_size: int = 1000,  # forÃ§a trazer tudo
+    page_size: int = 1000,  # força trazer tudo
     busca: Optional[str] = None,
     categoria_id: Optional[int] = None,
     marca_id: Optional[int] = None,
@@ -159,8 +159,8 @@ def listar_produtos(
     """
     Lista produtos com hierarquia PAI > FILHOS
 
-    REGRA DE NEGÃ“CIO (Sprint 2 + KIT - Atualizada):
-    - Produtos PAI aparecem na listagem com suas variaÃ§Ãµes agrupadas
+    REGRA DE NEGÓCIO (Sprint 2 + KIT - Atualizada):
+    - Produtos PAI aparecem na listagem com suas variações agrupadas
     - Produtos SIMPLES aparecem normalmente
     - Produtos KIT aparecem normalmente
     - Produtos VARIACAO aparecem apenas dentro do grupo do PAI
@@ -227,8 +227,8 @@ def listar_produtos(
     reservas_por_produto = _mapa_reservas_ativas_multitenant(db, access_ids)
     validade_por_produto = _mapa_validade_proxima_produtos(db, produtos, access_ids)
 
-    # HIERARQUIA: Para produtos PAI, buscar suas variaÃ§Ãµes
-    # Para produtos KIT, calcular estoque virtual e carregar composiÃ§Ã£o
+    # HIERARQUIA: Para produtos PAI, buscar suas variações
+    # Para produtos KIT, calcular estoque virtual e carregar composição
     produtos_expandidos = _expandir_produtos_listagem(
         db,
         produtos,

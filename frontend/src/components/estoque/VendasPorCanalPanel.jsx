@@ -24,7 +24,7 @@ export default function VendasPorCanalPanel({
 
       <div className="grid gap-3 p-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         {loading && vendasPorCanal.length === 0
-          ? Array.from({ length: 4 }, (_, index) => (
+          ? Array.from({ length: 6 }, (_, index) => (
               <div
                 key={index}
                 className="h-28 animate-pulse rounded-xl border border-slate-200 bg-slate-50"

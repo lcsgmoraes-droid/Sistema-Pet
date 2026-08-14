@@ -32,10 +32,10 @@ def atualizar_produtos_lote(
     db: Session = Depends(get_session),
     user_and_tenant=Depends(get_current_user_and_tenant),
 ):
-    """Atualiza dados comerciais e operacionais de mÃºltiplos produtos."""
+    """Atualiza dados comerciais e operacionais de múltiplos produtos."""
     _, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
 
-    logger.info(f"ðŸ“¦ Atualizando {len(dados.produto_ids)} produtos em lote")
+    logger.info(f"📦 Atualizando {len(dados.produto_ids)} produtos em lote")
 
     # Buscar produtos
     produtos = (
@@ -47,11 +47,11 @@ def atualizar_produtos_lote(
     if not produtos:
         raise HTTPException(status_code=404, detail="Nenhum produto encontrado")
 
-    # Validar se todos os produtos pertencem ao usuÃ¡rio
+    # Validar se todos os produtos pertencem ao usuário
     if len(produtos) != len(dados.produto_ids):
         raise HTTPException(
             status_code=400,
-            detail="Alguns produtos nÃ£o foram encontrados ou nÃ£o pertencem ao usuÃ¡rio",
+            detail="Alguns produtos não foram encontrados ou não pertencem ao usuário",
         )
 
     if dados.fornecedor_operacao:
@@ -204,7 +204,7 @@ def atualizar_produtos_lote(
 
     db.commit()
 
-    logger.info(f"âœ… {len(produtos)} produtos atualizados em lote")
+    logger.info(f"✅ {len(produtos)} produtos atualizados em lote")
 
     return {
         "produtos_atualizados": len(produtos),

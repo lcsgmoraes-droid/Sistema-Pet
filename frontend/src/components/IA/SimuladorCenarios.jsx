@@ -1,6 +1,6 @@
 ﻿/**
- * Simulador de CenÃ¡rios
- * Permite simular cenÃ¡rios otimista, pessimista e realista
+ * Simulador de Cenários
+ * Permite simular cenários otimista, pessimista e realista
  */
 
 import { useState } from "react";
@@ -14,21 +14,21 @@ const CENARIOS = [
   {
     id: "otimista",
     nome: "Otimista",
-    descricao: "Aumento de 20% nas receitas e reduÃ§Ã£o de 10% nas despesas",
+    descricao: "Aumento de 20% nas receitas e redução de 10% nas despesas",
     icon: TrendingUp,
     color: "green",
   },
   {
     id: "realista",
     nome: "Realista",
-    descricao: "MantÃ©m o padrÃ£o atual de receitas e despesas",
+    descricao: "Mantém o padrão atual de receitas e despesas",
     icon: Minus,
     color: "blue",
   },
   {
     id: "pessimista",
     nome: "Pessimista",
-    descricao: "ReduÃ§Ã£o de 20% nas receitas e aumento de 10% nas despesas",
+    descricao: "Redução de 20% nas receitas e aumento de 10% nas despesas",
     icon: TrendingDown,
     color: "red",
   },
@@ -52,10 +52,10 @@ export default function SimuladorCenarios({ userId, projecoesBase = [] }) {
       );
 
       setResultadoSimulacao(response.data);
-      toast.success(`CenÃ¡rio ${cenarioSelecionado} simulado com sucesso!`);
+      toast.success(`Cenário ${cenarioSelecionado} simulado com sucesso!`);
     } catch (error) {
-      console.error("Erro ao simular cenÃ¡rio:", error);
-      toast.error("Erro ao simular cenÃ¡rio");
+      console.error("Erro ao simular cenário:", error);
+      toast.error("Erro ao simular cenário");
     } finally {
       setSimulando(false);
     }
@@ -65,11 +65,11 @@ export default function SimuladorCenarios({ userId, projecoesBase = [] }) {
 
   return (
     <div className="space-y-6">
-      {/* Seletor de CenÃ¡rios */}
+      {/* Seletor de Cenários */}
       <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">Simulador de CenÃ¡rios</h3>
+        <h3 className="text-lg font-semibold text-gray-900 mb-4">Simulador de Cenários</h3>
         <p className="text-gray-600 mb-6">
-          Simule diferentes cenÃ¡rios para entender o impacto no seu fluxo de caixa
+          Simule diferentes cenários para entender o impacto no seu fluxo de caixa
         </p>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
@@ -126,25 +126,25 @@ export default function SimuladorCenarios({ userId, projecoesBase = [] }) {
           ) : (
             <>
               <Play className="w-5 h-5" />
-              Simular CenÃ¡rio
+              Simular Cenário
             </>
           )}
         </button>
       </div>
 
-      {/* Resultado da SimulaÃ§Ã£o */}
+      {/* Resultado da Simulação */}
       {resultadoSimulacao && (
         <>
-          {/* ComparaÃ§Ã£o de MÃ©tricas */}
+          {/* Comparação de Métricas */}
           <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">
-              ComparaÃ§Ã£o: Base vs {cenarioConfig?.nome}
+              Comparação: Base vs {cenarioConfig?.nome}
             </h3>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* ProjeÃ§Ã£o Base */}
+              {/* Projeção Base */}
               <div>
-                <h4 className="font-medium text-gray-700 mb-3">CenÃ¡rio Atual</h4>
+                <h4 className="font-medium text-gray-700 mb-3">Cenário Atual</h4>
                 <div className="space-y-2">
                   <div className="flex justify-between items-center">
                     <span className="text-sm text-gray-600">Saldo Final</span>
@@ -156,7 +156,7 @@ export default function SimuladorCenarios({ userId, projecoesBase = [] }) {
                     </span>
                   </div>
                   <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-600">VariaÃ§Ã£o</span>
+                    <span className="text-sm text-gray-600">Variação</span>
                     <span className="font-semibold text-gray-900">
                       {new Intl.NumberFormat("pt-BR", {
                         style: "currency",
@@ -170,9 +170,9 @@ export default function SimuladorCenarios({ userId, projecoesBase = [] }) {
                 </div>
               </div>
 
-              {/* ProjeÃ§Ã£o Simulada */}
+              {/* Projeção Simulada */}
               <div>
-                <h4 className="font-medium text-gray-700 mb-3">CenÃ¡rio {cenarioConfig?.nome}</h4>
+                <h4 className="font-medium text-gray-700 mb-3">Cenário {cenarioConfig?.nome}</h4>
                 <div className="space-y-2">
                   <div className="flex justify-between items-center">
                     <span className="text-sm text-gray-600">Saldo Final</span>
@@ -196,7 +196,7 @@ export default function SimuladorCenarios({ userId, projecoesBase = [] }) {
                     </span>
                   </div>
                   <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-600">VariaÃ§Ã£o</span>
+                    <span className="text-sm text-gray-600">Variação</span>
                     <span
                       className={`font-semibold ${
                         cenarioSelecionado === "otimista"
@@ -221,10 +221,10 @@ export default function SimuladorCenarios({ userId, projecoesBase = [] }) {
               </div>
             </div>
 
-            {/* DiferenÃ§a */}
+            {/* Diferença */}
             <div className="mt-6 pt-6 border-t border-gray-200">
               <div className="flex justify-between items-center">
-                <span className="font-medium text-gray-700">DiferenÃ§a no Saldo Final</span>
+                <span className="font-medium text-gray-700">Diferença no Saldo Final</span>
                 <span
                   className={`text-xl font-bold ${
                     (resultadoSimulacao?.projecoes_ajustadas?.[
@@ -249,20 +249,20 @@ export default function SimuladorCenarios({ userId, projecoesBase = [] }) {
             </div>
           </div>
 
-          {/* GrÃ¡fico da SimulaÃ§Ã£o */}
+          {/* Gráfico da Simulação */}
           <GraficoProjecoes
             projecoes={resultadoSimulacao?.projecoes_ajustadas || []}
-            titulo={`ProjeÃ§Ã£o - CenÃ¡rio ${cenarioConfig?.nome}`}
+            titulo={`Projeção - Cenário ${cenarioConfig?.nome}`}
             detalhado
           />
         </>
       )}
 
-      {/* CenÃ¡rio Base */}
+      {/* Cenário Base */}
       {!resultadoSimulacao && projecoesBase && projecoesBase.length > 0 && (
         <GraficoProjecoes
           projecoes={projecoesBase}
-          titulo="ProjeÃ§Ã£o Atual (CenÃ¡rio Base)"
+          titulo="Projeção Atual (Cenário Base)"
           detalhado
         />
       )}

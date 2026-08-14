@@ -80,7 +80,7 @@ def criar_internacao(
         if not consulta_ok:
             raise HTTPException(
                 status_code=404,
-                detail="Consulta vinculada nÃ£o encontrada para este pet",
+                detail="Consulta vinculada não encontrada para este pet",
             )
 
     if box_normalizado:
@@ -244,15 +244,15 @@ def registrar_procedimento_internacao(
 
     if quantidade_prevista is not None and quantidade_prevista < 0:
         raise HTTPException(
-            status_code=422, detail="Quantidade prevista nÃ£o pode ser negativa"
+            status_code=422, detail="Quantidade prevista não pode ser negativa"
         )
     if quantidade_executada is not None and quantidade_executada < 0:
         raise HTTPException(
-            status_code=422, detail="Quantidade executada nÃ£o pode ser negativa"
+            status_code=422, detail="Quantidade executada não pode ser negativa"
         )
     if quantidade_desperdicio < 0:
         raise HTTPException(
-            status_code=422, detail="Quantidade de desperdÃ­cio nÃ£o pode ser negativa"
+            status_code=422, detail="Quantidade de desperdício não pode ser negativa"
         )
     if (
         status_procedimento == "concluido"
@@ -290,7 +290,7 @@ def registrar_procedimento_internacao(
             referencia_id=ev.id,
             referencia_tipo="procedimento_internacao",
             documento=str(internacao_id),
-            observacao=f"Baixa automÃ¡tica da internaÃ§Ã£o #{internacao_id} - {body.medicamento}",
+            observacao=f"Baixa automática da internação #{internacao_id} - {body.medicamento}",
         )
         estoque_baixado = bool(estoque_movimentacao_ids)
 

@@ -1,8 +1,8 @@
 // ARQUIVO CRITICO DE PRODUCAO
-// Este arquivo impacta diretamente operaÃ§Ãµes reais (PDV / Financeiro / Estoque).
-// NÃƒO alterar sem:
+// Este arquivo impacta diretamente operações reais (PDV / Financeiro / Estoque).
+// NÃO alterar sem:
 // 1. Entender o fluxo completo
-// 2. Testar cenÃ¡rio real
+// 2. Testar cenário real
 // 3. Validar impacto financeiro
 
 import { useEffect, useRef, useState } from "react";
@@ -51,7 +51,7 @@ export default function PDV() {
   const { user } = useAuth();
   const { iniciarTour } = useTour("pdv", tourPDV, { delay: 1200 });
 
-  // ðŸ”’ Controle de visibilidade de dados gerenciais (lucro, margem, custos)
+  // 🔒 Controle de visibilidade de dados gerenciais (lucro, margem, custos)
   const podeVerMargem = user?.is_admin === true;
 
   // Estado da venda atual
@@ -66,8 +66,8 @@ export default function PDV() {
     cupom_discount_applied: null,
     total: 0,
     observacoes: "",
-    funcionario_id: null, // âœ… FuncionÃ¡rio para comissÃ£o
-    entregador_id: null, // ðŸšš Entregador para entrega
+    funcionario_id: null, // ✅ Funcionário para comissão
+    entregador_id: null, // 🚚 Entregador para entrega
     tem_entrega: false,
     entrega: {
       endereco_completo: "",

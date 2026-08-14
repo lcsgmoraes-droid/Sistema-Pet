@@ -122,7 +122,7 @@ def _atualizar_custo_produto_entrada(
 
 
 # ============================================================================
-# PREVIEW DE ENTRADA NO ESTOQUE - REVISÃƒÆ’O DE PREÃƒâ€¡OS
+# PREVIEW DE ENTRADA NO ESTOQUE - REVISÃO DE PREÇOS
 # ============================================================================
 
 
@@ -133,7 +133,7 @@ def preview_processamento(
     user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     """
-    Retorna preview da entrada com comparaÃƒÂ§ÃƒÂ£o de custos e preÃƒÂ§os atuais
+    Retorna preview da entrada com comparação de custos e preços atuais
     """
     _current_user, tenant_id = user_and_tenant
     nota = (
@@ -144,12 +144,12 @@ def preview_processamento(
     )
 
     if not nota:
-        raise HTTPException(status_code=404, detail="Nota nÃƒÂ£o encontrada")
+        raise HTTPException(status_code=404, detail="Nota não encontrada")
 
     if nota.produtos_nao_vinculados > 0:
         raise HTTPException(
             status_code=400,
-            detail=f"Existem {nota.produtos_nao_vinculados} produtos nÃƒÂ£o vinculados",
+            detail=f"Existem {nota.produtos_nao_vinculados} produtos não vinculados",
         )
 
     composicoes_custo = calcular_composicao_custos_nota(nota)
@@ -216,7 +216,7 @@ def preview_processamento(
             else:
                 margem_atual = 0
 
-            # Calcular margem projetada mantendo o preÃ§o de venda atual e aplicando o novo custo
+            # Calcular margem projetada mantendo o preço de venda atual e aplicando o novo custo
             if preco_venda_atual > 0 and custo_novo > 0:
                 margem_projetada = (
                     (preco_venda_atual - custo_novo) / preco_venda_atual
@@ -287,7 +287,7 @@ def preview_processamento(
 
 
 # ============================================================================
-# ATUALIZAR PREÃƒâ€¡OS DOS PRODUTOS
+# ATUALIZAR PREÇOS DOS PRODUTOS
 # ============================================================================
 
 
@@ -370,8 +370,8 @@ def atualizar_precos_produtos(
     user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     """
-    Atualiza preÃƒÂ§os de venda dos produtos antes de processar a nota
-    Registra histÃƒÂ³rico de alteraÃƒÂ§ÃƒÂµes
+    Atualiza preços de venda dos produtos antes de processar a nota
+    Registra histórico de alterações
     """
     current_user, tenant_id = user_and_tenant
 
@@ -381,7 +381,7 @@ def atualizar_precos_produtos(
         .first()
     )
     if not nota:
-        raise HTTPException(status_code=404, detail="Nota nÃƒÂ£o encontrada")
+        raise HTTPException(status_code=404, detail="Nota não encontrada")
 
     for preco_data in precos:
         produto = (
@@ -403,7 +403,7 @@ def atualizar_precos_produtos(
                 else 0
             )
 
-            # Atualizar preÃƒÂ§o
+            # Atualizar preço
             produto.preco_venda = preco_data.preco_venda
 
             # Calcular nova margem
@@ -417,7 +417,7 @@ def atualizar_precos_produtos(
                 else 0
             )
 
-            # Registrar histÃƒÂ³rico se houve alteraÃƒÂ§ÃƒÂ£o
+            # Registrar histórico se houve alteração
             if preco_venda_anterior != produto.preco_venda:
                 variacao_venda = (
                     (
@@ -437,23 +437,23 @@ def atualizar_precos_produtos(
                     preco_venda_novo=produto.preco_venda,
                     margem_anterior=margem_anterior,
                     margem_nova=margem_nova,
-                    variacao_custo_percentual=0,  # Custo nÃƒÂ£o mudou neste caso
+                    variacao_custo_percentual=0,  # Custo não mudou neste caso
                     variacao_venda_percentual=variacao_venda,
                     motivo="nfe_revisao_precos",
                     nota_entrada_id=nota.id,
-                    referencia=f"NF-e {nota.numero_nota} - RevisÃƒÂ£o de PreÃƒÂ§os",
-                    observacoes=f"PreÃƒÂ§o ajustado de R$ {preco_venda_anterior:.2f} para R$ {produto.preco_venda:.2f} (margem: {margem_anterior:.1f}% Ã¢â€ â€™ {margem_nova:.1f}%)",
+                    referencia=f"NF-e {nota.numero_nota} - Revisão de Preços",
+                    observacoes=f"Preço ajustado de R$ {preco_venda_anterior:.2f} para R$ {produto.preco_venda:.2f} (margem: {margem_anterior:.1f}% → {margem_nova:.1f}%)",
                     user_id=current_user.id,
                     tenant_id=tenant_id,
                 )
                 db.add(historico)
 
                 logger.info(
-                    f"Ã°Å¸â€œÅ  HistÃƒÂ³rico registrado: {produto.nome} - "
-                    f"PreÃƒÂ§o R$ {preco_venda_anterior:.2f} Ã¢â€ â€™ R$ {produto.preco_venda:.2f} "
+                    f"📊 Histórico registrado: {produto.nome} - "
+                    f"Preço R$ {preco_venda_anterior:.2f} → R$ {produto.preco_venda:.2f} "
                     f"({variacao_venda:+.2f}%)"
                 )
 
     db.commit()
 
-    return {"message": "PreÃƒÂ§os atualizados com sucesso"}
+    return {"message": "Preços atualizados com sucesso"}

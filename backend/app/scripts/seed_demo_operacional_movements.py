@@ -207,6 +207,50 @@ def _insert_legacy_cashflow(
     )
 
 
+def _insert_showcase_initial_stock_movement(
+    db,
+    *,
+    tenant_id: str,
+    user_id: int,
+    product: dict[str, Any],
+    initial_quantity: Decimal,
+    base_date: date,
+) -> None:
+    """Registra a entrada que explica o saldo antes das vendas multicanal."""
+
+    movement_dt = datetime.combine(
+        base_date - timedelta(days=6), time(hour=9, minute=0)
+    )
+    db.execute(
+        text(
+            """
+            INSERT INTO estoque_movimentacoes (
+                produto_id, tipo, motivo, quantidade, quantidade_anterior,
+                quantidade_nova, custo_unitario, valor_total, estoque_destino,
+                documento, referencia_tipo, observacao, user_id,
+                created_at, updated_at, tenant_id, status
+            )
+            VALUES (
+                :product_id, 'entrada', 'compra', :quantity, 0,
+                :quantity, :cost, :total_cost, 'fisico',
+                'DEMO-ESTOQUE-MULTICANAL-001', 'compra',
+                'Demo operacional - entrada inicial do produto vitrine multicanal',
+                :user_id, :created_at, :created_at, :tenant_id, 'confirmado'
+            )
+            """
+        ),
+        {
+            "product_id": product["id"],
+            "quantity": initial_quantity,
+            "cost": product["preco_custo"],
+            "total_cost": money(product["preco_custo"] * initial_quantity),
+            "user_id": user_id,
+            "created_at": movement_dt,
+            "tenant_id": tenant_id,
+        },
+    )
+
+
 def _insert_payable_with_payment(
     db,
     *,

@@ -13,7 +13,7 @@ export default function CategoriasFinanceirasExpandedPanel({
         <>
           <div className="px-6 py-2 bg-orange-50 border-b border-orange-200">
             <span className="text-xs font-semibold text-orange-700 uppercase tracking-wide">
-              Subcategorias Financeiras ({filhasFinanceiras.length}) â€” classifique cada uma
+              Subcategorias Financeiras ({filhasFinanceiras.length}) — classifique cada uma
             </span>
           </div>
           {filhasFinanceiras.map((filha) => (
@@ -21,7 +21,7 @@ export default function CategoriasFinanceirasExpandedPanel({
               key={filha.id}
               className="px-6 py-3 flex items-center gap-3 ml-9 border-b border-orange-100 last:border-b-0"
             >
-              <span className="text-orange-400 text-lg">â””â”€</span>
+              <span className="text-orange-400 text-lg">└─</span>
               <div className="flex-1">
                 <div className="text-sm font-medium text-gray-700">
                   {normalizeDisplayText(filha.nome)}
@@ -38,7 +38,7 @@ export default function CategoriasFinanceirasExpandedPanel({
                       : "bg-white text-gray-600 border-gray-300 hover:border-orange-400 hover:text-orange-600"
                   }`}
                 >
-                  ðŸ”’ Fixo
+                  🔒 Fixo
                 </button>
                 <button
                   onClick={() =>
@@ -53,7 +53,7 @@ export default function CategoriasFinanceirasExpandedPanel({
                       : "bg-white text-gray-600 border-gray-300 hover:border-blue-400 hover:text-blue-600"
                   }`}
                 >
-                  ðŸ“ˆ VariÃ¡vel
+                  📈 Variável
                 </button>
               </div>
             </div>
@@ -66,7 +66,7 @@ export default function CategoriasFinanceirasExpandedPanel({
           <div className="px-6 py-2 bg-purple-100/50 border-b border-purple-200">
             <span className="text-xs font-semibold text-purple-700 uppercase tracking-wide">
               Subcategorias DRE ({subsDRE.length})
-              {cat.tipo_custo === "ambos" && " â€” classifique cada uma"}
+              {cat.tipo_custo === "ambos" && " — classifique cada uma"}
             </span>
           </div>
           {subsDRE.map((sub) => (
@@ -74,7 +74,7 @@ export default function CategoriasFinanceirasExpandedPanel({
               key={sub.id}
               className="px-6 py-3 flex items-center gap-4 ml-9 border-b border-purple-100 last:border-b-0"
             >
-              <span className="text-purple-400 text-lg">â””â”€</span>
+              <span className="text-purple-400 text-lg">└─</span>
               <div className="flex-1">
                 <div className="text-sm font-medium text-gray-700">
                   {normalizeDisplayText(sub.nome)}
@@ -89,7 +89,7 @@ export default function CategoriasFinanceirasExpandedPanel({
                         : "bg-blue-100 text-blue-700"
                     }`}
                   >
-                    {sub.custo_pe === "fixo" ? "ðŸ”’ Fixo" : "ðŸ“ˆ VariÃ¡vel"}
+                    {sub.custo_pe === "fixo" ? "🔒 Fixo" : "📈 Variável"}
                   </span>
                 )}
                 {cat.tipo_custo === "ambos" && (
@@ -104,7 +104,7 @@ export default function CategoriasFinanceirasExpandedPanel({
                           : "bg-white text-gray-500 border-gray-300 hover:border-orange-400 hover:text-orange-600"
                       }`}
                     >
-                      ðŸ”’ Fixo
+                      🔒 Fixo
                     </button>
                     <button
                       onClick={() =>
@@ -116,7 +116,7 @@ export default function CategoriasFinanceirasExpandedPanel({
                           : "bg-white text-gray-500 border-gray-300 hover:border-blue-400 hover:text-blue-600"
                       }`}
                     >
-                      ðŸ“ˆ VariÃ¡vel
+                      📈 Variável
                     </button>
                   </div>
                 )}

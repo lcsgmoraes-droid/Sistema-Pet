@@ -102,12 +102,12 @@ class DepartamentoResponse(DepartamentoBase):
 
 
 # ==========================================
-# SCHEMAS - GERADOR DE CÃ“DIGO DE BARRAS
+# SCHEMAS - GERADOR DE CÓDIGO DE BARRAS
 # ==========================================
 
 
 class GerarCodigoBarrasRequest(BaseModel):
-    sku: str  # CÃ³digo do produto (ex: PROD-00123)
+    sku: str  # Código do produto (ex: PROD-00123)
 
 
 class GerarCodigoBarrasResponse(BaseModel):
@@ -126,7 +126,7 @@ class KitComponenteBase(BaseModel):
     """Schema base para componente de KIT"""
 
     produto_componente_id: int  # ID do produto que faz parte do KIT
-    quantidade: float  # Quantidade necessÃ¡ria do componente no KIT
+    quantidade: float  # Quantidade necessária do componente no KIT
     ordem: int = 0
     opcional: bool = False
 
@@ -204,14 +204,14 @@ class ProdutoBase(BaseModel):
     aliquota_icms: Optional[float] = None
     aliquota_pis: Optional[float] = None
     aliquota_cofins: Optional[float] = None
-    # RecorrÃªncia (Fase 1)
+    # Recorrência (Fase 1)
     tem_recorrencia: Optional[bool] = False
     tipo_recorrencia: Optional[str] = None
     intervalo_dias: Optional[int] = None
     numero_doses: Optional[int] = None
     especie_compativel: Optional[str] = None
     observacoes_recorrencia: Optional[str] = None
-    # RaÃ§Ã£o - Calculadora (Fase 2)
+    # Ração - Calculadora (Fase 2)
     eh_racao: Optional[bool] = None
     classificacao_racao: Optional[str] = None
     peso_embalagem: Optional[float] = None
@@ -219,36 +219,36 @@ class ProdutoBase(BaseModel):
     categoria_racao: Optional[str] = None
     especies_indicadas: Optional[str] = None
     tabela_consumo: Optional[str] = None  # JSON com tabela de consumo da embalagem
-    # OpÃ§Ãµes de RaÃ§Ã£o - Sistema DinÃ¢mico (Foreign Keys)
+    # Opções de Ração - Sistema Dinâmico (Foreign Keys)
     linha_racao_id: Optional[int] = None
     porte_animal_id: Optional[int] = None
     fase_publico_id: Optional[int] = None
     tipo_tratamento_id: Optional[int] = None
     sabor_proteina_id: Optional[int] = None
     apresentacao_peso_id: Optional[int] = None
-    # Sprint 2: Produtos com variaÃ§Ã£o
+    # Sprint 2: Produtos com variação
     tipo_produto: Optional[str] = "SIMPLES"  # SIMPLES, PAI, VARIACAO, KIT
     produto_pai_id: Optional[int] = None  # FK para produto PAI (se for VARIACAO)
     # Sprint 4: Produtos KIT
     tipo_kit: Optional[str] = (
-        None  # VIRTUAL (estoque calculado) ou FISICO (estoque prÃ³prio)
+        None  # VIRTUAL (estoque calculado) ou FISICO (estoque próprio)
     )
     e_kit_fisico: Optional[bool] = None  # Alias para tipo_kit (usado pelo frontend)
     # Sistema Predecessor/Sucessor
     produto_predecessor_id: Optional[int] = None  # ID do produto que este substitui
-    motivo_descontinuacao: Optional[str] = None  # Motivo da substituiÃ§Ã£o
+    motivo_descontinuacao: Optional[str] = None  # Motivo da substituição
 
 
 class ProdutoCreate(ProdutoBase):
     """
-    Schema para criaÃ§Ã£o de produto.
-    Nota: preco_venda Ã© opcional - produto PAI nÃ£o precisa ter preÃ§o.
-    A validaÃ§Ã£o de preÃ§o obrigatÃ³rio para produtos SIMPLES/VARIACAO Ã© feita no service.
+    Schema para criação de produto.
+    Nota: preco_venda é opcional - produto PAI não precisa ter preço.
+    A validação de preço obrigatório para produtos SIMPLES/VARIACAO é feita no service.
 
     Para produtos KIT:
     - Se tipo_produto='KIT', pode enviar composicao_kit (lista de componentes)
-    - Se e_kit_fisico=False (padrÃ£o), estoque serÃ¡ calculado automaticamente
-    - Se e_kit_fisico=True, terÃ¡ estoque prÃ³prio controlado manualmente
+    - Se e_kit_fisico=False (padrão), estoque será calculado automaticamente
+    - Se e_kit_fisico=True, terá estoque próprio controlado manualmente
     """
 
     composicao_kit: Optional[List[KitComponenteCreate]] = Field(default_factory=list)
@@ -297,14 +297,14 @@ class ProdutoUpdate(BaseModel):
     aliquota_icms: Optional[float] = None
     aliquota_pis: Optional[float] = None
     aliquota_cofins: Optional[float] = None
-    # RecorrÃªncia (Fase 1)
+    # Recorrência (Fase 1)
     tem_recorrencia: Optional[bool] = None
     tipo_recorrencia: Optional[str] = None
     intervalo_dias: Optional[int] = None
     numero_doses: Optional[int] = None
     especie_compativel: Optional[str] = None
     observacoes_recorrencia: Optional[str] = None
-    # RaÃ§Ã£o - Calculadora (Fase 2)
+    # Ração - Calculadora (Fase 2)
     eh_racao: Optional[bool] = None
     classificacao_racao: Optional[str] = None
     peso_embalagem: Optional[float] = None
@@ -312,14 +312,14 @@ class ProdutoUpdate(BaseModel):
     categoria_racao: Optional[str] = None
     especies_indicadas: Optional[str] = None
     tabela_consumo: Optional[str] = None
-    # OpÃ§Ãµes de RaÃ§Ã£o - Sistema DinÃ¢mico (Foreign Keys)
+    # Opções de Ração - Sistema Dinâmico (Foreign Keys)
     linha_racao_id: Optional[int] = None
     porte_animal_id: Optional[int] = None
     fase_publico_id: Optional[int] = None
     tipo_tratamento_id: Optional[int] = None
     sabor_proteina_id: Optional[int] = None
     apresentacao_peso_id: Optional[int] = None
-    # Sprint 2: Produtos com variaÃ§Ã£o
+    # Sprint 2: Produtos com variação
     tipo_produto: Optional[str] = None
     produto_pai_id: Optional[int] = None
     # Sprint 4: Produtos KIT
@@ -403,22 +403,22 @@ class ProdutoResponse(ProdutoBase):
 
     id: int
     estoque_atual: Optional[float] = 0
-    controlar_estoque: Optional[bool] = True  # Sempre controla estoque por padrÃ£o
+    controlar_estoque: Optional[bool] = True  # Sempre controla estoque por padrão
     markup_percentual: Optional[float] = None  # Campo calculado
     ativo: bool
     created_at: datetime
     updated_at: datetime
     categoria: Optional[CategoriaResponse] = None
     categoria_nome: Optional[str] = (
-        None  # ðŸ†• Nome da categoria (para facilitar uso no frontend)
+        None  # 🆕 Nome da categoria (para facilitar uso no frontend)
     )
     marca: Optional[MarcaResponse] = None
     imagens: List[ImagemUploadResponse] = Field(default_factory=list)
     lotes: List[LoteResponse] = Field(default_factory=list)
     imagem_principal: Optional[str] = None  # URL da imagem principal
     imagem_principal_thumbnail: Optional[str] = None
-    total_variacoes: Optional[int] = 0  # NÃºmero de variaÃ§Ãµes (para produtos PAI)
-    # Sprint 4: KIT - ComposiÃ§Ã£o e estoque virtual
+    total_variacoes: Optional[int] = 0  # Número de variações (para produtos PAI)
+    # Sprint 4: KIT - Composição e estoque virtual
     composicao_kit: List[KitComponenteResponse] = Field(
         default_factory=list
     )  # Componentes do KIT
@@ -459,7 +459,7 @@ class ProdutoResponse(ProdutoBase):
     @field_validator("categoria_nome", mode="before")
     @classmethod
     def set_categoria_nome(cls, v, info) -> Optional[str]:
-        # Se jÃ¡ tem valor, retornar
+        # Se já tem valor, retornar
         if v:
             return v
 

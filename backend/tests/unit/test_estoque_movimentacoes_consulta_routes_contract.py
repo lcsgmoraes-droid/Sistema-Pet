@@ -47,9 +47,14 @@ def test_resumo_de_vendas_por_canal_preserva_destaques_e_totais():
     assert [item["canal"] for item in resultado[:2]] == ["amazon", "shopee"]
     assert resultado[0]["valor"] == 20
     assert resultado[0]["pct"] == pytest.approx(100 * 4 / 6)
-    assert {"loja_fisica", "mercado_livre"}.issubset(
-        {item["canal"] for item in resultado}
-    )
+    assert {
+        "app",
+        "ecommerce",
+        "loja_fisica",
+        "mercado_livre",
+        "shopee",
+        "amazon",
+    } == {item["canal"] for item in resultado}
 
 
 def test_estoque_routes_nao_expoe_mais_consulta_movimentacoes():

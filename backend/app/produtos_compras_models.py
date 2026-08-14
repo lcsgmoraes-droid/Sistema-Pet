@@ -51,14 +51,14 @@ class PedidoCompra(BaseTenantModel):
     data_envio = Column(DateTime)
     data_confirmacao = Column(DateTime)
 
-    # Observa��es e IA
+    # Observações e IA
     observacoes = Column(Text)
     foi_alterado_apos_envio = Column(
         Boolean, default=False
-    )  # Flag para alertar mudan�as
+    )  # Flag para alertar mudanças
     sugestao_ia = Column(Boolean, default=False)  # Se foi sugerido por IA
-    confianca_ia = Column(Float)  # 0-1: Confian�a da sugest�o
-    dados_ia = Column(Text)  # JSON com an�lise da IA
+    confianca_ia = Column(Float)  # 0-1: Confiança da sugestão
+    dados_ia = Column(Text)  # JSON com análise da IA
 
     # Confronto com NF-e
     nota_entrada_id = Column(
@@ -253,12 +253,12 @@ class NotaEntradaItem(BaseTenantModel):
     codigo_produto = Column(String(100))
     descricao = Column(String(500), nullable=False)
     ncm = Column(String(8))
-    cest = Column(String(7))  # C�digo CEST do produto
+    cest = Column(String(7))  # Código CEST do produto
     cfop = Column(String(4))
     origem = Column(String(1))  # Origem da mercadoria (0-8)
-    aliquota_icms = Column(Float, default=0)  # Al�quota ICMS (%)
-    aliquota_pis = Column(Float, default=0)  # Al�quota PIS (%)
-    aliquota_cofins = Column(Float, default=0)  # Al�quota COFINS (%)
+    aliquota_icms = Column(Float, default=0)  # Alíquota ICMS (%)
+    aliquota_pis = Column(Float, default=0)  # Alíquota PIS (%)
+    aliquota_cofins = Column(Float, default=0)  # Alíquota COFINS (%)
     unidade = Column(String(10))
     quantidade = Column(Float, nullable=False)
     valor_unitario = Column(Float, nullable=False)
@@ -268,7 +268,7 @@ class NotaEntradaItem(BaseTenantModel):
     lote = Column(String(50))  # Lote do produto
     data_validade = Column(Date)  # Data de validade
 
-    # Vincula��o
+    # Vinculação
     produto_id = Column(Integer, ForeignKey("produtos.id"), index=True)
     vinculado = Column(Boolean, default=False)
     confianca_vinculo = Column(Float)  # 0-1
@@ -300,7 +300,7 @@ class NotaEntradaItem(BaseTenantModel):
 
 
 class ProdutoHistoricoPreco(BaseTenantModel):
-    """Hist�rico de altera��es de pre�os de produtos"""
+    """Histórico de alterações de preços de produtos"""
 
     __tablename__ = "produtos_historico_precos"
     __table_args__ = {"extend_existing": True}
@@ -308,7 +308,7 @@ class ProdutoHistoricoPreco(BaseTenantModel):
     id = Column(Integer, primary_key=True, index=True)
     produto_id = Column(Integer, ForeignKey("produtos.id"), nullable=False, index=True)
 
-    # Pre�os anteriores e novos
+    # Preços anteriores e novos
     preco_custo_anterior = Column(Float)
     preco_custo_novo = Column(Float)
     preco_venda_anterior = Column(Float)
@@ -316,16 +316,16 @@ class ProdutoHistoricoPreco(BaseTenantModel):
     margem_anterior = Column(Float)
     margem_nova = Column(Float)
 
-    # Varia��es percentuais
-    variacao_custo_percentual = Column(Float)  # % de varia��o do custo
-    variacao_venda_percentual = Column(Float)  # % de varia��o do pre�o venda
+    # Variações percentuais
+    variacao_custo_percentual = Column(Float)  # % de variação do custo
+    variacao_venda_percentual = Column(Float)  # % de variação do preço venda
 
-    # Contexto da altera��o
+    # Contexto da alteração
     motivo = Column(String(100))  # 'nfe_entrada', 'manual', 'promocao', 'reajuste'
     nota_entrada_id = Column(
         Integer, ForeignKey("notas_entrada.id"), nullable=True, index=True
     )
-    referencia = Column(String(100))  # n�mero da nota, descri��o, etc
+    referencia = Column(String(100))  # número da nota, descrição, etc
     observacoes = Column(Text)
 
     # Auditoria

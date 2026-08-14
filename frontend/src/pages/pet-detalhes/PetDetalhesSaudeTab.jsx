@@ -39,7 +39,7 @@ export default function PetDetalhesSaudeTab({
 }) {
   return (
     <div className="space-y-6">
-      <h2 className="text-xl font-bold text-gray-900 mb-4">InformaÃ§Ãµes de SaÃºde</h2>
+      <h2 className="text-xl font-bold text-gray-900 mb-4">Informações de Saúde</h2>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <ClinicalList
@@ -48,19 +48,19 @@ export default function PetDetalhesSaudeTab({
           empty="Nenhuma alergia registrada"
         />
         <ClinicalList
-          title="DoenÃ§as crÃ´nicas"
+          title="Doenças crônicas"
           items={listaClinica(pet.condicoes_cronicas_lista, pet.doencas_cronicas)}
-          empty="Nenhuma doenÃ§a crÃ´nica registrada"
+          empty="Nenhuma doença crônica registrada"
         />
         <ClinicalList
-          title="Medicamentos contÃ­nuos"
+          title="Medicamentos contínuos"
           items={listaClinica(pet.medicamentos_continuos_lista, pet.medicamentos_continuos)}
-          empty="Nenhum medicamento contÃ­nuo registrado"
+          empty="Nenhum medicamento contínuo registrado"
         />
         <ClinicalList
-          title="RestriÃ§Ãµes alimentares"
+          title="Restrições alimentares"
           items={listaClinica(pet.restricoes_alimentares_lista)}
-          empty="Nenhuma restriÃ§Ã£o alimentar registrada"
+          empty="Nenhuma restrição alimentar registrada"
         />
       </div>
 
@@ -72,7 +72,7 @@ export default function PetDetalhesSaudeTab({
           <div className="space-y-2">
             {carteirinha.alertas.slice(0, 6).map((alerta, idx) => (
               <div key={`alerta_${idx}`} className="text-sm text-amber-900">
-                â€¢ {alerta.mensagem}
+                • {alerta.mensagem}
               </div>
             ))}
           </div>
@@ -82,11 +82,11 @@ export default function PetDetalhesSaudeTab({
       <div className="space-y-4">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
-            HistÃ³rico ClÃ­nico
+            Histórico Clínico
           </label>
           <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
             <p className="text-gray-900 whitespace-pre-line">
-              {pet.historico_clinico || "Nenhum histÃ³rico clÃ­nico registrado"}
+              {pet.historico_clinico || "Nenhum histórico clínico registrado"}
             </p>
           </div>
         </div>

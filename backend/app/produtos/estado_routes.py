@@ -32,10 +32,10 @@ def atualizar_preco_produto(
     db: Session = Depends(get_session),
     user_and_tenant=Depends(get_current_user_and_tenant),
 ):
-    """Atualiza apenas o preÃ§o de um produto (ediÃ§Ã£o rÃ¡pida)"""
+    """Atualiza apenas o preço de um produto (edição rápida)"""
 
     current_user, tenant_id = user_and_tenant
-    logger.info(f"ðŸ·ï¸ Atualizando preÃ§o do produto {produto_id}")
+    logger.info(f"🏷️ Atualizando preço do produto {produto_id}")
 
     produto = (
         db.query(Produto)
@@ -44,9 +44,9 @@ def atualizar_preco_produto(
     )
 
     if not produto:
-        raise HTTPException(status_code=404, detail="Produto nÃ£o encontrado")
+        raise HTTPException(status_code=404, detail="Produto não encontrado")
 
-    # Atualizar apenas os preÃ§os fornecidos
+    # Atualizar apenas os preços fornecidos
     if preco_venda is not None:
         produto.preco_venda = preco_venda
     if preco_custo is not None:
@@ -59,7 +59,7 @@ def atualizar_preco_produto(
     db.commit()
     db.refresh(produto)
 
-    logger.info(f"âœ… PreÃ§o atualizado: PV={produto.preco_venda}")
+    logger.info(f"✅ Preço atualizado: PV={produto.preco_venda}")
 
     return {
         "id": produto.id,
@@ -86,7 +86,7 @@ def deletar_produto(
     )
 
     if not produto:
-        raise HTTPException(status_code=404, detail="Produto nÃ£o encontrado")
+        raise HTTPException(status_code=404, detail="Produto não encontrado")
 
     _validar_pode_inativar_produto(db, produto, tenant_id)
 
@@ -106,7 +106,7 @@ def atualizar_status_ativo_produto(
     db: Session = Depends(get_session),
     user_and_tenant=Depends(get_current_user_and_tenant),
 ):
-    """Ativa ou desativa produto sem removÃª-lo do sistema."""
+    """Ativa ou desativa produto sem removê-lo do sistema."""
 
     _, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
     produto = _obter_produto_ou_404(db, produto_id, tenant_id)
@@ -123,7 +123,7 @@ def atualizar_status_ativo_produto(
     db.refresh(produto)
 
     logger.info(
-        "ðŸ” Produto %s #%s com status alterado para %s",
+        "🔁 Produto %s #%s com status alterado para %s",
         produto.nome,
         produto.id,
         "ativo" if payload.ativo else "inativo",

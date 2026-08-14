@@ -43,12 +43,12 @@ def criar_produto(
     produto.codigo = _normalizar_sku_produto(produto.codigo)
 
     # ========================================
-    # VALIDAÃ‡Ã•ES DE INFRAESTRUTURA (mantidas na rota)
+    # VALIDAÇÕES DE INFRAESTRUTURA (mantidas na rota)
     # ========================================
 
     _validar_sku_unico(db, produto.codigo, tenant_id)
 
-    # Verificar se cÃ³digo de barras jÃ¡ existe
+    # Verificar se código de barras já existe
     if produto.codigo_barras:
         existe_barcode = (
             db.query(Produto)
@@ -62,7 +62,7 @@ def criar_produto(
         if existe_barcode:
             raise HTTPException(
                 status_code=400,
-                detail=f"CÃ³digo de barras '{produto.codigo_barras}' jÃ¡ cadastrado",
+                detail=f"Código de barras '{produto.codigo_barras}' já cadastrado",
             )
 
     # Verificar se categoria existe
@@ -77,7 +77,7 @@ def criar_produto(
             .first()
         )
         if not categoria:
-            raise HTTPException(status_code=404, detail="Categoria nÃ£o encontrada")
+            raise HTTPException(status_code=404, detail="Categoria não encontrada")
 
     # Verificar se marca existe
     if produto.marca_id:
@@ -91,29 +91,29 @@ def criar_produto(
             .first()
         )
         if not marca:
-            raise HTTPException(status_code=404, detail="Marca nÃ£o encontrada")
+            raise HTTPException(status_code=404, detail="Marca não encontrada")
 
     # ========================================
-    # ðŸ”’ TRAVA 3 â€” VALIDAÃ‡ÃƒO: PRODUTO PAI NÃƒO TEM PREÃ‡O
+    # 🔒 TRAVA 3 — VALIDAÇÃO: PRODUTO PAI NÃO TEM PREÇO
     # ========================================
     if produto.tipo_produto == "PAI":
         if produto.preco_venda and produto.preco_venda > 0:
             raise HTTPException(
                 status_code=400,
-                detail="âŒ Produto pai nÃ£o pode ter preÃ§o de venda. O preÃ§o deve ser definido nas variaÃ§Ãµes individuais.",
+                detail="❌ Produto pai não pode ter preço de venda. O preço deve ser definido nas variações individuais.",
             )
-        # Verificar estoque_atual se existir no modelo (pode nÃ£o existir em ProdutoCreate)
+        # Verificar estoque_atual se existir no modelo (pode não existir em ProdutoCreate)
         estoque = getattr(produto, "estoque_atual", None)
         if estoque and estoque > 0:
             raise HTTPException(
                 status_code=400,
-                detail="âŒ Produto pai nÃ£o pode ter estoque inicial. O estoque deve ser gerenciado nas variaÃ§Ãµes.",
+                detail="❌ Produto pai não pode ter estoque inicial. O estoque deve ser gerenciado nas variações.",
             )
 
     # ========================================
-    # ðŸ”’ VALIDAÃ‡ÃƒO: VARIAÃ‡ÃƒO DUPLICADA
+    # 🔒 VALIDAÇÃO: VARIAÇÃO DUPLICADA
     # ========================================
-    # Se estÃ¡ criando uma VARIAÃ‡ÃƒO, verificar duplicidade por signature
+    # Se está criando uma VARIAÇÃO, verificar duplicidade por signature
     variation_sig = getattr(produto, "variation_signature", None)
     if produto.produto_pai_id and variation_sig:
         variacao_existente = (
@@ -130,11 +130,11 @@ def criar_produto(
         if variacao_existente:
             raise HTTPException(
                 status_code=409,
-                detail=f"âŒ JÃ¡ existe uma variaÃ§Ã£o com os mesmos atributos para este produto. VariaÃ§Ã£o existente: '{variacao_existente.nome}' (ID: {variacao_existente.id})",
+                detail=f"❌ Já existe uma variação com os mesmos atributos para este produto. Variação existente: '{variacao_existente.nome}' (ID: {variacao_existente.id})",
             )
 
     # ========================================
-    # ðŸ”’ PREDECESSOR/SUCESSOR: Marcar predecessor como descontinuado
+    # 🔒 PREDECESSOR/SUCESSOR: Marcar predecessor como descontinuado
     # ========================================
     if produto.produto_predecessor_id:
         predecessor = (
@@ -148,7 +148,7 @@ def criar_produto(
 
         if not predecessor:
             raise HTTPException(
-                status_code=404, detail="Produto predecessor nÃ£o encontrado"
+                status_code=404, detail="Produto predecessor não encontrado"
             )
 
         # Marcar predecessor como descontinuado
@@ -156,10 +156,10 @@ def criar_produto(
         if produto.motivo_descontinuacao:
             predecessor.motivo_descontinuacao = produto.motivo_descontinuacao
         else:
-            predecessor.motivo_descontinuacao = f"SubstituÃ­do por: {produto.nome}"
+            predecessor.motivo_descontinuacao = f"Substituído por: {produto.nome}"
 
         logger.info(
-            f"ðŸ“¦ Produto predecessor {predecessor.id} marcado como descontinuado"
+            f"📦 Produto predecessor {predecessor.id} marcado como descontinuado"
         )
 
     # ========================================
@@ -172,26 +172,26 @@ def criar_produto(
             _normalizar_payload_granel(_normalizar_payload_racao(produto.model_dump()))
         )
 
-        # Adicionar user_id aos dados (necessÃ¡rio para o modelo)
+        # Adicionar user_id aos dados (necessário para o modelo)
         produto_data["user_id"] = current_user.id
 
-        # Chamar service com regras de negÃ³cio
+        # Chamar service com regras de negócio
         novo_produto = ProdutoService.create_produto(
             dados=produto_data, db=db, tenant_id=tenant_id
         )
 
-        logger.info(f"âœ… Produto criado com sucesso! ID: {novo_produto.id}")
+        logger.info(f"✅ Produto criado com sucesso! ID: {novo_produto.id}")
         return novo_produto
 
     except ValueError as e:
-        # Erros de validaÃ§Ã£o de negÃ³cio
-        logger.warning(f"âš ï¸ ValidaÃ§Ã£o de negÃ³cio falhou: {str(e)}")
+        # Erros de validação de negócio
+        logger.warning(f"⚠️ Validação de negócio falhou: {str(e)}")
         raise HTTPException(status_code=400, detail=str(e))
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"âŒ Erro ao criar produto: {str(e)}")
-        logger.error(f"âŒ Tipo do erro: {type(e).__name__}")
+        logger.error(f"❌ Erro ao criar produto: {str(e)}")
+        logger.error(f"❌ Tipo do erro: {type(e).__name__}")
         raise HTTPException(status_code=500, detail=f"Erro ao criar produto: {str(e)}")
 
 
@@ -207,7 +207,7 @@ def obter_produto(
     user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     """
-    ObtÃ©m detalhes completos de um produto
+    Obtém detalhes completos de um produto
 
     Para produtos do tipo KIT:
     - Retorna composicao_kit (lista de componentes)
@@ -228,7 +228,7 @@ def obter_produto(
     )
 
     if not produto:
-        raise HTTPException(status_code=404, detail="Produto nÃ£o encontrado")
+        raise HTTPException(status_code=404, detail="Produto não encontrado")
 
     # Preparar resposta base
     response_data = {
@@ -249,7 +249,7 @@ def obter_produto(
         from app.services.kit_estoque_service import KitEstoqueService
         from app.services.kit_custo_service import KitCustoService
 
-        # Buscar composiÃ§Ã£o do KIT
+        # Buscar composição do KIT
         composicao = KitEstoqueService.obter_detalhes_composicao(
             db,
             produto_id,
@@ -268,9 +268,9 @@ def obter_produto(
                 tenant_id=getattr(produto, "tenant_id", tenant_id),
             )
             response_data["estoque_virtual"] = estoque_virtual
-            logger.info(f"ðŸ§© Kit #{produto_id}: estoque_virtual={estoque_virtual}")
+            logger.info(f"🧩 Kit #{produto_id}: estoque_virtual={estoque_virtual}")
         else:
-            # KIT FÃSICO usa estoque prÃ³prio
+            # KIT FÍSICO usa estoque próprio
             response_data["estoque_virtual"] = int(produto.estoque_atual or 0)
 
     # Mapear tipo_kit para e_kit_fisico (compatibilidade com frontend)
@@ -335,9 +335,9 @@ def atualizar_produto(
     )
 
     if not produto:
-        raise HTTPException(status_code=404, detail="Produto nÃ£o encontrado")
+        raise HTTPException(status_code=404, detail="Produto não encontrado")
 
-    # Verificar se novo SKU jÃ¡ existe
+    # Verificar se novo SKU já existe
     if produto_update.codigo is not None:
         produto_update.codigo = _normalizar_sku_produto(produto_update.codigo)
         if produto_update.codigo.lower() != str(produto.codigo or "").strip().lower():
@@ -345,7 +345,7 @@ def atualizar_produto(
                 db, produto_update.codigo, tenant_id, produto_id=produto_id
             )
 
-    # Verificar se novo cÃ³digo de barras jÃ¡ existe
+    # Verificar se novo código de barras já existe
     if (
         produto_update.codigo_barras
         and produto_update.codigo_barras != produto.codigo_barras
@@ -363,7 +363,7 @@ def atualizar_produto(
         if existe_barcode:
             raise HTTPException(
                 status_code=400,
-                detail=f"CÃ³digo de barras '{produto_update.codigo_barras}' jÃ¡ cadastrado",
+                detail=f"Código de barras '{produto_update.codigo_barras}' já cadastrado",
             )
 
     # Extrair dados
@@ -376,13 +376,13 @@ def atualizar_produto(
     dados_recebidos = _normalizar_promocao_erp_payload(dados_recebidos, produto)
 
     # ========================================
-    # ï¿½ðŸ”’ TRAVA 3 â€” VALIDAÃ‡ÃƒO: PRODUTO PAI NÃƒO TEM PREÃ‡O (ATUALIZAÃ‡ÃƒO)
+    # 🔒 TRAVA 3 — VALIDAÇÃO: PRODUTO PAI NÃO TEM PREÇO (ATUALIZAÇÃO)
     # ========================================
     is_parent_atual = produto.is_parent
     is_parent_novo = dados_recebidos.get("is_parent", is_parent_atual)
 
     if is_parent_novo:
-        # Bloquear alteraÃ§Ã£o de preÃ§o em produto PAI
+        # Bloquear alteração de preço em produto PAI
         if (
             "preco_venda" in dados_recebidos
             and dados_recebidos["preco_venda"]
@@ -390,10 +390,10 @@ def atualizar_produto(
         ):
             raise HTTPException(
                 status_code=400,
-                detail="âŒ Produto pai nÃ£o pode ter preÃ§o de venda. O preÃ§o deve ser definido nas variaÃ§Ãµes individuais.",
+                detail="❌ Produto pai não pode ter preço de venda. O preço deve ser definido nas variações individuais.",
             )
 
-        # Bloquear alteraÃ§Ã£o de estoque em produto PAI
+        # Bloquear alteração de estoque em produto PAI
         if (
             "estoque_atual" in dados_recebidos
             and dados_recebidos["estoque_atual"]
@@ -401,13 +401,13 @@ def atualizar_produto(
         ):
             raise HTTPException(
                 status_code=400,
-                detail="âŒ Produto pai nÃ£o pode ter estoque. O estoque deve ser gerenciado nas variaÃ§Ãµes.",
+                detail="❌ Produto pai não pode ter estoque. O estoque deve ser gerenciado nas variações.",
             )
 
     # ========================================
-    # ðŸ”’ VALIDAÃ‡ÃƒO: VARIAÃ‡ÃƒO DUPLICADA (ATUALIZAÃ‡ÃƒO)
+    # 🔒 VALIDAÇÃO: VARIAÇÃO DUPLICADA (ATUALIZAÇÃO)
     # ========================================
-    # Se estÃ¡ atualizando signature de uma VARIAÃ‡ÃƒO, verificar duplicidade
+    # Se está atualizando signature de uma VARIAÇÃO, verificar duplicidade
     if (
         "variation_signature" in dados_recebidos
         and dados_recebidos["variation_signature"]
@@ -418,7 +418,7 @@ def atualizar_produto(
                 Produto.tenant_id == tenant_id,
                 Produto.produto_pai_id == produto.produto_pai_id,
                 Produto.variation_signature == dados_recebidos["variation_signature"],
-                Produto.id != produto_id,  # Excluir o prÃ³prio produto
+                Produto.id != produto_id,  # Excluir o próprio produto
                 Produto.ativo.is_(True),
             )
             .first()
@@ -427,7 +427,7 @@ def atualizar_produto(
         if variacao_existente:
             raise HTTPException(
                 status_code=409,
-                detail=f"âŒ JÃ¡ existe uma variaÃ§Ã£o com os mesmos atributos para este produto. VariaÃ§Ã£o existente: '{variacao_existente.nome}' (ID: {variacao_existente.id})",
+                detail=f"❌ Já existe uma variação com os mesmos atributos para este produto. Variação existente: '{variacao_existente.nome}' (ID: {variacao_existente.id})",
             )
 
     tipo_produto_final = dados_recebidos.get("tipo_produto", produto.tipo_produto)
@@ -468,16 +468,16 @@ def atualizar_produto(
         produto_sera_composto = False
 
     # ========================================
-    # ATUALIZAR COMPOSIÃ‡ÃƒO DO KIT (se enviado)
+    # ATUALIZAR COMPOSIÇÃO DO KIT (se enviado)
     # ========================================
     if composicao_kit is not None and produto_sera_composto:
         from app.services.kit_estoque_service import KitEstoqueService
 
-        # âš ï¸ VALIDAÃ‡ÃƒO OBRIGATÃ“RIA: KIT deve ter pelo menos 1 componente
+        # ⚠️ VALIDAÇÃO OBRIGATÓRIA: KIT deve ter pelo menos 1 componente
         if len(composicao_kit) == 0:
             raise HTTPException(
                 status_code=400,
-                detail="Produto do tipo KIT deve ter pelo menos 1 componente na composiÃ§Ã£o. Adicione os produtos que fazem parte do kit antes de salvar.",
+                detail="Produto do tipo KIT deve ter pelo menos 1 componente na composição. Adicione os produtos que fazem parte do kit antes de salvar.",
             )
 
         # Validar novos componentes
@@ -487,7 +487,7 @@ def atualizar_produto(
 
         if not valido:
             raise HTTPException(
-                status_code=400, detail=f"ComposiÃ§Ã£o invÃ¡lida: {erro}"
+                status_code=400, detail=f"Composição inválida: {erro}"
             )
 
         # Remover componentes antigos
@@ -508,7 +508,7 @@ def atualizar_produto(
             db.add(novo_comp)
 
         logger.info(
-            f"ðŸ§© ComposiÃ§Ã£o do Kit #{produto_id} atualizada: {len(composicao_kit)} componentes"
+            f"🧩 Composição do Kit #{produto_id} atualizada: {len(composicao_kit)} componentes"
         )
     elif composicao_kit is not None and not produto_sera_composto:
         db.query(ProdutoKitComponente).filter(
@@ -560,7 +560,7 @@ def atualizar_produto(
 
         db.commit()
         db.refresh(produto)
-        logger.info(f"âœ… Produto #{produto_id} atualizado com sucesso")
+        logger.info(f"✅ Produto #{produto_id} atualizado com sucesso")
 
         # Notificar clientes "Avise-me" se estoque voltou ao positivo
         if (
@@ -581,17 +581,17 @@ def atualizar_produto(
                     f"Aviso: erro ao enviar notificacoes avise-me: {_notify_err}"
                 )
 
-        # Retornar com composiÃ§Ã£o e estoque virtual
+        # Retornar com composição e estoque virtual
         return obter_produto(produto_id, db, user_and_tenant)
 
     except Exception as e:
         db.rollback()
-        logger.error(f"âŒ Erro ao atualizar produto: {str(e)}")
+        logger.error(f"❌ Erro ao atualizar produto: {str(e)}")
         raise HTTPException(
             status_code=500, detail=f"Erro ao atualizar produto: {str(e)}"
         )
 
 
 # ============================================================================
-# ATUALIZAÃ‡ÃƒO EM LOTE
+# ATUALIZAÇÃO EM LOTE
 # ============================================================================

@@ -28,8 +28,8 @@ def listar_contas_receber(
     data_fim: Optional[date] = Query(None),
     apenas_vencidas: bool = Query(False),
     apenas_vencer: bool = Query(False),
-    numero_venda: Optional[str] = Query(None),  # Filtro por nÃºmero da venda
-    limit: int = Query(500, le=1000),  # Aumentado para 500 registros por padrÃ£o
+    numero_venda: Optional[str] = Query(None),  # Filtro por número da venda
+    limit: int = Query(500, le=1000),  # Aumentado para 500 registros por padrão
     offset: int = Query(0, ge=0),
     db: Session = Depends(get_session),
     user_and_tenant=Depends(get_current_user_and_tenant),
@@ -64,7 +64,7 @@ def listar_contas_receber(
     if data_fim:
         query = query.filter(ContaReceber.data_vencimento <= data_fim)
 
-    # Filtro por nÃºmero de venda
+    # Filtro por número de venda
     if numero_venda:
         from app.vendas_models import Venda
 
@@ -119,7 +119,7 @@ def listar_contas_receber(
             if cliente:
                 cliente_nome = cliente.nome
 
-        # Buscar nÃºmero da venda se existir venda_id
+        # Buscar número da venda se existir venda_id
         numero_venda = None
         if conta.venda_id:
             from app.vendas_models import Venda
@@ -156,7 +156,7 @@ def listar_contas_receber(
                 "venda_id": conta.venda_id,
                 "numero_venda": numero_venda,
                 "observacoes": conta.observacoes,
-                # ConciliaÃ§Ã£o de cartÃ£o
+                # Conciliação de cartão
                 "nsu": conta.nsu,
                 "adquirente": conta.adquirente,
                 "conciliado": conta.conciliado,
@@ -168,7 +168,7 @@ def listar_contas_receber(
 
 
 # ============================================================================
-# BUSCAR CONTA ESPECÃFICA
+# BUSCAR CONTA ESPECÍFICA
 # ============================================================================
 
 
@@ -179,7 +179,7 @@ def buscar_conta_receber(
     user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     """
-    Busca uma conta a receber especÃ­fica com todos os detalhes
+    Busca uma conta a receber específica com todos os detalhes
     """
     from .vendas_models import Venda
     from .financeiro_models import ContaBancaria
@@ -199,7 +199,7 @@ def buscar_conta_receber(
     )
 
     if not conta:
-        raise HTTPException(status_code=404, detail="Conta nÃ£o encontrada")
+        raise HTTPException(status_code=404, detail="Conta não encontrada")
 
     # Buscar cliente
     cliente = None
@@ -225,7 +225,7 @@ def buscar_conta_receber(
             .first()
         )
 
-    # Buscar recebimentos com conta bancÃ¡ria
+    # Buscar recebimentos com conta bancária
     recebimentos_detalhados = []
     for r in conta.recebimentos:
         conta_bancaria = None
@@ -372,7 +372,7 @@ def dashboard_contas_receber(
         or 0
     )
 
-    # PrÃ³ximos 7 dias
+    # Próximos 7 dias
     data_7dias = hoje + timedelta(days=7)
     total_7dias = (
         db.query(func.sum(ContaReceber.valor_final - ContaReceber.valor_recebido))
@@ -387,7 +387,7 @@ def dashboard_contas_receber(
         or 0
     )
 
-    # PrÃ³ximos 30 dias
+    # Próximos 30 dias
     data_30dias = hoje + timedelta(days=30)
     total_30dias = (
         db.query(func.sum(ContaReceber.valor_final - ContaReceber.valor_recebido))
@@ -402,7 +402,7 @@ def dashboard_contas_receber(
         or 0
     )
 
-    # Recebido no mÃªs
+    # Recebido no mês
     primeiro_dia_mes = hoje.replace(day=1)
     total_recebido_mes = (
         db.query(func.sum(ContaReceber.valor_recebido))
@@ -428,5 +428,5 @@ def dashboard_contas_receber(
 
 
 # ============================================================================
-# PROCESSAR RECORRÃŠNCIAS
+# PROCESSAR RECORRÊNCIAS
 # ============================================================================

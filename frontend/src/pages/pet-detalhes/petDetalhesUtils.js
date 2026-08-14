@@ -29,7 +29,7 @@ export function calcularIdade(dataNascimento) {
   const meses = hoje.getMonth() - nascimento.getMonth();
 
   if (anos === 0) {
-    return `${meses} ${meses === 1 ? "mÃªs" : "meses"}`;
+    return `${meses} ${meses === 1 ? "mês" : "meses"}`;
   }
   if (meses < 0) {
     return `${anos - 1} anos e ${12 + meses} meses`;
@@ -37,7 +37,7 @@ export function calcularIdade(dataNascimento) {
   if (meses === 0) {
     return `${anos} ${anos === 1 ? "ano" : "anos"}`;
   }
-  return `${anos} anos e ${meses} ${meses === 1 ? "mÃªs" : "meses"}`;
+  return `${anos} anos e ${meses} ${meses === 1 ? "mês" : "meses"}`;
 }
 
 export function formatarData(data) {

@@ -17,14 +17,14 @@ export function normalizeDisplayText(value) {
   }
 
   return text
-    .replace(/ï¿½/g, "")
+    .replace(/�/g, "")
     .replace(/\s{2,}/g, " ")
     .trim();
 }
 
 export function normalizeIcon(iconValue) {
   const icon = normalizeDisplayText(iconValue);
-  if (!icon || /[?ï¿½]/.test(icon)) return ICON_FALLBACK;
+  if (!icon || /[?�]/.test(icon)) return ICON_FALLBACK;
   return icon;
 }
 
