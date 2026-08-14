@@ -13,114 +13,12 @@ from app.estoque_validade_service import EstoqueValidadeService
 from app.models import Tenant
 from app.scripts.seed_demo_operacional_catalog import _ensure_demo_product_category
 from app.scripts.seed_demo_operacional_db import _scalar
+from app.scripts.seed_demo_operacional_showcase_data import (
+    DEMO_RATION_SHOWCASE_PRODUCTS,
+    DEMO_REMINDER_SCENARIOS,
+    DEMO_VALIDITY_SCENARIOS,
+)
 from app.tenancy.context import tenant_context
-
-
-DEMO_RATION_SHOWCASE_PRODUCTS = (
-    {
-        "code": "DEMO-RACAO-COMP-001", "name": "Racao VivaPata Performance Caes Adultos Frango 15 kg",
-        "brand": "VivaPata Demo", "classification": "premium", "line": "Premium",
-        "species": "dog", "category": "adulto", "phase": "Adulto", "size": "Todos",
-        "flavor": "Frango", "weight": Decimal("15"),
-        "cost": Decimal("118.90"), "price": Decimal("199.90"),
-        "stock": Decimal("24"), "minimum_stock": Decimal("8"),
-        "interval_days": 30, "recurring": True,
-        "consumption": {"2kg": 48, "5kg": 92, "10kg": 150, "20kg": 280, "30kg": 365},
-    },
-    {
-        "code": "DEMO-RACAO-COMP-002", "name": "Racao NutriCauda Prime Caes Adultos Carne 15 kg",
-        "brand": "NutriCauda Demo", "classification": "super_premium", "line": "Super Premium",
-        "species": "dog", "category": "adulto", "phase": "Adulto", "size": "Todos",
-        "flavor": "Carne", "weight": Decimal("15"),
-        "cost": Decimal("132.00"), "price": Decimal("229.90"),
-        "stock": Decimal("18"), "minimum_stock": Decimal("7"),
-        "interval_days": 35, "recurring": True,
-        "consumption": {"2kg": 40, "5kg": 78, "10kg": 125, "20kg": 230, "30kg": 305},
-    },
-    {
-        "code": "DEMO-RACAO-COMP-003", "name": "Racao BemPet Essencial Caes Adultos Frango 15 kg",
-        "brand": "BemPet Demo", "classification": "standard", "line": "Standard",
-        "species": "dog", "category": "adulto", "phase": "Adulto", "size": "Todos",
-        "flavor": "Frango", "weight": Decimal("15"),
-        "cost": Decimal("89.90"), "price": Decimal("159.90"),
-        "stock": Decimal("30"), "minimum_stock": Decimal("10"),
-        "interval_days": 28, "recurring": True,
-        "consumption": {"2kg": 58, "5kg": 112, "10kg": 190, "20kg": 360, "30kg": 470},
-    },
-    {
-        "code": "DEMO-RACAO-COMP-004",
-        "name": "Racao VivaPata Crescer Filhotes Frango e Arroz 10 kg",
-        "brand": "VivaPata Demo",
-        "classification": "premium",
-        "line": "Premium",
-        "species": "dog",
-        "category": "filhote",
-        "phase": "Filhote",
-        "size": "Todos",
-        "flavor": "Frango e Arroz",
-        "weight": Decimal("10"),
-        "cost": Decimal("82.50"),
-        "price": Decimal("149.90"),
-        "stock": Decimal("20"),
-        "minimum_stock": Decimal("6"),
-        "interval_days": 30,
-        "recurring": False,
-        "consumption": {"2kg": 70, "5kg": 135, "10kg": 220, "20kg": 390, "30kg": 510},
-    },
-    {
-        "code": "DEMO-RACAO-COMP-005",
-        "name": "Racao NutriCauda Gatos Castrados Salmao 7 kg",
-        "brand": "NutriCauda Demo",
-        "classification": "super_premium",
-        "line": "Super Premium",
-        "species": "cat",
-        "category": "adulto",
-        "phase": "Adulto",
-        "size": "Todos",
-        "flavor": "Salmao",
-        "weight": Decimal("7"),
-        "cost": Decimal("76.40"),
-        "price": Decimal("139.90"),
-        "stock": Decimal("16"),
-        "minimum_stock": Decimal("5"),
-        "interval_days": 42,
-        "recurring": False,
-        "consumption": {"2kg": 32, "4kg": 55, "6kg": 76, "8kg": 92},
-    },
-    {
-        "code": "DEMO-RACAO-COMP-006",
-        "name": "Racao BemPet Gatos Adultos Frango 3 kg",
-        "brand": "BemPet Demo",
-        "classification": "especial",
-        "line": "Especial",
-        "species": "cat",
-        "category": "adulto",
-        "phase": "Adulto",
-        "size": "Todos",
-        "flavor": "Frango",
-        "weight": Decimal("3"),
-        "cost": Decimal("31.80"),
-        "price": Decimal("64.90"),
-        "stock": Decimal("22"),
-        "minimum_stock": Decimal("7"),
-        "interval_days": 35,
-        "recurring": False,
-        "consumption": {"2kg": 38, "4kg": 64, "6kg": 86, "8kg": 105},
-    },
-)
-
-DEMO_REMINDER_SCENARIOS = (
-    {"product": "DEMO-RACAO-COMP-001", "pet": "thor", "days": -2},
-    {"product": "DEMO-RACAO-COMP-002", "pet": "luna", "days": 3},
-    {"product": "DEMO-RACAO-COMP-003", "pet": "thor", "days": 7},
-    {"product": "DEMO-RACAO-COMP-001", "pet": "luna", "days": 18},
-)
-
-DEMO_VALIDITY_SCENARIOS = (
-    {"product": "DEMO-RACAO-COMP-004", "lot": "DEMO-VAL-001", "days": -1, "quantity": 3},
-    {"product": "DEMO-RACAO-COMP-005", "lot": "DEMO-VAL-002", "days": 5, "quantity": 4},
-    {"product": "DEMO-RACAO-COMP-006", "lot": "DEMO-VAL-003", "days": 12, "quantity": 6},
-)
 
 
 def _ensure_named_option(
@@ -131,7 +29,12 @@ def _ensure_named_option(
     name: str,
     order: int,
 ) -> int:
-    allowed_tables = {"linhas_racao", "portes_animal", "fases_publico", "sabores_proteina"}
+    allowed_tables = {
+        "linhas_racao",
+        "portes_animal",
+        "fases_publico",
+        "sabores_proteina",
+    }
     if table_name not in allowed_tables:
         raise ValueError(f"Tabela de opcao de racao nao permitida: {table_name}")
 
@@ -278,7 +181,9 @@ def _consumption_table(product: dict[str, Any]) -> str:
     }
     return json.dumps(
         {
-            "tipo": "filhote_peso_adulto" if product["category"] == "filhote" else "adulto_peso_atual",
+            "tipo": "filhote_peso_adulto"
+            if product["category"] == "filhote"
+            else "adulto_peso_atual",
             "dados": rows,
         },
         ensure_ascii=False,
@@ -417,14 +322,19 @@ def _ensure_showcase_product(
     }
 
 
-def _ensure_showcase_products(db, *, tenant_id: str, user_id: int) -> dict[str, dict[str, Any]]:
-    category_id = _ensure_demo_product_category(db, tenant_id=tenant_id, user_id=user_id)
+def _ensure_showcase_products(
+    db, *, tenant_id: str, user_id: int
+) -> dict[str, dict[str, Any]]:
+    category_id = _ensure_demo_product_category(
+        db, tenant_id=tenant_id, user_id=user_id
+    )
     option_cache: dict[tuple[str, str], int] = {}
     brand_cache: dict[str, int] = {}
     weight_cache: dict[Decimal, int] = {}
     result: dict[str, dict[str, Any]] = {}
 
     for index, product in enumerate(DEMO_RATION_SHOWCASE_PRODUCTS, start=1):
+
         def option(table_name: str, name: str) -> int:
             key = (table_name, name)
             if key not in option_cache:
@@ -618,7 +528,13 @@ def _insert_demo_reminders(
                 "notes": f"Demo operacional - lembrete recorrente {index}",
                 "price": product["price"],
                 "history": json.dumps(
-                    [{"dose": 1, "data": (due_at - timedelta(days=30)).isoformat(), "comprou": True}],
+                    [
+                        {
+                            "dose": 1,
+                            "data": (due_at - timedelta(days=30)).isoformat(),
+                            "comprou": True,
+                        }
+                    ],
                     ensure_ascii=False,
                 ),
             },

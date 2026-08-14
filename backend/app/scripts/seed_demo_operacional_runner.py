@@ -158,7 +158,9 @@ def apply_operational_seed(
             "sales_scenarios": [asdict(s) for s in build_demo_scenarios()],
             "fixed_payables": [asdict(p) for p in build_fixed_payables()],
             "purchase_scenarios": build_demo_purchase_scenarios(),
-            "showcase_products": [item["name"] for item in DEMO_RATION_SHOWCASE_PRODUCTS],
+            "showcase_products": [
+                item["name"] for item in DEMO_RATION_SHOWCASE_PRODUCTS
+            ],
         }
 
     _cleanup_previous_demo(db, tenant_id=tenant_id)

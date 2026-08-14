@@ -16,7 +16,9 @@ def test_demo_showcase_has_complete_rations_for_detailed_comparison():
     adult_15kg = [
         item
         for item in DEMO_RATION_SHOWCASE_PRODUCTS
-        if item["weight"] == 15 and item["phase"] == "Adulto" and item["size"] == "Todos"
+        if item["weight"] == 15
+        and item["phase"] == "Adulto"
+        and item["size"] == "Todos"
     ]
     assert len(adult_15kg) == 3
     assert {item["classification"] for item in adult_15kg} == {
@@ -24,8 +26,13 @@ def test_demo_showcase_has_complete_rations_for_detailed_comparison():
         "super_premium",
         "standard",
     }
-    assert all(item["price"] > item["cost"] > 0 for item in DEMO_RATION_SHOWCASE_PRODUCTS)
-    assert all(json.loads(_consumption_table(item))["dados"] for item in DEMO_RATION_SHOWCASE_PRODUCTS)
+    assert all(
+        item["price"] > item["cost"] > 0 for item in DEMO_RATION_SHOWCASE_PRODUCTS
+    )
+    assert all(
+        json.loads(_consumption_table(item))["dados"]
+        for item in DEMO_RATION_SHOWCASE_PRODUCTS
+    )
 
 
 def test_demo_showcase_covers_recurring_alert_deadlines():
