@@ -126,6 +126,7 @@ def _insert_order(
     client_id: int,
     total: Decimal,
     items: list[dict[str, Any]],
+    pickup_keyword: str | None,
 ) -> None:
     db.execute(
         text(
@@ -137,7 +138,7 @@ def _insert_order(
             )
             VALUES (
                 :order_id, :client_id, :tenant_id, :total, :origin, :status,
-                :tipo_retirada, :palavra_chave, false,
+                :tipo_retirada, :palavra_chave, :is_drive,
                 'demo', :preference, :payment_url, now()
             )
             """
@@ -149,8 +150,9 @@ def _insert_order(
             "total": float(total),
             "origin": scenario.order_origin,
             "status": scenario.order_status,
-            "tipo_retirada": "proprio" if not scenario.delivery else None,
-            "palavra_chave": "core-demo" if not scenario.delivery else None,
+            "tipo_retirada": scenario.pickup_type,
+            "palavra_chave": pickup_keyword,
+            "is_drive": scenario.is_drive,
             "preference": f"PREF-{scenario.order_id}",
             "payment_url": f"https://corepet.com.br/demo/pay/{scenario.order_id}",
         },

@@ -18,7 +18,7 @@ def test_demo_operacional_scenarios_cover_sales_story():
 
     assert {scenario.channel for scenario in scenarios} >= {
         "loja_fisica",
-        "app_mobile",
+        "app",
         "ecommerce",
     }
     assert any(scenario.delivery for scenario in scenarios)
@@ -38,6 +38,14 @@ def test_demo_operacional_scenarios_cover_sales_story():
     )
     assert any(scenario.order_origin == "app" for scenario in scenarios)
     assert any(scenario.order_origin == "web" for scenario in scenarios)
+    recent_online = [
+        scenario
+        for scenario in scenarios[:6]
+        if scenario.days_ago == 0 and scenario.channel in {"app", "ecommerce"}
+    ]
+    assert {scenario.channel for scenario in recent_online} == {"app", "ecommerce"}
+    assert any(scenario.delivery for scenario in recent_online)
+    assert any(scenario.pickup_type == "app_loja" for scenario in recent_online)
     assert any(getattr(scenario, "commissioned", False) for scenario in scenarios)
     historical_days = {scenario.days_ago for scenario in scenarios[6:]}
     assert all(1 <= day <= 88 for day in historical_days)
@@ -346,3 +354,21 @@ def test_demo_operacional_blocks_production_apply_without_override():
 def test_demo_operacional_money_rounds_to_cents():
     assert money("10.005") == Decimal("10.01")
     assert money(Decimal("10")) == Decimal("10.00")
+
+
+def test_demo_online_pickup_uses_checkout_keyword_generator(monkeypatch):
+    from app.routes import ecommerce_checkout_support
+    from app.scripts.seed_demo_operacional_sales_core import _online_pickup_details
+
+    scenario = next(
+        scenario
+        for scenario in build_demo_scenarios()
+        if scenario.pickup_type == "app_loja"
+    )
+    monkeypatch.setattr(
+        ecommerce_checkout_support,
+        "_gerar_palavra_chave_retirada",
+        lambda: "patinha",
+    )
+
+    assert _online_pickup_details(scenario) == ("app_loja", "patinha")
