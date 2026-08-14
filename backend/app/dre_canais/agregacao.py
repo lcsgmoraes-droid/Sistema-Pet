@@ -1,5 +1,6 @@
+from datetime import date
 from decimal import Decimal
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from sqlalchemy import and_, extract, func
 from sqlalchemy.orm import Session, selectinload
@@ -23,7 +24,7 @@ from app.dre_canais.base import (
     _normalizar_canal,
     _normalizar_forma_pagamento,
     _novo_canal,
-    _periodo_mes,
+    _periodo_meses,
     _separar_receita_produto_servico,
     _snapshot_pronto,
     _texto_conta,
@@ -482,9 +483,16 @@ def _aplicar_estimativas_cmv(
         dados["origem_percentual_cmv_estimado"] = origem_percentual
 
 
-def obter_vendas_por_canal(db: Session, mes: int, ano: int, tenant_id: str) -> Dict:
+def obter_vendas_por_canal(
+    db: Session,
+    mes: int,
+    ano: int,
+    tenant_id: str,
+    mes_inicial: Optional[int] = None,
+    data_final: Optional[date] = None,
+) -> Dict:
     """Retorna vendas agrupadas por canal usando a fotografia de rentabilidade da venda."""
-    inicio, fim = _periodo_mes(mes, ano)
+    inicio, fim = _periodo_meses(mes_inicial or mes, mes, ano, data_final)
     filtros_venda = [
         Venda.tenant_id == tenant_id,
         Venda.data_venda >= inicio,
@@ -579,9 +587,16 @@ def obter_vendas_por_canal(db: Session, mes: int, ano: int, tenant_id: str) -> D
 
 
 def agregar_contas_pagar_por_canal(
-    db: Session, mes: int, ano: int, tenant_id: str, dados_canais: Dict[str, Dict]
+    db: Session,
+    mes: int,
+    ano: int,
+    tenant_id: str,
+    dados_canais: Dict[str, Dict],
+    mes_inicial: Optional[int] = None,
+    data_final: Optional[date] = None,
 ) -> None:
     """Agrega despesas por competencia. Sem canal informado vai para Loja Fisica."""
+    inicio, fim = _periodo_meses(mes_inicial or mes, mes, ano, data_final)
     contas = (
         db.query(ContaPagar)
         .outerjoin(
@@ -590,8 +605,8 @@ def agregar_contas_pagar_por_canal(
         .filter(
             and_(
                 ContaPagar.tenant_id == tenant_id,
-                extract("month", ContaPagar.data_emissao) == mes,
-                extract("year", ContaPagar.data_emissao) == ano,
+                ContaPagar.data_emissao >= inicio,
+                ContaPagar.data_emissao < fim,
                 ContaPagar.status != "cancelado",
                 ContaPagar.afeta_dre.is_(True),
                 ContaPagar.nota_entrada_id.is_(None),
@@ -631,7 +646,14 @@ def agregar_contas_pagar_por_canal(
         dados[campo] += _conta_valor(conta)
 
     resumo_folha = calcular_resumo_folha_gerencial(
-        db, mes, ano, tenant_id, contas, subcategorias
+        db,
+        mes,
+        ano,
+        tenant_id,
+        contas,
+        subcategorias,
+        mes_inicial=mes_inicial,
+        data_final=data_final,
     )
     for canal, valor in resumo_folha["ajustes_por_canal"].items():
         if valor:
@@ -639,8 +661,15 @@ def agregar_contas_pagar_por_canal(
 
 
 def agregar_fretes_sobre_compras(
-    db: Session, mes: int, ano: int, tenant_id: str, dados_canais: Dict[str, Dict]
+    db: Session,
+    mes: int,
+    ano: int,
+    tenant_id: str,
+    dados_canais: Dict[str, Dict],
+    mes_inicial: Optional[int] = None,
+    data_final: Optional[date] = None,
 ) -> None:
+    inicio, fim = _periodo_meses(mes_inicial or mes, mes, ano, data_final)
     subcategoria_frete_compras = (
         db.query(DRESubcategoria)
         .filter(
@@ -658,8 +687,8 @@ def agregar_fretes_sobre_compras(
         .filter(
             and_(
                 ContaPagar.tenant_id == tenant_id,
-                extract("month", ContaPagar.data_emissao) == mes,
-                extract("year", ContaPagar.data_emissao) == ano,
+                ContaPagar.data_emissao >= inicio,
+                ContaPagar.data_emissao < fim,
                 ContaPagar.status != "cancelado",
                 ContaPagar.dre_subcategoria_id == subcategoria_frete_compras.id,
             )

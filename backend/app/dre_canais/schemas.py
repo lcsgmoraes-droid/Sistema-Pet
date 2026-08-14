@@ -1,3 +1,4 @@
+from datetime import date
 from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field
@@ -38,8 +39,10 @@ class DREPorCanalResponse(BaseModel):
     """DRE completa com linhas separadas por canal"""
 
     periodo: str
+    mes_inicial: int
     mes: int
     ano: int
+    data_final: Optional[date] = None
     linhas: List[LinhaCanal]
     totais: Dict
     canais_encontrados: List[str]
