@@ -40,6 +40,24 @@ def _payment_profile(support: dict[str, Any], key: str) -> dict[str, Any]:
     return _PAYMENT_PROFILES[key] | {"id": payment_id}
 
 
+def _online_pickup_details(scenario: SaleScenario) -> tuple[str | None, str | None]:
+    pickup_type = scenario.pickup_type
+    if pickup_type not in {"proprio", "terceiro", "app_loja"}:
+        return None, None
+
+    should_generate_keyword = pickup_type in {"terceiro", "app_loja"} or (
+        pickup_type == "proprio" and scenario.is_drive
+    )
+    if not should_generate_keyword:
+        return pickup_type, None
+
+    # Reuse the checkout rule so the demo follows the same automatic behavior
+    # used by real App/Ecommerce purchases.
+    from app.routes.ecommerce_checkout_support import _gerar_palavra_chave_retirada
+
+    return pickup_type, _gerar_palavra_chave_retirada()
+
+
 def _insert_cashier(
     db,
     *,
@@ -163,7 +181,7 @@ def _insert_sale(
     is_card_payment = scenario.payment_key in {"debito", "credito"}
     channel_category_key = (
         "receita_app"
-        if scenario.channel == "app_mobile"
+        if scenario.channel in {"app", "app_mobile"}
         else "receita_ecommerce"
         if scenario.channel == "ecommerce"
         else "receita_produtos"
@@ -173,6 +191,10 @@ def _insert_sale(
     client_id = support["people"][scenario.client_key]
     driver_id = support["people"]["entregador"] if scenario.delivery else None
     delivery_loja = money(scenario.delivery_fee - scenario.driver_share)
+    pickup_type, pickup_keyword = _online_pickup_details(scenario)
+    delivery_status = _sale_delivery_status(scenario.route_status)
+    if scenario.order_id and pickup_type and delivery_status is None:
+        delivery_status = "pendente"
     snapshot = {
         "demo_operacional": True,
         "cmv_total": cmv,
@@ -250,7 +272,7 @@ def _insert_sale(
                 "delivery_obs": "Demo operacional - entrega com rota"
                 if scenario.delivery
                 else None,
-                "delivery_status": _sale_delivery_status(scenario.route_status),
+                "delivery_status": delivery_status,
                 "delivery_date": sale_dt + timedelta(hours=2)
                 if scenario.route_status == "concluida"
                 else None,
@@ -266,15 +288,9 @@ def _insert_sale(
                 "finalized_at": sale_dt if scenario.received_ratio >= 1 else None,
                 "sale_dt": sale_dt,
                 "snapshot": json.dumps(snapshot, default=decimal_json),
-                "tipo_retirada": "proprio"
-                if scenario.order_id and not scenario.delivery
-                else None,
-                "palavra_chave": "core-demo"
-                if scenario.order_id and not scenario.delivery
-                else None,
-                "retirado_por": "Cliente demo"
-                if scenario.order_id and not scenario.delivery
-                else None,
+                "tipo_retirada": pickup_type,
+                "palavra_chave": pickup_keyword,
+                "retirado_por": None,
                 "tenant_id": tenant_id,
             },
         )
@@ -498,6 +514,7 @@ def _insert_sale(
             client_id=client_id,
             total=total,
             items=items,
+            pickup_keyword=pickup_keyword,
         )
 
     return {
@@ -508,6 +525,10 @@ def _insert_sale(
         "cmv": cmv,
         "card_fee": card_fee,
         "delivery_driver": scenario.driver_share,
+        "channel": scenario.channel,
+        "delivery": scenario.delivery,
+        "delivery_status": delivery_status,
+        "pickup_keyword": pickup_keyword,
     }
 
 

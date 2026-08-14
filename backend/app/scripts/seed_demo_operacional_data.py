@@ -54,6 +54,8 @@ class SaleScenario:
     order_id: str | None = None
     order_origin: str | None = None
     order_status: str | None = None
+    pickup_type: str | None = None
+    is_drive: bool = False
     commissioned: bool = False
     observations: str = ""
 
@@ -119,11 +121,11 @@ def build_demo_scenarios() -> list[SaleScenario]:
         ),
         SaleScenario(
             number="DEMO-VEN-003",
-            channel="app_mobile",
+            channel="app",
             client_key="maria",
             payment_key="credito",
             items=((0, Decimal("1")), (4, Decimal("2"))),
-            days_ago=5,
+            days_ago=0,
             due_in_days=12,
             discount_percent=Decimal("10.00"),
             coupon="APP10",
@@ -148,7 +150,7 @@ def build_demo_scenarios() -> list[SaleScenario]:
             client_key="ana",
             payment_key="credito",
             items=((1, Decimal("1")), (5, Decimal("1"))),
-            days_ago=2,
+            days_ago=0,
             due_in_days=18,
             delivery=True,
             delivery_fee=Decimal("22.00"),
@@ -176,17 +178,20 @@ def build_demo_scenarios() -> list[SaleScenario]:
         ),
         SaleScenario(
             number="DEMO-VEN-006",
-            channel="app_mobile",
+            channel="app",
             client_key="joao",
             payment_key="pix",
             items=((2, Decimal("2")), (0, Decimal("1"))),
-            days_ago=10,
+            days_ago=0,
             coupon="FIDELIDADE5",
             discount_value=Decimal("8.00"),
             order_id="DEMO-APP-002",
             order_origin="app",
-            order_status="entregue",
-            observations="Venda pelo app com campanha de fidelidade e retirada.",
+            order_status="pago",
+            pickup_type="app_loja",
+            observations=(
+                "Venda pelo app com campanha de fidelidade e retirada por palavra-chave."
+            ),
             commissioned=True,
         ),
     ]
@@ -211,7 +216,7 @@ def build_demo_historical_scenarios(count: int = 48) -> list[SaleScenario]:
         channel = (
             "ecommerce"
             if index % 10 == 0
-            else "app_mobile"
+            else "app"
             if index % 5 == 0
             else "loja_fisica"
         )
