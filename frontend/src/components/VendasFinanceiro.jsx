@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import toast from "react-hot-toast";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import api from "../api";
 import { useAuth } from "../contexts/AuthContext";
 import VendasFinanceiroView from "./financeiro/VendasFinanceiroView";
@@ -39,6 +39,7 @@ import {
 } from "./financeiro/vendasFinanceiroUtils";
 import { useVendasFinanceiroActions } from "./financeiro/vendasFinanceiro/useVendasFinanceiroActions";
 import { formatMoneyCellValue, isZeroMoneyValue } from "./ui/MoneyCell";
+import { getDashboardPeriodFromSearch } from "../pages/dashboard/dashboardOverview";
 
 function obterCanalVendaFinanceiro(venda) {
   return normalizeSalesChannel(
@@ -64,14 +65,18 @@ const RESUMO_VENDAS_VAZIO = {
 export default function VendasFinanceiro() {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const dashboardPeriod = useMemo(() => getDashboardPeriodFromSearch(searchParams), [searchParams]);
   const userPermissions = user?.permissions || [];
   const podeVerFinanceiroCompleto =
     user?.is_admin === true || userPermissions.includes("relatorios.financeiro");
   const [loading, setLoading] = useState(false);
   const [abaAtiva, setAbaAtiva] = useState("resumo");
-  const [dataInicio, setDataInicio] = useState("");
-  const [dataFim, setDataFim] = useState("");
-  const [filtroSelecionado, setFiltroSelecionado] = useState("");
+  const [dataInicio, setDataInicio] = useState(() => dashboardPeriod?.start || "");
+  const [dataFim, setDataFim] = useState(() => dashboardPeriod?.end || "");
+  const [filtroSelecionado, setFiltroSelecionado] = useState(
+    () => dashboardPeriod?.quickFilter || "",
+  );
   const [modoComparacao, setModoComparacao] = useState(false);
   const [periodoComparacao, setPeriodoComparacao] = useState("mes_anterior");
 
@@ -571,7 +576,7 @@ export default function VendasFinanceiro() {
 
   // Aplicar filtro "Este mês" ao carregar componente pela primeira vez
   useEffect(() => {
-    aplicarFiltroRapido("este_mes");
+    if (!dashboardPeriod) aplicarFiltroRapido("este_mes");
   }, []); // Roda apenas uma vez ao montar o componente
 
   if (loading) {

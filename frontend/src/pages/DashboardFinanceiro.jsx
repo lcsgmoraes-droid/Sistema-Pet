@@ -40,6 +40,7 @@ import {
   calculateDashboardIndicators,
   createEmptyDashboardSummary,
   createEmptyManagementMetrics,
+  getDashboardDetailPath,
   getExecutiveStatus,
   getPeriodLabel,
 } from "./dashboard/dashboardOverview";
@@ -268,7 +269,7 @@ export default function DashboardFinanceiro() {
             value={formatMoneyBRL(grossSales)}
             detail={periodLabel}
             tone="violet"
-            onClick={() => navigate("/financeiro/vendas")}
+            onClick={() => navigate(getDashboardDetailPath("sales", periodDays))}
           />
           <MetricCard
             icon={ShoppingBag}
@@ -276,7 +277,7 @@ export default function DashboardFinanceiro() {
             value={`${formatQuantity(salesCount)} / ${formatQuantity(unitsSold)}`}
             detail="Vendas e itens movimentados"
             tone="cyan"
-            onClick={() => navigate("/financeiro/vendas")}
+            onClick={() => navigate(getDashboardDetailPath("sales", periodDays))}
           />
           <MetricCard
             icon={BarChart3}
@@ -312,7 +313,7 @@ export default function DashboardFinanceiro() {
               value={formatMoneyBRL(cashResult)}
               detail={`${formatMoneyBRL(indicators.inflows)} entrou · ${formatMoneyBRL(indicators.outflows)} saiu`}
               tone={cashResult >= 0 ? "emerald" : "rose"}
-              onClick={() => navigate("/financeiro/fluxo-caixa")}
+              onClick={() => navigate(getDashboardDetailPath("cashFlow", periodDays))}
             />
             <CompactMetricCard
               icon={BarChart3}
@@ -320,7 +321,7 @@ export default function DashboardFinanceiro() {
               value={formatMoneyBRL(summary?.vendas_periodo?.ticket_medio || 0)}
               detail={periodLabel}
               tone="cyan"
-              onClick={() => navigate("/financeiro/vendas")}
+              onClick={() => navigate(getDashboardDetailPath("sales", periodDays))}
             />
             <CompactMetricCard
               icon={TrendingUp}
@@ -328,7 +329,7 @@ export default function DashboardFinanceiro() {
               value={formatMoneyBRL(summary?.contas_receber?.total || 0)}
               detail="Valores ainda em aberto"
               tone="emerald"
-              onClick={() => navigate("/financeiro/contas-receber")}
+              onClick={() => navigate(getDashboardDetailPath("receivableOpen", periodDays))}
             />
             <CompactMetricCard
               icon={TrendingDown}
@@ -336,7 +337,7 @@ export default function DashboardFinanceiro() {
               value={formatMoneyBRL(summary?.contas_pagar?.total || 0)}
               detail="Compromissos ainda em aberto"
               tone="rose"
-              onClick={() => navigate("/financeiro/contas-pagar")}
+              onClick={() => navigate(getDashboardDetailPath("payableOpen", periodDays))}
             />
           </div>
         </div>
@@ -359,7 +360,7 @@ export default function DashboardFinanceiro() {
                   : "Nenhum valor vencido"
               }
               hasIssue={indicators.overdueReceivable > 0}
-              onClick={() => navigate("/financeiro/contas-receber")}
+              onClick={() => navigate(getDashboardDetailPath("receivableOverdue", periodDays))}
             />
             <PriorityCard
               icon={Clock3}
@@ -371,7 +372,7 @@ export default function DashboardFinanceiro() {
                   : "Nenhum valor vencido"
               }
               hasIssue={indicators.overduePayable > 0}
-              onClick={() => navigate("/financeiro/contas-pagar")}
+              onClick={() => navigate(getDashboardDetailPath("payableOverdue", periodDays))}
             />
             <PriorityCard
               icon={Clock3}
@@ -383,7 +384,7 @@ export default function DashboardFinanceiro() {
                   : "Compromissos do dia, sem marcar como atraso"
               }
               hasIssue={indicators.dueTodayPayable > 0}
-              onClick={() => navigate("/financeiro/contas-pagar")}
+              onClick={() => navigate(getDashboardDetailPath("payableDueToday", periodDays))}
             />
             <PriorityCard
               icon={Users}
@@ -395,7 +396,7 @@ export default function DashboardFinanceiro() {
                   : "Nenhum VIP inativo há mais de 20 dias"
               }
               hasIssue={Number(management?.vips_inativos?.quantidade || 0) > 0}
-              onClick={() => navigate("/clientes")}
+              onClick={() => navigate(getDashboardDetailPath("vipAtRisk", periodDays))}
             />
             <PriorityCard
               icon={Users}
@@ -407,7 +408,7 @@ export default function DashboardFinanceiro() {
                   : "Nenhum cliente nessa condição"
               }
               hasIssue={Number(management?.clientes_inativos?.quantidade || 0) > 0}
-              onClick={() => navigate("/clientes")}
+              onClick={() => navigate(getDashboardDetailPath("inactiveCustomers", periodDays))}
             />
           </div>
         </div>
@@ -549,14 +550,26 @@ export default function DashboardFinanceiro() {
           </p>
           <div className="mt-4 divide-y divide-slate-100 dark:divide-slate-800">
             {[
-              ["Clientes ativos", management?.total_clientes || 0],
-              ["Novos promissores", management?.oportunidades_novos?.quantidade || 0],
-              ["Sem WhatsApp", management?.whatsapp_inativo?.quantidade || 0],
-            ].map(([label, value]) => (
+              {
+                label: "Clientes ativos",
+                value: management?.total_clientes || 0,
+                path: getDashboardDetailPath("activeCustomers", periodDays),
+              },
+              {
+                label: "Novos promissores",
+                value: management?.oportunidades_novos?.quantidade || 0,
+                path: getDashboardDetailPath("promisingCustomers", periodDays),
+              },
+              {
+                label: "Sem WhatsApp",
+                value: management?.whatsapp_inativo?.quantidade || 0,
+                path: getDashboardDetailPath("customersWithoutWhatsapp", periodDays),
+              },
+            ].map(({ label, value, path }) => (
               <button
                 key={label}
                 type="button"
-                onClick={() => navigate("/clientes")}
+                onClick={() => navigate(path)}
                 className="flex w-full items-center justify-between py-3 text-left"
               >
                 <span className="text-sm text-slate-600 dark:text-slate-400">{label}</span>
@@ -584,14 +597,14 @@ export default function DashboardFinanceiro() {
                   key: "contas_receber",
                   label: "A receber",
                   personKey: "cliente",
-                  path: "/financeiro/contas-receber",
+                  path: getDashboardDetailPath("receivableOverdue", periodDays),
                   tone: "text-emerald-700 dark:text-emerald-300",
                 },
                 {
                   key: "contas_pagar",
                   label: "A pagar",
                   personKey: "fornecedor",
-                  path: "/financeiro/contas-pagar",
+                  path: getDashboardDetailPath("payableOverdue", periodDays),
                   tone: "text-rose-700 dark:text-rose-300",
                 },
               ].map((group) => (

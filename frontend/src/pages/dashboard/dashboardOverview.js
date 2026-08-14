@@ -37,6 +37,60 @@ export function getPeriodLabel(periodDays) {
   return Number(periodDays) === 1 ? "Hoje" : `Últimos ${periodDays} dias`;
 }
 
+export function getDashboardDetailPath(detail, periodDays = 30) {
+  const dias = Math.min(Math.max(Number(periodDays) || 30, 1), 366);
+  const paths = {
+    sales: `/financeiro/vendas?periodo_dias=${dias}`,
+    cashFlow: `/financeiro/fluxo-caixa?periodo_dias=${dias}`,
+    receivableOpen: "/financeiro/contas-receber?filtro=em_aberto",
+    payableOpen: "/financeiro/contas-pagar?filtro=em_aberto",
+    receivableOverdue: "/financeiro/contas-receber?filtro=vencidas",
+    payableOverdue: "/financeiro/contas-pagar?filtro=vencidas",
+    payableDueToday: "/financeiro/contas-pagar?filtro=vence_hoje",
+    activeCustomers: "/clientes?visao=ativos",
+    vipAtRisk: "/clientes?visao=vip_em_risco",
+    inactiveCustomers: "/clientes?visao=inativos_90_dias",
+    promisingCustomers: "/clientes?visao=novos_promissores",
+    customersWithoutWhatsapp: "/clientes?visao=sem_whatsapp",
+  };
+
+  return paths[detail] || "/dashboard";
+}
+
+export function getDashboardPeriodFromSearch(searchParams, referenceDate = new Date()) {
+  const rawDays = Number(searchParams?.get?.("periodo_dias"));
+  if (!Number.isInteger(rawDays) || rawDays < 1 || rawDays > 366) return null;
+
+  const end = new Date(
+    referenceDate.getFullYear(),
+    referenceDate.getMonth(),
+    referenceDate.getDate(),
+  );
+  const start = new Date(end);
+  start.setDate(start.getDate() - (rawDays - 1));
+
+  const format = (date) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  };
+
+  return {
+    days: rawDays,
+    start: format(start),
+    end: format(end),
+    quickFilter:
+      rawDays === 1
+        ? "hoje"
+        : rawDays === 7
+          ? "ultimos_7_dias"
+          : rawDays === 30
+            ? "ultimos_30_dias"
+            : "personalizado",
+  };
+}
+
 export function calculateDashboardIndicators(summary = createEmptyDashboardSummary()) {
   const inflows = numberValue(summary?.fluxo_periodo?.entradas);
   const outflows = numberValue(summary?.fluxo_periodo?.saidas);

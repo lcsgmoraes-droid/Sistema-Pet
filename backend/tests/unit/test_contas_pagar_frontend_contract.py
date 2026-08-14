@@ -87,8 +87,8 @@ def test_contas_pagar_indica_e_filtra_vencimentos_de_hoje():
     assert "getStatusVisualContasPagar" in source
     assert 'params.append("vence_hoje", "true")' in source
     assert "vence_hoje: bool = Query(False)" in backend_source
-    assert 'ContaPagar.status.notin_(["pago", "cancelado"])' in backend_source
-    assert "ContaPagar.data_vencimento == date.today()" in backend_source
+    assert "ContaPagar.status.in_(STATUS_CONTAS_PAGAR_EM_ABERTO)" in backend_source
+    assert "ContaPagar.data_vencimento == hoje" in backend_source
 
 
 def test_contas_pagar_lista_abre_edicao_de_lancamento():

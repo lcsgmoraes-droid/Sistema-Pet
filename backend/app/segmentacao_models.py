@@ -6,13 +6,14 @@ Schema baseado em RELATORIO_SCHEMA_TABELAS_ORFAS.md - Fase 5.4
 """
 
 from sqlalchemy import Column, Integer, String, DateTime, Text, ForeignKey, Index
-from sqlalchemy.dialects.postgresql import UUID, JSONB
+from sqlalchemy.dialects.postgresql import JSONB
 from datetime import datetime
 
+from app.base_models import TenantScoped
 from app.db import Base
 
 
-class ClienteSegmento(Base):
+class ClienteSegmento(TenantScoped, Base):
     """
     Segmentação de clientes com métricas JSONB flexíveis.
     Permite classificação (VIP, Ouro, Prata, etc.) com análise RFM e LTV.
@@ -46,7 +47,6 @@ class ClienteSegmento(Base):
     # Relacionamentos
     cliente_id = Column(Integer, ForeignKey("clientes.id"), nullable=False)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    tenant_id = Column(UUID(as_uuid=True), nullable=False)
 
     # Segmentação
     segmento = Column(

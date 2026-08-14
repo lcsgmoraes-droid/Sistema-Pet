@@ -28,8 +28,11 @@ from app.financeiro.contas_pagar_schemas import (
 )
 from app.financeiro_models import CategoriaFinanceira, ContaPagar, TipoDespesa
 from app.models import Cliente
+from app.utils.timezone import now_brasilia
 
 router = APIRouter()
+
+STATUS_CONTAS_PAGAR_EM_ABERTO = ("pendente", "parcial", "vencido", "vencida")
 
 
 # LISTAR CONTAS A PAGAR
@@ -66,17 +69,20 @@ def listar_contas_pagar(
     Lista contas a pagar com filtros
     """
     current_user, tenant_id = user_and_tenant
+    hoje = now_brasilia().date()
 
     query = db.query(ContaPagar).filter(ContaPagar.tenant_id == tenant_id)
 
     # Filtros
     if status:
         status_normalizado = status.strip().lower()
-        if status_normalizado == "vencido":
+        if status_normalizado == "em_aberto":
+            query = query.filter(ContaPagar.status.in_(STATUS_CONTAS_PAGAR_EM_ABERTO))
+        elif status_normalizado == "vencido":
             query = query.filter(
                 and_(
-                    ContaPagar.status != "pago",
-                    ContaPagar.data_vencimento < date.today(),
+                    ContaPagar.status.in_(STATUS_CONTAS_PAGAR_EM_ABERTO),
+                    ContaPagar.data_vencimento < hoje,
                 )
             )
         else:
@@ -191,19 +197,23 @@ def listar_contas_pagar(
         )
     if apenas_vencidas:
         query = query.filter(
-            and_(ContaPagar.status != "pago", ContaPagar.data_vencimento < date.today())
+            and_(
+                ContaPagar.status.in_(STATUS_CONTAS_PAGAR_EM_ABERTO),
+                ContaPagar.data_vencimento < hoje,
+            )
         )
     if apenas_vencer:
         query = query.filter(
             and_(
-                ContaPagar.status != "pago", ContaPagar.data_vencimento >= date.today()
+                ContaPagar.status.in_(STATUS_CONTAS_PAGAR_EM_ABERTO),
+                ContaPagar.data_vencimento >= hoje,
             )
         )
     if vence_hoje:
         query = query.filter(
             and_(
-                ContaPagar.status.notin_(["pago", "cancelado"]),
-                ContaPagar.data_vencimento == date.today(),
+                ContaPagar.status.in_(STATUS_CONTAS_PAGAR_EM_ABERTO),
+                ContaPagar.data_vencimento == hoje,
             )
         )
 
@@ -218,7 +228,7 @@ def listar_contas_pagar(
         # Calcular dias para vencimento
         dias_venc = None
         if status_value == "pendente":
-            dias_venc = (conta.data_vencimento - date.today()).days
+            dias_venc = (conta.data_vencimento - hoje).days
 
         # Buscar nome do fornecedor
         fornecedor_nome = None

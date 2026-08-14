@@ -1,12 +1,12 @@
 """CRUD principal de clientes, fornecedores e pessoas operacionais."""
 
-from datetime import datetime as dt
+from datetime import datetime as dt, timedelta
 import json
 import logging
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import case, func, or_
+from sqlalchemy import Float, Integer, and_, case, cast, func, or_
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -28,6 +28,8 @@ from app.clientes.schemas import (
 )
 from app.db import get_session
 from app.models import AppAccessProfile, Cliente, Role, User, UserTenant
+from app.segmentacao_models import ClienteSegmento
+from app.vendas_models import Venda
 from app.partner_utils import get_all_accessible_tenant_ids
 from app.security.permissions_decorator import require_permission
 from app.services.cliente_alertas_pdv import normalizar_alertas_pdv
@@ -181,6 +183,7 @@ def list_clientes(
     incluir_inativos: bool = False,
     tipo_cadastro: Optional[List[str]] = Query(None),
     is_entregador: Optional[bool] = None,
+    visao_dashboard: Optional[str] = Query(None),
     db: Session = Depends(get_session),
     user_and_tenant=Depends(get_current_user_and_tenant),
 ):
@@ -196,6 +199,7 @@ def list_clientes(
             search=search,
             ativo=ativo,
             incluir_inativos=incluir_inativos,
+            visao_dashboard=visao_dashboard,
         )
         total = query.count()
         query = _ordenar_query_listagem(query, search)
@@ -587,6 +591,7 @@ def _montar_query_listagem_clientes(
     search,
     ativo,
     incluir_inativos,
+    visao_dashboard=None,
 ):
     access_ids = get_all_accessible_tenant_ids(db, tenant_id)
     query = db.query(Cliente).filter(Cliente.tenant_id.in_(access_ids))
@@ -601,6 +606,63 @@ def _montar_query_listagem_clientes(
     query = _aplicar_filtro_busca(query, search)
     if not incluir_inativos:
         query = _aplicar_filtro_ativo(query, ativo)
+    if visao_dashboard == "ativos":
+        query = query.filter(
+            Cliente.tenant_id == tenant_id,
+            Cliente.tipo_cadastro == "cliente",
+        )
+    elif visao_dashboard == "vip_em_risco":
+        query = query.join(
+            ClienteSegmento,
+            and_(
+                ClienteSegmento.cliente_id == Cliente.id,
+                ClienteSegmento.tenant_id == Cliente.tenant_id,
+            ),
+        ).filter(
+            Cliente.tenant_id == tenant_id,
+            Cliente.tipo_cadastro == "cliente",
+            ClienteSegmento.segmento == "VIP",
+            cast(ClienteSegmento.metricas["ultima_compra_dias"].astext, Integer) > 20,
+        )
+    elif visao_dashboard == "inativos_90_dias":
+        ultima_venda = (
+            db.query(
+                Venda.cliente_id.label("cliente_id"),
+                func.max(Venda.data_venda).label("ultima_venda"),
+            )
+            .filter(Venda.tenant_id == tenant_id, Venda.status == "finalizada")
+            .group_by(Venda.cliente_id)
+            .subquery()
+        )
+        query = query.outerjoin(
+            ultima_venda, ultima_venda.c.cliente_id == Cliente.id
+        ).filter(
+            Cliente.tenant_id == tenant_id,
+            Cliente.tipo_cadastro == "cliente",
+            or_(
+                ultima_venda.c.ultima_venda.is_(None),
+                ultima_venda.c.ultima_venda < dt.utcnow() - timedelta(days=90),
+            ),
+        )
+    elif visao_dashboard == "novos_promissores":
+        query = query.join(
+            ClienteSegmento,
+            and_(
+                ClienteSegmento.cliente_id == Cliente.id,
+                ClienteSegmento.tenant_id == Cliente.tenant_id,
+            ),
+        ).filter(
+            Cliente.tenant_id == tenant_id,
+            Cliente.tipo_cadastro == "cliente",
+            ClienteSegmento.segmento == "Novo",
+            cast(ClienteSegmento.metricas["ticket_medio"].astext, Float) > 200,
+        )
+    elif visao_dashboard == "sem_whatsapp":
+        query = query.filter(
+            Cliente.tenant_id == tenant_id,
+            Cliente.tipo_cadastro == "cliente",
+            or_(Cliente.celular.is_(None), func.trim(Cliente.celular) == ""),
+        )
     return query
 
 
