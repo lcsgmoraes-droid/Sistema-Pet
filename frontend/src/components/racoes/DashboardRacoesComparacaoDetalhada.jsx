@@ -77,7 +77,7 @@ const DashboardRacoesComparacaoDetalhada = ({
               Menor custo
             </span>
           </div>
-          <p className="text-2xl font-bold text-slate-900">R$ {menorCusto.toFixed(2)}</p>
+          <p className="text-2xl font-bold text-slate-900">{formatarMoedaCompacta(menorCusto)}</p>
           <p className="text-xs text-green-600 mt-1">Melhor preço de compra</p>
         </div>
 
@@ -110,7 +110,7 @@ const DashboardRacoesComparacaoDetalhada = ({
               Maior lucro
             </span>
           </div>
-          <p className="text-2xl font-bold text-slate-900">R$ {maiorLucro.toFixed(2)}</p>
+          <p className="text-2xl font-bold text-slate-900">{formatarMoedaCompacta(maiorLucro)}</p>
           <p className="text-xs text-amber-600 mt-1">Lucro absoluto por unidade</p>
         </div>
       </div>
@@ -135,26 +135,24 @@ const DashboardRacoesComparacaoDetalhada = ({
               <div>
                 <p className="text-sm text-gray-600 mb-1">Custo Médio/kg</p>
                 <p className="text-2xl font-bold text-slate-900">
-                  R${" "}
-                  {(
+                  {formatarMoedaCompacta(
                     produtosComparacao.reduce(
                       (acc, p) => acc + (p.preco_custo || 0) / (p.peso_embalagem || 1),
                       0,
-                    ) / produtosComparacao.length
-                  ).toFixed(2)}
+                    ) / produtosComparacao.length,
+                  )}
                 </p>
               </div>
 
               <div>
                 <p className="text-sm text-gray-600 mb-1">Preço Venda Médio/kg</p>
                 <p className="text-2xl font-bold text-emerald-700">
-                  R${" "}
-                  {(
+                  {formatarMoedaCompacta(
                     produtosComparacao.reduce(
                       (acc, p) => acc + (p.preco_venda || 0) / (p.peso_embalagem || 1),
                       0,
-                    ) / produtosComparacao.length
-                  ).toFixed(2)}
+                    ) / produtosComparacao.length,
+                  )}
                 </p>
               </div>
             </>

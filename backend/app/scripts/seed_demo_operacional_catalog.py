@@ -47,6 +47,10 @@ DEMO_MARGIN_PRODUCTS = (
 def _cleanup_previous_demo(db, *, tenant_id: str) -> None:
     params = {"tenant_id": tenant_id}
     statements = [
+        "DELETE FROM lembretes WHERE tenant_id = :tenant_id AND observacoes LIKE 'Demo operacional - lembrete recorrente%'",
+        "DELETE FROM estoque_validade_bloqueios WHERE tenant_id = :tenant_id AND lote_id IN (SELECT id FROM produto_lotes WHERE tenant_id = :tenant_id AND nome_lote LIKE 'DEMO-VAL-%')",
+        "DELETE FROM estoque_movimentacoes WHERE tenant_id = :tenant_id AND lote_id IN (SELECT id FROM produto_lotes WHERE tenant_id = :tenant_id AND nome_lote LIKE 'DEMO-VAL-%') AND motivo = 'validade_bloqueio'",
+        "DELETE FROM produto_lotes WHERE tenant_id = :tenant_id AND nome_lote LIKE 'DEMO-VAL-%'",
         "DELETE FROM conciliacao_importacoes WHERE tenant_id = :tenant_id AND resumo->>'demo_operacional' = 'true'",
         "DELETE FROM arquivos_evidencia WHERE tenant_id = :tenant_id AND caminho_storage = 'demo://conciliacao/stone-vendas.csv'",
         "DELETE FROM alertas_estoque_negativo WHERE tenant_id = :tenant_id AND observacao LIKE 'Demo operacional%'",
