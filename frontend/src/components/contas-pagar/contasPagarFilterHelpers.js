@@ -65,6 +65,26 @@ export function criarFiltrosPadraoContasPagar() {
   };
 }
 
+export function criarFiltrosContasPagarDaUrl(searchParams) {
+  const filtros = criarFiltrosPadraoContasPagar();
+  const filtro = searchParams?.get?.("filtro");
+
+  if (!["em_aberto", "vencidas", "vence_hoje"].includes(filtro)) return filtros;
+
+  Object.assign(filtros, {
+    data_inicio: "",
+    data_fim: "",
+    periodo_rapido: "",
+    ocultar_taxas_cartao: false,
+  });
+
+  if (filtro === "em_aberto") filtros.status = "em_aberto";
+  if (filtro === "vencidas") filtros.apenas_vencidas = true;
+  if (filtro === "vence_hoje") filtros.vence_hoje = true;
+
+  return filtros;
+}
+
 export function ehTaxaCartao(conta) {
   const texto = `${conta?.descricao || ""} ${conta?.documento || ""}`.toLowerCase();
   return (

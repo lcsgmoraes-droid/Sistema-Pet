@@ -1,4 +1,5 @@
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
+import os
 from uuid import UUID
 
 from fastapi import Depends, HTTPException, Request, status
@@ -27,6 +28,22 @@ security = HTTPBearer()
 
 ECOMMERCE_ACCESS_TOKEN_TYPE = "ecommerce_customer"
 ECOMMERCE_REFRESH_TOKEN_TYPE = "ecommerce_customer_refresh"
+MOBILE_SESSION_EXPIRE_DAYS = max(1, int(os.getenv("MOBILE_SESSION_EXPIRE_DAYS", "30")))
+
+
+def _is_app_client(request: Request | None) -> bool:
+    if request is None:
+        return False
+    channel = request.headers.get("X-Client-Channel") or request.headers.get(
+        "X-Canal-Venda"
+    )
+    return str(channel or "").strip().lower() == "app"
+
+
+def _session_lifetime_days(request: Request | None) -> int:
+    if _is_app_client(request):
+        return MOBILE_SESSION_EXPIRE_DAYS
+    return ACCESS_TOKEN_EXPIRE_DAYS
 
 
 def _session_expiry_utc(db_session) -> datetime:
@@ -41,11 +58,14 @@ def _create_ecommerce_token_pair(
     tenant_id: str,
     token_jti: str,
     expires_at: datetime,
+    active_profile: str | None = None,
 ) -> tuple[str, str]:
     common_data = {
         "sub": str(user.id),
         "email": user.email,
     }
+    if active_profile:
+        common_data["active_profile"] = active_profile
     access_token = create_access_token(
         data={**common_data, "token_type": ECOMMERCE_ACCESS_TOKEN_TYPE},
         jti=token_jti,
@@ -76,6 +96,7 @@ def _create_ecommerce_session_tokens(
     user: User,
     tenant_id: str,
     request: Request,
+    active_profile: str | None = None,
 ) -> dict:
     db_session = create_session(
         db=db,
@@ -83,18 +104,68 @@ def _create_ecommerce_session_tokens(
         tenant_id=tenant_id,
         ip_address=get_request_ip(request),
         user_agent=request.headers.get("user-agent"),
-        expires_in_days=ACCESS_TOKEN_EXPIRE_DAYS,
+        expires_in_days=_session_lifetime_days(request),
     )
     access_token, refresh_token = _create_ecommerce_token_pair(
         user,
         tenant_id,
         db_session.token_jti,
         _session_expiry_utc(db_session),
+        active_profile,
     )
     return _ecommerce_auth_payload(access_token, refresh_token)
 
 
-def _refresh_ecommerce_session(refresh_token: str, db: Session) -> dict:
+def _extend_mobile_session(
+    db: Session, db_session, request: Request | None
+) -> datetime:
+    if not _is_app_client(request):
+        return _session_expiry_utc(db_session)
+
+    now = datetime.now(timezone.utc)
+    db_session.expires_at = now + timedelta(days=MOBILE_SESSION_EXPIRE_DAYS)
+    db_session.last_activity_at = now
+    db.commit()
+    return _session_expiry_utc(db_session)
+
+
+def _issue_ecommerce_profile_tokens(
+    db: Session,
+    user: User,
+    tenant_id: str,
+    request: Request,
+    active_profile: str,
+) -> dict:
+    token_jti = str(getattr(user, "_auth_session_jti", "") or "").strip()
+    db_session = get_session_by_jti(db, token_jti) if token_jti else None
+    if (
+        db_session
+        and validate_session(db, token_jti)
+        and db_session.user_id == user.id
+        and str(db_session.tenant_id or "") == str(tenant_id)
+    ):
+        expires_at = _extend_mobile_session(db, db_session, request)
+        access_token, refresh_token = _create_ecommerce_token_pair(
+            user,
+            tenant_id,
+            token_jti,
+            expires_at,
+            active_profile,
+        )
+        return _ecommerce_auth_payload(access_token, refresh_token)
+
+    return _create_ecommerce_session_tokens(
+        db,
+        user,
+        tenant_id,
+        request,
+        active_profile=active_profile,
+    )
+
+
+def _refresh_ecommerce_session(
+    refresh_token: str, db: Session, request: Request | None = None
+) -> dict:
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Sessao expirada. Faca login novamente.",
@@ -111,6 +182,7 @@ def _refresh_ecommerce_session(refresh_token: str, db: Session) -> dict:
         user_id = int(payload.get("sub"))
         token_jti = str(payload.get("jti") or "").strip()
         tenant_id = _normalize_tenant_uuid(payload.get("tenant_id"))
+        active_profile = normalize_profile_type(payload.get("active_profile"))
         if not token_jti or not tenant_id:
             raise credentials_exception
     except (JWTError, TypeError, ValueError):
@@ -155,11 +227,13 @@ def _refresh_ecommerce_session(refresh_token: str, db: Session) -> dict:
     ):
         raise credentials_exception
 
+    expires_at = _extend_mobile_session(db, db_session, request)
     access_token, next_refresh_token = _create_ecommerce_token_pair(
         user,
         str(tenant_id),
         token_jti,
-        _session_expiry_utc(db_session),
+        expires_at,
+        active_profile,
     )
     return _ecommerce_auth_payload(access_token, next_refresh_token)
 
@@ -308,6 +382,8 @@ def _get_current_ecommerce_user(
         )
 
     active_profile = normalize_profile_type(payload.get("active_profile"))
+    if token_jti:
+        setattr(user, "_auth_session_jti", token_jti)
     if active_profile:
         setattr(user, "_active_app_profile", active_profile)
 

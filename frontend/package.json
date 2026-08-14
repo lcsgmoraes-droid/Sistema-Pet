@@ -41,6 +41,9 @@
     "test:lembretes-refactor": "node scripts/test-lembretes-refactor.mjs",
     "test:modal-nova-conta-pagar-refactor": "node scripts/test-modal-nova-conta-pagar-refactor.mjs",
     "test:contas-pagar-vence-hoje": "node scripts/test-contas-pagar-vence-hoje.mjs",
+    "test:dashboard-overview": "node scripts/test-dashboard-overview.mjs",
+    "test:dashboard-contextual-filters": "node scripts/test-dashboard-contextual-filters.mjs",
+    "test:dashboard-executive-layout": "node scripts/test-dashboard-executive-layout.mjs",
     "test:final-gui-large-files-refactor": "node scripts/test-final-gui-large-files-refactor.mjs",
     "test:frontend-zero-large-files-refactor": "node scripts/test-frontend-zero-large-files-refactor.mjs",
     "test:large-files-700-batch-refactor": "node scripts/test-large-files-700-batch-refactor.mjs",
@@ -85,7 +88,7 @@
   "overrides": {
     "brace-expansion": "5.0.9",
     "dompurify": "3.4.13",
-    "nanoid": "3.3.17",
+    "nanoid": "3.3.18",
     "socket.io-parser": "4.2.7",
     "ws": "8.21.0"
   },

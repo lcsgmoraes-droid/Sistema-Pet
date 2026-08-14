@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import api from "../api";
 
-export function useClientesNovoListagem({ tipoFiltro, setError }) {
+export function useClientesNovoListagem({ tipoFiltro, visaoDashboard = "", setError }) {
   const [clientes, setClientes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [carregamentoInicialConcluido, setCarregamentoInicialConcluido] = useState(false);
@@ -44,6 +44,10 @@ export function useClientesNovoListagem({ tipoFiltro, setError }) {
           params.append("search", termoBusca);
         }
 
+        if (visaoDashboard) {
+          params.append("visao_dashboard", visaoDashboard);
+        }
+
         const response = await api.get(`/clientes/?${params.toString()}`);
 
         if (response.data.items) {
@@ -65,7 +69,7 @@ export function useClientesNovoListagem({ tipoFiltro, setError }) {
         setCarregamentoInicialConcluido(true);
       }
     },
-    [paginaAtual, registrosPorPagina, searchTermAplicado, setError, tipoFiltro],
+    [paginaAtual, registrosPorPagina, searchTermAplicado, setError, tipoFiltro, visaoDashboard],
   );
 
   useEffect(() => {

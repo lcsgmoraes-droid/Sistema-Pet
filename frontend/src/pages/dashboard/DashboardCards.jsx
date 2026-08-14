@@ -30,6 +30,30 @@ export function MetricCard({ icon: Icon, label, value, detail, tone, onClick }) 
   );
 }
 
+export function CompactMetricCard({ icon: Icon, label, value, detail, tone = "blue", onClick }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="group flex min-h-28 flex-col rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md dark:border-slate-800 dark:bg-slate-900 dark:hover:border-slate-700"
+    >
+      <div className="flex items-start justify-between gap-3">
+        <span className={`rounded-xl border p-2 ${METRIC_STYLES[tone]}`}>
+          <Icon className="h-4 w-4" />
+        </span>
+        <ArrowRight className="h-4 w-4 text-slate-300 transition group-hover:translate-x-0.5 group-hover:text-slate-500 dark:text-slate-600" />
+      </div>
+      <p className="mt-3 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+        {label}
+      </p>
+      <p className="mt-1 text-lg font-bold leading-tight text-slate-950 dark:text-white">{value}</p>
+      <p className="mt-auto pt-1 text-xs leading-snug text-slate-500 dark:text-slate-400">
+        {detail}
+      </p>
+    </button>
+  );
+}
+
 export function PriorityCard({ icon: Icon, label, value, detail, hasIssue, onClick }) {
   return (
     <button

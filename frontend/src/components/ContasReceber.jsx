@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { ArrowDownUp, Plus, Receipt } from "lucide-react";
 import api from "../api";
 import { getAccessToken } from "../auth/tokenStorage";
@@ -18,6 +18,10 @@ import {
   ContasReceberRecebimentoModal,
 } from "./contasReceber/ContasReceberPanels";
 import ContasReceberAnalise from "./contasReceber/ContasReceberAnalise";
+import {
+  criarFiltrosContasReceberDaUrl,
+  montarParamsFiltrosContasReceber,
+} from "./contasReceber/contasReceberFilterHelpers";
 
 const formatarDataISO = (data) => {
   const ano = data.getFullYear();
@@ -58,17 +62,11 @@ const calcularIntervaloAnaliseReceber = (periodo) => {
 
 const ContasReceber = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [contas, setContas] = useState([]);
   const [loading, setLoading] = useState(true);
   const [abaAtivaContasReceber, setAbaAtivaContasReceber] = useState("lancamentos");
-  const [filtros, setFiltros] = useState({
-    status: "todos",
-    cliente_id: null,
-    data_inicio: "",
-    data_fim: "",
-    apenas_vencidas: false,
-    apenas_vencer: false,
-  });
+  const [filtros, setFiltros] = useState(() => criarFiltrosContasReceberDaUrl(searchParams));
 
   const [buscaNumeroVenda, setBuscaNumeroVenda] = useState("");
   const [ordenacao, setOrdenacao] = useState("desc"); // 'asc' = mais antiga primeiro, 'desc' = mais nova primeiro
@@ -126,7 +124,9 @@ const ContasReceber = () => {
       const headers = { Authorization: `Bearer ${token}` };
 
       const [contasRes, clientesRes, formasRes, bancariasRes] = await Promise.allSettled([
-        api.get(`/contas-receber/`, { headers }),
+        api.get(`/contas-receber/?${montarParamsFiltrosContasReceber(filtros)}`, {
+          headers,
+        }),
         api.get(`/clientes/`, { headers }),
         carregarFormasPagamento(headers),
         api.get(`/contas-bancarias?apenas_ativas=true`, { headers }),
@@ -163,22 +163,7 @@ const ContasReceber = () => {
   ) => {
     try {
       setLoading(true);
-      const params = new URLSearchParams();
-      if (filtrosParaAplicar.status !== "todos") {
-        params.append("status", filtrosParaAplicar.status);
-      }
-      if (filtrosParaAplicar.cliente_id) {
-        params.append("cliente_id", filtrosParaAplicar.cliente_id);
-      }
-      if (filtrosParaAplicar.data_inicio) {
-        params.append("data_inicio", filtrosParaAplicar.data_inicio);
-      }
-      if (filtrosParaAplicar.data_fim) {
-        params.append("data_fim", filtrosParaAplicar.data_fim);
-      }
-      if (filtrosParaAplicar.apenas_vencidas) params.append("apenas_vencidas", "true");
-      if (filtrosParaAplicar.apenas_vencer) params.append("apenas_vencer", "true");
-      if (buscaParaAplicar) params.append("numero_venda", buscaParaAplicar);
+      const params = montarParamsFiltrosContasReceber(filtrosParaAplicar, buscaParaAplicar);
 
       const response = await api.get(`/contas-receber/?${params}`);
 

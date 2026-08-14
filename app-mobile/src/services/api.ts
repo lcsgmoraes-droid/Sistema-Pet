@@ -60,14 +60,6 @@ function removeJsonContentTypeForFormData(config: any) {
   deleteHeader("content-type");
 }
 
-function requestUsedAuthentication(headers: any): boolean {
-  if (!headers) return false;
-  if (typeof headers.get === "function") {
-    return Boolean(headers.get("Authorization"));
-  }
-  return Boolean(headers.Authorization || headers.authorization);
-}
-
 function isPublicAuthRequest(url?: string): boolean {
   return PUBLIC_AUTH_PATHS.some((path) => url?.includes(path));
 }
@@ -175,14 +167,14 @@ api.interceptors.response.use(
     }
 
     const config = error.config as any;
-    const usedAuthentication = requestUsedAuthentication(config?.headers);
-    if (!usedAuthentication || config?._sessionRefreshRetried) {
+    if (isPublicAuthRequest(config?.url) || config?._sessionRefreshRetried) {
       return Promise.reject(error);
     }
 
     const refreshToken = await getRefreshToken();
     if (!refreshToken) {
-      await expireStoredSession();
+      const accessToken = await getAccessToken();
+      if (accessToken) await expireStoredSession();
       return Promise.reject(error);
     }
 

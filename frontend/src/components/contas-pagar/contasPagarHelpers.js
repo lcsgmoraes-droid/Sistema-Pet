@@ -3,6 +3,7 @@ export {
   calcularValorFinalPagamentoContasPagar,
   carregarFormasPagamentoContasPagar,
   criarFiltrosDespesasCaixaContasPagar,
+  criarFiltrosContasPagarDaUrl,
   criarFiltrosPadraoContasPagar,
   criarFiltrosTaxasCartaoContasPagar,
   ehTaxaCartao,

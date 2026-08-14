@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { AlertCircle, UsersRound } from "lucide-react";
 import toast from "react-hot-toast";
 import api from "../api";
@@ -20,12 +21,18 @@ import {
 import { useClientesNovoCadastro } from "../hooks/useClientesNovoCadastro";
 import { useClientesNovoListagem } from "../hooks/useClientesNovoListagem";
 import { debugLog } from "../utils/debug";
+import {
+  CLIENTES_DASHBOARD_VIEWS,
+  normalizarVisaoDashboardClientes,
+} from "./clientes/clientesDashboardFilters";
 
 const LIMITE_DUPLICIDADES_POR_PAGINA = 25;
 
 const Pessoas = () => {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const visaoDashboard = normalizarVisaoDashboardClientes(searchParams);
   const [error, setError] = useState("");
-  const [tipoFiltro, setTipoFiltro] = useState("todos"); // Filtro por tipo: todos, cliente, fornecedor, veterinario, funcionario
+  const [tipoFiltro, setTipoFiltro] = useState(visaoDashboard ? "cliente" : "todos");
   const [expandedPets, setExpandedPets] = useState({});
   const [clienteRecemCriado, setClienteRecemCriado] = useState(null);
   const [campoCopiadoRecente, setCampoCopiadoRecente] = useState("");
@@ -64,7 +71,12 @@ const Pessoas = () => {
     filteredClientes,
     loadClientes,
     getClientePorCodigoExato,
-  } = useClientesNovoListagem({ tipoFiltro, setError });
+  } = useClientesNovoListagem({ tipoFiltro, visaoDashboard, setError });
+
+  const setTipoFiltroComContexto = (proximoTipo) => {
+    setTipoFiltro(proximoTipo);
+    if (visaoDashboard) setSearchParams({}, { replace: true });
+  };
 
   const pessoasParaFusao = useMemo(() => {
     if (pessoasSugestaoFusao?.length === 2) return pessoasSugestaoFusao;
@@ -502,9 +514,26 @@ const Pessoas = () => {
 
       <ClientesNovoTabsBar
         tipoFiltro={tipoFiltro}
-        setTipoFiltro={setTipoFiltro}
+        setTipoFiltro={setTipoFiltroComContexto}
         setPaginaAtual={setPaginaAtual}
       />
+      {visaoDashboard ? (
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-teal-200 bg-teal-50 px-4 py-3 text-sm text-teal-950">
+          <div>
+            <p className="font-semibold">{CLIENTES_DASHBOARD_VIEWS[visaoDashboard].title}</p>
+            <p className="text-teal-800">
+              {CLIENTES_DASHBOARD_VIEWS[visaoDashboard].description} {totalRegistros} encontrado(s).
+            </p>
+          </div>
+          <button
+            type="button"
+            className="rounded-lg border border-teal-300 bg-white px-3 py-2 font-medium text-teal-800 hover:bg-teal-100"
+            onClick={() => setSearchParams({}, { replace: true })}
+          >
+            Ver todos os clientes
+          </button>
+        </div>
+      ) : null}
       <ClientesNovoActionsBar
         searchTerm={searchTerm}
         setSearchTerm={handleSearchTermChange}
