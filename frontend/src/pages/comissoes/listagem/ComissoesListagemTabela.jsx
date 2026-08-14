@@ -1,4 +1,4 @@
-import { CheckCircle2, X } from "lucide-react";
+import { CalendarDays, CheckCircle2, SlidersHorizontal, WalletCards, X } from "lucide-react";
 import ActionButton from "../../../components/ui/ActionButton";
 import CopyableCode from "../../../components/ui/CopyableCode";
 import MoneyCell from "../../../components/ui/MoneyCell";
@@ -220,77 +220,90 @@ export default function ComissoesListagemTabela({ controller }) {
         </p>
       </div>
 
-      {/* RODAPÉ FIXO COM RESUMO */}
+      {/* Resumo compacto, mantido visível sem criar uma faixa colorida sobre a tabela */}
       {comissoes.length > 0 && (
-        <div className="fixed bottom-0 left-64 right-0 bg-gradient-to-r from-indigo-600 via-blue-600 to-indigo-600 text-white shadow-lg z-40 border-t border-indigo-300/30">
-          <div className="max-w-7xl mx-auto px-8 py-3.5">
-            <div className="flex items-center justify-between">
-              {/* Período Selecionado */}
-              <div className="flex items-center gap-8">
-                <div>
-                  <div className="text-[10px] font-semibold text-indigo-200 mb-0.5 tracking-wide uppercase">
-                    📅 Período
-                  </div>
-                  <div className="text-sm font-bold text-white">
-                    {tipoFiltroData === "ate_hoje" ? (
-                      "Até hoje"
-                    ) : (
-                      <>
-                        {filtros.data_inicio
-                          ? new Date(filtros.data_inicio).toLocaleDateString("pt-BR")
-                          : "Início"}
-                        {" → "}
-                        {filtros.data_fim
-                          ? new Date(filtros.data_fim).toLocaleDateString("pt-BR")
-                          : "Fim"}
-                      </>
-                    )}
+        <div className="fixed bottom-[5.25rem] left-4 right-4 z-40 md:bottom-4 md:left-[17rem] md:right-6">
+          <div className="mx-auto max-w-7xl rounded-2xl border border-slate-200/90 bg-white/95 shadow-[0_14px_38px_rgba(15,23,42,0.14)] backdrop-blur">
+            <div className="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-5">
+              <div className="flex min-w-0 flex-wrap items-center gap-x-6 gap-y-2">
+                <div className="flex items-center gap-2.5">
+                  <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-teal-50 text-teal-700">
+                    <CalendarDays className="h-4 w-4" aria-hidden="true" />
+                  </span>
+                  <div>
+                    <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+                      Período
+                    </div>
+                    <div className="text-sm font-semibold text-slate-700">
+                      {tipoFiltroData === "ate_hoje" ? (
+                        "Até hoje"
+                      ) : (
+                        <>
+                          {filtros.data_inicio
+                            ? new Date(filtros.data_inicio).toLocaleDateString("pt-BR")
+                            : "Início"}
+                          {" → "}
+                          {filtros.data_fim
+                            ? new Date(filtros.data_fim).toLocaleDateString("pt-BR")
+                            : "Fim"}
+                        </>
+                      )}
+                    </div>
                   </div>
                 </div>
 
-                {/* Filtros Ativos */}
-                <div>
-                  <div className="text-[10px] font-semibold text-indigo-200 mb-0.5 tracking-wide uppercase">
-                    🔍 Filtros
-                  </div>
-                  <div className="text-sm font-bold text-white">
-                    {funcionarioSelecionado && (
-                      <span className="mr-2 bg-white/10 px-2 py-0.5 rounded">
-                        👤 {funcionarioSelecionado.nome}
-                      </span>
-                    )}
-                    {produtoSelecionado && (
-                      <span className="mr-2 bg-white/10 px-2 py-0.5 rounded">
-                        📦 {produtoSelecionado.nome}
-                      </span>
-                    )}
-                    {grupoSelecionado && (
-                      <span className="mr-2 bg-white/10 px-2 py-0.5 rounded">
-                        📂 {grupoSelecionado.nome}
-                      </span>
-                    )}
-                    {filtros.status && (
-                      <span className="mr-2 bg-white/10 px-2 py-0.5 rounded">
-                        ⚡ {filtros.status}
-                      </span>
-                    )}
-                    {!funcionarioSelecionado &&
-                      !produtoSelecionado &&
-                      !grupoSelecionado &&
-                      !filtros.status && <span className="text-indigo-200">Sem filtros</span>}
+                <div className="flex min-w-0 items-center gap-2.5">
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-500">
+                    <SlidersHorizontal className="h-4 w-4" aria-hidden="true" />
+                  </span>
+                  <div className="min-w-0">
+                    <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+                      Filtros
+                    </div>
+                    <div className="flex max-w-full flex-wrap gap-1 text-xs font-medium text-slate-600">
+                      {funcionarioSelecionado && (
+                        <span className="rounded-md bg-slate-100 px-2 py-0.5">
+                          {funcionarioSelecionado.nome}
+                        </span>
+                      )}
+                      {produtoSelecionado && (
+                        <span className="rounded-md bg-slate-100 px-2 py-0.5">
+                          {produtoSelecionado.nome}
+                        </span>
+                      )}
+                      {grupoSelecionado && (
+                        <span className="rounded-md bg-slate-100 px-2 py-0.5">
+                          {grupoSelecionado.nome}
+                        </span>
+                      )}
+                      {filtros.status && (
+                        <span className="rounded-md bg-slate-100 px-2 py-0.5">
+                          {filtros.status}
+                        </span>
+                      )}
+                      {!funcionarioSelecionado &&
+                        !produtoSelecionado &&
+                        !grupoSelecionado &&
+                        !filtros.status && (
+                          <span className="text-slate-500">Sem filtros adicionais</span>
+                        )}
+                    </div>
                   </div>
                 </div>
               </div>
 
-              {/* Total Calculado */}
-              <div className="text-right">
-                <div className="text-[10px] font-semibold text-indigo-200 mb-0.5 tracking-wide uppercase">
-                  💰 Total Pendente (Filtrado)
+              <div className="flex shrink-0 items-center gap-3 rounded-xl border border-emerald-100 bg-emerald-50/80 px-4 py-2">
+                <WalletCards className="h-5 w-5 text-emerald-600" aria-hidden="true" />
+                <div className="text-right">
+                  <div className="text-[10px] font-semibold uppercase tracking-wide text-emerald-700">
+                    Total pendente
+                  </div>
+                  <MoneyCell
+                    className="text-lg font-bold leading-tight text-slate-900"
+                    value={calcularTotalFiltrado()}
+                  />
                 </div>
-                <div className="text-3xl font-bold text-white drop-shadow-sm">
-                  <MoneyCell value={calcularTotalFiltrado()} />
-                </div>
-                <div className="text-[11px] text-indigo-100 mt-0.5 font-medium">
+                <div className="border-l border-emerald-200 pl-3 text-xs font-medium text-slate-500">
                   {comissoes.filter(comissaoPodeSerSelecionada).length} comissão(ões) pendente(s)
                 </div>
               </div>
@@ -299,8 +312,8 @@ export default function ComissoesListagemTabela({ controller }) {
         </div>
       )}
 
-      {/* Espaçamento para o rodapé fixo */}
-      {comissoes.length > 0 && <div className="h-24"></div>}
+      {/* Espaçamento para o resumo flutuante */}
+      {comissoes.length > 0 && <div className="h-24 md:h-20"></div>}
     </>
   );
 }

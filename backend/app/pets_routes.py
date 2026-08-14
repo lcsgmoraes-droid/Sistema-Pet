@@ -152,7 +152,9 @@ def enriquecer_pet_response(pet: Pet, de_parceiro: bool = False) -> dict:
         "especie": pet.especie,
         "raca": pet.raca,
         "sexo": pet.sexo,
-        "castrado": pet.castrado,
+        # Registros antigos podem ter NULL mesmo com o campo atual sendo booleano.
+        # A listagem deve entregar um valor previsivel ao frontend.
+        "castrado": bool(pet.castrado),
         "data_nascimento": pet.data_nascimento,
         "idade_aproximada": pet.idade_aproximada,
         "peso": pet.peso,
