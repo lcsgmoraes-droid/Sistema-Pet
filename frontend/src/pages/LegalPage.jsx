@@ -1,14 +1,16 @@
 import { Link } from "react-router-dom";
 import { ShieldCheck } from "lucide-react";
+import { billingContract } from "../data/billingContract";
 
-const updatedAt = "08/05/2026";
-const privacyContact = "atacadaopetpp@gmail.com";
+const privacyContact = "lcsgmoraes@gmail.com";
 
 const legalContent = {
+  contrato: billingContract,
   termos: {
     title: "Termos de Uso",
     eyebrow: "Contrato de uso da plataforma",
-    version: "Versao 2026-05-08",
+    version: "Versao 2026-08-14",
+    updatedAt: "14/08/2026",
     intro:
       "Estes Termos regulam o acesso e o uso do CorePet, plataforma de gestao, vendas, estoque, financeiro, entregas, atendimento, loja online, aplicativo e integracoes para operacoes de pet shop, clinica, banho e tosa e negocios relacionados.",
     sections: [
@@ -187,7 +189,8 @@ const legalContent = {
   privacidade: {
     title: "Politica de Privacidade",
     eyebrow: "Protecao de dados pessoais",
-    version: "Versao 2026-05-08",
+    version: "Versao 2026-08-14",
+    updatedAt: "14/08/2026",
     intro:
       "Esta Politica explica como dados pessoais podem ser coletados, usados, armazenados, compartilhados e protegidos no CorePet, incluindo ERP, loja online, aplicativo, atendimento, entregas, campanhas, integracoes e suporte.",
     sections: [
@@ -436,7 +439,7 @@ const LegalPage = ({ type = "termos" }) => {
             </div>
             <div className="min-w-44 rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
               <div className="font-semibold text-slate-900">{content.version}</div>
-              <div className="mt-1">Atualizado em {updatedAt}</div>
+              <div className="mt-1">Atualizado em {content.updatedAt}</div>
             </div>
           </div>
 

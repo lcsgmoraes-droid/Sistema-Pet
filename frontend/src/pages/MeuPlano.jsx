@@ -12,6 +12,11 @@ import {
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { MODULOS_INFO, useModulos } from "../contexts/ModulosContext";
+import {
+  BILLING_ACCEPTANCE_TEXT,
+  BILLING_CONTRACT_DOCUMENT_SHA256,
+  BILLING_CONTRACT_VERSION,
+} from "../data/billingContract";
 import { buildSalesContactUrl, publicPlans, serviceInvoiceAddon } from "../data/publicPlans";
 import { api } from "../services/api";
 
@@ -136,6 +141,7 @@ export default function MeuPlano() {
   const [billingLoading, setBillingLoading] = useState(false);
   const [billingError, setBillingError] = useState("");
   const [selectedPlan, setSelectedPlan] = useState(() => normalizedPlanCode(planoAtual));
+  const [contractAccepted, setContractAccepted] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -154,10 +160,27 @@ export default function MeuPlano() {
 
   useEffect(() => {
     setSelectedPlan(normalizedPlanCode(planoAtual));
+    setContractAccepted(false);
   }, [planoAtual]);
 
   const statusInfo = getStatusInfo(assinaturaAtual);
   const billingConfigured = billing?.configured === true;
+  const selectedPlanDetails = PLAN_OPTIONS.find((plan) => plan.id === selectedPlan);
+  const billingMatchesSelectedPlan = billing?.plan?.codigo === selectedPlan;
+  const currentAcceptance = billing?.contract_acceptance;
+  const hasCurrentAcceptance =
+    billingMatchesSelectedPlan &&
+    currentAcceptance?.contract_version === BILLING_CONTRACT_VERSION &&
+    currentAcceptance?.contract_document_sha256 === BILLING_CONTRACT_DOCUMENT_SHA256 &&
+    currentAcceptance?.plan_code === selectedPlan;
+  const selectedCheckoutUrl = billingMatchesSelectedPlan ? billing?.checkout_url : null;
+  const trialEnd = assinaturaAtual?.trial_fim ? new Date(assinaturaAtual.trial_fim) : null;
+  const today = new Date();
+  const summaryFirstDueDate =
+    (billingMatchesSelectedPlan && billing?.next_due_date) ||
+    (trialEnd && !Number.isNaN(trialEnd.getTime()) && trialEnd > today
+      ? assinaturaAtual.trial_fim
+      : today.toISOString());
   const StatusIcon = statusInfo.icon;
   const diasRestantes = assinaturaAtual?.dias_restantes_trial;
   const betaModules = (modulosBetaPublicos || [])
@@ -176,8 +199,13 @@ export default function MeuPlano() {
   );
 
   async function handleSubscribe() {
-    if (billing?.checkout_url && trustedAsaasUrl(billing.checkout_url)) {
-      window.location.assign(billing.checkout_url);
+    if (selectedCheckoutUrl && hasCurrentAcceptance && trustedAsaasUrl(selectedCheckoutUrl)) {
+      window.location.assign(selectedCheckoutUrl);
+      return;
+    }
+
+    if (!contractAccepted && !hasCurrentAcceptance) {
+      setBillingError("Leia os documentos e confirme o aceite para continuar.");
       return;
     }
 
@@ -187,8 +215,13 @@ export default function MeuPlano() {
       const response = await api.post("/billing/asaas/subscriptions", {
         plan_code: selectedPlan,
         billing_type: "UNDEFINED",
+        accepted: true,
+        contract_version: BILLING_CONTRACT_VERSION,
+        contract_document_sha256: BILLING_CONTRACT_DOCUMENT_SHA256,
+        client_timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
       });
       setBilling(response.data);
+      setContractAccepted(false);
       if (trustedAsaasUrl(response.data?.checkout_url)) {
         window.location.assign(response.data.checkout_url);
       } else {
@@ -279,7 +312,7 @@ export default function MeuPlano() {
                 value={selectedPlan}
                 onChange={(event) => {
                   setSelectedPlan(event.target.value);
-                  setBilling(null);
+                  setContractAccepted(false);
                   setBillingError("");
                 }}
                 className="mt-2 w-full rounded-md border border-slate-300 bg-white px-3 py-3 text-sm font-semibold text-slate-900 outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
@@ -311,11 +344,108 @@ export default function MeuPlano() {
               </p>
             </div>
 
+            <div className="mt-5 rounded-lg border border-slate-200 bg-slate-50 p-4">
+              <div className="flex items-center gap-2">
+                <FileText className="h-4 w-4 text-emerald-700" />
+                <h3 className="text-sm font-bold text-slate-950">Resumo da contratação</h3>
+              </div>
+              <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
+                <div>
+                  <dt className="text-xs font-bold uppercase text-slate-500">Plano</dt>
+                  <dd className="mt-1 font-semibold text-slate-900">
+                    {selectedPlanDetails?.name || selectedPlan}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-xs font-bold uppercase text-slate-500">Mensalidade</dt>
+                  <dd className="mt-1 font-semibold text-slate-900">
+                    R$ {selectedPlanDetails?.price || "-"}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-xs font-bold uppercase text-slate-500">Ciclo</dt>
+                  <dd className="mt-1 font-semibold text-slate-900">Mensal</dd>
+                </div>
+                <div>
+                  <dt className="text-xs font-bold uppercase text-slate-500">
+                    Primeiro vencimento
+                  </dt>
+                  <dd className="mt-1 font-semibold text-slate-900">
+                    {formatDate(summaryFirstDueDate)}
+                  </dd>
+                </div>
+              </dl>
+              <p className="mt-4 text-xs leading-5 text-slate-600">
+                Reajuste anual pela variação acumulada do IPCA/IBGE, nunca em período inferior a 12
+                meses, com aviso prévio mínimo de 30 dias.
+              </p>
+
+              {hasCurrentAcceptance ? (
+                <div className="mt-4 flex items-start gap-2 rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">
+                  <CheckCircle2 className="mt-0.5 h-4 w-4 flex-none" />
+                  <span>
+                    Aceite registrado em {formatDate(currentAcceptance.accepted_at)} para este plano
+                    e esta versão do contrato.
+                  </span>
+                </div>
+              ) : (
+                <label className="mt-4 flex cursor-pointer items-start gap-3 rounded-md border border-slate-300 bg-white p-4 text-sm leading-6 text-slate-700">
+                  <input
+                    type="checkbox"
+                    checked={contractAccepted}
+                    onChange={(event) => {
+                      setContractAccepted(event.target.checked);
+                      setBillingError("");
+                    }}
+                    className="mt-1 h-4 w-4 flex-none rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
+                  />
+                  <span>
+                    {BILLING_ACCEPTANCE_TEXT}{" "}
+                    <span className="font-semibold">
+                      Consulte o{" "}
+                      <Link
+                        to="/contrato-assinatura"
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-blue-700 underline hover:text-blue-800"
+                      >
+                        Contrato de Assinatura
+                      </Link>
+                      , os{" "}
+                      <Link
+                        to="/termos"
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-blue-700 underline hover:text-blue-800"
+                      >
+                        Termos de Uso
+                      </Link>{" "}
+                      e a{" "}
+                      <Link
+                        to="/privacidade"
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-blue-700 underline hover:text-blue-800"
+                      >
+                        Política de Privacidade
+                      </Link>
+                      .
+                    </span>
+                  </span>
+                </label>
+              )}
+            </div>
+
             <div className="mt-5 flex flex-col gap-3 sm:flex-row">
               <button
                 type="button"
                 onClick={handleSubscribe}
-                disabled={billingLoading || !selectedPlan || !billingConfigured}
+                disabled={
+                  billingLoading ||
+                  !selectedPlan ||
+                  !billingConfigured ||
+                  (!hasCurrentAcceptance && !contractAccepted)
+                }
                 className="inline-flex items-center justify-center gap-2 rounded-md bg-emerald-500 px-5 py-3 text-sm font-bold text-slate-950 transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 <CreditCard className="h-4 w-4" />
@@ -323,9 +453,11 @@ export default function MeuPlano() {
                   ? "Preparando pagamento..."
                   : !billingConfigured
                     ? "Pagamento online em configuracao"
-                    : billing?.checkout_url
+                    : selectedCheckoutUrl && hasCurrentAcceptance
                       ? "Abrir pagamento"
-                      : "Assinar pelo Asaas"}
+                      : hasCurrentAcceptance
+                        ? "Continuar pagamento"
+                        : "Aceitar e assinar pelo Asaas"}
               </button>
               <a
                 href={`https://wa.me/${WHATSAPP_NUMERO}?text=${msgContratar}`}
