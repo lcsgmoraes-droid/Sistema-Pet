@@ -57,7 +57,7 @@ def test_entrada_xml_lista_tem_filtros_operacionais_de_nf():
     )
 
     assert "filtrosNotas" in table_source
-    assert "setFiltrosNotas" in table_source
+    assert "onFiltrosChange" in table_source
     assert "Fornecedor" in table_source
     assert "NF ou chave" in table_source
     assert "Data inicial" in table_source
@@ -67,6 +67,25 @@ def test_entrada_xml_lista_tem_filtros_operacionais_de_nf():
     assert "nota.fornecedor_nome" in table_source
     assert "nota.numero_nota" in table_source
     assert "nota.chave_acesso" in table_source
+
+
+def test_entrada_xml_usa_paginacao_e_filtros_no_servidor():
+    page_source = read_source("frontend/src/components/EntradaXML.jsx")
+    table_source = read_source(
+        "frontend/src/components/entrada-xml/EntradaXmlNotasTable.jsx"
+    )
+    metricas_source = read_source(
+        "frontend/src/components/entrada-xml/EntradaXmlMetricas.jsx"
+    )
+
+    assert 'useState("pendente")' in page_source
+    assert 'api.get("/notas-entrada/listagem"' in page_source
+    assert "page_size: 20" in page_source
+    assert "PaginationControls" in table_source
+    assert "onItemsPerPageChange" in table_source
+    assert "totalItems={paginacao.total}" in table_source
+    assert "metricas.total_notas" in metricas_source
+    assert "metricas.valor_conciliado" in metricas_source
 
 
 def test_acoes_ja_lancadas_ficam_bloqueadas_na_revisao():

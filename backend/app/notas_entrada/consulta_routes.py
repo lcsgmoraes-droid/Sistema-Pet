@@ -78,6 +78,7 @@ from app.notas_entrada.schemas import (
     NotaEntradaResponse,
     ProcessarConfig,
 )
+from app.notas_entrada.listagem_routes import _serializar_nota_listagem
 from app.notas_entrada.rateio_routes import router as rateio_router
 from app.notas_entrada.conferencia_routes import (
     router as conferencia_router,
@@ -141,24 +142,8 @@ def listar_notas(
     for nota in notas:
         conferencia = _resumir_conferencia_nota(nota)
         respostas.append(
-            NotaEntradaResponse.model_validate(
-                {
-                    "id": nota.id,
-                    "numero_nota": nota.numero_nota,
-                    "serie": nota.serie,
-                    "chave_acesso": nota.chave_acesso,
-                    "fornecedor_nome": nota.fornecedor_nome,
-                    "fornecedor_cnpj": nota.fornecedor_cnpj,
-                    "fornecedor_id": nota.fornecedor_id,
-                    "data_emissao": nota.data_emissao,
-                    "valor_total": nota.valor_total,
-                    "status": nota.status,
-                    "produtos_vinculados": nota.produtos_vinculados,
-                    "produtos_nao_vinculados": nota.produtos_nao_vinculados,
-                    "entrada_estoque_realizada": nota.entrada_estoque_realizada,
-                    "conferencia_status": conferencia["status"],
-                    "divergencias_count": conferencia["itens_com_divergencia"],
-                }
+            _serializar_nota_listagem(
+                nota, int(conferencia["itens_com_divergencia"] or 0)
             )
         )
 

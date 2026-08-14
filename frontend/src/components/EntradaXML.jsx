@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import api from "../api";
 import { getAccessToken } from "../auth/tokenStorage";
@@ -37,18 +37,45 @@ import {
   extrairMensagemErroApi,
 } from "./entrada-xml/entradaXmlUtils";
 
+const FILTROS_NOTAS_INICIAIS = {
+  fornecedor: "",
+  nf: "",
+  data_inicio: "",
+  data_fim: "",
+  conferencia: "todos",
+};
+
+const METRICAS_INICIAIS = {
+  total_notas: 0,
+  pendentes: 0,
+  conciliadas: 0,
+  com_erro: 0,
+  valor_conciliado: 0,
+};
+
 const EntradaXML = () => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const autoOpenNotaIdRef = useRef(null);
+  const listRequestIdRef = useRef(0);
   const [notasEntrada, setNotasEntrada] = useState([]);
   const [loading, setLoading] = useState(false);
   const [mostrarDetalhes, setMostrarDetalhes] = useState(false);
   const [mostrarUploadPdf, setMostrarUploadPdf] = useState(false);
   const [mostrarVisualizacao, setMostrarVisualizacao] = useState(false);
+  const [carregandoLista, setCarregandoLista] = useState(false);
+  const [filtrosNotas, setFiltrosNotas] = useState(FILTROS_NOTAS_INICIAIS);
+  const [filtrosAplicados, setFiltrosAplicados] = useState(FILTROS_NOTAS_INICIAIS);
+  const [metricas, setMetricas] = useState(METRICAS_INICIAIS);
+  const [paginacao, setPaginacao] = useState({
+    page: 1,
+    page_size: 20,
+    pages: 1,
+    total: 0,
+  });
 
   // Filtro de status da tabela
-  const [filtroStatus, setFiltroStatus] = useState("todos");
+  const [filtroStatus, setFiltroStatus] = useState("pendente");
 
   const {
     multiplicadoresPack,
@@ -96,11 +123,6 @@ const EntradaXML = () => {
   };
 
   useEffect(() => {
-    console.log("?? [EntradaXML] Componente montado, iniciando carregamento...");
-    carregarDados();
-  }, []);
-
-  useEffect(() => {
     const notaIdParam = searchParams.get("nota_id");
     if (!notaIdParam) return;
     if (autoOpenNotaIdRef.current === notaIdParam) return;
@@ -116,33 +138,79 @@ const EntradaXML = () => {
     });
   }, [searchParams, setSearchParams]);
 
-  const carregarDados = async () => {
-    console.log("?? [EntradaXML] Carregando dados...");
+  useEffect(() => {
+    const timer = globalThis.setTimeout(() => {
+      setFiltrosAplicados((atuais) => {
+        const filtrosMudaram = Object.keys(FILTROS_NOTAS_INICIAIS).some(
+          (chave) => atuais[chave] !== filtrosNotas[chave],
+        );
+        return filtrosMudaram ? filtrosNotas : atuais;
+      });
+      setPaginacao((atual) => (atual.page === 1 ? atual : { ...atual, page: 1 }));
+    }, 350);
+
+    return () => globalThis.clearTimeout(timer);
+  }, [filtrosNotas]);
+
+  const carregarDados = useCallback(async () => {
+    const requestId = ++listRequestIdRef.current;
+    setCarregandoLista(true);
     try {
       const token = getAccessToken();
-      console.log("?? [EntradaXML] Token obtido:", token ? "SIM" : "NAO");
       const headers = { Authorization: `Bearer ${token}` };
+      const params = {
+        page: paginacao.page,
+        page_size: paginacao.page_size,
+      };
 
-      console.log("?? [EntradaXML] Fazendo requisicoes para:", {
-        notasEntrada: `/notas-entrada/`,
-      });
+      if (filtroStatus !== "todos") params.status = filtroStatus;
+      if (filtrosAplicados.fornecedor) params.fornecedor = filtrosAplicados.fornecedor;
+      if (filtrosAplicados.nf) params.nf = filtrosAplicados.nf;
+      if (filtrosAplicados.data_inicio) params.data_inicio = filtrosAplicados.data_inicio;
+      if (filtrosAplicados.data_fim) params.data_fim = filtrosAplicados.data_fim;
+      if (filtrosAplicados.conferencia !== "todos") {
+        params.conferencia = filtrosAplicados.conferencia;
+      }
 
-      const notasRes = await api.get(`/notas-entrada/`, { headers });
+      const { data } = await api.get("/notas-entrada/listagem", { headers, params });
+      if (requestId !== listRequestIdRef.current) return;
 
-      console.log("? [EntradaXML] Dados carregados:", {
-        notasEntrada: notasRes.data?.length || 0,
-      });
-
-      setNotasEntrada(notasRes.data);
+      setNotasEntrada(data.items || []);
+      setMetricas(data.metricas || METRICAS_INICIAIS);
+      setPaginacao((atual) => ({
+        ...atual,
+        page: data.page || 1,
+        page_size: data.page_size || atual.page_size,
+        pages: data.pages || 1,
+        total: data.total || 0,
+      }));
     } catch (error) {
-      console.error("? [EntradaXML] ERRO ao carregar dados:");
-      console.error("  - Mensagem:", error.message);
-      console.error("  - Response:", error.response?.data);
-      console.error("  - Status:", error.response?.status);
-      console.error("  - Stack:", error.stack);
+      if (requestId !== listRequestIdRef.current) return;
+      console.error("Erro ao carregar notas de entrada:", error);
       toast.error(`Erro ao carregar dados: ${extrairMensagemErroApi(error)}`);
+    } finally {
+      if (requestId === listRequestIdRef.current) {
+        setCarregandoLista(false);
+      }
     }
-  };
+  }, [filtroStatus, filtrosAplicados, paginacao.page, paginacao.page_size]);
+
+  useEffect(() => {
+    carregarDados();
+  }, [carregarDados]);
+
+  const alterarFiltroStatus = useCallback((status) => {
+    setFiltroStatus(status);
+    setPaginacao((atual) => (atual.page === 1 ? atual : { ...atual, page: 1 }));
+  }, []);
+
+  const alterarPagina = useCallback((page) => {
+    setPaginacao((atual) => ({ ...atual, page }));
+  }, []);
+
+  const alterarItensPorPagina = useCallback((pageSize) => {
+    setPaginacao((atual) => ({ ...atual, page: 1, page_size: pageSize }));
+  }, []);
 
   const {
     buscarHistoricoPrecos,
@@ -474,9 +542,9 @@ const EntradaXML = () => {
       />
 
       <EntradaXmlMetricas
-        notasEntrada={notasEntrada}
+        metricas={metricas}
         formatMoneyBRL={formatMoneyBRL}
-        onFiltroStatus={setFiltroStatus}
+        onFiltroStatus={alterarFiltroStatus}
       />
 
       <EntradaXmlNotasTable
@@ -486,10 +554,17 @@ const EntradaXML = () => {
         conferenciaStatusMeta={CONFERENCIA_STATUS_META}
         excluirNota={excluirNota}
         filtroStatus={filtroStatus}
+        filtrosNotas={filtrosNotas}
         formatMoneyBRL={formatMoneyBRL}
+        loading={carregandoLista}
         notasEntrada={notasEntrada}
+        onFiltrosChange={setFiltrosNotas}
+        onItemsPerPageChange={alterarItensPorPagina}
+        onPageChange={alterarPagina}
+        paginacao={paginacao}
         reverterNota={reverterNota}
-        setFiltroStatus={setFiltroStatus}
+        setFiltroStatus={alterarFiltroStatus}
+        totalNotasGlobal={metricas.total_notas}
       />
 
       <EntradaXmlDetalhesModal
