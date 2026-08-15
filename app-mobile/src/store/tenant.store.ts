@@ -8,6 +8,7 @@ export interface TenantInfo {
   slug: string;
   nome: string;
   logo_url: string | null;
+  imagem_url?: string | null;
   endereco?: string | null;
   numero?: string | null;
   bairro?: string | null;

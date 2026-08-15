@@ -340,12 +340,19 @@ def _tenant_public_payload(
     tenant: Tenant,
     distancia_km: float | None = None,
 ) -> dict:
+    imagem_url = (
+        tenant.logo_url
+        or tenant.banner_1_url
+        or tenant.banner_2_url
+        or tenant.banner_3_url
+    )
     payload = {
         "id": str(tenant.id),
         "slug": tenant.ecommerce_slug,
         "nome": tenant.name,
         "name": tenant.name,
         "logo_url": tenant.logo_url,
+        "imagem_url": imagem_url,
         "endereco": tenant.endereco,
         "numero": tenant.numero,
         "bairro": tenant.bairro,
