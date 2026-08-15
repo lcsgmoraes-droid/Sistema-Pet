@@ -12,6 +12,11 @@ test("sidebar mostra uma alca visivel para ajustar a largura", () => {
   assert.match(sidebarSource, /bg-\[#0f8b8d\]\/45/);
 });
 
+test("sidebar mobile fica fixa e nao ocupa a largura do conteudo", () => {
+  assert.match(sidebarSource, /erp-mobile-sidebar fixed/);
+  assert.doesNotMatch(sidebarSource, /erp-sidebar relative/);
+});
+
 test("nomes truncados mostram o texto completo ao passar o mouse", () => {
   assert.match(menuSource, /text\.scrollWidth > text\.clientWidth/);
   assert.match(menuSource, /role="tooltip"/);

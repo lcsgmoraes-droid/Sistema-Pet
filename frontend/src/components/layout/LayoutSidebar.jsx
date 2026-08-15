@@ -79,8 +79,8 @@ export default function LayoutSidebar({
           ? `erp-mobile-sidebar fixed inset-y-0 left-0 z-50 w-64 max-w-[calc(100vw-24px)] transform overflow-hidden transition-transform duration-300 ${
               sidebarOpen ? "translate-x-0" : "-translate-x-full"
             }`
-          : `${redimensionando ? "" : "transition-[width] duration-200"}`
-      } erp-sidebar relative shrink-0 bg-gradient-to-b from-[#f4fbfa] to-[#fff8ea] border-r border-[#d8eee9] flex flex-col shadow-lg dark:border-slate-800 dark:from-slate-950 dark:to-slate-900`}
+          : `${redimensionando ? "" : "transition-[width] duration-200"} relative`
+      } erp-sidebar shrink-0 bg-gradient-to-b from-[#f4fbfa] to-[#fff8ea] border-r border-[#d8eee9] flex flex-col shadow-lg dark:border-slate-800 dark:from-slate-950 dark:to-slate-900`}
       style={
         isMobile
           ? undefined
