@@ -5,7 +5,7 @@ const TIPOS = [
   {
     key: "logo",
     label: "Logo da Loja",
-    desc: "Aparece no cabeçalho da loja virtual (recomendado: 200×80 px)",
+    desc: "Aparece na loja virtual e como imagem da loja no app (use uma imagem nítida e com pouco espaço vazio)",
     targetW: 400,
     targetH: 160,
   },
@@ -35,7 +35,7 @@ const TIPOS = [
 /**
  * Redimensiona a imagem no navegador usando Canvas.
  * Banners: escala para até 1200px de largura mantendo proporção original (sem corte).
- * Logo: centraliza em 400×160 com fundo branco.
+ * Logo: limita a 400×160 preservando a proporção, sem adicionar espaço vazio.
  */
 function resizeImage(file, targetW, targetH, outputType = "image/webp", quality = 0.9) {
   return new Promise((resolve, reject) => {
@@ -53,15 +53,13 @@ function resizeImage(file, targetW, targetH, outputType = "image/webp", quality 
         canvas.height = Math.round(img.naturalHeight * scale);
         ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
       } else {
-        // Modo logo: cabe em targetW×targetH e preserva transparência.
-        canvas.width = targetW;
-        canvas.height = targetH;
-        const scale = Math.min(targetW / img.naturalWidth, targetH / img.naturalHeight);
-        const drawW = img.naturalWidth * scale;
-        const drawH = img.naturalHeight * scale;
-        const offsetX = (targetW - drawW) / 2;
-        const offsetY = (targetH - drawH) / 2;
-        ctx.drawImage(img, offsetX, offsetY, drawW, drawH);
+        // Modo logo: preserva o formato original para funcionar no site e no cartão quadrado do app.
+        const scale = Math.min(targetW / img.naturalWidth, targetH / img.naturalHeight, 1);
+        const drawW = Math.max(1, Math.round(img.naturalWidth * scale));
+        const drawH = Math.max(1, Math.round(img.naturalHeight * scale));
+        canvas.width = drawW;
+        canvas.height = drawH;
+        ctx.drawImage(img, 0, 0, drawW, drawH);
       }
 
       canvas.toBlob(
@@ -116,6 +114,98 @@ function PreviewImage({ url, label, cacheBuster, isBanner }) {
   );
 }
 
+function imageUrlWithCache(url, cacheBuster) {
+  if (!url) return null;
+  return url.startsWith("/uploads/") ? `${url}?t=${cacheBuster}` : url;
+}
+
+function AppStoreLogoPreview({ logoUrl, cacheBuster, storeName, cidade, uf }) {
+  const src = imageUrlWithCache(logoUrl, cacheBuster);
+  const local = [cidade, uf].filter(Boolean).join("/") || "Localização da loja";
+
+  return (
+    <div
+      style={{
+        marginTop: 16,
+        padding: 16,
+        background: "#f0fdfa",
+        border: "1px solid #99f6e4",
+        borderRadius: 10,
+      }}
+    >
+      <div style={{ fontSize: 13, fontWeight: 700, color: "#115e59", marginBottom: 4 }}>
+        Prévia no aplicativo
+      </div>
+      <p style={{ fontSize: 12, color: "#475569", margin: "0 0 12px" }}>
+        Esta logo aparece nas buscas e em “Lojas mais próximas”. Se não houver uma logo cadastrada,
+        o app poderá usar o primeiro banner.
+      </p>
+
+      <div
+        style={{
+          maxWidth: 430,
+          padding: "10px 12px",
+          display: "flex",
+          alignItems: "center",
+          gap: 12,
+          background: "#fff",
+          border: "1px solid #d1d5db",
+          borderRadius: 12,
+          boxShadow: "0 1px 2px rgba(15, 23, 42, 0.06)",
+        }}
+      >
+        <div
+          style={{
+            width: 48,
+            height: 48,
+            flexShrink: 0,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            overflow: "hidden",
+            background: "#fff",
+            border: "1px solid #e2e8f0",
+            borderRadius: 10,
+          }}
+        >
+          {src ? (
+            <img
+              src={src}
+              alt={`Logo de ${storeName || "sua loja"} no aplicativo`}
+              style={{ width: 42, height: 42, objectFit: "contain", display: "block" }}
+            />
+          ) : (
+            <span style={{ fontSize: 10, color: "#94a3b8", textAlign: "center", lineHeight: 1.1 }}>
+              Sem
+              <br />
+              logo
+            </span>
+          )}
+        </div>
+
+        <div style={{ minWidth: 0, flex: 1 }}>
+          <div
+            style={{
+              color: "#111827",
+              fontSize: 14,
+              fontWeight: 700,
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+            }}
+          >
+            {storeName || "Nome da sua loja"}
+          </div>
+          <div style={{ color: "#64748b", fontSize: 12, marginTop: 3 }}>{local}</div>
+        </div>
+        <span aria-hidden="true" style={{ color: "#94a3b8", fontSize: 24, lineHeight: 1 }}>
+          ›
+        </span>
+      </div>
+    </div>
+  );
+}
+
 export default function EcommerceAparencia() {
   const [aparencia, setAparencia] = useState({
     logo_url: null,
@@ -125,6 +215,11 @@ export default function EcommerceAparencia() {
   });
   const [slug, setSlug] = useState("");
   const [slugOriginal, setSlugOriginal] = useState("");
+  const [tenantContext, setTenantContext] = useState({
+    name: "",
+    cidade: "",
+    uf: "",
+  });
   const [salvandoSlug, setSalvandoSlug] = useState(false);
   const [localizacao, setLocalizacao] = useState({
     latitude: null,
@@ -147,6 +242,11 @@ export default function EcommerceAparencia() {
       .then((r) => {
         setSlug(r.data.ecommerce_slug || "");
         setSlugOriginal(r.data.ecommerce_slug || "");
+        setTenantContext({
+          name: r.data.name || "",
+          cidade: r.data.cidade || "",
+          uf: r.data.uf || "",
+        });
         setLocalizacao({
           latitude: r.data.latitude ?? null,
           longitude: r.data.longitude ?? null,
@@ -429,6 +529,16 @@ export default function EcommerceAparencia() {
                 cacheBuster={cacheBuster}
                 isBanner={key !== "logo"}
               />
+
+              {key === "logo" && (
+                <AppStoreLogoPreview
+                  logoUrl={aparencia.logo_url}
+                  cacheBuster={cacheBuster}
+                  storeName={tenantContext.name}
+                  cidade={tenantContext.cidade}
+                  uf={tenantContext.uf}
+                />
+              )}
 
               <div
                 style={{
