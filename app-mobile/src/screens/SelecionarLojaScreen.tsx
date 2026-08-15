@@ -1,7 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import * as Location from "expo-location";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -47,7 +47,13 @@ function StoreLogo({
   store: TenantInfo;
   size?: number;
 }) {
-  const logoUrl = resolveTenantAssetUrl(store.logo_url);
+  const imageUrl = resolveTenantAssetUrl(store.imagem_url ?? store.logo_url);
+  const [imageFailed, setImageFailed] = useState(false);
+
+  useEffect(() => {
+    setImageFailed(false);
+  }, [imageUrl]);
+
   return (
     <View
       style={[
@@ -55,11 +61,12 @@ function StoreLogo({
         { width: size, height: size, borderRadius: Math.min(12, size / 4) },
       ]}
     >
-      {logoUrl ? (
+      {imageUrl && !imageFailed ? (
         <Image
-          source={{ uri: logoUrl }}
+          source={{ uri: imageUrl }}
           style={{ width: size - 6, height: size - 6 }}
-          resizeMode="contain"
+          resizeMode={store.logo_url ? "contain" : "cover"}
+          onError={() => setImageFailed(true)}
         />
       ) : (
         <Ionicons

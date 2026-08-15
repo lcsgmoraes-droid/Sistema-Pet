@@ -8,6 +8,7 @@ from app.models import Tenant
 from app.tenant_identity import normalize_tenant_name
 from app.routes.ecommerce_public import (
     _distance_km,
+    _tenant_public_payload,
     buscar_tenants_por_nome,
     sugerir_tenants_por_localidade,
 )
@@ -102,6 +103,17 @@ def test_name_search_finds_store_without_geographic_filter():
         assert [store["slug"] for store in response["lojas"]] == ["atacadao"]
     finally:
         db.close()
+
+
+def test_public_store_image_prefers_logo_and_falls_back_to_first_banner():
+    store = _store("Loja com imagem", "loja-com-imagem", -22.12, -51.39)
+    store.banner_1_url = "/uploads/ecommerce/loja/banner_1.jpg"
+
+    assert _tenant_public_payload(store)["imagem_url"] == store.banner_1_url
+
+    store.logo_url = "/uploads/ecommerce/loja/logo.png"
+
+    assert _tenant_public_payload(store)["imagem_url"] == store.logo_url
 
 
 def test_store_search_contract_keeps_name_global_and_gps_limited_to_eight():
