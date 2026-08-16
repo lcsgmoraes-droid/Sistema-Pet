@@ -2,6 +2,7 @@ import { Route } from "react-router-dom";
 import {
   AppPaymentReturn,
   AppPublicEntry,
+  BillingOfferPublicPage,
   EcommerceMVP,
   EmailVerification,
   ForgotPassword,
@@ -24,6 +25,7 @@ export function createPublicRoutes() {
       <Route path="/termos" element={<LegalPage type="termos" />} />
       <Route path="/privacidade" element={<LegalPage type="privacidade" />} />
       <Route path="/contrato-assinatura" element={<LegalPage type="contrato" />} />
+      <Route path="/contratar/:token" element={<BillingOfferPublicPage />} />
       <Route path="/landing" element={<LandingPage />} />
       <Route path="/planos" element={<Planos />} />
       <Route path="/rastreio/:token" element={<RastreioPublico />} />

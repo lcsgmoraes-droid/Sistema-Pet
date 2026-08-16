@@ -8,6 +8,27 @@ import {
 } from "../opsTenantsUtils";
 
 import { extractError, sumCounts } from "./opsTenantsFormatters";
+import { BILLING_OFFER_PLAN_OPTIONS } from "./opsTenantsConstants";
+
+function tomorrowIsoDate() {
+  const value = new Date();
+  value.setDate(value.getDate() + 1);
+  const year = value.getFullYear();
+  const month = String(value.getMonth() + 1).padStart(2, "0");
+  const day = String(value.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function initialBillingOfferForm() {
+  return {
+    title: "CorePet - Pet Venda Ativa",
+    plan_code: "pet-venda-ativa",
+    price: 0,
+    first_due_date: tomorrowIsoDate(),
+    billing_type: "UNDEFINED",
+    extra_modules: [],
+  };
+}
 
 export default function useOpsTenantsController() {
   const [items, setItems] = useState([]);
@@ -19,6 +40,13 @@ export default function useOpsTenantsController() {
   const [commercialError, setCommercialError] = useState("");
   const [commercialSuccess, setCommercialSuccess] = useState("");
   const [commercialSaving, setCommercialSaving] = useState(false);
+  const [billingOfferForm, setBillingOfferForm] = useState(initialBillingOfferForm);
+  const [billingOffers, setBillingOffers] = useState([]);
+  const [billingOffersLoading, setBillingOffersLoading] = useState(false);
+  const [billingOfferCreating, setBillingOfferCreating] = useState(false);
+  const [billingOfferError, setBillingOfferError] = useState("");
+  const [billingOfferSuccess, setBillingOfferSuccess] = useState("");
+  const [billingOfferPublicUrl, setBillingOfferPublicUrl] = useState("");
   const [selectedTenantId, setSelectedTenantId] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -59,13 +87,34 @@ export default function useOpsTenantsController() {
     [items, selectedTenantId],
   );
 
+  const loadBillingOffers = useCallback(async (tenantId) => {
+    if (!tenantId) {
+      setBillingOffers([]);
+      return;
+    }
+    setBillingOffersLoading(true);
+    try {
+      const response = await api.get(`/admin/tenants/${tenantId}/billing-offers`);
+      setBillingOffers(response.data?.items || []);
+    } catch (err) {
+      setBillingOfferError(extractError(err, "Nao foi possivel carregar as propostas."));
+    } finally {
+      setBillingOffersLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     if (selectedTenant) {
       setCommercialForm(buildOpsTenantCommercialForm(selectedTenant));
       setCommercialError("");
       setCommercialSuccess("");
+      setBillingOfferForm(initialBillingOfferForm());
+      setBillingOfferError("");
+      setBillingOfferSuccess("");
+      setBillingOfferPublicUrl("");
+      loadBillingOffers(selectedTenant.id);
     }
-  }, [selectedTenant]);
+  }, [loadBillingOffers, selectedTenant]);
 
   const totals = useMemo(
     () => ({
@@ -166,6 +215,68 @@ export default function useOpsTenantsController() {
     }
   }
 
+  function handleBillingOfferChange(field, value) {
+    setBillingOfferForm((current) => {
+      const next = { ...current, [field]: value };
+      if (field === "plan_code") {
+        const plan = BILLING_OFFER_PLAN_OPTIONS.find((item) => item.value === value);
+        next.title = plan ? `CorePet - ${plan.label}` : current.title;
+      }
+      return next;
+    });
+    setBillingOfferError("");
+    setBillingOfferSuccess("");
+    setBillingOfferPublicUrl("");
+  }
+
+  function handleBillingOfferToggleModule(module) {
+    setBillingOfferForm((current) => ({
+      ...current,
+      extra_modules: current.extra_modules.includes(module)
+        ? current.extra_modules.filter((item) => item !== module)
+        : [...current.extra_modules, module],
+    }));
+    setBillingOfferError("");
+    setBillingOfferSuccess("");
+    setBillingOfferPublicUrl("");
+  }
+
+  async function handleBillingOfferSubmit(event) {
+    event.preventDefault();
+    if (!selectedTenant) {
+      setBillingOfferError("Selecione uma empresa antes de gerar a proposta.");
+      return;
+    }
+    const priceCents = Math.round(Number(billingOfferForm.price || 0) * 100);
+    if (priceCents < 100) {
+      setBillingOfferError("Informe o valor mensal combinado com o cliente.");
+      return;
+    }
+
+    setBillingOfferCreating(true);
+    setBillingOfferError("");
+    setBillingOfferSuccess("");
+    setBillingOfferPublicUrl("");
+    try {
+      const response = await api.post(`/admin/tenants/${selectedTenant.id}/billing-offers`, {
+        title: billingOfferForm.title.trim(),
+        plan_code: billingOfferForm.plan_code,
+        price_cents: priceCents,
+        first_due_date: billingOfferForm.first_due_date,
+        billing_type: billingOfferForm.billing_type,
+        extra_modules: billingOfferForm.extra_modules,
+      });
+      const publicUrl = new URL(response.data.public_path, globalThis.location.origin).toString();
+      setBillingOfferPublicUrl(publicUrl);
+      setBillingOfferSuccess("Proposta criada. Confira e envie o link ao cliente.");
+      await loadBillingOffers(selectedTenant.id);
+    } catch (err) {
+      setBillingOfferError(extractError(err, "Nao foi possivel gerar o link de contratacao."));
+    } finally {
+      setBillingOfferCreating(false);
+    }
+  }
+
   return {
     actionError,
     activeTab,
@@ -175,10 +286,20 @@ export default function useOpsTenantsController() {
     commercialForm,
     commercialSaving,
     commercialSuccess,
+    billingOfferCreating,
+    billingOfferError,
+    billingOfferForm,
+    billingOfferPublicUrl,
+    billingOffers,
+    billingOffersLoading,
+    billingOfferSuccess,
     error,
     handleApply,
     handleCommercialChange,
     handleCommercialSubmit,
+    handleBillingOfferChange,
+    handleBillingOfferSubmit,
+    handleBillingOfferToggleModule,
     handlePreview,
     items,
     loadTenants,

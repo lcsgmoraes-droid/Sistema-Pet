@@ -286,6 +286,7 @@ def create_subscription(
                     "billingType": normalized_type,
                     "value": float(Decimal(plan.price_cents) / Decimal(100)),
                     "description": f"CorePet - {plan.name}",
+                    "externalReference": str(tenant.id),
                 },
             )
         payment = _subscription_payment(client, subscription_id)
@@ -327,6 +328,20 @@ def create_subscription(
         provider_subscription_id=subscription_id,
         context=acceptance_context,
     )
+    from app.billing_models import BillingOffer
+
+    (
+        db.query(BillingOffer)
+        .filter(
+            BillingOffer.tenant_reference == str(tenant.id),
+            BillingOffer.revoked.is_(False),
+            BillingOffer.status.in_(["accepted", "active", "past_due", "blocked"]),
+        )
+        .update(
+            {"status": "replaced", "revoked": True},
+            synchronize_session=False,
+        )
+    )
     db.add(acceptance)
     db.commit()
     db.refresh(tenant)
@@ -363,13 +378,36 @@ def subscription_status(
 def apply_payment_event(
     db: Session, event_type: str, payment: dict[str, Any]
 ) -> Tenant | None:
+    from app.billing_models import BillingOffer
+    from app.services.billing_offer_service import (
+        apply_offer_payment_event,
+        offer_id_from_external_reference,
+    )
+
     external_reference = str(payment.get("externalReference") or "").strip()
     payment_id = str(payment.get("id") or "").strip()
     subscription_id = str(payment.get("subscription") or "").strip()
     customer_id = str(payment.get("customer") or "").strip()
 
+    offer = None
+    referenced_offer_id = offer_id_from_external_reference(external_reference)
+    if referenced_offer_id:
+        offer = (
+            db.query(BillingOffer)
+            .filter(
+                BillingOffer.offer_id == referenced_offer_id,
+                BillingOffer.revoked.is_(False),
+                BillingOffer.status.in_(["accepted", "active", "past_due", "blocked"]),
+            )
+            .first()
+        )
+
     tenant = None
-    if external_reference:
+    if offer is not None:
+        tenant = (
+            db.query(Tenant).filter(Tenant.id == str(offer.tenant_reference)).first()
+        )
+    if tenant is None and external_reference and not referenced_offer_id:
         tenant = db.query(Tenant).filter(Tenant.id == external_reference).first()
     if tenant is None and payment_id:
         tenant = (
@@ -392,6 +430,29 @@ def apply_payment_event(
     if tenant is None:
         return None
 
+    if offer is None and subscription_id:
+        offer = (
+            db.query(BillingOffer)
+            .filter(
+                BillingOffer.provider_subscription_id == subscription_id,
+                BillingOffer.revoked.is_(False),
+                BillingOffer.status.in_(["accepted", "active", "past_due", "blocked"]),
+            )
+            .order_by(BillingOffer.accepted_at.desc(), BillingOffer.created_at.desc())
+            .first()
+        )
+    if offer is None and payment_id:
+        offer = (
+            db.query(BillingOffer)
+            .filter(
+                BillingOffer.provider_payment_id == payment_id,
+                BillingOffer.revoked.is_(False),
+                BillingOffer.status.in_(["accepted", "active", "past_due", "blocked"]),
+            )
+            .order_by(BillingOffer.accepted_at.desc(), BillingOffer.created_at.desc())
+            .first()
+        )
+
     _apply_payment_snapshot(tenant, payment)
     tenant.subscription_source = "asaas"
     normalized_event = (event_type or "").strip().upper()
@@ -408,4 +469,12 @@ def apply_payment_event(
             )
     elif tenant.billing_status not in {"active", "trial"}:
         tenant.billing_status = "pending"
+    if offer is not None:
+        apply_offer_payment_event(
+            db,
+            offer=offer,
+            tenant=tenant,
+            event_type=normalized_event,
+            payment=payment,
+        )
     return tenant

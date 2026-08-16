@@ -19,12 +19,22 @@ export default function OpsTenantsPage() {
     activeTab,
     applyByTenant,
     busyKey,
+    billingOfferCreating,
+    billingOfferError,
+    billingOfferForm,
+    billingOfferPublicUrl,
+    billingOffers,
+    billingOffersLoading,
+    billingOfferSuccess,
     commercialError,
     commercialForm,
     commercialSaving,
     commercialSuccess,
     error,
     handleApply,
+    handleBillingOfferChange,
+    handleBillingOfferSubmit,
+    handleBillingOfferToggleModule,
     handleCommercialChange,
     handleCommercialSubmit,
     handlePreview,
@@ -141,6 +151,16 @@ export default function OpsTenantsPage() {
             onSelectTenant={setSelectedTenantId}
             onEditChange={handleCommercialChange}
             onEditSubmit={handleCommercialSubmit}
+            offerForm={billingOfferForm}
+            offers={billingOffers}
+            offersLoading={billingOffersLoading}
+            offerCreating={billingOfferCreating}
+            offerError={billingOfferError}
+            offerSuccess={billingOfferSuccess}
+            offerPublicUrl={billingOfferPublicUrl}
+            onOfferChange={handleBillingOfferChange}
+            onOfferToggleModule={handleBillingOfferToggleModule}
+            onOfferSubmit={handleBillingOfferSubmit}
           />
         ) : null}
 

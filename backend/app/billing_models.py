@@ -1,6 +1,7 @@
 """Modelos do plano de controle de cobranca do CorePet."""
 
 from sqlalchemy import (
+    Boolean,
     Column,
     Date,
     DateTime,
@@ -51,7 +52,7 @@ class BillingContractAcceptance(TenantScoped, Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     acceptance_id = Column(String(36), nullable=False)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
     user_name = Column(String(255), nullable=True)
     user_email = Column(String(255), nullable=False)
     user_role = Column(String(80), nullable=True)
@@ -77,6 +78,9 @@ class BillingContractAcceptance(TenantScoped, Base):
     provider = Column(String(30), nullable=False, server_default="asaas")
     provider_environment = Column(String(20), nullable=False)
     provider_subscription_id = Column(String(80), nullable=False, index=True)
+    billing_offer_id = Column(
+        String(36), ForeignKey("billing_offers.offer_id"), nullable=True, index=True
+    )
 
     channel = Column(String(20), nullable=False, server_default="web")
     request_id = Column(String(64), nullable=True, index=True)
@@ -88,4 +92,52 @@ class BillingContractAcceptance(TenantScoped, Base):
     accepted_at = Column(DateTime(timezone=True), nullable=False, index=True)
     created_at = Column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class BillingOffer(Base):
+    """Proposta comercial acessada por token opaco antes de existir autenticacao."""
+
+    __tablename__ = "billing_offers"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    offer_id = Column(String(36), nullable=False, unique=True)
+    tenant_reference = Column(String(36), nullable=False, index=True)
+    token_sha256 = Column(String(64), nullable=False, unique=True)
+    created_by_user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+
+    title = Column(String(160), nullable=False)
+    plan_code = Column(String(50), nullable=False, index=True)
+    plan_name = Column(String(120), nullable=False)
+    price_cents = Column(Integer, nullable=False)
+    currency = Column(String(3), nullable=False, server_default="BRL")
+    billing_cycle = Column(String(20), nullable=False, server_default="MONTHLY")
+    billing_type = Column(String(30), nullable=False, server_default="UNDEFINED")
+    first_due_date = Column(Date, nullable=False)
+    extra_modules_json = Column(Text, nullable=False, server_default="[]")
+
+    status = Column(String(20), nullable=False, server_default="ready", index=True)
+    payment_status = Column(String(40), nullable=True)
+    expires_at = Column(DateTime(timezone=True), nullable=False)
+    accepted_at = Column(DateTime(timezone=True), nullable=True)
+    representative_name = Column(String(255), nullable=True)
+    representative_email = Column(String(255), nullable=True)
+    representative_role = Column(String(120), nullable=True)
+
+    provider = Column(String(30), nullable=False, server_default="asaas")
+    provider_environment = Column(String(20), nullable=True)
+    provider_customer_id = Column(String(80), nullable=True)
+    provider_subscription_id = Column(String(80), nullable=True, index=True)
+    provider_payment_id = Column(String(80), nullable=True, index=True)
+    checkout_url = Column(String(500), nullable=True)
+
+    revoked = Column(Boolean, nullable=False, server_default="false")
+    created_at = Column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at = Column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
     )
