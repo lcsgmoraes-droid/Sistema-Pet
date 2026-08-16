@@ -131,7 +131,9 @@ def benefits_lines(benefits: list[dict[str, Any]]) -> list[str]:
             description = (
                 _format_brl(value)
                 if value > 0
-                else f"{percent:g}%" if percent > 0 else "cupom de recompra"
+                else f"{percent:g}%"
+                if percent > 0
+                else "cupom de recompra"
             )
         else:
             description = str(
