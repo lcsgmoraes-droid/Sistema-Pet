@@ -10,12 +10,12 @@ from datetime import datetime, timezone
 from typing import Literal
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
-from pydantic import BaseModel
+from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.auth.dependencies import get_current_user_and_tenant
-from app.billing_models import BillingWebhookEvent
+from app.billing_models import BillingOffer, BillingWebhookEvent
 from app.config import settings
 from app.db import get_session
 from app.middlewares.request_context import get_request_id
@@ -34,6 +34,12 @@ from app.services.billing_contract_service import (
     latest_current_acceptance,
     validate_contract_acceptance,
 )
+from app.services.billing_offer_service import (
+    BillingOfferError,
+    accept_billing_offer,
+    find_offer_by_token,
+    offer_to_public,
+)
 
 
 router = APIRouter(prefix="/billing/asaas", tags=["Assinaturas Asaas"])
@@ -46,6 +52,16 @@ class SubscriptionCreateRequest(BaseModel):
     contract_version: str = ""
     contract_document_sha256: str = ""
     client_timezone: str | None = None
+
+
+class PublicOfferAcceptRequest(BaseModel):
+    representative_name: str = Field(min_length=3, max_length=255)
+    representative_email: EmailStr
+    representative_role: str | None = Field(default=None, max_length=120)
+    accepted: bool = False
+    contract_version: str = ""
+    contract_document_sha256: str = ""
+    client_timezone: str | None = Field(default=None, max_length=80)
 
 
 def _tenant(db: Session, tenant_id: object) -> Tenant:
@@ -78,7 +94,84 @@ def get_billing_status(
     result["contract_acceptance"] = acceptance_to_public(
         latest_current_acceptance(db, tenant_id=tenant_id, plan_code=tenant.plan)
     )
+    custom_offer = (
+        db.query(BillingOffer)
+        .filter(
+            BillingOffer.tenant_reference == str(tenant.id),
+            BillingOffer.status.in_(["accepted", "active", "past_due", "blocked"]),
+            BillingOffer.revoked.is_(False),
+        )
+        .order_by(BillingOffer.accepted_at.desc(), BillingOffer.created_at.desc())
+        .first()
+    )
+    result["custom_offer"] = (
+        offer_to_public(custom_offer, tenant, include_checkout=False)
+        if custom_offer
+        else None
+    )
+    if custom_offer:
+        result["contract_acceptance"] = acceptance_to_public(
+            latest_current_acceptance(
+                db, tenant_id=tenant_id, plan_code=custom_offer.plan_code
+            )
+        )
     return result
+
+
+@router.get("/offers/public/{token}")
+def get_public_billing_offer(
+    token: str,
+    db: Session = Depends(get_session),
+):
+    try:
+        offer, tenant = find_offer_by_token(db, token)
+        return offer_to_public(offer, tenant)
+    except BillingOfferError as exc:
+        db.rollback()
+        raise HTTPException(status_code=exc.status_code, detail=str(exc)) from exc
+
+
+@router.post("/offers/public/{token}/accept")
+def accept_public_billing_offer(
+    token: str,
+    body: PublicOfferAcceptRequest,
+    request: Request,
+    db: Session = Depends(get_session),
+):
+    try:
+        validate_contract_acceptance(
+            accepted=body.accepted,
+            contract_version=body.contract_version,
+            contract_document_sha256=body.contract_document_sha256,
+        )
+        offer, tenant = find_offer_by_token(db, token, for_update=True)
+        return accept_billing_offer(
+            db,
+            offer=offer,
+            tenant=tenant,
+            representative_name=body.representative_name,
+            representative_email=str(body.representative_email),
+            representative_role=body.representative_role,
+            context=ContractAcceptanceContext(
+                ip_address=get_client_ip(request),
+                user_agent=(request.headers.get("user-agent") or "")[:1000] or None,
+                client_timezone=body.client_timezone,
+                request_id=get_request_id(),
+                channel="public_offer",
+            ),
+        )
+    except ValueError as exc:
+        db.rollback()
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except BillingOfferError as exc:
+        db.rollback()
+        raise HTTPException(status_code=exc.status_code, detail=str(exc)) from exc
+    except AsaasBillingError as exc:
+        db.rollback()
+        raise HTTPException(status_code=exc.status_code, detail=str(exc)) from exc
+    except RuntimeError as exc:
+        db.rollback()
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
 
 
 @router.post("/subscriptions")

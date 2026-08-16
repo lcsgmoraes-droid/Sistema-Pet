@@ -11,7 +11,7 @@ from app.routes.asaas_billing_routes import (
     _validate_webhook_token,
     subscribe,
 )
-from app.billing_models import BillingContractAcceptance
+from app.billing_models import BillingContractAcceptance, BillingOffer
 from app.services.asaas_billing_service import (
     AsaasBillingError,
     AsaasClient,
@@ -36,16 +36,22 @@ class _TenantQuery:
     def filter(self, *_args, **_kwargs):
         return self
 
+    def order_by(self, *_args):
+        return self
+
     def first(self):
         return self.tenant
+
+    def update(self, *_args, **_kwargs):
+        return 0
 
 
 class _FakeSession:
     def __init__(self, tenant):
         self.tenant = tenant
 
-    def query(self, _model):
-        return _TenantQuery(self.tenant)
+    def query(self, model):
+        return _TenantQuery(self.tenant if model is not BillingOffer else None)
 
 
 def _tenant(**overrides):
@@ -237,6 +243,9 @@ class _SubscriptionSession:
 
     def add(self, value):
         self.added.append(value)
+
+    def query(self, _model):
+        return _TenantQuery(None)
 
     def commit(self):
         self.commits += 1

@@ -14,12 +14,31 @@ export const TENANT_STATUS_EDIT_OPTIONS = [
 ];
 
 export const PLAN_EDIT_OPTIONS = [
+  { value: "pet-start", label: "Pet Start" },
+  { value: "pet-basico", label: "Pet Basico" },
+  { value: "pet-gestao", label: "Pet Gestao" },
+  { value: "pet-venda-ativa", label: "Pet Venda Ativa" },
+  { value: "vet-start", label: "Vet Start" },
+  { value: "vet-gestao", label: "Vet Gestao" },
+  { value: "vet-completo", label: "Vet Completo" },
+  { value: "grooming-start", label: "B&T Start" },
+  { value: "grooming-gestao", label: "B&T Gestao" },
+  { value: "grooming-completo", label: "B&T Completo" },
   { value: "basico", label: "Basico" },
   { value: "premium", label: "Premium" },
   { value: "enterprise", label: "Enterprise" },
   { value: "free", label: "Free legado" },
   { value: "legacy", label: "Legacy" },
   { value: "completo", label: "Completo" },
+];
+
+export const BILLING_OFFER_PLAN_OPTIONS = PLAN_EDIT_OPTIONS.slice(0, 10);
+
+export const BILLING_TYPE_OPTIONS = [
+  { value: "UNDEFINED", label: "Cliente escolhe no Asaas" },
+  { value: "CREDIT_CARD", label: "Cartão de crédito recorrente" },
+  { value: "PIX", label: "PIX mensal" },
+  { value: "BOLETO", label: "Boleto mensal" },
 ];
 
 export const BILLING_EDIT_OPTIONS = [
