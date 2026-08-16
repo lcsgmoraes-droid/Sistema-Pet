@@ -45,8 +45,8 @@ class IntentClassifier:
     Classifica intenção usando GPT-4o-mini (rápido e barato).
     """
 
-    def __init__(self, openai_api_key: str):
-        self.llm = LLMClient(api_key=openai_api_key)
+    def __init__(self, openai_api_key: str, model: str | None = None):
+        self.llm = LLMClient(api_key=openai_api_key, default_model=model)
 
     async def classify(self, message: str, context: Dict = None) -> Dict[str, any]:
         """
@@ -78,13 +78,13 @@ class IntentClassifier:
                 )
                 user_message += f"\n\nContexto recente:\n{history_text}"
 
-            # Chamar LLM (força GPT-4o-mini para velocidade)
+            # Chamar o modelo configurado para o atendimento.
             response = await self.llm.chat_completion(
                 messages=[
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_message},
                 ],
-                model="gpt-4o-mini",
+                model=self.llm.default_model,
                 temperature=0.3,  # Baixa temperatura para mais consistência
                 max_tokens=150,
             )

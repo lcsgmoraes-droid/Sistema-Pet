@@ -8,7 +8,9 @@ from app.whatsapp.processor import (
     MessageProcessor,
     _clean_response_image_links,
     _confirmation_reply,
+    _catalog_followup_query,
     _build_catalog_response,
+    _extract_explicit_measurements,
     _extract_product_media,
     _gold_catalog_query,
     _gold_brand_matches_product_caption,
@@ -482,6 +484,173 @@ def test_product_tool_query_preserves_weight_from_customer_message():
         _preserve_explicit_measurements("Ração Special Dog Gold 15kg", messages)
         == "Ração Special Dog Gold 15kg"
     )
+    assert (
+        _preserve_explicit_measurements("Ração Special Dog Gold 15 kg", messages)
+        == "Ração Special Dog Gold 15kg"
+    )
+
+
+def test_spoken_measurement_is_normalized_and_preserved_in_product_search():
+    messages = [
+        {
+            "role": "user",
+            "content": (
+                "[Audio do cliente] Pacote de três quilos tem da Bob Dog Gold?"
+            ),
+        }
+    ]
+
+    assert _extract_explicit_measurements(messages[0]["content"]) == ["3kg"]
+    assert (
+        _preserve_explicit_measurements("Bob Dog Gold", messages) == "Bob Dog Gold 3kg"
+    )
+
+
+def test_short_weight_followup_reuses_last_catalog_product_and_replaces_size():
+    assert (
+        _catalog_followup_query(
+            "[Audio do cliente] Eu quero o pacote de três quilos.",
+            "Racao Bob Dog Gold 15kg",
+        )
+        == "Racao Bob Dog Gold 3kg"
+    )
+    assert (
+        _catalog_followup_query(
+            "Quero o de filhote com três quilos",
+            "Racao Bob Dog Gold",
+        )
+        == "Racao Bob Dog Gold filhote 3kg"
+    )
+    assert (
+        _catalog_followup_query(
+            "Pacote de três quilos da Golden",
+            "Racao Bob Dog Gold",
+        )
+        is None
+    )
+
+
+def test_function_call_keeps_spoken_weight_and_ignores_unreliable_category():
+    captured = {}
+
+    async def fake_execute_function(**kwargs):
+        captured.update(kwargs)
+        return {"success": True, "data": {"produtos": []}}
+
+    async def fake_send_response(**kwargs):
+        return {"action": "responded", "response": kwargs["response"]}
+
+    processor = object.__new__(MessageProcessor)
+    processor._execute_function = fake_execute_function
+    processor._send_response = fake_send_response
+    messages = [
+        {"role": "system", "content": "Atendimento"},
+        {
+            "role": "user",
+            "content": (
+                "[Audio do cliente] Pacote de três quilos tem da Bob Dog Gold?"
+            ),
+        },
+    ]
+
+    asyncio.run(
+        processor._handle_function_calls(
+            session_id="session-test",
+            tool_calls=[
+                {
+                    "id": "call-1",
+                    "function": "buscar_produto",
+                    "arguments": {
+                        "termo": "Bob Dog Gold",
+                        "categoria": "Ração",
+                    },
+                }
+            ],
+            context={},
+            messages=messages,
+            response={
+                "model_used": "test-model",
+                "tokens_input": 1,
+                "tokens_output": 1,
+                "processing_time_ms": 1,
+            },
+        )
+    )
+
+    assert captured["arguments"] == {"termo": "Bob Dog Gold 3kg"}
+
+
+def test_spoken_weight_followup_bypasses_intent_and_handoff_with_session_context():
+    captured = {}
+    session = SimpleNamespace(
+        context=(
+            '{"pending_catalog_search": {"query": "Bob Dog Gold 15kg", "options": []}}'
+        )
+    )
+
+    class FakeQuery:
+        def get(self, _session_id):
+            return session
+
+    class FakeDB:
+        def query(self, *_args):
+            return FakeQuery()
+
+    processor = object.__new__(MessageProcessor)
+    processor.db = FakeDB()
+    processor.config = SimpleNamespace(
+        auto_response_enabled=True, bot_name="Assistente"
+    )
+    processor.ai_enabled = True
+    processor.router = SimpleNamespace(
+        get_quick_response=lambda *_args, **_kwargs: None
+    )
+
+    async def no_order_draft(**_kwargs):
+        return None
+
+    async def no_clarification(**kwargs):
+        return None, kwargs["message_content"], False
+
+    async def build_context(*_args, **_kwargs):
+        return {}
+
+    async def fail_intent_classifier(*_args, **_kwargs):
+        raise AssertionError("O refinamento não deve chegar ao classificador")
+
+    async def no_handoff(**kwargs):
+        captured["handoff_check"] = kwargs
+        return None
+
+    async def capture_catalog_lookup(**kwargs):
+        captured.update(kwargs)
+        return {"action": "catalog_lookup"}
+
+    async def no_metric(*_args, **_kwargs):
+        return None
+
+    processor._handle_order_draft_flow = no_order_draft
+    processor._handle_product_clarification = no_clarification
+    processor._build_context = build_context
+    processor._detect_intent = fail_intent_classifier
+    processor._maybe_transfer_to_human = no_handoff
+    processor._process_with_ai = capture_catalog_lookup
+    processor._save_detected_intent = lambda *_args, **_kwargs: None
+    processor._log_metric = no_metric
+
+    result = asyncio.run(
+        processor._process_message_with_context(
+            session_id="session-test",
+            message_id="message-test",
+            message_content=("[Audio do cliente] Eu quero o pacote de três quilos."),
+        )
+    )
+
+    assert result == {"action": "catalog_lookup"}
+    assert captured["message_content"] == "Bob Dog Gold 3kg"
+    assert captured["catalog_query_override"] == "Bob Dog Gold 3kg"
+    assert captured["intent"] == "consulta_produto"
+    assert captured["handoff_check"]["intent"] == "consulta_produto"
 
 
 def test_prompt_does_not_ask_pet_profile_or_add_variation_disclaimer():
