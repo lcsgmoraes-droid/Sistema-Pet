@@ -1,7 +1,7 @@
 """add iFood merchant configuration
 
 Revision ID: ifd20260816a1
-Revises: zwo20260814a1
+Revises: zwp20260816a1
 Create Date: 2026-08-16
 """
 
@@ -12,7 +12,7 @@ from sqlalchemy.dialects import postgresql
 from app.tenant_rls_migration import apply_tenant_rls
 
 revision = "ifd20260816a1"
-down_revision = "zwo20260814a1"
+down_revision = "zwp20260816a1"
 branch_labels = None
 depends_on = None
 
