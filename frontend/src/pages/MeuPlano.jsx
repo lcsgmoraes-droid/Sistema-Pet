@@ -19,6 +19,7 @@ import {
 } from "../data/billingContract";
 import { buildSalesContactUrl, publicPlans, serviceInvoiceAddon } from "../data/publicPlans";
 import { api } from "../services/api";
+import { formatMoneyBRL } from "../utils/formatters";
 
 const WHATSAPP_NUMERO = "5518997401641";
 const PLAN_OPTIONS = Object.entries(publicPlans).flatMap(([segment, plans]) =>
@@ -163,10 +164,21 @@ export default function MeuPlano() {
     setContractAccepted(false);
   }, [planoAtual]);
 
+  useEffect(() => {
+    if (billing?.custom_offer?.plan?.code) {
+      setSelectedPlan(normalizedPlanCode(billing.custom_offer.plan.code));
+      setContractAccepted(false);
+    }
+  }, [billing?.custom_offer?.plan?.code]);
+
   const statusInfo = getStatusInfo(assinaturaAtual);
   const billingConfigured = billing?.configured === true;
   const selectedPlanDetails = PLAN_OPTIONS.find((plan) => plan.id === selectedPlan);
-  const billingMatchesSelectedPlan = billing?.plan?.codigo === selectedPlan;
+  const customOffer = billing?.custom_offer;
+  const hasCustomOffer = Boolean(
+    customOffer && customOffer.plan?.code === selectedPlan && customOffer.status !== "replaced",
+  );
+  const billingMatchesSelectedPlan = billing?.plan?.codigo === selectedPlan || hasCustomOffer;
   const currentAcceptance = billing?.contract_acceptance;
   const hasCurrentAcceptance =
     billingMatchesSelectedPlan &&
@@ -310,6 +322,7 @@ export default function MeuPlano() {
               <select
                 id="billing-plan"
                 value={selectedPlan}
+                disabled={hasCustomOffer}
                 onChange={(event) => {
                   setSelectedPlan(event.target.value);
                   setContractAccepted(false);
@@ -340,7 +353,9 @@ export default function MeuPlano() {
                 </optgroup>
               </select>
               <p className="mt-2 text-xs leading-5 text-slate-500">
-                O primeiro vencimento respeita o fim dos seus 30 dias de experiencia completa.
+                {hasCustomOffer
+                  ? "Esta empresa possui uma condicao comercial personalizada aceita. Fale com a equipe CorePet para alterar o pacote."
+                  : "O primeiro vencimento respeita o fim dos seus 30 dias de experiencia completa."}
               </p>
             </div>
 
@@ -353,13 +368,15 @@ export default function MeuPlano() {
                 <div>
                   <dt className="text-xs font-bold uppercase text-slate-500">Plano</dt>
                   <dd className="mt-1 font-semibold text-slate-900">
-                    {selectedPlanDetails?.name || selectedPlan}
+                    {hasCustomOffer ? customOffer.title : selectedPlanDetails?.name || selectedPlan}
                   </dd>
                 </div>
                 <div>
                   <dt className="text-xs font-bold uppercase text-slate-500">Mensalidade</dt>
                   <dd className="mt-1 font-semibold text-slate-900">
-                    R$ {selectedPlanDetails?.price || "-"}
+                    {hasCustomOffer
+                      ? formatMoneyBRL(customOffer.price_cents / 100)
+                      : `R$ ${selectedPlanDetails?.price || "-"}`}
                   </dd>
                 </div>
                 <div>

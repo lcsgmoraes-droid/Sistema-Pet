@@ -1,14 +1,21 @@
 from __future__ import annotations
 
-from typing import Any
+from datetime import date
+from typing import Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.auth.dependencies import require_admin
 from app.db import get_session
-from app.models import User
+from app.models import Tenant, User
+from app.services.billing_offer_service import (
+    BillingOfferError,
+    create_billing_offer,
+    list_billing_offers,
+    offer_to_admin,
+)
 from app.services.ops_tenants_service import (
     OpsTenantActionError,
     apply_base_catalog_import,
@@ -30,6 +37,15 @@ class CommercialStateRequest(BaseModel):
     plan: str | None = None
     billing_status: str | None = None
     subscription_source: str | None = None
+
+
+class BillingOfferCreateRequest(BaseModel):
+    title: str = Field(min_length=3, max_length=160)
+    plan_code: str
+    price_cents: int = Field(ge=100, le=10_000_000)
+    first_due_date: date
+    billing_type: Literal["UNDEFINED", "PIX", "BOLETO", "CREDIT_CARD"] = "UNDEFINED"
+    extra_modules: list[str] = Field(default_factory=list, max_length=20)
 
 
 @router.get("")
@@ -61,6 +77,55 @@ def atualizar_estado_comercial_tenant(
     except OpsTenantActionError as exc:
         db.rollback()
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception:
+        db.rollback()
+        raise
+
+
+@router.get("/{tenant_id}/billing-offers")
+def listar_propostas_cobranca(
+    tenant_id: str,
+    limit: int = Query(10, ge=1, le=50),
+    _current_user: User = Depends(require_admin),
+    db: Session = Depends(get_session),
+) -> dict[str, Any]:
+    try:
+        return {
+            "items": list_billing_offers(db, tenant_reference=tenant_id, limit=limit)
+        }
+    except BillingOfferError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=str(exc)) from exc
+
+
+@router.post("/{tenant_id}/billing-offers")
+def criar_proposta_cobranca(
+    tenant_id: str,
+    payload: BillingOfferCreateRequest,
+    current_user: User = Depends(require_admin),
+    db: Session = Depends(get_session),
+) -> dict[str, Any]:
+    try:
+        offer, token = create_billing_offer(
+            db,
+            tenant_reference=tenant_id,
+            created_by=current_user,
+            title=payload.title,
+            plan_code=payload.plan_code,
+            price_cents=payload.price_cents,
+            first_due_date=payload.first_due_date,
+            billing_type=payload.billing_type,
+            extra_modules=payload.extra_modules,
+        )
+        db.commit()
+        result = offer_to_admin(
+            offer,
+            db.query(Tenant).filter(Tenant.id == offer.tenant_reference).first(),
+        )
+        result["public_path"] = f"/contratar/{token}"
+        return result
+    except BillingOfferError as exc:
+        db.rollback()
+        raise HTTPException(status_code=exc.status_code, detail=str(exc)) from exc
     except Exception:
         db.rollback()
         raise

@@ -4,6 +4,7 @@ import { isBillingAttention } from "../opsTenantsUtils";
 
 import OpsTenantsBadge from "./OpsTenantsBadge";
 import OpsTenantsCommercialEditPanel from "./OpsTenantsCommercialEditPanel";
+import OpsTenantBillingOfferPanel from "./OpsTenantBillingOfferPanel";
 import { billingBadge, formatDate, shortId } from "./opsTenantsFormatters";
 
 export default function OpsTenantsBillingTab({
@@ -17,6 +18,16 @@ export default function OpsTenantsBillingTab({
   onSelectTenant,
   onEditChange,
   onEditSubmit,
+  offerForm,
+  offers,
+  offersLoading,
+  offerCreating,
+  offerError,
+  offerSuccess,
+  offerPublicUrl,
+  onOfferChange,
+  onOfferToggleModule,
+  onOfferSubmit,
 }) {
   return (
     <div className="grid gap-4 xl:grid-cols-[1fr_360px]">
@@ -134,15 +145,30 @@ export default function OpsTenantsBillingTab({
         </div>
       </section>
 
-      <OpsTenantsCommercialEditPanel
-        tenant={selectedTenant}
-        form={editForm}
-        error={editError}
-        success={editSuccess}
-        saving={saving}
-        onChange={onEditChange}
-        onSubmit={onEditSubmit}
-      />
+      <div className="space-y-4">
+        <OpsTenantBillingOfferPanel
+          tenant={selectedTenant}
+          form={offerForm}
+          offers={offers}
+          loadingOffers={offersLoading}
+          creating={offerCreating}
+          error={offerError}
+          success={offerSuccess}
+          publicUrl={offerPublicUrl}
+          onChange={onOfferChange}
+          onToggleModule={onOfferToggleModule}
+          onSubmit={onOfferSubmit}
+        />
+        <OpsTenantsCommercialEditPanel
+          tenant={selectedTenant}
+          form={editForm}
+          error={editError}
+          success={editSuccess}
+          saving={saving}
+          onChange={onEditChange}
+          onSubmit={onEditSubmit}
+        />
+      </div>
     </div>
   );
 }
