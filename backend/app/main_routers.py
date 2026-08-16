@@ -497,7 +497,6 @@ def register_routers(app: FastAPI) -> None:
     app.include_router(
         whatsapp_orchestrator_internal_router,
         tags=["WhatsApp - Internal Orchestrator"],
-        dependencies=_module_dependencies("whatsapp"),
     )
     app.include_router(fiscal_sugestao_router, tags=["Fiscal - Sugestões Inteligentes"])
     app.include_router(produto_fiscal_router, tags=["Produto - Fiscal"])

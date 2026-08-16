@@ -105,7 +105,7 @@ def test_whatsapp_public_and_background_paths_manage_tenant_context():
     context_builder_source = _source("backend/app/ai/context_builder.py")
     context_manager_source = _source("backend/app/whatsapp/context_manager.py")
     function_handlers_source = _source("backend/app/whatsapp/function_handlers.py")
-    tools_source = _source("backend/app/whatsapp/tools.py")
+    tool_executor_source = _source("backend/app/whatsapp/tool_executor.py")
     vet_exam_files_source = _source("backend/app/veterinario_exames_arquivos.py")
 
     assert (
@@ -140,9 +140,9 @@ def test_whatsapp_public_and_background_paths_manage_tenant_context():
     assert "with whatsapp_tenant_context(tenant_id)" in function_handlers_source
     assert (
         "from app.whatsapp.tenant_context import whatsapp_tenant_context"
-        in tools_source
+        in tool_executor_source
     )
-    assert "with whatsapp_tenant_context(self.tenant_id)" in tools_source
+    assert "with whatsapp_tenant_context(self.tenant_id)" in tool_executor_source
     assert (
         "from .whatsapp.tenant_context import whatsapp_tenant_context"
         in vet_exam_files_source
