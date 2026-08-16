@@ -108,6 +108,9 @@ from app.api.racao_calculadora_routes import router as racao_calculadora_interna
 from app.api.whatsapp_orchestrator_internal_routes import (
     router as whatsapp_orchestrator_internal_router,
 )
+from app.api.whatsapp_data_internal_routes import (
+    router as whatsapp_data_internal_router,
+)
 from app.api.v1.fiscal_sugestao import router as fiscal_sugestao_router
 from app.api.v1.produto_fiscal import router as produto_fiscal_router
 from app.api.v1.pdv_fiscal import router as pdv_fiscal_router
@@ -498,6 +501,10 @@ def register_routers(app: FastAPI) -> None:
         whatsapp_orchestrator_internal_router,
         tags=["WhatsApp - Internal Orchestrator"],
         dependencies=_module_dependencies("whatsapp"),
+    )
+    app.include_router(
+        whatsapp_data_internal_router,
+        tags=["WhatsApp - Internal Read Only Data"],
     )
     app.include_router(fiscal_sugestao_router, tags=["Fiscal - Sugestões Inteligentes"])
     app.include_router(produto_fiscal_router, tags=["Produto - Fiscal"])
