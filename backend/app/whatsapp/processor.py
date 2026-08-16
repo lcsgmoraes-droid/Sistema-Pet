@@ -14,6 +14,8 @@ Orquestra todo o fluxo de processamento:
 import json
 import logging
 import os
+import re
+import unicodedata
 from typing import Dict, Any, Optional
 from sqlalchemy.orm import Session
 from datetime import datetime
@@ -35,8 +37,553 @@ from app.whatsapp.models import (
 )
 from app.whatsapp.handoff_manager import HandoffManager
 from app.whatsapp.tenant_context import whatsapp_tenant_context
+from app.whatsapp.customer_context_service import (
+    load_customer_benefits,
+    load_latest_delivery,
+    load_latest_purchase,
+    load_store_hours,
+    resolve_session_customer,
+)
+from app.whatsapp.order_drafts import (
+    HISTORY_ITEM_SELECTION_CONTEXT_KEY,
+    ORDER_DRAFT_CONTEXT_KEY,
+    build_order_draft_message,
+    draft_product_media,
+    draft_reason_details,
+    extract_history_quantity_request,
+    extract_multi_item_order,
+    format_draft_item,
+    is_generic_reorder_request,
+    purchase_items_as_draft,
+)
 
 logger = logging.getLogger(__name__)
+
+MAX_PRODUCT_IMAGES_PER_RESPONSE = 3
+MARKDOWN_IMAGE_PATTERN = re.compile(r"!\[[^\]]*\]\((https?://[^)\s]+)\)")
+PRODUCT_SEARCH_INTENTS = {
+    "consulta_produto",
+    "consulta_preco",
+    "consulta_estoque",
+}
+GOLD_BRAND_OPTIONS = {
+    "1": "Special Dog Gold",
+    "2": "Golden",
+    "3": "Bob Dog Gold",
+}
+GOLD_CLARIFICATION_MESSAGE = (
+    "Quando você diz ração Gold, qual marca ou linha procura?\n\n"
+    "1. Special Dog Gold\n"
+    "2. Golden\n"
+    "3. Bob Dog Gold\n\n"
+    "Responda com o número ou com o nome."
+)
+
+
+def _extract_product_media(function_result: Any) -> list[Dict[str, str]]:
+    """Extrai fotos dos produtos retornados pelas functions de catálogo."""
+    if not isinstance(function_result, dict):
+        return []
+
+    data = function_result.get("data")
+    if not isinstance(data, dict):
+        data = function_result
+
+    products = data.get("produtos")
+    if not isinstance(products, list):
+        return []
+
+    media: list[Dict[str, str]] = []
+    for product in products:
+        if not isinstance(product, dict):
+            continue
+        image_url = str(product.get("imagem_url") or "").strip()
+        if not image_url.startswith(("https://", "http://")):
+            continue
+
+        name = str(product.get("nome") or "Produto").strip()
+        price = product.get("preco")
+        caption = name
+        if isinstance(price, (int, float)):
+            caption += f" — R$ {float(price):.2f}".replace(".", ",")
+        media.append({"image_url": image_url, "caption": caption})
+
+    return media
+
+
+def _clean_response_image_links(
+    response: str, product_media: list[Dict[str, str]]
+) -> str:
+    """Remove links de imagem do texto quando a foto será anexada de verdade."""
+    cleaned = MARKDOWN_IMAGE_PATTERN.sub("", response or "")
+    for item in product_media:
+        image_url = item.get("image_url") or ""
+        if image_url:
+            cleaned = cleaned.replace(image_url, "")
+
+    cleaned = re.sub(r"(?m)^\s*-\s*$", "", cleaned)
+    cleaned = re.sub(r"\n{3,}", "\n\n", cleaned)
+    return cleaned.strip()
+
+
+def _normalize_text(value: str) -> str:
+    normalized = unicodedata.normalize("NFKD", value or "")
+    without_accents = "".join(
+        char for char in normalized if not unicodedata.combining(char)
+    )
+    return without_accents.lower()
+
+
+def _product_query_from_choice_phrase(message: str) -> Optional[str]:
+    """Extrai produto/marca de escolhas curtas sem presumir um pedido fechado."""
+    original = re.sub(r"\s+", " ", message or "").strip(" .!?")
+    normalized = _normalize_text(original)
+    match = re.fullmatch(
+        r"(?:eu\s+)?(?:quero|queria|prefiro|pode\s+ser|vou\s+querer)\s+(.+)",
+        normalized,
+    )
+    if not match:
+        return None
+
+    normalized_candidate = re.sub(r"^(?:a|o|uma|um)\s+", "", match.group(1)).strip()
+    if not normalized_candidate or re.search(r"\d", normalized_candidate):
+        return None
+
+    operational_terms = (
+        "atendente",
+        "atendimento",
+        "fechar",
+        "finalizar",
+        "pedido",
+        "entrega",
+        "entregar",
+        "pagamento",
+        "pagar",
+        "pix",
+        "cartao",
+        "dinheiro",
+        "comprar",
+    )
+    if any(
+        re.search(rf"\b{re.escape(term)}\b", normalized_candidate)
+        for term in operational_terms
+    ):
+        return None
+    if normalized_candidate in {"isso", "essa", "esse", "aquela", "aquele"}:
+        return None
+
+    original_match = re.fullmatch(
+        r"(?:eu\s+)?(?:quero|queria|prefiro|pode\s+ser|vou\s+querer)\s+(.+)",
+        original,
+        flags=re.IGNORECASE,
+    )
+    if not original_match:
+        return normalized_candidate
+    return re.sub(
+        r"^(?:a|o|uma|um)\s+", "", original_match.group(1), flags=re.IGNORECASE
+    ).strip()
+
+
+def _is_generic_gold_query(message: str) -> bool:
+    """Identifica 'Gold' sem uma marca/linha suficientemente definida."""
+    text = _normalize_text(message)
+    if not re.search(r"\bgold\b", text):
+        return False
+    return not any(brand in text for brand in ("special dog", "bob dog", "golden"))
+
+
+def _gold_brand_from_reply(message: str) -> Optional[str]:
+    text = _normalize_text(message).strip()
+    compact_choice = re.sub(r"[^0-9]", "", text)
+    if compact_choice in GOLD_BRAND_OPTIONS and len(text) <= 4:
+        return GOLD_BRAND_OPTIONS[compact_choice]
+    if "special dog" in text:
+        return GOLD_BRAND_OPTIONS["1"]
+    if "golden" in text:
+        return GOLD_BRAND_OPTIONS["2"]
+    if "bob dog" in text:
+        return GOLD_BRAND_OPTIONS["3"]
+    return None
+
+
+def _confirmation_reply(message: str) -> Optional[bool]:
+    """Interpreta respostas curtas de confirmação sem recorrer à IA."""
+    text = re.sub(r"[^a-z0-9 ]", " ", _normalize_text(message))
+    text = re.sub(r"\s+", " ", text).strip()
+    if not text:
+        return None
+
+    negative_replies = {
+        "nao",
+        "nao e",
+        "nao e essa",
+        "nao e esse",
+        "outra",
+        "outro",
+        "nenhuma",
+        "nenhum",
+    }
+    affirmative_replies = {
+        "sim",
+        "isso",
+        "essa",
+        "esse",
+        "e essa",
+        "e esse",
+        "correto",
+        "correta",
+    }
+    if text in negative_replies or text.startswith("nao "):
+        return False
+    if text in affirmative_replies:
+        return True
+    return None
+
+
+def _recent_purchase_confirmation_message(product_name: str) -> str:
+    return (
+        "Encontrei no seu histórico de compras:\n\n"
+        f"{product_name}\n\n"
+        "É essa ração que você procura? Responda sim ou não."
+    )
+
+
+def _replace_generic_gold(original_query: str, brand: str) -> str:
+    return re.sub(r"\bgold\b", brand, original_query, count=1, flags=re.IGNORECASE)
+
+
+def _gold_catalog_query(original_query: str, brand: str) -> str:
+    """Monta busca curta; frases completas pioram o ranking do catálogo."""
+    normalized_query = _normalize_text(original_query)
+    product_type = "Racao" if re.search(r"\bracao\b", normalized_query) else ""
+    weight_match = re.search(r"\b\d+(?:[.,]\d+)?\s*kg\b", normalized_query)
+    weight = weight_match.group(0).replace(" ", "") if weight_match else ""
+    return " ".join(part for part in (product_type, brand, weight) if part)
+
+
+def _gold_brand_matches_product_caption(brand: str, caption: str) -> bool:
+    """Garante que a foto realmente represente a opção de marca exibida."""
+    product_name = " ".join(_normalize_text((caption or "").split(" — ", 1)[0]).split())
+    normalized_brand = " ".join(_normalize_text(brand).split())
+    required_terms = [normalized_brand]
+    if normalized_brand in {"special dog gold", "bob dog gold"}:
+        required_terms = [normalized_brand.removesuffix(" gold"), "gold"]
+    return all(
+        re.search(rf"\b{re.escape(term)}\b", product_name) for term in required_terms
+    )
+
+
+def _tool_choice_for_intent(intent: str) -> Any:
+    if intent in PRODUCT_SEARCH_INTENTS:
+        return {"type": "function", "function": {"name": "buscar_produto"}}
+    return "auto"
+
+
+def _operational_handoff_reason(message: str) -> Optional[tuple[str, str]]:
+    """Reconhece casos em que o piloto não possui dados para responder com segurança."""
+    text = re.sub(r"\s+", " ", _normalize_text(message)).strip()
+    if not text:
+        return None
+
+    medical_patterns = (
+        r"\b(doente|passando mal|vomitando|vomitou|diarreia|intoxic|envenen|convuls|sangrando|sem comer)\b",
+        r"\b(qual|que) (remedio|medicamento).*(dar|usar)\b",
+        r"\bposso dar .*\b(remedio|medicamento)\b",
+    )
+    if any(re.search(pattern, text) for pattern in medical_patterns):
+        return (
+            "medical_guidance",
+            "Cliente pediu orientação de saúde; não indicar medicamento automaticamente",
+        )
+
+    return_or_exchange_patterns = (
+        r"\b(trocar|troca|devolver|devolucao|reembolso)\b",
+        r"\b(veio|mandaram|entregaram) (o |um )?(produto |pedido |item )?errado\b",
+        r"\b(produto|pedido|item|racao) errad[oa]\b",
+    )
+    if any(re.search(pattern, text) for pattern in return_or_exchange_patterns):
+        return (
+            "return_or_exchange",
+            "Cliente relatou troca, devolução, reembolso ou item incorreto",
+        )
+
+    delivery_status_patterns = (
+        r"\b(ainda nao chegou|nao chegou|ainda nao veio)\b",
+        r"\bonde (esta|ta) (o |meu )?pedido\b",
+        r"\b(ja saiu|entregador|atrasad|status do pedido|status da entrega|previsao da entrega)\b",
+    )
+    if any(re.search(pattern, text) for pattern in delivery_status_patterns):
+        return (
+            "delivery_status",
+            "Cliente pediu acompanhamento de uma entrega ou relatou atraso",
+        )
+
+    loyalty_patterns = (
+        r"\b(voucher|cartao fidelidade|credito em haver|desconto anotado)\b",
+        r"\b(cashback|carimbos?)\b",
+        r"\b(meu|tenho|saldo).{0,20}\bcredito\b",
+        r"\bcredito (da loja|disponivel|de devolucao)\b",
+    )
+    if any(re.search(pattern, text) for pattern in loyalty_patterns):
+        return (
+            "loyalty_or_credit",
+            "Cliente perguntou sobre fidelidade, voucher, desconto ou crédito",
+        )
+
+    store_hours_patterns = (
+        r"\b(aberto|aberta|abre|fecha|fechado|fechada).*\b(hora|horas|horario)\b",
+        r"\b(ate que horas|horario de funcionamento|qual o horario|qual e o horario)\b",
+    )
+    if any(re.search(pattern, text) for pattern in store_hours_patterns):
+        return (
+            "store_hours",
+            "Cliente perguntou o horário da loja, ainda não configurado no ERP",
+        )
+
+    delivery_policy_patterns = (
+        r"\b(entregam|entrega|entregar|frete) hoje\b",
+        r"\b(faz|fazem) entrega\b",
+        r"\b(consegue|conseguem|pode|podem) entregar\b",
+        r"\b(consegue|conseguem|pode|podem) (mandar|enviar).{0,30}\b(hoje|antes|ate)\b",
+        r"\b(valor|preco|quanto|taxa).{0,20}\b(entrega|frete)\b",
+        r"\b(entrega|frete).{0,20}\b(gratis|gratuita|nao paga)\b",
+        r"\b(a partir de|pedido minimo).{0,30}\b(entrega|frete)\b",
+    )
+    if any(re.search(pattern, text) for pattern in delivery_policy_patterns):
+        return (
+            "delivery_policy",
+            "Cliente perguntou regra, taxa, gratuidade ou disponibilidade de entrega",
+        )
+
+    return None
+
+
+def _is_contextless_product_photo_request(message: str) -> bool:
+    """Evita buscar no catálogo por termos vazios como apenas 'opções'."""
+    text = re.sub(r"[^a-z0-9 ]", " ", _normalize_text(message))
+    text = re.sub(r"\s+", " ", text).strip()
+    return text in {
+        "manda foto",
+        "manda as fotos",
+        "manda foto das opcoes",
+        "manda fotos das opcoes",
+        "pode mandar foto",
+        "pode mandar as fotos",
+        "quero ver as opcoes",
+        "tem foto",
+    }
+
+
+def _format_brl(value: Any) -> str:
+    formatted = f"{float(value or 0):,.2f}"
+    return "R$ " + formatted.replace(",", "_").replace(".", ",").replace("_", ".")
+
+
+def _delivery_status_response(delivery: dict[str, Any]) -> Optional[str]:
+    status_messages = {
+        "pendente": "está aguardando preparação ou saída para entrega",
+        "pronto": "está pronto e aguardando saída para entrega",
+        "em_rota": "está em rota de entrega",
+        "entregue": "consta como entregue",
+        "cancelado": "consta com a entrega cancelada",
+    }
+    status = str(delivery.get("status") or "").strip().lower()
+    status_message = status_messages.get(status)
+    if not status_message:
+        return None
+
+    order_number = str(delivery.get("number") or delivery.get("sale_id") or "").strip()
+    response = f"Consultei o CorePet: o pedido {order_number} {status_message}."
+    delivered_at = delivery.get("delivered_at")
+    if status == "entregue" and isinstance(delivered_at, datetime):
+        response += f" A entrega foi registrada em {delivered_at:%d/%m/%Y às %H:%M}."
+    return response
+
+
+def _coupon_description(coupon: dict[str, Any]) -> str:
+    coupon_type = str(coupon.get("type") or "")
+    if coupon_type == "percent" and coupon.get("discount_percent") is not None:
+        benefit = f"{float(coupon['discount_percent']):g}% de desconto"
+    elif coupon_type == "fixed" and coupon.get("discount_value") is not None:
+        benefit = f"{_format_brl(coupon['discount_value'])} de desconto"
+    elif coupon_type == "free_shipping":
+        benefit = "entrega grátis"
+    elif coupon_type == "gift":
+        benefit = "brinde"
+    else:
+        benefit = "benefício cadastrado"
+
+    valid_until = coupon.get("valid_until")
+    validity = (
+        f", válido até {valid_until:%d/%m/%Y}"
+        if isinstance(valid_until, datetime)
+        else ""
+    )
+    return f"{coupon.get('code')}: {benefit}{validity}"
+
+
+def _customer_benefits_response(
+    benefits: dict[str, Any], message_content: str
+) -> Optional[str]:
+    text = _normalize_text(message_content)
+    coupons = benefits.get("coupons") or []
+    store_credit = float(benefits.get("store_credit") or 0)
+    cashback = float(benefits.get("cashback") or 0)
+    loyalty_stamps = int(benefits.get("loyalty_stamps") or 0)
+    asks_credit = "credito" in text
+    asks_cashback = "cashback" in text
+    asks_loyalty = any(term in text for term in ("voucher", "fidelidade", "carimbo"))
+
+    if not any(
+        (
+            asks_credit,
+            asks_cashback,
+            asks_loyalty,
+            store_credit > 0,
+            cashback > 0,
+            loyalty_stamps > 0,
+            bool(coupons),
+        )
+    ):
+        return None
+
+    lines = ["Consultei os benefícios vinculados ao seu cadastro:"]
+    if asks_credit or store_credit > 0:
+        lines.append(f"- Crédito da loja: {_format_brl(store_credit)}")
+    if asks_cashback or cashback > 0:
+        lines.append(f"- Cashback disponível: {_format_brl(cashback)}")
+    if asks_loyalty or loyalty_stamps > 0:
+        lines.append(f"- Carimbos disponíveis: {loyalty_stamps}")
+    if coupons:
+        lines.append("- Cupons ativos:")
+        lines.extend(f"  • {_coupon_description(coupon)}" for coupon in coupons)
+    elif asks_loyalty:
+        return None
+    return "\n".join(lines)
+
+
+def _image_identification_response(message_content: str) -> Optional[str]:
+    marker = "[Imagem recebida sem pergunta]"
+    if not (message_content or "").startswith(marker):
+        return None
+
+    analysis = message_content[len(marker) :].strip()
+    analysis = re.sub(
+        r"(?is)\n*se precisar.*$",
+        "",
+        analysis,
+    ).strip()
+    if not analysis:
+        analysis = "Não consegui identificar detalhes com segurança."
+    return (
+        "Pela foto, consegui identificar:\n\n"
+        f"{analysis}\n\n"
+        "O que você gostaria de saber sobre esse produto?"
+    )
+
+
+def _image_catalog_query(message_content: str) -> Optional[str]:
+    marker = "[Imagem recebida] Pergunta do cliente:"
+    if not (message_content or "").startswith(marker):
+        return None
+
+    question, _, analysis = message_content[len(marker) :].partition(
+        "Leitura visual provisoria:"
+    )
+    question_normalized = _normalize_text(question)
+    product_question_terms = (
+        "tem ",
+        "vende",
+        "preco",
+        "valor",
+        "quanto",
+        "opcao",
+        "kg",
+        "peso",
+        "tamanho",
+    )
+    if not any(term in question_normalized for term in product_question_terms):
+        return None
+
+    def _field(name: str) -> str:
+        match = re.search(rf"(?im)^\s*{name}:\s*([^\r\n]+)", analysis)
+        if not match:
+            return ""
+        value = match.group(1).strip()
+        if "nao identificado" in _normalize_text(value):
+            return ""
+        return value
+
+    brand = _field("Marca")
+    product_line = _field("Linha")
+    product = _field("Produto") if not (brand or product_line) else ""
+    measurement_match = re.search(
+        r"\b\d+(?:[.,]\d+)?\s*(?:kg|g|ml|l)\b",
+        question_normalized,
+    )
+    measurement = (
+        measurement_match.group(0).replace(" ", "") if measurement_match else ""
+    )
+    query = " ".join(
+        part for part in (product, brand, product_line, measurement) if part
+    )
+    return query or None
+
+
+def _build_catalog_response(function_result: Any, catalog_query: str) -> str:
+    data = function_result.get("data") if isinstance(function_result, dict) else None
+    if not isinstance(data, dict):
+        data = function_result if isinstance(function_result, dict) else {}
+    products = data.get("produtos")
+    if not isinstance(products, list):
+        products = []
+
+    if not products:
+        return f"Não encontrei {catalog_query} no catálogo."
+
+    single_result = len(products) == 1
+    opening = (
+        f"Encontrei esta opção para {catalog_query}:"
+        if single_result
+        else f"Encontrei estas opções para {catalog_query}:"
+    )
+    lines = [opening]
+    for index, product in enumerate(
+        products[:MAX_PRODUCT_IMAGES_PER_RESPONSE], start=1
+    ):
+        name = str(product.get("nome") or "Produto").strip()
+        price = product.get("preco")
+        if isinstance(price, (int, float)):
+            price_text = f"R$ {float(price):.2f}".replace(".", ",")
+            lines.append(f"{index}. {name} — {price_text}")
+        else:
+            lines.append(f"{index}. {name}")
+    if not single_result:
+        lines.append("Qual delas você quis dizer?")
+    return "\n\n".join(lines)
+
+
+def _preserve_explicit_measurements(query: str, messages: list[Dict[str, Any]]) -> str:
+    """Reinsere peso/volume do cliente quando a IA omite isso na tool."""
+    last_user_message = next(
+        (
+            str(message.get("content") or "")
+            for message in reversed(messages)
+            if message.get("role") == "user"
+        ),
+        "",
+    )
+    measurements = re.findall(
+        r"\b\d+(?:[.,]\d+)?\s*(?:kg|g|ml|l)\b",
+        _normalize_text(last_user_message),
+    )
+    query_normalized = _normalize_text(query).replace(" ", "")
+    missing = [
+        measurement.replace(" ", "")
+        for measurement in measurements
+        if measurement.replace(" ", "") not in query_normalized
+    ]
+    return " ".join([query.strip(), *missing]).strip()
 
 
 class MessageProcessor:
@@ -164,6 +711,570 @@ class MessageProcessor:
         self._save_message_intent(message_id, intent)
         self._save_session_intent(session_id, intent)
 
+    def _load_session_context(self, session: WhatsAppSession) -> Dict[str, Any]:
+        try:
+            parsed = json.loads(session.context or "{}")
+            return parsed if isinstance(parsed, dict) else {}
+        except (TypeError, ValueError):
+            return {}
+
+    def _save_session_context(
+        self, session: WhatsAppSession, context: Dict[str, Any]
+    ) -> None:
+        session.context = json.dumps(context, ensure_ascii=False)
+        self.db.commit()
+
+    def _resolve_customer_for_session(self, session: WhatsAppSession):
+        try:
+            customer = resolve_session_customer(
+                self.db,
+                tenant_id=self.tenant_id,
+                session=session,
+            )
+            if (
+                customer
+                and not session.cliente_id
+                and not getattr(customer, "_remote_source", False)
+            ):
+                session.cliente_id = customer.id
+                self.db.commit()
+            return customer
+        except Exception as customer_error:
+            logger.warning(
+                "Falha ao identificar cliente da sessão %s: %s",
+                session.id,
+                customer_error,
+            )
+            self.db.rollback()
+            return None
+
+    async def _send_order_draft(
+        self,
+        *,
+        session: WhatsAppSession,
+        session_context: Dict[str, Any],
+        items: list[Dict[str, Any]],
+        source: str,
+        from_history: bool,
+    ) -> Dict[str, Any]:
+        session_context[ORDER_DRAFT_CONTEXT_KEY] = {
+            "source": source,
+            "items": items,
+        }
+        session_context.pop(HISTORY_ITEM_SELECTION_CONTEXT_KEY, None)
+        self._save_session_context(session, session_context)
+        return await self._send_response(
+            session_id=session.id,
+            response=build_order_draft_message(
+                items,
+                from_history=from_history,
+            ),
+            intent="rascunho_pedido",
+            model_used="deterministic_order_draft",
+            tokens_input=0,
+            tokens_output=0,
+            processing_time_ms=0,
+            product_media=draft_product_media(items),
+        )
+
+    async def _handle_order_draft_flow(
+        self, session_id: str, message_content: str
+    ) -> Optional[Dict[str, Any]]:
+        """Monta e confirma pedidos sem gravar uma venda automaticamente."""
+        session = self.db.query(WhatsAppSession).get(session_id)
+        if not session:
+            return None
+
+        session_context = self._load_session_context(session)
+        pending_selection = session_context.get(HISTORY_ITEM_SELECTION_CONTEXT_KEY)
+        if isinstance(pending_selection, dict):
+            normalized_reply = re.sub(r"[^0-9]", "", message_content or "")
+            options = pending_selection.get("options") or []
+            if normalized_reply and len(normalized_reply) <= 2:
+                selected_index = int(normalized_reply) - 1
+                if 0 <= selected_index < len(options):
+                    selected = dict(options[selected_index])
+                    selected["quantity"] = pending_selection.get("quantity", 1)
+                    selected["unit"] = pending_selection.get("unit") or "x"
+                    return await self._send_order_draft(
+                        session=session,
+                        session_context=session_context,
+                        items=[selected],
+                        source="history_quantity",
+                        from_history=True,
+                    )
+            if _confirmation_reply(message_content) is not None:
+                return await self._send_response(
+                    session_id=session_id,
+                    response="Escolha o número do produto da lista para eu montar o pedido.",
+                    intent="clarificacao_item_historico",
+                    model_used="deterministic_history_selection",
+                    tokens_input=0,
+                    tokens_output=0,
+                    processing_time_ms=0,
+                    product_media=draft_product_media(options),
+                )
+
+        pending_draft = session_context.get(ORDER_DRAFT_CONTEXT_KEY)
+        if isinstance(pending_draft, dict):
+            confirmation = _confirmation_reply(message_content)
+            if confirmation is True:
+                items = pending_draft.get("items") or []
+                source = str(pending_draft.get("source") or "whatsapp")
+                session_context.pop(ORDER_DRAFT_CONTEXT_KEY, None)
+                self._save_session_context(session, session_context)
+                return await self._transfer_to_human(
+                    session_id=session_id,
+                    reason="order_draft_confirmed",
+                    reason_details=draft_reason_details(items, source),
+                )
+            if confirmation is False:
+                session_context.pop(ORDER_DRAFT_CONTEXT_KEY, None)
+                self._save_session_context(session, session_context)
+                return await self._send_response(
+                    session_id=session_id,
+                    response="Certo. Envie a lista completa corrigida, com a quantidade de cada item.",
+                    intent="correcao_rascunho_pedido",
+                    model_used="deterministic_order_correction",
+                    tokens_input=0,
+                    tokens_output=0,
+                    processing_time_ms=0,
+                )
+            if any(
+                term in _normalize_text(message_content)
+                for term in ("alterar", "corrigir", "troca o item", "muda o item")
+            ):
+                return await self._send_response(
+                    session_id=session_id,
+                    response="Envie a lista completa corrigida, com a quantidade de cada item.",
+                    intent="correcao_rascunho_pedido",
+                    model_used="deterministic_order_correction",
+                    tokens_input=0,
+                    tokens_output=0,
+                    processing_time_ms=0,
+                )
+
+        multi_items = extract_multi_item_order(message_content)
+        if multi_items:
+            return await self._send_order_draft(
+                session=session,
+                session_context=session_context,
+                items=multi_items,
+                source="multi_item_message",
+                from_history=False,
+            )
+
+        quantity_request = extract_history_quantity_request(message_content)
+        if not quantity_request and not is_generic_reorder_request(message_content):
+            return None
+
+        customer = self._resolve_customer_for_session(session)
+        if not customer:
+            return await self._send_response(
+                session_id=session_id,
+                response=(
+                    "Não encontrei compras vinculadas a este número no CorePet. "
+                    "Se quiser, me diga qual produto você procura e eu consulto o catálogo."
+                ),
+                intent="recompra_cliente_nao_identificado",
+                model_used="deterministic_reorder_not_identified",
+                tokens_input=0,
+                tokens_output=0,
+                processing_time_ms=0,
+            )
+
+        try:
+            purchase = load_latest_purchase(
+                self.db,
+                tenant_id=self.tenant_id,
+                customer_id=customer.id,
+            )
+        except Exception as history_error:
+            logger.warning("Falha ao consultar última compra: %s", history_error)
+            self.db.rollback()
+            purchase = None
+        if not purchase:
+            return await self._send_response(
+                session_id=session_id,
+                response=(
+                    "Não encontrei uma compra concluída vinculada a este número. "
+                    "Se quiser, me diga qual produto você procura e eu consulto o catálogo."
+                ),
+                intent="recompra_historico_nao_encontrado",
+                model_used="deterministic_reorder_history_not_found",
+                tokens_input=0,
+                tokens_output=0,
+                processing_time_ms=0,
+            )
+
+        items = purchase_items_as_draft(purchase)
+        if quantity_request and len(items) > 1:
+            session_context[HISTORY_ITEM_SELECTION_CONTEXT_KEY] = {
+                "quantity": quantity_request["quantity"],
+                "unit": quantity_request["unit"],
+                "options": items,
+            }
+            self._save_session_context(session, session_context)
+            options_text = "\n\n".join(
+                f"{index}. {format_draft_item(item)}"
+                for index, item in enumerate(items, start=1)
+            )
+            return await self._send_response(
+                session_id=session_id,
+                response=(
+                    "Encontrei estes itens na sua compra mais recente. "
+                    "De qual deles você quer "
+                    f"{int(quantity_request['quantity']) if quantity_request['quantity'].is_integer() else quantity_request['quantity']} "
+                    f"{quantity_request['unit']}?\n\n{options_text}\n\nResponda com o número."
+                ),
+                intent="clarificacao_item_historico",
+                model_used="deterministic_history_selection",
+                tokens_input=0,
+                tokens_output=0,
+                processing_time_ms=0,
+                product_media=draft_product_media(items),
+            )
+
+        if quantity_request and items:
+            items[0]["quantity"] = quantity_request["quantity"]
+            items[0]["unit"] = quantity_request["unit"]
+
+        return await self._send_order_draft(
+            session=session,
+            session_context=session_context,
+            items=items,
+            source="purchase_history",
+            from_history=True,
+        )
+
+    async def _handle_real_operational_request(
+        self,
+        *,
+        session_id: str,
+        message_content: str,
+        reason: str,
+    ) -> Optional[Dict[str, Any]]:
+        """Responde usando o CorePet; retorna None quando falta dado confiável."""
+        try:
+            if reason == "store_hours":
+                hours = load_store_hours(self.db, tenant_id=self.tenant_id)
+                if not hours:
+                    return None
+                return await self._send_response(
+                    session_id=session_id,
+                    response=(
+                        "O horário cadastrado no CorePet é das "
+                        f"{hours['start']} às {hours['end']}."
+                    ),
+                    intent="consulta_horario_loja",
+                    model_used="corepet_store_hours",
+                    tokens_input=0,
+                    tokens_output=0,
+                    processing_time_ms=0,
+                )
+
+            if reason not in {"delivery_status", "loyalty_or_credit"}:
+                return None
+
+            session = self.db.query(WhatsAppSession).get(session_id)
+            if not session:
+                return None
+            customer = self._resolve_customer_for_session(session)
+            if not customer:
+                return None
+
+            if reason == "delivery_status":
+                delivery = load_latest_delivery(
+                    self.db,
+                    tenant_id=self.tenant_id,
+                    customer_id=customer.id,
+                )
+                response = _delivery_status_response(delivery) if delivery else None
+                if not response:
+                    return None
+                return await self._send_response(
+                    session_id=session_id,
+                    response=response,
+                    intent="consulta_status_entrega",
+                    model_used="corepet_delivery_status",
+                    tokens_input=0,
+                    tokens_output=0,
+                    processing_time_ms=0,
+                )
+
+            benefits = load_customer_benefits(
+                self.db,
+                tenant_id=self.tenant_id,
+                customer=customer,
+            )
+            response = _customer_benefits_response(benefits, message_content)
+            if not response:
+                return None
+            return await self._send_response(
+                session_id=session_id,
+                response=response,
+                intent="consulta_beneficios_cliente",
+                model_used="corepet_customer_benefits",
+                tokens_input=0,
+                tokens_output=0,
+                processing_time_ms=0,
+            )
+        except Exception as operational_error:
+            logger.warning(
+                "Falha na consulta operacional %s: %s",
+                reason,
+                operational_error,
+            )
+            self.db.rollback()
+            return None
+
+    async def _get_gold_clarification_media(
+        self, session_id: str, original_query: str
+    ) -> list[Dict[str, str]]:
+        """Busca no catálogo uma foto representativa para cada opção de marca."""
+        media: list[Dict[str, str]] = []
+        for choice, brand in GOLD_BRAND_OPTIONS.items():
+            result = await self._execute_function(
+                function_name="buscar_produto",
+                arguments={
+                    "termo": _gold_catalog_query(original_query, brand),
+                    "limit": 1,
+                },
+                context={},
+                session_id=session_id,
+            )
+            candidates = _extract_product_media(result)
+            matching_candidate = next(
+                (
+                    candidate
+                    for candidate in candidates
+                    if _gold_brand_matches_product_caption(
+                        brand, candidate.get("caption", "")
+                    )
+                ),
+                None,
+            )
+            if not matching_candidate:
+                continue
+            media.append(
+                {
+                    "image_url": matching_candidate["image_url"],
+                    "caption": f"{choice}. {brand}",
+                }
+            )
+        return media
+
+    def _find_recent_gold_purchase(
+        self, session: WhatsAppSession, original_query: str
+    ) -> Optional[str]:
+        """Retorna a compra Gold mais recente do cliente, respeitando peso e tenant."""
+        if not session.cliente_id:
+            return None
+
+        from sqlalchemy import func
+
+        from app.produtos_models import Produto
+        from app.vendas_models import Venda, VendaItem
+
+        try:
+            with whatsapp_tenant_context(self.tenant_id):
+                query = (
+                    self.db.query(Produto.nome)
+                    .join(VendaItem, VendaItem.produto_id == Produto.id)
+                    .join(Venda, Venda.id == VendaItem.venda_id)
+                    .filter(
+                        Produto.tenant_id == self.tenant_id,
+                        VendaItem.tenant_id == self.tenant_id,
+                        Venda.tenant_id == self.tenant_id,
+                        Venda.cliente_id == session.cliente_id,
+                        Venda.status != "cancelada",
+                        VendaItem.tipo == "produto",
+                        Produto.situacao.is_(True),
+                        Produto.nome.ilike("%gold%"),
+                    )
+                )
+
+                weight_match = re.search(
+                    r"\b\d+(?:[.,]\d+)?\s*kg\b",
+                    _normalize_text(original_query),
+                )
+                if weight_match:
+                    normalized_weight = weight_match.group(0).replace(" ", "")
+                    query = query.filter(
+                        func.replace(func.lower(Produto.nome), " ", "").like(
+                            f"%{normalized_weight}%"
+                        )
+                    )
+
+                recent = query.order_by(
+                    Venda.data_venda.desc(), VendaItem.id.desc()
+                ).first()
+                return str(recent.nome).strip() if recent and recent.nome else None
+        except Exception as history_error:
+            logger.warning(
+                "Falha ao consultar histórico de produto da sessão %s: %s",
+                session.id,
+                history_error,
+            )
+            self.db.rollback()
+            return None
+
+    async def _get_recent_purchase_media(
+        self, session_id: str, product_name: str
+    ) -> list[Dict[str, str]]:
+        result = await self._execute_function(
+            function_name="buscar_produto",
+            arguments={"termo": product_name, "limit": 5},
+            context={},
+            session_id=session_id,
+        )
+        media = _extract_product_media(result)
+        if not media:
+            return []
+
+        normalized_name = _normalize_text(product_name)
+        exact = next(
+            (
+                item
+                for item in media
+                if _normalize_text(item.get("caption", "").split(" — ", 1)[0])
+                == normalized_name
+            ),
+            media[0],
+        )
+        return [{"image_url": exact["image_url"], "caption": product_name}]
+
+    async def _send_gold_brand_clarification(
+        self,
+        session_id: str,
+        original_query: str,
+    ) -> Dict[str, Any]:
+        return await self._send_response(
+            session_id=session_id,
+            response=GOLD_CLARIFICATION_MESSAGE,
+            intent="clarificacao_produto",
+            model_used="deterministic_clarification",
+            tokens_input=0,
+            tokens_output=0,
+            processing_time_ms=0,
+            product_media=await self._get_gold_clarification_media(
+                session_id, original_query
+            ),
+        )
+
+    async def _handle_product_clarification(
+        self, session_id: str, message_content: str
+    ) -> tuple[Optional[Dict[str, Any]], str, bool]:
+        """Conduz ambiguidades de produto em etapas, antes de consultar a IA."""
+        session = self.db.query(WhatsAppSession).get(session_id)
+        if not session:
+            return None, message_content, False
+
+        session_context = self._load_session_context(session)
+        pending = session_context.get("pending_product_clarification")
+        if (
+            isinstance(pending, dict)
+            and pending.get("type") == "recent_gold_confirmation"
+        ):
+            original_query = str(pending.get("original_query") or "ração Gold")
+            product_name = str(pending.get("product_name") or "").strip()
+            brand = _gold_brand_from_reply(message_content)
+            if brand:
+                session_context.pop("pending_product_clarification", None)
+                self._save_session_context(session, session_context)
+                return None, _gold_catalog_query(original_query, brand), True
+
+            confirmation = _confirmation_reply(message_content)
+            if confirmation is True and product_name:
+                session_context.pop("pending_product_clarification", None)
+                self._save_session_context(session, session_context)
+                return None, product_name, True
+
+            if confirmation is False:
+                session_context["pending_product_clarification"] = {
+                    "type": "gold_brand",
+                    "original_query": original_query,
+                }
+                self._save_session_context(session, session_context)
+                return (
+                    await self._send_gold_brand_clarification(
+                        session_id, original_query
+                    ),
+                    message_content,
+                    False,
+                )
+
+            return (
+                await self._send_response(
+                    session_id=session_id,
+                    response=_recent_purchase_confirmation_message(product_name),
+                    intent="clarificacao_produto_historico",
+                    model_used="deterministic_purchase_history",
+                    tokens_input=0,
+                    tokens_output=0,
+                    processing_time_ms=0,
+                    product_media=await self._get_recent_purchase_media(
+                        session_id, product_name
+                    ),
+                ),
+                message_content,
+                False,
+            )
+
+        if isinstance(pending, dict) and pending.get("type") == "gold_brand":
+            brand = _gold_brand_from_reply(message_content)
+            if brand:
+                original_query = str(pending.get("original_query") or "ração Gold")
+                session_context.pop("pending_product_clarification", None)
+                self._save_session_context(session, session_context)
+                return None, _gold_catalog_query(original_query, brand), True
+
+            original_query = str(pending.get("original_query") or "ração Gold")
+            return (
+                await self._send_gold_brand_clarification(session_id, original_query),
+                message_content,
+                False,
+            )
+
+        if not _is_generic_gold_query(message_content):
+            return None, message_content, False
+
+        recent_product = self._find_recent_gold_purchase(session, message_content)
+        if recent_product:
+            session_context["pending_product_clarification"] = {
+                "type": "recent_gold_confirmation",
+                "original_query": message_content,
+                "product_name": recent_product,
+            }
+            self._save_session_context(session, session_context)
+            return (
+                await self._send_response(
+                    session_id=session_id,
+                    response=_recent_purchase_confirmation_message(recent_product),
+                    intent="clarificacao_produto_historico",
+                    model_used="deterministic_purchase_history",
+                    tokens_input=0,
+                    tokens_output=0,
+                    processing_time_ms=0,
+                    product_media=await self._get_recent_purchase_media(
+                        session_id, recent_product
+                    ),
+                ),
+                message_content,
+                False,
+            )
+
+        session_context["pending_product_clarification"] = {
+            "type": "gold_brand",
+            "original_query": message_content,
+        }
+        self._save_session_context(session, session_context)
+        return (
+            await self._send_gold_brand_clarification(session_id, message_content),
+            message_content,
+            False,
+        )
+
     async def _maybe_transfer_to_human(
         self,
         session_id: str,
@@ -248,11 +1359,91 @@ class MessageProcessor:
                 logger.info("Auto-response desabilitado")
                 return {"action": "skipped", "reason": "auto_response_disabled"}
 
+            order_draft_result = await self._handle_order_draft_flow(
+                session_id=session_id,
+                message_content=message_content,
+            )
+            if order_draft_result:
+                self._save_detected_intent(
+                    message_id,
+                    session_id,
+                    str(order_draft_result.get("reason") or "rascunho_pedido"),
+                )
+                return order_draft_result
+
+            operational_handoff = _operational_handoff_reason(message_content)
+            if operational_handoff:
+                reason, reason_details = operational_handoff
+                self._save_detected_intent(message_id, session_id, reason)
+                operational_result = await self._handle_real_operational_request(
+                    session_id=session_id,
+                    message_content=message_content,
+                    reason=reason,
+                )
+                if operational_result:
+                    return operational_result
+                return await self._transfer_to_human(
+                    session_id=session_id,
+                    reason=reason,
+                    reason_details=reason_details,
+                )
+
+            if _is_contextless_product_photo_request(message_content):
+                self._save_detected_intent(
+                    message_id, session_id, "clarificacao_foto_produto"
+                )
+                return await self._send_response(
+                    session_id=session_id,
+                    response=("Claro. De qual produto você gostaria de ver as fotos?"),
+                    intent="clarificacao_foto_produto",
+                    model_used="deterministic_photo_clarification",
+                    tokens_input=0,
+                    tokens_output=0,
+                    processing_time_ms=0,
+                )
+
+            image_response = _image_identification_response(message_content)
+            if image_response:
+                return await self._send_response(
+                    session_id=session_id,
+                    response=image_response,
+                    intent="identificacao_imagem",
+                    model_used="deterministic_image_identification",
+                    tokens_input=0,
+                    tokens_output=0,
+                    processing_time_ms=0,
+                )
+
+            image_catalog_query = _image_catalog_query(message_content)
+            if image_catalog_query:
+                message_content = image_catalog_query
+
+            product_choice_query = _product_query_from_choice_phrase(message_content)
+            if product_choice_query:
+                message_content = product_choice_query
+
+            (
+                clarification_result,
+                message_content,
+                product_query_resolved,
+            ) = await self._handle_product_clarification(
+                session_id=session_id,
+                message_content=message_content,
+            )
+            if clarification_result:
+                return clarification_result
+            product_query_resolved = bool(
+                product_query_resolved or image_catalog_query or product_choice_query
+            )
+
             # 1. Construir contexto
             context = await self._build_context(session_id, message_content)
 
             # 2. Classificar intenção
-            intent, confidence = await self._detect_intent(message_content, context)
+            if product_query_resolved:
+                intent, confidence = "consulta_produto", 1.0
+            else:
+                intent, confidence = await self._detect_intent(message_content, context)
 
             # Atualizar mensagem e sessão com intent detectado
             self._save_detected_intent(message_id, session_id, intent)
@@ -292,6 +1483,9 @@ class MessageProcessor:
                 message_content=message_content,
                 context=context,
                 intent=intent,
+                catalog_query_override=(
+                    message_content if product_query_resolved else None
+                ),
             )
 
         except Exception as e:
@@ -312,6 +1506,7 @@ class MessageProcessor:
         message_content: str,
         context: Dict[str, Any],
         intent: str,
+        catalog_query_override: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         Processa mensagem com IA (GPT).
@@ -335,10 +1530,17 @@ class MessageProcessor:
                 current_message,
             ]
 
+            if catalog_query_override:
+                return await self._handle_deterministic_product_lookup(
+                    session_id=session_id,
+                    catalog_query=catalog_query_override,
+                    context=context,
+                )
+
             # 5. Decidir modelo
             model = None
             if self.router.should_use_advanced_model(intent, context):
-                model = "gpt-4-turbo-preview"  # Força modelo avançado
+                model = self.llm_client.advanced_model
 
             # 6. Chamar LLM
             response = await self.llm_client.chat_completion(
@@ -347,7 +1549,7 @@ class MessageProcessor:
                 temperature=0.7,
                 max_tokens=500,
                 functions=AVAILABLE_FUNCTIONS_PHASE1_READ_ONLY,
-                function_call="auto",
+                function_call=_tool_choice_for_intent(intent),
             )
 
             # 7. Verificar se chamou function
@@ -389,6 +1591,28 @@ class MessageProcessor:
     # FUNCTION CALLING
     # ========================================================================
 
+    async def _handle_deterministic_product_lookup(
+        self, session_id: str, catalog_query: str, context: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Lista resultados reais sem permitir que a IA presuma uma compra."""
+        result = await self._execute_function(
+            function_name="buscar_produto",
+            arguments={"termo": catalog_query},
+            context=context,
+            session_id=session_id,
+        )
+
+        return await self._send_response(
+            session_id=session_id,
+            response=_build_catalog_response(result, catalog_query),
+            intent="function_executed",
+            model_used="deterministic_catalog",
+            tokens_input=0,
+            tokens_output=0,
+            processing_time_ms=0,
+            product_media=_extract_product_media(result),
+        )
+
     async def _handle_function_calls(
         self,
         session_id: str,
@@ -404,10 +1628,17 @@ class MessageProcessor:
 
         # Executar cada function
         function_results = []
+        product_media: list[Dict[str, str]] = []
+        catalog_result: Optional[Dict[str, Any]] = None
+        catalog_query = "produto solicitado"
 
         for tool_call in tool_calls:
             function_name = tool_call["function"]
-            arguments = tool_call["arguments"]
+            arguments = dict(tool_call["arguments"])
+            if function_name == "buscar_produto":
+                arguments["termo"] = _preserve_explicit_measurements(
+                    str(arguments.get("termo") or "produto"), messages
+                )
 
             # Executar function
             result = await self._execute_function(
@@ -416,6 +1647,10 @@ class MessageProcessor:
                 context=context,
                 session_id=session_id,
             )
+            product_media.extend(_extract_product_media(result))
+            if function_name == "buscar_produto" and isinstance(result, dict):
+                catalog_result = result
+                catalog_query = str(arguments.get("termo") or catalog_query).strip()
 
             function_results.append(
                 {
@@ -424,6 +1659,18 @@ class MessageProcessor:
                     "name": function_name,
                     "content": str(result),
                 }
+            )
+
+        if catalog_result is not None:
+            return await self._send_response(
+                session_id=session_id,
+                response=_build_catalog_response(catalog_result, catalog_query),
+                intent="function_executed",
+                model_used=response.get("model_used") or "deterministic_catalog",
+                tokens_input=response.get("tokens_input", 0),
+                tokens_output=response.get("tokens_output", 0),
+                processing_time_ms=response.get("processing_time_ms", 0),
+                product_media=product_media,
             )
 
         # Chamar IA novamente com resultados das functions
@@ -451,6 +1698,12 @@ class MessageProcessor:
         )
         messages.extend(function_results)
 
+        if product_media and messages and messages[0].get("role") == "system":
+            messages[0]["content"] += (
+                "\n\nAs fotos dos produtos serão enviadas pelo sistema como anexos do "
+                "WhatsApp. Não inclua URLs nem sintaxe Markdown de imagem na resposta."
+            )
+
         final_response = await self.llm_client.chat_completion(
             messages=messages, temperature=0.7, max_tokens=500
         )
@@ -465,6 +1718,7 @@ class MessageProcessor:
             tokens_output=response["tokens_output"] + final_response["tokens_output"],
             processing_time_ms=response["processing_time_ms"]
             + final_response["processing_time_ms"],
+            product_media=product_media,
         )
 
     async def _execute_function(
@@ -508,16 +1762,29 @@ class MessageProcessor:
         tokens_input: int,
         tokens_output: int,
         processing_time_ms: int,
+        product_media: Optional[list[Dict[str, str]]] = None,
     ) -> Dict[str, Any]:
         """
         Envia resposta via WhatsApp e registra no banco.
         """
-        # Enviar via WhatsApp
+        unique_media: list[Dict[str, str]] = []
+        seen_urls: set[str] = set()
+        for item in product_media or []:
+            image_url = str(item.get("image_url") or "").strip()
+            if not image_url or image_url in seen_urls:
+                continue
+            seen_urls.add(image_url)
+            unique_media.append(item)
+
+        unique_media = unique_media[:MAX_PRODUCT_IMAGES_PER_RESPONSE]
+        clean_response = _clean_response_image_links(response, unique_media)
+
+        # Enviar texto via WhatsApp
         message = await send_whatsapp_message(
             db=self.db,
             tenant_id=self.tenant_id,
             session_id=session_id,
-            message=response,
+            message=clean_response,
         )
 
         if not message:
@@ -531,11 +1798,33 @@ class MessageProcessor:
         message.processing_time_ms = processing_time_ms
         self.db.commit()
 
+        images_sent = 0
+        for item in unique_media:
+            image_message = await send_whatsapp_message(
+                db=self.db,
+                tenant_id=self.tenant_id,
+                session_id=session_id,
+                message=item.get("caption") or "Foto do produto",
+                message_type="image",
+                image_url=item["image_url"],
+            )
+            if image_message:
+                images_sent += 1
+            else:
+                logger.warning(
+                    "Falha ao enviar imagem de produto: session=%s",
+                    session_id,
+                )
+
         # Registrar métricas
         await self._log_metric("message_sent", 1)
         await self._log_metric("tokens_used", tokens_input + tokens_output)
 
-        logger.info(f"✅ Resposta enviada: {len(response)} chars")
+        logger.info(
+            "✅ Resposta enviada: %s chars, %s imagens",
+            len(clean_response),
+            images_sent,
+        )
 
         return {
             "action": "responded",
@@ -543,6 +1832,7 @@ class MessageProcessor:
             "intent": intent,
             "model": model_used,
             "tokens": tokens_input + tokens_output,
+            "images_sent": images_sent,
         }
 
     async def _transfer_to_human(
@@ -576,12 +1866,25 @@ class MessageProcessor:
 
             self.db.commit()
 
+        transfer_messages = {
+            "medical_guidance": (
+                "Para a segurança do seu pet, não vou indicar medicamento sem "
+                "avaliação. Vou chamar um atendente para orientar o próximo passo. ⏳"
+            ),
+            "delivery_status": (
+                "Vou chamar um atendente para verificar sua entrega. Um momento, por favor. ⏳"
+            ),
+        }
+
         # Enviar mensagem de transferência
         await send_whatsapp_message(
             db=self.db,
             tenant_id=self.tenant_id,
             session_id=session_id,
-            message="Um momento! Estou transferindo você para um atendente humano. ⏳",
+            message=transfer_messages.get(
+                reason,
+                "Um momento! Estou transferindo você para um atendente humano. ⏳",
+            ),
         )
 
         logger.info(f"👤 Transferido para humano: {reason}")

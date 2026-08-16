@@ -4,14 +4,21 @@ import logging
 from datetime import datetime, timedelta
 from typing import Any, Dict, Optional
 
-from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from app.whatsapp.tenant_context import whatsapp_tenant_context
-from app.whatsapp.tool_utils import _normalize_text, _only_digits
+from app.whatsapp.tool_product_search import (
+    buscar_produtos,
+    matches_relaxed_product_query,
+)
 
 
 logger = logging.getLogger(__name__)
+
+
+def _matches_relaxed_product_query(produto: Any, tokens: list[str]) -> bool:
+    """Mantém compatibilidade com o import público usado pelos testes."""
+    return matches_relaxed_product_query(produto, tokens)
 
 
 class ToolExecutor:
@@ -82,149 +89,13 @@ class ToolExecutor:
         self, query: str, categoria: Optional[str] = None, limite: int = 5
     ) -> Dict[str, Any]:
         """Busca produtos no catalogo"""
-        try:
-            from app.produtos_models import Produto
-            from app.produtos_models import CategoriaProduto
-
-            raw_query = (query or "").strip()
-            if not raw_query:
-                return {
-                    "success": True,
-                    "produtos": [],
-                    "message": "Informe o produto que deseja buscar.",
-                }
-
-            limite = max(1, min(int(limite or 5), 15))
-            query_norm = _normalize_text(raw_query)
-            query_digits = _only_digits(raw_query)
-            tokens = [t for t in query_norm.split() if t]
-            like_tokens = [f"%{t}%" for t in tokens] or [f"%{query_norm}%"]
-
-            base_query = self.db.query(
-                Produto.id,
-                Produto.nome,
-                Produto.codigo,
-                Produto.codigo_barras,
-                Produto.preco_venda,
-                Produto.estoque_atual,
-                Produto.descricao_curta,
-                Produto.categoria_id,
-            ).filter(
-                Produto.tenant_id == self.tenant_id,
-                Produto.situacao.is_(True),
-                Produto.tipo_produto != "PAI",
-            )
-
-            if categoria:
-                categoria_norm = _normalize_text(categoria)
-                categoria_obj = (
-                    self.db.query(CategoriaProduto)
-                    .filter(
-                        CategoriaProduto.tenant_id == self.tenant_id,
-                        CategoriaProduto.nome.ilike(f"%{categoria_norm}%"),
-                    )
-                    .first()
-                )
-                if categoria_obj:
-                    base_query = base_query.filter(
-                        Produto.categoria_id == categoria_obj.id
-                    )
-
-            filtered_query = base_query
-            for token_like in like_tokens:
-                filtered_query = filtered_query.filter(
-                    or_(
-                        Produto.nome.ilike(token_like),
-                        Produto.descricao_curta.ilike(token_like),
-                        Produto.codigo.ilike(token_like),
-                        Produto.codigo_barras.ilike(token_like),
-                    )
-                )
-
-            candidates = filtered_query.limit(max(limite * 8, 40)).all()
-
-            if not candidates:
-                candidates = (
-                    base_query.filter(
-                        or_(
-                            Produto.nome.ilike(f"%{raw_query}%"),
-                            Produto.descricao_curta.ilike(f"%{raw_query}%"),
-                            Produto.codigo.ilike(f"%{raw_query}%"),
-                            Produto.codigo_barras.ilike(f"%{raw_query}%"),
-                        )
-                    )
-                    .limit(max(limite * 8, 40))
-                    .all()
-                )
-
-            if not candidates:
-                return {
-                    "success": True,
-                    "produtos": [],
-                    "message": f"Nenhum produto encontrado para '{query}'",
-                }
-
-            def _score(produto: Any) -> float:
-                score = 0.0
-                nome = _normalize_text(getattr(produto, "nome", ""))
-                descricao = _normalize_text(getattr(produto, "descricao_curta", ""))
-                codigo = _normalize_text(getattr(produto, "codigo", ""))
-                ean = _only_digits(getattr(produto, "codigo_barras", ""))
-                estoque = float(getattr(produto, "estoque_atual", 0) or 0)
-
-                if query_digits and (
-                    query_digits == _only_digits(codigo) or query_digits == ean
-                ):
-                    score += 120
-                elif query_digits and (
-                    query_digits in _only_digits(codigo) or query_digits in ean
-                ):
-                    score += 60
-
-                if query_norm == nome:
-                    score += 80
-                elif query_norm and query_norm in nome:
-                    score += 45
-
-                for tok in tokens:
-                    if tok in nome:
-                        score += 20
-                    if tok in descricao:
-                        score += 8
-                    if tok in codigo:
-                        score += 25
-
-                if estoque > 0:
-                    score += 5
-                else:
-                    score -= 3
-
-                return score
-
-            ranked = sorted(candidates, key=_score, reverse=True)[:limite]
-
-            produtos = [
-                {
-                    "id": str(p.id),
-                    "nome": p.nome,
-                    "sku": p.codigo or "",
-                    "ean": p.codigo_barras or "",
-                    "preco": float(p.preco_venda) if p.preco_venda else 0.0,
-                    "estoque": float(p.estoque_atual)
-                    if p.estoque_atual is not None
-                    else 0,
-                    "estoque_disponivel": bool((p.estoque_atual or 0) > 0),
-                    "descricao": p.descricao_curta or "",
-                }
-                for p in ranked
-            ]
-
-            return {"success": True, "produtos": produtos, "total": len(produtos)}
-
-        except Exception as e:
-            logger.error(f"Erro ao buscar produtos: {e}")
-            self.db.rollback()
-            return {"success": False, "error": str(e)}
+        return buscar_produtos(
+            db=self.db,
+            tenant_id=self.tenant_id,
+            query=query,
+            categoria=categoria,
+            limite=limite,
+        )
 
     def _verificar_horarios_disponiveis(
         self, tipo_servico: str, data: Optional[str] = None

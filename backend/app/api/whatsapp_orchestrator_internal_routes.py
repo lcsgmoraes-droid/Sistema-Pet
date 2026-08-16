@@ -8,8 +8,11 @@ Seguranca por token interno dedicado.
 import os
 import io
 import asyncio
+import base64
+import logging
 import uuid as _uuid_mod
 from typing import Literal, Optional
+from urllib.parse import urlsplit, urlunsplit
 
 import httpx
 from fastapi import APIRouter, Depends, Header, HTTPException, status
@@ -23,6 +26,8 @@ from app.whatsapp.webhook import normalize_phone, process_incoming_message
 from app.whatsapp.handoff_manager import HandoffManager
 from app.whatsapp.models import WhatsAppSession, TenantWhatsAppConfig
 
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(
     prefix="/internal/whatsapp-orchestrator", tags=["whatsapp-orchestrator-internal"]
@@ -60,17 +65,53 @@ def _resolve_openai_api_key(db: Session, tenant_id: str) -> str:
     return (os.getenv("OPENAI_API_KEY") or "").strip()
 
 
+def _resolve_waha_media_url(media_url: str) -> str:
+    """Troca o host público do webhook pelo host acessível ao backend."""
+    original = urlsplit((media_url or "").strip())
+    if original.scheme not in {"http", "https"} or not original.hostname:
+        return ""
+    if not original.path.startswith("/api/files/"):
+        return ""
+
+    allowed_hosts = {"localhost", "127.0.0.1", "waha", "petshop-pilot-waha"}
+    if original.hostname.lower() not in allowed_hosts:
+        return ""
+
+    waha_base = urlsplit((os.getenv("WAHA_BASE_URL") or "http://waha:3000").strip())
+    if waha_base.scheme not in {"http", "https"} or not waha_base.netloc:
+        return ""
+
+    return urlunsplit(
+        (waha_base.scheme, waha_base.netloc, original.path, original.query, "")
+    )
+
+
+async def _download_waha_media(media_url: str) -> tuple[bytes, str]:
+    resolved_url = _resolve_waha_media_url(media_url)
+    if not resolved_url:
+        return b"", ""
+
+    headers = {}
+    waha_api_key = (os.getenv("WAHA_API_KEY") or "").strip()
+    if waha_api_key:
+        headers["X-Api-Key"] = waha_api_key
+
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.get(resolved_url, headers=headers)
+            response.raise_for_status()
+    except Exception:
+        return b"", ""
+
+    content_type = response.headers.get("content-type", "").split(";", 1)[0]
+    return response.content, content_type.strip().lower()
+
+
 async def _transcribe_audio_from_media_url(media_url: str, api_key: str) -> str:
     if not media_url or not api_key:
         return ""
 
-    try:
-        async with httpx.AsyncClient(timeout=20.0) as client:
-            response = await client.get(media_url)
-            response.raise_for_status()
-            audio_bytes = response.content
-    except Exception:
-        return ""
+    audio_bytes, _content_type = await _download_waha_media(media_url)
 
     if not audio_bytes:
         return ""
@@ -97,10 +138,19 @@ async def _analyze_image_from_media_url(
     if not media_url or not api_key:
         return ""
 
+    image_bytes, content_type = await _download_waha_media(media_url)
+    if not image_bytes:
+        return ""
+    if not content_type.startswith("image/"):
+        content_type = "image/jpeg"
+    image_base64 = base64.b64encode(image_bytes).decode("ascii")
+    image_data_url = f"data:{content_type};base64,{image_base64}"
+
     prompt = (
-        "Analise a imagem enviada no WhatsApp e retorne um resumo curto em portugues, "
-        "focado em identificar produto pet, marca, sabor, peso/tamanho, quantidade e texto visivel. "
-        "Se nao houver dados claros, diga isso de forma objetiva."
+        "Analise a imagem enviada no WhatsApp. Responda somente com linhas curtas "
+        "nos campos Produto, Marca, Linha, Sabor, Peso/Tamanho e Texto visivel. "
+        "Use 'nao identificado' quando algo nao estiver legivel. Nao inclua convite, "
+        "recomendacao, disponibilidade nem qualquer frase fora desses campos."
     )
     if caption:
         prompt += f" Legenda do cliente: {caption}"
@@ -114,7 +164,7 @@ async def _analyze_image_from_media_url(
                     "role": "user",
                     "content": [
                         {"type": "text", "text": prompt},
-                        {"type": "image_url", "image_url": {"url": media_url}},
+                        {"type": "image_url", "image_url": {"url": image_data_url}},
                     ],
                 }
             ],
@@ -149,9 +199,12 @@ def _build_message_content(payload: InternalIngestRequest) -> str:
 
     if payload.message_type == "image":
         if image_analysis and caption:
-            return f"[Imagem recebida] {caption}. Analise da imagem: {image_analysis}"
+            return (
+                f"[Imagem recebida] Pergunta do cliente: {caption}. "
+                f"Leitura visual provisoria: {image_analysis}"
+            )
         if image_analysis:
-            return f"[Imagem recebida] {image_analysis}"
+            return f"[Imagem recebida sem pergunta]\n{image_analysis}"
         if caption:
             return f"[Imagem recebida] {caption}"
         if text:
@@ -209,6 +262,11 @@ async def _enrich_payload_media(payload: InternalIngestRequest, api_key: str) ->
             media_url=(payload.media_url or "").strip(),
             api_key=api_key,
         )
+        logger.info(
+            "Audio recebido: media_url=%s, transcricao=%s",
+            bool((payload.media_url or "").strip()),
+            bool((payload.transcription_text or "").strip()),
+        )
         return
 
     if (
@@ -219,6 +277,11 @@ async def _enrich_payload_media(payload: InternalIngestRequest, api_key: str) ->
             media_url=(payload.media_url or "").strip(),
             caption=(payload.caption or "").strip(),
             api_key=api_key,
+        )
+        logger.info(
+            "Imagem recebida: media_url=%s, analise=%s",
+            bool((payload.media_url or "").strip()),
+            bool((payload.image_analysis_text or "").strip()),
         )
 
 
