@@ -92,9 +92,9 @@ def _listar_cupons_disponiveis_funcionario_pdv(
                     if cupom.min_purchase_value
                     else None
                 ),
-                "valid_until": cupom.valid_until.isoformat()
-                if cupom.valid_until
-                else None,
+                "valid_until": (
+                    cupom.valid_until.isoformat() if cupom.valid_until else None
+                ),
             }
         )
     return disponiveis
@@ -161,11 +161,11 @@ def _calcular_beneficios_gerados_funcionario_pdv(
     tenant_id: str,
     cliente_id: Optional[int],
     total_venda: float,
+    sale_channel: str = "loja_fisica",
 ) -> list[dict]:
     if total_venda <= 0:
         return []
 
-    sale_channel = "loja_fisica"
     campanhas = (
         db.query(Campaign)
         .filter(

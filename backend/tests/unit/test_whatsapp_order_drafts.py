@@ -193,31 +193,57 @@ def test_reorder_without_linked_customer_explains_missing_history():
     assert sent["intent"] == "recompra_cliente_nao_identificado"
 
 
-def test_confirmed_draft_is_forwarded_with_all_items():
+def test_confirmed_draft_starts_checkout_instead_of_human_handoff(monkeypatch):
     pending = {
         ORDER_DRAFT_CONTEXT_KEY: {
             "source": "multi_item_message",
             "items": [
-                {"quantity": 1, "unit": "saco", "name": "Ração"},
-                {"quantity": 2, "unit": "pacotes", "name": "Areia"},
+                {
+                    "product_id": 10,
+                    "quantity": 1,
+                    "unit": "saco",
+                    "name": "Ração",
+                },
+                {
+                    "product_id": 20,
+                    "quantity": 2,
+                    "unit": "pacotes",
+                    "name": "Areia",
+                },
             ],
         }
     }
     processor = object.__new__(MessageProcessor)
-    session = SimpleNamespace(id="session-test", context="ignored")
+    processor.tenant_id = "tenant-test"
+    session = SimpleNamespace(
+        id="session-test", context="ignored", phone_number="5518997401641"
+    )
     processor.db = _FakeDB(session)
-    captured = {}
+    sent = {}
     processor._load_session_context = lambda _session: pending
     processor._save_session_context = lambda _session, context: None
 
-    async def fake_transfer(**kwargs):
-        captured.update(kwargs)
-        return {"action": "transferred_to_human", "reason": kwargs["reason"]}
+    monkeypatch.setattr(
+        "app.whatsapp.processor.fetch_remote_order_preview",
+        lambda *_args, **_kwargs: {
+            "success": True,
+            "customer": {"id": 1, "delivery_address": "Rua Teste, 10"},
+            "items": [],
+            "total": 100,
+            "payment_methods": [{"key": "pix", "name": "PIX"}],
+            "benefits": [],
+        },
+    )
 
-    processor._transfer_to_human = fake_transfer
+    async def fake_send_response(**kwargs):
+        sent.update(kwargs)
+        return {"action": "responded", "intent": kwargs["intent"]}
+
+    processor._send_response = fake_send_response
 
     result = asyncio.run(processor._handle_order_draft_flow("session-test", "Sim"))
 
-    assert result["reason"] == "order_draft_confirmed"
-    assert "1 saco de Ração" in captured["reason_details"]
-    assert "2 pacotes de Areia" in captured["reason_details"]
+    assert result["action"] == "responded"
+    assert sent["intent"] == "pedido_escolha_entrega"
+    assert "Entrega" in sent["response"]
+    assert "Retirada" in sent["response"]

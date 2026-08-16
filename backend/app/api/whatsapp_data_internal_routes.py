@@ -1,10 +1,12 @@
-"""Ponte interna somente leitura para o piloto local do WhatsApp."""
+"""Ponte interna protegida entre o piloto do WhatsApp e o CorePet."""
 
 from __future__ import annotations
 
+import os
+import secrets
 from typing import Optional
 
-from fastapi import APIRouter, Depends, Header, Query
+from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from sqlalchemy import case, or_
 from sqlalchemy.orm import Session, joinedload
 
@@ -14,7 +16,15 @@ from app.api.whatsapp_orchestrator_internal_routes import (
 )
 from app.db import get_session
 from app.tenancy.context import clear_current_tenant, set_current_tenant
-
+from app.whatsapp.order_checkout_service import (
+    WhatsAppOrderCreateData,
+    WhatsAppOrderPreviewData,
+    build_order_preview as _build_order_preview,
+    create_order as _create_order,
+    customer_delivery_address as _customer_delivery_address,
+    phone_digits,
+    resolve_customer as _resolve_customer,
+)
 
 router = APIRouter(
     prefix="/internal/whatsapp-orchestrator",
@@ -32,7 +42,20 @@ def _normalize_text(value: str) -> str:
 
 
 def _phone_digits(value: str) -> str:
-    return "".join(character for character in str(value or "") if character.isdigit())
+    return phone_digits(value)
+
+
+def _validate_internal_write_token(value: Optional[str]) -> None:
+    expected = (os.getenv("WHATSAPP_ORCHESTRATOR_WRITE_TOKEN") or "").strip()
+    if not expected:
+        raise HTTPException(
+            status_code=503,
+            detail="Canal interno de escrita não configurado.",
+        )
+    if not value or not secrets.compare_digest(value.strip(), expected):
+        raise HTTPException(
+            status_code=401, detail="Token interno de escrita inválido."
+        )
 
 
 def _latest_purchase(db: Session, tenant_id: str, customer_id: int):
@@ -206,32 +229,7 @@ def get_customer_context_data(
                 .first()
             )
         elif phone:
-            digits = _phone_digits(phone)
-            if len(digits) >= 8:
-                last_four = digits[-4:]
-                candidates = (
-                    db.query(Cliente)
-                    .filter(
-                        Cliente.tenant_id == tenant_uuid,
-                        or_(
-                            Cliente.celular.ilike(f"%{last_four}%"),
-                            Cliente.telefone.ilike(f"%{last_four}%"),
-                        ),
-                    )
-                    .limit(20)
-                    .all()
-                )
-                matches = [
-                    candidate
-                    for candidate in candidates
-                    if any(
-                        _phone_digits(value).endswith(digits[-8:])
-                        for value in (candidate.celular, candidate.telefone)
-                        if value
-                    )
-                ]
-                if len(matches) == 1:
-                    customer = matches[0]
+            customer = _resolve_customer(db, tenant_uuid, phone=phone)
 
         if not customer:
             return {
@@ -249,6 +247,7 @@ def get_customer_context_data(
                 "name": customer.nome or "",
                 "phone": customer.celular or customer.telefone or "",
                 "store_credit": float(customer.credito or 0),
+                "delivery_address": _customer_delivery_address(customer),
             },
             "latest_purchase": _latest_purchase(db, tenant_id, customer.id),
             "latest_delivery": _latest_delivery(db, tenant_id, customer.id),
@@ -298,5 +297,61 @@ def get_store_context_data(
             "store": ({"id": str(tenant.id), "name": tenant.name} if tenant else None),
             "store_hours": hours,
         }
+    finally:
+        clear_current_tenant()
+
+
+@router.post("/{tenant_id}/order-preview-data")
+def preview_order_data(
+    tenant_id: str,
+    data: WhatsAppOrderPreviewData,
+    x_internal_token: Optional[str] = Header(default=None, alias="X-Internal-Token"),
+    db: Session = Depends(get_session),
+):
+    """Valida itens e calcula o resumo real sem criar venda ou baixar estoque."""
+    _validate_internal_token(x_internal_token)
+    tenant_uuid = _parse_tenant_uuid(tenant_id)
+    set_current_tenant(tenant_uuid)
+    try:
+        return _build_order_preview(
+            db,
+            tenant_uuid,
+            phone=data.phone,
+            requested_items=data.items,
+        )
+    finally:
+        clear_current_tenant()
+
+
+@router.post("/{tenant_id}/order-create-data")
+def create_order_data(
+    tenant_id: str,
+    data: WhatsAppOrderCreateData,
+    x_internal_token: Optional[str] = Header(default=None, alias="X-Internal-Token"),
+    x_internal_write_token: Optional[str] = Header(
+        default=None, alias="X-Internal-Write-Token"
+    ),
+    idempotency_key: Optional[str] = Header(default=None, alias="Idempotency-Key"),
+    db: Session = Depends(get_session),
+):
+    """Cria uma única venda em aberto após a confirmação explícita do cliente."""
+    _validate_internal_token(x_internal_token)
+    _validate_internal_write_token(x_internal_write_token)
+    if not idempotency_key or len(idempotency_key) < 16:
+        raise HTTPException(
+            status_code=400,
+            detail="Idempotency-Key é obrigatório e deve ter ao menos 16 caracteres.",
+        )
+
+    tenant_uuid = _parse_tenant_uuid(tenant_id)
+    set_current_tenant(tenant_uuid)
+    try:
+        return _create_order(
+            db,
+            tenant_uuid,
+            data=data,
+            idempotency_key=idempotency_key,
+            preview_builder=_build_order_preview,
+        )
     finally:
         clear_current_tenant()

@@ -148,9 +148,11 @@ def purchase_items_as_draft(purchase: dict) -> list[dict[str, Any]]:
 def draft_product_media(items: list[dict[str, Any]]) -> list[dict[str, str]]:
     return [
         {
-            "image_url": str(item.get("image_url") or ""),
-            "caption": str(item.get("name") or "Produto"),
+            "image_url": str(item.get("image_url") or item.get("imagem_url") or ""),
+            "caption": str(item.get("name") or item.get("nome") or "Produto"),
         }
         for item in items
-        if str(item.get("image_url") or "").startswith(("http://", "https://"))
+        if str(item.get("image_url") or item.get("imagem_url") or "").startswith(
+            ("http://", "https://")
+        )
     ]

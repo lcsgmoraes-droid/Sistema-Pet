@@ -49,6 +49,41 @@ def test_remote_catalog_uses_internal_token_without_exposing_it(monkeypatch):
     assert captured["headers"] == {"X-Internal-Token": "token-test"}
 
 
+def test_remote_order_creation_sends_idempotency_key(monkeypatch):
+    captured = {}
+
+    def fake_post(url, **kwargs):
+        captured["url"] = url
+        captured.update(kwargs)
+        return _FakeResponse({"success": True, "sale_id": 99, "number": "VEN-0099"})
+
+    monkeypatch.setenv(
+        "COREPET_WHATSAPP_DATA_BASE_URL",
+        "https://corepet.com.br/api/internal/whatsapp-orchestrator",
+    )
+    monkeypatch.setenv("WHATSAPP_ORCHESTRATOR_INTERNAL_TOKEN", "token-test")
+    monkeypatch.setenv("WHATSAPP_ORCHESTRATOR_WRITE_TOKEN", "write-token-test")
+    monkeypatch.setattr(remote_corepet_client.httpx, "post", fake_post)
+
+    result = remote_corepet_client.create_remote_order(
+        "tenant-test",
+        phone="5518997401641",
+        items=[{"product_id": 10, "quantity": 1}],
+        fulfillment="pickup",
+        payment_method={"key": "pix", "name": "PIX"},
+        delivery_address=None,
+        idempotency_key="checkout-test-1234567890",
+    )
+
+    assert result["sale_id"] == 99
+    assert captured["url"].endswith("/tenant-test/order-create-data")
+    assert captured["headers"] == {
+        "X-Internal-Token": "token-test",
+        "X-Internal-Write-Token": "write-token-test",
+        "Idempotency-Key": "checkout-test-1234567890",
+    }
+
+
 def test_remote_customer_is_resolved_without_local_foreign_key(monkeypatch):
     monkeypatch.setattr(
         customer_context_service,

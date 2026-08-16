@@ -3,7 +3,11 @@ from fastapi import HTTPException
 from types import SimpleNamespace
 
 from app.api import whatsapp_data_internal_routes as data_routes
-from app.api.whatsapp_data_internal_routes import _phone_digits
+from app.api.whatsapp_data_internal_routes import (
+    WhatsAppOrderCreateData,
+    _phone_digits,
+    _validate_internal_write_token,
+)
 from app.api.whatsapp_orchestrator_internal_routes import _validate_internal_token
 
 
@@ -20,6 +24,18 @@ def test_internal_data_token_is_required(monkeypatch):
     assert exc.value.status_code == 401
 
 
+def test_internal_write_token_is_separate_and_required(monkeypatch):
+    monkeypatch.delenv("WHATSAPP_ORCHESTRATOR_WRITE_TOKEN", raising=False)
+    with pytest.raises(HTTPException) as missing:
+        _validate_internal_write_token(None)
+    assert missing.value.status_code == 503
+
+    monkeypatch.setenv("WHATSAPP_ORCHESTRATOR_WRITE_TOKEN", "token-escrita")
+    with pytest.raises(HTTPException) as invalid:
+        _validate_internal_write_token("token-leitura")
+    assert invalid.value.status_code == 401
+
+
 def test_internal_read_only_data_routes_are_registered():
     from app.main import app
 
@@ -28,6 +44,8 @@ def test_internal_read_only_data_routes_are_registered():
     assert "/internal/whatsapp-orchestrator/{tenant_id}/catalog-data" in paths
     assert "/internal/whatsapp-orchestrator/{tenant_id}/customer-context-data" in paths
     assert "/internal/whatsapp-orchestrator/{tenant_id}/store-context-data" in paths
+    assert "/internal/whatsapp-orchestrator/{tenant_id}/order-preview-data" in paths
+    assert "/internal/whatsapp-orchestrator/{tenant_id}/order-create-data" in paths
 
 
 class _FakeQuery:
@@ -49,6 +67,39 @@ class _FakeQuery:
 
     def first(self):
         return self.first_row
+
+
+class _OrderCreateFakeDB:
+    def __init__(self):
+        self.registry = None
+        self.seller = SimpleNamespace(id=7)
+        self.sale = SimpleNamespace(
+            id=99,
+            tipo_retirada=None,
+            loja_origem=None,
+        )
+        self.commits = 0
+
+    def query(self, model):
+        model_name = model.__name__
+        if model_name == "IdempotencyKey":
+            return _FakeQuery(first=self.registry)
+        if model_name == "User":
+            return _FakeQuery(first=self.seller)
+        if model_name == "Venda":
+            return _FakeQuery(first=self.sale)
+        return _FakeQuery()
+
+    def add(self, row):
+        if row.__class__.__name__ == "IdempotencyKey":
+            row.id = 1
+            self.registry = row
+
+    def commit(self):
+        self.commits += 1
+
+    def rollback(self):
+        return None
 
 
 def test_catalog_data_serializes_real_product_shape(monkeypatch):
@@ -109,3 +160,71 @@ def test_customer_context_returns_latest_purchase(monkeypatch):
 
     assert result["customer"]["name"] == "Lucas Guerra"
     assert result["latest_purchase"]["number"] == "202608160001"
+
+
+def test_confirmed_order_is_idempotent_and_creates_open_sale_once(monkeypatch):
+    from app.vendas import VendaService
+
+    monkeypatch.setenv("WHATSAPP_ORCHESTRATOR_INTERNAL_TOKEN", "token-correto")
+    monkeypatch.setenv("WHATSAPP_ORCHESTRATOR_WRITE_TOKEN", "token-escrita")
+    preview = {
+        "success": True,
+        "customer": {
+            "id": 10563,
+            "name": "Lucas Guerra",
+            "delivery_address": "Rua Teste, 10",
+        },
+        "items": [
+            {
+                "product_id": 10,
+                "name": "Racao Bob Dog Gold 3kg",
+                "quantity": 1,
+                "unit_price": 48.9,
+                "subtotal": 48.9,
+            }
+        ],
+        "subtotal": 48.9,
+        "total": 48.9,
+        "payment_methods": [{"key": "pix", "name": "PIX"}],
+        "benefits": [],
+        "delivery": {"default_delivery_person_id": 3},
+    }
+    monkeypatch.setattr(data_routes, "_build_order_preview", lambda *_a, **_k: preview)
+    calls = []
+
+    def fake_create_sale(*, payload, user_id, db):
+        calls.append({"payload": payload, "user_id": user_id})
+        return {"id": 99, "numero_venda": "VEN-0099", "total": 48.9}
+
+    monkeypatch.setattr(VendaService, "criar_venda", fake_create_sale)
+    db = _OrderCreateFakeDB()
+    data = WhatsAppOrderCreateData(
+        phone="5518997401641",
+        items=[{"product_id": 10, "quantity": 1}],
+        fulfillment="pickup",
+        payment_method={"key": "pix", "name": "PIX"},
+    )
+
+    first = data_routes.create_order_data(
+        tenant_id="180d9cbf-5dcb-4676-bf11-dcbd91ed444b",
+        data=data,
+        x_internal_token="token-correto",
+        x_internal_write_token="token-escrita",
+        idempotency_key="checkout-test-1234567890",
+        db=db,
+    )
+    second = data_routes.create_order_data(
+        tenant_id="180d9cbf-5dcb-4676-bf11-dcbd91ed444b",
+        data=data,
+        x_internal_token="token-correto",
+        x_internal_write_token="token-escrita",
+        idempotency_key="checkout-test-1234567890",
+        db=db,
+    )
+
+    assert first == second
+    assert first["status"] == "aberta"
+    assert len(calls) == 1
+    assert calls[0]["payload"]["canal"] == "ecommerce"
+    assert "Forma de pagamento informada: PIX" in calls[0]["payload"]["observacoes"]
+    assert db.sale.tipo_retirada == "proprio"
