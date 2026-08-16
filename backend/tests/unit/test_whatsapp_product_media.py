@@ -12,6 +12,7 @@ from app.whatsapp.processor import (
     _build_catalog_response,
     _extract_explicit_measurements,
     _extract_product_media,
+    _filter_unavailable_catalog_products,
     _gold_catalog_query,
     _gold_brand_matches_product_caption,
     _image_identification_response,
@@ -465,6 +466,50 @@ def test_catalog_response_does_not_repeat_question_for_single_product():
 
     assert "Encontrei esta opção" in response
     assert "Qual delas" not in response
+
+
+def test_catalog_drops_out_of_stock_option_when_an_available_package_exists():
+    filtered = _filter_unavailable_catalog_products(
+        {
+            "data": {
+                "found": 2,
+                "produtos": [
+                    {
+                        "nome": "Bob Dog Gold Adultos 3kg",
+                        "estoque": 2,
+                    },
+                    {
+                        "nome": "Bob Dog Gold Filhotes 3kg",
+                        "estoque": 0,
+                    },
+                ],
+            }
+        }
+    )
+
+    assert filtered["data"]["found"] == 1
+    assert [product["nome"] for product in filtered["data"]["produtos"]] == [
+        "Bob Dog Gold Adultos 3kg"
+    ]
+
+
+def test_catalog_explains_when_exact_product_exists_but_is_out_of_stock():
+    filtered = _filter_unavailable_catalog_products(
+        {
+            "produtos": [
+                {
+                    "nome": "Bob Dog Gold Filhotes 3kg",
+                    "estoque": 0,
+                }
+            ]
+        }
+    )
+
+    response = _build_catalog_response(filtered, "Bob Dog Gold Filhotes 3kg")
+
+    assert response == (
+        "Encontrei Bob Dog Gold Filhotes 3kg, mas está sem estoque no momento."
+    )
 
 
 def test_product_tool_query_preserves_weight_from_customer_message():

@@ -750,6 +750,8 @@ def _build_catalog_response(function_result: Any, catalog_query: str) -> str:
         products = []
 
     if not products:
+        if data.get("unavailable_found"):
+            return f"Encontrei {catalog_query}, mas está sem estoque no momento."
         return f"Não encontrei {catalog_query} no catálogo."
 
     single_result = len(products) == 1
@@ -772,6 +774,39 @@ def _build_catalog_response(function_result: Any, catalog_query: str) -> str:
     if not single_result:
         lines.append("Qual delas você quis dizer?")
     return "\n\n".join(lines)
+
+
+def _filter_unavailable_catalog_products(function_result: Any) -> Any:
+    """Não oferece item esgotado quando o catálogo informa o estoque atual."""
+    if not isinstance(function_result, dict):
+        return function_result
+
+    result = dict(function_result)
+    nested_data = result.get("data")
+    data = dict(nested_data) if isinstance(nested_data, dict) else result
+    products = data.get("produtos")
+    if not isinstance(products, list):
+        return function_result
+
+    def _is_available(product: Any) -> bool:
+        if not isinstance(product, dict):
+            return False
+        if "estoque_disponivel" in product:
+            return bool(product.get("estoque_disponivel"))
+        if "estoque" not in product:
+            return True
+        try:
+            return float(product.get("estoque") or 0) > 0
+        except (TypeError, ValueError):
+            return True
+
+    available_products = [product for product in products if _is_available(product)]
+    data["produtos"] = available_products
+    data["found"] = len(available_products)
+    data["unavailable_found"] = bool(products and not available_products)
+    if isinstance(nested_data, dict):
+        result["data"] = data
+    return result
 
 
 def _preserve_explicit_measurements(query: str, messages: list[Dict[str, Any]]) -> str:
@@ -1913,6 +1948,7 @@ class MessageProcessor:
             context=context,
             session_id=session_id,
         )
+        result = _filter_unavailable_catalog_products(result)
         self._remember_catalog_search(session_id, catalog_query, result)
 
         return await self._send_response(
@@ -1963,6 +1999,8 @@ class MessageProcessor:
                 context=context,
                 session_id=session_id,
             )
+            if function_name == "buscar_produto":
+                result = _filter_unavailable_catalog_products(result)
             product_media.extend(_extract_product_media(result))
             if function_name == "buscar_produto" and isinstance(result, dict):
                 catalog_result = result
