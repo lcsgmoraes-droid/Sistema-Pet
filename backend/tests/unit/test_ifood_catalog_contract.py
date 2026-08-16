@@ -140,3 +140,16 @@ def test_never_sends_negative_stock_after_safety_reserve():
     )
 
     assert result.payload["inventory"]["stock"] == 0.0
+
+
+def test_discards_image_url_without_https():
+    insecure_url = "http" + "://cdn.example.com/produto.webp"
+    result = build_catalog_item(
+        _product(imagem_principal=insecure_url),
+        source="ecommerce",
+        public_base_url="https://corepet.com.br",
+        now=NOW,
+    )
+
+    assert result.eligible is True
+    assert result.payload["details"]["imageUrl"] is None

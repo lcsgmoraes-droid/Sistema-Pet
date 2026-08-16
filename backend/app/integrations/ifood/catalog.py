@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from decimal import Decimal, ROUND_HALF_UP
 from typing import Any, Iterable
-from urllib.parse import urljoin
+from urllib.parse import urljoin, urlparse
 
 _MONEY = Decimal("0.01")
 
@@ -69,9 +69,16 @@ def _image_url(raw: Any, public_base_url: str) -> str | None:
     value = str(raw or "").strip()
     if not value:
         return None
-    if value.startswith(("https://", "http://")):
-        return value
-    return urljoin(f"{public_base_url.rstrip('/')}/", value.lstrip("/"))
+
+    parsed = urlparse(value)
+    if parsed.scheme or parsed.netloc:
+        return value if parsed.scheme.lower() == "https" and parsed.netloc else None
+
+    absolute_url = urljoin(f"{public_base_url.rstrip('/')}/", value.lstrip("/"))
+    parsed_absolute = urlparse(absolute_url)
+    if parsed_absolute.scheme.lower() != "https" or not parsed_absolute.netloc:
+        return None
+    return absolute_url
 
 
 def _channel_prices(
@@ -99,33 +106,10 @@ def _channel_prices(
     return base, promo, promo_active
 
 
-def build_catalog_item(
-    product: Any,
-    *,
-    source: str = "ecommerce",
-    markup_percent: float = 0,
-    stock_safety: float = 0,
-    public_base_url: str = "",
-    now: datetime | None = None,
-) -> IfoodCatalogItem:
-    """Monta um item completo para POST, sem executar qualquer envio."""
-
-    current_time = _aware(now) if now else datetime.now(timezone.utc)
-    assert current_time is not None
+def _eligibility_errors(
+    product: Any, *, source: str, name: str, barcode: str
+) -> list[str]:
     errors: list[str] = []
-    warnings: list[str] = []
-    product_id = int(getattr(product, "id", 0) or 0)
-    sku = str(getattr(product, "codigo", "") or "").strip()
-    name = str(getattr(product, "nome", "") or "").strip()
-    ean = str(
-        getattr(product, "codigo_barras", None)
-        or getattr(product, "gtin_ean", None)
-        or ""
-    ).strip()
-    # O modulo Item aceita EAN ou codigo interno de balanca. O SKU evita
-    # cadastro manual para itens fracionados que legitimamente nao possuem EAN.
-    barcode = ean or sku
-
     if not bool(getattr(product, "situacao", True)) or not bool(
         getattr(product, "ativo", True)
     ):
@@ -146,7 +130,55 @@ def build_catalog_item(
         errors.append("Nome do produto ausente.")
     if not barcode:
         errors.append("EAN ou codigo interno ausente.")
-    elif not ean:
+    return errors
+
+
+def _promotion_price(
+    *,
+    promo_active: bool,
+    promo_raw: Any,
+    base_price: float,
+    markup_percent: float,
+) -> tuple[float | None, list[str]]:
+    if not promo_active or _number(promo_raw) <= 0:
+        return None, []
+
+    candidate = _money(promo_raw, markup_percent)
+    if candidate >= base_price:
+        return None, ["Promocao ignorada: preco promocional nao e menor que o normal."]
+    if candidate > base_price * 0.95:
+        return None, ["Promocao ignorada: o iFood exige desconto superior a 5%."]
+    return candidate, []
+
+
+def build_catalog_item(
+    product: Any,
+    *,
+    source: str = "ecommerce",
+    markup_percent: float = 0,
+    stock_safety: float = 0,
+    public_base_url: str = "",
+    now: datetime | None = None,
+) -> IfoodCatalogItem:
+    """Monta um item completo para POST, sem executar qualquer envio."""
+
+    current_time = _aware(now) if now else datetime.now(timezone.utc)
+    assert current_time is not None
+    warnings: list[str] = []
+    product_id = int(getattr(product, "id", 0) or 0)
+    sku = str(getattr(product, "codigo", "") or "").strip()
+    name = str(getattr(product, "nome", "") or "").strip()
+    ean = str(
+        getattr(product, "codigo_barras", None)
+        or getattr(product, "gtin_ean", None)
+        or ""
+    ).strip()
+    # O modulo Item aceita EAN ou codigo interno de balanca. O SKU evita
+    # cadastro manual para itens fracionados que legitimamente nao possuem EAN.
+    barcode = ean or sku
+
+    errors = _eligibility_errors(product, source=source, name=name, barcode=barcode)
+    if barcode and not ean:
         warnings.append(
             "Produto sem EAN; o SKU sera usado como codigo interno no iFood."
         )
@@ -158,17 +190,13 @@ def build_catalog_item(
     if base_price <= 0:
         errors.append("Preco de venda deve ser maior que zero.")
 
-    promo_price: float | None = None
-    if promo_active and _number(promo_raw) > 0:
-        candidate = _money(promo_raw, markup_percent)
-        if candidate >= base_price:
-            warnings.append(
-                "Promocao ignorada: preco promocional nao e menor que o normal."
-            )
-        elif candidate > base_price * 0.95:
-            warnings.append("Promocao ignorada: o iFood exige desconto superior a 5%.")
-        else:
-            promo_price = candidate
+    promo_price, promo_warnings = _promotion_price(
+        promo_active=promo_active,
+        promo_raw=promo_raw,
+        base_price=base_price,
+        markup_percent=markup_percent,
+    )
+    warnings.extend(promo_warnings)
 
     if errors:
         return IfoodCatalogItem(

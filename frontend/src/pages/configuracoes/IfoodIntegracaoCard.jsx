@@ -34,6 +34,48 @@ function statusLabel(status) {
   return "Configuração inicial";
 }
 
+function connectionBadgeClass(status) {
+  if (status === "connected") return "bg-emerald-100 text-emerald-700";
+  if (status === "error") return "bg-red-100 text-red-700";
+  return "bg-amber-100 text-amber-700";
+}
+
+function messageClass(type) {
+  if (type === "success") return "border-emerald-200 bg-emerald-50 text-emerald-800";
+  return "border-red-200 bg-red-50 text-red-800";
+}
+
+function actionText(action, expectedAction, pendingText, idleText) {
+  return action === expectedAction ? pendingText : idleText;
+}
+
+function CatalogItem({ item }) {
+  return (
+    <div className="flex items-start gap-3 px-4 py-3 text-sm">
+      {item.eligible ? (
+        <FiCheckCircle className="mt-0.5 shrink-0 text-emerald-600" />
+      ) : (
+        <FiXCircle className="mt-0.5 shrink-0 text-amber-600" />
+      )}
+      <div className="min-w-0">
+        <p className="truncate font-medium text-slate-800 dark:text-slate-200">
+          {item.payload?.name || item.sku || `Produto ${item.product_id}`}
+        </p>
+        <p className="text-xs text-slate-500">
+          <span>SKU {item.sku || "não informado"}</span>
+          {item.payload?.barcode ? <span> · Código {item.payload.barcode}</span> : null}
+        </p>
+        {item.errors?.length ? (
+          <p className="mt-1 text-xs text-amber-700">{item.errors.join(" ")}</p>
+        ) : null}
+        {item.warnings?.length ? (
+          <p className="mt-1 text-xs text-blue-700">{item.warnings.join(" ")}</p>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
 export default function IfoodIntegracaoCard() {
   const [data, setData] = useState(null);
   const [form, setForm] = useState(initialForm);
@@ -155,6 +197,7 @@ export default function IfoodIntegracaoCard() {
 
   const catalog = preview?.summary || data?.catalog || {};
   const connectionStatus = data?.config?.status || "draft";
+  const connectionClass = connectionBadgeClass(connectionStatus);
 
   return (
     <section className="rounded-2xl border border-red-100 bg-white p-6 shadow-sm dark:border-red-950 dark:bg-slate-950">
@@ -172,13 +215,7 @@ export default function IfoodIntegracaoCard() {
           </div>
         </div>
         <span
-          className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-medium ${
-            connectionStatus === "connected"
-              ? "bg-emerald-100 text-emerald-700"
-              : connectionStatus === "error"
-                ? "bg-red-100 text-red-700"
-                : "bg-amber-100 text-amber-700"
-          }`}
+          className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-medium ${connectionClass}`}
         >
           {connectionStatus === "connected" ? <FiCheckCircle /> : <FiAlertTriangle />}
           {statusLabel(connectionStatus)}
@@ -186,13 +223,7 @@ export default function IfoodIntegracaoCard() {
       </div>
 
       {message ? (
-        <div
-          className={`mt-4 rounded-xl border px-4 py-3 text-sm ${
-            message.type === "success"
-              ? "border-emerald-200 bg-emerald-50 text-emerald-800"
-              : "border-red-200 bg-red-50 text-red-800"
-          }`}
-        >
+        <div className={`mt-4 rounded-xl border px-4 py-3 text-sm ${messageClass(message.type)}`}>
           {message.text}
         </div>
       ) : null}
@@ -238,7 +269,7 @@ export default function IfoodIntegracaoCard() {
 
           <div className="mt-5 grid gap-4 rounded-xl border border-slate-200 p-4 dark:border-slate-800 sm:grid-cols-2">
             <label className="text-sm font-medium text-slate-700 dark:text-slate-300 sm:col-span-2">
-              Merchant ID da loja no iFood
+              <span>Merchant ID da loja no iFood</span>
               <input
                 name="merchant_id"
                 value={form.merchant_id || ""}
@@ -249,7 +280,7 @@ export default function IfoodIntegracaoCard() {
             </label>
 
             <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
-              Fonte do catálogo
+              <span>Fonte do catálogo</span>
               <select
                 name="catalog_source"
                 value={form.catalog_source}
@@ -262,7 +293,7 @@ export default function IfoodIntegracaoCard() {
             </label>
 
             <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
-              Acréscimo de preço no iFood (%)
+              <span>Acréscimo de preço no iFood (%)</span>
               <input
                 name="default_markup_percent"
                 type="number"
@@ -276,7 +307,7 @@ export default function IfoodIntegracaoCard() {
             </label>
 
             <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
-              Reserva de segurança do estoque
+              <span>Reserva de segurança do estoque</span>
               <input
                 name="stock_safety"
                 type="number"
@@ -296,7 +327,7 @@ export default function IfoodIntegracaoCard() {
                 onChange={updateField}
                 className="h-4 w-4 rounded border-slate-300 text-red-600"
               />
-              Ativar integração para esta empresa
+              <span>Ativar integração para esta empresa</span>
             </label>
           </div>
 
@@ -307,7 +338,7 @@ export default function IfoodIntegracaoCard() {
               disabled={Boolean(action)}
               className="inline-flex items-center gap-2 rounded-xl bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-60"
             >
-              <FiSave /> {action === "save" ? "Salvando..." : "Salvar configuração"}
+              <FiSave /> {actionText(action, "save", "Salvando...", "Salvar configuração")}
             </button>
             <button
               type="button"
@@ -315,7 +346,7 @@ export default function IfoodIntegracaoCard() {
               disabled={Boolean(action)}
               className="inline-flex items-center gap-2 rounded-xl border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60 dark:border-slate-700 dark:text-slate-300"
             >
-              <FiEye /> {action === "preview" ? "Analisando..." : "Conferir produtos"}
+              <FiEye /> {actionText(action, "preview", "Analisando...", "Conferir produtos")}
             </button>
             <button
               type="button"
@@ -323,7 +354,8 @@ export default function IfoodIntegracaoCard() {
               disabled={Boolean(action)}
               className="inline-flex items-center gap-2 rounded-xl border border-red-200 px-4 py-2 text-sm font-medium text-red-700 hover:bg-red-50 disabled:opacity-60"
             >
-              <FiPackage /> {action === "simulate" ? "Simulando..." : "Simular publicação"}
+              <FiPackage />
+              {actionText(action, "simulate", "Simulando...", "Simular publicação")}
             </button>
             <button
               type="button"
@@ -331,7 +363,7 @@ export default function IfoodIntegracaoCard() {
               disabled={Boolean(action) || !data?.credentials_configured || !form.merchant_id}
               className="inline-flex items-center gap-2 rounded-xl border border-emerald-200 px-4 py-2 text-sm font-medium text-emerald-700 hover:bg-emerald-50 disabled:opacity-50"
             >
-              <FiWifi /> {action === "test" ? "Testando..." : "Testar conexão"}
+              <FiWifi /> {actionText(action, "test", "Testando...", "Testar conexão")}
             </button>
           </div>
 
@@ -347,28 +379,7 @@ export default function IfoodIntegracaoCard() {
               </div>
               <div className="max-h-96 divide-y divide-slate-100 overflow-y-auto dark:divide-slate-800">
                 {(preview.items || []).map((item) => (
-                  <div key={item.product_id} className="flex items-start gap-3 px-4 py-3 text-sm">
-                    {item.eligible ? (
-                      <FiCheckCircle className="mt-0.5 shrink-0 text-emerald-600" />
-                    ) : (
-                      <FiXCircle className="mt-0.5 shrink-0 text-amber-600" />
-                    )}
-                    <div className="min-w-0">
-                      <p className="truncate font-medium text-slate-800 dark:text-slate-200">
-                        {item.payload?.name || item.sku || `Produto ${item.product_id}`}
-                      </p>
-                      <p className="text-xs text-slate-500">
-                        SKU {item.sku || "não informado"}
-                        {item.payload?.barcode ? ` · Código ${item.payload.barcode}` : ""}
-                      </p>
-                      {item.errors?.length ? (
-                        <p className="mt-1 text-xs text-amber-700">{item.errors.join(" ")}</p>
-                      ) : null}
-                      {item.warnings?.length ? (
-                        <p className="mt-1 text-xs text-blue-700">{item.warnings.join(" ")}</p>
-                      ) : null}
-                    </div>
-                  </div>
+                  <CatalogItem key={item.product_id} item={item} />
                 ))}
               </div>
             </div>
