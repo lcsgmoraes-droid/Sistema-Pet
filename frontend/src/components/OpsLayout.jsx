@@ -12,7 +12,7 @@ import {
   FiUsers,
 } from "react-icons/fi";
 
-import { useAuth } from "../contexts/AuthContext";
+import { usePlatformAuth } from "../contexts/PlatformAuthContext";
 import ThemeToggle from "./theme/ThemeToggle";
 
 const navItems = [
@@ -56,8 +56,8 @@ function getInitials(user) {
 }
 
 export default function OpsLayout() {
-  const { user, logout } = useAuth();
-  const roleName = user?.role?.name || "admin";
+  const { admin, logout } = usePlatformAuth();
+  const roleName = "plataforma";
 
   return (
     <div className="min-h-screen bg-slate-100 text-slate-950 dark:bg-slate-950 dark:text-slate-100">
@@ -122,7 +122,7 @@ export default function OpsLayout() {
 
         <div className="border-t border-slate-800 p-4">
           <Link
-            to="/lembretes"
+            to="/landing"
             className="mb-3 flex items-center gap-2 rounded-lg border border-slate-800 px-3 py-2 text-sm font-semibold text-slate-200 transition hover:bg-slate-900 hover:text-white"
           >
             <FiArrowLeft className="h-4 w-4" />
@@ -131,13 +131,13 @@ export default function OpsLayout() {
 
           <div className="flex items-center gap-3 rounded-lg bg-slate-900 px-3 py-3">
             <div className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-700 text-sm font-bold">
-              {getInitials(user)}
+              {getInitials(admin)}
             </div>
             <div className="min-w-0 flex-1">
-              <div className="truncate text-sm font-semibold">
-                {user?.nome || user?.name || "Operador"}
+              <div className="truncate text-sm font-semibold">{admin?.name || "Administrador"}</div>
+              <div className="truncate text-xs text-slate-400">
+                {admin?.email || "sessao ativa"}
               </div>
-              <div className="truncate text-xs text-slate-400">{user?.email || "sessao ativa"}</div>
             </div>
             <button
               type="button"

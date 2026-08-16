@@ -687,7 +687,6 @@ def apply_base_catalog_import(
     db: Session,
     *,
     tenant_id: str,
-    actor_user_id: int,
     confirm: bool,
 ) -> dict[str, Any]:
     if not confirm:
@@ -695,10 +694,11 @@ def apply_base_catalog_import(
 
     target_tenant_id = str(tenant_id).strip()
     _ensure_target_tenant(db, target_tenant_id)
+    target_user_id = _resolve_target_user_id(db, target_tenant_id)
     return import_base_catalog(
         db=db,
         source_tenant_id=_resolve_source_tenant_id(db),
         target_tenant_id=target_tenant_id,
-        user_id=_resolve_target_user_id(db, target_tenant_id) or int(actor_user_id),
+        user_id=target_user_id,
         dry_run=False,
     )

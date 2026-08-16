@@ -21,6 +21,7 @@
     "test:public-plans": "node scripts/test-public-plans.mjs",
     "test:billing-contract": "node scripts/test-billing-contract.mjs",
     "test:custom-billing-offer": "node scripts/test-custom-billing-offer.mjs",
+    "test:platform-admin-auth": "node scripts/test-platform-admin-auth.mjs",
     "test:ecommerce-account-validation": "node scripts/test-ecommerce-account-validation.mjs",
     "test:ecommerce-session": "node scripts/test-ecommerce-session.mjs",
     "test:ecommerce-checkout-conversion-flow": "node scripts/test-ecommerce-checkout-conversion-flow.mjs",

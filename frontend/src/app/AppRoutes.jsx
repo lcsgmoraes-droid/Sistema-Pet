@@ -1,6 +1,7 @@
 import { Navigate, Route, Routes } from "react-router-dom";
 import Layout from "../components/Layout";
 import OpsLayout from "../components/OpsLayout";
+import PlatformProtectedRoute from "../components/PlatformProtectedRoute";
 import ProtectedRoute from "../components/ProtectedRoute";
 import { createBathGroomingRoutes } from "./routes/BathGroomingRoutes";
 import { createCatalogAdminRoutes } from "./routes/CatalogAdminRoutes";
@@ -15,18 +16,22 @@ import { createPurchasingBlingRoutes } from "./routes/PurchasingBlingRoutes";
 import { createSalesMarketingRoutes } from "./routes/SalesMarketingRoutes";
 import { createSettingsAdminRoutes } from "./routes/SettingsAdminRoutes";
 import { createVeterinaryRoutes } from "./routes/VeterinaryRoutes";
+import { PlatformForgotPassword, PlatformLogin } from "./lazyPages";
 
 export default function AppRoutes() {
   return (
     <Routes>
       {createPublicRoutes()}
 
+      <Route path="/ops/login" element={<PlatformLogin />} />
+      <Route path="/ops/recuperar-senha" element={<PlatformForgotPassword />} />
+
       <Route
         path="/ops"
         element={
-          <ProtectedRoute permission="usuarios.manage">
+          <PlatformProtectedRoute>
             <OpsLayout />
-          </ProtectedRoute>
+          </PlatformProtectedRoute>
         }
       >
         {createOpsRoutes()}

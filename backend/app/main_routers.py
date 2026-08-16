@@ -169,6 +169,7 @@ from app.routes.error_events_routes import (
 from app.routes.ops_tenants_routes import (
     router as ops_tenants_router,
 )  # Gestao operacional de tenants
+from app.platform_auth import router as platform_auth_router
 from app.lgpd_routes import router as lgpd_router  # LGPD operacional
 
 # ============================================================================
@@ -231,6 +232,7 @@ def _entitlement_dependencies(entitlement: str):
 def register_routers(app: FastAPI) -> None:
     """Register application routers in the same precedence order used by main.py."""
     app.include_router(health_check_router, tags=["Infrastructure"])
+    app.include_router(platform_auth_router)
     app.include_router(error_events_router)
     app.include_router(ops_tenants_router)
     app.include_router(product_images_public_router)

@@ -15,7 +15,8 @@ from uuid import UUID, uuid4
 from sqlalchemy.orm import Session
 
 from app.billing_models import BillingOffer
-from app.models import AssinaturaModulo, Tenant, User
+from app.models import AssinaturaModulo, Tenant
+from app.platform_auth_models import PlatformAdmin
 from app.services.asaas_billing_service import (
     AsaasBillingError,
     AsaasClient,
@@ -163,7 +164,7 @@ def create_billing_offer(
     db: Session,
     *,
     tenant_reference: str,
-    created_by: User,
+    created_by: PlatformAdmin,
     title: str,
     plan_code: str,
     price_cents: int,
@@ -211,7 +212,7 @@ def create_billing_offer(
         offer_id=str(uuid4()),
         tenant_reference=str(tenant.id),
         token_sha256=_token_hash(token),
-        created_by_user_id=created_by.id,
+        created_by_platform_admin_id=created_by.id,
         title=normalized_title,
         plan_code=plan.code,
         plan_name=plan.name,

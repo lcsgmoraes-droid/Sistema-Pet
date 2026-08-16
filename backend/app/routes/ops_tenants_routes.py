@@ -7,9 +7,10 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
-from app.auth.dependencies import require_admin
 from app.db import get_session
-from app.models import Tenant, User
+from app.models import Tenant
+from app.platform_auth import require_platform_admin
+from app.platform_auth_models import PlatformAdmin
 from app.services.billing_offer_service import (
     BillingOfferError,
     create_billing_offer,
@@ -53,7 +54,7 @@ def listar_tenants_ops(
     search: str | None = Query(None),
     status: str | None = Query(None),
     limit: int = Query(100, ge=1, le=300),
-    _current_user: User = Depends(require_admin),
+    _current_admin: PlatformAdmin = Depends(require_platform_admin),
     db: Session = Depends(get_session),
 ) -> dict[str, Any]:
     return list_ops_tenants(db, search=search, status=status, limit=limit)
@@ -63,7 +64,7 @@ def listar_tenants_ops(
 def atualizar_estado_comercial_tenant(
     tenant_id: str,
     payload: CommercialStateRequest,
-    _current_user: User = Depends(require_admin),
+    _current_admin: PlatformAdmin = Depends(require_platform_admin),
     db: Session = Depends(get_session),
 ) -> dict[str, Any]:
     try:
@@ -86,7 +87,7 @@ def atualizar_estado_comercial_tenant(
 def listar_propostas_cobranca(
     tenant_id: str,
     limit: int = Query(10, ge=1, le=50),
-    _current_user: User = Depends(require_admin),
+    _current_admin: PlatformAdmin = Depends(require_platform_admin),
     db: Session = Depends(get_session),
 ) -> dict[str, Any]:
     try:
@@ -101,14 +102,14 @@ def listar_propostas_cobranca(
 def criar_proposta_cobranca(
     tenant_id: str,
     payload: BillingOfferCreateRequest,
-    current_user: User = Depends(require_admin),
+    current_admin: PlatformAdmin = Depends(require_platform_admin),
     db: Session = Depends(get_session),
 ) -> dict[str, Any]:
     try:
         offer, token = create_billing_offer(
             db,
             tenant_reference=tenant_id,
-            created_by=current_user,
+            created_by=current_admin,
             title=payload.title,
             plan_code=payload.plan_code,
             price_cents=payload.price_cents,
@@ -134,7 +135,7 @@ def criar_proposta_cobranca(
 @router.post("/{tenant_id}/catalog-import/preview")
 def simular_importacao_catalogo_base(
     tenant_id: str,
-    _current_user: User = Depends(require_admin),
+    _current_admin: PlatformAdmin = Depends(require_platform_admin),
     db: Session = Depends(get_session),
 ) -> dict[str, Any]:
     try:
@@ -150,14 +151,13 @@ def simular_importacao_catalogo_base(
 def aplicar_importacao_catalogo_base(
     tenant_id: str,
     payload: CatalogImportApplyRequest,
-    current_user: User = Depends(require_admin),
+    _current_admin: PlatformAdmin = Depends(require_platform_admin),
     db: Session = Depends(get_session),
 ) -> dict[str, Any]:
     try:
         result = apply_base_catalog_import(
             db,
             tenant_id=tenant_id,
-            actor_user_id=int(current_user.id),
             confirm=bool(payload.confirm),
         )
         db.commit()
