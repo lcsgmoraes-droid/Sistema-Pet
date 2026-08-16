@@ -27,9 +27,7 @@ def _normalize_text(value: str) -> str:
 
     normalized = unicodedata.normalize("NFKD", value or "")
     return "".join(
-        character
-        for character in normalized
-        if not unicodedata.combining(character)
+        character for character in normalized if not unicodedata.combining(character)
     ).lower()
 
 
@@ -68,9 +66,7 @@ def _latest_purchase(db: Session, tenant_id: str, customer_id: int):
                 ),
                 "quantity": float(item.quantidade or 0),
                 "unit_price": float(item.preco_unitario or 0),
-                "image_url": (
-                    str(product.imagem_principal or "") if product else ""
-                ),
+                "image_url": (str(product.imagem_principal or "") if product else ""),
             }
         )
     if not items:
@@ -299,9 +295,7 @@ def get_store_context_data(
             }
         return {
             "success": True,
-            "store": (
-                {"id": str(tenant.id), "name": tenant.name} if tenant else None
-            ),
+            "store": ({"id": str(tenant.id), "name": tenant.name} if tenant else None),
             "store_hours": hours,
         }
     finally:

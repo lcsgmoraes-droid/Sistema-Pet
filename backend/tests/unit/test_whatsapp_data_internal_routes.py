@@ -23,19 +23,11 @@ def test_internal_data_token_is_required(monkeypatch):
 def test_internal_read_only_data_routes_are_registered():
     from app.main import app
 
-    paths = {getattr(route, "path", "") for route in app.routes}
+    paths = set(app.openapi()["paths"])
 
-    assert (
-        "/internal/whatsapp-orchestrator/{tenant_id}/catalog-data" in paths
-    )
-    assert (
-        "/internal/whatsapp-orchestrator/{tenant_id}/customer-context-data"
-        in paths
-    )
-    assert (
-        "/internal/whatsapp-orchestrator/{tenant_id}/store-context-data"
-        in paths
-    )
+    assert "/internal/whatsapp-orchestrator/{tenant_id}/catalog-data" in paths
+    assert "/internal/whatsapp-orchestrator/{tenant_id}/customer-context-data" in paths
+    assert "/internal/whatsapp-orchestrator/{tenant_id}/store-context-data" in paths
 
 
 class _FakeQuery:
