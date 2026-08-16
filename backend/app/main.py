@@ -34,6 +34,7 @@ import app.produtos_models  # noqa: F401 - modelo de lembretes e produtos
 import app.idempotency_models  # noqa: F401 - modelo de idempotência
 import app.ecommerce_analytics_models  # noqa: F401 - funil anonimo do ecommerce
 import app.ecommerceai_integration_models  # noqa: F401 - integracao CorePet <-> EcommerceAI
+import app.ifood_integration_models  # noqa: F401 - integracao CorePet <-> iFood
 import app.models_configuracao_custo_moto  # noqa: F401 - custos da moto
 import app.pendencia_estoque_models  # noqa: F401 - lista de espera
 import app.ia.aba7_extrato_models  # noqa: F401 - modelos IA/DRE
