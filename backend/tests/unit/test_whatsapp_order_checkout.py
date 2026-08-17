@@ -193,10 +193,20 @@ def test_checkout_cancellation_never_creates_sale(monkeypatch):
     assert "Nenhuma venda foi lançada" in sent[-1]["response"]
 
 
-def test_checkout_explains_stock_conflict_instead_of_technical_error(monkeypatch):
+def test_checkout_explains_stock_conflict_and_transfers_to_human(monkeypatch):
     processor, sent = _processor_and_messages()
     session = SimpleNamespace(id="session-test", phone_number="5518997401641")
     context = {}
+    transferred = {}
+
+    async def fake_transfer(**kwargs):
+        transferred.update(kwargs)
+        return {
+            "action": "transferred_to_human",
+            "reason": kwargs["reason"],
+        }
+
+    processor._transfer_to_human = fake_transfer
 
     monkeypatch.setattr(
         "app.whatsapp.processor.fetch_remote_order_preview",
@@ -222,8 +232,10 @@ def test_checkout_explains_stock_conflict_instead_of_technical_error(monkeypatch
         )
     )
 
-    assert result["action"] == "responded"
-    assert sent[-1]["intent"] == "pedido_preview_recusado"
-    assert "Estoque insuficiente" in sent[-1]["response"]
-    assert "Nenhuma venda foi lançada" in sent[-1]["response"]
-    assert "problema técnico" not in sent[-1]["response"]
+    assert result["action"] == "transferred_to_human"
+    assert transferred["reason"] == "order_preview_rejected"
+    assert "Estoque insuficiente" in transferred["customer_message"]
+    assert "Nenhuma venda foi lançada" in transferred["customer_message"]
+    assert "atendente humano" in transferred["customer_message"]
+    assert "problema técnico" not in transferred["customer_message"]
+    assert sent == []

@@ -89,6 +89,44 @@ def extract_multi_item_order(message: str) -> list[dict[str, Any]]:
     return items if len(items) >= 2 else []
 
 
+def extract_single_item_order(message: str) -> Optional[dict[str, Any]]:
+    """Extrai um pedido explícito com quantidade e produto identificável."""
+    cleaned = re.sub(
+        r"(?i)^\s*(?:quero|preciso|manda|mandar|gostaria de|vou querer|pedido)\s*:?[ ]*",
+        "",
+        message or "",
+    )
+    cleaned = re.sub(r"(?i)\s+(?:por favor|pfv)\s*[.!?]*$", "", cleaned).strip()
+    match = re.fullmatch(
+        r"(?i)\s*(?P<quantity>\d+(?:[.,]\d+)?)\s*"
+        r"(?P<unit>x|un(?:idade)?s?|pct|pacotes?|sacos?|latas?|caixas?|sach[eê]s?)?\s+"
+        r"(?P<product>.+?)\s*",
+        cleaned,
+    )
+    if not match:
+        return None
+
+    product = re.sub(
+        r"(?i)^(?:de|da|do)\s+",
+        "",
+        match.group("product").strip(),
+    )
+    if len(product) < 2 or not re.search(r"[A-Za-zÀ-ÿ]", product):
+        return None
+
+    catalog_query = re.sub(r"(?i)\bbobdog\b", "Bob Dog", product)
+    catalog_query = re.sub(r"(?i)\bgolde\b", "Gold", catalog_query)
+    catalog_query = re.sub(r"(?i)\bde\s+(?=\d+(?:[.,]\d+)?\s*(?:kg|g|ml|l)\b)", "", catalog_query)
+    catalog_query = re.sub(r"\s+", " ", catalog_query).strip()
+
+    return {
+        "quantity": float(match.group("quantity").replace(",", ".")),
+        "unit": (match.group("unit") or "x").lower(),
+        "name": product,
+        "catalog_query": catalog_query,
+    }
+
+
 def format_quantity(value: Any) -> str:
     quantity = float(value or 0)
     if quantity.is_integer():

@@ -8,6 +8,7 @@ from app.whatsapp.order_drafts import (
     draft_product_media,
     extract_history_quantity_request,
     extract_multi_item_order,
+    extract_single_item_order,
     format_draft_item,
     is_generic_reorder_request,
 )
@@ -68,6 +69,19 @@ def test_multi_item_order_is_organized_with_quantities():
     assert "1 saco de ração Special Dog Gold 15kg" in message
     assert "2 pacotes de areia para gato" in message
     assert "Responda sim" in message
+
+
+def test_single_item_order_extracts_live_phrase_and_corrects_catalog_typo():
+    item = extract_single_item_order(
+        "Quero 1 ração bob dog golde de 3kg por favor"
+    )
+
+    assert item == {
+        "quantity": 1.0,
+        "unit": "x",
+        "name": "ração bob dog golde de 3kg",
+        "catalog_query": "ração bob dog Gold 3kg",
+    }
 
 
 def test_order_item_format_handles_fractional_and_unit_quantities():
@@ -180,6 +194,66 @@ def test_multi_item_message_creates_draft_before_human_handoff():
     assert ORDER_DRAFT_CONTEXT_KEY in saved_context
     assert len(saved_context[ORDER_DRAFT_CONTEXT_KEY]["items"]) == 2
     assert "Organizei seu pedido" in sent["response"]
+
+
+def test_single_item_message_searches_catalog_and_creates_draft():
+    processor = object.__new__(MessageProcessor)
+    session = SimpleNamespace(id="session-test", context="{}")
+    processor.db = _FakeDB(session)
+    saved_context = {}
+    sent = {}
+
+    def fake_save_session_context(_session, context):
+        saved_context.update(context)
+
+    async def fake_execute_function(**kwargs):
+        assert kwargs["arguments"]["termo"] == "ração bob dog Gold 3kg"
+        return {
+            "success": True,
+            "produtos": [
+                {
+                    "id": "5050",
+                    "nome": "Racao Bob Dog Gold Adultos 3kg",
+                    "preco": 48.9,
+                    "estoque": 2,
+                    "imagem_url": "https://img.example/bob-dog.webp",
+                },
+                {
+                    "id": "5053",
+                    "nome": "Racao Bob Dog Gold Filhotes 3kg",
+                    "preco": 51.9,
+                    "estoque": 0,
+                    "imagem_url": "https://img.example/bob-dog-filhote.webp",
+                },
+            ],
+        }
+
+    async def fake_send_response(**kwargs):
+        sent.update(kwargs)
+        return {"action": "responded", "intent": kwargs["intent"]}
+
+    async def fail_transfer(**_kwargs):
+        raise AssertionError("Produto disponível não deve ser transferido")
+
+    processor._save_session_context = fake_save_session_context
+    processor._execute_function = fake_execute_function
+    processor._remember_catalog_search = lambda *_args, **_kwargs: None
+    processor._send_response = fake_send_response
+    processor._transfer_to_human = fail_transfer
+
+    result = asyncio.run(
+        processor._handle_order_draft_flow(
+            "session-test",
+            "Quero 1 ração bob dog golde de 3kg por favor",
+        )
+    )
+
+    assert result["action"] == "responded"
+    draft = saved_context[ORDER_DRAFT_CONTEXT_KEY]
+    assert draft["items"][0]["product_id"] == "5050"
+    assert draft["items"][0]["quantity"] == 1
+    assert "Racao Bob Dog Gold Adultos 3kg" in sent["response"]
+    assert sent["product_media"][0]["image_url"].endswith("bob-dog.webp")
 
 
 def test_reorder_without_linked_customer_explains_missing_history():

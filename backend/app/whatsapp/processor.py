@@ -52,6 +52,7 @@ from app.whatsapp.order_drafts import (
     draft_product_media,
     extract_history_quantity_request,
     extract_multi_item_order,
+    extract_single_item_order,
     format_draft_item,
     is_safe_product_image_url,
     is_generic_reorder_request,
@@ -1145,18 +1146,15 @@ class MessageProcessor:
                 r"\s+", " ", str((preview or {}).get("detail") or "")
             ).strip()
             if rejection_detail:
-                return await self._send_response(
+                return await self._transfer_to_human(
                     session_id=session.id,
-                    response=(
+                    reason="order_preview_rejected",
+                    reason_details=rejection_detail,
+                    customer_message=(
                         f"Não consigo continuar com este pedido: {rejection_detail} "
-                        "Nenhuma venda foi lançada. Se quiser, posso procurar outra "
-                        "opção para você."
+                        "Nenhuma venda foi lançada. Vou encaminhar você para um "
+                        "atendente humano ajudar com uma alternativa. ⏳"
                     ),
-                    intent="pedido_preview_recusado",
-                    model_used="deterministic_checkout_preview_rejection",
-                    tokens_input=0,
-                    tokens_output=0,
-                    processing_time_ms=0,
                 )
             return await self._send_response(
                 session_id=session.id,
@@ -1489,6 +1487,101 @@ class MessageProcessor:
             product_media=draft_product_media(items),
         )
 
+    async def _handle_single_item_order(
+        self,
+        *,
+        session: WhatsAppSession,
+        session_context: Dict[str, Any],
+        requested_item: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        """Pesquisa um pedido unitário antes de decidir por atendimento humano."""
+        catalog_query = str(requested_item.get("catalog_query") or "").strip()
+        result = await self._execute_function(
+            function_name="buscar_produto",
+            arguments={"termo": catalog_query, "limit": 5},
+            context={},
+            session_id=session.id,
+        )
+        result = _filter_unavailable_catalog_products(result)
+        self._remember_catalog_search(session.id, catalog_query, result)
+
+        data = result.get("data") if isinstance(result, dict) else None
+        if not isinstance(data, dict):
+            data = result if isinstance(result, dict) else {}
+        products = data.get("produtos")
+        if not isinstance(products, list):
+            products = []
+
+        if not products:
+            unavailable = bool(data.get("unavailable_found"))
+            explanation = (
+                f"Encontrei {catalog_query}, mas está sem estoque no momento."
+                if unavailable
+                else f"Não consegui identificar {catalog_query} no catálogo."
+            )
+            return await self._transfer_to_human(
+                session_id=session.id,
+                reason=(
+                    "product_out_of_stock"
+                    if unavailable
+                    else "product_not_identified"
+                ),
+                reason_details=(
+                    f"Pedido explícito não resolvido automaticamente: {catalog_query}"
+                ),
+                customer_message=(
+                    f"{explanation} Vou encaminhar você para um atendente humano "
+                    "continuar o atendimento. ⏳"
+                ),
+            )
+
+        options = [
+            {
+                "product_id": product.get("id"),
+                "name": str(product.get("nome") or "Produto"),
+                "quantity": float(requested_item.get("quantity") or 1),
+                "unit": str(requested_item.get("unit") or "x"),
+                "unit_price": product.get("preco"),
+                "image_url": str(product.get("imagem_url") or ""),
+            }
+            for product in products[:MAX_PRODUCT_IMAGES_PER_RESPONSE]
+            if isinstance(product, dict) and product.get("id") not in (None, "")
+        ]
+        if len(options) == 1:
+            return await self._send_order_draft(
+                session=session,
+                session_context=session_context,
+                items=options,
+                source="single_item_catalog",
+                from_history=False,
+            )
+
+        session_context[HISTORY_ITEM_SELECTION_CONTEXT_KEY] = {
+            "source": "single_item_catalog",
+            "quantity": requested_item.get("quantity", 1),
+            "unit": requested_item.get("unit") or "x",
+            "options": options,
+        }
+        session_context.pop(ORDER_DRAFT_CONTEXT_KEY, None)
+        self._save_session_context(session, session_context)
+        options_text = "\n\n".join(
+            f"{index}. {option['name']}"
+            for index, option in enumerate(options, start=1)
+        )
+        return await self._send_response(
+            session_id=session.id,
+            response=(
+                "Encontrei mais de uma opção para esse pedido:\n\n"
+                f"{options_text}\n\nResponda com o número do produto."
+            ),
+            intent="clarificacao_item_catalogo",
+            model_used="deterministic_catalog_order_selection",
+            tokens_input=0,
+            tokens_output=0,
+            processing_time_ms=0,
+            product_media=draft_product_media(options),
+        )
+
     async def _handle_order_draft_flow(
         self, session_id: str, message_content: str
     ) -> Optional[Dict[str, Any]]:
@@ -1516,12 +1609,15 @@ class MessageProcessor:
                     selected = dict(options[selected_index])
                     selected["quantity"] = pending_selection.get("quantity", 1)
                     selected["unit"] = pending_selection.get("unit") or "x"
+                    selection_source = str(
+                        pending_selection.get("source") or "history_quantity"
+                    )
                     return await self._send_order_draft(
                         session=session,
                         session_context=session_context,
                         items=[selected],
-                        source="history_quantity",
-                        from_history=True,
+                        source=selection_source,
+                        from_history=selection_source != "single_item_catalog",
                     )
             if _confirmation_reply(message_content) is not None:
                 return await self._send_response(
@@ -1581,6 +1677,14 @@ class MessageProcessor:
                 items=multi_items,
                 source="multi_item_message",
                 from_history=False,
+            )
+
+        single_item = extract_single_item_order(message_content)
+        if single_item:
+            return await self._handle_single_item_order(
+                session=session,
+                session_context=session_context,
+                requested_item=single_item,
             )
 
         quantity_request = extract_history_quantity_request(message_content)
@@ -2593,7 +2697,11 @@ class MessageProcessor:
         }
 
     async def _transfer_to_human(
-        self, session_id: str, reason: str, reason_details: Optional[str] = None
+        self,
+        session_id: str,
+        reason: str,
+        reason_details: Optional[str] = None,
+        customer_message: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         Transfere conversa para atendente humano.
@@ -2642,7 +2750,8 @@ class MessageProcessor:
             session_id=session_id,
             message=transfer_messages.get(
                 reason,
-                "Um momento! Estou transferindo você para um atendente humano. ⏳",
+                customer_message
+                or "Um momento! Estou transferindo você para um atendente humano. ⏳",
             ),
         )
 
