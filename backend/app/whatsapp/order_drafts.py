@@ -71,7 +71,7 @@ def extract_multi_item_order(message: str) -> list[dict[str, Any]]:
         if not match:
             continue
         product = re.sub(
-            r"(?i)^(?:de|da|do)\s+|\s+(?:por favor|pfv)$",
+            r"(?i)(?:^(?:de|da|do)\s+|\s+(?:por favor|pfv)$)",
             "",
             match.group("product").strip(),
         ).strip()
