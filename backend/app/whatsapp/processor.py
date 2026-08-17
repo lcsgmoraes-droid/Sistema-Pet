@@ -1635,6 +1635,10 @@ class MessageProcessor:
         pending_draft = session_context.get(ORDER_DRAFT_CONTEXT_KEY)
         if isinstance(pending_draft, dict):
             confirmation = _confirmation_reply(message_content)
+            if confirmation is None and re.fullmatch(
+                r"\s*1[.)]?\s*", message_content or ""
+            ):
+                confirmation = True
             if confirmation is True:
                 items = pending_draft.get("items") or []
                 source = str(pending_draft.get("source") or "whatsapp")

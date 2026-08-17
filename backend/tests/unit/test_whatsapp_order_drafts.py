@@ -336,7 +336,7 @@ def test_confirmed_draft_starts_checkout_instead_of_human_handoff(monkeypatch):
     result = asyncio.run(
         processor._handle_order_draft_flow(
             "session-test",
-            "Quero repetir o pedido",
+            "1",
         )
     )
 
