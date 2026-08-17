@@ -11,6 +11,7 @@ import {
   FiXCircle,
 } from "react-icons/fi";
 import { api } from "../../services/api";
+import IfoodPedidosPanel from "./IfoodPedidosPanel";
 
 const initialForm = {
   merchant_id: "",
@@ -59,7 +60,7 @@ function CatalogItem({ item }) {
       )}
       <div className="min-w-0">
         <p className="truncate font-medium text-slate-800 dark:text-slate-200">
-          {item.payload?.name || item.sku || `Produto ${item.product_id}`}
+          {item.name || item.payload?.name || item.sku || `Produto ${item.product_id}`}
         </p>
         <p className="text-xs text-slate-500">
           <span>SKU {item.sku || "não informado"}</span>
@@ -138,7 +139,7 @@ export default function IfoodIntegracaoCard() {
     try {
       setAction("preview");
       const response = await api.get("/integracoes/ifood/catalogo/preview", {
-        params: { limit: 50 },
+        params: { limit: 50, only_issues: true },
       });
       setPreview(response.data);
       setMessage({
@@ -374,9 +375,22 @@ export default function IfoodIntegracaoCard() {
                   Diagnóstico do catálogo
                 </p>
                 <p className="text-xs text-slate-500">
-                  A lista mostra até 50 produtos e informa o que precisa ser corrigido no ERP.
+                  A lista mostra até 50 bloqueios reais e informa o que precisa ser corrigido no
+                  ERP.
                 </p>
               </div>
+              {preview.issues?.length ? (
+                <div className="grid gap-2 border-b border-slate-200 p-3 sm:grid-cols-2 dark:border-slate-800">
+                  {preview.issues.map((issue) => (
+                    <div
+                      key={issue.message}
+                      className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-900"
+                    >
+                      <strong>{issue.count}</strong> · {issue.message}
+                    </div>
+                  ))}
+                </div>
+              ) : null}
               <div className="max-h-96 divide-y divide-slate-100 overflow-y-auto dark:divide-slate-800">
                 {(preview.items || []).map((item) => (
                   <CatalogItem key={item.product_id} item={item} />
@@ -384,6 +398,11 @@ export default function IfoodIntegracaoCard() {
               </div>
             </div>
           ) : null}
+
+          <IfoodPedidosPanel
+            enabled={Boolean(data?.order_operations_enabled)}
+            onMessage={(type, text) => setMessage({ type, text })}
+          />
 
           <div className="mt-5 rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-900 dark:border-blue-950 dark:bg-blue-950/30 dark:text-blue-200">
             Os anúncios não precisam ser cadastrados um a um: o CorePet monta o catálogo a partir da

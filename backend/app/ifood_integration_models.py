@@ -36,4 +36,6 @@ class IfoodMerchantConfig(BaseTenantModel):
     status = Column(String(32), nullable=False, default="draft")
     last_connection_check_at = Column(DateTime(timezone=True), nullable=True)
     last_catalog_sync_at = Column(DateTime(timezone=True), nullable=True)
+    last_orders_poll_at = Column(DateTime(timezone=True), nullable=True)
+    last_orders_error = Column(Text, nullable=True)
     last_error = Column(Text, nullable=True)

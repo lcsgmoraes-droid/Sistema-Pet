@@ -120,6 +120,127 @@ class IfoodClient:
                 "O iFood retornou uma lista de lojas invalida."
             ) from exc
 
+    @staticmethod
+    def _json_response(response: httpx.Response, *, fallback: Any = None) -> Any:
+        if not response.content:
+            return fallback
+        try:
+            return response.json()
+        except ValueError as exc:
+            raise IfoodClientError("O iFood retornou uma resposta invalida.") from exc
+
+    @staticmethod
+    def _accepted_result(response: httpx.Response) -> dict[str, Any]:
+        result: dict[str, Any] = {"status_code": response.status_code}
+        if response.content:
+            try:
+                result["response"] = response.json()
+            except ValueError:
+                result["response"] = None
+        return result
+
+    def poll_events(self, merchant_ids: list[str]) -> list[dict[str, Any]]:
+        normalized_ids = [
+            str(item).strip() for item in merchant_ids if str(item).strip()
+        ]
+        if not normalized_ids:
+            raise IfoodClientError("Informe ao menos uma loja para consultar eventos.")
+        response = self._request(
+            "GET",
+            "/events/v1.0/events:polling",
+            headers={"x-polling-merchants": ",".join(normalized_ids)},
+            params={"categories": "GROCERY"},
+        )
+        if response.status_code == 204:
+            return []
+        payload = self._json_response(response, fallback=[])
+        if isinstance(payload, list):
+            return [item for item in payload if isinstance(item, dict)]
+        if isinstance(payload, dict) and isinstance(payload.get("events"), list):
+            return [item for item in payload["events"] if isinstance(item, dict)]
+        raise IfoodClientError("O iFood retornou eventos em formato invalido.")
+
+    def acknowledge_events(self, event_ids: list[str]) -> dict[str, Any]:
+        unique_ids = list(
+            dict.fromkeys(str(item).strip() for item in event_ids if str(item).strip())
+        )
+        if not unique_ids:
+            raise IfoodClientError("Nenhum evento valido para confirmar.")
+        response = self._request(
+            "POST",
+            "/events/v1.0/events/acknowledgment",
+            json=[{"id": event_id} for event_id in unique_ids],
+        )
+        return self._accepted_result(response)
+
+    def get_order(self, order_id: str) -> dict[str, Any]:
+        response = self._request("GET", f"/order/v1.0/orders/{order_id}")
+        payload = self._json_response(response, fallback={})
+        if not isinstance(payload, dict):
+            raise IfoodClientError("O iFood retornou um pedido invalido.")
+        return payload
+
+    def confirm_order(self, order_id: str) -> dict[str, Any]:
+        response = self._request("POST", f"/order/v1.0/orders/{order_id}/confirm")
+        return self._accepted_result(response)
+
+    def start_order_preparation(self, order_id: str) -> dict[str, Any]:
+        response = self._request(
+            "POST", f"/order/v1.0/orders/{order_id}/startPreparation"
+        )
+        return self._accepted_result(response)
+
+    def mark_order_ready(self, order_id: str) -> dict[str, Any]:
+        response = self._request("POST", f"/order/v1.0/orders/{order_id}/readyToPickup")
+        return self._accepted_result(response)
+
+    def dispatch_order(self, order_id: str) -> dict[str, Any]:
+        response = self._request(
+            "POST",
+            f"/order/v1.0/orders/{order_id}/dispatch",
+            json={"deliveredBy": "MERCHANT"},
+        )
+        return self._accepted_result(response)
+
+    def cancellation_reasons(self, order_id: str) -> list[dict[str, Any]]:
+        response = self._request(
+            "GET", f"/order/v1.0/orders/{order_id}/cancellationReasons"
+        )
+        payload = self._json_response(response, fallback=[])
+        if isinstance(payload, dict):
+            payload = payload.get("reasons", payload.get("data", []))
+        if not isinstance(payload, list):
+            raise IfoodClientError(
+                "O iFood retornou motivos de cancelamento invalidos."
+            )
+        return [item for item in payload if isinstance(item, dict)]
+
+    def request_order_cancellation(self, order_id: str, reason: str) -> dict[str, Any]:
+        response = self._request(
+            "POST",
+            f"/order/v1.0/orders/{order_id}/requestCancellation",
+            json={"reason": str(reason).strip()},
+        )
+        return self._accepted_result(response)
+
+    def validate_pickup_code(self, order_id: str, code: str) -> dict[str, Any]:
+        response = self._request(
+            "POST",
+            f"/order/v1.0/orders/{order_id}/validatePickupCode",
+            json={"code": str(code).strip()},
+        )
+        payload = self._json_response(response, fallback={})
+        return payload if isinstance(payload, dict) else {"valid": False}
+
+    def verify_delivery_code(self, order_id: str, code: str) -> dict[str, Any]:
+        response = self._request(
+            "POST",
+            f"/order/v1.0/orders/{order_id}/verifyDeliveryCode",
+            json={"code": str(code).strip()},
+        )
+        payload = self._json_response(response, fallback={})
+        return payload if isinstance(payload, dict) else {"valid": False}
+
     def ingest_items(
         self,
         merchant_id: str,
@@ -132,10 +253,4 @@ class IfoodClient:
         path = f"/item/v1.0/ingestion/{merchant_id}"
         params = {"reset": "false"} if method == "POST" else None
         response = self._request(method, path, params=params, json=items)
-        result: dict[str, Any] = {"status_code": response.status_code}
-        if response.content:
-            try:
-                result["response"] = response.json()
-            except ValueError:
-                result["response"] = None
-        return result
+        return self._accepted_result(response)

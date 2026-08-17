@@ -40,6 +40,10 @@ class Settings(BaseSettings):
     IFOOD_REQUEST_TIMEOUT_SECONDS: int = 15
     # Trava operacional: a primeira fase funciona em simulacao ate a homologacao.
     IFOOD_CATALOG_WRITE_ENABLED: bool = False
+    # Travas independentes: pedidos de teste so operam durante homologacao assistida.
+    IFOOD_ORDER_OPERATIONS_ENABLED: bool = False
+    IFOOD_ORDER_POLLING_ENABLED: bool = False
+    IFOOD_ORDER_POLLING_INTERVAL_SECONDS: int = 30
 
     # Imagens de produtos
     PRODUCT_IMAGE_STORAGE_BACKEND: str = "local"  # local | s3
