@@ -72,9 +72,17 @@ def test_validate_internal_token_accepts_valid(monkeypatch):
 def test_internal_orchestrator_is_not_blocked_by_user_module_auth():
     from app.main import app
 
+    registered_routes = []
+    for route in app.routes:
+        effective_candidates = getattr(route, "effective_candidates", None)
+        if callable(effective_candidates):
+            registered_routes.extend(effective_candidates())
+        else:
+            registered_routes.append(route)
+
     ingest_route = next(
         route
-        for route in app.routes
+        for route in registered_routes
         if getattr(route, "path", None)
         == "/internal/whatsapp-orchestrator/{tenant_id}/ingest"
     )

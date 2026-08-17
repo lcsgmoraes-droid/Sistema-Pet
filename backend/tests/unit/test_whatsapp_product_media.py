@@ -174,6 +174,8 @@ def test_gold_reply_resolves_brand_and_preserves_original_details():
 def test_purchase_history_confirmation_understands_yes_and_no():
     assert _confirmation_reply("Sim") is True
     assert _confirmation_reply("É essa") is True
+    assert _confirmation_reply("Quero repetir o pedido") is True
+    assert _confirmation_reply("Pode repetir") is True
     assert _confirmation_reply("não, é outra") is False
     assert _confirmation_reply("2") is None
     assert "histórico de compras" in _recent_purchase_confirmation_message(
@@ -184,6 +186,18 @@ def test_purchase_history_confirmation_understands_yes_and_no():
         == "Racao Special Dog Gold 15kg"
     )
     assert _gold_catalog_query("Quero Gold de 15 kg", "Golden") == "Golden 15kg"
+
+
+def test_no_ai_intent_detection_still_understands_greeting():
+    processor = object.__new__(MessageProcessor)
+    processor.ai_enabled = False
+
+    intent, confidence = asyncio.run(
+        processor._detect_intent("Olá, boa noite", context={})
+    )
+
+    assert intent == "saudacao"
+    assert confidence == 0.8
 
 
 def test_product_intents_force_catalog_lookup():

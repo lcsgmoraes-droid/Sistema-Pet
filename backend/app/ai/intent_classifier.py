@@ -158,7 +158,8 @@ ENTITIES: {"produto": "ração", "marca": "golden", "tipo": "filhote"}
             logger.warning(f"Erro ao parsear classificação: {e}")
             return self._fallback_classification(content)
 
-    def _fallback_classification(self, message: str) -> Dict:
+    @staticmethod
+    def _fallback_classification(message: str) -> Dict:
         """
         Classificação baseada em regras (fallback).
         Usado quando LLM falha.
