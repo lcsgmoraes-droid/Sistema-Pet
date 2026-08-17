@@ -53,6 +53,7 @@ from app.whatsapp.order_drafts import (
     extract_history_quantity_request,
     extract_multi_item_order,
     format_draft_item,
+    is_safe_product_image_url,
     is_generic_reorder_request,
     purchase_items_as_draft,
 )
@@ -115,7 +116,7 @@ def _extract_product_media(function_result: Any) -> list[Dict[str, str]]:
         if not isinstance(product, dict):
             continue
         image_url = str(product.get("imagem_url") or "").strip()
-        if not image_url.startswith(("https://", "http://")):
+        if not is_safe_product_image_url(image_url):
             continue
 
         name = str(product.get("nome") or "Produto").strip()
@@ -2545,10 +2546,7 @@ class MessageProcessor:
             if image_message:
                 images_sent += 1
             else:
-                logger.warning(
-                    "Falha ao enviar imagem de produto: session=%s",
-                    session_id,
-                )
+                logger.warning("Falha ao enviar imagem de produto")
 
         # Registrar métricas
         await self._log_metric("message_sent", 1)

@@ -5,6 +5,7 @@ from __future__ import annotations
 import re
 import unicodedata
 from typing import Any, Optional
+from urllib.parse import urlsplit
 
 
 ORDER_DRAFT_CONTEXT_KEY = "pending_order_draft"
@@ -58,7 +59,7 @@ def extract_multi_item_order(message: str) -> list[dict[str, Any]]:
         "",
         message or "",
     )
-    parts = re.split(r"[,;\n]+|\s+e\s+(?=\d+(?:[.,]\d+)?\s)", cleaned)
+    parts = re.split(r"(?:[,;\n]+|\s+e\s+(?=\d+(?:[.,]\d+)?\s))", cleaned)
     items: list[dict[str, Any]] = []
     item_pattern = re.compile(
         r"(?i)^\s*(?P<quantity>\d+(?:[.,]\d+)?)\s*"
@@ -145,6 +146,12 @@ def purchase_items_as_draft(purchase: dict) -> list[dict[str, Any]]:
     ]
 
 
+def is_safe_product_image_url(value: Any) -> bool:
+    """Aceita somente imagens externas transmitidas com HTTPS."""
+    parsed = urlsplit(str(value or "").strip())
+    return parsed.scheme == "https" and bool(parsed.netloc)
+
+
 def draft_product_media(items: list[dict[str, Any]]) -> list[dict[str, str]]:
     return [
         {
@@ -152,7 +159,7 @@ def draft_product_media(items: list[dict[str, Any]]) -> list[dict[str, str]]:
             "caption": str(item.get("name") or item.get("nome") or "Produto"),
         }
         for item in items
-        if str(item.get("image_url") or item.get("imagem_url") or "").startswith(
-            ("http://", "https://")
+        if is_safe_product_image_url(
+            item.get("image_url") or item.get("imagem_url") or ""
         )
     ]

@@ -29,6 +29,8 @@ from app.whatsapp.models import WhatsAppSession, TenantWhatsAppConfig
 
 logger = logging.getLogger(__name__)
 
+DEFAULT_WAHA_BASE_URL = urlunsplit(("http", "waha:3000", "", "", ""))
+
 router = APIRouter(
     prefix="/internal/whatsapp-orchestrator", tags=["whatsapp-orchestrator-internal"]
 )
@@ -77,7 +79,7 @@ def _resolve_waha_media_url(media_url: str) -> str:
     if original.hostname.lower() not in allowed_hosts:
         return ""
 
-    waha_base = urlsplit((os.getenv("WAHA_BASE_URL") or "http://waha:3000").strip())
+    waha_base = urlsplit((os.getenv("WAHA_BASE_URL") or DEFAULT_WAHA_BASE_URL).strip())
     if waha_base.scheme not in {"http", "https"} or not waha_base.netloc:
         return ""
 

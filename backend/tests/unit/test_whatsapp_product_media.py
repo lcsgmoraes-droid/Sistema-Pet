@@ -50,6 +50,22 @@ def test_extract_product_media_builds_caption_with_price():
     ]
 
 
+def test_extract_product_media_rejects_clear_text_http_image():
+    result = {
+        "data": {
+            "produtos": [
+                {
+                    "nome": "Imagem insegura",
+                    "preco": 10,
+                    "imagem_url": "http://img.example/produto.webp",
+                }
+            ]
+        }
+    }
+
+    assert _extract_product_media(result) == []
+
+
 def test_clean_response_removes_markdown_and_raw_image_urls():
     media = [
         {

@@ -5,6 +5,7 @@ from types import SimpleNamespace
 from app.whatsapp.order_drafts import (
     ORDER_DRAFT_CONTEXT_KEY,
     build_order_draft_message,
+    draft_product_media,
     extract_history_quantity_request,
     extract_multi_item_order,
     format_draft_item,
@@ -77,6 +78,23 @@ def test_order_item_format_handles_fractional_and_unit_quantities():
         format_draft_item({"quantity": 1.5, "unit": "kg", "name": "Petisco"})
         == "1,5 kg de Petisco"
     )
+
+
+def test_draft_product_media_accepts_https_and_rejects_clear_text_http():
+    media = draft_product_media(
+        [
+            {"name": "Seguro", "image_url": "https://img.example/seguro.webp"},
+            {"name": "Inseguro", "image_url": "http://img.example/inseguro.webp"},
+            {"name": "Inválido", "image_url": "sem-url"},
+        ]
+    )
+
+    assert media == [
+        {
+            "image_url": "https://img.example/seguro.webp",
+            "caption": "Seguro",
+        }
+    ]
 
 
 def test_real_delivery_status_response_uses_registered_status():
