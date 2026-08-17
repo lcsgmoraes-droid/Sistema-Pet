@@ -1586,6 +1586,7 @@ class MessageProcessor:
         self, session_id: str, message_content: str
     ) -> Optional[Dict[str, Any]]:
         """Monta e confirma pedidos sem gravar uma venda automaticamente."""
+        message_content = _strip_audio_marker(message_content)
         session = self.db.query(WhatsAppSession).get(session_id)
         if not session:
             return None

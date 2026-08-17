@@ -244,7 +244,7 @@ def test_single_item_message_searches_catalog_and_creates_draft():
     result = asyncio.run(
         processor._handle_order_draft_flow(
             "session-test",
-            "Quero 1 ração bob dog golde de 3kg por favor",
+            "[Audio do cliente] Quero 1 ração bob dog golde de 3kg por favor",
         )
     )
 
