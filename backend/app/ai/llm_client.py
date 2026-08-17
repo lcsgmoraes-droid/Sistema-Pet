@@ -6,6 +6,7 @@ Suporta function calling, seleção inteligente de modelo, streaming.
 """
 
 import logging
+import os
 import time
 from typing import Dict, Any, List, Optional, Callable
 from openai import AsyncOpenAI
@@ -19,10 +20,21 @@ class LLMClient:
     Cliente OpenAI com seleção inteligente de modelo.
     """
 
-    def __init__(self, api_key: str):
+    def __init__(
+        self,
+        api_key: str,
+        default_model: Optional[str] = None,
+        advanced_model: Optional[str] = None,
+    ):
         self.client = AsyncOpenAI(api_key=api_key)
-        self.default_model = "gpt-4o-mini"
-        self.advanced_model = "gpt-4-turbo-preview"  # ou gpt-4.1 quando disponível
+        self.default_model = (
+            default_model or os.getenv("WHATSAPP_OPENAI_MODEL") or "gpt-4o-mini"
+        )
+        self.advanced_model = (
+            advanced_model
+            or os.getenv("WHATSAPP_OPENAI_ADVANCED_MODEL")
+            or self.default_model
+        )
 
     async def chat_completion(
         self,
@@ -31,7 +43,7 @@ class LLMClient:
         temperature: float = 0.7,
         max_tokens: int = 500,
         functions: Optional[List[Dict]] = None,
-        function_call: Optional[str] = None,
+        function_call: Optional[Any] = None,
     ) -> Dict[str, Any]:
         """
         Chamada de chat completion.
@@ -42,7 +54,7 @@ class LLMClient:
             temperature: Criatividade (0.0-2.0)
             max_tokens: Máximo de tokens na resposta
             functions: Lista de funções disponíveis (function calling)
-            function_call: "auto", "none", ou {"name": "function_name"}
+            function_call: "auto", "none" ou uma escolha de tool específica
 
         Returns:
             Response completo com métricas
@@ -54,12 +66,14 @@ class LLMClient:
             model = model or self._select_model(messages)
 
             # Preparar kwargs
-            kwargs = {
-                "model": model,
-                "messages": messages,
-                "temperature": temperature,
-                "max_tokens": max_tokens,
-            }
+            kwargs = {"model": model, "messages": messages}
+            if model.startswith("gpt-5"):
+                kwargs["max_completion_tokens"] = max_tokens
+                # No Chat Completions, tools do GPT-5.6 exigem effort=none.
+                kwargs["reasoning_effort"] = "none"
+            else:
+                kwargs["temperature"] = temperature
+                kwargs["max_tokens"] = max_tokens
 
             # Adicionar functions se fornecidas
             if functions:
@@ -171,7 +185,10 @@ class LLMClient:
         model = model or self.default_model
 
         stream = await self.client.chat.completions.create(
-            model=model, messages=messages, stream=True
+            model=model,
+            messages=messages,
+            stream=True,
+            **({"reasoning_effort": "none"} if model.startswith("gpt-5") else {}),
         )
 
         full_response = ""
@@ -220,15 +237,51 @@ class PromptBuilder:
             tenant.get("tone", "friendly"), tone_map["friendly"]
         )
 
+        minimo_entrega = politicas.get("minimo_entrega")
+        formas_pagamento = politicas.get("formas_pagamento") or []
+        areas_entrega = politicas.get("areas_entrega") or []
+        working_hours = tenant.get("working_hours") or {}
+        working_hours_start = working_hours.get("start")
+        working_hours_end = working_hours.get("end")
+
+        policy_lines = [
+            (
+                f"- Valor mínimo para entrega: R$ {float(minimo_entrega):.2f}"
+                if isinstance(minimo_entrega, (int, float))
+                else "- Valor mínimo, taxa e gratuidade de entrega: não configurados; transfira para um atendente"
+            ),
+            (
+                f"- Formas de pagamento: {', '.join(formas_pagamento)}"
+                if formas_pagamento
+                else "- Formas de pagamento: não configuradas; transfira para um atendente"
+            ),
+            (
+                f"- Áreas de entrega: {', '.join(areas_entrega)}"
+                if areas_entrega
+                else "- Áreas de entrega: não configuradas; transfira para um atendente"
+            ),
+            (
+                f"- Horário da loja: {working_hours_start} às {working_hours_end}"
+                if working_hours_start and working_hours_end
+                else "- Horário da loja: não configurado; transfira para um atendente"
+            ),
+        ]
+        policy_context = "\n".join(policy_lines)
+
         # Montar prompt
         prompt = f"""Você é {bot_name}, assistente de vendas de um pet shop.
 
 REGRAS ABSOLUTAS:
 1. NUNCA invente produtos que não estão no catálogo fornecido
 2. NUNCA ofereça: {", ".join(politicas.get("proibido_vender", []))}
-3. SEMPRE confirme endereço antes de finalizar pedido
+3. Só confirme endereço se o cliente pedir explicitamente para finalizar a compra
 4. Se não souber algo, seja honesto e ofereça transferir para humano
-5. Valores e estoque podem mudar - sempre mencione "consulte disponibilidade atual"
+5. Responda somente ao que o cliente perguntou
+6. Não inclua avisos genéricos sobre mudança de preço, valor, estoque ou disponibilidade
+7. Não peça nome, idade, porte ou raça do pet
+8. Escolher ou esclarecer uma marca não significa confirmar uma compra
+9. NUNCA invente taxa, valor mínimo, entrega grátis, prazo, horário, desconto, voucher ou crédito
+10. Se uma informação comercial estiver como não configurada, transfira para um atendente
 
 INFORMAÇÕES DO CLIENTE:
 {f"- Nome: {cliente['nome']}" if cliente else "- Cliente novo (não identificado)"}
@@ -239,17 +292,14 @@ PRODUTOS DISPONÍVEIS:
 {PromptBuilder._format_produtos(produtos)}
 
 POLÍTICAS DA LOJA:
-- Entrega mínima: R$ {politicas.get("minimo_entrega", 50):.2f}
-- Formas de pagamento: {", ".join(politicas.get("formas_pagamento", []))}
-- Áreas de entrega: {", ".join(politicas.get("areas_entrega", []))}
+{policy_context}
 
 ESTILO DE COMUNICAÇÃO:
 {tone_instruction}
 
 IMPORTANTE:
-- Sempre pergunte sobre o pet do cliente (nome, idade, porte, raça)
-- Sugira produtos baseados nas necessidades do pet
 - Se cliente perguntar sobre produto não listado, diga que vai verificar disponibilidade
+- Faça apenas a próxima pergunta necessária para esclarecer o produto desejado
 """
 
         return prompt.strip()
@@ -330,24 +380,6 @@ AVAILABLE_FUNCTIONS_PHASE1_READ_ONLY = [
                 "produto_id": {"type": "string", "description": "ID do produto"}
             },
             "required": ["produto_id"],
-        },
-    },
-    {
-        "name": "calcular_frete",
-        "description": "Calcula valor e prazo de entrega para um endereço",
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "cep": {
-                    "type": "string",
-                    "description": "CEP de entrega (ex: '01310-100')",
-                },
-                "valor_pedido": {
-                    "type": "number",
-                    "description": "Valor total do pedido",
-                },
-            },
-            "required": ["cep"],
         },
     },
 ]

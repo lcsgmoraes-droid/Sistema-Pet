@@ -10,6 +10,7 @@ import logging
 from datetime import datetime
 
 from app.whatsapp.tenant_context import whatsapp_tenant_context
+from app.whatsapp.tool_executor import ToolExecutor
 
 logger = logging.getLogger(__name__)
 
@@ -36,52 +37,37 @@ def buscar_produto(
         categoria: Categoria opcional (ex: "Ração")
         limit: Máximo de resultados
     """
-    from app.produtos_models import Produto, Categoria
-    from sqlalchemy import or_
-
     try:
-        # Combina termo + keywords em uma lista unificada
-        all_keywords: List[str] = [t.strip() for t in termo.split() if t.strip()]
-        if keywords:
-            all_keywords.extend(keywords)
+        search_query = " ".join(
+            value.strip()
+            for value in [termo, *(keywords or [])]
+            if value and value.strip()
+        )
+        search_result = ToolExecutor(db=db, tenant_id=str(tenant_id)).execute_tool(
+            "buscar_produtos",
+            {"query": search_query, "categoria": categoria, "limite": limit},
+        )
 
-        # Query base
-        query = db.query(
-            Produto.id,
-            Produto.nome,
-            Produto.preco_venda,
-            Produto.estoque_atual,
-            Produto.descricao_curta,
-            Produto.categoria_id,
-        ).filter(Produto.tenant_id == tenant_id, Produto.situacao.is_(True))
+        if not search_result.get("success"):
+            return {
+                "found": 0,
+                "produtos": [],
+                "error": search_result.get("error") or "Falha ao buscar produtos",
+            }
 
-        # Filtrar por categoria (join com tabela Categoria)
-        if categoria:
-            query = query.join(
-                Categoria, Produto.categoria_id == Categoria.id, isouter=True
-            ).filter(Categoria.nome.ilike(f"%{categoria}%"))
-
-        # Filtrar por keywords (nome OU descricao_curta)
-        if all_keywords:
-            filters = []
-            for keyword in all_keywords:
-                filters.append(Produto.nome.ilike(f"%{keyword}%"))
-                if Produto.descricao_curta is not None:
-                    filters.append(Produto.descricao_curta.ilike(f"%{keyword}%"))
-            query = query.filter(or_(*filters))
-
-        produtos = query.limit(limit).all()
+        produtos = search_result.get("produtos") or []
 
         result = {
             "found": len(produtos),
             "produtos": [
                 {
-                    "id": p.id,
-                    "nome": p.nome,
-                    "preco": float(p.preco_venda) if p.preco_venda else 0.0,
-                    "estoque": p.estoque_atual or 0,
+                    "id": p.get("id"),
+                    "nome": p.get("nome", ""),
+                    "preco": p.get("preco", 0.0),
+                    "estoque": p.get("estoque", 0),
                     "categoria": "Sem categoria",
-                    "descricao": p.descricao_curta or "",
+                    "descricao": p.get("descricao", ""),
+                    "imagem_url": p.get("imagem_url", ""),
                 }
                 for p in produtos
             ],

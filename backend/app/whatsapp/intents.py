@@ -199,7 +199,6 @@ Seja objetivo e útil.
 Ajude o cliente a agendar um serviço.
 Pergunte qual serviço deseja (banho, tosa, consulta, etc.).
 Pergunte a data e horário de preferência.
-Pergunte o nome e raça do pet.
 Seja organizado e confirme cada informação.
 """,
     IntentType.PRODUTOS: """

@@ -136,9 +136,12 @@ class ContextBuilder:
         return {
             "proibido_vender": ["animais vivos", "medicamentos controlados"],
             "exige_prescricao": ["antibióticos", "vermífugos específicos"],
-            "minimo_entrega": 50.00,
-            "areas_entrega": ["zona sul", "centro", "jardins"],
-            "formas_pagamento": ["Dinheiro", "Pix", "Cartão Débito", "Cartão Crédito"],
+            # Estes dados ainda não possuem uma fonte confiável no ERP. Manter
+            # explicitamente vazios impede que o atendimento trate exemplos como
+            # políticas reais da loja.
+            "minimo_entrega": None,
+            "areas_entrega": [],
+            "formas_pagamento": [],
         }
 
     # ========================================================================
@@ -178,7 +181,11 @@ class ContextBuilder:
         # Buscar último pedido
         ultimo_pedido = (
             self.db.query(Venda)
-            .filter(Venda.cliente_id == cliente_id, Venda.tenant_id == tenant_id)
+            .filter(
+                Venda.cliente_id == cliente_id,
+                Venda.tenant_id == tenant_id,
+                Venda.status != "cancelada",
+            )
             .order_by(Venda.data_venda.desc())
             .first()
         )
@@ -206,8 +213,7 @@ class ContextBuilder:
             "ultimo_pedido": {
                 "id": ultimo_pedido.id,
                 "data": ultimo_pedido.data_venda.isoformat(),
-                "valor": float(ultimo_pedido.valor_total),
-                "forma_pagamento": ultimo_pedido.forma_pagamento,
+                "valor": float(ultimo_pedido.total or 0),
             }
             if ultimo_pedido
             else None,
