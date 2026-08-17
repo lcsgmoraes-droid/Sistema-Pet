@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta, timezone
+from uuid import uuid4
 
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
@@ -9,6 +10,7 @@ from sqlalchemy.pool import StaticPool
 from app.auth.auth_multitenant_support import _hash_token
 from app.auth.core import create_access_token, hash_password, verify_password
 from app.db import get_session
+from app.middlewares.tenant_middleware import TenantSecurityMiddleware
 from app.platform_auth import router as platform_auth_router
 from app.platform_auth_models import PlatformAdmin, PlatformAdminSession
 from app.routes.ops_tenants_routes import router as ops_tenants_router
@@ -27,6 +29,7 @@ def _test_app():
     app = FastAPI()
     app.include_router(platform_auth_router)
     app.include_router(ops_tenants_router)
+    app.add_middleware(TenantSecurityMiddleware)
 
     def override_session():
         db = session_factory()
@@ -82,7 +85,7 @@ def test_token_de_tenant_nao_acessa_corepet_ops():
     app, session_factory = _test_app()
     _seed_admin(session_factory)
     tenant_token = create_access_token(
-        data={"sub": "1", "jti": "tenant-session", "tenant_id": "tenant-a"}
+        data={"sub": "1", "jti": "tenant-session", "tenant_id": str(uuid4())}
     )
 
     with TestClient(app) as client:
