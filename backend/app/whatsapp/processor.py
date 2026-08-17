@@ -460,6 +460,13 @@ def _confirmation_reply(message: str) -> Optional[bool]:
         "e esse",
         "correto",
         "correta",
+        "quero repetir",
+        "quero repetir o pedido",
+        "pode repetir",
+        "pode repetir o pedido",
+        "repete",
+        "repete o pedido",
+        "quero o mesmo pedido",
     }
     if text in negative_replies or text.startswith("nao "):
         return False
@@ -953,7 +960,8 @@ class MessageProcessor:
         self, message_content: str, context: Dict[str, Any]
     ) -> tuple[str, float]:
         if not self.ai_enabled:
-            return "geral", 0.6
+            result = IntentClassifier._fallback_classification(message_content)
+            return result["intent"], result["confidence"]
 
         intent_result = await self.intent_classifier.classify(
             message=message_content,

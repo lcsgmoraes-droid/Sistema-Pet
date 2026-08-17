@@ -259,7 +259,12 @@ def test_confirmed_draft_starts_checkout_instead_of_human_handoff(monkeypatch):
 
     processor._send_response = fake_send_response
 
-    result = asyncio.run(processor._handle_order_draft_flow("session-test", "Sim"))
+    result = asyncio.run(
+        processor._handle_order_draft_flow(
+            "session-test",
+            "Quero repetir o pedido",
+        )
+    )
 
     assert result["action"] == "responded"
     assert sent["intent"] == "pedido_escolha_entrega"
