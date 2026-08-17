@@ -146,6 +146,19 @@ def merge_delivery_address(existing: str, complement: str) -> str:
     return f"{existing_clean}, {complement_clean}"
 
 
+def is_registered_address_question(message: str) -> bool:
+    """Detecta quando o cliente pergunta pelo endereço salvo, sem confundir com endereço."""
+    text = re.sub(r"[^a-z0-9 ]", " ", _normalize(message))
+    text = re.sub(r"\s+", " ", text).strip()
+    if "endereco" not in text:
+        return False
+    return bool(
+        re.search(r"\b(cadastro|cadastrado|salvo|registrado)\b", text)
+        or re.search(r"\b(ja|voce|voces|sistema)\b.*\b(tem|possui|sabe)\b", text)
+        or re.search(r"\b(tem|possui|sabe)\b.*\b(meu|o meu)\b", text)
+    )
+
+
 def parse_cash_change(message: str, *, total: float) -> Optional[dict[str, Any]]:
     """Interpreta se precisa de troco e, quando informado, para qual valor."""
     text = _normalize(message)

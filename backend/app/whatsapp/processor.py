@@ -68,6 +68,7 @@ from app.whatsapp.order_checkout import (
     is_new_conversation_greeting,
     is_order_cancellation,
     is_order_checkout_request,
+    is_registered_address_question,
     merge_delivery_address,
     parse_cash_change,
     parse_fulfillment_choice,
@@ -77,6 +78,7 @@ from app.whatsapp.order_checkout import (
 )
 from app.whatsapp.remote_corepet_client import (
     create_remote_order,
+    fetch_remote_customer_context,
     fetch_remote_order_preview,
 )
 
@@ -1198,6 +1200,27 @@ class MessageProcessor:
                 rollback()
             return None
 
+    def _registered_delivery_address(
+        self,
+        session: WhatsAppSession,
+        preview: Dict[str, Any],
+    ) -> str:
+        preview_customer = preview.get("customer") or {}
+        address = str(preview_customer.get("delivery_address") or "").strip()
+        if address:
+            return address
+
+        customer_id = preview_customer.get("id")
+        payload = fetch_remote_customer_context(
+            self.tenant_id,
+            phone=session.phone_number,
+            customer_id=(int(customer_id) if customer_id not in (None, "") else None),
+        )
+        customer = payload.get("customer") if isinstance(payload, dict) else None
+        if not isinstance(customer, dict):
+            return ""
+        return str(customer.get("delivery_address") or "").strip()
+
     def _enrich_checkout_preview(self, preview: Dict[str, Any]) -> Dict[str, Any]:
         enriched = dict(preview)
         opportunity = self._loyalty_opportunity(
@@ -1405,6 +1428,42 @@ class MessageProcessor:
             )
 
         if stage == "delivery_address":
+            if is_registered_address_question(message_content):
+                checkout.pop("delivery_address_partial", None)
+                registered_address = self._registered_delivery_address(
+                    session, preview
+                )
+                if not registered_address:
+                    response = (
+                        "Encontrei seu cadastro, mas ele está sem endereço de entrega "
+                        "preenchido. Me envie rua, número, bairro e CEP para continuar."
+                    )
+                else:
+                    missing = delivery_address_missing_fields(registered_address)
+                    if missing:
+                        checkout["delivery_address_partial"] = registered_address
+                        response = (
+                            f"Encontrei este endereço no cadastro: {registered_address}. "
+                            f"{self._missing_address_prompt(registered_address, missing)}"
+                        )
+                    else:
+                        checkout["registered_address_candidate"] = registered_address
+                        checkout["stage"] = "delivery_address_confirmation"
+                        response = (
+                            f"Tenho este endereço cadastrado: {registered_address}. "
+                            "Posso usar este endereço para a entrega?"
+                        )
+                self._save_session_context(session, session_context)
+                return await self._send_response(
+                    session_id=session.id,
+                    response=response,
+                    intent="pedido_consulta_endereco_cadastrado",
+                    model_used="deterministic_checkout_registered_address",
+                    tokens_input=0,
+                    tokens_output=0,
+                    processing_time_ms=0,
+                )
+
             delivery_address = merge_delivery_address(
                 str(checkout.get("delivery_address_partial") or ""),
                 message_content,
@@ -1448,6 +1507,41 @@ class MessageProcessor:
                 response=response,
                 intent="pedido_escolha_pagamento",
                 model_used="deterministic_checkout_payment",
+                tokens_input=0,
+                tokens_output=0,
+                processing_time_ms=0,
+            )
+
+        if stage == "delivery_address_confirmation":
+            candidate = str(checkout.get("registered_address_candidate") or "").strip()
+            confirmation = await self._interpret_confirmation_reply(
+                message_content,
+                pending_question=f"Posso usar este endereço para entrega: {candidate}?",
+            )
+            if confirmation is True and candidate:
+                checkout["delivery_address"] = candidate
+                checkout.pop("registered_address_candidate", None)
+                response = self._next_checkout_prompt(checkout)
+            elif confirmation is False:
+                checkout["stage"] = "delivery_address"
+                checkout.pop("registered_address_candidate", None)
+                checkout.pop("delivery_address", None)
+                checkout.pop("delivery_address_partial", None)
+                response = (
+                    "Sem problema. Qual endereço você quer usar? Me envie rua, número, "
+                    "bairro e CEP."
+                )
+            else:
+                response = (
+                    f"Tenho este endereço cadastrado: {candidate}. Posso usá-lo para "
+                    "a entrega? Pode responder do seu jeito."
+                )
+            self._save_session_context(session, session_context)
+            return await self._send_response(
+                session_id=session.id,
+                response=response,
+                intent="pedido_confirma_endereco_cadastrado",
+                model_used="deterministic_checkout_registered_address_confirmation",
                 tokens_input=0,
                 tokens_output=0,
                 processing_time_ms=0,

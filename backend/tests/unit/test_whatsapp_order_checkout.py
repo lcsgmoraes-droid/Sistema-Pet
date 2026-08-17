@@ -8,6 +8,7 @@ from app.whatsapp.order_checkout import (
     is_final_order_confirmation,
     is_new_conversation_greeting,
     is_order_checkout_request,
+    is_registered_address_question,
     merge_delivery_address,
     parse_cash_change,
     parse_fulfillment_choice,
@@ -86,6 +87,8 @@ def test_checkout_language_is_deterministic_and_requires_explicit_confirmation()
     assert is_final_order_confirmation("Não, quero alterar") is False
     assert is_new_conversation_greeting("Ola boa tarde") is True
     assert is_new_conversation_greeting("boa tarde, quero a Royal") is False
+    assert is_registered_address_question("Já tem meu endereço no cadastro não tem?")
+    assert not is_registered_address_question("Rua das Flores, 44, Centro, 19000-000")
 
 
 def test_checkout_understands_contextual_changes_address_and_cash_change():
@@ -221,6 +224,61 @@ def test_current_chat_flow_changes_quantity_completes_address_and_asks_change(
     assert checkout["cash_change_for"] == 100
     assert "Troco para: R$ 100,00" in sent[-1]["response"]
     assert "Cartão Fidelidade: 1 carimbo(s)" in sent[-1]["response"]
+
+
+def test_checkout_answers_registered_address_question_without_saving_it_as_address():
+    processor, sent = _processor_and_messages()
+    session = SimpleNamespace(id="session-test", phone_number="5518997401641")
+    context = _checkout_context()
+    checkout = context[ORDER_CHECKOUT_CONTEXT_KEY]
+    checkout.update({"stage": "delivery_address", "fulfillment": "delivery"})
+    processor._registered_delivery_address = lambda _session, _preview: ""
+
+    asyncio.run(
+        processor._handle_pending_checkout(
+            session=session,
+            session_context=context,
+            checkout=checkout,
+            message_content="Já tem meu endereço no cadastro não tem?",
+        )
+    )
+
+    assert checkout["stage"] == "delivery_address"
+    assert "delivery_address_partial" not in checkout
+    assert "sem endereço de entrega preenchido" in sent[-1]["response"]
+
+
+def test_checkout_confirms_complete_registered_address_then_moves_to_payment():
+    processor, sent = _processor_and_messages()
+    session = SimpleNamespace(id="session-test", phone_number="5518997401641")
+    context = _checkout_context()
+    checkout = context[ORDER_CHECKOUT_CONTEXT_KEY]
+    checkout.update({"stage": "delivery_address", "fulfillment": "delivery"})
+    registered = "Rua das Flores, 44, Centro, 19000-000"
+    processor._registered_delivery_address = lambda _session, _preview: registered
+
+    asyncio.run(
+        processor._handle_pending_checkout(
+            session=session,
+            session_context=context,
+            checkout=checkout,
+            message_content="Meu endereço já está cadastrado?",
+        )
+    )
+    assert checkout["stage"] == "delivery_address_confirmation"
+    assert registered in sent[-1]["response"]
+
+    asyncio.run(
+        processor._handle_pending_checkout(
+            session=session,
+            session_context=context,
+            checkout=checkout,
+            message_content="Sim, pode usar esse mesmo",
+        )
+    )
+    assert checkout["delivery_address"] == registered
+    assert checkout["stage"] == "payment"
+    assert "forma de pagamento" in sent[-1]["response"]
 
 
 def test_full_checkout_simulation_creates_once_only_after_confirm(monkeypatch):
