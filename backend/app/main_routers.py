@@ -208,6 +208,7 @@ from app.routes.ecommerceai_integration_routes import (
     router as ecommerceai_integration_router,
 )
 from app.routes.ifood_integration_routes import router as ifood_integration_router
+from app.routes.ifood_order_routes import router as ifood_order_router
 from app.security.module_access import require_active_entitlement, require_active_module
 from app.veterinario_routes import router as veterinario_router  # Módulo Veterinário
 from app.banho_tosa_routes import router as banho_tosa_router  # Modulo Banho & Tosa
@@ -641,4 +642,5 @@ def register_routers(app: FastAPI) -> None:
     app.include_router(asaas_billing_router)
     app.include_router(ecommerceai_integration_router)
     app.include_router(ifood_integration_router)
+    app.include_router(ifood_order_router)
     app.include_router(modulos_router)  # Módulos Premium

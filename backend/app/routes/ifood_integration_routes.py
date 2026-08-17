@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections import Counter
 from datetime import datetime, timezone
 from typing import Any, Literal
 from uuid import UUID
@@ -115,6 +116,8 @@ def _config_view(config: IfoodMerchantConfig | None) -> dict[str, Any]:
             config.last_connection_check_at if config else None
         ),
         "last_catalog_sync_at": config.last_catalog_sync_at if config else None,
+        "last_orders_poll_at": config.last_orders_poll_at if config else None,
+        "last_orders_error": config.last_orders_error if config else None,
         "last_error": config.last_error if config else None,
     }
 
@@ -146,17 +149,30 @@ def _catalog(
     )
 
 
-def _catalog_response(items: list[Any], *, limit: int) -> dict[str, Any]:
+def _catalog_response(
+    items: list[Any], *, limit: int, only_issues: bool = False
+) -> dict[str, Any]:
     eligible = [item for item in items if item.eligible]
     rejected = [item for item in items if not item.eligible]
+    selected = rejected if only_issues else items
+    error_counts = Counter(error for item in rejected for error in item.errors)
+    warning_counts = Counter(warning for item in items for warning in item.warnings)
     return {
         "summary": {
             "total_scanned": len(items),
             "eligible": len(eligible),
             "rejected": len(rejected),
         },
-        "items": [item.as_dict() for item in items[:limit]],
-        "has_more": len(items) > limit,
+        "issues": [
+            {"message": message, "count": count}
+            for message, count in error_counts.most_common()
+        ],
+        "warnings": [
+            {"message": message, "count": count}
+            for message, count in warning_counts.most_common()
+        ],
+        "items": [item.as_dict() for item in selected[:limit]],
+        "has_more": len(selected) > limit,
     }
 
 
@@ -192,6 +208,8 @@ def get_ifood_status(
         "configured": bool(config and config.merchant_id),
         "credentials_configured": _credentials_configured(),
         "catalog_write_enabled": bool(settings.IFOOD_CATALOG_WRITE_ENABLED),
+        "order_operations_enabled": bool(settings.IFOOD_ORDER_OPERATIONS_ENABLED),
+        "order_polling_enabled": bool(settings.IFOOD_ORDER_POLLING_ENABLED),
         "config": _config_view(config),
         "catalog": {
             "total_scanned": len(items),
@@ -231,12 +249,13 @@ def save_ifood_config(
 @router.get("/catalogo/preview")
 def preview_ifood_catalog(
     limit: int = Query(default=50, ge=1, le=200),
+    only_issues: bool = Query(default=False),
     auth=Depends(get_current_user_and_tenant),
     db: Session = Depends(get_session),
 ):
     _user, tenant_id = auth
     config = _get_config(db, tenant_id)
-    return _catalog_response(_catalog(db, config), limit=limit)
+    return _catalog_response(_catalog(db, config), limit=limit, only_issues=only_issues)
 
 
 @router.post("/testar-conexao")

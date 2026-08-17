@@ -15,6 +15,7 @@ _MONEY = Decimal("0.01")
 class IfoodCatalogItem:
     product_id: int
     sku: str
+    name: str
     eligible: bool
     payload: dict[str, Any] | None
     errors: tuple[str, ...] = ()
@@ -24,6 +25,7 @@ class IfoodCatalogItem:
         return {
             "product_id": self.product_id,
             "sku": self.sku,
+            "name": self.name,
             "eligible": self.eligible,
             "payload": self.payload,
             "errors": list(self.errors),
@@ -202,6 +204,7 @@ def build_catalog_item(
         return IfoodCatalogItem(
             product_id=product_id,
             sku=sku,
+            name=name,
             eligible=False,
             payload=None,
             errors=tuple(errors),
@@ -249,6 +252,7 @@ def build_catalog_item(
     return IfoodCatalogItem(
         product_id=product_id,
         sku=sku,
+        name=name,
         eligible=True,
         payload=payload,
         warnings=tuple(warnings),

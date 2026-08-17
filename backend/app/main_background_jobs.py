@@ -32,6 +32,9 @@ _vet_evidence_thread: Optional[threading.Thread] = None
 _vet_regulatory_stop_event = threading.Event()
 _vet_regulatory_thread: Optional[threading.Thread] = None
 
+_ifood_orders_stop_event = threading.Event()
+_ifood_orders_thread: Optional[threading.Thread] = None
+
 # SEFAZ — sincronização automática de NF-e por NSU
 _sefaz_sync_stop_event = threading.Event()
 _sefaz_sync_thread: Optional[threading.Thread] = None
@@ -118,6 +121,26 @@ def _release_background_jobs_leader() -> None:
 
     _background_jobs_lock_handle = None
     _is_background_jobs_leader = False
+
+
+def _loop_ifood_order_polling() -> None:
+    """Mantem o polling em 30s somente quando as duas travas estao habilitadas."""
+
+    from app.config import settings
+    from app.integrations.ifood.poller import poll_active_ifood_tenants_once
+
+    interval = max(30, int(settings.IFOOD_ORDER_POLLING_INTERVAL_SECONDS or 30))
+    logger.info("[IFOOD] Polling de pedidos iniciado (intervalo: %ss).", interval)
+    while not _ifood_orders_stop_event.is_set():
+        try:
+            summary = poll_active_ifood_tenants_once()
+            if summary["events"] or summary["failures"]:
+                logger.info("[IFOOD] Ciclo de pedidos concluido: %s", summary)
+        except Exception:
+            logger.exception("[IFOOD] Falha geral no ciclo de polling de pedidos")
+        if _ifood_orders_stop_event.wait(interval):
+            break
+    logger.info("[IFOOD] Polling de pedidos finalizado.")
 
 
 def _bling_recarregar_tokens_do_env():
@@ -766,6 +789,20 @@ def start_background_jobs() -> None:
                 "[JOBS] Atualizacao do bulario regulatorio desativada neste processo."
             )
 
+        if _env_bool("IFOOD_ORDER_POLLING_ENABLED", False) and _env_bool(
+            "IFOOD_ORDER_OPERATIONS_ENABLED", False
+        ):
+            global _ifood_orders_thread
+            _ifood_orders_stop_event.clear()
+            _ifood_orders_thread = threading.Thread(
+                target=_loop_ifood_order_polling,
+                name="ifood-order-polling",
+                daemon=True,
+            )
+            _ifood_orders_thread.start()
+        else:
+            logger.info("[JOBS] Polling de pedidos iFood desativado neste processo.")
+
         global _sefaz_sync_thread
         _sefaz_sync_stop_event.clear()
         _sefaz_sync_thread = threading.Thread(
@@ -833,5 +870,11 @@ def stop_background_jobs() -> None:
     if _vet_regulatory_thread and _vet_regulatory_thread.is_alive():
         _vet_regulatory_thread.join(timeout=2)
     _vet_regulatory_thread = None
+
+    global _ifood_orders_thread
+    _ifood_orders_stop_event.set()
+    if _ifood_orders_thread and _ifood_orders_thread.is_alive():
+        _ifood_orders_thread.join(timeout=2)
+    _ifood_orders_thread = None
 
     _release_background_jobs_leader()
