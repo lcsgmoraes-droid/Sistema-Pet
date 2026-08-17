@@ -44,7 +44,7 @@ def test_short_quantity_request_is_reserved_for_purchase_history():
 def test_multi_item_order_is_organized_with_quantities():
     items = extract_multi_item_order(
         "Quero 1 saco de ração Special Dog Gold 15kg, "
-        "2 pacotes de areia para gato e 3 sachês de frango"
+        "2 pacotes de areia para gato e 3 sachês de frango por favor"
     )
 
     assert items == [

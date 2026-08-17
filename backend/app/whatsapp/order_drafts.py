@@ -71,10 +71,11 @@ def extract_multi_item_order(message: str) -> list[dict[str, Any]]:
         if not match:
             continue
         product = re.sub(
-            r"(?i)(?:^(?:de|da|do)\s+|\s+(?:por favor|pfv)$)",
+            r"(?i)^(?:de|da|do)\s+",
             "",
             match.group("product").strip(),
-        ).strip()
+        )
+        product = re.sub(r"(?i)\s+(?:por favor|pfv)$", "", product).strip()
         if len(product) < 2:
             continue
         items.append(
