@@ -83,6 +83,12 @@ def test_single_item_order_extracts_live_phrase_and_corrects_catalog_typo():
         "name": "ração bob dog golde de 3kg",
         "catalog_query": "ração bob dog Gold 3kg",
     }
+    assert extract_single_item_order("Gostaria de pedir 3 bob dog gold 3kg") == {
+        "quantity": 3.0,
+        "unit": "x",
+        "name": "bob dog gold 3kg",
+        "catalog_query": "bob dog gold 3kg",
+    }
 
 
 def test_order_item_format_handles_fractional_and_unit_quantities():
@@ -255,6 +261,58 @@ def test_single_item_message_searches_catalog_and_creates_draft():
     assert draft["items"][0]["quantity"] == 1
     assert "Racao Bob Dog Gold Adultos 3kg" in sent["response"]
     assert sent["product_media"][0]["image_url"].endswith("bob-dog.webp")
+
+
+def test_single_item_request_offers_available_quantity_instead_of_handoff():
+    processor = object.__new__(MessageProcessor)
+    session = SimpleNamespace(id="session-test", context="{}")
+    processor.db = _FakeDB(session)
+    saved_context = {}
+    sent = {}
+
+    processor._save_session_context = (
+        lambda _session, context: saved_context.update(context)
+    )
+    processor._remember_catalog_search = lambda *_args, **_kwargs: None
+
+    async def fake_execute_function(**_kwargs):
+        return {
+            "success": True,
+            "produtos": [
+                {
+                    "id": "5050",
+                    "nome": "Racao Bob Dog Gold Adultos 3kg",
+                    "preco": 48.9,
+                    "estoque": 2,
+                    "imagem_url": "https://img.example/bob-dog.webp",
+                }
+            ],
+        }
+
+    async def fake_send_response(**kwargs):
+        sent.update(kwargs)
+        return {"action": "responded", "intent": kwargs["intent"]}
+
+    async def fail_transfer(**_kwargs):
+        raise AssertionError("Quantidade parcial não deve transferir para humano")
+
+    processor._execute_function = fake_execute_function
+    processor._send_response = fake_send_response
+    processor._transfer_to_human = fail_transfer
+
+    result = asyncio.run(
+        processor._handle_order_draft_flow(
+            "session-test",
+            "Gostaria de pedir 3 bob dog gold 3kg",
+        )
+    )
+
+    assert result["action"] == "responded"
+    draft = saved_context[ORDER_DRAFT_CONTEXT_KEY]
+    assert draft["items"][0]["quantity"] == 2
+    assert "Você pediu 3 unidade(s)" in sent["response"]
+    assert "encontrei 2 em estoque" in sent["response"]
+    assert "1. Sim, está certo" in sent["response"]
 
 
 def test_reorder_without_linked_customer_explains_missing_history():

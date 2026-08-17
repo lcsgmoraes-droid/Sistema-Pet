@@ -1755,6 +1755,7 @@ class MessageProcessor:
         items: list[Dict[str, Any]],
         source: str,
         from_history: bool,
+        customer_note: Optional[str] = None,
     ) -> Dict[str, Any]:
         session_context[ORDER_DRAFT_CONTEXT_KEY] = {
             "source": source,
@@ -1762,12 +1763,15 @@ class MessageProcessor:
         }
         session_context.pop(HISTORY_ITEM_SELECTION_CONTEXT_KEY, None)
         self._save_session_context(session, session_context)
+        draft_message = build_order_draft_message(
+            items,
+            from_history=from_history,
+        )
+        if customer_note:
+            draft_message = f"{customer_note}\n\n{draft_message}"
         return await self._send_response(
             session_id=session.id,
-            response=build_order_draft_message(
-                items,
-                from_history=from_history,
-            ),
+            response=draft_message,
             intent="rascunho_pedido",
             model_used="deterministic_order_draft",
             tokens_input=0,
@@ -1831,18 +1835,32 @@ class MessageProcessor:
                 "quantity": float(requested_item.get("quantity") or 1),
                 "unit": str(requested_item.get("unit") or "x"),
                 "unit_price": product.get("preco"),
+                "stock": float(product.get("estoque") or 0),
                 "image_url": str(product.get("imagem_url") or ""),
             }
             for product in products[:MAX_PRODUCT_IMAGES_PER_RESPONSE]
             if isinstance(product, dict) and product.get("id") not in (None, "")
         ]
         if len(options) == 1:
+            requested_quantity = float(requested_item.get("quantity") or 1)
+            available_quantity = float(options[0].get("stock") or 0)
+            customer_note = None
+            if 0 < available_quantity < requested_quantity:
+                options[0]["quantity"] = available_quantity
+                requested_text = _format_measurement_number(requested_quantity)
+                available_text = _format_measurement_number(available_quantity)
+                customer_note = (
+                    f"Você pediu {requested_text} unidade(s), mas encontrei "
+                    f"{available_text} em estoque. Posso montar o pedido com "
+                    f"as {available_text} disponíveis?"
+                )
             return await self._send_order_draft(
                 session=session,
                 session_context=session_context,
                 items=options,
                 source="single_item_catalog",
                 from_history=False,
+                customer_note=customer_note,
             )
 
         session_context[HISTORY_ITEM_SELECTION_CONTEXT_KEY] = {
