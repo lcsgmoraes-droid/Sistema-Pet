@@ -191,3 +191,39 @@ def test_checkout_cancellation_never_creates_sale(monkeypatch):
 
     assert ORDER_CHECKOUT_CONTEXT_KEY not in context
     assert "Nenhuma venda foi lançada" in sent[-1]["response"]
+
+
+def test_checkout_explains_stock_conflict_instead_of_technical_error(monkeypatch):
+    processor, sent = _processor_and_messages()
+    session = SimpleNamespace(id="session-test", phone_number="5518997401641")
+    context = {}
+
+    monkeypatch.setattr(
+        "app.whatsapp.processor.fetch_remote_order_preview",
+        lambda *_args, **_kwargs: {
+            "success": False,
+            "status_code": 409,
+            "detail": "Estoque insuficiente para Racao Special Dog Carne Adultos 15kg.",
+        },
+    )
+
+    result = asyncio.run(
+        processor._start_order_checkout(
+            session=session,
+            session_context=context,
+            items=[
+                {
+                    "product_id": 5866,
+                    "name": "Racao Special Dog Carne Adultos 15kg",
+                    "quantity": 3,
+                }
+            ],
+            source="purchase_history",
+        )
+    )
+
+    assert result["action"] == "responded"
+    assert sent[-1]["intent"] == "pedido_preview_recusado"
+    assert "Estoque insuficiente" in sent[-1]["response"]
+    assert "Nenhuma venda foi lançada" in sent[-1]["response"]
+    assert "problema técnico" not in sent[-1]["response"]

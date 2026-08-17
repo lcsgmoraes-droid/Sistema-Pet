@@ -70,6 +70,27 @@ def _post_remote_data(
         response.raise_for_status()
         response_payload = response.json()
         return response_payload if isinstance(response_payload, dict) else None
+    except httpx.HTTPStatusError as error:
+        status_code = error.response.status_code
+        detail = ""
+        if 400 <= status_code < 500:
+            try:
+                error_payload = error.response.json()
+            except ValueError:
+                error_payload = None
+            if isinstance(error_payload, dict):
+                detail = str(error_payload.get("detail") or "").strip()
+        logger.warning(
+            "Ponte de dados do CorePet recusou %s com status %s: %s",
+            path,
+            status_code,
+            detail or "sem detalhe seguro",
+        )
+        return {
+            "success": False,
+            "status_code": status_code,
+            "detail": detail[:500],
+        }
     except Exception as error:
         logger.warning("Falha na ponte de dados do CorePet (%s): %s", path, error)
         return None

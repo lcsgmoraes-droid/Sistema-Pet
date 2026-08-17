@@ -1141,6 +1141,23 @@ class MessageProcessor:
             items=requested_items,
         )
         if not preview or not preview.get("success"):
+            rejection_detail = re.sub(
+                r"\s+", " ", str((preview or {}).get("detail") or "")
+            ).strip()
+            if rejection_detail:
+                return await self._send_response(
+                    session_id=session.id,
+                    response=(
+                        f"Não consigo continuar com este pedido: {rejection_detail} "
+                        "Nenhuma venda foi lançada. Se quiser, posso procurar outra "
+                        "opção para você."
+                    ),
+                    intent="pedido_preview_recusado",
+                    model_used="deterministic_checkout_preview_rejection",
+                    tokens_input=0,
+                    tokens_output=0,
+                    processing_time_ms=0,
+                )
             return await self._send_response(
                 session_id=session.id,
                 response=(
