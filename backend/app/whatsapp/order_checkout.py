@@ -197,6 +197,21 @@ def is_order_cancellation(message: str) -> bool:
     }
 
 
+def is_new_conversation_greeting(message: str) -> bool:
+    """Reconhece uma saudação isolada que inicia um novo atendimento."""
+    text = re.sub(r"[^a-z0-9 ]", " ", _normalize(message))
+    text = re.sub(r"\s+", " ", text).strip()
+    if not text:
+        return False
+    return bool(
+        re.fullmatch(
+            r"(?:(?:oi+|ola+|opa|e ai|eai|bom dia|boa tarde|boa noite)\s*)+"
+            r"(?:(?:tudo bem|como vai)\s*)?",
+            text,
+        )
+    )
+
+
 def payment_methods_message(payment_methods: list[dict[str, Any]]) -> str:
     lines = ["Qual será a forma de pagamento?"]
     lines.extend(

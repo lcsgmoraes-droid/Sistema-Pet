@@ -65,6 +65,7 @@ from app.whatsapp.order_checkout import (
     build_checkout_summary,
     delivery_address_missing_fields,
     is_final_order_confirmation,
+    is_new_conversation_greeting,
     is_order_cancellation,
     is_order_checkout_request,
     merge_delivery_address,
@@ -1628,6 +1629,42 @@ class MessageProcessor:
         message_content: str,
     ) -> Optional[Dict[str, Any]]:
         pending_checkout = session_context.get(ORDER_CHECKOUT_CONTEXT_KEY)
+        if isinstance(pending_checkout, dict):
+            stage = str(pending_checkout.get("stage") or "fulfillment")
+            if stage == "confirmation" and is_new_conversation_greeting(
+                message_content
+            ):
+                session_context.pop(ORDER_CHECKOUT_CONTEXT_KEY, None)
+                session_context.pop(ORDER_DRAFT_CONTEXT_KEY, None)
+                session_context.pop(ORDER_ITEM_SELECTION_CONTEXT_KEY, None)
+                session_context.pop(HISTORY_ITEM_SELECTION_CONTEXT_KEY, None)
+                session_context.pop(CATALOG_SEARCH_CONTEXT_KEY, None)
+                self._save_session_context(session, session_context)
+                return await self._send_response(
+                    session_id=session.id,
+                    response=(
+                        "Oi! 😊 Aquele pedido anterior não tinha sido confirmado, então "
+                        "encerrei apenas o rascunho — nenhuma venda foi lançada. "
+                        "Como posso ajudar agora?"
+                    ),
+                    intent="novo_atendimento_apos_checkout",
+                    model_used="deterministic_checkout_new_conversation",
+                    tokens_input=0,
+                    tokens_output=0,
+                    processing_time_ms=0,
+                )
+
+            if stage == "confirmation" and _product_query_from_choice_phrase(
+                _strip_audio_marker(message_content)
+            ):
+                session_context.pop(ORDER_CHECKOUT_CONTEXT_KEY, None)
+                session_context.pop(ORDER_DRAFT_CONTEXT_KEY, None)
+                session_context.pop(ORDER_ITEM_SELECTION_CONTEXT_KEY, None)
+                session_context.pop(HISTORY_ITEM_SELECTION_CONTEXT_KEY, None)
+                session_context.pop(CATALOG_SEARCH_CONTEXT_KEY, None)
+                self._save_session_context(session, session_context)
+                pending_checkout = None
+
         if isinstance(pending_checkout, dict):
             return await self._handle_pending_checkout(
                 session=session,

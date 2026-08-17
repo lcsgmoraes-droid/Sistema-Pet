@@ -6,6 +6,7 @@ from app.whatsapp.order_checkout import (
     build_checkout_summary,
     delivery_address_missing_fields,
     is_final_order_confirmation,
+    is_new_conversation_greeting,
     is_order_checkout_request,
     merge_delivery_address,
     parse_cash_change,
@@ -79,6 +80,8 @@ def test_checkout_language_is_deterministic_and_requires_explicit_confirmation()
     assert parse_payment_choice("cartão de crédito", methods)["key"] == "credito"
     assert is_final_order_confirmation("ok") is True
     assert is_final_order_confirmation("CONFIRMAR") is True
+    assert is_new_conversation_greeting("Ola boa tarde") is True
+    assert is_new_conversation_greeting("boa tarde, quero a Royal") is False
 
 
 def test_checkout_understands_contextual_changes_address_and_cash_change():
@@ -317,6 +320,58 @@ def test_checkout_cancellation_never_creates_sale(monkeypatch):
 
     assert ORDER_CHECKOUT_CONTEXT_KEY not in context
     assert "Nenhuma venda foi lançada" in sent[-1]["response"]
+
+
+def test_greeting_at_confirmation_starts_clean_service_without_creating_sale(
+    monkeypatch,
+):
+    processor, sent = _processor_and_messages()
+    session = SimpleNamespace(id="session-test", phone_number="5518997401641")
+    context = _checkout_context()
+    checkout = context[ORDER_CHECKOUT_CONTEXT_KEY]
+    checkout.update(
+        {
+            "stage": "confirmation",
+            "fulfillment": "pickup",
+            "payment_method": {"key": "pix", "name": "PIX"},
+        }
+    )
+
+    def fail_create(*_args, **_kwargs):
+        raise AssertionError("Saudação não pode criar a venda anterior")
+
+    monkeypatch.setattr("app.whatsapp.processor.create_remote_order", fail_create)
+    result = asyncio.run(
+        processor._handle_order_checkout_flow(
+            session=session,
+            session_context=context,
+            message_content="Ola boa tarde",
+        )
+    )
+
+    assert result["intent"] == "novo_atendimento_apos_checkout"
+    assert ORDER_CHECKOUT_CONTEXT_KEY not in context
+    assert "nenhuma venda foi lançada" in sent[-1]["response"]
+    assert "Como posso ajudar agora?" in sent[-1]["response"]
+
+
+def test_new_product_request_replaces_checkout_and_continues_same_message():
+    processor, sent = _processor_and_messages()
+    session = SimpleNamespace(id="session-test", phone_number="5518997401641")
+    context = _checkout_context()
+    context[ORDER_CHECKOUT_CONTEXT_KEY]["stage"] = "confirmation"
+
+    result = asyncio.run(
+        processor._handle_order_checkout_flow(
+            session=session,
+            session_context=context,
+            message_content="quero a Royal",
+        )
+    )
+
+    assert result is None
+    assert ORDER_CHECKOUT_CONTEXT_KEY not in context
+    assert sent == []
 
 
 def test_checkout_explains_stock_conflict_and_transfers_to_human(monkeypatch):
