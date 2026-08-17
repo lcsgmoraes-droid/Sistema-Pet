@@ -11,7 +11,7 @@ import {
   FiServer,
 } from "react-icons/fi";
 
-import api from "../api";
+import api from "../platformApi";
 
 const PAGE_SIZE = 50;
 

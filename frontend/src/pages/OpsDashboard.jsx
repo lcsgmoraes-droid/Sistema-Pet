@@ -13,7 +13,7 @@ import {
   FiZap,
 } from "react-icons/fi";
 
-import api from "../api";
+import api from "../platformApi";
 
 const RANGE_HOURS = 24;
 

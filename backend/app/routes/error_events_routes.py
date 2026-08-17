@@ -3,7 +3,7 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, Query
 
-from app.auth.dependencies import require_admin
+from app.platform_auth import require_platform_admin
 from app.services.audit_event_report_service import list_audit_events
 from app.services.deploy_event_reporter import (
     list_deploy_events,
@@ -27,7 +27,7 @@ from sqlalchemy.orm import Session
 router = APIRouter(
     prefix="/admin/observabilidade",
     tags=["Admin - Observabilidade"],
-    dependencies=[Depends(require_admin)],
+    dependencies=[Depends(require_platform_admin)],
 )
 
 
