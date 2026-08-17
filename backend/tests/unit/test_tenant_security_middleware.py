@@ -84,6 +84,42 @@ async def test_tenant_security_allows_select_tenant_without_tenant():
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "path",
+    [
+        "/api/platform-auth/me",
+        "/api/admin/tenants",
+        "/api/admin/observabilidade/ops-summary",
+    ],
+)
+async def test_tenant_security_allows_platform_admin_only_on_ops_paths(path):
+    middleware = TenantSecurityMiddleware(app=lambda scope, receive, send: None)
+    token = _token({"sub": "platform:1", "scope": "platform_admin"})
+
+    response = await middleware.dispatch(_request(path, token), _call_next)
+
+    assert response.status_code == 200
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("path", "payload"),
+    [
+        ("/api/vendas", {"sub": "platform:1", "scope": "platform_admin"}),
+        ("/api/admin/tenants", {"sub": "1", "scope": "platform_admin"}),
+    ],
+)
+async def test_tenant_security_blocks_platform_scope_outside_ops_contract(
+    path, payload
+):
+    middleware = TenantSecurityMiddleware(app=lambda scope, receive, send: None)
+
+    response = await middleware.dispatch(_request(path, _token(payload)), _call_next)
+
+    assert response.status_code == 401
+
+
+@pytest.mark.asyncio
 async def test_tenant_security_returns_no_content_when_client_disconnects():
     middleware = TenantSecurityMiddleware(app=lambda scope, receive, send: None)
     response = await middleware.dispatch(_DisconnectedRequest(), _call_next_no_response)

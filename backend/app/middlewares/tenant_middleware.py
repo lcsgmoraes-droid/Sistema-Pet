@@ -25,6 +25,12 @@ TENANT_EXEMPT_PATHS = {
     "/openapi.json",
 }
 
+PLATFORM_ADMIN_PATH_PREFIXES = (
+    "/platform-auth",
+    "/admin/tenants",
+    "/admin/observabilidade",
+)
+
 
 def _normalize_path(path: str) -> str:
     normalized = path.rstrip("/") or "/"
@@ -36,6 +42,19 @@ def _normalize_path(path: str) -> str:
 def _is_tenant_exempt_path(path: str) -> bool:
     normalized = _normalize_path(path)
     return normalized in TENANT_EXEMPT_PATHS or normalized.startswith("/ecommerce/")
+
+
+def _is_platform_admin_request(path: str, payload: dict) -> bool:
+    normalized = _normalize_path(path)
+    subject = str(payload.get("sub") or "")
+    return (
+        payload.get("scope") == "platform_admin"
+        and subject.startswith("platform:")
+        and any(
+            normalized == prefix or normalized.startswith(f"{prefix}/")
+            for prefix in PLATFORM_ADMIN_PATH_PREFIXES
+        )
+    )
 
 
 def _extract_bearer_token(request: Request) -> str | None:
@@ -55,6 +74,12 @@ class TenantSecurityMiddleware(BaseHTTPMiddleware):
                     payload = jwt.decode(token, JWT_SECRET_KEY, algorithms=[ALGORITHM])
                 except JWTError:
                     # Token invalido continua para as dependencies devolverem o erro oficial.
+                    return await call_next(request)
+
+                # O administrador global nao pertence a um tenant. Ele so pode
+                # atravessar esta camada nas rotas exclusivas do CorePet Ops;
+                # as dependencies dessas rotas ainda validam sessao, tipo e JTI.
+                if _is_platform_admin_request(request.url.path, payload):
                     return await call_next(request)
 
                 tenant_id = payload.get("tenant_id")
