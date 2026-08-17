@@ -4,10 +4,14 @@ from types import SimpleNamespace
 from app.whatsapp.order_checkout import (
     ORDER_CHECKOUT_CONTEXT_KEY,
     build_checkout_summary,
+    delivery_address_missing_fields,
     is_final_order_confirmation,
     is_order_checkout_request,
+    merge_delivery_address,
+    parse_cash_change,
     parse_fulfillment_choice,
     parse_payment_choice,
+    parse_quantity_change,
 )
 from app.whatsapp.processor import MessageProcessor
 
@@ -77,6 +81,28 @@ def test_checkout_language_is_deterministic_and_requires_explicit_confirmation()
     assert is_final_order_confirmation("CONFIRMAR") is True
 
 
+def test_checkout_understands_contextual_changes_address_and_cash_change():
+    assert parse_quantity_change("Altera pra 2 unidades") == 2
+    assert parse_quantity_change("Pode mudar para duas unidades?") == 2
+    assert delivery_address_missing_fields("Rua Antônio de Maria, 44") == [
+        "bairro",
+        "CEP",
+    ]
+    full_address = merge_delivery_address(
+        "Rua Antônio de Maria, 44", "Centro, 19000-000"
+    )
+    assert delivery_address_missing_fields(full_address) == []
+    assert parse_cash_change("não precisa", total=97.8) == {
+        "needs_change": False,
+        "amount": None,
+    }
+    assert parse_cash_change("troco pra 100", total=97.8) == {
+        "needs_change": True,
+        "amount": 100,
+        "valid": True,
+    }
+
+
 def test_summary_uses_real_preview_values_and_campaign_benefits():
     checkout = _checkout_context()[ORDER_CHECKOUT_CONTEXT_KEY]
     checkout["fulfillment"] = "pickup"
@@ -88,6 +114,106 @@ def test_summary_uses_real_preview_values_and_campaign_benefits():
     assert "R$ 48,90" in summary
     assert "Cashback da loja: R$ 2,45" in summary
     assert "CONFIRMAR" in summary
+
+
+def test_summary_suggests_missing_value_for_next_loyalty_stamp():
+    checkout = _checkout_context()[ORDER_CHECKOUT_CONTEXT_KEY]
+    checkout["fulfillment"] = "pickup"
+    checkout["payment_method"] = {"key": "pix", "name": "PIX"}
+    checkout["preview"]["benefits"] = []
+    checkout["preview"]["loyalty_opportunity"] = {
+        "name": "Cartão Fidelidade",
+        "missing_amount": 1.1,
+    }
+
+    summary = build_checkout_summary(checkout)
+
+    assert "Faltam só R$ 1,10" in summary
+    assert "1 carimbo no Cartão Fidelidade" in summary
+    assert "Nenhum benefício" not in summary
+
+
+def test_current_chat_flow_changes_quantity_completes_address_and_asks_change(
+    monkeypatch,
+):
+    processor, sent = _processor_and_messages()
+    processor._loyalty_opportunity = lambda _total: {
+        "name": "Cartão Fidelidade",
+        "missing_amount": 2.2,
+    }
+    session = SimpleNamespace(id="session-test", phone_number="5518997401641")
+    context = _checkout_context()
+    checkout = context[ORDER_CHECKOUT_CONTEXT_KEY]
+    checkout.update(
+        {
+            "stage": "confirmation",
+            "fulfillment": "delivery",
+            "delivery_address": "Rua Antônio de Maria, 44",
+            "payment_method": {"key": "dinheiro", "name": "Dinheiro"},
+        }
+    )
+
+    monkeypatch.setattr(
+        "app.whatsapp.processor.fetch_remote_order_preview",
+        lambda *_args, **_kwargs: {
+            "success": True,
+            "customer": {"id": 1, "delivery_address": ""},
+            "items": [
+                {
+                    "product_id": 10,
+                    "name": "Ração Bob Dog Gold 3kg",
+                    "quantity": 2,
+                    "subtotal": 97.8,
+                }
+            ],
+            "total": 97.8,
+            "payment_methods": checkout["preview"]["payment_methods"],
+            "benefits": [
+                {
+                    "type": "loyalty",
+                    "title": "Cartão Fidelidade",
+                    "quantity": 1,
+                }
+            ],
+        },
+    )
+
+    asyncio.run(
+        processor._handle_pending_checkout(
+            session=session,
+            session_context=context,
+            checkout=checkout,
+            message_content="Altera pra 2 unidades",
+        )
+    )
+    assert checkout["items"][0]["quantity"] == 2
+    assert checkout["stage"] == "delivery_address"
+    assert "alterei para 2 unidade" in sent[-1]["response"]
+    assert "falta bairro e CEP" in sent[-1]["response"]
+
+    asyncio.run(
+        processor._handle_pending_checkout(
+            session=session,
+            session_context=context,
+            checkout=checkout,
+            message_content="Centro, 19000-000",
+        )
+    )
+    assert checkout["stage"] == "cash_change"
+    assert "precisar de troco" in sent[-1]["response"]
+
+    asyncio.run(
+        processor._handle_pending_checkout(
+            session=session,
+            session_context=context,
+            checkout=checkout,
+            message_content="troco pra 100",
+        )
+    )
+    assert checkout["stage"] == "confirmation"
+    assert checkout["cash_change_for"] == 100
+    assert "Troco para: R$ 100,00" in sent[-1]["response"]
+    assert "Cartão Fidelidade: 1 carimbo(s)" in sent[-1]["response"]
 
 
 def test_full_checkout_simulation_creates_once_only_after_confirm(monkeypatch):

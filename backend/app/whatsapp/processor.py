@@ -19,7 +19,7 @@ import unicodedata
 import uuid
 from typing import Dict, Any, Optional
 from sqlalchemy.orm import Session
-from datetime import datetime
+from datetime import datetime, timezone
 from types import SimpleNamespace
 
 from app.ai.intent_classifier import IntentClassifier, IntentRouter
@@ -63,11 +63,15 @@ from app.whatsapp.order_checkout import (
     ORDER_ITEM_SELECTION_CONTEXT_KEY,
     benefits_lines,
     build_checkout_summary,
+    delivery_address_missing_fields,
     is_final_order_confirmation,
     is_order_cancellation,
     is_order_checkout_request,
+    merge_delivery_address,
+    parse_cash_change,
     parse_fulfillment_choice,
     parse_payment_choice,
+    parse_quantity_change,
     payment_methods_message,
 )
 from app.whatsapp.remote_corepet_client import (
@@ -1108,6 +1112,112 @@ class MessageProcessor:
             "image_url": str(item.get("image_url") or item.get("imagem_url") or ""),
         }
 
+    def _loyalty_opportunity(self, total: Any) -> Optional[Dict[str, Any]]:
+        """Calcula quanto falta para o próximo carimbo da campanha ativa."""
+        from app.campaigns.models import (
+            Campaign,
+            CampaignStatusEnum,
+            CampaignTypeEnum,
+        )
+
+        try:
+            now = datetime.now(timezone.utc)
+            with whatsapp_tenant_context(self.tenant_id):
+                campaign = (
+                    self.db.query(Campaign)
+                    .filter(
+                        Campaign.tenant_id == self.tenant_id,
+                        Campaign.campaign_type == CampaignTypeEnum.loyalty_stamp,
+                        Campaign.status == CampaignStatusEnum.active,
+                        (Campaign.valid_from.is_(None) | (Campaign.valid_from <= now)),
+                        (Campaign.valid_until.is_(None) | (Campaign.valid_until >= now)),
+                    )
+                    .order_by(Campaign.priority.asc(), Campaign.id.asc())
+                    .first()
+                )
+            if not campaign:
+                return None
+            params = campaign.params or {}
+            stamp_value = float(params.get("min_purchase_value") or 0)
+            order_total = float(total or 0)
+            if stamp_value <= 0 or order_total < 0:
+                return None
+            earned_stamps = int(order_total // stamp_value)
+            next_target = (earned_stamps + 1) * stamp_value
+            return {
+                "name": campaign.name,
+                "stamp_value": stamp_value,
+                "earned_stamps": earned_stamps,
+                "missing_amount": round(max(next_target - order_total, 0), 2),
+                "stamps_to_complete": int(params.get("stamps_to_complete") or 0),
+                "reward_value": float(params.get("reward_value") or 0),
+            }
+        except Exception as campaign_error:
+            logger.warning("Falha ao consultar campanha de fidelidade: %s", campaign_error)
+            rollback = getattr(self.db, "rollback", None)
+            if callable(rollback):
+                rollback()
+            return None
+
+    def _enrich_checkout_preview(self, preview: Dict[str, Any]) -> Dict[str, Any]:
+        enriched = dict(preview)
+        opportunity = self._loyalty_opportunity(
+            enriched.get("total") or enriched.get("subtotal")
+        )
+        if opportunity:
+            enriched["loyalty_opportunity"] = opportunity
+        return enriched
+
+    @staticmethod
+    def _missing_address_prompt(address: str, missing: list[str]) -> str:
+        if not address:
+            return (
+                "Para entregar certinho, me envie rua, número, bairro e CEP. "
+                "Exemplo: Rua das Flores, 44, Centro, 19000-000."
+            )
+        missing_text = (
+            missing[0]
+            if len(missing) == 1
+            else f"{', '.join(missing[:-1])} e {missing[-1]}"
+        )
+        return (
+            f"Já anotei: {address}. Para completar o endereço, falta {missing_text}."
+        )
+
+    def _next_checkout_prompt(self, checkout: Dict[str, Any]) -> str:
+        """Avança somente até o próximo dado realmente necessário."""
+        preview = checkout.get("preview") or {}
+        if checkout.get("fulfillment") == "delivery":
+            address = str(
+                checkout.get("delivery_address")
+                or checkout.get("delivery_address_partial")
+                or (preview.get("customer") or {}).get("delivery_address")
+                or ""
+            ).strip()
+            missing = delivery_address_missing_fields(address)
+            if missing:
+                checkout["stage"] = "delivery_address"
+                checkout["delivery_address_partial"] = address
+                checkout.pop("delivery_address", None)
+                return self._missing_address_prompt(address, missing)
+            checkout["delivery_address"] = address
+            checkout.pop("delivery_address_partial", None)
+
+        payment = checkout.get("payment_method") or {}
+        if not payment:
+            checkout["stage"] = "payment"
+            return payment_methods_message(preview.get("payment_methods") or [])
+
+        if (
+            str(payment.get("key") or "").lower() == "dinheiro"
+            and not checkout.get("cash_change_answered")
+        ):
+            checkout["stage"] = "cash_change"
+            return "Vai precisar de troco? Se sim, para qual valor?"
+
+        checkout["stage"] = "confirmation"
+        return build_checkout_summary(checkout)
+
     async def _start_order_checkout(
         self,
         *,
@@ -1184,6 +1294,7 @@ class MessageProcessor:
                 processing_time_ms=0,
             )
 
+        preview = self._enrich_checkout_preview(preview)
         session_context[ORDER_CHECKOUT_CONTEXT_KEY] = {
             "stage": "fulfillment",
             "source": source,
@@ -1235,22 +1346,13 @@ class MessageProcessor:
         if stage == "fulfillment":
             fulfillment = parse_fulfillment_choice(message_content)
             if not fulfillment:
-                response = "Escolha 1 para entrega ou 2 para retirada na loja."
+                response = (
+                    "Você prefere que a gente entregue ou quer retirar na loja? "
+                    "Pode responder do seu jeito."
+                )
             else:
                 checkout["fulfillment"] = fulfillment
-                registered_address = str(
-                    (preview.get("customer") or {}).get("delivery_address") or ""
-                ).strip()
-                if fulfillment == "delivery" and not registered_address:
-                    checkout["stage"] = "delivery_address"
-                    response = "Qual é o endereço completo para a entrega?"
-                else:
-                    if fulfillment == "delivery":
-                        checkout["delivery_address"] = registered_address
-                    checkout["stage"] = "payment"
-                    response = payment_methods_message(
-                        preview.get("payment_methods") or []
-                    )
+                response = self._next_checkout_prompt(checkout)
             self._save_session_context(session, session_context)
             return await self._send_response(
                 session_id=session.id,
@@ -1263,13 +1365,18 @@ class MessageProcessor:
             )
 
         if stage == "delivery_address":
-            delivery_address = re.sub(r"\s+", " ", message_content or "").strip()
-            if len(delivery_address) < 8:
-                response = "Envie o endereço completo para a entrega."
+            delivery_address = merge_delivery_address(
+                str(checkout.get("delivery_address_partial") or ""),
+                message_content,
+            )
+            missing = delivery_address_missing_fields(delivery_address)
+            if missing:
+                checkout["delivery_address_partial"] = delivery_address
+                response = self._missing_address_prompt(delivery_address, missing)
             else:
                 checkout["delivery_address"] = delivery_address
-                checkout["stage"] = "payment"
-                response = payment_methods_message(preview.get("payment_methods") or [])
+                checkout.pop("delivery_address_partial", None)
+                response = self._next_checkout_prompt(checkout)
             self._save_session_context(session, session_context)
             return await self._send_response(
                 session_id=session.id,
@@ -1286,17 +1393,148 @@ class MessageProcessor:
                 message_content, preview.get("payment_methods") or []
             )
             if not payment_method:
-                response = payment_methods_message(preview.get("payment_methods") or [])
+                response = (
+                    "Não consegui identificar a forma de pagamento. Você prefere "
+                    "PIX, dinheiro, débito ou crédito?"
+                )
             else:
                 checkout["payment_method"] = payment_method
-                checkout["stage"] = "confirmation"
-                response = build_checkout_summary(checkout)
+                checkout.pop("cash_change_answered", None)
+                checkout.pop("cash_change_for", None)
+                response = self._next_checkout_prompt(checkout)
             self._save_session_context(session, session_context)
             return await self._send_response(
                 session_id=session.id,
                 response=response,
                 intent="pedido_escolha_pagamento",
                 model_used="deterministic_checkout_payment",
+                tokens_input=0,
+                tokens_output=0,
+                processing_time_ms=0,
+            )
+
+        if stage == "cash_change":
+            change = parse_cash_change(
+                message_content,
+                total=float(preview.get("total") or preview.get("subtotal") or 0),
+            )
+            if not change:
+                response = "Vai precisar de troco? Se sim, me diga para qual valor."
+            elif change.get("needs_change") and change.get("amount") is None:
+                response = "Claro. Troco para qual valor?"
+            elif change.get("needs_change") and not change.get("valid", True):
+                response = (
+                    "O valor do troco precisa ser maior que o total do pedido, que é "
+                    f"{_format_brl(preview.get('total'))}. Para quanto será o troco?"
+                )
+            else:
+                checkout["cash_change_answered"] = True
+                checkout["cash_change_for"] = change.get("amount")
+                response = self._next_checkout_prompt(checkout)
+            self._save_session_context(session, session_context)
+            return await self._send_response(
+                session_id=session.id,
+                response=response,
+                intent="pedido_troco_dinheiro",
+                model_used="deterministic_checkout_cash_change",
+                tokens_input=0,
+                tokens_output=0,
+                processing_time_ms=0,
+            )
+
+        quantity_change = parse_quantity_change(message_content)
+        if quantity_change is not None:
+            requested_items = checkout.get("items") or []
+            if len(requested_items) != 1:
+                response = (
+                    "Claro, posso alterar. De qual produto você quer mudar a quantidade?"
+                )
+            else:
+                updated_items = [
+                    {
+                        "product_id": requested_items[0]["product_id"],
+                        "quantity": quantity_change,
+                    }
+                ]
+                updated_preview = fetch_remote_order_preview(
+                    self.tenant_id,
+                    phone=session.phone_number,
+                    items=updated_items,
+                )
+                if not updated_preview or not updated_preview.get("success"):
+                    detail = str((updated_preview or {}).get("detail") or "").strip()
+                    response = (
+                        f"Não consegui alterar para essa quantidade: {detail}"
+                        if detail
+                        else "Não consegui recalcular essa quantidade agora."
+                    )
+                else:
+                    checkout["items"] = updated_items
+                    checkout["preview"] = self._enrich_checkout_preview(updated_preview)
+                    checkout["idempotency_key"] = str(uuid.uuid4())
+                    preview = checkout["preview"]
+                    quantity_text = (
+                        str(int(quantity_change))
+                        if quantity_change.is_integer()
+                        else str(quantity_change).replace(".", ",")
+                    )
+                    response = (
+                        f"Claro, alterei para {quantity_text} unidade(s).\n\n"
+                        f"{self._next_checkout_prompt(checkout)}"
+                    )
+            self._save_session_context(session, session_context)
+            return await self._send_response(
+                session_id=session.id,
+                response=response,
+                intent="pedido_quantidade_alterada",
+                model_used="deterministic_checkout_quantity_change",
+                tokens_input=0,
+                tokens_output=0,
+                processing_time_ms=0,
+            )
+
+        normalized_message = _normalize_text(message_content)
+        wants_change = any(
+            term in normalized_message
+            for term in ("altera", "alterar", "muda", "mudar", "troca", "trocar")
+        )
+        if wants_change:
+            payment_change = parse_payment_choice(
+                message_content, preview.get("payment_methods") or []
+            )
+            fulfillment_change = parse_fulfillment_choice(message_content)
+            if payment_change:
+                checkout["payment_method"] = payment_change
+                checkout.pop("cash_change_answered", None)
+                checkout.pop("cash_change_for", None)
+                response = (
+                    f"Claro, mudei o pagamento para {payment_change.get('name')}.\n\n"
+                    f"{self._next_checkout_prompt(checkout)}"
+                )
+            elif fulfillment_change:
+                checkout["fulfillment"] = fulfillment_change
+                if fulfillment_change == "pickup":
+                    checkout.pop("delivery_address", None)
+                    checkout.pop("delivery_address_partial", None)
+                response = self._next_checkout_prompt(checkout)
+            elif "endereco" in normalized_message:
+                checkout["stage"] = "delivery_address"
+                checkout["delivery_address_partial"] = ""
+                checkout.pop("delivery_address", None)
+                response = self._missing_address_prompt(
+                    "", ["rua", "número", "bairro", "CEP"]
+                )
+            else:
+                response = (
+                    "Claro, ainda dá para alterar. Você quer mudar a quantidade, "
+                    "a entrega/endereço ou a forma de pagamento?"
+                )
+            self._save_session_context(session, session_context)
+            return await self._send_response(
+                session_id=session.id,
+                response=response,
+                intent="pedido_solicitacao_alteracao",
+                model_used="deterministic_checkout_context_change",
                 tokens_input=0,
                 tokens_output=0,
                 processing_time_ms=0,
@@ -1316,6 +1554,19 @@ class MessageProcessor:
                 processing_time_ms=0,
             )
 
+        readiness_response = self._next_checkout_prompt(checkout)
+        if checkout.get("stage") != "confirmation":
+            self._save_session_context(session, session_context)
+            return await self._send_response(
+                session_id=session.id,
+                response=readiness_response,
+                intent="pedido_dados_pendentes",
+                model_used="deterministic_checkout_pending_data",
+                tokens_input=0,
+                tokens_output=0,
+                processing_time_ms=0,
+            )
+
         created = create_remote_order(
             self.tenant_id,
             phone=session.phone_number,
@@ -1323,6 +1574,7 @@ class MessageProcessor:
             fulfillment=str(checkout.get("fulfillment") or "pickup"),
             payment_method=checkout.get("payment_method") or {},
             delivery_address=checkout.get("delivery_address"),
+            cash_change_for=checkout.get("cash_change_for"),
             idempotency_key=str(checkout.get("idempotency_key") or ""),
         )
         if not created or not created.get("success"):

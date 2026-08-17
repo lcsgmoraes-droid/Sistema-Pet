@@ -148,6 +148,7 @@ def create_remote_order(
     fulfillment: str,
     payment_method: dict[str, Any],
     delivery_address: Optional[str],
+    cash_change_for: Optional[float],
     idempotency_key: str,
 ) -> Optional[dict[str, Any]]:
     return _post_remote_data(
@@ -159,6 +160,7 @@ def create_remote_order(
             "fulfillment": fulfillment,
             "payment_method": payment_method,
             "delivery_address": delivery_address,
+            "cash_change_for": cash_change_for,
         },
         idempotency_key=idempotency_key,
         require_write_token=True,

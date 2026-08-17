@@ -74,6 +74,7 @@ def test_remote_order_creation_sends_idempotency_key(monkeypatch):
         fulfillment="pickup",
         payment_method={"key": "pix", "name": "PIX"},
         delivery_address=None,
+        cash_change_for=None,
         idempotency_key="checkout-test-1234567890",
     )
 
@@ -84,6 +85,7 @@ def test_remote_order_creation_sends_idempotency_key(monkeypatch):
         "X-Internal-Write-Token": "write-token-test",
         "Idempotency-Key": "checkout-test-1234567890",
     }
+    assert captured["json"]["cash_change_for"] is None
 
 
 def test_remote_order_preview_preserves_safe_conflict_detail(monkeypatch):
