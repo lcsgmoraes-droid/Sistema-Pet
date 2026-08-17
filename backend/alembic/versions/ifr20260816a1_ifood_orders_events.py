@@ -1,7 +1,7 @@
 """add iFood orders and events
 
 Revision ID: ifr20260816a1
-Revises: ifd20260816a1, zwq20260816a1
+Revises: zwr20260816a1
 Create Date: 2026-08-16
 """
 
@@ -12,7 +12,7 @@ from sqlalchemy.dialects import postgresql
 from app.tenant_rls_migration import apply_tenant_rls
 
 revision = "ifr20260816a1"
-down_revision = ("ifd20260816a1", "zwq20260816a1")
+down_revision = "zwr20260816a1"
 branch_labels = None
 depends_on = None
 
