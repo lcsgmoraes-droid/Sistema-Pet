@@ -156,7 +156,7 @@ def build_order_draft_message(
     retry: bool = False,
 ) -> str:
     if retry:
-        opening = "Não entendi sua resposta. Confira novamente o pedido:"
+        opening = "Quero ter certeza de que entendi. Este é o pedido que você quer?"
     else:
         opening = (
             "Encontrei esta compra no seu histórico:"
@@ -168,7 +168,11 @@ def build_order_draft_message(
         f"{index}. {format_draft_item(item)}"
         for index, item in enumerate(items, start=1)
     )
-    lines.append("Está certo?\n\n1. Sim, está certo\n\n2. Não, quero alterar")
+    lines.append(
+        "Pode responder do seu jeito — por exemplo, ‘sim, está certo’ ou "
+        "‘quero alterar a quantidade’. Se preferir, use 1 para confirmar e "
+        "2 para alterar."
+    )
     return "\n\n".join(lines)
 
 

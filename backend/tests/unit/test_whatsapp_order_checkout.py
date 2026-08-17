@@ -80,6 +80,10 @@ def test_checkout_language_is_deterministic_and_requires_explicit_confirmation()
     assert parse_payment_choice("cartão de crédito", methods)["key"] == "credito"
     assert is_final_order_confirmation("ok") is True
     assert is_final_order_confirmation("CONFIRMAR") is True
+    assert (
+        is_final_order_confirmation("Sim, está tudo certo. Pode confirmar") is True
+    )
+    assert is_final_order_confirmation("Não, quero alterar") is False
     assert is_new_conversation_greeting("Ola boa tarde") is True
     assert is_new_conversation_greeting("boa tarde, quero a Royal") is False
 

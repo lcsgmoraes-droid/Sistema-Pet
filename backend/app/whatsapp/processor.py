@@ -441,42 +441,29 @@ def _gold_brand_from_reply(message: str) -> Optional[str]:
 
 
 def _confirmation_reply(message: str) -> Optional[bool]:
-    """Interpreta respostas curtas de confirmação sem recorrer à IA."""
+    """Interpreta confirmações naturais; respostas ambíguas ficam para a IA."""
     text = re.sub(r"[^a-z0-9 ]", " ", _normalize_text(message))
     text = re.sub(r"\s+", " ", text).strip()
     if not text:
         return None
 
-    negative_replies = {
-        "nao",
-        "nao e",
-        "nao e essa",
-        "nao e esse",
-        "outra",
-        "outro",
-        "nenhuma",
-        "nenhum",
-    }
-    affirmative_replies = {
-        "sim",
-        "isso",
-        "essa",
-        "esse",
-        "e essa",
-        "e esse",
-        "correto",
-        "correta",
-        "quero repetir",
-        "quero repetir o pedido",
-        "pode repetir",
-        "pode repetir o pedido",
-        "repete",
-        "repete o pedido",
-        "quero o mesmo pedido",
-    }
-    if text in negative_replies or text.startswith("nao "):
+    negative_pattern = (
+        r"\b(?:nao|negativo|errad[oa]|outr[oa]|nenhum[ao]?|desist[io]|"
+        r"alterar|mudar|corrigir|trocar|melhor nao)\b"
+    )
+    if re.search(negative_pattern, text):
         return False
-    if text in affirmative_replies:
+
+    uncertainty_pattern = r"\b(?:talvez|nao sei|tenho duvida|acho que nao)\b"
+    if re.search(uncertainty_pattern, text):
+        return None
+
+    affirmative_pattern = (
+        r"\b(?:sim|isso|essa|esse|corret[oa]|cert[oa]|perfeit[oa]|beleza|"
+        r"fechado|combinado|exatamente|pode sim|pode montar|pode separar|"
+        r"pode fazer|manda ver|vamos nessa|confirmo|repete|repetir)\b"
+    )
+    if text == "pode" or re.search(affirmative_pattern, text):
         return True
     return None
 
@@ -975,6 +962,57 @@ class MessageProcessor:
         )
         return intent_result["intent"], intent_result["confidence"]
 
+    async def _interpret_confirmation_reply(
+        self,
+        message: str,
+        *,
+        pending_question: str,
+    ) -> Optional[bool]:
+        """Usa IA apenas quando a confirmação não puder ser decidida com segurança."""
+        deterministic = _confirmation_reply(message)
+        if deterministic is not None:
+            return deterministic
+
+        llm_client = getattr(self, "llm_client", None)
+        if not getattr(self, "ai_enabled", False) or llm_client is None:
+            return None
+
+        try:
+            result = await llm_client.chat_completion(
+                messages=[
+                    {
+                        "role": "system",
+                        "content": (
+                            "Classifique a resposta do cliente à pergunta pendente. "
+                            "Responda somente SIM, NAO ou OUTRO. SIM significa que o "
+                            "cliente confirmou; NAO significa que recusou ou quer alterar; "
+                            "OUTRO significa dúvida, pergunta nova ou resposta insuficiente."
+                        ),
+                    },
+                    {
+                        "role": "user",
+                        "content": (
+                            f"Pergunta pendente: {pending_question}\n"
+                            f"Resposta do cliente: {message}"
+                        ),
+                    },
+                ],
+                temperature=0,
+                max_tokens=8,
+            )
+        except Exception as error:
+            logger.warning("Falha ao interpretar confirmação com IA: %s", error)
+            return None
+
+        label = re.sub(
+            r"[^a-z]", "", _normalize_text(str(result.get("content") or ""))
+        )
+        if label == "sim":
+            return True
+        if label == "nao":
+            return False
+        return None
+
     def _save_message_intent(self, message_id: str, intent: str) -> None:
         msg = self.db.query(WhatsAppMessage).get(message_id)
         if not msg:
@@ -1312,7 +1350,8 @@ class MessageProcessor:
                 "Perfeito. Como você prefere receber?\n\n"
                 "1. Entrega\n\n"
                 "2. Retirada na loja\n\n"
-                "Responda 1 ou 2."
+                "Pode responder do seu jeito, como ‘pode entregar’ ou ‘vou buscar’. "
+                "Se preferir, envie 1 ou 2."
             ),
             intent="pedido_escolha_entrega",
             model_used="deterministic_checkout_fulfillment",
@@ -1941,7 +1980,17 @@ class MessageProcessor:
 
         pending_draft = session_context.get(ORDER_DRAFT_CONTEXT_KEY)
         if isinstance(pending_draft, dict):
-            confirmation = _confirmation_reply(message_content)
+            confirmation = await self._interpret_confirmation_reply(
+                message_content,
+                pending_question=(
+                    "O pedido está correto: "
+                    + "; ".join(
+                        format_draft_item(item)
+                        for item in pending_draft.get("items") or []
+                    )
+                    + "?"
+                ),
+            )
             numeric_confirmation = re.fullmatch(
                 r"\s*([12])[.)]?\s*", message_content or ""
             )
@@ -2349,7 +2398,10 @@ class MessageProcessor:
                 )
                 return None, _gold_catalog_query(detailed_query, brand), True
 
-            confirmation = _confirmation_reply(message_content)
+            confirmation = await self._interpret_confirmation_reply(
+                message_content,
+                pending_question=f"É este produto: {product_name}?",
+            )
             if confirmation is True and product_name:
                 session_context.pop("pending_product_clarification", None)
                 self._save_session_context(session, session_context)

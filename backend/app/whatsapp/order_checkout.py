@@ -171,7 +171,7 @@ def parse_cash_change(message: str, *, total: float) -> Optional[dict[str, Any]]
 def is_final_order_confirmation(message: str) -> bool:
     text = re.sub(r"[^a-z0-9 ]", " ", _normalize(message))
     text = re.sub(r"\s+", " ", text).strip()
-    return text in {
+    if text in {
         "ok",
         "sim",
         "confirmar",
@@ -182,7 +182,17 @@ def is_final_order_confirmation(message: str) -> bool:
         "pode lancar",
         "pode criar",
         "pode fechar",
-    }
+    }:
+        return True
+    if re.search(r"\b(nao|cancelar|alterar|mudar|corrigir)\b", text):
+        return False
+    explicit_action = re.search(
+        r"\b(confirmar|confirmo|lancar|finalizar|fechar|criar)\b", text
+    )
+    affirmative_context = re.search(
+        r"\b(sim|ok|certo|tudo certo|pode|confirmo)\b", text
+    )
+    return bool(explicit_action and affirmative_context)
 
 
 def is_order_cancellation(message: str) -> bool:
@@ -218,7 +228,10 @@ def payment_methods_message(payment_methods: list[dict[str, Any]]) -> str:
         f"{index}. {method.get('name') or method.get('nome') or method.get('key')}"
         for index, method in enumerate(payment_methods, start=1)
     )
-    lines.append("Responda com o número ou com o nome da forma de pagamento.")
+    lines.append(
+        "Pode responder do seu jeito, como ‘vou pagar no PIX’ ou ‘vai ser dinheiro’. "
+        "Se preferir, envie só o número."
+    )
     return "\n\n".join(lines)
 
 
@@ -311,6 +324,8 @@ def build_checkout_summary(checkout: dict[str, Any]) -> str:
     else:
         lines.extend(benefits_lines([]))
     lines.append(
-        "Se estiver tudo certo, responda OK ou CONFIRMAR. A venda só será lançada depois dessa confirmação."
+        "Para lançar a venda, preciso de uma confirmação clara. Pode dizer "
+        "‘está tudo certo, pode confirmar’ ou simplesmente CONFIRMAR. "
+        "A venda só será lançada depois disso."
     )
     return "\n\n".join(lines)

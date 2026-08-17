@@ -14,6 +14,7 @@ from app.whatsapp.order_drafts import (
 )
 from app.whatsapp.processor import (
     MessageProcessor,
+    _confirmation_reply,
     _customer_benefits_response,
     _delivery_status_response,
 )
@@ -68,8 +69,8 @@ def test_multi_item_order_is_organized_with_quantities():
     message = build_order_draft_message(items, from_history=False)
     assert "1 saco de ração Special Dog Gold 15kg" in message
     assert "2 pacotes de areia para gato" in message
-    assert "1. Sim, está certo" in message
-    assert "2. Não, quero alterar" in message
+    assert "sim, está certo" in message
+    assert "quero alterar a quantidade" in message
 
 
 def test_single_item_order_extracts_live_phrase_and_corrects_catalog_typo():
@@ -89,6 +90,36 @@ def test_single_item_order_extracts_live_phrase_and_corrects_catalog_typo():
         "name": "bob dog gold 3kg",
         "catalog_query": "bob dog gold 3kg",
     }
+
+
+def test_confirmation_understands_natural_language_without_exact_phrase():
+    assert _confirmation_reply("Sim, esta certo. Pode sim") is True
+    assert _confirmation_reply("Perfeito, pode separar pra mim") is True
+    assert _confirmation_reply("Não, quero mudar a quantidade") is False
+    assert _confirmation_reply("Talvez, tenho uma dúvida") is None
+
+
+def test_ambiguous_confirmation_uses_ai_as_contextual_fallback():
+    processor = object.__new__(MessageProcessor)
+    processor.ai_enabled = True
+    calls = []
+
+    class _FakeLLM:
+        async def chat_completion(self, **kwargs):
+            calls.append(kwargs)
+            return {"content": "SIM"}
+
+    processor.llm_client = _FakeLLM()
+    result = asyncio.run(
+        processor._interpret_confirmation_reply(
+            "É o que eu tinha em mente",
+            pending_question="O pedido apresentado está correto?",
+        )
+    )
+
+    assert result is True
+    assert calls[0]["temperature"] == 0
+    assert calls[0]["max_tokens"] == 8
 
 
 def test_order_item_format_handles_fractional_and_unit_quantities():
@@ -312,7 +343,7 @@ def test_single_item_request_offers_available_quantity_instead_of_handoff():
     assert draft["items"][0]["quantity"] == 2
     assert "Você pediu 3 unidade(s)" in sent["response"]
     assert "encontrei 2 em estoque" in sent["response"]
-    assert "1. Sim, está certo" in sent["response"]
+    assert "sim, está certo" in sent["response"]
 
 
 def test_reorder_without_linked_customer_explains_missing_history():
@@ -469,9 +500,9 @@ def test_unrecognized_confirmation_repeats_pending_order_with_photo():
     assert result["action"] == "responded"
     assert ORDER_DRAFT_CONTEXT_KEY in pending
     assert sent["intent"] == "confirmacao_pedido_invalida"
-    assert "Não entendi sua resposta" in sent["response"]
-    assert "1. Sim, está certo" in sent["response"]
-    assert "2. Não, quero alterar" in sent["response"]
+    assert "Quero ter certeza de que entendi" in sent["response"]
+    assert "sim, está certo" in sent["response"]
+    assert "quero alterar a quantidade" in sent["response"]
     assert sent["product_media"] == [
         {
             "image_url": "https://img.example/bob-dog.webp",
