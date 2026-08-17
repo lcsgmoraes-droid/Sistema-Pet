@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-import api from "../api";
+import api from "../platformApi";
 
 import { PAGE_SIZE, sinceFromHours } from "./opsIncidentes/OpsIncidentesCards";
 import OpsIncidentesView from "./opsIncidentes/OpsIncidentesView";

@@ -154,6 +154,8 @@ def test_cria_proposta_de_300_reais_para_pet_venda_ativa():
 
     assert offer.plan_code == "pet-venda-ativa"
     assert offer.price_cents == 30_000
+    assert offer.created_by_platform_admin_id == 9
+    assert offer.created_by_user_id is None
     assert json.loads(offer.extra_modules_json) == []
     assert offer.token_sha256 == hashlib.sha256(token.encode()).hexdigest()
     assert len(token) >= 32
