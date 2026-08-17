@@ -149,20 +149,22 @@ def build_order_draft_message(
     items: list[dict[str, Any]],
     *,
     from_history: bool,
+    retry: bool = False,
 ) -> str:
-    opening = (
-        "Encontrei esta compra no seu histórico:"
-        if from_history
-        else "Organizei seu pedido assim:"
-    )
+    if retry:
+        opening = "Não entendi sua resposta. Confira novamente o pedido:"
+    else:
+        opening = (
+            "Encontrei esta compra no seu histórico:"
+            if from_history
+            else "Organizei seu pedido assim:"
+        )
     lines = [opening]
     lines.extend(
         f"{index}. {format_draft_item(item)}"
         for index, item in enumerate(items, start=1)
     )
-    lines.append(
-        "Está certo? Responda sim para eu encaminhar o pedido ou diga o que deseja alterar."
-    )
+    lines.append("Está certo?\n\n1. Sim, está certo\n\n2. Não, quero alterar")
     return "\n\n".join(lines)
 
 

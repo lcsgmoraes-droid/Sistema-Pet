@@ -1635,10 +1635,11 @@ class MessageProcessor:
         pending_draft = session_context.get(ORDER_DRAFT_CONTEXT_KEY)
         if isinstance(pending_draft, dict):
             confirmation = _confirmation_reply(message_content)
-            if confirmation is None and re.fullmatch(
-                r"\s*1[.)]?\s*", message_content or ""
-            ):
-                confirmation = True
+            numeric_confirmation = re.fullmatch(
+                r"\s*([12])[.)]?\s*", message_content or ""
+            )
+            if confirmation is None and numeric_confirmation:
+                confirmation = numeric_confirmation.group(1) == "1"
             if confirmation is True:
                 items = pending_draft.get("items") or []
                 source = str(pending_draft.get("source") or "whatsapp")
@@ -1690,6 +1691,24 @@ class MessageProcessor:
                 session=session,
                 session_context=session_context,
                 requested_item=single_item,
+            )
+
+        if isinstance(pending_draft, dict):
+            items = pending_draft.get("items") or []
+            source = str(pending_draft.get("source") or "")
+            return await self._send_response(
+                session_id=session_id,
+                response=build_order_draft_message(
+                    items,
+                    from_history=source in {"purchase_history", "history_quantity"},
+                    retry=True,
+                ),
+                intent="confirmacao_pedido_invalida",
+                model_used="deterministic_order_confirmation_retry",
+                tokens_input=0,
+                tokens_output=0,
+                processing_time_ms=0,
+                product_media=draft_product_media(items),
             )
 
         quantity_request = extract_history_quantity_request(message_content)

@@ -68,7 +68,8 @@ def test_multi_item_order_is_organized_with_quantities():
     message = build_order_draft_message(items, from_history=False)
     assert "1 saco de ração Special Dog Gold 15kg" in message
     assert "2 pacotes de areia para gato" in message
-    assert "Responda sim" in message
+    assert "1. Sim, está certo" in message
+    assert "2. Não, quero alterar" in message
 
 
 def test_single_item_order_extracts_live_phrase_and_corrects_catalog_typo():
@@ -344,3 +345,78 @@ def test_confirmed_draft_starts_checkout_instead_of_human_handoff(monkeypatch):
     assert sent["intent"] == "pedido_escolha_entrega"
     assert "Entrega" in sent["response"]
     assert "Retirada" in sent["response"]
+
+
+def test_numeric_two_rejects_pending_draft_and_requests_correction():
+    pending = {
+        ORDER_DRAFT_CONTEXT_KEY: {
+            "source": "single_item_catalog",
+            "items": [{"product_id": 5050, "quantity": 1, "name": "Ração"}],
+        }
+    }
+    processor = object.__new__(MessageProcessor)
+    session = SimpleNamespace(id="session-test", context="ignored")
+    processor.db = _FakeDB(session)
+    sent = {}
+    processor._load_session_context = lambda _session: pending
+    processor._save_session_context = lambda _session, _context: None
+
+    async def fake_send_response(**kwargs):
+        sent.update(kwargs)
+        return {"action": "responded", "intent": kwargs["intent"]}
+
+    processor._send_response = fake_send_response
+
+    result = asyncio.run(
+        processor._handle_order_draft_flow("session-test", "2")
+    )
+
+    assert result["action"] == "responded"
+    assert ORDER_DRAFT_CONTEXT_KEY not in pending
+    assert sent["intent"] == "correcao_rascunho_pedido"
+    assert "lista completa corrigida" in sent["response"]
+
+
+def test_unrecognized_confirmation_repeats_pending_order_with_photo():
+    pending = {
+        ORDER_DRAFT_CONTEXT_KEY: {
+            "source": "single_item_catalog",
+            "items": [
+                {
+                    "product_id": 5050,
+                    "quantity": 1,
+                    "unit": "x",
+                    "name": "Racao Bob Dog Gold 3kg",
+                    "image_url": "https://img.example/bob-dog.webp",
+                }
+            ],
+        }
+    }
+    processor = object.__new__(MessageProcessor)
+    session = SimpleNamespace(id="session-test", context="ignored")
+    processor.db = _FakeDB(session)
+    sent = {}
+    processor._load_session_context = lambda _session: pending
+
+    async def fake_send_response(**kwargs):
+        sent.update(kwargs)
+        return {"action": "responded", "intent": kwargs["intent"]}
+
+    processor._send_response = fake_send_response
+
+    result = asyncio.run(
+        processor._handle_order_draft_flow("session-test", "talvez")
+    )
+
+    assert result["action"] == "responded"
+    assert ORDER_DRAFT_CONTEXT_KEY in pending
+    assert sent["intent"] == "confirmacao_pedido_invalida"
+    assert "Não entendi sua resposta" in sent["response"]
+    assert "1. Sim, está certo" in sent["response"]
+    assert "2. Não, quero alterar" in sent["response"]
+    assert sent["product_media"] == [
+        {
+            "image_url": "https://img.example/bob-dog.webp",
+            "caption": "Racao Bob Dog Gold 3kg",
+        }
+    ]
