@@ -44,6 +44,18 @@ assert.match(
 
 assert.match(
   sidebarSource,
+  /const STATUS_VENDA_CANCELADA = new Set\(\["cancelada", "cancelado"\]\)/,
+  "painel deve reconhecer os status usados para vendas canceladas",
+);
+
+assert.match(
+  sidebarSource,
+  /!isVendaCancelada\(venda\) &&\s+isCanalOnline/,
+  "venda cancelada nao deve contar como pedido online operacional",
+);
+
+assert.match(
+  sidebarSource,
   /marcarProntoRetirada\(e, venda\.id\)/,
   "PDV deve permitir marcar pedido online como pronto",
 );

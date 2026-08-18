@@ -20,6 +20,14 @@ import StatusBadge from "../ui/StatusBadge";
 const CANAL_APP_FUNCIONARIO = "app_funcionario";
 const APP_FUNCIONARIO_LABEL = "App Funcionario";
 const APP_FUNCIONARIO_TITLE = "Venda pelo app do funcionario";
+const STATUS_VENDA_CANCELADA = new Set(["cancelada", "cancelado"]);
+
+function isVendaCancelada(venda) {
+  const status = String(venda?.status || "")
+    .trim()
+    .toLowerCase();
+  return STATUS_VENDA_CANCELADA.has(status);
+}
 
 function getCanalInfo(canal) {
   const info = getSalesChannelInfo(canal);
@@ -53,6 +61,7 @@ function isRetiradaOnlineSemEntrega(venda) {
 
 function isPedidoOnlineOperacional(venda) {
   return (
+    !isVendaCancelada(venda) &&
     isCanalOnline(venda?.canal) &&
     (Boolean(venda?.tem_entrega) || isRetiradaOnlineSemEntrega(venda))
   );
@@ -64,6 +73,7 @@ function isPedidoOnlinePendente(venda) {
 
 function canConfirmarRetirada(venda) {
   return (
+    !isVendaCancelada(venda) &&
     venda?.status_entrega !== "entregue" &&
     (isPedidoOnlineOperacional(venda) ||
       venda?.tipo_retirada === "terceiro" ||
@@ -89,6 +99,10 @@ function formatarDataVenda(dataStr) {
 }
 
 function getEntregaStatusInfo(venda) {
+  if (isVendaCancelada(venda)) {
+    return null;
+  }
+
   if (isPedidoOnlineOperacional(venda)) {
     if (venda.status_entrega === "pendente") {
       return {
