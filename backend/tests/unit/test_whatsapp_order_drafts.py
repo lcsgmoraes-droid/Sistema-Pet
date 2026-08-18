@@ -74,9 +74,7 @@ def test_multi_item_order_is_organized_with_quantities():
 
 
 def test_single_item_order_extracts_live_phrase_and_corrects_catalog_typo():
-    item = extract_single_item_order(
-        "Quero 1 ração bob dog golde de 3kg por favor"
-    )
+    item = extract_single_item_order("Quero 1 ração bob dog golde de 3kg por favor")
 
     assert item == {
         "quantity": 1.0,
@@ -301,8 +299,8 @@ def test_single_item_request_offers_available_quantity_instead_of_handoff():
     saved_context = {}
     sent = {}
 
-    processor._save_session_context = (
-        lambda _session, context: saved_context.update(context)
+    processor._save_session_context = lambda _session, context: saved_context.update(
+        context
     )
     processor._remember_catalog_search = lambda *_args, **_kwargs: None
 
@@ -456,9 +454,7 @@ def test_numeric_two_rejects_pending_draft_and_requests_correction():
 
     processor._send_response = fake_send_response
 
-    result = asyncio.run(
-        processor._handle_order_draft_flow("session-test", "2")
-    )
+    result = asyncio.run(processor._handle_order_draft_flow("session-test", "2"))
 
     assert result["action"] == "responded"
     assert ORDER_DRAFT_CONTEXT_KEY not in pending
@@ -493,9 +489,7 @@ def test_unrecognized_confirmation_repeats_pending_order_with_photo():
 
     processor._send_response = fake_send_response
 
-    result = asyncio.run(
-        processor._handle_order_draft_flow("session-test", "talvez")
-    )
+    result = asyncio.run(processor._handle_order_draft_flow("session-test", "talvez"))
 
     assert result["action"] == "responded"
     assert ORDER_DRAFT_CONTEXT_KEY in pending

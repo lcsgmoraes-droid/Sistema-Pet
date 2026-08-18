@@ -29,9 +29,7 @@ def _checkout(stage="delivery_address"):
 
 
 def test_orchestrator_understands_question_about_registered_address():
-    llm = _FakeLLM(
-        '{"action":"ask_registered_address","value":null,"confidence":0.98}'
-    )
+    llm = _FakeLLM('{"action":"ask_registered_address","value":null,"confidence":0.98}')
     decision = asyncio.run(
         interpret_checkout_message(
             llm,
@@ -45,9 +43,7 @@ def test_orchestrator_understands_question_about_registered_address():
 
 
 def test_orchestrator_rejects_action_not_allowed_for_current_stage():
-    llm = _FakeLLM(
-        '{"action":"cash_change","value":100,"confidence":0.99}'
-    )
+    llm = _FakeLLM('{"action":"cash_change","value":100,"confidence":0.99}')
     decision = asyncio.run(
         interpret_checkout_message(
             llm,
@@ -60,9 +56,7 @@ def test_orchestrator_rejects_action_not_allowed_for_current_stage():
 
 
 def test_orchestrator_accepts_json_inside_code_fence():
-    llm = _FakeLLM(
-        '```json\n{"action":"ask_total","value":null,"confidence":0.9}\n```'
-    )
+    llm = _FakeLLM('```json\n{"action":"ask_total","value":null,"confidence":0.9}\n```')
     decision = asyncio.run(
         interpret_checkout_message(
             llm,

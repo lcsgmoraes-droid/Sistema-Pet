@@ -77,7 +77,9 @@ def parse_payment_choice(
 def parse_quantity_change(message: str) -> Optional[float]:
     """Entende alterações como 'muda para 2 unidades' no pedido em andamento."""
     text = _normalize(message)
-    if not re.search(r"\b(altera|alterar|muda|mudar|troca|trocar|coloca|ajusta)\b", text):
+    if not re.search(
+        r"\b(altera|alterar|muda|mudar|troca|trocar|coloca|ajusta)\b", text
+    ):
         return None
 
     number_words = {
@@ -119,7 +121,9 @@ def delivery_address_missing_fields(address: str) -> list[str]:
 
     missing: list[str] = []
     normalized = _normalize(text)
-    if not re.search(r"\b(rua|avenida|av|travessa|alameda|estrada|rodovia|praca)\b", normalized):
+    if not re.search(
+        r"\b(rua|avenida|av|travessa|alameda|estrada|rodovia|praca)\b", normalized
+    ):
         missing.append("rua")
 
     without_cep = CEP_PATTERN.sub("", text)

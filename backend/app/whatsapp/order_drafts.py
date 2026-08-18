@@ -120,7 +120,9 @@ def extract_single_item_order(message: str) -> Optional[dict[str, Any]]:
 
     catalog_query = re.sub(r"(?i)\bbobdog\b", "Bob Dog", product)
     catalog_query = re.sub(r"(?i)\bgolde\b", "Gold", catalog_query)
-    catalog_query = re.sub(r"(?i)\bde\s+(?=\d+(?:[.,]\d+)?\s*(?:kg|g|ml|l)\b)", "", catalog_query)
+    catalog_query = re.sub(
+        r"(?i)\bde\s+(?=\d+(?:[.,]\d+)?\s*(?:kg|g|ml|l)\b)", "", catalog_query
+    )
     catalog_query = re.sub(r"\s+", " ", catalog_query).strip()
 
     return {

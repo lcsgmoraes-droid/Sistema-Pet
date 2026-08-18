@@ -1010,9 +1010,7 @@ class MessageProcessor:
             logger.warning("Falha ao interpretar confirmação com IA: %s", error)
             return None
 
-        label = re.sub(
-            r"[^a-z]", "", _normalize_text(str(result.get("content") or ""))
-        )
+        label = re.sub(r"[^a-z]", "", _normalize_text(str(result.get("content") or "")))
         if label == "sim":
             return True
         if label == "nao":
@@ -1175,7 +1173,10 @@ class MessageProcessor:
                         Campaign.campaign_type == CampaignTypeEnum.loyalty_stamp,
                         Campaign.status == CampaignStatusEnum.active,
                         (Campaign.valid_from.is_(None) | (Campaign.valid_from <= now)),
-                        (Campaign.valid_until.is_(None) | (Campaign.valid_until >= now)),
+                        (
+                            Campaign.valid_until.is_(None)
+                            | (Campaign.valid_until >= now)
+                        ),
                     )
                     .order_by(Campaign.priority.asc(), Campaign.id.asc())
                     .first()
@@ -1198,7 +1199,9 @@ class MessageProcessor:
                 "reward_value": float(params.get("reward_value") or 0),
             }
         except Exception as campaign_error:
-            logger.warning("Falha ao consultar campanha de fidelidade: %s", campaign_error)
+            logger.warning(
+                "Falha ao consultar campanha de fidelidade: %s", campaign_error
+            )
             rollback = getattr(self.db, "rollback", None)
             if callable(rollback):
                 rollback()
@@ -1253,9 +1256,7 @@ class MessageProcessor:
             if len(missing) == 1
             else f"{', '.join(missing[:-1])} e {missing[-1]}"
         )
-        return (
-            f"Já anotei: {address}. Para completar o endereço, falta {missing_text}."
-        )
+        return f"Já anotei: {address}. Para completar o endereço, falta {missing_text}."
 
     def _next_checkout_prompt(self, checkout: Dict[str, Any]) -> str:
         """Avança somente até o próximo dado realmente necessário."""
@@ -1281,9 +1282,8 @@ class MessageProcessor:
             checkout["stage"] = "payment"
             return payment_methods_message(preview.get("payment_methods") or [])
 
-        if (
-            str(payment.get("key") or "").lower() == "dinheiro"
-            and not checkout.get("cash_change_answered")
+        if str(payment.get("key") or "").lower() == "dinheiro" and not checkout.get(
+            "cash_change_answered"
         ):
             checkout["stage"] = "cash_change"
             return "Vai precisar de troco? Se sim, para qual valor?"
@@ -1542,7 +1542,11 @@ class MessageProcessor:
                 processing_time_ms=0,
             )
 
-        if decision and decision.action == "new_request" and decision.confidence >= 0.85:
+        if (
+            decision
+            and decision.action == "new_request"
+            and decision.confidence >= 0.85
+        ):
             session_context.pop(ORDER_CHECKOUT_CONTEXT_KEY, None)
             session_context.pop(ORDER_DRAFT_CONTEXT_KEY, None)
             session_context.pop(ORDER_ITEM_SELECTION_CONTEXT_KEY, None)
@@ -1687,9 +1691,7 @@ class MessageProcessor:
 
         if stage == "payment":
             payment_methods = preview.get("payment_methods") or []
-            payment_method = parse_payment_choice(
-                message_content, payment_methods
-            )
+            payment_method = parse_payment_choice(message_content, payment_methods)
             if not payment_method:
                 payment_method = self._payment_from_context_decision(
                     decision, payment_methods
@@ -1743,7 +1745,9 @@ class MessageProcessor:
                     missing = delivery_address_missing_fields(delivery_address)
                     if missing:
                         checkout["delivery_address_partial"] = delivery_address
-                        response = self._missing_address_prompt(delivery_address, missing)
+                        response = self._missing_address_prompt(
+                            delivery_address, missing
+                        )
                     else:
                         checkout["delivery_address"] = delivery_address
                         response = self._next_checkout_prompt(checkout)
@@ -1815,7 +1819,11 @@ class MessageProcessor:
             )
 
         quantity_change = parse_quantity_change(message_content)
-        if quantity_change is None and decision and decision.action == "change_quantity":
+        if (
+            quantity_change is None
+            and decision
+            and decision.action == "change_quantity"
+        ):
             try:
                 contextual_quantity = float(str(decision.value).replace(",", "."))
             except (TypeError, ValueError):
@@ -1824,9 +1832,7 @@ class MessageProcessor:
         if quantity_change is not None:
             requested_items = checkout.get("items") or []
             if len(requested_items) != 1:
-                response = (
-                    "Claro, posso alterar. De qual produto você quer mudar a quantidade?"
-                )
+                response = "Claro, posso alterar. De qual produto você quer mudar a quantidade?"
             else:
                 updated_items = [
                     {
@@ -1888,9 +1894,7 @@ class MessageProcessor:
         )
         if wants_change:
             payment_methods = preview.get("payment_methods") or []
-            payment_change = parse_payment_choice(
-                message_content, payment_methods
-            )
+            payment_change = parse_payment_choice(message_content, payment_methods)
             if not payment_change:
                 payment_change = self._payment_from_context_decision(
                     decision, payment_methods
@@ -2217,9 +2221,7 @@ class MessageProcessor:
             return await self._transfer_to_human(
                 session_id=session.id,
                 reason=(
-                    "product_out_of_stock"
-                    if unavailable
-                    else "product_not_identified"
+                    "product_out_of_stock" if unavailable else "product_not_identified"
                 ),
                 reason_details=(
                     f"Pedido explícito não resolvido automaticamente: {catalog_query}"
