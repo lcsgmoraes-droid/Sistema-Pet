@@ -2018,6 +2018,13 @@ class MessageProcessor:
         benefits = created.get("benefits") or []
         if benefits:
             lines.extend(["Você ganhou:", *benefits_lines(benefits)])
+        if (
+            created.get("fulfillment") == "delivery"
+            and created.get("delivery_address_registered")
+        ):
+            lines.append(
+                "Também deixei este endereço salvo para facilitar seus próximos pedidos."
+            )
         lines.append(
             "Agora nossa equipe vai preparar tudo. Se precisar ajustar alguma coisa, "
             "é só chamar."
