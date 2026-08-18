@@ -85,9 +85,7 @@ def customer_delivery_address(customer) -> str:
 def _address_key(value: str) -> str:
     normalized = unicodedata.normalize("NFKD", str(value or ""))
     without_accents = "".join(
-        character
-        for character in normalized
-        if not unicodedata.combining(character)
+        character for character in normalized if not unicodedata.combining(character)
     )
     return re.sub(r"[^a-z0-9]", "", without_accents.lower())
 

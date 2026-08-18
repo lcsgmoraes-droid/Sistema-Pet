@@ -105,6 +105,4 @@ def test_online_sales_channel_e_campanhas_usam_mesma_normalizacao():
     assert benefit_channel_from_sales_channel("whatsapp") == CANAL_ECOMMERCE
     assert benefit_channel_from_sales_channel("pdv") == CANAL_LOJA_FISICA
 
-    assert campaign_allows_sale_channel(
-        {"benefit_channels": ["ecommerce"]}, "whatsapp"
-    )
+    assert campaign_allows_sale_channel({"benefit_channels": ["ecommerce"]}, "whatsapp")
