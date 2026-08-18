@@ -19,7 +19,7 @@ import unicodedata
 import uuid
 from typing import Dict, Any, Optional
 from sqlalchemy.orm import Session
-from datetime import datetime
+from datetime import datetime, timezone
 from types import SimpleNamespace
 
 from app.ai.intent_classifier import IntentClassifier, IntentRouter
@@ -45,6 +45,10 @@ from app.whatsapp.customer_context_service import (
     load_store_hours,
     resolve_session_customer,
 )
+from app.whatsapp.conversation_orchestrator import (
+    CheckoutDecision,
+    interpret_checkout_message,
+)
 from app.whatsapp.order_drafts import (
     HISTORY_ITEM_SELECTION_CONTEXT_KEY,
     ORDER_DRAFT_CONTEXT_KEY,
@@ -52,6 +56,7 @@ from app.whatsapp.order_drafts import (
     draft_product_media,
     extract_history_quantity_request,
     extract_multi_item_order,
+    extract_single_item_order,
     format_draft_item,
     is_safe_product_image_url,
     is_generic_reorder_request,
@@ -62,15 +67,22 @@ from app.whatsapp.order_checkout import (
     ORDER_ITEM_SELECTION_CONTEXT_KEY,
     benefits_lines,
     build_checkout_summary,
+    delivery_address_missing_fields,
     is_final_order_confirmation,
+    is_new_conversation_greeting,
     is_order_cancellation,
     is_order_checkout_request,
+    is_registered_address_question,
+    merge_delivery_address,
+    parse_cash_change,
     parse_fulfillment_choice,
     parse_payment_choice,
+    parse_quantity_change,
     payment_methods_message,
 )
 from app.whatsapp.remote_corepet_client import (
     create_remote_order,
+    fetch_remote_customer_context,
     fetch_remote_order_preview,
 )
 
@@ -435,42 +447,29 @@ def _gold_brand_from_reply(message: str) -> Optional[str]:
 
 
 def _confirmation_reply(message: str) -> Optional[bool]:
-    """Interpreta respostas curtas de confirmação sem recorrer à IA."""
+    """Interpreta confirmações naturais; respostas ambíguas ficam para a IA."""
     text = re.sub(r"[^a-z0-9 ]", " ", _normalize_text(message))
     text = re.sub(r"\s+", " ", text).strip()
     if not text:
         return None
 
-    negative_replies = {
-        "nao",
-        "nao e",
-        "nao e essa",
-        "nao e esse",
-        "outra",
-        "outro",
-        "nenhuma",
-        "nenhum",
-    }
-    affirmative_replies = {
-        "sim",
-        "isso",
-        "essa",
-        "esse",
-        "e essa",
-        "e esse",
-        "correto",
-        "correta",
-        "quero repetir",
-        "quero repetir o pedido",
-        "pode repetir",
-        "pode repetir o pedido",
-        "repete",
-        "repete o pedido",
-        "quero o mesmo pedido",
-    }
-    if text in negative_replies or text.startswith("nao "):
+    negative_pattern = (
+        r"\b(?:nao|negativo|errad[oa]|outr[oa]|nenhum[ao]?|desist[io]|"
+        r"alterar|mudar|corrigir|trocar|melhor nao)\b"
+    )
+    if re.search(negative_pattern, text):
         return False
-    if text in affirmative_replies:
+
+    uncertainty_pattern = r"\b(?:talvez|nao sei|tenho duvida|acho que nao)\b"
+    if re.search(uncertainty_pattern, text):
+        return None
+
+    affirmative_pattern = (
+        r"\b(?:sim|isso|essa|esse|corret[oa]|cert[oa]|perfeit[oa]|beleza|"
+        r"fechado|combinado|exatamente|pode sim|pode montar|pode separar|"
+        r"pode fazer|manda ver|vamos nessa|confirmo|repete|repetir)\b"
+    )
+    if text == "pode" or re.search(affirmative_pattern, text):
         return True
     return None
 
@@ -969,6 +968,55 @@ class MessageProcessor:
         )
         return intent_result["intent"], intent_result["confidence"]
 
+    async def _interpret_confirmation_reply(
+        self,
+        message: str,
+        *,
+        pending_question: str,
+    ) -> Optional[bool]:
+        """Usa IA apenas quando a confirmação não puder ser decidida com segurança."""
+        deterministic = _confirmation_reply(message)
+        if deterministic is not None:
+            return deterministic
+
+        llm_client = getattr(self, "llm_client", None)
+        if not getattr(self, "ai_enabled", False) or llm_client is None:
+            return None
+
+        try:
+            result = await llm_client.chat_completion(
+                messages=[
+                    {
+                        "role": "system",
+                        "content": (
+                            "Classifique a resposta do cliente à pergunta pendente. "
+                            "Responda somente SIM, NAO ou OUTRO. SIM significa que o "
+                            "cliente confirmou; NAO significa que recusou ou quer alterar; "
+                            "OUTRO significa dúvida, pergunta nova ou resposta insuficiente."
+                        ),
+                    },
+                    {
+                        "role": "user",
+                        "content": (
+                            f"Pergunta pendente: {pending_question}\n"
+                            f"Resposta do cliente: {message}"
+                        ),
+                    },
+                ],
+                temperature=0,
+                max_tokens=8,
+            )
+        except Exception as error:
+            logger.warning("Falha ao interpretar confirmação com IA: %s", error)
+            return None
+
+        label = re.sub(r"[^a-z]", "", _normalize_text(str(result.get("content") or "")))
+        if label == "sim":
+            return True
+        if label == "nao":
+            return False
+        return None
+
     def _save_message_intent(self, message_id: str, intent: str) -> None:
         msg = self.db.query(WhatsAppMessage).get(message_id)
         if not msg:
@@ -1107,6 +1155,247 @@ class MessageProcessor:
             "image_url": str(item.get("image_url") or item.get("imagem_url") or ""),
         }
 
+    def _loyalty_opportunity(self, total: Any) -> Optional[Dict[str, Any]]:
+        """Calcula quanto falta para o próximo carimbo da campanha ativa."""
+        from app.campaigns.models import (
+            Campaign,
+            CampaignStatusEnum,
+            CampaignTypeEnum,
+        )
+
+        try:
+            now = datetime.now(timezone.utc)
+            with whatsapp_tenant_context(self.tenant_id):
+                campaign = (
+                    self.db.query(Campaign)
+                    .filter(
+                        Campaign.tenant_id == self.tenant_id,
+                        Campaign.campaign_type == CampaignTypeEnum.loyalty_stamp,
+                        Campaign.status == CampaignStatusEnum.active,
+                        (Campaign.valid_from.is_(None) | (Campaign.valid_from <= now)),
+                        (
+                            Campaign.valid_until.is_(None)
+                            | (Campaign.valid_until >= now)
+                        ),
+                    )
+                    .order_by(Campaign.priority.asc(), Campaign.id.asc())
+                    .first()
+                )
+            if not campaign:
+                return None
+            params = campaign.params or {}
+            stamp_value = float(params.get("min_purchase_value") or 0)
+            order_total = float(total or 0)
+            if stamp_value <= 0 or order_total < 0:
+                return None
+            earned_stamps = int(order_total // stamp_value)
+            next_target = (earned_stamps + 1) * stamp_value
+            return {
+                "name": campaign.name,
+                "stamp_value": stamp_value,
+                "earned_stamps": earned_stamps,
+                "missing_amount": round(max(next_target - order_total, 0), 2),
+                "stamps_to_complete": int(params.get("stamps_to_complete") or 0),
+                "reward_value": float(params.get("reward_value") or 0),
+            }
+        except Exception as campaign_error:
+            logger.warning(
+                "Falha ao consultar campanha de fidelidade: %s", campaign_error
+            )
+            rollback = getattr(self.db, "rollback", None)
+            if callable(rollback):
+                rollback()
+            return None
+
+    def _registered_delivery_address(
+        self,
+        session: WhatsAppSession,
+        preview: Dict[str, Any],
+    ) -> str:
+        preview_customer = preview.get("customer") or {}
+        address = str(preview_customer.get("delivery_address") or "").strip()
+        if address:
+            return address
+
+        customer_id = preview_customer.get("id")
+        payload = fetch_remote_customer_context(
+            self.tenant_id,
+            phone=session.phone_number,
+            customer_id=(int(customer_id) if customer_id not in (None, "") else None),
+        )
+        customer = payload.get("customer") if isinstance(payload, dict) else None
+        if isinstance(customer, dict):
+            address = str(customer.get("delivery_address") or "").strip()
+            if address:
+                return address
+        latest_delivery = (
+            payload.get("latest_delivery") if isinstance(payload, dict) else None
+        )
+        if not isinstance(latest_delivery, dict):
+            return ""
+        return str(latest_delivery.get("delivery_address") or "").strip()
+
+    def _enrich_checkout_preview(self, preview: Dict[str, Any]) -> Dict[str, Any]:
+        enriched = dict(preview)
+        opportunity = self._loyalty_opportunity(
+            enriched.get("total") or enriched.get("subtotal")
+        )
+        if opportunity:
+            enriched["loyalty_opportunity"] = opportunity
+        return enriched
+
+    @staticmethod
+    def _missing_address_prompt(address: str, missing: list[str]) -> str:
+        if not address:
+            return (
+                "Para entregar certinho, me envie rua, número, bairro e CEP. "
+                "Exemplo: Rua das Flores, 44, Centro, 19000-000."
+            )
+        missing_text = (
+            missing[0]
+            if len(missing) == 1
+            else f"{', '.join(missing[:-1])} e {missing[-1]}"
+        )
+        return f"Já anotei: {address}. Para completar o endereço, falta {missing_text}."
+
+    def _next_checkout_prompt(self, checkout: Dict[str, Any]) -> str:
+        """Avança somente até o próximo dado realmente necessário."""
+        preview = checkout.get("preview") or {}
+        if checkout.get("fulfillment") == "delivery":
+            address = str(
+                checkout.get("delivery_address")
+                or checkout.get("delivery_address_partial")
+                or (preview.get("customer") or {}).get("delivery_address")
+                or ""
+            ).strip()
+            missing = delivery_address_missing_fields(address)
+            if missing:
+                checkout["stage"] = "delivery_address"
+                checkout["delivery_address_partial"] = address
+                checkout.pop("delivery_address", None)
+                return self._missing_address_prompt(address, missing)
+            checkout["delivery_address"] = address
+            checkout.pop("delivery_address_partial", None)
+
+        payment = checkout.get("payment_method") or {}
+        if not payment:
+            checkout["stage"] = "payment"
+            return payment_methods_message(preview.get("payment_methods") or [])
+
+        if str(payment.get("key") or "").lower() == "dinheiro" and not checkout.get(
+            "cash_change_answered"
+        ):
+            checkout["stage"] = "cash_change"
+            return "Vai precisar de troco? Se sim, para qual valor?"
+
+        checkout["stage"] = "confirmation"
+        return build_checkout_summary(checkout)
+
+    def _current_checkout_prompt(self, checkout: Dict[str, Any]) -> str:
+        """Retoma a etapa atual sem avançar ou alterar o pedido."""
+        stage = str(checkout.get("stage") or "fulfillment")
+        preview = checkout.get("preview") or {}
+        if stage == "fulfillment":
+            return "Para continuar: você prefere entrega ou retirada na loja?"
+        if stage == "delivery_address":
+            address = str(checkout.get("delivery_address_partial") or "").strip()
+            return self._missing_address_prompt(
+                address, delivery_address_missing_fields(address)
+            )
+        if stage == "delivery_address_confirmation":
+            candidate = str(checkout.get("registered_address_candidate") or "").strip()
+            return f"Posso usar este endereço para a entrega: {candidate}?"
+        if stage == "payment":
+            return payment_methods_message(preview.get("payment_methods") or [])
+        if stage == "cash_change":
+            return "Vai precisar de troco? Se sim, para qual valor?"
+        return (
+            "Se estiver tudo certo, diga CONFIRMAR. Se quiser mudar alguma coisa, "
+            "pode me dizer o que deseja alterar."
+        )
+
+    async def _checkout_context_decision(
+        self,
+        *,
+        message_content: str,
+        checkout: Dict[str, Any],
+    ) -> Optional[CheckoutDecision]:
+        """Pede à IA somente uma ação estruturada; dados e escrita ficam no backend."""
+        llm_client = getattr(self, "llm_client", None)
+        if not getattr(self, "ai_enabled", False) or llm_client is None:
+            return None
+        if re.fullmatch(r"\s*\d{1,2}[.)]?\s*", message_content or ""):
+            return None
+        try:
+            return await interpret_checkout_message(
+                llm_client,
+                message=message_content,
+                checkout=checkout,
+            )
+        except Exception as error:
+            logger.warning("Falha no orquestrador contextual do checkout: %s", error)
+            return None
+
+    def _checkout_information_response(
+        self,
+        *,
+        action: str,
+        checkout: Dict[str, Any],
+    ) -> Optional[str]:
+        """Responde perguntas do pedido apenas com os dados verificados do preview."""
+        preview = checkout.get("preview") or {}
+        prompt = self._current_checkout_prompt(checkout)
+        if action == "ask_total":
+            total = preview.get("total") or preview.get("subtotal")
+            return f"Seu pedido está em {_format_brl(total)}.\n\n{prompt}"
+
+        if action == "ask_items":
+            items = preview.get("items") or checkout.get("items") or []
+            lines = ["Até aqui, seu pedido está assim:"]
+            for item in items:
+                quantity = float(item.get("quantity") or item.get("quantidade") or 0)
+                quantity_text = (
+                    str(int(quantity))
+                    if quantity.is_integer()
+                    else str(quantity).replace(".", ",")
+                )
+                name = item.get("name") or item.get("nome") or "Produto"
+                subtotal = item.get("subtotal")
+                suffix = f" — {_format_brl(subtotal)}" if subtotal is not None else ""
+                lines.append(f"- {quantity_text}x {name}{suffix}")
+            lines.append(prompt)
+            return "\n\n".join(lines)
+
+        if action == "ask_benefits":
+            benefits = preview.get("benefits") or []
+            opportunity = preview.get("loyalty_opportunity") or {}
+            lines = ["Para este pedido, os benefícios previstos são:"]
+            if benefits:
+                lines.extend(benefits_lines(benefits))
+            elif float(opportunity.get("missing_amount") or 0) > 0:
+                lines.append(
+                    "- Faltam "
+                    f"{_format_brl(opportunity['missing_amount'])} para ganhar "
+                    f"1 carimbo no {opportunity.get('name') or 'Clube Fidelidade'}."
+                )
+            else:
+                lines.extend(benefits_lines([]))
+            lines.append(prompt)
+            return "\n\n".join(lines)
+        return None
+
+    @staticmethod
+    def _payment_from_context_decision(
+        decision: Optional[CheckoutDecision],
+        payment_methods: list[Dict[str, Any]],
+    ) -> Optional[Dict[str, Any]]:
+        if not decision or decision.action != "choose_payment":
+            return None
+        value = str(decision.value or "").strip()
+        if not value:
+            return None
+        return parse_payment_choice(value, payment_methods)
+
     async def _start_order_checkout(
         self,
         *,
@@ -1141,6 +1430,20 @@ class MessageProcessor:
             items=requested_items,
         )
         if not preview or not preview.get("success"):
+            rejection_detail = re.sub(
+                r"\s+", " ", str((preview or {}).get("detail") or "")
+            ).strip()
+            if rejection_detail:
+                return await self._transfer_to_human(
+                    session_id=session.id,
+                    reason="order_preview_rejected",
+                    reason_details=rejection_detail,
+                    customer_message=(
+                        f"Não consigo continuar com este pedido: {rejection_detail} "
+                        "Nenhuma venda foi lançada. Vou encaminhar você para um "
+                        "atendente humano ajudar com uma alternativa. ⏳"
+                    ),
+                )
             return await self._send_response(
                 session_id=session.id,
                 response=(
@@ -1169,6 +1472,7 @@ class MessageProcessor:
                 processing_time_ms=0,
             )
 
+        preview = self._enrich_checkout_preview(preview)
         session_context[ORDER_CHECKOUT_CONTEXT_KEY] = {
             "stage": "fulfillment",
             "source": source,
@@ -1185,7 +1489,8 @@ class MessageProcessor:
                 "Perfeito. Como você prefere receber?\n\n"
                 "1. Entrega\n\n"
                 "2. Retirada na loja\n\n"
-                "Responda 1 ou 2."
+                "Pode responder do seu jeito, como ‘pode entregar’ ou ‘vou buscar’. "
+                "Se preferir, envie 1 ou 2."
             ),
             intent="pedido_escolha_entrega",
             model_used="deterministic_checkout_fulfillment",
@@ -1201,7 +1506,7 @@ class MessageProcessor:
         session_context: Dict[str, Any],
         checkout: Dict[str, Any],
         message_content: str,
-    ) -> Dict[str, Any]:
+    ) -> Optional[Dict[str, Any]]:
         if is_order_cancellation(message_content):
             session_context.pop(ORDER_CHECKOUT_CONTEXT_KEY, None)
             self._save_session_context(session, session_context)
@@ -1217,25 +1522,103 @@ class MessageProcessor:
 
         stage = str(checkout.get("stage") or "fulfillment")
         preview = checkout.get("preview") or {}
+        decision = await self._checkout_context_decision(
+            message_content=message_content,
+            checkout=checkout,
+        )
+
+        information_response = self._checkout_information_response(
+            action=decision.action if decision else "",
+            checkout=checkout,
+        )
+        if information_response:
+            return await self._send_response(
+                session_id=session.id,
+                response=information_response,
+                intent=f"pedido_contexto_{decision.action}",
+                model_used="contextual_checkout_orchestrator",
+                tokens_input=0,
+                tokens_output=0,
+                processing_time_ms=0,
+            )
+
+        if (
+            decision
+            and decision.action == "new_request"
+            and decision.confidence >= 0.85
+        ):
+            session_context.pop(ORDER_CHECKOUT_CONTEXT_KEY, None)
+            session_context.pop(ORDER_DRAFT_CONTEXT_KEY, None)
+            session_context.pop(ORDER_ITEM_SELECTION_CONTEXT_KEY, None)
+            self._save_session_context(session, session_context)
+            return None
+
+        asks_registered_address = is_registered_address_question(message_content) or (
+            decision is not None and decision.action == "ask_registered_address"
+        )
+        if asks_registered_address:
+            if stage == "delivery_address":
+                checkout.pop("delivery_address_partial", None)
+            registered_address = self._registered_delivery_address(session, preview)
+            if not registered_address:
+                response = (
+                    "Encontrei seu cadastro, mas ele está sem endereço de entrega "
+                    "preenchido."
+                )
+                if stage == "delivery_address":
+                    response += " Me envie rua, número, bairro e CEP para continuar."
+                else:
+                    response += f"\n\n{self._current_checkout_prompt(checkout)}"
+            elif stage != "delivery_address":
+                response = (
+                    f"Seu endereço de entrega cadastrado é: {registered_address}.\n\n"
+                    f"{self._current_checkout_prompt(checkout)}"
+                )
+            else:
+                missing = delivery_address_missing_fields(registered_address)
+                if missing:
+                    checkout["delivery_address_partial"] = registered_address
+                    response = (
+                        f"Encontrei este endereço no cadastro: {registered_address}. "
+                        f"{self._missing_address_prompt(registered_address, missing)}"
+                    )
+                else:
+                    checkout["registered_address_candidate"] = registered_address
+                    checkout["stage"] = "delivery_address_confirmation"
+                    response = (
+                        f"Tenho este endereço cadastrado: {registered_address}. "
+                        "Posso usar este endereço para a entrega?"
+                    )
+            self._save_session_context(session, session_context)
+            return await self._send_response(
+                session_id=session.id,
+                response=response,
+                intent="pedido_consulta_endereco_cadastrado",
+                model_used=(
+                    "contextual_checkout_orchestrator"
+                    if decision and decision.action == "ask_registered_address"
+                    else "deterministic_checkout_registered_address"
+                ),
+                tokens_input=0,
+                tokens_output=0,
+                processing_time_ms=0,
+            )
+
         if stage == "fulfillment":
             fulfillment = parse_fulfillment_choice(message_content)
+            if not fulfillment and decision:
+                if decision.action == "choose_delivery":
+                    fulfillment = "delivery"
+                elif decision.action == "choose_pickup":
+                    fulfillment = "pickup"
             if not fulfillment:
-                response = "Escolha 1 para entrega ou 2 para retirada na loja."
+                response = (
+                    "Você prefere que a gente entregue ou quer retirar na loja? "
+                    "Pode responder do seu jeito."
+                )
             else:
                 checkout["fulfillment"] = fulfillment
-                registered_address = str(
-                    (preview.get("customer") or {}).get("delivery_address") or ""
-                ).strip()
-                if fulfillment == "delivery" and not registered_address:
-                    checkout["stage"] = "delivery_address"
-                    response = "Qual é o endereço completo para a entrega?"
-                else:
-                    if fulfillment == "delivery":
-                        checkout["delivery_address"] = registered_address
-                    checkout["stage"] = "payment"
-                    response = payment_methods_message(
-                        preview.get("payment_methods") or []
-                    )
+                response = self._next_checkout_prompt(checkout)
             self._save_session_context(session, session_context)
             return await self._send_response(
                 session_id=session.id,
@@ -1248,13 +1631,53 @@ class MessageProcessor:
             )
 
         if stage == "delivery_address":
-            delivery_address = re.sub(r"\s+", " ", message_content or "").strip()
-            if len(delivery_address) < 8:
-                response = "Envie o endereço completo para a entrega."
+            message_missing = delivery_address_missing_fields(message_content)
+            if (
+                decision is not None
+                and decision.action not in {"provide_address", "other"}
+            ) or (
+                decision is not None
+                and decision.action == "other"
+                and len(message_missing) == 4
+            ):
+                return await self._send_response(
+                    session_id=session.id,
+                    response=(
+                        "Entendi, mas ainda preciso confirmar onde será a entrega. "
+                        "Você pode me passar rua, número, bairro e CEP, ou pedir para eu "
+                        "consultar o endereço cadastrado."
+                    ),
+                    intent="pedido_aguardando_endereco",
+                    model_used="contextual_checkout_orchestrator",
+                    tokens_input=0,
+                    tokens_output=0,
+                    processing_time_ms=0,
+                )
+            if decision is None and len(message_missing) == 4:
+                return await self._send_response(
+                    session_id=session.id,
+                    response=(
+                        "Não identifiquei um endereço nessa mensagem. Me passe rua, número, "
+                        "bairro e CEP, ou diga que quer usar o endereço cadastrado."
+                    ),
+                    intent="pedido_aguardando_endereco",
+                    model_used="deterministic_checkout_address_guard",
+                    tokens_input=0,
+                    tokens_output=0,
+                    processing_time_ms=0,
+                )
+            delivery_address = merge_delivery_address(
+                str(checkout.get("delivery_address_partial") or ""),
+                message_content,
+            )
+            missing = delivery_address_missing_fields(delivery_address)
+            if missing:
+                checkout["delivery_address_partial"] = delivery_address
+                response = self._missing_address_prompt(delivery_address, missing)
             else:
                 checkout["delivery_address"] = delivery_address
-                checkout["stage"] = "payment"
-                response = payment_methods_message(preview.get("payment_methods") or [])
+                checkout.pop("delivery_address_partial", None)
+                response = self._next_checkout_prompt(checkout)
             self._save_session_context(session, session_context)
             return await self._send_response(
                 session_id=session.id,
@@ -1267,15 +1690,23 @@ class MessageProcessor:
             )
 
         if stage == "payment":
-            payment_method = parse_payment_choice(
-                message_content, preview.get("payment_methods") or []
-            )
+            payment_methods = preview.get("payment_methods") or []
+            payment_method = parse_payment_choice(message_content, payment_methods)
             if not payment_method:
-                response = payment_methods_message(preview.get("payment_methods") or [])
+                payment_method = self._payment_from_context_decision(
+                    decision, payment_methods
+                )
+            if not payment_method:
+                response = (
+                    "Ainda não consegui identificar a forma de pagamento. Escolha uma "
+                    "das opções disponíveis abaixo.\n\n"
+                    f"{payment_methods_message(payment_methods)}"
+                )
             else:
                 checkout["payment_method"] = payment_method
-                checkout["stage"] = "confirmation"
-                response = build_checkout_summary(checkout)
+                checkout.pop("cash_change_answered", None)
+                checkout.pop("cash_change_for", None)
+                response = self._next_checkout_prompt(checkout)
             self._save_session_context(session, session_context)
             return await self._send_response(
                 session_id=session.id,
@@ -1287,15 +1718,257 @@ class MessageProcessor:
                 processing_time_ms=0,
             )
 
+        if stage == "delivery_address_confirmation":
+            candidate = str(checkout.get("registered_address_candidate") or "").strip()
+            if decision and decision.action == "provide_address":
+                confirmation = False
+            elif decision and decision.action == "confirm":
+                confirmation = True
+            elif decision and decision.action == "reject":
+                confirmation = False
+            else:
+                confirmation = await self._interpret_confirmation_reply(
+                    message_content,
+                    pending_question=f"Posso usar este endereço para entrega: {candidate}?",
+                )
+            if confirmation is True and candidate:
+                checkout["delivery_address"] = candidate
+                checkout.pop("registered_address_candidate", None)
+                response = self._next_checkout_prompt(checkout)
+            elif confirmation is False:
+                checkout["stage"] = "delivery_address"
+                checkout.pop("registered_address_candidate", None)
+                checkout.pop("delivery_address", None)
+                checkout.pop("delivery_address_partial", None)
+                if decision and decision.action == "provide_address":
+                    delivery_address = message_content.strip()
+                    missing = delivery_address_missing_fields(delivery_address)
+                    if missing:
+                        checkout["delivery_address_partial"] = delivery_address
+                        response = self._missing_address_prompt(
+                            delivery_address, missing
+                        )
+                    else:
+                        checkout["delivery_address"] = delivery_address
+                        response = self._next_checkout_prompt(checkout)
+                else:
+                    response = (
+                        "Sem problema. Qual endereço você quer usar? Me envie rua, número, "
+                        "bairro e CEP."
+                    )
+            else:
+                response = (
+                    f"Tenho este endereço cadastrado: {candidate}. Posso usá-lo para "
+                    "a entrega? Pode responder do seu jeito."
+                )
+            self._save_session_context(session, session_context)
+            return await self._send_response(
+                session_id=session.id,
+                response=response,
+                intent="pedido_confirma_endereco_cadastrado",
+                model_used="deterministic_checkout_registered_address_confirmation",
+                tokens_input=0,
+                tokens_output=0,
+                processing_time_ms=0,
+            )
+
+        if stage == "cash_change":
+            change = parse_cash_change(
+                message_content,
+                total=float(preview.get("total") or preview.get("subtotal") or 0),
+            )
+            if not change and decision and decision.action == "no_cash_change":
+                change = {"needs_change": False, "amount": None}
+            elif not change and decision and decision.action == "cash_change":
+                try:
+                    amount = float(str(decision.value).replace(",", "."))
+                except (TypeError, ValueError):
+                    amount = None
+                change = (
+                    {
+                        "needs_change": True,
+                        "amount": amount,
+                        "valid": amount
+                        > float(preview.get("total") or preview.get("subtotal") or 0),
+                    }
+                    if amount is not None
+                    else {"needs_change": True, "amount": None}
+                )
+            if not change:
+                response = "Vai precisar de troco? Se sim, me diga para qual valor."
+            elif change.get("needs_change") and change.get("amount") is None:
+                response = "Claro. Troco para qual valor?"
+            elif change.get("needs_change") and not change.get("valid", True):
+                response = (
+                    "O valor do troco precisa ser maior que o total do pedido, que é "
+                    f"{_format_brl(preview.get('total'))}. Para quanto será o troco?"
+                )
+            else:
+                checkout["cash_change_answered"] = True
+                checkout["cash_change_for"] = change.get("amount")
+                response = self._next_checkout_prompt(checkout)
+            self._save_session_context(session, session_context)
+            return await self._send_response(
+                session_id=session.id,
+                response=response,
+                intent="pedido_troco_dinheiro",
+                model_used="deterministic_checkout_cash_change",
+                tokens_input=0,
+                tokens_output=0,
+                processing_time_ms=0,
+            )
+
+        quantity_change = parse_quantity_change(message_content)
+        if (
+            quantity_change is None
+            and decision
+            and decision.action == "change_quantity"
+        ):
+            try:
+                contextual_quantity = float(str(decision.value).replace(",", "."))
+            except (TypeError, ValueError):
+                contextual_quantity = 0
+            quantity_change = contextual_quantity if contextual_quantity > 0 else None
+        if quantity_change is not None:
+            requested_items = checkout.get("items") or []
+            if len(requested_items) != 1:
+                response = "Claro, posso alterar. De qual produto você quer mudar a quantidade?"
+            else:
+                updated_items = [
+                    {
+                        "product_id": requested_items[0]["product_id"],
+                        "quantity": quantity_change,
+                    }
+                ]
+                updated_preview = fetch_remote_order_preview(
+                    self.tenant_id,
+                    phone=session.phone_number,
+                    items=updated_items,
+                )
+                if not updated_preview or not updated_preview.get("success"):
+                    detail = str((updated_preview or {}).get("detail") or "").strip()
+                    response = (
+                        f"Não consegui alterar para essa quantidade: {detail}"
+                        if detail
+                        else "Não consegui recalcular essa quantidade agora."
+                    )
+                else:
+                    checkout["items"] = updated_items
+                    checkout["preview"] = self._enrich_checkout_preview(updated_preview)
+                    checkout["idempotency_key"] = str(uuid.uuid4())
+                    preview = checkout["preview"]
+                    quantity_text = (
+                        str(int(quantity_change))
+                        if quantity_change.is_integer()
+                        else str(quantity_change).replace(".", ",")
+                    )
+                    response = (
+                        f"Claro, alterei para {quantity_text} unidade(s).\n\n"
+                        f"{self._next_checkout_prompt(checkout)}"
+                    )
+            self._save_session_context(session, session_context)
+            return await self._send_response(
+                session_id=session.id,
+                response=response,
+                intent="pedido_quantidade_alterada",
+                model_used="deterministic_checkout_quantity_change",
+                tokens_input=0,
+                tokens_output=0,
+                processing_time_ms=0,
+            )
+
+        normalized_message = _normalize_text(message_content)
+        wants_change = any(
+            term in normalized_message
+            for term in ("altera", "alterar", "muda", "mudar", "troca", "trocar")
+        ) or bool(
+            decision
+            and decision.action
+            in {
+                "modify_order",
+                "reject",
+                "choose_delivery",
+                "choose_pickup",
+                "choose_payment",
+            }
+        )
+        if wants_change:
+            payment_methods = preview.get("payment_methods") or []
+            payment_change = parse_payment_choice(message_content, payment_methods)
+            if not payment_change:
+                payment_change = self._payment_from_context_decision(
+                    decision, payment_methods
+                )
+            fulfillment_change = parse_fulfillment_choice(message_content)
+            if not fulfillment_change and decision:
+                if decision.action == "choose_delivery":
+                    fulfillment_change = "delivery"
+                elif decision.action == "choose_pickup":
+                    fulfillment_change = "pickup"
+            if payment_change:
+                checkout["payment_method"] = payment_change
+                checkout.pop("cash_change_answered", None)
+                checkout.pop("cash_change_for", None)
+                response = (
+                    f"Claro, mudei o pagamento para {payment_change.get('name')}.\n\n"
+                    f"{self._next_checkout_prompt(checkout)}"
+                )
+            elif fulfillment_change:
+                checkout["fulfillment"] = fulfillment_change
+                if fulfillment_change == "pickup":
+                    checkout.pop("delivery_address", None)
+                    checkout.pop("delivery_address_partial", None)
+                response = self._next_checkout_prompt(checkout)
+            elif "endereco" in normalized_message:
+                checkout["stage"] = "delivery_address"
+                checkout["delivery_address_partial"] = ""
+                checkout.pop("delivery_address", None)
+                response = self._missing_address_prompt(
+                    "", ["rua", "número", "bairro", "CEP"]
+                )
+            else:
+                response = (
+                    "Claro, ainda dá para ajustar. Me diga o que você quer mudar: "
+                    "produto ou quantidade, entrega/endereço, ou forma de pagamento."
+                )
+            self._save_session_context(session, session_context)
+            return await self._send_response(
+                session_id=session.id,
+                response=response,
+                intent="pedido_solicitacao_alteracao",
+                model_used="deterministic_checkout_context_change",
+                tokens_input=0,
+                tokens_output=0,
+                processing_time_ms=0,
+            )
+
         if not is_final_order_confirmation(message_content):
             return await self._send_response(
                 session_id=session.id,
                 response=(
-                    "A venda ainda não foi lançada. Responda OK ou CONFIRMAR para lançar ou "
-                    "CANCELAR para desistir."
+                    "A venda ainda não foi lançada; seu pedido continua aberto. Se estiver "
+                    "tudo certo, diga CONFIRMAR. Se quiser mudar algo, pode falar "
+                    "normalmente, por exemplo: ‘troca para PIX’ ou ‘altera para retirada’."
                 ),
                 intent="pedido_aguardando_confirmacao_final",
-                model_used="deterministic_checkout_confirmation",
+                model_used=(
+                    "contextual_checkout_orchestrator"
+                    if decision
+                    else "deterministic_checkout_confirmation"
+                ),
+                tokens_input=0,
+                tokens_output=0,
+                processing_time_ms=0,
+            )
+
+        readiness_response = self._next_checkout_prompt(checkout)
+        if checkout.get("stage") != "confirmation":
+            self._save_session_context(session, session_context)
+            return await self._send_response(
+                session_id=session.id,
+                response=readiness_response,
+                intent="pedido_dados_pendentes",
+                model_used="deterministic_checkout_pending_data",
                 tokens_input=0,
                 tokens_output=0,
                 processing_time_ms=0,
@@ -1308,6 +1981,7 @@ class MessageProcessor:
             fulfillment=str(checkout.get("fulfillment") or "pickup"),
             payment_method=checkout.get("payment_method") or {},
             delivery_address=checkout.get("delivery_address"),
+            cash_change_for=checkout.get("cash_change_for"),
             idempotency_key=str(checkout.get("idempotency_key") or ""),
         )
         if not created or not created.get("success"):
@@ -1361,6 +2035,42 @@ class MessageProcessor:
         message_content: str,
     ) -> Optional[Dict[str, Any]]:
         pending_checkout = session_context.get(ORDER_CHECKOUT_CONTEXT_KEY)
+        if isinstance(pending_checkout, dict):
+            stage = str(pending_checkout.get("stage") or "fulfillment")
+            if stage == "confirmation" and is_new_conversation_greeting(
+                message_content
+            ):
+                session_context.pop(ORDER_CHECKOUT_CONTEXT_KEY, None)
+                session_context.pop(ORDER_DRAFT_CONTEXT_KEY, None)
+                session_context.pop(ORDER_ITEM_SELECTION_CONTEXT_KEY, None)
+                session_context.pop(HISTORY_ITEM_SELECTION_CONTEXT_KEY, None)
+                session_context.pop(CATALOG_SEARCH_CONTEXT_KEY, None)
+                self._save_session_context(session, session_context)
+                return await self._send_response(
+                    session_id=session.id,
+                    response=(
+                        "Oi! 😊 Aquele pedido anterior não tinha sido confirmado, então "
+                        "encerrei apenas o rascunho — nenhuma venda foi lançada. "
+                        "Como posso ajudar agora?"
+                    ),
+                    intent="novo_atendimento_apos_checkout",
+                    model_used="deterministic_checkout_new_conversation",
+                    tokens_input=0,
+                    tokens_output=0,
+                    processing_time_ms=0,
+                )
+
+            if stage == "confirmation" and _product_query_from_choice_phrase(
+                _strip_audio_marker(message_content)
+            ):
+                session_context.pop(ORDER_CHECKOUT_CONTEXT_KEY, None)
+                session_context.pop(ORDER_DRAFT_CONTEXT_KEY, None)
+                session_context.pop(ORDER_ITEM_SELECTION_CONTEXT_KEY, None)
+                session_context.pop(HISTORY_ITEM_SELECTION_CONTEXT_KEY, None)
+                session_context.pop(CATALOG_SEARCH_CONTEXT_KEY, None)
+                self._save_session_context(session, session_context)
+                pending_checkout = None
+
         if isinstance(pending_checkout, dict):
             return await self._handle_pending_checkout(
                 session=session,
@@ -1451,6 +2161,7 @@ class MessageProcessor:
         items: list[Dict[str, Any]],
         source: str,
         from_history: bool,
+        customer_note: Optional[str] = None,
     ) -> Dict[str, Any]:
         session_context[ORDER_DRAFT_CONTEXT_KEY] = {
             "source": source,
@@ -1458,12 +2169,15 @@ class MessageProcessor:
         }
         session_context.pop(HISTORY_ITEM_SELECTION_CONTEXT_KEY, None)
         self._save_session_context(session, session_context)
+        draft_message = build_order_draft_message(
+            items,
+            from_history=from_history,
+        )
+        if customer_note:
+            draft_message = f"{customer_note}\n\n{draft_message}"
         return await self._send_response(
             session_id=session.id,
-            response=build_order_draft_message(
-                items,
-                from_history=from_history,
-            ),
+            response=draft_message,
             intent="rascunho_pedido",
             model_used="deterministic_order_draft",
             tokens_input=0,
@@ -1472,10 +2186,118 @@ class MessageProcessor:
             product_media=draft_product_media(items),
         )
 
+    async def _handle_single_item_order(
+        self,
+        *,
+        session: WhatsAppSession,
+        session_context: Dict[str, Any],
+        requested_item: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        """Pesquisa um pedido unitário antes de decidir por atendimento humano."""
+        catalog_query = str(requested_item.get("catalog_query") or "").strip()
+        result = await self._execute_function(
+            function_name="buscar_produto",
+            arguments={"termo": catalog_query, "limit": 5},
+            context={},
+            session_id=session.id,
+        )
+        result = _filter_unavailable_catalog_products(result)
+        self._remember_catalog_search(session.id, catalog_query, result)
+
+        data = result.get("data") if isinstance(result, dict) else None
+        if not isinstance(data, dict):
+            data = result if isinstance(result, dict) else {}
+        products = data.get("produtos")
+        if not isinstance(products, list):
+            products = []
+
+        if not products:
+            unavailable = bool(data.get("unavailable_found"))
+            explanation = (
+                f"Encontrei {catalog_query}, mas está sem estoque no momento."
+                if unavailable
+                else f"Não consegui identificar {catalog_query} no catálogo."
+            )
+            return await self._transfer_to_human(
+                session_id=session.id,
+                reason=(
+                    "product_out_of_stock" if unavailable else "product_not_identified"
+                ),
+                reason_details=(
+                    f"Pedido explícito não resolvido automaticamente: {catalog_query}"
+                ),
+                customer_message=(
+                    f"{explanation} Vou encaminhar você para um atendente humano "
+                    "continuar o atendimento. ⏳"
+                ),
+            )
+
+        options = [
+            {
+                "product_id": product.get("id"),
+                "name": str(product.get("nome") or "Produto"),
+                "quantity": float(requested_item.get("quantity") or 1),
+                "unit": str(requested_item.get("unit") or "x"),
+                "unit_price": product.get("preco"),
+                "stock": float(product.get("estoque") or 0),
+                "image_url": str(product.get("imagem_url") or ""),
+            }
+            for product in products[:MAX_PRODUCT_IMAGES_PER_RESPONSE]
+            if isinstance(product, dict) and product.get("id") not in (None, "")
+        ]
+        if len(options) == 1:
+            requested_quantity = float(requested_item.get("quantity") or 1)
+            available_quantity = float(options[0].get("stock") or 0)
+            customer_note = None
+            if 0 < available_quantity < requested_quantity:
+                options[0]["quantity"] = available_quantity
+                requested_text = _format_measurement_number(requested_quantity)
+                available_text = _format_measurement_number(available_quantity)
+                customer_note = (
+                    f"Você pediu {requested_text} unidade(s), mas encontrei "
+                    f"{available_text} em estoque. Posso montar o pedido com "
+                    f"as {available_text} disponíveis?"
+                )
+            return await self._send_order_draft(
+                session=session,
+                session_context=session_context,
+                items=options,
+                source="single_item_catalog",
+                from_history=False,
+                customer_note=customer_note,
+            )
+
+        session_context[HISTORY_ITEM_SELECTION_CONTEXT_KEY] = {
+            "source": "single_item_catalog",
+            "quantity": requested_item.get("quantity", 1),
+            "unit": requested_item.get("unit") or "x",
+            "options": options,
+        }
+        session_context.pop(ORDER_DRAFT_CONTEXT_KEY, None)
+        self._save_session_context(session, session_context)
+        options_text = "\n\n".join(
+            f"{index}. {option['name']}"
+            for index, option in enumerate(options, start=1)
+        )
+        return await self._send_response(
+            session_id=session.id,
+            response=(
+                "Encontrei mais de uma opção para esse pedido:\n\n"
+                f"{options_text}\n\nResponda com o número do produto."
+            ),
+            intent="clarificacao_item_catalogo",
+            model_used="deterministic_catalog_order_selection",
+            tokens_input=0,
+            tokens_output=0,
+            processing_time_ms=0,
+            product_media=draft_product_media(options),
+        )
+
     async def _handle_order_draft_flow(
         self, session_id: str, message_content: str
     ) -> Optional[Dict[str, Any]]:
         """Monta e confirma pedidos sem gravar uma venda automaticamente."""
+        message_content = _strip_audio_marker(message_content)
         session = self.db.query(WhatsAppSession).get(session_id)
         if not session:
             return None
@@ -1499,12 +2321,15 @@ class MessageProcessor:
                     selected = dict(options[selected_index])
                     selected["quantity"] = pending_selection.get("quantity", 1)
                     selected["unit"] = pending_selection.get("unit") or "x"
+                    selection_source = str(
+                        pending_selection.get("source") or "history_quantity"
+                    )
                     return await self._send_order_draft(
                         session=session,
                         session_context=session_context,
                         items=[selected],
-                        source="history_quantity",
-                        from_history=True,
+                        source=selection_source,
+                        from_history=selection_source != "single_item_catalog",
                     )
             if _confirmation_reply(message_content) is not None:
                 return await self._send_response(
@@ -1520,7 +2345,22 @@ class MessageProcessor:
 
         pending_draft = session_context.get(ORDER_DRAFT_CONTEXT_KEY)
         if isinstance(pending_draft, dict):
-            confirmation = _confirmation_reply(message_content)
+            confirmation = await self._interpret_confirmation_reply(
+                message_content,
+                pending_question=(
+                    "O pedido está correto: "
+                    + "; ".join(
+                        format_draft_item(item)
+                        for item in pending_draft.get("items") or []
+                    )
+                    + "?"
+                ),
+            )
+            numeric_confirmation = re.fullmatch(
+                r"\s*([12])[.)]?\s*", message_content or ""
+            )
+            if confirmation is None and numeric_confirmation:
+                confirmation = numeric_confirmation.group(1) == "1"
             if confirmation is True:
                 items = pending_draft.get("items") or []
                 source = str(pending_draft.get("source") or "whatsapp")
@@ -1564,6 +2404,32 @@ class MessageProcessor:
                 items=multi_items,
                 source="multi_item_message",
                 from_history=False,
+            )
+
+        single_item = extract_single_item_order(message_content)
+        if single_item:
+            return await self._handle_single_item_order(
+                session=session,
+                session_context=session_context,
+                requested_item=single_item,
+            )
+
+        if isinstance(pending_draft, dict):
+            items = pending_draft.get("items") or []
+            source = str(pending_draft.get("source") or "")
+            return await self._send_response(
+                session_id=session_id,
+                response=build_order_draft_message(
+                    items,
+                    from_history=source in {"purchase_history", "history_quantity"},
+                    retry=True,
+                ),
+                intent="confirmacao_pedido_invalida",
+                model_used="deterministic_order_confirmation_retry",
+                tokens_input=0,
+                tokens_output=0,
+                processing_time_ms=0,
+                product_media=draft_product_media(items),
             )
 
         quantity_request = extract_history_quantity_request(message_content)
@@ -1897,7 +2763,10 @@ class MessageProcessor:
                 )
                 return None, _gold_catalog_query(detailed_query, brand), True
 
-            confirmation = _confirmation_reply(message_content)
+            confirmation = await self._interpret_confirmation_reply(
+                message_content,
+                pending_question=f"É este produto: {product_name}?",
+            )
             if confirmation is True and product_name:
                 session_context.pop("pending_product_clarification", None)
                 self._save_session_context(session, session_context)
@@ -2576,7 +3445,11 @@ class MessageProcessor:
         }
 
     async def _transfer_to_human(
-        self, session_id: str, reason: str, reason_details: Optional[str] = None
+        self,
+        session_id: str,
+        reason: str,
+        reason_details: Optional[str] = None,
+        customer_message: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         Transfere conversa para atendente humano.
@@ -2625,7 +3498,8 @@ class MessageProcessor:
             session_id=session_id,
             message=transfer_messages.get(
                 reason,
-                "Um momento! Estou transferindo você para um atendente humano. ⏳",
+                customer_message
+                or "Um momento! Estou transferindo você para um atendente humano. ⏳",
             ),
         )
 

@@ -8,11 +8,13 @@ from app.whatsapp.order_drafts import (
     draft_product_media,
     extract_history_quantity_request,
     extract_multi_item_order,
+    extract_single_item_order,
     format_draft_item,
     is_generic_reorder_request,
 )
 from app.whatsapp.processor import (
     MessageProcessor,
+    _confirmation_reply,
     _customer_benefits_response,
     _delivery_status_response,
 )
@@ -67,7 +69,55 @@ def test_multi_item_order_is_organized_with_quantities():
     message = build_order_draft_message(items, from_history=False)
     assert "1 saco de ração Special Dog Gold 15kg" in message
     assert "2 pacotes de areia para gato" in message
-    assert "Responda sim" in message
+    assert "sim, está certo" in message
+    assert "quero alterar a quantidade" in message
+
+
+def test_single_item_order_extracts_live_phrase_and_corrects_catalog_typo():
+    item = extract_single_item_order("Quero 1 ração bob dog golde de 3kg por favor")
+
+    assert item == {
+        "quantity": 1.0,
+        "unit": "x",
+        "name": "ração bob dog golde de 3kg",
+        "catalog_query": "ração bob dog Gold 3kg",
+    }
+    assert extract_single_item_order("Gostaria de pedir 3 bob dog gold 3kg") == {
+        "quantity": 3.0,
+        "unit": "x",
+        "name": "bob dog gold 3kg",
+        "catalog_query": "bob dog gold 3kg",
+    }
+
+
+def test_confirmation_understands_natural_language_without_exact_phrase():
+    assert _confirmation_reply("Sim, esta certo. Pode sim") is True
+    assert _confirmation_reply("Perfeito, pode separar pra mim") is True
+    assert _confirmation_reply("Não, quero mudar a quantidade") is False
+    assert _confirmation_reply("Talvez, tenho uma dúvida") is None
+
+
+def test_ambiguous_confirmation_uses_ai_as_contextual_fallback():
+    processor = object.__new__(MessageProcessor)
+    processor.ai_enabled = True
+    calls = []
+
+    class _FakeLLM:
+        async def chat_completion(self, **kwargs):
+            calls.append(kwargs)
+            return {"content": "SIM"}
+
+    processor.llm_client = _FakeLLM()
+    result = asyncio.run(
+        processor._interpret_confirmation_reply(
+            "É o que eu tinha em mente",
+            pending_question="O pedido apresentado está correto?",
+        )
+    )
+
+    assert result is True
+    assert calls[0]["temperature"] == 0
+    assert calls[0]["max_tokens"] == 8
 
 
 def test_order_item_format_handles_fractional_and_unit_quantities():
@@ -182,6 +232,118 @@ def test_multi_item_message_creates_draft_before_human_handoff():
     assert "Organizei seu pedido" in sent["response"]
 
 
+def test_single_item_message_searches_catalog_and_creates_draft():
+    processor = object.__new__(MessageProcessor)
+    session = SimpleNamespace(id="session-test", context="{}")
+    processor.db = _FakeDB(session)
+    saved_context = {}
+    sent = {}
+
+    def fake_save_session_context(_session, context):
+        saved_context.update(context)
+
+    async def fake_execute_function(**kwargs):
+        assert kwargs["arguments"]["termo"] == "ração bob dog Gold 3kg"
+        return {
+            "success": True,
+            "produtos": [
+                {
+                    "id": "5050",
+                    "nome": "Racao Bob Dog Gold Adultos 3kg",
+                    "preco": 48.9,
+                    "estoque": 2,
+                    "imagem_url": "https://img.example/bob-dog.webp",
+                },
+                {
+                    "id": "5053",
+                    "nome": "Racao Bob Dog Gold Filhotes 3kg",
+                    "preco": 51.9,
+                    "estoque": 0,
+                    "imagem_url": "https://img.example/bob-dog-filhote.webp",
+                },
+            ],
+        }
+
+    async def fake_send_response(**kwargs):
+        sent.update(kwargs)
+        return {"action": "responded", "intent": kwargs["intent"]}
+
+    async def fail_transfer(**_kwargs):
+        raise AssertionError("Produto disponível não deve ser transferido")
+
+    processor._save_session_context = fake_save_session_context
+    processor._execute_function = fake_execute_function
+    processor._remember_catalog_search = lambda *_args, **_kwargs: None
+    processor._send_response = fake_send_response
+    processor._transfer_to_human = fail_transfer
+
+    result = asyncio.run(
+        processor._handle_order_draft_flow(
+            "session-test",
+            "[Audio do cliente] Quero 1 ração bob dog golde de 3kg por favor",
+        )
+    )
+
+    assert result["action"] == "responded"
+    draft = saved_context[ORDER_DRAFT_CONTEXT_KEY]
+    assert draft["items"][0]["product_id"] == "5050"
+    assert draft["items"][0]["quantity"] == 1
+    assert "Racao Bob Dog Gold Adultos 3kg" in sent["response"]
+    assert sent["product_media"][0]["image_url"].endswith("bob-dog.webp")
+
+
+def test_single_item_request_offers_available_quantity_instead_of_handoff():
+    processor = object.__new__(MessageProcessor)
+    session = SimpleNamespace(id="session-test", context="{}")
+    processor.db = _FakeDB(session)
+    saved_context = {}
+    sent = {}
+
+    processor._save_session_context = lambda _session, context: saved_context.update(
+        context
+    )
+    processor._remember_catalog_search = lambda *_args, **_kwargs: None
+
+    async def fake_execute_function(**_kwargs):
+        return {
+            "success": True,
+            "produtos": [
+                {
+                    "id": "5050",
+                    "nome": "Racao Bob Dog Gold Adultos 3kg",
+                    "preco": 48.9,
+                    "estoque": 2,
+                    "imagem_url": "https://img.example/bob-dog.webp",
+                }
+            ],
+        }
+
+    async def fake_send_response(**kwargs):
+        sent.update(kwargs)
+        return {"action": "responded", "intent": kwargs["intent"]}
+
+    async def fail_transfer(**_kwargs):
+        raise AssertionError("Quantidade parcial não deve transferir para humano")
+
+    processor._execute_function = fake_execute_function
+    processor._send_response = fake_send_response
+    processor._transfer_to_human = fail_transfer
+
+    result = asyncio.run(
+        processor._handle_order_draft_flow(
+            "session-test",
+            "Gostaria de pedir 3 bob dog gold 3kg",
+        )
+    )
+
+    assert result["action"] == "responded"
+    draft = saved_context[ORDER_DRAFT_CONTEXT_KEY]
+    assert draft["items"][0]["quantity"] == 2
+    assert "Você pediu 3 unidade(s)" in sent["response"]
+    assert "encontrei 2 em estoque" in sent["response"]
+    assert "sim, está certo" in sent["response"]
+
+
 def test_reorder_without_linked_customer_explains_missing_history():
     processor = object.__new__(MessageProcessor)
     session = SimpleNamespace(id="session-test", context="{}")
@@ -262,7 +424,7 @@ def test_confirmed_draft_starts_checkout_instead_of_human_handoff(monkeypatch):
     result = asyncio.run(
         processor._handle_order_draft_flow(
             "session-test",
-            "Quero repetir o pedido",
+            "1",
         )
     )
 
@@ -270,3 +432,74 @@ def test_confirmed_draft_starts_checkout_instead_of_human_handoff(monkeypatch):
     assert sent["intent"] == "pedido_escolha_entrega"
     assert "Entrega" in sent["response"]
     assert "Retirada" in sent["response"]
+
+
+def test_numeric_two_rejects_pending_draft_and_requests_correction():
+    pending = {
+        ORDER_DRAFT_CONTEXT_KEY: {
+            "source": "single_item_catalog",
+            "items": [{"product_id": 5050, "quantity": 1, "name": "Ração"}],
+        }
+    }
+    processor = object.__new__(MessageProcessor)
+    session = SimpleNamespace(id="session-test", context="ignored")
+    processor.db = _FakeDB(session)
+    sent = {}
+    processor._load_session_context = lambda _session: pending
+    processor._save_session_context = lambda _session, _context: None
+
+    async def fake_send_response(**kwargs):
+        sent.update(kwargs)
+        return {"action": "responded", "intent": kwargs["intent"]}
+
+    processor._send_response = fake_send_response
+
+    result = asyncio.run(processor._handle_order_draft_flow("session-test", "2"))
+
+    assert result["action"] == "responded"
+    assert ORDER_DRAFT_CONTEXT_KEY not in pending
+    assert sent["intent"] == "correcao_rascunho_pedido"
+    assert "lista completa corrigida" in sent["response"]
+
+
+def test_unrecognized_confirmation_repeats_pending_order_with_photo():
+    pending = {
+        ORDER_DRAFT_CONTEXT_KEY: {
+            "source": "single_item_catalog",
+            "items": [
+                {
+                    "product_id": 5050,
+                    "quantity": 1,
+                    "unit": "x",
+                    "name": "Racao Bob Dog Gold 3kg",
+                    "image_url": "https://img.example/bob-dog.webp",
+                }
+            ],
+        }
+    }
+    processor = object.__new__(MessageProcessor)
+    session = SimpleNamespace(id="session-test", context="ignored")
+    processor.db = _FakeDB(session)
+    sent = {}
+    processor._load_session_context = lambda _session: pending
+
+    async def fake_send_response(**kwargs):
+        sent.update(kwargs)
+        return {"action": "responded", "intent": kwargs["intent"]}
+
+    processor._send_response = fake_send_response
+
+    result = asyncio.run(processor._handle_order_draft_flow("session-test", "talvez"))
+
+    assert result["action"] == "responded"
+    assert ORDER_DRAFT_CONTEXT_KEY in pending
+    assert sent["intent"] == "confirmacao_pedido_invalida"
+    assert "Quero ter certeza de que entendi" in sent["response"]
+    assert "sim, está certo" in sent["response"]
+    assert "quero alterar a quantidade" in sent["response"]
+    assert sent["product_media"] == [
+        {
+            "image_url": "https://img.example/bob-dog.webp",
+            "caption": "Racao Bob Dog Gold 3kg",
+        }
+    ]

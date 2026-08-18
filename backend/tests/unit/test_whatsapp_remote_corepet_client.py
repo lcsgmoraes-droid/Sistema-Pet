@@ -1,5 +1,7 @@
 from types import SimpleNamespace
 
+import httpx
+
 from app.whatsapp import (
     customer_context_service,
     remote_corepet_client,
@@ -72,6 +74,7 @@ def test_remote_order_creation_sends_idempotency_key(monkeypatch):
         fulfillment="pickup",
         payment_method={"key": "pix", "name": "PIX"},
         delivery_address=None,
+        cash_change_for=None,
         idempotency_key="checkout-test-1234567890",
     )
 
@@ -81,6 +84,36 @@ def test_remote_order_creation_sends_idempotency_key(monkeypatch):
         "X-Internal-Token": "token-test",
         "X-Internal-Write-Token": "write-token-test",
         "Idempotency-Key": "checkout-test-1234567890",
+    }
+    assert captured["json"]["cash_change_for"] is None
+
+
+def test_remote_order_preview_preserves_safe_conflict_detail(monkeypatch):
+    def fake_post(url, **_kwargs):
+        request = httpx.Request("POST", url)
+        return httpx.Response(
+            409,
+            request=request,
+            json={"detail": "Estoque insuficiente para Racao Special Dog 15kg."},
+        )
+
+    monkeypatch.setenv(
+        "COREPET_WHATSAPP_DATA_BASE_URL",
+        "https://corepet.com.br/api/internal/whatsapp-orchestrator",
+    )
+    monkeypatch.setenv("WHATSAPP_ORCHESTRATOR_INTERNAL_TOKEN", "token-test")
+    monkeypatch.setattr(remote_corepet_client.httpx, "post", fake_post)
+
+    result = remote_corepet_client.fetch_remote_order_preview(
+        "tenant-test",
+        phone="5518997401641",
+        items=[{"product_id": 5866, "quantity": 3}],
+    )
+
+    assert result == {
+        "success": False,
+        "status_code": 409,
+        "detail": "Estoque insuficiente para Racao Special Dog 15kg.",
     }
 
 

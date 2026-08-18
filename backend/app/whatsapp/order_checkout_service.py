@@ -27,6 +27,7 @@ class WhatsAppOrderCreateData(WhatsAppOrderPreviewData):
     fulfillment: Literal["delivery", "pickup"]
     payment_method: dict[str, Any]
     delivery_address: Optional[str] = Field(default=None, max_length=1000)
+    cash_change_for: Optional[float] = Field(default=None, gt=0)
 
 
 def phone_digits(value: str) -> str:
@@ -404,7 +405,14 @@ def create_order(
             f"{order_marker} Pedido recebido pelo WhatsApp. "
             f"Modalidade: {fulfillment_label}. "
             f"Forma de pagamento informada: {available_payment['name']}. "
-            "Venda em aberto para conferência e recebimento."
+            + (
+                f"Troco para R$ {float(data.cash_change_for):.2f}. "
+                if payment_key == "dinheiro" and data.cash_change_for is not None
+                else "Sem necessidade de troco. "
+                if payment_key == "dinheiro"
+                else ""
+            )
+            + "Venda em aberto para conferência e recebimento."
         )
         sale_payload = {
             "cliente_id": preview["customer"]["id"],
@@ -435,7 +443,16 @@ def create_order(
             "endereco_entrega": (
                 delivery_address if data.fulfillment == "delivery" else None
             ),
-            "observacoes_entrega": "Pedido confirmado pelo cliente no WhatsApp",
+            "observacoes_entrega": (
+                "Pedido confirmado pelo cliente no WhatsApp. "
+                + (
+                    f"Levar troco para R$ {float(data.cash_change_for):.2f}."
+                    if payment_key == "dinheiro" and data.cash_change_for is not None
+                    else "Não precisa de troco."
+                    if payment_key == "dinheiro"
+                    else ""
+                )
+            ).strip(),
             "canal": "ecommerce",
             "tenant_id": str(tenant_id),
         }
