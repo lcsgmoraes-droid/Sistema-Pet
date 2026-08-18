@@ -54,6 +54,7 @@ from app.notas_entrada.fiscal import (
 from app.notas_entrada.financeiro import (
     criar_contas_pagar_da_nota,
 )
+from app.notas_entrada.exclusao import limpar_vinculos_nota_entrada
 from app.notas_entrada.fornecedores import (
     criar_fornecedor_automatico,
 )
@@ -296,7 +297,12 @@ def excluir_nota(
     user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     """Exclui uma nota de entrada e seus itens (cascade)"""
-    nota = db.query(NotaEntrada).filter(NotaEntrada.id == nota_id).first()
+    _, tenant_id = user_and_tenant
+    nota = (
+        db.query(NotaEntrada)
+        .filter(NotaEntrada.id == nota_id, NotaEntrada.tenant_id == tenant_id)
+        .first()
+    )
 
     if not nota:
         raise HTTPException(status_code=404, detail="Nota não encontrada")
@@ -313,7 +319,12 @@ def excluir_nota(
 
     # Excluir contas a pagar vinculadas (se existirem)
     contas_pagar = (
-        db.query(ContaPagar).filter(ContaPagar.nota_entrada_id == nota.id).all()
+        db.query(ContaPagar)
+        .filter(
+            ContaPagar.nota_entrada_id == nota.id,
+            ContaPagar.tenant_id == tenant_id,
+        )
+        .all()
     )
 
     contas_excluidas = 0
@@ -323,7 +334,12 @@ def excluir_nota(
         from app.financeiro_models import Pagamento
 
         pagamentos = (
-            db.query(Pagamento).filter(Pagamento.conta_pagar_id == conta.id).all()
+            db.query(Pagamento)
+            .filter(
+                Pagamento.conta_pagar_id == conta.id,
+                Pagamento.tenant_id == tenant_id,
+            )
+            .all()
         )
         for pagamento in pagamentos:
             db.delete(pagamento)
@@ -337,6 +353,10 @@ def excluir_nota(
             f"🗑️ {contas_excluidas} contas a pagar e {pagamentos_excluidos} pagamentos excluídos junto com a nota"
         )
 
+    vinculos_removidos = limpar_vinculos_nota_entrada(
+        db, nota_id=nota.id, tenant_id=tenant_id
+    )
+
     # Excluir nota (cascade deleta os itens automaticamente)
     db.delete(nota)
     db.commit()
@@ -348,6 +368,7 @@ def excluir_nota(
         "numero_nota": numero_nota,
         "itens_excluidos": total_itens,
         "contas_pagar_excluidas": contas_excluidas,
+        **vinculos_removidos,
     }
 
 
