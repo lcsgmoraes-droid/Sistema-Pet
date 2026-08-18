@@ -58,6 +58,46 @@ def _validate_internal_write_token(value: Optional[str]) -> None:
         )
 
 
+def _catalog_validity_by_product(
+    db: Session,
+    tenant_id,
+    products: list,
+) -> dict[int, object]:
+    """Retorna somente a validade do próximo lote vendável, sem expor o lote."""
+    from app.produtos_models import ProdutoLote
+
+    product_ids = [int(product.id) for product in products]
+    validity = {
+        int(product.id): getattr(product, "data_validade", None) for product in products
+    }
+    if not product_ids:
+        return validity
+
+    active_lots = (
+        db.query(ProdutoLote.produto_id, ProdutoLote.data_validade)
+        .filter(
+            ProdutoLote.tenant_id == tenant_id,
+            ProdutoLote.produto_id.in_(product_ids),
+            ProdutoLote.status == "ativo",
+            ProdutoLote.quantidade_disponivel > 0,
+        )
+        .order_by(
+            ProdutoLote.produto_id.asc(),
+            ProdutoLote.ordem_entrada.asc(),
+            ProdutoLote.id.asc(),
+        )
+        .all()
+    )
+    seen_products: set[int] = set()
+    for lot in active_lots:
+        product_id = int(lot.produto_id)
+        if product_id in seen_products:
+            continue
+        seen_products.add(product_id)
+        validity[product_id] = lot.data_validade
+    return validity
+
+
 def _latest_purchase(db: Session, tenant_id: str, customer_id: int):
     from app.produtos_models import Produto
     from app.vendas_models import Venda, VendaItem
@@ -185,6 +225,11 @@ def get_catalog_data(
             .limit(limit)
             .all()
         )
+        validity_by_product = _catalog_validity_by_product(
+            db,
+            tenant_uuid,
+            products,
+        )
         serialized = [
             {
                 "id": str(product.id),
@@ -196,6 +241,11 @@ def get_catalog_data(
                 "estoque_disponivel": bool((product.estoque_atual or 0) > 0),
                 "descricao": product.descricao_curta or "",
                 "imagem_url": product.imagem_principal or "",
+                "validade": (
+                    validity_by_product[int(product.id)].isoformat()
+                    if validity_by_product.get(int(product.id))
+                    else None
+                ),
             }
             for product in products
         ]

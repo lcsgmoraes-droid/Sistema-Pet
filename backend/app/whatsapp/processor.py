@@ -19,7 +19,7 @@ import unicodedata
 import uuid
 from typing import Dict, Any, Optional
 from sqlalchemy.orm import Session
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from types import SimpleNamespace
 
 from app.ai.intent_classifier import IntentClassifier, IntentRouter
@@ -422,6 +422,249 @@ def _product_query_from_choice_phrase(message: str) -> Optional[str]:
     return re.sub(
         r"^(?:a|o|uma|um)\s+", "", original_match.group(1), flags=re.IGNORECASE
     ).strip()
+
+
+def _special_catalog_request_query(
+    message: str,
+    *,
+    request_type: str,
+) -> tuple[bool, str]:
+    """Extrai o produto de perguntas sobre validade ou opções de embalagem."""
+    normalized = _normalize_text(_strip_audio_marker(message))
+    if request_type == "validity":
+        requested = bool(
+            re.search(
+                r"\b(validade|vencimento|vence|vencer|data de validade)\b",
+                normalized,
+            )
+        )
+        stop_words = {
+            "qual",
+            "quais",
+            "a",
+            "o",
+            "as",
+            "os",
+            "da",
+            "do",
+            "das",
+            "dos",
+            "de",
+            "dessa",
+            "desse",
+            "desta",
+            "deste",
+            "essa",
+            "esse",
+            "validade",
+            "vencimento",
+            "vence",
+            "vencer",
+            "data",
+            "quando",
+            "tem",
+            "me",
+            "informa",
+            "informar",
+        }
+    elif request_type == "weights":
+        requested = bool(
+            re.search(
+                r"\b(quais?|opcoes?)\b.{0,18}\b(pesos?|tamanhos?|embalagens?)\b",
+                normalized,
+            )
+            or re.search(
+                r"\btem\b.{0,22}\bquantos?\s*(?:kg|quilo|quilos)?\b",
+                normalized,
+            )
+            or re.search(
+                r"\b(?:pesos?|tamanhos?|embalagens?)\s+disponiveis\b", normalized
+            )
+        )
+        stop_words = {
+            "qual",
+            "quais",
+            "que",
+            "a",
+            "o",
+            "as",
+            "os",
+            "da",
+            "do",
+            "das",
+            "dos",
+            "de",
+            "dessa",
+            "desse",
+            "desta",
+            "deste",
+            "essa",
+            "esse",
+            "opcao",
+            "opcoes",
+            "peso",
+            "pesos",
+            "tamanho",
+            "tamanhos",
+            "embalagem",
+            "embalagens",
+            "pacote",
+            "pacotes",
+            "saco",
+            "sacos",
+            "disponivel",
+            "disponiveis",
+            "tem",
+            "quantos",
+            "quanto",
+            "kg",
+            "quilo",
+            "quilos",
+            "g",
+            "grama",
+            "gramas",
+            "ml",
+            "mililitro",
+            "mililitros",
+            "l",
+            "litro",
+            "litros",
+        }
+    else:
+        return False, ""
+
+    if not requested:
+        return False, ""
+
+    tokens = re.findall(r"\d+(?:[.,]\d+)?(?:kg|g|ml|l)|[a-z0-9]+", normalized)
+    query_tokens = [token for token in tokens if token not in stop_words]
+    query = _canonicalize_numeric_measurements(" ".join(query_tokens))
+    if query in {"produto", "racao", "essa racao", "esse produto"}:
+        query = ""
+    return True, query.strip()
+
+
+def _catalog_products(function_result: Any) -> list[Dict[str, Any]]:
+    if not isinstance(function_result, dict):
+        return []
+    data = function_result.get("data")
+    if not isinstance(data, dict):
+        data = function_result
+    products = data.get("produtos")
+    return [product for product in products or [] if isinstance(product, dict)]
+
+
+def _format_natural_list(values: list[str]) -> str:
+    if len(values) <= 1:
+        return "".join(values)
+    return f"{', '.join(values[:-1])} e {values[-1]}"
+
+
+def _measurement_sort_key(value: str) -> tuple[int, float]:
+    match = re.fullmatch(r"(\d+(?:[.,]\d+)?)(kg|g|ml|l)", value)
+    if not match:
+        return (9, float("inf"))
+    amount = float(match.group(1).replace(",", "."))
+    unit = match.group(2)
+    if unit == "kg":
+        return (0, amount * 1000)
+    if unit == "g":
+        return (0, amount)
+    if unit == "l":
+        return (1, amount * 1000)
+    return (1, amount)
+
+
+def _build_weight_options_response(function_result: Any, catalog_query: str) -> str:
+    products = _catalog_products(function_result)
+    if not products:
+        return _build_catalog_response(function_result, catalog_query)
+
+    measurements = sorted(
+        {
+            measurement
+            for product in products
+            for measurement in _extract_explicit_measurements(
+                str(product.get("nome") or "")
+            )
+        },
+        key=_measurement_sort_key,
+    )
+    if not measurements:
+        return _build_catalog_response(function_result, catalog_query)
+
+    if len(measurements) == 1:
+        return (
+            f"Para {catalog_query}, encontrei a embalagem de {measurements[0]} "
+            "com estoque. Quer que eu mostre a opção?"
+        )
+    return (
+        f"Para {catalog_query}, encontrei estas embalagens com estoque: "
+        f"{_format_natural_list(measurements)}.\n\nQual peso você prefere?"
+    )
+
+
+def _parse_catalog_validity(value: Any) -> Optional[date]:
+    if isinstance(value, datetime):
+        return value.date()
+    if isinstance(value, date):
+        return value
+    if not value:
+        return None
+    try:
+        return datetime.fromisoformat(str(value).replace("Z", "+00:00")).date()
+    except ValueError:
+        return None
+
+
+def _build_validity_response(
+    function_result: Any,
+    catalog_query: str,
+) -> tuple[str, bool]:
+    products = _catalog_products(function_result)
+    if not products:
+        return _build_catalog_response(function_result, catalog_query), False
+
+    lines = ["Consultei a validade cadastrada do estoque:"]
+    needs_human = False
+    for product in products[:MAX_PRODUCT_IMAGES_PER_RESPONSE]:
+        name = str(product.get("nome") or "Produto").strip()
+        validity = _parse_catalog_validity(product.get("validade"))
+        if validity and validity > date.today():
+            lines.append(f"- {name}: {validity:%d/%m/%Y}")
+        else:
+            needs_human = True
+            lines.append(f"- {name}: precisa de conferência da equipe")
+
+    if needs_human:
+        lines.append(
+            "Não vou informar uma data sem conferir o lote físico. "
+            "Vou chamar a equipe para confirmar certinho."
+        )
+    elif len(products) > 1:
+        lines.append("Qual dessas opções você quis dizer?")
+    return "\n\n".join(lines), needs_human
+
+
+def _restricted_scope_response(message: str) -> Optional[str]:
+    """Bloqueia pedidos que possam expor dados ou funcionamento interno."""
+    text = " ".join(_normalize_text(message).split())
+    restricted_patterns = (
+        r"\b(ignore|ignorar|esqueca).{0,30}\b(instrucoes|regras|prompt)\b",
+        r"\b(prompt|instrucoes internas|regras internas|mensagem de sistema)\b",
+        r"\b(senha|token|api key|chave de api|credencial|segredo)\b",
+        r"\b(banco de dados|dump|exporte|exportar).{0,35}\b(dados|clientes|cadastros)\b",
+        r"\b(lista|dados|telefone|cpf|endereco|historico|compras).{0,25}\b(outros? clientes?|todos os clientes)\b",
+        r"\b(outros? clientes?|todos os clientes).{0,25}\b(lista|dados|telefone|cpf|endereco|historico|compras)\b",
+        r"\b(preco de custo|margem de lucro|lucro da loja|dados do fornecedor)\b",
+    )
+    if not any(re.search(pattern, text) for pattern in restricted_patterns):
+        return None
+    return (
+        "Não consigo acessar ou compartilhar dados internos, credenciais ou "
+        "informações de outras pessoas. Posso ajudar com produtos, preços, "
+        "estoque, seu próprio histórico e seu pedido."
+    )
 
 
 def _is_generic_gold_query(message: str) -> bool:
@@ -1116,6 +1359,18 @@ class MessageProcessor:
             message_content,
             str(pending.get("query") or ""),
         )
+
+    def _last_catalog_query(self, session_id: str) -> str:
+        """Recupera o produto em foco para perguntas como 'qual a validade?'"""
+        if not getattr(self, "db", None):
+            return ""
+        session = self.db.query(WhatsAppSession).get(session_id)
+        if not session:
+            return ""
+        pending = self._load_session_context(session).get(CATALOG_SEARCH_CONTEXT_KEY)
+        if not isinstance(pending, dict):
+            return ""
+        return str(pending.get("query") or "").strip()
 
     def _resolve_customer_for_session(self, session: WhatsAppSession):
         try:
@@ -2963,6 +3218,23 @@ class MessageProcessor:
                 logger.info("Auto-response desabilitado")
                 return {"action": "skipped", "reason": "auto_response_disabled"}
 
+            restricted_response = _restricted_scope_response(message_content)
+            if restricted_response:
+                self._save_detected_intent(
+                    message_id,
+                    session_id,
+                    "fora_escopo_restrito",
+                )
+                return await self._send_response(
+                    session_id=session_id,
+                    response=restricted_response,
+                    intent="fora_escopo_restrito",
+                    model_used="deterministic_scope_guard",
+                    tokens_input=0,
+                    tokens_output=0,
+                    processing_time_ms=0,
+                )
+
             order_draft_result = await self._handle_order_draft_flow(
                 session_id=session_id,
                 message_content=message_content,
@@ -3044,6 +3316,65 @@ class MessageProcessor:
             )
             if clarification_result:
                 return clarification_result
+
+            validity_requested, validity_query = _special_catalog_request_query(
+                message_content,
+                request_type="validity",
+            )
+            if validity_requested:
+                validity_query = validity_query or self._last_catalog_query(session_id)
+                self._save_detected_intent(
+                    message_id,
+                    session_id,
+                    "consulta_validade_produto",
+                )
+                if not validity_query:
+                    return await self._send_response(
+                        session_id=session_id,
+                        response=(
+                            "Claro. De qual produto você quer conferir a validade?"
+                        ),
+                        intent="consulta_validade_produto",
+                        model_used="deterministic_validity_clarification",
+                        tokens_input=0,
+                        tokens_output=0,
+                        processing_time_ms=0,
+                    )
+                return await self._handle_deterministic_validity_lookup(
+                    session_id=session_id,
+                    catalog_query=validity_query,
+                    context={},
+                )
+
+            weights_requested, weights_query = _special_catalog_request_query(
+                message_content,
+                request_type="weights",
+            )
+            if weights_requested:
+                weights_query = weights_query or self._last_catalog_query(session_id)
+                self._save_detected_intent(
+                    message_id,
+                    session_id,
+                    "consulta_pesos_produto",
+                )
+                if not weights_query:
+                    return await self._send_response(
+                        session_id=session_id,
+                        response=(
+                            "Claro. De qual produto você quer ver os pesos disponíveis?"
+                        ),
+                        intent="consulta_pesos_produto",
+                        model_used="deterministic_weight_clarification",
+                        tokens_input=0,
+                        tokens_output=0,
+                        processing_time_ms=0,
+                    )
+                return await self._handle_deterministic_weight_options_lookup(
+                    session_id=session_id,
+                    catalog_query=weights_query,
+                    context={},
+                )
+
             product_query_resolved = bool(
                 product_query_resolved
                 or image_catalog_query
@@ -3224,6 +3555,66 @@ class MessageProcessor:
             response=_build_catalog_response(result, catalog_query),
             intent="function_executed",
             model_used="deterministic_catalog",
+            tokens_input=0,
+            tokens_output=0,
+            processing_time_ms=0,
+            product_media=_extract_product_media(result),
+        )
+
+    async def _handle_deterministic_weight_options_lookup(
+        self,
+        session_id: str,
+        catalog_query: str,
+        context: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        result = await self._execute_function(
+            function_name="buscar_produto",
+            arguments={"termo": catalog_query, "limit": 15},
+            context=context,
+            session_id=session_id,
+        )
+        result = _filter_unavailable_catalog_products(result)
+        self._remember_catalog_search(session_id, catalog_query, result)
+        return await self._send_response(
+            session_id=session_id,
+            response=_build_weight_options_response(result, catalog_query),
+            intent="consulta_pesos_produto",
+            model_used="deterministic_weight_options",
+            tokens_input=0,
+            tokens_output=0,
+            processing_time_ms=0,
+            product_media=_extract_product_media(result),
+        )
+
+    async def _handle_deterministic_validity_lookup(
+        self,
+        session_id: str,
+        catalog_query: str,
+        context: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        result = await self._execute_function(
+            function_name="buscar_produto",
+            arguments={"termo": catalog_query, "limit": 10},
+            context=context,
+            session_id=session_id,
+        )
+        result = _filter_unavailable_catalog_products(result)
+        self._remember_catalog_search(session_id, catalog_query, result)
+        response, needs_human = _build_validity_response(result, catalog_query)
+        if needs_human:
+            return await self._transfer_to_human(
+                session_id=session_id,
+                reason="product_validity",
+                reason_details=(
+                    "Validade ausente ou não segura no lote vendável consultado"
+                ),
+                customer_message=response,
+            )
+        return await self._send_response(
+            session_id=session_id,
+            response=response,
+            intent="consulta_validade_produto",
+            model_used="deterministic_product_validity",
             tokens_input=0,
             tokens_output=0,
             processing_time_ms=0,
