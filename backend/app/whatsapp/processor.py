@@ -1369,7 +1369,7 @@ class MessageProcessor:
         if action == "ask_benefits":
             benefits = preview.get("benefits") or []
             opportunity = preview.get("loyalty_opportunity") or {}
-            lines = ["Para este pedido, os benefícios previstos são:"]
+            lines = ["Com este pedido, você recebe:"]
             if benefits:
                 lines.extend(benefits_lines(benefits))
             elif float(opportunity.get("missing_amount") or 0) > 0:
@@ -1379,7 +1379,7 @@ class MessageProcessor:
                     f"1 carimbo no {opportunity.get('name') or 'Clube Fidelidade'}."
                 )
             else:
-                lines.extend(benefits_lines([]))
+                lines = ["Este pedido não gera um benefício adicional no momento."]
             lines.append(prompt)
             return "\n\n".join(lines)
         return None
@@ -1440,15 +1440,15 @@ class MessageProcessor:
                     reason_details=rejection_detail,
                     customer_message=(
                         f"Não consigo continuar com este pedido: {rejection_detail} "
-                        "Nenhuma venda foi lançada. Vou encaminhar você para um "
+                        "O pedido não foi confirmado. Vou encaminhar você para um "
                         "atendente humano ajudar com uma alternativa. ⏳"
                     ),
                 )
             return await self._send_response(
                 session_id=session.id,
                 response=(
-                    "Não consegui preparar o resumo no CorePet agora. O pedido não foi "
-                    "lançado. Pode tentar novamente em instantes."
+                    "Não consegui preparar o resumo agora. Seu pedido ainda não foi "
+                    "confirmado. Pode tentar novamente em instantes."
                 ),
                 intent="pedido_preview_indisponivel",
                 model_used="deterministic_checkout_preview_error",
@@ -1512,7 +1512,7 @@ class MessageProcessor:
             self._save_session_context(session, session_context)
             return await self._send_response(
                 session_id=session.id,
-                response="Certo, cancelei este fechamento. Nenhuma venda foi lançada.",
+                response="Certo, cancelei este pedido antes da confirmação.",
                 intent="pedido_cancelado_antes_confirmacao",
                 model_used="deterministic_checkout_cancel",
                 tokens_input=0,
@@ -1946,7 +1946,7 @@ class MessageProcessor:
             return await self._send_response(
                 session_id=session.id,
                 response=(
-                    "A venda ainda não foi lançada; seu pedido continua aberto. Se estiver "
+                    "Seu pedido ainda está aguardando sua confirmação. Se estiver "
                     "tudo certo, diga CONFIRMAR. Se quiser mudar algo, pode falar "
                     "normalmente, por exemplo: ‘troca para PIX’ ou ‘altera para retirada’."
                 ),
@@ -2009,14 +2009,25 @@ class MessageProcessor:
         )
         payment = created.get("payment_method") or checkout.get("payment_method") or {}
         lines = [
-            f"Pronto! A venda {created.get('number')} foi lançada no CorePet como aberta para conferência.",
-            f"Total dos produtos: {_format_brl(created.get('total'))}",
-            f"Modalidade: {fulfillment_label}",
-            f"Pagamento informado: {payment.get('name') or payment.get('nome') or payment.get('key')}",
-            "Benefícios previstos após a finalização:",
-            *benefits_lines(created.get("benefits") or []),
-            "O pagamento ainda não foi marcado como recebido.",
+            "Prontinho! Recebemos seu pedido 😊",
+            f"Pedido nº {created.get('number')}",
+            f"Total: {_format_brl(created.get('total'))}",
+            f"Recebimento: {fulfillment_label.capitalize()}",
+            f"Pagamento: {payment.get('name') or payment.get('nome') or payment.get('key')}",
         ]
+        benefits = created.get("benefits") or []
+        if benefits:
+            lines.extend(["Você ganhou:", *benefits_lines(benefits)])
+        if created.get("fulfillment") == "delivery" and created.get(
+            "delivery_address_registered"
+        ):
+            lines.append(
+                "Também deixei este endereço salvo para facilitar seus próximos pedidos."
+            )
+        lines.append(
+            "Agora nossa equipe vai preparar tudo. Se precisar ajustar alguma coisa, "
+            "é só chamar."
+        )
         return await self._send_response(
             session_id=session.id,
             response="\n\n".join(lines),
@@ -2050,7 +2061,7 @@ class MessageProcessor:
                     session_id=session.id,
                     response=(
                         "Oi! 😊 Aquele pedido anterior não tinha sido confirmado, então "
-                        "encerrei apenas o rascunho — nenhuma venda foi lançada. "
+                        "encerrei apenas o rascunho. "
                         "Como posso ajudar agora?"
                     ),
                     intent="novo_atendimento_apos_checkout",

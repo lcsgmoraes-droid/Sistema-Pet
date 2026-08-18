@@ -233,6 +233,7 @@ def processar_contas_pagar_entrega(
             "mercado_livre": "Mercado Livre",
             "shopee": "Shopee",
             "amazon": "Amazon",
+            "whatsapp": "E-commerce",
         }
         canal = venda.canal or "loja_fisica"
         canal_nome = CANAIS_NOMES.get(canal, "Loja Física")

@@ -222,7 +222,7 @@ def test_current_chat_flow_changes_quantity_completes_address_and_asks_change(
     assert checkout["stage"] == "confirmation"
     assert checkout["cash_change_for"] == 100
     assert "Troco para: R$ 100,00" in sent[-1]["response"]
-    assert "Cartão Fidelidade: 1 carimbo(s)" in sent[-1]["response"]
+    assert "Cartão Fidelidade: 1 carimbo" in sent[-1]["response"]
 
 
 def test_checkout_answers_registered_address_question_without_saving_it_as_address():
@@ -427,7 +427,7 @@ def test_full_checkout_simulation_creates_once_only_after_confirm(monkeypatch):
             message_content="beleza",
         )
     )
-    assert "ainda não foi lançada" in sent[-1]["response"]
+    assert "aguardando sua confirmação" in sent[-1]["response"]
     assert created_calls == []
 
     asyncio.run(
@@ -440,8 +440,12 @@ def test_full_checkout_simulation_creates_once_only_after_confirm(monkeypatch):
     )
     assert len(created_calls) == 1
     assert ORDER_CHECKOUT_CONTEXT_KEY not in context
-    assert "foi lançada no CorePet" in sent[-1]["response"]
-    assert "aberta para conferência" in sent[-1]["response"]
+    assert "Recebemos seu pedido" in sent[-1]["response"]
+    assert "Pedido nº VEN-20260816-0099" in sent[-1]["response"]
+    assert "Você ganhou:" in sent[-1]["response"]
+    assert "CorePet" not in sent[-1]["response"]
+    assert "venda" not in sent[-1]["response"].lower()
+    assert "pagamento ainda não" not in sent[-1]["response"].lower()
 
     result = asyncio.run(
         processor._handle_order_checkout_flow(
@@ -537,7 +541,7 @@ def test_checkout_cancellation_never_creates_sale(monkeypatch):
     )
 
     assert ORDER_CHECKOUT_CONTEXT_KEY not in context
-    assert "Nenhuma venda foi lançada" in sent[-1]["response"]
+    assert "cancelei este pedido antes da confirmação" in sent[-1]["response"]
 
 
 def test_greeting_at_confirmation_starts_clean_service_without_creating_sale(
@@ -569,7 +573,7 @@ def test_greeting_at_confirmation_starts_clean_service_without_creating_sale(
 
     assert result["intent"] == "novo_atendimento_apos_checkout"
     assert ORDER_CHECKOUT_CONTEXT_KEY not in context
-    assert "nenhuma venda foi lançada" in sent[-1]["response"]
+    assert "encerrei apenas o rascunho" in sent[-1]["response"]
     assert "Como posso ajudar agora?" in sent[-1]["response"]
 
 
@@ -634,7 +638,7 @@ def test_checkout_explains_stock_conflict_and_transfers_to_human(monkeypatch):
     assert result["action"] == "transferred_to_human"
     assert transferred["reason"] == "order_preview_rejected"
     assert "Estoque insuficiente" in transferred["customer_message"]
-    assert "Nenhuma venda foi lançada" in transferred["customer_message"]
+    assert "O pedido não foi confirmado" in transferred["customer_message"]
     assert "atendente humano" in transferred["customer_message"]
     assert "problema técnico" not in transferred["customer_message"]
     assert sent == []

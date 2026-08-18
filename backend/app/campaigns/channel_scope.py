@@ -56,6 +56,11 @@ CHANNEL_ALIASES = {
     "e-commerce": "ecommerce",
     "site": "ecommerce",
     "web": "ecommerce",
+    # O WhatsApp é exibido como origem própria da venda, mas usa o mesmo
+    # escopo comercial do e-commerce para campanhas e fidelidade.
+    "whatsapp": "ecommerce",
+    "whats_app": "ecommerce",
+    "zap": "ecommerce",
 }
 
 

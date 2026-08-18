@@ -264,7 +264,7 @@ def benefits_lines(benefits: list[dict[str, Any]]) -> list[str]:
             description = _format_brl(benefit["value"])
         elif benefit_type in {"loyalty", "fidelidade"}:
             quantity = int(benefit.get("quantity") or benefit.get("quantidade") or 0)
-            description = f"{quantity} carimbo(s)"
+            description = f"{quantity} {'carimbo' if quantity == 1 else 'carimbos'}"
         elif benefit_type in {"coupon", "cupom"}:
             value = float(benefit.get("value") or benefit.get("valor") or 0)
             percent = float(benefit.get("percent") or benefit.get("percentual") or 0)
@@ -326,8 +326,8 @@ def build_checkout_summary(checkout: dict[str, Any]) -> str:
     )
     benefits = preview.get("benefits") or []
     opportunity = preview.get("loyalty_opportunity") or {}
-    lines.append("Benefícios previstos após a finalização no CorePet:")
     if benefits:
+        lines.append("Benefícios deste pedido:")
         lines.extend(benefits_lines(benefits))
     elif float(opportunity.get("missing_amount") or 0) > 0:
         lines.append(
@@ -338,11 +338,8 @@ def build_checkout_summary(checkout: dict[str, Any]) -> str:
         lines.append(
             "Se quiser aproveitar, peça para adicionar outro produto antes de confirmar."
         )
-    else:
-        lines.extend(benefits_lines([]))
     lines.append(
-        "Para lançar a venda, preciso de uma confirmação clara. Pode dizer "
-        "‘está tudo certo, pode confirmar’ ou simplesmente CONFIRMAR. "
-        "A venda só será lançada depois disso."
+        "Se estiver tudo certo, diga ‘pode confirmar’ ou simplesmente CONFIRMAR. "
+        "Se quiser alterar alguma coisa, pode falar normalmente."
     )
     return "\n\n".join(lines)

@@ -1,4 +1,9 @@
-import { CANAL_APP, CANAL_ECOMMERCE, CANAL_LOJA_FISICA } from "../../utils/salesChannel";
+import {
+  CANAL_APP,
+  CANAL_ECOMMERCE,
+  CANAL_LOJA_FISICA,
+  CANAL_WHATSAPP,
+} from "../../utils/salesChannel";
 
 export const VENDAS_FINANCEIRO_CHANNEL_FILTERS = [
   {
@@ -32,5 +37,13 @@ export const VENDAS_FINANCEIRO_CHANNEL_FILTERS = [
     description: "Site da loja",
     activeClass: "bg-purple-600 text-white border-purple-600",
     idleClass: "bg-purple-50 text-purple-700 border-purple-200 hover:border-purple-300",
+  },
+  {
+    value: CANAL_WHATSAPP,
+    label: "WhatsApp",
+    filterLabel: "WhatsApp",
+    description: "Atendimento pelo WhatsApp",
+    activeClass: "bg-emerald-600 text-white border-emerald-600",
+    idleClass: "bg-emerald-50 text-emerald-700 border-emerald-200 hover:border-emerald-300",
   },
 ];

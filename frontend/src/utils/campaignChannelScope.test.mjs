@@ -7,6 +7,7 @@ test("normalizeBenefitChannel trata web e site como ecommerce", () => {
   assert.equal(normalizeBenefitChannel("web"), "ecommerce");
   assert.equal(normalizeBenefitChannel("site"), "ecommerce");
   assert.equal(normalizeBenefitChannel("e-commerce"), "ecommerce");
+  assert.equal(normalizeBenefitChannel("whatsapp"), "ecommerce");
 });
 
 test("normalizeBenefitChannel preserva canais app e pdv", () => {

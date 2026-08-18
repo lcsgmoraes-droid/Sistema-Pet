@@ -120,7 +120,7 @@ export default function VendasListaPanel({
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
+        <div className="grid grid-cols-2 gap-2 lg:grid-cols-5">
           {VENDAS_FINANCEIRO_CHANNEL_FILTERS.map((canal) => {
             const ativo = filtroCanalVenda === canal.value;
             const resumo = resumoCanais.get(canal.value) || { quantidade: 0, total: 0 };

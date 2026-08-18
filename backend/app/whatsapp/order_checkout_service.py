@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
+import unicodedata
 from datetime import datetime
 from typing import Any, Callable, Literal, Optional
 
@@ -78,6 +80,64 @@ def customer_delivery_address(customer) -> str:
         getattr(customer, "cep", None),
     ]
     return ", ".join(str(part).strip() for part in parts if str(part or "").strip())
+
+
+def _address_key(value: str) -> str:
+    normalized = unicodedata.normalize("NFKD", str(value or ""))
+    without_accents = "".join(
+        character for character in normalized if not unicodedata.combining(character)
+    )
+    return re.sub(r"[^a-z0-9]", "", without_accents.lower())
+
+
+def register_customer_delivery_address(customer, address: str) -> bool:
+    """Guarda o endereço confirmado no WhatsApp como entrega principal do cliente."""
+    clean_address = re.sub(r"\s+", " ", str(address or "")).strip(" ,")
+    if not clean_address:
+        return False
+
+    new_key = _address_key(clean_address)
+    primary = str(getattr(customer, "endereco_entrega", None) or "").strip()
+    if _address_key(primary) == new_key:
+        return False
+
+    secondary = str(getattr(customer, "endereco_entrega_2", None) or "").strip()
+    if primary:
+        if secondary and _address_key(secondary) != _address_key(primary):
+            additional = list(getattr(customer, "enderecos_adicionais", None) or [])
+            additional_keys = {
+                _address_key(
+                    item.get("endereco_completo")
+                    or ", ".join(
+                        str(item.get(field) or "").strip()
+                        for field in (
+                            "endereco",
+                            "numero",
+                            "complemento",
+                            "bairro",
+                            "cidade",
+                            "estado",
+                            "cep",
+                        )
+                        if str(item.get(field) or "").strip()
+                    )
+                )
+                for item in additional
+                if isinstance(item, dict)
+            }
+            if _address_key(secondary) not in additional_keys:
+                additional.append(
+                    {
+                        "tipo": "entrega",
+                        "apelido": "Endereço anterior",
+                        "endereco_completo": secondary,
+                    }
+                )
+                customer.enderecos_adicionais = additional
+        customer.endereco_entrega_2 = primary
+
+    customer.endereco_entrega = clean_address
+    return True
 
 
 def payment_methods(db: Session, tenant_id) -> list[dict[str, Any]]:
@@ -270,7 +330,7 @@ def create_order(
     preview_builder: Callable[..., dict[str, Any]] = build_order_preview,
 ) -> dict[str, Any]:
     from app.idempotency_models import IdempotencyKey
-    from app.models import User
+    from app.models import Cliente, User
     from app.vendas import VendaService
     from app.vendas_models import Venda
 
@@ -453,7 +513,7 @@ def create_order(
                     else ""
                 )
             ).strip(),
-            "canal": "ecommerce",
+            "canal": "whatsapp",
             "tenant_id": str(tenant_id),
         }
         sale = VendaService.criar_venda(
@@ -471,6 +531,21 @@ def create_order(
             sale_row.loja_origem = "whatsapp"
             db.commit()
 
+        delivery_address_registered = False
+        if data.fulfillment == "delivery" and delivery_address:
+            customer = (
+                db.query(Cliente)
+                .filter(
+                    Cliente.tenant_id == tenant_id,
+                    Cliente.id == preview["customer"]["id"],
+                )
+                .first()
+            )
+            if customer:
+                delivery_address_registered = register_customer_delivery_address(
+                    customer, delivery_address
+                )
+
         response = {
             "success": True,
             "sale_id": int(sale["id"]),
@@ -480,6 +555,7 @@ def create_order(
             "payment_method": available_payment,
             "fulfillment": data.fulfillment,
             "benefits": preview["benefits"],
+            "delivery_address_registered": delivery_address_registered,
         }
         registry = (
             db.query(IdempotencyKey).filter(IdempotencyKey.id == registry.id).first()

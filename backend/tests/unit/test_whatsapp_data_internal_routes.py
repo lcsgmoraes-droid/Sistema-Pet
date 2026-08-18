@@ -9,6 +9,7 @@ from app.api.whatsapp_data_internal_routes import (
     _validate_internal_write_token,
 )
 from app.api.whatsapp_orchestrator_internal_routes import _validate_internal_token
+from app.whatsapp.order_checkout_service import register_customer_delivery_address
 
 
 def test_phone_digits_normalizes_whatsapp_number():
@@ -78,6 +79,12 @@ class _OrderCreateFakeDB:
             tipo_retirada=None,
             loja_origem=None,
         )
+        self.customer = SimpleNamespace(
+            id=10563,
+            endereco_entrega=None,
+            endereco_entrega_2=None,
+            enderecos_adicionais=None,
+        )
         self.commits = 0
 
     def query(self, model):
@@ -88,6 +95,8 @@ class _OrderCreateFakeDB:
             return _FakeQuery(first=self.seller)
         if model_name == "Venda":
             return _FakeQuery(first=self.sale)
+        if model_name == "Cliente":
+            return _FakeQuery(first=self.customer)
         return _FakeQuery()
 
     def add(self, row):
@@ -225,6 +234,78 @@ def test_confirmed_order_is_idempotent_and_creates_open_sale_once(monkeypatch):
     assert first == second
     assert first["status"] == "aberta"
     assert len(calls) == 1
-    assert calls[0]["payload"]["canal"] == "ecommerce"
+    assert calls[0]["payload"]["canal"] == "whatsapp"
+    assert calls[0]["payload"]["loja_origem"] == "whatsapp"
     assert "Forma de pagamento informada: PIX" in calls[0]["payload"]["observacoes"]
     assert db.sale.tipo_retirada == "proprio"
+
+
+def test_delivery_order_registers_customer_address(monkeypatch):
+    from app.vendas import VendaService
+
+    monkeypatch.setenv("WHATSAPP_ORCHESTRATOR_INTERNAL_TOKEN", "token-correto")
+    monkeypatch.setenv("WHATSAPP_ORCHESTRATOR_WRITE_TOKEN", "token-escrita")
+    preview = {
+        "success": True,
+        "customer": {"id": 10563, "name": "Lucas Guerra", "delivery_address": ""},
+        "items": [
+            {
+                "product_id": 10,
+                "name": "Racao Bob Dog Gold 3kg",
+                "quantity": 1,
+                "unit_price": 48.9,
+                "subtotal": 48.9,
+            }
+        ],
+        "subtotal": 48.9,
+        "total": 48.9,
+        "payment_methods": [{"key": "pix", "name": "PIX"}],
+        "benefits": [],
+        "delivery": {"default_delivery_person_id": 3},
+    }
+    monkeypatch.setattr(data_routes, "_build_order_preview", lambda *_a, **_k: preview)
+    monkeypatch.setattr(
+        VendaService,
+        "criar_venda",
+        lambda **_kwargs: {"id": 99, "numero_venda": "VEN-0099", "total": 48.9},
+    )
+    db = _OrderCreateFakeDB()
+    address = "Rua Antonio de Maria, 44, CEP 19024-433, Presidente Prudente"
+
+    result = data_routes.create_order_data(
+        tenant_id="180d9cbf-5dcb-4676-bf11-dcbd91ed444b",
+        data=WhatsAppOrderCreateData(
+            phone="5518997401641",
+            items=[{"product_id": 10, "quantity": 1}],
+            fulfillment="delivery",
+            payment_method={"key": "pix", "name": "PIX"},
+            delivery_address=address,
+        ),
+        x_internal_token="token-correto",
+        x_internal_write_token="token-escrita",
+        idempotency_key="checkout-delivery-1234567890",
+        db=db,
+    )
+
+    assert result["delivery_address_registered"] is True
+    assert db.customer.endereco_entrega == address
+
+
+def test_customer_delivery_address_is_deduplicated_and_keeps_previous_addresses():
+    customer = SimpleNamespace(
+        endereco_entrega="Rua Antiga, 10",
+        endereco_entrega_2="Rua Mais Antiga, 20",
+        enderecos_adicionais=None,
+    )
+
+    assert register_customer_delivery_address(customer, " rua antiga 10 ") is False
+    assert register_customer_delivery_address(customer, "Rua Nova, 30") is True
+    assert customer.endereco_entrega == "Rua Nova, 30"
+    assert customer.endereco_entrega_2 == "Rua Antiga, 10"
+    assert customer.enderecos_adicionais == [
+        {
+            "tipo": "entrega",
+            "apelido": "Endereço anterior",
+            "endereco_completo": "Rua Mais Antiga, 20",
+        }
+    ]
