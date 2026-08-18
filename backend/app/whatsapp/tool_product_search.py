@@ -18,6 +18,58 @@ from app.whatsapp.remote_corepet_client import (
 logger = logging.getLogger(__name__)
 
 
+COMMON_PRODUCT_QUERY_TYPOS = {
+    "bobdog": "bob dog",
+    "bobdogue": "bob dog",
+    "bob dogue": "bob dog",
+    "bou dog": "bob dog",
+    "specialdog": "special dog",
+    "special dogue": "special dog",
+    "especial dog": "special dog",
+    "spesial": "special",
+    "specyal": "special",
+    "goud": "gold",
+    "gould": "gold",
+    "goold": "gold",
+    "goldi": "gold",
+    "goldem": "golden",
+    "goden": "golden",
+    "godlen": "golden",
+    "canim": "canin",
+    "caninn": "canin",
+    "royal canine": "royal canin",
+    "royal cannin": "royal canin",
+    "premie": "premier",
+    "premieer": "premier",
+    "pedigri": "pedigree",
+    "gran plus": "granplus",
+    "rassao": "racao",
+}
+
+
+def correct_common_product_query_typos(query: str) -> str:
+    """Corrige apenas erros frequentes e inequívocos de marca/linha."""
+    normalized = " ".join(_normalize_text(query).split())
+    if not normalized:
+        return ""
+
+    for typo, correction in COMMON_PRODUCT_QUERY_TYPOS.items():
+        normalized = re.sub(
+            rf"\b{re.escape(typo)}\b",
+            correction,
+            normalized,
+        )
+
+    # "golde" costuma significar a linha Gold quando Bob/Special Dog já foi
+    # informada; sem esse contexto, costuma ser uma tentativa de "Golden".
+    # A decisão vem depois dos aliases para contemplar "bou dog"/"especial dog".
+    if re.search(r"\b(?:bob|special)\s*dog\b", normalized):
+        normalized = re.sub(r"\bgolde\b", "gold", normalized)
+    else:
+        normalized = re.sub(r"\bgolde\b", "golden", normalized)
+    return " ".join(normalized.split())
+
+
 def _filter_remote_catalog_explicit_brand(
     result: Dict[str, Any], query: str
 ) -> Dict[str, Any]:
@@ -123,7 +175,7 @@ def buscar_produtos(
     try:
         from app.produtos_models import Categoria, Produto
 
-        raw_query = (query or "").strip()
+        raw_query = correct_common_product_query_typos(query)
         if not raw_query:
             return {
                 "success": True,

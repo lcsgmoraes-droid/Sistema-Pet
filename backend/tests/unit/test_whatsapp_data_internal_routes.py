@@ -122,8 +122,14 @@ def test_catalog_data_serializes_real_product_shape(monkeypatch):
         estoque_atual=2,
         descricao_curta="",
         imagem_principal="https://img.corepet.com.br/royal.webp",
+        data_validade=None,
     )
     db = SimpleNamespace(query=lambda _model: _FakeQuery(rows=[product]))
+    monkeypatch.setattr(
+        data_routes,
+        "_catalog_validity_by_product",
+        lambda *_args: {10: None},
+    )
 
     result = data_routes.get_catalog_data(
         tenant_id="180d9cbf-5dcb-4676-bf11-dcbd91ed444b",
@@ -137,6 +143,40 @@ def test_catalog_data_serializes_real_product_shape(monkeypatch):
     assert result["total"] == 1
     assert result["produtos"][0]["nome"] == "Racao Royal Canin 2,5kg"
     assert result["produtos"][0]["estoque_disponivel"] is True
+    assert result["produtos"][0]["validade"] is None
+
+
+def test_catalog_data_exposes_only_next_sellable_validity(monkeypatch):
+    monkeypatch.setenv("WHATSAPP_ORCHESTRATOR_INTERNAL_TOKEN", "token-correto")
+    product = SimpleNamespace(
+        id=10,
+        nome="Racao Bob Dog Gold 3kg",
+        codigo="5050",
+        codigo_barras="",
+        preco_venda=48.90,
+        estoque_atual=5,
+        descricao_curta="",
+        imagem_principal="",
+        data_validade=None,
+    )
+    db = SimpleNamespace(query=lambda _model: _FakeQuery(rows=[product]))
+    monkeypatch.setattr(
+        data_routes,
+        "_catalog_validity_by_product",
+        lambda *_args: {10: SimpleNamespace(isoformat=lambda: "2027-02-18T00:00:00")},
+    )
+
+    result = data_routes.get_catalog_data(
+        tenant_id="180d9cbf-5dcb-4676-bf11-dcbd91ed444b",
+        query="Bob Dog Gold 3kg",
+        categoria=None,
+        limit=5,
+        x_internal_token="token-correto",
+        db=db,
+    )
+
+    assert result["produtos"][0]["validade"] == "2027-02-18T00:00:00"
+    assert "lote" not in result["produtos"][0]
 
 
 def test_customer_context_returns_latest_purchase(monkeypatch):
