@@ -166,7 +166,7 @@ def _ensure_customer(client: AsaasClient, tenant: Tenant, current_user: User) ->
     existing = client.request(
         "GET",
         "/customers",
-        params={"externalReference": tenant.id, "limit": 1},
+        params={"externalReference": str(tenant.id), "limit": 1},
     )
     existing_data = existing.get("data")
     if isinstance(existing_data, list) and existing_data:
@@ -190,7 +190,7 @@ def _ensure_customer(client: AsaasClient, tenant: Tenant, current_user: User) ->
         ).strip(),
         "cpfCnpj": cpf_cnpj,
         "email": email,
-        "externalReference": tenant.id,
+        "externalReference": str(tenant.id),
         "notificationDisabled": False,
     }
     phone = _digits(tenant.telefone or current_user.telefone)
@@ -300,7 +300,7 @@ def create_subscription(
                 "value": float(Decimal(plan.price_cents) / Decimal(100)),
                 "cycle": "MONTHLY",
                 "description": f"CorePet - {plan.name}",
-                "externalReference": tenant.id,
+                "externalReference": str(tenant.id),
             },
         )
         subscription_id = str(subscription.get("id") or "").strip()
