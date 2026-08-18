@@ -126,6 +126,7 @@ def _latest_delivery(db: Session, tenant_id: str, customer_id: int):
         "date": sale.data_venda,
         "status": sale.status_entrega,
         "delivered_at": sale.data_entrega,
+        "delivery_address": str(sale.endereco_entrega or "").strip(),
     }
 
 

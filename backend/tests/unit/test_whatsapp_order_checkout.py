@@ -15,6 +15,7 @@ from app.whatsapp.order_checkout import (
     parse_payment_choice,
     parse_quantity_change,
 )
+from app.whatsapp.conversation_orchestrator import CheckoutDecision
 from app.whatsapp.processor import MessageProcessor
 
 
@@ -248,6 +249,81 @@ def test_checkout_answers_registered_address_question_without_saving_it_as_addre
     assert "sem endereço de entrega preenchido" in sent[-1]["response"]
 
 
+def test_contextual_checkout_finds_registered_address_without_exact_keywords():
+    processor, sent = _processor_and_messages()
+    session = SimpleNamespace(id="session-test", phone_number="5518997401641")
+    context = _checkout_context()
+    checkout = context[ORDER_CHECKOUT_CONTEXT_KEY]
+    checkout.update({"stage": "delivery_address", "fulfillment": "delivery"})
+    processor._registered_delivery_address = lambda _session, _preview: ""
+
+    async def contextual_decision(**_kwargs):
+        return CheckoutDecision("ask_registered_address", confidence=0.97)
+
+    processor._checkout_context_decision = contextual_decision
+    asyncio.run(
+        processor._handle_pending_checkout(
+            session=session,
+            session_context=context,
+            checkout=checkout,
+            message_content="vê onde vocês costumam entregar pra mim",
+        )
+    )
+
+    assert checkout["stage"] == "delivery_address"
+    assert "delivery_address_partial" not in checkout
+    assert "sem endereço de entrega preenchido" in sent[-1]["response"]
+
+
+def test_contextual_checkout_answers_total_without_losing_current_stage():
+    processor, sent = _processor_and_messages()
+    session = SimpleNamespace(id="session-test", phone_number="5518997401641")
+    context = _checkout_context()
+    checkout = context[ORDER_CHECKOUT_CONTEXT_KEY]
+    checkout["stage"] = "payment"
+
+    async def contextual_decision(**_kwargs):
+        return CheckoutDecision("ask_total", confidence=0.96)
+
+    processor._checkout_context_decision = contextual_decision
+    asyncio.run(
+        processor._handle_pending_checkout(
+            session=session,
+            session_context=context,
+            checkout=checkout,
+            message_content="antes de escolher, quanto deu tudo?",
+        )
+    )
+
+    assert checkout["stage"] == "payment"
+    assert "R$ 48,90" in sent[-1]["response"]
+    assert "forma de pagamento" in sent[-1]["response"]
+
+
+def test_contextual_checkout_does_not_save_unrelated_text_as_address():
+    processor, sent = _processor_and_messages()
+    session = SimpleNamespace(id="session-test", phone_number="5518997401641")
+    context = _checkout_context()
+    checkout = context[ORDER_CHECKOUT_CONTEXT_KEY]
+    checkout.update({"stage": "delivery_address", "fulfillment": "delivery"})
+
+    async def contextual_decision(**_kwargs):
+        return CheckoutDecision("other", confidence=0.93)
+
+    processor._checkout_context_decision = contextual_decision
+    asyncio.run(
+        processor._handle_pending_checkout(
+            session=session,
+            session_context=context,
+            checkout=checkout,
+            message_content="preciso ver isso depois",
+        )
+    )
+
+    assert "delivery_address_partial" not in checkout
+    assert "rua, número, bairro e CEP" in sent[-1]["response"]
+
+
 def test_checkout_confirms_complete_registered_address_then_moves_to_payment():
     processor, sent = _processor_and_messages()
     session = SimpleNamespace(id="session-test", phone_number="5518997401641")
@@ -279,6 +355,25 @@ def test_checkout_confirms_complete_registered_address_then_moves_to_payment():
     assert checkout["delivery_address"] == registered
     assert checkout["stage"] == "payment"
     assert "forma de pagamento" in sent[-1]["response"]
+
+
+def test_registered_address_falls_back_to_latest_delivery(monkeypatch):
+    processor, _sent = _processor_and_messages()
+    session = SimpleNamespace(id="session-test", phone_number="5518997401641")
+    preview = {"customer": {"id": 1, "delivery_address": ""}}
+    previous_address = "Rua das Palmeiras, 75, Centro, 19000-000"
+    monkeypatch.setattr(
+        "app.whatsapp.processor.fetch_remote_customer_context",
+        lambda *_args, **_kwargs: {
+            "success": True,
+            "customer": {"id": 1, "delivery_address": ""},
+            "latest_delivery": {"delivery_address": previous_address},
+        },
+    )
+
+    address = processor._registered_delivery_address(session, preview)
+
+    assert address == previous_address
 
 
 def test_full_checkout_simulation_creates_once_only_after_confirm(monkeypatch):
@@ -359,6 +454,69 @@ def test_full_checkout_simulation_creates_once_only_after_confirm(monkeypatch):
     )
     assert result is None
     assert len(created_calls) == 1
+
+
+def test_contextual_confirmation_never_replaces_explicit_customer_confirmation(
+    monkeypatch,
+):
+    processor, sent = _processor_and_messages()
+    session = SimpleNamespace(id="session-test", phone_number="5518997401641")
+    context = _checkout_context()
+    checkout = context[ORDER_CHECKOUT_CONTEXT_KEY]
+    checkout.update(
+        {
+            "stage": "confirmation",
+            "fulfillment": "pickup",
+            "payment_method": {"key": "pix", "name": "PIX"},
+        }
+    )
+    created_calls = []
+
+    async def contextual_decision(**_kwargs):
+        return CheckoutDecision("confirm", confidence=0.99)
+
+    processor._checkout_context_decision = contextual_decision
+    monkeypatch.setattr(
+        "app.whatsapp.processor.create_remote_order",
+        lambda *_args, **kwargs: created_calls.append(kwargs),
+    )
+
+    asyncio.run(
+        processor._handle_pending_checkout(
+            session=session,
+            session_context=context,
+            checkout=checkout,
+            message_content="beleza, entendi",
+        )
+    )
+
+    assert created_calls == []
+    assert ORDER_CHECKOUT_CONTEXT_KEY in context
+    assert "diga CONFIRMAR" in sent[-1]["response"]
+
+
+def test_contextual_fulfillment_understands_natural_delivery_request():
+    processor, sent = _processor_and_messages()
+    session = SimpleNamespace(id="session-test", phone_number="5518997401641")
+    context = _checkout_context()
+    checkout = context[ORDER_CHECKOUT_CONTEXT_KEY]
+
+    async def contextual_decision(**_kwargs):
+        return CheckoutDecision("choose_delivery", confidence=0.95)
+
+    processor._checkout_context_decision = contextual_decision
+    asyncio.run(
+        processor._handle_pending_checkout(
+            session=session,
+            session_context=context,
+            checkout=checkout,
+            message_content="manda aqui em casa pra mim",
+        )
+    )
+
+    assert checkout["fulfillment"] == "delivery"
+    assert checkout["stage"] == "delivery_address"
+    assert "falta bairro e CEP" in sent[-1]["response"]
 
 
 def test_checkout_cancellation_never_creates_sale(monkeypatch):
