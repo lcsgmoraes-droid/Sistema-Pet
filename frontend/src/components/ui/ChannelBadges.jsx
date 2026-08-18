@@ -7,6 +7,7 @@ const CHANNEL_LABELS = {
   mercado_livre: "Mercado Livre",
   pdv: "PDV",
   shopee: "Shopee",
+  whatsapp: "WhatsApp",
 };
 
 const CHANNEL_CLASSES = {
@@ -18,6 +19,7 @@ const CHANNEL_CLASSES = {
   mercado_livre: "border-yellow-200 bg-yellow-50 text-yellow-800",
   pdv: "border-blue-200 bg-blue-50 text-blue-700",
   shopee: "border-orange-200 bg-orange-50 text-orange-700",
+  whatsapp: "border-emerald-200 bg-emerald-50 text-emerald-700",
   default: "border-slate-200 bg-slate-50 text-slate-700",
 };
 

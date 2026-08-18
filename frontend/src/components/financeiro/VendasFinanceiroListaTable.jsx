@@ -21,6 +21,7 @@ import {
   CANAL_APP,
   CANAL_ECOMMERCE,
   CANAL_LOJA_FISICA,
+  CANAL_WHATSAPP,
   normalizeSalesChannel,
 } from "../../utils/salesChannel";
 
@@ -42,6 +43,12 @@ const CANAL_CONFIG = {
     className: "border-purple-200 bg-purple-50 text-purple-700",
     rowClassName: "border-l-4 border-l-purple-500",
     icon: ShoppingCart,
+  },
+  [CANAL_WHATSAPP]: {
+    label: "WhatsApp",
+    className: "border-emerald-200 bg-emerald-50 text-emerald-700",
+    rowClassName: "border-l-4 border-l-emerald-500",
+    icon: Smartphone,
   },
 };
 

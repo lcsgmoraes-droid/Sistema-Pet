@@ -31,6 +31,7 @@ const ORDER_CHANNEL_LABELS = {
   mercado_livre: "Mercado Livre",
   shopee: "Shopee",
   amazon: "Amazon",
+  whatsapp: "WhatsApp",
 };
 
 function normalizarStatusPedido(status) {

@@ -1,6 +1,7 @@
 export const CANAL_APP = "app";
 export const CANAL_ECOMMERCE = "ecommerce";
 export const CANAL_LOJA_FISICA = "loja_fisica";
+export const CANAL_WHATSAPP = "whatsapp";
 
 const CHANNEL_ALIASES = {
   pdv: CANAL_LOJA_FISICA,
@@ -19,6 +20,9 @@ const CHANNEL_ALIASES = {
   loja_virtual: CANAL_ECOMMERCE,
   site: CANAL_ECOMMERCE,
   web: CANAL_ECOMMERCE,
+  whatsapp: CANAL_WHATSAPP,
+  whats_app: CANAL_WHATSAPP,
+  zap: CANAL_WHATSAPP,
   app_funcionario: "app_funcionario",
   banho_tosa: "banho_tosa",
   "banho-e-tosa": "banho_tosa",
@@ -44,11 +48,12 @@ export function normalizeSalesChannel(value, defaultChannel = CANAL_ECOMMERCE) {
 }
 
 export function isOnlineSalesChannel(value) {
-  return [CANAL_APP, CANAL_ECOMMERCE].includes(normalizeSalesChannel(value));
+  return [CANAL_APP, CANAL_ECOMMERCE, CANAL_WHATSAPP].includes(normalizeSalesChannel(value));
 }
 
 export function benefitChannelFromSalesChannel(value) {
   const channel = normalizeSalesChannel(value, CANAL_LOJA_FISICA);
+  if (channel === CANAL_WHATSAPP) return CANAL_ECOMMERCE;
   if (
     [CANAL_APP, CANAL_ECOMMERCE, CANAL_LOJA_FISICA, "banho_tosa", "veterinario"].includes(channel)
   ) {
@@ -76,6 +81,15 @@ export function getSalesChannelInfo(value) {
         border: "border-green-200 hover:border-green-300",
         icon: "\uD83D\uDCF1",
         label: "App",
+      },
+      [CANAL_WHATSAPP]: {
+        value: CANAL_WHATSAPP,
+        cor: "border-l-emerald-500",
+        bg: "bg-emerald-50",
+        border: "border-emerald-200 hover:border-emerald-300",
+        icon: "💬",
+        label: "WhatsApp",
+        title: "Pedido recebido pelo WhatsApp",
       },
       app_funcionario: {
         value: "app_funcionario",

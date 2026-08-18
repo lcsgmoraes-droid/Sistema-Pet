@@ -453,7 +453,7 @@ def create_order(
                     else ""
                 )
             ).strip(),
-            "canal": "ecommerce",
+            "canal": "whatsapp",
             "tenant_id": str(tenant_id),
         }
         sale = VendaService.criar_venda(

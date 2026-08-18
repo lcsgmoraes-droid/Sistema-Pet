@@ -225,6 +225,7 @@ def test_confirmed_order_is_idempotent_and_creates_open_sale_once(monkeypatch):
     assert first == second
     assert first["status"] == "aberta"
     assert len(calls) == 1
-    assert calls[0]["payload"]["canal"] == "ecommerce"
+    assert calls[0]["payload"]["canal"] == "whatsapp"
+    assert calls[0]["payload"]["loja_origem"] == "whatsapp"
     assert "Forma de pagamento informada: PIX" in calls[0]["payload"]["observacoes"]
     assert db.sale.tipo_retirada == "proprio"

@@ -7,12 +7,14 @@ from app.services.sales_channel import (
     CANAL_APP,
     CANAL_ECOMMERCE,
     CANAL_LOJA_FISICA,
+    CANAL_WHATSAPP,
     benefit_channel_from_sales_channel,
     is_online_sales_channel,
     normalize_online_sales_channel,
     normalize_sales_channel,
     resolve_checkout_sales_channel,
 )
+from app.campaigns.channel_scope import campaign_allows_sale_channel
 
 
 def test_normalize_sales_channel_usa_canonicos_do_pdv_app_e_ecommerce():
@@ -28,6 +30,8 @@ def test_normalize_sales_channel_usa_canonicos_do_pdv_app_e_ecommerce():
     assert normalize_sales_channel("web") == CANAL_ECOMMERCE
     assert normalize_sales_channel("site") == CANAL_ECOMMERCE
     assert normalize_sales_channel("e-commerce") == CANAL_ECOMMERCE
+    assert normalize_sales_channel("WhatsApp") == CANAL_WHATSAPP
+    assert normalize_sales_channel("zap") == CANAL_WHATSAPP
 
 
 def test_normalize_sales_channel_preserva_canais_operacionais_conhecidos():
@@ -93,8 +97,14 @@ def test_online_sales_channel_e_campanhas_usam_mesma_normalizacao():
 
     assert is_online_sales_channel("mobile") is True
     assert is_online_sales_channel("site") is True
+    assert is_online_sales_channel("whatsapp") is True
     assert is_online_sales_channel("pdv") is False
 
     assert benefit_channel_from_sales_channel("mobile") == CANAL_APP
     assert benefit_channel_from_sales_channel("web") == CANAL_ECOMMERCE
+    assert benefit_channel_from_sales_channel("whatsapp") == CANAL_ECOMMERCE
     assert benefit_channel_from_sales_channel("pdv") == CANAL_LOJA_FISICA
+
+    assert campaign_allows_sale_channel(
+        {"benefit_channels": ["ecommerce"]}, "whatsapp"
+    )

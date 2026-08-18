@@ -4,6 +4,7 @@ from typing import Any
 CANAL_APP = "app"
 CANAL_ECOMMERCE = "ecommerce"
 CANAL_LOJA_FISICA = "loja_fisica"
+CANAL_WHATSAPP = "whatsapp"
 
 _CHANNEL_ALIASES = {
     "pdv": CANAL_LOJA_FISICA,
@@ -20,6 +21,9 @@ _CHANNEL_ALIASES = {
     "loja_virtual": CANAL_ECOMMERCE,
     "site": CANAL_ECOMMERCE,
     "web": CANAL_ECOMMERCE,
+    "whatsapp": CANAL_WHATSAPP,
+    "whats_app": CANAL_WHATSAPP,
+    "zap": CANAL_WHATSAPP,
     "app_funcionario": "app_funcionario",
     "banho_tosa": "banho_tosa",
     "banho_e_tosa": "banho_tosa",
@@ -45,11 +49,17 @@ def normalize_online_sales_channel(value: Any, default: str = CANAL_ECOMMERCE) -
 
 
 def is_online_sales_channel(value: Any) -> bool:
-    return normalize_sales_channel(value) in {CANAL_APP, CANAL_ECOMMERCE}
+    return normalize_sales_channel(value) in {
+        CANAL_APP,
+        CANAL_ECOMMERCE,
+        CANAL_WHATSAPP,
+    }
 
 
 def benefit_channel_from_sales_channel(value: Any) -> str:
     channel = normalize_sales_channel(value, default=CANAL_LOJA_FISICA)
+    if channel == CANAL_WHATSAPP:
+        return CANAL_ECOMMERCE
     if channel in {
         CANAL_APP,
         CANAL_ECOMMERCE,
