@@ -5,13 +5,13 @@ import ChannelBadges from "../ui/ChannelBadges";
 import {
   isKitFisicoProduto,
   isKitVirtualProduto,
+  isExpandIdSelected,
   isProdutoComComposicao,
   obterCanaisAtivosProduto,
   obterEstoqueVisualProduto,
 } from "./produtosUtils";
 import { createProdutosPricingColumns } from "./produtosPricingColumns";
 
-const normalizeExpandId = (value) => String(value ?? "");
 const getProdutoBlingId = (produto) => String(produto?.bling_produto_id || "").trim();
 const getProdutoBlingActionKey = (produtoId) => `produto-bling-${produtoId}`;
 
@@ -157,8 +157,8 @@ export function createProdutosColunas() {
         const isVariacao = produto.tipo_produto === "VARIACAO";
         const isPai = produto.tipo_produto === "PAI";
         const isKit = isProdutoComComposicao(produto);
-        const isKitExpandido = (props.kitsExpandidos || []).includes(normalizeExpandId(produto.id));
-        const isPaiExpandido = (props.paisExpandidos || []).includes(normalizeExpandId(produto.id));
+        const isKitExpandido = isExpandIdSelected(props.kitsExpandidos, produto.id);
+        const isPaiExpandido = isExpandIdSelected(props.paisExpandidos, produto.id);
 
         return (
           <td className="px-4 py-3">

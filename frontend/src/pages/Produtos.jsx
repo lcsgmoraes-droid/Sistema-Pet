@@ -98,6 +98,7 @@ export default function Produtos() {
   const {
     abrirModalColunas,
     colunasTemporarias,
+    detalhesKits,
     filtrarColunas,
     getCorEstoque,
     getValidadeMaisProxima,
@@ -106,6 +107,7 @@ export default function Produtos() {
     modalColunas,
     onCloseModalColunas,
     restaurarColunasPadrao,
+    recarregarDetalhesKit,
     salvarColunas,
     toggleColuna,
     toggleKitExpandido,
@@ -387,6 +389,7 @@ export default function Produtos() {
     },
     tableState: {
       blingActionKey,
+      detalhesKits,
       editandoMargem,
       editandoPreco,
       getCorEstoque,
@@ -418,6 +421,7 @@ export default function Produtos() {
       paginaAtual,
       paisExpandidos,
       produtos,
+      recarregarDetalhesKit,
       selecionados,
       setEditandoMargem,
       setNovoPreco,

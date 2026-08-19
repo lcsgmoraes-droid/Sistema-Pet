@@ -8,6 +8,7 @@ export default function ProdutosMainContent({
   blingBatchLoading,
   categorias,
   copiarTexto,
+  detalhesKits,
   editandoMargem,
   editandoPreco,
   filtrarColunas,
@@ -57,6 +58,7 @@ export default function ProdutosMainContent({
   persistirBusca,
   produtos,
   produtosColunas,
+  recarregarDetalhesKit,
   selecionados,
   selecionadosCount,
   setEditandoMargem,
@@ -101,6 +103,7 @@ export default function ProdutosMainContent({
       <ProdutosTabelaSection
         colunasVisiveis={colunasVisiveis}
         copiarTexto={copiarTexto}
+        detalhesKits={detalhesKits}
         editandoMargem={editandoMargem}
         editandoPreco={editandoPreco}
         getCorEstoque={getCorEstoque}
@@ -132,6 +135,7 @@ export default function ProdutosMainContent({
         paginaAtual={paginaAtual}
         paisExpandidos={paisExpandidos}
         produtos={produtos}
+        recarregarDetalhesKit={recarregarDetalhesKit}
         selecionados={selecionados}
         selecionadosCount={selecionadosCount}
         setEditandoMargem={setEditandoMargem}
