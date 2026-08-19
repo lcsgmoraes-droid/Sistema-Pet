@@ -176,7 +176,10 @@ def _produto_search_conditions_fast(palavra: str):
     prefix_pattern = f"{termo}%"
     contains_pattern = f"%{termo}%"
     conditions = [
-        Produto.codigo.ilike(prefix_pattern),
+        # O SKU oficial fica em Produto.codigo e pode conter espacos. Como a
+        # listagem aplica esta funcao para cada palavra digitada, usar apenas
+        # prefixo fazia "SKU CAIXA 3" falhar na palavra "CAIXA".
+        Produto.codigo.ilike(contains_pattern),
         *[
             column.ilike(prefix_pattern)
             for column in PRODUTO_EAN_SEARCH_COLUMNS
@@ -186,7 +189,7 @@ def _produto_search_conditions_fast(palavra: str):
     ]
 
     if PRODUTO_SKU_COLUMN is not None:
-        conditions.append(PRODUTO_SKU_COLUMN.ilike(prefix_pattern))
+        conditions.append(PRODUTO_SKU_COLUMN.ilike(contains_pattern))
 
     if PRODUTO_EAN_ALTERNATIVO_COLUMN is not None:
         conditions.append(PRODUTO_EAN_ALTERNATIVO_COLUMN.ilike(contains_pattern))
