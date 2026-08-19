@@ -49,6 +49,13 @@ def processar_baixa_estoque_item(
     """
     resultados = []
 
+    if not getattr(produto, "controlar_estoque", True):
+        logger.info(
+            "Servico %s vendido sem movimentacao de estoque",
+            getattr(produto, "id", None),
+        )
+        return resultados
+
     # Se tiver product_variation_id, usar o produto da variação
     if product_variation_id:
         from app.produtos_models import Produto
@@ -66,6 +73,8 @@ def processar_baixa_estoque_item(
             produto = (
                 variacao  # A variação é o próprio produto a ser baixado do estoque
             )
+            if not getattr(produto, "controlar_estoque", True):
+                return resultados
 
     # ============================================================
     # CASO 1: PRODUTO SIMPLES OU VARIAÇÃO

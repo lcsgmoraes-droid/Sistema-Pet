@@ -21,6 +21,7 @@ from app.produtos.validators import _validar_sku_unico, _validar_tenant_e_obter_
 from app.produtos_models import Categoria, Marca, Produto, ProdutoKitComponente
 from app.security.permissions_decorator import require_permission
 from app.services.produto_service import ProdutoService
+from app.produtos.tipos import aplicar_regras_servico_dados
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -374,6 +375,8 @@ def atualizar_produto(
         _normalizar_payload_racao(dados_recebidos)
     )
     dados_recebidos = _normalizar_promocao_erp_payload(dados_recebidos, produto)
+    dados_recebidos.setdefault("tipo", getattr(produto, "tipo", "produto"))
+    eh_servico = aplicar_regras_servico_dados(dados_recebidos)
 
     # ========================================
     # 🔒 TRAVA 3 — VALIDAÇÃO: PRODUTO PAI NÃO TEM PREÇO (ATUALIZAÇÃO)
@@ -457,7 +460,7 @@ def atualizar_produto(
         dados_recebidos.get("e_granel", produto.e_granel)
     ) or _nome_indica_granel(dados_recebidos.get("nome", produto.nome))
 
-    if produto_sera_granel:
+    if produto_sera_granel and not eh_servico:
         dados_recebidos["e_granel"] = True
         dados_recebidos["tipo_produto"] = "SIMPLES"
         dados_recebidos["tipo_kit"] = None
@@ -466,6 +469,11 @@ def atualizar_produto(
         tipo_produto_final = "SIMPLES"
         tipo_kit_final = None
         produto_sera_composto = False
+
+    if eh_servico:
+        db.query(ProdutoKitComponente).filter(
+            ProdutoKitComponente.kit_id == produto_id
+        ).delete(synchronize_session=False)
 
     # ========================================
     # ATUALIZAR COMPOSIÇÃO DO KIT (se enviado)

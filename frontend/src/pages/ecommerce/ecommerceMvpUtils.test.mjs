@@ -14,9 +14,11 @@ import {
   buildProductMap,
   calculateCatalogMetrics,
   filterCatalogProducts,
+  isProductOutOfStock,
   isCustomerProfileComplete,
   normalizeCatalogPayload,
   resolvePostAuthView,
+  resolveProductStock,
   resolveStoreDisplayName,
   settleCatalogRequests,
 } from "./ecommerceMvpUtils.js";
@@ -66,6 +68,23 @@ test("calculateCatalogMetrics conta imagens, estoque e produtos prontos", () => 
     emEstoque: 2,
     prontos: 2,
   });
+});
+
+test("servico permanece disponivel sem saldo de estoque", () => {
+  const servico = {
+    id: 4,
+    nome: "Consulta veterinaria",
+    tipo: "servico",
+    controlar_estoque: false,
+    estoque_atual: 0,
+  };
+
+  assert.equal(resolveProductStock(servico), Number.POSITIVE_INFINITY);
+  assert.equal(isProductOutOfStock(servico), false);
+  assert.deepEqual(
+    filterCatalogProducts([servico], { somenteComEstoque: true }).map((item) => item.id),
+    [4],
+  );
 });
 
 test("filterCatalogProducts filtra por busca, categoria, estoque e imagem", () => {

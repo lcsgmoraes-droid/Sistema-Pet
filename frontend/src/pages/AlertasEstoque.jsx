@@ -77,7 +77,11 @@ export default function AlertasEstoque() {
 
   const insights = useMemo(() => {
     const ativos = (produtosBrutos || []).filter(
-      (p) => p?.ativo !== false && p?.tipo_produto !== "PAI",
+      (p) =>
+        p?.ativo !== false &&
+        p?.tipo_produto !== "PAI" &&
+        p?.controlar_estoque !== false &&
+        p?.tipo !== "servico",
     );
     const est = (p) => Number(p?.estoque_atual ?? p?.estoque ?? 0);
     const min = (p) => Number(p?.estoque_minimo ?? 0);

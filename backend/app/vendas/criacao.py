@@ -203,62 +203,64 @@ def criar_venda(
             # 🔒 VALIDAÇÃO CRÍTICA: XOR entre produto_id e product_variation_id
             produto_id = item_data.get("produto_id")
             product_variation_id = item_data.get("product_variation_id")
+            tipo_solicitado = str(item_data.get("tipo") or "produto").strip().lower()
+            produto_catalogo = None
 
-            if item_data.get("tipo") == "produto":
-                # Valida XOR: OU produto_id OU product_variation_id
-                if not produto_id and not product_variation_id:
+            if produto_id and product_variation_id:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Item de venda não pode conter product_id e product_variation_id ao mesmo tempo",
+                )
+
+            # O tipo informado pelo cliente nunca pode burlar a regra do cadastro.
+            # Todo item ligado ao catalogo e carregado no tenant e normalizado aqui.
+            if produto_id:
+                produto_catalogo = (
+                    db.query(Produto)
+                    .filter(
+                        Produto.id == produto_id,
+                        Produto.tenant_id == payload.get("tenant_id"),
+                    )
+                    .first()
+                )
+                if not produto_catalogo:
+                    raise HTTPException(
+                        status_code=404,
+                        detail=f"Produto ID {produto_id} não encontrado",
+                    )
+                if produto_catalogo.tipo_produto == "PAI":
                     raise HTTPException(
                         status_code=400,
-                        detail="Item de venda deve conter product_id ou product_variation_id",
+                        detail=f"Produto '{produto_catalogo.nome}' é do tipo PAI e não pode ser vendido. Selecione uma variação.",
                     )
-
-                if produto_id and product_variation_id:
+            elif product_variation_id:
+                produto_catalogo = (
+                    db.query(Produto)
+                    .filter(
+                        Produto.id == product_variation_id,
+                        Produto.tenant_id == payload.get("tenant_id"),
+                        Produto.tipo_produto == "VARIACAO",
+                    )
+                    .first()
+                )
+                if not produto_catalogo:
                     raise HTTPException(
-                        status_code=400,
-                        detail="Item de venda não pode conter product_id e product_variation_id ao mesmo tempo",
+                        status_code=404,
+                        detail=f"Variação de produto ID {product_variation_id} não encontrada",
                     )
+            elif tipo_solicitado == "produto":
+                raise HTTPException(
+                    status_code=400,
+                    detail="Item de venda deve conter product_id ou product_variation_id",
+                )
 
-                # Se for produto simples, valida e busca preço
-                if produto_id:
-                    produto = (
-                        db.query(Produto)
-                        .filter(
-                            Produto.id == produto_id,
-                            Produto.tenant_id == payload.get("tenant_id"),
-                        )
-                        .first()
-                    )
-
-                    if not produto:
-                        raise HTTPException(
-                            status_code=404,
-                            detail=f"Produto ID {produto_id} não encontrado",
-                        )
-
-                    if produto.tipo_produto == "PAI":
-                        raise HTTPException(
-                            status_code=400,
-                            detail=f"Produto '{produto.nome}' é do tipo PAI e não pode ser vendido. Selecione uma variação.",
-                        )
-
-                # Se for variação, valida e busca preço
-                if product_variation_id:
-                    from app.produtos_models import Produto
-
-                    variacao = (
-                        db.query(Produto)
-                        .filter(
-                            Produto.id == product_variation_id,
-                            Produto.tipo_produto == "VARIACAO",
-                        )
-                        .first()
-                    )
-
-                    if not variacao:
-                        raise HTTPException(
-                            status_code=404,
-                            detail=f"Variação de produto ID {product_variation_id} não encontrada",
-                        )
+            tipo_item = tipo_solicitado
+            if produto_catalogo is not None:
+                tipo_item = (
+                    "produto"
+                    if getattr(produto_catalogo, "controlar_estoque", True)
+                    else "servico"
+                )
 
             # 🔒 ISOLAMENTO MULTI-TENANT: tenant_id obrigatório
             item = VendaItem(
@@ -266,10 +268,15 @@ def criar_venda(
                 tenant_id=payload.get(
                     "tenant_id"
                 ),  # ✅ Dupla proteção: injeção automática + explícita
-                tipo=item_data.get("tipo", "produto"),
+                tipo=tipo_item,
                 produto_id=produto_id,
                 product_variation_id=product_variation_id,
-                servico_descricao=item_data.get("servico_descricao"),
+                servico_descricao=item_data.get("servico_descricao")
+                or (
+                    produto_catalogo.nome
+                    if produto_catalogo is not None and tipo_item == "servico"
+                    else None
+                ),
                 quantidade=item_data["quantidade"],
                 preco_unitario=item_data["preco_unitario"],
                 desconto_item=item_data.get("desconto_item", 0) or 0,

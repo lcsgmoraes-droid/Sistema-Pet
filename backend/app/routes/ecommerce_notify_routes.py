@@ -16,6 +16,7 @@ from sqlalchemy.orm import Session
 from app.auth.dependencies import get_current_user_and_tenant
 from app.db import get_session
 from app.models import EcommerceNotifyRequest, Tenant
+from app.produtos_models import Produto
 from app.tenancy.context import set_current_tenant
 
 logger = logging.getLogger(__name__)
@@ -85,6 +86,19 @@ def registrar_avise_me(
 
     tenant_id = _set_tenant_context(str(tenant.id))
     email_lower = body.email.strip().lower()
+
+    produto = (
+        db.query(Produto)
+        .filter(Produto.id == body.product_id, Produto.tenant_id == tenant_id)
+        .first()
+    )
+    if not produto:
+        raise HTTPException(status_code=404, detail="Produto não encontrado")
+    if not getattr(produto, "controlar_estoque", True):
+        raise HTTPException(
+            status_code=400,
+            detail="Serviços não controlam estoque e não possuem aviso de reposição",
+        )
 
     # Evitar duplicatas
     existing = (

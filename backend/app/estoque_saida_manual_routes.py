@@ -104,6 +104,12 @@ def saida_estoque(
     if not produto:
         raise HTTPException(status_code=404, detail="Produto não encontrado")
 
+    if not getattr(produto, "controlar_estoque", True):
+        raise HTTPException(
+            status_code=400,
+            detail="Serviços não controlam estoque e não recebem saídas",
+        )
+
     # ========================================
     # 🔒 TRAVA 2 — VALIDAÇÃO: PRODUTO PAI NÃO TEM ESTOQUE
     # ========================================

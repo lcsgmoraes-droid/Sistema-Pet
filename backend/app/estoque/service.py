@@ -211,6 +211,14 @@ class EstoqueService:
                 "mensagem": f"Produto ID {produto_id} não encontrado",
             }
 
+        if not getattr(produto, "controlar_estoque", True):
+            return {
+                "disponivel": True,
+                "estoque_atual": 0,
+                "estoque_necessario": 0,
+                "mensagem": "Servico nao controla estoque",
+            }
+
         estoque_atual = produto.estoque_atual or 0
         disponivel = estoque_atual >= quantidade
 
@@ -268,6 +276,9 @@ class EstoqueService:
 
         if not produto:
             raise ValueError(f"Produto ID {produto_id} não encontrado")
+
+        if not getattr(produto, "controlar_estoque", True):
+            raise ValueError(f"Servico '{produto.nome}' nao controla estoque")
 
         # 🔒 VALIDAÇÃO CRÍTICA: Produto PAI não pode movimentar estoque
         if produto.tipo_produto == "PAI":
@@ -401,6 +412,9 @@ class EstoqueService:
 
         if not produto:
             raise ValueError(f"Produto ID {produto_id} não encontrado")
+
+        if not getattr(produto, "controlar_estoque", True):
+            raise ValueError(f"Servico '{produto.nome}' nao controla estoque")
 
         # 🔒 VALIDAÇÃO CRÍTICA: Produto PAI não pode movimentar estoque
         if produto.tipo_produto == "PAI":

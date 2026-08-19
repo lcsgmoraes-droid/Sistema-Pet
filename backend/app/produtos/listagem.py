@@ -402,7 +402,13 @@ def _aplicar_filtros_basicos_produtos(
         query = query.filter(Produto.departamento_id == departamento_id)
 
     if estoque_baixo:
-        query = query.filter(Produto.estoque_atual <= Produto.estoque_minimo)
+        query = query.filter(
+            or_(
+                Produto.tipo.is_(None),
+                func.lower(Produto.tipo) != "servico",
+            ),
+            Produto.estoque_atual <= Produto.estoque_minimo,
+        )
 
     if em_promocao:
         agora = as_brasilia_naive(referencia) or now_brasilia()

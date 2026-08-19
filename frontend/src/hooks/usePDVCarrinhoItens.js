@@ -41,7 +41,10 @@ export function usePDVCarrinhoItens({
       novosItens = [
         ...vendaAtual.itens,
         {
-          tipo: "produto",
+          tipo:
+            produto.controlar_estoque === false || produto.tipo === "servico"
+              ? "servico"
+              : "produto",
           produto_id: produto.id,
           produto_nome: produto.nome,
           produto_codigo: produto.codigo || null,
@@ -67,6 +70,7 @@ export function usePDVCarrinhoItens({
           classificacao_racao: produto.classificacao_racao,
           estoque_atual: produto.estoque_atual,
           estoque_virtual: produto.estoque_virtual,
+          controlar_estoque: produto.controlar_estoque !== false && produto.tipo !== "servico",
         },
       ];
     }
