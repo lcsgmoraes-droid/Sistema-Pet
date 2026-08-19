@@ -1,6 +1,10 @@
 import { useState } from "react";
 import { debugLog } from "../utils/debug";
-import { obterPrecoVendaPDV, recalcularSubtotalItem } from "../utils/pdvCarrinhoItensUtils";
+import {
+  colocarItemProdutoNoTopo,
+  obterPrecoVendaPDV,
+  recalcularSubtotalItem,
+} from "../utils/pdvCarrinhoItensUtils";
 
 export function usePDVCarrinhoItens({
   vendaAtual,
@@ -34,45 +38,40 @@ export function usePDVCarrinhoItens({
 
     let novosItens;
     if (itemExistente) {
-      novosItens = vendaAtual.itens.map((item) =>
-        item.produto_id === produto.id ? recalcularSubtotalItem(item, item.quantidade + 1) : item,
+      novosItens = colocarItemProdutoNoTopo(
+        vendaAtual.itens,
+        recalcularSubtotalItem(itemExistente, itemExistente.quantidade + 1),
       );
     } else {
-      novosItens = [
-        ...vendaAtual.itens,
-        {
-          tipo:
-            produto.controlar_estoque === false || produto.tipo === "servico"
-              ? "servico"
-              : "produto",
-          produto_id: produto.id,
-          produto_nome: produto.nome,
-          produto_codigo: produto.codigo || null,
-          produto_imagem_principal: produto.imagem_principal || null,
-          produto_imagem_thumbnail: produto.imagem_principal_thumbnail || null,
-          quantidade: 1,
-          preco_unitario: precoUnitario,
-          preco_venda_original:
-            produto.preco_venda_original ?? produto.preco_venda ?? precoUnitario,
-          em_promocao: promocaoAtiva,
-          promocao_origem: produto.promocao_origem_pdv || (promocaoAtiva ? "Promocao ERP" : null),
-          desconto_promocional_unitario: produto.desconto_promocional_pdv || 0,
-          desconto_item: 0,
-          subtotal: precoUnitario,
-          pet_id: vendaAtual.pet?.id || null,
-          tipo_produto: produto.tipo_produto,
-          tipo_kit: produto.tipo_kit,
-          composicao_kit: produto.composicao_kit || [],
-          categoria_id: produto.categoria_id,
-          categoria_nome: produto.categoria_nome,
-          peso_pacote_kg: produto.peso_liquido || produto.peso_bruto,
-          peso_embalagem: produto.peso_embalagem,
-          classificacao_racao: produto.classificacao_racao,
-          estoque_atual: produto.estoque_atual,
-          estoque_virtual: produto.estoque_virtual,
-          controlar_estoque: produto.controlar_estoque !== false && produto.tipo !== "servico",
-        },
-      ];
+      novosItens = colocarItemProdutoNoTopo(vendaAtual.itens, {
+        tipo:
+          produto.controlar_estoque === false || produto.tipo === "servico" ? "servico" : "produto",
+        produto_id: produto.id,
+        produto_nome: produto.nome,
+        produto_codigo: produto.codigo || null,
+        produto_imagem_principal: produto.imagem_principal || null,
+        produto_imagem_thumbnail: produto.imagem_principal_thumbnail || null,
+        quantidade: 1,
+        preco_unitario: precoUnitario,
+        preco_venda_original: produto.preco_venda_original ?? produto.preco_venda ?? precoUnitario,
+        em_promocao: promocaoAtiva,
+        promocao_origem: produto.promocao_origem_pdv || (promocaoAtiva ? "Promocao ERP" : null),
+        desconto_promocional_unitario: produto.desconto_promocional_pdv || 0,
+        desconto_item: 0,
+        subtotal: precoUnitario,
+        pet_id: vendaAtual.pet?.id || null,
+        tipo_produto: produto.tipo_produto,
+        tipo_kit: produto.tipo_kit,
+        composicao_kit: produto.composicao_kit || [],
+        categoria_id: produto.categoria_id,
+        categoria_nome: produto.categoria_nome,
+        peso_pacote_kg: produto.peso_liquido || produto.peso_bruto,
+        peso_embalagem: produto.peso_embalagem,
+        classificacao_racao: produto.classificacao_racao,
+        estoque_atual: produto.estoque_atual,
+        estoque_virtual: produto.estoque_virtual,
+        controlar_estoque: produto.controlar_estoque !== false && produto.tipo !== "servico",
+      });
     }
 
     recalcularTotais(novosItens);
