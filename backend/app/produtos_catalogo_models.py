@@ -14,6 +14,7 @@ from sqlalchemy import (
     JSON,
     String,
     Text,
+    event,
     func,
 )
 from sqlalchemy.dialects.postgresql import JSONB
@@ -108,6 +109,13 @@ class Produto(BaseTenantModel):
     nome = Column(String(200), nullable=False)
     tipo = Column(String(20), default="produto")  # produto, servico, produto_servico
     situacao = Column(Boolean, default=True)  # ativo/inativo
+
+    @property
+    def controlar_estoque(self) -> bool:
+        """Servicos sao vendaveis, mas nunca participam do controle de estoque."""
+        from app.produtos.tipos import tipo_controla_estoque
+
+        return tipo_controla_estoque(self.tipo)
 
     # ========== SPRINT 2: PRODUTOS COM VARIAÇÃO ==========
     # tipo_produto: Define a estrutura do produto
@@ -491,3 +499,16 @@ class Produto(BaseTenantModel):
     @property
     def imagem_principal_thumbnail(self):
         return build_product_thumbnail_url(self.imagem_principal)
+
+
+@event.listens_for(Produto, "before_insert")
+@event.listens_for(Produto, "before_update")
+def _aplicar_invariantes_servico_orm(_mapper, _connection, produto: Produto) -> None:
+    """Ultima barreira para importacoes e fluxos que gravam Produto diretamente."""
+    from app.produtos.tipos import aplicar_regras_servico_dados
+
+    dados = {"tipo": produto.tipo}
+    if not aplicar_regras_servico_dados(dados):
+        return
+    for campo, valor in dados.items():
+        setattr(produto, campo, valor)

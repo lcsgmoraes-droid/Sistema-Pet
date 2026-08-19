@@ -14,10 +14,12 @@ from datetime import datetime
 from app.db import get_session
 from app.auth.dependencies import get_current_user_and_tenant
 from app.services.nfe_cache_service import (
+    FONTES_NFE_LOCAIS,
     existe_nota_cache_no_intervalo,
     listar_notas_cache,
     obter_estado_cache_notas,
 )
+from app.services.bling_tenant_guard import tenant_pode_usar_bling_global
 from app.services.nfe_pending_reconciliation_service import (
     reconciliar_nfes_pendentes_recentes,
 )
@@ -136,6 +138,14 @@ def _buscar_venda_para_nfe(db: Session, venda_id: int, tenant_id):
     )
 
 
+def _exigir_bling_configurado_para_tenant(tenant_id) -> None:
+    if not tenant_pode_usar_bling_global(tenant_id):
+        raise HTTPException(
+            status_code=403,
+            detail="A integração Bling não está configurada para esta empresa",
+        )
+
+
 @router.post("/prevalidar")
 async def prevalidar_nfe(
     request: PrevalidarNFeRequest,
@@ -168,6 +178,7 @@ async def emitir_nfe(
 
     try:
         current_user, tenant_id = user_and_tenant
+        _exigir_bling_configurado_para_tenant(tenant_id)
         tipo_nota = _normalizar_tipo_nota(request.tipo_nota)
         venda = _buscar_venda_para_nfe(db, request.venda_id, tenant_id)
         if not venda:
@@ -324,6 +335,8 @@ async def listar_nfes(
 ):
     """Lista todas as NF-e/NFC-e emitidas — busca direto do Bling (inclui marketplace)"""
     current_user, tenant_id = user_and_tenant
+    bling_remoto_permitido = tenant_pode_usar_bling_global(tenant_id)
+    fontes_permitidas = None if bling_remoto_permitido else FONTES_NFE_LOCAIS
     cache_key = _cache_key_listar_nfes(tenant_id, data_inicial, data_final, situacao)
     cache_atual = _nfe_list_cache.get(cache_key)
     agora_cache = monotonic()
@@ -341,7 +354,9 @@ async def listar_nfes(
         )
         return payload_cache
 
-    estado_cache = obter_estado_cache_notas(db, tenant_id)
+    estado_cache = obter_estado_cache_notas(
+        db, tenant_id, fontes_permitidas=fontes_permitidas
+    )
     _sincronizar_fontes_locais_nfe_em_cache(
         db,
         tenant_id,
@@ -356,20 +371,29 @@ async def listar_nfes(
         data_inicial=data_inicial,
         data_final=data_final,
         situacao=situacao,
+        fontes_permitidas=fontes_permitidas,
     )
-    estado_cache = obter_estado_cache_notas(db, tenant_id)
+    estado_cache = obter_estado_cache_notas(
+        db, tenant_id, fontes_permitidas=fontes_permitidas
+    )
 
-    deve_sincronizar_bling, sync_data_inicial, sync_data_final, estrategia_sync = (
-        _planejar_sincronizacao_bling_nfes(
-            force_refresh=force_refresh,
-            data_inicial=data_inicial,
-            data_final=data_final,
-            cache_total=estado_cache.get("total", 0),
-            cache_intervalo_tem_dados=cache_intervalo_tem_dados,
-            ultimo_sync=estado_cache.get("ultimo_sync"),
-            ultima_data_emissao=estado_cache.get("ultima_data_emissao"),
+    if bling_remoto_permitido:
+        deve_sincronizar_bling, sync_data_inicial, sync_data_final, estrategia_sync = (
+            _planejar_sincronizacao_bling_nfes(
+                force_refresh=force_refresh,
+                data_inicial=data_inicial,
+                data_final=data_final,
+                cache_total=estado_cache.get("total", 0),
+                cache_intervalo_tem_dados=cache_intervalo_tem_dados,
+                ultimo_sync=estado_cache.get("ultimo_sync"),
+                ultima_data_emissao=estado_cache.get("ultima_data_emissao"),
+            )
         )
-    )
+    else:
+        deve_sincronizar_bling = False
+        sync_data_inicial = None
+        sync_data_final = None
+        estrategia_sync = "somente_fontes_locais"
 
     bling_ok = False
     if deve_sincronizar_bling:
@@ -387,6 +411,7 @@ async def listar_nfes(
         data_inicial=data_inicial,
         data_final=data_final,
         situacao=situacao,
+        fontes_permitidas=fontes_permitidas,
     )
 
     if not notas:
@@ -439,6 +464,7 @@ async def reconciliar_pendentes_nfe(
     user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     _, tenant_id = user_and_tenant
+    _exigir_bling_configurado_para_tenant(tenant_id)
     try:
         resultado = reconciliar_nfes_pendentes_recentes(
             db,

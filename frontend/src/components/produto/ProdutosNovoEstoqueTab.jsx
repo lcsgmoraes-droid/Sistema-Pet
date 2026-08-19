@@ -11,7 +11,14 @@ export default function ProdutosNovoEstoqueTab({
 }) {
   return (
     <div className="space-y-6">
-      {formData.tipo_produto === "PAI" ? (
+      {formData.tipo === "servico" ? (
+        <div className="rounded-lg border-2 border-dashed border-teal-300 bg-teal-50 py-12 text-center">
+          <p className="text-lg font-medium text-teal-900">Serviço não controla estoque</p>
+          <p className="mt-2 text-sm text-teal-700">
+            Não há saldo, lote, estoque mínimo ou lista de espera para este cadastro.
+          </p>
+        </div>
+      ) : formData.tipo_produto === "PAI" ? (
         <div className="text-center py-12 border-2 border-dashed border-blue-300 rounded-lg bg-blue-50">
           <svg
             className="mx-auto h-12 w-12 text-blue-400"

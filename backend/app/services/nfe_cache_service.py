@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Collection
 from datetime import datetime
 from decimal import Decimal
 
@@ -19,6 +20,8 @@ _SOURCE_PRIORITY = {
     "webhook": 100,
     "bling_detail": 110,
 }
+
+FONTES_NFE_LOCAIS = ("local_venda", "pedido_integrado")
 
 _STATUS_PRIORITY = {
     "pendente": 10,
@@ -179,10 +182,14 @@ def listar_notas_cache(
     data_final: str | None = None,
     situacao: str | None = None,
     limit: int | None = None,
+    fontes_permitidas: Collection[str] | None = None,
 ) -> list[dict]:
     query = db.query(BlingNotaFiscalCache).filter(
         BlingNotaFiscalCache.tenant_id == tenant_id
     )
+
+    if fontes_permitidas is not None:
+        query = query.filter(BlingNotaFiscalCache.source.in_(tuple(fontes_permitidas)))
 
     if situacao:
         query = query.filter(
@@ -220,6 +227,7 @@ def existe_nota_cache_no_intervalo(
     data_inicial: str | None = None,
     data_final: str | None = None,
     situacao: str | None = None,
+    fontes_permitidas: Collection[str] | None = None,
 ) -> bool:
     return bool(
         listar_notas_cache(
@@ -229,20 +237,25 @@ def existe_nota_cache_no_intervalo(
             data_final=data_final,
             situacao=situacao,
             limit=1,
+            fontes_permitidas=fontes_permitidas,
         )
     )
 
 
-def obter_estado_cache_notas(db: Session, tenant_id) -> dict:
-    total, ultima_data_emissao, ultimo_sync = (
-        db.query(
-            func.count(BlingNotaFiscalCache.id),
-            func.max(BlingNotaFiscalCache.data_emissao),
-            func.max(BlingNotaFiscalCache.last_synced_at),
-        )
-        .filter(BlingNotaFiscalCache.tenant_id == tenant_id)
-        .one()
-    )
+def obter_estado_cache_notas(
+    db: Session,
+    tenant_id,
+    *,
+    fontes_permitidas: Collection[str] | None = None,
+) -> dict:
+    query = db.query(
+        func.count(BlingNotaFiscalCache.id),
+        func.max(BlingNotaFiscalCache.data_emissao),
+        func.max(BlingNotaFiscalCache.last_synced_at),
+    ).filter(BlingNotaFiscalCache.tenant_id == tenant_id)
+    if fontes_permitidas is not None:
+        query = query.filter(BlingNotaFiscalCache.source.in_(tuple(fontes_permitidas)))
+    total, ultima_data_emissao, ultimo_sync = query.one()
     return {
         "total": int(total or 0),
         "ultima_data_emissao": ultima_data_emissao,
@@ -281,6 +294,7 @@ def upsert_nota_cache(
     source: str | None = None,
     resumo_payload: dict | None = None,
     detalhe_payload: dict | None = None,
+    substituir_origem_remota: bool = False,
 ) -> BlingNotaFiscalCache | None:
     bling_id = _texto(nota.get("id"))
     if not bling_id or bling_id in {"0", "-1"}:
@@ -322,6 +336,37 @@ def upsert_nota_cache(
         )
 
     source_novo = _texto(source) or _texto(nota.get("origem"))
+    if (
+        substituir_origem_remota
+        and registro.source
+        and _texto(registro.source).lower() not in FONTES_NFE_LOCAIS
+    ):
+        # Um ID remoto global pode coincidir com o ID de uma nota local. Para um
+        # tenant sem Bling proprio, descarte todo o conteudo remoto antes do merge.
+        for campo in (
+            "numero",
+            "serie",
+            "status",
+            "chave",
+            "data_emissao",
+            "valor",
+            "cliente",
+            "loja",
+            "unidade_negocio",
+            "canal",
+            "canal_label",
+            "numero_loja_virtual",
+            "origem_loja_virtual",
+            "origem_canal_venda",
+            "numero_pedido_loja",
+            "pedido_bling_id_ref",
+            "source",
+            "resumo_payload",
+            "detalhe_payload",
+            "detalhada_em",
+        ):
+            setattr(registro, campo, None)
+
     registro.tipo = (
         _texto(nota.get("tipo")) or registro.tipo or ("nfce" if modelo == 65 else "nfe")
     )

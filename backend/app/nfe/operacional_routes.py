@@ -5,17 +5,20 @@ from fastapi.responses import Response
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from app.auth import get_current_user
 from app.auth.dependencies import get_current_user_and_tenant
 from app.bling_integration import BlingAPI
 from app.db import get_session
-from app.models import User
 from app.nfe_cache_models import BlingNotaFiscalCache
 from app.produtos_models import EstoqueMovimentacao, Produto
 from app.services.bling_sync_service import BlingSyncService
+from app.services.bling_tenant_guard import (
+    bling_tenant_id_configurado,
+    tenant_pode_usar_bling_global,
+)
 from app.services.nfe_authorized_reconciliation_service import (
     reconciliar_nf_autorizada_cache,
 )
+from app.tenancy.rls import sync_rls_tenant
 from app.utils.logger import logger
 from app.vendas_models import Venda
 
@@ -36,6 +39,14 @@ def _nfe_routes():
     return nfe_routes
 
 
+def _exigir_bling_configurado_para_tenant(tenant_id) -> None:
+    if not tenant_pode_usar_bling_global(tenant_id):
+        raise HTTPException(
+            status_code=403,
+            detail="A integração Bling não está configurada para esta empresa",
+        )
+
+
 @router.post("/{nfe_id}/reconciliar-fluxo")
 async def reconciliar_fluxo_nfe(
     nfe_id: str,
@@ -43,6 +54,7 @@ async def reconciliar_fluxo_nfe(
     user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     _, tenant_id = user_and_tenant
+    _exigir_bling_configurado_para_tenant(tenant_id)
 
     registro = (
         db.query(BlingNotaFiscalCache)
@@ -96,6 +108,7 @@ async def consultar_nfe(
     """Consulta dados completos de uma NF-e/NFC-e"""
     try:
         _current_user, tenant_id = user_and_tenant
+        _exigir_bling_configurado_para_tenant(tenant_id)
         nfe_routes = _nfe_routes()
         bling = BlingAPI()
         detalhe, modelo_resolvido, venda = nfe_routes._consultar_detalhe_nota_bling(
@@ -128,6 +141,8 @@ async def baixar_xml(
     user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     """Baixa XML da NF-e"""
+    _, tenant_id = user_and_tenant
+    _exigir_bling_configurado_para_tenant(tenant_id)
     try:
         bling = BlingAPI()
         xml = bling.baixar_xml(nfe_id)
@@ -144,12 +159,18 @@ async def cancelar_nfe(
     user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     """Cancela uma NF-e"""
+    _, tenant_id = user_and_tenant
+    _exigir_bling_configurado_para_tenant(tenant_id)
     try:
         bling = BlingAPI()
         resultado = bling.cancelar_nfe(nfe_id, request.justificativa)
 
         # Atualizar status na venda
-        venda = db.query(Venda).filter(Venda.nfe_bling_id == nfe_id).first()
+        venda = (
+            db.query(Venda)
+            .filter(Venda.nfe_bling_id == nfe_id, Venda.tenant_id == tenant_id)
+            .first()
+        )
         if venda:
             venda.nfe_status = "cancelada"
             venda.nfe_motivo_rejeicao = request.justificativa
@@ -176,6 +197,8 @@ async def carta_correcao(
     user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     """Emite Carta de Correção Eletrônica (CC-e)"""
+    _, tenant_id = user_and_tenant
+    _exigir_bling_configurado_para_tenant(tenant_id)
     try:
         bling = BlingAPI()
         resultado = bling.carta_correcao(nfe_id, request.correcao)
@@ -253,6 +276,15 @@ async def excluir_nota(
 async def webhook_bling(request: Request, db: Session = Depends(get_session)):
     """Recebe notificações do Bling sobre mudanças de status das notas"""
     try:
+        tenant_id = bling_tenant_id_configurado()
+        if not tenant_id:
+            logger.error(
+                "webhook_bling",
+                "Webhook ignorado: tenant proprietario do Bling nao configurado",
+            )
+            return {"success": False, "message": "Integração Bling não configurada"}
+        sync_rls_tenant(db, tenant_id)
+
         # Pegar dados do webhook
         dados = await request.json()
 
@@ -277,7 +309,11 @@ async def webhook_bling(request: Request, db: Session = Depends(get_session)):
             return {"success": True, "message": "Webhook ignorado"}
 
         # Buscar venda com essa nota
-        venda = db.query(Venda).filter(Venda.nfe_bling_id == nfe_id).first()
+        venda = (
+            db.query(Venda)
+            .filter(Venda.nfe_bling_id == nfe_id, Venda.tenant_id == tenant_id)
+            .first()
+        )
 
         if not venda:
             logger.warning(
@@ -360,7 +396,12 @@ async def webhook_bling(request: Request, db: Session = Depends(get_session)):
             for mov in movimentacoes:
                 if mov.status != "cancelado":
                     produto = (
-                        db.query(Produto).filter(Produto.id == mov.produto_id).first()
+                        db.query(Produto)
+                        .filter(
+                            Produto.id == mov.produto_id,
+                            Produto.tenant_id == tenant_id,
+                        )
+                        .first()
                     )
                     if produto:
                         produto.estoque_atual = (
@@ -412,6 +453,7 @@ async def sincronizar_status_nota(
 ):
     """Sincroniza o status da nota fiscal com o Bling"""
     current_user, tenant_id = user_and_tenant
+    _exigir_bling_configurado_para_tenant(tenant_id)
     try:
         # Buscar venda
         venda = (
@@ -473,6 +515,7 @@ async def sincronizar_todos_status(
 ):
     """Sincroniza o status de todas as notas fiscais com o Bling"""
     current_user, tenant_id = user_and_tenant
+    _exigir_bling_configurado_para_tenant(tenant_id)
     try:
         # Buscar vendas com NF emitida
         vendas = (
@@ -536,6 +579,8 @@ async def baixar_danfe(
     user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     """Baixa PDF da DANFE"""
+    _, tenant_id = user_and_tenant
+    _exigir_bling_configurado_para_tenant(tenant_id)
     try:
         bling = BlingAPI()
         pdf_content = bling.baixar_danfe(nfe_id)
@@ -550,8 +595,12 @@ async def baixar_danfe(
 
 
 @router.get("/config/testar-conexao")
-async def testar_conexao(current_user: User = Depends(get_current_user)):
+async def testar_conexao(
+    user_and_tenant=Depends(get_current_user_and_tenant),
+):
     """Testa conexão com Bling"""
+    _, tenant_id = user_and_tenant
+    _exigir_bling_configurado_para_tenant(tenant_id)
     try:
         bling = BlingAPI()
         if bling.validar_conexao():

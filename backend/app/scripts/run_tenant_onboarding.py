@@ -19,6 +19,8 @@ if __package__ in {None, ""}:
     backend_path = Path(__file__).resolve().parents[2]
     sys.path.insert(0, str(backend_path))
 
+import app.models  # noqa: E402,F401 - registra Pet e modelos base antes dos relacionamentos
+import app.produtos_models  # noqa: E402,F401 - registra Produto usado pelo modulo veterinario
 from app.db import SessionLocal
 from app.services.tenant_onboarding_service import (
     REQUIRED_ONBOARDING_SECTIONS,

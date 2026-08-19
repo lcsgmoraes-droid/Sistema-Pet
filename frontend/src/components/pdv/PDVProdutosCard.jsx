@@ -45,10 +45,12 @@ function ProdutoSugestaoPDV({
   produto,
   vendaAtual,
 }) {
+  const controlaEstoque = produto.controlar_estoque !== false && produto.tipo !== "servico";
   const estoqueZerado =
-    produto.tipo_produto === "KIT" && produto.tipo_kit === "VIRTUAL"
+    controlaEstoque &&
+    (produto.tipo_produto === "KIT" && produto.tipo_kit === "VIRTUAL"
       ? produto.estoque_virtual !== undefined && Math.floor(produto.estoque_virtual) <= 0
-      : produto.estoque_atual !== undefined && Math.floor(produto.estoque_atual) <= 0;
+      : produto.estoque_atual !== undefined && Math.floor(produto.estoque_atual) <= 0);
   const imagemSugestao = resolveMediaUrl(obterImagemSugestaoProduto(produto));
   const precoPDV = obterPrecoPDV(produto);
   const precoOriginal = Number.parseFloat(produto.preco_venda_original ?? produto.preco_venda ?? 0);
@@ -103,10 +105,11 @@ function ProdutoSugestaoPDV({
             )}
             <div className="text-sm text-gray-500">
               {produto.codigo && `Cod: ${produto.codigo}`}
-              {produto.tipo_produto === "KIT" && produto.tipo_kit === "VIRTUAL"
+              {controlaEstoque && produto.tipo_produto === "KIT" && produto.tipo_kit === "VIRTUAL"
                 ? produto.estoque_virtual !== undefined &&
                   ` | Estoque: ${Math.floor(produto.estoque_virtual)}`
-                : produto.estoque_atual !== undefined &&
+                : controlaEstoque &&
+                  produto.estoque_atual !== undefined &&
                   ` | Estoque: ${Math.floor(produto.estoque_atual)}`}
             </div>
             {resumoPrecoKg.disponivel && (
@@ -214,10 +217,12 @@ export default function PDVProdutosCard({
             const imagemProduto = resolveMediaUrl(obterImagemMiniaturaItem(item));
             const chaveCodigoItem = `${item.produto_id || "item"}-${index}`;
             const hasComposicao = isKit && item.composicao_kit && item.composicao_kit.length > 0;
+            const itemControlaEstoque = item.controlar_estoque !== false && item.tipo !== "servico";
             const itemSemEstoque =
-              item.tipo_produto === "KIT" && item.tipo_kit === "VIRTUAL"
+              itemControlaEstoque &&
+              (item.tipo_produto === "KIT" && item.tipo_kit === "VIRTUAL"
                 ? item.estoque_virtual !== undefined && Math.floor(item.estoque_virtual) <= 0
-                : item.estoque_atual !== undefined && Math.floor(item.estoque_atual) <= 0;
+                : item.estoque_atual !== undefined && Math.floor(item.estoque_atual) <= 0);
             const itemEmPromocao = Boolean(item.em_promocao);
             const resumoPrecoKg = obterResumoPrecoPorKg(item);
 

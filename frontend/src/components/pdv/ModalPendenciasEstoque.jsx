@@ -93,7 +93,9 @@ export default function ModalPendenciasEstoque({
         },
       });
       // A API retorna um objeto com { items, total, page, page_size, pages }
-      const produtosData = Array.isArray(response.data?.items) ? response.data.items : [];
+      const produtosData = (Array.isArray(response.data?.items) ? response.data.items : []).filter(
+        (produto) => produto.controlar_estoque !== false && produto.tipo !== "servico",
+      );
       console.log("Produtos carregados:", produtosData.length, produtosData);
       setProdutos(produtosData);
       setProdutosFiltrados(produtosData); // Inicializar com todos os produtos

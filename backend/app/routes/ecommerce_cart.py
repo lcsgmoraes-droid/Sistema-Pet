@@ -298,8 +298,9 @@ def adicionar_item_carrinho(
             detail="Produto indisponível neste canal",
         )
 
+    controla_estoque = getattr(produto, "controlar_estoque", True)
     estoque_disponivel = float(produto.estoque_atual or 0.0)
-    if payload.quantidade > estoque_disponivel:
+    if controla_estoque and payload.quantidade > estoque_disponivel:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Quantidade indisponível em estoque",
@@ -328,13 +329,21 @@ def adicionar_item_carrinho(
     if item:
         nova_quantidade = item.quantidade + payload.quantidade
 
-    reservado_outros = _quantidade_reservada_produto(
-        db,
-        tenant_id=tenant_id,
-        produto_id=produto.id,
-        excluir_pedido_id=carrinho.pedido_id,
+    reservado_outros = (
+        _quantidade_reservada_produto(
+            db,
+            tenant_id=tenant_id,
+            produto_id=produto.id,
+            excluir_pedido_id=carrinho.pedido_id,
+        )
+        if controla_estoque
+        else 0.0
     )
-    disponivel_para_carrinho = max(estoque_disponivel - reservado_outros, 0.0)
+    disponivel_para_carrinho = (
+        max(estoque_disponivel - reservado_outros, 0.0)
+        if controla_estoque
+        else float("inf")
+    )
 
     if float(nova_quantidade) > disponivel_para_carrinho:
         if item:
@@ -426,14 +435,23 @@ def atualizar_item_carrinho(
             detail="Produto indisponível neste canal",
         )
 
+    controla_estoque = getattr(produto, "controlar_estoque", True)
     estoque_disponivel = float(produto.estoque_atual or 0.0)
-    reservado_outros = _quantidade_reservada_produto(
-        db,
-        tenant_id=tenant_id,
-        produto_id=item.produto_id,
-        excluir_pedido_id=carrinho.pedido_id,
+    reservado_outros = (
+        _quantidade_reservada_produto(
+            db,
+            tenant_id=tenant_id,
+            produto_id=item.produto_id,
+            excluir_pedido_id=carrinho.pedido_id,
+        )
+        if controla_estoque
+        else 0.0
     )
-    disponivel_para_carrinho = max(estoque_disponivel - reservado_outros, 0.0)
+    disponivel_para_carrinho = (
+        max(estoque_disponivel - reservado_outros, 0.0)
+        if controla_estoque
+        else float("inf")
+    )
 
     if float(payload.quantidade) > disponivel_para_carrinho:
         raise HTTPException(

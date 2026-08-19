@@ -34,6 +34,7 @@ from app.nfe.listagem_pedidos import (
 )
 from app.pedido_integrado_models import PedidoIntegrado
 from app.services.bling_sync_service import BlingSyncService
+from app.services.bling_tenant_guard import tenant_pode_usar_bling_global
 from app.services.nfe_cache_service import obter_estado_cache_notas, upsert_nota_cache
 from app.utils.logger import logger
 from app.vendas_models import Venda
@@ -70,6 +71,7 @@ def _sincronizar_vendas_em_cache(
             tenant_id,
             _normalizar_nota_venda_local(venda),
             source="local_venda",
+            substituir_origem_remota=not tenant_pode_usar_bling_global(tenant_id),
         )
 
 
@@ -101,6 +103,7 @@ def _sincronizar_pedidos_integrados_em_cache(
             nota,
             source="pedido_integrado",
             resumo_payload=_dict(pedido.payload),
+            substituir_origem_remota=not tenant_pode_usar_bling_global(tenant_id),
         )
 
 
@@ -369,6 +372,13 @@ def _sincronizar_cache_nfes_com_bling(
     data_final: str | None = None,
     situacao: str | None = None,
 ) -> tuple[bool, list[dict]]:
+    if not tenant_pode_usar_bling_global(tenant_id):
+        logger.warning(
+            "listar_nfes",
+            f"Sincronizacao Bling bloqueada para tenant sem credencial propria: {tenant_id}",
+        )
+        return False, []
+
     try:
         bling = BlingAPI()
     except Exception as e:
