@@ -62,6 +62,7 @@ import app.compras_pendencias_models
 import app.bling_pedido_webhook_queue_models
 import app.template_models
 import app.veterinario_models
+import app.nfse_manual.models
 import app.ecommerce_payment_models
 import app.billing_models
 

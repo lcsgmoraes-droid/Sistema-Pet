@@ -303,12 +303,26 @@ export function createLayoutMenuItems({ lembretesCount = 0 } = {}) {
       ],
     },
     {
-      path: "/notas-fiscais/saida",
+      path: "/notas-fiscais",
       icon: FiFileText,
       iconKey: "file-text",
-      label: "NF de Saída",
+      label: "Notas fiscais",
       modulo: "fiscal",
       permission: "vendas.visualizar",
+      anyOfPermissions: ["vendas.visualizar", "configuracoes.empresa", "configuracoes.editar"],
+      submenu: [
+        {
+          path: "/notas-fiscais/saida",
+          label: "NF-e de produtos",
+          permission: "vendas.visualizar",
+        },
+        {
+          path: "/notas-fiscais/servicos",
+          label: "NFS-e de serviços",
+          permission: "vendas.visualizar",
+          anyOfPermissions: ["vendas.visualizar", "configuracoes.empresa", "configuracoes.editar"],
+        },
+      ],
     },
     {
       path: "/compras",

@@ -116,6 +116,7 @@ from app.api.v1.produto_fiscal import router as produto_fiscal_router
 from app.api.v1.pdv_fiscal import router as pdv_fiscal_router
 from app.api.v1.produto_fiscal_v2 import router as produto_fiscal_v2_router
 from app.api.v1.empresa_fiscal import router as empresa_fiscal_router
+from app.nfse_manual.routes import router as nfse_manual_router
 from app.simples_routes import router as simples_router
 from app.auditoria_provisoes_routes import router as auditoria_provisoes_router
 from app.projecao_caixa_routes import router as projecao_caixa_router
@@ -514,6 +515,7 @@ def register_routers(app: FastAPI) -> None:
     app.include_router(pdv_fiscal_router, tags=["PDV - Fiscal em Tempo Real"])
     app.include_router(produto_fiscal_v2_router, tags=["Produto - Fiscal V2"])
     app.include_router(empresa_fiscal_router, tags=["Empresa - Configuração Fiscal"])
+    app.include_router(nfse_manual_router)
     app.include_router(
         simples_router,
         tags=["Simples Nacional - Fechamento Mensal"],
