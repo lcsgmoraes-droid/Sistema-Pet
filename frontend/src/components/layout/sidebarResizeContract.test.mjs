@@ -12,6 +12,11 @@ test("sidebar mostra uma alca visivel para ajustar a largura", () => {
   assert.match(sidebarSource, /bg-\[#0f8b8d\]\/45/);
 });
 
+test("alca de largura fica fora da barra de rolagem da sidebar", () => {
+  assert.match(sidebarSource, /-right-2 z-30 w-2/);
+  assert.doesNotMatch(sidebarSource, /-right-1 z-30 w-3/);
+});
+
 test("sidebar mobile fica fixa e nao ocupa a largura do conteudo", () => {
   assert.match(sidebarSource, /erp-mobile-sidebar fixed/);
   assert.doesNotMatch(sidebarSource, /erp-sidebar relative/);

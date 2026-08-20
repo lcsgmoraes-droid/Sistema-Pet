@@ -218,7 +218,7 @@ export default function LayoutSidebar({
           type="button"
           data-sidebar-resize-handle
           onPointerDown={iniciarRedimensionamento}
-          className={`group absolute inset-y-0 -right-1 z-30 w-3 cursor-col-resize touch-none focus:outline-none ${
+          className={`group absolute inset-y-0 -right-2 z-30 w-2 cursor-col-resize touch-none focus:outline-none ${
             redimensionando ? "bg-[#0f8b8d]/10" : "bg-transparent"
           }`}
           title="Arraste para ajustar a largura do menu"
