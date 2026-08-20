@@ -1,6 +1,6 @@
 # Plano mestre de maturidade 10/10
 
-Atualizado em: 2026-06-19
+Atualizado em: 2026-08-20
 
 Este e o guia vivo para acompanhar a analise inicial completa de maturidade do Sistema Pet. Ele existe para nao deixar nenhum bloco para tras.
 
@@ -116,6 +116,10 @@ Ja feito:
 - [x] Primeira fatia de campanhas/cupons extrai regras puras para `backend/app/campaigns/coupon_rules.py` sem mudar contratos.
 - [x] Primeira fatia de financeiro extrai origem de contas a pagar para `backend/app/financeiro/contas_pagar_origem.py` sem mudar endpoints.
 - [x] Varredura final de hotspots registrada e criterio de manutencao modular consolidado.
+- [x] Mapa oficial do codigo-fonte e arquitetura atual registrados em
+  `docs/MAPA_CODIGO_FONTE.md` e `docs/ARQUITETURA.md`.
+- [x] Raizes antigas `app/` e `src/` colocadas em quarentena por validador de
+  estrutura, sem remocao arriscada nesta etapa.
 
 Falta para 10/10:
 
@@ -328,6 +332,9 @@ Referencias principais:
 - `docs/MATURIDADE_GERAL_10_10_GUIA.md`
 - `docs/EVOLUCAO_ENTERPRISE_UI_REFATORACAO.md`
 - `docs/auditorias/plano-basico-tenant-checklist.md`
+- `docs/MAPA_CODIGO_FONTE.md`
+- `docs/ARQUITETURA.md`
+- `CONTRIBUTING.md`
 
 Ja feito:
 
@@ -341,6 +348,10 @@ Ja feito:
 - [x] Padrao de evidencia operacional criado em `docs/PADRAO_EVIDENCIA.md`.
 - [x] Rotina obrigatoria de atualizacao de guias registrada no indice oficial.
 - [x] Docs historicos passaram a ser tratados como referencia nao autoritativa quando conflitam com guias oficiais.
+- [x] Codigo-fonte ativo, arquitetura, artefatos gerados e raizes antigas foram
+  explicados em documentos oficiais ligados pelo README.
+- [x] Guia unico de contribuicao passou a aplicar o mesmo padrao para trabalho
+  humano, assistido ou gerado por IA.
 
 Falta para 10/10:
 
