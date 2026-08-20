@@ -191,26 +191,11 @@ function montarCupom(venda) {
   return linhas.join("\n");
 }
 
-export default function ImprimirCupom({ className = "", size = "md", venda }) {
-  const imprimir = () => {
-    globalThis.print();
-  };
-
+export function CupomImpressao({ venda }) {
   if (!venda) return null;
 
   return (
     <>
-      {/* Bot\u00e3o Imprimir (vis\u00edvel na tela) */}
-      <ActionButton
-        onClick={imprimir}
-        icon={Printer}
-        intent="neutral"
-        size={size}
-        className={["print:hidden", className].filter(Boolean).join(" ")}
-      >
-        <span>Imprimir Cupom</span>
-      </ActionButton>
-
       {/* Estilos espec\u00edficos para impress\u00e3o */}
       <style>{`
         @media print {
@@ -264,54 +249,80 @@ export default function ImprimirCupom({ className = "", size = "md", venda }) {
   );
 }
 
+export default function ImprimirCupom({ className = "", size = "md", venda }) {
+  if (!venda) return null;
+
+  return (
+    <>
+      <ActionButton
+        onClick={() => globalThis.print()}
+        icon={Printer}
+        intent="neutral"
+        size={size}
+        className={["print:hidden", className].filter(Boolean).join(" ")}
+      >
+        <span>Imprimir Cupom</span>
+      </ActionButton>
+
+      <CupomImpressao venda={venda} />
+    </>
+  );
+}
+
+const vendaPropType = PropTypes.shape({
+  id: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+  numero_venda: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+  data_venda: PropTypes.string,
+  subtotal: PropTypes.number,
+  desconto_valor: PropTypes.number,
+  total: PropTypes.number,
+  cliente_nome: PropTypes.string,
+  telefone_cliente: PropTypes.string,
+  endereco_entrega: PropTypes.string,
+  observacoes_entrega: PropTypes.string,
+  cliente: PropTypes.shape({
+    nome: PropTypes.string,
+    telefone: PropTypes.string,
+    celular: PropTypes.string,
+    celular_whatsapp: PropTypes.string,
+    endereco: PropTypes.string,
+    numero: PropTypes.string,
+    bairro: PropTypes.string,
+    cidade: PropTypes.string,
+    estado: PropTypes.string,
+  }),
+  pet: PropTypes.shape({ nome: PropTypes.string }),
+  itens: PropTypes.arrayOf(
+    PropTypes.shape({
+      produto_nome: PropTypes.string,
+      descricao: PropTypes.string,
+      quantidade: PropTypes.number,
+      preco_unitario: PropTypes.number,
+      subtotal: PropTypes.number,
+      desconto_valor: PropTypes.number,
+    }),
+  ),
+  pagamentos: PropTypes.arrayOf(
+    PropTypes.shape({
+      forma_pagamento: PropTypes.string,
+      valor: PropTypes.number,
+    }),
+  ),
+  tem_entrega: PropTypes.bool,
+  entrega: PropTypes.shape({
+    taxa_entrega_total: PropTypes.number,
+    endereco_completo: PropTypes.string,
+    observacoes_entrega: PropTypes.string,
+  }),
+  observacoes: PropTypes.string,
+});
+
+CupomImpressao.propTypes = {
+  venda: vendaPropType,
+};
+
 ImprimirCupom.propTypes = {
   className: PropTypes.string,
   size: PropTypes.oneOf(["xs", "sm", "md", "lg"]),
-  venda: PropTypes.shape({
-    id: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
-    numero_venda: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
-    data_venda: PropTypes.string,
-    subtotal: PropTypes.number,
-    desconto_valor: PropTypes.number,
-    total: PropTypes.number,
-    cliente_nome: PropTypes.string,
-    telefone_cliente: PropTypes.string,
-    endereco_entrega: PropTypes.string,
-    observacoes_entrega: PropTypes.string,
-    cliente: PropTypes.shape({
-      nome: PropTypes.string,
-      telefone: PropTypes.string,
-      celular: PropTypes.string,
-      celular_whatsapp: PropTypes.string,
-      endereco: PropTypes.string,
-      numero: PropTypes.string,
-      bairro: PropTypes.string,
-      cidade: PropTypes.string,
-      estado: PropTypes.string,
-    }),
-    pet: PropTypes.shape({ nome: PropTypes.string }),
-    itens: PropTypes.arrayOf(
-      PropTypes.shape({
-        produto_nome: PropTypes.string,
-        descricao: PropTypes.string,
-        quantidade: PropTypes.number,
-        preco_unitario: PropTypes.number,
-        subtotal: PropTypes.number,
-        desconto_valor: PropTypes.number,
-      }),
-    ),
-    pagamentos: PropTypes.arrayOf(
-      PropTypes.shape({
-        forma_pagamento: PropTypes.string,
-        valor: PropTypes.number,
-      }),
-    ),
-    tem_entrega: PropTypes.bool,
-    entrega: PropTypes.shape({
-      taxa_entrega_total: PropTypes.number,
-      endereco_completo: PropTypes.string,
-      observacoes_entrega: PropTypes.string,
-    }),
-    observacoes: PropTypes.string,
-  }),
+  venda: vendaPropType,
 };
