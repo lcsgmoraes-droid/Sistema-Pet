@@ -1,4 +1,9 @@
-import { CheckCircle, FileText } from "lucide-react";
+import { CheckCircle, FileText, Printer } from "lucide-react";
+import { usePersistentBooleanState } from "../hooks/usePersistentBooleanState";
+import { concluirVendaComCupom } from "../utils/pdvCupomFinalizacao";
+import { CupomImpressao } from "./ImprimirCupom";
+
+const IMPRESSAO_CUPOM_STORAGE_KEY = "pdv_imprimir_cupom_ao_finalizar";
 
 export default function ModalPerguntaNFe({
   cliente,
@@ -6,7 +11,20 @@ export default function ModalPerguntaNFe({
   loading = false,
   onConfirmar,
   onEmitir,
+  venda,
 }) {
+  const [imprimirCupom, setImprimirCupom] = usePersistentBooleanState(
+    IMPRESSAO_CUPOM_STORAGE_KEY,
+    false,
+  );
+
+  const handleEmitirCupomFiscal = () => {
+    concluirVendaComCupom({
+      imprimirCupom,
+      onConcluir: onConfirmar,
+    });
+  };
+
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
       <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
@@ -58,18 +76,35 @@ export default function ModalPerguntaNFe({
               </button>
             )}
 
+            <label className="flex cursor-pointer items-center justify-between gap-4 rounded-lg border border-gray-200 bg-gray-50 px-4 py-3">
+              <span className="flex items-center gap-2 text-sm font-medium text-gray-700">
+                <Printer className="h-4 w-4" />
+                Imprimir automaticamente neste computador
+              </span>
+              <input
+                type="checkbox"
+                checked={imprimirCupom}
+                onChange={(event) => setImprimirCupom(event.target.checked)}
+                disabled={loading}
+                className="h-5 w-5 rounded border-gray-300 text-green-600 focus:ring-green-500 disabled:opacity-50"
+              />
+            </label>
+
             <button
-              onClick={onConfirmar}
+              onClick={handleEmitirCupomFiscal}
               disabled={loading}
-              className="w-full px-4 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg font-medium transition-colors disabled:opacity-50"
+              className="flex w-full items-center justify-center space-x-2 rounded-lg bg-gray-100 px-4 py-3 font-medium text-gray-700 transition-colors hover:bg-gray-200 disabled:opacity-50"
             >
-              Não emitir agora
+              <Printer className="h-5 w-5" />
+              <span>Emitir cupom fiscal</span>
             </button>
           </div>
 
           <p className="text-xs text-gray-500 text-center mt-4">
-            Você pode emitir a nota fiscal depois na tela de vendas
+            Com a opção desmarcada, o botão apenas encerra e sai da venda.
           </p>
+
+          <CupomImpressao venda={venda} />
         </div>
       </div>
     </div>

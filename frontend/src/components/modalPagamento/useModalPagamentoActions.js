@@ -55,6 +55,7 @@ export function useModalPagamentoActions({
   setValorExcedente,
   setValorRecebido,
   setVendaFinalizadaId,
+  setVendaFinalizadaParaCupom,
   troco,
   valorRecebido,
   valorRestante,
@@ -235,6 +236,7 @@ export function useModalPagamentoActions({
       });
 
       setVendaFinalizadaId(vendaId);
+      setVendaFinalizadaParaCupom(resultado);
 
       if (devePerguntarNotaFiscal(resultado)) {
         setMostrarPerguntaNFe(true);

@@ -52,6 +52,7 @@ export default function useModalPagamentoController({
   const [totalPagoExistente, setTotalPagoExistente] = useState(0);
   const [mostrarPerguntaNFe, setMostrarPerguntaNFe] = useState(false);
   const [vendaFinalizadaId, setVendaFinalizadaId] = useState(null);
+  const [vendaFinalizadaParaCupom, setVendaFinalizadaParaCupom] = useState(null);
 
   // 🆕 Estados para status de margem operacional
   const [statusMargem, setStatusMargem] = useState(null);
@@ -545,6 +546,7 @@ export default function useModalPagamentoController({
     setValorExcedente,
     setValorRecebido,
     setVendaFinalizadaId,
+    setVendaFinalizadaParaCupom,
     troco,
     valorRecebido,
     valorRestante,
@@ -560,6 +562,7 @@ export default function useModalPagamentoController({
       loading,
       onConfirmar,
       onEmitir: emitirNFe,
+      venda: vendaFinalizadaParaCupom || venda,
     },
     viewProps: {
       venda,
