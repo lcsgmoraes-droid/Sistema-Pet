@@ -76,20 +76,6 @@ export default function ModalPerguntaNFe({
               </button>
             )}
 
-            <label className="flex cursor-pointer items-center justify-between gap-4 rounded-lg border border-gray-200 bg-gray-50 px-4 py-3">
-              <span className="flex items-center gap-2 text-sm font-medium text-gray-700">
-                <Printer className="h-4 w-4" />
-                Imprimir automaticamente neste computador
-              </span>
-              <input
-                type="checkbox"
-                checked={imprimirCupom}
-                onChange={(event) => setImprimirCupom(event.target.checked)}
-                disabled={loading}
-                className="h-5 w-5 rounded border-gray-300 text-green-600 focus:ring-green-500 disabled:opacity-50"
-              />
-            </label>
-
             <button
               onClick={handleEmitirCupomFiscal}
               disabled={loading}
@@ -98,13 +84,23 @@ export default function ModalPerguntaNFe({
               <Printer className="h-5 w-5" />
               <span>Emitir cupom fiscal</span>
             </button>
+
+            <label
+              className="flex cursor-pointer items-center justify-center gap-1.5 px-1 text-[11px] text-gray-400"
+              title="Esta preferência fica salva neste computador"
+            >
+              <input
+                type="checkbox"
+                checked={imprimirCupom}
+                onChange={(event) => setImprimirCupom(event.target.checked)}
+                disabled={loading}
+                className="h-3.5 w-3.5 rounded border-gray-300 text-gray-500 focus:ring-1 focus:ring-gray-400 disabled:opacity-50"
+              />
+              <span>Imprimir automaticamente</span>
+            </label>
           </div>
 
-          <p className="text-xs text-gray-500 text-center mt-4">
-            Com a opção desmarcada, o botão apenas encerra e sai da venda.
-          </p>
-
-          <CupomImpressao venda={venda} />
+          <CupomImpressao portal venda={venda} />
         </div>
       </div>
     </div>
