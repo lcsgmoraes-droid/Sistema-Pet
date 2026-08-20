@@ -5,7 +5,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import RedirectResponse
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict
 from sqlalchemy.orm import Session
 
 from app.auth.dependencies import get_current_user_and_tenant
@@ -18,8 +18,7 @@ from app.services.ecommerce_payment_config import (
     disconnect_mercado_pago_oauth_config,
     exchange_mercado_pago_oauth_code,
     get_mercado_pago_config,
-    is_mercado_pago_oauth_available,
-    missing_mercado_pago_oauth_settings,
+    is_mercado_pago_connection_available,
     new_webhook_token,
     save_mercado_pago_config,
     save_mercado_pago_oauth_tokens,
@@ -41,39 +40,23 @@ public_router = APIRouter(
 class MercadoPagoConfigResponse(BaseModel):
     provider: str
     enabled: bool
-    environment: str
-    public_key: Optional[str]
-    public_key_configured: bool
-    public_key_preview: Optional[str]
     access_token_configured: bool
-    webhook_secret_configured: bool
-    oauth_client_id_configured: bool
-    oauth_client_id_preview: Optional[str]
-    oauth_client_secret_configured: bool
     oauth_available: bool
     oauth_connected: bool
     oauth_connected_at: Optional[str]
     mercado_pago_user_id: Optional[str]
-    oauth_redirect_uri: str
-    webhook_url: str
     updated_at: Optional[str]
 
 
 class MercadoPagoConfigUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     enabled: bool = False
-    environment: str = Field(default="production")
-    public_key: Optional[str] = None
-    access_token: Optional[str] = None
-    webhook_secret: Optional[str] = None
-    oauth_client_id: Optional[str] = None
-    oauth_client_secret: Optional[str] = None
 
 
 class MercadoPagoOAuthUrlResponse(BaseModel):
     configured: bool
     authorization_url: Optional[str] = None
-    redirect_uri: str
-    missing: list[str] = Field(default_factory=list)
 
 
 def _ensure_config(
@@ -118,12 +101,10 @@ def gerar_url_oauth_mercado_pago(
     current_user, tenant_id = user_and_tenant
     config = _ensure_config(db, tenant_id=tenant_id)
     redirect_uri = build_mercado_pago_oauth_redirect_uri()
-    if not is_mercado_pago_oauth_available(config):
+    if not is_mercado_pago_connection_available(config):
         return MercadoPagoOAuthUrlResponse(
             configured=False,
             authorization_url=None,
-            redirect_uri=redirect_uri,
-            missing=missing_mercado_pago_oauth_settings(config),
         )
     return MercadoPagoOAuthUrlResponse(
         configured=True,
@@ -133,8 +114,6 @@ def gerar_url_oauth_mercado_pago(
             redirect_uri=redirect_uri,
             config=config,
         ),
-        redirect_uri=redirect_uri,
-        missing=[],
     )
 
 
@@ -202,19 +181,19 @@ def salvar_config_mercado_pago(
     user_and_tenant=Depends(get_current_user_and_tenant),
     db: Session = Depends(get_session),
 ):
-    """Salva credenciais Mercado Pago do tenant sem retornar valores sensiveis."""
+    """Atualiza somente a preferência de pagamento do tenant."""
     current_user, tenant_id = user_and_tenant
     config = save_mercado_pago_config(
         db,
         tenant_id=tenant_id,
         user_id=current_user.id,
         enabled=body.enabled,
-        environment=body.environment,
-        public_key=body.public_key,
-        access_token=body.access_token,
-        webhook_secret=body.webhook_secret,
-        oauth_client_id=body.oauth_client_id,
-        oauth_client_secret=body.oauth_client_secret,
+        environment=None,
+        public_key=None,
+        access_token=None,
+        webhook_secret=None,
+        oauth_client_id=None,
+        oauth_client_secret=None,
     )
     return serialize_mercado_pago_config(config)
 

@@ -209,27 +209,31 @@ def _mask_config_value(value: str | None) -> str | None:
 
 
 def _oauth_client_id(config: Any | None = None) -> str:
-    configured = str(getattr(config, "oauth_client_id", None) or "").strip()
-    if configured:
-        return configured
-    return (
+    global_value = (
         os.getenv("MERCADO_PAGO_OAUTH_CLIENT_ID")
         or os.getenv("MERCADOPAGO_OAUTH_CLIENT_ID")
         or os.getenv("MERCADO_PAGO_CLIENT_ID")
         or ""
     ).strip()
+    if global_value:
+        return global_value
+    # Compatibilidade com vínculos OAuth antigos. Novos tenants usam sempre
+    # a aplicação global do CorePet configurada no servidor.
+    return str(getattr(config, "oauth_client_id", None) or "").strip()
 
 
 def _oauth_client_secret(config: Any | None = None) -> str:
-    configured = decrypt_secret(getattr(config, "oauth_client_secret_encrypted", None))
-    if configured:
-        return configured
-    return (
+    global_value = (
         os.getenv("MERCADO_PAGO_OAUTH_CLIENT_SECRET")
         or os.getenv("MERCADOPAGO_OAUTH_CLIENT_SECRET")
         or os.getenv("MERCADO_PAGO_CLIENT_SECRET")
         or ""
     ).strip()
+    if global_value:
+        return global_value
+    # Compatibilidade com vínculos OAuth antigos. O segredo de novos vínculos
+    # nunca é recebido do tenant.
+    return decrypt_secret(getattr(config, "oauth_client_secret_encrypted", None))
 
 
 def is_mercado_pago_oauth_available(config: Any | None = None) -> bool:
@@ -242,7 +246,17 @@ def missing_mercado_pago_oauth_settings(config: Any | None = None) -> list[str]:
         missing.append("MERCADO_PAGO_OAUTH_CLIENT_ID")
     if not _oauth_client_secret(config):
         missing.append("MERCADO_PAGO_OAUTH_CLIENT_SECRET")
+    if not _effective_webhook_secret(config):
+        missing.append("MERCADO_PAGO_WEBHOOK_SECRET")
     return missing
+
+
+def is_mercado_pago_connection_available(config: Any | None = None) -> bool:
+    """Indica se o CorePet consegue concluir e ativar um novo vínculo."""
+
+    return bool(
+        is_mercado_pago_oauth_available(config) and _effective_webhook_secret(config)
+    )
 
 
 def _global_mercado_pago_webhook_secret() -> str:
@@ -659,15 +673,11 @@ def save_mercado_pago_config(
 
     if enabled:
         existing_access_token = decrypt_secret(config.access_token_encrypted)
-        existing_oauth_settings = is_mercado_pago_oauth_available(config)
         existing_webhook_secret = _effective_webhook_secret(config)
-        if not existing_access_token and not existing_oauth_settings:
+        if not existing_access_token:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=(
-                    "Access token ou Client ID/Client Secret OAuth do Mercado Pago "
-                    "obrigatorios para ativar o pagamento online."
-                ),
+                detail="Conecte a conta Mercado Pago antes de ativar o pagamento online.",
             )
         if not existing_webhook_secret:
             raise HTTPException(
@@ -747,7 +757,7 @@ def serialize_mercado_pago_config(
             "oauth_client_id_configured": bool(env_oauth_client_id),
             "oauth_client_id_preview": _mask_config_value(env_oauth_client_id),
             "oauth_client_secret_configured": bool(_oauth_client_secret()),
-            "oauth_available": is_mercado_pago_oauth_available(),
+            "oauth_available": is_mercado_pago_connection_available(),
             "oauth_connected": False,
             "oauth_connected_at": None,
             "mercado_pago_user_id": None,
@@ -772,7 +782,7 @@ def serialize_mercado_pago_config(
         "oauth_client_id_configured": bool(oauth_client_id),
         "oauth_client_id_preview": _mask_config_value(oauth_client_id),
         "oauth_client_secret_configured": bool(_oauth_client_secret(config)),
-        "oauth_available": is_mercado_pago_oauth_available(config),
+        "oauth_available": is_mercado_pago_connection_available(config),
         "oauth_connected": bool(getattr(config, "oauth_connected", False)),
         "oauth_connected_at": (
             config.oauth_connected_at.isoformat()

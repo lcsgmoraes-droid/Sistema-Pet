@@ -2,6 +2,9 @@ import os
 import inspect
 from types import SimpleNamespace
 
+import pytest
+from fastapi import HTTPException
+
 os.environ.setdefault("DATABASE_URL", "sqlite:///./test.db")
 os.environ.setdefault("ENVIRONMENT", "test")
 
@@ -132,10 +135,12 @@ def test_save_config_preserva_valores_sensiveis_quando_campos_vazios(monkeypatch
     assert db.committed is True
 
 
-def test_save_config_ativa_com_oauth_sem_access_token_para_permitir_conectar(
+def test_save_config_nao_ativa_antes_da_conta_ser_conectada(
     monkeypatch,
 ):
     monkeypatch.setenv("JWT_SECRET_KEY", "tenant-secret-for-oauth-save-tests")
+    monkeypatch.setenv("MERCADO_PAGO_OAUTH_CLIENT_ID", "corepet-client-id")
+    monkeypatch.setenv("MERCADO_PAGO_OAUTH_CLIENT_SECRET", "corepet-client-secret")
     config = SimpleNamespace(
         enabled=False,
         environment="production",
@@ -167,23 +172,24 @@ def test_save_config_ativa_com_oauth_sem_access_token_para_permitir_conectar(
         service, "get_mercado_pago_config", lambda db, tenant_id: config
     )
 
-    saved = save_mercado_pago_config(
-        Db(),
-        tenant_id="180d9cbf-5dcb-4676-bf11-dcbd91ed444b",
-        user_id=1,
-        enabled=True,
-        environment="production",
-        public_key=None,
-        access_token=None,
-        webhook_secret=None,
-        oauth_client_id="tenant-client-id",
-        oauth_client_secret="tenant-client-secret",
-    )
+    with pytest.raises(HTTPException) as exc_info:
+        save_mercado_pago_config(
+            Db(),
+            tenant_id="180d9cbf-5dcb-4676-bf11-dcbd91ed444b",
+            user_id=1,
+            enabled=True,
+            environment="production",
+            public_key=None,
+            access_token=None,
+            webhook_secret=None,
+            oauth_client_id=None,
+            oauth_client_secret=None,
+        )
 
-    assert saved.enabled is True
-    assert saved.oauth_client_id == "tenant-client-id"
-    assert decrypt_secret(saved.oauth_client_secret_encrypted) == "tenant-client-secret"
-    assert saved.access_token_encrypted is None
+    assert exc_info.value.status_code == 400
+    assert "Conecte a conta Mercado Pago" in str(exc_info.value.detail)
+    assert config.enabled is False
+    assert config.access_token_encrypted is None
 
 
 def test_preferencia_usa_webhook_especifico_do_tenant():

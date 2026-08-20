@@ -4,6 +4,9 @@ from types import SimpleNamespace
 from urllib.parse import parse_qs, urlparse
 from uuid import UUID
 
+import pytest
+from pydantic import ValidationError
+
 os.environ.setdefault("DATABASE_URL", "sqlite:///./test.db")
 os.environ.setdefault("ENVIRONMENT", "test")
 
@@ -19,6 +22,7 @@ from app.services.ecommerce_payment_config import (
     ensure_mercado_pago_access_token_fresh,
     encrypt_secret,
     exchange_mercado_pago_oauth_code,
+    is_mercado_pago_connection_available,
     is_mercado_pago_oauth_available,
     save_mercado_pago_oauth_tokens,
     serialize_mercado_pago_config,
@@ -155,6 +159,59 @@ def test_oauth_available_exige_client_id_e_secret(monkeypatch):
     monkeypatch.setenv("MERCADO_PAGO_OAUTH_CLIENT_SECRET", "client-secret")
 
     assert is_mercado_pago_oauth_available() is True
+
+
+def test_conexao_exige_configuracao_global_completa(monkeypatch):
+    monkeypatch.setenv("MERCADO_PAGO_OAUTH_CLIENT_ID", "corepet-client-id")
+    monkeypatch.setenv("MERCADO_PAGO_OAUTH_CLIENT_SECRET", "corepet-client-secret")
+    monkeypatch.delenv("MERCADO_PAGO_WEBHOOK_SECRET", raising=False)
+
+    assert is_mercado_pago_connection_available() is False
+
+    monkeypatch.setenv("MERCADO_PAGO_WEBHOOK_SECRET", "corepet-webhook-secret")
+
+    assert is_mercado_pago_connection_available() is True
+
+
+def test_configuracao_do_tenant_rejeita_credenciais_tecnicas():
+    with pytest.raises(ValidationError) as exc_info:
+        ecommerce_payment_config_routes.MercadoPagoConfigUpdate.model_validate(
+            {
+                "enabled": False,
+                "environment": "production",
+                "oauth_client_id": "nao-deve-ser-aceito",
+            }
+        )
+
+    assert "oauth_client_id" in str(exc_info.value)
+
+
+def test_configuracao_do_tenant_rejeita_troca_de_ambiente():
+    with pytest.raises(ValidationError) as exc_info:
+        ecommerce_payment_config_routes.MercadoPagoConfigUpdate.model_validate(
+            {"enabled": False, "environment": "sandbox"}
+        )
+
+    assert "environment" in str(exc_info.value)
+
+
+def test_resposta_do_tenant_nao_expoe_configuracao_tecnica():
+    response_fields = set(
+        ecommerce_payment_config_routes.MercadoPagoConfigResponse.model_fields
+    )
+
+    assert response_fields.isdisjoint(
+        {
+            "environment",
+            "public_key",
+            "webhook_secret_configured",
+            "oauth_client_id_configured",
+            "oauth_client_id_preview",
+            "oauth_client_secret_configured",
+            "oauth_redirect_uri",
+            "webhook_url",
+        }
+    )
 
 
 def test_oauth_pode_usar_client_id_e_secret_do_tenant(monkeypatch):
