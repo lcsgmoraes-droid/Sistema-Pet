@@ -6,8 +6,10 @@ const source = readFileSync(
   new URL("./MovimentacoesLancamentosTable.jsx", import.meta.url),
   "utf8",
 );
+const pageSource = readFileSync(new URL("../MovimentacoesProduto.jsx", import.meta.url), "utf8");
 
 test("tabela preserva largura minima para observacoes", () => {
+  assert.match(pageSource, /max-w-\[1440px\]/);
   assert.match(source, /min-w-\[1320px\]/);
   assert.match(source, /min-w-\[320px\]/);
   assert.match(source, /break-words/);
