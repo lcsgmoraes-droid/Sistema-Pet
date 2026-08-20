@@ -60,6 +60,15 @@ export default function ConfiguracaoFiscalEmpresa() {
     cnae_descricao: "",
     cnaes_secundarios: [],
     uf: "",
+    municipio_iss: "",
+    municipio_iss_codigo: "",
+    iss_aliquota: "",
+    iss_retido: false,
+    nfse_item_lista_servico: "",
+    nfse_natureza_operacao: "1",
+    nfse_regime_especial_tributacao: "",
+    nfse_incentivador_cultural: false,
+    nfse_portal_url: "",
   });
 
   useEffect(() => {
@@ -86,6 +95,15 @@ export default function ConfiguracaoFiscalEmpresa() {
           cnae_descricao: resFiscal.data.cnae_descricao || "",
           cnaes_secundarios: cnaesSecundarios,
           uf: resFiscal.data.uf || "",
+          municipio_iss: resFiscal.data.municipio_iss || "",
+          municipio_iss_codigo: resFiscal.data.municipio_iss_codigo || "",
+          iss_aliquota: resFiscal.data.iss_aliquota ?? "",
+          iss_retido: Boolean(resFiscal.data.iss_retido),
+          nfse_item_lista_servico: resFiscal.data.nfse_item_lista_servico || "",
+          nfse_natureza_operacao: resFiscal.data.nfse_natureza_operacao || "1",
+          nfse_regime_especial_tributacao: resFiscal.data.nfse_regime_especial_tributacao || "",
+          nfse_incentivador_cultural: Boolean(resFiscal.data.nfse_incentivador_cultural),
+          nfse_portal_url: resFiscal.data.nfse_portal_url || "",
         });
 
         // Atualizar estados locais para exibição
@@ -173,11 +191,12 @@ export default function ConfiguracaoFiscalEmpresa() {
   };
 
   function handleChange(e) {
-    const { name, value } = e.target;
+    const { name, value, type, checked } = e.target;
+    const nextValue = type === "checkbox" ? checked : value;
     setForm((prev) => {
       const updated = {
         ...prev,
-        [name]: value,
+        [name]: nextValue,
       };
 
       // Se mudou o regime para Simples Nacional, garantir valores padrão
@@ -289,6 +308,8 @@ export default function ConfiguracaoFiscalEmpresa() {
     try {
       const payload = {
         ...form,
+        simples_ativo: form.regime_tributario === "Simples Nacional",
+        iss_aliquota: form.iss_aliquota === "" ? null : Number(form.iss_aliquota),
         cnaes_secundarios: normalizeCnaesSecundarios(form.cnaes_secundarios),
       };
 

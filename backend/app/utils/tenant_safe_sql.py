@@ -75,6 +75,7 @@ TENANT_SCOPED_TABLES = {
     "notas_entrada_itens",
     "notas_saida",
     "notas_saida_itens",
+    "nfse_manual_documents",
     "opportunities",
     "opportunity_events",
     "pedido_itens",
