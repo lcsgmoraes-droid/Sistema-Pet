@@ -508,12 +508,16 @@ export default function MovimentacoesProduto() {
       return;
     }
 
-    setTipoLancamento(produtoEhGranel ? "balanco" : "entrada");
-    setShowModal(true);
+    abrirModal(produtoEhGranel ? "balanco" : "entrada");
+  };
+
+  const fecharModalLancamento = () => {
+    setShowModal(false);
+    setEditingMovimentacao(null);
   };
 
   return (
-    <div className="mx-auto max-w-7xl space-y-4 p-4">
+    <div className="mx-auto max-w-[1440px] space-y-4 p-4">
       <MovimentacoesProdutoHeader
         abrirModalReservas={abrirModalReservas}
         estoqueAtual={estoqueAtual}
@@ -605,7 +609,7 @@ export default function MovimentacoesProduto() {
         nomeGranelSelecionado={nomeGranelSelecionado}
         observacaoGranel={observacaoGranel}
         onCloseGranel={() => setShowGranelModal(false)}
-        onCloseLancamento={() => setShowModal(false)}
+        onCloseLancamento={fecharModalLancamento}
         onCloseReservas={() => setShowReservasModal(false)}
         precoMinimoEsperadoGranel={precoMinimoEsperadoGranel}
         precoVendaAtualGranel={precoVendaAtualGranel}
