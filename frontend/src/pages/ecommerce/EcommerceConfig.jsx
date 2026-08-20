@@ -58,28 +58,11 @@ export default function EcommerceConfig() {
   const [paymentLoading, setPaymentLoading] = useState(true);
   const [paymentConfig, setPaymentConfig] = useState({
     enabled: false,
-    environment: "production",
-    public_key: "",
-    public_key_configured: false,
-    public_key_preview: null,
     access_token_configured: false,
-    webhook_secret_configured: false,
-    oauth_client_id_configured: false,
-    oauth_client_id_preview: null,
-    oauth_client_secret_configured: false,
     oauth_available: false,
     oauth_connected: false,
     oauth_connected_at: null,
     mercado_pago_user_id: null,
-    oauth_redirect_uri: "",
-    webhook_url: "",
-  });
-  const [paymentSecrets, setPaymentSecrets] = useState({
-    public_key: "",
-    access_token: "",
-    webhook_secret: "",
-    oauth_client_id: "",
-    oauth_client_secret: "",
   });
 
   // Avise-me pendentes
@@ -109,21 +92,11 @@ export default function EcommerceConfig() {
     const d = data || {};
     setPaymentConfig({
       enabled: Boolean(d.enabled),
-      environment: d.environment || "production",
-      public_key: "",
-      public_key_configured: Boolean(d.public_key_configured),
-      public_key_preview: d.public_key_preview || null,
       access_token_configured: Boolean(d.access_token_configured),
-      webhook_secret_configured: Boolean(d.webhook_secret_configured),
-      oauth_client_id_configured: Boolean(d.oauth_client_id_configured),
-      oauth_client_id_preview: d.oauth_client_id_preview || null,
-      oauth_client_secret_configured: Boolean(d.oauth_client_secret_configured),
       oauth_available: Boolean(d.oauth_available),
       oauth_connected: Boolean(d.oauth_connected),
       oauth_connected_at: d.oauth_connected_at || null,
       mercado_pago_user_id: d.mercado_pago_user_id || null,
-      oauth_redirect_uri: d.oauth_redirect_uri || "",
-      webhook_url: d.webhook_url || "",
     });
   }
 
@@ -223,22 +196,9 @@ export default function EcommerceConfig() {
     try {
       const res = await api.put("/ecommerce-payment-config/mercadopago", {
         enabled: paymentConfig.enabled,
-        environment: paymentConfig.environment,
-        public_key: paymentSecrets.public_key || null,
-        access_token: paymentSecrets.access_token || null,
-        webhook_secret: paymentSecrets.webhook_secret || null,
-        oauth_client_id: paymentSecrets.oauth_client_id || null,
-        oauth_client_secret: paymentSecrets.oauth_client_secret || null,
       });
       applyPaymentConfigResponse(res.data);
-      setPaymentSecrets({
-        public_key: "",
-        access_token: "",
-        webhook_secret: "",
-        oauth_client_id: "",
-        oauth_client_secret: "",
-      });
-      setSuccess("Configuracao do Mercado Pago salva com sucesso!");
+      setSuccess("Preferência de pagamento salva com sucesso!");
       setTimeout(() => setSuccess(""), 4000);
     } catch (err) {
       setError(
@@ -258,11 +218,7 @@ export default function EcommerceConfig() {
       const res = await api.get("/ecommerce-payment-config/mercadopago/oauth/url");
       const data = res.data || {};
       if (!data.configured || !data.authorization_url) {
-        const missing =
-          Array.isArray(data.missing) && data.missing.length > 0
-            ? ` (${data.missing.join(", ")})`
-            : "";
-        setError(`OAuth Mercado Pago ainda nao esta configurado no servidor CorePet${missing}.`);
+        setError("A conexão está temporariamente indisponível. Fale com o suporte CorePet.");
         return;
       }
       window.location.assign(data.authorization_url);
@@ -290,13 +246,6 @@ export default function EcommerceConfig() {
     try {
       const res = await api.post("/ecommerce-payment-config/mercadopago/oauth/disconnect");
       applyPaymentConfigResponse(res.data);
-      setPaymentSecrets({
-        public_key: "",
-        access_token: "",
-        webhook_secret: "",
-        oauth_client_id: "",
-        oauth_client_secret: "",
-      });
       setSuccess("Mercado Pago desconectado desta loja.");
       setTimeout(() => setSuccess(""), 4000);
     } catch (err) {
@@ -304,25 +253,6 @@ export default function EcommerceConfig() {
     } finally {
       setDisconnectingPayment(false);
     }
-  }
-
-  async function copiarTexto(texto, mensagem) {
-    if (!texto) return;
-    try {
-      await navigator.clipboard.writeText(texto);
-      setSuccess(mensagem);
-      setTimeout(() => setSuccess(""), 2500);
-    } catch {
-      setError("Nao foi possivel copiar automaticamente.");
-    }
-  }
-
-  function copiarWebhookUrl() {
-    copiarTexto(paymentConfig.webhook_url, "URL do webhook copiada.");
-  }
-
-  function copiarOAuthRedirectUri() {
-    copiarTexto(paymentConfig.oauth_redirect_uri, "URL de retorno OAuth copiada.");
   }
 
   function toggleDia(key) {
@@ -361,10 +291,6 @@ export default function EcommerceConfig() {
       disconnectingPayment={disconnectingPayment}
       conectarMercadoPago={conectarMercadoPago}
       connectingPayment={connectingPayment}
-      copiarWebhookUrl={copiarWebhookUrl}
-      copiarOAuthRedirectUri={copiarOAuthRedirectUri}
-      paymentSecrets={paymentSecrets}
-      setPaymentSecrets={setPaymentSecrets}
       savingPayment={savingPayment}
       avisos={avisos}
       loadingAvisos={loadingAvisos}

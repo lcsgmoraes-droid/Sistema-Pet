@@ -1,13 +1,4 @@
-import {
-  AlertCircle,
-  CheckCircle2,
-  Copy,
-  CreditCard,
-  ExternalLink,
-  KeyRound,
-  Unplug,
-  Webhook,
-} from "lucide-react";
+import { AlertCircle, CheckCircle2, CreditCard, ExternalLink, Unplug } from "lucide-react";
 import CurrencyInput from "../../components/CurrencyInput";
 
 export default function EcommerceConfigView({
@@ -39,10 +30,6 @@ export default function EcommerceConfigView({
   disconnectingPayment,
   conectarMercadoPago,
   connectingPayment,
-  copiarWebhookUrl,
-  copiarOAuthRedirectUri,
-  paymentSecrets,
-  setPaymentSecrets,
   savingPayment,
   avisos,
   loadingAvisos,
@@ -79,16 +66,6 @@ export default function EcommerceConfigView({
     );
   }
 
-  function statusConfigurado(configurado, preview = null) {
-    if (!configurado) return null;
-    return (
-      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700">
-        <CheckCircle2 size={12} />
-        {preview ? `Configurado (${preview})` : "Configurado"}
-      </span>
-    );
-  }
-
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[300px]">
@@ -109,6 +86,9 @@ export default function EcommerceConfigView({
     acc[key].emails.push(aviso.email);
     return acc;
   }, {});
+  const hasPaymentCredential = Boolean(
+    paymentConfig.oauth_connected || paymentConfig.access_token_configured,
+  );
 
   return (
     <div className="max-w-2xl mx-auto p-6 space-y-8">
@@ -431,24 +411,33 @@ export default function EcommerceConfigView({
                 <div>
                   <p className="font-medium text-gray-700">Pagamento online</p>
                   <p className="text-sm text-gray-500">
-                    {paymentConfig.enabled
-                      ? "Ativo no app e e-commerce."
-                      : "Desligado para esta loja."}
+                    {!hasPaymentCredential
+                      ? "Será ativado automaticamente após conectar sua conta."
+                      : paymentConfig.enabled
+                        ? "Ativo no app e no e-commerce."
+                        : "Desligado para esta loja."}
                   </p>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setPaymentConfig((prev) => ({ ...prev, enabled: !prev.enabled }))}
-                  className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors focus:outline-none ${
-                    paymentConfig.enabled ? "bg-emerald-500" : "bg-gray-300"
-                  }`}
-                >
-                  <span
-                    className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${
-                      paymentConfig.enabled ? "translate-x-6" : "translate-x-1"
+                {hasPaymentCredential && (
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-label="Pagamento online"
+                    aria-checked={paymentConfig.enabled}
+                    onClick={() =>
+                      setPaymentConfig((prev) => ({ ...prev, enabled: !prev.enabled }))
+                    }
+                    className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors focus:outline-none ${
+                      paymentConfig.enabled ? "bg-emerald-500" : "bg-gray-300"
                     }`}
-                  />
-                </button>
+                  >
+                    <span
+                      className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${
+                        paymentConfig.enabled ? "translate-x-6" : "translate-x-1"
+                      }`}
+                    />
+                  </button>
+                )}
               </div>
 
               <div className="border border-emerald-100 rounded-lg p-4 bg-emerald-50/40 space-y-3">
@@ -467,12 +456,16 @@ export default function EcommerceConfigView({
                       <p className="font-medium text-gray-800">
                         {paymentConfig.oauth_connected
                           ? "Conta Mercado Pago conectada"
-                          : "Conectar conta Mercado Pago"}
+                          : paymentConfig.access_token_configured
+                            ? "Mercado Pago configurado"
+                            : "Conecte sua conta Mercado Pago"}
                       </p>
                       <p className="text-sm text-gray-500">
                         {paymentConfig.oauth_connected
                           ? `Recebendo nesta loja${paymentConfig.mercado_pago_user_id ? ` (conta ${paymentConfig.mercado_pago_user_id})` : ""}.`
-                          : "O cliente autoriza a propria conta e os tokens ficam salvos no tenant."}
+                          : paymentConfig.access_token_configured
+                            ? "A configuração atual foi preservada. Conecte para usar o novo vínculo automático."
+                            : "Clique em Conectar para entrar no Mercado Pago e autorizar o CorePet."}
                       </p>
                     </div>
                   </div>
@@ -498,217 +491,25 @@ export default function EcommerceConfigView({
                     </button>
                   )}
                 </div>
-                {!paymentConfig.oauth_available && (
+                {!paymentConfig.oauth_connected && !paymentConfig.oauth_available && (
                   <p className="text-xs text-amber-700 bg-amber-50 border border-amber-100 rounded-md px-3 py-2">
-                    O botao sera liberado quando o Client ID e Client Secret OAuth forem salvos
-                    abaixo.
+                    A conexão está temporariamente indisponível. Fale com o suporte CorePet.
                   </p>
                 )}
               </div>
-
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">
-                  URL do webhook
-                </label>
-                <div className="flex gap-2">
-                  <input
-                    value={paymentConfig.webhook_url}
-                    readOnly
-                    className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm bg-gray-50 text-gray-700"
-                  />
-                  <button
-                    type="button"
-                    onClick={copiarWebhookUrl}
-                    className="inline-flex items-center justify-center h-10 w-10 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50"
-                    title="Copiar URL"
-                  >
-                    <Copy size={18} />
-                  </button>
-                </div>
-              </div>
-
-              <details className="border border-gray-200 rounded-lg">
-                <summary className="cursor-pointer px-4 py-3 text-sm font-medium text-gray-700">
-                  Configuracao avancada
-                </summary>
-                <div className="px-4 pb-4 pt-1 space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-xs font-medium text-gray-600 mb-1">
-                        Ambiente
-                      </label>
-                      <select
-                        value={paymentConfig.environment}
-                        onChange={(e) =>
-                          setPaymentConfig((prev) => ({ ...prev, environment: e.target.value }))
-                        }
-                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400 bg-white"
-                      >
-                        <option value="production">Producao</option>
-                        <option value="sandbox">Teste / Sandbox</option>
-                      </select>
-                    </div>
-                    <div>
-                      <div className="mb-1 flex items-center justify-between gap-2">
-                        <label className="block text-xs font-medium text-gray-600">
-                          Public key
-                        </label>
-                        {statusConfigurado(
-                          paymentConfig.public_key_configured,
-                          paymentConfig.public_key_preview,
-                        )}
-                      </div>
-                      <input
-                        type="password"
-                        value={paymentSecrets.public_key}
-                        onChange={(e) =>
-                          setPaymentSecrets((prev) => ({ ...prev, public_key: e.target.value }))
-                        }
-                        placeholder={
-                          paymentConfig.public_key_configured
-                            ? "Public key ja configurada"
-                            : "APP_USR-..."
-                        }
-                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">
-                      URL de retorno OAuth
-                    </label>
-                    <div className="flex gap-2">
-                      <input
-                        value={paymentConfig.oauth_redirect_uri}
-                        readOnly
-                        className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm bg-gray-50 text-gray-700"
-                      />
-                      <button
-                        type="button"
-                        onClick={copiarOAuthRedirectUri}
-                        className="inline-flex items-center justify-center h-10 w-10 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50"
-                        title="Copiar URL de retorno OAuth"
-                      >
-                        <Copy size={18} />
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <div className="mb-1 flex items-center justify-between gap-2">
-                        <label className="flex items-center gap-1 text-xs font-medium text-gray-600">
-                          <KeyRound size={14} />
-                          OAuth Client ID
-                        </label>
-                        {statusConfigurado(
-                          paymentConfig.oauth_client_id_configured,
-                          paymentConfig.oauth_client_id_preview,
-                        )}
-                      </div>
-                      <input
-                        value={paymentSecrets.oauth_client_id}
-                        onChange={(e) =>
-                          setPaymentSecrets((prev) => ({
-                            ...prev,
-                            oauth_client_id: e.target.value,
-                          }))
-                        }
-                        placeholder={
-                          paymentConfig.oauth_client_id_configured
-                            ? "Client ID ja configurado"
-                            : "Client ID da aplicacao"
-                        }
-                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
-                      />
-                    </div>
-                    <div>
-                      <div className="mb-1 flex items-center justify-between gap-2">
-                        <label className="flex items-center gap-1 text-xs font-medium text-gray-600">
-                          <KeyRound size={14} />
-                          OAuth Client Secret
-                        </label>
-                        {statusConfigurado(paymentConfig.oauth_client_secret_configured)}
-                      </div>
-                      <input
-                        type="password"
-                        value={paymentSecrets.oauth_client_secret}
-                        onChange={(e) =>
-                          setPaymentSecrets((prev) => ({
-                            ...prev,
-                            oauth_client_secret: e.target.value,
-                          }))
-                        }
-                        placeholder={
-                          paymentConfig.oauth_client_secret_configured
-                            ? "Client Secret ja configurado"
-                            : "Client Secret da aplicacao"
-                        }
-                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <div className="mb-1 flex items-center justify-between gap-2">
-                        <label className="flex items-center gap-1 text-xs font-medium text-gray-600">
-                          <KeyRound size={14} />
-                          Access token
-                        </label>
-                        {statusConfigurado(paymentConfig.access_token_configured)}
-                      </div>
-                      <input
-                        type="password"
-                        value={paymentSecrets.access_token}
-                        onChange={(e) =>
-                          setPaymentSecrets((prev) => ({ ...prev, access_token: e.target.value }))
-                        }
-                        placeholder={
-                          paymentConfig.access_token_configured
-                            ? "Token ja configurado"
-                            : "APP_USR-..."
-                        }
-                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
-                      />
-                    </div>
-                    <div>
-                      <div className="mb-1 flex items-center justify-between gap-2">
-                        <label className="flex items-center gap-1 text-xs font-medium text-gray-600">
-                          <Webhook size={14} />
-                          Assinatura secreta
-                        </label>
-                        {statusConfigurado(paymentConfig.webhook_secret_configured)}
-                      </div>
-                      <input
-                        type="password"
-                        value={paymentSecrets.webhook_secret}
-                        onChange={(e) =>
-                          setPaymentSecrets((prev) => ({ ...prev, webhook_secret: e.target.value }))
-                        }
-                        placeholder={
-                          paymentConfig.webhook_secret_configured
-                            ? "Assinatura ja configurada"
-                            : "Cole a assinatura secreta do webhook"
-                        }
-                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
-                      />
-                    </div>
-                  </div>
-                </div>
-              </details>
             </>
           )}
         </div>
 
-        <button
-          type="submit"
-          disabled={savingPayment || paymentLoading}
-          className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-semibold py-2.5 rounded-xl transition-colors"
-        >
-          {savingPayment ? "Salvando..." : "Salvar Mercado Pago"}
-        </button>
+        {hasPaymentCredential && (
+          <button
+            type="submit"
+            disabled={savingPayment || paymentLoading}
+            className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-semibold py-2.5 rounded-xl transition-colors"
+          >
+            {savingPayment ? "Salvando..." : "Salvar preferência de pagamento"}
+          </button>
+        )}
       </form>
 
       {/* Avisos de Estoque Pendentes */}
