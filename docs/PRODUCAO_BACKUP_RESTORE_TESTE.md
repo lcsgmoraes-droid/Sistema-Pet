@@ -101,6 +101,19 @@ diariamente as 03:45, depois do backup local das 03:15.
 Nunca enviar as chaves por chat, salvar em `.env` do repositorio ou imprimir no
 log. A ativacao no servidor exige autorizacao explicita de producao.
 
+## Ultima copia externa validada
+
+Data: 2026-07-13.
+
+- Commit em producao: `e2134e939`.
+- Provedor: Cloudflare R2, bucket privado `corepet-backups-prod`.
+- Objeto: `corepet/database/petshop_prod_20260713_234008.dump.gz`.
+- Tamanho: `28973026` bytes.
+- SHA-256: `910aea7b1c554dc35f76d30fa0194c47f44b9b20971db4ceb4634c0eb33be617`.
+- Checksum complementar enviado e visivel no bucket.
+- Retencao remota: 90 dias.
+- Resultado: `external_copy_status=ok` e health publico saudavel.
+
 ## Criterio para marcar como validado
 
 So marcar o item do guia mestre como feito quando houver evidencia de:
