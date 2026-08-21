@@ -24,6 +24,13 @@ BRAND_ALIASES = {
     "amex": "amex",
     "american express": "amex",
     "hipercard": "hipercard",
+    "hiper": "hiper",
+    "cabal": "cabal",
+    "diners": "diners",
+    "diners club": "diners",
+    "discover": "discover",
+    "union pay": "unionpay",
+    "unionpay": "unionpay",
     "outro": "outros",
     "outros": "outros",
 }

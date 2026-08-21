@@ -75,6 +75,9 @@ function OperadorasCartao() {
               <li>- O PDV usara a operadora padrao automaticamente para vendas com cartao</li>
               <li>- Cada combinacao de bandeira e parcela usada no PDV precisa ter uma taxa</li>
               <li>
+                - Sugestoes inativas podem ser ativadas depois que as taxas reais forem preenchidas
+              </li>
+              <li>
                 - Operadoras com vendas vinculadas nao podem ser excluidas (apenas desativadas)
               </li>
             </ul>

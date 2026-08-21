@@ -61,6 +61,11 @@ test("mantem lista padrao de bandeiras de cartao", () => {
     "Elo",
     "American Express",
     "Hipercard",
+    "Hiper",
+    "Cabal",
+    "Diners Club",
+    "Discover",
+    "UnionPay",
     "Outros",
   ]);
 });
@@ -75,6 +80,8 @@ test("resolve bandeiras e parcelas pela matriz de taxas da operadora", () => {
   ];
 
   assert.equal(normalizarBandeiraCartao("American Express"), "amex");
+  assert.equal(normalizarBandeiraCartao("Diners Club"), "diners");
+  assert.equal(normalizarBandeiraCartao("Union Pay"), "unionpay");
   assert.equal(obterModalidadeCartao({ tipo: "cartao_credito" }), "credito");
   assert.equal(ehFormaPagamentoCartao({ tipo: "cartao_debito" }), true);
   assert.deepEqual(obterBandeirasDisponiveis({ taxas, modalidade: "credito" }), [

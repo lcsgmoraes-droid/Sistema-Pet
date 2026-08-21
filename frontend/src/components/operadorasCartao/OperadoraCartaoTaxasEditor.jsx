@@ -7,6 +7,11 @@ export const BANDEIRAS_TAXA = [
   { codigo: "elo", nome: "Elo" },
   { codigo: "amex", nome: "American Express" },
   { codigo: "hipercard", nome: "Hipercard" },
+  { codigo: "hiper", nome: "Hiper" },
+  { codigo: "cabal", nome: "Cabal" },
+  { codigo: "diners", nome: "Diners Club" },
+  { codigo: "discover", nome: "Discover" },
+  { codigo: "unionpay", nome: "UnionPay" },
   { codigo: "outros", nome: "Outras bandeiras (fallback)" },
 ];
 

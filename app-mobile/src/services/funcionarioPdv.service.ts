@@ -101,6 +101,11 @@ const BANDEIRAS_CARTAO_LABEL: Record<string, string> = {
   elo: "Elo",
   amex: "American Express",
   hipercard: "Hipercard",
+  hiper: "Hiper",
+  cabal: "Cabal",
+  diners: "Diners Club",
+  discover: "Discover",
+  unionpay: "UnionPay",
   outros: "Outros",
 };
 

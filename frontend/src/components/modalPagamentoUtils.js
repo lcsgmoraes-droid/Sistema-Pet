@@ -9,6 +9,11 @@ export const BANDEIRAS_CARTAO = [
   "Elo",
   "American Express",
   "Hipercard",
+  "Hiper",
+  "Cabal",
+  "Diners Club",
+  "Discover",
+  "UnionPay",
   "Outros",
 ];
 
@@ -18,6 +23,11 @@ const BANDEIRA_POR_CODIGO = {
   elo: "Elo",
   amex: "American Express",
   hipercard: "Hipercard",
+  hiper: "Hiper",
+  cabal: "Cabal",
+  diners: "Diners Club",
+  discover: "Discover",
+  unionpay: "UnionPay",
   outros: "Outros",
 };
 
@@ -27,6 +37,8 @@ export function normalizarBandeiraCartao(bandeira = "") {
     .toLowerCase();
   if (valor === "master" || valor === "master card") return "mastercard";
   if (valor === "american express") return "amex";
+  if (valor === "diners club") return "diners";
+  if (valor === "union pay") return "unionpay";
   if (valor === "outro" || valor === "outras" || valor === "outra") return "outros";
   return valor;
 }

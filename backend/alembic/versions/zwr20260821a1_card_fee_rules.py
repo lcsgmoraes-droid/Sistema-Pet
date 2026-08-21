@@ -30,6 +30,20 @@ def _columns(inspector, table_name: str) -> set[str]:
     return {column["name"] for column in inspector.get_columns(table_name)}
 
 
+def _set_rls_for_backfill(bind, table_names: tuple[str, ...], *, enabled: bool) -> None:
+    if bind.dialect.name != "postgresql":
+        return
+    existing = set(sa.inspect(bind).get_table_names())
+    for table_name in table_names:
+        if table_name not in existing:
+            continue
+        if enabled:
+            op.execute(f"ALTER TABLE {table_name} ENABLE ROW LEVEL SECURITY")
+            op.execute(f"ALTER TABLE {table_name} FORCE ROW LEVEL SECURITY")
+        else:
+            op.execute(f"ALTER TABLE {table_name} DISABLE ROW LEVEL SECURITY")
+
+
 def _normalize_brand(value) -> str:
     text = str(value or "").strip().lower()
     aliases = {
@@ -344,13 +358,6 @@ def upgrade() -> None:
                 "ativo",
             ],
         )
-    apply_tenant_rls(
-        op_module=op,
-        sa_module=sa,
-        table_names=("operadoras_cartao", "operadoras_cartao_taxas"),
-        enable=True,
-    )
-
     payment_columns = _columns(sa.inspect(bind), "venda_pagamentos")
     additions = {
         "forma_pagamento_id": sa.Column(
@@ -397,7 +404,16 @@ def upgrade() -> None:
             ["taxa_cartao_regra_id"],
         )
 
+    source_tables = ("formas_pagamento", "operadoras_cartao")
+    _set_rls_for_backfill(bind, source_tables, enabled=False)
     _backfill_legacy_rules(bind, sa.inspect(bind))
+    _set_rls_for_backfill(bind, source_tables, enabled=True)
+    apply_tenant_rls(
+        op_module=op,
+        sa_module=sa,
+        table_names=("operadoras_cartao", "operadoras_cartao_taxas"),
+        enable=True,
+    )
 
 
 def downgrade() -> None:
