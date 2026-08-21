@@ -69,6 +69,22 @@ def test_generated_runtime_artifact_is_rejected():
     ]
 
 
+def test_import_data_and_reports_cannot_be_tracked():
+    module = load_validator()
+    tracked = {
+        "backend/app/main.py",
+        "backend/logs_importacao/relatorio.json",
+        "backend/resultado_importacao.txt",
+        "simplesvet/glo_pessoa.csv",
+    }
+
+    assert module.forbidden_generated_artifacts(tracked) == [
+        "backend/logs_importacao/relatorio.json",
+        "backend/resultado_importacao.txt",
+        "simplesvet/glo_pessoa.csv",
+    ]
+
+
 def test_new_root_markdown_is_rejected():
     module = load_validator()
     tracked = {

@@ -4,11 +4,9 @@
 Script modular para importar dados do sistema SimplesVet.
 Importa em fases respeitando dependências.
 
-Uso:
-    python importar_simplesvet.py --fase 1 --limite 20
-    python importar_simplesvet.py --fase 2 --limite 20
-    python importar_simplesvet.py --all --limite 20  # Todas as fases
-    python importar_simplesvet.py --all               # Importação completa
+Uso seguro:
+    python importar_simplesvet_cli.py plan --help
+    python importar_simplesvet_cli.py apply --help
 
 Fases:
     1 - Cadastros Base (espécies, raças)
@@ -20,7 +18,6 @@ Fases:
 # ruff: noqa: E402
 
 import sys
-import argparse
 from datetime import datetime
 from typing import List, Optional
 from pathlib import Path
@@ -29,13 +26,12 @@ from pathlib import Path
 backend_path = Path(__file__).parent
 sys.path.insert(0, str(backend_path))
 
-from sqlalchemy import text
+from sqlalchemy.exc import ResourceClosedError
 from sqlalchemy.orm import Session
 from app.models import Cliente, Pet, Especie, Raca
 from app.produtos_models import Produto, Marca
 from app.vendas_models import Venda, VendaItem
-from app.db import SessionLocal
-from importar_simplesvet_state import ID_MAP, NAO_IMPORTADOS, STATS, TENANT_ID, USER_ID
+from importar_simplesvet_state import ID_MAP, NAO_IMPORTADOS, RUNTIME, STATS
 from importar_simplesvet_summary import exibir_resumo as _exibir_resumo
 from importar_simplesvet_utils import (
     carregar_contatos,
@@ -48,28 +44,16 @@ from importar_simplesvet_utils import (
 )
 
 
-def obter_tenant_id(db: Session) -> str:
-    """Busca o tenant_id do primeiro usuário do sistema"""
-    global TENANT_ID
-    if TENANT_ID:
-        return TENANT_ID
+def _finish_row_savepoint(savepoint, failed: bool) -> None:
+    """Fecha a unidade de trabalho de uma linha sem perder as anteriores."""
 
     try:
-        result = db.execute(
-            text("SELECT tenant_id FROM users WHERE id = :user_id LIMIT 1"),
-            {"user_id": USER_ID},
-        )
-        row = result.fetchone()
-        if row and row[0]:
-            TENANT_ID = str(row[0])
-            log(f"Tenant ID encontrado: {TENANT_ID}")
-            return TENANT_ID
-        else:
-            log("Nenhum tenant_id encontrado no banco!", "ERRO")
-            sys.exit(1)
-    except Exception as e:
-        log(f"Erro ao buscar tenant_id: {e}", "ERRO")
-        sys.exit(1)
+        if failed:
+            savepoint.rollback()
+        elif savepoint.is_active:
+            savepoint.commit()
+    except ResourceClosedError:
+        return
 
 
 # =====================================================================
@@ -85,6 +69,8 @@ def importar_especies(db: Session, limite: Optional[int] = None):
     STATS["especies"]["total"] = len(registros)
 
     for row in registros:
+        savepoint = db.begin_nested()
+        row_failed = False
         try:
             # Verificar se já existe
             existe = (
@@ -105,7 +91,7 @@ def importar_especies(db: Session, limite: Optional[int] = None):
             especie = Especie(
                 nome=row["esp_var_nome"],
                 ativo=True,
-                tenant_id=TENANT_ID,
+                tenant_id=RUNTIME.tenant_id,
                 created_at=parse_date(row.get("esp_dti_inclusao")),
             )
 
@@ -117,14 +103,17 @@ def importar_especies(db: Session, limite: Optional[int] = None):
             log(f"Espécie: {especie.nome}", "SUCESSO")
 
         except Exception as e:
+            row_failed = True
             STATS["especies"]["erro"] += 1
             log(
                 f"Erro espécie {row.get('esp_var_nome', 'DESCONHECIDO')}: {str(e)}",
                 "ERRO",
             )
-            continue  # Continua sem fazer rollback
+            continue  # O savepoint descarta apenas esta linha.
+        finally:
+            _finish_row_savepoint(savepoint, row_failed)
 
-    db.commit()
+    db.flush()
     log(f"✓ Espécies: {STATS['especies']['sucesso']}/{STATS['especies']['total']}")
 
 
@@ -136,6 +125,8 @@ def importar_racas(db: Session, limite: Optional[int] = None):
     STATS["racas"]["total"] = len(registros)
 
     for row in registros:
+        savepoint = db.begin_nested()
+        row_failed = False
         try:
             especie_id = ID_MAP["especies"].get(row["esp_int_codigo"])
 
@@ -158,7 +149,7 @@ def importar_racas(db: Session, limite: Optional[int] = None):
                 nome=row["rac_var_nome"],
                 especie_id=especie_id,
                 ativo=True,
-                tenant_id=TENANT_ID,
+                tenant_id=RUNTIME.tenant_id,
                 created_at=parse_date(row.get("rac_dti_inclusao")),
             )
 
@@ -169,13 +160,16 @@ def importar_racas(db: Session, limite: Optional[int] = None):
             STATS["racas"]["sucesso"] += 1
 
         except Exception as e:
+            row_failed = True
             STATS["racas"]["erro"] += 1
             log(
                 f"Erro raça {row.get('rac_var_nome', 'DESCONHECIDO')}: {str(e)}", "ERRO"
             )
-            continue  # Continua sem fazer rollback
+            continue  # O savepoint descarta apenas esta linha.
+        finally:
+            _finish_row_savepoint(savepoint, row_failed)
 
-    db.commit()
+    db.flush()
     log(f"✓ Raças: {STATS['racas']['sucesso']}/{STATS['racas']['total']}")
 
 
@@ -193,6 +187,8 @@ def importar_clientes(db: Session, limite: Optional[int] = None):
     STATS["clientes"]["total"] = len(registros)
 
     for row in registros:
+        savepoint = db.begin_nested()
+        row_failed = False
         try:
             cpf = limpar_cpf(row.get("pes_var_cpf"))
             codigo = row.get("pes_var_chave")
@@ -256,8 +252,8 @@ def importar_clientes(db: Session, limite: Optional[int] = None):
                 continue
 
             cliente = Cliente(
-                user_id=USER_ID,
-                tenant_id=TENANT_ID,
+                user_id=RUNTIME.user_id,
+                tenant_id=RUNTIME.tenant_id,
                 codigo=codigo,
                 nome=nome,
                 cpf=cpf,
@@ -303,14 +299,17 @@ def importar_clientes(db: Session, limite: Optional[int] = None):
             log(f"Cliente: {cliente.nome} (#{cliente.codigo})", "SUCESSO")
 
         except Exception as e:
+            row_failed = True
             STATS["clientes"]["erro"] += 1
             log(
                 f"Erro cliente {row.get('pes_var_nome', 'DESCONHECIDO')}: {str(e)}",
                 "ERRO",
             )
             continue
+        finally:
+            _finish_row_savepoint(savepoint, row_failed)
 
-    db.commit()
+    db.flush()
     log(f"✓ Clientes: {STATS['clientes']['sucesso']}/{STATS['clientes']['total']}")
 
 
@@ -325,6 +324,8 @@ def importar_produtos(db: Session, limite: Optional[int] = None):
     linha = 0  # Contador de linha para relatório
     for row in registros:
         linha += 1
+        savepoint = db.begin_nested()
+        row_failed = False
         try:
             # VALIDAÇÃO RIGOROSA DO SKU
             codigo_bruto = row.get("pro_var_chave", "").strip()
@@ -394,8 +395,8 @@ def importar_produtos(db: Session, limite: Optional[int] = None):
             situacao = row.get("pro_var_status", "Ativo") == "Ativo"
 
             produto = Produto(
-                user_id=USER_ID,
-                tenant_id=TENANT_ID,
+                user_id=RUNTIME.user_id,
+                tenant_id=RUNTIME.tenant_id,
                 codigo=codigo,
                 nome=row["pro_var_nome"],
                 tipo=tipo,
@@ -421,6 +422,7 @@ def importar_produtos(db: Session, limite: Optional[int] = None):
             log(f"Produto: {produto.nome} (SKU: {produto.codigo})", "SUCESSO")
 
         except KeyError as e:
+            row_failed = True
             STATS["produtos"]["erro"] += 1
             erro_msg = f"Campo obrigatório faltando: {str(e)}"
             log(
@@ -438,6 +440,7 @@ def importar_produtos(db: Session, limite: Optional[int] = None):
             )
             continue
         except Exception as e:
+            row_failed = True
             STATS["produtos"]["erro"] += 1
             erro_msg = str(e)
             log(
@@ -454,18 +457,20 @@ def importar_produtos(db: Session, limite: Optional[int] = None):
                 }
             )
             continue
+        finally:
+            _finish_row_savepoint(savepoint, row_failed)
 
-    db.commit()
+    db.flush()
     log(f"✓ Produtos: {STATS['produtos']['sucesso']}/{STATS['produtos']['total']}")
 
     # Gerar relatório de produtos NÃO importados
     if NAO_IMPORTADOS["produtos"]:
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         csv_file = (
-            Path(__file__).parent
-            / f"logs_importacao/produtos_nao_importados_{timestamp}.csv"
+            RUNTIME.require_configured().report_dir
+            / f"produtos_nao_importados_{timestamp}.csv"
         )
-        csv_file.parent.mkdir(exist_ok=True)
+        csv_file.parent.mkdir(parents=True, exist_ok=True)
 
         with open(csv_file, "w", encoding="utf-8", newline="") as f:
             import csv as csv_module
@@ -489,6 +494,8 @@ def importar_marcas(db: Session):
     STATS["marcas"]["total"] = len(registros)
 
     for row in registros:
+        savepoint = db.begin_nested()
+        row_failed = False
         try:
             nome = row.get("mar_var_nome")
             if not nome or nome == "NULL":
@@ -501,8 +508,8 @@ def importar_marcas(db: Session):
                 continue
 
             marca = Marca(
-                user_id=USER_ID,
-                tenant_id=TENANT_ID,
+                user_id=RUNTIME.user_id,
+                tenant_id=RUNTIME.tenant_id,
                 nome=nome,
                 ativo=True,
                 created_at=datetime.now(),
@@ -515,14 +522,17 @@ def importar_marcas(db: Session):
             STATS["marcas"]["sucesso"] += 1
 
         except Exception as e:
+            row_failed = True
             STATS["marcas"]["erro"] += 1
             log(
                 f"Erro marca {row.get('mar_var_nome', 'DESCONHECIDO')}: {str(e)}",
                 "ERRO",
             )
             continue
+        finally:
+            _finish_row_savepoint(savepoint, row_failed)
 
-    db.commit()
+    db.flush()
     log(f"✓ Marcas: {STATS['marcas']['sucesso']}/{STATS['marcas']['total']}")
 
 
@@ -539,6 +549,8 @@ def importar_pets(db: Session, limite: Optional[int] = None):
     STATS["pets"]["total"] = len(registros)
 
     for row in registros:
+        savepoint = db.begin_nested()
+        row_failed = False
         try:
             cliente_id = ID_MAP["pessoas"].get(row["pes_int_codigo"])
 
@@ -571,8 +583,8 @@ def importar_pets(db: Session, limite: Optional[int] = None):
 
             pet = Pet(
                 cliente_id=cliente_id,
-                user_id=USER_ID,
-                tenant_id=TENANT_ID,
+                user_id=RUNTIME.user_id,
+                tenant_id=RUNTIME.tenant_id,
                 codigo=codigo,
                 nome=row["ani_var_nome"],
                 especie=especie_nome,
@@ -601,12 +613,14 @@ def importar_pets(db: Session, limite: Optional[int] = None):
             log(f"Pet: {pet.nome} - {pet.especie}", "SUCESSO")
 
         except Exception as e:
+            row_failed = True
             STATS["pets"]["erro"] += 1
             log(f"Erro pet {row.get('ani_var_nome', 'DESCONHECIDO')}: {str(e)}", "ERRO")
-            db.rollback()  # Rollback necessário após erro para continuar
             continue
+        finally:
+            _finish_row_savepoint(savepoint, row_failed)
 
-    db.commit()
+    db.flush()
     log(f"✓ Pets: {STATS['pets']['sucesso']}/{STATS['pets']['total']}")
 
 
@@ -625,6 +639,8 @@ def importar_vendas(db: Session, limite: Optional[int] = None, data_hoje: bool =
     vendas_ids_antigos = []
 
     for row in registros:
+        savepoint = db.begin_nested()
+        row_failed = False
         try:
             cliente_id = None
             if row.get("pes_int_codigo") and row["pes_int_codigo"] != "NULL":
@@ -662,16 +678,15 @@ def importar_vendas(db: Session, limite: Optional[int] = None, data_hoje: bool =
             if existe:
                 ID_MAP["vendas"][row["ven_int_codigo"]] = existe.id
                 STATS["vendas"]["duplicado"] += 1
-                vendas_ids_antigos.append(row["ven_int_codigo"])
                 log(f"Venda já existe: {numero_venda}", "AVISO")
                 continue
 
             venda = Venda(
-                user_id=USER_ID,
-                tenant_id=TENANT_ID,
+                user_id=RUNTIME.user_id,
+                tenant_id=RUNTIME.tenant_id,
                 numero_venda=numero_venda,
                 cliente_id=cliente_id,
-                vendedor_id=USER_ID,
+                vendedor_id=RUNTIME.user_id,
                 subtotal=subtotal,
                 desconto_valor=desconto_valor,
                 desconto_percentual=desconto_percentual,
@@ -694,15 +709,17 @@ def importar_vendas(db: Session, limite: Optional[int] = None, data_hoje: bool =
             log(f"Venda: {venda.numero_venda} - R$ {venda.total:.2f}", "SUCESSO")
 
         except Exception as e:
+            row_failed = True
             STATS["vendas"]["erro"] += 1
             log(
                 f"Erro venda {row.get('ven_var_chave', 'DESCONHECIDO')}: {str(e)}",
                 "ERRO",
             )
-            db.rollback()  # Rollback necessário após erro
             continue
+        finally:
+            _finish_row_savepoint(savepoint, row_failed)
 
-    db.commit()
+    db.flush()
     log(f"✓ Vendas: {STATS['vendas']['sucesso']}/{STATS['vendas']['total']}")
 
     # Importar itens
@@ -719,6 +736,8 @@ def importar_itens_venda(db: Session, vendas_ids: List[str]):
     STATS["itens_venda"]["total"] = len(itens_filtrados)
 
     for row in itens_filtrados:
+        savepoint = db.begin_nested()
+        row_failed = False
         try:
             venda_id = ID_MAP["vendas"].get(row["ven_int_codigo"])
             produto_id = ID_MAP["produtos"].get(row["pro_int_codigo"])
@@ -732,26 +751,31 @@ def importar_itens_venda(db: Session, vendas_ids: List[str]):
             preco_total = quantidade * preco_unitario
 
             item = VendaItem(
-                user_id=USER_ID,
-                tenant_id=TENANT_ID,
+                user_id=RUNTIME.user_id,
+                tenant_id=RUNTIME.tenant_id,
                 venda_id=venda_id,
                 produto_id=produto_id,
                 quantidade=quantidade,
                 preco_unitario=preco_unitario,
-                preco_total=preco_total,
-                desconto=0.0,
+                tipo="produto",
+                subtotal=preco_total,
+                desconto_item=0.0,
                 created_at=parse_date(row.get("vpr_dti_inclusao")) or datetime.now(),
             )
 
             db.add(item)
+            db.flush()
             STATS["itens_venda"]["sucesso"] += 1
 
         except Exception as e:
+            row_failed = True
             STATS["itens_venda"]["erro"] += 1
             log(f"Erro item: {str(e)}", "ERRO")
             continue
+        finally:
+            _finish_row_savepoint(savepoint, row_failed)
 
-    db.commit()
+    db.flush()
     log(f"✓ Itens: {STATS['itens_venda']['sucesso']}/{STATS['itens_venda']['total']}")
 
 
@@ -765,52 +789,47 @@ def exibir_resumo():
     _exibir_resumo(STATS, NAO_IMPORTADOS)
 
 
-def main():
-    """Executar importação"""
-    parser = argparse.ArgumentParser(description="Importar dados do SimplesVet")
-    parser.add_argument("--fase", type=int, help="Fase específica (1-4)")
-    parser.add_argument("--all", action="store_true", help="Todas as fases")
-    parser.add_argument("--limite", type=int, default=20, help="Limite de registros")
-    parser.add_argument(
-        "--data-hoje", action="store_true", help="Força data das vendas para hoje"
-    )
+def executar_escopo(db: Session, *, scope: str, limite: Optional[int] = None) -> None:
+    """Executa um escopo com suas dependencias dentro da transacao do chamador."""
 
-    args = parser.parse_args()
+    RUNTIME.require_configured()
+    log(f"INICIANDO IMPORTACAO SIMPLESVET ({scope})")
+    log(f"Limite por arquivo: {limite if limite is not None else 'sem limite'}")
 
-    db = SessionLocal()
+    if scope == "all":
+        importar_especies(db, limite)
+        importar_racas(db, limite)
+        importar_clientes(db, limite)
+        importar_produtos(db, limite)
+        importar_pets(db, limite)
+        importar_vendas(db, limite)
+    elif scope == "base":
+        importar_especies(db, limite)
+        importar_racas(db, limite)
+    elif scope == "catalog":
+        importar_clientes(db, limite)
+        importar_produtos(db, limite)
+    elif scope == "pets":
+        importar_clientes(db, limite)
+        importar_pets(db, limite)
+    elif scope == "sales":
+        importar_clientes(db, limite)
+        importar_produtos(db, limite)
+        importar_vendas(db, limite)
+    else:
+        raise ValueError(f"Escopo de importacao desconhecido: {scope}")
 
-    try:
-        log("INICIANDO IMPORTACAO SIMPLESVET")
+    exibir_resumo()
+    log("IMPORTACAO PROCESSADA; A TRANSACAO AINDA NAO FOI CONFIRMADA")
 
-        # Buscar tenant_id do banco
-        obter_tenant_id(db)
 
-        log(f"Limite de registros: {args.limite}")
+def main(argv: list[str] | None = None) -> int:
+    """Encaminha a linha de comando para o fluxo seguro plan/apply."""
 
-        if args.all or args.fase == 1:
-            importar_especies(db)
-            importar_racas(db, args.limite)
+    from importar_simplesvet_cli import main as cli_main
 
-        if args.all or args.fase == 2:
-            importar_clientes(db, args.limite)
-            importar_produtos(db, args.limite)
-
-        if args.all or args.fase == 3:
-            importar_pets(db, args.limite)
-
-        if args.all or args.fase == 4:
-            importar_vendas(db, args.limite, data_hoje=args.data_hoje)
-
-        exibir_resumo()
-        log("✅ IMPORTAÇÃO CONCLUÍDA")
-
-    except Exception as e:
-        log(f"ERRO FATAL: {str(e)}", "ERRO")
-        db.rollback()
-        raise
-    finally:
-        db.close()
+    return cli_main(argv)
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

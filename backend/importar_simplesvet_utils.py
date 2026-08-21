@@ -5,25 +5,20 @@ from __future__ import annotations
 import csv
 import re
 from datetime import datetime
-from pathlib import Path
 from typing import Dict, List, Optional
 
-
-SIMPLESVET_PATH = Path(
-    r"c:\Users\Lucas\OneDrive\Área de Trabalho\Programa\Sistema Pet\simplesvet\banco"
-)
+from importar_simplesvet_state import RUNTIME
 
 
 def ler_csv(arquivo: str, limite: Optional[int] = None) -> List[Dict]:
     """Le arquivo CSV e retorna lista de dicionarios."""
-    caminho = SIMPLESVET_PATH / arquivo
+    caminho = RUNTIME.require_configured().source_dir / arquivo
 
     if not caminho.exists():
-        print(f"[ERRO] Arquivo nao encontrado: {caminho}")
-        return []
+        raise FileNotFoundError(f"Arquivo obrigatorio nao encontrado: {caminho}")
 
     registros = []
-    with open(caminho, "r", encoding="utf-8") as f:
+    with open(caminho, "r", encoding="utf-8-sig", newline="") as f:
         reader = csv.DictReader(f)
         for i, row in enumerate(reader):
             if limite and i >= limite:

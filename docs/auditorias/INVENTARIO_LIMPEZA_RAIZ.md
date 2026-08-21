@@ -1,6 +1,6 @@
 # Inventario para limpeza segura da raiz
 
-Atualizado em: 2026-08-20
+Atualizado em: 2026-08-21
 
 Objetivo: reduzir a confusao visual da raiz sem apagar atalhos utilizados ou
 alterar o runtime das empresas ativas.
@@ -33,6 +33,16 @@ somente encaminham para implementacoes em `scripts/`. Entradas obsoletas que
 misturavam configuracao local com dados reais ou usavam caminhos fixos ficaram
 bloqueadas. O validador passou a rejeitar qualquer novo `.bat`, `.ps1` ou `.sh`
 solto na raiz sem classificacao explicita.
+
+Na etapa de importacao multitenant, `IMPORTAR_SIMPLESVET_TESTE.bat` deixou de
+ser uma entrada bloqueada e virou um alias fino para
+`scripts/importar_simplesvet_seguro.ps1`. O caminho fixo e a escolha implicita
+de empresa foram removidos; simulacao e plano imutavel passaram a ser
+obrigatorios antes de qualquer gravacao.
+
+Os seis importadores e scripts de depuracao substituidos pelo fluxo novo tambem
+foram removidos da raiz do backend. Um teste estrutural impede que esses nomes
+inseguros voltem a ser executaveis.
 
 ## Itens oficiais na raiz
 

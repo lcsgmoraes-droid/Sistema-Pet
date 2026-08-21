@@ -56,6 +56,7 @@ Para release/deploy, use a sequencia completa:
 
 - Nao versionar arquivos locais (backups, dumps, temporarios, certificados).
 - Nao enviar dados de DEV para producao.
+- Nao versionar CSVs, planos ou relatorios de importacao; usar `runtime/importacoes-simplesvet/`.
 - Nao pular validacao de release.
 - Nao corrigir em producao manualmente sem refletir no Git.
 - **Sempre rodar `npm run build` (na pasta `frontend`) antes de release/deploy quando houver mudancas no frontend. Nao commitar `frontend/dist`; o deploy seguro gera `runtime/frontend/dist` no servidor.**

@@ -1,6 +1,6 @@
 # Indice operacional do Sistema Pet
 
-Atualizado em: 2026-08-20
+Atualizado em: 2026-08-21
 
 Este e o ponto de entrada oficial da documentacao. Se houver conflito entre este
 indice e um documento historico, use este indice e o guia mestre de maturidade.
@@ -25,6 +25,7 @@ Guia mestre:
 | Deploy real | `docs/PRODUCAO_DEPLOY_SSH.md` | `petshop-status-producao` e health publico |
 | Rollback | `docs/PRODUCAO_ROLLBACK_CHECKLIST.md` | Backup operacional do deploy |
 | Backup/restore de banco | `docs/PRODUCAO_BACKUP_RESTORE_TESTE.md` | Restore smoke controlado |
+| Importar dados SimplesVet | `docs/IMPORTACAO_SIMPLESVET_SEGURA.md` | Plano, hashes e recibo da importacao |
 | Observabilidade e auditoria | `docs/RETENCAO_LOGS_AUDITORIA.md` | Painel Ops e logs JSONL |
 | Teste seguro de capacidade | `docs/TESTE_CAPACIDADE_SEGURO.md` | `scripts/capacity_smoke.py` em ambiente local |
 | Estrutura/refatoracao | `docs/auditorias/estrutura-geral-definition-of-done.md` | Testes focados da fatia |
@@ -66,6 +67,7 @@ Guia mestre:
 | Testes/CI | `docs/auditorias/testes-ci-cobertura-critica.md` |
 | Observabilidade/auditoria | `docs/RETENCAO_LOGS_AUDITORIA.md` |
 | Portabilidade/configuracao | `docs/DEV_ENVIRONMENT_CHECK.md` |
+| Importacao SimplesVet | `docs/IMPORTACAO_SIMPLESVET_SEGURA.md` |
 | Venda do Plano Basico | `docs/GUIA_VENDA_PLANO_BASICO.md` |
 | Implantacao inicial | `docs/implantacao/GUIA_IMPLANTACAO_INICIAL.md` |
 | Criativos e videos | `docs/marketing/MATRIZ_CRIATIVOS_SISTEMA.md` |

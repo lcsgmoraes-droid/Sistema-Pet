@@ -69,6 +69,7 @@ COMPATIBILITY_ENTRYPOINTS = {
     "PILOTO_WHATSAPP.bat": "scripts/whatsapp_pilot.ps1",
     "RESETAR_SEQUENCES.bat": "scripts/manutencao_banco_dev.ps1",
     "TESTAR_AUTENTICACAO.bat": "scripts/diagnosticar_autenticacao_dev.ps1",
+    "IMPORTAR_SIMPLESVET_TESTE.bat": "scripts/importar_simplesvet_seguro.ps1",
 }
 
 COMPATIBILITY_REQUIRED_ACTIONS = {
@@ -88,7 +89,6 @@ BLOCKED_LEGACY_ENTRYPOINTS = (
     "ASSISTENTE_RELEASE.bat",
     "ASSISTENTE_RELEASE_EXECUTAR.bat",
     "FRONTEND_PILOTO.bat",
-    "IMPORTAR_SIMPLESVET_TESTE.bat",
 )
 
 OFFICIAL_ROOT_OPERATIONAL_ENTRYPOINTS = frozenset({"FLUXO_UNICO.bat"})
@@ -150,6 +150,10 @@ FORBIDDEN_TRACKED_PREFIXES = (
     "node_modules/",
     "runtime/",
     ".venv/",
+    "backend/logs_importacao/",
+    "backend/resultado_importacao.txt",
+    "simplesvet/",
+    "backend/simplesvet/",
 )
 
 SOURCE_SUFFIXES = frozenset({".py", ".js", ".jsx", ".ts", ".tsx", ".mjs"})

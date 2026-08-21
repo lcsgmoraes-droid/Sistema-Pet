@@ -128,6 +128,22 @@ Padrao atual:
 - produtos importados pertencem ao tenant;
 - editar produto importado nao altera template nem outro tenant.
 
+## Importacao externa de dados
+
+Exportacoes de sistemas anteriores seguem um fluxo diferente do onboarding de
+templates, mas obedecem ao mesmo isolamento:
+
+- tenant e usuario de destino sao obrigatorios e validados em conjunto;
+- nenhuma importacao pode escolher o primeiro usuario ou um tenant implicito;
+- os arquivos precisam ser simulados integralmente antes da gravacao;
+- a aplicacao aceita apenas o plano, o banco e os hashes simulados;
+- toda aplicacao deve ser atomica e falhar fechada;
+- relatorios e dados exportados ficam fora do Git;
+- producao exige backup, autorizacao explicita e confirmacao adicional;
+- queries, duplicidades e inserts sao avaliados dentro do contexto do tenant.
+
+O contrato operacional esta em `docs/IMPORTACAO_SIMPLESVET_SEGURA.md`.
+
 ## Catalogo Base Administrativo
 
 O catalogo base da loja `admin@mlprohub.com.br` pode ser importado por acao administrativa
