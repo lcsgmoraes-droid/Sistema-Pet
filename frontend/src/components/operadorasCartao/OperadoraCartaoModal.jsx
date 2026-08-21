@@ -1,5 +1,6 @@
 import { AlertCircle, Eye, EyeOff, Save, X } from "lucide-react";
 import { ICONES_DISPONIVEIS } from "./operadorasCartaoUtils";
+import OperadoraCartaoTaxasEditor from "./OperadoraCartaoTaxasEditor";
 
 function OperadoraCartaoModal({
   erro,
@@ -12,12 +13,15 @@ function OperadoraCartaoModal({
   operadoraSelecionada,
   setErro,
   setFormData,
+  setTaxas,
+  taxas,
+  taxasLoading,
 }) {
   if (!modalAberto) return null;
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+      <div className="bg-white rounded-lg w-full max-w-5xl max-h-[90vh] overflow-y-auto">
         <div className="p-6 border-b border-gray-200 flex items-center justify-between sticky top-0 bg-white z-10">
           <h2 className="text-xl font-bold text-gray-900">
             {operadoraSelecionada ? "Editar Operadora" : "Nova Operadora"}
@@ -81,9 +85,16 @@ function OperadoraCartaoModal({
                 <input
                   type="number"
                   value={formData.max_parcelas}
-                  onChange={(e) =>
-                    setFormData({ ...formData, max_parcelas: parseInt(e.target.value, 10) || 1 })
-                  }
+                  onChange={(e) => {
+                    const maxParcelas = parseInt(e.target.value, 10) || 1;
+                    setFormData({ ...formData, max_parcelas: maxParcelas });
+                    setTaxas((atuais) =>
+                      atuais.filter(
+                        (taxa) =>
+                          taxa.modalidade === "debito" || Number(taxa.parcelas) <= maxParcelas,
+                      ),
+                    );
+                  }}
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   min="1"
                   max="24"
@@ -115,6 +126,19 @@ function OperadoraCartaoModal({
               </div>
             </div>
           </div>
+
+          {taxasLoading ? (
+            <div className="mb-6 rounded-lg border border-gray-200 bg-gray-50 p-4 text-sm text-gray-600">
+              Carregando tabela de taxas...
+            </div>
+          ) : (
+            <OperadoraCartaoTaxasEditor
+              formData={formData}
+              setFormData={setFormData}
+              taxas={taxas}
+              setTaxas={setTaxas}
+            />
+          )}
 
           <div className="mb-6">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">Interface</h3>

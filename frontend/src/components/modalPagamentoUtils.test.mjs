@@ -9,6 +9,7 @@ import {
   devePerguntarNotaFiscal,
   descreverCupomMargem,
   ehFormaPagamentoPix,
+  ehFormaPagamentoCartao,
   ehFormaPagamentoStonePos,
   avaliarEstadoJustificativaMargem,
   extrairCorIndicadorMargem,
@@ -28,9 +29,15 @@ import {
   montarVendaParaPersistirComCupom,
   montarObservacoesComJustificativaMargem,
   normalizarResultadoSimulacaoParcelamento,
+  normalizarBandeiraCartao,
+  obterBandeiraPadraoPdv,
+  obterBandeirasDisponiveis,
   obterCorVisualParcelamento,
   obterEstiloVisualParcelamento,
   obterCorParcelamentoAtual,
+  obterModalidadeCartao,
+  obterParcelasDisponiveis,
+  obterTaxaCartaoSelecionada,
   podeEnviarPagamentoStonePos,
   resolverFaixasParcelamentoDaForma,
   validarPagamentoParaAdicionar,
@@ -54,8 +61,59 @@ test("mantem lista padrao de bandeiras de cartao", () => {
     "Elo",
     "American Express",
     "Hipercard",
+    "Hiper",
+    "Cabal",
+    "Diners Club",
+    "Discover",
+    "UnionPay",
     "Outros",
   ]);
+});
+
+test("resolve bandeiras e parcelas pela matriz de taxas da operadora", () => {
+  const taxas = [
+    { id: 1, bandeira: "visa", modalidade: "credito", parcelas: 1, taxa_percentual: 2 },
+    { id: 2, bandeira: "visa", modalidade: "credito", parcelas: 3, taxa_percentual: 3 },
+    { id: 3, bandeira: "mastercard", modalidade: "credito", parcelas: 1 },
+    { id: 4, bandeira: "outros", modalidade: "credito", parcelas: 2 },
+    { id: 5, bandeira: "visa", modalidade: "debito", parcelas: 1 },
+  ];
+
+  assert.equal(normalizarBandeiraCartao("American Express"), "amex");
+  assert.equal(normalizarBandeiraCartao("Diners Club"), "diners");
+  assert.equal(normalizarBandeiraCartao("Union Pay"), "unionpay");
+  assert.equal(obterModalidadeCartao({ tipo: "cartao_credito" }), "credito");
+  assert.equal(ehFormaPagamentoCartao({ tipo: "cartao_debito" }), true);
+  assert.deepEqual(obterBandeirasDisponiveis({ taxas, modalidade: "credito" }), [
+    "Visa",
+    "Mastercard",
+  ]);
+  assert.deepEqual(obterBandeirasDisponiveis({ taxas, modalidade: "voucher" }), []);
+  assert.deepEqual(
+    obterParcelasDisponiveis({
+      taxas,
+      modalidade: "credito",
+      bandeira: "Visa",
+      maxParcelas: 12,
+    }),
+    [1, 2, 3],
+  );
+  assert.equal(
+    obterBandeiraPadraoPdv({
+      operadora: { bandeira_padrao: "mastercard" },
+      bandeiras: ["Visa", "Mastercard"],
+    }),
+    "Mastercard",
+  );
+  assert.equal(
+    obterTaxaCartaoSelecionada({
+      taxas,
+      modalidade: "credito",
+      bandeira: "Visa",
+      parcelas: 1,
+    }).id,
+    1,
+  );
 });
 
 test("calcula dados auxiliares da venda sem depender do modal", () => {
@@ -371,8 +429,20 @@ test("monta pagamento simulado e normaliza retorno da margem por parcela", () =>
       formaPagamentoId: 7,
       valorTotal: 150,
       parcelas: 3,
+      operadoraId: 9,
+      bandeira: "Visa",
+      modalidade: "credito",
     }),
-    [{ forma_pagamento_id: 7, valor: 150, parcelas: 3 }],
+    [
+      {
+        forma_pagamento_id: 7,
+        valor: 150,
+        parcelas: 3,
+        operadora_id: 9,
+        bandeira: "Visa",
+        modalidade: "credito",
+      },
+    ],
   );
 
   assert.deepEqual(
@@ -549,6 +619,7 @@ test("monta pagamento de cartao com valor efetivo limitado ao restante", () => {
     bandeira: "Visa",
     nsu_cartao: "123456",
     operadora_id: 7,
+    modalidade_cartao: "credito",
     numero_parcelas: 3,
     parcelas: 3,
     valor_recebido: 150,
@@ -579,6 +650,7 @@ test("monta pagamento em dinheiro com troco e sem dados de cartao", () => {
   assert.equal(pagamento.bandeira, null);
   assert.equal(pagamento.nsu_cartao, null);
   assert.equal(pagamento.numero_parcelas, 1);
+  assert.equal(pagamento.modalidade_cartao, null);
   assert.equal(pagamento.troco, 20);
 });
 
@@ -650,7 +722,14 @@ test("monta formas de pagamento para analise da venda com restante em dinheiro",
   });
 
   assert.deepEqual(formas, [
-    { forma_pagamento_id: 4, valor: 60, parcelas: 2 },
+    {
+      forma_pagamento_id: 4,
+      valor: 60,
+      parcelas: 2,
+      operadora_id: null,
+      bandeira: null,
+      modalidade: null,
+    },
     { forma_pagamento_id: 1, valor: 40, parcelas: 1 },
   ]);
 });

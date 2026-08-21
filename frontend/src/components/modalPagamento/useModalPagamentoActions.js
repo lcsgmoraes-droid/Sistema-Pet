@@ -33,6 +33,7 @@ export function useModalPagamentoActions({
   onVendaAtualizada,
   operadoraSelecionada,
   operadoras,
+  parcelasDisponiveis,
   opcaoExcedente,
   pagamentos,
   podeConfirmarFinalizacao,
@@ -73,6 +74,7 @@ export function useModalPagamentoActions({
       bandeira,
       operadora: operadoraSelecionada,
       numeroParcelas,
+      parcelasDisponiveis,
     });
 
     if (erroValidacao) {
@@ -123,7 +125,7 @@ export function useModalPagamentoActions({
     setFormaPagamentoSelecionada(null);
     setValorRecebido(0);
     setBandeira("");
-    setOperadoraSelecionada(operadoras.find((op) => op.padrao) || null);
+    setOperadoraSelecionada(operadoras.find((op) => op.padrao) || operadoras[0] || null);
     setNsuCartao("");
     setNumeroParcelas(1);
     setErro("");

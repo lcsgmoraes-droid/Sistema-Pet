@@ -8,6 +8,7 @@ const FORM_INICIAL = {
   max_parcelas: 12,
   padrao: false,
   ativo: true,
+  bandeira_padrao: null,
   api_enabled: false,
   api_endpoint: "",
   api_token_encrypted: "",
@@ -26,6 +27,7 @@ function normalizarForm(operadora) {
     max_parcelas: operadora.max_parcelas || 12,
     padrao: !!operadora.padrao,
     ativo: operadora.ativo !== false,
+    bandeira_padrao: operadora.bandeira_padrao || null,
     api_enabled: !!operadora.api_enabled,
     api_endpoint: operadora.api_endpoint || "",
     api_token_encrypted: operadora.api_token_encrypted || "",
@@ -42,6 +44,8 @@ export function useOperadorasCartaoPage() {
   const [erro, setErro] = useState("");
   const [mostrarToken, setMostrarToken] = useState(false);
   const [formData, setFormData] = useState(FORM_INICIAL);
+  const [taxas, setTaxas] = useState([]);
+  const [taxasLoading, setTaxasLoading] = useState(false);
 
   const carregarOperadoras = async () => {
     try {
@@ -65,12 +69,30 @@ export function useOperadorasCartaoPage() {
     [operadoras],
   );
 
-  const abrirModal = (operadora = null) => {
+  const abrirModal = async (operadora = null) => {
     setFormData(normalizarForm(operadora));
     setOperadoraSelecionada(operadora);
+    setTaxas([]);
     setModalAberto(true);
     setErro("");
     setMostrarToken(false);
+
+    if (!operadora) return;
+
+    try {
+      setTaxasLoading(true);
+      const response = await api.get(`/operadoras-cartao/${operadora.id}/taxas`, {
+        params: { apenas_ativas: true },
+      });
+      setTaxas(response.data || []);
+    } catch (error) {
+      console.error("Erro ao carregar taxas da operadora:", error);
+      const mensagem = error.response?.data?.detail || "Erro ao carregar tabela de taxas";
+      setErro(mensagem);
+      toast.error(mensagem);
+    } finally {
+      setTaxasLoading(false);
+    }
   };
 
   const fecharModal = () => {
@@ -79,6 +101,8 @@ export function useOperadorasCartaoPage() {
     setErro("");
     setMostrarToken(false);
     setFormData({ ...FORM_INICIAL });
+    setTaxas([]);
+    setTaxasLoading(false);
   };
 
   const salvarOperadora = async (event) => {
@@ -94,6 +118,32 @@ export function useOperadorasCartaoPage() {
       return;
     }
 
+    const taxaForaDoLimite = taxas.some(
+      (taxa) => taxa.modalidade !== "debito" && Number(taxa.parcelas) > formData.max_parcelas,
+    );
+    if (taxaForaDoLimite) {
+      toast.error("Remova as taxas acima do novo limite de parcelas antes de salvar");
+      return;
+    }
+
+    const temTaxaLegada = [
+      operadoraSelecionada?.taxa_debito,
+      operadoraSelecionada?.taxa_credito_vista,
+      operadoraSelecionada?.taxa_credito_parcelado,
+    ].some((taxa) => taxa != null);
+    if (formData.ativo && !taxas.length && !temTaxaLegada) {
+      toast.error("Cadastre ao menos uma taxa antes de ativar a operadora");
+      return;
+    }
+
+    if (
+      formData.bandeira_padrao &&
+      !taxas.some((taxa) => taxa.bandeira === formData.bandeira_padrao)
+    ) {
+      toast.error("A bandeira padrao precisa ter ao menos uma taxa configurada");
+      return;
+    }
+
     try {
       const dadosEnvio = {
         ...formData,
@@ -103,13 +153,32 @@ export function useOperadorasCartaoPage() {
         api_token_encrypted: formData.api_token_encrypted?.trim() || null,
       };
 
+      let operadoraSalva;
       if (operadoraSelecionada) {
-        await api.put(`/operadoras-cartao/${operadoraSelecionada.id}`, dadosEnvio);
-        toast.success("Operadora atualizada com sucesso!");
+        const response = await api.put(`/operadoras-cartao/${operadoraSelecionada.id}`, dadosEnvio);
+        operadoraSalva = response.data;
       } else {
-        await api.post("/operadoras-cartao", dadosEnvio);
-        toast.success("Operadora criada com sucesso!");
+        const response = await api.post("/operadoras-cartao", dadosEnvio);
+        operadoraSalva = response.data;
+        setOperadoraSelecionada(operadoraSalva);
       }
+
+      await api.put(`/operadoras-cartao/${operadoraSalva.id}/taxas`, {
+        taxas: taxas.map((taxa) => ({
+          bandeira: taxa.bandeira,
+          modalidade: taxa.modalidade,
+          parcelas: Number(taxa.parcelas),
+          taxa_percentual: Number(taxa.taxa_percentual || 0),
+          taxa_fixa: Number(taxa.taxa_fixa || 0),
+          prazo_recebimento_dias: Number(taxa.prazo_recebimento_dias || 0),
+        })),
+      });
+
+      toast.success(
+        operadoraSelecionada
+          ? "Operadora atualizada com sucesso!"
+          : "Operadora e taxas criadas com sucesso!",
+      );
 
       fecharModal();
       await carregarOperadoras();
@@ -155,5 +224,8 @@ export function useOperadorasCartaoPage() {
     setErro,
     setFormData,
     setMostrarToken,
+    setTaxas,
+    taxas,
+    taxasLoading,
   };
 }

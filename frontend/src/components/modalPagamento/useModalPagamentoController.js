@@ -1,4 +1,4 @@
-﻿import { useCallback, useState, useEffect, useRef } from "react";
+﻿import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import api from "../../api";
 import useRevealFloatingPanel from "../../hooks/useRevealFloatingPanel";
@@ -11,6 +11,7 @@ import {
   calcularCustoTotalItensVenda,
   calcularResumoRecebimento,
   descreverCupomMargem,
+  ehFormaPagamentoCartao,
   ehFormaPagamentoPix,
   avaliarEstadoJustificativaMargem,
   extrairCorIndicadorMargem,
@@ -21,9 +22,14 @@ import {
   montarPagamentosMargem,
   montarPayloadAnaliseMargem,
   normalizarResultadoSimulacaoParcelamento,
+  obterBandeiraPadraoPdv,
+  obterBandeirasDisponiveis,
   obterCorParcelamentoAtual,
   obterCorVisualParcelamento,
   obterEstiloVisualParcelamento,
+  obterModalidadeCartao,
+  obterParcelasDisponiveis,
+  obterTaxaCartaoSelecionada,
   resolverFaixasParcelamentoDaForma,
 } from "../modalPagamentoUtils";
 
@@ -41,6 +47,7 @@ export default function useModalPagamentoController({
   const [formasPagamento, setFormasPagamento] = useState([]);
   const [operadoras, setOperadoras] = useState([]); // 🆕 Operadoras de cartão
   const [operadoraSelecionada, setOperadoraSelecionada] = useState(null); // 🆕 Operadora selecionada
+  const [taxasOperadora, setTaxasOperadora] = useState([]);
   const [formaPagamentoSelecionada, setFormaPagamentoSelecionada] = useState(null);
   const [bandeira, setBandeira] = useState("");
   const [nsuCartao, setNsuCartao] = useState(""); // NSU para conciliação bancária
@@ -162,7 +169,7 @@ export default function useModalPagamentoController({
         setOperadoras(response.data);
 
         // Pré-selecionar operadora padrão
-        const padrao = response.data.find((op) => op.padrao);
+        const padrao = response.data.find((op) => op.padrao) || response.data[0];
         if (padrao) {
           setOperadoraSelecionada(padrao);
         }
@@ -172,6 +179,35 @@ export default function useModalPagamentoController({
     };
     carregarOperadoras();
   }, []);
+
+  useEffect(() => {
+    let ativo = true;
+    setTaxasOperadora([]);
+    setBandeira("");
+    setNumeroParcelas(1);
+
+    if (!operadoraSelecionada?.id) {
+      return () => {
+        ativo = false;
+      };
+    }
+
+    api
+      .get(`/operadoras-cartao/${operadoraSelecionada.id}/taxas`, {
+        params: { apenas_ativas: true },
+      })
+      .then((response) => {
+        if (ativo) setTaxasOperadora(response.data || []);
+      })
+      .catch((error) => {
+        console.error("Erro ao carregar taxas da operadora no PDV:", error);
+        if (ativo) setTaxasOperadora([]);
+      });
+
+    return () => {
+      ativo = false;
+    };
+  }, [operadoraSelecionada?.id]);
 
   // Buscar pagamentos existentes da venda
   useEffect(() => {
@@ -210,6 +246,61 @@ export default function useModalPagamentoController({
   }, [formaPagamentoSelecionada?.permite_parcelamento]);
 
   const valorTotal = venda.total;
+  const modalidadeCartao = obterModalidadeCartao(formaPagamentoSelecionada);
+  const bandeirasDisponiveis = useMemo(
+    () => obterBandeirasDisponiveis({ taxas: taxasOperadora, modalidade: modalidadeCartao }),
+    [modalidadeCartao, taxasOperadora],
+  );
+  const parcelasDisponiveis = useMemo(() => {
+    if (!ehFormaPagamentoCartao(formaPagamentoSelecionada)) {
+      const maxParcelas = formaPagamentoSelecionada?.parcelas_maximas || 12;
+      return Array.from({ length: maxParcelas }, (_, index) => index + 1);
+    }
+    const maxParcelas =
+      operadoraSelecionada?.max_parcelas || formaPagamentoSelecionada?.parcelas_maximas || 12;
+    return obterParcelasDisponiveis({
+      taxas: taxasOperadora,
+      modalidade: modalidadeCartao,
+      bandeira,
+      maxParcelas,
+    });
+  }, [
+    bandeira,
+    formaPagamentoSelecionada?.parcelas_maximas,
+    modalidadeCartao,
+    operadoraSelecionada?.max_parcelas,
+    taxasOperadora,
+  ]);
+  const taxaCartaoSelecionada = useMemo(
+    () =>
+      obterTaxaCartaoSelecionada({
+        taxas: taxasOperadora,
+        modalidade: modalidadeCartao,
+        bandeira,
+        parcelas: numeroParcelas,
+      }),
+    [bandeira, modalidadeCartao, numeroParcelas, taxasOperadora],
+  );
+
+  useEffect(() => {
+    if (!ehFormaPagamentoCartao(formaPagamentoSelecionada) || !operadoraSelecionada) return;
+    const aindaDisponivel = bandeirasDisponiveis.includes(bandeira);
+    if (aindaDisponivel) return;
+    setBandeira(
+      obterBandeiraPadraoPdv({ operadora: operadoraSelecionada, bandeiras: bandeirasDisponiveis }),
+    );
+  }, [bandeira, bandeirasDisponiveis, formaPagamentoSelecionada, operadoraSelecionada]);
+
+  useEffect(() => {
+    if (!parcelasDisponiveis.length) {
+      setNumeroParcelas(1);
+      return;
+    }
+    if (!parcelasDisponiveis.includes(numeroParcelas)) {
+      setNumeroParcelas(parcelasDisponiveis[0]);
+    }
+  }, [numeroParcelas, parcelasDisponiveis]);
+
   const { valorPago, valorRestante, podeConfirmarFinalizacao, troco } = calcularResumoRecebimento({
     valorTotal,
     pagamentos,
@@ -429,7 +520,15 @@ export default function useModalPagamentoController({
       return;
     }
 
-    const maxParcelas = formaPagamento?.parcelas_maximas ?? 12;
+    if (ehFormaPagamentoCartao(formaPagamento) && (!operadoraSelecionada || !bandeira)) {
+      return;
+    }
+
+    const parcelasParaSimular = ehFormaPagamentoCartao(formaPagamento)
+      ? parcelasDisponiveis
+      : Array.from({ length: formaPagamento?.parcelas_maximas ?? 12 }, (_, index) => index + 1);
+    if (!parcelasParaSimular.length) return;
+    const maxParcelas = Math.max(...parcelasParaSimular);
     const formaPagamentoId = formaPagamento.id;
 
     console.log(`🎲 Simulando parcelamentos para ${formaPagamento.nome} (até ${maxParcelas}x)...`);
@@ -440,11 +539,14 @@ export default function useModalPagamentoController({
       const resultados = {};
 
       // Simular todas as parcelas de 1 até max
-      for (let parcelas = 1; parcelas <= maxParcelas; parcelas++) {
+      for (const parcelas of parcelasParaSimular) {
         const pagamentoSimulado = montarPagamentoSimuladoParcelamento({
           formaPagamentoId,
           valorTotal: venda.total,
           parcelas,
+          operadoraId: operadoraSelecionada?.id || null,
+          bandeira,
+          modalidade: obterModalidadeCartao(formaPagamento),
         });
 
         try {
@@ -483,6 +585,16 @@ export default function useModalPagamentoController({
     }
   };
 
+  useEffect(() => {
+    if (!formaPagamentoSelecionada?.id) return;
+    setSimulacoesParcelamento((atuais) => {
+      const atualizados = { ...atuais };
+      delete atualizados[formaPagamentoSelecionada.id];
+      return atualizados;
+    });
+    setFaixasParcelamento(null);
+  }, [bandeira, formaPagamentoSelecionada?.id, operadoraSelecionada?.id]);
+
   // 🆕 PASSO 2️⃣ - Disparar simulação quando forma de pagamento é selecionada
   useEffect(() => {
     const decisaoParcelamento = resolverFaixasParcelamentoDaForma({
@@ -502,7 +614,13 @@ export default function useModalPagamentoController({
         console.log("Reutilizando simulacao existente");
       }
     }
-  }, [formaPagamentoSelecionada?.id]);
+  }, [
+    bandeira,
+    formaPagamentoSelecionada?.id,
+    operadoraSelecionada?.id,
+    parcelasDisponiveis.join(","),
+    simulacoesParcelamento,
+  ]);
 
   const {
     adicionarPagamento,
@@ -524,6 +642,7 @@ export default function useModalPagamentoController({
     onVendaAtualizada,
     operadoraSelecionada,
     operadoras,
+    parcelasDisponiveis,
     opcaoExcedente,
     pagamentos,
     podeConfirmarFinalizacao,
@@ -584,6 +703,9 @@ export default function useModalPagamentoController({
       operadoras,
       operadoraSelecionada,
       setOperadoraSelecionada,
+      bandeirasDisponiveis,
+      parcelasDisponiveis,
+      taxaCartaoSelecionada,
       troco,
       opcaoExcedente,
       setOpcaoExcedente,

@@ -8,6 +8,11 @@ from sqlalchemy.orm import Session
 from app.db import get_session
 from app.financeiro_models import FormaPagamento
 from app.models import User
+from app.operadoras_models import OperadoraCartao, OperadoraCartaoTaxa
+from app.services.card_fee_service import (
+    CardFeeConfigurationError,
+    resolve_card_fee,
+)
 from app.routes.ecommerce_auth import _get_current_ecommerce_user
 
 from .auth import _get_funcionario_operacional_or_403
@@ -93,9 +98,24 @@ def _resolver_forma_pagamento_cartao_funcionario_pdv(
         forma = formas_cartao[0]
 
     max_parcelas = max(1, int(forma.parcelas_maximas or forma.max_parcelas or 1))
+    if pagamento.operadora_id:
+        operadora = (
+            db.query(OperadoraCartao)
+            .filter(
+                OperadoraCartao.id == pagamento.operadora_id,
+                OperadoraCartao.tenant_id == tenant_id,
+                OperadoraCartao.ativo.is_(True),
+            )
+            .first()
+        )
+        if not operadora:
+            raise HTTPException(status_code=400, detail="Operadora de cartao invalida.")
+        max_parcelas = max(1, int(operadora.max_parcelas or 1))
     numero_parcelas = max(1, int(pagamento.numero_parcelas or 1))
     pode_parcelar = forma_normalizada == "credito" and (
-        bool(forma.permite_parcelamento) or bool(forma.split_parcelas)
+        bool(forma.permite_parcelamento)
+        or bool(forma.split_parcelas)
+        or bool(pagamento.operadora_id)
     )
 
     if forma_normalizada == "debito" and numero_parcelas != 1:
@@ -111,6 +131,22 @@ def _resolver_forma_pagamento_cartao_funcionario_pdv(
             status_code=400,
             detail=f"Esta forma de credito permite no maximo {max_parcelas}x.",
         )
+
+    if pagamento.operadora_id:
+        try:
+            resolve_card_fee(
+                db,
+                tenant_id=tenant_id,
+                valor=pagamento.valor,
+                forma_pagamento_id=forma.id,
+                operadora_id=pagamento.operadora_id,
+                bandeira=pagamento.bandeira,
+                modalidade=forma_normalizada,
+                parcelas=numero_parcelas,
+                strict=True,
+            )
+        except CardFeeConfigurationError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     return forma
 
@@ -133,34 +169,135 @@ def listar_formas_pagamento_funcionario_pdv(
         .order_by(FormaPagamento.nome.asc())
         .all()
     )
+    operadoras = (
+        db.query(OperadoraCartao)
+        .filter(
+            OperadoraCartao.tenant_id == tenant_id,
+            OperadoraCartao.ativo.is_(True),
+        )
+        .order_by(OperadoraCartao.padrao.desc(), OperadoraCartao.nome.asc())
+        .all()
+    )
+    regras = (
+        db.query(OperadoraCartaoTaxa)
+        .filter(
+            OperadoraCartaoTaxa.tenant_id == tenant_id,
+            OperadoraCartaoTaxa.ativo.is_(True),
+            OperadoraCartaoTaxa.operadora_id.in_(
+                [operadora.id for operadora in operadoras]
+            ),
+        )
+        .all()
+    )
 
     resposta = []
+    modalidades_cartao_adicionadas = set()
     for forma in formas:
         key = _forma_pagamento_key_funcionario_pdv(forma)
         if not key:
             continue
+        if key in {"credito", "debito"}:
+            if key in modalidades_cartao_adicionadas:
+                continue
+            modalidades_cartao_adicionadas.add(key)
         parcelas_maximas = int(forma.parcelas_maximas or forma.max_parcelas or 1)
         max_parcelas = int(forma.max_parcelas or parcelas_maximas or 1)
         numero_parcelas = max(1, parcelas_maximas, max_parcelas)
         permite_parcelamento = key == "credito" and (
             bool(forma.permite_parcelamento) or bool(forma.split_parcelas)
         )
-        resposta.append(
-            {
-                "id": forma.id,
-                "nome": forma.nome,
-                "tipo": forma.tipo,
-                "key": key,
-                "taxa_percentual": float(forma.taxa_percentual or 0),
-                "permite_parcelamento": permite_parcelamento,
-                "numero_parcelas": numero_parcelas if permite_parcelamento else 1,
-                "max_parcelas": numero_parcelas if permite_parcelamento else 1,
-                "parcelas_maximas": numero_parcelas if permite_parcelamento else 1,
-                "operadora": forma.operadora,
-                "requer_nsu": bool(forma.requer_nsu),
-                "tipo_cartao": forma.tipo_cartao,
-                "bandeira": forma.bandeira,
-                "split_parcelas": bool(forma.split_parcelas),
-            }
-        )
+        resposta_base = {
+            "id": forma.id,
+            "selection_id": f"forma:{forma.id}",
+            "nome": forma.nome,
+            "tipo": forma.tipo,
+            "key": key,
+            "taxa_percentual": float(forma.taxa_percentual or 0),
+            "permite_parcelamento": permite_parcelamento,
+            "numero_parcelas": numero_parcelas if permite_parcelamento else 1,
+            "max_parcelas": numero_parcelas if permite_parcelamento else 1,
+            "parcelas_maximas": numero_parcelas if permite_parcelamento else 1,
+            "operadora": forma.operadora,
+            "operadora_id": None,
+            "requer_nsu": bool(forma.requer_nsu),
+            "tipo_cartao": forma.tipo_cartao,
+            "bandeira": forma.bandeira,
+            "split_parcelas": bool(forma.split_parcelas),
+            "parcelas_disponiveis": list(range(1, numero_parcelas + 1))
+            if permite_parcelamento
+            else [1],
+        }
+
+        if key not in {"credito", "debito"}:
+            resposta.append(resposta_base)
+            continue
+
+        opcoes_estruturadas = []
+        for operadora in operadoras:
+            regras_modalidade = [
+                regra
+                for regra in regras
+                if regra.operadora_id == operadora.id and regra.modalidade == key
+            ]
+            bandeiras = sorted(
+                {
+                    regra.bandeira
+                    for regra in regras_modalidade
+                    if regra.bandeira != "outros"
+                },
+                key=lambda bandeira: (
+                    bandeira != operadora.bandeira_padrao,
+                    bandeira,
+                ),
+            )
+            if not bandeiras and any(
+                regra.bandeira == "outros" for regra in regras_modalidade
+            ):
+                bandeiras = ["outros"]
+
+            for bandeira in bandeiras:
+                regras_bandeira = [
+                    regra
+                    for regra in regras_modalidade
+                    if regra.bandeira in {bandeira, "outros"}
+                ]
+                parcelas = sorted({int(regra.parcelas) for regra in regras_bandeira})
+                if key == "debito":
+                    parcelas = [1] if 1 in parcelas else []
+                if not parcelas:
+                    continue
+                regra_1x = next(
+                    (
+                        regra
+                        for regra in regras_bandeira
+                        if regra.bandeira == bandeira and regra.parcelas == 1
+                    ),
+                    next(
+                        (regra for regra in regras_bandeira if regra.parcelas == 1),
+                        regras_bandeira[0],
+                    ),
+                )
+                opcoes_estruturadas.append(
+                    {
+                        **resposta_base,
+                        "selection_id": (
+                            f"forma:{forma.id}:operadora:{operadora.id}:bandeira:{bandeira}"
+                        ),
+                        "taxa_percentual": float(regra_1x.taxa_percentual or 0),
+                        "numero_parcelas": max(parcelas),
+                        "max_parcelas": max(parcelas),
+                        "parcelas_maximas": max(parcelas),
+                        "permite_parcelamento": key == "credito"
+                        and any(parcela > 1 for parcela in parcelas),
+                        "operadora": operadora.nome,
+                        "operadora_id": operadora.id,
+                        "bandeira": bandeira,
+                        "parcelas_disponiveis": parcelas,
+                    }
+                )
+
+        if opcoes_estruturadas:
+            resposta.extend(opcoes_estruturadas)
+        elif not regras:
+            resposta.append(resposta_base)
     return resposta

@@ -10,7 +10,8 @@ from app.db import get_session
 from app.empresa_config_fiscal_models import EmpresaConfigFiscal
 from app.empresa_config_geral_models import EmpresaConfigGeral
 from app.financeiro_models import FormaPagamento
-from app.formas_pagamento_models import ConfiguracaoImposto, FormaPagamentoTaxa
+from app.formas_pagamento_models import ConfiguracaoImposto
+from app.services.card_fee_service import resolve_card_fee
 from app.produtos_models import Produto
 from app.security.permissions_decorator import require_any_permission
 from app.utils.logger import logger
@@ -138,60 +139,21 @@ def analisar_venda(
                     f"\n🔍 Processando: {forma_pag.nome} - Valor: R$ {forma_pag_item.valor:.2f} - Parcelas: {forma_pag_item.parcelas}"
                 )
 
-                taxa_percentual = 0
-                taxa_fixa = 0
-
-                # PRIMEIRO: Se tem parcelamento, buscar do JSON taxas_por_parcela
-                if (
-                    forma_pag.permite_parcelamento
-                    and forma_pag.taxas_por_parcela
-                    and forma_pag_item.parcelas > 1
-                ):
-                    try:
-                        import json
-
-                        taxas_json = json.loads(forma_pag.taxas_por_parcela)
-                        taxa_key = str(forma_pag_item.parcelas)
-
-                        if taxa_key in taxas_json:
-                            taxa_percentual = float(taxas_json[taxa_key])
-                            logger.info(
-                                f"   ✅ Taxa do JSON: {taxa_percentual}% para {forma_pag_item.parcelas}x"
-                            )
-                    except Exception as e:
-                        logger.info(f"   ❌ Erro ao processar JSON: {e}")
-
-                if forma_pag.taxa_fixa:
-                    taxa_fixa = float(forma_pag.taxa_fixa)
-                    logger.info(f"   ✅ Taxa fixa: R$ {taxa_fixa:.2f}")
-
-                # SEGUNDO: a taxa configurada para a parcela e mais especifica
-                # do que a taxa geral da forma de pagamento.
-                if taxa_percentual == 0:
-                    taxa_obj = (
-                        db.query(FormaPagamentoTaxa)
-                        .filter(
-                            FormaPagamentoTaxa.tenant_id == tenant_id,
-                            FormaPagamentoTaxa.forma_pagamento_id
-                            == forma_pag_item.forma_pagamento_id,
-                            FormaPagamentoTaxa.parcelas == forma_pag_item.parcelas,
-                        )
-                        .first()
-                    )
-
-                    if taxa_obj:
-                        taxa_percentual = float(taxa_obj.taxa_percentual)
-                        logger.info(f"   ✅ Taxa da tabela: {taxa_percentual}%")
-
-                # TERCEIRO: usar a taxa geral apenas quando nao houver uma taxa
-                # especifica no JSON nem na tabela de parcelas.
-                if taxa_percentual == 0 and forma_pag.taxa_percentual:
-                    taxa_percentual = float(forma_pag.taxa_percentual)
-                    logger.info(f"   ✅ Taxa percentual: {taxa_percentual}%")
-
-                # Calcular valores das taxas
-                valor_taxa_percentual = forma_pag_item.valor * (taxa_percentual / 100)
+                taxa_resolvida = resolve_card_fee(
+                    db,
+                    tenant_id=tenant_id,
+                    valor=forma_pag_item.valor,
+                    forma_pagamento_id=forma_pag_item.forma_pagamento_id,
+                    operadora_id=forma_pag_item.operadora_id,
+                    bandeira=forma_pag_item.bandeira,
+                    modalidade=forma_pag_item.modalidade,
+                    parcelas=forma_pag_item.parcelas,
+                    strict=False,
+                )
+                taxa_percentual = float(taxa_resolvida.taxa_percentual)
+                taxa_fixa = float(taxa_resolvida.taxa_fixa)
                 valor_taxa_fixa = taxa_fixa
+                valor_taxa_percentual = float(taxa_resolvida.valor_taxa) - taxa_fixa
 
                 taxa_cartao_total += valor_taxa_percentual
                 taxa_fixa_total += valor_taxa_fixa
@@ -208,6 +170,8 @@ def analisar_venda(
                         "taxa_fixa": float(taxa_fixa),
                         "valor_taxa_fixa": float(valor_taxa_fixa),
                         "total_taxas": float(valor_taxa_percentual + valor_taxa_fixa),
+                        "fonte_taxa": taxa_resolvida.fonte,
+                        "regra_taxa_id": taxa_resolvida.regra_id,
                     }
                 )
         except Exception as e:

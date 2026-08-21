@@ -67,6 +67,7 @@ async def finalizar_venda(
         [
             {
                 "forma_pagamento": p.forma_pagamento,
+                "forma_pagamento_id": p.forma_pagamento_id,
                 "valor": p.valor,
                 "numero_parcelas": p.numero_parcelas,
                 "bandeira": getattr(p, "bandeira", None),
@@ -74,6 +75,7 @@ async def finalizar_venda(
                 "operadora_id": getattr(
                     p, "operadora_id", None
                 ),  # 🆕 Capturar operadora
+                "modalidade_cartao": p.modalidade_cartao,
             }
             for p in dados.pagamentos
         ]

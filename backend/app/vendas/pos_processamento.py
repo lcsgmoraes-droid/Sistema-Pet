@@ -469,70 +469,94 @@ def processar_contas_pagar_taxas(
             if "dinheiro" in forma_pag_nome or "credito_cliente" in forma_pag_nome:
                 continue
 
-            # Buscar configuração da forma de pagamento
-            forma_pag = (
-                db.query(FormaPagamento)
-                .filter(
-                    FormaPagamento.tenant_id == tenant_id,
-                    FormaPagamento.ativo.is_(True),
-                )
-                .filter(
+            taxa_gravada = getattr(pagamento, "valor_taxa_prevista", None)
+
+            # Buscar a forma pelo ID gravado na venda; nome fica como fallback legado.
+            forma_pag_id = getattr(pagamento, "forma_pagamento_id", None)
+            forma_query = db.query(FormaPagamento).filter(
+                FormaPagamento.tenant_id == tenant_id,
+                FormaPagamento.ativo.is_(True),
+            )
+            if forma_pag_id:
+                forma_pag = forma_query.filter(
+                    FormaPagamento.id == forma_pag_id
+                ).first()
+            else:
+                forma_pag = forma_query.filter(
                     (FormaPagamento.nome == pagamento.forma_pagamento)
                     | (FormaPagamento.tipo == pagamento.forma_pagamento)
                     | (func.lower(FormaPagamento.nome).like(f"%{forma_pag_nome}%"))
-                )
-                .first()
-            )
+                ).first()
 
-            if not forma_pag:
+            if not forma_pag and taxa_gravada is None:
                 logger.warning(
                     f"⚠️ Forma de pagamento não encontrada: {pagamento.forma_pagamento}"
                 )
                 continue
 
-            # Verificar se tem taxa configurada
-            taxa_percentual = Decimal(str(forma_pag.taxa_percentual or 0))
-            taxa_fixa = Decimal(str(forma_pag.taxa_fixa or 0))
-
-            if taxa_percentual == 0 and taxa_fixa == 0:
-                logger.debug(f"✓ Forma de pagamento sem taxa: {forma_pag.nome}")
-                continue
+            taxa_percentual = Decimal(
+                str(
+                    getattr(pagamento, "taxa_percentual_aplicada", None)
+                    if taxa_gravada is not None
+                    else getattr(forma_pag, "taxa_percentual", 0) or 0
+                )
+            )
+            taxa_fixa = Decimal(
+                str(
+                    getattr(pagamento, "taxa_fixa_aplicada", None)
+                    if taxa_gravada is not None
+                    else getattr(forma_pag, "taxa_fixa", 0) or 0
+                )
+            )
 
             # Verificar se tem taxa específica para número de parcelas
             num_parcelas = getattr(pagamento, "numero_parcelas", 1) or 1
 
-            if num_parcelas > 1 and forma_pag.taxas_por_parcela:
+            if (
+                taxa_gravada is None
+                and num_parcelas > 1
+                and getattr(forma_pag, "taxas_por_parcela", None)
+            ):
                 try:
                     taxas_por_parcela_dict = json.loads(forma_pag.taxas_por_parcela)
                     if str(num_parcelas) in taxas_por_parcela_dict:
                         taxa_parcela_config = taxas_por_parcela_dict[str(num_parcelas)]
-                        taxa_percentual = Decimal(
-                            str(
-                                taxa_parcela_config.get(
-                                    "taxa_percentual", taxa_percentual
+                        if isinstance(taxa_parcela_config, dict):
+                            taxa_percentual = Decimal(
+                                str(
+                                    taxa_parcela_config.get(
+                                        "taxa_percentual", taxa_percentual
+                                    )
                                 )
                             )
-                        )
-                        taxa_fixa = Decimal(
-                            str(taxa_parcela_config.get("taxa_fixa", taxa_fixa))
-                        )
+                            taxa_fixa = Decimal(
+                                str(taxa_parcela_config.get("taxa_fixa", taxa_fixa))
+                            )
+                        else:
+                            taxa_percentual = Decimal(str(taxa_parcela_config))
                         logger.info(
                             f"💳 Taxa específica para {num_parcelas}x: {taxa_percentual}% + R$ {taxa_fixa}"
                         )
-                except (json.JSONDecodeError, KeyError, ValueError) as e:
+                except (json.JSONDecodeError, KeyError, TypeError, ValueError) as e:
                     logger.warning(f"⚠️ Erro ao processar taxas_por_parcela: {str(e)}")
 
             # Calcular valor da taxa
             valor_pagamento = Decimal(str(pagamento.valor))
             valor_taxa = (
-                valor_pagamento * taxa_percentual / Decimal("100")
-            ) + taxa_fixa
+                Decimal(str(taxa_gravada))
+                if taxa_gravada is not None
+                else (valor_pagamento * taxa_percentual / Decimal("100")) + taxa_fixa
+            )
 
             if valor_taxa <= 0:
                 continue
 
             # Determinar nome da subcategoria DRE
-            tipo_pagamento_base = forma_pag.tipo or pagamento.forma_pagamento
+            tipo_pagamento_base = (
+                getattr(pagamento, "modalidade_cartao", None)
+                or getattr(forma_pag, "tipo", None)
+                or pagamento.forma_pagamento
+            )
             nome_subcategoria_base = MAPA_SUBCATEGORIAS.get(
                 tipo_pagamento_base,
                 MAPA_SUBCATEGORIAS.get(pagamento.forma_pagamento, None),
@@ -581,7 +605,7 @@ def processar_contas_pagar_taxas(
             )
 
             # Criar conta a pagar
-            descricao = f"Taxa {forma_pag.nome}"
+            descricao = f"Taxa {getattr(forma_pag, 'nome', pagamento.forma_pagamento)}"
             if num_parcelas > 1:
                 descricao += f" {num_parcelas}x"
             descricao += f" - Venda {venda.numero_venda}"
@@ -597,7 +621,14 @@ def processar_contas_pagar_taxas(
                 observacoes += f" - Taxa fixa de R$ {taxa_fixa}"
 
             # Data de vencimento: assumindo 30 dias (pode ser ajustado pelo campo prazo_dias)
-            prazo_dias = forma_pag.prazo_dias or forma_pag.prazo_recebimento or 30
+            prazo_aplicado = getattr(pagamento, "prazo_recebimento_dias", None)
+            prazo_dias = (
+                max(0, int(prazo_aplicado))
+                if prazo_aplicado is not None
+                else getattr(forma_pag, "prazo_dias", None)
+                or getattr(forma_pag, "prazo_recebimento", None)
+                or 30
+            )
             data_vencimento = date.today() + timedelta(days=prazo_dias)
 
             conta_taxa = ContaPagar(

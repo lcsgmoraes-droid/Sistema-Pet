@@ -57,6 +57,7 @@ class FuncionarioPdvPagamentoRequest(BaseModel):
     forma_pagamento_id: Optional[int] = None
     bandeira: Optional[str] = None
     operadora: Optional[str] = None
+    operadora_id: Optional[int] = None
     nsu_cartao: Optional[str] = None
 
 
@@ -81,6 +82,7 @@ class FuncionarioPdvSalvarRequest(BaseModel):
 
 class FuncionarioPdvFormaPagamentoResponse(BaseModel):
     id: int
+    selection_id: str
     nome: str
     tipo: str
     key: str
@@ -90,10 +92,12 @@ class FuncionarioPdvFormaPagamentoResponse(BaseModel):
     max_parcelas: int = 1
     parcelas_maximas: int = 1
     operadora: Optional[str] = None
+    operadora_id: Optional[int] = None
     requer_nsu: bool = False
     tipo_cartao: Optional[str] = None
     bandeira: Optional[str] = None
     split_parcelas: bool = False
+    parcelas_disponiveis: list[int] = Field(default_factory=lambda: [1])
 
 
 class FuncionarioPdvBeneficioCupomResponse(BaseModel):

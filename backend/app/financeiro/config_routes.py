@@ -244,10 +244,8 @@ def listar_formas_pagamento(
 
     formas = query.order_by(FormaPagamento.nome).all()
 
-    # Converter valores de centavos para reais
+    # A taxa fixa ja e persistida em reais; apenas normaliza percentuais Decimal.
     for f in formas:
-        if f.taxa_fixa:
-            f.taxa_fixa = f.taxa_fixa / 100
         if f.taxa_percentual:
             f.taxa_percentual = float(f.taxa_percentual)
 
@@ -354,9 +352,6 @@ def atualizar_forma_pagamento(
 
     db.commit()
     db.refresh(f)
-
-    # Converter de volta para resposta
-    f.taxa_fixa = f.taxa_fixa / 100
 
     return f
 
