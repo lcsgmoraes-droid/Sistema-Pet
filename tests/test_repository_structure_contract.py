@@ -57,3 +57,18 @@ def test_generated_runtime_artifact_is_rejected():
     assert module.forbidden_generated_artifacts(tracked) == [
         "runtime/frontend/dist/index.html"
     ]
+
+
+def test_root_operational_entrypoints_only_delegate_to_safe_flow():
+    module = load_validator()
+    assert module.operational_entrypoint_errors(ROOT) == []
+
+
+def test_destructive_operation_in_root_entrypoint_is_rejected():
+    module = load_validator()
+    content = "git reset --hard origin/main\nDROP TABLE IF EXISTS alembic_version"
+
+    assert module.forbidden_operational_snippets(content) == [
+        "drop table if exists alembic_version",
+        "git reset --hard",
+    ]

@@ -1,6 +1,6 @@
 # Indice operacional do Sistema Pet
 
-Atualizado em: 2026-07-13
+Atualizado em: 2026-08-20
 
 Este e o ponto de entrada oficial da documentacao. Se houver conflito entre este
 indice e um documento historico, use este indice e o guia mestre de maturidade.
@@ -21,6 +21,7 @@ Guia mestre:
 | Trabalhar em dois PCs | `docs/GIT_FLUXO_2_PCS.md` | `scripts/git_check_updates.ps1` |
 | Usar MCPs locais | `mcp/README.md` | `scripts/test_mcp.ps1` |
 | Entender CI e checks | `docs/CI_CD_DEPLOY_SAFETY_AUDIT.md` | GitHub Actions do PR |
+| Entender scripts e atalhos antigos | `docs/ATALHOS_OPERACIONAIS.md` | `python scripts/validate_repository_structure.py` |
 | Deploy real | `docs/PRODUCAO_DEPLOY_SSH.md` | `petshop-status-producao` e health publico |
 | Rollback | `docs/PRODUCAO_ROLLBACK_CHECKLIST.md` | Backup operacional do deploy |
 | Backup/restore de banco | `docs/PRODUCAO_BACKUP_RESTORE_TESTE.md` | Restore smoke controlado |
@@ -60,6 +61,7 @@ Guia mestre:
 | MCPs | `docs/MCP_MATURIDADE_GUIA.md` |
 | Estrutura geral | `docs/auditorias/estrutura-geral-inventario.md` |
 | Seguranca operacional | `docs/CI_CD_DEPLOY_SAFETY_AUDIT.md` |
+| Atalhos operacionais | `docs/ATALHOS_OPERACIONAIS.md` |
 | Testes/CI | `docs/auditorias/testes-ci-cobertura-critica.md` |
 | Observabilidade/auditoria | `docs/RETENCAO_LOGS_AUDITORIA.md` |
 | Portabilidade/configuracao | `docs/DEV_ENVIRONMENT_CHECK.md` |
