@@ -64,6 +64,75 @@ export default function useEcommerceCheckout({
     setAddressFields(buildCustomerAddressFields(customer));
   }, [customer]);
 
+  useEffect(() => {
+    setCheckoutResumo(null);
+    if (!customerToken || !cart?.itens?.length) return undefined;
+
+    const cidadeFinal = String(
+      deliveryMode === "retirada"
+        ? tenantContext?.cidade || cidadeDestino
+        : addressFields.cidade || cidadeDestino,
+    ).trim();
+    const enderecoFormatado =
+      deliveryMode === "retirada" ? "RETIRADA NA LOJA" : buildAddressText(addressFields);
+    const enderecoCompleto =
+      deliveryMode === "retirada" ||
+      Boolean(
+        addressFields.endereco?.trim() &&
+        addressFields.numero?.trim() &&
+        addressFields.cidade?.trim() &&
+        addressFields.estado?.trim(),
+      );
+    if (cidadeFinal.length < 2 || !enderecoCompleto) return undefined;
+
+    let active = true;
+    const timer = window.setTimeout(async () => {
+      try {
+        const response = await ecommerceApi.get("/api/checkout/resumo", {
+          headers: authHeaders,
+          params: {
+            cidade_destino: cidadeFinal,
+            endereco_entrega: enderecoFormatado,
+            cupom: cupomResult?.codigo || undefined,
+            tipo_retirada: deliveryMode === "retirada" ? tipoRetirada : undefined,
+          },
+        });
+        if (active) {
+          setCheckoutResumo(response.data);
+          onError("");
+        }
+      } catch (err) {
+        if (active) {
+          setCheckoutResumo(null);
+          onError(extractApiErrorMessage(err, "Não foi possível calcular o frete"));
+        }
+      }
+    }, 650);
+
+    return () => {
+      active = false;
+      window.clearTimeout(timer);
+    };
+  }, [
+    addressFields.bairro,
+    addressFields.cep,
+    addressFields.cidade,
+    addressFields.complemento,
+    addressFields.endereco,
+    addressFields.estado,
+    addressFields.numero,
+    authHeaders,
+    cart?.itens?.length,
+    cart?.total,
+    cidadeDestino,
+    cupomResult?.codigo,
+    customerToken,
+    deliveryMode,
+    onError,
+    tenantContext?.cidade,
+    tipoRetirada,
+  ]);
+
   function resetCheckoutStatus() {
     setCheckoutResumo(null);
     setCheckoutResult(null);
@@ -134,6 +203,18 @@ export default function useEcommerceCheckout({
       onError("Cidade da loja n\u00e3o configurada para checkout.");
       return;
     }
+    const enderecoFormatado =
+      deliveryMode === "retirada" ? "RETIRADA NA LOJA" : buildAddressText(addressFields);
+    if (
+      deliveryMode === "entrega" &&
+      (!addressFields.endereco?.trim() ||
+        !addressFields.numero?.trim() ||
+        !addressFields.cidade?.trim() ||
+        !addressFields.estado?.trim())
+    ) {
+      onError("Complete rua, número, cidade e UF para calcular o frete.");
+      return;
+    }
 
     onError("");
     setCheckoutResumo(null);
@@ -142,6 +223,7 @@ export default function useEcommerceCheckout({
         headers: authHeaders,
         params: {
           cidade_destino: cidadeFinal,
+          endereco_entrega: enderecoFormatado,
           cupom: cupomResult?.codigo || undefined,
           tipo_retirada: deliveryMode === "retirada" ? tipoRetirada : undefined,
         },
@@ -183,6 +265,10 @@ export default function useEcommerceCheckout({
     }
     if (!pagamentoTipo) {
       onError("Escolha PIX, debito ou credito para continuar para o pagamento.");
+      return;
+    }
+    if (!checkoutResumo) {
+      onError("Aguarde o cálculo atualizado do frete antes de continuar.");
       return;
     }
 

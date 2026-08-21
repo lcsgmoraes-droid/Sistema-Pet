@@ -1,4 +1,13 @@
-from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey, Boolean
+from sqlalchemy import (
+    Column,
+    Integer,
+    String,
+    Float,
+    DateTime,
+    ForeignKey,
+    Boolean,
+    Text,
+)
 from sqlalchemy.sql import func
 from sqlalchemy.orm.attributes import flag_modified
 from datetime import datetime
@@ -36,6 +45,16 @@ class Pedido(TenantScoped, Base):
     # Retirada na loja
     tipo_retirada = Column(String(20), nullable=True)  # proprio, terceiro
     palavra_chave_retirada = Column(String(100), nullable=True)
+
+    # Snapshot financeiro e logistico calculado no fechamento do checkout
+    endereco_entrega = Column(Text, nullable=True)
+    frete_valor = Column(Float, nullable=False, default=0, server_default="0")
+    frete_distancia_km = Column(Float, nullable=True)
+    frete_valor_por_km = Column(Float, nullable=True)
+    frete_modalidade = Column(String(20), nullable=True)
+    frete_gratis_aplicado = Column(
+        Boolean, nullable=False, default=False, server_default="0"
+    )
 
     # Drive-thru pickup (cliente avisa que chegou no carro)
     is_drive = Column(Boolean, default=False, nullable=False, server_default="0")

@@ -89,6 +89,27 @@ class ConfiguracaoEntrega(BaseTenantModel):
         String(20), nullable=False, default="auto_rota", server_default="auto_rota"
     )
 
+    # Politica comercial compartilhada pelo app e ecommerce
+    entrega_ativa = Column(
+        Boolean, nullable=False, default=True, server_default=sa.text("true")
+    )
+    retirada_ativa = Column(
+        Boolean, nullable=False, default=True, server_default=sa.text("true")
+    )
+    modalidade_cobranca = Column(
+        String(20), nullable=False, default="fixa", server_default="fixa"
+    )
+    taxa_fixa = Column(DECIMAL(10, 2), nullable=False, default=0, server_default="0")
+    valor_por_km_cobrado = Column(DECIMAL(10, 2), nullable=True)
+    taxa_minima = Column(DECIMAL(10, 2), nullable=False, default=0, server_default="0")
+    distancia_maxima_entrega_km = Column(DECIMAL(10, 2), nullable=True)
+    frete_gratis_acima = Column(DECIMAL(10, 2), nullable=True)
+    distancia_maxima_frete_gratis_km = Column(DECIMAL(10, 2), nullable=True)
+    pedido_minimo = Column(
+        DECIMAL(10, 2), nullable=False, default=0, server_default="0"
+    )
+    prazo_entrega_texto = Column(String(120), nullable=True)
+
     # Relacionamento com o entregador padrão
     entregador_padrao = relationship("Cliente", foreign_keys=[entregador_padrao_id])
 

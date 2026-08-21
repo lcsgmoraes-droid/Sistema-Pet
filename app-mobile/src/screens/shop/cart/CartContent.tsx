@@ -12,6 +12,7 @@ import {
 
 import { CORES } from "../../../theme";
 import { formatarMoeda } from "../../../utils/format";
+import type { CheckoutResumo } from "../../../services/shop.service";
 import { CartItemCard } from "./CartItemCard";
 import { cartStyles as styles } from "./CartStyles";
 import { ModoRecebimento, PagamentoTipo, TipoRetirada } from "./CartUtils";
@@ -20,6 +21,11 @@ type CartContentProps = {
   itens: any[];
   subtotal: number;
   finalizando: boolean;
+  checkoutResumo: CheckoutResumo | null;
+  calculandoFrete: boolean;
+  erroFrete: string;
+  entregaAtiva: boolean;
+  retiradaAtiva: boolean;
   modo: ModoRecebimento;
   tipoRetirada: TipoRetirada;
   isDrive: boolean;
@@ -50,6 +56,11 @@ export function CartContent({
   itens,
   subtotal,
   finalizando,
+  checkoutResumo,
+  calculandoFrete,
+  erroFrete,
+  entregaAtiva,
+  retiradaAtiva,
   modo,
   tipoRetirada,
   isDrive,
@@ -127,49 +138,61 @@ export function CartContent({
           <View style={styles.opcaoEntrega}>
             <Text style={styles.secaoTitulo}>Forma de recebimento</Text>
             <View style={styles.modoRow}>
-              <TouchableOpacity
-                style={[
-                  styles.modoBotao,
-                  modo === "retirada" && styles.modoBotaoAtivo,
-                ]}
-                onPress={() => onModoChange("retirada")}
-              >
-                <Ionicons
-                  name="storefront-outline"
-                  size={18}
-                  color={modo === "retirada" ? "#fff" : CORES.texto}
-                />
-                <Text
+              {retiradaAtiva && (
+                <TouchableOpacity
                   style={[
-                    styles.modoTexto,
-                    modo === "retirada" && styles.modoTextoAtivo,
+                    styles.modoBotao,
+                    modo === "retirada" && styles.modoBotaoAtivo,
                   ]}
+                  onPress={() => onModoChange("retirada")}
                 >
-                  Retirar na loja
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[
-                  styles.modoBotao,
-                  modo === "entrega" && styles.modoBotaoAtivo,
-                ]}
-                onPress={() => onModoChange("entrega")}
-              >
-                <Ionicons
-                  name="bicycle-outline"
-                  size={18}
-                  color={modo === "entrega" ? "#fff" : CORES.texto}
-                />
-                <Text
+                  <Ionicons
+                    name="storefront-outline"
+                    size={18}
+                    color={modo === "retirada" ? "#fff" : CORES.texto}
+                  />
+                  <Text
+                    style={[
+                      styles.modoTexto,
+                      modo === "retirada" && styles.modoTextoAtivo,
+                    ]}
+                  >
+                    Retirar na loja
+                  </Text>
+                </TouchableOpacity>
+              )}
+              {entregaAtiva && (
+                <TouchableOpacity
                   style={[
-                    styles.modoTexto,
-                    modo === "entrega" && styles.modoTextoAtivo,
+                    styles.modoBotao,
+                    modo === "entrega" && styles.modoBotaoAtivo,
                   ]}
+                  onPress={() => onModoChange("entrega")}
                 >
-                  Entrega
-                </Text>
-              </TouchableOpacity>
+                  <Ionicons
+                    name="bicycle-outline"
+                    size={18}
+                    color={modo === "entrega" ? "#fff" : CORES.texto}
+                  />
+                  <Text
+                    style={[
+                      styles.modoTexto,
+                      modo === "entrega" && styles.modoTextoAtivo,
+                    ]}
+                  >
+                    Entrega
+                  </Text>
+                </TouchableOpacity>
+              )}
             </View>
+
+            {!entregaAtiva && !retiradaAtiva && (
+              <View style={styles.aviso}>
+                <Text style={styles.avisoTexto}>
+                  A loja não configurou uma forma de recebimento.
+                </Text>
+              </View>
+            )}
 
             {modo === "retirada" && (
               <View style={styles.subSecao}>
@@ -325,6 +348,16 @@ export function CartContent({
                     </Text>
                   </TouchableOpacity>
                 )}
+                {calculandoFrete && (
+                  <Text style={[styles.enderecoSalvoTexto, { marginTop: 8 }]}>
+                    Calculando frete...
+                  </Text>
+                )}
+                {!!erroFrete && !calculandoFrete && (
+                  <View style={styles.aviso}>
+                    <Text style={styles.avisoTexto}>{erroFrete}</Text>
+                  </View>
+                )}
               </View>
             )}
 
@@ -426,15 +459,44 @@ export function CartContent({
       />
 
       <View style={styles.rodape}>
-        <View style={styles.resumo}>
-          <Text style={styles.resumoLabel}>Total</Text>
-          <Text style={styles.resumoTotal}>{formatarMoeda(subtotal)}</Text>
+        <View style={{ marginBottom: 10 }}>
+          <View style={styles.resumo}>
+            <Text style={styles.resumoLabel}>Produtos</Text>
+            <Text style={styles.resumoLabel}>{formatarMoeda(subtotal)}</Text>
+          </View>
+          <View style={styles.resumo}>
+            <Text style={styles.resumoLabel}>
+              Frete
+              {checkoutResumo?.frete?.distancia_km != null
+                ? ` (${checkoutResumo.frete.distancia_km.toFixed(1)} km)`
+                : ""}
+            </Text>
+            <Text style={styles.resumoLabel}>
+              {calculandoFrete
+                ? "Calculando..."
+                : checkoutResumo?.frete?.frete_gratis_aplicado
+                  ? "Grátis"
+                  : checkoutResumo
+                    ? formatarMoeda(checkoutResumo.frete.valor_frete || 0)
+                    : "—"}
+            </Text>
+          </View>
+          <View style={styles.resumo}>
+            <Text style={styles.resumoLabel}>Total</Text>
+            <Text style={styles.resumoTotal}>
+              {formatarMoeda(checkoutResumo?.total ?? subtotal)}
+            </Text>
+          </View>
         </View>
 
         <TouchableOpacity
-          style={[styles.botaoFinalizar, finalizando && styles.botaoDesativado]}
+          style={[
+            styles.botaoFinalizar,
+            (finalizando || calculandoFrete || !checkoutResumo) &&
+              styles.botaoDesativado,
+          ]}
           onPress={onFinalize}
-          disabled={finalizando}
+          disabled={finalizando || calculandoFrete || !checkoutResumo}
         >
           {finalizando ? (
             <ActivityIndicator color="#fff" />

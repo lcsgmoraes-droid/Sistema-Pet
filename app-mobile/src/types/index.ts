@@ -15,10 +15,7 @@ export interface AuthResponse extends AuthTokens {
 }
 
 export type AppProfileType =
-  | "cliente"
-  | "entregador"
-  | "veterinario"
-  | "funcionario";
+  "cliente" | "entregador" | "veterinario" | "funcionario";
 
 export interface AppAccessProfile {
   type: AppProfileType;
@@ -56,6 +53,11 @@ export interface EcommerceUser {
   cidade?: string | null;
   estado?: string | null;
   endereco_entrega?: string | null;
+  frete_valor?: number;
+  frete_distancia_km?: number | null;
+  frete_valor_por_km?: number | null;
+  frete_modalidade?: string | null;
+  frete_gratis_aplicado?: boolean;
   usar_endereco_entrega_diferente?: boolean | null;
   endereco_entrega_detalhado?: EcommerceDeliveryAddress | null;
   // perfil entregador
@@ -452,10 +454,7 @@ export interface FuncionarioPdvItemPayload {
 }
 
 export type FuncionarioPdvFormaPagamento =
-  | "dinheiro"
-  | "pix"
-  | "credito"
-  | "debito";
+  "dinheiro" | "pix" | "credito" | "debito";
 
 export interface FuncionarioPdvFormaPagamentoOpcao {
   id: number;
