@@ -1,5 +1,9 @@
 # 🚀 Guia Rápido - Deploy Digital Ocean
 
+> Documento historico. Nao execute os comandos de instalacao desta pagina em
+> infraestrutura atual. Use `docs/PRODUCAO_DEPLOY_SSH.md`; os atalhos de
+> compatibilidade estao explicados em `docs/ATALHOS_OPERACIONAIS.md`.
+
 ## ⚡ Quick Start (10 minutos)
 
 ### 1. Criar Droplet Digital Ocean

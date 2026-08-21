@@ -1,5 +1,9 @@
 # 🚀 Guia de Deploy - Digital Ocean
 
+> Documento historico da primeira infraestrutura. Para a operacao atual, use
+> `docs/PRODUCAO_DEPLOY_SSH.md`. Nao execute os comandos abaixo em um servidor
+> atual sem uma revisao especifica e autorizacao operacional.
+
 ## 📋 Visão Geral
 
 Substituir sistema atual em **mlprohub.com.br** pelo **Sistema Pet Shop Pro**.

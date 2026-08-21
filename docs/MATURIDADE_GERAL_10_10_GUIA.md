@@ -120,6 +120,8 @@ Ja feito:
   `docs/MAPA_CODIGO_FONTE.md` e `docs/ARQUITETURA.md`.
 - [x] Raizes antigas `app/` e `src/` auditadas e removidas depois de busca de
   referencias, testes e build; o validador impede que retornem.
+- [x] Scripts antigos de producao convertidos em atalhos para o fluxo seguro;
+  operacoes destrutivas antigas passaram a ser bloqueadas pelo CI.
 
 Falta para 10/10:
 

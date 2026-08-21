@@ -9,7 +9,9 @@ alterar o runtime das empresas ativas.
 
 As copias de codigo em `app/` e `src/` da raiz foram removidas em uma tarefa
 separada depois de comprovado que nao participavam do runtime, build ou CI. Os
-scripts e atalhos antigos continuam intocados ate receberem auditoria propria.
+scripts antigos de producao foram auditados depois disso: os nomes ainda citados
+por atalhos foram transformados em encaminhamentos para o fluxo oficial e a
+entrada de configuracao de servidor incompativel foi bloqueada.
 
 ## Itens oficiais na raiz
 
@@ -67,6 +69,10 @@ O caminho oficial atual e:
 - deploy real: `scripts/deploy_producao_remoto.ps1`;
 - documentacao operacional: `docs/INDICE_OPERACIONAL.md`.
 
+A matriz completa de compatibilidade e seus bloqueios esta em
+`docs/ATALHOS_OPERACIONAIS.md`. O validador estrutural impede que operacoes
+destrutivas conhecidas voltem aos scripts de producao da raiz.
+
 ## Metodo para cada remocao
 
 1. Escolher um grupo pequeno de candidatos.
@@ -81,7 +87,7 @@ O caminho oficial atual e:
 
 1. [Concluido] Provar e remover `src/` da raiz.
 2. [Concluido] Provar e remover `app/` da raiz.
-3. Auditar scripts `deploy*` antigos contra o deploy oficial.
+3. [Concluido] Auditar scripts `deploy*` antigos contra o deploy oficial.
 4. Auditar atalhos `INICIAR_*`, `CORRIGIR_*` e `DIAGNOSTICAR_*`.
 5. Consolidar Markdown solto em `docs/` e manter redirecionamento quando
    necessario.
