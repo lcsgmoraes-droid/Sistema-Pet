@@ -35,17 +35,7 @@ README_REFERENCES = (
     "CONTRIBUTING.md",
 )
 
-KNOWN_LEGACY_SOURCE = frozenset(
-    {
-        "app/__init__.py",
-        "app/core/settings_validation.py",
-        "app/db/guardrails.py",
-        "app/db/transaction.py",
-        "src/pages/NotaFiscalItemRateio.jsx",
-        "src/pages/TransferenciaLote.jsx",
-        "src/services/api.js",
-    }
-)
+KNOWN_LEGACY_SOURCE: frozenset[str] = frozenset()
 
 FORBIDDEN_TRACKED_PREFIXES = (
     "frontend/dist/",
@@ -70,9 +60,10 @@ def tracked_files(root: Path = ROOT) -> set[str]:
         check=True,
         capture_output=True,
     )
-    return {
+    decoded = {
         _normalize(item.decode("utf-8")) for item in result.stdout.split(b"\0") if item
     }
+    return {path for path in decoded if (root / path).exists()}
 
 
 def legacy_source_files_on_disk(root: Path = ROOT) -> set[str]:

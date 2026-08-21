@@ -88,20 +88,15 @@ manutencao:
 Se alguem receber apenas o site publicado, um container ou a pasta `dist`, essa
 pessoa recebeu o programa montado, nao o repositorio de codigo-fonte.
 
-## Raizes antigas em transicao
+## Raizes antigas removidas
 
-Existem duas pastas de codigo na raiz, criadas na primeira versao do projeto:
+As pastas `app/` e `src/` da raiz foram criadas na primeira versao do projeto,
+mas deixaram de participar do runtime. Elas foram removidas em 2026-08-20 depois
+de busca de referencias, comparacao com as fontes ativas, testes de backend e
+build do frontend.
 
-- `app/`;
-- `src/`.
-
-Elas nao sao as raizes ativas descritas acima. A auditoria de 2026-08-20 nao
-encontrou referencias atuais a esses arquivos no runtime principal. Por
-seguranca, eles permanecem temporariamente versionados e entram como candidatos
-de remocao em uma tarefa separada, depois de CI completo e validacao de ambiente
-limpo.
-
-Regra: nenhuma funcionalidade nova pode ser adicionada nessas duas pastas.
+O historico desses arquivos continua disponivel no Git. O validador estrutural
+impede que codigo novo volte a ser criado nessas duas raizes.
 
 ## Como entregar o projeto para manutencao
 

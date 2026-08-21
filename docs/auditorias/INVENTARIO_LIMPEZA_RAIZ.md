@@ -7,10 +7,9 @@ alterar o runtime das empresas ativas.
 
 ## Decisao desta etapa
 
-Nenhum arquivo antigo foi removido ou movido nesta etapa. Primeiro o projeto
-passa a declarar o que e fonte oficial e a impedir crescimento das raizes
-antigas. Remocoes serao feitas em PRs separados, com busca de referencias,
-testes e validacao em ambiente limpo.
+As copias de codigo em `app/` e `src/` da raiz foram removidas em uma tarefa
+separada depois de comprovado que nao participavam do runtime, build ou CI. Os
+scripts e atalhos antigos continuam intocados ate receberem auditoria propria.
 
 ## Itens oficiais na raiz
 
@@ -28,7 +27,7 @@ Devem continuar faceis de localizar:
 - `scripts/`: automacao oficial;
 - `docs/`: documentacao.
 
-## Codigo antigo na raiz
+## Codigo antigo removido da raiz
 
 ### `app/`
 
@@ -39,9 +38,8 @@ Arquivos encontrados:
 - `app/db/guardrails.py`;
 - `app/db/transaction.py`.
 
-Estado: candidato legado. O pacote ativo do backend e `backend/app/`. A busca
-por referencias atuais nao encontrou consumidores fora dos exemplos internos
-desses proprios arquivos.
+Estado: removido. O pacote ativo do backend e `backend/app/`. As funcoes ainda
+necessarias ja existem e sao importadas a partir do pacote ativo.
 
 ### `src/`
 
@@ -51,10 +49,10 @@ Arquivos encontrados:
 - `src/pages/NotaFiscalItemRateio.jsx`;
 - `src/pages/TransferenciaLote.jsx`.
 
-Estado: candidato legado. O Vite ativo usa `frontend/src/`. A busca por
-referencias atuais nao encontrou importacao desses arquivos pela aplicacao web.
+Estado: removido. O Vite ativo usa `frontend/src/` e nao importava esses
+prototipos.
 
-Regra temporaria: nao adicionar arquivos a `app/` ou `src/` da raiz.
+Regra permanente: nao adicionar arquivos a `app/` ou `src/` da raiz.
 
 ## Scripts e guias soltos
 
@@ -81,8 +79,8 @@ O caminho oficial atual e:
 
 ## Ordem recomendada
 
-1. Provar e remover `src/` da raiz.
-2. Provar e remover ou migrar o conteudo de `app/` da raiz.
+1. [Concluido] Provar e remover `src/` da raiz.
+2. [Concluido] Provar e remover `app/` da raiz.
 3. Auditar scripts `deploy*` antigos contra o deploy oficial.
 4. Auditar atalhos `INICIAR_*`, `CORRIGIR_*` e `DIAGNOSTICAR_*`.
 5. Consolidar Markdown solto em `docs/` e manter redirecionamento quando
