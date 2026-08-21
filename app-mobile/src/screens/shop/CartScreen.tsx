@@ -1,8 +1,12 @@
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { Alert, Linking } from "react-native";
 
-import { finalizarCheckoutAppLoja } from "../../services/shop.service";
+import {
+  finalizarCheckoutAppLoja,
+  resumoCheckout,
+} from "../../services/shop.service";
+import type { CheckoutResumo } from "../../services/shop.service";
 import { useAuthStore } from "../../store/auth.store";
 import { useCartStore } from "../../store/cart.store";
 import { useTenantStore } from "../../store/tenant.store";
@@ -47,6 +51,11 @@ export default function CartScreen() {
   const [cidade, setCidade] = useState(enderecoInicial.cidade);
   const [estado, setEstado] = useState(enderecoInicial.estado);
   const [buscandoCep, setBuscandoCep] = useState(false);
+  const [checkoutResumo, setCheckoutResumo] = useState<CheckoutResumo | null>(
+    null,
+  );
+  const [calculandoFrete, setCalculandoFrete] = useState(false);
+  const [erroFrete, setErroFrete] = useState("");
 
   useFocusEffect(
     useCallback(() => {
@@ -54,6 +63,79 @@ export default function CartScreen() {
       void carregar({ userId: user.id, tenantId: tenant.id });
     }, [carregar, tenant?.id, user?.id]),
   );
+
+  useEffect(() => {
+    if (
+      tenant?.ecommerce_retirada_ativa === false &&
+      tenant.ecommerce_entrega_ativa !== false
+    ) {
+      setModo("entrega");
+    } else if (
+      tenant?.ecommerce_entrega_ativa === false &&
+      tenant.ecommerce_retirada_ativa !== false
+    ) {
+      setModo("retirada");
+    }
+  }, [tenant?.ecommerce_entrega_ativa, tenant?.ecommerce_retirada_ativa]);
+
+  useEffect(() => {
+    setCheckoutResumo(null);
+    setErroFrete("");
+    setCalculandoFrete(false);
+    if (!itens.length || !tenant) return undefined;
+
+    const endereco = modo === "entrega" ? getEnderecoEntrega() : undefined;
+    const cidadeCheckout =
+      modo === "entrega"
+        ? cidade.trim()
+        : String(tenant.cidade || user?.cidade || "").trim();
+    const enderecoCompleto =
+      modo === "retirada" ||
+      Boolean(rua.trim() && numero.trim() && cidade.trim() && estado.trim());
+    if (!cidadeCheckout || !enderecoCompleto) return undefined;
+
+    let active = true;
+    setCalculandoFrete(true);
+    const timer = setTimeout(async () => {
+      try {
+        const resumo = await resumoCheckout({
+          cidade: cidadeCheckout,
+          modo,
+          endereco,
+          tipoRetirada,
+        });
+        if (active) setCheckoutResumo(resumo);
+      } catch (error: any) {
+        if (active) {
+          setErroFrete(
+            error?.response?.data?.detail ||
+              "Não foi possível calcular o frete para este endereço.",
+          );
+        }
+      } finally {
+        if (active) setCalculandoFrete(false);
+      }
+    }, 650);
+
+    return () => {
+      active = false;
+      clearTimeout(timer);
+    };
+  }, [
+    bairro,
+    cep,
+    cidade,
+    complemento,
+    estado,
+    itens.length,
+    modo,
+    numero,
+    rua,
+    subtotal,
+    tenant,
+    tipoRetirada,
+    user?.cidade,
+  ]);
 
   async function buscarCep(value: string) {
     const { numeros, cep: cepFormatado } = formatarCep(value);
@@ -146,10 +228,10 @@ export default function CartScreen() {
     }
 
     if (modo === "entrega") {
-      if (!usarEnderecoSalvo && (!rua.trim() || !cidade.trim())) {
+      if (!rua.trim() || !numero.trim() || !cidade.trim() || !estado.trim()) {
         Alert.alert(
           "Endereço incompleto",
-          "Preencha pelo menos a rua e a cidade para entrega.",
+          "Preencha rua, número, cidade e estado para entrega.",
         );
         return;
       }
@@ -161,6 +243,14 @@ export default function CartScreen() {
         setUsarEnderecoSalvo(false);
         return;
       }
+    }
+
+    if (!checkoutResumo) {
+      Alert.alert(
+        "Frete ainda não calculado",
+        erroFrete || "Complete o endereço e aguarde o cálculo do frete.",
+      );
+      return;
     }
 
     if (!pagamentoTipo) {
@@ -197,10 +287,17 @@ export default function CartScreen() {
     const lojaLabel = tenant
       ? `Loja: ${tenant.nome}${enderecoLoja ? `\n${enderecoLoja}` : ""}`
       : "Loja selecionada no aplicativo";
+    const freteLabel = checkoutResumo.frete.frete_gratis_aplicado
+      ? "Grátis"
+      : formatarMoeda(checkoutResumo.frete.valor_frete || 0);
+    const distanciaLabel =
+      checkoutResumo.frete.distancia_km != null
+        ? ` (${checkoutResumo.frete.distancia_km.toFixed(1)} km)`
+        : "";
 
     Alert.alert(
       "Confirmar compra",
-      `${lojaLabel}\n\nTotal: ${formatarMoeda(subtotal)}\n\n${modoLabel}${pagLabel}\n\nConfirme que esta comprando na loja correta. O pedido sera liberado apos aprovacao do pagamento online.`,
+      `${lojaLabel}\n\nProdutos: ${formatarMoeda(checkoutResumo.subtotal)}\nFrete${distanciaLabel}: ${freteLabel}\nTotal: ${formatarMoeda(checkoutResumo.total)}\n\n${modoLabel}${pagLabel}\n\nConfirme que esta comprando na loja correta. O pedido sera liberado apos aprovacao do pagamento online.`,
       [
         { text: "Cancelar", style: "cancel" },
         {
@@ -209,7 +306,10 @@ export default function CartScreen() {
             setFinalizando(true);
             try {
               const pedido = await finalizarCheckoutAppLoja({
-                cidade: user?.cidade || "loja",
+                cidade:
+                  modo === "entrega"
+                    ? cidade.trim()
+                    : String(tenant?.cidade || user?.cidade || "loja"),
                 modo,
                 tipoRetirada,
                 isDrive:
@@ -248,6 +348,11 @@ export default function CartScreen() {
         itens={itens}
         subtotal={subtotal}
         finalizando={finalizando}
+        checkoutResumo={checkoutResumo}
+        calculandoFrete={calculandoFrete}
+        erroFrete={erroFrete}
+        entregaAtiva={tenant?.ecommerce_entrega_ativa !== false}
+        retiradaAtiva={tenant?.ecommerce_retirada_ativa !== false}
         modo={modo}
         tipoRetirada={tipoRetirada}
         isDrive={isDrive}

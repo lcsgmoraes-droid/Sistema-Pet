@@ -19,6 +19,7 @@ from app.routes.ecommerce_auth import (
     _get_current_ecommerce_user,
 )
 from app.services.ecommerce_payment_config import get_active_mercado_pago_runtime_config
+from app.services.delivery_quote_service import DeliveryQuoteError, quote_delivery
 from app.services.sales_channel import resolve_checkout_sales_channel
 from app.tenancy.context import (
     clear_current_tenant,
@@ -97,6 +98,7 @@ class EcommerceIdentity(BaseModel):
 
 class CheckoutCalcularFreteRequest(BaseModel):
     cidade_destino: str = Field(min_length=2)
+    endereco_entrega: str | None = None
     subtotal: float = Field(default=0, ge=0)
 
 
@@ -145,14 +147,9 @@ def _normalize_text(value: str | None) -> str:
     )
 
 
-def _frete_local_por_cidade(
-    db: Session,
-    tenant_id: str,
-    cidade_destino: str,
-    subtotal: float = 0,
-) -> dict:
-    cidade_loja_raw = None
-    tenant = None
+def _delivery_context(
+    db: Session, tenant_id: str
+) -> tuple[ConfiguracaoEntrega | None, Tenant | None]:
     previous_tenant = get_current_tenant()
     try:
         tenant_uuid = UUID(str(tenant_id))
@@ -163,68 +160,36 @@ def _frete_local_por_cidade(
             .first()
         )
         tenant = db.query(Tenant).filter(Tenant.id == tenant_id).first()
-        if config:
-            cidade_loja_raw = config.cidade
-        if not cidade_loja_raw and tenant:
-            cidade_loja_raw = tenant.cidade
+        return config, tenant
     finally:
         if previous_tenant is None:
             clear_current_tenant()
         else:
             set_current_tenant(previous_tenant)
 
-    cidade_loja = _normalize_text(cidade_loja_raw)
-    destino = _normalize_text(cidade_destino)
 
-    if not destino:
+def _frete_local_por_cidade(
+    db: Session,
+    tenant_id: str,
+    cidade_destino: str,
+    subtotal: float = 0,
+    endereco_entrega: str | None = None,
+    delivery_context: tuple[ConfiguracaoEntrega | None, Tenant | None] | None = None,
+) -> dict:
+    config, tenant = delivery_context or _delivery_context(db, tenant_id)
+    try:
+        return quote_delivery(
+            config=config,
+            tenant=tenant,
+            cidade_destino=cidade_destino,
+            endereco_destino=endereco_entrega,
+            subtotal_elegivel=subtotal,
+        )
+    except DeliveryQuoteError as exc:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Cidade de destino obrigatória",
-        )
-    if tenant and getattr(tenant, "ecommerce_entrega_ativa", True) is False:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Entrega desativada para esta loja. Escolha retirada na loja.",
-        )
-    if not cidade_loja:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=(
-                "Entrega ainda não configurada: informe a cidade da loja nas "
-                "configurações de entrega."
-            ),
-        )
-    if destino != cidade_loja:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Entrega disponível apenas na cidade da loja",
-        )
-
-    taxa = max(float(getattr(tenant, "ecommerce_taxa_entrega", 0) or 0), 0)
-    frete_gratis_acima = getattr(tenant, "ecommerce_frete_gratis_acima", None)
-    ganhou_frete_gratis = (
-        frete_gratis_acima is not None
-        and float(frete_gratis_acima) > 0
-        and float(subtotal or 0) >= float(frete_gratis_acima)
-    )
-    prazo = (
-        getattr(tenant, "ecommerce_prazo_entrega_texto", None)
-        or "Prazo combinado com a loja"
-    )
-
-    return {
-        "disponivel": True,
-        "valor_frete": round(0.0 if ganhou_frete_gratis else taxa, 2),
-        "prazo_estimado": prazo,
-        "tipo": "entrega_local",
-        "cidade_loja": cidade_loja_raw,
-        "cidade_destino": cidade_destino,
-        "frete_gratis_aplicado": ganhou_frete_gratis,
-        "frete_gratis_acima": (
-            float(frete_gratis_acima) if frete_gratis_acima is not None else None
-        ),
-        "observacao": "Entrega local da loja",
-    }
+            detail=str(exc),
+        ) from exc
 
 
 def _buscar_carrinho(db: Session, identity: EcommerceIdentity) -> Pedido | None:
@@ -397,6 +362,7 @@ __all__ = [
     "_checkout_idempotency_payload",
     "_classificar_forma_pagamento_online",
     "_current_identity",
+    "_delivery_context",
     "_expirar_reservas_automaticamente",
     "_frete_local_por_cidade",
     "_gerar_palavra_chave_retirada",

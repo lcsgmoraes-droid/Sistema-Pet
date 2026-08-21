@@ -21,7 +21,9 @@ const CREDIT_INSTALLMENTS = [1, 2, 3];
 
 function getFinalizeBlockReason({
   cart,
+  checkoutResumo,
   cidadeDestino,
+  deliveryMode,
   isProfileComplete,
   pagamentoTipo,
   tenantContext,
@@ -39,6 +41,11 @@ function getFinalizeBlockReason({
   }
   if (!(tenantContext?.cidade || cidadeDestino)) return "Cidade da loja nao configurada.";
   if (!isProfileComplete) return "Complete seu cadastro (nome, telefone, CPF e endereco).";
+  if (!checkoutResumo) {
+    return deliveryMode === "entrega"
+      ? "Complete o endereço e aguarde o cálculo do frete."
+      : "Aguarde o cálculo do total.";
+  }
   if (!pagamentoTipo) return "Escolha a forma de pagamento para continuar.";
   return "";
 }
@@ -61,7 +68,6 @@ function CheckoutDeliveryForm({
 }) {
   const updateAddress = (field) => (e) =>
     setAddressFields((prev) => ({ ...prev, [field]: e.target.value }));
-  const hasTenantCity = Boolean(tenantContext?.cidade);
 
   return (
     <div style={S.formCard}>
@@ -183,13 +189,18 @@ function CheckoutDeliveryForm({
           </div>
         )}
 
-        <input
-          value={tenantContext?.cidade || cidadeDestino}
-          onChange={(e) => onCidadeDestinoChange(e.target.value)}
-          placeholder="Cidade da loja"
-          disabled={hasTenantCity}
-          style={{ ...S.formInput, background: hasTenantCity ? "#f8fafc" : "#fff" }}
-        />
+        {deliveryMode === "retirada" && (
+          <input
+            value={tenantContext?.cidade || cidadeDestino}
+            onChange={(e) => onCidadeDestinoChange(e.target.value)}
+            placeholder="Cidade da loja"
+            disabled={Boolean(tenantContext?.cidade)}
+            style={{
+              ...S.formInput,
+              background: tenantContext?.cidade ? "#f8fafc" : "#fff",
+            }}
+          />
+        )}
 
         {deliveryMode === "entrega" && (
           <>
@@ -228,11 +239,10 @@ function CheckoutDeliveryForm({
             />
             <div style={{ display: "grid", gridTemplateColumns: "1fr 120px", gap: 8 }}>
               <input
-                value={addressFields.cidade || tenantContext?.cidade || ""}
+                value={addressFields.cidade || ""}
                 onChange={updateAddress("cidade")}
                 placeholder="Cidade"
-                disabled={hasTenantCity}
-                style={{ ...S.formInput, background: hasTenantCity ? "#f8fafc" : "#fff" }}
+                style={S.formInput}
               />
               <input
                 value={addressFields.estado || tenantContext?.uf || ""}
@@ -244,7 +254,7 @@ function CheckoutDeliveryForm({
           </>
         )}
         <button type="submit" style={S.payBtn(true)}>
-          Calcular resumo
+          Recalcular frete e total
         </button>
       </form>
     </div>
@@ -435,8 +445,17 @@ function CheckoutSummary({
               color: "#6b7280",
             }}
           >
-            <span>Frete</span>
-            <span>{formatCurrency(checkoutResumo?.frete?.valor_frete)}</span>
+            <span>
+              Frete
+              {checkoutResumo?.frete?.distancia_km != null
+                ? ` (${Number(checkoutResumo.frete.distancia_km).toFixed(1)} km)`
+                : ""}
+            </span>
+            <span>
+              {checkoutResumo?.frete?.frete_gratis_aplicado
+                ? "Grátis"
+                : formatCurrency(checkoutResumo?.frete?.valor_frete)}
+            </span>
           </div>
           {checkoutResumo?.cupom?.desconto > 0 && (
             <div
@@ -577,7 +596,9 @@ export default function EcommerceCheckoutPage({
 }) {
   const finalizeBlockReason = getFinalizeBlockReason({
     cart,
+    checkoutResumo,
     cidadeDestino,
+    deliveryMode,
     isProfileComplete,
     pagamentoTipo,
     tenantContext,

@@ -188,12 +188,6 @@ export default function EcommerceConfig() {
         ecommerce_horario_fechamento: horarioFechamento || null,
         ecommerce_dias_funcionamento:
           diasSelecionados.length > 0 ? formatDias(diasSelecionados) : null,
-        ecommerce_entrega_ativa: commerceConfig.entregaAtiva,
-        ecommerce_retirada_ativa: commerceConfig.retiradaAtiva,
-        ecommerce_taxa_entrega: commerceConfig.taxaEntrega,
-        ecommerce_frete_gratis_acima: commerceConfig.freteGratisAcima || null,
-        ecommerce_pedido_minimo: commerceConfig.pedidoMinimo,
-        ecommerce_prazo_entrega_texto: commerceConfig.prazoEntrega || null,
         ecommerce_usar_estoque_canal: commerceConfig.usarEstoqueCanal,
         ecommerce_ocultar_sem_estoque: commerceConfig.ocultarSemEstoque,
         ecommerce_ocultar_sem_imagem: commerceConfig.ocultarSemImagem,
