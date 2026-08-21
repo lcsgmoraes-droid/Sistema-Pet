@@ -13,6 +13,9 @@ Guia mestre:
 
 | Necessidade | Ler primeiro | Depois validar com |
 |---|---|---|
+| Localizar o codigo-fonte | `docs/MAPA_CODIGO_FONTE.md` | `python scripts/validate_repository_structure.py` |
+| Entender a arquitetura | `docs/ARQUITETURA.md` | Codigo e diagramas citados no documento |
+| Contribuir com seguranca | `CONTRIBUTING.md` | `AGENTS.md` e checks do PR |
 | Entender maturidade geral | `docs/MATURIDADE_GERAL_10_10_GUIA.md` | Historico de PRs no proprio guia |
 | Preparar um PC DEV | `docs/DEV_ENVIRONMENT_CHECK.md` | `scripts/check_dev_environment.ps1` |
 | Trabalhar em dois PCs | `docs/GIT_FLUXO_2_PCS.md` | `scripts/git_check_updates.ps1` |
@@ -51,6 +54,9 @@ Guia mestre:
 
 | Area | Documento oficial |
 |---|---|
+| Codigo-fonte | `docs/MAPA_CODIGO_FONTE.md` |
+| Arquitetura | `docs/ARQUITETURA.md` |
+| Contribuicao | `CONTRIBUTING.md` |
 | MCPs | `docs/MCP_MATURIDADE_GUIA.md` |
 | Estrutura geral | `docs/auditorias/estrutura-geral-inventario.md` |
 | Seguranca operacional | `docs/CI_CD_DEPLOY_SAFETY_AUDIT.md` |

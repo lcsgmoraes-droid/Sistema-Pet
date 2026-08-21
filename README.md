@@ -5,6 +5,14 @@ financeiro, campanhas, integracoes e operacao segura em producao.
 
 ## Comece por aqui
 
+Mapa oficial do codigo-fonte:
+
+- `docs/MAPA_CODIGO_FONTE.md`
+
+Arquitetura atual:
+
+- `docs/ARQUITETURA.md`
+
 O indice oficial de documentacao fica em:
 
 - `docs/INDICE_OPERACIONAL.md`
@@ -15,6 +23,20 @@ O guia vivo de maturidade 10/10 fica em:
 
 Esses dois arquivos mandam mais do que documentos antigos, backups historicos ou
 anotacoes soltas.
+
+## Codigo-fonte oficial
+
+| Produto | Fonte |
+|---|---|
+| Backend e regras de negocio | `backend/app/` |
+| Sistema web | `frontend/src/` |
+| Aplicativo mobile | `app-mobile/src/` |
+| Evolucao do banco | `backend/alembic/versions/` |
+
+Pastas de build, containers, dependencias, uploads e arquivos `.env` nao sao
+codigo-fonte. Veja a explicacao completa em `docs/MAPA_CODIGO_FONTE.md`.
+
+Para contribuir, siga `CONTRIBUTING.md` e `AGENTS.md`.
 
 ## Fluxo de trabalho
 
