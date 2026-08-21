@@ -21,6 +21,12 @@ centralizados. Os nomes uteis continuam funcionando por compatibilidade, e os
 tres inicializadores de producao local incompativeis ficaram bloqueados. O guia
 antigo desses ambientes agora redireciona para a documentacao atual.
 
+Os documentos soltos da raiz tambem foram consolidados. Guias de ambientes,
+bancos e deploy antigos foram removidos ou reduzidos a redirecionamentos. A
+documentacao ainda valida da classificacao de racoes foi reescrita em
+`docs/CLASSIFICACAO_RACOES.md`. A raiz passou de dez para cinco arquivos
+Markdown e o validador impede que novos guias sejam criados fora de `docs/`.
+
 ## Itens oficiais na raiz
 
 Devem continuar faceis de localizar:
@@ -98,9 +104,9 @@ destrutivas conhecidas voltem aos scripts de producao da raiz.
 3. [Concluido] Auditar scripts `deploy*` antigos contra o deploy oficial.
 4. [Concluido] Atalhos `CORRIGIR_*`, `DIAGNOSTICAR_*`, `INICIAR_*` e
    `PARAR_TUDO.bat` centralizados ou bloqueados com seguranca.
-5. [Em andamento] Consolidar Markdown solto em `docs/` e manter redirecionamento quando
-   necessario.
-6. Recontar arquivos de raiz e endurecer o validador.
+5. [Concluido] Consolidar Markdown solto em `docs/` e manter redirecionamento
+   quando necessario.
+6. [Concluido] Recontar arquivos de raiz e endurecer o validador.
 
 ## Criterio de sucesso
 

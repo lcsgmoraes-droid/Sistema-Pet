@@ -32,6 +32,7 @@ REQUIRED_GUIDES = (
     "docs/ARQUITETURA.md",
     "docs/INDICE_OPERACIONAL.md",
     "docs/ATALHOS_OPERACIONAIS.md",
+    "docs/CLASSIFICACAO_RACOES.md",
 )
 
 README_REFERENCES = (
@@ -76,8 +77,20 @@ BLOCKED_LEGACY_ENTRYPOINTS = (
 )
 
 LEGACY_DOCUMENT_REDIRECTS = {
+    "DEPLOY_QUICKSTART.md": "docs/PRODUCAO_DEPLOY_SSH.md",
     "GUIA_COMPLETO_AMBIENTES.md": "docs/ATALHOS_OPERACIONAIS.md",
 }
+MAX_LEGACY_DOCUMENT_REDIRECT_LINES = 40
+
+ALLOWED_ROOT_MARKDOWN = frozenset(
+    {
+        "AGENTS.md",
+        "CONTRIBUTING.md",
+        "DEPLOY_QUICKSTART.md",
+        "GUIA_COMPLETO_AMBIENTES.md",
+        "README.md",
+    }
+)
 
 FORBIDDEN_ROOT_OPERATION_SNIPPETS = (
     "git push origin main",
@@ -166,6 +179,17 @@ def forbidden_generated_artifacts(paths: Iterable[str]) -> list[str]:
     )
 
 
+def unexpected_root_markdown(paths: Iterable[str]) -> list[str]:
+    normalized = {_normalize(path) for path in paths}
+    return sorted(
+        path
+        for path in normalized
+        if "/" not in path
+        and path.casefold().endswith(".md")
+        and path not in ALLOWED_ROOT_MARKDOWN
+    )
+
+
 def forbidden_operational_snippets(content: str) -> list[str]:
     normalized = content.casefold().replace("\\", "/")
     return sorted(
@@ -246,6 +270,16 @@ def legacy_document_redirect_errors(root: Path = ROOT) -> list[str]:
             errors.append(
                 f"Documento historico sem destino oficial {official_target}: {relative_path}"
             )
+        if len(content.splitlines()) > MAX_LEGACY_DOCUMENT_REDIRECT_LINES:
+            errors.append(
+                f"Redirecionamento historico voltou a ser guia: {relative_path}"
+            )
+        forbidden = forbidden_operational_snippets(content)
+        if forbidden:
+            errors.append(
+                f"Instrucao operacional voltou ao documento {relative_path}: "
+                + ", ".join(forbidden)
+            )
     return errors
 
 
@@ -281,6 +315,10 @@ def validate_repository_structure(
         errors.append(
             "Artefato gerado ou dependencia rastreada no Git: " + ", ".join(generated)
         )
+
+    unexpected_docs = unexpected_root_markdown(tracked)
+    if unexpected_docs:
+        errors.append("Documento solto fora de docs/: " + ", ".join(unexpected_docs))
 
     errors.extend(operational_entrypoint_errors(root))
     errors.extend(legacy_document_redirect_errors(root))
