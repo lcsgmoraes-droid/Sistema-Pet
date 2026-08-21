@@ -7,6 +7,8 @@ from uuid import uuid4
 import pytest
 import requests
 
+from tests.e2e_safety import is_production_base_url
+
 
 os.environ.setdefault("DATABASE_URL", "sqlite:///./test.db")
 os.environ.setdefault("ENVIRONMENT", "test")
@@ -86,7 +88,7 @@ def e2e_config() -> E2EConfig:
         pytest.skip("Plano Basico E2E skipped; missing env vars: " + ", ".join(missing))
 
     base_url = os.environ["E2E_BASE_URL"].rstrip("/")
-    if "mlprohub.com.br" in base_url and not _env_bool("E2E_ALLOW_PRODUCTION"):
+    if is_production_base_url(base_url) and not _env_bool("E2E_ALLOW_PRODUCTION"):
         pytest.skip(
             "Plano Basico E2E skipped; set E2E_ALLOW_PRODUCTION=true for production"
         )

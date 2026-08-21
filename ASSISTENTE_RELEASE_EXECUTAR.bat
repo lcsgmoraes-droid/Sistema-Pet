@@ -1,5 +1,9 @@
 @echo off
-cd /d "%~dp0"
+setlocal
+REM LEGACY_BLOCKED
 
-powershell -ExecutionPolicy Bypass -File ".\scripts\assistente_release_seguro.ps1" -ExecutarCommit -ExecutarPush
-pause
+echo Este assistente pertence a uma organizacao antiga de commits e foi bloqueado.
+echo.
+echo Use os scripts oficiais de tarefa descritos em CONTRIBUTING.md.
+echo O envio deve ocorrer por branch e Pull Request; nunca diretamente na main.
+exit /b 1
