@@ -57,6 +57,8 @@
     "*.tar",
     "*.tar.gz",
     "*.zip",
+    "backend/logs_importacao/**",
+    "backend/resultado_importacao.txt",
     "nginx/ssl/*.pem"
   ],
   "protected_files_never_delete": [

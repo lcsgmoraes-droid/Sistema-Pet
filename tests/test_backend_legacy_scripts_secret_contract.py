@@ -2,7 +2,10 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from backend_legacy_root_scripts import CLEANED_LEGACY_ROOT_SCRIPTS
+from backend_legacy_root_scripts import (
+    CLEANED_LEGACY_ROOT_SCRIPTS,
+    REMOVED_UNSAFE_IMPORT_SCRIPTS,
+)
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -31,3 +34,11 @@ def test_legacy_root_scripts_do_not_embed_known_credentials():
                 offenders.append(f"{script}: {fragment[:24]}")
 
     assert offenders == []
+
+
+def test_unsafe_import_scripts_stay_removed():
+    assert [
+        script
+        for script in REMOVED_UNSAFE_IMPORT_SCRIPTS
+        if (BACKEND / script).exists()
+    ] == []

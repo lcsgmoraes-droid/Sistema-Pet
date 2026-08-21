@@ -76,6 +76,13 @@ primeiro argumento, por exemplo:
 
 O endereco depende da rede atual e por isso nao fica gravado no codigo.
 
+### Importacao SimplesVet
+
+`IMPORTAR_SIMPLESVET_TESTE.bat` agora e apenas um nome de compatibilidade para
+`scripts/importar_simplesvet_seguro.ps1`. O fluxo oficial exige empresa e
+usuario de destino, simula com rollback e gera um plano antes de permitir a
+gravacao. Consulte `docs/IMPORTACAO_SIMPLESVET_SEGURA.md`.
+
 ## Entradas antigas bloqueadas
 
 `setup-server.sh` pertence a uma infraestrutura antiga. O arquivo agora apenas
@@ -95,10 +102,7 @@ Outros atalhos antigos tambem ficaram bloqueados:
 - `ASSISTENTE_RELEASE.bat` e `ASSISTENTE_RELEASE_EXECUTAR.bat` preparavam
   blocos historicos de commit que nao representam mais a estrutura atual;
 - `FRONTEND_PILOTO.bat` dependia de uma configuracao removida e podia misturar
-  o ambiente DEV com dados reais;
-- `IMPORTAR_SIMPLESVET_TESTE.bat` usava um caminho fixo de computador e nao
-  exigia a escolha explicita da empresa de destino. O codigo do importador foi
-  preservado para receber uma camada multitenant segura em uma tarefa propria.
+  o ambiente DEV com dados reais.
 
 O guia historico `GUIA_COMPLETO_AMBIENTES.md` virou um redirecionamento curto
 porque descrevia ambientes, dominios e credenciais que foram descontinuados.

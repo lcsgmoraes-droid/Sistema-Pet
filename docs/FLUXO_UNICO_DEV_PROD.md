@@ -106,6 +106,18 @@ Acao: fazer correcao de merge de migrations antes de producao.
 
 Se `release-check` falhar, **nao subir producao**.
 
+## Importacao de dados de uma nova empresa
+
+Importacao de CSV nao faz parte do deploy. Ela possui um fluxo proprio para
+evitar mistura entre empresas:
+
+1. usar `scripts/importar_simplesvet_seguro.ps1` em modo `Simular`;
+2. conferir empresa, usuario, contagens, rejeicoes e `plan_id`;
+3. aplicar somente o plano gerado, ainda valido e com os mesmos arquivos;
+4. em producao, fazer backup e obter autorizacao explicita antes de aplicar.
+
+O procedimento completo esta em `docs/IMPORTACAO_SIMPLESVET_SEGURA.md`.
+
 ---
 
 ## Regra critica de deploy do backend no servidor

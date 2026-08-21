@@ -26,10 +26,25 @@ def test_importar_simplesvet_refactor_modules_exist():
             "def log(",
         ],
         "importar_simplesvet_summary.py": ["def exibir_resumo("],
-        "importar_simplesvet_state.py": ["ID_MAP = {", "STATS = {", "USER_ID = 1"],
+        "importar_simplesvet_state.py": [
+            "ID_MAP = {",
+            "STATS = {",
+            "RUNTIME = ImportRuntime()",
+            "def reset_import_state(",
+        ],
     }
 
     for filename, snippets in expected_exports.items():
         source = (ROOT / filename).read_text(encoding="utf-8")
         for snippet in snippets:
             assert snippet in source
+
+
+def test_sales_items_use_current_model_fields_and_atomic_boundary():
+    source = (ROOT / "importar_simplesvet.py").read_text(encoding="utf-8")
+
+    assert 'tipo="produto"' in source
+    assert "subtotal=preco_total" in source
+    assert "desconto_item=0.0" in source
+    assert "preco_total=preco_total" not in source
+    assert "db.commit()" not in source

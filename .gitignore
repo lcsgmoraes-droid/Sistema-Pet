@@ -139,6 +139,8 @@ docs/SAAS_MULTITENANT_DIAGNOSTICO.txt
 simplesvet/
 **/simplesvet/
 **/simplesvet_data/
+backend/logs_importacao/
+backend/resultado_importacao.txt
 
 # Uploads e dados locais fora do backend padrão
 uploads/
