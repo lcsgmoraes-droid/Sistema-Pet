@@ -16,6 +16,11 @@ entrada de configuracao de servidor incompativel foi bloqueada.
 Na etapa seguinte, os quatro atalhos historicos de erro 404 foram reduzidos a um
 diagnostico publico somente leitura, compartilhado e coberto por testes.
 
+Na etapa atual, os atalhos locais `INICIAR_*` e `PARAR_TUDO.bat` foram
+centralizados. Os nomes uteis continuam funcionando por compatibilidade, e os
+tres inicializadores de producao local incompativeis ficaram bloqueados. O guia
+antigo desses ambientes agora redireciona para a documentacao atual.
+
 ## Itens oficiais na raiz
 
 Devem continuar faceis de localizar:
@@ -91,9 +96,9 @@ destrutivas conhecidas voltem aos scripts de producao da raiz.
 1. [Concluido] Provar e remover `src/` da raiz.
 2. [Concluido] Provar e remover `app/` da raiz.
 3. [Concluido] Auditar scripts `deploy*` antigos contra o deploy oficial.
-4. [Em andamento] Atalhos `CORRIGIR_*` e `DIAGNOSTICAR_*` de erro 404 ja foram
-   neutralizados; ainda faltam os demais atalhos locais `INICIAR_*`.
-5. Consolidar Markdown solto em `docs/` e manter redirecionamento quando
+4. [Concluido] Atalhos `CORRIGIR_*`, `DIAGNOSTICAR_*`, `INICIAR_*` e
+   `PARAR_TUDO.bat` centralizados ou bloqueados com seguranca.
+5. [Em andamento] Consolidar Markdown solto em `docs/` e manter redirecionamento quando
    necessario.
 6. Recontar arquivos de raiz e endurecer o validador.
 

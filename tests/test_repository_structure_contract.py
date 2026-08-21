@@ -64,6 +64,11 @@ def test_root_operational_entrypoints_only_delegate_to_safe_flow():
     assert module.operational_entrypoint_errors(ROOT) == []
 
 
+def test_legacy_root_documents_only_redirect_to_current_guides():
+    module = load_validator()
+    assert module.legacy_document_redirect_errors(ROOT) == []
+
+
 def test_destructive_operation_in_root_entrypoint_is_rejected():
     module = load_validator()
     content = "git reset --hard origin/main\nDROP TABLE IF EXISTS alembic_version"
@@ -71,4 +76,30 @@ def test_destructive_operation_in_root_entrypoint_is_rejected():
     assert module.forbidden_operational_snippets(content) == [
         "drop table if exists alembic_version",
         "git reset --hard",
+    ]
+
+
+def test_old_local_machine_and_example_password_are_rejected():
+    module = load_validator()
+    content = "curl http://192.168.15.138:8000/health\nSenha: admin123"
+
+    assert module.forbidden_operational_snippets(content) == [
+        "192.168.15.138",
+        "admin123",
+    ]
+
+
+def test_blocked_batch_entrypoint_requires_batch_exit_code():
+    module = load_validator()
+
+    assert module.has_blocking_exit("antigo.bat", "exit /b 1") is True
+    assert module.has_blocking_exit("antigo.bat", "exit 1") is False
+    assert module.has_blocking_exit("antigo.sh", "exit 1") is True
+
+
+def test_root_shortcuts_cannot_start_local_production():
+    module = load_validator()
+
+    assert module.forbidden_operational_snippets('call "FLUXO_UNICO.bat" prod-up') == [
+        "prod-up"
     ]

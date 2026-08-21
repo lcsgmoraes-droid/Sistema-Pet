@@ -21,6 +21,8 @@ REQUIRED_ENTRYPOINTS = (
     "scripts/deploy_producao_remoto.ps1",
     "scripts/deploy_producao_seguro.sh",
     "scripts/diagnosticar_producao_publica.py",
+    "scripts/iniciar_frontend_dev.ps1",
+    "scripts/iniciar_app_mobile.ps1",
 )
 
 REQUIRED_GUIDES = (
@@ -51,9 +53,31 @@ COMPATIBILITY_ENTRYPOINTS = {
     "CORRIGIR_LEMBRETES_404.ps1": "scripts/diagnosticar_producao_publica.py",
     "DIAGNOSTICAR_404.ps1": "scripts/diagnosticar_producao_publica.py",
     "DIAGNOSTICAR_E_CORRIGIR_404.sh": "scripts/diagnosticar_producao_publica.py",
+    "INICIAR_APP.bat": "scripts/iniciar_app_mobile.ps1",
+    "INICIAR_BACKEND_LOCAL.bat": "FLUXO_UNICO.bat",
+    "INICIAR_DEV.bat": "FLUXO_UNICO.bat",
+    "INICIAR_FRONTEND.bat": "scripts/iniciar_frontend_dev.ps1",
+    "INICIAR_TUDO.bat": "FLUXO_UNICO.bat",
+    "PARAR_TUDO.bat": "FLUXO_UNICO.bat",
 }
 
-BLOCKED_LEGACY_ENTRYPOINTS = ("setup-server.sh",)
+COMPATIBILITY_REQUIRED_ACTIONS = {
+    "INICIAR_BACKEND_LOCAL.bat": "dev-up",
+    "INICIAR_DEV.bat": "dev-up",
+    "INICIAR_TUDO.bat": "dev-up",
+    "PARAR_TUDO.bat": "dev-down",
+}
+
+BLOCKED_LEGACY_ENTRYPOINTS = (
+    "setup-server.sh",
+    "INICIAR_BANCO_PRODUCAO.bat",
+    "INICIAR_PRODUCAO_LOCAL.bat",
+    "INICIAR_PRODUCAO.bat",
+)
+
+LEGACY_DOCUMENT_REDIRECTS = {
+    "GUIA_COMPLETO_AMBIENTES.md": "docs/ATALHOS_OPERACIONAIS.md",
+}
 
 FORBIDDEN_ROOT_OPERATION_SNIPPETS = (
     "git push origin main",
@@ -69,6 +93,14 @@ FORBIDDEN_ROOT_OPERATION_SNIPPETS = (
     "npm run build",
     "frontend/.env.production",
     "root@mlprohub.com.br",
+    "192.168.15.138",
+    "admin123",
+    "copy /y .env.development .env",
+    "docker-compose.production-local.yml",
+    "docker-compose.production.yml",
+    "python -m uvicorn",
+    "npm install",
+    "prod-up",
 )
 
 FORBIDDEN_TRACKED_PREFIXES = (
@@ -143,6 +175,13 @@ def forbidden_operational_snippets(content: str) -> list[str]:
     )
 
 
+def has_blocking_exit(relative_path: str, content: str) -> bool:
+    normalized = content.casefold()
+    if Path(relative_path).suffix.casefold() == ".bat":
+        return "exit /b 1" in normalized
+    return "exit 1" in normalized
+
+
 def operational_entrypoint_errors(root: Path = ROOT) -> list[str]:
     errors: list[str] = []
 
@@ -161,6 +200,9 @@ def operational_entrypoint_errors(root: Path = ROOT) -> list[str]:
             errors.append(
                 f"Atalho fora da implementacao oficial {official_target}: {relative_path}"
             )
+        required_action = COMPATIBILITY_REQUIRED_ACTIONS.get(relative_path)
+        if required_action and required_action not in content.casefold():
+            errors.append(f"Atalho sem acao oficial {required_action}: {relative_path}")
         forbidden = forbidden_operational_snippets(content)
         if forbidden:
             errors.append(
@@ -174,7 +216,9 @@ def operational_entrypoint_errors(root: Path = ROOT) -> list[str]:
             errors.append(f"Bloqueio de compatibilidade ausente: {relative_path}")
             continue
         content = path.read_text(encoding="utf-8")
-        if "LEGACY_BLOCKED" not in content or "exit 1" not in content:
+        if "LEGACY_BLOCKED" not in content or not has_blocking_exit(
+            relative_path, content
+        ):
             errors.append(f"Entrada legada deixou de estar bloqueada: {relative_path}")
         forbidden = forbidden_operational_snippets(content)
         if forbidden:
@@ -183,6 +227,25 @@ def operational_entrypoint_errors(root: Path = ROOT) -> list[str]:
                 + ", ".join(forbidden)
             )
 
+    return errors
+
+
+def legacy_document_redirect_errors(root: Path = ROOT) -> list[str]:
+    errors: list[str] = []
+    for relative_path, official_target in LEGACY_DOCUMENT_REDIRECTS.items():
+        path = root / relative_path
+        if not path.exists():
+            errors.append(f"Redirecionamento de documento ausente: {relative_path}")
+            continue
+        content = path.read_text(encoding="utf-8")
+        if "LEGACY_DOCUMENT_REDIRECT" not in content:
+            errors.append(
+                f"Documento historico voltou a ter instrucoes: {relative_path}"
+            )
+        if official_target not in content:
+            errors.append(
+                f"Documento historico sem destino oficial {official_target}: {relative_path}"
+            )
     return errors
 
 
@@ -220,6 +283,7 @@ def validate_repository_structure(
         )
 
     errors.extend(operational_entrypoint_errors(root))
+    errors.extend(legacy_document_redirect_errors(root))
 
     return errors
 
