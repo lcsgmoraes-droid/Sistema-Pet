@@ -52,7 +52,8 @@ def ensure_configuracoes_entrega_schema(db: Session) -> None:
                 + column_definition
             )
         )
-    db.execute(text("""
+    db.execute(
+        text("""
         UPDATE configuracoes_entrega ce
         SET user_id = u.id
         FROM (
@@ -62,7 +63,8 @@ def ensure_configuracoes_entrega_schema(db: Session) -> None:
         ) u
         WHERE ce.tenant_id = u.tenant_id
           AND ce.user_id IS NULL
-    """))
+    """)
+    )
     db.execute(
         text(
             "CREATE INDEX IF NOT EXISTS ix_configuracoes_entrega_user_id "
