@@ -165,15 +165,11 @@ export default function EcommerceConfig() {
     setPaymentAccountLoading(true);
     setPaymentAccountError("");
     try {
-      const res = await api.get(
-        "/ecommerce-payment-config/mercadopago/account-identity",
-      );
+      const res = await api.get("/ecommerce-payment-config/mercadopago/account-identity");
       setPaymentAccount(res.data || null);
     } catch {
       setPaymentAccount(null);
-      setPaymentAccountError(
-        "Não foi possível confirmar os dados da conta no Mercado Pago agora.",
-      );
+      setPaymentAccountError("Não foi possível confirmar os dados da conta no Mercado Pago agora.");
     } finally {
       setPaymentAccountLoading(false);
     }

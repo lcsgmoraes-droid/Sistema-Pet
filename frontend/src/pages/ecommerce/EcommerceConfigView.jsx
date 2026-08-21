@@ -498,7 +498,9 @@ export default function EcommerceConfigView({
                 {paymentConfig.oauth_connected && (
                   <div className="rounded-lg border border-emerald-100 bg-white p-3">
                     {paymentAccountLoading ? (
-                      <p className="text-sm text-gray-500">Confirmando a conta no Mercado Pago...</p>
+                      <p className="text-sm text-gray-500">
+                        Confirmando a conta no Mercado Pago...
+                      </p>
                     ) : paymentAccount ? (
                       <div className="space-y-3">
                         <div
@@ -535,7 +537,7 @@ export default function EcommerceConfigView({
                                   Documento
                                 </dt>
                                 <dd className="font-medium text-gray-800">
-                                  {paymentAccount.identification_type.toUpperCase()} final {" "}
+                                  {paymentAccount.identification_type.toUpperCase()} final{" "}
                                   {paymentAccount.identification_last_four}
                                 </dd>
                               </div>
