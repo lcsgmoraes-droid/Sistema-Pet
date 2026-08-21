@@ -7,12 +7,22 @@ import sys
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "scripts" / "validate_repository_structure.py"
+E2E_SAFETY = ROOT / "backend" / "tests" / "e2e_safety.py"
 
 
 def load_validator():
     spec = importlib.util.spec_from_file_location(
         "validate_repository_structure", SCRIPT
     )
+    module = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+def load_e2e_safety_module():
+    spec = importlib.util.spec_from_file_location("e2e_safety_contract", E2E_SAFETY)
     module = importlib.util.module_from_spec(spec)
     assert spec.loader is not None
     sys.modules[spec.name] = module
@@ -81,6 +91,27 @@ def test_root_markdown_allowlist_matches_current_repository():
     assert current == module.ALLOWED_ROOT_MARKDOWN
 
 
+def test_new_root_operational_entrypoint_is_rejected():
+    module = load_validator()
+    tracked = {"FLUXO_UNICO.bat", "NOVO_DEPLOY.bat", "scripts/seguro.ps1"}
+
+    assert module.unexpected_root_operational_entrypoints(tracked) == [
+        "NOVO_DEPLOY.bat"
+    ]
+
+
+def test_root_operational_allowlist_matches_current_repository():
+    module = load_validator()
+    current = {
+        path
+        for path in module.tracked_files(ROOT)
+        if "/" not in path
+        and Path(path).suffix.casefold() in module.ROOT_OPERATIONAL_SUFFIXES
+    }
+
+    assert current == module.ALLOWED_ROOT_OPERATIONAL_ENTRYPOINTS
+
+
 def test_root_operational_entrypoints_only_delegate_to_safe_flow():
     module = load_validator()
     assert module.operational_entrypoint_errors(ROOT) == []
@@ -125,3 +156,29 @@ def test_root_shortcuts_cannot_start_local_production():
     assert module.forbidden_operational_snippets('call "FLUXO_UNICO.bat" prod-up') == [
         "prod-up"
     ]
+
+
+def test_root_shortcuts_cannot_restore_machine_specific_or_direct_db_logic():
+    module = load_validator()
+    content = (
+        "copy /Y .env.piloto .env\n"
+        "docker exec -i banco psql\n"
+        "C:/Users/alguem/Downloads/dados"
+    )
+
+    assert module.forbidden_operational_snippets(content) == [
+        "c:/users/",
+        "copy /y .env",
+        "docker exec",
+    ]
+
+
+def test_e2e_recognizes_current_production_domain_without_substring_false_positive():
+    module = load_e2e_safety_module()
+
+    assert module.is_production_base_url("https://corepet.com.br") is True
+    assert module.is_production_base_url("https://www.corepet.com.br/api") is True
+    assert module.is_production_base_url("https://api.corepet.com.br") is True
+    assert module.is_production_base_url("https://mlprohub.com.br") is True
+    assert module.is_production_base_url("http://127.0.0.1:8000") is False
+    assert module.is_production_base_url("https://corepet.com.br.example.test") is False

@@ -1,16 +1,9 @@
 @echo off
-REM Script para resetar sequences do PostgreSQL
-REM Útil quando há erros de duplicate key
+setlocal
+REM COMPATIBILITY_ALIAS
+cd /d "%~dp0"
 
-echo ========================================
-echo RESETANDO SEQUENCES DO POSTGRESQL
-echo ========================================
-echo.
-
-Get-Content "backend\scripts\reset_sequences.sql" | docker exec -i petshop-dev-postgres psql -U postgres -d petshop_dev
-
-echo.
-echo ========================================
-echo SEQUENCES RESETADAS COM SUCESSO!
-echo ========================================
+powershell -ExecutionPolicy Bypass -File ".\scripts\manutencao_banco_dev.ps1" -Operacao resetar-sequences
+set "EXIT_CODE=%ERRORLEVEL%"
 pause
+exit /b %EXIT_CODE%

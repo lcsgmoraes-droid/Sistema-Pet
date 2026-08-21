@@ -160,18 +160,14 @@ Esse script:
 
 ---
 
-## Assistente automatico (com confirmacao)
+## Atalhos antigos de release
 
-Se quiser que o sistema te guie e pergunte antes de cada passo importante, use:
+`ASSISTENTE_RELEASE.bat` e `ASSISTENTE_RELEASE_EXECUTAR.bat` foram bloqueados.
+Eles preparavam tres blocos historicos de alteracoes que ja foram concluidos e
+nao representam o trabalho atual.
 
-- `ASSISTENTE_RELEASE.bat`
-
-O que ele faz:
-1. Prepara os 3 blocos de commit (higiene, fluxo, migrations).
-2. Mostra os arquivos e pergunta se pode commitar cada bloco.
-3. Roda `check` e `release-check` no final.
-4. Pergunta: "Posso fazer push final?"
-5. So faz push se voce confirmar.
+O fluxo Git atual e sempre o descrito em `CONTRIBUTING.md`: abrir uma branch com
+`scripts/git_start_task.ps1`, validar e fechar com `scripts/git_finish_task.ps1`.
 
 ---
 

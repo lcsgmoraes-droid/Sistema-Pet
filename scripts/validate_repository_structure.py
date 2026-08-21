@@ -21,8 +21,11 @@ REQUIRED_ENTRYPOINTS = (
     "scripts/deploy_producao_remoto.ps1",
     "scripts/deploy_producao_seguro.sh",
     "scripts/diagnosticar_producao_publica.py",
+    "scripts/diagnosticar_autenticacao_dev.ps1",
+    "scripts/executar_testes_e2e.ps1",
     "scripts/iniciar_frontend_dev.ps1",
     "scripts/iniciar_app_mobile.ps1",
+    "scripts/manutencao_banco_dev.ps1",
 )
 
 REQUIRED_GUIDES = (
@@ -60,6 +63,12 @@ COMPATIBILITY_ENTRYPOINTS = {
     "INICIAR_FRONTEND.bat": "scripts/iniciar_frontend_dev.ps1",
     "INICIAR_TUDO.bat": "FLUXO_UNICO.bat",
     "PARAR_TUDO.bat": "FLUXO_UNICO.bat",
+    "CORRIGIR_PERMISSOES_ADMIN.bat": "scripts/manutencao_banco_dev.ps1",
+    "EXECUTAR_TESTES_E2E.bat": "scripts/executar_testes_e2e.ps1",
+    "FRONTEND_DEV.bat": "scripts/iniciar_frontend_dev.ps1",
+    "PILOTO_WHATSAPP.bat": "scripts/whatsapp_pilot.ps1",
+    "RESETAR_SEQUENCES.bat": "scripts/manutencao_banco_dev.ps1",
+    "TESTAR_AUTENTICACAO.bat": "scripts/diagnosticar_autenticacao_dev.ps1",
 }
 
 COMPATIBILITY_REQUIRED_ACTIONS = {
@@ -67,6 +76,8 @@ COMPATIBILITY_REQUIRED_ACTIONS = {
     "INICIAR_DEV.bat": "dev-up",
     "INICIAR_TUDO.bat": "dev-up",
     "PARAR_TUDO.bat": "dev-down",
+    "CORRIGIR_PERMISSOES_ADMIN.bat": "corrigir-permissoes-admin",
+    "RESETAR_SEQUENCES.bat": "resetar-sequences",
 }
 
 BLOCKED_LEGACY_ENTRYPOINTS = (
@@ -74,6 +85,18 @@ BLOCKED_LEGACY_ENTRYPOINTS = (
     "INICIAR_BANCO_PRODUCAO.bat",
     "INICIAR_PRODUCAO_LOCAL.bat",
     "INICIAR_PRODUCAO.bat",
+    "ASSISTENTE_RELEASE.bat",
+    "ASSISTENTE_RELEASE_EXECUTAR.bat",
+    "FRONTEND_PILOTO.bat",
+    "IMPORTAR_SIMPLESVET_TESTE.bat",
+)
+
+OFFICIAL_ROOT_OPERATIONAL_ENTRYPOINTS = frozenset({"FLUXO_UNICO.bat"})
+ROOT_OPERATIONAL_SUFFIXES = frozenset({".bat", ".ps1", ".sh"})
+ALLOWED_ROOT_OPERATIONAL_ENTRYPOINTS = frozenset(
+    set(OFFICIAL_ROOT_OPERATIONAL_ENTRYPOINTS)
+    | set(COMPATIBILITY_ENTRYPOINTS)
+    | set(BLOCKED_LEGACY_ENTRYPOINTS)
 )
 
 LEGACY_DOCUMENT_REDIRECTS = {
@@ -114,6 +137,10 @@ FORBIDDEN_ROOT_OPERATION_SNIPPETS = (
     "python -m uvicorn",
     "npm install",
     "prod-up",
+    "docker exec",
+    "c:/users/",
+    "copy /y .env",
+    "docker-compose.development.yml",
 )
 
 FORBIDDEN_TRACKED_PREFIXES = (
@@ -187,6 +214,17 @@ def unexpected_root_markdown(paths: Iterable[str]) -> list[str]:
         if "/" not in path
         and path.casefold().endswith(".md")
         and path not in ALLOWED_ROOT_MARKDOWN
+    )
+
+
+def unexpected_root_operational_entrypoints(paths: Iterable[str]) -> list[str]:
+    normalized = {_normalize(path) for path in paths}
+    return sorted(
+        path
+        for path in normalized
+        if "/" not in path
+        and Path(path).suffix.casefold() in ROOT_OPERATIONAL_SUFFIXES
+        and path not in ALLOWED_ROOT_OPERATIONAL_ENTRYPOINTS
     )
 
 
@@ -319,6 +357,13 @@ def validate_repository_structure(
     unexpected_docs = unexpected_root_markdown(tracked)
     if unexpected_docs:
         errors.append("Documento solto fora de docs/: " + ", ".join(unexpected_docs))
+
+    unexpected_operations = unexpected_root_operational_entrypoints(tracked)
+    if unexpected_operations:
+        errors.append(
+            "Atalho operacional novo e nao classificado na raiz: "
+            + ", ".join(unexpected_operations)
+        )
 
     errors.extend(operational_entrypoint_errors(root))
     errors.extend(legacy_document_redirect_errors(root))

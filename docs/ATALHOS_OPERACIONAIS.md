@@ -16,6 +16,10 @@ ela.
 | Fluxo interno do ambiente local | `scripts/fluxo_unico.ps1` |
 | Iniciar somente o frontend DEV | `scripts/iniciar_frontend_dev.ps1` |
 | Iniciar o app mobile no Expo | `scripts/iniciar_app_mobile.ps1` |
+| Diagnosticar autenticacao no DEV | `scripts/diagnosticar_autenticacao_dev.ps1` |
+| Rodar o E2E longo com protecao de producao | `scripts/executar_testes_e2e.ps1` |
+| Fazer manutencao controlada no banco DEV | `scripts/manutencao_banco_dev.ps1` |
+| Operar o piloto WhatsApp local | `scripts/whatsapp_pilot.ps1` |
 | Iniciar deploy remoto pelo Windows | `scripts/deploy_producao_remoto.ps1` |
 | Executar deploy dentro do servidor | `scripts/deploy_producao_seguro.sh` |
 | Diagnosticar producao sem alterar nada | `python scripts/diagnosticar_producao_publica.py` |
@@ -56,6 +60,12 @@ duplicadas:
   encaminham para `FLUXO_UNICO.bat dev-up`;
 - `INICIAR_FRONTEND.bat` inicia o script oficial do frontend DEV;
 - `PARAR_TUDO.bat` encaminha para `FLUXO_UNICO.bat dev-down`.
+- `FRONTEND_DEV.bat` encaminha para o mesmo inicializador oficial do frontend;
+- `EXECUTAR_TESTES_E2E.bat` valida as variaveis e bloqueia producao sem liberacao;
+- `TESTAR_AUTENTICACAO.bat` executa um diagnostico somente no DEV local;
+- `PILOTO_WHATSAPP.bat` encaminha para a automacao oficial do piloto;
+- `CORRIGIR_PERMISSOES_ADMIN.bat` e `RESETAR_SEQUENCES.bat` usam uma unica
+  manutencao controlada, fixada no container e no banco DEV e com confirmacao.
 
 Para testar o app em um celular fisico, a URL da API pode ser informada como
 primeiro argumento, por exemplo:
@@ -80,6 +90,16 @@ correto e terminam sem alterar banco, arquivos ou containers:
 - `INICIAR_PRODUCAO_LOCAL.bat`;
 - `INICIAR_PRODUCAO.bat`.
 
+Outros atalhos antigos tambem ficaram bloqueados:
+
+- `ASSISTENTE_RELEASE.bat` e `ASSISTENTE_RELEASE_EXECUTAR.bat` preparavam
+  blocos historicos de commit que nao representam mais a estrutura atual;
+- `FRONTEND_PILOTO.bat` dependia de uma configuracao removida e podia misturar
+  o ambiente DEV com dados reais;
+- `IMPORTAR_SIMPLESVET_TESTE.bat` usava um caminho fixo de computador e nao
+  exigia a escolha explicita da empresa de destino. O codigo do importador foi
+  preservado para receber uma camada multitenant segura em uma tarefa propria.
+
 O guia historico `GUIA_COMPLETO_AMBIENTES.md` virou um redirecionamento curto
 porque descrevia ambientes, dominios e credenciais que foram descontinuados.
 
@@ -91,7 +111,9 @@ que:
 - todos os atalhos continuam apontando para o fluxo seguro;
 - os atalhos de diagnostico continuam somente leitura;
 - nenhuma operacao destrutiva conhecida volta para esses arquivos da raiz;
-- o instalador antigo permanece bloqueado.
+- o instalador antigo permanece bloqueado;
+- nenhum novo `.bat`, `.ps1` ou `.sh` pode aparecer na raiz sem ser
+  classificado como oficial, compatibilidade ou bloqueado.
 
 Qualquer mudanca nessa regra deve ser pequena, revisada em Pull Request e
 validada pelos checks do GitHub.

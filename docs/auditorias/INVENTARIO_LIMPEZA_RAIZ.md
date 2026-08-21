@@ -27,6 +27,13 @@ documentacao ainda valida da classificacao de racoes foi reescrita em
 `docs/CLASSIFICACAO_RACOES.md`. A raiz passou de dez para cinco arquivos
 Markdown e o validador impede que novos guias sejam criados fora de `docs/`.
 
+Na etapa seguinte, os dez atalhos restantes de release, frontend, testes,
+WhatsApp e manutencao de banco foram classificados. Os nomes ainda uteis agora
+somente encaminham para implementacoes em `scripts/`. Entradas obsoletas que
+misturavam configuracao local com dados reais ou usavam caminhos fixos ficaram
+bloqueadas. O validador passou a rejeitar qualquer novo `.bat`, `.ps1` ou `.sh`
+solto na raiz sem classificacao explicita.
+
 ## Itens oficiais na raiz
 
 Devem continuar faceis de localizar:
@@ -107,6 +114,8 @@ destrutivas conhecidas voltem aos scripts de producao da raiz.
 5. [Concluido] Consolidar Markdown solto em `docs/` e manter redirecionamento
    quando necessario.
 6. [Concluido] Recontar arquivos de raiz e endurecer o validador.
+7. [Concluido] Classificar os atalhos operacionais restantes e impedir novos
+   scripts soltos na raiz.
 
 ## Criterio de sucesso
 
