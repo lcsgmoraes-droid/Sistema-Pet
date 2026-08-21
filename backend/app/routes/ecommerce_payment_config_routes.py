@@ -17,6 +17,7 @@ from app.services.ecommerce_payment_config import (
     build_mercado_pago_oauth_return_url,
     disconnect_mercado_pago_oauth_config,
     exchange_mercado_pago_oauth_code,
+    get_mercado_pago_account_identity,
     get_mercado_pago_config,
     is_mercado_pago_connection_available,
     new_webhook_token,
@@ -59,6 +60,15 @@ class MercadoPagoOAuthUrlResponse(BaseModel):
     authorization_url: Optional[str] = None
 
 
+class MercadoPagoAccountIdentityResponse(BaseModel):
+    verified: bool
+    mercado_pago_user_id: Optional[str]
+    account_holder: Optional[str]
+    email_masked: Optional[str]
+    identification_type: Optional[str]
+    identification_last_four: Optional[str]
+
+
 def _ensure_config(
     db: Session,
     *,
@@ -90,6 +100,20 @@ def buscar_config_mercado_pago(
     _, tenant_id = user_and_tenant
     config = _ensure_config(db, tenant_id=tenant_id)
     return serialize_mercado_pago_config(config)
+
+
+@router.get(
+    "/mercadopago/account-identity",
+    response_model=MercadoPagoAccountIdentityResponse,
+)
+def buscar_identidade_conta_mercado_pago(
+    user_and_tenant=Depends(get_current_user_and_tenant),
+    db: Session = Depends(get_session),
+):
+    """Confirma no Mercado Pago a identidade da conta autorizada pelo tenant."""
+    _, tenant_id = user_and_tenant
+    config = _ensure_config(db, tenant_id=tenant_id)
+    return get_mercado_pago_account_identity(db, config)
 
 
 @router.get("/mercadopago/oauth/url", response_model=MercadoPagoOAuthUrlResponse)

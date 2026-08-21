@@ -25,6 +25,10 @@ export default function EcommerceConfigView({
   paymentLoading,
   oauthReturn,
   paymentConfig,
+  paymentAccount,
+  paymentAccountLoading,
+  paymentAccountError,
+  recarregarPaymentAccount,
   setPaymentConfig,
   desconectarMercadoPago,
   disconnectingPayment,
@@ -462,7 +466,7 @@ export default function EcommerceConfigView({
                       </p>
                       <p className="text-sm text-gray-500">
                         {paymentConfig.oauth_connected
-                          ? `Recebendo nesta loja${paymentConfig.mercado_pago_user_id ? ` (conta ${paymentConfig.mercado_pago_user_id})` : ""}.`
+                          ? "Confira abaixo a conta que receberá as vendas desta loja."
                           : paymentConfig.access_token_configured
                             ? "A configuração atual foi preservada. Conecte para usar o novo vínculo automático."
                             : "Clique em Conectar para entrar no Mercado Pago e autorizar o CorePet."}
@@ -491,6 +495,96 @@ export default function EcommerceConfigView({
                     </button>
                   )}
                 </div>
+                {paymentConfig.oauth_connected && (
+                  <div className="rounded-lg border border-emerald-100 bg-white p-3">
+                    {paymentAccountLoading ? (
+                      <p className="text-sm text-gray-500">Confirmando a conta no Mercado Pago...</p>
+                    ) : paymentAccount ? (
+                      <div className="space-y-3">
+                        <div
+                          className={`flex items-center gap-2 text-sm font-semibold ${
+                            paymentAccount.verified ? "text-emerald-700" : "text-amber-700"
+                          }`}
+                        >
+                          {paymentAccount.verified ? (
+                            <CheckCircle2 size={17} />
+                          ) : (
+                            <AlertCircle size={17} />
+                          )}
+                          <span>
+                            {paymentAccount.verified
+                              ? "Conta confirmada diretamente no Mercado Pago"
+                              : "Confira novamente a conta autorizada"}
+                          </span>
+                        </div>
+                        <dl className="grid gap-3 text-sm sm:grid-cols-2">
+                          {paymentAccount.account_holder && (
+                            <div>
+                              <dt className="text-xs font-medium uppercase tracking-wide text-gray-400">
+                                Titular
+                              </dt>
+                              <dd className="font-medium text-gray-800">
+                                {paymentAccount.account_holder}
+                              </dd>
+                            </div>
+                          )}
+                          {paymentAccount.identification_type &&
+                            paymentAccount.identification_last_four && (
+                              <div>
+                                <dt className="text-xs font-medium uppercase tracking-wide text-gray-400">
+                                  Documento
+                                </dt>
+                                <dd className="font-medium text-gray-800">
+                                  {paymentAccount.identification_type.toUpperCase()} final {" "}
+                                  {paymentAccount.identification_last_four}
+                                </dd>
+                              </div>
+                            )}
+                          {paymentAccount.email_masked && (
+                            <div>
+                              <dt className="text-xs font-medium uppercase tracking-wide text-gray-400">
+                                E-mail da conta
+                              </dt>
+                              <dd className="font-medium text-gray-800">
+                                {paymentAccount.email_masked}
+                              </dd>
+                            </div>
+                          )}
+                          {(paymentAccount.mercado_pago_user_id ||
+                            paymentConfig.mercado_pago_user_id) && (
+                            <div>
+                              <dt className="text-xs font-medium uppercase tracking-wide text-gray-400">
+                                ID Mercado Pago
+                              </dt>
+                              <dd className="font-medium text-gray-800">
+                                {paymentAccount.mercado_pago_user_id ||
+                                  paymentConfig.mercado_pago_user_id}
+                              </dd>
+                            </div>
+                          )}
+                        </dl>
+                      </div>
+                    ) : (
+                      <div className="flex flex-wrap items-center justify-between gap-3">
+                        <div>
+                          <p className="text-sm text-amber-700">{paymentAccountError}</p>
+                          {paymentConfig.mercado_pago_user_id && (
+                            <p className="mt-1 text-xs text-gray-500">
+                              ID Mercado Pago: {paymentConfig.mercado_pago_user_id}
+                            </p>
+                          )}
+                        </div>
+                        <button
+                          type="button"
+                          onClick={recarregarPaymentAccount}
+                          className="rounded-md border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50"
+                        >
+                          Tentar novamente
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
                 {!paymentConfig.oauth_connected && !paymentConfig.oauth_available && (
                   <p className="text-xs text-amber-700 bg-amber-50 border border-amber-100 rounded-md px-3 py-2">
                     A conexão está temporariamente indisponível. Fale com o suporte CorePet.
