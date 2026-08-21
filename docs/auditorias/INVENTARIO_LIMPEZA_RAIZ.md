@@ -13,6 +13,9 @@ scripts antigos de producao foram auditados depois disso: os nomes ainda citados
 por atalhos foram transformados em encaminhamentos para o fluxo oficial e a
 entrada de configuracao de servidor incompativel foi bloqueada.
 
+Na etapa seguinte, os quatro atalhos historicos de erro 404 foram reduzidos a um
+diagnostico publico somente leitura, compartilhado e coberto por testes.
+
 ## Itens oficiais na raiz
 
 Devem continuar faceis de localizar:
@@ -88,7 +91,8 @@ destrutivas conhecidas voltem aos scripts de producao da raiz.
 1. [Concluido] Provar e remover `src/` da raiz.
 2. [Concluido] Provar e remover `app/` da raiz.
 3. [Concluido] Auditar scripts `deploy*` antigos contra o deploy oficial.
-4. Auditar atalhos `INICIAR_*`, `CORRIGIR_*` e `DIAGNOSTICAR_*`.
+4. [Em andamento] Atalhos `CORRIGIR_*` e `DIAGNOSTICAR_*` de erro 404 ja foram
+   neutralizados; ainda faltam os demais atalhos locais `INICIAR_*`.
 5. Consolidar Markdown solto em `docs/` e manter redirecionamento quando
    necessario.
 6. Recontar arquivos de raiz e endurecer o validador.

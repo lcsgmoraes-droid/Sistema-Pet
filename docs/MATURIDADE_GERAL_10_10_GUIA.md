@@ -122,6 +122,8 @@ Ja feito:
   referencias, testes e build; o validador impede que retornem.
 - [x] Scripts antigos de producao convertidos em atalhos para o fluxo seguro;
   operacoes destrutivas antigas passaram a ser bloqueadas pelo CI.
+- [x] Atalhos historicos de erro 404 convertidos em diagnostico publico somente
+  leitura, com uma implementacao compartilhada e testes automatizados.
 
 Falta para 10/10:
 

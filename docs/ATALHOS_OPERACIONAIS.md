@@ -15,6 +15,7 @@ ela.
 | Fluxo interno do ambiente local | `scripts/fluxo_unico.ps1` |
 | Iniciar deploy remoto pelo Windows | `scripts/deploy_producao_remoto.ps1` |
 | Executar deploy dentro do servidor | `scripts/deploy_producao_seguro.sh` |
+| Diagnosticar producao sem alterar nada | `python scripts/diagnosticar_producao_publica.py` |
 | Entender o deploy real | `docs/PRODUCAO_DEPLOY_SSH.md` |
 
 ## Atalhos de compatibilidade
@@ -33,6 +34,17 @@ Essa compatibilidade impede quebra imediata de atalhos locais e, ao mesmo tempo,
 remove comportamentos antigos como push direto na `main`, reset forcado do Git,
 alteracao manual de migrations e reinicio sem rebuild.
 
+Os quatro nomes antigos relacionados a erro 404 tambem foram preservados, mas
+agora executam somente o diagnostico publico e nao conseguem fazer deploy:
+
+- `CORRIGIR_LEMBRETES_404_SIMPLES.ps1`;
+- `CORRIGIR_LEMBRETES_404.ps1`;
+- `DIAGNOSTICAR_404.ps1`;
+- `DIAGNOSTICAR_E_CORRIGIR_404.sh`.
+
+O diagnostico central verifica API, watchdog, commit publicado e uma rota da
+aplicacao web. Ele nao acessa SSH, containers, banco ou arquivos de ambiente.
+
 ## Entrada antiga bloqueada
 
 `setup-server.sh` pertence a uma infraestrutura antiga. O arquivo agora apenas
@@ -45,6 +57,7 @@ de infraestrutura deve seguir o guia atual e exigir autorizacao operacional.
 que:
 
 - todos os atalhos continuam apontando para o fluxo seguro;
+- os atalhos de diagnostico continuam somente leitura;
 - nenhuma operacao destrutiva conhecida volta para esses arquivos da raiz;
 - o instalador antigo permanece bloqueado.
 

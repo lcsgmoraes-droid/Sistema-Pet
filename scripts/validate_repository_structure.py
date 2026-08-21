@@ -20,6 +20,7 @@ REQUIRED_ENTRYPOINTS = (
     "backend/alembic/versions",
     "scripts/deploy_producao_remoto.ps1",
     "scripts/deploy_producao_seguro.sh",
+    "scripts/diagnosticar_producao_publica.py",
 )
 
 REQUIRED_GUIDES = (
@@ -39,15 +40,18 @@ README_REFERENCES = (
 
 KNOWN_LEGACY_SOURCE: frozenset[str] = frozenset()
 
-BASH_DEPLOY_ALIASES = (
-    "deploy.sh",
-    "deploy-producao.sh",
-    "deploy_completo_producao.sh",
-    "CORRIGIR_PRODUCAO.sh",
-    "EXECUTAR_NO_SERVIDOR.sh",
-)
-
-POWERSHELL_DEPLOY_ALIASES = ("deploy-prod-auto.ps1",)
+COMPATIBILITY_ENTRYPOINTS = {
+    "deploy.sh": "scripts/deploy_producao_seguro.sh",
+    "deploy-producao.sh": "scripts/deploy_producao_seguro.sh",
+    "deploy_completo_producao.sh": "scripts/deploy_producao_seguro.sh",
+    "CORRIGIR_PRODUCAO.sh": "scripts/deploy_producao_seguro.sh",
+    "EXECUTAR_NO_SERVIDOR.sh": "scripts/deploy_producao_seguro.sh",
+    "deploy-prod-auto.ps1": "scripts/deploy_producao_remoto.ps1",
+    "CORRIGIR_LEMBRETES_404_SIMPLES.ps1": "scripts/diagnosticar_producao_publica.py",
+    "CORRIGIR_LEMBRETES_404.ps1": "scripts/diagnosticar_producao_publica.py",
+    "DIAGNOSTICAR_404.ps1": "scripts/diagnosticar_producao_publica.py",
+    "DIAGNOSTICAR_E_CORRIGIR_404.sh": "scripts/diagnosticar_producao_publica.py",
+}
 
 BLOCKED_LEGACY_ENTRYPOINTS = ("setup-server.sh",)
 
@@ -59,6 +63,12 @@ FORBIDDEN_ROOT_OPERATION_SNIPPETS = (
     "docker restart petshop-prod-backend",
     "docker cp ",
     "server_ip=",
+    "git pull",
+    "docker compose",
+    "docker-compose",
+    "npm run build",
+    "frontend/.env.production",
+    "root@mlprohub.com.br",
 )
 
 FORBIDDEN_TRACKED_PREFIXES = (
@@ -125,7 +135,7 @@ def forbidden_generated_artifacts(paths: Iterable[str]) -> list[str]:
 
 
 def forbidden_operational_snippets(content: str) -> list[str]:
-    normalized = content.casefold()
+    normalized = content.casefold().replace("\\", "/")
     return sorted(
         snippet
         for snippet in FORBIDDEN_ROOT_OPERATION_SNIPPETS
@@ -136,7 +146,7 @@ def forbidden_operational_snippets(content: str) -> list[str]:
 def operational_entrypoint_errors(root: Path = ROOT) -> list[str]:
     errors: list[str] = []
 
-    for relative_path in BASH_DEPLOY_ALIASES:
+    for relative_path, official_target in COMPATIBILITY_ENTRYPOINTS.items():
         path = root / relative_path
         if not path.exists():
             errors.append(f"Atalho de compatibilidade ausente: {relative_path}")
@@ -146,27 +156,11 @@ def operational_entrypoint_errors(root: Path = ROOT) -> list[str]:
             errors.append(
                 f"Atalho sem identificacao de compatibilidade: {relative_path}"
             )
-        if "scripts/deploy_producao_seguro.sh" not in content:
-            errors.append(f"Atalho fora do deploy seguro oficial: {relative_path}")
-        forbidden = forbidden_operational_snippets(content)
-        if forbidden:
+        normalized_content = content.replace("\\", "/")
+        if official_target not in normalized_content:
             errors.append(
-                f"Operacao perigosa voltou ao atalho {relative_path}: "
-                + ", ".join(forbidden)
+                f"Atalho fora da implementacao oficial {official_target}: {relative_path}"
             )
-
-    for relative_path in POWERSHELL_DEPLOY_ALIASES:
-        path = root / relative_path
-        if not path.exists():
-            errors.append(f"Atalho de compatibilidade ausente: {relative_path}")
-            continue
-        content = path.read_text(encoding="utf-8")
-        if "COMPATIBILITY_ALIAS" not in content:
-            errors.append(
-                f"Atalho sem identificacao de compatibilidade: {relative_path}"
-            )
-        if r"scripts\deploy_producao_remoto.ps1" not in content:
-            errors.append(f"Atalho fora do launcher remoto oficial: {relative_path}")
         forbidden = forbidden_operational_snippets(content)
         if forbidden:
             errors.append(
