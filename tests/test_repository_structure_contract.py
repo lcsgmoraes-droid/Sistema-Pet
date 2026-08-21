@@ -59,6 +59,28 @@ def test_generated_runtime_artifact_is_rejected():
     ]
 
 
+def test_new_root_markdown_is_rejected():
+    module = load_validator()
+    tracked = {
+        "README.md",
+        "docs/ARQUITETURA.md",
+        "NOVO_GUIA_SOLTO.md",
+    }
+
+    assert module.unexpected_root_markdown(tracked) == ["NOVO_GUIA_SOLTO.md"]
+
+
+def test_root_markdown_allowlist_matches_current_repository():
+    module = load_validator()
+    current = {
+        path
+        for path in module.tracked_files(ROOT)
+        if "/" not in path and path.casefold().endswith(".md")
+    }
+
+    assert current == module.ALLOWED_ROOT_MARKDOWN
+
+
 def test_root_operational_entrypoints_only_delegate_to_safe_flow():
     module = load_validator()
     assert module.operational_entrypoint_errors(ROOT) == []

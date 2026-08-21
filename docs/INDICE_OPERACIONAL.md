@@ -48,6 +48,7 @@ Guia mestre:
 | Release app mobile com EAS | `docs/GUIA_RELEASE_APP_MOBILE_EAS.md` | Canal `preview`/`production`, runtime e verificacao OTA |
 | Publicar app mobile nas lojas | `docs/APP_MOBILE_PUBLICACAO_LOJAS.md` | Checklist Play Store/App Store, privacidade e metadados |
 | Base oficial de dados | `docs/CRONOGRAMA_BASE_DADOS_OFICIAL.md` | Produtos, imagens, cadastros iniciais e atualizacoes |
+| Classificacao de racoes | `docs/CLASSIFICACAO_RACOES.md` | Fontes e rotas atuais da funcionalidade |
 | Plano Basico | `docs/auditorias/plano-basico-tenant-checklist.md` | E2E longo controlado |
 | Produto/roadmap | `docs/ROADMAP_MASTER.md` | Checklist da frente especifica |
 
@@ -80,6 +81,7 @@ Guia mestre:
 | Release app mobile com EAS | `docs/GUIA_RELEASE_APP_MOBILE_EAS.md` |
 | Publicacao nas lojas | `docs/APP_MOBILE_PUBLICACAO_LOJAS.md` |
 | Base oficial de dados | `docs/CRONOGRAMA_BASE_DADOS_OFICIAL.md` |
+| Classificacao de racoes | `docs/CLASSIFICACAO_RACOES.md` |
 | Evidencias | `docs/PADRAO_EVIDENCIA.md` |
 
 ## Rotina obrigatoria por PR
