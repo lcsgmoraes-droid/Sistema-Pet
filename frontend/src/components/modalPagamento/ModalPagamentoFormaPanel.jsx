@@ -2,11 +2,8 @@ import { Wallet, AlertCircle } from "lucide-react";
 
 import CurrencyInput from "../CurrencyInput";
 import PaymentMethodIcon from "../PaymentMethodIcon";
-import {
-  BANDEIRAS_CARTAO,
-  obterCorVisualParcelamento,
-  obterEstiloVisualParcelamento,
-} from "../modalPagamentoUtils";
+import { formatMoneyBRL } from "../../utils/formatters";
+import { obterCorVisualParcelamento, obterEstiloVisualParcelamento } from "../modalPagamentoUtils";
 
 export default function ModalPagamentoFormaPanel({
   venda,
@@ -33,6 +30,9 @@ export default function ModalPagamentoFormaPanel({
   estiloVisualParcelamento,
   simulacoesParcelamento,
   adicionarPagamento,
+  bandeirasDisponiveis,
+  parcelasDisponiveis,
+  taxaCartaoSelecionada,
 }) {
   return (
     <>
@@ -323,7 +323,9 @@ export default function ModalPagamentoFormaPanel({
                     </select>
                     {operadoraSelecionada && (
                       <p className="text-xs text-gray-500 mt-1">
-                        Máximo de {operadoraSelecionada.max_parcelas} parcelas
+                        {operadoraSelecionada.taxas_configuradas > 0
+                          ? `${operadoraSelecionada.taxas_configuradas} taxas configuradas`
+                          : `Cadastro legado, ate ${operadoraSelecionada.max_parcelas} parcelas`}
                       </p>
                     )}
                   </div>
@@ -333,16 +335,48 @@ export default function ModalPagamentoFormaPanel({
                     <select
                       value={bandeira}
                       onChange={(e) => setBandeira(e.target.value)}
+                      disabled={!bandeirasDisponiveis.length}
                       className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                     >
                       <option value="">Selecione...</option>
-                      {BANDEIRAS_CARTAO.map((b) => (
+                      {!bandeirasDisponiveis.length && (
+                        <option value="">Nenhuma taxa para esta modalidade</option>
+                      )}
+                      {bandeirasDisponiveis.map((b) => (
                         <option key={b} value={b}>
                           {b}
                         </option>
                       ))}
                     </select>
                   </div>
+
+                  {bandeira && operadoraSelecionada?.taxas_configuradas > 0 && (
+                    <div
+                      className={`rounded-lg border p-3 text-sm ${
+                        taxaCartaoSelecionada
+                          ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+                          : "border-red-200 bg-red-50 text-red-700"
+                      }`}
+                    >
+                      {taxaCartaoSelecionada ? (
+                        <>
+                          Taxa cadastrada:{" "}
+                          {Number(taxaCartaoSelecionada.taxa_percentual || 0).toLocaleString(
+                            "pt-BR",
+                            { maximumFractionDigits: 4 },
+                          )}
+                          %
+                          {Number(taxaCartaoSelecionada.taxa_fixa || 0) > 0
+                            ? ` + ${formatMoneyBRL(Number(taxaCartaoSelecionada.taxa_fixa))}`
+                            : ""}
+                          . Recebimento previsto em {taxaCartaoSelecionada.prazo_recebimento_dias}{" "}
+                          dia(s).
+                        </>
+                      ) : (
+                        "Nao ha taxa cadastrada para essa combinacao. Escolha outra bandeira ou parcela."
+                      )}
+                    </div>
+                  )}
 
                   {/* NSU do Cartão (para conciliação bancária) */}
                   <div>
@@ -372,18 +406,11 @@ export default function ModalPagamentoFormaPanel({
                 <select
                   value={numeroParcelas}
                   onChange={(e) => setNumeroParcelas(parseInt(e.target.value))}
+                  disabled={!parcelasDisponiveis.length}
                   className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 ${estiloVisualParcelamento.selectClass}`}
                 >
-                  {/* 🆕 Usar max_parcelas da operadora se cartão, senão da forma de pagamento */}
-                  {Array.from(
-                    {
-                      length:
-                        operadoraSelecionada?.max_parcelas ||
-                        formaPagamentoSelecionada.parcelas_maximas ||
-                        12,
-                    },
-                    (_, i) => i + 1,
-                  ).map((n) => {
+                  {!parcelasDisponiveis.length && <option value="">Sem taxa configurada</option>}
+                  {parcelasDisponiveis.map((n) => {
                     const valorParaParcelar = valorRecebido || valorRestante;
                     const valorParcela = valorParaParcelar / n;
                     const cor = obterCorVisualParcelamento({

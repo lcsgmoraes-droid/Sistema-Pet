@@ -95,11 +95,21 @@ export async function obterCaixaAbertoPdv(): Promise<FuncionarioPdvCaixa> {
   };
 }
 
+const BANDEIRAS_CARTAO_LABEL: Record<string, string> = {
+  visa: "Visa",
+  mastercard: "Mastercard",
+  elo: "Elo",
+  amex: "American Express",
+  hipercard: "Hipercard",
+  outros: "Outros",
+};
+
 export async function listarFormasPagamentoPdv(): Promise<FuncionarioPdvFormaPagamentoOpcao[]> {
   const response = await api.get("/app/funcionario/pdv/formas-pagamento");
   return Array.isArray(response.data)
     ? response.data.map((item: any) => ({
         id: Number(item.id),
+        selection_id: String(item.selection_id ?? `forma:${item.id}`),
         nome: String(item.nome ?? ""),
         tipo: String(item.tipo ?? ""),
         key: item.key,
@@ -109,10 +119,16 @@ export async function listarFormasPagamentoPdv(): Promise<FuncionarioPdvFormaPag
         max_parcelas: Number(item.max_parcelas ?? item.numero_parcelas ?? 1),
         parcelas_maximas: Number(item.parcelas_maximas ?? item.numero_parcelas ?? 1),
         operadora: item.operadora ?? null,
+        operadora_id: item.operadora_id == null ? null : Number(item.operadora_id),
         requer_nsu: Boolean(item.requer_nsu),
         tipo_cartao: item.tipo_cartao ?? null,
-        bandeira: item.bandeira ?? null,
+        bandeira: item.bandeira
+          ? BANDEIRAS_CARTAO_LABEL[String(item.bandeira).toLowerCase()] ?? String(item.bandeira)
+          : null,
         split_parcelas: Boolean(item.split_parcelas),
+        parcelas_disponiveis: Array.isArray(item.parcelas_disponiveis)
+          ? item.parcelas_disponiveis.map(Number)
+          : [1],
       }))
     : [];
 }

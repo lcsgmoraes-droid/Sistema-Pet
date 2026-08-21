@@ -66,7 +66,7 @@ export type FuncionarioPdvContentProps = {
   valorAPagar: number;
   formaPagamento: FuncionarioPdvFormaPagamento;
   setFormaPagamento: Dispatch<SetStateAction<FuncionarioPdvFormaPagamento>>;
-  setFormaPagamentoIdSelecionada: Dispatch<SetStateAction<number | null>>;
+  setFormaPagamentoIdSelecionada: Dispatch<SetStateAction<string | null>>;
   setNumeroParcelas: Dispatch<SetStateAction<number>>;
   setNsuCartao: Dispatch<SetStateAction<string>>;
   valorRecebido: string;
@@ -577,13 +577,13 @@ export function FuncionarioPdvContent({
               {opcoesCartao.length ? (
                 <View style={styles.cartaoOpcoesGrid}>
                   {opcoesCartao.map((opcao) => {
-                    const ativa = formaPagamentoSelecionada?.id === opcao.id;
+                    const ativa = formaPagamentoSelecionada?.selection_id === opcao.selection_id;
                     return (
                       <TouchableOpacity
-                        key={opcao.id}
+                        key={opcao.selection_id}
                         style={[styles.cartaoOpcao, ativa && styles.cartaoOpcaoAtiva]}
                         onPress={() => {
-                          setFormaPagamentoIdSelecionada(opcao.id);
+                          setFormaPagamentoIdSelecionada(opcao.selection_id);
                           setNumeroParcelas(1);
                         }}
                       >
@@ -614,7 +614,8 @@ export function FuncionarioPdvContent({
                 style={styles.input}
               />
 
-              {formaPagamento === "credito" && parcelasCredito.length > 1 ? (
+              {formaPagamento === "credito" &&
+              (parcelasCredito.length > 1 || parcelasCredito[0] !== 1) ? (
                 <View style={styles.parcelasBox}>
                   <Text style={styles.label}>Parcelamento</Text>
                   <View style={styles.parcelasGrid}>

@@ -117,9 +117,20 @@ def processar_pagamentos_finalizacao(
         CashbackSourceTypeEnum,
         CashbackTransaction,
     )
-    from app.financeiro_models import CategoriaFinanceira, LancamentoManual
+    from app.financeiro_models import (
+        CategoriaFinanceira,
+        FormaPagamento,
+        LancamentoManual,
+    )
     from app.models import Cliente
-    from app.operadoras_models import OperadoraCartao
+    from app.operadoras_models import OperadoraCartao, OperadoraCartaoTaxa
+    from app.services.card_fee_service import (
+        CardFeeConfigurationError,
+        applied_fee_fields,
+        modality_from_payment_form,
+        normalize_card_brand,
+        resolve_card_fee,
+    )
     from app.vendas_models import Venda, VendaPagamento
 
     movimentacoes_caixa_ids: List[int] = []
@@ -127,8 +138,109 @@ def processar_pagamentos_finalizacao(
     for pag_data in pagamentos:
         operadora_id = pag_data.get("operadora_id")
         numero_parcelas = pag_data.get("numero_parcelas", 1)
+        forma_pagamento_id = pag_data.get("forma_pagamento_id") or pag_data.get(
+            "forma_id"
+        )
+        forma_pagamento = None
+        if forma_pagamento_id:
+            forma_pagamento = (
+                db.query(FormaPagamento)
+                .filter(
+                    FormaPagamento.id == forma_pagamento_id,
+                    FormaPagamento.tenant_id == tenant_id,
+                    FormaPagamento.ativo.is_(True),
+                )
+                .first()
+            )
+            if not forma_pagamento:
+                raise HTTPException(
+                    status_code=400, detail="Forma de pagamento inexistente ou inativa."
+                )
 
-        if operadora_id and numero_parcelas > 1:
+        modalidade_cartao = modality_from_payment_form(
+            forma_pagamento,
+            pag_data.get("modalidade_cartao") or pag_data.get("forma_pagamento"),
+        )
+        taxa_aplicada = {}
+        bandeira = normalize_card_brand(pag_data.get("bandeira"))
+
+        if modalidade_cartao:
+            if not operadora_id:
+                operadora_padrao = (
+                    db.query(OperadoraCartao)
+                    .filter(
+                        OperadoraCartao.tenant_id == tenant_id,
+                        OperadoraCartao.ativo.is_(True),
+                        OperadoraCartao.padrao.is_(True),
+                    )
+                    .first()
+                )
+                if operadora_padrao:
+                    operadora_id = operadora_padrao.id
+
+            operadora = (
+                db.query(OperadoraCartao)
+                .filter(
+                    OperadoraCartao.id == operadora_id,
+                    OperadoraCartao.tenant_id == tenant_id,
+                    OperadoraCartao.ativo.is_(True),
+                )
+                .first()
+            )
+            if not operadora:
+                raise HTTPException(
+                    status_code=400, detail="Selecione uma operadora de cartao ativa."
+                )
+
+            if not bandeira:
+                bandeira = normalize_card_brand(
+                    getattr(forma_pagamento, "bandeira", None)
+                    or operadora.bandeira_padrao
+                )
+            if not bandeira:
+                configured_brands = [
+                    row[0]
+                    for row in db.query(OperadoraCartaoTaxa.bandeira)
+                    .filter(
+                        OperadoraCartaoTaxa.tenant_id == tenant_id,
+                        OperadoraCartaoTaxa.operadora_id == operadora.id,
+                        OperadoraCartaoTaxa.ativo.is_(True),
+                        OperadoraCartaoTaxa.bandeira != "outros",
+                    )
+                    .distinct()
+                    .all()
+                ]
+                if len(configured_brands) == 1:
+                    bandeira = configured_brands[0]
+            if not bandeira:
+                raise HTTPException(
+                    status_code=400, detail="Selecione a bandeira do cartao."
+                )
+            if modalidade_cartao == "debito" and numero_parcelas != 1:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Cartao de debito deve ser registrado em 1x.",
+                )
+
+            try:
+                resolution = resolve_card_fee(
+                    db,
+                    tenant_id=tenant_id,
+                    valor=pag_data["valor"],
+                    forma_pagamento_id=forma_pagamento_id,
+                    operadora_id=operadora.id,
+                    bandeira=bandeira,
+                    modalidade=modalidade_cartao,
+                    parcelas=numero_parcelas,
+                    strict=True,
+                )
+            except CardFeeConfigurationError as exc:
+                raise HTTPException(status_code=400, detail=str(exc)) from exc
+            taxa_aplicada = applied_fee_fields(resolution)
+            operadora_id = resolution.operadora_id
+            bandeira = resolution.bandeira
+
+        if operadora_id and numero_parcelas > 1 and not modalidade_cartao:
             operadora = (
                 db.query(OperadoraCartao)
                 .filter(
@@ -177,11 +289,13 @@ def processar_pagamentos_finalizacao(
             venda_id=venda.id,
             tenant_id=tenant_id,
             forma_pagamento=pag_data["forma_pagamento"],
+            forma_pagamento_id=forma_pagamento_id,
             valor=pag_data["valor"],
             numero_parcelas=numero_parcelas,
-            bandeira=pag_data.get("bandeira"),
+            bandeira=bandeira or None,
             nsu_cartao=pag_data.get("nsu_cartao"),
             operadora_id=operadora_id,
+            **taxa_aplicada,
         )
         db.add(pagamento)
         db.flush()

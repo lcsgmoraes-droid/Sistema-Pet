@@ -12,7 +12,11 @@ from pydantic import BaseModel, Field
 
 from app.db import get_session
 from app.auth.dependencies import get_current_user_and_tenant
-from app.operadoras_models import OperadoraCartao
+from app.operadoras_models import OperadoraCartao, OperadoraCartaoTaxa
+from app.services.card_fee_service import (
+    normalize_card_brand,
+    normalize_card_modality,
+)
 from app.vendas_models import VendaPagamento
 from app.security.permissions_decorator import (
     require_any_permission,
@@ -25,6 +29,7 @@ router = APIRouter(prefix="/operadoras-cartao", tags=["Operadoras de Cartão"])
 def ensure_operadoras_table_exists(db: Session) -> None:
     """Cria a tabela de operadoras automaticamente em ambientes sem migration."""
     OperadoraCartao.__table__.create(bind=db.get_bind(), checkfirst=True)
+    OperadoraCartaoTaxa.__table__.create(bind=db.get_bind(), checkfirst=True)
 
 
 # ============================================================================
@@ -46,6 +51,7 @@ class OperadoraCartaoCreate(BaseModel):
     )
     padrao: bool = Field(False, description="Se é a operadora padrão do tenant")
     ativo: bool = Field(True, description="Se a operadora está ativa")
+    bandeira_padrao: Optional[str] = Field(None, max_length=30)
 
     # Taxas
     taxa_debito: Optional[float] = Field(
@@ -82,6 +88,7 @@ class OperadoraCartaoUpdate(BaseModel):
     max_parcelas: Optional[int] = Field(None, ge=1, le=24)
     padrao: Optional[bool] = None
     ativo: Optional[bool] = None
+    bandeira_padrao: Optional[str] = Field(None, max_length=30)
     taxa_debito: Optional[float] = Field(None, ge=0, le=100)
     taxa_credito_vista: Optional[float] = Field(None, ge=0, le=100)
     taxa_credito_parcelado: Optional[float] = Field(None, ge=0, le=100)
@@ -102,6 +109,9 @@ class OperadoraCartaoResponse(BaseModel):
     max_parcelas: int
     padrao: bool
     ativo: bool
+    bandeira_padrao: Optional[str]
+    bandeiras_habilitadas: List[str] = Field(default_factory=list)
+    taxas_configuradas: int = 0
     taxa_debito: Optional[float]
     taxa_credito_vista: Optional[float]
     taxa_credito_parcelado: Optional[float]
@@ -112,6 +122,33 @@ class OperadoraCartaoResponse(BaseModel):
     user_id: int
     created_at: str
     updated_at: str
+
+    model_config = {"from_attributes": True}
+
+
+class OperadoraCartaoTaxaInput(BaseModel):
+    bandeira: str = Field(..., min_length=1, max_length=30)
+    modalidade: str = Field(..., pattern="^(credito|debito|voucher)$")
+    parcelas: int = Field(..., ge=1, le=24)
+    taxa_percentual: float = Field(0, ge=0, le=100)
+    taxa_fixa: float = Field(0, ge=0)
+    prazo_recebimento_dias: int = Field(0, ge=0, le=365)
+
+
+class OperadoraCartaoTaxasReplace(BaseModel):
+    taxas: List[OperadoraCartaoTaxaInput]
+
+
+class OperadoraCartaoTaxaResponse(BaseModel):
+    id: int
+    operadora_id: int
+    bandeira: str
+    modalidade: str
+    parcelas: int
+    taxa_percentual: float
+    taxa_fixa: float
+    prazo_recebimento_dias: int
+    ativo: bool
 
     model_config = {"from_attributes": True}
 
@@ -205,7 +242,24 @@ def desmarcar_outras_operadoras_padrao(
     db.query(OperadoraCartao).filter(
         and_(OperadoraCartao.tenant_id == tenant_id, OperadoraCartao.id != operadora_id)
     ).update({"padrao": False})
-    db.commit()
+
+
+def serializar_operadora(db: Session, operadora: OperadoraCartao) -> dict:
+    data = operadora.to_dict()
+    taxas = (
+        db.query(OperadoraCartaoTaxa)
+        .filter(
+            OperadoraCartaoTaxa.tenant_id == operadora.tenant_id,
+            OperadoraCartaoTaxa.operadora_id == operadora.id,
+            OperadoraCartaoTaxa.ativo.is_(True),
+        )
+        .all()
+    )
+    data["bandeiras_habilitadas"] = sorted(
+        {taxa.bandeira for taxa in taxas if taxa.bandeira != "outros"}
+    )
+    data["taxas_configuradas"] = len(taxas)
+    return data
 
 
 # ============================================================================
@@ -246,7 +300,7 @@ def listar_operadoras(
             return []
         raise
 
-    return [op.to_dict() for op in operadoras]
+    return [serializar_operadora(db, op) for op in operadoras]
 
 
 @router.get("/padrao", response_model=OperadoraCartaoResponse)
@@ -281,7 +335,7 @@ def obter_operadora_padrao(
             detail="❌ Nenhuma operadora padrão encontrada. Configure uma operadora como padrão.",
         )
 
-    return operadora.to_dict()
+    return serializar_operadora(db, operadora)
 
 
 @router.get("/{operadora_id}", response_model=OperadoraCartaoResponse)
@@ -311,7 +365,7 @@ def obter_operadora(
             status_code=status.HTTP_404_NOT_FOUND, detail="❌ Operadora não encontrada"
         )
 
-    return operadora.to_dict()
+    return serializar_operadora(db, operadora)
 
 
 @router.post(
@@ -332,20 +386,38 @@ def criar_operadora(
     current_user, tenant_id = user_and_tenant
     ensure_operadoras_table_exists(db)
 
+    create_data = operadora_data.model_dump()
+    if create_data.get("bandeira_padrao"):
+        create_data["bandeira_padrao"] = normalize_card_brand(
+            create_data["bandeira_padrao"]
+        )
+
+    tem_operadora_ativa = (
+        db.query(OperadoraCartao)
+        .filter(
+            OperadoraCartao.tenant_id == tenant_id,
+            OperadoraCartao.ativo.is_(True),
+        )
+        .first()
+        is not None
+    )
+    if not tem_operadora_ativa and create_data.get("ativo", True):
+        create_data["padrao"] = True
+
     # Se marcar como padrão, desmarca as outras
-    if operadora_data.padrao:
+    if create_data.get("padrao"):
         desmarcar_outras_operadoras_padrao(db, tenant_id, operadora_id=0)
 
     # Cria operadora
     nova_operadora = OperadoraCartao(
-        tenant_id=tenant_id, user_id=current_user.id, **operadora_data.model_dump()
+        tenant_id=tenant_id, user_id=current_user.id, **create_data
     )
 
     db.add(nova_operadora)
     db.commit()
     db.refresh(nova_operadora)
 
-    return nova_operadora.to_dict()
+    return serializar_operadora(db, nova_operadora)
 
 
 @router.put("/{operadora_id}", response_model=OperadoraCartaoResponse)
@@ -395,13 +467,155 @@ def atualizar_operadora(
 
     # Atualiza campos
     update_data = operadora_data.model_dump(exclude_unset=True)
+    if update_data.get("bandeira_padrao"):
+        update_data["bandeira_padrao"] = normalize_card_brand(
+            update_data["bandeira_padrao"]
+        )
     for field, value in update_data.items():
         setattr(operadora, field, value)
 
     db.commit()
     db.refresh(operadora)
 
-    return operadora.to_dict()
+    return serializar_operadora(db, operadora)
+
+
+@router.get("/{operadora_id}/taxas", response_model=List[OperadoraCartaoTaxaResponse])
+@require_any_permission(("vendas.criar", "configuracoes.editar"))
+def listar_taxas_operadora(
+    operadora_id: int,
+    apenas_ativas: bool = True,
+    db: Session = Depends(get_session),
+    user_and_tenant: tuple = Depends(get_current_user_and_tenant),
+):
+    """Lista a matriz de taxas da operadora."""
+    current_user, tenant_id = user_and_tenant
+    ensure_operadoras_table_exists(db)
+    operadora = (
+        db.query(OperadoraCartao)
+        .filter(
+            OperadoraCartao.id == operadora_id,
+            OperadoraCartao.tenant_id == tenant_id,
+        )
+        .first()
+    )
+    if not operadora:
+        raise HTTPException(status_code=404, detail="Operadora nao encontrada")
+
+    query = db.query(OperadoraCartaoTaxa).filter(
+        OperadoraCartaoTaxa.tenant_id == tenant_id,
+        OperadoraCartaoTaxa.operadora_id == operadora_id,
+    )
+    if apenas_ativas:
+        query = query.filter(OperadoraCartaoTaxa.ativo.is_(True))
+    taxas = query.order_by(
+        OperadoraCartaoTaxa.modalidade,
+        OperadoraCartaoTaxa.bandeira,
+        OperadoraCartaoTaxa.parcelas,
+    ).all()
+    return [taxa.to_dict() for taxa in taxas]
+
+
+@router.put("/{operadora_id}/taxas", response_model=List[OperadoraCartaoTaxaResponse])
+@require_permission("configuracoes.editar")
+def substituir_taxas_operadora(
+    operadora_id: int,
+    payload: OperadoraCartaoTaxasReplace,
+    db: Session = Depends(get_session),
+    user_and_tenant: tuple = Depends(get_current_user_and_tenant),
+):
+    """Substitui de forma atomica todas as taxas ativas de uma operadora."""
+    current_user, tenant_id = user_and_tenant
+    ensure_operadoras_table_exists(db)
+    operadora = (
+        db.query(OperadoraCartao)
+        .filter(
+            OperadoraCartao.id == operadora_id,
+            OperadoraCartao.tenant_id == tenant_id,
+        )
+        .first()
+    )
+    if not operadora:
+        raise HTTPException(status_code=404, detail="Operadora nao encontrada")
+
+    normalized = {}
+    for item in payload.taxas:
+        brand = normalize_card_brand(item.bandeira)
+        modality = normalize_card_modality(item.modalidade)
+        if not brand:
+            raise HTTPException(status_code=400, detail="Bandeira invalida")
+        if modality not in {"credito", "debito", "voucher"}:
+            raise HTTPException(status_code=400, detail="Modalidade de cartao invalida")
+        if modality == "debito" and item.parcelas != 1:
+            raise HTTPException(
+                status_code=400, detail="Debito deve possuir somente a parcela 1x"
+            )
+        if item.parcelas > operadora.max_parcelas:
+            raise HTTPException(
+                status_code=400,
+                detail=f"{operadora.nome} permite no maximo {operadora.max_parcelas}x",
+            )
+        key = (brand, modality, item.parcelas)
+        if key in normalized:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Taxa duplicada para {brand} / {modality} / {item.parcelas}x",
+            )
+        normalized[key] = item
+
+    existentes = (
+        db.query(OperadoraCartaoTaxa)
+        .filter(
+            OperadoraCartaoTaxa.tenant_id == tenant_id,
+            OperadoraCartaoTaxa.operadora_id == operadora_id,
+        )
+        .all()
+    )
+    existing_map = {
+        (taxa.bandeira, taxa.modalidade, taxa.parcelas): taxa for taxa in existentes
+    }
+    for key, taxa in existing_map.items():
+        if key not in normalized:
+            taxa.ativo = False
+
+    for key, item in normalized.items():
+        taxa = existing_map.get(key)
+        if not taxa:
+            taxa = OperadoraCartaoTaxa(
+                tenant_id=tenant_id,
+                operadora_id=operadora_id,
+                bandeira=key[0],
+                modalidade=key[1],
+                parcelas=key[2],
+                user_id=current_user.id,
+            )
+            db.add(taxa)
+        taxa.taxa_percentual = item.taxa_percentual
+        taxa.taxa_fixa = item.taxa_fixa
+        taxa.prazo_recebimento_dias = item.prazo_recebimento_dias
+        taxa.ativo = True
+
+    if operadora.bandeira_padrao:
+        active_brands = {key[0] for key in normalized}
+        if operadora.bandeira_padrao not in active_brands:
+            operadora.bandeira_padrao = None
+
+    db.commit()
+    taxas_ativas = (
+        db.query(OperadoraCartaoTaxa)
+        .filter(
+            OperadoraCartaoTaxa.tenant_id == tenant_id,
+            OperadoraCartaoTaxa.operadora_id == operadora_id,
+            OperadoraCartaoTaxa.ativo.is_(True),
+        )
+        .order_by(
+            OperadoraCartaoTaxa.modalidade,
+            OperadoraCartaoTaxa.bandeira,
+            OperadoraCartaoTaxa.parcelas,
+        )
+        .all()
+    )
+    return [taxa.to_dict() for taxa in taxas_ativas]
 
 
 @router.delete("/{operadora_id}", status_code=status.HTTP_204_NO_CONTENT)

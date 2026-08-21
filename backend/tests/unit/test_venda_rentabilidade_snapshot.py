@@ -155,3 +155,55 @@ def test_snapshot_usa_taxa_real_do_gateway_quando_pagamento_online_tem_dados_mp(
     assert snapshot["gateway_payment_ids"] == ["1387729134"]
     assert snapshot["venda_liquida"] == 3.75
     assert snapshot["itens"][0]["taxa_cartao"] == 0.23
+
+
+def test_snapshot_preserva_taxa_aplicada_na_venda_mesmo_se_cadastro_mudar():
+    venda = SimpleNamespace(
+        id=126,
+        numero_venda="202608210001",
+        status="finalizada",
+        data_venda=None,
+        cliente=SimpleNamespace(nome="Cliente Loja"),
+        subtotal=100,
+        desconto_valor=0,
+        taxa_entrega=0,
+        valor_taxa_entregador=0,
+        tem_entrega=False,
+        entregador_id=None,
+        cupom_code=None,
+        cupom_discount_applied=None,
+        itens=[
+            SimpleNamespace(
+                produto_id=10,
+                quantidade=1,
+                preco_unitario=100,
+                produto=SimpleNamespace(nome="Produto QA", preco_custo=50),
+            )
+        ],
+        pagamentos=[
+            SimpleNamespace(
+                forma_pagamento="cartao_credito",
+                valor=100,
+                numero_parcelas=1,
+                valor_taxa_prevista=2.99,
+                gateway_provider=None,
+            )
+        ],
+    )
+
+    snapshot = build_venda_rentabilidade_snapshot(
+        venda,
+        db=SimpleNamespace(query=lambda *_args, **_kwargs: None),
+        tenant_id="tenant-qa",
+        impostos_percentual=0,
+        formas_pagamento_map={
+            "cartao_credito": SimpleNamespace(taxa_percentual=99, taxa_fixa=10)
+        },
+        custo_campanha=0,
+        cupom_desconto=0,
+        comissao_total=0,
+        estoque_custos_por_produto={},
+    )
+
+    assert snapshot["taxa_cartao"] == 2.99
+    assert snapshot["venda_liquida"] == 97.01

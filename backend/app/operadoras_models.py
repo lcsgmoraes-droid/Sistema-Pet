@@ -12,6 +12,8 @@ from sqlalchemy import (
     Numeric,
     Text,
     ForeignKey,
+    CheckConstraint,
+    UniqueConstraint,
 )
 from datetime import datetime
 from app.base_models import BaseTenantModel
@@ -50,6 +52,7 @@ class OperadoraCartao(BaseTenantModel):
         Boolean, default=False, nullable=False, index=True
     )  # Operadora padrão do tenant
     ativo = Column(Boolean, default=True, nullable=False, index=True)
+    bandeira_padrao = Column(String(30), nullable=True)
 
     # Taxas (percentuais)
     taxa_debito = Column(Numeric(5, 2), nullable=True)  # Ex: 2.50 para 2.5%
@@ -87,6 +90,7 @@ class OperadoraCartao(BaseTenantModel):
             "max_parcelas": self.max_parcelas,
             "padrao": self.padrao,
             "ativo": self.ativo,
+            "bandeira_padrao": self.bandeira_padrao,
             "taxa_debito": safe_decimal_to_float(self.taxa_debito),
             "taxa_credito_vista": safe_decimal_to_float(self.taxa_credito_vista),
             "taxa_credito_parcelado": safe_decimal_to_float(
@@ -97,6 +101,60 @@ class OperadoraCartao(BaseTenantModel):
             "cor": self.cor,
             "icone": self.icone,
             "user_id": self.user_id,
+            "created_at": safe_datetime_to_iso(self.created_at),
+            "updated_at": safe_datetime_to_iso(self.updated_at),
+        }
+
+
+class OperadoraCartaoTaxa(BaseTenantModel):
+    """Regra de taxa por operadora, bandeira, modalidade e parcelas."""
+
+    __tablename__ = "operadoras_cartao_taxas"
+    __table_args__ = (
+        UniqueConstraint(
+            "tenant_id",
+            "operadora_id",
+            "bandeira",
+            "modalidade",
+            "parcelas",
+            name="uq_operadora_taxa_contexto",
+        ),
+        CheckConstraint(
+            "parcelas >= 1 AND parcelas <= 24", name="ck_operadora_taxa_parcelas"
+        ),
+        CheckConstraint(
+            "taxa_percentual >= 0 AND taxa_percentual <= 100",
+            name="ck_operadora_taxa_percentual",
+        ),
+        {"extend_existing": True},
+    )
+
+    operadora_id = Column(
+        Integer,
+        ForeignKey("operadoras_cartao.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    bandeira = Column(String(30), nullable=False, index=True)
+    modalidade = Column(String(20), nullable=False, index=True)
+    parcelas = Column(Integer, nullable=False)
+    taxa_percentual = Column(Numeric(7, 4), nullable=False, default=0)
+    taxa_fixa = Column(Numeric(10, 2), nullable=False, default=0)
+    prazo_recebimento_dias = Column(Integer, nullable=False, default=0)
+    ativo = Column(Boolean, nullable=False, default=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "operadora_id": self.operadora_id,
+            "bandeira": self.bandeira,
+            "modalidade": self.modalidade,
+            "parcelas": self.parcelas,
+            "taxa_percentual": safe_decimal_to_float(self.taxa_percentual) or 0,
+            "taxa_fixa": safe_decimal_to_float(self.taxa_fixa) or 0,
+            "prazo_recebimento_dias": self.prazo_recebimento_dias or 0,
+            "ativo": self.ativo,
             "created_at": safe_datetime_to_iso(self.created_at),
             "updated_at": safe_datetime_to_iso(self.updated_at),
         }

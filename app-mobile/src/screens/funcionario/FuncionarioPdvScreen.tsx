@@ -51,7 +51,7 @@ export default function FuncionarioPdvScreen() {
   const [mostrarDetalhesCliente, setMostrarDetalhesCliente] = useState(false);
   const [formaPagamento, setFormaPagamento] = useState<FuncionarioPdvFormaPagamento>("dinheiro");
   const [formasPagamentoErp, setFormasPagamentoErp] = useState<FuncionarioPdvFormaPagamentoOpcao[]>([]);
-  const [formaPagamentoIdSelecionada, setFormaPagamentoIdSelecionada] = useState<number | null>(null);
+  const [formaPagamentoIdSelecionada, setFormaPagamentoIdSelecionada] = useState<string | null>(null);
   const [numeroParcelas, setNumeroParcelas] = useState(1);
   const [nsuCartao, setNsuCartao] = useState("");
   const [valorRecebido, setValorRecebido] = useState("");
@@ -147,7 +147,7 @@ export default function FuncionarioPdvScreen() {
     [formasPagamentoErp, formaPagamento],
   );
   const formaPagamentoSelecionada = useMemo(
-    () => opcoesCartao.find((item) => item.id === formaPagamentoIdSelecionada) ?? null,
+    () => opcoesCartao.find((item) => item.selection_id === formaPagamentoIdSelecionada) ?? null,
     [opcoesCartao, formaPagamentoIdSelecionada],
   );
   const parcelasCredito = useMemo(() => {
@@ -155,15 +155,10 @@ export default function FuncionarioPdvScreen() {
     const podeParcelar =
       formaPagamento === "credito" &&
       Boolean(formaParcelamento?.permite_parcelamento || formaParcelamento?.split_parcelas);
-    const maximo = Math.max(
-      1,
-      Number(
-        podeParcelar
-          ? formaParcelamento?.parcelas_maximas ?? formaParcelamento?.max_parcelas ?? formaParcelamento?.numero_parcelas ?? 1
-          : 1,
-      ),
-    );
-    return Array.from({ length: maximo }, (_, indice) => indice + 1);
+    if (!podeParcelar) return [1];
+    return formaParcelamento?.parcelas_disponiveis?.length
+      ? formaParcelamento.parcelas_disponiveis
+      : [1];
   }, [formaPagamento, formaPagamentoSelecionada]);
 
   useEffect(() => {
@@ -173,8 +168,13 @@ export default function FuncionarioPdvScreen() {
       setNumeroParcelas(1);
       return;
     }
-    if (formaPagamentoIdSelecionada && !opcoesCartao.some((item) => item.id === formaPagamentoIdSelecionada)) {
+    if (formaPagamentoIdSelecionada && !opcoesCartao.some((item) => item.selection_id === formaPagamentoIdSelecionada)) {
       setFormaPagamentoIdSelecionada(null);
+      return;
+    }
+    if (!formaPagamentoIdSelecionada && opcoesCartao.length) {
+      setFormaPagamentoIdSelecionada(opcoesCartao[0].selection_id);
+      return;
     }
     if (formaPagamento !== "credito") {
       setNumeroParcelas(1);
@@ -529,6 +529,7 @@ export default function FuncionarioPdvScreen() {
           forma_pagamento_id: ehCartao ? formaPagamentoSelecionada?.id ?? null : null,
           bandeira: ehCartao ? formaPagamentoSelecionada?.bandeira ?? formaPagamentoSelecionada?.nome ?? null : null,
           operadora: ehCartao ? formaPagamentoSelecionada?.operadora ?? null : null,
+          operadora_id: ehCartao ? formaPagamentoSelecionada?.operadora_id ?? null : null,
           nsu_cartao: ehCartao ? nsuCartao.trim() || null : null,
         },
         observacoes: observacoes.trim() || null,

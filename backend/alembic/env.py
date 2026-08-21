@@ -48,6 +48,7 @@ import app.financeiro.models_imobilizado
 import app.comissoes_models
 import app.comissoes_avancadas_models
 import app.formas_pagamento_models
+import app.operadoras_models
 import app.idempotency_models
 import app.cargo_models
 import app.segmentacao_models

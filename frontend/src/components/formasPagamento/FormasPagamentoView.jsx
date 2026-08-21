@@ -1,5 +1,8 @@
 import { ArrowLeftRight, Banknote, CreditCard, QrCode, Receipt } from "lucide-react";
-import { toast } from "react-hot-toast";
+import CurrencyInput from "../CurrencyInput";
+import { formatMoneyBRL } from "../../utils/formatters";
+
+const ehTipoCartao = (tipo) => ["cartao_credito", "cartao_debito"].includes(tipo);
 
 const getIconeFormaPagamento = (icone, tipo) => {
   const key = (icone || tipo || "").toLowerCase();
@@ -41,6 +44,8 @@ export default function FormasPagamentoView({
   if (loading) {
     return <div className="flex justify-center items-center h-64">Carregando...</div>;
   }
+
+  const editandoCartao = ehTipoCartao(formData.tipo);
 
   return (
     <div className="p-6">
@@ -130,9 +135,17 @@ export default function FormasPagamentoView({
                   <td className="px-6 py-4 text-sm">
                     {tiposDisponiveis.find((t) => t.value === forma.tipo)?.label || forma.tipo}
                   </td>
-                  <td className="px-6 py-4 text-sm">{forma.taxa_percentual}%</td>
-                  <td className="px-6 py-4 text-sm">R$ {forma.taxa_fixa?.toFixed(2) || "0.00"}</td>
-                  <td className="px-6 py-4 text-sm">{forma.prazo_dias} dias</td>
+                  <td className="px-6 py-4 text-sm">
+                    {ehTipoCartao(forma.tipo) ? "Por operadora" : `${forma.taxa_percentual}%`}
+                  </td>
+                  <td className="px-6 py-4 text-sm">
+                    {ehTipoCartao(forma.tipo)
+                      ? "Por operadora"
+                      : formatMoneyBRL(forma.taxa_fixa || 0)}
+                  </td>
+                  <td className="px-6 py-4 text-sm">
+                    {ehTipoCartao(forma.tipo) ? "Por regra" : `${forma.prazo_dias} dias`}
+                  </td>
                   {financeiroErpAtivo && (
                     <td className="px-6 py-4 text-sm">
                       {forma.conta_bancaria_destino_id ? (
@@ -234,46 +247,46 @@ export default function FormasPagamentoView({
                   />
                 </div>
 
-                {/* Taxa Percentual */}
-                <div>
-                  <label className="block text-sm font-medium mb-1">Taxa % (Ex: 2.5%)</label>
-                  <input
-                    type="number"
-                    className="w-full border border-gray-300 rounded px-3 py-2"
-                    step="0.01"
-                    value={formData.taxa_percentual}
-                    onChange={(e) =>
-                      setFormData({ ...formData, taxa_percentual: parseFloat(e.target.value) || 0 })
-                    }
-                  />
-                </div>
+                {!editandoCartao && (
+                  <>
+                    <div>
+                      <label className="block text-sm font-medium mb-1">Taxa % (Ex: 2.5%)</label>
+                      <input
+                        type="number"
+                        className="w-full border border-gray-300 rounded px-3 py-2"
+                        step="0.01"
+                        value={formData.taxa_percentual}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            taxa_percentual: parseFloat(e.target.value) || 0,
+                          })
+                        }
+                      />
+                    </div>
 
-                {/* Taxa Fixa */}
-                <div>
-                  <label className="block text-sm font-medium mb-1">Taxa Fixa (R$)</label>
-                  <input
-                    type="number"
-                    className="w-full border border-gray-300 rounded px-3 py-2"
-                    step="0.01"
-                    value={formData.taxa_fixa}
-                    onChange={(e) =>
-                      setFormData({ ...formData, taxa_fixa: parseFloat(e.target.value) || 0 })
-                    }
-                  />
-                </div>
+                    <div>
+                      <label className="block text-sm font-medium mb-1">Taxa Fixa (R$)</label>
+                      <CurrencyInput
+                        className="w-full border border-gray-300 rounded px-3 py-2"
+                        value={formData.taxa_fixa}
+                        onChange={(value) => setFormData({ ...formData, taxa_fixa: value })}
+                      />
+                    </div>
 
-                {/* Prazo */}
-                <div>
-                  <label className="block text-sm font-medium mb-1">Prazo (dias)</label>
-                  <input
-                    type="number"
-                    className="w-full border border-gray-300 rounded px-3 py-2"
-                    value={formData.prazo_dias}
-                    onChange={(e) =>
-                      setFormData({ ...formData, prazo_dias: parseInt(e.target.value) || 0 })
-                    }
-                  />
-                </div>
+                    <div>
+                      <label className="block text-sm font-medium mb-1">Prazo (dias)</label>
+                      <input
+                        type="number"
+                        className="w-full border border-gray-300 rounded px-3 py-2"
+                        value={formData.prazo_dias}
+                        onChange={(e) =>
+                          setFormData({ ...formData, prazo_dias: parseInt(e.target.value) || 0 })
+                        }
+                      />
+                    </div>
+                  </>
+                )}
 
                 {financeiroErpAtivo && (
                   <div className="col-span-2">
@@ -303,59 +316,14 @@ export default function FormasPagamentoView({
                 )}
 
                 {/* Operadora (para cartoes) */}
-                {(formData.tipo === "cartao_credito" || formData.tipo === "cartao_debito") && (
-                  <>
-                    <div>
-                      <label className="block text-sm font-medium mb-1">Operadora *</label>
-                      <select
-                        className="w-full border border-gray-300 rounded px-3 py-2"
-                        value={formData.operadora_id || ""}
-                        onChange={(e) => {
-                          const operadoraId = parseInt(e.target.value) || null;
-                          const operadora = operadoras.find((o) => o.id === operadoraId);
-
-                          // Sempre ajusta parcelas_maximas para o limite da nova operadora
-                          let novasParcelas = operadora?.max_parcelas || formData.parcelas_maximas;
-
-                          setFormData({
-                            ...formData,
-                            operadora_id: operadoraId,
-                            operadora: operadora?.nome || "",
-                            parcelas_maximas: novasParcelas,
-                          });
-                        }}
-                      >
-                        <option value="">Selecione a operadora...</option>
-                        {operadoras.map((op) => (
-                          <option key={op.id} value={op.id}>
-                            {op.icone} {op.nome} (ate {op.max_parcelas}x)
-                          </option>
-                        ))}
-                      </select>
-                      {formData.operadora_id && (
-                        <p className="text-xs text-gray-500 mt-1">
-                          Limite de parcelas desta operadora:{" "}
-                          {operadoras.find((o) => o.id === formData.operadora_id)?.max_parcelas}x
-                        </p>
-                      )}
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium mb-1">Bandeira</label>
-                      <select
-                        className="w-full border border-gray-300 rounded px-3 py-2"
-                        value={formData.bandeira}
-                        onChange={(e) => setFormData({ ...formData, bandeira: e.target.value })}
-                      >
-                        <option value="">Selecione...</option>
-                        <option value="visa">Visa</option>
-                        <option value="master">Mastercard</option>
-                        <option value="elo">Elo</option>
-                        <option value="amex">American Express</option>
-                        <option value="hipercard">Hipercard</option>
-                      </select>
-                    </div>
-                  </>
+                {editandoCartao && (
+                  <div className="col-span-2 rounded border border-blue-200 bg-blue-50 p-4 text-sm text-blue-800">
+                    Operadora, bandeira, taxa e prazo de recebimento sao configurados em{" "}
+                    <a href="/cadastros/financeiro/operadoras" className="font-semibold underline">
+                      Operadoras de Cartao
+                    </a>
+                    . Esta forma define apenas se o pagamento e credito ou debito.
+                  </div>
                 )}
 
                 {/* Checkboxes */}
@@ -408,91 +376,73 @@ export default function FormasPagamentoView({
                           type="number"
                           className="w-full border border-gray-300 rounded px-3 py-2"
                           min="1"
-                          max={
-                            formData.operadora_id
-                              ? operadoras.find((o) => o.id === formData.operadora_id)
-                                  ?.max_parcelas || 24
-                              : 24
-                          }
+                          max={24}
                           value={formData.parcelas_maximas}
                           onChange={(e) => {
                             const valor = parseInt(e.target.value) || 1;
-                            const operadora = operadoras.find(
-                              (o) => o.id === formData.operadora_id,
-                            );
-                            const maxPermitido = operadora?.max_parcelas || 24;
-
-                            if (valor > maxPermitido) {
-                              toast.error(`Esta operadora permite no maximo ${maxPermitido}x`);
-                              return;
-                            }
-
                             setFormData({ ...formData, parcelas_maximas: valor });
                           }}
                         />
-                        {formData.operadora_id && (
-                          <p className="text-xs text-amber-600 mt-1">
-                            Limitado a{" "}
-                            {operadoras.find((o) => o.id === formData.operadora_id)?.max_parcelas}x
-                            pela operadora selecionada
-                          </p>
-                        )}
                       </div>
 
                       {/* Configuracao de taxas por parcela */}
-                      <div className="bg-blue-50 border border-blue-200 rounded p-3">
-                        <h4 className="text-sm font-semibold text-blue-900 mb-2">
-                          Taxas Especificas por Numero de Parcelas
-                        </h4>
-                        <p className="text-xs text-blue-700 mb-3">
-                          Configure taxas diferentes para cada quantidade de parcelas. Se nao
-                          informado, usa a taxa base ({formData.taxa_percentual}%).
-                        </p>
+                      {!editandoCartao && (
+                        <div className="bg-blue-50 border border-blue-200 rounded p-3">
+                          <h4 className="text-sm font-semibold text-blue-900 mb-2">
+                            Taxas Especificas por Numero de Parcelas
+                          </h4>
+                          <p className="text-xs text-blue-700 mb-3">
+                            Configure taxas diferentes para cada quantidade de parcelas. Se nao
+                            informado, usa a taxa base ({formData.taxa_percentual}%).
+                          </p>
 
-                        <div className="grid grid-cols-3 gap-2 max-h-48 overflow-y-auto">
-                          {Array.from({ length: formData.parcelas_maximas }, (_, i) => i + 1).map(
-                            (numParcelas) => (
-                              <div key={numParcelas} className="flex items-center gap-2">
-                                <label className="text-xs font-medium text-gray-700 w-10">
-                                  {numParcelas}x:
-                                </label>
-                                <input
-                                  type="number"
-                                  step="0.01"
-                                  className="flex-1 border border-gray-300 rounded px-2 py-1 text-sm"
-                                  placeholder={formData.taxa_percentual}
-                                  value={formData.taxas_por_parcela[numParcelas] || ""}
-                                  onChange={(e) => {
-                                    const novasTaxas = { ...formData.taxas_por_parcela };
-                                    if (e.target.value) {
-                                      novasTaxas[numParcelas] = parseFloat(e.target.value);
-                                    } else {
-                                      delete novasTaxas[numParcelas];
-                                    }
-                                    setFormData({ ...formData, taxas_por_parcela: novasTaxas });
-                                  }}
-                                />
-                                <span className="text-xs text-gray-500">%</span>
-                              </div>
-                            ),
-                          )}
+                          <div className="grid grid-cols-3 gap-2 max-h-48 overflow-y-auto">
+                            {Array.from({ length: formData.parcelas_maximas }, (_, i) => i + 1).map(
+                              (numParcelas) => (
+                                <div key={numParcelas} className="flex items-center gap-2">
+                                  <label className="text-xs font-medium text-gray-700 w-10">
+                                    {numParcelas}x:
+                                  </label>
+                                  <input
+                                    type="number"
+                                    step="0.01"
+                                    className="flex-1 border border-gray-300 rounded px-2 py-1 text-sm"
+                                    placeholder={formData.taxa_percentual}
+                                    value={formData.taxas_por_parcela[numParcelas] || ""}
+                                    onChange={(e) => {
+                                      const novasTaxas = { ...formData.taxas_por_parcela };
+                                      if (e.target.value) {
+                                        novasTaxas[numParcelas] = parseFloat(e.target.value);
+                                      } else {
+                                        delete novasTaxas[numParcelas];
+                                      }
+                                      setFormData({ ...formData, taxas_por_parcela: novasTaxas });
+                                    }}
+                                  />
+                                  <span className="text-xs text-gray-500">%</span>
+                                </div>
+                              ),
+                            )}
+                          </div>
                         </div>
-                      </div>
+                      )}
                     </div>
                   )}
 
-                  <label className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      checked={formData.permite_antecipacao}
-                      onChange={(e) =>
-                        setFormData({ ...formData, permite_antecipacao: e.target.checked })
-                      }
-                    />
-                    <span className="text-sm">Permite Antecipacao de Recebiveis</span>
-                  </label>
+                  {!editandoCartao && (
+                    <label className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={formData.permite_antecipacao}
+                        onChange={(e) =>
+                          setFormData({ ...formData, permite_antecipacao: e.target.checked })
+                        }
+                      />
+                      <span className="text-sm">Permite Antecipacao de Recebiveis</span>
+                    </label>
+                  )}
 
-                  {formData.permite_antecipacao && (
+                  {!editandoCartao && formData.permite_antecipacao && (
                     <div className="ml-6 space-y-3">
                       <div>
                         <label className="block text-sm font-medium mb-1">

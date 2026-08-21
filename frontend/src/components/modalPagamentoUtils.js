@@ -12,6 +12,104 @@ export const BANDEIRAS_CARTAO = [
   "Outros",
 ];
 
+const BANDEIRA_POR_CODIGO = {
+  visa: "Visa",
+  mastercard: "Mastercard",
+  elo: "Elo",
+  amex: "American Express",
+  hipercard: "Hipercard",
+  outros: "Outros",
+};
+
+export function normalizarBandeiraCartao(bandeira = "") {
+  const valor = String(bandeira || "")
+    .trim()
+    .toLowerCase();
+  if (valor === "master" || valor === "master card") return "mastercard";
+  if (valor === "american express") return "amex";
+  if (valor === "outro" || valor === "outras" || valor === "outra") return "outros";
+  return valor;
+}
+
+export function obterModalidadeCartao(formaPagamento = null) {
+  const tipo = String(formaPagamento?.tipo_cartao || formaPagamento?.tipo || "").toLowerCase();
+  const nome = String(formaPagamento?.nome || "").toLowerCase();
+  if (tipo.includes("debito") || tipo.includes("débito") || nome.includes("débito")) {
+    return "debito";
+  }
+  if (tipo.includes("credito") || tipo.includes("crédito") || nome.includes("crédito")) {
+    return "credito";
+  }
+  if (tipo.includes("voucher") || nome.includes("voucher")) return "voucher";
+  return "";
+}
+
+export function ehFormaPagamentoCartao(formaPagamento = null) {
+  return Boolean(obterModalidadeCartao(formaPagamento));
+}
+
+export function obterBandeirasDisponiveis({ taxas = [], modalidade = "" } = {}) {
+  const regrasModalidade = (taxas || []).filter((taxa) => taxa.modalidade === modalidade);
+  if (!regrasModalidade.length) return taxas.length ? [] : BANDEIRAS_CARTAO;
+
+  const codigosExatos = [...new Set(regrasModalidade.map((taxa) => taxa.bandeira))].filter(
+    (codigo) => codigo !== "outros",
+  );
+  if (!codigosExatos.length) return BANDEIRAS_CARTAO;
+  return codigosExatos.map((codigo) => BANDEIRA_POR_CODIGO[codigo] || codigo);
+}
+
+export function obterParcelasDisponiveis({
+  taxas = [],
+  modalidade = "",
+  bandeira = "",
+  maxParcelas = 12,
+} = {}) {
+  const limite = modalidade === "debito" ? 1 : Math.max(1, Number(maxParcelas || 1));
+  const regrasModalidade = (taxas || []).filter((taxa) => taxa.modalidade === modalidade);
+  if (!regrasModalidade.length) {
+    if (taxas.length) return [];
+    return Array.from({ length: limite }, (_, index) => index + 1);
+  }
+
+  const codigoBandeira = normalizarBandeiraCartao(bandeira);
+  if (!codigoBandeira) return [];
+  return [
+    ...new Set(
+      regrasModalidade
+        .filter((taxa) => [codigoBandeira, "outros"].includes(taxa.bandeira))
+        .map((taxa) => Number(taxa.parcelas)),
+    ),
+  ]
+    .filter((parcela) => parcela >= 1 && parcela <= limite)
+    .sort((a, b) => a - b);
+}
+
+export function obterBandeiraPadraoPdv({ operadora = null, bandeiras = [] } = {}) {
+  const padrao = normalizarBandeiraCartao(operadora?.bandeira_padrao);
+  const correspondente = bandeiras.find(
+    (bandeira) => normalizarBandeiraCartao(bandeira) === padrao,
+  );
+  if (correspondente) return correspondente;
+  return bandeiras.length === 1 ? bandeiras[0] : "";
+}
+
+export function obterTaxaCartaoSelecionada({
+  taxas = [],
+  modalidade = "",
+  bandeira = "",
+  parcelas = 1,
+} = {}) {
+  const codigo = normalizarBandeiraCartao(bandeira);
+  const candidatas = (taxas || []).filter(
+    (taxa) =>
+      taxa.modalidade === modalidade &&
+      Number(taxa.parcelas) === Number(parcelas) &&
+      [codigo, "outros"].includes(taxa.bandeira),
+  );
+  return candidatas.find((taxa) => taxa.bandeira === codigo) || candidatas[0] || null;
+}
+
 export function identificarIconeFormaPagamento(icone, nome) {
   const key = String(icone || nome || "").toLowerCase();
   if (key.includes("pix")) return "qr_code";
@@ -233,6 +331,7 @@ export function montarPagamentoRecebido({
     bandeira: isCartao ? bandeira : null,
     nsu_cartao: isCartao && nsuCartao ? nsuCartao : null,
     operadora_id: operadora?.id || null,
+    modalidade_cartao: isCartao ? obterModalidadeCartao(formaPagamento) : null,
     numero_parcelas: parcelas,
     parcelas,
     valor_recebido: Number(valor || 0),
@@ -249,6 +348,7 @@ export function validarPagamentoParaAdicionar({
   bandeira = "",
   operadora = null,
   numeroParcelas = 1,
+  parcelasDisponiveis = [],
 }) {
   if (!formaPagamento) {
     return "Selecione uma forma de pagamento";
@@ -289,6 +389,14 @@ export function validarPagamentoParaAdicionar({
     return `A operadora ${operadora.nome} permite no máximo ${operadora.max_parcelas}x`;
   }
 
+  if (isCartao && parcelasDisponiveis.length && !parcelasDisponiveis.includes(numeroParcelas)) {
+    return "Nao existe taxa cadastrada para a parcela escolhida";
+  }
+
+  if (isCartao && bandeira && operadora?.taxas_configuradas > 0 && !parcelasDisponiveis.length) {
+    return "Nao existe taxa cadastrada para essa operadora, bandeira e modalidade";
+  }
+
   return "";
 }
 
@@ -315,12 +423,18 @@ export function montarPagamentoSimuladoParcelamento({
   formaPagamentoId,
   valorTotal = 0,
   parcelas = 1,
+  operadoraId = null,
+  bandeira = "",
+  modalidade = "",
 }) {
   return [
     {
       forma_pagamento_id: formaPagamentoId,
       valor: Number(valorTotal || 0),
       parcelas,
+      operadora_id: operadoraId,
+      bandeira: bandeira || null,
+      modalidade: modalidade || null,
     },
   ];
 }
@@ -396,6 +510,9 @@ export function montarFormasPagamentoAnalise({
     forma_pagamento_id: pagamento.forma_pagamento_id || pagamento.forma_id,
     valor: pagamento.valor,
     parcelas: pagamento.parcelas || pagamento.numero_parcelas || 1,
+    operadora_id: pagamento.operadora_id || null,
+    bandeira: pagamento.bandeira || null,
+    modalidade: pagamento.modalidade || pagamento.modalidade_cartao || null,
   }));
 
   if (restante > 0) {

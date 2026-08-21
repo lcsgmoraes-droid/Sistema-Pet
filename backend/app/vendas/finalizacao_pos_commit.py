@@ -32,7 +32,10 @@ def processar_pos_commit_finalizacao(
     contas_criadas_ids = []
     try:
         resultado_contas = ContasReceberService.criar_de_venda(
-            venda=venda, pagamentos=pagamentos, user_id=user_id, db=db
+            venda=venda,
+            pagamentos=list(getattr(venda, "pagamentos", []) or pagamentos),
+            user_id=user_id,
+            db=db,
         )
         contas_criadas_ids = resultado_contas["contas_criadas"]
         db.commit()  # Commit separado para contas
@@ -67,18 +70,9 @@ def processar_pos_commit_finalizacao(
         f"💳 Iniciando processamento de taxas de pagamento - Venda #{venda.numero_venda}"
     )
     try:
-        pagamentos_para_taxas = [
-            type(
-                "obj",
-                (object,),
-                {
-                    "forma_pagamento": p["forma_pagamento"],
-                    "valor": p["valor"],
-                    "numero_parcelas": p.get("numero_parcelas", 1),
-                },
-            )()
-            for p in pagamentos
-        ]
+        # Usa os pagamentos persistidos para preservar a regra e a taxa exatas
+        # aplicadas durante a finalizacao.
+        pagamentos_para_taxas = list(getattr(venda, "pagamentos", []) or [])
 
         logger.info(f"💳 Total de pagamentos a processar: {len(pagamentos_para_taxas)}")
         for pag in pagamentos_para_taxas:
