@@ -33,9 +33,9 @@ def test_new_source_in_legacy_root_is_rejected():
     assert module.unexpected_legacy_source(tracked) == ["src/pages/NovaTela.jsx"]
 
 
-def test_known_legacy_files_remain_temporary_allowlist():
+def test_legacy_source_allowlist_is_empty():
     module = load_validator()
-    assert module.unexpected_legacy_source(module.KNOWN_LEGACY_SOURCE) == []
+    assert module.KNOWN_LEGACY_SOURCE == frozenset()
 
 
 def test_untracked_source_in_legacy_root_is_rejected(tmp_path):

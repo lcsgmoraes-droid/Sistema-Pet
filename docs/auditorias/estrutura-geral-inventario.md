@@ -406,8 +406,8 @@ builds ou dependencias:
 - as fontes oficiais passaram a ser documentadas em
   `docs/MAPA_CODIGO_FONTE.md`;
 - a arquitetura atual passou a ser documentada em `docs/ARQUITETURA.md`;
-- `app/` e `src/` na raiz foram classificados como candidatos legados e
-  bloqueados para novas funcionalidades por
+- `app/` e `src/` na raiz foram classificados como legados, removidos depois de
+  validacao e bloqueados para retorno por
   `scripts/validate_repository_structure.py`;
 - a limpeza fisica da raiz foi registrada em
   `docs/auditorias/INVENTARIO_LIMPEZA_RAIZ.md` e sera feita em fatias separadas.
@@ -416,7 +416,5 @@ Proxima fatia recomendada:
 
 1. Concluir a divisao incremental de `backend/app/whatsapp/processor.py`, com
    testes de comportamento e compatibilidade.
-2. Provar que `src/` e `app/` da raiz nao participam de build, testes ou runtime
-   antes de remove-los em PR proprio.
-3. Auditar atalhos e scripts antigos da raiz sem alterar o caminho oficial.
+2. Auditar atalhos e scripts antigos da raiz sem alterar o caminho oficial.
 

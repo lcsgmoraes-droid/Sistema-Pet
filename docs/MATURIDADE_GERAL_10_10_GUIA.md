@@ -118,8 +118,8 @@ Ja feito:
 - [x] Varredura final de hotspots registrada e criterio de manutencao modular consolidado.
 - [x] Mapa oficial do codigo-fonte e arquitetura atual registrados em
   `docs/MAPA_CODIGO_FONTE.md` e `docs/ARQUITETURA.md`.
-- [x] Raizes antigas `app/` e `src/` colocadas em quarentena por validador de
-  estrutura, sem remocao arriscada nesta etapa.
+- [x] Raizes antigas `app/` e `src/` auditadas e removidas depois de busca de
+  referencias, testes e build; o validador impede que retornem.
 
 Falta para 10/10:
 
