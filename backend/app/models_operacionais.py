@@ -8,13 +8,17 @@ from sqlalchemy import (
     ForeignKey,
     Index,
     Integer,
+    JSON,
     String,
     Text,
     UniqueConstraint,
 )
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship
 
 from app.base_models import BaseTenantModel
+
+JSON_DOCUMENT = JSON().with_variant(JSONB, "postgresql")
 
 
 class FeatureFlag(BaseTenantModel):
@@ -102,6 +106,10 @@ class ConfiguracaoEntrega(BaseTenantModel):
     taxa_fixa = Column(DECIMAL(10, 2), nullable=False, default=0, server_default="0")
     valor_por_km_cobrado = Column(DECIMAL(10, 2), nullable=True)
     taxa_minima = Column(DECIMAL(10, 2), nullable=False, default=0, server_default="0")
+    faixas_distancia = Column(
+        JSON_DOCUMENT, nullable=False, default=list, server_default=sa.text("'[]'")
+    )
+    valor_km_excedente = Column(DECIMAL(10, 2), nullable=True)
     distancia_maxima_entrega_km = Column(DECIMAL(10, 2), nullable=True)
     frete_gratis_acima = Column(DECIMAL(10, 2), nullable=True)
     distancia_maxima_frete_gratis_km = Column(DECIMAL(10, 2), nullable=True)
