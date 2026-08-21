@@ -1,8 +1,8 @@
 # Validação do guia no Chrome
 
 Data: 2026-08-21  
-PR: a registrar após a abertura do Pull Request  
-Commit: branch `codex/docs-configurando-taxas-cartao`  
+PR: #1121  
+Commit: `338686b60`  
 Ambiente: produção, em tenant autorizado pelo responsável do sistema  
 Responsável: Codex/Lucas  
 Comando: validação manual da rota `/cadastros/financeiro/operadoras` no perfil autenticado do Chrome  
@@ -20,4 +20,3 @@ Próxima ação: publicar o guia após revisão do Pull Request e manter esta pa
 - Crédito e débito mantêm tabelas independentes.
 - Marcar uma parcela como configurada habilita os campos de taxa percentual, taxa fixa e prazo de recebimento.
 - Deixar a bandeira padrão vazia mantém a opção de solicitá-la em cada venda.
-
