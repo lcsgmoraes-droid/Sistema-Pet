@@ -22,6 +22,7 @@ from app.services.ecommerce_payment_config import (
     ensure_mercado_pago_access_token_fresh,
     encrypt_secret,
     exchange_mercado_pago_oauth_code,
+    get_mercado_pago_account_identity,
     is_mercado_pago_connection_available,
     is_mercado_pago_oauth_available,
     save_mercado_pago_oauth_tokens,
@@ -305,6 +306,84 @@ def test_salva_tokens_oauth_criptografados_no_tenant(monkeypatch):
     assert decrypt_secret(config.refresh_token_encrypted) == "oauth-refresh"
     assert config.access_token_expires_at == datetime(2026, 6, 1, 16, 0, 0)
     assert config.oauth_last_error is None
+
+
+def test_confirma_e_mascara_identidade_da_conta_autorizada(monkeypatch):
+    monkeypatch.setenv("JWT_SECRET_KEY", "oauth-account-identity-secret")
+    config = SimpleNamespace(
+        access_token_encrypted=encrypt_secret("APP_USR-account-token"),
+        refresh_token_encrypted=None,
+        access_token_expires_at=datetime.utcnow() + timedelta(days=30),
+        oauth_connected=True,
+        mercado_pago_user_id="2171983412",
+    )
+    captured = {}
+
+    class Response:
+        status_code = 200
+
+        @staticmethod
+        def json():
+            return {
+                "id": 2171983412,
+                "nickname": "AUMIGOPET",
+                "first_name": "Aumigo",
+                "last_name": "Pet",
+                "email": "financeiro@aumigopet.com.br",
+                "identification": {
+                    "type": "CNPJ",
+                    "number": "58.119.480/0001-94",
+                },
+                "company": {"corporate_name": "Aumigo Pet LTDA"},
+            }
+
+    def http_get(url, headers, timeout):
+        captured.update({"url": url, "headers": headers, "timeout": timeout})
+        return Response()
+
+    identity = get_mercado_pago_account_identity(
+        SimpleNamespace(),
+        config,
+        http_get=http_get,
+    )
+
+    assert identity == {
+        "verified": True,
+        "mercado_pago_user_id": "2171983412",
+        "account_holder": "Aumigo Pet LTDA",
+        "email_masked": "f***@aumigopet.com.br",
+        "identification_type": "CNPJ",
+        "identification_last_four": "0194",
+    }
+    assert captured["url"] == "https://api.mercadolibre.com/users/me"
+    assert captured["headers"]["Authorization"] == "Bearer APP_USR-account-token"
+
+
+def test_identidade_sinaliza_user_id_diferente_do_vinculo_salvo(monkeypatch):
+    monkeypatch.setenv("JWT_SECRET_KEY", "oauth-account-mismatch-secret")
+    config = SimpleNamespace(
+        access_token_encrypted=encrypt_secret("APP_USR-account-token"),
+        refresh_token_encrypted=None,
+        access_token_expires_at=datetime.utcnow() + timedelta(days=30),
+        oauth_connected=True,
+        mercado_pago_user_id="2171983412",
+    )
+
+    class Response:
+        status_code = 200
+
+        @staticmethod
+        def json():
+            return {"id": 9999999999, "nickname": "OUTRA_CONTA"}
+
+    identity = get_mercado_pago_account_identity(
+        SimpleNamespace(),
+        config,
+        http_get=lambda *_args, **_kwargs: Response(),
+    )
+
+    assert identity["verified"] is False
+    assert identity["mercado_pago_user_id"] == "9999999999"
 
 
 def test_refresh_oauth_atualiza_access_token_expirado(monkeypatch):
