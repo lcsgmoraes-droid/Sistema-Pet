@@ -1,5 +1,5 @@
 param(
-    [ValidateSet('check', 'release-check', 'dev-up', 'prod-up', 'status')]
+    [ValidateSet('check', 'release-check', 'dev-up', 'dev-down', 'prod-up', 'status')]
     [string]$Acao = 'status'
 )
 
@@ -35,6 +35,17 @@ function Run-ComposeUp([string]$composeFile) {
     }
 }
 
+function Run-ComposeDown([string]$composeFile) {
+    if (-not (Test-Path $composeFile)) {
+        throw "Arquivo docker compose nao encontrado: $composeFile"
+    }
+
+    docker compose -f $composeFile down
+    if ($LASTEXITCODE -ne 0) {
+        throw "Falha ao parar containers com compose: $composeFile"
+    }
+}
+
 function Run-ComposeStatus([string]$composeFile) {
     if (-not (Test-Path $composeFile)) {
         throw "Arquivo docker compose nao encontrado: $composeFile"
@@ -65,6 +76,10 @@ switch ($Acao) {
     'dev-up' {
         Run-Validator -allowLocalChanges $true
         Run-ComposeUp -composeFile $devComposeFile
+    }
+
+    'dev-down' {
+        Run-ComposeDown -composeFile $devComposeFile
     }
 
     'prod-up' {

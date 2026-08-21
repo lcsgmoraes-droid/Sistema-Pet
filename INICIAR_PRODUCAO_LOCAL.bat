@@ -1,47 +1,8 @@
 @echo off
-chcp 65001 >nul
-title 🟢 PRODUÇÃO LOCAL - Pet Shop Pro
+REM LEGACY_BLOCKED
+REM Este ambiente piloto local foi descontinuado e usava arquivos inexistentes.
 
-echo.
-echo ============================================================================
-echo   🟢 INICIAR AMBIENTE DE PRODUÇÃO LOCAL (PILOTO)
-echo ============================================================================
-echo.
-echo Subindo:
-echo   - Banco de produção (porta 5433)
-echo   - Backend de produção (porta 8001)
-echo.
-echo Frontend: http://localhost:5173 (Vite hot reload)
-echo Backend:  http://localhost:8001
-echo Docs:     http://localhost:8001/docs
-echo.
-echo ⚠️  Este é o ambiente de PILOTO com dados REAIS!
-echo ⚠️  NÃO use para testes, use o INICIAR_DEV.bat
-echo.
-pause
-
-echo.
-echo Subindo containers...
-docker-compose -f docker-compose.production-local.yml up -d
-
-echo.
-echo ✅ Ambiente de produção iniciado!
-echo.
-echo Aguardando backend ficar pronto (20 segundos)...
-timeout /t 20 /nobreak >nul
-
-echo.
-echo ============================================================================
-echo   Acesse: http://localhost:5173
-echo   
-echo   Login inicial:
-echo   Email: admin@petshop.com
-echo   Senha: admin123
-echo   
-echo   🔴 IMPORTANTE: Altere a senha após o primeiro login!
-echo ============================================================================
-echo.
-echo Para ver logs: docker-compose -f docker-compose.production-local.yml logs -f
-echo Para parar: docker-compose -f docker-compose.production-local.yml down
-echo.
-pause
+echo Atalho antigo bloqueado por seguranca.
+echo Para DEV, use: FLUXO_UNICO.bat dev-up
+echo A producao real usa somente o fluxo de docs\PRODUCAO_DEPLOY_SSH.md.
+exit /b 1

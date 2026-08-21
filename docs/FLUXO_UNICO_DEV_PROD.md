@@ -36,6 +36,11 @@ Use para: validar se esta tudo pronto para subir em producao.
 
 Regra: **nunca pular este passo**.
 
+### 3.1) `FLUXO_UNICO.bat dev-down`
+Use para: parar somente os containers do ambiente DEV local.
+
+O atalho antigo `PARAR_TUDO.bat` encaminha para esse mesmo comando.
+
 ### 4) `FLUXO_UNICO.bat prod-up`
 Uso legado/local. Para producao real no servidor, prefira `bash scripts/deploy_producao_seguro.sh`.
 
