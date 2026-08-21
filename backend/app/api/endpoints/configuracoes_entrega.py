@@ -37,6 +37,8 @@ def ensure_configuracoes_entrega_schema(db: Session) -> None:
         "taxa_fixa NUMERIC(10, 2) NOT NULL DEFAULT 0",
         "valor_por_km_cobrado NUMERIC(10, 2)",
         "taxa_minima NUMERIC(10, 2) NOT NULL DEFAULT 0",
+        "faixas_distancia JSONB NOT NULL DEFAULT '[]'::jsonb",
+        "valor_km_excedente NUMERIC(10, 2)",
         "distancia_maxima_entrega_km NUMERIC(10, 2)",
         "frete_gratis_acima NUMERIC(10, 2)",
         "distancia_maxima_frete_gratis_km NUMERIC(10, 2)",
@@ -50,8 +52,7 @@ def ensure_configuracoes_entrega_schema(db: Session) -> None:
                 + column_definition
             )
         )
-    db.execute(
-        text("""
+    db.execute(text("""
         UPDATE configuracoes_entrega ce
         SET user_id = u.id
         FROM (
@@ -61,8 +62,7 @@ def ensure_configuracoes_entrega_schema(db: Session) -> None:
         ) u
         WHERE ce.tenant_id = u.tenant_id
           AND ce.user_id IS NULL
-    """)
-    )
+    """))
     db.execute(
         text(
             "CREATE INDEX IF NOT EXISTS ix_configuracoes_entrega_user_id "
