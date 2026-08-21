@@ -56,6 +56,9 @@ export default function EcommerceConfig() {
     corSecundaria: "#0f766e",
   });
   const [paymentLoading, setPaymentLoading] = useState(true);
+  const [paymentAccountLoading, setPaymentAccountLoading] = useState(false);
+  const [paymentAccountError, setPaymentAccountError] = useState("");
+  const [paymentAccount, setPaymentAccount] = useState(null);
   const [paymentConfig, setPaymentConfig] = useState({
     enabled: false,
     access_token_configured: false,
@@ -145,10 +148,30 @@ export default function EcommerceConfig() {
     try {
       const res = await api.get("/ecommerce-payment-config/mercadopago");
       applyPaymentConfigResponse(res.data);
+      if (res.data?.oauth_connected) {
+        void fetchPaymentAccountIdentity();
+      } else {
+        setPaymentAccount(null);
+        setPaymentAccountError("");
+      }
     } catch {
       setError("Nao foi possivel carregar a configuracao de pagamento.");
     } finally {
       setPaymentLoading(false);
+    }
+  }
+
+  async function fetchPaymentAccountIdentity() {
+    setPaymentAccountLoading(true);
+    setPaymentAccountError("");
+    try {
+      const res = await api.get("/ecommerce-payment-config/mercadopago/account-identity");
+      setPaymentAccount(res.data || null);
+    } catch {
+      setPaymentAccount(null);
+      setPaymentAccountError("Não foi possível confirmar os dados da conta no Mercado Pago agora.");
+    } finally {
+      setPaymentAccountLoading(false);
     }
   }
 
@@ -246,6 +269,8 @@ export default function EcommerceConfig() {
     try {
       const res = await api.post("/ecommerce-payment-config/mercadopago/oauth/disconnect");
       applyPaymentConfigResponse(res.data);
+      setPaymentAccount(null);
+      setPaymentAccountError("");
       setSuccess("Mercado Pago desconectado desta loja.");
       setTimeout(() => setSuccess(""), 4000);
     } catch (err) {
@@ -286,6 +311,10 @@ export default function EcommerceConfig() {
       paymentLoading={paymentLoading}
       oauthReturn={oauthReturn}
       paymentConfig={paymentConfig}
+      paymentAccount={paymentAccount}
+      paymentAccountLoading={paymentAccountLoading}
+      paymentAccountError={paymentAccountError}
+      recarregarPaymentAccount={fetchPaymentAccountIdentity}
       setPaymentConfig={setPaymentConfig}
       desconectarMercadoPago={desconectarMercadoPago}
       disconnectingPayment={disconnectingPayment}

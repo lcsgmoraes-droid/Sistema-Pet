@@ -34,6 +34,7 @@ WEBHOOK_TOKEN_RLS_SETTING = "app.payment_webhook_token"
 _SET_WEBHOOK_TOKEN_SQL = text("SELECT set_config(:setting_name, :setting_value, true)")
 OAUTH_AUTH_URL = "https://auth.mercadopago.com/authorization"
 OAUTH_TOKEN_URL = "https://api.mercadopago.com/oauth/token"
+MERCADO_PAGO_USER_URL = "https://api.mercadolibre.com/users/me"
 OAUTH_STATE_TTL_SECONDS = 15 * 60
 OAUTH_REFRESH_SKEW_SECONDS = 5 * 60
 
@@ -206,6 +207,21 @@ def _mask_config_value(value: str | None) -> str | None:
     if len(raw) <= 10:
         return "configurado"
     return f"{raw[:6]}...{raw[-4:]}"
+
+
+def _mask_account_email(value: str | None) -> str | None:
+    raw = str(value or "").strip()
+    if "@" not in raw:
+        return None
+    local_part, domain = raw.rsplit("@", 1)
+    if not local_part or not domain:
+        return None
+    return f"{local_part[0]}***@{domain}"
+
+
+def _last_four(value: str | None) -> str | None:
+    digits = "".join(character for character in str(value or "") if character.isdigit())
+    return digits[-4:] if digits else None
 
 
 def _oauth_client_id(config: Any | None = None) -> str:
@@ -609,6 +625,104 @@ def ensure_mercado_pago_access_token_fresh(
         config.oauth_refresh_failed_at = datetime.utcnow()
         db.commit()
         return current_token
+
+
+def get_mercado_pago_account_identity(
+    db: Session,
+    config: Any,
+    *,
+    http_get=requests.get,
+) -> dict[str, Any]:
+    """Consulta e mascara a identidade da conta que autorizou o CorePet."""
+
+    if not getattr(config, "oauth_connected", False):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Conecte uma conta Mercado Pago para confirmar os dados.",
+        )
+
+    access_token = ensure_mercado_pago_access_token_fresh(db, config)
+    if not access_token:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="A conta Mercado Pago precisa ser conectada novamente.",
+        )
+
+    try:
+        response = http_get(
+            MERCADO_PAGO_USER_URL,
+            headers={
+                "Authorization": f"Bearer {access_token}",
+                "Accept": "application/json",
+            },
+            timeout=20,
+        )
+    except requests.RequestException as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Nao foi possivel confirmar a conta no Mercado Pago agora.",
+        ) from exc
+
+    if getattr(response, "status_code", 500) >= 300:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Nao foi possivel confirmar a conta no Mercado Pago agora.",
+        )
+
+    try:
+        data = response.json()
+    except (TypeError, ValueError) as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Mercado Pago retornou dados invalidos para a conta conectada.",
+        ) from exc
+    if not isinstance(data, dict):
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Mercado Pago retornou dados invalidos para a conta conectada.",
+        )
+
+    mercado_pago_user_id = str(data.get("id") or data.get("user_id") or "").strip()
+    stored_user_id = str(getattr(config, "mercado_pago_user_id", None) or "").strip()
+    company = data.get("company") if isinstance(data.get("company"), dict) else {}
+    account_holder = next(
+        (
+            str(value).strip()
+            for value in (
+                company.get("corporate_name"),
+                company.get("brand_name"),
+                " ".join(
+                    part
+                    for part in (
+                        str(data.get("first_name") or "").strip(),
+                        str(data.get("last_name") or "").strip(),
+                    )
+                    if part
+                ),
+                data.get("nickname"),
+            )
+            if str(value or "").strip()
+        ),
+        None,
+    )
+    identification = (
+        data.get("identification")
+        if isinstance(data.get("identification"), dict)
+        else {}
+    )
+
+    return {
+        "verified": bool(
+            mercado_pago_user_id
+            and stored_user_id
+            and mercado_pago_user_id == stored_user_id
+        ),
+        "mercado_pago_user_id": mercado_pago_user_id or stored_user_id or None,
+        "account_holder": account_holder,
+        "email_masked": _mask_account_email(data.get("email")),
+        "identification_type": str(identification.get("type") or "").strip() or None,
+        "identification_last_four": _last_four(identification.get("number")),
+    }
 
 
 def disconnect_mercado_pago_oauth_config(config: Any) -> None:
