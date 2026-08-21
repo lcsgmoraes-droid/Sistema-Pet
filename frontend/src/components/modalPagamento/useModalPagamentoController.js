@@ -251,29 +251,26 @@ export default function useModalPagamentoController({
     () => obterBandeirasDisponiveis({ taxas: taxasOperadora, modalidade: modalidadeCartao }),
     [modalidadeCartao, taxasOperadora],
   );
-  const parcelasDisponiveis = useMemo(
-    () => {
-      if (!ehFormaPagamentoCartao(formaPagamentoSelecionada)) {
-        const maxParcelas = formaPagamentoSelecionada?.parcelas_maximas || 12;
-        return Array.from({ length: maxParcelas }, (_, index) => index + 1);
-      }
-      const maxParcelas =
-        operadoraSelecionada?.max_parcelas || formaPagamentoSelecionada?.parcelas_maximas || 12;
-      return obterParcelasDisponiveis({
-        taxas: taxasOperadora,
-        modalidade: modalidadeCartao,
-        bandeira,
-        maxParcelas,
-      });
-    },
-    [
+  const parcelasDisponiveis = useMemo(() => {
+    if (!ehFormaPagamentoCartao(formaPagamentoSelecionada)) {
+      const maxParcelas = formaPagamentoSelecionada?.parcelas_maximas || 12;
+      return Array.from({ length: maxParcelas }, (_, index) => index + 1);
+    }
+    const maxParcelas =
+      operadoraSelecionada?.max_parcelas || formaPagamentoSelecionada?.parcelas_maximas || 12;
+    return obterParcelasDisponiveis({
+      taxas: taxasOperadora,
+      modalidade: modalidadeCartao,
       bandeira,
-      formaPagamentoSelecionada?.parcelas_maximas,
-      modalidadeCartao,
-      operadoraSelecionada?.max_parcelas,
-      taxasOperadora,
-    ],
-  );
+      maxParcelas,
+    });
+  }, [
+    bandeira,
+    formaPagamentoSelecionada?.parcelas_maximas,
+    modalidadeCartao,
+    operadoraSelecionada?.max_parcelas,
+    taxasOperadora,
+  ]);
   const taxaCartaoSelecionada = useMemo(
     () =>
       obterTaxaCartaoSelecionada({
