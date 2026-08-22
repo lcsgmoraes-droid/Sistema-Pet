@@ -61,6 +61,7 @@
     "test:large-files-700-batch-7-refactor": "node scripts/test-large-files-700-batch-7-refactor.mjs",
     "test:pdv-preco-manual": "node scripts/test-pdv-preco-manual.mjs",
     "test:pdv-produto-busca": "node scripts/test-pdv-produto-busca.mjs",
+    "test:pdv-card-fee-visibility": "node scripts/test-pdv-card-fee-visibility.mjs",
     "test:balanco": "node scripts/test-produtos-balanco-utils.mjs",
     "test:vendas-reprocessamento-feedback": "node scripts/test-vendas-reprocessamento-feedback.mjs",
     "test:onboarding-inicial": "node scripts/test-onboarding-inicial-contract.mjs",
