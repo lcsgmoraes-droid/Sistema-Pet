@@ -191,14 +191,18 @@ def validar_catalogo_evolucao() -> None:
 
         canais = set(item.get("canais") or [])
         if not canais or not canais.issubset(CANAIS_EVOLUCAO):
-            raise ValueError(f"Canais de evolucao invalidos em {item_id}: {sorted(canais)}")
+            raise ValueError(
+                f"Canais de evolucao invalidos em {item_id}: {sorted(canais)}"
+            )
 
         if not item.get("atualizado_em"):
             raise ValueError(f"Item de evolucao sem data de atualizacao: {item_id}")
 
         if status == "disponivel":
             if not item.get("publicado_em"):
-                raise ValueError(f"Novidade disponivel sem data de publicacao: {item_id}")
+                raise ValueError(
+                    f"Novidade disponivel sem data de publicacao: {item_id}"
+                )
             if not item.get("caminho_ajuda"):
                 raise ValueError(f"Novidade disponivel sem caminho de ajuda: {item_id}")
 
@@ -221,7 +225,9 @@ def listar_evolucao_corepet(canal: str) -> dict[str, Any]:
     )
     return {
         "itens": itens,
-        "atualizado_em": max(item["atualizado_em"] for item in itens) if itens else None,
+        "atualizado_em": max(item["atualizado_em"] for item in itens)
+        if itens
+        else None,
         "total_disponivel": sum(item["status"] == "disponivel" for item in itens),
     }
 
