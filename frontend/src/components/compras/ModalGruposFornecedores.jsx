@@ -1,9 +1,6 @@
 import { useMemo, useRef, useState } from "react";
 import FornecedorSelector, { getFornecedorNome } from "../fornecedores/FornecedorSelector";
-import {
-  applyShiftRangeSelection,
-  getShiftSelectionEvent,
-} from "../../utils/shiftRangeSelection";
+import { applyShiftRangeSelection, getShiftSelectionEvent } from "../../utils/shiftRangeSelection";
 
 const ModalGruposFornecedores = ({
   grupos,
@@ -287,9 +284,7 @@ const ModalGruposFornecedores = ({
                       <input
                         type="checkbox"
                         checked={selecionado}
-                        onChange={(event) =>
-                          alternarFornecedorComIntervalo(fornecedor.id, event)
-                        }
+                        onChange={(event) => alternarFornecedorComIntervalo(fornecedor.id, event)}
                         className="mt-1 h-4 w-4 rounded"
                       />
                       <span className="min-w-0 flex-1">

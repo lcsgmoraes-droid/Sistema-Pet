@@ -2,10 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import toast from "react-hot-toast";
 import api from "../api";
 import { confirmarCorePet } from "../services/corepetDialog";
-import {
-  applyShiftRangeSelection,
-  getShiftSelectionEvent,
-} from "../utils/shiftRangeSelection";
+import { applyShiftRangeSelection, getShiftSelectionEvent } from "../utils/shiftRangeSelection";
 
 const EMPTY_ROLE = {
   nome: "",
@@ -116,9 +113,7 @@ export default function useRolesPage() {
   }, [permissions]);
   const visiblePermissions = useMemo(
     () =>
-      permissionGroups.flatMap((group) =>
-        expandedCategories[group.key] ? group.permissions : [],
-      ),
+      permissionGroups.flatMap((group) => (expandedCategories[group.key] ? group.permissions : [])),
     [expandedCategories, permissionGroups],
   );
 

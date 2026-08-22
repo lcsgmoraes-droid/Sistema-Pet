@@ -10,10 +10,7 @@ import {
   normalizarNumero,
   obterErroAcertoTransferencia,
 } from "./transferenciaParceiroUtils";
-import {
-  applyShiftRangeSelection,
-  getShiftSelectionEvent,
-} from "../../utils/shiftRangeSelection";
+import { applyShiftRangeSelection, getShiftSelectionEvent } from "../../utils/shiftRangeSelection";
 
 const PREVIEW_VAZIO = {
   items: [],

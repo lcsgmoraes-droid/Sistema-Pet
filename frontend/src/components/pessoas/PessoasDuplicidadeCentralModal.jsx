@@ -11,10 +11,7 @@ import {
 } from "lucide-react";
 import ActionButton from "../ui/ActionButton";
 import { motivoDuplicidadeLabel } from "./PessoasDuplicidadeBanner";
-import {
-  applyShiftRangeSelection,
-  getShiftSelectionEvent,
-} from "../../utils/shiftRangeSelection";
+import { applyShiftRangeSelection, getShiftSelectionEvent } from "../../utils/shiftRangeSelection";
 
 function chaveSugestao(sugestao) {
   return `${sugestao?.principal?.id || "principal"}:${sugestao?.duplicado?.id || "duplicado"}`;

@@ -220,9 +220,7 @@ export default function PedidosCompraSugestaoTable({
                         <input
                           type="checkbox"
                           checked={produtosSelecionados.includes(sugestao.produto_id)}
-                          onChange={(event) =>
-                            toggleProdutoNoIntervalo(sugestao.produto_id, event)
-                          }
+                          onChange={(event) => toggleProdutoNoIntervalo(sugestao.produto_id, event)}
                           className="w-4 h-4 rounded"
                         />
                       </td>
