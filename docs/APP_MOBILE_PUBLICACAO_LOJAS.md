@@ -1,6 +1,6 @@
 # Publicacao do App Mobile - Play Store e App Store
 
-Atualizado em: 2026-07-16
+Atualizado em: 2026-08-22
 
 Este guia organiza o que falta para publicar o app CorePet nas lojas. Ele separa
 o que ja esta pronto no codigo, o que pode ser feito pelo time tecnico e o que
@@ -8,8 +8,14 @@ precisa ser feito pelo titular das contas Apple/Google.
 
 ## Estado atual do app
 
-- Builds enviados para Google Play e App Store; publicação aguardando a revisão
-  e aprovação das lojas.
+- App Store: CorePet ja publicado. Atualizacoes compativeis de JavaScript/assets
+  seguem pelo canal EAS `production`, sem novo envio para revisao.
+- Google Play: publicacao em fase de aprovacao. Nao substituir o binario em
+  revisao sem autorizacao especifica do Lucas.
+- Os binarios ativos usam runtime `1.0.3`; este e o alvo das atualizacoes OTA
+  enquanto nao houver uma nova versao nativa aprovada.
+- Artefatos `1.0.4` gerados em 22/08/2026 nao representam mudanca da versao
+  publica e nao devem ser escolhidos nas lojas sem nova decisao de release.
 - Compras pelo app e pelo ecommerce validadas em produção.
 - Compra real pelo app confirmada no tenant Atacadão Pet: venda `202607010031`,
   cliente Josiane Moreno, finalizada em 01/07/2026.
@@ -65,7 +71,7 @@ JavaScript/assets e o runtime for compativel:
 
 ```powershell
 cd app-mobile
-eas update --channel production --platform all --message "ajuste app mobile"
+eas update --channel production --platform all --environment production --message "ajuste app mobile"
 ```
 
 ## O que Lucas precisa fazer nas contas

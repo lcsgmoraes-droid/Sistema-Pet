@@ -3,7 +3,7 @@
     "name": "CorePet",
     "slug": "petshop-app",
     "scheme": "corepet",
-    "version": "1.0.4",
+    "version": "1.0.3",
     "orientation": "portrait",
     "updates": {
       "enabled": true,
@@ -50,7 +50,7 @@
         "android.permission.RECORD_AUDIO",
         "android.permission.SYSTEM_ALERT_WINDOW"
       ],
-      "runtimeVersion": "1.0.4",
+      "runtimeVersion": "1.0.3",
       "versionCode": 12
     },
     "web": {

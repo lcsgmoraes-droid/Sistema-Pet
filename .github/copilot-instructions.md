@@ -63,6 +63,26 @@ Para release/deploy, use a sequencia completa:
 - **NUNCA usar `git add -A` sem antes verificar `git status --short` e checar se ha arquivos de infraestrutura sendo deletados (linhas com ` D` ou `D `). Arquivos protegidos: `docker-compose.*.yml`, `.env.*`, `scripts/*.ps1`, `.github/`, `docs/FLUXO_UNICO_DEV_PROD.md`. Se aparecerem como deletados: restaurar com `git checkout HEAD -- <arquivo>` antes de commitar.**
 - **PRODUCAO REAL E REMOTA: a fonte de verdade do destino e o DNS de `corepet.com.br`, nunca um IP copiado em documentacao. O `prod-up` local NAO afeta a producao real. Primeiro o PR deve estar mergeado na `main`; depois usar `scripts/deploy_producao_remoto.ps1`. NUNCA usar `git pull` + `docker restart` como deploy de codigo; o backend fica DENTRO DA IMAGEM DOCKER e precisa do script seguro com rebuild.**
 
+## Atualizacao do app mobile: OTA antes de lojas
+
+- O caminho padrao para mudancas somente em `app-mobile/src`, JavaScript,
+  TypeScript, assets compativeis e backend e o EAS Update para as duas
+  plataformas:
+  `eas update --channel production --platform all --environment production`.
+- Antes de qualquer build/submissao, conferir `eas build:list` e
+  `eas update:list` e ler `docs/GUIA_RELEASE_APP_MOBILE_EAS.md`.
+- Em OTA, manter a versao e o runtime dos binarios ativos. Nao incrementar
+  `version`, `runtimeVersion`, `versionCode` ou `buildNumber`, nao acessar lojas
+  e nao criar credenciais de submissao.
+- Nao aplicar `expo install --fix` automaticamente durante uma OTA. Qualquer
+  recomendacao que atualize dependencia nativa vira uma tarefa separada de
+  release nativa.
+- Somente usar EAS Build/Submit quando houver necessidade nativa comprovada
+  (dependencia, plugin, permissao, codigo nativo ou runtime incompativel) e
+  explicar essa evidencia ao Lucas antes de mudar o fluxo.
+- Estado em 2026-08-22: iOS publicado e Android em aprovacao. Nao substituir a
+  revisao/binario atual por iniciativa propria.
+
 ## Padronizacao de numeros e moeda (OBRIGATORIO)
 
 **Formato brasileiro obrigatorio em todo o sistema:**
