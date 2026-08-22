@@ -1,4 +1,12 @@
-import { FiCreditCard, FiPackage, FiSettings, FiShield, FiTruck, FiUsers } from "react-icons/fi";
+import {
+  FiCreditCard,
+  FiLink,
+  FiPackage,
+  FiSettings,
+  FiShield,
+  FiTruck,
+  FiUsers,
+} from "react-icons/fi";
 import { Link } from "react-router-dom";
 import PageHeader from "../components/ui/PageHeader";
 import Panel from "../components/ui/Panel";
@@ -37,6 +45,14 @@ const cards = [
     link: "/configuracoes/geral",
     color: "orange",
     permission: "configuracoes.editar",
+  },
+  {
+    title: "Grupos de Empresas",
+    description: "Convites, empresas vinculadas e recursos consolidados",
+    icon: FiLink,
+    link: "/configuracoes/grupos-empresas",
+    color: "purple",
+    anyOfPermissions: ["configuracoes.empresa", "configuracoes.editar"],
   },
   {
     title: "Estoque",

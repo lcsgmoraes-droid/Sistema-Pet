@@ -265,6 +265,13 @@ export default function SidebarMenu({
                                 iconClassName="w-3 h-3 flex-shrink-0"
                               />
                             )}
+                            {sidebarOpen && subitem.badge ? (
+                              <span
+                                className="h-2 w-2 shrink-0 animate-pulse rounded-full bg-orange-400"
+                                title={subitem.badgeLabel || "Há itens pendentes"}
+                                aria-label={subitem.badgeLabel || "Há itens pendentes"}
+                              />
+                            ) : null}
                             {sidebarOpen && (
                               <FavoriteToggle
                                 item={favoriteItem(subitem, item)}

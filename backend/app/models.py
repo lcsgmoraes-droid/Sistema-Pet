@@ -45,6 +45,12 @@ from app.models_authz import (
     RolePermission,
     UserTenant,
 )
+from app.empresa_grupo_models import (
+    EmpresaGrupo,
+    EmpresaGrupoCodigo,
+    EmpresaGrupoConvite,
+    EmpresaGrupoMembro,
+)
 from app.models_cadastros import (
     Cliente,
     Especie,
