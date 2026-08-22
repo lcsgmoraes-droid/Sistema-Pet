@@ -14,16 +14,31 @@ branch_labels = None
 depends_on = None
 
 
+def _tenant_id_type(inspector: sa.Inspector) -> sa.types.TypeEngine:
+    """Replica o tipo real de ``tenants.id``.
+
+    Bancos historicos do CorePet podem ter essa chave como VARCHAR ou UUID.
+    As FKs globais do grupo precisam usar exatamente o tipo encontrado no banco.
+    """
+
+    for coluna in inspector.get_columns("tenants"):
+        if coluna["name"] == "id":
+            return coluna["type"].copy()
+    raise RuntimeError("Coluna tenants.id nao encontrada")
+
+
 def upgrade() -> None:
     bind = op.get_bind()
-    tabelas = set(sa.inspect(bind).get_table_names())
+    inspector = sa.inspect(bind)
+    tabelas = set(inspector.get_table_names())
+    tenant_id_type = _tenant_id_type(inspector)
 
     if "empresa_grupos" not in tabelas:
         op.create_table(
             "empresa_grupos",
             sa.Column("id", sa.Integer(), autoincrement=True, nullable=False),
             sa.Column("nome", sa.String(length=150), nullable=False),
-            sa.Column("criado_por_empresa_id", sa.String(length=36), nullable=False),
+            sa.Column("criado_por_empresa_id", tenant_id_type.copy(), nullable=False),
             sa.Column("criado_por_usuario_id", sa.Integer(), nullable=False),
             sa.Column(
                 "status", sa.String(length=20), server_default="ativo", nullable=False
@@ -57,7 +72,7 @@ def upgrade() -> None:
             "empresa_grupo_membros",
             sa.Column("id", sa.Integer(), autoincrement=True, nullable=False),
             sa.Column("grupo_id", sa.Integer(), nullable=False),
-            sa.Column("empresa_id", sa.String(length=36), nullable=False),
+            sa.Column("empresa_id", tenant_id_type.copy(), nullable=False),
             sa.Column(
                 "papel", sa.String(length=20), server_default="membro", nullable=False
             ),
@@ -103,7 +118,7 @@ def upgrade() -> None:
         op.create_table(
             "empresa_grupo_codigos",
             sa.Column("id", sa.Integer(), autoincrement=True, nullable=False),
-            sa.Column("empresa_id", sa.String(length=36), nullable=False),
+            sa.Column("empresa_id", tenant_id_type.copy(), nullable=False),
             sa.Column("competencia", sa.String(length=7), nullable=False),
             sa.Column("codigo", sa.String(length=12), nullable=False),
             sa.Column("criado_por_usuario_id", sa.Integer(), nullable=False),
@@ -135,8 +150,10 @@ def upgrade() -> None:
             "empresa_grupo_convites",
             sa.Column("id", sa.Integer(), autoincrement=True, nullable=False),
             sa.Column("grupo_id", sa.Integer(), nullable=False),
-            sa.Column("empresa_convidada_id", sa.String(length=36), nullable=False),
-            sa.Column("convidado_por_empresa_id", sa.String(length=36), nullable=False),
+            sa.Column("empresa_convidada_id", tenant_id_type.copy(), nullable=False),
+            sa.Column(
+                "convidado_por_empresa_id", tenant_id_type.copy(), nullable=False
+            ),
             sa.Column("convidado_por_usuario_id", sa.Integer(), nullable=False),
             sa.Column("respondido_por_usuario_id", sa.Integer(), nullable=True),
             sa.Column(
