@@ -320,17 +320,55 @@ function StoreBanner({
             }}
           >
             {banner.type === "image" ? (
-              <img
-                src={resolveMediaUrl(banner.url)}
-                alt={`Banner ${index + 1}`}
+              <div
                 style={{
                   width: "100%",
                   height: "100%",
-                  objectFit: "cover",
-                  objectPosition: isMobile ? "right center" : "center",
-                  display: "block",
+                  position: "relative",
+                  overflow: "hidden",
+                  background: "#17130f",
                 }}
-              />
+              >
+                {isMobile && (
+                  <>
+                    <div
+                      aria-hidden="true"
+                      style={{
+                        position: "absolute",
+                        inset: -18,
+                        backgroundImage: `url("${resolveMediaUrl(banner.url)}")`,
+                        backgroundPosition: "center",
+                        backgroundSize: "cover",
+                        filter: "blur(16px)",
+                        opacity: 0.72,
+                        transform: "scale(1.08)",
+                      }}
+                    />
+                    <div
+                      aria-hidden="true"
+                      style={{
+                        position: "absolute",
+                        inset: 0,
+                        background:
+                          "linear-gradient(90deg, rgba(15,12,9,0.3), rgba(15,12,9,0.08) 45%, rgba(15,12,9,0.3))",
+                      }}
+                    />
+                  </>
+                )}
+                <img
+                  src={resolveMediaUrl(banner.url)}
+                  alt={`Banner ${index + 1}`}
+                  style={{
+                    width: "100%",
+                    height: "100%",
+                    position: "relative",
+                    objectFit: isMobile ? "contain" : "cover",
+                    objectPosition: "center",
+                    display: "block",
+                    filter: isMobile ? "drop-shadow(0 6px 14px rgba(0,0,0,0.24))" : "none",
+                  }}
+                />
+              </div>
             ) : (
               <div
                 style={{
@@ -400,7 +438,10 @@ function StoreBanner({
               key={index}
               onClick={() => onBannerSlideChange(index)}
               aria-label={`Mostrar banner ${index + 1}`}
-              style={S.bannerDot(bannerSlide === index)}
+              style={{
+                ...S.bannerDot(bannerSlide === index),
+                minHeight: isMobile ? 9 : undefined,
+              }}
             />
           ))}
         </div>
