@@ -120,4 +120,3 @@ python scripts/validate_repository_structure.py
 
 O validador confirma que as raizes oficiais existem, que os documentos de
 entrada continuam ligados e que codigo novo nao apareceu nas raizes antigas.
-

@@ -134,4 +134,3 @@ destrutivas conhecidas voltem aos scripts de producao da raiz.
 - nenhum atalho usado pelo responsavel deixa de funcionar sem substituto;
 - o CI impede retorno de codigo para raizes antigas;
 - o historico permanece recuperavel no Git.
-

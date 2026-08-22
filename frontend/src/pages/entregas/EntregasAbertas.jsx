@@ -2,6 +2,7 @@
 import { toast } from "react-hot-toast";
 import { api } from "../../services/api";
 import { confirmarCorePet } from "../../services/corepetDialog";
+import useShiftRangeSelection from "../../hooks/useShiftRangeSelection";
 import CustomerIdentity from "../../components/ui/CustomerIdentity";
 import SaleReference from "../../components/ui/SaleReference";
 import "./Entregas.css";
@@ -123,11 +124,10 @@ export default function EntregasAbertas() {
     }
   }
 
-  function toggleVenda(vendaId) {
-    setSelecionadas((prev) =>
-      prev.includes(vendaId) ? prev.filter((id) => id !== vendaId) : [...prev, vendaId],
-    );
-  }
+  const toggleVenda = useShiftRangeSelection({
+    items: vendas,
+    setSelectedIds: setSelecionadas,
+  });
 
   async function handleCriarRota() {
     if (selecionadas.length === 0) {
@@ -275,7 +275,7 @@ export default function EntregasAbertas() {
                     <input
                       type="checkbox"
                       checked={selecionadas.includes(venda.id)}
-                      onChange={() => toggleVenda(venda.id)}
+                      onChange={(event) => toggleVenda(venda.id, event)}
                     />
                   </td>
                   <td>

@@ -1,4 +1,5 @@
 import { Info, RefreshCw, Search, X } from "lucide-react";
+import useShiftRangeSelection from "../../hooks/useShiftRangeSelection";
 
 export default function PedidosCompraSugestaoHeader({
   fecharModalSugestao,
@@ -11,7 +12,6 @@ export default function PedidosCompraSugestaoHeader({
   setMarcasSelecionadas,
   marcasSelecionadas,
   marcasFornecedor,
-  alternarMarcaSelecionada,
   periodoSugestao,
   setPeriodoSugestao,
   diasCobertura,
@@ -31,6 +31,11 @@ export default function PedidosCompraSugestaoHeader({
   obterQuantidadeTotalUnidadesSugestao,
   calcularValorTotalSugestao,
 }) {
+  const alternarMarcaComIntervalo = useShiftRangeSelection({
+    items: marcasFornecedor,
+    setSelectedIds: setMarcasSelecionadas,
+  });
+
   return (
     <>
       {/* Header */}
@@ -120,7 +125,7 @@ export default function PedidosCompraSugestaoHeader({
                         <input
                           type="checkbox"
                           checked={marcasSelecionadas.includes(marca.id)}
-                          onChange={() => alternarMarcaSelecionada(marca.id)}
+                          onChange={(event) => alternarMarcaComIntervalo(marca.id, event)}
                           className="h-4 w-4 rounded"
                         />
                         <span className="truncate">{marca.nome}</span>

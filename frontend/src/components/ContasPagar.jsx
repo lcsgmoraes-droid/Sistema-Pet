@@ -25,6 +25,7 @@ import {
   ordenarTiposDespesaContasPagar,
 } from "./contas-pagar/contasPagarHelpers";
 import { confirmarCorePet } from "../services/corepetDialog";
+import useShiftRangeSelection from "../hooks/useShiftRangeSelection";
 
 const ContasPagar = () => {
   const [searchParams] = useSearchParams();
@@ -311,11 +312,11 @@ const ContasPagar = () => {
     }
   };
 
-  const alternarRecorrenciaExclusao = (itemId) => {
-    setRecorrenciasSelecionadasExclusao((atuais) =>
-      atuais.includes(itemId) ? atuais.filter((id) => id !== itemId) : [...atuais, itemId],
-    );
-  };
+  const alternarRecorrenciaExclusao = useShiftRangeSelection({
+    isItemSelectable: (item) => item.pode_excluir,
+    items: modalExclusaoRecorrencia.itens,
+    setSelectedIds: setRecorrenciasSelecionadasExclusao,
+  });
 
   const confirmarExclusaoRecorrencia = async () => {
     if (recorrenciasSelecionadasExclusao.length === 0) {

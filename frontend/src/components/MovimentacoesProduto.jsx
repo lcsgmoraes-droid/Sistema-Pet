@@ -29,6 +29,7 @@ import { useMovimentacoesProdutoGranel } from "./estoque/useMovimentacoesProduto
 import useMovimentacoesProdutoListagem from "./estoque/useMovimentacoesProdutoListagem";
 import { useModulos } from "../contexts/ModulosContext";
 import { confirmarCorePet } from "../services/corepetDialog";
+import useShiftRangeSelection from "../hooks/useShiftRangeSelection";
 
 export default function MovimentacoesProduto() {
   const { id } = useParams();
@@ -261,13 +262,10 @@ export default function MovimentacoesProduto() {
     }
   };
 
-  const handleSelectOne = (id) => {
-    if (selectedIds.includes(id)) {
-      setSelectedIds(selectedIds.filter((sid) => sid !== id));
-    } else {
-      setSelectedIds([...selectedIds, id]);
-    }
-  };
+  const handleSelectOne = useShiftRangeSelection({
+    items: movimentacoes,
+    setSelectedIds,
+  });
 
   const handleDelete = async () => {
     if (selectedIds.length === 0) {

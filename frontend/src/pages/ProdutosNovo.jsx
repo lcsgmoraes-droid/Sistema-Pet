@@ -5,6 +5,7 @@ import { useState, useEffect } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import ProdutosNovoMainContent from "../components/produto/ProdutosNovoMainContent";
 import ProdutosNovoModalsLayer from "../components/produto/ProdutosNovoModalsLayer";
+import CatalogoProdutoModal from "../components/produtos/CatalogoProdutoModal";
 import useProdutosNovoCarregamento from "../hooks/useProdutosNovoCarregamento";
 import useProdutosNovoCodigos from "../hooks/useProdutosNovoCodigos";
 import useProdutosNovoFornecedores from "../hooks/useProdutosNovoFornecedores";
@@ -152,6 +153,7 @@ export default function ProdutosNovo() {
   const [categoriasHierarquicas, setCategoriasHierarquicas] = useState([]);
   const [marcas, setMarcas] = useState([]);
   const [departamentos, setDepartamentos] = useState([]);
+  const [catalogoModal, setCatalogoModal] = useState(null);
   const [imagens, setImagens] = useState([]);
   const [clientes, setClientes] = useState([]);
 
@@ -369,6 +371,50 @@ export default function ProdutosNovo() {
     navigate(`/produtos/novo?clone=${id}`);
   };
 
+  const adicionarOuAtualizarCatalogo = (lista, item) => {
+    const semDuplicado = lista.filter((atual) => String(atual.id) !== String(item.id));
+    return [...semDuplicado, item].sort((a, b) =>
+      String(a.nome || "").localeCompare(String(b.nome || ""), "pt-BR"),
+    );
+  };
+
+  const handleCatalogoCriado = async (item) => {
+    if (catalogoModal === "marca") {
+      setMarcas((atuais) => adicionarOuAtualizarCatalogo(atuais, item));
+      handleChange("marca_id", String(item.id));
+      return;
+    }
+
+    if (catalogoModal === "departamento") {
+      setDepartamentos((atuais) => adicionarOuAtualizarCatalogo(atuais, item));
+      handleChange("departamento_id", String(item.id));
+      return;
+    }
+
+    if (catalogoModal === "categoria") {
+      setCategorias((atuais) => adicionarOuAtualizarCatalogo(atuais, item));
+      setCategoriasHierarquicas((atuais) => {
+        const semDuplicado = atuais.filter((atual) => String(atual.id) !== String(item.id));
+        return [
+          ...semDuplicado,
+          {
+            ...item,
+            nivel: item.nivel ?? 0,
+            nomeFormatado: item.nome,
+          },
+        ];
+      });
+      handleChange("categoria_id", String(item.id));
+      if (item.departamento_id) {
+        handleChange("departamento_id", String(item.departamento_id));
+      }
+    }
+  };
+
+  const handleDepartamentoCriadoNoModal = async (departamento) => {
+    setDepartamentos((atuais) => adicionarOuAtualizarCatalogo(atuais, departamento));
+  };
+
   const handleCriarOpcaoRacao = async (tipo, dados) => {
     const configs = {
       linha: {
@@ -473,6 +519,7 @@ export default function ProdutosNovo() {
       clientes,
       departamentos,
       marcas,
+      onNovoCatalogo: setCatalogoModal,
     },
     predecessorState: {
       buscaPredecessor,
@@ -637,6 +684,21 @@ export default function ProdutosNovo() {
       <ProdutosNovoMainContent handleSubmit={handleSubmit} {...mainContentProps} />
 
       <ProdutosNovoModalsLayer {...modalsLayerProps} />
+
+      {catalogoModal ? (
+        <CatalogoProdutoModal
+          tipo={catalogoModal}
+          departamentos={departamentos}
+          initialValues={
+            catalogoModal === "categoria"
+              ? { departamento_id: formData.departamento_id || null }
+              : undefined
+          }
+          onClose={() => setCatalogoModal(null)}
+          onDepartamentoCriado={handleDepartamentoCriadoNoModal}
+          onSaved={handleCatalogoCriado}
+        />
+      ) : null}
     </>
   );
 }

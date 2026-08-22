@@ -78,7 +78,7 @@ function PermissionCategory({
                   type="checkbox"
                   name="permissions"
                   checked={checked}
-                  onChange={() => onTogglePermission(permission.permission_id)}
+                  onChange={(event) => onTogglePermission(permission.permission_id, event)}
                   className="mt-0.5 h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
                 />
                 <span className="min-w-0">
