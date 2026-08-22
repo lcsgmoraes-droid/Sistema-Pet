@@ -15,6 +15,62 @@ Para publicacao nas lojas, use tambem:
 - Se o usuario esta com APK `preview`, publicar apenas em `production` nao muda
   o app instalado.
 
+## Decisao obrigatoria: OTA ou novo binario
+
+O fluxo padrao do CorePet e OTA. Nao iniciar um novo build, `eas submit`, Play
+Console, App Store Connect ou configuracao de Service Account antes de provar
+que a mudanca exige codigo nativo.
+
+Use OTA quando a entrega tiver somente:
+
+- telas e navegacao em JavaScript/TypeScript;
+- chamadas para APIs/backend;
+- textos, estilos e assets compativeis;
+- correcoes que nao adicionam nem atualizam modulos nativos.
+
+Nesse caso, mantenha a mesma `version` e o mesmo `runtimeVersion` dos binarios
+ativos. Tambem nao altere `versionCode` nem `buildNumber`. Publique para Android
+e iOS juntos:
+
+```bash
+cd app-mobile
+eas update --channel production --platform all --environment production --message "mensagem curta"
+```
+
+Nao rode `expo install --fix` como parte de uma OTA. Se o Expo Doctor recomendar
+novas versoes de dependencias nativas, registre a recomendacao para uma tarefa
+separada; aceitar a correcao muda o contrato nativo e pode obrigar um novo
+binario nas lojas.
+
+Novo binario so deve ser preparado quando houver pelo menos uma destas causas:
+
+- dependencia ou plugin nativo novo/atualizado;
+- permissao ou configuracao nativa alterada;
+- mudanca necessaria em `android/` ou no projeto iOS;
+- runtime atual incapaz de executar a nova versao.
+
+Antes de escolher o fluxo, sempre conferir:
+
+```bash
+cd app-mobile
+eas build:list --platform all --limit 20 --json --non-interactive
+eas update:list --branch production --limit 10 --json --non-interactive
+```
+
+Se ainda houver duvida, comparar o fingerprint local com os builds ativos. Uma
+mudanca somente em numero de compilacao, script operacional ou configuracao que
+nao entra no aplicativo nao basta, por si so, para trocar OTA por loja.
+
+### Estado operacional registrado em 22/08/2026
+
+- iOS: aplicativo publicado; binario ativo usa runtime `1.0.3`.
+- Android: publicacao em fase de aprovacao; binario de loja usa runtime `1.0.3`.
+- O canal `production` ja possui historico de OTAs para Android e iOS juntos.
+- Os artefatos `1.0.4` gerados em 22/08/2026 nao devem substituir os binarios
+  atuais sem uma decisao explicita de nova versao nativa.
+- O fluxo atual nao depende de criar outra conta Google ou Service Account de
+  Play Store. Nao iniciar esse cadastro para uma atualizacao OTA.
+
 ## Antes de publicar update
 
 1. Confirmar qual canal o build instalado usa:
@@ -40,14 +96,15 @@ Para APK interno:
 
 ```bash
 cd app-mobile
-eas update --channel preview --platform all --message "mensagem curta"
+eas update --channel preview --platform all --environment preview --message "mensagem curta"
 ```
 
-Para build de loja/producao:
+Para build de loja/producao, somente quando a decisao acima comprovar mudanca
+nativa:
 
 ```bash
 cd app-mobile
-eas update --channel production --platform all --message "mensagem curta"
+eas update --channel production --platform all --environment production --message "mensagem curta"
 ```
 
 Quando a mesma correcao precisa chegar aos dois tipos de app, publicar nos dois
@@ -81,7 +138,7 @@ APK quando houver:
 - alteracao de runtime;
 - dependencia nativa que exige rebuild.
 
-## Build de loja
+## Build de loja (excecao nativa)
 
 Antes de gerar build de loja:
 
@@ -112,7 +169,7 @@ O profile `production` usa:
 - Android package: `br.com.corepet.app`;
 - iOS bundle identifier: `br.com.corepet.app`.
 
-## Submissao para as lojas
+## Submissao para as lojas (excecao nativa)
 
 Primeira submissao Android:
 
