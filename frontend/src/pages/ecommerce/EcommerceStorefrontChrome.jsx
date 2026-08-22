@@ -293,14 +293,19 @@ function StoreBanner({
   onNavigate,
 }) {
   return (
-    <div style={{ padding: "16px 20px 0", boxSizing: "border-box" }}>
+    <div
+      style={{
+        padding: isMobile ? "12px 12px 0" : "16px 20px 0",
+        boxSizing: "border-box",
+      }}
+    >
       <div
         style={{
           ...S.bannerWrap,
           borderRadius: isMobile ? 12 : 16,
           maxWidth: 1280,
           margin: "0 auto",
-          height: isMobile ? 180 : 260,
+          height: isMobile ? "clamp(132px, 38vw, 150px)" : 260,
         }}
       >
         {activeBanners.map((banner, index) => (
@@ -321,8 +326,8 @@ function StoreBanner({
                 style={{
                   width: "100%",
                   height: "100%",
-                  objectFit: isMobile ? "contain" : "cover",
-                  background: "#f5f5f4",
+                  objectFit: "cover",
+                  objectPosition: isMobile ? "right center" : "center",
                   display: "block",
                 }}
               />
@@ -333,14 +338,14 @@ function StoreBanner({
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
-                  padding: "0 48px",
-                  gap: 24,
+                  padding: isMobile ? "0 18px" : "0 48px",
+                  gap: isMobile ? 12 : 24,
                   height: "100%",
                 }}
               >
                 <span
                   style={{
-                    fontSize: 72,
+                    fontSize: isMobile ? 42 : 72,
                     flexShrink: 0,
                     filter: "drop-shadow(0 4px 12px rgba(0,0,0,0.25))",
                   }}
@@ -352,27 +357,33 @@ function StoreBanner({
                     style={{
                       color: "#fff",
                       fontWeight: 800,
-                      fontSize: 34,
+                      fontSize: isMobile ? 22 : 34,
                       lineHeight: 1.2,
                       textShadow: "0 2px 12px rgba(0,0,0,0.2)",
                     }}
                   >
                     {banner.title}
                   </div>
-                  <div style={{ color: "rgba(255,255,255,0.88)", fontSize: 16, marginTop: 8 }}>
+                  <div
+                    style={{
+                      color: "rgba(255,255,255,0.88)",
+                      fontSize: isMobile ? 13 : 16,
+                      marginTop: isMobile ? 4 : 8,
+                    }}
+                  >
                     {banner.sub}
                   </div>
                   <button
                     onClick={() => onNavigate("loja")}
                     style={{
-                      marginTop: 16,
+                      marginTop: isMobile ? 8 : 16,
                       background: "#fff",
                       color: "#f97316",
                       border: "none",
                       borderRadius: 24,
-                      padding: "10px 24px",
+                      padding: isMobile ? "7px 14px" : "10px 24px",
                       fontWeight: 700,
-                      fontSize: 14,
+                      fontSize: isMobile ? 12 : 14,
                       cursor: "pointer",
                     }}
                   >
