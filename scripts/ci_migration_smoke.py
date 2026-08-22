@@ -35,6 +35,7 @@ class SmokeDatabase:
     label: str
     name: str
     start_revision: str | None
+    tenant_id_uuid: bool = False
 
 
 def _env_bool(name: str, default: bool = False) -> bool:
@@ -52,8 +53,7 @@ def _database_url() -> URL:
     url = make_url(raw_url)
     if not url.drivername.startswith("postgresql"):
         raise SystemExit(
-            "Migration smoke requires PostgreSQL; got driver "
-            f"{url.drivername!r}"
+            f"Migration smoke requires PostgreSQL; got driver {url.drivername!r}"
         )
     return url
 
@@ -81,7 +81,9 @@ def _admin_database(url: URL) -> str:
 
 def _prepare_database(admin_url: URL, name: str) -> None:
     quoted = _quote_identifier(name)
-    conn = psycopg2.connect(**_psycopg2_connect_kwargs(admin_url, _admin_database(admin_url)))
+    conn = psycopg2.connect(
+        **_psycopg2_connect_kwargs(admin_url, _admin_database(admin_url))
+    )
     try:
         conn.autocommit = True
         with conn.cursor() as cur:
@@ -99,7 +101,9 @@ def _prepare_database(admin_url: URL, name: str) -> None:
 
 def _drop_database(admin_url: URL, name: str) -> None:
     quoted = _quote_identifier(name)
-    conn = psycopg2.connect(**_psycopg2_connect_kwargs(admin_url, _admin_database(admin_url)))
+    conn = psycopg2.connect(
+        **_psycopg2_connect_kwargs(admin_url, _admin_database(admin_url))
+    )
     try:
         conn.autocommit = True
         with conn.cursor() as cur:
@@ -134,6 +138,19 @@ def _run_alembic(database_url: URL, *args: str) -> None:
         env=env,
         check=True,
     )
+
+
+def _simulate_production_tenant_uuid(database_url: URL) -> None:
+    """Reproduz o tipo de ``tenants.id`` encontrado no banco de producao."""
+
+    engine = create_engine(database_url)
+    try:
+        with engine.begin() as conn:
+            conn.execute(
+                text("ALTER TABLE tenants ALTER COLUMN id TYPE uuid USING id::uuid")
+            )
+    finally:
+        engine.dispose()
 
 
 def _assert_rls_no_debt(database_url: URL) -> None:
@@ -176,7 +193,9 @@ def _expected_head(database_url: URL) -> str:
         capture_output=True,
         text=True,
     )
-    heads = [line.split()[0].strip() for line in result.stdout.splitlines() if line.strip()]
+    heads = [
+        line.split()[0].strip() for line in result.stdout.splitlines() if line.strip()
+    ]
     if len(heads) != 1:
         raise SystemExit(f"Expected exactly one Alembic head, got: {heads}")
     return heads[0]
@@ -186,7 +205,9 @@ def _assert_database_at_head(database_url: URL, expected_head: str) -> None:
     engine = create_engine(database_url)
     try:
         with engine.connect() as conn:
-            current = conn.execute(text("SELECT version_num FROM alembic_version")).scalar()
+            current = conn.execute(
+                text("SELECT version_num FROM alembic_version")
+            ).scalar()
             table_count = conn.execute(
                 text(
                     "SELECT count(*) FROM information_schema.tables "
@@ -204,10 +225,18 @@ def _assert_database_at_head(database_url: URL, expected_head: str) -> None:
 
 def _database_plan() -> list[SmokeDatabase]:
     prefix = os.getenv("MIGRATION_SMOKE_DB_PREFIX", "petshop_migration_smoke")
-    history_revision = os.getenv("MIGRATION_SMOKE_HISTORY_REVISION", DEFAULT_HISTORY_REVISION)
+    history_revision = os.getenv(
+        "MIGRATION_SMOKE_HISTORY_REVISION", DEFAULT_HISTORY_REVISION
+    )
     return [
         SmokeDatabase("clean", f"{prefix}_clean", None),
         SmokeDatabase("history", f"{prefix}_history", history_revision),
+        SmokeDatabase(
+            "production_uuid",
+            f"{prefix}_production_uuid",
+            "zwv20260822a1",
+            tenant_id_uuid=True,
+        ),
     ]
 
 
@@ -229,6 +258,10 @@ def main() -> int:
                     f"label={database.label} target={database.start_revision}"
                 )
                 _run_alembic(target_url, "upgrade", database.start_revision)
+
+            if database.tenant_id_uuid:
+                print(f"migration_smoke_prepare label={database.label} tenants_id=uuid")
+                _simulate_production_tenant_uuid(target_url)
 
             print(f"migration_smoke_upgrade label={database.label} target=head")
             _run_alembic(target_url, "upgrade", "head")

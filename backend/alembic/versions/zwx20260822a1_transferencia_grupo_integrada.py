@@ -14,10 +14,20 @@ branch_labels = None
 depends_on = None
 
 
+def _tenant_id_type(inspector: sa.Inspector) -> sa.types.TypeEngine:
+    """Replica o tipo real de ``tenants.id`` (UUID ou VARCHAR historico)."""
+
+    for coluna in inspector.get_columns("tenants"):
+        if coluna["name"] == "id":
+            return coluna["type"].copy()
+    raise RuntimeError("Coluna tenants.id nao encontrada")
+
+
 def upgrade() -> None:
     bind = op.get_bind()
     inspector = sa.inspect(bind)
     tabelas = set(inspector.get_table_names())
+    tenant_id_type = _tenant_id_type(inspector)
 
     if "empresa_grupo_membros" in tabelas:
         colunas = {
@@ -36,8 +46,8 @@ def upgrade() -> None:
         "empresa_grupo_transferencias",
         sa.Column("id", sa.Integer(), autoincrement=True, nullable=False),
         sa.Column("grupo_id", sa.Integer(), nullable=False),
-        sa.Column("empresa_origem_id", sa.String(length=36), nullable=False),
-        sa.Column("empresa_destino_id", sa.String(length=36), nullable=False),
+        sa.Column("empresa_origem_id", tenant_id_type.copy(), nullable=False),
+        sa.Column("empresa_destino_id", tenant_id_type.copy(), nullable=False),
         sa.Column("usuario_origem_id", sa.Integer(), nullable=False),
         sa.Column("usuario_destino_id", sa.Integer(), nullable=True),
         sa.Column("chave_idempotencia", sa.String(length=36), nullable=False),
