@@ -36,20 +36,24 @@ export default function BlingIntegracao() {
   }, []);
 
   async function carregarStatus() {
+    const statusDesconectado = {
+      conectado: false,
+      ultima_renovacao: null,
+      proxima_renovacao: null,
+      renovacoes_automaticas: 0,
+      temp_acesso_horas: 0,
+      total_produtos_bling: 0,
+    };
+
     try {
       setLoading(true);
       const resp = await api.get("/bling/teste-conexao");
       setStatus(resp.data);
+      return resp.data;
     } catch {
       // Conexão falhada é normal se token expirou
-      setStatus({
-        conectado: false,
-        ultima_renovacao: null,
-        proxima_renovacao: null,
-        renovacoes_automaticas: 0,
-        temp_acesso_horas: 0,
-        total_produtos_bling: 0,
-      });
+      setStatus(statusDesconectado);
+      return statusDesconectado;
     } finally {
       setLoading(false);
     }
@@ -60,35 +64,63 @@ export default function BlingIntegracao() {
     setTimeout(() => setMsg(null), 6000);
   }
 
+  async function abrirAutorizacaoBling() {
+    mostrarMensagem("info", "⏳ Abrindo autorização segura no Bling...");
+
+    const response = await api.get("/auth/bling/link-autorizacao");
+    const authUrl = String(response.data?.url_autorizacao || "").trim();
+
+    if (!authUrl) {
+      throw new Error(response.data?.erro || "O link de autorização do Bling não foi gerado.");
+    }
+
+    const parsedUrl = new URL(authUrl);
+    const isBlingHost =
+      parsedUrl.protocol === "https:" &&
+      (parsedUrl.hostname === "bling.com.br" || parsedUrl.hostname.endsWith(".bling.com.br"));
+
+    if (!isBlingHost) {
+      throw new Error("O servidor retornou um endereço de autorização inválido.");
+    }
+
+    window.location.assign(parsedUrl.toString());
+  }
+
   async function renovarToken() {
     setRenovando(true);
     try {
-      const resp = await api.post("/bling/renovar-token");
-      mostrarMensagem(
-        "sucesso",
-        `✅ Token renovado! Válido por ${resp.data.expires_in_hours?.toFixed(1) || 6} horas.`,
-      );
-      setTimeout(() => carregarStatus(), 1000);
-    } catch (e) {
-      // Se o refresh token expirou, redireciona para autorização OAuth
-      const detail = e.response?.data?.detail || "";
-      const isInvalidGrant =
-        detail.includes("invalid_grant") ||
-        detail.includes("Invalid refresh token") ||
-        e.response?.status === 400;
-
-      if (isInvalidGrant) {
-        mostrarMensagem("info", "⏳ Abrindo autorização no Bling...");
-        try {
-          window.location.assign("/api/auth/bling/link-autorizacao?redirect=1");
-          return;
-        } catch {
-          // fallback abaixo
-        }
+      if (!status.conectado) {
+        await abrirAutorizacaoBling();
+        return;
       }
 
-      const erro = detail || e.message || "Erro ao renovar token";
-      mostrarMensagem("erro", `❌ ${erro}`);
+      try {
+        const resp = await api.post("/bling/renovar-token");
+        mostrarMensagem(
+          "sucesso",
+          `✅ Token renovado! Válido por ${resp.data.expires_in_hours?.toFixed(1) || 6} horas.`,
+        );
+        setTimeout(() => carregarStatus(), 1000);
+      } catch (error) {
+        const detail = String(error.response?.data?.detail || "");
+        const refreshInvalido =
+          detail.includes("invalid_grant") ||
+          detail.includes("Invalid refresh token") ||
+          error.response?.status === 400;
+
+        if (!refreshInvalido) {
+          throw error;
+        }
+
+        await abrirAutorizacaoBling();
+      }
+    } catch (error) {
+      const detail = String(error.response?.data?.detail || "");
+      const mensagemSegura =
+        detail && !detail.includes("invalid_grant") && !detail.includes("Invalid refresh token")
+          ? detail
+          : error.message || "Não foi possível abrir a autorização do Bling.";
+      mostrarMensagem("erro", `❌ ${mensagemSegura}`);
     } finally {
       setRenovando(false);
     }
@@ -97,14 +129,14 @@ export default function BlingIntegracao() {
   async function testarConexao() {
     try {
       setLoading(true);
-      await carregarStatus();
-      if (status.conectado) {
+      const statusAtual = await carregarStatus();
+      if (statusAtual.conectado) {
         mostrarMensagem(
           "sucesso",
-          `✅ Conectado! ${status.total_produtos_bling || 0} produtos no Bling.`,
+          `✅ Conectado! ${statusAtual.total_produtos_bling || 0} produtos no Bling.`,
         );
       } else {
-        mostrarMensagem("info", "⚠️ Token expirado. Use o botão 'Renovar Token' abaixo.");
+        mostrarMensagem("info", "⚠️ Token expirado. Use o botão 'Reconectar Bling' abaixo.");
       }
     } catch {
       mostrarMensagem("erro", "Erro ao testar conexão.");
@@ -219,7 +251,7 @@ export default function BlingIntegracao() {
             text-white shadow-sm hover:shadow-md"
         >
           <FiRefreshCw className={renovando ? "animate-spin" : ""} />
-          {renovando ? "Renovando..." : "Renovar Token"}
+          {renovando ? "Abrindo..." : status.conectado ? "Renovar Token" : "Reconectar Bling"}
         </button>
 
         <button
@@ -247,19 +279,18 @@ export default function BlingIntegracao() {
           </p>
 
           <p className="text-gray-700">
-            <strong>Renovação automática:</strong> O sistema renova o token automaticamente a cada
-            5h30min. Você não precisa fazer nada.
+            <strong>Renovação automática:</strong> O sistema renova o token automaticamente a cada 5
+            horas. Você não precisa fazer nada.
           </p>
 
           {!status.conectado && (
             <div className="bg-amber-50 border border-amber-200 rounded p-3 text-amber-800">
-              <p className="font-medium mb-2">Se o botão acima não funcionar:</p>
+              <p className="font-medium mb-2">Como reconectar:</p>
               <ol className="list-decimal list-inside space-y-1 text-xs">
-                <li>Acesse o painel do Bling (bling.com.br)</li>
-                <li>Vá em Integrações → Aplicações</li>
-                <li>Encontre "CorePet" e autorize novamente</li>
-                <li>Copie o código gerado</li>
-                <li>Contacte o suporte com esse código</li>
+                <li>Clique em "Reconectar Bling".</li>
+                <li>Entre na conta correta do Bling, se for solicitado.</li>
+                <li>Autorize o CorePet e aguarde a confirmação.</li>
+                <li>Volte a esta tela e teste a conexão.</li>
               </ol>
             </div>
           )}
