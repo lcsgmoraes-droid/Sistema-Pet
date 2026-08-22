@@ -14,6 +14,10 @@ import Svg, { Circle, Path } from 'react-native-svg';
 import HeaderProfileActions from '../components/HeaderProfileActions';
 import StoreContextBadge from '../components/StoreContextBadge';
 import { listarNotificacoesApp } from '../services/appNotifications.service';
+import {
+  contarNovidadesAppNaoVistas,
+  listarEvolucaoCorePetApp,
+} from '../services/evolucaoCorePet.service';
 import { listarProdutos } from '../services/shop.service';
 import { useAuthStore } from '../store/auth.store';
 import { CORES, ESPACO, FONTE, RAIO, SOMBRA } from '../theme';
@@ -54,12 +58,23 @@ export default function HomeScreen() {
       return;
     }
     try {
-      const response = await listarNotificacoesApp();
-      setUnreadNotifications(Math.max(0, Number(response.unread_count ?? 0)));
+      const [notificacoes, evolucao] = await Promise.allSettled([
+        listarNotificacoesApp(),
+        listarEvolucaoCorePetApp(),
+      ]);
+      const avisosNaoLidos =
+        notificacoes.status === 'fulfilled'
+          ? Math.max(0, Number(notificacoes.value.unread_count ?? 0))
+          : 0;
+      const novidadesNaoVistas =
+        evolucao.status === 'fulfilled'
+          ? await contarNovidadesAppNaoVistas(evolucao.value.itens, user?.id)
+          : 0;
+      setUnreadNotifications(avisosNaoLidos + novidadesNaoVistas);
     } catch {
       setUnreadNotifications(0);
     }
-  }, [isAuthenticated]);
+  }, [isAuthenticated, user?.id]);
 
   useFocusEffect(
     useCallback(() => {
@@ -106,34 +121,34 @@ export default function HomeScreen() {
         </View>
         <View style={styles.headerActions}>
           {isAuthenticated ? <>
-            <View style={styles.headerTopActions}>
-            <TouchableOpacity
-              style={styles.pontosCard}
-              onPress={() => navigation.navigate('Beneficios')}
-            >
-              <Ionicons name="trophy" size={16} color={CORES.pontos} />
-              <Text style={styles.pontosTexto}>{pontos} pts</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              accessibilityLabel="Abrir notificacoes"
-              style={styles.notificacoesButton}
-              onPress={() => navigation.navigate('Notificacoes')}
-            >
+              <View style={styles.headerTopActions}>
+                <TouchableOpacity
+                  style={styles.pontosCard}
+                  onPress={() => navigation.navigate('Beneficios')}
+                >
+                  <Ionicons name="trophy" size={16} color={CORES.pontos} />
+                  <Text style={styles.pontosTexto}>{pontos} pts</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  accessibilityLabel="Abrir notificacoes"
+                  style={styles.notificacoesButton}
+                  onPress={() => navigation.navigate('Notificacoes')}
+                >
               <Ionicons name="notifications-outline" size={18} color={CORES.primario} />
-              {unreadNotifications > 0 ? (
-                <View style={styles.notificacoesBadge}>
-                  <Text style={styles.notificacoesBadgeText}>
-                    {unreadNotifications > 99 ? '99+' : unreadNotifications}
-                  </Text>
-                </View>
-              ) : null}
-            </TouchableOpacity>
-            </View>
-            <HeaderProfileActions
-              color={CORES.primario}
-              logoutContextLabel="cliente"
-              showLogout={false}
-            />
+                  {unreadNotifications > 0 ? (
+                    <View style={styles.notificacoesBadge}>
+                      <Text style={styles.notificacoesBadgeText}>
+                        {unreadNotifications > 99 ? '99+' : unreadNotifications}
+                      </Text>
+                    </View>
+                  ) : null}
+                </TouchableOpacity>
+              </View>
+              <HeaderProfileActions
+                color={CORES.primario}
+                logoutContextLabel="cliente"
+                showLogout={false}
+              />
           </> : (
             <TouchableOpacity
               style={styles.loginButton}

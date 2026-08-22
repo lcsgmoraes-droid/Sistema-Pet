@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -17,6 +17,13 @@ import {
   listarNotificacoesApp,
   markNotificationAsRead,
 } from '../../services/appNotifications.service';
+import {
+  contarNovidadesAppNaoVistas,
+  EvolucaoCorePetItem,
+  listarEvolucaoCorePetApp,
+  marcarNovidadesAppComoVistas,
+} from '../../services/evolucaoCorePet.service';
+import { useAuthStore } from '../../store/auth.store';
 import { CORES, ESPACO, FONTE, RAIO } from '../../theme';
 import {
   appointmentNotificationTarget,
@@ -24,19 +31,65 @@ import {
   recurrenceNotificationToProductId,
   stockNotificationToProductId,
 } from '../../utils/notificationNavigation';
+import EvolucaoCorePetList from './EvolucaoCorePetList';
 
-export default function NotificationsScreen({ navigation }: any) {
+export default function NotificationsScreen({ navigation, route }: any) {
+  const somenteNovidades = Boolean(route?.params?.somenteNovidades);
+  const userId = useAuthStore((state) => state.user?.id);
+  const [secao, setSecao] = useState<'avisos' | 'novidades'>(
+    somenteNovidades ? 'novidades' : 'avisos',
+  );
   const [items, setItems] = useState<AppNotification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [evolucaoItems, setEvolucaoItems] = useState<EvolucaoCorePetItem[]>([]);
+  const [evolucaoUnreadCount, setEvolucaoUnreadCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [clearing, setClearing] = useState(false);
 
   const carregar = useCallback(async () => {
-    const response = await listarNotificacoesApp();
-    setItems(response.items);
-    setUnreadCount(response.unread_count);
+    const [notificacoes, evolucao] = await Promise.allSettled([
+      listarNotificacoesApp(),
+      listarEvolucaoCorePetApp(),
+    ]);
+
+    if (notificacoes.status === 'fulfilled') {
+      setItems(notificacoes.value.items);
+      setUnreadCount(notificacoes.value.unread_count);
+    } else {
+      setItems([]);
+      setUnreadCount(0);
+    }
+
+    if (evolucao.status === 'fulfilled') {
+      setEvolucaoItems(evolucao.value.itens);
+      setEvolucaoUnreadCount(
+        await contarNovidadesAppNaoVistas(evolucao.value.itens, userId),
+      );
+    } else {
+      setEvolucaoItems([]);
+      setEvolucaoUnreadCount(0);
+    }
+  }, [userId]);
+
+  const abrirSecao = useCallback((proxima: 'avisos' | 'novidades') => {
+    setSecao(proxima);
   }, []);
+
+  useEffect(() => {
+    if (secao !== 'novidades' || evolucaoItems.length === 0) return;
+    let active = true;
+    marcarNovidadesAppComoVistas(evolucaoItems, userId)
+      .then(() => {
+        if (active) setEvolucaoUnreadCount(0);
+      })
+      .catch(() => {
+        // A leitura local sera tentada novamente na proxima abertura.
+      });
+    return () => {
+      active = false;
+    };
+  }, [evolucaoItems, secao, userId]);
 
   useFocusEffect(
     useCallback(() => {
@@ -70,7 +123,11 @@ export default function NotificationsScreen({ navigation }: any) {
       setItems((atuais) =>
         atuais.map((notificacao) =>
           notificacao.id === item.id
-            ? { ...notificacao, read_at: new Date().toISOString(), is_read: true }
+            ? {
+                ...notificacao,
+                read_at: new Date().toISOString(),
+                is_read: true,
+              }
             : notificacao,
         ),
       );
@@ -143,12 +200,16 @@ export default function NotificationsScreen({ navigation }: any) {
     <View style={styles.container}>
       <View style={styles.summaryRow}>
         <View style={styles.summaryText}>
-          <Text style={styles.summaryTitle}>Notificacoes</Text>
+          <Text style={styles.summaryTitle}>
+            {somenteNovidades ? 'Novidades' : 'Avisos e novidades'}
+          </Text>
           <Text style={styles.summarySubtitle}>
-            {unreadCount > 0 ? `${unreadCount} nao lida(s)` : 'Tudo em dia'}
+            {unreadCount + evolucaoUnreadCount > 0
+              ? `${unreadCount + evolucaoUnreadCount} não visto(s)`
+              : 'Tudo em dia'}
           </Text>
         </View>
-        {items.length > 0 ? (
+        {secao === 'avisos' && items.length > 0 ? (
           <TouchableOpacity
             style={[styles.clearButton, clearing && styles.clearButtonDisabled]}
             onPress={confirmarLimpeza}
@@ -164,63 +225,132 @@ export default function NotificationsScreen({ navigation }: any) {
         ) : null}
       </View>
 
-      <FlatList
-        data={items}
-        keyExtractor={(item) => String(item.id)}
-        contentContainerStyle={items.length ? styles.list : styles.emptyList}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            tintColor={CORES.primario}
-          />
-        }
-        ListEmptyComponent={
-          <View style={styles.emptyState}>
-            <Ionicons name="notifications-outline" size={34} color={CORES.textoClaro} />
-            <Text style={styles.emptyTitle}>Nenhuma notificacao</Text>
-            <Text style={styles.emptyText}>
-              Quando houver novidades, elas aparecem aqui.
-            </Text>
-          </View>
-        }
-        renderItem={({ item }) => (
+      {!somenteNovidades ? (
+        <View style={styles.sectionTabs}>
           <TouchableOpacity
-            style={[styles.item, !item.read_at && styles.itemUnread]}
-            activeOpacity={0.82}
-            onPress={() => abrirNotificacao(item)}
+            style={[
+              styles.sectionTab,
+              secao === 'avisos' && styles.sectionTabActive,
+            ]}
+            onPress={() => abrirSecao('avisos')}
           >
-            <View style={styles.iconBox}>
-              <Ionicons
-                name={
-                  item.source === 'stock_waitlist'
-                    ? 'cube-outline'
-                    : item.source === 'appointment_reminder'
-                      ? 'calendar-outline'
-                      : item.source === 'campaign'
-                        ? 'gift-outline'
-                      : 'notifications-outline'
-                }
-                size={20}
-                color={CORES.primario}
-              />
-            </View>
-            <View style={styles.itemText}>
-              <View style={styles.itemTitleRow}>
-                <Text style={styles.itemTitle} numberOfLines={2}>
-                  {item.title}
-                </Text>
-                {!item.read_at ? <View style={styles.unreadDot} /> : null}
-              </View>
-              <Text style={styles.itemBody} numberOfLines={3}>
-                {item.body}
-              </Text>
-              <Text style={styles.itemDate}>{formatarData(item.created_at)}</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={18} color={CORES.textoClaro} />
+            <Ionicons
+              name="notifications-outline"
+              size={18}
+              color={secao === 'avisos' ? CORES.primario : CORES.textoClaro}
+            />
+            <Text
+              style={[
+                styles.sectionTabText,
+                secao === 'avisos' && styles.sectionTabTextActive,
+              ]}
+            >
+              Avisos
+            </Text>
+            {unreadCount > 0 ? <View style={styles.sectionUnreadDot} /> : null}
           </TouchableOpacity>
-        )}
-      />
+          <TouchableOpacity
+            style={[
+              styles.sectionTab,
+              secao === 'novidades' && styles.sectionTabActive,
+            ]}
+            onPress={() => abrirSecao('novidades')}
+          >
+            <Ionicons
+              name="sparkles-outline"
+              size={18}
+              color={secao === 'novidades' ? CORES.primario : CORES.textoClaro}
+            />
+            <Text
+              style={[
+                styles.sectionTabText,
+                secao === 'novidades' && styles.sectionTabTextActive,
+              ]}
+            >
+              Novidades
+            </Text>
+            {evolucaoUnreadCount > 0 ? (
+              <View style={styles.sectionUnreadDot} />
+            ) : null}
+          </TouchableOpacity>
+        </View>
+      ) : null}
+
+      {secao === 'novidades' ? (
+        <EvolucaoCorePetList
+          itens={evolucaoItems}
+          refreshing={refreshing}
+          onRefresh={onRefresh}
+        />
+      ) : (
+        <FlatList
+          data={items}
+          keyExtractor={(item) => String(item.id)}
+          contentContainerStyle={items.length ? styles.list : styles.emptyList}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor={CORES.primario}
+            />
+          }
+          ListEmptyComponent={
+            <View style={styles.emptyState}>
+              <Ionicons
+                name="notifications-outline"
+                size={34}
+                color={CORES.textoClaro}
+              />
+            <Text style={styles.emptyTitle}>Nenhuma notificação</Text>
+              <Text style={styles.emptyText}>
+              Quando houver um aviso, ele aparecerá aqui.
+              </Text>
+            </View>
+          }
+          renderItem={({ item }) => (
+            <TouchableOpacity
+              style={[styles.item, !item.read_at && styles.itemUnread]}
+              activeOpacity={0.82}
+              onPress={() => abrirNotificacao(item)}
+            >
+              <View style={styles.iconBox}>
+                <Ionicons
+                  name={
+                    item.source === 'stock_waitlist'
+                      ? 'cube-outline'
+                      : item.source === 'appointment_reminder'
+                        ? 'calendar-outline'
+                        : item.source === 'campaign'
+                          ? 'gift-outline'
+                          : 'notifications-outline'
+                  }
+                  size={20}
+                  color={CORES.primario}
+                />
+              </View>
+              <View style={styles.itemText}>
+                <View style={styles.itemTitleRow}>
+                  <Text style={styles.itemTitle} numberOfLines={2}>
+                    {item.title}
+                  </Text>
+                  {!item.read_at ? <View style={styles.unreadDot} /> : null}
+                </View>
+                <Text style={styles.itemBody} numberOfLines={3}>
+                  {item.body}
+                </Text>
+                <Text style={styles.itemDate}>
+                  {formatarData(item.created_at)}
+                </Text>
+              </View>
+              <Ionicons
+                name="chevron-forward"
+                size={18}
+                color={CORES.textoClaro}
+              />
+            </TouchableOpacity>
+          )}
+        />
+      )}
     </View>
   );
 }
@@ -256,11 +386,45 @@ const styles = StyleSheet.create({
     gap: ESPACO.md,
   },
   summaryText: { flex: 1, minWidth: 0 },
-  summaryTitle: { fontSize: FONTE.grande, fontWeight: '800', color: CORES.texto },
+  summaryTitle: {
+    fontSize: FONTE.grande,
+    fontWeight: '800',
+    color: CORES.texto,
+  },
   summarySubtitle: {
     marginTop: 2,
     fontSize: FONTE.normal,
     color: CORES.textoSecundario,
+  },
+  sectionTabs: {
+    flexDirection: 'row',
+    padding: ESPACO.sm,
+    gap: ESPACO.sm,
+    backgroundColor: CORES.superficie,
+    borderBottomWidth: 1,
+    borderBottomColor: CORES.borda,
+  },
+  sectionTab: {
+    flex: 1,
+    minHeight: 42,
+    borderRadius: RAIO.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    gap: ESPACO.xs,
+  },
+  sectionTabActive: { backgroundColor: CORES.primarioClaro },
+  sectionTabText: {
+    fontSize: FONTE.normal,
+    fontWeight: '800',
+    color: CORES.textoSecundario,
+  },
+  sectionTabTextActive: { color: CORES.primario },
+  sectionUnreadDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+    backgroundColor: CORES.erro,
   },
   clearButton: {
     minHeight: 38,
@@ -320,7 +484,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: ESPACO.xs,
   },
-  itemTitle: { flex: 1, fontSize: FONTE.media, fontWeight: '800', color: CORES.texto },
+  itemTitle: {
+    flex: 1,
+    fontSize: FONTE.media,
+    fontWeight: '800',
+    color: CORES.texto,
+  },
   unreadDot: {
     width: 8,
     height: 8,

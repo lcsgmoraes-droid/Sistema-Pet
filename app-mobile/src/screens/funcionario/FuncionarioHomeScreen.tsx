@@ -51,6 +51,26 @@ export default function FuncionarioHomeScreen() {
         </View>
         <Ionicons name="chevron-forward" size={20} color={CORES.textoClaro} />
       </TouchableOpacity>
+
+      <TouchableOpacity
+        style={styles.acao}
+        onPress={() =>
+          navigation.navigate("FuncionarioNovidades", {
+            somenteNovidades: true,
+          })
+        }
+      >
+        <View style={[styles.acaoIcone, { backgroundColor: "#FEF3C7" }]}>
+          <Ionicons name="sparkles-outline" size={24} color={CORES.aviso} />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.acaoTitulo}>Novidades do CorePet</Text>
+          <Text style={styles.acaoTexto}>
+            Veja o que foi liberado e acompanhe os próximos projetos.
+          </Text>
+        </View>
+        <Ionicons name="chevron-forward" size={20} color={CORES.textoClaro} />
+      </TouchableOpacity>
     </View>
   );
 }
