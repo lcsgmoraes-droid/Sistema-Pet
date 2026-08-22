@@ -106,7 +106,7 @@ export function DetalheEntregaContent({
   if (!rota) {
     return (
       <View style={styles.center}>
-        <Text style={styles.errorText}>Rota nÃ£o encontrada.</Text>
+        <Text style={styles.errorText}>Rota não encontrada.</Text>
       </View>
     );
   }
@@ -162,7 +162,7 @@ export function DetalheEntregaContent({
 
       {rota.status === "pendente" && (
         <TouchableOpacity style={styles.btnIniciar} onPress={iniciarRota}>
-          <Text style={styles.btnIniciarText}>? Iniciar Rota</Text>
+          <Text style={styles.btnIniciarText}>▶ Iniciar Rota</Text>
         </TouchableOpacity>
       )}
 
@@ -173,7 +173,7 @@ export function DetalheEntregaContent({
           onPress={finalizarRota}
         >
           <Text style={styles.btnFinalizarText}>
-            {processandoFinalizacao ? "Finalizando..." : "? Finalizar Rota"}
+            {processandoFinalizacao ? "Finalizando..." : "✅ Finalizar Rota"}
           </Text>
         </TouchableOpacity>
       )}
