@@ -28,6 +28,7 @@ import VendasPorCanalPanel from "./estoque/VendasPorCanalPanel";
 import { useMovimentacoesProdutoGranel } from "./estoque/useMovimentacoesProdutoGranel";
 import useMovimentacoesProdutoListagem from "./estoque/useMovimentacoesProdutoListagem";
 import { useModulos } from "../contexts/ModulosContext";
+import { confirmarCorePet } from "../services/corepetDialog";
 
 export default function MovimentacoesProduto() {
   const { id } = useParams();
@@ -274,7 +275,7 @@ export default function MovimentacoesProduto() {
       return;
     }
 
-    if (!confirm(`Deseja realmente excluir ${selectedIds.length} lançamento(s)?`)) {
+    if (!await confirmarCorePet(`Deseja realmente excluir ${selectedIds.length} lançamento(s)?`)) {
       return;
     }
 

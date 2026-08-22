@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
 import api from "../api";
+import { confirmarCorePet } from "../services/corepetDialog";
 
 const USUARIO_INICIAL = {
   email: "",
@@ -102,7 +103,7 @@ export default function useUsuariosPage() {
 
   async function toggleStatus(userId, isActive) {
     const acao = isActive ? "desativar acesso" : "ativar acesso";
-    if (!confirm(`Confirma ${acao} deste usuario?`)) return;
+    if (!await confirmarCorePet(`Confirma ${acao} deste usuario?`)) return;
 
     try {
       await api.patch(`/usuarios/${userId}/status`, {
@@ -118,7 +119,7 @@ export default function useUsuariosPage() {
 
   async function forcarLogout(userId) {
     if (
-      !confirm("Forcar logout deste usuario em todos os dispositivos? A conta continuara ativa.")
+      !await confirmarCorePet("Forcar logout deste usuario em todos os dispositivos? A conta continuara ativa.")
     ) {
       return;
     }

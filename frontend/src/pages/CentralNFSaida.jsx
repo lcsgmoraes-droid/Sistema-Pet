@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import api from "../api";
 import CentralNFSaidaView from "./centralNFSaida/CentralNFSaidaView";
 import { montarDetalheFallback, soDigitos } from "./centralNFSaida/centralNFSaidaUtils";
+import { confirmarCorePet } from "../services/corepetDialog";
 
 export default function CentralNFSaida() {
   const [notas, setNotas] = useState([]);
@@ -191,7 +192,7 @@ export default function CentralNFSaida() {
 
   async function excluirNota(vendaId, numero) {
     if (
-      !globalThis.confirm(
+      !await confirmarCorePet(
         `Deseja realmente excluir a nota ${numero}?\n\nIsso apenas remove os dados da nota do sistema, não cancela no Bling/SEFAZ.`,
       )
     )

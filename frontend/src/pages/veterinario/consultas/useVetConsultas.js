@@ -11,6 +11,7 @@ import {
   toggleConsultaSelecionada,
   toggleTodasConsultasSelecionadas,
 } from "./consultasUtils";
+import { confirmarCorePet } from "../../../services/corepetDialog";
 
 export function useVetConsultas() {
   const [consultas, setConsultas] = useState([]);
@@ -108,7 +109,7 @@ export function useVetConsultas() {
     if (consultasSelecionadas.length === 0) return;
 
     const totalSelecionado = consultasSelecionadas.length;
-    const confirmado = window.confirm(
+    const confirmado = await confirmarCorePet(
       `Deseja excluir ${totalSelecionado} consulta${totalSelecionado > 1 ? "s" : ""} selecionada${totalSelecionado > 1 ? "s" : ""}?`,
     );
     if (!confirmado) return;

@@ -22,6 +22,7 @@ import {
   obterErroAcertoTransferencia,
 } from "./transferenciaParceiroUtils";
 import useTransferenciaBaixaLoteController from "./useTransferenciaBaixaLoteController";
+import { confirmarCorePet } from "../../services/corepetDialog";
 export default function useTransferenciaHistoricoController({
   parceiroSelecionado,
   transferenciaEditando,
@@ -601,7 +602,7 @@ export default function useTransferenciaHistoricoController({
   };
 
   const excluirTransferencia = async (registro) => {
-    const confirmar = window.confirm(
+    const confirmar = await confirmarCorePet(
       `Excluir a transferencia ${registro.documento || registro.conta_receber_id}? O estoque sera estornado.`,
     );
     if (!confirmar) return;

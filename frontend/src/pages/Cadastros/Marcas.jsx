@@ -5,6 +5,7 @@ import ActionButton from "../../components/ui/ActionButton";
 import EmptyState from "../../components/ui/EmptyState";
 import IconActionButton from "../../components/ui/IconActionButton";
 import LoadingState from "../../components/ui/LoadingState";
+import { confirmarCorePet } from "../../services/corepetDialog";
 
 const Marcas = () => {
   const [marcas, setMarcas] = useState([]);
@@ -68,7 +69,7 @@ const Marcas = () => {
   };
 
   const handleExcluir = async (marca) => {
-    if (!window.confirm(`Deseja realmente excluir a marca "${marca.nome}"?`)) {
+    if (!await confirmarCorePet(`Deseja realmente excluir a marca "${marca.nome}"?`)) {
       return;
     }
 

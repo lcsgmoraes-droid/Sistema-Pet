@@ -5,6 +5,7 @@ import ActionButton from "../../components/ui/ActionButton";
 import EmptyState from "../../components/ui/EmptyState";
 import IconActionButton from "../../components/ui/IconActionButton";
 import LoadingState from "../../components/ui/LoadingState";
+import { confirmarCorePet } from "../../services/corepetDialog";
 
 const Departamentos = () => {
   const [departamentos, setDepartamentos] = useState([]);
@@ -65,7 +66,7 @@ const Departamentos = () => {
   };
 
   const handleExcluir = async (departamento) => {
-    if (!window.confirm(`Deseja realmente excluir o departamento "${departamento.nome}"?`)) {
+    if (!await confirmarCorePet(`Deseja realmente excluir o departamento "${departamento.nome}"?`)) {
       return;
     }
     try {

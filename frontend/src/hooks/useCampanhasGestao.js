@@ -3,6 +3,7 @@ import api from "../api";
 import { formatBRL } from "../utils/formatters";
 import { FRASES_ANIVERSARIO } from "../components/campanhas/campanhasConstants";
 import { formatBenefitChannelsSummary } from "../utils/campaignChannelScope";
+import { confirmarCorePet } from "../services/corepetDialog";
 
 export default function useCampanhasGestao({ setCampanhas, carregarCampanhas }) {
   const [toggling, setToggling] = useState(null);
@@ -46,7 +47,7 @@ export default function useCampanhasGestao({ setCampanhas, carregarCampanhas }) 
 
   const arquivarCampanha = async (campanha) => {
     if (
-      !window.confirm(
+      !await confirmarCorePet(
         `Arquivar a campanha "${campanha.name}"? Ela ficara inativa e nao podera ser reativada pela interface.`,
       )
     ) {

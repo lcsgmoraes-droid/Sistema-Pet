@@ -11,6 +11,7 @@ import BanhoTosaCreditoForm from "./BanhoTosaCreditoForm";
 import BanhoTosaCreditosList from "./BanhoTosaCreditosList";
 import BanhoTosaPacoteForm from "./BanhoTosaPacoteForm";
 import BanhoTosaPacotesList from "./BanhoTosaPacotesList";
+import { confirmarCorePet } from "../../../services/corepetDialog";
 
 export default function BanhoTosaPacotesView({ servicos = [], onChanged }) {
   const [pacotes, setPacotes] = useState([]);
@@ -50,7 +51,7 @@ export default function BanhoTosaPacotesView({ servicos = [], onChanged }) {
   }
 
   async function excluirPacote(pacote) {
-    const confirmou = window.confirm(
+    const confirmou = await confirmarCorePet(
       `Excluir o pacote "${pacote.nome}"? Se ele ja tiver creditos emitidos, o sistema vai apenas desativar.`,
     );
     if (!confirmou) return;

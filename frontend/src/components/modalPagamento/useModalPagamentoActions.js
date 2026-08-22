@@ -20,6 +20,7 @@ import {
   persistirVendaAbertaParaPagamento,
   validarPagamentoParaAdicionar,
 } from "../modalPagamentoUtils";
+import { confirmarCorePet } from "../../services/corepetDialog";
 
 export function useModalPagamentoActions({
   bandeira,
@@ -146,7 +147,7 @@ export function useModalPagamentoActions({
   };
 
   const excluirPagamentoExistente = async (pagamentoId) => {
-    if (!globalThis.confirm("Deseja realmente excluir este pagamento?")) {
+    if (!await confirmarCorePet("Deseja realmente excluir este pagamento?")) {
       return;
     }
 
@@ -198,7 +199,7 @@ export function useModalPagamentoActions({
       return true;
     }
 
-    return globalThis.confirm(montarMensagemEstoqueNegativo(produtosNegativos));
+    return await confirmarCorePet(montarMensagemEstoqueNegativo(produtosNegativos));
   };
 
   const salvarVendaAbertaParaPagamento = async () => {
@@ -287,7 +288,7 @@ export function useModalPagamentoActions({
       setErro(mensagem);
       if (
         acaoFiscal &&
-        globalThis.confirm(`${mensagem}\n\nAbrir o cadastro fiscal deste produto agora?`)
+        await confirmarCorePet(`${mensagem}\n\nAbrir o cadastro fiscal deste produto agora?`)
       ) {
         navigate(acaoFiscal.url);
       } else {

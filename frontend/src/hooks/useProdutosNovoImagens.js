@@ -1,6 +1,7 @@
 import { useState } from "react";
 import api from "../api";
 import { deleteImagemProduto, uploadImagemProduto } from "../api/produtos";
+import { confirmarCorePet } from "../services/corepetDialog";
 
 const MAX_UPLOAD_SIZE_BYTES = 10 * 1024 * 1024;
 
@@ -61,7 +62,7 @@ export default function useProdutosNovoImagens({ id, setImagens }) {
   };
 
   const handleDeleteImagem = async (imagemId) => {
-    if (!window.confirm("Deseja realmente excluir esta imagem?")) {
+    if (!await confirmarCorePet("Deseja realmente excluir esta imagem?")) {
       return;
     }
 

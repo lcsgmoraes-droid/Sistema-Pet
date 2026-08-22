@@ -1,5 +1,6 @@
 import { useState } from "react";
 import api from "../api";
+import { confirmarCorePet, perguntarCorePet } from "../services/corepetDialog";
 
 export default function useCampanhasGestor() {
   const [gestorSearch, setGestorSearch] = useState("");
@@ -125,7 +126,7 @@ export default function useCampanhasGestor() {
   };
 
   const estornarCarimboGestor = async (stampId) => {
-    const motivo = window.prompt("Motivo do estorno (opcional):");
+    const motivo = await perguntarCorePet("Motivo do estorno (opcional):");
     if (motivo === null) return;
 
     setGestorRemovendo(stampId);
@@ -144,12 +145,12 @@ export default function useCampanhasGestor() {
     const ids = Array.from(new Set(stampIds)).filter(Boolean);
     if (!ids.length) return false;
 
-    const motivo = window.prompt(
+    const motivo = await perguntarCorePet(
       `Motivo do estorno para ${ids.length} carimbo(s) selecionado(s) (opcional):`,
     );
     if (motivo === null) return false;
 
-    if (!window.confirm(`Remover ${ids.length} carimbo(s) selecionado(s)?`)) {
+    if (!await confirmarCorePet(`Remover ${ids.length} carimbo(s) selecionado(s)?`)) {
       return false;
     }
 
@@ -199,7 +200,7 @@ export default function useCampanhasGestor() {
   };
 
   const anularCupomGestor = async (code) => {
-    if (!window.confirm(`Anular o cupom ${code}?`)) return;
+    if (!await confirmarCorePet(`Anular o cupom ${code}?`)) return;
 
     setGestorAnulando(code);
     try {

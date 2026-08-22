@@ -1,4 +1,5 @@
 import { safeArray } from "../../utils/safeArray";
+import { confirmarCorePet } from "../../services/corepetDialog";
 
 const hojeISO = () => new Date().toISOString().split("T")[0];
 
@@ -116,7 +117,7 @@ export const gerarPreviewParcelas = (dados, intervaloParcelas) => {
   return parcelas;
 };
 
-export const montarPayloadContaPagar = (dados, contaEdicao, pertenceRecorrencia) => {
+export const montarPayloadContaPagar = async (dados, contaEdicao, pertenceRecorrencia) => {
   const payload = {
     ...dados,
     valor_original: parseFloat(dados.valor_original),
@@ -137,7 +138,7 @@ export const montarPayloadContaPagar = (dados, contaEdicao, pertenceRecorrencia)
     descricaoAnterior &&
     descricaoAtual !== descricaoAnterior &&
     !payload.aplicar_recorrencia_futura &&
-    window.confirm("Deseja aplicar o novo nome aos próximos lançamentos desta recorrência?");
+    await confirmarCorePet("Deseja aplicar o novo nome aos próximos lançamentos desta recorrência?");
   const recorrenciaPayload = {
     data_inicio_recorrencia:
       normalizarDataOpcionalRecorrencia(payload.data_inicio_recorrencia) || payload.data_vencimento,

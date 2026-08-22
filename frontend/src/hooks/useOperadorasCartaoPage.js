@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "react-hot-toast";
 import api from "../api";
+import { confirmarCorePet } from "../services/corepetDialog";
 
 const FORM_INICIAL = {
   nome: "",
@@ -191,7 +192,7 @@ export function useOperadorasCartaoPage() {
   };
 
   const excluirOperadora = async (id) => {
-    const confirmar = window.confirm(
+    const confirmar = await confirmarCorePet(
       "Deseja realmente excluir esta operadora? Ela sera desativada se houver vendas vinculadas.",
     );
     if (!confirmar) return;

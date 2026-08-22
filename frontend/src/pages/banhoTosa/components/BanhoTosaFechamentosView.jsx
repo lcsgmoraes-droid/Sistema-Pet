@@ -9,6 +9,7 @@ import Panel from "../../../components/ui/Panel";
 import { formatMoneyBRL } from "../../../utils/formatters";
 import { banhoTosaApi } from "../banhoTosaApi";
 import { getApiErrorMessage } from "../banhoTosaUtils";
+import { confirmarCorePet } from "../../../services/corepetDialog";
 
 export default function BanhoTosaFechamentosView({ onChanged }) {
   const [pendencias, setPendencias] = useState([]);
@@ -60,7 +61,7 @@ export default function BanhoTosaFechamentosView({ onChanged }) {
   }
 
   async function entregar(item) {
-    const confirmou = window.confirm(
+    const confirmou = await confirmarCorePet(
       `Confirmar a entrega de ${item.pet_nome || "este pet"} e encerrar o atendimento?`,
     );
     if (!confirmou) return;

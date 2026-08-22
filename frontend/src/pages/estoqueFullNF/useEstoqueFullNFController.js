@@ -9,6 +9,7 @@ import {
   normalizarSku,
   toNumber,
 } from "./estoqueFullNFUtils";
+import { confirmarCorePet } from "../../services/corepetDialog";
 
 export function useEstoqueFullNFController() {
   const [numeroNF, setNumeroNF] = useState("");
@@ -402,7 +403,7 @@ export function useEstoqueFullNFController() {
       (soma, problema) => soma + Number(problema.faltante || 0),
       0,
     );
-    const confirmou = confirm(
+    const confirmou = await confirmarCorePet(
       `Confirmar esta baixa mesmo deixando estoque negativo?\n\nItens com falta: ${problemasEstoque.length}\nTotal faltante: ${formatarQuantidade(totalFaltante)}\n\nUse esta opcao apenas para nao travar o fluxo agora. Depois ajuste o estoque dos produtos.`,
     );
     if (!confirmou) return;

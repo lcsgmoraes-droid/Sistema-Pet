@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Settings } from "lucide-react";
 import { api } from "../../services/api";
 import FornecedorIdentity from "../../components/ui/FornecedorIdentity";
+import { confirmarCorePet } from "../../services/corepetDialog";
 
 // Componente Modal de Classificação
 export function ModalClassificacao({ movimentacao, onClose, onClassificar }) {
@@ -138,7 +139,7 @@ export function ModalRegras({ regras, onClose, onAtualizar }) {
   const [regrasLocais, setRegrasLocais] = useState(regras);
 
   const excluirRegra = async (regraId) => {
-    if (!confirm("Deseja realmente desativar esta regra?")) return;
+    if (!await confirmarCorePet("Deseja realmente desativar esta regra?")) return;
 
     try {
       await api.delete(`/conciliacao/regras/${regraId}`);

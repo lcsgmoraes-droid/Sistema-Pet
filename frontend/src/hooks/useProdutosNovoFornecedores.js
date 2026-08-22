@@ -5,6 +5,7 @@ import {
   getFornecedoresProduto,
   updateFornecedorProduto,
 } from "../api/produtos";
+import { confirmarCorePet } from "../services/corepetDialog";
 
 const FORNECEDOR_INICIAL = {
   fornecedor_id: "",
@@ -80,7 +81,7 @@ export default function useProdutosNovoFornecedores({ id }) {
   };
 
   const handleDeleteFornecedor = async (fornecedorId) => {
-    if (!window.confirm("Deseja realmente desvincular este fornecedor?")) {
+    if (!await confirmarCorePet("Deseja realmente desvincular este fornecedor?")) {
       return;
     }
 

@@ -35,6 +35,7 @@ import useProdutosRelatorios from "../hooks/useProdutosRelatorios";
 import useProdutosTabela from "../hooks/useProdutosTabela";
 import { useTour } from "../hooks/useTour";
 import { tourProdutos } from "../tours/tourDefinitions";
+import { confirmarCorePet } from "../services/corepetDialog";
 
 export default function Produtos() {
   const navigate = useNavigate();
@@ -216,7 +217,7 @@ export default function Produtos() {
       ignorados > 0
         ? `\n\n${ignorados} selecionado(s) ja tem Bling ou sao agrupadores e serao ignorados.`
         : "";
-    const confirmado = window.confirm(
+    const confirmado = await confirmarCorePet(
       `Cadastrar ${candidatos.length} produto(s) no Bling?${avisoIgnorados}`,
     );
     if (!confirmado) return;

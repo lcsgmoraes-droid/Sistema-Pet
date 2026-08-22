@@ -8,6 +8,7 @@ import {
   formatarQuantidadeMovimentacao as formatarQuantidade,
   parseNumeroInputMovimentacao as parseNumeroInput,
 } from "./movimentacoesProdutoUtils";
+import { confirmarCorePet } from "../../services/corepetDialog";
 
 export function useMovimentacoesProdutoGranel({ carregarDados, id, produto }) {
   const [showGranelModal, setShowGranelModal] = useState(false);
@@ -185,7 +186,7 @@ export function useMovimentacoesProdutoGranel({ carregarDados, id, produto }) {
   };
 
   const handleDesvincularGranel = async (vinculoId) => {
-    if (!confirm("Desvincular este produto granel da origem?")) {
+    if (!await confirmarCorePet("Desvincular este produto granel da origem?")) {
       return;
     }
 

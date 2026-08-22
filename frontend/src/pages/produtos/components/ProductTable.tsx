@@ -7,6 +7,7 @@ import React from "react";
 import { useNavigate } from "react-router-dom";
 import type { Product } from "../types";
 import "../styles/ProductTable.css";
+import { confirmarCorePet } from "../../../services/corepetDialog";
 
 interface ProductTableProps {
   products: Product[];
@@ -61,7 +62,7 @@ export const ProductTableComponent: React.FC<ProductTableProps> = ({
 
   const handleToggleStatus = async (product: Product) => {
     if (
-      confirm(
+      await confirmarCorePet(
         `Deseja ${product.status === "ativo" ? "inativar" : "ativar"} o produto "${product.nome}"?`,
       )
     ) {
