@@ -343,8 +343,8 @@ export default function ModalPagamentoFormaPanel({
                     operadoraSelecionada?.taxas_configuradas > 0 &&
                     !taxaCartaoSelecionada && (
                       <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
-                        Esta combinacao nao esta disponivel. Escolha outra bandeira ou quantidade
-                        de parcelas.
+                        Esta combinacao nao esta disponivel. Escolha outra bandeira ou quantidade de
+                        parcelas.
                       </div>
                     )}
 
@@ -379,7 +379,9 @@ export default function ModalPagamentoFormaPanel({
                   disabled={!parcelasDisponiveis.length}
                   className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 ${estiloVisualParcelamento.selectClass}`}
                 >
-                  {!parcelasDisponiveis.length && <option value="">Nenhuma parcela disponivel</option>}
+                  {!parcelasDisponiveis.length && (
+                    <option value="">Nenhuma parcela disponivel</option>
+                  )}
                   {parcelasDisponiveis.map((n) => {
                     const valorParaParcelar = valorRecebido || valorRestante;
                     const valorParcela = valorParaParcelar / n;
