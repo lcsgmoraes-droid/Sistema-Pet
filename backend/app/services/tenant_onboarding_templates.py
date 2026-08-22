@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Any
 
 DEFAULT_BUNDLE_CODE = "petshop-br"
-DEFAULT_BUNDLE_VERSION = "v1"
+DEFAULT_BUNDLE_VERSION = "v2"
 NAME_RECEITAS_VENDAS = "Receitas de Vendas"
 NAME_TAXAS_CARTAO = "Taxas de Cartao"
 PRODUCT_REFERENCE_DESCRIPTION = "Produto de referencia para importacao opcional."
@@ -487,6 +487,542 @@ BUILTIN_TEMPLATE_ITEMS: list[dict[str, Any]] = [
         920,
     ),
 ]
+
+
+# Base financeira v2: plano inicial suficientemente completo para o tenant
+# operar e classificar a DRE desde o primeiro dia, sem copiar movimentacoes,
+# valores ou dados privados de outra empresa.
+_DRE_CATEGORY_TEMPLATES = (
+    ("dre_outras_receitas", "Outras Receitas", "receita", 2),
+    ("dre_deducoes_receita", "Deduções da Receita", "despesa", 3),
+    ("dre_pessoal", "Despesas com Pessoal", "despesa", 6),
+    ("dre_ocupacao", "Despesas de Ocupação", "despesa", 7),
+    ("dre_comercial", "Despesas Comerciais", "despesa", 8),
+    ("dre_administrativas", "Despesas Administrativas", "despesa", 9),
+    ("dre_veiculos", "Despesas com Veículos e Logística", "despesa", 10),
+    ("dre_tributos", "Tributos", "despesa", 11),
+    ("dre_financeiras", "Despesas Financeiras", "despesa", 12),
+)
+
+for template_code, name, nature, order in _DRE_CATEGORY_TEMPLATES:
+    BUILTIN_TEMPLATE_ITEMS.append(
+        _template_item(
+            "dre_category",
+            template_code,
+            name,
+            {"nome": name, "ordem": order, "natureza": nature, "ativo": True},
+            100 + (order * 100),
+        )
+    )
+
+
+_DRE_SUBCATEGORY_TEMPLATES = (
+    (
+        "dre_receitas_financeiras",
+        "dre_outras_receitas",
+        "Receitas Financeiras",
+        "direto",
+        None,
+    ),
+    (
+        "dre_outras_receitas_operacionais",
+        "dre_outras_receitas",
+        "Outras Receitas Operacionais",
+        "direto",
+        None,
+    ),
+    (
+        "dre_devolucoes",
+        "dre_deducoes_receita",
+        "Devoluções e Cancelamentos",
+        "direto",
+        None,
+    ),
+    (
+        "dre_descontos_concedidos",
+        "dre_deducoes_receita",
+        "Descontos Concedidos",
+        "direto",
+        None,
+    ),
+    ("dre_cmv_servicos", "dre_cmv", "CMV - Materiais e Serviços", "direto", None),
+    ("dre_fretes_compras", "dre_cmv", "Fretes sobre Compras", "direto", None),
+    (
+        "dre_comissoes_vendas",
+        "dre_despesas_operacionais",
+        "Comissões de Vendas",
+        "direto",
+        None,
+    ),
+    ("dre_embalagens", "dre_despesas_operacionais", "Embalagens", "direto", None),
+    (
+        "dre_frete_operacional",
+        "dre_despesas_operacionais",
+        "Fretes e Entregas",
+        "direto",
+        None,
+    ),
+    (
+        "dre_salarios_encargos",
+        "dre_pessoal",
+        "Salários e Encargos",
+        "indireto_rateavel",
+        "faturamento",
+    ),
+    ("dre_prolabore", "dre_pessoal", "Pró-Labore", "corporativo", None),
+    (
+        "dre_beneficios",
+        "dre_pessoal",
+        "Benefícios e Treinamentos",
+        "indireto_rateavel",
+        "faturamento",
+    ),
+    (
+        "dre_aluguel",
+        "dre_ocupacao",
+        "Aluguel e Condomínio",
+        "indireto_rateavel",
+        "faturamento",
+    ),
+    (
+        "dre_energia",
+        "dre_ocupacao",
+        "Energia Elétrica",
+        "indireto_rateavel",
+        "faturamento",
+    ),
+    ("dre_agua", "dre_ocupacao", "Água e Esgoto", "indireto_rateavel", "faturamento"),
+    (
+        "dre_internet",
+        "dre_ocupacao",
+        "Internet e Telefonia",
+        "indireto_rateavel",
+        "faturamento",
+    ),
+    (
+        "dre_limpeza",
+        "dre_ocupacao",
+        "Limpeza e Conservação",
+        "indireto_rateavel",
+        "faturamento",
+    ),
+    (
+        "dre_manutencao_predial",
+        "dre_ocupacao",
+        "Manutenção Predial",
+        "indireto_rateavel",
+        "faturamento",
+    ),
+    (
+        "dre_seguranca",
+        "dre_ocupacao",
+        "Segurança e Alarme",
+        "indireto_rateavel",
+        "faturamento",
+    ),
+    (
+        "dre_marketing",
+        "dre_comercial",
+        "Marketing e Publicidade",
+        "indireto_rateavel",
+        "faturamento",
+    ),
+    (
+        "dre_fidelidade",
+        "dre_comercial",
+        "Fidelidade, Brindes e Eventos",
+        "indireto_rateavel",
+        "faturamento",
+    ),
+    (
+        "dre_contabilidade",
+        "dre_administrativas",
+        "Contabilidade e Assessoria",
+        "corporativo",
+        None,
+    ),
+    (
+        "dre_software",
+        "dre_administrativas",
+        "Softwares e Sistemas",
+        "corporativo",
+        None,
+    ),
+    (
+        "dre_material_escritorio",
+        "dre_administrativas",
+        "Material de Escritório e Limpeza",
+        "corporativo",
+        None,
+    ),
+    ("dre_seguros", "dre_administrativas", "Seguros e Licenças", "corporativo", None),
+    (
+        "dre_combustivel",
+        "dre_veiculos",
+        "Combustível",
+        "indireto_rateavel",
+        "faturamento",
+    ),
+    (
+        "dre_manutencao_veiculos",
+        "dre_veiculos",
+        "Manutenção de Veículos",
+        "indireto_rateavel",
+        "faturamento",
+    ),
+    (
+        "dre_logistica",
+        "dre_veiculos",
+        "Logística, Pedágios e Estacionamento",
+        "indireto_rateavel",
+        "faturamento",
+    ),
+    ("dre_simples_das", "dre_tributos", "Simples Nacional / DAS", "corporativo", None),
+    ("dre_impostos_vendas", "dre_tributos", "Impostos sobre Vendas", "direto", None),
+    (
+        "dre_tarifas_bancarias",
+        "dre_financeiras",
+        "Tarifas Bancárias",
+        "corporativo",
+        None,
+    ),
+    ("dre_juros_multas", "dre_financeiras", "Juros e Multas", "corporativo", None),
+    (
+        "dre_outros_fixos",
+        "dre_administrativas",
+        "Outros Custos Fixos",
+        "corporativo",
+        None,
+    ),
+    (
+        "dre_outros_variaveis",
+        "dre_despesas_operacionais",
+        "Outros Custos Variáveis",
+        "direto",
+        None,
+    ),
+)
+
+for index, (
+    template_code,
+    category_code,
+    name,
+    cost_type,
+    allocation_base,
+) in enumerate(
+    _DRE_SUBCATEGORY_TEMPLATES,
+    start=1,
+):
+    BUILTIN_TEMPLATE_ITEMS.append(
+        _template_item(
+            "dre_subcategory",
+            template_code,
+            name,
+            {
+                "categoria_code": category_code,
+                "nome": name,
+                "tipo_custo": cost_type,
+                "base_rateio": allocation_base,
+                "escopo_rateio": "ambos",
+                "ativo": True,
+            },
+            1300 + index,
+        )
+    )
+
+
+_FINANCIAL_CATEGORY_TEMPLATES = (
+    (
+        "fin_vendas_servicos",
+        "Vendas de Serviços",
+        "receita",
+        "#0D9488",
+        "briefcase",
+        "dre_vendas_servicos",
+        "variavel",
+    ),
+    (
+        "fin_receitas_financeiras",
+        "Receitas Financeiras",
+        "receita",
+        "#16A34A",
+        "landmark",
+        "dre_receitas_financeiras",
+        "variavel",
+    ),
+    (
+        "fin_outras_receitas",
+        "Outras Receitas",
+        "receita",
+        "#22C55E",
+        "circle-plus",
+        "dre_outras_receitas_operacionais",
+        "variavel",
+    ),
+    (
+        "fin_devolucoes",
+        "Devoluções e Cancelamentos",
+        "despesa",
+        "#DC2626",
+        "undo",
+        "dre_devolucoes",
+        "variavel",
+    ),
+    (
+        "fin_descontos",
+        "Descontos Concedidos",
+        "despesa",
+        "#EA580C",
+        "badge-percent",
+        "dre_descontos_concedidos",
+        "variavel",
+    ),
+    (
+        "fin_fretes_compras",
+        "Fretes sobre Compras",
+        "despesa",
+        "#0891B2",
+        "truck",
+        "dre_fretes_compras",
+        "variavel",
+    ),
+    (
+        "fin_taxas_cartao",
+        "Taxas de Cartão",
+        "despesa",
+        "#7C3AED",
+        "credit-card",
+        "dre_taxas_cartao",
+        "variavel",
+    ),
+    (
+        "fin_comissoes",
+        "Comissões de Vendas",
+        "despesa",
+        "#DB2777",
+        "users",
+        "dre_comissoes_vendas",
+        "variavel",
+    ),
+    (
+        "fin_embalagens",
+        "Embalagens",
+        "despesa",
+        "#D97706",
+        "package",
+        "dre_embalagens",
+        "variavel",
+    ),
+    (
+        "fin_salarios",
+        "Salários e Encargos",
+        "despesa",
+        "#4F46E5",
+        "users",
+        "dre_salarios_encargos",
+        "fixo",
+    ),
+    (
+        "fin_prolabore",
+        "Pró-Labore",
+        "despesa",
+        "#4338CA",
+        "user-round",
+        "dre_prolabore",
+        "fixo",
+    ),
+    (
+        "fin_aluguel",
+        "Aluguel e Condomínio",
+        "despesa",
+        "#64748B",
+        "store",
+        "dre_aluguel",
+        "fixo",
+    ),
+    (
+        "fin_energia",
+        "Energia Elétrica",
+        "despesa",
+        "#CA8A04",
+        "zap",
+        "dre_energia",
+        "fixo",
+    ),
+    ("fin_agua", "Água e Esgoto", "despesa", "#0284C7", "droplets", "dre_agua", "fixo"),
+    (
+        "fin_internet",
+        "Internet e Telefonia",
+        "despesa",
+        "#2563EB",
+        "wifi",
+        "dre_internet",
+        "fixo",
+    ),
+    (
+        "fin_marketing",
+        "Marketing e Publicidade",
+        "despesa",
+        "#DB2777",
+        "megaphone",
+        "dre_marketing",
+        "ambos",
+    ),
+    (
+        "fin_contabilidade",
+        "Contabilidade e Assessoria",
+        "despesa",
+        "#475569",
+        "calculator",
+        "dre_contabilidade",
+        "fixo",
+    ),
+    (
+        "fin_softwares",
+        "Softwares e Sistemas",
+        "despesa",
+        "#6366F1",
+        "monitor",
+        "dre_software",
+        "fixo",
+    ),
+    (
+        "fin_seguros",
+        "Seguros e Licenças",
+        "despesa",
+        "#0F766E",
+        "shield",
+        "dre_seguros",
+        "fixo",
+    ),
+    (
+        "fin_combustivel",
+        "Combustível e Veículos",
+        "despesa",
+        "#B45309",
+        "car",
+        "dre_combustivel",
+        "variavel",
+    ),
+    (
+        "fin_impostos",
+        "Impostos / DAS",
+        "despesa",
+        "#991B1B",
+        "landmark",
+        "dre_simples_das",
+        "fixo",
+    ),
+    (
+        "fin_tarifas_bancarias",
+        "Tarifas Bancárias",
+        "despesa",
+        "#334155",
+        "landmark",
+        "dre_tarifas_bancarias",
+        "variavel",
+    ),
+    (
+        "fin_juros_multas",
+        "Juros e Multas",
+        "despesa",
+        "#BE123C",
+        "triangle-alert",
+        "dre_juros_multas",
+        "variavel",
+    ),
+    (
+        "fin_outros_fixos",
+        "Outros Custos Fixos",
+        "despesa",
+        "#78716C",
+        "circle-ellipsis",
+        "dre_outros_fixos",
+        "fixo",
+    ),
+    (
+        "fin_outros_variaveis",
+        "Outros Custos Variáveis",
+        "despesa",
+        "#A16207",
+        "circle-ellipsis",
+        "dre_outros_variaveis",
+        "variavel",
+    ),
+)
+
+for index, (template_code, name, kind, color, icon, dre_code, cost_kind) in enumerate(
+    _FINANCIAL_CATEGORY_TEMPLATES,
+    start=1,
+):
+    BUILTIN_TEMPLATE_ITEMS.append(
+        _template_item(
+            "financial_category",
+            template_code,
+            name,
+            {
+                "nome": name,
+                "tipo": kind,
+                "cor": color,
+                "icone": icon,
+                "descricao": f"Classificação padrão: {name}.",
+                "dre_subcategory_code": dre_code,
+                "tipo_custo": cost_kind,
+                "ativo": True,
+            },
+            1500 + index,
+        )
+    )
+
+
+_EXPENSE_TYPE_TEMPLATES = (
+    ("expense_rent", "Aluguel", True, "dre_aluguel"),
+    ("expense_payroll", "Salários e Encargos", True, "dre_salarios_encargos"),
+    ("expense_das", "Impostos / DAS Simples Nacional", True, "dre_simples_das"),
+    ("expense_energy", "Energia Elétrica", True, "dre_energia"),
+    ("expense_phone", "Internet / Telefone", True, "dre_internet"),
+    ("expense_water", "Água", True, "dre_agua"),
+    ("expense_accounting", "Contador / Assessoria Contábil", True, "dre_contabilidade"),
+    ("expense_software", "Sistema / Software", True, "dre_software"),
+    ("expense_insurance", "Seguro", True, "dre_seguros"),
+    ("expense_fixed_marketing", "Marketing / Publicidade Fixo", True, "dre_marketing"),
+    ("expense_resale_products", "Produto para Revenda", False, "dre_cmv_produtos"),
+    ("expense_purchase_freight", "Frete de Compra", False, "dre_fretes_compras"),
+    ("expense_sales_commission", "Comissões de Vendas", False, "dre_comissoes_vendas"),
+    ("expense_packaging", "Embalagens", False, "dre_embalagens"),
+    (
+        "expense_performance_marketing",
+        "Marketing / Anúncios por Resultado",
+        False,
+        "dre_marketing",
+    ),
+    (
+        "expense_other_variable",
+        "Outros Custos Variáveis",
+        False,
+        "dre_outros_variaveis",
+    ),
+    ("expense_other_fixed", "Outros Custos Fixos", True, "dre_outros_fixos"),
+)
+
+for index, (template_code, name, is_fixed, dre_code) in enumerate(
+    _EXPENSE_TYPE_TEMPLATES,
+    start=1,
+):
+    BUILTIN_TEMPLATE_ITEMS.append(
+        _template_item(
+            "expense_type",
+            template_code,
+            name,
+            {
+                "nome": name,
+                "e_custo_fixo": is_fixed,
+                "dre_subcategory_code": dre_code,
+                "ativo": True,
+            },
+            1600 + index,
+        )
+    )
 
 BUILTIN_TEMPLATE_ITEMS.extend(
     [

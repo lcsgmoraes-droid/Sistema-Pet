@@ -123,7 +123,7 @@ def test_onboarding_script_future_tenant_check_does_not_read_or_update_existing_
     assert payload["tenant_scope"] == "synthetic_future_tenant"
     assert payload["dry_run"] is True
     assert payload["result"]["would_create"]["payment_methods"] == 4
-    assert payload["result"]["would_create"]["dre_categories"] == 3
+    assert payload["result"]["would_create"]["dre_categories"] == 12
     assert payload["result"]["would_create"]["product_categories"] == 2
     assert TENANT_A not in captured.out
     assert _count(onboarding_session, "formas_pagamento", TENANT_A) == 0
