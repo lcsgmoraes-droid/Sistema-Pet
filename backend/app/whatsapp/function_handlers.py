@@ -68,6 +68,7 @@ def buscar_produto(
                     "categoria": "Sem categoria",
                     "descricao": p.get("descricao", ""),
                     "imagem_url": p.get("imagem_url", ""),
+                    "validade": p.get("validade"),
                 }
                 for p in produtos
             ],

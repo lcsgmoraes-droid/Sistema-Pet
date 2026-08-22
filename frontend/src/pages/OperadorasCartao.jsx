@@ -30,6 +30,9 @@ function OperadorasCartao() {
     setErro,
     setFormData,
     setMostrarToken,
+    setTaxas,
+    taxas,
+    taxasLoading,
   } = useOperadorasCartaoPage();
 
   if (loading) {
@@ -48,7 +51,7 @@ function OperadorasCartao() {
       <PageHeader
         icon={CreditCard}
         title="Operadoras de Cartao"
-        subtitle="Configure as operadoras de cartao disponiveis para o PDV."
+        subtitle="Configure operadoras, bandeiras, parcelas e taxas usadas pelo PDV."
         actions={
           <ActionButton
             onClick={() => abrirModal()}
@@ -70,6 +73,10 @@ function OperadorasCartao() {
             <ul className="text-sm text-amber-700 space-y-1">
               <li>- Pelo menos uma operadora deve estar marcada como padrao e ativa</li>
               <li>- O PDV usara a operadora padrao automaticamente para vendas com cartao</li>
+              <li>- Cada combinacao de bandeira e parcela usada no PDV precisa ter uma taxa</li>
+              <li>
+                - Sugestoes inativas podem ser ativadas depois que as taxas reais forem preenchidas
+              </li>
               <li>
                 - Operadoras com vendas vinculadas nao podem ser excluidas (apenas desativadas)
               </li>
@@ -106,6 +113,9 @@ function OperadorasCartao() {
         operadoraSelecionada={operadoraSelecionada}
         setErro={setErro}
         setFormData={setFormData}
+        setTaxas={setTaxas}
+        taxas={taxas}
+        taxasLoading={taxasLoading}
       />
     </div>
   );

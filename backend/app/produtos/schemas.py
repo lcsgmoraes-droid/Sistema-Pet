@@ -7,7 +7,9 @@ A ordem das classes preserva o comportamento historico de ProdutoResponse e Lote
 from datetime import datetime
 from typing import List, Optional
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+
+from app.produtos.tipos import normalizar_tipo_catalogo
 
 
 # ==========================================
@@ -164,6 +166,7 @@ class KitComponenteResponse(BaseModel):
 class ProdutoBase(BaseModel):
     codigo: str  # SKU
     nome: str
+    tipo: str = "produto"
     descricao_curta: Optional[str] = None
     descricao_completa: Optional[str] = None
     codigo_barras: Optional[str] = None
@@ -257,6 +260,7 @@ class ProdutoCreate(ProdutoBase):
 class ProdutoUpdate(BaseModel):
     codigo: Optional[str] = None
     nome: Optional[str] = None
+    tipo: Optional[str] = None
     descricao_curta: Optional[str] = None
     descricao_completa: Optional[str] = None
     codigo_barras: Optional[str] = None
@@ -403,7 +407,7 @@ class ProdutoResponse(ProdutoBase):
 
     id: int
     estoque_atual: Optional[float] = 0
-    controlar_estoque: Optional[bool] = True  # Sempre controla estoque por padrão
+    controlar_estoque: bool = True
     markup_percentual: Optional[float] = None  # Campo calculado
     ativo: bool
     created_at: datetime
@@ -455,6 +459,30 @@ class ProdutoResponse(ProdutoBase):
     bling_sincronizar: bool = False
     bling_ultima_sincronizacao: Optional[datetime] = None
     bling_ultimo_erro: Optional[str] = None
+
+    @field_validator("tipo", mode="before")
+    @classmethod
+    def normalizar_tipo(cls, value) -> str:
+        return normalizar_tipo_catalogo(value)
+
+    @model_validator(mode="after")
+    def ocultar_estoque_de_servico(self):
+        if self.controlar_estoque:
+            return self
+
+        self.estoque_atual = 0
+        self.estoque_minimo = 0
+        self.estoque_maximo = 0
+        self.estoque_reservado = 0
+        self.estoque_disponivel = 0
+        self.estoque_virtual = None
+        self.controle_lote = False
+        self.lotes = []
+        self.lotes_validade_resumo = []
+        self.validade_proxima = None
+        self.validade_proxima_listagem = None
+        self.lote_validade_proxima = None
+        return self
 
     @field_validator("categoria_nome", mode="before")
     @classmethod

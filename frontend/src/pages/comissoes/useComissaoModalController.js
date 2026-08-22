@@ -220,7 +220,9 @@ export function useComissaoModalController({ funcionarioId, configuracoes, onSav
       }
 
       if (
-        !await confirmarCorePet("Deseja atualizar as regras de cálculo em TODAS as configurações deste parceiro?")
+        !(await confirmarCorePet(
+          "Deseja atualizar as regras de cálculo em TODAS as configurações deste parceiro?",
+        ))
       ) {
         return;
       }
@@ -261,7 +263,10 @@ export function useComissaoModalController({ funcionarioId, configuracoes, onSav
   };
 
   const removerConfiguracaoExistente = async (key, config) => {
-    if (!await confirmarCorePet(`Deseja remover a configuração de "${config.nome_item || "Item"}"?`)) return;
+    if (
+      !(await confirmarCorePet(`Deseja remover a configuração de "${config.nome_item || "Item"}"?`))
+    )
+      return;
 
     try {
       await api.delete(`/comissoes/configuracoes/${config.id}`);

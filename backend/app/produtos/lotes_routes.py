@@ -27,6 +27,14 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
+def _validar_controle_estoque(produto: Produto) -> None:
+    if not getattr(produto, "controlar_estoque", True):
+        raise HTTPException(
+            status_code=400,
+            detail="Serviços não controlam estoque nem possuem lotes",
+        )
+
+
 # ==========================================
 # ENDPOINTS - LOTES E FIFO
 # ==========================================
@@ -60,6 +68,7 @@ def criar_lote(
 
     if not produto:
         raise HTTPException(status_code=404, detail="Produto não encontrado")
+    _validar_controle_estoque(produto)
 
     # Verificar se número de lote já existe para este produto
     lote_existente = (
@@ -133,6 +142,9 @@ def listar_lotes(
     if not produto:
         raise HTTPException(status_code=404, detail="Produto não encontrado")
 
+    if not getattr(produto, "controlar_estoque", True):
+        return []
+
     query = db.query(ProdutoLote).filter(
         ProdutoLote.produto_id == produto_id,
         ProdutoLote.status != "excluido",  # Apenas lotes não excluídos
@@ -180,6 +192,7 @@ def atualizar_lote(
 
     if not produto:
         raise HTTPException(status_code=404, detail="Produto não encontrado")
+    _validar_controle_estoque(produto)
 
     # Calcular diferença de quantidade para ajustar estoque
     diferenca_quantidade = lote_data.quantidade_inicial - lote.quantidade_inicial
@@ -288,6 +301,8 @@ def entrada_estoque(
 
     if not produto:
         raise HTTPException(status_code=404, detail="Produto não encontrado")
+
+    _validar_controle_estoque(produto)
 
     # VALIDAÇÃO: Produto PAI não pode ter movimentação de estoque
     if produto.is_parent:
@@ -415,6 +430,8 @@ def saida_estoque_fifo(
 
     if not produto:
         raise HTTPException(status_code=404, detail="Produto não encontrado")
+
+    _validar_controle_estoque(produto)
 
     # VALIDAÇÃO: Produto PAI não pode ter movimentação de estoque
     if produto.is_parent:

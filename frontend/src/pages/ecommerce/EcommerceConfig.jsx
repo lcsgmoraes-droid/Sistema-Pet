@@ -251,9 +251,9 @@ export default function EcommerceConfig() {
 
   async function desconectarMercadoPago() {
     if (
-      !await confirmarCorePet(
+      !(await confirmarCorePet(
         "Desconectar o Mercado Pago vai impedir novos pagamentos online. Deseja continuar?",
-      )
+      ))
     ) {
       return;
     }

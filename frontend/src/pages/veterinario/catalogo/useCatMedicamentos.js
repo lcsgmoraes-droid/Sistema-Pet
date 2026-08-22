@@ -80,7 +80,7 @@ export function useCatMedicamentos() {
   }
 
   async function excluir(item) {
-    if (!await confirmarCorePet(`Deseja excluir o medicamento "${item.nome}"?`)) return;
+    if (!(await confirmarCorePet(`Deseja excluir o medicamento "${item.nome}"?`))) return;
     setRemovendoId(item.id);
     setErro("");
     try {

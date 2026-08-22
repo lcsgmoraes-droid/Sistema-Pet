@@ -1,5 +1,6 @@
 import { Printer } from "lucide-react";
 import PropTypes from "prop-types";
+import { createPortal } from "react-dom";
 import { formatMoneyBRL } from "../utils/formatters";
 import ActionButton from "./ui/ActionButton";
 
@@ -191,10 +192,10 @@ function montarCupom(venda) {
   return linhas.join("\n");
 }
 
-export function CupomImpressao({ venda }) {
+export function CupomImpressao({ portal = false, venda }) {
   if (!venda) return null;
 
-  return (
+  const conteudo = (
     <>
       {/* Estilos espec\u00edficos para impress\u00e3o */}
       <style>{`
@@ -247,6 +248,13 @@ export function CupomImpressao({ venda }) {
       </pre>
     </>
   );
+
+  const portalTarget = globalThis.document?.body;
+  if (portal && portalTarget) {
+    return createPortal(conteudo, portalTarget);
+  }
+
+  return conteudo;
 }
 
 export default function ImprimirCupom({ className = "", size = "md", venda }) {
@@ -318,6 +326,7 @@ const vendaPropType = PropTypes.shape({
 });
 
 CupomImpressao.propTypes = {
+  portal: PropTypes.bool,
   venda: vendaPropType,
 };
 

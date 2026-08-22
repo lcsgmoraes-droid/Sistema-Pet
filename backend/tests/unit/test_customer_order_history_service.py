@@ -18,6 +18,7 @@ def test_channel_label_for_explicit_customer_channels():
     assert channel_label_for("app") == "App mobile"
     assert channel_label_for("loja_fisica") == "Loja fisica / ERP"
     assert channel_label_for("mercado_livre") == "Mercado Livre"
+    assert channel_label_for("whatsapp") == "WhatsApp"
     assert channel_label_for("canal_novo") == "Canal novo"
 
 

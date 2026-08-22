@@ -217,10 +217,10 @@ const ClassificarLancamentosModal = ({ isOpen, onClose, onSuccess }) => {
     }
 
     if (
-      !await confirmarCorePet(
+      !(await confirmarCorePet(
         `Deseja marcar "${beneficiario}" como fornecedor de produtos (Não Controla DRE)?\n\n` +
           `Todos os lançamentos deste fornecedor serão automaticamente ignorados no DRE.`,
-      )
+      ))
     ) {
       return;
     }

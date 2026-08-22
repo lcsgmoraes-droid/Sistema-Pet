@@ -244,7 +244,6 @@ def test_apply_base_catalog_import_requires_explicit_confirmation(ops_tenants_se
         apply_base_catalog_import(
             ops_tenants_session,
             tenant_id=TARGET_TENANT,
-            actor_user_id=99,
             confirm=False,
         )
 

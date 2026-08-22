@@ -1,4 +1,5 @@
 from app.whatsapp import function_handlers as fh
+from app.whatsapp import tool_product_search as product_search
 from app.whatsapp.tool_executor import _matches_relaxed_product_query
 from types import SimpleNamespace
 
@@ -142,3 +143,59 @@ def test_relaxed_product_match_does_not_turn_golden_into_any_racao():
     )
 
     assert _matches_relaxed_product_query(product, ["racao", "golden"]) is False
+
+
+def test_common_catalog_typos_are_corrected_conservatively():
+    assert (
+        product_search.correct_common_product_query_typos("bob dog golde 3kg")
+        == "bob dog gold 3kg"
+    )
+    assert (
+        product_search.correct_common_product_query_typos("ração golde 3kg")
+        == "racao golden 3kg"
+    )
+    assert (
+        product_search.correct_common_product_query_typos("Royal Canim 10kg")
+        == "royal canin 10kg"
+    )
+    assert (
+        product_search.correct_common_product_query_typos("spesial dog gould 15kg")
+        == "special dog gold 15kg"
+    )
+    assert (
+        product_search.correct_common_product_query_typos("especial dog gould 15kg")
+        == "special dog gold 15kg"
+    )
+    assert (
+        product_search.correct_common_product_query_typos("bou dog golde 3kg")
+        == "bob dog gold 3kg"
+    )
+
+
+def test_remote_catalog_receives_corrected_typo(monkeypatch):
+    captured = {}
+
+    monkeypatch.setattr(product_search, "remote_data_enabled", lambda: True)
+
+    def fake_remote_catalog(_tenant_id, query, **_kwargs):
+        captured["query"] = query
+        return {
+            "success": True,
+            "produtos": [
+                {
+                    "nome": "Racao Bob Dog Gold Adultos 3kg",
+                    "estoque": 2,
+                }
+            ],
+        }
+
+    monkeypatch.setattr(product_search, "fetch_remote_catalog", fake_remote_catalog)
+
+    result = product_search.buscar_produtos(
+        None,
+        "tenant-test",
+        "bob dog golde 3kg",
+    )
+
+    assert captured["query"] == "bob dog gold 3kg"
+    assert result["produtos"][0]["nome"] == "Racao Bob Dog Gold Adultos 3kg"

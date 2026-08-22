@@ -124,9 +124,9 @@ export default function NotasFiscais() {
 
   const excluirNota = async (venda_id, numero) => {
     if (
-      !await confirmarCorePet(
+      !(await confirmarCorePet(
         `Deseja realmente excluir a nota ${numero}?\n\nIsso apenas remove os dados da nota do sistema, não cancela no Bling/SEFAZ.`,
-      )
+      ))
     ) {
       return;
     }

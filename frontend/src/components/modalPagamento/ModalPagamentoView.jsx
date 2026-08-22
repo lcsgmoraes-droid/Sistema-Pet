@@ -66,6 +66,9 @@ export default function ModalPagamentoView({
   mostrarModalCreditoExcedente,
   setMostrarModalCreditoExcedente,
   valorExcedente,
+  bandeirasDisponiveis,
+  parcelasDisponiveis,
+  taxaCartaoSelecionada,
 }) {
   return (
     <>
@@ -120,6 +123,9 @@ export default function ModalPagamentoView({
                 estiloVisualParcelamento={estiloVisualParcelamento}
                 simulacoesParcelamento={simulacoesParcelamento}
                 adicionarPagamento={adicionarPagamento}
+                bandeirasDisponiveis={bandeirasDisponiveis}
+                parcelasDisponiveis={parcelasDisponiveis}
+                taxaCartaoSelecionada={taxaCartaoSelecionada}
               />
 
               {/* Coluna Direita - Resumo */}

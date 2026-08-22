@@ -87,7 +87,7 @@ export default function useProdutosNovoVariacoes({ id, isEdicao, abaAtiva, formD
   };
 
   const handleExcluirVariacao = async (variacao) => {
-    if (!await confirmarCorePet(`Deseja excluir a variação ${variacao.nome}?`)) {
+    if (!(await confirmarCorePet(`Deseja excluir a variação ${variacao.nome}?`))) {
       return;
     }
 

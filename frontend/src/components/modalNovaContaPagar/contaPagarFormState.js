@@ -138,7 +138,9 @@ export const montarPayloadContaPagar = async (dados, contaEdicao, pertenceRecorr
     descricaoAnterior &&
     descricaoAtual !== descricaoAnterior &&
     !payload.aplicar_recorrencia_futura &&
-    await confirmarCorePet("Deseja aplicar o novo nome aos próximos lançamentos desta recorrência?");
+    (await confirmarCorePet(
+      "Deseja aplicar o novo nome aos próximos lançamentos desta recorrência?",
+    ));
   const recorrenciaPayload = {
     data_inicio_recorrencia:
       normalizarDataOpcionalRecorrencia(payload.data_inicio_recorrencia) || payload.data_vencimento,

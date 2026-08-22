@@ -5,10 +5,19 @@ from __future__ import annotations
 import re
 import unicodedata
 from typing import Any, Optional
+from urllib.parse import urlsplit
 
 
 ORDER_DRAFT_CONTEXT_KEY = "pending_order_draft"
 HISTORY_ITEM_SELECTION_CONTEXT_KEY = "pending_history_item_selection"
+ORDER_INTRO_PATTERN = re.compile(
+    r"(?i)^\s*(?:"
+    r"(?:eu\s+)?(?:quero|queria|gostaria\s+de|preciso(?:\s+de)?|vou\s+querer)"
+    r"(?:\s+(?:pedir|comprar|levar))?"
+    r"|(?:pode\s+)?(?:manda(?:r)?|envia(?:r)?|pedir)"
+    r"|pedido"
+    r")\s*:?\s*"
+)
 
 
 def _normalize(value: str) -> str:
@@ -16,6 +25,10 @@ def _normalize(value: str) -> str:
     return "".join(
         character for character in normalized if not unicodedata.combining(character)
     ).lower()
+
+
+def _strip_order_intro(message: str) -> str:
+    return ORDER_INTRO_PATTERN.sub("", message or "", count=1)
 
 
 def is_generic_reorder_request(message: str) -> bool:
@@ -53,12 +66,8 @@ def extract_history_quantity_request(message: str) -> Optional[dict[str, Any]]:
 
 def extract_multi_item_order(message: str) -> list[dict[str, Any]]:
     """Extrai listas explícitas como '1 saco de ração, 2 pacotes de areia'."""
-    cleaned = re.sub(
-        r"(?i)^\s*(?:quero|preciso|manda|mandar|gostaria de|vou querer|pedido)\s*:?[ ]*",
-        "",
-        message or "",
-    )
-    parts = re.split(r"[,;\n]+|\s+e\s+(?=\d+(?:[.,]\d+)?\s)", cleaned)
+    cleaned = _strip_order_intro(message)
+    parts = re.split(r"(?:[,;\n]+|\s+e\s+(?=\d+(?:[.,]\d+)?\s))", cleaned)
     items: list[dict[str, Any]] = []
     item_pattern = re.compile(
         r"(?i)^\s*(?P<quantity>\d+(?:[.,]\d+)?)\s*"
@@ -70,10 +79,11 @@ def extract_multi_item_order(message: str) -> list[dict[str, Any]]:
         if not match:
             continue
         product = re.sub(
-            r"(?i)^(?:de|da|do)\s+|\s+(?:por favor|pfv)$",
+            r"(?i)^(?:de|da|do)\s+",
             "",
             match.group("product").strip(),
-        ).strip()
+        )
+        product = re.sub(r"(?i)\s+(?:por favor|pfv)$", "", product).strip()
         if len(product) < 2:
             continue
         items.append(
@@ -85,6 +95,42 @@ def extract_multi_item_order(message: str) -> list[dict[str, Any]]:
         )
 
     return items if len(items) >= 2 else []
+
+
+def extract_single_item_order(message: str) -> Optional[dict[str, Any]]:
+    """Extrai um pedido explícito com quantidade e produto identificável."""
+    cleaned = _strip_order_intro(message)
+    cleaned = re.sub(r"(?i)\s+(?:por favor|pfv)\s*[.!?]*$", "", cleaned).strip()
+    match = re.fullmatch(
+        r"(?i)\s*(?P<quantity>\d+(?:[.,]\d+)?)\s*"
+        r"(?P<unit>x|un(?:idade)?s?|pct|pacotes?|sacos?|latas?|caixas?|sach[eê]s?)?\s+"
+        r"(?P<product>.+?)\s*",
+        cleaned,
+    )
+    if not match:
+        return None
+
+    product = re.sub(
+        r"(?i)^(?:de|da|do)\s+",
+        "",
+        match.group("product").strip(),
+    )
+    if len(product) < 2 or not re.search(r"[A-Za-zÀ-ÿ]", product):
+        return None
+
+    catalog_query = re.sub(r"(?i)\bbobdog\b", "Bob Dog", product)
+    catalog_query = re.sub(r"(?i)\bgolde\b", "Gold", catalog_query)
+    catalog_query = re.sub(
+        r"(?i)\bde\s+(?=\d+(?:[.,]\d+)?\s*(?:kg|g|ml|l)\b)", "", catalog_query
+    )
+    catalog_query = re.sub(r"\s+", " ", catalog_query).strip()
+
+    return {
+        "quantity": float(match.group("quantity").replace(",", ".")),
+        "unit": (match.group("unit") or "x").lower(),
+        "name": product,
+        "catalog_query": catalog_query,
+    }
 
 
 def format_quantity(value: Any) -> str:
@@ -109,19 +155,25 @@ def build_order_draft_message(
     items: list[dict[str, Any]],
     *,
     from_history: bool,
+    retry: bool = False,
 ) -> str:
-    opening = (
-        "Encontrei esta compra no seu histórico:"
-        if from_history
-        else "Organizei seu pedido assim:"
-    )
+    if retry:
+        opening = "Quero ter certeza de que entendi. Este é o pedido que você quer?"
+    else:
+        opening = (
+            "Encontrei esta compra no seu histórico:"
+            if from_history
+            else "Organizei seu pedido assim:"
+        )
     lines = [opening]
     lines.extend(
         f"{index}. {format_draft_item(item)}"
         for index, item in enumerate(items, start=1)
     )
     lines.append(
-        "Está certo? Responda sim para eu encaminhar o pedido ou diga o que deseja alterar."
+        "Pode responder do seu jeito — por exemplo, ‘sim, está certo’ ou "
+        "‘quero alterar a quantidade’. Se preferir, use 1 para confirmar e "
+        "2 para alterar."
     )
     return "\n\n".join(lines)
 
@@ -145,12 +197,20 @@ def purchase_items_as_draft(purchase: dict) -> list[dict[str, Any]]:
     ]
 
 
+def is_safe_product_image_url(value: Any) -> bool:
+    """Aceita somente imagens externas transmitidas com HTTPS."""
+    parsed = urlsplit(str(value or "").strip())
+    return parsed.scheme == "https" and bool(parsed.netloc)
+
+
 def draft_product_media(items: list[dict[str, Any]]) -> list[dict[str, str]]:
     return [
         {
-            "image_url": str(item.get("image_url") or ""),
-            "caption": str(item.get("name") or "Produto"),
+            "image_url": str(item.get("image_url") or item.get("imagem_url") or ""),
+            "caption": str(item.get("name") or item.get("nome") or "Produto"),
         }
         for item in items
-        if str(item.get("image_url") or "").startswith(("http://", "https://"))
+        if is_safe_product_image_url(
+            item.get("image_url") or item.get("imagem_url") or ""
+        )
     ]

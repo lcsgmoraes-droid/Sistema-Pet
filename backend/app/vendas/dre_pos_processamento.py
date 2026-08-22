@@ -121,6 +121,7 @@ def gerar_dre_competencia_venda(
             "amazon": "Amazon",
             "ecommerce": "E-commerce",
             "app": "App",
+            "whatsapp": "E-commerce",
         }
         canal_label = canal_labels.get(canal, "Loja Fisica")
 

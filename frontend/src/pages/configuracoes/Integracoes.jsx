@@ -1,7 +1,16 @@
 import { useState } from "react";
-import { FiActivity, FiArrowLeft, FiCheck, FiCpu, FiGrid, FiPackage } from "react-icons/fi";
+import {
+  FiActivity,
+  FiArrowLeft,
+  FiCheck,
+  FiCpu,
+  FiGrid,
+  FiPackage,
+  FiShoppingBag,
+} from "react-icons/fi";
 import BlingIntegracao from "./BlingIntegracao";
 import EcommerceAIIntegracaoCard from "./EcommerceAIIntegracaoCard";
+import IfoodIntegracaoCard from "./IfoodIntegracaoCard";
 import OpenAIIntegracaoCard from "./OpenAIIntegracaoCard";
 
 const INTEGRACOES = [
@@ -20,6 +29,22 @@ const INTEGRACOES = [
       "border-emerald-200 bg-emerald-50/70 hover:border-emerald-300 hover:bg-emerald-50 dark:border-emerald-800 dark:bg-emerald-950/20 dark:hover:border-emerald-700",
     iconClass: "bg-emerald-600 text-white",
     linkClass: "text-emerald-700 dark:text-emerald-300",
+  },
+  {
+    id: "ifood",
+    nome: "iFood",
+    categoria: "Marketplace",
+    descricao: "Prepare produtos, preços e estoque do CorePet para vender no iFood.",
+    recursos: [
+      "Catálogo gerado a partir do ERP",
+      "Validação de EAN, preço e estoque",
+      "Simulação segura antes da publicação",
+    ],
+    icon: FiShoppingBag,
+    cardClass:
+      "border-red-200 bg-red-50/70 hover:border-red-300 hover:bg-red-50 dark:border-red-900 dark:bg-red-950/20 dark:hover:border-red-800",
+    iconClass: "bg-red-600 text-white",
+    linkClass: "text-red-700 dark:text-red-300",
   },
   {
     id: "ecommerceai",
@@ -57,6 +82,7 @@ const INTEGRACOES = [
 
 const PAINEIS = {
   bling: BlingIntegracao,
+  ifood: IfoodIntegracaoCard,
   ecommerceai: EcommerceAIIntegracaoCard,
   openai: OpenAIIntegracaoCard,
 };

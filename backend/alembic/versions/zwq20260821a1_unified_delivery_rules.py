@@ -1,7 +1,7 @@
 """unify delivery pricing rules for app and ecommerce
 
 Revision ID: zwq20260821a1
-Revises: zwp20260816a1
+Revises: ifr20260816a1
 """
 
 from alembic import op
@@ -9,7 +9,7 @@ import sqlalchemy as sa
 
 
 revision = "zwq20260821a1"
-down_revision = "zwp20260816a1"
+down_revision = "ifr20260816a1"
 branch_labels = None
 depends_on = None
 

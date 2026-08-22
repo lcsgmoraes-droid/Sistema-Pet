@@ -230,8 +230,9 @@ export default function EcommerceConfigView({
             </p>
           </div>
           <div className="rounded-lg border border-blue-100 bg-blue-50 p-4 text-sm text-blue-900">
-            Configure taxa fixa ou preço por km, área máxima, frete grátis, pedido mínimo e prazo em
-            um só lugar. A regra é recalculada pelo servidor antes de criar cada pedido.
+            Configure taxa fixa, preço por km ou preços fechados por faixa de distância, além de
+            área máxima, frete grátis, pedido mínimo e prazo. A regra é recalculada pelo servidor
+            antes de criar cada pedido.
           </div>
           <a
             href="/configuracoes/entregas"

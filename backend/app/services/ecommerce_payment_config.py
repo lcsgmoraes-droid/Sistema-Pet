@@ -720,8 +720,7 @@ def get_mercado_pago_account_identity(
         "mercado_pago_user_id": mercado_pago_user_id or stored_user_id or None,
         "account_holder": account_holder,
         "email_masked": _mask_account_email(data.get("email")),
-        "identification_type": str(identification.get("type") or "").strip()
-        or None,
+        "identification_type": str(identification.get("type") or "").strip() or None,
         "identification_last_four": _last_four(identification.get("number")),
     }
 

@@ -71,7 +71,13 @@ def _resolve_taxa_cartao_total(
     taxa_total = 0.0
 
     for pagamento in list(getattr(venda, "pagamentos", []) or []):
+        taxa_aplicada = getattr(pagamento, "valor_taxa_prevista", None)
+        if taxa_aplicada is not None:
+            taxa_total += _as_float(taxa_aplicada)
+            continue
+
         taxa_percentual = 0.0
+        taxa_fixa = 0.0
         forma_pagamento = _normalize_forma_pagamento(
             getattr(pagamento, "forma_pagamento", None)
         )
@@ -87,15 +93,25 @@ def _resolve_taxa_cartao_total(
 
             numero_parcelas = getattr(pagamento, "numero_parcelas", None)
             if isinstance(taxas_por_parcela, dict) and numero_parcelas:
-                taxa_percentual = _as_float(
-                    taxas_por_parcela.get(str(numero_parcelas), 0)
-                )
+                configured = taxas_por_parcela.get(str(numero_parcelas))
+                if isinstance(configured, dict):
+                    taxa_percentual = _as_float(
+                        configured.get("taxa_percentual", forma.taxa_percentual)
+                    )
+                    taxa_fixa = _as_float(configured.get("taxa_fixa", forma.taxa_fixa))
+                elif configured is not None:
+                    taxa_percentual = _as_float(configured)
+                    taxa_fixa = _as_float(getattr(forma, "taxa_fixa", 0))
+                else:
+                    taxa_percentual = _as_float(getattr(forma, "taxa_percentual", 0))
+                    taxa_fixa = _as_float(getattr(forma, "taxa_fixa", 0))
             else:
                 taxa_percentual = _as_float(getattr(forma, "taxa_percentual", 0))
+                taxa_fixa = _as_float(getattr(forma, "taxa_fixa", 0))
 
         taxa_total += (
             _as_float(getattr(pagamento, "valor", 0)) * taxa_percentual / 100.0
-        )
+        ) + taxa_fixa
 
     return _round_money(taxa_total)
 

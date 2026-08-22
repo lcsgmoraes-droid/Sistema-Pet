@@ -2,12 +2,11 @@
 
 from __future__ import annotations
 
-from decimal import Decimal, ROUND_HALF_UP
+from decimal import Decimal, ROUND_CEILING, ROUND_HALF_UP
 from typing import Callable
 import unicodedata
 
 from app.services.google_maps_service import calcular_distancia_km
-
 
 MONEY = Decimal("0.01")
 DISTANCE = Decimal("0.01")
@@ -39,6 +38,30 @@ def _money(value) -> Decimal:
     )
 
 
+def _distance_tiers(value) -> list[dict[str, Decimal]]:
+    """Normaliza faixas persistidas em JSON sem confiar no formato do banco."""
+
+    if not isinstance(value, list):
+        return []
+
+    tiers = []
+    for item in value:
+        if isinstance(item, dict):
+            limit_value = item.get("ate_km")
+            price_value = item.get("valor")
+        else:
+            limit_value = getattr(item, "ate_km", None)
+            price_value = getattr(item, "valor", None)
+
+        limit = _decimal(limit_value)
+        price = _decimal(price_value)
+        if limit is None or limit <= 0 or price is None or price < 0:
+            continue
+        tiers.append({"ate_km": limit, "valor": _money(price)})
+
+    return sorted(tiers, key=lambda tier: tier["ate_km"])
+
+
 def resolve_delivery_policy(config, tenant) -> dict:
     """Combina a configuracao nova com os campos legados do tenant."""
 
@@ -56,7 +79,7 @@ def resolve_delivery_policy(config, tenant) -> dict:
         return default
 
     modalidade = str(configured("modalidade_cobranca", default="fixa") or "fixa")
-    if modalidade not in {"fixa", "por_km"}:
+    if modalidade not in {"fixa", "por_km", "por_faixa"}:
         modalidade = "fixa"
 
     return {
@@ -75,6 +98,10 @@ def resolve_delivery_policy(config, tenant) -> dict:
             configured("valor_por_km_cobrado", default=Decimal("0"))
         ),
         "taxa_minima": _money(configured("taxa_minima", default=Decimal("0"))),
+        "faixas_distancia": _distance_tiers(configured("faixas_distancia", default=[])),
+        "valor_km_excedente": _money(
+            configured("valor_km_excedente", default=Decimal("0"))
+        ),
         "distancia_maxima_entrega_km": _decimal(
             configured("distancia_maxima_entrega_km")
         ),
@@ -154,7 +181,7 @@ def quote_delivery(
     endereco_destino = str(endereco_destino or "").strip()
     origem = build_origin_address(config, tenant)
     needs_distance = bool(
-        policy["modalidade_cobranca"] == "por_km"
+        policy["modalidade_cobranca"] in {"por_km", "por_faixa"}
         or policy["distancia_maxima_entrega_km"] is not None
         or (
             policy["frete_gratis_acima"] is not None
@@ -196,6 +223,8 @@ def quote_delivery(
             f"Endereco fora da area de entrega. O limite desta loja e {float(limite_entrega):g} km."
         )
 
+    faixa_aplicada = None
+    km_excedentes_cobrados = 0
     if policy["modalidade_cobranca"] == "por_km":
         if policy["valor_por_km_cobrado"] <= 0:
             raise DeliveryQuoteError(
@@ -205,6 +234,35 @@ def quote_delivery(
             (distancia_km or Decimal("0")) * policy["valor_por_km_cobrado"],
             policy["taxa_minima"],
         ).quantize(MONEY, rounding=ROUND_HALF_UP)
+    elif policy["modalidade_cobranca"] == "por_faixa":
+        tiers = policy["faixas_distancia"]
+        if not tiers:
+            raise DeliveryQuoteError(
+                "Entrega por faixa ainda nao configurada: cadastre ao menos uma faixa de distancia."
+            )
+
+        distance = distancia_km or Decimal("0")
+        faixa_aplicada = next(
+            (tier for tier in tiers if distance <= tier["ate_km"]), None
+        )
+        if faixa_aplicada is not None:
+            valor_base = faixa_aplicada["valor"]
+        else:
+            last_tier = tiers[-1]
+            extra_price = policy["valor_km_excedente"]
+            if extra_price <= 0:
+                raise DeliveryQuoteError(
+                    "Endereco fora das faixas de entrega configuradas para esta loja."
+                )
+            km_excedentes_cobrados = int(
+                (distance - last_tier["ate_km"]).to_integral_value(
+                    rounding=ROUND_CEILING
+                )
+            )
+            valor_base = (
+                last_tier["valor"] + extra_price * km_excedentes_cobrados
+            ).quantize(MONEY, rounding=ROUND_HALF_UP)
+            faixa_aplicada = last_tier
     else:
         valor_base = policy["taxa_fixa"]
 
@@ -225,17 +283,35 @@ def quote_delivery(
         "valor_frete": float(Decimal("0") if free_shipping else valor_base),
         "valor_frete_base": float(valor_base),
         "prazo_estimado": policy["prazo_entrega_texto"] or "Prazo combinado com a loja",
-        "tipo": "entrega_por_km"
-        if policy["modalidade_cobranca"] == "por_km"
-        else "entrega_taxa_fixa",
+        "tipo": {
+            "fixa": "entrega_taxa_fixa",
+            "por_km": "entrega_por_km",
+            "por_faixa": "entrega_por_faixa",
+        }[policy["modalidade_cobranca"]],
         "modalidade_cobranca": policy["modalidade_cobranca"],
         "cidade_loja": cidade_loja,
         "cidade_destino": cidade_destino,
         "distancia_km": float(distancia_km) if distancia_km is not None else None,
-        "valor_por_km": float(policy["valor_por_km_cobrado"])
-        if policy["modalidade_cobranca"] == "por_km"
-        else None,
+        "valor_por_km": (
+            float(policy["valor_por_km_cobrado"])
+            if policy["modalidade_cobranca"] == "por_km"
+            else None
+        ),
         "taxa_minima": float(policy["taxa_minima"]),
+        "faixa_distancia_aplicada": (
+            {
+                "ate_km": float(faixa_aplicada["ate_km"]),
+                "valor": float(faixa_aplicada["valor"]),
+            }
+            if faixa_aplicada is not None
+            else None
+        ),
+        "valor_km_excedente": (
+            float(policy["valor_km_excedente"])
+            if policy["modalidade_cobranca"] == "por_faixa"
+            else None
+        ),
+        "km_excedentes_cobrados": km_excedentes_cobrados,
         "frete_gratis_aplicado": free_shipping,
         "frete_gratis_acima": float(threshold) if threshold is not None else None,
         "distancia_maxima_frete_gratis_km": (
@@ -244,7 +320,13 @@ def quote_delivery(
         "distancia_maxima_entrega_km": (
             float(limite_entrega) if limite_entrega is not None else None
         ),
-        "observacao": "Distancia de rota, em um unico sentido, entre a loja e o cliente."
-        if distancia_km is not None
-        else "Taxa fixa de entrega.",
+        "observacao": (
+            "Preco fechado pela faixa de distancia da rota, em um unico sentido."
+            if policy["modalidade_cobranca"] == "por_faixa"
+            else (
+                "Distancia de rota, em um unico sentido, entre a loja e o cliente."
+                if distancia_km is not None
+                else "Taxa fixa de entrega."
+            )
+        ),
     }

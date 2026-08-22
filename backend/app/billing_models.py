@@ -2,6 +2,7 @@
 
 from sqlalchemy import (
     Boolean,
+    CheckConstraint,
     Column,
     Date,
     DateTime,
@@ -99,12 +100,24 @@ class BillingOffer(Base):
     """Proposta comercial acessada por token opaco antes de existir autenticacao."""
 
     __tablename__ = "billing_offers"
+    __table_args__ = (
+        CheckConstraint(
+            "(created_by_user_id IS NOT NULL AND "
+            "created_by_platform_admin_id IS NULL) OR "
+            "(created_by_user_id IS NULL AND "
+            "created_by_platform_admin_id IS NOT NULL)",
+            name="ck_billing_offers_creator",
+        ),
+    )
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     offer_id = Column(String(36), nullable=False, unique=True)
     tenant_reference = Column(String(36), nullable=False, index=True)
     token_sha256 = Column(String(64), nullable=False, unique=True)
-    created_by_user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    created_by_user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    created_by_platform_admin_id = Column(
+        Integer, ForeignKey("platform_admins.id"), nullable=True, index=True
+    )
 
     title = Column(String(160), nullable=False)
     plan_code = Column(String(50), nullable=False, index=True)

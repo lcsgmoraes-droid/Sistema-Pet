@@ -79,6 +79,38 @@ export default function PDVEntregaCard({
                     </button>
                   )}
 
+                  {cliente.endereco_entrega && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        onSelecionarEndereco(cliente.endereco_entrega);
+                      }}
+                      disabled={modoVisualizacao}
+                      className="w-full text-left px-3 py-2 bg-white hover:bg-blue-100 border border-blue-300 rounded text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <span className="font-medium text-blue-700">📦 Entrega principal:</span>{" "}
+                      <span className="text-gray-700">{cliente.endereco_entrega}</span>
+                    </button>
+                  )}
+
+                  {cliente.endereco_entrega_2 && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        onSelecionarEndereco(cliente.endereco_entrega_2);
+                      }}
+                      disabled={modoVisualizacao}
+                      className="w-full text-left px-3 py-2 bg-white hover:bg-blue-100 border border-blue-300 rounded text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <span className="font-medium text-blue-700">📦 Outra entrega:</span>{" "}
+                      <span className="text-gray-700">{cliente.endereco_entrega_2}</span>
+                    </button>
+                  )}
+
                   {cliente.enderecos_adicionais &&
                     cliente.enderecos_adicionais.map((end, idx) => (
                       <button
@@ -88,7 +120,8 @@ export default function PDVEntregaCard({
                           e.preventDefault();
                           e.stopPropagation();
                           onSelecionarEndereco(
-                            `${end.endereco}, ${end.numero}${end.complemento ? " - " + end.complemento : ""}, ${end.bairro}, ${end.cidade}/${end.estado}`,
+                            end.endereco_completo ||
+                              `${end.endereco}, ${end.numero}${end.complemento ? " - " + end.complemento : ""}, ${end.bairro}, ${end.cidade}/${end.estado}`,
                           );
                         }}
                         disabled={modoVisualizacao}
@@ -119,12 +152,15 @@ export default function PDVEntregaCard({
                           {end.apelido || end.tipo}
                         </span>
                         <span className="text-gray-700">
-                          {end.endereco}, {end.numero} - {end.bairro}
+                          {end.endereco_completo ||
+                            `${end.endereco}, ${end.numero} - ${end.bairro}`}
                         </span>
                       </button>
                     ))}
 
                   {!cliente.endereco &&
+                    !cliente.endereco_entrega &&
+                    !cliente.endereco_entrega_2 &&
                     (!cliente.enderecos_adicionais ||
                       cliente.enderecos_adicionais.length === 0) && (
                       <p className="text-sm text-gray-600 italic">

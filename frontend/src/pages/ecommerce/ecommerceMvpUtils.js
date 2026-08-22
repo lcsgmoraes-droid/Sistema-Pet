@@ -96,6 +96,10 @@ export function resolveValidityPromotionLimit(product) {
 }
 
 export function resolveProductStock(product) {
+  if (product?.controlar_estoque === false || product?.tipo === "servico") {
+    return Number.POSITIVE_INFINITY;
+  }
+
   const currentStock = Number(product?.estoque_atual);
 
   if (Number.isFinite(currentStock)) {

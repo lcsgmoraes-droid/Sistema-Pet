@@ -261,7 +261,7 @@ export function useProdutosFormController() {
   };
 
   const handleDeleteImagem = async (imagemId) => {
-    if (!await confirmarCorePet("Deseja realmente excluir esta imagem?")) return;
+    if (!(await confirmarCorePet("Deseja realmente excluir esta imagem?"))) return;
 
     try {
       await deleteImagemProduto(imagemId);
@@ -320,7 +320,7 @@ export function useProdutosFormController() {
   };
 
   const handleDeleteFornecedor = async (fornecedorId) => {
-    if (!await confirmarCorePet("Deseja realmente desvincular este fornecedor?")) return;
+    if (!(await confirmarCorePet("Deseja realmente desvincular este fornecedor?"))) return;
 
     try {
       await deleteFornecedorProduto(fornecedorId);

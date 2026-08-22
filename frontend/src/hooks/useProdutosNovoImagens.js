@@ -62,7 +62,7 @@ export default function useProdutosNovoImagens({ id, setImagens }) {
   };
 
   const handleDeleteImagem = async (imagemId) => {
-    if (!await confirmarCorePet("Deseja realmente excluir esta imagem?")) {
+    if (!(await confirmarCorePet("Deseja realmente excluir esta imagem?"))) {
       return;
     }
 

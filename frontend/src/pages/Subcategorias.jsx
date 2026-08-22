@@ -107,7 +107,7 @@ export default function Subcategorias() {
   };
 
   const handleDelete = async (id) => {
-    if (!await confirmarCorePet("Deseja realmente excluir esta subcategoria?")) return;
+    if (!(await confirmarCorePet("Deseja realmente excluir esta subcategoria?"))) return;
 
     try {
       await api.delete(`/dre/subcategorias/${id}`);

@@ -46,7 +46,7 @@ export default function useCampanhasCupons({
 
   const anularCupom = useCallback(
     async (code) => {
-      if (!await confirmarCorePet(`Anular o cupom ${code}? Esta acao nao pode ser desfeita.`)) {
+      if (!(await confirmarCorePet(`Anular o cupom ${code}? Esta acao nao pode ser desfeita.`))) {
         return;
       }
       setAnulando(code);

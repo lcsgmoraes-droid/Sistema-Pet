@@ -71,16 +71,28 @@ def test_validate_internal_token_accepts_valid(monkeypatch):
 
 def test_internal_orchestrator_is_not_blocked_by_user_module_auth():
     from app.main import app
-    from app.main_routers import whatsapp_orchestrator_internal_router
 
-    included_router = next(
+    registered_routes = []
+    for route in app.routes:
+        effective_candidates = getattr(route, "effective_candidates", None)
+        if callable(effective_candidates):
+            registered_routes.extend(effective_candidates())
+        else:
+            registered_routes.append(route)
+
+    ingest_route = next(
         route
-        for route in app.routes
-        if getattr(route, "original_router", None)
-        is whatsapp_orchestrator_internal_router
+        for route in registered_routes
+        if getattr(route, "path", None)
+        == "/internal/whatsapp-orchestrator/{tenant_id}/ingest"
     )
 
-    assert included_router.include_context.dependencies == []
+    dependency_names = {
+        getattr(dependency.call, "__name__", "")
+        for dependency in ingest_route.dependant.dependencies
+    }
+
+    assert dependency_names == {"get_session"}
 
 
 def test_internal_read_only_data_routes_are_registered():

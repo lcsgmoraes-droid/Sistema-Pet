@@ -7,6 +7,7 @@ import ErrorBoundary from "./components/ErrorBoundary";
 import CorePetDialogHost from "./components/ui/CorePetDialogHost";
 import { AuthProvider } from "./contexts/AuthContext";
 import { ModulosProvider } from "./contexts/ModulosContext";
+import { PlatformAuthProvider } from "./contexts/PlatformAuthContext";
 import { ThemeProvider } from "./theme/ThemeContext";
 import { instalarProtecaoRodaInputsNumericos } from "./utils/numberInputWheel";
 
@@ -42,20 +43,24 @@ function App() {
     <ThemeProvider>
       <ErrorBoundary>
         <AuthProvider>
-          <ModulosProvider>
-            <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
-              <Toaster position="top-right" toastOptions={{ className: "corepet-toast" }} />
-              <CorePetDialogHost />
-              <AppRoutePreloader />
-              <Suspense
-                fallback={
-                  <div className="p-4 text-sm text-gray-500 dark:text-slate-400">Carregando...</div>
-                }
-              >
-                <AppRoutes />
-              </Suspense>
-            </BrowserRouter>
-          </ModulosProvider>
+          <PlatformAuthProvider>
+            <ModulosProvider>
+              <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+                <Toaster position="top-right" toastOptions={{ className: "corepet-toast" }} />
+                <CorePetDialogHost />
+                <AppRoutePreloader />
+                <Suspense
+                  fallback={
+                    <div className="p-4 text-sm text-gray-500 dark:text-slate-400">
+                      Carregando...
+                    </div>
+                  }
+                >
+                  <AppRoutes />
+                </Suspense>
+              </BrowserRouter>
+            </ModulosProvider>
+          </PlatformAuthProvider>
         </AuthProvider>
       </ErrorBoundary>
     </ThemeProvider>

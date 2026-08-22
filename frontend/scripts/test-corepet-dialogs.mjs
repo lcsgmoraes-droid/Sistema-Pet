@@ -67,7 +67,6 @@ listSourceFiles(srcRoot).forEach((filePath) => {
         }
       }
     }
-
     ts.forEachChild(node, visit);
   }
 
@@ -76,5 +75,4 @@ listSourceFiles(srcRoot).forEach((filePath) => {
 
 assert.equal(errors.length, 0, errors.join("\n"));
 assert.ok(corePetDialogCalls > 0, "nenhum dialogo visual do CorePet foi encontrado");
-
 console.log(`OK: ${corePetDialogCalls} dialogos CorePet validados, sem confirm/prompt nativo.`);

@@ -133,7 +133,7 @@ export default function useAssistenteIAChatHandlers({
     setSalvandoFeedbackId(String(mensagemId));
     try {
       const comentarioBruto =
-        await perguntarCorePet("Comentário opcional para melhorar a IA:", "") || "";
+        (await perguntarCorePet("Comentário opcional para melhorar a IA:", "")) || "";
       const comentario = comentarioBruto.trim();
       const payload = {
         util,

@@ -22,6 +22,11 @@ export function obterPrecoVendaPDV(produto) {
   return Number.isFinite(numero) ? numero : 0;
 }
 
+export function colocarItemProdutoNoTopo(itens, itemAtualizado) {
+  const outrosItens = itens.filter((item) => item.produto_id !== itemAtualizado.produto_id);
+  return [itemAtualizado, ...outrosItens];
+}
+
 export function recalcularSubtotalItem(item, novaQuantidade) {
   const quantidade = normalizarQuantidadePDV(novaQuantidade);
   const precoUnitario = Number(item.preco_unitario ?? item.preco_venda ?? 0) || 0;

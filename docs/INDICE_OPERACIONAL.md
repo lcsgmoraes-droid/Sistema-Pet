@@ -1,6 +1,6 @@
 # Indice operacional do Sistema Pet
 
-Atualizado em: 2026-07-13
+Atualizado em: 2026-08-21
 
 Este e o ponto de entrada oficial da documentacao. Se houver conflito entre este
 indice e um documento historico, use este indice e o guia mestre de maturidade.
@@ -13,14 +13,19 @@ Guia mestre:
 
 | Necessidade | Ler primeiro | Depois validar com |
 |---|---|---|
+| Localizar o codigo-fonte | `docs/MAPA_CODIGO_FONTE.md` | `python scripts/validate_repository_structure.py` |
+| Entender a arquitetura | `docs/ARQUITETURA.md` | Codigo e diagramas citados no documento |
+| Contribuir com seguranca | `CONTRIBUTING.md` | `AGENTS.md` e checks do PR |
 | Entender maturidade geral | `docs/MATURIDADE_GERAL_10_10_GUIA.md` | Historico de PRs no proprio guia |
 | Preparar um PC DEV | `docs/DEV_ENVIRONMENT_CHECK.md` | `scripts/check_dev_environment.ps1` |
 | Trabalhar em dois PCs | `docs/GIT_FLUXO_2_PCS.md` | `scripts/git_check_updates.ps1` |
 | Usar MCPs locais | `mcp/README.md` | `scripts/test_mcp.ps1` |
 | Entender CI e checks | `docs/CI_CD_DEPLOY_SAFETY_AUDIT.md` | GitHub Actions do PR |
+| Entender scripts e atalhos antigos | `docs/ATALHOS_OPERACIONAIS.md` | `python scripts/validate_repository_structure.py` |
 | Deploy real | `docs/PRODUCAO_DEPLOY_SSH.md` | `petshop-status-producao` e health publico |
 | Rollback | `docs/PRODUCAO_ROLLBACK_CHECKLIST.md` | Backup operacional do deploy |
 | Backup/restore de banco | `docs/PRODUCAO_BACKUP_RESTORE_TESTE.md` | Restore smoke controlado |
+| Importar dados SimplesVet | `docs/IMPORTACAO_SIMPLESVET_SEGURA.md` | Plano, hashes e recibo da importacao |
 | Observabilidade e auditoria | `docs/RETENCAO_LOGS_AUDITORIA.md` | Painel Ops e logs JSONL |
 | Teste seguro de capacidade | `docs/TESTE_CAPACIDADE_SEGURO.md` | `scripts/capacity_smoke.py` em ambiente local |
 | Estrutura/refatoracao | `docs/auditorias/estrutura-geral-definition-of-done.md` | Testes focados da fatia |
@@ -44,6 +49,7 @@ Guia mestre:
 | Release app mobile com EAS | `docs/GUIA_RELEASE_APP_MOBILE_EAS.md` | Canal `preview`/`production`, runtime e verificacao OTA |
 | Publicar app mobile nas lojas | `docs/APP_MOBILE_PUBLICACAO_LOJAS.md` | Checklist Play Store/App Store, privacidade e metadados |
 | Base oficial de dados | `docs/CRONOGRAMA_BASE_DADOS_OFICIAL.md` | Produtos, imagens, cadastros iniciais e atualizacoes |
+| Classificacao de racoes | `docs/CLASSIFICACAO_RACOES.md` | Fontes e rotas atuais da funcionalidade |
 | Plano Basico | `docs/auditorias/plano-basico-tenant-checklist.md` | E2E longo controlado |
 | Produto/roadmap | `docs/ROADMAP_MASTER.md` | Checklist da frente especifica |
 
@@ -51,12 +57,17 @@ Guia mestre:
 
 | Area | Documento oficial |
 |---|---|
+| Codigo-fonte | `docs/MAPA_CODIGO_FONTE.md` |
+| Arquitetura | `docs/ARQUITETURA.md` |
+| Contribuicao | `CONTRIBUTING.md` |
 | MCPs | `docs/MCP_MATURIDADE_GUIA.md` |
 | Estrutura geral | `docs/auditorias/estrutura-geral-inventario.md` |
 | Seguranca operacional | `docs/CI_CD_DEPLOY_SAFETY_AUDIT.md` |
+| Atalhos operacionais | `docs/ATALHOS_OPERACIONAIS.md` |
 | Testes/CI | `docs/auditorias/testes-ci-cobertura-critica.md` |
 | Observabilidade/auditoria | `docs/RETENCAO_LOGS_AUDITORIA.md` |
 | Portabilidade/configuracao | `docs/DEV_ENVIRONMENT_CHECK.md` |
+| Importacao SimplesVet | `docs/IMPORTACAO_SIMPLESVET_SEGURA.md` |
 | Venda do Plano Basico | `docs/GUIA_VENDA_PLANO_BASICO.md` |
 | Implantacao inicial | `docs/implantacao/GUIA_IMPLANTACAO_INICIAL.md` |
 | Criativos e videos | `docs/marketing/MATRIZ_CRIATIVOS_SISTEMA.md` |
@@ -72,6 +83,7 @@ Guia mestre:
 | Release app mobile com EAS | `docs/GUIA_RELEASE_APP_MOBILE_EAS.md` |
 | Publicacao nas lojas | `docs/APP_MOBILE_PUBLICACAO_LOJAS.md` |
 | Base oficial de dados | `docs/CRONOGRAMA_BASE_DADOS_OFICIAL.md` |
+| Classificacao de racoes | `docs/CLASSIFICACAO_RACOES.md` |
 | Evidencias | `docs/PADRAO_EVIDENCIA.md` |
 
 ## Rotina obrigatoria por PR

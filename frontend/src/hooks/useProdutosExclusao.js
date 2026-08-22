@@ -185,7 +185,7 @@ export default function useProdutosExclusao({
   };
 
   const handleExcluir = async (id) => {
-    if (!await confirmarCorePet("Deseja realmente excluir este produto?")) return;
+    if (!(await confirmarCorePet("Deseja realmente excluir este produto?"))) return;
 
     try {
       await deleteProduto(id);
@@ -207,7 +207,7 @@ export default function useProdutosExclusao({
   };
 
   const handleExcluirSelecionados = async (selecionados) => {
-    if (!await confirmarCorePet(`Deseja realmente excluir ${selecionados.length} produtos?`)) {
+    if (!(await confirmarCorePet(`Deseja realmente excluir ${selecionados.length} produtos?`))) {
       return;
     }
 
@@ -259,7 +259,7 @@ export default function useProdutosExclusao({
     const proximoAtivo = produto.ativo === false;
     const acao = proximoAtivo ? "ativar" : "desativar";
 
-    if (!await confirmarCorePet(`Deseja realmente ${acao} o produto "${produto.nome}"?`)) {
+    if (!(await confirmarCorePet(`Deseja realmente ${acao} o produto "${produto.nome}"?`))) {
       return;
     }
 

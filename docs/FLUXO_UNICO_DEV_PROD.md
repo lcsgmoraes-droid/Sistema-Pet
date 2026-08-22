@@ -36,6 +36,11 @@ Use para: validar se esta tudo pronto para subir em producao.
 
 Regra: **nunca pular este passo**.
 
+### 3.1) `FLUXO_UNICO.bat dev-down`
+Use para: parar somente os containers do ambiente DEV local.
+
+O atalho antigo `PARAR_TUDO.bat` encaminha para esse mesmo comando.
+
 ### 4) `FLUXO_UNICO.bat prod-up`
 Uso legado/local. Para producao real no servidor, prefira `bash scripts/deploy_producao_seguro.sh`.
 
@@ -101,6 +106,18 @@ Acao: fazer correcao de merge de migrations antes de producao.
 
 Se `release-check` falhar, **nao subir producao**.
 
+## Importacao de dados de uma nova empresa
+
+Importacao de CSV nao faz parte do deploy. Ela possui um fluxo proprio para
+evitar mistura entre empresas:
+
+1. usar `scripts/importar_simplesvet_seguro.ps1` em modo `Simular`;
+2. conferir empresa, usuario, contagens, rejeicoes e `plan_id`;
+3. aplicar somente o plano gerado, ainda valido e com os mesmos arquivos;
+4. em producao, fazer backup e obter autorizacao explicita antes de aplicar.
+
+O procedimento completo esta em `docs/IMPORTACAO_SIMPLESVET_SEGURA.md`.
+
 ---
 
 ## Regra critica de deploy do backend no servidor
@@ -155,18 +172,14 @@ Esse script:
 
 ---
 
-## Assistente automatico (com confirmacao)
+## Atalhos antigos de release
 
-Se quiser que o sistema te guie e pergunte antes de cada passo importante, use:
+`ASSISTENTE_RELEASE.bat` e `ASSISTENTE_RELEASE_EXECUTAR.bat` foram bloqueados.
+Eles preparavam tres blocos historicos de alteracoes que ja foram concluidos e
+nao representam o trabalho atual.
 
-- `ASSISTENTE_RELEASE.bat`
-
-O que ele faz:
-1. Prepara os 3 blocos de commit (higiene, fluxo, migrations).
-2. Mostra os arquivos e pergunta se pode commitar cada bloco.
-3. Roda `check` e `release-check` no final.
-4. Pergunta: "Posso fazer push final?"
-5. So faz push se voce confirmar.
+O fluxo Git atual e sempre o descrito em `CONTRIBUTING.md`: abrir uma branch com
+`scripts/git_start_task.ps1`, validar e fechar com `scripts/git_finish_task.ps1`.
 
 ---
 

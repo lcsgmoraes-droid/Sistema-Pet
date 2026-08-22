@@ -104,6 +104,9 @@ def ajustar_estoque_edicao_venda(
                 detail=f"Produto ID {produto_id} não encontrado",
             )
 
+        if not getattr(produto, "controlar_estoque", True):
+            continue
+
         try:
             if diferenca < 0:
                 quantidade_estorno = abs(diferenca)

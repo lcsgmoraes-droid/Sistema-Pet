@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
+import CurrencyInput from "../../components/CurrencyInput";
 import { api } from "../../services/api";
+import { formatMoneyBRL } from "../../utils/formatters";
 import { getGuiaInlineStyle } from "../../utils/guiaHighlight";
 
 const fieldStyle = {
@@ -17,6 +19,17 @@ function optionalNumber(value) {
   if (value === "" || value === null || value === undefined) return null;
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : null;
+}
+
+function optionalPositiveNumber(value) {
+  const parsed = optionalNumber(value);
+  return parsed !== null && parsed > 0 ? parsed : null;
+}
+
+function nextTierLimit(tiers) {
+  const lastTier = tiers[tiers.length - 1];
+  const lastLimit = Number(lastTier?.ate_km);
+  return Number.isFinite(lastLimit) && lastLimit > 0 ? String(lastLimit + 1) : "1";
 }
 
 export default function EntregasConfig() {
@@ -43,10 +56,12 @@ export default function EntregasConfig() {
     retirada_ativa: true,
     modalidade_cobranca: "fixa",
     taxa_fixa: 0,
-    valor_por_km_cobrado: "",
+    valor_por_km_cobrado: 0,
     taxa_minima: 0,
+    faixas_distancia: [],
+    valor_km_excedente: 0,
     distancia_maxima_entrega_km: "",
-    frete_gratis_acima: "",
+    frete_gratis_acima: 0,
     distancia_maxima_frete_gratis_km: "",
     pedido_minimo: 0,
     prazo_entrega_texto: "",
@@ -81,10 +96,17 @@ export default function EntregasConfig() {
           retirada_ativa: cfg.data.retirada_ativa !== false,
           modalidade_cobranca: cfg.data.modalidade_cobranca ?? "fixa",
           taxa_fixa: Number(cfg.data.taxa_fixa || 0),
-          valor_por_km_cobrado: cfg.data.valor_por_km_cobrado ?? "",
+          valor_por_km_cobrado: Number(cfg.data.valor_por_km_cobrado || 0),
           taxa_minima: Number(cfg.data.taxa_minima || 0),
+          faixas_distancia: Array.isArray(cfg.data.faixas_distancia)
+            ? cfg.data.faixas_distancia.map((faixa) => ({
+                ate_km: String(faixa.ate_km ?? ""),
+                valor: Number(faixa.valor || 0),
+              }))
+            : [],
+          valor_km_excedente: Number(cfg.data.valor_km_excedente || 0),
           distancia_maxima_entrega_km: cfg.data.distancia_maxima_entrega_km ?? "",
-          frete_gratis_acima: cfg.data.frete_gratis_acima ?? "",
+          frete_gratis_acima: Number(cfg.data.frete_gratis_acima || 0),
           distancia_maxima_frete_gratis_km: cfg.data.distancia_maxima_frete_gratis_km ?? "",
           pedido_minimo: Number(cfg.data.pedido_minimo || 0),
           prazo_entrega_texto: cfg.data.prazo_entrega_texto ?? "",
@@ -142,15 +164,80 @@ export default function EntregasConfig() {
     }
   }
 
+  function changeBillingMode(modalidade) {
+    setForm((current) => ({
+      ...current,
+      modalidade_cobranca: modalidade,
+      faixas_distancia:
+        modalidade === "por_faixa" && current.faixas_distancia.length === 0
+          ? [{ ate_km: "1", valor: 0 }]
+          : current.faixas_distancia,
+    }));
+  }
+
+  function updateDistanceTier(index, field, value) {
+    setForm((current) => ({
+      ...current,
+      faixas_distancia: current.faixas_distancia.map((tier, tierIndex) =>
+        tierIndex === index ? { ...tier, [field]: value } : tier,
+      ),
+    }));
+  }
+
+  function addDistanceTier() {
+    setForm((current) => ({
+      ...current,
+      faixas_distancia: [
+        ...current.faixas_distancia,
+        { ate_km: nextTierLimit(current.faixas_distancia), valor: 0 },
+      ],
+    }));
+  }
+
+  function removeDistanceTier(index) {
+    setForm((current) => ({
+      ...current,
+      faixas_distancia: current.faixas_distancia.filter((_tier, tierIndex) => tierIndex !== index),
+    }));
+  }
+
   async function handleSave(e) {
     e.preventDefault();
     if (form.modalidade_cobranca === "por_km" && Number(form.valor_por_km_cobrado || 0) <= 0) {
       alert("Informe um valor por km maior que zero.");
       return;
     }
-    if (form.modalidade_cobranca === "por_km" && (!form.logradouro || !form.numero)) {
-      alert("Para cobrar por km, complete pelo menos logradouro e número da loja.");
+    const distancePricing = ["por_km", "por_faixa"].includes(form.modalidade_cobranca);
+    if (distancePricing && (!form.logradouro || !form.numero)) {
+      alert("Para cobrar por distância, complete pelo menos logradouro e número da loja.");
       return;
+    }
+    const distanceTiers = form.faixas_distancia.map((tier) => ({
+      ate_km: Number(tier.ate_km),
+      valor: Number(tier.valor),
+    }));
+    if (form.modalidade_cobranca === "por_faixa") {
+      if (
+        distanceTiers.length === 0 ||
+        distanceTiers.some(
+          (tier) =>
+            !Number.isFinite(tier.ate_km) ||
+            tier.ate_km <= 0 ||
+            !Number.isFinite(tier.valor) ||
+            tier.valor < 0,
+        )
+      ) {
+        alert("Preencha todas as faixas com uma distância maior que zero e um preço válido.");
+        return;
+      }
+      if (
+        distanceTiers.some(
+          (tier, index) => index > 0 && tier.ate_km <= distanceTiers[index - 1].ate_km,
+        )
+      ) {
+        alert("Organize as faixas em ordem crescente, sem repetir a distância.");
+        return;
+      }
     }
     setSaving(true);
     try {
@@ -172,9 +259,13 @@ export default function EntregasConfig() {
         valor_por_km_cobrado:
           form.modalidade_cobranca === "por_km" ? Number(form.valor_por_km_cobrado || 0) : null,
         taxa_minima: Number(form.taxa_minima || 0),
-        distancia_maxima_entrega_km: optionalNumber(form.distancia_maxima_entrega_km),
-        frete_gratis_acima: optionalNumber(form.frete_gratis_acima),
-        distancia_maxima_frete_gratis_km: optionalNumber(form.distancia_maxima_frete_gratis_km),
+        faixas_distancia: distanceTiers,
+        valor_km_excedente: optionalPositiveNumber(form.valor_km_excedente),
+        distancia_maxima_entrega_km: optionalPositiveNumber(form.distancia_maxima_entrega_km),
+        frete_gratis_acima: optionalPositiveNumber(form.frete_gratis_acima),
+        distancia_maxima_frete_gratis_km: optionalPositiveNumber(
+          form.distancia_maxima_frete_gratis_km,
+        ),
         pedido_minimo: Number(form.pedido_minimo || 0),
         prazo_entrega_texto: form.prazo_entrega_texto.trim() || null,
       });
@@ -647,11 +738,12 @@ export default function EntregasConfig() {
             Como cobrar o frete
             <select
               value={form.modalidade_cobranca}
-              onChange={(event) => setForm({ ...form, modalidade_cobranca: event.target.value })}
+              onChange={(event) => changeBillingMode(event.target.value)}
               style={{ ...fieldStyle, marginTop: 6 }}
             >
               <option value="fixa">Taxa fixa</option>
               <option value="por_km">Distância × preço por km</option>
+              <option value="por_faixa">Preço fixo por faixa de distância</option>
             </select>
           </label>
 
@@ -663,46 +755,166 @@ export default function EntregasConfig() {
               marginTop: 14,
             }}
           >
-            {form.modalidade_cobranca === "fixa" ? (
+            {form.modalidade_cobranca === "fixa" && (
               <label style={{ fontSize: 13, fontWeight: 600, color: "#374151" }}>
                 Taxa fixa (R$)
-                <input
-                  type="number"
-                  min="0"
-                  step="0.01"
+                <CurrencyInput
                   value={form.taxa_fixa}
-                  onChange={(event) => setForm({ ...form, taxa_fixa: event.target.value })}
+                  onChange={(value) => setForm({ ...form, taxa_fixa: value })}
+                  aria-label="Taxa fixa"
                   style={{ ...fieldStyle, marginTop: 6 }}
                 />
               </label>
-            ) : (
+            )}
+
+            {form.modalidade_cobranca === "por_km" && (
               <>
                 <label style={{ fontSize: 13, fontWeight: 600, color: "#374151" }}>
                   Preço por km (R$)
-                  <input
-                    type="number"
-                    min="0.01"
-                    step="0.01"
+                  <CurrencyInput
                     value={form.valor_por_km_cobrado}
-                    onChange={(event) =>
-                      setForm({ ...form, valor_por_km_cobrado: event.target.value })
-                    }
+                    onChange={(value) => setForm({ ...form, valor_por_km_cobrado: value })}
+                    aria-label="Preço por km"
                     style={{ ...fieldStyle, marginTop: 6 }}
                     required
                   />
                 </label>
                 <label style={{ fontSize: 13, fontWeight: 600, color: "#374151" }}>
                   Taxa mínima (R$)
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.01"
+                  <CurrencyInput
                     value={form.taxa_minima}
-                    onChange={(event) => setForm({ ...form, taxa_minima: event.target.value })}
+                    onChange={(value) => setForm({ ...form, taxa_minima: value })}
+                    aria-label="Taxa mínima"
                     style={{ ...fieldStyle, marginTop: 6 }}
                   />
                 </label>
               </>
+            )}
+
+            {form.modalidade_cobranca === "por_faixa" && (
+              <div
+                style={{
+                  gridColumn: "1 / -1",
+                  border: "1px solid #bfdbfe",
+                  borderRadius: 10,
+                  background: "#eff6ff",
+                  padding: 14,
+                }}
+              >
+                <div style={{ marginBottom: 12 }}>
+                  <strong style={{ display: "block", color: "#1e3a8a", fontSize: 14 }}>
+                    Faixas com preço fechado
+                  </strong>
+                  <span style={{ color: "#475569", fontSize: 12, lineHeight: 1.5 }}>
+                    O sistema escolhe a primeira faixa que comporta a distância calculada. Ex.: até
+                    2 km por R$ 8,49 também atende rotas de 1,4 km.
+                  </span>
+                </div>
+
+                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                  {form.faixas_distancia.map((tier, index) => (
+                    <div
+                      key={`distance-tier-${index}`}
+                      style={{
+                        display: "grid",
+                        gridTemplateColumns: "64px minmax(100px, 1fr) minmax(150px, 1.4fr) auto",
+                        gap: 10,
+                        alignItems: "end",
+                        padding: 10,
+                        background: "#fff",
+                        border: "1px solid #dbeafe",
+                        borderRadius: 8,
+                      }}
+                    >
+                      <strong style={{ alignSelf: "center", color: "#1d4ed8", fontSize: 12 }}>
+                        Faixa {index + 1}
+                      </strong>
+                      <label style={{ fontSize: 12, fontWeight: 600, color: "#374151" }}>
+                        Até (km)
+                        <input
+                          type="number"
+                          min="0.01"
+                          step="0.01"
+                          value={tier.ate_km}
+                          onChange={(event) =>
+                            updateDistanceTier(index, "ate_km", event.target.value)
+                          }
+                          aria-label={`Distância máxima da faixa ${index + 1}`}
+                          style={{ ...fieldStyle, marginTop: 5 }}
+                        />
+                      </label>
+                      <label style={{ fontSize: 12, fontWeight: 600, color: "#374151" }}>
+                        Preço fechado (R$)
+                        <CurrencyInput
+                          value={tier.valor}
+                          onChange={(value) => updateDistanceTier(index, "valor", value)}
+                          aria-label={`Preço da faixa ${index + 1}`}
+                          style={{ ...fieldStyle, marginTop: 5 }}
+                        />
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => removeDistanceTier(index)}
+                        aria-label={`Remover faixa ${index + 1}`}
+                        title="Remover faixa"
+                        style={{
+                          height: 40,
+                          width: 40,
+                          border: "1px solid #fecaca",
+                          borderRadius: 8,
+                          background: "#fff1f2",
+                          color: "#be123c",
+                          cursor: "pointer",
+                          fontSize: 18,
+                        }}
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={addDistanceTier}
+                  disabled={form.faixas_distancia.length >= 50}
+                  style={{
+                    marginTop: 10,
+                    border: "1px solid #93c5fd",
+                    borderRadius: 8,
+                    padding: "8px 12px",
+                    background: "#fff",
+                    color: "#1d4ed8",
+                    fontWeight: 700,
+                    cursor: "pointer",
+                  }}
+                >
+                  + Adicionar faixa
+                </button>
+
+                <label
+                  style={{
+                    display: "block",
+                    marginTop: 14,
+                    fontSize: 13,
+                    fontWeight: 600,
+                    color: "#374151",
+                  }}
+                >
+                  Adicional por km iniciado acima da última faixa (R$)
+                  <CurrencyInput
+                    value={form.valor_km_excedente}
+                    onChange={(value) => setForm({ ...form, valor_km_excedente: value })}
+                    aria-label="Adicional por km acima da última faixa"
+                    style={{ ...fieldStyle, marginTop: 6, maxWidth: 320 }}
+                  />
+                </label>
+                <p style={{ margin: "8px 0 0", color: "#475569", fontSize: 12 }}>
+                  {Number(form.valor_km_excedente || 0) > 0
+                    ? `Após a última faixa, cada km adicional iniciado soma ${formatMoneyBRL(form.valor_km_excedente)}.`
+                    : "Com adicional em R$ 0,00, endereços acima da última faixa não serão atendidos."}
+                </p>
+              </div>
             )}
 
             <label style={{ fontSize: 13, fontWeight: 600, color: "#374151" }}>
@@ -721,26 +933,24 @@ export default function EntregasConfig() {
             </label>
             <label style={{ fontSize: 13, fontWeight: 600, color: "#374151" }}>
               Pedido mínimo (R$)
-              <input
-                type="number"
-                min="0"
-                step="0.01"
+              <CurrencyInput
                 value={form.pedido_minimo}
-                onChange={(event) => setForm({ ...form, pedido_minimo: event.target.value })}
+                onChange={(value) => setForm({ ...form, pedido_minimo: value })}
+                aria-label="Pedido mínimo"
                 style={{ ...fieldStyle, marginTop: 6 }}
               />
             </label>
             <label style={{ fontSize: 13, fontWeight: 600, color: "#374151" }}>
               Frete grátis acima de (R$)
-              <input
-                type="number"
-                min="0.01"
-                step="0.01"
+              <CurrencyInput
                 value={form.frete_gratis_acima}
-                onChange={(event) => setForm({ ...form, frete_gratis_acima: event.target.value })}
-                placeholder="Não oferecer"
+                onChange={(value) => setForm({ ...form, frete_gratis_acima: value })}
+                aria-label="Frete grátis acima de"
                 style={{ ...fieldStyle, marginTop: 6 }}
               />
+              <span style={{ display: "block", marginTop: 4, color: "#64748b", fontSize: 11 }}>
+                Use R$ 0,00 para não oferecer.
+              </span>
             </label>
             <label style={{ fontSize: 13, fontWeight: 600, color: "#374151" }}>
               Frete grátis somente até (km)

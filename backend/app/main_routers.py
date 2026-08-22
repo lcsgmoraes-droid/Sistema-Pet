@@ -52,6 +52,7 @@ from app.admin_routes import router as admin_router
 from app.lancamentos_routes import router as lancamentos_router
 from app.categorias_routes import router as categorias_router
 from app.bling_routes import router as bling_router
+from app.bling_oauth_routes import public_router as bling_oauth_public_router
 from app.bling_oauth_routes import router as bling_oauth_router
 from app.integracao_bling_pedido_routes import router as bling_pedido_router
 from app.integracao_bling_nf_routes import router as bling_nf_router
@@ -107,6 +108,9 @@ from app.api.pdv_internal_routes import router as pdv_internal_router
 from app.api.racao_calculadora_routes import router as racao_calculadora_internal_router
 from app.api.whatsapp_orchestrator_internal_routes import (
     router as whatsapp_orchestrator_internal_router,
+)
+from app.api.whatsapp_data_internal_routes import (
+    router as whatsapp_data_internal_router,
 )
 from app.api.v1.fiscal_sugestao import router as fiscal_sugestao_router
 from app.api.v1.produto_fiscal import router as produto_fiscal_router
@@ -169,6 +173,7 @@ from app.routes.error_events_routes import (
 from app.routes.ops_tenants_routes import (
     router as ops_tenants_router,
 )  # Gestao operacional de tenants
+from app.platform_auth import router as platform_auth_router
 from app.routes.evolucao_routes import router as evolucao_router
 from app.lgpd_routes import router as lgpd_router  # LGPD operacional
 
@@ -204,6 +209,8 @@ from app.routes.asaas_billing_routes import router as asaas_billing_router
 from app.routes.ecommerceai_integration_routes import (
     router as ecommerceai_integration_router,
 )
+from app.routes.ifood_integration_routes import router as ifood_integration_router
+from app.routes.ifood_order_routes import router as ifood_order_router
 from app.security.module_access import require_active_entitlement, require_active_module
 from app.veterinario_routes import router as veterinario_router  # Módulo Veterinário
 from app.banho_tosa_routes import router as banho_tosa_router  # Modulo Banho & Tosa
@@ -232,6 +239,7 @@ def _entitlement_dependencies(entitlement: str):
 def register_routers(app: FastAPI) -> None:
     """Register application routers in the same precedence order used by main.py."""
     app.include_router(health_check_router, tags=["Infrastructure"])
+    app.include_router(platform_auth_router)
     app.include_router(error_events_router)
     app.include_router(ops_tenants_router)
     app.include_router(evolucao_router)
@@ -442,6 +450,7 @@ def register_routers(app: FastAPI) -> None:
         tags=["Bling OAuth"],
         dependencies=_module_dependencies("bling"),
     )
+    app.include_router(bling_oauth_public_router, tags=["Bling OAuth"])
     app.include_router(
         bling_pedido_router,
         tags=["Integração Bling - Pedido"],
@@ -499,6 +508,10 @@ def register_routers(app: FastAPI) -> None:
     app.include_router(
         whatsapp_orchestrator_internal_router,
         tags=["WhatsApp - Internal Orchestrator"],
+    )
+    app.include_router(
+        whatsapp_data_internal_router,
+        tags=["WhatsApp - Internal Read Only Data"],
     )
     app.include_router(fiscal_sugestao_router, tags=["Fiscal - Sugestões Inteligentes"])
     app.include_router(produto_fiscal_router, tags=["Produto - Fiscal"])
@@ -632,4 +645,6 @@ def register_routers(app: FastAPI) -> None:
     )  # Descontos Globais por Canal (Ecommerce / App)
     app.include_router(asaas_billing_router)
     app.include_router(ecommerceai_integration_router)
+    app.include_router(ifood_integration_router)
+    app.include_router(ifood_order_router)
     app.include_router(modulos_router)  # Módulos Premium

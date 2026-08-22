@@ -204,7 +204,7 @@ export default function ChatIA() {
   }
 
   const deletarConversa = async (conversaId) => {
-    if (!await confirmarCorePet("Deseja deletar esta conversa?")) return;
+    if (!(await confirmarCorePet("Deseja deletar esta conversa?"))) return;
 
     try {
       await api.delete(`/chat/conversa/${conversaId}`);

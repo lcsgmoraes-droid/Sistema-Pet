@@ -68,6 +68,12 @@ def criar_pendencia(
     if not produto:
         raise HTTPException(status_code=404, detail="Produto não encontrado")
 
+    if not getattr(produto, "controlar_estoque", True):
+        raise HTTPException(
+            status_code=400,
+            detail="Serviços não controlam estoque e não possuem lista de espera",
+        )
+
     # Verificar se já existe pendência ativa deste cliente para este produto
     pendencia_existente = (
         db.query(PendenciaEstoque)

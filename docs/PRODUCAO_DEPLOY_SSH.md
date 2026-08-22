@@ -1,6 +1,6 @@
 # Producao - acesso e deploy por SSH
 
-Fonte oficial para deploy real do MLProHub em producao.
+Fonte oficial para deploy real do CorePet em producao.
 
 ## Servidor atual
 
@@ -11,9 +11,9 @@ Fonte oficial para deploy real do MLProHub em producao.
 - Health publico: `https://corepet.com.br/api/health`
 - Watchdog publico: `https://corepet.com.br/health/watchdog`
 
-Use o IP para SSH. O dominio pode estar atras de Cloudflare e nao deve ser usado como referencia para conexao SSH operacional.
-
-O DNS de `corepet.com.br` e a fonte de verdade. Nunca copie um IP antigo para um comando de deploy. O launcher e o servidor comparam o DNS com os IPs locais e bloqueiam qualquer divergencia.
+Use `corepet.com.br` no launcher oficial. O DNS e a fonte de verdade: nunca copie
+um IP antigo para comandos operacionais. O launcher e o servidor resolvem o
+dominio e bloqueiam qualquer divergencia antes de alterar codigo ou banco.
 
 ## Deploy padrao
 

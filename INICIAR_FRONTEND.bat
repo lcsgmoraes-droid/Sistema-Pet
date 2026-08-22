@@ -1,18 +1,8 @@
 @echo off
-echo ========================================
-echo   INICIAR FRONTEND - Sistema Pet Shop
-echo ========================================
-echo.
-echo Iniciando servidor Vite (Frontend)...
-echo.
+REM COMPATIBILITY_ALIAS
+REM A implementacao oficial fica em scripts\iniciar_frontend_dev.ps1.
 
-cd frontend
-start "Frontend - Vite" npm run dev
-
-echo.
-echo ========================================
-echo   Frontend iniciado!
-echo   Acesse: http://localhost:5173
-echo ========================================
-echo.
-pause
+cd /d "%~dp0"
+echo Atalho de compatibilidade: iniciando o frontend DEV oficial.
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\iniciar_frontend_dev.ps1"
+exit /b %ERRORLEVEL%

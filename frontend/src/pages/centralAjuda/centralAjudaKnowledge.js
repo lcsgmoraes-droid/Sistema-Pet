@@ -560,9 +560,10 @@ export const BASE_CONHECIMENTO = [
         tags: ["operadora", "cartão", "cielo", "stone", "rede", "taxa"],
         conteudo: [
           "Acesse **Financeiro → Operadoras de Cartão**.",
-          "Cadastre cada operadora com: nome, taxa de débito e taxa de crédito.",
-          "Essas taxas são usadas nos relatórios de conciliação para calcular o valor líquido recebido.",
-          "Você pode ter múltiplas operadoras cadastradas (Cielo, Stone, Rede, etc).",
+          "Cadastre cada operadora e marque uma ativa como padrão para ela vir selecionada no PDV.",
+          "Na tabela de taxas, selecione uma ou mais bandeiras e informe a taxa de cada modalidade e quantidade de parcelas.",
+          "As taxas aplicadas ficam gravadas na venda e são usadas na margem, no valor líquido, nos recebíveis e na conciliação.",
+          "Você pode ter múltiplas operadoras cadastradas (Cielo, Stone, Rede, Getnet etc.).",
         ],
       },
     ],

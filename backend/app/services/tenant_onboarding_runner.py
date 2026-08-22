@@ -4,6 +4,7 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
+from app.services.card_operator_defaults import ensure_card_operator_presets
 from app.services.tenant_onboarding_catalog_copies import (
     _copy_named_options,
     _copy_package_weights,
@@ -20,6 +21,7 @@ from app.services.tenant_onboarding_contract import (
 from app.services.tenant_onboarding_core import (
     OnboardingResult,
     _enforce_required_onboarding,
+    _table_exists,
     _tables_ready_or_warn,
     _warn_missing_template_infra_for_strict,
 )
@@ -62,6 +64,16 @@ def _run_onboarding_steps(
             tenant_id_str,
             user_id_int,
             result,
+        )
+
+    # Operadoras sao sugestoes opcionais e inativas. Nao geram aviso em schemas
+    # antigos e nunca entram no PDV antes de o tenant cadastrar as taxas reais.
+    if _table_exists(db, "operadoras_cartao") and not dry_run:
+        ensure_card_operator_presets(
+            db,
+            tenant_id=tenant_id_str,
+            user_id=user_id_int,
+            result=result,
         )
 
     if _tables_ready_or_warn(db, result, "contas bancarias", ("contas_bancarias",)):

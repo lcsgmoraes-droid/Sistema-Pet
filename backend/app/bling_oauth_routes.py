@@ -3,10 +3,13 @@ Bling OAuth2 - callback e renovacao automatica de tokens.
 """
 
 import base64
+import hashlib
+import hmac
 import json
 import logging
 import os
 import secrets
+import time
 from contextlib import nullcontext
 from datetime import datetime, timedelta
 from html import escape
@@ -19,11 +22,13 @@ from fastapi import APIRouter, Query, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 
 from app.bling_integration_parts.core import BLING_OAUTH_TOKEN_URL, _bling_token_lock
+from app.config import JWT_SECRET_KEY
 
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/auth/bling", tags=["Bling OAuth"])
+public_router = APIRouter(prefix="/auth/bling", tags=["Bling OAuth"])
 
 ENV_PATHS = [
     Path("/opt/petshop/.env"),
@@ -38,6 +43,74 @@ TOKEN_CONTROL_PATHS = [
 ]
 
 LAST_RENEWAL_PATH = Path("/tmp/bling_token_last_renewal.txt")
+OAUTH_STATE_TTL_SECONDS = 600
+
+
+def _bling_redirect_uri(request: Request) -> str:
+    configured_uri = os.getenv("BLING_REDIRECT_URI", "").strip()
+    if configured_uri:
+        return configured_uri
+
+    public_base_url = (
+        os.getenv("ECOMMERCE_PUBLIC_BASE_URL", "").strip()
+        or os.getenv("FRONTEND_PUBLIC_BASE_URL", "").strip()
+    )
+    if public_base_url:
+        return f"{public_base_url.rstrip('/')}/api/auth/bling/callback"
+
+    base_url = str(request.base_url).rstrip("/")
+    return f"{base_url}/auth/bling/callback"
+
+
+def _b64url_encode(raw: bytes) -> str:
+    return base64.urlsafe_b64encode(raw).decode("ascii").rstrip("=")
+
+
+def _b64url_decode(value: str) -> bytes:
+    padded = value + "=" * (-len(value) % 4)
+    return base64.urlsafe_b64decode(padded.encode("ascii"))
+
+
+def _encode_oauth_state(*, expires_in: int = OAUTH_STATE_TTL_SECONDS) -> str:
+    payload = {
+        "exp": int(time.time()) + int(expires_in),
+        "nonce": secrets.token_urlsafe(16),
+        "purpose": "bling_oauth",
+    }
+    payload_raw = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode(
+        "utf-8"
+    )
+    payload_part = _b64url_encode(payload_raw)
+    signature = hmac.new(
+        JWT_SECRET_KEY.encode("utf-8"),
+        payload_part.encode("ascii"),
+        hashlib.sha256,
+    ).digest()
+    return f"{payload_part}.{_b64url_encode(signature)}"
+
+
+def _validate_oauth_state(state: str | None) -> bool:
+    raw = str(state or "").strip()
+    if not raw or "." not in raw:
+        return False
+
+    payload_part, signature_part = raw.split(".", 1)
+    expected = hmac.new(
+        JWT_SECRET_KEY.encode("utf-8"),
+        payload_part.encode("ascii"),
+        hashlib.sha256,
+    ).digest()
+    try:
+        received = _b64url_decode(signature_part)
+        payload = json.loads(_b64url_decode(payload_part).decode("utf-8"))
+    except Exception:
+        return False
+
+    return (
+        hmac.compare_digest(expected, received)
+        and payload.get("purpose") == "bling_oauth"
+        and int(payload.get("exp") or 0) >= int(time.time())
+    )
 
 
 def _get_env_path() -> Path:
@@ -163,7 +236,7 @@ def _trocar_code_por_tokens(code: str, redirect_uri: str) -> dict:
     return response.json()
 
 
-@router.get("/callback", response_class=HTMLResponse)
+@public_router.get("/callback", response_class=HTMLResponse)
 def bling_oauth_callback(
     request: Request,
     code: str | None = None,
@@ -187,9 +260,14 @@ def bling_oauth_callback(
             status_code=400,
         )
 
+    if not _validate_oauth_state(state):
+        return HTMLResponse(
+            content=_html_erro("Estado de autorizacao invalido ou expirado"),
+            status_code=400,
+        )
+
     try:
-        base_url = str(request.base_url).rstrip("/")
-        redirect_uri = f"{base_url}/auth/bling/callback"
+        redirect_uri = _bling_redirect_uri(request)
 
         logger.info("Trocando code por tokens Bling")
         tokens = _trocar_code_por_tokens(code, redirect_uri)
@@ -234,9 +312,8 @@ def gerar_link_autorizacao(
     if not client_id:
         return {"erro": "BLING_CLIENT_ID nao configurado"}
 
-    base_url = str(request.base_url).rstrip("/")
-    redirect_uri = f"{base_url}/auth/bling/callback"
-    state = secrets.token_hex(16)
+    redirect_uri = _bling_redirect_uri(request)
+    state = _encode_oauth_state()
 
     auth_url = (
         "https://www.bling.com.br/Api/v3/oauth/authorize"

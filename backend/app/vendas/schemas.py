@@ -20,6 +20,7 @@ class VendaItemSchema(BaseModel):
 
 class VendaPagamentoSchema(BaseModel):
     forma_pagamento: str
+    forma_pagamento_id: Optional[int] = None
     valor: float
     bandeira: Optional[str] = None
     numero_parcelas: Optional[int] = 1
@@ -27,6 +28,7 @@ class VendaPagamentoSchema(BaseModel):
     numero_autorizacao: Optional[str] = None
     nsu_cartao: Optional[str] = None
     operadora_id: Optional[int] = None
+    modalidade_cartao: Optional[str] = None
     valor_recebido: Optional[float] = None
     troco: Optional[float] = None
 

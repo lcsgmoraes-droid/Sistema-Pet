@@ -87,7 +87,7 @@ const Especies = () => {
   };
 
   const handleDelete = async (especie) => {
-    if (!await confirmarCorePet(`Deseja realmente desativar a espécie "${especie.nome}"?`)) {
+    if (!(await confirmarCorePet(`Deseja realmente desativar a espécie "${especie.nome}"?`))) {
       return;
     }
 

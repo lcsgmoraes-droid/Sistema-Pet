@@ -48,6 +48,31 @@ function OperadoraCartaoCard({ operadora, onEditar, onExcluir }) {
           <span className="font-medium text-gray-900">{operadora.max_parcelas}x</span>
         </div>
 
+        <div className="flex justify-between gap-3">
+          <span className="text-gray-600">Taxas configuradas:</span>
+          <span className="font-medium text-gray-900">{operadora.taxas_configuradas || 0}</span>
+        </div>
+
+        <div className="flex justify-between gap-3">
+          <span className="text-gray-600">Bandeiras:</span>
+          <span className="text-right font-medium text-gray-900">
+            {operadora.bandeiras_habilitadas?.length
+              ? operadora.bandeiras_habilitadas.join(", ")
+              : operadora.taxas_configuradas > 0
+                ? "Outras (fallback)"
+                : "Cadastro legado"}
+          </span>
+        </div>
+
+        {operadora.bandeira_padrao && (
+          <div className="flex justify-between gap-3">
+            <span className="text-gray-600">Bandeira padrao:</span>
+            <span className="font-medium capitalize text-gray-900">
+              {operadora.bandeira_padrao}
+            </span>
+          </div>
+        )}
+
         {operadora.api_enabled && (
           <div className="mt-2 pt-2 border-t border-gray-200">
             <span className="text-xs text-blue-600 flex items-center gap-1">

@@ -515,6 +515,12 @@ chmod -R u+rwX,g+rwX \
   "$APP_DIR/backend/secrets" \
   || log "Aviso: nao foi possivel ajustar permissao dos diretorios persistentes"
 
+runtime_env_path="$APP_DIR/.env"
+[[ -f "$runtime_env_path" ]] || fail "Arquivo de ambiente de producao nao encontrado"
+chown 1000:1000 "$runtime_env_path" \
+  && chmod 0600 "$runtime_env_path" \
+  || fail "Nao foi possivel permitir a persistencia segura dos tokens do Bling"
+
 ops_command_audit_log_path="$APP_DIR/backend/logs/ops_command_events.jsonl"
 touch "$ops_command_audit_log_path" \
   && chown 1000:1000 "$ops_command_audit_log_path" \

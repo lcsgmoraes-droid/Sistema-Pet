@@ -97,7 +97,7 @@ export default function EcommerceAIIntegracaoCard() {
   }
 
   async function disconnect() {
-    if (!await confirmarCorePet("Desconectar o EcommerceAI do CorePet?")) return;
+    if (!(await confirmarCorePet("Desconectar o EcommerceAI do CorePet?"))) return;
     try {
       setAction("disconnect");
       await api.post("/integracoes/ecommerceai/disconnect");

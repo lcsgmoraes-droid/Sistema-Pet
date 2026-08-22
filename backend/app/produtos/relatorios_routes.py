@@ -444,11 +444,12 @@ def relatorio_vendas_produto(
 
     media_diaria_30 = float(janelas["30"]["media_diaria"] or 0)
     estoque_atual = float(produto.estoque_atual or 0)
-    ruptura_ativa = estoque_atual <= 0
+    controla_estoque = getattr(produto, "controlar_estoque", True)
+    ruptura_ativa = controla_estoque and estoque_atual <= 0
     estoque_para_cobertura = max(0.0, estoque_atual)
     cobertura_estimada_dias = (
         round(estoque_para_cobertura / media_diaria_30, 1)
-        if media_diaria_30 > 0
+        if controla_estoque and media_diaria_30 > 0
         else None
     )
 

@@ -458,6 +458,7 @@ export type FuncionarioPdvFormaPagamento =
 
 export interface FuncionarioPdvFormaPagamentoOpcao {
   id: number;
+  selection_id: string;
   nome: string;
   tipo: string;
   key: FuncionarioPdvFormaPagamento;
@@ -467,10 +468,12 @@ export interface FuncionarioPdvFormaPagamentoOpcao {
   max_parcelas: number;
   parcelas_maximas: number;
   operadora?: string | null;
+  operadora_id?: number | null;
   requer_nsu: boolean;
   tipo_cartao?: string | null;
   bandeira?: string | null;
   split_parcelas: boolean;
+  parcelas_disponiveis: number[];
 }
 
 export interface FuncionarioPdvPagamentoPayload {
@@ -482,6 +485,7 @@ export interface FuncionarioPdvPagamentoPayload {
   forma_pagamento_id?: number | null;
   bandeira?: string | null;
   operadora?: string | null;
+  operadora_id?: number | null;
   nsu_cartao?: string | null;
 }
 

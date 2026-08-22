@@ -186,7 +186,7 @@ export function useMovimentacoesProdutoGranel({ carregarDados, id, produto }) {
   };
 
   const handleDesvincularGranel = async (vinculoId) => {
-    if (!await confirmarCorePet("Desvincular este produto granel da origem?")) {
+    if (!(await confirmarCorePet("Desvincular este produto granel da origem?"))) {
       return;
     }
 

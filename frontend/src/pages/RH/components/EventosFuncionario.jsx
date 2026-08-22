@@ -22,7 +22,7 @@ export default function EventosFuncionario({ funcionario, onClose }) {
   }, []);
 
   const concederFerias = async () => {
-    if (!await confirmarCorePet("Confirmar concessão de férias?")) return;
+    if (!(await confirmarCorePet("Confirmar concessão de férias?"))) return;
     setLoading(true);
 
     try {
@@ -46,7 +46,7 @@ export default function EventosFuncionario({ funcionario, onClose }) {
   };
 
   const pagarDecimo = async (parcela) => {
-    if (!await confirmarCorePet(`Confirmar pagamento da ${parcela}ª parcela do 13º?`)) return;
+    if (!(await confirmarCorePet(`Confirmar pagamento da ${parcela}ª parcela do 13º?`))) return;
 
     setLoading(true);
 

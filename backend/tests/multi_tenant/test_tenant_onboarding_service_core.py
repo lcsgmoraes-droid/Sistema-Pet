@@ -56,8 +56,8 @@ def test_onboarding_apply_creates_default_copy_for_tenant(onboarding_session):
     assert _count(onboarding_session, "contas_bancarias", TENANT_A) == 2
     assert _count(onboarding_session, "especies", TENANT_A) == 2
     assert _count(onboarding_session, "racas", TENANT_A) == 2
-    assert _count(onboarding_session, "dre_categorias", TENANT_A) == 3
-    assert _count(onboarding_session, "tipo_despesas", TENANT_A) == 2
+    assert _count(onboarding_session, "dre_categorias", TENANT_A) == 12
+    assert _count(onboarding_session, "tipo_despesas", TENANT_A) == 19
     assert _count(onboarding_session, "categorias", TENANT_A) == 2
     assert _count(onboarding_session, "linhas_racao", TENANT_A) == 4
     assert _count(onboarding_session, "portes_animal", TENANT_A) == 6
@@ -74,7 +74,11 @@ def test_onboarding_apply_creates_default_copy_for_tenant(onboarding_session):
         {"tenant_id": TENANT_A},
     ).all()
     assert enum_values
-    assert all(tipo_custo == "DIRETO" for tipo_custo, _escopo in enum_values)
+    assert {tipo_custo for tipo_custo, _escopo in enum_values} == {
+        "DIRETO",
+        "INDIRETO_RATEAVEL",
+        "CORPORATIVO",
+    }
     assert all(escopo == "AMBOS" for _tipo_custo, escopo in enum_values)
 
 
@@ -96,8 +100,8 @@ def test_onboarding_is_idempotent_for_same_tenant(onboarding_session):
     assert _count(onboarding_session, "contas_bancarias", TENANT_A) == 2
     assert _count(onboarding_session, "linhas_racao", TENANT_A) == 4
     assert _count(onboarding_session, "vet_catalogo_procedimentos", TENANT_A) == 70
-    assert _count(onboarding_session, "dre_categorias", TENANT_A) == 3
-    assert _count(onboarding_session, "tipo_despesas", TENANT_A) == 2
+    assert _count(onboarding_session, "dre_categorias", TENANT_A) == 12
+    assert _count(onboarding_session, "tipo_despesas", TENANT_A) == 19
     assert _count(onboarding_session, "tenant_template_installs") == 1
 
 
@@ -212,10 +216,10 @@ def test_onboarding_item_mapping_survives_tenant_dre_category_edit(onboarding_se
     onboarding_session.commit()
 
     assert second["created"] == {}
-    assert second["skipped"]["dre_categories"] == 3
-    assert second["skipped"]["dre_subcategories"] == 4
-    assert _count(onboarding_session, "dre_categorias", TENANT_A) == 3
-    assert _count(onboarding_session, "dre_subcategorias", TENANT_A) == 4
+    assert second["skipped"]["dre_categories"] == 12
+    assert second["skipped"]["dre_subcategories"] == 38
+    assert _count(onboarding_session, "dre_categorias", TENANT_A) == 12
+    assert _count(onboarding_session, "dre_subcategorias", TENANT_A) == 38
     assert (
         onboarding_session.execute(
             text(
@@ -242,10 +246,10 @@ def test_onboarding_creates_isolated_copies_for_each_tenant(onboarding_session):
 
     assert _count(onboarding_session, "formas_pagamento", TENANT_A) == 4
     assert _count(onboarding_session, "formas_pagamento", TENANT_B) == 4
-    assert _count(onboarding_session, "dre_categorias", TENANT_A) == 3
-    assert _count(onboarding_session, "dre_categorias", TENANT_B) == 3
-    assert _count(onboarding_session, "tipo_despesas", TENANT_A) == 2
-    assert _count(onboarding_session, "tipo_despesas", TENANT_B) == 2
+    assert _count(onboarding_session, "dre_categorias", TENANT_A) == 12
+    assert _count(onboarding_session, "dre_categorias", TENANT_B) == 12
+    assert _count(onboarding_session, "tipo_despesas", TENANT_A) == 19
+    assert _count(onboarding_session, "tipo_despesas", TENANT_B) == 19
     assert _count(onboarding_session, "vet_catalogo_procedimentos", TENANT_A) == 70
     assert _count(onboarding_session, "vet_catalogo_procedimentos", TENANT_B) == 70
 

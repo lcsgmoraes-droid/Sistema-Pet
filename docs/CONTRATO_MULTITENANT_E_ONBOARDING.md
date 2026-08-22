@@ -71,15 +71,15 @@ Para validar sem sujar banco:
 3. Rodar onboarding nos dois com `strict_required=True`.
 4. Confirmar contagens:
    - `formas_pagamento = 4`
-   - `dre_categorias = 3`
-   - `dre_subcategorias = 4`
-   - `categorias_financeiras = 2`
-   - `tipo_despesas = 2`
+   - `dre_categorias = 12`
+   - `dre_subcategorias = 38`
+   - `categorias_financeiras = 27`
+   - `tipo_despesas = 19`
    - `departamentos = 1`
    - `categorias = 2`
    - `produtos = 0`
    - `tenant_template_installs = 1`
-   - `tenant_template_item_installs = 18`
+   - `tenant_template_item_installs` registra todos os itens copiados do pacote v2;
 5. Editar uma copia do tenant A.
 6. Confirmar que tenant B e template global nao mudam.
 7. Reexecutar onboarding no tenant A e confirmar que nao duplica.
@@ -127,6 +127,22 @@ Padrao atual:
 - importacao/copia de produtos deve ser acao explicita;
 - produtos importados pertencem ao tenant;
 - editar produto importado nao altera template nem outro tenant.
+
+## Importacao externa de dados
+
+Exportacoes de sistemas anteriores seguem um fluxo diferente do onboarding de
+templates, mas obedecem ao mesmo isolamento:
+
+- tenant e usuario de destino sao obrigatorios e validados em conjunto;
+- nenhuma importacao pode escolher o primeiro usuario ou um tenant implicito;
+- os arquivos precisam ser simulados integralmente antes da gravacao;
+- a aplicacao aceita apenas o plano, o banco e os hashes simulados;
+- toda aplicacao deve ser atomica e falhar fechada;
+- relatorios e dados exportados ficam fora do Git;
+- producao exige backup, autorizacao explicita e confirmacao adicional;
+- queries, duplicidades e inserts sao avaliados dentro do contexto do tenant.
+
+O contrato operacional esta em `docs/IMPORTACAO_SIMPLESVET_SEGURA.md`.
 
 ## Catalogo Base Administrativo
 

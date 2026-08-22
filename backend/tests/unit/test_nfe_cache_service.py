@@ -103,3 +103,69 @@ def test_upsert_nota_cache_permite_upgrade_de_pendente_para_autorizada():
     assert registro is persistido
     assert registro.status == "Autorizada"
     assert registro.source == "bling_api"
+
+
+def test_upsert_local_preserva_enriquecimento_para_tenant_dono_do_bling():
+    persistido = BlingNotaFiscalCache(
+        tenant_id="tenant-1",
+        bling_id="25461868579",
+        modelo=55,
+        tipo="nfe",
+        numero="011149",
+        status="Autorizada",
+        source="bling_detail",
+    )
+    db = _FakeDB(persistido=persistido)
+
+    nota_local = {
+        "id": "25461868579",
+        "modelo": 55,
+        "tipo": "nfe",
+        "numero": "011149",
+        "status": "Pendente",
+    }
+
+    registro = upsert_nota_cache(
+        db, "tenant-1", nota_local, source="local_venda", resumo_payload=nota_local
+    )
+
+    assert registro.status == "Autorizada"
+    assert registro.source == "bling_detail"
+
+
+def test_upsert_local_remove_dados_remotos_para_tenant_sem_bling():
+    persistido = BlingNotaFiscalCache(
+        tenant_id="tenant-1",
+        bling_id="25461868579",
+        modelo=55,
+        tipo="nfe",
+        numero="nota-de-outra-empresa",
+        status="Autorizada",
+        source="bling_detail",
+        cliente={"nome": "Cliente de outra empresa"},
+        detalhe_payload={"dado": "remoto"},
+    )
+    db = _FakeDB(persistido=persistido)
+    nota_local = {
+        "id": "25461868579",
+        "modelo": 55,
+        "tipo": "nfe",
+        "numero": "nota-local",
+        "status": "Pendente",
+        "cliente": {"nome": "Cliente local"},
+    }
+
+    registro = upsert_nota_cache(
+        db,
+        "tenant-1",
+        nota_local,
+        source="local_venda",
+        resumo_payload=nota_local,
+        substituir_origem_remota=True,
+    )
+
+    assert registro.numero == "nota-local"
+    assert registro.status == "Pendente"
+    assert registro.source == "local_venda"
+    assert registro.cliente == {"nome": "Cliente local"}
+    assert registro.detalhe_payload is None

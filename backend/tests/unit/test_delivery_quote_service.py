@@ -2,7 +2,9 @@ from decimal import Decimal
 from types import SimpleNamespace
 
 import pytest
+from pydantic import ValidationError
 
+from app.schemas.configuracao_entrega import ConfiguracaoEntregaUpdate
 from app.services.delivery_quote_service import DeliveryQuoteError, quote_delivery
 
 
@@ -20,6 +22,8 @@ def _config(**overrides):
         "taxa_fixa": 12,
         "valor_por_km_cobrado": 2,
         "taxa_minima": 5,
+        "faixas_distancia": [],
+        "valor_km_excedente": None,
         "distancia_maxima_entrega_km": 20,
         "frete_gratis_acima": 150,
         "distancia_maxima_frete_gratis_km": 8,
@@ -52,6 +56,104 @@ def test_por_km_charges_distance_and_respects_minimum_fee():
     assert regular["distancia_km"] == 10
     assert regular["valor_por_km"] == 2
     assert minimum["valor_frete"] == 5
+
+
+def test_distance_tiers_charge_the_fixed_price_for_the_matching_range():
+    config = _config(
+        modalidade_cobranca="por_faixa",
+        faixas_distancia=[
+            {"ate_km": 2, "valor": 8.49},
+            {"ate_km": 3, "valor": 9.99},
+            {"ate_km": 4, "valor": 11.49},
+            {"ate_km": 5, "valor": 12.59},
+            {"ate_km": 6, "valor": 14.69},
+            {"ate_km": 7, "valor": 16.79},
+        ],
+        valor_km_excedente=2,
+    )
+
+    first_range = _quote(config, distance=Decimal("1.15"))
+    next_range = _quote(config, distance=Decimal("2.01"))
+    exact_limit = _quote(config, distance=Decimal("7"))
+
+    assert first_range["valor_frete"] == 8.49
+    assert first_range["faixa_distancia_aplicada"] == {
+        "ate_km": 2.0,
+        "valor": 8.49,
+    }
+    assert next_range["valor_frete"] == 9.99
+    assert exact_limit["valor_frete"] == 16.79
+    assert exact_limit["tipo"] == "entrega_por_faixa"
+
+
+def test_distance_tiers_charge_each_started_km_above_the_last_range():
+    config = _config(
+        modalidade_cobranca="por_faixa",
+        faixas_distancia=[{"ate_km": 7, "valor": 16.79}],
+        valor_km_excedente=2,
+        distancia_maxima_entrega_km=None,
+    )
+
+    first_extra_km = _quote(config, distance=Decimal("7.01"))
+    second_extra_km = _quote(config, distance=Decimal("8.01"))
+
+    assert first_extra_km["valor_frete"] == 18.79
+    assert first_extra_km["km_excedentes_cobrados"] == 1
+    assert second_extra_km["valor_frete"] == 20.79
+    assert second_extra_km["km_excedentes_cobrados"] == 2
+
+
+def test_distance_tiers_block_above_last_range_without_extra_price():
+    config = _config(
+        modalidade_cobranca="por_faixa",
+        faixas_distancia=[{"ate_km": 7, "valor": 16.79}],
+        valor_km_excedente=None,
+        distancia_maxima_entrega_km=None,
+    )
+
+    with pytest.raises(DeliveryQuoteError, match="fora das faixas"):
+        _quote(config, distance=Decimal("7.01"))
+
+
+def test_distance_tiers_still_respect_free_shipping_distance_limit():
+    config = _config(
+        modalidade_cobranca="por_faixa",
+        faixas_distancia=[
+            {"ate_km": 4, "valor": 9.99},
+            {"ate_km": 7, "valor": 16.79},
+        ],
+        valor_km_excedente=2,
+        frete_gratis_acima=100,
+        distancia_maxima_frete_gratis_km=4,
+    )
+
+    free = _quote(config, subtotal=120, distance=Decimal("3.5"))
+    charged = _quote(config, subtotal=120, distance=Decimal("5"))
+
+    assert free["valor_frete"] == 0
+    assert free["frete_gratis_aplicado"] is True
+    assert charged["valor_frete"] == 16.79
+    assert charged["frete_gratis_aplicado"] is False
+
+
+def test_distance_tiers_configuration_requires_ordered_unique_ranges():
+    common = {
+        "modalidade_cobranca": "por_faixa",
+        "logradouro": "Rua da Loja",
+        "numero": "100",
+    }
+
+    with pytest.raises(ValidationError, match="ao menos uma faixa"):
+        ConfiguracaoEntregaUpdate(**common, faixas_distancia=[])
+
+    with pytest.raises(ValidationError, match="ordem crescente"):
+        ConfiguracaoEntregaUpdate(
+            **common,
+            faixas_distancia=[
+                {"ate_km": 3, "valor": 9.99},
+                {"ate_km": 2, "valor": 8.49},
+            ],
+        )
 
 
 def test_free_shipping_value_does_not_override_free_distance_limit():

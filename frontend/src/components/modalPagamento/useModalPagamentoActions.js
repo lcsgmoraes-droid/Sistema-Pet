@@ -1,3 +1,4 @@
+import { useRef } from "react";
 import { useNavigate } from "react-router-dom";
 
 import api from "../../api";
@@ -16,6 +17,7 @@ import {
   montarObservacoesComJustificativaMargem,
   montarPagamentoRecebido,
   montarVendaParaPersistirComCupom,
+  persistirVendaAbertaParaPagamento,
   validarPagamentoParaAdicionar,
 } from "../modalPagamentoUtils";
 import { confirmarCorePet } from "../../services/corepetDialog";
@@ -34,6 +36,7 @@ export function useModalPagamentoActions({
   onVendaAtualizada,
   operadoraSelecionada,
   operadoras,
+  parcelasDisponiveis,
   opcaoExcedente,
   pagamentos,
   podeConfirmarFinalizacao,
@@ -64,6 +67,7 @@ export function useModalPagamentoActions({
   vendaFinalizadaId,
 }) {
   const navigate = useNavigate();
+  const vendaIdPersistidaRef = useRef(venda?.id || null);
 
   const adicionarPagamento = () => {
     const valor = valorRecebido || 0;
@@ -74,6 +78,7 @@ export function useModalPagamentoActions({
       bandeira,
       operadora: operadoraSelecionada,
       numeroParcelas,
+      parcelasDisponiveis,
     });
 
     if (erroValidacao) {
@@ -124,7 +129,7 @@ export function useModalPagamentoActions({
     setFormaPagamentoSelecionada(null);
     setValorRecebido(0);
     setBandeira("");
-    setOperadoraSelecionada(operadoras.find((op) => op.padrao) || null);
+    setOperadoraSelecionada(operadoras.find((op) => op.padrao) || operadoras[0] || null);
     setNsuCartao("");
     setNumeroParcelas(1);
     setErro("");
@@ -142,7 +147,7 @@ export function useModalPagamentoActions({
   };
 
   const excluirPagamentoExistente = async (pagamentoId) => {
-    if (!await confirmarCorePet("Deseja realmente excluir este pagamento?")) {
+    if (!(await confirmarCorePet("Deseja realmente excluir este pagamento?"))) {
       return;
     }
 
@@ -204,14 +209,15 @@ export function useModalPagamentoActions({
     });
     const payloadVenda = montarPayloadVenda(vendaParaPersistir);
 
-    const vendaIdPersistida = vendaParaPersistir.id;
-    if (!vendaIdPersistida) {
-      const vendaCriada = await criarVenda(payloadVenda);
-      return vendaCriada.id;
-    }
-
-    await atualizarVenda(vendaIdPersistida, payloadVenda);
-    return vendaIdPersistida;
+    const vendaId = await persistirVendaAbertaParaPagamento({
+      vendaParaPersistir,
+      payloadVenda,
+      vendaIdPersistida: vendaIdPersistidaRef.current,
+      criarVenda,
+      atualizarVenda,
+    });
+    vendaIdPersistidaRef.current = vendaId;
+    return vendaId;
   };
 
   const handleFinalizar = async () => {
@@ -282,7 +288,7 @@ export function useModalPagamentoActions({
       setErro(mensagem);
       if (
         acaoFiscal &&
-        await confirmarCorePet(`${mensagem}\n\nAbrir o cadastro fiscal deste produto agora?`)
+        (await confirmarCorePet(`${mensagem}\n\nAbrir o cadastro fiscal deste produto agora?`))
       ) {
         navigate(acaoFiscal.url);
       } else {

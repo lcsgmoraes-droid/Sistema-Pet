@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { FiPlus, FiEdit2, FiTrash2, FiAlertCircle } from "react-icons/fi";
 import api from "../../api";
-import CatalogoProdutoModal from "../../components/produtos/CatalogoProdutoModal";
 import ActionButton from "../../components/ui/ActionButton";
 import EmptyState from "../../components/ui/EmptyState";
 import IconActionButton from "../../components/ui/IconActionButton";
@@ -13,6 +12,10 @@ const Departamentos = () => {
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [editando, setEditando] = useState(null);
+  const [formData, setFormData] = useState({
+    nome: "",
+    descricao: "",
+  });
 
   useEffect(() => {
     carregarDepartamentos();
@@ -31,13 +34,41 @@ const Departamentos = () => {
     }
   };
 
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      if (editando) {
+        await api.put(`/produtos/departamentos/${editando}`, formData);
+      } else {
+        await api.post("/produtos/departamentos", formData);
+      }
+      setShowModal(false);
+      setEditando(null);
+      setFormData({ nome: "", descricao: "" });
+      carregarDepartamentos();
+    } catch (error) {
+      console.error("Erro ao salvar departamento:", error);
+      if (error.response?.data?.detail) {
+        alert(error.response.data.detail);
+      } else {
+        alert("Erro ao salvar departamento");
+      }
+    }
+  };
+
   const handleEditar = (departamento) => {
-    setEditando(departamento);
+    setEditando(departamento.id);
+    setFormData({
+      nome: departamento.nome,
+      descricao: departamento.descricao || "",
+    });
     setShowModal(true);
   };
 
   const handleExcluir = async (departamento) => {
-    if (!await confirmarCorePet(`Deseja realmente excluir o departamento "${departamento.nome}"?`)) {
+    if (
+      !(await confirmarCorePet(`Deseja realmente excluir o departamento "${departamento.nome}"?`))
+    ) {
       return;
     }
     try {
@@ -51,17 +82,8 @@ const Departamentos = () => {
 
   const handleNovoDepartamento = () => {
     setEditando(null);
+    setFormData({ nome: "", descricao: "" });
     setShowModal(true);
-  };
-
-  const fecharModal = () => {
-    setShowModal(false);
-    setEditando(null);
-  };
-
-  const handleDepartamentoSalvo = async () => {
-    fecharModal();
-    await carregarDepartamentos();
   };
 
   if (loading) {
@@ -145,12 +167,47 @@ const Departamentos = () => {
 
       {/* Modal */}
       {showModal && (
-        <CatalogoProdutoModal
-          tipo="departamento"
-          item={editando}
-          onClose={fecharModal}
-          onSaved={handleDepartamentoSalvo}
-        />
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md">
+            <h2 className="text-xl font-bold mb-4">
+              {editando ? "Editar Departamento" : "Novo Departamento"}
+            </h2>
+
+            <form onSubmit={handleSubmit}>
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-1">Nome *</label>
+                <input
+                  type="text"
+                  value={formData.nome}
+                  onChange={(e) => setFormData({ ...formData, nome: e.target.value })}
+                  className="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="Ex: Alimentação, Higiene, Acessórios..."
+                  required
+                />
+              </div>
+
+              <div className="mb-6">
+                <label className="block text-sm font-medium text-gray-700 mb-1">Descrição</label>
+                <textarea
+                  value={formData.descricao}
+                  onChange={(e) => setFormData({ ...formData, descricao: e.target.value })}
+                  className="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="Descrição opcional do departamento"
+                  rows={3}
+                />
+              </div>
+
+              <div className="flex justify-end gap-3">
+                <ActionButton onClick={() => setShowModal(false)} intent="neutral" tone="soft">
+                  Cancelar
+                </ActionButton>
+                <ActionButton type="submit" intent={editando ? "edit" : "create"}>
+                  {editando ? "Salvar" : "Criar"}
+                </ActionButton>
+              </div>
+            </form>
+          </div>
+        </div>
       )}
     </div>
   );

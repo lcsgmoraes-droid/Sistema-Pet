@@ -176,6 +176,7 @@ def finalizar_venda_funcionario_pdv(
                 if forma_pagamento_selecionada
                 else None
             ),
+            "operadora_id": dados.pagamento.operadora_id,
             "nsu_cartao": dados.pagamento.nsu_cartao,
         }
         if dados.pagamento.valor_recebido is not None:

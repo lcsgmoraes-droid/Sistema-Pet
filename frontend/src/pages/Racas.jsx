@@ -106,7 +106,7 @@ const Racas = () => {
   };
 
   const handleDelete = async (raca) => {
-    if (!await confirmarCorePet(`Deseja realmente desativar a raça "${raca.nome}"?`)) {
+    if (!(await confirmarCorePet(`Deseja realmente desativar a raça "${raca.nome}"?`))) {
       return;
     }
 

@@ -9,6 +9,7 @@ from sqlalchemy import (
     BigInteger,
     String,
     Boolean,
+    Date,
     DateTime,
     Text,
     ForeignKey,
@@ -511,6 +512,7 @@ class VendaPagamento(BaseTenantModel):
     forma_pagamento = Column(
         String(50), nullable=False
     )  # dinheiro, cartao_credito, cartao_debito, pix, boleto, outros
+    forma_pagamento_id = Column(Integer, nullable=True, index=True)
     valor = Column(DECIMAL(10, 2), nullable=False)
 
     # Detalhes (se cartão)
@@ -526,6 +528,14 @@ class VendaPagamento(BaseTenantModel):
     operadora_id = Column(
         Integer, nullable=True, index=True
     )  # was: ForeignKey('operadoras_cartao.id') - tabela não existe
+    modalidade_cartao = Column(String(20), nullable=True)
+    taxa_cartao_regra_id = Column(Integer, nullable=True, index=True)
+    taxa_percentual_aplicada = Column(DECIMAL(7, 4), nullable=True)
+    taxa_fixa_aplicada = Column(DECIMAL(10, 2), nullable=True)
+    valor_taxa_prevista = Column(DECIMAL(10, 2), nullable=True)
+    valor_liquido_previsto = Column(DECIMAL(10, 2), nullable=True)
+    prazo_recebimento_dias = Column(Integer, nullable=True)
+    data_recebimento_prevista = Column(Date, nullable=True)
     status_conciliacao = Column(
         Enum("nao_conciliado", "conciliado", name="status_conciliacao_enum"),
         nullable=False,
@@ -559,9 +569,26 @@ class VendaPagamento(BaseTenantModel):
         return {
             "id": self.id,
             "forma_pagamento": self.forma_pagamento,
+            "forma_pagamento_id": self.forma_pagamento_id,
             "valor": safe_decimal_to_float(self.valor),
             "bandeira": self.bandeira,
             "numero_parcelas": self.numero_parcelas,
+            "operadora_id": self.operadora_id,
+            "modalidade_cartao": self.modalidade_cartao,
+            "taxa_cartao_regra_id": self.taxa_cartao_regra_id,
+            "taxa_percentual_aplicada": safe_decimal_to_float(
+                self.taxa_percentual_aplicada
+            ),
+            "taxa_fixa_aplicada": safe_decimal_to_float(self.taxa_fixa_aplicada),
+            "valor_taxa_prevista": safe_decimal_to_float(self.valor_taxa_prevista),
+            "valor_liquido_previsto": safe_decimal_to_float(
+                self.valor_liquido_previsto
+            ),
+            "prazo_recebimento_dias": self.prazo_recebimento_dias,
+            "data_recebimento_prevista": self.data_recebimento_prevista.isoformat()
+            if self.data_recebimento_prevista
+            else None,
+            "nsu_cartao": self.nsu_cartao,
             "status": self.status,
             "data_pagamento": safe_datetime_to_iso(self.data_pagamento),
             "gateway_provider": self.gateway_provider,

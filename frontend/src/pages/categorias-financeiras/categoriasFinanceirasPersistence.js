@@ -169,7 +169,7 @@ export function createCategoriasFinanceirasPersistence({
   }
 
   async function handleDelete(id) {
-    if (!await confirmarCorePet("Deseja realmente excluir esta categoria?")) return;
+    if (!(await confirmarCorePet("Deseja realmente excluir esta categoria?"))) return;
 
     try {
       await api.delete(`/categorias-financeiras/${id}`);

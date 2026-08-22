@@ -6,13 +6,14 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
-from sqlalchemy import and_, desc, text
+from sqlalchemy import and_, desc, func, text
 from sqlalchemy.exc import NoReferencedTableError
 from datetime import datetime
 
 from app.auth.dependencies import get_current_user_and_tenant
 from app.db import get_session
 from app.estoque_models import AlertaEstoqueNegativo
+from app.produtos_models import Produto
 from app.utils.logger import logger
 
 
@@ -25,6 +26,24 @@ def _obter_usuario_e_tenant(user_and_tenant):
     current_user, tenant_id = user_and_tenant
     set_current_tenant(tenant_id)
     return current_user, tenant_id
+
+
+def _query_alertas_de_produtos_controlados(db: Session, tenant_id):
+    """Oculta alertas legados de cadastros que agora sao servicos."""
+    return (
+        db.query(AlertaEstoqueNegativo)
+        .join(
+            Produto,
+            and_(
+                Produto.id == AlertaEstoqueNegativo.produto_id,
+                Produto.tenant_id == AlertaEstoqueNegativo.tenant_id,
+            ),
+        )
+        .filter(
+            AlertaEstoqueNegativo.tenant_id == tenant_id,
+            func.lower(func.coalesce(Produto.tipo, "produto")) != "servico",
+        )
+    )
 
 
 def ensure_alertas_table_exists(db: Session) -> None:
@@ -149,11 +168,8 @@ def listar_alertas_pendentes(
     current_user, tenant_id = _obter_usuario_e_tenant(user_and_tenant)
     ensure_alertas_table_exists(db)
 
-    query = db.query(AlertaEstoqueNegativo).filter(
-        and_(
-            AlertaEstoqueNegativo.tenant_id == tenant_id,
-            AlertaEstoqueNegativo.status == "pendente",
-        )
+    query = _query_alertas_de_produtos_controlados(db, tenant_id).filter(
+        AlertaEstoqueNegativo.status == "pendente"
     )
 
     if apenas_criticos:
@@ -183,9 +199,7 @@ def listar_todos_alertas(
     current_user, tenant_id = _obter_usuario_e_tenant(user_and_tenant)
     ensure_alertas_table_exists(db)
 
-    query = db.query(AlertaEstoqueNegativo).filter(
-        AlertaEstoqueNegativo.tenant_id == tenant_id
-    )
+    query = _query_alertas_de_produtos_controlados(db, tenant_id)
 
     if status:
         query = query.filter(AlertaEstoqueNegativo.status == status)
@@ -205,36 +219,24 @@ def dashboard_alertas(
 
     🟢 MODELO CONTROLADO - Métricas visíveis para tomada de decisão
     """
-    from app.produtos_models import Produto
-
     current_user, tenant_id = _obter_usuario_e_tenant(user_and_tenant)
     ensure_alertas_table_exists(db)
 
     # Total de TODOS os alertas (independente do status)
-    total_alertas = (
-        db.query(AlertaEstoqueNegativo)
-        .filter(AlertaEstoqueNegativo.tenant_id == tenant_id)
-        .count()
-    )
+    total_alertas = _query_alertas_de_produtos_controlados(db, tenant_id).count()
 
     # Total de alertas pendentes
     alertas_pendentes = (
-        db.query(AlertaEstoqueNegativo)
-        .filter(
-            and_(
-                AlertaEstoqueNegativo.tenant_id == tenant_id,
-                AlertaEstoqueNegativo.status == "pendente",
-            )
-        )
+        _query_alertas_de_produtos_controlados(db, tenant_id)
+        .filter(AlertaEstoqueNegativo.status == "pendente")
         .count()
     )
 
     # Total de alertas críticos PENDENTES
     alertas_criticos = (
-        db.query(AlertaEstoqueNegativo)
+        _query_alertas_de_produtos_controlados(db, tenant_id)
         .filter(
             and_(
-                AlertaEstoqueNegativo.tenant_id == tenant_id,
                 AlertaEstoqueNegativo.status == "pendente",
                 AlertaEstoqueNegativo.critico.is_(True),
             )
@@ -244,12 +246,9 @@ def dashboard_alertas(
 
     # Total de alertas resolvidos
     alertas_resolvidos = (
-        db.query(AlertaEstoqueNegativo)
+        _query_alertas_de_produtos_controlados(db, tenant_id)
         .filter(
-            and_(
-                AlertaEstoqueNegativo.tenant_id == tenant_id,
-                AlertaEstoqueNegativo.status.in_(["resolvido", "ignorado"]),
-            )
+            AlertaEstoqueNegativo.status.in_(["resolvido", "ignorado"]),
         )
         .count()
     )
@@ -257,7 +256,13 @@ def dashboard_alertas(
     # Produtos com estoque negativo ATUAL
     produtos_negativos = (
         db.query(Produto.id, Produto.nome, Produto.estoque_atual)
-        .filter(and_(Produto.tenant_id == tenant_id, Produto.estoque_atual < 0))
+        .filter(
+            and_(
+                Produto.tenant_id == tenant_id,
+                Produto.estoque_atual < 0,
+                func.lower(func.coalesce(Produto.tipo, "produto")) != "servico",
+            )
+        )
         .all()
     )
 

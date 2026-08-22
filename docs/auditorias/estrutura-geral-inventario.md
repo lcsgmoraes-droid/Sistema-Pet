@@ -393,3 +393,28 @@ Proxima fatia recomendada:
    `backend/app/services/tenant_onboarding_service.py` ou
    `backend/app/api/endpoints/rotas_entrega.py`.
 
+## Atualizacao continua - 2026-08-20 - fonte e entrada do repositorio
+
+Nova medicao feita a partir da `main`, considerando codigo de aplicacao em
+`backend/app/`, `frontend/src/` e `app-mobile/src/`, sem testes, migrations,
+builds ou dependencias:
+
+- existe 1 arquivo ativo acima de 1000 linhas;
+- `backend/app/whatsapp/processor.py` possui 3606 linhas e permanece como
+  hotspot estrutural prioritario;
+- `backend/app/main.py` esta pequeno e atua como composicao da aplicacao;
+- as fontes oficiais passaram a ser documentadas em
+  `docs/MAPA_CODIGO_FONTE.md`;
+- a arquitetura atual passou a ser documentada em `docs/ARQUITETURA.md`;
+- `app/` e `src/` na raiz foram classificados como legados, removidos depois de
+  validacao e bloqueados para retorno por
+  `scripts/validate_repository_structure.py`;
+- a limpeza fisica da raiz foi registrada em
+  `docs/auditorias/INVENTARIO_LIMPEZA_RAIZ.md` e sera feita em fatias separadas.
+
+Proxima fatia recomendada:
+
+1. Concluir a divisao incremental de `backend/app/whatsapp/processor.py`, com
+   testes de comportamento e compatibilidade.
+2. Auditar atalhos e scripts antigos da raiz sem alterar o caminho oficial.
+

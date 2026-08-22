@@ -33,6 +33,9 @@ class FormaPagamentoAnalise(BaseModel):
     forma_pagamento_id: int
     valor: float
     parcelas: int = 1
+    operadora_id: Optional[int] = None
+    bandeira: Optional[str] = None
+    modalidade: Optional[str] = None
 
 
 class AnaliseVendaRequest(BaseModel):

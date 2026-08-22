@@ -97,9 +97,9 @@ export default function useProdutosNovoLotes({ id }) {
 
   const handleExcluirLote = async (lote) => {
     if (
-      !await confirmarCorePet(
+      !(await confirmarCorePet(
         `Deseja realmente excluir o lote ${lote.nome_lote}?\n\nQuantidade: ${lote.quantidade_disponivel} unidades\nIsso removerá o registro de entrada do estoque.`,
-      )
+      ))
     ) {
       return;
     }

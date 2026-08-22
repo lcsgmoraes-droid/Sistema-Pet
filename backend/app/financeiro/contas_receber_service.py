@@ -176,11 +176,20 @@ class ContasReceberService:
             )
 
             # Buscar configuração da forma de pagamento
-            forma_pag = (
-                db.query(FormaPagamento)
-                .filter(FormaPagamento.nome.ilike(f"%{forma_pag_nome}%"))
-                .first()
+            forma_pag_id = (
+                pag.get("forma_pagamento_id")
+                if isinstance(pag, dict)
+                else getattr(pag, "forma_pagamento_id", None)
             )
+            forma_query = db.query(FormaPagamento)
+            if forma_pag_id:
+                forma_pag = forma_query.filter(
+                    FormaPagamento.id == forma_pag_id
+                ).first()
+            else:
+                forma_pag = forma_query.filter(
+                    FormaPagamento.nome.ilike(f"%{forma_pag_nome}%")
+                ).first()
 
             # Verificar se é cartão parcelado
             numero_parcelas = (
@@ -273,8 +282,11 @@ class ContasReceberService:
             f"(Total: R$ {float(valor_total):.2f})"
         )
 
+        data_primeira_parcela = getattr(
+            pagamento, "data_recebimento_prevista", None
+        ) or (date.today() + timedelta(days=30))
         for i, valor_parcela in enumerate(valores_parcelas, start=1):
-            data_vencimento = date.today() + timedelta(days=30 * i)
+            data_vencimento = data_primeira_parcela + timedelta(days=30 * (i - 1))
 
             # Criar conta a receber
             # Garantir valores não-nulos para campos obrigatórios
@@ -349,8 +361,12 @@ class ContasReceberService:
         )
 
         # Determinar prazo
+        prazo_aplicado = getattr(pagamento, "prazo_recebimento_dias", None)
+        data_aplicada = getattr(pagamento, "data_recebimento_prevista", None)
         prazo_dias = 0
-        if forma_pag and forma_pag.prazo_dias:
+        if prazo_aplicado is not None:
+            prazo_dias = max(0, int(prazo_aplicado))
+        elif forma_pag and forma_pag.prazo_dias:
             prazo_dias = forma_pag.prazo_dias
         elif forma_pag_nome.lower() in ["credito", "crédito", "cartao_credito"]:
             prazo_dias = 30  # Padrão cartão de crédito
@@ -367,7 +383,7 @@ class ContasReceberService:
         )
 
         # SEMPRE criar conta a receber (inclusive à vista, para rastreabilidade)
-        data_vencimento = (
+        data_vencimento = data_aplicada or (
             date.today()
             if prazo_dias == 0
             else (date.today() + timedelta(days=prazo_dias))

@@ -130,9 +130,9 @@ const EspeciesRacas = () => {
 
   const handleDeleteEspecie = async (especie) => {
     if (
-      !await confirmarCorePet(
+      !(await confirmarCorePet(
         `Deseja realmente desativar a espécie "${especie.nome}"?\n\nIsso também desativará todas as raças vinculadas.`,
-      )
+      ))
     ) {
       return;
     }
@@ -209,7 +209,7 @@ const EspeciesRacas = () => {
   };
 
   const handleDeleteRaca = async (raca) => {
-    if (!await confirmarCorePet(`Deseja realmente desativar a raça "${raca.nome}"?`)) {
+    if (!(await confirmarCorePet(`Deseja realmente desativar a raça "${raca.nome}"?`))) {
       return;
     }
 

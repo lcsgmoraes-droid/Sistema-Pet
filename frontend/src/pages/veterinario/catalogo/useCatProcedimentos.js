@@ -140,7 +140,7 @@ export function useCatProcedimentos() {
   }
 
   async function excluir(item) {
-    if (!await confirmarCorePet(`Deseja excluir o procedimento "${item.nome}"?`)) return;
+    if (!(await confirmarCorePet(`Deseja excluir o procedimento "${item.nome}"?`))) return;
     setRemovendoId(item.id);
     setErro("");
     try {

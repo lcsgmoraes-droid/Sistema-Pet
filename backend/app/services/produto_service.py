@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 import logging
 
 from ..produtos_models import Produto, ProdutoKitComponente
+from ..produtos.tipos import aplicar_regras_servico_dados
 
 logger = logging.getLogger(__name__)
 
@@ -86,7 +87,9 @@ class ProdutoService:
         dados["codigo"] = normalizar_sku_produto(dados.get("codigo"))
         validar_sku_unico_produto(db, sku=dados["codigo"], tenant_id=tenant_id)
 
-        _aplicar_regras_granel(dados)
+        eh_servico = aplicar_regras_servico_dados(dados)
+        if not eh_servico:
+            _aplicar_regras_granel(dados)
         tipo_produto = dados.get("tipo_produto", "SIMPLES")
 
         # ========================================
@@ -164,8 +167,8 @@ class ProdutoService:
         # CRIAR PRODUTO
         # ========================================
 
-        # Forçar controle_lote=True para todos os produtos
-        dados["controle_lote"] = True
+        # Preserva o comportamento legado dos produtos; servicos nunca possuem lote.
+        dados["controle_lote"] = False if eh_servico else True
 
         # Remover campos None ou vazios (exceto campos numéricos que podem ser 0)
         dados_limpos = {

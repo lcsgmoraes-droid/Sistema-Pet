@@ -259,7 +259,7 @@ export function usePDVVendaFinalizacao({
       const acaoFiscal = extrairAcaoCorrecaoFiscal(error);
       if (
         acaoFiscal &&
-        await confirmarCorePet(`${mensagem}\n\nAbrir o cadastro fiscal deste produto agora?`)
+        (await confirmarCorePet(`${mensagem}\n\nAbrir o cadastro fiscal deste produto agora?`))
       ) {
         navigate(acaoFiscal.url);
       } else {

@@ -109,7 +109,7 @@ const ModalLancamentosRecorrentes = ({ isOpen, onClose, onSave }) => {
   };
 
   const handleExcluir = async (id) => {
-    if (!await confirmarCorePet("Deseja realmente excluir este lançamento recorrente?")) return;
+    if (!(await confirmarCorePet("Deseja realmente excluir este lançamento recorrente?"))) return;
 
     try {
       await api.delete(`/lancamentos/recorrentes/${id}`);

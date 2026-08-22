@@ -1,21 +1,8 @@
 @echo off
-chcp 65001 >nul
-title PARAR DEV
+REM COMPATIBILITY_ALIAS
+REM O fluxo local real e unico fica em FLUXO_UNICO.bat.
 
-echo.
-echo ============================================================================
-echo   PARAR AMBIENTE DEV
-echo ============================================================================
-echo.
-pause
-
-echo.
-echo Parando DEV...
-docker-compose -f docker-compose.local-dev.yml down
-
-echo.
-echo Ambiente DEV parado!
-echo.
-echo Para iniciar novamente: INICIAR_DEV.bat
-echo.
-pause
+cd /d "%~dp0"
+echo Atalho de compatibilidade: parando o ambiente DEV oficial.
+call "%~dp0FLUXO_UNICO.bat" dev-down
+exit /b %ERRORLEVEL%

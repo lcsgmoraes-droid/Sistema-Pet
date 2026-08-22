@@ -72,6 +72,16 @@ def test_deploy_script_keeps_manual_ops_audit_log_restricted_to_backend_owner():
     assert 'chmod 0666 "$ops_command_audit_log_path"' not in script
 
 
+def test_deploy_allows_runtime_to_rotate_bling_tokens_without_exposing_env():
+    script = _deploy_script_text()
+
+    assert 'runtime_env_path="$APP_DIR/.env"' in script
+    assert 'chown 1000:1000 "$runtime_env_path"' in script
+    assert 'chmod 0600 "$runtime_env_path"' in script
+    assert 'chmod 0660 "$runtime_env_path"' not in script
+    assert 'chmod 0666 "$runtime_env_path"' not in script
+
+
 def test_operational_docs_use_the_public_watchdog_route():
     for doc_path in OPERATIONAL_WATCHDOG_DOCS:
         content = doc_path.read_text(encoding="utf-8")

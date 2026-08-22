@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from backend_legacy_root_scripts import REMOVED_UNSAFE_IMPORT_SCRIPTS
+
 
 ROOT = Path(__file__).resolve().parents[1]
 BACKEND_CI_WORKFLOW = ROOT / ".github" / "workflows" / "backend-ci.yml"
@@ -55,6 +57,23 @@ def test_backend_ci_keeps_postgres_migration_smoke():
     assert "image: postgres:16" in source
     assert "Run Alembic migration smoke" in source
     assert "python scripts/ci_migration_smoke.py" in source
+
+
+def test_backend_ci_formats_only_the_active_simplesvet_importer():
+    source = _workflow_source()
+
+    for filename in REMOVED_UNSAFE_IMPORT_SCRIPTS:
+        assert filename not in source
+
+    for filename in (
+        "importar_simplesvet.py",
+        "importar_simplesvet_cli.py",
+        "importar_simplesvet_plan.py",
+        "importar_simplesvet_state.py",
+        "importar_simplesvet_summary.py",
+        "importar_simplesvet_utils.py",
+    ):
+        assert filename in source
 
 
 def test_backend_ci_quality_gate_does_not_wait_for_sonarcloud_external_check():

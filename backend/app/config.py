@@ -33,6 +33,18 @@ class Settings(BaseSettings):
     )
     ECOMMERCEAI_CONNECTION_REQUEST_TTL_MINUTES: int = 15
 
+    # iFood Merchant API (credenciais do aplicativo CorePet, nunca por tenant)
+    IFOOD_API_BASE_URL: str = "https://merchant-api.ifood.com.br"
+    IFOOD_CLIENT_ID: str = ""
+    IFOOD_CLIENT_SECRET: str = ""
+    IFOOD_REQUEST_TIMEOUT_SECONDS: int = 15
+    # Trava operacional: a primeira fase funciona em simulacao ate a homologacao.
+    IFOOD_CATALOG_WRITE_ENABLED: bool = False
+    # Travas independentes: pedidos de teste so operam durante homologacao assistida.
+    IFOOD_ORDER_OPERATIONS_ENABLED: bool = False
+    IFOOD_ORDER_POLLING_ENABLED: bool = False
+    IFOOD_ORDER_POLLING_INTERVAL_SECONDS: int = 30
+
     # Imagens de produtos
     PRODUCT_IMAGE_STORAGE_BACKEND: str = "local"  # local | s3
     PRODUCT_IMAGE_LOCAL_BASE_DIR: str = "uploads/produtos"
