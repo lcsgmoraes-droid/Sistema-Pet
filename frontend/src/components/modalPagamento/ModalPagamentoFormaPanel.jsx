@@ -2,7 +2,6 @@ import { Wallet, AlertCircle } from "lucide-react";
 
 import CurrencyInput from "../CurrencyInput";
 import PaymentMethodIcon from "../PaymentMethodIcon";
-import { formatMoneyBRL } from "../../utils/formatters";
 import { obterCorVisualParcelamento, obterEstiloVisualParcelamento } from "../modalPagamentoUtils";
 
 export default function ModalPagamentoFormaPanel({
@@ -146,9 +145,6 @@ export default function ModalPagamentoFormaPanel({
                   >
                     {forma.nome}
                   </div>
-                  {forma.taxa_percentual > 0 && (
-                    <div className="text-xs text-gray-500 mt-1">Taxa: {forma.taxa_percentual}%</div>
-                  )}
                 </button>
               );
             })}
@@ -321,13 +317,6 @@ export default function ModalPagamentoFormaPanel({
                         </option>
                       ))}
                     </select>
-                    {operadoraSelecionada && (
-                      <p className="text-xs text-gray-500 mt-1">
-                        {operadoraSelecionada.taxas_configuradas > 0
-                          ? `${operadoraSelecionada.taxas_configuradas} taxas configuradas`
-                          : `Cadastro legado, ate ${operadoraSelecionada.max_parcelas} parcelas`}
-                      </p>
-                    )}
                   </div>
 
                   <div>
@@ -340,7 +329,7 @@ export default function ModalPagamentoFormaPanel({
                     >
                       <option value="">Selecione...</option>
                       {!bandeirasDisponiveis.length && (
-                        <option value="">Nenhuma taxa para esta modalidade</option>
+                        <option value="">Nenhuma bandeira disponivel</option>
                       )}
                       {bandeirasDisponiveis.map((b) => (
                         <option key={b} value={b}>
@@ -350,33 +339,14 @@ export default function ModalPagamentoFormaPanel({
                     </select>
                   </div>
 
-                  {bandeira && operadoraSelecionada?.taxas_configuradas > 0 && (
-                    <div
-                      className={`rounded-lg border p-3 text-sm ${
-                        taxaCartaoSelecionada
-                          ? "border-emerald-200 bg-emerald-50 text-emerald-800"
-                          : "border-red-200 bg-red-50 text-red-700"
-                      }`}
-                    >
-                      {taxaCartaoSelecionada ? (
-                        <>
-                          Taxa cadastrada:{" "}
-                          {Number(taxaCartaoSelecionada.taxa_percentual || 0).toLocaleString(
-                            "pt-BR",
-                            { maximumFractionDigits: 4 },
-                          )}
-                          %
-                          {Number(taxaCartaoSelecionada.taxa_fixa || 0) > 0
-                            ? ` + ${formatMoneyBRL(Number(taxaCartaoSelecionada.taxa_fixa))}`
-                            : ""}
-                          . Recebimento previsto em {taxaCartaoSelecionada.prazo_recebimento_dias}{" "}
-                          dia(s).
-                        </>
-                      ) : (
-                        "Nao ha taxa cadastrada para essa combinacao. Escolha outra bandeira ou parcela."
-                      )}
-                    </div>
-                  )}
+                  {bandeira &&
+                    operadoraSelecionada?.taxas_configuradas > 0 &&
+                    !taxaCartaoSelecionada && (
+                      <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+                        Esta combinacao nao esta disponivel. Escolha outra bandeira ou quantidade de
+                        parcelas.
+                      </div>
+                    )}
 
                   {/* NSU do Cartão (para conciliação bancária) */}
                   <div>
@@ -409,7 +379,9 @@ export default function ModalPagamentoFormaPanel({
                   disabled={!parcelasDisponiveis.length}
                   className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 ${estiloVisualParcelamento.selectClass}`}
                 >
-                  {!parcelasDisponiveis.length && <option value="">Sem taxa configurada</option>}
+                  {!parcelasDisponiveis.length && (
+                    <option value="">Nenhuma parcela disponivel</option>
+                  )}
                   {parcelasDisponiveis.map((n) => {
                     const valorParaParcelar = valorRecebido || valorRestante;
                     const valorParcela = valorParaParcelar / n;
