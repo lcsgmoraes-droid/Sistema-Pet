@@ -1,4 +1,5 @@
-import { createProduto, updateProduto } from "../api/produtos";
+import { useState } from "react";
+import { createProduto, previewPrecosVendaProdutosCompostos, updateProduto } from "../api/produtos";
 import { normalizarCodigosBarrasAlternativosPayload } from "../pages/produtosFormUtils";
 import { debugLog } from "../utils/debug";
 import { normalizeMarkdownContent } from "../utils/safeMarkdown";
@@ -10,8 +11,49 @@ export default function useProdutosNovoSubmit({
   formData,
   navigate,
   salvarFiscal,
+  salvando,
   setSalvando,
 }) {
+  const [dadosPendentes, setDadosPendentes] = useState(null);
+  const [previewPrecosCompostos, setPreviewPrecosCompostos] = useState(null);
+  const [precosCompostosSelecionados, setPrecosCompostosSelecionados] = useState([]);
+
+  const salvarEdicao = async (dados, produtosCompostosIds) => {
+    await salvarFiscal({ id, tipo_produto: formData.tipo_produto });
+    const payload =
+      produtosCompostosIds === undefined
+        ? dados
+        : {
+            ...dados,
+            produtos_compostos_preco_venda_ids: produtosCompostosIds,
+          };
+    await updateProduto(id, payload);
+    alert("Produto atualizado com sucesso!");
+    navigate("/produtos");
+  };
+
+  const fecharPreviewPrecosCompostos = () => {
+    if (salvando) return;
+    setDadosPendentes(null);
+    setPreviewPrecosCompostos(null);
+    setPrecosCompostosSelecionados([]);
+  };
+
+  const confirmarPreviewPrecosCompostos = async () => {
+    if (!dadosPendentes) return;
+
+    try {
+      setSalvando(true);
+      await salvarEdicao(dadosPendentes, precosCompostosSelecionados);
+      fecharPreviewPrecosCompostos();
+    } catch (error) {
+      console.error("Erro ao salvar produto:", error);
+      alert(error.response?.data?.detail || "Erro ao salvar produto");
+    } finally {
+      setSalvando(false);
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
 
@@ -145,10 +187,21 @@ export default function useProdutosNovoSubmit({
       debugLog("Enviando dados para API:", dados);
 
       if (isEdicao) {
-        await salvarFiscal({ id, tipo_produto: formData.tipo_produto });
-        await updateProduto(id, dados);
-        alert("Produto atualizado com sucesso!");
-        navigate("/produtos");
+        const podeSugerirPrecosCompostos =
+          formData.tipo_produto !== "PAI" && Number.isFinite(dados.preco_venda);
+        const preview = podeSugerirPrecosCompostos
+          ? (await previewPrecosVendaProdutosCompostos(id, dados.preco_venda)).data || {}
+          : {};
+        const sugestoes = Array.isArray(preview.sugestoes) ? preview.sugestoes : [];
+
+        if (sugestoes.length > 0) {
+          setDadosPendentes(dados);
+          setPreviewPrecosCompostos(preview);
+          setPrecosCompostosSelecionados(sugestoes.map((item) => item.produto_id));
+          return;
+        }
+
+        await salvarEdicao(dados);
         return;
       }
 
@@ -171,5 +224,34 @@ export default function useProdutosNovoSubmit({
     }
   };
 
-  return { handleSubmit };
+  const toggleProdutoComposto = (produtoId, checked) => {
+    setPrecosCompostosSelecionados((atuais) =>
+      checked
+        ? Array.from(new Set([...atuais, produtoId]))
+        : atuais.filter((idAtual) => idAtual !== produtoId),
+    );
+  };
+
+  const toggleTodosProdutosCompostos = (checked) => {
+    const sugestoes = previewPrecosCompostos?.sugestoes || [];
+    setPrecosCompostosSelecionados(checked ? sugestoes.map((item) => item.produto_id) : []);
+  };
+
+  const precosCompostosModalProps = previewPrecosCompostos
+    ? {
+        aberto: true,
+        nomeProduto: formData.nome,
+        onClose: fecharPreviewPrecosCompostos,
+        onConfirmar: confirmarPreviewPrecosCompostos,
+        onToggleProduto: toggleProdutoComposto,
+        onToggleTodos: toggleTodosProdutosCompostos,
+        precoVendaAtual: Number(previewPrecosCompostos.preco_venda_atual || 0),
+        precoVendaNovo: Number(previewPrecosCompostos.preco_venda_novo || 0),
+        salvando,
+        selecionados: precosCompostosSelecionados,
+        sugestoes: previewPrecosCompostos.sugestoes || [],
+      }
+    : null;
+
+  return { handleSubmit, precosCompostosModalProps };
 }

@@ -16,7 +16,13 @@ from app.produtos.core import (
 )
 from app.produtos.listagem import _resolver_promocao_erp_produto
 from app.produtos.racao import _normalizar_payload_racao
-from app.produtos.schemas import ProdutoCreate, ProdutoResponse, ProdutoUpdate
+from app.produtos.schemas import (
+    ProdutoCompostoPrecoVendaPreviewRequest,
+    ProdutoCompostoPrecoVendaPreviewResponse,
+    ProdutoCreate,
+    ProdutoResponse,
+    ProdutoUpdate,
+)
 from app.produtos.validators import _validar_sku_unico, _validar_tenant_e_obter_usuario
 from app.produtos_models import Categoria, Marca, Produto, ProdutoKitComponente
 from app.security.permissions_decorator import require_permission
@@ -312,6 +318,42 @@ def obter_produto(
     return response_data
 
 
+@router.post(
+    "/{produto_id}/precos-compostos/preview",
+    response_model=ProdutoCompostoPrecoVendaPreviewResponse,
+)
+@require_permission("produtos.editar")
+def preview_precos_venda_produtos_compostos(
+    produto_id: int,
+    payload: ProdutoCompostoPrecoVendaPreviewRequest,
+    db: Session = Depends(get_session),
+    user_and_tenant=Depends(get_current_user_and_tenant),
+):
+    """Mostra os precos de venda sugeridos sem alterar nenhum produto."""
+
+    _, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
+    produto = (
+        db.query(Produto)
+        .filter(Produto.id == produto_id, Produto.tenant_id == tenant_id)
+        .first()
+    )
+    if not produto:
+        raise HTTPException(status_code=404, detail="Produto não encontrado")
+
+    from app.services.kit_preco_venda_service import KitPrecoVendaService
+
+    sugestoes = KitPrecoVendaService.listar_sugestoes(
+        db, produto, payload.preco_venda, tenant_id
+    )
+    return {
+        "produto_id": produto.id,
+        "produto_nome": produto.nome,
+        "preco_venda_atual": float(produto.preco_venda or 0),
+        "preco_venda_novo": payload.preco_venda,
+        "sugestoes": sugestoes,
+    }
+
+
 @router.put("/{produto_id}", response_model=ProdutoResponse)
 @require_permission("produtos.editar")
 def atualizar_produto(
@@ -370,6 +412,9 @@ def atualizar_produto(
     # Extrair dados
     dados_recebidos = produto_update.model_dump(exclude_unset=True)
     composicao_kit = dados_recebidos.pop("composicao_kit", None)
+    produtos_compostos_preco_venda_ids = dados_recebidos.pop(
+        "produtos_compostos_preco_venda_ids", None
+    )
 
     dados_recebidos = _normalizar_payload_granel(
         _normalizar_payload_racao(dados_recebidos)
@@ -528,6 +573,7 @@ def atualizar_produto(
     # ATUALIZAR CAMPOS DO PRODUTO
     # ========================================
     custo_componente_alterado = "preco_custo" in dados_recebidos
+    preco_venda_componente_anterior = float(getattr(produto, "preco_venda", 0) or 0)
 
     for key, value in dados_recebidos.items():
         setattr(produto, key, value)
@@ -540,6 +586,26 @@ def atualizar_produto(
 
     try:
         from app.services.kit_custo_service import KitCustoService
+
+        if (
+            produtos_compostos_preco_venda_ids is not None
+            and dados_recebidos.get("preco_venda") is not None
+        ):
+            from app.services.kit_preco_venda_service import KitPrecoVendaService
+
+            precos_compostos_atualizados = KitPrecoVendaService.aplicar_sugestoes(
+                db=db,
+                produto_componente=produto,
+                novo_preco_venda=dados_recebidos["preco_venda"],
+                produtos_compostos_ids=produtos_compostos_preco_venda_ids,
+                tenant_id=tenant_id,
+                preco_venda_atual=preco_venda_componente_anterior,
+            )
+            if precos_compostos_atualizados:
+                logger.info(
+                    "Precos de venda de %s produto(s) composto(s) atualizados com autorizacao",
+                    len(precos_compostos_atualizados),
+                )
 
         db.flush()
 

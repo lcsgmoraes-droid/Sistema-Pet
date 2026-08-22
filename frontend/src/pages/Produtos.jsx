@@ -267,6 +267,7 @@ export default function Produtos() {
     handleSalvarPreco,
     modalEdicaoLote,
     novoPreco,
+    precosCompostosModalProps,
     setDadosEdicaoLote,
     setEditandoMargem,
     setModalEdicaoLote,
@@ -374,6 +375,7 @@ export default function Produtos() {
       dadosEdicaoLote,
       modalEdicaoLote,
       modalFusao,
+      precosCompostosModalProps,
       onCloseModalFusao: () => setModalFusao(false),
       onFusaoSucesso: () => {
         carregarDados();

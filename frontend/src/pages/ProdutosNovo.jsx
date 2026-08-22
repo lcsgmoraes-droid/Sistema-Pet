@@ -342,13 +342,14 @@ export default function ProdutosNovo() {
       setFormData,
     });
 
-  const { handleSubmit } = useProdutosNovoSubmit({
+  const { handleSubmit, precosCompostosModalProps } = useProdutosNovoSubmit({
     id,
     isClone,
     isEdicao,
     formData,
     navigate,
     salvarFiscal,
+    salvando,
     setSalvando,
   });
 
@@ -683,7 +684,10 @@ export default function ProdutosNovo() {
     <>
       <ProdutosNovoMainContent handleSubmit={handleSubmit} {...mainContentProps} />
 
-      <ProdutosNovoModalsLayer {...modalsLayerProps} />
+      <ProdutosNovoModalsLayer
+        {...modalsLayerProps}
+        precosCompostosModalProps={precosCompostosModalProps}
+      />
 
       {catalogoModal ? (
         <CatalogoProdutoModal

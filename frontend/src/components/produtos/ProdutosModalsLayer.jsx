@@ -4,6 +4,7 @@ import ProdutosConflitoExclusaoModal from "./ProdutosConflitoExclusaoModal";
 import ProdutosEdicaoLoteModal from "./ProdutosEdicaoLoteModal";
 import ProdutosFusaoModal from "./ProdutosFusaoModal";
 import ProdutosRelatorioModal from "./ProdutosRelatorioModal";
+import ProdutosCompostosPrecoVendaModal from "../produto/ProdutosCompostosPrecoVendaModal";
 
 export default function ProdutosModalsLayer({
   autoSelecionarConflito,
@@ -23,6 +24,7 @@ export default function ProdutosModalsLayer({
   modalEdicaoLote,
   modalFusao,
   modalImportacao,
+  precosCompostosModalProps,
   modalRelatorioPersonalizado,
   onCancelarConflito,
   onCloseModalFusao,
@@ -116,6 +118,10 @@ export default function ProdutosModalsLayer({
         onClose={onCloseImportacao}
         onSuccess={onImportacaoSucesso}
       />
+
+      {precosCompostosModalProps && (
+        <ProdutosCompostosPrecoVendaModal {...precosCompostosModalProps} />
+      )}
     </>
   );
 }
