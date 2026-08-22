@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { X, AlertCircle, Clock, CheckCircle, Bell, Trash2, Search } from "lucide-react";
 import api from "../../api";
 import toast from "react-hot-toast";
+import { confirmarCorePet } from "../../services/corepetDialog";
 
 export default function ModalPendenciasEstoque({
   isOpen,
@@ -162,7 +163,7 @@ export default function ModalPendenciasEstoque({
   };
 
   const cancelarPendencia = async (pendenciaId) => {
-    if (!confirm("Deseja realmente cancelar esta pendência?")) return;
+    if (!await confirmarCorePet("Deseja realmente cancelar esta pendência?")) return;
 
     try {
       await api.delete(`/pendencias-estoque/${pendenciaId}`);

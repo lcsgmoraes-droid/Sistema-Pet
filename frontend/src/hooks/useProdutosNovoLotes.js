@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { deleteLote, entradaEstoque, getLotes, updateLote } from "../api/produtos";
+import { confirmarCorePet } from "../services/corepetDialog";
 
 const ENTRADA_INICIAL = {
   quantidade: "",
@@ -96,7 +97,7 @@ export default function useProdutosNovoLotes({ id }) {
 
   const handleExcluirLote = async (lote) => {
     if (
-      !window.confirm(
+      !await confirmarCorePet(
         `Deseja realmente excluir o lote ${lote.nome_lote}?\n\nQuantidade: ${lote.quantidade_disponivel} unidades\nIsso removerá o registro de entrada do estoque.`,
       )
     ) {

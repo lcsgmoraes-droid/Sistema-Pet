@@ -404,6 +404,26 @@ class ProdutoEstoqueNegativoResponse(BaseModel):
     estoque_resultante: float
 
 
+def _obter_estoque_pre_venda(db: Session, produto, tenant_id) -> float:
+    """Usa o estoque derivado dos componentes quando o produto e um kit virtual."""
+    usa_estoque_virtual = (
+        getattr(produto, "tipo_produto", None) in ("KIT", "VARIACAO")
+        and getattr(produto, "tipo_kit", None) == "VIRTUAL"
+    )
+    if not usa_estoque_virtual:
+        return float(produto.estoque_atual or 0)
+
+    from app.services.kit_estoque_service import KitEstoqueService
+
+    return float(
+        KitEstoqueService.calcular_estoque_virtual_kit(
+            db,
+            produto.id,
+            tenant_id=tenant_id,
+        )
+    )
+
+
 @router.post(
     "/verificar-estoque-negativo", response_model=List[ProdutoEstoqueNegativoResponse]
 )
@@ -432,7 +452,7 @@ def verificar_estoque_negativo_pre_venda(
         if not produto:
             continue
 
-        estoque_atual = produto.estoque_atual or 0
+        estoque_atual = _obter_estoque_pre_venda(db, produto, tenant_id)
         estoque_resultante = estoque_atual - item.quantidade
 
         # Se ficará negativo, adicionar à lista

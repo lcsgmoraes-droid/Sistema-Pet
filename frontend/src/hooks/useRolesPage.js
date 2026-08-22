@@ -1,6 +1,11 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import toast from "react-hot-toast";
 import api from "../api";
+import { confirmarCorePet } from "../services/corepetDialog";
+import {
+  applyShiftRangeSelection,
+  getShiftSelectionEvent,
+} from "../utils/shiftRangeSelection";
 
 const EMPTY_ROLE = {
   nome: "",
@@ -64,6 +69,7 @@ export default function useRolesPage() {
   const [expandedCategories, setExpandedCategories] = useState({});
   const [roleForm, setRoleForm] = useState(cloneEmptyRole);
   const [roleFormError, setRoleFormError] = useState("");
+  const ultimaPermissaoSelecionadaRef = useRef(null);
 
   const carregarDados = useCallback(async () => {
     setLoading(true);
@@ -108,6 +114,13 @@ export default function useRolesPage() {
       }))
       .sort((a, b) => a.label.localeCompare(b.label, "pt-BR"));
   }, [permissions]);
+  const visiblePermissions = useMemo(
+    () =>
+      permissionGroups.flatMap((group) =>
+        expandedCategories[group.key] ? group.permissions : [],
+      ),
+    [expandedCategories, permissionGroups],
+  );
 
   const abrirCriacao = useCallback(() => {
     setEditingRole(null);
@@ -139,17 +152,27 @@ export default function useRolesPage() {
     setRoleFormError("");
   }, []);
 
-  const togglePermission = useCallback((permissionId) => {
-    setRoleForm((current) => {
-      const selected = current.permissions.includes(permissionId);
-      return {
+  const togglePermission = useCallback(
+    (permissionId, event) => {
+      const { checked, shiftKey } = getShiftSelectionEvent(event);
+
+      setRoleForm((current) => ({
         ...current,
-        permissions: selected
-          ? current.permissions.filter((id) => id !== permissionId)
-          : [...current.permissions, permissionId],
-      };
-    });
-  }, []);
+        permissions: applyShiftRangeSelection({
+          anchorId: ultimaPermissaoSelecionadaRef.current,
+          checked,
+          currentSelection: current.permissions,
+          getItemId: (permission) => permission.permission_id,
+          itemId: permissionId,
+          items: visiblePermissions,
+          shiftKey,
+        }),
+      }));
+
+      ultimaPermissaoSelecionadaRef.current = permissionId;
+    },
+    [visiblePermissions],
+  );
 
   const toggleCategory = useCallback((permissionIds) => {
     setRoleForm((current) => {
@@ -213,7 +236,7 @@ export default function useRolesPage() {
 
   const deletarRole = useCallback(
     async (roleId) => {
-      if (!window.confirm("Excluir este perfil de acesso?")) return;
+      if (!await confirmarCorePet("Excluir este perfil de acesso?")) return;
 
       try {
         await api.delete(`/roles/${roleId}`);

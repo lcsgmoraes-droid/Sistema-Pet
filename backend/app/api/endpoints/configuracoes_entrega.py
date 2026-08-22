@@ -30,6 +30,26 @@ def ensure_configuracoes_entrega_schema(db: Session) -> None:
             "ALTER TABLE configuracoes_entrega ADD COLUMN IF NOT EXISTS metodo_km_entrega VARCHAR(20) DEFAULT 'auto_rota'"
         )
     )
+    delivery_columns = (
+        "entrega_ativa BOOLEAN NOT NULL DEFAULT true",
+        "retirada_ativa BOOLEAN NOT NULL DEFAULT true",
+        "modalidade_cobranca VARCHAR(20) NOT NULL DEFAULT 'fixa'",
+        "taxa_fixa NUMERIC(10, 2) NOT NULL DEFAULT 0",
+        "valor_por_km_cobrado NUMERIC(10, 2)",
+        "taxa_minima NUMERIC(10, 2) NOT NULL DEFAULT 0",
+        "distancia_maxima_entrega_km NUMERIC(10, 2)",
+        "frete_gratis_acima NUMERIC(10, 2)",
+        "distancia_maxima_frete_gratis_km NUMERIC(10, 2)",
+        "pedido_minimo NUMERIC(10, 2) NOT NULL DEFAULT 0",
+        "prazo_entrega_texto VARCHAR(120)",
+    )
+    for column_definition in delivery_columns:
+        db.execute(
+            text(
+                "ALTER TABLE configuracoes_entrega ADD COLUMN IF NOT EXISTS "
+                + column_definition
+            )
+        )
     db.execute(
         text("""
         UPDATE configuracoes_entrega ce
@@ -50,6 +70,35 @@ def ensure_configuracoes_entrega_schema(db: Session) -> None:
         )
     )
     db.commit()
+
+
+def _legacy_delivery_defaults(tenant: Tenant) -> dict:
+    return {
+        "entrega_ativa": bool(getattr(tenant, "ecommerce_entrega_ativa", True)),
+        "retirada_ativa": bool(getattr(tenant, "ecommerce_retirada_ativa", True)),
+        "modalidade_cobranca": "fixa",
+        "taxa_fixa": float(getattr(tenant, "ecommerce_taxa_entrega", 0) or 0),
+        "frete_gratis_acima": getattr(tenant, "ecommerce_frete_gratis_acima", None),
+        "pedido_minimo": float(getattr(tenant, "ecommerce_pedido_minimo", 0) or 0),
+        "prazo_entrega_texto": getattr(tenant, "ecommerce_prazo_entrega_texto", None),
+    }
+
+
+def _sync_tenant_delivery_mirror(tenant: Tenant, config: ConfiguracaoEntrega) -> None:
+    """Mantem os campos publicos legados alinhados durante a transicao."""
+
+    tenant.ecommerce_entrega_ativa = bool(config.entrega_ativa)
+    tenant.ecommerce_retirada_ativa = bool(config.retirada_ativa)
+    tenant.ecommerce_taxa_entrega = (
+        float(config.taxa_fixa or 0) if config.modalidade_cobranca == "fixa" else 0
+    )
+    tenant.ecommerce_frete_gratis_acima = (
+        float(config.frete_gratis_acima)
+        if config.frete_gratis_acima is not None
+        else None
+    )
+    tenant.ecommerce_pedido_minimo = float(config.pedido_minimo or 0)
+    tenant.ecommerce_prazo_entrega_texto = config.prazo_entrega_texto
 
 
 @router.get("", response_model=ConfiguracaoEntregaResponse)
@@ -106,6 +155,7 @@ def get_configuracao_entrega(
             bairro=None,
             cidade=None,
             estado=None,
+            **_legacy_delivery_defaults(tenant),
         )
         db.add(config)
         db.commit()
@@ -177,6 +227,8 @@ def update_configuracao_entrega(
     # Atualiza apenas campos fornecidos
     for field, value in payload.model_dump(exclude_unset=True).items():
         setattr(config, field, value)
+
+    _sync_tenant_delivery_mirror(tenant, config)
 
     db.commit()
     db.refresh(config)

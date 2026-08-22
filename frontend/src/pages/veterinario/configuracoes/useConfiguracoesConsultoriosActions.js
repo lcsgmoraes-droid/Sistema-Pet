@@ -2,6 +2,7 @@ import { useCallback } from "react";
 
 import { vetApi } from "../vetApi";
 import { FORM_CONSULTORIO_INICIAL } from "./configuracoesConstants";
+import { confirmarCorePet } from "../../../services/corepetDialog";
 
 export function useConfiguracoesConsultoriosActions({
   carregar,
@@ -71,7 +72,7 @@ export function useConfiguracoesConsultoriosActions({
 
   const removerConsultorio = useCallback(
     async (consultorio) => {
-      if (!window.confirm(`Deseja remover o consultorio "${consultorio.nome}"?`)) return;
+      if (!await confirmarCorePet(`Deseja remover o consultorio "${consultorio.nome}"?`)) return;
 
       try {
         await vetApi.removerConsultorio(consultorio.id);

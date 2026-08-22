@@ -9,6 +9,7 @@ import {
   Brain,
 } from "lucide-react";
 import api from "../api";
+import { perguntarCorePet } from "../services/corepetDialog";
 
 const ExtratoBancario = () => {
   const [arquivo, setArquivo] = useState(null);
@@ -301,8 +302,8 @@ const ExtratoBancario = () => {
                         <CheckCircle size={16} />
                       </button>
                       <button
-                        onClick={() => {
-                          const nova_categoria = prompt("Digite a categoria correta:");
+                        onClick={async () => {
+                          const nova_categoria = await perguntarCorePet("Digite a categoria correta:");
                           if (nova_categoria) {
                             corrigirLancamento(lancamento.id, nova_categoria);
                           }

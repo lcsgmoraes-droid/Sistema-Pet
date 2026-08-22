@@ -3,6 +3,7 @@ import api from "../api";
 import { buscarClientePorId } from "../api/clientes";
 import { buscarVenda, listarVendas } from "../api/vendas";
 import { debugLog } from "../utils/debug";
+import { perguntarCorePet } from "../services/corepetDialog";
 
 function criarEntregaVazia() {
   return {
@@ -185,7 +186,7 @@ export function usePDVVendaCarregamento({
         )
         .join("\n");
 
-      const numeroEscolhido = prompt(
+      const numeroEscolhido = await perguntarCorePet(
         `Encontradas ${resultado.vendas.length} vendas. Digite o numero da opcao:\n\n${escolha}`,
       );
 

@@ -8,6 +8,7 @@ export const LegalPage = lazy(() => import("../pages/LegalPage"));
 export const LandingPage = lazy(() => import("../pages/LandingPage"));
 export const Planos = lazy(() => import("../pages/Planos"));
 export const MeuPlano = lazy(() => import("../pages/MeuPlano"));
+export const BillingOfferPublicPage = lazy(() => import("../pages/BillingOfferPublicPage"));
 export const AppPublicEntry = lazy(() => import("../pages/AppPublicEntry"));
 export const AppPaymentReturn = lazy(() => import("../pages/AppPaymentReturn"));
 
@@ -152,3 +153,4 @@ export const EcommercePreview = lazy(() => import("../pages/ecommerce/EcommerceP
 export const Campanhas = lazy(() => import("../pages/Campanhas"));
 export const CanalDescontos = lazy(() => import("../pages/CanalDescontos"));
 export const Ajuda = lazy(() => import("../pages/Ajuda"));
+export const EvolucaoCorePet = lazy(() => import("../pages/EvolucaoCorePet"));

@@ -192,7 +192,11 @@ export function useModalNovaContaPagarController({ isOpen, onClose, onSave, cont
     setLoading(true);
 
     try {
-      const payloadNormalizado = montarPayloadContaPagar(dados, contaEdicao, pertenceRecorrencia);
+      const payloadNormalizado = await montarPayloadContaPagar(
+        dados,
+        contaEdicao,
+        pertenceRecorrencia,
+      );
 
       if (isEditando) {
         await api.patch(

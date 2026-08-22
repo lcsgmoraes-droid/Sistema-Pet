@@ -10,6 +10,7 @@ import {
   CreditCard,
 } from "lucide-react";
 import { api } from "../services/api";
+import { confirmarCorePet, perguntarCorePet } from "../services/corepetDialog";
 
 /**
  * 🎯 PRINCÍPIO DE DESIGN: SIMPLICIDADE
@@ -142,7 +143,7 @@ export default function ConciliacaoCartoes() {
 
     let justificativa = null;
     if (precisaJustificativa) {
-      justificativa = prompt("⚠️ Confiança BAIXA.\n\nJustificativa obrigatória para processar:");
+      justificativa = await perguntarCorePet("⚠️ Confiança BAIXA.\n\nJustificativa obrigatória para processar:");
       if (!justificativa || justificativa.trim() === "") {
         alert("❌ Justificativa obrigatória para divergência alta");
         return;
@@ -150,7 +151,7 @@ export default function ConciliacaoCartoes() {
     }
 
     if (confirmacao && !precisaJustificativa) {
-      const confirmar = window.confirm(
+      const confirmar = await confirmarCorePet(
         `⚠️ Deseja confirmar o processamento?\n\nConfiança: ${validacao.confianca}\nDivergência: ${validacao.percentual_divergencia}%\nParcelas a processar: ${quantidadeParcelas}`,
       );
       if (!confirmar) return;
@@ -180,7 +181,7 @@ export default function ConciliacaoCartoes() {
   };
 
   const reverter = async (validacao) => {
-    const motivo = prompt("⚠️ REVERSÃO\n\nMotivo obrigatório:");
+    const motivo = await perguntarCorePet("⚠️ REVERSÃO\n\nMotivo obrigatório:");
     if (!motivo || motivo.trim() === "") {
       alert("❌ Motivo obrigatório para reversão");
       return;

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import EcommerceConfigView from "./EcommerceConfigView";
 import { api } from "../../services/api";
 import { readMercadoPagoOAuthReturn } from "../../utils/mercadoPagoOAuthReturn";
+import { confirmarCorePet } from "../../services/corepetDialog";
 
 const DIAS_SEMANA = [
   { key: "seg", label: "Segunda" },
@@ -165,15 +166,11 @@ export default function EcommerceConfig() {
     setPaymentAccountLoading(true);
     setPaymentAccountError("");
     try {
-      const res = await api.get(
-        "/ecommerce-payment-config/mercadopago/account-identity",
-      );
+      const res = await api.get("/ecommerce-payment-config/mercadopago/account-identity");
       setPaymentAccount(res.data || null);
     } catch {
       setPaymentAccount(null);
-      setPaymentAccountError(
-        "Não foi possível confirmar os dados da conta no Mercado Pago agora.",
-      );
+      setPaymentAccountError("Não foi possível confirmar os dados da conta no Mercado Pago agora.");
     } finally {
       setPaymentAccountLoading(false);
     }
@@ -192,12 +189,6 @@ export default function EcommerceConfig() {
         ecommerce_horario_fechamento: horarioFechamento || null,
         ecommerce_dias_funcionamento:
           diasSelecionados.length > 0 ? formatDias(diasSelecionados) : null,
-        ecommerce_entrega_ativa: commerceConfig.entregaAtiva,
-        ecommerce_retirada_ativa: commerceConfig.retiradaAtiva,
-        ecommerce_taxa_entrega: commerceConfig.taxaEntrega,
-        ecommerce_frete_gratis_acima: commerceConfig.freteGratisAcima || null,
-        ecommerce_pedido_minimo: commerceConfig.pedidoMinimo,
-        ecommerce_prazo_entrega_texto: commerceConfig.prazoEntrega || null,
         ecommerce_usar_estoque_canal: commerceConfig.usarEstoqueCanal,
         ecommerce_ocultar_sem_estoque: commerceConfig.ocultarSemEstoque,
         ecommerce_ocultar_sem_imagem: commerceConfig.ocultarSemImagem,
@@ -260,7 +251,7 @@ export default function EcommerceConfig() {
 
   async function desconectarMercadoPago() {
     if (
-      !window.confirm(
+      !await confirmarCorePet(
         "Desconectar o Mercado Pago vai impedir novos pagamentos online. Deseja continuar?",
       )
     ) {

@@ -1,13 +1,13 @@
-import api from './api';
-import { Produto, Pedido } from '../types';
-import { API_BASE_URL } from '../config';
-import * as SecureStore from 'expo-secure-store';
+import api from "./api";
+import { Produto, Pedido } from "../types";
+import { API_BASE_URL } from "../config";
+import * as SecureStore from "expo-secure-store";
 
 function toNumberOrNull(value: unknown): number | null {
-  if (value === null || value === undefined || value === '') return null;
-  if (typeof value === 'number') return Number.isFinite(value) ? value : null;
-  if (typeof value === 'string') {
-    const parsed = Number(value.replace(',', '.').trim());
+  if (value === null || value === undefined || value === "") return null;
+  if (typeof value === "number") return Number.isFinite(value) ? value : null;
+  if (typeof value === "string") {
+    const parsed = Number(value.replace(",", ".").trim());
     return Number.isFinite(parsed) ? parsed : null;
   }
   const parsed = Number(value);
@@ -17,18 +17,18 @@ function toNumberOrNull(value: unknown): number | null {
 /** Retorna o tenant_id salvo, ou string vazia se não vinculado */
 async function getTenantId(): Promise<string> {
   try {
-    const raw = await SecureStore.getItemAsync('tenant_info');
-    if (raw) return JSON.parse(raw)?.id ?? '';
+    const raw = await SecureStore.getItemAsync("tenant_info");
+    if (raw) return JSON.parse(raw)?.id ?? "";
   } catch (_) {}
-  return '';
+  return "";
 }
 
 // Resolve URL de mídia: se relativa, usa a base da API
 function resolveMediaUrl(url: string | null | undefined): string | null {
   if (!url) return null;
   if (/^https?:\/\//i.test(url)) return url;
-  const base = API_BASE_URL.replace(/\/api\/?$/, '').replace(/\/$/, '');
-  return `${base}${url.startsWith('/') ? url : '/' + url}`;
+  const base = API_BASE_URL.replace(/\/api\/?$/, "").replace(/\/$/, "");
+  return `${base}${url.startsWith("/") ? url : "/" + url}`;
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -41,7 +41,7 @@ export async function registrarAviseme(
   product_name: string,
 ): Promise<{ ok: boolean; message: string }> {
   const tenant_id = await getTenantId();
-  const { data } = await api.post('/ecommerce-notify/registrar', {
+  const { data } = await api.post("/ecommerce-notify/registrar", {
     email,
     product_id,
     product_name,
@@ -54,7 +54,7 @@ export async function registrarAviseme(
 // PRODUTOS - endpoints públicos do e-commerce
 // ─────────────────────────────────────────────────────────────
 
-export type CatalogOrder = 'prontos' | 'nome' | 'menor_preco' | 'maior_preco';
+export type CatalogOrder = "prontos" | "nome" | "menor_preco" | "maior_preco";
 
 export type CatalogoFiltroOpcoes = {
   marcas: string[];
@@ -82,12 +82,13 @@ function normalizarProdutoCatalogo(p: any): Produto {
     codigo_barras: p.codigo_barras ?? null,
     descricao: p.descricao ?? null,
     peso_embalagem_kg: p.peso_embalagem ?? p.peso_embalagem_kg ?? null,
-    unidade: p.unidade ?? 'UN',
+    unidade: p.unidade ?? "UN",
     anunciar_app: p.anunciar_app ?? true,
     anunciar_ecommerce: p.anunciar_ecommerce ?? true,
     disponivel_app: p.disponivel_app ?? p.anunciar_app ?? true,
     disponivel_ecommerce:
-      p.disponivel_ecommerce ?? (p.anunciar_ecommerce !== false && estoqueCatalogo > 0),
+      p.disponivel_ecommerce ??
+      (p.anunciar_ecommerce !== false && estoqueCatalogo > 0),
   };
 }
 
@@ -107,23 +108,25 @@ export async function listarProdutos(params?: {
   const limit = Math.min(500, Math.max(1, Number(params?.limit || 40)));
   const offset = (paginaAtual - 1) * limit;
 
-  const { data } = await api.get('/ecommerce/produtos', {
+  const { data } = await api.get("/ecommerce/produtos", {
     params: {
       busca: params?.busca,
       limit,
       offset,
-      canal: 'app',
+      canal: "app",
       cache_bust: params?.cacheBust ?? Date.now(),
       apenas_com_estoque: params?.somenteComEstoque || undefined,
       apenas_com_imagem: params?.somenteComImagem || undefined,
-      ordenacao: params?.ordenacao || 'prontos',
+      ordenacao: params?.ordenacao || "prontos",
       marca: params?.marca || undefined,
       peso_embalagem_kg: params?.pesoEmbalagemKg ?? undefined,
     },
   });
   // Backend retorna { items: [...] } — adaptar para o formato do app
   const items = data.items ?? data.produtos ?? [];
-  const produtos: Produto[] = items.map((p: any) => normalizarProdutoCatalogo(p));
+  const produtos: Produto[] = items.map((p: any) =>
+    normalizarProdutoCatalogo(p),
+  );
   return { produtos, total: Number(data?.total ?? produtos.length) };
 }
 
@@ -138,16 +141,16 @@ function opcoesFiltrosDeProdutos(produtos: Produto[]): CatalogoFiltroOpcoes {
     new Set(
       produtos
         .map((produto) => produto.marca_nome?.trim())
-        .filter((marca): marca is string => !!marca)
-    )
+        .filter((marca): marca is string => !!marca),
+    ),
   ).sort((a, b) => a.localeCompare(b));
 
   const pesos_embalagem_kg = Array.from(
     new Set(
       produtos
         .map((produto) => normalizarPesoOpcao(produto.peso_embalagem_kg))
-        .filter((peso): peso is number => peso !== null)
-    )
+        .filter((peso): peso is number => peso !== null),
+    ),
   ).sort((a, b) => a - b);
 
   return { marcas, pesos_embalagem_kg };
@@ -156,10 +159,12 @@ function opcoesFiltrosDeProdutos(produtos: Produto[]): CatalogoFiltroOpcoes {
 function normalizarOpcoesFiltrosCatalogo(data: any): CatalogoFiltroOpcoes {
   const marcasRaw = Array.isArray(data?.marcas) ? data.marcas : [];
   const marcasNormalizadas = marcasRaw
-    .map((marca: any) => (typeof marca === 'string' ? marca : marca?.nome))
-    .map((marca: unknown): string => String(marca ?? '').trim())
+    .map((marca: any) => (typeof marca === "string" ? marca : marca?.nome))
+    .map((marca: unknown): string => String(marca ?? "").trim())
     .filter((marca: string) => marca.length > 0);
-  const marcas = Array.from(new Set<string>(marcasNormalizadas)).sort((a, b) => a.localeCompare(b));
+  const marcas = Array.from(new Set<string>(marcasNormalizadas)).sort((a, b) =>
+    a.localeCompare(b),
+  );
 
   const pesosRaw = Array.isArray(data?.pesos_embalagem_kg)
     ? data.pesos_embalagem_kg
@@ -169,7 +174,9 @@ function normalizarOpcoesFiltrosCatalogo(data: any): CatalogoFiltroOpcoes {
   const pesosNormalizados = pesosRaw
     .map(normalizarPesoOpcao)
     .filter((peso: number | null): peso is number => peso !== null);
-  const pesos_embalagem_kg = Array.from(new Set<number>(pesosNormalizados)).sort((a, b) => a - b);
+  const pesos_embalagem_kg = Array.from(
+    new Set<number>(pesosNormalizados),
+  ).sort((a, b) => a - b);
 
   return { marcas, pesos_embalagem_kg };
 }
@@ -179,10 +186,10 @@ export async function listarOpcoesFiltrosCatalogo(params?: {
   ordenacao?: CatalogOrder;
 }): Promise<CatalogoFiltroOpcoes> {
   try {
-    const { data } = await api.get('/ecommerce/produtos/filtros', {
+    const { data } = await api.get("/ecommerce/produtos/filtros", {
       params: {
         busca: params?.busca,
-        canal: 'app',
+        canal: "app",
         cache_bust: Date.now(),
       },
     });
@@ -203,21 +210,26 @@ export async function listarOpcoesFiltrosCatalogo(params?: {
   }
 }
 
-export async function buscarProdutoPorBarcode(barcode: string): Promise<Produto | null> {
+export async function buscarProdutoPorBarcode(
+  barcode: string,
+): Promise<Produto | null> {
   try {
-    const { data } = await api.get<any>(`/app/produto-barcode/${encodeURIComponent(barcode)}`);
+    const { data } = await api.get<any>(
+      `/app/produto-barcode/${encodeURIComponent(barcode)}`,
+    );
     return {
       id: data.id,
       nome: data.nome,
       preco: Number(data.preco_original ?? data.preco ?? 0),
       preco_original: data.preco_original ?? data.preco ?? null,
-      preco_promocional: data.preco_promocional ?? (data.promocao_ativa ? data.preco : null),
+      preco_promocional:
+        data.preco_promocional ?? (data.promocao_ativa ? data.preco : null),
       promocao_ativa: !!data.promocao_ativa,
       foto_url: resolveMediaUrl(data.foto_url),
       estoque: Number(data.estoque ?? 0),
       codigo: data.codigo ?? data.codigo_barras ?? null,
       codigo_barras: data.codigo_barras ?? null,
-      unidade: data.unidade ?? 'UN',
+      unidade: data.unidade ?? "UN",
     };
   } catch (err: any) {
     if (err?.response?.status === 404) return null;
@@ -239,8 +251,8 @@ export async function obterCarrinho(): Promise<{
   itens: any[];
   subtotal: number;
 }> {
-  const { data } = await api.get('/carrinho', {
-    headers: { 'X-Canal-Venda': 'app' },
+  const { data } = await api.get("/carrinho", {
+    headers: { "X-Canal-Venda": "app" },
   });
   return {
     ...data,
@@ -253,16 +265,30 @@ export async function obterCarrinho(): Promise<{
   };
 }
 
-export async function adicionarAoCarrinho(produto_id: number, quantidade = 1): Promise<void> {
-  await api.post('/carrinho/adicionar', { produto_id, quantidade }, {
-    headers: { 'X-Canal-Venda': 'app' },
-  });
+export async function adicionarAoCarrinho(
+  produto_id: number,
+  quantidade = 1,
+): Promise<void> {
+  await api.post(
+    "/carrinho/adicionar",
+    { produto_id, quantidade },
+    {
+      headers: { "X-Canal-Venda": "app" },
+    },
+  );
 }
 
-export async function atualizarCarrinho(produto_id: number, quantidade: number): Promise<void> {
-  await api.put('/carrinho/atualizar', { produto_id, quantidade }, {
-    headers: { 'X-Canal-Venda': 'app' },
-  });
+export async function atualizarCarrinho(
+  produto_id: number,
+  quantidade: number,
+): Promise<void> {
+  await api.put(
+    "/carrinho/atualizar",
+    { produto_id, quantidade },
+    {
+      headers: { "X-Canal-Venda": "app" },
+    },
+  );
 }
 
 export async function removerDoCarrinho(produto_id: number): Promise<void> {
@@ -270,11 +296,13 @@ export async function removerDoCarrinho(produto_id: number): Promise<void> {
 }
 
 export async function limparCarrinho(): Promise<void> {
-  await api.delete('/carrinho/limpar');
+  await api.delete("/carrinho/limpar");
 }
 
 // Repetir um pedido anterior: limpa o carrinho e re-adiciona os itens
-export async function repetirPedido(pedido: { itens?: { produto_id?: number | null; quantidade: number }[] }): Promise<number> {
+export async function repetirPedido(pedido: {
+  itens?: { produto_id?: number | null; quantidade: number }[];
+}): Promise<number> {
   await limparCarrinho();
   let adicionados = 0;
   const itens = Array.isArray(pedido.itens) ? pedido.itens : [];
@@ -294,13 +322,41 @@ export async function repetirPedido(pedido: { itens?: { produto_id?: number | nu
 // CHECKOUT - com tipo_retirada "app_loja" para compra in-store
 // ─────────────────────────────────────────────────────────────
 
-export async function resumoCheckout(cidade: string): Promise<{
+export interface CheckoutResumo {
   subtotal: number;
   total: number;
-  frete: any;
-}> {
-  const { data } = await api.get('/checkout/resumo', {
-    params: { cidade_destino: cidade },
+  frete: {
+    valor_frete: number;
+    distancia_km?: number | null;
+    valor_por_km?: number | null;
+    modalidade_cobranca?: string | null;
+    frete_gratis_aplicado?: boolean;
+    prazo_estimado?: string | null;
+  };
+}
+
+export interface CheckoutResumoOptions {
+  cidade: string;
+  modo: "retirada" | "entrega";
+  endereco?: string;
+  tipoRetirada?: "proprio" | "terceiro";
+}
+
+export async function resumoCheckout(
+  opcoes: CheckoutResumoOptions,
+): Promise<CheckoutResumo> {
+  const { data } = await api.get("/checkout/resumo", {
+    params: {
+      cidade_destino: opcoes.cidade,
+      endereco_entrega:
+        opcoes.modo === "entrega" ? opcoes.endereco : "RETIRADA NA LOJA",
+      tipo_retirada:
+        opcoes.modo === "retirada"
+          ? opcoes.tipoRetirada === "terceiro"
+            ? "terceiro"
+            : "app_loja"
+          : undefined,
+    },
   });
   return data;
 }
@@ -312,47 +368,67 @@ export interface FormaPagamentoItem {
 }
 
 export async function getFormasPagamento(): Promise<FormaPagamentoItem[]> {
-  const { data } = await api.get<{ formas_pagamento: FormaPagamentoItem[] }>('/checkout/formas-pagamento');
+  const { data } = await api.get<{ formas_pagamento: FormaPagamentoItem[] }>(
+    "/checkout/formas-pagamento",
+  );
   return data.formas_pagamento;
 }
 
 export interface CheckoutOptions {
   cidade: string;
-  modo: 'retirada' | 'entrega'; // retirada na loja ou entrega
-  tipoRetirada?: 'proprio' | 'terceiro'; // quem vai retirar
+  modo: "retirada" | "entrega"; // retirada na loja ou entrega
+  tipoRetirada?: "proprio" | "terceiro"; // quem vai retirar
   isDrive?: boolean; // cliente aguarda no carro (drive-thru)
   endereco?: string; // usado quando modo === 'entrega'
   formaPagamentoNome?: string; // forma de pagamento selecionada pelo cliente
 }
 
-export async function finalizarCheckoutAppLoja(opcoes: CheckoutOptions | string): Promise<Pedido> {
+export async function finalizarCheckoutAppLoja(
+  opcoes: CheckoutOptions | string,
+): Promise<Pedido> {
   // Compatibilidade: aceita string (legado) ou objeto com opções
-  const cidade = typeof opcoes === 'string' ? opcoes : opcoes.cidade;
-  const modo = typeof opcoes === 'object' ? opcoes.modo : 'retirada';
-  const tipoRetirada = typeof opcoes === 'object' ? (opcoes.tipoRetirada ?? 'proprio') : 'proprio';
-  const isDrive = typeof opcoes === 'object' ? (opcoes.isDrive ?? false) : false;
-  const endereco = typeof opcoes === 'object' && opcoes.modo === 'entrega' ? opcoes.endereco : undefined;
+  const cidade = typeof opcoes === "string" ? opcoes : opcoes.cidade;
+  const modo = typeof opcoes === "object" ? opcoes.modo : "retirada";
+  const tipoRetirada =
+    typeof opcoes === "object" ? (opcoes.tipoRetirada ?? "proprio") : "proprio";
+  const isDrive =
+    typeof opcoes === "object" ? (opcoes.isDrive ?? false) : false;
+  const endereco =
+    typeof opcoes === "object" && opcoes.modo === "entrega"
+      ? opcoes.endereco
+      : undefined;
 
   const idempotencyKey = `app-loja-${Date.now()}`;
-  const formaPagamentoNome = typeof opcoes === 'object' ? opcoes.formaPagamentoNome : undefined;
+  const formaPagamentoNome =
+    typeof opcoes === "object" ? opcoes.formaPagamentoNome : undefined;
 
   const { data } = await api.post<Pedido>(
-    '/checkout/finalizar',
+    "/checkout/finalizar",
     {
       cidade_destino: cidade,
-      tipo_retirada: modo === 'entrega' ? 'entrega' : (tipoRetirada === 'terceiro' ? 'terceiro' : 'app_loja'),
+      tipo_retirada:
+        modo === "entrega"
+          ? "entrega"
+          : tipoRetirada === "terceiro"
+            ? "terceiro"
+            : "app_loja",
       is_drive: isDrive,
-      endereco_entrega: modo === 'entrega' ? (endereco || 'A INFORMAR') : (modo === 'retirada' ? 'RETIRADA NA LOJA' : null),
+      endereco_entrega:
+        modo === "entrega"
+          ? endereco || "A INFORMAR"
+          : modo === "retirada"
+            ? "RETIRADA NA LOJA"
+            : null,
       forma_pagamento_nome: formaPagamentoNome || null,
-      origem: 'app',
+      origem: "app",
     },
     {
       headers: {
-        'Idempotency-Key': idempotencyKey,
-        'X-Client-Channel': 'app',
-        'X-Canal-Venda': 'app',
+        "Idempotency-Key": idempotencyKey,
+        "X-Client-Channel": "app",
+        "X-Canal-Venda": "app",
       },
-    }
+    },
   );
   return data;
 }
@@ -364,7 +440,7 @@ export async function finalizarCheckoutAppLoja(opcoes: CheckoutOptions | string)
 export interface RacaoCadastrada {
   id: number;
   nome: string;
-  peso_embalagem: number;    // kg
+  peso_embalagem: number; // kg
   preco: number;
   classificacao_racao?: string | null; // filhote, adulto, senior
   categoria_racao?: string | null;
@@ -373,10 +449,12 @@ export interface RacaoCadastrada {
 
 export async function listarRacoesCadastradas(): Promise<RacaoCadastrada[]> {
   try {
-    const { data } = await api.get('/ecommerce/produtos', {
+    const { data } = await api.get("/ecommerce/produtos", {
       params: { limit: 500 },
     });
-    const items: any[] = Array.isArray(data) ? data : (data.items ?? data.produtos ?? []);
+    const items: any[] = Array.isArray(data)
+      ? data
+      : (data.items ?? data.produtos ?? []);
     return items
       .filter((p: any) => p.peso_embalagem && Number(p.peso_embalagem) > 0)
       .map((p: any) => ({
@@ -397,9 +475,9 @@ export async function calcularRacaoComProduto(params: {
   produto_id?: number | null;
   peso_pet_kg: number;
   idade_meses?: number | null;
-  nivel_atividade: 'baixo' | 'normal' | 'alto';
+  nivel_atividade: "baixo" | "normal" | "alto";
 }): Promise<any> {
-  const { data } = await api.post('/api/produtos/calculadora-racao', params);
+  const { data } = await api.post("/api/produtos/calculadora-racao", params);
   return data;
 }
 
@@ -423,7 +501,9 @@ export async function compararRacoesCategoria(params: {
   if (params.idade_meses) query.idade_meses = params.idade_meses;
   if (params.classificacao) query.classificacao = params.classificacao;
   // Backend aceita POST com params na query string
-  const { data } = await api.post('/api/produtos/comparar-racoes', null, { params: query });
+  const { data } = await api.post("/api/produtos/comparar-racoes", null, {
+    params: query,
+  });
   return data;
 }
 
@@ -437,12 +517,14 @@ export async function compararRacoesCategoria(params: {
 // ─────────────────────────────────────────────────────────────
 
 function isPedidoRecord(value: unknown): value is Pedido {
-  return !!value && typeof value === 'object';
+  return !!value && typeof value === "object";
 }
 
 export async function listarPedidos(): Promise<Pedido[]> {
-  const { data } = await api.get<{ pedidos: Pedido[] }>('/checkout/pedidos');
-  return Array.isArray(data?.pedidos) ? data.pedidos.filter(isPedidoRecord) : [];
+  const { data } = await api.get<{ pedidos: Pedido[] }>("/checkout/pedidos");
+  return Array.isArray(data?.pedidos)
+    ? data.pedidos.filter(isPedidoRecord)
+    : [];
 }
 
 export async function consultarStatusPedido(pedidoId: string): Promise<Pedido> {

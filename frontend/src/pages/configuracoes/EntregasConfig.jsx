@@ -2,6 +2,23 @@ import { useEffect, useState } from "react";
 import { api } from "../../services/api";
 import { getGuiaInlineStyle } from "../../utils/guiaHighlight";
 
+const fieldStyle = {
+  width: "100%",
+  padding: "10px 12px",
+  border: "1px solid #d1d5db",
+  borderRadius: 8,
+  fontSize: 14,
+  color: "#111827",
+  background: "#fff",
+  boxSizing: "border-box",
+};
+
+function optionalNumber(value) {
+  if (value === "" || value === null || value === undefined) return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
 export default function EntregasConfig() {
   const guiaAtiva = new URLSearchParams(window.location.search).get("guia");
   const destacarEntregaConfig = guiaAtiva === "entrega-config";
@@ -22,6 +39,17 @@ export default function EntregasConfig() {
     cidade: "",
     estado: "",
     metodo_km_entrega: "auto_rota",
+    entrega_ativa: true,
+    retirada_ativa: true,
+    modalidade_cobranca: "fixa",
+    taxa_fixa: 0,
+    valor_por_km_cobrado: "",
+    taxa_minima: 0,
+    distancia_maxima_entrega_km: "",
+    frete_gratis_acima: "",
+    distancia_maxima_frete_gratis_km: "",
+    pedido_minimo: 0,
+    prazo_entrega_texto: "",
   });
 
   useEffect(() => {
@@ -49,6 +77,17 @@ export default function EntregasConfig() {
           cidade: cfg.data.cidade ?? "",
           estado: cfg.data.estado ?? "",
           metodo_km_entrega: cfg.data.metodo_km_entrega ?? "auto_rota",
+          entrega_ativa: cfg.data.entrega_ativa !== false,
+          retirada_ativa: cfg.data.retirada_ativa !== false,
+          modalidade_cobranca: cfg.data.modalidade_cobranca ?? "fixa",
+          taxa_fixa: Number(cfg.data.taxa_fixa || 0),
+          valor_por_km_cobrado: cfg.data.valor_por_km_cobrado ?? "",
+          taxa_minima: Number(cfg.data.taxa_minima || 0),
+          distancia_maxima_entrega_km: cfg.data.distancia_maxima_entrega_km ?? "",
+          frete_gratis_acima: cfg.data.frete_gratis_acima ?? "",
+          distancia_maxima_frete_gratis_km: cfg.data.distancia_maxima_frete_gratis_km ?? "",
+          pedido_minimo: Number(cfg.data.pedido_minimo || 0),
+          prazo_entrega_texto: cfg.data.prazo_entrega_texto ?? "",
         });
 
         // 🛡️ PROTEÇÃO: Garantir que entregadores seja SEMPRE um array
@@ -105,6 +144,14 @@ export default function EntregasConfig() {
 
   async function handleSave(e) {
     e.preventDefault();
+    if (form.modalidade_cobranca === "por_km" && Number(form.valor_por_km_cobrado || 0) <= 0) {
+      alert("Informe um valor por km maior que zero.");
+      return;
+    }
+    if (form.modalidade_cobranca === "por_km" && (!form.logradouro || !form.numero)) {
+      alert("Para cobrar por km, complete pelo menos logradouro e número da loja.");
+      return;
+    }
     setSaving(true);
     try {
       // Enviar campos separados para o backend
@@ -118,6 +165,18 @@ export default function EntregasConfig() {
         cidade: form.cidade || null,
         estado: form.estado || null,
         metodo_km_entrega: form.metodo_km_entrega || "auto_rota",
+        entrega_ativa: form.entrega_ativa,
+        retirada_ativa: form.retirada_ativa,
+        modalidade_cobranca: form.modalidade_cobranca,
+        taxa_fixa: Number(form.taxa_fixa || 0),
+        valor_por_km_cobrado:
+          form.modalidade_cobranca === "por_km" ? Number(form.valor_por_km_cobrado || 0) : null,
+        taxa_minima: Number(form.taxa_minima || 0),
+        distancia_maxima_entrega_km: optionalNumber(form.distancia_maxima_entrega_km),
+        frete_gratis_acima: optionalNumber(form.frete_gratis_acima),
+        distancia_maxima_frete_gratis_km: optionalNumber(form.distancia_maxima_frete_gratis_km),
+        pedido_minimo: Number(form.pedido_minimo || 0),
+        prazo_entrega_texto: form.prazo_entrega_texto.trim() || null,
       });
       alert("Configurações salvas com sucesso");
     } catch (e) {
@@ -167,11 +226,11 @@ export default function EntregasConfig() {
           🚚 Configurações de Entregas
         </h1>
         <p style={{ margin: "6px 0 0", fontSize: 14, color: "#64748b" }}>
-          Gerencie entregadores, ponto de partida e como o sistema registra a distância percorrida.
+          Uma única regra de entrega para o aplicativo e para o e-commerce.
         </p>
       </div>
 
-      <form onSubmit={handleSave} style={{ maxWidth: 640 }}>
+      <form onSubmit={handleSave} style={{ maxWidth: 760 }}>
         {/* ── Entregador Padrão ─────────────────────────────────────── */}
         <div
           style={{
@@ -516,6 +575,228 @@ export default function EntregasConfig() {
             }}
           >
             💡 Preencha o CEP acima para buscar o endereço automaticamente.
+          </div>
+        </div>
+
+        {/* ── Regras comerciais compartilhadas ────────────────────── */}
+        <div
+          style={{
+            background: "#f8fafc",
+            border: "1px solid #e2e8f0",
+            borderRadius: 12,
+            padding: "20px 24px",
+            marginBottom: 24,
+          }}
+        >
+          <h3 style={{ margin: "0 0 4px", fontSize: 16, fontWeight: 700, color: "#1e293b" }}>
+            💰 Preço e área de entrega
+          </h3>
+          <p style={{ margin: "0 0 18px", fontSize: 13, color: "#64748b", lineHeight: 1.5 }}>
+            Esta regra é usada igualmente no aplicativo e no e-commerce. A distância é a rota de ida
+            entre a loja e o cliente.
+          </p>
+
+          <div
+            style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 18 }}
+          >
+            <label
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 10,
+                padding: "12px 14px",
+                border: "1px solid #dbeafe",
+                borderRadius: 9,
+                background: "#eff6ff",
+                fontSize: 14,
+                fontWeight: 600,
+                color: "#1e3a8a",
+              }}
+            >
+              <input
+                type="checkbox"
+                checked={form.entrega_ativa}
+                onChange={(event) => setForm({ ...form, entrega_ativa: event.target.checked })}
+              />
+              Oferecer entrega
+            </label>
+            <label
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 10,
+                padding: "12px 14px",
+                border: "1px solid #dbeafe",
+                borderRadius: 9,
+                background: "#eff6ff",
+                fontSize: 14,
+                fontWeight: 600,
+                color: "#1e3a8a",
+              }}
+            >
+              <input
+                type="checkbox"
+                checked={form.retirada_ativa}
+                onChange={(event) => setForm({ ...form, retirada_ativa: event.target.checked })}
+              />
+              Oferecer retirada na loja
+            </label>
+          </div>
+
+          <label style={{ display: "block", fontSize: 13, fontWeight: 600, color: "#374151" }}>
+            Como cobrar o frete
+            <select
+              value={form.modalidade_cobranca}
+              onChange={(event) => setForm({ ...form, modalidade_cobranca: event.target.value })}
+              style={{ ...fieldStyle, marginTop: 6 }}
+            >
+              <option value="fixa">Taxa fixa</option>
+              <option value="por_km">Distância × preço por km</option>
+            </select>
+          </label>
+
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+              gap: 12,
+              marginTop: 14,
+            }}
+          >
+            {form.modalidade_cobranca === "fixa" ? (
+              <label style={{ fontSize: 13, fontWeight: 600, color: "#374151" }}>
+                Taxa fixa (R$)
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={form.taxa_fixa}
+                  onChange={(event) => setForm({ ...form, taxa_fixa: event.target.value })}
+                  style={{ ...fieldStyle, marginTop: 6 }}
+                />
+              </label>
+            ) : (
+              <>
+                <label style={{ fontSize: 13, fontWeight: 600, color: "#374151" }}>
+                  Preço por km (R$)
+                  <input
+                    type="number"
+                    min="0.01"
+                    step="0.01"
+                    value={form.valor_por_km_cobrado}
+                    onChange={(event) =>
+                      setForm({ ...form, valor_por_km_cobrado: event.target.value })
+                    }
+                    style={{ ...fieldStyle, marginTop: 6 }}
+                    required
+                  />
+                </label>
+                <label style={{ fontSize: 13, fontWeight: 600, color: "#374151" }}>
+                  Taxa mínima (R$)
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={form.taxa_minima}
+                    onChange={(event) => setForm({ ...form, taxa_minima: event.target.value })}
+                    style={{ ...fieldStyle, marginTop: 6 }}
+                  />
+                </label>
+              </>
+            )}
+
+            <label style={{ fontSize: 13, fontWeight: 600, color: "#374151" }}>
+              Distância máxima de entrega (km)
+              <input
+                type="number"
+                min="0.01"
+                step="0.01"
+                value={form.distancia_maxima_entrega_km}
+                onChange={(event) =>
+                  setForm({ ...form, distancia_maxima_entrega_km: event.target.value })
+                }
+                placeholder="Sem limite"
+                style={{ ...fieldStyle, marginTop: 6 }}
+              />
+            </label>
+            <label style={{ fontSize: 13, fontWeight: 600, color: "#374151" }}>
+              Pedido mínimo (R$)
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                value={form.pedido_minimo}
+                onChange={(event) => setForm({ ...form, pedido_minimo: event.target.value })}
+                style={{ ...fieldStyle, marginTop: 6 }}
+              />
+            </label>
+            <label style={{ fontSize: 13, fontWeight: 600, color: "#374151" }}>
+              Frete grátis acima de (R$)
+              <input
+                type="number"
+                min="0.01"
+                step="0.01"
+                value={form.frete_gratis_acima}
+                onChange={(event) => setForm({ ...form, frete_gratis_acima: event.target.value })}
+                placeholder="Não oferecer"
+                style={{ ...fieldStyle, marginTop: 6 }}
+              />
+            </label>
+            <label style={{ fontSize: 13, fontWeight: 600, color: "#374151" }}>
+              Frete grátis somente até (km)
+              <input
+                type="number"
+                min="0.01"
+                step="0.01"
+                value={form.distancia_maxima_frete_gratis_km}
+                onChange={(event) =>
+                  setForm({ ...form, distancia_maxima_frete_gratis_km: event.target.value })
+                }
+                disabled={!form.frete_gratis_acima}
+                placeholder="Sem limite próprio"
+                style={{
+                  ...fieldStyle,
+                  marginTop: 6,
+                  background: form.frete_gratis_acima ? "#fff" : "#f1f5f9",
+                }}
+              />
+            </label>
+          </div>
+
+          <label
+            style={{
+              display: "block",
+              marginTop: 14,
+              fontSize: 13,
+              fontWeight: 600,
+              color: "#374151",
+            }}
+          >
+            Prazo informado ao cliente
+            <input
+              type="text"
+              maxLength={120}
+              value={form.prazo_entrega_texto}
+              onChange={(event) => setForm({ ...form, prazo_entrega_texto: event.target.value })}
+              placeholder="Ex.: Entrega em até 2 horas"
+              style={{ ...fieldStyle, marginTop: 6 }}
+            />
+          </label>
+
+          <div
+            style={{
+              marginTop: 14,
+              padding: "10px 12px",
+              borderRadius: 8,
+              background: "#fff7ed",
+              color: "#9a3412",
+              fontSize: 12,
+              lineHeight: 1.5,
+            }}
+          >
+            Se o pedido atingir o valor de frete grátis, mas estiver além do limite de km da
+            gratuidade, o frete normal continua sendo cobrado. Acima da distância máxima de entrega,
+            o checkout informa que o endereço está fora da área atendida.
           </div>
         </div>
 

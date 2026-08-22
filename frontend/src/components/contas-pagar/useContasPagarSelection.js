@@ -2,7 +2,9 @@ import { useEffect, useMemo, useState } from "react";
 import { toast } from "react-hot-toast";
 
 import api from "../../api";
+import useShiftRangeSelection from "../../hooks/useShiftRangeSelection";
 import { safeArray } from "../../utils/safeArray";
+import { confirmarCorePet, perguntarCorePet } from "../../services/corepetDialog";
 
 export default function useContasPagarSelection({ contas, carregarDados, abrirModalEdicao }) {
   const [contasSelecionadas, setContasSelecionadas] = useState([]);
@@ -37,11 +39,10 @@ export default function useContasPagarSelection({ contas, carregarDados, abrirMo
   const haContaCancelavelSelecionada = contasSelecionadasObjetos.some(contaPodeCancelar);
   const haContaExcluivelSelecionada = contasSelecionadasObjetos.some(contaPodeExcluir);
 
-  const alternarSelecaoConta = (contaId) => {
-    setContasSelecionadas((atuais) =>
-      atuais.includes(contaId) ? atuais.filter((id) => id !== contaId) : [...atuais, contaId],
-    );
-  };
+  const alternarSelecaoConta = useShiftRangeSelection({
+    items: contasVisiveis,
+    setSelectedIds: setContasSelecionadas,
+  });
 
   const selecionarTodasContasVisiveis = (event) => {
     const selecionar = event.target.checked;
@@ -73,10 +74,10 @@ export default function useContasPagarSelection({ contas, carregarDados, abrirMo
       return;
     }
 
-    const motivo = window.prompt("Motivo do estorno (opcional):", "");
+    const motivo = await perguntarCorePet("Motivo do estorno (opcional):", "");
     if (motivo === null) return;
 
-    const confirmado = window.confirm(
+    const confirmado = await confirmarCorePet(
       `Estornar pagamento de ${contasParaEstornar.length} lancamento(s)? O saldo bancario sera revertido.`,
     );
     if (!confirmado) return;
@@ -101,10 +102,10 @@ export default function useContasPagarSelection({ contas, carregarDados, abrirMo
       return;
     }
 
-    const motivo = window.prompt("Motivo do cancelamento (opcional):", "");
+    const motivo = await perguntarCorePet("Motivo do cancelamento (opcional):", "");
     if (motivo === null) return;
 
-    const confirmado = window.confirm(
+    const confirmado = await confirmarCorePet(
       `Cancelar ${contasParaCancelar.length} lancamento(s)? O historico sera mantido.`,
     );
     if (!confirmado) return;
@@ -132,7 +133,7 @@ export default function useContasPagarSelection({ contas, carregarDados, abrirMo
     const ignoradas = totalSelecionadas - contasParaExcluir.length;
     const avisoIgnoradas =
       ignoradas > 0 ? ` ${ignoradas} lancamento(s) com pagamento serao ignorados.` : "";
-    const confirmado = window.confirm(
+    const confirmado = await confirmarCorePet(
       `Excluir ${contasParaExcluir.length} lancamento(s) selecionado(s)?${avisoIgnoradas}`,
     );
     if (!confirmado) return;

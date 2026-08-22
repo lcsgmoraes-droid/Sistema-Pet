@@ -8,6 +8,8 @@ import {
   FiAlertCircle,
 } from "react-icons/fi";
 import api from "../../api";
+import CatalogoProdutoModal from "../../components/produtos/CatalogoProdutoModal";
+import { confirmarCorePet } from "../../services/corepetDialog";
 
 const Categorias = () => {
   const [categorias, setCategorias] = useState([]);
@@ -16,13 +18,7 @@ const Categorias = () => {
   const [showModal, setShowModal] = useState(false);
   const [editando, setEditando] = useState(null);
   const [expandidas, setExpandidas] = useState(new Set());
-  const [formData, setFormData] = useState({
-    nome: "",
-    descricao: "",
-    categoria_pai_id: null,
-    departamento_id: null,
-    ordem: 0,
-  });
+  const [valoresIniciaisModal, setValoresIniciaisModal] = useState({});
 
   const MAX_NIVEL = 4; // Limite de 4 níveis
 
@@ -63,50 +59,9 @@ const Categorias = () => {
     setExpandidas(novasExpandidas);
   };
 
-  const limparCachesCatalogos = () => {
-    sessionStorage.removeItem("produtos_catalogos_cache_v1");
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-
-    try {
-      if (editando) {
-        await api.put(`/produtos/categorias/${editando}`, formData);
-      } else {
-        await api.post("/produtos/categorias", formData);
-      }
-
-      limparCachesCatalogos();
-      setShowModal(false);
-      setEditando(null);
-      setFormData({
-        nome: "",
-        descricao: "",
-        categoria_pai_id: null,
-        departamento_id: null,
-        ordem: 0,
-      });
-      carregarCategorias();
-    } catch (error) {
-      console.error("Erro ao salvar categoria:", error);
-      if (error.response?.data?.detail) {
-        alert(error.response.data.detail);
-      } else {
-        alert("Erro ao salvar categoria");
-      }
-    }
-  };
-
   const handleEditar = (categoria) => {
-    setEditando(categoria.id);
-    setFormData({
-      nome: categoria.nome,
-      descricao: categoria.descricao || "",
-      categoria_pai_id: categoria.categoria_pai_id,
-      departamento_id: categoria.departamento_id || null,
-      ordem: categoria.ordem,
-    });
+    setEditando(categoria);
+    setValoresIniciaisModal({});
     setShowModal(true);
   };
 
@@ -118,7 +73,7 @@ const Categorias = () => {
 
     if (categoria.total_produtos > 0) {
       if (
-        !confirm(
+        !await confirmarCorePet(
           `Esta categoria possui ${categoria.total_produtos} produto(s). Deseja realmente excluir?`,
         )
       ) {
@@ -128,7 +83,7 @@ const Categorias = () => {
 
     try {
       await api.delete(`/produtos/categorias/${categoria.id}`);
-      limparCachesCatalogos();
+      sessionStorage.removeItem("produtos_catalogos_cache_v1");
       carregarCategorias();
     } catch (error) {
       console.error("Erro ao excluir categoria:", error);
@@ -143,9 +98,7 @@ const Categorias = () => {
     }
 
     setEditando(null);
-    setFormData({
-      nome: "",
-      descricao: "",
+    setValoresIniciaisModal({
       categoria_pai_id: categoriaPai.id,
       departamento_id: categoriaPai.departamento_id || null,
       ordem: 0,
@@ -155,14 +108,32 @@ const Categorias = () => {
 
   const handleNovaCategoriaRaiz = () => {
     setEditando(null);
-    setFormData({
-      nome: "",
-      descricao: "",
+    setValoresIniciaisModal({
       categoria_pai_id: null,
       departamento_id: null,
       ordem: 0,
     });
     setShowModal(true);
+  };
+
+  const fecharModal = () => {
+    setShowModal(false);
+    setEditando(null);
+    setValoresIniciaisModal({});
+  };
+
+  const handleCategoriaSalva = async () => {
+    fecharModal();
+    await carregarCategorias();
+  };
+
+  const handleDepartamentoCriado = (departamento) => {
+    setDepartamentos((atuais) => {
+      const semDuplicado = atuais.filter((atual) => String(atual.id) !== String(departamento.id));
+      return [...semDuplicado, departamento].sort((a, b) =>
+        String(a.nome || "").localeCompare(String(b.nome || ""), "pt-BR"),
+      );
+    });
   };
 
   // Construir árvore hierárquica
@@ -323,119 +294,15 @@ const Categorias = () => {
 
       {/* Modal */}
       {showModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md">
-            <h2 className="text-xl font-bold mb-4">
-              {editando
-                ? "Editar Categoria"
-                : formData.categoria_pai_id
-                  ? "Nova Subcategoria"
-                  : "Nova Categoria"}
-            </h2>
-
-            <form onSubmit={handleSubmit}>
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Nome *</label>
-                <input
-                  type="text"
-                  value={formData.nome}
-                  onChange={(e) => setFormData({ ...formData, nome: e.target.value })}
-                  className="w-full border rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  required
-                  autoFocus
-                />
-              </div>
-
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Departamento</label>
-                <select
-                  value={formData.departamento_id || ""}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      departamento_id: e.target.value ? parseInt(e.target.value) : null,
-                    })
-                  }
-                  className="w-full border rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="">Sem departamento</option>
-                  {departamentos.map((dep) => (
-                    <option key={dep.id} value={dep.id}>
-                      {dep.nome}
-                    </option>
-                  ))}
-                </select>
-                {departamentos.length === 0 && (
-                  <p className="text-xs text-amber-600 mt-1">
-                    Nenhum departamento cadastrado ainda.{" "}
-                    <a href="/cadastros/departamentos" className="underline">
-                      Criar departamentos
-                    </a>
-                  </p>
-                )}
-              </div>
-
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Descrição</label>
-                <textarea
-                  value={formData.descricao}
-                  onChange={(e) => setFormData({ ...formData, descricao: e.target.value })}
-                  className="w-full border rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  rows="3"
-                />
-              </div>
-
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Ordem</label>
-                <input
-                  type="number"
-                  value={formData.ordem}
-                  onChange={(e) =>
-                    setFormData({ ...formData, ordem: parseInt(e.target.value) || 0 })
-                  }
-                  className="w-full border rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  min="0"
-                />
-                <p className="text-xs text-gray-500 mt-1">Menor valor aparece primeiro</p>
-              </div>
-
-              {formData.categoria_pai_id && (
-                <div className="mb-4 p-3 bg-blue-50 rounded">
-                  <p className="text-sm text-blue-800">
-                    <FiAlertCircle className="inline mr-1" />
-                    Esta será uma subcategoria
-                  </p>
-                </div>
-              )}
-
-              <div className="flex gap-2 justify-end">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowModal(false);
-                    setEditando(null);
-                    setFormData({
-                      nome: "",
-                      descricao: "",
-                      categoria_pai_id: null,
-                      departamento_id: null,
-                      ordem: 0,
-                    });
-                  }}
-                  className="px-4 py-2 text-gray-700 bg-gray-200 rounded hover:bg-gray-300 transition-colors"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
-                >
-                  {editando ? "Salvar" : "Criar"}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
+        <CatalogoProdutoModal
+          tipo="categoria"
+          item={editando}
+          initialValues={valoresIniciaisModal}
+          departamentos={departamentos}
+          onClose={fecharModal}
+          onDepartamentoCriado={handleDepartamentoCriado}
+          onSaved={handleCategoriaSalva}
+        />
       )}
     </div>
   );

@@ -280,7 +280,7 @@ export default function MovimentacoesLancamentosTable({
                       <input
                         type="checkbox"
                         checked={selectedIds.includes(movimentacao.id)}
-                        onChange={() => handleSelectOne(movimentacao.id)}
+                        onChange={(event) => handleSelectOne(movimentacao.id, event)}
                         className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
                       />
                     </td>

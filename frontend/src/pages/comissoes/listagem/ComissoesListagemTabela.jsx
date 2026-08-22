@@ -134,7 +134,9 @@ export default function ComissoesListagemTabela({ controller }) {
                     <input
                       type="checkbox"
                       checked={comissoesSelecionadas.includes(comissao.id)}
-                      onChange={() => toggleSelecaoComissao(comissao.id, comissao.status)}
+                      onChange={(event) =>
+                        toggleSelecaoComissao(comissao.id, comissao.status, event)
+                      }
                       disabled={!comissaoPodeSerSelecionada(comissao)}
                       className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
                       title={

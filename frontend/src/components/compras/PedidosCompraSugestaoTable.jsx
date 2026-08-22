@@ -1,6 +1,7 @@
 import FornecedorIdentity from "../ui/FornecedorIdentity";
 import { AlertCircle, CheckSquare, MinusCircle } from "lucide-react";
 import PedidosCompraSugestaoUnidadeCell from "./PedidosCompraSugestaoUnidadeCell";
+import useShiftRangeSelection from "../../hooks/useShiftRangeSelection";
 
 export default function PedidosCompraSugestaoTable({
   modoAplicacaoSugestao,
@@ -20,7 +21,6 @@ export default function PedidosCompraSugestaoTable({
   classeCabecalhoTabelaSugestao,
   setProdutosSelecionados,
   corpoTabelaSugestaoRef,
-  toggleSelecionarProduto,
   copiarSkuSugestao,
   montarTooltipGiroSugestao,
   formatarQuantidadeCurta,
@@ -40,6 +40,11 @@ export default function PedidosCompraSugestaoTable({
   fecharModalSugestao,
   adicionarSugestoesAoPedido,
 }) {
+  const toggleProdutoNoIntervalo = useShiftRangeSelection({
+    items: sugestoesFiltradas,
+    setSelectedIds: setProdutosSelecionados,
+  });
+
   return (
     <>
       {/* Tabela de Sugestões */}
@@ -215,7 +220,9 @@ export default function PedidosCompraSugestaoTable({
                         <input
                           type="checkbox"
                           checked={produtosSelecionados.includes(sugestao.produto_id)}
-                          onChange={() => toggleSelecionarProduto(sugestao.produto_id)}
+                          onChange={(event) =>
+                            toggleProdutoNoIntervalo(sugestao.produto_id, event)
+                          }
                           className="w-4 h-4 rounded"
                         />
                       </td>

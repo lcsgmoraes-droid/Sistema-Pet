@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import api from "../api";
 import { formatMoneyBRL } from "../utils/formatters";
+import { confirmarCorePet } from "../services/corepetDialog";
 
 function formatarChave(valor) {
   return valor.replaceAll(/\D/g, "").slice(0, 44);
@@ -157,7 +158,7 @@ export default function SEFAZImportacao() {
   }
 
   async function _pularParaHoje() {
-    const confirmado = window.confirm(
+    const confirmado = await confirmarCorePet(
       "Isso vai fazer o sistema IGNORAR todas as NFs antigas e começar pelo ponto atual da SEFAZ.\n\nAs NFs antigas NÃO serão importadas. Continuar?",
     );
     if (!confirmado) return;

@@ -38,7 +38,7 @@ export default function BaixaLoteTransferenciaLista({
                   <input
                     type="checkbox"
                     checked={marcado}
-                    onChange={(event) => onToggleAplicacao(item, event.target.checked)}
+                    onChange={(event) => onToggleAplicacao(item, event)}
                     className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
                   />
                 </td>

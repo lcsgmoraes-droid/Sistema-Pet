@@ -2,6 +2,7 @@ import { useCallback } from "react";
 
 import { vetApi } from "../vetApi";
 import { FORM_PARCEIRO_INICIAL } from "./configuracoesConstants";
+import { confirmarCorePet } from "../../../services/corepetDialog";
 
 export function useConfiguracoesParceirosActions({
   carregar,
@@ -73,7 +74,7 @@ export function useConfiguracoesParceirosActions({
 
   const removerParceiro = useCallback(
     async (id) => {
-      if (!window.confirm("Tem certeza que deseja remover este vinculo de parceria?")) return;
+      if (!await confirmarCorePet("Tem certeza que deseja remover este vinculo de parceria?")) return;
 
       try {
         await vetApi.removerParceiro(id);

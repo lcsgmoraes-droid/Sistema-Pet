@@ -6,6 +6,7 @@ Suporta function calling, seleção inteligente de modelo, streaming.
 """
 
 import logging
+import os
 import time
 from typing import Dict, Any, List, Optional, Callable
 from openai import AsyncOpenAI
@@ -19,10 +20,21 @@ class LLMClient:
     Cliente OpenAI com seleção inteligente de modelo.
     """
 
-    def __init__(self, api_key: str):
+    def __init__(
+        self,
+        api_key: str,
+        default_model: Optional[str] = None,
+        advanced_model: Optional[str] = None,
+    ):
         self.client = AsyncOpenAI(api_key=api_key)
-        self.default_model = "gpt-4o-mini"
-        self.advanced_model = "gpt-4o-mini"
+        self.default_model = (
+            default_model or os.getenv("WHATSAPP_OPENAI_MODEL") or "gpt-4o-mini"
+        )
+        self.advanced_model = (
+            advanced_model
+            or os.getenv("WHATSAPP_OPENAI_ADVANCED_MODEL")
+            or self.default_model
+        )
 
     async def chat_completion(
         self,
@@ -54,12 +66,14 @@ class LLMClient:
             model = model or self._select_model(messages)
 
             # Preparar kwargs
-            kwargs = {
-                "model": model,
-                "messages": messages,
-                "temperature": temperature,
-                "max_tokens": max_tokens,
-            }
+            kwargs = {"model": model, "messages": messages}
+            if model.startswith("gpt-5"):
+                kwargs["max_completion_tokens"] = max_tokens
+                # No Chat Completions, tools do GPT-5.6 exigem effort=none.
+                kwargs["reasoning_effort"] = "none"
+            else:
+                kwargs["temperature"] = temperature
+                kwargs["max_tokens"] = max_tokens
 
             # Adicionar functions se fornecidas
             if functions:
@@ -171,7 +185,10 @@ class LLMClient:
         model = model or self.default_model
 
         stream = await self.client.chat.completions.create(
-            model=model, messages=messages, stream=True
+            model=model,
+            messages=messages,
+            stream=True,
+            **({"reasoning_effort": "none"} if model.startswith("gpt-5") else {}),
         )
 
         full_response = ""

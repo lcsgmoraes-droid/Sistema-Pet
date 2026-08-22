@@ -1,5 +1,6 @@
 import { useState } from "react";
 import api from "../api";
+import { confirmarCorePet } from "../services/corepetDialog";
 
 export const NOVA_REGRA_RETENCAO_PADRAO = {
   name: "",
@@ -36,7 +37,7 @@ export default function useCampanhasRetencao({ carregarRetencao }) {
   };
 
   const deletarRetencao = async (id) => {
-    if (!window.confirm("Remover esta regra de retencao?")) return;
+    if (!await confirmarCorePet("Remover esta regra de retencao?")) return;
     setDeletandoRetencao(id);
     try {
       await api.delete(`/campanhas/retencao/${id}`);

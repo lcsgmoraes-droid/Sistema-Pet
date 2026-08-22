@@ -8,6 +8,8 @@ import {
   filtrarVendasRelatorio,
   ordenarVendasRelatorio,
 } from "../vendasFinanceiroUtils";
+import { confirmarCorePet } from "../../../services/corepetDialog";
+import useShiftRangeSelection from "../../../hooks/useShiftRangeSelection";
 
 export function useVendasFinanceiroActions({
   carregarDados,
@@ -32,6 +34,11 @@ export function useVendasFinanceiroActions({
   setVendasSelecionadasIds,
   vendasPorDataCalendario,
 }) {
+  const toggleSelecaoVenda = useShiftRangeSelection({
+    items: listaVendasFiltrada,
+    setSelectedIds: setVendasSelecionadasIds,
+  });
+
   const filtrarVendasParaRelatorio = (escopo) =>
     filtrarVendasRelatorio(listaVendasComImpostoAjustado, {
       escopo,
@@ -198,18 +205,6 @@ export function useVendasFinanceiroActions({
     }
   };
 
-  const toggleSelecaoVenda = (vendaId, selecionada) => {
-    setVendasSelecionadasIds((prev) => {
-      const proximo = new Set(prev);
-      if (selecionada) {
-        proximo.add(vendaId);
-      } else {
-        proximo.delete(vendaId);
-      }
-      return proximo;
-    });
-  };
-
   const toggleSelecaoTodasVendas = (selecionar) => {
     setVendasSelecionadasIds((prev) => {
       const proximo = new Set(prev);
@@ -269,7 +264,7 @@ export function useVendasFinanceiroActions({
     const descricaoEscopo = periodo
       ? `do periodo ${formatarData(dataInicio)} ate ${formatarData(dataFim)}`
       : "selecionada(s)";
-    const confirmou = globalThis.confirm(
+    const confirmou = await confirmarCorePet(
       `Reprocessar ${quantidade} venda(s) ${descricaoEscopo}?\n\n` +
         "Isso atualiza o custo das movimentacoes de estoque da venda para o custo atual do produto e recalcula custo, lucro e margem.",
     );

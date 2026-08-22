@@ -99,6 +99,20 @@ def build_checkout_history_entry(
         "drive_chegou_at": _to_iso(getattr(pedido, "drive_chegou_at", None)),
         "drive_entregue_at": _to_iso(getattr(pedido, "drive_entregue_at", None)),
         "palavra_chave_retirada": getattr(pedido, "palavra_chave_retirada", None),
+        "endereco_entrega": getattr(pedido, "endereco_entrega", None),
+        "frete_valor": _to_float(getattr(pedido, "frete_valor", 0)),
+        "frete_distancia_km": (
+            _to_float(getattr(pedido, "frete_distancia_km", None))
+            if getattr(pedido, "frete_distancia_km", None) is not None
+            else None
+        ),
+        "frete_valor_por_km": (
+            _to_float(getattr(pedido, "frete_valor_por_km", None))
+            if getattr(pedido, "frete_valor_por_km", None) is not None
+            else None
+        ),
+        "frete_modalidade": getattr(pedido, "frete_modalidade", None),
+        "frete_gratis_aplicado": bool(getattr(pedido, "frete_gratis_aplicado", False)),
         "payment_provider": payment_info.get("payment_provider"),
         "payment_preference_id": payment_info.get("payment_preference_id"),
         "payment_url": payment_info.get("payment_url"),
@@ -137,6 +151,23 @@ def build_sale_history_entry(venda: Any, *, linked_order: Any | None = None) -> 
         "drive_entregue_at": _to_iso(getattr(linked_order, "drive_entregue_at", None)),
         "palavra_chave_retirada": getattr(venda, "palavra_chave_retirada", None)
         or getattr(linked_order, "palavra_chave_retirada", None),
+        "endereco_entrega": getattr(venda, "endereco_entrega", None)
+        or getattr(linked_order, "endereco_entrega", None),
+        "frete_valor": _to_float(getattr(venda, "taxa_entrega", 0)),
+        "frete_distancia_km": (
+            _to_float(getattr(venda, "distancia_km", None))
+            if getattr(venda, "distancia_km", None) is not None
+            else None
+        ),
+        "frete_valor_por_km": (
+            _to_float(getattr(venda, "valor_por_km", None))
+            if getattr(venda, "valor_por_km", None) is not None
+            else None
+        ),
+        "frete_modalidade": getattr(linked_order, "frete_modalidade", None),
+        "frete_gratis_aplicado": bool(
+            getattr(linked_order, "frete_gratis_aplicado", False)
+        ),
         "payment_provider": getattr(linked_order, "payment_provider", None),
         "payment_preference_id": getattr(linked_order, "payment_preference_id", None),
         "payment_url": getattr(linked_order, "payment_url", None),

@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import api from "../api";
 import CustomerIdentity from "../components/ui/CustomerIdentity";
+import { confirmarCorePet } from "../services/corepetDialog";
 
 export default function NotasFiscais() {
   const [notas, setNotas] = useState([]);
@@ -123,7 +124,7 @@ export default function NotasFiscais() {
 
   const excluirNota = async (venda_id, numero) => {
     if (
-      !confirm(
+      !await confirmarCorePet(
         `Deseja realmente excluir a nota ${numero}?\n\nIsso apenas remove os dados da nota do sistema, não cancela no Bling/SEFAZ.`,
       )
     ) {

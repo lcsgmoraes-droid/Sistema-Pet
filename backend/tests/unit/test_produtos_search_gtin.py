@@ -25,3 +25,11 @@ def test_ordenacao_de_busca_prioriza_todos_os_eans_cadastrados():
     assert "gtin_ean" in expressao_ordenacao
     assert "gtin_ean_tributario" in expressao_ordenacao
     assert "codigos_barras_alternativos" in expressao_ordenacao
+
+
+def test_busca_rapida_encontra_palavra_interna_do_sku_com_espacos():
+    expressao = _produto_search_conditions_fast("TESTE")
+    primeira_condicao = list(expressao.clauses)[0]
+
+    assert primeira_condicao.left.name == "codigo"
+    assert primeira_condicao.right.value == "%TESTE%"

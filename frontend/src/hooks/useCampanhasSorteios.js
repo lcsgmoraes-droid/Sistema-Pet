@@ -1,5 +1,6 @@
 import { useState } from "react";
 import api from "../api";
+import { confirmarCorePet } from "../services/corepetDialog";
 
 const DEFAULT_SORTEIO = {
   name: "",
@@ -67,7 +68,7 @@ export default function useCampanhasSorteios({
   };
 
   const executarSorteio = async (drawingId) => {
-    if (!window.confirm("Executar o sorteio agora? Esta acao e irreversivel.")) {
+    if (!await confirmarCorePet("Executar o sorteio agora? Esta acao e irreversivel.")) {
       return;
     }
     setExecutandoSorteio(drawingId);
@@ -83,7 +84,7 @@ export default function useCampanhasSorteios({
   };
 
   const cancelarSorteio = async (drawingId, nome) => {
-    if (!window.confirm(`Cancelar o sorteio "${nome}"?`)) return;
+    if (!await confirmarCorePet(`Cancelar o sorteio "${nome}"?`)) return;
     try {
       await api.delete(`/campanhas/sorteios/${drawingId}`);
       setSorteios((prev) => prev.filter((s) => s.id !== drawingId));

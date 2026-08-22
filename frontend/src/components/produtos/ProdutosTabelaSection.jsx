@@ -6,7 +6,10 @@ import DataTable from "../ui/DataTable";
 import MoneyCell from "../ui/MoneyCell";
 import PaginationControls from "../ui/PaginationControls";
 import {
+  getKitComponentAvailableStock,
+  isExpandIdSelected,
   montarTooltipLotesValidade,
+  normalizeExpandId,
   obterCanaisAtivosProduto,
   obterEstoqueVisualProduto,
   obterLotesValidadeDisponiveis,
@@ -104,6 +107,7 @@ export default function ProdutosTabelaSection({
   handleToggleAtivo,
   isProdutoComComposicao,
   itensPorPagina,
+  detalhesKits,
   kitsExpandidos,
   linhaProdutoRefs,
   loading,
@@ -116,6 +120,7 @@ export default function ProdutosTabelaSection({
   paginaAtual,
   paisExpandidos,
   produtos,
+  recarregarDetalhesKit,
   selecionados,
   selecionadosCount,
   setEditandoMargem,
@@ -168,61 +173,102 @@ export default function ProdutosTabelaSection({
   });
 
   const isProdutoExpandido = (produto) =>
-    isProdutoComComposicao(produto) &&
-    kitsExpandidos.includes(produto.id) &&
-    produto.composicao_kit &&
-    produto.composicao_kit.length > 0;
+    isProdutoComComposicao(produto) && isExpandIdSelected(kitsExpandidos, produto.id);
 
-  const renderProdutoExpandido = (produto, _rowIndex, colSpan) => (
-    <tr key={`kit-${produto.id}`} className="bg-amber-50/50 border-l-4 border-amber-400">
-      <td colSpan={colSpan} className="px-4 py-3">
-        <div className="ml-12">
-          <div className="text-xs font-semibold text-amber-800 mb-2 flex items-center gap-2">
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
-              />
-            </svg>
-            COMPOSICAO DO KIT:
-          </div>
-          <div className="grid gap-1">
-            {produto.composicao_kit.map((componente, index) => (
-              <div
-                key={index}
-                className="flex items-center gap-3 text-xs bg-white rounded px-3 py-2 border border-amber-200"
-              >
-                <span className="font-mono font-semibold text-amber-700 min-w-[40px]">
-                  {componente.quantidade}x
-                </span>
-                <span className="flex-1 text-gray-700">
-                  {componente.produto_nome ||
-                    componente.nome ||
-                    `Produto #${componente.produto_id || componente.produto_componente_id}`}
-                </span>
-                {componente.produto_estoque !== undefined && (
-                  <span className="text-gray-500">
-                    Estoque:{" "}
-                    <span
-                      className={
-                        componente.produto_estoque > 0
-                          ? "text-green-600 font-semibold"
-                          : "text-red-600 font-semibold"
-                      }
-                    >
-                      {componente.produto_estoque}
-                    </span>
-                  </span>
-                )}
+  const renderProdutoExpandido = (produto, _rowIndex, colSpan) => {
+    const produtoId = normalizeExpandId(produto.id);
+    const detalhes = detalhesKits?.[produtoId];
+    const composicao = detalhes?.composicao || produto.composicao_kit || [];
+    const carregando = detalhes?.status === "loading";
+    const comErro = detalhes?.status === "error";
+
+    return (
+      <tr key={`kit-${produto.id}`} className="bg-amber-50/50 border-l-4 border-amber-400">
+        <td colSpan={colSpan} className="px-4 py-3">
+          <div className="ml-12">
+            <div className="text-xs font-semibold text-amber-800 mb-2 flex items-center gap-2">
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
+                />
+              </svg>
+              COMPOSIÇÃO DO KIT:
+            </div>
+
+            {carregando && (
+              <div className="flex items-center gap-2 rounded border border-amber-200 bg-white px-3 py-3 text-xs text-gray-600">
+                <span className="h-4 w-4 animate-spin rounded-full border-2 border-amber-200 border-t-amber-600" />
+                Carregando itens do kit...
               </div>
-            ))}
+            )}
+
+            {comErro && (
+              <div className="flex flex-wrap items-center justify-between gap-2 rounded border border-red-200 bg-white px-3 py-3 text-xs text-red-700">
+                <span>{detalhes.erro}</span>
+                <button
+                  type="button"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    recarregarDetalhesKit(produto.id);
+                  }}
+                  className="rounded border border-red-200 px-2 py-1 font-semibold hover:bg-red-50"
+                >
+                  Tentar novamente
+                </button>
+              </div>
+            )}
+
+            {!carregando && !comErro && composicao.length === 0 && (
+              <div className="rounded border border-amber-200 bg-white px-3 py-3 text-xs text-gray-600">
+                Nenhum item cadastrado nesta composição.
+              </div>
+            )}
+
+            {!carregando && !comErro && composicao.length > 0 && (
+              <div className="grid gap-1">
+                {composicao.map((componente, index) => {
+                  const estoqueDisponivel = getKitComponentAvailableStock(componente);
+
+                  return (
+                    <div
+                      key={componente.id || componente.produto_id || index}
+                      className="flex items-center gap-3 text-xs bg-white rounded px-3 py-2 border border-amber-200"
+                    >
+                      <span className="font-mono font-semibold text-amber-700 min-w-[40px]">
+                        {componente.quantidade}x
+                      </span>
+                      <span className="flex-1 text-gray-700">
+                        {componente.produto_nome ||
+                          componente.nome ||
+                          `Produto #${componente.produto_id || componente.produto_componente_id}`}
+                      </span>
+                      {estoqueDisponivel !== null && (
+                        <span className="text-gray-500">
+                          Disponível:{" "}
+                          <span
+                            className={
+                              estoqueDisponivel > 0
+                                ? "text-green-600 font-semibold"
+                                : "text-red-600 font-semibold"
+                            }
+                          >
+                            {estoqueDisponivel}
+                          </span>
+                        </span>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
-        </div>
-      </td>
-    </tr>
-  );
+        </td>
+      </tr>
+    );
+  };
 
   return (
     <>

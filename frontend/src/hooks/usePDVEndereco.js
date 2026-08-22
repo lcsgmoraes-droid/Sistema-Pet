@@ -58,8 +58,8 @@ export function usePDVEndereco({ vendaAtual, setVendaAtual }) {
   };
 
   const salvarEnderecoNoCliente = async () => {
-    if (!enderecoAtual?.cep || !enderecoAtual.endereco || !enderecoAtual.cidade) {
-      alert("Preencha pelo menos CEP, Endereço e Cidade");
+    if (!enderecoAtual?.endereco || !enderecoAtual.cidade) {
+      alert("Preencha pelo menos Endereço e Cidade");
       return;
     }
 

@@ -511,6 +511,13 @@ def _integrar_venda_ao_motor(
     tem_entrega, entregador_id, endereco_entrega = _resolver_entrega_webhook(
         payload_data, metadata, nested_metadata
     )
+    retirada = str(getattr(pedido, "tipo_retirada", None) or "").strip().lower()
+    if retirada in {"proprio", "terceiro", "app_loja"}:
+        tem_entrega = False
+        endereco_entrega = None
+    elif getattr(pedido, "endereco_entrega", None):
+        tem_entrega = True
+        endereco_entrega = pedido.endereco_entrega
     entregador_id = _resolver_entregador_padrao(db, pedido, tem_entrega, entregador_id)
 
     integration_endpoint = "POST /api/ecommerce/integracao/venda"
@@ -531,23 +538,28 @@ def _integrar_venda_ao_motor(
 
     cliente = _resolver_cliente_venda(db, pedido)
     cliente_id = cliente.id if cliente else None
+    frete_valor = float(getattr(pedido, "frete_valor", 0) or 0)
+    itens_subtotal = round(sum(float(item.subtotal or 0) for item in itens), 2)
+    desconto_valor = round(
+        max(itens_subtotal + frete_valor - float(pedido.total or 0), 0), 2
+    )
     payload = {
         "cliente_id": cliente_id,
         "vendedor_id": vendedor.id,
         "funcionario_id": None,
         "itens": _itens_payload_venda(itens),
-        "desconto_valor": 0,
+        "desconto_valor": desconto_valor,
         "desconto_percentual": 0,
         "observacoes": f"Pedido {origem_label} {pedido.pedido_id}",
         "tem_entrega": tem_entrega,
-        "taxa_entrega": 0,
+        "taxa_entrega": frete_valor,
         "percentual_taxa_loja": 100,
         "percentual_taxa_entregador": 0,
         "entregador_id": entregador_id,
         "loja_origem": canal_origem,
         "endereco_entrega": endereco_entrega,
-        "distancia_km": None,
-        "valor_por_km": None,
+        "distancia_km": getattr(pedido, "frete_distancia_km", None),
+        "valor_por_km": getattr(pedido, "frete_valor_por_km", None),
         "observacoes_entrega": None,
         "canal": canal_origem,
         "tenant_id": str(pedido.tenant_id),

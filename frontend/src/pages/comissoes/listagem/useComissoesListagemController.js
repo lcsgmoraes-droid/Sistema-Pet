@@ -1,7 +1,11 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../../../api";
 import { formatMoneyCellValue } from "../../../components/ui/MoneyCell";
+import {
+  applyShiftRangeSelection,
+  getShiftSelectionEvent,
+} from "../../../utils/shiftRangeSelection";
 
 export default function useComissoesListagemController() {
   const navigate = useNavigate();
@@ -49,6 +53,7 @@ export default function useComissoesListagemController() {
 
   // Estados - Fechamento de Comissões
   const [comissoesSelecionadas, setComissoesSelecionadas] = useState([]);
+  const ultimaComissaoSelecionadaRef = useRef(null);
   const [mostrarModalFechamento, setMostrarModalFechamento] = useState(false);
   const [dataPagamento, setDataPagamento] = useState("");
   const [observacaoFechamento, setObservacaoFechamento] = useState("");
@@ -374,27 +379,36 @@ export default function useComissoesListagemController() {
   // ========== FUNÇÕES DE FECHAMENTO ==========
 
   // Toggle seleção de comissão individual
-  const toggleSelecaoComissao = (comissaoId, status) => {
+  const toggleSelecaoComissao = (comissaoId, status, event) => {
     if (!["pendente", "fechada"].includes(status)) return;
 
+    const { checked, shiftKey } = getShiftSelectionEvent(event);
+
     setComissoesSelecionadas((prev) => {
-      if (prev.includes(comissaoId)) {
-        return prev.filter((id) => id !== comissaoId);
-      } else {
-        const comissaoAtual = comissoes.find((item) => item.id === comissaoId);
-        const funcionariosSelecionados = new Set(
-          comissoes.filter((item) => prev.includes(item.id)).map((item) => item.funcionario_id),
-        );
-        if (
-          funcionariosSelecionados.size > 0 &&
-          !funcionariosSelecionados.has(comissaoAtual?.funcionario_id)
-        ) {
-          alert("Selecione comissões de apenas um funcionário por vez.");
-          return prev;
-        }
-        return [...prev, comissaoId];
+      const proximaSelecao = applyShiftRangeSelection({
+        anchorId: ultimaComissaoSelecionadaRef.current,
+        checked,
+        currentSelection: prev,
+        isItemSelectable: (comissao) => ["pendente", "fechada"].includes(comissao.status),
+        itemId: comissaoId,
+        items: comissoes,
+        shiftKey,
+      });
+      const funcionariosSelecionados = new Set(
+        comissoes
+          .filter((item) => proximaSelecao.includes(item.id))
+          .map((item) => item.funcionario_id),
+      );
+
+      if (funcionariosSelecionados.size > 1) {
+        alert("Selecione comissões de apenas um funcionário por vez.");
+        return prev;
       }
+
+      return proximaSelecao;
     });
+
+    ultimaComissaoSelecionadaRef.current = comissaoId;
   };
 
   // Selecionar/desselecionar todas as comissões pendentes

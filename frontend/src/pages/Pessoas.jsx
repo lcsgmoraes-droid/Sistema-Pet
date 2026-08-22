@@ -18,6 +18,7 @@ import PageHeader from "../components/ui/PageHeader";
 import Panel from "../components/ui/Panel";
 import StatusBadge from "../components/ui/StatusBadge";
 import { useTour } from "../hooks/useTour";
+import useShiftRangeSelection from "../hooks/useShiftRangeSelection";
 import { tourPessoas } from "../tours/tourDefinitions";
 
 const TIPOS_CADASTRO = {
@@ -96,11 +97,10 @@ export default function Pessoas() {
     setSelecionados((prev) => prev.filter((id) => pessoas.some((pessoa) => pessoa.id === id)));
   }, [pessoas]);
 
-  const selecionarPessoa = (id) => {
-    setSelecionados((prev) =>
-      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id],
-    );
-  };
+  const selecionarPessoa = useShiftRangeSelection({
+    items: pessoas,
+    setSelectedIds: setSelecionados,
+  });
 
   const selecionarTodosVisiveis = () => {
     const idsVisiveis = pessoas.map((pessoa) => pessoa.id);
@@ -142,7 +142,7 @@ export default function Pessoas() {
           <input
             type="checkbox"
             checked={selecionados.includes(pessoa.id)}
-            onChange={() => selecionarPessoa(pessoa.id)}
+            onChange={(event) => selecionarPessoa(pessoa.id, event)}
             className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
             aria-label={`Selecionar ${pessoa.nome}`}
           />
@@ -213,7 +213,7 @@ export default function Pessoas() {
         ),
       },
     ],
-    [navigate, selecionados, todosVisiveisSelecionados],
+    [navigate, selecionarPessoa, selecionados, todosVisiveisSelecionados],
   );
 
   return (

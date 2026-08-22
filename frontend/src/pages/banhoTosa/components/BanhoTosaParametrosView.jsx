@@ -14,6 +14,7 @@ import BanhoTosaPorteForm, {
   initialPorteForm,
   payloadFromPorteForm,
 } from "./BanhoTosaPorteForm";
+import { confirmarCorePet } from "../../../services/corepetDialog";
 
 export default function BanhoTosaParametrosView({ config, parametros, onChanged }) {
   const [configForm, setConfigForm] = useState(null);
@@ -203,7 +204,7 @@ export default function BanhoTosaParametrosView({ config, parametros, onChanged 
   }
 
   async function excluirPorte(item) {
-    const confirmou = window.confirm(
+    const confirmou = await confirmarCorePet(
       `Excluir o porte "${item.porte}"? Se ele ja tiver historico, o sistema vai apenas desativar.`,
     );
     if (!confirmou) return;

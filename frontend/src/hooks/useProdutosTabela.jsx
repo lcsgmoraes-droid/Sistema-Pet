@@ -1,13 +1,15 @@
 import { useEffect, useRef, useState } from "react";
 import toast from "react-hot-toast";
-import { formatarData } from "../api/produtos";
+import { formatarData, getProduto } from "../api/produtos";
 import {
+  getKitCompositionFromResponse,
+  isExpandIdSelected,
   montarTooltipLotesValidade,
+  normalizeExpandId,
   obterEstoqueVisualProduto,
   obterLotesValidadeDisponiveis,
 } from "../components/produtos/produtosUtils";
 
-const normalizeExpandId = (value) => String(value ?? "");
 const PRODUTOS_COLUNAS_STORAGE_KEY = "produtos_colunas_visiveis";
 const PRODUTOS_COLUNAS_VERSION_KEY = "produtos_colunas_visiveis_version";
 const PRODUTOS_COLUNAS_VERSION = 3;
@@ -47,7 +49,9 @@ export default function useProdutosTabela({
   setPaisExpandidos: setPaisExpandidosExterno,
 }) {
   const linhaProdutoRefs = useRef({});
+  const kitsEmCarregamentoRef = useRef(new Set());
   const [kitsExpandidos, setKitsExpandidos] = useState([]);
+  const [detalhesKits, setDetalhesKits] = useState({});
   const [paisExpandidosInterno, setPaisExpandidosInterno] = useState([]);
   const [colunasVisiveis, setColunasVisiveis] = useState(() => {
     return carregarColunasVisiveisSalvas(colunasTabela);
@@ -150,19 +154,64 @@ export default function useProdutosTabela({
     });
   };
 
+  const carregarDetalhesKit = async (produtoId, { recarregar = false } = {}) => {
+    const produtoIdNormalizado = normalizeExpandId(produtoId);
+    if (!produtoIdNormalizado || kitsEmCarregamentoRef.current.has(produtoIdNormalizado)) return;
+    if (!recarregar && detalhesKits[produtoIdNormalizado]?.status === "success") return;
+
+    kitsEmCarregamentoRef.current.add(produtoIdNormalizado);
+    setDetalhesKits((prev) => ({
+      ...prev,
+      [produtoIdNormalizado]: {
+        composicao: prev[produtoIdNormalizado]?.composicao || [],
+        erro: "",
+        status: "loading",
+      },
+    }));
+
+    try {
+      const response = await getProduto(produtoId);
+      const composicao = getKitCompositionFromResponse(response);
+      setDetalhesKits((prev) => ({
+        ...prev,
+        [produtoIdNormalizado]: {
+          composicao,
+          erro: "",
+          status: "success",
+        },
+      }));
+    } catch (error) {
+      const detalhe = error?.response?.data?.detail;
+      setDetalhesKits((prev) => ({
+        ...prev,
+        [produtoIdNormalizado]: {
+          composicao: prev[produtoIdNormalizado]?.composicao || [],
+          erro:
+            typeof detalhe === "string" ? detalhe : "Nao foi possivel carregar os itens deste kit.",
+          status: "error",
+        },
+      }));
+    } finally {
+      kitsEmCarregamentoRef.current.delete(produtoIdNormalizado);
+    }
+  };
+
   const toggleKitExpandido = (produtoId) => {
     const produtoIdNormalizado = normalizeExpandId(produtoId);
-    const vaiExpandir = !kitsExpandidos.includes(produtoIdNormalizado);
+    const vaiExpandir = !isExpandIdSelected(kitsExpandidos, produtoIdNormalizado);
     setKitsExpandidos((prev) =>
-      prev.includes(produtoIdNormalizado)
-        ? prev.filter((id) => id !== produtoIdNormalizado)
+      isExpandIdSelected(prev, produtoIdNormalizado)
+        ? prev.filter((id) => normalizeExpandId(id) !== produtoIdNormalizado)
         : [...prev, produtoIdNormalizado],
     );
 
     if (vaiExpandir) {
+      void carregarDetalhesKit(produtoId);
       setTimeout(() => garantirLinhaVisivel(produtoId), 80);
     }
   };
+
+  const recarregarDetalhesKit = (produtoId) => carregarDetalhesKit(produtoId, { recarregar: true });
 
   const togglePaiExpandido = (produtoId) => {
     const produtoIdNormalizado = normalizeExpandId(produtoId);
@@ -217,6 +266,7 @@ export default function useProdutosTabela({
     abrirModalColunas,
     colunasTemporarias,
     colunasVisiveis,
+    detalhesKits,
     filtrarColunas,
     getCorEstoque,
     getValidadeMaisProxima,
@@ -226,6 +276,7 @@ export default function useProdutosTabela({
     onCloseModalColunas: () => setModalColunas(false),
     paisExpandidos,
     resetPaisExpandidos,
+    recarregarDetalhesKit,
     restaurarColunasPadrao,
     salvarColunas,
     toggleColuna,

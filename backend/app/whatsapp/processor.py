@@ -60,6 +60,7 @@ from app.whatsapp.order_drafts import (
 logger = logging.getLogger(__name__)
 
 MAX_PRODUCT_IMAGES_PER_RESPONSE = 3
+CATALOG_SEARCH_CONTEXT_KEY = "pending_catalog_search"
 MARKDOWN_IMAGE_PATTERN = re.compile(r"!\[[^\]]*\]\((https?://[^)\s]+)\)")
 PRODUCT_SEARCH_INTENTS = {
     "consulta_produto",
@@ -132,6 +133,216 @@ def _normalize_text(value: str) -> str:
         char for char in normalized if not unicodedata.combining(char)
     )
     return without_accents.lower()
+
+
+def _strip_audio_marker(value: str) -> str:
+    """Remove o marcador interno sem apagar o texto transcrito do cliente."""
+    return re.sub(
+        r"^\s*\[audio do cliente\]\s*",
+        "",
+        value or "",
+        flags=re.IGNORECASE,
+    ).strip()
+
+
+MEASUREMENT_NUMBER_WORDS = {
+    "meio": 0.5,
+    "um": 1,
+    "uma": 1,
+    "dois": 2,
+    "duas": 2,
+    "tres": 3,
+    "quatro": 4,
+    "cinco": 5,
+    "seis": 6,
+    "sete": 7,
+    "oito": 8,
+    "nove": 9,
+    "dez": 10,
+    "onze": 11,
+    "doze": 12,
+    "treze": 13,
+    "quatorze": 14,
+    "catorze": 14,
+    "quinze": 15,
+    "dezesseis": 16,
+    "dezessete": 17,
+    "dezoito": 18,
+    "dezenove": 19,
+    "vinte": 20,
+    "vinte e cinco": 25,
+}
+MEASUREMENT_UNITS = {
+    "kg": "kg",
+    "quilo": "kg",
+    "quilos": "kg",
+    "g": "g",
+    "grama": "g",
+    "gramas": "g",
+    "ml": "ml",
+    "mililitro": "ml",
+    "mililitros": "ml",
+    "l": "l",
+    "litro": "l",
+    "litros": "l",
+}
+
+
+def _format_measurement_number(value: float) -> str:
+    if float(value).is_integer():
+        return str(int(value))
+    return str(value).replace(".", ",")
+
+
+def _canonicalize_numeric_measurements(value: str) -> str:
+    unit_pattern = "|".join(
+        sorted((re.escape(unit) for unit in MEASUREMENT_UNITS), key=len, reverse=True)
+    )
+
+    def _replace(match: re.Match) -> str:
+        number, unit = match.groups()
+        return f"{number}{MEASUREMENT_UNITS[_normalize_text(unit)]}"
+
+    return re.sub(
+        rf"\b(\d+(?:[.,]\d+)?)\s*({unit_pattern})\b",
+        _replace,
+        value or "",
+        flags=re.IGNORECASE,
+    )
+
+
+def _extract_explicit_measurements(value: str) -> list[str]:
+    """Normaliza medidas digitadas ou faladas, como 'três quilos' -> '3kg'."""
+    text = " ".join(_normalize_text(_strip_audio_marker(value)).split())
+    measurements: list[str] = []
+
+    unit_pattern = "|".join(
+        sorted((re.escape(unit) for unit in MEASUREMENT_UNITS), key=len, reverse=True)
+    )
+    for number, unit in re.findall(
+        rf"\b(\d+(?:[.,]\d+)?)\s*({unit_pattern})\b",
+        text,
+    ):
+        measurements.append(f"{number}{MEASUREMENT_UNITS[unit]}")
+
+    word_pattern = "|".join(
+        sorted(
+            (re.escape(word) for word in MEASUREMENT_NUMBER_WORDS),
+            key=len,
+            reverse=True,
+        )
+    )
+    for number_word, half_suffix, unit in re.findall(
+        rf"\b({word_pattern})(\s+e\s+meio)?\s+({unit_pattern})\b",
+        text,
+    ):
+        number = float(MEASUREMENT_NUMBER_WORDS[number_word])
+        if half_suffix:
+            number += 0.5
+        measurements.append(
+            f"{_format_measurement_number(number)}{MEASUREMENT_UNITS[unit]}"
+        )
+
+    unique_measurements: list[str] = []
+    for measurement in measurements:
+        if measurement not in unique_measurements:
+            unique_measurements.append(measurement)
+    return unique_measurements
+
+
+def _remove_explicit_measurements(value: str) -> str:
+    text = value or ""
+    for measurement in _extract_explicit_measurements(text):
+        match = re.fullmatch(r"(\d+(?:[.,]\d+)?)(kg|g|ml|l)", measurement)
+        if not match:
+            continue
+        number, canonical_unit = match.groups()
+        unit_variants = {
+            "kg": "kg|quilo|quilos",
+            "g": "g|grama|gramas",
+            "ml": "ml|mililitro|mililitros",
+            "l": "l|litro|litros",
+        }[canonical_unit]
+        text = re.sub(
+            rf"\b{re.escape(number)}\s*(?:{unit_variants})\b",
+            " ",
+            text,
+            flags=re.IGNORECASE,
+        )
+    return " ".join(text.split())
+
+
+def _catalog_followup_query(message: str, previous_query: str) -> Optional[str]:
+    """Combina detalhes curtos com o último produto, sem depender da memória da IA."""
+    measurements = _extract_explicit_measurements(message)
+    if not measurements or not (previous_query or "").strip():
+        return None
+
+    plain = _normalize_text(_strip_audio_marker(message))
+    tokens = re.findall(r"[a-z0-9]+", plain)
+    generic_tokens = {
+        "audio",
+        "cliente",
+        "eu",
+        "quero",
+        "queria",
+        "prefiro",
+        "pode",
+        "ser",
+        "tem",
+        "teria",
+        "o",
+        "a",
+        "os",
+        "as",
+        "um",
+        "uma",
+        "de",
+        "da",
+        "do",
+        "das",
+        "dos",
+        "com",
+        "pacote",
+        "embalagem",
+        "opcao",
+        "esse",
+        "essa",
+        "aquele",
+        "aquela",
+        "qual",
+        "e",
+        *MEASUREMENT_NUMBER_WORDS.keys(),
+        *MEASUREMENT_UNITS.keys(),
+    }
+    descriptors = {
+        "adulto",
+        "adultos",
+        "filhote",
+        "filhotes",
+        "mini",
+        "bits",
+        "frango",
+        "carne",
+        "arroz",
+        "cao",
+        "caes",
+        "gato",
+        "gatos",
+    }
+    remaining = [
+        token
+        for token in tokens
+        if token not in generic_tokens
+        and not token.isdigit()
+        and not re.fullmatch(r"\d+(?:kg|g|ml|l)", token)
+    ]
+    if any(token not in descriptors for token in remaining):
+        return None
+
+    base_query = _remove_explicit_measurements(previous_query)
+    base_query = re.sub(r"\bgranel\b", " ", base_query, flags=re.IGNORECASE)
+    return " ".join([base_query.strip(), *remaining, *measurements]).strip()
 
 
 def _product_query_from_choice_phrase(message: str) -> Optional[str]:
@@ -539,6 +750,8 @@ def _build_catalog_response(function_result: Any, catalog_query: str) -> str:
         products = []
 
     if not products:
+        if data.get("unavailable_found"):
+            return f"Encontrei {catalog_query}, mas está sem estoque no momento."
         return f"Não encontrei {catalog_query} no catálogo."
 
     single_result = len(products) == 1
@@ -563,8 +776,42 @@ def _build_catalog_response(function_result: Any, catalog_query: str) -> str:
     return "\n\n".join(lines)
 
 
+def _filter_unavailable_catalog_products(function_result: Any) -> Any:
+    """Não oferece item esgotado quando o catálogo informa o estoque atual."""
+    if not isinstance(function_result, dict):
+        return function_result
+
+    result = dict(function_result)
+    nested_data = result.get("data")
+    data = dict(nested_data) if isinstance(nested_data, dict) else result
+    products = data.get("produtos")
+    if not isinstance(products, list):
+        return function_result
+
+    def _is_available(product: Any) -> bool:
+        if not isinstance(product, dict):
+            return False
+        if "estoque_disponivel" in product:
+            return bool(product.get("estoque_disponivel"))
+        if "estoque" not in product:
+            return True
+        try:
+            return float(product.get("estoque") or 0) > 0
+        except (TypeError, ValueError):
+            return True
+
+    available_products = [product for product in products if _is_available(product)]
+    data["produtos"] = available_products
+    data["found"] = len(available_products)
+    data["unavailable_found"] = bool(products and not available_products)
+    if isinstance(nested_data, dict):
+        result["data"] = data
+    return result
+
+
 def _preserve_explicit_measurements(query: str, messages: list[Dict[str, Any]]) -> str:
     """Reinsere peso/volume do cliente quando a IA omite isso na tool."""
+    query = _canonicalize_numeric_measurements(query)
     last_user_message = next(
         (
             str(message.get("content") or "")
@@ -573,10 +820,7 @@ def _preserve_explicit_measurements(query: str, messages: list[Dict[str, Any]]) 
         ),
         "",
     )
-    measurements = re.findall(
-        r"\b\d+(?:[.,]\d+)?\s*(?:kg|g|ml|l)\b",
-        _normalize_text(last_user_message),
-    )
+    measurements = _extract_explicit_measurements(last_user_message)
     query_normalized = _normalize_text(query).replace(" ", "")
     missing = [
         measurement.replace(" ", "")
@@ -611,6 +855,7 @@ class MessageProcessor:
             )
             self.config = SimpleNamespace(
                 openai_api_key=fallback_openai_key,
+                model_preference=(os.getenv("WHATSAPP_OPENAI_MODEL") or "gpt-4o-mini"),
                 auto_response_enabled=True,
                 bot_name="Assistente",
             )
@@ -619,6 +864,11 @@ class MessageProcessor:
             if not self.config.openai_api_key and fallback_openai_key:
                 self.config = SimpleNamespace(
                     openai_api_key=fallback_openai_key,
+                    model_preference=(
+                        os.getenv("WHATSAPP_OPENAI_MODEL")
+                        or getattr(config, "model_preference", None)
+                        or "gpt-4o-mini"
+                    ),
                     auto_response_enabled=getattr(
                         config, "auto_response_enabled", True
                     ),
@@ -626,14 +876,27 @@ class MessageProcessor:
                 )
 
         self.ai_enabled = bool(self.config.openai_api_key)
+        preferred_model = (
+            os.getenv("WHATSAPP_OPENAI_MODEL")
+            or getattr(self.config, "model_preference", None)
+            or "gpt-4o-mini"
+        )
 
         # Inicializar componentes
         self.intent_classifier = (
-            IntentClassifier(self.config.openai_api_key) if self.ai_enabled else None
+            IntentClassifier(self.config.openai_api_key, model=preferred_model)
+            if self.ai_enabled
+            else None
         )
         self.context_builder = ContextBuilder(db)
         self.llm_client = (
-            LLMClient(self.config.openai_api_key) if self.ai_enabled else None
+            LLMClient(
+                self.config.openai_api_key,
+                default_model=preferred_model,
+                advanced_model=preferred_model,
+            )
+            if self.ai_enabled
+            else None
         )
         self.router = IntentRouter()
 
@@ -723,6 +986,61 @@ class MessageProcessor:
     ) -> None:
         session.context = json.dumps(context, ensure_ascii=False)
         self.db.commit()
+
+    def _remember_catalog_search(
+        self,
+        session_id: str,
+        catalog_query: str,
+        function_result: Any,
+    ) -> None:
+        """Guarda o produto pesquisado para entender refinamentos na próxima fala."""
+        if not getattr(self, "db", None):
+            return
+        session = self.db.query(WhatsAppSession).get(session_id)
+        if not session:
+            return
+
+        data = (
+            function_result.get("data") if isinstance(function_result, dict) else None
+        )
+        if not isinstance(data, dict):
+            data = function_result if isinstance(function_result, dict) else {}
+        products = data.get("produtos")
+        if not isinstance(products, list):
+            products = []
+
+        session_context = self._load_session_context(session)
+        session_context[CATALOG_SEARCH_CONTEXT_KEY] = {
+            "query": catalog_query,
+            "options": [
+                {
+                    "id": product.get("id"),
+                    "nome": product.get("nome"),
+                    "estoque": product.get("estoque"),
+                }
+                for product in products[:MAX_PRODUCT_IMAGES_PER_RESPONSE]
+                if isinstance(product, dict)
+            ],
+        }
+        self._save_session_context(session, session_context)
+
+    def _resolve_catalog_followup(
+        self, session_id: str, message_content: str
+    ) -> Optional[str]:
+        """Aplica peso/variação curta ao último produto consultado na sessão."""
+        if not getattr(self, "db", None):
+            return None
+        session = self.db.query(WhatsAppSession).get(session_id)
+        if not session:
+            return None
+        session_context = self._load_session_context(session)
+        pending = session_context.get(CATALOG_SEARCH_CONTEXT_KEY)
+        if not isinstance(pending, dict):
+            return None
+        return _catalog_followup_query(
+            message_content,
+            str(pending.get("query") or ""),
+        )
 
     def _resolve_customer_for_session(self, session: WhatsAppSession):
         try:
@@ -1182,7 +1500,16 @@ class MessageProcessor:
             if brand:
                 session_context.pop("pending_product_clarification", None)
                 self._save_session_context(session, session_context)
-                return None, _gold_catalog_query(original_query, brand), True
+                current_measurements = _extract_explicit_measurements(message_content)
+                detailed_query = " ".join(
+                    [
+                        _remove_explicit_measurements(original_query)
+                        if current_measurements
+                        else original_query,
+                        *current_measurements,
+                    ]
+                )
+                return None, _gold_catalog_query(detailed_query, brand), True
 
             confirmation = _confirmation_reply(message_content)
             if confirmation is True and product_name:
@@ -1227,7 +1554,16 @@ class MessageProcessor:
                 original_query = str(pending.get("original_query") or "ração Gold")
                 session_context.pop("pending_product_clarification", None)
                 self._save_session_context(session, session_context)
-                return None, _gold_catalog_query(original_query, brand), True
+                current_measurements = _extract_explicit_measurements(message_content)
+                detailed_query = " ".join(
+                    [
+                        _remove_explicit_measurements(original_query)
+                        if current_measurements
+                        else original_query,
+                        *current_measurements,
+                    ]
+                )
+                return None, _gold_catalog_query(detailed_query, brand), True
 
             original_query = str(pending.get("original_query") or "ração Gold")
             return (
@@ -1418,7 +1754,15 @@ class MessageProcessor:
             if image_catalog_query:
                 message_content = image_catalog_query
 
-            product_choice_query = _product_query_from_choice_phrase(message_content)
+            catalog_followup_query = self._resolve_catalog_followup(
+                session_id, message_content
+            )
+            if catalog_followup_query:
+                message_content = catalog_followup_query
+
+            product_choice_query = _product_query_from_choice_phrase(
+                _strip_audio_marker(message_content)
+            )
             if product_choice_query:
                 message_content = product_choice_query
 
@@ -1433,7 +1777,10 @@ class MessageProcessor:
             if clarification_result:
                 return clarification_result
             product_query_resolved = bool(
-                product_query_resolved or image_catalog_query or product_choice_query
+                product_query_resolved
+                or image_catalog_query
+                or catalog_followup_query
+                or product_choice_query
             )
 
             # 1. Construir contexto
@@ -1601,6 +1948,8 @@ class MessageProcessor:
             context=context,
             session_id=session_id,
         )
+        result = _filter_unavailable_catalog_products(result)
+        self._remember_catalog_search(session_id, catalog_query, result)
 
         return await self._send_response(
             session_id=session_id,
@@ -1639,6 +1988,9 @@ class MessageProcessor:
                 arguments["termo"] = _preserve_explicit_measurements(
                     str(arguments.get("termo") or "produto"), messages
                 )
+                # A categoria sugerida pela IA pode não refletir a categoria
+                # cadastrada no ERP e já ocultou embalagens exatas no piloto.
+                arguments.pop("categoria", None)
 
             # Executar function
             result = await self._execute_function(
@@ -1647,6 +1999,8 @@ class MessageProcessor:
                 context=context,
                 session_id=session_id,
             )
+            if function_name == "buscar_produto":
+                result = _filter_unavailable_catalog_products(result)
             product_media.extend(_extract_product_media(result))
             if function_name == "buscar_produto" and isinstance(result, dict):
                 catalog_result = result
@@ -1662,6 +2016,7 @@ class MessageProcessor:
             )
 
         if catalog_result is not None:
+            self._remember_catalog_search(session_id, catalog_query, catalog_result)
             return await self._send_response(
                 session_id=session_id,
                 response=_build_catalog_response(catalog_result, catalog_query),

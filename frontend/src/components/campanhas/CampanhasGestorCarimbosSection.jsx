@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 
 import CampanhasGestorSection from "./CampanhasGestorSection";
+import useShiftRangeSelection from "../../hooks/useShiftRangeSelection";
 
 export default function CampanhasGestorCarimbosSection({
   gestorSaldo,
@@ -53,11 +54,11 @@ export default function CampanhasGestorCarimbosSection({
     setCarimbosSelecionados(todosVisiveisSelecionados ? [] : idsSelecionaveis);
   };
 
-  const alternarCarimbo = (stampId) => {
-    setCarimbosSelecionados((atuais) =>
-      atuais.includes(stampId) ? atuais.filter((id) => id !== stampId) : [...atuais, stampId],
-    );
-  };
+  const alternarCarimbo = useShiftRangeSelection({
+    isItemSelectable: (stamp) => !stamp.voided_at,
+    items: carimbosVisiveis,
+    setSelectedIds: setCarimbosSelecionados,
+  });
 
   const removerSelecionados = async () => {
     const ok = await estornarCarimbosSelecionadosGestor(selecionadosVisiveis);
@@ -209,7 +210,7 @@ export default function CampanhasGestorCarimbosSection({
                         <input
                           type="checkbox"
                           checked={carimbosSelecionados.includes(stamp.id)}
-                          onChange={() => alternarCarimbo(stamp.id)}
+                          onChange={(event) => alternarCarimbo(stamp.id, event)}
                           disabled={Boolean(stamp.voided_at) || removendoLote}
                           className="rounded"
                           aria-label={`Selecionar carimbo ${stamp.id}`}

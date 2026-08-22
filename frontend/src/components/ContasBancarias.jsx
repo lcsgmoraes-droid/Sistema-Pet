@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import api from "../api";
 import { getGuiaClassNames } from "../utils/guiaHighlight";
+import { confirmarCorePet } from "../services/corepetDialog";
 
 const TIPOS_CONTA = [
   { value: "banco", label: "Banco", icon: Building2, cor_padrao: "#dc2626" },
@@ -219,7 +220,7 @@ function ContasBancarias() {
   };
 
   const excluirConta = async (id) => {
-    if (!confirm("Deseja realmente excluir esta conta?")) return;
+    if (!await confirmarCorePet("Deseja realmente excluir esta conta?")) return;
 
     try {
       await api.delete(`/contas-bancarias/${id}`);

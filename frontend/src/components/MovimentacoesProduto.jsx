@@ -28,6 +28,8 @@ import VendasPorCanalPanel from "./estoque/VendasPorCanalPanel";
 import { useMovimentacoesProdutoGranel } from "./estoque/useMovimentacoesProdutoGranel";
 import useMovimentacoesProdutoListagem from "./estoque/useMovimentacoesProdutoListagem";
 import { useModulos } from "../contexts/ModulosContext";
+import { confirmarCorePet } from "../services/corepetDialog";
+import useShiftRangeSelection from "../hooks/useShiftRangeSelection";
 
 export default function MovimentacoesProduto() {
   const { id } = useParams();
@@ -260,13 +262,10 @@ export default function MovimentacoesProduto() {
     }
   };
 
-  const handleSelectOne = (id) => {
-    if (selectedIds.includes(id)) {
-      setSelectedIds(selectedIds.filter((sid) => sid !== id));
-    } else {
-      setSelectedIds([...selectedIds, id]);
-    }
-  };
+  const handleSelectOne = useShiftRangeSelection({
+    items: movimentacoes,
+    setSelectedIds,
+  });
 
   const handleDelete = async () => {
     if (selectedIds.length === 0) {
@@ -274,7 +273,7 @@ export default function MovimentacoesProduto() {
       return;
     }
 
-    if (!confirm(`Deseja realmente excluir ${selectedIds.length} lançamento(s)?`)) {
+    if (!await confirmarCorePet(`Deseja realmente excluir ${selectedIds.length} lançamento(s)?`)) {
       return;
     }
 
@@ -508,12 +507,16 @@ export default function MovimentacoesProduto() {
       return;
     }
 
-    setTipoLancamento(produtoEhGranel ? "balanco" : "entrada");
-    setShowModal(true);
+    abrirModal(produtoEhGranel ? "balanco" : "entrada");
+  };
+
+  const fecharModalLancamento = () => {
+    setShowModal(false);
+    setEditingMovimentacao(null);
   };
 
   return (
-    <div className="mx-auto max-w-7xl space-y-4 p-4">
+    <div className="mx-auto max-w-[1440px] space-y-4 p-4">
       <MovimentacoesProdutoHeader
         abrirModalReservas={abrirModalReservas}
         estoqueAtual={estoqueAtual}
@@ -605,7 +608,7 @@ export default function MovimentacoesProduto() {
         nomeGranelSelecionado={nomeGranelSelecionado}
         observacaoGranel={observacaoGranel}
         onCloseGranel={() => setShowGranelModal(false)}
-        onCloseLancamento={() => setShowModal(false)}
+        onCloseLancamento={fecharModalLancamento}
         onCloseReservas={() => setShowReservasModal(false)}
         precoMinimoEsperadoGranel={precoMinimoEsperadoGranel}
         precoVendaAtualGranel={precoVendaAtualGranel}

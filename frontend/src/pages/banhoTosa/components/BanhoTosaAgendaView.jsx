@@ -12,6 +12,7 @@ import { banhoTosaApi } from "../banhoTosaApi";
 import { getApiErrorMessage, toApiDecimal } from "../banhoTosaUtils";
 import BanhoTosaAgendaCriacaoPanel from "./BanhoTosaAgendaCriacaoPanel";
 import BanhoTosaAgendaList from "./BanhoTosaAgendaList";
+import { confirmarCorePet } from "../../../services/corepetDialog";
 const todayIso = () => new Date().toISOString().slice(0, 10);
 const criarFormularioInicial = () => ({
   pet_id: "",
@@ -260,7 +261,7 @@ export default function BanhoTosaAgendaView({ recursos = [], servicos, onChanged
   }
 
   async function cancelar(agendamento) {
-    const confirmou = window.confirm(
+    const confirmou = await confirmarCorePet(
       `Cancelar o agendamento de ${agendamento.pet_nome || "este pet"}?`,
     );
     if (!confirmou) return;

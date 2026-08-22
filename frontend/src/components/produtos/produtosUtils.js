@@ -6,6 +6,28 @@ export const normalizeSearchText = (value) => {
     .replaceAll(/[\u0300-\u036f]/g, "");
 };
 
+export const normalizeExpandId = (value) => String(value ?? "");
+
+export const isExpandIdSelected = (expandedIds, value) => {
+  const normalizedId = normalizeExpandId(value);
+  return (expandedIds || []).some((id) => normalizeExpandId(id) === normalizedId);
+};
+
+export const getKitCompositionFromResponse = (response) => {
+  const data = response?.data ?? response;
+  return Array.isArray(data?.composicao_kit) ? data.composicao_kit : [];
+};
+
+export const getKitComponentAvailableStock = (component) => {
+  const stock =
+    component?.estoque_disponivel ?? component?.estoque_componente ?? component?.produto_estoque;
+
+  if (stock === null || stock === undefined) return null;
+
+  const normalizedStock = Number(stock);
+  return Number.isFinite(normalizedStock) ? normalizedStock : null;
+};
+
 export const corrigirTextoQuebrado = (value) => {
   if (value === null || value === undefined) return "";
 

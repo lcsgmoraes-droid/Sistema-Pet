@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.auth.dependencies import get_current_user_and_tenant
 from app.db import get_session
-from app.models import Tenant
+from app.models import ConfiguracaoEntrega, Tenant
 from app.security.permissions_decorator import require_permission
 
 router = APIRouter(prefix="/ecommerce-config", tags=["ecommerce-config"])
@@ -67,7 +67,9 @@ class EcommerceConfigUpdate(BaseModel):
 _CONFIG_FIELDS = tuple(EcommerceConfigResponse.model_fields)
 
 
-def _serialize_config(tenant: Tenant) -> EcommerceConfigResponse:
+def _serialize_config(
+    tenant: Tenant, delivery_config: ConfiguracaoEntrega | None = None
+) -> EcommerceConfigResponse:
     values = {field: getattr(tenant, field, None) for field in _CONFIG_FIELDS}
     values.update(
         {
@@ -90,6 +92,25 @@ def _serialize_config(tenant: Tenant) -> EcommerceConfigResponse:
         values["ecommerce_frete_gratis_acima"] = float(
             tenant.ecommerce_frete_gratis_acima
         )
+    if delivery_config:
+        values.update(
+            {
+                "ecommerce_entrega_ativa": bool(delivery_config.entrega_ativa),
+                "ecommerce_retirada_ativa": bool(delivery_config.retirada_ativa),
+                "ecommerce_taxa_entrega": (
+                    float(delivery_config.taxa_fixa or 0)
+                    if delivery_config.modalidade_cobranca == "fixa"
+                    else 0
+                ),
+                "ecommerce_frete_gratis_acima": (
+                    float(delivery_config.frete_gratis_acima)
+                    if delivery_config.frete_gratis_acima is not None
+                    else None
+                ),
+                "ecommerce_pedido_minimo": float(delivery_config.pedido_minimo or 0),
+                "ecommerce_prazo_entrega_texto": delivery_config.prazo_entrega_texto,
+            }
+        )
     return EcommerceConfigResponse(**values)
 
 
@@ -107,7 +128,12 @@ def buscar_config(
     tenant = db.query(Tenant).filter(Tenant.id == tenant_id).first()
     if not tenant:
         raise HTTPException(status_code=404, detail="Tenant não encontrado")
-    return _serialize_config(tenant)
+    delivery_config = (
+        db.query(ConfiguracaoEntrega)
+        .filter(ConfiguracaoEntrega.tenant_id == tenant_id)
+        .first()
+    )
+    return _serialize_config(tenant, delivery_config)
 
 
 @router.put("", response_model=EcommerceConfigResponse)
@@ -118,7 +144,7 @@ def atualizar_config(
     db: Session = Depends(get_session),
 ):
     """Atualiza as configurações da loja virtual do tenant."""
-    _, tenant_id = user_and_tenant
+    current_user, tenant_id = user_and_tenant
     tenant = db.query(Tenant).filter(Tenant.id == tenant_id).first()
     if not tenant:
         raise HTTPException(status_code=404, detail="Tenant não encontrado")
@@ -129,7 +155,34 @@ def atualizar_config(
             value = value.strip() or None
         setattr(tenant, field, value)
 
+    delivery_field_map = {
+        "ecommerce_entrega_ativa": "entrega_ativa",
+        "ecommerce_retirada_ativa": "retirada_ativa",
+        "ecommerce_taxa_entrega": "taxa_fixa",
+        "ecommerce_frete_gratis_acima": "frete_gratis_acima",
+        "ecommerce_pedido_minimo": "pedido_minimo",
+        "ecommerce_prazo_entrega_texto": "prazo_entrega_texto",
+    }
+    delivery_fields = body.model_fields_set.intersection(delivery_field_map)
+    delivery_config = None
+    if delivery_fields:
+        delivery_config = (
+            db.query(ConfiguracaoEntrega)
+            .filter(ConfiguracaoEntrega.tenant_id == tenant_id)
+            .first()
+        )
+        if not delivery_config:
+            delivery_config = ConfiguracaoEntrega(
+                tenant_id=tenant_id,
+                user_id=current_user.id,
+            )
+            db.add(delivery_config)
+        for field in delivery_fields:
+            setattr(delivery_config, delivery_field_map[field], getattr(body, field))
+        if "ecommerce_taxa_entrega" in delivery_fields:
+            delivery_config.modalidade_cobranca = "fixa"
+
     db.commit()
     db.refresh(tenant)
 
-    return _serialize_config(tenant)
+    return _serialize_config(tenant, delivery_config)

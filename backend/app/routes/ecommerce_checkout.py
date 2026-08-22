@@ -23,6 +23,7 @@ from app.routes.ecommerce_checkout_support import (
     _checkout_idempotency_payload,
     _classificar_forma_pagamento_online as _classificar_forma_pagamento_online,
     _current_identity,
+    _delivery_context,
     _expirar_reservas_automaticamente,
     _frete_local_por_cidade,
     _gerar_palavra_chave_retirada,
@@ -32,6 +33,7 @@ from app.routes.ecommerce_checkout_support import (
     _resolver_origem_checkout,
     _validar_forma_pagamento_online,
 )
+from app.services.delivery_quote_service import resolve_delivery_policy
 from app.services.ecommerce_payment_config import get_active_mercado_pago_runtime_config
 from app.services.customer_order_history import list_customer_order_history
 from app.services.mercado_pago_checkout import (
@@ -201,12 +203,14 @@ def calcular_frete_local(
         tenant_id,
         payload.cidade_destino,
         subtotal=payload.subtotal,
+        endereco_entrega=payload.endereco_entrega,
     )
 
 
 @router.get("/resumo")
 def resumo_checkout(
     cidade_destino: str = Query(..., min_length=2),
+    endereco_entrega: str | None = Query(default=None),
     cupom: str | None = Query(default=None),
     tipo_retirada: str | None = Query(default=None),
     identity: EcommerceIdentity = Depends(_current_identity),
@@ -228,9 +232,13 @@ def resumo_checkout(
         )
 
     subtotal = round(sum(float(item.subtotal or 0.0) for item in itens), 2)
-    tenant = db.query(Tenant).filter(Tenant.id == tenant_id).first()
-    pedido_minimo = float(getattr(tenant, "ecommerce_pedido_minimo", 0) or 0)
-    if subtotal < pedido_minimo:
+    cupom_codigo, cupom_percentual, desconto = _calcular_desconto(subtotal, cupom)
+    subtotal_elegivel = round(max(subtotal - desconto, 0.0), 2)
+    delivery_context = _delivery_context(db, tenant_id)
+    config, tenant = delivery_context
+    policy = resolve_delivery_policy(config, tenant)
+    pedido_minimo = float(policy["pedido_minimo"] or 0)
+    if subtotal_elegivel < pedido_minimo:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Pedido mínimo para esta loja: R$ {pedido_minimo:.2f}".replace(
@@ -238,7 +246,7 @@ def resumo_checkout(
             ),
         )
     if tipo_retirada in ("proprio", "terceiro", "app_loja"):
-        if getattr(tenant, "ecommerce_retirada_ativa", True) is False:
+        if not policy["retirada_ativa"]:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Retirada na loja está desativada. Escolha entrega.",
@@ -250,15 +258,20 @@ def resumo_checkout(
             "tipo": "retirada",
             "cidade_loja": tenant.cidade,
             "cidade_destino": cidade_destino,
+            "modalidade_cobranca": "retirada",
+            "distancia_km": None,
+            "valor_por_km": None,
+            "frete_gratis_aplicado": False,
         }
     else:
         frete = _frete_local_por_cidade(
             db,
             tenant_id,
             cidade_destino,
-            subtotal=subtotal,
+            subtotal=subtotal_elegivel,
+            endereco_entrega=endereco_entrega,
+            delivery_context=delivery_context,
         )
-    cupom_codigo, cupom_percentual, desconto = _calcular_desconto(subtotal, cupom)
     total = round(max(subtotal - desconto, 0.0) + float(frete["valor_frete"]), 2)
 
     return {
@@ -358,8 +371,15 @@ def finalizar_checkout(
         )
 
     subtotal = round(sum(float(item.subtotal or 0.0) for item in itens), 2)
-    pedido_minimo = float(getattr(tenant, "ecommerce_pedido_minimo", 0) or 0)
-    if subtotal < pedido_minimo:
+    cupom_codigo, cupom_percentual, desconto = _calcular_desconto(
+        subtotal, payload.cupom
+    )
+    subtotal_elegivel = round(max(subtotal - desconto, 0.0), 2)
+    delivery_context = _delivery_context(db, tenant_id)
+    config, delivery_tenant = delivery_context
+    policy = resolve_delivery_policy(config, delivery_tenant or tenant)
+    pedido_minimo = float(policy["pedido_minimo"] or 0)
+    if subtotal_elegivel < pedido_minimo:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Pedido mínimo para esta loja: R$ {pedido_minimo:.2f}".replace(
@@ -369,7 +389,7 @@ def finalizar_checkout(
 
     # Retirada na loja (próprio, terceiro ou app_loja): não valida frete por cidade
     if payload.tipo_retirada in ("proprio", "terceiro", "app_loja"):
-        if getattr(tenant, "ecommerce_retirada_ativa", True) is False:
+        if not policy["retirada_ativa"]:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Retirada na loja está desativada. Escolha entrega.",
@@ -381,22 +401,39 @@ def finalizar_checkout(
             "tipo": "retirada",
             "cidade_loja": None,
             "cidade_destino": payload.cidade_destino,
+            "modalidade_cobranca": "retirada",
+            "distancia_km": None,
+            "valor_por_km": None,
+            "frete_gratis_aplicado": False,
         }
     else:
+        if not str(payload.endereco_entrega or "").strip():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Informe o endereco completo para entrega.",
+            )
         frete = _frete_local_por_cidade(
             db,
             tenant_id,
             payload.cidade_destino,
-            subtotal=subtotal,
+            subtotal=subtotal_elegivel,
+            endereco_entrega=payload.endereco_entrega,
+            delivery_context=delivery_context,
         )
-
-    cupom_codigo, cupom_percentual, desconto = _calcular_desconto(
-        subtotal, payload.cupom
-    )
     total = round(max(subtotal - desconto, 0.0) + float(frete["valor_frete"]), 2)
 
     carrinho.total = total
     carrinho.status = "pendente"
+    carrinho.endereco_entrega = (
+        payload.endereco_entrega
+        if payload.tipo_retirada not in ("proprio", "terceiro", "app_loja")
+        else None
+    )
+    carrinho.frete_valor = float(frete["valor_frete"] or 0)
+    carrinho.frete_distancia_km = frete.get("distancia_km")
+    carrinho.frete_valor_por_km = frete.get("valor_por_km")
+    carrinho.frete_modalidade = frete.get("modalidade_cobranca")
+    carrinho.frete_gratis_aplicado = bool(frete.get("frete_gratis_aplicado"))
 
     # Tipo de retirada e palavra-chave para terceiro retirar
     tipo_retirada = payload.tipo_retirada  # 'proprio' | 'terceiro' | 'app_loja' | None
@@ -561,6 +598,12 @@ def consultar_status_pedido(
         if pedido.drive_entregue_at
         else None,
         "palavra_chave_retirada": pedido.palavra_chave_retirada,
+        "endereco_entrega": pedido.endereco_entrega,
+        "frete_valor": float(pedido.frete_valor or 0),
+        "frete_distancia_km": pedido.frete_distancia_km,
+        "frete_valor_por_km": pedido.frete_valor_por_km,
+        "frete_modalidade": pedido.frete_modalidade,
+        "frete_gratis_aplicado": bool(pedido.frete_gratis_aplicado),
         "payment_provider": payment_info["payment_provider"],
         "payment_preference_id": payment_info["payment_preference_id"],
         "payment_url": payment_info["payment_url"],

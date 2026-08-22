@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { X, Plus, Edit2, Trash2, Play } from "lucide-react";
 import api from "../api";
+import { confirmarCorePet, perguntarCorePet } from "../services/corepetDialog";
 
 const ModalLancamentosRecorrentes = ({ isOpen, onClose, onSave }) => {
   const [lancamentos, setLancamentos] = useState([]);
@@ -108,7 +109,7 @@ const ModalLancamentosRecorrentes = ({ isOpen, onClose, onSave }) => {
   };
 
   const handleExcluir = async (id) => {
-    if (!confirm("Deseja realmente excluir este lançamento recorrente?")) return;
+    if (!await confirmarCorePet("Deseja realmente excluir este lançamento recorrente?")) return;
 
     try {
       await api.delete(`/lancamentos/recorrentes/${id}`);
@@ -122,7 +123,7 @@ const ModalLancamentosRecorrentes = ({ isOpen, onClose, onSave }) => {
   };
 
   const handleGerarParcelas = async (id, descricao) => {
-    const meses = prompt(`Quantos meses deseja gerar para "${descricao}"?`, "3");
+    const meses = await perguntarCorePet(`Quantos meses deseja gerar para "${descricao}"?`, "3");
     if (!meses || isNaN(parseInt(meses))) return;
 
     setLoading(true);

@@ -64,7 +64,9 @@ export default function PDVEnderecoModal({
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">CEP *</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                CEP (opcional)
+              </label>
               <div className="relative">
                 <input
                   type="text"

@@ -3,6 +3,7 @@ import { useCallback } from "react";
 import { buildConsultaPayloadFromAgendamento } from "../fluxoConsultaAgendamentoUtils";
 import { vetApi } from "../vetApi";
 import { normalizarTipoAgendamento } from "./agendaUtils";
+import { confirmarCorePet } from "../../../services/corepetDialog";
 
 export function useAgendaGerenciamentoAcoes({
   agendamentoSelecionado,
@@ -101,7 +102,7 @@ export function useAgendaGerenciamentoAcoes({
 
   const excluirAgendamentoSelecionado = useCallback(async () => {
     if (!agendamentoSelecionado?.id) return;
-    const confirmado = window.confirm("Deseja excluir este agendamento?");
+    const confirmado = await confirmarCorePet("Deseja excluir este agendamento?");
     if (!confirmado) return;
     setProcessandoAgendamentoId(agendamentoSelecionado.id);
     setErro(null);

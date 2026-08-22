@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { vetApi } from "../vetApi";
 import { calcularTotaisRepasse, periodoInicial } from "./repasseUtils";
+import { confirmarCorePet } from "../../../services/corepetDialog";
 
 export function useVetRepasse() {
   const periodo = periodoInicial();
@@ -38,7 +39,7 @@ export function useVetRepasse() {
 
   const darBaixa = useCallback(
     async (contaId) => {
-      const confirmado = window.confirm(
+      const confirmado = await confirmarCorePet(
         "Confirmar o recebimento integral deste lançamento na data de hoje?",
       );
       if (!confirmado) return;
@@ -57,7 +58,7 @@ export function useVetRepasse() {
 
   const estornarBaixa = useCallback(
     async (contaId) => {
-      const confirmado = window.confirm(
+      const confirmado = await confirmarCorePet(
         "Estornar esta baixa? O lançamento voltará para o status pendente.",
       );
       if (!confirmado) return;

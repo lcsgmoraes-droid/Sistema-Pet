@@ -1,7 +1,7 @@
-import * as SecureStore from 'expo-secure-store';
-import { Linking } from 'react-native';
-import { create } from 'zustand';
-import { API_BASE_URL } from '../config';
+import * as SecureStore from "expo-secure-store";
+import { Linking } from "react-native";
+import { create } from "zustand";
+import { API_BASE_URL } from "../config";
 
 export interface TenantInfo {
   id: string;
@@ -16,6 +16,12 @@ export interface TenantInfo {
   cidade: string | null;
   uf: string | null;
   distancia_km?: number | null;
+  ecommerce_entrega_ativa?: boolean;
+  ecommerce_retirada_ativa?: boolean;
+  ecommerce_taxa_entrega?: number;
+  ecommerce_frete_gratis_acima?: number | null;
+  ecommerce_pedido_minimo?: number;
+  ecommerce_prazo_entrega_texto?: string | null;
 }
 
 interface TenantState {
@@ -24,7 +30,10 @@ interface TenantState {
   loadTenant: () => Promise<void>;
   buscarPorSlug: (slug: string) => Promise<TenantInfo>;
   buscarPorNome: (nome: string) => Promise<TenantInfo[]>;
-  buscarPorLocalidade: (cidade: string, uf?: string | null) => Promise<TenantInfo[]>;
+  buscarPorLocalidade: (
+    cidade: string,
+    uf?: string | null,
+  ) => Promise<TenantInfo[]>;
   buscarProximas: (
     latitude: number,
     longitude: number,
@@ -35,80 +44,88 @@ interface TenantState {
   limparTenant: () => Promise<void>;
 }
 
-const STORAGE_KEY = 'tenant_info';
+const STORAGE_KEY = "tenant_info";
 
 function apiPublicBaseUrl(): string {
-  return API_BASE_URL.replace(/\/api\/?$/, '').replace(/\/$/, '');
+  return API_BASE_URL.replace(/\/api\/?$/, "").replace(/\/$/, "");
 }
 
 export function resolveTenantAssetUrl(url?: string | null): string | null {
   if (!url) return null;
   if (/^https?:\/\//i.test(url)) return url;
-  return `${apiPublicBaseUrl()}${url.startsWith('/') ? '' : '/'}${url}`;
+  return `${apiPublicBaseUrl()}${url.startsWith("/") ? "" : "/"}${url}`;
 }
 
 export function extractStoreSlug(input: string): string {
   const raw = input.trim().toLowerCase();
-  if (!raw) return '';
+  if (!raw) return "";
 
   try {
     const url = new URL(raw);
     const querySlug =
-      url.searchParams.get('loja') ||
-      url.searchParams.get('slug') ||
-      url.searchParams.get('tenant') ||
-      url.searchParams.get('store');
+      url.searchParams.get("loja") ||
+      url.searchParams.get("slug") ||
+      url.searchParams.get("tenant") ||
+      url.searchParams.get("store");
 
     if (querySlug) return sanitizeSlug(querySlug);
 
     const segments = url.pathname
-      .split('/')
+      .split("/")
       .map((segment) => segment.trim())
       .filter(Boolean);
     return sanitizeSlug(firstUsefulSegment(segments));
   } catch {
-    const [, queryString = ''] = raw.split('?');
+    const [, queryString = ""] = raw.split("?");
     const queryParams = new URLSearchParams(queryString);
     const querySlug =
-      queryParams.get('loja') ||
-      queryParams.get('slug') ||
-      queryParams.get('tenant') ||
-      queryParams.get('store');
+      queryParams.get("loja") ||
+      queryParams.get("slug") ||
+      queryParams.get("tenant") ||
+      queryParams.get("store");
 
     if (querySlug) return sanitizeSlug(querySlug);
 
     const withoutProtocol = raw
-      .replace(/^(?:[a-z]+:\/\/)?[^/\s]+\.[^/\s]+\/?/i, '')
-      .replace(/^\//, '');
-    const [withoutQuery] = withoutProtocol.split('?');
-    return sanitizeSlug(firstUsefulSegment(withoutQuery.split('/').filter(Boolean)) || withoutQuery);
+      .replace(/^(?:[a-z]+:\/\/)?[^/\s]+\.[^/\s]+\/?/i, "")
+      .replace(/^\//, "");
+    const [withoutQuery] = withoutProtocol.split("?");
+    return sanitizeSlug(
+      firstUsefulSegment(withoutQuery.split("/").filter(Boolean)) ||
+        withoutQuery,
+    );
   }
 }
 
 function firstUsefulSegment(segments: string[]): string {
-  const reserved = new Set(['loja', 'store', 'ecommerce', 'app', 'tenant']);
+  const reserved = new Set(["loja", "store", "ecommerce", "app", "tenant"]);
   return (
     segments.find((segment) => !reserved.has(segment.toLowerCase())) ||
     segments[segments.length - 1] ||
-    ''
+    ""
   );
 }
 
 function sanitizeSlug(value: string): string {
-  return value.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '');
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9_-]/g, "");
 }
 
 async function fetchTenantBySlug(slug: string): Promise<TenantInfo> {
   const slugLimpo = extractStoreSlug(slug);
   if (!slugLimpo) {
-    throw new Error('Informe o codigo ou QR Code da loja.');
+    throw new Error("Informe o codigo ou QR Code da loja.");
   }
 
-  const response = await fetch(`${apiPublicBaseUrl()}/api/ecommerce/tenant-slug/${slugLimpo}`);
+  const response = await fetch(
+    `${apiPublicBaseUrl()}/api/ecommerce/tenant-slug/${slugLimpo}`,
+  );
 
   if (!response.ok) {
     const body = await response.json().catch(() => ({}));
-    throw new Error(body.detail || 'Loja nao encontrada. Verifique o codigo.');
+    throw new Error(body.detail || "Loja nao encontrada. Verifique o codigo.");
   }
 
   return response.json();
@@ -129,7 +146,7 @@ export const useTenantStore = create<TenantState>()((set) => ({
       }
 
       const initialUrl = await Linking.getInitialURL().catch(() => null);
-      const slugInicial = initialUrl ? extractStoreSlug(initialUrl) : '';
+      const slugInicial = initialUrl ? extractStoreSlug(initialUrl) : "";
       if (slugInicial) {
         const tenant = await fetchTenantBySlug(slugInicial);
         await SecureStore.setItemAsync(STORAGE_KEY, JSON.stringify(tenant));
@@ -150,7 +167,7 @@ export const useTenantStore = create<TenantState>()((set) => ({
     const nomeLimpo = nome.trim();
     if (nomeLimpo.length < 2) return [];
 
-    const params = new URLSearchParams({ q: nomeLimpo, limit: '20' });
+    const params = new URLSearchParams({ q: nomeLimpo, limit: "20" });
     const response = await fetch(
       `${apiPublicBaseUrl()}/api/ecommerce/tenants/buscar?${params.toString()}`,
     );
@@ -165,9 +182,11 @@ export const useTenantStore = create<TenantState>()((set) => ({
     if (!cidadeLimpa) return [];
 
     const params = new URLSearchParams({ cidade: cidadeLimpa });
-    if (uf?.trim()) params.set('uf', uf.trim().slice(0, 2).toUpperCase());
+    if (uf?.trim()) params.set("uf", uf.trim().slice(0, 2).toUpperCase());
 
-    const response = await fetch(`${apiPublicBaseUrl()}/api/ecommerce/tenants/sugerir?${params.toString()}`);
+    const response = await fetch(
+      `${apiPublicBaseUrl()}/api/ecommerce/tenants/sugerir?${params.toString()}`,
+    );
     if (!response.ok) return [];
 
     const data = await response.json().catch(() => ({ lojas: [] }));
@@ -178,10 +197,10 @@ export const useTenantStore = create<TenantState>()((set) => ({
     const params = new URLSearchParams({
       latitude: String(latitude),
       longitude: String(longitude),
-      limit: '8',
+      limit: "8",
     });
-    if (cidade?.trim()) params.set('cidade', cidade.trim());
-    if (uf?.trim()) params.set('uf', uf.trim().slice(0, 2).toUpperCase());
+    if (cidade?.trim()) params.set("cidade", cidade.trim());
+    if (uf?.trim()) params.set("uf", uf.trim().slice(0, 2).toUpperCase());
 
     const response = await fetch(
       `${apiPublicBaseUrl()}/api/ecommerce/tenants/sugerir?${params.toString()}`,

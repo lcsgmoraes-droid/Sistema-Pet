@@ -6,6 +6,7 @@ import PedidoBlingCampoInfo from "./PedidoBlingCampoInfo";
 import PedidoBlingLinhaItem from "./PedidoBlingLinhaItem";
 import PedidoBlingStatusBadge from "./PedidoBlingStatusBadge";
 import { formatarDataHora, formatarMoeda } from "./pedidoBlingUtils";
+import { confirmarCorePet, perguntarCorePet } from "../../services/corepetDialog";
 
 export default function PedidoBlingCard({
   pedido,
@@ -32,7 +33,7 @@ export default function PedidoBlingCard({
   const retornoEstoque = pedido.retorno_estoque || {};
 
   async function handleConfirmar() {
-    const confirmou = window.confirm(
+    const confirmou = await confirmarCorePet(
       `Confirmar pedido Bling #${pedido.pedido_bling_numero || pedido.pedido_bling_id}?\nIsso vai apenas confirmar o pedido no sistema. A venda sera consolidada somente quando houver NF.`,
     );
     if (!confirmou) return;
@@ -57,7 +58,7 @@ export default function PedidoBlingCard({
   }
 
   async function handleCancelar() {
-    const confirmou = window.confirm(
+    const confirmou = await confirmarCorePet(
       `Cancelar pedido #${pedido.pedido_bling_numero || pedido.pedido_bling_id}?\nAs reservas de estoque serao liberadas.`,
     );
     if (!confirmou) return;
@@ -94,7 +95,7 @@ export default function PedidoBlingCard({
 
   async function handleSolicitarCancelamentoNF() {
     const reenviar = ["erro", "solicitado"].includes(cancelamentoNF.status);
-    const confirmou = window.confirm(
+    const confirmou = await confirmarCorePet(
       `${reenviar ? "Reenviar" : "Solicitar"} o cancelamento da NF #${
         notaFiscal.numero || notaFiscal.id
       } ao Bling?\n\nO estoque nao sera alterado por esta acao.`,
@@ -111,14 +112,14 @@ export default function PedidoBlingCard({
 
   async function handleDecidirRetornoEstoque(acaoEstoque) {
     const vaiRetornar = acaoEstoque === "retornar";
-    const confirmou = window.confirm(
+    const confirmou = await confirmarCorePet(
       vaiRetornar
         ? "Confirma que os produtos voltaram fisicamente e podem ser somados ao estoque?"
         : "Confirma que os produtos nao retornaram? O saldo continuara baixado.",
     );
     if (!confirmou) return;
 
-    const motivo = window.prompt(
+    const motivo = await perguntarCorePet(
       vaiRetornar
         ? "Informe o motivo ou a conferencia realizada:"
         : "Informe por que o produto nao retornou (danificado, item errado, nao devolvido etc.):",

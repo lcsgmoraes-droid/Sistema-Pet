@@ -8,10 +8,12 @@ import CorePetDialogHost from "./components/ui/CorePetDialogHost";
 import { AuthProvider } from "./contexts/AuthContext";
 import { ModulosProvider } from "./contexts/ModulosContext";
 import { ThemeProvider } from "./theme/ThemeContext";
+import { instalarProtecaoRodaInputsNumericos } from "./utils/numberInputWheel";
 
 function App() {
   useEffect(() => {
     const alertaNativo = window.alert;
+    const removerProtecaoRoda = instalarProtecaoRodaInputsNumericos();
 
     window.alert = (mensagem) => {
       const texto = String(mensagem ?? "").trim() || "Operação concluída.";
@@ -32,6 +34,7 @@ function App() {
 
     return () => {
       window.alert = alertaNativo;
+      removerProtecaoRoda();
     };
   }, []);
 

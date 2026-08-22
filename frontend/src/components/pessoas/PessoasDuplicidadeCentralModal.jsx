@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertTriangle,
   ChevronLeft,
@@ -11,6 +11,10 @@ import {
 } from "lucide-react";
 import ActionButton from "../ui/ActionButton";
 import { motivoDuplicidadeLabel } from "./PessoasDuplicidadeBanner";
+import {
+  applyShiftRangeSelection,
+  getShiftSelectionEvent,
+} from "../../utils/shiftRangeSelection";
 
 function chaveSugestao(sugestao) {
   return `${sugestao?.principal?.id || "principal"}:${sugestao?.duplicado?.id || "duplicado"}`;
@@ -55,6 +59,7 @@ export default function PessoasDuplicidadeCentralModal({
   onFundirAssistidasNome,
 }) {
   const [selecionadas, setSelecionadas] = useState(() => new Map());
+  const ultimaSugestaoSelecionadaRef = useRef(null);
 
   useEffect(() => {
     if (!isOpen) setSelecionadas(new Map());
@@ -70,14 +75,31 @@ export default function PessoasDuplicidadeCentralModal({
 
   if (!isOpen) return null;
 
-  const alternarSugestao = (sugestao) => {
+  const alternarSugestao = (sugestao, event) => {
     const chave = chaveSugestao(sugestao);
+    const { checked, shiftKey } = getShiftSelectionEvent(event);
+
     setSelecionadas((atual) => {
-      const proxima = new Map(atual);
-      if (proxima.has(chave)) proxima.delete(chave);
-      else proxima.set(chave, sugestao);
-      return proxima;
+      const sugestoesPorChave = new Map(atual);
+      sugestoes.forEach((item) => sugestoesPorChave.set(chaveSugestao(item), item));
+      const proximasChaves = applyShiftRangeSelection({
+        anchorId: ultimaSugestaoSelecionadaRef.current,
+        checked,
+        currentSelection: Array.from(atual.keys()),
+        getItemId: chaveSugestao,
+        itemId: chave,
+        items: sugestoes,
+        shiftKey,
+      });
+
+      return new Map(
+        proximasChaves
+          .map((itemChave) => [itemChave, sugestoesPorChave.get(itemChave)])
+          .filter(([, item]) => Boolean(item)),
+      );
     });
+
+    ultimaSugestaoSelecionadaRef.current = chave;
   };
 
   const alternarPagina = () => {
@@ -196,7 +218,7 @@ export default function PessoasDuplicidadeCentralModal({
                         aria-label={`Selecionar possível duplicidade entre ${sugestao.principal?.nome || "pessoa"} e ${sugestao.duplicado?.nome || "pessoa"}`}
                         checked={selecionada}
                         className="mt-4 h-4 w-4 rounded border-slate-300"
-                        onChange={() => alternarSugestao(sugestao)}
+                        onChange={(event) => alternarSugestao(sugestao, event)}
                         type="checkbox"
                       />
                       <PessoaCompacta

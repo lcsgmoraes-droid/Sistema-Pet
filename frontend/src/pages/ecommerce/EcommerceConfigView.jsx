@@ -1,5 +1,4 @@
 import { AlertCircle, CheckCircle2, CreditCard, ExternalLink, Unplug } from "lucide-react";
-import CurrencyInput from "../../components/CurrencyInput";
 
 export default function EcommerceConfigView({
   loading,
@@ -223,70 +222,24 @@ export default function EcommerceConfigView({
           </div>
         </div>
 
-        <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm space-y-5">
+        <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm space-y-4">
           <div>
             <h2 className="text-base font-semibold text-gray-800">Entrega e retirada</h2>
             <p className="text-sm text-gray-500 mt-1">
-              Estas regras aparecem na loja e são validadas novamente ao fechar o pedido.
+              O aplicativo e o e-commerce agora usam exatamente a mesma regra de frete.
             </p>
           </div>
-          <ToggleSetting
-            configKey="entregaAtiva"
-            label="Entrega local"
-            description="Permite entregar apenas na cidade configurada para a loja."
-          />
-          <ToggleSetting
-            configKey="retiradaAtiva"
-            label="Retirada na loja"
-            description="Permite retirada própria, por terceiro ou pelo app."
-          />
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <label className="text-xs font-medium text-gray-600">
-              Taxa de entrega
-              <CurrencyInput
-                id="ecommerce-delivery-fee"
-                name="delivery_fee"
-                value={commerceConfig.taxaEntrega}
-                onChange={(value) => updateCommerce("taxaEntrega", value)}
-                className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-              />
-            </label>
-            <label className="text-xs font-medium text-gray-600">
-              Frete grátis acima de
-              <CurrencyInput
-                id="ecommerce-free-shipping-threshold"
-                name="free_shipping_threshold"
-                value={commerceConfig.freteGratisAcima}
-                onChange={(value) => updateCommerce("freteGratisAcima", value)}
-                className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-              />
-              <span className="block mt-1 text-[11px] text-gray-400">
-                Deixe 0,00 para não oferecer.
-              </span>
-            </label>
-            <label className="text-xs font-medium text-gray-600">
-              Pedido mínimo
-              <CurrencyInput
-                id="ecommerce-minimum-order"
-                name="minimum_order"
-                value={commerceConfig.pedidoMinimo}
-                onChange={(value) => updateCommerce("pedidoMinimo", value)}
-                className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-              />
-            </label>
+          <div className="rounded-lg border border-blue-100 bg-blue-50 p-4 text-sm text-blue-900">
+            Configure taxa fixa ou preço por km, área máxima, frete grátis, pedido mínimo e prazo em
+            um só lugar. A regra é recalculada pelo servidor antes de criar cada pedido.
           </div>
-          <label className="block text-xs font-medium text-gray-600">
-            Prazo informado ao cliente
-            <input
-              id="ecommerce-delivery-deadline"
-              name="delivery_deadline"
-              value={commerceConfig.prazoEntrega}
-              onChange={(event) => updateCommerce("prazoEntrega", event.target.value)}
-              maxLength={80}
-              placeholder="Ex.: Entrega em até 2 horas"
-              className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-            />
-          </label>
+          <a
+            href="/configuracoes/entregas"
+            className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
+          >
+            Abrir Configurações de Entregas
+            <ExternalLink size={15} />
+          </a>
         </div>
 
         <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm space-y-3">
@@ -498,7 +451,9 @@ export default function EcommerceConfigView({
                 {paymentConfig.oauth_connected && (
                   <div className="rounded-lg border border-emerald-100 bg-white p-3">
                     {paymentAccountLoading ? (
-                      <p className="text-sm text-gray-500">Confirmando a conta no Mercado Pago...</p>
+                      <p className="text-sm text-gray-500">
+                        Confirmando a conta no Mercado Pago...
+                      </p>
                     ) : paymentAccount ? (
                       <div className="space-y-3">
                         <div
@@ -535,7 +490,7 @@ export default function EcommerceConfigView({
                                   Documento
                                 </dt>
                                 <dd className="font-medium text-gray-800">
-                                  {paymentAccount.identification_type.toUpperCase()} final {" "}
+                                  {paymentAccount.identification_type.toUpperCase()} final{" "}
                                   {paymentAccount.identification_last_four}
                                 </dd>
                               </div>

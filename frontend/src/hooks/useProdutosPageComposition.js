@@ -76,6 +76,7 @@ export default function useProdutosPageComposition({
   const { colunasRelatorioProdutos } = reportState;
   const {
     blingActionKey,
+    detalhesKits,
     editandoMargem,
     editandoPreco,
     getCorEstoque,
@@ -104,6 +105,7 @@ export default function useProdutosPageComposition({
     paginaAtual,
     paisExpandidos,
     produtos,
+    recarregarDetalhesKit,
     selecionados,
     setEditandoMargem,
     setNovoPreco,
@@ -121,6 +123,7 @@ export default function useProdutosPageComposition({
       blingBatchLoading,
       categorias,
       copiarTexto,
+      detalhesKits,
       editandoMargem,
       editandoPreco,
       filtrarColunas,
@@ -170,6 +173,7 @@ export default function useProdutosPageComposition({
       persistirBusca,
       produtos,
       produtosColunas: colunasTabela,
+      recarregarDetalhesKit,
       selecionados,
       selecionadosCount,
       setEditandoMargem,

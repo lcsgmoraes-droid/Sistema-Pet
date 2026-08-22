@@ -34,6 +34,12 @@ def test_build_checkout_history_entry_preserves_app_channel_and_items():
         is_drive=False,
         drive_chegou_at=None,
         drive_entregue_at=None,
+        endereco_entrega="Rua do Cliente, 10",
+        frete_valor=8.5,
+        frete_distancia_km=4.25,
+        frete_valor_por_km=2,
+        frete_modalidade="por_km",
+        frete_gratis_aplicado=False,
     )
     item = SimpleNamespace(
         produto_id=7,
@@ -59,6 +65,8 @@ def test_build_checkout_history_entry_preserves_app_channel_and_items():
     assert entry["canal_label"] == "App mobile"
     assert entry["itens"][0]["nome"] == "Racao"
     assert entry["payment_url"] == "https://mp.test"
+    assert entry["frete_valor"] == 8.5
+    assert entry["frete_distancia_km"] == 4.25
 
 
 def test_build_sale_history_entry_uses_erp_channel_and_linked_order_data():

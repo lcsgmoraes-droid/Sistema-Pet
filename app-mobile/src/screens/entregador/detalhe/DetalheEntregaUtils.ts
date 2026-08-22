@@ -100,7 +100,7 @@ export function abrirMapa(endereco: string) {
   const enderecoMaps = limparEnderecoParaMaps(endereco) || endereco;
   const url = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(enderecoMaps)}`;
   Linking.openURL(url).catch(() =>
-    Alert.alert("Erro", "NÃ£o foi possÃ­vel abrir o mapa."),
+    Alert.alert("Erro", "Não foi possível abrir o mapa."),
   );
 }
 
@@ -108,7 +108,7 @@ export function ligar(telefone?: string | null) {
   if (!telefone) return;
   const digits = telefone.replaceAll(/\D/g, "");
   Linking.openURL(`tel:${digits}`).catch(() =>
-    Alert.alert("Erro", "NÃ£o foi possÃ­vel ligar."),
+    Alert.alert("Erro", "Não foi possível ligar."),
   );
 }
 
@@ -149,6 +149,6 @@ export const STATUS_BADGE: Record<
   { label: string; color: string; bg: string }
 > = {
   pendente: { label: "Pendente", color: "#92400e", bg: "#fef3c7" },
-  entregue: { label: "Entregue ?", color: "#065f46", bg: "#d1fae5" },
-  nao_entregue: { label: "NÃ£o entregue ?", color: "#7f1d1d", bg: "#fee2e2" },
+  entregue: { label: "Entregue ✓", color: "#065f46", bg: "#d1fae5" },
+  nao_entregue: { label: "Não entregue ✗", color: "#7f1d1d", bg: "#fee2e2" },
 };

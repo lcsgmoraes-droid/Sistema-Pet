@@ -24,6 +24,8 @@ import {
   montarParamsFiltrosContasPagar,
   ordenarTiposDespesaContasPagar,
 } from "./contas-pagar/contasPagarHelpers";
+import { confirmarCorePet } from "../services/corepetDialog";
+import useShiftRangeSelection from "../hooks/useShiftRangeSelection";
 
 const ContasPagar = () => {
   const [searchParams] = useSearchParams();
@@ -310,11 +312,11 @@ const ContasPagar = () => {
     }
   };
 
-  const alternarRecorrenciaExclusao = (itemId) => {
-    setRecorrenciasSelecionadasExclusao((atuais) =>
-      atuais.includes(itemId) ? atuais.filter((id) => id !== itemId) : [...atuais, itemId],
-    );
-  };
+  const alternarRecorrenciaExclusao = useShiftRangeSelection({
+    isItemSelectable: (item) => item.pode_excluir,
+    items: modalExclusaoRecorrencia.itens,
+    setSelectedIds: setRecorrenciasSelecionadasExclusao,
+  });
 
   const confirmarExclusaoRecorrencia = async () => {
     if (recorrenciasSelecionadasExclusao.length === 0) {
@@ -410,7 +412,7 @@ const ContasPagar = () => {
     });
   };
 
-  const confirmarSaldoNegativoPagamentoEmLote = () => {
+  const confirmarSaldoNegativoPagamentoEmLote = async () => {
     const contaBancaria = safeArray(contasBancarias).find(
       (conta) => Number(conta.id) === Number(dadosPagamentoLote.conta_bancaria_id),
     );
@@ -430,7 +432,7 @@ const ContasPagar = () => {
       "Deseja baixar mesmo assim?",
     ].join("\n");
 
-    return window.confirm(mensagem);
+    return await confirmarCorePet(mensagem);
   };
 
   const registrarPagamentoEmLote = async () => {
@@ -438,7 +440,7 @@ const ContasPagar = () => {
       toast.error("Selecione pelo menos uma conta com saldo aberto para pagar");
       return;
     }
-    if (!confirmarSaldoNegativoPagamentoEmLote()) {
+    if (!(await confirmarSaldoNegativoPagamentoEmLote())) {
       return;
     }
 
@@ -469,7 +471,7 @@ const ContasPagar = () => {
       return;
     }
 
-    const confirmado = window.confirm(
+    const confirmado = await confirmarCorePet(
       `Excluir a conta "${conta.descricao}"? Apenas contas sem pagamento registrado podem ser excluidas.`,
     );
     if (!confirmado) return;
@@ -555,7 +557,7 @@ const ContasPagar = () => {
   const calcularValorFinalPagamento = (dados = dadosPagamento) =>
     calcularValorFinalPagamentoContasPagar(dados);
 
-  const confirmarSaldoNegativoPagamento = () => {
+  const confirmarSaldoNegativoPagamento = async () => {
     const contaBancaria = safeArray(contasBancarias).find(
       (conta) => Number(conta.id) === Number(dadosPagamento.conta_bancaria_id),
     );
@@ -582,11 +584,11 @@ const ContasPagar = () => {
       "Deseja baixar mesmo assim?",
     ].join("\n");
 
-    return window.confirm(mensagem);
+    return await confirmarCorePet(mensagem);
   };
 
   const registrarPagamento = async () => {
-    if (!confirmarSaldoNegativoPagamento()) {
+    if (!(await confirmarSaldoNegativoPagamento())) {
       return;
     }
 

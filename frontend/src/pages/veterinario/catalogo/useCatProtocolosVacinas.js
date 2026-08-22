@@ -6,6 +6,7 @@ import {
   FORM_PROTOCOLO_INICIAL,
   mapProtocoloParaForm,
 } from "./protocolosVacinasForm";
+import { confirmarCorePet } from "../../../services/corepetDialog";
 
 export function useCatProtocolosVacinas() {
   const [lista, setLista] = useState([]);
@@ -79,7 +80,7 @@ export function useCatProtocolosVacinas() {
   }
 
   async function excluir(item) {
-    if (!window.confirm(`Deseja excluir o protocolo "${item.nome}"?`)) return;
+    if (!await confirmarCorePet(`Deseja excluir o protocolo "${item.nome}"?`)) return;
     setRemovendoId(item.id);
     setErro("");
     try {

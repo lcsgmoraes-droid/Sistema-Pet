@@ -8,9 +8,10 @@ import {
   filtrarConsultas,
   removerConsultasSelecionadas,
   todasConsultasVisiveisSelecionadas,
-  toggleConsultaSelecionada,
   toggleTodasConsultasSelecionadas,
 } from "./consultasUtils";
+import { confirmarCorePet } from "../../../services/corepetDialog";
+import useShiftRangeSelection from "../../../hooks/useShiftRangeSelection";
 
 export function useVetConsultas() {
   const [consultas, setConsultas] = useState([]);
@@ -87,15 +88,16 @@ export function useVetConsultas() {
     () => todasConsultasVisiveisSelecionadas(consultasSelecionadas, consultasFiltradas),
     [consultasFiltradas, consultasSelecionadas],
   );
+  const alternarConsultaSelecionada = useShiftRangeSelection({
+    getItemId: (consulta) => Number(consulta.id),
+    items: consultasFiltradas,
+    setSelectedIds: setConsultasSelecionadas,
+  });
 
   function alterarStatus(status) {
     setFiltroStatus(status);
     setPagina(1);
     setConsultasSelecionadas([]);
-  }
-
-  function alternarConsultaSelecionada(consultaId) {
-    setConsultasSelecionadas((atuais) => toggleConsultaSelecionada(atuais, consultaId));
   }
 
   function alternarTodasConsultasSelecionadas() {
@@ -108,7 +110,7 @@ export function useVetConsultas() {
     if (consultasSelecionadas.length === 0) return;
 
     const totalSelecionado = consultasSelecionadas.length;
-    const confirmado = window.confirm(
+    const confirmado = await confirmarCorePet(
       `Deseja excluir ${totalSelecionado} consulta${totalSelecionado > 1 ? "s" : ""} selecionada${totalSelecionado > 1 ? "s" : ""}?`,
     );
     if (!confirmado) return;

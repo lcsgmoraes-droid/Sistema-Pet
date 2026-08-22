@@ -25,6 +25,7 @@ import {
   CLIENTES_DASHBOARD_VIEWS,
   normalizarVisaoDashboardClientes,
 } from "./clientes/clientesDashboardFilters";
+import { confirmarCorePet } from "../services/corepetDialog";
 
 const LIMITE_DUPLICIDADES_POR_PAGINA = 25;
 
@@ -121,7 +122,7 @@ const Pessoas = () => {
   });
 
   const handleDelete = async (id) => {
-    if (!confirm("Tem certeza que deseja excluir este cliente?")) return;
+    if (!await confirmarCorePet("Tem certeza que deseja excluir este cliente?")) return;
 
     try {
       debugLog("Excluindo cliente ID:", id);
@@ -137,7 +138,7 @@ const Pessoas = () => {
   };
 
   const handleDeletePet = async (petId) => {
-    if (!confirm("Tem certeza que deseja excluir este pet?")) return;
+    if (!await confirmarCorePet("Tem certeza que deseja excluir este pet?")) return;
 
     try {
       debugLog("Excluindo pet ID:", petId);
@@ -265,7 +266,7 @@ const Pessoas = () => {
     if (
       !silencioso &&
       duplicidade.totalAutomaticas > 0 &&
-      !window.confirm(
+      !await confirmarCorePet(
         `Fundir agora ate ${Math.min(
           duplicidade.totalAutomaticas,
           25,
@@ -328,7 +329,7 @@ const Pessoas = () => {
         return;
       }
 
-      const confirmou = window.confirm(
+      const confirmou = await confirmarCorePet(
         `Foram encontrados ${elegiveis} par(es) elegíveis e ${bloqueadas} bloqueado(s).\n\n` +
           "Você confirmou que nomes exatamente iguais representam a mesma pessoa. " +
           "A fusão preencherá campos vazios, preservará históricos, créditos e acessos, " +
