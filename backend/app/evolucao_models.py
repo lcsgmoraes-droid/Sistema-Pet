@@ -19,4 +19,3 @@ class EvolucaoFuncionalidadeUso(Base):
     primeiro_uso_em = Column(DateTime(timezone=True), nullable=True)
     ultimo_uso_em = Column(DateTime(timezone=True), nullable=True)
     limiar_teste_atingido_em = Column(DateTime(timezone=True), nullable=True)
-

@@ -325,9 +325,13 @@ def registrar_uso_funcionalidade(
     tabela = EvolucaoFuncionalidadeUso.__table__
 
     def incrementar_existente() -> bool:
-        existente = db.execute(
-            select(tabela).where(tabela.c.item_id == item_id).with_for_update()
-        ).mappings().first()
+        existente = (
+            db.execute(
+                select(tabela).where(tabela.c.item_id == item_id).with_for_update()
+            )
+            .mappings()
+            .first()
+        )
         if existente is None:
             return False
         novo_total = int(existente["usos_total"] or 0) + quantidade
@@ -342,9 +346,7 @@ def registrar_uso_funcionalidade(
             and existente["limiar_teste_atingido_em"] is None
         ):
             valores["limiar_teste_atingido_em"] = momento
-        db.execute(
-            update(tabela).where(tabela.c.item_id == item_id).values(**valores)
-        )
+        db.execute(update(tabela).where(tabela.c.item_id == item_id).values(**valores))
         db.commit()
         return True
 
@@ -416,7 +418,9 @@ def _resolver_fase_disponivel(
         criterio = ciclo.get("promover_quando", "todos")
         if criterio == "qualquer":
             candidatos = [valor for valor in (marco_tempo, marco_uso) if valor]
-            implantado_em = min(candidatos) if candidatos and agora >= min(candidatos) else None
+            implantado_em = (
+                min(candidatos) if candidatos and agora >= min(candidatos) else None
+            )
         else:
             implantado_em = (
                 max(marco_tempo, marco_uso)
@@ -440,9 +444,7 @@ def _serializar_item(
     if item["status"] not in STATUS_DISPONIVEIS:
         return registro
 
-    fase, implantado_em, novidade_ate = _resolver_fase_disponivel(
-        item, metrica, agora
-    )
+    fase, implantado_em, novidade_ate = _resolver_fase_disponivel(item, metrica, agora)
     if novidade_ate is not None and agora.date() > novidade_ate:
         return None
 
@@ -452,7 +454,9 @@ def _serializar_item(
     registro["status_label"] = (
         "Disponível — em fase de teste" if fase == "teste" else "Implantado"
     )
-    registro["implantado_em"] = implantado_em.date().isoformat() if implantado_em else None
+    registro["implantado_em"] = (
+        implantado_em.date().isoformat() if implantado_em else None
+    )
     registro["novidade_ate"] = novidade_ate.isoformat() if novidade_ate else None
     registro.pop("ciclo_novidade", None)
     registro.pop("dias_visivel_apos_implantado", None)
@@ -474,7 +478,11 @@ def listar_evolucao_corepet(
     catalogo_canal = [item for item in ITENS_EVOLUCAO if canal in item["canais"]]
     metricas: dict[str, Mapping[str, Any]] = {}
     if db is not None:
-        ids = [item["id"] for item in catalogo_canal if item["status"] == "disponivel_teste"]
+        ids = [
+            item["id"]
+            for item in catalogo_canal
+            if item["status"] == "disponivel_teste"
+        ]
         if ids:
             tabela = EvolucaoFuncionalidadeUso.__table__
             try:
