@@ -23,6 +23,36 @@ __all__ = [
 ]
 
 
+def _montar_campos_venda_pagamento(
+    *,
+    venda_id: int,
+    tenant_id: str,
+    pag_data: Dict[str, Any],
+    forma_pagamento_id: Optional[int],
+    numero_parcelas: int,
+    bandeira: Optional[str],
+    operadora_id: Optional[int],
+    taxa_aplicada: Dict[str, Any],
+) -> Dict[str, Any]:
+    campos = {
+        "venda_id": venda_id,
+        "tenant_id": tenant_id,
+        "forma_pagamento": pag_data["forma_pagamento"],
+        "forma_pagamento_id": forma_pagamento_id,
+        "valor": pag_data["valor"],
+        "numero_parcelas": numero_parcelas,
+        "bandeira": bandeira or None,
+        "nsu_cartao": pag_data.get("nsu_cartao"),
+        "operadora_id": operadora_id,
+        "prazo_recebimento_dias": pag_data.get("prazo_recebimento_dias"),
+        "data_recebimento_prevista": pag_data.get("data_recebimento_prevista"),
+    }
+    # Para cartao, a regra resolvida e a fonte de verdade. Atualizar o dicionario
+    # antes de construir o model evita passar prazo/data duas vezes como kwargs.
+    campos.update(taxa_aplicada)
+    return campos
+
+
 def _calcular_pagamentos_finalizacao(
     *,
     total_venda: Any,
@@ -286,18 +316,16 @@ def processar_pagamentos_finalizacao(
                 )
 
         pagamento = VendaPagamento(
-            venda_id=venda.id,
-            tenant_id=tenant_id,
-            forma_pagamento=pag_data["forma_pagamento"],
-            forma_pagamento_id=forma_pagamento_id,
-            valor=pag_data["valor"],
-            numero_parcelas=numero_parcelas,
-            bandeira=bandeira or None,
-            nsu_cartao=pag_data.get("nsu_cartao"),
-            operadora_id=operadora_id,
-            prazo_recebimento_dias=pag_data.get("prazo_recebimento_dias"),
-            data_recebimento_prevista=pag_data.get("data_recebimento_prevista"),
-            **taxa_aplicada,
+            **_montar_campos_venda_pagamento(
+                venda_id=venda.id,
+                tenant_id=tenant_id,
+                pag_data=pag_data,
+                forma_pagamento_id=forma_pagamento_id,
+                numero_parcelas=numero_parcelas,
+                bandeira=bandeira,
+                operadora_id=operadora_id,
+                taxa_aplicada=taxa_aplicada,
+            )
         )
         db.add(pagamento)
         db.flush()
