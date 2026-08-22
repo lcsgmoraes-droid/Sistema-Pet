@@ -29,16 +29,22 @@ que o mesmo arquivo ainda não aparece como concluído neste registro.
 - Carrossel 09 — Recompra inteligente
 - Feed 10 — Banho & tosa: agenda operacional
 - Carrossel 11 — Clínica veterinária em piloto
+- Reel 12 — Lista de espera no app
+- Feed 13 — Pet shop: catálogo centralizado
+- Feed 14 — Retenção: clientes inativos
 
 ## Fila aprovada
 
-1. `growth/weekly/2026-32/12-reel-lista-espera-app.mp4`
-2. `growth/weekly/2026-33/13-petshop-catalogo-centralizado.png`
-3. `growth/weekly/2026-33/14-retencao-clientes-inativos.png`
-4. `growth/weekly/2026-33/15-carrossel-banho-tosa-rotina/01.png` a `05.png`
-5. `growth/weekly/2026-33/16-resultado-por-venda.png`
-6. `growth/weekly/2026-33/17-reel-proximo-passo.mp4`
-7. `growth/weekly/2026-33/18-clinica-piloto-acompanhado.png`
+1. `growth/weekly/2026-33/15-carrossel-banho-tosa-rotina/01.png` a `05.png`
+2. `growth/weekly/2026-33/16-resultado-por-venda.png`
+3. `growth/weekly/2026-33/17-reel-proximo-passo.mp4`
+4. `growth/weekly/2026-33/18-clinica-piloto-acompanhado.png`
+5. `growth/weekly/2026-34/19-lista-espera-estoque.png`
+6. `growth/weekly/2026-34/20-carrossel-recompra-com-contexto/01.png` a `05.png`
+7. `growth/weekly/2026-34/21-reel-canais-mesma-operacao.mp4`
+8. `growth/weekly/2026-34/22-venda-com-contexto.png`
+9. `growth/weekly/2026-34/23-carrossel-escolher-sistema-pet/01.png` a `05.png`
+10. `growth/weekly/2026-34/24-catalogo-aberto.png`
 
 ## Stories aprovados
 
@@ -46,6 +52,9 @@ que o mesmo arquivo ainda não aparece como concluído neste registro.
 
 | Data e hora (BRT) | Formato | Arquivo(s) | Resultado | Link |
 |---|---|---|---|---|
+| 15/08/2026 14:04 | Feed | `growth/weekly/2026-33/14-retencao-clientes-inativos.png` | Publicado e conferido no perfil em 4:5, com filtro Original e legenda aprovada; rótulo de IA e Facebook desligados; sem ação paga | https://www.instagram.com/corepet.erp/p/DcEYjHcDjXh/ |
+| 14/08/2026 08:06 | Feed | `growth/weekly/2026-33/13-petshop-catalogo-centralizado.png` | Publicado e conferido no perfil em 4:5, com filtro Original e legenda aprovada; rótulo de IA e Facebook desligados; sem ação paga | https://www.instagram.com/corepet.erp/p/DcBKpSRjhrL/ |
+| 13/08/2026 08:07 | Reel | `growth/weekly/2026-32/12-reel-lista-espera-app.mp4` | Publicado e conferido no perfil em 9:16 após revisão vertical e do recorte central web; legenda aprovada aplicada; rótulo de IA e Facebook desligados; sem ação paga | https://www.instagram.com/corepet.erp/reel/Db-mVu5Ib_d/ |
 | 12/08/2026 08:06 | Carrossel | `growth/weekly/2026-32/11-carrossel-clinica-piloto/01.png` a `05.png` | Publicado e conferido no perfil em 4:5, com filtro Original e legenda aprovada; rótulo de IA e Facebook desligados; sem ação paga | https://www.instagram.com/corepet.erp/p/Db8BF8FjkvY/ |
 | 11/08/2026 08:10 | Feed | `growth/weekly/2026-32/10-banho-tosa-agenda-operacional.png` | Publicado e conferido no perfil em 4:5, com filtro Original, rótulo de IA e Facebook desligados; a legenda aprovada não foi mantida pelo Instagram na criação nem após uma edição normal; sem ação paga | https://www.instagram.com/corepet.erp/p/Db5ca9PDrOb/ |
 | 10/08/2026 08:28 | Carrossel | `growth/weekly/2026-32/09-carrossel-recompra-inteligente/01.png` a `05.png` | Publicado e conferido no perfil em 4:5, com filtro Original e Facebook desligado; legenda aprovada pendente porque o Instagram não a manteve na criação nem nas edições desta execução; versão inicial sem legenda removida e republicada | https://www.instagram.com/corepet.erp/p/Db25kRSDky1/ |
@@ -69,6 +78,9 @@ Não publicar os 20 arquivos de uma vez. Distribuir por tema e registrar abaixo.
 
 | Data e hora (BRT) | Formato | Arquivo(s) | Resultado | Link/observação |
 |---|---|---|---|---|
+| 15/08/2026 14:04 | Feed | `growth/weekly/2026-33/14-retencao-clientes-inativos.png` | Publicado e conferido no perfil em 4:5, com filtro Original e legenda aprovada; rótulo de IA e Facebook desligados; sem ação paga | https://www.instagram.com/corepet.erp/p/DcEYjHcDjXh/ |
+| 14/08/2026 08:06 | Feed | `growth/weekly/2026-33/13-petshop-catalogo-centralizado.png` | Publicado e conferido no perfil em 4:5, com filtro Original e legenda aprovada; rótulo de IA e Facebook desligados; sem ação paga | https://www.instagram.com/corepet.erp/p/DcBKpSRjhrL/ |
+| 13/08/2026 08:07 | Reel | `growth/weekly/2026-32/12-reel-lista-espera-app.mp4` | Publicado e conferido no perfil em 9:16 após revisão vertical e do recorte central web; legenda aprovada aplicada; rótulo de IA e Facebook desligados; sem ação paga | https://www.instagram.com/corepet.erp/reel/Db-mVu5Ib_d/ |
 | 12/08/2026 08:06 | Carrossel | `growth/weekly/2026-32/11-carrossel-clinica-piloto/01.png` a `05.png` | Publicado e conferido no perfil em 4:5, com filtro Original e legenda aprovada; rótulo de IA e Facebook desligados; sem ação paga | https://www.instagram.com/corepet.erp/p/Db8BF8FjkvY/ |
 | 11/08/2026 08:10 | Feed | `growth/weekly/2026-32/10-banho-tosa-agenda-operacional.png` | Publicado e conferido no perfil em 4:5, com filtro Original, rótulo de IA e Facebook desligados; a legenda aprovada não foi mantida pelo Instagram na criação nem após uma edição normal; sem ação paga | https://www.instagram.com/corepet.erp/p/Db5ca9PDrOb/ |
 | 10/08/2026 08:28 | Carrossel | `growth/weekly/2026-32/09-carrossel-recompra-inteligente/01.png` a `05.png` | Publicado e conferido no perfil em 4:5, com filtro Original e Facebook desligado; legenda aprovada pendente porque o Instagram não a manteve na criação nem nas edições desta execução; versão inicial sem legenda removida e republicada | https://www.instagram.com/corepet.erp/p/Db25kRSDky1/ |

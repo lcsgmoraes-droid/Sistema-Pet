@@ -1,5 +1,6 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import FornecedorSelector, { getFornecedorNome } from "../fornecedores/FornecedorSelector";
+import { applyShiftRangeSelection, getShiftSelectionEvent } from "../../utils/shiftRangeSelection";
 
 const ModalGruposFornecedores = ({
   grupos,
@@ -17,6 +18,7 @@ const ModalGruposFornecedores = ({
 }) => {
   const [buscaFornecedor, setBuscaFornecedor] = useState("");
   const [fornecedorBuscaRapida, setFornecedorBuscaRapida] = useState("");
+  const ultimoFornecedorSelecionadoRef = useRef(null);
   const fornecedoresSelecionadosSet = useMemo(
     () => new Set((form.fornecedor_ids || []).map((id) => Number(id))),
     [form.fornecedor_ids],
@@ -62,6 +64,29 @@ const ModalGruposFornecedores = ({
       })
       .slice(0, 120);
   }, [fornecedores, buscaFornecedor]);
+  const alternarFornecedorComIntervalo = (fornecedorId, event) => {
+    const id = Number(fornecedorId);
+    const { checked, shiftKey } = getShiftSelectionEvent(event);
+    const idsAtuais = Array.from(fornecedoresSelecionadosSet);
+    const proximosIds = applyShiftRangeSelection({
+      anchorId: ultimoFornecedorSelecionadoRef.current,
+      checked,
+      currentSelection: idsAtuais,
+      getItemId: (fornecedor) => Number(fornecedor.id),
+      itemId: id,
+      items: fornecedoresFiltrados,
+      shiftKey,
+    });
+    const proximosIdsSet = new Set(proximosIds);
+
+    new Set([...idsAtuais, ...proximosIds]).forEach((itemId) => {
+      if (fornecedoresSelecionadosSet.has(itemId) !== proximosIdsSet.has(itemId)) {
+        onToggleFornecedor(itemId);
+      }
+    });
+
+    ultimoFornecedorSelecionadoRef.current = id;
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
@@ -259,7 +284,7 @@ const ModalGruposFornecedores = ({
                       <input
                         type="checkbox"
                         checked={selecionado}
-                        onChange={() => onToggleFornecedor(fornecedor.id)}
+                        onChange={(event) => alternarFornecedorComIntervalo(fornecedor.id, event)}
                         className="mt-1 h-4 w-4 rounded"
                       />
                       <span className="min-w-0 flex-1">

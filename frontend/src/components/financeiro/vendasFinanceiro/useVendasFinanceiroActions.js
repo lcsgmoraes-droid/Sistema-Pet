@@ -9,6 +9,7 @@ import {
   ordenarVendasRelatorio,
 } from "../vendasFinanceiroUtils";
 import { confirmarCorePet } from "../../../services/corepetDialog";
+import useShiftRangeSelection from "../../../hooks/useShiftRangeSelection";
 
 export function useVendasFinanceiroActions({
   carregarDados,
@@ -33,6 +34,11 @@ export function useVendasFinanceiroActions({
   setVendasSelecionadasIds,
   vendasPorDataCalendario,
 }) {
+  const toggleSelecaoVenda = useShiftRangeSelection({
+    items: listaVendasFiltrada,
+    setSelectedIds: setVendasSelecionadasIds,
+  });
+
   const filtrarVendasParaRelatorio = (escopo) =>
     filtrarVendasRelatorio(listaVendasComImpostoAjustado, {
       escopo,
@@ -197,18 +203,6 @@ export function useVendasFinanceiroActions({
       console.error("Erro ao exportar Excel:", error);
       toast.error("Erro ao exportar Excel");
     }
-  };
-
-  const toggleSelecaoVenda = (vendaId, selecionada) => {
-    setVendasSelecionadasIds((prev) => {
-      const proximo = new Set(prev);
-      if (selecionada) {
-        proximo.add(vendaId);
-      } else {
-        proximo.delete(vendaId);
-      }
-      return proximo;
-    });
   };
 
   const toggleSelecaoTodasVendas = (selecionar) => {

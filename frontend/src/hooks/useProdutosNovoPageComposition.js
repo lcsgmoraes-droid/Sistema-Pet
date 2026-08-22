@@ -13,7 +13,7 @@ export default function useProdutosNovoPageComposition({
   utilsState,
   variacoesState,
 }) {
-  const { categoriasHierarquicas, clientes, departamentos, marcas } = catalogos;
+  const { categoriasHierarquicas, clientes, departamentos, marcas, onNovoCatalogo } = catalogos;
   const {
     fornecedores,
     fornecedorData,
@@ -152,6 +152,7 @@ export default function useProdutosNovoPageComposition({
     isEdicao,
     marcas,
     mostrarBuscaPredecessor,
+    onNovoCatalogo,
     parseNumber,
     predecessorSelecionado,
     produtosBusca,

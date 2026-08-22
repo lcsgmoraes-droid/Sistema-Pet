@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { getProdutos } from "../api/produtos";
 import { produtoCorrespondeBusca } from "../utils/pdvProdutoBuscaUtils";
+import useShiftRangeSelection from "./useShiftRangeSelection";
 
 const PRODUTOS_PERSISTIR_KEY = "produtos_persistir_busca";
 const PRODUTOS_FILTROS_KEY = "produtos_filtros_v2";
@@ -134,7 +135,6 @@ export default function useProdutosListagem({
   const [produtosBrutos, setProdutosBrutos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selecionados, setSelecionados] = useState([]);
-  const [ultimoSelecionado, setUltimoSelecionado] = useState(null);
   const [filtros, setFiltros] = useState(estadoPersistidoInicial.filtros);
   const [paginaAtual, setPaginaAtual] = useState(estadoPersistidoInicial.paginaAtual);
   const [itensPorPagina, setItensPorPagina] = useState(estadoPersistidoInicial.itensPorPagina);
@@ -199,6 +199,10 @@ export default function useProdutosListagem({
     produtosBrutos,
   ]);
   const produtos = produtosFiltrados;
+  const selecionarProdutoNoIntervalo = useShiftRangeSelection({
+    items: produtos,
+    setSelectedIds: setSelecionados,
+  });
   const totalPaginas = Math.max(totalPaginasServidor, 1);
   const totalItens = totalItensServidor;
 
@@ -357,27 +361,7 @@ export default function useProdutosListagem({
       return;
     }
 
-    if (event?.shiftKey && ultimoSelecionado !== null) {
-      const indexUltimo = produtos.findIndex((p) => p.id === ultimoSelecionado);
-      const indexAtual = produtos.findIndex((p) => p.id === id);
-
-      if (indexUltimo !== -1 && indexAtual !== -1) {
-        const inicio = Math.min(indexUltimo, indexAtual);
-        const fim = Math.max(indexUltimo, indexAtual);
-        const intervalo = produtos.slice(inicio, fim + 1).map((p) => p.id);
-
-        setSelecionados((prev) => {
-          const novo = new Set(prev);
-          intervalo.forEach((prodId) => novo.add(prodId));
-          return Array.from(novo);
-        });
-        setUltimoSelecionado(id);
-        return;
-      }
-    }
-
-    setSelecionados((prev) => (prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]));
-    setUltimoSelecionado(id);
+    selecionarProdutoNoIntervalo(id, event);
   };
 
   const handleSelecionarTodos = () => {

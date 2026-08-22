@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import toast from "react-hot-toast";
 import api from "../../api";
 import {
@@ -10,6 +10,7 @@ import {
   normalizarNumero,
   obterErroAcertoTransferencia,
 } from "./transferenciaParceiroUtils";
+import { applyShiftRangeSelection, getShiftSelectionEvent } from "../../utils/shiftRangeSelection";
 
 const PREVIEW_VAZIO = {
   items: [],
@@ -41,6 +42,7 @@ export default function useTransferenciaBaixaLoteController({
   );
   const [previewBaixaLote, setPreviewBaixaLote] = useState(PREVIEW_VAZIO);
   const [aplicacoesBaixaLote, setAplicacoesBaixaLote] = useState({});
+  const ultimaAplicacaoSelecionadaRef = useRef(null);
 
   const totalAplicadoBaixaLote = useMemo(
     () =>
@@ -248,6 +250,45 @@ export default function useTransferenciaBaixaLoteController({
   };
 
   const pessoaBaixaLoteAtual = resolverPessoaBaixaLote();
+  const alternarAplicacaoBaixaLote = (registro, event) => {
+    const contaId = String(registro.conta_receber_id);
+    const { checked, shiftKey } = getShiftSelectionEvent(event);
+
+    setAplicacoesBaixaLote((prev) => {
+      const aplicacoesAtuais = prev || {};
+      const idsAtuais = Object.keys(aplicacoesAtuais).filter(
+        (itemId) => aplicacoesAtuais[itemId] !== "",
+      );
+      const proximosIds = applyShiftRangeSelection({
+        anchorId: ultimaAplicacaoSelecionadaRef.current,
+        checked,
+        currentSelection: idsAtuais,
+        getItemId: (item) => String(item.conta_receber_id),
+        itemId: contaId,
+        items: previewBaixaLote.items || [],
+        shiftKey,
+      });
+      const proximosIdsSet = new Set(proximosIds);
+      const proximo = { ...aplicacoesAtuais };
+
+      (previewBaixaLote.items || []).forEach((item) => {
+        const itemId = String(item.conta_receber_id);
+        if (!proximosIdsSet.has(itemId)) {
+          delete proximo[itemId];
+          return;
+        }
+        if (proximo[itemId] !== undefined && proximo[itemId] !== "") return;
+        proximo[itemId] =
+          item.valor_sugerido > 0
+            ? Number(item.valor_sugerido).toFixed(2)
+            : Number(item.saldo_aberto || 0).toFixed(2);
+      });
+
+      return proximo;
+    });
+
+    ultimaAplicacaoSelecionadaRef.current = contaId;
+  };
 
   return {
     salvandoBaixaLote,
@@ -268,19 +309,7 @@ export default function useTransferenciaBaixaLoteController({
     ajustarBaixaAoSaldoAcerto,
     atualizarValorAplicacaoBaixaLote: (contaReceberId, valor) =>
       setAplicacoesBaixaLote((prev) => ({ ...(prev || {}), [contaReceberId]: valor })),
-    alternarAplicacaoBaixaLote: (registro, marcado) =>
-      setAplicacoesBaixaLote((prev) => {
-        const proximo = { ...(prev || {}) };
-        if (!marcado) {
-          delete proximo[registro.conta_receber_id];
-          return proximo;
-        }
-        proximo[registro.conta_receber_id] =
-          registro.valor_sugerido > 0
-            ? Number(registro.valor_sugerido).toFixed(2)
-            : Number(registro.saldo_aberto || 0).toFixed(2);
-        return proximo;
-      }),
+    alternarAplicacaoBaixaLote,
     atualizarValorCompensacaoBaixaLote: (contaPagarId, valor) =>
       setFormBaixaLote((prev) => ({
         ...prev,

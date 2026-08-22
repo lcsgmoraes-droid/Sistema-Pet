@@ -10,6 +10,7 @@ import {
 import { useModulos } from "../../contexts/ModulosContext";
 import CustomerIdentity from "../ui/CustomerIdentity";
 import SaleReference from "../ui/SaleReference";
+import useShiftRangeSelection from "../../hooks/useShiftRangeSelection";
 
 export default function VendasEmAberto({ cliente, clienteId, clienteNome, onClose, onSucesso }) {
   const { moduloAtivo } = useModulos();
@@ -94,16 +95,6 @@ export default function VendasEmAberto({ cliente, clienteId, clienteNome, onClos
     }
   };
 
-  const toggleVenda = (vendaId) => {
-    setVendasSelecionadas((prev) => {
-      if (prev.includes(vendaId)) {
-        return prev.filter((id) => id !== vendaId);
-      } else {
-        return [...prev, vendaId];
-      }
-    });
-  };
-
   const selecionarTodas = () => {
     if (vendasSelecionadas.length === vendas.length) {
       setVendasSelecionadas([]);
@@ -127,6 +118,10 @@ export default function VendasEmAberto({ cliente, clienteId, clienteNome, onClos
     } else {
       return new Date(b.data_venda) - new Date(a.data_venda);
     }
+  });
+  const toggleVenda = useShiftRangeSelection({
+    items: vendasOrdenadas,
+    setSelectedIds: setVendasSelecionadas,
   });
 
   const totalSelecionado = vendas
@@ -459,7 +454,7 @@ export default function VendasEmAberto({ cliente, clienteId, clienteNome, onClos
                             <input
                               type="checkbox"
                               checked={vendasSelecionadas.includes(venda.id)}
-                              onChange={() => toggleVenda(venda.id)}
+                              onChange={(event) => toggleVenda(venda.id, event)}
                               className="rounded border-gray-300"
                             />
                           </td>

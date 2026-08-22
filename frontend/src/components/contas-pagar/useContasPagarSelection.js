@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { toast } from "react-hot-toast";
 
 import api from "../../api";
+import useShiftRangeSelection from "../../hooks/useShiftRangeSelection";
 import { safeArray } from "../../utils/safeArray";
 import { confirmarCorePet, perguntarCorePet } from "../../services/corepetDialog";
 
@@ -38,11 +39,10 @@ export default function useContasPagarSelection({ contas, carregarDados, abrirMo
   const haContaCancelavelSelecionada = contasSelecionadasObjetos.some(contaPodeCancelar);
   const haContaExcluivelSelecionada = contasSelecionadasObjetos.some(contaPodeExcluir);
 
-  const alternarSelecaoConta = (contaId) => {
-    setContasSelecionadas((atuais) =>
-      atuais.includes(contaId) ? atuais.filter((id) => id !== contaId) : [...atuais, contaId],
-    );
-  };
+  const alternarSelecaoConta = useShiftRangeSelection({
+    items: contasVisiveis,
+    setSelectedIds: setContasSelecionadas,
+  });
 
   const selecionarTodasContasVisiveis = (event) => {
     const selecionar = event.target.checked;
