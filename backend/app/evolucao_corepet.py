@@ -133,20 +133,38 @@ ITENS_EVOLUCAO: tuple[dict[str, Any], ...] = (
         "caminho_ajuda": "/ajuda?aba=central&artigo=lancar-granel-bipagem",
     },
     {
-        "id": "grupos-empresas-transferencia-integrada",
-        "titulo": "Grupos de empresas e transferência integrada",
+        "id": "grupos-empresas-convites",
+        "titulo": "Grupos de empresas por convite",
         "resumo": (
-            "Empresas poderão formar grupos por convite, acompanhar resultados consolidados "
-            "e transferir produtos com saída em uma empresa e entrada na outra."
+            "Cada empresa recebe um código mensal e pode criar ou aceitar grupos com "
+            "outras empresas, mantendo o aceite e os membros sob controle."
         ),
-        "status": "em_estudo",
+        "status": "disponivel_teste",
+        "tipo": "projeto",
+        "modulo": "Empresas",
+        "plataformas": ["ERP"],
+        "canais": ["erp"],
+        "publicado_em": "2026-08-22",
+        "atualizado_em": "2026-08-22",
+        "ciclo_novidade": deepcopy(CICLO_PADRAO),
+        "destaque": True,
+        "caminho_ajuda": "/ajuda?aba=central&artigo=grupos-empresas-convites",
+    },
+    {
+        "id": "grupos-empresas-transferencia-integrada",
+        "titulo": "Transferência integrada entre empresas do grupo",
+        "resumo": (
+            "A transferência poderá registrar a saída na empresa de origem e preparar a "
+            "entrada correspondente na empresa de destino, com rastreabilidade."
+        ),
+        "status": "em_desenvolvimento",
         "tipo": "projeto",
         "modulo": "Empresas e estoque",
         "plataformas": ["ERP"],
         "canais": ["erp"],
         "publicado_em": None,
         "atualizado_em": "2026-08-22",
-        "destaque": False,
+        "destaque": True,
         "caminho_ajuda": None,
     },
     {

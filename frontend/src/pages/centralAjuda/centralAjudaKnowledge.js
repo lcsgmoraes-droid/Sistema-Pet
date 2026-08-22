@@ -46,6 +46,20 @@ export const BASE_CONHECIMENTO = [
         ],
       },
       {
+        slug: "grupos-empresas-convites",
+        titulo: "Como criar um grupo de empresas e enviar convites",
+        tags: ["grupo", "empresas", "convite", "codigo mensal", "consolidado"],
+        conteudo: [
+          "Acesse **Configurações → Grupos de Empresas** no ERP.",
+          "Na parte **Código mensal da sua empresa**, copie o código e envie somente para a empresa que deverá convidá-la. O código muda automaticamente no início de cada mês.",
+          "Para administrar um grupo, informe um nome em **Criar um grupo**. A empresa que cria o grupo fica como responsável pelos convites e membros.",
+          "Para convidar outra empresa, peça o código mensal dela, abra o grupo criado, preencha **Convidar empresa** e confirme.",
+          "A empresa convidada verá o aviso em **Convites recebidos** e poderá **Aceitar** ou **Recusar**. O vínculo só é criado depois do aceite.",
+          "O código não permite acessar dados e não adiciona a empresa automaticamente. Ele serve apenas para localizar com segurança o destino do convite.",
+          "A empresa responsável pode remover membros. Os dados continuam separados por empresa; recursos consolidados e transferências serão liberados de forma controlada.",
+        ],
+      },
+      {
         titulo: "Primeiros passos para configurar o Sistema Pet",
         tags: ["inicio", "configuracao", "onboarding", "primeiros passos"],
         conteudo: [

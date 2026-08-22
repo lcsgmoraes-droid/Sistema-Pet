@@ -128,6 +128,7 @@ export const Configuracoes = lazy(() => import("../pages/Configuracoes"));
 export const ConfiguracaoFiscalEmpresa = lazy(
   () => import("../pages/configuracoes/ConfiguracaoFiscalEmpresa"),
 );
+export const GruposEmpresas = lazy(() => import("../pages/configuracoes/GruposEmpresas"));
 export const EntregasConfig = lazy(() => import("../pages/configuracoes/EntregasConfig"));
 export const CustosMoto = lazy(() => import("../pages/configuracoes/CustosMoto"));
 export const ConfiguracaoEstoque = lazy(() => import("../pages/configuracoes/ConfiguracaoEstoque"));

@@ -126,6 +126,7 @@ from app.funcionarios_routes import router as funcionarios_router
 from app.empresa_config_routes import router as empresa_config_router
 from app.pdv_indicadores_routes import router as pdv_indicadores_router
 from app.empresa_routes import router as empresa_router
+from app.empresa_grupo_routes import router as empresa_grupo_router
 from app.api.endpoints.configuracoes_entrega import (
     router as configuracoes_entrega_router,
 )
@@ -549,6 +550,7 @@ def register_routers(app: FastAPI) -> None:
     app.include_router(empresa_config_router, tags=["Empresa - Configuração Geral"])
     app.include_router(pdv_indicadores_router, tags=["PDV - Indicadores e Margens"])
     app.include_router(empresa_router, tags=["Empresa - Configurações"])
+    app.include_router(empresa_grupo_router)
     app.include_router(
         configuracoes_entrega_router,
         tags=["Configurações - Entregas"],

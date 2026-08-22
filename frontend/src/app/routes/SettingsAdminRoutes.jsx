@@ -11,6 +11,7 @@ import {
   EntregasConfig,
   EvolucaoCorePet,
   Funcionarios,
+  GruposEmpresas,
   Integracoes,
   LGPDOperacional,
   ProjecaoCaixa,
@@ -34,7 +35,7 @@ export function createSettingsAdminRoutes() {
       <Route
         path="configuracoes"
         element={
-          <ProtectedRoute permission="configuracoes.editar">
+          <ProtectedRoute anyOfPermissions={["configuracoes.empresa", "configuracoes.editar"]}>
             <Configuracoes />
           </ProtectedRoute>
         }
@@ -52,6 +53,14 @@ export function createSettingsAdminRoutes() {
         element={
           <ProtectedRoute permission="configuracoes.editar">
             <ConfiguracaoGeralNegocio />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="configuracoes/grupos-empresas"
+        element={
+          <ProtectedRoute anyOfPermissions={["configuracoes.empresa", "configuracoes.editar"]}>
+            <GruposEmpresas />
           </ProtectedRoute>
         }
       />

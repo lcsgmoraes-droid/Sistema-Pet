@@ -21,7 +21,7 @@ import {
 } from "react-icons/fi";
 import { applyLayoutMenuStructure } from "./menuStructure.js";
 
-export function createLayoutMenuItems({ lembretesCount = 0 } = {}) {
+export function createLayoutMenuItems({ lembretesCount = 0, convitesGruposCount = 0 } = {}) {
   const items = [
     {
       path: "/dashboard",
@@ -632,6 +632,7 @@ export function createLayoutMenuItems({ lembretesCount = 0 } = {}) {
       iconKey: "settings",
       label: "Configurações",
       permission: "configuracoes.editar",
+      anyOfPermissions: ["configuracoes.editar", "configuracoes.empresa"],
       submenu: [
         {
           path: "/configuracoes/fiscal",
@@ -642,6 +643,14 @@ export function createLayoutMenuItems({ lembretesCount = 0 } = {}) {
           path: "/configuracoes/geral",
           label: "Parâmetros Gerais",
           permission: "configuracoes.editar",
+        },
+        {
+          path: "/configuracoes/grupos-empresas",
+          label: "Grupos de Empresas",
+          permission: "configuracoes.empresa",
+          anyOfPermissions: ["configuracoes.empresa", "configuracoes.editar"],
+          badge: convitesGruposCount > 0,
+          badgeLabel: `${convitesGruposCount} convite(s) pendente(s)`,
         },
         {
           path: "/configuracoes/entregas",

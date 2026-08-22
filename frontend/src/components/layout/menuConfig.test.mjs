@@ -60,3 +60,14 @@ test("createLayoutMenuItems aplica badge de lembretes conforme contador", () => 
   assert.equal(findMenuItem(semPendencias, "/lembretes")?.badge, false);
   assert.equal(findMenuItem(comPendencias, "/lembretes")?.badge, true);
 });
+
+test("createLayoutMenuItems sinaliza convites pendentes de grupos de empresas", () => {
+  const items = createLayoutMenuItems({ convitesGruposCount: 3 });
+  const configuracoes = findMenuItem(items, "/configuracoes");
+  const grupos = configuracoes?.submenu?.find(
+    (item) => item.path === "/configuracoes/grupos-empresas",
+  );
+
+  assert.equal(grupos?.badge, true);
+  assert.equal(grupos?.badgeLabel, "3 convite(s) pendente(s)");
+});
