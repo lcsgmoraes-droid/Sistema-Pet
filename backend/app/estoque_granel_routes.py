@@ -1,7 +1,6 @@
 """Rotas de estoque para produtos vendidos a granel."""
 
 from datetime import datetime
-import logging
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -10,25 +9,18 @@ from sqlalchemy import or_
 from sqlalchemy.orm import Session, joinedload
 
 from .auth.dependencies import get_current_user_and_tenant
-from .bling_estoque_sync import sincronizar_bling_background
 from .db import get_session
 from .estoque.granel import (
+    executar_conversao_granel,
     _normalizar_produto_granel,
     _obter_ou_criar_vinculo_granel,
     _produto_e_granel,
-    _resolver_origem_por_payload_granel,
     _serializar_vinculo_granel,
     _validar_produto_origem_granel,
 )
-from .produtos_models import (
-    EstoqueMovimentacao,
-    GranelConversao,
-    Produto,
-    ProdutoGranelVinculo,
-)
+from .produtos_models import Produto, ProdutoGranelVinculo
 
 
-logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/estoque", tags=["Estoque - Granel"])
 
 
@@ -42,6 +34,8 @@ class ConversaoGranelRequest(BaseModel):
     preco_venda_granel: Optional[float] = Field(default=None, ge=0)
     documento: Optional[str] = None
     observacao: Optional[str] = None
+    produto_origem_barcode: Optional[str] = None
+    produto_granel_barcode: Optional[str] = None
 
 
 class GranelVinculoRequest(BaseModel):
@@ -307,152 +301,13 @@ def converter_estoque_granel(
 ):
     """Converte pacote(s) fechados de origem em estoque fisico granel medido em kg."""
     current_user, tenant_id = user_and_tenant
+    from .models import Tenant
 
-    produto_base = _resolver_origem_por_payload_granel(db, tenant_id, payload)
-    produto_granel = (
-        db.query(Produto)
-        .filter(
-            Produto.id == payload.produto_granel_id,
-            Produto.tenant_id == tenant_id,
-        )
-        .first()
-    )
-    if not produto_granel:
-        raise HTTPException(status_code=404, detail="Produto granel nao encontrado")
-    if not _produto_e_granel(produto_granel):
-        raise HTTPException(
-            status_code=400, detail="Produto informado nao esta marcado como granel"
-        )
-
-    peso_pacote_kg = _validar_produto_origem_granel(produto_base)
-    _normalizar_produto_granel(produto_granel)
-    vinculo = _obter_ou_criar_vinculo_granel(
+    tenant = db.query(Tenant).filter(Tenant.id == str(tenant_id)).first()
+    return executar_conversao_granel(
         db,
         tenant_id,
         current_user,
-        produto_base,
-        produto_granel,
-        None,
+        payload,
+        exigir_bipagem=bool(getattr(tenant, "granel_bipagem_obrigatoria", False)),
     )
-
-    quantidade_pacotes = float(payload.quantidade_pacotes or 0)
-    estoque_base_anterior = float(produto_base.estoque_atual or 0)
-    if estoque_base_anterior < quantidade_pacotes:
-        raise HTTPException(
-            status_code=400,
-            detail=(
-                f"Estoque insuficiente do produto base '{produto_base.nome}'. "
-                f"Disponivel: {estoque_base_anterior}, solicitado: {quantidade_pacotes} pacote(s)."
-            ),
-        )
-
-    quantidade_kg = quantidade_pacotes * peso_pacote_kg
-    estoque_granel_anterior = float(produto_granel.estoque_atual or 0)
-    custo_pacote = float(produto_base.preco_custo or 0)
-    custo_kg = custo_pacote / peso_pacote_kg if peso_pacote_kg > 0 else 0
-    custo_granel_anterior = float(produto_granel.preco_custo or 0)
-    preco_venda_granel_anterior = float(produto_granel.preco_venda or 0)
-    preco_venda_granel_atualizado = bool(
-        payload.atualizar_preco_venda_granel and payload.preco_venda_granel is not None
-    )
-
-    produto_base.estoque_atual = estoque_base_anterior - quantidade_pacotes
-    produto_granel.estoque_atual = estoque_granel_anterior + quantidade_kg
-    if produto_granel.estoque_atual > 0:
-        produto_granel.preco_custo = (
-            (estoque_granel_anterior * custo_granel_anterior)
-            + (quantidade_kg * custo_kg)
-        ) / produto_granel.estoque_atual
-    if preco_venda_granel_atualizado:
-        produto_granel.preco_venda = float(payload.preco_venda_granel or 0)
-
-    conversao = GranelConversao(
-        produto_granel_id=produto_granel.id,
-        produto_origem_id=produto_base.id,
-        quantidade_origem=quantidade_pacotes,
-        peso_por_unidade_kg=peso_pacote_kg,
-        quantidade_granel_kg=quantidade_kg,
-        estoque_origem_anterior=estoque_base_anterior,
-        estoque_origem_novo=produto_base.estoque_atual,
-        estoque_granel_anterior=estoque_granel_anterior,
-        estoque_granel_novo=produto_granel.estoque_atual,
-        documento=payload.documento,
-        observacao=payload.observacao,
-        user_id=current_user.id,
-        tenant_id=tenant_id,
-    )
-    db.add(conversao)
-    db.flush()
-
-    mov_saida_base = EstoqueMovimentacao(
-        produto_id=produto_base.id,
-        tipo="saida",
-        motivo="conversao_granel",
-        quantidade=quantidade_pacotes,
-        quantidade_anterior=estoque_base_anterior,
-        quantidade_nova=produto_base.estoque_atual,
-        custo_unitario=custo_pacote,
-        valor_total=quantidade_pacotes * custo_pacote,
-        documento=payload.documento,
-        referencia_id=conversao.id,
-        referencia_tipo="conversao_granel",
-        observacao=f"Conversao para granel '{produto_granel.nome}' ({quantidade_kg:.3f} kg)",
-        user_id=current_user.id,
-        tenant_id=tenant_id,
-    )
-    mov_entrada_granel = EstoqueMovimentacao(
-        produto_id=produto_granel.id,
-        tipo="entrada",
-        motivo="conversao_granel",
-        quantidade=quantidade_kg,
-        quantidade_anterior=estoque_granel_anterior,
-        quantidade_nova=produto_granel.estoque_atual,
-        custo_unitario=custo_kg,
-        valor_total=quantidade_kg * custo_kg,
-        documento=payload.documento,
-        referencia_id=conversao.id,
-        referencia_tipo="conversao_granel",
-        observacao=payload.observacao
-        or f"Entrada granel a partir de {quantidade_pacotes:g} pacote(s) de '{produto_base.nome}'",
-        user_id=current_user.id,
-        tenant_id=tenant_id,
-    )
-    db.add(mov_saida_base)
-    db.add(mov_entrada_granel)
-    db.commit()
-
-    try:
-        sincronizar_bling_background(
-            produto_base.id, produto_base.estoque_atual, "conversao_granel_saida"
-        )
-        sincronizar_bling_background(
-            produto_granel.id, produto_granel.estoque_atual, "conversao_granel_entrada"
-        )
-    except Exception as e_sync:
-        logger.warning(
-            f"[BLING-SYNC] Erro ao agendar sync (conversao granel): {e_sync}"
-        )
-
-    return {
-        "id": conversao.id,
-        "produto_granel_id": produto_granel.id,
-        "produto_granel_nome": produto_granel.nome,
-        "produto_origem_id": produto_base.id,
-        "produto_origem_nome": produto_base.nome,
-        "vinculo_id": vinculo.id,
-        "quantidade_pacotes": quantidade_pacotes,
-        "peso_por_unidade_kg": peso_pacote_kg,
-        "quantidade_granel_kg": quantidade_kg,
-        "custo_por_kg": custo_kg,
-        "preco_venda_granel_anterior": preco_venda_granel_anterior,
-        "preco_venda_granel_novo": float(produto_granel.preco_venda or 0),
-        "preco_venda_granel_atualizado": preco_venda_granel_atualizado,
-        "estoque_origem_anterior": estoque_base_anterior,
-        "estoque_origem_novo": float(produto_base.estoque_atual or 0),
-        "estoque_granel_anterior": estoque_granel_anterior,
-        "estoque_granel_novo": float(produto_granel.estoque_atual or 0),
-        "movimentacoes": {
-            "saida_origem_id": mov_saida_base.id,
-            "entrada_granel_id": mov_entrada_granel.id,
-        },
-    }

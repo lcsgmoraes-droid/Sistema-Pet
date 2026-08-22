@@ -22,11 +22,13 @@ type OrdersContentProps = {
   repetindo: string | null;
   erroPedidos: string | null;
   onOpenCatalog: () => void;
+  onOpenCrediario: () => void;
   onPayNow: (paymentUrl: string) => void;
   onRefresh: () => void;
   onReload: () => void;
   onRepeat: (pedido: Pedido) => void;
   onTrack: (pedido: Pedido) => void;
+  onRated: () => void | Promise<void>;
 };
 
 export function OrdersContent({
@@ -36,11 +38,13 @@ export function OrdersContent({
   repetindo,
   erroPedidos,
   onOpenCatalog,
+  onOpenCrediario,
   onPayNow,
   onRefresh,
   onReload,
   onRepeat,
   onTrack,
+  onRated,
 }: OrdersContentProps) {
   if (carregando) {
     return (
@@ -62,36 +66,33 @@ export function OrdersContent({
           onPayNow={onPayNow}
           onRepeat={onRepeat}
           onTrack={onTrack}
+          onRated={onRated}
         />
       )}
       contentContainerStyle={styles.lista}
       refreshControl={
-        <RefreshControl
-          refreshing={refreshing}
-          onRefresh={onRefresh}
-          tintColor={CORES.primario}
-        />
+        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={CORES.primario} />
       }
       ListHeaderComponent={
-        pedidos.length > 0 ? (
-          <View style={styles.header}>
-            <Ionicons name="receipt-outline" size={24} color={CORES.primario} />
-            <View>
-              <Text style={styles.headerTitulo}>Meus Pedidos</Text>
-              <Text style={styles.headerSub}>
-                {pedidos.length} {pedidos.length === 1 ? "pedido" : "pedidos"}
-              </Text>
-            </View>
+        <View style={styles.header}>
+          <Ionicons name="receipt-outline" size={24} color={CORES.primario} />
+          <View style={{ flex: 1 }}>
+            <Text style={styles.headerTitulo}>Meus Pedidos</Text>
+            <Text style={styles.headerSub}>
+              {pedidos.length} {pedidos.length === 1 ? "pedido" : "pedidos"}
+            </Text>
           </View>
-        ) : null
+          <TouchableOpacity style={styles.btnCrediario} onPress={onOpenCrediario}>
+            <Ionicons name="calendar-outline" size={16} color={CORES.primario} />
+            <Text style={styles.btnCrediarioTexto}>Crediario</Text>
+          </TouchableOpacity>
+        </View>
       }
       ListEmptyComponent={
         erroPedidos ? (
           <View style={styles.vazio}>
             <Ionicons name="alert-circle-outline" size={56} color={CORES.erro} />
-            <Text style={styles.vazioTitulo}>
-              Não foi possível carregar seus pedidos
-            </Text>
+            <Text style={styles.vazioTitulo}>Não foi possível carregar seus pedidos</Text>
             <Text style={styles.vazioTexto}>
               Puxe para atualizar ou tente novamente em instantes.
             </Text>
@@ -107,10 +108,7 @@ export function OrdersContent({
             <Text style={styles.vazioTexto}>
               Seus pedidos aparecerão aqui assim que você finalizar uma compra.
             </Text>
-            <TouchableOpacity
-              style={styles.btnComprar}
-              onPress={onOpenCatalog}
-            >
+            <TouchableOpacity style={styles.btnComprar} onPress={onOpenCatalog}>
               <Ionicons name="storefront-outline" size={16} color="#fff" />
               <Text style={styles.btnComprarTexto}>Ver produtos</Text>
             </TouchableOpacity>

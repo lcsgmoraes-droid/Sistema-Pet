@@ -14,8 +14,7 @@ export interface AuthResponse extends AuthTokens {
   email_verification_sent?: boolean;
 }
 
-export type AppProfileType =
-  "cliente" | "entregador" | "veterinario" | "funcionario";
+export type AppProfileType = "cliente" | "entregador" | "veterinario" | "funcionario";
 
 export interface AppAccessProfile {
   type: AppProfileType;
@@ -440,6 +439,12 @@ export interface FuncionarioPdvCliente {
   cupons_disponiveis?: any[];
 }
 
+export interface FuncionarioPdvClienteRapidoPayload {
+  nome?: string | null;
+  telefone?: string | null;
+  endereco?: string | null;
+}
+
 export interface FuncionarioPdvCaixa {
   aberto: boolean;
   caixa_id?: number | null;
@@ -453,8 +458,7 @@ export interface FuncionarioPdvItemPayload {
   preco_unitario: number;
 }
 
-export type FuncionarioPdvFormaPagamento =
-  "dinheiro" | "pix" | "credito" | "debito";
+export type FuncionarioPdvFormaPagamento = "dinheiro" | "pix" | "credito" | "debito" | "crediario";
 
 export interface FuncionarioPdvFormaPagamentoOpcao {
   id: number;
@@ -487,6 +491,7 @@ export interface FuncionarioPdvPagamentoPayload {
   operadora?: string | null;
   operadora_id?: number | null;
   nsu_cartao?: string | null;
+  data_vencimento?: string | null;
 }
 
 export interface FuncionarioPdvCupomDisponivel {
@@ -592,6 +597,12 @@ export interface Pedido {
   payment_preference_id?: string | null;
   payment_url?: string | null;
   created_at?: string | null;
+  pode_avaliar_entrega?: boolean;
+  avaliacao_entrega?: {
+    nota: number;
+    comentario?: string | null;
+    created_at?: string | null;
+  } | null;
   itens: {
     produto_id: number;
     nome: string;

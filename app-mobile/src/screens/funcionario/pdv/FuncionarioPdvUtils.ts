@@ -16,6 +16,7 @@ export const FORMAS_PAGAMENTO: {
   { key: "pix", label: "Pix", icon: "qr-code-outline" },
   { key: "credito", label: "Credito", icon: "card-outline" },
   { key: "debito", label: "Debito", icon: "card-outline" },
+  { key: "crediario", label: "Crediario", icon: "calendar-outline" },
 ];
 
 export function mensagemErroApi(error: any, fallback: string) {
@@ -25,7 +26,9 @@ export function mensagemErroApi(error: any, fallback: string) {
 }
 
 export function parseNumero(valor: string): number | null {
-  let texto = String(valor ?? "").trim().replace(/\s/g, "");
+  let texto = String(valor ?? "")
+    .trim()
+    .replace(/\s/g, "");
   if (!texto) return null;
   if (texto.includes(",") && texto.includes(".")) {
     texto =

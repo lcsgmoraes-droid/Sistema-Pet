@@ -87,8 +87,7 @@ function normalizarProdutoCatalogo(p: any): Produto {
     anunciar_ecommerce: p.anunciar_ecommerce ?? true,
     disponivel_app: p.disponivel_app ?? p.anunciar_app ?? true,
     disponivel_ecommerce:
-      p.disponivel_ecommerce ??
-      (p.anunciar_ecommerce !== false && estoqueCatalogo > 0),
+      p.disponivel_ecommerce ?? (p.anunciar_ecommerce !== false && estoqueCatalogo > 0),
   };
 }
 
@@ -124,9 +123,7 @@ export async function listarProdutos(params?: {
   });
   // Backend retorna { items: [...] } — adaptar para o formato do app
   const items = data.items ?? data.produtos ?? [];
-  const produtos: Produto[] = items.map((p: any) =>
-    normalizarProdutoCatalogo(p),
-  );
+  const produtos: Produto[] = items.map((p: any) => normalizarProdutoCatalogo(p));
   return { produtos, total: Number(data?.total ?? produtos.length) };
 }
 
@@ -162,9 +159,7 @@ function normalizarOpcoesFiltrosCatalogo(data: any): CatalogoFiltroOpcoes {
     .map((marca: any) => (typeof marca === "string" ? marca : marca?.nome))
     .map((marca: unknown): string => String(marca ?? "").trim())
     .filter((marca: string) => marca.length > 0);
-  const marcas = Array.from(new Set<string>(marcasNormalizadas)).sort((a, b) =>
-    a.localeCompare(b),
-  );
+  const marcas = Array.from(new Set<string>(marcasNormalizadas)).sort((a, b) => a.localeCompare(b));
 
   const pesosRaw = Array.isArray(data?.pesos_embalagem_kg)
     ? data.pesos_embalagem_kg
@@ -174,9 +169,7 @@ function normalizarOpcoesFiltrosCatalogo(data: any): CatalogoFiltroOpcoes {
   const pesosNormalizados = pesosRaw
     .map(normalizarPesoOpcao)
     .filter((peso: number | null): peso is number => peso !== null);
-  const pesos_embalagem_kg = Array.from(
-    new Set<number>(pesosNormalizados),
-  ).sort((a, b) => a - b);
+  const pesos_embalagem_kg = Array.from(new Set<number>(pesosNormalizados)).sort((a, b) => a - b);
 
   return { marcas, pesos_embalagem_kg };
 }
@@ -210,20 +203,15 @@ export async function listarOpcoesFiltrosCatalogo(params?: {
   }
 }
 
-export async function buscarProdutoPorBarcode(
-  barcode: string,
-): Promise<Produto | null> {
+export async function buscarProdutoPorBarcode(barcode: string): Promise<Produto | null> {
   try {
-    const { data } = await api.get<any>(
-      `/app/produto-barcode/${encodeURIComponent(barcode)}`,
-    );
+    const { data } = await api.get<any>(`/app/produto-barcode/${encodeURIComponent(barcode)}`);
     return {
       id: data.id,
       nome: data.nome,
       preco: Number(data.preco_original ?? data.preco ?? 0),
       preco_original: data.preco_original ?? data.preco ?? null,
-      preco_promocional:
-        data.preco_promocional ?? (data.promocao_ativa ? data.preco : null),
+      preco_promocional: data.preco_promocional ?? (data.promocao_ativa ? data.preco : null),
       promocao_ativa: !!data.promocao_ativa,
       foto_url: resolveMediaUrl(data.foto_url),
       estoque: Number(data.estoque ?? 0),
@@ -265,10 +253,7 @@ export async function obterCarrinho(): Promise<{
   };
 }
 
-export async function adicionarAoCarrinho(
-  produto_id: number,
-  quantidade = 1,
-): Promise<void> {
+export async function adicionarAoCarrinho(produto_id: number, quantidade = 1): Promise<void> {
   await api.post(
     "/carrinho/adicionar",
     { produto_id, quantidade },
@@ -278,10 +263,7 @@ export async function adicionarAoCarrinho(
   );
 }
 
-export async function atualizarCarrinho(
-  produto_id: number,
-  quantidade: number,
-): Promise<void> {
+export async function atualizarCarrinho(produto_id: number, quantidade: number): Promise<void> {
   await api.put(
     "/carrinho/atualizar",
     { produto_id, quantidade },
@@ -342,14 +324,11 @@ export interface CheckoutResumoOptions {
   tipoRetirada?: "proprio" | "terceiro";
 }
 
-export async function resumoCheckout(
-  opcoes: CheckoutResumoOptions,
-): Promise<CheckoutResumo> {
+export async function resumoCheckout(opcoes: CheckoutResumoOptions): Promise<CheckoutResumo> {
   const { data } = await api.get("/checkout/resumo", {
     params: {
       cidade_destino: opcoes.cidade,
-      endereco_entrega:
-        opcoes.modo === "entrega" ? opcoes.endereco : "RETIRADA NA LOJA",
+      endereco_entrega: opcoes.modo === "entrega" ? opcoes.endereco : "RETIRADA NA LOJA",
       tipo_retirada:
         opcoes.modo === "retirada"
           ? opcoes.tipoRetirada === "terceiro"
@@ -383,35 +362,24 @@ export interface CheckoutOptions {
   formaPagamentoNome?: string; // forma de pagamento selecionada pelo cliente
 }
 
-export async function finalizarCheckoutAppLoja(
-  opcoes: CheckoutOptions | string,
-): Promise<Pedido> {
+export async function finalizarCheckoutAppLoja(opcoes: CheckoutOptions | string): Promise<Pedido> {
   // Compatibilidade: aceita string (legado) ou objeto com opções
   const cidade = typeof opcoes === "string" ? opcoes : opcoes.cidade;
   const modo = typeof opcoes === "object" ? opcoes.modo : "retirada";
-  const tipoRetirada =
-    typeof opcoes === "object" ? (opcoes.tipoRetirada ?? "proprio") : "proprio";
-  const isDrive =
-    typeof opcoes === "object" ? (opcoes.isDrive ?? false) : false;
+  const tipoRetirada = typeof opcoes === "object" ? (opcoes.tipoRetirada ?? "proprio") : "proprio";
+  const isDrive = typeof opcoes === "object" ? (opcoes.isDrive ?? false) : false;
   const endereco =
-    typeof opcoes === "object" && opcoes.modo === "entrega"
-      ? opcoes.endereco
-      : undefined;
+    typeof opcoes === "object" && opcoes.modo === "entrega" ? opcoes.endereco : undefined;
 
   const idempotencyKey = `app-loja-${Date.now()}`;
-  const formaPagamentoNome =
-    typeof opcoes === "object" ? opcoes.formaPagamentoNome : undefined;
+  const formaPagamentoNome = typeof opcoes === "object" ? opcoes.formaPagamentoNome : undefined;
 
   const { data } = await api.post<Pedido>(
     "/checkout/finalizar",
     {
       cidade_destino: cidade,
       tipo_retirada:
-        modo === "entrega"
-          ? "entrega"
-          : tipoRetirada === "terceiro"
-            ? "terceiro"
-            : "app_loja",
+        modo === "entrega" ? "entrega" : tipoRetirada === "terceiro" ? "terceiro" : "app_loja",
       is_drive: isDrive,
       endereco_entrega:
         modo === "entrega"
@@ -452,9 +420,7 @@ export async function listarRacoesCadastradas(): Promise<RacaoCadastrada[]> {
     const { data } = await api.get("/ecommerce/produtos", {
       params: { limit: 500 },
     });
-    const items: any[] = Array.isArray(data)
-      ? data
-      : (data.items ?? data.produtos ?? []);
+    const items: any[] = Array.isArray(data) ? data : (data.items ?? data.produtos ?? []);
     return items
       .filter((p: any) => p.peso_embalagem && Number(p.peso_embalagem) > 0)
       .map((p: any) => ({
@@ -522,9 +488,18 @@ function isPedidoRecord(value: unknown): value is Pedido {
 
 export async function listarPedidos(): Promise<Pedido[]> {
   const { data } = await api.get<{ pedidos: Pedido[] }>("/checkout/pedidos");
-  return Array.isArray(data?.pedidos)
-    ? data.pedidos.filter(isPedidoRecord)
-    : [];
+  return Array.isArray(data?.pedidos) ? data.pedidos.filter(isPedidoRecord) : [];
+}
+
+export async function avaliarEntrega(
+  vendaId: number,
+  nota: number,
+  comentario?: string | null,
+): Promise<void> {
+  await api.post(`/checkout/vendas/${vendaId}/avaliacao-entrega`, {
+    nota,
+    comentario: comentario?.trim() || null,
+  });
 }
 
 export async function consultarStatusPedido(pedidoId: string): Promise<Pedido> {

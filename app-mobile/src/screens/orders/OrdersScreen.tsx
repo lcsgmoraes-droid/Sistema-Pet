@@ -42,10 +42,7 @@ export default function OrdersScreen() {
         ],
       );
     } catch {
-      Alert.alert(
-        "Erro",
-        "Não foi possível repetir o pedido. Tente novamente.",
-      );
+      Alert.alert("Erro", "Não foi possível repetir o pedido. Tente novamente.");
     } finally {
       setRepetindo(null);
     }
@@ -71,9 +68,7 @@ export default function OrdersScreen() {
   );
 
   useEffect(() => {
-    const temPedidoPendente = pedidos.some(
-      (pedido) => getPedidoStatusKey(pedido) === "pendente",
-    );
+    const temPedidoPendente = pedidos.some((pedido) => getPedidoStatusKey(pedido) === "pendente");
     const temRetiradaAberta = pedidos.some(hasOpenFulfillmentOrder);
     if (!temPedidoPendente && !temRetiradaAberta) return;
 
@@ -108,11 +103,13 @@ export default function OrdersScreen() {
       repetindo={repetindo}
       erroPedidos={erroPedidos}
       onOpenCatalog={() => navigation.navigate("Loja", { screen: "Catalogo" })}
+      onOpenCrediario={() => navigation.navigate("Crediario")}
       onPayNow={handlePagarAgora}
       onRefresh={onRefresh}
       onReload={carregar}
       onRepeat={handleRepetirPedido}
       onTrack={handleRastrear}
+      onRated={carregar}
     />
   );
 }

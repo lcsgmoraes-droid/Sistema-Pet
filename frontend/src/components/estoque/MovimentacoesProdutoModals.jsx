@@ -5,8 +5,11 @@ import ReservasAtivasModal from "./ReservasAtivasModal";
 export default function MovimentacoesProdutoModals({
   abrirPedidoReservado,
   atualizarPrecoGranel,
+  barcodeOrigemGranel,
+  barcodeProdutoGranel,
   baseMargemGranel,
   baseMargemTexto,
+  bipagemObrigatoriaGranel,
   buscaGranel,
   custoKgGranel,
   diferencaPrecoGranel,
@@ -47,6 +50,8 @@ export default function MovimentacoesProdutoModals({
   quantidadeGranelNumero,
   reservasAtivas,
   setAtualizarPrecoGranel,
+  setBarcodeOrigemGranel,
+  setBarcodeProdutoGranel,
   setBuscaGranel,
   setFormData,
   setMargemBaseGranel,
@@ -90,8 +95,11 @@ export default function MovimentacoesProdutoModals({
       {showGranelModal && (
         <GranelLancamentoModal
           atualizarPrecoGranel={atualizarPrecoGranel}
+          barcodeOrigemGranel={barcodeOrigemGranel}
+          barcodeProdutoGranel={barcodeProdutoGranel}
           baseMargemGranel={baseMargemGranel}
           baseMargemTexto={baseMargemTexto}
+          bipagemObrigatoriaGranel={bipagemObrigatoriaGranel}
           buscaGranel={buscaGranel}
           custoKgGranel={custoKgGranel}
           diferencaPrecoGranel={diferencaPrecoGranel}
@@ -124,6 +132,8 @@ export default function MovimentacoesProdutoModals({
           quantidadeGranel={quantidadeGranel}
           quantidadeGranelNumero={quantidadeGranelNumero}
           setAtualizarPrecoGranel={setAtualizarPrecoGranel}
+          setBarcodeOrigemGranel={setBarcodeOrigemGranel}
+          setBarcodeProdutoGranel={setBarcodeProdutoGranel}
           setBuscaGranel={setBuscaGranel}
           setMargemBaseGranel={setMargemBaseGranel}
           setMargemGranel={setMargemGranel}

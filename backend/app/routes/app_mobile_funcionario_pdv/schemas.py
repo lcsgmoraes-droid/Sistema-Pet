@@ -1,5 +1,6 @@
 """Schemas do PDV do funcionario no App Mobile."""
 
+from datetime import date
 from typing import Optional
 
 from pydantic import BaseModel, Field
@@ -35,6 +36,12 @@ class FuncionarioPdvClienteResponse(BaseModel):
     cupons_disponiveis: list[dict] = Field(default_factory=list)
 
 
+class FuncionarioPdvClienteRapidoRequest(BaseModel):
+    nome: Optional[str] = Field(default=None, max_length=255)
+    telefone: Optional[str] = Field(default=None, max_length=50)
+    endereco: Optional[str] = Field(default=None, max_length=500)
+
+
 class FuncionarioPdvCaixaResponse(BaseModel):
     aberto: bool
     caixa_id: Optional[int] = None
@@ -59,6 +66,7 @@ class FuncionarioPdvPagamentoRequest(BaseModel):
     operadora: Optional[str] = None
     operadora_id: Optional[int] = None
     nsu_cartao: Optional[str] = None
+    data_vencimento: Optional[date] = None
 
 
 class FuncionarioPdvFinalizarRequest(BaseModel):

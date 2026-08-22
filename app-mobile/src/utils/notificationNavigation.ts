@@ -21,22 +21,15 @@ function toPositiveInteger(value: unknown): number | null {
 export function stockNotificationToProductId(data: NotificationData): number | null {
   if (!data) return null;
   const isStockWaitlist =
-    data.source === "stock_waitlist" &&
-    (!data.kind || data.kind === "stock_available");
+    data.source === "stock_waitlist" && (!data.kind || data.kind === "stock_available");
   const isLegacyNotifyMe = !data.source && data.type === "stock_available";
   if (!isStockWaitlist && !isLegacyNotifyMe) return null;
 
   return toPositiveInteger(data.produto_id) ?? toPositiveInteger(data.product_id);
 }
 
-export function recurrenceNotificationToProductId(
-  data: NotificationData,
-): number | null {
-  if (
-    !data ||
-    data.source !== "product_recurrence" ||
-    data.kind !== "repurchase_due"
-  ) {
+export function recurrenceNotificationToProductId(data: NotificationData): number | null {
+  if (!data || data.source !== "product_recurrence" || data.kind !== "repurchase_due") {
     return null;
   }
   return toPositiveInteger(data.produto_id) ?? toPositiveInteger(data.product_id);
@@ -72,17 +65,24 @@ export function campaignNotificationTarget(data: NotificationData): NavigationTa
     return { route: "Beneficios", params: { screen: "MeusBeneficios" } };
   }
 
-  if ([
-    "birthday_customer",
-    "birthday_pet",
-    "welcome_app",
-    "welcome_ecommerce",
-    "inactivity",
-    "quick_repurchase",
-    "monthly_highlight",
-  ].includes(kind)) {
+  if (
+    [
+      "birthday_customer",
+      "birthday_pet",
+      "welcome_app",
+      "welcome_ecommerce",
+      "inactivity",
+      "quick_repurchase",
+      "monthly_highlight",
+    ].includes(kind)
+  ) {
     return { route: "Beneficios", params: { screen: "MeusCupons" } };
   }
 
   return { route: "Beneficios", params: { screen: "MeusBeneficios" } };
+}
+
+export function crediarioNotificationTarget(data: NotificationData): NavigationTarget | null {
+  if (!data || data.source !== "crediario") return null;
+  return { route: "Pedidos", params: { screen: "Crediario" } };
 }

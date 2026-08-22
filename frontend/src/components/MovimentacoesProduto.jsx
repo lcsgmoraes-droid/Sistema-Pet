@@ -82,8 +82,11 @@ export default function MovimentacoesProduto() {
   const {
     abrirModalGranel,
     atualizarPrecoGranel,
+    barcodeOrigemGranel,
+    barcodeProdutoGranel,
     baseMargemGranel,
     baseMargemTexto,
+    bipagemObrigatoriaGranel,
     buscaGranel,
     custoKgGranel,
     diferencaPrecoGranel,
@@ -114,6 +117,8 @@ export default function MovimentacoesProduto() {
     quantidadeGranel,
     quantidadeGranelNumero,
     setAtualizarPrecoGranel,
+    setBarcodeOrigemGranel,
+    setBarcodeProdutoGranel,
     setBuscaGranel,
     setMargemBaseGranel,
     setMargemGranel,
@@ -583,8 +588,11 @@ export default function MovimentacoesProduto() {
       <MovimentacoesProdutoModals
         abrirPedidoReservado={abrirPedidoReservado}
         atualizarPrecoGranel={atualizarPrecoGranel}
+        barcodeOrigemGranel={barcodeOrigemGranel}
+        barcodeProdutoGranel={barcodeProdutoGranel}
         baseMargemGranel={baseMargemGranel}
         baseMargemTexto={baseMargemTexto}
+        bipagemObrigatoriaGranel={bipagemObrigatoriaGranel}
         buscaGranel={buscaGranel}
         custoKgGranel={custoKgGranel}
         diferencaPrecoGranel={diferencaPrecoGranel}
@@ -625,6 +633,8 @@ export default function MovimentacoesProduto() {
         quantidadeGranelNumero={quantidadeGranelNumero}
         reservasAtivas={reservasAtivas}
         setAtualizarPrecoGranel={setAtualizarPrecoGranel}
+        setBarcodeOrigemGranel={setBarcodeOrigemGranel}
+        setBarcodeProdutoGranel={setBarcodeProdutoGranel}
         setBuscaGranel={setBuscaGranel}
         setFormData={setFormData}
         setMargemBaseGranel={setMargemBaseGranel}

@@ -314,6 +314,7 @@ class ConfigEstoqueResponse(BaseModel):
     bloquear_validade_pdv: bool = True
     bloquear_validade_ecommerce: bool = True
     bloquear_validade_integracoes_online: bool = False
+    granel_bipagem_obrigatoria: bool = False
 
     class Config:
         from_attributes = True
@@ -326,6 +327,7 @@ class ConfigEstoqueUpdate(BaseModel):
     bloquear_validade_pdv: bool = True
     bloquear_validade_ecommerce: bool = True
     bloquear_validade_integracoes_online: bool = False
+    granel_bipagem_obrigatoria: bool = False
 
 
 def _config_estoque_response(tenant: Tenant) -> ConfigEstoqueResponse:
@@ -339,6 +341,9 @@ def _config_estoque_response(tenant: Tenant) -> ConfigEstoqueResponse:
         ),
         bloquear_validade_integracoes_online=bool(
             getattr(tenant, "bloquear_validade_integracoes_online", False)
+        ),
+        granel_bipagem_obrigatoria=bool(
+            getattr(tenant, "granel_bipagem_obrigatoria", False)
         ),
     )
 
@@ -398,6 +403,7 @@ def atualizar_config_estoque(
     tenant.bloquear_validade_integracoes_online = (
         config.bloquear_validade_integracoes_online
     )
+    tenant.granel_bipagem_obrigatoria = config.granel_bipagem_obrigatoria
 
     db.commit()
     db.refresh(tenant)

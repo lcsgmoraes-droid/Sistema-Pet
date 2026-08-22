@@ -18,6 +18,7 @@ EXPECTED_PDV_MODULES = {
     "caixa.py",
     "pagamentos.py",
     "beneficios.py",
+    "granel.py",
     "vendas.py",
     "routes.py",
 }
@@ -25,11 +26,16 @@ EXPECTED_PDV_SUBROUTES = {
     ("/funcionario/pdv/produtos/buscar", "GET"),
     ("/funcionario/pdv/produtos/barcode/{barcode}", "GET"),
     ("/funcionario/pdv/clientes/buscar", "GET"),
+    ("/funcionario/pdv/clientes/rapido", "POST"),
     ("/funcionario/pdv/caixa/aberto", "GET"),
     ("/funcionario/pdv/formas-pagamento", "GET"),
     ("/funcionario/pdv/beneficios/preview", "POST"),
     ("/funcionario/pdv/vendas/salvar", "POST"),
     ("/funcionario/pdv/vendas/finalizar", "POST"),
+    ("/funcionario/granel/config", "GET"),
+    ("/funcionario/granel/produtos/barcode/{barcode}", "GET"),
+    ("/funcionario/granel/produtos/buscar", "GET"),
+    ("/funcionario/granel/converter", "POST"),
 }
 EXPECTED_PUBLIC_PDV_ROUTES = {
     (f"/app{path}", method) for path, method in EXPECTED_PDV_SUBROUTES
@@ -49,6 +55,17 @@ def read_pdv_backend_source() -> str:
             for path in sorted(package_dir.glob("*.py"))
         )
     return "\n\n".join(chunks)
+
+
+def read_mobile_pdv_source() -> str:
+    paths = [
+        "app-mobile/src/screens/funcionario/FuncionarioPdvScreen.tsx",
+        "app-mobile/src/screens/funcionario/pdv/FuncionarioPdvContent.tsx",
+        "app-mobile/src/screens/funcionario/pdv/FuncionarioPdvScanner.tsx",
+        "app-mobile/src/screens/funcionario/pdv/FuncionarioPdvProductImage.tsx",
+        "app-mobile/src/screens/funcionario/pdv/FuncionarioPdvUtils.ts",
+    ]
+    return "\n\n".join(read_repo(path) for path in paths)
 
 
 def extract_block(source: str, marker: str) -> str:
@@ -186,7 +203,7 @@ def test_funcionario_pdv_searches_products_and_clients_like_web_pdv():
     serializer_block = extract_block(source, "def _serialize_funcionario_pdv_cliente")
     types = read_repo("app-mobile/src/types/index.ts")
     service = read_repo("app-mobile/src/services/funcionarioPdv.service.ts")
-    screen = read_repo("app-mobile/src/screens/funcionario/FuncionarioPdvScreen.tsx")
+    screen = read_mobile_pdv_source()
 
     for field in [
         "Produto.nome.ilike",
@@ -234,7 +251,7 @@ def test_mobile_app_has_employee_pdv_navigation_service_and_screen():
     nav_types = read_repo("app-mobile/src/types/funcionarioNavigation.ts")
     navigator = read_repo("app-mobile/src/navigation/FuncionarioNavigator.tsx")
     service = read_repo("app-mobile/src/services/funcionarioPdv.service.ts")
-    screen = read_repo("app-mobile/src/screens/funcionario/FuncionarioPdvScreen.tsx")
+    screen = read_mobile_pdv_source()
 
     assert "FuncionarioHome" in nav_types
     assert "FuncionarioPdv" in nav_types
@@ -249,7 +266,7 @@ def test_mobile_app_has_employee_pdv_navigation_service_and_screen():
 def test_funcionario_pdv_supports_campaign_benefits_preview_contract():
     backend = read_pdv_backend_source()
     service = read_repo("app-mobile/src/services/funcionarioPdv.service.ts")
-    screen = read_repo("app-mobile/src/screens/funcionario/FuncionarioPdvScreen.tsx")
+    screen = read_mobile_pdv_source()
 
     assert '"/funcionario/pdv/beneficios/preview"' in backend
     assert "preview_coupon_redemption" in backend
@@ -286,7 +303,7 @@ def test_funcionario_pdv_supports_credit_installments_from_erp_payment_rules():
     backend = read_pdv_backend_source()
     types = read_repo("app-mobile/src/types/index.ts")
     service = read_repo("app-mobile/src/services/funcionarioPdv.service.ts")
-    screen = read_repo("app-mobile/src/screens/funcionario/FuncionarioPdvScreen.tsx")
+    screen = read_mobile_pdv_source()
     finalizar_block = extract_block(backend, "def finalizar_venda_funcionario_pdv")
 
     assert "FuncionarioPdvFormaPagamentoResponse" in backend
@@ -308,7 +325,7 @@ def test_funcionario_pdv_collects_card_brand_nsu_and_erp_payment_rule():
     backend = read_pdv_backend_source()
     types = read_repo("app-mobile/src/types/index.ts")
     service = read_repo("app-mobile/src/services/funcionarioPdv.service.ts")
-    screen = read_repo("app-mobile/src/screens/funcionario/FuncionarioPdvScreen.tsx")
+    screen = read_mobile_pdv_source()
     formas_block = extract_block(backend, "def listar_formas_pagamento_funcionario_pdv")
     finalizar_block = extract_block(backend, "def finalizar_venda_funcionario_pdv")
 
@@ -329,7 +346,9 @@ def test_funcionario_pdv_collects_card_brand_nsu_and_erp_payment_rule():
     assert '"requer_nsu": bool(forma.requer_nsu)' in formas_block
     assert '"bandeira": forma.bandeira' in formas_block
     assert '"operadora": forma.operadora' in formas_block
-    assert '"forma_pagamento_id": dados.pagamento.forma_pagamento_id' in finalizar_block
+    assert '"forma_pagamento_id": (' in finalizar_block
+    assert "forma_pagamento_selecionada.id" in finalizar_block
+    assert "else dados.pagamento.forma_pagamento_id" in finalizar_block
     assert '"bandeira": dados.pagamento.bandeira' in finalizar_block
     assert '"nsu_cartao": dados.pagamento.nsu_cartao' in finalizar_block
     assert "formaPagamentoSelecionada" in screen
@@ -344,7 +363,7 @@ def test_funcionario_pdv_card_brand_is_explicit_and_nsu_optional():
     resolver_block = extract_block(
         backend, "def _resolver_forma_pagamento_cartao_funcionario_pdv"
     )
-    screen = read_repo("app-mobile/src/screens/funcionario/FuncionarioPdvScreen.tsx")
+    screen = read_mobile_pdv_source()
 
     assert "Informe o NSU do cartao" not in resolver_block
     assert "formaPagamentoSelecionada?.requer_nsu && !nsuCartao.trim()" not in screen
@@ -365,7 +384,7 @@ def test_funcionario_pdv_search_ranks_full_phrase_before_loose_code_digits():
 
 def test_funcionario_pdv_uses_keyboard_safe_scroll_and_product_images():
     service = read_repo("app-mobile/src/services/funcionarioPdv.service.ts")
-    screen = read_repo("app-mobile/src/screens/funcionario/FuncionarioPdvScreen.tsx")
+    screen = read_mobile_pdv_source()
 
     assert "resolveMediaUrl" in service
     assert "imagem_url: resolveMediaUrl" in service
@@ -381,7 +400,7 @@ def test_funcionario_pdv_uses_keyboard_safe_scroll_and_product_images():
 def test_funcionario_pdv_can_save_open_sale_for_cashier_checkout():
     backend = read_pdv_backend_source()
     service = read_repo("app-mobile/src/services/funcionarioPdv.service.ts")
-    screen = read_repo("app-mobile/src/screens/funcionario/FuncionarioPdvScreen.tsx")
+    screen = read_mobile_pdv_source()
     save_block = extract_block(backend, "def salvar_venda_funcionario_pdv")
     payload_block = extract_block(backend, "def _criar_payload_venda_funcionario_pdv")
 
@@ -400,7 +419,7 @@ def test_funcionario_pdv_can_save_open_sale_for_cashier_checkout():
 def test_funcionario_pdv_supports_fractional_quantity_and_value_to_weight_inputs():
     backend = read_pdv_backend_source()
     types = read_repo("app-mobile/src/types/index.ts")
-    screen = read_repo("app-mobile/src/screens/funcionario/FuncionarioPdvScreen.tsx")
+    screen = read_mobile_pdv_source()
 
     assert "quantidade: float = Field(gt=0)" in backend
     assert "quantidade: number" in types
@@ -418,7 +437,7 @@ def test_funcionario_pdv_supports_fractional_quantity_and_value_to_weight_inputs
 def test_funcionario_pdv_shows_customer_details_like_web_pdv():
     types = read_repo("app-mobile/src/types/index.ts")
     service = read_repo("app-mobile/src/services/funcionarioPdv.service.ts")
-    screen = read_repo("app-mobile/src/screens/funcionario/FuncionarioPdvScreen.tsx")
+    screen = read_mobile_pdv_source()
 
     for field in [
         "email?: string | null",

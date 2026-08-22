@@ -3,5 +3,6 @@ export type FuncionarioStackParamList = {
   FuncionarioBalanco: undefined;
   FuncionarioContagem: undefined;
   FuncionarioPdv: undefined;
+  FuncionarioGranel: undefined;
   FuncionarioNovidades: { somenteNovidades?: boolean } | undefined;
 };

@@ -11,6 +11,8 @@ from sqlalchemy import (
     DateTime,
     Text,
     ForeignKey,
+    CheckConstraint,
+    UniqueConstraint,
 )
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
@@ -168,3 +170,23 @@ class RotaEntregaParada(BaseTenantModel):
     venda = relationship("Venda", backref="paradas_rota", lazy="select")
 
     # created_at herdado de BaseTenantModel
+
+
+class EntregaAvaliacao(BaseTenantModel):
+    """Feedback do cliente sobre uma entrega concluida."""
+
+    __tablename__ = "entrega_avaliacoes"
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "venda_id", name="uq_entrega_avaliacao_venda"),
+        CheckConstraint("nota >= 1 AND nota <= 5", name="ck_entrega_avaliacao_nota"),
+    )
+
+    venda_id = Column(Integer, ForeignKey("vendas.id"), nullable=False, index=True)
+    cliente_id = Column(Integer, ForeignKey("clientes.id"), nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    nota = Column(Integer, nullable=False)
+    comentario = Column(Text, nullable=True)
+
+    venda = relationship("Venda")
+    cliente = relationship("Cliente")
+    user = relationship("User")

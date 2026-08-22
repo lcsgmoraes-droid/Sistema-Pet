@@ -19,7 +19,7 @@ from app.api.endpoints.rotas_entrega_tracking import registrar_token_rastreio
 from app.auth.dependencies import get_current_user_and_tenant
 from app.db import get_session
 from app.models import Cliente
-from app.rotas_entrega_models import RotaEntrega, RotaEntregaParada
+from app.rotas_entrega_models import EntregaAvaliacao, RotaEntrega, RotaEntregaParada
 from app.schemas.rota_entrega import RotaEntregaResponse, RotaEntregaUpdate
 from app.vendas_models import Venda
 
@@ -113,6 +113,15 @@ def _hidratar_paradas_rota(db: Session, rota: RotaEntrega, tenant_id: int) -> No
     dist_por_parada = {row[0]: row for row in dist_rows}
 
     vendas_por_id = {}
+    avaliacoes_por_venda = {
+        int(avaliacao.venda_id): avaliacao
+        for avaliacao in db.query(EntregaAvaliacao)
+        .filter(
+            EntregaAvaliacao.tenant_id == tenant_id,
+            EntregaAvaliacao.venda_id.in_([parada.venda_id for parada in paradas]),
+        )
+        .all()
+    }
     for parada in paradas:
         dist_row = dist_por_parada.get(parada.id)
         if dist_row:
@@ -148,6 +157,11 @@ def _hidratar_paradas_rota(db: Session, rota: RotaEntrega, tenant_id: int) -> No
             )
             parada.observacoes_entrega = venda.observacoes_entrega
             parada.canal_venda = venda.canal
+            avaliacao = avaliacoes_por_venda.get(int(venda.id))
+            if avaliacao:
+                parada.avaliacao_entrega_nota = int(avaliacao.nota)
+                parada.avaliacao_entrega_comentario = avaliacao.comentario
+                parada.avaliacao_entrega_data = avaliacao.created_at
 
     _hidratar_resumo_financeiro_rota(rota, list(vendas_por_id.values()))
 

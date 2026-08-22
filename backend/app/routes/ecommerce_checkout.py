@@ -1,16 +1,21 @@
 from uuid import UUID
-from datetime import datetime
+from datetime import date, datetime
 import json
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Header, status
+from pydantic import BaseModel, Field
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.db import get_session
 from app.financeiro_models import FormaPagamento
+from app.financeiro_models import ContaReceber
 from app.idempotency_models import IdempotencyKey
-from app.models import Tenant
+from app.models import Cliente, Tenant
 from app.pedido_models import Pedido
+from app.rotas_entrega_models import EntregaAvaliacao
+from app.vendas_models import Venda
 from app.routes.ecommerce_checkout_support import (
     CheckoutCalcularFreteRequest,
     CheckoutFinalizarRequest,
@@ -52,6 +57,11 @@ from app.utils.timezone import now_brasilia
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/checkout", tags=["ecommerce-checkout"])
+
+
+class EntregaAvaliacaoRequest(BaseModel):
+    nota: int = Field(ge=1, le=5)
+    comentario: str | None = Field(default=None, max_length=1000)
 
 
 def _payment_info_for_pedido(db: Session, pedido: Pedido) -> dict[str, str | None]:
@@ -553,6 +563,141 @@ def listar_pedidos_cliente(
     response = {"pedidos": pedidos}
     db.rollback()
     return response
+
+
+@router.get("/crediario")
+def listar_crediario_cliente(
+    identity: EcommerceIdentity = Depends(_current_identity),
+    db: Session = Depends(get_session),
+):
+    """Lista parcelas em aberto e quitadas das pessoas ligadas ao usuario do app."""
+    tenant_id = _activate_checkout_tenant_context(identity)
+    cliente_ids = [
+        row[0]
+        for row in db.query(Cliente.id)
+        .filter(
+            Cliente.tenant_id == tenant_id,
+            Cliente.auth_user_id == identity.user_id,
+        )
+        .all()
+    ]
+    if not cliente_ids:
+        return {"resumo": {"em_aberto": 0, "vencido": 0}, "contas": []}
+    contas = (
+        db.query(ContaReceber)
+        .join(FormaPagamento, FormaPagamento.id == ContaReceber.forma_pagamento_id)
+        .filter(
+            ContaReceber.tenant_id == tenant_id,
+            ContaReceber.cliente_id.in_(cliente_ids),
+            FormaPagamento.tipo == "crediario",
+        )
+        .order_by(ContaReceber.data_vencimento.desc(), ContaReceber.id.desc())
+        .limit(100)
+        .all()
+    )
+    hoje = date.today()
+    itens = []
+    em_aberto = 0.0
+    vencido = 0.0
+    for conta in contas:
+        saldo = max(float(conta.valor_final or 0) - float(conta.valor_recebido or 0), 0)
+        esta_aberta = (
+            conta.status
+            not in {
+                "recebido",
+                "pago",
+                "cancelado",
+                "cancelada",
+                "estornado",
+                "estornada",
+            }
+            and saldo > 0.009
+        )
+        esta_vencida = esta_aberta and conta.data_vencimento < hoje
+        if esta_aberta:
+            em_aberto += saldo
+        if esta_vencida:
+            vencido += saldo
+        itens.append(
+            {
+                "id": conta.id,
+                "venda_id": conta.venda_id,
+                "descricao": conta.descricao,
+                "valor_original": float(conta.valor_original or 0),
+                "valor_recebido": float(conta.valor_recebido or 0),
+                "saldo": saldo,
+                "data_vencimento": conta.data_vencimento.isoformat(),
+                "status": "vencido" if esta_vencida else conta.status,
+            }
+        )
+    return {
+        "resumo": {"em_aberto": round(em_aberto, 2), "vencido": round(vencido, 2)},
+        "contas": itens,
+    }
+
+
+@router.post("/vendas/{venda_id}/avaliacao-entrega", status_code=201)
+def avaliar_entrega_cliente(
+    venda_id: int,
+    payload: EntregaAvaliacaoRequest,
+    identity: EcommerceIdentity = Depends(_current_identity),
+    db: Session = Depends(get_session),
+):
+    """Registra uma unica avaliacao da entrega pelo cliente dono da venda."""
+    tenant_id = _activate_checkout_tenant_context(identity)
+    venda = (
+        db.query(Venda)
+        .join(Cliente, Cliente.id == Venda.cliente_id)
+        .filter(
+            Venda.id == venda_id,
+            Venda.tenant_id == tenant_id,
+            Cliente.auth_user_id == identity.user_id,
+        )
+        .first()
+    )
+    if not venda:
+        raise HTTPException(status_code=404, detail="Entrega nao encontrada.")
+    cliente = venda.cliente
+    if not venda.tem_entrega or str(venda.status_entrega or "").lower() != "entregue":
+        raise HTTPException(
+            status_code=400,
+            detail="A entrega so pode ser avaliada depois de concluida.",
+        )
+    existente = (
+        db.query(EntregaAvaliacao)
+        .filter(
+            EntregaAvaliacao.tenant_id == tenant_id,
+            EntregaAvaliacao.venda_id == venda.id,
+        )
+        .first()
+    )
+    if existente:
+        raise HTTPException(status_code=409, detail="Esta entrega ja foi avaliada.")
+
+    avaliacao = EntregaAvaliacao(
+        tenant_id=tenant_id,
+        venda_id=venda.id,
+        cliente_id=cliente.id,
+        user_id=identity.user_id,
+        nota=payload.nota,
+        comentario=(payload.comentario or "").strip() or None,
+    )
+    db.add(avaliacao)
+    try:
+        db.commit()
+    except IntegrityError as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=409, detail="Esta entrega ja foi avaliada."
+        ) from exc
+    db.refresh(avaliacao)
+    return {
+        "id": avaliacao.id,
+        "venda_id": avaliacao.venda_id,
+        "nota": avaliacao.nota,
+        "comentario": avaliacao.comentario,
+        "created_at": avaliacao.created_at,
+    }
 
 
 @router.get("/pedido/{pedido_id}/status")

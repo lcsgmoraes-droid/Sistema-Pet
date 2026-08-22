@@ -3,7 +3,7 @@
     "name": "CorePet",
     "slug": "petshop-app",
     "scheme": "corepet",
-    "version": "1.0.3",
+    "version": "1.0.4",
     "orientation": "portrait",
     "updates": {
       "enabled": true,
@@ -27,7 +27,7 @@
       "runtimeVersion": {
         "policy": "appVersion"
       },
-      "buildNumber": "10"
+      "buildNumber": "11"
     },
     "android": {
       "softwareKeyboardLayoutMode": "resize",
@@ -50,7 +50,7 @@
         "android.permission.RECORD_AUDIO",
         "android.permission.SYSTEM_ALERT_WINDOW"
       ],
-      "runtimeVersion": "1.0.3",
+      "runtimeVersion": "1.0.4",
       "versionCode": 11
     },
     "web": {

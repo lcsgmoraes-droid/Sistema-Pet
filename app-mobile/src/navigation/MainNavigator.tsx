@@ -16,6 +16,7 @@ import BeneficiosScreen from "../screens/benefits/BeneficiosScreen";
 import CouponsScreen from "../screens/coupons/CouponsScreen";
 import HomeScreen from "../screens/HomeScreen";
 import OrdersScreen from "../screens/orders/OrdersScreen";
+import CrediarioScreen from "../screens/orders/CrediarioScreen";
 import TrackDeliveryScreen from "../screens/orders/TrackDeliveryScreen";
 import FoodCalculatorScreen from "../screens/pets/FoodCalculatorScreen";
 import PetDetailScreen from "../screens/pets/PetDetailScreen";
@@ -50,11 +51,7 @@ function StoreHeaderBadge() {
 function HomeNavigator() {
   return (
     <HomeStack.Navigator screenOptions={{ headerRight: StoreHeaderBadge }}>
-      <HomeStack.Screen
-        name="Inicio"
-        component={HomeScreen}
-        options={{ headerShown: false }}
-      />
+      <HomeStack.Screen name="Inicio" component={HomeScreen} options={{ headerShown: false }} />
       <HomeStack.Screen
         name="Notificacoes"
         component={NotificationsScreen}
@@ -67,11 +64,7 @@ function HomeNavigator() {
 function LojaNavigator() {
   return (
     <LojaStack.Navigator screenOptions={{ headerRight: StoreHeaderBadge }}>
-      <LojaStack.Screen
-        name="Catalogo"
-        component={CatalogScreen}
-        options={{ title: "Produtos" }}
-      />
+      <LojaStack.Screen name="Catalogo" component={CatalogScreen} options={{ title: "Produtos" }} />
       <LojaStack.Screen
         name="Carrinho"
         component={CartScreen}
@@ -177,6 +170,11 @@ function PedidosNavigator() {
         options={{ headerTitle: "Meus Pedidos" }}
       />
       <PedidosStack.Screen
+        name="Crediario"
+        component={CrediarioScreen}
+        options={{ headerTitle: "Meu crediario", headerBackTitle: "Pedidos" }}
+      />
+      <PedidosStack.Screen
         name="Rastreio"
         component={TrackDeliveryScreen}
         options={{
@@ -215,14 +213,10 @@ function CustomerTabs() {
   function protectTab(event: any, navigation: any) {
     if (isAuthenticated) return;
     event.preventDefault();
-    Alert.alert(
-      "Entre na sua conta",
-      "Esta area guarda dados pessoais e precisa de login.",
-      [
-        { text: "Agora nao", style: "cancel" },
-        { text: "Entrar", onPress: () => navigateToLogin(navigation) },
-      ],
-    );
+    Alert.alert("Entre na sua conta", "Esta area guarda dados pessoais e precisa de login.", [
+      { text: "Agora nao", style: "cancel" },
+      { text: "Entrar", onPress: () => navigateToLogin(navigation) },
+    ]);
   }
 
   return (
@@ -261,9 +255,7 @@ function CustomerTabs() {
         })}
         options={{
           title: "Loja",
-          tabBarIcon: ({ color, size }) => (
-            <StoreIcon color={color} size={size} />
-          ),
+          tabBarIcon: ({ color, size }) => <StoreIcon color={color} size={size} />,
         }}
       />
       <Tab.Screen
@@ -274,9 +266,7 @@ function CustomerTabs() {
         })}
         options={{
           title: "Favoritos",
-          tabBarIcon: ({ color, size }) => (
-            <HeartIcon color={color} size={size} />
-          ),
+          tabBarIcon: ({ color, size }) => <HeartIcon color={color} size={size} />,
           headerShown: true,
           headerTitle: "Meus Favoritos",
         }}

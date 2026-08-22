@@ -19,7 +19,10 @@ export default function FuncionarioHomeScreen() {
         </View>
       </View>
 
-      <TouchableOpacity style={styles.acao} onPress={() => navigation.navigate("FuncionarioBalanco")}>
+      <TouchableOpacity
+        style={styles.acao}
+        onPress={() => navigation.navigate("FuncionarioBalanco")}
+      >
         <View style={[styles.acaoIcone, { backgroundColor: "#DCFCE7" }]}>
           <Ionicons name="barcode-outline" size={24} color={CORES.sucesso} />
         </View>
@@ -30,7 +33,10 @@ export default function FuncionarioHomeScreen() {
         <Ionicons name="chevron-forward" size={20} color={CORES.textoClaro} />
       </TouchableOpacity>
 
-      <TouchableOpacity style={styles.acao} onPress={() => navigation.navigate("FuncionarioContagem")}>
+      <TouchableOpacity
+        style={styles.acao}
+        onPress={() => navigation.navigate("FuncionarioContagem")}
+      >
         <View style={[styles.acaoIcone, { backgroundColor: "#FEF3C7" }]}>
           <Ionicons name="clipboard-outline" size={24} color={CORES.aviso} />
         </View>
@@ -47,7 +53,25 @@ export default function FuncionarioHomeScreen() {
         </View>
         <View style={{ flex: 1 }}>
           <Text style={styles.acaoTitulo}>Passar venda</Text>
-          <Text style={styles.acaoTexto}>Scanner, carrinho, cliente opcional e pagamento simples.</Text>
+          <Text style={styles.acaoTexto}>
+            Scanner, carrinho, cliente opcional e pagamento simples.
+          </Text>
+        </View>
+        <Ionicons name="chevron-forward" size={20} color={CORES.textoClaro} />
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        style={styles.acao}
+        onPress={() => navigation.navigate("FuncionarioGranel")}
+      >
+        <View style={[styles.acaoIcone, { backgroundColor: "#F3E8FF" }]}>
+          <Ionicons name="scale-outline" size={24} color="#7E22CE" />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.acaoTitulo}>Lancar granel</Text>
+          <Text style={styles.acaoTexto}>
+            Bipe o pacote pai e confirme o produto granel vinculado.
+          </Text>
         </View>
         <Ionicons name="chevron-forward" size={20} color={CORES.textoClaro} />
       </TouchableOpacity>
