@@ -49,6 +49,23 @@ const STATUS: Record<
   },
 };
 
+function obterStatus(item: EvolucaoCorePetItem) {
+  if (item.status === 'disponivel' && item.fase_disponibilidade === 'teste') {
+    return {
+      label: 'Disponível — em fase de teste',
+      cor: '#7C3AED',
+      fundo: '#EDE9FE',
+    };
+  }
+  if (
+    item.status === 'disponivel' &&
+    item.fase_disponibilidade === 'implantado'
+  ) {
+    return { label: 'Implantado', cor: CORES.sucesso, fundo: '#DCFCE7' };
+  }
+  return STATUS[item.status];
+}
+
 type Props = {
   itens: EvolucaoCorePetItem[];
   refreshing: boolean;
@@ -137,7 +154,20 @@ export default function EvolucaoCorePetList({
           </View>
         }
         renderItem={({ item }) => {
-          const status = STATUS[item.status];
+          const status = obterStatus(item);
+          const implantado =
+            item.status === 'disponivel' &&
+            item.fase_disponibilidade === 'implantado';
+          const rotuloData = implantado
+            ? 'Implantado'
+            : item.status === 'disponivel'
+              ? 'Disponível'
+              : 'Atualizado';
+          const dataStatus = implantado
+            ? item.implantado_em
+            : item.status === 'disponivel'
+              ? item.publicado_em
+              : item.atualizado_em;
           return (
             <View style={[styles.card, item.destaque && styles.cardDestaque]}>
               <View style={styles.cardTopo}>
@@ -160,12 +190,7 @@ export default function EvolucaoCorePetList({
                 ))}
               </View>
               <Text style={styles.data}>
-                {item.status === 'disponivel' ? 'Publicado' : 'Atualizado'} em{' '}
-                {formatarData(
-                  item.status === 'disponivel'
-                    ? item.publicado_em
-                    : item.atualizado_em,
-                )}
+                {rotuloData} em {formatarData(dataStatus)}
               </Text>
             </View>
           );

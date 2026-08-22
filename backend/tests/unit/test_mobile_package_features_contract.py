@@ -77,7 +77,7 @@ def test_crediario_transporta_vencimento_ate_contas_a_receber():
 
     assert 'forma_pagamento == "Crediário"' in vendas
     assert 'pagamento_payload["data_recebimento_prevista"]' in vendas
-    assert "data_recebimento_prevista=pag_data.get" in persistencia
+    assert '"data_recebimento_prevista": pag_data.get' in persistencia
     assert "data_aplicada or" in contas
     assert '@router.get("/crediario")' in checkout
     assert 'source="crediario"' in vendas

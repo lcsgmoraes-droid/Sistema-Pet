@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.db import get_session
+from app.evolucao_corepet import registrar_uso_funcionalidade
 from app.models import Cliente, User
 from app.routes.ecommerce_auth import _get_current_ecommerce_user
 
@@ -288,6 +289,8 @@ def finalizar_venda_funcionario_pdv(
                 idempotency_key=f"crediario:venda:{venda_criada['id']}",
             )
             db.commit()
+    if eh_crediario:
+        registrar_uso_funcionalidade(db, "crediario-vencimento-alertas")
     return {
         "status": venda_resultado.get("status", "finalizada"),
         "venda_id": venda_criada["id"],
