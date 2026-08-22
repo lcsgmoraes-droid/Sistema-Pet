@@ -437,12 +437,17 @@ export default function useModalPagamentoController({
         pagamentosExistentes,
         pagamentos,
       });
+      const formasPagamentoMargem = montarFormasPagamentoAnalise({
+        pagamentos: todosPagamentos,
+        formasPagamento,
+        valorTotal: venda.total,
+      });
 
       const response = await api.post(
         `/formas-pagamento/analisar-venda`,
         montarPayloadAnaliseMargem({
           venda,
-          formasPagamento: todosPagamentos,
+          formasPagamento: formasPagamentoMargem,
         }),
       );
 

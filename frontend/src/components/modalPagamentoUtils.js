@@ -185,6 +185,28 @@ export function montarVendaParaPersistirComCupom({ venda = {}, cupomParaFinaliza
   };
 }
 
+export async function persistirVendaAbertaParaPagamento({
+  vendaParaPersistir = {},
+  payloadVenda = {},
+  vendaIdPersistida = null,
+  criarVenda,
+  atualizarVenda,
+}) {
+  const vendaId = vendaParaPersistir.id || vendaIdPersistida;
+
+  if (vendaId) {
+    await atualizarVenda(vendaId, payloadVenda);
+    return vendaId;
+  }
+
+  const vendaCriada = await criarVenda(payloadVenda);
+  if (!vendaCriada?.id) {
+    throw new Error("A venda foi criada sem retornar um identificador");
+  }
+
+  return vendaCriada.id;
+}
+
 export function devePerguntarNotaFiscal(resultado = {}) {
   return resultado?.status === "finalizada" || resultado?.status === "pago_nf";
 }
@@ -333,11 +355,12 @@ export function montarPagamentoRecebido({
   const tipo = formaPagamento?.tipo;
   const isCartao = ["cartao_credito", "cartao_debito"].includes(tipo);
   const parcelas = formaPagamento?.permite_parcelamento ? numeroParcelas : 1;
+  const formaPagamentoId = normalizarFormaPagamentoId(formaPagamento?.id);
 
   return {
     forma_pagamento: formaPagamento.nome,
     forma_id: formaPagamento.id,
-    forma_pagamento_id: formaPagamento.id,
+    forma_pagamento_id: formaPagamentoId,
     nome: formaPagamento.nome,
     valor: Math.min(Number(valor || 0), Number(valorRestante || 0)),
     bandeira: isCartao ? bandeira : null,
@@ -513,29 +536,71 @@ export function montarFormasPagamentoAnalise({
         .toLowerCase()
         .includes("dinheiro"),
   );
+  const dinheiroId = normalizarFormaPagamentoId(dinheiro?.id);
 
   if (pagamentos.length === 0) {
-    return montarPagamentoAVista(Number(valorTotal || 0), dinheiro?.id || null);
+    return dinheiroId ? montarPagamentoAVista(Number(valorTotal || 0), dinheiroId) : [];
   }
 
-  const formasAnalise = pagamentos.map((pagamento) => ({
-    forma_pagamento_id: pagamento.forma_pagamento_id || pagamento.forma_id,
-    valor: pagamento.valor,
-    parcelas: pagamento.parcelas || pagamento.numero_parcelas || 1,
-    operadora_id: pagamento.operadora_id || null,
-    bandeira: pagamento.bandeira || null,
-    modalidade: pagamento.modalidade || pagamento.modalidade_cartao || null,
-  }));
+  const formasAnalise = pagamentos.flatMap((pagamento) => {
+    const formaPagamentoId = resolverFormaPagamentoIdAnalise(pagamento, formasPagamento);
+    if (!formaPagamentoId) return [];
 
-  if (restante > 0) {
+    return [
+      {
+        forma_pagamento_id: formaPagamentoId,
+        valor: pagamento.valor,
+        parcelas: pagamento.parcelas || pagamento.numero_parcelas || 1,
+        operadora_id: pagamento.operadora_id || null,
+        bandeira: pagamento.bandeira || null,
+        modalidade: pagamento.modalidade || pagamento.modalidade_cartao || null,
+      },
+    ];
+  });
+
+  if (restante > 0 && dinheiroId) {
     formasAnalise.push({
-      forma_pagamento_id: dinheiro?.id || null,
+      forma_pagamento_id: dinheiroId,
       valor: restante,
       parcelas: 1,
     });
   }
 
   return formasAnalise;
+}
+
+function normalizarFormaPagamentoId(valor) {
+  if (typeof valor === "number" && Number.isInteger(valor) && valor > 0) {
+    return valor;
+  }
+
+  if (typeof valor === "string" && /^\d+$/.test(valor.trim())) {
+    const id = Number(valor);
+    return id > 0 ? id : null;
+  }
+
+  return null;
+}
+
+function resolverFormaPagamentoIdAnalise(pagamento = {}, formasPagamento = []) {
+  const idDireto = normalizarFormaPagamentoId(
+    pagamento.forma_pagamento_id ?? pagamento.forma_id,
+  );
+  if (idDireto) return idDireto;
+
+  const nomePagamento = String(pagamento.forma_pagamento || pagamento.nome || "")
+    .trim()
+    .toLocaleLowerCase("pt-BR");
+  if (!nomePagamento) return null;
+
+  const formaCorrespondente = formasPagamento.find(
+    (forma) =>
+      String(forma.nome || "")
+        .trim()
+        .toLocaleLowerCase("pt-BR") === nomePagamento,
+  );
+
+  return normalizarFormaPagamentoId(formaCorrespondente?.id);
 }
 
 export function calcularFaixasParcelamento(simulacoes, maxParcelas) {

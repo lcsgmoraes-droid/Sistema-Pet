@@ -39,6 +39,7 @@ import {
   obterParcelasDisponiveis,
   obterTaxaCartaoSelecionada,
   podeEnviarPagamentoStonePos,
+  persistirVendaAbertaParaPagamento,
   resolverFaixasParcelamentoDaForma,
   validarPagamentoParaAdicionar,
 } from "./modalPagamentoUtils.js";
@@ -654,6 +655,23 @@ test("monta pagamento em dinheiro com troco e sem dados de cartao", () => {
   assert.equal(pagamento.troco, 20);
 });
 
+test("nao envia identificador textual do credito do cliente ao backend", () => {
+  const pagamento = montarPagamentoRecebido({
+    formaPagamento: {
+      id: "credito_cliente",
+      nome: "Crédito Cliente",
+      tipo: "credito_cliente",
+      credito_disponivel: 7,
+    },
+    valor: 7,
+    valorRestante: 121.4,
+  });
+
+  assert.equal(pagamento.forma_id, "credito_cliente");
+  assert.equal(pagamento.forma_pagamento_id, null);
+  assert.equal(pagamento.is_credito_cliente, true);
+});
+
 test("monta itens e payload para analise de margem", () => {
   const venda = {
     total: 200,
@@ -732,6 +750,76 @@ test("monta formas de pagamento para analise da venda com restante em dinheiro",
     },
     { forma_pagamento_id: 1, valor: 40, parcelas: 1 },
   ]);
+});
+
+test("analisa credito do cliente com Getnet Mastercard em uma vez", () => {
+  const formas = montarFormasPagamentoAnalise({
+    pagamentos: [
+      {
+        forma_pagamento: "Crédito Cliente",
+        forma_id: "credito_cliente",
+        forma_pagamento_id: "credito_cliente",
+        valor: 7,
+        parcelas: 1,
+      },
+      {
+        forma_pagamento: "Crédito",
+        forma_id: 4,
+        forma_pagamento_id: 4,
+        valor: 114.4,
+        parcelas: 1,
+        bandeira: "Mastercard",
+        modalidade_cartao: "credito",
+        operadora_id: 11,
+      },
+    ],
+    formasPagamento: [
+      { id: 1, tipo: "dinheiro", nome: "Dinheiro" },
+      { id: 4, tipo: "cartao_credito", nome: "Crédito" },
+    ],
+    valorTotal: 121.4,
+  });
+
+  assert.deepEqual(formas, [
+    {
+      forma_pagamento_id: 4,
+      valor: 114.4,
+      parcelas: 1,
+      operadora_id: 11,
+      bandeira: "Mastercard",
+      modalidade: "credito",
+    },
+  ]);
+});
+
+test("reutiliza venda criada quando a primeira finalizacao falha", async () => {
+  const chamadas = { criar: 0, atualizar: 0 };
+  const criarVenda = async () => {
+    chamadas.criar += 1;
+    return { id: 1068294 };
+  };
+  const atualizarVenda = async (vendaId) => {
+    chamadas.atualizar += 1;
+    assert.equal(vendaId, 1068294);
+  };
+
+  const primeiraVendaId = await persistirVendaAbertaParaPagamento({
+    vendaParaPersistir: {},
+    payloadVenda: { total: 121.4 },
+    criarVenda,
+    atualizarVenda,
+  });
+  const segundaVendaId = await persistirVendaAbertaParaPagamento({
+    vendaParaPersistir: {},
+    payloadVenda: { total: 121.4 },
+    vendaIdPersistida: primeiraVendaId,
+    criarVenda,
+    atualizarVenda,
+  });
+
+  assert.equal(primeiraVendaId, 1068294);
+  assert.equal(segundaVendaId, 1068294);
+  assert.deepEqual(chamadas, { criar: 1, atualizar: 1 });
 });
 
 test("monta pagamento a vista com a forma cadastrada no tenant", () => {
