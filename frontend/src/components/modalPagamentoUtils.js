@@ -583,9 +583,7 @@ function normalizarFormaPagamentoId(valor) {
 }
 
 function resolverFormaPagamentoIdAnalise(pagamento = {}, formasPagamento = []) {
-  const idDireto = normalizarFormaPagamentoId(
-    pagamento.forma_pagamento_id ?? pagamento.forma_id,
-  );
+  const idDireto = normalizarFormaPagamentoId(pagamento.forma_pagamento_id ?? pagamento.forma_id);
   if (idDireto) return idDireto;
 
   const nomePagamento = String(pagamento.forma_pagamento || pagamento.nome || "")
