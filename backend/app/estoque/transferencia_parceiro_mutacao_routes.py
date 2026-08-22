@@ -2,6 +2,7 @@
 
 from datetime import date
 from decimal import Decimal
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import or_
@@ -37,6 +38,7 @@ router = APIRouter(tags=["Estoque - Transferencia Parceiro"])
 
 __all__ = [
     "editar_transferencia_parceiro",
+    "registrar_saida_parceiro",
     "router",
     "transferir_estoque_para_parceiro",
 ]
@@ -67,33 +69,26 @@ def _validar_itens_transferencia(payload: TransferenciaParceiroRequest):
     return itens_validos
 
 
-@router.post("/transferencia-parceiro", status_code=status.HTTP_201_CREATED)
-@require_permission("produtos.editar")
-def transferir_estoque_para_parceiro(
+def registrar_saida_parceiro(
+    db: Session,
+    *,
+    tenant_id,
+    user_id: int,
     payload: TransferenciaParceiroRequest,
-    db: Session = Depends(get_session),
-    user_and_tenant=Depends(get_current_user_and_tenant),
-):
-    """
-    Transfere estoque para um parceiro pelo custo.
-
-    Regras:
-    - baixa estoque via FIFO/lotes;
-    - nao cria venda nem entra no faturamento do PDV;
-    - gera um contas a receber separado para o ressarcimento do parceiro.
-    """
-    current_user, tenant_id = user_and_tenant
-
+    commit: bool = True,
+    sincronizar: bool = True,
+) -> dict:
+    """Registra a saida e permite compor uma transacao multiempresa atomica."""
+    tenant_id = UUID(str(tenant_id))
     parceiro = _buscar_parceiro_transferencia(db, tenant_id, payload.parceiro_id)
     itens_validos = _validar_itens_transferencia(payload)
-
     codigo_transferencia = (
         _texto_limpo(payload.documento) or _gerar_codigo_transferencia_parceiro()
     )
     conta_existente = (
         db.query(ContaReceber)
         .filter(
-            ContaReceber.tenant_id == str(tenant_id),
+            ContaReceber.tenant_id == tenant_id,
             ContaReceber.documento == codigo_transferencia,
         )
         .first()
@@ -104,73 +99,73 @@ def transferir_estoque_para_parceiro(
             detail="Ja existe um registro financeiro com este documento",
         )
 
-    try:
-        itens_processados, total_transferencia = _preparar_itens_transferencia_parceiro(
-            db,
+    itens_processados, total_transferencia = _preparar_itens_transferencia_parceiro(
+        db,
+        tenant_id=tenant_id,
+        itens_validos=itens_validos,
+    )
+    categoria_financeira = _obter_ou_criar_categoria_financeira_transferencia(
+        db,
+        tenant_id=tenant_id,
+        user_id=user_id,
+    )
+    dre_subcategoria_id = (
+        categoria_financeira.dre_subcategoria_id
+        or _obter_dre_subcategoria_receita_padrao(db, tenant_id)
+    )
+    conta_receber = ContaReceber(
+        tenant_id=tenant_id,
+        descricao=f"Transferencia para parceiro - {parceiro.nome}",
+        cliente_id=parceiro.id,
+        categoria_id=categoria_financeira.id,
+        dre_subcategoria_id=dre_subcategoria_id,
+        canal="transferencia_parceiro",
+        valor_original=total_transferencia,
+        valor_recebido=Decimal("0"),
+        valor_final=total_transferencia,
+        data_emissao=date.today(),
+        data_vencimento=payload.data_vencimento or date.today(),
+        status="pendente",
+        documento=codigo_transferencia,
+        observacoes=_montar_observacoes_transferencia_parceiro(
+            payload.observacao,
+            itens_processados,
+        ),
+        user_id=user_id,
+    )
+    db.add(conta_receber)
+    db.flush()
+    for item in itens_processados:
+        observacao_item = (
+            f"Transferencia para parceiro {parceiro.nome} pelo custo. "
+            f"Conta a receber #{conta_receber.id}."
+        )
+        if payload.observacao:
+            observacao_item = f"{observacao_item} {payload.observacao}"
+        resultado_baixa = EstoqueService.baixar_estoque(
+            produto_id=item["produto_id"],
+            quantidade=item["quantidade"],
+            motivo=_MOTIVO_TRANSFERENCIA_PARCEIRO_ESTOQUE,
+            referencia_id=conta_receber.id,
+            referencia_tipo=_MOTIVO_TRANSFERENCIA_PARCEIRO_ESTOQUE,
+            user_id=user_id,
+            db=db,
             tenant_id=tenant_id,
-            itens_validos=itens_validos,
-        )
-
-        categoria_financeira = _obter_ou_criar_categoria_financeira_transferencia(
-            db,
-            tenant_id=tenant_id,
-            user_id=current_user.id,
-        )
-        dre_subcategoria_id = (
-            categoria_financeira.dre_subcategoria_id
-            or _obter_dre_subcategoria_receita_padrao(db, tenant_id)
-        )
-
-        conta_receber = ContaReceber(
-            tenant_id=str(tenant_id),
-            descricao=f"Transferencia para parceiro - {parceiro.nome}",
-            cliente_id=parceiro.id,
-            categoria_id=categoria_financeira.id,
-            dre_subcategoria_id=dre_subcategoria_id,
-            canal="transferencia_parceiro",
-            valor_original=total_transferencia,
-            valor_recebido=Decimal("0"),
-            valor_final=total_transferencia,
-            data_emissao=date.today(),
-            data_vencimento=payload.data_vencimento or date.today(),
-            status="pendente",
             documento=codigo_transferencia,
-            observacoes=_montar_observacoes_transferencia_parceiro(
-                payload.observacao,
-                itens_processados,
-            ),
-            user_id=current_user.id,
+            observacao=observacao_item,
+            custo_unitario_override=item["custo_unitario"],
+            valor_total_override=item["total_item"],
+            # O helper agenda a sincronizacao somente depois do commit.
+            sincronizar=False,
         )
-        db.add(conta_receber)
-        db.flush()
+        item["movimentacao_id"] = resultado_baixa["movimentacao_id"]
+        item["estoque_novo"] = resultado_baixa["estoque_novo"]
 
-        for item in itens_processados:
-            observacao_item = (
-                f"Transferencia para parceiro {parceiro.nome} pelo custo. "
-                f"Conta a receber #{conta_receber.id}."
-            )
-            if payload.observacao:
-                observacao_item = f"{observacao_item} {payload.observacao}"
-
-            resultado_baixa = EstoqueService.baixar_estoque(
-                produto_id=item["produto_id"],
-                quantidade=item["quantidade"],
-                motivo=_MOTIVO_TRANSFERENCIA_PARCEIRO_ESTOQUE,
-                referencia_id=conta_receber.id,
-                referencia_tipo=_MOTIVO_TRANSFERENCIA_PARCEIRO_ESTOQUE,
-                user_id=current_user.id,
-                db=db,
-                tenant_id=str(tenant_id),
-                documento=codigo_transferencia,
-                observacao=observacao_item,
-                custo_unitario_override=item["custo_unitario"],
-                valor_total_override=item["total_item"],
-            )
-            item["movimentacao_id"] = resultado_baixa["movimentacao_id"]
-            item["estoque_novo"] = resultado_baixa["estoque_novo"]
-
+    if commit:
         db.commit()
-
+    else:
+        db.flush()
+    if commit and sincronizar:
         for item in itens_processados:
             try:
                 sincronizar_bling_background(
@@ -183,22 +178,40 @@ def transferir_estoque_para_parceiro(
                     f"[BLING-SYNC] Erro ao agendar sync (transferencia-parceiro): {e_sync}"
                 )
 
-        return {
-            "sucesso": True,
-            "documento": codigo_transferencia,
-            "conta_receber_id": conta_receber.id,
-            "parceiro": {
-                "id": parceiro.id,
-                "nome": parceiro.nome,
-                "codigo": getattr(parceiro, "codigo", None),
-                "email": getattr(parceiro, "email", None),
-            },
-            "data_vencimento": conta_receber.data_vencimento.isoformat()
-            if conta_receber.data_vencimento
-            else None,
-            "total_ressarcimento": float(total_transferencia),
-            "itens": itens_processados,
-        }
+    return {
+        "sucesso": True,
+        "documento": codigo_transferencia,
+        "conta_receber_id": conta_receber.id,
+        "parceiro": {
+            "id": parceiro.id,
+            "nome": parceiro.nome,
+            "codigo": getattr(parceiro, "codigo", None),
+            "email": getattr(parceiro, "email", None),
+        },
+        "data_vencimento": conta_receber.data_vencimento.isoformat()
+        if conta_receber.data_vencimento
+        else None,
+        "total_ressarcimento": float(total_transferencia),
+        "itens": itens_processados,
+    }
+
+
+@router.post("/transferencia-parceiro", status_code=status.HTTP_201_CREATED)
+@require_permission("produtos.editar")
+def transferir_estoque_para_parceiro(
+    payload: TransferenciaParceiroRequest,
+    db: Session = Depends(get_session),
+    user_and_tenant=Depends(get_current_user_and_tenant),
+):
+    """Baixa o estoque e gera o ressarcimento da transferencia ao parceiro."""
+    current_user, tenant_id = user_and_tenant
+    try:
+        return registrar_saida_parceiro(
+            db,
+            tenant_id=tenant_id,
+            user_id=current_user.id,
+            payload=payload,
+        )
     except HTTPException:
         db.rollback()
         raise

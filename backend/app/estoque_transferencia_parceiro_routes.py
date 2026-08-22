@@ -60,6 +60,9 @@ from .estoque.transferencia_parceiro_mutacao_routes import (
     router as transferencia_parceiro_mutacao_router,
     transferir_estoque_para_parceiro,
 )
+from .estoque.transferencia_grupo_routes import (
+    router as transferencia_grupo_router,
+)
 from .security.permissions_decorator import require_permission
 from .services.email_service import is_email_configured, send_email
 
@@ -409,6 +412,7 @@ def enviar_email_transferencia_parceiro(
 
 
 router.include_router(transferencia_parceiro_mutacao_router)
+router.include_router(transferencia_grupo_router)
 router.include_router(transferencia_parceiro_entrada_router)
 router.include_router(transferencia_parceiro_baixa_router)
 router.include_router(transferencia_parceiro_baixa_lote_router)

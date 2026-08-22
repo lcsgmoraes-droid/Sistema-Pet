@@ -227,6 +227,7 @@ class EmpresaGrupoService:
             empresa_id=empresa_id,
             papel="responsavel",
             status="ativo",
+            usuario_referencia_id=usuario_id,
         )
         self.db.add(membro)
         self._auditar(
@@ -386,6 +387,7 @@ class EmpresaGrupoService:
                     empresa_id=empresa_id,
                     papel="membro",
                     status="ativo",
+                    usuario_referencia_id=usuario_id,
                 )
                 self.db.add(membro)
             else:
@@ -393,6 +395,7 @@ class EmpresaGrupoService:
                 membro.status = "ativo"
                 membro.entrou_em = self.agora
                 membro.removido_em = None
+                membro.usuario_referencia_id = usuario_id
             convite.status = "aceito"
             grupo.versao_membros = int(grupo.versao_membros or 1) + 1
             evento = "empresa_grupo_convite_aceito"

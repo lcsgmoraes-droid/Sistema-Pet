@@ -50,6 +50,7 @@ from app.empresa_grupo_models import (
     EmpresaGrupoCodigo,
     EmpresaGrupoConvite,
     EmpresaGrupoMembro,
+    EmpresaGrupoTransferencia,
 )
 from app.models_cadastros import (
     Cliente,

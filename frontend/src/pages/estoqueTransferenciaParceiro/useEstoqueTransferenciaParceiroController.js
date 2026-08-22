@@ -35,6 +35,11 @@ export default function useEstoqueTransferenciaParceiroController() {
     abaAtiva,
     lancamentoProps: {
       parceiroRef: lancamento.parceiroRef,
+      destinosGrupo: lancamento.destinosGrupo,
+      loadingDestinosGrupo: lancamento.loadingDestinosGrupo,
+      destinoGrupoSelecionado: lancamento.destinoGrupoSelecionado,
+      previaGrupo: lancamento.previaGrupo,
+      selecionarDestinoGrupo: lancamento.selecionarDestinoGrupo,
       parceiroSelecionado: lancamento.parceiroSelecionado,
       limparParceiro: lancamento.limparParceiro,
       buscaParceiro: lancamento.buscaParceiro,

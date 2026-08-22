@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import date, datetime
 from decimal import Decimal, ROUND_HALF_UP
+from uuid import UUID
 
 from fastapi import HTTPException
 from sqlalchemy import desc, or_
@@ -280,7 +281,7 @@ def _registrar_movimentacoes_entrada(
                 f"Conta a pagar #{conta_pagar.id}."
             ),
             user_id=user_id,
-            tenant_id=str(tenant_id),
+            tenant_id=tenant_id,
         )
         db.add(produto)
         db.add(movimentacao)
@@ -291,16 +292,21 @@ def _registrar_movimentacoes_entrada(
 
 
 def registrar_entrada_parceiro(
-    db: Session, *, tenant_id, user_id: int, payload
+    db: Session,
+    *,
+    tenant_id,
+    user_id: int,
+    payload,
+    commit: bool = True,
+    sincronizar: bool = True,
 ) -> dict:
+    tenant_id = UUID(str(tenant_id))
     parceiro = _buscar_parceiro_entrada(db, tenant_id, int(payload.parceiro_id))
     documento = _texto_limpo(payload.documento) or _gerar_documento_entrada_parceiro()
 
     conta_existente = (
         db.query(ContaPagar)
-        .filter(
-            ContaPagar.tenant_id == str(tenant_id), ContaPagar.documento == documento
-        )
+        .filter(ContaPagar.tenant_id == tenant_id, ContaPagar.documento == documento)
         .first()
     )
     if conta_existente:
@@ -320,7 +326,7 @@ def registrar_entrada_parceiro(
     data_emissao = payload.data_emissao or date.today()
     data_vencimento = payload.data_vencimento or data_emissao
     conta_pagar = ContaPagar(
-        tenant_id=str(tenant_id),
+        tenant_id=tenant_id,
         descricao=f"Entrada de parceiro - {parceiro.nome}",
         fornecedor_id=parceiro.id,
         canal=CANAL_ENTRADA_PARCEIRO,
@@ -354,9 +360,12 @@ def registrar_entrada_parceiro(
             produtos_cache=produtos_cache,
         )
 
-    db.commit()
+    if commit:
+        db.commit()
+    else:
+        db.flush()
 
-    if payload.entrar_estoque:
+    if commit and sincronizar and payload.entrar_estoque:
         for item in itens_processados:
             produto = produtos_cache.get(int(item["produto_id"]))
             if not produto:

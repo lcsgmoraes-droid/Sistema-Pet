@@ -56,7 +56,21 @@ export const BASE_CONHECIMENTO = [
           "Para convidar outra empresa, peça o código mensal dela, abra o grupo criado, preencha **Convidar empresa** e confirme.",
           "A empresa convidada verá o aviso em **Convites recebidos** e poderá **Aceitar** ou **Recusar**. O vínculo só é criado depois do aceite.",
           "O código não permite acessar dados e não adiciona a empresa automaticamente. Ele serve apenas para localizar com segurança o destino do convite.",
-          "A empresa responsável pode remover membros. Os dados continuam separados por empresa; recursos consolidados e transferências serão liberados de forma controlada.",
+          "A empresa responsável pode remover membros. Os dados continuam separados por empresa, e a transferência integrada só acontece depois da escolha e confirmação do usuário.",
+        ],
+      },
+      {
+        slug: "transferencia-integrada-grupo",
+        titulo: "Como transferir produtos entre empresas do grupo",
+        tags: ["grupo", "empresas", "transferencia", "estoque", "codigo de barras"],
+        conteudo: [
+          "Antes de começar, as duas empresas precisam estar como membros ativos do mesmo grupo em **Configurações → Grupos de Empresas**.",
+          "Acesse **Produtos / Estoque → Transferência Parceiro** e escolha **Entre empresas do grupo** no tipo de lançamento.",
+          "Selecione a empresa de destino, adicione os produtos, informe quantidades e valores e clique em **Transferir e dar entrada**.",
+          "O sistema confere cada produto pelo mesmo código de barras ou GTIN nas duas empresas. Produto sem código, não encontrado, duplicado ou inativo no destino bloqueia a operação e aparece na conferência.",
+          "Depois da confirmação, o CorePet dá baixa no estoque e cria o contas a receber da origem; ao mesmo tempo, dá entrada no estoque e cria o contas a pagar do destino.",
+          "As duas partes são gravadas juntas. Se qualquer validação ou gravação falhar, nenhuma saída ou entrada é mantida.",
+          "O documento interno é compartilhado entre as duas empresas e permite rastrear o lançamento nos históricos financeiro e de estoque.",
         ],
       },
       {

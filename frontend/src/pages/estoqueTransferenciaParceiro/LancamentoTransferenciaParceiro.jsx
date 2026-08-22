@@ -4,6 +4,11 @@ import { formatarQuantidade } from "./transferenciaParceiroUtils";
 
 export default function LancamentoTransferenciaParceiro({
   parceiroRef,
+  destinosGrupo,
+  loadingDestinosGrupo,
+  destinoGrupoSelecionado,
+  previaGrupo,
+  selecionarDestinoGrupo,
   parceiroSelecionado,
   limparParceiro,
   buscaParceiro,
@@ -40,6 +45,7 @@ export default function LancamentoTransferenciaParceiro({
   removerItem,
 }) {
   const entradaParceiro = form.tipo_operacao === "entrada_parceiro";
+  const transferenciaGrupo = form.tipo_operacao === "saida_grupo";
 
   return (
     <div className="space-y-6">
@@ -47,12 +53,14 @@ export default function LancamentoTransferenciaParceiro({
         <div className="flex items-center justify-between gap-3">
           <div>
             <h2 className="text-lg font-semibold text-gray-900">
-              1. Pessoa responsavel e dados da transferencia
+              1. Destino e dados da transferencia
             </h2>
             <p className="mt-1 text-sm text-gray-600">
-              {entradaParceiro
-                ? "Registre de quem veio o produto e a divida que sera criada."
-                : "Primeiro selecione quem sera responsavel pelo ressarcimento ou acerto."}
+              {transferenciaGrupo
+                ? "Escolha qual empresa do grupo recebera os produtos automaticamente."
+                : entradaParceiro
+                  ? "Registre de quem veio o produto e a divida que sera criada."
+                  : "Primeiro selecione quem sera responsavel pelo ressarcimento ou acerto."}
             </p>
           </div>
         </div>
@@ -63,12 +71,12 @@ export default function LancamentoTransferenciaParceiro({
               <label className="mb-2 block text-sm font-medium text-gray-700">
                 Tipo de lancamento
               </label>
-              <div className="grid gap-2 rounded-2xl border border-gray-200 bg-slate-50 p-1 sm:grid-cols-2">
+              <div className="grid gap-2 rounded-2xl border border-gray-200 bg-slate-50 p-1 lg:grid-cols-3">
                 <button
                   type="button"
                   onClick={() => atualizarCampo("tipo_operacao", "saida_parceiro")}
                   className={`rounded-xl px-4 py-3 text-sm font-semibold transition ${
-                    !entradaParceiro
+                    !entradaParceiro && !transferenciaGrupo
                       ? "bg-white text-blue-700 shadow-sm"
                       : "text-slate-600 hover:bg-white"
                   }`}
@@ -86,91 +94,149 @@ export default function LancamentoTransferenciaParceiro({
                 >
                   Entrada do parceiro
                 </button>
+                <button
+                  type="button"
+                  onClick={() => atualizarCampo("tipo_operacao", "saida_grupo")}
+                  className={`rounded-xl px-4 py-3 text-sm font-semibold transition ${
+                    transferenciaGrupo
+                      ? "bg-white text-blue-700 shadow-sm"
+                      : "text-slate-600 hover:bg-white"
+                  }`}
+                >
+                  Entre empresas do grupo
+                </button>
               </div>
             </div>
           ) : null}
 
-          <div ref={parceiroRef} className="relative">
-            <label className="mb-2 block text-sm font-medium text-gray-700">
-              Pessoa / parceiro
-            </label>
-            {parceiroSelecionado ? (
-              <div className="flex items-start justify-between gap-3 rounded-2xl border border-blue-200 bg-blue-50 p-4">
-                <div>
-                  <p className="text-sm font-semibold text-blue-900">{parceiroSelecionado.nome}</p>
-                  <p className="mt-1 text-xs text-blue-800">
-                    Codigo: {parceiroSelecionado.codigo || "-"}
-                    {parceiroSelecionado.celular
-                      ? ` | Celular: ${parceiroSelecionado.celular}`
-                      : ""}
-                  </p>
-                  <p className="mt-1 text-xs text-blue-800">
-                    Tipo: {parceiroSelecionado.tipo_cadastro || "pessoa"}
-                    {parceiroSelecionado.parceiro_ativo ? " | Parceiro ativo" : ""}
-                  </p>
-                  {parceiroSelecionado.email ? (
-                    <p className="mt-1 text-xs text-blue-800">{parceiroSelecionado.email}</p>
-                  ) : null}
+          {transferenciaGrupo ? (
+            <div>
+              <label className="mb-2 block text-sm font-medium text-gray-700">
+                Empresa que recebera os produtos
+              </label>
+              <select
+                value={form.destino_grupo_chave || ""}
+                onChange={(event) => selecionarDestinoGrupo(event.target.value)}
+                disabled={loadingDestinosGrupo}
+                className="w-full rounded-2xl border border-gray-300 bg-white px-4 py-3 text-sm text-gray-900 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100 disabled:bg-slate-100"
+              >
+                <option value="">
+                  {loadingDestinosGrupo
+                    ? "Carregando empresas do grupo..."
+                    : "Selecione uma empresa"}
+                </option>
+                {(destinosGrupo || []).map((destino) => (
+                  <option
+                    key={`${destino.grupo_id}|${destino.empresa_id}`}
+                    value={`${destino.grupo_id}|${destino.empresa_id}`}
+                  >
+                    {destino.empresa_nome} — {destino.grupo_nome}
+                  </option>
+                ))}
+              </select>
+              {!loadingDestinosGrupo && (destinosGrupo || []).length === 0 ? (
+                <p className="mt-2 text-sm text-amber-700">
+                  Nenhuma outra empresa ativa do grupo esta disponivel. Confira os convites em
+                  Configuracoes &gt; Grupos de empresas.
+                </p>
+              ) : null}
+              {destinoGrupoSelecionado ? (
+                <div className="mt-3 rounded-2xl border border-indigo-100 bg-indigo-50 p-4 text-sm text-indigo-900">
+                  <span className="font-semibold">Operacao integrada:</span> o sistema dara saida
+                  nesta empresa e entrada em {destinoGrupoSelecionado.empresa_nome}. As duas partes
+                  serao confirmadas juntas.
                 </div>
-                <button
-                  type="button"
-                  onClick={limparParceiro}
-                  className="rounded-xl border border-blue-200 bg-white px-3 py-2 text-sm font-medium text-blue-700 transition-colors hover:bg-blue-100"
-                >
-                  Trocar
-                </button>
-              </div>
-            ) : (
-              <>
-                <input
-                  type="text"
-                  value={buscaParceiro}
-                  onChange={(event) => setBuscaParceiro(event.target.value)}
-                  onFocus={() => setDropdownParceiroAberto(true)}
-                  placeholder="Buscar pessoa por nome, codigo, telefone ou email"
-                  className="w-full rounded-2xl border border-gray-300 px-4 py-3 text-sm text-gray-900 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
-                />
-
-                {dropdownParceiroAberto && (
-                  <div className="absolute z-20 mt-2 w-full rounded-2xl border border-gray-200 bg-white p-2 shadow-xl">
-                    {loadingParceiros ? (
-                      <p className="px-3 py-3 text-sm text-gray-500">Buscando pessoas...</p>
-                    ) : sugestoesParceiros.length > 0 ? (
-                      sugestoesParceiros.map((parceiro) => (
-                        <button
-                          key={parceiro.id}
-                          type="button"
-                          onClick={() => selecionarParceiro(parceiro)}
-                          className="flex w-full flex-col rounded-xl px-3 py-3 text-left transition-colors hover:bg-slate-50"
-                        >
-                          <span className="text-sm font-semibold text-gray-900">
-                            {parceiro.nome}
-                          </span>
-                          <span className="mt-1 text-xs text-gray-500">
-                            Codigo: {parceiro.codigo || "-"}
-                            {parceiro.celular ? ` | ${parceiro.celular}` : ""}
-                          </span>
-                          <span className="mt-1 text-xs text-gray-500">
-                            {parceiro.tipo_cadastro || "pessoa"}
-                            {parceiro.parceiro_ativo ? " | Parceiro ativo" : ""}
-                          </span>
-                        </button>
-                      ))
-                    ) : (
-                      <p className="px-3 py-3 text-sm text-gray-500">
-                        Nenhuma pessoa ativa encontrada para esta busca.
-                      </p>
-                    )}
+              ) : null}
+            </div>
+          ) : (
+            <div ref={parceiroRef} className="relative">
+              <label className="mb-2 block text-sm font-medium text-gray-700">
+                Pessoa / parceiro
+              </label>
+              {parceiroSelecionado ? (
+                <div className="flex items-start justify-between gap-3 rounded-2xl border border-blue-200 bg-blue-50 p-4">
+                  <div>
+                    <p className="text-sm font-semibold text-blue-900">
+                      {parceiroSelecionado.nome}
+                    </p>
+                    <p className="mt-1 text-xs text-blue-800">
+                      Codigo: {parceiroSelecionado.codigo || "-"}
+                      {parceiroSelecionado.celular
+                        ? ` | Celular: ${parceiroSelecionado.celular}`
+                        : ""}
+                    </p>
+                    <p className="mt-1 text-xs text-blue-800">
+                      Tipo: {parceiroSelecionado.tipo_cadastro || "pessoa"}
+                      {parceiroSelecionado.parceiro_ativo ? " | Parceiro ativo" : ""}
+                    </p>
+                    {parceiroSelecionado.email ? (
+                      <p className="mt-1 text-xs text-blue-800">{parceiroSelecionado.email}</p>
+                    ) : null}
                   </div>
-                )}
-              </>
-            )}
-          </div>
+                  <button
+                    type="button"
+                    onClick={limparParceiro}
+                    className="rounded-xl border border-blue-200 bg-white px-3 py-2 text-sm font-medium text-blue-700 transition-colors hover:bg-blue-100"
+                  >
+                    Trocar
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <input
+                    type="text"
+                    value={buscaParceiro}
+                    onChange={(event) => setBuscaParceiro(event.target.value)}
+                    onFocus={() => setDropdownParceiroAberto(true)}
+                    placeholder="Buscar pessoa por nome, codigo, telefone ou email"
+                    className="w-full rounded-2xl border border-gray-300 px-4 py-3 text-sm text-gray-900 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
+                  />
+
+                  {dropdownParceiroAberto && (
+                    <div className="absolute z-20 mt-2 w-full rounded-2xl border border-gray-200 bg-white p-2 shadow-xl">
+                      {loadingParceiros ? (
+                        <p className="px-3 py-3 text-sm text-gray-500">Buscando pessoas...</p>
+                      ) : sugestoesParceiros.length > 0 ? (
+                        sugestoesParceiros.map((parceiro) => (
+                          <button
+                            key={parceiro.id}
+                            type="button"
+                            onClick={() => selecionarParceiro(parceiro)}
+                            className="flex w-full flex-col rounded-xl px-3 py-3 text-left transition-colors hover:bg-slate-50"
+                          >
+                            <span className="text-sm font-semibold text-gray-900">
+                              {parceiro.nome}
+                            </span>
+                            <span className="mt-1 text-xs text-gray-500">
+                              Codigo: {parceiro.codigo || "-"}
+                              {parceiro.celular ? ` | ${parceiro.celular}` : ""}
+                            </span>
+                            <span className="mt-1 text-xs text-gray-500">
+                              {parceiro.tipo_cadastro || "pessoa"}
+                              {parceiro.parceiro_ativo ? " | Parceiro ativo" : ""}
+                            </span>
+                          </button>
+                        ))
+                      ) : (
+                        <p className="px-3 py-3 text-sm text-gray-500">
+                          Nenhuma pessoa ativa encontrada para esta busca.
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          )}
 
           <div className="grid gap-4 md:grid-cols-2">
             <div>
               <label className="mb-2 block text-sm font-medium text-gray-700">
-                {entradaParceiro ? "Vencimento da divida" : "Vencimento do ressarcimento"}
+                {entradaParceiro
+                  ? "Vencimento da divida"
+                  : transferenciaGrupo
+                    ? "Vencimento do acerto entre empresas"
+                    : "Vencimento do ressarcimento"}
               </label>
               <input
                 type="date"
@@ -230,7 +296,9 @@ export default function LancamentoTransferenciaParceiro({
           <p className="mt-1 text-sm text-gray-600">
             {entradaParceiro
               ? "Pesquise os produtos recebidos do parceiro para gerar a divida."
-              : "Pesquise por nome, SKU, codigo ou codigo de barras e monte a transferencia."}
+              : transferenciaGrupo
+                ? "Adicione os produtos. Antes de confirmar, o sistema conferira os codigos de barras na empresa de destino."
+                : "Pesquise por nome, SKU, codigo ou codigo de barras e monte a transferencia."}
           </p>
         </div>
 
@@ -287,9 +355,55 @@ export default function LancamentoTransferenciaParceiro({
         <div className="mt-5 rounded-2xl border border-blue-100 bg-blue-50 p-4 text-sm text-blue-800">
           {entradaParceiro
             ? "Depois de selecionar o produto, confira quantidade e valor da divida antes de registrar."
-            : "Depois de selecionar o produto, confira quantidade e valores na lista abaixo. O botao de registrar fica junto da conferencia final."}
+            : transferenciaGrupo
+              ? "Os produtos precisam ter o mesmo codigo de barras ou GTIN nas duas empresas. A transferencia sera bloqueada se faltar correspondencia segura."
+              : "Depois de selecionar o produto, confira quantidade e valores na lista abaixo. O botao de registrar fica junto da conferencia final."}
         </div>
       </section>
+
+      {transferenciaGrupo && previaGrupo ? (
+        <section className="rounded-3xl border border-gray-200 bg-white p-6 shadow-sm">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <h2 className="text-lg font-semibold text-gray-900">
+                Conferencia na empresa de destino
+              </h2>
+              <p className="mt-1 text-sm text-gray-600">
+                {previaGrupo.todos_mapeados
+                  ? "Todos os produtos foram encontrados pelo codigo de barras."
+                  : "Corrija os itens abaixo antes de tentar novamente."}
+              </p>
+            </div>
+            <span
+              className={`w-fit rounded-full px-3 py-1 text-xs font-semibold ${
+                previaGrupo.todos_mapeados
+                  ? "bg-emerald-100 text-emerald-800"
+                  : "bg-amber-100 text-amber-800"
+              }`}
+            >
+              {previaGrupo.todos_mapeados ? "Pronto para transferir" : "Acao necessaria"}
+            </span>
+          </div>
+          <div className="mt-4 grid gap-3">
+            {(previaGrupo.itens || []).map((item) => (
+              <div
+                key={item.produto_origem_id}
+                className={`rounded-2xl border p-4 ${
+                  item.status === "mapeado"
+                    ? "border-emerald-100 bg-emerald-50"
+                    : "border-amber-200 bg-amber-50"
+                }`}
+              >
+                <p className="text-sm font-semibold text-gray-900">
+                  {item.produto_origem_nome}
+                  {item.produto_destino_nome ? ` → ${item.produto_destino_nome}` : ""}
+                </p>
+                <p className="mt-1 text-xs text-gray-700">{item.mensagem}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+      ) : null}
 
       <section ref={itensRef} className="rounded-3xl border border-gray-200 bg-white shadow-sm">
         <div className="flex flex-col gap-3 border-b border-gray-100 px-6 py-5 lg:flex-row lg:items-center lg:justify-between">
@@ -321,7 +435,9 @@ export default function LancamentoTransferenciaParceiro({
                   ? "Salvar edicao"
                   : entradaParceiro
                     ? "Registrar entrada"
-                    : "Registrar transferencia"}
+                    : transferenciaGrupo
+                      ? "Transferir e dar entrada"
+                      : "Registrar transferencia"}
             </button>
           </div>
         </div>
@@ -375,7 +491,9 @@ export default function LancamentoTransferenciaParceiro({
             <p className="mt-2 text-sm text-gray-500">
               {entradaParceiro
                 ? "Use a busca acima para incluir os produtos recebidos do parceiro."
-                : "Use a busca acima para incluir os produtos que sairao para a pessoa responsavel."}
+                : transferenciaGrupo
+                  ? "Use a busca acima para incluir os produtos enviados para a outra empresa."
+                  : "Use a busca acima para incluir os produtos que sairao para a pessoa responsavel."}
             </p>
           </div>
         ) : (

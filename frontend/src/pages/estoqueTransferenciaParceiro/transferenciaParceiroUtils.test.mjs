@@ -26,6 +26,8 @@ import {
   montarCompensacoesBaixaPayload,
   montarCupomTransferencia,
   montarEntradaParceiroPayload,
+  montarTransferenciaGrupoPayload,
+  montarTransferenciaGrupoPreviaPayload,
   montarBaixaLoteTransferenciaPayload,
   montarFiltrosHistoricoTransferenciaParams,
   montarParametrosDocumentoTransferencia,
@@ -216,6 +218,62 @@ test("montarEntradaParceiroPayload envia divida e opcao de entrada no estoque", 
       documento: "ENT-1",
       observacao: "produto emprestado",
       entrar_estoque: true,
+      itens: [
+        {
+          produto_id: 10,
+          quantidade: 2,
+          custo_unitario: 25,
+          valor_total: 50,
+        },
+      ],
+    },
+  );
+});
+
+test("payload da transferencia integrada preserva destino, valores e idempotencia", () => {
+  const destino = {
+    grupo_id: 9,
+    empresa_id: "22222222-2222-2222-2222-222222222222",
+  };
+  const itens = [
+    {
+      produto_id: 10,
+      quantidade: 2,
+      custo_unitario: 25,
+      total_item: 50,
+    },
+  ];
+
+  assert.deepEqual(montarTransferenciaGrupoPreviaPayload(destino, itens), {
+    grupo_id: 9,
+    empresa_destino_id: "22222222-2222-2222-2222-222222222222",
+    itens: [
+      {
+        produto_id: 10,
+        quantidade: 2,
+        custo_unitario: 25,
+        valor_total: 50,
+      },
+    ],
+  });
+  assert.deepEqual(
+    montarTransferenciaGrupoPayload(
+      destino,
+      {
+        data_vencimento: "2026-08-31",
+        documento: " GRUPO-1 ",
+        observacao: " reposicao ",
+      },
+      itens,
+      "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+    ),
+    {
+      grupo_id: 9,
+      empresa_destino_id: "22222222-2222-2222-2222-222222222222",
+      chave_idempotencia: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      data_vencimento: "2026-08-31",
+      documento: "GRUPO-1",
+      observacao: "reposicao",
       itens: [
         {
           produto_id: 10,

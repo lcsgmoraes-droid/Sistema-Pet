@@ -68,7 +68,7 @@ class EstoqueService:
 
         usuario_tenant = (
             db.query(User)
-            .filter(User.tenant_id == str(tenant_id), User.is_active == True)  # noqa: E712
+            .filter(User.tenant_id == tenant_id, User.is_active == True)  # noqa: E712
             .order_by(User.id.asc())
             .first()
         )
@@ -98,7 +98,7 @@ class EstoqueService:
 
         from app.models import Tenant
 
-        tenant = db.query(Tenant).filter(Tenant.id == tenant_id).first()
+        tenant = db.query(Tenant).filter(Tenant.id == str(tenant_id)).first()
 
         if not tenant or not tenant.permite_estoque_negativo:
             raise ValueError(
@@ -245,6 +245,7 @@ class EstoqueService:
         observacao: Optional[str] = None,
         custo_unitario_override: Optional[float] = None,
         valor_total_override: Optional[float] = None,
+        sincronizar: bool = True,
     ) -> Dict:
         """
         Baixa estoque de um produto com FIFO de lotes
@@ -357,7 +358,8 @@ class EstoqueService:
         )
 
         # 🔄 Enfileirar sync com Bling (não bloqueia, não falha a operação)
-        _agenda_sync_bling(produto.id, float(estoque_novo), motivo)
+        if sincronizar:
+            _agenda_sync_bling(produto.id, float(estoque_novo), motivo)
 
         return {
             "sucesso": True,
