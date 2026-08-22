@@ -7,6 +7,7 @@ import json
 import logging
 import os
 import secrets
+from contextlib import nullcontext
 from datetime import datetime, timedelta
 from html import escape
 from pathlib import Path
@@ -16,6 +17,8 @@ from urllib.parse import quote
 import requests
 from fastapi import APIRouter, Query, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
+
+from app.bling_integration_parts.core import BLING_OAUTH_TOKEN_URL, _bling_token_lock
 
 
 logger = logging.getLogger(__name__)
@@ -83,40 +86,48 @@ def _sincronizar_controle_token(expires_in: int = 21600) -> None:
     logger.info("Controle local do token Bling sincronizado")
 
 
-def _salvar_tokens(access_token: str, refresh_token: str, expires_in: int = 21600):
+def _salvar_tokens(
+    access_token: str,
+    refresh_token: str,
+    expires_in: int = 21600,
+    *,
+    lock_held: bool = False,
+):
     """Salva tokens no arquivo .env."""
-    env_path = _get_env_path()
-    logger.info("Salvando tokens Bling")
+    lock_context = nullcontext() if lock_held else _bling_token_lock()
+    with lock_context:
+        env_path = _get_env_path()
+        logger.info("Salvando tokens Bling")
 
-    if not env_path.exists():
-        logger.warning("Arquivo .env nao encontrado, criando")
-        env_path.write_text("")
+        if not env_path.exists():
+            logger.warning("Arquivo .env nao encontrado, criando")
+            env_path.write_text("")
 
-    linhas = env_path.read_text(encoding="utf-8").splitlines()
-    novas_linhas = []
-    achou_access = False
-    achou_refresh = False
+        linhas = env_path.read_text(encoding="utf-8").splitlines()
+        novas_linhas = []
+        achou_access = False
+        achou_refresh = False
 
-    for linha in linhas:
-        if linha.startswith("BLING_ACCESS_TOKEN="):
+        for linha in linhas:
+            if linha.startswith("BLING_ACCESS_TOKEN="):
+                novas_linhas.append(f"BLING_ACCESS_TOKEN={access_token}")
+                achou_access = True
+            elif linha.startswith("BLING_REFRESH_TOKEN="):
+                novas_linhas.append(f"BLING_REFRESH_TOKEN={refresh_token}")
+                achou_refresh = True
+            else:
+                novas_linhas.append(linha)
+
+        if not achou_access:
             novas_linhas.append(f"BLING_ACCESS_TOKEN={access_token}")
-            achou_access = True
-        elif linha.startswith("BLING_REFRESH_TOKEN="):
+        if not achou_refresh:
             novas_linhas.append(f"BLING_REFRESH_TOKEN={refresh_token}")
-            achou_refresh = True
-        else:
-            novas_linhas.append(linha)
 
-    if not achou_access:
-        novas_linhas.append(f"BLING_ACCESS_TOKEN={access_token}")
-    if not achou_refresh:
-        novas_linhas.append(f"BLING_REFRESH_TOKEN={refresh_token}")
+        env_path.write_text("\n".join(novas_linhas) + "\n", encoding="utf-8")
 
-    env_path.write_text("\n".join(novas_linhas) + "\n", encoding="utf-8")
-
-    os.environ["BLING_ACCESS_TOKEN"] = access_token
-    os.environ["BLING_REFRESH_TOKEN"] = refresh_token
-    _sincronizar_controle_token(expires_in=expires_in)
+        os.environ["BLING_ACCESS_TOKEN"] = access_token
+        os.environ["BLING_REFRESH_TOKEN"] = refresh_token
+        _sincronizar_controle_token(expires_in=expires_in)
 
     logger.info("Tokens Bling salvos com sucesso")
 
@@ -132,7 +143,7 @@ def _trocar_code_por_tokens(code: str, redirect_uri: str) -> dict:
     creds = base64.b64encode(f"{client_id}:{client_secret}".encode()).decode()
 
     response = requests.post(
-        "https://www.bling.com.br/Api/v3/oauth/token",
+        BLING_OAUTH_TOKEN_URL,
         headers={
             "Authorization": f"Basic {creds}",
             "Content-Type": "application/x-www-form-urlencoded",

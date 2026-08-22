@@ -1,6 +1,8 @@
-import requests
-import pytest
+from contextlib import nullcontext
 from types import SimpleNamespace
+
+import pytest
+import requests
 
 from app.bling_integration import BlingAPI, _montar_url_bling, prevalidar_fiscal_venda
 
@@ -156,6 +158,41 @@ def test_request_renova_token_e_repete_quando_bling_retorna_invalid_token(monkey
     assert chamadas[0]["timeout"] == 30
 
 
+def test_request_reaproveita_token_renovado_por_outro_processo(monkeypatch):
+    api = _make_api()
+    chamadas = []
+    recargas = 0
+    renovacoes = []
+
+    def fake_get(url, headers=None, params=None, timeout=None):
+        chamadas.append(headers.get("Authorization"))
+        if len(chamadas) == 1:
+            return _FakeResponse(
+                401,
+                {"error": {"type": "invalid_token", "message": "invalid_token"}},
+            )
+        return _FakeResponse(200, {"data": []})
+
+    def fake_recarregar():
+        nonlocal recargas
+        recargas += 1
+        if recargas == 2:
+            api.access_token = "token-do-outro-processo"
+            api.refresh_token = "refresh-do-outro-processo"
+            return True
+        return False
+
+    monkeypatch.setattr("requests.get", fake_get)
+    monkeypatch.setattr(api, "_recarregar_tokens_compartilhados", fake_recarregar)
+    monkeypatch.setattr(
+        api, "_renovar_token_automatico", lambda: renovacoes.append(True)
+    )
+
+    assert api._request("GET", "/nfe") == {"data": []}
+    assert chamadas == ["Bearer token-antigo", "Bearer token-do-outro-processo"]
+    assert renovacoes == []
+
+
 def test_request_nao_renova_para_erro_diferente_de_invalid_token(monkeypatch):
     api = _make_api()
     renovacoes = []
@@ -247,15 +284,64 @@ def test_renovar_access_token_usa_timeout(monkeypatch):
         return FakeResponse()
 
     monkeypatch.setattr("requests.post", fake_post)
-    monkeypatch.setattr("app.bling_oauth_routes._salvar_tokens", lambda *_args: None)
+    monkeypatch.setattr(
+        "app.bling_oauth_routes._salvar_tokens",
+        lambda *_args, **_kwargs: None,
+    )
 
     assert api.renovar_access_token()["access_token"] == "token-novo"
-    assert chamadas[0]["url"] == "https://www.bling.com.br/Api/v3/oauth/token"
+    assert chamadas[0]["url"] == "https://api.bling.com.br/Api/v3/oauth/token"
     assert chamadas[0]["data"] == {
         "grant_type": "refresh_token",
         "refresh_token": "refresh-token",
     }
     assert chamadas[0]["timeout"] == 30
+
+
+def test_renovar_access_token_prefere_refresh_mais_recente_do_arquivo(monkeypatch):
+    api = _make_api()
+    api.client_id = "client-id-antigo"
+    api.client_secret = "client-secret-antigo"
+    api.refresh_token = "refresh-antigo"
+    chamadas = []
+
+    class FakeResponse:
+        status_code = 200
+        text = "ok"
+
+        def json(self):
+            return {
+                "access_token": "token-novo",
+                "refresh_token": "refresh-novo",
+                "expires_in": 21600,
+            }
+
+    def fake_post(url, headers=None, data=None, timeout=None):
+        chamadas.append({"url": url, "data": data})
+        return FakeResponse()
+
+    monkeypatch.setattr("requests.post", fake_post)
+    monkeypatch.setattr(
+        "app.bling_integration_parts.core._bling_token_lock", nullcontext
+    )
+    monkeypatch.setattr(
+        "app.bling_integration_parts.core._load_bling_runtime_config",
+        lambda **_kwargs: {
+            "access_token": "token-compartilhado",
+            "refresh_token": "refresh-compartilhado",
+            "client_id": "client-id-atual",
+            "client_secret": "client-secret-atual",
+        },
+    )
+    monkeypatch.setattr(
+        "app.bling_oauth_routes._salvar_tokens",
+        lambda *_args, **_kwargs: None,
+    )
+
+    api.renovar_access_token()
+
+    assert chamadas[0]["url"] == "https://api.bling.com.br/Api/v3/oauth/token"
+    assert chamadas[0]["data"]["refresh_token"] == "refresh-compartilhado"
 
 
 def test_payload_nfce_usa_serie_3_e_deixa_numero_para_sequencia_do_bling():
