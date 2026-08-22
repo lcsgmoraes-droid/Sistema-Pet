@@ -3,6 +3,7 @@ import toast from "react-hot-toast";
 import { useNavigate } from "react-router-dom";
 import api from "../../api";
 import { useModulos } from "../../contexts/ModulosContext";
+import { confirmarCorePet } from "../../services/corepetDialog";
 
 export default function useLembretesController() {
   const { moduloAtivo } = useModulos();
@@ -172,7 +173,7 @@ export default function useLembretesController() {
 
   const cancelarLembrete = useCallback(
     async (lembrete_id) => {
-      if (!window.confirm("Tem certeza que deseja cancelar este lembrete?")) return;
+      if (!(await confirmarCorePet("Tem certeza que deseja cancelar este lembrete?"))) return;
       try {
         await api.delete(`/lembretes/${lembrete_id}`);
         toast.success("Lembrete cancelado");
@@ -198,7 +199,7 @@ export default function useLembretesController() {
       };
 
       if (!endpoints[acao]) return;
-      if (!window.confirm(mensagens[acao])) return;
+      if (!(await confirmarCorePet(mensagens[acao]))) return;
 
       try {
         await api.post(`/estoque/validade/${item.id}/${endpoints[acao]}`, {

@@ -13,6 +13,7 @@ import BanhoTosaServicoForm, {
   payloadFromServicoForm,
 } from "./BanhoTosaServicoForm";
 import BanhoTosaServicosTable from "./BanhoTosaServicosTable";
+import { confirmarCorePet } from "../../../services/corepetDialog";
 
 export default function BanhoTosaServicosView({ servicos, onChanged }) {
   const [form, setForm] = useState(initialServicoForm);
@@ -91,7 +92,7 @@ export default function BanhoTosaServicosView({ servicos, onChanged }) {
   }
 
   async function excluirServico(servico) {
-    const confirmou = window.confirm(
+    const confirmou = await confirmarCorePet(
       `Excluir o servico "${servico.nome}"? Se ele ja tiver historico, o sistema vai apenas desativar.`,
     );
     if (!confirmou) return;

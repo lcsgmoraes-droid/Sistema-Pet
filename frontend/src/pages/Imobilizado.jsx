@@ -21,6 +21,7 @@ import MetricGrid from "../components/ui/MetricGrid";
 import PageHeader from "../components/ui/PageHeader";
 import StatusBadge from "../components/ui/StatusBadge";
 import { formatMoneyBRL } from "../utils/formatters";
+import { confirmarCorePet } from "../services/corepetDialog";
 
 const CATEGORIAS = [
   ["equipamentos", "Equipamentos"],
@@ -223,7 +224,7 @@ export default function Imobilizado() {
   };
 
   const excluir = async (bem) => {
-    if (!globalThis.confirm(`Excluir definitivamente "${bem.nome}"?`)) return;
+    if (!(await confirmarCorePet(`Excluir definitivamente "${bem.nome}"?`))) return;
     setExcluindoId(bem.id);
     try {
       await api.delete(`/financeiro/imobilizado/${bem.id}`);

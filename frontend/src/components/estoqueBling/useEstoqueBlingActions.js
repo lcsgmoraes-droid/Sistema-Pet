@@ -7,6 +7,7 @@ import {
   MASS_LINK_BATCH_SIZE,
   MASS_LINK_MAX_BATCHES,
 } from "./estoqueBlingConfig";
+import { confirmarCorePet } from "../../services/corepetDialog";
 
 export function useEstoqueBlingActions({
   activeTab,
@@ -233,7 +234,7 @@ export function useEstoqueBlingActions({
   };
 
   const handleImportImagesFromBling = async () => {
-    const confirmed = window.confirm(
+    const confirmed = await confirmarCorePet(
       "Importar imagens do Bling para os produtos do sistema que ainda estao sem foto? A rotina usa o SKU/codigo atual e roda mais devagar para respeitar o limite da API.",
     );
 
@@ -521,7 +522,7 @@ export function useEstoqueBlingActions({
       return;
     }
 
-    const confirmed = window.confirm(
+    const confirmed = await confirmarCorePet(
       `Cadastrar ${produtoIds.length} produto(s) selecionado(s) no Bling? Se algum SKU ja existir la, o sistema apenas cria o vinculo.`,
     );
     if (!confirmed) return;

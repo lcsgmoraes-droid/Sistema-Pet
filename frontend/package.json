@@ -17,6 +17,8 @@
     "test:auth-storage": "node scripts/test-token-storage.mjs",
     "test:auth-refresh": "node scripts/test-refresh-manager.mjs",
     "test:corepet-branding": "node scripts/test-corepet-branding.mjs",
+    "test:corepet-dialogs": "node scripts/test-corepet-dialogs.mjs",
+    "test:number-input-wheel": "node src/utils/numberInputWheel.test.mjs",
     "test:text-encoding": "node scripts/test-text-encoding.mjs",
     "test:public-plans": "node scripts/test-public-plans.mjs",
     "test:billing-contract": "node scripts/test-billing-contract.mjs",

@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import api from "../api";
 import { FiPlus, FiEdit2, FiTrash2, FiSave, FiX, FiAlertCircle, FiFilter } from "react-icons/fi";
 import "./Cadastros.css";
+import { confirmarCorePet } from "../services/corepetDialog";
 
 const Racas = () => {
   const [racas, setRacas] = useState([]);
@@ -105,7 +106,7 @@ const Racas = () => {
   };
 
   const handleDelete = async (raca) => {
-    if (!window.confirm(`Deseja realmente desativar a raça "${raca.nome}"?`)) {
+    if (!(await confirmarCorePet(`Deseja realmente desativar a raça "${raca.nome}"?`))) {
       return;
     }
 

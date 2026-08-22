@@ -8,6 +8,7 @@ import {
   FiAlertCircle,
 } from "react-icons/fi";
 import api from "../../api";
+import { confirmarCorePet } from "../../services/corepetDialog";
 
 const Categorias = () => {
   const [categorias, setCategorias] = useState([]);
@@ -118,9 +119,9 @@ const Categorias = () => {
 
     if (categoria.total_produtos > 0) {
       if (
-        !confirm(
+        !(await confirmarCorePet(
           `Esta categoria possui ${categoria.total_produtos} produto(s). Deseja realmente excluir?`,
-        )
+        ))
       ) {
         return;
       }

@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { confirmarCorePet } from "../services/corepetDialog";
 
 function normalizarVendaId(valor) {
   const vendaId = Number.parseInt(valor, 10);
@@ -48,8 +49,8 @@ export function usePDVInicializacao({
     }
   }, []);
 
-  const handleNovaVenda = () => {
-    if (window.confirm("Descartar venda atual sem salvar?")) {
+  const handleNovaVenda = async () => {
+    if (await confirmarCorePet("Descartar venda atual sem salvar?")) {
       limparVenda();
     }
   };

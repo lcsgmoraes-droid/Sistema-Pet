@@ -25,6 +25,7 @@ import Panel from "./ui/Panel";
 import SegmentedControl from "./ui/SegmentedControl";
 import StatusBadge from "./ui/StatusBadge";
 import { getGuiaClassNames } from "../utils/guiaHighlight";
+import { confirmarCorePet } from "../services/corepetDialog";
 
 const FIELD_CLASS =
   "w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100";
@@ -138,7 +139,7 @@ function OpcoesRacao() {
   };
 
   const handleDeletar = async (id) => {
-    if (!confirm("Tem certeza que deseja inativar este item?")) return;
+    if (!(await confirmarCorePet("Tem certeza que deseja inativar este item?"))) return;
 
     try {
       await api.delete(`${abaConfig.endpoint}/${id}`);

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import api from "../../api";
 import EventosFuncionario from "./components/EventosFuncionario";
+import { confirmarCorePet } from "../../services/corepetDialog";
 
 const funcionarioPadrao = () => ({
   nome: "",
@@ -108,13 +109,13 @@ export default function Funcionarios() {
   };
 
   const inativar = async (id) => {
-    if (!window.confirm("Deseja inativar este funcionario?")) return;
+    if (!(await confirmarCorePet("Deseja inativar este funcionario?"))) return;
     await api.delete(`/funcionarios/${id}`);
     carregar();
   };
 
   const ativar = async (id) => {
-    if (!window.confirm("Deseja ativar este funcionario?")) return;
+    if (!(await confirmarCorePet("Deseja ativar este funcionario?"))) return;
     await api.post(`/funcionarios/${id}/ativar`);
     carregar();
   };

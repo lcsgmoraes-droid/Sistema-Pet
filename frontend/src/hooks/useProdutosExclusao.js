@@ -1,6 +1,7 @@
 import { useState } from "react";
 import toast from "react-hot-toast";
 import { deleteProduto, getProdutoVariacoes, toggleProdutoAtivo } from "../api/produtos";
+import { confirmarCorePet } from "../services/corepetDialog";
 
 export default function useProdutosExclusao({
   carregarDados,
@@ -121,7 +122,7 @@ export default function useProdutosExclusao({
     }
 
     if (!pularConfirmacaoConflito) {
-      const confirma = confirm(
+      const confirma = await confirmarCorePet(
         "Confirmar resolucao rapida? O sistema vai desativar as variacoes selecionadas e tentar excluir os produtos pai automaticamente.",
       );
       if (!confirma) return;
@@ -184,7 +185,7 @@ export default function useProdutosExclusao({
   };
 
   const handleExcluir = async (id) => {
-    if (!confirm("Deseja realmente excluir este produto?")) return;
+    if (!(await confirmarCorePet("Deseja realmente excluir este produto?"))) return;
 
     try {
       await deleteProduto(id);
@@ -206,7 +207,7 @@ export default function useProdutosExclusao({
   };
 
   const handleExcluirSelecionados = async (selecionados) => {
-    if (!confirm(`Deseja realmente excluir ${selecionados.length} produtos?`)) {
+    if (!(await confirmarCorePet(`Deseja realmente excluir ${selecionados.length} produtos?`))) {
       return;
     }
 
@@ -258,7 +259,7 @@ export default function useProdutosExclusao({
     const proximoAtivo = produto.ativo === false;
     const acao = proximoAtivo ? "ativar" : "desativar";
 
-    if (!confirm(`Deseja realmente ${acao} o produto "${produto.nome}"?`)) {
+    if (!(await confirmarCorePet(`Deseja realmente ${acao} o produto "${produto.nome}"?`))) {
       return;
     }
 

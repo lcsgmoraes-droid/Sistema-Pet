@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
 import api from "../api";
+import { confirmarCorePet } from "../services/corepetDialog";
 
 const EMPTY_ROLE = {
   nome: "",
@@ -213,7 +214,7 @@ export default function useRolesPage() {
 
   const deletarRole = useCallback(
     async (roleId) => {
-      if (!window.confirm("Excluir este perfil de acesso?")) return;
+      if (!(await confirmarCorePet("Excluir este perfil de acesso?"))) return;
 
       try {
         await api.delete(`/roles/${roleId}`);

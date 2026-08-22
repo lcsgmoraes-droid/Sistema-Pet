@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import api from "../../api";
 import { getGuiaClassNames } from "../../utils/guiaHighlight";
+import { perguntarCorePet } from "../../services/corepetDialog";
 
 export function useComissoesPageController() {
   const guiaAtiva = new URLSearchParams(window.location.search).get("guia");
@@ -75,7 +76,7 @@ export function useComissoesPageController() {
   };
 
   const duplicarConfiguracao = async (funcionarioOrigemId) => {
-    const funcionarioDestinoId = prompt("Digite o ID do parceiro de destino:");
+    const funcionarioDestinoId = await perguntarCorePet("Digite o ID do parceiro de destino:");
     if (!funcionarioDestinoId) return;
 
     try {

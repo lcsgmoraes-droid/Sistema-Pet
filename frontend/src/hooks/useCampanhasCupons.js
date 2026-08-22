@@ -1,6 +1,7 @@
 import { useCallback, useState } from "react";
 import api from "../api";
 import { formatBRL } from "../utils/formatters";
+import { confirmarCorePet } from "../services/corepetDialog";
 
 const DEFAULT_CUPOM = {
   coupon_type: "fixed",
@@ -45,7 +46,7 @@ export default function useCampanhasCupons({
 
   const anularCupom = useCallback(
     async (code) => {
-      if (!window.confirm(`Anular o cupom ${code}? Esta acao nao pode ser desfeita.`)) {
+      if (!(await confirmarCorePet(`Anular o cupom ${code}? Esta acao nao pode ser desfeita.`))) {
         return;
       }
       setAnulando(code);

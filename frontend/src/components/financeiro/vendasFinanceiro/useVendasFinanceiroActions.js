@@ -8,6 +8,7 @@ import {
   filtrarVendasRelatorio,
   ordenarVendasRelatorio,
 } from "../vendasFinanceiroUtils";
+import { confirmarCorePet } from "../../../services/corepetDialog";
 
 export function useVendasFinanceiroActions({
   carregarDados,
@@ -269,7 +270,7 @@ export function useVendasFinanceiroActions({
     const descricaoEscopo = periodo
       ? `do periodo ${formatarData(dataInicio)} ate ${formatarData(dataFim)}`
       : "selecionada(s)";
-    const confirmou = globalThis.confirm(
+    const confirmou = await confirmarCorePet(
       `Reprocessar ${quantidade} venda(s) ${descricaoEscopo}?\n\n` +
         "Isso atualiza o custo das movimentacoes de estoque da venda para o custo atual do produto e recalcula custo, lucro e margem.",
     );

@@ -13,6 +13,7 @@ import BanhoTosaRecursoForm, {
   payloadFromRecursoForm,
 } from "./BanhoTosaRecursoForm";
 import BanhoTosaRecursosList from "./BanhoTosaRecursosList";
+import { confirmarCorePet } from "../../../services/corepetDialog";
 
 export default function BanhoTosaRecursosView({ recursos, onChanged }) {
   const [form, setForm] = useState(initialRecursoForm);
@@ -73,7 +74,7 @@ export default function BanhoTosaRecursosView({ recursos, onChanged }) {
   }
 
   async function excluirRecurso(recurso) {
-    const confirmou = window.confirm(
+    const confirmou = await confirmarCorePet(
       `Excluir o recurso "${recurso.nome}"? Se ele ja tiver historico, o sistema vai apenas desativar.`,
     );
     if (!confirmou) return;

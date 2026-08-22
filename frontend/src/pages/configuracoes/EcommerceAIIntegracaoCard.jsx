@@ -10,6 +10,7 @@ import {
   FiXCircle,
 } from "react-icons/fi";
 import { api } from "../../services/api";
+import { confirmarCorePet } from "../../services/corepetDialog";
 
 const money = new Intl.NumberFormat("pt-BR", {
   style: "currency",
@@ -96,7 +97,7 @@ export default function EcommerceAIIntegracaoCard() {
   }
 
   async function disconnect() {
-    if (!globalThis.confirm("Desconectar o EcommerceAI do CorePet?")) return;
+    if (!(await confirmarCorePet("Desconectar o EcommerceAI do CorePet?"))) return;
     try {
       setAction("disconnect");
       await api.post("/integracoes/ecommerceai/disconnect");

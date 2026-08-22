@@ -1,5 +1,6 @@
 import { useState } from "react";
 import api from "../api";
+import { perguntarCorePet } from "../services/corepetDialog";
 
 export default function useCampanhasFidelidade() {
   const [fidClienteId, setFidClienteId] = useState("");
@@ -27,7 +28,7 @@ export default function useCampanhasFidelidade() {
   };
 
   const estornarCarimbo = async (stampId) => {
-    const motivo = window.prompt("Motivo do estorno (opcional):");
+    const motivo = await perguntarCorePet("Motivo do estorno (opcional):");
     if (motivo === null) return;
     setFidRemovendo(stampId);
     try {

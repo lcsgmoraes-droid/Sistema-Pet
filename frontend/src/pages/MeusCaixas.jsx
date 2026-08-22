@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { listarCaixas, reabrirCaixa } from "../api/caixa";
 import { getAccessToken } from "../auth/tokenStorage";
+import { confirmarCorePet } from "../services/corepetDialog";
 
 export default function MeusCaixas() {
   const navigate = useNavigate();
@@ -47,7 +48,7 @@ export default function MeusCaixas() {
   };
 
   const handleReabrir = async (caixaId) => {
-    if (!confirm("Deseja realmente reabrir este caixa?")) return;
+    if (!(await confirmarCorePet("Deseja realmente reabrir este caixa?"))) return;
 
     try {
       await reabrirCaixa(caixaId);

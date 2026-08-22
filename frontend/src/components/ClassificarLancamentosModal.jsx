@@ -11,6 +11,7 @@ import {
 } from "react-icons/fi";
 import api from "../api";
 import { toast } from "react-hot-toast";
+import { confirmarCorePet } from "../services/corepetDialog";
 
 const ClassificarLancamentosModal = ({ isOpen, onClose, onSuccess }) => {
   const [loading, setLoading] = useState(false);
@@ -216,10 +217,10 @@ const ClassificarLancamentosModal = ({ isOpen, onClose, onSuccess }) => {
     }
 
     if (
-      !window.confirm(
+      !(await confirmarCorePet(
         `Deseja marcar "${beneficiario}" como fornecedor de produtos (Não Controla DRE)?\n\n` +
           `Todos os lançamentos deste fornecedor serão automaticamente ignorados no DRE.`,
-      )
+      ))
     ) {
       return;
     }

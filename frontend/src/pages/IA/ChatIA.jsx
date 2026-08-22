@@ -8,6 +8,7 @@ import { useLocation } from "react-router-dom";
 import api from "../../api";
 import { toast } from "react-hot-toast";
 import { Send, Loader, MessageSquare, Plus, Trash2, Bot, User } from "lucide-react";
+import { confirmarCorePet } from "../../services/corepetDialog";
 
 export default function ChatIA() {
   const location = useLocation();
@@ -203,7 +204,7 @@ export default function ChatIA() {
   }
 
   const deletarConversa = async (conversaId) => {
-    if (!confirm("Deseja deletar esta conversa?")) return;
+    if (!(await confirmarCorePet("Deseja deletar esta conversa?"))) return;
 
     try {
       await api.delete(`/chat/conversa/${conversaId}`);

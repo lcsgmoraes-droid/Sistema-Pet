@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { api } from "../../services/api";
+import { confirmarCorePet } from "../../services/corepetDialog";
 
 export default function CustosMoto() {
   const [form, setForm] = useState({
@@ -94,11 +95,11 @@ export default function CustosMoto() {
     });
   }
 
-  function preencherValoresSugeridos() {
+  async function preencherValoresSugeridos() {
     if (
-      !confirm(
+      !(await confirmarCorePet(
         "Preencher com valores sugeridos baseados em uma moto de entrega típica (CG 160, Biz 125, Pop 110)? Os valores atuais serão substituídos.",
-      )
+      ))
     ) {
       return;
     }

@@ -1,4 +1,5 @@
 import api from "../api";
+import { confirmarCorePet } from "../services/corepetDialog";
 
 function linhaProduto(item) {
   const partes = [];
@@ -78,7 +79,7 @@ function erroComValidacaoFiscal(validacao) {
 export async function emitirNotaFiscalAssistida({
   vendaId,
   tipoNota = "nfce",
-  confirmar = window.confirm,
+  confirmar = confirmarCorePet,
 } = {}) {
   const { data: validacao } = await api.post("/nfe/prevalidar", {
     venda_id: vendaId,
@@ -100,7 +101,7 @@ export async function emitirNotaFiscalAssistida({
       "",
       "Autorizar correcao fiscal e emitir a nota agora?",
     ].join("\n");
-    autorizarCorrecoes = confirmar(mensagem);
+    autorizarCorrecoes = await confirmar(mensagem);
     if (!autorizarCorrecoes) {
       return { cancelado: true, validacao };
     }

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { api } from "../../../services/api";
+import { confirmarCorePet } from "../../../services/corepetDialog";
 
 export default function EventosFuncionario({ funcionario, onClose }) {
   const [provisoes, setProvisoes] = useState(null);
@@ -21,7 +22,7 @@ export default function EventosFuncionario({ funcionario, onClose }) {
   }, []);
 
   const concederFerias = async () => {
-    if (!window.confirm("Confirmar concessão de férias?")) return;
+    if (!(await confirmarCorePet("Confirmar concessão de férias?"))) return;
     setLoading(true);
 
     try {
@@ -45,7 +46,7 @@ export default function EventosFuncionario({ funcionario, onClose }) {
   };
 
   const pagarDecimo = async (parcela) => {
-    if (!window.confirm(`Confirmar pagamento da ${parcela}ª parcela do 13º?`)) return;
+    if (!(await confirmarCorePet(`Confirmar pagamento da ${parcela}ª parcela do 13º?`))) return;
 
     setLoading(true);
 

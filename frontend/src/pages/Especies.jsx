@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import api from "../api";
 import { FiPlus, FiEdit2, FiTrash2, FiSave, FiX, FiAlertCircle } from "react-icons/fi";
 import "./Cadastros.css";
+import { confirmarCorePet } from "../services/corepetDialog";
 
 const Especies = () => {
   const [especies, setEspecies] = useState([]);
@@ -86,7 +87,7 @@ const Especies = () => {
   };
 
   const handleDelete = async (especie) => {
-    if (!window.confirm(`Deseja realmente desativar a espécie "${especie.nome}"?`)) {
+    if (!(await confirmarCorePet(`Deseja realmente desativar a espécie "${especie.nome}"?`))) {
       return;
     }
 

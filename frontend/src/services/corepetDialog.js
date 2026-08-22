@@ -43,23 +43,27 @@ export function resolverCorePetDialog(valor) {
 
 export function confirmarCorePet(opcoes) {
   const configuracao = typeof opcoes === "string" ? { mensagem: opcoes } : opcoes;
+  const texto = String(configuracao?.mensagem || "").toLocaleLowerCase("pt-BR");
+  const acaoPerigosa = /(exclu|cancel|remov|desativ|inativ|estorn|desvinc|anul|descart)/.test(
+    texto,
+  );
 
   return solicitarDialogo({
     tipo: "confirmacao",
-    titulo: "Confirmar acao",
+    titulo: acaoPerigosa ? "Atenção" : "Confirmar ação",
     confirmarTexto: "Confirmar",
     cancelarTexto: "Cancelar",
-    variante: "info",
+    variante: acaoPerigosa ? "danger" : "question",
     ...configuracao,
   });
 }
 
-export function perguntarCorePet(opcoes) {
-  const configuracao = typeof opcoes === "string" ? { mensagem: opcoes } : opcoes;
+export function perguntarCorePet(opcoes, valorInicial = "") {
+  const configuracao = typeof opcoes === "string" ? { mensagem: opcoes, valorInicial } : opcoes;
 
   return solicitarDialogo({
     tipo: "entrada",
-    titulo: "Informe os dados",
+    titulo: "Preencha os dados",
     confirmarTexto: "Continuar",
     cancelarTexto: "Cancelar",
     variante: "info",

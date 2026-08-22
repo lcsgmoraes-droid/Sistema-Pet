@@ -1,5 +1,6 @@
 import { useState } from "react";
 import api from "../api";
+import { confirmarCorePet } from "../services/corepetDialog";
 
 export default function useCampanhasUnificacao({ setSugestoes, carregarSugestoes }) {
   const [confirmandoMerge, setConfirmandoMerge] = useState(null);
@@ -7,9 +8,9 @@ export default function useCampanhasUnificacao({ setSugestoes, carregarSugestoes
 
   const confirmarMerge = async (keepId, removeId, motivo) => {
     if (
-      !globalThis.confirm(
+      !(await confirmarCorePet(
         `Unificar clientes? O cliente #${removeId} sera mesclado no #${keepId}. Os dados de campanhas serao transferidos.`,
-      )
+      ))
     ) {
       return;
     }
@@ -37,7 +38,11 @@ export default function useCampanhasUnificacao({ setSugestoes, carregarSugestoes
   };
 
   const desfazerMerge = async (mergeId) => {
-    if (!globalThis.confirm("Desfazer esta unificacao? Os dados de campanhas serao restaurados.")) {
+    if (
+      !(await confirmarCorePet(
+        "Desfazer esta unificacao? Os dados de campanhas serao restaurados.",
+      ))
+    ) {
       return;
     }
     try {

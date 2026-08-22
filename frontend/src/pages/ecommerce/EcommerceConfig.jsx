@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import EcommerceConfigView from "./EcommerceConfigView";
 import { api } from "../../services/api";
 import { readMercadoPagoOAuthReturn } from "../../utils/mercadoPagoOAuthReturn";
+import { confirmarCorePet } from "../../services/corepetDialog";
 
 const DIAS_SEMANA = [
   { key: "seg", label: "Segunda" },
@@ -250,9 +251,9 @@ export default function EcommerceConfig() {
 
   async function desconectarMercadoPago() {
     if (
-      !window.confirm(
+      !(await confirmarCorePet(
         "Desconectar o Mercado Pago vai impedir novos pagamentos online. Deseja continuar?",
-      )
+      ))
     ) {
       return;
     }

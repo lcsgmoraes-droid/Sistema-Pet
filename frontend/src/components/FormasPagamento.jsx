@@ -5,6 +5,7 @@ import FormasPagamentoView from "./formasPagamento/FormasPagamentoView";
 import { useAuth } from "../contexts/AuthContext";
 import { useModulos } from "../contexts/ModulosContext";
 import { getGuiaClassNames } from "../utils/guiaHighlight";
+import { confirmarCorePet } from "../services/corepetDialog";
 
 const DEFAULT_ICON_BY_TIPO = {
   dinheiro: "\uD83D\uDCB5",
@@ -232,7 +233,7 @@ const FormasPagamento = () => {
   };
 
   const excluir = async (id) => {
-    if (!confirm("Deseja realmente excluir esta forma de pagamento?")) return;
+    if (!(await confirmarCorePet("Deseja realmente excluir esta forma de pagamento?"))) return;
 
     try {
       await api.delete(`/financeiro/formas-pagamento/${id}`);

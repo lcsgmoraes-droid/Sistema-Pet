@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import api from "../api";
+import { confirmarCorePet } from "../services/corepetDialog";
 
 export default function Subcategorias() {
   const [categorias, setCategorias] = useState([]);
@@ -106,7 +107,7 @@ export default function Subcategorias() {
   };
 
   const handleDelete = async (id) => {
-    if (!confirm("Deseja realmente excluir esta subcategoria?")) return;
+    if (!(await confirmarCorePet("Deseja realmente excluir esta subcategoria?"))) return;
 
     try {
       await api.delete(`/dre/subcategorias/${id}`);

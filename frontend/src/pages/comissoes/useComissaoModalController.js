@@ -14,6 +14,7 @@ import {
   mapConfiguracoesPorItem,
   parseCommissionInteger,
 } from "./comissoesUtils";
+import { confirmarCorePet } from "../../services/corepetDialog";
 
 export function useComissaoModalController({ funcionarioId, configuracoes, onSave }) {
   const [funcionarios, setFuncionarios] = useState([]);
@@ -82,7 +83,7 @@ export function useComissaoModalController({ funcionarioId, configuracoes, onSav
     setItemSelecionado(createSelectedCommissionItem(tipo, id, nome, getConfiguracao(tipo, id)));
   };
 
-  const adicionarConfiguracao = () => {
+  const adicionarConfiguracao = async () => {
     if (!funcionarioSel) {
       alert("Selecione um parceiro");
       return;
@@ -102,7 +103,7 @@ export function useComissaoModalController({ funcionarioId, configuracoes, onSav
       itemSelecionado.tipo === "geral" &&
       (configuracoesParaSalvar.length > 0 || Object.keys(configuracao).length > 0)
     ) {
-      const confirma = confirm(
+      const confirma = await confirmarCorePet(
         "A regra geral vale para todos os produtos e categorias deste parceiro.\n\n" +
           "Regras especificas de produto, subcategoria ou categoria continuam com prioridade.\n\nDeseja adicionar mesmo assim?",
       );
@@ -116,7 +117,7 @@ export function useComissaoModalController({ funcionarioId, configuracoes, onSav
           config.nome.includes(itemSelecionado.nome),
       );
       if (temProdutosOuSubs) {
-        const confirma = confirm(
+        const confirma = await confirmarCorePet(
           `ATENÇÃO: Você já configurou produtos/subcategorias desta categoria.\n\n` +
             `HIERARQUIA: Produto > Subcategoria > Categoria\n\n` +
             `A configuração mais específica tem prioridade.\n\nDeseja adicionar mesmo assim?`,
@@ -219,7 +220,9 @@ export function useComissaoModalController({ funcionarioId, configuracoes, onSav
       }
 
       if (
-        !confirm("Deseja atualizar as regras de cálculo em TODAS as configurações deste parceiro?")
+        !(await confirmarCorePet(
+          "Deseja atualizar as regras de cálculo em TODAS as configurações deste parceiro?",
+        ))
       ) {
         return;
       }
@@ -260,7 +263,10 @@ export function useComissaoModalController({ funcionarioId, configuracoes, onSav
   };
 
   const removerConfiguracaoExistente = async (key, config) => {
-    if (!confirm(`Deseja remover a configuração de "${config.nome_item || "Item"}"?`)) return;
+    if (
+      !(await confirmarCorePet(`Deseja remover a configuração de "${config.nome_item || "Item"}"?`))
+    )
+      return;
 
     try {
       await api.delete(`/comissoes/configuracoes/${config.id}`);

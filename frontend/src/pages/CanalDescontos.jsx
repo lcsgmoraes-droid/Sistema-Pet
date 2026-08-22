@@ -12,6 +12,7 @@
 
 import { useEffect, useState } from "react";
 import api from "../api";
+import { confirmarCorePet } from "../services/corepetDialog";
 
 const CANAIS = [
   { value: "ecommerce", label: "🛒 Ecommerce", cor: "purple" },
@@ -149,7 +150,7 @@ export default function CanalDescontos() {
   };
 
   const excluir = async (id) => {
-    if (!window.confirm("Excluir este desconto?")) return;
+    if (!(await confirmarCorePet("Excluir este desconto?"))) return;
     try {
       await api.delete(`/canal-descontos/${id}`);
       setDescontos((prev) => prev.filter((d) => d.id !== id));

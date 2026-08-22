@@ -5,6 +5,7 @@ import { toast } from "react-hot-toast";
 import ActionButton from "../../components/ui/ActionButton";
 import IconActionButton from "../../components/ui/IconActionButton";
 import LoadingState from "../../components/ui/LoadingState";
+import { confirmarCorePet } from "../../services/corepetDialog";
 
 const TipoDespesa = () => {
   const [tipos, setTipos] = useState([]);
@@ -90,7 +91,7 @@ const TipoDespesa = () => {
   };
 
   const excluir = async (id) => {
-    if (!window.confirm("Desativar este tipo de despesa?")) return;
+    if (!(await confirmarCorePet("Desativar este tipo de despesa?"))) return;
     try {
       await api.delete(`/cadastros/tipo-despesa/${id}`);
       toast.success("Tipo desativado");

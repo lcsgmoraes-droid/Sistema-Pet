@@ -1,6 +1,7 @@
 import { useState } from "react";
 import toast from "react-hot-toast";
 import api from "../api";
+import { confirmarCorePet } from "../services/corepetDialog";
 
 export default function useProdutosEdicao({ carregarDados, selecionados, setSelecionados }) {
   const [editandoPreco, setEditandoPreco] = useState(null);
@@ -190,7 +191,7 @@ export default function useProdutosEdicao({ carregarDados, selecionados, setSele
       }
 
       if (dadosEnvio.ativo === false) {
-        const confirmado = window.confirm(
+        const confirmado = await confirmarCorePet(
           `Desativar ${selecionados.length} produto(s) selecionado(s)? Eles deixam de aparecer como ativos e os canais e-commerce/app serao desligados automaticamente.`,
         );
         if (!confirmado) {
@@ -199,7 +200,7 @@ export default function useProdutosEdicao({ carregarDados, selecionados, setSele
       }
 
       if (dadosEnvio.fornecedor_operacao === "remover") {
-        const confirmado = window.confirm(
+        const confirmado = await confirmarCorePet(
           `Remover os fornecedores vinculados de ${selecionados.length} produto(s) selecionado(s)? Os produtos ficarao sem fornecedor principal ate voce definir um novo.`,
         );
         if (!confirmado) {

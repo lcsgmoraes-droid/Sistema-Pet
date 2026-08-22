@@ -6,6 +6,7 @@ import {
   FORM_PROCEDIMENTO_INICIAL,
   mapProcedimentoParaForm,
 } from "./procedimentosForm";
+import { confirmarCorePet } from "../../../services/corepetDialog";
 
 export function useCatProcedimentos() {
   const [lista, setLista] = useState([]);
@@ -139,7 +140,7 @@ export function useCatProcedimentos() {
   }
 
   async function excluir(item) {
-    if (!window.confirm(`Deseja excluir o procedimento "${item.nome}"?`)) return;
+    if (!(await confirmarCorePet(`Deseja excluir o procedimento "${item.nome}"?`))) return;
     setRemovendoId(item.id);
     setErro("");
     try {
@@ -155,7 +156,7 @@ export function useCatProcedimentos() {
   async function importarModeloCorePet() {
     const quantidade = statusModelo?.disponiveis_para_importar || 0;
     if (!quantidade) return;
-    const confirmado = window.confirm(
+    const confirmado = await confirmarCorePet(
       `Importar ${quantidade} procedimento(s) do modelo CorePet? Preços e insumos continuarão em branco.`,
     );
     if (!confirmado) return;

@@ -10,6 +10,7 @@ import {
   extrairAcaoCorrecaoFiscal,
   extrairMensagemNFe,
 } from "../utils/nfeFiscalAssistida";
+import { confirmarCorePet, perguntarCorePet } from "../services/corepetDialog";
 
 async function carregarPagamentosDaVenda(vendaId) {
   try {
@@ -142,22 +143,31 @@ export function usePDVVendaFinalizacao({
   const excluirVenda = async () => {
     if (!vendaAtual.id) return;
 
-    const confirmar = window.confirm(
-      "Deseja cancelar/excluir esta venda?\n\nEla continuara rastreavel no historico, e o estoque sera devolvido.",
-    );
+    const confirmar = await confirmarCorePet({
+      titulo: "Cancelar venda?",
+      mensagem:
+        "A venda continuará rastreável no histórico e os itens serão devolvidos ao estoque.",
+      confirmarTexto: "Cancelar venda",
+      variante: "danger",
+    });
 
     if (!confirmar) return;
 
-    const motivo = window.prompt("Informe a justificativa do cancelamento/exclusao da venda:");
+    const motivo = await perguntarCorePet({
+      titulo: "Justificativa do cancelamento",
+      mensagem: "Explique por que esta venda está sendo cancelada.",
+      rotulo: "Justificativa",
+      placeholder: "Digite pelo menos 10 caracteres",
+      confirmarTexto: "Continuar",
+      variante: "warning",
+      obrigatorio: true,
+      minimoCaracteres: 10,
+      multilinha: true,
+    });
 
     if (!motivo) return;
 
     const motivoNormalizado = motivo.trim();
-    if (motivoNormalizado.length < 10) {
-      alert("Informe uma justificativa com pelo menos 10 caracteres.");
-      return;
-    }
-
     try {
       setLoading(true);
       await cancelarVenda(vendaAtual.id, motivoNormalizado);
@@ -175,7 +185,7 @@ export function usePDVVendaFinalizacao({
   const mudarStatusParaAberta = async () => {
     if (!vendaAtual.id) return;
 
-    const confirmar = window.confirm(
+    const confirmar = await confirmarCorePet(
       'Deseja reabrir esta venda?\n\nOs pagamentos ser\u00e3o mantidos e o status mudar\u00e1 para "aberta".',
     );
 
@@ -216,13 +226,13 @@ export function usePDVVendaFinalizacao({
 
     let tipoNota = "nfce";
     if (vendaAtual.cliente?.cnpj) {
-      const emitirNfe = window.confirm(
+      const emitirNfe = await confirmarCorePet(
         "Cliente tem CNPJ.\n\nClique OK para emitir NF-e (Empresa)\nClique Cancelar para emitir NFC-e (Cupom).",
       );
       tipoNota = emitirNfe ? "nfe" : "nfce";
     }
 
-    const confirmar = window.confirm(
+    const confirmar = await confirmarCorePet(
       `Confirma emitir ${tipoNota === "nfe" ? "NF-e" : "NFC-e"} para esta venda finalizada?`,
     );
     if (!confirmar) return;
@@ -249,7 +259,7 @@ export function usePDVVendaFinalizacao({
       const acaoFiscal = extrairAcaoCorrecaoFiscal(error);
       if (
         acaoFiscal &&
-        window.confirm(`${mensagem}\n\nAbrir o cadastro fiscal deste produto agora?`)
+        (await confirmarCorePet(`${mensagem}\n\nAbrir o cadastro fiscal deste produto agora?`))
       ) {
         navigate(acaoFiscal.url);
       } else {

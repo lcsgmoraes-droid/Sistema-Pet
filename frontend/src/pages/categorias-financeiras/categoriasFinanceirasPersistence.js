@@ -1,6 +1,7 @@
 import { toast } from "react-hot-toast";
 import api from "../../api.js";
 import { buildCategoriaPayload, buildSubcategoriaDREPayload } from "./categoriasFinanceirasUtils";
+import { confirmarCorePet } from "../../services/corepetDialog";
 
 export function createCategoriasFinanceirasPersistence({
   carregarDados,
@@ -168,7 +169,7 @@ export function createCategoriasFinanceirasPersistence({
   }
 
   async function handleDelete(id) {
-    if (!window.confirm("Deseja realmente excluir esta categoria?")) return;
+    if (!(await confirmarCorePet("Deseja realmente excluir esta categoria?"))) return;
 
     try {
       await api.delete(`/categorias-financeiras/${id}`);

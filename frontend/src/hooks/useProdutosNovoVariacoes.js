@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { createProduto, deleteProduto, getProdutoVariacoes } from "../api/produtos";
+import { confirmarCorePet } from "../services/corepetDialog";
 
 const VARIACAO_INICIAL = {
   sku: "",
@@ -86,7 +87,7 @@ export default function useProdutosNovoVariacoes({ id, isEdicao, abaAtiva, formD
   };
 
   const handleExcluirVariacao = async (variacao) => {
-    if (!window.confirm(`Deseja excluir a variação ${variacao.nome}?`)) {
+    if (!(await confirmarCorePet(`Deseja excluir a variação ${variacao.nome}?`))) {
       return;
     }
 
