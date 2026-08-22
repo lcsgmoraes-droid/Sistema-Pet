@@ -155,3 +155,4 @@ export const EcommercePreview = lazy(() => import("../pages/ecommerce/EcommerceP
 export const Campanhas = lazy(() => import("../pages/Campanhas"));
 export const CanalDescontos = lazy(() => import("../pages/CanalDescontos"));
 export const Ajuda = lazy(() => import("../pages/Ajuda"));
+export const EvolucaoCorePet = lazy(() => import("../pages/EvolucaoCorePet"));

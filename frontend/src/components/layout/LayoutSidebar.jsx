@@ -1,7 +1,8 @@
-import { FiCreditCard, FiHelpCircle, FiLogOut, FiMenu, FiX } from "react-icons/fi";
+import { FiBell, FiCreditCard, FiHelpCircle, FiLogOut, FiMenu, FiX } from "react-icons/fi";
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 
+import useNovidadesNaoVistas from "../../hooks/useNovidadesNaoVistas";
 import SidebarMenu from "./SidebarMenu";
 
 const COREPET_LOGO = "/brand/corepet/corepet-horizontal.png";
@@ -31,6 +32,7 @@ export default function LayoutSidebar({
 }) {
   const resizeRef = useRef(null);
   const [redimensionando, setRedimensionando] = useState(false);
+  const novidadesNaoVistas = useNovidadesNaoVistas();
 
   useEffect(
     () => () => {
@@ -193,6 +195,25 @@ export default function LayoutSidebar({
         >
           <FiCreditCard className="text-lg flex-shrink-0" />
           {sidebarOpen && <span className="font-medium text-sm">Meu Plano</span>}
+        </Link>
+        <Link
+          to="/novidades"
+          onClick={handleMenuClick}
+          className="relative mx-2 mt-1 flex w-full items-center gap-3 rounded-lg px-4 py-2.5 text-[#9a6b05] transition-all hover:bg-[#fff1c9] dark:text-amber-300 dark:hover:bg-amber-500/10"
+          title={!sidebarOpen ? "Novidades" : ""}
+        >
+          <FiBell className="flex-shrink-0 text-lg" />
+          {sidebarOpen && <span className="font-medium text-sm">Novidades</span>}
+          {novidadesNaoVistas > 0 ? (
+            <span
+              className={`${
+                sidebarOpen ? "ml-auto" : "absolute right-1 top-1"
+              } inline-flex min-w-5 items-center justify-center rounded-full bg-red-600 px-1.5 py-0.5 text-[10px] font-bold text-white`}
+              aria-label={`${novidadesNaoVistas} novidade(s) não vista(s)`}
+            >
+              {novidadesNaoVistas > 9 ? "9+" : novidadesNaoVistas}
+            </span>
+          ) : null}
         </Link>
         <Link
           to="/ajuda"
