@@ -1,3 +1,4 @@
+import { useRef } from "react";
 import { useNavigate } from "react-router-dom";
 
 import api from "../../api";
@@ -16,6 +17,7 @@ import {
   montarObservacoesComJustificativaMargem,
   montarPagamentoRecebido,
   montarVendaParaPersistirComCupom,
+  persistirVendaAbertaParaPagamento,
   validarPagamentoParaAdicionar,
 } from "../modalPagamentoUtils";
 
@@ -64,6 +66,7 @@ export function useModalPagamentoActions({
   vendaFinalizadaId,
 }) {
   const navigate = useNavigate();
+  const vendaIdPersistidaRef = useRef(venda?.id || null);
 
   const adicionarPagamento = () => {
     const valor = valorRecebido || 0;
@@ -205,14 +208,15 @@ export function useModalPagamentoActions({
     });
     const payloadVenda = montarPayloadVenda(vendaParaPersistir);
 
-    const vendaIdPersistida = vendaParaPersistir.id;
-    if (!vendaIdPersistida) {
-      const vendaCriada = await criarVenda(payloadVenda);
-      return vendaCriada.id;
-    }
-
-    await atualizarVenda(vendaIdPersistida, payloadVenda);
-    return vendaIdPersistida;
+    const vendaId = await persistirVendaAbertaParaPagamento({
+      vendaParaPersistir,
+      payloadVenda,
+      vendaIdPersistida: vendaIdPersistidaRef.current,
+      criarVenda,
+      atualizarVenda,
+    });
+    vendaIdPersistidaRef.current = vendaId;
+    return vendaId;
   };
 
   const handleFinalizar = async () => {
