@@ -64,7 +64,7 @@ data = {
 
 try:
     response = requests.post(
-        "https://www.bling.com.br/Api/v3/oauth/token", headers=headers, data=data
+        "https://api.bling.com.br/Api/v3/oauth/token", headers=headers, data=data
     )
 
     if response.status_code == 200:

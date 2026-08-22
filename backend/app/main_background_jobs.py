@@ -15,6 +15,7 @@ def _runtime_file(filename: str) -> str:
 
 
 BLING_TOKEN_RENOVACAO_INTERVALO_SEGUNDOS = 5 * 60 * 60  # 5 horas
+BLING_TOKEN_RENOVACAO_RETRY_SEGUNDOS = 5 * 60  # 5 minutos apos falha
 _bling_token_stop_event = threading.Event()
 _bling_token_thread: Optional[threading.Thread] = None
 
@@ -176,6 +177,7 @@ def _loop_renovacao_token_bling():
     )
 
     while not _bling_token_stop_event.is_set():
+        proxima_espera = BLING_TOKEN_RENOVACAO_INTERVALO_SEGUNDOS
         try:
             # Tenta importar fcntl (disponível no Linux/servidor)
             try:
@@ -227,11 +229,12 @@ def _loop_renovacao_token_bling():
                 logger.info("[BLING] ✅ Token renovado automaticamente")
 
         except Exception as e:
+            proxima_espera = BLING_TOKEN_RENOVACAO_RETRY_SEGUNDOS
             logger.warning(
-                f"[BLING] ⚠️ PID {worker_pid} — Falha na renovação automática do token: {e}"
+                f"[BLING] ⚠️ PID {worker_pid} — Falha na renovação automática do token: {e}. Nova tentativa em 5 minutos."
             )
 
-        _bling_token_stop_event.wait(BLING_TOKEN_RENOVACAO_INTERVALO_SEGUNDOS)
+        _bling_token_stop_event.wait(proxima_espera)
 
     logger.info(f"[BLING] Job de renovação automática finalizado (PID {worker_pid})")
 

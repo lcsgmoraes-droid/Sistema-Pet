@@ -71,7 +71,7 @@ def main():
     print("\n📋 PASSO 3: Obtendo tokens...")
     print("-" * 60)
 
-    token_url = "https://www.bling.com.br/Api/v3/oauth/token"
+    token_url = "https://api.bling.com.br/Api/v3/oauth/token"
     payload = {
         "grant_type": "authorization_code",
         "code": code,
