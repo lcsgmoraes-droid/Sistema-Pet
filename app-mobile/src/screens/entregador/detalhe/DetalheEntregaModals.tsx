@@ -138,7 +138,7 @@ export function DetalheEntregaModals({
                 }}
               >
                 <Text style={styles.modalConfirmarText}>
-                  {salvandoOrdemManual ? "Salvando..." : "Salvar posiÃ§Ã£o"}
+                  {salvandoOrdemManual ? "Salvando..." : "Salvar posição"}
                 </Text>
               </TouchableOpacity>
             </View>
@@ -209,7 +209,7 @@ export function DetalheEntregaModals({
           <View style={styles.modalCard}>
             <Text style={styles.modalTitulo}>Registrar Recebimento</Text>
             <Text style={styles.modalSubtitulo}>
-              PrÃ©-integraÃ§Ã£o Stone/Operadora
+              Pré-integração Stone/Operadora
             </Text>
 
             <View style={styles.opcoesLinha}>
@@ -250,7 +250,7 @@ export function DetalheEntregaModals({
                       styles.opcaoTextoAtivo,
                   ]}
                 >
-                  DÃ©bito
+                  Débito
                 </Text>
               </TouchableOpacity>
 
@@ -268,7 +268,7 @@ export function DetalheEntregaModals({
                       styles.opcaoTextoAtivo,
                   ]}
                 >
-                  CrÃ©dito
+                  Crédito
                 </Text>
               </TouchableOpacity>
             </View>
@@ -333,7 +333,7 @@ export function DetalheEntregaModals({
         <View style={styles.modalOverlay}>
           <View style={[styles.modalCard, { maxHeight: "85%" }]}>
             <View style={styles.modalHeaderDetalhes}>
-              <Text style={styles.modalTitulo}>?? Detalhes da Venda</Text>
+              <Text style={styles.modalTitulo}>🧾 Detalhes da Venda</Text>
               <TouchableOpacity onPress={() => setModalVendaAberto(false)}>
                 <Text style={styles.fecharDetalhes}>Fechar</Text>
               </TouchableOpacity>
@@ -368,7 +368,7 @@ export function DetalheEntregaModals({
                   {vendaDetalhes?.status_pagamento || "N/A"}
                 </Text>
                 <Text style={styles.detalheLinha}>
-                  <Text style={styles.detalheLabel}>EndereÃ§o: </Text>
+                  <Text style={styles.detalheLabel}>Endereço: </Text>
                   {vendaDetalhes?.endereco_entrega || "N/A"}
                 </Text>
                 <Text style={styles.detalheLinha}>
@@ -391,7 +391,7 @@ export function DetalheEntregaModals({
                     </Text>
                     <Text style={styles.itemVendaValor}>
                       {Number(item.quantidade || 0)} x R$ {Number(item.preco_unitario || 0).toFixed(2)}
-                      {" ? "}R$ {Number(item.subtotal || 0).toFixed(2)}
+                      {" • "}R$ {Number(item.subtotal || 0).toFixed(2)}
                     </Text>
                   </View>
                 ))}
