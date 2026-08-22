@@ -71,15 +71,15 @@ Para validar sem sujar banco:
 3. Rodar onboarding nos dois com `strict_required=True`.
 4. Confirmar contagens:
    - `formas_pagamento = 4`
-   - `dre_categorias = 3`
-   - `dre_subcategorias = 4`
-   - `categorias_financeiras = 2`
-   - `tipo_despesas = 2`
+   - `dre_categorias = 12`
+   - `dre_subcategorias = 38`
+   - `categorias_financeiras = 27`
+   - `tipo_despesas = 19`
    - `departamentos = 1`
    - `categorias = 2`
    - `produtos = 0`
    - `tenant_template_installs = 1`
-   - `tenant_template_item_installs = 18`
+   - `tenant_template_item_installs` registra todos os itens copiados do pacote v2;
 5. Editar uma copia do tenant A.
 6. Confirmar que tenant B e template global nao mudam.
 7. Reexecutar onboarding no tenant A e confirmar que nao duplica.

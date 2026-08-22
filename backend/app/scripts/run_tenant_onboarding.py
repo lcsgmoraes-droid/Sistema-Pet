@@ -27,6 +27,7 @@ from app.services.tenant_onboarding_service import (
     onboard_tenant_defaults,
     validate_onboarding_template_contract,
 )
+from app.services.tenant_onboarding_templates import DEFAULT_BUNDLE_VERSION
 
 
 PRODUCTION_ENVS = {"prod", "production"}
@@ -72,7 +73,9 @@ def _build_parser() -> argparse.ArgumentParser:
         "--bundle-code", default="petshop-br", help="Template bundle code."
     )
     parser.add_argument(
-        "--bundle-version", default="v1", help="Template bundle version."
+        "--bundle-version",
+        default=DEFAULT_BUNDLE_VERSION,
+        help="Template bundle version.",
     )
     parser.add_argument(
         "--apply",
