@@ -3,6 +3,7 @@ import toast from "react-hot-toast";
 import api from "../../api";
 import { buscarClientes } from "../../api/clientes";
 import { getProdutos } from "../../api/produtos";
+import { confirmarCorePet } from "../../services/corepetDialog";
 import {
   calcularTotalDiferencaLancadaTransferencia,
   criarFormTransferencia,
@@ -13,15 +14,25 @@ import {
   incrementarItemTransferencia,
   montarEntradaParceiroPayload,
   montarPayloadTransferencia,
+  montarTransferenciaGrupoPayload,
+  montarTransferenciaGrupoPreviaPayload,
   normalizarNumero,
   produtoConfereCodigo,
 } from "./transferenciaParceiroUtils";
+
+function novaChaveIdempotencia() {
+  return (
+    globalThis.crypto?.randomUUID?.() ||
+    `00000000-0000-4000-8000-${Date.now().toString().padStart(12, "0").slice(-12)}`
+  );
+}
 
 export default function useTransferenciaLancamentoController({ setAbaAtiva } = {}) {
   const parceiroRef = useRef(null);
   const produtoRef = useRef(null);
   const produtoInputRef = useRef(null);
   const itensRef = useRef(null);
+  const chaveIdempotenciaGrupoRef = useRef(novaChaveIdempotencia());
 
   const [form, setForm] = useState(() => criarFormTransferencia());
   const [parceiroSelecionado, setParceiroSelecionado] = useState(null);
@@ -38,6 +49,34 @@ export default function useTransferenciaLancamentoController({ setAbaAtiva } = {
   const [itens, setItens] = useState([]);
   const [salvando, setSalvando] = useState(false);
   const [transferenciaEditando, setTransferenciaEditando] = useState(null);
+  const [destinosGrupo, setDestinosGrupo] = useState([]);
+  const [loadingDestinosGrupo, setLoadingDestinosGrupo] = useState(false);
+  const [previaGrupo, setPreviaGrupo] = useState(null);
+
+  useEffect(() => {
+    setPreviaGrupo(null);
+  }, [itens, form.destino_grupo_chave, form.tipo_operacao]);
+
+  useEffect(() => {
+    let ativo = true;
+    async function carregarDestinosGrupo() {
+      try {
+        setLoadingDestinosGrupo(true);
+        const response = await api.get("/estoque/transferencia-parceiro/grupo/destinos");
+        if (ativo) {
+          setDestinosGrupo(Array.isArray(response.data?.items) ? response.data.items : []);
+        }
+      } catch {
+        if (ativo) setDestinosGrupo([]);
+      } finally {
+        if (ativo) setLoadingDestinosGrupo(false);
+      }
+    }
+    carregarDestinosGrupo();
+    return () => {
+      ativo = false;
+    };
+  }, []);
 
   useEffect(() => {
     const termo = buscaParceiro.trim();
@@ -132,6 +171,14 @@ export default function useTransferenciaLancamentoController({ setAbaAtiva } = {
   const itensSemValor = useMemo(
     () => itens.filter((item) => Number(item.total_item || 0) <= 0).length,
     [itens],
+  );
+
+  const destinoGrupoSelecionado = useMemo(
+    () =>
+      destinosGrupo.find(
+        (destino) => `${destino.grupo_id}|${destino.empresa_id}` === form.destino_grupo_chave,
+      ) || null,
+    [destinosGrupo, form.destino_grupo_chave],
   );
 
   const selecionarParceiro = (parceiro) => {
@@ -290,6 +337,8 @@ export default function useTransferenciaLancamentoController({ setAbaAtiva } = {
     setSugestoesProdutos([]);
     setDropdownProdutoAberto(false);
     setForm((prev) => ({ ...prev, documento: "", observacao: "" }));
+    setPreviaGrupo(null);
+    chaveIdempotenciaGrupoRef.current = novaChaveIdempotencia();
   };
 
   const iniciarEdicaoTransferencia = (registro) => {
@@ -341,8 +390,13 @@ export default function useTransferenciaLancamentoController({ setAbaAtiva } = {
   };
 
   const registrarTransferencia = async (onTransferenciaSalva) => {
-    if (!parceiroSelecionado?.id) {
+    const transferenciaGrupo = form.tipo_operacao === "saida_grupo";
+    if (!transferenciaGrupo && !parceiroSelecionado?.id) {
       toast.error("Selecione uma pessoa para registrar a transferencia.");
+      return;
+    }
+    if (transferenciaGrupo && !destinoGrupoSelecionado) {
+      toast.error("Selecione a empresa do grupo que receberá os produtos.");
       return;
     }
     if (itens.length === 0) {
@@ -366,30 +420,67 @@ export default function useTransferenciaLancamentoController({ setAbaAtiva } = {
         return;
       }
 
-      const payload = entradaParceiro
-        ? montarEntradaParceiroPayload(parceiroSelecionado.id, form, itens)
-        : montarPayloadTransferencia(parceiroSelecionado.id, form, itens);
-      const response = entradaParceiro
-        ? await api.post("/estoque/transferencia-parceiro/entrada-parceiro", payload)
-        : transferenciaEditando?.conta_receber_id
-          ? await api.put(
-              `/estoque/transferencia-parceiro/${transferenciaEditando.conta_receber_id}`,
-              payload,
-            )
-          : await api.post("/estoque/transferencia-parceiro", payload);
+      let response;
+      if (transferenciaGrupo) {
+        const previaPayload = montarTransferenciaGrupoPreviaPayload(destinoGrupoSelecionado, itens);
+        const previaResponse = await api.post(
+          "/estoque/transferencia-parceiro/grupo/previa",
+          previaPayload,
+        );
+        const previa = previaResponse.data;
+        setPreviaGrupo(previa);
+        if (!previa?.todos_mapeados) {
+          toast.error(
+            "Existem produtos sem correspondência segura na empresa de destino. Confira a lista.",
+          );
+          return;
+        }
+        const confirmou = await confirmarCorePet({
+          titulo: "Confirmar transferência entre empresas",
+          mensagem: `Dar saída nesta empresa e entrada imediata em ${destinoGrupoSelecionado.empresa_nome}? As duas movimentações serão gravadas juntas.`,
+          confirmarTexto: "Transferir e dar entrada",
+        });
+        if (!confirmou) return;
+        const payloadGrupo = montarTransferenciaGrupoPayload(
+          destinoGrupoSelecionado,
+          form,
+          itens,
+          chaveIdempotenciaGrupoRef.current,
+        );
+        response = await api.post("/estoque/transferencia-parceiro/grupo/executar", payloadGrupo);
+      } else {
+        const payload = entradaParceiro
+          ? montarEntradaParceiroPayload(parceiroSelecionado.id, form, itens)
+          : montarPayloadTransferencia(parceiroSelecionado.id, form, itens);
+        response = entradaParceiro
+          ? await api.post("/estoque/transferencia-parceiro/entrada-parceiro", payload)
+          : transferenciaEditando?.conta_receber_id
+            ? await api.put(
+                `/estoque/transferencia-parceiro/${transferenciaEditando.conta_receber_id}`,
+                payload,
+              )
+            : await api.post("/estoque/transferencia-parceiro", payload);
+      }
       const documentoGerado = response?.data?.documento || "registrada";
-      const mensagemSucesso = entradaParceiro
-        ? `Entrada ${documentoGerado} registrada e divida criada.`
-        : transferenciaEditando?.conta_receber_id
-          ? `Transferencia ${documentoGerado} atualizada com sucesso.`
-          : `Transferencia ${documentoGerado} registrada com sucesso.`;
+      const mensagemSucesso = transferenciaGrupo
+        ? `Transferência ${documentoGerado}: saída e entrada registradas juntas.`
+        : entradaParceiro
+          ? `Entrada ${documentoGerado} registrada e divida criada.`
+          : transferenciaEditando?.conta_receber_id
+            ? `Transferencia ${documentoGerado} atualizada com sucesso.`
+            : `Transferencia ${documentoGerado} registrada com sucesso.`;
       toast.success(mensagemSucesso);
 
       limparLancamentoAtual();
       await onTransferenciaSalva?.();
     } catch (error) {
       console.error("Erro ao registrar transferencia:", error);
-      toast.error(error?.response?.data?.detail || "Nao foi possivel registrar a transferencia.");
+      const detalhe = error?.response?.data?.detail;
+      if (detalhe?.previa) setPreviaGrupo(detalhe.previa);
+      toast.error(
+        (typeof detalhe === "string" ? detalhe : detalhe?.mensagem) ||
+          "Nao foi possivel registrar a transferencia.",
+      );
     } finally {
       setSalvando(false);
     }
@@ -421,6 +512,10 @@ export default function useTransferenciaLancamentoController({ setAbaAtiva } = {
     totalRessarcimento,
     totalDiferencaLancada,
     itensSemValor,
+    destinosGrupo,
+    loadingDestinosGrupo,
+    destinoGrupoSelecionado,
+    previaGrupo,
     selecionarParceiro,
     limparParceiro,
     adicionarProduto,
@@ -430,6 +525,10 @@ export default function useTransferenciaLancamentoController({ setAbaAtiva } = {
     atualizarTotalItem,
     removerItem: (uid) => setItens((prev) => prev.filter((item) => item.uid !== uid)),
     atualizarCampo: (campo, valor) => setForm((prev) => ({ ...prev, [campo]: valor })),
+    selecionarDestinoGrupo: (valor) => {
+      setPreviaGrupo(null);
+      setForm((prev) => ({ ...prev, destino_grupo_chave: valor }));
+    },
     limparLancamentoAtual,
     iniciarEdicaoTransferencia,
     cancelarEdicaoTransferencia,

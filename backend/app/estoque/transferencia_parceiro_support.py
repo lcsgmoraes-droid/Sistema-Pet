@@ -54,8 +54,8 @@ def _obter_dre_subcategoria_receita_padrao(db: Session, tenant_id) -> int:
         db.query(DRESubcategoria)
         .join(DRECategoria, DRECategoria.id == DRESubcategoria.categoria_id)
         .filter(
-            DRESubcategoria.tenant_id == str(tenant_id),
-            DRECategoria.tenant_id == str(tenant_id),
+            DRESubcategoria.tenant_id == tenant_id,
+            DRECategoria.tenant_id == tenant_id,
             and_(DRESubcategoria.ativo.is_(True), DRECategoria.ativo.is_(True)),
             DRECategoria.natureza == NaturezaDRE.RECEITA,
         )
@@ -74,7 +74,7 @@ def _obter_ou_criar_categoria_financeira_transferencia(
     categoria = (
         db.query(CategoriaFinanceira)
         .filter(
-            CategoriaFinanceira.tenant_id == str(tenant_id),
+            CategoriaFinanceira.tenant_id == tenant_id,
             CategoriaFinanceira.nome == "Transferencia para Parceiro",
             CategoriaFinanceira.tipo == "receita",
         )
@@ -84,7 +84,7 @@ def _obter_ou_criar_categoria_financeira_transferencia(
         return categoria
 
     categoria = CategoriaFinanceira(
-        tenant_id=str(tenant_id),
+        tenant_id=tenant_id,
         nome="Transferencia para Parceiro",
         tipo="receita",
         descricao="Ressarcimento de estoque transferido a parceiro sem gerar venda no PDV.",

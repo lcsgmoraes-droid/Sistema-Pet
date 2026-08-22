@@ -11,6 +11,7 @@ from sqlalchemy import (
     ForeignKey,
     Index,
     Integer,
+    JSON,
     String,
     UniqueConstraint,
 )
@@ -68,6 +69,7 @@ class EmpresaGrupoMembro(Base):
         String(20), nullable=False, default="membro", server_default="membro"
     )
     status = Column(String(20), nullable=False, default="ativo", server_default="ativo")
+    usuario_referencia_id = Column(Integer, nullable=True)
     entrou_em = Column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )
@@ -139,3 +141,52 @@ class EmpresaGrupoConvite(Base):
     )
     expira_em = Column(DateTime(timezone=True), nullable=False)
     respondido_em = Column(DateTime(timezone=True), nullable=True)
+
+
+class EmpresaGrupoTransferencia(Base):
+    __tablename__ = "empresa_grupo_transferencias"
+    __table_args__ = (
+        UniqueConstraint(
+            "empresa_origem_id",
+            "chave_idempotencia",
+            name="uq_empresa_grupo_transferencia_idempotencia",
+        ),
+        Index(
+            "ix_empresa_grupo_transferencias_grupo_criado",
+            "grupo_id",
+            "criado_em",
+        ),
+        Index(
+            "ix_empresa_grupo_transferencias_destino_criado",
+            "empresa_destino_id",
+            "criado_em",
+        ),
+    )
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    grupo_id = Column(
+        Integer,
+        ForeignKey("empresa_grupos.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    empresa_origem_id = Column(
+        String(36), ForeignKey("tenants.id", ondelete="RESTRICT"), nullable=False
+    )
+    empresa_destino_id = Column(
+        String(36), ForeignKey("tenants.id", ondelete="RESTRICT"), nullable=False
+    )
+    usuario_origem_id = Column(Integer, nullable=False)
+    usuario_destino_id = Column(Integer, nullable=True)
+    chave_idempotencia = Column(String(36), nullable=False)
+    documento = Column(String(100), nullable=False)
+    status = Column(
+        String(20), nullable=False, default="processando", server_default="processando"
+    )
+    conta_receber_origem_id = Column(Integer, nullable=True)
+    conta_pagar_destino_id = Column(Integer, nullable=True)
+    itens_snapshot = Column(JSON, nullable=False, default=list)
+    resultado = Column(JSON, nullable=True)
+    criado_em = Column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+    concluido_em = Column(DateTime(timezone=True), nullable=True)

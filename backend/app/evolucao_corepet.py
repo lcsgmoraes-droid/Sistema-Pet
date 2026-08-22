@@ -154,18 +154,19 @@ ITENS_EVOLUCAO: tuple[dict[str, Any], ...] = (
         "id": "grupos-empresas-transferencia-integrada",
         "titulo": "Transferência integrada entre empresas do grupo",
         "resumo": (
-            "A transferência poderá registrar a saída na empresa de origem e preparar a "
-            "entrada correspondente na empresa de destino, com rastreabilidade."
+            "A transferência registra a saída na empresa de origem e a entrada na "
+            "empresa de destino em uma única operação, com conferência por código de barras."
         ),
-        "status": "em_desenvolvimento",
+        "status": "disponivel_teste",
         "tipo": "projeto",
         "modulo": "Empresas e estoque",
         "plataformas": ["ERP"],
         "canais": ["erp"],
-        "publicado_em": None,
+        "publicado_em": "2026-08-22",
         "atualizado_em": "2026-08-22",
+        "ciclo_novidade": deepcopy(CICLO_PADRAO),
         "destaque": True,
-        "caminho_ajuda": None,
+        "caminho_ajuda": "/ajuda?aba=central&artigo=transferencia-integrada-grupo",
     },
     {
         "id": "crediario-vencimento-alertas",

@@ -97,6 +97,7 @@ export function criarFormTransferencia(overrides = {}) {
   return {
     tipo_operacao: "saida_parceiro",
     entrar_estoque: true,
+    destino_grupo_chave: "",
     parceiro_id: "",
     data_vencimento: fimDoMesIso(),
     documento: "",
@@ -299,6 +300,33 @@ export function montarEntradaParceiroPayload(parceiroId, form, itens) {
   if (!payload.documento) delete payload.documento;
   if (!payload.observacao) delete payload.observacao;
 
+  return payload;
+}
+
+export function montarTransferenciaGrupoPreviaPayload(destino, itens) {
+  return {
+    grupo_id: Number(destino.grupo_id),
+    empresa_destino_id: destino.empresa_id,
+    itens: itens.map((item) => ({
+      produto_id: Number(item.produto_id),
+      quantidade: Number(item.quantidade),
+      custo_unitario: Number(item.custo_unitario || 0),
+      valor_total: Number(item.total_item || 0),
+    })),
+  };
+}
+
+export function montarTransferenciaGrupoPayload(destino, form, itens, chaveIdempotencia) {
+  const payload = {
+    ...montarTransferenciaGrupoPreviaPayload(destino, itens),
+    chave_idempotencia: chaveIdempotencia,
+    data_vencimento: form.data_vencimento || undefined,
+    documento: form.documento?.trim() || undefined,
+    observacao: form.observacao?.trim() || undefined,
+  };
+  if (!payload.data_vencimento) delete payload.data_vencimento;
+  if (!payload.documento) delete payload.documento;
+  if (!payload.observacao) delete payload.observacao;
   return payload;
 }
 
