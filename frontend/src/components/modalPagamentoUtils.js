@@ -365,7 +365,7 @@ export function montarPagamentoRecebido({
     valor: Math.min(Number(valor || 0), Number(valorRestante || 0)),
     bandeira: isCartao ? bandeira : null,
     nsu_cartao: isCartao && nsuCartao ? nsuCartao : null,
-    operadora_id: operadora?.id || null,
+    operadora_id: isCartao ? operadora?.id || null : null,
     modalidade_cartao: isCartao ? obterModalidadeCartao(formaPagamento) : null,
     numero_parcelas: parcelas,
     parcelas,
