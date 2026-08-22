@@ -15,6 +15,7 @@ from sqlalchemy import case, func, or_
 from sqlalchemy.orm import Session, joinedload, selectinload
 
 from app.db import get_session
+from app.evolucao_corepet import listar_evolucao_corepet
 from app.models import AppNotification, Cliente, User, UserPushDevice
 from app.produtos_models import Produto
 from app.routes.ecommerce_auth import (
@@ -364,6 +365,20 @@ def listar_notificacoes_app(
         "items": [_serialize_app_notification(item) for item in items],
         "unread_count": unread_count,
     }
+
+
+@router.get("/evolucao")
+def listar_evolucao_app(
+    current_user: User = Depends(_get_current_ecommerce_user),
+):
+    perfil = str(getattr(current_user, "_active_app_profile", None) or "cliente")
+    canais_por_perfil = {
+        "cliente": "app_cliente",
+        "funcionario": "app_funcionario",
+        "entregador": "app_entregador",
+        "veterinario": "app_veterinario",
+    }
+    return listar_evolucao_corepet(canais_por_perfil.get(perfil, "app_cliente"))
 
 
 @router.post("/notificacoes/{notificacao_id}/lida")
