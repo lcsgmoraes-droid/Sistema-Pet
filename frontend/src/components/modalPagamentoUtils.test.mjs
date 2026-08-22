@@ -665,10 +665,12 @@ test("nao envia identificador textual do credito do cliente ao backend", () => {
     },
     valor: 7,
     valorRestante: 121.4,
+    operadora: { id: 1, nome: "Stone" },
   });
 
   assert.equal(pagamento.forma_id, "credito_cliente");
   assert.equal(pagamento.forma_pagamento_id, null);
+  assert.equal(pagamento.operadora_id, null);
   assert.equal(pagamento.is_credito_cliente, true);
 });
 
