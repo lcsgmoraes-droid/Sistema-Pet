@@ -221,6 +221,15 @@ export const updateProduto = (id, data) => {
 };
 
 /**
+ * Simular os precos de venda dos produtos compostos afetados.
+ */
+export const previewPrecosVendaProdutosCompostos = (id, precoVenda) => {
+  return api.post(`/produtos/${id}/precos-compostos/preview`, {
+    preco_venda: precoVenda,
+  });
+};
+
+/**
  * Excluir produto (soft delete)
  */
 export const deleteProduto = (id) => {

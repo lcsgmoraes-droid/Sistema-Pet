@@ -333,6 +333,30 @@ class ProdutoUpdate(BaseModel):
     # Sistema Predecessor/Sucessor
     produto_predecessor_id: Optional[int] = None
     motivo_descontinuacao: Optional[str] = None
+    # Precos de venda de produtos compostos so mudam com autorizacao explicita.
+    produtos_compostos_preco_venda_ids: Optional[List[int]] = None
+
+
+class ProdutoCompostoPrecoVendaPreviewRequest(BaseModel):
+    preco_venda: float = Field(..., ge=0)
+
+
+class ProdutoCompostoPrecoVendaSugestao(BaseModel):
+    produto_id: int
+    sku: str
+    nome: str
+    ativo: bool
+    quantidade_componente: float
+    preco_venda_atual: float
+    preco_venda_sugerido: float
+
+
+class ProdutoCompostoPrecoVendaPreviewResponse(BaseModel):
+    produto_id: int
+    produto_nome: str
+    preco_venda_atual: float
+    preco_venda_novo: float
+    sugestoes: List[ProdutoCompostoPrecoVendaSugestao] = Field(default_factory=list)
 
 
 class ProdutoAtivoUpdate(BaseModel):

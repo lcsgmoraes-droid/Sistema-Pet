@@ -1,12 +1,16 @@
 import { useState } from "react";
 import toast from "react-hot-toast";
 import api from "../api";
+import { previewPrecosVendaProdutosCompostos, updateProduto } from "../api/produtos";
 import { confirmarCorePet } from "../services/corepetDialog";
 
 export default function useProdutosEdicao({ carregarDados, selecionados, setSelecionados }) {
   const [editandoPreco, setEditandoPreco] = useState(null);
   const [novoPreco, setNovoPreco] = useState("");
   const [editandoMargem, setEditandoMargem] = useState(null);
+  const [previewPrecosCompostos, setPreviewPrecosCompostos] = useState(null);
+  const [precosCompostosSelecionados, setPrecosCompostosSelecionados] = useState([]);
+  const [salvandoPrecosCompostos, setSalvandoPrecosCompostos] = useState(false);
   const [modalEdicaoLote, setModalEdicaoLote] = useState(false);
   const [dadosEdicaoLote, setDadosEdicaoLote] = useState({
     ativo: "",
@@ -36,16 +40,43 @@ export default function useProdutosEdicao({ carregarDados, selecionados, setSele
     setNovoPreco(precoAtual.toString());
   };
 
-  const handleSalvarPreco = async (produtoId) => {
+  const concluirAtualizacaoPreco = async (produtoId, precoVenda, produtosCompostosIds) => {
+    const payload = { preco_venda: precoVenda };
+    if (produtosCompostosIds !== undefined) {
+      payload.produtos_compostos_preco_venda_ids = produtosCompostosIds;
+    }
+
+    await updateProduto(produtoId, payload);
+    toast.success("Preço atualizado!");
+    setEditandoPreco(null);
+    setEditandoMargem(null);
+    carregarDados();
+  };
+
+  const prepararAtualizacaoPreco = async (produtoId, precoVenda) => {
     try {
-      await api.patch(`/produtos/${produtoId}?preco_venda=${novoPreco}`, {});
-      toast.success("Preço atualizado!");
-      setEditandoPreco(null);
-      carregarDados();
+      setSalvandoPrecosCompostos(true);
+      const response = await previewPrecosVendaProdutosCompostos(produtoId, precoVenda);
+      const preview = response.data || {};
+      const sugestoes = Array.isArray(preview.sugestoes) ? preview.sugestoes : [];
+
+      if (sugestoes.length > 0) {
+        setPreviewPrecosCompostos(preview);
+        setPrecosCompostosSelecionados(sugestoes.map((item) => item.produto_id));
+        return;
+      }
+
+      await concluirAtualizacaoPreco(produtoId, precoVenda);
     } catch (error) {
       console.error("Erro ao atualizar preço:", error);
       toast.error("Erro ao atualizar preço");
+    } finally {
+      setSalvandoPrecosCompostos(false);
     }
+  };
+
+  const handleSalvarPreco = async (produtoId) => {
+    await prepararAtualizacaoPreco(produtoId, Number(novoPreco));
   };
 
   const handleSalvarMargem = async (produtoId, custo) => {
@@ -63,10 +94,7 @@ export default function useProdutosEdicao({ carregarDados, selecionados, setSele
         novoPrecoCalculado = Number(editandoMargem.valor);
       }
       novoPrecoCalculado = Math.round(novoPrecoCalculado * 100) / 100;
-      await api.patch(`/produtos/${produtoId}?preco_venda=${novoPrecoCalculado}`, {});
-      toast.success("Preço atualizado!");
-      setEditandoMargem(null);
-      carregarDados();
+      await prepararAtualizacaoPreco(produtoId, novoPrecoCalculado);
     } catch (error) {
       console.error("Erro ao atualizar preço pela margem:", error);
       toast.error("Erro ao atualizar preço");
@@ -75,6 +103,45 @@ export default function useProdutosEdicao({ carregarDados, selecionados, setSele
 
   const handleCancelarEdicaoPreco = () => {
     setEditandoPreco(null);
+  };
+
+  const fecharPreviewPrecosCompostos = () => {
+    if (salvandoPrecosCompostos) return;
+    setPreviewPrecosCompostos(null);
+    setPrecosCompostosSelecionados([]);
+  };
+
+  const confirmarPreviewPrecosCompostos = async () => {
+    if (!previewPrecosCompostos) return;
+
+    try {
+      setSalvandoPrecosCompostos(true);
+      await concluirAtualizacaoPreco(
+        previewPrecosCompostos.produto_id,
+        previewPrecosCompostos.preco_venda_novo,
+        precosCompostosSelecionados,
+      );
+      setPreviewPrecosCompostos(null);
+      setPrecosCompostosSelecionados([]);
+    } catch (error) {
+      console.error("Erro ao atualizar preços:", error);
+      toast.error("Erro ao atualizar preços");
+    } finally {
+      setSalvandoPrecosCompostos(false);
+    }
+  };
+
+  const toggleProdutoComposto = (produtoId, checked) => {
+    setPrecosCompostosSelecionados((atuais) =>
+      checked
+        ? Array.from(new Set([...atuais, produtoId]))
+        : atuais.filter((idAtual) => idAtual !== produtoId),
+    );
+  };
+
+  const toggleTodosProdutosCompostos = (checked) => {
+    const sugestoes = previewPrecosCompostos?.sugestoes || [];
+    setPrecosCompostosSelecionados(checked ? sugestoes.map((item) => item.produto_id) : []);
   };
 
   const handleAbrirEdicaoLote = () => {
@@ -230,6 +297,22 @@ export default function useProdutosEdicao({ carregarDados, selecionados, setSele
     }
   };
 
+  const precosCompostosModalProps = previewPrecosCompostos
+    ? {
+        aberto: true,
+        nomeProduto: previewPrecosCompostos.produto_nome || "produto unitário",
+        onClose: fecharPreviewPrecosCompostos,
+        onConfirmar: confirmarPreviewPrecosCompostos,
+        onToggleProduto: toggleProdutoComposto,
+        onToggleTodos: toggleTodosProdutosCompostos,
+        precoVendaAtual: Number(previewPrecosCompostos.preco_venda_atual || 0),
+        precoVendaNovo: Number(previewPrecosCompostos.preco_venda_novo || 0),
+        salvando: salvandoPrecosCompostos,
+        selecionados: precosCompostosSelecionados,
+        sugestoes: previewPrecosCompostos.sugestoes || [],
+      }
+    : null;
+
   return {
     dadosEdicaoLote,
     editandoMargem,
@@ -242,6 +325,7 @@ export default function useProdutosEdicao({ carregarDados, selecionados, setSele
     handleSalvarPreco,
     modalEdicaoLote,
     novoPreco,
+    precosCompostosModalProps,
     setDadosEdicaoLote,
     setEditandoMargem,
     setModalEdicaoLote,
