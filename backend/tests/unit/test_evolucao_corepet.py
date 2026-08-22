@@ -43,6 +43,12 @@ def test_catalogo_filtra_projetos_por_canal_sem_expor_item_interno():
     assert erp["total_disponivel"] >= 1
 
 
+def test_catalogo_nao_anuncia_granel_de_farmacia_descartado():
+    ids = {item["id"] for item in ITENS_EVOLUCAO}
+
+    assert "fracionamento-produtos-farmacia" not in ids
+
+
 def test_funcao_liberada_aparece_como_disponivel_em_fase_de_teste():
     resultado = listar_evolucao_corepet(
         "app_cliente",

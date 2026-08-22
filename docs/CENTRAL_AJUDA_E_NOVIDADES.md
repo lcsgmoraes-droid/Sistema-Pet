@@ -39,3 +39,9 @@ O catálogo é validado por `backend/tests/unit/test_evolucao_corepet.py`. Um it
 Os guias completos devem conter objetivo, público, pré-requisitos, caminho da tela, passos, exemplos, alertas, teste, checklist e dúvidas comuns. Guias curtos de integrações podem usar apresentação horizontal; configurações longas devem usar A4 vertical.
 
 Capturas de tela nunca devem expor dados reais de clientes ou informações sigilosas.
+
+## Decisões encerradas
+
+Projetos descartados não permanecem no catálogo de Novidades, para não sugerir ao usuário que ainda serão desenvolvidos.
+
+- Em 22/08/2026, foi encerrada a ideia de tratar medicamentos fracionados como granel. Para caixas com venda unitária, o padrão do CorePet continua sendo **produto com composição**, funcionalidade que já existe.
