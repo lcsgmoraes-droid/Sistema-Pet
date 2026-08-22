@@ -4,6 +4,7 @@ import {
   FuncionarioPdvBeneficiosPreviewPayload,
   FuncionarioPdvCaixa,
   FuncionarioPdvCliente,
+  FuncionarioPdvClienteRapidoPayload,
   FuncionarioPdvFormaPagamentoOpcao,
   FuncionarioPdvFinalizarPayload,
   FuncionarioPdvFinalizarResponse,
@@ -85,6 +86,13 @@ export async function buscarClientesPdv(termo: string): Promise<FuncionarioPdvCl
   return Array.isArray(response.data) ? response.data.map(normalizarClientePdv) : [];
 }
 
+export async function criarClienteRapidoPdv(
+  payload: FuncionarioPdvClienteRapidoPayload,
+): Promise<FuncionarioPdvCliente> {
+  const response = await api.post("/app/funcionario/pdv/clientes/rapido", payload);
+  return normalizarClientePdv(response.data);
+}
+
 export async function obterCaixaAbertoPdv(): Promise<FuncionarioPdvCaixa> {
   const response = await api.get("/app/funcionario/pdv/caixa/aberto");
   return {
@@ -128,7 +136,7 @@ export async function listarFormasPagamentoPdv(): Promise<FuncionarioPdvFormaPag
         requer_nsu: Boolean(item.requer_nsu),
         tipo_cartao: item.tipo_cartao ?? null,
         bandeira: item.bandeira
-          ? BANDEIRAS_CARTAO_LABEL[String(item.bandeira).toLowerCase()] ?? String(item.bandeira)
+          ? (BANDEIRAS_CARTAO_LABEL[String(item.bandeira).toLowerCase()] ?? String(item.bandeira))
           : null,
         split_parcelas: Boolean(item.split_parcelas),
         parcelas_disponiveis: Array.isArray(item.parcelas_disponiveis)

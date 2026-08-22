@@ -295,6 +295,8 @@ def processar_pagamentos_finalizacao(
             bandeira=bandeira or None,
             nsu_cartao=pag_data.get("nsu_cartao"),
             operadora_id=operadora_id,
+            prazo_recebimento_dias=pag_data.get("prazo_recebimento_dias"),
+            data_recebimento_prevista=pag_data.get("data_recebimento_prevista"),
             **taxa_aplicada,
         )
         db.add(pagamento)

@@ -7,6 +7,7 @@ import {
   buscarClientesPdv,
   buscarProdutoPdvPorBarcode,
   buscarProdutosPdv,
+  criarClienteRapidoPdv,
   finalizarVendaPdv,
   listarFormasPagamentoPdv,
   obterCaixaAbertoPdv,
@@ -23,6 +24,7 @@ import type {
 } from "../../types";
 import { formatarMoeda } from "../../utils/format";
 import { FuncionarioPdvContent } from "./pdv/FuncionarioPdvContent";
+import { FuncionarioPdvClienteRapidoModal } from "./pdv/FuncionarioPdvClienteRapidoModal";
 import {
   FuncionarioPdvPermissionRequest,
   FuncionarioPdvScanner,
@@ -35,6 +37,14 @@ import {
 } from "./pdv/FuncionarioPdvUtils";
 
 export default function FuncionarioPdvScreen() {
+  const vencimentoPadrao = () => {
+    const data = new Date();
+    data.setDate(data.getDate() + 30);
+    const ano = data.getFullYear();
+    const mes = String(data.getMonth() + 1).padStart(2, "0");
+    const dia = String(data.getDate()).padStart(2, "0");
+    return `${ano}-${mes}-${dia}`;
+  };
   const isFocused = useIsFocused();
   const [permission, requestPermission] = useCameraPermissions();
   const [scannerAberto, setScannerAberto] = useState(false);
@@ -49,18 +59,26 @@ export default function FuncionarioPdvScreen() {
   const [clientesSugestoes, setClientesSugestoes] = useState<FuncionarioPdvCliente[]>([]);
   const [cliente, setCliente] = useState<FuncionarioPdvCliente | null>(null);
   const [mostrarDetalhesCliente, setMostrarDetalhesCliente] = useState(false);
+  const [cadastroRapidoAberto, setCadastroRapidoAberto] = useState(false);
+  const [salvandoClienteRapido, setSalvandoClienteRapido] = useState(false);
   const [formaPagamento, setFormaPagamento] = useState<FuncionarioPdvFormaPagamento>("dinheiro");
-  const [formasPagamentoErp, setFormasPagamentoErp] = useState<FuncionarioPdvFormaPagamentoOpcao[]>([]);
-  const [formaPagamentoIdSelecionada, setFormaPagamentoIdSelecionada] = useState<string | null>(null);
+  const [formasPagamentoErp, setFormasPagamentoErp] = useState<FuncionarioPdvFormaPagamentoOpcao[]>(
+    [],
+  );
+  const [formaPagamentoIdSelecionada, setFormaPagamentoIdSelecionada] = useState<string | null>(
+    null,
+  );
   const [numeroParcelas, setNumeroParcelas] = useState(1);
   const [nsuCartao, setNsuCartao] = useState("");
   const [valorRecebido, setValorRecebido] = useState("");
+  const [dataVencimentoCrediario, setDataVencimentoCrediario] = useState(vencimentoPadrao);
   const [observacoes, setObservacoes] = useState("");
   const [caixa, setCaixa] = useState<FuncionarioPdvCaixa | null>(null);
   const [carregandoCaixa, setCarregandoCaixa] = useState(false);
   const [finalizando, setFinalizando] = useState(false);
   const [salvandoAberta, setSalvandoAberta] = useState(false);
-  const [beneficiosPreview, setBeneficiosPreview] = useState<FuncionarioPdvBeneficiosPreview | null>(null);
+  const [beneficiosPreview, setBeneficiosPreview] =
+    useState<FuncionarioPdvBeneficiosPreview | null>(null);
   const [carregandoBeneficios, setCarregandoBeneficios] = useState(false);
   const [erroBeneficios, setErroBeneficios] = useState<string | null>(null);
   const [cupomCodigo, setCupomCodigo] = useState("");
@@ -130,7 +148,7 @@ export default function FuncionarioPdvScreen() {
   );
   const itensPreviewKey = useMemo(() => JSON.stringify(itensPayload), [itensPayload]);
   const cashbackSolicitado = useMemo(
-    () => (usarCashback ? parseNumero(cashbackValor) ?? 0 : 0),
+    () => (usarCashback ? (parseNumero(cashbackValor) ?? 0) : 0),
     [cashbackValor, usarCashback],
   );
   const totalComBeneficios = beneficiosPreview?.total_venda ?? total;
@@ -168,7 +186,10 @@ export default function FuncionarioPdvScreen() {
       setNumeroParcelas(1);
       return;
     }
-    if (formaPagamentoIdSelecionada && !opcoesCartao.some((item) => item.selection_id === formaPagamentoIdSelecionada)) {
+    if (
+      formaPagamentoIdSelecionada &&
+      !opcoesCartao.some((item) => item.selection_id === formaPagamentoIdSelecionada)
+    ) {
       setFormaPagamentoIdSelecionada(null);
       return;
     }
@@ -183,7 +204,14 @@ export default function FuncionarioPdvScreen() {
     if (!parcelasCredito.includes(numeroParcelas)) {
       setNumeroParcelas(parcelasCredito[0] ?? 1);
     }
-  }, [ehCartao, formaPagamento, formaPagamentoIdSelecionada, numeroParcelas, opcoesCartao, parcelasCredito]);
+  }, [
+    ehCartao,
+    formaPagamento,
+    formaPagamentoIdSelecionada,
+    numeroParcelas,
+    opcoesCartao,
+    parcelasCredito,
+  ]);
 
   useEffect(() => {
     if (!isFocused || carrinho.length === 0) {
@@ -253,7 +281,10 @@ export default function FuncionarioPdvScreen() {
 
   function adicionarProduto(produto: FuncionarioPdvProduto) {
     if (!produto.vendavel) {
-      Alert.alert("Produto nao vendavel", produto.aviso || "Este produto nao pode ser vendido no PDV.");
+      Alert.alert(
+        "Produto nao vendavel",
+        produto.aviso || "Este produto nao pode ser vendido no PDV.",
+      );
       return;
     }
     setQuantidadeEditando((atual) => {
@@ -296,7 +327,9 @@ export default function FuncionarioPdvScreen() {
     if (!Number.isFinite(quantidade) || quantidade <= 0) return;
     setCarrinho((atual) =>
       atual.map((item) =>
-        item.produto.id === produtoId ? { ...item, quantidade: arredondarQuantidadePdv(quantidade) } : item,
+        item.produto.id === produtoId
+          ? { ...item, quantidade: arredondarQuantidadePdv(quantidade) }
+          : item,
       ),
     );
   }
@@ -426,6 +459,26 @@ export default function FuncionarioPdvScreen() {
     }
   }
 
+  async function criarClienteRapido(payload: {
+    nome?: string | null;
+    telefone?: string | null;
+    endereco?: string | null;
+  }) {
+    setSalvandoClienteRapido(true);
+    try {
+      const criado = await criarClienteRapidoPdv(payload);
+      setCliente(criado);
+      setClientesSugestoes([]);
+      setClienteBusca("");
+      setMostrarDetalhesCliente(false);
+      return criado;
+    } catch (error: any) {
+      Alert.alert("Erro", mensagemErroApi(error, "Nao foi possivel adicionar a pessoa."));
+    } finally {
+      setSalvandoClienteRapido(false);
+    }
+  }
+
   function limparVendaAtual() {
     setCarrinho([]);
     setQuantidadeEditando({});
@@ -443,11 +496,15 @@ export default function FuncionarioPdvScreen() {
     setFormaPagamentoIdSelecionada(null);
     setNumeroParcelas(1);
     setNsuCartao("");
+    setDataVencimentoCrediario(vencimentoPadrao());
   }
 
   async function salvarAberta() {
     if (!caixa?.aberto) {
-      Alert.alert("Caixa fechado", caixa?.mensagem || "Abra um caixa no ERP web antes de salvar pelo app.");
+      Alert.alert(
+        "Caixa fechado",
+        caixa?.mensagem || "Abra um caixa no ERP web antes de salvar pelo app.",
+      );
       return;
     }
     if (!carrinho.length) {
@@ -473,7 +530,10 @@ export default function FuncionarioPdvScreen() {
         desconto_cupom: previewAtual.desconto_cupom,
         cashback_valor: 0,
       });
-      Alert.alert("Venda salva", `${resposta.numero_venda} ficou aberta para recebimento no caixa.`);
+      Alert.alert(
+        "Venda salva",
+        `${resposta.numero_venda} ficou aberta para recebimento no caixa.`,
+      );
       limparVendaAtual();
       carregarCaixa();
     } catch (error: any) {
@@ -485,7 +545,10 @@ export default function FuncionarioPdvScreen() {
 
   async function finalizar() {
     if (!caixa?.aberto) {
-      Alert.alert("Caixa fechado", caixa?.mensagem || "Abra um caixa no ERP web antes de vender pelo app.");
+      Alert.alert(
+        "Caixa fechado",
+        caixa?.mensagem || "Abra um caixa no ERP web antes de vender pelo app.",
+      );
       return;
     }
     if (!carrinho.length) {
@@ -508,7 +571,11 @@ export default function FuncionarioPdvScreen() {
         return;
       }
 
-      if (formaPagamento === "dinheiro" && previewAtual.valor_pagamento > 0 && valorRecebidoNumero + 0.01 < previewAtual.valor_pagamento) {
+      if (
+        formaPagamento === "dinheiro" &&
+        previewAtual.valor_pagamento > 0 &&
+        valorRecebidoNumero + 0.01 < previewAtual.valor_pagamento
+      ) {
         Alert.alert("Valor recebido", "Informe um valor recebido igual ou maior que o total.");
         return;
       }
@@ -516,28 +583,51 @@ export default function FuncionarioPdvScreen() {
         Alert.alert("Cartao", "Selecione a bandeira/operadora do cartao.");
         return;
       }
-      const trocoFinal = formaPagamento === "dinheiro" ? Math.max(0, valorRecebidoNumero - previewAtual.valor_pagamento) : 0;
+      if (formaPagamento === "crediario" && !cliente) {
+        Alert.alert("Cliente obrigatorio", "Selecione um cliente para vender no crediario.");
+        return;
+      }
+      if (formaPagamento === "crediario" && !/^\d{4}-\d{2}-\d{2}$/.test(dataVencimentoCrediario)) {
+        Alert.alert("Data invalida", "Informe o vencimento no formato AAAA-MM-DD.");
+        return;
+      }
+      const trocoFinal =
+        formaPagamento === "dinheiro"
+          ? Math.max(0, valorRecebidoNumero - previewAtual.valor_pagamento)
+          : 0;
       const resposta = await finalizarVendaPdv({
         cliente_id: cliente?.id ?? null,
         itens: itensPayload,
         pagamento: {
           forma_pagamento: formaPagamento,
           valor: Number(previewAtual.valor_pagamento.toFixed(2)),
-          valor_recebido: formaPagamento === "dinheiro" && previewAtual.valor_pagamento > 0 ? Number(valorRecebidoNumero.toFixed(2)) : null,
-          troco: formaPagamento === "dinheiro" && previewAtual.valor_pagamento > 0 ? Number(trocoFinal.toFixed(2)) : null,
+          valor_recebido:
+            formaPagamento === "dinheiro" && previewAtual.valor_pagamento > 0
+              ? Number(valorRecebidoNumero.toFixed(2))
+              : null,
+          troco:
+            formaPagamento === "dinheiro" && previewAtual.valor_pagamento > 0
+              ? Number(trocoFinal.toFixed(2))
+              : null,
           numero_parcelas: formaPagamento === "credito" ? numeroParcelas : 1,
-          forma_pagamento_id: ehCartao ? formaPagamentoSelecionada?.id ?? null : null,
-          bandeira: ehCartao ? formaPagamentoSelecionada?.bandeira ?? formaPagamentoSelecionada?.nome ?? null : null,
-          operadora: ehCartao ? formaPagamentoSelecionada?.operadora ?? null : null,
-          operadora_id: ehCartao ? formaPagamentoSelecionada?.operadora_id ?? null : null,
+          forma_pagamento_id: ehCartao ? (formaPagamentoSelecionada?.id ?? null) : null,
+          bandeira: ehCartao
+            ? (formaPagamentoSelecionada?.bandeira ?? formaPagamentoSelecionada?.nome ?? null)
+            : null,
+          operadora: ehCartao ? (formaPagamentoSelecionada?.operadora ?? null) : null,
+          operadora_id: ehCartao ? (formaPagamentoSelecionada?.operadora_id ?? null) : null,
           nsu_cartao: ehCartao ? nsuCartao.trim() || null : null,
+          data_vencimento: formaPagamento === "crediario" ? dataVencimentoCrediario : null,
         },
         observacoes: observacoes.trim() || null,
         cupom_codigo: cupomCodigo.trim() || null,
         desconto_cupom: previewAtual.desconto_cupom,
         cashback_valor: previewAtual.cashback_valor,
       });
-      Alert.alert("Venda registrada", `${resposta.numero_venda} - ${formatarMoeda(resposta.total)}`);
+      Alert.alert(
+        "Venda registrada",
+        `${resposta.numero_venda} - ${formatarMoeda(resposta.total)}`,
+      );
       limparVendaAtual();
       carregarCaixa();
     } catch (error: any) {
@@ -575,68 +665,79 @@ export default function FuncionarioPdvScreen() {
   }
 
   return (
-    <FuncionarioPdvContent
-      caixa={caixa}
-      carregarCaixa={carregarCaixa}
-      carregandoCaixa={carregandoCaixa}
-      abrirScanner={abrirScanner}
-      buscaManual={buscaManual}
-      setBuscaManual={setBuscaManual}
-      buscarManualProduto={buscarManualProduto}
-      buscandoProduto={buscandoProduto}
-      sugestoes={sugestoes}
-      adicionarProduto={adicionarProduto}
-      carrinho={carrinho}
-      totalItens={totalItens}
-      quantidadeEditando={quantidadeEditando}
-      valorEditando={valorEditando}
-      alterarQuantidade={alterarQuantidade}
-      editarQuantidadeItem={editarQuantidadeItem}
-      finalizarEdicaoQuantidade={finalizarEdicaoQuantidade}
-      editarValorItem={editarValorItem}
-      finalizarEdicaoValor={finalizarEdicaoValor}
-      cliente={cliente}
-      setCliente={setCliente}
-      mostrarDetalhesCliente={mostrarDetalhesCliente}
-      setMostrarDetalhesCliente={setMostrarDetalhesCliente}
-      clienteBusca={clienteBusca}
-      setClienteBusca={setClienteBusca}
-      buscarCliente={buscarCliente}
-      clientesSugestoes={clientesSugestoes}
-      setClientesSugestoes={setClientesSugestoes}
-      carregandoBeneficios={carregandoBeneficios}
-      cupomCodigo={cupomCodigo}
-      setCupomCodigo={setCupomCodigo}
-      carregarBeneficios={carregarBeneficios}
-      erroBeneficios={erroBeneficios}
-      beneficiosPreview={beneficiosPreview}
-      totalComBeneficios={totalComBeneficios}
-      usarCashback={usarCashback}
-      setUsarCashback={setUsarCashback}
-      cashbackValor={cashbackValor}
-      setCashbackValor={setCashbackValor}
-      valorAPagar={valorAPagar}
-      formaPagamento={formaPagamento}
-      setFormaPagamento={setFormaPagamento}
-      setFormaPagamentoIdSelecionada={setFormaPagamentoIdSelecionada}
-      setNumeroParcelas={setNumeroParcelas}
-      setNsuCartao={setNsuCartao}
-      valorRecebido={valorRecebido}
-      setValorRecebido={setValorRecebido}
-      troco={troco}
-      ehCartao={ehCartao}
-      formaPagamentoSelecionada={formaPagamentoSelecionada}
-      opcoesCartao={opcoesCartao}
-      nsuCartao={nsuCartao}
-      parcelasCredito={parcelasCredito}
-      numeroParcelas={numeroParcelas}
-      observacoes={observacoes}
-      setObservacoes={setObservacoes}
-      total={total}
-      finalizando={finalizando}
-      salvandoAberta={salvandoAberta}
-      salvarAberta={salvarAberta}
-      finalizar={finalizar}
-    />
+    <>
+      <FuncionarioPdvContent
+        caixa={caixa}
+        carregarCaixa={carregarCaixa}
+        carregandoCaixa={carregandoCaixa}
+        abrirScanner={abrirScanner}
+        buscaManual={buscaManual}
+        setBuscaManual={setBuscaManual}
+        buscarManualProduto={buscarManualProduto}
+        buscandoProduto={buscandoProduto}
+        sugestoes={sugestoes}
+        adicionarProduto={adicionarProduto}
+        carrinho={carrinho}
+        totalItens={totalItens}
+        quantidadeEditando={quantidadeEditando}
+        valorEditando={valorEditando}
+        alterarQuantidade={alterarQuantidade}
+        editarQuantidadeItem={editarQuantidadeItem}
+        finalizarEdicaoQuantidade={finalizarEdicaoQuantidade}
+        editarValorItem={editarValorItem}
+        finalizarEdicaoValor={finalizarEdicaoValor}
+        cliente={cliente}
+        setCliente={setCliente}
+        mostrarDetalhesCliente={mostrarDetalhesCliente}
+        setMostrarDetalhesCliente={setMostrarDetalhesCliente}
+        clienteBusca={clienteBusca}
+        setClienteBusca={setClienteBusca}
+        buscarCliente={buscarCliente}
+        abrirCadastroRapido={() => setCadastroRapidoAberto(true)}
+        clientesSugestoes={clientesSugestoes}
+        setClientesSugestoes={setClientesSugestoes}
+        carregandoBeneficios={carregandoBeneficios}
+        cupomCodigo={cupomCodigo}
+        setCupomCodigo={setCupomCodigo}
+        carregarBeneficios={carregarBeneficios}
+        erroBeneficios={erroBeneficios}
+        beneficiosPreview={beneficiosPreview}
+        totalComBeneficios={totalComBeneficios}
+        usarCashback={usarCashback}
+        setUsarCashback={setUsarCashback}
+        cashbackValor={cashbackValor}
+        setCashbackValor={setCashbackValor}
+        valorAPagar={valorAPagar}
+        formaPagamento={formaPagamento}
+        setFormaPagamento={setFormaPagamento}
+        setFormaPagamentoIdSelecionada={setFormaPagamentoIdSelecionada}
+        setNumeroParcelas={setNumeroParcelas}
+        setNsuCartao={setNsuCartao}
+        valorRecebido={valorRecebido}
+        setValorRecebido={setValorRecebido}
+        dataVencimentoCrediario={dataVencimentoCrediario}
+        setDataVencimentoCrediario={setDataVencimentoCrediario}
+        troco={troco}
+        ehCartao={ehCartao}
+        formaPagamentoSelecionada={formaPagamentoSelecionada}
+        opcoesCartao={opcoesCartao}
+        nsuCartao={nsuCartao}
+        parcelasCredito={parcelasCredito}
+        numeroParcelas={numeroParcelas}
+        observacoes={observacoes}
+        setObservacoes={setObservacoes}
+        total={total}
+        finalizando={finalizando}
+        salvandoAberta={salvandoAberta}
+        salvarAberta={salvarAberta}
+        finalizar={finalizar}
+      />
+      <FuncionarioPdvClienteRapidoModal
+        visible={cadastroRapidoAberto}
+        salvando={salvandoClienteRapido}
+        onClose={() => setCadastroRapidoAberto(false)}
+        onSave={criarClienteRapido}
+      />
+    </>
   );
 }

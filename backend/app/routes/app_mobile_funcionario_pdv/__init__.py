@@ -3,6 +3,7 @@
 from .schemas import (
     FuncionarioPdvProdutoResponse as FuncionarioPdvProdutoResponse,
     FuncionarioPdvClienteResponse as FuncionarioPdvClienteResponse,
+    FuncionarioPdvClienteRapidoRequest as FuncionarioPdvClienteRapidoRequest,
     FuncionarioPdvCaixaResponse as FuncionarioPdvCaixaResponse,
     FuncionarioPdvItemRequest as FuncionarioPdvItemRequest,
     FuncionarioPdvPagamentoRequest as FuncionarioPdvPagamentoRequest,
@@ -36,6 +37,13 @@ from .clientes import (
     _buscar_cliente_pdv_funcionario as _buscar_cliente_pdv_funcionario,
     _serialize_funcionario_pdv_cliente as _serialize_funcionario_pdv_cliente,
     buscar_clientes_funcionario_pdv as buscar_clientes_funcionario_pdv,
+    criar_cliente_rapido_funcionario_pdv as criar_cliente_rapido_funcionario_pdv,
+)
+from .granel import (
+    buscar_produto_granel_funcionario_barcode as buscar_produto_granel_funcionario_barcode,
+    buscar_produtos_granel_funcionario as buscar_produtos_granel_funcionario,
+    converter_granel_funcionario as converter_granel_funcionario,
+    obter_config_granel_funcionario as obter_config_granel_funcionario,
 )
 from .common import (
     _round_money_funcionario_pdv as _round_money_funcionario_pdv,
@@ -72,6 +80,7 @@ from .vendas import (
 __all__ = [
     "FuncionarioPdvProdutoResponse",
     "FuncionarioPdvClienteResponse",
+    "FuncionarioPdvClienteRapidoRequest",
     "FuncionarioPdvCaixaResponse",
     "FuncionarioPdvItemRequest",
     "FuncionarioPdvPagamentoRequest",
@@ -104,12 +113,17 @@ __all__ = [
     "_produto_busca_texto_funcionario",
     "_resolver_forma_pagamento_cartao_funcionario_pdv",
     "_round_money_funcionario_pdv",
+    "buscar_produto_granel_funcionario_barcode",
+    "buscar_produtos_granel_funcionario",
+    "converter_granel_funcionario",
+    "obter_config_granel_funcionario",
     "_serialize_funcionario_pdv_cliente",
     "_serialize_funcionario_pdv_produto",
     "_somente_digitos_funcionario_pdv",
     "_termo_parece_codigo_produto_funcionario",
     "_tokens_busca_produto_funcionario",
     "buscar_clientes_funcionario_pdv",
+    "criar_cliente_rapido_funcionario_pdv",
     "buscar_produto_funcionario_pdv_barcode",
     "buscar_produtos_funcionario_pdv",
     "finalizar_venda_funcionario_pdv",

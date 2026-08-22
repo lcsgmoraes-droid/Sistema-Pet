@@ -601,6 +601,7 @@ class Tenant(Base):
     bloquear_validade_integracoes_online = Column(
         Boolean, nullable=False, server_default="false"
     )
+    granel_bipagem_obrigatoria = Column(Boolean, nullable=False, server_default="false")
     ecommerce_slug = Column(String(80), nullable=True, unique=True, index=True)
 
     # Configurações da loja virtual

@@ -100,6 +100,9 @@ class RotaEntregaParadaResponse(BaseModel):
     valor_pago: Optional[Decimal] = None
     observacoes_entrega: Optional[str] = None
     canal_venda: Optional[str] = None
+    avaliacao_entrega_nota: Optional[int] = None
+    avaliacao_entrega_comentario: Optional[str] = None
+    avaliacao_entrega_data: Optional[datetime] = None
 
     model_config = {"from_attributes": True}
 

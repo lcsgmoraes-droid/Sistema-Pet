@@ -4,6 +4,7 @@ import HeaderProfileActions from "../components/HeaderProfileActions";
 import FuncionarioBalancoScreen from "../screens/funcionario/FuncionarioBalancoScreen";
 import FuncionarioContagemScreen from "../screens/funcionario/FuncionarioContagemScreen";
 import FuncionarioHomeScreen from "../screens/funcionario/FuncionarioHomeScreen";
+import FuncionarioGranelScreen from "../screens/funcionario/FuncionarioGranelScreen";
 import FuncionarioPdvScreen from "../screens/funcionario/FuncionarioPdvScreen";
 import NotificationsScreen from "../screens/notifications/NotificationsScreen";
 import { FuncionarioStackParamList } from "../types/funcionarioNavigation";
@@ -36,6 +37,11 @@ export default function FuncionarioNavigator() {
         name="FuncionarioContagem"
         component={FuncionarioContagemScreen}
         options={{ title: "Contagem" }}
+      />
+      <Stack.Screen
+        name="FuncionarioGranel"
+        component={FuncionarioGranelScreen}
+        options={{ title: "Lancar granel" }}
       />
       <Stack.Screen
         name="FuncionarioPdv"

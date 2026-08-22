@@ -214,6 +214,19 @@ export const BASE_CONHECIMENTO = [
     cor: "orange",
     artigos: [
       {
+        slug: "lancar-granel-bipagem",
+        titulo: "Como lançar granel com conferência por bipagem",
+        tags: ["granel", "bipagem", "produto pai", "estoque", "app funcionario"],
+        conteudo: [
+          "Antes de lançar, vincule o produto fechado ao produto granel. Um mesmo granel pode receber vínculos de embalagens diferentes, como 10 kg, 15 kg e 20 kg.",
+          "No ERP, abra **Configurações → Estoque** para decidir se a bipagem será obrigatória.",
+          "No app do funcionário, abra **Lançar granel**, bipe primeiro o pacote pai e depois o produto granel.",
+          "O sistema mostra **Tudo certo** somente quando a combinação estiver vinculada. Uma combinação diferente é recusada.",
+          "Informe quantos pacotes foram abertos e confirme. O estoque do pai diminui e o estoque do granel recebe o peso correspondente em kg.",
+          "Quando a trava estiver desligada, a busca manual continua disponível no ERP e no app.",
+        ],
+      },
+      {
         titulo: "Como cadastrar um produto",
         tags: ["produto", "cadastro", "estoque", "novo"],
         conteudo: [
@@ -277,6 +290,29 @@ export const BASE_CONHECIMENTO = [
     icone: FiShoppingCart,
     cor: "yellow",
     artigos: [
+      {
+        slug: "cadastro-rapido-cliente-app-funcionario",
+        titulo: "Como cadastrar uma pessoa durante a venda no app do funcionário",
+        tags: ["app funcionario", "cadastro rapido", "cliente", "telefone", "endereco"],
+        conteudo: [
+          "Na tela **Passar venda**, localize a área da pessoa e toque no botão **+**.",
+          "Preencha nome, telefone e endereço somente se tiver essas informações. Nenhum campo é obrigatório.",
+          "Toque em **Adicionar**. A pessoa criada já fica selecionada na venda atual.",
+          "Quando nenhum nome for informado, o sistema cria uma identificação provisória com o código do cadastro; ela poderá ser completada depois no ERP.",
+        ],
+      },
+      {
+        slug: "venda-crediario-app-funcionario",
+        titulo: "Como fazer uma venda no crediário pelo app do funcionário",
+        tags: ["crediario", "vencimento", "contas a receber", "app funcionario"],
+        conteudo: [
+          "Selecione obrigatoriamente a pessoa que fará a compra.",
+          "Em **Pagamento**, escolha **Crediário** e informe a data combinada no formato AAAA-MM-DD.",
+          "Finalize a venda. O valor não entra como dinheiro no caixa: ele fica pendente em **Financeiro → Contas a Receber**.",
+          "O cliente ligado ao cadastro recebe um aviso no app e pode acompanhar o saldo e o vencimento em **Pedidos → Crediário**.",
+          "Quando o cliente pagar, registre a baixa normalmente no Contas a Receber do ERP.",
+        ],
+      },
       {
         titulo: "Como fazer uma venda no PDV",
         tags: ["venda", "pdv", "caixa", "vender", "produto"],
@@ -640,6 +676,17 @@ export const BASE_CONHECIMENTO = [
     icone: FiGlobe,
     cor: "indigo",
     artigos: [
+      {
+        slug: "avaliar-entrega-app-cliente",
+        titulo: "Como funciona a avaliação da entrega pelo app",
+        tags: ["entrega", "avaliacao", "estrelas", "feedback", "app cliente"],
+        conteudo: [
+          "Depois que a entrega for marcada como concluída, o botão **Avaliar entrega** aparece no pedido do cliente.",
+          "O cliente escolhe de 1 a 5 estrelas e pode escrever um comentário opcional.",
+          "Cada entrega aceita uma avaliação, evitando respostas duplicadas.",
+          "A empresa consulta a nota e o comentário em **Entregas → Histórico de Entregas**, abrindo a rota e a parada correspondente.",
+        ],
+      },
       {
         titulo: "Módulo Campanhas — o que faz",
         tags: ["campanha", "marketing", "promoção", "desconto", "cliente", "premium"],
