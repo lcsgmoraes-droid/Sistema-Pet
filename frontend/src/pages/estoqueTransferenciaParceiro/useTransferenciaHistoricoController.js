@@ -23,6 +23,7 @@ import {
 } from "./transferenciaParceiroUtils";
 import useTransferenciaBaixaLoteController from "./useTransferenciaBaixaLoteController";
 import { confirmarCorePet } from "../../services/corepetDialog";
+import useShiftRangeSelection from "../../hooks/useShiftRangeSelection";
 export default function useTransferenciaHistoricoController({
   parceiroSelecionado,
   transferenciaEditando,
@@ -342,13 +343,11 @@ export default function useTransferenciaHistoricoController({
     setFiltrosHistoricoAplicados(proximosFiltros);
   };
 
-  const alternarSelecaoHistorico = (contaReceberId) => {
-    setSelecionadosHistorico((prev) =>
-      prev.includes(contaReceberId)
-        ? prev.filter((id) => id !== contaReceberId)
-        : [...prev, contaReceberId],
-    );
-  };
+  const alternarSelecaoHistorico = useShiftRangeSelection({
+    getItemId: (item) => item.conta_receber_id,
+    items: historico.items,
+    setSelectedIds: setSelecionadosHistorico,
+  });
 
   const alternarSelecaoPaginaHistorico = () => {
     setSelecionadosHistorico((prev) => {

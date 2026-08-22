@@ -56,7 +56,7 @@ export default function ContasPagarTable({
           aria-label={`Selecionar lancamento ${conta.id}`}
           checked={contasSelecionadas.includes(conta.id)}
           className="contas-pagar-select-row h-4 w-4 rounded border-slate-300"
-          onChange={() => alternarSelecaoConta(conta.id)}
+          onChange={(event) => alternarSelecaoConta(conta.id, event)}
           onClick={(event) => event.stopPropagation()}
           type="checkbox"
         />

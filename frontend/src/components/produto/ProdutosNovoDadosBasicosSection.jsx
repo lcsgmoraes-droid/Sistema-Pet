@@ -1,3 +1,4 @@
+import { Plus } from "lucide-react";
 import { useMemo, useState } from "react";
 import SafeMarkdown from "../ui/SafeMarkdown";
 import {
@@ -16,6 +17,7 @@ export default function ProdutosNovoDadosBasicosSection({
   handleGerarCodigoBarras,
   handleGerarSKU,
   marcas,
+  onNovoCatalogo,
 }) {
   const [descricaoModo, setDescricaoModo] = useState("editar");
   const descricaoNormalizada = useMemo(
@@ -134,18 +136,29 @@ export default function ProdutosNovoDadosBasicosSection({
 
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Departamento</label>
-          <select
-            value={formData.departamento_id}
-            onChange={(e) => handleChange("departamento_id", e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          >
-            <option value="">Selecione...</option>
-            {departamentos.map((dep) => (
-              <option key={dep.id} value={dep.id}>
-                {dep.nome}
-              </option>
-            ))}
-          </select>
+          <div className="flex gap-2">
+            <select
+              value={formData.departamento_id}
+              onChange={(e) => handleChange("departamento_id", e.target.value)}
+              className="min-w-0 flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            >
+              <option value="">Selecione...</option>
+              {departamentos.map((dep) => (
+                <option key={dep.id} value={dep.id}>
+                  {dep.nome}
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              onClick={() => onNovoCatalogo?.("departamento")}
+              className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-emerald-200 bg-white text-emerald-700 transition hover:bg-emerald-50 hover:text-emerald-900 dark:border-emerald-800 dark:bg-slate-900 dark:text-emerald-300 dark:hover:bg-emerald-950/40"
+              title="Cadastrar departamento"
+              aria-label="Cadastrar departamento"
+            >
+              <Plus className="h-4 w-4" />
+            </button>
+          </div>
         </div>
 
         <div>
@@ -157,6 +170,8 @@ export default function ProdutosNovoDadosBasicosSection({
             placeholder="Selecione..."
             searchPlaceholder="Digite para buscar categoria..."
             inputClassName="border-gray-300"
+            onCreateOption={() => onNovoCatalogo?.("categoria")}
+            createOptionLabel="Cadastrar categoria"
           />
         </div>
 
@@ -169,6 +184,8 @@ export default function ProdutosNovoDadosBasicosSection({
             placeholder="Selecione..."
             searchPlaceholder="Digite para buscar marca..."
             inputClassName="border-gray-300"
+            onCreateOption={() => onNovoCatalogo?.("marca")}
+            createOptionLabel="Cadastrar marca"
           />
         </div>
       </div>

@@ -5,8 +5,19 @@ import { CORES, ESPACO, FONTE, RAIO, SOMBRA } from "../../../theme";
 export const funcionarioPdvStyles = StyleSheet.create({
   container: { flex: 1, backgroundColor: CORES.fundo },
   conteudo: { padding: ESPACO.md, gap: ESPACO.md, paddingBottom: ESPACO.xxl },
-  centrado: { flex: 1, alignItems: "center", justifyContent: "center", padding: ESPACO.lg, backgroundColor: CORES.fundo },
-  tituloPermissao: { fontSize: FONTE.titulo, fontWeight: "800", color: CORES.texto, marginVertical: ESPACO.md },
+  centrado: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    padding: ESPACO.lg,
+    backgroundColor: CORES.fundo,
+  },
+  tituloPermissao: {
+    fontSize: FONTE.titulo,
+    fontWeight: "800",
+    color: CORES.texto,
+    marginVertical: ESPACO.md,
+  },
   botaoPrimario: {
     height: 48,
     borderRadius: RAIO.md,
@@ -95,6 +106,14 @@ export const funcionarioPdvStyles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+  botaoAdicionarCliente: {
+    width: 52,
+    height: 48,
+    borderRadius: RAIO.md,
+    backgroundColor: CORES.sucesso,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   sugestao: {
     flexDirection: "row",
     alignItems: "center",
@@ -151,7 +170,13 @@ export const funcionarioPdvStyles = StyleSheet.create({
   itemControles: { flexDirection: "row", flexWrap: "wrap", gap: ESPACO.sm },
   campoCarrinho: { gap: 3 },
   campoCarrinhoLabel: { color: CORES.textoSecundario, fontSize: FONTE.pequena, fontWeight: "800" },
-  quantidadeBox: { flexDirection: "row", alignItems: "center", borderWidth: 1, borderColor: CORES.borda, borderRadius: RAIO.md },
+  quantidadeBox: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: CORES.borda,
+    borderRadius: RAIO.md,
+  },
   botaoQuantidade: { width: 34, height: 38, alignItems: "center", justifyContent: "center" },
   inputQuantidade: {
     width: 66,
@@ -210,7 +235,12 @@ export const funcionarioPdvStyles = StyleSheet.create({
     gap: 3,
   },
   detalhesClienteTitulo: { color: CORES.texto, fontWeight: "900", fontSize: FONTE.media },
-  detalhesClienteSubtitulo: { color: CORES.primario, fontWeight: "900", fontSize: FONTE.pequena, marginTop: ESPACO.xs },
+  detalhesClienteSubtitulo: {
+    color: CORES.primario,
+    fontWeight: "900",
+    fontSize: FONTE.pequena,
+    marginTop: ESPACO.xs,
+  },
   detalhesClienteLinha: { color: CORES.textoSecundario, fontSize: FONTE.pequena },
   botaoLimpar: {
     width: 36,
@@ -378,6 +408,15 @@ export const funcionarioPdvStyles = StyleSheet.create({
   },
   inputMultilinha: { minHeight: 80, textAlignVertical: "top" },
   troco: { color: CORES.sucesso, fontWeight: "800", fontSize: FONTE.media },
+  crediarioBox: {
+    marginTop: ESPACO.sm,
+    padding: ESPACO.md,
+    borderWidth: 1,
+    borderColor: "#FCD34D",
+    borderRadius: RAIO.md,
+    backgroundColor: "#FFFBEB",
+  },
+  crediarioAviso: { color: CORES.erro, fontWeight: "800", marginTop: ESPACO.sm },
   resumo: {
     backgroundColor: CORES.superficie,
     borderRadius: RAIO.md,
@@ -440,7 +479,13 @@ export const funcionarioPdvStyles = StyleSheet.create({
     borderRadius: RAIO.lg,
     backgroundColor: "rgba(255,255,255,0.08)",
   },
-  scannerTexto: { color: "#fff", marginTop: ESPACO.md, fontSize: FONTE.media, fontWeight: "800", textAlign: "center" },
+  scannerTexto: {
+    color: "#fff",
+    marginTop: ESPACO.md,
+    fontSize: FONTE.media,
+    fontWeight: "800",
+    textAlign: "center",
+  },
   botaoScanner: {
     flexDirection: "row",
     alignItems: "center",

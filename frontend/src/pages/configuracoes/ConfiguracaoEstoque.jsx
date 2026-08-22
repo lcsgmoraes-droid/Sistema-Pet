@@ -25,6 +25,7 @@ export default function ConfiguracaoEstoque() {
   const [bloquearValidadePdv, setBloquearValidadePdv] = useState(true);
   const [bloquearValidadeEcommerce, setBloquearValidadeEcommerce] = useState(true);
   const [bloquearValidadeIntegracoesOnline, setBloquearValidadeIntegracoesOnline] = useState(false);
+  const [granelBipagemObrigatoria, setGranelBipagemObrigatoria] = useState(false);
 
   useEffect(() => {
     async function carregar() {
@@ -38,6 +39,7 @@ export default function ConfiguracaoEstoque() {
         setBloquearValidadeIntegracoesOnline(
           Boolean(res.data.bloquear_validade_integracoes_online),
         );
+        setGranelBipagemObrigatoria(Boolean(res.data.granel_bipagem_obrigatoria));
       } catch (e) {
         console.error("Erro ao carregar configurações de estoque", e);
         toast.error("Erro ao carregar configurações");
@@ -58,6 +60,7 @@ export default function ConfiguracaoEstoque() {
         bloquear_validade_pdv: bloquearValidadePdv,
         bloquear_validade_ecommerce: bloquearValidadeEcommerce,
         bloquear_validade_integracoes_online: bloquearValidadeIntegracoesOnline,
+        granel_bipagem_obrigatoria: granelBipagemObrigatoria,
       });
       toast.success("Configurações de estoque atualizadas com sucesso!");
     } catch (e) {
@@ -249,6 +252,25 @@ export default function ConfiguracaoEstoque() {
         </div>
 
         <div className="flex justify-end pt-4 mt-6 border-t">
+          <div className="mr-auto max-w-xl pr-6">
+            <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-gray-200 p-4 hover:bg-gray-50">
+              <input
+                type="checkbox"
+                checked={granelBipagemObrigatoria}
+                onChange={(event) => setGranelBipagemObrigatoria(event.target.checked)}
+                className="mt-1 text-blue-600 focus:ring-blue-500"
+              />
+              <span>
+                <span className="block font-semibold text-gray-900">
+                  Travar lançamento de granel por bipagem
+                </span>
+                <span className="mt-1 block text-sm text-gray-600">
+                  Exige o código de barras do produto pai e do granel vinculado antes de converter o
+                  estoque, tanto no computador quanto no app do funcionário.
+                </span>
+              </span>
+            </label>
+          </div>
           <button
             onClick={handleSalvar}
             disabled={salvando}

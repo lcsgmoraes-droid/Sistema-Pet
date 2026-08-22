@@ -29,6 +29,7 @@ import { useMovimentacoesProdutoGranel } from "./estoque/useMovimentacoesProduto
 import useMovimentacoesProdutoListagem from "./estoque/useMovimentacoesProdutoListagem";
 import { useModulos } from "../contexts/ModulosContext";
 import { confirmarCorePet } from "../services/corepetDialog";
+import useShiftRangeSelection from "../hooks/useShiftRangeSelection";
 
 export default function MovimentacoesProduto() {
   const { id } = useParams();
@@ -82,8 +83,11 @@ export default function MovimentacoesProduto() {
   const {
     abrirModalGranel,
     atualizarPrecoGranel,
+    barcodeOrigemGranel,
+    barcodeProdutoGranel,
     baseMargemGranel,
     baseMargemTexto,
+    bipagemObrigatoriaGranel,
     buscaGranel,
     custoKgGranel,
     diferencaPrecoGranel,
@@ -114,6 +118,8 @@ export default function MovimentacoesProduto() {
     quantidadeGranel,
     quantidadeGranelNumero,
     setAtualizarPrecoGranel,
+    setBarcodeOrigemGranel,
+    setBarcodeProdutoGranel,
     setBuscaGranel,
     setMargemBaseGranel,
     setMargemGranel,
@@ -261,13 +267,10 @@ export default function MovimentacoesProduto() {
     }
   };
 
-  const handleSelectOne = (id) => {
-    if (selectedIds.includes(id)) {
-      setSelectedIds(selectedIds.filter((sid) => sid !== id));
-    } else {
-      setSelectedIds([...selectedIds, id]);
-    }
-  };
+  const handleSelectOne = useShiftRangeSelection({
+    items: movimentacoes,
+    setSelectedIds,
+  });
 
   const handleDelete = async () => {
     if (selectedIds.length === 0) {
@@ -583,8 +586,11 @@ export default function MovimentacoesProduto() {
       <MovimentacoesProdutoModals
         abrirPedidoReservado={abrirPedidoReservado}
         atualizarPrecoGranel={atualizarPrecoGranel}
+        barcodeOrigemGranel={barcodeOrigemGranel}
+        barcodeProdutoGranel={barcodeProdutoGranel}
         baseMargemGranel={baseMargemGranel}
         baseMargemTexto={baseMargemTexto}
+        bipagemObrigatoriaGranel={bipagemObrigatoriaGranel}
         buscaGranel={buscaGranel}
         custoKgGranel={custoKgGranel}
         diferencaPrecoGranel={diferencaPrecoGranel}
@@ -625,6 +631,8 @@ export default function MovimentacoesProduto() {
         quantidadeGranelNumero={quantidadeGranelNumero}
         reservasAtivas={reservasAtivas}
         setAtualizarPrecoGranel={setAtualizarPrecoGranel}
+        setBarcodeOrigemGranel={setBarcodeOrigemGranel}
+        setBarcodeProdutoGranel={setBarcodeProdutoGranel}
         setBuscaGranel={setBuscaGranel}
         setFormData={setFormData}
         setMargemBaseGranel={setMargemBaseGranel}

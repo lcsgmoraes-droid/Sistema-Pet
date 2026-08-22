@@ -10,6 +10,7 @@ from sqlalchemy.orm import joinedload
 from app.idempotency_models import IdempotencyKey
 from app.models import Cliente
 from app.pedido_models import Pedido, PedidoItem
+from app.rotas_entrega_models import EntregaAvaliacao
 from app.services.sales_channel_labels import channel_label_for
 from app.services.sales_channel import normalize_sales_channel
 from app.vendas_models import Venda, VendaItem
@@ -374,6 +375,37 @@ def list_customer_order_history(
         )
         for venda in vendas_by_id.values()
     ]
+
+    avaliacoes_por_venda = {
+        int(avaliacao.venda_id): avaliacao
+        for avaliacao in (
+            db.query(EntregaAvaliacao)
+            .filter(
+                EntregaAvaliacao.tenant_id == tenant_id,
+                EntregaAvaliacao.venda_id.in_(list(vendas_by_id.keys())),
+            )
+            .all()
+            if vendas_by_id
+            else []
+        )
+    }
+    for entry in sale_entries:
+        venda_id = int(entry.get("venda_id") or 0)
+        avaliacao = avaliacoes_por_venda.get(venda_id)
+        entry["avaliacao_entrega"] = (
+            {
+                "nota": int(avaliacao.nota),
+                "comentario": avaliacao.comentario,
+                "created_at": _to_iso(avaliacao.created_at),
+            }
+            if avaliacao
+            else None
+        )
+        entry["pode_avaliar_entrega"] = bool(
+            entry.get("tem_entrega")
+            and str(entry.get("status_entrega") or "").lower() == "entregue"
+            and not avaliacao
+        )
 
     checkout_entries = [
         build_checkout_history_entry(

@@ -15,8 +15,11 @@ const formatMoneyPadrao = (valor) =>
 
 export default function GranelLancamentoModal({
   atualizarPrecoGranel,
+  barcodeOrigemGranel,
+  barcodeProdutoGranel,
   baseMargemGranel,
   baseMargemTexto,
+  bipagemObrigatoriaGranel,
   buscaGranel,
   custoKgGranel,
   diferencaPrecoGranel,
@@ -49,6 +52,8 @@ export default function GranelLancamentoModal({
   quantidadeGranel,
   quantidadeGranelNumero,
   setAtualizarPrecoGranel,
+  setBarcodeOrigemGranel,
+  setBarcodeProdutoGranel,
   setBuscaGranel,
   setMargemBaseGranel,
   setMargemGranel,
@@ -78,6 +83,37 @@ export default function GranelLancamentoModal({
         </div>
 
         <form onSubmit={onSubmit} className="max-h-[82vh] space-y-4 overflow-y-auto p-6">
+          {bipagemObrigatoriaGranel && (
+            <div className="rounded-lg border border-blue-200 bg-blue-50 p-4">
+              <div className="font-semibold text-blue-900">Conferência obrigatória por bipagem</div>
+              <p className="mt-1 text-xs text-blue-700">
+                Bipe primeiro o pacote pai aberto e depois o produto granel que receberá o estoque.
+              </p>
+              <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                <label className="text-xs font-medium text-slate-700">
+                  Código de barras do pai
+                  <input
+                    autoFocus
+                    type="text"
+                    value={barcodeOrigemGranel}
+                    onChange={(event) => setBarcodeOrigemGranel(event.target.value)}
+                    className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
+                    placeholder="Bipe o pacote"
+                  />
+                </label>
+                <label className="text-xs font-medium text-slate-700">
+                  Código de barras do granel
+                  <input
+                    type="text"
+                    value={barcodeProdutoGranel}
+                    onChange={(event) => setBarcodeProdutoGranel(event.target.value)}
+                    className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
+                    placeholder="Bipe o produto granel"
+                  />
+                </label>
+              </div>
+            </div>
+          )}
           {granelVinculos.length > 0 && (
             <div>
               <label className="mb-2 block text-sm font-medium text-slate-700">

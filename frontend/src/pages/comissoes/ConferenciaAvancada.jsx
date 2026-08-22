@@ -14,6 +14,7 @@ import api from "../../api";
 import CurrencyInput from "../../components/CurrencyInput";
 import CustomerIdentity from "../../components/ui/CustomerIdentity";
 import { formatMoneyBRL } from "../../utils/formatters";
+import useShiftRangeSelection from "../../hooks/useShiftRangeSelection";
 
 const ConferenciaAvancada = () => {
   const { funcionario_id } = useParams();
@@ -131,15 +132,10 @@ const ConferenciaAvancada = () => {
     setTimeout(() => carregarDados(), 100);
   };
 
-  const toggleComissaoSelecionada = (id) => {
-    const nova = new Set(comissoesSelecionadas);
-    if (nova.has(id)) {
-      nova.delete(id);
-    } else {
-      nova.add(id);
-    }
-    setComissoesSelecionadas(nova);
-  };
+  const toggleComissaoSelecionada = useShiftRangeSelection({
+    items: comissoes,
+    setSelectedIds: setComissoesSelecionadas,
+  });
 
   const selecionarTodas = () => {
     if (comissoesSelecionadas.size === comissoes.length) {
@@ -420,7 +416,7 @@ const ConferenciaAvancada = () => {
                     <input
                       type="checkbox"
                       checked={comissoesSelecionadas.has(comissao.id)}
-                      onChange={() => toggleComissaoSelecionada(comissao.id)}
+                      onChange={(event) => toggleComissaoSelecionada(comissao.id, event)}
                     />
                   </td>
                   <td className="px-4 py-3 text-sm">

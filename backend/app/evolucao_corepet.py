@@ -77,7 +77,7 @@ ITENS_EVOLUCAO: tuple[dict[str, Any], ...] = (
             "Um botão + permitirá localizar ou cadastrar uma pessoa sem sair da venda. "
             "Nome, telefone e endereço serão opcionais."
         ),
-        "status": "planejado",
+        "status": "em_testes",
         "tipo": "projeto",
         "modulo": "Vendas",
         "plataformas": ["App do funcionário"],
@@ -85,7 +85,7 @@ ITENS_EVOLUCAO: tuple[dict[str, Any], ...] = (
         "publicado_em": None,
         "atualizado_em": "2026-08-22",
         "destaque": True,
-        "caminho_ajuda": None,
+        "caminho_ajuda": "/ajuda?aba=central&artigo=cadastro-rapido-cliente-app-funcionario",
     },
     {
         "id": "granel-bipagem-vinculada",
@@ -94,7 +94,7 @@ ITENS_EVOLUCAO: tuple[dict[str, Any], ...] = (
             "O produto a granel poderá ser ligado a mais de um produto pai. A bipagem "
             "confere a combinação e poderá ser obrigatória ou opcional por configuração."
         ),
-        "status": "planejado",
+        "status": "em_testes",
         "tipo": "projeto",
         "modulo": "Produtos e estoque",
         "plataformas": ["ERP", "App do funcionário"],
@@ -102,7 +102,7 @@ ITENS_EVOLUCAO: tuple[dict[str, Any], ...] = (
         "publicado_em": None,
         "atualizado_em": "2026-08-22",
         "destaque": True,
-        "caminho_ajuda": None,
+        "caminho_ajuda": "/ajuda?aba=central&artigo=lancar-granel-bipagem",
     },
     {
         "id": "grupos-empresas-transferencia-integrada",
@@ -128,15 +128,15 @@ ITENS_EVOLUCAO: tuple[dict[str, Any], ...] = (
             "A venda ficará em aberto com data combinada para pagamento, alerta no ERP "
             "e aviso para o cliente no aplicativo."
         ),
-        "status": "planejado",
+        "status": "em_testes",
         "tipo": "projeto",
         "modulo": "Financeiro e vendas",
-        "plataformas": ["ERP", "App do cliente"],
+        "plataformas": ["ERP", "App do funcionário", "App do cliente"],
         "canais": ["erp", "app_cliente"],
         "publicado_em": None,
         "atualizado_em": "2026-08-22",
         "destaque": True,
-        "caminho_ajuda": None,
+        "caminho_ajuda": "/ajuda?aba=central&artigo=venda-crediario-app-funcionario",
     },
     {
         "id": "avaliacao-entrega-app",
@@ -145,7 +145,7 @@ ITENS_EVOLUCAO: tuple[dict[str, Any], ...] = (
             "Depois da entrega, o cliente poderá avaliar a experiência para que a empresa "
             "acompanhe a qualidade de cada atendimento."
         ),
-        "status": "planejado",
+        "status": "em_testes",
         "tipo": "projeto",
         "modulo": "Entregas",
         "plataformas": ["ERP", "App do cliente"],
@@ -153,7 +153,7 @@ ITENS_EVOLUCAO: tuple[dict[str, Any], ...] = (
         "publicado_em": None,
         "atualizado_em": "2026-08-22",
         "destaque": False,
-        "caminho_ajuda": None,
+        "caminho_ajuda": "/ajuda?aba=central&artigo=avaliar-entrega-app-cliente",
     },
     {
         "id": "fracionamento-produtos-farmacia",

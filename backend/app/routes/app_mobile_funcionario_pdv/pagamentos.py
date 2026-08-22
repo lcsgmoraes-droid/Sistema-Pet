@@ -36,6 +36,8 @@ def _normalizar_forma_pagamento_pdv(forma_pagamento: str) -> str:
         "cartao_debito": "cartao_debito",
         "cartao de debito": "cartao_debito",
         "cashback": "Cashback",
+        "crediario": "Crediário",
+        "crediário": "Crediário",
     }
     if forma not in mapa:
         raise HTTPException(
@@ -56,7 +58,41 @@ def _forma_pagamento_key_funcionario_pdv(
         return "pix"
     if "dinheiro" in texto:
         return "dinheiro"
+    if "crediario" in texto or "crediário" in texto:
+        return "crediario"
     return None
+
+
+def _obter_ou_criar_forma_crediario_funcionario_pdv(
+    db: Session, tenant_id: str, current_user: User
+) -> FormaPagamento:
+    forma = (
+        db.query(FormaPagamento)
+        .filter(
+            FormaPagamento.tenant_id == tenant_id,
+            FormaPagamento.ativo.is_(True),
+            FormaPagamento.tipo == "crediario",
+        )
+        .first()
+    )
+    if forma:
+        return forma
+    forma = FormaPagamento(
+        tenant_id=tenant_id,
+        nome="Crediário",
+        tipo="crediario",
+        prazo_dias=30,
+        prazo_recebimento=30,
+        gera_contas_receber=True,
+        ativo=True,
+        permite_parcelamento=False,
+        max_parcelas=1,
+        parcelas_maximas=1,
+        user_id=current_user.id,
+    )
+    db.add(forma)
+    db.flush()
+    return forma
 
 
 def _resolver_forma_pagamento_cartao_funcionario_pdv(
@@ -300,4 +336,26 @@ def listar_formas_pagamento_funcionario_pdv(
             resposta.extend(opcoes_estruturadas)
         elif not regras:
             resposta.append(resposta_base)
+    if not any(item["key"] == "crediario" for item in resposta):
+        resposta.append(
+            {
+                "id": 0,
+                "selection_id": "builtin:crediario",
+                "nome": "Crediário",
+                "tipo": "crediario",
+                "key": "crediario",
+                "taxa_percentual": 0,
+                "permite_parcelamento": False,
+                "numero_parcelas": 1,
+                "max_parcelas": 1,
+                "parcelas_maximas": 1,
+                "operadora": None,
+                "operadora_id": None,
+                "requer_nsu": False,
+                "tipo_cartao": None,
+                "bandeira": None,
+                "split_parcelas": False,
+                "parcelas_disponiveis": [1],
+            }
+        )
     return resposta

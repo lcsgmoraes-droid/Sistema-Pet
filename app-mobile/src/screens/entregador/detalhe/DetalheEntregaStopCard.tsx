@@ -82,7 +82,7 @@ export function DetalheEntregaStopCard({
             delayLongPress={70}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
-            <Text style={styles.btnDragText}>?</Text>
+            <Text style={styles.btnDragText}>☰</Text>
           </TouchableOpacity>
         ) : null}
         <View style={[styles.statusBadge, { backgroundColor: badge.bg }]}>
@@ -93,7 +93,7 @@ export function DetalheEntregaStopCard({
       </View>
 
       {!!parada.observacoes && (
-        <Text style={styles.observacoes}>?? {parada.observacoes}</Text>
+        <Text style={styles.observacoes}>📝 {parada.observacoes}</Text>
       )}
 
       <View style={styles.paradaBotoes}>
@@ -101,7 +101,7 @@ export function DetalheEntregaStopCard({
           style={styles.btnMapa}
           onPress={() => abrirMapa(parada.endereco)}
         >
-          <Text style={styles.btnMapaText}>?? Navegar</Text>
+          <Text style={styles.btnMapaText}>📍 Navegar</Text>
         </TouchableOpacity>
 
         {parada.cliente_telefone || parada.cliente_celular ? (
@@ -111,7 +111,7 @@ export function DetalheEntregaStopCard({
               ligar(parada.cliente_celular ?? parada.cliente_telefone)
             }
           >
-            <Text style={styles.btnLigarText}>?? Ligar</Text>
+            <Text style={styles.btnLigarText}>📞 Ligar</Text>
           </TouchableOpacity>
         ) : null}
 
@@ -119,7 +119,7 @@ export function DetalheEntregaStopCard({
           style={styles.btnRecebimento}
           onPress={() => abrirModalRecebimento(parada.id)}
         >
-          <Text style={styles.btnRecebimentoIcon}>??</Text>
+          <Text style={styles.btnRecebimentoIcon}>💳</Text>
           <Text style={styles.btnRecebimentoText}>Receber</Text>
         </TouchableOpacity>
 
@@ -127,7 +127,7 @@ export function DetalheEntregaStopCard({
           style={styles.btnDetalhes}
           onPress={() => abrirDetalhesVenda(parada.venda_id)}
         >
-          <Text style={styles.btnDetalhesText}>?? Detalhes</Text>
+          <Text style={styles.btnDetalhesText}>📄 Detalhes</Text>
         </TouchableOpacity>
       </View>
 
@@ -141,13 +141,13 @@ export function DetalheEntregaStopCard({
                 style={styles.btnEntregue}
                 onPress={() => marcarEntregue(parada.id)}
               >
-                <Text style={styles.btnEntregueText}>? Entregue</Text>
+                <Text style={styles.btnEntregueText}>✅ Entregue</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.btnNaoEntregue}
                 onPress={() => marcarNaoEntregue(parada.id)}
               >
-                <Text style={styles.btnNaoEntregueText}>? NÃ£o entregue</Text>
+                <Text style={styles.btnNaoEntregueText}>❌ Não entregue</Text>
               </TouchableOpacity>
             </>
           )}

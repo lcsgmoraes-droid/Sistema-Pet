@@ -1,4 +1,4 @@
-import { ChevronDown, Search, X } from "lucide-react";
+import { ChevronDown, Plus, Search, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import useRevealFloatingPanel from "../../hooks/useRevealFloatingPanel";
@@ -17,10 +17,12 @@ export default function AutocompleteSelect({
   label,
   maxOptions = 30,
   onChange,
+  onCreateOption,
   options = [],
   placeholder = "Selecione...",
   searchPlaceholder,
   showLabel = true,
+  createOptionLabel = "Cadastrar nova opcao",
   value,
 }) {
   const containerRef = useRef(null);
@@ -128,6 +130,7 @@ export default function AutocompleteSelect({
           disabled={disabled}
           className={[
             "h-10 w-full rounded-lg border border-slate-300 bg-white pl-9 pr-16 text-sm text-slate-800 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:ring-cyan-400 dark:disabled:bg-slate-800 dark:disabled:text-slate-500",
+            onCreateOption ? "pr-24" : "pr-16",
             inputClassName,
           ]
             .filter(Boolean)
@@ -144,6 +147,21 @@ export default function AutocompleteSelect({
               title="Limpar"
             >
               <X className="h-4 w-4" />
+            </button>
+          ) : null}
+          {onCreateOption ? (
+            <button
+              type="button"
+              onClick={() => {
+                setAberto(false);
+                onCreateOption();
+              }}
+              disabled={disabled}
+              className="rounded-md p-1 text-emerald-600 transition hover:bg-emerald-50 hover:text-emerald-800 disabled:opacity-50 dark:text-emerald-400 dark:hover:bg-emerald-950/40 dark:hover:text-emerald-200"
+              title={createOptionLabel}
+              aria-label={createOptionLabel}
+            >
+              <Plus className="h-4 w-4" />
             </button>
           ) : null}
           <button

@@ -24,6 +24,9 @@ export function useMovimentacoesProdutoGranel({ carregarDados, id, produto }) {
   const [margemGranel, setMargemGranel] = useState("20");
   const [precoVendaGranel, setPrecoVendaGranel] = useState("");
   const [atualizarPrecoGranel, setAtualizarPrecoGranel] = useState(true);
+  const [bipagemObrigatoriaGranel, setBipagemObrigatoriaGranel] = useState(false);
+  const [barcodeOrigemGranel, setBarcodeOrigemGranel] = useState("");
+  const [barcodeProdutoGranel, setBarcodeProdutoGranel] = useState("");
 
   const produtoEhGranel =
     Boolean(produto?.e_granel) || (produto?.nome || "").toLowerCase().includes("granel");
@@ -112,10 +115,17 @@ export function useMovimentacoesProdutoGranel({ carregarDados, id, produto }) {
     setMargemGranel("20");
     setPrecoVendaGranel("");
     setAtualizarPrecoGranel(true);
+    setBarcodeOrigemGranel("");
+    setBarcodeProdutoGranel("");
     setShowGranelModal(true);
     setLoadingGranel(true);
     try {
-      await Promise.all([carregarVinculosGranel(), buscarProdutosGranel("")]);
+      const [, , configResponse] = await Promise.all([
+        carregarVinculosGranel(),
+        buscarProdutosGranel(""),
+        api.get("/empresa/config-estoque"),
+      ]);
+      setBipagemObrigatoriaGranel(Boolean(configResponse.data?.granel_bipagem_obrigatoria));
     } catch (error) {
       toast.error(extrairMensagemErroApi(error, "Erro ao carregar vinculos de granel"));
     } finally {
@@ -136,6 +146,11 @@ export function useMovimentacoesProdutoGranel({ carregarDados, id, produto }) {
       return;
     }
 
+    if (bipagemObrigatoriaGranel && (!barcodeOrigemGranel.trim() || !barcodeProdutoGranel.trim())) {
+      toast.error("Bipe o produto pai e depois o produto granel vinculado.");
+      return;
+    }
+
     try {
       setLoadingGranel(true);
       const response = await api.post("/estoque/granel/converter", {
@@ -148,6 +163,8 @@ export function useMovimentacoesProdutoGranel({ carregarDados, id, produto }) {
             ? Number(precoVendaSugeridoGranel.toFixed(2))
             : null,
         observacao: observacaoGranel || null,
+        produto_origem_barcode: barcodeOrigemGranel.trim() || null,
+        produto_granel_barcode: barcodeProdutoGranel.trim() || null,
       });
 
       const precoAtualizadoMsg = response.data.preco_venda_granel_atualizado
@@ -219,8 +236,11 @@ export function useMovimentacoesProdutoGranel({ carregarDados, id, produto }) {
   return {
     abrirModalGranel,
     atualizarPrecoGranel,
+    barcodeOrigemGranel,
+    barcodeProdutoGranel,
     baseMargemGranel,
     baseMargemTexto,
+    bipagemObrigatoriaGranel,
     buscaGranel,
     custoKgGranel,
     diferencaPrecoGranel,
@@ -251,6 +271,8 @@ export function useMovimentacoesProdutoGranel({ carregarDados, id, produto }) {
     quantidadeGranel,
     quantidadeGranelNumero,
     setAtualizarPrecoGranel,
+    setBarcodeOrigemGranel,
+    setBarcodeProdutoGranel,
     setBuscaGranel,
     setMargemBaseGranel,
     setMargemGranel,

@@ -35,6 +35,7 @@ import {
   normalizarVinculosBling,
 } from "./estoqueBling/estoqueBlingNormalizers";
 import { useEstoqueBlingActions } from "./estoqueBling/useEstoqueBlingActions";
+import useShiftRangeSelection from "../hooks/useShiftRangeSelection";
 
 function EstoqueBling() {
   const [activeTab, setActiveTab] = useState("criar");
@@ -433,18 +434,11 @@ function EstoqueBling() {
     syncProblems,
   });
 
-  const toggleLocalSelection = (produtoId) => {
-    setSelectedLocalIds((current) => {
-      const id = Number(produtoId);
-      const next = new Set(current);
-      if (next.has(id)) {
-        next.delete(id);
-      } else {
-        next.add(id);
-      }
-      return next;
-    });
-  };
+  const toggleLocalSelection = useShiftRangeSelection({
+    getItemId: (item) => Number(item.id),
+    items: filteredLocal,
+    setSelectedIds: setSelectedLocalIds,
+  });
 
   const searchPlaceholder = {
     criar: "Buscar por nome, SKU ou codigo de barras",

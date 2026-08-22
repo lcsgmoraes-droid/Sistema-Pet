@@ -589,6 +589,29 @@ export default function HistoricoEntregas() {
                                   📝 {parada.observacoes || parada.observacoes_entrega}
                                 </div>
                               )}
+                              {parada.avaliacao_entrega_nota && (
+                                <div
+                                  style={{
+                                    marginTop: 9,
+                                    padding: 9,
+                                    borderRadius: 7,
+                                    background: "#fff7ed",
+                                    color: "#9a3412",
+                                    fontSize: 12,
+                                  }}
+                                >
+                                  <strong>
+                                    Avaliação do cliente:{" "}
+                                    {"★".repeat(parada.avaliacao_entrega_nota)}
+                                    {"☆".repeat(5 - parada.avaliacao_entrega_nota)}
+                                  </strong>
+                                  {parada.avaliacao_entrega_comentario && (
+                                    <div style={{ marginTop: 4 }}>
+                                      “{parada.avaliacao_entrega_comentario}”
+                                    </div>
+                                  )}
+                                </div>
+                              )}
                             </div>
                           </div>
                         </div>

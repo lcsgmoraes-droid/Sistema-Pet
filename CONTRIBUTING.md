@@ -136,4 +136,3 @@ Uma tarefa esta pronta quando:
 Contribuir com codigo nao autoriza deploy. O procedimento de producao esta em
 `docs/PRODUCAO_DEPLOY_SSH.md` e sempre exige autorizacao explicita antes de
 qualquer comando no servidor.
-

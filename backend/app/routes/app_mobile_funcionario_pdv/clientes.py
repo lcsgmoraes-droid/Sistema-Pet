@@ -4,15 +4,21 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import func, or_
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.audit_log import log_create
+from app.clientes.common import gerar_codigo_cliente
 from app.db import get_session
 from app.models import Cliente, User
 from app.routes.ecommerce_auth import _get_current_ecommerce_user
 
 from .auth import _get_funcionario_operacional_or_403
 from .common import _somente_digitos_funcionario_pdv
-from .schemas import FuncionarioPdvClienteResponse
+from .schemas import (
+    FuncionarioPdvClienteRapidoRequest,
+    FuncionarioPdvClienteResponse,
+)
 
 router = APIRouter()
 
@@ -143,3 +149,57 @@ def buscar_clientes_funcionario_pdv(
         .all()
     )
     return [_serialize_funcionario_pdv_cliente(cliente) for cliente in clientes]
+
+
+@router.post(
+    "/funcionario/pdv/clientes/rapido",
+    response_model=FuncionarioPdvClienteResponse,
+    status_code=201,
+)
+def criar_cliente_rapido_funcionario_pdv(
+    payload: FuncionarioPdvClienteRapidoRequest,
+    current_user: User = Depends(_get_current_ecommerce_user),
+    db: Session = Depends(get_session),
+):
+    """Cria uma pessoa sem tirar o funcionario da venda atual."""
+
+    _funcionario, tenant_id = _get_funcionario_operacional_or_403(db, current_user)
+    codigo = gerar_codigo_cliente(db, "cliente", "PF", tenant_id)
+    nome = (payload.nome or "").strip() or f"Cliente {codigo}"
+    telefone = _somente_digitos_funcionario_pdv(payload.telefone) or None
+    endereco = (payload.endereco or "").strip() or None
+    cliente = Cliente(
+        tenant_id=tenant_id,
+        user_id=current_user.id,
+        codigo=codigo,
+        tipo_cadastro="cliente",
+        tipo_pessoa="PF",
+        nome=nome,
+        telefone=telefone,
+        endereco=endereco,
+        ativo=True,
+    )
+    db.add(cliente)
+    try:
+        db.commit()
+    except IntegrityError as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=409,
+            detail="Nao foi possivel gerar o codigo da pessoa. Tente novamente.",
+        ) from exc
+
+    db.refresh(cliente)
+    log_create(
+        db,
+        current_user.id,
+        "cliente",
+        cliente.id,
+        {
+            "origem": "app_funcionario_pdv",
+            "nome": nome,
+            "telefone": telefone,
+            "endereco": endereco,
+        },
+    )
+    return _serialize_funcionario_pdv_cliente(cliente)

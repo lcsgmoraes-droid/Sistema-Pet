@@ -1,6 +1,6 @@
-import { Ionicons } from '@expo/vector-icons';
-import { useFocusEffect } from '@react-navigation/native';
-import React, { useCallback, useEffect, useState } from 'react';
+import { Ionicons } from "@expo/vector-icons";
+import { useFocusEffect } from "@react-navigation/native";
+import React, { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -10,34 +10,35 @@ import {
   Text,
   TouchableOpacity,
   View,
-} from 'react-native';
+} from "react-native";
 import {
   AppNotification,
   limparNotificacoesApp,
   listarNotificacoesApp,
   markNotificationAsRead,
-} from '../../services/appNotifications.service';
+} from "../../services/appNotifications.service";
 import {
   contarNovidadesAppNaoVistas,
   EvolucaoCorePetItem,
   listarEvolucaoCorePetApp,
   marcarNovidadesAppComoVistas,
-} from '../../services/evolucaoCorePet.service';
-import { useAuthStore } from '../../store/auth.store';
-import { CORES, ESPACO, FONTE, RAIO } from '../../theme';
+} from "../../services/evolucaoCorePet.service";
+import { useAuthStore } from "../../store/auth.store";
+import { CORES, ESPACO, FONTE, RAIO } from "../../theme";
 import {
   appointmentNotificationTarget,
   campaignNotificationTarget,
+  crediarioNotificationTarget,
   recurrenceNotificationToProductId,
   stockNotificationToProductId,
-} from '../../utils/notificationNavigation';
-import EvolucaoCorePetList from './EvolucaoCorePetList';
+} from "../../utils/notificationNavigation";
+import EvolucaoCorePetList from "./EvolucaoCorePetList";
 
 export default function NotificationsScreen({ navigation, route }: any) {
   const somenteNovidades = Boolean(route?.params?.somenteNovidades);
   const userId = useAuthStore((state) => state.user?.id);
-  const [secao, setSecao] = useState<'avisos' | 'novidades'>(
-    somenteNovidades ? 'novidades' : 'avisos',
+  const [secao, setSecao] = useState<"avisos" | "novidades">(
+    somenteNovidades ? "novidades" : "avisos",
   );
   const [items, setItems] = useState<AppNotification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -53,7 +54,7 @@ export default function NotificationsScreen({ navigation, route }: any) {
       listarEvolucaoCorePetApp(),
     ]);
 
-    if (notificacoes.status === 'fulfilled') {
+    if (notificacoes.status === "fulfilled") {
       setItems(notificacoes.value.items);
       setUnreadCount(notificacoes.value.unread_count);
     } else {
@@ -61,23 +62,21 @@ export default function NotificationsScreen({ navigation, route }: any) {
       setUnreadCount(0);
     }
 
-    if (evolucao.status === 'fulfilled') {
+    if (evolucao.status === "fulfilled") {
       setEvolucaoItems(evolucao.value.itens);
-      setEvolucaoUnreadCount(
-        await contarNovidadesAppNaoVistas(evolucao.value.itens, userId),
-      );
+      setEvolucaoUnreadCount(await contarNovidadesAppNaoVistas(evolucao.value.itens, userId));
     } else {
       setEvolucaoItems([]);
       setEvolucaoUnreadCount(0);
     }
   }, [userId]);
 
-  const abrirSecao = useCallback((proxima: 'avisos' | 'novidades') => {
+  const abrirSecao = useCallback((proxima: "avisos" | "novidades") => {
     setSecao(proxima);
   }, []);
 
   useEffect(() => {
-    if (secao !== 'novidades' || evolucaoItems.length === 0) return;
+    if (secao !== "novidades" || evolucaoItems.length === 0) return;
     let active = true;
     marcarNovidadesAppComoVistas(evolucaoItems, userId)
       .then(() => {
@@ -137,11 +136,10 @@ export default function NotificationsScreen({ navigation, route }: any) {
     }
 
     const produtoId =
-      recurrenceNotificationToProductId(item.data) ??
-      stockNotificationToProductId(item.data);
+      recurrenceNotificationToProductId(item.data) ?? stockNotificationToProductId(item.data);
     if (produtoId) {
-      navigation.navigate('Loja', {
-        screen: 'DetalhesProduto',
+      navigation.navigate("Loja", {
+        screen: "DetalhesProduto",
         params: { produtoId },
       });
       return;
@@ -156,23 +154,25 @@ export default function NotificationsScreen({ navigation, route }: any) {
     const campaignTarget = campaignNotificationTarget(item.data);
     if (campaignTarget) {
       navigation.navigate(campaignTarget.route, campaignTarget.params);
+      return;
+    }
+
+    const crediarioTarget = crediarioNotificationTarget(item.data);
+    if (crediarioTarget) {
+      navigation.navigate(crediarioTarget.route, crediarioTarget.params);
     }
   }
 
   function confirmarLimpeza() {
     if (items.length === 0 || clearing) return;
-    Alert.alert(
-      'Limpar notificacoes',
-      'Deseja limpar todas as notificacoes desta lista?',
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        {
-          text: 'Limpar',
-          style: 'destructive',
-          onPress: limparLista,
-        },
-      ],
-    );
+    Alert.alert("Limpar notificacoes", "Deseja limpar todas as notificacoes desta lista?", [
+      { text: "Cancelar", style: "cancel" },
+      {
+        text: "Limpar",
+        style: "destructive",
+        onPress: limparLista,
+      },
+    ]);
   }
 
   async function limparLista() {
@@ -182,7 +182,7 @@ export default function NotificationsScreen({ navigation, route }: any) {
       setItems([]);
       setUnreadCount(0);
     } catch {
-      Alert.alert('Notificacoes', 'Nao foi possivel limpar agora.');
+      Alert.alert("Notificacoes", "Nao foi possivel limpar agora.");
     } finally {
       setClearing(false);
     }
@@ -201,15 +201,15 @@ export default function NotificationsScreen({ navigation, route }: any) {
       <View style={styles.summaryRow}>
         <View style={styles.summaryText}>
           <Text style={styles.summaryTitle}>
-            {somenteNovidades ? 'Novidades' : 'Avisos e novidades'}
+            {somenteNovidades ? "Novidades" : "Avisos e novidades"}
           </Text>
           <Text style={styles.summarySubtitle}>
             {unreadCount + evolucaoUnreadCount > 0
               ? `${unreadCount + evolucaoUnreadCount} não visto(s)`
-              : 'Tudo em dia'}
+              : "Tudo em dia"}
           </Text>
         </View>
-        {secao === 'avisos' && items.length > 0 ? (
+        {secao === "avisos" && items.length > 0 ? (
           <TouchableOpacity
             style={[styles.clearButton, clearing && styles.clearButtonDisabled]}
             onPress={confirmarLimpeza}
@@ -228,60 +228,42 @@ export default function NotificationsScreen({ navigation, route }: any) {
       {!somenteNovidades ? (
         <View style={styles.sectionTabs}>
           <TouchableOpacity
-            style={[
-              styles.sectionTab,
-              secao === 'avisos' && styles.sectionTabActive,
-            ]}
-            onPress={() => abrirSecao('avisos')}
+            style={[styles.sectionTab, secao === "avisos" && styles.sectionTabActive]}
+            onPress={() => abrirSecao("avisos")}
           >
             <Ionicons
               name="notifications-outline"
               size={18}
-              color={secao === 'avisos' ? CORES.primario : CORES.textoClaro}
+              color={secao === "avisos" ? CORES.primario : CORES.textoClaro}
             />
             <Text
-              style={[
-                styles.sectionTabText,
-                secao === 'avisos' && styles.sectionTabTextActive,
-              ]}
+              style={[styles.sectionTabText, secao === "avisos" && styles.sectionTabTextActive]}
             >
               Avisos
             </Text>
             {unreadCount > 0 ? <View style={styles.sectionUnreadDot} /> : null}
           </TouchableOpacity>
           <TouchableOpacity
-            style={[
-              styles.sectionTab,
-              secao === 'novidades' && styles.sectionTabActive,
-            ]}
-            onPress={() => abrirSecao('novidades')}
+            style={[styles.sectionTab, secao === "novidades" && styles.sectionTabActive]}
+            onPress={() => abrirSecao("novidades")}
           >
             <Ionicons
               name="sparkles-outline"
               size={18}
-              color={secao === 'novidades' ? CORES.primario : CORES.textoClaro}
+              color={secao === "novidades" ? CORES.primario : CORES.textoClaro}
             />
             <Text
-              style={[
-                styles.sectionTabText,
-                secao === 'novidades' && styles.sectionTabTextActive,
-              ]}
+              style={[styles.sectionTabText, secao === "novidades" && styles.sectionTabTextActive]}
             >
               Novidades
             </Text>
-            {evolucaoUnreadCount > 0 ? (
-              <View style={styles.sectionUnreadDot} />
-            ) : null}
+            {evolucaoUnreadCount > 0 ? <View style={styles.sectionUnreadDot} /> : null}
           </TouchableOpacity>
         </View>
       ) : null}
 
-      {secao === 'novidades' ? (
-        <EvolucaoCorePetList
-          itens={evolucaoItems}
-          refreshing={refreshing}
-          onRefresh={onRefresh}
-        />
+      {secao === "novidades" ? (
+        <EvolucaoCorePetList itens={evolucaoItems} refreshing={refreshing} onRefresh={onRefresh} />
       ) : (
         <FlatList
           data={items}
@@ -296,15 +278,9 @@ export default function NotificationsScreen({ navigation, route }: any) {
           }
           ListEmptyComponent={
             <View style={styles.emptyState}>
-              <Ionicons
-                name="notifications-outline"
-                size={34}
-                color={CORES.textoClaro}
-              />
-            <Text style={styles.emptyTitle}>Nenhuma notificação</Text>
-              <Text style={styles.emptyText}>
-              Quando houver um aviso, ele aparecerá aqui.
-              </Text>
+              <Ionicons name="notifications-outline" size={34} color={CORES.textoClaro} />
+              <Text style={styles.emptyTitle}>Nenhuma notificação</Text>
+              <Text style={styles.emptyText}>Quando houver um aviso, ele aparecerá aqui.</Text>
             </View>
           }
           renderItem={({ item }) => (
@@ -316,13 +292,13 @@ export default function NotificationsScreen({ navigation, route }: any) {
               <View style={styles.iconBox}>
                 <Ionicons
                   name={
-                    item.source === 'stock_waitlist'
-                      ? 'cube-outline'
-                      : item.source === 'appointment_reminder'
-                        ? 'calendar-outline'
-                        : item.source === 'campaign'
-                          ? 'gift-outline'
-                          : 'notifications-outline'
+                    item.source === "stock_waitlist"
+                      ? "cube-outline"
+                      : item.source === "appointment_reminder"
+                        ? "calendar-outline"
+                        : item.source === "campaign"
+                          ? "gift-outline"
+                          : "notifications-outline"
                   }
                   size={20}
                   color={CORES.primario}
@@ -338,15 +314,9 @@ export default function NotificationsScreen({ navigation, route }: any) {
                 <Text style={styles.itemBody} numberOfLines={3}>
                   {item.body}
                 </Text>
-                <Text style={styles.itemDate}>
-                  {formatarData(item.created_at)}
-                </Text>
+                <Text style={styles.itemDate}>{formatarData(item.created_at)}</Text>
               </View>
-              <Ionicons
-                name="chevron-forward"
-                size={18}
-                color={CORES.textoClaro}
-              />
+              <Ionicons name="chevron-forward" size={18} color={CORES.textoClaro} />
             </TouchableOpacity>
           )}
         />
@@ -356,14 +326,14 @@ export default function NotificationsScreen({ navigation, route }: any) {
 }
 
 function formatarData(value?: string | null): string {
-  if (!value) return '';
+  if (!value) return "";
   const data = new Date(value);
-  if (Number.isNaN(data.getTime())) return '';
-  return data.toLocaleDateString('pt-BR', {
-    day: '2-digit',
-    month: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
+  if (Number.isNaN(data.getTime())) return "";
+  return data.toLocaleDateString("pt-BR", {
+    day: "2-digit",
+    month: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
   });
 }
 
@@ -371,8 +341,8 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: CORES.fundo },
   center: {
     flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     backgroundColor: CORES.fundo,
   },
   summaryRow: {
@@ -381,14 +351,14 @@ const styles = StyleSheet.create({
     backgroundColor: CORES.superficie,
     borderBottomWidth: 1,
     borderBottomColor: CORES.borda,
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: ESPACO.md,
   },
   summaryText: { flex: 1, minWidth: 0 },
   summaryTitle: {
     fontSize: FONTE.grande,
-    fontWeight: '800',
+    fontWeight: "800",
     color: CORES.texto,
   },
   summarySubtitle: {
@@ -397,7 +367,7 @@ const styles = StyleSheet.create({
     color: CORES.textoSecundario,
   },
   sectionTabs: {
-    flexDirection: 'row',
+    flexDirection: "row",
     padding: ESPACO.sm,
     gap: ESPACO.sm,
     backgroundColor: CORES.superficie,
@@ -408,15 +378,15 @@ const styles = StyleSheet.create({
     flex: 1,
     minHeight: 42,
     borderRadius: RAIO.md,
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexDirection: 'row',
+    alignItems: "center",
+    justifyContent: "center",
+    flexDirection: "row",
     gap: ESPACO.xs,
   },
   sectionTabActive: { backgroundColor: CORES.primarioClaro },
   sectionTabText: {
     fontSize: FONTE.normal,
-    fontWeight: '800',
+    fontWeight: "800",
     color: CORES.textoSecundario,
   },
   sectionTabTextActive: { color: CORES.primario },
@@ -431,32 +401,32 @@ const styles = StyleSheet.create({
     paddingHorizontal: ESPACO.md,
     borderRadius: RAIO.md,
     backgroundColor: CORES.erro,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
     gap: ESPACO.xs,
   },
   clearButtonDisabled: { opacity: 0.72 },
-  clearButtonText: { color: '#fff', fontWeight: '800', fontSize: FONTE.normal },
+  clearButtonText: { color: "#fff", fontWeight: "800", fontSize: FONTE.normal },
   list: { padding: ESPACO.md, gap: ESPACO.sm },
   emptyList: { flexGrow: 1, padding: ESPACO.lg },
   emptyState: {
     flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     paddingHorizontal: ESPACO.lg,
   },
   emptyTitle: {
     marginTop: ESPACO.sm,
     fontSize: FONTE.grande,
-    fontWeight: '800',
+    fontWeight: "800",
     color: CORES.texto,
   },
   emptyText: {
     marginTop: ESPACO.xs,
     fontSize: FONTE.normal,
     color: CORES.textoSecundario,
-    textAlign: 'center',
+    textAlign: "center",
   },
   item: {
     minHeight: 92,
@@ -465,8 +435,8 @@ const styles = StyleSheet.create({
     borderRadius: RAIO.md,
     backgroundColor: CORES.superficie,
     padding: ESPACO.md,
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: ESPACO.sm,
   },
   itemUnread: { borderColor: CORES.primario },
@@ -475,19 +445,19 @@ const styles = StyleSheet.create({
     height: 40,
     borderRadius: RAIO.md,
     backgroundColor: CORES.primarioClaro,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   itemText: { flex: 1, minWidth: 0 },
   itemTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: ESPACO.xs,
   },
   itemTitle: {
     flex: 1,
     fontSize: FONTE.media,
-    fontWeight: '800',
+    fontWeight: "800",
     color: CORES.texto,
   },
   unreadDot: {

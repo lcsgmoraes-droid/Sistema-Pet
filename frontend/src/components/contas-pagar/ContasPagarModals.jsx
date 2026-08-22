@@ -492,7 +492,7 @@ export default function ContasPagarModals({
                           type="checkbox"
                           disabled={!item.pode_excluir}
                           checked={selecionado}
-                          onChange={() => alternarRecorrenciaExclusao(item.id)}
+                          onChange={(event) => alternarRecorrenciaExclusao(item.id, event)}
                           className="h-4 w-4"
                         />
                         <div className="min-w-0 flex-1">

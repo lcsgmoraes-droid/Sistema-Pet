@@ -6,6 +6,7 @@ TARGETS = [
     "app/whatsapp/tools.py",
     "app/whatsapp/tool_definitions.py",
     "app/whatsapp/tool_executor.py",
+    "app/whatsapp/tool_product_search.py",
     "app/whatsapp/tool_utils.py",
 ]
 
@@ -58,3 +59,23 @@ def test_whatsapp_tool_executor_preserva_dispatch_basico():
     assert callable(executor.execute_tool)
     assert callable(executor._buscar_produtos)
     assert callable(executor._finalizar_pedido)
+
+
+def test_whatsapp_tool_executor_usa_modelo_atual_de_categoria():
+    from app.whatsapp.tools import ToolExecutor
+
+    class QueryReached(Exception):
+        pass
+
+    class FakeDB:
+        def query(self, *_args):
+            raise QueryReached("consulta alcançada")
+
+        def rollback(self):
+            pass
+
+    result = ToolExecutor(db=FakeDB(), tenant_id="tenant-test")._buscar_produtos(
+        "ração gold"
+    )
+
+    assert result == {"success": False, "error": "consulta alcançada"}

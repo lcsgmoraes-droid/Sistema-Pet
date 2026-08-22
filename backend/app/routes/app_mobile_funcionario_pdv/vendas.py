@@ -1,5 +1,7 @@
 """Criacao e finalizacao de vendas do PDV mobile."""
 
+from datetime import date
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
@@ -12,6 +14,7 @@ from .beneficios import _calcular_beneficios_funcionario_pdv
 from .caixa import _obter_caixa_aberto_funcionario_pdv
 from .pagamentos import (
     _normalizar_forma_pagamento_pdv,
+    _obter_ou_criar_forma_crediario_funcionario_pdv,
     _resolver_forma_pagamento_cartao_funcionario_pdv,
 )
 from .schemas import (
@@ -140,10 +143,28 @@ def finalizar_venda_funcionario_pdv(
         )
 
     forma_pagamento = _normalizar_forma_pagamento_pdv(dados.pagamento.forma_pagamento)
+    eh_crediario = forma_pagamento == "Crediário"
+    if eh_crediario:
+        if not dados.cliente_id:
+            raise HTTPException(
+                status_code=400, detail="Selecione um cliente para vender no crediario."
+            )
+        if not dados.pagamento.data_vencimento:
+            raise HTTPException(
+                status_code=400, detail="Informe a data de vencimento do crediario."
+            )
+        if dados.pagamento.data_vencimento < date.today():
+            raise HTTPException(
+                status_code=400, detail="A data do crediario nao pode estar no passado."
+            )
     numero_parcelas = max(1, int(dados.pagamento.numero_parcelas or 1))
     forma_pagamento_selecionada = _resolver_forma_pagamento_cartao_funcionario_pdv(
         db, tenant_id, dados.pagamento
     )
+    if eh_crediario:
+        forma_pagamento_selecionada = _obter_ou_criar_forma_crediario_funcionario_pdv(
+            db, tenant_id, current_user
+        )
     if forma_pagamento != "cartao_credito":
         numero_parcelas = max(1, min(numero_parcelas, 1))
     criar_payload = _criar_payload_venda_funcionario_pdv(
@@ -163,7 +184,11 @@ def finalizar_venda_funcionario_pdv(
             "forma_pagamento": forma_pagamento,
             "valor": valor_pagamento,
             "numero_parcelas": numero_parcelas,
-            "forma_pagamento_id": dados.pagamento.forma_pagamento_id,
+            "forma_pagamento_id": (
+                forma_pagamento_selecionada.id
+                if forma_pagamento_selecionada
+                else dados.pagamento.forma_pagamento_id
+            ),
             "bandeira": dados.pagamento.bandeira
             or (
                 forma_pagamento_selecionada.bandeira
@@ -183,6 +208,13 @@ def finalizar_venda_funcionario_pdv(
             pagamento_payload["valor_recebido"] = float(dados.pagamento.valor_recebido)
         if dados.pagamento.troco is not None:
             pagamento_payload["troco"] = float(dados.pagamento.troco)
+        if eh_crediario and dados.pagamento.data_vencimento:
+            pagamento_payload["data_recebimento_prevista"] = (
+                dados.pagamento.data_vencimento
+            )
+            pagamento_payload["prazo_recebimento_dias"] = max(
+                1, (dados.pagamento.data_vencimento - date.today()).days
+            )
         pagamentos_payload.append(pagamento_payload)
 
     if beneficios["cashback_valor"] > 0:
@@ -220,6 +252,42 @@ def finalizar_venda_funcionario_pdv(
         db=db,
     )
     venda_resultado = resultado.get("venda", {})
+    if eh_crediario and dados.cliente_id and dados.pagamento.data_vencimento:
+        cliente_crediario = (
+            db.query(Cliente)
+            .filter(Cliente.id == dados.cliente_id, Cliente.tenant_id == tenant_id)
+            .first()
+        )
+        if cliente_crediario:
+            from app.services.app_notifications import (
+                criar_notificacao_app,
+                resolve_customer_app_user_id,
+            )
+
+            app_user_id = resolve_customer_app_user_id(
+                db, tenant_id=tenant_id, cliente=cliente_crediario
+            )
+            criar_notificacao_app(
+                db,
+                tenant_id=tenant_id,
+                user_id=app_user_id,
+                customer_id=cliente_crediario.id,
+                title="Compra no crediário",
+                body=(
+                    f"A compra {venda_criada.get('numero_venda') or venda_criada['id']} "
+                    f"vence em {dados.pagamento.data_vencimento.strftime('%d/%m/%Y')}."
+                ),
+                source="crediario",
+                kind="crediario_created",
+                payload={
+                    "source": "crediario",
+                    "kind": "crediario_created",
+                    "venda_id": venda_criada["id"],
+                    "data_vencimento": dados.pagamento.data_vencimento.isoformat(),
+                },
+                idempotency_key=f"crediario:venda:{venda_criada['id']}",
+            )
+            db.commit()
     return {
         "status": venda_resultado.get("status", "finalizada"),
         "venda_id": venda_criada["id"],
@@ -230,5 +298,9 @@ def finalizar_venda_funcionario_pdv(
             venda_resultado.get("total_pago") or beneficios["total_venda"]
         ),
         "forma_pagamento": " + ".join(p["forma_pagamento"] for p in pagamentos_payload),
-        "mensagem": "Venda registrada pelo app.",
+        "mensagem": (
+            "Venda registrada no crediario."
+            if eh_crediario
+            else "Venda registrada pelo app."
+        ),
     }

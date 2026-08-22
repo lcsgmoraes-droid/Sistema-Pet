@@ -116,7 +116,7 @@ function ConsultaTableRow({ consulta, onAbrirConsulta, onSelecionarConsulta, sel
         <input
           type="checkbox"
           checked={selecionada}
-          onChange={() => onSelecionarConsulta(consulta.id)}
+          onChange={(event) => onSelecionarConsulta(Number(consulta.id), event)}
           aria-label={`Selecionar consulta #${consulta.id}`}
           className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
         />

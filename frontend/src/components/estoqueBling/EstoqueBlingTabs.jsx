@@ -242,7 +242,7 @@ export function EstoqueBlingLocalTab({
               <input
                 type="checkbox"
                 checked={Boolean(selected)}
-                onChange={() => toggleLocalSelection(item.id)}
+                onChange={(event) => toggleLocalSelection(Number(item.id), event)}
                 disabled={rowActionKey !== ""}
                 className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
               />

@@ -423,7 +423,7 @@ export default function VendasFinanceiroListaTable({
         <input
           type="checkbox"
           checked={vendasSelecionadasIds.has(venda.id)}
-          onChange={(event) => onToggleSelecaoVenda?.(venda.id, event.target.checked)}
+          onChange={(event) => onToggleSelecaoVenda?.(venda.id, event)}
           onClick={(event) => event.stopPropagation()}
           className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
           title="Selecionar venda"

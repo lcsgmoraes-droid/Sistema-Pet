@@ -19,6 +19,7 @@ export default function ProdutosNovoCaracteristicasTab(props) {
     isEdicao,
     marcas,
     mostrarBuscaPredecessor,
+    onNovoCatalogo,
     parseNumber,
     predecessorSelecionado,
     produtosBusca,
@@ -37,6 +38,7 @@ export default function ProdutosNovoCaracteristicasTab(props) {
         handleGerarCodigoBarras={handleGerarCodigoBarras}
         handleGerarSKU={handleGerarSKU}
         marcas={marcas}
+        onNovoCatalogo={onNovoCatalogo}
       />
 
       <ProdutosNovoPrecosSection

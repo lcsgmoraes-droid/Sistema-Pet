@@ -133,7 +133,7 @@ function HistoricoTransferenciaCard({
               <input
                 type="checkbox"
                 checked={selecionado}
-                onChange={() => onAlternarSelecao(registro.conta_receber_id)}
+                onChange={(event) => onAlternarSelecao(registro.conta_receber_id, event)}
                 className="h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-slate-400"
               />
               Selecionar

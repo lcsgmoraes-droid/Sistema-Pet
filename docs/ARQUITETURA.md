@@ -202,4 +202,3 @@ Mudancas estruturais seguem
 
 Reescrita total nao e a estrategia padrao. Refatoracao incremental reduz risco
 para empresas que ja utilizam o sistema.
-

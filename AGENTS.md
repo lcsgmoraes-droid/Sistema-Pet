@@ -27,6 +27,29 @@ feita nos momentos certos, sem virar repeticao a cada micro-etapa.
 - Antes de qualquer `git push origin main` ou comando no servidor de producao, pedir autorizacao explicita ao Lucas em portugues simples.
 - Seguir tambem `.github/assistant-rules.json`, `.github/copilot-instructions.md` e `docs/FLUXO_UNICO_DEV_PROD.md`.
 
+## Fluxo obrigatorio do app mobile
+
+- Antes de gerar novo APK/AAB/IPA, enviar para uma loja ou configurar credenciais
+  de loja, verificar o historico do EAS e classificar a mudanca como OTA ou nativa.
+- Se a mudanca estiver limitada a JavaScript/TypeScript, assets compativeis e
+  backend, preservar a versao/runtime dos binarios instalados e usar o fluxo ja
+  existente:
+  `eas update --channel production --platform all --environment production`.
+- Nesse caso, nao incrementar `version`, `runtimeVersion`, `versionCode` ou
+  `buildNumber`, nao criar build de loja e nao abrir fluxo de Service Account.
+- Nao executar nem aceitar automaticamente `expo install --fix` durante uma
+  OTA. Recomendacoes do Expo Doctor que atualizem dependencias nativas devem ser
+  tratadas em uma tarefa separada de release nativa.
+- Novo build e submissao as lojas so sao cabiveis quando houver mudanca nativa,
+  como dependencia nativa, plugin, permissao, pasta `android`/iOS ou runtime
+  realmente incompativel. Explicar a evidencia ao Lucas antes de trocar de fluxo.
+- Se houver duvida, consultar `docs/GUIA_RELEASE_APP_MOBILE_EAS.md`, executar
+  `eas build:list`, `eas update:list` e comparar o fingerprint com os binarios
+  ativos antes de agir.
+- Estado registrado em 2026-08-22: o iOS esta publicado e o Android esta em fase
+  de aprovacao. Nao substituir os binarios/revisoes atuais sem autorizacao
+  especifica para uma nova versao nativa.
+
 ## Padrao de trabalho
 
 - Fazer mudancas pequenas e focadas.
