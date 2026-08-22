@@ -139,7 +139,7 @@ function OpcoesRacao() {
   };
 
   const handleDeletar = async (id) => {
-    if (!await confirmarCorePet("Tem certeza que deseja inativar este item?")) return;
+    if (!(await confirmarCorePet("Tem certeza que deseja inativar este item?"))) return;
 
     try {
       await api.delete(`${abaConfig.endpoint}/${id}`);

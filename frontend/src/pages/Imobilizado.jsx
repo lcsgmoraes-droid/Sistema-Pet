@@ -224,7 +224,7 @@ export default function Imobilizado() {
   };
 
   const excluir = async (bem) => {
-    if (!await confirmarCorePet(`Excluir definitivamente "${bem.nome}"?`)) return;
+    if (!(await confirmarCorePet(`Excluir definitivamente "${bem.nome}"?`))) return;
     setExcluindoId(bem.id);
     try {
       await api.delete(`/financeiro/imobilizado/${bem.id}`);

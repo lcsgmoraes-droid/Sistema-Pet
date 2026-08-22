@@ -81,7 +81,7 @@ export default function useProdutosNovoFornecedores({ id }) {
   };
 
   const handleDeleteFornecedor = async (fornecedorId) => {
-    if (!await confirmarCorePet("Deseja realmente desvincular este fornecedor?")) {
+    if (!(await confirmarCorePet("Deseja realmente desvincular este fornecedor?"))) {
       return;
     }
 

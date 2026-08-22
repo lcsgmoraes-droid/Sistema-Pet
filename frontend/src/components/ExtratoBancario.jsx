@@ -303,7 +303,9 @@ const ExtratoBancario = () => {
                       </button>
                       <button
                         onClick={async () => {
-                          const nova_categoria = await perguntarCorePet("Digite a categoria correta:");
+                          const nova_categoria = await perguntarCorePet(
+                            "Digite a categoria correta:",
+                          );
                           if (nova_categoria) {
                             corrigirLancamento(lancamento.id, nova_categoria);
                           }

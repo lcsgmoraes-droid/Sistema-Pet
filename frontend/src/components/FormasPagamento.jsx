@@ -233,7 +233,7 @@ const FormasPagamento = () => {
   };
 
   const excluir = async (id) => {
-    if (!await confirmarCorePet("Deseja realmente excluir esta forma de pagamento?")) return;
+    if (!(await confirmarCorePet("Deseja realmente excluir esta forma de pagamento?"))) return;
 
     try {
       await api.delete(`/financeiro/formas-pagamento/${id}`);

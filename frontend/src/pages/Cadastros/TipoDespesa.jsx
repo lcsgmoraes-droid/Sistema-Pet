@@ -91,7 +91,7 @@ const TipoDespesa = () => {
   };
 
   const excluir = async (id) => {
-    if (!await confirmarCorePet("Desativar este tipo de despesa?")) return;
+    if (!(await confirmarCorePet("Desativar este tipo de despesa?"))) return;
     try {
       await api.delete(`/cadastros/tipo-despesa/${id}`);
       toast.success("Tipo desativado");

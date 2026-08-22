@@ -119,9 +119,9 @@ const Categorias = () => {
 
     if (categoria.total_produtos > 0) {
       if (
-        !await confirmarCorePet(
+        !(await confirmarCorePet(
           `Esta categoria possui ${categoria.total_produtos} produto(s). Deseja realmente excluir?`,
-        )
+        ))
       ) {
         return;
       }

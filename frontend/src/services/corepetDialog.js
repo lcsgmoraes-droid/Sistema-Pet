@@ -44,7 +44,9 @@ export function resolverCorePetDialog(valor) {
 export function confirmarCorePet(opcoes) {
   const configuracao = typeof opcoes === "string" ? { mensagem: opcoes } : opcoes;
   const texto = String(configuracao?.mensagem || "").toLocaleLowerCase("pt-BR");
-  const acaoPerigosa = /(exclu|cancel|remov|desativ|inativ|estorn|desvinc|anul|descart)/.test(texto);
+  const acaoPerigosa = /(exclu|cancel|remov|desativ|inativ|estorn|desvinc|anul|descart)/.test(
+    texto,
+  );
 
   return solicitarDialogo({
     tipo: "confirmacao",
@@ -57,8 +59,7 @@ export function confirmarCorePet(opcoes) {
 }
 
 export function perguntarCorePet(opcoes, valorInicial = "") {
-  const configuracao =
-    typeof opcoes === "string" ? { mensagem: opcoes, valorInicial } : opcoes;
+  const configuracao = typeof opcoes === "string" ? { mensagem: opcoes, valorInicial } : opcoes;
 
   return solicitarDialogo({
     tipo: "entrada",

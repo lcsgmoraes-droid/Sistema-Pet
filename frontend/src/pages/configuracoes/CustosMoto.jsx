@@ -97,9 +97,9 @@ export default function CustosMoto() {
 
   async function preencherValoresSugeridos() {
     if (
-      !await confirmarCorePet(
+      !(await confirmarCorePet(
         "Preencher com valores sugeridos baseados em uma moto de entrega típica (CG 160, Biz 125, Pop 110)? Os valores atuais serão substituídos.",
-      )
+      ))
     ) {
       return;
     }

@@ -37,7 +37,7 @@ export default function useCampanhasRetencao({ carregarRetencao }) {
   };
 
   const deletarRetencao = async (id) => {
-    if (!await confirmarCorePet("Remover esta regra de retencao?")) return;
+    if (!(await confirmarCorePet("Remover esta regra de retencao?"))) return;
     setDeletandoRetencao(id);
     try {
       await api.delete(`/campanhas/retencao/${id}`);

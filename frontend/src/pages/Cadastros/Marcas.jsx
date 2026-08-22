@@ -69,7 +69,7 @@ const Marcas = () => {
   };
 
   const handleExcluir = async (marca) => {
-    if (!await confirmarCorePet(`Deseja realmente excluir a marca "${marca.nome}"?`)) {
+    if (!(await confirmarCorePet(`Deseja realmente excluir a marca "${marca.nome}"?`))) {
       return;
     }
 

@@ -165,7 +165,7 @@ export default function ModalPendenciasEstoque({
   };
 
   const cancelarPendencia = async (pendenciaId) => {
-    if (!await confirmarCorePet("Deseja realmente cancelar esta pendência?")) return;
+    if (!(await confirmarCorePet("Deseja realmente cancelar esta pendência?"))) return;
 
     try {
       await api.delete(`/pendencias-estoque/${pendenciaId}`);

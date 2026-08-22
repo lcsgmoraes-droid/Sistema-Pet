@@ -147,7 +147,7 @@ export function useModalPagamentoActions({
   };
 
   const excluirPagamentoExistente = async (pagamentoId) => {
-    if (!await confirmarCorePet("Deseja realmente excluir este pagamento?")) {
+    if (!(await confirmarCorePet("Deseja realmente excluir este pagamento?"))) {
       return;
     }
 
@@ -288,7 +288,7 @@ export function useModalPagamentoActions({
       setErro(mensagem);
       if (
         acaoFiscal &&
-        await confirmarCorePet(`${mensagem}\n\nAbrir o cadastro fiscal deste produto agora?`)
+        (await confirmarCorePet(`${mensagem}\n\nAbrir o cadastro fiscal deste produto agora?`))
       ) {
         navigate(acaoFiscal.url);
       } else {

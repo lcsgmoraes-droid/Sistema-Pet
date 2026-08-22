@@ -122,7 +122,7 @@ const Pessoas = () => {
   });
 
   const handleDelete = async (id) => {
-    if (!await confirmarCorePet("Tem certeza que deseja excluir este cliente?")) return;
+    if (!(await confirmarCorePet("Tem certeza que deseja excluir este cliente?"))) return;
 
     try {
       debugLog("Excluindo cliente ID:", id);
@@ -138,7 +138,7 @@ const Pessoas = () => {
   };
 
   const handleDeletePet = async (petId) => {
-    if (!await confirmarCorePet("Tem certeza que deseja excluir este pet?")) return;
+    if (!(await confirmarCorePet("Tem certeza que deseja excluir este pet?"))) return;
 
     try {
       debugLog("Excluindo pet ID:", petId);
@@ -266,12 +266,12 @@ const Pessoas = () => {
     if (
       !silencioso &&
       duplicidade.totalAutomaticas > 0 &&
-      !await confirmarCorePet(
+      !(await confirmarCorePet(
         `Fundir agora ate ${Math.min(
           duplicidade.totalAutomaticas,
           25,
         )} duplicidade(s) com documento valido e igual?`,
-      )
+      ))
     ) {
       return;
     }

@@ -109,13 +109,13 @@ export default function Funcionarios() {
   };
 
   const inativar = async (id) => {
-    if (!await confirmarCorePet("Deseja inativar este funcionario?")) return;
+    if (!(await confirmarCorePet("Deseja inativar este funcionario?"))) return;
     await api.delete(`/funcionarios/${id}`);
     carregar();
   };
 
   const ativar = async (id) => {
-    if (!await confirmarCorePet("Deseja ativar este funcionario?")) return;
+    if (!(await confirmarCorePet("Deseja ativar este funcionario?"))) return;
     await api.post(`/funcionarios/${id}/ativar`);
     carregar();
   };

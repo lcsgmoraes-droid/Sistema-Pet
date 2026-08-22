@@ -220,7 +220,7 @@ function ContasBancarias() {
   };
 
   const excluirConta = async (id) => {
-    if (!await confirmarCorePet("Deseja realmente excluir esta conta?")) return;
+    if (!(await confirmarCorePet("Deseja realmente excluir esta conta?"))) return;
 
     try {
       await api.delete(`/contas-bancarias/${id}`);

@@ -143,7 +143,9 @@ export default function ConciliacaoCartoes() {
 
     let justificativa = null;
     if (precisaJustificativa) {
-      justificativa = await perguntarCorePet("⚠️ Confiança BAIXA.\n\nJustificativa obrigatória para processar:");
+      justificativa = await perguntarCorePet(
+        "⚠️ Confiança BAIXA.\n\nJustificativa obrigatória para processar:",
+      );
       if (!justificativa || justificativa.trim() === "") {
         alert("❌ Justificativa obrigatória para divergência alta");
         return;

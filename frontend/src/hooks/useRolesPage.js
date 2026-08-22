@@ -214,7 +214,7 @@ export default function useRolesPage() {
 
   const deletarRole = useCallback(
     async (roleId) => {
-      if (!await confirmarCorePet("Excluir este perfil de acesso?")) return;
+      if (!(await confirmarCorePet("Excluir este perfil de acesso?"))) return;
 
       try {
         await api.delete(`/roles/${roleId}`);

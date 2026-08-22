@@ -173,7 +173,7 @@ export default function useLembretesController() {
 
   const cancelarLembrete = useCallback(
     async (lembrete_id) => {
-      if (!await confirmarCorePet("Tem certeza que deseja cancelar este lembrete?")) return;
+      if (!(await confirmarCorePet("Tem certeza que deseja cancelar este lembrete?"))) return;
       try {
         await api.delete(`/lembretes/${lembrete_id}`);
         toast.success("Lembrete cancelado");
@@ -199,7 +199,7 @@ export default function useLembretesController() {
       };
 
       if (!endpoints[acao]) return;
-      if (!await confirmarCorePet(mensagens[acao])) return;
+      if (!(await confirmarCorePet(mensagens[acao]))) return;
 
       try {
         await api.post(`/estoque/validade/${item.id}/${endpoints[acao]}`, {

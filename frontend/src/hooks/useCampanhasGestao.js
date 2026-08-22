@@ -47,9 +47,9 @@ export default function useCampanhasGestao({ setCampanhas, carregarCampanhas }) 
 
   const arquivarCampanha = async (campanha) => {
     if (
-      !await confirmarCorePet(
+      !(await confirmarCorePet(
         `Arquivar a campanha "${campanha.name}"? Ela ficara inativa e nao podera ser reativada pela interface.`,
-      )
+      ))
     ) {
       return;
     }

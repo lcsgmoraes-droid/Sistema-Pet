@@ -80,7 +80,7 @@ export function useCatProtocolosVacinas() {
   }
 
   async function excluir(item) {
-    if (!await confirmarCorePet(`Deseja excluir o protocolo "${item.nome}"?`)) return;
+    if (!(await confirmarCorePet(`Deseja excluir o protocolo "${item.nome}"?`))) return;
     setRemovendoId(item.id);
     setErro("");
     try {

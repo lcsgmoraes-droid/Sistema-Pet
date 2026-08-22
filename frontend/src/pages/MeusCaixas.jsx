@@ -48,7 +48,7 @@ export default function MeusCaixas() {
   };
 
   const handleReabrir = async (caixaId) => {
-    if (!await confirmarCorePet("Deseja realmente reabrir este caixa?")) return;
+    if (!(await confirmarCorePet("Deseja realmente reabrir este caixa?"))) return;
 
     try {
       await reabrirCaixa(caixaId);

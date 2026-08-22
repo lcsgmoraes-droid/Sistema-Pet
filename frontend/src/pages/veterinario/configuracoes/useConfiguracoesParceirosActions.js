@@ -74,7 +74,8 @@ export function useConfiguracoesParceirosActions({
 
   const removerParceiro = useCallback(
     async (id) => {
-      if (!await confirmarCorePet("Tem certeza que deseja remover este vinculo de parceria?")) return;
+      if (!(await confirmarCorePet("Tem certeza que deseja remover este vinculo de parceria?")))
+        return;
 
       try {
         await vetApi.removerParceiro(id);

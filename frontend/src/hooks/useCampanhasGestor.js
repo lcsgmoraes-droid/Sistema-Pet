@@ -150,7 +150,7 @@ export default function useCampanhasGestor() {
     );
     if (motivo === null) return false;
 
-    if (!await confirmarCorePet(`Remover ${ids.length} carimbo(s) selecionado(s)?`)) {
+    if (!(await confirmarCorePet(`Remover ${ids.length} carimbo(s) selecionado(s)?`))) {
       return false;
     }
 
@@ -200,7 +200,7 @@ export default function useCampanhasGestor() {
   };
 
   const anularCupomGestor = async (code) => {
-    if (!await confirmarCorePet(`Anular o cupom ${code}?`)) return;
+    if (!(await confirmarCorePet(`Anular o cupom ${code}?`))) return;
 
     setGestorAnulando(code);
     try {

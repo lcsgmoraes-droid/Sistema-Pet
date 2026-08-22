@@ -72,7 +72,7 @@ export function useConfiguracoesConsultoriosActions({
 
   const removerConsultorio = useCallback(
     async (consultorio) => {
-      if (!await confirmarCorePet(`Deseja remover o consultorio "${consultorio.nome}"?`)) return;
+      if (!(await confirmarCorePet(`Deseja remover o consultorio "${consultorio.nome}"?`))) return;
 
       try {
         await vetApi.removerConsultorio(consultorio.id);

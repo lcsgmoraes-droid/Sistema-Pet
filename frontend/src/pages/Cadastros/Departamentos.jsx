@@ -66,7 +66,9 @@ const Departamentos = () => {
   };
 
   const handleExcluir = async (departamento) => {
-    if (!await confirmarCorePet(`Deseja realmente excluir o departamento "${departamento.nome}"?`)) {
+    if (
+      !(await confirmarCorePet(`Deseja realmente excluir o departamento "${departamento.nome}"?`))
+    ) {
       return;
     }
     try {

@@ -103,7 +103,7 @@ export default function useUsuariosPage() {
 
   async function toggleStatus(userId, isActive) {
     const acao = isActive ? "desativar acesso" : "ativar acesso";
-    if (!await confirmarCorePet(`Confirma ${acao} deste usuario?`)) return;
+    if (!(await confirmarCorePet(`Confirma ${acao} deste usuario?`))) return;
 
     try {
       await api.patch(`/usuarios/${userId}/status`, {
@@ -119,7 +119,9 @@ export default function useUsuariosPage() {
 
   async function forcarLogout(userId) {
     if (
-      !await confirmarCorePet("Forcar logout deste usuario em todos os dispositivos? A conta continuara ativa.")
+      !(await confirmarCorePet(
+        "Forcar logout deste usuario em todos os dispositivos? A conta continuara ativa.",
+      ))
     ) {
       return;
     }

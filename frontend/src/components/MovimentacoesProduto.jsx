@@ -275,7 +275,9 @@ export default function MovimentacoesProduto() {
       return;
     }
 
-    if (!await confirmarCorePet(`Deseja realmente excluir ${selectedIds.length} lançamento(s)?`)) {
+    if (
+      !(await confirmarCorePet(`Deseja realmente excluir ${selectedIds.length} lançamento(s)?`))
+    ) {
       return;
     }
 
