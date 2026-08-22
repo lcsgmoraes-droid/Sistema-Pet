@@ -15,7 +15,7 @@ const ABAS = [
   {
     id: "novidades",
     label: "Novidades",
-    descricao: "Já disponível para usar",
+    descricao: "Disponível para usar",
     status: ["disponivel"],
     icon: FiCheckCircle,
   },
@@ -58,6 +58,24 @@ const STATUS_INFO = {
   },
 };
 
+const FASE_DISPONIBILIDADE_INFO = {
+  teste: {
+    label: "Disponível — em fase de teste",
+    classe: "border-violet-200 bg-violet-50 text-violet-700",
+  },
+  implantado: {
+    label: "Implantado",
+    classe: "border-emerald-200 bg-emerald-50 text-emerald-700",
+  },
+};
+
+function obterStatusInfo(item) {
+  if (item.status === "disponivel" && item.fase_disponibilidade) {
+    return FASE_DISPONIBILIDADE_INFO[item.fase_disponibilidade] ?? STATUS_INFO.disponivel;
+  }
+  return STATUS_INFO[item.status] ?? STATUS_INFO.em_estudo;
+}
+
 function formatarData(value) {
   if (!value) return "";
   const [ano, mes, dia] = String(value).split("-").map(Number);
@@ -70,7 +88,18 @@ function formatarData(value) {
 }
 
 function CardEvolucao({ item }) {
-  const status = STATUS_INFO[item.status] ?? STATUS_INFO.em_estudo;
+  const status = obterStatusInfo(item);
+  const implantado = item.status === "disponivel" && item.fase_disponibilidade === "implantado";
+  const dataStatus = implantado
+    ? item.implantado_em
+    : item.status === "disponivel"
+      ? item.publicado_em
+      : item.atualizado_em;
+  const rotuloData = implantado
+    ? "Implantado"
+    : item.status === "disponivel"
+      ? "Disponível"
+      : "Atualizado";
   return (
     <article
       className={`rounded-2xl border bg-white p-5 shadow-sm transition-shadow hover:shadow-md dark:bg-slate-900 ${
@@ -109,8 +138,7 @@ function CardEvolucao({ item }) {
 
       <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-4 dark:border-slate-800">
         <span className="text-xs text-slate-400">
-          {item.status === "disponivel" ? "Publicado" : "Atualizado"} em{" "}
-          {formatarData(item.status === "disponivel" ? item.publicado_em : item.atualizado_em)}
+          {rotuloData} em {formatarData(dataStatus)}
         </span>
         {item.status === "disponivel" && item.caminho_ajuda ? (
           <Link

@@ -8,6 +8,7 @@ from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from app.db import get_session
+from app.evolucao_corepet import registrar_uso_funcionalidade
 from app.estoque.granel import (
     _produto_e_granel,
     _validar_produto_origem_granel,
@@ -190,10 +191,12 @@ def converter_granel_funcionario(
     db: Session = Depends(get_session),
 ):
     _funcionario, tenant_id = _get_funcionario_operacional_or_403(db, current_user)
-    return executar_conversao_granel(
+    resultado = executar_conversao_granel(
         db,
         tenant_id,
         current_user,
         payload,
         exigir_bipagem=_config_bipagem_granel(db, tenant_id),
     )
+    registrar_uso_funcionalidade(db, "granel-bipagem-vinculada")
+    return resultado

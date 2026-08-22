@@ -26,9 +26,23 @@ export const BASE_CONHECIMENTO = [
         conteudo: [
           "Acesse **Novidades** no menu lateral do ERP. No aplicativo do cliente, abra o sino e escolha a aba **Novidades**. No app do funcionário, use o cartão **Novidades do CorePet**.",
           "A aba **Novidades** mostra somente funções já disponíveis para usar.",
-          "A aba **Em andamento** reúne o que está em desenvolvimento ou em testes.",
+          "O selo **Disponível — em fase de teste** indica que a função já pode ser usada, mas ainda está no período inicial de acompanhamento e pode receber correções.",
+          "Depois do tempo e da quantidade de usos programados, o selo muda automaticamente para **Implantado**.",
+          "Uma função implantada continua em Novidades por um período e depois deixa essa lista. O recurso e seu guia de ajuda continuam disponíveis normalmente.",
+          "A aba **Em andamento** reúne somente o que ainda está em desenvolvimento e não foi liberado para uso.",
           "A aba **Em estudo** apresenta ideias e itens planejados. Eles podem mudar conforme os testes e as prioridades.",
-          "Quando uma função for liberada, ela passa para **Disponível** e apresenta o caminho para o respectivo guia de ajuda.",
+          "Quando uma função for liberada, ela passa para **Disponível — em fase de teste** e apresenta o caminho para o respectivo guia de ajuda.",
+        ],
+      },
+      {
+        slug: "foto-pet-carteira-vacina",
+        titulo: "Como exibir a foto do pet na carteira de vacinação",
+        tags: ["pet", "foto", "vacina", "carteira", "aplicativo"],
+        conteudo: [
+          "No aplicativo do cliente, abra **Pets** e selecione o animal.",
+          "Use **Editar** para escolher e salvar uma foto do pet. Nenhuma foto é obrigatória.",
+          "Ao abrir a **Carteira digital de vacinas**, a imagem cadastrada aparece junto aos dados do pet.",
+          "Se não houver foto, o aplicativo mantém o identificador padrão do animal.",
         ],
       },
       {

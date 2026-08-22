@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from app.audit_log import log_create
 from app.clientes.common import gerar_codigo_cliente
 from app.db import get_session
+from app.evolucao_corepet import registrar_uso_funcionalidade
 from app.models import Cliente, User
 from app.routes.ecommerce_auth import _get_current_ecommerce_user
 
@@ -202,4 +203,5 @@ def criar_cliente_rapido_funcionario_pdv(
             "endereco": endereco,
         },
     )
+    registrar_uso_funcionalidade(db, "cadastro-rapido-cliente-app-funcionario")
     return _serialize_funcionario_pdv_cliente(cliente)

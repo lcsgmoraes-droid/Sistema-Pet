@@ -20,6 +20,10 @@ export type EvolucaoCorePetItem = {
   atualizado_em: string;
   destaque?: boolean;
   caminho_ajuda?: string | null;
+  fase_disponibilidade?: 'teste' | 'implantado' | null;
+  status_label?: string | null;
+  implantado_em?: string | null;
+  novidade_ate?: string | null;
 };
 
 export type EvolucaoCorePetResponse = {

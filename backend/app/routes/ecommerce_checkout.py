@@ -9,6 +9,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.db import get_session
+from app.evolucao_corepet import registrar_uso_funcionalidade
 from app.financeiro_models import FormaPagamento
 from app.financeiro_models import ContaReceber
 from app.idempotency_models import IdempotencyKey
@@ -691,6 +692,7 @@ def avaliar_entrega_cliente(
             status_code=409, detail="Esta entrega ja foi avaliada."
         ) from exc
     db.refresh(avaliacao)
+    registrar_uso_funcionalidade(db, "avaliacao-entrega-app")
     return {
         "id": avaliacao.id,
         "venda_id": avaliacao.venda_id,

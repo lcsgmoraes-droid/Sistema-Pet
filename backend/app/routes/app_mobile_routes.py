@@ -370,6 +370,7 @@ def listar_notificacoes_app(
 @router.get("/evolucao")
 def listar_evolucao_app(
     current_user: User = Depends(_get_current_ecommerce_user),
+    db: Session = Depends(get_session),
 ):
     perfil = str(getattr(current_user, "_active_app_profile", None) or "cliente")
     canais_por_perfil = {
@@ -378,7 +379,7 @@ def listar_evolucao_app(
         "entregador": "app_entregador",
         "veterinario": "app_veterinario",
     }
-    return listar_evolucao_corepet(canais_por_perfil.get(perfil, "app_cliente"))
+    return listar_evolucao_corepet(canais_por_perfil.get(perfil, "app_cliente"), db)
 
 
 @router.post("/notificacoes/{notificacao_id}/lida")
