@@ -225,23 +225,6 @@ ITENS_EVOLUCAO: tuple[dict[str, Any], ...] = (
         "destaque": False,
         "caminho_ajuda": "/ajuda?aba=central&artigo=foto-pet-carteira-vacina",
     },
-    {
-        "id": "fracionamento-produtos-farmacia",
-        "titulo": "Venda unitária de produtos de farmácia",
-        "resumo": (
-            "O fluxo correto para caixas com unidades será estudado usando fracionamento "
-            "de embalagem ou produto com composição, sem misturar com ração a granel."
-        ),
-        "status": "em_estudo",
-        "tipo": "projeto",
-        "modulo": "Produtos e estoque",
-        "plataformas": ["ERP"],
-        "canais": ["erp"],
-        "publicado_em": None,
-        "atualizado_em": "2026-08-22",
-        "destaque": False,
-        "caminho_ajuda": None,
-    },
 )
 
 
