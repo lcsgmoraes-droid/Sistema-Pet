@@ -219,6 +219,25 @@ Inventario atualizado em 2026-07-07 pela contagem operacional de linhas com cont
 - Observacao mobile: `app-mobile/src` esta com 0 arquivos acima de 700 linhas; a frente mobile zerou as telas grandes mantendo separacao por `Content`, `Scanner`, `Cards`, `Forms`, `styles` e `utils`.
 - Observacao operacional: no inventario amplo `backend` + `frontend/src` + `app-mobile/src`, ainda ha 8 arquivos acima de 700 linhas: 6 testes backend e 2 migrations geradas.
 
+Revalidacao de manutencao em 2026-08-22: depois das novas frentes de produto,
+o inventario de aplicacao voltou a registrar 23 arquivos com pelo menos 700 linhas
+com conteudo. A primeira fatia deste novo ciclo separou o registro de onboarding de
+tenant por responsabilidade:
+
+- `backend/app/services/tenant_onboarding_templates.py`: 1202 -> 398 linhas com
+  conteudo, mantendo apenas os templates-base e a composicao publica do registro.
+- `backend/app/services/tenant_onboarding_financial_templates.py`: concentra o
+  plano financeiro/DRE inicial.
+- `backend/app/services/tenant_onboarding_catalog_templates.py`: concentra contas
+  iniciais, especies, racas, classificacoes de racao e procedimentos veterinarios.
+- `backend/app/services/tenant_onboarding_template_contracts.py`: concentra os
+  contratos, tabelas permitidas e normalizacoes compartilhadas.
+- O registro final preserva os mesmos 226 itens, na mesma ordem e com os mesmos
+  payloads; todos os quatro modulos ficaram abaixo de 700 linhas com conteudo.
+- O inventario atual caiu de 23 para 22 arquivos acima de 700 linhas. Esse numero
+  substitui o retrato historico de 2026-07-07 e deve continuar caindo por fatias,
+  sem alterar contratos de produto.
+
 Fatia aplicacao 700 batch 56 de 2026-07-07: os ultimos arquivos de aplicacao backend/web/mobile acima de 700 linhas sairam da faixa com contrato automatizado de guarda:
 
 - `backend/app/financeiro/reparos_consistencia.py`: 776 -> 141 linhas com conteudo, mantendo a fachada publica e separando reparos de contas a receber, contas a pagar, centavos e helpers comuns.
