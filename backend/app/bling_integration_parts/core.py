@@ -4,9 +4,11 @@ import json
 import os
 import threading
 import time
+from contextlib import contextmanager, nullcontext
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Dict, Optional
+from tempfile import gettempdir
+from typing import Dict, Iterator, Optional
 
 import requests
 from dotenv import dotenv_values
@@ -15,10 +17,12 @@ from app.utils.logger import logger
 
 
 BLING_API_BASE_URL = "https://api.bling.com.br/Api/v3"
+BLING_OAUTH_TOKEN_URL = f"{BLING_API_BASE_URL}/oauth/token"
 BLING_NFE_SERIE_PADRAO = 1
 BLING_NFCE_SERIE_PADRAO = 3
 TOKEN_CONTROL_FILE = Path("bling_token_control.json")
 _BLING_RATE_LOCK = threading.Lock()
+_BLING_TOKEN_THREAD_LOCK = threading.RLock()
 _BLING_LAST_REQUEST_AT = 0.0
 _BLING_MIN_INTERVAL_SECONDS = 0.42
 ENV_PATHS = [
@@ -28,6 +32,39 @@ ENV_PATHS = [
 ]
 
 
+def _get_bling_token_lock_path() -> Path:
+    configured_path = os.getenv("BLING_TOKEN_LOCK_PATH", "").strip()
+    if configured_path:
+        return Path(configured_path)
+
+    shared_data_dir = Path("/app/data")
+    if shared_data_dir.exists():
+        return shared_data_dir / "bling_token_renewal.lock"
+
+    return Path(gettempdir()) / "bling_token_renewal.lock"
+
+
+@contextmanager
+def _bling_token_lock() -> Iterator[None]:
+    """Serializa leitura, renovacao e persistencia dos tokens do Bling."""
+    with _BLING_TOKEN_THREAD_LOCK:
+        lock_path = _get_bling_token_lock_path()
+        lock_path.parent.mkdir(parents=True, exist_ok=True)
+
+        with lock_path.open("a+", encoding="utf-8") as lock_file:
+            try:
+                import fcntl
+            except ImportError:
+                yield
+                return
+
+            fcntl.flock(lock_file, fcntl.LOCK_EX)
+            try:
+                yield
+            finally:
+                fcntl.flock(lock_file, fcntl.LOCK_UN)
+
+
 def _get_shared_env_path() -> Optional[Path]:
     for path in ENV_PATHS:
         if path.exists():
@@ -35,21 +72,24 @@ def _get_shared_env_path() -> Optional[Path]:
     return None
 
 
-def _load_bling_runtime_config() -> Dict[str, str]:
+def _load_bling_runtime_config(*, lock_held: bool = False) -> Dict[str, str]:
     values: Dict[str, str] = {}
-    env_path = _get_shared_env_path()
+    lock_context = nullcontext() if lock_held else _bling_token_lock()
 
-    if env_path:
-        try:
-            values = {
-                key: str(value)
-                for key, value in dotenv_values(env_path).items()
-                if value is not None
-            }
-        except Exception as error:
-            logger.warning(
-                f"Nao foi possivel reler configuracao compartilhada do Bling em {env_path}: {error}"
-            )
+    with lock_context:
+        env_path = _get_shared_env_path()
+
+        if env_path:
+            try:
+                values = {
+                    key: str(value)
+                    for key, value in dotenv_values(env_path).items()
+                    if value is not None
+                }
+            except Exception as error:
+                logger.warning(
+                    f"Nao foi possivel reler configuracao compartilhada do Bling em {env_path}: {error}"
+                )
 
     def pick(name: str, default: str = "") -> str:
         return (values.get(name) or os.getenv(name) or default).strip()
@@ -224,6 +264,20 @@ class BlingAPIBase:
             "enable-jwt": self.enable_jwt,
         }
 
+    def _recarregar_tokens_compartilhados(self) -> bool:
+        """Adota tokens renovados por outro processo ou container."""
+        runtime_config = _load_bling_runtime_config()
+        access_token = runtime_config.get("access_token", "")
+        refresh_token = runtime_config.get("refresh_token", "")
+        access_changed = bool(access_token and access_token != self.access_token)
+
+        if access_token:
+            self.access_token = access_token
+        if refresh_token:
+            self.refresh_token = refresh_token
+
+        return access_changed
+
     def _deve_renovar_token_apos_erro(
         self, error: requests.exceptions.HTTPError
     ) -> bool:
@@ -254,8 +308,10 @@ class BlingAPIBase:
         """Faz requisição para API do Bling"""
         url = _montar_url_bling(self.base_url, endpoint)
         token_renovado = False
+        self._recarregar_tokens_compartilhados()
 
         for tentativa in range(5):
+            access_token_usado = self.access_token
             headers = self._get_headers()
 
             try:
@@ -295,10 +351,18 @@ class BlingAPIBase:
                     continue
 
                 if not token_renovado and self._deve_renovar_token_apos_erro(e):
+                    if self._recarregar_tokens_compartilhados():
+                        logger.info(
+                            f"Token do Bling ja foi renovado por outro processo ao consultar {endpoint}. Repetindo a chamada."
+                        )
+                        continue
+
                     logger.warning(
                         f"Bling retornou token invalido ao consultar {endpoint}. Tentando renovar e repetir."
                     )
                     token_renovado = True
+                    if self.access_token != access_token_usado:
+                        continue
                     if self._renovar_token_automatico():
                         continue
 
@@ -343,51 +407,58 @@ class BlingAPIBase:
         """
         import base64
 
-        refresh = (
-            refresh_token
-            or self.refresh_token
-            or _load_bling_runtime_config().get("refresh_token")
-            or ""
-        ).strip()
-        if not refresh:
-            raise ValueError("BLING_REFRESH_TOKEN não configurado")
+        with _bling_token_lock():
+            runtime_config = _load_bling_runtime_config(lock_held=True)
+            refresh = (
+                refresh_token
+                or runtime_config.get("refresh_token")
+                or self.refresh_token
+                or ""
+            ).strip()
+            if not refresh:
+                raise ValueError("BLING_REFRESH_TOKEN não configurado")
 
-        # Basic Auth
-        credentials = f"{self.client_id}:{self.client_secret}"
-        encoded = base64.b64encode(credentials.encode()).decode()
+            self.client_id = runtime_config.get("client_id") or self.client_id
+            self.client_secret = (
+                runtime_config.get("client_secret") or self.client_secret
+            )
 
-        headers = {
-            "Authorization": f"Basic {encoded}",
-            "Content-Type": "application/x-www-form-urlencoded",
-            "enable-jwt": self.enable_jwt,
-        }
+            credentials = f"{self.client_id}:{self.client_secret}"
+            encoded = base64.b64encode(credentials.encode()).decode()
 
-        data = {"grant_type": "refresh_token", "refresh_token": refresh}
+            headers = {
+                "Authorization": f"Basic {encoded}",
+                "Content-Type": "application/x-www-form-urlencoded",
+                "enable-jwt": self.enable_jwt,
+            }
+            data = {"grant_type": "refresh_token", "refresh_token": refresh}
 
-        response = requests.post(
-            "https://www.bling.com.br/Api/v3/oauth/token",
-            headers=headers,
-            data=data,
-            timeout=30,
-        )
+            response = requests.post(
+                BLING_OAUTH_TOKEN_URL,
+                headers=headers,
+                data=data,
+                timeout=30,
+            )
 
-        if response.status_code == 200:
+            if response.status_code != 200:
+                raise Exception(
+                    f"Erro ao renovar token: {response.status_code} - {response.text}"
+                )
+
             tokens = response.json()
-
-            # Atualizar token na instância
             self.access_token = tokens["access_token"]
             self.refresh_token = tokens["refresh_token"]
 
-            # Atualizar .env e variáveis em memória
             try:
                 from app.bling_oauth_routes import _salvar_tokens
 
-                _salvar_tokens(tokens["access_token"], tokens["refresh_token"])
+                _salvar_tokens(
+                    tokens["access_token"],
+                    tokens["refresh_token"],
+                    tokens.get("expires_in", 21600),
+                    lock_held=True,
+                )
             except Exception as e:
                 logger.info(f"⚠️ Não foi possível persistir tokens no .env: {e}")
 
             return tokens
-        else:
-            raise Exception(
-                f"Erro ao renovar token: {response.status_code} - {response.text}"
-            )
