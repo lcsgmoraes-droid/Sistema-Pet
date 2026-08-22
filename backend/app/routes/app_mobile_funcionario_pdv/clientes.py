@@ -203,7 +203,5 @@ def criar_cliente_rapido_funcionario_pdv(
             "endereco": endereco,
         },
     )
-    registrar_uso_funcionalidade(
-        db, "cadastro-rapido-cliente-app-funcionario"
-    )
+    registrar_uso_funcionalidade(db, "cadastro-rapido-cliente-app-funcionario")
     return _serialize_funcionario_pdv_cliente(cliente)

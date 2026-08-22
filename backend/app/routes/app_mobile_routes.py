@@ -379,9 +379,7 @@ def listar_evolucao_app(
         "entregador": "app_entregador",
         "veterinario": "app_veterinario",
     }
-    return listar_evolucao_corepet(
-        canais_por_perfil.get(perfil, "app_cliente"), db
-    )
+    return listar_evolucao_corepet(canais_por_perfil.get(perfil, "app_cliente"), db)
 
 
 @router.post("/notificacoes/{notificacao_id}/lida")
