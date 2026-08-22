@@ -5,6 +5,7 @@ import FuncionarioBalancoScreen from "../screens/funcionario/FuncionarioBalancoS
 import FuncionarioContagemScreen from "../screens/funcionario/FuncionarioContagemScreen";
 import FuncionarioHomeScreen from "../screens/funcionario/FuncionarioHomeScreen";
 import FuncionarioPdvScreen from "../screens/funcionario/FuncionarioPdvScreen";
+import NotificationsScreen from "../screens/notifications/NotificationsScreen";
 import { FuncionarioStackParamList } from "../types/funcionarioNavigation";
 
 export type { FuncionarioStackParamList } from "../types/funcionarioNavigation";
@@ -40,6 +41,12 @@ export default function FuncionarioNavigator() {
         name="FuncionarioPdv"
         component={FuncionarioPdvScreen}
         options={{ title: "PDV Rapido" }}
+      />
+      <Stack.Screen
+        name="FuncionarioNovidades"
+        component={NotificationsScreen}
+        initialParams={{ somenteNovidades: true }}
+        options={{ title: "Novidades" }}
       />
     </Stack.Navigator>
   );

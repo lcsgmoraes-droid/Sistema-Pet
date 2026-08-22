@@ -18,7 +18,7 @@ import {
   FiTruck,
   FiZap,
 } from "react-icons/fi";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { MODULOS_INFO } from "../contexts/ModulosContext";
 import CentralAjuda from "./CentralAjuda";
 import IntroducaoGuiada from "./IntroducaoGuiada";
@@ -197,7 +197,11 @@ const ItemFAQ = ({ pergunta, resposta }) => {
    Página principal
 -------------------------------------------------------- */
 const Ajuda = () => {
-  const [aba, setAba] = useState("planos");
+  const [searchParams] = useSearchParams();
+  const abaSolicitada = searchParams.get("aba");
+  const [aba, setAba] = useState(
+    ["planos", "introducao", "central"].includes(abaSolicitada) ? abaSolicitada : "planos",
+  );
   const msgGeral = encodeURIComponent("Olá! Tenho dúvidas sobre os planos do CorePet.");
 
   return (
@@ -282,7 +286,7 @@ const Ajuda = () => {
       </div>
 
       {/* Conteúdo da aba Central de Ajuda */}
-      {aba === "central" && <CentralAjuda />}
+      {aba === "central" && <CentralAjuda artigoDestaque={searchParams.get("artigo")} />}
 
       {/* Conteudo da aba Introducao Guiada */}
       {aba === "introducao" && <IntroducaoGuiada />}

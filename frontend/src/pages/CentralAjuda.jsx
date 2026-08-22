@@ -146,8 +146,15 @@ const CardArtigo = ({ artigo, corClasses, destaqueTexto }) => {
 /* ──────────────────────────────────────────────────────────────
    Componente principal
 ────────────────────────────────────────────────────────────── */
-const CentralAjuda = () => {
-  const [busca, setBusca] = useState("");
+const CentralAjuda = ({ artigoDestaque = null }) => {
+  const artigoInicial = useMemo(
+    () =>
+      BASE_CONHECIMENTO.flatMap((modulo) => modulo.artigos).find(
+        (artigo) => artigo.slug === artigoDestaque,
+      ),
+    [artigoDestaque],
+  );
+  const [busca, setBusca] = useState(artigoInicial?.titulo ?? "");
   const [moduloAtivo, setModuloAtivo] = useState(null); // null = todos
 
   /* Filtra artigos pela busca */

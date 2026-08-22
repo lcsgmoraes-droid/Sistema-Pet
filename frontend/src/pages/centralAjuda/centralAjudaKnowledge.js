@@ -20,6 +20,18 @@ export const BASE_CONHECIMENTO = [
     cor: "emerald",
     artigos: [
       {
+        slug: "acompanhar-novidades-projetos",
+        titulo: "Como acompanhar Novidades e Projetos do CorePet",
+        tags: ["novidades", "projetos", "evolucao", "em andamento", "em estudo"],
+        conteudo: [
+          "Acesse **Novidades** no menu lateral do ERP. No aplicativo do cliente, abra o sino e escolha a aba **Novidades**. No app do funcionário, use o cartão **Novidades do CorePet**.",
+          "A aba **Novidades** mostra somente funções já disponíveis para usar.",
+          "A aba **Em andamento** reúne o que está em desenvolvimento ou em testes.",
+          "A aba **Em estudo** apresenta ideias e itens planejados. Eles podem mudar conforme os testes e as prioridades.",
+          "Quando uma função for liberada, ela passa para **Disponível** e apresenta o caminho para o respectivo guia de ajuda.",
+        ],
+      },
+      {
         titulo: "Primeiros passos para configurar o Sistema Pet",
         tags: ["inicio", "configuracao", "onboarding", "primeiros passos"],
         conteudo: [

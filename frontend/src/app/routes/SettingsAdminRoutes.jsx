@@ -9,6 +9,7 @@ import {
   Configuracoes,
   CustosMoto,
   EntregasConfig,
+  EvolucaoCorePet,
   Funcionarios,
   Integracoes,
   LGPDOperacional,
@@ -141,6 +142,7 @@ export function createSettingsAdminRoutes() {
         element={<Navigate to="/ops/observabilidade" replace />}
       />
       <Route path="ajuda" element={<Ajuda />} />
+      <Route path="novidades" element={<EvolucaoCorePet />} />
     </>
   );
 }
