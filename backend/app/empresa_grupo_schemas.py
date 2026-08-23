@@ -15,3 +15,25 @@ class EmpresaGrupoCriar(BaseModel):
 
 class EmpresaGrupoConvidar(BaseModel):
     codigo_empresa: str = Field(min_length=12, max_length=20)
+
+
+class EmpresaGrupoProdutoReferencia(BaseModel):
+    empresa_id: str = Field(min_length=36, max_length=36)
+    produto_id: int = Field(gt=0)
+
+
+class EmpresaGrupoProdutoVincular(BaseModel):
+    produto_a: EmpresaGrupoProdutoReferencia
+    produto_b: EmpresaGrupoProdutoReferencia
+
+    @field_validator("produto_b")
+    @classmethod
+    def validar_empresas_distintas(
+        cls,
+        value: EmpresaGrupoProdutoReferencia,
+        info,
+    ) -> EmpresaGrupoProdutoReferencia:
+        produto_a = info.data.get("produto_a")
+        if produto_a and produto_a.empresa_id == value.empresa_id:
+            raise ValueError("Escolha produtos de empresas diferentes.")
+        return value
