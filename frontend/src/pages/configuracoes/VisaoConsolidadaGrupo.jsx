@@ -15,13 +15,27 @@ import ActionButton from "../../components/ui/ActionButton";
 import LoadingState from "../../components/ui/LoadingState";
 import MetricCard from "../../components/ui/MetricCard";
 import MetricGrid from "../../components/ui/MetricGrid";
+import ModuleTabs from "../../components/ui/ModuleTabs";
 import PageHeader from "../../components/ui/PageHeader";
 import Panel from "../../components/ui/Panel";
 import StatusBadge from "../../components/ui/StatusBadge";
 import { obterVisaoConsolidadaGrupo } from "../../services/gruposEmpresas";
 import { formatMoneyBRL } from "../../utils/formatters";
+import GrupoContasPagarTab from "./visaoGrupo/GrupoContasPagarTab";
+import GrupoPedidosTab from "./visaoGrupo/GrupoPedidosTab";
+import GrupoPedidosCompraTab from "./visaoGrupo/GrupoPedidosCompraTab";
+import GrupoProdutosVendidosTab from "./visaoGrupo/GrupoProdutosVendidosTab";
+import GrupoVinculosProdutosTab from "./visaoGrupo/GrupoVinculosProdutosTab";
 
 const PERIODOS = [7, 30, 90, 180, 365];
+const ABAS = [
+  { id: "resumo", label: "Resumo" },
+  { id: "pedidos", label: "Pedidos / vendas" },
+  { id: "produtos", label: "Produtos vendidos" },
+  { id: "pedidos-compra", label: "Pedidos de compra" },
+  { id: "contas-pagar", label: "Contas a pagar" },
+  { id: "vinculos", label: "Vínculos de produtos" },
+];
 
 function formatarQuantidade(valor) {
   return Number(valor || 0).toLocaleString("pt-BR", {
@@ -41,6 +55,7 @@ function mensagemErro(error) {
 
 export default function VisaoConsolidadaGrupo() {
   const { grupoId } = useParams();
+  const [aba, setAba] = useState("resumo");
   const [periodoDias, setPeriodoDias] = useState(30);
   const [dados, setDados] = useState(null);
   const [carregando, setCarregando] = useState(true);
@@ -85,35 +100,44 @@ export default function VisaoConsolidadaGrupo() {
         title="Visão consolidada do grupo"
         subtitle={
           dados?.grupo?.nome
-            ? `${dados.grupo.nome}: compare os resultados das empresas participantes.`
-            : "Compare os resultados das empresas participantes."
+            ? `${dados.grupo.nome}: resultados, pedidos, produtos e financeiro em conjunto.`
+            : "Analise as empresas participantes em conjunto."
         }
       />
 
-      <Panel
-        title="Período das vendas"
-        subtitle="Estoque e saldos financeiros mostram a posição atual; somente as vendas mudam com este filtro."
-      >
-        <div className="flex flex-wrap gap-2">
-          {PERIODOS.map((dias) => (
-            <ActionButton
-              key={dias}
-              intent={periodoDias === dias ? "info" : "neutral"}
-              tone={periodoDias === dias ? "solid" : "outline"}
-              disabled={carregando}
-              onClick={() => setPeriodoDias(dias)}
-            >
-              {dias} dias
-            </ActionButton>
-          ))}
-        </div>
-        {dados?.periodo ? (
-          <p className="mt-3 text-sm text-slate-500 dark:text-slate-400">
-            Vendas de {formatarData(dados.periodo.data_inicio)} a{" "}
-            {formatarData(dados.periodo.data_fim)}.
-          </p>
-        ) : null}
-      </Panel>
+      <ModuleTabs
+        active={aba}
+        ariaLabel="Análises consolidadas do grupo"
+        onChange={setAba}
+        tabs={ABAS}
+      />
+
+      {["resumo", "pedidos", "produtos", "pedidos-compra", "contas-pagar"].includes(aba) ? (
+        <Panel
+          title="Período das vendas"
+          subtitle="O filtro atualiza vendas, pedidos, produtos e títulos pagos/todos. Estoque e saldos em aberto mostram a posição atual."
+        >
+          <div className="flex flex-wrap gap-2">
+            {PERIODOS.map((dias) => (
+              <ActionButton
+                key={dias}
+                intent={periodoDias === dias ? "info" : "neutral"}
+                tone={periodoDias === dias ? "solid" : "soft"}
+                disabled={carregando}
+                onClick={() => setPeriodoDias(dias)}
+              >
+                {dias} dias
+              </ActionButton>
+            ))}
+          </div>
+          {dados?.periodo ? (
+            <p className="mt-3 text-sm text-slate-500 dark:text-slate-400">
+              Vendas de {formatarData(dados.periodo.data_inicio)} a{" "}
+              {formatarData(dados.periodo.data_fim)}.
+            </p>
+          ) : null}
+        </Panel>
+      ) : null}
 
       {erro ? (
         <Panel className="border-red-200 bg-red-50 dark:border-red-500/30 dark:bg-red-500/10">
@@ -122,7 +146,7 @@ export default function VisaoConsolidadaGrupo() {
             <div>
               <p className="font-semibold">Não foi possível atualizar os números.</p>
               <p className="mt-1 text-sm">{erro}</p>
-              <ActionButton className="mt-3" intent="danger" tone="outline" onClick={carregar}>
+              <ActionButton className="mt-3" intent="info" tone="soft" onClick={carregar}>
                 Tentar novamente
               </ActionButton>
             </div>
@@ -130,7 +154,7 @@ export default function VisaoConsolidadaGrupo() {
         </Panel>
       ) : null}
 
-      {totais ? (
+      {aba === "resumo" && totais ? (
         <>
           <MetricGrid>
             <MetricCard
@@ -271,6 +295,34 @@ export default function VisaoConsolidadaGrupo() {
             </div>
           </Panel>
         </>
+      ) : null}
+
+      {aba === "pedidos" ? (
+        <GrupoPedidosTab
+          empresas={dados?.empresas || []}
+          grupoId={grupoId}
+          periodoDias={periodoDias}
+        />
+      ) : null}
+      {aba === "produtos" ? (
+        <GrupoProdutosVendidosTab grupoId={grupoId} periodoDias={periodoDias} />
+      ) : null}
+      {aba === "pedidos-compra" ? (
+        <GrupoPedidosCompraTab
+          empresas={dados?.empresas || []}
+          grupoId={grupoId}
+          periodoDias={periodoDias}
+        />
+      ) : null}
+      {aba === "contas-pagar" ? (
+        <GrupoContasPagarTab
+          empresas={dados?.empresas || []}
+          grupoId={grupoId}
+          periodoDias={periodoDias}
+        />
+      ) : null}
+      {aba === "vinculos" ? (
+        <GrupoVinculosProdutosTab empresas={dados?.empresas || []} grupoId={grupoId} />
       ) : null}
     </div>
   );

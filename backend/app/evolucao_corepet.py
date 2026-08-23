@@ -194,6 +194,24 @@ ITENS_EVOLUCAO: tuple[dict[str, Any], ...] = (
         "caminho_ajuda": "/ajuda?aba=central&artigo=transferencia-integrada-grupo",
     },
     {
+        "id": "grupos-empresas-analises-detalhadas",
+        "titulo": "Pedidos, produtos e contas consolidados por grupo",
+        "resumo": (
+            "Consulte vendas e pedidos de compra das empresas juntas, pesquise produtos por SKU "
+            "ou EAN, confirme equivalências e acompanhe o contas a pagar mesclado."
+        ),
+        "status": "disponivel_teste",
+        "tipo": "projeto",
+        "modulo": "Empresas e relatórios",
+        "plataformas": ["ERP"],
+        "canais": ["erp"],
+        "publicado_em": "2026-08-23",
+        "atualizado_em": "2026-08-23",
+        "ciclo_novidade": deepcopy(CICLO_PADRAO),
+        "destaque": True,
+        "caminho_ajuda": "/ajuda?aba=central&artigo=visao-consolidada-grupo-empresas",
+    },
+    {
         "id": "crediario-vencimento-alertas",
         "titulo": "Crediário com vencimento e alertas",
         "resumo": (

@@ -12,6 +12,51 @@ export async function obterVisaoConsolidadaGrupo(grupoId, periodoDias = 30) {
   return data;
 }
 
+export async function obterPedidosGrupo(grupoId, params = {}) {
+  const { data } = await api.get(`/grupos-empresas/${grupoId}/pedidos`, { params });
+  return data;
+}
+
+export async function obterProdutosVendidosGrupo(grupoId, params = {}) {
+  const { data } = await api.get(`/grupos-empresas/${grupoId}/produtos-vendidos`, {
+    params,
+  });
+  return data;
+}
+
+export async function obterPedidosCompraGrupo(grupoId, params = {}) {
+  const { data } = await api.get(`/grupos-empresas/${grupoId}/pedidos-compra`, { params });
+  return data;
+}
+
+export async function obterContasPagarGrupo(grupoId, params = {}) {
+  const { data } = await api.get(`/grupos-empresas/${grupoId}/contas-pagar`, { params });
+  return data;
+}
+
+export async function buscarProdutosGrupo(grupoId, params = {}) {
+  const { data } = await api.get(`/grupos-empresas/${grupoId}/produtos`, { params });
+  return data;
+}
+
+export async function obterVinculosProdutosGrupo(grupoId) {
+  const { data } = await api.get(`/grupos-empresas/${grupoId}/vinculos-produtos`);
+  return data;
+}
+
+export async function vincularProdutosGrupo(grupoId, produtoA, produtoB) {
+  const { data } = await api.post(`/grupos-empresas/${grupoId}/vinculos-produtos`, {
+    produto_a: produtoA,
+    produto_b: produtoB,
+  });
+  return data;
+}
+
+export async function removerVinculoProdutosGrupo(grupoId, vinculoId) {
+  const { data } = await api.delete(`/grupos-empresas/${grupoId}/vinculos-produtos/${vinculoId}`);
+  return data;
+}
+
 export async function criarGrupoEmpresa(nome) {
   const { data } = await api.post("/grupos-empresas", { nome });
   return data;
