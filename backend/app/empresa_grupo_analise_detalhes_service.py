@@ -450,6 +450,7 @@ class EmpresaGrupoAnaliseDetalhesService:
                         Produto.gtin_ean,
                         Produto.estoque_atual,
                         Produto.estoque_minimo,
+                        Produto.preco_custo,
                         func.coalesce(func.sum(VendaItem.quantidade), 0).label(
                             "quantidade"
                         ),
@@ -483,6 +484,7 @@ class EmpresaGrupoAnaliseDetalhesService:
                         Produto.gtin_ean,
                         Produto.estoque_atual,
                         Produto.estoque_minimo,
+                        Produto.preco_custo,
                     )
                     .all()
                 )
@@ -497,6 +499,7 @@ class EmpresaGrupoAnaliseDetalhesService:
                         "ean": resultado.codigo_barras or resultado.gtin_ean,
                         "estoque": _quantidade(resultado.estoque_atual),
                         "estoque_minimo": _quantidade(resultado.estoque_minimo),
+                        "preco_custo": _moeda(resultado.preco_custo),
                         "quantidade": _quantidade(resultado.quantidade),
                         "valor_total": _moeda(resultado.valor_total),
                         "pedidos": int(resultado.pedidos or 0),
@@ -519,6 +522,7 @@ class EmpresaGrupoAnaliseDetalhesService:
                         Produto.gtin_ean,
                         Produto.estoque_atual,
                         Produto.estoque_minimo,
+                        Produto.preco_custo,
                     )
                     .filter(Produto.tenant_id == empresa_uuid)
                     .all()
@@ -534,6 +538,7 @@ class EmpresaGrupoAnaliseDetalhesService:
                         "ean": produto.codigo_barras or produto.gtin_ean,
                         "estoque": _quantidade(produto.estoque_atual),
                         "estoque_minimo": _quantidade(produto.estoque_minimo),
+                        "preco_custo": _moeda(produto.preco_custo),
                         "quantidade": 0.0,
                         "valor_total": 0.0,
                         "pedidos": 0,

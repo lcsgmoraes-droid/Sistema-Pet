@@ -22,9 +22,11 @@ import StatusBadge from "../../components/ui/StatusBadge";
 import { obterVisaoConsolidadaGrupo } from "../../services/gruposEmpresas";
 import { formatMoneyBRL } from "../../utils/formatters";
 import GrupoContasPagarTab from "./visaoGrupo/GrupoContasPagarTab";
+import GrupoAnaliseFinanceiraTab from "./visaoGrupo/GrupoAnaliseFinanceiraTab";
 import GrupoPedidosTab from "./visaoGrupo/GrupoPedidosTab";
 import GrupoPedidosCompraTab from "./visaoGrupo/GrupoPedidosCompraTab";
 import GrupoProdutosVendidosTab from "./visaoGrupo/GrupoProdutosVendidosTab";
+import GrupoReposicaoInteligenteTab from "./visaoGrupo/GrupoReposicaoInteligenteTab";
 import GrupoVinculosProdutosTab from "./visaoGrupo/GrupoVinculosProdutosTab";
 
 const PERIODOS = [7, 30, 90, 180, 365];
@@ -32,8 +34,10 @@ const ABAS = [
   { id: "resumo", label: "Resumo" },
   { id: "pedidos", label: "Pedidos / vendas" },
   { id: "produtos", label: "Produtos vendidos" },
+  { id: "reposicao", label: "Reposição inteligente" },
   { id: "pedidos-compra", label: "Pedidos de compra" },
   { id: "contas-pagar", label: "Contas a pagar" },
+  { id: "financeiro", label: "Análise financeira" },
   { id: "vinculos", label: "Vínculos de produtos" },
 ];
 
@@ -112,7 +116,9 @@ export default function VisaoConsolidadaGrupo() {
         tabs={ABAS}
       />
 
-      {["resumo", "pedidos", "produtos", "pedidos-compra", "contas-pagar"].includes(aba) ? (
+      {["resumo", "pedidos", "produtos", "reposicao", "pedidos-compra", "contas-pagar"].includes(
+        aba,
+      ) ? (
         <Panel
           title="Período das vendas"
           subtitle="O filtro atualiza vendas, pedidos, produtos e títulos pagos/todos. Estoque e saldos em aberto mostram a posição atual."
@@ -307,6 +313,9 @@ export default function VisaoConsolidadaGrupo() {
       {aba === "produtos" ? (
         <GrupoProdutosVendidosTab grupoId={grupoId} periodoDias={periodoDias} />
       ) : null}
+      {aba === "reposicao" ? (
+        <GrupoReposicaoInteligenteTab grupoId={grupoId} periodoDias={periodoDias} />
+      ) : null}
       {aba === "pedidos-compra" ? (
         <GrupoPedidosCompraTab
           empresas={dados?.empresas || []}
@@ -321,6 +330,7 @@ export default function VisaoConsolidadaGrupo() {
           periodoDias={periodoDias}
         />
       ) : null}
+      {aba === "financeiro" ? <GrupoAnaliseFinanceiraTab grupoId={grupoId} /> : null}
       {aba === "vinculos" ? (
         <GrupoVinculosProdutosTab empresas={dados?.empresas || []} grupoId={grupoId} />
       ) : null}

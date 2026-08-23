@@ -34,6 +34,18 @@ export async function obterContasPagarGrupo(grupoId, params = {}) {
   return data;
 }
 
+export async function obterReposicaoInteligenteGrupo(grupoId, params = {}) {
+  const { data } = await api.get(`/grupos-empresas/${grupoId}/reposicao-inteligente`, {
+    params,
+  });
+  return data;
+}
+
+export async function obterAnaliseFinanceiraGrupo(grupoId) {
+  const { data } = await api.get(`/grupos-empresas/${grupoId}/analise-financeira`);
+  return data;
+}
+
 export async function buscarProdutosGrupo(grupoId, params = {}) {
   const { data } = await api.get(`/grupos-empresas/${grupoId}/produtos`, { params });
   return data;

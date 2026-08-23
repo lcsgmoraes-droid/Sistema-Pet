@@ -21,10 +21,13 @@ from app.empresa_grupo_models import (
     EmpresaGrupoMembro,
     EmpresaGrupoProdutoVinculo,
 )
+from app.empresa_grupo_planejamento_service import (
+    EmpresaGrupoPlanejamentoService,
+)
 from app.empresa_grupo_produto_vinculo_service import (
     EmpresaGrupoProdutoVinculoService,
 )
-from app.financeiro_models import ContaPagar
+from app.financeiro_models import ContaPagar, ContaReceber
 from app.models import Tenant
 from app.models_cadastros import Cliente
 from app.produtos_models import PedidoCompra, PedidoCompraItem, Produto
@@ -63,6 +66,7 @@ def db_local(monkeypatch):
             PedidoCompra.__table__,
             PedidoCompraItem.__table__,
             ContaPagar.__table__,
+            ContaReceber.__table__,
         ],
     )
     session = Session(engine, expire_on_commit=False)
@@ -115,6 +119,22 @@ def _conta(descricao, valor, pago, vencimento, fornecedor_id):
         data_emissao=date(2026, 8, 1),
         data_vencimento=vencimento,
         status="pendente",
+        user_id=1,
+    )
+
+
+def _receber(descricao, valor, recebido, vencimento, cliente_id):
+    return ContaReceber(
+        descricao=descricao,
+        cliente_id=cliente_id,
+        valor_original=valor,
+        valor_recebido=recebido,
+        valor_final=valor,
+        data_emissao=date(2026, 8, 1),
+        data_vencimento=vencimento,
+        status="pendente",
+        dre_subcategoria_id=1,
+        canal="loja_fisica",
         user_id=1,
     )
 
@@ -220,6 +240,13 @@ def _preparar(db: Session):
                         valor,
                         20,
                         vencimento,
+                        cliente.id,
+                    ),
+                    _receber(
+                        f"Cliente {prefixo}",
+                        150 if prefixo == "A" else 80,
+                        50 if prefixo == "A" else 0,
+                        date(2026, 8, 22) if prefixo == "A" else date(2026, 9, 10),
                         cliente.id,
                     ),
                 ]
@@ -415,3 +442,83 @@ def test_empresa_fora_do_grupo_nao_acessa_detalhes(db_local):
         service.listar_pedidos(grupo.id, EMPRESA_FORA)
 
     assert erro.value.status_code == 403
+
+
+def test_reposicao_inteligente_prioriza_transferencia_antes_da_compra(db_local):
+    grupo, referencias = _preparar(db_local)
+    referencias[EMPRESA_A]["produto_ean"].estoque_atual = 0
+    referencias[EMPRESA_B]["produto_ean"].estoque_atual = 10
+    db_local.commit()
+
+    service = EmpresaGrupoPlanejamentoService(db_local, agora=AGORA)
+    resultado = service.listar_reposicao_inteligente(
+        grupo.id,
+        EMPRESA_A,
+        periodo_dias=30,
+        dias_cobertura=30,
+        busca="RACAO-B",
+    )
+
+    assert resultado["resumo"]["produtos_para_transferir"] == 1
+    assert resultado["resumo"]["produtos_para_comprar"] == 0
+    item = resultado["itens"][0]
+    assert item["quantidade_compra_sugerida"] == 0
+    assert item["transferencias_sugeridas"] == [
+        {
+            "empresa_origem_id": EMPRESA_B,
+            "empresa_origem_nome": "Loja B",
+            "produto_origem_id": referencias[EMPRESA_B]["produto_ean"].id,
+            "sku_origem": "RACAO-B",
+            "empresa_destino_id": EMPRESA_A,
+            "empresa_destino_nome": "Loja A",
+            "produto_destino_id": referencias[EMPRESA_A]["produto_ean"].id,
+            "sku_destino": "RACAO-A",
+            "quantidade": 2.0,
+        }
+    ]
+
+
+def test_reposicao_inteligente_sugere_compra_para_deficit_do_grupo(db_local):
+    grupo, referencias = _preparar(db_local)
+    referencias[EMPRESA_A]["produto_ean"].estoque_atual = 0
+    referencias[EMPRESA_B]["produto_ean"].estoque_atual = 0
+    db_local.commit()
+
+    service = EmpresaGrupoPlanejamentoService(db_local, agora=AGORA)
+    resultado = service.listar_reposicao_inteligente(
+        grupo.id,
+        EMPRESA_A,
+        periodo_dias=30,
+        dias_cobertura=30,
+        busca="7891000000011",
+    )
+
+    assert resultado["resumo"]["produtos_para_comprar"] == 1
+    item = resultado["itens"][0]
+    assert item["prioridade"] == "critico"
+    assert item["quantidade_compra_sugerida"] == 4
+    assert item["valor_compra_estimado"] == 40
+    assert {empresa["compra_sugerida"] for empresa in item["empresas"]} == {2.0}
+
+
+def test_analise_financeira_cruza_entradas_saidas_e_vencimentos(db_local):
+    grupo, _referencias = _preparar(db_local)
+    service = EmpresaGrupoPlanejamentoService(db_local, agora=AGORA)
+
+    resultado = service.analisar_financeiro(grupo.id, EMPRESA_A)
+
+    assert resultado["resumo"] == {
+        "receber_aberto": 180.0,
+        "pagar_aberto": 260.0,
+        "saldo_liquido": -80.0,
+        "receber_vencido": 0.0,
+        "pagar_vencido": 180.0,
+        "saldo_30_dias": 100.0,
+        "inadimplencia_receber_percentual": 0.0,
+        "atraso_pagar_percentual": 69.2,
+    }
+    faixas = {item["chave"]: item for item in resultado["faixas"]}
+    assert faixas["vencido"]["pagar"] == 180.0
+    assert faixas["hoje"]["receber"] == 100.0
+    assert faixas["8_15"]["pagar"] == 80.0
+    assert faixas["16_30"]["receber"] == 80.0
