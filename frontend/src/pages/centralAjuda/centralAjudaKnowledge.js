@@ -75,6 +75,20 @@ export const BASE_CONHECIMENTO = [
         ],
       },
       {
+        slug: "visao-consolidada-grupo-empresas",
+        titulo: "Como comparar os resultados das empresas de um grupo",
+        tags: ["grupo", "empresas", "consolidado", "vendas", "estoque", "financeiro"],
+        conteudo: [
+          "Antes de começar, as empresas precisam ser membros ativos do mesmo grupo e o usuário precisa ter permissão de relatório gerencial ou financeiro.",
+          "Acesse **Configurações → Grupos de Empresas** e clique em **Ver visão consolidada** no grupo desejado.",
+          "Escolha o período das vendas: 7, 30, 90, 180 ou 365 dias. O valor vendido e o ticket médio são atualizados pelo período selecionado.",
+          "Os cartões de estoque mostram a posição atual dos produtos ativos, considerando somente saldos positivos e sem duplicar kits virtuais.",
+          "A posição financeira mostra os saldos atuais a receber e a pagar, inclusive o que está vencido. Esses números não mudam com o período das vendas.",
+          "Use **Espelho por empresa** para comparar cada participante e o total do grupo. A tela não mostra clientes, produtos ou lançamentos individuais de outra empresa.",
+          "Vendas canceladas não entram nos valores. Se uma empresa for removida do grupo, ela deixa de aparecer imediatamente na consolidação.",
+        ],
+      },
+      {
         slug: "transferencia-integrada-grupo",
         titulo: "Como transferir produtos entre empresas do grupo",
         tags: ["grupo", "empresas", "transferencia", "estoque", "codigo de barras"],

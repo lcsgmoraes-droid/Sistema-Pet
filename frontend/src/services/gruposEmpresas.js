@@ -5,6 +5,13 @@ export async function obterResumoGruposEmpresas() {
   return data;
 }
 
+export async function obterVisaoConsolidadaGrupo(grupoId, periodoDias = 30) {
+  const { data } = await api.get(`/grupos-empresas/${grupoId}/visao-consolidada`, {
+    params: { periodo_dias: periodoDias },
+  });
+  return data;
+}
+
 export async function criarGrupoEmpresa(nome) {
   const { data } = await api.post("/grupos-empresas", { nome });
   return data;
