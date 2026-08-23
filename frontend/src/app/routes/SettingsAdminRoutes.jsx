@@ -18,6 +18,7 @@ import {
   RolesPage,
   SimulacaoContratacao,
   UsuariosPage,
+  VisaoConsolidadaGrupo,
 } from "../lazyPages";
 import { ModuleGate } from "./RouteGates";
 
@@ -61,6 +62,14 @@ export function createSettingsAdminRoutes() {
         element={
           <ProtectedRoute anyOfPermissions={["configuracoes.empresa", "configuracoes.editar"]}>
             <GruposEmpresas />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="configuracoes/grupos-empresas/:grupoId/visao-consolidada"
+        element={
+          <ProtectedRoute anyOfPermissions={["relatorios.gerencial", "relatorios.financeiro"]}>
+            <VisaoConsolidadaGrupo />
           </ProtectedRoute>
         }
       />

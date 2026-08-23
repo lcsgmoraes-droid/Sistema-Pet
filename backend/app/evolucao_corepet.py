@@ -157,6 +157,24 @@ ITENS_EVOLUCAO: tuple[dict[str, Any], ...] = (
         "caminho_ajuda": "/ajuda?aba=central&artigo=grupos-empresas-convites",
     },
     {
+        "id": "grupos-empresas-visao-consolidada",
+        "titulo": "Visão consolidada do grupo de empresas",
+        "resumo": (
+            "Compare vendas, estoque e saldos financeiros das empresas do grupo "
+            "em uma única tela, sem misturar cadastros ou lançamentos individuais."
+        ),
+        "status": "disponivel_teste",
+        "tipo": "projeto",
+        "modulo": "Empresas e relatórios",
+        "plataformas": ["ERP"],
+        "canais": ["erp"],
+        "publicado_em": "2026-08-22",
+        "atualizado_em": "2026-08-22",
+        "ciclo_novidade": deepcopy(CICLO_PADRAO),
+        "destaque": True,
+        "caminho_ajuda": "/ajuda?aba=central&artigo=visao-consolidada-grupo-empresas",
+    },
+    {
         "id": "grupos-empresas-transferencia-integrada",
         "titulo": "Transferência integrada entre empresas do grupo",
         "resumo": (

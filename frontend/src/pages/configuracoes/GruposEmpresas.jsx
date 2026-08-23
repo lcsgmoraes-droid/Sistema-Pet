@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 import {
   FiCheck,
+  FiBarChart2,
   FiChevronLeft,
   FiCopy,
   FiLink,
@@ -25,6 +26,7 @@ import {
   responderConviteGrupo,
 } from "../../services/gruposEmpresas";
 import { confirmarCorePet } from "../../services/corepetDialog";
+import { useAuth } from "../../contexts/AuthContext";
 
 const resumoVazio = {
   codigo_empresa: null,
@@ -45,11 +47,19 @@ function formatarData(value) {
 }
 
 export default function GruposEmpresas() {
+  const navigate = useNavigate();
+  const { user } = useAuth();
   const [resumo, setResumo] = useState(resumoVazio);
   const [carregando, setCarregando] = useState(true);
   const [acao, setAcao] = useState("");
   const [nomeGrupo, setNomeGrupo] = useState("");
   const [codigosConvite, setCodigosConvite] = useState({});
+  const permissoes = user?.permissions || [];
+  const podeAnalisarGrupo =
+    user?.role?.name?.toLowerCase() === "admin" ||
+    ["relatorios.gerencial", "relatorios.financeiro"].some((permissao) =>
+      permissoes.includes(permissao),
+    );
 
   const carregar = useCallback(async () => {
     try {
@@ -279,9 +289,23 @@ export default function GruposEmpresas() {
               key={grupo.id}
               title={grupo.nome}
               actions={
-                <StatusBadge intent={grupo.papel === "responsavel" ? "purple" : "info"}>
-                  {grupo.papel === "responsavel" ? "Responsável" : "Membro"}
-                </StatusBadge>
+                <div className="flex flex-wrap items-center gap-2">
+                  <StatusBadge intent={grupo.papel === "responsavel" ? "purple" : "info"}>
+                    {grupo.papel === "responsavel" ? "Responsável" : "Membro"}
+                  </StatusBadge>
+                  {podeAnalisarGrupo ? (
+                    <ActionButton
+                      icon={FiBarChart2}
+                      intent="info"
+                      tone="outline"
+                      onClick={() =>
+                        navigate(`/configuracoes/grupos-empresas/${grupo.id}/visao-consolidada`)
+                      }
+                    >
+                      Ver visão consolidada
+                    </ActionButton>
+                  ) : null}
+                </div>
               }
             >
               <div className="grid gap-5 lg:grid-cols-[1fr_0.9fr]">
