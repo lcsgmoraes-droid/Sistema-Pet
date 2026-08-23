@@ -1,5 +1,6 @@
 import { X } from "lucide-react";
 import { safeArray } from "../../utils/safeArray";
+import { calcularSaldoFinanceiro } from "../../utils/financeiroStatus";
 import ActionButton from "../ui/ActionButton";
 import CustomerIdentity from "../ui/CustomerIdentity";
 import DataTable from "../ui/DataTable";
@@ -57,6 +58,7 @@ export function ContasReceberFilters({
               <option value="parcial">Parcial</option>
               <option value="recebido">Recebido</option>
               <option value="vencido">Vencido</option>
+              <option value="cancelado">Cancelado</option>
             </select>
           </div>
 
@@ -175,7 +177,7 @@ export function ContasReceberRecebimentoModal({
                 <strong>Ja Recebido:</strong> {formatarMoeda(contaSelecionada.valor_recebido)}
                 <br />
                 <strong>Saldo Restante:</strong>{" "}
-                {formatarMoeda(contaSelecionada.valor_final - contaSelecionada.valor_recebido)}
+                {formatarMoeda(calcularSaldoFinanceiro(contaSelecionada, "valor_recebido"))}
               </div>
 
               <div className="grid grid-cols-2 gap-4">
@@ -470,7 +472,16 @@ export function ContasReceberDetalhesModal({
                 <div>
                   <label className="block text-sm font-medium text-gray-700">Saldo Restante</label>
                   <p className="mt-1 text-lg font-semibold text-red-600">
-                    {formatarMoeda(detalhesCompletos.valores.saldo)}
+                    {formatarMoeda(
+                      calcularSaldoFinanceiro(
+                        {
+                          status: detalhesCompletos.status,
+                          valor_final: detalhesCompletos.valores.final,
+                          valor_recebido: detalhesCompletos.valores.recebido,
+                        },
+                        "valor_recebido",
+                      ),
+                    )}
                   </p>
                 </div>
                 <div>

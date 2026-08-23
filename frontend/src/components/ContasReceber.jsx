@@ -4,6 +4,10 @@ import { ArrowDownUp, Plus, Receipt } from "lucide-react";
 import api from "../api";
 import { getAccessToken } from "../auth/tokenStorage";
 import { toast } from "react-hot-toast";
+import {
+  calcularSaldoFinanceiro,
+  ehLancamentoFinanceiroCancelado,
+} from "../utils/financeiroStatus";
 import { safeArray } from "../utils/safeArray";
 import ActionButton from "./ui/ActionButton";
 import CustomerIdentity from "./ui/CustomerIdentity";
@@ -309,6 +313,7 @@ const ContasReceber = () => {
   const getStatusBadge = (conta) => {
     const hoje = new Date();
     const vencimento = new Date(conta.data_vencimento);
+    if (ehLancamentoFinanceiroCancelado(conta)) return <StatusBadge status="cancelado" />;
     if (conta.status === "recebido") return <StatusBadge status="recebido" />;
     if (vencimento < hoje) return <StatusBadge status="vencida" />;
     if (conta.status === "parcial") return <StatusBadge status="parcial" />;
@@ -376,7 +381,9 @@ const ContasReceber = () => {
       header: "Saldo",
       align: "right",
       className: "font-bold",
-      render: (conta) => <MoneyCell value={conta.valor_final - conta.valor_recebido} zeroAsDash />,
+      render: (conta) => (
+        <MoneyCell value={calcularSaldoFinanceiro(conta, "valor_recebido")} zeroAsDash />
+      ),
     },
     {
       key: "status",
@@ -389,7 +396,7 @@ const ContasReceber = () => {
       className: "min-w-[230px]",
       render: (conta) => (
         <div className="flex flex-wrap items-center gap-2">
-          {conta.status !== "recebido" && (
+          {conta.status !== "recebido" && !ehLancamentoFinanceiroCancelado(conta) && (
             <>
               {conta.nsu && !conta.conciliado ? (
                 <>
@@ -567,7 +574,7 @@ const ContasReceber = () => {
                 <strong className="ml-3">Saldo a Receber:</strong>{" "}
                 <MoneyCell
                   value={contasReceberExibidas.reduce(
-                    (sum, c) => sum + (c.valor_final - c.valor_recebido),
+                    (sum, c) => sum + calcularSaldoFinanceiro(c, "valor_recebido"),
                     0,
                   )}
                   zeroAsDash

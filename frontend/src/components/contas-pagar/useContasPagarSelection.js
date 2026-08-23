@@ -4,34 +4,41 @@ import { toast } from "react-hot-toast";
 import api from "../../api";
 import useShiftRangeSelection from "../../hooks/useShiftRangeSelection";
 import { safeArray } from "../../utils/safeArray";
+import { ehLancamentoFinanceiroCancelado } from "../../utils/financeiroStatus";
 import { confirmarCorePet, perguntarCorePet } from "../../services/corepetDialog";
 
 export default function useContasPagarSelection({ contas, carregarDados, abrirModalEdicao }) {
   const [contasSelecionadas, setContasSelecionadas] = useState([]);
 
   const contasVisiveis = useMemo(() => safeArray(contas), [contas]);
+  const contasSelecionaveis = useMemo(
+    () => contasVisiveis.filter((conta) => !ehLancamentoFinanceiroCancelado(conta)),
+    [contasVisiveis],
+  );
 
   useEffect(() => {
-    const idsVisiveis = new Set(contasVisiveis.map((conta) => conta.id));
+    const idsVisiveis = new Set(contasSelecionaveis.map((conta) => conta.id));
     setContasSelecionadas((atuais) => atuais.filter((id) => idsVisiveis.has(id)));
-  }, [contasVisiveis]);
+  }, [contasSelecionaveis]);
 
   const contaTemPagamento = (conta) =>
     Number(conta?.valor_pago || 0) > 0 || ["pago", "parcial"].includes(conta?.status);
   const contaPodePagar = (conta) =>
     !["pago", "cancelado"].includes(conta?.status) &&
     Number(conta?.valor_final || 0) > Number(conta?.valor_pago || 0);
-  const contaPodeExcluir = (conta) => !contaTemPagamento(conta);
-  const contaPodeCancelar = (conta) => !contaTemPagamento(conta) && conta?.status !== "cancelado";
+  const contaPodeExcluir = (conta) =>
+    !contaTemPagamento(conta) && !ehLancamentoFinanceiroCancelado(conta);
+  const contaPodeCancelar = (conta) =>
+    !contaTemPagamento(conta) && !ehLancamentoFinanceiroCancelado(conta);
 
   const contasSelecionadasObjetos = contasVisiveis.filter((conta) =>
     contasSelecionadas.includes(conta.id),
   );
   const totalSelecionadas = contasSelecionadasObjetos.length;
   const todasVisiveisSelecionadas =
-    contasVisiveis.length > 0 &&
-    contasVisiveis.every((conta) => contasSelecionadas.includes(conta.id));
-  const algumasVisiveisSelecionadas = contasVisiveis.some((conta) =>
+    contasSelecionaveis.length > 0 &&
+    contasSelecionaveis.every((conta) => contasSelecionadas.includes(conta.id));
+  const algumasVisiveisSelecionadas = contasSelecionaveis.some((conta) =>
     contasSelecionadas.includes(conta.id),
   );
   const haContaPagaSelecionada = contasSelecionadasObjetos.some(contaTemPagamento);
@@ -40,6 +47,7 @@ export default function useContasPagarSelection({ contas, carregarDados, abrirMo
   const haContaExcluivelSelecionada = contasSelecionadasObjetos.some(contaPodeExcluir);
 
   const alternarSelecaoConta = useShiftRangeSelection({
+    isItemSelectable: (conta) => !ehLancamentoFinanceiroCancelado(conta),
     items: contasVisiveis,
     setSelectedIds: setContasSelecionadas,
   });
@@ -51,7 +59,7 @@ export default function useContasPagarSelection({ contas, carregarDados, abrirMo
       return;
     }
 
-    setContasSelecionadas(contasVisiveis.map((conta) => conta.id));
+    setContasSelecionadas(contasSelecionaveis.map((conta) => conta.id));
   };
 
   const limparSelecaoContas = () => {
@@ -64,7 +72,13 @@ export default function useContasPagarSelection({ contas, carregarDados, abrirMo
       return;
     }
 
-    abrirModalEdicao(contasSelecionadasObjetos[0]);
+    const conta = contasSelecionadasObjetos[0];
+    if (ehLancamentoFinanceiroCancelado(conta)) {
+      toast.error("Lancamentos cancelados ficam disponiveis somente para consulta");
+      return;
+    }
+
+    abrirModalEdicao(conta);
   };
 
   const estornarContasSelecionadas = async () => {
