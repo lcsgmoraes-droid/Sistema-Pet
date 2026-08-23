@@ -501,6 +501,32 @@ def test_reposicao_inteligente_sugere_compra_para_deficit_do_grupo(db_local):
     assert {empresa["compra_sugerida"] for empresa in item["empresas"]} == {2.0}
 
 
+def test_reposicao_inteligente_conta_apenas_produtos_com_acao_ao_mostrar_todos(
+    db_local,
+):
+    grupo, referencias = _preparar(db_local)
+    referencias[EMPRESA_A]["produto_ean"].estoque_atual = 10
+    referencias[EMPRESA_B]["produto_ean"].estoque_atual = 10
+    db_local.commit()
+
+    service = EmpresaGrupoPlanejamentoService(db_local, agora=AGORA)
+    resultado = service.listar_reposicao_inteligente(
+        grupo.id,
+        EMPRESA_A,
+        periodo_dias=30,
+        dias_cobertura=30,
+        busca="7891000000011",
+        somente_acao=False,
+    )
+
+    assert resultado["resumo"]["produtos_analisados"] == 1
+    assert resultado["resumo"]["produtos_com_acao"] == 0
+    assert len(resultado["itens"]) == 1
+    assert resultado["itens"][0]["prioridade"] == "normal"
+    assert resultado["itens"][0]["quantidade_compra_sugerida"] == 0
+    assert resultado["itens"][0]["transferencias_sugeridas"] == []
+
+
 def test_analise_financeira_cruza_entradas_saidas_e_vencimentos(db_local):
     grupo, _referencias = _preparar(db_local)
     service = EmpresaGrupoPlanejamentoService(db_local, agora=AGORA)

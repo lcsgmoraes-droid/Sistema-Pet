@@ -217,7 +217,9 @@ export default function GrupoReposicaoInteligenteTab({ grupoId, periodoDias }) {
                           </div>
                         ) : (
                           <span className="text-xs text-slate-500">
-                            Sem sobra interna suficiente
+                            {item.quantidade_compra_sugerida > 0
+                              ? "Sem sobra interna suficiente"
+                              : "Nenhuma transferência necessária"}
                           </span>
                         )}
                       </td>
