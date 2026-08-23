@@ -122,6 +122,7 @@ class EmpresaGrupoPlanejamentoService:
             limite=100_000,
         )
         itens = []
+        produtos_com_acao = 0
         for produto in produtos["itens"]:
             empresas = []
             for detalhe in produto["empresas"]:
@@ -165,6 +166,8 @@ class EmpresaGrupoPlanejamentoService:
                 transferencias=transferencias,
             )
             tem_acao = quantidade_compra > 0 or bool(transferencias)
+            if tem_acao:
+                produtos_com_acao += 1
             if somente_acao and not tem_acao:
                 continue
             itens.append(
@@ -204,7 +207,7 @@ class EmpresaGrupoPlanejamentoService:
             "somente_acao": somente_acao,
             "resumo": {
                 "produtos_analisados": produtos["resumo"]["produtos"],
-                "produtos_com_acao": len(itens),
+                "produtos_com_acao": produtos_com_acao,
                 "produtos_para_comprar": sum(
                     1 for item in itens if item["quantidade_compra_sugerida"] > 0
                 ),
