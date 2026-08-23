@@ -179,7 +179,8 @@ ITENS_EVOLUCAO: tuple[dict[str, Any], ...] = (
         "titulo": "Transferência integrada entre empresas do grupo",
         "resumo": (
             "A transferência registra a saída na empresa de origem e a entrada na "
-            "empresa de destino em uma única operação, com conferência por código de barras."
+            "empresa de destino em uma única operação, com conferência por código de barras "
+            "e cancelamento seguro dos dois lados."
         ),
         "status": "disponivel_teste",
         "tipo": "projeto",

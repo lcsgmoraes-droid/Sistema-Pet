@@ -100,6 +100,9 @@ export const BASE_CONHECIMENTO = [
           "Depois da confirmação, o CorePet dá baixa no estoque e cria o contas a receber da origem; ao mesmo tempo, dá entrada no estoque e cria o contas a pagar do destino.",
           "As duas partes são gravadas juntas. Se qualquer validação ou gravação falhar, nenhuma saída ou entrada é mantida.",
           "O documento interno é compartilhado entre as duas empresas e permite rastrear o lançamento nos históricos financeiro e de estoque.",
+          "Para desfazer antes de qualquer baixa financeira, abra **Histórico e acertos**, localize o lançamento integrado, expanda os detalhes e clique em **Cancelar transferência integrada**.",
+          "O cancelamento devolve o estoque à origem, retira a mesma quantidade do destino e cancela o contas a receber e o contas a pagar juntos. O histórico permanece visível como **Cancelada** para auditoria.",
+          "Se a empresa de destino já tiver consumido parte do estoque ou se alguma das contas tiver recebimento ou pagamento, o CorePet bloqueia o cancelamento. Reponha o estoque ou desfaça a baixa financeira antes de tentar novamente.",
         ],
       },
       {

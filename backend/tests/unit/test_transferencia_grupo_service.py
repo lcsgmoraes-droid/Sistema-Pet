@@ -23,12 +23,15 @@ from app.estoque.transferencia_grupo_schemas import (
     TransferenciaGrupoExecutarRequest,
     TransferenciaGrupoItemRequest,
 )
-from app.estoque.transferencia_grupo_service import executar_transferencia_integrada
+from app.estoque.transferencia_grupo_service import (
+    MOTIVO_CANCELAMENTO_GRUPO,
+    cancelar_transferencia_integrada_por_conta,
+    executar_transferencia_integrada,
+)
 from app.financeiro_models import ContaPagar, ContaReceber
 from app.models import Role, Tenant, User, UserTenant
-from app.produtos_models import Produto
+from app.produtos_models import EstoqueMovimentacao, Produto
 from app.tenancy.context import tenant_context
-
 
 EMPRESA_A = "41111111-1111-1111-1111-111111111111"
 EMPRESA_B = "42222222-2222-2222-2222-222222222222"
@@ -265,3 +268,124 @@ def test_falha_na_entrada_reverte_toda_a_saida_da_origem(db_local, monkeypatch):
         assert db_session.query(ContaPagar).count() == 0
     with tenant_context(EMPRESA_A):
         assert db_session.query(EmpresaGrupoTransferencia).count() == 0
+
+
+def test_cancelamento_integrado_reverte_estoque_e_financeiro_dos_dois_lados(
+    db_local, monkeypatch
+):
+    db_session = db_local
+    grupo, usuario_a, produto_a, produto_b = _preparar_cenario(db_session)
+    _silenciar_pos_commit(monkeypatch)
+    payload = _ajustar_produto_payload(
+        _payload(grupo.id, "cccccccc-cccc-4ccc-8ccc-cccccccccccc"),
+        produto_a.id,
+    )
+
+    with tenant_context(EMPRESA_A):
+        resultado = executar_transferencia_integrada(
+            db_session,
+            empresa_origem_id=EMPRESA_A,
+            usuario_origem_id=usuario_a.id,
+            payload=payload,
+        )
+        cancelamento = cancelar_transferencia_integrada_por_conta(
+            db_session,
+            empresa_origem_id=EMPRESA_A,
+            usuario_origem_id=usuario_a.id,
+            conta_receber_origem_id=resultado["conta_receber_origem_id"],
+        )
+        cancelamento_repetido = cancelar_transferencia_integrada_por_conta(
+            db_session,
+            empresa_origem_id=EMPRESA_A,
+            usuario_origem_id=usuario_a.id,
+            conta_receber_origem_id=resultado["conta_receber_origem_id"],
+        )
+
+    db_session.expire_all()
+    assert cancelamento is not None
+    assert cancelamento["transferencia_integrada"] is True
+    assert cancelamento["status"] == "cancelada"
+    assert cancelamento["idempotente"] is False
+    assert cancelamento_repetido is not None
+    assert cancelamento_repetido["idempotente"] is True
+
+    with tenant_context(EMPRESA_A):
+        assert db_session.get(Produto, produto_a.id).estoque_atual == pytest.approx(5)
+        conta_receber = db_session.get(
+            ContaReceber, resultado["conta_receber_origem_id"]
+        )
+        assert conta_receber.status == "cancelado"
+        assert (
+            db_session.query(EstoqueMovimentacao)
+            .filter(EstoqueMovimentacao.motivo == MOTIVO_CANCELAMENTO_GRUPO)
+            .count()
+            == 1
+        )
+    with tenant_context(EMPRESA_B):
+        assert db_session.get(Produto, produto_b.id).estoque_atual == pytest.approx(1)
+        conta_pagar = db_session.get(ContaPagar, resultado["conta_pagar_destino_id"])
+        assert conta_pagar.status == "cancelado"
+        assert (
+            db_session.query(EstoqueMovimentacao)
+            .filter(EstoqueMovimentacao.motivo == MOTIVO_CANCELAMENTO_GRUPO)
+            .count()
+            == 1
+        )
+    transferencia = db_session.get(
+        EmpresaGrupoTransferencia, resultado["transferencia_grupo_id"]
+    )
+    assert transferencia.status == "cancelada"
+    assert (
+        transferencia.resultado["cancelamento"]["cancelado_por_usuario_id"]
+        == usuario_a.id
+    )
+
+
+def test_cancelamento_integrado_bloqueia_se_estoque_destino_ja_foi_consumido(
+    db_local, monkeypatch
+):
+    db_session = db_local
+    grupo, usuario_a, produto_a, produto_b = _preparar_cenario(db_session)
+    _silenciar_pos_commit(monkeypatch)
+    payload = _ajustar_produto_payload(
+        _payload(grupo.id, "dddddddd-dddd-4ddd-8ddd-dddddddddddd"),
+        produto_a.id,
+    )
+
+    with tenant_context(EMPRESA_A):
+        resultado = executar_transferencia_integrada(
+            db_session,
+            empresa_origem_id=EMPRESA_A,
+            usuario_origem_id=usuario_a.id,
+            payload=payload,
+        )
+    with tenant_context(EMPRESA_B):
+        produto_destino = db_session.get(Produto, produto_b.id)
+        produto_destino.estoque_atual = 1
+        db_session.commit()
+
+    with tenant_context(EMPRESA_A):
+        with pytest.raises(HTTPException, match="Reponha o estoque"):
+            cancelar_transferencia_integrada_por_conta(
+                db_session,
+                empresa_origem_id=EMPRESA_A,
+                usuario_origem_id=usuario_a.id,
+                conta_receber_origem_id=resultado["conta_receber_origem_id"],
+            )
+        db_session.rollback()
+
+    db_session.expire_all()
+    with tenant_context(EMPRESA_A):
+        assert db_session.get(Produto, produto_a.id).estoque_atual == pytest.approx(3)
+        conta_receber = db_session.get(
+            ContaReceber, resultado["conta_receber_origem_id"]
+        )
+        assert conta_receber.status == "pendente"
+    with tenant_context(EMPRESA_B):
+        assert db_session.get(Produto, produto_b.id).estoque_atual == pytest.approx(1)
+        conta_pagar = db_session.get(ContaPagar, resultado["conta_pagar_destino_id"])
+        assert conta_pagar.status == "pendente"
+    transferencia = db_session.get(
+        EmpresaGrupoTransferencia, resultado["transferencia_grupo_id"]
+    )
+    assert transferencia.status == "concluida"

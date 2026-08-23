@@ -26,6 +26,7 @@ from app.estoque.transferencia_parceiro_support import (
     _restaurar_lotes_consumidos_transferencia,
     _texto_limpo,
 )
+from app.empresa_grupo_models import EmpresaGrupoTransferencia
 from app.financeiro_models import ContaReceber
 from app.models import Cliente
 from app.produtos_models import EstoqueMovimentacao
@@ -238,6 +239,22 @@ def editar_transferencia_parceiro(
     """Edita uma transferencia ainda sem baixa, preservando estoque e financeiro."""
     current_user, tenant_id = user_and_tenant
     conta = _buscar_conta_transferencia_parceiro(db, tenant_id, conta_receber_id)
+    transferencia_integrada = (
+        db.query(EmpresaGrupoTransferencia.id)
+        .filter(
+            EmpresaGrupoTransferencia.empresa_origem_id == str(tenant_id),
+            EmpresaGrupoTransferencia.conta_receber_origem_id == conta_receber_id,
+        )
+        .first()
+    )
+    if transferencia_integrada is not None:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Transferência integrada não pode ser editada somente na origem. "
+                "Cancele a transferência e faça um novo lançamento."
+            ),
+        )
 
     if float(conta.valor_recebido or 0) > 0:
         raise HTTPException(

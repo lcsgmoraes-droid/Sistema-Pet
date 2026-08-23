@@ -601,15 +601,24 @@ export default function useTransferenciaHistoricoController({
   };
 
   const excluirTransferencia = async (registro) => {
+    const integrada = Boolean(registro.transferencia_integrada);
     const confirmar = await confirmarCorePet(
-      `Excluir a transferencia ${registro.documento || registro.conta_receber_id}? O estoque sera estornado.`,
+      integrada
+        ? `Cancelar a transferência integrada ${registro.documento || registro.conta_receber_id}? O estoque e os lançamentos financeiros serão revertidos nas duas empresas.`
+        : `Excluir a transferência ${registro.documento || registro.conta_receber_id}? O estoque será estornado.`,
     );
     if (!confirmar) return;
 
     try {
       setContaExcluindo(registro.conta_receber_id);
-      await api.delete(`/estoque/transferencia-parceiro/${registro.conta_receber_id}`);
-      toast.success("Transferencia excluida com sucesso.");
+      const response = await api.delete(
+        `/estoque/transferencia-parceiro/${registro.conta_receber_id}`,
+      );
+      toast.success(
+        response.data?.transferencia_integrada
+          ? "Transferência integrada cancelada nas duas empresas."
+          : "Transferência excluída com sucesso.",
+      );
       setSelecionadosHistorico((prev) => prev.filter((id) => id !== registro.conta_receber_id));
       if (baixaAbertaId === registro.conta_receber_id) fecharBaixaTransferencia();
       if (transferenciaEditando?.conta_receber_id === registro.conta_receber_id) {

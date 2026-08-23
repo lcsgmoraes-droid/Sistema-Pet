@@ -21,8 +21,17 @@ function EntradaParceiroRow({ entrada }) {
               {entrada.documento || `Entrada #${entrada.conta_pagar_id}`}
             </h4>
             <StatusTransferenciaBadge status={entrada.status} label={entrada.status_label} />
+            {entrada.transferencia_integrada ? (
+              <span className="rounded-full border border-violet-200 bg-violet-50 px-3 py-1 text-xs font-medium text-violet-700">
+                Integrada de {entrada.empresa_origem_nome || "empresa do grupo"}
+              </span>
+            ) : null}
             <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-medium text-slate-600">
-              {entrada.estoque_atualizado ? "Estoque lancado" : "Sem entrada no estoque"}
+              {entrada.status === "cancelado"
+                ? "Estoque revertido"
+                : entrada.estoque_atualizado
+                  ? "Estoque lançado"
+                  : "Sem entrada no estoque"}
             </span>
           </div>
           <p className="text-sm text-slate-700">

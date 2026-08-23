@@ -19,6 +19,9 @@ from app.estoque.transferencia_parceiro_baixa_lote_service import (
     _registrar_lancamento_financeiro,
     resolver_data_recebimento_financeiro,
 )
+from app.estoque.transferencia_grupo_service import (
+    cancelar_transferencia_integrada_por_conta,
+)
 from app.estoque.transferencia_parceiro_schemas import (
     TransferenciaParceiroContaPagarCompensacaoItem,
     TransferenciaParceiroContaPagarCompensacaoResponse,
@@ -46,7 +49,6 @@ from app.financeiro_models import Recebimento
 from app.domain.dre.lancamento_dre_sync import atualizar_dre_por_lancamento
 from app.produtos_models import EstoqueMovimentacao
 from app.security.permissions_decorator import require_permission
-
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -374,9 +376,9 @@ def registrar_recebimento_transferencia_parceiro(
         "status_label": status_label,
         "valor_recebido": float(conta.valor_recebido or 0),
         "saldo_aberto": _saldo_conta_receber(conta),
-        "data_recebimento": conta.data_recebimento.isoformat()
-        if conta.data_recebimento
-        else None,
+        "data_recebimento": (
+            conta.data_recebimento.isoformat() if conta.data_recebimento else None
+        ),
         "modo_baixa": modo_baixa,
         "modo_baixa_label": modo_label,
         "forma_pagamento_id": forma_pagamento.id if forma_pagamento else None,
@@ -398,6 +400,29 @@ def excluir_transferencia_parceiro(
     """Exclui uma transferencia ainda sem baixa, estornando o estoque."""
     current_user, tenant_id = user_and_tenant
     conta = _buscar_conta_transferencia_parceiro(db, tenant_id, conta_receber_id)
+
+    try:
+        cancelamento_integrado = cancelar_transferencia_integrada_por_conta(
+            db,
+            empresa_origem_id=tenant_id,
+            usuario_origem_id=current_user.id,
+            conta_receber_origem_id=conta_receber_id,
+        )
+        if cancelamento_integrado is not None:
+            return cancelamento_integrado
+    except HTTPException:
+        db.rollback()
+        raise
+    except ValueError as exc:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(exc))
+    except Exception as exc:
+        db.rollback()
+        logger.exception("Erro ao cancelar transferencia integrada: %s", exc)
+        raise HTTPException(
+            status_code=500,
+            detail="Nao foi possivel cancelar a transferencia integrada",
+        )
 
     if float(conta.valor_recebido or 0) > 0:
         raise HTTPException(
