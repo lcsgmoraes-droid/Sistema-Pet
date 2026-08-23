@@ -451,6 +451,8 @@ class EmpresaGrupoAnaliseDetalhesService:
                         Produto.estoque_atual,
                         Produto.estoque_minimo,
                         Produto.preco_custo,
+                        Produto.fornecedor_id,
+                        Produto.unidade,
                         func.coalesce(func.sum(VendaItem.quantidade), 0).label(
                             "quantidade"
                         ),
@@ -485,9 +487,26 @@ class EmpresaGrupoAnaliseDetalhesService:
                         Produto.estoque_atual,
                         Produto.estoque_minimo,
                         Produto.preco_custo,
+                        Produto.fornecedor_id,
+                        Produto.unidade,
                     )
                     .all()
                 )
+                fornecedores = {
+                    fornecedor.id: fornecedor.nome
+                    for fornecedor in self.db.query(Cliente.id, Cliente.nome)
+                    .filter(
+                        Cliente.tenant_id == empresa_uuid,
+                        Cliente.id.in_(
+                            {
+                                resultado.fornecedor_id
+                                for resultado in resultados
+                                if resultado.fornecedor_id
+                            }
+                        ),
+                    )
+                    .all()
+                }
             for resultado in resultados:
                 linhas.append(
                     {
@@ -500,6 +519,9 @@ class EmpresaGrupoAnaliseDetalhesService:
                         "estoque": _quantidade(resultado.estoque_atual),
                         "estoque_minimo": _quantidade(resultado.estoque_minimo),
                         "preco_custo": _moeda(resultado.preco_custo),
+                        "fornecedor_id": resultado.fornecedor_id,
+                        "fornecedor_nome": fornecedores.get(resultado.fornecedor_id),
+                        "unidade": resultado.unidade or "UN",
                         "quantidade": _quantidade(resultado.quantidade),
                         "valor_total": _moeda(resultado.valor_total),
                         "pedidos": int(resultado.pedidos or 0),
@@ -523,10 +545,27 @@ class EmpresaGrupoAnaliseDetalhesService:
                         Produto.estoque_atual,
                         Produto.estoque_minimo,
                         Produto.preco_custo,
+                        Produto.fornecedor_id,
+                        Produto.unidade,
                     )
                     .filter(Produto.tenant_id == empresa_uuid)
                     .all()
                 )
+                fornecedores = {
+                    fornecedor.id: fornecedor.nome
+                    for fornecedor in self.db.query(Cliente.id, Cliente.nome)
+                    .filter(
+                        Cliente.tenant_id == empresa_uuid,
+                        Cliente.id.in_(
+                            {
+                                produto.fornecedor_id
+                                for produto in produtos
+                                if produto.fornecedor_id
+                            }
+                        ),
+                    )
+                    .all()
+                }
             for produto in produtos:
                 catalogo.append(
                     {
@@ -539,6 +578,9 @@ class EmpresaGrupoAnaliseDetalhesService:
                         "estoque": _quantidade(produto.estoque_atual),
                         "estoque_minimo": _quantidade(produto.estoque_minimo),
                         "preco_custo": _moeda(produto.preco_custo),
+                        "fornecedor_id": produto.fornecedor_id,
+                        "fornecedor_nome": fornecedores.get(produto.fornecedor_id),
+                        "unidade": produto.unidade or "UN",
                         "quantidade": 0.0,
                         "valor_total": 0.0,
                         "pedidos": 0,

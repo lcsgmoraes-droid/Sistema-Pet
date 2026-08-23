@@ -1,5 +1,6 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { toast } from "react-hot-toast";
+import { useLocation, useNavigate } from "react-router-dom";
 import usePedidosCompraGruposFornecedores from "./usePedidosCompraGruposFornecedores";
 import usePedidosCompraSugestao from "./usePedidosCompraSugestao";
 import { createPedidosCompraDataController } from "./pedidosCompraDataController";
@@ -7,7 +8,11 @@ import { createPedidosCompraFormularioController } from "./pedidosCompraFormular
 import { createPedidosCompraItemController } from "./pedidosCompraItemController";
 import { createPedidosCompraOperacoesController } from "./pedidosCompraOperacoesController";
 import { COLUNAS_DOCUMENTO_COMPLETO } from "./pedidoDocumentoColunas";
-import { numeroSeguro, textoContemTokens } from "./pedidoCompraUtils";
+import {
+  montarRascunhoPedidoReposicaoGrupo,
+  numeroSeguro,
+  textoContemTokens,
+} from "./pedidoCompraUtils";
 
 const FORM_DATA_INICIAL = {
   fornecedor_id: "",
@@ -36,9 +41,13 @@ const FILTROS_PEDIDOS_INICIAL = {
 };
 
 export default function usePedidosCompraController() {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const planoReposicaoAplicadoRef = useRef(false);
   const [pedidos, setPedidos] = useState([]);
   const [filtrosPedidos, setFiltrosPedidos] = useState(FILTROS_PEDIDOS_INICIAL);
   const [loadingListaPedidos, setLoadingListaPedidos] = useState(false);
+  const [dadosIniciaisCarregados, setDadosIniciaisCarregados] = useState(false);
   const [paginaPedidos, setPaginaPedidos] = useState(1);
   const [pedidosPorPagina, setPedidosPorPagina] = useState(20);
   const [paginacaoPedidos, setPaginacaoPedidos] = useState({
@@ -327,7 +336,13 @@ export default function usePedidosCompraController() {
   });
 
   useEffect(() => {
-    carregarDados(FILTROS_PEDIDOS_INICIAL);
+    let ativo = true;
+    Promise.resolve(carregarDados(FILTROS_PEDIDOS_INICIAL)).finally(() => {
+      if (ativo) setDadosIniciaisCarregados(true);
+    });
+    return () => {
+      ativo = false;
+    };
   }, []);
 
   const {
@@ -403,6 +418,42 @@ export default function usePedidosCompraController() {
     setProdutos,
     setProdutoTexto,
   });
+
+  useEffect(() => {
+    const plano = location.state?.reposicaoGrupoPedido;
+    if (!plano || !dadosIniciaisCarregados || planoReposicaoAplicadoRef.current) return;
+
+    planoReposicaoAplicadoRef.current = true;
+    const rascunho = montarRascunhoPedidoReposicaoGrupo(plano);
+    const fornecedor = rascunho ? obterFornecedorPorId(rascunho.fornecedor_id) : null;
+
+    if (!rascunho || !fornecedor) {
+      toast.error(
+        "Não foi possível preparar o pedido. Confira o fornecedor do produto e recalcule o plano.",
+      );
+    } else {
+      abrirNovoFormulario();
+      setFornecedorTexto(fornecedor.nome || plano.fornecedor_nome || "");
+      setFormData(rascunho);
+      setIncluirGrupoFornecedor(Boolean(obterGrupoDoFornecedor(fornecedor.id)));
+      carregarProdutosFornecedor(fornecedor.id, {
+        fornecedorGrupoId: obterGrupoDoFornecedor(fornecedor.id)?.id,
+      });
+      toast.success("Pedido preparado. Revise fornecedor, itens e valores antes de salvar.");
+    }
+
+    navigate(`${location.pathname}${location.search}`, { replace: true, state: null });
+  }, [
+    abrirNovoFormulario,
+    carregarProdutosFornecedor,
+    dadosIniciaisCarregados,
+    location.pathname,
+    location.search,
+    location.state,
+    navigate,
+    obterFornecedorPorId,
+    obterGrupoDoFornecedor,
+  ]);
 
   const {
     handleSubmit,

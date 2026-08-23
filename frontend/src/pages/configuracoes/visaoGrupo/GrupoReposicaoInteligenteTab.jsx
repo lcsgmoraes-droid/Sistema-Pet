@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import toast from "react-hot-toast";
 import { FiAlertTriangle, FiBox, FiDollarSign, FiRepeat, FiShoppingCart } from "react-icons/fi";
+import { useNavigate } from "react-router-dom";
 import ActionButton from "../../../components/ui/ActionButton";
 import EmptyState from "../../../components/ui/EmptyState";
 import MetricCard from "../../../components/ui/MetricCard";
@@ -29,6 +30,7 @@ function formatarQuantidade(valor) {
 }
 
 export default function GrupoReposicaoInteligenteTab({ grupoId, periodoDias }) {
+  const navigate = useNavigate();
   const [busca, setBusca] = useState("");
   const [buscaAplicada, setBuscaAplicada] = useState("");
   const [diasCobertura, setDiasCobertura] = useState(30);
@@ -62,6 +64,14 @@ export default function GrupoReposicaoInteligenteTab({ grupoId, periodoDias }) {
 
   const resumo = dados?.resumo || {};
   const itens = dados?.itens || [];
+  const acoes = dados?.acoes_empresa_atual || {};
+  const transferencias = acoes.transferencias || [];
+  const compras = acoes.compras || [];
+  const comprasSemFornecedor = acoes.compras_sem_fornecedor || [];
+  const pendenciasOutrasEmpresas = acoes.pendencias_outras_empresas || {};
+  const totalPendenciasOutras =
+    Number(pendenciasOutrasEmpresas.transferencias || 0) +
+    Number(pendenciasOutrasEmpresas.compras || 0);
 
   return (
     <div className="space-y-4">
@@ -140,6 +150,97 @@ export default function GrupoReposicaoInteligenteTab({ grupoId, periodoDias }) {
         />
       </MetricGrid>
 
+      {!carregando &&
+      (transferencias.length ||
+        compras.length ||
+        comprasSemFornecedor.length ||
+        totalPendenciasOutras) ? (
+        <Panel
+          title="Ações para esta empresa"
+          subtitle="Os botões apenas preparam os dados. A movimentação ou o pedido só acontece depois da sua revisão na tela original."
+        >
+          <div className="grid gap-3 lg:grid-cols-2">
+            {transferencias.map((plano) => (
+              <div
+                key={`transferencia-${plano.empresa_destino_id}`}
+                className="rounded-xl border border-cyan-200 bg-cyan-50/70 p-4 dark:border-cyan-500/30 dark:bg-cyan-500/10"
+              >
+                <div className="flex items-start gap-3">
+                  <FiRepeat className="mt-0.5 shrink-0 text-cyan-700 dark:text-cyan-300" />
+                  <div className="min-w-0 flex-1">
+                    <div className="font-semibold text-slate-900 dark:text-white">
+                      Transferir para {plano.empresa_destino_nome}
+                    </div>
+                    <div className="mt-1 text-xs text-slate-600 dark:text-slate-300">
+                      {plano.itens.length} produto(s) · {formatarQuantidade(plano.quantidade_total)}{" "}
+                      unidade(s) · {formatMoneyBRL(plano.valor_total)}
+                    </div>
+                    <ActionButton
+                      className="mt-3"
+                      icon={FiRepeat}
+                      intent="info"
+                      onClick={() =>
+                        navigate("/estoque/transferencia-parceiro", {
+                          state: { reposicaoGrupoTransferencia: plano },
+                        })
+                      }
+                    >
+                      Preparar transferência
+                    </ActionButton>
+                  </div>
+                </div>
+              </div>
+            ))}
+
+            {compras.map((plano) => (
+              <div
+                key={`compra-${plano.fornecedor_id}`}
+                className="rounded-xl border border-emerald-200 bg-emerald-50/70 p-4 dark:border-emerald-500/30 dark:bg-emerald-500/10"
+              >
+                <div className="flex items-start gap-3">
+                  <FiShoppingCart className="mt-0.5 shrink-0 text-emerald-700 dark:text-emerald-300" />
+                  <div className="min-w-0 flex-1">
+                    <div className="font-semibold text-slate-900 dark:text-white">
+                      Comprar de {plano.fornecedor_nome}
+                    </div>
+                    <div className="mt-1 text-xs text-slate-600 dark:text-slate-300">
+                      {plano.itens.length} produto(s) · {formatarQuantidade(plano.quantidade_total)}{" "}
+                      unidade(s) · {formatMoneyBRL(plano.valor_total)}
+                    </div>
+                    <ActionButton
+                      className="mt-3"
+                      icon={FiShoppingCart}
+                      intent="create"
+                      onClick={() =>
+                        navigate("/compras/pedidos", {
+                          state: { reposicaoGrupoPedido: plano },
+                        })
+                      }
+                    >
+                      Montar pedido
+                    </ActionButton>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {comprasSemFornecedor.length ? (
+            <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100">
+              {comprasSemFornecedor.length} produto(s) precisam de fornecedor no cadastro antes de
+              montar o pedido.
+            </div>
+          ) : null}
+
+          {totalPendenciasOutras ? (
+            <div className="mt-3 text-xs text-slate-500 dark:text-slate-400">
+              Existem {totalPendenciasOutras} ação(ões) sob responsabilidade de outras empresas do
+              grupo. Elas poderão prepará-las ao acessar esta análise.
+            </div>
+          ) : null}
+        </Panel>
+      ) : null}
+
       {itens.length === 0 && !carregando ? (
         <EmptyState
           icon={FiBox}
@@ -149,7 +250,7 @@ export default function GrupoReposicaoInteligenteTab({ grupoId, periodoDias }) {
       ) : (
         <Panel
           title="Plano inteligente do grupo"
-          subtitle="A sugestão é uma simulação de leitura e não movimenta estoque nem cria pedidos automaticamente."
+          subtitle="A análise não movimenta estoque nem cria pedidos automaticamente; use as ações acima para preparar e revisar cada operação."
           padding="none"
         >
           <div className="overflow-x-auto">

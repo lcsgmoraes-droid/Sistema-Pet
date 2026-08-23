@@ -28,6 +28,7 @@ import {
   montarEntradaParceiroPayload,
   montarTransferenciaGrupoPayload,
   montarTransferenciaGrupoPreviaPayload,
+  montarRascunhoTransferenciaReposicaoGrupo,
   montarBaixaLoteTransferenciaPayload,
   montarFiltrosHistoricoTransferenciaParams,
   montarParametrosDocumentoTransferencia,
@@ -191,6 +192,47 @@ test("helpers de item e payload mantem calculos da transferencia", () => {
       ],
     },
   );
+});
+
+test("plano do grupo vira rascunho de transferencia sem movimentar estoque", () => {
+  const rascunho = montarRascunhoTransferenciaReposicaoGrupo(
+    {
+      grupo_id: 9,
+      empresa_destino_id: "22222222-2222-2222-2222-222222222222",
+      empresa_destino_nome: "Loja B",
+      itens: [
+        {
+          produto_id: 10,
+          produto_nome: "Ração",
+          codigo: "RAC-10",
+          codigo_barras: "789",
+          estoque_atual: 12,
+          preco_custo: 15,
+          quantidade: 3,
+        },
+      ],
+    },
+    100,
+  );
+
+  assert.equal(rascunho.form.tipo_operacao, "saida_grupo");
+  assert.equal(rascunho.form.destino_grupo_chave, "9|22222222-2222-2222-2222-222222222222");
+  assert.match(rascunho.form.observacao, /Revise os itens/);
+  assert.deepEqual(rascunho.itens, [
+    {
+      uid: "10-100",
+      produto_id: 10,
+      produto_nome: "Ração",
+      codigo: "RAC-10",
+      codigo_barras: "789",
+      estoque_atual: 12,
+      custo_base_unitario: 15,
+      custo_unitario: 15,
+      quantidade: 3,
+      total_item: 45,
+    },
+  ]);
+  assert.equal(montarRascunhoTransferenciaReposicaoGrupo({ grupo_id: 9 }), null);
 });
 
 test("montarEntradaParceiroPayload envia divida e opcao de entrada no estoque", () => {

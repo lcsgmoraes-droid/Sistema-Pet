@@ -216,6 +216,49 @@ export function criarItemTransferencia(produto, timestamp = Date.now()) {
   };
 }
 
+export function montarRascunhoTransferenciaReposicaoGrupo(plano, timestamp = Date.now()) {
+  const grupoId = Number(plano?.grupo_id);
+  const empresaDestinoId = String(plano?.empresa_destino_id || "").trim();
+  const itensPlano = Array.isArray(plano?.itens) ? plano.itens : [];
+  if (!Number.isFinite(grupoId) || grupoId <= 0 || !empresaDestinoId || !itensPlano.length) {
+    return null;
+  }
+
+  const itens = itensPlano
+    .map((produto, index) => {
+      const quantidade = normalizarNumero(produto?.quantidade);
+      if (!produto?.produto_id || quantidade <= 0) return null;
+
+      const item = criarItemTransferencia(
+        {
+          id: produto.produto_id,
+          nome: produto.produto_nome,
+          codigo: produto.codigo,
+          codigo_barras: produto.codigo_barras,
+          estoque_atual: produto.estoque_atual,
+          preco_custo: produto.preco_custo,
+        },
+        timestamp + index,
+      );
+      return {
+        ...item,
+        quantidade,
+        total_item: quantidade * item.custo_unitario,
+      };
+    })
+    .filter(Boolean);
+
+  if (!itens.length) return null;
+  return {
+    form: criarFormTransferencia({
+      tipo_operacao: "saida_grupo",
+      destino_grupo_chave: `${grupoId}|${empresaDestinoId}`,
+      observacao: `Reposição inteligente do grupo para ${plano.empresa_destino_nome || "empresa do grupo"}. Revise os itens antes de confirmar.`,
+    }),
+    itens,
+  };
+}
+
 export function incrementarItemTransferencia(item, produto) {
   const novaQuantidade = Number(item.quantidade || 0) + 1;
   return {
