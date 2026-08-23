@@ -212,6 +212,24 @@ ITENS_EVOLUCAO: tuple[dict[str, Any], ...] = (
         "caminho_ajuda": "/ajuda?aba=central&artigo=visao-consolidada-grupo-empresas",
     },
     {
+        "id": "grupos-empresas-planejamento-inteligente",
+        "titulo": "Reposição e financeiro inteligentes para o grupo",
+        "resumo": (
+            "Planeje compras usando o estoque de todas as empresas, transfira sobras antes "
+            "de comprar e acompanhe entradas e saídas por vencimento."
+        ),
+        "status": "disponivel_teste",
+        "tipo": "projeto",
+        "modulo": "Empresas, compras e financeiro",
+        "plataformas": ["ERP"],
+        "canais": ["erp"],
+        "publicado_em": "2026-08-23",
+        "atualizado_em": "2026-08-23",
+        "ciclo_novidade": deepcopy(CICLO_PADRAO),
+        "destaque": True,
+        "caminho_ajuda": "/ajuda?aba=central&artigo=visao-consolidada-grupo-empresas",
+    },
+    {
         "id": "crediario-vencimento-alertas",
         "titulo": "Crediário com vencimento e alertas",
         "resumo": (

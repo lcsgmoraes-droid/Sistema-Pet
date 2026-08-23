@@ -7,6 +7,9 @@ from app.empresa_grupo_analise_service import EmpresaGrupoAnaliseService
 from app.empresa_grupo_analise_detalhes_service import (
     EmpresaGrupoAnaliseDetalhesService,
 )
+from app.empresa_grupo_planejamento_service import (
+    EmpresaGrupoPlanejamentoService,
+)
 from app.empresa_grupo_produto_vinculo_service import (
     EmpresaGrupoProdutoVinculoService,
 )
@@ -145,6 +148,47 @@ def listar_contas_pagar_grupo(
         limite=limite,
     )
     registrar_uso_funcionalidade(db, "grupos-empresas-analises-detalhadas")
+    return resultado
+
+
+@router.get("/{grupo_id}/reposicao-inteligente")
+@require_any_permission(PERMISSOES_ANALISE_GRUPO)
+def listar_reposicao_inteligente_grupo(
+    grupo_id: int,
+    periodo_dias: int = Query(30, ge=7, le=366),
+    dias_cobertura: int = Query(30, ge=7, le=120),
+    busca: str = Query("", max_length=120),
+    somente_acao: bool = Query(True),
+    limite: int = Query(200, ge=20, le=500),
+    db: Session = Depends(get_session),
+    user_and_tenant=Depends(get_current_user_and_tenant),
+):
+    _usuario, empresa_atual_id = user_and_tenant
+    resultado = EmpresaGrupoPlanejamentoService(db).listar_reposicao_inteligente(
+        grupo_id,
+        empresa_atual_id,
+        periodo_dias=periodo_dias,
+        dias_cobertura=dias_cobertura,
+        busca=busca,
+        somente_acao=somente_acao,
+        limite=limite,
+    )
+    registrar_uso_funcionalidade(db, "grupos-empresas-planejamento-inteligente")
+    return resultado
+
+
+@router.get("/{grupo_id}/analise-financeira")
+@require_any_permission(PERMISSOES_ANALISE_GRUPO)
+def obter_analise_financeira_grupo(
+    grupo_id: int,
+    db: Session = Depends(get_session),
+    user_and_tenant=Depends(get_current_user_and_tenant),
+):
+    _usuario, empresa_atual_id = user_and_tenant
+    resultado = EmpresaGrupoPlanejamentoService(db).analisar_financeiro(
+        grupo_id, empresa_atual_id
+    )
+    registrar_uso_funcionalidade(db, "grupos-empresas-planejamento-inteligente")
     return resultado
 
 
