@@ -3,6 +3,10 @@ import ActionButton from "../ui/ActionButton";
 import DataTable from "../ui/DataTable";
 import MoneyCell from "../ui/MoneyCell";
 import FornecedorIdentity, { getFornecedorIdentityName } from "../ui/FornecedorIdentity";
+import {
+  calcularSaldoFinanceiro,
+  ehLancamentoFinanceiroCancelado,
+} from "../../utils/financeiroStatus";
 import { ehVencimentoHojeContasPagar } from "./contasPagarHelpers";
 
 export default function ContasPagarTable({
@@ -56,6 +60,7 @@ export default function ContasPagarTable({
           aria-label={`Selecionar lancamento ${conta.id}`}
           checked={contasSelecionadas.includes(conta.id)}
           className="contas-pagar-select-row h-4 w-4 rounded border-slate-300"
+          disabled={ehLancamentoFinanceiroCancelado(conta)}
           onChange={(event) => alternarSelecaoConta(conta.id, event)}
           onClick={(event) => event.stopPropagation()}
           type="checkbox"
@@ -176,7 +181,9 @@ export default function ContasPagarTable({
       align: "right",
       headerClassName: "w-[100px] whitespace-nowrap",
       className: "w-[100px] whitespace-nowrap tabular-nums font-bold",
-      render: (conta) => <MoneyCell value={conta.valor_final - conta.valor_pago} zeroAsDash />,
+      render: (conta) => (
+        <MoneyCell value={calcularSaldoFinanceiro(conta, "valor_pago")} zeroAsDash />
+      ),
     },
     {
       key: "status",
@@ -190,51 +197,54 @@ export default function ContasPagarTable({
         "contas-pagar-actions-cell sticky right-0 z-20 w-[260px] min-w-[260px] bg-gray-50 text-right",
       className:
         "contas-pagar-actions-cell sticky right-0 z-10 w-[260px] min-w-[260px] border-l border-slate-100 bg-white",
-      render: (conta) => (
-        <div className="flex flex-wrap items-center justify-end gap-2">
-          <ActionButton
-            intent="edit"
-            tone="soft"
-            size="xs"
-            icon={Edit3}
-            onClick={() => abrirModalEdicao(conta)}
-            title="Editar conta a pagar"
-          >
-            Editar
-          </ActionButton>
-          {conta.status !== "pago" && (
+      render: (conta) =>
+        ehLancamentoFinanceiroCancelado(conta) ? (
+          <span className="text-xs font-medium text-slate-500">Somente leitura</span>
+        ) : (
+          <div className="flex flex-wrap items-center justify-end gap-2">
             <ActionButton
-              intent="create"
+              intent="edit"
+              tone="soft"
               size="xs"
-              onClick={() => abrirModalPagamento(conta)}
-              title="Registrar Pagamento"
+              icon={Edit3}
+              onClick={() => abrirModalEdicao(conta)}
+              title="Editar conta a pagar"
             >
-              Pagar
+              Editar
             </ActionButton>
-          )}
-          {precisaClassificacao(conta) && (
+            {conta.status !== "pago" && (
+              <ActionButton
+                intent="create"
+                size="xs"
+                onClick={() => abrirModalPagamento(conta)}
+                title="Registrar Pagamento"
+              >
+                Pagar
+              </ActionButton>
+            )}
+            {precisaClassificacao(conta) && (
+              <ActionButton
+                intent="warning"
+                size="xs"
+                onClick={() => abrirModalClassificacao(conta)}
+                title="Classificar categoria, DRE e tipo da despesa"
+              >
+                Classificar
+              </ActionButton>
+            )}
             <ActionButton
-              intent="warning"
+              intent="delete"
+              tone="soft"
               size="xs"
-              onClick={() => abrirModalClassificacao(conta)}
-              title="Classificar categoria, DRE e tipo da despesa"
+              icon={Trash2}
+              onClick={() => excluirContaPagar(conta)}
+              disabled={contaTemPagamento(conta)}
+              title="Excluir conta sem pagamento"
             >
-              Classificar
+              Excluir
             </ActionButton>
-          )}
-          <ActionButton
-            intent="delete"
-            tone="soft"
-            size="xs"
-            icon={Trash2}
-            onClick={() => excluirContaPagar(conta)}
-            disabled={contaTemPagamento(conta)}
-            title="Excluir conta sem pagamento"
-          >
-            Excluir
-          </ActionButton>
-        </div>
-      ),
+          </div>
+        ),
     },
   ];
 
@@ -337,7 +347,10 @@ export default function ContasPagarTable({
             <strong>Total:</strong> {contasVisiveis.length} conta(s) |
             <strong className="ml-3">Saldo a Pagar:</strong>{" "}
             <MoneyCell
-              value={contasVisiveis.reduce((sum, c) => sum + (c.valor_final - c.valor_pago), 0)}
+              value={contasVisiveis.reduce(
+                (sum, c) => sum + calcularSaldoFinanceiro(c, "valor_pago"),
+                0,
+              )}
               zeroAsDash
             />
           </div>

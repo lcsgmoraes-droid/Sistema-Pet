@@ -162,7 +162,7 @@ export default function GrupoPedidosCompraTab({ empresas, grupoId, periodoDias }
                     <td className="px-4 py-3 text-right">
                       <div className="font-medium">{item.quantidade_recebida}</div>
                       <div className="text-xs text-slate-500">
-                        de {item.quantidade_pedida} pedidos
+                        de {item.quantidade_pedida} unidades
                       </div>
                     </td>
                     <td className="px-4 py-3 text-right font-semibold text-slate-900 dark:text-slate-100">
