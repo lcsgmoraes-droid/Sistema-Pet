@@ -263,10 +263,7 @@ function HistoricoTransferenciaCard({
             <button
               type="button"
               onClick={() => void onExcluirTransferencia(registro)}
-              disabled={
-                contaExcluindo === registro.conta_receber_id ||
-                bloqueiaAlteracao
-              }
+              disabled={contaExcluindo === registro.conta_receber_id || bloqueiaAlteracao}
               className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-2 text-sm font-medium text-rose-700 transition-colors hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {contaExcluindo === registro.conta_receber_id
