@@ -1,6 +1,7 @@
 import FornecedorSelector from "../fornecedores/FornecedorSelector";
 import ProductIdentity from "../ui/ProductIdentity";
 import { Check, Lightbulb, Plus, Save, X } from "lucide-react";
+import { formatMoneyBRL } from "../../utils/formatters";
 import {
   formatarQuantidadeCompraPedido,
   montarTooltipQuantidadeCompraPedido,
@@ -408,10 +409,10 @@ export default function PedidoCompraFormulario({
                         </div>
                       </td>
                       <td className="px-4 py-2 text-right">
-                        R$ {numeroSeguro(item.preco_unitario).toFixed(2)}
+                        {formatMoneyBRL(numeroSeguro(item.preco_unitario))}
                       </td>
                       <td className="px-4 py-2 text-right font-semibold">
-                        R$ {numeroSeguro(item.total).toFixed(2)}
+                        {formatMoneyBRL(numeroSeguro(item.total))}
                       </td>
                       <td className="px-4 py-2 text-right">
                         <button
@@ -453,7 +454,9 @@ export default function PedidoCompraFormulario({
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Total</label>
-            <div className="text-2xl font-bold text-green-600">R$ {calcularTotal().toFixed(2)}</div>
+            <div className="text-2xl font-bold text-green-600">
+              {formatMoneyBRL(calcularTotal())}
+            </div>
           </div>
         </div>
 

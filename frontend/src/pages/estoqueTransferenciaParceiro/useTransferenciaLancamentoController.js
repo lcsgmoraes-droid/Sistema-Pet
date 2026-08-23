@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import toast from "react-hot-toast";
+import { useLocation, useNavigate } from "react-router-dom";
 import api from "../../api";
 import { buscarClientes } from "../../api/clientes";
 import { getProdutos } from "../../api/produtos";
@@ -14,6 +15,7 @@ import {
   incrementarItemTransferencia,
   montarEntradaParceiroPayload,
   montarPayloadTransferencia,
+  montarRascunhoTransferenciaReposicaoGrupo,
   montarTransferenciaGrupoPayload,
   montarTransferenciaGrupoPreviaPayload,
   normalizarNumero,
@@ -28,11 +30,14 @@ function novaChaveIdempotencia() {
 }
 
 export default function useTransferenciaLancamentoController({ setAbaAtiva } = {}) {
+  const location = useLocation();
+  const navigate = useNavigate();
   const parceiroRef = useRef(null);
   const produtoRef = useRef(null);
   const produtoInputRef = useRef(null);
   const itensRef = useRef(null);
   const chaveIdempotenciaGrupoRef = useRef(novaChaveIdempotencia());
+  const planoReposicaoAplicadoRef = useRef(false);
 
   const [form, setForm] = useState(() => criarFormTransferencia());
   const [parceiroSelecionado, setParceiroSelecionado] = useState(null);
@@ -50,7 +55,7 @@ export default function useTransferenciaLancamentoController({ setAbaAtiva } = {
   const [salvando, setSalvando] = useState(false);
   const [transferenciaEditando, setTransferenciaEditando] = useState(null);
   const [destinosGrupo, setDestinosGrupo] = useState([]);
-  const [loadingDestinosGrupo, setLoadingDestinosGrupo] = useState(false);
+  const [loadingDestinosGrupo, setLoadingDestinosGrupo] = useState(true);
   const [previaGrupo, setPreviaGrupo] = useState(null);
 
   useEffect(() => {
@@ -77,6 +82,40 @@ export default function useTransferenciaLancamentoController({ setAbaAtiva } = {
       ativo = false;
     };
   }, []);
+
+  useEffect(() => {
+    const plano = location.state?.reposicaoGrupoTransferencia;
+    if (!plano || loadingDestinosGrupo || planoReposicaoAplicadoRef.current) return;
+
+    planoReposicaoAplicadoRef.current = true;
+    const rascunho = montarRascunhoTransferenciaReposicaoGrupo(plano);
+    const destinoExiste = destinosGrupo.some(
+      (destino) =>
+        `${destino.grupo_id}|${destino.empresa_id}` === rascunho?.form.destino_grupo_chave,
+    );
+
+    if (!rascunho || !destinoExiste) {
+      toast.error(
+        "Não foi possível preparar a transferência. Atualize o plano do grupo e tente novamente.",
+      );
+    } else {
+      setForm(rascunho.form);
+      setItens(rascunho.itens);
+      setTransferenciaEditando(null);
+      setAbaAtiva?.("lancamento");
+      toast.success("Transferência preparada. Revise os itens antes de confirmar.");
+    }
+
+    navigate(`${location.pathname}${location.search}`, { replace: true, state: null });
+  }, [
+    destinosGrupo,
+    loadingDestinosGrupo,
+    location.pathname,
+    location.search,
+    location.state,
+    navigate,
+    setAbaAtiva,
+  ]);
 
   useEffect(() => {
     const termo = buscaParceiro.trim();

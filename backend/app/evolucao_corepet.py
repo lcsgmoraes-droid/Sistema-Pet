@@ -216,7 +216,8 @@ ITENS_EVOLUCAO: tuple[dict[str, Any], ...] = (
         "titulo": "Reposição e financeiro inteligentes para o grupo",
         "resumo": (
             "Planeje compras usando o estoque de todas as empresas, transfira sobras antes "
-            "de comprar e acompanhe entradas e saídas por vencimento."
+            "de comprar, prepare transferências e pedidos para revisão e acompanhe entradas "
+            "e saídas por vencimento."
         ),
         "status": "disponivel_teste",
         "tipo": "projeto",

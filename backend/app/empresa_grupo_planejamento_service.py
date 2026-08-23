@@ -103,6 +103,116 @@ class EmpresaGrupoPlanejamentoService:
             for item in empresas
         }
 
+    @staticmethod
+    def _acoes_da_empresa_atual(
+        grupo_id: int, empresa_atual_id, itens: list[dict]
+    ) -> dict:
+        empresa_id = str(empresa_atual_id)
+        transferencias_por_destino: dict[str, dict] = {}
+        compras_por_fornecedor: dict[str, dict] = {}
+        compras_sem_fornecedor = []
+        transferencias_outras_empresas = 0
+        compras_outras_empresas = 0
+
+        for item in itens:
+            empresas_por_id = {
+                empresa["empresa_id"]: empresa for empresa in item["empresas"]
+            }
+            for transferencia in item["transferencias_sugeridas"]:
+                if transferencia["empresa_origem_id"] != empresa_id:
+                    transferencias_outras_empresas += 1
+                    continue
+
+                origem = empresas_por_id[empresa_id]
+                destino_id = transferencia["empresa_destino_id"]
+                lote = transferencias_por_destino.setdefault(
+                    destino_id,
+                    {
+                        "grupo_id": grupo_id,
+                        "empresa_destino_id": destino_id,
+                        "empresa_destino_nome": transferencia["empresa_destino_nome"],
+                        "quantidade_total": 0.0,
+                        "valor_total": 0.0,
+                        "itens": [],
+                    },
+                )
+                quantidade = _numero(transferencia["quantidade"])
+                custo_unitario = _numero(origem.get("preco_custo"))
+                lote["quantidade_total"] += quantidade
+                lote["valor_total"] += quantidade * custo_unitario
+                lote["itens"].append(
+                    {
+                        "produto_id": transferencia["produto_origem_id"],
+                        "produto_nome": origem["produto_nome"],
+                        "codigo": origem.get("sku"),
+                        "codigo_barras": origem.get("ean"),
+                        "estoque_atual": origem["estoque"],
+                        "preco_custo": custo_unitario,
+                        "quantidade": _quantidade(quantidade),
+                    }
+                )
+
+            for empresa in item["empresas"]:
+                compra_exata = _numero(empresa.get("compra_sugerida"))
+                if compra_exata <= 0.0005:
+                    continue
+                if empresa["empresa_id"] != empresa_id:
+                    compras_outras_empresas += 1
+                    continue
+
+                quantidade = ceil(max(0, compra_exata - 0.0005))
+                custo_unitario = _numero(empresa.get("preco_custo"))
+                item_compra = {
+                    "produto_id": empresa["produto_id"],
+                    "produto_nome": empresa["produto_nome"],
+                    "produto_codigo": empresa.get("sku"),
+                    "quantidade_pedida": quantidade,
+                    "unidade_compra": "UN",
+                    "quantidade_por_embalagem": 1,
+                    "preco_unitario": custo_unitario,
+                    "desconto_item": 0,
+                    "total": _moeda(quantidade * custo_unitario),
+                }
+                fornecedor_id = empresa.get("fornecedor_id")
+                if not fornecedor_id:
+                    compras_sem_fornecedor.append(item_compra)
+                    continue
+
+                chave_fornecedor = str(fornecedor_id)
+                lote = compras_por_fornecedor.setdefault(
+                    chave_fornecedor,
+                    {
+                        "fornecedor_id": fornecedor_id,
+                        "fornecedor_nome": empresa.get("fornecedor_nome")
+                        or f"Fornecedor {fornecedor_id}",
+                        "quantidade_total": 0.0,
+                        "valor_total": 0.0,
+                        "itens": [],
+                    },
+                )
+                lote["quantidade_total"] += quantidade
+                lote["valor_total"] += quantidade * custo_unitario
+                lote["itens"].append(item_compra)
+
+        transferencias = list(transferencias_por_destino.values())
+        compras = list(compras_por_fornecedor.values())
+        for lote in [*transferencias, *compras]:
+            lote["quantidade_total"] = _quantidade(lote["quantidade_total"])
+            lote["valor_total"] = _moeda(lote["valor_total"])
+
+        transferencias.sort(key=lambda lote: lote["empresa_destino_nome"])
+        compras.sort(key=lambda lote: lote["fornecedor_nome"])
+        return {
+            "empresa_id": empresa_id,
+            "transferencias": transferencias,
+            "compras": compras,
+            "compras_sem_fornecedor": compras_sem_fornecedor,
+            "pendencias_outras_empresas": {
+                "transferencias": transferencias_outras_empresas,
+                "compras": compras_outras_empresas,
+            },
+        }
+
     def listar_reposicao_inteligente(
         self,
         grupo_id: int,
@@ -200,8 +310,10 @@ class EmpresaGrupoPlanejamentoService:
                 item["produto_nome"],
             )
         )
+        itens_exibidos = itens[:limite]
         return {
             "grupo": produtos["grupo"],
+            "empresa_atual_id": str(empresa_atual_id),
             "periodo": produtos["periodo"],
             "dias_cobertura_alvo": dias_cobertura,
             "somente_acao": somente_acao,
@@ -221,7 +333,10 @@ class EmpresaGrupoPlanejamentoService:
                     sum(item["valor_compra_estimado"] for item in itens)
                 ),
             },
-            "itens": itens[:limite],
+            "acoes_empresa_atual": self._acoes_da_empresa_atual(
+                grupo_id, empresa_atual_id, itens_exibidos
+            ),
+            "itens": itens_exibidos,
             "limite": limite,
         }
 

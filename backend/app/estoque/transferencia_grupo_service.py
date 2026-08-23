@@ -15,6 +15,7 @@ from app.bling_estoque_sync import sincronizar_bling_background
 from app.empresa_grupo_models import (
     EmpresaGrupo,
     EmpresaGrupoMembro,
+    EmpresaGrupoProdutoVinculo,
     EmpresaGrupoTransferencia,
 )
 from app.estoque.transferencia_grupo_schemas import (
@@ -188,6 +189,55 @@ def _produto_destino_valido(produto: Produto) -> str | None:
     return None
 
 
+def _produtos_destino_vinculados(
+    db: Session,
+    *,
+    grupo_id: int,
+    empresa_origem_id: str,
+    produto_origem_id: int,
+    empresa_destino_id: str,
+) -> list[Produto]:
+    vinculos = (
+        db.query(EmpresaGrupoProdutoVinculo)
+        .filter(
+            EmpresaGrupoProdutoVinculo.grupo_id == grupo_id,
+            EmpresaGrupoProdutoVinculo.status == "ativo",
+            or_(
+                (
+                    (EmpresaGrupoProdutoVinculo.empresa_a_id == empresa_origem_id)
+                    & (EmpresaGrupoProdutoVinculo.produto_a_id == produto_origem_id)
+                    & (EmpresaGrupoProdutoVinculo.empresa_b_id == empresa_destino_id)
+                ),
+                (
+                    (EmpresaGrupoProdutoVinculo.empresa_b_id == empresa_origem_id)
+                    & (EmpresaGrupoProdutoVinculo.produto_b_id == produto_origem_id)
+                    & (EmpresaGrupoProdutoVinculo.empresa_a_id == empresa_destino_id)
+                ),
+            ),
+        )
+        .all()
+    )
+    ids_destino = {
+        int(vinculo.produto_b_id)
+        if str(vinculo.empresa_a_id) == empresa_origem_id
+        else int(vinculo.produto_a_id)
+        for vinculo in vinculos
+    }
+    if not ids_destino:
+        return []
+
+    empresa_destino_uuid = UUID(empresa_destino_id)
+    with tenant_context(empresa_destino_uuid):
+        return (
+            db.query(Produto)
+            .filter(
+                Produto.tenant_id == empresa_destino_uuid,
+                Produto.id.in_(ids_destino),
+            )
+            .all()
+        )
+
+
 def preparar_previa_transferencia(
     db: Session, *, empresa_origem_id, payload: TransferenciaGrupoPreviaRequest
 ) -> dict:
@@ -222,14 +272,38 @@ def preparar_previa_transferencia(
                 detail=f"Produto ID {produto_id} não encontrado na empresa de origem.",
             )
         identificadores = _identificadores_produto(produto_origem)
+        candidatos_vinculados = _produtos_destino_vinculados(
+            db,
+            grupo_id=grupo.id,
+            empresa_origem_id=empresa_origem_id,
+            produto_origem_id=produto_id,
+            empresa_destino_id=empresa_destino_id,
+        )
         base = {
             "produto_origem_id": produto_id,
             "produto_origem_nome": produto_origem.nome,
             "produto_destino_id": None,
             "produto_destino_nome": None,
-            "identificador": identificadores[0] if identificadores else None,
+            "identificador": "Vínculo do grupo"
+            if candidatos_vinculados
+            else (identificadores[0] if identificadores else None),
         }
-        if not identificadores:
+        if len(candidatos_vinculados) > 1:
+            resultados.append(
+                {
+                    **base,
+                    "status": "ambiguo",
+                    "mensagem": (
+                        "Mais de um produto do destino está vinculado a este item. "
+                        "Corrija os vínculos antes de transferir."
+                    ),
+                }
+            )
+            continue
+        if candidatos_vinculados:
+            candidatos = candidatos_vinculados
+            confirmado_por_vinculo = True
+        elif not identificadores:
             resultados.append(
                 {
                     **base,
@@ -238,24 +312,27 @@ def preparar_previa_transferencia(
                 }
             )
             continue
-
-        with tenant_context(empresa_destino_id):
-            candidatos = (
-                db.query(Produto)
-                .filter(
-                    Produto.tenant_id == empresa_destino_uuid,
-                    or_(
-                        func.upper(func.trim(Produto.codigo_barras)).in_(
-                            identificadores
+        else:
+            confirmado_por_vinculo = False
+            with tenant_context(empresa_destino_id):
+                candidatos = (
+                    db.query(Produto)
+                    .filter(
+                        Produto.tenant_id == empresa_destino_uuid,
+                        or_(
+                            func.upper(func.trim(Produto.codigo_barras)).in_(
+                                identificadores
+                            ),
+                            func.upper(func.trim(Produto.gtin_ean)).in_(
+                                identificadores
+                            ),
+                            func.upper(func.trim(Produto.gtin_ean_tributario)).in_(
+                                identificadores
+                            ),
                         ),
-                        func.upper(func.trim(Produto.gtin_ean)).in_(identificadores),
-                        func.upper(func.trim(Produto.gtin_ean_tributario)).in_(
-                            identificadores
-                        ),
-                    ),
+                    )
+                    .all()
                 )
-                .all()
-            )
         if not candidatos:
             resultados.append(
                 {
@@ -299,7 +376,11 @@ def preparar_previa_transferencia(
                 "produto_destino_id": produto_destino.id,
                 "produto_destino_nome": produto_destino.nome,
                 "status": STATUS_MAPEADO,
-                "mensagem": "Produto correspondente confirmado pelo código de barras.",
+                "mensagem": (
+                    "Produto correspondente confirmado pelo vínculo do grupo."
+                    if confirmado_por_vinculo
+                    else "Produto correspondente confirmado pelo código de barras."
+                ),
             }
         )
 

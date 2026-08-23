@@ -180,12 +180,18 @@ def _preparar(db: Session):
     ):
         with tenant_context(empresa_id):
             cliente = Cliente(user_id=1, nome=f"Cliente {prefixo}")
+            fornecedor = Cliente(
+                user_id=1,
+                nome=f"Fornecedor {prefixo}",
+                tipo_cadastro="fornecedor",
+            )
             produto_ean = _produto(f"Ração {prefixo}", f"RACAO-{prefixo}", ean, 5)
             produto_manual = _produto(
                 f"Petisco {prefixo}", f"PET-{prefixo}", f"78920000000{prefixo}", 3
             )
-            db.add_all([cliente, produto_ean, produto_manual])
+            db.add_all([cliente, fornecedor, produto_ean, produto_manual])
             db.flush()
+            produto_ean.fornecedor_id = fornecedor.id
             venda = _venda(
                 f"{prefixo}-1",
                 valor,
@@ -196,7 +202,7 @@ def _preparar(db: Session):
             db.flush()
             pedido_compra = PedidoCompra(
                 numero_pedido=f"PC-{prefixo}-1",
-                fornecedor_id=cliente.id,
+                fornecedor_id=fornecedor.id,
                 status="enviado" if prefixo == "A" else "recebido_total",
                 valor_total=valor,
                 valor_final=valor,
@@ -240,7 +246,7 @@ def _preparar(db: Session):
                         valor,
                         20,
                         vencimento,
-                        cliente.id,
+                        fornecedor.id,
                     ),
                     _receber(
                         f"Cliente {prefixo}",
@@ -253,6 +259,7 @@ def _preparar(db: Session):
             )
             db.flush()
             referencias[empresa_id] = {
+                "fornecedor": fornecedor,
                 "produto_ean": produto_ean,
                 "produto_manual": produto_manual,
             }
@@ -282,8 +289,8 @@ def test_lista_pedidos_e_contas_pagar_das_duas_empresas(db_local):
         "valor_total": 300.0,
     }
     assert {item["fornecedor_nome"] for item in pedidos_compra["itens"]} == {
-        "Cliente A",
-        "Cliente B",
+        "Fornecedor A",
+        "Fornecedor B",
     }
     assert contas["resumo"] == {
         "contas": 2,
@@ -476,6 +483,34 @@ def test_reposicao_inteligente_prioriza_transferencia_antes_da_compra(db_local):
             "quantidade": 2.0,
         }
     ]
+    assert resultado["acoes_empresa_atual"]["transferencias"] == []
+    assert resultado["acoes_empresa_atual"]["pendencias_outras_empresas"] == {
+        "transferencias": 1,
+        "compras": 0,
+    }
+
+    resultado_origem = service.listar_reposicao_inteligente(
+        grupo.id,
+        EMPRESA_B,
+        periodo_dias=30,
+        dias_cobertura=30,
+        busca="RACAO-B",
+    )
+    lote = resultado_origem["acoes_empresa_atual"]["transferencias"][0]
+    assert lote["empresa_destino_id"] == EMPRESA_A
+    assert lote["quantidade_total"] == 2.0
+    assert lote["valor_total"] == 20.0
+    assert lote["itens"] == [
+        {
+            "produto_id": referencias[EMPRESA_B]["produto_ean"].id,
+            "produto_nome": "Ração B",
+            "codigo": "RACAO-B",
+            "codigo_barras": "7891000000011",
+            "estoque_atual": 10.0,
+            "preco_custo": 10.0,
+            "quantidade": 2.0,
+        }
+    ]
 
 
 def test_reposicao_inteligente_sugere_compra_para_deficit_do_grupo(db_local):
@@ -499,6 +534,32 @@ def test_reposicao_inteligente_sugere_compra_para_deficit_do_grupo(db_local):
     assert item["quantidade_compra_sugerida"] == 4
     assert item["valor_compra_estimado"] == 40
     assert {empresa["compra_sugerida"] for empresa in item["empresas"]} == {2.0}
+    assert resultado["empresa_atual_id"] == EMPRESA_A
+    assert resultado["acoes_empresa_atual"]["compras"] == [
+        {
+            "fornecedor_id": referencias[EMPRESA_A]["fornecedor"].id,
+            "fornecedor_nome": "Fornecedor A",
+            "quantidade_total": 2.0,
+            "valor_total": 20.0,
+            "itens": [
+                {
+                    "produto_id": referencias[EMPRESA_A]["produto_ean"].id,
+                    "produto_nome": "Ração A",
+                    "produto_codigo": "RACAO-A",
+                    "quantidade_pedida": 2,
+                    "unidade_compra": "UN",
+                    "quantidade_por_embalagem": 1,
+                    "preco_unitario": 10.0,
+                    "desconto_item": 0,
+                    "total": 20.0,
+                }
+            ],
+        }
+    ]
+    assert resultado["acoes_empresa_atual"]["pendencias_outras_empresas"] == {
+        "transferencias": 0,
+        "compras": 1,
+    }
 
 
 def test_reposicao_inteligente_conta_apenas_produtos_com_acao_ao_mostrar_todos(

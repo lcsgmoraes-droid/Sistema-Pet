@@ -161,6 +161,24 @@ export const normalizarItemPedido = (item = {}) => {
 
 export const clonarItensPedido = (itens = []) => itens.map((item) => normalizarItemPedido(item));
 
+export const montarRascunhoPedidoReposicaoGrupo = (plano = {}) => {
+  const fornecedorId = Number(plano.fornecedor_id);
+  const itens = clonarItensPedido(Array.isArray(plano.itens) ? plano.itens : []);
+  if (!Number.isFinite(fornecedorId) || fornecedorId <= 0 || !itens.length) {
+    return null;
+  }
+
+  return {
+    fornecedor_id: String(fornecedorId),
+    data_prevista_entrega: "",
+    valor_frete: "0",
+    valor_desconto: "0",
+    observacoes:
+      "Reposição inteligente do grupo. Revise fornecedor, quantidades e valores antes de salvar.",
+    itens,
+  };
+};
+
 export const consolidarItensPedido = (
   itensBase = [],
   itensAdicionais = [],

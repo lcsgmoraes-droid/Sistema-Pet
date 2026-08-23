@@ -17,16 +17,19 @@ from app.db import Base
 from app.empresa_grupo_models import (
     EmpresaGrupo,
     EmpresaGrupoMembro,
+    EmpresaGrupoProdutoVinculo,
     EmpresaGrupoTransferencia,
 )
 from app.estoque.transferencia_grupo_schemas import (
     TransferenciaGrupoExecutarRequest,
     TransferenciaGrupoItemRequest,
+    TransferenciaGrupoPreviaRequest,
 )
 from app.estoque.transferencia_grupo_service import (
     MOTIVO_CANCELAMENTO_GRUPO,
     cancelar_transferencia_integrada_por_conta,
     executar_transferencia_integrada,
+    preparar_previa_transferencia,
 )
 from app.financeiro_models import ContaPagar, ContaReceber
 from app.models import Role, Tenant, User, UserTenant
@@ -186,6 +189,51 @@ def _silenciar_pos_commit(monkeypatch):
     monkeypatch.setattr(
         "app.estoque.transferencia_grupo_service.registrar_uso_funcionalidade",
         lambda *_args, **_kwargs: True,
+    )
+
+
+def test_previa_aceita_vinculo_manual_quando_codigos_sao_diferentes(db_local):
+    grupo, usuario_a, produto_a, produto_b = _preparar_cenario(db_local)
+    produto_a.codigo_barras = "1111111111111"
+    produto_b.codigo_barras = "2222222222222"
+    db_local.add(
+        EmpresaGrupoProdutoVinculo(
+            grupo_id=grupo.id,
+            empresa_a_id=EMPRESA_A,
+            produto_a_id=produto_a.id,
+            empresa_b_id=EMPRESA_B,
+            produto_b_id=produto_b.id,
+            status="ativo",
+            criado_por_empresa_id=EMPRESA_A,
+            criado_por_usuario_id=usuario_a.id,
+        )
+    )
+    db_local.commit()
+    payload = TransferenciaGrupoPreviaRequest(
+        grupo_id=grupo.id,
+        empresa_destino_id=UUID(EMPRESA_B),
+        itens=[
+            TransferenciaGrupoItemRequest(
+                produto_id=produto_a.id,
+                quantidade=2,
+                custo_unitario=20,
+                valor_total=40,
+            )
+        ],
+    )
+
+    with tenant_context(EMPRESA_A):
+        resultado = preparar_previa_transferencia(
+            db_local,
+            empresa_origem_id=EMPRESA_A,
+            payload=payload,
+        )
+
+    assert resultado["todos_mapeados"] is True
+    assert resultado["itens"][0]["produto_destino_id"] == produto_b.id
+    assert resultado["itens"][0]["identificador"] == "Vínculo do grupo"
+    assert resultado["itens"][0]["mensagem"] == (
+        "Produto correspondente confirmado pelo vínculo do grupo."
     )
 
 

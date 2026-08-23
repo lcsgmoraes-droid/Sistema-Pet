@@ -356,7 +356,7 @@ export default function LancamentoTransferenciaParceiro({
           {entradaParceiro
             ? "Depois de selecionar o produto, confira quantidade e valor da divida antes de registrar."
             : transferenciaGrupo
-              ? "Os produtos precisam ter o mesmo codigo de barras ou GTIN nas duas empresas. A transferencia sera bloqueada se faltar correspondencia segura."
+              ? "Os produtos precisam estar vinculados no grupo ou ter o mesmo codigo de barras/GTIN nas duas empresas. A transferencia sera bloqueada se faltar correspondencia segura."
               : "Depois de selecionar o produto, confira quantidade e valores na lista abaixo. O botao de registrar fica junto da conferencia final."}
         </div>
       </section>
@@ -370,7 +370,7 @@ export default function LancamentoTransferenciaParceiro({
               </h2>
               <p className="mt-1 text-sm text-gray-600">
                 {previaGrupo.todos_mapeados
-                  ? "Todos os produtos foram encontrados pelo codigo de barras."
+                  ? "Todos os produtos foram confirmados por vínculo do grupo ou código de barras."
                   : "Corrija os itens abaixo antes de tentar novamente."}
               </p>
             </div>
