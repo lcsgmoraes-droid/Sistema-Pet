@@ -299,6 +299,41 @@ def test_consolida_produtos_automaticamente_por_ean_e_pesquisa_por_sku(db_local)
     assert produto_sem_estoque["cobertura_dias"] == 0.0
 
 
+def test_consolida_estoque_por_ean_quando_equivalente_nao_teve_venda(db_local):
+    grupo, referencias = _preparar(db_local)
+    produto_sem_venda = referencias[EMPRESA_B]["produto_ean"]
+    with tenant_context(EMPRESA_B):
+        item_vendido = (
+            db_local.query(VendaItem)
+            .filter(VendaItem.produto_id == produto_sem_venda.id)
+            .one()
+        )
+        db_local.delete(item_vendido)
+    db_local.commit()
+
+    service = EmpresaGrupoAnaliseDetalhesService(db_local, agora=AGORA)
+    resultado = service.listar_produtos_vendidos(
+        grupo.id, EMPRESA_A, periodo_dias=30, busca="RACAO-B"
+    )
+
+    assert resultado["resumo"]["produtos"] == 1
+    produto = resultado["itens"][0]
+    assert produto["tipo_vinculo"] == "ean"
+    assert produto["quantidade"] == 2.0
+    assert produto["valor_total"] == 100.0
+    assert produto["estoque_grupo"] == 10.0
+    assert {item["empresa_nome"] for item in produto["empresas"]} == {
+        "Loja A",
+        "Loja B",
+    }
+    detalhe_sem_venda = next(
+        item for item in produto["empresas"] if item["empresa_id"] == EMPRESA_B
+    )
+    assert detalhe_sem_venda["quantidade"] == 0.0
+    assert detalhe_sem_venda["valor_total"] == 0.0
+    assert detalhe_sem_venda["pedidos"] == 0
+
+
 def test_vinculo_manual_agrupa_skus_diferentes_e_pode_ser_removido(db_local):
     grupo, referencias = _preparar(db_local)
     service = EmpresaGrupoAnaliseDetalhesService(db_local, agora=AGORA)
@@ -334,6 +369,42 @@ def test_vinculo_manual_agrupa_skus_diferentes_e_pode_ser_removido(db_local):
 
     vinculos_service.remover_vinculo(grupo.id, vinculo["id"], EMPRESA_A, 1)
     assert vinculos_service.listar_vinculos(grupo.id, EMPRESA_A)["itens"] == []
+
+
+def test_vinculo_manual_inclui_estoque_do_equivalente_sem_venda(db_local):
+    grupo, referencias = _preparar(db_local)
+    vinculos_service = EmpresaGrupoProdutoVinculoService(db_local, agora=AGORA)
+    produto_a = referencias[EMPRESA_A]["produto_manual"]
+    produto_b = referencias[EMPRESA_B]["produto_manual"]
+    vinculos_service.vincular_produtos(
+        grupo.id,
+        EMPRESA_A,
+        1,
+        SimpleNamespace(empresa_id=EMPRESA_A, produto_id=produto_a.id),
+        SimpleNamespace(empresa_id=EMPRESA_B, produto_id=produto_b.id),
+    )
+    with tenant_context(EMPRESA_B):
+        item_vendido = (
+            db_local.query(VendaItem).filter(VendaItem.produto_id == produto_b.id).one()
+        )
+        db_local.delete(item_vendido)
+    db_local.commit()
+
+    service = EmpresaGrupoAnaliseDetalhesService(db_local, agora=AGORA)
+    resultado = service.listar_produtos_vendidos(
+        grupo.id, EMPRESA_A, periodo_dias=30, busca="PET-B"
+    )
+
+    assert resultado["resumo"]["produtos"] == 1
+    produto = resultado["itens"][0]
+    assert produto["tipo_vinculo"] == "manual"
+    assert produto["quantidade"] == 1.0
+    assert produto["valor_total"] == 10.0
+    assert produto["estoque_grupo"] == 6.0
+    assert {item["empresa_nome"] for item in produto["empresas"]} == {
+        "Loja A",
+        "Loja B",
+    }
 
 
 def test_empresa_fora_do_grupo_nao_acessa_detalhes(db_local):

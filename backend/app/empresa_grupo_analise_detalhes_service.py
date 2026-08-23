@@ -504,6 +504,91 @@ class EmpresaGrupoAnaliseDetalhesService:
                 )
         return linhas
 
+    def _catalogo_produtos_grupo(self, membros: list) -> list[dict]:
+        catalogo = []
+        for membro, empresa in membros:
+            empresa_id = str(membro.empresa_id)
+            empresa_uuid = UUID(empresa_id)
+            with tenant_context(empresa_uuid):
+                produtos = (
+                    self.db.query(
+                        Produto.id,
+                        Produto.nome,
+                        Produto.codigo,
+                        Produto.codigo_barras,
+                        Produto.gtin_ean,
+                        Produto.estoque_atual,
+                        Produto.estoque_minimo,
+                    )
+                    .filter(Produto.tenant_id == empresa_uuid)
+                    .all()
+                )
+            for produto in produtos:
+                catalogo.append(
+                    {
+                        "empresa_id": empresa_id,
+                        "empresa_nome": empresa.name,
+                        "produto_id": produto.id,
+                        "produto_nome": produto.nome,
+                        "sku": produto.codigo,
+                        "ean": produto.codigo_barras or produto.gtin_ean,
+                        "estoque": _quantidade(produto.estoque_atual),
+                        "estoque_minimo": _quantidade(produto.estoque_minimo),
+                        "quantidade": 0.0,
+                        "valor_total": 0.0,
+                        "pedidos": 0,
+                    }
+                )
+        return catalogo
+
+    def _complementar_equivalentes_sem_venda(
+        self,
+        linhas: list[dict],
+        membros: list,
+        vinculos: list,
+    ) -> list[dict]:
+        if not linhas:
+            return linhas
+
+        catalogo = self._catalogo_produtos_grupo(membros)
+        chaves_catalogo = {
+            (item["empresa_id"], item["produto_id"]) for item in catalogo
+        }
+        equivalencias = _ConjuntosProdutos(chaves_catalogo)
+
+        por_ean = defaultdict(list)
+        for item in catalogo:
+            ean = _normalizar_codigo(item["ean"])
+            if ean:
+                por_ean[ean].append((item["empresa_id"], item["produto_id"]))
+        for equivalentes in por_ean.values():
+            if len({chave[0] for chave in equivalentes}) < 2:
+                continue
+            primeira = equivalentes[0]
+            for equivalente in equivalentes[1:]:
+                equivalencias.unir(primeira, equivalente)
+
+        for vinculo in vinculos:
+            equivalencias.unir(
+                (str(vinculo.empresa_a_id), vinculo.produto_a_id),
+                (str(vinculo.empresa_b_id), vinculo.produto_b_id),
+            )
+
+        chaves_com_venda = {(item["empresa_id"], item["produto_id"]) for item in linhas}
+        raizes_com_venda = {
+            equivalencias.encontrar(chave)
+            for chave in chaves_com_venda
+            if chave in chaves_catalogo
+        }
+        complementares = [
+            item
+            for item in catalogo
+            if (item["empresa_id"], item["produto_id"]) not in chaves_com_venda
+            and equivalencias.encontrar((item["empresa_id"], item["produto_id"]))
+            in raizes_com_venda
+        ]
+        return [*linhas, *complementares]
+
     def listar_produtos_vendidos(
         self,
         grupo_id: int,
@@ -516,8 +601,6 @@ class EmpresaGrupoAnaliseDetalhesService:
         grupo, membros, _membros_por_id = self._contexto(grupo_id, empresa_atual_id)
         inicio, fim = self._periodo(periodo_dias)
         linhas = self._linhas_produtos_vendidos(membros, inicio, fim)
-        chaves = {(item["empresa_id"], item["produto_id"]) for item in linhas}
-        conjuntos = _ConjuntosProdutos(chaves)
 
         vinculos = (
             self.db.query(EmpresaGrupoProdutoVinculo)
@@ -527,6 +610,10 @@ class EmpresaGrupoAnaliseDetalhesService:
             )
             .all()
         )
+        linhas = self._complementar_equivalentes_sem_venda(linhas, membros, vinculos)
+        chaves = {(item["empresa_id"], item["produto_id"]) for item in linhas}
+        conjuntos = _ConjuntosProdutos(chaves)
+
         chaves_vinculadas = set()
         for vinculo in vinculos:
             chave_a = (str(vinculo.empresa_a_id), vinculo.produto_a_id)
