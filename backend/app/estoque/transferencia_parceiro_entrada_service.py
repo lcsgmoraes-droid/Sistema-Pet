@@ -9,10 +9,10 @@ from sqlalchemy import desc, or_
 from sqlalchemy.orm import Session, joinedload
 
 from app.bling_estoque_sync import sincronizar_bling_background
+from app.empresa_grupo_models import EmpresaGrupoTransferencia
 from app.financeiro_models import ContaPagar
 from app.models import Cliente
 from app.produtos_models import EstoqueMovimentacao, Produto
-
 
 CENTAVO = Decimal("0.01")
 MOTIVO_ENTRADA_PARCEIRO = "transf_parceiro_entrada"
@@ -53,10 +53,10 @@ def _status_entrada_parceiro(conta, *, hoje=None) -> tuple[str, str]:
     data_hoje = _data_ref(hoje) or date.today()
     data_vencimento = _data_ref(getattr(conta, "data_vencimento", None))
 
-    if status_atual in {"pago", "recebido"} or saldo_aberto <= 0:
-        return "pago", "Paga"
     if status_atual in {"cancelado", "cancelada"}:
         return "cancelado", "Cancelada"
+    if status_atual in {"pago", "recebido"} or saldo_aberto <= 0:
+        return "pago", "Paga"
     if data_vencimento and data_vencimento < data_hoje:
         return "vencido", "Vencida"
     if status_atual == "parcial":
@@ -74,7 +74,9 @@ def normalizar_status_filtro_entrada(status_filtro: str | None) -> str:
 def serializar_entrada_parceiro(conta, *, hoje=None) -> dict:
     parceiro = getattr(conta, "fornecedor", None)
     status, status_label = _status_entrada_parceiro(conta, hoje=hoje)
-    saldo_aberto = _saldo_conta_pagar_decimal(conta)
+    saldo_aberto = (
+        Decimal("0.00") if status == "cancelado" else _saldo_conta_pagar_decimal(conta)
+    )
     observacoes = _texto_limpo(getattr(conta, "observacoes", None))
 
     return {
@@ -436,6 +438,35 @@ def listar_entradas_parceiro(
 
     contas = query.order_by(desc(ContaPagar.data_emissao), desc(ContaPagar.id)).all()
     registros = [serializar_entrada_parceiro(conta) for conta in contas]
+    integradas = (
+        db.query(EmpresaGrupoTransferencia)
+        .filter(
+            EmpresaGrupoTransferencia.empresa_destino_id == str(tenant_id),
+            EmpresaGrupoTransferencia.conta_pagar_destino_id.in_(
+                [conta.id for conta in contas]
+            ),
+        )
+        .all()
+        if contas
+        else []
+    )
+    integradas_por_conta = {
+        int(transferencia.conta_pagar_destino_id): transferencia
+        for transferencia in integradas
+        if transferencia.conta_pagar_destino_id is not None
+    }
+    for registro in registros:
+        transferencia = integradas_por_conta.get(int(registro["conta_pagar_id"]))
+        registro["transferencia_integrada"] = transferencia is not None
+        registro["transferencia_grupo_id"] = transferencia.id if transferencia else None
+        registro["transferencia_grupo_status"] = (
+            transferencia.status if transferencia else None
+        )
+        registro["empresa_origem_nome"] = (
+            (transferencia.resultado or {}).get("empresa_origem_nome")
+            if transferencia
+            else None
+        )
     if status_normalizado:
         registros = [item for item in registros if item["status"] == status_normalizado]
 

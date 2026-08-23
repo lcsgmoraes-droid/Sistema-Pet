@@ -123,6 +123,7 @@ function HistoricoTransferenciaCard({
     Number(registro.valor_recebido || 0) > 0 ||
     registro.status === "recebido" ||
     registro.status === "cancelado";
+  const bloqueiaEdicao = bloqueiaAlteracao || registro.transferencia_integrada;
 
   return (
     <article className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
@@ -142,6 +143,11 @@ function HistoricoTransferenciaCard({
               {registro.documento || `Transferencia #${registro.conta_receber_id}`}
             </h3>
             <StatusTransferenciaBadge status={registro.status} label={registro.status_label} />
+            {registro.transferencia_integrada ? (
+              <span className="rounded-full border border-violet-200 bg-violet-50 px-3 py-1 text-xs font-medium text-violet-700">
+                Integrada com {registro.empresa_destino_nome || "empresa do grupo"}
+              </span>
+            ) : null}
           </div>
           <p className="text-sm text-gray-700">
             {registro.parceiro_nome}
@@ -215,7 +221,12 @@ function HistoricoTransferenciaCard({
             <button
               type="button"
               onClick={() => onIniciarEdicaoTransferencia(registro)}
-              disabled={bloqueiaAlteracao}
+              disabled={bloqueiaEdicao}
+              title={
+                registro.transferencia_integrada
+                  ? "Cancele a transferência integrada e faça um novo lançamento."
+                  : undefined
+              }
               className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-2 text-sm font-medium text-amber-700 transition-colors hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-60"
             >
               Editar lancamento
@@ -254,11 +265,17 @@ function HistoricoTransferenciaCard({
               onClick={() => void onExcluirTransferencia(registro)}
               disabled={
                 contaExcluindo === registro.conta_receber_id ||
-                Number(registro.valor_recebido || 0) > 0
+                bloqueiaAlteracao
               }
               className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-2 text-sm font-medium text-rose-700 transition-colors hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              {contaExcluindo === registro.conta_receber_id ? "Excluindo..." : "Excluir lancamento"}
+              {contaExcluindo === registro.conta_receber_id
+                ? registro.transferencia_integrada
+                  ? "Cancelando..."
+                  : "Excluindo..."
+                : registro.transferencia_integrada
+                  ? "Cancelar transferência integrada"
+                  : "Excluir lançamento"}
             </button>
           </div>
 

@@ -131,6 +131,10 @@ class TransferenciaParceiroBaixaHistoricoItem(BaseModel):
 
 class TransferenciaParceiroHistoricoItem(BaseModel):
     conta_receber_id: int
+    transferencia_integrada: bool = False
+    transferencia_grupo_id: Optional[int] = None
+    transferencia_grupo_status: Optional[str] = None
+    empresa_destino_nome: Optional[str] = None
     documento: Optional[str] = None
     parceiro_id: Optional[int] = None
     parceiro_nome: str

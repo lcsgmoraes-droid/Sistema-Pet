@@ -62,10 +62,10 @@ def _status_transferencia_parceiro(conta: ContaReceber) -> tuple[str, str]:
     saldo_aberto = _saldo_conta_receber(conta)
     hoje = date.today()
 
-    if status_atual in {"recebido", "pago"} or saldo_aberto <= 0:
-        return "recebido", "Recebida"
     if status_atual in {"cancelado", "cancelada"}:
         return "cancelado", "Cancelada"
+    if status_atual in {"recebido", "pago"} or saldo_aberto <= 0:
+        return "recebido", "Recebida"
     if status_atual in {"parcial", "baixa_parcial"}:
         if conta.data_vencimento and conta.data_vencimento < hoje:
             return "vencido", "Vencida"
@@ -137,9 +137,11 @@ def _gerar_pdf_transferencia_parceiro_bytes(
     elements = [
         Paragraph("TRANSFERENCIA COM RESSARCIMENTO", titulo_style),
         Paragraph(
-            "Documento operacional de saida de estoque pelo custo"
-            if mostra_valores
-            else "Documento operacional de retirada de estoque",
+            (
+                "Documento operacional de saida de estoque pelo custo"
+                if mostra_valores
+                else "Documento operacional de retirada de estoque"
+            ),
             subtitulo_style,
         ),
     ]
@@ -162,9 +164,11 @@ def _gerar_pdf_transferencia_parceiro_bytes(
                 "Emissao",
                 conta.data_emissao.strftime("%d/%m/%Y") if conta.data_emissao else "-",
                 "Vencimento",
-                conta.data_vencimento.strftime("%d/%m/%Y")
-                if conta.data_vencimento
-                else "-",
+                (
+                    conta.data_vencimento.strftime("%d/%m/%Y")
+                    if conta.data_vencimento
+                    else "-"
+                ),
             ],
             ["Status", status_label, "Email", getattr(parceiro, "email", None) or "-"],
         ],
@@ -280,9 +284,11 @@ def _gerar_pdf_transferencia_parceiro_bytes(
                         "TEXTCOLOR",
                         (1, 2),
                         (1, 2),
-                        colors.HexColor("#b45309")
-                        if status_resolvido != "recebido"
-                        else colors.HexColor("#047857"),
+                        (
+                            colors.HexColor("#b45309")
+                            if status_resolvido != "recebido"
+                            else colors.HexColor("#047857")
+                        ),
                     ),
                     ("LINEABOVE", (0, 2), (-1, 2), 1, colors.HexColor("#94a3b8")),
                     ("FONTSIZE", (0, 0), (-1, -1), 9),

@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from .auth.dependencies import get_current_user_and_tenant
 from .db import get_session
+from .empresa_grupo_models import EmpresaGrupoTransferencia
 from .estoque.transferencia_parceiro_documents import (
     _gerar_pdf_transferencia_parceiro_bytes,
     _gerar_pdf_transferencias_parceiro_consolidado_bytes,
@@ -65,7 +66,6 @@ from .estoque.transferencia_grupo_routes import (
 )
 from .security.permissions_decorator import require_permission
 from .services.email_service import is_email_configured, send_email
-
 
 router = APIRouter(prefix="/estoque", tags=["Estoque - Transferencia Parceiro"])
 
@@ -143,6 +143,21 @@ def listar_transferencias_para_parceiro(
         [conta.id for conta in contas],
         ordem_desc=True,
     )
+    transferencias_integradas = (
+        db.query(EmpresaGrupoTransferencia)
+        .filter(
+            EmpresaGrupoTransferencia.empresa_origem_id == str(tenant_id),
+            EmpresaGrupoTransferencia.conta_receber_origem_id.in_(
+                [conta.id for conta in contas]
+            ),
+        )
+        .all()
+    )
+    integradas_por_conta = {
+        int(transferencia.conta_receber_origem_id): transferencia
+        for transferencia in transferencias_integradas
+        if transferencia.conta_receber_origem_id is not None
+    }
 
     registros_filtrados: list[TransferenciaParceiroHistoricoItem] = []
     totais = {
@@ -159,7 +174,10 @@ def listar_transferencias_para_parceiro(
         status_resolvido, status_label = _status_transferencia_parceiro(conta)
         valor_original = float(conta.valor_original or 0)
         valor_recebido = float(conta.valor_recebido or 0)
-        saldo_aberto = _saldo_conta_receber(conta)
+        saldo_aberto = (
+            0.0 if status_resolvido == "cancelado" else _saldo_conta_receber(conta)
+        )
+        transferencia_integrada = integradas_por_conta.get(int(conta.id))
 
         totais["total_registros"] += 1
         totais["valor_total"] += valor_original
@@ -186,6 +204,20 @@ def listar_transferencias_para_parceiro(
         registros_filtrados.append(
             TransferenciaParceiroHistoricoItem(
                 conta_receber_id=conta.id,
+                transferencia_integrada=transferencia_integrada is not None,
+                transferencia_grupo_id=(
+                    transferencia_integrada.id if transferencia_integrada else None
+                ),
+                transferencia_grupo_status=(
+                    transferencia_integrada.status if transferencia_integrada else None
+                ),
+                empresa_destino_nome=(
+                    (transferencia_integrada.resultado or {}).get(
+                        "empresa_destino_nome"
+                    )
+                    if transferencia_integrada
+                    else None
+                ),
                 documento=conta.documento,
                 parceiro_id=cliente.id if cliente else None,
                 parceiro_nome=cliente.nome if cliente else "Parceiro nao encontrado",
