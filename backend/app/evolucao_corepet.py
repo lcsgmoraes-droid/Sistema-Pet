@@ -77,13 +77,13 @@ ITENS_EVOLUCAO: tuple[dict[str, Any], ...] = (
         "id": "expansao-central-ajuda",
         "titulo": "Central de Ajuda cada vez mais guiada",
         "resumo": (
-            "Os artigos do sistema e os guias visuais em PDF serão ampliados por módulo, "
-            "sempre com caminho da tela, exemplos, alertas e checklist final."
+            "A Central reúne artigos pesquisáveis por módulo e links diretos das novidades, "
+            "com caminho da tela, passos, alertas e checklist de conferência."
         ),
-        "status": "em_desenvolvimento",
+        "status": "disponivel_teste",
         "tipo": "melhoria",
         "modulo": "Ajuda",
-        "plataformas": ["ERP", "App do cliente", "App do funcionário"],
+        "plataformas": ["ERP"],
         "canais": [
             "erp",
             "app_cliente",
@@ -91,10 +91,16 @@ ITENS_EVOLUCAO: tuple[dict[str, Any], ...] = (
             "app_entregador",
             "app_veterinario",
         ],
-        "publicado_em": None,
+        "publicado_em": "2026-08-22",
         "atualizado_em": "2026-08-22",
+        "ciclo_novidade": {
+            **deepcopy(CICLO_PADRAO),
+            # A leitura dos artigos não identifica usuário ou empresa; a promoção
+            # desta melhoria depende apenas do período mínimo de acompanhamento.
+            "usos_minimos_teste": 0,
+        },
         "destaque": True,
-        "caminho_ajuda": None,
+        "caminho_ajuda": "/ajuda?aba=central&artigo=usar-central-ajuda-guiada",
     },
     {
         "id": "cadastro-rapido-cliente-app-funcionario",

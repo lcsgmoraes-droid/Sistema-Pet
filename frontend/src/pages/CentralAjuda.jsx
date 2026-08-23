@@ -61,6 +61,13 @@ const COR_CLASSES = {
     icon: "text-teal-500",
     tab: "bg-teal-600 text-white",
   },
+  emerald: {
+    bg: "bg-emerald-50",
+    text: "text-emerald-700",
+    border: "border-emerald-200",
+    icon: "text-emerald-500",
+    tab: "bg-emerald-600 text-white",
+  },
   gray: {
     bg: "bg-gray-50",
     text: "text-gray-700",
