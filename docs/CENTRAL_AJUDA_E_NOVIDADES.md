@@ -33,12 +33,19 @@ Toda tela ou funcionalidade nova voltada ao usuário deve incluir:
 5. data de publicação e data da última atualização.
 
 O catálogo é validado por `backend/tests/unit/test_evolucao_corepet.py`. Um item disponível sem data de publicação, caminho de ajuda ou ciclo válido deve falhar na validação.
+O mesmo teste também confere se cada link do catálogo aponta para um artigo realmente existente na Central de Ajuda.
 
 ## Padrão dos guias
 
 Os guias completos devem conter objetivo, público, pré-requisitos, caminho da tela, passos, exemplos, alertas, teste, checklist e dúvidas comuns. Guias curtos de integrações podem usar apresentação horizontal; configurações longas devem usar A4 vertical.
 
 Capturas de tela nunca devem expor dados reais de clientes ou informações sigilosas.
+
+## Central disponível
+
+Desde 22/08/2026, a Central de Ajuda do ERP está disponível em fase de teste em **Ajuda e Planos → Central de Ajuda**. Ela possui busca por conteúdo, filtros por módulo e abertura direta do artigo a partir de **Novidades → Ver como usar**.
+
+Como a leitura dos artigos não registra cliente, empresa nem usuário, o item `expansao-central-ajuda` usa somente o período mínimo de 14 dias para passar automaticamente de **Disponível — em fase de teste** para **Implantado**. Depois disso, permanece em Novidades por mais 30 dias e sai apenas da divulgação; os artigos continuam disponíveis.
 
 ## Decisões encerradas
 

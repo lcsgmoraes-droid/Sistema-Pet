@@ -20,6 +20,21 @@ export const BASE_CONHECIMENTO = [
     cor: "emerald",
     artigos: [
       {
+        slug: "usar-central-ajuda-guiada",
+        titulo: "Como usar a Central de Ajuda guiada do CorePet",
+        tags: ["ajuda", "central", "guia", "artigos", "pesquisa", "passo a passo"],
+        conteudo: [
+          "Acesse **Ajuda e Planos → Central de Ajuda** no menu do ERP. A tela reúne os artigos de uso do CorePet em um único lugar.",
+          "Digite uma dúvida, funcionalidade ou palavra-chave na busca. O CorePet procura no título, nas tags e no conteúdo dos artigos.",
+          "Se preferir navegar, escolha um módulo, como **PDV**, **Financeiro** ou **Produtos e Estoque**, e abra o artigo desejado.",
+          "Nas funções recém-lançadas, use **Novidades → Ver como usar**. O link abre diretamente o artigo correspondente e destaca o conteúdo procurado.",
+          "Cada artigo informa o caminho da tela e os passos essenciais. Os guias mais completos também incluem pré-requisitos, alertas, teste seguro e checklist final.",
+          "Se a busca não encontrar o assunto, tente uma palavra mais curta ou selecione **Todos** para voltar à lista completa.",
+          "Antes de usar uma configuração nova na operação diária, faça o teste indicado pelo guia sem dados reais ou sigilosos.",
+          "Ao concluir, confira se os dados foram salvos, se o resultado apareceu na tela correta e se o processo terminou sem erro.",
+        ],
+      },
+      {
         slug: "acompanhar-novidades-projetos",
         titulo: "Como acompanhar Novidades e Projetos do CorePet",
         tags: ["novidades", "projetos", "evolucao", "em andamento", "em estudo"],

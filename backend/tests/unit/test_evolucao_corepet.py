@@ -1,4 +1,6 @@
 from datetime import datetime, timezone
+from pathlib import Path
+from urllib.parse import parse_qs, urlparse
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -28,6 +30,28 @@ def test_catalogo_evolucao_respeita_contrato_de_publicacao():
         if item["status"] in STATUS_DISPONIVEIS:
             assert item["publicado_em"]
             assert item["caminho_ajuda"]
+
+
+def test_links_do_catalogo_apontam_para_artigos_existentes_na_central():
+    raiz_repositorio = Path(__file__).resolve().parents[3]
+    base_ajuda = (
+        raiz_repositorio
+        / "frontend"
+        / "src"
+        / "pages"
+        / "centralAjuda"
+        / "centralAjudaKnowledge.js"
+    ).read_text(encoding="utf-8")
+
+    for item in ITENS_EVOLUCAO:
+        caminho = item.get("caminho_ajuda")
+        if not caminho:
+            continue
+        artigo = parse_qs(urlparse(caminho).query).get("artigo", [None])[0]
+        assert artigo, f"Caminho de ajuda sem artigo: {item['id']}"
+        assert f'slug: "{artigo}"' in base_ajuda, (
+            f"Artigo {artigo!r} do item {item['id']} não existe na Central de Ajuda"
+        )
 
 
 def test_catalogo_filtra_projetos_por_canal_sem_expor_item_interno():
@@ -61,6 +85,33 @@ def test_funcao_liberada_aparece_como_disponivel_em_fase_de_teste():
     assert avaliacao["status"] == "disponivel"
     assert avaliacao["fase_disponibilidade"] == "teste"
     assert avaliacao["status_label"] == "Disponível — em fase de teste"
+
+
+def test_central_ajuda_liberada_promove_por_tempo_sem_rastrear_leituras():
+    durante_teste = listar_evolucao_corepet(
+        "erp",
+        agora=datetime(2026, 8, 22, 12, tzinfo=timezone.utc),
+    )
+    central_teste = next(
+        item
+        for item in durante_teste["itens"]
+        if item["id"] == "expansao-central-ajuda"
+    )
+
+    assert central_teste["status_label"] == "Disponível — em fase de teste"
+
+    depois_do_periodo = listar_evolucao_corepet(
+        "erp",
+        agora=datetime(2026, 9, 5, 12, tzinfo=timezone.utc),
+    )
+    central_implantada = next(
+        item
+        for item in depois_do_periodo["itens"]
+        if item["id"] == "expansao-central-ajuda"
+    )
+
+    assert central_implantada["status_label"] == "Implantado"
+    assert central_implantada["implantado_em"] == "2026-09-05"
 
 
 def test_promove_para_implantado_depois_do_tempo_e_quantidade_de_usos():
