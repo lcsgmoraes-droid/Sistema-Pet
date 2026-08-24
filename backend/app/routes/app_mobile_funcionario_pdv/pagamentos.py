@@ -38,6 +38,9 @@ def _normalizar_forma_pagamento_pdv(forma_pagamento: str) -> str:
         "cashback": "Cashback",
         "crediario": "Crediário",
         "crediário": "Crediário",
+        "boleto": "Boleto",
+        "transferencia": "Transferência",
+        "transferência": "Transferência",
     }
     if forma not in mapa:
         raise HTTPException(
@@ -60,38 +63,68 @@ def _forma_pagamento_key_funcionario_pdv(
         return "dinheiro"
     if "crediario" in texto or "crediário" in texto:
         return "crediario"
+    if "boleto" in texto:
+        return "boleto"
+    if "transferencia" in texto or "transferência" in texto:
+        return "transferencia"
     return None
 
 
-def _obter_ou_criar_forma_crediario_funcionario_pdv(
-    db: Session, tenant_id: str, current_user: User
+def _obter_forma_crediario_ativa_funcionario_pdv(
+    db: Session, tenant_id: str, forma_pagamento_id: Optional[int] = None
 ) -> FormaPagamento:
+    query = db.query(FormaPagamento).filter(
+        FormaPagamento.tenant_id == tenant_id,
+        FormaPagamento.ativo.is_(True),
+        FormaPagamento.tipo == "crediario",
+    )
+    if forma_pagamento_id:
+        query = query.filter(FormaPagamento.id == forma_pagamento_id)
+    forma = query.first()
+    if not forma:
+        raise HTTPException(
+            status_code=400,
+            detail="O crediário está desativado nas formas de pagamento do ERP.",
+        )
+    return forma
+
+
+def _resolver_forma_pagamento_ativa_funcionario_pdv(
+    db: Session,
+    tenant_id: str,
+    pagamento: FuncionarioPdvPagamentoRequest,
+) -> Optional[FormaPagamento]:
+    if not pagamento.forma_pagamento_id:
+        return None
+
     forma = (
         db.query(FormaPagamento)
         .filter(
+            FormaPagamento.id == pagamento.forma_pagamento_id,
             FormaPagamento.tenant_id == tenant_id,
             FormaPagamento.ativo.is_(True),
-            FormaPagamento.tipo == "crediario",
         )
         .first()
     )
-    if forma:
-        return forma
-    forma = FormaPagamento(
-        tenant_id=tenant_id,
-        nome="Crediário",
-        tipo="crediario",
-        prazo_dias=30,
-        prazo_recebimento=30,
-        gera_contas_receber=True,
-        ativo=True,
-        permite_parcelamento=False,
-        max_parcelas=1,
-        parcelas_maximas=1,
-        user_id=current_user.id,
-    )
-    db.add(forma)
-    db.flush()
+    if not forma:
+        raise HTTPException(
+            status_code=400,
+            detail="A forma de pagamento selecionada não está ativa no ERP.",
+        )
+
+    key_esperada = _forma_pagamento_key_funcionario_pdv(forma)
+    key_informada = (pagamento.forma_pagamento or "").strip().lower()
+    key_informada = {
+        "cartao_credito": "credito",
+        "cartao_debito": "debito",
+        "crediário": "crediario",
+        "transferência": "transferencia",
+    }.get(key_informada, key_informada)
+    if not key_esperada or key_esperada != key_informada:
+        raise HTTPException(
+            status_code=400,
+            detail="A forma de pagamento não corresponde ao cadastro selecionado no ERP.",
+        )
     return forma
 
 
@@ -227,15 +260,10 @@ def listar_formas_pagamento_funcionario_pdv(
     )
 
     resposta = []
-    modalidades_cartao_adicionadas = set()
     for forma in formas:
         key = _forma_pagamento_key_funcionario_pdv(forma)
         if not key:
             continue
-        if key in {"credito", "debito"}:
-            if key in modalidades_cartao_adicionadas:
-                continue
-            modalidades_cartao_adicionadas.add(key)
         parcelas_maximas = int(forma.parcelas_maximas or forma.max_parcelas or 1)
         max_parcelas = int(forma.max_parcelas or parcelas_maximas or 1)
         numero_parcelas = max(1, parcelas_maximas, max_parcelas)
@@ -336,26 +364,4 @@ def listar_formas_pagamento_funcionario_pdv(
             resposta.extend(opcoes_estruturadas)
         elif not regras:
             resposta.append(resposta_base)
-    if not any(item["key"] == "crediario" for item in resposta):
-        resposta.append(
-            {
-                "id": 0,
-                "selection_id": "builtin:crediario",
-                "nome": "Crediário",
-                "tipo": "crediario",
-                "key": "crediario",
-                "taxa_percentual": 0,
-                "permite_parcelamento": False,
-                "numero_parcelas": 1,
-                "max_parcelas": 1,
-                "parcelas_maximas": 1,
-                "operadora": None,
-                "operadora_id": None,
-                "requer_nsu": False,
-                "tipo_cartao": None,
-                "bandeira": None,
-                "split_parcelas": False,
-                "parcelas_disponiveis": [1],
-            }
-        )
     return resposta

@@ -458,7 +458,14 @@ export interface FuncionarioPdvItemPayload {
   preco_unitario: number;
 }
 
-export type FuncionarioPdvFormaPagamento = "dinheiro" | "pix" | "credito" | "debito" | "crediario";
+export type FuncionarioPdvFormaPagamento =
+  | "dinheiro"
+  | "pix"
+  | "credito"
+  | "debito"
+  | "crediario"
+  | "boleto"
+  | "transferencia";
 
 export interface FuncionarioPdvFormaPagamentoOpcao {
   id: number;

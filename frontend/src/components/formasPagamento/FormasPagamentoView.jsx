@@ -173,12 +173,14 @@ export default function FormasPagamentoView({
                       >
                         Editar
                       </button>
-                      <button
-                        className="text-red-600 hover:text-red-800"
-                        onClick={() => excluir(forma.id)}
-                      >
-                        Excluir
-                      </button>
+                      {forma.tipo !== "crediario" && (
+                        <button
+                          className="text-red-600 hover:text-red-800"
+                          onClick={() => excluir(forma.id)}
+                        >
+                          Excluir
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>
@@ -328,6 +330,12 @@ export default function FormasPagamentoView({
 
                 {/* Checkboxes */}
                 <div className="col-span-2 space-y-2">
+                  {formData.tipo === "crediario" && (
+                    <p className="rounded border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+                      Forma padrão do sistema. Use o campo Ativo para mostrar ou ocultar o crediário
+                      no ERP e no app do funcionário.
+                    </p>
+                  )}
                   <label className="flex items-center gap-2">
                     <input
                       type="checkbox"

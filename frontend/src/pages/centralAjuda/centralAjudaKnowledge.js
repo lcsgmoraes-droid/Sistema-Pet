@@ -406,7 +406,8 @@ export const BASE_CONHECIMENTO = [
         tags: ["crediario", "vencimento", "contas a receber", "app funcionario"],
         conteudo: [
           "Selecione obrigatoriamente a pessoa que fará a compra.",
-          "Em **Pagamento**, escolha **Crediário** e informe a data combinada no formato AAAA-MM-DD.",
+          "O **Crediário** é criado automaticamente no ERP. Em **Cadastros → Formas de Pagamento**, use o campo **Ativo** para mostrá-lo ou ocultá-lo no ERP e no app.",
+          "Em **Pagamento**, escolha **Crediário** e informe a data combinada no formato DD-MM-AAAA.",
           "Finalize a venda. O valor não entra como dinheiro no caixa: ele fica pendente em **Financeiro → Contas a Receber**.",
           "O cliente ligado ao cadastro recebe um aviso no app e pode acompanhar o saldo e o vencimento em **Pedidos → Crediário**.",
           "Quando o cliente pagar, registre a baixa normalmente no Contas a Receber do ERP.",
