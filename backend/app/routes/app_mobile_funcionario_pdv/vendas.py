@@ -15,7 +15,8 @@ from .beneficios import _calcular_beneficios_funcionario_pdv
 from .caixa import _obter_caixa_aberto_funcionario_pdv
 from .pagamentos import (
     _normalizar_forma_pagamento_pdv,
-    _obter_ou_criar_forma_crediario_funcionario_pdv,
+    _obter_forma_crediario_ativa_funcionario_pdv,
+    _resolver_forma_pagamento_ativa_funcionario_pdv,
     _resolver_forma_pagamento_cartao_funcionario_pdv,
 )
 from .schemas import (
@@ -163,8 +164,12 @@ def finalizar_venda_funcionario_pdv(
         db, tenant_id, dados.pagamento
     )
     if eh_crediario:
-        forma_pagamento_selecionada = _obter_ou_criar_forma_crediario_funcionario_pdv(
-            db, tenant_id, current_user
+        forma_pagamento_selecionada = _obter_forma_crediario_ativa_funcionario_pdv(
+            db, tenant_id, dados.pagamento.forma_pagamento_id
+        )
+    elif not forma_pagamento_selecionada:
+        forma_pagamento_selecionada = _resolver_forma_pagamento_ativa_funcionario_pdv(
+            db, tenant_id, dados.pagamento
         )
     if forma_pagamento != "cartao_credito":
         numero_parcelas = max(1, min(numero_parcelas, 1))

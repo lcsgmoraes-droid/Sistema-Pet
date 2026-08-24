@@ -9,7 +9,7 @@ import app.db  # noqa: F401 - registra hooks multitenant
 TENANT_A = "11111111-1111-1111-1111-111111111111"
 TENANT_B = "22222222-2222-2222-2222-222222222222"
 BASE_EXPECTED_COUNTS = {
-    "payment_methods": 4,
+    "payment_methods": 5,
     "bank_accounts": 2,
     "pet_species": 2,
     "pet_breeds": 2,

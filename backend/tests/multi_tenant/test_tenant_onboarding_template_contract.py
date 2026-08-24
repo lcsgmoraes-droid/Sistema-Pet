@@ -27,7 +27,7 @@ def test_template_contract_check_is_read_only_and_accepts_complete_builtin_contr
     assert result["missing_template_tables"] == []
     assert result["missing_operational_tables"] == {}
     assert result["dependency_errors"] == []
-    assert result["template_item_counts"]["payment_method"] == 4
+    assert result["template_item_counts"]["payment_method"] == 5
     assert result["template_item_counts"]["bank_account"] == 2
     assert result["template_item_counts"]["pet_species"] == 2
     assert result["template_item_counts"]["pet_breed"] == 2

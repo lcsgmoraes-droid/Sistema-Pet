@@ -79,6 +79,7 @@ export function useModalPagamentoActions({
       operadora: operadoraSelecionada,
       numeroParcelas,
       parcelasDisponiveis,
+      cliente: venda.cliente,
     });
 
     if (erroValidacao) {

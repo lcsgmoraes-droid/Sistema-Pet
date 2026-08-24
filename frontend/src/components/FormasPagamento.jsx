@@ -14,6 +14,7 @@ const DEFAULT_ICON_BY_TIPO = {
   pix: "\uD83D\uDCF1",
   boleto: "\uD83D\uDCC4",
   transferencia: "\uD83C\uDFE6",
+  crediario: "\uD83D\uDCC5",
 };
 
 const tryRepairMojibake = (value) => {
@@ -252,6 +253,7 @@ const FormasPagamento = () => {
     { value: "pix", label: "PIX", icone: "\uD83D\uDCF1" },
     { value: "boleto", label: "Boleto", icone: "\uD83D\uDCC4" },
     { value: "transferencia", label: "Transferencia", icone: "\uD83C\uDFE6" },
+    { value: "crediario", label: "Crediário", icone: "\uD83D\uDCC5" },
   ];
 
   return (

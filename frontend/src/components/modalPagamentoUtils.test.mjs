@@ -6,6 +6,7 @@ import {
   calcularFaixasParcelamento,
   calcularCustoTotalItensVenda,
   calcularResumoRecebimento,
+  dataCrediarioParaIso,
   devePerguntarNotaFiscal,
   descreverCupomMargem,
   ehFormaPagamentoPix,
@@ -28,6 +29,7 @@ import {
   montarPayloadAnaliseMargem,
   montarVendaParaPersistirComCupom,
   montarObservacoesComJustificativaMargem,
+  mascararDataCrediario,
   normalizarResultadoSimulacaoParcelamento,
   normalizarBandeiraCartao,
   obterBandeiraPadraoPdv,
@@ -655,6 +657,25 @@ test("monta pagamento em dinheiro com troco e sem dados de cartao", () => {
   assert.equal(pagamento.troco, 20);
 });
 
+test("monta crediario do ERP com vencimento informado em DD-MM-AAAA", () => {
+  const pagamento = montarPagamentoRecebido({
+    formaPagamento: {
+      id: 9,
+      nome: "Crediário",
+      tipo: "crediario",
+      data_vencimento_crediario: "30-09-2026",
+    },
+    valor: 100,
+    valorRestante: 100,
+  });
+
+  assert.equal(pagamento.forma_pagamento_id, 9);
+  assert.equal(pagamento.data_recebimento_prevista, "2026-09-30");
+  assert.equal(dataCrediarioParaIso("30-09-2026"), "2026-09-30");
+  assert.equal(dataCrediarioParaIso("31-02-2026"), null);
+  assert.equal(mascararDataCrediario("30092026"), "30-09-2026");
+});
+
 test("nao envia identificador textual do credito do cliente ao backend", () => {
   const pagamento = montarPagamentoRecebido({
     formaPagamento: {
@@ -845,6 +866,31 @@ test("valida pagamento antes de adicionar", () => {
       valor: 0,
     }),
     "Informe o valor recebido",
+  );
+
+  assert.equal(
+    validarPagamentoParaAdicionar({
+      formaPagamento: {
+        id: 9,
+        tipo: "crediario",
+        data_vencimento_crediario: "30-09-2026",
+      },
+      valor: 100,
+    }),
+    "Selecione o cliente da venda para usar o crediário",
+  );
+
+  assert.equal(
+    validarPagamentoParaAdicionar({
+      formaPagamento: {
+        id: 9,
+        tipo: "crediario",
+        data_vencimento_crediario: "31-02-2026",
+      },
+      valor: 100,
+      cliente: { id: 4 },
+    }),
+    "Informe uma data de vencimento válida no formato DD-MM-AAAA",
   );
 
   assert.equal(

@@ -267,25 +267,41 @@ def criar_forma_pagamento(
     Cria nova forma de pagamento com todos os campos
     """
     current_user, tenant_id = user_and_tenant
+    eh_crediario = forma.tipo == "crediario"
+    if eh_crediario:
+        crediario_existente = (
+            db.query(FormaPagamento.id)
+            .filter(
+                FormaPagamento.tenant_id == tenant_id,
+                FormaPagamento.tipo == "crediario",
+            )
+            .first()
+        )
+        if crediario_existente:
+            raise HTTPException(
+                status_code=400,
+                detail="O crediário padrão já existe. Ative-o ou desative-o no cadastro.",
+            )
+
     nova_forma = FormaPagamento(
-        nome=forma.nome,
+        nome="Crediário" if eh_crediario else forma.nome,
         tipo=forma.tipo,
         taxa_percentual=forma.taxa_percentual,
         taxa_fixa=forma.taxa_fixa,
-        prazo_dias=forma.prazo_dias,
-        prazo_recebimento=forma.prazo_dias,  # Compatibilidade
+        prazo_dias=30 if eh_crediario else forma.prazo_dias,
+        prazo_recebimento=30 if eh_crediario else forma.prazo_dias,
         operadora=forma.operadora,
         operadora_id=forma.operadora_id,
-        gera_contas_receber=forma.gera_contas_receber,
+        gera_contas_receber=True if eh_crediario else forma.gera_contas_receber,
         split_parcelas=forma.split_parcelas,
         conta_bancaria_destino_id=forma.conta_bancaria_destino_id,
         requer_nsu=forma.requer_nsu,
         tipo_cartao=forma.tipo_cartao,
         bandeira=forma.bandeira,
         ativo=forma.ativo,
-        permite_parcelamento=forma.permite_parcelamento,
-        max_parcelas=forma.parcelas_maximas,
-        parcelas_maximas=forma.parcelas_maximas,  # Compatibilidade
+        permite_parcelamento=False if eh_crediario else forma.permite_parcelamento,
+        max_parcelas=1 if eh_crediario else forma.parcelas_maximas,
+        parcelas_maximas=1 if eh_crediario else forma.parcelas_maximas,
         taxas_por_parcela=forma.taxas_por_parcela,  # JSON string
         permite_antecipacao=forma.permite_antecipacao,
         dias_recebimento_antecipado=forma.dias_recebimento_antecipado,
@@ -325,24 +341,25 @@ def atualizar_forma_pagamento(
         raise HTTPException(status_code=404, detail="Forma de pagamento não encontrada")
 
     # Atualizar todos os campos
-    f.nome = forma.nome
-    f.tipo = forma.tipo
+    eh_crediario = f.tipo == "crediario" or forma.tipo == "crediario"
+    f.nome = "Crediário" if eh_crediario else forma.nome
+    f.tipo = "crediario" if eh_crediario else forma.tipo
     f.taxa_percentual = forma.taxa_percentual
     f.taxa_fixa = forma.taxa_fixa
-    f.prazo_dias = forma.prazo_dias
-    f.prazo_recebimento = forma.prazo_dias
+    f.prazo_dias = 30 if eh_crediario else forma.prazo_dias
+    f.prazo_recebimento = 30 if eh_crediario else forma.prazo_dias
     f.operadora = forma.operadora
     f.operadora_id = forma.operadora_id
-    f.gera_contas_receber = forma.gera_contas_receber
+    f.gera_contas_receber = True if eh_crediario else forma.gera_contas_receber
     f.split_parcelas = forma.split_parcelas
     f.conta_bancaria_destino_id = forma.conta_bancaria_destino_id
     f.requer_nsu = forma.requer_nsu
     f.tipo_cartao = forma.tipo_cartao
     f.bandeira = forma.bandeira
     f.ativo = forma.ativo
-    f.permite_parcelamento = forma.permite_parcelamento
-    f.max_parcelas = forma.parcelas_maximas
-    f.parcelas_maximas = forma.parcelas_maximas
+    f.permite_parcelamento = False if eh_crediario else forma.permite_parcelamento
+    f.max_parcelas = 1 if eh_crediario else forma.parcelas_maximas
+    f.parcelas_maximas = 1 if eh_crediario else forma.parcelas_maximas
     f.taxas_por_parcela = forma.taxas_por_parcela  # JSON string
     f.permite_antecipacao = forma.permite_antecipacao
     f.dias_recebimento_antecipado = forma.dias_recebimento_antecipado
@@ -376,6 +393,12 @@ def excluir_forma_pagamento(
 
     if not forma:
         raise HTTPException(status_code=404, detail="Forma de pagamento não encontrada")
+
+    if forma.tipo == "crediario":
+        raise HTTPException(
+            status_code=400,
+            detail="O crediário é uma forma padrão. Desative-o em vez de excluir.",
+        )
 
     # Hard delete - remove permanentemente do banco
     db.delete(forma)

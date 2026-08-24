@@ -1,4 +1,4 @@
-import type { FuncionarioPdvFormaPagamento, FuncionarioPdvProduto } from "../../../types";
+import type { FuncionarioPdvProduto } from "../../../types";
 
 export type ItemCarrinhoPdv = {
   produto: FuncionarioPdvProduto;
@@ -6,18 +6,6 @@ export type ItemCarrinhoPdv = {
 };
 
 const QUANTIDADE_MINIMA_PDV = 0.001;
-
-export const FORMAS_PAGAMENTO: {
-  key: FuncionarioPdvFormaPagamento;
-  label: string;
-  icon: string;
-}[] = [
-  { key: "dinheiro", label: "Dinheiro", icon: "cash-outline" },
-  { key: "pix", label: "Pix", icon: "qr-code-outline" },
-  { key: "credito", label: "Credito", icon: "card-outline" },
-  { key: "debito", label: "Debito", icon: "card-outline" },
-  { key: "crediario", label: "Crediario", icon: "calendar-outline" },
-];
 
 export function mensagemErroApi(error: any, fallback: string) {
   const detail = error?.response?.data?.detail;
@@ -63,4 +51,36 @@ export function formatarValorCampo(valor: number | null | undefined) {
     maximumFractionDigits: 2,
     useGrouping: false,
   }).format(Number(valor ?? 0));
+}
+
+export function vencimentoPadraoBr() {
+  const data = new Date();
+  data.setDate(data.getDate() + 30);
+  const dia = String(data.getDate()).padStart(2, "0");
+  const mes = String(data.getMonth() + 1).padStart(2, "0");
+  return `${dia}-${mes}-${data.getFullYear()}`;
+}
+
+export function mascararDataBr(valor: string) {
+  const digitos = String(valor ?? "")
+    .replace(/\D/g, "")
+    .slice(0, 8);
+  if (digitos.length <= 2) return digitos;
+  if (digitos.length <= 4) return `${digitos.slice(0, 2)}-${digitos.slice(2)}`;
+  return `${digitos.slice(0, 2)}-${digitos.slice(2, 4)}-${digitos.slice(4)}`;
+}
+
+export function dataBrParaIso(valor: string) {
+  const correspondencia = String(valor ?? "").match(/^(\d{2})-(\d{2})-(\d{4})$/);
+  if (!correspondencia) return null;
+  const [, dia, mes, ano] = correspondencia;
+  const data = new Date(Number(ano), Number(mes) - 1, Number(dia));
+  if (
+    data.getFullYear() !== Number(ano) ||
+    data.getMonth() !== Number(mes) - 1 ||
+    data.getDate() !== Number(dia)
+  ) {
+    return null;
+  }
+  return `${ano}-${mes}-${dia}`;
 }

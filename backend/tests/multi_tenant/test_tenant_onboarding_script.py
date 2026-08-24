@@ -28,7 +28,7 @@ def test_onboarding_script_defaults_to_dry_run(monkeypatch, capsys, onboarding_s
     payload = json.loads(captured.out)
     assert code == 0
     assert payload["dry_run"] is True
-    assert payload["would_create"]["payment_methods"] == 4
+    assert payload["would_create"]["payment_methods"] == 5
     assert _count(onboarding_session, "formas_pagamento", TENANT_A) == 0
 
 
@@ -47,8 +47,8 @@ def test_onboarding_script_apply_persists(monkeypatch, capsys, onboarding_sessio
     payload = json.loads(captured.out)
     assert code == 0
     assert payload["dry_run"] is False
-    assert payload["created"]["payment_methods"] == 4
-    assert _count(onboarding_session, "formas_pagamento", TENANT_A) == 4
+    assert payload["created"]["payment_methods"] == 5
+    assert _count(onboarding_session, "formas_pagamento", TENANT_A) == 5
 
 
 def test_onboarding_script_all_active_tenants_dry_run(
@@ -89,7 +89,7 @@ def test_onboarding_script_all_active_tenants_dry_run(
     assert payload["dry_run"] is True
     assert payload["mode"] == "all_active_tenants"
     assert payload["tenant_count"] == 2
-    assert payload["totals"]["would_create"]["payment_methods"] == 8
+    assert payload["totals"]["would_create"]["payment_methods"] == 10
     assert _count(onboarding_session, "formas_pagamento", TENANT_A) == 0
     assert _count(onboarding_session, "formas_pagamento", TENANT_B) == 0
 
@@ -122,7 +122,7 @@ def test_onboarding_script_future_tenant_check_does_not_read_or_update_existing_
     assert payload["mode"] == "future_tenant_check"
     assert payload["tenant_scope"] == "synthetic_future_tenant"
     assert payload["dry_run"] is True
-    assert payload["result"]["would_create"]["payment_methods"] == 4
+    assert payload["result"]["would_create"]["payment_methods"] == 5
     assert payload["result"]["would_create"]["dre_categories"] == 12
     assert payload["result"]["would_create"]["product_categories"] == 2
     assert TENANT_A not in captured.out
@@ -194,9 +194,9 @@ def test_onboarding_script_all_active_tenants_apply_with_explicit_override(
     assert code == 0
     assert payload["dry_run"] is False
     assert payload["tenant_count"] == 2
-    assert payload["totals"]["created"]["payment_methods"] == 8
-    assert _count(onboarding_session, "formas_pagamento", TENANT_A) == 4
-    assert _count(onboarding_session, "formas_pagamento", TENANT_B) == 4
+    assert payload["totals"]["created"]["payment_methods"] == 10
+    assert _count(onboarding_session, "formas_pagamento", TENANT_A) == 5
+    assert _count(onboarding_session, "formas_pagamento", TENANT_B) == 5
 
 
 def test_onboarding_script_health_check_reports_incomplete_and_complete(
@@ -241,7 +241,7 @@ def test_onboarding_script_health_check_reports_incomplete_and_complete(
     assert payload["incomplete_count"] == 1
     assert payload["complete_tenants"] == [TENANT_A]
     assert payload["incomplete_tenants"][0]["tenant_id"] == TENANT_B
-    assert payload["incomplete_tenants"][0]["would_create"]["payment_methods"] == 4
+    assert payload["incomplete_tenants"][0]["would_create"]["payment_methods"] == 5
     assert _count(onboarding_session, "formas_pagamento", TENANT_B) == 0
 
 
@@ -328,7 +328,7 @@ def test_onboarding_script_template_check_reports_contract(
     assert code == 0
     assert payload["ok"] is True
     assert payload["mode"] == "template_contract_check"
-    assert payload["template_item_counts"]["payment_method"] == 4
+    assert payload["template_item_counts"]["payment_method"] == 5
     assert payload["template_item_counts"]["bank_account"] == 2
     assert payload["template_item_counts"]["pet_species"] == 2
     assert payload["template_item_counts"]["ration_line"] == 4

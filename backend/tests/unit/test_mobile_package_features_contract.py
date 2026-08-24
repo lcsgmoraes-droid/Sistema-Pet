@@ -83,6 +83,38 @@ def test_crediario_transporta_vencimento_ate_contas_a_receber():
     assert 'source="crediario"' in vendas
 
 
+def test_crediario_e_controlado_pelo_cadastro_do_erp_em_ambas_as_interfaces():
+    pagamentos = read_repo(
+        "backend/app/routes/app_mobile_funcionario_pdv/pagamentos.py"
+    )
+    cadastro = read_repo("backend/app/financeiro/config_routes.py")
+    mobile = read_repo(
+        "app-mobile/src/screens/funcionario/pdv/FuncionarioPdvContent.tsx"
+    )
+    erp = read_repo(
+        "frontend/src/components/modalPagamento/ModalPagamentoFormaPanel.jsx"
+    )
+    migration = read_repo(
+        "backend/alembic/versions/zwz20260824a1_seed_crediario_padrao.py"
+    )
+
+    assert "FormaPagamento.ativo.is_(True)" in pagamentos
+    assert 'FormaPagamento.tipo == "crediario"' in pagamentos
+    assert '"boleto": "Boleto"' in pagamentos
+    assert '"transferencia": "Transferência"' in pagamentos
+    assert "builtin:crediario" not in pagamentos
+    assert "_obter_ou_criar_forma_crediario" not in pagamentos
+    assert "modalidades_cartao_adicionadas" not in pagamentos
+    assert 'f.tipo = "crediario" if eh_crediario else forma.tipo' in cadastro
+    assert "formasPagamentoErp" in mobile
+    assert "formasPagamentoBotoes.map" in mobile
+    assert "{forma.nome}" in mobile
+    assert 'placeholder="DD-MM-AAAA"' in mobile
+    assert 'formaPagamentoSelecionada.tipo === "crediario"' in erp
+    assert 'revision = "zwz20260824a1"' in migration
+    assert "'Crediário', 'crediario'" in migration
+
+
 def test_avaliacao_de_entrega_exige_entrega_concluida_e_uma_nota_valida():
     checkout = read_repo("backend/app/routes/ecommerce_checkout.py")
     model = read_repo("backend/app/rotas_entrega_models.py")

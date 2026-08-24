@@ -16,10 +16,10 @@ import { formatarMoeda } from "../../../utils/format";
 import { FuncionarioPdvProductImage as ProdutoImagem } from "./FuncionarioPdvProductImage";
 import { funcionarioPdvStyles as styles } from "./FuncionarioPdvStyles";
 import {
-  FORMAS_PAGAMENTO,
   formatarQuantidade,
   formatarQuantidadeCampo,
   formatarValorCampo,
+  mascararDataBr,
   type ItemCarrinhoPdv,
 } from "./FuncionarioPdvUtils";
 
@@ -66,6 +66,7 @@ export type FuncionarioPdvContentProps = {
   setCashbackValor: Dispatch<SetStateAction<string>>;
   valorAPagar: number;
   formaPagamento: FuncionarioPdvFormaPagamento;
+  formasPagamentoErp: FuncionarioPdvFormaPagamentoOpcao[];
   setFormaPagamento: Dispatch<SetStateAction<FuncionarioPdvFormaPagamento>>;
   setFormaPagamentoIdSelecionada: Dispatch<SetStateAction<string | null>>;
   setNumeroParcelas: Dispatch<SetStateAction<number>>;
@@ -133,6 +134,7 @@ export function FuncionarioPdvContent({
   setCashbackValor,
   valorAPagar,
   formaPagamento,
+  formasPagamentoErp,
   setFormaPagamento,
   setFormaPagamentoIdSelecionada,
   setNumeroParcelas,
@@ -156,6 +158,19 @@ export function FuncionarioPdvContent({
   salvarAberta,
   finalizar,
 }: FuncionarioPdvContentProps) {
+  const formasPagamentoBotoes = formasPagamentoErp.filter(
+    (forma, indice, todas) => todas.findIndex((item) => item.id === forma.id) === indice,
+  );
+  const iconesFormaPagamento: Record<FuncionarioPdvFormaPagamento, string> = {
+    dinheiro: "cash-outline",
+    pix: "qr-code-outline",
+    credito: "card-outline",
+    debito: "card-outline",
+    crediario: "calendar-outline",
+    boleto: "document-text-outline",
+    transferencia: "swap-horizontal-outline",
+  };
+
   return (
     <KeyboardSafeScrollView style={styles.container} contentContainerStyle={styles.conteudo}>
       <View style={styles.headerCard}>
@@ -605,26 +620,26 @@ export function FuncionarioPdvContent({
       <View style={styles.card}>
         <Text style={styles.secaoTitulo}>Pagamento</Text>
         <View style={styles.formasGrid}>
-          {FORMAS_PAGAMENTO.map((forma) => (
+          {formasPagamentoBotoes.map((forma) => (
             <TouchableOpacity
               key={forma.key}
               style={[styles.formaBotao, formaPagamento === forma.key && styles.formaBotaoAtivo]}
               onPress={() => {
                 setFormaPagamento(forma.key);
-                setFormaPagamentoIdSelecionada(null);
+                setFormaPagamentoIdSelecionada(forma.selection_id);
                 setNumeroParcelas(1);
                 setNsuCartao("");
               }}
             >
               <Ionicons
-                name={forma.icon as keyof typeof Ionicons.glyphMap}
+                name={iconesFormaPagamento[forma.key] as keyof typeof Ionicons.glyphMap}
                 size={20}
                 color={formaPagamento === forma.key ? CORES.primario : CORES.textoSecundario}
               />
               <Text
                 style={[styles.formaTexto, formaPagamento === forma.key && styles.formaTextoAtivo]}
               >
-                {forma.label}
+                {forma.nome}
               </Text>
             </TouchableOpacity>
           ))}
@@ -658,8 +673,8 @@ export function FuncionarioPdvContent({
             <Text style={styles.label}>Data de vencimento</Text>
             <TextInput
               value={dataVencimentoCrediario}
-              onChangeText={setDataVencimentoCrediario}
-              placeholder="AAAA-MM-DD"
+              onChangeText={(valor) => setDataVencimentoCrediario(mascararDataBr(valor))}
+              placeholder="DD-MM-AAAA"
               style={styles.input}
               autoCapitalize="none"
               maxLength={10}

@@ -342,6 +342,36 @@ export function montarObservacoesComJustificativaMargem({
   return observacoesAtuais ? `${observacoesAtuais}\n\n${blocoJustificativa}` : blocoJustificativa;
 }
 
+export function vencimentoPadraoCrediario(dias = 30) {
+  const data = new Date();
+  data.setDate(data.getDate() + dias);
+  const dia = String(data.getDate()).padStart(2, "0");
+  const mes = String(data.getMonth() + 1).padStart(2, "0");
+  return `${dia}-${mes}-${data.getFullYear()}`;
+}
+
+export function mascararDataCrediario(valor = "") {
+  const digitos = String(valor).replace(/\D/g, "").slice(0, 8);
+  if (digitos.length <= 2) return digitos;
+  if (digitos.length <= 4) return `${digitos.slice(0, 2)}-${digitos.slice(2)}`;
+  return `${digitos.slice(0, 2)}-${digitos.slice(2, 4)}-${digitos.slice(4)}`;
+}
+
+export function dataCrediarioParaIso(valor = "") {
+  const correspondencia = String(valor).match(/^(\d{2})-(\d{2})-(\d{4})$/);
+  if (!correspondencia) return null;
+  const [, dia, mes, ano] = correspondencia;
+  const data = new Date(Number(ano), Number(mes) - 1, Number(dia));
+  if (
+    data.getFullYear() !== Number(ano) ||
+    data.getMonth() !== Number(mes) - 1 ||
+    data.getDate() !== Number(dia)
+  ) {
+    return null;
+  }
+  return `${ano}-${mes}-${dia}`;
+}
+
 export function montarPagamentoRecebido({
   formaPagamento,
   valor = 0,
@@ -356,6 +386,8 @@ export function montarPagamentoRecebido({
   const isCartao = ["cartao_credito", "cartao_debito"].includes(tipo);
   const parcelas = formaPagamento?.permite_parcelamento ? numeroParcelas : 1;
   const formaPagamentoId = normalizarFormaPagamentoId(formaPagamento?.id);
+  const dataVencimentoCrediario =
+    tipo === "crediario" ? dataCrediarioParaIso(formaPagamento?.data_vencimento_crediario) : null;
 
   return {
     forma_pagamento: formaPagamento.nome,
@@ -373,6 +405,17 @@ export function montarPagamentoRecebido({
     troco: tipo === "dinheiro" && troco > 0 ? troco : null,
     is_credito_cliente: formaPagamento.nome === "Crédito Cliente" || tipo === "credito_cliente",
     is_cashback: formaPagamento.id === "cashback",
+    ...(dataVencimentoCrediario
+      ? {
+          data_recebimento_prevista: dataVencimentoCrediario,
+          prazo_recebimento_dias: Math.max(
+            0,
+            Math.ceil(
+              (new Date(`${dataVencimentoCrediario}T12:00:00`).getTime() - Date.now()) / 86400000,
+            ),
+          ),
+        }
+      : {}),
   };
 }
 
@@ -384,6 +427,7 @@ export function validarPagamentoParaAdicionar({
   operadora = null,
   numeroParcelas = 1,
   parcelasDisponiveis = [],
+  cliente = null,
 }) {
   if (!formaPagamento) {
     return "Selecione uma forma de pagamento";
@@ -393,6 +437,17 @@ export function validarPagamentoParaAdicionar({
 
   if (valorNumerico <= 0) {
     return "Informe o valor recebido";
+  }
+
+  if (formaPagamento.tipo === "crediario" && !cliente?.id) {
+    return "Selecione o cliente da venda para usar o crediário";
+  }
+
+  if (
+    formaPagamento.tipo === "crediario" &&
+    !dataCrediarioParaIso(formaPagamento.data_vencimento_crediario)
+  ) {
+    return "Informe uma data de vencimento válida no formato DD-MM-AAAA";
   }
 
   if (
