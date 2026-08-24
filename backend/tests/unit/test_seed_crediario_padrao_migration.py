@@ -20,7 +20,6 @@ def test_migration_seeds_one_crediario_per_tenant_and_preserves_existing(monkeyp
     engine = sa.create_engine("sqlite:///:memory:")
 
     with engine.begin() as connection:
-        connection.execute(sa.text("CREATE TABLE tenants (id TEXT PRIMARY KEY)"))
         connection.execute(
             sa.text(
                 "CREATE TABLE users (id INTEGER PRIMARY KEY, tenant_id TEXT NOT NULL)"
@@ -53,9 +52,6 @@ def test_migration_seeds_one_crediario_per_tenant_and_preserves_existing(monkeyp
                 )
                 """
             )
-        )
-        connection.execute(
-            sa.text("INSERT INTO tenants (id) VALUES ('tenant-a'), ('tenant-b')")
         )
         connection.execute(
             sa.text(

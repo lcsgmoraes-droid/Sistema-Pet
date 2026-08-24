@@ -14,12 +14,24 @@ branch_labels = None
 depends_on = None
 
 
+def _set_rls(bind, *, enabled: bool) -> None:
+    if bind.dialect.name != "postgresql":
+        return
+    for table_name in ("users", "formas_pagamento"):
+        if enabled:
+            op.execute(f"ALTER TABLE {table_name} ENABLE ROW LEVEL SECURITY")
+            op.execute(f"ALTER TABLE {table_name} FORCE ROW LEVEL SECURITY")
+        else:
+            op.execute(f"ALTER TABLE {table_name} DISABLE ROW LEVEL SECURITY")
+
+
 def upgrade() -> None:
     bind = op.get_bind()
     tables = set(sa.inspect(bind).get_table_names())
-    if not {"tenants", "users", "formas_pagamento"}.issubset(tables):
+    if not {"users", "formas_pagamento"}.issubset(tables):
         return
 
+    _set_rls(bind, enabled=False)
     bind.execute(
         sa.text(
             """
@@ -30,19 +42,20 @@ def upgrade() -> None:
                 max_parcelas, parcelas_maximas, icone, cor, created_at, updated_at
             )
             SELECT
-                t.id, MIN(u.id), 'Crediário', 'crediario', 0, 0,
+                u.tenant_id, MIN(u.id), 'Crediário', 'crediario', 0, 0,
                 30, 30, true, false, false, true, false,
                 1, 1, 'calendar', '#F59E0B', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
-            FROM tenants t
-            JOIN users u ON u.tenant_id = t.id
-            WHERE NOT EXISTS (
+            FROM users u
+            WHERE u.tenant_id IS NOT NULL
+              AND NOT EXISTS (
                 SELECT 1 FROM formas_pagamento fp
-                WHERE fp.tenant_id = t.id AND fp.tipo = 'crediario'
-            )
-            GROUP BY t.id
+                WHERE fp.tenant_id = u.tenant_id AND fp.tipo = 'crediario'
+              )
+            GROUP BY u.tenant_id
             """
         )
     )
+    _set_rls(bind, enabled=True)
 
 
 def downgrade() -> None:
