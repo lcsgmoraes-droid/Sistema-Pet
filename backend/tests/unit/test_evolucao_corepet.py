@@ -82,9 +82,73 @@ def test_novidade_de_granel_mostra_os_caminhos_de_configuracao():
         "Produtos / Estoque",
         "Ver movimentações de estoque",
         "Configurações → Estoque",
-        "app do funcionário",
+        "Funcionário → Lançar granel",
+        "produto fechado",
     ):
         assert trecho in item["resumo"]
+    assert "pacote pai" not in item["resumo"].lower()
+    assert "produto pai" not in item["resumo"].lower()
+
+
+def test_novidade_crediario_explica_configuracao_e_consequencias():
+    item = next(
+        item for item in ITENS_EVOLUCAO if item["id"] == "crediario-vencimento-alertas"
+    )
+
+    for trecho in (
+        "já vem criado",
+        "Cadastros → Formas de Pagamento",
+        "selecione o cliente",
+        "DD-MM-AAAA",
+        "Contas a Receber",
+        "app do cliente",
+    ):
+        assert trecho in item["resumo"]
+
+
+def test_central_ajuda_crediario_tem_passo_a_passo_completo():
+    raiz_repositorio = Path(__file__).resolve().parents[3]
+    base_ajuda = (
+        raiz_repositorio
+        / "frontend"
+        / "src"
+        / "pages"
+        / "centralAjuda"
+        / "centralAjudaKnowledge.js"
+    ).read_text(encoding="utf-8")
+    inicio = base_ajuda.index('slug: "venda-crediario-app-funcionario"')
+    fim = base_ajuda.index("      {", inicio + 20)
+    artigo = base_ajuda[inicio:fim]
+
+    for trecho in (
+        "Crediário já é criado automaticamente",
+        "Não é necessário criar outra forma",
+        "PDV (Vendas)",
+        "Funcionário → Passar venda",
+        "DD-MM-AAAA",
+        "Financeiro → Contas a Receber",
+        "Pedidos → Crediário",
+        "Quando o cliente pagar",
+    ):
+        assert trecho in artigo
+
+
+def test_fluxo_granel_nao_exibe_terminologia_pai_ao_usuario():
+    raiz_repositorio = Path(__file__).resolve().parents[3]
+    arquivos = (
+        "app-mobile/src/screens/funcionario/FuncionarioGranelScreen.tsx",
+        "app-mobile/src/screens/funcionario/FuncionarioHomeScreen.tsx",
+        "backend/app/estoque/granel.py",
+        "backend/app/routes/app_mobile_funcionario_pdv/granel.py",
+        "frontend/src/components/estoque/GranelLancamentoModal.jsx",
+        "frontend/src/components/estoque/useMovimentacoesProdutoGranel.js",
+        "frontend/src/pages/configuracoes/ConfiguracaoEstoque.jsx",
+    )
+
+    for caminho in arquivos:
+        conteudo = (raiz_repositorio / caminho).read_text(encoding="utf-8").lower()
+        assert "pacote pai" not in conteudo, caminho
+        assert "produto pai" not in conteudo, caminho
 
 
 def test_funcao_liberada_aparece_como_disponivel_em_fase_de_teste():

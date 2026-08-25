@@ -265,8 +265,8 @@ export default function ConfiguracaoEstoque() {
                   Travar lançamento de granel por bipagem
                 </span>
                 <span className="mt-1 block text-sm text-gray-600">
-                  Exige o código de barras do produto pai e do granel vinculado antes de converter o
-                  estoque, tanto no computador quanto no app do funcionário.
+                  Exige o código de barras do produto fechado e do produto a granel vinculado antes
+                  de converter o estoque, tanto no computador quanto no app do funcionário.
                 </span>
               </span>
             </label>

@@ -94,12 +94,12 @@ export default function FuncionarioGranelScreen() {
         setGranel(null);
         setBarcodeOrigem(data);
         setBarcodeGranel(null);
-        Alert.alert("Produto pai conferido", "Agora bipe o produto granel vinculado.");
+        Alert.alert("Produto fechado conferido", "Agora bipe o produto a granel vinculado.");
       } else {
         setGranel(produto);
         setBarcodeGranel(data);
         setScannerAberto(false);
-        Alert.alert("Tudo certo", "O produto granel corresponde ao produto pai.");
+        Alert.alert("Tudo certo", "O produto a granel corresponde ao produto fechado.");
       }
     } catch (error: any) {
       Vibration.vibrate([0, 90, 60, 130]);
@@ -136,12 +136,12 @@ export default function FuncionarioGranelScreen() {
 
   async function lancar() {
     if (!origem || !granel) {
-      Alert.alert("Produtos pendentes", "Informe o produto pai e o produto granel.");
+      Alert.alert("Produtos pendentes", "Informe o produto fechado e o produto a granel.");
       return;
     }
     const quantidadeNumero = Number(quantidade.replace(",", "."));
     if (!Number.isFinite(quantidadeNumero) || quantidadeNumero <= 0) {
-      Alert.alert("Quantidade invalida", "Informe quantos pacotes foram abertos.");
+      Alert.alert("Quantidade invalida", "Informe quantas embalagens foram abertas.");
       return;
     }
     setSalvando(true);
@@ -208,7 +208,11 @@ export default function FuncionarioGranelScreen() {
           </TouchableOpacity>
           <View style={styles.frameScan} />
           <Text style={styles.scannerTexto}>
-            {buscando ? "Conferindo..." : origem ? "Bipe o produto granel" : "Bipe o produto pai"}
+            {buscando
+              ? "Conferindo..."
+              : origem
+                ? "Bipe o produto a granel"
+                : "Bipe o produto fechado"}
           </Text>
         </View>
       </View>
@@ -231,15 +235,15 @@ export default function FuncionarioGranelScreen() {
         />
         <Text style={styles.avisoTexto}>
           {bipagemObrigatoria
-            ? "A empresa exige a bipagem do pai e do granel vinculado."
+            ? "A empresa exige a bipagem do produto fechado e do produto a granel vinculado."
             : "Voce pode bipar os produtos ou usar a busca manual."}
         </Text>
       </View>
 
       <View style={styles.etapas}>
-        <ProdutoCard titulo="1. Produto pai" produto={origem} onLimpar={limpar} />
+        <ProdutoCard titulo="1. Produto fechado" produto={origem} onLimpar={limpar} />
         <ProdutoCard
-          titulo="2. Produto granel"
+          titulo="2. Produto a granel"
           produto={granel}
           onLimpar={() => {
             setGranel(null);
@@ -251,14 +255,14 @@ export default function FuncionarioGranelScreen() {
       <TouchableOpacity style={styles.botaoScanner} onPress={() => setScannerAberto(true)}>
         <Ionicons name="barcode-outline" size={22} color="#fff" />
         <Text style={styles.botaoPrimarioTexto}>
-          {origem ? "Bipar produto granel" : "Bipar produto pai"}
+          {origem ? "Bipar produto a granel" : "Bipar produto fechado"}
         </Text>
       </TouchableOpacity>
 
       {!bipagemObrigatoria && (
         <View>
           <Text style={styles.label}>
-            Busca manual de {origem ? "granel vinculado" : "produto pai"}
+            Busca manual de {origem ? "produto a granel vinculado" : "produto fechado"}
           </Text>
           <View style={styles.buscaLinha}>
             <TextInput
@@ -292,7 +296,7 @@ export default function FuncionarioGranelScreen() {
       )}
 
       <View style={styles.card}>
-        <Text style={styles.label}>Pacotes abertos</Text>
+        <Text style={styles.label}>Embalagens abertas</Text>
         <TextInput
           style={styles.inputInteiro}
           value={quantidade}
