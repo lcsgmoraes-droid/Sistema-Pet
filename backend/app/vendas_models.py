@@ -536,6 +536,7 @@ class VendaPagamento(BaseTenantModel):
     valor_liquido_previsto = Column(DECIMAL(10, 2), nullable=True)
     prazo_recebimento_dias = Column(Integer, nullable=True)
     data_recebimento_prevista = Column(Date, nullable=True)
+    intervalo_crediario = Column(String(20), nullable=True)
     status_conciliacao = Column(
         Enum("nao_conciliado", "conciliado", name="status_conciliacao_enum"),
         nullable=False,
@@ -588,6 +589,7 @@ class VendaPagamento(BaseTenantModel):
             "data_recebimento_prevista": self.data_recebimento_prevista.isoformat()
             if self.data_recebimento_prevista
             else None,
+            "intervalo_crediario": self.intervalo_crediario,
             "nsu_cartao": self.nsu_cartao,
             "status": self.status,
             "data_pagamento": safe_datetime_to_iso(self.data_pagamento),

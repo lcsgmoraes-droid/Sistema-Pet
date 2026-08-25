@@ -372,6 +372,50 @@ export function dataCrediarioParaIso(valor = "") {
   return `${ano}-${mes}-${dia}`;
 }
 
+export function gerarPlanoCrediario({
+  valorTotal = 0,
+  numeroParcelas = 1,
+  primeiraData = "",
+  intervalo = "mensal",
+} = {}) {
+  const dataIso = dataCrediarioParaIso(primeiraData);
+  const quantidade = Math.trunc(Number(numeroParcelas || 0));
+  if (!dataIso || quantidade < 1 || quantidade > 60) return [];
+  if (quantidade > 1 && !["7_dias", "15_dias", "mensal"].includes(intervalo)) return [];
+
+  const [ano, mes, dia] = dataIso.split("-").map(Number);
+  const primeira = new Date(ano, mes - 1, dia, 12);
+  const totalCentavos = Math.round(Number(valorTotal || 0) * 100);
+  const valorBaseCentavos = Math.round(totalCentavos / quantidade);
+
+  return Array.from({ length: quantidade }, (_, indice) => {
+    let vencimento;
+    if (intervalo === "7_dias" || intervalo === "15_dias") {
+      vencimento = new Date(primeira);
+      vencimento.setDate(primeira.getDate() + (intervalo === "7_dias" ? 7 : 15) * indice);
+    } else {
+      const indiceMes = ano * 12 + (mes - 1) + indice;
+      const anoParcela = Math.floor(indiceMes / 12);
+      const mesParcela = indiceMes % 12;
+      const ultimoDia = new Date(anoParcela, mesParcela + 1, 0, 12).getDate();
+      vencimento = new Date(anoParcela, mesParcela, Math.min(dia, ultimoDia), 12);
+    }
+
+    const valorCentavos =
+      indice === quantidade - 1
+        ? totalCentavos - valorBaseCentavos * (quantidade - 1)
+        : valorBaseCentavos;
+    return {
+      numero: indice + 1,
+      total_parcelas: quantidade,
+      valor: valorCentavos / 100,
+      data_vencimento: `${String(vencimento.getDate()).padStart(2, "0")}-${String(
+        vencimento.getMonth() + 1,
+      ).padStart(2, "0")}-${vencimento.getFullYear()}`,
+    };
+  });
+}
+
 export function montarPagamentoRecebido({
   formaPagamento,
   valor = 0,
@@ -384,7 +428,8 @@ export function montarPagamentoRecebido({
 }) {
   const tipo = formaPagamento?.tipo;
   const isCartao = ["cartao_credito", "cartao_debito"].includes(tipo);
-  const parcelas = formaPagamento?.permite_parcelamento ? numeroParcelas : 1;
+  const parcelas =
+    tipo === "crediario" || formaPagamento?.permite_parcelamento ? numeroParcelas : 1;
   const formaPagamentoId = normalizarFormaPagamentoId(formaPagamento?.id);
   const dataVencimentoCrediario =
     tipo === "crediario" ? dataCrediarioParaIso(formaPagamento?.data_vencimento_crediario) : null;
@@ -414,6 +459,8 @@ export function montarPagamentoRecebido({
               (new Date(`${dataVencimentoCrediario}T12:00:00`).getTime() - Date.now()) / 86400000,
             ),
           ),
+          intervalo_crediario:
+            parcelas > 1 ? formaPagamento?.intervalo_crediario || "mensal" : null,
         }
       : {}),
   };
@@ -448,6 +495,26 @@ export function validarPagamentoParaAdicionar({
     !dataCrediarioParaIso(formaPagamento.data_vencimento_crediario)
   ) {
     return "Informe uma data de vencimento válida no formato DD-MM-AAAA";
+  }
+
+  if (formaPagamento.tipo === "crediario") {
+    const dataIso = dataCrediarioParaIso(formaPagamento.data_vencimento_crediario);
+    const hoje = new Date();
+    const hojeIso = `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, "0")}-${String(
+      hoje.getDate(),
+    ).padStart(2, "0")}`;
+    if (dataIso && dataIso < hojeIso) {
+      return "A primeira data do crediário não pode estar no passado";
+    }
+    if (!Number.isInteger(numeroParcelas) || numeroParcelas < 1 || numeroParcelas > 60) {
+      return "Informe uma quantidade entre 1 e 60 parcelas";
+    }
+    if (
+      numeroParcelas > 1 &&
+      !["7_dias", "15_dias", "mensal"].includes(formaPagamento.intervalo_crediario)
+    ) {
+      return "Escolha o intervalo entre as parcelas do crediário";
+    }
   }
 
   if (

@@ -3,6 +3,7 @@ import { Wallet, AlertCircle } from "lucide-react";
 import CurrencyInput from "../CurrencyInput";
 import PaymentMethodIcon from "../PaymentMethodIcon";
 import {
+  gerarPlanoCrediario,
   mascararDataCrediario,
   obterCorVisualParcelamento,
   obterEstiloVisualParcelamento,
@@ -38,6 +39,16 @@ export default function ModalPagamentoFormaPanel({
   parcelasDisponiveis,
   taxaCartaoSelecionada,
 }) {
+  const planoCrediario =
+    formaPagamentoSelecionada?.tipo === "crediario"
+      ? gerarPlanoCrediario({
+          valorTotal: Math.min(Number(valorRecebido || 0), Number(valorRestante || 0)),
+          numeroParcelas,
+          primeiraData: formaPagamentoSelecionada.data_vencimento_crediario,
+          intervalo: formaPagamentoSelecionada.intervalo_crediario || "mensal",
+        })
+      : [];
+
   return (
     <>
       {/* Coluna Esquerda - Seleção de Pagamentos */}
@@ -137,6 +148,7 @@ export default function ModalPagamentoFormaPanel({
                             data_vencimento_crediario: vencimentoPadraoCrediario(
                               forma.prazo_dias || forma.prazo_recebimento || 30,
                             ),
+                            intervalo_crediario: "mensal",
                           }
                         : forma,
                     );
@@ -245,7 +257,7 @@ export default function ModalPagamentoFormaPanel({
             {formaPagamentoSelecionada.tipo === "crediario" && (
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Data combinada para pagamento
+                  Primeira data de vencimento
                 </label>
                 <input
                   type="text"
@@ -261,6 +273,67 @@ export default function ModalPagamentoFormaPanel({
                   maxLength={10}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                 />
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Quantidade de parcelas
+                    </label>
+                    <input
+                      type="number"
+                      min="1"
+                      max="60"
+                      value={numeroParcelas}
+                      onChange={(event) =>
+                        setNumeroParcelas(
+                          Math.max(1, Math.min(60, Number.parseInt(event.target.value || "1", 10))),
+                        )
+                      }
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                  {numeroParcelas > 1 && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Intervalo
+                      </label>
+                      <select
+                        value={formaPagamentoSelecionada.intervalo_crediario || "mensal"}
+                        onChange={(event) =>
+                          setFormaPagamentoSelecionada((formaAtual) => ({
+                            ...formaAtual,
+                            intervalo_crediario: event.target.value,
+                          }))
+                        }
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="7_dias">A cada 7 dias</option>
+                        <option value="15_dias">A cada 15 dias</option>
+                        <option value="mensal">Mensal</option>
+                      </select>
+                    </div>
+                  )}
+                </div>
+                {planoCrediario.length > 0 && (
+                  <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3">
+                    <p className="text-sm font-semibold text-amber-900 mb-2">Prévia das parcelas</p>
+                    <div className="max-h-44 overflow-y-auto space-y-1">
+                      {planoCrediario.map((parcela) => (
+                        <div
+                          key={parcela.numero}
+                          className="flex items-center justify-between text-xs text-amber-900"
+                        >
+                          <span>
+                            {parcela.numero}/{parcela.total_parcelas} · {parcela.data_vencimento}
+                          </span>
+                          <strong>R$ {parcela.valor.toFixed(2).replace(".", ",")}</strong>
+                        </div>
+                      ))}
+                    </div>
+                    <p className="text-[11px] text-amber-700 mt-2">
+                      A última parcela absorve eventual diferença de centavos.
+                    </p>
+                  </div>
+                )}
                 {!venda.cliente && (
                   <p className="text-xs text-amber-700 mt-1">
                     Selecione o cliente da venda para usar o crediário.

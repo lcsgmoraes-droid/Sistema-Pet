@@ -38,11 +38,25 @@ def processar_pos_commit_finalizacao(
             db=db,
         )
         contas_criadas_ids = resultado_contas["contas_criadas"]
+        from app.services.crediario_notifications import (
+            criar_notificacoes_parcelas_crediario,
+        )
+
+        notificacoes_crediario = criar_notificacoes_parcelas_crediario(
+            db,
+            venda=venda,
+            contas_ids=contas_criadas_ids,
+            tenant_id=tenant_id,
+        )
         db.commit()  # Commit separado para contas
         logger.info(
             f"📋 Contas a receber criadas: {resultado_contas['total_contas']} conta(s), "
             f"{len(resultado_contas['lancamentos_criados'])} lançamento(s)"
         )
+        if notificacoes_crediario:
+            logger.info(
+                "🔔 Notificacoes de crediario criadas: %s", notificacoes_crediario
+            )
     except Exception as e:
         logger.error(f"⚠️ Erro ao criar contas a receber: {str(e)}", exc_info=True)
         db.rollback()  # Rollback apenas das contas (venda já commitada)

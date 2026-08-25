@@ -14,6 +14,7 @@ import {
   ehFormaPagamentoStonePos,
   avaliarEstadoJustificativaMargem,
   extrairCorIndicadorMargem,
+  gerarPlanoCrediario,
   identificarIconeFormaPagamento,
   mapearTipoPagamentoStonePos,
   montarCupomParaFinalizar,
@@ -674,6 +675,39 @@ test("monta crediario do ERP com vencimento informado em DD-MM-AAAA", () => {
   assert.equal(dataCrediarioParaIso("30-09-2026"), "2026-09-30");
   assert.equal(dataCrediarioParaIso("31-02-2026"), null);
   assert.equal(mascararDataCrediario("30092026"), "30-09-2026");
+});
+
+test("monta crediario parcelado e gera previa mensal preservando o dia original", () => {
+  const formaPagamento = {
+    id: 9,
+    nome: "Crediário",
+    tipo: "crediario",
+    data_vencimento_crediario: "31-01-2027",
+    intervalo_crediario: "mensal",
+  };
+  const pagamento = montarPagamentoRecebido({
+    formaPagamento,
+    valor: 200,
+    valorRestante: 200,
+    numeroParcelas: 3,
+  });
+  const plano = gerarPlanoCrediario({
+    valorTotal: 200,
+    numeroParcelas: 3,
+    primeiraData: "31-01-2027",
+    intervalo: "mensal",
+  });
+
+  assert.equal(pagamento.numero_parcelas, 3);
+  assert.equal(pagamento.intervalo_crediario, "mensal");
+  assert.deepEqual(
+    plano.map((parcela) => parcela.data_vencimento),
+    ["31-01-2027", "28-02-2027", "31-03-2027"],
+  );
+  assert.deepEqual(
+    plano.map((parcela) => parcela.valor),
+    [66.67, 66.67, 66.66],
+  );
 });
 
 test("nao envia identificador textual do credito do cliente ao backend", () => {

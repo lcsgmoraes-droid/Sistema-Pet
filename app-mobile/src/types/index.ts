@@ -499,6 +499,8 @@ export interface FuncionarioPdvPagamentoPayload {
   operadora_id?: number | null;
   nsu_cartao?: string | null;
   data_vencimento?: string | null;
+  data_recebimento_prevista?: string | null;
+  intervalo_crediario?: "7_dias" | "15_dias" | "mensal" | null;
 }
 
 export interface FuncionarioPdvCupomDisponivel {

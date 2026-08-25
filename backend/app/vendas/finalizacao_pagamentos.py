@@ -46,6 +46,7 @@ def _montar_campos_venda_pagamento(
         "operadora_id": operadora_id,
         "prazo_recebimento_dias": pag_data.get("prazo_recebimento_dias"),
         "data_recebimento_prevista": pag_data.get("data_recebimento_prevista"),
+        "intervalo_crediario": pag_data.get("intervalo_crediario"),
     }
     # Para cartao, a regra resolvida e a fonte de verdade. Atualizar o dicionario
     # antes de construir o model evita passar prazo/data duas vezes como kwargs.
@@ -186,6 +187,64 @@ def processar_pagamentos_finalizacao(
                 raise HTTPException(
                     status_code=400, detail="Forma de pagamento inexistente ou inativa."
                 )
+
+        nome_forma_normalizado = (
+            str(pag_data.get("forma_pagamento") or "").strip().lower()
+        )
+        if not forma_pagamento and nome_forma_normalizado in {"crediario", "crediário"}:
+            forma_pagamento = (
+                db.query(FormaPagamento)
+                .filter(
+                    FormaPagamento.tenant_id == tenant_id,
+                    FormaPagamento.tipo == "crediario",
+                    FormaPagamento.ativo.is_(True),
+                )
+                .order_by(FormaPagamento.id.asc())
+                .first()
+            )
+            if not forma_pagamento:
+                raise HTTPException(
+                    status_code=400,
+                    detail="O crediario esta desativado nas formas de pagamento do ERP.",
+                )
+            forma_pagamento_id = forma_pagamento.id
+
+        eh_crediario = bool(
+            forma_pagamento and getattr(forma_pagamento, "tipo", None) == "crediario"
+        )
+        if eh_crediario:
+            if not venda.cliente_id:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Selecione um cliente para vender no crediario.",
+                )
+            primeira_data = pag_data.get("data_recebimento_prevista")
+            if not primeira_data:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Informe a primeira data de vencimento do crediario.",
+                )
+            if primeira_data < _date.today():
+                raise HTTPException(
+                    status_code=400,
+                    detail="A primeira data do crediario nao pode estar no passado.",
+                )
+            if not 1 <= int(numero_parcelas or 1) <= 60:
+                raise HTTPException(
+                    status_code=400,
+                    detail="O crediario permite de 1 a 60 parcelas.",
+                )
+            from app.financeiro.crediario_parcelamento import (
+                normalizar_intervalo_crediario,
+            )
+
+            try:
+                pag_data["intervalo_crediario"] = normalizar_intervalo_crediario(
+                    pag_data.get("intervalo_crediario"),
+                    numero_parcelas=int(numero_parcelas or 1),
+                )
+            except ValueError as exc:
+                raise HTTPException(status_code=400, detail=str(exc)) from exc
 
         modalidade_cartao = modality_from_payment_form(
             forma_pagamento,

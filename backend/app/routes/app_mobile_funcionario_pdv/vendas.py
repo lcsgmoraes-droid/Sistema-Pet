@@ -146,16 +146,19 @@ def finalizar_venda_funcionario_pdv(
 
     forma_pagamento = _normalizar_forma_pagamento_pdv(dados.pagamento.forma_pagamento)
     eh_crediario = forma_pagamento == "Crediário"
+    primeira_data_crediario = (
+        dados.pagamento.data_recebimento_prevista or dados.pagamento.data_vencimento
+    )
     if eh_crediario:
         if not dados.cliente_id:
             raise HTTPException(
                 status_code=400, detail="Selecione um cliente para vender no crediario."
             )
-        if not dados.pagamento.data_vencimento:
+        if not primeira_data_crediario:
             raise HTTPException(
                 status_code=400, detail="Informe a data de vencimento do crediario."
             )
-        if dados.pagamento.data_vencimento < date.today():
+        if primeira_data_crediario < date.today():
             raise HTTPException(
                 status_code=400, detail="A data do crediario nao pode estar no passado."
             )
@@ -171,7 +174,7 @@ def finalizar_venda_funcionario_pdv(
         forma_pagamento_selecionada = _resolver_forma_pagamento_ativa_funcionario_pdv(
             db, tenant_id, dados.pagamento
         )
-    if forma_pagamento != "cartao_credito":
+    if forma_pagamento not in {"cartao_credito", "Crediário"}:
         numero_parcelas = max(1, min(numero_parcelas, 1))
     criar_payload = _criar_payload_venda_funcionario_pdv(
         dados=dados,
@@ -214,12 +217,13 @@ def finalizar_venda_funcionario_pdv(
             pagamento_payload["valor_recebido"] = float(dados.pagamento.valor_recebido)
         if dados.pagamento.troco is not None:
             pagamento_payload["troco"] = float(dados.pagamento.troco)
-        if eh_crediario and dados.pagamento.data_vencimento:
-            pagamento_payload["data_recebimento_prevista"] = (
-                dados.pagamento.data_vencimento
+        if eh_crediario and primeira_data_crediario:
+            pagamento_payload["data_recebimento_prevista"] = primeira_data_crediario
+            pagamento_payload["intervalo_crediario"] = (
+                dados.pagamento.intervalo_crediario
             )
             pagamento_payload["prazo_recebimento_dias"] = max(
-                1, (dados.pagamento.data_vencimento - date.today()).days
+                1, (primeira_data_crediario - date.today()).days
             )
         pagamentos_payload.append(pagamento_payload)
 
@@ -258,42 +262,6 @@ def finalizar_venda_funcionario_pdv(
         db=db,
     )
     venda_resultado = resultado.get("venda", {})
-    if eh_crediario and dados.cliente_id and dados.pagamento.data_vencimento:
-        cliente_crediario = (
-            db.query(Cliente)
-            .filter(Cliente.id == dados.cliente_id, Cliente.tenant_id == tenant_id)
-            .first()
-        )
-        if cliente_crediario:
-            from app.services.app_notifications import (
-                criar_notificacao_app,
-                resolve_customer_app_user_id,
-            )
-
-            app_user_id = resolve_customer_app_user_id(
-                db, tenant_id=tenant_id, cliente=cliente_crediario
-            )
-            criar_notificacao_app(
-                db,
-                tenant_id=tenant_id,
-                user_id=app_user_id,
-                customer_id=cliente_crediario.id,
-                title="Compra no crediário",
-                body=(
-                    f"A compra {venda_criada.get('numero_venda') or venda_criada['id']} "
-                    f"vence em {dados.pagamento.data_vencimento.strftime('%d/%m/%Y')}."
-                ),
-                source="crediario",
-                kind="crediario_created",
-                payload={
-                    "source": "crediario",
-                    "kind": "crediario_created",
-                    "venda_id": venda_criada["id"],
-                    "data_vencimento": dados.pagamento.data_vencimento.isoformat(),
-                },
-                idempotency_key=f"crediario:venda:{venda_criada['id']}",
-            )
-            db.commit()
     if eh_crediario:
         registrar_uso_funcionalidade(db, "crediario-vencimento-alertas")
     return {

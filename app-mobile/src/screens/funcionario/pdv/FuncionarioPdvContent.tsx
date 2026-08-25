@@ -19,7 +19,9 @@ import {
   formatarQuantidade,
   formatarQuantidadeCampo,
   formatarValorCampo,
+  gerarPlanoCrediario,
   mascararDataBr,
+  type IntervaloCrediario,
   type ItemCarrinhoPdv,
 } from "./FuncionarioPdvUtils";
 
@@ -75,6 +77,8 @@ export type FuncionarioPdvContentProps = {
   setValorRecebido: Dispatch<SetStateAction<string>>;
   dataVencimentoCrediario: string;
   setDataVencimentoCrediario: Dispatch<SetStateAction<string>>;
+  intervaloCrediario: IntervaloCrediario;
+  setIntervaloCrediario: Dispatch<SetStateAction<IntervaloCrediario>>;
   troco: number;
   ehCartao: boolean;
   formaPagamentoSelecionada: FuncionarioPdvFormaPagamentoOpcao | null;
@@ -143,6 +147,8 @@ export function FuncionarioPdvContent({
   setValorRecebido,
   dataVencimentoCrediario,
   setDataVencimentoCrediario,
+  intervaloCrediario,
+  setIntervaloCrediario,
   troco,
   ehCartao,
   formaPagamentoSelecionada,
@@ -161,6 +167,15 @@ export function FuncionarioPdvContent({
   const formasPagamentoBotoes = formasPagamentoErp.filter(
     (forma, indice, todas) => todas.findIndex((item) => item.id === forma.id) === indice,
   );
+  const planoCrediario =
+    formaPagamento === "crediario"
+      ? gerarPlanoCrediario({
+          valorTotal: valorAPagar,
+          numeroParcelas,
+          primeiraData: dataVencimentoCrediario,
+          intervalo: intervaloCrediario,
+        })
+      : [];
   const iconesFormaPagamento: Record<FuncionarioPdvFormaPagamento, string> = {
     dinheiro: "cash-outline",
     pix: "qr-code-outline",
@@ -670,7 +685,7 @@ export function FuncionarioPdvContent({
             {!cliente ? (
               <Text style={styles.crediarioAviso}>Selecione um cliente para usar o crediario.</Text>
             ) : null}
-            <Text style={styles.label}>Data de vencimento</Text>
+            <Text style={styles.label}>Primeira data de vencimento</Text>
             <TextInput
               value={dataVencimentoCrediario}
               onChangeText={(valor) => setDataVencimentoCrediario(mascararDataBr(valor))}
@@ -679,6 +694,64 @@ export function FuncionarioPdvContent({
               autoCapitalize="none"
               maxLength={10}
             />
+            <Text style={styles.label}>Quantidade de parcelas</Text>
+            <TextInput
+              value={String(numeroParcelas)}
+              onChangeText={(valor) => {
+                const quantidade = Number.parseInt(valor.replace(/\D/g, "") || "1", 10);
+                setNumeroParcelas(Math.max(1, Math.min(60, quantidade)));
+              }}
+              placeholder="Ex: 3"
+              keyboardType="number-pad"
+              style={styles.input}
+              maxLength={2}
+            />
+            {numeroParcelas > 1 ? (
+              <>
+                <Text style={styles.label}>Intervalo entre parcelas</Text>
+                <View style={styles.crediarioIntervalos}>
+                  {[
+                    ["7_dias", "7 dias"],
+                    ["15_dias", "15 dias"],
+                    ["mensal", "Mensal"],
+                  ].map(([valor, label]) => (
+                    <TouchableOpacity
+                      key={valor}
+                      style={[
+                        styles.crediarioIntervaloBotao,
+                        intervaloCrediario === valor && styles.crediarioIntervaloBotaoAtivo,
+                      ]}
+                      onPress={() => setIntervaloCrediario(valor as IntervaloCrediario)}
+                    >
+                      <Text
+                        style={[
+                          styles.crediarioIntervaloTexto,
+                          intervaloCrediario === valor && styles.crediarioIntervaloTextoAtivo,
+                        ]}
+                      >
+                        {label}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </>
+            ) : null}
+            {planoCrediario.length ? (
+              <View style={styles.crediarioPrevia}>
+                <Text style={styles.crediarioPreviaTitulo}>Previa das parcelas</Text>
+                {planoCrediario.map((parcela) => (
+                  <View key={parcela.numero} style={styles.crediarioPreviaLinha}>
+                    <Text style={styles.crediarioPreviaTexto}>
+                      {parcela.numero}/{parcela.totalParcelas} - {parcela.dataVencimento}
+                    </Text>
+                    <Text style={styles.crediarioPreviaValor}>{formatarMoeda(parcela.valor)}</Text>
+                  </View>
+                ))}
+                <Text style={styles.crediarioPreviaRodape}>
+                  A ultima parcela absorve eventual diferenca de centavos.
+                </Text>
+              </View>
+            ) : null}
           </View>
         ) : null}
 

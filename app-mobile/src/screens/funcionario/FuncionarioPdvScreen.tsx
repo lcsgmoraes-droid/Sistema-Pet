@@ -35,6 +35,7 @@ import {
   mensagemErroApi,
   parseNumero,
   vencimentoPadraoBr,
+  type IntervaloCrediario,
   type ItemCarrinhoPdv,
 } from "./pdv/FuncionarioPdvUtils";
 
@@ -66,6 +67,7 @@ export default function FuncionarioPdvScreen() {
   const [nsuCartao, setNsuCartao] = useState("");
   const [valorRecebido, setValorRecebido] = useState("");
   const [dataVencimentoCrediario, setDataVencimentoCrediario] = useState(vencimentoPadraoBr);
+  const [intervaloCrediario, setIntervaloCrediario] = useState<IntervaloCrediario>("mensal");
   const [observacoes, setObservacoes] = useState("");
   const [caixa, setCaixa] = useState<FuncionarioPdvCaixa | null>(null);
   const [carregandoCaixa, setCarregandoCaixa] = useState(false);
@@ -189,7 +191,9 @@ export default function FuncionarioPdvScreen() {
   useEffect(() => {
     if (!ehCartao) {
       setNsuCartao("");
-      setNumeroParcelas(1);
+      if (formaPagamento !== "crediario") {
+        setNumeroParcelas(1);
+      }
       return;
     }
     if (
@@ -503,6 +507,7 @@ export default function FuncionarioPdvScreen() {
     setNumeroParcelas(1);
     setNsuCartao("");
     setDataVencimentoCrediario(vencimentoPadraoBr());
+    setIntervaloCrediario("mensal");
   }
 
   async function salvarAberta() {
@@ -598,6 +603,13 @@ export default function FuncionarioPdvScreen() {
         Alert.alert("Data invalida", "Informe o vencimento no formato DD-MM-AAAA.");
         return;
       }
+      if (
+        formaPagamento === "crediario" &&
+        (!Number.isInteger(numeroParcelas) || numeroParcelas < 1 || numeroParcelas > 60)
+      ) {
+        Alert.alert("Parcelas invalidas", "Informe uma quantidade entre 1 e 60 parcelas.");
+        return;
+      }
       const trocoFinal =
         formaPagamento === "dinheiro"
           ? Math.max(0, valorRecebidoNumero - previewAtual.valor_pagamento)
@@ -616,7 +628,8 @@ export default function FuncionarioPdvScreen() {
             formaPagamento === "dinheiro" && previewAtual.valor_pagamento > 0
               ? Number(trocoFinal.toFixed(2))
               : null,
-          numero_parcelas: formaPagamento === "credito" ? numeroParcelas : 1,
+          numero_parcelas:
+            formaPagamento === "credito" || formaPagamento === "crediario" ? numeroParcelas : 1,
           forma_pagamento_id: formaPagamentoSelecionada?.id ?? null,
           bandeira: ehCartao
             ? (formaPagamentoSelecionada?.bandeira ?? formaPagamentoSelecionada?.nome ?? null)
@@ -624,7 +637,12 @@ export default function FuncionarioPdvScreen() {
           operadora: ehCartao ? (formaPagamentoSelecionada?.operadora ?? null) : null,
           operadora_id: ehCartao ? (formaPagamentoSelecionada?.operadora_id ?? null) : null,
           nsu_cartao: ehCartao ? nsuCartao.trim() || null : null,
-          data_vencimento: formaPagamento === "crediario" ? vencimentoCrediarioIso : null,
+          data_recebimento_prevista:
+            formaPagamento === "crediario" ? vencimentoCrediarioIso : null,
+          intervalo_crediario:
+            formaPagamento === "crediario" && numeroParcelas > 1
+              ? intervaloCrediario
+              : null,
         },
         observacoes: observacoes.trim() || null,
         cupom_codigo: cupomCodigo.trim() || null,
@@ -725,6 +743,8 @@ export default function FuncionarioPdvScreen() {
         setValorRecebido={setValorRecebido}
         dataVencimentoCrediario={dataVencimentoCrediario}
         setDataVencimentoCrediario={setDataVencimentoCrediario}
+        intervaloCrediario={intervaloCrediario}
+        setIntervaloCrediario={setIntervaloCrediario}
         troco={troco}
         ehCartao={ehCartao}
         formaPagamentoSelecionada={formaPagamentoSelecionada}

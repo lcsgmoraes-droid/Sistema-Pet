@@ -1,7 +1,7 @@
 """Schemas do PDV do funcionario no App Mobile."""
 
 from datetime import date
-from typing import Optional
+from typing import Literal, Optional
 
 from pydantic import BaseModel, Field
 
@@ -60,13 +60,15 @@ class FuncionarioPdvPagamentoRequest(BaseModel):
     valor: float = Field(ge=0)
     valor_recebido: Optional[float] = None
     troco: Optional[float] = None
-    numero_parcelas: int = Field(default=1, ge=1)
+    numero_parcelas: int = Field(default=1, ge=1, le=60)
     forma_pagamento_id: Optional[int] = None
     bandeira: Optional[str] = None
     operadora: Optional[str] = None
     operadora_id: Optional[int] = None
     nsu_cartao: Optional[str] = None
     data_vencimento: Optional[date] = None
+    data_recebimento_prevista: Optional[date] = None
+    intervalo_crediario: Optional[Literal["7_dias", "15_dias", "mensal"]] = None
 
 
 class FuncionarioPdvFinalizarRequest(BaseModel):
