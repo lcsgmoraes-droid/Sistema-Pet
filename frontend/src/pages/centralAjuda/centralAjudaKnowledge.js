@@ -317,7 +317,7 @@ export const BASE_CONHECIMENTO = [
         titulo: "Como lançar granel com conferência por bipagem",
         tags: ["granel", "bipagem", "produto pai", "estoque", "app funcionario"],
         conteudo: [
-          "Antes de lançar, vincule o produto fechado ao produto granel. Um mesmo granel pode receber vínculos de embalagens diferentes, como 10 kg, 15 kg e 20 kg.",
+          "Para conferir ou criar o vínculo no ERP, acesse **Produtos / Estoque → Listar Produtos**, abra o produto fechado de origem, clique em **Ver movimentações de estoque → Lançar granel** e selecione o produto granel. Um mesmo granel pode receber vínculos de embalagens diferentes, como 10 kg, 15 kg e 20 kg.",
           "No ERP, abra **Configurações → Estoque** para decidir se a bipagem será obrigatória.",
           "No app do funcionário, abra **Lançar granel**, bipe primeiro o pacote pai e depois o produto granel.",
           "O sistema mostra **Tudo certo** somente quando a combinação estiver vinculada. Uma combinação diferente é recusada.",
