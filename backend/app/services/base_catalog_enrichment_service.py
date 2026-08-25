@@ -12,6 +12,8 @@ import unicodedata
 from collections import Counter, defaultdict
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
+from decimal import Decimal, InvalidOperation
+from difflib import SequenceMatcher
 from typing import Any
 
 from sqlalchemy import text
@@ -35,6 +37,116 @@ from app.tenancy.rls import sync_rls_tenant
 DEFAULT_EAN_ENRICHMENT_BUNDLE_CODE = "catalogo-base-enriquecimento-ean"
 DEFAULT_EAN_ENRICHMENT_BUNDLE_VERSION = "v1"
 USELESS_CATEGORY_NAMES = {"a classificar", "sem categoria", "nao classificado"}
+
+_TOKEN_ALIASES = {
+    "adult": "adulto",
+    "adultos": "adulto",
+    "caes": "cao",
+    "cachorros": "cao",
+    "canino": "cao",
+    "caninos": "cao",
+    "dog": "cao",
+    "dogs": "cao",
+    "cats": "gato",
+    "felino": "gato",
+    "felinos": "gato",
+    "filhotes": "filhote",
+    "junior": "filhote",
+    "puppy": "filhote",
+    "seniores": "senior",
+    "chicken": "frango",
+    "bovina": "bovino",
+    "carne": "bovino",
+    "beef": "bovino",
+    "lamb": "cordeiro",
+    "suina": "suino",
+    "comprimidos": "comprimido",
+    "comp": "comprimido",
+    "cpr": "comprimido",
+    "capsulas": "capsula",
+    "saches": "sache",
+    "tabletes": "tablete",
+    "unidades": "unidade",
+}
+_IDENTITY_IGNORED_TOKENS = {
+    "a",
+    "as",
+    "com",
+    "da",
+    "das",
+    "de",
+    "display",
+    "do",
+    "dos",
+    "e",
+    "em",
+    "para",
+    "por",
+    "sem",
+    "caixa",
+    "cartela",
+    "pacote",
+    "produto",
+    "racao",
+    "alimento",
+    "medicamento",
+    "pet",
+    "sabor",
+    "cao",
+    "gato",
+    "adulto",
+    "filhote",
+    "senior",
+    "bovino",
+    "frango",
+    "cordeiro",
+    "peru",
+    "peixe",
+    "salmao",
+    "atum",
+    "sardinha",
+    "suino",
+    "comprimido",
+    "capsula",
+    "sache",
+    "tablete",
+    "unidade",
+    "mg",
+    "mcg",
+    "kg",
+    "ml",
+}
+_SEMANTIC_DIMENSIONS = {
+    "especie": {"cao", "gato"},
+    "fase": {"adulto", "filhote", "senior"},
+    "porte": {"mini", "pequeno", "medio", "grande", "gigante"},
+    "proteina": {
+        "bovino",
+        "frango",
+        "cordeiro",
+        "peru",
+        "peixe",
+        "salmao",
+        "atum",
+        "sardinha",
+        "suino",
+    },
+}
+_MEASUREMENT_RE = re.compile(
+    r"(?<![a-z0-9])(\d+(?:[.,]\d+)?)\s*(mcg|ug|mg|kg|g|ml|l)(?![a-z])",
+    re.IGNORECASE,
+)
+_MEASUREMENT_RANGE_RE = re.compile(
+    r"(?<![a-z0-9])(\d+(?:[.,]\d+)?)\s*(?:a|ate|[-/])\s*"
+    r"(\d+(?:[.,]\d+)?)\s*(mcg|ug|mg|kg|g|ml|l)(?![a-z])",
+    re.IGNORECASE,
+)
+_COUNT_RE = re.compile(
+    r"(?<![a-z0-9])(\d+)\s*"
+    r"(cp|cpr|comp|comprimidos?|capsulas?|saches?|tabletes?|un|und|unidades?)"
+    r"(?![a-z])",
+    re.IGNORECASE,
+)
 
 # Lista positiva. Preco, custo, margem, estoque, fornecedor, promocao, comissao,
 # desconto e configuracoes de publicacao nao fazem parte deste contrato.
@@ -77,6 +189,13 @@ class BaseCatalogEnrichmentError(RuntimeError):
     pass
 
 
+@dataclass(frozen=True)
+class ProductIdentityDecision:
+    compatible: bool
+    score: float
+    reasons: tuple[str, ...] = ()
+
+
 @dataclass
 class BaseCatalogEnrichmentResult:
     source_tenant_id: str
@@ -93,10 +212,14 @@ class BaseCatalogEnrichmentResult:
     target_ambiguous_gtins: int = 0
     source_invalid_gtins: int = 0
     target_invalid_gtins: int = 0
+    compatible_products: int = 0
+    incompatible_products: int = 0
+    incompatibility_reasons: Counter[str] = field(default_factory=Counter)
     fields: Counter[str] = field(default_factory=Counter)
     entities_created: Counter[str] = field(default_factory=Counter)
     entities_reused: Counter[str] = field(default_factory=Counter)
     samples: list[dict[str, Any]] = field(default_factory=list)
+    rejected_samples: list[dict[str, Any]] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
     errors: list[str] = field(default_factory=list)
 
@@ -122,10 +245,16 @@ class BaseCatalogEnrichmentResult:
             "target_ambiguous_gtins": self.target_ambiguous_gtins,
             "source_invalid_gtins": self.source_invalid_gtins,
             "target_invalid_gtins": self.target_invalid_gtins,
+            "compatible_products": self.compatible_products,
+            "incompatible_products": self.incompatible_products,
+            "incompatibility_reasons": dict(
+                sorted(self.incompatibility_reasons.items())
+            ),
             "fields": dict(sorted(self.fields.items())),
             "entities_created": dict(sorted(self.entities_created.items())),
             "entities_reused": dict(sorted(self.entities_reused.items())),
             "samples": self.samples,
+            "rejected_samples": self.rejected_samples,
             "warnings": self.warnings,
             "errors": self.errors,
         }
@@ -135,6 +264,150 @@ def _text_key(value: Any) -> str:
     normalized = unicodedata.normalize("NFKD", str(value or ""))
     normalized = "".join(char for char in normalized if not unicodedata.combining(char))
     return re.sub(r"[^a-z0-9]+", " ", normalized.casefold()).strip()
+
+
+def _ascii_text(value: Any) -> str:
+    normalized = unicodedata.normalize("NFKD", str(value or ""))
+    return "".join(
+        char for char in normalized if not unicodedata.combining(char)
+    ).casefold()
+
+
+def _name_tokens(value: Any) -> set[str]:
+    tokens = re.findall(r"[a-z0-9]+", _ascii_text(value))
+    return {_TOKEN_ALIASES.get(token, token) for token in tokens}
+
+
+def _identity_tokens(value: Any) -> set[str]:
+    return {
+        token
+        for token in _name_tokens(value)
+        if not token.isdigit()
+        and len(token) >= 3
+        and token not in _IDENTITY_IGNORED_TOKENS
+    }
+
+
+def _decimal_token(value: str) -> Decimal | None:
+    try:
+        return Decimal(value.replace(",", "."))
+    except InvalidOperation:
+        return None
+
+
+def _canonical_measurement(value: Decimal, unit: str) -> tuple[str, Decimal]:
+    normalized_unit = unit.casefold()
+    if normalized_unit in {"mcg", "ug"}:
+        return "mass_mg", value / Decimal("1000")
+    if normalized_unit == "mg":
+        return "mass_mg", value
+    if normalized_unit == "g":
+        return "mass_mg", value * Decimal("1000")
+    if normalized_unit == "kg":
+        return "mass_mg", value * Decimal("1000000")
+    if normalized_unit == "ml":
+        return "volume_ml", value
+    return "volume_ml", value * Decimal("1000")
+
+
+def _measurement_signature(value: Any) -> dict[str, set[Decimal]]:
+    text_value = _ascii_text(value)
+    result: dict[str, set[Decimal]] = defaultdict(set)
+    for match in _MEASUREMENT_RANGE_RE.finditer(text_value):
+        unit = match.group(3)
+        for raw in match.group(1, 2):
+            parsed = _decimal_token(raw)
+            if parsed is not None:
+                dimension, canonical = _canonical_measurement(parsed, unit)
+                result[dimension].add(canonical)
+    for match in _MEASUREMENT_RE.finditer(text_value):
+        parsed = _decimal_token(match.group(1))
+        if parsed is not None:
+            dimension, canonical = _canonical_measurement(parsed, match.group(2))
+            result[dimension].add(canonical)
+    counts = {Decimal(match.group(1)) for match in _COUNT_RE.finditer(text_value)}
+    if counts:
+        result["count"].update(counts)
+    return result
+
+
+def _measurement_conflicts(source_name: Any, target_name: Any) -> list[str]:
+    source = _measurement_signature(source_name)
+    target = _measurement_signature(target_name)
+    return [
+        f"medida_incompativel:{dimension}"
+        for dimension in sorted(set(source) & set(target))
+        if source[dimension].isdisjoint(target[dimension])
+    ]
+
+
+def _semantic_conflicts(source_name: Any, target_name: Any) -> list[str]:
+    source_tokens = _name_tokens(source_name)
+    target_tokens = _name_tokens(target_name)
+    conflicts: list[str] = []
+    for dimension, vocabulary in _SEMANTIC_DIMENSIONS.items():
+        source_values = source_tokens & vocabulary
+        target_values = target_tokens & vocabulary
+        if source_values and target_values and source_values.isdisjoint(target_values):
+            conflicts.append(f"atributo_incompativel:{dimension}")
+    return conflicts
+
+
+def _structured_weight_conflict(source: dict[str, Any], target: dict[str, Any]) -> bool:
+    source_weight = _decimal_token(str(source.get("peso_embalagem") or ""))
+    target_weight = _decimal_token(str(target.get("peso_embalagem") or ""))
+    if not source_weight or not target_weight:
+        return False
+    tolerance = max(Decimal("0.05"), source_weight * Decimal("0.03"))
+    return abs(source_weight - target_weight) > tolerance
+
+
+def assess_product_identity_compatibility(
+    source: dict[str, Any], target: dict[str, Any]
+) -> ProductIdentityDecision:
+    source_name = source.get("nome")
+    target_name = target.get("nome")
+    reasons = [
+        *_measurement_conflicts(source_name, target_name),
+        *_semantic_conflicts(source_name, target_name),
+    ]
+    if _structured_weight_conflict(source, target):
+        reasons.append("medida_incompativel:peso_estruturado")
+    if reasons:
+        return ProductIdentityDecision(False, 0.0, tuple(sorted(set(reasons))))
+
+    source_tokens = _identity_tokens(source_name)
+    target_tokens = _identity_tokens(target_name)
+    if not source_tokens or not target_tokens:
+        return ProductIdentityDecision(False, 0.0, ("identidade_insuficiente",))
+
+    common = source_tokens & target_tokens
+    if not common or max(map(len, common)) < 4:
+        return ProductIdentityDecision(False, 0.0, ("nome_sem_ancora_comum",))
+
+    smaller_size = min(len(source_tokens), len(target_tokens))
+    overlap = len(common) / smaller_size
+    union = source_tokens | target_tokens
+    jaccard = len(common) / len(union)
+    sequence = SequenceMatcher(
+        None, _text_key(source_name), _text_key(target_name)
+    ).ratio()
+    score = round(
+        (Decimal(str(overlap)) * Decimal("0.5"))
+        + (Decimal(str(jaccard)) * Decimal("0.25"))
+        + (Decimal(str(sequence)) * Decimal("0.25")),
+        4,
+    )
+
+    enough_identity = smaller_size == 1 or len(common) >= 2
+    enough_similarity = overlap >= 0.5 and (jaccard >= 0.25 or sequence >= 0.55)
+    if not (enough_identity and enough_similarity):
+        return ProductIdentityDecision(
+            False,
+            float(score),
+            ("sobreposicao_de_nome_insuficiente",),
+        )
+    return ProductIdentityDecision(True, float(score))
 
 
 def _is_missing(value: Any) -> bool:
@@ -489,6 +762,24 @@ def enrich_existing_products_by_gtin(
 
     planned_entities: dict[str, set[str]] = defaultdict(set)
     for source, target, gtin in matches:
+        identity = assess_product_identity_compatibility(source, target)
+        if not identity.compatible:
+            result.incompatible_products += 1
+            result.incompatibility_reasons.update(identity.reasons)
+            if len(result.rejected_samples) < 20:
+                result.rejected_samples.append(
+                    {
+                        "gtin": gtin,
+                        "source_product_id": int(source["id"]),
+                        "target_product_id": int(target["id"]),
+                        "source_name": source.get("nome"),
+                        "target_name": target.get("nome"),
+                        "score": identity.score,
+                        "reasons": list(identity.reasons),
+                    }
+                )
+            continue
+        result.compatible_products += 1
         scalar_updates = plan_product_scalar_updates(source, target)
         for field_name in scalar_updates:
             result.fields[field_name] += 1
@@ -677,7 +968,9 @@ def enrich_existing_products_by_gtin(
             "produto_imagens": result.copied_images,
         }
         result.skipped = {
-            "produtos_sem_alteracao": result.matched_products - result.updated_products
+            "produtos_sem_alteracao": result.compatible_products
+            - result.updated_products,
+            "produtos_gtin_incompativel": result.incompatible_products,
         }
         _record_install(db, int(user_id), result)
 
