@@ -6,7 +6,7 @@ from datetime import date, timedelta
 from decimal import Decimal
 from typing import Any
 
-from sqlalchemy import text
+from sqlalchemy import inspect, text
 from sqlalchemy.orm import Session
 
 from app.financeiro.contas_receber_service import ContasReceberService
@@ -58,14 +58,33 @@ def _fetch_vendas_sem_contas_receber(
 def _fetch_pagamentos_venda(
     db: Session, *, tenant_id: str, venda_id: int
 ) -> list[dict[str, Any]]:
+    try:
+        colunas = {
+            coluna["name"]
+            for coluna in inspect(db.get_bind()).get_columns("venda_pagamentos")
+        }
+    except Exception:
+        colunas = set()
+    data_prevista_sql = (
+        "data_recebimento_prevista"
+        if "data_recebimento_prevista" in colunas
+        else "NULL AS data_recebimento_prevista"
+    )
+    intervalo_sql = (
+        "intervalo_crediario"
+        if "intervalo_crediario" in colunas
+        else "NULL AS intervalo_crediario"
+    )
     return _rows(
         db,
-        """
+        f"""
         SELECT
             id AS venda_pagamento_id,
             forma_pagamento,
             valor,
             COALESCE(numero_parcelas, 1) AS numero_parcelas,
+            {data_prevista_sql},
+            {intervalo_sql},
             status,
             data_pagamento
         FROM venda_pagamentos
@@ -94,10 +113,11 @@ def _cr_parcela_state(
     prazo: int,
     recebido: bool,
     valor_parcela: Decimal,
+    vencimento_parcela: date | None = None,
 ) -> tuple[date, str, Decimal, date | None]:
     if numero_parcelas > 1:
         return (
-            pagamento_date + timedelta(days=30 * idx),
+            vencimento_parcela or pagamento_date + timedelta(days=30 * idx),
             "pendente",
             Decimal("0.00"),
             None,
@@ -180,6 +200,29 @@ def _build_cr_actions_for_pagamento(
         numero_parcelas=numero_parcelas,
     )
 
+    vencimentos: list[date] = []
+    if numero_parcelas > 1:
+        primeira_data = (
+            _as_date(pagamento["data_recebimento_prevista"])
+            if pagamento.get("data_recebimento_prevista")
+            else pagamento_date + timedelta(days=30)
+        )
+        if forma and forma.get("tipo") == "crediario":
+            from app.financeiro.crediario_parcelamento import (
+                gerar_vencimentos_crediario,
+            )
+
+            vencimentos = gerar_vencimentos_crediario(
+                primeira_data,
+                numero_parcelas,
+                pagamento.get("intervalo_crediario"),
+            )
+        else:
+            vencimentos = [
+                primeira_data + timedelta(days=30 * indice)
+                for indice in range(numero_parcelas)
+            ]
+
     actions: list[dict[str, Any]] = []
     for idx, valor_parcela in enumerate(valores, start=1):
         vencimento, status, valor_recebido, data_recebimento = _cr_parcela_state(
@@ -189,6 +232,7 @@ def _build_cr_actions_for_pagamento(
             prazo=prazo,
             recebido=recebido,
             valor_parcela=valor_parcela,
+            vencimento_parcela=(vencimentos[idx - 1] if vencimentos else None),
         )
         actions.append(
             _build_cr_action(

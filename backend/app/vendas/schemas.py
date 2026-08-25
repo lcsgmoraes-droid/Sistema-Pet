@@ -1,8 +1,9 @@
 """Schemas Pydantic usados pelas rotas de vendas."""
 
-from typing import List, Optional
+from datetime import date
+from typing import List, Literal, Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class VendaItemSchema(BaseModel):
@@ -23,7 +24,7 @@ class VendaPagamentoSchema(BaseModel):
     forma_pagamento_id: Optional[int] = None
     valor: float
     bandeira: Optional[str] = None
-    numero_parcelas: Optional[int] = 1
+    numero_parcelas: Optional[int] = Field(default=1, ge=1, le=60)
     numero_transacao: Optional[str] = None
     numero_autorizacao: Optional[str] = None
     nsu_cartao: Optional[str] = None
@@ -31,6 +32,8 @@ class VendaPagamentoSchema(BaseModel):
     modalidade_cartao: Optional[str] = None
     valor_recebido: Optional[float] = None
     troco: Optional[float] = None
+    data_recebimento_prevista: Optional[date] = None
+    intervalo_crediario: Optional[Literal["7_dias", "15_dias", "mensal"]] = None
 
 
 class CriarVendaRequest(BaseModel):

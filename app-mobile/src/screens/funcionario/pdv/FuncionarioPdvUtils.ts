@@ -84,3 +84,53 @@ export function dataBrParaIso(valor: string) {
   }
   return `${ano}-${mes}-${dia}`;
 }
+
+export type IntervaloCrediario = "7_dias" | "15_dias" | "mensal";
+
+export function gerarPlanoCrediario({
+  valorTotal,
+  numeroParcelas,
+  primeiraData,
+  intervalo,
+}: {
+  valorTotal: number;
+  numeroParcelas: number;
+  primeiraData: string;
+  intervalo: IntervaloCrediario;
+}) {
+  const dataIso = dataBrParaIso(primeiraData);
+  const quantidade = Math.trunc(Number(numeroParcelas || 0));
+  if (!dataIso || quantidade < 1 || quantidade > 60) return [];
+
+  const [ano, mes, dia] = dataIso.split("-").map(Number);
+  const primeira = new Date(ano, mes - 1, dia, 12);
+  const totalCentavos = Math.round(Number(valorTotal || 0) * 100);
+  const valorBaseCentavos = Math.round(totalCentavos / quantidade);
+
+  return Array.from({ length: quantidade }, (_, indice) => {
+    let vencimento: Date;
+    if (intervalo === "7_dias" || intervalo === "15_dias") {
+      vencimento = new Date(primeira);
+      vencimento.setDate(primeira.getDate() + (intervalo === "7_dias" ? 7 : 15) * indice);
+    } else {
+      const indiceMes = ano * 12 + (mes - 1) + indice;
+      const anoParcela = Math.floor(indiceMes / 12);
+      const mesParcela = indiceMes % 12;
+      const ultimoDia = new Date(anoParcela, mesParcela + 1, 0, 12).getDate();
+      vencimento = new Date(anoParcela, mesParcela, Math.min(dia, ultimoDia), 12);
+    }
+
+    const valorCentavos =
+      indice === quantidade - 1
+        ? totalCentavos - valorBaseCentavos * (quantidade - 1)
+        : valorBaseCentavos;
+    return {
+      numero: indice + 1,
+      totalParcelas: quantidade,
+      valor: valorCentavos / 100,
+      dataVencimento: `${String(vencimento.getDate()).padStart(2, "0")}-${String(
+        vencimento.getMonth() + 1,
+      ).padStart(2, "0")}-${vencimento.getFullYear()}`,
+    };
+  });
+}

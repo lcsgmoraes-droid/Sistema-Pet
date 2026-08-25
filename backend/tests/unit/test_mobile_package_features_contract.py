@@ -66,10 +66,14 @@ def test_crediario_transporta_vencimento_ate_contas_a_receber():
     payload = FuncionarioPdvPagamentoRequest(
         forma_pagamento="crediario",
         valor=100,
-        data_vencimento=vencimento,
+        data_recebimento_prevista=vencimento,
+        numero_parcelas=3,
+        intervalo_crediario="mensal",
     )
 
-    assert payload.data_vencimento == vencimento
+    assert payload.data_recebimento_prevista == vencimento
+    assert payload.numero_parcelas == 3
+    assert payload.intervalo_crediario == "mensal"
     vendas = read_repo("backend/app/routes/app_mobile_funcionario_pdv/vendas.py")
     persistencia = read_repo("backend/app/vendas/finalizacao_pagamentos.py")
     contas = read_repo("backend/app/financeiro/contas_receber_service.py")
@@ -80,7 +84,9 @@ def test_crediario_transporta_vencimento_ate_contas_a_receber():
     assert '"data_recebimento_prevista": pag_data.get' in persistencia
     assert "data_aplicada or" in contas
     assert '@router.get("/crediario")' in checkout
-    assert 'source="crediario"' in vendas
+    notificacoes = read_repo("backend/app/services/crediario_notifications.py")
+    assert 'source="crediario"' in notificacoes
+    assert 'idempotency_key=f"crediario:conta:{conta.id}"' in notificacoes
 
 
 def test_crediario_e_controlado_pelo_cadastro_do_erp_em_ambas_as_interfaces():

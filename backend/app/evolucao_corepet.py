@@ -233,12 +233,13 @@ ITENS_EVOLUCAO: tuple[dict[str, Any], ...] = (
     },
     {
         "id": "crediario-vencimento-alertas",
-        "titulo": "Crediário com vencimento e alertas",
+        "titulo": "Crediário parcelado com vencimentos e alertas",
         "resumo": (
             "O Crediário já vem criado: ative ou desative em Cadastros → Formas de Pagamento. "
             "No ERP ou no app do funcionário, selecione o cliente, escolha Crediário e informe "
-            "o vencimento em DD-MM-AAAA. A venda gera Contas a Receber, alerta no ERP e aviso "
-            "no app do cliente."
+            "a primeira data em DD-MM-AAAA, a quantidade e o intervalo de 7 dias, 15 dias ou "
+            "mensal. A prévia mostra os valores e vencimentos; cada parcela gera Contas a "
+            "Receber e um aviso no app do cliente."
         ),
         "status": "disponivel_teste",
         "tipo": "projeto",

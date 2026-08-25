@@ -76,6 +76,8 @@ async def finalizar_venda(
                     p, "operadora_id", None
                 ),  # 🆕 Capturar operadora
                 "modalidade_cartao": p.modalidade_cartao,
+                "data_recebimento_prevista": p.data_recebimento_prevista,
+                "intervalo_crediario": p.intervalo_crediario,
             }
             for p in dados.pagamentos
         ]

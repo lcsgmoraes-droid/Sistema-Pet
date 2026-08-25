@@ -29,6 +29,7 @@ def test_campos_pagamento_cartao_usam_prazo_resolvido_sem_duplicar_kwargs():
 
     assert campos["prazo_recebimento_dias"] == 1
     assert campos["data_recebimento_prevista"] == data_prevista
+    assert campos["intervalo_crediario"] is None
     assert campos["modalidade_cartao"] == "debito"
     assert campos["taxa_cartao_regra_id"] == 12
 
@@ -44,6 +45,7 @@ def test_campos_pagamento_sem_taxa_preservam_prazo_informado():
             "valor": 80.0,
             "prazo_recebimento_dias": 10,
             "data_recebimento_prevista": data_prevista,
+            "intervalo_crediario": "mensal",
         },
         forma_pagamento_id=8,
         numero_parcelas=1,
@@ -54,3 +56,4 @@ def test_campos_pagamento_sem_taxa_preservam_prazo_informado():
 
     assert campos["prazo_recebimento_dias"] == 10
     assert campos["data_recebimento_prevista"] == data_prevista
+    assert campos["intervalo_crediario"] == "mensal"

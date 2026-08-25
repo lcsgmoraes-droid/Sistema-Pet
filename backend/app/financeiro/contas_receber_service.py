@@ -61,7 +61,7 @@ DATA: 2025-01-23
 
 import logging
 from typing import Dict, Any, List, Optional
-from decimal import Decimal, ROUND_HALF_UP
+from decimal import Decimal
 from datetime import date, timedelta
 from sqlalchemy.orm import Session
 
@@ -82,18 +82,9 @@ class ContasReceberService:
         valor_total: Decimal, numero_parcelas: int
     ) -> List[Decimal]:
         """Distribui parcelas em centavos preservando exatamente o total."""
-        if numero_parcelas < 1:
-            raise ValueError("numero_parcelas deve ser maior que zero")
+        from app.financeiro.crediario_parcelamento import distribuir_valor_parcelas
 
-        centavo = Decimal("0.01")
-        total = Decimal(str(valor_total)).quantize(centavo, rounding=ROUND_HALF_UP)
-        valor_base = (total / numero_parcelas).quantize(centavo, rounding=ROUND_HALF_UP)
-        parcelas = [valor_base for _ in range(max(numero_parcelas - 1, 0))]
-        ultima = (total - sum(parcelas, Decimal("0.00"))).quantize(
-            centavo, rounding=ROUND_HALF_UP
-        )
-        parcelas.append(ultima)
-        return parcelas
+        return distribuir_valor_parcelas(valor_total, numero_parcelas)
 
     @staticmethod
     def criar_de_venda(
@@ -198,12 +189,14 @@ class ContasReceberService:
                 else getattr(pag, "numero_parcelas", 1)
             )
             numero_parcelas = numero_parcelas or 1
-            eh_cartao_parcelado = (
-                forma_pag and forma_pag.tipo == "cartao_credito" and numero_parcelas > 1
+            eh_pagamento_parcelado = bool(
+                forma_pag
+                and forma_pag.tipo in {"cartao_credito", "crediario"}
+                and numero_parcelas > 1
             )
 
-            if eh_cartao_parcelado:
-                # CARTÃO PARCELADO: Criar múltiplas contas + lançamentos
+            if eh_pagamento_parcelado:
+                # CARTÃO OU CREDIÁRIO PARCELADO: criar uma conta por parcela.
                 resultado_parcelado = ContasReceberService._criar_contas_parceladas(
                     venda=venda,
                     pagamento=pag,
@@ -282,12 +275,34 @@ class ContasReceberService:
             f"(Total: R$ {float(valor_total):.2f})"
         )
 
-        data_primeira_parcela = getattr(
-            pagamento, "data_recebimento_prevista", None
-        ) or (date.today() + timedelta(days=30))
-        for i, valor_parcela in enumerate(valores_parcelas, start=1):
-            data_vencimento = data_primeira_parcela + timedelta(days=30 * (i - 1))
+        def campo(nome: str, padrao=None):
+            if isinstance(pagamento, dict):
+                return pagamento.get(nome, padrao)
+            return getattr(pagamento, nome, padrao)
 
+        data_primeira_parcela = campo("data_recebimento_prevista") or (
+            date.today() + timedelta(days=30)
+        )
+        intervalo_crediario = campo("intervalo_crediario")
+        if getattr(forma_pag, "tipo", None) == "crediario":
+            from app.financeiro.crediario_parcelamento import (
+                gerar_vencimentos_crediario,
+            )
+
+            datas_vencimento = gerar_vencimentos_crediario(
+                data_primeira_parcela,
+                numero_parcelas,
+                intervalo_crediario,
+            )
+        else:
+            datas_vencimento = [
+                data_primeira_parcela + timedelta(days=30 * indice)
+                for indice in range(numero_parcelas)
+            ]
+
+        for i, (valor_parcela, data_vencimento) in enumerate(
+            zip(valores_parcelas, datas_vencimento, strict=True), start=1
+        ):
             # Criar conta a receber
             # Garantir valores não-nulos para campos obrigatórios
             canal_venda = getattr(venda, "canal", None) or "loja_fisica"
@@ -361,8 +376,12 @@ class ContasReceberService:
         )
 
         # Determinar prazo
-        prazo_aplicado = getattr(pagamento, "prazo_recebimento_dias", None)
-        data_aplicada = getattr(pagamento, "data_recebimento_prevista", None)
+        if isinstance(pagamento, dict):
+            prazo_aplicado = pagamento.get("prazo_recebimento_dias")
+            data_aplicada = pagamento.get("data_recebimento_prevista")
+        else:
+            prazo_aplicado = getattr(pagamento, "prazo_recebimento_dias", None)
+            data_aplicada = getattr(pagamento, "data_recebimento_prevista", None)
         prazo_dias = 0
         if prazo_aplicado is not None:
             prazo_dias = max(0, int(prazo_aplicado))
@@ -389,8 +408,13 @@ class ContasReceberService:
             else (date.today() + timedelta(days=prazo_dias))
         )
 
-        # Se for à vista (prazo = 0), criar conta já recebida
-        if prazo_dias == 0:
+        eh_crediario = bool(
+            forma_pag and getattr(forma_pag, "tipo", None) == "crediario"
+        )
+
+        # Crediário continua pendente mesmo quando vence hoje. Nos demais meios,
+        # prazo zero representa recebimento imediato.
+        if prazo_dias == 0 and not eh_crediario:
             status_conta = "recebido"
             valor_recebido = valor
             data_recebimento = date.today()
@@ -434,7 +458,7 @@ class ContasReceberService:
 
         # Se for à vista, criar registro de recebimento imediato
         recebimento_id = None
-        if prazo_dias == 0:
+        if prazo_dias == 0 and not eh_crediario:
             from app.financeiro_models import Recebimento
 
             recebimento = Recebimento(
