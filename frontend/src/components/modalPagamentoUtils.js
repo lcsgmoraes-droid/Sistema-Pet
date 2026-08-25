@@ -826,11 +826,7 @@ export function calcularBeneficiosCampanhaPreview({
         chaveA.localeCompare(chaveB),
       ),
     );
-    const assinatura = JSON.stringify([
-      campanha.campaign_type,
-      campanha.name,
-      paramsOrdenados,
-    ]);
+    const assinatura = JSON.stringify([campanha.campaign_type, campanha.name, paramsOrdenados]);
     if (assinaturasVistas.has(assinatura)) return false;
     assinaturasVistas.add(assinatura);
     return true;
