@@ -135,7 +135,7 @@ def enrichment_session():
                 categoria_id, preco_custo, preco_venda, estoque_atual,
                 situacao, ativo
             ) VALUES (
-                22, :tenant, 10, 'LEGADO-22', 'Nome preservado',
+                22, :tenant, 10, 'LEGADO-22', 'Special Dog Base do cliente',
                 '7898242036467', 3, 59.85, 97, 7, 1, 1
             )
             """
@@ -182,6 +182,8 @@ def test_dry_run_nao_grava_e_mostra_campos_seguros(enrichment_session):
     )
 
     assert result["matched_products"] == 1
+    assert result["compatible_products"] == 1
+    assert result["incompatible_products"] == 0
     assert result["would_update_products"] == 1
     assert result["would_copy_images"] == 1
     assert result["fields"]["ncm"] == 1
@@ -204,7 +206,7 @@ def test_apply_enriquece_sem_criar_produto_ou_mudar_dados_comerciais(
     target = _target_product(enrichment_session)
     assert result["updated_products"] == 1
     assert result["copied_images"] == 1
-    assert target["nome"] == "Nome preservado"
+    assert target["nome"] == "Special Dog Base do cliente"
     assert target["descricao_curta"] == "Racao completa"
     assert target["ncm"] == "23099010"
     assert target["cest"] == "2200100"
@@ -227,3 +229,39 @@ def test_apply_enriquece_sem_criar_produto_ou_mudar_dados_comerciais(
     )
     assert rerun["updated_products"] == 0
     assert rerun["copied_images"] == 0
+
+
+def test_apply_bloqueia_gtin_com_nomes_e_dosagens_incompativeis(
+    enrichment_session,
+):
+    enrichment_session.execute(
+        text(
+            "UPDATE produtos "
+            "SET nome='Maxicam Dipy 2.0mg com 10 Comprimidos' WHERE id=11"
+        )
+    )
+    enrichment_session.execute(
+        text("UPDATE produtos SET nome='PREDIDERM 20MG - DISPLAY 15X10CP' WHERE id=22")
+    )
+    enrichment_session.commit()
+
+    result = enrich_existing_products_by_gtin(
+        db=enrichment_session,
+        source_tenant_id=SOURCE_TENANT,
+        target_tenant_id=TARGET_TENANT,
+        user_id=10,
+        dry_run=False,
+    )
+    enrichment_session.commit()
+
+    target = _target_product(enrichment_session)
+    assert result["matched_products"] == 1
+    assert result["compatible_products"] == 0
+    assert result["incompatible_products"] == 1
+    assert result["updated_products"] == 0
+    assert result["copied_images"] == 0
+    assert result["rejected_samples"][0]["gtin"] == "7898242036467"
+    assert target["descricao_curta"] is None
+    assert target["imagem_principal"] is None
+    assert target["preco_custo"] == 59.85
+    assert target["preco_venda"] == 97

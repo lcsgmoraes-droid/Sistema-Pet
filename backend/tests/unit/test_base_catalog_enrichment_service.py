@@ -1,5 +1,6 @@
 from app.services.base_catalog_enrichment_service import (
     _unique_rows_by_gtin,
+    assess_product_identity_compatibility,
     normalize_gtin,
     plan_product_scalar_updates,
 )
@@ -65,3 +66,45 @@ def test_planejamento_preenche_so_campos_cadastrais_ausentes():
     assert "preco_custo" not in updates
     assert "preco_venda" not in updates
     assert "estoque_atual" not in updates
+
+
+def test_identidade_aceita_variacoes_de_escrita_peso_e_apresentacao():
+    decision = assess_product_identity_compatibility(
+        {
+            "nome": "Cartela Clavaseptin P 250mg 10 comprimidos",
+            "peso_embalagem": None,
+        },
+        {
+            "nome": "CLAVASEPTIN P 250 MG - 10 COMP.",
+            "peso_embalagem": None,
+        },
+    )
+
+    assert decision.compatible is True
+    assert decision.reasons == ()
+
+
+def test_identidade_rejeita_produtos_diferentes_mesmo_com_gtin_igual():
+    decision = assess_product_identity_compatibility(
+        {"nome": "Maxicam Dipy 2.0mg com 10 Comprimidos"},
+        {"nome": "PREDIDERM 20MG - DISPLAY 15X10CP"},
+    )
+
+    assert decision.compatible is False
+    assert "medida_incompativel:mass_mg" in decision.reasons
+
+
+def test_identidade_rejeita_fase_ou_proteina_divergente():
+    stage = assess_product_identity_compatibility(
+        {"nome": "Premier Frango Caes Adultos 12kg"},
+        {"nome": "Premier Frango Caes Filhotes 12kg"},
+    )
+    protein = assess_product_identity_compatibility(
+        {"nome": "Special Dog Prime Adultos Frango 15kg"},
+        {"nome": "Special Dog Prime Adultos Carne 15kg"},
+    )
+
+    assert stage.compatible is False
+    assert "atributo_incompativel:fase" in stage.reasons
+    assert protein.compatible is False
+    assert "atributo_incompativel:proteina" in protein.reasons
