@@ -124,8 +124,9 @@ ITENS_EVOLUCAO: tuple[dict[str, Any], ...] = (
         "id": "granel-bipagem-vinculada",
         "titulo": "Lançamento de granel com conferência por bipagem",
         "resumo": (
-            "O produto a granel pode ser ligado a mais de um produto pai. A bipagem "
-            "confere a combinação e pode ser obrigatória ou opcional por configuração."
+            "No ERP: Produtos / Estoque → Listar Produtos → abra o pacote pai → "
+            "Ver movimentações de estoque → Lançar granel. A trava de bipagem fica "
+            "em Configurações → Estoque. No app do funcionário, use Lançar granel."
         ),
         "status": "disponivel_teste",
         "tipo": "projeto",
@@ -133,7 +134,7 @@ ITENS_EVOLUCAO: tuple[dict[str, Any], ...] = (
         "plataformas": ["ERP", "App do funcionário"],
         "canais": ["erp", "app_funcionario"],
         "publicado_em": "2026-08-22",
-        "atualizado_em": "2026-08-22",
+        "atualizado_em": "2026-08-24",
         "ciclo_novidade": deepcopy(CICLO_PADRAO),
         "destaque": True,
         "caminho_ajuda": "/ajuda?aba=central&artigo=lancar-granel-bipagem",

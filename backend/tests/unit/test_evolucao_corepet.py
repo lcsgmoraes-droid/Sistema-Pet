@@ -73,6 +73,20 @@ def test_catalogo_nao_anuncia_granel_de_farmacia_descartado():
     assert "fracionamento-produtos-farmacia" not in ids
 
 
+def test_novidade_de_granel_mostra_os_caminhos_de_configuracao():
+    item = next(
+        item for item in ITENS_EVOLUCAO if item["id"] == "granel-bipagem-vinculada"
+    )
+
+    for trecho in (
+        "Produtos / Estoque",
+        "Ver movimentações de estoque",
+        "Configurações → Estoque",
+        "app do funcionário",
+    ):
+        assert trecho in item["resumo"]
+
+
 def test_funcao_liberada_aparece_como_disponivel_em_fase_de_teste():
     resultado = listar_evolucao_corepet(
         "app_cliente",
