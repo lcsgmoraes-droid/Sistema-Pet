@@ -236,10 +236,11 @@ ITENS_EVOLUCAO: tuple[dict[str, Any], ...] = (
         "titulo": "Crediário parcelado com vencimentos e alertas",
         "resumo": (
             "O Crediário já vem criado: ative ou desative em Cadastros → Formas de Pagamento. "
-            "No ERP ou no app do funcionário, selecione o cliente, escolha Crediário e informe "
-            "a primeira data em DD-MM-AAAA, a quantidade e o intervalo de 7 dias, 15 dias ou "
-            "mensal. A prévia mostra os valores e vencimentos; cada parcela gera Contas a "
-            "Receber e um aviso no app do cliente."
+            "No ERP, siga PDV (Vendas) → Cliente → Registrar Recebimento → Crediário. No app, "
+            "siga Funcionário → Passar venda → Comprador → Pagamento → Crediário. Informe a "
+            "primeira data em DD-MM-AAAA, a quantidade e o intervalo de 7 dias, 15 dias ou "
+            "mensal. Confira as parcelas em Financeiro → Contas a Receber; o cliente recebe "
+            "os avisos e acompanha em Pedidos → Crediário."
         ),
         "status": "disponivel_teste",
         "tipo": "projeto",
@@ -247,7 +248,7 @@ ITENS_EVOLUCAO: tuple[dict[str, Any], ...] = (
         "plataformas": ["ERP", "App do funcionário", "App do cliente"],
         "canais": ["erp", "app_funcionario", "app_cliente"],
         "publicado_em": "2026-08-22",
-        "atualizado_em": "2026-08-24",
+        "atualizado_em": "2026-08-25",
         "ciclo_novidade": deepcopy(CICLO_PADRAO),
         "destaque": True,
         "caminho_ajuda": "/ajuda?aba=central&artigo=venda-crediario-app-funcionario",
