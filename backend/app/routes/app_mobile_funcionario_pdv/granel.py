@@ -4,7 +4,7 @@ from typing import Literal, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
-from sqlalchemy import or_
+from sqlalchemy import and_, exists, or_
 from sqlalchemy.orm import Session
 
 from app.db import get_session
@@ -50,6 +50,28 @@ def _serializar_produto_granel_app(produto: Produto) -> dict:
         "unidade": produto.unidade,
         "e_granel": _produto_e_granel(produto),
     }
+
+
+def _filtrar_produtos_com_vinculo_granel(
+    query,
+    tenant_id,
+    etapa: Literal["origem", "granel"],
+    produto_origem_id: int | None,
+):
+    condicoes = [
+        ProdutoGranelVinculo.tenant_id == tenant_id,
+        ProdutoGranelVinculo.ativo.is_(True),
+    ]
+    if etapa == "origem":
+        condicoes.append(ProdutoGranelVinculo.produto_origem_id == Produto.id)
+    else:
+        condicoes.extend(
+            [
+                ProdutoGranelVinculo.produto_granel_id == Produto.id,
+                ProdutoGranelVinculo.produto_origem_id == produto_origem_id,
+            ]
+        )
+    return query.filter(exists().where(and_(*condicoes)))
 
 
 def _validar_produto_etapa_granel(
@@ -156,28 +178,15 @@ def buscar_produtos_granel_funcionario(
             Produto.gtin_ean.ilike(pattern),
         ),
     )
-    if etapa == "origem":
-        query = query.join(
-            ProdutoGranelVinculo,
-            ProdutoGranelVinculo.produto_origem_id == Produto.id,
-        ).filter(
-            ProdutoGranelVinculo.tenant_id == tenant_id,
-            ProdutoGranelVinculo.ativo.is_(True),
-        )
-    else:
+    if etapa == "granel":
         if not produto_origem_id:
             raise HTTPException(
                 status_code=400, detail="Selecione primeiro o produto pai."
             )
-        query = query.join(
-            ProdutoGranelVinculo,
-            ProdutoGranelVinculo.produto_granel_id == Produto.id,
-        ).filter(
-            ProdutoGranelVinculo.tenant_id == tenant_id,
-            ProdutoGranelVinculo.produto_origem_id == produto_origem_id,
-            ProdutoGranelVinculo.ativo.is_(True),
-        )
-    produtos = query.distinct().order_by(Produto.nome.asc()).limit(20).all()
+    query = _filtrar_produtos_com_vinculo_granel(
+        query, tenant_id, etapa, produto_origem_id
+    )
+    produtos = query.order_by(Produto.nome.asc()).limit(20).all()
     return [_serializar_produto_granel_app(produto) for produto in produtos]
 
 
