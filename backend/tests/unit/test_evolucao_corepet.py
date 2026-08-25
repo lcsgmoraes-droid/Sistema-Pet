@@ -98,12 +98,15 @@ def test_novidade_crediario_explica_configuracao_e_consequencias():
     for trecho in (
         "já vem criado",
         "Cadastros → Formas de Pagamento",
-        "selecione o cliente",
+        "PDV (Vendas) → Cliente → Registrar Recebimento → Crediário",
+        "Funcionário → Passar venda → Comprador → Pagamento → Crediário",
         "DD-MM-AAAA",
-        "Contas a Receber",
-        "app do cliente",
+        "Financeiro → Contas a Receber",
+        "Pedidos → Crediário",
     ):
         assert trecho in item["resumo"]
+
+    assert item["atualizado_em"] == "2026-08-25"
 
 
 def test_central_ajuda_crediario_tem_passo_a_passo_completo():
