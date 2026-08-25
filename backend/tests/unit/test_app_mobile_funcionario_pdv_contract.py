@@ -317,6 +317,9 @@ def test_funcionario_pdv_supports_credit_installments_from_erp_payment_rules():
     assert "parcelasCredito" in screen
     assert "numeroParcelas" in screen
     assert "setNumeroParcelas" in screen
+    assert "if (!digitos)" in screen
+    assert "setNumeroParcelas(0)" in screen
+    assert "if (numeroParcelas < 1) setNumeroParcelas(1)" in screen
     assert '"numero_parcelas": numero_parcelas' in finalizar_block
     assert '"numero_parcelas": 1' not in finalizar_block
 

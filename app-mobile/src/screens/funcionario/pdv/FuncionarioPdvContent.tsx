@@ -696,10 +696,18 @@ export function FuncionarioPdvContent({
             />
             <Text style={styles.label}>Quantidade de parcelas</Text>
             <TextInput
-              value={String(numeroParcelas)}
+              value={numeroParcelas > 0 ? String(numeroParcelas) : ""}
               onChangeText={(valor) => {
-                const quantidade = Number.parseInt(valor.replace(/\D/g, "") || "1", 10);
-                setNumeroParcelas(Math.max(1, Math.min(60, quantidade)));
+                const digitos = valor.replace(/\D/g, "");
+                if (!digitos) {
+                  setNumeroParcelas(0);
+                  return;
+                }
+                const quantidade = Number.parseInt(digitos, 10);
+                setNumeroParcelas(Math.min(60, quantidade));
+              }}
+              onBlur={() => {
+                if (numeroParcelas < 1) setNumeroParcelas(1);
               }}
               placeholder="Ex: 3"
               keyboardType="number-pad"
