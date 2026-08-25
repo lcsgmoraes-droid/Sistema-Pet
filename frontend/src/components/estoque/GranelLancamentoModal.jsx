@@ -87,7 +87,7 @@ export default function GranelLancamentoModal({
             <div className="rounded-lg border border-blue-200 bg-blue-50 p-4">
               <div className="font-semibold text-blue-900">Conferência obrigatória por bipagem</div>
               <p className="mt-1 text-xs text-blue-700">
-                Bipe primeiro o pacote pai aberto e depois o produto granel que receberá o estoque.
+                Bipe primeiro o produto fechado e depois o produto a granel que receberá o estoque.
               </p>
               <div className="mt-3 grid gap-3 sm:grid-cols-2">
                 <label className="text-xs font-medium text-slate-700">
@@ -108,7 +108,7 @@ export default function GranelLancamentoModal({
                     value={barcodeProdutoGranel}
                     onChange={(event) => setBarcodeProdutoGranel(event.target.value)}
                     className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
-                    placeholder="Bipe o produto granel"
+                    placeholder="Bipe o produto a granel"
                   />
                 </label>
               </div>
@@ -169,7 +169,7 @@ export default function GranelLancamentoModal({
 
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-700">
-              Buscar outro produto granel
+              Buscar outro produto a granel
             </label>
             <input
               type="text"
@@ -212,7 +212,7 @@ export default function GranelLancamentoModal({
 
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-700">
-              Pacotes abertos *
+              Embalagens abertas *
             </label>
             <input
               type="number"
@@ -287,7 +287,7 @@ export default function GranelLancamentoModal({
                   className="mt-0.5 rounded border-slate-300 text-orange-600 focus:ring-orange-500"
                 />
                 <span>
-                  Calcular margem sobre venda/kg do pacote pai. Desmarcado usa o custo/kg.
+                  Calcular margem sobre venda/kg do produto fechado. Desmarcado usa o custo/kg.
                 </span>
               </label>
 

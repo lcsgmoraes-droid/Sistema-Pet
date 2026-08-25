@@ -124,9 +124,9 @@ ITENS_EVOLUCAO: tuple[dict[str, Any], ...] = (
         "id": "granel-bipagem-vinculada",
         "titulo": "Lançamento de granel com conferência por bipagem",
         "resumo": (
-            "No ERP: Produtos / Estoque → Listar Produtos → abra o pacote pai → "
+            "No ERP: Produtos / Estoque → Listar Produtos → abra o produto fechado → "
             "Ver movimentações de estoque → Lançar granel. A trava de bipagem fica "
-            "em Configurações → Estoque. No app do funcionário, use Lançar granel."
+            "em Configurações → Estoque. No app: Funcionário → Lançar granel."
         ),
         "status": "disponivel_teste",
         "tipo": "projeto",
@@ -235,8 +235,10 @@ ITENS_EVOLUCAO: tuple[dict[str, Any], ...] = (
         "id": "crediario-vencimento-alertas",
         "titulo": "Crediário com vencimento e alertas",
         "resumo": (
-            "A venda fica em aberto com data combinada para pagamento, alerta no ERP "
-            "e aviso para o cliente no aplicativo."
+            "O Crediário já vem criado: ative ou desative em Cadastros → Formas de Pagamento. "
+            "No ERP ou no app do funcionário, selecione o cliente, escolha Crediário e informe "
+            "o vencimento em DD-MM-AAAA. A venda gera Contas a Receber, alerta no ERP e aviso "
+            "no app do cliente."
         ),
         "status": "disponivel_teste",
         "tipo": "projeto",
@@ -244,7 +246,7 @@ ITENS_EVOLUCAO: tuple[dict[str, Any], ...] = (
         "plataformas": ["ERP", "App do funcionário", "App do cliente"],
         "canais": ["erp", "app_funcionario", "app_cliente"],
         "publicado_em": "2026-08-22",
-        "atualizado_em": "2026-08-22",
+        "atualizado_em": "2026-08-24",
         "ciclo_novidade": deepcopy(CICLO_PADRAO),
         "destaque": True,
         "caminho_ajuda": "/ajuda?aba=central&artigo=venda-crediario-app-funcionario",

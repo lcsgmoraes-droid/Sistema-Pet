@@ -70,7 +70,7 @@ export default function FuncionarioHomeScreen() {
         <View style={{ flex: 1 }}>
           <Text style={styles.acaoTitulo}>Lancar granel</Text>
           <Text style={styles.acaoTexto}>
-            Bipe o pacote pai e confirme o produto granel vinculado.
+            Bipe o produto fechado e confirme o produto a granel vinculado.
           </Text>
         </View>
         <Ionicons name="chevron-forward" size={20} color={CORES.textoClaro} />

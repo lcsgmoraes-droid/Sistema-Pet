@@ -97,12 +97,12 @@ def _validar_produto_etapa_granel(
         if not possui_vinculo:
             raise HTTPException(
                 status_code=400,
-                detail="Este produto pai nao possui produto granel vinculado.",
+                detail="Este produto fechado nao possui produto a granel vinculado.",
             )
         return produto
 
     if not produto_origem_id:
-        raise HTTPException(status_code=400, detail="Bipe primeiro o produto pai.")
+        raise HTTPException(status_code=400, detail="Bipe primeiro o produto fechado.")
     vinculo = (
         db.query(ProdutoGranelVinculo)
         .filter(
@@ -115,7 +115,8 @@ def _validar_produto_etapa_granel(
     )
     if not vinculo:
         raise HTTPException(
-            status_code=400, detail="Produto granel nao corresponde ao produto pai."
+            status_code=400,
+            detail="O produto a granel nao corresponde ao produto fechado.",
         )
     return produto
 
@@ -181,7 +182,7 @@ def buscar_produtos_granel_funcionario(
     if etapa == "granel":
         if not produto_origem_id:
             raise HTTPException(
-                status_code=400, detail="Selecione primeiro o produto pai."
+                status_code=400, detail="Selecione primeiro o produto fechado."
             )
     query = _filtrar_produtos_com_vinculo_granel(
         query, tenant_id, etapa, produto_origem_id

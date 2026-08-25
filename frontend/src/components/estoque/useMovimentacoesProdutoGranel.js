@@ -72,7 +72,9 @@ export function useMovimentacoesProdutoGranel({ carregarDados, id, produto }) {
     precoMinimoEsperadoGranel > 0 ? precoVendaSugeridoGranel >= precoMinimoEsperadoGranel : true;
   const diferencaPrecoGranel = precoVendaSugeridoGranel - precoVendaAtualGranel;
   const baseMargemTexto =
-    margemBaseGranel === "preco_venda_kg" ? "venda/kg do pacote pai" : "custo/kg do pacote pai";
+    margemBaseGranel === "preco_venda_kg"
+      ? "venda/kg do produto fechado"
+      : "custo/kg do produto fechado";
 
   const carregarVinculosGranel = async () => {
     if (!id) return [];
@@ -137,17 +139,17 @@ export function useMovimentacoesProdutoGranel({ carregarDados, id, produto }) {
     e.preventDefault();
 
     if (!granelSelecionadoId) {
-      toast.error("Selecione o produto granel que vai receber os kg.");
+      toast.error("Selecione o produto a granel que vai receber os kg.");
       return;
     }
 
     if (!quantidadeGranelNumero || quantidadeGranelNumero <= 0) {
-      toast.error("Informe a quantidade de pacotes abertos.");
+      toast.error("Informe a quantidade de embalagens abertas.");
       return;
     }
 
     if (bipagemObrigatoriaGranel && (!barcodeOrigemGranel.trim() || !barcodeProdutoGranel.trim())) {
-      toast.error("Bipe o produto pai e depois o produto granel vinculado.");
+      toast.error("Bipe o produto fechado e depois o produto a granel vinculado.");
       return;
     }
 
@@ -203,7 +205,7 @@ export function useMovimentacoesProdutoGranel({ carregarDados, id, produto }) {
   };
 
   const handleDesvincularGranel = async (vinculoId) => {
-    if (!(await confirmarCorePet("Desvincular este produto granel da origem?"))) {
+    if (!(await confirmarCorePet("Desvincular este produto a granel da origem?"))) {
       return;
     }
 

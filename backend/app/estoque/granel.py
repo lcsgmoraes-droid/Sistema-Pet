@@ -46,7 +46,7 @@ def _validar_produto_origem_granel(produto_origem: Produto | None) -> float:
     if produto_origem.tipo_produto == "PAI":
         raise HTTPException(
             status_code=400,
-            detail="Produto pai/agrupador nao possui estoque para fracionar",
+            detail="Este item e um agrupador de variacoes e nao possui estoque para fracionar",
         )
 
     peso_pacote_kg = float(produto_origem.peso_embalagem or 0)
@@ -203,7 +203,7 @@ def executar_conversao_granel(
         .first()
     )
     if not produto_granel:
-        raise HTTPException(status_code=404, detail="Produto granel nao encontrado")
+        raise HTTPException(status_code=404, detail="Produto a granel nao encontrado")
     if not _produto_e_granel(produto_granel):
         raise HTTPException(
             status_code=400, detail="Produto informado nao esta marcado como granel"
@@ -215,14 +215,14 @@ def executar_conversao_granel(
         ):
             raise HTTPException(
                 status_code=400,
-                detail="Bipe do produto pai nao corresponde ao produto selecionado.",
+                detail="O codigo bipado nao corresponde ao produto fechado selecionado.",
             )
         if not _produto_corresponde_barcode_granel(
             produto_granel, getattr(payload, "produto_granel_barcode", None)
         ):
             raise HTTPException(
                 status_code=400,
-                detail="Produto granel nao corresponde ao produto bipado.",
+                detail="O produto a granel nao corresponde ao produto bipado.",
             )
 
     vinculo_existente = (
@@ -237,7 +237,8 @@ def executar_conversao_granel(
     )
     if exigir_bipagem and not vinculo_existente:
         raise HTTPException(
-            status_code=400, detail="Produto granel nao corresponde ao produto pai."
+            status_code=400,
+            detail="O produto a granel nao corresponde ao produto fechado selecionado.",
         )
 
     peso_pacote_kg = _validar_produto_origem_granel(produto_base)
