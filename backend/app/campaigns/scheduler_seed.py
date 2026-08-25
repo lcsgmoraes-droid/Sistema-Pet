@@ -1,5 +1,7 @@
 """Seed de campanhas padrao usado pelo scheduler e rotas administrativas."""
 
+from sqlalchemy import text
+
 _DEFAULT_CAMPAIGNS = [
     {
         "name": "Cartão Fidelidade",
@@ -120,6 +122,18 @@ _DEFAULT_CAMPAIGNS = [
 ]
 
 
+def _bloquear_seed_concorrente(db, tenant_id) -> None:
+    """Serializa o seed por tenant no PostgreSQL para impedir insercoes em corrida."""
+    bind = db.get_bind()
+    if bind.dialect.name != "postgresql":
+        return
+
+    db.execute(
+        text("SELECT pg_advisory_xact_lock(hashtextextended(:lock_key, 0))"),
+        {"lock_key": f"corepet:campaign-seed:{tenant_id}"},
+    )
+
+
 def seed_campaigns_for_tenant(db, tenant_id) -> int:
     """
     Cria campanhas padrão para o tenant se ele ainda não as tiver.
@@ -127,6 +141,8 @@ def seed_campaigns_for_tenant(db, tenant_id) -> int:
     Retorna o número de campanhas criadas.
     """
     from app.campaigns.models import Campaign, CampaignStatusEnum, CampaignTypeEnum
+
+    _bloquear_seed_concorrente(db, tenant_id)
 
     # Tipos já existentes para este tenant
     existing_types = {
@@ -151,10 +167,15 @@ def seed_campaigns_for_tenant(db, tenant_id) -> int:
         db.add(campaign)
         created += 1
 
-    if created:
-        db.commit()
+    # O commit tambem libera o advisory lock quando nenhuma campanha precisou
+    # ser criada. A segunda execucao concorrente passa a enxergar a primeira.
+    db.commit()
 
     return created
 
 
-__all__ = ["_DEFAULT_CAMPAIGNS", "seed_campaigns_for_tenant"]
+__all__ = [
+    "_DEFAULT_CAMPAIGNS",
+    "_bloquear_seed_concorrente",
+    "seed_campaigns_for_tenant",
+]

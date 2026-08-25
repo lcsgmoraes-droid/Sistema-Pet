@@ -40,6 +40,7 @@ import {
   obterCorParcelamentoAtual,
   obterModalidadeCartao,
   obterParcelasDisponiveis,
+  obterParcelasPermitidasParaForma,
   obterTaxaCartaoSelecionada,
   podeEnviarPagamentoStonePos,
   persistirVendaAbertaParaPagamento,
@@ -118,6 +119,17 @@ test("resolve bandeiras e parcelas pela matriz de taxas da operadora", () => {
     }).id,
     1,
   );
+});
+
+test("crediario oferece de uma a sessenta parcelas sem herdar o limite cadastral antigo", () => {
+  const parcelas = obterParcelasPermitidasParaForma({
+    tipo: "crediario",
+    parcelas_maximas: 1,
+  });
+
+  assert.equal(parcelas.length, 60);
+  assert.deepEqual(parcelas.slice(0, 3), [1, 2, 3]);
+  assert.equal(parcelas.at(-1), 60);
 });
 
 test("calcula dados auxiliares da venda sem depender do modal", () => {
@@ -525,6 +537,32 @@ test("calcula previa de cashback, carimbos e recompra elegiveis por canal", () =
       },
     ],
   });
+});
+
+test("ignora campanhas exatamente duplicadas sem esconder configuracoes distintas", () => {
+  const fidelidade = {
+    name: "Cartao fidelidade",
+    campaign_type: "loyalty_stamp",
+    params: { benefit_channels: ["loja_fisica"], min_purchase_value: 50 },
+  };
+  const resultado = calcularBeneficiosCampanhaPreview({
+    campanhasCompra: [
+      fidelidade,
+      { ...fidelidade, id: 99 },
+      {
+        ...fidelidade,
+        name: "Cartao fidelidade VIP",
+        params: { benefit_channels: ["loja_fisica"], min_purchase_value: 100 },
+      },
+    ],
+    canalVenda: "loja_fisica",
+    valorBase: 100,
+  });
+
+  assert.deepEqual(resultado.carimbosPrevistos, [
+    { campanha: "Cartao fidelidade", quantidade: 2 },
+    { campanha: "Cartao fidelidade VIP", quantidade: 1 },
+  ]);
 });
 
 test("calcula resumo do recebimento considerando pagamentos novos e existentes", () => {

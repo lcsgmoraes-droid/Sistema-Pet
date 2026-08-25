@@ -97,6 +97,15 @@ export function obterParcelasDisponiveis({
     .sort((a, b) => a - b);
 }
 
+export function obterParcelasPermitidasParaForma(formaPagamento = null) {
+  if (formaPagamento?.tipo === "crediario") {
+    return Array.from({ length: 60 }, (_, index) => index + 1);
+  }
+
+  const limite = Math.max(1, Number(formaPagamento?.parcelas_maximas || 12));
+  return Array.from({ length: limite }, (_, index) => index + 1);
+}
+
 export function obterBandeiraPadraoPdv({ operadora = null, bandeiras = [] } = {}) {
   const padrao = normalizarBandeiraCartao(operadora?.bandeira_padrao);
   const correspondente = bandeiras.find(
@@ -808,9 +817,20 @@ export function calcularBeneficiosCampanhaPreview({
 }) {
   const valorBaseNumerico = Number(valorBase || 0);
   const canal = canalVenda || "loja_fisica";
-  const campanhasElegiveisCanal = campanhasCompra.filter((campanha) =>
-    campaignAllowsSaleChannel(campanha, canal),
-  );
+  const assinaturasVistas = new Set();
+  const campanhasElegiveisCanal = campanhasCompra.filter((campanha) => {
+    if (!campaignAllowsSaleChannel(campanha, canal)) return false;
+
+    const paramsOrdenados = Object.fromEntries(
+      Object.entries(campanha.params || {}).sort(([chaveA], [chaveB]) =>
+        chaveA.localeCompare(chaveB),
+      ),
+    );
+    const assinatura = JSON.stringify([campanha.campaign_type, campanha.name, paramsOrdenados]);
+    if (assinaturasVistas.has(assinatura)) return false;
+    assinaturasVistas.add(assinatura);
+    return true;
+  });
 
   const cashbackPrevisto = campanhasElegiveisCanal
     .filter((campanha) => campanha.campaign_type === "cashback")

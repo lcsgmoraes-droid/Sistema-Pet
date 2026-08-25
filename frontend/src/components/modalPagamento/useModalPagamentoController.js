@@ -29,6 +29,7 @@ import {
   obterEstiloVisualParcelamento,
   obterModalidadeCartao,
   obterParcelasDisponiveis,
+  obterParcelasPermitidasParaForma,
   obterTaxaCartaoSelecionada,
   resolverFaixasParcelamentoDaForma,
 } from "../modalPagamentoUtils";
@@ -253,8 +254,7 @@ export default function useModalPagamentoController({
   );
   const parcelasDisponiveis = useMemo(() => {
     if (!ehFormaPagamentoCartao(formaPagamentoSelecionada)) {
-      const maxParcelas = formaPagamentoSelecionada?.parcelas_maximas || 12;
-      return Array.from({ length: maxParcelas }, (_, index) => index + 1);
+      return obterParcelasPermitidasParaForma(formaPagamentoSelecionada);
     }
     const maxParcelas =
       operadoraSelecionada?.max_parcelas || formaPagamentoSelecionada?.parcelas_maximas || 12;
