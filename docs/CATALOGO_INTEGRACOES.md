@@ -96,8 +96,9 @@ Toda integração nova ou alterada deve registrar, antes da homologação:
   produtos, estoque e notas; webhooks entram no Sistema Pet e APIs do Bling são
   chamadas pelo backend.
 - **Autenticação e segredos:** OAuth 2.0 com token bearer, credenciais de cliente
-  e refresh token fora do Git. `BLING_WEBHOOK_TENANT_ID` fixa o tenant das
-  chamadas públicas, mas isso identifica o destino e não autentica a origem.
+  e refresh token fora do Git. Webhooks de pedido e nota validam o cabeçalho
+  oficial `X-Bling-Signature-256` por HMAC-SHA256 sobre o corpo bruto usando o
+  `BLING_CLIENT_SECRET`. `BLING_WEBHOOK_TENANT_ID` fixa o tenant de destino.
 - **Timeout:** chamadas HTTP usam limite de 30 segundos.
 - **Retry:** a API renova token expirado e tenta novamente; respostas `429`
   possuem até cinco tentativas com espera progressiva. A fila de pedidos usa
@@ -114,11 +115,9 @@ Toda integração nova ou alterada deve registrar, antes da homologação:
   tenant e logs operacionais.
 - **Responsável:** negócio do ERP pelo responsável do Sistema Pet; execução
   técnica pela IA; homologação pelo operador autorizado da empresa integrada.
-- **Lacuna prioritária:** os endpoints públicos de pedido e nota mapeados no
-  controle de módulos não verificam hoje assinatura ou segredo do provedor.
-  Antes de ampliar o uso, adotar assinatura suportada pelo Bling ou proteção
-  equivalente no gateway, testar replay e consolidar/aposentar rotas legadas
-  para existir uma única entrada oficial.
+- **Lacuna prioritária:** acompanhar rejeições de assinatura, exercitar replay e
+  indisponibilidade em homologação e consolidar/aposentar rotas legadas para
+  existir uma única entrada oficial.
 - **Evidência no código:** `backend/app/bling_integration_parts/core.py`,
   `backend/app/integracao_bling_pedido_routes.py`,
   `backend/app/services/bling_pedido_webhook_queue_service.py`,
@@ -233,7 +232,9 @@ Toda integração nova ou alterada deve registrar, antes da homologação:
 - **Finalidade e direção:** envia e recebe mensagens de atendimento por tenant;
   inclui ponte interna protegida para o orquestrador n8n/WAHA.
 - **Autenticação e segredos:** chave de API do 360dialog ou WAHA, segredo de
-  webhook por tenant e token interno dedicado, todos fora do Git.
+  webhook por tenant e token interno dedicado, todos fora do Git. A entrada
+  aceita HMAC-SHA256 quando o provedor o fornece ou o cabeçalho personalizado
+  `X-CorePet-Webhook-Token`, suportado na configuração do 360dialog.
 - **Timeout:** envio externo usa limite de 30 segundos.
 - **Retry:** processamento recebido pode ocorrer em segundo plano, mas não há
   contrato único de fila durável/retry para toda saída.
@@ -247,10 +248,11 @@ Toda integração nova ou alterada deve registrar, antes da homologação:
   envio sem registrar credenciais.
 - **Responsável:** negócio de atendimento pelo responsável do Sistema Pet;
   execução técnica pela IA; homologação por operador autorizado do canal.
-- **Lacuna prioritária:** quando houver segredo configurado, rejeitar também a
-  assinatura ausente — hoje a verificação ocorre somente se segredo e cabeçalho
-  vierem juntos. Adicionar deduplicação persistente, teste de replay e alerta de
-  falha acumulada.
+- **Lacuna prioritária:** a autenticação agora é fail-closed: segredo ausente
+  causa indisponibilidade explícita e token/assinatura ausente ou inválido é
+  rejeitado. Ainda
+  falta adicionar deduplicação persistente por `wamid`, teste de replay e alerta
+  de falha acumulada.
 - **Evidência no código:** `backend/app/whatsapp/sender.py`,
   `backend/app/whatsapp/webhook.py` e
   `backend/app/api/whatsapp_orchestrator_internal_routes.py`.
@@ -519,7 +521,8 @@ Toda integração nova ou alterada deve registrar, antes da homologação:
 
 ## Ordem de endurecimento recomendada
 
-1. autenticar de forma fail-closed os webhooks Bling e WhatsApp e testar replay;
+1. concluir deduplicação/replay do WhatsApp e monitorar rejeições de assinatura
+   nos webhooks Bling e WhatsApp;
 2. criar reconciliação e alertas de pagamentos/assinaturas para Mercado Pago e
    Asaas;
 3. formalizar backoff, fila e recuperação de iFood e EcommerceAI;
@@ -530,6 +533,25 @@ Toda integração nova ou alterada deve registrar, antes da homologação:
 Essas mudanças devem ser pequenas e separadas. Uma integração só avança de
 controle documentado para controle comprovado quando houver teste automatizado,
 homologação de falha/recuperação e evidência operacional.
+
+## Ativação segura da autenticação de webhook
+
+Esta mudança de segurança precisa de rollout coordenado; merge de código não é
+autorização de produção.
+
+1. Em homologação, confirmar que `BLING_CLIENT_SECRET` está disponível ao
+   backend e enviar um payload assinado como `X-Bling-Signature-256`.
+2. No 360dialog, configurar o cabeçalho `X-CorePet-Webhook-Token` com o mesmo
+   segredo forte já cadastrado para o tenant. O valor não entra no Git, URL,
+   print ou evidência.
+3. Provar no Bling: assinatura válida aceita, cabeçalho ausente rejeitado e
+   corpo adulterado rejeitado. Provar no WhatsApp: token válido aceito e token
+   ausente ou incorreto rejeitado, sempre por HTTPS.
+4. Só então autorizar deploy; acompanhar respostas `403`, `503`, fila e chegada
+   de eventos reais durante a janela assistida.
+5. Em caso de erro, corrigir primeiro a credencial/configuração do provedor. O
+   rollback é voltar ao commit anterior; não deixar validação permanentemente
+   desabilitada como atalho.
 
 ## Manutenção e revisão
 

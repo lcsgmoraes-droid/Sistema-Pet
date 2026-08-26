@@ -52,12 +52,12 @@ def test_catalog_covers_the_external_integration_groups_found_in_source():
         assert integration in source
 
 
-def test_catalog_keeps_known_webhook_risks_visible_until_they_are_fixed():
+def test_catalog_keeps_remaining_webhook_risks_visible():
     source = CATALOG.read_text(encoding="utf-8")
 
-    assert "endpoints públicos de pedido e nota" in source
-    assert "rejeitar também a\n  assinatura ausente" in source
-    assert "autenticar de forma fail-closed os webhooks Bling e WhatsApp" in source
+    assert "X-Bling-Signature-256" in source
+    assert "a autenticação agora é fail-closed" in source
+    assert "deduplicação persistente por `wamid`" in source
 
 
 def test_official_navigation_and_structure_reference_the_catalog():
