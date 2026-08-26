@@ -6,7 +6,7 @@ Este módulo implementa validação rigorosa de variáveis de ambiente críticas
 na inicialização do sistema, garantindo que:
 
 1. Todas as variáveis obrigatórias estejam presentes
-2. O ambiente (DEV/TEST/PROD) esteja configurado corretamente
+2. O ambiente (DEV/TEST/STAGING/PROD) esteja configurado corretamente
 3. Guard rails e logs estejam adequados para produção
 4. A aplicação falhe imediatamente se algo estiver incorreto
 
@@ -74,7 +74,7 @@ def validate_settings(settings: Any) -> None:
     # ==================================================================
 
     required_vars = {
-        "ENV": "Ambiente de execução (development/test/production)",
+        "ENV": "Ambiente de execução (development/test/staging/production)",
         "DATABASE_URL": "URL de conexão com o banco de dados",
         "SQL_AUDIT_ENFORCE": "Flag de enforcement de auditoria SQL",
         "SQL_AUDIT_ENFORCE_LEVEL": "Nível de enforcement (warn/error/strict)",
@@ -106,6 +106,8 @@ def validate_settings(settings: Any) -> None:
 
     if env == "production":
         _validate_production_settings(settings, errors)
+    elif env == "staging":
+        _validate_staging_settings(settings, errors)
     elif env == "test":
         _validate_test_settings(settings, errors)
     elif env == "development":
@@ -113,7 +115,7 @@ def validate_settings(settings: Any) -> None:
     else:
         errors.append(
             f"[CRITICAL] ENV inválido: '{env}'\n"
-            f"           Valores permitidos: development, test, production"
+            f"           Valores permitidos: development, test, staging, production"
         )
 
     # ==================================================================
@@ -206,6 +208,42 @@ def _validate_test_settings(settings: Any, errors: List[str]) -> None:
     logger.info("🧪 Validação de teste executada")
 
 
+def _validate_staging_settings(settings: Any, errors: List[str]) -> None:
+    """Valida staging como ambiente rigoroso, isolado de produção."""
+
+    debug = getattr(settings, "DEBUG", False)
+    if debug:
+        errors.append(
+            f"[STAGING] Debug está ATIVADO (valor: {debug})\n"
+            "          Debug DEVE estar DESATIVADO em staging"
+        )
+
+    database_url = getattr(settings, "DATABASE_URL", "")
+    if "production" in database_url.lower() or "prod" in database_url.lower():
+        errors.append(
+            "[STAGING] Ambiente de homologação NÃO DEVE usar banco de produção\n"
+            "          DATABASE_URL contém 'production' ou 'prod'"
+        )
+
+    sql_audit_level = getattr(settings, "SQL_AUDIT_ENFORCE_LEVEL", "").upper()
+    if sql_audit_level not in ["ERROR", "STRICT"]:
+        errors.append(
+            f"[STAGING] SQL Audit level inadequado (valor: {sql_audit_level})\n"
+            "          Em staging, SQL_AUDIT_ENFORCE_LEVEL DEVE ser 'error' ou 'strict'"
+        )
+
+    payment_key = (
+        os.getenv("PAYMENT_CONFIG_ENCRYPTION_KEY") or os.getenv("ENCRYPTION_KEY") or ""
+    ).strip()
+    if not payment_key:
+        errors.append(
+            "[STAGING] PAYMENT_CONFIG_ENCRYPTION_KEY ausente\n"
+            "          Staging exige chave própria e nunca compartilha a chave de produção."
+        )
+
+    logger.info("🧪 Validação de staging executada")
+
+
 def _validate_development_settings(settings: Any, errors: List[str]) -> None:
     """
     Validações específicas para ambiente de DESENVOLVIMENTO.
@@ -286,14 +324,15 @@ def get_validation_summary(settings: Any) -> Dict[str, Any]:
 
     # Verificar configurações de produção
     env = summary["environment"].lower()
-    if env == "production":
+    if env in {"production", "staging"}:
         debug = getattr(settings, "DEBUG", False)
-        guardrails = getattr(settings, "ENABLE_GUARDRAILS", False)
 
         if debug:
-            summary["warnings"].append("Debug ativado em produção")
+            summary["warnings"].append(f"Debug ativado em {env}")
             summary["is_valid"] = False
 
+    if env == "production":
+        guardrails = getattr(settings, "ENABLE_GUARDRAILS", False)
         if guardrails:
             summary["warnings"].append("Guard rails ativados em produção")
             summary["is_valid"] = False
