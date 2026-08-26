@@ -21,6 +21,7 @@ Guia mestre:
 | Preparar entrega relevante | `docs/templates/FICHA_ENTREGA.md` | Criterios de aceite, risco, testes e rollback |
 | Registrar homologacao | `docs/templates/REGISTRO_HOMOLOGACAO.md` | Evidencias conforme `docs/PADRAO_EVIDENCIA.md` |
 | Preparar um PC DEV | `docs/DEV_ENVIRONMENT_CHECK.md` | `scripts/check_dev_environment.ps1` |
+| Subir homologacao isolada | `docs/HOMOLOGACAO_LOCAL_ISOLADA.md` | `scripts/homologacao_local.ps1` |
 | Trabalhar em dois PCs | `docs/GIT_FLUXO_2_PCS.md` | `scripts/git_check_updates.ps1` |
 | Usar MCPs locais | `mcp/README.md` | `scripts/test_mcp.ps1` |
 | Entender CI e checks | `docs/CI_CD_DEPLOY_SAFETY_AUDIT.md` | GitHub Actions do PR |
@@ -70,6 +71,7 @@ Guia mestre:
 | Testes/CI | `docs/auditorias/testes-ci-cobertura-critica.md` |
 | Observabilidade/auditoria | `docs/RETENCAO_LOGS_AUDITORIA.md` |
 | Portabilidade/configuracao | `docs/DEV_ENVIRONMENT_CHECK.md` |
+| Homologacao local | `docs/HOMOLOGACAO_LOCAL_ISOLADA.md` |
 | Importacao SimplesVet | `docs/IMPORTACAO_SIMPLESVET_SEGURA.md` |
 | Venda do Plano Basico | `docs/GUIA_VENDA_PLANO_BASICO.md` |
 | Implantacao inicial | `docs/implantacao/GUIA_IMPLANTACAO_INICIAL.md` |

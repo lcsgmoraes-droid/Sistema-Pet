@@ -16,9 +16,9 @@ controles que tornam a evolução segura.
 Na avaliação atual:
 
 - 3 áreas estão **sólidas** para o estágio atual;
-- 6 áreas estão **parcialmente fortes**, com controles reais e pontos de
+- 8 áreas estão **parcialmente fortes**, com controles reais e pontos de
   consolidação;
-- 5 áreas estão **parciais** e entram no plano prioritário de evolução;
+- 3 áreas estão **parciais** e entram no plano prioritário de evolução;
 - nenhuma área exige reescrita total do sistema.
 
 Esta avaliação complementa o placar técnico de
@@ -59,8 +59,8 @@ Até existir uma equipe de desenvolvimento formal:
 | 6 | Integrações | Parcial | Há documentação e código para integrações específicas, correlação de requisições, jobs e tratamento assíncrono em áreas críticas. | Criar catálogo único com sistema, finalidade, autenticação, timeout, retry, idempotência, fallback, reconciliação, alertas e responsável. |
 | 7 | Desenvolvimento | Sólido | Branch por tarefa, PR, revisão, padrões backend/frontend, migrations, pequenas fatias, regras para IA e Definition of Done estão em `AGENTS.md` e `CONTRIBUTING.md`. | Manter os gates e impedir exceções informais conforme o volume de mudanças crescer. |
 | 8 | Qualidade e testes | Sólido | CI de backend, frontend, segurança, smoke, migrations, multiempresa e E2E longo; matriz de testes por risco e evidência obrigatória. | Ampliar regressão funcional e testes de desempenho em homologação sem transformar produção em ambiente de teste. |
-| 9 | Ambientes e configuração | Parcial | DEV local, MCP, CI e produção estão separados; variáveis e segredos ficam fora do Git; há bootstrap e verificação de ambiente. | Criar ambiente de homologação dedicado, descartável ou isolado, com dados fictícios e configuração próxima de produção. |
-| 10 | Homologação | Parcial | Existem checklists de implantação, aceite de piloto, E2E controlado e padrão de evidência. | Faltava processo genérico. `docs/templates/REGISTRO_HOMOLOGACAO.md` passa a registrar cenários, evidências, inconsistências, responsável e decisão de aceite. |
+| 9 | Ambientes e configuração | Parcial forte | DEV local, homologação descartável, CI e produção estão separados; variáveis e segredos ficam fora do Git; há bootstrap e verificação de ambiente. | Executar o primeiro aceite real em `corepet-homolog` e criar staging remoto apenas quando acesso compartilhado, webhooks, HTTPS ou carga contínua justificarem o custo. |
+| 10 | Homologação | Parcial forte | Há ambiente isolado com PostgreSQL próprio, build de produção, migrations, tenant fictício, E2E controlado, modelo de aceite e padrão de evidência. | Usar o processo em entregas reais e medir inconsistências encontradas antes de mudar o status para sólido. |
 | 11 | Gestão da mudança e treinamento | Parcial | Há Central de Ajuda, novidades, onboarding, guias de implantação e materiais por funcionalidade. | Tornar obrigatória a avaliação de impacto, comunicação, manual e treinamento em cada mudança visível ao usuário. A ficha de entrega inclui esse gate. |
 | 12 | Publicação e versões | Sólido | CI/CD, proteção de branch, commit identificável, deploy por usuário restrito, health, backup, migrations, evidência e rollback estão documentados e exercitados. | Manter aprovação explícita de produção e registrar toda exceção ou correção emergencial. |
 | 13 | Produção e observabilidade | Parcial forte | Health/watchdog, logs estruturados, `request_id`, auditoria, painel Ops, alertas externos e trilha de deploy estão implementados. | Definir SLOs e indicadores de negócio: sucesso de venda, integração, onboarding, erros por jornada e tendência por empresa sem expor dados entre tenants. |
@@ -110,9 +110,10 @@ programação.
 
 1. **Padronizar requisitos e homologação.** Implantado neste pacote documental
    pela ficha de entrega, registro de homologação e checklist de PR.
-2. **Criar homologação separada de produção.** Planejar infraestrutura, dados
-   fictícios, acesso restrito, atualização e descarte. Até existir, produção não
-   deve ser usada para descobrir se uma mudança funciona.
+2. **Criar homologação separada de produção.** Implementada como ambiente local,
+   isolado e descartável em `docs/HOMOLOGACAO_LOCAL_ISOLADA.md`, respeitando a
+   decisão de não contratar um segundo servidor neste estágio. Falta acumular
+   evidência de uso em entregas reais.
 3. **Consolidar incidentes e sustentação.** Unificar severidade, primeira
    resposta, comunicação, causa raiz, ações preventivas e métricas.
 

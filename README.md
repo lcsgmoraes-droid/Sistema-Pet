@@ -94,7 +94,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\bootstrap_dev_environment.ps1
 | DEV local | Desenvolvimento, testes e validacao antes de PR | `docs/DEV_ENVIRONMENT_CHECK.md` |
 | MCP local | Ferramentas locais para Codex/VS Code | `mcp/README.md` |
 | CI/GitHub | Checks obrigatorios e suites longas | `docs/CI_CD_DEPLOY_SAFETY_AUDIT.md` |
-| HOMOLOG dedicado | Aceite com dados ficticios antes de producao | Planejado em `docs/GOVERNANCA_ENTERPRISE.md`; ainda nao disponivel |
+| HOMOLOG local | Aceite isolado e descartavel com dados ficticios | `docs/HOMOLOGACAO_LOCAL_ISOLADA.md` |
 | Producao | Dados reais, deploy via `petdeploy` | `docs/PRODUCAO_DEPLOY_SSH.md` |
 
 ## Producao

@@ -1,6 +1,6 @@
 # Auditoria de CI/CD e deploy seguro
 
-Atualizado em: 2026-06-19
+Atualizado em: 2026-08-26
 
 Este arquivo acompanha a maturidade de CI/CD e deploy seguro do Sistema Pet.
 
@@ -44,6 +44,7 @@ Meta: 10/10 antes de automatizar qualquer deploy de producao.
 | Feito | Backend CI valida migrations Alembic em Postgres descartavel para banco limpo e historico controlado | `.github/workflows/backend-ci.yml`, `scripts/ci_migration_smoke.py` |
 | Feito | Matriz de cobertura critica separa checks rapidos obrigatorios de suites longas | `docs/auditorias/testes-ci-cobertura-critica.md` |
 | Feito | Suite E2E longa do Plano Basico possui workflow manual/agendado separado dos checks obrigatorios | `.github/workflows/e2e-long.yml` |
+| Feito | Homologacao isolada monta build de producao, PostgreSQL, migrations e E2E com dados ficticios sem acessar producao | `.github/workflows/homologacao-isolada.yml`, `docs/HOMOLOGACAO_LOCAL_ISOLADA.md` |
 
 ## PRs ja juntados
 
@@ -125,6 +126,11 @@ Deploy sem rebuild validado:
 | `Smoke test` | Garante smoke de backend/auth e build de frontend |
 
 ## Suites longas separadas
+
+O workflow `Homologacao Isolada` monta um ambiente descartavel completo em Linux
+quando seus arquivos de infraestrutura mudam e tambem permite disparo manual. As
+credenciais sao geradas durante a execucao, nenhum GitHub Secret e necessario e
+os volumes sao removidos ao final. Ele nao faz deploy.
 
 O workflow `E2E Long` fica fora dos checks obrigatorios de PR. Ele roda por
 `workflow_dispatch` ou agenda semanal, usando somente variaveis `E2E_*` vindas

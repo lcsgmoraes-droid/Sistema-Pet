@@ -1,0 +1,75 @@
+name: Homologacao Isolada
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - "docker-compose.homolog.yml"
+      - "homolog.env.example"
+      - "nginx/homolog.local.conf"
+      - "scripts/homologacao_local.ps1"
+      - "scripts/executar_testes_e2e.ps1"
+      - "tests/test_homologacao_local_contract.py"
+      - "tests/test_permission_catalog_migration_contract.py"
+      - "backend/alembic/**"
+      - "backend/app/auth/**"
+      - "backend/app/services/default_roles_service.py"
+      - ".github/workflows/homologacao-isolada.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: homologacao-isolada-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  homologacao:
+    name: Homologacao isolada
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Setup Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install E2E dependencies
+        run: |
+          python -m pip install -r backend/requirements.txt -c backend/requirements.lock
+
+      - name: Validate homologation contracts
+        run: >-
+          python -m pytest
+          tests/test_homologacao_local_contract.py
+          tests/test_permission_catalog_migration_contract.py
+          tests/test_tenant_ecommerce_slug_migration_contract.py
+          -q
+
+      - name: Validate Docker Compose
+        shell: pwsh
+        run: ./scripts/homologacao_local.ps1 -Acao verificar-config
+
+      - name: Build and start isolated homologation
+        shell: pwsh
+        run: ./scripts/homologacao_local.ps1 -Acao subir
+
+      - name: Run Plano Basico E2E with fictitious data
+        shell: pwsh
+        run: ./scripts/homologacao_local.ps1 -Acao validar
+
+      - name: Show final container state
+        if: always()
+        run: docker compose --env-file .env.homolog.local -f docker-compose.homolog.yml --project-name corepet-homolog ps
+
+      - name: Remove disposable homologation volumes
+        if: always()
+        continue-on-error: true
+        shell: pwsh
+        run: ./scripts/homologacao_local.ps1 -Acao resetar -ConfirmarReset
