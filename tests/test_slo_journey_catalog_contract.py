@@ -64,13 +64,16 @@ def test_catalog_records_current_measurement_limits_and_next_instrumentation():
 
     for required in (
         "não possui denominador de todas as requisições",
-        "Falta evento padronizado",
+        "`ops_journey_events` e JSONL sanitizado medem login",
         "Criar evento sanitizado por jornada",
+        "Implementado para login, seleção",
         "30 dias de linha de base",
         "burn rate",
         "jornadas autenticadas em homologação",
     ):
         assert required in source
+
+    assert "Falta evento padronizado" not in source
 
 
 def test_official_navigation_references_the_slo_catalog():

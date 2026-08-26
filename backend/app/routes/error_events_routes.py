@@ -10,6 +10,10 @@ from app.services.deploy_event_reporter import (
     summarize_deploy_events,
 )
 from app.services.error_event_reporter import list_error_events, summarize_error_events
+from app.services.journey_event_reporter import (
+    list_journey_events,
+    summarize_journey_events,
+)
 from app.services.ops_dashboard_service import build_ops_dashboard
 from app.services.ops_persistence_service import (
     list_ops_alerts,
@@ -75,6 +79,44 @@ def resumo_eventos_erro(
     db: Session = Depends(get_session),
 ) -> dict[str, Any]:
     return summarize_error_events(
+        tenant_id=tenant_id,
+        since=since,
+        until=until,
+        db=db,
+    )
+
+
+@router.get("/journey-events")
+def listar_eventos_jornada(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(50, ge=1, le=200),
+    journey: str | None = Query(None),
+    tenant_id: str | None = Query(None),
+    since: datetime | None = Query(None),
+    until: datetime | None = Query(None),
+    db: Session = Depends(get_session),
+) -> dict[str, Any]:
+    return list_journey_events(
+        page=page,
+        page_size=page_size,
+        journey=journey,
+        tenant_id=tenant_id,
+        since=since,
+        until=until,
+        db=db,
+    )
+
+
+@router.get("/journey-events/summary")
+def resumo_eventos_jornada(
+    journey: str | None = Query(None),
+    tenant_id: str | None = Query(None),
+    since: datetime | None = Query(None),
+    until: datetime | None = Query(None),
+    db: Session = Depends(get_session),
+) -> dict[str, Any]:
+    return summarize_journey_events(
+        journey=journey,
         tenant_id=tenant_id,
         since=since,
         until=until,

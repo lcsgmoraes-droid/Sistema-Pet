@@ -108,3 +108,38 @@ class OpsRecoveryAction(Base):
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )
     payload = Column(JSON, nullable=True)
+
+
+class OpsJourneyEvent(Base):
+    """Evento terminal sanitizado usado para calcular SLOs por jornada."""
+
+    __tablename__ = "ops_journey_events"
+    __table_args__ = (
+        Index("ix_ops_journey_events_journey_created", "journey", "created_at"),
+        Index(
+            "ix_ops_journey_events_tenant_journey_created",
+            "tenant_id",
+            "journey",
+            "created_at",
+        ),
+        Index("ix_ops_journey_events_outcome_created", "outcome", "created_at"),
+    )
+
+    id = Column(BigInteger, primary_key=True, autoincrement=True)
+    event_key = Column(String(96), nullable=False, unique=True, index=True)
+    created_at = Column(DateTime(timezone=True), nullable=False, index=True)
+    captured_at = Column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+    journey = Column(String(80), nullable=False, index=True)
+    outcome = Column(String(32), nullable=False, index=True)
+    reason_code = Column(String(80), nullable=False)
+    duration_ms = Column(Float, nullable=False, default=0)
+    status_code = Column(Integer, nullable=True)
+    tenant_id = Column(UUID(as_uuid=True), nullable=True, index=True)
+    request_id = Column(String(80), nullable=True, index=True)
+    operation_id = Column(String(96), nullable=False, index=True)
+    method = Column(String(12), nullable=False)
+    path_template = Column(String(180), nullable=False, index=True)
+    provider = Column(String(60), nullable=True, index=True)
+    source = Column(String(60), nullable=False, default="request_context")

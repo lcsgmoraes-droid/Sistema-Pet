@@ -36,6 +36,7 @@ def test_assert_no_unexpected_no_rls_tables_accepts_intentional_globals():
             ("notification_queue",),
             ("ops_alerts",),
             ("ops_error_events",),
+            ("ops_journey_events",),
             ("user_sessions",),
         ]
     )

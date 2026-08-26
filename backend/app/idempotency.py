@@ -288,6 +288,7 @@ def idempotent(require_key: bool = True):
                         content=json.dumps(response_body, ensure_ascii=False),
                         status_code=existing_key.response_status_code or 200,
                         media_type="application/json",
+                        headers={"X-Idempotency-Replayed": "true"},
                     )
 
             # Cenário 2: Nova chave - criar registro

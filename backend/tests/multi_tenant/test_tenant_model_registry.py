@@ -72,6 +72,9 @@ INTENTIONALLY_GLOBAL_TENANT_TABLES = frozenset(
         # por tenant quebraria o painel de admin e a captura de eventos sem tenant.
         "ops_alerts",
         "ops_error_events",
+        # Eventos terminais sanitizados usados no painel global de SLOs. A tabela
+        # nao guarda payload de cliente/venda e a leitura exige platform admin.
+        "ops_journey_events",
         # Fila persistente de webhooks do Bling: o worker (process_pending_bling_pedido_
         # webhooks) faz claim cross-tenant SEM tenant no contexto (roda fora de request
         # HTTP); o webhook público enfileira sem sessão. tenant_id é etiqueta nullable.
@@ -139,7 +142,8 @@ KNOWN_BASE_TENANT_DEBT = frozenset(
         # unique preservado; migration pl20260609a1). Dup morto custo_moto.py/models removido.
         # app/opcoes_racao_models.py — MIGRADO para TenantScoped (PR opcoes/duplicatas):
         #   apresentacoes_peso, fases_publico, linhas_racao, portes_animal, sabores_proteina, tipos_tratamento
-        # app/ops_models.py — ops_alerts, ops_error_events DECLARADOS INTENCIONALMENTE
+        # app/ops_models.py — ops_alerts, ops_error_events, ops_journey_events
+        # DECLARADOS INTENCIONALMENTE
         # GLOBAIS (observabilidade admin cross-tenant) → ver INTENTIONALLY_GLOBAL_TENANT_TABLES.
         # app/pedido_models.py — MIGRADOS (Leva 3: String→UUID + TenantScoped; checkout_real
         # passou a chamar set_current_tenant antes de consultar Pedido)
@@ -173,7 +177,8 @@ KNOWN_BASE_TENANT_DEBT = frozenset(
 KNOWN_NULLABLE_TENANT_DEBT = frozenset(
     {
         # VAZIO. dre_periodos saiu: tenant_id agora NOT NULL (migration pn20260610a1) + TenantScoped.
-        # ops_alerts, ops_error_events e bling_pedido_webhook_events saíram daqui:
+        # ops_alerts, ops_error_events, ops_journey_events e
+        # bling_pedido_webhook_events saíram daqui:
         # agora são INTENTIONALLY_GLOBAL (nullable é esperado em tabela global).
     }
 )

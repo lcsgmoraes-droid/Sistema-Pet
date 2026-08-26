@@ -26,6 +26,7 @@ from contextvars import ContextVar
 import logging
 
 from app.services.error_event_reporter import record_request_event
+from app.services.journey_event_reporter import record_http_journey_event
 from app.security.error_sanitization import is_strict_runtime_environment
 from app.utils.logger import clear_context as clear_log_context
 from app.utils.logger import set_endpoint, set_trace_id
@@ -46,6 +47,16 @@ def _env_int(name: str, default: int) -> int:
 SLOW_REQUEST_LOG_MS = _env_int("REQUEST_CONTEXT_SLOW_MS", 3000)
 REQUEST_ID_MAX_LENGTH = 80
 REQUEST_ID_SAFE_PATTERN = re.compile(r"^[A-Za-z0-9._-]+$")
+
+
+def _record_http_journey_event_safely(**event) -> None:
+    """Garante que uma falha de telemetria nunca altere a resposta do cliente."""
+
+    try:
+        record_http_journey_event(**event)
+    except Exception:
+        logger.debug("Journey telemetry failed", exc_info=False)
+
 
 # ============================================================================
 # CONTEXTVARS PARA REQUEST_ID E METADATA
@@ -254,6 +265,17 @@ class RequestContextMiddleware(BaseHTTPMiddleware):
                 status_code=response.status_code,
                 duration_ms=duration_ms,
             )
+            _record_http_journey_event_safely(
+                request=request,
+                request_id=request_id,
+                method=method,
+                path=path,
+                status_code=response.status_code,
+                duration_ms=duration_ms,
+                replayed=(
+                    response.headers.get("X-Idempotency-Replayed", "").lower() == "true"
+                ),
+            )
 
             # ============================================================
             # 5️⃣ ADICIONAR REQUEST_ID NO HEADER DA RESPOSTA
@@ -291,6 +313,14 @@ class RequestContextMiddleware(BaseHTTPMiddleware):
                 duration_ms=duration_ms,
                 exception_type=type(e).__name__,
                 exception_message=exception_message,
+            )
+            _record_http_journey_event_safely(
+                request=request,
+                request_id=request_id,
+                method=method,
+                path=path,
+                duration_ms=duration_ms,
+                exception=True,
             )
 
             raise  # Re-raise para FastAPI lidar

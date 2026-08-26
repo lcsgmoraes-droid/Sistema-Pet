@@ -301,16 +301,19 @@ Ver `docs/CATALOGO_INTEGRACOES.md` para o contrato técnico de cada integração
 ### DAD-013 — Auditoria, segurança e observabilidade
 
 - **Dados:** usuário/tenant, ação, entidade, IP, user-agent, request/correlation
-  ID, erro sanitizado, alerta, deploy e recuperação.
+  ID, erro sanitizado, alerta, deploy, recuperação e eventos terminais de jornada
+  sem corpo da requisição ou conteúdo de cliente/venda.
 - **Finalidade proposta:** segurança, rastreabilidade, suporte, prevenção a fraude,
   disponibilidade, investigação e defesa de direitos.
 - **Hipótese a validar:** legítimo interesse após avaliação, obrigação legal e
   exercício regular de direitos conforme a fonte.
 - **Controles existentes:** auditoria no banco, logs JSONL, painel Ops, alertas,
-  mascaramento e lista explícita de dados proibidos em log.
+  mascaramento, lista explícita de dados proibidos em log e tabela global
+  `ops_journey_events` acessível somente pela administração da plataforma.
 - **Retenção implementada/proposta:** matriz operacional em
   `docs/RETENCAO_LOGS_AUDITORIA.md`: por exemplo, `audit_logs` por 24 meses quente
-  e 7 anos arquivado; logs HTTP/container por 30 dias e até 90 dias em incidente.
+  e 7 anos arquivado; `ops_journey_events` por 90 dias com agregado por 24 meses;
+  logs HTTP/container por 30 dias e até 90 dias em incidente.
   Esses prazos ainda dependem de validação jurídica e automação completa.
 - **Lacunas:** job de purge/anonimização, rotação no host, agregação antes do
   descarte e medição da idade/volume dos registros.
