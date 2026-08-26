@@ -1,7 +1,7 @@
 """Rotas de listagem e busca de produtos."""
 
 import logging
-from typing import Optional
+from typing import Literal, Optional
 
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
@@ -142,6 +142,8 @@ def listar_produtos(
     fornecedor_id: Optional[int] = None,
     fornecedor_grupo_id: Optional[int] = None,
     estoque_baixo: Optional[bool] = False,
+    estoque_situacao: Literal["todos", "com_estoque", "sem_estoque"] = "todos",
+    ordenacao: Literal["recentes", "estoque_desc", "estoque_asc"] = "recentes",
     em_promocao: Optional[bool] = False,
     ativo: Optional[bool] = True,
     tipo_produto: Optional[str] = None,  # Filtro por tipo de produto
@@ -193,6 +195,7 @@ def listar_produtos(
         departamento_id=departamento_id,
         estoque_baixo=estoque_baixo,
         em_promocao=em_promocao,
+        estoque_situacao=estoque_situacao,
     )
 
     fornecedor_ids_filtro, filtro_fornecedor_por_grupo = (
@@ -215,6 +218,7 @@ def listar_produtos(
     produtos, total, load_options = _buscar_pagina_produtos_listagem(
         query,
         termo_busca=termo_busca,
+        ordenacao=ordenacao,
         offset=offset,
         page_size=page_size,
         incluir_imagens=incluir_imagens,

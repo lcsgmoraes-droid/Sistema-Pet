@@ -419,6 +419,27 @@ def test_buscar_pagina_produtos_listagem_permite_total_posterior():
     assert query.limit_arg == 50
 
 
+@pytest.mark.parametrize("ordenacao", ["estoque_desc", "estoque_asc"])
+def test_buscar_pagina_produtos_listagem_ordena_por_estoque_com_desempate_recente(
+    ordenacao,
+):
+    query = _FakePageQuery([], total=0)
+
+    produtos_listagem._buscar_pagina_produtos_listagem(
+        query,
+        termo_busca="",
+        ordenacao=ordenacao,
+        offset=0,
+        page_size=20,
+        incluir_imagens=False,
+        incluir_lotes=False,
+    )
+
+    assert len(query.order_by_args) == 3
+    assert "estoque_atual" in str(query.order_by_args[0])
+    assert "created_at" in str(query.order_by_args[1])
+
+
 def test_montar_resposta_produtos_paginados_calcula_pages_e_total():
     assert hasattr(produtos_listagem, "_montar_resposta_produtos_paginados")
     produto = SimpleNamespace(id=10)
@@ -580,6 +601,26 @@ def test_aplicar_filtros_basicos_produtos_aplica_filtros_disponiveis():
 
     assert resultado is query
     assert len(query.filters) == 5
+
+
+@pytest.mark.parametrize("estoque_situacao", ["com_estoque", "sem_estoque"])
+def test_aplicar_filtros_basicos_produtos_filtra_situacao_estoque(
+    estoque_situacao,
+):
+    query = _FakeProdutoQuery()
+
+    resultado = _aplicar_filtros_basicos_produtos(
+        query,
+        categoria_id=None,
+        marca_id=None,
+        departamento_id=None,
+        estoque_baixo=False,
+        em_promocao=False,
+        estoque_situacao=estoque_situacao,
+    )
+
+    assert resultado is query
+    assert len(query.filters) == 1
 
 
 def test_normalizar_paginacao_produtos_limita_page_size_e_calcula_offset():

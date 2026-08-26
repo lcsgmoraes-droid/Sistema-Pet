@@ -145,6 +145,7 @@ def _buscar_pagina_produtos_listagem(
     query: Any,
     *,
     termo_busca: Optional[str],
+    ordenacao: str = "recentes",
     offset: int,
     page_size: int,
     incluir_imagens: bool,
@@ -153,7 +154,20 @@ def _buscar_pagina_produtos_listagem(
     contar_total: bool = True,
 ) -> tuple[list[Produto], Optional[int], list[Any]]:
     total = query.count() if contar_total else None
-    order_clause = _build_produto_search_order_clause(termo_busca)
+    if ordenacao == "estoque_desc":
+        order_clause = [
+            func.coalesce(Produto.estoque_atual, 0).desc(),
+            Produto.created_at.desc(),
+            Produto.id.desc(),
+        ]
+    elif ordenacao == "estoque_asc":
+        order_clause = [
+            func.coalesce(Produto.estoque_atual, 0).asc(),
+            Produto.created_at.desc(),
+            Produto.id.desc(),
+        ]
+    else:
+        order_clause = _build_produto_search_order_clause(termo_busca)
     load_options = _load_options_listagem_produtos(
         incluir_imagens=incluir_imagens,
         incluir_lotes=incluir_lotes,
@@ -390,6 +404,7 @@ def _aplicar_filtros_basicos_produtos(
     departamento_id: Optional[int],
     estoque_baixo: Optional[bool],
     em_promocao: Optional[bool],
+    estoque_situacao: Optional[str] = None,
     referencia: Optional[datetime] = None,
 ) -> Any:
     if categoria_id:
@@ -409,6 +424,11 @@ def _aplicar_filtros_basicos_produtos(
             ),
             Produto.estoque_atual <= Produto.estoque_minimo,
         )
+
+    if estoque_situacao == "com_estoque":
+        query = query.filter(func.coalesce(Produto.estoque_atual, 0) > 0)
+    elif estoque_situacao == "sem_estoque":
+        query = query.filter(func.coalesce(Produto.estoque_atual, 0) <= 0)
 
     if em_promocao:
         agora = as_brasilia_naive(referencia) or now_brasilia()

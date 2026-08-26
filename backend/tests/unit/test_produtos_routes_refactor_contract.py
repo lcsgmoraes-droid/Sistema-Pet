@@ -1,3 +1,4 @@
+import inspect
 from pathlib import Path
 
 from app import produtos_routes
@@ -76,6 +77,15 @@ def test_produtos_routes_reexporta_handlers_extraidos():
         produtos_routes.atualizar_status_ativo_produto
         is estado_routes.atualizar_status_ativo_produto
     )
+
+
+def test_listar_produtos_expoe_filtro_e_ordenacao_por_estoque():
+    parametros = inspect.signature(listagem_routes.listar_produtos).parameters
+
+    assert parametros["estoque_situacao"].default == "todos"
+    assert "com_estoque" in str(parametros["estoque_situacao"].annotation)
+    assert parametros["ordenacao"].default == "recentes"
+    assert "estoque_desc" in str(parametros["ordenacao"].annotation)
 
 
 def test_produtos_routes_stays_below_large_file_threshold_after_extraction():

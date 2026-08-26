@@ -22,7 +22,7 @@ export default function ProdutosFiltrosPanel({
 
   return (
     <FilterBar id="tour-produtos-filtros" className="mb-4 md:mb-6" onSubmit={handleSubmit}>
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-7 md:gap-4">
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-8 md:gap-4">
         <div id="tour-produtos-busca" className="md:col-span-2">
           <ProdutoSelector
             placeholder="Buscar por SKU, nome ou qualquer EAN..."
@@ -88,7 +88,33 @@ export default function ProdutosFiltrosPanel({
           </select>
         </div>
 
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 md:col-span-2">
+        <div>
+          <select
+            aria-label="Filtrar por estoque"
+            value={filtros.estoque_situacao}
+            onChange={(event) => handleFiltroChange("estoque_situacao", event.target.value)}
+            className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="todos">Todo estoque</option>
+            <option value="com_estoque">Com estoque</option>
+            <option value="sem_estoque">Sem estoque</option>
+          </select>
+        </div>
+
+        <div>
+          <select
+            aria-label="Ordenar produtos"
+            value={filtros.ordenacao}
+            onChange={(event) => handleFiltroChange("ordenacao", event.target.value)}
+            className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="recentes">Últimos cadastrados</option>
+            <option value="estoque_desc">Maior estoque</option>
+            <option value="estoque_asc">Menor estoque</option>
+          </select>
+        </div>
+
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 md:col-span-8 md:grid-cols-4">
           <label className="flex min-h-10 items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 cursor-pointer">
             <input
               type="checkbox"
@@ -109,7 +135,7 @@ export default function ProdutosFiltrosPanel({
             <span className="text-sm text-gray-700">Em Promocao</span>
           </label>
 
-          <label className="flex min-h-10 items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 cursor-pointer sm:col-span-2">
+          <label className="flex min-h-10 items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 cursor-pointer sm:col-span-2 md:col-span-1">
             <input
               type="checkbox"
               checked={filtros.mostrarPaisVariacoes}
@@ -120,7 +146,7 @@ export default function ProdutosFiltrosPanel({
           </label>
 
           <label
-            className="flex min-h-10 items-center gap-2 cursor-pointer rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 sm:col-span-2"
+            className="flex min-h-10 items-center gap-2 cursor-pointer rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 sm:col-span-2 md:col-span-1"
             title="Quando ligado, a busca fica salva ao sair e voltar para a lista"
           >
             <input
