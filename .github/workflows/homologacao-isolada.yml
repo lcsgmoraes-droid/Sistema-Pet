@@ -11,6 +11,10 @@ on:
       - "scripts/homologacao_local.ps1"
       - "scripts/executar_testes_e2e.ps1"
       - "tests/test_homologacao_local_contract.py"
+      - "tests/test_permission_catalog_migration_contract.py"
+      - "backend/alembic/**"
+      - "backend/app/auth/**"
+      - "backend/app/services/default_roles_service.py"
       - ".github/workflows/homologacao-isolada.yml"
 
 permissions:
@@ -46,6 +50,7 @@ jobs:
         run: >-
           python -m pytest
           tests/test_homologacao_local_contract.py
+          tests/test_permission_catalog_migration_contract.py
           tests/test_tenant_ecommerce_slug_migration_contract.py
           -q
 
