@@ -74,7 +74,7 @@ ruidosa.
 Variaveis opcionais:
 
 ```text
-E2E_BLOCKED_PATH=/banho-tosa/configuracao
+E2E_BLOCKED_PATH=/bling/teste-conexao
 E2E_TIMEOUT_SECONDS=20
 E2E_ALLOW_PRODUCTION=false
 ```

@@ -99,7 +99,7 @@ def e2e_config() -> E2EConfig:
         user_email=os.environ["E2E_USER_EMAIL"].strip().lower(),
         user_password=os.environ["E2E_USER_PASSWORD"],
         tenant_id=os.environ["E2E_TENANT_ID"].strip(),
-        blocked_path=os.getenv("E2E_BLOCKED_PATH") or "/banho-tosa/configuracao",
+        blocked_path=os.getenv("E2E_BLOCKED_PATH") or "/bling/teste-conexao",
         timeout_seconds=float(os.getenv("E2E_TIMEOUT_SECONDS") or "20"),
         prefix=f"E2E-PB-{stamp}",
     )

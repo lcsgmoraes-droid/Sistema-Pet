@@ -58,6 +58,7 @@ def test_homologacao_script_protects_reset_and_production():
     assert "if (-not $ConfirmarReset)" in script
     assert "down', '--volumes'" in script
     assert "$env:E2E_ALLOW_PRODUCTION = 'false'" in script
+    assert "$env:E2E_BLOCKED_PATH = '/bling/teste-conexao'" in script
     assert "http://127.0.0.1:18080/api" in script
     assert "sem exibir credenciais" in script
     assert "Show-HomologDiagnostics" in script

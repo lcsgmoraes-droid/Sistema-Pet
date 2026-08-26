@@ -193,7 +193,7 @@ switch ($Acao) {
             $env:E2E_USER_EMAIL = $values['HOMOLOG_USER_EMAIL']
             $env:E2E_USER_PASSWORD = $values['HOMOLOG_USER_PASSWORD']
             $env:E2E_TENANT_ID = $tenantId
-            $env:E2E_BLOCKED_PATH = '/banho-tosa/configuracao'
+            $env:E2E_BLOCKED_PATH = '/bling/teste-conexao'
             $env:E2E_ALLOW_PRODUCTION = 'false'
 
             & (Join-Path $PSScriptRoot 'executar_testes_e2e.ps1')
