@@ -86,6 +86,9 @@ services:
       - homolog_network
 
   backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.prod
     image: corepet-backend:homolog
     restart: unless-stopped
     environment: *backend-environment

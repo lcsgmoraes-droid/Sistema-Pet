@@ -84,6 +84,13 @@ function Invoke-HomologCompose([string[]]$Arguments, [string]$EnvFile = $localEn
     }
 }
 
+function Show-HomologDiagnostics {
+    Write-Host 'Diagnostico seguro dos containers de homologacao:' -ForegroundColor Yellow
+    & docker compose --env-file $localEnvFile -f $composeFile --project-name $projectName ps
+    & docker compose --env-file $localEnvFile -f $composeFile --project-name $projectName `
+        logs --no-color --tail 240 migrate backend
+}
+
 function Wait-HomologHealth {
     $deadline = (Get-Date).AddMinutes(4)
     do {
@@ -157,7 +164,13 @@ switch ($Acao) {
     'subir' {
         Initialize-HomologEnv
         Assert-DockerEngine
-        Invoke-HomologCompose @('up', '-d', '--build', '--remove-orphans')
+        try {
+            Invoke-HomologCompose @('up', '-d', '--build', '--remove-orphans')
+        }
+        catch {
+            Show-HomologDiagnostics
+            throw
+        }
         Wait-HomologHealth
         Write-Host 'Homologacao disponivel somente neste computador: http://127.0.0.1:18080' -ForegroundColor Cyan
     }
