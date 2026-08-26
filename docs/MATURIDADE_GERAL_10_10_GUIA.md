@@ -1,6 +1,6 @@
 # Plano mestre de maturidade 10/10
 
-Atualizado em: 2026-08-20
+Atualizado em: 2026-08-26
 
 Este e o guia vivo para acompanhar a analise inicial completa de maturidade do Sistema Pet. Ele existe para nao deixar nenhum bloco para tras.
 
@@ -15,6 +15,14 @@ Regra de uso:
 - Marcar itens com `[x]` somente quando houver PR mergeado, validacao local ou evidencia operacional registrada.
 - Quando uma nota mudar, registrar o motivo na secao da area.
 - Nao confundir "feito para uso interno" com "hyperscale 10/10"; cada area tem criterio proprio.
+
+Camada seguinte de governanca:
+
+- `docs/GOVERNANCA_ENTERPRISE.md` avalia requisitos, arquitetura, privacidade,
+  dados, integracoes, ambientes, homologacao, mudanca, publicacao, producao e
+  incidentes em 14 areas.
+- Essa matriz nao invalida o fechamento tecnico abaixo. Ela registra os controles
+  adicionais necessarios para crescer de forma controlada.
 
 ## Placar geral
 
@@ -338,6 +346,9 @@ Referencias principais:
 - `docs/auditorias/plano-basico-tenant-checklist.md`
 - `docs/MAPA_CODIGO_FONTE.md`
 - `docs/ARQUITETURA.md`
+- `docs/GOVERNANCA_ENTERPRISE.md`
+- `docs/templates/FICHA_ENTREGA.md`
+- `docs/templates/REGISTRO_HOMOLOGACAO.md`
 - `CONTRIBUTING.md`
 
 Ja feito:
@@ -356,6 +367,9 @@ Ja feito:
   explicados em documentos oficiais ligados pelo README.
 - [x] Guia unico de contribuicao passou a aplicar o mesmo padrao para trabalho
   humano, assistido ou gerado por IA.
+- [x] Matriz das 14 areas de governanca enterprise consolidada com evidencias,
+  lacunas e prioridades.
+- [x] Modelos de ficha de entrega e registro de homologacao ligados ao PR.
 
 Falta para 10/10:
 
@@ -370,6 +384,8 @@ Para manter 10/10:
 - [ ] Todo PR que muda procedimento deve atualizar o guia da area e, se necessario, `docs/INDICE_OPERACIONAL.md`.
 - [ ] Evidencia operacional deve seguir `docs/PADRAO_EVIDENCIA.md`.
 - [ ] Documento historico so volta a ser fonte oficial depois de ser consolidado em guia atual.
+- [ ] Revisar `docs/GOVERNANCA_ENTERPRISE.md` antes de ampliar de forma relevante
+  clientes, equipe, infraestrutura ou integracoes.
 
 ## Historico de PRs relevantes
 

@@ -21,8 +21,12 @@ O guia vivo de maturidade 10/10 fica em:
 
 - `docs/MATURIDADE_GERAL_10_10_GUIA.md`
 
-Esses dois arquivos mandam mais do que documentos antigos, backups historicos ou
-anotacoes soltas.
+A matriz das 14 areas de governanca enterprise fica em:
+
+- `docs/GOVERNANCA_ENTERPRISE.md`
+
+O indice e esses guias mandam mais do que documentos antigos, backups historicos
+ou anotacoes soltas.
 
 ## Codigo-fonte oficial
 
@@ -90,6 +94,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\bootstrap_dev_environment.ps1
 | DEV local | Desenvolvimento, testes e validacao antes de PR | `docs/DEV_ENVIRONMENT_CHECK.md` |
 | MCP local | Ferramentas locais para Codex/VS Code | `mcp/README.md` |
 | CI/GitHub | Checks obrigatorios e suites longas | `docs/CI_CD_DEPLOY_SAFETY_AUDIT.md` |
+| HOMOLOG dedicado | Aceite com dados ficticios antes de producao | Planejado em `docs/GOVERNANCA_ENTERPRISE.md`; ainda nao disponivel |
 | Producao | Dados reais, deploy via `petdeploy` | `docs/PRODUCAO_DEPLOY_SSH.md` |
 
 ## Producao
@@ -107,6 +112,11 @@ Antes de qualquer deploy real, confirmar escopo, rollback e autorizacao.
 Novas evidencias de trabalho devem seguir:
 
 - `docs/PADRAO_EVIDENCIA.md`
+
+Entregas relevantes e homologacoes devem usar:
+
+- `docs/templates/FICHA_ENTREGA.md`
+- `docs/templates/REGISTRO_HOMOLOGACAO.md`
 
 Quando um PR fecha uma frente de maturidade, atualizar no mesmo PR:
 

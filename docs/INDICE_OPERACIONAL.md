@@ -1,6 +1,6 @@
 # Indice operacional do Sistema Pet
 
-Atualizado em: 2026-08-21
+Atualizado em: 2026-08-26
 
 Este e o ponto de entrada oficial da documentacao. Se houver conflito entre este
 indice e um documento historico, use este indice e o guia mestre de maturidade.
@@ -17,6 +17,9 @@ Guia mestre:
 | Entender a arquitetura | `docs/ARQUITETURA.md` | Codigo e diagramas citados no documento |
 | Contribuir com seguranca | `CONTRIBUTING.md` | `AGENTS.md` e checks do PR |
 | Entender maturidade geral | `docs/MATURIDADE_GERAL_10_10_GUIA.md` | Historico de PRs no proprio guia |
+| Avaliar governanca enterprise | `docs/GOVERNANCA_ENTERPRISE.md` | Matriz das 14 areas e plano priorizado |
+| Preparar entrega relevante | `docs/templates/FICHA_ENTREGA.md` | Criterios de aceite, risco, testes e rollback |
+| Registrar homologacao | `docs/templates/REGISTRO_HOMOLOGACAO.md` | Evidencias conforme `docs/PADRAO_EVIDENCIA.md` |
 | Preparar um PC DEV | `docs/DEV_ENVIRONMENT_CHECK.md` | `scripts/check_dev_environment.ps1` |
 | Trabalhar em dois PCs | `docs/GIT_FLUXO_2_PCS.md` | `scripts/git_check_updates.ps1` |
 | Usar MCPs locais | `mcp/README.md` | `scripts/test_mcp.ps1` |
@@ -85,15 +88,20 @@ Guia mestre:
 | Base oficial de dados | `docs/CRONOGRAMA_BASE_DADOS_OFICIAL.md` |
 | Classificacao de racoes | `docs/CLASSIFICACAO_RACOES.md` |
 | Evidencias | `docs/PADRAO_EVIDENCIA.md` |
+| Governanca enterprise | `docs/GOVERNANCA_ENTERPRISE.md` |
+| Requisitos e entrega | `docs/templates/FICHA_ENTREGA.md` |
+| Homologacao | `docs/templates/REGISTRO_HOMOLOGACAO.md` |
 
 ## Rotina obrigatoria por PR
 
 1. Confirmar se o PR muda runtime, CI, docs, infra ou produto.
-2. Rodar a validacao apropriada e registrar resultado no PR.
-3. Atualizar o guia vivo da area quando a maturidade ou o procedimento mudar.
-4. Atualizar `docs/MATURIDADE_GERAL_10_10_GUIA.md` quando a nota, checklist ou
+2. Para entrega relevante, preencher `docs/templates/FICHA_ENTREGA.md` e
+   registrar homologacao ou justificar por que ela nao se aplica.
+3. Rodar a validacao apropriada e registrar resultado no PR.
+4. Atualizar o guia vivo da area quando a maturidade ou o procedimento mudar.
+5. Atualizar `docs/MATURIDADE_GERAL_10_10_GUIA.md` quando a nota, checklist ou
    historico de PR mudar.
-5. Usar `docs/PADRAO_EVIDENCIA.md` para registrar deploy, teste operacional,
+6. Usar `docs/PADRAO_EVIDENCIA.md` para registrar deploy, teste operacional,
    restore, E2E, smoke real ou incidente.
 
 ## Documentos historicos
