@@ -1,6 +1,6 @@
 # Arquitetura do CorePet
 
-Atualizado em: 2026-08-20
+Atualizado em: 2026-08-26
 
 Status: documento oficial da arquitetura atual.
 
@@ -150,6 +150,14 @@ ao build.
 O ambiente local usa Docker Compose para PostgreSQL e backend, com frontend
 executado pelo Vite conforme os scripts oficiais. O guia e
 `docs/DEV_ENVIRONMENT_CHECK.md`.
+
+### Homologacao
+
+O ambiente `corepet-homolog` usa os Dockerfiles de producao, PostgreSQL proprio,
+backend em modo `staging`, migrations automaticas antes da API e frontend
+compilado. Ele e descartavel, aceita somente dados ficticios e nao possui acesso
+ao banco ou aos segredos de producao. O guia e
+`docs/HOMOLOGACAO_LOCAL_ISOLADA.md`.
 
 ### Producao
 

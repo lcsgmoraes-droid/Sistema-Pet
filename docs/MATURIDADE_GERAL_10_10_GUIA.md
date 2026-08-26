@@ -349,6 +349,7 @@ Referencias principais:
 - `docs/GOVERNANCA_ENTERPRISE.md`
 - `docs/templates/FICHA_ENTREGA.md`
 - `docs/templates/REGISTRO_HOMOLOGACAO.md`
+- `docs/HOMOLOGACAO_LOCAL_ISOLADA.md`
 - `CONTRIBUTING.md`
 
 Ja feito:
@@ -370,6 +371,8 @@ Ja feito:
 - [x] Matriz das 14 areas de governanca enterprise consolidada com evidencias,
   lacunas e prioridades.
 - [x] Modelos de ficha de entrega e registro de homologacao ligados ao PR.
+- [x] Ambiente de homologacao local isolado documentado com PostgreSQL proprio,
+  build de producao, migrations e dados ficticios.
 
 Falta para 10/10:
 
