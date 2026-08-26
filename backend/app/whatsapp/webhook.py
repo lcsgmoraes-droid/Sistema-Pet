@@ -26,6 +26,8 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/webhook/whatsapp", tags=["WhatsApp Webhook"])
 
+WHATSAPP_WEBHOOK_TOKEN_HEADER = "X-CorePet-Webhook-Token"
+
 
 # ============================================================================
 # WEBHOOK VALIDATION (360dialog)
@@ -34,19 +36,46 @@ router = APIRouter(prefix="/webhook/whatsapp", tags=["WhatsApp Webhook"])
 
 def validate_webhook_signature(payload: bytes, signature: str, secret: str) -> bool:
     """
-    Valida assinatura do webhook 360dialog.
+    Valida HMAC-SHA256 de uma conexão direta compatível.
 
-    360dialog usa HMAC-SHA256 com o webhook_secret.
+    Para 360dialog, o caminho preferencial é o token em cabeçalho personalizado.
     """
-    try:
-        expected_signature = hmac.new(
-            secret.encode(), payload, hashlib.sha256
-        ).hexdigest()
-
-        return hmac.compare_digest(signature, expected_signature)
-    except Exception as e:
-        logger.error(f"Erro ao validar assinatura: {e}")
+    normalized_secret = str(secret or "").strip()
+    normalized_signature = str(signature or "").strip()
+    if not normalized_secret or not normalized_signature:
         return False
+
+    if normalized_signature.lower().startswith("sha256="):
+        normalized_signature = normalized_signature.split("=", 1)[1].strip()
+    if len(normalized_signature) != 64:
+        return False
+
+    try:
+        bytes.fromhex(normalized_signature)
+        expected_signature = hmac.new(
+            normalized_secret.encode("utf-8"), payload, hashlib.sha256
+        ).hexdigest()
+        return hmac.compare_digest(normalized_signature.lower(), expected_signature)
+    except (TypeError, ValueError):
+        return False
+
+
+def validate_webhook_authentication(
+    payload: bytes,
+    *,
+    signature: str | None,
+    static_token: str | None,
+    secret: str,
+) -> bool:
+    """Accept a provider HMAC or the custom header supported by 360dialog."""
+
+    normalized_secret = str(secret or "").strip()
+    normalized_token = str(static_token or "").strip()
+    if not normalized_secret:
+        return False
+    if normalized_token and hmac.compare_digest(normalized_token, normalized_secret):
+        return True
+    return validate_webhook_signature(payload, signature or "", normalized_secret)
 
 
 # ============================================================================
@@ -129,17 +158,26 @@ async def receive_webhook(
         logger.warning("Tenant sem configuracao WhatsApp")
         raise HTTPException(status_code=404, detail="Tenant não configurado")
 
-    # 2. Validar assinatura (se configurada)
+    # 2. Validar assinatura de forma fail-closed antes de interpretar o payload.
     body = await request.body()
     signature = request.headers.get("X-Hub-Signature-256", "")
+    static_token = request.headers.get(WHATSAPP_WEBHOOK_TOKEN_HEADER, "")
 
-    if config.webhook_secret and signature:
-        # Remover prefixo "sha256=" se existir
-        signature = signature.replace("sha256=", "")
+    if not config.webhook_secret:
+        logger.error("Webhook WhatsApp sem segredo configurado para o tenant")
+        raise HTTPException(
+            status_code=503,
+            detail="Webhook não configurado com segurança",
+        )
 
-        if not validate_webhook_signature(body, signature, config.webhook_secret):
-            logger.warning("Assinatura invalida no webhook")
-            raise HTTPException(status_code=403, detail="Assinatura inválida")
+    if not validate_webhook_authentication(
+        body,
+        signature=signature,
+        static_token=static_token,
+        secret=config.webhook_secret,
+    ):
+        logger.warning("Autenticacao ausente ou invalida no webhook WhatsApp")
+        raise HTTPException(status_code=403, detail="Autenticação inválida")
 
     # 3. Parsear payload JSON
     try:

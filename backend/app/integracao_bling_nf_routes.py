@@ -45,6 +45,7 @@ from app.services.bling_flow_monitor_service import (
     registrar_vinculo_nf_pedido,
     resolver_incidentes_relacionados,
 )
+from app.services.bling_webhook_security import require_bling_webhook_signature
 from app.services.pedido_integrado_consolidation_service import (
     localizar_pedido_por_bling_id,
 )
@@ -103,7 +104,11 @@ __all__ = [
 
 
 @router.post("/nf")
-async def receber_nf_bling(request: Request, db: Session = Depends(get_session)):
+async def receber_nf_bling(
+    request: Request,
+    db: Session = Depends(get_session),
+    _signature_verified: None = Depends(require_bling_webhook_signature),
+):
     """
     Recebe webhooks de NF-e e NF-e de consumidor do Bling.
     Formato envelope v1:

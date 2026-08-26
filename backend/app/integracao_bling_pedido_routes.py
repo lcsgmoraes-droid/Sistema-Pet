@@ -55,6 +55,7 @@ from app.services.bling_flow_monitor_service import (
     registrar_evento,
     registrar_vinculo_nf_pedido,
 )
+from app.services.bling_webhook_security import require_bling_webhook_signature
 from app.services import pedido_nf_reconciliation_service as nf_reconciliation
 from app.services.pedido_integrado_consolidation_service import (
     listar_pedidos_por_numero_loja,
@@ -700,7 +701,11 @@ def _set_bling_request_tenant(request: Request | None = None) -> UUID | None:
 
 
 @router.post("/pedido", status_code=status.HTTP_202_ACCEPTED)
-async def receber_pedido_bling(request: Request, db: Session = Depends(get_session)):
+async def receber_pedido_bling(
+    request: Request,
+    db: Session = Depends(get_session),
+    _signature_verified: None = Depends(require_bling_webhook_signature),
+):
     """Recebe webhooks do Bling e enfileira o trabalho pesado fora da request."""
     _set_bling_request_tenant(request)
     body = await request.json()
