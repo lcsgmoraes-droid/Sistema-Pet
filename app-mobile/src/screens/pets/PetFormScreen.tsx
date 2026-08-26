@@ -9,6 +9,7 @@ import {
   ActivityIndicator,
   Switch,
   Image,
+  Platform,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
@@ -57,10 +58,12 @@ export default function PetFormScreen({ route, navigation }: Props) {
   const ignorarAvisoSaidaRef = useRef(false);
 
   async function pickFoto() {
-    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!perm.granted) {
-      Alert.alert('Permissão necessária', 'Permita o acesso à galeria nas configurações do celular.');
-      return;
+    if (Platform.OS === 'ios') {
+      const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!perm.granted) {
+        Alert.alert('Permissão necessária', 'Permita o acesso às fotos nas configurações do celular.');
+        return;
+      }
     }
     Alert.alert(
       'Enquadrar foto',

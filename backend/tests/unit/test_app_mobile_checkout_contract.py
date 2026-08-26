@@ -91,8 +91,12 @@ def test_android_manifest_removes_unused_store_sensitive_permissions():
         "app-mobile/android/app/src/main/AndroidManifest.xml"
     )
 
+    assert 'android.permission.READ_EXTERNAL_STORAGE" tools:node="remove"' in manifest
+    assert 'android.permission.READ_MEDIA_IMAGES" tools:node="remove"' in manifest
+    assert 'android.permission.READ_MEDIA_VIDEO" tools:node="remove"' in manifest
     assert 'android.permission.RECORD_AUDIO" tools:node="remove"' in manifest
     assert 'android.permission.SYSTEM_ALERT_WINDOW" tools:node="remove"' in manifest
+    assert 'android.permission.WRITE_EXTERNAL_STORAGE" tools:node="remove"' in manifest
 
 
 def test_mobile_orders_screen_shows_channel_label_and_order_push_navigates_to_orders():
@@ -286,6 +290,8 @@ def test_pet_photo_flow_guides_crop_and_protects_unsaved_photo():
     pet_form = _read_mobile_source("app-mobile/src/screens/pets/PetFormScreen.tsx")
 
     assert "ImagePicker.launchImageLibraryAsync" in pet_form
+    assert "Platform.OS === 'ios'" in pet_form
+    assert "ImagePicker.requestMediaLibraryPermissionsAsync" in pet_form
     assert "allowsEditing: true" in pet_form
     assert "Cortar" in pet_form
     assert "navigation.addListener('beforeRemove'" in pet_form
