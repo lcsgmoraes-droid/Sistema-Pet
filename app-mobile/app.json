@@ -54,7 +54,7 @@
         "android.permission.WRITE_EXTERNAL_STORAGE"
       ],
       "runtimeVersion": "1.0.3",
-      "versionCode": 13
+      "versionCode": 14
     },
     "web": {
       "favicon": "./assets/favicon.png"
