@@ -5,8 +5,8 @@
 | Campo | Valor |
 |---|---|
 | Entrega | Medição sanitizada de login, seleção de empresa e finalização de venda |
-| Issue/PR | Branch `feat/20260826-1638-telemetria-jornadas-login-venda`; PR a registrar após o push |
-| Commit/versão testada | Worktree da branch antes do commit final, migration `zxe20260826a1` |
+| Issue/PR | PR #1180 — `feat/20260826-1638-telemetria-jornadas-login-venda` |
+| Commit/versão testada | `0483a5cc8`, migration `zxe20260826a1` |
 | Data e horário | 2026-08-26, período da tarde, horário de Brasília |
 | Ambiente | HOMOLOG Docker local isolada |
 | Responsável técnico | IA |
@@ -78,5 +78,5 @@ separada.
 
 Data: 2026-08-26.
 
-Próximo passo: concluir branch/PR, aguardar CI verde e pedir autorização
+Próximo passo: concluir o PR #1180, aguardar CI verde e pedir autorização
 explícita antes de qualquer comando de produção.

@@ -8,7 +8,7 @@
 | Data | 2026-08-26 |
 | Responsável de negócio | Responsável pelo Sistema Pet |
 | Executor técnico | IA |
-| Issue/PR | Branch `feat/20260826-1638-telemetria-jornadas-login-venda`; PR a registrar após o push |
+| Issue/PR | PR #1180 — `feat/20260826-1638-telemetria-jornadas-login-venda` |
 | Prioridade | P1 |
 | Risco | Médio: inclui middleware HTTP, migration e painel administrativo; a coleta é fail-open e não altera regras comerciais |
 | Domínios afetados | Autenticação, vendas, observabilidade, dados técnicos e painel Ops |
@@ -130,7 +130,7 @@
 
 - Tipo: backend, frontend, migration, configuração e documentação; sem alteração
   mobile nativa ou OTA.
-- Commit/versão: será identificado no fechamento da branch e no PR.
+- Commit/versão técnica homologada: `0483a5cc8`; histórico completo no PR #1180.
 - Ordem: backup/release check existente, migration aditiva, backend e frontend.
   Código anterior ignora a nova tabela; a migration não altera tabelas de negócio.
 - Plano: merge após CI verde; pedir autorização explícita; executar deploy
@@ -179,5 +179,5 @@
 Decisão final: aprovado tecnicamente para merge. Produção continua condicionada
 à autorização explícita separada.
 
-Pendências: PR/commit serão registrados no fechamento; purge/agregação, ampliação
-das jornadas e revisão de metas seguem no backlog enterprise.
+Pendências: purge/agregação, ampliação das jornadas e revisão de metas seguem no
+backlog enterprise.
