@@ -192,6 +192,11 @@ Antes de ampliar uma faixa de clientes, devem existir cenarios de carga para
 login, vendas, estoque, listagens, relatorios e integracoes, com metas de erro,
 latencia e uso do banco.
 
+Os objetivos iniciais, formulas, jornadas, indicadores de negocio, alertas e
+lacunas de instrumentacao ficam em `docs/SLOS_INDICADORES_JORNADAS.md`. Metas
+propostas so viram compromisso aprovado depois de linha de base real e teste
+autenticado em homologacao.
+
 O monolito modular pode crescer vertical e horizontalmente. Extracao de um
 servico deve acontecer quando uma medicao mostrar que um dominio precisa de
 escala, isolamento de falha ou ciclo de deploy proprio.

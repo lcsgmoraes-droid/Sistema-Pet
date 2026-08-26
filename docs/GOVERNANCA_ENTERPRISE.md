@@ -53,7 +53,7 @@ Até existir uma equipe de desenvolvimento formal:
 |---:|---|---|---|---|
 | 1 | Necessidade e requisitos | Parcial | Existem specs por funcionalidade, regras de domínio, `CONTRIBUTING.md` e Definition of Done. | O formato não era único. A ficha `docs/templates/FICHA_ENTREGA.md` passa a registrar problema, usuários, prioridade, requisitos, não funcionais e aceite. |
 | 2 | Documentação | Parcial forte | Há índice oficial, mapa do código-fonte, arquitetura, guias operacionais, evidências e histórico Git. | Decisões arquiteturais e requisitos ainda aparecem dispersos. Consolidar decisões duradouras e aposentar documentos históricos quando forem substituídos. |
-| 3 | Arquitetura e tecnologia | Parcial forte | O monólito modular, componentes, multiempresa, dados, worker, deploy e evolução incremental estão em `docs/ARQUITETURA.md`. Há smoke de capacidade seguro. | Falta medir jornadas autenticadas, banco e integrações em homologação, com metas de latência, erro e capacidade antes de ampliar faixas de clientes. |
+| 3 | Arquitetura e tecnologia | Parcial forte | O monólito modular, componentes, multiempresa, dados, worker, deploy e evolução incremental estão em `docs/ARQUITETURA.md`. O catálogo de SLOs define metas técnicas e por jornada. | Falta instrumentar o denominador completo e medir jornadas autenticadas, banco e integrações em homologação antes de ampliar faixas de clientes. |
 | 4 | Segurança e privacidade | Parcial forte | Autenticação, permissões, tenant, RLS, regras de segredos, logs seguros, alertas e política de privacidade possuem controles reais. O inventário `docs/CATALOGO_DADOS_CRITICOS_LGPD.md` centraliza dados pessoais, finalidade proposta, direitos, retenção, papéis, controles e lacunas. | Aprovar hipóteses legais e papéis por tratamento com apoio jurídico, nomear responsáveis, registrar operadores/suboperadores e ampliar o fluxo de direitos além de clientes. |
 | 5 | Dados e banco de dados | Parcial forte | PostgreSQL, SQLAlchemy, migrations Alembic, transações, isolamento, backup, restore smoke, auditoria e retenção técnica estão documentados. O catálogo de dados classifica 16 domínios, criticidade, responsáveis propostos e ciclo de vida. | Aprovar proprietários, retenção por domínio e RPO/RTO; provar backup de arquivos/cópia externa e automatizar descarte/anonimização. |
 | 6 | Integrações | Parcial forte | O catálogo `docs/CATALOGO_INTEGRACOES.md` centraliza finalidade, autenticação, timeout, retry, idempotência, fallback, reconciliação, observabilidade, responsáveis, evidências e lacunas das integrações reais. | Corrigir autenticação fail-closed dos webhooks prioritários, exercitar indisponibilidade/replay em homologação e acumular evidência operacional antes de considerar a área sólida. |
@@ -63,7 +63,7 @@ Até existir uma equipe de desenvolvimento formal:
 | 10 | Homologação | Parcial forte | Há ambiente isolado com PostgreSQL próprio, build de produção, migrations, tenant fictício, E2E controlado, modelo de aceite e padrão de evidência. | Usar o processo em entregas reais e medir inconsistências encontradas antes de mudar o status para sólido. |
 | 11 | Gestão da mudança e treinamento | Parcial | Há Central de Ajuda, novidades, onboarding, guias de implantação e materiais por funcionalidade. | Tornar obrigatória a avaliação de impacto, comunicação, manual e treinamento em cada mudança visível ao usuário. A ficha de entrega inclui esse gate. |
 | 12 | Publicação e versões | Sólido | CI/CD, proteção de branch, commit identificável, deploy por usuário restrito, health, backup, migrations, evidência e rollback estão documentados e exercitados. | Manter aprovação explícita de produção e registrar toda exceção ou correção emergencial. |
-| 13 | Produção e observabilidade | Parcial forte | Health/watchdog, logs estruturados, `request_id`, auditoria, painel Ops, alertas externos e trilha de deploy estão implementados. | Definir SLOs e indicadores de negócio: sucesso de venda, integração, onboarding, erros por jornada e tendência por empresa sem expor dados entre tenants. |
+| 13 | Produção e observabilidade | Parcial forte | Health/watchdog, logs estruturados, `request_id`, auditoria, painel Ops, alertas externos e trilha de deploy estão implementados. `docs/SLOS_INDICADORES_JORNADAS.md` define objetivos técnicos, oito jornadas, KPIs, orçamento de erro e resposta. | Instrumentar todas as tentativas/sucessos, consolidar disponibilidade externa e criar 30 dias de linha de base antes de aprovar percentuais ou SLA. |
 | 14 | Sustentação e incidentes | Parcial forte | A política geral, o registro padrão, P0/P1/P2/P3, responsáveis, comunicação, causa raiz, MTTD/MTTR e melhoria estrutural estão consolidados em `docs/GESTAO_INCIDENTES_SUSTENTACAO.md`; painel Ops, rollback e evidências apoiam a execução. | Usar o processo no próximo incidente real, revisar métricas mensalmente e registrar a primeira evidência antes de mudar o status para sólido. |
 
 ## Evidências principais usadas na avaliação
@@ -88,6 +88,7 @@ Até existir uma equipe de desenvolvimento formal:
 - Treinamento e comunicação: `docs/CENTRAL_AJUDA_E_NOVIDADES.md`.
 - Integrações e modos de falha: `docs/CATALOGO_INTEGRACOES.md`.
 - Dados críticos e privacidade: `docs/CATALOGO_DADOS_CRITICOS_LGPD.md`.
+- SLOs e indicadores por jornada: `docs/SLOS_INDICADORES_JORNADAS.md`.
 
 ## Gate proporcional por mudança
 
@@ -132,7 +133,12 @@ programação.
    finalidade proposta, papéis, direitos, retenção, continuidade e lacunas
    verificadas no código. Faltam as aprovações jurídica/contábil, responsáveis
    formais, RPO/RTO e automações de descarte antes de considerar a área sólida.
-6. Definir SLOs técnicos e indicadores de negócio por jornada.
+6. **Definir SLOs técnicos e indicadores de negócio por jornada.** Implantado em
+   `docs/SLOS_INDICADORES_JORNADAS.md`, com objetivos de plataforma, oito
+   jornadas críticas, indicadores de negócio, orçamento de erro, alertas,
+   privacidade e plano de instrumentação. Falta coletar o denominador completo,
+   formar linha de base de 30 dias e aprovar as metas antes de tratá-las como
+   compromisso.
 7. Executar capacidade autenticada em homologação antes de prometer nova faixa
    de escala.
 
