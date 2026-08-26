@@ -214,11 +214,12 @@ atribuição, esta resposta precisa ser revisada antes de publicar update.
 ### Android
 
 - `POST_NOTIFICATIONS`: enviar notificacoes de compra, pagamento e status.
-- `READ_MEDIA_IMAGES`: permitir foto de pet ou selecao de imagem quando o
-  usuario acionar esse recurso.
+- Fotos do pet: usa o seletor de fotos do proprio Android, sem solicitar acesso
+  amplo a galeria (`READ_MEDIA_IMAGES`/`READ_MEDIA_VIDEO`).
 - `VIBRATE`: permitir alerta vibratorio de notificacoes.
-- `RECORD_AUDIO` e `SYSTEM_ALERT_WINDOW`: declaradas como removidas no Manifest;
-  nao devem ser solicitadas ao usuario nem usadas pela publicacao de loja.
+- Permissoes amplas de armazenamento, `RECORD_AUDIO` e `SYSTEM_ALERT_WINDOW`:
+  declaradas como removidas no Manifest; nao devem ser solicitadas ao usuario
+  nem usadas pela publicacao de loja.
 
 ### iOS
 
