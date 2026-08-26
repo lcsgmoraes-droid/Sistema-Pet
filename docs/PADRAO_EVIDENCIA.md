@@ -5,6 +5,10 @@ Atualizado em: 2026-05-17
 Use este formato para registrar fatos operacionais sem espalhar informacao
 incompleta pelos docs.
 
+Para incidente, use tambem o processo em
+`docs/GESTAO_INCIDENTES_SUSTENTACAO.md` e copie o modelo completo
+`docs/templates/REGISTRO_INCIDENTE.md`.
+
 ## Quando registrar
 
 Registrar evidencia quando houver:

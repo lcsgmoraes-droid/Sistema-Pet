@@ -90,6 +90,10 @@ real dos pilotos e revisao juridica.
 
 ## 6. Resposta a incidente
 
+O processo geral e os criterios de encerramento ficam em
+`docs/GESTAO_INCIDENTES_SUSTENTACAO.md`. Os tempos do piloto abaixo continuam
+valendo como metas operacionais, nao como SLA contratual.
+
 1. Registrar horario, cliente, impacto e `request_id`, quando existir.
 2. Classificar P0, P1, P2 ou melhoria.
 3. Consultar `/ops` sem copiar dados sensiveis para mensagens.
