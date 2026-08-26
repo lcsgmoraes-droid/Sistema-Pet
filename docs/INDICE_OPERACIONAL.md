@@ -20,6 +20,7 @@ Guia mestre:
 | Avaliar governanca enterprise | `docs/GOVERNANCA_ENTERPRISE.md` | Matriz das 14 areas e plano priorizado |
 | Preparar entrega relevante | `docs/templates/FICHA_ENTREGA.md` | Criterios de aceite, risco, testes e rollback |
 | Registrar homologacao | `docs/templates/REGISTRO_HOMOLOGACAO.md` | Evidencias conforme `docs/PADRAO_EVIDENCIA.md` |
+| Tratar incidente ou falha recorrente | `docs/GESTAO_INCIDENTES_SUSTENTACAO.md` | `docs/templates/REGISTRO_INCIDENTE.md` e painel Ops |
 | Preparar um PC DEV | `docs/DEV_ENVIRONMENT_CHECK.md` | `scripts/check_dev_environment.ps1` |
 | Subir homologacao isolada | `docs/HOMOLOGACAO_LOCAL_ISOLADA.md` | `scripts/homologacao_local.ps1` |
 | Trabalhar em dois PCs | `docs/GIT_FLUXO_2_PCS.md` | `scripts/git_check_updates.ps1` |
@@ -93,6 +94,8 @@ Guia mestre:
 | Governanca enterprise | `docs/GOVERNANCA_ENTERPRISE.md` |
 | Requisitos e entrega | `docs/templates/FICHA_ENTREGA.md` |
 | Homologacao | `docs/templates/REGISTRO_HOMOLOGACAO.md` |
+| Incidentes e sustentacao | `docs/GESTAO_INCIDENTES_SUSTENTACAO.md` |
+| Registro de incidente | `docs/templates/REGISTRO_INCIDENTE.md` |
 
 ## Rotina obrigatoria por PR
 

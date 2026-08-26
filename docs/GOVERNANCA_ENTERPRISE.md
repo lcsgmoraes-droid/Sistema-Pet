@@ -64,7 +64,7 @@ Até existir uma equipe de desenvolvimento formal:
 | 11 | Gestão da mudança e treinamento | Parcial | Há Central de Ajuda, novidades, onboarding, guias de implantação e materiais por funcionalidade. | Tornar obrigatória a avaliação de impacto, comunicação, manual e treinamento em cada mudança visível ao usuário. A ficha de entrega inclui esse gate. |
 | 12 | Publicação e versões | Sólido | CI/CD, proteção de branch, commit identificável, deploy por usuário restrito, health, backup, migrations, evidência e rollback estão documentados e exercitados. | Manter aprovação explícita de produção e registrar toda exceção ou correção emergencial. |
 | 13 | Produção e observabilidade | Parcial forte | Health/watchdog, logs estruturados, `request_id`, auditoria, painel Ops, alertas externos e trilha de deploy estão implementados. | Definir SLOs e indicadores de negócio: sucesso de venda, integração, onboarding, erros por jornada e tendência por empresa sem expor dados entre tenants. |
-| 14 | Sustentação e incidentes | Parcial forte | O piloto define P0/P1/P2, metas de primeira resposta e fluxo de incidente; o painel Ops, rollback e padrão de evidência apoiam investigação. | Consolidar política geral de incidentes, causa raiz, ações preventivas, responsáveis, métricas MTTD/MTTR e regra de quando a correção vira melhoria estrutural. |
+| 14 | Sustentação e incidentes | Parcial forte | A política geral, o registro padrão, P0/P1/P2/P3, responsáveis, comunicação, causa raiz, MTTD/MTTR e melhoria estrutural estão consolidados em `docs/GESTAO_INCIDENTES_SUSTENTACAO.md`; painel Ops, rollback e evidências apoiam a execução. | Usar o processo no próximo incidente real, revisar métricas mensalmente e registrar a primeira evidência antes de mudar o status para sólido. |
 
 ## Evidências principais usadas na avaliação
 
@@ -114,8 +114,10 @@ programação.
    isolado e descartável em `docs/HOMOLOGACAO_LOCAL_ISOLADA.md`, respeitando a
    decisão de não contratar um segundo servidor neste estágio. Falta acumular
    evidência de uso em entregas reais.
-3. **Consolidar incidentes e sustentação.** Unificar severidade, primeira
-   resposta, comunicação, causa raiz, ações preventivas e métricas.
+3. **Consolidar incidentes e sustentação.** Política e modelo implantados em
+   `docs/GESTAO_INCIDENTES_SUSTENTACAO.md` e
+   `docs/templates/REGISTRO_INCIDENTE.md`. Falta acumular evidência do primeiro
+   uso real e da revisão mensal.
 
 ### P1 — preparar crescimento controlado
 
