@@ -48,9 +48,7 @@ class _ConfigDb:
 
 
 def _hmac_header(secret: str, raw_body: bytes) -> str:
-    digest = hmac.new(
-        secret.encode("utf-8"), raw_body, hashlib.sha256
-    ).hexdigest()
+    digest = hmac.new(secret.encode("utf-8"), raw_body, hashlib.sha256).hexdigest()
     return f"sha256={digest}"
 
 
@@ -71,7 +69,9 @@ def test_bling_accepts_the_official_signature_over_the_exact_raw_body():
 
 
 @pytest.mark.asyncio
-async def test_bling_rejects_missing_or_invalid_signature_before_processing(monkeypatch):
+async def test_bling_rejects_missing_or_invalid_signature_before_processing(
+    monkeypatch,
+):
     secret = "bling-client-secret"
     raw_body = b'{"eventId":"evt-1"}'
     monkeypatch.setattr(
@@ -101,9 +101,7 @@ async def test_bling_fails_closed_when_client_secret_is_unavailable(monkeypatch)
     )
 
     with pytest.raises(HTTPException) as exc:
-        await bling_webhook_security.require_bling_webhook_signature(
-            _Request(b"{}")
-        )
+        await bling_webhook_security.require_bling_webhook_signature(_Request(b"{}"))
 
     assert exc.value.status_code == 503
 
