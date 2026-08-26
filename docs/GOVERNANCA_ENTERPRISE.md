@@ -16,9 +16,9 @@ controles que tornam a evolução segura.
 Na avaliação atual:
 
 - 3 áreas estão **sólidas** para o estágio atual;
-- 8 áreas estão **parcialmente fortes**, com controles reais e pontos de
+- 9 áreas estão **parcialmente fortes**, com controles reais e pontos de
   consolidação;
-- 3 áreas estão **parciais** e entram no plano prioritário de evolução;
+- 2 áreas estão **parciais** e entram no plano prioritário de evolução;
 - nenhuma área exige reescrita total do sistema.
 
 Esta avaliação complementa o placar técnico de
@@ -56,7 +56,7 @@ Até existir uma equipe de desenvolvimento formal:
 | 3 | Arquitetura e tecnologia | Parcial forte | O monólito modular, componentes, multiempresa, dados, worker, deploy e evolução incremental estão em `docs/ARQUITETURA.md`. Há smoke de capacidade seguro. | Falta medir jornadas autenticadas, banco e integrações em homologação, com metas de latência, erro e capacidade antes de ampliar faixas de clientes. |
 | 4 | Segurança e privacidade | Parcial forte | Autenticação, permissões, tenant, RLS, regras de segredos, logs seguros, alertas e política de privacidade possuem controles reais. | Criar inventário de dados pessoais, finalidade/base legal, solicitações do titular, retenção e responsável por decisão LGPD. Revisão jurídica continua sendo uma atividade externa. |
 | 5 | Dados e banco de dados | Parcial forte | PostgreSQL, SQLAlchemy, migrations Alembic, transações, isolamento, backup, cópia externa, restore smoke, auditoria e retenção técnica estão documentados. | Criar catálogo de dados críticos com proprietário de negócio, classificação, retenção e RPO/RTO aprovados. |
-| 6 | Integrações | Parcial | Há documentação e código para integrações específicas, correlação de requisições, jobs e tratamento assíncrono em áreas críticas. | Criar catálogo único com sistema, finalidade, autenticação, timeout, retry, idempotência, fallback, reconciliação, alertas e responsável. |
+| 6 | Integrações | Parcial forte | O catálogo `docs/CATALOGO_INTEGRACOES.md` centraliza finalidade, autenticação, timeout, retry, idempotência, fallback, reconciliação, observabilidade, responsáveis, evidências e lacunas das integrações reais. | Corrigir autenticação fail-closed dos webhooks prioritários, exercitar indisponibilidade/replay em homologação e acumular evidência operacional antes de considerar a área sólida. |
 | 7 | Desenvolvimento | Sólido | Branch por tarefa, PR, revisão, padrões backend/frontend, migrations, pequenas fatias, regras para IA e Definition of Done estão em `AGENTS.md` e `CONTRIBUTING.md`. | Manter os gates e impedir exceções informais conforme o volume de mudanças crescer. |
 | 8 | Qualidade e testes | Sólido | CI de backend, frontend, segurança, smoke, migrations, multiempresa e E2E longo; matriz de testes por risco e evidência obrigatória. | Ampliar regressão funcional e testes de desempenho em homologação sem transformar produção em ambiente de teste. |
 | 9 | Ambientes e configuração | Parcial forte | DEV local, homologação descartável, CI e produção estão separados; variáveis e segredos ficam fora do Git; há bootstrap e verificação de ambiente. | Executar o primeiro aceite real em `corepet-homolog` e criar staging remoto apenas quando acesso compartilhado, webhooks, HTTPS ou carga contínua justificarem o custo. |
@@ -86,6 +86,7 @@ Até existir uma equipe de desenvolvimento formal:
   `docs/comercial/PACOTE_PILOTO_PLANO_BASICO.md` e
   `docs/implantacao/CHECKLIST_PLANO_BASICO_PILOTO.md`.
 - Treinamento e comunicação: `docs/CENTRAL_AJUDA_E_NOVIDADES.md`.
+- Integrações e modos de falha: `docs/CATALOGO_INTEGRACOES.md`.
 
 ## Gate proporcional por mudança
 
@@ -121,7 +122,10 @@ programação.
 
 ### P1 — preparar crescimento controlado
 
-4. Criar catálogo único de integrações e seus modos de falha.
+4. **Criar catálogo único de integrações e seus modos de falha.** Implantado em
+   `docs/CATALOGO_INTEGRACOES.md`, com controles e lacunas verificados no código.
+   Falta executar o endurecimento dos webhooks prioritários e testes de
+   indisponibilidade/replay em homologação.
 5. Criar catálogo de dados críticos e inventário LGPD.
 6. Definir SLOs técnicos e indicadores de negócio por jornada.
 7. Executar capacidade autenticada em homologação antes de prometer nova faixa
