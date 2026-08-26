@@ -17,8 +17,9 @@ Leia primeiro:
 1. `AGENTS.md`;
 2. `docs/MAPA_CODIGO_FONTE.md`;
 3. `docs/ARQUITETURA.md`;
-4. `docs/auditorias/estrutura-geral-definition-of-done.md`;
-5. o guia do dominio que sera alterado.
+4. `docs/GOVERNANCA_ENTERPRISE.md`;
+5. `docs/auditorias/estrutura-geral-definition-of-done.md`;
+6. o guia do dominio que sera alterado.
 
 ## Fluxo Git
 
@@ -52,6 +53,11 @@ Registre de forma curta:
 - riscos para tenant, dinheiro, estoque, fiscal e integracoes;
 - testes que provarao o resultado;
 - necessidade ou nao de migration.
+
+Nova funcionalidade, mudanca de regra, integracao, migration, seguranca,
+arquitetura ou operacao relevante deve usar
+`docs/templates/FICHA_ENTREGA.md`. Quando houver aceite funcional, registrar a
+evidencia com `docs/templates/REGISTRO_HOMOLOGACAO.md`.
 
 Uma mudanca grande deve ser dividida antes da edicao.
 
