@@ -55,9 +55,7 @@ def validate_webhook_signature(payload: bytes, signature: str, secret: str) -> b
         expected_signature = hmac.new(
             normalized_secret.encode("utf-8"), payload, hashlib.sha256
         ).hexdigest()
-        return hmac.compare_digest(
-            normalized_signature.lower(), expected_signature
-        )
+        return hmac.compare_digest(normalized_signature.lower(), expected_signature)
     except (TypeError, ValueError):
         return False
 
