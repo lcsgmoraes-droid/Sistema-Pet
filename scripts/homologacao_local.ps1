@@ -186,18 +186,24 @@ switch ($Acao) {
         Assert-DockerEngine
         $values = Read-HomologEnv
         Wait-HomologHealth
-        $tenantId = Get-OrCreate-HomologIdentity $values
+        try {
+            $tenantId = Get-OrCreate-HomologIdentity $values
 
-        $env:E2E_BASE_URL = 'http://127.0.0.1:18080/api'
-        $env:E2E_USER_EMAIL = $values['HOMOLOG_USER_EMAIL']
-        $env:E2E_USER_PASSWORD = $values['HOMOLOG_USER_PASSWORD']
-        $env:E2E_TENANT_ID = $tenantId
-        $env:E2E_BLOCKED_PATH = '/banho-tosa/configuracao'
-        $env:E2E_ALLOW_PRODUCTION = 'false'
+            $env:E2E_BASE_URL = 'http://127.0.0.1:18080/api'
+            $env:E2E_USER_EMAIL = $values['HOMOLOG_USER_EMAIL']
+            $env:E2E_USER_PASSWORD = $values['HOMOLOG_USER_PASSWORD']
+            $env:E2E_TENANT_ID = $tenantId
+            $env:E2E_BLOCKED_PATH = '/banho-tosa/configuracao'
+            $env:E2E_ALLOW_PRODUCTION = 'false'
 
-        & (Join-Path $PSScriptRoot 'executar_testes_e2e.ps1')
-        if ($LASTEXITCODE -ne 0) {
-            throw 'A jornada E2E da homologacao falhou.'
+            & (Join-Path $PSScriptRoot 'executar_testes_e2e.ps1')
+            if ($LASTEXITCODE -ne 0) {
+                throw 'A jornada E2E da homologacao falhou.'
+            }
+        }
+        catch {
+            Show-HomologDiagnostics
+            throw
         }
         Write-Host 'Homologacao funcional concluida com dados ficticios.' -ForegroundColor Green
     }
