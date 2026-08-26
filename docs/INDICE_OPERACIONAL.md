@@ -18,6 +18,7 @@ Guia mestre:
 | Contribuir com seguranca | `CONTRIBUTING.md` | `AGENTS.md` e checks do PR |
 | Entender maturidade geral | `docs/MATURIDADE_GERAL_10_10_GUIA.md` | Historico de PRs no proprio guia |
 | Avaliar governanca enterprise | `docs/GOVERNANCA_ENTERPRISE.md` | Matriz das 14 areas e plano priorizado |
+| Consultar integracoes externas | `docs/CATALOGO_INTEGRACOES.md` | Controles, modos de falha, responsaveis e lacunas |
 | Preparar entrega relevante | `docs/templates/FICHA_ENTREGA.md` | Criterios de aceite, risco, testes e rollback |
 | Registrar homologacao | `docs/templates/REGISTRO_HOMOLOGACAO.md` | Evidencias conforme `docs/PADRAO_EVIDENCIA.md` |
 | Tratar incidente ou falha recorrente | `docs/GESTAO_INCIDENTES_SUSTENTACAO.md` | `docs/templates/REGISTRO_INCIDENTE.md` e painel Ops |
@@ -92,6 +93,7 @@ Guia mestre:
 | Classificacao de racoes | `docs/CLASSIFICACAO_RACOES.md` |
 | Evidencias | `docs/PADRAO_EVIDENCIA.md` |
 | Governanca enterprise | `docs/GOVERNANCA_ENTERPRISE.md` |
+| Integracoes externas | `docs/CATALOGO_INTEGRACOES.md` |
 | Requisitos e entrega | `docs/templates/FICHA_ENTREGA.md` |
 | Homologacao | `docs/templates/REGISTRO_HOMOLOGACAO.md` |
 | Incidentes e sustentacao | `docs/GESTAO_INCIDENTES_SUSTENTACAO.md` |
