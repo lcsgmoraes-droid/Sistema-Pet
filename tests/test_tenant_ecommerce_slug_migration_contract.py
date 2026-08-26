@@ -9,6 +9,13 @@ MIGRATION = (
     / "versions"
     / "zxb20260826a1_repair_tenant_ecommerce_slug.py"
 )
+ENUM_MIGRATION = (
+    ROOT
+    / "backend"
+    / "alembic"
+    / "versions"
+    / "zxc20260826a1_normalize_naturezadre_labels.py"
+)
 
 
 def test_ecommerce_slug_repair_is_in_the_official_alembic_chain():
@@ -28,3 +35,20 @@ def test_ecommerce_slug_repair_preserves_preexisting_schema():
     assert "if COLUMN_NAME not in columns" in source
     assert "if _has_unique_slug(inspector)" in source
     assert "Forward-only repair" in source
+
+
+def test_naturezadre_uses_the_same_values_as_the_orm():
+    source = ENUM_MIGRATION.read_text(encoding="utf-8")
+
+    assert 'revision = "zxc20260826a1"' in source
+    assert 'down_revision = "zxb20260826a1"' in source
+    for old_label, new_label in (
+        ("RECEITA", "receita"),
+        ("CUSTO", "custo"),
+        ("DESPESA", "despesa"),
+        ("RESULTADO", "resultado"),
+    ):
+        assert f'("{old_label}", "{new_label}")' in source
+
+    assert "ALTER TYPE {ENUM_TYPE}" in source
+    assert "RENAME VALUE" in source
