@@ -14,6 +14,7 @@ import {
 } from "react-icons/fi";
 
 import api from "../platformApi";
+import JourneySloPanel from "./opsDashboard/JourneySloPanel";
 
 const RANGE_HOURS = 24;
 
@@ -754,6 +755,8 @@ export default function OpsDashboard() {
             tone={statusTone(tls?.status)}
           />
         </div>
+
+        <JourneySloPanel journeys={dashboard?.journeys} />
 
         <div className="grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
           <AlertPanel alerts={dashboard?.alerts || []} />

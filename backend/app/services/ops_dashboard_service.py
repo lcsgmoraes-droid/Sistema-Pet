@@ -13,6 +13,10 @@ from app.services.error_event_reporter import (
     get_error_events,
     summarize_error_events,
 )
+from app.services.journey_event_reporter import (
+    get_journey_events,
+    summarize_journey_events,
+)
 from app.services.ops_alert_notifier import notify_ops_alerts
 from app.services.ops_continuity_service import summarize_continuity
 from app.services.ops_dashboard_actionable_alerts import _build_actionable_alerts
@@ -61,6 +65,7 @@ def build_ops_dashboard(
     error_events = get_error_events(since=period_since, until=period_until, db=db)
     deploy_events = get_deploy_events(since=period_since, until=period_until)
     watchdog_events = get_watchdog_events(since=period_since, until=period_until, db=db)
+    journey_events = get_journey_events(since=period_since, until=period_until, db=db)
 
     error_summary = summarize_error_events(
         since=period_since, until=period_until, db=db
@@ -71,6 +76,11 @@ def build_ops_dashboard(
     deploy_summary = summarize_deploy_events(since=period_since, until=period_until)
     watchdog_summary = summarize_watchdog_events(
         since=period_since, until=period_until, db=db
+    )
+    journey_summary = summarize_journey_events(
+        events=journey_events,
+        since=period_since,
+        until=period_until,
     )
     watchdog = _watchdog_now(db)
     continuity = summarize_continuity(now=now)
@@ -171,6 +181,7 @@ def build_ops_dashboard(
         "errors": error_summary,
         "deploys": deploy_summary,
         "watchdog_events": watchdog_summary,
+        "journeys": journey_summary,
         "queues": {
             "bling_pedido_webhooks": queue_snapshot,
         },
@@ -190,5 +201,6 @@ def build_ops_dashboard(
             "errors": list(reversed(error_events))[:10],
             "deploys": list(reversed(deploy_events))[:10],
             "watchdog": list(reversed(watchdog_events))[:10],
+            "journeys": list(reversed(journey_events))[:10],
         },
     }

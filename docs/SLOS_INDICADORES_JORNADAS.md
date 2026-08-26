@@ -70,7 +70,7 @@ deixar uma falha aberta: incidente P0 continua com resposta imediata.
 | Recursos do host | Implementado | Health detalhado e métricas protegidas | CPU, memória ou disco acima de 90% degradam o health detalhado. |
 | Backup/restore | Implementado com aprovação pendente | Painel de continuidade e evidência de restore | Backup saudável até 26 h; restore até 31 dias; objetivos configurados de RPO 24 h/RTO 4 h. |
 | Ativação de empresa | Implementado | Painel Ops por tenant | Marcos de acesso no dia 1, configuração no dia 3 e operação no dia 7. |
-| Sucesso/latência por jornada | Sem medição completa | Há tabelas de negócio e eventos de erro | Falta evento padronizado para toda tentativa, resultado e duração. |
+| Sucesso/latência por jornada | Parcial | `ops_journey_events` e JSONL sanitizado medem login, seleção de tenant e finalização de venda no web/app | Falta linha de base, classificação de causa mais fina e cobertura das demais jornadas. |
 | Disponibilidade histórica externa | Parcial | Health, watchdog e alertas | Falta série histórica externa consolidada para calcular o percentual mensal. |
 
 Os limites técnicos encontrados no código são guardrails operacionais, não
@@ -110,7 +110,7 @@ capacidade real, conforme `docs/CATALOGO_DADOS_CRITICOS_LGPD.md`.
 | Falhas que contam | 5xx, timeout, sessão inválida gerada pelo sistema, tenant/permissão incorreta. |
 | Exclusões | Senha incorreta, conta legitimamente bloqueada/inativa e validação esperada. |
 | Fonte atual | Usuários, sessões, auditoria, último login e erros por rota. |
-| Lacuna | Evento sanitizado de início/fim e motivo categorizado para formar o denominador. |
+| Lacuna | Acumular linha de base e atribuir a seleção concluída ao tenant sem confiar em entrada não validada. |
 | Dono | Operação técnica e administração SaaS. |
 
 Incidente de acesso a tenant incorreto não espera percentual: é P0 de tolerância
@@ -126,7 +126,7 @@ zero.
 | Indicadores de proteção | Duplicação financeira = 0; estoque negativo indevido = 0; divergência de total = 0. |
 | Exclusões | Cancelamento deliberado, falta de estoque validada e dado obrigatório ausente informado ao usuário. |
 | Fonte atual | `vendas`, pagamentos, estoque, transações, auditoria e erros por rota. |
-| Lacuna | Evento único `sale.finalization` com attempt ID, tenant, resultado, duração e motivo sanitizado. |
+| Lacuna | Acumular linha de base e refinar causas esperadas além da categoria HTTP, sem guardar dados da venda. |
 | Dono | Operação do tenant e engenharia. |
 
 Valor da venda, itens e identidade do cliente não entram na telemetria de SLO.
@@ -268,8 +268,11 @@ impacto real, não apenas do número bruto.
 
 1. Criar evento sanitizado por jornada com:
    `journey`, `operation_id`, `tenant_id`, `started_at`, `duration_ms`, `outcome`,
-   `reason_code`, `provider` e `request_id`.
+   `reason_code`, `provider` e `request_id`. **Implementado para login, seleção
+   de tenant e finalização de venda**, usando o instante terminal `created_at`.
 2. Coletar toda tentativa elegível, não apenas erro 5xx ou lentidão.
+   **Implementado nas três rotas iniciais; falta ampliar para as outras
+   jornadas.**
 3. Criar contadores e histogramas por jornada/tenant, com cardinalidade limitada
    e sem nome, e-mail, documento, conteúdo, valor ou segredo.
 4. Consolidar probe externa e série histórica para disponibilidade.

@@ -85,3 +85,68 @@ def test_http_request_log_includes_request_id(monkeypatch):
     assert captured[-1]["request_id"] == client_request_id
     assert captured[-1]["method"] == "GET"
     assert captured[-1]["path"] == "/probe"
+
+
+def test_request_context_reports_terminal_journey_result(monkeypatch):
+    captured: list[dict] = []
+
+    def capture_journey(**kwargs):
+        captured.append(kwargs)
+
+    monkeypatch.setattr(
+        "app.middlewares.request_context.record_http_journey_event",
+        capture_journey,
+    )
+    app = FastAPI()
+
+    @app.post("/auth/login-multitenant")
+    def login_probe():
+        return {"ok": True}
+
+    app.add_middleware(RequestContextMiddleware)
+    response = TestClient(app).post(
+        "/auth/login-multitenant",
+        headers={"X-Request-ID": "req-login-middleware"},
+    )
+
+    assert response.status_code == 200
+    assert len(captured) == 1
+    event = captured[0]
+    assert set(event) == {
+        "request",
+        "request_id",
+        "method",
+        "path",
+        "status_code",
+        "duration_ms",
+        "replayed",
+    }
+    assert event["request_id"] == "req-login-middleware"
+    assert event["method"] == "POST"
+    assert event["path"] == "/auth/login-multitenant"
+    assert event["status_code"] == 200
+    assert isinstance(event["duration_ms"], float)
+    assert event["duration_ms"] >= 0
+    assert event["replayed"] is False
+
+
+def test_journey_telemetry_failure_never_changes_customer_response(monkeypatch):
+    def fail_telemetry(**_kwargs):
+        raise OSError("telemetry unavailable")
+
+    monkeypatch.setattr(
+        "app.middlewares.request_context.record_http_journey_event",
+        fail_telemetry,
+    )
+    app = FastAPI()
+
+    @app.post("/auth/login-multitenant")
+    def login_probe():
+        return {"ok": True}
+
+    app.add_middleware(RequestContextMiddleware)
+    response = TestClient(app).post("/auth/login-multitenant")
+
+    assert response.status_code == 200
+    assert response.json() == {"ok": True}
+    assert response.headers["X-Request-ID"]

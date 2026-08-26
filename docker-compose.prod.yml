@@ -172,6 +172,8 @@ services:
       OPS_ALERT_WEBHOOK_MIN_SEVERITY: ${OPS_ALERT_WEBHOOK_MIN_SEVERITY:-critical}
       OPS_ALERT_WEBHOOK_TIMEOUT_SECONDS: ${OPS_ALERT_WEBHOOK_TIMEOUT_SECONDS:-5}
       OPS_ALERT_NOTIFICATION_LOG_PATH: ${OPS_ALERT_NOTIFICATION_LOG_PATH:-logs/ops_alert_notifications.jsonl}
+      JOURNEY_EVENT_LOG_PATH: ${JOURNEY_EVENT_LOG_PATH:-logs/journey_events.jsonl}
+      JOURNEY_EVENT_REPORT_MAX_READ_LINES: ${JOURNEY_EVENT_REPORT_MAX_READ_LINES:-50000}
     volumes:
       - ./backend/uploads:/app/uploads
       - ./backend/logs:/app/logs

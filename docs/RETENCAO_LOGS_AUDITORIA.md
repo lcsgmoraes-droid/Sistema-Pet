@@ -41,9 +41,11 @@ Referencias externas:
 |---|---|---|---:|---:|---|
 | `audit_logs` | Login, acesso, alteracoes sensiveis, eventos de negocio | Banco principal | 24 meses | 7 anos | Anonimizar ou purgar campos pessoais quando nao houver base de conservacao |
 | `ops_error_events` | Erros, 5xx, lentidao e incidentes por request | Banco principal | 180 dias | 24 meses agregado | Purgar payload bruto e manter agregados sem dado pessoal |
+| `ops_journey_events` | Jornada, resultado, duracao, tenant e identificadores tecnicos; sem payload pessoal | Banco principal | 90 dias | 24 meses agregado | Purgar evento detalhado e manter contagens/percentis sem identificador |
 | `ops_alerts` | Alertas operacionais e estado de resolucao | Banco principal | 24 meses | 36 meses agregado | Purgar alertas resolvidos antigos ou manter somente estatistica |
 | `ops_recovery_actions` | Watchdog e recuperacoes automaticas | Banco principal | 24 meses | 36 meses agregado | Purgar payload bruto, manter resumo operacional |
 | `backend/logs/error_events.jsonl` | Espelho local de erros de request | Servidor/producao | 30 dias | 90 dias compactado | Rotacionar e apagar arquivo antigo |
+| `backend/logs/journey_events.jsonl` | Espelho sanitizado das tentativas de login, selecao de tenant e finalizacao de venda | Servidor/producao | 30 dias | Sem arquivo bruto | Sincronizar, rotacionar e apagar arquivo antigo |
 | `backend/logs/deploy_events.jsonl` | Deploys, falhas e rollbacks | Servidor/producao | 24 meses | Historico resumido em docs | Compactar antigo; registro essencial fica no checklist |
 | `backend/logs/ops_command_events.jsonl` | Comandos manuais sensiveis em producao | Servidor/producao | 24 meses | Historico resumido em docs | Compactar antigo; preservar eventos de incidente |
 | `backend/logs/ops_alert_notifications.jsonl` | Deduplicacao de notificacao de alerta Ops | Servidor/producao | 24 meses | Historico resumido em docs | Compactar antigo; preservar eventos de incidente |
@@ -142,7 +144,8 @@ Apos cada deploy real:
 ## Backlog para 10/10
 
 - Criar job seguro de purge/anonimizacao para `audit_logs`,
-  `ops_error_events`, `ops_alerts` e `ops_recovery_actions`.
+  `ops_error_events`, `ops_journey_events`, `ops_alerts` e
+  `ops_recovery_actions`.
 - Adicionar logrotate ou rotina equivalente para `backend/logs/*.jsonl` no host.
 - Exibir no painel Ops a idade do log mais antigo e o tamanho dos arquivos.
 - Registrar metricas agregadas antes de apagar payload bruto.

@@ -41,6 +41,7 @@ TENANT_WHITELIST_TABLES = {
     # (tests/multi_tenant/test_tenant_model_registry.py).
     "ops_alerts",  # cockpit admin (require_admin), visão cross-tenant
     "ops_error_events",  # captura de erros (roda antes de haver tenant)
+    "ops_journey_events",  # SLOs globais; tenant_id e apenas etiqueta tecnica
     "bling_pedido_webhook_events",  # fila de worker: claim cross-tenant sem contexto
     # Filas do motor de campanhas: o worker/sender faz claim cross-tenant (SELECT FOR
     # UPDATE SKIP LOCKED) fora de request, sem tenant no contexto. A engine seta o tenant
