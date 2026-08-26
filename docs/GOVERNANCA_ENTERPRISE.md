@@ -54,8 +54,8 @@ Até existir uma equipe de desenvolvimento formal:
 | 1 | Necessidade e requisitos | Parcial | Existem specs por funcionalidade, regras de domínio, `CONTRIBUTING.md` e Definition of Done. | O formato não era único. A ficha `docs/templates/FICHA_ENTREGA.md` passa a registrar problema, usuários, prioridade, requisitos, não funcionais e aceite. |
 | 2 | Documentação | Parcial forte | Há índice oficial, mapa do código-fonte, arquitetura, guias operacionais, evidências e histórico Git. | Decisões arquiteturais e requisitos ainda aparecem dispersos. Consolidar decisões duradouras e aposentar documentos históricos quando forem substituídos. |
 | 3 | Arquitetura e tecnologia | Parcial forte | O monólito modular, componentes, multiempresa, dados, worker, deploy e evolução incremental estão em `docs/ARQUITETURA.md`. Há smoke de capacidade seguro. | Falta medir jornadas autenticadas, banco e integrações em homologação, com metas de latência, erro e capacidade antes de ampliar faixas de clientes. |
-| 4 | Segurança e privacidade | Parcial forte | Autenticação, permissões, tenant, RLS, regras de segredos, logs seguros, alertas e política de privacidade possuem controles reais. | Criar inventário de dados pessoais, finalidade/base legal, solicitações do titular, retenção e responsável por decisão LGPD. Revisão jurídica continua sendo uma atividade externa. |
-| 5 | Dados e banco de dados | Parcial forte | PostgreSQL, SQLAlchemy, migrations Alembic, transações, isolamento, backup, cópia externa, restore smoke, auditoria e retenção técnica estão documentados. | Criar catálogo de dados críticos com proprietário de negócio, classificação, retenção e RPO/RTO aprovados. |
+| 4 | Segurança e privacidade | Parcial forte | Autenticação, permissões, tenant, RLS, regras de segredos, logs seguros, alertas e política de privacidade possuem controles reais. O inventário `docs/CATALOGO_DADOS_CRITICOS_LGPD.md` centraliza dados pessoais, finalidade proposta, direitos, retenção, papéis, controles e lacunas. | Aprovar hipóteses legais e papéis por tratamento com apoio jurídico, nomear responsáveis, registrar operadores/suboperadores e ampliar o fluxo de direitos além de clientes. |
+| 5 | Dados e banco de dados | Parcial forte | PostgreSQL, SQLAlchemy, migrations Alembic, transações, isolamento, backup, restore smoke, auditoria e retenção técnica estão documentados. O catálogo de dados classifica 16 domínios, criticidade, responsáveis propostos e ciclo de vida. | Aprovar proprietários, retenção por domínio e RPO/RTO; provar backup de arquivos/cópia externa e automatizar descarte/anonimização. |
 | 6 | Integrações | Parcial forte | O catálogo `docs/CATALOGO_INTEGRACOES.md` centraliza finalidade, autenticação, timeout, retry, idempotência, fallback, reconciliação, observabilidade, responsáveis, evidências e lacunas das integrações reais. | Corrigir autenticação fail-closed dos webhooks prioritários, exercitar indisponibilidade/replay em homologação e acumular evidência operacional antes de considerar a área sólida. |
 | 7 | Desenvolvimento | Sólido | Branch por tarefa, PR, revisão, padrões backend/frontend, migrations, pequenas fatias, regras para IA e Definition of Done estão em `AGENTS.md` e `CONTRIBUTING.md`. | Manter os gates e impedir exceções informais conforme o volume de mudanças crescer. |
 | 8 | Qualidade e testes | Sólido | CI de backend, frontend, segurança, smoke, migrations, multiempresa e E2E longo; matriz de testes por risco e evidência obrigatória. | Ampliar regressão funcional e testes de desempenho em homologação sem transformar produção em ambiente de teste. |
@@ -87,6 +87,7 @@ Até existir uma equipe de desenvolvimento formal:
   `docs/implantacao/CHECKLIST_PLANO_BASICO_PILOTO.md`.
 - Treinamento e comunicação: `docs/CENTRAL_AJUDA_E_NOVIDADES.md`.
 - Integrações e modos de falha: `docs/CATALOGO_INTEGRACOES.md`.
+- Dados críticos e privacidade: `docs/CATALOGO_DADOS_CRITICOS_LGPD.md`.
 
 ## Gate proporcional por mudança
 
@@ -126,7 +127,11 @@ programação.
    `docs/CATALOGO_INTEGRACOES.md`, com controles e lacunas verificados no código.
    Falta executar o endurecimento dos webhooks prioritários e testes de
    indisponibilidade/replay em homologação.
-5. Criar catálogo de dados críticos e inventário LGPD.
+5. **Criar catálogo de dados críticos e inventário LGPD.** Implantado em
+   `docs/CATALOGO_DADOS_CRITICOS_LGPD.md`, com 16 domínios, classificação,
+   finalidade proposta, papéis, direitos, retenção, continuidade e lacunas
+   verificadas no código. Faltam as aprovações jurídica/contábil, responsáveis
+   formais, RPO/RTO e automações de descarte antes de considerar a área sólida.
 6. Definir SLOs técnicos e indicadores de negócio por jornada.
 7. Executar capacidade autenticada em homologação antes de prometer nova faixa
    de escala.
