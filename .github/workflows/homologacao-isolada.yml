@@ -43,7 +43,11 @@ jobs:
           python -m pip install pytest
 
       - name: Validate homologation contracts
-        run: python -m pytest tests/test_homologacao_local_contract.py -q
+        run: >-
+          python -m pytest
+          tests/test_homologacao_local_contract.py
+          tests/test_tenant_ecommerce_slug_migration_contract.py
+          -q
 
       - name: Validate Docker Compose
         shell: pwsh
