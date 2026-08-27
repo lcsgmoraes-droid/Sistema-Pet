@@ -4,7 +4,7 @@ Lista de espera para produtos sem estoque com notificação automática
 """
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import and_, desc
 from typing import Optional
 from datetime import datetime
@@ -16,6 +16,7 @@ from app.pendencia_estoque_models import PendenciaEstoque
 from app.models import Cliente
 from app.produtos_models import Produto
 from app.services.pendencia_estoque_service import STATUS_ATIVOS_LISTA_ESPERA
+from app.services.pendencia_estoque_relatorio import montar_relatorio_lista_espera
 
 router = APIRouter(prefix="/pendencias-estoque", tags=["Pendências de Estoque"])
 
@@ -170,6 +171,31 @@ def listar_pendencias(
         "offset": offset,
         "pendencias": [p.to_dict() for p in pendencias],
     }
+
+
+@router.get("/relatorio", response_model=dict)
+def relatorio_lista_espera(
+    db: Session = Depends(get_session),
+    user_and_tenant=Depends(get_current_user_and_tenant),
+):
+    """Relatorio ativo com totalizadores por SKU e detalhes cliente x produto."""
+    _user, tenant = user_and_tenant
+
+    pendencias = (
+        db.query(PendenciaEstoque)
+        .options(
+            joinedload(PendenciaEstoque.cliente),
+            joinedload(PendenciaEstoque.produto).joinedload(Produto.marca),
+            joinedload(PendenciaEstoque.produto).joinedload(Produto.fornecedor),
+        )
+        .filter(
+            PendenciaEstoque.tenant_id == tenant,
+            PendenciaEstoque.status.in_(STATUS_ATIVOS_LISTA_ESPERA),
+        )
+        .all()
+    )
+
+    return montar_relatorio_lista_espera(pendencias)
 
 
 @router.get("/cliente/{cliente_id}", response_model=dict)

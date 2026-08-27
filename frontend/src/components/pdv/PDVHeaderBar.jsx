@@ -101,16 +101,14 @@ export default function PDVHeaderBar({
         </div>
 
         <div className="flex w-full flex-wrap items-center justify-start gap-2 sm:justify-end xl:max-w-[54rem] xl:self-end">
-          {vendaAtual.cliente && (
-            <IconActionButton
-              onClick={onAbrirPendenciasEstoque}
-              icon={Bell}
-              intent="warning"
-              size="lg"
-              badge={pendenciasCount > 0 ? pendenciasCount : null}
-              title="Lista de espera - Produtos sem estoque"
-            />
-          )}
+          <IconActionButton
+            onClick={onAbrirPendenciasEstoque}
+            icon={Bell}
+            intent="warning"
+            size="lg"
+            badge={pendenciasCount > 0 ? pendenciasCount : null}
+            title="Lista de espera e relatório de produtos aguardados"
+          />
 
           {vendaAtual.cliente && (
             <IconActionButton
