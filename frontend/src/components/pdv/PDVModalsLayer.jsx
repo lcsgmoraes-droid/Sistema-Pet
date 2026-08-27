@@ -115,11 +115,11 @@ export default function PDVModalsLayer({
         />
       )}
 
-      {mostrarPendenciasEstoque && clienteAtual && (
+      {mostrarPendenciasEstoque && (
         <ModalPendenciasEstoque
           isOpen={mostrarPendenciasEstoque}
           onClose={onClosePendenciasEstoque}
-          clienteId={clienteAtual.id}
+          clienteId={clienteAtual?.id || null}
           onPendenciaAdicionada={onPendenciaAdicionada}
         />
       )}

@@ -429,6 +429,32 @@ export const BASE_CONHECIMENTO = [
         ],
       },
       {
+        slug: "relatorio-lista-espera-sku",
+        titulo: "Como usar o relatório da lista de espera por SKU",
+        tags: [
+          "lista de espera",
+          "sku",
+          "produto sem estoque",
+          "fornecedor",
+          "marca",
+          "relatorio",
+          "csv",
+          "pdv",
+        ],
+        conteudo: [
+          "**Objetivo:** saber exatamente quais produtos precisam ser comprados e quais clientes aguardam cada item, sem somar SKUs diferentes em um único número.",
+          "**Público:** responsáveis por vendas, estoque e compras. Antes de usar, cadastre a marca e o fornecedor principal dos produtos para obter o agrupamento mais completo.",
+          "Acesse **PDV (Vendas)** e clique no **sino da lista de espera** no alto da tela. O sino pode ser aberto mesmo sem selecionar um cliente.",
+          "Abra a aba **Relatório geral**. Os cartões mostram clientes distintos, SKUs distintos, quantidade total desejada e quantidade de vínculos **cliente × produto**.",
+          "Em **Necessidade de compra**, os itens aparecem na ordem **Fornecedor → Marca → SKU**. Cada SKU mostra separadamente quantos clientes o aguardam e a soma das quantidades solicitadas.",
+          "Exemplo: se 10 clientes aguardam Special Dog Carne e 7 aguardam Fórmula Natural, o relatório mostra os dois SKUs em linhas separadas; não apresenta apenas '17 produtos'.",
+          "Na seção **Cliente × produto**, consulte o nome, telefone, produto, SKU, marca e quantidade de cada pessoa. Use **Baixar CSV** para levar os totalizadores e os detalhes no mesmo arquivo.",
+          "O relatório considera apenas a lista ativa: registros **pendentes** e **notificados**. Itens finalizados ou cancelados não entram. Produtos sem cadastro continuam visíveis como **Sem fornecedor**, **Sem marca** ou **Sem SKU**.",
+          "**Conferência:** compare o total de clientes de um SKU com a lista cliente × produto e confirme se a quantidade desejada corresponde ao que será pedido ao fornecedor.",
+          "Se um fornecedor ou uma marca aparecerem como não cadastrados, complete o cadastro do produto e clique em **Atualizar** no relatório.",
+        ],
+      },
+      {
         titulo: "Como fazer uma venda no PDV",
         tags: ["venda", "pdv", "caixa", "vender", "produto"],
         conteudo: [

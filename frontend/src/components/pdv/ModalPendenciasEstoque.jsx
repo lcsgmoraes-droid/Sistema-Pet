@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef } from "react";
-import { X, AlertCircle, Clock, CheckCircle, Bell, Trash2, Search } from "lucide-react";
+import { X, AlertCircle, Clock, CheckCircle, Bell, Trash2, Search, BarChart3 } from "lucide-react";
 import api from "../../api";
 import toast from "react-hot-toast";
 import { confirmarCorePet } from "../../services/corepetDialog";
+import ModalPendenciasEstoqueRelatorio from "./ModalPendenciasEstoqueRelatorio";
 
 export default function ModalPendenciasEstoque({
   isOpen,
@@ -11,7 +12,7 @@ export default function ModalPendenciasEstoque({
   produtoId = null,
   onPendenciaAdicionada = () => {},
 }) {
-  const [modo, setModo] = useState("listar"); // 'listar' | 'adicionar'
+  const [modo, setModo] = useState(() => (clienteId ? "listar" : "relatorio"));
   const [pendencias, setPendencias] = useState([]);
   const [produtos, setProdutos] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -32,13 +33,19 @@ export default function ModalPendenciasEstoque({
   });
 
   useEffect(() => {
-    if (isOpen && clienteId) {
-      carregarPendencias();
-      if (!produtoId) {
-        carregarProdutosSemEstoque();
-      }
+    if (!isOpen) return;
+
+    if (!clienteId) {
+      setPendencias([]);
+      setModo("relatorio");
+      return;
     }
-  }, [isOpen, clienteId]);
+
+    carregarPendencias();
+    if (!produtoId) {
+      carregarProdutosSemEstoque();
+    }
+  }, [isOpen, clienteId, produtoId]);
 
   // Efeito para filtrar produtos conforme a busca
   useEffect(() => {
@@ -234,7 +241,7 @@ export default function ModalPendenciasEstoque({
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-xl max-w-3xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+      <div className="bg-white rounded-lg shadow-xl max-w-6xl w-full max-h-[90vh] overflow-hidden flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b bg-gradient-to-r from-blue-50 to-blue-100">
           <div className="flex items-center gap-3">
@@ -253,25 +260,39 @@ export default function ModalPendenciasEstoque({
 
         {/* Tabs */}
         <div className="flex border-b">
+          {clienteId && (
+            <>
+              <button
+                onClick={() => setModo("listar")}
+                className={`flex-1 px-4 py-3 font-medium transition-colors ${
+                  modo === "listar"
+                    ? "text-blue-600 border-b-2 border-blue-600 bg-blue-50"
+                    : "text-gray-600 hover:bg-gray-50"
+                }`}
+              >
+                Lista do cliente ({pendencias.length})
+              </button>
+              <button
+                onClick={() => setModo("adicionar")}
+                className={`flex-1 px-4 py-3 font-medium transition-colors ${
+                  modo === "adicionar"
+                    ? "text-blue-600 border-b-2 border-blue-600 bg-blue-50"
+                    : "text-gray-600 hover:bg-gray-50"
+                }`}
+              >
+                Adicionar Pendência
+              </button>
+            </>
+          )}
           <button
-            onClick={() => setModo("listar")}
-            className={`flex-1 px-4 py-3 font-medium transition-colors ${
-              modo === "listar"
-                ? "text-blue-600 border-b-2 border-blue-600 bg-blue-50"
+            onClick={() => setModo("relatorio")}
+            className={`flex flex-1 items-center justify-center gap-2 px-4 py-3 font-medium transition-colors ${
+              modo === "relatorio"
+                ? "border-b-2 border-blue-600 bg-blue-50 text-blue-600"
                 : "text-gray-600 hover:bg-gray-50"
             }`}
           >
-            Lista de Espera ({pendencias.length})
-          </button>
-          <button
-            onClick={() => setModo("adicionar")}
-            className={`flex-1 px-4 py-3 font-medium transition-colors ${
-              modo === "adicionar"
-                ? "text-blue-600 border-b-2 border-blue-600 bg-blue-50"
-                : "text-gray-600 hover:bg-gray-50"
-            }`}
-          >
-            Adicionar Pendência
+            <BarChart3 className="h-4 w-4" /> Relatório geral
           </button>
         </div>
 
@@ -367,7 +388,7 @@ export default function ModalPendenciasEstoque({
                 ))
               )}
             </div>
-          ) : (
+          ) : modo === "adicionar" ? (
             // Form para adicionar pendência
             <div className="space-y-4 max-w-lg mx-auto">
               <div>
@@ -508,6 +529,8 @@ export default function ModalPendenciasEstoque({
                 {loading ? "Adicionando..." : "Adicionar à Lista de Espera"}
               </button>
             </div>
+          ) : (
+            <ModalPendenciasEstoqueRelatorio />
           )}
         </div>
       </div>
