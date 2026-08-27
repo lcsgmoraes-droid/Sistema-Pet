@@ -85,6 +85,15 @@ function formatHours(value) {
   return `${number.toLocaleString("pt-BR", { maximumFractionDigits: 1 })} h`;
 }
 
+function formatDurationSeconds(value) {
+  const seconds = Number(value);
+  if (!Number.isFinite(seconds)) return "-";
+  if (seconds < 60) return `${seconds.toLocaleString("pt-BR")} s`;
+  const minutes = seconds / 60;
+  if (minutes < 60) return `${minutes.toLocaleString("pt-BR", { maximumFractionDigits: 1 })} min`;
+  return `${(minutes / 60).toLocaleString("pt-BR", { maximumFractionDigits: 1 })} h`;
+}
+
 function MetricCard({ icon: Icon, label, value, detail, tone = "slate" }) {
   return (
     <div className={`rounded-lg border p-4 shadow-sm ${toneClasses(tone)}`}>
@@ -395,6 +404,12 @@ function ContinuityPanel({ continuity }) {
             <div className="mt-1 text-xs opacity-75">
               {item?.age_hours != null ? `Idade: ${formatHours(item.age_hours)}` : detail}
             </div>
+            {label === "Restore controlado" && item?.restore_duration_seconds != null ? (
+              <div className="mt-1 text-xs opacity-75">
+                Duracao: {formatDurationSeconds(item.restore_duration_seconds)} · Checksum:{" "}
+                {item?.checksum_verified ? "verificado" : "nao comprovado"}
+              </div>
+            ) : null}
           </div>
         ))}
       </div>
@@ -408,7 +423,9 @@ function ContinuityPanel({ continuity }) {
         </div>
         <div className="rounded-lg bg-slate-50 px-3 py-2">
           RTO alvo: <b>{formatHours(objectives?.rto_target_hours)}</b> -{" "}
-          {objectives?.rto_test_evidence ? "restore comprovado" : "sem evidencia recente"}
+          {objectives?.rto_test_evidence
+            ? `restore comprovado em ${formatDurationSeconds(objectives.rto_restore_duration_seconds)}`
+            : "tempo ou integridade nao comprovados"}
         </div>
       </div>
     </section>

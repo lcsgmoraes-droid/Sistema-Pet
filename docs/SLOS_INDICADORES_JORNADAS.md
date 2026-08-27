@@ -206,10 +206,10 @@ meta interna de processo, não obrigação automática do cliente.
 | Item | Definição |
 |---|---|
 | Resultado bom | Backup íntegro é restaurado em ambiente isolado e as jornadas críticas voltam sem corrupção. |
-| Guardrails atuais | Backup com idade <= 26 h; restore smoke <= 31 dias; cópia externa verificada quando configurada. |
+| Guardrails atuais | Backup com idade <= 26 h; restore smoke <= 31 dias; SHA-256 obrigatório antes do restore; duração medida; cópia externa verificada quando configurada. |
 | Objetivos configurados | RPO 24 h e RTO 4 h. São propostas operacionais, ainda sem aceite/SLA. |
-| Fonte atual | Eventos de backup, checksum, restore, cópia externa e painel Ops. |
-| Lacuna | Medir duração total real, arquivos fora do banco, fila pós-restore e repetir teste mensal. |
+| Fonte atual | Eventos de backup, checksum, duração do restore, cópia externa e painel Ops. |
+| Lacuna | Medir a retomada das jornadas, arquivos fora do banco e filas pós-restore; sustentar a evidência recorrente no servidor. |
 | Dono | Operação técnica e responsável do negócio pela continuidade. |
 
 ## Indicadores de negócio

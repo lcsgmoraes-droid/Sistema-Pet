@@ -11,6 +11,8 @@ record_ops_continuity_event() {
   local backup_sha256="${5:-}"
   local public_tables="${6:-}"
   local alembic_rows="${7:-}"
+  local restore_duration_seconds="${8:-}"
+  local checksum_verified="${9:-}"
   local event_path="${OPS_CONTINUITY_EVENT_LOG_PATH:-$APP_DIR/backend/logs/continuity_events.jsonl}"
   local created_at
 
@@ -25,6 +27,11 @@ record_ops_continuity_event() {
   backup_sha256="${backup_sha256//[^a-fA-F0-9]/}"
   public_tables="${public_tables//[^0-9]/}"
   alembic_rows="${alembic_rows//[^0-9]/}"
+  restore_duration_seconds="${restore_duration_seconds//[^0-9]/}"
+  case "$checksum_verified" in
+    true|false) ;;
+    *) checksum_verified="" ;;
+  esac
   created_at="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
 
   mkdir -p "$(dirname -- "$event_path")"
@@ -33,14 +40,16 @@ record_ops_continuity_event() {
   if command -v flock >/dev/null 2>&1; then
     (
       flock -x 9
-      printf '{"created_at":"%s","operation":"%s","status":"%s","backup_file":"%s","backup_bytes":"%s","backup_sha256":"%s","public_tables":"%s","alembic_rows":"%s"}\n' \
+      printf '{"created_at":"%s","operation":"%s","status":"%s","backup_file":"%s","backup_bytes":"%s","backup_sha256":"%s","public_tables":"%s","alembic_rows":"%s","restore_duration_seconds":"%s","checksum_verified":"%s"}\n' \
         "$created_at" "$operation" "$status" "$backup_file" "$backup_bytes" \
-        "$backup_sha256" "$public_tables" "$alembic_rows" >&9
+        "$backup_sha256" "$public_tables" "$alembic_rows" \
+        "$restore_duration_seconds" "$checksum_verified" >&9
     ) 9>>"$event_path"
   else
-    printf '{"created_at":"%s","operation":"%s","status":"%s","backup_file":"%s","backup_bytes":"%s","backup_sha256":"%s","public_tables":"%s","alembic_rows":"%s"}\n' \
+    printf '{"created_at":"%s","operation":"%s","status":"%s","backup_file":"%s","backup_bytes":"%s","backup_sha256":"%s","public_tables":"%s","alembic_rows":"%s","restore_duration_seconds":"%s","checksum_verified":"%s"}\n' \
       "$created_at" "$operation" "$status" "$backup_file" "$backup_bytes" \
-      "$backup_sha256" "$public_tables" "$alembic_rows" >>"$event_path"
+      "$backup_sha256" "$public_tables" "$alembic_rows" \
+      "$restore_duration_seconds" "$checksum_verified" >>"$event_path"
   fi
 
   chmod 0640 "$event_path" 2>/dev/null || true

@@ -64,6 +64,14 @@ def _safe_int(value: Any) -> int | None:
         return None
 
 
+def _safe_bool(value: Any) -> bool | None:
+    if value is True or str(value).lower() == "true":
+        return True
+    if value is False or str(value).lower() == "false":
+        return False
+    return None
+
+
 def _operation_summary(
     events: list[dict[str, Any]],
     operation: str,
@@ -110,6 +118,14 @@ def _operation_summary(
         "alembic_rows": _safe_int(latest_success.get("alembic_rows"))
         if latest_success
         else None,
+        "restore_duration_seconds": _safe_int(
+            latest_success.get("restore_duration_seconds")
+        )
+        if latest_success
+        else None,
+        "checksum_verified": _safe_bool(latest_success.get("checksum_verified"))
+        if latest_success
+        else None,
     }
 
 
@@ -136,9 +152,21 @@ def summarize_continuity(*, now: datetime | None = None) -> dict[str, Any]:
         now=current_time,
     )
 
+    restore_duration_seconds = restore["restore_duration_seconds"]
+    rto_test_evidence = (
+        restore["status"] == "healthy"
+        and restore["checksum_verified"] is True
+        and restore_duration_seconds is not None
+        and restore_duration_seconds <= rto_target_hours * 3600
+    )
+
     if backup["status"] != "healthy":
         status = "critical"
-    elif restore["status"] != "healthy" or external_copy["status"] != "healthy":
+    elif (
+        restore["status"] != "healthy"
+        or external_copy["status"] != "healthy"
+        or not rto_test_evidence
+    ):
         status = "warning"
     else:
         status = "healthy"
@@ -153,7 +181,8 @@ def summarize_continuity(*, now: datetime | None = None) -> dict[str, Any]:
             "rpo_target_hours": rpo_target_hours,
             "rpo_met": backup_age is not None and backup_age <= rpo_target_hours,
             "rto_target_hours": rto_target_hours,
-            "rto_test_evidence": restore["status"] == "healthy",
+            "rto_test_evidence": rto_test_evidence,
+            "rto_restore_duration_seconds": restore_duration_seconds,
             "external_copy_verified": external_copy["status"] == "healthy",
         },
     }
