@@ -83,6 +83,29 @@ for (const literal of [
   assert(featureSource.includes(literal), `Missing modal conta pagar behavior literal: ${literal}`);
 }
 
+const basicFieldsSource = read("src/components/modalNovaContaPagar/ContaPagarBasicFields.jsx");
+assert(
+  basicFieldsSource.includes('className="flex min-w-0 gap-2"'),
+  "Category row should allow the select to shrink inside the modal",
+);
+assert(
+  basicFieldsSource.includes('className="shrink-0 px-3 py-2'),
+  "Add category button should remain fully visible inside the modal",
+);
+
+const helpSource = read("src/pages/centralAjuda/centralAjudaKnowledge.js");
+for (const literal of [
+  'slug: "vincular-categoria-dre-conta-pagar"',
+  "Como vincular uma categoria ao DRE ao criar uma conta a pagar",
+  "Esta categoria ainda não está vinculada ao DRE",
+  "Classificar agora",
+  "Salvar vínculo",
+  "Teste seguro",
+  "Checklist final",
+]) {
+  assert(helpSource.includes(literal), `Missing DRE help article literal: ${literal}`);
+}
+
 const contasPagarViewSource = read("src/components/contas-pagar/ContasPagarView.jsx");
 assert(
   contasPagarViewSource.includes('from "../ModalNovaContaPagar"'),

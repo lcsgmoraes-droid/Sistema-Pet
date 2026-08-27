@@ -67,16 +67,16 @@ export default function ContaPagarBasicFields({ controller, onOpenCategoria }) {
         />
       </div>
 
-      <div>
+      <div className="min-w-0">
         <label className="block text-sm font-medium text-gray-700 mb-1">
           <Tag size={16} className="inline mr-1" />
           Categoria
         </label>
-        <div className="flex gap-2">
+        <div className="flex min-w-0 gap-2">
           <select
             value={dados.categoria_id || ""}
             onChange={(event) => handleCategoriaChange(event.target.value)}
-            className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
+            className="min-w-0 flex-1 px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
           >
             <option value="">Selecione...</option>
             {safeArray(categorias).map((categoria) => (
@@ -88,7 +88,7 @@ export default function ContaPagarBasicFields({ controller, onOpenCategoria }) {
           <button
             type="button"
             onClick={onOpenCategoria}
-            className="px-3 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 flex items-center gap-1 whitespace-nowrap"
+            className="shrink-0 px-3 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 flex items-center gap-1 whitespace-nowrap"
             title="Adicionar nova categoria"
           >
             <Plus size={16} /> Adicionar
