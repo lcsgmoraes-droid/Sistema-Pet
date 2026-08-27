@@ -21,6 +21,8 @@ import {
   formatarValorCampo,
   gerarPlanoCrediario,
   mascararDataBr,
+  subtotalBrutoItemPdv,
+  subtotalLiquidoItemPdv,
   type IntervaloCrediario,
   type ItemCarrinhoPdv,
 } from "./FuncionarioPdvUtils";
@@ -38,6 +40,9 @@ export type FuncionarioPdvContentProps = {
   adicionarProduto: (produto: FuncionarioPdvProduto) => void;
   carrinho: ItemCarrinhoPdv[];
   totalItens: number;
+  descontoManual: number;
+  abrirEdicaoItem: (item: ItemCarrinhoPdv) => void;
+  abrirDescontoTotal: () => void;
   quantidadeEditando: Record<number, string>;
   valorEditando: Record<number, string>;
   alterarQuantidade: (produtoId: number, quantidade: number) => void;
@@ -89,6 +94,7 @@ export type FuncionarioPdvContentProps = {
   observacoes: string;
   setObservacoes: Dispatch<SetStateAction<string>>;
   total: number;
+  totalBruto: number;
   finalizando: boolean;
   salvandoAberta: boolean;
   salvarAberta: () => void | Promise<void>;
@@ -108,6 +114,9 @@ export function FuncionarioPdvContent({
   adicionarProduto,
   carrinho,
   totalItens,
+  descontoManual,
+  abrirEdicaoItem,
+  abrirDescontoTotal,
   quantidadeEditando,
   valorEditando,
   alterarQuantidade,
@@ -159,6 +168,7 @@ export function FuncionarioPdvContent({
   observacoes,
   setObservacoes,
   total,
+  totalBruto,
   finalizando,
   salvandoAberta,
   salvarAberta,
@@ -274,7 +284,15 @@ export function FuncionarioPdvContent({
       <View style={styles.card}>
         <View style={styles.linhaTitulo}>
           <Text style={styles.secaoTitulo}>Carrinho</Text>
-          <Text style={styles.badge}>{formatarQuantidade(totalItens)} item(ns)</Text>
+          <View style={styles.carrinhoCabecalhoAcoes}>
+            {carrinho.length ? (
+              <TouchableOpacity style={styles.botaoDescontoTotal} onPress={abrirDescontoTotal}>
+                <Ionicons name="pricetag-outline" size={16} color={CORES.primario} />
+                <Text style={styles.botaoDescontoTotalTexto}>Desconto no total</Text>
+              </TouchableOpacity>
+            ) : null}
+            <Text style={styles.badge}>{formatarQuantidade(totalItens)} item(ns)</Text>
+          </View>
         </View>
         {carrinho.length === 0 ? (
           <View style={styles.vazio}>
@@ -284,67 +302,90 @@ export function FuncionarioPdvContent({
         ) : (
           carrinho.map((item) => (
             <View key={item.produto.id} style={styles.itemCarrinho}>
-              <ProdutoImagem uri={item.produto.imagem_url} compacta />
-              <View style={styles.itemCarrinhoConteudo}>
-                <View style={styles.itemCarrinhoTopo}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.itemNome} numberOfLines={2}>
-                      {item.produto.nome}
-                    </Text>
-                    <Text style={styles.itemMeta}>
-                      {formatarMoeda(item.produto.preco_venda)} /{" "}
-                      {(item.produto.unidade || "un").toLowerCase()}
-                    </Text>
-                  </View>
-                  <Text style={styles.itemSubtotal}>
-                    {formatarMoeda(item.quantidade * Number(item.produto.preco_venda ?? 0))}
-                  </Text>
-                </View>
-                <View style={styles.itemControles}>
-                  <View style={styles.campoCarrinho}>
-                    <Text style={styles.campoCarrinhoLabel}>Qtd.</Text>
-                    <View style={styles.quantidadeBox}>
-                      <TouchableOpacity
-                        style={styles.botaoQuantidade}
-                        onPress={() => alterarQuantidade(item.produto.id, item.quantidade - 1)}
-                      >
-                        <Ionicons name="remove" size={16} color={CORES.texto} />
-                      </TouchableOpacity>
-                      <TextInput
-                        value={
-                          quantidadeEditando[item.produto.id] ??
-                          formatarQuantidadeCampo(item.quantidade)
-                        }
-                        onChangeText={(valor) => editarQuantidadeItem(item.produto.id, valor)}
-                        onBlur={() => finalizarEdicaoQuantidade(item.produto.id)}
-                        keyboardType="decimal-pad"
-                        returnKeyType="done"
-                        selectTextOnFocus
-                        style={styles.inputQuantidade}
-                      />
-                      <TouchableOpacity
-                        style={styles.botaoQuantidade}
-                        onPress={() => alterarQuantidade(item.produto.id, item.quantidade + 1)}
-                      >
-                        <Ionicons name="add" size={16} color={CORES.texto} />
-                      </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.itemResumoToque}
+                onPress={() => abrirEdicaoItem(item)}
+                accessibilityRole="button"
+                accessibilityLabel={`Editar ${item.produto.nome}`}
+              >
+                <ProdutoImagem uri={item.produto.imagem_url} compacta />
+                <View style={styles.itemCarrinhoConteudo}>
+                  <View style={styles.itemCarrinhoTopo}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.itemNome} numberOfLines={2}>
+                        {item.produto.nome}
+                      </Text>
+                      <Text style={styles.itemMeta}>
+                        {formatarMoeda(item.precoUnitario)} /{" "}
+                        {(item.produto.unidade || "un").toLowerCase()}
+                      </Text>
+                    </View>
+                    <View>
+                      <Text style={styles.itemSubtotal}>
+                        {formatarMoeda(subtotalLiquidoItemPdv(item))}
+                      </Text>
+                      {item.descontoValor > 0 ? (
+                        <Text style={styles.itemSubtotalBruto}>
+                          {formatarMoeda(subtotalBrutoItemPdv(item))}
+                        </Text>
+                      ) : null}
                     </View>
                   </View>
-                  <View style={styles.campoCarrinho}>
-                    <Text style={styles.campoCarrinhoLabel}>Valor (R$)</Text>
+                  {item.descontoValor > 0 ? (
+                    <Text style={styles.itemDesconto}>
+                      Desconto de {formatarMoeda(item.descontoValor)} (
+                      {formatarQuantidade(item.descontoPercentual)}%)
+                    </Text>
+                  ) : null}
+                  <Text style={styles.itemEditarAjuda}>
+                    Toque no produto para editar e dar desconto
+                  </Text>
+                </View>
+              </TouchableOpacity>
+              <View style={styles.itemControles}>
+                <View style={styles.campoCarrinho}>
+                  <Text style={styles.campoCarrinhoLabel}>Qtd.</Text>
+                  <View style={styles.quantidadeBox}>
+                    <TouchableOpacity
+                      style={styles.botaoQuantidade}
+                      onPress={() => alterarQuantidade(item.produto.id, item.quantidade - 1)}
+                    >
+                      <Ionicons name="remove" size={16} color={CORES.texto} />
+                    </TouchableOpacity>
                     <TextInput
                       value={
-                        valorEditando[item.produto.id] ??
-                        formatarValorCampo(item.quantidade * Number(item.produto.preco_venda ?? 0))
+                        quantidadeEditando[item.produto.id] ??
+                        formatarQuantidadeCampo(item.quantidade)
                       }
-                      onChangeText={(valor) => editarValorItem(item, valor)}
-                      onBlur={() => finalizarEdicaoValor(item)}
+                      onChangeText={(valor) => editarQuantidadeItem(item.produto.id, valor)}
+                      onBlur={() => finalizarEdicaoQuantidade(item.produto.id)}
                       keyboardType="decimal-pad"
                       returnKeyType="done"
                       selectTextOnFocus
-                      style={styles.inputValorItem}
+                      style={styles.inputQuantidade}
                     />
+                    <TouchableOpacity
+                      style={styles.botaoQuantidade}
+                      onPress={() => alterarQuantidade(item.produto.id, item.quantidade + 1)}
+                    >
+                      <Ionicons name="add" size={16} color={CORES.texto} />
+                    </TouchableOpacity>
                   </View>
+                </View>
+                <View style={styles.campoCarrinho}>
+                  <Text style={styles.campoCarrinhoLabel}>Valor (R$)</Text>
+                  <TextInput
+                    value={
+                      valorEditando[item.produto.id] ??
+                      formatarValorCampo(item.quantidade * item.precoUnitario)
+                    }
+                    onChangeText={(valor) => editarValorItem(item, valor)}
+                    onBlur={() => finalizarEdicaoValor(item)}
+                    keyboardType="decimal-pad"
+                    returnKeyType="done"
+                    selectTextOnFocus
+                    style={styles.inputValorItem}
+                  />
                 </View>
               </View>
             </View>
@@ -608,6 +649,14 @@ export function FuncionarioPdvContent({
                 {formatarMoeda(beneficiosPreview.subtotal)}
               </Text>
             </View>
+            {beneficiosPreview.desconto_manual > 0 ? (
+              <View style={styles.beneficioLinha}>
+                <Text style={styles.beneficioResumoLabel}>Desconto da venda</Text>
+                <Text style={styles.beneficioResumoDesconto}>
+                  - {formatarMoeda(beneficiosPreview.desconto_manual)}
+                </Text>
+              </View>
+            ) : null}
             {beneficiosPreview.desconto_cupom > 0 ? (
               <View style={styles.beneficioLinha}>
                 <Text style={styles.beneficioResumoLabel}>Cupom</Text>
@@ -860,6 +909,11 @@ export function FuncionarioPdvContent({
         <View>
           <Text style={styles.resumoLabel}>Total a pagar</Text>
           <Text style={styles.resumoValor}>{formatarMoeda(valorAPagar)}</Text>
+          {descontoManual > 0 ? (
+            <Text style={styles.resumoSubvalor}>
+              Bruto {formatarMoeda(totalBruto)} | Desconto {formatarMoeda(descontoManual)}
+            </Text>
+          ) : null}
           {valorAPagar !== total ? (
             <Text style={styles.resumoSubvalor}>Venda {formatarMoeda(totalComBeneficios)}</Text>
           ) : null}

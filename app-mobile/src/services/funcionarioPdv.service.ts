@@ -159,7 +159,9 @@ export async function previewBeneficiosPdv(
 
   return {
     subtotal: Number(response.data?.subtotal ?? 0),
+    desconto_manual: Number(response.data?.desconto_manual ?? 0),
     desconto_cupom: Number(response.data?.desconto_cupom ?? 0),
+    desconto_total: Number(response.data?.desconto_total ?? response.data?.desconto_cupom ?? 0),
     cupom_code: response.data?.cupom_code ?? null,
     cashback_disponivel: Number(response.data?.cashback_disponivel ?? 0),
     cashback_valor: Number(response.data?.cashback_valor ?? 0),

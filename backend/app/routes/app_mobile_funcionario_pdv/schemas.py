@@ -53,6 +53,7 @@ class FuncionarioPdvItemRequest(BaseModel):
     produto_id: int
     quantidade: float = Field(gt=0)
     preco_unitario: float = Field(ge=0)
+    desconto_item: float = Field(default=0, ge=0)
 
 
 class FuncionarioPdvPagamentoRequest(BaseModel):
@@ -129,7 +130,9 @@ class FuncionarioPdvBeneficiosPreviewRequest(BaseModel):
 
 class FuncionarioPdvBeneficiosPreviewResponse(BaseModel):
     subtotal: float
+    desconto_manual: float
     desconto_cupom: float
+    desconto_total: float
     cupom_code: Optional[str] = None
     cashback_disponivel: float
     cashback_valor: float

@@ -456,6 +456,7 @@ export interface FuncionarioPdvItemPayload {
   produto_id: number;
   quantidade: number;
   preco_unitario: number;
+  desconto_item?: number;
 }
 
 export type FuncionarioPdvFormaPagamento =
@@ -531,7 +532,9 @@ export interface FuncionarioPdvBeneficiosPreviewPayload {
 
 export interface FuncionarioPdvBeneficiosPreview {
   subtotal: number;
+  desconto_manual: number;
   desconto_cupom: number;
+  desconto_total: number;
   cupom_code?: string | null;
   cashback_disponivel: number;
   cashback_valor: number;

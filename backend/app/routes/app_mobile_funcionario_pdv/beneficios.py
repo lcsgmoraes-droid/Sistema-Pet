@@ -322,6 +322,37 @@ def _aplicar_desconto_cupom_nos_itens_funcionario_pdv(
     return itens_com_desconto
 
 
+def _normalizar_item_venda_funcionario_pdv(
+    item: FuncionarioPdvItemRequest,
+    produto: Produto,
+) -> dict:
+    preco_informado = float(item.preco_unitario or 0)
+    preco_unitario = _round_money_funcionario_pdv(
+        preco_informado if preco_informado > 0 else produto.preco_venda
+    )
+    if preco_unitario <= 0:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Produto '{produto.nome}' esta sem preco de venda.",
+        )
+
+    quantidade = float(item.quantidade)
+    subtotal_bruto = _round_money_funcionario_pdv(quantidade * preco_unitario)
+    desconto_item = min(
+        _round_money_funcionario_pdv(item.desconto_item),
+        subtotal_bruto,
+    )
+    return {
+        "tipo": "produto",
+        "produto_id": produto.id,
+        "quantidade": quantidade,
+        "preco_unitario": preco_unitario,
+        "desconto_item": desconto_item,
+        "subtotal": _round_money_funcionario_pdv(subtotal_bruto - desconto_item),
+        "subtotal_bruto": subtotal_bruto,
+    }
+
+
 def _calcular_beneficios_funcionario_pdv(
     db: Session,
     *,
@@ -340,6 +371,7 @@ def _calcular_beneficios_funcionario_pdv(
 
     itens_payload = []
     subtotal_bruto = 0.0
+    desconto_manual = 0.0
     for item in itens:
         produto = (
             db.query(Produto)
@@ -357,26 +389,18 @@ def _calcular_beneficios_funcionario_pdv(
                 status_code=404, detail=f"Produto ID {item.produto_id} nao encontrado."
             )
 
-        preco_unitario = float(produto.preco_venda or item.preco_unitario or 0)
-        if preco_unitario <= 0:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Produto '{produto.nome}' esta sem preco de venda.",
-            )
-
-        quantidade = float(item.quantidade)
-        subtotal_item = _round_money_funcionario_pdv(quantidade * preco_unitario)
-        subtotal_bruto = _round_money_funcionario_pdv(subtotal_bruto + subtotal_item)
-        itens_payload.append(
-            {
-                "tipo": "produto",
-                "produto_id": produto.id,
-                "quantidade": quantidade,
-                "preco_unitario": preco_unitario,
-                "desconto_item": 0,
-                "subtotal": subtotal_item,
-            }
+        item_payload = _normalizar_item_venda_funcionario_pdv(item, produto)
+        subtotal_bruto = _round_money_funcionario_pdv(
+            subtotal_bruto + item_payload.pop("subtotal_bruto")
         )
+        desconto_manual = _round_money_funcionario_pdv(
+            desconto_manual + item_payload["desconto_item"]
+        )
+        itens_payload.append(item_payload)
+
+    subtotal_apos_desconto_manual = _round_money_funcionario_pdv(
+        sum(item["subtotal"] for item in itens_payload)
+    )
 
     cupom_code = None
     desconto_cupom = 0.0
@@ -385,7 +409,7 @@ def _calcular_beneficios_funcionario_pdv(
             db,
             tenant_id=tenant_id,
             code=cupom_codigo,
-            venda_total=subtotal_bruto,
+            venda_total=subtotal_apos_desconto_manual,
             customer_id=cliente_id,
         )
         cupom_code = preview_cupom["code"]
@@ -426,7 +450,7 @@ def _calcular_beneficios_funcionario_pdv(
         db,
         tenant_id=tenant_id,
         cliente_id=cliente_id,
-        subtotal=subtotal_bruto,
+        subtotal=subtotal_apos_desconto_manual,
     )
     beneficios_gerados = _calcular_beneficios_gerados_funcionario_pdv(
         db,
@@ -435,10 +459,13 @@ def _calcular_beneficios_funcionario_pdv(
         total_venda=total_venda,
     )
 
+    desconto_total = _round_money_funcionario_pdv(desconto_manual + desconto_cupom)
     return {
         "itens_payload": itens_payload,
         "subtotal": subtotal_bruto,
+        "desconto_manual": desconto_manual,
         "desconto_cupom": desconto_cupom,
+        "desconto_total": desconto_total,
         "cupom_code": cupom_code,
         "cashback_disponivel": cashback_disponivel,
         "cashback_valor": cashback_usado,
@@ -470,7 +497,9 @@ def preview_beneficios_funcionario_pdv(
     )
     return {
         "subtotal": beneficios["subtotal"],
+        "desconto_manual": beneficios["desconto_manual"],
         "desconto_cupom": beneficios["desconto_cupom"],
+        "desconto_total": beneficios["desconto_total"],
         "cupom_code": beneficios["cupom_code"],
         "cashback_disponivel": beneficios["cashback_disponivel"],
         "cashback_valor": beneficios["cashback_valor"],
