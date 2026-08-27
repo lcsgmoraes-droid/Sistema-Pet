@@ -52,3 +52,5 @@ def test_modelos_sao_multitenant_e_rotas_filtram_tenant_explicitamente():
     assert "Produto.tenant_id == tenant_id" in service
     assert "PendenciaEstoque.tenant_id == tenant_id" in service
     assert 'table_names=("nao_vendas", "nao_venda_itens")' in migration
+    assert migration.count("postgresql.UUID(as_uuid=True)") == 2
+    assert "_tenant_id_type" not in migration

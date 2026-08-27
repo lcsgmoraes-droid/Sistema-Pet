@@ -7,6 +7,7 @@ Create Date: 2026-08-27
 
 from alembic import op
 import sqlalchemy as sa
+from sqlalchemy.dialects import postgresql
 
 from app.tenant_rls_migration import apply_tenant_rls
 
@@ -30,15 +31,7 @@ MOTIVOS = (
 )
 
 
-def _tenant_id_type(inspector: sa.Inspector) -> sa.types.TypeEngine:
-    for column in inspector.get_columns("tenants"):
-        if column["name"] == "id":
-            return column["type"].copy()
-    raise RuntimeError("Coluna tenants.id nao encontrada")
-
-
 def upgrade() -> None:
-    tenant_id_type = _tenant_id_type(sa.inspect(op.get_bind()))
     motivo_sql = ", ".join(f"'{motivo}'" for motivo in MOTIVOS)
 
     op.create_table(
@@ -52,7 +45,7 @@ def upgrade() -> None:
         sa.Column("valor_estimado_total", sa.Numeric(12, 2), nullable=True),
         sa.Column("origem", sa.String(length=30), server_default="pdv", nullable=False),
         sa.Column("id", sa.Integer(), sa.Identity(always=True), nullable=False),
-        sa.Column("tenant_id", tenant_id_type, nullable=False),
+        sa.Column("tenant_id", postgresql.UUID(as_uuid=True), nullable=False),
         sa.Column(
             "created_at",
             sa.DateTime(timezone=True),
@@ -109,7 +102,7 @@ def upgrade() -> None:
             nullable=False,
         ),
         sa.Column("id", sa.Integer(), sa.Identity(always=True), nullable=False),
-        sa.Column("tenant_id", tenant_id_type, nullable=False),
+        sa.Column("tenant_id", postgresql.UUID(as_uuid=True), nullable=False),
         sa.Column(
             "created_at",
             sa.DateTime(timezone=True),
