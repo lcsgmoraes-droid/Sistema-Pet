@@ -29,6 +29,7 @@ const expectedFiles = [
   "src/components/modalNovaContaPagar/ContaPagarParcelamentoSection.jsx",
   "src/components/modalNovaContaPagar/CategoriaFinanceiraModal.jsx",
   "src/components/modalNovaContaPagar/CategoriaSubcategoriasFields.jsx",
+  "src/components/modalNovaContaPagar/VincularCategoriaDREModal.jsx",
 ];
 
 for (const relativePath of expectedFiles) {
@@ -73,15 +74,19 @@ for (const literal of [
   "Despesa Recorrente",
   "Parcelar esta conta",
   "Nova Categoria Financeira",
+  "Classificar categoria no DRE",
+  "handleCategoriaChange",
+  "handleSubmitVinculoDRE",
+  "Categoria vinculada ao DRE!",
   "aplicar_recorrencia_futura",
 ]) {
   assert(featureSource.includes(literal), `Missing modal conta pagar behavior literal: ${literal}`);
 }
 
-const contasPagarSource = read("src/components/ContasPagar.jsx");
+const contasPagarViewSource = read("src/components/contas-pagar/ContasPagarView.jsx");
 assert(
-  contasPagarSource.includes('from "./ModalNovaContaPagar"'),
-  "ContasPagar should keep importing the public modal path",
+  contasPagarViewSource.includes('from "../ModalNovaContaPagar"'),
+  "ContasPagarView should keep importing the public modal path",
 );
 
 console.log("Modal nova conta pagar refactor contract OK");
