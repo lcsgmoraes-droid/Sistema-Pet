@@ -4,6 +4,8 @@ import test from "node:test";
 import {
   buildOpsTenantCommercialForm,
   buildOpsTenantCommercialPayload,
+  buildOpsTenantOnboardingForm,
+  buildOpsTenantOnboardingPayload,
   buildOpsTenantTabSummaries,
   formatStorageMb,
   isBillingAttention,
@@ -108,5 +110,42 @@ test("buildOpsTenantCommercialPayload envia somente campos alterados", () => {
   assert.deepEqual(payload, {
     plan: "premium",
     billing_status: "active",
+  });
+});
+
+test("buildOpsTenantOnboardingForm monta acompanhamento salvo", () => {
+  const form = buildOpsTenantOnboardingForm({
+    onboarding_follow_up: {
+      owner_name: "Ana Operacoes",
+      unblocked_on: "2026-08-27",
+      satisfaction: "satisfied",
+    },
+  });
+
+  assert.deepEqual(form, {
+    owner_name: "Ana Operacoes",
+    unblocked_on: "2026-08-27",
+    satisfaction: "satisfied",
+  });
+});
+
+test("buildOpsTenantOnboardingPayload permite alterar e limpar campos", () => {
+  const payload = buildOpsTenantOnboardingPayload(
+    {
+      owner_name: "Ana",
+      unblocked_on: "2026-08-20",
+      satisfaction: "not_collected",
+    },
+    {
+      owner_name: "  Lucas  ",
+      unblocked_on: "",
+      satisfaction: "neutral",
+    },
+  );
+
+  assert.deepEqual(payload, {
+    owner_name: "Lucas",
+    unblocked_on: null,
+    satisfaction: "neutral",
   });
 });

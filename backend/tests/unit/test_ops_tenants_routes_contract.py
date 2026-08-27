@@ -14,9 +14,11 @@ def test_ops_tenants_routes_are_platform_admin_only_and_expose_import_actions():
     assert "require_admin" not in source
     assert '@router.get("")' in source
     assert '@router.patch("/{tenant_id}/commercial")' in source
+    assert '@router.patch("/{tenant_id}/onboarding-follow-up")' in source
     assert '"/{tenant_id}/catalog-import/preview"' in source
     assert '"/{tenant_id}/catalog-import/apply"' in source
     assert "CommercialStateRequest" in source
+    assert "OnboardingFollowUpRequest" in source
     assert "confirm" in source
 
 

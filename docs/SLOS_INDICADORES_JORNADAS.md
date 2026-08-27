@@ -181,9 +181,9 @@ continua sendo indicador de negócio e deve ter causa acionável para o tenant.
 | Resultado bom | Empresa acessa, possui cadastro mínimo e realiza a primeira operação sem alerta crítico. |
 | SLI | Empresas que cumprem cada marco / empresas iniciadas elegíveis. |
 | Metas iniciais | Dia 1: acesso confirmado em 100%; dia 3: configuração em >= 90%; dia 7: primeira operação sem erro 5xx/alerta crítico em >= 85%. |
-| Fonte atual | Painel Ops por tenant: acesso, registros de setup, vendas/agenda, erros 7d, alertas, marco atrasado e próxima ação calculada. |
+| Fonte atual | Painel Ops por tenant: acesso, registros de setup, vendas/agenda, erros 7d, alertas, marco atrasado, próxima ação, responsável, data de desbloqueio e satisfação inicial. |
 | Regra de amostra | Com poucos tenants, sempre exibir “2 de 3”, não apenas “66,7%”. |
-| Lacuna | Nomear responsável, registrar data de desbloqueio e satisfação inicial. |
+| Lacuna | Adicionar histórico detalhado das mudanças quando o volume operacional justificar. |
 | Dono | Onboarding/comercial e administrador do tenant. |
 
 Os marcos de dia 1, 3 e 7 já existem no serviço operacional. A porcentagem é uma

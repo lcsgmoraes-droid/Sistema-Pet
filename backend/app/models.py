@@ -558,6 +558,11 @@ class Tenant(Base):
     __tablename__ = "tenants"
     __table_args__ = (
         Index("ux_tenants_name_normalized", "name_normalized", unique=True),
+        sa.CheckConstraint(
+            "onboarding_satisfaction IN "
+            "('not_collected', 'satisfied', 'neutral', 'dissatisfied')",
+            name="ck_tenants_onboarding_satisfaction",
+        ),
     )
 
     id = Column(String(36), primary_key=True)  # UUID
@@ -598,6 +603,12 @@ class Tenant(Base):
     billing_type = Column(String(30), nullable=True)
     billing_next_due_date = Column(Date, nullable=True)
     billing_checkout_url = Column(String(500), nullable=True)
+    onboarding_owner_name = Column(String(160), nullable=True)
+    onboarding_unblocked_on = Column(Date, nullable=True)
+    onboarding_satisfaction = Column(
+        String(24), nullable=False, server_default="not_collected"
+    )
+    onboarding_follow_up_updated_at = Column(DateTime(timezone=True), nullable=True)
 
     # Configurações operacionais
     permite_estoque_negativo = Column(Boolean, nullable=False, server_default="false")

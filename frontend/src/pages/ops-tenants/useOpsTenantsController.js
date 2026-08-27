@@ -4,6 +4,8 @@ import api from "../../platformApi";
 import {
   buildOpsTenantCommercialForm,
   buildOpsTenantCommercialPayload,
+  buildOpsTenantOnboardingForm,
+  buildOpsTenantOnboardingPayload,
   buildOpsTenantTabSummaries,
 } from "../opsTenantsUtils";
 
@@ -40,6 +42,10 @@ export default function useOpsTenantsController() {
   const [commercialError, setCommercialError] = useState("");
   const [commercialSuccess, setCommercialSuccess] = useState("");
   const [commercialSaving, setCommercialSaving] = useState(false);
+  const [onboardingForm, setOnboardingForm] = useState(buildOpsTenantOnboardingForm());
+  const [onboardingError, setOnboardingError] = useState("");
+  const [onboardingSuccess, setOnboardingSuccess] = useState("");
+  const [onboardingSaving, setOnboardingSaving] = useState(false);
   const [billingOfferForm, setBillingOfferForm] = useState(initialBillingOfferForm);
   const [billingOffers, setBillingOffers] = useState([]);
   const [billingOffersLoading, setBillingOffersLoading] = useState(false);
@@ -106,15 +112,21 @@ export default function useOpsTenantsController() {
   useEffect(() => {
     if (selectedTenant) {
       setCommercialForm(buildOpsTenantCommercialForm(selectedTenant));
-      setCommercialError("");
-      setCommercialSuccess("");
+      setOnboardingForm(buildOpsTenantOnboardingForm(selectedTenant));
       setBillingOfferForm(initialBillingOfferForm());
-      setBillingOfferError("");
-      setBillingOfferSuccess("");
-      setBillingOfferPublicUrl("");
       loadBillingOffers(selectedTenant.id);
     }
   }, [loadBillingOffers, selectedTenant]);
+
+  useEffect(() => {
+    setCommercialError("");
+    setCommercialSuccess("");
+    setOnboardingError("");
+    setOnboardingSuccess("");
+    setBillingOfferError("");
+    setBillingOfferSuccess("");
+    setBillingOfferPublicUrl("");
+  }, [selectedTenantId]);
 
   const totals = useMemo(
     () => ({
@@ -215,6 +227,47 @@ export default function useOpsTenantsController() {
     }
   }
 
+  function handleOnboardingChange(field, value) {
+    setOnboardingForm((current) => ({ ...current, [field]: value }));
+    setOnboardingError("");
+    setOnboardingSuccess("");
+  }
+
+  async function handleOnboardingSubmit(event) {
+    event.preventDefault();
+    if (!selectedTenant) {
+      setOnboardingError("Selecione uma empresa antes de salvar.");
+      return;
+    }
+
+    const original = buildOpsTenantOnboardingForm(selectedTenant);
+    const payload = buildOpsTenantOnboardingPayload(original, onboardingForm);
+    if (Object.keys(payload).length === 0) {
+      setOnboardingSuccess("Nenhuma alteracao para salvar.");
+      return;
+    }
+
+    setOnboardingSaving(true);
+    setOnboardingError("");
+    setOnboardingSuccess("");
+    try {
+      const response = await api.patch(
+        `/admin/tenants/${selectedTenant.id}/onboarding-follow-up`,
+        payload,
+      );
+      setItems((current) =>
+        current.map((item) => (item.id === selectedTenant.id ? response.data : item)),
+      );
+      setOnboardingSuccess("Acompanhamento salvo.");
+      await loadTenants();
+      setSelectedTenantId(response.data.id);
+    } catch (err) {
+      setOnboardingError(extractError(err, "Nao foi possivel salvar o acompanhamento."));
+    } finally {
+      setOnboardingSaving(false);
+    }
+  }
+
   function handleBillingOfferChange(field, value) {
     setBillingOfferForm((current) => {
       const next = { ...current, [field]: value };
@@ -297,6 +350,8 @@ export default function useOpsTenantsController() {
     handleApply,
     handleCommercialChange,
     handleCommercialSubmit,
+    handleOnboardingChange,
+    handleOnboardingSubmit,
     handleBillingOfferChange,
     handleBillingOfferSubmit,
     handleBillingOfferToggleModule,
@@ -304,6 +359,10 @@ export default function useOpsTenantsController() {
     items,
     loadTenants,
     loading,
+    onboardingError,
+    onboardingForm,
+    onboardingSaving,
+    onboardingSuccess,
     previewByTenant,
     search,
     selectedTenant,
