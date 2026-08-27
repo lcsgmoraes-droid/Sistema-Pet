@@ -36,7 +36,6 @@ test("resume a escolha registrada no item do carrinho", () => {
   assert.equal(resumirPrevisaoFimRacao({}), "Avisar quando acabar");
 });
 
-test("explica no modal o aviso no app e o push do celular", () => {
-  assert.match(modalSource, /conta vinculada no app CorePet/);
-  assert.match(modalSource, /aviso chega\s+como\s+push/);
+test("explica no modal que o aviso sera enviado pelo app", () => {
+  assert.match(modalSource, /será enviado pelo app CorePet antes da data/);
 });

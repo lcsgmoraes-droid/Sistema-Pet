@@ -126,8 +126,7 @@ ITENS_EVOLUCAO: tuple[dict[str, Any], ...] = (
         "resumo": (
             "No carrinho do PDV, cada ração permite informar uma data ou um prazo em dias. "
             "Ao finalizar a venda, o CorePet cria um lembrete para a loja e programa o aviso "
-            "no app do cliente vinculado, com push quando as notificações do celular estiverem "
-            "ativadas."
+            "no app do cliente."
         ),
         "status": "disponivel_teste",
         "tipo": "melhoria",
