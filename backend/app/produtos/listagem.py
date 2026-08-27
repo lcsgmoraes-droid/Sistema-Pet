@@ -405,6 +405,7 @@ def _aplicar_filtros_basicos_produtos(
     estoque_baixo: Optional[bool],
     em_promocao: Optional[bool],
     estoque_situacao: Optional[str] = None,
+    imagem_situacao: Optional[str] = None,
     referencia: Optional[datetime] = None,
 ) -> Any:
     if categoria_id:
@@ -429,6 +430,14 @@ def _aplicar_filtros_basicos_produtos(
         query = query.filter(func.coalesce(Produto.estoque_atual, 0) > 0)
     elif estoque_situacao == "sem_estoque":
         query = query.filter(func.coalesce(Produto.estoque_atual, 0) <= 0)
+
+    imagem_principal_normalizada = func.trim(
+        func.coalesce(Produto.imagem_principal, "")
+    )
+    if imagem_situacao == "com_foto":
+        query = query.filter(imagem_principal_normalizada != "")
+    elif imagem_situacao == "sem_foto":
+        query = query.filter(imagem_principal_normalizada == "")
 
     if em_promocao:
         agora = as_brasilia_naive(referencia) or now_brasilia()

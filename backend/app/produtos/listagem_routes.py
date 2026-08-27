@@ -143,6 +143,7 @@ def listar_produtos(
     fornecedor_grupo_id: Optional[int] = None,
     estoque_baixo: Optional[bool] = False,
     estoque_situacao: Literal["todos", "com_estoque", "sem_estoque"] = "todos",
+    imagem_situacao: Literal["todas", "com_foto", "sem_foto"] = "todas",
     ordenacao: Literal["recentes", "estoque_desc", "estoque_asc"] = "recentes",
     em_promocao: Optional[bool] = False,
     ativo: Optional[bool] = True,
@@ -196,6 +197,7 @@ def listar_produtos(
         estoque_baixo=estoque_baixo,
         em_promocao=em_promocao,
         estoque_situacao=estoque_situacao,
+        imagem_situacao=imagem_situacao,
     )
 
     fornecedor_ids_filtro, filtro_fornecedor_por_grupo = (

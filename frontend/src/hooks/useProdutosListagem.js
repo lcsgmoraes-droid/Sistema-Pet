@@ -15,6 +15,7 @@ const FILTROS_PADRAO = {
   fornecedor_id: "",
   estoque_baixo: false,
   estoque_situacao: "todos",
+  imagem_situacao: "todas",
   ordenacao: "recentes",
   em_promocao: false,
   mostrarPaisVariacoes: false,
@@ -33,6 +34,9 @@ function normalizarFiltrosSalvos(filtros = {}) {
     estoque_situacao: ["todos", "com_estoque", "sem_estoque"].includes(filtros.estoque_situacao)
       ? filtros.estoque_situacao
       : "todos",
+    imagem_situacao: ["todas", "com_foto", "sem_foto"].includes(filtros.imagem_situacao)
+      ? filtros.imagem_situacao
+      : "todas",
     ordenacao: ["recentes", "estoque_desc", "estoque_asc"].includes(filtros.ordenacao)
       ? filtros.ordenacao
       : "recentes",
@@ -327,6 +331,7 @@ export default function useProdutosListagem({
     filtros.em_promocao,
     filtros.estoque_baixo,
     filtros.estoque_situacao,
+    filtros.imagem_situacao,
     filtros.fornecedor_id,
     filtros.marca_id,
     filtros.mostrarPaisVariacoes,

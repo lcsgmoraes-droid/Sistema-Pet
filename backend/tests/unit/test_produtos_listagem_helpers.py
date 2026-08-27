@@ -623,6 +623,29 @@ def test_aplicar_filtros_basicos_produtos_filtra_situacao_estoque(
     assert len(query.filters) == 1
 
 
+@pytest.mark.parametrize("imagem_situacao", ["com_foto", "sem_foto"])
+def test_aplicar_filtros_basicos_produtos_filtra_situacao_imagem(
+    imagem_situacao,
+):
+    query = _FakeProdutoQuery()
+
+    resultado = _aplicar_filtros_basicos_produtos(
+        query,
+        categoria_id=None,
+        marca_id=None,
+        departamento_id=None,
+        estoque_baixo=False,
+        em_promocao=False,
+        imagem_situacao=imagem_situacao,
+    )
+
+    assert resultado is query
+    assert len(query.filters) == 1
+    expressao = str(query.filters[0][0])
+    assert "imagem_principal" in expressao
+    assert "trim" in expressao.lower()
+
+
 def test_normalizar_paginacao_produtos_limita_page_size_e_calcula_offset():
     assert _normalizar_paginacao_produtos(page=3, page_size=500, max_page_size=200) == (
         3,
