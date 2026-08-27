@@ -13,6 +13,7 @@ from app.services.venda_rentabilidade_snapshot_service import (
     get_or_build_venda_rentabilidade_snapshot,
     invalidate_venda_rentabilidade_snapshot,
 )
+from app.produtos.tipos import tipo_controla_estoque
 from app.utils.timezone import now_brasilia
 
 logger = logging.getLogger(__name__)
@@ -111,7 +112,7 @@ def cancelar_venda(
         itens_estornados = 0
 
         for item in itens:
-            if item.produto_id:  # Apenas produtos físicos têm estoque
+            if item.produto_id and tipo_controla_estoque(item.tipo):
                 try:
                     resultado = EstoqueService.estornar_estoque(
                         produto_id=item.produto_id,
