@@ -165,3 +165,50 @@ def test_load_customer_push_targets_prefers_app_user_email_over_operational_user
     )
 
     assert [target.token for target in targets] == ["ExponentPushToken[phone-a]"]
+
+
+def test_load_customer_push_targets_prefers_explicit_app_account_link():
+    cliente_pdv = SimpleNamespace(
+        id=77,
+        tenant_id=TENANT_ID,
+        auth_user_id=7,
+        email="outro-usuario@example.com",
+    )
+    usuario_vinculado = SimpleNamespace(
+        id=7,
+        tenant_id=TENANT_ID,
+        email="cliente-app@example.com",
+        push_token=None,
+    )
+    usuario_mesmo_email = SimpleNamespace(
+        id=8,
+        tenant_id=TENANT_ID,
+        email="outro-usuario@example.com",
+        push_token=None,
+    )
+    device_vinculado = SimpleNamespace(
+        id=10,
+        user_id=7,
+        tenant_id=TENANT_ID,
+        expo_push_token="ExponentPushToken[linked-account]",
+        enabled=True,
+    )
+    device_mesmo_email = SimpleNamespace(
+        id=11,
+        user_id=8,
+        tenant_id=TENANT_ID,
+        expo_push_token="ExponentPushToken[email-account]",
+        enabled=True,
+    )
+
+    targets = load_customer_push_targets(
+        _PushDb(
+            clientes=[cliente_pdv],
+            users=[usuario_vinculado, usuario_mesmo_email],
+            devices=[device_vinculado, device_mesmo_email],
+        ),
+        tenant_id=TENANT_ID,
+        customer_id=77,
+    )
+
+    assert [target.token for target in targets] == ["ExponentPushToken[linked-account]"]

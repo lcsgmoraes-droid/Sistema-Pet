@@ -125,14 +125,14 @@ ITENS_EVOLUCAO: tuple[dict[str, Any], ...] = (
         "titulo": "Avise o cliente quando a ração estiver perto de acabar",
         "resumo": (
             "No carrinho do PDV, cada ração permite informar uma data ou um prazo em dias. "
-            "Ao finalizar a venda, o CorePet cria um lembrete ligado ao cliente, ao produto "
-            "e à venda para facilitar o contato e a recompra no momento certo."
+            "Ao finalizar a venda, o CorePet cria um lembrete para a loja e programa o aviso "
+            "no app do cliente."
         ),
         "status": "disponivel_teste",
         "tipo": "melhoria",
         "modulo": "Vendas e lembretes",
-        "plataformas": ["ERP"],
-        "canais": ["erp"],
+        "plataformas": ["ERP", "App do cliente"],
+        "canais": ["erp", "app_cliente"],
         "publicado_em": "2026-08-27",
         "atualizado_em": "2026-08-27",
         "ciclo_novidade": deepcopy(CICLO_PADRAO),

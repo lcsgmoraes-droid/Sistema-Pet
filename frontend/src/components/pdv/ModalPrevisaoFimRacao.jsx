@@ -97,8 +97,9 @@ export default function ModalPrevisaoFimRacao({ cliente, item, onClose, onSalvar
 
         <div className="space-y-5 p-5">
           <div className="rounded-xl border border-teal-200 bg-teal-50 p-3 text-sm text-teal-900">
-            O aviso ficará ligado a <strong>{cliente?.nome}</strong> e aparecerá em
-            <strong> Lembretes</strong> depois que a venda for finalizada.
+            Após finalizar a venda, o aviso ficará ligado a <strong>{cliente?.nome}</strong>,
+            aparecerá em <strong>Lembretes</strong> e será enviado pelo app CorePet antes da data
+            prevista.
           </div>
 
           <div className="grid grid-cols-2 gap-2 rounded-xl bg-slate-100 p-1">
