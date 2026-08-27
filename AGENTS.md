@@ -27,6 +27,22 @@ feita nos momentos certos, sem virar repeticao a cada micro-etapa.
 - Antes de qualquer `git push origin main` ou comando no servidor de producao, pedir autorizacao explicita ao Lucas em portugues simples.
 - Seguir tambem `.github/assistant-rules.json`, `.github/copilot-instructions.md` e `docs/FLUXO_UNICO_DEV_PROD.md`.
 
+## Controle direto do navegador
+
+- Para operar sites como Play Console, App Store Connect, Expo e o ERP, usar
+  primeiro o controlador direto do Chrome conectado a aba e ao perfil ja
+  autenticados pelo Lucas.
+- Nao usar o controle geral do Windows enquanto o controlador direto do Chrome
+  estiver disponivel para a tarefa.
+- Quando houver mais de uma janela, perfil ou sessao do Chrome, identificar a
+  janela correta pelo titulo e pela URL retornados pelo controlador direto e
+  validar novamente depois de navegacoes relevantes.
+- Nao abrir nem trocar para outro perfil se o Lucas indicou uma sessao ja
+  autenticada.
+- Usar o controle geral do Windows apenas quando o alvo nao puder ser operado
+  pelo controlador direto do navegador. Antes desse fallback, explicar o motivo
+  ao Lucas e pedir autorizacao.
+
 ## Fluxo obrigatorio do app mobile
 
 - Antes de gerar novo APK/AAB/IPA, enviar para uma loja ou configurar credenciais
