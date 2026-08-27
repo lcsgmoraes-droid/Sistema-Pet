@@ -26,14 +26,24 @@ import { formatarMoeda } from "../../utils/format";
 import { FuncionarioPdvContent } from "./pdv/FuncionarioPdvContent";
 import { FuncionarioPdvClienteRapidoModal } from "./pdv/FuncionarioPdvClienteRapidoModal";
 import {
+  FuncionarioPdvDescontoTotalModal,
+  FuncionarioPdvItemModal,
+} from "./pdv/FuncionarioPdvDescontoModals";
+import {
   FuncionarioPdvPermissionRequest,
   FuncionarioPdvScanner,
 } from "./pdv/FuncionarioPdvScanner";
 import {
+  aplicarDescontoTotalPdv,
   arredondarQuantidadePdv,
+  atualizarItemCarrinhoPdv,
+  criarItemCarrinhoPdv,
   dataBrParaIso,
+  descontoItemPdv,
   mensagemErroApi,
   parseNumero,
+  subtotalBrutoItemPdv,
+  subtotalLiquidoItemPdv,
   vencimentoPadraoBr,
   type IntervaloCrediario,
   type ItemCarrinhoPdv,
@@ -48,6 +58,8 @@ export default function FuncionarioPdvScreen() {
   const [buscaManual, setBuscaManual] = useState("");
   const [sugestoes, setSugestoes] = useState<FuncionarioPdvProduto[]>([]);
   const [carrinho, setCarrinho] = useState<ItemCarrinhoPdv[]>([]);
+  const [itemEditando, setItemEditando] = useState<ItemCarrinhoPdv | null>(null);
+  const [descontoTotalAberto, setDescontoTotalAberto] = useState(false);
   const [quantidadeEditando, setQuantidadeEditando] = useState<Record<number, string>>({});
   const [valorEditando, setValorEditando] = useState<Record<number, string>>({});
   const [clienteBusca, setClienteBusca] = useState("");
@@ -125,12 +137,16 @@ export default function FuncionarioPdvScreen() {
     return () => clearTimeout(autocompleteClientesTimer);
   }, [clienteBusca, cliente, isFocused]);
 
+  const totalBruto = useMemo(
+    () => carrinho.reduce((soma, item) => soma + subtotalBrutoItemPdv(item), 0),
+    [carrinho],
+  );
+  const descontoManual = useMemo(
+    () => carrinho.reduce((soma, item) => soma + descontoItemPdv(item), 0),
+    [carrinho],
+  );
   const total = useMemo(
-    () =>
-      carrinho.reduce(
-        (soma, item) => soma + item.quantidade * Number(item.produto.preco_venda ?? 0),
-        0,
-      ),
+    () => carrinho.reduce((soma, item) => soma + subtotalLiquidoItemPdv(item), 0),
     [carrinho],
   );
   const itensPayload = useMemo(
@@ -138,7 +154,8 @@ export default function FuncionarioPdvScreen() {
       carrinho.map((item) => ({
         produto_id: item.produto.id,
         quantidade: item.quantidade,
-        preco_unitario: Number(item.produto.preco_venda ?? 0),
+        preco_unitario: item.precoUnitario,
+        desconto_item: descontoItemPdv(item),
       })),
     [carrinho],
   );
@@ -311,11 +328,14 @@ export default function FuncionarioPdvScreen() {
       const existente = atual.find((item) => item.produto.id === produto.id);
       if (existente) {
         return atual.map((item) =>
-          item.produto.id === produto.id ? { ...item, quantidade: item.quantidade + 1 } : item,
+          item.produto.id === produto.id
+            ? atualizarItemCarrinhoPdv(item, { quantidade: item.quantidade + 1 })
+            : item,
         );
       }
-      return [...atual, { produto, quantidade: 1 }];
+      return [...atual, criarItemCarrinhoPdv(produto)];
     });
+    setBeneficiosPreview(null);
     setSugestoes([]);
     setBuscaManual("");
   }
@@ -338,14 +358,18 @@ export default function FuncionarioPdvScreen() {
     setCarrinho((atual) =>
       atual.map((item) =>
         item.produto.id === produtoId
-          ? { ...item, quantidade: arredondarQuantidadePdv(quantidade) }
+          ? atualizarItemCarrinhoPdv(item, {
+              quantidade: arredondarQuantidadePdv(quantidade),
+            })
           : item,
       ),
     );
+    setBeneficiosPreview(null);
   }
 
   function removerProduto(produtoId: number) {
     setCarrinho((atual) => atual.filter((item) => item.produto.id !== produtoId));
+    setBeneficiosPreview(null);
     limparEdicaoItem(produtoId);
   }
 
@@ -392,7 +416,7 @@ export default function FuncionarioPdvScreen() {
       return proximo;
     });
     const valor = parseNumero(texto);
-    const precoUnitario = Number(item.produto.preco_venda ?? 0);
+    const precoUnitario = item.precoUnitario;
     if (valor !== null && valor > 0 && precoUnitario > 0) {
       aplicarQuantidade(item.produto.id, valor / precoUnitario);
     }
@@ -401,7 +425,7 @@ export default function FuncionarioPdvScreen() {
   function finalizarEdicaoValor(item: ItemCarrinhoPdv) {
     const texto = valorEditando[item.produto.id];
     const valor = parseNumero(texto ?? "");
-    const precoUnitario = Number(item.produto.preco_venda ?? 0);
+    const precoUnitario = item.precoUnitario;
     if (valor !== null && valor > 0 && precoUnitario > 0) {
       aplicarQuantidade(item.produto.id, valor / precoUnitario);
     }
@@ -410,6 +434,41 @@ export default function FuncionarioPdvScreen() {
       delete proximo[item.produto.id];
       return proximo;
     });
+  }
+
+  function abrirEdicaoItem(item: ItemCarrinhoPdv) {
+    setItemEditando(item);
+  }
+
+  function salvarEdicaoItem(payload: {
+    quantidade: number;
+    precoUnitario: number;
+    tipoDesconto: "valor" | "percentual";
+    valorDesconto: number;
+  }) {
+    if (!itemEditando) return;
+    setCarrinho((atual) =>
+      atual.map((item) =>
+        item.produto.id === itemEditando.produto.id
+          ? atualizarItemCarrinhoPdv(item, payload)
+          : item,
+      ),
+    );
+    setBeneficiosPreview(null);
+    limparEdicaoItem(itemEditando.produto.id);
+    setItemEditando(null);
+  }
+
+  function removerItemEditando() {
+    if (!itemEditando) return;
+    removerProduto(itemEditando.produto.id);
+    setItemEditando(null);
+  }
+
+  function aplicarDescontoTotal(tipo: "valor" | "percentual", valor: number) {
+    setCarrinho((atual) => aplicarDescontoTotalPdv(atual, tipo, valor));
+    setBeneficiosPreview(null);
+    setDescontoTotalAberto(false);
   }
 
   async function onBarcodeScanned({ data }: { data: string }) {
@@ -491,6 +550,8 @@ export default function FuncionarioPdvScreen() {
 
   function limparVendaAtual() {
     setCarrinho([]);
+    setItemEditando(null);
+    setDescontoTotalAberto(false);
     setQuantidadeEditando({});
     setValorEditando({});
     setCliente(null);
@@ -704,6 +765,9 @@ export default function FuncionarioPdvScreen() {
         adicionarProduto={adicionarProduto}
         carrinho={carrinho}
         totalItens={totalItens}
+        descontoManual={descontoManual}
+        abrirEdicaoItem={abrirEdicaoItem}
+        abrirDescontoTotal={() => setDescontoTotalAberto(true)}
         quantidadeEditando={quantidadeEditando}
         valorEditando={valorEditando}
         alterarQuantidade={alterarQuantidade}
@@ -755,6 +819,7 @@ export default function FuncionarioPdvScreen() {
         observacoes={observacoes}
         setObservacoes={setObservacoes}
         total={total}
+        totalBruto={totalBruto}
         finalizando={finalizando}
         salvandoAberta={salvandoAberta}
         salvarAberta={salvarAberta}
@@ -765,6 +830,20 @@ export default function FuncionarioPdvScreen() {
         salvando={salvandoClienteRapido}
         onClose={() => setCadastroRapidoAberto(false)}
         onSave={criarClienteRapido}
+      />
+      <FuncionarioPdvItemModal
+        item={itemEditando}
+        visible={Boolean(itemEditando)}
+        onClose={() => setItemEditando(null)}
+        onRemover={removerItemEditando}
+        onSalvar={salvarEdicaoItem}
+      />
+      <FuncionarioPdvDescontoTotalModal
+        itens={carrinho}
+        descontoAtual={descontoManual}
+        visible={descontoTotalAberto}
+        onClose={() => setDescontoTotalAberto(false)}
+        onAplicar={aplicarDescontoTotal}
       />
     </>
   );

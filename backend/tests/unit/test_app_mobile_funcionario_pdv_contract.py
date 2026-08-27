@@ -6,6 +6,11 @@ os.environ.setdefault("DATABASE_URL", "sqlite:///./test.db")
 
 from app.routes import app_mobile_funcionario_pdv_routes
 from app.routes import app_mobile_routes
+from app.routes.app_mobile_funcionario_pdv.beneficios import (
+    _aplicar_desconto_cupom_nos_itens_funcionario_pdv,
+    _normalizar_item_venda_funcionario_pdv,
+)
+from app.routes.app_mobile_funcionario_pdv.schemas import FuncionarioPdvItemRequest
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 PDV_SOURCE = "backend/app/routes/app_mobile_funcionario_pdv_routes.py"
@@ -471,6 +476,59 @@ def test_erp_recent_sales_highlights_employee_mobile_origin():
     assert "App Funcionario" in sidebar
     assert "Smartphone" in sidebar
     assert "Venda pelo app do funcionario" in sidebar
+
+
+def test_funcionario_pdv_accepts_manual_price_and_item_discount():
+    produto = type(
+        "ProdutoFake",
+        (),
+        {"id": 7, "nome": "Racao teste", "preco_venda": 100},
+    )()
+    item = FuncionarioPdvItemRequest(
+        produto_id=produto.id,
+        quantidade=2,
+        preco_unitario=80,
+        desconto_item=15,
+    )
+
+    normalizado = _normalizar_item_venda_funcionario_pdv(item, produto)
+
+    assert normalizado["preco_unitario"] == 80
+    assert normalizado["subtotal_bruto"] == 160
+    assert normalizado["desconto_item"] == 15
+    assert normalizado["subtotal"] == 145
+
+
+def test_funcionario_pdv_combines_manual_and_coupon_discounts_in_items():
+    itens = [
+        {
+            "produto_id": 1,
+            "preco_unitario": 100,
+            "quantidade": 1,
+            "desconto_item": 10,
+            "subtotal": 90,
+        },
+        {
+            "produto_id": 2,
+            "preco_unitario": 90,
+            "quantidade": 1,
+            "desconto_item": 0,
+            "subtotal": 90,
+        },
+    ]
+
+    atualizados = _aplicar_desconto_cupom_nos_itens_funcionario_pdv(itens, 30)
+
+    assert sum(item["desconto_item"] for item in atualizados) == 40
+    assert sum(item["subtotal"] for item in atualizados) == 150
+
+
+def test_funcionario_pdv_persists_total_discount_in_sale_payload():
+    source = read_pdv_backend_source()
+    payload_block = extract_block(source, "def _criar_payload_venda_funcionario_pdv")
+
+    assert '"desconto_valor": beneficios["desconto_total"]' in payload_block
+    assert '"cupom_discount_applied": beneficios["desconto_cupom"]' in payload_block
 
 
 def test_funcionario_pdv_backend_stays_split_into_small_modules():

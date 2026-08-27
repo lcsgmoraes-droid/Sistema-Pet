@@ -42,8 +42,12 @@ def _criar_payload_venda_funcionario_pdv(
         "vendedor_id": current_user.id,
         "funcionario_id": funcionario.id,
         "itens": beneficios["itens_payload"],
-        "desconto_valor": beneficios["desconto_cupom"],
-        "desconto_percentual": 0,
+        "desconto_valor": beneficios["desconto_total"],
+        "desconto_percentual": (
+            beneficios["desconto_total"] / beneficios["subtotal"] * 100
+            if beneficios["subtotal"] > 0
+            else 0
+        ),
         "cupom_code": beneficios["cupom_code"],
         "cupom_discount_applied": beneficios["desconto_cupom"],
         "tenant_id": tenant_id,

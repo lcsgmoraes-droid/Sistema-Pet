@@ -3,7 +3,13 @@ import type { FuncionarioPdvProduto } from "../../../types";
 export type ItemCarrinhoPdv = {
   produto: FuncionarioPdvProduto;
   quantidade: number;
+  precoUnitario: number;
+  descontoValor: number;
+  descontoPercentual: number;
+  tipoDesconto: TipoDescontoPdv;
 };
+
+export type TipoDescontoPdv = "valor" | "percentual";
 
 const QUANTIDADE_MINIMA_PDV = 0.001;
 
@@ -32,6 +38,103 @@ export function parseNumero(valor: string): number | null {
 
 export function arredondarQuantidadePdv(valor: number) {
   return Math.round(Math.max(QUANTIDADE_MINIMA_PDV, valor) * 1000) / 1000;
+}
+
+export function arredondarDinheiroPdv(valor: number) {
+  return Math.round((Number(valor) + Number.EPSILON) * 100) / 100;
+}
+
+export function criarItemCarrinhoPdv(produto: FuncionarioPdvProduto): ItemCarrinhoPdv {
+  return {
+    produto,
+    quantidade: 1,
+    precoUnitario: arredondarDinheiroPdv(Number(produto.preco_venda ?? 0)),
+    descontoValor: 0,
+    descontoPercentual: 0,
+    tipoDesconto: "valor",
+  };
+}
+
+export function subtotalBrutoItemPdv(item: ItemCarrinhoPdv) {
+  return arredondarDinheiroPdv(item.quantidade * item.precoUnitario);
+}
+
+export function descontoItemPdv(item: ItemCarrinhoPdv) {
+  return arredondarDinheiroPdv(
+    Math.min(Math.max(Number(item.descontoValor || 0), 0), subtotalBrutoItemPdv(item)),
+  );
+}
+
+export function subtotalLiquidoItemPdv(item: ItemCarrinhoPdv) {
+  return arredondarDinheiroPdv(subtotalBrutoItemPdv(item) - descontoItemPdv(item));
+}
+
+export function atualizarItemCarrinhoPdv(
+  item: ItemCarrinhoPdv,
+  {
+    quantidade = item.quantidade,
+    precoUnitario = item.precoUnitario,
+    tipoDesconto = item.tipoDesconto,
+    valorDesconto =
+      item.tipoDesconto === "percentual" ? item.descontoPercentual : item.descontoValor,
+  }: {
+    quantidade?: number;
+    precoUnitario?: number;
+    tipoDesconto?: TipoDescontoPdv;
+    valorDesconto?: number;
+  },
+): ItemCarrinhoPdv {
+  const quantidadeNormalizada = arredondarQuantidadePdv(quantidade);
+  const precoNormalizado = arredondarDinheiroPdv(Math.max(0, precoUnitario));
+  const subtotalBruto = arredondarDinheiroPdv(quantidadeNormalizada * precoNormalizado);
+  const descontoInformado = Math.max(0, Number(valorDesconto || 0));
+  const descontoValor =
+    tipoDesconto === "percentual"
+      ? arredondarDinheiroPdv((subtotalBruto * Math.min(descontoInformado, 100)) / 100)
+      : arredondarDinheiroPdv(Math.min(descontoInformado, subtotalBruto));
+  const descontoPercentual =
+    subtotalBruto > 0 ? Math.min(100, (descontoValor / subtotalBruto) * 100) : 0;
+
+  return {
+    ...item,
+    quantidade: quantidadeNormalizada,
+    precoUnitario: precoNormalizado,
+    descontoValor,
+    descontoPercentual,
+    tipoDesconto,
+  };
+}
+
+export function aplicarDescontoTotalPdv(
+  itens: ItemCarrinhoPdv[],
+  tipoDesconto: TipoDescontoPdv,
+  valor: number,
+) {
+  const totalBruto = arredondarDinheiroPdv(
+    itens.reduce((soma, item) => soma + subtotalBrutoItemPdv(item), 0),
+  );
+  if (!itens.length || totalBruto <= 0) return itens;
+
+  const valorNormalizado = Math.max(0, Number(valor || 0));
+  const descontoTotal =
+    tipoDesconto === "percentual"
+      ? arredondarDinheiroPdv((totalBruto * Math.min(valorNormalizado, 100)) / 100)
+      : arredondarDinheiroPdv(Math.min(valorNormalizado, totalBruto));
+  let descontoAlocado = 0;
+
+  return itens.map((item, indice) => {
+    const subtotalItem = subtotalBrutoItemPdv(item);
+    const descontoItem =
+      indice === itens.length - 1
+        ? arredondarDinheiroPdv(descontoTotal - descontoAlocado)
+        : arredondarDinheiroPdv((descontoTotal * subtotalItem) / totalBruto);
+    descontoAlocado = arredondarDinheiroPdv(descontoAlocado + descontoItem);
+
+    return atualizarItemCarrinhoPdv(item, {
+      tipoDesconto: "valor",
+      valorDesconto: Math.min(descontoItem, subtotalItem),
+    });
+  });
 }
 
 export function formatarQuantidade(valor: number | null | undefined) {
