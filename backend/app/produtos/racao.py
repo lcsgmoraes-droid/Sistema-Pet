@@ -60,7 +60,13 @@ def _normalizar_payload_racao(dados: dict[str, Any]) -> dict[str, Any]:
 
     if eh_racao is not None:
         eh_racao = bool(eh_racao)
-        dados["tipo"] = "ração" if eh_racao else "produto"
+        tipo_atual = str(dados.get("tipo") or "").strip().lower()
+        if eh_racao:
+            dados["tipo"] = "ração"
+        elif not tipo_atual or tipo_atual in {"racao", "ração"}:
+            # Ao desmarcar uma racao, ela volta a ser produto. Tipos comerciais
+            # explicitos, como servico, nao podem ser sobrescritos por esta regra.
+            dados["tipo"] = "produto"
 
         if not eh_racao:
             for campo in (

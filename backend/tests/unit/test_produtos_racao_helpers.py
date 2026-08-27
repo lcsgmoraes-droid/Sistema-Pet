@@ -36,6 +36,29 @@ def test_normalizar_payload_racao_limpa_campos_quando_desmarca_racao():
     assert normalizado["porte_animal_id"] is None
 
 
+def test_normalizar_payload_racao_preserva_tipo_servico():
+    normalizado = _normalizar_payload_racao(
+        {
+            "tipo": "servico",
+            "eh_racao": False,
+            "classificacao_racao": None,
+            "peso_embalagem": None,
+        }
+    )
+
+    assert normalizado["tipo"] == "servico"
+    assert normalizado["classificacao_racao"] is None
+    assert normalizado["peso_embalagem"] is None
+
+
+def test_normalizar_payload_racao_desmarcada_converte_tipo_legado_em_produto():
+    normalizado = _normalizar_payload_racao(
+        {"tipo": "ração", "eh_racao": False, "classificacao_racao": None}
+    )
+
+    assert normalizado["tipo"] == "produto"
+
+
 def test_normalizar_payload_racao_inferido_por_classificacao():
     normalizado = _normalizar_payload_racao({"classificacao_racao": "Premium"})
 
