@@ -27,7 +27,7 @@
       "runtimeVersion": {
         "policy": "appVersion"
       },
-      "buildNumber": "12"
+      "buildNumber": "13"
     },
     "android": {
       "softwareKeyboardLayoutMode": "resize",
@@ -52,7 +52,7 @@
         "android.permission.WRITE_EXTERNAL_STORAGE"
       ],
       "runtimeVersion": "1.0.4",
-      "versionCode": 14
+      "versionCode": 15
     },
     "web": {
       "favicon": "./assets/favicon.png"
