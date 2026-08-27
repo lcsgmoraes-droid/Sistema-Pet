@@ -128,7 +128,7 @@
       "codigo das pastas nativas mudou por necessidade funcional",
       "o runtime atual nao consegue executar a mudanca"
     ],
-    "current_state_2026_08_22": "iOS publicado; Android em aprovacao; nao substituir binarios ou revisoes atuais sem autorizacao especifica do Lucas"
+    "current_state_2026_08_27": "iOS e Android publicados; nao substituir binarios ou revisoes atuais sem autorizacao especifica do Lucas"
   },
   "producao_deploy_rules": {
     "frontend_changes": "build de producao gera runtime/frontend/dist no servidor; nao commitar frontend/dist",
