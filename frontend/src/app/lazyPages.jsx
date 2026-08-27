@@ -146,6 +146,7 @@ export const Cargos = lazy(() => import("../pages/Cadastros/Cargos"));
 export const Funcionarios = lazy(() => import("../pages/RH/Funcionarios"));
 export const EntregasAbertas = lazy(() => import("../pages/entregas/EntregasAbertas"));
 export const RotasEntrega = lazy(() => import("../pages/entregas/RotasEntrega"));
+export const RastreamentoAoVivo = lazy(() => import("../pages/entregas/RastreamentoAoVivo"));
 export const RastreioPublico = lazy(() => import("../pages/entregas/RastreioPublico"));
 export const HistoricoEntregas = lazy(() => import("../pages/entregas/HistoricoEntregas"));
 export const DashEntregasFinanceiro = lazy(
@@ -156,6 +157,7 @@ export const EcommerceAparencia = lazy(() => import("../pages/ecommerce/Ecommerc
 export const EcommerceConfig = lazy(() => import("../pages/ecommerce/EcommerceConfig"));
 export const EcommerceAnalytics = lazy(() => import("../pages/ecommerce/EcommerceAnalytics"));
 export const EcommercePreview = lazy(() => import("../pages/ecommerce/EcommercePreview"));
+export const EcommerceDivulgacao = lazy(() => import("../pages/ecommerce/EcommerceDivulgacao"));
 export const Campanhas = lazy(() => import("../pages/Campanhas"));
 export const CanalDescontos = lazy(() => import("../pages/CanalDescontos"));
 export const Ajuda = lazy(() => import("../pages/Ajuda"));

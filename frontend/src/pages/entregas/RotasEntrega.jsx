@@ -185,8 +185,20 @@ export default function RotasEntrega() {
 
   return (
     <div className="page">
-      <h1>Rotas de Entrega</h1>
-      <p style={{ color: "#666", marginBottom: 20 }}>Rotas criadas e em andamento</p>
+      <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+        <div>
+          <h1>Rotas de Entrega</h1>
+          <p style={{ color: "#666", marginBottom: 20 }}>Rotas criadas e em andamento</p>
+        </div>
+        <button
+          type="button"
+          onClick={() => navigate("/entregas/rastreamento")}
+          className="btn-primary"
+          style={{ alignSelf: "flex-start" }}
+        >
+          📡 Abrir rastreamento ao vivo
+        </button>
+      </div>
 
       <div
         style={{

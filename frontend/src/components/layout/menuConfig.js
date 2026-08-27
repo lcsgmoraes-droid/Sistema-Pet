@@ -271,6 +271,11 @@ export function createLayoutMenuItems({ lembretesCount = 0, convitesGruposCount 
           permission: "configuracoes.editar",
         },
         {
+          path: "/ecommerce/divulgacao",
+          label: "📣 Divulgue sua Loja",
+          permission: "configuracoes.editar",
+        },
+        {
           path: "/ecommerce/configuracoes",
           label: "⚙️ Configurações",
           permission: "configuracoes.editar",
@@ -479,6 +484,11 @@ export function createLayoutMenuItems({ lembretesCount = 0, convitesGruposCount 
         {
           path: "/entregas/rotas",
           label: "Rotas de Entrega",
+          permission: "entregas.rotas",
+        },
+        {
+          path: "/entregas/rastreamento",
+          label: "📡 Rastreamento ao Vivo",
           permission: "entregas.rotas",
         },
         {

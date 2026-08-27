@@ -8,6 +8,7 @@ import {
   HistoricoEntregas,
   IAFluxoCaixa,
   OpcoesRacao,
+  RastreamentoAoVivo,
   RotasEntrega,
   WhatsAppDashboard,
 } from "../lazyPages";
@@ -22,6 +23,7 @@ export function createDeliveryAiRoutes() {
     <>
       <Route path="entregas/abertas" element={entregasPage(<EntregasAbertas />)} />
       <Route path="entregas/rotas" element={entregasPage(<RotasEntrega />)} />
+      <Route path="entregas/rastreamento" element={entregasPage(<RastreamentoAoVivo />)} />
       <Route path="entregas/historico" element={entregasPage(<HistoricoEntregas />)} />
       <Route path="entregas/financeiro" element={entregasPage(<DashEntregasFinanceiro />)} />
       <Route
