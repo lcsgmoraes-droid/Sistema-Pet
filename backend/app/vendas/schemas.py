@@ -3,7 +3,7 @@
 from datetime import date
 from typing import List, Literal, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 class VendaItemSchema(BaseModel):
@@ -17,6 +17,21 @@ class VendaItemSchema(BaseModel):
     lote_id: Optional[int] = None
     pet_id: Optional[int] = None
     is_kit: Optional[bool] = None
+    racao_data_prevista_fim: Optional[date] = None
+    racao_prazo_estimado_dias: Optional[int] = Field(default=None, ge=1, le=365)
+
+    @model_validator(mode="after")
+    def validar_previsao_fim_racao(self):
+        if self.racao_data_prevista_fim and self.racao_prazo_estimado_dias:
+            raise ValueError(
+                "Informe a data ou o prazo para a ração acabar, não os dois."
+            )
+        if (
+            self.racao_data_prevista_fim
+            and self.racao_data_prevista_fim <= date.today()
+        ):
+            raise ValueError("A data prevista precisa ser posterior a hoje.")
+        return self
 
 
 class VendaPagamentoSchema(BaseModel):

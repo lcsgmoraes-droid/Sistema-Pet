@@ -259,6 +259,13 @@ export function usePDVPageComposition({
     onAlterarQuantidade: alterarQuantidade,
     onAtualizarPetItem: atualizarPetDoItem,
     onAtualizarQuantidadeItem: atualizarQuantidadeItem,
+    onAtualizarPrevisaoFimRacao: (itemIndex, previsao) =>
+      setVendaAtual((prev) => ({
+        ...prev,
+        itens: prev.itens.map((item, index) =>
+          index === itemIndex ? { ...item, ...previsao } : item,
+        ),
+      })),
     onBuscarProdutoChange: handleBuscarProdutoChange,
     onBuscarProdutoFocus: handleBuscarProdutoFocus,
     onBuscarProdutoKeyDown: handleBuscarProdutoKeyDown,

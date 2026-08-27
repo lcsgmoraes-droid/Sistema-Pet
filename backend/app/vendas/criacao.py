@@ -61,6 +61,7 @@ def criar_venda(
     from app.vendas_models import Venda, VendaItem
     from app.financeiro_models import LancamentoManual, CategoriaFinanceira
     from app.audit_log import log_action
+    from app.vendas.racao_previsao import validar_previsao_fim_racao
 
     logger.info(f"📝 Criando nova venda para user_id={user_id}")
 
@@ -262,6 +263,12 @@ def criar_venda(
                     else "servico"
                 )
 
+            previsao_racao = validar_previsao_fim_racao(
+                item_data,
+                produto=produto_catalogo,
+                cliente_id=payload.get("cliente_id"),
+            )
+
             # 🔒 ISOLAMENTO MULTI-TENANT: tenant_id obrigatório
             item = VendaItem(
                 venda_id=venda.id,
@@ -283,6 +290,8 @@ def criar_venda(
                 subtotal=item_data["subtotal"],
                 lote_id=item_data.get("lote_id"),
                 pet_id=item_data.get("pet_id"),
+                racao_data_prevista_fim=previsao_racao.data_prevista,
+                racao_prazo_estimado_dias=previsao_racao.prazo_dias,
             )
             db.add(item)
 

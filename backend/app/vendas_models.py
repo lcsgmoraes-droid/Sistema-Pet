@@ -374,6 +374,11 @@ class VendaItem(BaseTenantModel):
     # Vincular item a um pet específico
     pet_id = Column(Integer, ForeignKey("pets.id"), nullable=True)
 
+    # Previsao opcional informada no PDV para avisar quando a racao deve acabar.
+    # Apenas um dos dois campos pode ser preenchido por item.
+    racao_data_prevista_fim = Column(Date, nullable=True)
+    racao_prazo_estimado_dias = Column(Integer, nullable=True)
+
     created_at = Column(DateTime, default=func.now())
 
     # Relacionamentos
@@ -421,6 +426,10 @@ class VendaItem(BaseTenantModel):
             "pet_id": self.pet_id,
             "pet_nome": self.pet.nome if self.pet else None,
             "pet_codigo": self.pet.codigo if self.pet else None,
+            "racao_data_prevista_fim": self.racao_data_prevista_fim.isoformat()
+            if self.racao_data_prevista_fim
+            else None,
+            "racao_prazo_estimado_dias": self.racao_prazo_estimado_dias,
         }
 
         # Incluir detalhes do produto se disponível
@@ -443,7 +452,15 @@ class VendaItem(BaseTenantModel):
                 )
                 if hasattr(self.produto, "imagem_principal")
                 else None,
+                "eh_racao": self.produto.eh_racao,
             }
+            result["eh_racao"] = self.produto.eh_racao
+            result["classificacao_racao"] = self.produto.classificacao_racao
+            result["peso_embalagem"] = self.produto.peso_embalagem
+            result["categoria_id"] = self.produto.categoria_id
+            result["categoria_nome"] = (
+                self.produto.categoria.nome if self.produto.categoria else None
+            )
 
         # Incluir detalhes do serviço se for serviço
         if self.tipo == "servico" and self.servico_descricao:
