@@ -155,6 +155,53 @@ def test_novidade_relatorio_lista_espera_explica_totalizadores_e_agrupamento():
         assert trecho in item["resumo"]
 
 
+def test_novidade_registro_rapido_nao_venda_cobre_produto_livre_e_relatorio():
+    item = next(
+        item for item in ITENS_EVOLUCAO if item["id"] == "registro-rapido-nao-venda"
+    )
+
+    assert item["status"] == "disponivel_teste"
+    assert item["plataformas"] == ["ERP"]
+    assert item["canais"] == ["erp"]
+    for trecho in (
+        "cliente opcional",
+        "não existem no catálogo",
+        "motivos",
+        "produto, marca e fornecedor",
+        "cliente × produto",
+        "CSV",
+    ):
+        assert trecho in item["resumo"]
+
+
+def test_central_ajuda_registro_nao_venda_explica_diferenca_da_lista_espera():
+    raiz_repositorio = Path(__file__).resolve().parents[3]
+    base_ajuda = (
+        raiz_repositorio
+        / "frontend"
+        / "src"
+        / "pages"
+        / "centralAjuda"
+        / "centralAjudaKnowledge.js"
+    ).read_text(encoding="utf-8")
+    inicio = base_ajuda.index('slug: "registro-rapido-nao-venda"')
+    fim = base_ajuda.index("      {", inicio + 20)
+    artigo = base_ajuda[inicio:fim]
+
+    for trecho in (
+        "cliente é opcional",
+        "nome e telefone",
+        "Outro produto",
+        "não cria automaticamente um produto",
+        "produto que a loja não trabalha",
+        "Também colocar na lista de espera",
+        "Fornecedor → Marca → Produto/SKU",
+        "Atendimento × produto",
+        "Baixar CSV",
+    ):
+        assert trecho in artigo
+
+
 def test_central_ajuda_relatorio_lista_espera_tem_passo_a_passo_completo():
     raiz_repositorio = Path(__file__).resolve().parents[3]
     base_ajuda = (

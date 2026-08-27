@@ -38,6 +38,7 @@ import app.ifood_integration_models  # noqa: F401 - integracao CorePet <-> iFood
 import app.ifood_order_models  # noqa: F401 - pedidos e eventos do iFood
 import app.models_configuracao_custo_moto  # noqa: F401 - custos da moto
 import app.pendencia_estoque_models  # noqa: F401 - lista de espera
+import app.nao_venda_models  # noqa: F401 - atendimentos sem venda
 import app.ia.aba7_extrato_models  # noqa: F401 - modelos IA/DRE
 import app.ia.aba7_models  # noqa: F401 - modelos DRE
 

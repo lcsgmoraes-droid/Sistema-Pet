@@ -8,6 +8,7 @@ import {
   ShoppingCart,
   Star,
   Trash2,
+  UserRoundX,
   Wallet,
   X,
 } from "lucide-react";
@@ -31,6 +32,7 @@ export default function PDVHeaderBar({
   painelAssistenteAberto,
   mensagensAssistenteLength,
   onAbrirPendenciasEstoque,
+  onAbrirNaoVenda,
   onAbrirOportunidades,
   onToggleAssistente,
   abrirDevolucaoSignal,
@@ -101,6 +103,18 @@ export default function PDVHeaderBar({
         </div>
 
         <div className="flex w-full flex-wrap items-center justify-start gap-2 sm:justify-end xl:max-w-[54rem] xl:self-end">
+          <ActionButton
+            onClick={onAbrirNaoVenda}
+            icon={UserRoundX}
+            intent="warning"
+            tone="soft"
+            size="lg"
+            className="w-full sm:w-auto sm:min-w-[132px]"
+            title="Registrar cliente que não comprou ou produto procurado"
+          >
+            <span>Não venda</span>
+          </ActionButton>
+
           <IconActionButton
             onClick={onAbrirPendenciasEstoque}
             icon={Bell}
