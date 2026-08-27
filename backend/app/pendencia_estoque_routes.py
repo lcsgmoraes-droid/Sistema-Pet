@@ -11,6 +11,7 @@ from datetime import datetime
 from pydantic import BaseModel
 
 from app.db import get_session
+from app.evolucao_corepet import registrar_uso_funcionalidade
 from app.auth import get_current_user_and_tenant
 from app.pendencia_estoque_models import PendenciaEstoque
 from app.models import Cliente
@@ -195,7 +196,9 @@ def relatorio_lista_espera(
         .all()
     )
 
-    return montar_relatorio_lista_espera(pendencias)
+    relatorio = montar_relatorio_lista_espera(pendencias)
+    registrar_uso_funcionalidade(db, "relatorio-lista-espera-sku")
+    return relatorio
 
 
 @router.get("/cliente/{cliente_id}", response_model=dict)

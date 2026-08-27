@@ -136,6 +136,54 @@ def test_central_ajuda_crediario_tem_passo_a_passo_completo():
         assert trecho in artigo
 
 
+def test_novidade_relatorio_lista_espera_explica_totalizadores_e_agrupamento():
+    item = next(
+        item for item in ITENS_EVOLUCAO if item["id"] == "relatorio-lista-espera-sku"
+    )
+
+    assert item["status"] == "disponivel_teste"
+    assert item["plataformas"] == ["ERP"]
+    assert item["canais"] == ["erp"]
+    for trecho in (
+        "Relatório geral",
+        "clientes aguardam",
+        "quantidade desejada",
+        "fornecedor e marca",
+        "cliente × produto",
+        "CSV",
+    ):
+        assert trecho in item["resumo"]
+
+
+def test_central_ajuda_relatorio_lista_espera_tem_passo_a_passo_completo():
+    raiz_repositorio = Path(__file__).resolve().parents[3]
+    base_ajuda = (
+        raiz_repositorio
+        / "frontend"
+        / "src"
+        / "pages"
+        / "centralAjuda"
+        / "centralAjudaKnowledge.js"
+    ).read_text(encoding="utf-8")
+    inicio = base_ajuda.index('slug: "relatorio-lista-espera-sku"')
+    fim = base_ajuda.index("      {", inicio + 20)
+    artigo = base_ajuda[inicio:fim]
+
+    for trecho in (
+        "sino da lista de espera",
+        "Relatório geral",
+        "Fornecedor → Marca → SKU",
+        "clientes o aguardam",
+        "Cliente × produto",
+        "Baixar CSV",
+        "pendentes",
+        "notificados",
+        "Sem fornecedor",
+        "Atualizar",
+    ):
+        assert trecho in artigo
+
+
 def test_fluxo_granel_nao_exibe_terminologia_pai_ao_usuario():
     raiz_repositorio = Path(__file__).resolve().parents[3]
     arquivos = (

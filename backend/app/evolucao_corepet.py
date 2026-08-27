@@ -121,6 +121,25 @@ ITENS_EVOLUCAO: tuple[dict[str, Any], ...] = (
         "caminho_ajuda": "/ajuda?aba=central&artigo=vincular-categoria-dre-conta-pagar",
     },
     {
+        "id": "relatorio-lista-espera-sku",
+        "titulo": "Lista de espera organizada por fornecedor, marca e SKU",
+        "resumo": (
+            "No PDV, abra o sino e use Relatório geral para ver quantos clientes aguardam "
+            "cada SKU e a quantidade desejada. O relatório agrupa fornecedor e marca, mostra "
+            "cliente × produto e permite baixar tudo em CSV."
+        ),
+        "status": "disponivel_teste",
+        "tipo": "melhoria",
+        "modulo": "Vendas e estoque",
+        "plataformas": ["ERP"],
+        "canais": ["erp"],
+        "publicado_em": "2026-08-27",
+        "atualizado_em": "2026-08-27",
+        "ciclo_novidade": deepcopy(CICLO_PADRAO),
+        "destaque": True,
+        "caminho_ajuda": "/ajuda?aba=central&artigo=relatorio-lista-espera-sku",
+    },
+    {
         "id": "cadastro-rapido-cliente-app-funcionario",
         "titulo": "Cadastro rápido de cliente durante a venda",
         "resumo": (
