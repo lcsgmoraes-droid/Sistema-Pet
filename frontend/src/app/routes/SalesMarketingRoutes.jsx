@@ -7,6 +7,7 @@ import {
   EcommerceAnalytics,
   EcommerceAparencia,
   EcommerceConfig,
+  EcommerceDivulgacao,
   EcommercePreview,
   MeusCaixas,
   NFEntrada,
@@ -73,6 +74,16 @@ export function createSalesMarketingRoutes() {
           <ModuleGate modulo="ecommerce">
             <ProtectedRoute permission="configuracoes.editar">
               <EcommercePreview />
+            </ProtectedRoute>
+          </ModuleGate>
+        }
+      />
+      <Route
+        path="ecommerce/divulgacao"
+        element={
+          <ModuleGate modulo="ecommerce">
+            <ProtectedRoute permission="configuracoes.editar">
+              <EcommerceDivulgacao />
             </ProtectedRoute>
           </ModuleGate>
         }

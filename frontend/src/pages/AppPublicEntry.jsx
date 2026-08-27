@@ -1,4 +1,4 @@
-import { ArrowRight, Search, ShieldCheck, XCircle } from "lucide-react";
+import { ArrowRight, Search, ShieldCheck, Smartphone, XCircle } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import ecommerceApi from "../services/ecommerceApi";
@@ -87,6 +87,13 @@ export default function AppPublicEntry() {
     }
   }
 
+  function openCorePetApp() {
+    const slug = store?.slug || extractStoreSlug(storeCode);
+    if (slug) {
+      window.location.href = `corepet://app?loja=${encodeURIComponent(slug)}`;
+    }
+  }
+
   useEffect(() => {
     if (initialCode) {
       searchStore(initialCode);
@@ -172,14 +179,24 @@ export default function AppPublicEntry() {
                     </p>
                   </div>
                 </div>
-                <button
-                  type="button"
-                  onClick={enterStore}
-                  className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-emerald-600 px-4 text-sm font-semibold text-white transition hover:bg-emerald-700"
-                >
-                  Entrar nesta loja
-                  <ArrowRight size={17} />
-                </button>
+                <div className="flex flex-col gap-2 sm:flex-row">
+                  <button
+                    type="button"
+                    onClick={openCorePetApp}
+                    className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white transition hover:bg-blue-700"
+                  >
+                    <Smartphone size={17} />
+                    Abrir no app
+                  </button>
+                  <button
+                    type="button"
+                    onClick={enterStore}
+                    className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-emerald-600 px-4 text-sm font-semibold text-white transition hover:bg-emerald-700"
+                  >
+                    Comprar online
+                    <ArrowRight size={17} />
+                  </button>
+                </div>
               </div>
             </div>
           ) : null}
