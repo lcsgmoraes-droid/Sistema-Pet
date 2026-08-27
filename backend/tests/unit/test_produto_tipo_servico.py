@@ -1,6 +1,7 @@
 from types import SimpleNamespace
 from datetime import datetime
 
+from app.produtos.racao import _normalizar_payload_racao
 from app.produtos.schemas import ProdutoResponse
 from app.produtos_catalogo_models import _aplicar_invariantes_servico_orm
 from app.produtos.tipos import (
@@ -48,6 +49,22 @@ def test_regras_de_servico_zeram_estoque_e_desligam_lotes():
     assert dados["produto_pai_id"] is None
     assert dados["is_parent"] is False
     assert dados["is_sellable"] is True
+
+
+def test_fluxo_de_edicao_preserva_servico_quando_nao_e_racao():
+    dados = _normalizar_payload_racao(
+        {
+            "tipo": "servico",
+            "eh_racao": False,
+            "estoque_atual": -7,
+            "controle_lote": False,
+        }
+    )
+
+    assert aplicar_regras_servico_dados(dados) is True
+    assert dados["tipo"] == "servico"
+    assert dados["estoque_atual"] == 0
+    assert dados["controle_lote"] is False
 
 
 def test_baixa_de_venda_de_servico_nao_chama_estoque():
