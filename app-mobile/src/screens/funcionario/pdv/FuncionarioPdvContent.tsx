@@ -284,16 +284,29 @@ export function FuncionarioPdvContent({
       <View style={styles.card}>
         <View style={styles.linhaTitulo}>
           <Text style={styles.secaoTitulo}>Carrinho</Text>
-          <View style={styles.carrinhoCabecalhoAcoes}>
-            {carrinho.length ? (
-              <TouchableOpacity style={styles.botaoDescontoTotal} onPress={abrirDescontoTotal}>
-                <Ionicons name="pricetag-outline" size={16} color={CORES.primario} />
-                <Text style={styles.botaoDescontoTotalTexto}>Desconto no total</Text>
-              </TouchableOpacity>
-            ) : null}
-            <Text style={styles.badge}>{formatarQuantidade(totalItens)} item(ns)</Text>
-          </View>
+          <Text style={styles.badge}>{formatarQuantidade(totalItens)} item(ns)</Text>
         </View>
+        {carrinho.length ? (
+          <TouchableOpacity
+            style={styles.botaoDescontoTotal}
+            onPress={abrirDescontoTotal}
+            accessibilityRole="button"
+            accessibilityLabel="Aplicar desconto no total da venda"
+          >
+            <View style={styles.botaoDescontoTotalIcone}>
+              <Ionicons name="pricetag-outline" size={20} color={CORES.primario} />
+            </View>
+            <View style={styles.botaoDescontoTotalConteudo}>
+              <Text style={styles.botaoDescontoTotalTexto}>Desconto no total da venda</Text>
+              <Text style={styles.botaoDescontoTotalAjuda}>
+                {descontoManual > 0
+                  ? `Desconto aplicado: ${formatarMoeda(descontoManual)}`
+                  : "Aplicar em R$ ou porcentagem"}
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color={CORES.primario} />
+          </TouchableOpacity>
+        ) : null}
         {carrinho.length === 0 ? (
           <View style={styles.vazio}>
             <Ionicons name="cube-outline" size={34} color={CORES.textoClaro} />
