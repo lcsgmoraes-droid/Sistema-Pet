@@ -29,7 +29,9 @@ def test_base_url_allows_local_homologation_with_api_prefix():
 
 def test_base_url_blocks_remote_without_explicit_flag():
     module = load_module()
-    with pytest.raises(module.AuthenticatedCapacityError, match="Alvo remoto bloqueado"):
+    with pytest.raises(
+        module.AuthenticatedCapacityError, match="Alvo remoto bloqueado"
+    ):
         module.validate_base_url("https://staging.example.test/api")
 
 
@@ -52,10 +54,14 @@ def test_authentication_selects_explicit_tenant_without_exposing_secret():
     def fake_requester(method, url, timeout, headers, payload):
         calls.append((method, url, timeout, headers, payload))
         if url.endswith("/auth/login-multitenant"):
-            return 200, {
-                "access_token": "temporary-token",
-                "tenants": [{"id": "tenant-a"}],
-            }, 12.5
+            return (
+                200,
+                {
+                    "access_token": "temporary-token",
+                    "tenants": [{"id": "tenant-a"}],
+                },
+                12.5,
+            )
         return 200, {"access_token": "final-token"}, 8.25
 
     token, timings = module.authenticate(
@@ -77,10 +83,14 @@ def test_authentication_rejects_tenant_not_returned_by_login():
     module = load_module()
 
     def fake_requester(_method, _url, _timeout, _headers, _payload):
-        return 200, {
-            "access_token": "temporary-token",
-            "tenants": [{"id": "tenant-a"}],
-        }, 10
+        return (
+            200,
+            {
+                "access_token": "temporary-token",
+                "tenants": [{"id": "tenant-a"}],
+            },
+            10,
+        )
 
     with pytest.raises(module.AuthenticatedCapacityError, match="nao pertence"):
         module.authenticate(
