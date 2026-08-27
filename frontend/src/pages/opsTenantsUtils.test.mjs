@@ -118,6 +118,7 @@ test("buildOpsTenantOnboardingForm monta acompanhamento salvo", () => {
     onboarding_follow_up: {
       owner_name: "Ana Operacoes",
       unblocked_on: "2026-08-27",
+      next_contact_on: "2026-08-30",
       satisfaction: "satisfied",
     },
   });
@@ -125,6 +126,7 @@ test("buildOpsTenantOnboardingForm monta acompanhamento salvo", () => {
   assert.deepEqual(form, {
     owner_name: "Ana Operacoes",
     unblocked_on: "2026-08-27",
+    next_contact_on: "2026-08-30",
     satisfaction: "satisfied",
   });
 });
@@ -134,11 +136,13 @@ test("buildOpsTenantOnboardingPayload permite alterar e limpar campos", () => {
     {
       owner_name: "Ana",
       unblocked_on: "2026-08-20",
+      next_contact_on: "2026-08-28",
       satisfaction: "not_collected",
     },
     {
       owner_name: "  Lucas  ",
       unblocked_on: "",
+      next_contact_on: "2026-09-01",
       satisfaction: "neutral",
     },
   );
@@ -146,6 +150,7 @@ test("buildOpsTenantOnboardingPayload permite alterar e limpar campos", () => {
   assert.deepEqual(payload, {
     owner_name: "Lucas",
     unblocked_on: null,
+    next_contact_on: "2026-09-01",
     satisfaction: "neutral",
   });
 });

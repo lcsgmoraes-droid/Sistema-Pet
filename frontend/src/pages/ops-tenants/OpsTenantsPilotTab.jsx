@@ -3,7 +3,7 @@ import { FiActivity, FiAlertTriangle, FiCheckCircle, FiClock } from "react-icons
 import OpsTenantsBadge from "./OpsTenantsBadge";
 import OpsTenantsMetricCard from "./OpsTenantsMetricCard";
 import OpsTenantsOnboardingPanel from "./OpsTenantsOnboardingPanel";
-import { formatDate, formatNumber, shortId } from "./opsTenantsFormatters";
+import { formatDate, formatDateOnly, formatNumber, shortId } from "./opsTenantsFormatters";
 
 const STATUS = {
   active: {
@@ -71,6 +71,14 @@ export default function OpsTenantsPilotTab({
   onSelectTenant,
   onChange,
   onSubmit,
+  notes,
+  notesLoading,
+  noteText,
+  noteError,
+  noteSuccess,
+  noteSaving,
+  onNoteChange,
+  onNoteSubmit,
 }) {
   return (
     <div className="space-y-4">
@@ -218,6 +226,9 @@ export default function OpsTenantsPilotTab({
                           <div className="mt-1 text-xs text-slate-500">
                             Satisfacao: {SATISFACTION[followUp.satisfaction] || "nao registrada"}
                           </div>
+                          <div className="mt-1 text-xs text-slate-500">
+                            Proximo contato: {formatDateOnly(followUp.next_contact_on)}
+                          </div>
                           <button
                             type="button"
                             onClick={() => onSelectTenant(tenant.id)}
@@ -243,6 +254,14 @@ export default function OpsTenantsPilotTab({
           saving={saving}
           onChange={onChange}
           onSubmit={onSubmit}
+          notes={notes}
+          notesLoading={notesLoading}
+          noteText={noteText}
+          noteError={noteError}
+          noteSuccess={noteSuccess}
+          noteSaving={noteSaving}
+          onNoteChange={onNoteChange}
+          onNoteSubmit={onNoteSubmit}
         />
       </div>
     </div>

@@ -38,6 +38,8 @@ export default function OpsTenantsPage() {
     handleCommercialChange,
     handleCommercialSubmit,
     handleOnboardingChange,
+    handleOnboardingNoteChange,
+    handleOnboardingNoteSubmit,
     handleOnboardingSubmit,
     handlePreview,
     items,
@@ -45,6 +47,12 @@ export default function OpsTenantsPage() {
     loading,
     onboardingError,
     onboardingForm,
+    onboardingNoteError,
+    onboardingNoteSaving,
+    onboardingNoteSuccess,
+    onboardingNoteText,
+    onboardingNotes,
+    onboardingNotesLoading,
     onboardingSaving,
     onboardingSuccess,
     previewByTenant,
@@ -187,6 +195,14 @@ export default function OpsTenantsPage() {
             onSelectTenant={setSelectedTenantId}
             onChange={handleOnboardingChange}
             onSubmit={handleOnboardingSubmit}
+            notes={onboardingNotes}
+            notesLoading={onboardingNotesLoading}
+            noteText={onboardingNoteText}
+            noteError={onboardingNoteError}
+            noteSuccess={onboardingNoteSuccess}
+            noteSaving={onboardingNoteSaving}
+            onNoteChange={handleOnboardingNoteChange}
+            onNoteSubmit={handleOnboardingNoteSubmit}
           />
         ) : null}
       </div>

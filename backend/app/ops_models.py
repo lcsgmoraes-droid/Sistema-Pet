@@ -1,8 +1,11 @@
 from sqlalchemy import (
     BigInteger,
+    CheckConstraint,
     Column,
+    Date,
     DateTime,
     Float,
+    ForeignKey,
     Index,
     Integer,
     JSON,
@@ -10,9 +13,11 @@ from sqlalchemy import (
     Text,
 )
 from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 
 from app.db import Base
+from app.platform_auth_models import PlatformAdmin
 
 
 class OpsErrorEvent(Base):
@@ -143,3 +148,41 @@ class OpsJourneyEvent(Base):
     path_template = Column(String(180), nullable=False, index=True)
     provider = Column(String(60), nullable=True, index=True)
     source = Column(String(60), nullable=False, default="request_context")
+
+
+class OpsTenantOnboardingNote(Base):
+    """Nota imutavel do acompanhamento feito pelo administrador da plataforma."""
+
+    __tablename__ = "ops_tenant_onboarding_notes"
+    __table_args__ = (
+        CheckConstraint(
+            "length(note) BETWEEN 3 AND 1000",
+            name="ck_ops_tenant_onboarding_notes_length",
+        ),
+        Index(
+            "ix_ops_tenant_onboarding_notes_tenant_created",
+            "tenant_id",
+            "created_at",
+        ),
+    )
+
+    id = Column(BigInteger, primary_key=True, autoincrement=True)
+    tenant_id = Column(
+        String(36),
+        ForeignKey("tenants.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    note = Column(Text, nullable=False)
+    next_contact_on = Column(Date, nullable=True)
+    created_by_platform_admin_id = Column(
+        Integer,
+        ForeignKey("platform_admins.id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
+    )
+    created_by_label = Column(String(255), nullable=False)
+    created_at = Column(
+        DateTime(timezone=True), nullable=False, server_default=func.now(), index=True
+    )
+    created_by_admin = relationship(PlatformAdmin)

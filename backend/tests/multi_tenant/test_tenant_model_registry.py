@@ -75,6 +75,9 @@ INTENTIONALLY_GLOBAL_TENANT_TABLES = frozenset(
         # Eventos terminais sanitizados usados no painel global de SLOs. A tabela
         # nao guarda payload de cliente/venda e a leitura exige platform admin.
         "ops_journey_events",
+        # Notas operacionais do onboarding: cockpit global protegido por platform
+        # admin; tenant_id e filtro obrigatorio em todas as operacoes do servico.
+        "ops_tenant_onboarding_notes",
         # Fila persistente de webhooks do Bling: o worker (process_pending_bling_pedido_
         # webhooks) faz claim cross-tenant SEM tenant no contexto (roda fora de request
         # HTTP); o webhook público enfileira sem sessão. tenant_id é etiqueta nullable.

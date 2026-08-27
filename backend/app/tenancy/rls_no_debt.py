@@ -16,6 +16,7 @@ INTENTIONALLY_GLOBAL_NO_RLS_TABLES = frozenset(
         "ops_alerts",
         "ops_error_events",
         "ops_journey_events",
+        "ops_tenant_onboarding_notes",
         "rotas_entrega_rastreio_tokens",
         "user_sessions",
     }
