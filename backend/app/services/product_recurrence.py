@@ -9,7 +9,6 @@ from datetime import date, datetime, timedelta
 from statistics import median
 from typing import Iterable
 
-from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 logger = logging.getLogger(__name__)
@@ -307,7 +306,8 @@ def run_due_recurrence_notifications(*, db_factory, logger_override=None) -> dic
     """Enfileira no app os lembretes vencidos, por tenant e sem duplicacao."""
     from app.campaigns.models import NotificationQueue
     from app.campaigns.notification_service import enqueue_push
-    from app.models import Tenant, User
+    from app.models import Tenant
+    from app.services.app_notifications import resolve_customer_app_user_id
     from app.produtos_models import Lembrete
     from app.tenancy.context import tenant_context
     from app.vendas_models import Venda  # noqa: F401 - registra a FK de lembretes
@@ -334,22 +334,12 @@ def run_due_recurrence_notifications(*, db_factory, logger_override=None) -> dic
                     )
                     tenant_queued = 0
                     for reminder in due:
-                        customer_email = (
-                            str(getattr(reminder.cliente, "email", "") or "")
-                            .strip()
-                            .lower()
+                        app_user_id = resolve_customer_app_user_id(
+                            db,
+                            tenant_id=tenant_id,
+                            cliente=reminder.cliente,
                         )
-                        app_user = None
-                        if customer_email:
-                            app_user = (
-                                db.query(User.id)
-                                .filter(
-                                    User.tenant_id == tenant_id,
-                                    func.lower(User.email) == customer_email,
-                                )
-                                .first()
-                            )
-                        if not app_user:
+                        if not app_user_id:
                             # Sem conta no app ainda: preserva o lembrete para
                             # uma tentativa futura, sem enviar ao usuario errado.
                             continue

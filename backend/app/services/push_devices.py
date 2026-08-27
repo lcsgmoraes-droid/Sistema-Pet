@@ -100,6 +100,28 @@ def load_customer_push_targets(
         return _legacy_target(legacy_push_token)
 
     user_id = getattr(cliente, "auth_user_id", None)
+    if user_id:
+        user = None
+        try:
+            user = (
+                db.query(User)
+                .filter(
+                    User.id == user_id,
+                    User.tenant_id == tenant_id,
+                )
+                .first()
+            )
+        except Exception as exc:
+            logger.warning("[PushDevices] Falha ao consultar usuario do push: %s", exc)
+
+        fallback = legacy_push_token or getattr(user, "push_token", None)
+        return load_user_push_targets(
+            db,
+            tenant_id=tenant_id,
+            user_id=user_id,
+            legacy_push_token=fallback,
+        )
+
     cliente_email = _clean_token(getattr(cliente, "email", None)).lower()
     email_user = None
     if cliente_email:
@@ -119,39 +141,14 @@ def load_customer_push_targets(
             )
 
     if email_user:
-        targets = load_user_push_targets(
+        return load_user_push_targets(
             db,
             tenant_id=tenant_id,
             user_id=getattr(email_user, "id", None),
             legacy_push_token=legacy_push_token
             or getattr(email_user, "push_token", None),
         )
-        if targets:
-            return targets
-
-    if not user_id:
-        return _legacy_target(legacy_push_token)
-
-    user = None
-    try:
-        user = (
-            db.query(User)
-            .filter(
-                User.id == user_id,
-                User.tenant_id == tenant_id,
-            )
-            .first()
-        )
-    except Exception as exc:
-        logger.warning("[PushDevices] Falha ao consultar usuario do push: %s", exc)
-
-    fallback = legacy_push_token or getattr(user, "push_token", None)
-    return load_user_push_targets(
-        db,
-        tenant_id=tenant_id,
-        user_id=user_id,
-        legacy_push_token=fallback,
-    )
+    return _legacy_target(legacy_push_token)
 
 
 def mark_push_target_result(

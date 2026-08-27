@@ -441,7 +441,7 @@ export const BASE_CONHECIMENTO = [
           "Clique em **Salvar aviso**. O carrinho passa a mostrar o prazo ou a data escolhida. Para corrigir, clique novamente; para desistir, use **Remover aviso**.",
           "A previsão fica salva mesmo se a venda for apenas salva ou receber pagamento parcial. O lembrete é criado quando a venda fica totalmente finalizada.",
           "Depois da finalização, acesse **Produtos / Estoque → Lembretes**. O cartão mostra produto, cliente, telefone e data prevista. O aviso informado na venda tem prioridade sobre a estimativa automática de recompra.",
-          "Se o cliente possuir conta no app, a automação existente também pode enviar a notificação de reposição conforme a antecedência calculada pelo CorePet.",
+          "Se o cliente possuir conta vinculada no app CorePet, a automação também registra o aviso na central do app conforme a antecedência calculada. Com as notificações do celular ativadas, o cliente recebe o aviso como push.",
           "**Conferência:** confirme se o cliente correto está selecionado e se o item do carrinho mostra a data ou o prazo antes de registrar o recebimento.",
         ],
       },

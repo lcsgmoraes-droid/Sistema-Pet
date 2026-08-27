@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import test from "node:test";
 
 import {
@@ -9,6 +10,7 @@ import {
 } from "./pdvPrevisaoFimRacao.js";
 
 const referencia = new Date(2026, 7, 27, 10, 0, 0);
+const modalSource = readFileSync(new URL("./ModalPrevisaoFimRacao.jsx", import.meta.url), "utf8");
 
 test("calcula a data local a partir do prazo sem desvio de fuso", () => {
   assert.equal(calcularDataFimPorPrazo(30, referencia), "2026-09-26");
@@ -32,4 +34,9 @@ test("resume a escolha registrada no item do carrinho", () => {
     "Acaba em cerca de 30 dias",
   );
   assert.equal(resumirPrevisaoFimRacao({}), "Avisar quando acabar");
+});
+
+test("explica no modal o aviso no app e o push do celular", () => {
+  assert.match(modalSource, /conta vinculada no app CorePet/);
+  assert.match(modalSource, /aviso chega\s+como\s+push/);
 });
