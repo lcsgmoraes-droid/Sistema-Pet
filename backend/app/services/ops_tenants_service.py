@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from typing import Any
 
 from sqlalchemy import inspect, text
@@ -58,6 +58,13 @@ COMMERCIAL_STATE_LABELS = {
     "plan": "Plano",
     "billing_status": "Status de cobranca",
     "subscription_source": "Origem da assinatura",
+}
+
+ONBOARDING_SATISFACTION_OPTIONS = {
+    "not_collected",
+    "satisfied",
+    "neutral",
+    "dissatisfied",
 }
 
 
@@ -378,6 +385,8 @@ def _pilot_follow_up(
     operational_events: int,
     errors_7d: int,
     critical_alerts_open: int,
+    onboarding_owner_name: str | None,
+    onboarding_satisfaction: str | None,
 ) -> dict[str, Any]:
     reasons: list[dict[str, Any]] = []
     overdue_milestones: list[str] = []
@@ -433,6 +442,33 @@ def _pilot_follow_up(
             overdue_milestone="D7" if operation_overdue else None,
         )
 
+    owner_name = str(onboarding_owner_name or "").strip()
+    satisfaction = str(onboarding_satisfaction or "not_collected").strip().lower()
+    if not owner_name:
+        add_reason(
+            "owner_pending",
+            "responsavel pelo acompanhamento ainda nao definido",
+            "normal",
+        )
+    if satisfaction == "dissatisfied":
+        add_reason(
+            "initial_dissatisfaction",
+            "empresa informou insatisfacao no acompanhamento inicial",
+            "high",
+        )
+    elif satisfaction == "neutral":
+        add_reason(
+            "initial_satisfaction_neutral",
+            "satisfacao inicial neutra precisa de retorno",
+            "normal",
+        )
+    elif satisfaction == "not_collected" and operational_events > 0:
+        add_reason(
+            "initial_satisfaction_pending",
+            "satisfacao inicial ainda nao registrada",
+            "normal",
+        )
+
     severities = {reason["severity"] for reason in reasons}
     if "critical" in severities:
         attention_level = "critical"
@@ -453,8 +489,16 @@ def _pilot_follow_up(
         next_action = "Concluir os cadastros iniciais ou a importacao assistida."
     elif operational_events <= 0:
         next_action = "Acompanhar a primeira venda, agenda ou consulta."
+    elif satisfaction == "dissatisfied":
+        next_action = "Agendar retorno e tratar o motivo da insatisfacao inicial."
+    elif not owner_name:
+        next_action = "Definir o responsavel pelo acompanhamento desta empresa."
+    elif satisfaction == "not_collected":
+        next_action = "Confirmar e registrar a satisfacao inicial da empresa."
+    elif satisfaction == "neutral":
+        next_action = "Entender o que falta para a empresa ficar satisfeita."
     else:
-        next_action = "Manter acompanhamento semanal e confirmar satisfacao inicial."
+        next_action = "Manter acompanhamento semanal."
 
     return {
         "attention_level": attention_level,
@@ -535,6 +579,8 @@ def _tenant_pilot_status(
         operational_events=operational_events,
         errors_7d=errors_7d,
         critical_alerts_open=critical_alerts_open,
+        onboarding_owner_name=row.get("onboarding_owner_name"),
+        onboarding_satisfaction=row.get("onboarding_satisfaction"),
     )
     return {
         "kind": kind,
@@ -586,6 +632,12 @@ def _tenant_row_to_item(db: Session, row: dict[str, Any]) -> dict[str, Any]:
         "created_at": row.get("created_at"),
         "updated_at": row.get("updated_at"),
         "principal_user": principal_user,
+        "onboarding_follow_up": {
+            "owner_name": row.get("onboarding_owner_name"),
+            "unblocked_on": _iso(row.get("onboarding_unblocked_on")),
+            "satisfaction": row.get("onboarding_satisfaction") or "not_collected",
+            "updated_at": _iso(row.get("onboarding_follow_up_updated_at")),
+        },
         "counts": counts,
         "usage": _tenant_usage(db, tenant_id, counts),
         "base_catalog": _base_catalog_status(db, tenant_id),
@@ -605,7 +657,10 @@ def _fetch_tenant_item(db: Session, tenant_id: str) -> dict[str, Any]:
             text(
                 """
             SELECT id, name, status, plan, billing_status, subscription_source,
-                   subscription_activated_at, organization_type, created_at, updated_at
+                   subscription_activated_at, organization_type,
+                   onboarding_owner_name, onboarding_unblocked_on,
+                   onboarding_satisfaction, onboarding_follow_up_updated_at,
+                   created_at, updated_at
             FROM tenants
             WHERE CAST(id AS TEXT) = :tenant_id
             LIMIT 1
@@ -650,7 +705,10 @@ def list_ops_tenants(
         text(
             f"""
             SELECT id, name, status, plan, billing_status, subscription_source,
-                   subscription_activated_at, organization_type, created_at, updated_at
+                   subscription_activated_at, organization_type,
+                   onboarding_owner_name, onboarding_unblocked_on,
+                   onboarding_satisfaction, onboarding_follow_up_updated_at,
+                   created_at, updated_at
             FROM tenants
             {where_sql}
             ORDER BY name ASC
@@ -730,6 +788,82 @@ def update_ops_tenant_commercial_state(
             f"""
             UPDATE tenants
             SET {assignments}
+            WHERE CAST(id AS TEXT) = :tenant_id
+            """
+        ),
+        params,
+    )
+    return _fetch_tenant_item(db, target_tenant_id)
+
+
+def _normalize_onboarding_owner(value: Any) -> str | None:
+    normalized = str(value or "").strip()
+    if len(normalized) > 160:
+        raise OpsTenantActionError(
+            "Responsavel pelo acompanhamento deve ter no maximo 160 caracteres."
+        )
+    return normalized or None
+
+
+def _normalize_onboarding_date(value: Any) -> date | None:
+    if value in {None, ""}:
+        return None
+    if isinstance(value, datetime):
+        return value.date()
+    if isinstance(value, date):
+        return value
+    try:
+        return date.fromisoformat(str(value).strip())
+    except ValueError as exc:
+        raise OpsTenantActionError(
+            "Data de desbloqueio invalida. Use o formato AAAA-MM-DD."
+        ) from exc
+
+
+def _normalize_onboarding_satisfaction(value: Any) -> str:
+    normalized = str(value or "not_collected").strip().lower()
+    if normalized not in ONBOARDING_SATISFACTION_OPTIONS:
+        allowed = ", ".join(sorted(ONBOARDING_SATISFACTION_OPTIONS))
+        raise OpsTenantActionError(
+            f"Satisfacao inicial invalida. Use um destes valores: {allowed}."
+        )
+    return normalized
+
+
+def update_ops_tenant_onboarding_follow_up(
+    db: Session,
+    *,
+    tenant_id: str,
+    changes: dict[str, Any],
+) -> dict[str, Any]:
+    target_tenant_id = str(tenant_id).strip()
+    _ensure_target_tenant(db, target_tenant_id)
+
+    normalizers = {
+        "onboarding_owner_name": _normalize_onboarding_owner,
+        "onboarding_unblocked_on": _normalize_onboarding_date,
+        "onboarding_satisfaction": _normalize_onboarding_satisfaction,
+    }
+    normalized = {
+        field: normalizer(changes[field])
+        for field, normalizer in normalizers.items()
+        if field in changes
+    }
+    if not normalized:
+        raise OpsTenantActionError("Nenhuma alteracao de onboarding informada.")
+
+    assignments = [f"{field} = :{field}" for field in normalized]
+    assignments.append("onboarding_follow_up_updated_at = :updated_at")
+    params: dict[str, Any] = {
+        "tenant_id": target_tenant_id,
+        "updated_at": datetime.now(timezone.utc),
+        **normalized,
+    }
+    db.execute(
+        text(
+            f"""
+            UPDATE tenants
+            SET {", ".join(assignments)}
             WHERE CAST(id AS TEXT) = :tenant_id
             """
         ),

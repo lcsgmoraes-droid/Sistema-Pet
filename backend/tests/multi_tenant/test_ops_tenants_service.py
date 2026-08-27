@@ -31,6 +31,10 @@ def ops_tenants_session():
             subscription_source TEXT,
             subscription_activated_at TEXT,
             organization_type TEXT,
+            onboarding_owner_name TEXT,
+            onboarding_unblocked_on TEXT,
+            onboarding_satisfaction TEXT NOT NULL DEFAULT 'not_collected',
+            onboarding_follow_up_updated_at TEXT,
             created_at TEXT,
             updated_at TEXT
         )
@@ -97,10 +101,12 @@ def ops_tenants_session():
             """
             INSERT INTO tenants (
                 id, name, status, plan, billing_status, subscription_source,
-                subscription_activated_at, organization_type, created_at
+                subscription_activated_at, organization_type,
+                onboarding_owner_name, onboarding_unblocked_on,
+                onboarding_satisfaction, created_at
             ) VALUES
-            (:source, 'Atacadao das Racoes Pet', 'active', 'premium', 'active', 'manual', '2026-05-01', 'petshop', '2026-05-01'),
-            (:target, 'Clinica Veterinaria Sao Jose', 'active', 'basico', 'past_due', 'manual', '2026-05-17', 'veterinary_clinic', '2026-05-17')
+            (:source, 'Atacadao das Racoes Pet', 'active', 'premium', 'active', 'manual', '2026-05-01', 'petshop', 'Lucas', NULL, 'not_collected', '2026-05-01'),
+            (:target, 'Clinica Veterinaria Sao Jose', 'active', 'basico', 'past_due', 'manual', '2026-05-17', 'veterinary_clinic', 'Lucas', '2026-05-20', 'satisfied', '2026-05-17')
             """
         ),
         {"source": SOURCE_TENANT, "target": TARGET_TENANT},
@@ -233,7 +239,13 @@ def test_list_ops_tenants_returns_counts_and_catalog_status(ops_tenants_session)
     assert tenant["pilot"]["attention_level"] == "healthy"
     assert tenant["pilot"]["needs_follow_up"] is False
     assert tenant["pilot"]["attention_reasons"] == []
-    assert "satisfacao inicial" in tenant["pilot"]["next_action"]
+    assert tenant["pilot"]["next_action"] == "Manter acompanhamento semanal."
+    assert tenant["onboarding_follow_up"] == {
+        "owner_name": "Lucas",
+        "unblocked_on": "2026-05-20",
+        "satisfaction": "satisfied",
+        "updated_at": None,
+    }
     assert result["summary"]["pilots_active"] == 1
     assert result["summary"]["pilots_blocked"] == 0
 
@@ -333,6 +345,55 @@ def test_active_pilot_with_recent_errors_gets_investigation_action(
     assert "erros 5xx" in pilot["next_action"]
 
 
+def test_active_pilot_without_owner_gets_follow_up_action(ops_tenants_session):
+    from app.services.ops_tenants_service import list_ops_tenants
+
+    ops_tenants_session.execute(
+        text(
+            """
+            UPDATE tenants
+            SET onboarding_owner_name = NULL,
+                onboarding_satisfaction = 'not_collected'
+            WHERE id = :tenant_id
+            """
+        ),
+        {"tenant_id": TARGET_TENANT},
+    )
+    ops_tenants_session.commit()
+
+    pilot = list_ops_tenants(ops_tenants_session, search="clinica")["items"][0]["pilot"]
+
+    assert pilot["attention_level"] == "normal"
+    assert pilot["needs_follow_up"] is True
+    assert [reason["code"] for reason in pilot["attention_reasons"]] == [
+        "owner_pending",
+        "initial_satisfaction_pending",
+    ]
+    assert "Definir o responsavel" in pilot["next_action"]
+
+
+def test_dissatisfied_pilot_gets_recovery_action(ops_tenants_session):
+    from app.services.ops_tenants_service import list_ops_tenants
+
+    ops_tenants_session.execute(
+        text(
+            """
+            UPDATE tenants
+            SET onboarding_satisfaction = 'dissatisfied'
+            WHERE id = :tenant_id
+            """
+        ),
+        {"tenant_id": TARGET_TENANT},
+    )
+    ops_tenants_session.commit()
+
+    pilot = list_ops_tenants(ops_tenants_session, search="clinica")["items"][0]["pilot"]
+
+    assert pilot["attention_level"] == "high"
+    assert pilot["attention_reasons"][0]["code"] == "initial_dissatisfaction"
+    assert "insatisfacao" in pilot["next_action"]
+
+
 def test_update_ops_tenant_commercial_state_changes_safe_fields(ops_tenants_session):
     from app.services.ops_tenants_service import update_ops_tenant_commercial_state
 
@@ -386,6 +447,47 @@ def test_update_ops_tenant_commercial_state_rejects_invalid_values(ops_tenants_s
             ops_tenants_session,
             tenant_id=TARGET_TENANT,
             changes={"plan": "plano sem cadastro"},
+        )
+
+
+def test_update_ops_tenant_onboarding_follow_up_saves_safe_fields(
+    ops_tenants_session,
+):
+    from app.services.ops_tenants_service import (
+        update_ops_tenant_onboarding_follow_up,
+    )
+
+    tenant = update_ops_tenant_onboarding_follow_up(
+        ops_tenants_session,
+        tenant_id=TARGET_TENANT,
+        changes={
+            "onboarding_owner_name": "  Ana Operacoes  ",
+            "onboarding_unblocked_on": "2026-08-27",
+            "onboarding_satisfaction": "neutral",
+        },
+    )
+
+    assert tenant["onboarding_follow_up"]["owner_name"] == "Ana Operacoes"
+    assert tenant["onboarding_follow_up"]["unblocked_on"] == "2026-08-27"
+    assert tenant["onboarding_follow_up"]["satisfaction"] == "neutral"
+    assert tenant["onboarding_follow_up"]["updated_at"] is not None
+    assert tenant["pilot"]["attention_level"] == "normal"
+    assert "empresa ficar satisfeita" in tenant["pilot"]["next_action"]
+
+
+def test_update_ops_tenant_onboarding_follow_up_rejects_invalid_satisfaction(
+    ops_tenants_session,
+):
+    from app.services.ops_tenants_service import (
+        OpsTenantActionError,
+        update_ops_tenant_onboarding_follow_up,
+    )
+
+    with pytest.raises(OpsTenantActionError, match="Satisfacao inicial invalida"):
+        update_ops_tenant_onboarding_follow_up(
+            ops_tenants_session,
+            tenant_id=TARGET_TENANT,
+            changes={"onboarding_satisfaction": "excelente"},
         )
 
 

@@ -37,10 +37,16 @@ export default function OpsTenantsPage() {
     handleBillingOfferToggleModule,
     handleCommercialChange,
     handleCommercialSubmit,
+    handleOnboardingChange,
+    handleOnboardingSubmit,
     handlePreview,
     items,
     loadTenants,
     loading,
+    onboardingError,
+    onboardingForm,
+    onboardingSaving,
+    onboardingSuccess,
     previewByTenant,
     search,
     selectedTenant,
@@ -169,7 +175,19 @@ export default function OpsTenantsPage() {
         ) : null}
 
         {activeTab === "pilot" ? (
-          <OpsTenantsPilotTab items={items} summaries={tabSummaries} loading={loading} />
+          <OpsTenantsPilotTab
+            items={items}
+            summaries={tabSummaries}
+            loading={loading}
+            selectedTenant={selectedTenant}
+            form={onboardingForm}
+            error={onboardingError}
+            success={onboardingSuccess}
+            saving={onboardingSaving}
+            onSelectTenant={setSelectedTenantId}
+            onChange={handleOnboardingChange}
+            onSubmit={handleOnboardingSubmit}
+          />
         ) : null}
       </div>
     </div>

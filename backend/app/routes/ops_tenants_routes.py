@@ -23,6 +23,7 @@ from app.services.ops_tenants_service import (
     list_ops_tenants,
     preview_base_catalog_import,
     update_ops_tenant_commercial_state,
+    update_ops_tenant_onboarding_follow_up,
 )
 
 
@@ -38,6 +39,20 @@ class CommercialStateRequest(BaseModel):
     plan: str | None = None
     billing_status: str | None = None
     subscription_source: str | None = None
+
+
+class OnboardingFollowUpRequest(BaseModel):
+    owner_name: str | None = Field(default=None, max_length=160)
+    unblocked_on: date | None = None
+    satisfaction: (
+        Literal[
+            "not_collected",
+            "satisfied",
+            "neutral",
+            "dissatisfied",
+        ]
+        | None
+    ) = None
 
 
 class BillingOfferCreateRequest(BaseModel):
@@ -72,6 +87,31 @@ def atualizar_estado_comercial_tenant(
             db,
             tenant_id=tenant_id,
             changes=payload.model_dump(exclude_unset=True),
+        )
+        db.commit()
+        return result
+    except OpsTenantActionError as exc:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception:
+        db.rollback()
+        raise
+
+
+@router.patch("/{tenant_id}/onboarding-follow-up")
+def atualizar_acompanhamento_onboarding(
+    tenant_id: str,
+    payload: OnboardingFollowUpRequest,
+    _current_admin: PlatformAdmin = Depends(require_platform_admin),
+    db: Session = Depends(get_session),
+) -> dict[str, Any]:
+    changes = payload.model_dump(exclude_unset=True)
+    mapped_changes = {f"onboarding_{field}": value for field, value in changes.items()}
+    try:
+        result = update_ops_tenant_onboarding_follow_up(
+            db,
+            tenant_id=tenant_id,
+            changes=mapped_changes,
         )
         db.commit()
         return result
