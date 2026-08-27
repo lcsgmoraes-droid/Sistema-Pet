@@ -88,16 +88,18 @@ export function useModalNovaContaPagarController({ isOpen, onClose, onSave, cont
   };
 
   const abrirModalVinculoDRE = (categoriaId = dados.categoria_id) => {
-    const categoria = safeArray(categorias).find(
-      (item) => String(item.id) === String(categoriaId),
-    );
+    const categoria = safeArray(categorias).find((item) => String(item.id) === String(categoriaId));
     if (!categoria) return;
 
-    const nomeCategoria = String(categoria.nome || "").trim().toLocaleLowerCase("pt-BR");
+    const nomeCategoria = String(categoria.nome || "")
+      .trim()
+      .toLocaleLowerCase("pt-BR");
     const subcategoriaSugerida = safeArray(subcategoriasDRE).find(
       (subcategoria) =>
         subcategoria.ativo !== false &&
-        String(subcategoria.nome || "").trim().toLocaleLowerCase("pt-BR") === nomeCategoria,
+        String(subcategoria.nome || "")
+          .trim()
+          .toLocaleLowerCase("pt-BR") === nomeCategoria,
     );
 
     setVinculoDRESubcategoriaId(
