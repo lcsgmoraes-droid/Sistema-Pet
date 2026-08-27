@@ -211,6 +211,4 @@ def test_load_customer_push_targets_prefers_explicit_app_account_link():
         customer_id=77,
     )
 
-    assert [target.token for target in targets] == [
-        "ExponentPushToken[linked-account]"
-    ]
+    assert [target.token for target in targets] == ["ExponentPushToken[linked-account]"]
