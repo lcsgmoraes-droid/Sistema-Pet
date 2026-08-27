@@ -356,6 +356,7 @@ class TestCancelarVenda:
 
             # Configurar itens
             item_mock = MagicMock()
+            item_mock.tipo = "produto"
             item_mock.produto_id = 10
             item_mock.quantidade = 2
 
@@ -407,6 +408,58 @@ class TestCancelarVenda:
             assert evento.venda_id == 100
             assert evento.motivo == "Cliente desistiu"
 
+    def test_cancelar_venda_com_servico_nao_estorna_estoque(
+        self,
+        mock_db_session,
+        mock_estoque_service,
+        mock_event_dispatcher,
+        fake_venda_model,
+        make_query_mock,
+    ):
+        """Serviços podem referenciar o catálogo, mas não movimentam estoque."""
+        with (
+            patch("app.vendas_models.Venda") as MockVenda,
+            patch("app.vendas_models.VendaItem") as MockItem,
+            patch("app.financeiro_models.ContaReceber"),
+            patch("app.caixa_models.MovimentacaoCaixa"),
+            patch("app.financeiro_models.MovimentacaoFinanceira"),
+            patch("app.audit_log.log_action"),
+            patch("app.comissoes_estorno.estornar_comissoes_venda") as mock_estorno,
+        ):
+            fake_venda_model.status = "aberta"
+
+            item_mock = MagicMock()
+            item_mock.tipo = "servico"
+            item_mock.produto_id = 10
+            item_mock.quantidade = 1
+
+            def side_effect_query(*models):
+                model = models[0] if len(models) == 1 else None
+                if model is MockVenda:
+                    return make_query_mock(first=fake_venda_model)
+                if model is MockItem:
+                    return make_query_mock(all_=[item_mock])
+                return make_query_mock()
+
+            mock_db_session.query.side_effect = side_effect_query
+            mock_estorno.return_value = {
+                "success": True,
+                "comissoes_estornadas": 0,
+                "valor_estornado": 0,
+            }
+
+            resultado = VendaService.cancelar_venda(
+                venda_id=100,
+                motivo="Teste com serviço",
+                user_id=1,
+                tenant_id="00000000-0000-0000-0000-000000000001",
+                db=mock_db_session,
+            )
+
+            assert fake_venda_model.status == "cancelada"
+            assert resultado["estornos"]["itens_estornados"] == 0
+            mock_estoque_service.estornar_estoque.assert_not_called()
+
     def test_cancelar_venda_finalizada_estorna_tudo(
         self,
         mock_db_session,
@@ -427,12 +480,18 @@ class TestCancelarVenda:
             patch("app.caixa_models.MovimentacaoCaixa") as MockMovCaixa,
             patch("app.financeiro_models.MovimentacaoFinanceira"),
             patch("app.audit_log.log_action"),
-            patch("app.comissoes_estorno.estornar_comissoes_venda"),
+            patch("app.comissoes_estorno.estornar_comissoes_venda") as mock_estorno,
         ):
             fake_venda_model.status = "finalizada"
+            mock_estorno.return_value = {
+                "success": True,
+                "comissoes_estornadas": 0,
+                "valor_estornado": 0,
+            }
 
             # Itens
             item_mock = MagicMock()
+            item_mock.tipo = "produto"
             item_mock.produto_id = 10
             item_mock.quantidade = 2
 
