@@ -29,6 +29,7 @@ teste de DNS/HTTPS ou carga contínua.
 - Proxy local: `nginx/homolog.local.conf`.
 - Exemplo sem segredos: `homolog.env.example`.
 - Operação segura: `scripts/homologacao_local.ps1`.
+- Capacidade autenticada: `scripts/capacity_authenticated.py`.
 - Prova automatizada: `.github/workflows/homologacao-isolada.yml`.
 - Aceite: `docs/templates/REGISTRO_HOMOLOGACAO.md`.
 
@@ -62,6 +63,18 @@ fictícia e depois roda o E2E oficial:
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\homologacao_local.ps1 -Acao validar
 ```
+
+Medir consultas autenticadas de sessão, clientes, produtos e vendas, todas
+somente leitura:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\homologacao_local.ps1 -Acao capacidade -Requisicoes 320 -Concorrencia 8
+```
+
+O comando lê as credenciais aleatórias de `.env.homolog.local`, não as exibe,
+seleciona explicitamente o tenant fictício e restaura as variáveis do processo
+ao terminar. O executor bloqueia `corepet.com.br`, o domínio legado e seus
+subdomínios mesmo que alguém tente liberar um alvo remoto.
 
 Consultar estado:
 
