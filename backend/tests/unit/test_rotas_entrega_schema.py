@@ -73,10 +73,10 @@ def test_schema_legado_executa_ddl_uma_unica_vez():
     schema.ensure_rotas_entrega_schema(db)
 
     ddl = [
-        statement
-        for statement in db.statements
-        if statement.startswith("ALTER TABLE")
+        statement for statement in db.statements if statement.startswith("ALTER TABLE")
     ]
-    assert len(ddl) == sum(len(columns) for columns in schema._REQUIRED_COLUMNS.values())
+    assert len(ddl) == sum(
+        len(columns) for columns in schema._REQUIRED_COLUMNS.values()
+    )
     assert db.commits == 1
     assert schema._rotas_schema_checked is True
