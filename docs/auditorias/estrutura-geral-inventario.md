@@ -480,3 +480,34 @@ Proxima fatia recomendada:
 2. Mexer em `whatsapp/processor.py` apenas quando houver um corte de fluxo claro
    e testes de replay/deduplicacao suficientes.
 
+## Atualizacao continua - 2026-08-27 - Operacao administrativa de empresas
+
+O servico administrativo de empresas foi separado entre leitura e comandos,
+preservando a fachada importada pelas rotas e pelos testes existentes:
+
+- `backend/app/services/ops_tenants_service.py` ficou responsavel pelos comandos
+  comerciais, acompanhamento de onboarding, notas e importacao de catalogo;
+- consultas, contagens, uso, atividade e montagem da visao operacional foram
+  movidas para `backend/app/services/ops_tenants_read_service.py`;
+- erro de negocio, datas e helpers de introspeccao compartilhados ficaram em
+  `backend/app/services/ops_tenants_common.py`;
+- a fachada continua expondo os mesmos nomes, inclusive helpers legados usados
+  por integracoes e testes;
+- o arquivo principal caiu de 1042 para 411 linhas fisicas; o maior modulo novo
+  possui 672 linhas;
+- nenhum endpoint, payload, schema, migration ou regra de negocio foi alterado;
+- a suite administrativa e multiempresa passou com 20 testes, incluindo
+  isolamento por empresa, metricas, onboarding, notas e importacao de catalogo;
+- um contrato estrutural novo impede que os tres arquivos ultrapassem 700 linhas.
+
+Hotspot ativo acima de 1000 linhas fisicas depois desta fatia:
+
+- `backend/app/whatsapp/processor.py`: 1019 linhas.
+
+Proxima fatia recomendada:
+
+1. Mapear um fluxo isolado de `whatsapp/processor.py` com protecao de replay e
+   deduplicacao antes de mover codigo.
+2. Se esse corte ainda nao estiver suficientemente protegido, priorizar um
+   modulo operacional abaixo de 1000 linhas com testes mais maduros.
+
