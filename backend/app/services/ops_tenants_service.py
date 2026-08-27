@@ -370,6 +370,101 @@ def _pilot_critical_alerts(db: Session, tenant_id: str) -> int:
     )
 
 
+def _pilot_follow_up(
+    *,
+    days_since_start: int | None,
+    access_confirmed: bool,
+    setup_records: int,
+    operational_events: int,
+    errors_7d: int,
+    critical_alerts_open: int,
+) -> dict[str, Any]:
+    reasons: list[dict[str, Any]] = []
+    overdue_milestones: list[str] = []
+
+    def add_reason(
+        code: str, label: str, severity: str, *, overdue_milestone: str | None = None
+    ) -> None:
+        reasons.append(
+            {
+                "code": code,
+                "label": label,
+                "severity": severity,
+                "overdue": overdue_milestone is not None,
+            }
+        )
+        if overdue_milestone:
+            overdue_milestones.append(overdue_milestone)
+
+    if critical_alerts_open:
+        add_reason(
+            "critical_alert",
+            f"{critical_alerts_open} alerta(s) critico(s) aberto(s)",
+            "critical",
+        )
+    if not access_confirmed:
+        access_overdue = days_since_start is not None and days_since_start >= 1
+        add_reason(
+            "access_pending",
+            "primeiro acesso ainda nao confirmado",
+            "high" if access_overdue else "normal",
+            overdue_milestone="D1" if access_overdue else None,
+        )
+    if errors_7d:
+        add_reason(
+            "recent_server_errors",
+            f"{errors_7d} erro(s) 5xx nos ultimos 7 dias",
+            "high",
+        )
+    if setup_records <= 0:
+        setup_overdue = days_since_start is not None and days_since_start >= 3
+        add_reason(
+            "setup_pending",
+            "cadastros iniciais ainda nao identificados",
+            "high" if setup_overdue else "normal",
+            overdue_milestone="D3" if setup_overdue else None,
+        )
+    if operational_events <= 0:
+        operation_overdue = days_since_start is not None and days_since_start >= 7
+        add_reason(
+            "first_operation_pending",
+            "primeira operacao ainda nao identificada",
+            "high" if operation_overdue else "normal",
+            overdue_milestone="D7" if operation_overdue else None,
+        )
+
+    severities = {reason["severity"] for reason in reasons}
+    if "critical" in severities:
+        attention_level = "critical"
+    elif "high" in severities:
+        attention_level = "high"
+    elif reasons:
+        attention_level = "normal"
+    else:
+        attention_level = "healthy"
+
+    if critical_alerts_open:
+        next_action = "Resolver o alerta critico e validar a jornada afetada."
+    elif not access_confirmed:
+        next_action = "Confirmar o primeiro acesso do responsavel pela empresa."
+    elif errors_7d:
+        next_action = "Investigar os erros 5xx antes do proximo acompanhamento."
+    elif setup_records <= 0:
+        next_action = "Concluir os cadastros iniciais ou a importacao assistida."
+    elif operational_events <= 0:
+        next_action = "Acompanhar a primeira venda, agenda ou consulta."
+    else:
+        next_action = "Manter acompanhamento semanal e confirmar satisfacao inicial."
+
+    return {
+        "attention_level": attention_level,
+        "needs_follow_up": attention_level != "healthy",
+        "attention_reasons": reasons,
+        "overdue_milestones": overdue_milestones,
+        "next_action": next_action,
+    }
+
+
 def _tenant_pilot_status(
     db: Session,
     *,
@@ -433,6 +528,14 @@ def _tenant_pilot_status(
         if parsed_start
         else None
     )
+    follow_up = _pilot_follow_up(
+        days_since_start=days_since_start,
+        access_confirmed=access_confirmed,
+        setup_records=setup_records,
+        operational_events=operational_events,
+        errors_7d=errors_7d,
+        critical_alerts_open=critical_alerts_open,
+    )
     return {
         "kind": kind,
         "status": status,
@@ -451,6 +554,7 @@ def _tenant_pilot_status(
             and errors_7d == 0
             and critical_alerts_open == 0,
         },
+        **follow_up,
     }
 
 
@@ -580,6 +684,9 @@ def list_ops_tenants(
         ),
         "pilots_blocked": sum(
             1 for item in items if item.get("pilot", {}).get("status") == "blocked"
+        ),
+        "pilots_need_follow_up": sum(
+            1 for item in items if bool(item.get("pilot", {}).get("needs_follow_up"))
         ),
     }
     return {"items": items, "summary": summary}

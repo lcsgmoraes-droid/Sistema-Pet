@@ -23,6 +23,25 @@ const STATUS = {
   },
 };
 
+const ATTENTION = {
+  healthy: {
+    label: "em dia",
+    className: "border-emerald-200 bg-emerald-50 text-emerald-700",
+  },
+  normal: {
+    label: "acompanhar",
+    className: "border-blue-200 bg-blue-50 text-blue-700",
+  },
+  high: {
+    label: "acao necessaria",
+    className: "border-amber-200 bg-amber-50 text-amber-800",
+  },
+  critical: {
+    label: "urgente",
+    className: "border-rose-200 bg-rose-50 text-rose-700",
+  },
+};
+
 function Milestone({ checked, children }) {
   return (
     <div className="flex items-center gap-2 text-xs text-slate-600">
@@ -35,7 +54,7 @@ function Milestone({ checked, children }) {
 export default function OpsTenantsPilotTab({ items, summaries, loading }) {
   return (
     <div className="space-y-4">
-      <div className="grid gap-3 md:grid-cols-3">
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
         <OpsTenantsMetricCard
           icon={FiActivity}
           label="Pilotos ativos"
@@ -56,6 +75,13 @@ export default function OpsTenantsPilotTab({ items, summaries, loading }) {
           value={formatNumber(summaries.pilot.blocked)}
           detail="Com alerta critico aberto"
           tone={summaries.pilot.blocked ? "amber" : "green"}
+        />
+        <OpsTenantsMetricCard
+          icon={FiClock}
+          label="Com proxima acao"
+          value={formatNumber(summaries.pilot.needFollowUp)}
+          detail="Fila objetiva para o acompanhamento"
+          tone={summaries.pilot.needFollowUp ? "amber" : "green"}
         />
       </div>
 
@@ -79,7 +105,7 @@ export default function OpsTenantsPilotTab({ items, summaries, loading }) {
         </div>
 
         <div className="overflow-x-auto">
-          <table className="min-w-[1280px] w-full divide-y divide-slate-200 text-left">
+          <table className="min-w-[1480px] w-full divide-y divide-slate-200 text-left">
             <thead className="bg-slate-50 text-xs uppercase text-slate-500">
               <tr>
                 <th className="px-4 py-3 font-bold">Tenant / piloto</th>
@@ -88,12 +114,13 @@ export default function OpsTenantsPilotTab({ items, summaries, loading }) {
                 <th className="px-4 py-3 font-bold">Operacao</th>
                 <th className="px-4 py-3 font-bold">Saude 7 dias</th>
                 <th className="px-4 py-3 font-bold">Marcos</th>
+                <th className="px-4 py-3 font-bold">Proxima acao</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {items.length === 0 && !loading ? (
                 <tr>
-                  <td colSpan={6} className="px-4 py-10 text-center text-sm text-slate-500">
+                  <td colSpan={7} className="px-4 py-10 text-center text-sm text-slate-500">
                     Nenhum tenant encontrado para o filtro atual.
                   </td>
                 </tr>
@@ -102,6 +129,7 @@ export default function OpsTenantsPilotTab({ items, summaries, loading }) {
                   const pilot = tenant.pilot || {};
                   const status = STATUS[pilot.status] || STATUS.pending;
                   const milestones = pilot.milestones || {};
+                  const attention = ATTENTION[pilot.attention_level] || ATTENTION.normal;
                   return (
                     <tr key={tenant.id} className="bg-white align-top hover:bg-slate-50">
                       <td className="px-4 py-3">
@@ -143,6 +171,19 @@ export default function OpsTenantsPilotTab({ items, summaries, loading }) {
                         <Milestone checked={milestones.day_7_operation}>
                           D7 operacao saudavel
                         </Milestone>
+                      </td>
+                      <td className="px-4 py-3">
+                        <OpsTenantsBadge className={attention.className}>
+                          {attention.label}
+                        </OpsTenantsBadge>
+                        <div className="mt-2 max-w-xs text-xs font-semibold text-slate-700">
+                          {pilot.next_action || "Revisar o onboarding desta empresa."}
+                        </div>
+                        {(pilot.overdue_milestones || []).length > 0 ? (
+                          <div className="mt-1 text-xs text-rose-700">
+                            Atrasado: {pilot.overdue_milestones.join(", ")}
+                          </div>
+                        ) : null}
                       </td>
                     </tr>
                   );

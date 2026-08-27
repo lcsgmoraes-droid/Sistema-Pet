@@ -230,6 +230,10 @@ def test_list_ops_tenants_returns_counts_and_catalog_status(ops_tenants_session)
     assert tenant["pilot"]["last_activity_at"] == "2026-07-13 11:00:00"
     assert tenant["pilot"]["errors_7d"] == 0
     assert tenant["pilot"]["critical_alerts_open"] == 0
+    assert tenant["pilot"]["attention_level"] == "healthy"
+    assert tenant["pilot"]["needs_follow_up"] is False
+    assert tenant["pilot"]["attention_reasons"] == []
+    assert "satisfacao inicial" in tenant["pilot"]["next_action"]
     assert result["summary"]["pilots_active"] == 1
     assert result["summary"]["pilots_blocked"] == 0
 
@@ -276,8 +280,57 @@ def test_list_ops_tenants_blocks_pilot_with_critical_alert(ops_tenants_session):
     assert result["items"][0]["pilot"]["status"] == "blocked"
     assert result["items"][0]["pilot"]["critical_alerts_open"] == 1
     assert result["items"][0]["pilot"]["errors_7d"] == 1
+    assert result["items"][0]["pilot"]["attention_level"] == "critical"
+    assert result["items"][0]["pilot"]["needs_follow_up"] is True
+    assert "alerta critico" in result["items"][0]["pilot"]["next_action"]
     assert result["summary"]["pilots_active"] == 0
     assert result["summary"]["pilots_blocked"] == 1
+
+
+def test_list_ops_tenants_explains_overdue_onboarding_next_action(
+    ops_tenants_session,
+):
+    from app.services.ops_tenants_service import list_ops_tenants
+
+    result = list_ops_tenants(ops_tenants_session, search="Atacadao")
+
+    pilot = result["items"][0]["pilot"]
+    assert pilot["status"] == "pending"
+    assert pilot["attention_level"] == "high"
+    assert pilot["needs_follow_up"] is True
+    assert pilot["overdue_milestones"] == ["D3", "D7"]
+    assert [reason["code"] for reason in pilot["attention_reasons"]] == [
+        "setup_pending",
+        "first_operation_pending",
+    ]
+    assert "cadastros iniciais" in pilot["next_action"]
+    assert result["summary"]["pilots_need_follow_up"] == 1
+
+
+def test_active_pilot_with_recent_errors_gets_investigation_action(
+    ops_tenants_session,
+):
+    from app.services.ops_tenants_service import list_ops_tenants
+
+    ops_tenants_session.execute(
+        text(
+            """
+            INSERT INTO ops_error_events (id, tenant_id, status_code, created_at)
+            VALUES (2, :target, 500, :created_at)
+            """
+        ),
+        {"target": TARGET_TENANT, "created_at": datetime.now(timezone.utc)},
+    )
+    ops_tenants_session.commit()
+
+    result = list_ops_tenants(ops_tenants_session, search="clinica")
+
+    pilot = result["items"][0]["pilot"]
+    assert pilot["status"] == "active"
+    assert pilot["attention_level"] == "high"
+    assert pilot["needs_follow_up"] is True
+    assert pilot["attention_reasons"][0]["code"] == "recent_server_errors"
+    assert "erros 5xx" in pilot["next_action"]
 
 
 def test_update_ops_tenant_commercial_state_changes_safe_fields(ops_tenants_session):
