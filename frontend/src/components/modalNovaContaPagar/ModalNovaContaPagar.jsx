@@ -1,5 +1,6 @@
 import CategoriaFinanceiraModal from "./CategoriaFinanceiraModal";
 import ModalNovaContaPagarDialog from "./ModalNovaContaPagarDialog";
+import VincularCategoriaDREModal from "./VincularCategoriaDREModal";
 import { useModalNovaContaPagarController } from "./useModalNovaContaPagarController";
 
 export default function ModalNovaContaPagar({ isOpen, onClose, onSave, contaEdicao = null }) {
@@ -30,6 +31,17 @@ export default function ModalNovaContaPagar({ isOpen, onClose, onSave, contaEdic
         onSubmit={controller.handleSubmitCategoria}
         onUpdateSubcategoria={controller.atualizarSubcategoriaNova}
         setFormCategoria={controller.setFormCategoria}
+      />
+
+      <VincularCategoriaDREModal
+        categoria={controller.categoriaSelecionada}
+        isOpen={controller.showModalVinculoDRE}
+        loading={controller.salvandoVinculoDRE}
+        onChange={controller.setVinculoDRESubcategoriaId}
+        onClose={() => controller.setShowModalVinculoDRE(false)}
+        onSubmit={controller.handleSubmitVinculoDRE}
+        subcategoriaId={controller.vinculoDRESubcategoriaId}
+        subcategoriasDRE={controller.subcategoriasDRE}
       />
     </div>
   );

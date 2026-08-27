@@ -25,6 +25,9 @@ export function useModalNovaContaPagarController({ isOpen, onClose, onSave, cont
   const [previewParcelas, setPreviewParcelas] = useState([]);
   const [intervaloParcelas, setIntervaloParcelas] = useState(30);
   const [showModalCategoria, setShowModalCategoria] = useState(false);
+  const [showModalVinculoDRE, setShowModalVinculoDRE] = useState(false);
+  const [vinculoDRESubcategoriaId, setVinculoDRESubcategoriaId] = useState("");
+  const [salvandoVinculoDRE, setSalvandoVinculoDRE] = useState(false);
   const [formCategoria, setFormCategoria] = useState(criarFormCategoriaPadrao);
   const [dados, setDados] = useState(criarDadosPadraoContaPagar);
 
@@ -34,6 +37,14 @@ export function useModalNovaContaPagarController({ isOpen, onClose, onSave, cont
         (fornecedor) => String(fornecedor.id) === String(dados.fornecedor_id),
       ) || null,
     [dados.fornecedor_id, fornecedores],
+  );
+
+  const categoriaSelecionada = useMemo(
+    () =>
+      safeArray(categorias).find(
+        (categoria) => String(categoria.id) === String(dados.categoria_id),
+      ) || null,
+    [categorias, dados.categoria_id],
   );
 
   const carregarDados = async () => {
@@ -62,6 +73,8 @@ export function useModalNovaContaPagarController({ isOpen, onClose, onSave, cont
     carregarDados();
     setDados(isEditando ? montarDadosEdicaoContaPagar(contaEdicao) : criarDadosPadraoContaPagar());
     setPreviewParcelas([]);
+    setShowModalVinculoDRE(false);
+    setVinculoDRESubcategoriaId("");
   }, [isOpen, contaEdicao?.id]);
 
   const resetForm = () => {
@@ -70,7 +83,84 @@ export function useModalNovaContaPagarController({ isOpen, onClose, onSave, cont
 
   const fecharComReset = () => {
     onClose();
+    setShowModalVinculoDRE(false);
     resetForm();
+  };
+
+  const abrirModalVinculoDRE = (categoriaId = dados.categoria_id) => {
+    const categoria = safeArray(categorias).find(
+      (item) => String(item.id) === String(categoriaId),
+    );
+    if (!categoria) return;
+
+    const nomeCategoria = String(categoria.nome || "").trim().toLocaleLowerCase("pt-BR");
+    const subcategoriaSugerida = safeArray(subcategoriasDRE).find(
+      (subcategoria) =>
+        subcategoria.ativo !== false &&
+        String(subcategoria.nome || "").trim().toLocaleLowerCase("pt-BR") === nomeCategoria,
+    );
+
+    setVinculoDRESubcategoriaId(
+      String(
+        categoria.dre_subcategoria_id ||
+          (String(dados.categoria_id) === String(categoriaId) && dados.dre_subcategoria_id) ||
+          subcategoriaSugerida?.id ||
+          "",
+      ),
+    );
+    setShowModalVinculoDRE(true);
+  };
+
+  const handleCategoriaChange = (categoriaIdValue) => {
+    const categoriaId = categoriaIdValue ? parseInt(categoriaIdValue, 10) : null;
+    const categoria = safeArray(categorias).find((item) => item.id === categoriaId) || null;
+    const dreSubcategoriaId = categoria?.dre_subcategoria_id || null;
+
+    setDados((dadosAtuais) => ({
+      ...dadosAtuais,
+      categoria_id: categoriaId,
+      dre_subcategoria_id: dreSubcategoriaId,
+    }));
+
+    if (categoria && !dreSubcategoriaId) {
+      abrirModalVinculoDRE(categoria.id);
+    }
+  };
+
+  const handleSubmitVinculoDRE = async (event) => {
+    event.preventDefault();
+
+    const categoriaId = Number(dados.categoria_id);
+    const subcategoriaId = Number(vinculoDRESubcategoriaId);
+    if (!categoriaId || !subcategoriaId) {
+      toast.error("Selecione uma subcategoria DRE");
+      return;
+    }
+
+    try {
+      setSalvandoVinculoDRE(true);
+      await api.put(`/categorias-financeiras/${categoriaId}`, {
+        dre_subcategoria_id: subcategoriaId,
+      });
+      setCategorias((categoriasAtuais) =>
+        categoriasAtuais.map((categoria) =>
+          Number(categoria.id) === categoriaId
+            ? { ...categoria, dre_subcategoria_id: subcategoriaId }
+            : categoria,
+        ),
+      );
+      setDados((dadosAtuais) => ({
+        ...dadosAtuais,
+        dre_subcategoria_id: subcategoriaId,
+      }));
+      setShowModalVinculoDRE(false);
+      toast.success("Categoria vinculada ao DRE!");
+    } catch (error) {
+      console.error("Erro ao vincular categoria ao DRE:", error);
+      toast.error(error.response?.data?.detail || "Erro ao vincular categoria ao DRE");
+    } finally {
+      setSalvandoVinculoDRE(false);
+    }
   };
 
   const gerarPreview = () => {
@@ -189,6 +279,11 @@ export function useModalNovaContaPagarController({ isOpen, onClose, onSave, cont
       return;
     }
 
+    if (categoriaSelecionada && !categoriaSelecionada.dre_subcategoria_id) {
+      abrirModalVinculoDRE(categoriaSelecionada.id);
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -230,7 +325,9 @@ export function useModalNovaContaPagarController({ isOpen, onClose, onSave, cont
     atualizarDataParcela,
     atualizarSubcategoriaNova,
     atualizarValorParcela,
+    abrirModalVinculoDRE,
     categorias,
+    categoriaSelecionada,
     dados,
     fecharComReset,
     formCategoria,
@@ -238,22 +335,29 @@ export function useModalNovaContaPagarController({ isOpen, onClose, onSave, cont
     fornecedores,
     gerarPreview,
     handleKeyDownSubcategoria,
+    handleCategoriaChange,
     handleSubmit,
     handleSubmitCategoria,
+    handleSubmitVinculoDRE,
     intervaloParcelas,
     isEditando,
     loading,
     pertenceRecorrencia,
     previewParcelas,
     removerSubcategoriaNova,
+    salvandoVinculoDRE,
     setDados,
     setFormCategoria,
     setFornecedores,
     setIntervaloParcelas,
     setPreviewParcelas,
     setShowModalCategoria,
+    setShowModalVinculoDRE,
     showModalCategoria,
+    showModalVinculoDRE,
     subcategoriasDRE,
     tiposDespesa,
+    vinculoDRESubcategoriaId,
+    setVinculoDRESubcategoriaId,
   };
 }

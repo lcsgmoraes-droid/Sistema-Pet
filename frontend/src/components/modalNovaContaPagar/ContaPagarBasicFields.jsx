@@ -8,6 +8,8 @@ export default function ContaPagarBasicFields({ controller, onOpenCategoria }) {
     dados,
     fornecedorSelecionado,
     fornecedores,
+    handleCategoriaChange,
+    abrirModalVinculoDRE,
     setDados,
     setFornecedores,
     subcategoriasDRE,
@@ -73,12 +75,7 @@ export default function ContaPagarBasicFields({ controller, onOpenCategoria }) {
         <div className="flex gap-2">
           <select
             value={dados.categoria_id || ""}
-            onChange={(event) =>
-              setDados({
-                ...dados,
-                categoria_id: event.target.value ? parseInt(event.target.value) : null,
-              })
-            }
+            onChange={(event) => handleCategoriaChange(event.target.value)}
             className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
           >
             <option value="">Selecione...</option>
@@ -113,6 +110,18 @@ export default function ContaPagarBasicFields({ controller, onOpenCategoria }) {
                 ? "📈 Despesa Variável"
                 : "↕ Custo Misto (Fixo + Variável)"}
           </p>
+        )}
+        {categoriaSelecionada && !categoriaSelecionada.dre_subcategoria_id && (
+          <div className="mt-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900 flex items-center justify-between gap-3">
+            <span>Esta categoria ainda não está vinculada ao DRE.</span>
+            <button
+              type="button"
+              onClick={() => abrirModalVinculoDRE(categoriaSelecionada.id)}
+              className="font-semibold text-blue-700 hover:text-blue-900 whitespace-nowrap"
+            >
+              Classificar agora
+            </button>
+          </div>
         )}
       </div>
 
