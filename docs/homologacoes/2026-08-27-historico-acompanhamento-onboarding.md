@@ -18,6 +18,8 @@ producao.
   indices e limite de 3 a 1.000 caracteres.
 - Downgrade ate `zxf20260827a1` e novo upgrade ate a head concluiram no
   PostgreSQL descartavel.
+- O smoke de migrations cobre `tenants.id` historico em texto e o formato UUID
+  usado em producao; a nova chave estrangeira replica o tipo encontrado.
 - Backend e frontend permaneceram saudaveis depois da reversao e reaplicacao.
 
 ## Resultado funcional

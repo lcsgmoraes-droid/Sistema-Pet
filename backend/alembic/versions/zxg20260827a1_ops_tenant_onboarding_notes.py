@@ -14,7 +14,17 @@ branch_labels = None
 depends_on = None
 
 
+def _tenant_id_type(inspector: sa.Inspector) -> sa.types.TypeEngine:
+    """Replica o tipo real de tenants.id em bancos historicos e atuais."""
+
+    for column in inspector.get_columns("tenants"):
+        if column["name"] == "id":
+            return column["type"].copy()
+    raise RuntimeError("Coluna tenants.id nao encontrada")
+
+
 def upgrade() -> None:
+    tenant_id_type = _tenant_id_type(sa.inspect(op.get_bind()))
     op.add_column(
         "tenants",
         sa.Column("onboarding_next_contact_on", sa.Date(), nullable=True),
@@ -22,7 +32,7 @@ def upgrade() -> None:
     op.create_table(
         "ops_tenant_onboarding_notes",
         sa.Column("id", sa.BigInteger(), autoincrement=True, nullable=False),
-        sa.Column("tenant_id", sa.String(length=36), nullable=False),
+        sa.Column("tenant_id", tenant_id_type, nullable=False),
         sa.Column("note", sa.Text(), nullable=False),
         sa.Column("next_contact_on", sa.Date(), nullable=True),
         sa.Column("created_by_platform_admin_id", sa.Integer(), nullable=False),

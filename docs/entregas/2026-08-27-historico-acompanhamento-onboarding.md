@@ -38,6 +38,8 @@ Requisitos nao funcionais:
 - `ops_tenant_onboarding_notes` guarda o historico imutavel de forma separada.
 - Cada nota possui empresa, texto, agenda vigente, administrador autor e data.
 - Chaves estrangeiras impedem nota sem empresa ou autor existente.
+- A migration replica o tipo real de `tenants.id`, aceitando com seguranca tanto
+  bancos historicos com `VARCHAR` quanto a estrutura de producao com `UUID`.
 - Exclusao de uma empresa remove suas notas; exclusao de um autor com historico
   e bloqueada para preservar a auditoria.
 - A tabela e global por desenho porque o cockpit administrativo precisa operar

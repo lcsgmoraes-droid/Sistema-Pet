@@ -11,6 +11,9 @@ def test_onboarding_notes_migration_is_linear_and_reversible():
 
     assert 'revision = "zxg20260827a1"' in source
     assert 'down_revision = "zxf20260827a1"' in source
+    assert "def _tenant_id_type(" in source
+    assert 'inspector.get_columns("tenants")' in source
+    assert 'sa.Column("tenant_id", tenant_id_type, nullable=False)' in source
     assert "op.add_column(" in source
     assert '"tenants",' in source
     assert '"onboarding_next_contact_on"' in source
