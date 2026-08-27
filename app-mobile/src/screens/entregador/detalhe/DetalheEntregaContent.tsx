@@ -21,6 +21,7 @@ export type DetalheEntregaContentProps = {
   rota: Rota | null;
   processando: number | null;
   processandoFinalizacao: boolean;
+  statusRastreamento: "iniciando" | "ativo" | "limitado" | null;
   iniciarRota: () => void | Promise<void>;
   finalizarRota: () => void | Promise<void>;
   salvarNovaOrdemParadas: (paradasOrdenadas: Parada[]) => boolean | Promise<boolean>;
@@ -61,6 +62,7 @@ export function DetalheEntregaContent({
   rota,
   processando,
   processandoFinalizacao,
+  statusRastreamento,
   iniciarRota,
   finalizarRota,
   salvarNovaOrdemParadas,
@@ -161,10 +163,52 @@ export function DetalheEntregaContent({
       </View>
 
       {rota.status === "pendente" && (
-        <TouchableOpacity style={styles.btnIniciar} onPress={iniciarRota}>
-          <Text style={styles.btnIniciarText}>▶ Iniciar Rota</Text>
-        </TouchableOpacity>
+        <>
+          <View style={styles.avisoRastreamento}>
+            <Text style={styles.avisoRastreamentoTitulo}>
+              Localização compartilhada durante a rota
+            </Text>
+            <Text style={styles.avisoRastreamentoTexto}>
+              A loja e o cliente acompanham o entregador somente após iniciar a
+              rota. O compartilhamento continua ao abrir o mapa ou bloquear a
+              tela e para ao finalizar.
+            </Text>
+          </View>
+          <TouchableOpacity style={styles.btnIniciar} onPress={iniciarRota}>
+            <Text style={styles.btnIniciarText}>▶ Iniciar Rota</Text>
+          </TouchableOpacity>
+        </>
       )}
+
+      {["em_rota", "em_andamento"].includes(rota.status) &&
+        statusRastreamento && (
+          <View
+            style={[
+              styles.statusRastreamento,
+              statusRastreamento === "limitado" &&
+                styles.statusRastreamentoLimitado,
+            ]}
+          >
+            <Text
+              style={[
+                styles.statusRastreamentoTitulo,
+                statusRastreamento === "limitado" &&
+                  styles.statusRastreamentoTituloLimitado,
+              ]}
+            >
+              {statusRastreamento === "ativo"
+                ? "Rastreamento ativo"
+                : statusRastreamento === "iniciando"
+                  ? "Ativando rastreamento..."
+                  : "Rastreamento limitado"}
+            </Text>
+            <Text style={styles.statusRastreamentoTexto}>
+              {statusRastreamento === "limitado"
+                ? "Mantenha o CorePet aberto e verifique a permissão de localização antes de usar o mapa."
+                : "Você pode abrir o mapa ou bloquear a tela. A localização deixa de ser compartilhada ao finalizar a rota."}
+            </Text>
+          </View>
+        )}
 
       {podeFinalizar && (
         <TouchableOpacity

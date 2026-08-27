@@ -181,9 +181,9 @@ continua sendo indicador de negócio e deve ter causa acionável para o tenant.
 | Resultado bom | Empresa acessa, possui cadastro mínimo e realiza a primeira operação sem alerta crítico. |
 | SLI | Empresas que cumprem cada marco / empresas iniciadas elegíveis. |
 | Metas iniciais | Dia 1: acesso confirmado em 100%; dia 3: configuração em >= 90%; dia 7: primeira operação sem erro 5xx/alerta crítico em >= 85%. |
-| Fonte atual | Painel Ops por tenant: acesso, registros de setup, vendas/agenda, erros 7d e alertas. |
+| Fonte atual | Painel Ops por tenant: acesso, registros de setup, vendas/agenda, erros 7d, alertas, marco atrasado, próxima ação, responsável, data de desbloqueio e satisfação inicial. |
 | Regra de amostra | Com poucos tenants, sempre exibir “2 de 3”, não apenas “66,7%”. |
-| Lacuna | Registrar motivo de atraso, responsável, data de desbloqueio e satisfação inicial. |
+| Lacuna | Adicionar histórico detalhado das mudanças quando o volume operacional justificar. |
 | Dono | Onboarding/comercial e administrador do tenant. |
 
 Os marcos de dia 1, 3 e 7 já existem no serviço operacional. A porcentagem é uma
@@ -206,10 +206,10 @@ meta interna de processo, não obrigação automática do cliente.
 | Item | Definição |
 |---|---|
 | Resultado bom | Backup íntegro é restaurado em ambiente isolado e as jornadas críticas voltam sem corrupção. |
-| Guardrails atuais | Backup com idade <= 26 h; restore smoke <= 31 dias; cópia externa verificada quando configurada. |
+| Guardrails atuais | Backup com idade <= 26 h; restore smoke <= 31 dias; SHA-256 obrigatório antes do restore; duração medida; cópia externa verificada quando configurada. |
 | Objetivos configurados | RPO 24 h e RTO 4 h. São propostas operacionais, ainda sem aceite/SLA. |
-| Fonte atual | Eventos de backup, checksum, restore, cópia externa e painel Ops. |
-| Lacuna | Medir duração total real, arquivos fora do banco, fila pós-restore e repetir teste mensal. |
+| Fonte atual | Eventos de backup, checksum, duração do restore, cópia externa e painel Ops. |
+| Lacuna | Medir a retomada das jornadas, arquivos fora do banco e filas pós-restore; sustentar a evidência recorrente no servidor. |
 | Dono | Operação técnica e responsável do negócio pela continuidade. |
 
 ## Indicadores de negócio

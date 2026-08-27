@@ -66,6 +66,14 @@ export function buildOpsTenantTabSummaries(items = [], summary = {}) {
     summary?.pilots_blocked ??
       items.filter((item) => String(item?.pilot?.status || "") === "blocked").length,
   );
+  const pilotNeedFollowUp = Number(
+    summary?.pilots_need_follow_up ??
+      items.filter((item) => {
+        const pilot = item?.pilot || {};
+        if (typeof pilot.needs_follow_up === "boolean") return pilot.needs_follow_up;
+        return String(pilot.status || "") !== "active";
+      }).length,
+  );
   const pilotPending = items.filter((item) =>
     ["pending", "ready"].includes(String(item?.pilot?.status || "")),
   ).length;
@@ -87,6 +95,7 @@ export function buildOpsTenantTabSummaries(items = [], summary = {}) {
       active: pilotActive,
       blocked: pilotBlocked,
       pending: pilotPending,
+      needFollowUp: pilotNeedFollowUp,
     },
     usage: {
       recordsTotal,
@@ -126,4 +135,31 @@ export function buildOpsTenantCommercialPayload(current = {}, next = {}) {
     }
     return payload;
   }, {});
+}
+
+export function buildOpsTenantOnboardingForm(tenant = {}) {
+  const followUp = tenant?.onboarding_follow_up || {};
+  return {
+    owner_name: String(followUp.owner_name || "").trim(),
+    unblocked_on: String(followUp.unblocked_on || "").trim(),
+    next_contact_on: String(followUp.next_contact_on || "").trim(),
+    satisfaction: String(followUp.satisfaction || "not_collected")
+      .trim()
+      .toLowerCase(),
+  };
+}
+
+export function buildOpsTenantOnboardingPayload(current = {}, next = {}) {
+  return ["owner_name", "unblocked_on", "next_contact_on", "satisfaction"].reduce(
+    (payload, field) => {
+      const currentValue = String(current?.[field] || "").trim();
+      const nextValue = String(next?.[field] || "").trim();
+      if (nextValue !== currentValue) {
+        payload[field] =
+          field === "satisfaction" ? nextValue || "not_collected" : nextValue || null;
+      }
+      return payload;
+    },
+    {},
+  );
 }

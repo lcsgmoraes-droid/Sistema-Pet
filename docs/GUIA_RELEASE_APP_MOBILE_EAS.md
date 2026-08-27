@@ -61,10 +61,13 @@ Se ainda houver duvida, comparar o fingerprint local com os builds ativos. Uma
 mudanca somente em numero de compilacao, script operacional ou configuracao que
 nao entra no aplicativo nao basta, por si so, para trocar OTA por loja.
 
-### Estado operacional registrado em 22/08/2026
+### Estado operacional verificado em 27/08/2026
 
-- iOS: aplicativo publicado; binario ativo usa runtime `1.0.3`.
-- Android: publicacao em fase de aprovacao; binario de loja usa runtime `1.0.3`.
+- iOS: aplicativo publicado. A App Store Connect exibe o CorePet como `Pronto
+  para distribuicao` e possui um contrato atualizado pendente de aceite pelo
+  titular antes do envio de uma nova versao.
+- Android: aplicativo publicado; a Google Play exibe a versao `14 (1.0.3)`
+  ativa em producao e o binario usa runtime `1.0.3`.
 - O canal `production` ja possui historico de OTAs para Android e iOS juntos.
 - Os artefatos `1.0.4` gerados em 22/08/2026 nao devem substituir os binarios
   atuais sem uma decisao explicita de nova versao nativa.

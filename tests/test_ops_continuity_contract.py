@@ -70,6 +70,9 @@ def test_backup_and_restore_publish_safe_continuity_events():
     assert 'record_restore_event "ok"' in restore
     assert 'record_backup_event "failed"' in backup
     assert 'record_restore_event "failed"' in restore
+    assert "backup checksum mismatch" in restore
+    assert "backup_checksum_verified=true" in restore
+    assert "restore_duration_seconds" in restore
     assert 'record_external_copy_event "ok"' in external_copy
     assert 'record_external_copy_event "failed"' in external_copy
     assert "head-object" in external_copy
@@ -79,6 +82,8 @@ def test_backup_and_restore_publish_safe_continuity_events():
     assert "continuity_events.jsonl" in event_writer
     assert "backup_sha256" in event_writer
     assert "public_tables" in event_writer
+    assert "restore_duration_seconds" in event_writer
+    assert "checksum_verified" in event_writer
     assert "external_copy:ok" in event_writer
     assert "POSTGRES_PASSWORD" not in event_writer
     assert "OPS_RUNTIME_UID:-1000" in event_writer
@@ -120,6 +125,7 @@ def test_ops_dashboard_exposes_continuity_summary():
     assert "function ContinuityPanel" in dashboard
     assert "RPO alvo" in dashboard
     assert "RTO alvo" in dashboard
+    assert "tempo ou integridade nao comprovados" in dashboard
 
 
 def test_ops_dashboard_exposes_automated_tls_expiry_status():

@@ -4,6 +4,8 @@ import test from "node:test";
 import {
   buildOpsTenantCommercialForm,
   buildOpsTenantCommercialPayload,
+  buildOpsTenantOnboardingForm,
+  buildOpsTenantOnboardingPayload,
   buildOpsTenantTabSummaries,
   formatStorageMb,
   isBillingAttention,
@@ -30,7 +32,7 @@ test("buildOpsTenantTabSummaries resume tenants por aba do MVP Ops", () => {
       base_catalog: { installed: true },
       counts: { produtos: 3 },
       usage: { records_total: 18, image_bytes: 1572864 },
-      pilot: { status: "active" },
+      pilot: { status: "active", needs_follow_up: false },
     },
     {
       status: "suspended",
@@ -38,7 +40,7 @@ test("buildOpsTenantTabSummaries resume tenants por aba do MVP Ops", () => {
       base_catalog: { installed: false },
       counts: { produtos: 0 },
       usage: { records_total: 2, image_bytes: 0 },
-      pilot: { status: "blocked" },
+      pilot: { status: "blocked", needs_follow_up: true },
     },
   ];
 
@@ -69,6 +71,7 @@ test("buildOpsTenantTabSummaries resume tenants por aba do MVP Ops", () => {
     active: 1,
     blocked: 1,
     pending: 0,
+    needFollowUp: 1,
   });
 });
 
@@ -107,5 +110,47 @@ test("buildOpsTenantCommercialPayload envia somente campos alterados", () => {
   assert.deepEqual(payload, {
     plan: "premium",
     billing_status: "active",
+  });
+});
+
+test("buildOpsTenantOnboardingForm monta acompanhamento salvo", () => {
+  const form = buildOpsTenantOnboardingForm({
+    onboarding_follow_up: {
+      owner_name: "Ana Operacoes",
+      unblocked_on: "2026-08-27",
+      next_contact_on: "2026-08-30",
+      satisfaction: "satisfied",
+    },
+  });
+
+  assert.deepEqual(form, {
+    owner_name: "Ana Operacoes",
+    unblocked_on: "2026-08-27",
+    next_contact_on: "2026-08-30",
+    satisfaction: "satisfied",
+  });
+});
+
+test("buildOpsTenantOnboardingPayload permite alterar e limpar campos", () => {
+  const payload = buildOpsTenantOnboardingPayload(
+    {
+      owner_name: "Ana",
+      unblocked_on: "2026-08-20",
+      next_contact_on: "2026-08-28",
+      satisfaction: "not_collected",
+    },
+    {
+      owner_name: "  Lucas  ",
+      unblocked_on: "",
+      next_contact_on: "2026-09-01",
+      satisfaction: "neutral",
+    },
+  );
+
+  assert.deepEqual(payload, {
+    owner_name: "Lucas",
+    unblocked_on: null,
+    next_contact_on: "2026-09-01",
+    satisfaction: "neutral",
   });
 });

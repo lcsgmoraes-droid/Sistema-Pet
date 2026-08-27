@@ -1,0 +1,18 @@
+@keyframes corepet-tracker-pulse {
+  0% {
+    transform: scale(0.8);
+    opacity: 0.38;
+  }
+  70% {
+    transform: scale(1.35);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(1.35);
+    opacity: 0;
+  }
+}
+
+.tracker-live-pulse {
+  animation: corepet-tracker-pulse 1.8s ease-out infinite;
+}

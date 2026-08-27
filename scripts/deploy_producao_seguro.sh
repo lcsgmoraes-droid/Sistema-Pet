@@ -487,12 +487,18 @@ if [[ -f "$APP_DIR/scripts/install_ops_continuity_cron.sh" ]]; then
   bash "$APP_DIR/scripts/install_ops_continuity_cron.sh" || fail "Nao foi possivel instalar o cron de continuidade operacional"
 fi
 
-mark_step "instalar_restore_smoke_wrapper"
-audit_step "Instalando wrapper restrito para restore smoke"
-log "Instalando wrapper operacional de restore smoke"
-if [[ -f "$APP_DIR/scripts/install_prod_restore_smoke_wrapper.sh" ]]; then
-  bash "$APP_DIR/scripts/install_prod_restore_smoke_wrapper.sh" || fail "Nao foi possivel instalar o wrapper de restore smoke"
-fi
+mark_step "instalar_wrappers_operacionais"
+audit_step "Instalando wrappers restritos para deploy, status e restore smoke"
+log "Instalando wrappers operacionais restritos"
+for wrapper_installer in \
+  install_prod_deploy_wrapper.sh \
+  install_prod_status_wrapper.sh \
+  install_prod_restore_smoke_wrapper.sh; do
+  [[ -f "$APP_DIR/scripts/$wrapper_installer" ]] \
+    || fail "Instalador operacional ausente: $wrapper_installer"
+  bash "$APP_DIR/scripts/$wrapper_installer" \
+    || fail "Nao foi possivel executar $wrapper_installer"
+done
 
 mark_step "preparar_diretorios_persistentes"
 audit_step "Preparando diretorios persistentes do backend"

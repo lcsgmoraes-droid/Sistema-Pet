@@ -46,9 +46,9 @@ feita nos momentos certos, sem virar repeticao a cada micro-etapa.
 - Se houver duvida, consultar `docs/GUIA_RELEASE_APP_MOBILE_EAS.md`, executar
   `eas build:list`, `eas update:list` e comparar o fingerprint com os binarios
   ativos antes de agir.
-- Estado registrado em 2026-08-22: o iOS esta publicado e o Android esta em fase
-  de aprovacao. Nao substituir os binarios/revisoes atuais sem autorizacao
-  especifica para uma nova versao nativa.
+- Estado verificado nas lojas em 2026-08-27: iOS e Android estao publicados.
+  Nao substituir os binarios/revisoes atuais sem autorizacao especifica para
+  uma nova versao nativa.
 
 ## Padrao de trabalho
 

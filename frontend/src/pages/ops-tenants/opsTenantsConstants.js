@@ -60,3 +60,10 @@ export const SOURCE_EDIT_OPTIONS = [
   { value: "mercado_pago", label: "Mercado Pago" },
   { value: "external", label: "Externo" },
 ];
+
+export const ONBOARDING_SATISFACTION_OPTIONS = [
+  { value: "not_collected", label: "Ainda nao perguntamos" },
+  { value: "satisfied", label: "Satisfeito" },
+  { value: "neutral", label: "Neutro / precisa de retorno" },
+  { value: "dissatisfied", label: "Insatisfeito" },
+];
