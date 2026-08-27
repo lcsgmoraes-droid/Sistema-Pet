@@ -418,3 +418,34 @@ Proxima fatia recomendada:
    testes de comportamento e compatibilidade.
 2. Auditar atalhos e scripts antigos da raiz sem alterar o caminho oficial.
 
+## Atualizacao continua - 2026-08-27 - Transferencia entre empresas
+
+Fatia pequena executada na trilha de arquivos grandes:
+
+- o cancelamento atomico de transferencia entre empresas foi movido para
+  `backend/app/estoque/transferencia_grupo_cancelamento_service.py`;
+- `backend/app/estoque/transferencia_grupo_service.py` preserva a interface
+  publica usada pelas rotas e testes, delegando o cancelamento ao novo modulo;
+- a dependencia de sincronizacao de estoque continua entrando pela fachada,
+  preservando os contratos de teste e evitando acoplamento com o agendador;
+- o arquivo principal caiu de 1133 para 747 linhas fisicas;
+- o modulo novo possui 433 linhas e concentra apenas validacao financeira,
+  reversao de estoque, auditoria e idempotencia do cancelamento;
+- nenhuma rota, schema, migration ou regra de negocio foi alterada;
+- a suite `backend/tests/unit/test_transferencia_grupo_service.py` passou com
+  5 testes, cobrindo execucao, idempotencia, rollback e cancelamento nos dois
+  tenants.
+
+Nova medicao de codigo ativo, contando linhas fisicas inclusive em branco:
+
+- `frontend/src/pages/configuracoes/EntregasConfig.jsx`: 1191 linhas;
+- `backend/app/services/ops_tenants_service.py`: 1042 linhas;
+- `backend/app/whatsapp/processor.py`: 1019 linhas.
+
+Proxima fatia recomendada:
+
+1. Dividir `EntregasConfig.jsx` somente depois de criar testes de caracterizacao
+   para carregamento, validacao e salvamento das configuracoes.
+2. Revisar `ops_tenants_service.py` e `whatsapp/processor.py` por responsabilidade,
+   sem extrair codigo apenas para reduzir a contagem de linhas.
+
