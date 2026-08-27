@@ -67,6 +67,8 @@ for (const literal of [
   "Planos e pagamentos",
   "Uso e cadastros",
   "Acompanhamento dos pilotos",
+  "Com proxima acao",
+  "Proxima acao",
   "Guardrails do MVP",
   "Rode uma simulacao valida antes de aplicar a importacao.",
   "Manutencao salva.",

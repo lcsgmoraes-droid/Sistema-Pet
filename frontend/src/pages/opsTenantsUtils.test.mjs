@@ -30,7 +30,7 @@ test("buildOpsTenantTabSummaries resume tenants por aba do MVP Ops", () => {
       base_catalog: { installed: true },
       counts: { produtos: 3 },
       usage: { records_total: 18, image_bytes: 1572864 },
-      pilot: { status: "active" },
+      pilot: { status: "active", needs_follow_up: false },
     },
     {
       status: "suspended",
@@ -38,7 +38,7 @@ test("buildOpsTenantTabSummaries resume tenants por aba do MVP Ops", () => {
       base_catalog: { installed: false },
       counts: { produtos: 0 },
       usage: { records_total: 2, image_bytes: 0 },
-      pilot: { status: "blocked" },
+      pilot: { status: "blocked", needs_follow_up: true },
     },
   ];
 
@@ -69,6 +69,7 @@ test("buildOpsTenantTabSummaries resume tenants por aba do MVP Ops", () => {
     active: 1,
     blocked: 1,
     pending: 0,
+    needFollowUp: 1,
   });
 });
 

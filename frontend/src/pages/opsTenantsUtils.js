@@ -66,6 +66,14 @@ export function buildOpsTenantTabSummaries(items = [], summary = {}) {
     summary?.pilots_blocked ??
       items.filter((item) => String(item?.pilot?.status || "") === "blocked").length,
   );
+  const pilotNeedFollowUp = Number(
+    summary?.pilots_need_follow_up ??
+      items.filter((item) => {
+        const pilot = item?.pilot || {};
+        if (typeof pilot.needs_follow_up === "boolean") return pilot.needs_follow_up;
+        return String(pilot.status || "") !== "active";
+      }).length,
+  );
   const pilotPending = items.filter((item) =>
     ["pending", "ready"].includes(String(item?.pilot?.status || "")),
   ).length;
@@ -87,6 +95,7 @@ export function buildOpsTenantTabSummaries(items = [], summary = {}) {
       active: pilotActive,
       blocked: pilotBlocked,
       pending: pilotPending,
+      needFollowUp: pilotNeedFollowUp,
     },
     usage: {
       recordsTotal,
