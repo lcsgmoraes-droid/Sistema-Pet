@@ -1,5 +1,6 @@
 import { FiCheckCircle, FiRefreshCw, FiTrash2 } from "react-icons/fi";
 import PetIdentity from "../../components/ui/PetIdentity";
+import CustomerIdentity from "../../components/ui/CustomerIdentity";
 import { formatarMoeda } from "./lembretesFormatters";
 
 export default function LembreteCard({ lembrete, onCompletar, onRenovar, onCancelar }) {
@@ -8,6 +9,7 @@ export default function LembreteCard({ lembrete, onCompletar, onRenovar, onCance
   const status = diasRestantes < 0 ? "vencido" : diasRestantes <= 7 ? "proximo" : "futuro";
   const temDoseTotal = lembrete.dose_total && lembrete.dose_total > 0;
   const progressoPercentual = temDoseTotal ? (lembrete.dose_atual / lembrete.dose_total) * 100 : 0;
+  const informadoNoPdv = String(lembrete.origem_intervalo || "").startsWith("informado_venda");
 
   return (
     <article className="grid gap-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition hover:border-slate-300 dark:border-slate-700 dark:bg-slate-900 dark:hover:border-slate-600 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
@@ -20,6 +22,11 @@ export default function LembreteCard({ lembrete, onCompletar, onRenovar, onCance
             {temDoseTotal && (
               <span className="rounded-full bg-indigo-50 px-2.5 py-1 text-xs font-semibold text-indigo-700 ring-1 ring-inset ring-indigo-200 dark:bg-indigo-500/10 dark:text-indigo-300 dark:ring-indigo-500/30">
                 Dose {lembrete.dose_atual}/{lembrete.dose_total}
+              </span>
+            )}
+            {informadoNoPdv && (
+              <span className="rounded-full bg-teal-50 px-2.5 py-1 text-xs font-semibold text-teal-700 ring-1 ring-inset ring-teal-200 dark:bg-teal-500/10 dark:text-teal-300 dark:ring-teal-500/30">
+                Informado no PDV
               </span>
             )}
             <span className={statusClassName(status)}>
@@ -41,7 +48,19 @@ export default function LembreteCard({ lembrete, onCompletar, onRenovar, onCance
           </div>
         )}
 
-        <dl className="mt-3 grid gap-x-5 gap-y-2 text-sm text-slate-600 dark:text-slate-400 sm:grid-cols-2 xl:grid-cols-4">
+        <dl className="mt-3 grid gap-x-5 gap-y-2 text-sm text-slate-600 dark:text-slate-400 sm:grid-cols-2 xl:grid-cols-5">
+          <div className="flex min-w-0 gap-1.5">
+            <dt className="font-medium text-slate-500 dark:text-slate-500">Cliente:</dt>
+            <dd className="m-0 min-w-0 text-slate-800 dark:text-slate-200">
+              <CustomerIdentity
+                fallback="Nao informado"
+                layout="inline"
+                nameClassName="font-medium"
+                record={lembrete}
+                showCode={false}
+              />
+            </dd>
+          </div>
           <div className="flex min-w-0 gap-1.5">
             <dt className="font-medium text-slate-500 dark:text-slate-500">Pet:</dt>
             <dd className="m-0 min-w-0 text-slate-800 dark:text-slate-200">
@@ -68,6 +87,14 @@ export default function LembreteCard({ lembrete, onCompletar, onRenovar, onCance
               <dt className="font-medium text-slate-500 dark:text-slate-500">Valor estimado:</dt>
               <dd className="m-0 text-slate-800 dark:text-slate-200">
                 {formatarMoeda(lembrete.preco_estimado)}
+              </dd>
+            </div>
+          )}
+          {lembrete.cliente_telefone && (
+            <div className="flex gap-1.5">
+              <dt className="font-medium text-slate-500 dark:text-slate-500">Telefone:</dt>
+              <dd className="m-0 text-slate-800 dark:text-slate-200">
+                {lembrete.cliente_telefone}
               </dd>
             </div>
           )}

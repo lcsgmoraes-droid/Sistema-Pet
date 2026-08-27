@@ -429,6 +429,23 @@ export const BASE_CONHECIMENTO = [
         ],
       },
       {
+        slug: "alerta-fim-racao-na-venda",
+        titulo: "Como programar o aviso de quando a ração deve acabar",
+        tags: ["ração", "aviso", "lembrete", "recompra", "data", "prazo", "cliente", "pdv"],
+        conteudo: [
+          "**Objetivo:** registrar durante a venda quando a ração deve acabar, para a loja acompanhar a recompra e contatar a pessoa no momento certo.",
+          "Acesse **PDV (Vendas)** e selecione o cliente. O vínculo com o cliente é obrigatório porque o aviso precisa identificar quem comprou a ração.",
+          "Adicione uma ração ao carrinho. No próprio item, clique em **Avisar quando acabar**.",
+          "Escolha **Prazo em dias** quando o cliente souber quanto tempo o pacote costuma durar. Você pode digitar de 1 a 365 dias ou usar um dos atalhos.",
+          "Escolha **Data prevista** quando o cliente informar diretamente o dia em que acredita que a ração acabará. A data precisa ser posterior ao dia atual.",
+          "Clique em **Salvar aviso**. O carrinho passa a mostrar o prazo ou a data escolhida. Para corrigir, clique novamente; para desistir, use **Remover aviso**.",
+          "A previsão fica salva mesmo se a venda for apenas salva ou receber pagamento parcial. O lembrete é criado quando a venda fica totalmente finalizada.",
+          "Depois da finalização, acesse **Produtos / Estoque → Lembretes**. O cartão mostra produto, cliente, telefone e data prevista. O aviso informado na venda tem prioridade sobre a estimativa automática de recompra.",
+          "Se o cliente possuir conta no app, a automação existente também pode enviar a notificação de reposição conforme a antecedência calculada pelo CorePet.",
+          "**Conferência:** confirme se o cliente correto está selecionado e se o item do carrinho mostra a data ou o prazo antes de registrar o recebimento.",
+        ],
+      },
+      {
         slug: "registro-rapido-nao-venda",
         titulo: "Como registrar uma não venda ou produto que a loja não possui",
         tags: [

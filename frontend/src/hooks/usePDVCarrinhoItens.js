@@ -65,6 +65,7 @@ export function usePDVCarrinhoItens({
         composicao_kit: produto.composicao_kit || [],
         categoria_id: produto.categoria_id,
         categoria_nome: produto.categoria_nome,
+        eh_racao: produto.eh_racao,
         peso_pacote_kg: produto.peso_liquido || produto.peso_bruto,
         peso_embalagem: produto.peso_embalagem,
         classificacao_racao: produto.classificacao_racao,

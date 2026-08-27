@@ -121,6 +121,25 @@ ITENS_EVOLUCAO: tuple[dict[str, Any], ...] = (
         "caminho_ajuda": "/ajuda?aba=central&artigo=vincular-categoria-dre-conta-pagar",
     },
     {
+        "id": "alerta-fim-racao-na-venda",
+        "titulo": "Avise o cliente quando a ração estiver perto de acabar",
+        "resumo": (
+            "No carrinho do PDV, cada ração permite informar uma data ou um prazo em dias. "
+            "Ao finalizar a venda, o CorePet cria um lembrete ligado ao cliente, ao produto "
+            "e à venda para facilitar o contato e a recompra no momento certo."
+        ),
+        "status": "disponivel_teste",
+        "tipo": "melhoria",
+        "modulo": "Vendas e lembretes",
+        "plataformas": ["ERP"],
+        "canais": ["erp"],
+        "publicado_em": "2026-08-27",
+        "atualizado_em": "2026-08-27",
+        "ciclo_novidade": deepcopy(CICLO_PADRAO),
+        "destaque": True,
+        "caminho_ajuda": "/ajuda?aba=central&artigo=alerta-fim-racao-na-venda",
+    },
+    {
         "id": "registro-rapido-nao-venda",
         "titulo": "Registre não vendas e produtos que a loja não possui",
         "resumo": (

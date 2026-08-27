@@ -52,6 +52,11 @@ export function usePDVClienteContexto({ vendaAtual, setVendaAtual }) {
       ...prev,
       cliente: null,
       pet: null,
+      itens: (prev.itens || []).map((item) => ({
+        ...item,
+        racao_data_prevista_fim: null,
+        racao_prazo_estimado_dias: null,
+      })),
     }));
     setSaldoCampanhas(null);
     setVendasEmAbertoInfo(null);

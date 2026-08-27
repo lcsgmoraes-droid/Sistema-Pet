@@ -434,7 +434,26 @@ def atualizar_venda(
     db.query(VendaItem).filter_by(venda_id=venda.id).delete()
 
     # Criar novos itens
+    from app.produtos_models import Produto
+    from app.vendas.racao_previsao import validar_previsao_fim_racao
+
     for item_data in dados.itens:
+        produto_catalogo = None
+        if item_data.produto_id:
+            produto_catalogo = (
+                db.query(Produto)
+                .filter(
+                    Produto.id == item_data.produto_id,
+                    Produto.tenant_id == tenant_id,
+                )
+                .first()
+            )
+        previsao_racao = validar_previsao_fim_racao(
+            item_data,
+            produto=produto_catalogo,
+            cliente_id=dados.cliente_id,
+        )
+
         # 🔒 ISOLAMENTO MULTI-TENANT: tenant_id obrigatório
         item = VendaItem(
             venda_id=venda.id,
@@ -448,6 +467,8 @@ def atualizar_venda(
             subtotal=item_data.subtotal,
             lote_id=item_data.lote_id,
             pet_id=item_data.pet_id,
+            racao_data_prevista_fim=previsao_racao.data_prevista,
+            racao_prazo_estimado_dias=previsao_racao.prazo_dias,
         )
         db.add(item)
 

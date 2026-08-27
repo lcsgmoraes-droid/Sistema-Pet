@@ -89,6 +89,7 @@ def process_finalized_sale_recurrence(
     """Completa o ciclo anterior e cria a proxima oportunidade de recompra."""
     from app.models import Pet
     from app.produtos_models import Lembrete, Produto
+    from app.vendas.racao_previsao import resolver_previsao_fim_racao
     from app.vendas_models import Venda, VendaItem
 
     result = {"created": [], "completed": [], "skipped": []}
@@ -123,6 +124,11 @@ def process_finalized_sale_recurrence(
 
         is_protocol = bool(
             getattr(produto, "numero_doses", None) and produto.numero_doses > 1
+        )
+        previsao_manual = (
+            resolver_previsao_fim_racao(item, data_compra=purchase_at)
+            if produto.eh_racao
+            else None
         )
         pet_id = item.pet_id if is_protocol else None
         key = (produto.id, pet_id)
@@ -180,7 +186,14 @@ def process_finalized_sale_recurrence(
             getattr(produto, "intervalo_dias", None),
             minimum_days=1 if is_protocol else MIN_INTERVAL_DAYS,
         )
-        if is_protocol:
+        if previsao_manual:
+            estimate = RecurrenceEstimate(
+                previsao_manual.intervalo_dias,
+                1.0,
+                len({value.date() for value in purchase_dates}),
+                previsao_manual.origem,
+            )
+        elif is_protocol:
             estimate = RecurrenceEstimate(
                 configured_interval,
                 1.0 if configured_interval else 0.0,
@@ -239,7 +252,11 @@ def process_finalized_sale_recurrence(
             )
             continue
 
-        next_at = purchase_at + timedelta(days=estimate.interval_days)
+        next_at = (
+            previsao_manual.data_prevista
+            if previsao_manual
+            else purchase_at + timedelta(days=estimate.interval_days)
+        )
         lead_days = notification_lead_days(estimate.interval_days)
         reminder = Lembrete(
             tenant_id=tenant_id,
@@ -256,6 +273,11 @@ def process_finalized_sale_recurrence(
             notificacao_enviada=False,
             quantidade_recomendada=float(item.quantidade),
             preco_estimado=float(produto.preco_venda or 0),
+            observacoes=(
+                "Previsão de término da ração informada no PDV."
+                if previsao_manual
+                else None
+            ),
             dose_atual=next_dose,
             dose_total=produto.numero_doses if is_protocol else None,
             historico_doses=json.dumps(updated_history, ensure_ascii=False),

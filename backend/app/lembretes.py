@@ -191,6 +191,13 @@ async def listar_lembretes_pendentes(
             "lembretes": [
                 {
                     "id": lembrete.id,
+                    "cliente_id": lembrete.cliente_id,
+                    "cliente_nome": lembrete.cliente.nome if lembrete.cliente else None,
+                    "cliente_telefone": (
+                        lembrete.cliente.celular or lembrete.cliente.telefone
+                        if lembrete.cliente
+                        else None
+                    ),
                     "pet_nome": lembrete.pet.nome if lembrete.pet else None,
                     "produto_nome": lembrete.produto.nome,
                     "data_proxima_dose": lembrete.data_proxima_dose.isoformat(),

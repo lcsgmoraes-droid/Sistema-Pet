@@ -1,5 +1,7 @@
+import { useState } from "react";
 import {
   BookmarkPlus,
+  CalendarClock,
   ChevronDown,
   ChevronRight,
   Layers,
@@ -8,6 +10,7 @@ import {
   Plus,
   Trash2,
 } from "lucide-react";
+import toast from "react-hot-toast";
 import QuantidadeInput from "../QuantidadeInput";
 import SubtotalInput from "../SubtotalInput";
 import { formatMoneyBRL } from "../../utils/formatters";
@@ -18,6 +21,9 @@ import ProdutoSelector from "../produtos/ProdutoSelector";
 import CopyableCode from "../ui/CopyableCode";
 import CopyableValue from "../ui/CopyableValue";
 import Panel from "../ui/Panel";
+import { ehRacao } from "../../helpers/deteccaoRacao";
+import ModalPrevisaoFimRacao from "./ModalPrevisaoFimRacao";
+import { resumirPrevisaoFimRacao } from "./pdvPrevisaoFimRacao";
 
 function obterImagemMiniaturaItem(item) {
   return (
@@ -150,6 +156,7 @@ export default function PDVProdutosCard({
   onAlterarQuantidade,
   onAtualizarPetItem,
   onAtualizarQuantidadeItem,
+  onAtualizarPrevisaoFimRacao,
   onBuscarProdutoChange,
   onBuscarProdutoFocus,
   onBuscarProdutoKeyDown,
@@ -161,6 +168,27 @@ export default function PDVProdutosCard({
   produtosSugeridos,
   vendaAtual,
 }) {
+  const [previsaoEditando, setPrevisaoEditando] = useState(null);
+
+  function abrirPrevisaoFimRacao(item, index, event) {
+    event.stopPropagation();
+    if (!vendaAtual.cliente?.id) {
+      toast.error("Selecione o cliente antes de programar o aviso da ração.");
+      return;
+    }
+    setPrevisaoEditando({ item, index });
+  }
+
+  function salvarPrevisaoFimRacao(previsao) {
+    onAtualizarPrevisaoFimRacao(previsaoEditando.index, previsao);
+    setPrevisaoEditando(null);
+    toast.success(
+      previsao.racao_data_prevista_fim || previsao.racao_prazo_estimado_dias
+        ? "Aviso da ração preparado para esta venda."
+        : "Aviso da ração removido.",
+    );
+  }
+
   return (
     <Panel id="tour-pdv-carrinho" padding="sm">
       <h2 className="mb-3 flex items-center text-base font-semibold text-gray-900">
@@ -346,6 +374,22 @@ export default function PDVProdutosCard({
                             {resumoPrecoKg.precoPorKgFormatado}
                           </span>
                         )}
+                        {ehRacao(item) && (
+                          <button
+                            className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold transition ${
+                              item.racao_data_prevista_fim || item.racao_prazo_estimado_dias
+                                ? "bg-teal-100 text-teal-800 hover:bg-teal-200"
+                                : "bg-sky-50 text-sky-700 hover:bg-sky-100"
+                            } disabled:cursor-default disabled:opacity-70`}
+                            disabled={modoVisualizacao}
+                            onClick={(event) => abrirPrevisaoFimRacao(item, index, event)}
+                            title="Informar quando a ração deve acabar"
+                            type="button"
+                          >
+                            <CalendarClock className="h-3.5 w-3.5" />
+                            {resumirPrevisaoFimRacao(item)}
+                          </button>
+                        )}
                       </div>
                       <div className="mt-1 flex min-w-0 flex-wrap items-center gap-x-1 gap-y-0.5 text-sm text-gray-500">
                         <span>
@@ -487,6 +531,12 @@ export default function PDVProdutosCard({
           })}
         </div>
       )}
+      <ModalPrevisaoFimRacao
+        cliente={vendaAtual.cliente}
+        item={previsaoEditando?.item || null}
+        onClose={() => setPrevisaoEditando(null)}
+        onSalvar={salvarPrevisaoFimRacao}
+      />
     </Panel>
   );
 }
