@@ -1,6 +1,6 @@
 # Indice operacional do Sistema Pet
 
-Atualizado em: 2026-08-26
+Atualizado em: 2026-08-27
 
 Este e o ponto de entrada oficial da documentacao. Se houver conflito entre este
 indice e um documento historico, use este indice e o guia mestre de maturidade.
@@ -15,6 +15,7 @@ Guia mestre:
 |---|---|---|
 | Localizar o codigo-fonte | `docs/MAPA_CODIGO_FONTE.md` | `python scripts/validate_repository_structure.py` |
 | Entender a arquitetura | `docs/ARQUITETURA.md` | Codigo e diagramas citados no documento |
+| Consultar decisões arquiteturais | `docs/adr/README.md` | Contexto, alternativas, consequências e gatilhos de revisão |
 | Contribuir com seguranca | `CONTRIBUTING.md` | `AGENTS.md` e checks do PR |
 | Entender maturidade geral | `docs/MATURIDADE_GERAL_10_10_GUIA.md` | Historico de PRs no proprio guia |
 | Avaliar governanca enterprise | `docs/GOVERNANCA_ENTERPRISE.md` | Matriz das 14 areas e plano priorizado |
@@ -35,7 +36,7 @@ Guia mestre:
 | Backup/restore de banco | `docs/PRODUCAO_BACKUP_RESTORE_TESTE.md` | Restore smoke controlado |
 | Importar dados SimplesVet | `docs/IMPORTACAO_SIMPLESVET_SEGURA.md` | Plano, hashes e recibo da importacao |
 | Observabilidade e auditoria | `docs/RETENCAO_LOGS_AUDITORIA.md` | Painel Ops e logs JSONL |
-| Teste seguro de capacidade | `docs/TESTE_CAPACIDADE_SEGURO.md` | `scripts/capacity_smoke.py` em ambiente local |
+| Teste seguro de capacidade | `docs/TESTE_CAPACIDADE_SEGURO.md` | `scripts/capacity_smoke.py` e `scripts/capacity_authenticated.py` |
 | Estrutura/refatoracao | `docs/auditorias/estrutura-geral-definition-of-done.md` | Testes focados da fatia |
 | Vender Plano Basico | `docs/GUIA_VENDA_PLANO_BASICO.md` | Checklist de onboarding e clientes piloto |
 | Proposta e suporte do piloto | `docs/comercial/PACOTE_PILOTO_PLANO_BASICO.md` | Checklist exclusivo do Plano Basico |
@@ -67,6 +68,7 @@ Guia mestre:
 |---|---|
 | Codigo-fonte | `docs/MAPA_CODIGO_FONTE.md` |
 | Arquitetura | `docs/ARQUITETURA.md` |
+| Decisões arquiteturais (ADR) | `docs/adr/README.md` |
 | Contribuicao | `CONTRIBUTING.md` |
 | MCPs | `docs/MCP_MATURIDADE_GUIA.md` |
 | Estrutura geral | `docs/auditorias/estrutura-geral-inventario.md` |

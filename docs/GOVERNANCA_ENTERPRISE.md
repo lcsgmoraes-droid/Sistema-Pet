@@ -1,6 +1,6 @@
 # Governança enterprise do Sistema Pet
 
-Atualizado em: 2026-08-26
+Atualizado em: 2026-08-27
 
 Status: fonte oficial para avaliar a preparação organizacional e técnica do
 Sistema Pet nas 14 áreas de governança enterprise.
@@ -52,15 +52,15 @@ Até existir uma equipe de desenvolvimento formal:
 | Nº | Área | Status | O que já está coberto | Lacuna e próxima decisão |
 |---:|---|---|---|---|
 | 1 | Necessidade e requisitos | Parcial | Existem specs por funcionalidade, regras de domínio, `CONTRIBUTING.md` e Definition of Done. | O formato não era único. A ficha `docs/templates/FICHA_ENTREGA.md` passa a registrar problema, usuários, prioridade, requisitos, não funcionais e aceite. |
-| 2 | Documentação | Parcial forte | Há índice oficial, mapa do código-fonte, arquitetura, guias operacionais, evidências e histórico Git. | Decisões arquiteturais e requisitos ainda aparecem dispersos. Consolidar decisões duradouras e aposentar documentos históricos quando forem substituídos. |
-| 3 | Arquitetura e tecnologia | Parcial forte | O monólito modular, componentes, multiempresa, dados, worker, deploy e evolução incremental estão em `docs/ARQUITETURA.md`. O catálogo de SLOs define metas técnicas e por jornada. | Falta instrumentar o denominador completo e medir jornadas autenticadas, banco e integrações em homologação antes de ampliar faixas de clientes. |
+| 2 | Documentação | Parcial forte | Há índice oficial, mapa do código-fonte, arquitetura, ADRs, guias operacionais, evidências e histórico Git. | Manter novos ADRs para decisões duradouras e aposentar documentos históricos quando forem substituídos. |
+| 3 | Arquitetura e tecnologia | Parcial forte | O monólito modular, componentes, multiempresa, dados, worker, deploy e evolução incremental estão em `docs/ARQUITETURA.md`. O catálogo de SLOs define metas técnicas e por jornada; a primeira carga autenticada passou em homologação. | Ampliar volume fictício, medir recursos do host/banco e exercitar integrações antes de aprovar novas faixas de clientes. |
 | 4 | Segurança e privacidade | Parcial forte | Autenticação, permissões, tenant, RLS, regras de segredos, logs seguros, alertas e política de privacidade possuem controles reais. O inventário `docs/CATALOGO_DADOS_CRITICOS_LGPD.md` centraliza dados pessoais, finalidade proposta, direitos, retenção, papéis, controles e lacunas. | Aprovar hipóteses legais e papéis por tratamento com apoio jurídico, nomear responsáveis, registrar operadores/suboperadores e ampliar o fluxo de direitos além de clientes. |
 | 5 | Dados e banco de dados | Parcial forte | PostgreSQL, SQLAlchemy, migrations Alembic, transações, isolamento, backup, restore smoke, auditoria e retenção técnica estão documentados. O catálogo de dados classifica 16 domínios, criticidade, responsáveis propostos e ciclo de vida. | Aprovar proprietários, retenção por domínio e RPO/RTO; provar backup de arquivos/cópia externa e automatizar descarte/anonimização. |
 | 6 | Integrações | Parcial forte | O catálogo `docs/CATALOGO_INTEGRACOES.md` centraliza finalidade, autenticação, timeout, retry, idempotência, fallback, reconciliação, observabilidade, responsáveis, evidências e lacunas das integrações reais. | Corrigir autenticação fail-closed dos webhooks prioritários, exercitar indisponibilidade/replay em homologação e acumular evidência operacional antes de considerar a área sólida. |
 | 7 | Desenvolvimento | Sólido | Branch por tarefa, PR, revisão, padrões backend/frontend, migrations, pequenas fatias, regras para IA e Definition of Done estão em `AGENTS.md` e `CONTRIBUTING.md`. | Manter os gates e impedir exceções informais conforme o volume de mudanças crescer. |
 | 8 | Qualidade e testes | Sólido | CI de backend, frontend, segurança, smoke, migrations, multiempresa e E2E longo; matriz de testes por risco e evidência obrigatória. | Ampliar regressão funcional e testes de desempenho em homologação sem transformar produção em ambiente de teste. |
-| 9 | Ambientes e configuração | Parcial forte | DEV local, homologação descartável, CI e produção estão separados; variáveis e segredos ficam fora do Git; há bootstrap e verificação de ambiente. | Executar o primeiro aceite real em `corepet-homolog` e criar staging remoto apenas quando acesso compartilhado, webhooks, HTTPS ou carga contínua justificarem o custo. |
-| 10 | Homologação | Parcial forte | Há ambiente isolado com PostgreSQL próprio, build de produção, migrations, tenant fictício, E2E controlado, modelo de aceite e padrão de evidência. | Usar o processo em entregas reais e medir inconsistências encontradas antes de mudar o status para sólido. |
+| 9 | Ambientes e configuração | Parcial forte | DEV local, homologação descartável, CI e produção estão separados; variáveis e segredos ficam fora do Git; há bootstrap e verificação de ambiente. A homologação já foi usada em entregas reais e na primeira carga autenticada. | Criar staging remoto apenas quando acesso compartilhado, webhooks, HTTPS ou carga contínua justificarem o custo. |
+| 10 | Homologação | Parcial forte | Há ambiente isolado com PostgreSQL próprio, build de produção, migrations, tenant fictício, E2E, capacidade autenticada, modelo de aceite e evidências reais. | Repetir o processo nas entregas relevantes e acompanhar inconsistências antes de mudar o status para sólido. |
 | 11 | Gestão da mudança e treinamento | Parcial | Há Central de Ajuda, novidades, onboarding, guias de implantação e materiais por funcionalidade. | Tornar obrigatória a avaliação de impacto, comunicação, manual e treinamento em cada mudança visível ao usuário. A ficha de entrega inclui esse gate. |
 | 12 | Publicação e versões | Sólido | CI/CD, proteção de branch, commit identificável, deploy por usuário restrito, health, backup, migrations, evidência e rollback estão documentados e exercitados. | Manter aprovação explícita de produção e registrar toda exceção ou correção emergencial. |
 | 13 | Produção e observabilidade | Parcial forte | Health/watchdog, logs estruturados, `request_id`, auditoria, painel Ops, alertas externos e trilha de deploy estão implementados. O catálogo define objetivos e `ops_journey_events` começa o denominador sanitizado de login, seleção de tenant e venda. | Ampliar a instrumentação às demais jornadas, consolidar disponibilidade externa e criar 30 dias de linha de base antes de aprovar percentuais ou SLA. |
@@ -139,12 +139,16 @@ programação.
    privacidade e plano de instrumentação. Falta coletar o denominador completo,
    formar linha de base de 30 dias e aprovar as metas antes de tratá-las como
    compromisso.
-7. Executar capacidade autenticada em homologação antes de prometer nova faixa
-   de escala.
+7. **Executar capacidade autenticada em homologação.** Executor somente leitura,
+   bloqueio de produção e degraus iniciais 320/8 e 396/12 implantados. Faltam
+   massa representativa, recursos do host/banco e degraus maiores antes de
+   prometer nova faixa de escala.
 
 ### P2 — preparar entrada de mais pessoas e processos
 
-8. Criar registro curto de decisões arquiteturais duradouras.
+8. **Criar registro curto de decisões arquiteturais duradouras.** Índice e três
+   ADRs iniciais implantados em `docs/adr/README.md`; novos registros seguem o
+   mesmo formato quando uma decisão for transversal ou difícil de reverter.
 9. Formalizar comunicação, treinamento e notas de versão para mudanças de maior
    impacto.
 10. Revisar a matriz a cada trimestre ou antes de uma expansão relevante de
