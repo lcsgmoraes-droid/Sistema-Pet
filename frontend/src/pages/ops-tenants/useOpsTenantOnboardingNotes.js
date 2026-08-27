@@ -75,10 +75,9 @@ export default function useOpsTenantOnboardingNotes(selectedTenantId) {
     setNoteError("");
     setNoteSuccess("");
     try {
-      const response = await api.post(
-        `/admin/tenants/${tenantId}/onboarding-follow-up/notes`,
-        { note },
-      );
+      const response = await api.post(`/admin/tenants/${tenantId}/onboarding-follow-up/notes`, {
+        note,
+      });
       if (activeTenantId.current === tenantId) {
         setNotes((current) => [response.data, ...current]);
         setNoteText("");
