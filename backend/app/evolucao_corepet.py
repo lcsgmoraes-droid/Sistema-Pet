@@ -121,6 +121,26 @@ ITENS_EVOLUCAO: tuple[dict[str, Any], ...] = (
         "caminho_ajuda": "/ajuda?aba=central&artigo=vincular-categoria-dre-conta-pagar",
     },
     {
+        "id": "registro-rapido-nao-venda",
+        "titulo": "Registre não vendas e produtos que a loja não possui",
+        "resumo": (
+            "No PDV, o botão Não venda registra cliente opcional, motivo e produtos "
+            "procurados, inclusive itens que não existem no catálogo. O relatório mostra "
+            "atendimentos perdidos, motivos e demanda por produto, marca e fornecedor, "
+            "com detalhes cliente × produto e exportação em CSV."
+        ),
+        "status": "disponivel_teste",
+        "tipo": "melhoria",
+        "modulo": "Vendas e gestão",
+        "plataformas": ["ERP"],
+        "canais": ["erp"],
+        "publicado_em": "2026-08-27",
+        "atualizado_em": "2026-08-27",
+        "ciclo_novidade": deepcopy(CICLO_PADRAO),
+        "destaque": True,
+        "caminho_ajuda": "/ajuda?aba=central&artigo=registro-rapido-nao-venda",
+    },
+    {
         "id": "relatorio-lista-espera-sku",
         "titulo": "Lista de espera organizada por fornecedor, marca e SKU",
         "resumo": (

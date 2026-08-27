@@ -56,6 +56,7 @@ export default function PDVOverlays(props) {
     mostrarModalEndereco,
     mostrarModalPagamento,
     mostrarPendenciasEstoque,
+    mostrarNaoVenda,
     mostrarVendasEmAberto,
     podeVerMargem,
     racaoIdFechada,
@@ -82,6 +83,7 @@ export default function PDVOverlays(props) {
     onCloseModalEndereco,
     onCloseModalPagamento,
     onClosePendenciasEstoque,
+    onCloseNaoVenda,
     onCloseVendasEmAberto,
     onConfirmarCredito,
     onConfirmarPagamento,
@@ -160,6 +162,7 @@ export default function PDVOverlays(props) {
         mostrarModalEndereco={mostrarModalEndereco}
         mostrarModalPagamento={mostrarModalPagamento}
         mostrarPendenciasEstoque={mostrarPendenciasEstoque}
+        mostrarNaoVenda={mostrarNaoVenda}
         mostrarVendasEmAberto={mostrarVendasEmAberto}
         podeVerMargem={podeVerMargem}
         racaoIdFechada={racaoIdFechada}
@@ -187,6 +190,7 @@ export default function PDVOverlays(props) {
         onCloseModalEndereco={onCloseModalEndereco}
         onCloseModalPagamento={onCloseModalPagamento}
         onClosePendenciasEstoque={onClosePendenciasEstoque}
+        onCloseNaoVenda={onCloseNaoVenda}
         onCloseVendasEmAberto={onCloseVendasEmAberto}
         onConfirmarCredito={onConfirmarCredito}
         onConfirmarPagamento={onConfirmarPagamento}

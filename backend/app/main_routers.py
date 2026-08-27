@@ -144,6 +144,7 @@ from app.api.endpoints.dashboard_entregas import (
 from app.pendencia_estoque_routes import (
     router as pendencia_estoque_router,
 )  # Sistema de Lista de Espera
+from app.nao_venda_routes import router as nao_venda_router
 
 # ============================================================================
 # WHATSAPP + IA - SPRINT 2 & 4 & 6 & 7
@@ -580,6 +581,7 @@ def register_routers(app: FastAPI) -> None:
     app.include_router(
         pendencia_estoque_router, tags=["Pendências de Estoque - Lista de Espera"]
     )
+    app.include_router(nao_venda_router, tags=["PDV - Não vendas"])
 
     # ============================================================================
     # WHATSAPP + IA - SPRINT 2 & 4 & 5 & 6 & 7

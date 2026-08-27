@@ -7,6 +7,7 @@ import HistoricoCliente from "./HistoricoCliente";
 import ModalCadastroCliente from "./ModalCadastroCliente";
 import ModalCalculadoraRacaoPDV from "./ModalCalculadoraRacaoPDV";
 import ModalPendenciasEstoque from "./ModalPendenciasEstoque";
+import ModalNaoVenda from "./ModalNaoVenda";
 import PDVDescontoItemModal from "./PDVDescontoItemModal";
 import PDVDescontoTotalModal from "./PDVDescontoTotalModal";
 import PDVEnderecoModal from "./PDVEnderecoModal";
@@ -29,6 +30,7 @@ export default function PDVModalsLayer({
   mostrarModalEndereco,
   mostrarModalPagamento,
   mostrarPendenciasEstoque,
+  mostrarNaoVenda,
   mostrarVendasEmAberto,
   podeVerMargem,
   racaoIdFechada,
@@ -57,6 +59,7 @@ export default function PDVModalsLayer({
   onCloseModalEndereco,
   onCloseModalPagamento,
   onClosePendenciasEstoque,
+  onCloseNaoVenda,
   onCloseVendasEmAberto,
   onConfirmarCredito,
   onConfirmarPagamento,
@@ -79,6 +82,7 @@ export default function PDVModalsLayer({
     mostrarVendasEmAberto && onCloseVendasEmAberto,
     mostrarHistoricoCliente && onCloseHistoricoCliente,
     mostrarPendenciasEstoque && onClosePendenciasEstoque,
+    mostrarNaoVenda && onCloseNaoVenda,
     mostrarCalculadoraRacao && onCloseCalculadoraRacao,
     mostrarModalAbrirCaixa && onCloseModalAbrirCaixa,
     mostrarAnaliseVenda && onCloseAnalise,
@@ -121,6 +125,14 @@ export default function PDVModalsLayer({
           onClose={onClosePendenciasEstoque}
           clienteId={clienteAtual?.id || null}
           onPendenciaAdicionada={onPendenciaAdicionada}
+        />
+      )}
+
+      {mostrarNaoVenda && (
+        <ModalNaoVenda
+          isOpen={mostrarNaoVenda}
+          clienteInicial={clienteAtual}
+          onClose={onCloseNaoVenda}
         />
       )}
 

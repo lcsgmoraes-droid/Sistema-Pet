@@ -8,6 +8,7 @@ export function usePDVUIState() {
   const [mostrarHistoricoCliente, setMostrarHistoricoCliente] = useState(false);
   const [mostrarModalAdicionarCredito, setMostrarModalAdicionarCredito] = useState(false);
   const [mostrarPendenciasEstoque, setMostrarPendenciasEstoque] = useState(false);
+  const [mostrarNaoVenda, setMostrarNaoVenda] = useState(false);
   const [loading, setLoading] = useState(false);
   const [modoVisualizacao, setModoVisualizacao] = useState(false);
   const [searchVendaQuery, setSearchVendaQuery] = useState("");
@@ -33,6 +34,8 @@ export function usePDVUIState() {
     setMostrarModalAdicionarCredito,
     mostrarPendenciasEstoque,
     setMostrarPendenciasEstoque,
+    mostrarNaoVenda,
+    setMostrarNaoVenda,
     loading,
     setLoading,
     modoVisualizacao,

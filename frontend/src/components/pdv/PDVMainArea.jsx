@@ -28,6 +28,7 @@ export default function PDVMainArea(props) {
     painelAssistenteAberto,
     mensagensAssistenteLength,
     onAbrirPendenciasEstoque,
+    onAbrirNaoVenda,
     onAbrirOportunidades,
     onToggleAssistente,
     abrirDevolucaoSignal,
@@ -170,6 +171,7 @@ export default function PDVMainArea(props) {
         painelAssistenteAberto={painelAssistenteAberto}
         mensagensAssistenteLength={mensagensAssistenteLength}
         onAbrirPendenciasEstoque={onAbrirPendenciasEstoque}
+        onAbrirNaoVenda={onAbrirNaoVenda}
         onAbrirOportunidades={onAbrirOportunidades}
         onToggleAssistente={onToggleAssistente}
         abrirDevolucaoSignal={abrirDevolucaoSignal}
