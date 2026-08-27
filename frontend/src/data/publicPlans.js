@@ -210,9 +210,22 @@ function formatPriceFromCents(priceCents) {
   });
 }
 
-function createMixedPlanOffer({ id, name, planIds, description, featured = false }) {
+function createMixedPlanOffer({
+  id,
+  name,
+  planIds,
+  promotionalPriceCents,
+  description,
+  featured = false,
+}) {
   const plans = planIds.map((planId) => findPublicPlan(planId));
-  const priceCents = plans.reduce((total, plan) => total + priceToCents(plan.price), 0);
+  const regularPriceCents = plans.reduce((total, plan) => total + priceToCents(plan.price), 0);
+  const priceCents = promotionalPriceCents ?? regularPriceCents;
+  const savingsCents = regularPriceCents - priceCents;
+
+  if (savingsCents < 0) {
+    throw new Error(`O preço promocional de ${name} não pode superar a soma dos planos.`);
+  }
 
   return {
     id,
@@ -222,6 +235,10 @@ function createMixedPlanOffer({ id, name, planIds, description, featured = false
     planNames: plans.map((plan) => plan.name),
     price: formatPriceFromCents(priceCents),
     priceCents,
+    regularPrice: formatPriceFromCents(regularPriceCents),
+    regularPriceCents,
+    savings: formatPriceFromCents(savingsCents),
+    savingsCents,
     featured,
   };
 }
@@ -231,24 +248,28 @@ export const mixedPlanStartingOffers = [
     id: "pet-grooming-start",
     name: "Loja + Banho & Tosa",
     planIds: ["pet-start", "grooming-start"],
+    promotionalPriceCents: 9_990,
     description: "PDV e estoque da loja com agenda e rotina de serviços.",
   }),
   createMixedPlanOffer({
     id: "pet-vet-start",
     name: "Loja + Veterinário",
     planIds: ["pet-start", "vet-start"],
+    promotionalPriceCents: 11_990,
     description: "Operação da loja com agenda e atendimento veterinário.",
   }),
   createMixedPlanOffer({
     id: "vet-grooming-start",
     name: "Veterinário + Banho & Tosa",
     planIds: ["vet-start", "grooming-start"],
+    promotionalPriceCents: 12_990,
     description: "Agenda clínica e serviços compartilhando clientes e pets.",
   }),
   createMixedPlanOffer({
     id: "corepet-mix-start",
     name: "CorePet Mix · 3 áreas",
     planIds: ["pet-start", "vet-start", "grooming-start"],
+    promotionalPriceCents: 16_990,
     description: "Loja, Veterinário e Banho & Tosa no mesmo ecossistema.",
     featured: true,
   }),
@@ -258,6 +279,7 @@ export const mixedPlanCompleteOffer = createMixedPlanOffer({
   id: "corepet-mix-completo",
   name: "CorePet Mix Completo",
   planIds: ["pet-venda-ativa", "vet-completo", "grooming-completo"],
+  promotionalPriceCents: 109_700,
   description:
     "Os planos mais completos de Loja Pet, Veterinário e Banho & Tosa na mesma operação.",
 });

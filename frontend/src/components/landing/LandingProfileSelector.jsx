@@ -156,10 +156,10 @@ function MixedPlanPricing() {
           Preço claro para operações mistas
         </p>
         <h3 className="mt-2 text-3xl font-black tracking-tight">
-          Combine as áreas. Pague pelos planos escolhidos.
+          Combine as áreas e economize com o CorePet Mix.
         </h3>
         <p className="mt-3 max-w-3xl leading-7 text-slate-600">
-          Os valores abaixo somam os planos Start de cada área. Loja, Veterinário e Banho & Tosa
+          Os valores abaixo combinam os planos Start com desconto. Loja, Veterinário e Banho & Tosa
           compartilham clientes e pets, e cada módulo pode evoluir separadamente.
         </p>
       </div>
@@ -193,6 +193,13 @@ function MixedPlanPricing() {
               </span>
             </div>
             <p
+              className={`mt-1 text-xs font-bold ${
+                offer.featured ? "text-emerald-300" : "text-emerald-700"
+              }`}
+            >
+              De R$ {offer.regularPrice} · economize R$ {offer.savings}
+            </p>
+            <p
               className={`mt-3 text-sm leading-6 ${
                 offer.featured ? "text-slate-300" : "text-slate-600"
               }`}
@@ -206,11 +213,12 @@ function MixedPlanPricing() {
       <div className="flex flex-col gap-5 border-t border-violet-200 bg-white px-6 py-6 sm:px-8 lg:flex-row lg:items-center lg:justify-between">
         <div>
           <p className="text-sm font-black text-slate-950">
-            Quer tudo no nível mais completo? R$ {mixedPlanCompleteOffer.price}/mês.
+            CorePet Mix Completo: R$ {mixedPlanCompleteOffer.price}/mês.
           </p>
           <p className="mt-1 text-sm leading-6 text-slate-600">
-            Esse valor soma Pet Venda Ativa, Vet Completo e B&amp;T Completo, sem desconto oculto ou
-            surpresa na proposta.
+            Pet Venda Ativa, Vet Completo e B&amp;T Completo custariam R${" "}
+            {mixedPlanCompleteOffer.regularPrice}. No Mix, a economia é de R${" "}
+            {mixedPlanCompleteOffer.savings} por mês.
           </p>
         </div>
         <a

@@ -344,6 +344,13 @@ export default function Planos() {
                     </span>
                   </p>
                   <p
+                    className={`mt-1 text-xs font-bold ${
+                      offer.featured ? "text-emerald-300" : "text-emerald-700"
+                    }`}
+                  >
+                    De R$ {offer.regularPrice} · economize R$ {offer.savings}
+                  </p>
+                  <p
                     className={`mt-2 text-sm leading-6 ${
                       offer.featured ? "text-slate-300" : "text-slate-600"
                     }`}
@@ -355,7 +362,9 @@ export default function Planos() {
             </div>
             <p className="mt-6 rounded-2xl bg-white px-5 py-4 text-sm font-bold leading-6 text-slate-700">
               CorePet Mix Completo: R$ {mixedPlanCompleteOffer.price}/mês — Pet Venda Ativa, Vet
-              Completo e B&amp;T Completo na mesma operação.
+              Completo e B&amp;T Completo na mesma operação. Economia de R${" "}
+              {mixedPlanCompleteOffer.savings} sobre o valor individual de R${" "}
+              {mixedPlanCompleteOffer.regularPrice}.
             </p>
           </section>
         )}
