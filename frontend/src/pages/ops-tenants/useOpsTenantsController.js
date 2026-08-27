@@ -11,6 +11,7 @@ import {
 
 import { extractError, sumCounts } from "./opsTenantsFormatters";
 import { BILLING_OFFER_PLAN_OPTIONS } from "./opsTenantsConstants";
+import useOpsTenantOnboardingNotes from "./useOpsTenantOnboardingNotes";
 
 function tomorrowIsoDate() {
   const value = new Date();
@@ -117,6 +118,17 @@ export default function useOpsTenantsController() {
       loadBillingOffers(selectedTenant.id);
     }
   }, [loadBillingOffers, selectedTenant]);
+
+  const {
+    handleNoteChange: handleOnboardingNoteChange,
+    handleNoteSubmit: handleOnboardingNoteSubmit,
+    noteError: onboardingNoteError,
+    noteSaving: onboardingNoteSaving,
+    noteSuccess: onboardingNoteSuccess,
+    noteText: onboardingNoteText,
+    notes: onboardingNotes,
+    notesLoading: onboardingNotesLoading,
+  } = useOpsTenantOnboardingNotes(selectedTenant?.id || "");
 
   useEffect(() => {
     setCommercialError("");
@@ -351,6 +363,8 @@ export default function useOpsTenantsController() {
     handleCommercialChange,
     handleCommercialSubmit,
     handleOnboardingChange,
+    handleOnboardingNoteChange,
+    handleOnboardingNoteSubmit,
     handleOnboardingSubmit,
     handleBillingOfferChange,
     handleBillingOfferSubmit,
@@ -361,6 +375,12 @@ export default function useOpsTenantsController() {
     loading,
     onboardingError,
     onboardingForm,
+    onboardingNoteError,
+    onboardingNoteSaving,
+    onboardingNoteSuccess,
+    onboardingNoteText,
+    onboardingNotes,
+    onboardingNotesLoading,
     onboardingSaving,
     onboardingSuccess,
     previewByTenant,

@@ -605,6 +605,7 @@ class Tenant(Base):
     billing_checkout_url = Column(String(500), nullable=True)
     onboarding_owner_name = Column(String(160), nullable=True)
     onboarding_unblocked_on = Column(Date, nullable=True)
+    onboarding_next_contact_on = Column(Date, nullable=True)
     onboarding_satisfaction = Column(
         String(24), nullable=False, server_default="not_collected"
     )

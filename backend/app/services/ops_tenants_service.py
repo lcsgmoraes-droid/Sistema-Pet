@@ -2,17 +2,18 @@ from __future__ import annotations
 
 from datetime import date, datetime, timedelta, timezone
 from typing import Any
+from zoneinfo import ZoneInfo
 
 from sqlalchemy import inspect, text
 from sqlalchemy.orm import Session
 
+from app.ops_models import OpsTenantOnboardingNote
 from app.services.base_catalog_import_service import (
     DEFAULT_BASE_CATALOG_BUNDLE_CODE,
     DEFAULT_BASE_CATALOG_BUNDLE_VERSION,
     DEFAULT_BASE_CATALOG_SOURCE_EMAIL,
     import_base_catalog,
 )
-
 
 COUNT_TABLES = {
     "produtos": "produtos",
@@ -66,6 +67,7 @@ ONBOARDING_SATISFACTION_OPTIONS = {
     "neutral",
     "dissatisfied",
 }
+BUSINESS_TIMEZONE = ZoneInfo("America/Sao_Paulo")
 
 
 class OpsTenantActionError(RuntimeError):
@@ -107,6 +109,23 @@ def _parse_datetime(value: Any) -> datetime | None:
     return parsed.astimezone(timezone.utc)
 
 
+def _parse_date(value: Any) -> date | None:
+    if value is None:
+        return None
+    if isinstance(value, datetime):
+        return value.date()
+    if isinstance(value, date):
+        return value
+    try:
+        return date.fromisoformat(str(value).strip()[:10])
+    except ValueError:
+        return None
+
+
+def _business_today() -> date:
+    return datetime.now(BUSINESS_TIMEZONE).date()
+
+
 def _count_by_tenant(db: Session, table_name: str, tenant_id: str) -> int:
     if not _table_exists(db, table_name):
         return 0
@@ -125,14 +144,12 @@ def _count_users(db: Session, tenant_id: str) -> int:
     if _table_exists(db, "user_tenants"):
         return int(
             db.execute(
-                text(
-                    """
+                text("""
                     SELECT COUNT(DISTINCT user_id)
                     FROM user_tenants
                     WHERE CAST(tenant_id AS TEXT) = :tenant_id
                       AND COALESCE(CAST(is_active AS TEXT), 'true') NOT IN ('false', '0')
-                    """
-                ),
+                    """),
                 {"tenant_id": tenant_id},
             ).scalar()
             or 0
@@ -148,15 +165,13 @@ def _principal_user(db: Session, tenant_id: str) -> dict[str, Any] | None:
 
     row = (
         db.execute(
-            text(
-                """
+            text("""
             SELECT id, email, nome, is_active, is_admin, email_verified, last_login_at
             FROM users
             WHERE CAST(tenant_id AS TEXT) = :tenant_id
             ORDER BY is_admin DESC, id ASC
             LIMIT 1
-            """
-            ),
+            """),
             {"tenant_id": tenant_id},
         )
         .mappings()
@@ -166,8 +181,7 @@ def _principal_user(db: Session, tenant_id: str) -> dict[str, Any] | None:
     if not row and _table_exists(db, "user_tenants"):
         row = (
             db.execute(
-                text(
-                    """
+                text("""
                 SELECT u.id, u.email, u.nome, u.is_active, u.is_admin,
                        u.email_verified, u.last_login_at
                 FROM user_tenants ut
@@ -175,8 +189,7 @@ def _principal_user(db: Session, tenant_id: str) -> dict[str, Any] | None:
                 WHERE CAST(ut.tenant_id AS TEXT) = :tenant_id
                 ORDER BY u.is_admin DESC, u.id ASC
                 LIMIT 1
-                """
-                ),
+                """),
                 {"tenant_id": tenant_id},
             )
             .mappings()
@@ -210,8 +223,7 @@ def _base_catalog_status(db: Session, tenant_id: str) -> dict[str, Any]:
 
     row = (
         db.execute(
-            text(
-                """
+            text("""
             SELECT status, updated_at, created_at, created_by_user_id
             FROM tenant_template_installs
             WHERE CAST(tenant_id AS TEXT) = :tenant_id
@@ -219,8 +231,7 @@ def _base_catalog_status(db: Session, tenant_id: str) -> dict[str, Any]:
               AND bundle_version = :bundle_version
             ORDER BY updated_at DESC, created_at DESC, id DESC
             LIMIT 1
-            """
-            ),
+            """),
             {
                 "tenant_id": tenant_id,
                 "bundle_code": DEFAULT_BASE_CATALOG_BUNDLE_CODE,
@@ -256,13 +267,11 @@ def _image_bytes(db: Session, tenant_id: str) -> int:
         return 0
     return int(
         db.execute(
-            text(
-                """
+            text("""
                 SELECT COALESCE(SUM(COALESCE(tamanho, 0)), 0)
                 FROM produto_imagens
                 WHERE CAST(tenant_id AS TEXT) = :tenant_id
-                """
-            ),
+                """),
             {"tenant_id": tenant_id},
         ).scalar()
         or 0
@@ -287,13 +296,11 @@ def _latest_tenant_timestamp(
     if not _column_exists(db, table_name, column_name):
         return None
     value = db.execute(
-        text(
-            f"""
+        text(f"""
             SELECT MAX({column_name})
             FROM {table_name}
             WHERE CAST(tenant_id AS TEXT) = :tenant_id
-            """
-        ),
+            """),
         {"tenant_id": tenant_id},
     ).scalar()
     return _iso(value)
@@ -304,27 +311,23 @@ def _latest_user_login(db: Session, tenant_id: str) -> str | None:
         return None
     candidates = [
         db.execute(
-            text(
-                """
+            text("""
                 SELECT MAX(last_login_at)
                 FROM users
                 WHERE CAST(tenant_id AS TEXT) = :tenant_id
-                """
-            ),
+                """),
             {"tenant_id": tenant_id},
         ).scalar()
     ]
     if _table_exists(db, "user_tenants"):
         candidates.append(
             db.execute(
-                text(
-                    """
+                text("""
                     SELECT MAX(u.last_login_at)
                     FROM user_tenants ut
                     JOIN users u ON u.id = ut.user_id
                     WHERE CAST(ut.tenant_id AS TEXT) = :tenant_id
-                    """
-                ),
+                    """),
                 {"tenant_id": tenant_id},
             ).scalar()
         )
@@ -342,15 +345,13 @@ def _pilot_errors_7d(db: Session, tenant_id: str) -> int:
     since = datetime.now(timezone.utc) - timedelta(days=7)
     return int(
         db.execute(
-            text(
-                """
+            text("""
                 SELECT COUNT(*)
                 FROM ops_error_events
                 WHERE CAST(tenant_id AS TEXT) = :tenant_id
                   AND status_code >= 500
                   AND created_at >= :since
-                """
-            ),
+                """),
             {"tenant_id": tenant_id, "since": since},
         ).scalar()
         or 0
@@ -362,15 +363,13 @@ def _pilot_critical_alerts(db: Session, tenant_id: str) -> int:
         return 0
     return int(
         db.execute(
-            text(
-                """
+            text("""
                 SELECT COUNT(*)
                 FROM ops_alerts
                 WHERE CAST(tenant_id AS TEXT) = :tenant_id
                   AND lower(severity) = 'critical'
                   AND lower(status) = 'open'
-                """
-            ),
+                """),
             {"tenant_id": tenant_id},
         ).scalar()
         or 0
@@ -387,6 +386,7 @@ def _pilot_follow_up(
     critical_alerts_open: int,
     onboarding_owner_name: str | None,
     onboarding_satisfaction: str | None,
+    onboarding_next_contact_on: date | str | None,
 ) -> dict[str, Any]:
     reasons: list[dict[str, Any]] = []
     overdue_milestones: list[str] = []
@@ -444,6 +444,20 @@ def _pilot_follow_up(
 
     owner_name = str(onboarding_owner_name or "").strip()
     satisfaction = str(onboarding_satisfaction or "not_collected").strip().lower()
+    next_contact_on = _parse_date(onboarding_next_contact_on)
+    today = _business_today()
+    if next_contact_on and next_contact_on < today:
+        add_reason(
+            "follow_up_overdue",
+            f"contato agendado para {next_contact_on.strftime('%d/%m/%Y')} esta atrasado",
+            "high",
+        )
+    elif next_contact_on == today:
+        add_reason(
+            "follow_up_due_today",
+            "contato de acompanhamento agendado para hoje",
+            "normal",
+        )
     if not owner_name:
         add_reason(
             "owner_pending",
@@ -485,6 +499,11 @@ def _pilot_follow_up(
         next_action = "Confirmar o primeiro acesso do responsavel pela empresa."
     elif errors_7d:
         next_action = "Investigar os erros 5xx antes do proximo acompanhamento."
+    elif next_contact_on and next_contact_on <= today:
+        next_action = (
+            "Realizar o contato de acompanhamento agendado para "
+            f"{next_contact_on.strftime('%d/%m/%Y')}."
+        )
     elif setup_records <= 0:
         next_action = "Concluir os cadastros iniciais ou a importacao assistida."
     elif operational_events <= 0:
@@ -581,6 +600,7 @@ def _tenant_pilot_status(
         critical_alerts_open=critical_alerts_open,
         onboarding_owner_name=row.get("onboarding_owner_name"),
         onboarding_satisfaction=row.get("onboarding_satisfaction"),
+        onboarding_next_contact_on=row.get("onboarding_next_contact_on"),
     )
     return {
         "kind": kind,
@@ -635,6 +655,7 @@ def _tenant_row_to_item(db: Session, row: dict[str, Any]) -> dict[str, Any]:
         "onboarding_follow_up": {
             "owner_name": row.get("onboarding_owner_name"),
             "unblocked_on": _iso(row.get("onboarding_unblocked_on")),
+            "next_contact_on": _iso(row.get("onboarding_next_contact_on")),
             "satisfaction": row.get("onboarding_satisfaction") or "not_collected",
             "updated_at": _iso(row.get("onboarding_follow_up_updated_at")),
         },
@@ -654,18 +675,16 @@ def _tenant_row_to_item(db: Session, row: dict[str, Any]) -> dict[str, Any]:
 def _fetch_tenant_item(db: Session, tenant_id: str) -> dict[str, Any]:
     row = (
         db.execute(
-            text(
-                """
+            text("""
             SELECT id, name, status, plan, billing_status, subscription_source,
                    subscription_activated_at, organization_type,
-                   onboarding_owner_name, onboarding_unblocked_on,
+                   onboarding_owner_name, onboarding_unblocked_on, onboarding_next_contact_on,
                    onboarding_satisfaction, onboarding_follow_up_updated_at,
                    created_at, updated_at
             FROM tenants
             WHERE CAST(id AS TEXT) = :tenant_id
             LIMIT 1
-            """
-            ),
+            """),
             {"tenant_id": tenant_id},
         )
         .mappings()
@@ -702,19 +721,17 @@ def list_ops_tenants(
 
     where_sql = f"WHERE {' AND '.join(clauses)}" if clauses else ""
     rows = db.execute(
-        text(
-            f"""
+        text(f"""
             SELECT id, name, status, plan, billing_status, subscription_source,
                    subscription_activated_at, organization_type,
-                   onboarding_owner_name, onboarding_unblocked_on,
+                   onboarding_owner_name, onboarding_unblocked_on, onboarding_next_contact_on,
                    onboarding_satisfaction, onboarding_follow_up_updated_at,
                    created_at, updated_at
             FROM tenants
             {where_sql}
             ORDER BY name ASC
             LIMIT :limit
-            """
-        ),
+            """),
         params,
     ).mappings()
     items = [_tenant_row_to_item(db, dict(row)) for row in rows]
@@ -784,13 +801,11 @@ def update_ops_tenant_commercial_state(
     assignments = ", ".join(f"{field} = :{field}" for field in normalized)
     params: dict[str, Any] = {"tenant_id": target_tenant_id, **normalized}
     db.execute(
-        text(
-            f"""
+        text(f"""
             UPDATE tenants
             SET {assignments}
             WHERE CAST(id AS TEXT) = :tenant_id
-            """
-        ),
+            """),
         params,
     )
     return _fetch_tenant_item(db, target_tenant_id)
@@ -805,7 +820,7 @@ def _normalize_onboarding_owner(value: Any) -> str | None:
     return normalized or None
 
 
-def _normalize_onboarding_date(value: Any) -> date | None:
+def _normalize_onboarding_date(value: Any, *, label: str) -> date | None:
     if value in {None, ""}:
         return None
     if isinstance(value, datetime):
@@ -816,7 +831,7 @@ def _normalize_onboarding_date(value: Any) -> date | None:
         return date.fromisoformat(str(value).strip())
     except ValueError as exc:
         raise OpsTenantActionError(
-            "Data de desbloqueio invalida. Use o formato AAAA-MM-DD."
+            f"{label} invalida. Use o formato AAAA-MM-DD."
         ) from exc
 
 
@@ -841,7 +856,12 @@ def update_ops_tenant_onboarding_follow_up(
 
     normalizers = {
         "onboarding_owner_name": _normalize_onboarding_owner,
-        "onboarding_unblocked_on": _normalize_onboarding_date,
+        "onboarding_unblocked_on": lambda value: _normalize_onboarding_date(
+            value, label="Data de desbloqueio"
+        ),
+        "onboarding_next_contact_on": lambda value: _normalize_onboarding_date(
+            value, label="Data do proximo contato"
+        ),
         "onboarding_satisfaction": _normalize_onboarding_satisfaction,
     }
     normalized = {
@@ -860,16 +880,95 @@ def update_ops_tenant_onboarding_follow_up(
         **normalized,
     }
     db.execute(
-        text(
-            f"""
+        text(f"""
             UPDATE tenants
             SET {", ".join(assignments)}
             WHERE CAST(id AS TEXT) = :tenant_id
-            """
-        ),
+            """),
         params,
     )
     return _fetch_tenant_item(db, target_tenant_id)
+
+
+def _normalize_onboarding_note(value: Any) -> str:
+    normalized = str(value or "").strip()
+    if len(normalized) < 3:
+        raise OpsTenantActionError("A nota deve ter pelo menos 3 caracteres.")
+    if len(normalized) > 1000:
+        raise OpsTenantActionError("A nota deve ter no maximo 1000 caracteres.")
+    return normalized
+
+
+def _onboarding_note_to_item(note: OpsTenantOnboardingNote) -> dict[str, Any]:
+    return {
+        "id": int(note.id),
+        "tenant_id": str(note.tenant_id),
+        "note": note.note,
+        "next_contact_on": _iso(note.next_contact_on),
+        "created_by": {
+            "platform_admin_id": int(note.created_by_platform_admin_id),
+            "label": note.created_by_label,
+        },
+        "created_at": _iso(note.created_at),
+    }
+
+
+def list_ops_tenant_onboarding_notes(
+    db: Session,
+    *,
+    tenant_id: str,
+    limit: int = 20,
+) -> list[dict[str, Any]]:
+    target_tenant_id = str(tenant_id).strip()
+    _ensure_target_tenant(db, target_tenant_id)
+    rows = (
+        db.query(OpsTenantOnboardingNote)
+        .filter(OpsTenantOnboardingNote.tenant_id == target_tenant_id)
+        .order_by(
+            OpsTenantOnboardingNote.created_at.desc(),
+            OpsTenantOnboardingNote.id.desc(),
+        )
+        .limit(max(1, min(int(limit), 100)))
+        .all()
+    )
+    return [_onboarding_note_to_item(row) for row in rows]
+
+
+def create_ops_tenant_onboarding_note(
+    db: Session,
+    *,
+    tenant_id: str,
+    note: str,
+    platform_admin_id: int,
+    platform_admin_label: str,
+) -> dict[str, Any]:
+    target_tenant_id = str(tenant_id).strip()
+    _ensure_target_tenant(db, target_tenant_id)
+    normalized_note = _normalize_onboarding_note(note)
+    normalized_label = str(platform_admin_label or "").strip()
+    if not normalized_label:
+        raise OpsTenantActionError("Administrador responsavel nao identificado.")
+
+    next_contact_on = db.execute(
+        text("""
+            SELECT onboarding_next_contact_on
+            FROM tenants
+            WHERE CAST(id AS TEXT) = :tenant_id
+            LIMIT 1
+            """),
+        {"tenant_id": target_tenant_id},
+    ).scalar()
+    row = OpsTenantOnboardingNote(
+        tenant_id=target_tenant_id,
+        note=normalized_note,
+        next_contact_on=_parse_date(next_contact_on),
+        created_by_platform_admin_id=int(platform_admin_id),
+        created_by_label=normalized_label[:255],
+        created_at=datetime.now(timezone.utc),
+    )
+    db.add(row)
+    db.flush()
+    return _onboarding_note_to_item(row)
 
 
 def _resolve_source_tenant_id(
@@ -879,16 +978,14 @@ def _resolve_source_tenant_id(
         raise OpsTenantActionError("Tabela de usuarios ausente.")
 
     row = db.execute(
-        text(
-            """
+        text("""
             SELECT tenant_id
             FROM users
             WHERE lower(email) = lower(:email)
               AND tenant_id IS NOT NULL
             ORDER BY id ASC
             LIMIT 1
-            """
-        ),
+            """),
         {"email": source_email},
     ).first()
     if not row:

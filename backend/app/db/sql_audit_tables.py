@@ -82,6 +82,8 @@ WHITELIST_TABLES = {
     "permissions",
     "roles",
     "sessions",
+    # Operacao interna cross-tenant, protegida por autenticacao de platform admin.
+    "ops_tenant_onboarding_notes",
     # Sistema
     "alembic_version",
     "migrations",

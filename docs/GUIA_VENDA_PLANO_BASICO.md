@@ -283,6 +283,8 @@ Toda semana, revisar:
 - [ ] Quantas demos foram feitas.
 - [ ] Quantos clientes entraram em onboarding.
 - [ ] Quantos estao ativos sem bloqueador.
+- [ ] Quais contatos estao vencidos ou agendados para hoje na aba `Pilotos`.
+- [ ] Se cada contato realizado recebeu uma nota operacional curta e segura.
 - [ ] Quais duvidas apareceram mais.
 - [ ] Quais bugs P0/P1 apareceram.
 - [ ] Se algum item da oferta precisa mudar.

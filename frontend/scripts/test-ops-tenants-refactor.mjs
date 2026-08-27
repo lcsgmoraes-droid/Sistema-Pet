@@ -22,6 +22,7 @@ const expectedFiles = [
   "src/pages/OpsTenants.jsx",
   "src/pages/ops-tenants/OpsTenantsPage.jsx",
   "src/pages/ops-tenants/useOpsTenantsController.js",
+  "src/pages/ops-tenants/useOpsTenantOnboardingNotes.js",
   "src/pages/ops-tenants/opsTenantsConstants.js",
   "src/pages/ops-tenants/opsTenantsFormatters.js",
   "src/pages/ops-tenants/OpsTenantsBadge.jsx",

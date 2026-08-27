@@ -42,6 +42,9 @@ TENANT_WHITELIST_TABLES = {
     "ops_alerts",  # cockpit admin (require_admin), visão cross-tenant
     "ops_error_events",  # captura de erros (roda antes de haver tenant)
     "ops_journey_events",  # SLOs globais; tenant_id e apenas etiqueta tecnica
+    # Historico interno lido somente pelo cockpit de platform admin. A visao precisa
+    # atravessar empresas para que a equipe operadora conduza os onboardings.
+    "ops_tenant_onboarding_notes",
     "bling_pedido_webhook_events",  # fila de worker: claim cross-tenant sem contexto
     # Filas do motor de campanhas: o worker/sender faz claim cross-tenant (SELECT FOR
     # UPDATE SKIP LOCKED) fora de request, sem tenant no contexto. A engine seta o tenant
