@@ -72,7 +72,10 @@ test("tela envia desconto por item e abre edicao ao tocar no produto", () => {
 
   assert.match(screen, /desconto_item:\s*descontoItemPdv\(item\)/);
   assert.match(content, /onPress=\{\(\) => abrirEdicaoItem\(item\)\}/);
-  assert.match(content, /Desconto no total/);
+  assert.match(content, /Desconto no total da venda/);
+  assert.match(content, /Aplicar em R\$ ou porcentagem/);
+  assert.match(content, /Desconto aplicado:/);
+  assert.match(content, /accessibilityLabel="Aplicar desconto no total da venda"/);
   assert.match(modals, /Alterar item da venda/);
   assert.match(modals, /Tipo de desconto/);
 });
