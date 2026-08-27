@@ -103,6 +103,24 @@ ITENS_EVOLUCAO: tuple[dict[str, Any], ...] = (
         "caminho_ajuda": "/ajuda?aba=central&artigo=usar-central-ajuda-guiada",
     },
     {
+        "id": "vinculo-categoria-dre-conta-pagar",
+        "titulo": "Classifique a categoria no DRE ao lançar uma despesa",
+        "resumo": (
+            "Ao escolher uma categoria sem vínculo no Contas a Pagar, o CorePet avisa e abre "
+            "a classificação no DRE antes de salvar o lançamento."
+        ),
+        "status": "disponivel_teste",
+        "tipo": "melhoria",
+        "modulo": "Financeiro",
+        "plataformas": ["ERP"],
+        "canais": ["erp"],
+        "publicado_em": "2026-08-27",
+        "atualizado_em": "2026-08-27",
+        "ciclo_novidade": deepcopy(CICLO_PADRAO),
+        "destaque": True,
+        "caminho_ajuda": "/ajuda?aba=central&artigo=vincular-categoria-dre-conta-pagar",
+    },
+    {
         "id": "cadastro-rapido-cliente-app-funcionario",
         "titulo": "Cadastro rápido de cliente durante a venda",
         "resumo": (

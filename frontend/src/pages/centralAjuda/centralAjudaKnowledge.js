@@ -513,6 +513,33 @@ export const BASE_CONHECIMENTO = [
         ],
       },
       {
+        slug: "vincular-categoria-dre-conta-pagar",
+        titulo: "Como vincular uma categoria ao DRE ao criar uma conta a pagar",
+        tags: [
+          "conta a pagar",
+          "categoria financeira",
+          "dre",
+          "classificar",
+          "vinculo",
+          "nova categoria",
+        ],
+        conteudo: [
+          "**Objetivo:** garantir que a despesa apareça na linha correta do DRE e nos relatórios financeiros.",
+          "**Antes de começar:** entre no CorePet com um usuário que possa cadastrar contas a pagar e categorias financeiras.",
+          "Acesse **Financeiro → Contas a Pagar** e clique em **+ Nova Conta**.",
+          "Preencha a descrição da despesa e, no campo **Categoria**, selecione uma categoria existente.",
+          "Para criar uma categoria, clique em **Adicionar**, informe um nome claro, como 'Aluguel da Loja', e confirme em **Criar Categoria**.",
+          "Quando a categoria ainda não tiver vínculo, o CorePet mostrará o aviso **Esta categoria ainda não está vinculada ao DRE**. Clique em **Classificar agora**.",
+          "No modal **Classificar categoria no DRE**, escolha a subcategoria que representa corretamente a despesa e clique em **Salvar vínculo**.",
+          "A classificação escolhida ficará preenchida na conta atual e gravada na categoria para os próximos lançamentos.",
+          "Complete o tipo de despesa, canal, valor, vencimento e os demais dados. Revise as informações e clique em **Salvar Conta**.",
+          "**Atenção:** escolha a classificação pelo significado real da despesa. Uma categoria vinculada ao local errado distorce a análise do DRE.",
+          "**Teste seguro:** crie uma categoria identificada como teste, vincule-a, lance uma conta de baixo valor e confirme se categoria e DRE aparecem corretos. Depois, exclua a conta e a categoria de teste.",
+          "**Checklist final:** a conta foi salva; a categoria correta aparece selecionada; a subcategoria DRE foi preenchida; e o aviso de categoria sem vínculo desapareceu.",
+          "Se cancelar a classificação, a conta não será salva enquanto a categoria continuar sem vínculo. Use **Classificar agora** para concluir.",
+        ],
+      },
+      {
         titulo: "Fluxo de Caixa — como usar",
         tags: ["fluxo de caixa", "entradas", "saídas", "financeiro"],
         conteudo: [
