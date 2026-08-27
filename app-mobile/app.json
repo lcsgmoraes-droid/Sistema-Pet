@@ -3,7 +3,7 @@
     "name": "CorePet",
     "slug": "petshop-app",
     "scheme": "corepet",
-    "version": "1.0.3",
+    "version": "1.0.4",
     "orientation": "portrait",
     "updates": {
       "enabled": true,
@@ -27,7 +27,7 @@
       "runtimeVersion": {
         "policy": "appVersion"
       },
-      "buildNumber": "12"
+      "buildNumber": "13"
     },
     "android": {
       "softwareKeyboardLayoutMode": "resize",
@@ -51,8 +51,8 @@
         "android.permission.SYSTEM_ALERT_WINDOW",
         "android.permission.WRITE_EXTERNAL_STORAGE"
       ],
-      "runtimeVersion": "1.0.3",
-      "versionCode": 14
+      "runtimeVersion": "1.0.4",
+      "versionCode": 15
     },
     "web": {
       "favicon": "./assets/favicon.png"
