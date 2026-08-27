@@ -22,7 +22,7 @@ export default function ProdutosFiltrosPanel({
 
   return (
     <FilterBar id="tour-produtos-filtros" className="mb-4 md:mb-6" onSubmit={handleSubmit}>
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-8 md:gap-4">
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-4 md:gap-4 xl:grid-cols-9">
         <div id="tour-produtos-busca" className="md:col-span-2">
           <ProdutoSelector
             placeholder="Buscar por SKU, nome ou qualquer EAN..."
@@ -103,6 +103,19 @@ export default function ProdutosFiltrosPanel({
 
         <div>
           <select
+            aria-label="Filtrar por foto"
+            value={filtros.imagem_situacao}
+            onChange={(event) => handleFiltroChange("imagem_situacao", event.target.value)}
+            className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="todas">Todas as fotos</option>
+            <option value="com_foto">Com foto</option>
+            <option value="sem_foto">Sem foto</option>
+          </select>
+        </div>
+
+        <div>
+          <select
             aria-label="Ordenar produtos"
             value={filtros.ordenacao}
             onChange={(event) => handleFiltroChange("ordenacao", event.target.value)}
@@ -114,7 +127,7 @@ export default function ProdutosFiltrosPanel({
           </select>
         </div>
 
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 md:col-span-8 md:grid-cols-4">
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 md:col-span-4 md:grid-cols-4 xl:col-span-9">
           <label className="flex min-h-10 items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 cursor-pointer">
             <input
               type="checkbox"

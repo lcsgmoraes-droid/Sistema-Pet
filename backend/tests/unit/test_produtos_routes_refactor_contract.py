@@ -84,6 +84,9 @@ def test_listar_produtos_expoe_filtro_e_ordenacao_por_estoque():
 
     assert parametros["estoque_situacao"].default == "todos"
     assert "com_estoque" in str(parametros["estoque_situacao"].annotation)
+    assert parametros["imagem_situacao"].default == "todas"
+    assert "com_foto" in str(parametros["imagem_situacao"].annotation)
+    assert "sem_foto" in str(parametros["imagem_situacao"].annotation)
     assert parametros["ordenacao"].default == "recentes"
     assert "estoque_desc" in str(parametros["ordenacao"].annotation)
 
