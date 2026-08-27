@@ -449,3 +449,34 @@ Proxima fatia recomendada:
 2. Revisar `ops_tenants_service.py` e `whatsapp/processor.py` por responsabilidade,
    sem extrair codigo apenas para reduzir a contagem de linhas.
 
+## Atualizacao continua - 2026-08-27 - Configuracao de entregas
+
+A tela de configuracao de entregas foi separada por responsabilidade, sem mudar
+a rota publica nem o contrato enviado ao backend:
+
+- `frontend/src/pages/configuracoes/EntregasConfig.jsx` virou a composicao da
+  pagina e caiu de 1191 para 125 linhas fisicas;
+- carregamento, busca de CEP, alteracao de faixas e salvamento foram movidos para
+  `entregasConfig/useEntregasConfigController.js`;
+- valores iniciais, normalizacao, validacao e montagem do payload ficaram em
+  `entregasConfig/entregasConfigUtils.js`, permitindo testes sem renderizar React;
+- entregador, endereco, regras comerciais e metodo de distancia viraram quatro
+  componentes visuais coesos;
+- todos os arquivos da fatia ficaram abaixo de 420 linhas; o maior possui 355;
+- `scripts/test-entregas-config-refactor.mjs` protege endpoints, textos de erro,
+  normalizacao, payload, composicao e limite estrutural;
+- o contrato de zero arquivos frontend acima de 1000 linhas e o build de
+  producao passaram.
+
+Hotspots ativos acima de 1000 linhas fisicas depois desta fatia:
+
+- `backend/app/services/ops_tenants_service.py`: 1042 linhas;
+- `backend/app/whatsapp/processor.py`: 1019 linhas.
+
+Proxima fatia recomendada:
+
+1. Avaliar `ops_tenants_service.py` por grupos de consulta e serializacao, com a
+   suite multiempresa como protecao obrigatoria.
+2. Mexer em `whatsapp/processor.py` apenas quando houver um corte de fluxo claro
+   e testes de replay/deduplicacao suficientes.
+
