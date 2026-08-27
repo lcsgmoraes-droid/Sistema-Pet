@@ -142,6 +142,7 @@ export function buildOpsTenantOnboardingForm(tenant = {}) {
   return {
     owner_name: String(followUp.owner_name || "").trim(),
     unblocked_on: String(followUp.unblocked_on || "").trim(),
+    next_contact_on: String(followUp.next_contact_on || "").trim(),
     satisfaction: String(followUp.satisfaction || "not_collected")
       .trim()
       .toLowerCase(),
@@ -149,12 +150,16 @@ export function buildOpsTenantOnboardingForm(tenant = {}) {
 }
 
 export function buildOpsTenantOnboardingPayload(current = {}, next = {}) {
-  return ["owner_name", "unblocked_on", "satisfaction"].reduce((payload, field) => {
-    const currentValue = String(current?.[field] || "").trim();
-    const nextValue = String(next?.[field] || "").trim();
-    if (nextValue !== currentValue) {
-      payload[field] = field === "satisfaction" ? nextValue || "not_collected" : nextValue || null;
-    }
-    return payload;
-  }, {});
+  return ["owner_name", "unblocked_on", "next_contact_on", "satisfaction"].reduce(
+    (payload, field) => {
+      const currentValue = String(current?.[field] || "").trim();
+      const nextValue = String(next?.[field] || "").trim();
+      if (nextValue !== currentValue) {
+        payload[field] =
+          field === "satisfaction" ? nextValue || "not_collected" : nextValue || null;
+      }
+      return payload;
+    },
+    {},
+  );
 }
