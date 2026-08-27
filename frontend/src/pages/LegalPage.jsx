@@ -9,8 +9,8 @@ const legalContent = {
   termos: {
     title: "Termos de Uso",
     eyebrow: "Contrato de uso da plataforma",
-    version: "Versao 2026-08-27",
-    updatedAt: "27/08/2026",
+    version: "Versao 2026-08-14",
+    updatedAt: "14/08/2026",
     intro:
       "Estes Termos regulam o acesso e o uso do CorePet, plataforma de gestao, vendas, estoque, financeiro, entregas, atendimento, loja online, aplicativo e integracoes para operacoes de pet shop, clinica, banho e tosa e negocios relacionados.",
     sections: [
@@ -189,8 +189,8 @@ const legalContent = {
   privacidade: {
     title: "Politica de Privacidade",
     eyebrow: "Protecao de dados pessoais",
-    version: "Versao 2026-08-14",
-    updatedAt: "14/08/2026",
+    version: "Versao 2026-08-27",
+    updatedAt: "27/08/2026",
     intro:
       "Esta Politica explica como dados pessoais podem ser coletados, usados, armazenados, compartilhados e protegidos no CorePet, incluindo ERP, loja online, aplicativo, atendimento, entregas, campanhas, integracoes e suporte.",
     sections: [

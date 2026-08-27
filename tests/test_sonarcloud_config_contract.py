@@ -23,6 +23,7 @@ REQUIRED_SHARED_CPD_EXCLUSIONS = (
     "**/backend/alembic/**",
     "backend/migrations/**",
     "**/backend/migrations/**",
+    "frontend/src/pages/LegalPage.jsx",
 )
 
 
