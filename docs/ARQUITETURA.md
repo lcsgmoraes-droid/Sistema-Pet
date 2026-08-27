@@ -7,6 +7,10 @@ Status: documento oficial da arquitetura atual.
 Este documento explica como o sistema funciona por dentro. Ele descreve o que
 existe hoje; planos futuros devem ser registrados separadamente.
 
+Decisões duradouras, alternativas e gatilhos de revisão ficam no índice
+`docs/adr/README.md`. Este documento continua sendo a visão consolidada do
+desenho atual.
+
 ## Visao geral
 
 O CorePet e um SaaS multiempresa construido como monolito modular. Isso
@@ -197,6 +201,12 @@ lacunas de instrumentacao ficam em `docs/SLOS_INDICADORES_JORNADAS.md`. Metas
 propostas so viram compromisso aprovado depois de linha de base real e teste
 autenticado em homologacao.
 
+O executor `scripts/capacity_authenticated.py` mede consultas reais de sessão,
+clientes, produtos e vendas com tenant selecionado, sem escrever dados. Ele é
+operado pelo ambiente isolado e bloqueia produção. A primeira linha de base,
+registrada em `docs/TESTE_CAPACIDADE_SEGURO.md`, não substitui ensaios com maior
+volume de dados, recursos do host observados e staging remoto quando necessário.
+
 O monolito modular pode crescer vertical e horizontalmente. Extracao de um
 servico deve acontecer quando uma medicao mostrar que um dominio precisa de
 escala, isolamento de falha ou ciclo de deploy proprio.
@@ -215,3 +225,6 @@ Mudancas estruturais seguem
 
 Reescrita total nao e a estrategia padrao. Refatoracao incremental reduz risco
 para empresas que ja utilizam o sistema.
+
+As decisões que sustentam esse caminho são ADR-0001, ADR-0002 e ADR-0003 em
+`docs/adr/README.md`.

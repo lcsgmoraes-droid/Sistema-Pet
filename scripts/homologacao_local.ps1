@@ -1,6 +1,12 @@
 param(
-    [ValidateSet('preparar', 'verificar-config', 'subir', 'status', 'validar', 'parar', 'resetar')]
+    [ValidateSet('preparar', 'verificar-config', 'subir', 'status', 'validar', 'capacidade', 'parar', 'resetar')]
     [string]$Acao = 'status',
+
+    [ValidateRange(4, 2000)]
+    [int]$Requisicoes = 320,
+
+    [ValidateRange(1, 20)]
+    [int]$Concorrencia = 8,
 
     [switch]$ConfirmarReset
 )
@@ -206,6 +212,41 @@ switch ($Acao) {
             throw
         }
         Write-Host 'Homologacao funcional concluida com dados ficticios.' -ForegroundColor Green
+    }
+    'capacidade' {
+        Assert-DockerEngine
+        $values = Read-HomologEnv
+        Wait-HomologHealth
+        $previousCapacityEnv = @{
+            CAPACITY_BASE_URL = $env:CAPACITY_BASE_URL
+            CAPACITY_USER_EMAIL = $env:CAPACITY_USER_EMAIL
+            CAPACITY_USER_PASSWORD = $env:CAPACITY_USER_PASSWORD
+            CAPACITY_TENANT_ID = $env:CAPACITY_TENANT_ID
+        }
+        try {
+            $tenantId = Get-OrCreate-HomologIdentity $values
+            $env:CAPACITY_BASE_URL = 'http://127.0.0.1:18080/api'
+            $env:CAPACITY_USER_EMAIL = $values['HOMOLOG_USER_EMAIL']
+            $env:CAPACITY_USER_PASSWORD = $values['HOMOLOG_USER_PASSWORD']
+            $env:CAPACITY_TENANT_ID = $tenantId
+
+            & python (Join-Path $PSScriptRoot 'capacity_authenticated.py') `
+                --requests $Requisicoes --concurrency $Concorrencia
+            if ($LASTEXITCODE -ne 0) {
+                throw 'O teste de capacidade autenticada nao atingiu os criterios.'
+            }
+        }
+        finally {
+            foreach ($entry in $previousCapacityEnv.GetEnumerator()) {
+                if ($null -eq $entry.Value) {
+                    Remove-Item "Env:$($entry.Key)" -ErrorAction SilentlyContinue
+                }
+                else {
+                    Set-Item "Env:$($entry.Key)" $entry.Value
+                }
+            }
+        }
+        Write-Host 'Capacidade autenticada concluida sem escrita de dados.' -ForegroundColor Green
     }
     'parar' {
         Assert-DockerEngine
