@@ -89,6 +89,24 @@ function badgeFor(status: string) {
   return BADGE[status] ?? { label: status, color: "#6b7280" };
 }
 
+function mensagemErroApi(
+  error: unknown,
+  fallback: string,
+  timeoutMessage = "A comunicação demorou mais que o esperado. Atualize a tela e tente novamente.",
+) {
+  const apiError = error as {
+    code?: string;
+    response?: { data?: { detail?: unknown } };
+  };
+  const detail = apiError?.response?.data?.detail;
+  if (typeof detail === "string" && detail.trim()) return detail;
+  if (apiError?.code === "ECONNABORTED") return timeoutMessage;
+  if (!apiError?.response) {
+    return "Não foi possível conectar ao sistema. Confira sua internet e tente novamente.";
+  }
+  return fallback;
+}
+
 // ─── Componente ──────────────────────────────────────────────────────────────
 
 export default function RotasDoEntregadorScreen() {
@@ -138,16 +156,30 @@ export default function RotasDoEntregadorScreen() {
       }
 
       if (!carregouAlgumaLista && mostrarErro) {
+        const erroCarregamento =
+          rotasRes.status === "rejected"
+            ? rotasRes.reason
+            : abertasRes.status === "rejected"
+              ? abertasRes.reason
+              : historicoRes.status === "rejected"
+                ? historicoRes.reason
+                : undefined;
         Alert.alert(
           "Erro",
-          "Nao foi possivel carregar as entregas. Tente novamente.",
+          mensagemErroApi(
+            erroCarregamento,
+            "Não foi possível carregar as entregas. Tente novamente.",
+          ),
         );
       }
-    } catch {
+    } catch (error: unknown) {
       if (mostrarErro) {
         Alert.alert(
           "Erro",
-          "Nao foi possivel carregar as entregas. Tente novamente.",
+          mensagemErroApi(
+            error,
+            "Não foi possível carregar as entregas. Tente novamente.",
+          ),
         );
       }
     } finally {
@@ -254,8 +286,15 @@ export default function RotasDoEntregadorScreen() {
             'Rota criada com sucesso. Abra a rota e toque em "Iniciar Rota".',
           );
         }
-      } catch {
-        Alert.alert("Erro", "Não foi possível criar a rota agora.");
+      } catch (error: unknown) {
+        Alert.alert(
+          "Erro",
+          mensagemErroApi(
+            error,
+            "Não foi possível criar a rota agora.",
+            "A comunicação demorou mais que o esperado. Atualize a tela para conferir se a rota foi criada antes de tentar novamente.",
+          ),
+        );
       } finally {
         setCriandoRota(false);
       }
