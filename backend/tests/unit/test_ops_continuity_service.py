@@ -36,6 +36,8 @@ def test_continuity_is_healthy_with_recent_backup_and_restore(tmp_path, monkeypa
                 "status": "ok",
                 "public_tables": "217",
                 "alembic_rows": "1",
+                "restore_duration_seconds": "120",
+                "checksum_verified": "true",
             },
             {
                 "created_at": "2026-07-13T06:05:00Z",
@@ -52,8 +54,11 @@ def test_continuity_is_healthy_with_recent_backup_and_restore(tmp_path, monkeypa
     assert summary["backup"]["age_hours"] == 6
     assert summary["backup"]["backup_bytes"] == 1024
     assert summary["restore"]["public_tables"] == 217
+    assert summary["restore"]["restore_duration_seconds"] == 120
+    assert summary["restore"]["checksum_verified"] is True
     assert summary["objectives"]["rpo_met"] is True
     assert summary["objectives"]["rto_test_evidence"] is True
+    assert summary["objectives"]["rto_restore_duration_seconds"] == 120
     assert summary["objectives"]["external_copy_verified"] is True
 
 
@@ -100,3 +105,66 @@ def test_missing_evidence_is_reported_without_exposing_source_path(
     assert summary["restore"]["status"] == "missing"
     assert summary["external_copy"]["status"] == "missing"
     assert str(tmp_path) not in str(summary)
+
+
+def test_restore_without_integrity_and_duration_is_not_rto_evidence(
+    tmp_path, monkeypatch
+):
+    _write_events(
+        tmp_path,
+        monkeypatch,
+        [
+            {
+                "created_at": "2026-07-13T06:00:00Z",
+                "operation": "backup",
+                "status": "ok",
+            },
+            {
+                "created_at": "2026-07-12T06:00:00Z",
+                "operation": "restore",
+                "status": "ok",
+            },
+            {
+                "created_at": "2026-07-13T06:05:00Z",
+                "operation": "external_copy",
+                "status": "ok",
+            },
+        ],
+    )
+
+    summary = ops_continuity_service.summarize_continuity(now=NOW)
+
+    assert summary["status"] == "warning"
+    assert summary["objectives"]["rto_test_evidence"] is False
+
+
+def test_restore_slower_than_rto_target_is_not_accepted(tmp_path, monkeypatch):
+    monkeypatch.setenv("OPS_RTO_TARGET_HOURS", "4")
+    _write_events(
+        tmp_path,
+        monkeypatch,
+        [
+            {
+                "created_at": "2026-07-13T06:00:00Z",
+                "operation": "backup",
+                "status": "ok",
+            },
+            {
+                "created_at": "2026-07-12T06:00:00Z",
+                "operation": "restore",
+                "status": "ok",
+                "restore_duration_seconds": str(4 * 3600 + 1),
+                "checksum_verified": "true",
+            },
+            {
+                "created_at": "2026-07-13T06:05:00Z",
+                "operation": "external_copy",
+                "status": "ok",
+            },
+        ],
+    )
+
+    summary = ops_continuity_service.summarize_continuity(now=NOW)
+
+    assert summary["status"] == "warning"
+    assert summary["objectives"]["rto_test_evidence"] is False

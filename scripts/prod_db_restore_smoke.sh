@@ -15,6 +15,8 @@ TIMESTAMP="$(date '+%Y%m%d_%H%M%S')"
 RESTORE_CONTAINER_NAME="${RESTORE_CONTAINER_NAME:-petshop-restore-smoke-$TIMESTAMP}"
 RESTORE_VOLUME_NAME="${RESTORE_VOLUME_NAME:-petshop-restore-smoke-data-$TIMESTAMP}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+restore_started_seconds="$SECONDS"
+checksum_verified="false"
 
 # shellcheck source=ops_continuity_event.sh
 source "$SCRIPT_DIR/ops_continuity_event.sh"
@@ -24,7 +26,8 @@ continuity_event_recorded="false"
 record_restore_event() {
   continuity_event_recorded="true"
   record_ops_continuity_event \
-    "restore" "$1" "${2:-}" "" "" "${3:-}" "${4:-}"
+    "restore" "$1" "${2:-}" "" "" "${3:-}" "${4:-}" \
+    "$((SECONDS - restore_started_seconds))" "$checksum_verified"
 }
 
 record_unexpected_restore_failure() {
@@ -64,6 +67,7 @@ fi
 
 require_cmd docker
 require_cmd gzip
+require_cmd sha256sum
 
 cd "$APP_DIR"
 
@@ -95,6 +99,21 @@ esac
 if [[ ! -s "$backup_file" ]]; then
   fail "backup file not found or empty: $backup_file"
 fi
+
+checksum_file="$backup_file.sha256"
+if [[ ! -f "$checksum_file" ]]; then
+  fail "checksum file not found: $checksum_file"
+fi
+
+expected_sha256="$(tr -d '[:space:]' <"$checksum_file")"
+actual_sha256="$(sha256sum "$backup_file" | awk '{print $1}')"
+if [[ ! "$expected_sha256" =~ ^[a-fA-F0-9]{64}$ ]]; then
+  fail "invalid backup checksum: $checksum_file"
+fi
+if [[ "$actual_sha256" != "$expected_sha256" ]]; then
+  fail "backup checksum mismatch: $backup_file"
+fi
+checksum_verified="true"
 
 cleanup_resources() {
   docker rm -f -v "$RESTORE_CONTAINER_NAME" >/dev/null 2>&1 || true
@@ -169,5 +188,7 @@ printf 'backup_file=%s\n' "$backup_file"
 printf 'created_backup=%s\n' "$created_backup"
 printf 'public_tables=%s\n' "$public_tables"
 printf 'alembic_rows=%s\n' "$alembic_rows"
+printf 'backup_checksum_verified=true\n'
+printf 'restore_duration_seconds=%s\n' "$((SECONDS - restore_started_seconds))"
 printf 'restore_container_removed=true\n'
 printf 'restore_volume_removed=true\n'

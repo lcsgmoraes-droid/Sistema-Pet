@@ -15,9 +15,10 @@ O script `scripts/prod_db_restore_smoke.sh`:
 2. Salva o dump em `/opt/petshop/backups/db`.
 3. Cria um volume identificado e sobe um container Postgres temporario, sem
    porta publicada.
-4. Restaura o dump nesse container descartavel.
-5. Valida que tabelas publicas e `alembic_version` existem.
-6. Remove o container e o volume temporarios ao final, inclusive quando o teste
+4. Confere o SHA-256 do arquivo antes de iniciar a restauracao.
+5. Restaura o dump nesse container descartavel e mede a duracao total.
+6. Valida que tabelas publicas e `alembic_version` existem.
+7. Remove o container e o volume temporarios ao final, inclusive quando o teste
    falha.
 
 O teste nao baixa dados para o computador local, nao imprime linhas de tabelas e
@@ -44,6 +45,8 @@ backup_sha256=...
 restore_smoke_status=ok
 public_tables=...
 alembic_rows=1
+backup_checksum_verified=true
+restore_duration_seconds=...
 restore_container_removed=true
 restore_volume_removed=true
 ```
@@ -108,12 +111,31 @@ So marcar o item do guia mestre como feito quando houver evidencia de:
 - `backup_status=ok`.
 - `restore_smoke_status=ok`.
 - `alembic_rows` maior ou igual a 1.
+- `backup_checksum_verified=true`.
+- `restore_duration_seconds` menor ou igual ao objetivo interno de RTO.
 - Container temporario removido.
 - Volume temporario removido.
 - Health publico e watchdog saudaveis depois do teste.
 
 Registrar apenas caminho do backup, tamanho, checksum e resultado. Nunca
 registrar conteudo do banco.
+
+## Validacao local da medicao de integridade e RTO
+
+Data: 2026-08-27.
+
+A implementacao foi exercitada contra o banco de homologacao local, com dados
+ficticios, e restaurada em PostgreSQL descartavel sem porta publicada:
+
+- `backup_checksum_verified=true`;
+- `restore_duration_seconds=8`;
+- `public_tables=255`;
+- `alembic_rows=1`;
+- container e volume temporarios removidos.
+
+Essa evidencia comprova o mecanismo em ambiente isolado. Ela nao substitui a
+evidencia recorrente de producao, nao le dados do banco principal e nao autoriza
+deploy ou comando remoto.
 
 ## Ultimo teste validado
 
