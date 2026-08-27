@@ -9,8 +9,8 @@ const legalContent = {
   termos: {
     title: "Termos de Uso",
     eyebrow: "Contrato de uso da plataforma",
-    version: "Versao 2026-08-14",
-    updatedAt: "14/08/2026",
+    version: "Versao 2026-08-27",
+    updatedAt: "27/08/2026",
     intro:
       "Estes Termos regulam o acesso e o uso do CorePet, plataforma de gestao, vendas, estoque, financeiro, entregas, atendimento, loja online, aplicativo e integracoes para operacoes de pet shop, clinica, banho e tosa e negocios relacionados.",
     sections: [
@@ -230,6 +230,7 @@ const legalContent = {
           "Dados de pets, como nome, especie, raca, porte, idade, peso, observacoes, historico de banho e tosa, lembretes, vacinas, atendimentos e informacoes operacionais.",
           "Informacoes veterinarias ou de saude podem exigir cuidado adicional e devem ser usadas somente por usuarios autorizados e para finalidades compativeis.",
           "Dados de entrega, como endereco, referencia, rota, status, entregador, comprovantes e ocorrencias.",
+          "Durante uma rota ativa, o app do entregador pode coletar localizacao precisa, data e hora e deslocamento para permitir o acompanhamento pela loja e pelo cliente vinculado. A coleta comeca quando o entregador confirma Iniciar Rota, pode continuar com o app minimizado ou a tela bloqueada e para quando a rota e finalizada ou cancelada.",
         ],
       },
       {
@@ -293,6 +294,7 @@ const legalContent = {
           "Meios de pagamento, bancos, conciliacao, gateways, antifraude e cobranca.",
           "Emissores fiscais, SEFAZ, contabilidade, documentos, marketplaces, ERPs e plataformas de e-commerce.",
           "Mapas, rotas, entrega, transportadores e parceiros logisticos.",
+          "A posicao da rota ativa pode ser exibida a usuarios autorizados da loja e ao cliente que possui o acesso de rastreio daquela entrega. A localizacao do entregador nao e usada para publicidade.",
           "Fornecedores, clientes, usuarios autorizados, autoridades publicas ou terceiros quando houver obrigacao, autorizacao ou necessidade legitima.",
         ],
       },
@@ -312,6 +314,7 @@ const legalContent = {
           "Dados de conta podem ser mantidos enquanto houver conta ativa e por periodo posterior necessario para auditoria e defesa de direitos.",
           "Dados fiscais, financeiros, contabeis e transacionais podem ser mantidos conforme prazos legais e regulatorios aplicaveis.",
           "Logs de seguranca e acesso podem ser mantidos para investigacao, estabilidade, antifraude e auditoria.",
+          "No rastreamento de entregas, o sistema mantem a posicao mais recente e metricas de distancia vinculadas a rota; a finalidade e acompanhar e comprovar a operacao da entrega.",
           "Dados podem ser anonimizados, bloqueados ou eliminados quando aplicavel, respeitadas obrigacoes de conservacao.",
         ],
       },

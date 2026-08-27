@@ -80,8 +80,8 @@ Para release/deploy, use a sequencia completa:
 - Somente usar EAS Build/Submit quando houver necessidade nativa comprovada
   (dependencia, plugin, permissao, codigo nativo ou runtime incompativel) e
   explicar essa evidencia ao Lucas antes de mudar o fluxo.
-- Estado em 2026-08-22: iOS publicado e Android em aprovacao. Nao substituir a
-  revisao/binario atual por iniciativa propria.
+- Estado verificado em 2026-08-27: iOS e Android publicados. Nao substituir os
+  binarios atuais por iniciativa propria.
 
 ## Padronizacao de numeros e moeda (OBRIGATORIO)
 

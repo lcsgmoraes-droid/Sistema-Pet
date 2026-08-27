@@ -24,6 +24,7 @@ import { EntregadorStackParamList } from "../../types/entregadorNavigation";
 
 type RouteProps = RouteProp<EntregadorStackParamList, "DetalheEntrega">;
 type Nav = NativeStackNavigationProp<EntregadorStackParamList, "DetalheEntrega">;
+type StatusRastreamento = "iniciando" | "ativo" | "limitado" | null;
 
 export default function DetalheEntregaScreen() {
   const navigation = useNavigation<Nav>();
@@ -44,6 +45,8 @@ export default function DetalheEntregaScreen() {
   const [modalVendaAberto, setModalVendaAberto] = useState(false);
   const [loadingVenda, setLoadingVenda] = useState(false);
   const [vendaDetalhes, setVendaDetalhes] = useState<VendaDetalhes | null>(null);
+  const [statusRastreamento, setStatusRastreamento] =
+    useState<StatusRastreamento>(null);
   const [modalOrdemAberto, setModalOrdemAberto] = useState(false);
   const [paradaOrdemEmEdicao, setParadaOrdemEmEdicao] = useState<Parada | null>(null);
   const [novaOrdemTexto, setNovaOrdemTexto] = useState("");
@@ -92,6 +95,7 @@ export default function DetalheEntregaScreen() {
 
   useEffect(() => {
     if (!rota || !["em_rota", "em_andamento"].includes(rota.status)) {
+      setStatusRastreamento(null);
       localizacaoSubscriptionRef.current?.remove();
       localizacaoSubscriptionRef.current = null;
       void pararRastreamentoEntregaEmSegundoPlano(rotaId);
@@ -124,9 +128,16 @@ export default function DetalheEntregaScreen() {
     };
 
     const iniciar = async () => {
+      setStatusRastreamento("iniciando");
       const rastreioEmSegundoPlano =
         await iniciarRastreamentoEntregaEmSegundoPlano(rotaId);
-      if (rastreioEmSegundoPlano || !ativo) return;
+      if (!ativo) return;
+      if (rastreioEmSegundoPlano) {
+        setStatusRastreamento("ativo");
+        return;
+      }
+
+      setStatusRastreamento("limitado");
 
       try {
         const permissao = await Location.getForegroundPermissionsAsync();
@@ -272,7 +283,7 @@ export default function DetalheEntregaScreen() {
     }
   }
 
-  async function iniciarRota() {
+  async function confirmarInicioRota() {
     try {
       const localizacao = await obterLocalizacaoOpcional();
       await api.post(
@@ -285,7 +296,19 @@ export default function DetalheEntregaScreen() {
           },
         },
       );
+      const rastreioEmSegundoPlano =
+        await iniciarRastreamentoEntregaEmSegundoPlano(rotaId);
+      setStatusRastreamento(
+        rastreioEmSegundoPlano ? "ativo" : "limitado",
+      );
       await carregar();
+
+      if (!rastreioEmSegundoPlano) {
+        Alert.alert(
+          "Rastreamento limitado",
+          "A rota foi iniciada, mas a localização não continuará de forma confiável ao abrir o mapa ou bloquear a tela. Verifique a permissão de localização do CorePet.",
+        );
+      }
     } catch (error) {
       const rotaAtualizada = await carregar(false);
       if (rotaAtualizada && rotaAtualizada.status !== "pendente") {
@@ -298,6 +321,22 @@ export default function DetalheEntregaScreen() {
         obterMensagemErro(error, "Nao foi possivel iniciar a rota agora."),
       );
     }
+  }
+
+  function iniciarRota() {
+    Alert.alert(
+      "Localização durante a rota",
+      "Ao iniciar, o CorePet compartilha sua localização com a loja e o cliente somente durante esta rota, inclusive quando o mapa estiver aberto ou a tela bloqueada. Uma notificação permanecerá visível e o compartilhamento para ao finalizar a rota.",
+      [
+        { text: "Cancelar", style: "cancel" },
+        {
+          text: "Iniciar e compartilhar",
+          onPress: () => {
+            void confirmarInicioRota();
+          },
+        },
+      ],
+    );
   }
 
   async function moverParada(paradaId: number, direcao: "up" | "down") {
@@ -494,6 +533,7 @@ export default function DetalheEntregaScreen() {
       rota={rota}
       processando={processando}
       processandoFinalizacao={processandoFinalizacao}
+      statusRastreamento={statusRastreamento}
       iniciarRota={iniciarRota}
       finalizarRota={finalizarRota}
       salvarNovaOrdemParadas={salvarNovaOrdemParadas}

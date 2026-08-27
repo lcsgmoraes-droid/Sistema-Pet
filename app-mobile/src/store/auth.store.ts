@@ -1,6 +1,7 @@
 import * as SecureStore from "expo-secure-store";
 import { create } from "zustand";
 import * as AuthService from "../services/auth.service";
+import { pararRastreamentoEntregaEmSegundoPlano } from "../services/deliveryLocationTracking";
 import {
   AppAccessProfile,
   AppProfileType,
@@ -216,6 +217,7 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
   },
 
   logout: async () => {
+    await pararRastreamentoEntregaEmSegundoPlano();
     await clearOperationalRoleCache(get().user);
     await AuthService.logout();
     set({

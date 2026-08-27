@@ -34,7 +34,16 @@ if (!TaskManager.isTaskDefined(DELIVERY_LOCATION_TASK)) {
             },
           },
         );
-      } catch {
+      } catch (requestError) {
+        const status = (
+          requestError as { response?: { status?: number } }
+        )?.response?.status;
+
+        if (status && [400, 401, 403, 404].includes(status)) {
+          await pararRastreamentoEntregaEmSegundoPlano(rotaId);
+          return;
+        }
+
         // Rede pode oscilar durante a rota; o proximo ponto tenta novamente.
       }
     },
@@ -45,14 +54,24 @@ export async function iniciarRastreamentoEntregaEmSegundoPlano(
   rotaId: number | string,
 ): Promise<boolean> {
   try {
-    if (Platform.OS === "android") return false;
-    if (!(await Location.isBackgroundLocationAvailableAsync())) return false;
+    if (Platform.OS !== "android" && Platform.OS !== "ios") return false;
+    if (
+      Platform.OS === "ios" &&
+      !(await Location.isBackgroundLocationAvailableAsync())
+    ) {
+      return false;
+    }
 
     const foreground = await Location.requestForegroundPermissionsAsync();
     if (!foreground.granted) return false;
 
-    const background = await Location.requestBackgroundPermissionsAsync();
-    if (!background.granted) return false;
+    // No Android, a rota usa um serviço visível, iniciado pelo entregador e
+    // acompanhado por notificação permanente. Assim, não precisamos pedir
+    // acesso irrestrito à localização fora de uma rota ativa.
+    if (Platform.OS === "ios") {
+      const background = await Location.requestBackgroundPermissionsAsync();
+      if (!background.granted) return false;
+    }
 
     const rotaIdTexto = String(rotaId);
     const rotaAtiva = await SecureStore.getItemAsync(ACTIVE_ROUTE_KEY);
@@ -74,8 +93,8 @@ export async function iniciarRastreamentoEntregaEmSegundoPlano(
       pausesUpdatesAutomatically: false,
       showsBackgroundLocationIndicator: true,
       foregroundService: {
-        notificationTitle: "CorePet - rota em andamento",
-        notificationBody: "Compartilhando a localizacao durante as entregas.",
+        notificationTitle: "CorePet — rota em andamento",
+        notificationBody: "Compartilhando a localização durante as entregas.",
         notificationColor: "#0F5F66",
         killServiceOnDestroy: false,
       },
