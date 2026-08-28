@@ -1,16 +1,10 @@
-"""Basic unauthenticated diagnostic routes."""
+"""Basic unauthenticated application routes."""
 
-import logging
 from typing import Optional
 
-from fastapi import Depends, FastAPI
-from fastapi.responses import JSONResponse
-from sqlalchemy.orm import Session
+from fastapi import FastAPI
 
 from app.config import SYSTEM_NAME, SYSTEM_VERSION
-from app.db import get_session as get_db
-
-logger = logging.getLogger(__name__)
 
 
 def register_basic_routes(app: FastAPI) -> None:
@@ -25,32 +19,6 @@ def register_basic_routes(app: FastAPI) -> None:
             "status": "online",
             "docs": "/docs",
         }
-
-    @app.get("/health")
-    def health_check():
-        """Health check para monitoramento"""
-        return {"status": "healthy", "system": SYSTEM_NAME, "version": SYSTEM_VERSION}
-
-    @app.get("/ready")
-    def readiness_check(db: Session = Depends(get_db)):
-        """
-        Readiness check - verifica se o sistema está pronto para receber requests
-        Valida conexão com banco de dados
-        """
-        try:
-            # Testar conexão com banco
-            db.execute("SELECT 1")
-            return {"status": "ready", "system": SYSTEM_NAME, "database": "connected"}
-        except Exception as e:
-            logger.exception("Readiness check failed")
-            return JSONResponse(
-                status_code=503,
-                content={
-                    "status": "not_ready",
-                    "database": "disconnected",
-                    "error": str(e),
-                },
-            )
 
     @app.get("/test-racas")
     def test_racas(especie: str = ""):
