@@ -18,6 +18,10 @@ from app.banho_tosa_schemas import (
     BanhoTosaTaxiDogStatusUpdate,
     BanhoTosaTaxiDogUpdate,
 )
+from app.banho_tosa_taxi_fluxo import (
+    sincronizar_chegada_taxi_dog,
+    validar_transicao_status_taxi_dog,
+)
 from app.db import get_session
 from app.models import Cliente
 from app.veterinario_core import _get_tenant
@@ -126,7 +130,20 @@ def atualizar_status_taxi_dog(
 ):
     _, tenant_id = _get_tenant(current)
     taxi = _obter_taxi_ou_404(db, tenant_id, taxi_id)
-    taxi.status = body.status.strip().lower()
+    try:
+        taxi.status = validar_transicao_status_taxi_dog(
+            taxi.status,
+            body.status,
+            taxi.tipo,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    if taxi.status == "entregue_na_clinica":
+        sincronizar_chegada_taxi_dog(
+            db,
+            tenant_id,
+            agendamento_id=taxi.agendamento_id,
+        )
     _recalcular_custo_vinculado(db, tenant_id, taxi)
     db.commit()
     taxi = _obter_taxi_ou_404(db, tenant_id, taxi.id)

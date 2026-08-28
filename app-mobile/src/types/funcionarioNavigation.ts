@@ -4,5 +4,6 @@ export type FuncionarioStackParamList = {
   FuncionarioContagem: undefined;
   FuncionarioPdv: undefined;
   FuncionarioGranel: undefined;
+  FuncionarioBanhoTosa: undefined;
   FuncionarioNovidades: { somenteNovidades?: boolean } | undefined;
 };
