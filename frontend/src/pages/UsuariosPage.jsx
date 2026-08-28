@@ -1,6 +1,8 @@
 import { Plus, Users } from "lucide-react";
 import UsuarioModal from "../components/usuarios/UsuarioModal";
 import UsuarioCredenciaisModal from "../components/usuarios/UsuarioCredenciaisModal";
+import UsuarioAcessoInicialModal from "../components/usuarios/UsuarioAcessoInicialModal";
+import UsuarioLojaLoginCard from "../components/usuarios/UsuarioLojaLoginCard";
 import UsuariosTable from "../components/usuarios/UsuariosTable";
 import ActionButton from "../components/ui/ActionButton";
 import PageHeader from "../components/ui/PageHeader";
@@ -15,6 +17,7 @@ export default function UsuariosPage() {
     forcarLogout,
     generatedPassword,
     gerarNovaSenha,
+    initialAccessCredentials,
     loading,
     novoUsuario,
     onAbrirModalUsuario,
@@ -28,6 +31,8 @@ export default function UsuariosPage() {
     showPassword,
     salvarCredenciais,
     savingCredentials,
+    setInitialAccessCredentials,
+    tenantLoginReference,
     toggleStatus,
     usuarioFormError,
     usuarioCredenciais,
@@ -46,6 +51,8 @@ export default function UsuariosPage() {
           </ActionButton>
         }
       />
+
+      <UsuarioLojaLoginCard tenantReference={tenantLoginReference} />
 
       <UsuariosTable
         loading={loading}
@@ -76,7 +83,13 @@ export default function UsuariosPage() {
         onClose={fecharCredenciais}
         onGenerate={gerarNovaSenha}
         onSubmit={salvarCredenciais}
+        tenantReference={tenantLoginReference}
         usuario={usuarioCredenciais}
+      />
+
+      <UsuarioAcessoInicialModal
+        credentials={initialAccessCredentials}
+        onClose={() => setInitialAccessCredentials(null)}
       />
     </div>
   );

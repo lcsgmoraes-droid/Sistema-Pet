@@ -3,6 +3,7 @@ import ModalImportacaoPessoas from "../ModalImportacaoPessoas";
 import ModalRemoverCredito from "../ModalRemoverCredito";
 import ClientesNovoEnderecoModal from "./ClientesNovoEnderecoModal";
 import ClientesNovoWizardModal from "./ClientesNovoWizardModal";
+import UsuarioAcessoInicialModal from "../usuarios/UsuarioAcessoInicialModal";
 
 const ClientesNovoModalsLayer = ({
   showModal,
@@ -25,6 +26,8 @@ const ClientesNovoModalsLayer = ({
   setFormData,
   usuariosAcessoApp,
   rolesAcessoApp,
+  initialAccessCredentials,
+  setInitialAccessCredentials,
   loadingUsuariosAcessoApp,
   buscarCep,
   loadingCep,
@@ -100,6 +103,11 @@ const ClientesNovoModalsLayer = ({
         prevStep={prevStep}
         nextStep={nextStep}
         handleSubmitFinal={handleSubmitFinal}
+      />
+
+      <UsuarioAcessoInicialModal
+        credentials={initialAccessCredentials}
+        onClose={() => setInitialAccessCredentials(null)}
       />
 
       {mostrarFormEndereco && enderecoAtual && (
