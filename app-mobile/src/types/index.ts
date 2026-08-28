@@ -37,7 +37,8 @@ export interface EcommerceDeliveryAddress {
 
 export interface EcommerceUser {
   id: number;
-  email: string;
+  email: string | null;
+  username?: string | null;
   email_verified?: boolean;
   nome: string | null;
   telefone?: string | null;

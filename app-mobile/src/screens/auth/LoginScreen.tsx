@@ -41,7 +41,7 @@ export default function LoginScreen({ navigation, route }: any) {
 
   async function handleLogin() {
     if (!email.trim() || !senha.trim()) {
-      Alert.alert('Campos obrigatórios', 'Preencha e-mail e senha.');
+      Alert.alert('Campos obrigatórios', 'Preencha e-mail ou usuário e senha.');
       return;
     }
     setCarregando(true);
@@ -51,7 +51,7 @@ export default function LoginScreen({ navigation, route }: any) {
     } catch (err: any) {
       const msg =
         err?.response?.data?.detail === 'Incorrect username or password'
-          ? 'E-mail ou senha incorretos.'
+          ? 'E-mail, usuário ou senha incorretos.'
           : err?.response?.data?.detail || 'Erro ao fazer login. Tente novamente.';
       Alert.alert('Erro', msg);
     } finally {
@@ -96,15 +96,14 @@ export default function LoginScreen({ navigation, route }: any) {
             </View>
           )}
 
-          <Text style={styles.label}>E-mail</Text>
+          <Text style={styles.label}>E-mail ou nome de usuário</Text>
           <TextInput
             style={styles.input}
-            placeholder="seu@email.com"
+            placeholder="seu@email.com ou maria.silva"
             placeholderTextColor={CORES.textoClaro}
-            keyboardType="email-address"
             autoCapitalize="none"
             autoCorrect={false}
-            autoComplete="email"
+            autoComplete="username"
             textContentType="username"
             importantForAutofill="yes"
             value={email}

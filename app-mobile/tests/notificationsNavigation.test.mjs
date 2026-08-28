@@ -268,7 +268,7 @@ test("login e cadastro usam autofill seguro do celular", () => {
     "utf8",
   );
 
-  assert.match(loginSource, /autoComplete="email"/);
+  assert.match(loginSource, /autoComplete="username"/);
   assert.match(loginSource, /textContentType="username"/);
   assert.match(loginSource, /autoComplete="current-password"/);
   assert.match(loginSource, /textContentType="password"/);

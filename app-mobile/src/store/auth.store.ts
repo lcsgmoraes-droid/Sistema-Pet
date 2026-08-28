@@ -108,7 +108,7 @@ interface AuthState {
   isLoading: boolean;
 
   // Ações
-  login: (email: string, password: string) => Promise<void>;
+  login: (identifier: string, password: string) => Promise<void>;
   selectProfile: (profileType: AppProfileType) => Promise<void>;
   register: (
     email: string,
@@ -131,8 +131,8 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
   needsProfileSelection: false,
   isLoading: true,
 
-  login: async (email, password) => {
-    const { user } = await AuthService.login(email, password);
+  login: async (identifier, password) => {
+    const { user } = await AuthService.login(identifier, password);
     if (shouldSelectProfile(user)) {
       set({
         isAuthenticated: false,
