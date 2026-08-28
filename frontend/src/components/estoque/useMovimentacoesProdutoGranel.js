@@ -8,6 +8,10 @@ import {
   formatarQuantidadeMovimentacao as formatarQuantidade,
   parseNumeroInputMovimentacao as parseNumeroInput,
 } from "./movimentacoesProdutoUtils";
+import {
+  ALTERAR_PRECO_GRANEL_PADRAO,
+  montarCamposAtualizacaoPrecoGranel,
+} from "./granelPrecoUtils";
 import { confirmarCorePet } from "../../services/corepetDialog";
 
 export function useMovimentacoesProdutoGranel({ carregarDados, id, produto }) {
@@ -23,7 +27,7 @@ export function useMovimentacoesProdutoGranel({ carregarDados, id, produto }) {
   const [margemBaseGranel, setMargemBaseGranel] = useState("preco_venda_kg");
   const [margemGranel, setMargemGranel] = useState("20");
   const [precoVendaGranel, setPrecoVendaGranel] = useState("");
-  const [atualizarPrecoGranel, setAtualizarPrecoGranel] = useState(true);
+  const [atualizarPrecoGranel, setAtualizarPrecoGranel] = useState(ALTERAR_PRECO_GRANEL_PADRAO);
   const [bipagemObrigatoriaGranel, setBipagemObrigatoriaGranel] = useState(false);
   const [barcodeOrigemGranel, setBarcodeOrigemGranel] = useState("");
   const [barcodeProdutoGranel, setBarcodeProdutoGranel] = useState("");
@@ -116,7 +120,7 @@ export function useMovimentacoesProdutoGranel({ carregarDados, id, produto }) {
     setMargemBaseGranel("preco_venda_kg");
     setMargemGranel("20");
     setPrecoVendaGranel("");
-    setAtualizarPrecoGranel(true);
+    setAtualizarPrecoGranel(ALTERAR_PRECO_GRANEL_PADRAO);
     setBarcodeOrigemGranel("");
     setBarcodeProdutoGranel("");
     setShowGranelModal(true);
@@ -153,17 +157,23 @@ export function useMovimentacoesProdutoGranel({ carregarDados, id, produto }) {
       return;
     }
 
+    if (atualizarPrecoGranel && precoVendaSugeridoGranel <= 0) {
+      toast.error("Informe um novo preco de venda maior que zero.");
+      return;
+    }
+
+    const camposAtualizacaoPreco = montarCamposAtualizacaoPrecoGranel({
+      deveAlterarPreco: atualizarPrecoGranel,
+      precoVendaSugerido: precoVendaSugeridoGranel,
+    });
+
     try {
       setLoadingGranel(true);
       const response = await api.post("/estoque/granel/converter", {
         produto_origem_id: Number(id),
         produto_granel_id: Number(granelSelecionadoId),
         quantidade_pacotes: quantidadeGranelNumero,
-        atualizar_preco_venda_granel: Boolean(atualizarPrecoGranel && precoVendaSugeridoGranel > 0),
-        preco_venda_granel:
-          atualizarPrecoGranel && precoVendaSugeridoGranel > 0
-            ? Number(precoVendaSugeridoGranel.toFixed(2))
-            : null,
+        ...camposAtualizacaoPreco,
         observacao: observacaoGranel || null,
         produto_origem_barcode: barcodeOrigemGranel.trim() || null,
         produto_granel_barcode: barcodeProdutoGranel.trim() || null,

@@ -13,10 +13,70 @@ from app.produtos_models import (
     GranelConversao,
     Produto,
     ProdutoGranelVinculo,
+    ProdutoHistoricoPreco,
 )
 
 
 logger = logging.getLogger(__name__)
+
+
+def _calcular_margem_preco(preco_venda: float, preco_custo: float) -> float:
+    if preco_venda <= 0:
+        return 0
+    return ((preco_venda - preco_custo) / preco_venda) * 100
+
+
+def _alterar_preco_venda_granel_com_historico(
+    db: Session,
+    tenant_id,
+    current_user,
+    produto_granel: Produto,
+    preco_venda_anterior: float,
+    preco_custo_anterior: float,
+    preco_venda_novo: float,
+    conversao_id: int,
+) -> bool:
+    preco_venda_novo = round(float(preco_venda_novo), 2)
+    if round(preco_venda_anterior, 2) == preco_venda_novo:
+        return False
+
+    preco_custo_novo = float(produto_granel.preco_custo or 0)
+    variacao_custo = (
+        ((preco_custo_novo - preco_custo_anterior) / preco_custo_anterior) * 100
+        if preco_custo_anterior > 0
+        else 0
+    )
+    variacao_venda = (
+        ((preco_venda_novo - preco_venda_anterior) / preco_venda_anterior) * 100
+        if preco_venda_anterior > 0
+        else 0
+    )
+
+    produto_granel.preco_venda = preco_venda_novo
+    db.add(
+        ProdutoHistoricoPreco(
+            produto_id=produto_granel.id,
+            preco_custo_anterior=preco_custo_anterior,
+            preco_custo_novo=preco_custo_novo,
+            preco_venda_anterior=preco_venda_anterior,
+            preco_venda_novo=preco_venda_novo,
+            margem_anterior=_calcular_margem_preco(
+                preco_venda_anterior, preco_custo_anterior
+            ),
+            margem_nova=_calcular_margem_preco(preco_venda_novo, preco_custo_novo),
+            variacao_custo_percentual=variacao_custo,
+            variacao_venda_percentual=variacao_venda,
+            motivo="conversao_granel",
+            referencia=f"Conversao granel #{conversao_id}",
+            observacoes=(
+                "Preco de venda alterado por escolha explicita no lancamento de "
+                f"granel, de R$ {preco_venda_anterior:.2f} para R$ {preco_venda_novo:.2f}."
+            ),
+            user_id=current_user.id,
+            tenant_id=tenant_id,
+        )
+    )
+    return True
 
 
 def _produto_e_granel(produto: Produto | None) -> bool:
@@ -269,10 +329,11 @@ def executar_conversao_granel(
     custo_kg = custo_pacote / peso_pacote_kg if peso_pacote_kg > 0 else 0
     custo_granel_anterior = float(produto_granel.preco_custo or 0)
     preco_venda_granel_anterior = float(produto_granel.preco_venda or 0)
-    preco_venda_granel_atualizado = bool(
+    deve_atualizar_preco_venda_granel = bool(
         getattr(payload, "atualizar_preco_venda_granel", False)
         and getattr(payload, "preco_venda_granel", None) is not None
     )
+    preco_venda_granel_atualizado = False
 
     produto_base.estoque_atual = estoque_base_anterior - quantidade_pacotes
     produto_granel.estoque_atual = estoque_granel_anterior + quantidade_kg
@@ -281,9 +342,6 @@ def executar_conversao_granel(
             (estoque_granel_anterior * custo_granel_anterior)
             + (quantidade_kg * custo_kg)
         ) / produto_granel.estoque_atual
-    if preco_venda_granel_atualizado:
-        produto_granel.preco_venda = float(payload.preco_venda_granel or 0)
-
     documento = getattr(payload, "documento", None)
     observacao = getattr(payload, "observacao", None)
     conversao = GranelConversao(
@@ -303,6 +361,18 @@ def executar_conversao_granel(
     )
     db.add(conversao)
     db.flush()
+
+    if deve_atualizar_preco_venda_granel:
+        preco_venda_granel_atualizado = _alterar_preco_venda_granel_com_historico(
+            db=db,
+            tenant_id=tenant_id,
+            current_user=current_user,
+            produto_granel=produto_granel,
+            preco_venda_anterior=preco_venda_granel_anterior,
+            preco_custo_anterior=custo_granel_anterior,
+            preco_venda_novo=float(payload.preco_venda_granel),
+            conversao_id=conversao.id,
+        )
 
     mov_saida_base = EstoqueMovimentacao(
         produto_id=produto_base.id,
