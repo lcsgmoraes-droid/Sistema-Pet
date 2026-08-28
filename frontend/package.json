@@ -74,6 +74,7 @@
     "test:banho-tosa-fluxo": "node scripts/test-banho-tosa-fluxo.mjs",
     "test:pessoas-duplicidade-central": "node scripts/test-pessoas-duplicidade-central.mjs",
     "test:pessoa-app-login": "node src/utils/pessoaAppLogin.test.mjs",
+    "test:usuario-acesso-inicial": "node src/utils/usuarioAcessoInicial.test.mjs",
     "preview": "vite preview"
   },
   "dependencies": {

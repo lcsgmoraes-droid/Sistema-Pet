@@ -1,11 +1,16 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../api";
+import { useAuth } from "../contexts/AuthContext";
 import { debugLog } from "../utils/debug";
 import { useModulos } from "../contexts/ModulosContext";
 import { useClientesNovoEnderecos } from "./useClientesNovoEnderecos";
 import { normalizeClienteAlertasPdv } from "../utils/clienteAlertasPdv";
 import { normalizePessoaAppLogin } from "../utils/pessoaAppLogin";
+import {
+  buildInitialAccessCredentials,
+  resolveTenantLoginReference,
+} from "../utils/usuarioAcessoInicial";
 
 const STEPS = [
   { number: 1, title: "Dados da pessoa" },
@@ -146,6 +151,7 @@ export function useClientesNovoCadastro({
   error,
   setError,
 }) {
+  const { user } = useAuth();
   const { moduloAtivo } = useModulos();
   const moduloCampanhasAtivo = moduloAtivo("campanhas");
   const navigate = useNavigate();
@@ -169,7 +175,12 @@ export function useClientesNovoCadastro({
   const [usuariosAcessoApp, setUsuariosAcessoApp] = useState([]);
   const [rolesAcessoApp, setRolesAcessoApp] = useState([]);
   const [loadingUsuariosAcessoApp, setLoadingUsuariosAcessoApp] = useState(false);
+  const [initialAccessCredentials, setInitialAccessCredentials] = useState(null);
   const [formData, setFormData] = useState(buildNovoClienteFormData("cliente", "PF"));
+  const tenantLoginReference = resolveTenantLoginReference(
+    user,
+    typeof window === "undefined" ? null : window.localStorage.getItem("selectedTenant"),
+  );
   const steps = useMemo(() => {
     const etapas = formData.tipo_cadastro === "veterinario" ? VETERINARIO_STEPS : STEPS;
     return editingCliente ? etapas : etapas.filter((step) => step.number <= 4);
@@ -422,6 +433,7 @@ export function useClientesNovoCadastro({
 
     try {
       const isEdicao = Boolean(editingCliente);
+      const appLoginInicial = !isEdicao ? formData.app_login : null;
       const errosValidacao = [];
 
       if (!formData.nome || formData.nome.trim() === "") {
@@ -561,6 +573,16 @@ export function useClientesNovoCadastro({
 
       closeModal();
 
+      const createdCredentials = buildInitialAccessCredentials({
+        tenant: tenantLoginReference,
+        username: appLoginInicial?.username,
+        password: appLoginInicial?.password,
+        personName: clienteSalvo?.nome || formData.nome,
+      });
+      if (createdCredentials) {
+        setInitialAccessCredentials(createdCredentials);
+      }
+
       if (!isEdicao && typeof onClienteCriado === "function") {
         await Promise.resolve(onClienteCriado(clienteSalvo));
       } else {
@@ -661,6 +683,8 @@ export function useClientesNovoCadastro({
       setFormData,
       usuariosAcessoApp,
       rolesAcessoApp,
+      initialAccessCredentials,
+      setInitialAccessCredentials,
       loadingUsuariosAcessoApp,
       buscarCep,
       loadingCep,
@@ -740,6 +764,9 @@ export function useClientesNovoCadastro({
       steps,
       usuariosAcessoApp,
       rolesAcessoApp,
+      initialAccessCredentials,
+      setInitialAccessCredentials,
+      tenantLoginReference,
     ],
   );
 

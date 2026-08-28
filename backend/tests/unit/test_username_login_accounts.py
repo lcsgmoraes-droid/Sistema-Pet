@@ -9,7 +9,10 @@ from starlette.requests import Request
 
 from app import produtos_models  # noqa: F401 - registra relacionamentos do ORM
 from app.auth import verify_password
-from app.auth.auth_multitenant_account_routes import login_multitenant
+from app.auth.auth_multitenant_account_routes import (
+    _tenant_reference_filters,
+    login_multitenant,
+)
 from app.auth.auth_multitenant_schemas import LoginRequest
 from app.models import Role, Tenant, User, UserTenant
 from app.routes.ecommerce_auth_public import login_cliente
@@ -146,6 +149,17 @@ def test_login_schemas_keep_email_compatibility_and_accept_username():
     assert username.identifier == "joao.silva"
     assert legacy_mobile.identifier == "joao.silva"
     assert mobile.identifier == "joao.silva"
+
+
+def test_tenant_name_lookup_does_not_compare_name_with_uuid_id():
+    name_filters = _tenant_reference_filters("Pet Feliz Demo")
+    uuid_filters = _tenant_reference_filters("00000000-0000-0000-0000-000000000001")
+
+    name_sql = " ".join(str(item) for item in name_filters)
+    uuid_sql = " ".join(str(item) for item in uuid_filters)
+
+    assert "tenants.id =" not in name_sql
+    assert "tenants.id =" in uuid_sql
 
 
 def test_web_login_resolves_username_inside_informed_store(monkeypatch):

@@ -1,4 +1,5 @@
 import { Clipboard, KeyRound, RefreshCw, X } from "lucide-react";
+import { formatInitialAccessCredentials } from "../../utils/usuarioAcessoInicial";
 import ActionButton from "../ui/ActionButton";
 import IconActionButton from "../ui/IconActionButton";
 
@@ -11,6 +12,7 @@ export default function UsuarioCredenciaisModal({
   onClose,
   onGenerate,
   onSubmit,
+  tenantReference,
   usuario,
 }) {
   if (!usuario) return null;
@@ -18,6 +20,17 @@ export default function UsuarioCredenciaisModal({
   const copiarSenha = async () => {
     if (!generatedPassword) return;
     await navigator.clipboard.writeText(generatedPassword);
+  };
+
+  const copiarDadosDeAcesso = async () => {
+    if (!generatedPassword || !tenantReference) return;
+    await navigator.clipboard.writeText(
+      formatInitialAccessCredentials({
+        tenant: tenantReference,
+        username: credenciais.username,
+        password: generatedPassword,
+      }),
+    );
   };
 
   return (
@@ -97,6 +110,16 @@ export default function UsuarioCredenciaisModal({
                   title="Copiar senha"
                 />
               </div>
+              {tenantReference ? (
+                <button
+                  type="button"
+                  onClick={copiarDadosDeAcesso}
+                  className="mt-3 inline-flex items-center gap-2 text-xs font-semibold text-emerald-800 underline-offset-2 hover:underline"
+                >
+                  <Clipboard className="h-3.5 w-3.5" aria-hidden="true" />
+                  Copiar loja, usuario e nova senha
+                </button>
+              ) : null}
             </div>
           )}
 

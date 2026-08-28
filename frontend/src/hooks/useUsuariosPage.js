@@ -1,7 +1,12 @@
 import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
 import api from "../api";
+import { useAuth } from "../contexts/AuthContext";
 import { confirmarCorePet } from "../services/corepetDialog";
+import {
+  buildInitialAccessCredentials,
+  resolveTenantLoginReference,
+} from "../utils/usuarioAcessoInicial";
 
 const USUARIO_INICIAL = {
   nome: "",
@@ -74,6 +79,7 @@ function emailPareceValido(email) {
 }
 
 export default function useUsuariosPage() {
+  const { user } = useAuth();
   const [usuarios, setUsuarios] = useState([]);
   const [roles, setRoles] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -86,6 +92,11 @@ export default function useUsuariosPage() {
   const [credenciaisError, setCredenciaisError] = useState("");
   const [generatedPassword, setGeneratedPassword] = useState("");
   const [savingCredentials, setSavingCredentials] = useState(false);
+  const [initialAccessCredentials, setInitialAccessCredentials] = useState(null);
+  const tenantLoginReference = resolveTenantLoginReference(
+    user,
+    typeof window === "undefined" ? null : window.localStorage.getItem("selectedTenant"),
+  );
 
   async function carregarUsuarios() {
     try {
@@ -179,6 +190,14 @@ export default function useUsuariosPage() {
         username,
         email: email || null,
       });
+      setInitialAccessCredentials(
+        buildInitialAccessCredentials({
+          tenant: tenantLoginReference,
+          username,
+          password: novoUsuario.password,
+          personName: novoUsuario.nome,
+        }),
+      );
       toast.success("Usuario criado com sucesso.");
       resetarModalUsuario();
       carregarUsuarios();
@@ -282,6 +301,7 @@ export default function useUsuariosPage() {
     forcarLogout,
     generatedPassword,
     gerarNovaSenha,
+    initialAccessCredentials,
     loading,
     novoUsuario,
     onAbrirModalUsuario: abrirModalUsuario,
@@ -295,6 +315,8 @@ export default function useUsuariosPage() {
     showPassword,
     salvarCredenciais,
     savingCredentials,
+    setInitialAccessCredentials,
+    tenantLoginReference,
     toggleStatus,
     usuarioFormError,
     usuarioCredenciais,

@@ -55,6 +55,23 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
+def _tenant_reference_filters(tenant_reference: str):
+    """Build a safe tenant lookup for both names/slugs and UUID identifiers."""
+    reference = str(tenant_reference or "").strip()
+    filters = [
+        func.lower(Tenant.ecommerce_slug) == reference.lower(),
+        Tenant.name_normalized == normalize_tenant_name(reference),
+    ]
+
+    try:
+        uuid.UUID(reference)
+    except (TypeError, ValueError, AttributeError):
+        return filters
+
+    filters.append(Tenant.id == reference)
+    return filters
+
+
 @router.post("/register", response_model=LoginResponse)
 def register(
     request: Request, payload: RegisterRequest, db: Session = Depends(get_session)
@@ -297,16 +314,9 @@ def login_multitenant(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Para entrar com nome de usuario, informe a loja.",
             )
-        tenant_reference_lower = tenant_reference.lower()
         tenant = (
             db.query(Tenant)
-            .filter(
-                or_(
-                    func.lower(Tenant.ecommerce_slug) == tenant_reference_lower,
-                    Tenant.name_normalized == normalize_tenant_name(tenant_reference),
-                    Tenant.id == tenant_reference,
-                )
-            )
+            .filter(or_(*_tenant_reference_filters(tenant_reference)))
             .first()
         )
         if not tenant:
