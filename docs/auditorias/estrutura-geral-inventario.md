@@ -511,3 +511,37 @@ Proxima fatia recomendada:
 2. Se esse corte ainda nao estiver suficientemente protegido, priorizar um
    modulo operacional abaixo de 1000 linhas com testes mais maduros.
 
+## Atualizacao continua - 2026-08-27 - Processador do WhatsApp
+
+O processador foi separado em mais duas responsabilidades coesas, depois da
+entrada da protecao persistente contra replay e duplicidade do webhook:
+
+- clarificacao de marca, consulta de compra recente e midias relacionadas a
+  produtos foram movidas para
+  `backend/app/whatsapp/processor_product_clarification_flow.py`;
+- consultas operacionais de horario, entrega e beneficios do cliente foram
+  movidas para `backend/app/whatsapp/processor_operational_flow.py`;
+- `backend/app/whatsapp/processor.py` continua sendo a fachada e o orquestrador,
+  preservando os nomes auxiliares importados pelo codigo e pelos testes legados;
+- os seis metodos extraidos tiveram sua arvore sintatica comparada com a versao
+  anterior, sem diferenca de logica;
+- o arquivo principal caiu de 1019 para 669 linhas fisicas; os novos modulos
+  possuem, respectivamente, 300 e 103 linhas;
+- nenhum endpoint, payload, schema, migration ou regra de negocio foi alterado;
+- os 151 testes unitarios do WhatsApp passaram, incluindo isolamento por
+  empresa, replay, checkout, pedidos, catalogo, atendimento humano e integracoes
+  internas;
+- o contrato estrutural agora limita o processador principal a menos de 700
+  linhas e fiscaliza separadamente os novos modulos.
+
+Hotspots ativos acima de 1000 linhas fisicas no backend depois desta fatia:
+
+- nenhum arquivo Python em `backend/app`.
+
+Proxima fatia recomendada:
+
+1. Priorizar melhorias funcionais, observabilidade e cobertura de cenarios reais
+   em vez de continuar dividindo arquivos que ja estao abaixo dos limites.
+2. Voltar a uma refatoracao estrutural somente quando houver um problema concreto
+   de manutencao, teste ou responsabilidade misturada.
+
