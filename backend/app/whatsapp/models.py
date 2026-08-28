@@ -28,6 +28,7 @@ import uuid
 
 from app.base_models import TenantScoped
 from app.db import Base
+from app.security.tenant_config_crypto import decrypt_secret, encrypt_secret
 
 
 TENANTS_ID_FK = "tenants.id"
@@ -49,13 +50,16 @@ class TenantWhatsAppConfig(TenantScoped, Base):
 
     # Provider Config
     provider = Column(String(50), default="360dialog")  # 360dialog, z-api, twilio
-    api_key = Column(Text)
+    _api_key_legacy = Column("api_key", Text)
+    _api_key_encrypted = Column("api_key_encrypted", Text)
     phone_number = Column(String(20))
     webhook_url = Column(Text)
-    webhook_secret = Column(Text)
+    _webhook_secret_legacy = Column("webhook_secret", Text)
+    _webhook_secret_encrypted = Column("webhook_secret_encrypted", Text)
 
     # IA Config
-    openai_api_key = Column(Text)
+    _openai_api_key_legacy = Column("openai_api_key", Text)
+    _openai_api_key_encrypted = Column("openai_api_key_encrypted", Text)
     model_preference = Column(String(50), default="gpt-4o-mini")  # gpt-4o-mini, gpt-4.1
 
     # Business Rules
@@ -75,6 +79,45 @@ class TenantWhatsAppConfig(TenantScoped, Base):
     # Timestamps
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    @staticmethod
+    def _read_secret(encrypted_value: str | None, legacy_value: str | None) -> str:
+        return (
+            decrypt_secret(encrypted_value) if encrypted_value else (legacy_value or "")
+        )
+
+    @property
+    def api_key(self) -> str:
+        return self._read_secret(self._api_key_encrypted, self._api_key_legacy)
+
+    @api_key.setter
+    def api_key(self, value: str | None) -> None:
+        self._api_key_encrypted = encrypt_secret(value)
+        self._api_key_legacy = None
+
+    @property
+    def webhook_secret(self) -> str:
+        return self._read_secret(
+            self._webhook_secret_encrypted,
+            self._webhook_secret_legacy,
+        )
+
+    @webhook_secret.setter
+    def webhook_secret(self, value: str | None) -> None:
+        self._webhook_secret_encrypted = encrypt_secret(value)
+        self._webhook_secret_legacy = None
+
+    @property
+    def openai_api_key(self) -> str:
+        return self._read_secret(
+            self._openai_api_key_encrypted,
+            self._openai_api_key_legacy,
+        )
+
+    @openai_api_key.setter
+    def openai_api_key(self, value: str | None) -> None:
+        self._openai_api_key_encrypted = encrypt_secret(value)
+        self._openai_api_key_legacy = None
 
     def __repr__(self):
         return f"<TenantWhatsAppConfig(tenant_id={self.tenant_id}, provider={self.provider})>"
