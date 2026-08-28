@@ -377,15 +377,11 @@ async def _ingest_message_inner(
     if not message_content:
         raise HTTPException(status_code=400, detail="Conteudo vazio")
 
-    whatsapp_msg_id = (
-        payload.external_message_id or f"internal_{tenant_id}_{normalized_phone}"
-    )
-
     await process_incoming_message(
         tenant_id=tenant_id,
         phone=normalized_phone,
         message_content=message_content,
-        whatsapp_msg_id=whatsapp_msg_id,
+        whatsapp_msg_id=payload.external_message_id,
         db=db,
     )
 

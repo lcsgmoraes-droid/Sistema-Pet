@@ -17,7 +17,9 @@ from sqlalchemy import (
     Integer,
     Float,
     ForeignKey,
+    Index,
     Time,
+    text,
 )
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
@@ -119,7 +121,21 @@ class WhatsAppMessage(TenantScoped, Base):
     """Mensagem individual"""
 
     __tablename__ = "whatsapp_ia_messages"
-    __table_args__ = {"extend_existing": True}
+    __table_args__ = (
+        Index(
+            "ux_whatsapp_ia_messages_tenant_provider_message",
+            "tenant_id",
+            "whatsapp_message_id",
+            unique=True,
+            postgresql_where=text(
+                "whatsapp_message_id IS NOT NULL AND btrim(whatsapp_message_id) <> ''"
+            ),
+            sqlite_where=text(
+                "whatsapp_message_id IS NOT NULL AND trim(whatsapp_message_id) <> ''"
+            ),
+        ),
+        {"extend_existing": True},
+    )
 
     id = Column(String, primary_key=True, default=generate_uuid)
     session_id = Column(String, ForeignKey("whatsapp_ia_sessions.id"), nullable=False)
