@@ -5,6 +5,7 @@ import { debugLog } from "../utils/debug";
 import { useModulos } from "../contexts/ModulosContext";
 import { useClientesNovoEnderecos } from "./useClientesNovoEnderecos";
 import { normalizeClienteAlertasPdv } from "../utils/clienteAlertasPdv";
+import { normalizePessoaAppLogin } from "../utils/pessoaAppLogin";
 
 const STEPS = [
   { number: 1, title: "Dados da pessoa" },
@@ -488,6 +489,7 @@ export function useClientesNovoCadastro({
 
       const { celular_whatsapp: _celular_whatsapp, tags: _tags, ...clienteData } = formData;
       clienteData.alertas_pdv = normalizeClienteAlertasPdv(clienteData.alertas_pdv);
+      clienteData.app_login = normalizePessoaAppLogin(clienteData.app_login);
 
       if (clienteData.is_entregador) {
         if (clienteData.tipo_cadastro === "funcionario") {
