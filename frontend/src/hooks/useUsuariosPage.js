@@ -4,10 +4,14 @@ import api from "../api";
 import { confirmarCorePet } from "../services/corepetDialog";
 
 const USUARIO_INICIAL = {
+  nome: "",
+  username: "",
   email: "",
   password: "",
   role_id: null,
 };
+
+const CREDENCIAIS_INICIAIS = { username: "", new_password: "" };
 
 function detalhesValidacaoParaMensagem(details) {
   const validationDetails = Array.isArray(details) ? details : [];
@@ -77,6 +81,11 @@ export default function useUsuariosPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [novoUsuario, setNovoUsuario] = useState(USUARIO_INICIAL);
   const [usuarioFormError, setUsuarioFormError] = useState("");
+  const [usuarioCredenciais, setUsuarioCredenciais] = useState(null);
+  const [credenciais, setCredenciais] = useState(CREDENCIAIS_INICIAIS);
+  const [credenciaisError, setCredenciaisError] = useState("");
+  const [generatedPassword, setGeneratedPassword] = useState("");
+  const [savingCredentials, setSavingCredentials] = useState(false);
 
   async function carregarUsuarios() {
     try {
@@ -141,8 +150,13 @@ export default function useUsuariosPage() {
     event.preventDefault();
     setUsuarioFormError("");
 
+    const username = (novoUsuario.username || "").trim().toLowerCase();
     const email = (novoUsuario.email || "").trim().toLowerCase();
-    if (!emailPareceValido(email)) {
+    if (username.length < 3) {
+      setUsuarioFormError("Informe um nome de usuario com pelo menos 3 caracteres.");
+      return;
+    }
+    if (email && !emailPareceValido(email)) {
       setUsuarioFormError(
         "E-mail invalido. Use o formato nome@dominio.com, por exemplo usuario@empresa.com.br.",
       );
@@ -162,7 +176,8 @@ export default function useUsuariosPage() {
     try {
       await api.post("/usuarios", {
         ...novoUsuario,
-        email,
+        username,
+        email: email || null,
       });
       toast.success("Usuario criado com sucesso.");
       resetarModalUsuario();
@@ -172,6 +187,71 @@ export default function useUsuariosPage() {
         console.error("Erro ao criar usuario:", error);
       }
       setUsuarioFormError(mensagemErroCriacaoUsuario(error));
+    }
+  }
+
+  function abrirCredenciais(usuario) {
+    setUsuarioCredenciais(usuario);
+    setCredenciais({
+      username: usuario.username || "",
+      new_password: "",
+    });
+    setCredenciaisError("");
+    setGeneratedPassword("");
+  }
+
+  function fecharCredenciais() {
+    setUsuarioCredenciais(null);
+    setCredenciais({ ...CREDENCIAIS_INICIAIS });
+    setCredenciaisError("");
+    setGeneratedPassword("");
+  }
+
+  async function salvarCredenciais(event) {
+    event.preventDefault();
+    await atualizarCredenciais(false);
+  }
+
+  async function gerarNovaSenha() {
+    await atualizarCredenciais(true);
+  }
+
+  async function atualizarCredenciais(generatePassword) {
+    if (!usuarioCredenciais) return;
+    const username = (credenciais.username || "").trim().toLowerCase();
+    if (username.length < 3) {
+      setCredenciaisError("Informe um nome de usuario com pelo menos 3 caracteres.");
+      return;
+    }
+    if (!generatePassword && credenciais.new_password && credenciais.new_password.length < 8) {
+      setCredenciaisError("A nova senha deve ter no minimo 8 caracteres.");
+      return;
+    }
+
+    setSavingCredentials(true);
+    setCredenciaisError("");
+    setGeneratedPassword("");
+    try {
+      const response = await api.patch(`/usuarios/${usuarioCredenciais.user_id}/credenciais`, {
+        username,
+        new_password: generatePassword ? null : credenciais.new_password || null,
+        generate_password: generatePassword,
+      });
+      setCredenciais((current) => ({ ...current, username, new_password: "" }));
+      await carregarUsuarios();
+      if (response.data?.generated_password) {
+        setGeneratedPassword(response.data.generated_password);
+        toast.success("Nova senha gerada. Copie antes de fechar.");
+      } else {
+        toast.success("Acesso atualizado com sucesso.");
+        fecharCredenciais();
+      }
+    } catch (error) {
+      setCredenciaisError(
+        error.response?.data?.detail || "Nao foi possivel atualizar o acesso deste usuario.",
+      );
+    } finally {
+      setSavingCredentials(false);
     }
   }
 
@@ -196,18 +276,28 @@ export default function useUsuariosPage() {
 
   return {
     criarUsuario,
+    credenciais,
+    credenciaisError,
+    fecharCredenciais,
     forcarLogout,
+    generatedPassword,
+    gerarNovaSenha,
     loading,
     novoUsuario,
     onAbrirModalUsuario: abrirModalUsuario,
+    onAbrirCredenciais: abrirCredenciais,
     onCloseModalUsuario: resetarModalUsuario,
     roles,
     setNovoUsuario,
+    setCredenciais,
     setShowPassword,
     showModal,
     showPassword,
+    salvarCredenciais,
+    savingCredentials,
     toggleStatus,
     usuarioFormError,
+    usuarioCredenciais,
     usuarios,
   };
 }

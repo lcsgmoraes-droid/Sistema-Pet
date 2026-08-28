@@ -65,9 +65,21 @@ class User(BaseTenantModel):
     """Usuário do sistema (multi-tenant)"""
 
     __tablename__ = "users"
+    __table_args__ = (
+        UniqueConstraint(
+            "tenant_id",
+            "username",
+            name="uq_users_tenant_username",
+        ),
+        sa.CheckConstraint(
+            "email IS NOT NULL OR username IS NOT NULL",
+            name="ck_users_login_identifier",
+        ),
+    )
 
     id = Column(Integer, primary_key=True, index=True)
-    email = Column(String(255), unique=True, index=True, nullable=False)
+    email = Column(String(255), unique=True, index=True, nullable=True)
+    username = Column(String(50), nullable=True)
     hashed_password = Column(String(255), nullable=True)  # Nullable para OAuth
     is_active = Column(Boolean, default=True)
     is_admin = Column(Boolean, default=False)  # Superusuário

@@ -347,7 +347,7 @@ def resolver_alerta(
     logger.info(
         f"✅ Alerta de estoque negativo {dados.status} - "
         f"ID: {alerta_id}, Produto: {alerta.produto_nome}, "
-        f"Usuário: {current_user.nome or current_user.email}"
+        f"Usuário: {current_user.nome or getattr(current_user, 'username', None) or current_user.email}"
     )
 
     return alerta

@@ -312,7 +312,9 @@ async def baixar_vendas_lote(
                     descricao=f"Baixa venda #{venda.id} - {venda.cliente.nome if venda.cliente else 'Cliente avulso'}",
                     venda_id=venda.id,
                     usuario_id=current_user.id,
-                    usuario_nome=current_user.nome or current_user.email,
+                    usuario_nome=current_user.nome
+                    or getattr(current_user, "username", None)
+                    or current_user.email,
                     data_movimento=dt.now(),
                     tenant_id=tenant_id,  # ✅ Garantir isolamento entre empresas
                 )

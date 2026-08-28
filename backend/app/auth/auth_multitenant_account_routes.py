@@ -5,6 +5,7 @@ import uuid
 from datetime import timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
+from sqlalchemy import func, or_
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -43,7 +44,11 @@ from app.services.plan_catalog import resolve_signup_selection
 from app.tenant_identity import normalize_tenant_name
 from app.session_manager import create_session
 from app.tenancy.context import clear_tenant_context, set_tenant_context
-from app.tenancy.rls import sync_rls_auth_email, sync_rls_auth_user
+from app.tenancy.rls import (
+    sync_rls_auth_email,
+    sync_rls_auth_user,
+    sync_rls_tenant,
+)
 
 
 logger = logging.getLogger(__name__)
@@ -280,9 +285,47 @@ def login_multitenant(
     Fase 1: Autentica usuario e retorna lista de tenants disponiveis.
     Token gerado SEM tenant_id.
     """
-    email = credentials.email.strip().lower()
-    sync_rls_auth_email(db, email)
-    user = db.query(User).filter(User.email == email).first()
+    identifier = str(credentials.identifier or "").strip().lower()
+    login_por_email = "@" in identifier
+    if login_por_email:
+        sync_rls_auth_email(db, identifier)
+        user = db.query(User).filter(func.lower(User.email) == identifier).first()
+    else:
+        tenant_reference = str(credentials.tenant or "").strip()
+        if not tenant_reference:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Para entrar com nome de usuario, informe a loja.",
+            )
+        tenant_reference_lower = tenant_reference.lower()
+        tenant = (
+            db.query(Tenant)
+            .filter(
+                or_(
+                    func.lower(Tenant.ecommerce_slug) == tenant_reference_lower,
+                    Tenant.name_normalized == normalize_tenant_name(tenant_reference),
+                    Tenant.id == tenant_reference,
+                )
+            )
+            .first()
+        )
+        if not tenant:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Loja, usuario ou senha incorretos",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        tenant_id = uuid.UUID(str(tenant.id))
+        set_tenant_context(tenant_id)
+        sync_rls_tenant(db, tenant_id)
+        user = (
+            db.query(User)
+            .filter(
+                User.tenant_id == tenant_id,
+                User.username == identifier,
+            )
+            .first()
+        )
 
     if user and is_user_locked(user):
         raise HTTPException(
@@ -299,7 +342,7 @@ def login_multitenant(
             db.commit()
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Email ou senha incorretos",
+            detail="E-mail, usuario ou senha incorretos",
             headers={"WWW-Authenticate": "Bearer"},
         )
 
@@ -309,7 +352,7 @@ def login_multitenant(
             detail="Usuario inativo",
         )
 
-    if _email_verification_block(user):
+    if user.email and _email_verification_block(user):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Email ainda nao confirmado. Verifique sua caixa de entrada ou solicite um novo link.",
@@ -355,6 +398,7 @@ def login_multitenant(
             "id": user.id,
             "name": user.nome,
             "email": user.email,
+            "username": user.username,
             "is_active": user.is_active,
             "email_verified": user.email_verified,
         },

@@ -146,7 +146,9 @@ def adicionar_credito(
         saldo_anterior=Decimal(str(credito_anterior)),
         saldo_atual=Decimal(str(float(cliente.credito))),
         motivo=dados.motivo,
-        usuario_nome=current_user.nome or current_user.email,
+        usuario_nome=current_user.nome
+        or getattr(current_user, "username", None)
+        or current_user.email,
     )
     db.add(log_credito)
 
@@ -221,7 +223,9 @@ def remover_credito(
         saldo_anterior=Decimal(str(credito_atual)),
         saldo_atual=novo_saldo,
         motivo=dados.motivo,
-        usuario_nome=current_user.nome or current_user.email,
+        usuario_nome=current_user.nome
+        or getattr(current_user, "username", None)
+        or current_user.email,
     )
     db.add(log_credito)
 

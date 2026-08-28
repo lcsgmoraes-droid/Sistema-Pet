@@ -24,6 +24,7 @@ const ClientesNovoModalsLayer = ({
   setClienteDuplicado,
   setFormData,
   usuariosAcessoApp,
+  rolesAcessoApp,
   loadingUsuariosAcessoApp,
   buscarCep,
   loadingCep,
@@ -80,6 +81,7 @@ const ClientesNovoModalsLayer = ({
         setClienteDuplicado={setClienteDuplicado}
         setFormData={setFormData}
         usuariosAcessoApp={usuariosAcessoApp}
+        rolesAcessoApp={rolesAcessoApp}
         loadingUsuariosAcessoApp={loadingUsuariosAcessoApp}
         buscarCep={buscarCep}
         loadingCep={loadingCep}

@@ -1,6 +1,6 @@
 from typing import Literal
 
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, model_validator
 
 
 class EcommerceRegisterRequest(BaseModel):
@@ -23,8 +23,18 @@ class EcommerceRegisterRequest(BaseModel):
 
 
 class EcommerceLoginRequest(BaseModel):
-    email: EmailStr
+    identifier: str | None = None
+    # Compatibilidade com versoes anteriores do site e do app.
+    email: EmailStr | None = None
     password: str
+
+    @model_validator(mode="after")
+    def validate_identifier(self):
+        identifier = str(self.identifier or self.email or "").strip()
+        if not identifier:
+            raise ValueError("Informe o e-mail ou nome de usuario")
+        self.identifier = identifier
+        return self
 
 
 class EcommerceRefreshRequest(BaseModel):

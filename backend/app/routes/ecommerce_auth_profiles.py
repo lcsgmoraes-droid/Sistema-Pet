@@ -51,6 +51,7 @@ def _anonymize_ecommerce_user(user: User, *, now: datetime) -> None:
     user.email = (
         f"conta-excluida-{user.id}-{secrets.token_hex(8)}@deleted.corepet.invalid"
     )
+    user.username = None
     user.hashed_password = hash_password(secrets.token_urlsafe(48))
     user.is_active = False
     user.is_admin = False
@@ -124,6 +125,7 @@ def _serialize_profile(
     payload = {
         "id": user.id,
         "email": user.email,
+        "username": getattr(user, "username", None),
         "email_verified": user.email_verified,
         "nome": user.nome,
         "telefone": (cliente.telefone if cliente else None) or user.telefone,

@@ -1,6 +1,7 @@
 import re
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
+from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
 from app.auth import hash_password, verify_password
@@ -167,10 +168,17 @@ def login_cliente(
     payload: EcommerceLoginRequest, request: Request, db: Session = Depends(get_session)
 ):
     tenant_id = _extract_tenant_id_from_request(request)
-    email = payload.email.strip().lower()
-
+    identifier = str(payload.identifier or "").strip().lower()
     user = (
-        db.query(User).filter(User.email == email, User.tenant_id == tenant_id).first()
+        db.query(User)
+        .filter(
+            User.tenant_id == tenant_id,
+            or_(
+                func.lower(User.email) == identifier,
+                User.username == identifier,
+            ),
+        )
+        .first()
     )
 
     if user and is_user_locked(user):
@@ -186,7 +194,7 @@ def login_cliente(
             db.commit()
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Email ou senha inválidos",
+            detail="E-mail, usuario ou senha invalidos",
             headers={"WWW-Authenticate": "Bearer"},
         )
 
@@ -195,7 +203,7 @@ def login_cliente(
             status_code=status.HTTP_403_FORBIDDEN, detail="Conta inativa"
         )
 
-    if _email_verification_block(user):
+    if user.email and _email_verification_block(user):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Email ainda nao confirmado. Verifique sua caixa de entrada ou solicite um novo link.",

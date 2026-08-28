@@ -113,9 +113,13 @@ export const AuthProvider = ({ children }) => {
     return { success: true };
   };
 
-  const login = async (email, password) => {
+  const login = async (identifier, password, tenant = null) => {
     try {
-      const response = await api.post("/auth/login-multitenant", { email, password });
+      const response = await api.post("/auth/login-multitenant", {
+        identifier,
+        password,
+        tenant,
+      });
       const { access_token, tenants } = response.data;
       return await completeTenantSelection(access_token, tenants);
     } catch (error) {

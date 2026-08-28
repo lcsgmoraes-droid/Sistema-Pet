@@ -156,6 +156,11 @@ def _anexar_metadados_criacao_cliente(db: Session, clientes):
         )
         setattr(
             cliente,
+            "auth_user_username",
+            getattr(auth_user, "username", None) if auth_user else None,
+        )
+        setattr(
+            cliente,
             "app_access_profiles",
             perfis_por_cliente.get(getattr(cliente, "id", None), []),
         )

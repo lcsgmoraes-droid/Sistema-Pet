@@ -28,6 +28,7 @@ const ClientesNovoWizardModal = ({
   setClienteDuplicado,
   setFormData,
   usuariosAcessoApp,
+  rolesAcessoApp,
   loadingUsuariosAcessoApp,
   buscarCep,
   loadingCep,
@@ -168,6 +169,7 @@ const ClientesNovoWizardModal = ({
                 formData={formData}
                 setFormData={setFormData}
                 usuarios={usuariosAcessoApp}
+                roles={rolesAcessoApp}
                 loadingUsuarios={loadingUsuariosAcessoApp}
               />
             </>

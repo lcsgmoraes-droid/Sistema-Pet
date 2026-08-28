@@ -402,7 +402,7 @@ def _get_or_create_cliente_for_user(db: Session, user: User) -> Cliente:
             user_id=user.id,
             auth_user_id=user.id,
             codigo=gerar_codigo_cliente(db, "cliente", "PF", tenant_id),
-            nome=user.nome or user.email,
+            nome=user.nome or getattr(user, "username", None) or user.email,
             email=user.email,
             telefone=user.telefone,
             cpf=user.cpf_cnpj,
@@ -417,7 +417,7 @@ def _get_or_create_cliente_for_user(db: Session, user: User) -> Cliente:
         if getattr(cliente, "ativo", True) is False:
             cliente.ativo = True
         if not cliente.nome:
-            cliente.nome = user.nome or user.email
+            cliente.nome = user.nome or getattr(user, "username", None) or user.email
         if not cliente.email:
             cliente.email = user.email
         if not cliente.telefone and user.telefone:

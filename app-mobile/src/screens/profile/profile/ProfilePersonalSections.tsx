@@ -25,7 +25,7 @@ export function ProfileAvatarSection({ user }: { user: EcommerceUser | null }) {
         <Text style={styles.avatarLetter}>{user?.nome ? user.nome[0].toUpperCase() : "U"}</Text>
       </View>
       <Text style={styles.nomeUsuario}>{user?.nome || "Meu perfil"}</Text>
-      <Text style={styles.emailUsuario}>{user?.email}</Text>
+      <Text style={styles.emailUsuario}>{user?.username || user?.email}</Text>
     </View>
   );
 }
@@ -180,7 +180,7 @@ export function PersonalDataSection({
         </>
       ) : (
         <>
-          <InfoRow label="E-mail" valor={user?.email} />
+          <InfoRow label="Usuario" valor={user?.username || user?.email} />
           <InfoRow label="Nome" valor={user?.nome || "-"} />
           <InfoRow label="Telefone" valor={user?.telefone || "-"} />
           <InfoRow label="CPF" valor={user?.cpf || "-"} />

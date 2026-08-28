@@ -52,19 +52,58 @@ export default function UsuarioModal({
 
           <div>
             <label
+              htmlFor="novo-usuario-nome"
+              className="mb-1 block text-sm font-medium text-slate-700"
+            >
+              Nome da pessoa (opcional)
+            </label>
+            <input
+              id="novo-usuario-nome"
+              type="text"
+              value={novoUsuario.nome}
+              onChange={(event) => setNovoUsuario({ ...novoUsuario, nome: event.target.value })}
+              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+              placeholder="Maria da Silva"
+              autoComplete="name"
+            />
+          </div>
+
+          <div>
+            <label
+              htmlFor="novo-usuario-username"
+              className="mb-1 block text-sm font-medium text-slate-700"
+            >
+              Nome de usuario
+            </label>
+            <input
+              id="novo-usuario-username"
+              type="text"
+              required
+              minLength={3}
+              maxLength={40}
+              value={novoUsuario.username}
+              onChange={(event) => setNovoUsuario({ ...novoUsuario, username: event.target.value })}
+              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+              placeholder="maria.silva"
+              autoComplete="username"
+            />
+            <p className="mt-1 text-xs text-slate-500">Usado para entrar nesta loja.</p>
+          </div>
+
+          <div>
+            <label
               htmlFor="novo-usuario-email"
               className="mb-1 block text-sm font-medium text-slate-700"
             >
-              Email
+              E-mail (opcional)
             </label>
             <input
               id="novo-usuario-email"
               type="email"
-              required
               value={novoUsuario.email}
               onChange={(event) => setNovoUsuario({ ...novoUsuario, email: event.target.value })}
               className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-              placeholder="usuario@empresa.com.br"
+              placeholder="Para recuperacao por e-mail"
               autoComplete="email"
             />
           </div>

@@ -11,6 +11,7 @@ from pydantic import BaseModel, EmailStr, Field, validator
 from app.services.cliente_alertas_pdv import normalizar_alertas_pdv
 
 __all__ = [
+    "AppLoginCreate",
     "AjustarCreditoRequest",
     "ClienteCreate",
     "ClienteResponse",
@@ -136,6 +137,13 @@ class PetResponse(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class AppLoginCreate(BaseModel):
+    username: str = Field(min_length=3, max_length=50)
+    email: Optional[EmailStr] = None
+    password: str = Field(min_length=8, max_length=72)
+    role_id: int
+
+
 class ClienteCreate(BaseModel):
     # Tipo de cadastro
     tipo_cadastro: str = "cliente"  # cliente, fornecedor, veterinario, funcionario
@@ -148,6 +156,7 @@ class ClienteCreate(BaseModel):
     celular: Optional[str] = None
     email: Optional[str] = None
     auth_user_id: Optional[int] = None
+    app_login: Optional[AppLoginCreate] = None
     app_access_profiles: List[str] = Field(default_factory=list)
 
     # Pessoa Física
@@ -280,6 +289,7 @@ class ClienteUpdate(BaseModel):
     telefone: Optional[str] = None
     celular: Optional[str] = None
     auth_user_id: Optional[int] = None
+    app_login: Optional[AppLoginCreate] = None
     app_access_profiles: Optional[List[str]] = None
 
     # Campos PJ
@@ -403,6 +413,7 @@ class ClienteResponse(BaseModel):
     auth_user_id: Optional[int] = None
     auth_user_nome: Optional[str] = None
     auth_user_email: Optional[str] = None
+    auth_user_username: Optional[str] = None
     app_access_profiles: List[str] = Field(default_factory=list)
     merged_into_id: Optional[int] = None
 
