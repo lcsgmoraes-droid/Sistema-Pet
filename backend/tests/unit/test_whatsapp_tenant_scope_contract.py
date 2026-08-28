@@ -102,6 +102,9 @@ def test_whatsapp_public_and_background_paths_manage_tenant_context():
     webhook_source = _source("backend/app/whatsapp/webhook.py")
     sender_source = _source("backend/app/whatsapp/sender.py")
     processor_source = _source("backend/app/whatsapp/processor.py")
+    product_clarification_source = _source(
+        "backend/app/whatsapp/processor_product_clarification_flow.py"
+    )
     context_builder_source = _source("backend/app/ai/context_builder.py")
     context_manager_source = _source("backend/app/whatsapp/context_manager.py")
     function_handlers_source = _source("backend/app/whatsapp/function_handlers.py")
@@ -122,7 +125,16 @@ def test_whatsapp_public_and_background_paths_manage_tenant_context():
         "from app.whatsapp.tenant_context import whatsapp_tenant_context"
         in processor_source
     )
-    assert processor_source.count("with whatsapp_tenant_context(self.tenant_id)") >= 2
+    assert (
+        "from app.whatsapp.tenant_context import whatsapp_tenant_context"
+        in product_clarification_source
+    )
+    processor_tenant_contexts = processor_source.count(
+        "with whatsapp_tenant_context(self.tenant_id)"
+    ) + product_clarification_source.count(
+        "with whatsapp_tenant_context(self.tenant_id)"
+    )
+    assert processor_tenant_contexts >= 2
     assert (
         "from app.whatsapp.tenant_context import whatsapp_tenant_context"
         in context_builder_source
