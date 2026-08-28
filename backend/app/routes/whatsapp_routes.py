@@ -9,13 +9,7 @@ import logging
 
 from app.db import get_session
 from app.auth.dependencies import get_current_user_and_tenant
-from app.whatsapp.schemas import (
-    TenantWhatsAppConfigCreate,
-    TenantWhatsAppConfigUpdate,
-    TenantWhatsAppConfigResponse,
-    WhatsAppStatsResponse,
-)
-from app.whatsapp.models import TenantWhatsAppConfig
+from app.routers import whatsapp_config as _whatsapp_config_api
 from app.whatsapp.tools import ToolExecutor, TOOLS_DEFINITIONS
 from app.whatsapp.ai_service import get_ai_service
 
@@ -23,31 +17,17 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/whatsapp", tags=["WhatsApp"])
 
+# Fachada de compatibilidade para imports antigos. As rotas HTTP de configuracao
+# sao registradas exclusivamente por app.routers.whatsapp_config.
+get_config = _whatsapp_config_api.get_whatsapp_config
+create_config = _whatsapp_config_api.create_whatsapp_config
+update_config = _whatsapp_config_api.update_whatsapp_config
+delete_config = _whatsapp_config_api.delete_whatsapp_config
+get_stats = _whatsapp_config_api.get_whatsapp_stats
+
 
 async def _tenant_whatsapp(user_and_tenant=Depends(get_current_user_and_tenant)):
     return user_and_tenant[1]
-
-
-# ============================================================================
-# CONFIGURAÇÃO
-# ============================================================================
-
-
-@router.get("/config", response_model=TenantWhatsAppConfigResponse)
-async def get_config(
-    tenant_id=Depends(_tenant_whatsapp), db: Session = Depends(get_session)
-):
-    """Obtém configuração WhatsApp do tenant"""
-    config = (
-        db.query(TenantWhatsAppConfig)
-        .filter(TenantWhatsAppConfig.tenant_id == tenant_id)
-        .first()
-    )
-
-    if not config:
-        raise HTTPException(status_code=404, detail="Configuração não encontrada")
-
-    return config
 
 
 # ============================================================================
@@ -162,98 +142,6 @@ async def get_ultimas_mensagens_cliente(
         raise HTTPException(
             status_code=500, detail=f"Erro ao buscar mensagens: {str(e)}"
         )
-
-
-@router.post("/config", response_model=TenantWhatsAppConfigResponse, status_code=201)
-async def create_config(
-    config_data: TenantWhatsAppConfigCreate,
-    tenant_id=Depends(_tenant_whatsapp),
-    db: Session = Depends(get_session),
-):
-    """Cria configuração WhatsApp"""
-
-    # Verificar se já existe
-    existing = (
-        db.query(TenantWhatsAppConfig)
-        .filter(TenantWhatsAppConfig.tenant_id == tenant_id)
-        .first()
-    )
-
-    if existing:
-        raise HTTPException(
-            status_code=400, detail="Configuração já existe. Use PUT para atualizar."
-        )
-
-    # Criar nova configuração
-    new_config = TenantWhatsAppConfig(tenant_id=tenant_id, **config_data.model_dump())
-
-    db.add(new_config)
-    db.commit()
-    db.refresh(new_config)
-
-    return new_config
-
-
-@router.put("/config", response_model=TenantWhatsAppConfigResponse)
-async def update_config(
-    config_data: TenantWhatsAppConfigUpdate,
-    tenant_id=Depends(_tenant_whatsapp),
-    db: Session = Depends(get_session),
-):
-    """Atualiza configuração WhatsApp"""
-
-    config = (
-        db.query(TenantWhatsAppConfig)
-        .filter(TenantWhatsAppConfig.tenant_id == tenant_id)
-        .first()
-    )
-
-    if not config:
-        raise HTTPException(status_code=404, detail="Configuração não encontrada")
-
-    # Atualizar campos
-    for field, value in config_data.model_dump(exclude_unset=True).items():
-        setattr(config, field, value)
-
-    db.commit()
-    db.refresh(config)
-
-    return config
-
-
-@router.delete("/config", status_code=204)
-async def delete_config(
-    tenant_id=Depends(_tenant_whatsapp), db: Session = Depends(get_session)
-):
-    """Remove configuração WhatsApp"""
-
-    config = (
-        db.query(TenantWhatsAppConfig)
-        .filter(TenantWhatsAppConfig.tenant_id == tenant_id)
-        .first()
-    )
-
-    if not config:
-        raise HTTPException(status_code=404, detail="Configuração não encontrada")
-
-    db.delete(config)
-    db.commit()
-
-
-@router.get("/config/stats", response_model=WhatsAppStatsResponse)
-async def get_stats(
-    tenant_id=Depends(_tenant_whatsapp), db: Session = Depends(get_session)
-):
-    """Obtém estatísticas de uso"""
-    # TODO: Implementar estatísticas reais
-    return {
-        "total_sessions": 0,
-        "active_sessions": 0,
-        "total_messages": 0,
-        "messages_today": 0,
-        "avg_response_time": 0.0,
-        "ai_usage_percentage": 0.0,
-    }
 
 
 # ============================================================================
