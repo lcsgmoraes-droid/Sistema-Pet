@@ -120,8 +120,8 @@ def test_whatsapp_config_http_informa_presenca_sem_expor_segredos():
     app = FastAPI()
     app.include_router(whatsapp_config.router)
     app.dependency_overrides[whatsapp_config.get_db] = lambda: _ConfigDb(config)
-    app.dependency_overrides[whatsapp_config._tenant_whatsapp_config] = (
-        lambda: config.tenant_id
+    app.dependency_overrides[whatsapp_config._tenant_whatsapp_config] = lambda: (
+        config.tenant_id
     )
 
     response = TestClient(app).get("/whatsapp/config")
