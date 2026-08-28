@@ -25,7 +25,7 @@ class EcommerceRegisterRequest(BaseModel):
 class EcommerceLoginRequest(BaseModel):
     identifier: str | None = None
     # Compatibilidade com versoes anteriores do site e do app.
-    email: EmailStr | None = None
+    email: str | None = None
     password: str
 
     @model_validator(mode="after")
