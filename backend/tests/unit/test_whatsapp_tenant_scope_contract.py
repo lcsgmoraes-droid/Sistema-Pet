@@ -74,7 +74,7 @@ def test_whatsapp_config_routes_use_selected_tenant_dependency():
     assert "current_user.tenant_id" not in source
 
 
-def test_legacy_whatsapp_routes_use_selected_tenant_dependency():
+def test_whatsapp_tool_routes_use_selected_tenant_dependency():
     assert _depends_on_dependency(
         whatsapp_routes._tenant_whatsapp,
         get_current_user_and_tenant,
@@ -82,11 +82,6 @@ def test_legacy_whatsapp_routes_use_selected_tenant_dependency():
     )
 
     for func in (
-        whatsapp_routes.get_config,
-        whatsapp_routes.create_config,
-        whatsapp_routes.update_config,
-        whatsapp_routes.delete_config,
-        whatsapp_routes.get_stats,
         whatsapp_routes.test_tool,
         whatsapp_routes.test_message,
         whatsapp_routes.test_conversation,
@@ -96,6 +91,14 @@ def test_legacy_whatsapp_routes_use_selected_tenant_dependency():
     source = _source("backend/app/routes/whatsapp_routes.py")
     assert "current_user: User = Depends(get_current_user_and_tenant)" not in source
     assert "current_user.tenant_id" not in source
+
+
+def test_legacy_config_names_delegate_to_single_whatsapp_router():
+    assert whatsapp_routes.get_config is whatsapp_config.get_whatsapp_config
+    assert whatsapp_routes.create_config is whatsapp_config.create_whatsapp_config
+    assert whatsapp_routes.update_config is whatsapp_config.update_whatsapp_config
+    assert whatsapp_routes.delete_config is whatsapp_config.delete_whatsapp_config
+    assert whatsapp_routes.get_stats is whatsapp_config.get_whatsapp_stats
 
 
 def test_whatsapp_public_and_background_paths_manage_tenant_context():
