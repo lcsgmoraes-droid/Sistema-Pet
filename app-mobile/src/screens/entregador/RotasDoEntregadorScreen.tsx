@@ -23,8 +23,7 @@ import {
   HistoricoRotasEntregador,
   type RotaHistorico,
 } from "./HistoricoRotasEntregador";
-
-// ─── Tipos ───────────────────────────────────────────────────────────────────
+import { TaxiDogEntregador } from "./TaxiDogEntregador";
 
 interface ParadaResumo {
   id: number;
@@ -76,8 +75,6 @@ interface EntregaAberta {
 type Nav = NativeStackNavigationProp<EntregadorStackParamList, "MinhasRotas">;
 type RouteProps = RouteProp<EntregadorStackParamList, "MinhasRotas">;
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
-
 const BADGE: Record<string, { label: string; color: string }> = {
   pendente: { label: "Pendente", color: "#f59e0b" },
   em_rota: { label: "Em rota", color: "#3b82f6" },
@@ -89,12 +86,10 @@ function badgeFor(status: string) {
   return BADGE[status] ?? { label: status, color: "#6b7280" };
 }
 
-// ─── Componente ──────────────────────────────────────────────────────────────
-
 export default function RotasDoEntregadorScreen() {
   const navigation = useNavigation<Nav>();
   const route = useRoute<RouteProps>();
-  const [aba, setAba] = useState<"abertas" | "rotas" | "historico">("abertas");
+  const [aba, setAba] = useState<"abertas" | "rotas" | "taxi_dog" | "historico">("abertas");
 
   const [entregasAbertas, setEntregasAbertas] = useState<EntregaAberta[]>([]);
   const [selecionadas, setSelecionadas] = useState<number[]>([]);
@@ -276,8 +271,6 @@ export default function RotasDoEntregadorScreen() {
     );
   }
 
-  // ── Render item ────────────────────────────────────────────────────────────
-
   const renderRota = ({ item }: { item: Rota }) => {
     const badge = badgeFor(item.status);
     const total = Number(item.total_entregas) || item.paradas.length;
@@ -375,8 +368,6 @@ export default function RotasDoEntregadorScreen() {
     );
   };
 
-  // ── Tela ───────────────────────────────────────────────────────────────────
-
   if (loading) {
     return (
       <View style={styles.center}>
@@ -407,6 +398,16 @@ export default function RotasDoEntregadorScreen() {
             style={[styles.tabText, aba === "rotas" && styles.tabTextAtivo]}
           >
             🚚 Rotas Ativas
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.tabBtn, aba === "taxi_dog" && styles.tabBtnAtivo]}
+          onPress={() => setAba("taxi_dog")}
+        >
+          <Text
+            style={[styles.tabText, aba === "taxi_dog" && styles.tabTextAtivo]}
+          >
+            🐾 Taxi Dog
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
@@ -511,11 +512,10 @@ export default function RotasDoEntregadorScreen() {
           }
         />
       )}
+      {aba === "taxi_dog" && <TaxiDogEntregador />}
     </View>
   );
 }
-
-// ─── Estilos ─────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
   list: {
@@ -613,7 +613,6 @@ const styles = StyleSheet.create({
     color: "#6b7280",
     marginTop: 4,
   },
-  // Card
   card: {
     backgroundColor: "#fff",
     borderRadius: 12,

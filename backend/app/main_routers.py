@@ -188,6 +188,10 @@ from app.routes.ecommerce_public import router as ecommerce_public_router
 from app.routes.ecommerce_cart import router as ecommerce_cart_router
 from app.routes.ecommerce_checkout import router as ecommerce_checkout_router
 from app.routes.app_banho_tosa_routes import router as app_banho_tosa_router
+from app.routes.app_banho_tosa_funcionario_routes import (
+    router as app_banho_tosa_funcionario_router,
+    taxi_dog_router as app_taxi_dog_entregador_router,
+)
 from app.routes.app_mobile_routes import router as app_mobile_router
 from app.routes.app_privacy_routes import router as app_privacy_router
 from app.routes.app_vet_routes import router as app_vet_router
@@ -641,6 +645,8 @@ def register_routers(app: FastAPI) -> None:
     app.include_router(app_vet_router)  # App Mobile - Veterinario operacional
     app.include_router(app_privacy_router)  # App Mobile - Privacidade/LGPD
     app.include_router(app_banho_tosa_router)  # App Mobile - Banho & Tosa
+    app.include_router(app_banho_tosa_funcionario_router)
+    app.include_router(app_taxi_dog_entregador_router)
     app.include_router(
         campaigns_router, dependencies=_module_dependencies("campanhas")
     )  # Motor de Campanhas

@@ -13,6 +13,7 @@ const fechamentos = read("src/pages/banhoTosa/components/BanhoTosaFechamentosVie
 const relatorios = read("src/pages/banhoTosa/components/BanhoTosaRelatoriosView.jsx");
 const exportacao = read("src/pages/banhoTosa/banhoTosaRelatorioExport.js");
 const rotas = read("src/app/routes/BathGroomingRoutes.jsx");
+const taxiDog = read("src/pages/banhoTosa/components/BanhoTosaTaxiDogList.jsx");
 
 assert.match(
   fila,
@@ -47,5 +48,17 @@ assert.match(
 assert.match(relatorios, /Baixar PDF/, "relatórios devem expor geração de PDF");
 assert.match(relatorios, /Exportar CSV/, "relatórios devem expor geração de CSV");
 assert.match(exportacao, /new jsPDF/, "exportação deve construir um PDF real");
+assert.match(taxiDog, /const statusFlows =/);
+assert.match(
+  taxiDog,
+  /ida: \["agendado", "motorista_a_caminho", "pet_coletado", "entregue_na_clinica"\]/,
+  "somente ida deve encerrar ao entregar o pet na loja",
+);
+assert.match(
+  taxiDog,
+  /volta: \["agendado", "aguardando_retorno", "retornando", "entregue_ao_tutor"\]/,
+  "somente volta deve começar aguardando o retorno",
+);
+assert.match(taxiDog, /proximoStatus\(item\.status, item\.tipo\)/);
 
 console.log("Banho & Tosa fluid flow checks passed.");
