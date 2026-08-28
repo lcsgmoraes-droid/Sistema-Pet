@@ -103,8 +103,28 @@ class TenantWhatsAppConfigUpdate(BaseModel):
     tone: Optional[ToneType] = None
 
 
-class TenantWhatsAppConfigResponse(TenantWhatsAppConfigBase):
-    """Schema de resposta"""
+class TenantWhatsAppConfigResponse(BaseModel):
+    """Resposta segura, sem devolver credenciais persistidas ao cliente."""
+
+    # Esta resposta nao deve herdar TenantWhatsAppConfigBase: aquele schema e
+    # usado para entrada e contem segredos que nunca podem voltar ao navegador.
+    model_config = ConfigDict(from_attributes=True, protected_namespaces=())
+
+    provider: ProviderType = ProviderType.DIALOG_360
+    phone_number: Optional[str] = None
+    webhook_url: Optional[str] = None
+    model_preference: str = "gpt-4o-mini"
+    auto_response_enabled: bool = True
+    human_handoff_keywords: Optional[str] = None
+    working_hours_start: Optional[time] = None
+    working_hours_end: Optional[time] = None
+    notificacoes_entrega_enabled: bool = False
+    bot_name: Optional[str] = None
+    greeting_message: Optional[str] = None
+    tone: ToneType = ToneType.FRIENDLY
+    has_api_key: bool = False
+    has_webhook_secret: bool = False
+    has_openai_api_key: bool = False
 
     id: str
     tenant_id: str
@@ -118,9 +138,6 @@ class TenantWhatsAppConfigResponse(TenantWhatsAppConfigBase):
         if isinstance(v, UUID):
             return str(v)
         return v
-
-    class Config:
-        from_attributes = True
 
 
 # ============================================================================

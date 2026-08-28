@@ -53,7 +53,7 @@ export default function OpenAIIntegracaoCard() {
       const data = response.data;
       if (data) {
         setConfigExiste(true);
-        setTemChaveSalva(Boolean(data.openai_api_key));
+        setTemChaveSalva(Boolean(data.has_openai_api_key));
         setForm((prev) => ({
           ...prev,
           openai_api_key: "",
