@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from ..auth.dependencies import get_current_user_and_tenant
 from ..db import get_session
 from ..models import Cliente
+from ..security.permissions_decorator import require_permission_dependency
 from ..veterinario_core import _get_tenant
 from ..veterinario_models import AgendamentoVet, ConsultorioVet
 from ..veterinario_lembrete_configuracoes import (
@@ -23,7 +24,9 @@ from ..veterinario_schemas import (
     VeterinarioSimples,
 )
 
-router = APIRouter()
+router = APIRouter(
+    dependencies=[Depends(require_permission_dependency("veterinario.acessar"))]
+)
 
 
 @router.get(
