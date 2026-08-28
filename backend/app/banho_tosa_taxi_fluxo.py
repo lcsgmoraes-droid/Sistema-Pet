@@ -68,7 +68,9 @@ def validar_transicao_status_taxi_dog(
         return novo
     esperado = proximo_status_taxi_dog(atual, tipo)
     if not esperado or novo != esperado:
-        esperado_label = TAXI_DOG_STATUS_LABELS.get(esperado or "", esperado or "finalizado")
+        esperado_label = TAXI_DOG_STATUS_LABELS.get(
+            esperado or "", esperado or "finalizado"
+        )
         raise ValueError(f"Proxima etapa permitida: {esperado_label}")
     return novo
 
@@ -92,7 +94,9 @@ def sincronizar_chegada_taxi_dog(
         .first()
     )
     if not agendamento:
-        raise HTTPException(status_code=404, detail="Agendamento do Taxi Dog nao encontrado")
+        raise HTTPException(
+            status_code=404, detail="Agendamento do Taxi Dog nao encontrado"
+        )
     if agendamento.status in {"cancelado", "no_show", "entregue"}:
         raise HTTPException(
             status_code=422,

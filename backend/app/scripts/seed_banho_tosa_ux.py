@@ -33,25 +33,116 @@ DEFAULT_TARGET_EMAIL = "corepeterp@gmail.com"
 PRODUCTION_ENVS = {"production", "prod", "producao"}
 
 AGENDADOS = (
-    ("Bento", "Golden Retriever", "grande", "Banho Completo", 8, "Primeira visita; confirmar sensibilidade nos ouvidos."),
-    ("Luna", "Shih-tzu", "pequeno", "Banho + Tosa Higienica", 9, "Taxi Dog na ida; tutora pediu lacinho amarelo."),
-    ("Thor", "Bulldog Frances", "medio", "Banho Higienico", 10, "Usar shampoo hipoalergenico."),
-    ("Mel", "Yorkshire", "pequeno", "Hidratacao de Pelagem", 11, "Taxi Dog ida e volta; nao usar perfume forte."),
-    ("Nina", "Border Collie", "grande", "Desembaraco", 12, "Pelagem longa com alguns nos."),
+    (
+        "Bento",
+        "Golden Retriever",
+        "grande",
+        "Banho Completo",
+        8,
+        "Primeira visita; confirmar sensibilidade nos ouvidos.",
+    ),
+    (
+        "Luna",
+        "Shih-tzu",
+        "pequeno",
+        "Banho + Tosa Higienica",
+        9,
+        "Taxi Dog na ida; tutora pediu lacinho amarelo.",
+    ),
+    (
+        "Thor",
+        "Bulldog Frances",
+        "medio",
+        "Banho Higienico",
+        10,
+        "Usar shampoo hipoalergenico.",
+    ),
+    (
+        "Mel",
+        "Yorkshire",
+        "pequeno",
+        "Hidratacao de Pelagem",
+        11,
+        "Taxi Dog ida e volta; nao usar perfume forte.",
+    ),
+    (
+        "Nina",
+        "Border Collie",
+        "grande",
+        "Desembaraco",
+        12,
+        "Pelagem longa com alguns nos.",
+    ),
     ("Fred", "Pug", "pequeno", "Banho medio completo", 13, "Secar bem as dobrinhas."),
-    ("Amora", "Lhasa Apso", "pequeno", "Tosa Completa", 14, "Tosa baixa, preservar topete."),
-    ("Bob", "Vira-lata", "medio", "Banho + Tosa Higienica", 15, "Tutor busca no balcao apos as 17h."),
+    (
+        "Amora",
+        "Lhasa Apso",
+        "pequeno",
+        "Tosa Completa",
+        14,
+        "Tosa baixa, preservar topete.",
+    ),
+    (
+        "Bob",
+        "Vira-lata",
+        "medio",
+        "Banho + Tosa Higienica",
+        15,
+        "Tutor busca no balcao apos as 17h.",
+    ),
 )
 
 EM_PROCESSO = (
-    ("Pipoca", "Spitz Alemao", "pequeno", "chegou", 0, "Aguardando avaliacao de entrada."),
-    ("Zeus", "Rottweiler", "grande", "chegou", 0, "Pet docil, mas estranha secador muito perto."),
-    ("Maia", "Beagle", "medio", "banho", 12, "Banho iniciado; conferir ouvido esquerdo."),
+    (
+        "Pipoca",
+        "Spitz Alemao",
+        "pequeno",
+        "chegou",
+        0,
+        "Aguardando avaliacao de entrada.",
+    ),
+    (
+        "Zeus",
+        "Rottweiler",
+        "grande",
+        "chegou",
+        0,
+        "Pet docil, mas estranha secador muito perto.",
+    ),
+    (
+        "Maia",
+        "Beagle",
+        "medio",
+        "banho",
+        12,
+        "Banho iniciado; conferir ouvido esquerdo.",
+    ),
     ("Theo", "Maltês", "pequeno", "banho", 28, "Usar shampoo para pele sensivel."),
     ("Belinha", "Poodle", "pequeno", "secagem", 8, "Secagem em temperatura baixa."),
-    ("Chico", "Schnauzer", "medio", "secagem", 24, "Tutor prefere barba bem seca e penteada."),
-    ("Lola", "Cocker Spaniel", "medio", "tosa", 18, "Tosa tesoura; preservar franja das orelhas."),
-    ("Max", "Labrador", "grande", "tosa", 38, "Acabamento de patas e retirada de subpelo."),
+    (
+        "Chico",
+        "Schnauzer",
+        "medio",
+        "secagem",
+        24,
+        "Tutor prefere barba bem seca e penteada.",
+    ),
+    (
+        "Lola",
+        "Cocker Spaniel",
+        "medio",
+        "tosa",
+        18,
+        "Tosa tesoura; preservar franja das orelhas.",
+    ),
+    (
+        "Max",
+        "Labrador",
+        "grande",
+        "tosa",
+        38,
+        "Acabamento de patas e retirada de subpelo.",
+    ),
 )
 
 STATUS_POR_ETAPA = {
@@ -191,8 +282,15 @@ def _upsert_appointment(
             {
                 **params,
                 "id": appointment_id,
-                "restricoes": json.dumps({"alertas": ["Confirmar pele e ouvidos antes do banho"]}),
-                "perfil": json.dumps({"temperamento": "docil", "observacao": "Apresentar o secador aos poucos"}),
+                "restricoes": json.dumps(
+                    {"alertas": ["Confirmar pele e ouvidos antes do banho"]}
+                ),
+                "perfil": json.dumps(
+                    {
+                        "temperamento": "docil",
+                        "observacao": "Apresentar o secador aos poucos",
+                    }
+                ),
             },
         )
     else:
@@ -216,8 +314,15 @@ def _upsert_appointment(
                 ),
                 {
                     **params,
-                    "restricoes": json.dumps({"alertas": ["Confirmar pele e ouvidos antes do banho"]}),
-                    "perfil": json.dumps({"temperamento": "docil", "observacao": "Apresentar o secador aos poucos"}),
+                    "restricoes": json.dumps(
+                        {"alertas": ["Confirmar pele e ouvidos antes do banho"]}
+                    ),
+                    "perfil": json.dumps(
+                        {
+                            "temperamento": "docil",
+                            "observacao": "Apresentar o secador aos poucos",
+                        }
+                    ),
                 },
             ).scalar_one()
         )
@@ -333,7 +438,9 @@ def _set_process_stage(
         for index, etapa in enumerate(flow[: current_index + 1]):
             is_current = etapa == stage
             duration = elapsed_minutes if is_current else 20 + (index * 5)
-            inicio = base_time - timedelta(minutes=elapsed_minutes) if is_current else cursor
+            inicio = (
+                base_time - timedelta(minutes=elapsed_minutes) if is_current else cursor
+            )
             fim = None if is_current else inicio + timedelta(minutes=duration)
             resource_id = _resource_id(db, tenant_id, RECURSO_POR_ETAPA[etapa])
             db.execute(
@@ -476,7 +583,9 @@ def _upsert_taxi(
             ).scalar_one()
         )
     db.execute(
-        text("UPDATE banho_tosa_agendamentos SET taxi_dog_id = :taxi_id WHERE id = :id"),
+        text(
+            "UPDATE banho_tosa_agendamentos SET taxi_dog_id = :taxi_id WHERE id = :id"
+        ),
         {"taxi_id": taxi_id, "id": appointment_id},
     )
     return taxi_id
@@ -520,7 +629,14 @@ def seed(db, *, email: str, base_date: date, dry_run: bool) -> dict[str, Any]:
 
     appointments: list[dict[str, int]] = []
     all_scenarios = list(AGENDADOS) + list(EM_PROCESSO)
-    for index, (nome, raca, porte, service_or_stage, hour_or_elapsed, note) in enumerate(all_scenarios):
+    for index, (
+        nome,
+        raca,
+        porte,
+        service_or_stage,
+        hour_or_elapsed,
+        note,
+    ) in enumerate(all_scenarios):
         codigo = f"UX-BT-CLI-{index + 1:02d}"
         cliente_id = _ensure_person(
             db,

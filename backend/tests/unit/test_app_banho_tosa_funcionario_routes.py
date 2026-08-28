@@ -42,7 +42,10 @@ def test_app_entregador_expoe_taxi_dog_atribuido_ao_motorista():
 
 def test_fluxo_taxi_dog_respeita_ida_volta_e_nao_pula_etapa():
     assert proximo_status_taxi_dog("agendado", "ida_volta") == "motorista_a_caminho"
-    assert proximo_status_taxi_dog("entregue_na_clinica", "ida_volta") == "aguardando_retorno"
+    assert (
+        proximo_status_taxi_dog("entregue_na_clinica", "ida_volta")
+        == "aguardando_retorno"
+    )
     assert fluxo_status_taxi_dog("ida")[-1] == "entregue_na_clinica"
     assert fluxo_status_taxi_dog("volta") == (
         "agendado",

@@ -351,7 +351,9 @@ def atualizar_status_taxi_dog_entregador_mobile(
         .first()
     )
     if not taxi:
-        raise HTTPException(status_code=404, detail="Taxi Dog nao encontrado para este motorista")
+        raise HTTPException(
+            status_code=404, detail="Taxi Dog nao encontrado para este motorista"
+        )
     try:
         novo_status = validar_transicao_status_taxi_dog(
             taxi.status,
