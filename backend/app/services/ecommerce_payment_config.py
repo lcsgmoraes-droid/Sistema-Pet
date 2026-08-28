@@ -15,21 +15,23 @@ from typing import Any
 from urllib.parse import urlencode
 from uuid import UUID
 
-from cryptography.fernet import Fernet
 from fastapi import HTTPException, status
 import requests
 from sqlalchemy import text
 from sqlalchemy.exc import NoResultFound
 from sqlalchemy.orm import Session
 
-from app.config import JWT_SECRET_KEY
 from app.ecommerce_payment_models import EcommercePaymentGatewayConfig
+from app.security.tenant_config_crypto import (
+    decrypt_secret,
+    encrypt_secret,
+    secret_key as _secret_key,
+)
 from app.utils.tenant_safe_sql import execute_tenant_safe_one
 
 
 MERCADO_PAGO_PROVIDER = "mercadopago"
 VALID_ENVIRONMENTS = {"production", "sandbox"}
-SECRET_PREFIX = "fernet:"
 WEBHOOK_TOKEN_RLS_SETTING = "app.payment_webhook_token"
 _SET_WEBHOOK_TOKEN_SQL = text("SELECT set_config(:setting_name, :setting_value, true)")
 OAUTH_AUTH_URL = "https://auth.mercadopago.com/authorization"
@@ -107,66 +109,6 @@ def sync_mercado_pago_webhook_token(db: Session, webhook_token: str) -> bool:
         },
     )
     return True
-
-
-def _secret_key() -> str:
-    # Chave dedicada de criptografia dos segredos de pagamento.
-    key = (
-        os.getenv("PAYMENT_CONFIG_ENCRYPTION_KEY") or os.getenv("ENCRYPTION_KEY") or ""
-    ).strip()
-    if key:
-        return key
-    # Em PRODUCAO e OBRIGATORIA: nada de cair para a chave de login (JWT_SECRET_KEY)
-    # nem para um literal embutido no codigo (que seria um segredo publico).
-    if (os.getenv("ENVIRONMENT") or "").strip().lower() == "production":
-        raise RuntimeError(
-            "PAYMENT_CONFIG_ENCRYPTION_KEY (ou ENCRYPTION_KEY) e obrigatorio em producao "
-            "para criptografar segredos de pagamento."
-        )
-    # Apenas DEV/teste: conveniencia local (nunca em producao).
-    return (
-        os.getenv("JWT_SECRET_KEY") or JWT_SECRET_KEY or "corepet-dev-only-payment-key"
-    ).strip()
-
-
-def _fernet_key() -> bytes:
-    raw_secret = _secret_key()
-    try:
-        Fernet(raw_secret.encode("utf-8"))
-        return raw_secret.encode("utf-8")
-    except Exception:
-        digest = hashlib.sha256(raw_secret.encode("utf-8")).digest()
-        return base64.urlsafe_b64encode(digest)
-
-
-def _cipher() -> Fernet:
-    return Fernet(_fernet_key())
-
-
-def encrypt_secret(value: str | None) -> str | None:
-    """Criptografa um segredo do gateway sem expor texto claro no banco."""
-    if value is None:
-        return None
-    raw = str(value).strip()
-    if not raw:
-        return None
-    if raw.startswith(SECRET_PREFIX):
-        return raw
-    return SECRET_PREFIX + _cipher().encrypt(raw.encode("utf-8")).decode("utf-8")
-
-
-def decrypt_secret(value: str | None) -> str:
-    """Descriptografa segredo, mantendo compatibilidade com dados legados em texto."""
-    raw = str(value or "").strip()
-    if not raw:
-        return ""
-    if not raw.startswith(SECRET_PREFIX):
-        return raw
-    token = raw[len(SECRET_PREFIX) :]
-    try:
-        return _cipher().decrypt(token.encode("utf-8")).decode("utf-8")
-    except Exception:
-        return ""
 
 
 def new_webhook_token() -> str:

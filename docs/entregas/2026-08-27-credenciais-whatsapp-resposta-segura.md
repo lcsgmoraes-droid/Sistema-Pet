@@ -48,6 +48,6 @@ frontend. Nao ha conversao nem perda de dados.
 
 ## Proxima melhoria recomendada
 
-As credenciais continuam armazenadas nas colunas atuais do banco. Criptografia
-em repouso deve ser tratada em tarefa separada, com migration e plano de
-compatibilidade para valores ja existentes.
+A criptografia em repouso foi implementada na entrega
+`2026-08-28-credenciais-whatsapp-criptografadas.md`, com migration dos valores
+existentes e rollback documentado.

@@ -232,9 +232,11 @@ Toda integração nova ou alterada deve registrar, antes da homologação:
 - **Finalidade e direção:** envia e recebe mensagens de atendimento por tenant;
   inclui ponte interna protegida para o orquestrador n8n/WAHA.
 - **Autenticação e segredos:** chave de API do 360dialog ou WAHA, segredo de
-  webhook por tenant e token interno dedicado, todos fora do Git. A entrada
-  aceita HMAC-SHA256 quando o provedor o fornece ou o cabeçalho personalizado
-  `X-CorePet-Webhook-Token`, suportado na configuração do 360dialog.
+  webhook por tenant e token interno dedicado, todos fora do Git. As
+  credenciais por tenant sao criptografadas no banco e nunca retornam ao
+  navegador depois de salvas. A entrada aceita HMAC-SHA256 quando o provedor o
+  fornece ou o cabecalho personalizado `X-CorePet-Webhook-Token`, suportado na
+  configuracao do 360dialog.
 - **Timeout:** envio externo usa limite de 30 segundos.
 - **Retry:** processamento recebido pode ocorrer em segundo plano, mas não há
   contrato único de fila durável/retry para toda saída.
@@ -255,7 +257,9 @@ Toda integração nova ou alterada deve registrar, antes da homologação:
   de falha acumulada.
 - **Evidência no código:** `backend/app/whatsapp/sender.py`,
   `backend/app/whatsapp/webhook.py` e
-  `backend/app/api/whatsapp_orchestrator_internal_routes.py`.
+  `backend/app/api/whatsapp_orchestrator_internal_routes.py`; criptografia em
+  `backend/app/security/tenant_config_crypto.py` e migration
+  `zxk20260828a1_encrypt_whatsapp_config_secrets.py`.
 
 ### INT-007 — EcommerceAI
 
