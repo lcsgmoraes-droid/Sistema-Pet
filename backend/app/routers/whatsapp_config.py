@@ -27,6 +27,24 @@ async def _tenant_whatsapp_config(user_and_tenant=Depends(get_current_user_and_t
     return user_and_tenant[1]
 
 
+def _has_configured_secret(value: Optional[str]) -> bool:
+    return bool(value and value.strip())
+
+
+def _safe_config_response(
+    config: TenantWhatsAppConfig,
+) -> TenantWhatsAppConfigResponse:
+    """Monta a resposta publica sem copiar credenciais persistidas."""
+    response = TenantWhatsAppConfigResponse.model_validate(config)
+    return response.model_copy(
+        update={
+            "has_api_key": _has_configured_secret(config.api_key),
+            "has_webhook_secret": _has_configured_secret(config.webhook_secret),
+            "has_openai_api_key": _has_configured_secret(config.openai_api_key),
+        }
+    )
+
+
 # ============================================================================
 # GET CONFIG
 # ============================================================================
@@ -53,7 +71,7 @@ def get_whatsapp_config(
         else:
             logger.info("ℹ️ Nenhuma config encontrada")
 
-        return config
+        return _safe_config_response(config) if config else None
     except Exception as e:
         logger.error(f"❌ Erro no GET config: {type(e).__name__}: {str(e)}")
         import traceback
@@ -98,7 +116,7 @@ def create_whatsapp_config(
 
     logger.info(f"✅ Config WhatsApp criada: tenant={tenant_id}")
 
-    return config
+    return _safe_config_response(config)
 
 
 # ============================================================================
@@ -135,7 +153,7 @@ def update_whatsapp_config(
 
     logger.info(f"✅ Config WhatsApp atualizada: tenant={tenant_id}")
 
-    return config
+    return _safe_config_response(config)
 
 
 # ============================================================================

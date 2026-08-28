@@ -41,9 +41,9 @@ configuracao existente e salvar uma alteracao controlada em homologacao.
 
 Rollback: reverter o commit e reconstruir o backend. Nao ha alteracao de dados.
 
-## Lacuna observada fora desta entrega
+## Lacuna observada e resolvida
 
-A resposta atual de configuracao ainda inclui campos secretos para o navegador.
-Esse endurecimento deve ser feito em uma tarefa separada, com um campo booleano
-como `has_openai_api_key` para preservar a experiencia da tela sem devolver a
+A exposicao de campos secretos para o navegador foi resolvida na entrega
+`2026-08-27-credenciais-whatsapp-resposta-segura.md`. A API passou a informar
+somente indicadores booleanos, incluindo `has_openai_api_key`, sem devolver a
 credencial gravada.
