@@ -1,18 +1,20 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { FiAlertCircle, FiEye, FiEyeOff, FiLock, FiMail } from "react-icons/fi";
+import { FiAlertCircle, FiBriefcase, FiEye, FiEyeOff, FiLock, FiUser } from "react-icons/fi";
 import { useAuth } from "../contexts/AuthContext";
 
 const COREPET_LOGO = "/brand/corepet/corepet-horizontal.png";
 
 const Login = () => {
-  const [email, setEmail] = useState("");
+  const [identifier, setIdentifier] = useState("");
+  const [tenant, setTenant] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const { login } = useAuth();
   const navigate = useNavigate();
+  const loginComUsuario = Boolean(identifier.trim() && !identifier.includes("@"));
 
   const redirectAfterLogin = () => {
     const savedUser = localStorage.getItem("user");
@@ -39,7 +41,7 @@ const Login = () => {
     setLoading(true);
 
     try {
-      const result = await login(email, password);
+      const result = await login(identifier.trim().toLowerCase(), password, tenant.trim() || null);
       if (result.success) {
         redirectAfterLogin();
       } else {
@@ -72,7 +74,7 @@ const Login = () => {
               {String(error).toLowerCase().includes("email") &&
                 String(error).toLowerCase().includes("confirm") && (
                   <Link
-                    to={`/verificar-email?email=${encodeURIComponent(email)}`}
+                    to={`/verificar-email?email=${encodeURIComponent(identifier)}`}
                     className="inline-block mt-2 font-semibold text-red-800 underline"
                   >
                     Confirmar e-mail ou reenviar link
@@ -84,20 +86,42 @@ const Login = () => {
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Email</label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              E-mail ou nome de usuario
+            </label>
             <div className="relative">
-              <FiMail className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+              <FiUser className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
               <input
-                type="email"
-                value={email}
+                type="text"
+                value={identifier}
                 autoComplete="username"
-                onChange={(event) => setEmail(event.target.value)}
+                onChange={(event) => setIdentifier(event.target.value)}
                 className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#0f8b8d] focus:border-transparent outline-none transition"
-                placeholder="seu@email.com"
+                placeholder="seu@email.com ou maria.silva"
                 required
               />
             </div>
           </div>
+
+          {loginComUsuario && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Loja</label>
+              <div className="relative">
+                <FiBriefcase className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                <input
+                  type="text"
+                  value={tenant}
+                  onChange={(event) => setTenant(event.target.value)}
+                  className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#0f8b8d] focus:border-transparent outline-none transition"
+                  placeholder="Nome ou codigo da loja"
+                  required
+                />
+              </div>
+              <p className="mt-1 text-xs text-gray-500">
+                O administrador da loja informa este nome junto com seu usuario.
+              </p>
+            </div>
+          )}
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Senha</label>

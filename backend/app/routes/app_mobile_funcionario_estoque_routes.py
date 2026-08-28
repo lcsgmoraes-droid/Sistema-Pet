@@ -391,5 +391,5 @@ def registrar_balanco_funcionario_estoque(
         "tipo_movimentacao": tipo_movimentacao,
         "quantidade_movimentada": quantidade_movimentada,
         "movimentacao_id": movimentacao.id,
-        "mensagem": f"Balanco registrado por {funcionario.nome or current_user.nome or current_user.email}.",
+        "mensagem": f"Balanco registrado por {funcionario.nome or current_user.nome or getattr(current_user, 'username', None) or current_user.email}.",
     }

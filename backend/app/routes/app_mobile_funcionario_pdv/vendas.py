@@ -250,7 +250,10 @@ def finalizar_venda_funcionario_pdv(
         venda_id=venda_criada["id"],
         pagamentos=pagamentos_payload,
         user_id=current_user.id,
-        user_nome=current_user.nome or current_user.email or "Funcionario",
+        user_nome=current_user.nome
+        or getattr(current_user, "username", None)
+        or current_user.email
+        or "Funcionario",
         tenant_id=tenant_id,
         db=db,
         cupom_code=beneficios["cupom_code"],

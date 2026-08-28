@@ -90,7 +90,10 @@ async def finalizar_venda(
         venda_id=venda_id,
         pagamentos=pagamentos_list,
         user_id=current_user.id,
-        user_nome=current_user.nome or current_user.email or "Usuário",
+        user_nome=current_user.nome
+        or getattr(current_user, "username", None)
+        or current_user.email
+        or "Usuário",
         tenant_id=tenant_id,
         cupom_code=dados.cupom_code,
         cupom_discount_applied=dados.cupom_discount_applied,

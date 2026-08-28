@@ -32,8 +32,19 @@ from app.segmentacao_models import ClienteSegmento
 from app.vendas_models import Venda
 from app.partner_utils import get_all_accessible_tenant_ids
 from app.security.permissions_decorator import require_permission
+from app.security.permissions_service import check_permission
 from app.services.cliente_alertas_pdv import normalizar_alertas_pdv
 from app.services.app_access_profile_service import sync_cliente_app_access_profiles
+from app.services.business_audit_service import (
+    build_user_access_metadata,
+    log_business_event,
+)
+from app.services.user_account_service import (
+    UserAccountError,
+    create_tenant_user_account,
+    is_unique_email_violation,
+    is_unique_username_violation,
+)
 from app.utils.tenant_safe_sql import execute_tenant_safe
 
 logger = logging.getLogger(__name__)
@@ -61,7 +72,61 @@ def create_cliente(
     )
     dados_payload = cliente_data.model_dump()
     auth_user_id = dados_payload.pop("auth_user_id", None)
+    app_login = dados_payload.pop("app_login", None)
     app_access_profiles = dados_payload.pop("app_access_profiles", [])
+    if auth_user_id is not None and app_login is not None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Escolha uma conta existente ou crie uma nova, nao as duas opcoes.",
+        )
+    if app_login is not None:
+        check_permission(
+            db,
+            current_user.id,
+            "usuarios.manage",
+            tenant_id,
+            current_user=current_user,
+        )
+        try:
+            login_user, login_role = create_tenant_user_account(
+                db,
+                tenant_id=tenant_id,
+                username=app_login.get("username"),
+                email=app_login.get("email"),
+                password=app_login.get("password"),
+                role_id=app_login.get("role_id"),
+                nome=cliente_data.nome,
+            )
+        except UserAccountError as exc:
+            db.rollback()
+            raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+        except IntegrityError as exc:
+            db.rollback()
+            if is_unique_username_violation(exc):
+                detail = "Este nome de usuario ja esta em uso nesta loja."
+            elif is_unique_email_violation(exc):
+                detail = "Este e-mail ja esta cadastrado."
+            else:
+                detail = "Nao foi possivel criar a conta de acesso."
+            raise HTTPException(status_code=409, detail=detail) from exc
+        auth_user_id = login_user.id
+        log_business_event(
+            db=db,
+            tenant_id=tenant_id,
+            user_id=current_user.id,
+            event="access.user_created_from_person",
+            entity_type="users",
+            entity_id=login_user.id,
+            metadata=build_user_access_metadata(
+                actor=current_user,
+                target_user=login_user,
+                tenant_id=tenant_id,
+                role=login_role,
+                extra={"source": "person_registration"},
+            ),
+            details=f"Conta de acesso {login_user.username or login_user.email} criada no cadastro da pessoa",
+            commit=False,
+        )
     _normalizar_campos_identidade(dados_payload)
     dados_cliente = _preparar_dados_cliente(
         dados_payload,
@@ -102,7 +167,11 @@ def create_cliente(
 
     db.refresh(novo_cliente)
     log_create(
-        db, current_user.id, "cliente", novo_cliente.id, cliente_data.model_dump()
+        db,
+        current_user.id,
+        "cliente",
+        novo_cliente.id,
+        cliente_data.model_dump(exclude={"app_login"}),
     )
     _anexar_metadados_criacao_cliente(db, novo_cliente)
     return novo_cliente
@@ -130,7 +199,7 @@ def listar_usuarios_para_acesso_app(
             User.is_active.is_(True),
             UserTenant.is_active.is_(True),
         )
-        .order_by(User.nome.asc().nullslast(), User.email.asc())
+        .order_by(User.nome.asc().nullslast(), User.username.asc(), User.email.asc())
         .all()
     )
     usuarios: dict[int, dict] = {}
@@ -141,6 +210,7 @@ def listar_usuarios_para_acesso_app(
                 "user_id": user.id,
                 "nome": user.nome,
                 "email": user.email,
+                "username": user.username,
                 "perfis_sistema": [],
             },
         )
@@ -248,7 +318,67 @@ def update_cliente(
     auth_user_informado = "auth_user_id" in dados_payload
     perfis_informados = "app_access_profiles" in dados_payload
     auth_user_id = dados_payload.pop("auth_user_id", None)
+    app_login = dados_payload.pop("app_login", None)
     app_access_profiles = dados_payload.pop("app_access_profiles", None)
+    if auth_user_id is not None and app_login is not None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Escolha uma conta existente ou crie uma nova, nao as duas opcoes.",
+        )
+    if app_login is not None:
+        check_permission(
+            db,
+            current_user.id,
+            "usuarios.manage",
+            tenant_id,
+            current_user=current_user,
+        )
+        if cliente.auth_user_id is not None:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Este cadastro ja possui uma conta vinculada.",
+            )
+        try:
+            login_user, login_role = create_tenant_user_account(
+                db,
+                tenant_id=tenant_id,
+                username=app_login.get("username"),
+                email=app_login.get("email"),
+                password=app_login.get("password"),
+                role_id=app_login.get("role_id"),
+                nome=cliente_data.nome or cliente.nome,
+            )
+        except UserAccountError as exc:
+            db.rollback()
+            raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+        except IntegrityError as exc:
+            db.rollback()
+            if is_unique_username_violation(exc):
+                detail = "Este nome de usuario ja esta em uso nesta loja."
+            elif is_unique_email_violation(exc):
+                detail = "Este e-mail ja esta cadastrado."
+            else:
+                detail = "Nao foi possivel criar a conta de acesso."
+            raise HTTPException(status_code=409, detail=detail) from exc
+        auth_user_id = login_user.id
+        auth_user_informado = True
+        log_business_event(
+            db=db,
+            tenant_id=tenant_id,
+            user_id=current_user.id,
+            event="access.user_created_from_person",
+            entity_type="users",
+            entity_id=login_user.id,
+            metadata=build_user_access_metadata(
+                actor=current_user,
+                target_user=login_user,
+                tenant_id=tenant_id,
+                role=login_role,
+                extra={"source": "person_update", "cliente_id": cliente.id},
+            ),
+            details=f"Conta de acesso {login_user.username or login_user.email} criada no cadastro da pessoa",
+            commit=False,
+        )
     _normalizar_campos_identidade(dados_payload)
     update_data = _preparar_dados_cliente(
         dados_payload,
@@ -851,6 +981,7 @@ def _montar_resposta_update(cliente: Cliente) -> dict:
         "auth_user_id": getattr(cliente, "auth_user_id", None),
         "auth_user_nome": getattr(cliente, "auth_user_nome", None),
         "auth_user_email": getattr(cliente, "auth_user_email", None),
+        "auth_user_username": getattr(cliente, "auth_user_username", None),
         "app_access_profiles": getattr(cliente, "app_access_profiles", []),
     }
 

@@ -46,7 +46,8 @@ class TokenResponse(BaseModel):
 
 class UserResponse(BaseModel):
     id: int
-    email: str
+    email: Optional[str]
+    username: Optional[str]
     nome: Optional[str]
     is_admin: bool
     is_active: bool
@@ -217,6 +218,7 @@ def get_me(current_user: models.User = Depends(get_current_user)):
     return {
         "id": current_user.id,
         "email": current_user.email,
+        "username": getattr(current_user, "username", None),
         "nome": current_user.nome,
         "is_admin": current_user.is_admin,
         "is_active": current_user.is_active,

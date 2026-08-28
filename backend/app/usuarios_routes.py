@@ -1,10 +1,9 @@
-from datetime import datetime, timezone
+import secrets
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, model_validator
 
 from app.db import get_session
 from app.auth import get_current_user_and_tenant
@@ -16,22 +15,43 @@ from app.services.business_audit_service import (
     build_user_access_metadata,
     log_business_event,
 )
+from app.services.auth_security import register_password_changed
+from app.services.user_account_service import (
+    UserAccountError,
+    create_tenant_user_account,
+    email_exists_globally,
+    is_unique_email_violation,
+    is_unique_username_violation,
+    normalize_username,
+    username_exists_in_tenant,
+    validate_password,
+)
 from app.session_manager import revoke_all_sessions
-from app.tenancy.rls import sync_rls_auth_email, sync_rls_auth_user
+from app.tenancy.rls import sync_rls_auth_user
 
 router = APIRouter(prefix="/usuarios", tags=["Usuários"])
 MAX_MENU_FAVORITOS = 8
 
 
 class UserCreate(BaseModel):
-    email: EmailStr
-    password: str
+    username: str | None = Field(default=None, min_length=3, max_length=50)
+    email: EmailStr | None = None
+    nome: str | None = Field(default=None, max_length=255)
+    password: str = Field(min_length=8, max_length=72)
     role_id: int  # Role a ser vinculada ao usuário
+
+    @model_validator(mode="after")
+    def validate_identifier(self):
+        if not self.username and not self.email:
+            raise ValueError("Informe o nome de usuario ou o e-mail")
+        return self
 
 
 class UsuarioListResponse(BaseModel):
     user_id: int
-    email: str
+    username: str | None = None
+    email: str | None = None
+    nome: str | None = None
     role: str
     is_active: bool
 
@@ -41,7 +61,8 @@ class UsuarioListResponse(BaseModel):
 
 class UserResponse(BaseModel):
     id: int
-    email: str
+    username: str | None = None
+    email: str | None = None
     is_active: bool
 
     class Config:
@@ -56,6 +77,24 @@ class MenuFavoritoItem(BaseModel):
 
 class MenuFavoritosPayload(BaseModel):
     items: list[MenuFavoritoItem] = Field(default_factory=list)
+
+
+class UserCredentialsUpdate(BaseModel):
+    username: str | None = Field(default=None, min_length=3, max_length=50)
+    new_password: str | None = Field(default=None, min_length=8, max_length=72)
+    generate_password: bool = False
+
+    @model_validator(mode="after")
+    def validate_change(self):
+        if (
+            self.username is None
+            and self.new_password is None
+            and not self.generate_password
+        ):
+            raise ValueError("Informe o nome de usuario ou uma nova senha")
+        if self.new_password is not None and self.generate_password:
+            raise ValueError("Escolha uma senha ou gere uma senha, nao as duas opcoes")
+        return self
 
 
 def _serializar_menu_favorito(favorito: UsuarioMenuFavorito) -> dict:
@@ -150,21 +189,11 @@ def salvar_meus_menu_favoritos(
 
 def _email_ja_cadastrado_globalmente(db: Session, email: str) -> bool:
     """Users.email tem unicidade global; a checagem precisa ignorar o filtro de tenant."""
-    sync_rls_auth_email(db, email)
-    row = db.execute(
-        text("SELECT id FROM users WHERE lower(email) = :email LIMIT 1"),
-        {"email": email},
-    ).first()
-    return row is not None
+    return email_exists_globally(db, email)
 
 
 def _is_unique_email_violation(exc: IntegrityError) -> bool:
-    error_text = str(getattr(exc, "orig", exc)).lower()
-    return (
-        "users_email" in error_text
-        or "users.email" in error_text
-        or ("unique" in error_text and "email" in error_text)
-    )
+    return is_unique_email_violation(exc)
 
 
 @router.get("", response_model=list[UsuarioListResponse])
@@ -179,7 +208,9 @@ def listar_usuarios(
     rows = (
         db.query(
             User.id.label("user_id"),
+            User.username,
             User.email,
+            User.nome,
             Role.name.label("role"),
             UserTenant.is_active,
         )
@@ -200,50 +231,17 @@ def criar_usuario(
     user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     actor, tenant_id = user_and_tenant
-    email = payload.email.strip().lower()
-    if len(payload.password) < 8:
-        raise HTTPException(
-            status_code=400,
-            detail="Senha deve ter no minimo 8 caracteres. Use uma senha com 8 caracteres ou mais.",
-        )
-
-    if _email_ja_cadastrado_globalmente(db, email):
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Este e-mail ja esta cadastrado. Use outro e-mail ou verifique se o usuario ja existe em outro tenant.",
-        )
-
-    role = (
-        db.query(Role)
-        .filter(Role.id == payload.role_id, Role.tenant_id == tenant_id)
-        .first()
-    )
-    if not role:
-        raise HTTPException(
-            status_code=400,
-            detail="Perfil de acesso invalido para este tenant. Atualize a pagina e selecione um perfil novamente.",
-        )
-
-    user = User(
-        email=email,
-        hashed_password=hash_password(payload.password),
-        is_active=True,
-        tenant_id=tenant_id,
-        email_verified=True,
-        email_verified_at=datetime.now(timezone.utc),
-    )
 
     try:
-        db.add(user)
-        db.flush()
-
-        vinculo = UserTenant(
-            user_id=user.id,
+        user, role = create_tenant_user_account(
+            db,
             tenant_id=tenant_id,
-            role_id=role.id,
-            is_active=True,
+            username=payload.username,
+            email=payload.email,
+            password=payload.password,
+            role_id=payload.role_id,
+            nome=payload.nome,
         )
-        db.add(vinculo)
         log_business_event(
             db=db,
             tenant_id=tenant_id,
@@ -258,11 +256,14 @@ def criar_usuario(
                 role=role,
                 extra={"is_active": True},
             ),
-            details=f"Usuario {user.email} criado no tenant",
+            details=f"Usuario {user.username or user.email} criado no tenant",
             commit=False,
         )
         db.commit()
         db.refresh(user)
+    except UserAccountError as exc:
+        db.rollback()
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
     except IntegrityError as exc:
         db.rollback()
         if _is_unique_email_violation(exc):
@@ -270,12 +271,121 @@ def criar_usuario(
                 status_code=status.HTTP_409_CONFLICT,
                 detail="Este e-mail ja esta cadastrado. Use outro e-mail ou verifique se o usuario ja existe em outro tenant.",
             ) from exc
+        if is_unique_username_violation(exc):
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Este nome de usuario ja esta em uso nesta loja.",
+            ) from exc
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Nao foi possivel criar o usuario agora. Tente novamente em instantes.",
         ) from exc
 
     return user
+
+
+@router.patch("/{user_id}/credenciais")
+@require_permission("usuarios.manage")
+def atualizar_credenciais_usuario(
+    user_id: int,
+    payload: UserCredentialsUpdate,
+    db: Session = Depends(get_session),
+    user_and_tenant=Depends(get_current_user_and_tenant),
+):
+    actor, tenant_id = user_and_tenant
+    row = (
+        db.query(User, UserTenant)
+        .join(UserTenant, UserTenant.user_id == User.id)
+        .filter(
+            User.id == user_id,
+            User.tenant_id == tenant_id,
+            UserTenant.tenant_id == tenant_id,
+        )
+        .first()
+    )
+    if not row:
+        raise HTTPException(status_code=404, detail="Usuario nao encontrado nesta loja")
+
+    target_user, _vinculo = row
+    username_changed = False
+    password_changed = False
+    generated_password: str | None = None
+
+    try:
+        if payload.username is not None:
+            normalized_username = normalize_username(payload.username)
+            if username_exists_in_tenant(
+                db,
+                tenant_id=tenant_id,
+                username=normalized_username,
+                exclude_user_id=target_user.id,
+            ):
+                raise UserAccountError(
+                    "Este nome de usuario ja esta em uso nesta loja.",
+                    status_code=409,
+                )
+            username_changed = target_user.username != normalized_username
+            target_user.username = normalized_username
+
+        new_password = payload.new_password
+        if payload.generate_password:
+            generated_password = secrets.token_urlsafe(12)
+            new_password = generated_password
+        if new_password is not None:
+            new_password = validate_password(new_password)
+            target_user.hashed_password = hash_password(new_password)
+            register_password_changed(db, target_user, None, "admin_reset")
+            password_changed = True
+
+        if password_changed:
+            sessions_revoked = revoke_all_sessions(
+                db=db,
+                user_id=target_user.id,
+                reason="admin_password_reset",
+            )
+        else:
+            sessions_revoked = 0
+
+        log_business_event(
+            db=db,
+            tenant_id=tenant_id,
+            user_id=actor.id,
+            event="access.user_credentials_changed",
+            entity_type="users",
+            entity_id=target_user.id,
+            metadata=build_user_access_metadata(
+                actor=actor,
+                target_user=target_user,
+                tenant_id=tenant_id,
+                role=None,
+                extra={
+                    "username_changed": username_changed,
+                    "password_changed": password_changed,
+                    "sessions_revoked": sessions_revoked,
+                },
+            ),
+            details=f"Credenciais do usuario #{target_user.id} atualizadas",
+            commit=True,
+        )
+    except UserAccountError as exc:
+        db.rollback()
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+    except IntegrityError as exc:
+        db.rollback()
+        if is_unique_username_violation(exc):
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Este nome de usuario ja esta em uso nesta loja.",
+            ) from exc
+        raise
+
+    return {
+        "status": "ok",
+        "username": target_user.username,
+        "password_changed": password_changed,
+        "generated_password": generated_password,
+        "sessions_revoked": sessions_revoked,
+    }
 
 
 # ==========================================
@@ -349,7 +459,7 @@ def vincular_usuario(
             role=role,
             extra={"is_active": True},
         ),
-        details=f"Usuario {user.email} vinculado ao tenant",
+        details=f"Usuario {user.username or user.email or user.id} vinculado ao tenant",
         commit=False,
     )
     db.commit()

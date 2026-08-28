@@ -90,7 +90,11 @@ async def abrir_caixa(
     numero_caixa = (ultimo_caixa or 0) + 1
 
     # Nome do usuário (fallback para email se nome não estiver preenchido)
-    usuario_nome = current_user.nome or current_user.email
+    usuario_nome = (
+        current_user.nome
+        or getattr(current_user, "username", None)
+        or current_user.email
+    )
 
     # Criar novo caixa
     novo_caixa = Caixa(
@@ -225,7 +229,11 @@ async def criar_movimentacao(
         )
 
     # Nome do usuário (fallback para email se nome não estiver preenchido)
-    usuario_nome = current_user.nome or current_user.email
+    usuario_nome = (
+        current_user.nome
+        or getattr(current_user, "username", None)
+        or current_user.email
+    )
 
     # Criar movimentação
     movimentacao = MovimentacaoCaixa(

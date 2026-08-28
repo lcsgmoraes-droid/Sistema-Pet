@@ -105,8 +105,10 @@ def build_user_access_metadata(
     metadata = {
         "actor_user_id": getattr(actor, "id", None),
         "actor_email": getattr(actor, "email", None),
+        "actor_username": getattr(actor, "username", None),
         "target_user_id": getattr(target_user, "id", None),
         "target_email": getattr(target_user, "email", None),
+        "target_username": getattr(target_user, "username", None),
         "tenant_id": _to_serializable_id(tenant_id),
         "role_id": getattr(role, "id", None) if role else None,
         "role_name": getattr(role, "name", None) if role else None,

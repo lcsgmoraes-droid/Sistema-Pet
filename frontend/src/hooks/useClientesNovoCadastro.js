@@ -37,6 +37,7 @@ function buildNovoClienteFormData(tipoCadastro, tipoPessoa) {
     celular: "",
     celular_whatsapp: true,
     auth_user_id: null,
+    app_login: null,
     app_access_profiles: perfilInicial,
     cnpj: "",
     inscricao_estadual: "",
@@ -92,6 +93,7 @@ function buildClienteFormData(cliente) {
     celular: cliente.celular || "",
     celular_whatsapp: true,
     auth_user_id: cliente.auth_user_id || null,
+    app_login: null,
     app_access_profiles: cliente.app_access_profiles || [],
     cnpj: cliente.cnpj || "",
     inscricao_estadual: cliente.inscricao_estadual || "",
@@ -164,6 +166,7 @@ export function useClientesNovoCadastro({
   const [saldoCampanhas, setSaldoCampanhas] = useState(null);
   const [loadingCadastro, setLoadingCadastro] = useState(false);
   const [usuariosAcessoApp, setUsuariosAcessoApp] = useState([]);
+  const [rolesAcessoApp, setRolesAcessoApp] = useState([]);
   const [loadingUsuariosAcessoApp, setLoadingUsuariosAcessoApp] = useState(false);
   const [formData, setFormData] = useState(buildNovoClienteFormData("cliente", "PF"));
   const steps = useMemo(() => {
@@ -263,8 +266,19 @@ export function useClientesNovoCadastro({
     }
   };
 
+  const loadRolesAcessoApp = async () => {
+    try {
+      const response = await api.get("/roles");
+      setRolesAcessoApp(response.data || []);
+    } catch (err) {
+      console.error("Erro ao carregar perfis para a conta de acesso:", err);
+      setRolesAcessoApp([]);
+    }
+  };
+
   const openModal = (cliente = null, tipo = null, petIdToEdit = null) => {
     void loadUsuariosAcessoApp(cliente?.id || null);
+    void loadRolesAcessoApp();
     if (cliente) {
       setEditingCliente(cliente);
 
@@ -644,6 +658,7 @@ export function useClientesNovoCadastro({
       setClienteDuplicado,
       setFormData,
       usuariosAcessoApp,
+      rolesAcessoApp,
       loadingUsuariosAcessoApp,
       buscarCep,
       loadingCep,
@@ -722,6 +737,7 @@ export function useClientesNovoCadastro({
       onClienteCriado,
       steps,
       usuariosAcessoApp,
+      rolesAcessoApp,
     ],
   );
 

@@ -2,12 +2,23 @@
 
 from typing import List, Optional
 
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, model_validator
 
 
 class LoginRequest(BaseModel):
-    email: str
+    identifier: str | None = None
+    # Mantido para clientes web antigos durante a transicao.
+    email: str | None = None
+    tenant: str | None = None
     password: str
+
+    @model_validator(mode="after")
+    def validate_identifier(self):
+        identifier = str(self.identifier or self.email or "").strip()
+        if not identifier:
+            raise ValueError("Informe o e-mail ou nome de usuario")
+        self.identifier = identifier
+        return self
 
 
 class RegisterRequest(BaseModel):

@@ -740,12 +740,16 @@ const Layout = () => {
             <ThemeToggle />
             <div className="text-right hidden sm:block">
               <p className="text-sm font-medium text-gray-900 dark:text-slate-100">
-                {user?.nome || user?.email}
+                {user?.nome || user?.username || user?.email}
               </p>
-              <p className="text-xs text-gray-500 dark:text-slate-400">{user?.email}</p>
+              <p className="text-xs text-gray-500 dark:text-slate-400">
+                {user?.username || user?.email}
+              </p>
             </div>
             <div className="w-9 h-9 md:w-10 md:h-10 rounded-full bg-[#0f5f63] flex items-center justify-center text-white font-bold text-sm md:text-base">
-              {user?.nome?.[0]?.toUpperCase() || user?.email?.[0]?.toUpperCase()}
+              {user?.nome?.[0]?.toUpperCase() ||
+                user?.username?.[0]?.toUpperCase() ||
+                user?.email?.[0]?.toUpperCase()}
             </div>
           </div>
         </header>

@@ -1,5 +1,6 @@
 import { Plus, Users } from "lucide-react";
 import UsuarioModal from "../components/usuarios/UsuarioModal";
+import UsuarioCredenciaisModal from "../components/usuarios/UsuarioCredenciaisModal";
 import UsuariosTable from "../components/usuarios/UsuariosTable";
 import ActionButton from "../components/ui/ActionButton";
 import PageHeader from "../components/ui/PageHeader";
@@ -8,18 +9,28 @@ import useUsuariosPage from "../hooks/useUsuariosPage";
 export default function UsuariosPage() {
   const {
     criarUsuario,
+    credenciais,
+    credenciaisError,
+    fecharCredenciais,
     forcarLogout,
+    generatedPassword,
+    gerarNovaSenha,
     loading,
     novoUsuario,
     onAbrirModalUsuario,
+    onAbrirCredenciais,
     onCloseModalUsuario,
     roles,
     setNovoUsuario,
+    setCredenciais,
     setShowPassword,
     showModal,
     showPassword,
+    salvarCredenciais,
+    savingCredentials,
     toggleStatus,
     usuarioFormError,
+    usuarioCredenciais,
     usuarios,
   } = useUsuariosPage();
 
@@ -39,6 +50,7 @@ export default function UsuariosPage() {
       <UsuariosTable
         loading={loading}
         onForcarLogout={forcarLogout}
+        onManageCredentials={onAbrirCredenciais}
         onToggleStatus={toggleStatus}
         usuarios={usuarios}
       />
@@ -53,6 +65,18 @@ export default function UsuariosPage() {
         showModal={showModal}
         showPassword={showPassword}
         usuarioFormError={usuarioFormError}
+      />
+
+      <UsuarioCredenciaisModal
+        credenciais={credenciais}
+        erro={credenciaisError}
+        generatedPassword={generatedPassword}
+        loading={savingCredentials}
+        onChange={setCredenciais}
+        onClose={fecharCredenciais}
+        onGenerate={gerarNovaSenha}
+        onSubmit={salvarCredenciais}
+        usuario={usuarioCredenciais}
       />
     </div>
   );

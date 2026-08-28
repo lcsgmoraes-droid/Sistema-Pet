@@ -22,11 +22,11 @@ type EcommerceProfileUpdate = Partial<EcommerceUser> & {
 };
 
 export async function login(
-  email: string,
+  identifier: string,
   password: string,
 ): Promise<AuthResponse> {
   const { data } = await api.post<AuthResponse>("/ecommerce/auth/login", {
-    email,
+    identifier,
     password,
   });
   if (data.access_token) {

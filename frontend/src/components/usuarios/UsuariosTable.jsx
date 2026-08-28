@@ -1,18 +1,28 @@
-import { LogOut, UserCheck, UserX } from "lucide-react";
+import { KeyRound, LogOut, UserCheck, UserX } from "lucide-react";
 import DataTable from "../ui/DataTable";
 import IconActionButton from "../ui/IconActionButton";
 import Panel from "../ui/Panel";
 import StatusBadge from "../ui/StatusBadge";
 
-export default function UsuariosTable({ loading, onForcarLogout, onToggleStatus, usuarios }) {
+export default function UsuariosTable({
+  loading,
+  onForcarLogout,
+  onManageCredentials,
+  onToggleStatus,
+  usuarios,
+}) {
   const columns = [
     {
-      key: "email",
-      header: "Email",
+      key: "username",
+      header: "Usuario",
       render: (usuario) => (
         <div className="min-w-0">
-          <p className="truncate text-sm font-semibold text-slate-900">{usuario.email}</p>
-          <p className="text-xs text-slate-500">ID {usuario.user_id}</p>
+          <p className="truncate text-sm font-semibold text-slate-900">
+            {usuario.username || usuario.email}
+          </p>
+          <p className="truncate text-xs text-slate-500">
+            {usuario.nome || usuario.email || `ID ${usuario.user_id}`}
+          </p>
         </div>
       ),
     },
@@ -42,6 +52,12 @@ export default function UsuariosTable({ loading, onForcarLogout, onToggleStatus,
       align: "center",
       render: (usuario) => (
         <div className="flex items-center justify-center gap-2">
+          <IconActionButton
+            icon={KeyRound}
+            intent="edit"
+            onClick={() => onManageCredentials(usuario)}
+            title="Gerenciar usuario e senha"
+          />
           <IconActionButton
             icon={LogOut}
             intent="warning"

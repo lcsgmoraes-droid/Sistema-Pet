@@ -63,6 +63,7 @@ def _create_ecommerce_token_pair(
     common_data = {
         "sub": str(user.id),
         "email": user.email,
+        "username": getattr(user, "username", None),
     }
     if active_profile:
         common_data["active_profile"] = active_profile
