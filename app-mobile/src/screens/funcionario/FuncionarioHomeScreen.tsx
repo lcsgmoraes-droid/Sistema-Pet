@@ -1,14 +1,14 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import React from "react";
-import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { CORES, ESPACO, FONTE, RAIO, SOMBRA } from "../../theme";
 
 export default function FuncionarioHomeScreen() {
   const navigation = useNavigation<any>();
 
   return (
-    <View style={styles.container}>
+    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <View style={styles.headerCard}>
         <View style={styles.headerIcone}>
           <Ionicons name="briefcase-outline" size={26} color={CORES.sucesso} />
@@ -78,6 +78,22 @@ export default function FuncionarioHomeScreen() {
 
       <TouchableOpacity
         style={styles.acao}
+        onPress={() => navigation.navigate("FuncionarioBanhoTosa")}
+      >
+        <View style={[styles.acaoIcone, { backgroundColor: "#CCFBF1" }]}>
+          <Ionicons name="cut-outline" size={24} color="#0F766E" />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.acaoTitulo}>Banho & Tosa</Text>
+          <Text style={styles.acaoTexto}>
+            Agenda, check-in e avance cada pet pela fila da equipe.
+          </Text>
+        </View>
+        <Ionicons name="chevron-forward" size={20} color={CORES.textoClaro} />
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        style={styles.acao}
         onPress={() =>
           navigation.navigate("FuncionarioNovidades", {
             somenteNovidades: true,
@@ -95,7 +111,7 @@ export default function FuncionarioHomeScreen() {
         </View>
         <Ionicons name="chevron-forward" size={20} color={CORES.textoClaro} />
       </TouchableOpacity>
-    </View>
+    </ScrollView>
   );
 }
 
@@ -103,8 +119,11 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: CORES.fundo,
+  },
+  content: {
     padding: ESPACO.md,
     gap: ESPACO.md,
+    paddingBottom: ESPACO.xxl,
   },
   headerCard: {
     flexDirection: "row",

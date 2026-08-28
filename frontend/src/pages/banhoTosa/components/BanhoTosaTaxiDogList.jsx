@@ -7,15 +7,19 @@ import PetAvatar from "../../../components/ui/PetAvatar";
 import PetIdentity from "../../../components/ui/PetIdentity";
 import { formatCurrency } from "../banhoTosaUtils";
 
-const statusFlow = [
-  "agendado",
-  "motorista_a_caminho",
-  "pet_coletado",
-  "entregue_na_clinica",
-  "aguardando_retorno",
-  "retornando",
-  "entregue_ao_tutor",
-];
+const statusFlows = {
+  ida: ["agendado", "motorista_a_caminho", "pet_coletado", "entregue_na_clinica"],
+  volta: ["agendado", "aguardando_retorno", "retornando", "entregue_ao_tutor"],
+  ida_volta: [
+    "agendado",
+    "motorista_a_caminho",
+    "pet_coletado",
+    "entregue_na_clinica",
+    "aguardando_retorno",
+    "retornando",
+    "entregue_ao_tutor",
+  ],
+};
 
 export default function BanhoTosaTaxiDogList({
   items,
@@ -57,7 +61,7 @@ export default function BanhoTosaTaxiDogList({
 }
 
 function TaxiCard({ item, saving, onAtualizarMedicao, onSalvarMedicao, onStatus }) {
-  const proximo = proximoStatus(item.status);
+  const proximo = proximoStatus(item.status, item.tipo);
   return (
     <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -148,10 +152,11 @@ function atualizarItem(id, field, value, onAtualizarMedicao) {
   );
 }
 
-function proximoStatus(status) {
-  const index = statusFlow.indexOf(status);
-  if (index < 0 || index >= statusFlow.length - 1) return null;
-  return statusFlow[index + 1];
+function proximoStatus(status, tipo) {
+  const flow = statusFlows[tipo] || statusFlows.ida_volta;
+  const index = flow.indexOf(status);
+  if (index < 0 || index >= flow.length - 1) return null;
+  return flow[index + 1];
 }
 
 function hora(value) {
