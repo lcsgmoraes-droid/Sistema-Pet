@@ -139,10 +139,12 @@ def test_login_schemas_keep_email_compatibility_and_accept_username():
         tenant="loja-teste",
         password="segredo",
     )
+    legacy_mobile = EcommerceLoginRequest(email="joao.silva", password="segredo")
     mobile = EcommerceLoginRequest(identifier="joao.silva", password="segredo")
 
     assert legacy.identifier == "dono@loja.com"
     assert username.identifier == "joao.silva"
+    assert legacy_mobile.identifier == "joao.silva"
     assert mobile.identifier == "joao.silva"
 
 
