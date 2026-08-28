@@ -14,7 +14,14 @@ from app.tenancy.context import clear_current_tenant
 def test_verificar_saude_read_models_funciona_sem_tenant_context():
     clear_current_tenant()
     engine = create_engine("sqlite:///:memory:")
-    Base.metadata.create_all(engine)
+    Base.metadata.create_all(
+        engine,
+        tables=[
+            VendasResumoDiario.__table__,
+            ReceitaMensal.__table__,
+            PerformanceParceiro.__table__,
+        ],
+    )
     Session = sessionmaker(bind=engine)
     db = Session()
 

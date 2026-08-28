@@ -4,6 +4,7 @@ Fornece endpoints para verificação de saúde da aplicação e métricas
 """
 
 import logging
+import math
 import os
 import hmac
 
@@ -26,6 +27,7 @@ WHATSAPP_ACTIVE_SESSIONS_COUNT_SQL = (
     "SELECT count(*) FROM whatsapp_ia_sessions WHERE status = :status"
 )
 PROTECTED_HEALTH_ENVIRONMENTS = {"production", "prod", "staging"}
+DEFAULT_WATCHDOG_DB_MAX_LATENCY_MS = 3000.0
 
 
 def _is_protected_health_environment() -> bool:
@@ -57,20 +59,28 @@ def _scalar_count(db: Session, sql: str, params: dict | None = None) -> int:
     return int(db.execute(text(sql), params or {}).scalar() or 0)
 
 
-@router.get("")
-async def health_check() -> Dict[str, Any]:
-    """
-    🏥 **Health Check Básico**
+def _watchdog_max_latency_ms() -> float:
+    raw_value = os.getenv("WATCHDOG_DB_MAX_LATENCY_MS", "").strip()
+    if not raw_value:
+        return DEFAULT_WATCHDOG_DB_MAX_LATENCY_MS
+    try:
+        configured_value = float(raw_value)
+    except ValueError:
+        configured_value = 0
+    if not math.isfinite(configured_value) or configured_value <= 0:
+        logger.warning(
+            "WATCHDOG_DB_MAX_LATENCY_MS invalido; usando valor padrao",
+            extra={"configured_value": raw_value},
+        )
+        return DEFAULT_WATCHDOG_DB_MAX_LATENCY_MS
+    return configured_value
 
-    Retorna status geral da aplicação.
-    Usado por load balancers e monitoramento.
-    """
-    return {
-        "status": "healthy",
-        "timestamp": datetime.utcnow().isoformat(),
-        "service": "CorePet - WhatsApp IA",
-        "version": "1.0.0",
-    }
+
+def _safe_pool_status() -> str:
+    try:
+        return engine.pool.status()
+    except Exception:
+        return "unavailable"
 
 
 @router.get("/watchdog")
@@ -83,7 +93,7 @@ async def watchdog_health():
     503 para disparar a recuperacao automatica.
     """
     start_time = time.perf_counter()
-    max_latency_ms = float(os.getenv("WATCHDOG_DB_MAX_LATENCY_MS", "3000"))
+    max_latency_ms = _watchdog_max_latency_ms()
 
     try:
         with engine.connect() as connection:
@@ -94,7 +104,6 @@ async def watchdog_health():
             "status": "healthy",
             "database": "connected",
             "latency_ms": latency_ms,
-            "pool": engine.pool.status(),
             "timestamp": datetime.utcnow().isoformat(),
         }
 
@@ -115,7 +124,7 @@ async def watchdog_health():
             type(exc).__name__,
             extra={
                 "latency_ms": latency_ms,
-                "pool_status": engine.pool.status(),
+                "pool_status": _safe_pool_status(),
             },
         )
         return JSONResponse(
@@ -123,9 +132,7 @@ async def watchdog_health():
             content={
                 "status": "unhealthy",
                 "database": "error",
-                "error_type": type(exc).__name__,
                 "latency_ms": latency_ms,
-                "pool": engine.pool.status(),
                 "timestamp": datetime.utcnow().isoformat(),
             },
         )
