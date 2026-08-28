@@ -10,6 +10,7 @@ Endpoints:
 """
 
 from fastapi import APIRouter, HTTPException, Request, BackgroundTasks, Depends, Query
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 import hashlib
 import hmac
@@ -295,9 +296,64 @@ async def process_webhook_payload(
 # ============================================================================
 
 
+def _normalize_provider_message_id(value: Any) -> str | None:
+    normalized = str(value or "").strip()
+    return normalized or None
+
+
+def _find_message_by_provider_id(
+    db: Session,
+    *,
+    tenant_id: str,
+    provider_message_id: str | None,
+) -> WhatsAppMessage | None:
+    if not provider_message_id:
+        return None
+    with whatsapp_tenant_context(tenant_id):
+        return (
+            db.query(WhatsAppMessage)
+            .filter(
+                WhatsAppMessage.tenant_id == tenant_id,
+                WhatsAppMessage.whatsapp_message_id == provider_message_id,
+            )
+            .first()
+        )
+
+
+def _duplicate_message_result(
+    provider_message_id: str, existing: WhatsAppMessage
+) -> Dict[str, Any]:
+    return {
+        "status": "duplicate",
+        "whatsapp_message_id": provider_message_id,
+        "message_id": existing.id,
+    }
+
+
 async def process_incoming_message(
-    tenant_id: str, phone: str, message_content: str, whatsapp_msg_id: str, db: Session
-):
+    tenant_id: str,
+    phone: str,
+    message_content: str,
+    whatsapp_msg_id: str | None,
+    db: Session,
+) -> Dict[str, Any]:
+    with whatsapp_tenant_context(tenant_id):
+        return await _process_incoming_message_with_context(
+            tenant_id=tenant_id,
+            phone=phone,
+            message_content=message_content,
+            whatsapp_msg_id=whatsapp_msg_id,
+            db=db,
+        )
+
+
+async def _process_incoming_message_with_context(
+    tenant_id: str,
+    phone: str,
+    message_content: str,
+    whatsapp_msg_id: str | None,
+    db: Session,
+) -> Dict[str, Any]:
     """
     Processa mensagem individual (roda em background).
 
@@ -310,6 +366,20 @@ async def process_incoming_message(
     """
     try:
         logger.info(f"📨 Processando mensagem: tenant={tenant_id}, phone={phone}")
+
+        provider_message_id = _normalize_provider_message_id(whatsapp_msg_id)
+        existing = _find_message_by_provider_id(
+            db,
+            tenant_id=tenant_id,
+            provider_message_id=provider_message_id,
+        )
+        if existing and provider_message_id:
+            logger.info(
+                "Mensagem WhatsApp duplicada ignorada: tenant=%s provider_id=%s",
+                tenant_id,
+                provider_message_id,
+            )
+            return _duplicate_message_result(provider_message_id, existing)
 
         # 1. Normalizar telefone (remover caracteres especiais)
         phone_normalized = normalize_phone(phone)
@@ -325,7 +395,7 @@ async def process_incoming_message(
             tenant_id=tenant_id,
             tipo="recebida",
             conteudo=message_content,
-            whatsapp_message_id=whatsapp_msg_id,
+            whatsapp_message_id=provider_message_id,
             created_at=datetime.utcnow(),
         )
 
@@ -335,27 +405,55 @@ async def process_incoming_message(
         session.message_count += 1
         session.last_message_at = datetime.utcnow()
 
-        db.commit()
+        try:
+            db.commit()
+        except IntegrityError:
+            db.rollback()
+            existing = _find_message_by_provider_id(
+                db,
+                tenant_id=tenant_id,
+                provider_message_id=provider_message_id,
+            )
+            if existing and provider_message_id:
+                logger.info(
+                    "Concorrencia de mensagem WhatsApp duplicada bloqueada: "
+                    "tenant=%s provider_id=%s",
+                    tenant_id,
+                    provider_message_id,
+                )
+                return _duplicate_message_result(provider_message_id, existing)
+            raise
 
         logger.info(f"✅ Mensagem salva: session={session.id}")
 
         # 4. Processar com IA
+        processor_result = None
         try:
             from app.whatsapp.processor import MessageProcessor
 
             with whatsapp_tenant_context(tenant_id):
                 processor = MessageProcessor(db=db, tenant_id=tenant_id)
-                result = await processor.process_message(
+                processor_result = await processor.process_message(
                     session_id=session.id,
                     message_id=message.id,
                     message_content=message_content,
                 )
 
-            logger.info(f"✅ Processamento concluído: {result.get('action')}")
+            logger.info(
+                "✅ Processamento concluído: %s",
+                processor_result.get("action"),
+            )
 
         except Exception as proc_error:
             logger.error(f"Erro no processor (não-bloqueante): {proc_error}")
             # Não falha se processor der erro
+
+        return {
+            "status": "processed",
+            "whatsapp_message_id": provider_message_id,
+            "message_id": message.id,
+            "processor_result": processor_result,
+        }
 
     except Exception as e:
         logger.error(f"❌ Erro ao processar mensagem: {e}")
