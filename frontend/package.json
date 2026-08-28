@@ -73,6 +73,7 @@
     "test:onboarding-inicial": "node scripts/test-onboarding-inicial-contract.mjs",
     "test:banho-tosa-fluxo": "node scripts/test-banho-tosa-fluxo.mjs",
     "test:pessoas-duplicidade-central": "node scripts/test-pessoas-duplicidade-central.mjs",
+    "test:pessoa-app-login": "node src/utils/pessoaAppLogin.test.mjs",
     "preview": "vite preview"
   },
   "dependencies": {
