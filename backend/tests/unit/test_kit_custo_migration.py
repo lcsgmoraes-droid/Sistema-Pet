@@ -7,7 +7,7 @@ MIGRATION = (
     Path(__file__).resolve().parents[2]
     / "alembic"
     / "versions"
-    / "zxn20260829a1_backfill_custos_kits.py"
+    / "zxo20260829a1_backfill_custos_kits.py"
 )
 
 
@@ -24,8 +24,8 @@ def test_backfill_custos_kits_encadeia_head_e_preserva_tenant(monkeypatch):
 
     migration["upgrade"]()
 
-    assert migration["revision"] == "zxn20260829a1"
-    assert migration["down_revision"] == "zxm20260829a1"
+    assert migration["revision"] == "zxo20260829a1"
+    assert migration["down_revision"] == "zxn20260829a1"
     assert len(comandos) == 1
     sql = comandos[0]
     assert "componente.tenant_id = rel.tenant_id" in sql

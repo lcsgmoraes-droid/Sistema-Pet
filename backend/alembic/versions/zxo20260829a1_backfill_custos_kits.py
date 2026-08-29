@@ -1,7 +1,7 @@
 """backfill de custos de produtos compostos
 
-Revision ID: zxn20260829a1
-Revises: zxm20260829a1
+Revision ID: zxo20260829a1
+Revises: zxn20260829a1
 Create Date: 2026-08-29
 """
 
@@ -9,8 +9,8 @@ from alembic import op
 import sqlalchemy as sa
 
 
-revision = "zxn20260829a1"
-down_revision = "zxm20260829a1"
+revision = "zxo20260829a1"
+down_revision = "zxn20260829a1"
 branch_labels = None
 depends_on = None
 
