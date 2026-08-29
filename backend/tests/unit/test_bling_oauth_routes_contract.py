@@ -1,12 +1,15 @@
 from starlette.requests import Request
+from uuid import uuid4
 
 from app.bling_oauth_routes import (
     _bling_redirect_uri,
     _encode_oauth_state,
     _html_erro,
     _validate_oauth_state,
+    bling_oauth_callback,
     public_router,
 )
+from app.tenancy.context import clear_current_tenant, get_current_tenant
 
 
 def _request() -> Request:
@@ -54,7 +57,7 @@ def test_bling_redirect_uri_accepts_explicit_configuration(monkeypatch):
 
 def test_bling_oauth_state_is_signed_and_expires(monkeypatch):
     monkeypatch.setattr("app.bling_oauth_routes.time.time", lambda: 1_000)
-    state = _encode_oauth_state(expires_in=60)
+    state = _encode_oauth_state(tenant_id=uuid4(), expires_in=60)
 
     assert _validate_oauth_state(state) is True
 
@@ -71,3 +74,33 @@ def test_bling_oauth_callback_is_exposed_by_public_router():
     }
 
     assert "/auth/bling/callback" in callback_paths
+
+
+def test_bling_oauth_callback_salva_no_tenant_assinado(monkeypatch):
+    tenant_id = uuid4()
+    captured = {}
+    clear_current_tenant()
+    monkeypatch.setattr(
+        "app.bling_oauth_routes._trocar_code_por_tokens",
+        lambda *_args: {
+            "access_token": "access-gabi",
+            "refresh_token": "refresh-gabi",
+            "expires_in": 3600,
+        },
+    )
+    monkeypatch.setattr(
+        "app.bling_oauth_routes._salvar_tokens",
+        lambda *args, **kwargs: captured.update({"args": args, "kwargs": kwargs}),
+    )
+
+    response = bling_oauth_callback(
+        request=_request(),
+        code="authorization-code",
+        state=_encode_oauth_state(tenant_id=tenant_id),
+        db=object(),
+    )
+
+    assert response.status_code == 200
+    assert captured["kwargs"]["tenant_id"] == tenant_id
+    assert captured["args"] == ("access-gabi", "refresh-gabi")
+    assert get_current_tenant() is None

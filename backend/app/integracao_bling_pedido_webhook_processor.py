@@ -51,7 +51,7 @@ def processar_pedido_bling_payload(body: dict, db: Session):
     registrar_vinculo_nf_pedido = routes.registrar_vinculo_nf_pedido
 
     # Tenant fixo para webhooks (chamadas sem JWT)
-    _tenant_uuid = _set_bling_request_tenant()
+    _tenant_uuid = _set_bling_request_tenant(payload=body, db=db)
 
     # Desempacotar envelope Bling (v1)
     event = body.get("event", "")  # ex: "order.created"

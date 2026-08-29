@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 INTENTIONALLY_GLOBAL_NO_RLS_TABLES = frozenset(
     {
+        "bling_company_tenant_links",
         "bling_pedido_webhook_events",
         "campaign_event_queue",
         "ecommerceai_connection_requests",

@@ -60,6 +60,9 @@ TENANT_WHITELIST_TABLES = {
     # rotas públicas exigem HMAC/token e, após a resolução, estabelecem o contexto.
     "ecommerceai_connection_requests",
     "ecommerceai_connections",
+    # Indice minimo autenticado do webhook Bling: companyId -> tenant. Nao guarda
+    # tokens nem dados comerciais; resolve o tenant antes de ativar o contexto RLS.
+    "bling_company_tenant_links",
 }
 
 

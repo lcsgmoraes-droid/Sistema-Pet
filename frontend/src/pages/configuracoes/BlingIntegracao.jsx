@@ -155,11 +155,11 @@ export default function BlingIntegracao() {
 
   const statusClasse = status.conectado
     ? "bg-emerald-50 border-emerald-200"
-    : "bg-red-50 border-red-200";
+    : "bg-amber-50 border-amber-200";
 
-  const statusTexto = status.conectado ? "✅ Conectado" : "❌ Token Expirado";
+  const statusTexto = status.conectado ? "✅ Conectado" : "🔗 Não conectado";
 
-  const statusCor = status.conectado ? "text-emerald-700" : "text-red-700";
+  const statusCor = status.conectado ? "text-emerald-700" : "text-amber-700";
 
   return (
     <div className="container mx-auto px-4 py-6 max-w-2xl">
@@ -196,13 +196,15 @@ export default function BlingIntegracao() {
           </div>
           <div
             className={`p-2 rounded-full ${
-              status.conectado ? "bg-emerald-200/50 text-emerald-600" : "bg-red-200/50 text-red-600"
+              status.conectado
+                ? "bg-emerald-200/50 text-emerald-600"
+                : "bg-amber-200/50 text-amber-700"
             }`}
           >
             {status.conectado ? (
               <FiCheckCircle className="w-6 h-6" />
             ) : (
-              <FiAlertCircle className="w-6 h-6" />
+              <FiLink2 className="w-6 h-6" />
             )}
           </div>
         </div>
@@ -235,7 +237,8 @@ export default function BlingIntegracao() {
           )}
           {!status.conectado && (
             <p className="text-gray-700">
-              O token expirou ou é inválido. Clique em "Renovar Token" abaixo para reconectar.
+              Conecte a conta do Bling pertencente a esta empresa. As credenciais e a sincronização
+              ficam isoladas das demais empresas do CorePet.
             </p>
           )}
         </div>
