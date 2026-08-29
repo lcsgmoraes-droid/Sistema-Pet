@@ -134,3 +134,29 @@ execução em produção continua exigindo autorização operacional explícita.
 Esta primeira versão também rejeita qualquer e-mail de origem diferente de
 `atacadaopetpp@gmail.com`.
 
+## Imagens fornecidas com EAN no nome
+
+Lotes de imagens podem ser inventariados quando cada arquivo segue o formato
+`EAN_NOME.jpg`, `EAN_NOME.jpeg`, `EAN_NOME.png` ou `EAN_NOME.webp`:
+
+```powershell
+python -m app.scripts.run_catalogo_mestre_image_import `
+  --source-dir C:\caminho\para\imagens `
+  --source-ref identificador-do-lote
+```
+
+O comando tambem inicia em simulacao. Ele valida o digito verificador do GTIN,
+o formato real da imagem, tamanho, dimensoes e SHA-256. Quando o lote inclui
+`relatorio_download.csv`, a fonte informada de cada arquivo tambem acompanha a
+proveniencia, mas nao e tratada como licenca de uso. O casamento e sempre por
+GTIN exato com um produto que ja existe no catalogo mestre e pertence ao escopo
+inicial. Nome de arquivo nunca cria produto e GTIN ambiguo fica bloqueado.
+
+Com `--apply`, o arquivo e apenas copiado para
+`uploads/catalogo_mestre_pendente`, prefixo que nao e servido publicamente pelo
+backend. A imagem entra inativa, com direitos `nao_verificado` e revisao
+`pendente`; `arquivo_url` permanece vazio. Assim, a carga nao publica imagem,
+nao preenche automaticamente as cinco posicoes e nao altera nenhum cadastro de
+loja. Em producao, a aplicacao ainda exige `--allow-production-apply` e
+autorizacao operacional explicita.
+
