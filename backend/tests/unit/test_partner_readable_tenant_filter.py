@@ -51,10 +51,24 @@ def test_partner_readable_models_compile_with_partner_tenant_subquery():
         assert "vet_tenant_id" in compiled
 
 
-def test_non_partner_readable_models_keep_strict_current_tenant_filter():
+def test_global_user_identity_accepts_active_membership_in_current_tenant():
     from app.models import User
 
     compiled = _compiled_filter_for(User)
 
     assert "users.tenant_id" in compiled
+    assert "user_tenants" in compiled
+    assert "user_tenants.user_id = users.id" in compiled
+    assert "user_tenants.tenant_id" in compiled
+    assert "user_tenants.is_active IS true" in compiled
+    assert "vet_partner_link" not in compiled
+
+
+def test_non_partner_readable_models_keep_strict_current_tenant_filter():
+    from app.models_authz import Role
+
+    compiled = _compiled_filter_for(Role)
+
+    assert "roles.tenant_id" in compiled
+    assert "user_tenants" not in compiled
     assert "vet_partner_link" not in compiled

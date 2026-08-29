@@ -71,7 +71,23 @@ PARTNER_READABLE_TENANT_TABLES = {
 
 
 def _tenant_read_filter(cls, tenant_id):
-    if getattr(cls, "__tablename__", None) not in PARTNER_READABLE_TENANT_TABLES:
+    table_name = getattr(cls, "__tablename__", None)
+
+    if table_name == "users":
+        # User e uma identidade global legada com tenant_id de origem. O acesso
+        # atual a cada empresa e definido por UserTenant; limitar apenas pelo
+        # tenant_id de origem impede o mesmo login de operar outro tenant ao qual
+        # possui vinculo ativo.
+        from app.models_authz import UserTenant
+
+        active_membership = select(UserTenant.id).where(
+            UserTenant.user_id == cls.id,
+            UserTenant.tenant_id == tenant_id,
+            UserTenant.is_active.is_(True),
+        )
+        return or_(cls.tenant_id == tenant_id, active_membership.exists())
+
+    if table_name not in PARTNER_READABLE_TENANT_TABLES:
         return cls.tenant_id == tenant_id
 
     from app.veterinario_models import VetPartnerLink
