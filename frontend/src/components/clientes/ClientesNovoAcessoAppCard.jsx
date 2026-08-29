@@ -14,7 +14,17 @@ const PERFIS_APP = [
     label: "Funcionario",
     description: "Rotinas internas liberadas para funcionarios",
   },
+  {
+    value: "banho_tosa",
+    label: "Banho & Tosa",
+    description: "Agenda, check-in e andamento dos pets",
+  },
   { value: "entregador", label: "Entregador", description: "Entregas e rotas do app" },
+  {
+    value: "taxi_dog",
+    label: "Taxi Dog",
+    description: "Coleta, rota e devolucao dos pets",
+  },
   {
     value: "veterinario",
     label: "Veterinario",

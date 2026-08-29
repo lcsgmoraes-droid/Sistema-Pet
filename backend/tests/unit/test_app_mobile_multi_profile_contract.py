@@ -15,6 +15,8 @@ def test_mobile_types_include_available_profiles():
     assert "available_profiles" in source
     assert "selected_profile" in source
     assert '"gestor"' in source
+    assert '"banho_tosa"' in source
+    assert '"taxi_dog"' in source
 
 
 def test_mobile_auth_service_and_store_can_select_profile():
@@ -50,6 +52,8 @@ def test_operational_mobile_navigators_expose_profile_switch_in_header():
     entregador = read_repo("app-mobile/src/navigation/EntregadorNavigator.tsx")
     veterinario = read_repo("app-mobile/src/navigation/VeterinarioNavigator.tsx")
     gestor = read_repo("app-mobile/src/navigation/GestorNavigator.tsx")
+    banho_tosa = read_repo("app-mobile/src/navigation/BanhoTosaNavigator.tsx")
+    taxi_dog = read_repo("app-mobile/src/navigation/TaxiDogNavigator.tsx")
 
     assert "available_profiles" in actions
     assert "selectProfile" in actions
@@ -58,6 +62,29 @@ def test_operational_mobile_navigators_expose_profile_switch_in_header():
     assert "HeaderProfileActions" in entregador
     assert "HeaderProfileActions" in veterinario
     assert "HeaderProfileActions" in gestor
+    assert "HeaderProfileActions" in banho_tosa
+    assert "HeaderProfileActions" in taxi_dog
+
+
+def test_dedicated_operational_profiles_open_only_their_work_screen():
+    navigator = read_repo("app-mobile/src/navigation/AppNavigator.tsx")
+    banho_tosa = read_repo("app-mobile/src/navigation/BanhoTosaNavigator.tsx")
+    taxi_dog = read_repo("app-mobile/src/navigation/TaxiDogNavigator.tsx")
+    customer_access = read_repo(
+        "frontend/src/components/clientes/ClientesNovoAcessoAppCard.jsx"
+    )
+    employee_access = read_repo("frontend/src/pages/RH/Funcionarios.jsx")
+
+    assert 'perfil_operacional === "banho_tosa"' in navigator
+    assert 'perfil_operacional === "taxi_dog"' in navigator
+    assert "FuncionarioBanhoTosaScreen" in banho_tosa
+    assert "FuncionarioHomeScreen" not in banho_tosa
+    assert "TaxiDogEntregador" in taxi_dog
+    assert "RotasDoEntregadorScreen" not in taxi_dog
+    assert 'value: "banho_tosa"' in customer_access
+    assert 'value: "taxi_dog"' in customer_access
+    assert '["banho_tosa", "Banho & Tosa"]' in employee_access
+    assert '["taxi_dog", "Taxi Dog"]' in employee_access
 
 
 def test_mobile_profile_switch_only_appears_for_multiple_profiles():

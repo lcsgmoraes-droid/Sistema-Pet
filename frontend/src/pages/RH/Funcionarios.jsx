@@ -377,7 +377,9 @@ export default function Funcionarios() {
                     ["cliente", "Cliente"],
                     ["gestor", "Gestor"],
                     ["funcionario", "Funcionario"],
+                    ["banho_tosa", "Banho & Tosa"],
                     ["entregador", "Entregador"],
+                    ["taxi_dog", "Taxi Dog"],
                     ["veterinario", "Veterinario"],
                   ].map(([profileType, label]) => (
                     <label

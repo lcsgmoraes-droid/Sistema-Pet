@@ -379,7 +379,9 @@ def listar_evolucao_app(
         "cliente": "app_cliente",
         "gestor": "app_funcionario",
         "funcionario": "app_funcionario",
+        "banho_tosa": "app_funcionario",
         "entregador": "app_entregador",
+        "taxi_dog": "app_entregador",
         "veterinario": "app_veterinario",
     }
     return listar_evolucao_corepet(canais_por_perfil.get(perfil, "app_cliente"), db)

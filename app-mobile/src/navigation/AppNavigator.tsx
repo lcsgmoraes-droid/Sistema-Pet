@@ -11,9 +11,11 @@ import { CORES } from "../theme";
 
 // Navegadores
 import EntregadorNavigator from "./EntregadorNavigator";
+import BanhoTosaNavigator from "./BanhoTosaNavigator";
 import FuncionarioNavigator from "./FuncionarioNavigator";
 import GestorNavigator from "./GestorNavigator";
 import MainNavigator from "./MainNavigator";
+import TaxiDogNavigator from "./TaxiDogNavigator";
 import VeterinarioNavigator from "./VeterinarioNavigator";
 import {
   flushPendingNavigation,
@@ -149,6 +151,10 @@ export default function AppNavigator() {
     (user?.is_gestor || user?.perfil_operacional === "gestor")
   ) {
     activeNav = <GestorNavigator />;
+  } else if (isAuthenticated && user?.perfil_operacional === "banho_tosa") {
+    activeNav = <BanhoTosaNavigator />;
+  } else if (isAuthenticated && user?.perfil_operacional === "taxi_dog") {
+    activeNav = <TaxiDogNavigator />;
   } else if (
     isAuthenticated &&
     (user?.is_veterinario || user?.perfil_operacional === "veterinario")

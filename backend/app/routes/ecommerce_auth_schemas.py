@@ -77,7 +77,10 @@ class EcommerceProfileUpdateRequest(BaseModel):
 
 class EcommerceSelectProfileRequest(BaseModel):
     profile_type: str = Field(
-        description="cliente | gestor | funcionario | entregador | veterinario"
+        description=(
+            "cliente | gestor | funcionario | banho_tosa | entregador | "
+            "taxi_dog | veterinario"
+        )
     )
 
 
