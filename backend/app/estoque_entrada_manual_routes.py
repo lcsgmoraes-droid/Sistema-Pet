@@ -36,6 +36,7 @@ from .bling_estoque_sync import sincronizar_bling_background
 from .estoque.granel import (
     _produto_e_granel,
 )
+from .services.kit_custo_service import KitCustoService
 import logging
 
 logger = logging.getLogger(__name__)
@@ -286,8 +287,11 @@ def entrada_estoque(
     )
 
     # Atualizar preco_custo APENAS se a entrada tiver custo definido
+    custo_produto_anterior = float(produto.preco_custo or 0)
+    custo_produto_alterado = False
     if entrada.custo_unitario and entrada.custo_unitario > 0:
         produto.preco_custo = entrada.custo_unitario
+        custo_produto_alterado = float(entrada.custo_unitario) != custo_produto_anterior
         logger.info(
             f"💰 Preço de custo atualizado: R$ {custo_anterior or 0:.2f} → R$ {produto.preco_custo:.2f}"
         )
@@ -323,6 +327,8 @@ def entrada_estoque(
         tenant_id=tenant_id,
     )
     db.add(movimentacao)
+    if custo_produto_alterado:
+        KitCustoService.recalcular_kits_que_usam_produto(db, produto.id)
     db.commit()
     db.refresh(movimentacao)
 

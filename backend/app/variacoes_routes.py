@@ -13,6 +13,7 @@ from datetime import datetime
 from app.db import get_session
 from app.auth import get_current_user_and_tenant
 from app.produtos_models import Produto
+from app.services.kit_custo_service import KitCustoService
 from app.utils.product_variation import (
     build_variation_signature,
     validate_variation_attributes,
@@ -334,6 +335,7 @@ def atualizar_variacao(
 
     if dados.preco_custo is not None:
         variacao.preco_custo = dados.preco_custo
+        KitCustoService.recalcular_kits_que_usam_produto(db, variacao.id)
 
     if dados.estoque_atual is not None:
         variacao.estoque_atual = dados.estoque_atual
