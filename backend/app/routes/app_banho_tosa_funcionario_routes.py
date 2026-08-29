@@ -83,9 +83,7 @@ def _get_mobile_funcionario_or_403(
             status_code=403,
             detail="Selecione o perfil Banho & Tosa ou Funcionario.",
         )
-    funcionario = get_cliente_for_app_profile_or_none(
-        db, current_user, active_profile
-    )
+    funcionario = get_cliente_for_app_profile_or_none(db, current_user, active_profile)
     if not funcionario:
         raise HTTPException(
             status_code=403,
@@ -107,9 +105,7 @@ def _get_mobile_entregador_or_403(
             status_code=403,
             detail="Selecione o perfil Taxi Dog ou Entregador.",
         )
-    entregador = get_cliente_for_app_profile_or_none(
-        db, current_user, active_profile
-    )
+    entregador = get_cliente_for_app_profile_or_none(db, current_user, active_profile)
     if not entregador:
         raise HTTPException(
             status_code=403,

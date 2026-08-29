@@ -45,7 +45,10 @@ def test_perfis_dedicados_reaproveitam_rotas_sem_liberar_todo_o_app_operacional(
 
     assert '{"funcionario", "banho_tosa"}' in source
     assert '{"entregador", "taxi_dog"}' in source
-    assert 'get_cliente_for_app_profile_or_none(\n        db, current_user, active_profile' in source
+    assert (
+        "get_cliente_for_app_profile_or_none(\n        db, current_user, active_profile"
+        in source
+    )
 
 
 def test_fluxo_taxi_dog_respeita_ida_volta_e_nao_pula_etapa():

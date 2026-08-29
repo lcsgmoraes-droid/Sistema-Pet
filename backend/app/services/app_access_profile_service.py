@@ -146,8 +146,7 @@ def apply_selected_profile_flags(
             "is_funcionario": profile_type == "funcionario",
             "is_gestor": profile_type == "gestor",
             "funcionario_id": cliente_id
-            if profile_type
-            in {"entregador", "funcionario", "banho_tosa", "taxi_dog"}
+            if profile_type in {"entregador", "funcionario", "banho_tosa", "taxi_dog"}
             else None,
             "is_veterinario": profile_type == "veterinario",
             "veterinario_id": cliente_id if profile_type == "veterinario" else None,
