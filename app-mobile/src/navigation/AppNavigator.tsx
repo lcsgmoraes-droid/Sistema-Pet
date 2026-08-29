@@ -12,6 +12,7 @@ import { CORES } from "../theme";
 // Navegadores
 import EntregadorNavigator from "./EntregadorNavigator";
 import FuncionarioNavigator from "./FuncionarioNavigator";
+import GestorNavigator from "./GestorNavigator";
 import MainNavigator from "./MainNavigator";
 import VeterinarioNavigator from "./VeterinarioNavigator";
 import {
@@ -144,6 +145,11 @@ export default function AppNavigator() {
   // Loja escolhida → fluxo normal (login ou app)
   let activeNav: React.ReactNode;
   if (
+    isAuthenticated &&
+    (user?.is_gestor || user?.perfil_operacional === "gestor")
+  ) {
+    activeNav = <GestorNavigator />;
+  } else if (
     isAuthenticated &&
     (user?.is_veterinario || user?.perfil_operacional === "veterinario")
   ) {

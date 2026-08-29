@@ -1,7 +1,14 @@
 import { FiSmartphone, FiUserCheck } from "react-icons/fi";
+import { useAuth } from "../../contexts/AuthContext";
+import { canManageAppAccessProfiles } from "../../utils/appAccessProfiles";
 
 const PERFIS_APP = [
   { value: "cliente", label: "Cliente", description: "Compras, pedidos e dados do cliente" },
+  {
+    value: "gestor",
+    label: "Gestor",
+    description: "Indicadores financeiros e gerenciais, somente para consulta",
+  },
   {
     value: "funcionario",
     label: "Funcionario",
@@ -22,6 +29,8 @@ export default function ClientesNovoAcessoAppCard({
   roles = [],
   loadingUsuarios = false,
 }) {
+  const { user } = useAuth();
+  const canManage = canManageAppAccessProfiles(user);
   const perfisSelecionados = formData.app_access_profiles || [];
   const perfisObrigatorios = new Set();
   if (["cliente", "funcionario", "veterinario"].includes(formData.tipo_cadastro)) {
@@ -77,6 +86,8 @@ export default function ClientesNovoAcessoAppCard({
       app_login: { ...(prev.app_login || {}), [field]: value },
     }));
 
+  if (!canManage) return null;
+
   return (
     <section className="mt-5 rounded-lg border border-indigo-200 bg-indigo-50/60 p-4">
       <div className="mb-3 flex items-start gap-3">
@@ -88,6 +99,9 @@ export default function ClientesNovoAcessoAppCard({
           <p className="mt-1 text-xs text-slate-600">
             Vincule a conta usada no login e marque os tipos de acesso. Isso nao permite entrar como
             outra pessoa.
+          </p>
+          <p className="mt-1 text-xs font-medium text-indigo-700">
+            Somente administradores podem alterar estes acessos.
           </p>
         </div>
       </div>

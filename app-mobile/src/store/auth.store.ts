@@ -20,7 +20,12 @@ async function clearOperationalRoleCache(
 
 async function cacheOperationalRole(user: EcommerceUser | null): Promise<void> {
   if (!user?.id) return;
-  if (!user.is_veterinario && !user.is_entregador && !user.is_funcionario) {
+  if (
+    !user.is_gestor &&
+    !user.is_veterinario &&
+    !user.is_entregador &&
+    !user.is_funcionario
+  ) {
     await clearOperationalRoleCache(user);
     return;
   }
@@ -29,18 +34,21 @@ async function cacheOperationalRole(user: EcommerceUser | null): Promise<void> {
   await SecureStore.setItemAsync(
     cacheKey,
     JSON.stringify({
+      is_gestor: user.is_gestor ?? false,
       is_veterinario: user.is_veterinario ?? false,
       veterinario_id: user.veterinario_id ?? null,
       is_entregador: user.is_entregador ?? false,
       is_funcionario: user.is_funcionario ?? false,
       funcionario_id: user.funcionario_id ?? null,
-      perfil_operacional: user.is_veterinario
-        ? "veterinario"
-        : user.is_entregador
-          ? "entregador"
-          : user.is_funcionario
-            ? "funcionario"
-            : (user.perfil_operacional ?? "cliente"),
+      perfil_operacional: user.is_gestor
+        ? "gestor"
+        : user.is_veterinario
+          ? "veterinario"
+          : user.is_entregador
+            ? "entregador"
+            : user.is_funcionario
+              ? "funcionario"
+              : (user.perfil_operacional ?? "cliente"),
     }),
   );
 }
@@ -50,6 +58,7 @@ async function applyCachedOperationalRole(
 ): Promise<EcommerceUser> {
   if (
     !user?.id ||
+    user.is_gestor ||
     user.is_veterinario ||
     user.is_entregador ||
     user.is_funcionario
@@ -66,6 +75,7 @@ async function applyCachedOperationalRole(
 
   try {
     const cached = JSON.parse(raw) as {
+      is_gestor?: boolean;
       is_veterinario?: boolean;
       veterinario_id?: number | null;
       is_entregador?: boolean;
@@ -74,12 +84,14 @@ async function applyCachedOperationalRole(
       perfil_operacional?: AppProfileType;
     };
     if (
+      cached?.is_gestor ||
       cached?.is_veterinario ||
       cached?.is_entregador ||
       cached?.is_funcionario
     ) {
       return {
         ...user,
+        is_gestor: cached.is_gestor ?? user.is_gestor ?? false,
         is_veterinario: cached.is_veterinario ?? user.is_veterinario ?? false,
         veterinario_id: cached.veterinario_id ?? user.veterinario_id ?? null,
         is_entregador: cached.is_entregador ?? user.is_entregador ?? false,
@@ -236,6 +248,7 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
         const freshUser = await AuthService.getProfile();
         if (
           freshUser.perfil_operacional === "cliente" &&
+          !freshUser.is_gestor &&
           !freshUser.is_veterinario &&
           !freshUser.is_entregador &&
           !freshUser.is_funcionario

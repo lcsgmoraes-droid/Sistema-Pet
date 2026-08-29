@@ -6,6 +6,7 @@ import { debugLog } from "../utils/debug";
 import { useModulos } from "../contexts/ModulosContext";
 import { useClientesNovoEnderecos } from "./useClientesNovoEnderecos";
 import { normalizeClienteAlertasPdv } from "../utils/clienteAlertasPdv";
+import { canManageAppAccessProfiles } from "../utils/appAccessProfiles";
 import { normalizePessoaAppLogin } from "../utils/pessoaAppLogin";
 import {
   buildInitialAccessCredentials,
@@ -152,6 +153,7 @@ export function useClientesNovoCadastro({
   setError,
 }) {
   const { user } = useAuth();
+  const canManageAppAccess = canManageAppAccessProfiles(user);
   const { moduloAtivo } = useModulos();
   const moduloCampanhasAtivo = moduloAtivo("campanhas");
   const navigate = useNavigate();
@@ -264,6 +266,7 @@ export function useClientesNovoCadastro({
   };
 
   const loadUsuariosAcessoApp = async (clienteId = null) => {
+    if (!canManageAppAccess) return;
     try {
       setLoadingUsuariosAcessoApp(true);
       const response = await api.get("/clientes/acessos-app/usuarios", {
@@ -279,6 +282,7 @@ export function useClientesNovoCadastro({
   };
 
   const loadRolesAcessoApp = async () => {
+    if (!canManageAppAccess) return;
     try {
       const response = await api.get("/roles");
       setRolesAcessoApp(response.data || []);
@@ -502,6 +506,12 @@ export function useClientesNovoCadastro({
       const { celular_whatsapp: _celular_whatsapp, tags: _tags, ...clienteData } = formData;
       clienteData.alertas_pdv = normalizeClienteAlertasPdv(clienteData.alertas_pdv);
       clienteData.app_login = normalizePessoaAppLogin(clienteData.app_login);
+
+      if (!canManageAppAccess) {
+        delete clienteData.auth_user_id;
+        delete clienteData.app_login;
+        delete clienteData.app_access_profiles;
+      }
 
       if (clienteData.is_entregador) {
         if (clienteData.tipo_cadastro === "funcionario") {

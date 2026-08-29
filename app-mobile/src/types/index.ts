@@ -14,7 +14,12 @@ export interface AuthResponse extends AuthTokens {
   email_verification_sent?: boolean;
 }
 
-export type AppProfileType = "cliente" | "entregador" | "veterinario" | "funcionario";
+export type AppProfileType =
+  | "cliente"
+  | "gestor"
+  | "entregador"
+  | "veterinario"
+  | "funcionario";
 
 export interface AppAccessProfile {
   type: AppProfileType;
@@ -65,6 +70,8 @@ export interface EcommerceUser {
   funcionario_id?: number | null;
   // perfil operacional funcionario
   is_funcionario?: boolean;
+  // perfil gerencial de consulta
+  is_gestor?: boolean;
   // perfil operacional veterinario
   is_veterinario?: boolean;
   veterinario_id?: number | null;

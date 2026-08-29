@@ -101,6 +101,7 @@ from app.routes.app_mobile_funcionario_contagem_routes import (
     obter_contagem_funcionario as obter_contagem_funcionario,
     router as funcionario_contagem_router,
 )
+from app.routes.app_mobile_gestor_routes import router as gestor_router
 from app.services.validade_campanha_service import (
     mapear_ofertas_validade_por_produto,
     resolver_preco_publico_produto,
@@ -136,6 +137,7 @@ router.include_router(pets_router)
 router.include_router(funcionario_pdv_router)
 router.include_router(funcionario_estoque_router)
 router.include_router(funcionario_contagem_router)
+router.include_router(gestor_router)
 router.include_router(rastreio_router)
 
 
@@ -375,6 +377,7 @@ def listar_evolucao_app(
     perfil = str(getattr(current_user, "_active_app_profile", None) or "cliente")
     canais_por_perfil = {
         "cliente": "app_cliente",
+        "gestor": "app_funcionario",
         "funcionario": "app_funcionario",
         "entregador": "app_entregador",
         "veterinario": "app_veterinario",
