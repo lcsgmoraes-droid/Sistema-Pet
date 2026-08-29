@@ -159,6 +159,8 @@ export const EcommerceAnalytics = lazy(() => import("../pages/ecommerce/Ecommerc
 export const EcommercePreview = lazy(() => import("../pages/ecommerce/EcommercePreview"));
 export const EcommerceDivulgacao = lazy(() => import("../pages/ecommerce/EcommerceDivulgacao"));
 export const Campanhas = lazy(() => import("../pages/Campanhas"));
+export const EstudioOfertas = lazy(() => import("../pages/ofertas/EstudioOfertas"));
+export const OfertaPublica = lazy(() => import("../pages/ofertas/OfertaPublica"));
 export const CanalDescontos = lazy(() => import("../pages/CanalDescontos"));
 export const Ajuda = lazy(() => import("../pages/Ajuda"));
 export const EvolucaoCorePet = lazy(() => import("../pages/EvolucaoCorePet"));

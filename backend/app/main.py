@@ -36,6 +36,7 @@ import app.ecommerce_analytics_models  # noqa: F401 - funil anonimo do ecommerce
 import app.ecommerceai_integration_models  # noqa: F401 - integracao CorePet <-> EcommerceAI
 import app.ifood_integration_models  # noqa: F401 - integracao CorePet <-> iFood
 import app.ifood_order_models  # noqa: F401 - pedidos e eventos do iFood
+import app.ofertas_estudio_models  # noqa: F401 - publicacoes do estudio de ofertas
 import app.models_configuracao_custo_moto  # noqa: F401 - custos da moto
 import app.pendencia_estoque_models  # noqa: F401 - lista de espera
 import app.nao_venda_models  # noqa: F401 - atendimentos sem venda
@@ -87,7 +88,7 @@ register_exception_handlers(app)
 # ARQUIVOS ESTATICOS - ANTES DOS ROUTERS!
 # ============================================================================
 
-PUBLIC_UPLOAD_PREFIXES = {"produtos", "ecommerce", "pets", "banho_tosa"}
+PUBLIC_UPLOAD_PREFIXES = {"produtos", "ecommerce", "pets", "banho_tosa", "ofertas"}
 
 
 class PublicUploadsStaticFiles(StaticFiles):

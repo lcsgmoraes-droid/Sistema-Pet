@@ -77,6 +77,7 @@ def _create_sqlite_schema(engine) -> None:
         ecommerceai_integration_models,
         financeiro_models,
         models,
+        ofertas_estudio_models,
         produtos_models,
         vendas_models,
     )
