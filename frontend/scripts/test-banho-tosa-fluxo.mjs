@@ -25,6 +25,8 @@ assert.match(
   /BanhoTosaTransicaoPanel/,
   "mudança de etapa deve passar pelo painel operacional",
 );
+assert.match(fila, /showCode=\{false\}/, "fila nao deve poluir o card com codigos");
+assert.match(fila, /atendimento\.pet_nome \|\| "Pet"\} →/, "acao deve identificar o pet");
 assert.match(
   transicao,
   /iniciar_timer: operacional/,

@@ -152,8 +152,19 @@ def _finalizar_etapas_abertas(etapas: Iterable[BanhoTosaEtapa], fim: datetime) -
     for etapa in etapas or []:
         if etapa.fim_em:
             continue
-        etapa.fim_em = fim
+        fim_compativel = _normalizar_fuso_para_inicio(etapa.inicio_em, fim)
+        etapa.fim_em = fim_compativel
         if etapa.inicio_em:
             etapa.duracao_minutos = max(
-                0, int((fim - etapa.inicio_em).total_seconds() // 60)
+                0, int((fim_compativel - etapa.inicio_em).total_seconds() // 60)
             )
+
+
+def _normalizar_fuso_para_inicio(inicio: datetime | None, fim: datetime) -> datetime:
+    if not inicio:
+        return fim
+    if inicio.tzinfo is not None and fim.tzinfo is None:
+        return fim.replace(tzinfo=inicio.tzinfo)
+    if inicio.tzinfo is None and fim.tzinfo is not None:
+        return fim.replace(tzinfo=None)
+    return fim
