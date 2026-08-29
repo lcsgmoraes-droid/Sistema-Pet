@@ -15,6 +15,24 @@ Para publicacao nas lojas, use tambem:
 - Se o usuario esta com APK `preview`, publicar apenas em `production` nao muda
   o app instalado.
 
+## Build de preview somente manual
+
+O workflow `App Mobile - EAS Build Manual (Android APK)` nao e executado a cada
+push na `main`. Ele deve ser iniciado manualmente no GitHub Actions apenas quando
+um novo APK for realmente necessario.
+
+Antes de confirmar o workflow:
+
+1. informe o motivo do novo APK;
+2. confirme que uma OTA nao atende a necessidade;
+3. verifique se houve mudanca nativa, runtime novo ou se o APK anterior deixou
+   de estar disponivel.
+
+Mudancas somente em JavaScript/TypeScript, telas, textos, estilos, chamadas ao
+backend e assets compativeis devem reutilizar o APK instalado e seguir o fluxo
+OTA do canal `preview` ou `production`. Um merge na `main`, sozinho, nao e motivo
+para gerar outro APK.
+
 ## Decisao obrigatoria: OTA ou novo binario
 
 O fluxo padrao do CorePet e OTA. Nao iniciar um novo build, `eas submit`, Play
