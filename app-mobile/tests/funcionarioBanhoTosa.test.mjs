@@ -58,6 +58,7 @@ test("entregador recebe Taxi Dog e pode abrir rota e avancar o trajeto", () => {
   const rotas = source("src/screens/entregador/RotasDoEntregadorScreen.tsx");
   const taxi = source("src/screens/entregador/TaxiDogEntregador.tsx");
   const service = source("src/services/taxiDogEntregador.service.ts");
+  const operationalDateTime = source("src/utils/operationalDateTime.ts");
 
   assert.match(rotas, /TaxiDogEntregador/);
   assert.match(rotas, /🐾 Taxi Dog/);
@@ -67,6 +68,9 @@ test("entregador recebe Taxi Dog e pode abrir rota e avancar o trajeto", () => {
   assert.match(taxi, /entra\s+automaticamente na fila/);
   assert.match(taxi, /resolveTenantAssetUrl\(url\)/);
   assert.match(taxi, /source=\{\{ uri: imageUrl \}\}/);
+  assert.match(taxi, /formatOperationalTime\(item\.janela_inicio\)/);
+  assert.doesNotMatch(taxi, /new Date\(value\)\.toLocaleTimeString/);
+  assert.match(operationalDateTime, /match \? `\$\{match\[1\]\}:\$\{match\[2\]\}`/);
 });
 
 test("perfis dedicados abrem somente Banho e Tosa ou Taxi Dog", () => {

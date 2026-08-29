@@ -19,6 +19,7 @@ import {
 } from "../../services/taxiDogEntregador.service";
 import { resolveTenantAssetUrl } from "../../store/tenant.store";
 import { limparEnderecoParaMaps } from "../../utils/mapsAddress";
+import { formatOperationalTime } from "../../utils/operationalDateTime";
 
 const STATUS_ACTIONS: Record<string, string> = {
   motorista_a_caminho: "Estou a caminho",
@@ -184,7 +185,8 @@ export function TaxiDogEntregador() {
           </View>
 
           <Text style={taxiStyles.window}>
-            Janela {hora(item.janela_inicio)} - {hora(item.janela_fim)} ·{" "}
+            Janela {formatOperationalTime(item.janela_inicio)} -{" "}
+            {formatOperationalTime(item.janela_fim)} ·{" "}
             {labelTipo(item.tipo)}
           </Text>
           <Endereco label="Origem" value={item.endereco_origem} />
@@ -268,14 +270,6 @@ function Endereco({ label, value }: { label: string; value?: string | null }) {
       </Text>
     </View>
   );
-}
-
-function hora(value?: string | null) {
-  if (!value) return "--:--";
-  return new Date(value).toLocaleTimeString("pt-BR", {
-    hour: "2-digit",
-    minute: "2-digit",
-  });
 }
 
 function labelTipo(tipo: string) {
