@@ -420,16 +420,17 @@ function AtendimentoCard({
               <PetIdentity
                 fallback={`Pet #${atendimento.pet_id || "-"}`}
                 layout="inline"
-                nameClassName="font-semibold text-slate-900"
+                nameClassName="text-lg font-bold text-slate-950"
                 record={atendimento}
+                showCode={false}
               />
               <CustomerIdentity
                 className="mt-0.5 text-xs text-slate-500"
-                codeLabel="Cod. tutor"
                 fallback={`Tutor #${atendimento.cliente_id || "-"}`}
                 label="Tutor"
                 nameClassName="font-medium text-slate-500"
                 record={atendimento}
+                showCode={false}
                 showLabel
               />
             </div>
@@ -492,7 +493,9 @@ function AtendimentoCard({
           onClick={() => proxima && onMover(atendimento, proxima)}
           size="sm"
         >
-          {proxima === "entregue" ? "Fechar e entregar" : `Avançar para ${labelEtapa(proxima)}`}
+          {proxima === "entregue"
+            ? `Entregar ${atendimento.pet_nome || "pet"}`
+            : `${atendimento.pet_nome || "Pet"} → ${labelEtapa(proxima)}`}
         </ActionButton>
 
         <ActionButton

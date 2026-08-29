@@ -14,6 +14,9 @@ test("funcionario acessa agenda e fila do banho e tosa", () => {
   const navigator = source("src/navigation/FuncionarioNavigator.tsx");
   const home = source("src/screens/funcionario/FuncionarioHomeScreen.tsx");
   const screen = source("src/screens/funcionario/FuncionarioBanhoTosaScreen.tsx");
+  const content = source(
+    "src/screens/funcionario/banho-tosa/FuncionarioBanhoTosaContent.tsx",
+  );
 
   assert.match(navigator, /FuncionarioBanhoTosaScreen/);
   assert.match(home, /navigation\.navigate\("FuncionarioBanhoTosa"\)/);
@@ -22,6 +25,9 @@ test("funcionario acessa agenda e fila do banho e tosa", () => {
   assert.match(screen, /realizarCheckinBanhoTosaFuncionario/);
   assert.match(screen, /moverEtapaBanhoTosaFuncionario/);
   assert.match(screen, /setInterval\(\(\) => void carregarOperacao\(false\), 30000\)/);
+  assert.match(content, /resolveTenantAssetUrl\(url\)/);
+  assert.match(content, /<Image source=\{\{ uri: imageUrl \}\}/);
+  assert.match(content, /`\$\{item\.pet_nome \|\| "Pet"\} →/);
 });
 
 test("agenda do funcionario permite criar horario com pet servico e recurso", () => {

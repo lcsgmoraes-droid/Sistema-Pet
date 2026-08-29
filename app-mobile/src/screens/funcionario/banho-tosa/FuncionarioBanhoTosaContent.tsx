@@ -1,10 +1,11 @@
 import { Ionicons } from "@expo/vector-icons";
 import React from "react";
-import { ScrollView, Text, TouchableOpacity, View } from "react-native";
+import { Image, ScrollView, Text, TouchableOpacity, View } from "react-native";
 import {
   FuncionarioBanhoTosaAgendamento,
   FuncionarioBanhoTosaAtendimento,
 } from "../../../services/funcionarioBanhoTosa.service";
+import { resolveTenantAssetUrl } from "../../../store/tenant.store";
 import { formatarMoeda } from "../../../utils/format";
 import { styles } from "./FuncionarioBanhoTosaStyles";
 import {
@@ -114,11 +115,14 @@ function AgendaCard({
   return (
     <View style={styles.card}>
       <View style={styles.cardTop}>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.cardPet}>
-            {formatarHora(item.data_hora_inicio)} · {item.pet_nome || `Pet #${item.pet_id}`}
-          </Text>
-          <Text style={styles.cardTutor}>{item.cliente_nome || "Tutor nao informado"}</Text>
+        <View style={styles.petIdentity}>
+          <PetPhoto name={item.pet_nome} url={item.pet_foto_url} />
+          <View style={styles.petIdentityText}>
+            <Text style={styles.cardPet}>
+              {formatarHora(item.data_hora_inicio)} · {item.pet_nome || `Pet #${item.pet_id}`}
+            </Text>
+            <Text style={styles.cardTutor}>{item.cliente_nome || "Tutor nao informado"}</Text>
+          </View>
         </View>
         <View style={styles.badge}>
           <Text style={styles.badgeText}>{statusAgendamentoLabel(item.status)}</Text>
@@ -236,9 +240,12 @@ function FilaCard({
   return (
     <View style={styles.card}>
       <View style={styles.cardTop}>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.cardPet}>{item.pet_nome || `Pet #${item.pet_id}`}</Text>
-          <Text style={styles.cardTutor}>{item.cliente_nome || "Tutor nao informado"}</Text>
+        <View style={styles.petIdentity}>
+          <PetPhoto name={item.pet_nome} url={item.pet_foto_url} />
+          <View style={styles.petIdentityText}>
+            <Text style={styles.cardPet}>{item.pet_nome || `Pet #${item.pet_id}`}</Text>
+            <Text style={styles.cardTutor}>{item.cliente_nome || "Tutor nao informado"}</Text>
+          </View>
         </View>
         <View style={[styles.badge, item.atrasado && styles.badgeAlert]}>
           <Text style={[styles.badgeText, item.atrasado && styles.badgeAlertText]}>
@@ -273,12 +280,27 @@ function FilaCard({
             onPress={() => onAvancar(item)}
           >
             <Text style={styles.primaryButtonText}>
-              {salvando ? "Atualizando..." : `Iniciar ${item.proxima_etapa_label || labelEtapa(item.proxima_etapa_codigo)}`}
+              {salvando
+                ? "Atualizando..."
+                : `${item.pet_nome || "Pet"} → ${item.proxima_etapa_label || labelEtapa(item.proxima_etapa_codigo)}`}
             </Text>
           </TouchableOpacity>
         </View>
       ) : (
         <Text style={styles.meta}>Pronto para fechamento e entrega no ERP.</Text>
+      )}
+    </View>
+  );
+}
+
+function PetPhoto({ name, url }: { name?: string | null; url?: string | null }) {
+  const imageUrl = resolveTenantAssetUrl(url);
+  return (
+    <View style={styles.petPhotoFrame} accessibilityLabel={`Foto de ${name || "pet"}`}>
+      {imageUrl ? (
+        <Image source={{ uri: imageUrl }} style={styles.petPhoto} resizeMode="cover" />
+      ) : (
+        <Ionicons name="paw" size={24} color="#64748B" />
       )}
     </View>
   );
