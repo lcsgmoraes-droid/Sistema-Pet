@@ -1,4 +1,7 @@
-const normalizeRoleName = (user) => String(user?.role?.name || "").trim().toLowerCase();
+const normalizeRoleName = (user) =>
+  String(user?.role?.name || "")
+    .trim()
+    .toLowerCase();
 
 export const isAdminRole = (user) => ["admin", "administrador"].includes(normalizeRoleName(user));
 
