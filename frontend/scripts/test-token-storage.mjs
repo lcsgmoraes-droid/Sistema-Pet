@@ -1,10 +1,13 @@
 import assert from "node:assert/strict";
 import {
   clearAuthTokens,
+  clearTempToken,
   getAccessToken,
   getRefreshToken,
+  getTempToken,
   setAccessToken,
   setRefreshToken,
+  setTempToken,
 } from "../src/auth/tokenStorage.js";
 
 class MemoryStorage {
@@ -83,3 +86,10 @@ clearAuthTokens();
 
 assert.equal(globalThis.localStorage.getItem("refresh_token"), null);
 assert.equal(globalThis.sessionStorage.getItem("refresh_token"), null);
+
+setTempToken("token-de-selecao");
+assert.equal(getTempToken(), "token-de-selecao");
+assert.equal(globalThis.localStorage.getItem("tempToken"), null);
+
+clearTempToken();
+assert.equal(getTempToken(), null);

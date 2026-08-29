@@ -100,6 +100,14 @@ export const setTempToken = (token) => {
   local?.removeItem(TEMP_TOKEN_KEY);
 };
 
+export const clearTempToken = () => {
+  const session = getSessionStorage();
+  const local = getLocalStorage();
+
+  session?.removeItem(TEMP_TOKEN_KEY);
+  local?.removeItem(TEMP_TOKEN_KEY);
+};
+
 export const clearAuthTokens = () => {
   const session = getSessionStorage();
   const local = getLocalStorage();
