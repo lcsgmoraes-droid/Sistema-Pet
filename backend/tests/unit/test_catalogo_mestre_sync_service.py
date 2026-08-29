@@ -285,9 +285,7 @@ def test_initial_scope_includes_litter_and_excludes_toys_and_litter_accessories(
     catalog_session,
 ):
     catalog_session.execute(
-        text(
-            "INSERT INTO marcas (id, tenant_id, nome) " "VALUES (2, :tenant, 'Pipicat')"
-        ),
+        text("INSERT INTO marcas (id, tenant_id, nome) VALUES (2, :tenant, 'Pipicat')"),
         {"tenant": SOURCE_TENANT},
     )
     for category_id, category_name in (
@@ -375,10 +373,7 @@ def test_new_source_image_reduces_backlog_without_touching_source_product(
     catalog_session.commit()
 
     master = catalog_session.execute(
-        text(
-            "SELECT imagem_quantidade, imagem_faltantes "
-            "FROM catalogo_mestre_produtos"
-        )
+        text("SELECT imagem_quantidade, imagem_faltantes FROM catalogo_mestre_produtos")
     ).one()
     assert result["imported_images"] == 1
     assert result["resolved_pending_tasks"] == 1
