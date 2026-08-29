@@ -320,23 +320,43 @@ function DashboardCards({ summary }: { summary: GestorResumo }) {
       <Card
         icon="pulse-outline"
         title="Fluxo de caixa de hoje"
-        subtitle="Entradas menos saidas do dia"
+        subtitle="Saldo das contas e movimentacao do dia"
       >
         {fluxo.disponivel ? (
           <>
+            <View style={styles.cashDayResult}>
+              <Text style={styles.cashDayLabel}>Saldo do dia</Text>
+              <Text
+                style={[
+                  styles.cashDayValue,
+                  fluxo.saldo_do_dia >= 0 ? styles.positive : styles.negative,
+                ]}
+                numberOfLines={1}
+                adjustsFontSizeToFit
+              >
+                {formatarMoeda(fluxo.saldo_do_dia)}
+              </Text>
+              <Text style={styles.cashDayCaption}>
+                Saldo inicial + entradas realizadas - saidas realizadas
+              </Text>
+            </View>
             <View style={styles.balanceGrid}>
               <BalanceBox
-                label="Realizado"
+                label="Movimento realizado"
                 value={fluxo.saldo_realizado}
                 projected={false}
               />
               <BalanceBox
-                label="Projetado"
-                value={fluxo.saldo_projetado}
+                label="Saldo com previstos"
+                value={fluxo.saldo_previsto_do_dia}
                 projected
               />
             </View>
             <View style={styles.detailRows}>
+              <DetailRow
+                label="Saldo inicial"
+                value={formatarMoeda(fluxo.saldo_inicial)}
+              />
               <DetailRow
                 label="Entradas realizadas"
                 value={formatarMoeda(fluxo.entradas_realizadas)}
@@ -394,27 +414,52 @@ function DashboardCards({ summary }: { summary: GestorResumo }) {
                 Margem liquida: {formatQuantity(dre.margem_liquida)}%
               </Text>
             </View>
-            <View style={styles.detailRows}>
-              <DetailRow
+            <View style={styles.dreCalculation}>
+              <Text style={styles.dreCalculationTitle}>
+                Como chegamos neste resultado
+              </Text>
+              <DreCalculationRow
                 label="Receita bruta"
-                value={formatarMoeda(dre.receita_bruta)}
+                value={dre.receita_bruta}
               />
-              <DetailRow
+              <DreCalculationRow
+                operator="−"
+                label="Descontos"
+                value={dre.descontos}
+              />
+              <DreCalculationRow
+                operator="−"
+                label="Impostos"
+                value={dre.impostos}
+              />
+              <DreCalculationRow
+                operator="="
                 label="Receita liquida"
-                value={formatarMoeda(dre.receita_liquida)}
+                value={dre.receita_liquida}
+                tone="subtotal"
               />
-              <DetailRow label="CMV" value={formatarMoeda(dre.cmv)} />
-              <DetailRow
-                label="Despesas variaveis"
-                value={formatarMoeda(dre.despesas_variaveis)}
-              />
-              <DetailRow
-                label="Despesas operacionais"
-                value={formatarMoeda(dre.despesas_operacionais)}
-              />
-              <DetailRow
+              <DreCalculationRow operator="−" label="CMV" value={dre.cmv} />
+              <DreCalculationRow
+                operator="="
                 label="Lucro bruto"
-                value={formatarMoeda(dre.lucro_bruto)}
+                value={dre.lucro_bruto}
+                tone="subtotal"
+              />
+              <DreCalculationRow
+                operator="−"
+                label="Despesas variaveis"
+                value={dre.despesas_variaveis}
+              />
+              <DreCalculationRow
+                operator="−"
+                label="Despesas fixas e operacionais"
+                value={dre.despesas_fixas_operacionais}
+              />
+              <DreCalculationRow
+                operator="="
+                label="Lucro liquido"
+                value={dre.lucro_liquido}
+                tone="result"
               />
             </View>
             <Text style={styles.footnote}>
@@ -537,6 +582,47 @@ function DetailRow({ label, value }: { label: string; value: string }) {
   );
 }
 
+function DreCalculationRow({
+  operator = "+",
+  label,
+  value,
+  tone = "normal",
+}: {
+  operator?: "+" | "−" | "=";
+  label: string;
+  value: number;
+  tone?: "normal" | "subtotal" | "result";
+}) {
+  return (
+    <View
+      style={[
+        styles.dreCalculationRow,
+        tone === "subtotal" && styles.dreCalculationSubtotal,
+        tone === "result" && styles.dreCalculationResult,
+      ]}
+    >
+      <Text style={styles.dreOperator}>{operator}</Text>
+      <Text
+        style={[
+          styles.dreCalculationLabel,
+          tone !== "normal" && styles.dreCalculationStrong,
+        ]}
+      >
+        {label}
+      </Text>
+      <Text
+        style={[
+          styles.dreCalculationValue,
+          tone !== "normal" && styles.dreCalculationStrong,
+          tone === "result" && (value >= 0 ? styles.positive : styles.negative),
+        ]}
+      >
+        {formatarMoeda(value)}
+      </Text>
+    </View>
+  );
+}
+
 function AccountPanel({
   kind,
   summary,
@@ -565,12 +651,18 @@ function AccountPanel({
         </Text>
       </View>
       <Text style={styles.accountTotal}>
-        {formatarMoeda(summary.total_aberto)}
+        {formatarMoeda(summary.vence_hoje)}
       </Text>
       <Text style={styles.accountCaption}>
-        {summary.quantidade_abertas} conta(s) em aberto
+        Do dia · {summary.quantidade_vence_hoje} conta(s) vencendo hoje
       </Text>
       <View style={styles.accountStats}>
+        <View style={styles.accountStat}>
+          <Text style={styles.accountStatLabel}>Em aberto</Text>
+          <Text style={styles.accountStatValue}>
+            {formatarMoeda(summary.total_aberto)}
+          </Text>
+        </View>
         <View style={styles.accountStat}>
           <Text style={styles.accountStatLabel}>Vencido</Text>
           <Text
@@ -580,12 +672,6 @@ function AccountPanel({
             ]}
           >
             {formatarMoeda(summary.vencido)}
-          </Text>
-        </View>
-        <View style={styles.accountStat}>
-          <Text style={styles.accountStatLabel}>Vence hoje</Text>
-          <Text style={styles.accountStatValue}>
-            {formatarMoeda(summary.vence_hoje)}
           </Text>
         </View>
         <View style={styles.accountStat}>

@@ -6,22 +6,32 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
+from sqlalchemy import func
 from sqlalchemy.orm import Session, joinedload
 
+from app.banho_tosa_api.agenda_routes import criar_agendamento as criar_agendamento_erp
 from app.banho_tosa_models import (
     BanhoTosaAgendamento,
     BanhoTosaAtendimento,
     BanhoTosaAvaliacao,
+    BanhoTosaConfiguracao,
     BanhoTosaRecurso,
     BanhoTosaServico,
 )
 from app.banho_tosa_api.fluxo import estado_operacional_atendimento, etapa_ativa
-from app.banho_tosa_api.utils import obter_ou_criar_configuracao
+from app.banho_tosa_api.utils import (
+    STATUS_AGENDAMENTO_FINAIS,
+    obter_ou_criar_configuracao,
+)
+from app.banho_tosa_schemas import (
+    BanhoTosaAgendamentoCreate,
+    BanhoTosaAgendamentoServicoInput,
+)
 from app.db import get_session
 from app.models import User
 from app.routes.app_mobile_routes import _get_cliente_or_404
 from app.routes.ecommerce_auth import _get_current_ecommerce_user
-
+from app.utils.timezone import now_brasilia
 
 router = APIRouter(prefix="/app/banho-tosa", tags=["App Mobile - Banho & Tosa"])
 
@@ -57,6 +67,14 @@ class BanhoTosaAvaliacaoInput(BaseModel):
     comentario: Optional[str] = Field(default=None, max_length=1000)
 
 
+class BanhoTosaAgendamentoClienteInput(BaseModel):
+    pet_id: int = Field(..., gt=0)
+    servico_id: int = Field(..., gt=0)
+    data_agendamento: date
+    horario_inicio: str = Field(..., pattern=r"^\d{2}:\d{2}$")
+    observacoes: Optional[str] = Field(default=None, max_length=500)
+
+
 @router.get("/calendario")
 def obter_calendario_banho_tosa(
     data_inicio: Optional[str] = None,
@@ -87,7 +105,8 @@ def obter_calendario_banho_tosa(
         }
 
     dias = max(1, min(int(dias or 7), 14))
-    inicio = _parse_data(data_inicio) or date.today()
+    agora = now_brasilia()
+    inicio = _parse_data(data_inicio) or agora.date()
     servico = (
         next((item for item in servicos if item.id == servico_id), None)
         if servico_id
@@ -130,12 +149,15 @@ def obter_calendario_banho_tosa(
         fim_dia = datetime.combine(dia, _parse_hora(config.horario_fim) or time(18, 0))
         while cursor + timedelta(minutes=duracao_minutos) <= fim_dia:
             slot_fim = cursor + timedelta(minutes=duracao_minutos)
-            ocupados = sum(
-                1
-                for item in agendamentos
-                if _intervalos_sobrepoem(cursor, slot_fim, item)
-            )
-            vagas = max(capacidade_total - ocupados, 0)
+            if cursor <= agora:
+                vagas = 0
+            else:
+                ocupados = sum(
+                    1
+                    for item in agendamentos
+                    if _intervalos_sobrepoem(cursor, slot_fim, item)
+                )
+                vagas = max(capacidade_total - ocupados, 0)
             slots.append(
                 {
                     "horario_inicio": cursor.strftime("%H:%M"),
@@ -179,6 +201,77 @@ def listar_status_banho_tosa(
             {k: v for k, v in item.items() if k != "ordenacao"} for item in itens
         ],
     }
+
+
+@router.post("/agendamentos", status_code=201)
+def criar_agendamento_cliente_banho_tosa(
+    payload: BanhoTosaAgendamentoClienteInput,
+    current_user: User = Depends(_get_current_ecommerce_user),
+    db: Session = Depends(get_session),
+):
+    """Permite ao tutor reservar um horario livre para um pet da propria conta."""
+    cliente = _get_cliente_or_404(db, current_user)
+    tenant_id = current_user.tenant_id
+    config = obter_ou_criar_configuracao(db, tenant_id)
+    if not getattr(config, "mostrar_calendario_cliente", False):
+        raise HTTPException(
+            status_code=403,
+            detail="A loja ainda nao liberou agendamentos pelo app.",
+        )
+    config = (
+        db.query(BanhoTosaConfiguracao)
+        .filter(
+            BanhoTosaConfiguracao.id == config.id,
+            BanhoTosaConfiguracao.tenant_id == tenant_id,
+        )
+        .with_for_update()
+        .one()
+    )
+
+    servico = (
+        db.query(BanhoTosaServico)
+        .filter(
+            BanhoTosaServico.id == payload.servico_id,
+            BanhoTosaServico.tenant_id == tenant_id,
+            BanhoTosaServico.ativo.is_(True),
+        )
+        .first()
+    )
+    if not servico:
+        raise HTTPException(status_code=404, detail="Servico nao encontrado.")
+
+    horario = _parse_hora(payload.horario_inicio)
+    if not horario:
+        raise HTTPException(status_code=422, detail="Horario invalido.")
+    inicio = datetime.combine(payload.data_agendamento, horario)
+    duracao = max(int(servico.duracao_padrao_minutos or 60), 1)
+    fim = inicio + timedelta(minutes=duracao)
+    _validar_slot_cliente(config, inicio, fim)
+    recurso_id = _resolver_recurso_slot(db, tenant_id, inicio, fim)
+
+    body = BanhoTosaAgendamentoCreate(
+        cliente_id=cliente.id,
+        pet_id=payload.pet_id,
+        data_hora_inicio=inicio,
+        data_hora_fim_prevista=fim,
+        recurso_id=recurso_id,
+        origem="app",
+        observacoes=(payload.observacoes or "").strip() or None,
+        valor_previsto=servico.preco_base or Decimal("0"),
+        servicos=[
+            BanhoTosaAgendamentoServicoInput(
+                servico_id=servico.id,
+                quantidade=Decimal("1"),
+                valor_unitario=servico.preco_base or Decimal("0"),
+                tempo_previsto_minutos=duracao,
+            )
+        ],
+    )
+    return criar_agendamento_erp(
+        body=body,
+        db=db,
+        current=(current_user, tenant_id),
+    )
 
 
 @router.post("/atendimentos/{atendimento_id}/avaliacao")
@@ -273,6 +366,81 @@ def _dia_funciona(config, dia: date) -> bool:
     }
     configurados = {str(item).strip().lower() for item in dias}
     return bool(nomes.get(dia.weekday(), set()) & configurados)
+
+
+def _validar_slot_cliente(config, inicio: datetime, fim: datetime) -> None:
+    agora = now_brasilia()
+    if inicio <= agora:
+        raise HTTPException(status_code=422, detail="Escolha um horario futuro.")
+    if inicio.date() > agora.date() + timedelta(days=13):
+        raise HTTPException(
+            status_code=422,
+            detail="Escolha um horario dentro dos proximos 14 dias.",
+        )
+    if not _dia_funciona(config, inicio.date()):
+        raise HTTPException(status_code=422, detail="A loja nao funciona neste dia.")
+
+    abertura = datetime.combine(
+        inicio.date(), _parse_hora(config.horario_inicio) or time(8, 0)
+    )
+    fechamento = datetime.combine(
+        inicio.date(), _parse_hora(config.horario_fim) or time(18, 0)
+    )
+    if inicio < abertura or fim > fechamento:
+        raise HTTPException(
+            status_code=422,
+            detail="O horario esta fora da janela de atendimento da loja.",
+        )
+
+    intervalo = max(int(getattr(config, "intervalo_slot_minutos", None) or 30), 5)
+    minutos_desde_abertura = int((inicio - abertura).total_seconds() // 60)
+    if minutos_desde_abertura % intervalo:
+        raise HTTPException(status_code=422, detail="Horario fora da grade da agenda.")
+
+
+def _resolver_recurso_slot(
+    db: Session, tenant_id, inicio: datetime, fim: datetime
+) -> Optional[int]:
+    recursos = (
+        db.query(BanhoTosaRecurso)
+        .filter(
+            BanhoTosaRecurso.tenant_id == tenant_id,
+            BanhoTosaRecurso.ativo.is_(True),
+        )
+        .order_by(BanhoTosaRecurso.id.asc())
+        .all()
+    )
+    sobrepostos = db.query(BanhoTosaAgendamento).filter(
+        BanhoTosaAgendamento.tenant_id == tenant_id,
+        BanhoTosaAgendamento.status.notin_(list(STATUS_AGENDAMENTO_FINAIS)),
+        BanhoTosaAgendamento.data_hora_inicio < fim,
+        func.coalesce(
+            BanhoTosaAgendamento.data_hora_fim_prevista,
+            BanhoTosaAgendamento.data_hora_inicio,
+        )
+        > inicio,
+    )
+    capacidade_total = (
+        sum(max(int(item.capacidade_simultanea or 1), 1) for item in recursos) or 1
+    )
+    if sobrepostos.count() >= capacidade_total:
+        raise HTTPException(
+            status_code=409,
+            detail="Este horario acabou de ser ocupado. Escolha outro.",
+        )
+
+    if not recursos:
+        return None
+    for recurso in recursos:
+        ocupacao = sobrepostos.filter(
+            BanhoTosaAgendamento.recurso_id == recurso.id
+        ).count()
+        if ocupacao < max(int(recurso.capacidade_simultanea or 1), 1):
+            return recurso.id
+    raise HTTPException(
+        status_code=409,
+        detail="Nenhum recurso esta livre neste horario. Escolha outro.",
+    )
 
 
 def _intervalos_sobrepoem(

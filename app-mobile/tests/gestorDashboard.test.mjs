@@ -33,6 +33,12 @@ test("dashboard gestor consulta resumo protegido e exibe filtros principais", ()
   assert.match(utils, /Mes anterior/);
   assert.match(screen, /Faturamento/);
   assert.match(screen, /Fluxo de caixa de hoje/);
+  assert.match(screen, /Saldo do dia/);
   assert.match(screen, /Contas a receber/);
+  assert.match(screen, /Do dia/);
   assert.match(screen, /Resultado da DRE/);
+  assert.match(screen, /Como chegamos neste resultado/);
+  assert.match(screen, /Despesas fixas e operacionais/);
+  assert.match(service, /saldo_previsto_do_dia/);
+  assert.match(service, /despesas_fixas_operacionais/);
 });

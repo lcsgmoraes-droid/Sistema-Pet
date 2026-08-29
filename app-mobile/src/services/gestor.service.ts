@@ -25,6 +25,9 @@ export interface GestorContaResumo {
 export interface GestorFluxoDiaResumo {
   data: string;
   disponivel: boolean;
+  saldo_inicial: number;
+  saldo_do_dia: number;
+  saldo_previsto_do_dia: number;
   entradas_realizadas: number;
   saidas_realizadas: number;
   saldo_realizado: number;
@@ -38,12 +41,18 @@ export interface GestorDREResumo {
   periodo: string;
   criterio: "periodo_selecionado" | "competencia_do_mes";
   receita_bruta: number;
+  descontos: number;
+  impostos: number;
+  deducoes_total: number;
   receita_liquida: number;
   cmv: number;
   despesas_variaveis: number;
   despesas_operacionais: number;
+  despesas_fixas_operacionais: number;
   lucro_bruto: number;
+  resultado_operacional: number;
   lucro_liquido: number;
+  margem_bruta: number;
   margem_liquida: number;
 }
 
