@@ -24,9 +24,7 @@ def _produto(*, tenant_id, user_id, codigo, nome, tipo_produto, custo, tipo_kit=
     )
 
 
-def test_calcular_custos_kits_em_lote_soma_componentes(
-    db_session, tenant_context
-):
+def test_calcular_custos_kits_em_lote_soma_componentes(db_session, tenant_context):
     tenant_id = UUID("00000000-0000-0000-0000-000000000101")
     tenant_context(tenant_id)
     componente = _produto(

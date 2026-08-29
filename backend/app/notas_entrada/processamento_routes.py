@@ -555,9 +555,7 @@ def processar_entrada_estoque(
     else:
         logger.info("Geracao de contas a pagar desmarcada para NF %s", nota.numero_nota)
 
-    KitCustoService.recalcular_kits_que_usam_produtos(
-        db, produtos_com_custo_alterado
-    )
+    KitCustoService.recalcular_kits_que_usam_produtos(db, produtos_com_custo_alterado)
     db.commit()
 
     # SINCRONIZAR ESTOQUE COM BLING para todos os itens processados

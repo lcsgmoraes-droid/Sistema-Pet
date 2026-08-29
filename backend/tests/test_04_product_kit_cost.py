@@ -186,8 +186,9 @@ def test_recalcular_kits_que_usam_produto_atualiza_dependentes(monkeypatch):
 
     monkeypatch.setattr(
         "app.services.kit_custo_service.KitCustoService.recalcular_kits_que_usam_produtos",
-        lambda db, produto_ids: chamadas.append((db, produto_ids))
-        or {20: Decimal("14")},
+        lambda db, produto_ids: (
+            chamadas.append((db, produto_ids)) or {20: Decimal("14")}
+        ),
     )
 
     resultado = KitCustoService.recalcular_kits_que_usam_produto(db, 5)
