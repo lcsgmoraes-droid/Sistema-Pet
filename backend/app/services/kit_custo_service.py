@@ -8,10 +8,12 @@ Responsabilidades:
 - Validar estrutura do produto composto
 """
 
+from collections import defaultdict
 from decimal import Decimal
-from typing import Optional
-from sqlalchemy.orm import Session
 import logging
+from typing import Iterable, Optional
+
+from sqlalchemy.orm import Session
 
 from ..produtos_models import Produto, ProdutoKitComponente
 
@@ -38,6 +40,84 @@ class KitCustoService:
             return False
 
         return produto.tipo_produto in ("KIT", "VARIACAO") and bool(produto.tipo_kit)
+
+    @staticmethod
+    def calcular_custos_kits_em_lote(
+        db: Session, produtos: Iterable[Produto]
+    ) -> dict[int, Decimal]:
+        """Calcula o custo efetivo de vários produtos compostos em uma consulta.
+
+        A listagem de produtos usa este método para manter o custo correto sem
+        voltar ao carregamento detalhado (e repetitivo) de cada composição.
+        """
+        kits = {
+            int(produto.id): produto
+            for produto in produtos
+            if KitCustoService.produto_usa_custo_por_componentes(produto)
+        }
+        if not kits:
+            return {}
+
+        linhas = (
+            db.query(ProdutoKitComponente, Produto)
+            .join(
+                Produto,
+                Produto.id == ProdutoKitComponente.produto_componente_id,
+            )
+            .filter(ProdutoKitComponente.kit_id.in_(list(kits)))
+            .order_by(
+                ProdutoKitComponente.kit_id,
+                ProdutoKitComponente.ordem,
+                ProdutoKitComponente.id,
+            )
+            .all()
+        )
+
+        componentes_por_kit: dict[int, list[tuple[ProdutoKitComponente, Produto]]] = (
+            defaultdict(list)
+        )
+        for relacao, componente in linhas:
+            componentes_por_kit[int(relacao.kit_id)].append((relacao, componente))
+
+        custos: dict[int, Decimal] = {}
+        for kit_id, kit in kits.items():
+            componentes = componentes_por_kit.get(kit_id, [])
+            kit_e_granel = (
+                bool(getattr(kit, "e_granel", False))
+                or "granel" in str(kit.nome or "").lower()
+            )
+
+            if kit_e_granel:
+                if not componentes:
+                    custos[kit_id] = Decimal(str(kit.preco_custo or 0))
+                    continue
+                _, componente = componentes[0]
+                peso_pacote = Decimal(str(componente.peso_embalagem or 0))
+                custos[kit_id] = (
+                    Decimal(str(componente.preco_custo or 0)) / peso_pacote
+                    if peso_pacote > 0
+                    else Decimal(str(kit.preco_custo or 0))
+                )
+                continue
+
+            custo_total = Decimal("0")
+            for relacao, componente in componentes:
+                if componente.tipo_produto in ("KIT", "PAI"):
+                    logger.warning(
+                        "Componente invalido %s (%s) no produto composto %s; "
+                        "mantendo o custo persistido na listagem",
+                        componente.id,
+                        componente.tipo_produto,
+                        kit_id,
+                    )
+                    custo_total = Decimal(str(kit.preco_custo or 0))
+                    break
+                custo_total += Decimal(str(componente.preco_custo or 0)) * Decimal(
+                    str(relacao.quantidade or 0)
+                )
+            custos[kit_id] = custo_total
+
+        return custos
 
     @staticmethod
     def calcular_custo_kit(
@@ -217,24 +297,50 @@ class KitCustoService:
 
         Não faz commit. Deixa a transação com o chamador.
         """
-        componentes_kits = (
+        return KitCustoService.recalcular_kits_que_usam_produtos(db, [produto_id])
+
+    @staticmethod
+    def recalcular_kits_que_usam_produtos(
+        db: Session, produto_ids: Iterable[int]
+    ) -> dict[int, Decimal]:
+        """Recalcula em lote os kits afetados por mudanças de custo.
+
+        É usado nos fluxos que podem alterar vários componentes de uma vez,
+        como entrada por nota fiscal e importação de produtos.
+        """
+        ids = {int(produto_id) for produto_id in produto_ids if produto_id is not None}
+        if not ids:
+            return {}
+
+        relacoes = (
             db.query(ProdutoKitComponente)
-            .filter(ProdutoKitComponente.produto_componente_id == produto_id)
+            .filter(ProdutoKitComponente.produto_componente_id.in_(ids))
             .all()
         )
+        kit_ids = {int(relacao.kit_id) for relacao in relacoes}
+        if not kit_ids:
+            return {}
 
-        resultado: dict[int, Decimal] = {}
+        kits = db.query(Produto).filter(Produto.id.in_(kit_ids)).all()
+        kits = [
+            kit
+            for kit in kits
+            if KitCustoService.produto_usa_custo_por_componentes(kit)
+        ]
+        custos = KitCustoService.calcular_custos_kits_em_lote(db, kits)
 
-        for comp in componentes_kits:
-            kit = db.query(Produto).filter(Produto.id == comp.kit_id).first()
-            if not KitCustoService.produto_usa_custo_por_componentes(kit):
-                continue
+        for kit in kits:
+            custo = custos.get(int(kit.id))
+            if custo is not None:
+                kit.preco_custo = float(custo)
 
-            resultado[comp.kit_id] = KitCustoService.sincronizar_custo_kit(
-                db, comp.kit_id
+        if custos:
+            db.flush()
+            logger.info(
+                "Custos sincronizados para %s produto(s) composto(s)", len(custos)
             )
 
-        return resultado
+        return custos
 
     @staticmethod
     def validar_componentes_kit(kit_id: int, db: Session, user_id: int) -> dict:

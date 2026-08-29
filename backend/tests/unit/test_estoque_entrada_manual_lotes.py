@@ -134,6 +134,7 @@ def test_registrar_lote_entrada_usa_codigo_quando_produto_nao_tem_sku(monkeypatc
 def test_entrada_manual_notifica_pendencias_do_pdv_quando_estoque_volta(monkeypatch):
     ecommerce_calls = []
     pendencia_calls = []
+    kits_recalculados = []
 
     monkeypatch.setattr(
         "app.routes.ecommerce_notify_routes.notificar_clientes_estoque_disponivel",
@@ -154,6 +155,11 @@ def test_entrada_manual_notifica_pendencias_do_pdv_quando_estoque_volta(monkeypa
         estoque_entrada_manual_routes,
         "EstoqueMovimentacao",
         _FakeMovimentacao,
+    )
+    monkeypatch.setattr(
+        estoque_entrada_manual_routes.KitCustoService,
+        "recalcular_kits_que_usam_produto",
+        lambda db, produto_id: kits_recalculados.append((db, produto_id)) or {},
     )
 
     tenant_id = "11111111-1111-4111-8111-111111111111"
@@ -188,6 +194,7 @@ def test_entrada_manual_notifica_pendencias_do_pdv_quando_estoque_volta(monkeypa
     assert response["quantidade_nova"] == 3
     assert ecommerce_calls
     assert pendencia_calls
+    assert kits_recalculados == [(db, produto.id)]
     assert pendencia_calls[0][1] == {
         "db": db,
         "tenant_id": tenant_id,

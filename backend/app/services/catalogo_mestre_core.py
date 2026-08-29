@@ -19,22 +19,99 @@ INITIAL_CATALOG_TYPES = frozenset(
 )
 
 _LITTER_ACCESSORY_MARKERS = (
+    "bandeja",
+    "banheira",
     "banheiro para gato",
     "caixa de areia",
+    "furba",
     "pa coletora",
     "pa higienica",
     "pazinha",
     "tapete coletor",
     "tapete para caixa",
+    "toalete",
 )
 _LITTER_MARKERS = (
     "areia",
     "cristais de silica",
+    "granulado de madeira",
     "granulado higienico",
     "granulado sanitario",
     "pipicat",
     "silica sanitaria",
     "substrato higienico",
+)
+_LITTER_OTHER_USE_MARKERS = ("aquario", "ave", "passaro", "reptil", "terrario")
+_MEDICINE_MARKERS = (
+    "farmacia",
+    "medicamento",
+    "medicamentos",
+    "remedio",
+    "remedios",
+)
+_MEDICINE_CONTEXT_MARKERS = _MEDICINE_MARKERS + (
+    "antiparasitario",
+    "antiparasitarios",
+    "vacina",
+    "vacinas",
+)
+_TREAT_MARKERS = (
+    "biscoito",
+    "biscoitos",
+    "petiscao",
+    "petisco",
+    "petiscos",
+    "snack",
+    "snacks",
+)
+_RATION_MARKERS = ("alimento completo", "racao", "racoes")
+_ACCESSORY_MARKERS = (
+    "almofada",
+    "aplicador",
+    "arranhador",
+    "bandeja",
+    "banheira",
+    "banheiro para gato",
+    "bebedouro",
+    "bola petisco",
+    "brinquedo",
+    "caixa de areia",
+    "caixa de transporte",
+    "cama",
+    "canister",
+    "casinha",
+    "colchonete",
+    "comedouro",
+    "container",
+    "dispenser",
+    "dosador de racao",
+    "fantasia",
+    "furba",
+    "mordedor",
+    "pa dosadora",
+    "pa dosadora para racao",
+    "pa higienica",
+    "pazinha",
+    "peitoral",
+    "porta comprimido",
+    "porta medicamento",
+    "porta petisco",
+    "porta petiscos",
+    "porta racao",
+    "pote p agua racao",
+    "pote para agua racao",
+    "roupa",
+    "tapete coletor",
+    "tapete para caixa",
+    "toalete",
+)
+_NON_TARGET_CONTEXT_MARKERS = (
+    "acessorios",
+    "brinquedos",
+    "casas e caixas de transporte",
+    "habitat e transporte",
+    "roupas e moda",
+    "servicos",
 )
 
 
@@ -213,15 +290,22 @@ def barcode_identity(product: dict[str, Any]) -> tuple[str | None, str, list[str
     return None, ("invalido" if raw_codes else "ausente"), raw_codes
 
 
+def _contains_marker(value: str, markers: tuple[str, ...]) -> bool:
+    """Compara palavras/frases completas para evitar ``racao`` em ``FuracaoPet``."""
+
+    padded = f" {value} "
+    return any(f" {marker} " in padded for marker in markers)
+
+
 def classify_product(
     product: dict[str, Any], category: str | None, department: str | None
 ) -> str:
-    haystack = ascii_key(
+    name = ascii_key(text_value(product.get("nome")))
+    context = ascii_key(
         " ".join(
             filter(
                 None,
                 (
-                    text_value(product.get("nome")),
                     category,
                     department,
                     text_value(product.get("subcategoria")),
@@ -229,14 +313,43 @@ def classify_product(
             )
         )
     )
-    if any(token in haystack for token in ("farmacia", "medicamento", "remedio")):
-        return "medicamento"
-    if any(token in haystack for token in ("petisco", "biscoito", "snack")):
+
+    # A origem possui acessorios com palavras como racao, petisco e remedio no nome.
+    # Esses formatos sao recipientes/aplicadores, nao o produto consumivel.
+    if _contains_marker(name, _ACCESSORY_MARKERS):
+        return "outro"
+
+    if _contains_marker(name, _LITTER_MARKERS):
+        if _contains_marker(name, _LITTER_ACCESSORY_MARKERS):
+            return "outro"
+        if _contains_marker(name, _LITTER_OTHER_USE_MARKERS):
+            return "outro"
+        return "areia_sanitaria"
+
+    if _contains_marker(name, _TREAT_MARKERS):
         return "petisco"
-    if any(token in haystack for token in ("racao", "racoes", "alimento completo")):
+    if _contains_marker(name, _RATION_MARKERS):
         return "racao"
-    if not any(marker in haystack for marker in _LITTER_ACCESSORY_MARKERS) and any(
-        marker in haystack for marker in _LITTER_MARKERS
+    if _contains_marker(name, _MEDICINE_MARKERS):
+        return "medicamento"
+
+    # Farmacia pode conter apresentacoes veterinarias como coleiras
+    # antiparasitarias, cujo nome nao usa a palavra "medicamento".
+    if _contains_marker(context, _MEDICINE_CONTEXT_MARKERS):
+        return "medicamento"
+
+    # Categoria/departamento sao auxiliares: cadastros antigos possuem conflitos.
+    # Se o nome nao trouxe evidencia forte, um contexto explicitamente generico
+    # ou um formato de acessorio impede a inclusao automatica.
+    if _contains_marker(context, _NON_TARGET_CONTEXT_MARKERS):
+        return "outro"
+
+    if _contains_marker(context, _TREAT_MARKERS):
+        return "petisco"
+    if _contains_marker(context, _RATION_MARKERS):
+        return "racao"
+    if not _contains_marker(name, _LITTER_ACCESSORY_MARKERS) and _contains_marker(
+        context, _LITTER_MARKERS
     ):
         return "areia_sanitaria"
     return "outro"

@@ -42,3 +42,37 @@ def test_listagem_calcula_estoque_virtual_mesmo_sem_detalhes_do_kit():
     assert resultado.composicao_kit == []
     assert resultado.estoque_virtual == 31
     assert resultado.estoque_disponivel == 31
+
+
+def test_listagem_aplica_custo_efetivo_sem_carregar_detalhes_do_kit():
+    db = object()
+    produto = SimpleNamespace(
+        id=6936,
+        tenant_id="tenant-1",
+        tipo_produto="VARIACAO",
+        tipo_kit="VIRTUAL",
+        estoque_atual=-1,
+        categoria=None,
+        preco_custo=0,
+        preco_venda=59.90,
+        preco_promocional=None,
+        promocao_inicio=None,
+        promocao_fim=None,
+    )
+
+    with patch.object(
+        produtos_listagem.KitEstoqueService,
+        "calcular_estoque_virtual_kit",
+        return_value=31,
+    ):
+        resultado = produtos_routes._enriquecer_produto_listagem(
+            db,
+            produto,
+            tenant_id="tenant-1",
+            reservas_por_produto={},
+            incluir_detalhes_composto=False,
+            custos_compostos={produto.id: 26.92},
+        )
+
+    assert resultado.preco_custo == 26.92
+    assert resultado.composicao_kit == []
