@@ -54,9 +54,7 @@ def resumir_navegacao_publicacao(
     return {
         "total_paginas": total_paginas,
         "total_produtos": total_produtos,
-        "modo_paginacao": (
-            "produto_por_pagina" if paginas_individuais else "catalogo"
-        ),
+        "modo_paginacao": ("produto_por_pagina" if paginas_individuais else "catalogo"),
         "cta_label": cta_label,
     }
 
