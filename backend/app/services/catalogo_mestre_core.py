@@ -14,6 +14,28 @@ from typing import Any
 DEFAULT_MASTER_CATALOG_SOURCE_EMAIL = "atacadaopetpp@gmail.com"
 DEFAULT_IMAGE_TARGET = 5
 VALID_GTIN_LENGTHS = {8, 12, 13, 14}
+INITIAL_CATALOG_TYPES = frozenset(
+    {"racao", "petisco", "medicamento", "areia_sanitaria"}
+)
+
+_LITTER_ACCESSORY_MARKERS = (
+    "banheiro para gato",
+    "caixa de areia",
+    "pa coletora",
+    "pa higienica",
+    "pazinha",
+    "tapete coletor",
+    "tapete para caixa",
+)
+_LITTER_MARKERS = (
+    "areia",
+    "cristais de silica",
+    "granulado higienico",
+    "granulado sanitario",
+    "pipicat",
+    "silica sanitaria",
+    "substrato higienico",
+)
 
 
 class CatalogoMestreError(RuntimeError):
@@ -35,7 +57,9 @@ class CatalogoMestreSyncResult:
     dry_run: bool
     image_target: int
     source_products: int = 0
+    operational_products: int = 0
     eligible_products: int = 0
+    excluded_by_scope: int = 0
     skipped_products: int = 0
     created_products: int = 0
     updated_products: int = 0
@@ -56,6 +80,7 @@ class CatalogoMestreSyncResult:
     duplicate_gtins: int = 0
     quality_average: float = 0.0
     types: dict[str, int] = field(default_factory=dict)
+    excluded_types: dict[str, int] = field(default_factory=dict)
     pending_types: dict[str, int] = field(default_factory=dict)
     samples: list[dict[str, Any]] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
@@ -72,7 +97,9 @@ class CatalogoMestreSyncResult:
             "dry_run": self.dry_run,
             "image_target": self.image_target,
             "source_products": self.source_products,
+            "operational_products": self.operational_products,
             "eligible_products": self.eligible_products,
+            "excluded_by_scope": self.excluded_by_scope,
             "skipped_products": self.skipped_products,
             "created_products": self.created_products,
             "updated_products": self.updated_products,
@@ -93,6 +120,7 @@ class CatalogoMestreSyncResult:
             "duplicate_gtins": self.duplicate_gtins,
             "quality_average": self.quality_average,
             "types": dict(sorted(self.types.items())),
+            "excluded_types": dict(sorted(self.excluded_types.items())),
             "pending_types": dict(sorted(self.pending_types.items())),
             "samples": self.samples,
             "warnings": self.warnings,
@@ -205,9 +233,19 @@ def classify_product(
         return "medicamento"
     if any(token in haystack for token in ("petisco", "biscoito", "snack")):
         return "petisco"
-    if any(token in haystack for token in ("racao", "alimento completo")):
+    if any(token in haystack for token in ("racao", "racoes", "alimento completo")):
         return "racao"
+    if not any(marker in haystack for marker in _LITTER_ACCESSORY_MARKERS) and any(
+        marker in haystack for marker in _LITTER_MARKERS
+    ):
+        return "areia_sanitaria"
     return "outro"
+
+
+def is_initial_catalog_type(tipo_catalogo: str) -> bool:
+    """Limita a primeira fase a produtos padronizaveis e normalmente de marca."""
+
+    return tipo_catalogo in INITIAL_CATALOG_TYPES
 
 
 def source_image_urls(

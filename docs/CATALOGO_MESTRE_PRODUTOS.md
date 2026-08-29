@@ -6,6 +6,19 @@ Manter uma base global, progressivamente enriquecida, que possa ser oferecida
 como referência aos usuários do Sistema Pet. A primeira fonte autorizada é o
 catálogo do **Atacadão das Rações Pet**.
 
+O escopo da primeira fase é propositalmente limitado a produtos padronizáveis e
+normalmente identificados por marca:
+
+- rações;
+- petiscos e biscoitos;
+- medicamentos/farmácia;
+- areias sanitárias, sílicas e granulados higiênicos, incluindo linhas como
+  Pipicat.
+
+Brinquedos, caixas, pás, comedouros e acessórios genéricos ficam fora desta
+primeira carga. A regra é uma lista positiva: um produto só entra se for
+classificado em um dos quatro grupos acima.
+
 O catálogo mestre não é o cadastro operacional de nenhuma loja. Ele não contém
 preço, custo, estoque, margem, comissão, fornecedor ou promoções e não atualiza
 automaticamente a tabela `produtos` de nenhum tenant.
@@ -17,12 +30,12 @@ Auditoria somente leitura realizada em 29/08/2026 no tenant do Atacadão:
 | Indicador | Quantidade |
 | --- | ---: |
 | Produtos não excluídos | 7.022 |
-| Produtos ativos, vendáveis e elegíveis para o catálogo mestre | 6.773 |
-| Elegíveis sem imagem | 6.045 |
-| Elegíveis com exatamente 1 imagem | 669 |
-| Elegíveis com 2 a 4 imagens | 4 |
-| Elegíveis com 5 ou mais imagens | 55 |
-| Posições de imagem ainda necessárias para atingir a meta de 5 | 32.912 |
+| Produtos ativos e vendáveis antes do filtro de escopo | 6.773 |
+| Candidatos sem imagem antes do filtro de escopo | 6.045 |
+| Candidatos com exatamente 1 imagem antes do filtro | 669 |
+| Candidatos com 2 a 4 imagens antes do filtro | 4 |
+| Candidatos com 5 ou mais imagens antes do filtro | 55 |
+| Posições de imagem no universo anterior ao filtro | 32.912 |
 | Produtos não excluídos com algum EAN/GTIN | 4.891 |
 | Produtos não excluídos com descrição curta/completa | 388 / 348 |
 | Produtos não excluídos com NCM legado / NCM fiscal V2 | 3.892 / 6.461 |
@@ -34,6 +47,10 @@ regime tributário e tipo de operação.
 
 Há 19 GTINs repetidos na origem. A sincronização mantém esses itens separados e
 os marca para revisão; não existe fusão automática por código de barras.
+
+O primeiro `dry-run` após a publicação informará a quantidade exata dentro do
+novo escopo. Os números de imagem acima são o teto operacional anterior ao
+filtro e, portanto, não devem ser usados como tamanho final da fila inicial.
 
 ## Estrutura criada
 

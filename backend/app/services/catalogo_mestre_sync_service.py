@@ -18,6 +18,7 @@ from app.services.catalogo_mestre_core import (
     CatalogoMestreError,
     CatalogoMestreSyncResult,
     build_source_payload,
+    is_initial_catalog_type,
     json_safe,
     pending_specs,
     quality_and_gaps,
@@ -343,9 +344,10 @@ def sync_catalogo_mestre_from_tenant(
 
     products = _source_rows(db, "produtos", source_tenant_id)
     result.source_products = len(products)
-    eligible = [product for product in products if _eligible_product(product)]
-    result.eligible_products = len(eligible)
-    result.skipped_products = len(products) - len(eligible)
+    operational_products = [
+        product for product in products if _eligible_product(product)
+    ]
+    result.operational_products = len(operational_products)
 
     brands = _name_map(_source_rows(db, "marcas", source_tenant_id))
     categories = _name_map(_source_rows(db, "categorias", source_tenant_id))
@@ -362,7 +364,7 @@ def sync_catalogo_mestre_from_tenant(
 
     payloads: dict[int, dict[str, Any]] = {}
     source_images: dict[int, list[dict[str, Any]]] = {}
-    for product in eligible:
+    for product in operational_products:
         product_id = int(product["id"])
         payload = build_source_payload(
             product=product,
@@ -374,10 +376,17 @@ def sync_catalogo_mestre_from_tenant(
             image_target=image_target,
             synced_at=synced_at,
         )
+        if not is_initial_catalog_type(payload["tipo_catalogo"]):
+            result.excluded_by_scope += 1
+            result.bump("excluded_types", payload["tipo_catalogo"])
+            continue
         payloads[product_id] = payload
         source_images[product_id] = source_image_urls(
             product, images_by_product.get(product_id, [])
         )
+
+    result.eligible_products = len(payloads)
+    result.skipped_products = len(products) - len(payloads)
 
     gtin_counts = Counter(
         payload["gtin"] for payload in payloads.values() if payload.get("gtin")

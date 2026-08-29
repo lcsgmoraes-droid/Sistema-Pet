@@ -281,6 +281,68 @@ def test_duplicate_gtin_is_queued_for_review_without_automatic_merge(catalog_ses
     assert "sem fusao automatica" in result["warnings"][0]
 
 
+def test_initial_scope_includes_litter_and_excludes_toys_and_litter_accessories(
+    catalog_session,
+):
+    catalog_session.execute(
+        text(
+            "INSERT INTO marcas (id, tenant_id, nome) " "VALUES (2, :tenant, 'Pipicat')"
+        ),
+        {"tenant": SOURCE_TENANT},
+    )
+    for category_id, category_name in (
+        (2, "Areias e granulados"),
+        (3, "Brinquedos"),
+    ):
+        catalog_session.execute(
+            text(
+                "INSERT INTO categorias (id, tenant_id, nome) "
+                "VALUES (:id, :tenant, :name)"
+            ),
+            {"id": category_id, "tenant": SOURCE_TENANT, "name": category_name},
+        )
+    for product_id, code, name, category_id, brand_id in (
+        (40, "PIPICAT-4KG", "Areia Sanitaria Pipicat Floral 4kg", 2, 2),
+        (41, "BRINQ-1", "Bola de borracha colorida", 3, None),
+        (42, "PA-AREIA", "Pazinha para caixa de areia", 2, None),
+    ):
+        catalog_session.execute(
+            text("""
+                INSERT INTO produtos (
+                    id, tenant_id, codigo, nome, tipo, situacao, ativo,
+                    is_sellable, tipo_produto, marca_id, categoria_id,
+                    departamento_id
+                ) VALUES (
+                    :id, :tenant, :code, :name, 'produto', 1, 1, 1,
+                    'SIMPLES', :brand_id, :category_id, 1
+                )
+                """),
+            {
+                "id": product_id,
+                "tenant": SOURCE_TENANT,
+                "code": code,
+                "name": name,
+                "brand_id": brand_id,
+                "category_id": category_id,
+            },
+        )
+    catalog_session.commit()
+
+    result = sync_catalogo_mestre_from_tenant(
+        db=catalog_session,
+        source_tenant_id=SOURCE_TENANT,
+        dry_run=True,
+    )
+
+    assert result["source_products"] == 4
+    assert result["operational_products"] == 4
+    assert result["eligible_products"] == 2
+    assert result["excluded_by_scope"] == 2
+    assert result["types"] == {"areia_sanitaria": 1, "racao": 1}
+    assert result["excluded_types"] == {"outro": 2}
+    assert {sample["source_product_id"] for sample in result["samples"]} == {10, 40}
+
+
 def test_new_source_image_reduces_backlog_without_touching_source_product(
     catalog_session,
 ):
