@@ -24,6 +24,8 @@ test("funcionario acessa agenda e fila do banho e tosa", () => {
   assert.match(screen, /FuncionarioBanhoTosaFila/);
   assert.match(screen, /realizarCheckinBanhoTosaFuncionario/);
   assert.match(screen, /moverEtapaBanhoTosaFuncionario/);
+  assert.match(screen, /STATUS_AGENDA_OPERACIONAL\.has\(item\.status\)/);
+  assert.match(screen, /`Agenda \(\$\{agendaOperacional\.length\}\)`/);
   assert.match(screen, /setInterval\(\(\) => void carregarOperacao\(false\), 30000\)/);
   assert.match(content, /resolveTenantAssetUrl\(url\)/);
   assert.match(content, /<Image source=\{\{ uri: imageUrl \}\}/);
