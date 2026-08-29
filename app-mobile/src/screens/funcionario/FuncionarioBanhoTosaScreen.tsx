@@ -50,6 +50,7 @@ const APOIOS_VAZIOS: FuncionarioBanhoTosaApoios = {
   servicos: [],
   pets: [],
 };
+const STATUS_AGENDA_OPERACIONAL = new Set(["agendado", "confirmado"]);
 
 function novoForm(data = isoDate(new Date())): NovoAgendamentoForm {
   return {
@@ -84,7 +85,11 @@ export default function FuncionarioBanhoTosaScreen() {
   });
   const [etapaSelecionada, setEtapaSelecionada] = useState("chegou");
   const periodo = useMemo(() => periodoAgenda(modo, referencia), [modo, referencia]);
-  const grupos = useMemo(() => agruparAgenda(agenda), [agenda]);
+  const agendaOperacional = useMemo(
+    () => agenda.filter((item) => STATUS_AGENDA_OPERACIONAL.has(item.status)),
+    [agenda],
+  );
+  const grupos = useMemo(() => agruparAgenda(agendaOperacional), [agendaOperacional]);
   const periodoKey = JSON.stringify(periodo.params);
 
   const carregarOperacao = useCallback(
@@ -294,7 +299,7 @@ export default function FuncionarioBanhoTosaScreen() {
               onPress={() => setAba(item)}
             >
               <Text style={[styles.tabText, aba === item && styles.tabTextActive]}>
-                {item === "agenda" ? `Agenda (${agenda.length})` : `Fila (${fila.length})`}
+                {item === "agenda" ? `Agenda (${agendaOperacional.length})` : `Fila (${fila.length})`}
               </Text>
             </TouchableOpacity>
           ))}
