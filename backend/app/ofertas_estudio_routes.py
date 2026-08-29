@@ -195,6 +195,7 @@ async def gerar_imagem(
     produto_id: int = Form(...),
     estilo: str = Form(default="profissional"),
     orientacao: str = Form(default="quadrada"),
+    prompt_usuario: str = Form(default="", max_length=800),
     file: UploadFile = File(...),
     db: Session = Depends(get_session),
     user_and_tenant=Depends(get_current_user_and_tenant),
@@ -213,7 +214,10 @@ async def gerar_imagem(
     if not api_key:
         raise HTTPException(
             status_code=400,
-            detail="Configure a chave da OpenAI em Configuracoes > Integracoes para usar este recurso.",
+            detail=(
+                "A conexao com a OpenAI ainda nao esta configurada. "
+                "Configure a integracao da empresa ou a chave do servidor."
+            ),
         )
     content = await _ler_imagem(file)
     url = await run_in_threadpool(
@@ -226,6 +230,7 @@ async def gerar_imagem(
         content_type=file.content_type or "image/png",
         estilo=estilo,
         orientacao=orientacao,
+        prompt_usuario=prompt_usuario,
     )
     return {"url": url, "estilo": estilo, "modelo": "gpt-image-2"}
 
@@ -268,6 +273,13 @@ async def publicar_oferta(
         dados.produtos,
         fim_em=dados.fim_em,
     )
+    if dados.tipo_arte in {"individual", "produto"} and any(
+        not str(item.get("imagem_url") or "").strip() for item in snapshots
+    ):
+        raise HTTPException(
+            status_code=400,
+            detail="Toda pagina individual precisa ter uma foto do produto.",
+        )
     paginas = []
     total_bytes = 0
     for file in files:

@@ -5,6 +5,13 @@ export const FORMATOS_OFERTA = {
   a4: { label: "A4 para impressão", ratio: "210 / 297", width: 1240, height: 1754 },
 };
 
+export const LAYOUTS_JORNAL = {
+  quadrado: { colunas: 2, linhas: 2, itens: 4 },
+  retrato: { colunas: 2, linhas: 3, itens: 6 },
+  story: { colunas: 2, linhas: 3, itens: 6 },
+  a4: { colunas: 2, linhas: 3, itens: 6 },
+};
+
 export const TIPOS_ARTE = {
   jornal: { label: "Jornal / panfleto", descricao: "Vários produtos por página" },
   individual: { label: "Um produto por página", descricao: "Card completo com oferta" },
@@ -51,6 +58,8 @@ export function criarPeriodo(periodicidade, base = new Date()) {
 
 export function criarItemSelecionado(produto, usarValidade = false) {
   const validadeAtiva = Boolean(usarValidade && produto.lote_validade);
+  const imagens = Array.isArray(produto.imagens) ? produto.imagens : [];
+  const imagemInicial = produto.imagem_url || imagens[0]?.url || null;
   return {
     ...produto,
     produto_id: produto.id,
@@ -60,9 +69,12 @@ export function criarItemSelecionado(produto, usarValidade = false) {
         : produto.preco_erp,
     mostrar_validade: validadeAtiva,
     lote_id: validadeAtiva ? produto.lote_validade.id : null,
-    imagem_original_url: produto.imagem_url || null,
+    imagens_disponiveis: imagens,
+    imagem_original_url: imagemInicial,
     imagem_gerada_url: null,
-    imagem_url_arte: produto.imagem_url || null,
+    imagem_gerada_salva: false,
+    imagem_url_arte: imagemInicial,
+    prompt_criacao: "",
   };
 }
 
@@ -82,9 +94,11 @@ export function calcularMargem(precoArte, precoCusto) {
 
 export function itensPorPagina(tipoArte, formato) {
   if (tipoArte !== "jornal") return 1;
-  if (formato === "quadrado") return 6;
-  if (formato === "story") return 5;
-  return 8;
+  return (LAYOUTS_JORNAL[formato] || LAYOUTS_JORNAL.quadrado).itens;
+}
+
+export function layoutJornal(formato) {
+  return LAYOUTS_JORNAL[formato] || LAYOUTS_JORNAL.quadrado;
 }
 
 export function agruparPaginas(itens, tipoArte, formato) {
@@ -106,6 +120,8 @@ export function montarPayloadPublicacao({
   expira,
   itens,
   tema,
+  exibirApp = false,
+  exibirEcommerce = false,
 }) {
   return {
     titulo: titulo.trim(),
@@ -122,6 +138,12 @@ export function montarPayloadPublicacao({
       mostrar_validade: Boolean(item.mostrar_validade),
       lote_id: item.mostrar_validade ? item.lote_id : null,
     })),
-    configuracao: { tema },
+    configuracao: {
+      tema,
+      canais: {
+        app: Boolean(exibirApp),
+        ecommerce: Boolean(exibirEcommerce),
+      },
+    },
   };
 }

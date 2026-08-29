@@ -35,9 +35,7 @@ def _naive(value: datetime | None) -> datetime | None:
     return value.replace(tzinfo=None) if value.tzinfo else value
 
 
-def _imagem_produto(produto: Produto) -> str | None:
-    if produto.imagem_principal:
-        return produto.imagem_principal
+def _imagens_produto(produto: Produto) -> list[dict]:
     imagens = sorted(
         produto.imagens or [],
         key=lambda imagem: (
@@ -46,7 +44,38 @@ def _imagem_produto(produto: Produto) -> str | None:
             int(imagem.id or 0),
         ),
     )
-    return imagens[0].url if imagens else None
+    resultado = []
+    urls_vistas = set()
+    principal = str(produto.imagem_principal or "").strip()
+    if principal:
+        resultado.append(
+            {
+                "id": None,
+                "url": principal,
+                "ordem": 0,
+                "e_principal": True,
+            }
+        )
+        urls_vistas.add(principal)
+    for imagem in imagens:
+        url = str(imagem.url or "").strip()
+        if not url or url in urls_vistas:
+            continue
+        resultado.append(
+            {
+                "id": int(imagem.id) if imagem.id is not None else None,
+                "url": url,
+                "ordem": int(imagem.ordem or 0),
+                "e_principal": bool(imagem.e_principal),
+            }
+        )
+        urls_vistas.add(url)
+    return resultado
+
+
+def _imagem_produto(produto: Produto) -> str | None:
+    imagens = _imagens_produto(produto)
+    return imagens[0]["url"] if imagens else None
 
 
 def _lotes_validos(
@@ -208,6 +237,7 @@ def serializar_produto_oferta(
         "codigo": produto.codigo,
         "nome": produto.nome,
         "imagem_url": _imagem_produto(produto),
+        "imagens": _imagens_produto(produto),
         "preco_erp": preco_erp,
         "preco_app": preco_app,
         "preco_ecommerce": preco_ecommerce,

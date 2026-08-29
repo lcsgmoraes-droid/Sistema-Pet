@@ -320,13 +320,21 @@ function StoreBanner({
             }}
           >
             {banner.type === "image" ? (
-              <div
+              <a
+                href={banner.href || undefined}
+                aria-label={
+                  banner.href ? `Abrir ${banner.title || `oferta ${index + 1}`}` : undefined
+                }
+                target={banner.href ? "_blank" : undefined}
+                rel={banner.href ? "noreferrer" : undefined}
                 style={{
+                  display: "block",
                   width: "100%",
                   height: "100%",
                   position: "relative",
                   overflow: "hidden",
                   background: "#17130f",
+                  cursor: banner.href ? "pointer" : "default",
                 }}
               >
                 {isMobile && (
@@ -362,13 +370,13 @@ function StoreBanner({
                     width: "100%",
                     height: "100%",
                     position: "relative",
-                    objectFit: isMobile ? "contain" : "cover",
+                    objectFit: banner.fit || (isMobile ? "contain" : "cover"),
                     objectPosition: "center",
                     display: "block",
                     filter: isMobile ? "drop-shadow(0 6px 14px rgba(0,0,0,0.24))" : "none",
                   }}
                 />
-              </div>
+              </a>
             ) : (
               <div
                 style={{

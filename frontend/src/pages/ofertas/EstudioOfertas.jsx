@@ -52,6 +52,8 @@ function criarConfigInicial() {
     tipoArte: "jornal",
     formato: "quadrado",
     tema: "premium",
+    exibirApp: true,
+    exibirEcommerce: true,
     ...periodo,
   };
 }
@@ -130,6 +132,7 @@ export default function EstudioOfertas() {
   const [publicando, setPublicando] = useState(false);
   const [gerandoImagemId, setGerandoImagemId] = useState(null);
   const [enviandoImagemId, setEnviandoImagemId] = useState(null);
+  const [salvandoImagemId, setSalvandoImagemId] = useState(null);
   const [desativandoId, setDesativandoId] = useState(null);
 
   const carregarProdutos = useCallback(async (termo = "") => {
@@ -248,6 +251,45 @@ export default function EstudioOfertas() {
     );
   }
 
+  function adicionarFotoAoProduto(produtoId, foto, usarNaArte = true) {
+    setProdutos((atuais) =>
+      atuais.map((produto) => {
+        if (produto.id !== produtoId) return produto;
+        const imagens = Array.isArray(produto.imagens) ? produto.imagens : [];
+        const novasImagens = imagens.some((item) => item.url === foto.url)
+          ? imagens
+          : [...imagens, foto];
+        return {
+          ...produto,
+          imagens: novasImagens,
+          imagem_url: produto.imagem_url || foto.url,
+        };
+      }),
+    );
+    setSelecionados((atuais) =>
+      atuais.map((item) => {
+        if (item.produto_id !== produtoId) return item;
+        const imagens = Array.isArray(item.imagens_disponiveis) ? item.imagens_disponiveis : [];
+        const novasImagens = imagens.some((imagem) => imagem.url === foto.url)
+          ? imagens
+          : [...imagens, foto];
+        return {
+          ...item,
+          imagens_disponiveis: novasImagens,
+          imagem_url: item.imagem_url || foto.url,
+          ...(usarNaArte
+            ? {
+                imagem_original_url: foto.url,
+                imagem_url_arte: foto.url,
+                imagem_gerada_url: null,
+                imagem_gerada_salva: false,
+              }
+            : {}),
+        };
+      }),
+    );
+  }
+
   async function enviarImagem(produto, file) {
     if (!file) return;
     setEnviandoImagemId(produto.produto_id || produto.id);
@@ -257,14 +299,7 @@ export default function EstudioOfertas() {
       const { data } = await uploadImagemProduto(produto.produto_id || produto.id, formData);
       const url = data?.url;
       if (!url) throw new Error("A imagem enviada não retornou endereço.");
-      setProdutos((atuais) =>
-        atuais.map((item) => (item.id === produto.id ? { ...item, imagem_url: url } : item)),
-      );
-      atualizarItem(produto.produto_id || produto.id, {
-        imagem_url: url,
-        imagem_original_url: url,
-        imagem_url_arte: url,
-      });
+      adicionarFotoAoProduto(produto.produto_id || produto.id, data);
       toast.success("Foto adicionada ao produto.");
     } catch (error) {
       toast.error(detalheErro(error, error.message || "Não foi possível enviar a foto."));
@@ -285,10 +320,14 @@ export default function EstudioOfertas() {
       formData.append("produto_id", String(item.produto_id));
       formData.append("estilo", config.tema === "natural" ? "natural" : "profissional");
       formData.append("orientacao", config.formato === "quadrado" ? "quadrada" : "vertical");
+      if (item.prompt_criacao?.trim()) {
+        formData.append("prompt_usuario", item.prompt_criacao.trim());
+      }
       formData.append("file", blob, "produto.png");
       const { data } = await gerarImagemOferta(formData);
       atualizarItem(item.produto_id, {
         imagem_gerada_url: data.url,
+        imagem_gerada_salva: false,
         imagem_url_arte: data.url,
       });
       toast.success("Versão profissional criada. Confira a embalagem antes de publicar.");
@@ -296,6 +335,32 @@ export default function EstudioOfertas() {
       toast.error(detalheErro(error, error.message || "Não foi possível gerar a imagem."));
     } finally {
       setGerandoImagemId(null);
+    }
+  }
+
+  async function salvarImagemGeradaNoProduto(item) {
+    if (!item.imagem_gerada_url) return;
+    setSalvandoImagemId(item.produto_id);
+    try {
+      const origem = resolveMediaUrl(item.imagem_gerada_url);
+      const imagemResponse = await fetch(origem, { credentials: "include" });
+      if (!imagemResponse.ok) throw new Error("Não foi possível ler a imagem gerada.");
+      const blob = await imagemResponse.blob();
+      const formData = new FormData();
+      formData.append("file", blob, `produto-${item.produto_id}-ia.png`);
+      const { data } = await uploadImagemProduto(item.produto_id, formData);
+      if (!data?.url) throw new Error("A imagem salva não retornou endereço.");
+      adicionarFotoAoProduto(item.produto_id, data, false);
+      atualizarItem(item.produto_id, {
+        imagem_gerada_url: data.url,
+        imagem_url_arte: data.url,
+        imagem_gerada_salva: true,
+      });
+      toast.success("Imagem gerada salva na galeria do produto.");
+    } catch (error) {
+      toast.error(detalheErro(error, error.message || "Não foi possível salvar a imagem."));
+    } finally {
+      setSalvandoImagemId(null);
     }
   }
 
@@ -497,14 +562,21 @@ export default function EstudioOfertas() {
             />
             <OfertaEditorItens
               itens={selecionados}
+              tipoArte={config.tipoArte}
               onUpdate={atualizarItem}
               onRemove={(produtoId) =>
                 setSelecionados((atuais) => atuais.filter((item) => item.produto_id !== produtoId))
               }
+              onRemoveMany={(produtoIds) => {
+                const ids = new Set(produtoIds);
+                setSelecionados((atuais) => atuais.filter((item) => !ids.has(item.produto_id)));
+              }}
               onUpload={enviarImagem}
               onGerarImagem={gerarImagemProfissional}
+              onSalvarImagemGerada={salvarImagemGeradaNoProduto}
               gerandoImagemId={gerandoImagemId}
               enviandoImagemId={enviandoImagemId}
+              salvandoImagemId={salvandoImagemId}
             />
             <OfertaPublicacoes
               publicacoes={publicacoes}

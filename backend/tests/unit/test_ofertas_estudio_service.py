@@ -1,3 +1,4 @@
+import base64
 from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 
@@ -6,8 +7,13 @@ from pydantic import ValidationError
 
 from app.ofertas_estudio_routes import _status_publicacao
 from app.ofertas_estudio_schemas import OfertaPublicacaoCreate
+from app.routes.ecommerce_public import _publicacao_habilitada_no_canal
+from app.services import ofertas_estudio_ai
 from app.services.ofertas_estudio_ai import (
+    _prompt,
     diretorio_storage_tenant,
+    gerar_imagem_profissional,
+    resolver_chave_openai_tenant,
     segmento_tenant_storage,
 )
 from app.services.ofertas_estudio_service import (
@@ -70,6 +76,102 @@ def test_produto_valido_prioriza_preco_erp_e_expoe_divergencias():
     assert item["preco_ecommerce"] == 26
     assert item["precos_divergentes"] is True
     assert item["lote_validade"]["id"] == 1
+
+
+def test_produto_expoe_galeria_ordenada_sem_duplicar_a_principal():
+    produto = _produto(
+        imagens=[
+            SimpleNamespace(
+                id=3,
+                url="/uploads/produtos/lateral.webp",
+                ordem=2,
+                e_principal=False,
+            ),
+            SimpleNamespace(
+                id=2,
+                url="/uploads/produtos/racao.webp",
+                ordem=1,
+                e_principal=True,
+            ),
+        ]
+    )
+
+    item = serializar_produto_oferta(produto)
+
+    assert [imagem["url"] for imagem in item["imagens"]] == [
+        "/uploads/produtos/racao.webp",
+        "/uploads/produtos/lateral.webp",
+    ]
+
+
+def test_prompt_usuario_preserva_identidade_real_do_produto():
+    prompt = _prompt(
+        "Racao Premium",
+        "profissional",
+        "quadrada",
+        "Colocar em uma bancada moderna com fundo verde",
+    )
+
+    assert "bancada moderna com fundo verde" in prompt
+    assert "nunca pode alterar" in prompt
+    assert "rotulo" in prompt
+
+
+def test_gpt_image_2_nao_recebe_parametros_incompativeis(monkeypatch, tmp_path):
+    chamadas = {}
+
+    class FakeImages:
+        def edit(self, **kwargs):
+            chamadas.update(kwargs)
+            return SimpleNamespace(
+                data=[SimpleNamespace(b64_json=base64.b64encode(b"png").decode())]
+            )
+
+    class FakeOpenAI:
+        def __init__(self, **kwargs):
+            chamadas["client"] = kwargs
+            self.images = FakeImages()
+
+    import openai
+
+    monkeypatch.setattr(openai, "OpenAI", FakeOpenAI)
+    monkeypatch.setattr(ofertas_estudio_ai, "UPLOAD_DIR", tmp_path)
+
+    url = gerar_imagem_profissional(
+        api_key="chave-teste",
+        tenant_id="12345678-1234-5678-1234-567812345678",
+        produto_id=10,
+        produto_nome="Racao Premium",
+        file_bytes=b"imagem",
+        content_type="image/png",
+        estilo="profissional",
+        orientacao="quadrada",
+        prompt_usuario="fundo verde",
+    )
+
+    assert chamadas["model"] == "gpt-image-2"
+    assert "input_fidelity" not in chamadas
+    assert "response_format" not in chamadas
+    assert chamadas["output_format"] == "png"
+    assert url.startswith("/uploads/ofertas/12345678123456781234567812345678/ia/")
+
+
+def test_chave_global_e_fallback_quando_empresa_nao_tem_chave(monkeypatch):
+    class FakeDb:
+        def query(self, _model):
+            raise RuntimeError("tabela indisponivel")
+
+    monkeypatch.setenv("OPENAI_API_KEY", "chave-global")
+
+    assert resolver_chave_openai_tenant(FakeDb(), "tenant") == "chave-global"
+
+
+def test_publicacao_so_aparece_nos_canais_marcados():
+    configuracao = {"canais": {"app": True, "ecommerce": False}}
+
+    assert _publicacao_habilitada_no_canal(configuracao, "app") is True
+    assert _publicacao_habilitada_no_canal(configuracao, "ecommerce") is False
+    assert _publicacao_habilitada_no_canal({}, "app") is False
 
 
 def test_contrato_exige_preco_positivo_e_ao_menos_um_produto():

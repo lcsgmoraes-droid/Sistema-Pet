@@ -3,6 +3,7 @@ import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   Image,
+  Linking,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -18,7 +19,7 @@ import {
   contarNovidadesAppNaoVistas,
   listarEvolucaoCorePetApp,
 } from '../services/evolucaoCorePet.service';
-import { listarProdutos } from '../services/shop.service';
+import { listarOfertasAtivas, listarProdutos, OfertaAtiva } from '../services/shop.service';
 import { useAuthStore } from '../store/auth.store';
 import { CORES, ESPACO, FONTE, RAIO, SOMBRA } from '../theme';
 import { Produto } from '../types';
@@ -36,16 +37,21 @@ export default function HomeScreen() {
   const navigation = useNavigation<any>();
   const requireAuth = useRequireAuth(navigation);
   const [produtos, setProdutos] = useState<Produto[]>([]);
+  const [ofertas, setOfertas] = useState<OfertaAtiva[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [unreadNotifications, setUnreadNotifications] = useState(0);
 
   async function carregar() {
-    try {
-      const { produtos: prods } = await listarProdutos({ pagina: 1 });
-      setProdutos((prods ?? []).slice(0, 6));
-    } catch {
-      setProdutos([]);
-    }
+    const [resultadoProdutos, resultadoOfertas] = await Promise.allSettled([
+      listarProdutos({ pagina: 1 }),
+      listarOfertasAtivas(),
+    ]);
+    setProdutos(
+      resultadoProdutos.status === 'fulfilled'
+        ? (resultadoProdutos.value.produtos ?? []).slice(0, 6)
+        : [],
+    );
+    setOfertas(resultadoOfertas.status === 'fulfilled' ? resultadoOfertas.value : []);
   }
 
   useEffect(() => {
@@ -164,6 +170,39 @@ export default function HomeScreen() {
       <View style={styles.storeContext}>
         <StoreContextBadge />
       </View>
+
+      {ofertas.length > 0 ? (
+        <View style={styles.ofertasSection}>
+          <Text style={styles.sectionTitulo}>Ofertas da loja</Text>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.ofertasLista}
+          >
+            {ofertas.map((oferta) => {
+              const vertical = oferta.formato !== 'quadrado';
+              return (
+                <TouchableOpacity
+                  key={oferta.id}
+                  style={[styles.ofertaCard, vertical && styles.ofertaCardVertical]}
+                  activeOpacity={0.88}
+                  onPress={() => void Linking.openURL(oferta.link_path)}
+                >
+                  <Image
+                    source={{ uri: oferta.imagem_url }}
+                    style={styles.ofertaImagem}
+                    resizeMode="contain"
+                  />
+                  <Text style={styles.ofertaTitulo} numberOfLines={2}>
+                    {oferta.titulo}
+                  </Text>
+                  <Text style={styles.ofertaAcao}>Ver oferta completa</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+        </View>
+      ) : null}
 
       <TouchableOpacity
         style={styles.scannerCardCompacto}
@@ -573,6 +612,47 @@ const styles = StyleSheet.create({
   storeContext: {
     marginHorizontal: ESPACO.lg,
     marginTop: ESPACO.md,
+  },
+  ofertasSection: {
+    marginTop: ESPACO.lg,
+    marginBottom: ESPACO.md,
+  },
+  ofertasLista: {
+    paddingHorizontal: ESPACO.lg,
+    gap: ESPACO.md,
+  },
+  ofertaCard: {
+    width: 286,
+    height: 350,
+    borderRadius: RAIO.md,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: CORES.borda,
+    backgroundColor: CORES.superficie,
+    ...SOMBRA,
+  },
+  ofertaCardVertical: {
+    width: 238,
+  },
+  ofertaImagem: {
+    width: '100%',
+    flex: 1,
+    backgroundColor: '#17130F',
+  },
+  ofertaTitulo: {
+    paddingHorizontal: ESPACO.md,
+    paddingTop: ESPACO.sm,
+    color: CORES.texto,
+    fontSize: FONTE.normal,
+    fontWeight: '800',
+  },
+  ofertaAcao: {
+    paddingHorizontal: ESPACO.md,
+    paddingTop: 2,
+    paddingBottom: ESPACO.md,
+    color: CORES.primario,
+    fontSize: FONTE.pequena,
+    fontWeight: '800',
   },
   scannerCardCompacto: {
     marginHorizontal: ESPACO.lg,

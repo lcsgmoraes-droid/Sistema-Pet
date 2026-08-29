@@ -31,6 +31,31 @@ function resolveMediaUrl(url: string | null | undefined): string | null {
   return `${base}${url.startsWith("/") ? url : "/" + url}`;
 }
 
+export interface OfertaAtiva {
+  id: number;
+  titulo: string;
+  tipo_arte: string;
+  formato: string;
+  fim_em: string;
+  imagem_url: string;
+  imagens_urls: string[];
+  link_path: string;
+}
+
+export async function listarOfertasAtivas(): Promise<OfertaAtiva[]> {
+  const { data } = await api.get("/ecommerce/ofertas-ativas", {
+    params: { canal: "app" },
+  });
+  return (data?.items ?? []).map((item: OfertaAtiva) => ({
+    ...item,
+    imagem_url: resolveMediaUrl(item.imagem_url) || "",
+    imagens_urls: (item.imagens_urls ?? [])
+      .map((url) => resolveMediaUrl(url))
+      .filter((url): url is string => Boolean(url)),
+    link_path: resolveMediaUrl(item.link_path) || item.link_path,
+  }));
+}
+
 // ─────────────────────────────────────────────────────────────
 // AVISE-ME — notificação de estoque
 // ─────────────────────────────────────────────────────────────
