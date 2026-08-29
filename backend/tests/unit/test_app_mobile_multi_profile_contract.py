@@ -14,6 +14,7 @@ def test_mobile_types_include_available_profiles():
     assert "AppAccessProfile" in source
     assert "available_profiles" in source
     assert "selected_profile" in source
+    assert '"gestor"' in source
 
 
 def test_mobile_auth_service_and_store_can_select_profile():
@@ -48,6 +49,7 @@ def test_operational_mobile_navigators_expose_profile_switch_in_header():
     funcionario = read_repo("app-mobile/src/navigation/FuncionarioNavigator.tsx")
     entregador = read_repo("app-mobile/src/navigation/EntregadorNavigator.tsx")
     veterinario = read_repo("app-mobile/src/navigation/VeterinarioNavigator.tsx")
+    gestor = read_repo("app-mobile/src/navigation/GestorNavigator.tsx")
 
     assert "available_profiles" in actions
     assert "selectProfile" in actions
@@ -55,6 +57,7 @@ def test_operational_mobile_navigators_expose_profile_switch_in_header():
     assert "HeaderProfileActions" in funcionario
     assert "HeaderProfileActions" in entregador
     assert "HeaderProfileActions" in veterinario
+    assert "HeaderProfileActions" in gestor
 
 
 def test_mobile_profile_switch_only_appears_for_multiple_profiles():
@@ -93,7 +96,10 @@ def test_mobile_logout_asks_explicit_push_consent():
     profile = read_repo("app-mobile/src/screens/profile/ProfileScreen.tsx")
 
     assert "unregisterPushToken" in service
-    assert "api.delete('/app/push-token'" in service
+    assert (
+        'api.delete("/app/push-token"' in service
+        or "api.delete('/app/push-token'" in service
+    )
     assert "confirmLogoutWithNotificationChoice" in helper
     assert "continuar recebendo notificacoes" in helper.lower()
     assert "outras pessoas" in helper.lower()

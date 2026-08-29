@@ -10,6 +10,7 @@ from app.auth.dependencies import get_current_user_and_tenant
 from app.cargo_models import Cargo
 from app.db import get_session
 from app.models import Cliente
+from app.security.permissions_service import check_permission
 from app.services.remuneracao_service import calcular_composicao_remuneracao
 
 from .helpers import (
@@ -163,6 +164,15 @@ async def criar_funcionario(
     """
     user, tenant_id = current_user_and_tenant
 
+    if "app_access_profiles" in funcionario_data.model_fields_set:
+        check_permission(
+            db,
+            user.id,
+            "usuarios.manage",
+            tenant_id,
+            current_user=user,
+        )
+
     cargo = (
         db.query(Cargo)
         .filter(Cargo.id == funcionario_data.cargo_id, Cargo.tenant_id == tenant_id)
@@ -244,6 +254,15 @@ async def atualizar_funcionario(
     Atualiza um funcionário existente.
     """
     user, tenant_id = current_user_and_tenant
+
+    if "app_access_profiles" in funcionario_data.model_fields_set:
+        check_permission(
+            db,
+            user.id,
+            "usuarios.manage",
+            tenant_id,
+            current_user=user,
+        )
 
     funcionario = (
         db.query(Cliente)

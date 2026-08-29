@@ -46,3 +46,5 @@ def test_funcionarios_rh_exposes_app_access_controls():
     assert "Funcionario" in page_source
     assert "Entregador" in page_source
     assert "Veterinario" in page_source
+    assert "Gestor" in page_source
+    assert "canManageAppAccess" in page_source

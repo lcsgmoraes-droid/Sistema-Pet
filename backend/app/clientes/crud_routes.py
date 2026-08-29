@@ -64,6 +64,15 @@ def create_cliente(
 ):
     """Criar novo cliente/fornecedor."""
     current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
+    access_fields = {"auth_user_id", "app_login", "app_access_profiles"}
+    if access_fields.intersection(cliente_data.model_fields_set):
+        check_permission(
+            db,
+            current_user.id,
+            "usuarios.manage",
+            tenant_id,
+            current_user=current_user,
+        )
     _validar_telefone_cliente_obrigatorio(cliente_data)
     _validar_documentos_unicos_criacao(db, cliente_data, tenant_id)
 
@@ -80,13 +89,6 @@ def create_cliente(
             detail="Escolha uma conta existente ou crie uma nova, nao as duas opcoes.",
         )
     if app_login is not None:
-        check_permission(
-            db,
-            current_user.id,
-            "usuarios.manage",
-            tenant_id,
-            current_user=current_user,
-        )
         try:
             login_user, login_role = create_tenant_user_account(
                 db,
@@ -178,7 +180,7 @@ def create_cliente(
 
 
 @base_router.get("/acessos-app/usuarios")
-@require_permission("clientes.editar")
+@require_permission("usuarios.manage")
 def listar_usuarios_para_acesso_app(
     cliente_id: Optional[int] = None,
     db: Session = Depends(get_session),
@@ -317,6 +319,14 @@ def update_cliente(
     dados_payload = cliente_data.model_dump(exclude_unset=True)
     auth_user_informado = "auth_user_id" in dados_payload
     perfis_informados = "app_access_profiles" in dados_payload
+    if {"auth_user_id", "app_login", "app_access_profiles"}.intersection(dados_payload):
+        check_permission(
+            db,
+            current_user.id,
+            "usuarios.manage",
+            tenant_id,
+            current_user=current_user,
+        )
     auth_user_id = dados_payload.pop("auth_user_id", None)
     app_login = dados_payload.pop("app_login", None)
     app_access_profiles = dados_payload.pop("app_access_profiles", None)
@@ -326,13 +336,6 @@ def update_cliente(
             detail="Escolha uma conta existente ou crie uma nova, nao as duas opcoes.",
         )
     if app_login is not None:
-        check_permission(
-            db,
-            current_user.id,
-            "usuarios.manage",
-            tenant_id,
-            current_user=current_user,
-        )
         if cliente.auth_user_id is not None:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
