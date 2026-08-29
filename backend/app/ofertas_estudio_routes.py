@@ -7,7 +7,6 @@ import secrets
 import shutil
 from datetime import datetime, timezone
 from io import BytesIO
-from pathlib import Path
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
@@ -25,8 +24,10 @@ from app.produtos_models import Produto
 from app.security.permissions_decorator import require_permission
 from app.services.ofertas_estudio_ai import (
     ESTILOS,
+    diretorio_storage_tenant,
     gerar_imagem_profissional,
     resolver_chave_openai_tenant,
+    segmento_tenant_storage,
 )
 from app.services.ofertas_estudio_service import (
     buscar_produtos_publicaveis,
@@ -40,7 +41,6 @@ from app.tenancy.context import tenant_context
 
 router = APIRouter(prefix="/ofertas", tags=["Estudio de Ofertas"])
 public_router = APIRouter(prefix="/ofertas", tags=["Ofertas Publicas"])
-UPLOAD_DIR = Path("uploads/ofertas")
 ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/webp"}
 MAX_IMAGE_BYTES = 15 * 1024 * 1024
 MAX_PUBLICATION_BYTES = 60 * 1024 * 1024
@@ -297,7 +297,8 @@ async def publicar_oferta(
     db.add(publicacao)
     db.flush()
 
-    destino = UPLOAD_DIR / str(tenant_id) / str(publicacao.id)
+    tenant_segmento = segmento_tenant_storage(tenant_id)
+    destino = diretorio_storage_tenant(tenant_id, int(publicacao.id))
     try:
         destino.mkdir(parents=True, exist_ok=True)
         urls = []
@@ -307,7 +308,7 @@ async def publicar_oferta(
             )
             nome = f"pagina-{indice:02d}-{uuid4().hex}.{extensao}"
             (destino / nome).write_bytes(content)
-            urls.append(f"/uploads/ofertas/{tenant_id}/{publicacao.id}/{nome}")
+            urls.append(f"/uploads/ofertas/{tenant_segmento}/{publicacao.id}/{nome}")
         publicacao.imagens_urls = urls
         token = secrets.token_urlsafe(32)
         publicacao.indice_publico = OfertaPublicacaoToken(

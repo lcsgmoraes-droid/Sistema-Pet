@@ -3,15 +3,39 @@
 from __future__ import annotations
 
 import base64
+import os
 from datetime import datetime
 from pathlib import Path
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 from fastapi import HTTPException
 
 
 UPLOAD_DIR = Path("uploads/ofertas")
 ESTILOS = {"profissional", "natural", "fundo_limpo"}
+
+
+def segmento_tenant_storage(tenant_id) -> str:
+    """Converte o tenant em um nome sem separadores de caminho."""
+
+    normalizado = UUID(str(tenant_id)).hex
+    return os.path.basename(normalizado)
+
+
+def diretorio_storage_tenant(tenant_id, *subdiretorios) -> Path:
+    """Monta um destino e garante que ele permanece sob uploads/ofertas."""
+
+    raiz = UPLOAD_DIR.resolve()
+    segmentos = [segmento_tenant_storage(tenant_id)]
+    for valor in subdiretorios:
+        original = str(valor)
+        seguro = os.path.basename(original)
+        if seguro != original or seguro in {"", ".", ".."}:
+            raise ValueError("Segmento de storage invalido.")
+        segmentos.append(seguro)
+    destino = raiz.joinpath(*segmentos).resolve()
+    destino.relative_to(raiz)
+    return destino
 
 
 def resolver_chave_openai_tenant(db, tenant_id) -> str:
@@ -110,8 +134,9 @@ def gerar_imagem_profissional(
             status_code=502, detail="A IA retornou um erro ao gerar a foto."
         ) from exc
 
-    destino = UPLOAD_DIR / str(tenant_id) / "ia"
+    tenant_segmento = segmento_tenant_storage(tenant_id)
+    destino = diretorio_storage_tenant(tenant_id, "ia")
     destino.mkdir(parents=True, exist_ok=True)
     nome = f"produto-{produto_id}-{datetime.utcnow():%Y%m%d}-{uuid4().hex}.png"
     (destino / nome).write_bytes(imagem)
-    return f"/uploads/ofertas/{tenant_id}/ia/{nome}"
+    return f"/uploads/ofertas/{tenant_segmento}/ia/{nome}"

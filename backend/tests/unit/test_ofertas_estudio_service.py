@@ -6,6 +6,10 @@ from pydantic import ValidationError
 
 from app.ofertas_estudio_routes import _status_publicacao
 from app.ofertas_estudio_schemas import OfertaPublicacaoCreate
+from app.services.ofertas_estudio_ai import (
+    diretorio_storage_tenant,
+    segmento_tenant_storage,
+)
 from app.services.ofertas_estudio_service import (
     produto_publicavel,
     serializar_produto_oferta,
@@ -109,3 +113,11 @@ def test_status_da_publicacao_respeita_agendamento_expiracao_e_desativacao():
     publicacao.desativada_em = None
     publicacao.fim_em = agora - timedelta(seconds=1)
     assert _status_publicacao(publicacao) == "expirada"
+
+
+def test_storage_normaliza_tenant_e_recusa_segmento_de_caminho():
+    tenant = "12345678-1234-5678-1234-567812345678"
+
+    assert segmento_tenant_storage(tenant) == "12345678123456781234567812345678"
+    with pytest.raises(ValueError):
+        diretorio_storage_tenant(tenant, "../fora")
