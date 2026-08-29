@@ -82,9 +82,10 @@ class KitCustoService:
         custos: dict[int, Decimal] = {}
         for kit_id, kit in kits.items():
             componentes = componentes_por_kit.get(kit_id, [])
-            kit_e_granel = bool(getattr(kit, "e_granel", False)) or "granel" in str(
-                kit.nome or ""
-            ).lower()
+            kit_e_granel = (
+                bool(getattr(kit, "e_granel", False))
+                or "granel" in str(kit.nome or "").lower()
+            )
 
             if kit_e_granel:
                 if not componentes:
@@ -320,11 +321,7 @@ class KitCustoService:
         if not kit_ids:
             return {}
 
-        kits = (
-            db.query(Produto)
-            .filter(Produto.id.in_(kit_ids))
-            .all()
-        )
+        kits = db.query(Produto).filter(Produto.id.in_(kit_ids)).all()
         kits = [
             kit
             for kit in kits
