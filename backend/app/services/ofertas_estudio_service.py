@@ -29,15 +29,43 @@ ESTRATEGIAS = {
 STATUS_LOTE_BLOQUEADOS = {"vencido", "bloqueado", "esgotado", "excluido"}
 
 
+def resumir_navegacao_publicacao(
+    tipo_arte: str,
+    imagens_urls: Iterable[str] | None,
+    produtos_snapshot: Iterable[dict] | None,
+) -> dict:
+    """Monta o contrato comum usado nas chamadas do app e do e-commerce."""
+
+    total_paginas = len([url for url in (imagens_urls or []) if str(url).strip()])
+    total_produtos = len(list(produtos_snapshot or []))
+    paginas_individuais = tipo_arte in {"individual", "produto"}
+
+    if total_paginas <= 1:
+        cta_label = "Ver oferta"
+    elif tipo_arte == "individual":
+        quantidade = total_produtos or total_paginas
+        cta_label = f"Ver jornal — {quantidade} ofertas"
+    elif tipo_arte == "produto":
+        quantidade = total_produtos or total_paginas
+        cta_label = f"Ver catálogo — {quantidade} produtos"
+    else:
+        cta_label = f"Ver jornal — {total_paginas} páginas"
+
+    return {
+        "total_paginas": total_paginas,
+        "total_produtos": total_produtos,
+        "modo_paginacao": ("produto_por_pagina" if paginas_individuais else "catalogo"),
+        "cta_label": cta_label,
+    }
+
+
 def _naive(value: datetime | None) -> datetime | None:
     if value is None:
         return None
     return value.replace(tzinfo=None) if value.tzinfo else value
 
 
-def _imagem_produto(produto: Produto) -> str | None:
-    if produto.imagem_principal:
-        return produto.imagem_principal
+def _imagens_produto(produto: Produto) -> list[dict]:
     imagens = sorted(
         produto.imagens or [],
         key=lambda imagem: (
@@ -46,7 +74,38 @@ def _imagem_produto(produto: Produto) -> str | None:
             int(imagem.id or 0),
         ),
     )
-    return imagens[0].url if imagens else None
+    resultado = []
+    urls_vistas = set()
+    principal = str(produto.imagem_principal or "").strip()
+    if principal:
+        resultado.append(
+            {
+                "id": None,
+                "url": principal,
+                "ordem": 0,
+                "e_principal": True,
+            }
+        )
+        urls_vistas.add(principal)
+    for imagem in imagens:
+        url = str(imagem.url or "").strip()
+        if not url or url in urls_vistas:
+            continue
+        resultado.append(
+            {
+                "id": int(imagem.id) if imagem.id is not None else None,
+                "url": url,
+                "ordem": int(imagem.ordem or 0),
+                "e_principal": bool(imagem.e_principal),
+            }
+        )
+        urls_vistas.add(url)
+    return resultado
+
+
+def _imagem_produto(produto: Produto) -> str | None:
+    imagens = _imagens_produto(produto)
+    return imagens[0]["url"] if imagens else None
 
 
 def _lotes_validos(
@@ -208,6 +267,7 @@ def serializar_produto_oferta(
         "codigo": produto.codigo,
         "nome": produto.nome,
         "imagem_url": _imagem_produto(produto),
+        "imagens": _imagens_produto(produto),
         "preco_erp": preco_erp,
         "preco_app": preco_app,
         "preco_ecommerce": preco_ecommerce,

@@ -2,7 +2,7 @@ import { ImageOff, PackageCheck } from "lucide-react";
 
 import { formatMoneyBRL } from "../../utils/formatters";
 import { resolveMediaUrl } from "../../utils/mediaUrl";
-import { agruparPaginas, FORMATOS_OFERTA } from "./ofertasEstudioUtils";
+import { agruparPaginas, FORMATOS_OFERTA, layoutJornal } from "./ofertasEstudioUtils";
 
 const TEMAS = {
   premium: { acento: "#f59e0b", fundo: "#052e2b", fundo2: "#0f766e", texto: "#ffffff" },
@@ -24,7 +24,14 @@ function ImagemProduto({ item, className = "" }) {
       </div>
     );
   }
-  return <img src={url} alt="" crossOrigin="anonymous" className={`object-contain ${className}`} />;
+  return (
+    <img
+      src={url}
+      alt=""
+      crossOrigin="anonymous"
+      className={`block max-h-full max-w-full object-contain ${className}`}
+    />
+  );
 }
 
 function Validade({ item, compacto = false }) {
@@ -41,7 +48,10 @@ function Validade({ item, compacto = false }) {
 
 function JornalCard({ item, tema }) {
   return (
-    <article className="relative flex min-h-0 flex-col overflow-hidden rounded-[1.1rem] bg-white p-[5%] text-slate-900 shadow-xl">
+    <article
+      style={{ containerType: "size" }}
+      className="relative flex min-h-0 min-w-0 flex-col overflow-hidden rounded-[1.1rem] bg-white p-[5%] text-slate-900 shadow-xl"
+    >
       {item.motivo_sugestao ? (
         <span
           className="absolute left-2 top-2 z-10 max-w-[80%] truncate rounded-full px-2 py-1 text-[8px] font-black uppercase tracking-wide text-slate-950"
@@ -50,24 +60,32 @@ function JornalCard({ item, tema }) {
           {item.motivo_sugestao}
         </span>
       ) : null}
-      <ImagemProduto item={item} className="min-h-0 w-full flex-1" />
-      <h3 className="mt-2 line-clamp-2 text-[clamp(.68rem,1.7vw,1.05rem)] font-black leading-tight">
+      <div className="flex min-h-0 flex-1 items-center justify-center overflow-hidden">
+        <ImagemProduto item={item} className="h-full w-full" />
+      </div>
+      <h3
+        style={{ fontSize: "clamp(10px, 7cqw, 18px)", overflowWrap: "break-word" }}
+        className="mt-[3cqh] line-clamp-2 min-h-[2.2em] shrink-0 overflow-hidden font-black leading-[1.08]"
+      >
         {item.nome}
       </h3>
-      <div className="mt-1 flex items-end justify-between gap-2">
+      <div className="mt-[2cqh] flex shrink-0 items-end justify-between gap-2 overflow-hidden">
         <div>
           {Number(item.preco_arte) < Number(item.preco_erp) ? (
             <p className="text-[9px] font-semibold text-slate-400 line-through">
               {formatMoneyBRL(item.preco_erp)}
             </p>
           ) : null}
-          <p className="text-[clamp(1.05rem,3vw,1.8rem)] font-black leading-none text-red-600">
+          <p
+            style={{ fontSize: "clamp(15px, 12cqw, 30px)" }}
+            className="whitespace-nowrap font-black leading-none text-red-600"
+          >
             {formatMoneyBRL(item.preco_arte)}
           </p>
         </div>
         <PackageCheck className="h-5 w-5 shrink-0" style={{ color: tema.fundo2 }} />
       </div>
-      <div className="mt-2">
+      <div className="mt-[2cqh] shrink-0 overflow-hidden">
         <Validade item={item} compacto />
       </div>
     </article>
@@ -93,7 +111,10 @@ function Cabecalho({ contexto, titulo, periodoLabel, tema }) {
           <p className="truncate text-[10px] font-black uppercase tracking-[0.18em] text-white/75">
             {contexto?.nome || "Sua loja"}
           </p>
-          <h2 className="line-clamp-2 text-[clamp(1.35rem,4vw,2.7rem)] font-black leading-[.95]">
+          <h2
+            style={{ fontSize: "clamp(20px, 5cqw, 42px)", overflowWrap: "break-word" }}
+            className="line-clamp-2 overflow-hidden font-black leading-[.95]"
+          >
             {titulo || "Ofertas especiais"}
           </h2>
         </div>
@@ -108,13 +129,18 @@ function Cabecalho({ contexto, titulo, periodoLabel, tema }) {
   );
 }
 
-function PaginaJornal({ itens, contexto, titulo, periodoLabel, tema, pagina, total }) {
-  const poucasOfertas = itens.length <= 4;
+function PaginaJornal({ itens, contexto, titulo, periodoLabel, tema, pagina, total, formato }) {
+  const layout = layoutJornal(formato);
+  const linhasUsadas = Math.max(1, Math.ceil(itens.length / layout.colunas));
   return (
     <>
       <Cabecalho contexto={contexto} titulo={titulo} periodoLabel={periodoLabel} tema={tema} />
       <div
-        className={`relative z-10 my-[5%] grid min-h-0 flex-1 gap-[2.6%] ${poucasOfertas ? "grid-cols-2" : "grid-cols-2 md:grid-cols-3"}`}
+        style={{
+          gridTemplateColumns: `repeat(${layout.colunas}, minmax(0, 1fr))`,
+          gridTemplateRows: `repeat(${Math.min(layout.linhas, linhasUsadas)}, minmax(0, 1fr))`,
+        }}
+        className="relative z-10 my-[4%] grid min-h-0 flex-1 gap-[2.6%] overflow-hidden"
       >
         {itens.map((item) => (
           <JornalCard key={item.produto_id} item={item} tema={tema} />
@@ -136,9 +162,14 @@ function PaginaIndividual({ item, contexto, titulo, periodoLabel, tema }) {
   return (
     <>
       <Cabecalho contexto={contexto} titulo={titulo} periodoLabel={periodoLabel} tema={tema} />
-      <div className="relative z-10 my-[4%] flex min-h-0 flex-1 flex-col items-center justify-center rounded-[2rem] bg-white/95 p-[7%] text-center text-slate-900 shadow-2xl">
-        <ImagemProduto item={item} className="min-h-0 w-full flex-1" />
-        <p className="mt-3 max-w-[92%] text-[clamp(1.2rem,4vw,2.8rem)] font-black leading-tight">
+      <div className="relative z-10 my-[4%] flex min-h-0 flex-1 flex-col items-center justify-center overflow-hidden rounded-[2rem] bg-white/95 p-[7%] text-center text-slate-900 shadow-2xl">
+        <div className="flex min-h-0 w-full flex-1 items-center justify-center overflow-hidden">
+          <ImagemProduto item={item} className="h-full w-full" />
+        </div>
+        <p
+          style={{ fontSize: "clamp(18px, 5cqw, 40px)", overflowWrap: "break-word" }}
+          className="mt-[2.5cqw] line-clamp-3 max-w-[92%] shrink-0 overflow-hidden font-black leading-[1.08]"
+        >
           {item.nome}
         </p>
         {Number(item.preco_arte) < Number(item.preco_erp) ? (
@@ -146,7 +177,10 @@ function PaginaIndividual({ item, contexto, titulo, periodoLabel, tema }) {
             De {formatMoneyBRL(item.preco_erp)}
           </p>
         ) : null}
-        <p className="mt-1 text-[clamp(2.3rem,8vw,5.5rem)] font-black leading-none text-red-600">
+        <p
+          style={{ fontSize: "clamp(34px, 10cqw, 76px)" }}
+          className="mt-1 shrink-0 whitespace-nowrap font-black leading-none text-red-600"
+        >
           {formatMoneyBRL(item.preco_arte)}
         </p>
         <div className="mt-4">
@@ -159,7 +193,7 @@ function PaginaIndividual({ item, contexto, titulo, periodoLabel, tema }) {
 
 function PaginaProduto({ item }) {
   return (
-    <div className="relative z-10 flex h-full w-full items-center justify-center rounded-[2rem] bg-white p-[8%] shadow-2xl">
+    <div className="relative z-10 flex h-full w-full items-center justify-center bg-white">
       <ImagemProduto item={item} className="h-full w-full" />
     </div>
   );
@@ -198,13 +232,21 @@ export default function OfertaCanvas({
             data-oferta-page
             style={{
               aspectRatio: formatoConfig.ratio,
+              containerType: "inline-size",
               color: tema.texto,
-              background: `linear-gradient(145deg, ${tema.fundo} 0%, ${tema.fundo2} 72%, ${tema.acento} 165%)`,
+              background:
+                tipoArte === "produto"
+                  ? "#ffffff"
+                  : `linear-gradient(145deg, ${tema.fundo} 0%, ${tema.fundo2} 72%, ${tema.acento} 165%)`,
             }}
-            className="relative flex w-full flex-col overflow-hidden rounded-2xl p-[5%] shadow-2xl"
+            className={`relative flex w-full flex-col overflow-hidden rounded-2xl shadow-2xl ${tipoArte === "produto" ? "p-0" : "p-[5%]"}`}
           >
-            <div className="absolute -right-[12%] -top-[8%] h-[35%] w-[48%] rounded-full bg-white/10" />
-            <div className="absolute -bottom-[15%] -left-[8%] h-[36%] w-[45%] rounded-full bg-black/10" />
+            {tipoArte !== "produto" ? (
+              <>
+                <div className="absolute -right-[12%] -top-[8%] h-[35%] w-[48%] rounded-full bg-white/10" />
+                <div className="absolute -bottom-[15%] -left-[8%] h-[36%] w-[45%] rounded-full bg-black/10" />
+              </>
+            ) : null}
             {tipoArte === "jornal" ? (
               <PaginaJornal
                 itens={paginaItens}
@@ -214,6 +256,7 @@ export default function OfertaCanvas({
                 tema={tema}
                 pagina={index + 1}
                 total={paginas.length}
+                formato={formato}
               />
             ) : tipoArte === "individual" ? (
               <PaginaIndividual

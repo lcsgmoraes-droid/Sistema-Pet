@@ -6,13 +6,18 @@ import {
   calcularMargem,
   criarItemSelecionado,
   criarPeriodo,
+  itensPorPagina,
+  layoutJornal,
   montarPayloadPublicacao,
 } from "./ofertasEstudioUtils.js";
 
 assert.equal(calcularDesconto(100, 75), 25);
 assert.equal(calcularDesconto(100, 120), 0);
 assert.equal(calcularMargem(50, 30), 40);
-assert.equal(agruparPaginas(Array.from({ length: 13 }), "jornal", "quadrado").length, 3);
+assert.equal(itensPorPagina("jornal", "quadrado"), 4);
+assert.equal(itensPorPagina("jornal", "retrato"), 6);
+assert.deepEqual(layoutJornal("story"), { colunas: 2, linhas: 3, itens: 6 });
+assert.equal(agruparPaginas(Array.from({ length: 13 }), "jornal", "quadrado").length, 4);
 assert.equal(agruparPaginas(Array.from({ length: 3 }), "individual", "story").length, 3);
 
 const selecionado = criarItemSelecionado(
@@ -22,12 +27,17 @@ const selecionado = criarItemSelecionado(
     preco_sugerido_validade: 30,
     lote_validade: { id: 9 },
     imagem_url: "/produto.webp",
+    imagens: [
+      { id: 1, url: "/produto.webp" },
+      { id: 2, url: "/produto-verso.webp" },
+    ],
   },
   true,
 );
 assert.equal(selecionado.preco_arte, 30);
 assert.equal(selecionado.lote_id, 9);
 assert.equal(selecionado.mostrar_validade, true);
+assert.equal(selecionado.imagens_disponiveis.length, 2);
 
 const periodo = criarPeriodo("semanal", new Date("2026-08-29T12:00:00-03:00"));
 assert.ok(periodo.inicio);
@@ -45,9 +55,12 @@ const payload = montarPayloadPublicacao({
   expira: "2026-09-05T12:00",
   itens: [selecionado],
   tema: "premium",
+  exibirApp: true,
+  exibirEcommerce: false,
 });
 assert.equal(payload.titulo, "Jornal da semana");
 assert.equal(payload.produtos[0].imagem_url, "/produto.webp");
 assert.equal(payload.produtos[0].lote_id, 9);
+assert.deepEqual(payload.configuracao.canais, { app: true, ecommerce: false });
 
 console.log("ofertasEstudioUtils: ok");

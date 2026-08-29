@@ -3,6 +3,7 @@ import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   Image,
+  Linking,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -18,7 +19,7 @@ import {
   contarNovidadesAppNaoVistas,
   listarEvolucaoCorePetApp,
 } from '../services/evolucaoCorePet.service';
-import { listarProdutos } from '../services/shop.service';
+import { listarOfertasAtivas, listarProdutos, OfertaAtiva } from '../services/shop.service';
 import { useAuthStore } from '../store/auth.store';
 import { CORES, ESPACO, FONTE, RAIO, SOMBRA } from '../theme';
 import { Produto } from '../types';
@@ -36,16 +37,21 @@ export default function HomeScreen() {
   const navigation = useNavigation<any>();
   const requireAuth = useRequireAuth(navigation);
   const [produtos, setProdutos] = useState<Produto[]>([]);
+  const [ofertas, setOfertas] = useState<OfertaAtiva[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [unreadNotifications, setUnreadNotifications] = useState(0);
 
   async function carregar() {
-    try {
-      const { produtos: prods } = await listarProdutos({ pagina: 1 });
-      setProdutos((prods ?? []).slice(0, 6));
-    } catch {
-      setProdutos([]);
-    }
+    const [resultadoProdutos, resultadoOfertas] = await Promise.allSettled([
+      listarProdutos({ pagina: 1 }),
+      listarOfertasAtivas(),
+    ]);
+    setProdutos(
+      resultadoProdutos.status === 'fulfilled'
+        ? (resultadoProdutos.value.produtos ?? []).slice(0, 6)
+        : [],
+    );
+    setOfertas(resultadoOfertas.status === 'fulfilled' ? resultadoOfertas.value : []);
   }
 
   useEffect(() => {
@@ -164,6 +170,70 @@ export default function HomeScreen() {
       <View style={styles.storeContext}>
         <StoreContextBadge />
       </View>
+
+      {ofertas.length > 0 ? (
+        <View style={styles.ofertasSection}>
+          <Text style={styles.sectionTitulo}>Ofertas da loja</Text>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.ofertasLista}
+          >
+            {ofertas.map((oferta) => {
+              const vertical = oferta.formato !== 'quadrado';
+              const totalPaginas = Math.max(
+                1,
+                Number(oferta.total_paginas || oferta.imagens_urls?.length || 1),
+              );
+              const totalProdutos = Math.max(0, Number(oferta.total_produtos || 0));
+              const acaoOferta =
+                oferta.cta_label ||
+                (totalPaginas > 1
+                  ? oferta.modo_paginacao === 'produto_por_pagina'
+                    ? `Ver jornal — ${totalProdutos || totalPaginas} ofertas`
+                    : `Ver jornal — ${totalPaginas} páginas`
+                  : 'Ver oferta');
+              return (
+                <TouchableOpacity
+                  key={oferta.id}
+                  style={[styles.ofertaCard, vertical && styles.ofertaCardVertical]}
+                  activeOpacity={0.88}
+                  onPress={() => void Linking.openURL(oferta.link_path)}
+                  accessibilityRole="link"
+                  accessibilityLabel={`${acaoOferta}: ${oferta.titulo}`}
+                >
+                  <View style={styles.ofertaImagemArea}>
+                    <Image
+                      source={{ uri: oferta.imagem_url }}
+                      style={styles.ofertaImagem}
+                      resizeMode="contain"
+                    />
+                    {totalPaginas > 1 ? (
+                      <View style={styles.ofertaPaginasBadge}>
+                        <Text style={styles.ofertaPaginasBadgeText}>1 de {totalPaginas}</Text>
+                      </View>
+                    ) : null}
+                    <View style={styles.ofertaExpandirBadge}>
+                      <Ionicons name="expand-outline" size={16} color="#fff" />
+                    </View>
+                  </View>
+                  <View style={styles.ofertaRodape}>
+                    <Text style={styles.ofertaTitulo} numberOfLines={2}>
+                      {oferta.titulo}
+                    </Text>
+                    <View style={styles.ofertaAcaoRow}>
+                      <Text style={styles.ofertaAcao} numberOfLines={1}>
+                        {acaoOferta}
+                      </Text>
+                      <Ionicons name="chevron-forward" size={16} color={CORES.primario} />
+                    </View>
+                  </View>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+        </View>
+      ) : null}
 
       <TouchableOpacity
         style={styles.scannerCardCompacto}
@@ -573,6 +643,85 @@ const styles = StyleSheet.create({
   storeContext: {
     marginHorizontal: ESPACO.lg,
     marginTop: ESPACO.md,
+  },
+  ofertasSection: {
+    marginTop: ESPACO.lg,
+    marginBottom: ESPACO.md,
+  },
+  ofertasLista: {
+    paddingHorizontal: ESPACO.lg,
+    gap: ESPACO.md,
+  },
+  ofertaCard: {
+    width: 286,
+    height: 350,
+    borderRadius: RAIO.md,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: CORES.borda,
+    backgroundColor: CORES.superficie,
+    ...SOMBRA,
+  },
+  ofertaCardVertical: {
+    width: 238,
+  },
+  ofertaImagemArea: {
+    flex: 1,
+    position: 'relative',
+    backgroundColor: '#17130F',
+  },
+  ofertaImagem: {
+    width: '100%',
+    height: '100%',
+  },
+  ofertaPaginasBadge: {
+    position: 'absolute',
+    top: ESPACO.sm,
+    right: ESPACO.sm,
+    borderRadius: RAIO.circulo,
+    backgroundColor: 'rgba(15, 23, 42, 0.84)',
+    paddingHorizontal: ESPACO.sm,
+    paddingVertical: 5,
+  },
+  ofertaPaginasBadgeText: {
+    color: '#fff',
+    fontSize: 11,
+    fontWeight: '900',
+  },
+  ofertaExpandirBadge: {
+    position: 'absolute',
+    right: ESPACO.sm,
+    bottom: ESPACO.sm,
+    width: 32,
+    height: 32,
+    borderRadius: RAIO.circulo,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(15, 23, 42, 0.84)',
+  },
+  ofertaRodape: {
+    paddingHorizontal: ESPACO.md,
+    paddingTop: ESPACO.sm,
+    paddingBottom: ESPACO.md,
+  },
+  ofertaTitulo: {
+    color: CORES.texto,
+    fontSize: FONTE.normal,
+    fontWeight: '800',
+  },
+  ofertaAcaoRow: {
+    minWidth: 0,
+    marginTop: 4,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: ESPACO.xs,
+  },
+  ofertaAcao: {
+    flex: 1,
+    color: CORES.primario,
+    fontSize: FONTE.pequena,
+    fontWeight: '800',
   },
   scannerCardCompacto: {
     marginHorizontal: ESPACO.lg,

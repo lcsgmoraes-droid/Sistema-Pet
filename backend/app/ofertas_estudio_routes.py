@@ -32,6 +32,7 @@ from app.services.ofertas_estudio_ai import (
 from app.services.ofertas_estudio_service import (
     buscar_produtos_publicaveis,
     montar_sugestao,
+    resumir_navegacao_publicacao,
     serializar_produto_oferta,
     validar_snapshot_publicacao,
 )
@@ -77,6 +78,8 @@ def _serializar_publicacao(
     publicacao: OfertaPublicacao, *, incluir_snapshot: bool = True
 ) -> dict:
     token = publicacao.indice_publico.token if publicacao.indice_publico else None
+    imagens_urls = list(publicacao.imagens_urls or [])
+    produtos_snapshot = list(publicacao.produtos_snapshot or [])
     payload = {
         "id": int(publicacao.id),
         "titulo": publicacao.titulo,
@@ -92,13 +95,18 @@ def _serializar_publicacao(
         "status": _status_publicacao(publicacao),
         "token": token,
         "link_path": f"/oferta/{token}" if token else None,
-        "imagens_urls": list(publicacao.imagens_urls or []),
+        "imagens_urls": imagens_urls,
+        **resumir_navegacao_publicacao(
+            publicacao.tipo_arte,
+            imagens_urls,
+            produtos_snapshot,
+        ),
         "created_at": publicacao.created_at.isoformat()
         if publicacao.created_at
         else None,
     }
     if incluir_snapshot:
-        payload["produtos"] = list(publicacao.produtos_snapshot or [])
+        payload["produtos"] = produtos_snapshot
         payload["configuracao"] = dict(publicacao.configuracao or {})
     return payload
 
@@ -195,6 +203,7 @@ async def gerar_imagem(
     produto_id: int = Form(...),
     estilo: str = Form(default="profissional"),
     orientacao: str = Form(default="quadrada"),
+    prompt_usuario: str = Form(default="", max_length=800),
     file: UploadFile = File(...),
     db: Session = Depends(get_session),
     user_and_tenant=Depends(get_current_user_and_tenant),
@@ -213,7 +222,10 @@ async def gerar_imagem(
     if not api_key:
         raise HTTPException(
             status_code=400,
-            detail="Configure a chave da OpenAI em Configuracoes > Integracoes para usar este recurso.",
+            detail=(
+                "A conexao com a OpenAI ainda nao esta configurada. "
+                "Configure a integracao da empresa ou a chave do servidor."
+            ),
         )
     content = await _ler_imagem(file)
     url = await run_in_threadpool(
@@ -226,6 +238,7 @@ async def gerar_imagem(
         content_type=file.content_type or "image/png",
         estilo=estilo,
         orientacao=orientacao,
+        prompt_usuario=prompt_usuario,
     )
     return {"url": url, "estilo": estilo, "modelo": "gpt-image-2"}
 
@@ -268,6 +281,13 @@ async def publicar_oferta(
         dados.produtos,
         fim_em=dados.fim_em,
     )
+    if dados.tipo_arte in {"individual", "produto"} and any(
+        not str(item.get("imagem_url") or "").strip() for item in snapshots
+    ):
+        raise HTTPException(
+            status_code=400,
+            detail="Toda pagina individual precisa ter uma foto do produto.",
+        )
     paginas = []
     total_bytes = 0
     for file in files:
@@ -394,6 +414,8 @@ def obter_publicacao_publica(token: str, db: Session = Depends(get_session)):
             raise HTTPException(status_code=404, detail="Oferta nao encontrada.")
         status = _status_publicacao(publicacao)
         ativa = status == "ativa"
+        imagens_urls = list(publicacao.imagens_urls or []) if ativa else []
+        produtos_snapshot = list(publicacao.produtos_snapshot or []) if ativa else []
         return {
             "titulo": publicacao.titulo,
             "empresa": tenant.name,
@@ -412,6 +434,13 @@ def obter_publicacao_publica(token: str, db: Session = Depends(get_session)):
             ),
             "inicio_em": publicacao.inicio_em.isoformat(),
             "fim_em": publicacao.fim_em.isoformat(),
-            "imagens_urls": list(publicacao.imagens_urls or []) if ativa else [],
-            "produtos": list(publicacao.produtos_snapshot or []) if ativa else [],
+            "tipo_arte": publicacao.tipo_arte,
+            "formato": publicacao.formato,
+            "imagens_urls": imagens_urls,
+            "produtos": produtos_snapshot,
+            **resumir_navegacao_publicacao(
+                publicacao.tipo_arte,
+                imagens_urls,
+                produtos_snapshot,
+            ),
         }
