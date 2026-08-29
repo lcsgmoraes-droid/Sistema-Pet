@@ -1,14 +1,29 @@
-name: 📱 App Mobile - EAS Build (Android APK)
+name: 📱 App Mobile - EAS Build Manual (Android APK)
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'app-mobile/**'
+  workflow_dispatch:
+    inputs:
+      motivo:
+        description: 'Por que um novo APK e necessario?'
+        required: true
+        type: string
+      confirmar_necessidade_build:
+        description: 'Confirmo que OTA nao atende (mudanca nativa, runtime novo ou APK indisponivel)'
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: eas-preview-android
+  cancel-in-progress: false
 
 jobs:
   build:
     name: 🔨 Build APK Android
+    if: ${{ inputs.confirmar_necessidade_build }}
     runs-on: ubuntu-latest
 
     steps:
