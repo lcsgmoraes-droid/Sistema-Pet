@@ -1,6 +1,9 @@
+import json
 from pathlib import Path
 
 from PIL import Image
+from sqlalchemy import create_engine, text
+from sqlalchemy.orm import Session
 
 from app.services.catalogo_mestre_image_import import (
     CatalogImageCandidate,
@@ -165,35 +168,50 @@ def test_stage_keeps_file_private_inactive_and_pending(tmp_path):
     )
     staging_root = tmp_path / "seguro" / "catalogo_mestre_pendente"
 
-    class FakeDb:
-        def __init__(self):
-            self.added = []
-            self.flushed = False
-
-        def add(self, value):
-            self.added.append(value)
-
-        def flush(self):
-            self.flushed = True
-
-    db = FakeDb()
-
     from app.services.catalogo_mestre_image_import import stage_image_import
 
-    staged = stage_image_import(
-        db,
-        plan,
-        source_ref="drive-folder-id",
-        staging_dir=staging_root,
-    )
+    engine = create_engine("sqlite+pysqlite:///:memory:")
+    with engine.begin() as connection:
+        connection.execute(
+            text(
+                """
+                CREATE TABLE catalogo_mestre_imagens (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    produto_id INTEGER NOT NULL,
+                    tipo_origem TEXT NOT NULL,
+                    url_origem TEXT,
+                    arquivo_url TEXT,
+                    hash_arquivo TEXT,
+                    ordem INTEGER NOT NULL,
+                    e_principal BOOLEAN NOT NULL,
+                    gerada_por_ia BOOLEAN NOT NULL,
+                    direitos_uso_status TEXT NOT NULL,
+                    status_revisao TEXT NOT NULL,
+                    largura INTEGER,
+                    altura INTEGER,
+                    tamanho_bytes INTEGER,
+                    metadados JSON,
+                    ativo BOOLEAN NOT NULL
+                )
+                """
+            )
+        )
+    with Session(engine) as db:
+        staged = stage_image_import(
+            db,
+            plan,
+            source_ref="drive-folder-id",
+            staging_dir=staging_root,
+        )
+        db.commit()
+        image = (
+            db.execute(text("SELECT * FROM catalogo_mestre_imagens")).mappings().one()
+        )
 
     assert staged == 1
-    assert db.flushed is True
-    assert len(db.added) == 1
-    image = db.added[0]
-    assert image.ativo is False
-    assert image.status_revisao == "pendente"
-    assert image.direitos_uso_status == "nao_verificado"
-    assert image.arquivo_url is None
-    assert image.metadados["protegida_de_publicacao"] is True
+    assert image["ativo"] == 0
+    assert image["status_revisao"] == "pendente"
+    assert image["direitos_uso_status"] == "nao_verificado"
+    assert image["arquivo_url"] is None
+    assert json.loads(image["metadados"])["protegida_de_publicacao"] is True
     assert len(list(staging_root.rglob("*.jpg"))) == 1
