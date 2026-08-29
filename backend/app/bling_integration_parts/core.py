@@ -97,11 +97,16 @@ def _load_bling_runtime_config(*, lock_held: bool = False) -> dict[str, Any]:
 
     tenant_id = get_current_tenant()
     tenant_credentials = None
+    tenant_app_credentials = None
     if tenant_id:
         try:
-            from app.services.bling_connection_service import load_bling_credentials
+            from app.services.bling_connection_service import (
+                load_bling_app_credentials,
+                load_bling_credentials,
+            )
 
             tenant_credentials = load_bling_credentials(tenant_id)
+            tenant_app_credentials = load_bling_app_credentials(tenant_id)
         except Exception as error:
             logger.warning(
                 "Nao foi possivel carregar a conexao Bling do tenant %s: %s",
@@ -110,7 +115,7 @@ def _load_bling_runtime_config(*, lock_held: bool = False) -> dict[str, Any]:
             )
 
     legacy_allowed = False
-    if tenant_id and not tenant_credentials:
+    if tenant_id:
         from app.services.bling_tenant_guard import tenant_pode_usar_bling_global
 
         legacy_allowed = tenant_pode_usar_bling_global(tenant_id)
@@ -124,8 +129,14 @@ def _load_bling_runtime_config(*, lock_held: bool = False) -> dict[str, Any]:
             (tenant_credentials or {}).get("refresh_token")
             or (pick("BLING_REFRESH_TOKEN") if legacy_allowed else "")
         ).strip(),
-        "client_id": pick("BLING_CLIENT_ID"),
-        "client_secret": pick("BLING_CLIENT_SECRET"),
+        "client_id": str(
+            (tenant_app_credentials or {}).get("client_id")
+            or (pick("BLING_CLIENT_ID") if legacy_allowed else "")
+        ).strip(),
+        "client_secret": str(
+            (tenant_app_credentials or {}).get("client_secret")
+            or (pick("BLING_CLIENT_SECRET") if legacy_allowed else "")
+        ).strip(),
         "enable_jwt": pick("BLING_ENABLE_JWT", "1"),
         "ambiente": pick("BLING_NFE_AMBIENTE", "rascunho"),
         "source": str(
@@ -443,8 +454,8 @@ class BlingAPIBase:
     def validar_conexao(self) -> bool:
         """Testa se a conexão com Bling está funcionando"""
         try:
-            # Tenta listar notas (limite 1 para ser rápido)
-            self._request("GET", "/nfe", data={"limite": 1})
+            # Produtos fazem parte do escopo minimo da integracao de estoque.
+            self._request("GET", "/produtos", data={"limite": 1})
             return True
         except Exception:
             return False

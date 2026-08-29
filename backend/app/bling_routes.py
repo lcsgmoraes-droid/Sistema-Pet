@@ -95,8 +95,6 @@ async def renovar_token(
             "success": True,
             "message": "Token renovado com sucesso!",
             "expires_in_hours": tokens.get("expires_in", 21600) / 3600,
-            "new_access_token": tokens["access_token"][:50] + "...",
-            "new_refresh_token": tokens["refresh_token"][:50] + "...",
         }
     except HTTPException:
         raise
@@ -129,7 +127,7 @@ async def testar_conexao(
     try:
         # Tentar conectar
         bling = BlingAPI()
-        resultado = bling.listar_naturezas_operacoes()
+        resultado = bling.listar_produtos(limite=1)
 
         if connection:
             token_info = {

@@ -19,6 +19,7 @@ from uuid import UUID
 import requests
 from fastapi import APIRouter, Depends, Query, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 from sqlalchemy.orm import Session
 
 from app.auth.dependencies import get_current_user_and_tenant
@@ -30,10 +31,15 @@ from app.bling_integration_parts.core import (
 from app.config import JWT_SECRET_KEY
 from app.db import get_session
 from app.services.bling_connection_service import (
+    load_bling_app_credentials,
     load_bling_credentials,
+    save_bling_app_credentials,
     save_bling_tokens,
 )
-from app.services.bling_tenant_guard import bling_tenant_id_configurado
+from app.services.bling_tenant_guard import (
+    bling_tenant_id_configurado,
+    tenant_pode_usar_bling_global,
+)
 from app.tenancy.context import get_current_tenant
 
 
@@ -43,6 +49,21 @@ router = APIRouter(prefix="/auth/bling", tags=["Bling OAuth"])
 public_router = APIRouter(prefix="/auth/bling", tags=["Bling OAuth"])
 
 OAUTH_STATE_TTL_SECONDS = 600
+
+
+class BlingOAuthAppConfigUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    client_id: str = Field(min_length=1, max_length=255)
+    client_secret: str = Field(min_length=1, max_length=1000)
+
+    @field_validator("client_id", "client_secret")
+    @classmethod
+    def strip_value(cls, value: str) -> str:
+        normalized = str(value or "").strip()
+        if not normalized:
+            raise ValueError("Campo obrigatorio")
+        return normalized
 
 
 def _bling_redirect_uri(request: Request) -> str:
@@ -165,13 +186,45 @@ def _salvar_tokens(
     logger.info("Tokens Bling salvos com seguranca para o tenant %s", resolved_tenant)
 
 
-def _trocar_code_por_tokens(code: str, redirect_uri: str) -> dict:
-    """Troca o authorization code pelos tokens de acesso."""
+def _legacy_oauth_app_credentials(tenant_id: UUID | str) -> dict[str, str] | None:
+    if not tenant_pode_usar_bling_global(tenant_id):
+        return None
     client_id = os.getenv("BLING_CLIENT_ID", "").strip()
     client_secret = os.getenv("BLING_CLIENT_SECRET", "").strip()
-
     if not client_id or not client_secret:
-        raise RuntimeError("BLING_CLIENT_ID ou BLING_CLIENT_SECRET nao configurados")
+        return None
+    return {
+        "client_id": client_id,
+        "client_secret": client_secret,
+        "source": "legacy",
+    }
+
+
+def _oauth_app_credentials_for_tenant(
+    tenant_id: UUID | str,
+    *,
+    db: Session | None = None,
+) -> dict[str, str] | None:
+    return load_bling_app_credentials(
+        tenant_id, db=db
+    ) or _legacy_oauth_app_credentials(tenant_id)
+
+
+def _trocar_code_por_tokens(
+    code: str,
+    redirect_uri: str,
+    *,
+    tenant_id: UUID | str,
+    db: Session | None = None,
+) -> dict:
+    """Troca o authorization code pelos tokens de acesso."""
+    credentials = _oauth_app_credentials_for_tenant(tenant_id, db=db)
+    if not credentials:
+        raise RuntimeError(
+            "Aplicativo OAuth do Bling nao configurado para esta empresa"
+        )
+    client_id = credentials["client_id"]
+    client_secret = credentials["client_secret"]
 
     creds = base64.b64encode(f"{client_id}:{client_secret}".encode()).decode()
 
@@ -233,7 +286,12 @@ def bling_oauth_callback(
         redirect_uri = _bling_redirect_uri(request)
 
         logger.info("Trocando code por tokens Bling")
-        tokens = _trocar_code_por_tokens(code, redirect_uri)
+        tokens = _trocar_code_por_tokens(
+            code,
+            redirect_uri,
+            tenant_id=tenant_id,
+            db=db,
+        )
 
         access_token = tokens.get("access_token")
         refresh_token = tokens.get("refresh_token")
@@ -273,17 +331,21 @@ def gerar_link_autorizacao(
         ),
     ] = False,
     user_and_tenant=Depends(get_current_user_and_tenant),
+    db: Session = Depends(get_session),
 ):
     """
     Retorna o link para o usuario autorizar o aplicativo no Bling.
     Acesse este endpoint para obter a URL de autorizacao.
     """
-    client_id = os.getenv("BLING_CLIENT_ID", "").strip()
-    if not client_id:
-        return {"erro": "BLING_CLIENT_ID nao configurado"}
-
     redirect_uri = _bling_redirect_uri(request)
     _current_user, tenant_id = user_and_tenant
+    credentials = _oauth_app_credentials_for_tenant(tenant_id, db=db)
+    if not credentials:
+        return {
+            "erro": "Configure o aplicativo OAuth do Bling para esta empresa",
+            "redirect_uri_configurado": redirect_uri,
+        }
+    client_id = credentials["client_id"]
     state = _encode_oauth_state(tenant_id=tenant_id)
 
     auth_url = (
@@ -305,6 +367,81 @@ def gerar_link_autorizacao(
             "O 'Link de redirecionamento' no cadastro do app Bling deve ser: "
             + redirect_uri
         ),
+    }
+
+
+def _mask_client_id(value: str | None) -> str | None:
+    raw = str(value or "").strip()
+    if not raw:
+        return None
+    if len(raw) <= 10:
+        return f"{raw[:2]}...{raw[-2:]}"
+    return f"{raw[:6]}...{raw[-4:]}"
+
+
+@router.get("/configuracao")
+def buscar_configuracao_oauth_bling(
+    request: Request,
+    user_and_tenant=Depends(get_current_user_and_tenant),
+    db: Session = Depends(get_session),
+):
+    """Informa se o tenant possui aplicativo OAuth sem expor o segredo."""
+    current_user, tenant_id = user_and_tenant
+    if not current_user.is_admin:
+        return {
+            "configured": bool(_oauth_app_credentials_for_tenant(tenant_id, db=db)),
+            "can_manage": False,
+            "redirect_uri": _bling_redirect_uri(request),
+        }
+
+    tenant_credentials = load_bling_app_credentials(tenant_id, db=db)
+    effective_credentials = tenant_credentials or _legacy_oauth_app_credentials(
+        tenant_id
+    )
+    return {
+        "configured": bool(effective_credentials),
+        "can_manage": True,
+        "source": (effective_credentials or {}).get("source"),
+        "client_id_preview": _mask_client_id(
+            (effective_credentials or {}).get("client_id")
+        ),
+        "client_secret_configured": bool(
+            (effective_credentials or {}).get("client_secret")
+        ),
+        "redirect_uri": _bling_redirect_uri(request),
+    }
+
+
+@router.put("/configuracao")
+def salvar_configuracao_oauth_bling(
+    body: BlingOAuthAppConfigUpdate,
+    request: Request,
+    user_and_tenant=Depends(get_current_user_and_tenant),
+    db: Session = Depends(get_session),
+):
+    """Salva as credenciais do aplicativo Bling somente para o tenant atual."""
+    current_user, tenant_id = user_and_tenant
+    if not current_user.is_admin:
+        from fastapi import HTTPException, status
+
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Somente administradores podem configurar o aplicativo Bling.",
+        )
+
+    connection = save_bling_app_credentials(
+        tenant_id=tenant_id,
+        client_id=body.client_id,
+        client_secret=body.client_secret,
+        db=db,
+    )
+    return {
+        "configured": True,
+        "can_manage": True,
+        "source": "tenant",
+        "client_id_preview": _mask_client_id(connection.oauth_client_id),
+        "client_secret_configured": bool(connection.oauth_client_secret),
+        "redirect_uri": _bling_redirect_uri(request),
     }
 
 

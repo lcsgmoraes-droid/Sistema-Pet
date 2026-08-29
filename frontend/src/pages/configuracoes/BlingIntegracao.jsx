@@ -21,6 +21,17 @@ import { api } from "../../services/api";
 export default function BlingIntegracao() {
   const [loading, setLoading] = useState(true);
   const [renovando, setRenovando] = useState(false);
+  const [salvandoCredenciais, setSalvandoCredenciais] = useState(false);
+  const [clientId, setClientId] = useState("");
+  const [clientSecret, setClientSecret] = useState("");
+  const [oauthConfig, setOauthConfig] = useState({
+    configured: false,
+    can_manage: false,
+    source: null,
+    client_id_preview: null,
+    client_secret_configured: false,
+    redirect_uri: "",
+  });
   const [msg, setMsg] = useState(null); // { tipo: 'sucesso'|'erro'|'info', texto: '' }
   const [status, setStatus] = useState({
     conectado: false,
@@ -32,10 +43,19 @@ export default function BlingIntegracao() {
   });
 
   useEffect(() => {
-    carregarStatus();
+    carregarTela();
   }, []);
 
-  async function carregarStatus() {
+  async function carregarTela() {
+    setLoading(true);
+    try {
+      await Promise.all([carregarStatus(false), carregarConfiguracaoOAuth()]);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function carregarStatus(controlarLoading = true) {
     const statusDesconectado = {
       conectado: false,
       ultima_renovacao: null,
@@ -46,7 +66,7 @@ export default function BlingIntegracao() {
     };
 
     try {
-      setLoading(true);
+      if (controlarLoading) setLoading(true);
       const resp = await api.get("/bling/teste-conexao");
       setStatus(resp.data);
       return resp.data;
@@ -55,7 +75,18 @@ export default function BlingIntegracao() {
       setStatus(statusDesconectado);
       return statusDesconectado;
     } finally {
-      setLoading(false);
+      if (controlarLoading) setLoading(false);
+    }
+  }
+
+  async function carregarConfiguracaoOAuth() {
+    try {
+      const response = await api.get("/auth/bling/configuracao");
+      setOauthConfig((current) => ({ ...current, ...response.data }));
+      return response.data;
+    } catch {
+      setOauthConfig((current) => ({ ...current, configured: false }));
+      return null;
     }
   }
 
@@ -84,6 +115,33 @@ export default function BlingIntegracao() {
     }
 
     window.location.assign(parsedUrl.toString());
+  }
+
+  async function salvarCredenciaisOAuth(event) {
+    event.preventDefault();
+    if (!clientId.trim() || !clientSecret.trim()) {
+      mostrarMensagem("erro", "Informe o Client ID e o Client Secret do aplicativo Bling.");
+      return;
+    }
+
+    setSalvandoCredenciais(true);
+    try {
+      const response = await api.put("/auth/bling/configuracao", {
+        client_id: clientId.trim(),
+        client_secret: clientSecret.trim(),
+      });
+      setOauthConfig((current) => ({ ...current, ...response.data }));
+      setClientId("");
+      setClientSecret("");
+      mostrarMensagem("sucesso", "✅ Aplicativo Bling configurado para esta empresa.");
+    } catch (error) {
+      mostrarMensagem(
+        "erro",
+        `❌ ${error.response?.data?.detail || "Não foi possível salvar as credenciais do Bling."}`,
+      );
+    } finally {
+      setSalvandoCredenciais(false);
+    }
   }
 
   async function renovarToken() {
@@ -296,6 +354,77 @@ export default function BlingIntegracao() {
                 <li>Volte a esta tela e teste a conexão.</li>
               </ol>
             </div>
+          )}
+
+          {oauthConfig.can_manage && oauthConfig.source !== "legacy" && (
+            <form
+              onSubmit={salvarCredenciaisOAuth}
+              className="border border-gray-200 bg-white rounded-lg p-4 space-y-3"
+            >
+              <div>
+                <p className="font-medium text-gray-900">Aplicativo OAuth desta empresa</p>
+                <p className="text-xs text-gray-600 mt-1">
+                  Cadastre um aplicativo privado na Área do Integrador do Bling e informe as chaves
+                  abaixo. O segredo será armazenado criptografado e nunca será exibido novamente.
+                </p>
+              </div>
+
+              {oauthConfig.configured && (
+                <p className="text-xs text-emerald-700">
+                  Configurado: {oauthConfig.client_id_preview || "Client ID protegido"}
+                </p>
+              )}
+
+              <label className="block">
+                <span className="text-xs font-medium text-gray-700">Link de redirecionamento</span>
+                <input
+                  readOnly
+                  value={oauthConfig.redirect_uri || ""}
+                  className="mt-1 w-full rounded border border-gray-300 bg-gray-100 px-3 py-2 text-xs"
+                />
+              </label>
+
+              <label className="block">
+                <span className="text-xs font-medium text-gray-700">Client ID</span>
+                <input
+                  autoComplete="off"
+                  value={clientId}
+                  onChange={(event) => setClientId(event.target.value)}
+                  placeholder={
+                    oauthConfig.configured ? "Informe para substituir" : "Cole o Client ID"
+                  }
+                  className="mt-1 w-full rounded border border-gray-300 px-3 py-2"
+                />
+              </label>
+
+              <label className="block">
+                <span className="text-xs font-medium text-gray-700">Client Secret</span>
+                <input
+                  type="password"
+                  autoComplete="new-password"
+                  value={clientSecret}
+                  onChange={(event) => setClientSecret(event.target.value)}
+                  placeholder={
+                    oauthConfig.configured ? "Informe para substituir" : "Cole o Client Secret"
+                  }
+                  className="mt-1 w-full rounded border border-gray-300 px-3 py-2"
+                />
+              </label>
+
+              <button
+                type="submit"
+                disabled={salvandoCredenciais || !clientId.trim() || !clientSecret.trim()}
+                className="rounded bg-gray-900 px-4 py-2 text-xs font-medium text-white disabled:opacity-50"
+              >
+                {salvandoCredenciais ? "Salvando..." : "Salvar aplicativo Bling"}
+              </button>
+            </form>
+          )}
+
+          {oauthConfig.can_manage && oauthConfig.source === "legacy" && (
+            <p className="rounded border border-blue-200 bg-blue-50 p-3 text-xs text-blue-800">
+              Esta empresa usa o aplicativo central já configurado no CorePet.
+            </p>
           )}
 
           <p className="text-gray-600 text-xs mt-4">

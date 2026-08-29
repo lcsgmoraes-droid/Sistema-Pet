@@ -19,8 +19,12 @@ class BlingConnection(BaseTenantModel):
         UniqueConstraint("tenant_id", name="uq_bling_connections_tenant"),
     )
 
-    _access_token_encrypted = Column("access_token_encrypted", Text, nullable=False)
-    _refresh_token_encrypted = Column("refresh_token_encrypted", Text, nullable=False)
+    _access_token_encrypted = Column("access_token_encrypted", Text, nullable=True)
+    _refresh_token_encrypted = Column("refresh_token_encrypted", Text, nullable=True)
+    oauth_client_id = Column(String(255), nullable=True)
+    _oauth_client_secret_encrypted = Column(
+        "oauth_client_secret_encrypted", Text, nullable=True
+    )
     company_id = Column(String(100), nullable=True, index=True)
     status = Column(
         String(24), nullable=False, default="active", server_default="active"
@@ -48,6 +52,14 @@ class BlingConnection(BaseTenantModel):
     @refresh_token.setter
     def refresh_token(self, value: str | None) -> None:
         self._refresh_token_encrypted = encrypt_secret(value)
+
+    @property
+    def oauth_client_secret(self) -> str:
+        return decrypt_secret(self._oauth_client_secret_encrypted)
+
+    @oauth_client_secret.setter
+    def oauth_client_secret(self, value: str | None) -> None:
+        self._oauth_client_secret_encrypted = encrypt_secret(value)
 
 
 class BlingCompanyTenantLink(Base):

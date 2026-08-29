@@ -67,6 +67,7 @@ def get_bling_connection(
     tenant_id: UUID | str | None = None,
     *,
     db: Session | None = None,
+    active_only: bool = True,
 ) -> BlingConnection | None:
     resolved_tenant = _tenant_uuid(tenant_id) or get_current_tenant()
     if not resolved_tenant:
@@ -81,14 +82,12 @@ def get_bling_connection(
     )
     try:
         with context:
-            return (
-                session.query(BlingConnection)
-                .filter(
-                    BlingConnection.tenant_id == resolved_tenant,
-                    BlingConnection.status == "active",
-                )
-                .first()
+            query = session.query(BlingConnection).filter(
+                BlingConnection.tenant_id == resolved_tenant
             )
+            if active_only:
+                query = query.filter(BlingConnection.status == "active")
+            return query.first()
     finally:
         if owns_session:
             session.close()
@@ -107,12 +106,91 @@ def load_bling_credentials(
     return {
         "access_token": access_token,
         "refresh_token": refresh_token,
+        "client_id": str(connection.oauth_client_id or "").strip(),
+        "client_secret": connection.oauth_client_secret,
         "company_id": connection.company_id,
         "expires_at": connection.expires_at,
         "last_refresh_at": connection.last_refresh_at,
         "renewal_count": int(connection.renewal_count or 0),
         "source": "tenant",
     }
+
+
+def load_bling_app_credentials(
+    tenant_id: UUID | str | None = None,
+    *,
+    db: Session | None = None,
+) -> dict[str, str] | None:
+    """Carrega as credenciais do aplicativo OAuth pertencente ao tenant."""
+    connection = get_bling_connection(
+        tenant_id,
+        db=db,
+        active_only=False,
+    )
+    if not connection:
+        return None
+    client_id = str(connection.oauth_client_id or "").strip()
+    client_secret = connection.oauth_client_secret
+    if not client_id or not client_secret:
+        return None
+    return {
+        "client_id": client_id,
+        "client_secret": client_secret,
+        "source": "tenant",
+    }
+
+
+def save_bling_app_credentials(
+    *,
+    tenant_id: UUID | str,
+    client_id: str,
+    client_secret: str,
+    db: Session | None = None,
+) -> BlingConnection:
+    """Salva client id/secret criptografados sem misturar tenants."""
+    resolved_tenant = _tenant_uuid(tenant_id)
+    normalized_client_id = str(client_id or "").strip()
+    normalized_client_secret = str(client_secret or "").strip()
+    if not resolved_tenant:
+        raise ValueError("Tenant invalido para salvar as credenciais do Bling")
+    if not normalized_client_id or len(normalized_client_id) > 255:
+        raise ValueError("Client ID do Bling invalido")
+    if not normalized_client_secret or len(normalized_client_secret) > 1000:
+        raise ValueError("Client Secret do Bling invalido")
+
+    owns_session = db is None
+    session = db or SessionLocal()
+    context = (
+        nullcontext(resolved_tenant)
+        if get_current_tenant() == resolved_tenant
+        else tenant_context(resolved_tenant)
+    )
+    try:
+        with context:
+            connection = (
+                session.query(BlingConnection)
+                .filter(BlingConnection.tenant_id == resolved_tenant)
+                .first()
+            )
+            if not connection:
+                connection = BlingConnection(
+                    tenant_id=resolved_tenant,
+                    status="configured",
+                )
+                session.add(connection)
+
+            connection.oauth_client_id = normalized_client_id
+            connection.oauth_client_secret = normalized_client_secret
+            connection.last_error = None
+            session.commit()
+            session.refresh(connection)
+            return connection
+    except Exception:
+        session.rollback()
+        raise
+    finally:
+        if owns_session:
+            session.close()
 
 
 def save_bling_tokens(
