@@ -2,6 +2,10 @@ from pathlib import Path
 
 BACKEND_ROOT = Path(__file__).resolve().parents[2]
 MIGRATION = BACKEND_ROOT / "alembic/versions/zxn20260829a1_catalogo_mestre_produtos.py"
+WORKER_MIGRATION = (
+    BACKEND_ROOT
+    / "alembic/versions/zxp20260829a1_fila_enriquecimento_catalogo_mestre.py"
+)
 
 
 def test_catalogo_mestre_migration_is_linear_and_reversible():
@@ -33,3 +37,19 @@ def test_catalogo_mestre_schema_separates_source_and_operational_data():
     assert '"bula_conteudo"' in source
     assert '"preco_venda"' not in source
     assert '"estoque_atual"' not in source
+
+
+def test_catalog_worker_migration_adds_lease_and_execution_audit():
+    source = WORKER_MIGRATION.read_text(encoding="utf-8")
+
+    assert 'revision = "zxp20260829a1"' in source
+    assert 'down_revision = "zxo20260829a1"' in source
+    for field_name in (
+        "reservada_por",
+        "reserva_expira_em",
+        "ultima_execucao_em",
+    ):
+        assert f'"{field_name}"' in source
+    assert '"catalogo_mestre_enriquecimento_execucoes"' in source
+    assert 'op.drop_table("catalogo_mestre_enriquecimento_execucoes")' in source
+    assert '"produtos"' not in source

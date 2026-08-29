@@ -229,6 +229,9 @@ class CatalogoMestrePendencia(Base):
     detalhes = Column(JSON, nullable=True)
     tentativas = Column(Integer, nullable=False, default=0)
     proxima_tentativa_em = Column(DateTime(timezone=True), nullable=True, index=True)
+    reservada_por = Column(String(120), nullable=True, index=True)
+    reserva_expira_em = Column(DateTime(timezone=True), nullable=True, index=True)
+    ultima_execucao_em = Column(DateTime(timezone=True), nullable=True, index=True)
     ultimo_erro = Column(Text, nullable=True)
     resolvida_em = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(
@@ -242,6 +245,48 @@ class CatalogoMestrePendencia(Base):
     )
 
     produto = relationship("CatalogoMestreProduto", back_populates="pendencias")
+
+
+class CatalogoMestreEnriquecimentoExecucao(Base):
+    """Auditoria persistente de cada tentativa feita pelo robo de enriquecimento."""
+
+    __tablename__ = "catalogo_mestre_enriquecimento_execucoes"
+    __table_args__ = (
+        Index(
+            "ix_catalogo_mestre_enriquecimento_execucoes_dia",
+            "iniciada_em",
+            "tipo",
+        ),
+        Index(
+            "ix_catalogo_mestre_enriquecimento_execucoes_status",
+            "status",
+            "iniciada_em",
+        ),
+    )
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    pendencia_id = Column(
+        Integer,
+        ForeignKey("catalogo_mestre_pendencias.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    produto_id = Column(
+        Integer,
+        ForeignKey("catalogo_mestre_produtos.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    tipo = Column(String(50), nullable=False, index=True)
+    provedor = Column(String(50), nullable=False)
+    modelo = Column(String(120), nullable=False)
+    versao_prompt = Column(String(120), nullable=False)
+    worker_id = Column(String(120), nullable=False, index=True)
+    status = Column(String(30), nullable=False, default="processando")
+    erro = Column(Text, nullable=True)
+    metadados = Column(JSON, nullable=True)
+    iniciada_em = Column(DateTime(timezone=True), nullable=False)
+    concluida_em = Column(DateTime(timezone=True), nullable=True)
 
 
 class CatalogoMestreSincronizacao(Base):

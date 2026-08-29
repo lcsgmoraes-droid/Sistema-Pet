@@ -27,7 +27,7 @@ def test_production_status_checks_runtime_database_and_public_release():
 
     assert "validate_deploy_target.py" in status
     assert "git status --porcelain" in status
-    assert "postgres backend worker-bling nginx" in status
+    assert "postgres backend worker-bling worker-catalogo nginx" in status
     assert "alembic current" in status
     assert "PUBLIC_HEALTH_URL" in status
     assert "PUBLIC_WATCHDOG_URL" in status
