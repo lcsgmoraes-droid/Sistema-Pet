@@ -181,29 +181,19 @@ def test_produto_service_permita_criar_variacao_kit_sem_componentes_para_configu
 
 
 def test_recalcular_kits_que_usam_produto_atualiza_dependentes(monkeypatch):
-    kit = SimpleNamespace(
-        id=20,
-        nome="Kit Dependente",
-        tipo_produto="KIT",
-        tipo_kit="VIRTUAL",
-        preco_custo=0,
-    )
-    componente_relacao = SimpleNamespace(kit_id=20, produto_componente_id=5)
-    db = FakeDB(
-        responses={
-            (ProdutoKitComponente, "all"): [[componente_relacao]],
-            (Produto, "first"): [kit],
-        }
-    )
+    db = FakeDB()
+    chamadas = []
 
     monkeypatch.setattr(
-        "app.services.kit_custo_service.KitCustoService.sincronizar_custo_kit",
-        lambda db, kit_id: 14,
+        "app.services.kit_custo_service.KitCustoService.recalcular_kits_que_usam_produtos",
+        lambda db, produto_ids: chamadas.append((db, produto_ids))
+        or {20: Decimal("14")},
     )
 
     resultado = KitCustoService.recalcular_kits_que_usam_produto(db, 5)
 
-    assert resultado == {20: 14}
+    assert resultado == {20: Decimal("14")}
+    assert chamadas == [(db, [5])]
 
 
 def test_sugerir_preco_venda_composto_aplica_impacto_da_quantidade():

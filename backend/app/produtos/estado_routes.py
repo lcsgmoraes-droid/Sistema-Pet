@@ -18,6 +18,7 @@ from app.produtos.validators import (
 )
 from app.produtos_models import Produto
 from app.security.permissions_decorator import require_permission
+from app.services.kit_custo_service import KitCustoService
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -51,6 +52,7 @@ def atualizar_preco_produto(
         produto.preco_venda = preco_venda
     if preco_custo is not None:
         produto.preco_custo = preco_custo
+        KitCustoService.recalcular_kits_que_usam_produto(db, produto.id)
     if preco_promocional is not None:
         produto.preco_promocional = preco_promocional
 

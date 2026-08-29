@@ -19,6 +19,7 @@ from app.produtos_models import (
     ProdutoHistoricoPreco,
     ProdutoLote,
 )
+from app.services.kit_custo_service import KitCustoService
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -280,6 +281,9 @@ def reverter_entrada_estoque(
         nota.processamento_contexto = None
         nota.processamento_acoes = None
 
+        KitCustoService.recalcular_kits_que_usam_produtos(
+            db, produtos_precos_revertidos
+        )
         db.commit()
 
         # SINCRONIZAR ESTOQUE COM BLING para todos os itens revertidos

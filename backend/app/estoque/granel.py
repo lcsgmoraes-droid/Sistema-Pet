@@ -15,6 +15,7 @@ from app.produtos_models import (
     ProdutoGranelVinculo,
     ProdutoHistoricoPreco,
 )
+from app.services.kit_custo_service import KitCustoService
 
 
 logger = logging.getLogger(__name__)
@@ -409,6 +410,8 @@ def executar_conversao_granel(
     )
     db.add(mov_saida_base)
     db.add(mov_entrada_granel)
+    if float(produto_granel.preco_custo or 0) != custo_granel_anterior:
+        KitCustoService.recalcular_kits_que_usam_produto(db, produto_granel.id)
     db.commit()
 
     try:

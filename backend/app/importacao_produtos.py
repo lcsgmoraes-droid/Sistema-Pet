@@ -17,6 +17,7 @@ from app.db import get_session
 from app.auth import get_current_user_and_tenant
 from app.produtos_models import Produto, Categoria, Marca
 from app.services.produto_service import normalizar_sku_produto
+from app.services.kit_custo_service import KitCustoService
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -337,6 +338,7 @@ async def importar_produtos(
         # Cache para categorias e marcas
         categorias_cache = {}
         marcas_cache = {}
+        produtos_com_custo_alterado: set[int] = set()
 
         # Processar linhas (pular cabeçalho e instruções)
         for row_num in range(3, ws.max_row + 1):
@@ -512,6 +514,7 @@ async def importar_produtos(
 
                 if produto:
                     # ATUALIZAR produto existente
+                    custo_anterior = float(produto.preco_custo or 0)
                     produto.codigo = sku_normalizado
                     produto.nome = nome
                     produto.descricao_curta = descricao
@@ -520,6 +523,8 @@ async def importar_produtos(
                     produto.fornecedor_id = fornecedor_id
                     produto.codigo_barras = codigo_barras
                     produto.preco_custo = preco_custo
+                    if float(preco_custo or 0) != custo_anterior:
+                        produtos_com_custo_alterado.add(int(produto.id))
                     produto.preco_venda = preco_venda
                     produto.estoque_minimo = estoque_minimo
                     produto.estoque_maximo = estoque_maximo
@@ -602,6 +607,10 @@ async def importar_produtos(
                         "erro": str(e),
                     }
                 )
+
+        KitCustoService.recalcular_kits_que_usam_produtos(
+            session, produtos_com_custo_alterado
+        )
 
         # Commit no banco
         session.commit()

@@ -55,6 +55,7 @@ from app.produtos_models import (
     ProdutoHistoricoPreco,
     ProdutoLote,
 )
+from app.services.kit_custo_service import KitCustoService
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -180,6 +181,7 @@ def processar_entrada_estoque(
 
     itens_processados = []
     custos_atualizados = 0
+    produtos_com_custo_alterado: set[int] = set()
     composicoes_custo = calcular_composicao_custos_nota(nota)
     lotes_rastro_por_item = _mapear_lotes_rastro_xml(nota.xml_content)
 
@@ -328,6 +330,7 @@ def processar_entrada_estoque(
                 tenant_id=tenant_id,
             ):
                 custos_atualizados += 1
+                produtos_com_custo_alterado.add(int(produto.id))
             item.status = "processado"
             continue
 
@@ -383,6 +386,7 @@ def processar_entrada_estoque(
             produto.preco_custo = custo_unitario_entrada
             alterou_custo = True
             custos_atualizados += 1
+            produtos_com_custo_alterado.add(int(produto.id))
 
         # Calcular margem nova
         preco_venda_novo = produto.preco_venda or 0
@@ -551,6 +555,9 @@ def processar_entrada_estoque(
     else:
         logger.info("Geracao de contas a pagar desmarcada para NF %s", nota.numero_nota)
 
+    KitCustoService.recalcular_kits_que_usam_produtos(
+        db, produtos_com_custo_alterado
+    )
     db.commit()
 
     # SINCRONIZAR ESTOQUE COM BLING para todos os itens processados

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime
+from decimal import Decimal
 from typing import Any, List, Optional
 
 from fastapi import HTTPException
@@ -17,6 +18,7 @@ from app.produtos.search import (
     _produto_search_conditions_fast,
 )
 from app.produtos.validade import _mapa_validade_proxima_produtos
+from app.services.kit_custo_service import KitCustoService
 from app.services.kit_estoque_service import KitEstoqueService
 from app.utils.timezone import as_brasilia_naive, now_brasilia, wall_time_naive
 
@@ -289,6 +291,17 @@ def _expandir_produtos_listagem(
         if todas_variacoes
         else {}
     )
+    produtos_compostos = [
+        produto
+        for produto in [*produtos, *todas_variacoes]
+        if getattr(produto, "tipo_produto", None) in ("KIT", "VARIACAO")
+        and bool(getattr(produto, "tipo_kit", None))
+    ]
+    custos_compostos = (
+        KitCustoService.calcular_custos_kits_em_lote(db, produtos_compostos)
+        if produtos_compostos
+        else {}
+    )
 
     for produto in produtos:
         if produto.tipo_produto == "PAI":
@@ -302,6 +315,7 @@ def _expandir_produtos_listagem(
             incluir_detalhes_composto=incluir_detalhes_composto,
             validade_por_produto=validade_por_produto,
             incluir_bling_sync=incluir_bling_sync,
+            custos_compostos=custos_compostos,
         )
         produtos_expandidos.append(produto)
 
@@ -317,6 +331,7 @@ def _expandir_produtos_listagem(
                     incluir_detalhes_composto=incluir_detalhes_composto,
                     validade_por_produto=validade_por_variacao,
                     incluir_bling_sync=incluir_bling_sync,
+                    custos_compostos=custos_compostos,
                 )
                 produtos_expandidos.append(variacao)
 
@@ -560,6 +575,7 @@ def _enriquecer_produto_listagem(
     incluir_detalhes_composto: bool = True,
     validade_por_produto: dict[int, dict[str, Any]] | None = None,
     incluir_bling_sync: bool = False,
+    custos_compostos: dict[int, Decimal] | None = None,
 ):
     """Padroniza dados de listagem para produtos simples, kits e variacoes-kit."""
     reservas_por_produto = reservas_por_produto or {}
@@ -577,10 +593,13 @@ def _enriquecer_produto_listagem(
 
     produto_composto = produto.tipo_produto in ("KIT", "VARIACAO") and produto.tipo_kit
 
+    if produto_composto and custos_compostos is not None:
+        custo_efetivo = custos_compostos.get(int(produto.id))
+        if custo_efetivo is not None:
+            produto.preco_custo = float(custo_efetivo)
+
     if produto_composto and incluir_detalhes_composto:
         try:
-            from app.services.kit_custo_service import KitCustoService
-
             composicao = KitEstoqueService.obter_detalhes_composicao(
                 db,
                 produto.id,
@@ -606,9 +625,10 @@ def _enriquecer_produto_listagem(
                 }
                 for comp in composicao
             ]
-            produto.preco_custo = float(
-                KitCustoService.calcular_custo_kit(produto.id, db)
-            )
+            if custos_compostos is None:
+                produto.preco_custo = float(
+                    KitCustoService.calcular_custo_kit(produto.id, db)
+                )
 
             if produto.tipo_kit == "VIRTUAL":
                 produto.estoque_virtual = int(
