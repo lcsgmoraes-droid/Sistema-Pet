@@ -7,12 +7,22 @@ from sqlalchemy.orm import Session, joinedload
 from app.models import AppAccessProfile, Cliente, User
 
 
-PROFILE_ORDER = ("cliente", "gestor", "funcionario", "entregador", "veterinario")
+PROFILE_ORDER = (
+    "cliente",
+    "gestor",
+    "funcionario",
+    "banho_tosa",
+    "entregador",
+    "taxi_dog",
+    "veterinario",
+)
 PROFILE_LABELS = {
     "cliente": "Cliente",
     "gestor": "Gestor",
     "funcionario": "Funcionario",
+    "banho_tosa": "Banho & Tosa",
     "entregador": "Entregador",
+    "taxi_dog": "Taxi Dog",
     "veterinario": "Veterinario",
 }
 
@@ -136,7 +146,7 @@ def apply_selected_profile_flags(
             "is_funcionario": profile_type == "funcionario",
             "is_gestor": profile_type == "gestor",
             "funcionario_id": cliente_id
-            if profile_type in {"entregador", "funcionario"}
+            if profile_type in {"entregador", "funcionario", "banho_tosa", "taxi_dog"}
             else None,
             "is_veterinario": profile_type == "veterinario",
             "veterinario_id": cliente_id if profile_type == "veterinario" else None,

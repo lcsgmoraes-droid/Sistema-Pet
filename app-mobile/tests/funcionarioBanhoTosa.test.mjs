@@ -13,7 +13,9 @@ function source(relativePath) {
 test("funcionario acessa agenda e fila do banho e tosa", () => {
   const navigator = source("src/navigation/FuncionarioNavigator.tsx");
   const home = source("src/screens/funcionario/FuncionarioHomeScreen.tsx");
-  const screen = source("src/screens/funcionario/FuncionarioBanhoTosaScreen.tsx");
+  const screen = source(
+    "src/screens/funcionario/FuncionarioBanhoTosaScreen.tsx",
+  );
   const content = source(
     "src/screens/funcionario/banho-tosa/FuncionarioBanhoTosaContent.tsx",
   );
@@ -26,7 +28,10 @@ test("funcionario acessa agenda e fila do banho e tosa", () => {
   assert.match(screen, /moverEtapaBanhoTosaFuncionario/);
   assert.match(screen, /STATUS_AGENDA_OPERACIONAL\.has\(item\.status\)/);
   assert.match(screen, /`Agenda \(\$\{agendaOperacional\.length\}\)`/);
-  assert.match(screen, /setInterval\(\(\) => void carregarOperacao\(false\), 30000\)/);
+  assert.match(
+    screen,
+    /setInterval\(\(\) => void carregarOperacao\(false\), 30000\)/,
+  );
   assert.match(content, /resolveTenantAssetUrl\(url\)/);
   assert.match(content, /<Image source=\{\{ uri: imageUrl \}\}/);
   assert.match(content, /`\$\{item\.pet_nome \|\| "Pet"\} →/);
@@ -34,7 +39,9 @@ test("funcionario acessa agenda e fila do banho e tosa", () => {
 
 test("agenda do funcionario permite criar horario com pet servico e recurso", () => {
   const service = source("src/services/funcionarioBanhoTosa.service.ts");
-  const screen = source("src/screens/funcionario/FuncionarioBanhoTosaScreen.tsx");
+  const screen = source(
+    "src/screens/funcionario/FuncionarioBanhoTosaScreen.tsx",
+  );
   const modal = source(
     "src/screens/funcionario/banho-tosa/FuncionarioBanhoTosaModals.tsx",
   );
@@ -57,5 +64,20 @@ test("entregador recebe Taxi Dog e pode abrir rota e avancar o trajeto", () => {
   assert.match(service, /\/app\/entregador\/taxi-dog/);
   assert.match(taxi, /Abrir rota/);
   assert.match(taxi, /Entreguei na loja/);
-  assert.match(taxi, /entra automaticamente na fila/);
+  assert.match(taxi, /entra\s+automaticamente na fila/);
+  assert.match(taxi, /resolveTenantAssetUrl\(url\)/);
+  assert.match(taxi, /source=\{\{ uri: imageUrl \}\}/);
+});
+
+test("perfis dedicados abrem somente Banho e Tosa ou Taxi Dog", () => {
+  const appNavigator = source("src/navigation/AppNavigator.tsx");
+  const banhoTosaNavigator = source("src/navigation/BanhoTosaNavigator.tsx");
+  const taxiDogNavigator = source("src/navigation/TaxiDogNavigator.tsx");
+
+  assert.match(appNavigator, /perfil_operacional === "banho_tosa"/);
+  assert.match(appNavigator, /perfil_operacional === "taxi_dog"/);
+  assert.match(banhoTosaNavigator, /FuncionarioBanhoTosaScreen/);
+  assert.doesNotMatch(banhoTosaNavigator, /FuncionarioHomeScreen/);
+  assert.match(taxiDogNavigator, /TaxiDogEntregador/);
+  assert.doesNotMatch(taxiDogNavigator, /RotasDoEntregadorScreen/);
 });

@@ -18,7 +18,9 @@ export type AppProfileType =
   | "cliente"
   | "gestor"
   | "entregador"
+  | "taxi_dog"
   | "veterinario"
+  | "banho_tosa"
   | "funcionario";
 
 export interface AppAccessProfile {

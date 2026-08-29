@@ -40,6 +40,17 @@ def test_app_entregador_expoe_taxi_dog_atribuido_ao_motorista():
     assert 'novo_status == "entregue_na_clinica"' in source
 
 
+def test_perfis_dedicados_reaproveitam_rotas_sem_liberar_todo_o_app_operacional():
+    source = read_backend("app/routes/app_banho_tosa_funcionario_routes.py")
+
+    assert '{"funcionario", "banho_tosa"}' in source
+    assert '{"entregador", "taxi_dog"}' in source
+    assert (
+        "get_cliente_for_app_profile_or_none(\n        db, current_user, active_profile"
+        in source
+    )
+
+
 def test_fluxo_taxi_dog_respeita_ida_volta_e_nao_pula_etapa():
     assert proximo_status_taxi_dog("agendado", "ida_volta") == "motorista_a_caminho"
     assert (

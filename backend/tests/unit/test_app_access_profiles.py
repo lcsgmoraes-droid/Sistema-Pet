@@ -138,6 +138,42 @@ def test_app_access_service_does_not_add_gestor_without_manual_grant():
     assert [profile["type"] for profile in profiles] == ["cliente"]
 
 
+def test_app_access_service_adds_dedicated_banho_tosa_and_taxi_dog_profiles():
+    service = load_service_module()
+    user = SimpleNamespace(id=31, email="operacao@example.com")
+    pessoa = cliente(id=202, nome="Operacao", tipo_cadastro="cliente")
+
+    profiles = service.build_available_profiles_for_clientes(
+        user,
+        [pessoa],
+        explicit_grants=[
+            grant(profile_type="banho_tosa", cliente=pessoa),
+            grant(profile_type="taxi_dog", cliente=pessoa),
+        ],
+    )
+
+    assert [profile["type"] for profile in profiles] == [
+        "cliente",
+        "banho_tosa",
+        "taxi_dog",
+    ]
+    assert [profile["label"] for profile in profiles] == [
+        "Cliente",
+        "Banho & Tosa",
+        "Taxi Dog",
+    ]
+
+    selected = service.apply_selected_profile_flags(
+        {"id": user.id, "email": user.email},
+        profiles,
+        "banho_tosa",
+    )
+    assert selected["perfil_operacional"] == "banho_tosa"
+    assert selected["funcionario_id"] == pessoa.id
+    assert selected["is_funcionario"] is False
+    assert selected["is_entregador"] is False
+
+
 def test_ecommerce_auth_exposes_available_profiles_and_select_profile_endpoint():
     source = read_backend("app/routes/ecommerce_auth_profiles.py")
 
