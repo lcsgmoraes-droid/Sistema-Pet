@@ -1,7 +1,8 @@
 from types import SimpleNamespace
-from unittest.mock import Mock
+from unittest.mock import AsyncMock, Mock
 
 import pytest
+from fastapi import HTTPException
 
 from app.integracao_bling_pedido_routes import (
     _baixar_item_pedido,
@@ -15,6 +16,7 @@ from app.integracao_bling_pedido_routes import (
     _serializar_pedido_bling,
     _situacao_codigo_bling,
     processar_pedido_bling_payload,
+    receber_pedido_bling,
 )
 from app.services.pedido_integrado_consolidation_service import (
     escolher_pedido_canonico,
@@ -28,6 +30,20 @@ from app.services.pedido_integrado_consolidation_service import (
 
 def test_situacao_codigo_bling_prioriza_id():
     assert _situacao_codigo_bling({"id": 9, "valor": 1}) == 9
+
+
+@pytest.mark.asyncio
+async def test_webhook_pedido_rejeita_empresa_sem_vinculo(monkeypatch):
+    request = SimpleNamespace(json=AsyncMock(return_value={"companyId": "unknown"}))
+    monkeypatch.setattr(
+        "app.integracao_bling_pedido_routes._set_bling_request_tenant",
+        lambda *_args, **_kwargs: None,
+    )
+
+    with pytest.raises(HTTPException) as exc_info:
+        await receber_pedido_bling(request=request, db=Mock())
+
+    assert getattr(exc_info.value, "status_code", None) == 409
 
 
 def test_situacao_codigo_bling_faz_fallback_para_valor():
@@ -510,7 +526,7 @@ def test_pedido_ja_cancelado_reconsulta_nf_e_mantem_alerta_fiscal(monkeypatch):
 
     monkeypatch.setattr(
         "app.integracao_bling_pedido_routes._set_bling_request_tenant",
-        lambda: pedido.tenant_id,
+        lambda *args, **kwargs: pedido.tenant_id,
     )
     monkeypatch.setattr(
         "app.integracao_bling_pedido_routes.localizar_pedido_por_bling_id",
@@ -804,7 +820,7 @@ def test_order_updated_com_nf_autorizada_consolida_venda(
 
     monkeypatch.setattr(
         "app.integracao_bling_pedido_routes._set_bling_request_tenant",
-        lambda request=None: "tenant-1",
+        lambda *args, **kwargs: "tenant-1",
     )
     monkeypatch.setattr("app.bling_integration.BlingAPI", lambda: FakeBling())
     monkeypatch.setattr(
@@ -920,7 +936,7 @@ def test_order_created_com_nf_autorizada_consolida_venda(
 
     monkeypatch.setattr(
         "app.integracao_bling_pedido_routes._set_bling_request_tenant",
-        lambda request=None: "11111111-1111-1111-1111-111111111111",
+        lambda *args, **kwargs: "11111111-1111-1111-1111-111111111111",
     )
     monkeypatch.setattr("app.bling_integration.BlingAPI", lambda: FakeBling())
     monkeypatch.setattr(

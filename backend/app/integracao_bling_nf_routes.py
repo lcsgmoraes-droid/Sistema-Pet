@@ -1,7 +1,7 @@
 import os
 from uuid import UUID
 
-from fastapi import APIRouter, Request, Depends, Query
+from fastapi import APIRouter, Request, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 from datetime import datetime, timezone, timedelta
 
@@ -66,8 +66,14 @@ def _bling_webhook_tenant_uuid() -> UUID | None:
         return None
 
 
-def _set_bling_request_tenant(request: Request | None = None) -> UUID | None:
-    tenant_id = _bling_webhook_tenant_uuid()
+def _set_bling_request_tenant(
+    request: Request | None = None,
+    payload: dict | None = None,
+    db: Session | None = None,
+) -> UUID | None:
+    from app.services.bling_tenant_guard import resolver_tenant_bling
+
+    tenant_id = resolver_tenant_bling(payload, db=db)
     if tenant_id:
         set_current_tenant(tenant_id)
         if request is not None:
@@ -116,9 +122,14 @@ async def receber_nf_bling(
     O campo data.situacao é um NÚMERO: 2=Emitida, 5/9=Autorizada, 4=Cancelada.
     O payload do webhook NÃO inclui o pedido vinculado — precisa chamar a API.
     """
-    # Injetar tenant no contexto (webhook chega sem JWT)
-    tenant_id_monitor = _set_bling_request_tenant(request)
     body = await request.json()
+    # O payload assinado traz companyId, usado para resolver o tenant correto.
+    tenant_id_monitor = _set_bling_request_tenant(request, body, db)
+    if not tenant_id_monitor:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Empresa do webhook Bling ainda nao vinculada ao CorePet.",
+        )
 
     # Desempacotar envelope Bling (v1)
     event = body.get("event", "invoice.updated")

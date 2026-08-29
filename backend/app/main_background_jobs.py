@@ -3,7 +3,7 @@
 import logging
 import os
 import threading
-import time
+from datetime import datetime, timedelta, timezone
 from tempfile import gettempdir
 from typing import Optional
 
@@ -47,11 +47,6 @@ _campaign_scheduler = None
 _bling_sync_scheduler = None
 
 # Arquivos usados para coordenar renovação entre os múltiplos workers uvicorn
-_BLING_LOCK_FILE = _runtime_file("bling_token_renewal.lock")
-_BLING_LAST_RENEWAL_FILE = _runtime_file("bling_token_last_renewal.txt")
-# Janela de segurança: se outro worker renovou há menos de 60s, apenas recarrega do .env
-_BLING_RENEWAL_COOLDOWN = 60
-
 # File lock para coordenar sincronização SEFAZ entre workers uvicorn
 _SEFAZ_LOCK_FILE = _runtime_file("sefaz_sync.lock")
 
@@ -144,34 +139,92 @@ def _loop_ifood_order_polling() -> None:
     logger.info("[IFOOD] Polling de pedidos finalizado.")
 
 
-def _bling_recarregar_tokens_do_env():
-    """Relê o access_token e refresh_token do .env e atualiza os.environ."""
-    import os as _os
+def _bootstrap_conexao_bling_legada() -> bool:
+    """Importa uma unica vez a conexao historica do Atacadao para o banco."""
+    from app.bling_integration_parts.core import _load_bling_runtime_config
+    from app.services.bling_connection_service import (
+        get_bling_connection,
+        save_bling_tokens,
+    )
+    from app.services.bling_tenant_guard import bling_tenant_id_configurado
+    from app.tenancy.context import tenant_context
 
-    try:
-        from dotenv import dotenv_values
+    legacy_tenant = bling_tenant_id_configurado()
+    if not legacy_tenant:
+        return False
 
-        env_path = "/opt/petshop/.env"
-        if _os.path.exists(env_path):
-            vals = dotenv_values(env_path)
-            if vals.get("BLING_ACCESS_TOKEN"):
-                _os.environ["BLING_ACCESS_TOKEN"] = vals["BLING_ACCESS_TOKEN"]
-            if vals.get("BLING_REFRESH_TOKEN"):
-                _os.environ["BLING_REFRESH_TOKEN"] = vals["BLING_REFRESH_TOKEN"]
-    except Exception as e:
-        logger.warning(f"[BLING] ⚠️ Erro ao recarregar tokens do .env: {e}")
+    with tenant_context(legacy_tenant):
+        if get_bling_connection(legacy_tenant):
+            return False
+        runtime_config = _load_bling_runtime_config()
+        if runtime_config.get("source") != "legacy":
+            return False
+        access_token = str(runtime_config.get("access_token") or "").strip()
+        refresh_token = str(runtime_config.get("refresh_token") or "").strip()
+        if not access_token or not refresh_token:
+            return False
+
+        # A validade exata do token antigo nao esta registrada. Marcamos a
+        # conexao como vencendo para forcar uma renovacao JWT logo em seguida,
+        # criando tambem o mapa companyId -> tenant.
+        save_bling_tokens(
+            tenant_id=legacy_tenant,
+            access_token=access_token,
+            refresh_token=refresh_token,
+            expires_in=60,
+        )
+    logger.info("[BLING] Conexao historica migrada para armazenamento por tenant")
+    return True
+
+
+def _renovar_conexoes_bling() -> dict[str, int]:
+    """Renova somente conexoes proximas do vencimento, isoladas por tenant."""
+    from app.bling_integration import BlingAPI
+    from app.services.bling_connection_service import (
+        connected_bling_tenant_ids,
+        get_bling_connection,
+    )
+    from app.services.bling_tenant_guard import bling_tenant_id_configurado
+    from app.tenancy.context import tenant_context
+
+    _bootstrap_conexao_bling_legada()
+
+    tenant_ids = {str(value) for value in connected_bling_tenant_ids()}
+    legacy_tenant = bling_tenant_id_configurado()
+    if legacy_tenant:
+        tenant_ids.add(legacy_tenant)
+
+    result = {"renovadas": 0, "adiadas": 0, "falhas": 0}
+    renew_before = datetime.now(timezone.utc) + timedelta(minutes=90)
+    for tenant_id in sorted(tenant_ids):
+        try:
+            with tenant_context(tenant_id):
+                connection = get_bling_connection(tenant_id)
+                expires_at = connection.expires_at if connection else None
+                if expires_at and expires_at.tzinfo is None:
+                    expires_at = expires_at.replace(tzinfo=timezone.utc)
+                if expires_at and expires_at > renew_before:
+                    result["adiadas"] += 1
+                    continue
+                BlingAPI().renovar_access_token()
+            result["renovadas"] += 1
+        except Exception as exc:
+            result["falhas"] += 1
+            logger.warning(
+                "[BLING] Falha ao renovar token do tenant %s: %s",
+                tenant_id,
+                exc,
+            )
+    return result
 
 
 def _loop_renovacao_token_bling():
     """
     Loop em background para renovar token Bling periodicamente.
-    Usa um arquivo de lock para garantir que apenas um dos múltiplos
-    workers uvicorn execute a renovação — os demais apenas recarregam
-    o token atualizado do .env.
+    O lider de background jobs elege um unico worker; a trava do cliente
+    serializa renovacoes manuais concorrentes.
     """
-    import os as _os
-
-    worker_pid = _os.getpid()
+    worker_pid = os.getpid()
     logger.info(
         f"[BLING] Job de renovação automática iniciado (PID {worker_pid}, intervalo: 5h)"
     )
@@ -179,54 +232,10 @@ def _loop_renovacao_token_bling():
     while not _bling_token_stop_event.is_set():
         proxima_espera = BLING_TOKEN_RENOVACAO_INTERVALO_SEGUNDOS
         try:
-            # Tenta importar fcntl (disponível no Linux/servidor)
-            try:
-                import fcntl
-
-                has_fcntl = True
-            except ImportError:
-                has_fcntl = False
-
-            if has_fcntl:
-                # Coordenação via file lock entre workers
-                with open(_BLING_LOCK_FILE, "w") as lock_f:
-                    fcntl.flock(lock_f, fcntl.LOCK_EX)
-                    try:
-                        now = time.time()
-                        recently_renewed = False
-                        if _os.path.exists(_BLING_LAST_RENEWAL_FILE):
-                            try:
-                                with open(_BLING_LAST_RENEWAL_FILE, "r") as tf:
-                                    last_ts = float(tf.read().strip())
-                                if now - last_ts < _BLING_RENEWAL_COOLDOWN:
-                                    recently_renewed = True
-                            except Exception:
-                                pass
-
-                        if recently_renewed:
-                            logger.info(
-                                f"[BLING] PID {worker_pid} — token já renovado por outro worker, recarregando do .env"
-                            )
-                            _bling_recarregar_tokens_do_env()
-                        else:
-                            from app.bling_integration import BlingAPI
-
-                            bling = BlingAPI()
-                            bling.renovar_access_token()
-                            with open(_BLING_LAST_RENEWAL_FILE, "w") as tf:
-                                tf.write(str(time.time()))
-                            logger.info(
-                                f"[BLING] ✅ PID {worker_pid} — Token renovado automaticamente"
-                            )
-                    finally:
-                        fcntl.flock(lock_f, fcntl.LOCK_UN)
-            else:
-                # Ambiente de desenvolvimento (Windows) — renova diretamente
-                from app.bling_integration import BlingAPI
-
-                bling = BlingAPI()
-                bling.renovar_access_token()
-                logger.info("[BLING] ✅ Token renovado automaticamente")
+            summary = _renovar_conexoes_bling()
+            if summary["falhas"]:
+                proxima_espera = BLING_TOKEN_RENOVACAO_RETRY_SEGUNDOS
+            logger.info("[BLING] Ciclo de renovacao concluido: %s", summary)
 
         except Exception as e:
             proxima_espera = BLING_TOKEN_RENOVACAO_RETRY_SEGUNDOS

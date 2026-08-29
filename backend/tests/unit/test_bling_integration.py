@@ -344,6 +344,35 @@ def test_renovar_access_token_prefere_refresh_mais_recente_do_arquivo(monkeypatc
     assert chamadas[0]["data"]["refresh_token"] == "refresh-compartilhado"
 
 
+def test_renovar_access_token_propaga_falha_ao_persistir(monkeypatch):
+    api = _make_api()
+    api.client_id = "client-id"
+    api.client_secret = "client-secret"
+    api.refresh_token = "refresh-token"
+
+    class FakeResponse:
+        status_code = 200
+        text = "ok"
+
+        def json(self):
+            return {
+                "access_token": "token-novo",
+                "refresh_token": "refresh-novo",
+                "expires_in": 21600,
+            }
+
+    monkeypatch.setattr("requests.post", lambda *_args, **_kwargs: FakeResponse())
+    monkeypatch.setattr(
+        "app.bling_oauth_routes._salvar_tokens",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(
+            RuntimeError("db indisponivel")
+        ),
+    )
+
+    with pytest.raises(RuntimeError, match="db indisponivel"):
+        api.renovar_access_token()
+
+
 def test_payload_nfce_usa_serie_3_e_deixa_numero_para_sequencia_do_bling():
     api = _make_api()
     payload = api._montar_payload(_make_venda_nfce(), "nfce")

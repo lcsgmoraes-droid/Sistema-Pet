@@ -12,6 +12,8 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.bling_pedido_webhook_queue_models import BlingPedidoWebhookEvent
+from app.services.bling_tenant_guard import resolver_tenant_bling
+from app.tenancy.context import tenant_context
 from app.utils.correlation import derive_correlation_id, operation_correlation_context
 from app.utils.logger import logger
 
@@ -92,8 +94,14 @@ def _extract_metadata(payload: dict) -> dict[str, str | None]:
         or data.get("pedido_bling_id")
     )
 
+    company_id = _text(
+        envelope.get("companyId")
+        or envelope.get("company_id")
+        or envelope.get("empresaId")
+    )
+    company_prefix = f"company:{company_id}:" if company_id else ""
     if event_id:
-        dedupe_key = f"event:{event_id}"
+        dedupe_key = f"{company_prefix}event:{event_id}"
     else:
         digest = hashlib.sha256(
             _canonical_payload(envelope).encode("utf-8")
@@ -157,8 +165,9 @@ def enqueue_bling_pedido_webhook(db: Session, payload: dict) -> dict[str, Any]:
             "deduplicated": True,
         }
 
+    resolved_tenant = resolver_tenant_bling(payload, db=db) or _webhook_tenant_id()
     event = BlingPedidoWebhookEvent(
-        tenant_id=_webhook_tenant_id(),
+        tenant_id=resolved_tenant,
         dedupe_key=metadata["dedupe_key"],
         event_id=metadata["event_id"],
         event_type=metadata["event_type"] or "legacy",
@@ -315,7 +324,12 @@ def process_pending_bling_pedido_webhooks(
                 "job.bling_pedido_webhook",
                 correlation_id=correlation_id,
             ):
-                response = processar_pedido_bling_payload(dict(event.payload or {}), db)
+                if not event.tenant_id:
+                    raise RuntimeError("Webhook do Bling sem tenant identificado")
+                with tenant_context(event.tenant_id):
+                    response = processar_pedido_bling_payload(
+                        dict(event.payload or {}), db
+                    )
                 if isinstance(response, dict):
                     response = dict(response)
                     response.setdefault("request_id", correlation_id)

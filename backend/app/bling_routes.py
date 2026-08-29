@@ -11,6 +11,8 @@ from sqlalchemy.orm import Session
 from app.db import get_session
 from app.auth.dependencies import get_current_user_and_tenant
 from app.bling_integration import BlingAPI
+from app.services.bling_connection_service import get_bling_connection
+from app.services.bling_tenant_guard import tenant_pode_usar_bling_global
 from app.bling_flow_monitor_routes import (
     corrigir_incidente as corrigir_incidente_monitor,
     executar_auditoria as executar_auditoria_monitor,
@@ -78,6 +80,14 @@ async def renovar_token(
     Atualiza automaticamente o .env com os novos tokens
     """
     try:
+        _current_user, tenant_id = user_and_tenant
+        if not get_bling_connection(
+            tenant_id, db=db
+        ) and not tenant_pode_usar_bling_global(tenant_id):
+            raise HTTPException(
+                status_code=409,
+                detail="Bling nao conectado para esta empresa. Inicie a autorizacao OAuth.",
+            )
         bling = BlingAPI()
         tokens = bling.renovar_access_token()
 
@@ -88,6 +98,8 @@ async def renovar_token(
             "new_access_token": tokens["access_token"][:50] + "...",
             "new_refresh_token": tokens["refresh_token"][:50] + "...",
         }
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Erro ao renovar token: {str(e)}")
 
@@ -100,17 +112,38 @@ async def testar_conexao(
     """
     Testa a conexão com a API do Bling e retorna status + info de renovação
     """
+    _current_user, tenant_id = user_and_tenant
+    connection = get_bling_connection(tenant_id, db=db)
+    legacy_allowed = tenant_pode_usar_bling_global(tenant_id)
+    if not connection and not legacy_allowed:
+        return {
+            "conectado": False,
+            "status": "desconectado",
+            "message": "Bling ainda nao conectado para esta empresa.",
+            "ultima_renovacao": None,
+            "proxima_renovacao": None,
+            "renovacoes_automaticas": 0,
+            "temp_acesso_horas": 0,
+            "total_produtos_bling": 0,
+        }
     try:
         # Tentar conectar
         bling = BlingAPI()
         resultado = bling.listar_naturezas_operacoes()
 
-        # Carregar info de controle de token
-        token_control_file = Path("bling_token_control.json")
-        token_info = await asyncio.to_thread(
-            _carregar_controle_token_bling,
-            token_control_file,
-        )
+        if connection:
+            token_info = {
+                "ultima_renovacao": connection.last_refresh_at,
+                "proxima_renovacao": connection.expires_at,
+                "renovacoes_automaticas": int(connection.renewal_count or 0),
+            }
+        else:
+            # Compatibilidade temporaria da conexao historica do Atacadao.
+            token_control_file = Path("bling_token_control.json")
+            token_info = await asyncio.to_thread(
+                _carregar_controle_token_bling,
+                token_control_file,
+            )
 
         return {
             "conectado": True,
