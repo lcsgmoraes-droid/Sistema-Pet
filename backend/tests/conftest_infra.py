@@ -129,6 +129,8 @@ def tenant_factory(db_session):
     """
     from sqlalchemy import text
 
+    from app.tenant_identity import normalize_tenant_name
+
     _, _, Tenant, _ = _get_db_dependencies()
 
     def _create_tenant(nome: str = None, email: str = None):
@@ -139,10 +141,20 @@ def tenant_factory(db_session):
         # Inserir diretamente via SQL para evitar ORM Guards
         db_session.execute(
             text("""
-                INSERT INTO tenants (id, name, email, status, plan, created_at, updated_at)
-                VALUES (:id, :name, :email, 'active', 'basic', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                INSERT INTO tenants (
+                    id, name, name_normalized, email, status, plan, created_at, updated_at
+                )
+                VALUES (
+                    :id, :name, :name_normalized, :email, 'active', 'basic',
+                    CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+                )
             """),
-            {"id": tenant_id, "name": tenant_name, "email": tenant_email},
+            {
+                "id": tenant_id,
+                "name": tenant_name,
+                "name_normalized": normalize_tenant_name(tenant_name),
+                "email": tenant_email,
+            },
         )
         db_session.flush()
 

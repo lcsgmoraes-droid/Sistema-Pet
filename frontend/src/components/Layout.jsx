@@ -6,6 +6,7 @@ import { Link, Outlet, useLocation } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { useModulos } from "../contexts/ModulosContext";
 import { api } from "../services/api";
+import { isAdminRole } from "../auth/userRole";
 import { useEscapeFallbackForVisibleModals } from "../utils/modalEscape";
 import { isVeterinarioProfile } from "../utils/veterinarioPerfil";
 import {
@@ -81,8 +82,7 @@ const Layout = () => {
     if (!user) return false;
 
     // Admins têm acesso a tudo (qualquer variação do nome do role admin)
-    const adminRoles = ["admin", "Admin", "Administrador", "administrador", "ADMIN"];
-    if (adminRoles.includes(user.role?.name)) {
+    if (isAdminRole(user)) {
       return true;
     }
 
