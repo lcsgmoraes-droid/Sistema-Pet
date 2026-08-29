@@ -3,12 +3,14 @@ import assert from "node:assert/strict";
 import {
   agruparPaginas,
   calcularDesconto,
+  calcularDimensoesCaptura,
   calcularMargem,
   criarItemSelecionado,
   criarPeriodo,
   itensPorPagina,
   layoutJornal,
   montarPayloadPublicacao,
+  resumirTextoArte,
 } from "./ofertasEstudioUtils.js";
 
 assert.equal(calcularDesconto(100, 75), 25);
@@ -19,6 +21,14 @@ assert.equal(itensPorPagina("jornal", "retrato"), 6);
 assert.deepEqual(layoutJornal("story"), { colunas: 2, linhas: 3, itens: 6 });
 assert.equal(agruparPaginas(Array.from({ length: 13 }), "jornal", "quadrado").length, 4);
 assert.equal(agruparPaginas(Array.from({ length: 3 }), "individual", "story").length, 3);
+
+for (const formato of ["quadrado", "retrato", "story", "a4"]) {
+  const dimensoes = calcularDimensoesCaptura(formato);
+  assert.equal(Math.round(dimensoes.largura * dimensoes.escala), dimensoes.larguraFinal);
+  assert.equal(Math.round(dimensoes.altura * dimensoes.escala), dimensoes.alturaFinal);
+}
+assert.equal(resumirTextoArte(" Produto   com   espaços ", 40), "Produto com espaços");
+assert.equal(resumirTextoArte("abcdefghij", 6), "abcde…");
 
 const selecionado = criarItemSelecionado(
   {

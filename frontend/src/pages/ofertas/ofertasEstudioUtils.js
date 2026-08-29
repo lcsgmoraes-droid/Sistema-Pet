@@ -12,6 +12,8 @@ export const LAYOUTS_JORNAL = {
   a4: { colunas: 2, linhas: 3, itens: 6 },
 };
 
+export const LARGURA_REFERENCIA_CAPTURA = 720;
+
 export const TIPOS_ARTE = {
   jornal: { label: "Jornal / panfleto", descricao: "Vários produtos por página" },
   individual: { label: "Um produto por página", descricao: "Card completo com oferta" },
@@ -108,6 +110,26 @@ export function agruparPaginas(itens, tipoArte, formato) {
     paginas.push(itens.slice(index, index + tamanho));
   }
   return paginas;
+}
+
+export function calcularDimensoesCaptura(formato) {
+  const config = FORMATOS_OFERTA[formato] || FORMATOS_OFERTA.quadrado;
+  const escala = config.width / LARGURA_REFERENCIA_CAPTURA;
+  return {
+    largura: LARGURA_REFERENCIA_CAPTURA,
+    altura: config.height / escala,
+    escala,
+    larguraFinal: config.width,
+    alturaFinal: config.height,
+  };
+}
+
+export function resumirTextoArte(texto, limite) {
+  const valor = String(texto || "")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (valor.length <= limite) return valor;
+  return `${valor.slice(0, Math.max(1, limite - 1)).trimEnd()}…`;
 }
 
 export function montarPayloadPublicacao({
