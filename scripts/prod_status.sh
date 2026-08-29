@@ -61,7 +61,7 @@ printf 'git_branch=%s\n' "$branch"
 printf 'git_commit=%s\n' "$head_commit"
 docker compose -f "$COMPOSE_FILE" ps
 
-for service in postgres backend worker-bling nginx; do
+for service in postgres backend worker-bling worker-catalogo nginx; do
   require_service_healthy "$service"
 done
 

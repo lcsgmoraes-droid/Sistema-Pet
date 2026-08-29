@@ -38,6 +38,7 @@ json_event() {
   HOST_WATCHDOG_BACKEND_HEALTH="${backend_health:-unknown}" \
   HOST_WATCHDOG_NGINX_HEALTH="${nginx_health:-unknown}" \
   HOST_WATCHDOG_WORKER_HEALTH="${worker_health:-unknown}" \
+  HOST_WATCHDOG_CATALOG_WORKER_HEALTH="${catalog_worker_health:-unknown}" \
   HOST_WATCHDOG_POSTGRES_HEALTH="${postgres_health:-unknown}" \
   HOST_WATCHDOG_PUBLIC_OK="${public_ok:-unknown}" \
   HOST_WATCHDOG_INTERNAL_OK="${internal_ok:-unknown}" \
@@ -59,6 +60,7 @@ event = {
     "backend_health": os.environ.get("HOST_WATCHDOG_BACKEND_HEALTH"),
     "nginx_health": os.environ.get("HOST_WATCHDOG_NGINX_HEALTH"),
     "worker_health": os.environ.get("HOST_WATCHDOG_WORKER_HEALTH"),
+    "catalog_worker_health": os.environ.get("HOST_WATCHDOG_CATALOG_WORKER_HEALTH"),
     "postgres_health": os.environ.get("HOST_WATCHDOG_POSTGRES_HEALTH"),
     "public_ok": os.environ.get("HOST_WATCHDOG_PUBLIC_OK"),
     "internal_ok": os.environ.get("HOST_WATCHDOG_INTERNAL_OK"),
@@ -164,6 +166,7 @@ read_state
 backend_health="$(container_health petshop-prod-backend)"
 nginx_health="$(container_health petshop-prod-nginx)"
 worker_health="$(container_health petshop-prod-worker-bling)"
+catalog_worker_health="$(container_health petshop-prod-worker-catalogo)"
 postgres_health="$(container_health petshop-prod-postgres)"
 
 public_ok=false
@@ -202,6 +205,10 @@ fi
 if [[ "$worker_health" != "healthy" ]]; then
   healthy=false
   reasons+=("worker_${worker_health}")
+fi
+if [[ "$catalog_worker_health" != "healthy" ]]; then
+  healthy=false
+  reasons+=("catalog_worker_${catalog_worker_health}")
 fi
 if [[ "$postgres_health" != "healthy" ]]; then
   healthy=false
@@ -287,6 +294,12 @@ else
     log "Reiniciando worker-bling por health ruim"
     compose restart worker-bling
     actions+=("restart_worker_bling")
+  fi
+
+  if [[ "$catalog_worker_health" != "healthy" ]]; then
+    log "Reiniciando worker-catalogo por health ruim"
+    compose restart worker-catalogo
+    actions+=("restart_worker_catalogo")
   fi
 fi
 

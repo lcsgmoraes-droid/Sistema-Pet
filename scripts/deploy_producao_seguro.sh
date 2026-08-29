@@ -603,8 +603,8 @@ docker compose -f "$COMPOSE_FILE" run --rm --no-deps -e PYTHONPATH=/app backend 
 
 mark_step "subir_servicos"
 audit_step "Subindo backend e worker"
-log "Subindo backend e worker"
-docker compose -f "$COMPOSE_FILE" up -d backend worker-bling
+log "Subindo backend e workers"
+docker compose -f "$COMPOSE_FILE" up -d backend worker-bling worker-catalogo
 
 mark_step "publicar_frontend"
 audit_step "Publicando frontend gerado"
@@ -633,6 +633,15 @@ log "Aguardando worker Bling"
 wait_for \
   "worker Bling" \
   "cd '$APP_DIR' && docker compose -f '$COMPOSE_FILE' exec -T worker-bling sh -c 'test -n \"\$BLING_WORKER_HEARTBEAT_PATH\" && test -f \"\$BLING_WORKER_HEARTBEAT_PATH\"'" \
+  24 \
+  5
+
+mark_step "validar_worker_catalogo"
+audit_step "Validando heartbeat do worker do catalogo mestre"
+log "Aguardando worker do catalogo mestre"
+wait_for \
+  "worker do catalogo mestre" \
+  "cd '$APP_DIR' && docker compose -f '$COMPOSE_FILE' exec -T worker-catalogo sh -c 'test -n \"\$CATALOGO_MESTRE_WORKER_HEARTBEAT_PATH\" && test -f \"\$CATALOGO_MESTRE_WORKER_HEARTBEAT_PATH\"'" \
   24 \
   5
 
