@@ -9,6 +9,7 @@ import {
   EcommerceConfig,
   EcommerceDivulgacao,
   EcommercePreview,
+  EstudioOfertas,
   MeusCaixas,
   NFEntrada,
   PDV,
@@ -65,6 +66,16 @@ export function createSalesMarketingRoutes() {
         element={
           <ModuleGate modulo="campanhas">
             <CanalDescontos />
+          </ModuleGate>
+        }
+      />
+      <Route
+        path="campanhas/estudio-ofertas"
+        element={
+          <ModuleGate modulo="campanhas">
+            <ProtectedRoute permission="vendas.criar">
+              <EstudioOfertas />
+            </ProtectedRoute>
           </ModuleGate>
         }
       />
