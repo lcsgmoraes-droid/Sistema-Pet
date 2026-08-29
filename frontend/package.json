@@ -16,6 +16,7 @@
     "test:ui-dark-classes": "node scripts/test-ui-dark-classes.mjs",
     "test:auth-storage": "node scripts/test-token-storage.mjs",
     "test:auth-refresh": "node scripts/test-refresh-manager.mjs",
+    "test:tenant-selection": "node src/auth/tenantSelection.test.mjs",
     "test:corepet-branding": "node scripts/test-corepet-branding.mjs",
     "test:corepet-dialogs": "node scripts/test-corepet-dialogs.mjs",
     "test:number-input-wheel": "node src/utils/numberInputWheel.test.mjs",
