@@ -181,22 +181,53 @@ export default function HomeScreen() {
           >
             {ofertas.map((oferta) => {
               const vertical = oferta.formato !== 'quadrado';
+              const totalPaginas = Math.max(
+                1,
+                Number(oferta.total_paginas || oferta.imagens_urls?.length || 1),
+              );
+              const totalProdutos = Math.max(0, Number(oferta.total_produtos || 0));
+              const acaoOferta =
+                oferta.cta_label ||
+                (totalPaginas > 1
+                  ? oferta.modo_paginacao === 'produto_por_pagina'
+                    ? `Ver jornal — ${totalProdutos || totalPaginas} ofertas`
+                    : `Ver jornal — ${totalPaginas} páginas`
+                  : 'Ver oferta');
               return (
                 <TouchableOpacity
                   key={oferta.id}
                   style={[styles.ofertaCard, vertical && styles.ofertaCardVertical]}
                   activeOpacity={0.88}
                   onPress={() => void Linking.openURL(oferta.link_path)}
+                  accessibilityRole="link"
+                  accessibilityLabel={`${acaoOferta}: ${oferta.titulo}`}
                 >
-                  <Image
-                    source={{ uri: oferta.imagem_url }}
-                    style={styles.ofertaImagem}
-                    resizeMode="contain"
-                  />
-                  <Text style={styles.ofertaTitulo} numberOfLines={2}>
-                    {oferta.titulo}
-                  </Text>
-                  <Text style={styles.ofertaAcao}>Ver oferta completa</Text>
+                  <View style={styles.ofertaImagemArea}>
+                    <Image
+                      source={{ uri: oferta.imagem_url }}
+                      style={styles.ofertaImagem}
+                      resizeMode="contain"
+                    />
+                    {totalPaginas > 1 ? (
+                      <View style={styles.ofertaPaginasBadge}>
+                        <Text style={styles.ofertaPaginasBadgeText}>1 de {totalPaginas}</Text>
+                      </View>
+                    ) : null}
+                    <View style={styles.ofertaExpandirBadge}>
+                      <Ionicons name="expand-outline" size={16} color="#fff" />
+                    </View>
+                  </View>
+                  <View style={styles.ofertaRodape}>
+                    <Text style={styles.ofertaTitulo} numberOfLines={2}>
+                      {oferta.titulo}
+                    </Text>
+                    <View style={styles.ofertaAcaoRow}>
+                      <Text style={styles.ofertaAcao} numberOfLines={1}>
+                        {acaoOferta}
+                      </Text>
+                      <Ionicons name="chevron-forward" size={16} color={CORES.primario} />
+                    </View>
+                  </View>
                 </TouchableOpacity>
               );
             })}
@@ -634,22 +665,60 @@ const styles = StyleSheet.create({
   ofertaCardVertical: {
     width: 238,
   },
-  ofertaImagem: {
-    width: '100%',
+  ofertaImagemArea: {
     flex: 1,
+    position: 'relative',
     backgroundColor: '#17130F',
   },
-  ofertaTitulo: {
+  ofertaImagem: {
+    width: '100%',
+    height: '100%',
+  },
+  ofertaPaginasBadge: {
+    position: 'absolute',
+    top: ESPACO.sm,
+    right: ESPACO.sm,
+    borderRadius: RAIO.circulo,
+    backgroundColor: 'rgba(15, 23, 42, 0.84)',
+    paddingHorizontal: ESPACO.sm,
+    paddingVertical: 5,
+  },
+  ofertaPaginasBadgeText: {
+    color: '#fff',
+    fontSize: 11,
+    fontWeight: '900',
+  },
+  ofertaExpandirBadge: {
+    position: 'absolute',
+    right: ESPACO.sm,
+    bottom: ESPACO.sm,
+    width: 32,
+    height: 32,
+    borderRadius: RAIO.circulo,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(15, 23, 42, 0.84)',
+  },
+  ofertaRodape: {
     paddingHorizontal: ESPACO.md,
     paddingTop: ESPACO.sm,
+    paddingBottom: ESPACO.md,
+  },
+  ofertaTitulo: {
     color: CORES.texto,
     fontSize: FONTE.normal,
     fontWeight: '800',
   },
+  ofertaAcaoRow: {
+    minWidth: 0,
+    marginTop: 4,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: ESPACO.xs,
+  },
   ofertaAcao: {
-    paddingHorizontal: ESPACO.md,
-    paddingTop: 2,
-    paddingBottom: ESPACO.md,
+    flex: 1,
     color: CORES.primario,
     fontSize: FONTE.pequena,
     fontWeight: '800',

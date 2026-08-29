@@ -32,6 +32,7 @@ from app.services.ofertas_estudio_ai import (
 from app.services.ofertas_estudio_service import (
     buscar_produtos_publicaveis,
     montar_sugestao,
+    resumir_navegacao_publicacao,
     serializar_produto_oferta,
     validar_snapshot_publicacao,
 )
@@ -77,6 +78,8 @@ def _serializar_publicacao(
     publicacao: OfertaPublicacao, *, incluir_snapshot: bool = True
 ) -> dict:
     token = publicacao.indice_publico.token if publicacao.indice_publico else None
+    imagens_urls = list(publicacao.imagens_urls or [])
+    produtos_snapshot = list(publicacao.produtos_snapshot or [])
     payload = {
         "id": int(publicacao.id),
         "titulo": publicacao.titulo,
@@ -92,13 +95,18 @@ def _serializar_publicacao(
         "status": _status_publicacao(publicacao),
         "token": token,
         "link_path": f"/oferta/{token}" if token else None,
-        "imagens_urls": list(publicacao.imagens_urls or []),
+        "imagens_urls": imagens_urls,
+        **resumir_navegacao_publicacao(
+            publicacao.tipo_arte,
+            imagens_urls,
+            produtos_snapshot,
+        ),
         "created_at": publicacao.created_at.isoformat()
         if publicacao.created_at
         else None,
     }
     if incluir_snapshot:
-        payload["produtos"] = list(publicacao.produtos_snapshot or [])
+        payload["produtos"] = produtos_snapshot
         payload["configuracao"] = dict(publicacao.configuracao or {})
     return payload
 
@@ -406,6 +414,8 @@ def obter_publicacao_publica(token: str, db: Session = Depends(get_session)):
             raise HTTPException(status_code=404, detail="Oferta nao encontrada.")
         status = _status_publicacao(publicacao)
         ativa = status == "ativa"
+        imagens_urls = list(publicacao.imagens_urls or []) if ativa else []
+        produtos_snapshot = list(publicacao.produtos_snapshot or []) if ativa else []
         return {
             "titulo": publicacao.titulo,
             "empresa": tenant.name,
@@ -424,6 +434,13 @@ def obter_publicacao_publica(token: str, db: Session = Depends(get_session)):
             ),
             "inicio_em": publicacao.inicio_em.isoformat(),
             "fim_em": publicacao.fim_em.isoformat(),
-            "imagens_urls": list(publicacao.imagens_urls or []) if ativa else [],
-            "produtos": list(publicacao.produtos_snapshot or []) if ativa else [],
+            "tipo_arte": publicacao.tipo_arte,
+            "formato": publicacao.formato,
+            "imagens_urls": imagens_urls,
+            "produtos": produtos_snapshot,
+            **resumir_navegacao_publicacao(
+                publicacao.tipo_arte,
+                imagens_urls,
+                produtos_snapshot,
+            ),
         }

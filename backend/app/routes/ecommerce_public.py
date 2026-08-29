@@ -18,6 +18,7 @@ from app.services.validade_campanha_service import (
     mapear_ofertas_validade_por_produto,
     resolver_preco_publico_produto,
 )
+from app.services.ofertas_estudio_service import resumir_navegacao_publicacao
 from app.tenant_identity import normalize_tenant_name
 from app.tenancy.context import set_current_tenant
 
@@ -619,6 +620,11 @@ def listar_ofertas_ativas_publicas(
                 "imagem_url": imagens[0],
                 "imagens_urls": imagens,
                 "link_path": f"/oferta/{token}",
+                **resumir_navegacao_publicacao(
+                    publicacao.tipo_arte,
+                    imagens,
+                    publicacao.produtos_snapshot,
+                ),
             }
         )
         if len(items) >= limite:

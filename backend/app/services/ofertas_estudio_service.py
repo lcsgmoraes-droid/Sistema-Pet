@@ -29,6 +29,38 @@ ESTRATEGIAS = {
 STATUS_LOTE_BLOQUEADOS = {"vencido", "bloqueado", "esgotado", "excluido"}
 
 
+def resumir_navegacao_publicacao(
+    tipo_arte: str,
+    imagens_urls: Iterable[str] | None,
+    produtos_snapshot: Iterable[dict] | None,
+) -> dict:
+    """Monta o contrato comum usado nas chamadas do app e do e-commerce."""
+
+    total_paginas = len([url for url in (imagens_urls or []) if str(url).strip()])
+    total_produtos = len(list(produtos_snapshot or []))
+    paginas_individuais = tipo_arte in {"individual", "produto"}
+
+    if total_paginas <= 1:
+        cta_label = "Ver oferta"
+    elif tipo_arte == "individual":
+        quantidade = total_produtos or total_paginas
+        cta_label = f"Ver jornal — {quantidade} ofertas"
+    elif tipo_arte == "produto":
+        quantidade = total_produtos or total_paginas
+        cta_label = f"Ver catálogo — {quantidade} produtos"
+    else:
+        cta_label = f"Ver jornal — {total_paginas} páginas"
+
+    return {
+        "total_paginas": total_paginas,
+        "total_produtos": total_produtos,
+        "modo_paginacao": (
+            "produto_por_pagina" if paginas_individuais else "catalogo"
+        ),
+        "cta_label": cta_label,
+    }
+
+
 def _naive(value: datetime | None) -> datetime | None:
     if value is None:
         return None

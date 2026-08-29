@@ -40,6 +40,10 @@ export interface OfertaAtiva {
   imagem_url: string;
   imagens_urls: string[];
   link_path: string;
+  total_paginas?: number;
+  total_produtos?: number;
+  modo_paginacao?: "produto_por_pagina" | "catalogo";
+  cta_label?: string;
 }
 
 export async function listarOfertasAtivas(): Promise<OfertaAtiva[]> {

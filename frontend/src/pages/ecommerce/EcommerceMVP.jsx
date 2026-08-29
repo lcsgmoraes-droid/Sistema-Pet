@@ -111,6 +111,10 @@ export default function EcommerceMVP() {
       href: oferta.link_path,
       fit: "contain",
       title: oferta.titulo,
+      campaign: true,
+      pageCount: Number(oferta.total_paginas || oferta.imagens_urls?.length || 1),
+      productCount: Number(oferta.total_produtos || 0),
+      ctaLabel: oferta.cta_label || "Ver oferta",
     }));
     return [...bannersDeOfertas, ...buildActiveBanners(tenantContext)];
   }, [ofertasAtivas, tenantContext]);

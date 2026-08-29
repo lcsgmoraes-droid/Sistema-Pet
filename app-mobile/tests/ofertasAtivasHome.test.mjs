@@ -12,5 +12,8 @@ assert.match(service, /canal:\s*["']app["']/);
 assert.match(home, /listarOfertasAtivas/);
 assert.match(home, /resizeMode=["']contain["']/);
 assert.match(home, /Linking\.openURL\(oferta\.link_path\)/);
+assert.match(home, /1 de \{totalPaginas\}/);
+assert.match(home, /expand-outline/);
+assert.match(home, /oferta\.cta_label/);
 
 console.log('ofertasAtivasHome: ok');

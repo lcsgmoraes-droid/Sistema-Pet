@@ -18,6 +18,7 @@ from app.services.ofertas_estudio_ai import (
 )
 from app.services.ofertas_estudio_service import (
     produto_publicavel,
+    resumir_navegacao_publicacao,
     serializar_produto_oferta,
 )
 
@@ -172,6 +173,31 @@ def test_publicacao_so_aparece_nos_canais_marcados():
     assert _publicacao_habilitada_no_canal(configuracao, "app") is True
     assert _publicacao_habilitada_no_canal(configuracao, "ecommerce") is False
     assert _publicacao_habilitada_no_canal({}, "app") is False
+
+
+def test_resumo_de_navegacao_diferencia_jornal_e_produto_por_pagina():
+    individual = resumir_navegacao_publicacao(
+        "individual",
+        ["/pagina-1.png", "/pagina-2.png", "/pagina-3.png"],
+        [{"produto_id": 1}, {"produto_id": 2}, {"produto_id": 3}],
+    )
+    jornal = resumir_navegacao_publicacao(
+        "jornal",
+        ["/pagina-1.png", "/pagina-2.png"],
+        [{"produto_id": 1}, {"produto_id": 2}, {"produto_id": 3}],
+    )
+    unica = resumir_navegacao_publicacao(
+        "individual", ["/pagina-1.png"], [{"produto_id": 1}]
+    )
+
+    assert individual == {
+        "total_paginas": 3,
+        "total_produtos": 3,
+        "modo_paginacao": "produto_por_pagina",
+        "cta_label": "Ver jornal — 3 ofertas",
+    }
+    assert jornal["cta_label"] == "Ver jornal — 2 páginas"
+    assert unica["cta_label"] == "Ver oferta"
 
 
 def test_contrato_exige_preco_positivo_e_ao_menos_um_produto():

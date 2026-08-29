@@ -128,6 +128,27 @@ function BoxIcon() {
   );
 }
 
+function ExpandIcon({ size = 15 }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <polyline points="15 3 21 3 21 9" />
+      <polyline points="9 21 3 21 3 15" />
+      <line x1="21" y1="3" x2="14" y2="10" />
+      <line x1="3" y1="21" x2="10" y2="14" />
+    </svg>
+  );
+}
+
 function StoreTopbar({ cart, cartTotal, isMobile, styles: S, tenantContext }) {
   const cartCount = cart?.itens?.length || 0;
   const freeShippingThreshold = Number(tenantContext?.ecommerce_frete_gratis_acima || 0);
@@ -323,7 +344,9 @@ function StoreBanner({
               <a
                 href={banner.href || undefined}
                 aria-label={
-                  banner.href ? `Abrir ${banner.title || `oferta ${index + 1}`}` : undefined
+                  banner.href
+                    ? `${banner.ctaLabel || "Abrir oferta"}: ${banner.title || `oferta ${index + 1}`}`
+                    : undefined
                 }
                 target={banner.href ? "_blank" : undefined}
                 rel={banner.href ? "noreferrer" : undefined}
@@ -365,7 +388,7 @@ function StoreBanner({
                 )}
                 <img
                   src={resolveMediaUrl(banner.url)}
-                  alt={`Banner ${index + 1}`}
+                  alt={banner.title || `Banner ${index + 1}`}
                   style={{
                     width: "100%",
                     height: "100%",
@@ -376,6 +399,54 @@ function StoreBanner({
                     filter: isMobile ? "drop-shadow(0 6px 14px rgba(0,0,0,0.24))" : "none",
                   }}
                 />
+                {banner.campaign && Number(banner.pageCount || 1) > 1 && (
+                  <span
+                    style={{
+                      position: "absolute",
+                      top: isMobile ? 9 : 14,
+                      right: isMobile ? 9 : 14,
+                      zIndex: 2,
+                      padding: isMobile ? "5px 8px" : "7px 11px",
+                      borderRadius: 999,
+                      background: "rgba(15, 23, 42, 0.84)",
+                      color: "#fff",
+                      fontSize: isMobile ? 10 : 12,
+                      fontWeight: 800,
+                      boxShadow: "0 4px 14px rgba(0,0,0,0.18)",
+                    }}
+                  >
+                    1 de {banner.pageCount}
+                  </span>
+                )}
+                {banner.campaign && (
+                  <span
+                    style={{
+                      position: "absolute",
+                      right: isMobile ? 9 : 14,
+                      bottom: isMobile ? 9 : 14,
+                      zIndex: 2,
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 6,
+                      maxWidth: "calc(100% - 28px)",
+                      padding: isMobile ? "7px 10px" : "9px 13px",
+                      borderRadius: 999,
+                      background: "rgba(255, 255, 255, 0.94)",
+                      color: "#0f766e",
+                      fontSize: isMobile ? 10 : 12,
+                      fontWeight: 800,
+                      lineHeight: 1.1,
+                      boxShadow: "0 6px 18px rgba(0,0,0,0.22)",
+                    }}
+                  >
+                    <ExpandIcon size={isMobile ? 13 : 15} />
+                    <span
+                      style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+                    >
+                      {banner.ctaLabel || "Ver oferta"}
+                    </span>
+                  </span>
+                )}
               </a>
             ) : (
               <div
