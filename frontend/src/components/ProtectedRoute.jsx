@@ -1,4 +1,5 @@
 import { Navigate } from "react-router-dom";
+import { isAdminRole } from "../auth/userRole";
 import { useAuth } from "../contexts/AuthContext";
 
 const ProtectedRoute = ({ children, permission, requiredPermissions, anyOfPermissions }) => {
@@ -19,10 +20,8 @@ const ProtectedRoute = ({ children, permission, requiredPermissions, anyOfPermis
   // Se uma permissão específica é exigida
   if (permission || requiredPermissions || anyOfPermissions) {
     const userPermissions = user?.permissions || [];
-    const roleName = user?.role?.name?.toLowerCase();
-
     // Admin tem acesso a tudo
-    if (roleName === "admin") {
+    if (isAdminRole(user)) {
       return children;
     }
 

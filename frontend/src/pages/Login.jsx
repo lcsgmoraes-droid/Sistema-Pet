@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { FiAlertCircle, FiBriefcase, FiEye, FiEyeOff, FiLock, FiUser } from "react-icons/fi";
+import { getDefaultAuthenticatedRoute } from "../auth/userRole";
 import { useAuth } from "../contexts/AuthContext";
 
 const COREPET_LOGO = "/brand/corepet/corepet-horizontal.png";
@@ -24,16 +25,7 @@ const Login = () => {
       return;
     }
 
-    const user = JSON.parse(savedUser);
-    const roleName = user.role?.name?.toLowerCase();
-
-    if (roleName === "caixa") {
-      navigate("/pdv");
-    } else if (roleName === "admin" || roleName === "gerente") {
-      navigate("/dashboard");
-    } else {
-      navigate("/lembretes");
-    }
+    navigate(getDefaultAuthenticatedRoute(JSON.parse(savedUser)));
   };
 
   const handleSubmit = async (event) => {

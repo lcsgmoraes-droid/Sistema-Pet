@@ -29,7 +29,6 @@ from app.security.jwt_compat import JWTError, jwt
 from app.services.auth_security import register_logout
 from app.services.plan_limits import enforce_simultaneous_session_limit
 from app.session_manager import (
-    get_active_sessions,
     get_session_by_jti,
     revoke_session,
     validate_session,
@@ -279,18 +278,32 @@ def get_me_multitenant(
 @router.post("/logout-multitenant")
 def logout_multitenant(
     request: Request,
+    credentials: HTTPAuthorizationCredentials = Depends(security),
     db: Session = Depends(get_session),
     current_user: User = Depends(get_current_user),
 ):
     """
-    Revoga todas as sessoes do usuario.
+    Revoga somente a sessao usada nesta requisicao.
+
+    Outras sessoes do mesmo usuario, inclusive em outro navegador ou tenant,
+    permanecem ativas. O encerramento remoto de todas as sessoes continua sendo
+    tratado pelos fluxos administrativos especificos.
     """
-    sessions = get_active_sessions(db, current_user.id)
+    token_payload = jwt.decode(
+        credentials.credentials, SECRET_KEY, algorithms=[ALGORITHM]
+    )
+    token_jti = token_payload.get("jti")
+    db_session = get_session_by_jti(db, token_jti) if token_jti else None
 
-    for session in sessions:
-        revoke_session(db, session.id, current_user.id, "user_logout")
+    if not db_session or db_session.user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Sessao invalida. Faca login novamente.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
 
-    register_logout(db, current_user, request, len(sessions))
+    revoke_session(db, db_session.id, current_user.id, "user_logout")
+    register_logout(db, current_user, request, 1)
     db.commit()
 
     return {"message": "Logout realizado com sucesso"}
