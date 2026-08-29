@@ -30,7 +30,6 @@ from app.utils.serialization import safe_decimal_to_float_zero
 from app.utils.timezone import now_brasilia
 from app.vendas_models import Venda
 
-
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/gestor", tags=["App Mobile - Gestor"])
 
@@ -68,6 +67,9 @@ class GestorContaResumo(BaseModel):
 class GestorFluxoDiaResumo(BaseModel):
     data: date
     disponivel: bool = True
+    saldo_inicial: float = 0
+    saldo_do_dia: float = 0
+    saldo_previsto_do_dia: float = 0
     entradas_realizadas: float = 0
     saidas_realizadas: float = 0
     saldo_realizado: float = 0
@@ -81,12 +83,18 @@ class GestorDREResumo(BaseModel):
     periodo: str
     criterio: str
     receita_bruta: float = 0
+    descontos: float = 0
+    impostos: float = 0
+    deducoes_total: float = 0
     receita_liquida: float = 0
     cmv: float = 0
     despesas_variaveis: float = 0
     despesas_operacionais: float = 0
+    despesas_fixas_operacionais: float = 0
     lucro_bruto: float = 0
+    resultado_operacional: float = 0
     lucro_liquido: float = 0
+    margem_bruta: float = 0
     margem_liquida: float = 0
 
 
@@ -250,6 +258,9 @@ def _resumo_fluxo_hoje(
     projetado = realizado + fluxo.total_previsto_entradas - fluxo.total_previsto_saidas
     return GestorFluxoDiaResumo(
         data=hoje,
+        saldo_inicial=round(fluxo.saldo_inicial, 2),
+        saldo_do_dia=round(fluxo.saldo_final, 2),
+        saldo_previsto_do_dia=round(fluxo.saldo_previsto_final, 2),
         entradas_realizadas=round(fluxo.total_realizado_entradas, 2),
         saidas_realizadas=round(fluxo.total_realizado_saidas, 2),
         saldo_realizado=round(realizado, 2),
@@ -289,16 +300,26 @@ def _resumo_dre(
         user_and_tenant=(current_user, tenant_id),
     )
     totais = dre.totais
+    despesas_variaveis = float(totais.get("despesas_variaveis", 0))
+    despesas_operacionais = float(totais.get("despesas_operacionais", 0))
     return GestorDREResumo(
         periodo=dre.periodo,
         criterio=criterio,
         receita_bruta=round(float(totais.get("receita_bruta", 0)), 2),
+        descontos=round(float(totais.get("descontos", 0)), 2),
+        impostos=round(float(totais.get("impostos", 0)), 2),
+        deducoes_total=round(float(totais.get("deducoes_total", 0)), 2),
         receita_liquida=round(float(totais.get("receita_liquida", 0)), 2),
         cmv=round(float(totais.get("cmv", 0)), 2),
-        despesas_variaveis=round(float(totais.get("despesas_variaveis", 0)), 2),
-        despesas_operacionais=round(float(totais.get("despesas_operacionais", 0)), 2),
+        despesas_variaveis=round(despesas_variaveis, 2),
+        despesas_operacionais=round(despesas_operacionais, 2),
+        despesas_fixas_operacionais=round(
+            max(despesas_operacionais - despesas_variaveis, 0), 2
+        ),
         lucro_bruto=round(float(totais.get("lucro_bruto", 0)), 2),
+        resultado_operacional=round(float(totais.get("resultado_operacional", 0)), 2),
         lucro_liquido=round(float(totais.get("lucro_liquido", 0)), 2),
+        margem_bruta=round(float(totais.get("margem_bruta", 0)), 2),
         margem_liquida=round(float(totais.get("margem_liquida", 0)), 2),
     )
 

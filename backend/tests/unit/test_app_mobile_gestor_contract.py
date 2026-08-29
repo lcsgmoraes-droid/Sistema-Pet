@@ -1,6 +1,5 @@
 from pathlib import Path
 
-
 REPO_ROOT = Path(__file__).resolve().parents[3]
 
 
@@ -50,9 +49,22 @@ def test_mobile_gestor_screen_has_requested_periods_and_indicators():
         "Contas a receber",
         "Contas a pagar",
         "Resultado da DRE",
+        "Saldo do dia",
+        "Do dia",
+        "Como chegamos neste resultado",
+        "Despesas fixas e operacionais",
     ]:
         assert label in screen
     assert '"/app/gestor/resumo"' in service
+    for field in [
+        "saldo_inicial",
+        "saldo_do_dia",
+        "saldo_previsto_do_dia",
+        "descontos",
+        "impostos",
+        "despesas_fixas_operacionais",
+    ]:
+        assert field in service
 
 
 def test_app_navigator_routes_gestor_to_dedicated_navigation():
