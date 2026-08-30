@@ -61,7 +61,10 @@ def test_product_filter_requires_explicit_active_group_stock_share():
     assert "empresa_grupo_membros" in compiled
     assert "produto_origem_id = produtos.id" in compiled
     assert "empresa_consumidora_id" in compiled
-    assert "CAST(empresa_grupo_estoques_compartilhados.empresa_origem_id AS VARCHAR)" in compiled
+    assert (
+        "CAST(empresa_grupo_estoques_compartilhados.empresa_origem_id AS VARCHAR)"
+        in compiled
+    )
     assert (
         "CAST(empresa_grupo_estoques_compartilhados.empresa_consumidora_id AS VARCHAR)"
         in compiled
