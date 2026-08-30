@@ -7,6 +7,16 @@ from typing import Dict, Optional
 class BlingCatalogoMixin:
     """Operacoes de catalogo, estoque e pedidos do cliente Bling."""
 
+    def _resolver_deposito_estoque(
+        self, deposito_id: Optional[int]
+    ) -> Optional[int | str]:
+        """Resolve o deposito sem misturar configuracoes entre tenants."""
+        if deposito_id is not None:
+            return deposito_id
+        if getattr(self, "token_source", "") == "legacy":
+            return os.getenv("BLING_DEPOSITO_ID")
+        return None
+
     def listar_produtos(
         self,
         codigo: str = None,
@@ -118,11 +128,11 @@ class BlingCatalogoMixin:
         Args:
             produto_id: ID do produto no Bling
             estoque_novo: Novo saldo físico de estoque (valor absoluto)
-            deposito_id: ID do depósito (opcional, usa BLING_DEPOSITO_ID do .env se não informado)
+            deposito_id: ID do depósito (opcional). A variável global
+                BLING_DEPOSITO_ID só é usada na conexão legada.
             observacao: Observação para o lançamento
         """
-        # Deposito: parâmetro > variável de ambiente > sem especificar (Bling usa o padrão)
-        _deposito_id = deposito_id or os.getenv("BLING_DEPOSITO_ID")
+        _deposito_id = self._resolver_deposito_estoque(deposito_id)
 
         payload: Dict = {
             "produto": {"id": int(produto_id)},
@@ -152,7 +162,7 @@ class BlingCatalogoMixin:
         Returns:
             dict com saldoFisicoTotal, saldoVirtualTotal e lista de depositos
         """
-        _deposito_id = deposito_id or os.getenv("BLING_DEPOSITO_ID")
+        _deposito_id = self._resolver_deposito_estoque(deposito_id)
 
         params: Dict = {"idsProdutos[]": produto_id}
 
