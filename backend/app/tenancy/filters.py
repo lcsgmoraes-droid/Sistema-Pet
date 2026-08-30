@@ -70,6 +70,7 @@ PARTNER_READABLE_TENANT_TABLES = {
     "clientes",
     "pets",
     "produtos",
+    "produto_imagens",
 }
 
 
@@ -100,7 +101,7 @@ def _tenant_read_filter(cls, tenant_id):
         VetPartnerLink.ativo.is_(True),
     )
     criterios = [cls.tenant_id == tenant_id, cls.tenant_id.in_(partner_tenant_ids)]
-    if table_name == "produtos":
+    if table_name in {"produtos", "produto_imagens"}:
         from app.empresa_grupo_models import (
             EmpresaGrupo,
             EmpresaGrupoEstoqueCompartilhado,
@@ -139,7 +140,8 @@ def _tenant_read_filter(cls, tenant_id):
                 ),
             )
             .where(
-                EmpresaGrupoEstoqueCompartilhado.produto_origem_id == cls.id,
+                EmpresaGrupoEstoqueCompartilhado.produto_origem_id
+                == (cls.id if table_name == "produtos" else cls.produto_id),
                 empresa_id_sql(EmpresaGrupoEstoqueCompartilhado.empresa_origem_id)
                 == empresa_id_sql(cls.tenant_id),
                 empresa_id_sql(EmpresaGrupoEstoqueCompartilhado.empresa_consumidora_id)
