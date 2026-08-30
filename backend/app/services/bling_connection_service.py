@@ -109,11 +109,57 @@ def load_bling_credentials(
         "client_id": str(connection.oauth_client_id or "").strip(),
         "client_secret": connection.oauth_client_secret,
         "company_id": connection.company_id,
+        "stock_deposit_id": connection.stock_deposit_id,
         "expires_at": connection.expires_at,
         "last_refresh_at": connection.last_refresh_at,
         "renewal_count": int(connection.renewal_count or 0),
         "source": "tenant",
     }
+
+
+def save_bling_stock_deposit_id(
+    *,
+    tenant_id: UUID | str,
+    stock_deposit_id: int,
+    db: Session | None = None,
+) -> BlingConnection:
+    """Persiste o deposito de estoque pertencente a uma conexao Bling."""
+    resolved_tenant = _tenant_uuid(tenant_id)
+    try:
+        normalized_deposit_id = int(stock_deposit_id)
+    except (TypeError, ValueError) as error:
+        raise ValueError("Deposito do Bling invalido") from error
+    if not resolved_tenant:
+        raise ValueError("Tenant invalido para salvar o deposito do Bling")
+    if normalized_deposit_id <= 0:
+        raise ValueError("Deposito do Bling invalido")
+
+    owns_session = db is None
+    session = db or SessionLocal()
+    context = (
+        nullcontext(resolved_tenant)
+        if get_current_tenant() == resolved_tenant
+        else tenant_context(resolved_tenant)
+    )
+    try:
+        with context:
+            connection = (
+                session.query(BlingConnection)
+                .filter(BlingConnection.tenant_id == resolved_tenant)
+                .first()
+            )
+            if not connection:
+                raise ValueError("Conexao Bling nao encontrada para esta empresa")
+            connection.stock_deposit_id = normalized_deposit_id
+            session.commit()
+            session.refresh(connection)
+            return connection
+    except Exception:
+        session.rollback()
+        raise
+    finally:
+        if owns_session:
+            session.close()
 
 
 def load_bling_app_credentials(

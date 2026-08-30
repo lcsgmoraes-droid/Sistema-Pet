@@ -2,7 +2,15 @@
 
 from __future__ import annotations
 
-from sqlalchemy import Column, DateTime, Integer, String, Text, UniqueConstraint
+from sqlalchemy import (
+    BigInteger,
+    Column,
+    DateTime,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+)
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.sql import func
 
@@ -26,6 +34,7 @@ class BlingConnection(BaseTenantModel):
         "oauth_client_secret_encrypted", Text, nullable=True
     )
     company_id = Column(String(100), nullable=True, index=True)
+    stock_deposit_id = Column(BigInteger, nullable=True)
     status = Column(
         String(24), nullable=False, default="active", server_default="active"
     )

@@ -13,9 +13,46 @@ class BlingCatalogoMixin:
         """Resolve o deposito sem misturar configuracoes entre tenants."""
         if deposito_id is not None:
             return deposito_id
+        deposito_configurado = getattr(self, "stock_deposit_id", None)
+        if deposito_configurado:
+            return deposito_configurado
         if getattr(self, "token_source", "") == "legacy":
-            return os.getenv("BLING_DEPOSITO_ID")
-        return None
+            deposito_legado = os.getenv("BLING_DEPOSITO_ID")
+            if deposito_legado:
+                return deposito_legado
+        return self._descobrir_deposito_padrao_estoque()
+
+    def _descobrir_deposito_padrao_estoque(self) -> int:
+        """Descobre e memoriza o deposito padrao da empresa conectada."""
+        resposta = self.listar_depositos()
+        depositos = [
+            item
+            for item in resposta.get("data", [])
+            if item.get("id") and item.get("situacao", 1) in (1, True, "1")
+        ]
+        padroes = [item for item in depositos if item.get("padrao") is True]
+        selecionado = (
+            padroes[0] if padroes else (depositos[0] if len(depositos) == 1 else None)
+        )
+        if not selecionado:
+            raise ValueError(
+                "Nenhum deposito padrao do Bling foi identificado para esta empresa"
+            )
+
+        deposito_id = int(selecionado["id"])
+        self.stock_deposit_id = deposito_id
+        if getattr(self, "token_source", "") == "tenant" and getattr(
+            self, "tenant_id", None
+        ):
+            from app.services.bling_connection_service import (
+                save_bling_stock_deposit_id,
+            )
+
+            save_bling_stock_deposit_id(
+                tenant_id=self.tenant_id,
+                stock_deposit_id=deposito_id,
+            )
+        return deposito_id
 
     def listar_produtos(
         self,
@@ -45,6 +82,14 @@ class BlingCatalogoMixin:
             params["sku"] = sku
 
         return self._request("GET", "/produtos", data=params)
+
+    def listar_depositos(self, pagina: int = 1, limite: int = 100) -> Dict:
+        """Lista depositos disponiveis para a empresa conectada no Bling."""
+        return self._request(
+            "GET",
+            "/depositos",
+            data={"pagina": max(int(pagina or 1), 1), "limite": min(limite, 100)},
+        )
 
     def consultar_produto(self, produto_id: str) -> Dict:
         """
@@ -128,8 +173,8 @@ class BlingCatalogoMixin:
         Args:
             produto_id: ID do produto no Bling
             estoque_novo: Novo saldo físico de estoque (valor absoluto)
-            deposito_id: ID do depósito (opcional). A variável global
-                BLING_DEPOSITO_ID só é usada na conexão legada.
+            deposito_id: ID do depósito (opcional). Quando omitido, usa o
+                depósito persistido no tenant ou descobre o padrão no Bling.
             observacao: Observação para o lançamento
         """
         _deposito_id = self._resolver_deposito_estoque(deposito_id)
