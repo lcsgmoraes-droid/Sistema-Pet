@@ -5,7 +5,7 @@ from types import SimpleNamespace
 import pytest
 from pydantic import ValidationError
 
-from app.ofertas_estudio_routes import _status_publicacao
+from app.ofertas_estudio_routes import _serializar_publicacao, _status_publicacao
 from app.ofertas_estudio_schemas import OfertaPublicacaoCreate
 from app.routes.ecommerce_public import _publicacao_habilitada_no_canal
 from app.services import ofertas_estudio_ai
@@ -173,6 +173,32 @@ def test_publicacao_so_aparece_nos_canais_marcados():
     assert _publicacao_habilitada_no_canal(configuracao, "app") is True
     assert _publicacao_habilitada_no_canal(configuracao, "ecommerce") is False
     assert _publicacao_habilitada_no_canal({}, "app") is False
+
+
+def test_listagem_da_campanha_informa_os_canais_publicados():
+    agora = datetime.now(timezone.utc)
+    publicacao = SimpleNamespace(
+        id=12,
+        titulo="Jornal semanal",
+        periodicidade="semanal",
+        tipo_arte="jornal",
+        formato="quadrado",
+        inicio_em=agora,
+        fim_em=agora + timedelta(days=7),
+        expira_em=agora + timedelta(days=7),
+        desativada_em=None,
+        imagens_urls=["/uploads/ofertas/tenant/12/pagina.png"],
+        produtos_snapshot=[{"produto_id": 1}],
+        configuracao={"canais": {"app": True, "ecommerce": True}},
+        indice_publico=SimpleNamespace(token="t" * 32),
+        created_at=agora,
+    )
+
+    resultado = _serializar_publicacao(publicacao, incluir_snapshot=False)
+
+    assert resultado["id"] == 12
+    assert resultado["canais"] == {"app": True, "ecommerce": True}
+    assert "configuracao" not in resultado
 
 
 def test_resumo_de_navegacao_diferencia_jornal_e_produto_por_pagina():

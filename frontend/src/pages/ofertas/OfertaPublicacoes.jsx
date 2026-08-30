@@ -1,4 +1,4 @@
-import { Copy, ExternalLink, Link2Off, MessageCircle } from "lucide-react";
+import { Copy, ExternalLink, Link2Off, MessageCircle, Smartphone, Store } from "lucide-react";
 
 const STATUS_STYLE = {
   ativa: "bg-emerald-100 text-emerald-700",
@@ -11,7 +11,17 @@ export default function OfertaPublicacoes({ publicacoes, onDesativar, onCopiar, 
   if (!publicacoes.length) return null;
   return (
     <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-      <h2 className="font-black text-slate-950">Links publicados</h2>
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div>
+          <h2 className="font-black text-slate-950">Campanhas salvas</h2>
+          <p className="mt-1 text-xs text-slate-500">
+            Cada campanha é independente. Você pode manter várias ativas ao mesmo tempo.
+          </p>
+        </div>
+        <span className="rounded-full bg-violet-100 px-3 py-1 text-xs font-black text-violet-700">
+          {publicacoes.length} campanha(s)
+        </span>
+      </div>
       <div className="mt-4 space-y-3">
         {publicacoes.map((item) => {
           const link = `${window.location.origin}${item.link_path}`;
@@ -33,6 +43,18 @@ export default function OfertaPublicacoes({ publicacoes, onDesativar, onCopiar, 
                 <p className="mt-1 text-xs text-slate-500">
                   Expira em {new Date(item.expira_em).toLocaleString("pt-BR")}
                 </p>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {item.canais?.ecommerce ? (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-orange-50 px-2 py-1 text-[10px] font-black text-orange-700">
+                      <Store size={12} /> E-commerce
+                    </span>
+                  ) : null}
+                  {item.canais?.app ? (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2 py-1 text-[10px] font-black text-blue-700">
+                      <Smartphone size={12} /> Aplicativo
+                    </span>
+                  ) : null}
+                </div>
               </div>
               <div className="flex flex-wrap gap-2">
                 <button
