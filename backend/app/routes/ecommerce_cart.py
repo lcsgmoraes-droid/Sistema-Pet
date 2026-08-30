@@ -198,8 +198,10 @@ def _serialize_carrinho(db: Session, carrinho: Pedido) -> dict:
         produtos_por_id = {produto.id: produto for produto in produtos_locais}
     for produto_id in produto_ids - set(produtos_por_id):
         try:
-            resolvido = EmpresaGrupoEstoqueCompartilhadoService.resolver_produto_catalogo(
-                db, carrinho.tenant_id, produto_id
+            resolvido = (
+                EmpresaGrupoEstoqueCompartilhadoService.resolver_produto_catalogo(
+                    db, carrinho.tenant_id, produto_id
+                )
             )
             produtos_por_id[produto_id] = resolvido.produto
         except HTTPException:
