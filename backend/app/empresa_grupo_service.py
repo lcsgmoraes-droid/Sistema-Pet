@@ -8,7 +8,6 @@ from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
 
 from fastapi import HTTPException, status
-from sqlalchemy import String, cast, func
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -19,6 +18,7 @@ from app.empresa_grupo_models import (
     EmpresaGrupoEstoqueCompartilhado,
     EmpresaGrupoMembro,
 )
+from app.empresa_grupo_sql import empresa_id_igual
 from app.models import Tenant
 from app.evolucao_corepet import registrar_uso_funcionalidade
 from app.services.business_audit_service import log_business_event
@@ -454,27 +454,13 @@ class EmpresaGrupoService:
             .filter(
                 EmpresaGrupoEstoqueCompartilhado.grupo_id == grupo.id,
                 EmpresaGrupoEstoqueCompartilhado.status == "ativo",
-                (
-                    func.replace(
-                        cast(
-                            EmpresaGrupoEstoqueCompartilhado.empresa_origem_id,
-                            String,
-                        ),
-                        "-",
-                        "",
-                    )
-                    == str(membro_empresa_id).replace("-", "")
+                empresa_id_igual(
+                    EmpresaGrupoEstoqueCompartilhado.empresa_origem_id,
+                    membro_empresa_id,
                 )
-                | (
-                    func.replace(
-                        cast(
-                            EmpresaGrupoEstoqueCompartilhado.empresa_consumidora_id,
-                            String,
-                        ),
-                        "-",
-                        "",
-                    )
-                    == str(membro_empresa_id).replace("-", "")
+                | empresa_id_igual(
+                    EmpresaGrupoEstoqueCompartilhado.empresa_consumidora_id,
+                    membro_empresa_id,
                 ),
             )
             .all()

@@ -6,11 +6,12 @@ from decimal import Decimal
 from typing import Any, List, Optional
 
 from fastapi import HTTPException
-from sqlalchemy import String, and_, cast, func, or_
+from sqlalchemy import and_, func, or_
 from sqlalchemy import select
 from sqlalchemy.orm import Session, aliased, joinedload, noload
 
 from app.models import Cliente, FornecedorGrupo
+from app.empresa_grupo_sql import empresa_id_igual, empresa_id_sql
 from app.partner_utils import is_partner_owned
 from app.produtos_models import Produto, ProdutoFornecedor
 from app.produtos.search import (
@@ -80,36 +81,24 @@ def _montar_query_produtos_vendaveis(
             membro_origem,
             (membro_origem.grupo_id == EmpresaGrupoEstoqueCompartilhado.grupo_id)
             & (
-                func.replace(cast(membro_origem.empresa_id, String), "-", "")
-                == func.replace(
-                    cast(EmpresaGrupoEstoqueCompartilhado.empresa_origem_id, String),
-                    "-",
-                    "",
-                )
+                empresa_id_sql(membro_origem.empresa_id)
+                == empresa_id_sql(EmpresaGrupoEstoqueCompartilhado.empresa_origem_id)
             ),
         )
         .join(
             membro_consumidora,
             (membro_consumidora.grupo_id == EmpresaGrupoEstoqueCompartilhado.grupo_id)
             & (
-                func.replace(cast(membro_consumidora.empresa_id, String), "-", "")
-                == func.replace(
-                    cast(
-                        EmpresaGrupoEstoqueCompartilhado.empresa_consumidora_id,
-                        String,
-                    ),
-                    "-",
-                    "",
+                empresa_id_sql(membro_consumidora.empresa_id)
+                == empresa_id_sql(
+                    EmpresaGrupoEstoqueCompartilhado.empresa_consumidora_id
                 )
             ),
         )
         .where(
-            func.replace(
-                cast(EmpresaGrupoEstoqueCompartilhado.empresa_consumidora_id, String),
-                "-",
-                "",
-            )
-            == str(tenant_id).replace("-", ""),
+            empresa_id_igual(
+                EmpresaGrupoEstoqueCompartilhado.empresa_consumidora_id, tenant_id
+            ),
             EmpresaGrupoEstoqueCompartilhado.status == "ativo",
             EmpresaGrupo.status == "ativo",
             membro_origem.status == "ativo",

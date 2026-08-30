@@ -9,7 +9,7 @@ from typing import Iterable
 from uuid import UUID
 
 from fastapi import HTTPException, status
-from sqlalchemy import MetaData, String, Table, cast, func, or_
+from sqlalchemy import MetaData, Table, func, or_
 from sqlalchemy.orm import Session, aliased
 
 from app.empresa_grupo_models import (
@@ -17,6 +17,7 @@ from app.empresa_grupo_models import (
     EmpresaGrupoEstoqueCompartilhado,
     EmpresaGrupoMembro,
 )
+from app.empresa_grupo_sql import empresa_id_igual, empresa_id_sql
 from app.evolucao_corepet import registrar_uso_funcionalidade
 from app.models import Tenant
 from app.produtos_models import Produto
@@ -85,12 +86,6 @@ class EmpresaGrupoEstoqueCompartilhadoService:
         except (AttributeError, NotImplementedError):
             pass
         return str(value)
-
-    @staticmethod
-    def _empresa_coluna_igual(coluna, value):
-        return func.replace(cast(coluna, String), "-", "") == str(value).replace(
-            "-", ""
-        )
 
     def _inserir_novos_compartilhamentos(
         self,
@@ -207,10 +202,10 @@ class EmpresaGrupoEstoqueCompartilhadoService:
             self.db.query(EmpresaGrupoEstoqueCompartilhado)
             .filter(
                 EmpresaGrupoEstoqueCompartilhado.grupo_id == grupo_id,
-                self._empresa_coluna_igual(
+                empresa_id_igual(
                     EmpresaGrupoEstoqueCompartilhado.empresa_origem_id, origem
                 ),
-                self._empresa_coluna_igual(
+                empresa_id_igual(
                     EmpresaGrupoEstoqueCompartilhado.empresa_consumidora_id,
                     consumidora,
                 ),
@@ -252,34 +247,25 @@ class EmpresaGrupoEstoqueCompartilhadoService:
             )
             .join(
                 origem_tenant,
-                func.replace(cast(origem_tenant.id, String), "-", "")
-                == func.replace(
-                    cast(EmpresaGrupoEstoqueCompartilhado.empresa_origem_id, String),
-                    "-",
-                    "",
-                ),
+                empresa_id_sql(origem_tenant.id)
+                == empresa_id_sql(EmpresaGrupoEstoqueCompartilhado.empresa_origem_id),
             )
             .join(
                 consumidora_tenant,
-                func.replace(cast(consumidora_tenant.id, String), "-", "")
-                == func.replace(
-                    cast(
-                        EmpresaGrupoEstoqueCompartilhado.empresa_consumidora_id,
-                        String,
-                    ),
-                    "-",
-                    "",
+                empresa_id_sql(consumidora_tenant.id)
+                == empresa_id_sql(
+                    EmpresaGrupoEstoqueCompartilhado.empresa_consumidora_id
                 ),
             )
             .filter(
                 EmpresaGrupoEstoqueCompartilhado.grupo_id == grupo_id,
                 EmpresaGrupoEstoqueCompartilhado.status == "ativo",
                 or_(
-                    self._empresa_coluna_igual(
+                    empresa_id_igual(
                         EmpresaGrupoEstoqueCompartilhado.empresa_origem_id,
                         empresa_atual,
                     ),
-                    self._empresa_coluna_igual(
+                    empresa_id_igual(
                         EmpresaGrupoEstoqueCompartilhado.empresa_consumidora_id,
                         empresa_atual,
                     ),
@@ -369,11 +355,11 @@ class EmpresaGrupoEstoqueCompartilhadoService:
                 self.db.query(EmpresaGrupoEstoqueCompartilhado)
                 .filter(
                     EmpresaGrupoEstoqueCompartilhado.grupo_id == grupo_id,
-                    self._empresa_coluna_igual(
+                    empresa_id_igual(
                         EmpresaGrupoEstoqueCompartilhado.empresa_origem_id, origem
                     ),
                     EmpresaGrupoEstoqueCompartilhado.produto_origem_id == produto_id,
-                    self._empresa_coluna_igual(
+                    empresa_id_igual(
                         EmpresaGrupoEstoqueCompartilhado.empresa_consumidora_id,
                         consumidora,
                     ),
@@ -427,7 +413,7 @@ class EmpresaGrupoEstoqueCompartilhadoService:
             .filter(
                 EmpresaGrupoEstoqueCompartilhado.id == compartilhamento_id,
                 EmpresaGrupoEstoqueCompartilhado.grupo_id == grupo_id,
-                self._empresa_coluna_igual(
+                empresa_id_igual(
                     EmpresaGrupoEstoqueCompartilhado.empresa_origem_id, origem
                 ),
                 EmpresaGrupoEstoqueCompartilhado.status == "ativo",
@@ -469,14 +455,9 @@ class EmpresaGrupoEstoqueCompartilhadoService:
                 membro_origem,
                 (membro_origem.grupo_id == EmpresaGrupoEstoqueCompartilhado.grupo_id)
                 & (
-                    func.replace(cast(membro_origem.empresa_id, String), "-", "")
-                    == func.replace(
-                        cast(
-                            EmpresaGrupoEstoqueCompartilhado.empresa_origem_id,
-                            String,
-                        ),
-                        "-",
-                        "",
+                    empresa_id_sql(membro_origem.empresa_id)
+                    == empresa_id_sql(
+                        EmpresaGrupoEstoqueCompartilhado.empresa_origem_id
                     )
                 ),
             )
@@ -487,28 +468,19 @@ class EmpresaGrupoEstoqueCompartilhadoService:
                     == EmpresaGrupoEstoqueCompartilhado.grupo_id
                 )
                 & (
-                    func.replace(cast(membro_consumidora.empresa_id, String), "-", "")
-                    == func.replace(
-                        cast(
-                            EmpresaGrupoEstoqueCompartilhado.empresa_consumidora_id,
-                            String,
-                        ),
-                        "-",
-                        "",
+                    empresa_id_sql(membro_consumidora.empresa_id)
+                    == empresa_id_sql(
+                        EmpresaGrupoEstoqueCompartilhado.empresa_consumidora_id
                     )
                 ),
             )
             .join(
                 Tenant,
-                func.replace(cast(Tenant.id, String), "-", "")
-                == func.replace(
-                    cast(EmpresaGrupoEstoqueCompartilhado.empresa_origem_id, String),
-                    "-",
-                    "",
-                ),
+                empresa_id_sql(Tenant.id)
+                == empresa_id_sql(EmpresaGrupoEstoqueCompartilhado.empresa_origem_id),
             )
             .filter(
-                cls._empresa_coluna_igual(
+                empresa_id_igual(
                     EmpresaGrupoEstoqueCompartilhado.empresa_consumidora_id,
                     empresa_consumidora_id,
                 ),
