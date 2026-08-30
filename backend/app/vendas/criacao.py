@@ -199,6 +199,11 @@ def criar_venda(
         # ============================================================
 
         from app.produtos_models import Produto
+        from app.empresa_grupo_estoque_compartilhado_service import (
+            EmpresaGrupoEstoqueCompartilhadoService,
+            contexto_tenant_estoque,
+            resolver_tenant_estoque_item,
+        )
 
         for item_data in itens:
             # 🔒 VALIDAÇÃO CRÍTICA: XOR entre produto_id e product_variation_id
@@ -206,6 +211,7 @@ def criar_venda(
             product_variation_id = item_data.get("product_variation_id")
             tipo_solicitado = str(item_data.get("tipo") or "produto").strip().lower()
             produto_catalogo = None
+            produto_resolvido = None
 
             if produto_id and product_variation_id:
                 raise HTTPException(
@@ -216,19 +222,12 @@ def criar_venda(
             # O tipo informado pelo cliente nunca pode burlar a regra do cadastro.
             # Todo item ligado ao catalogo e carregado no tenant e normalizado aqui.
             if produto_id:
-                produto_catalogo = (
-                    db.query(Produto)
-                    .filter(
-                        Produto.id == produto_id,
-                        Produto.tenant_id == payload.get("tenant_id"),
+                produto_resolvido = (
+                    EmpresaGrupoEstoqueCompartilhadoService.resolver_produto_venda(
+                        db, payload.get("tenant_id"), produto_id
                     )
-                    .first()
                 )
-                if not produto_catalogo:
-                    raise HTTPException(
-                        status_code=404,
-                        detail=f"Produto ID {produto_id} não encontrado",
-                    )
+                produto_catalogo = produto_resolvido.produto
                 if produto_catalogo.tipo_produto == "PAI":
                     raise HTTPException(
                         status_code=400,
@@ -281,7 +280,29 @@ def criar_venda(
                 servico_descricao=item_data.get("servico_descricao")
                 or (
                     produto_catalogo.nome
-                    if produto_catalogo is not None and tipo_item == "servico"
+                    if produto_catalogo is not None
+                    and (
+                        tipo_item == "servico"
+                        or (
+                            produto_resolvido is not None
+                            and produto_resolvido.compartilhado
+                        )
+                    )
+                    else None
+                ),
+                estoque_origem_tenant_id=(
+                    produto_resolvido.tenant_origem_id
+                    if produto_resolvido is not None and produto_resolvido.compartilhado
+                    else None
+                ),
+                estoque_compartilhado_id=(
+                    produto_resolvido.compartilhamento_id
+                    if produto_resolvido is not None
+                    else None
+                ),
+                estoque_origem_nome=(
+                    produto_resolvido.empresa_origem_nome
+                    if produto_resolvido is not None
                     else None
                 ),
                 quantidade=item_data["quantidade"],
@@ -380,33 +401,43 @@ def criar_venda(
                 try:
                     from app.produtos_models import Produto
 
-                    # Buscar produto
-                    produto = (
-                        db.query(Produto)
-                        .filter(
-                            Produto.id == item.produto_id,
-                            Produto.tenant_id == tenant_id,
-                        )
-                        .first()
+                    tenant_estoque, compartilhado = resolver_tenant_estoque_item(
+                        item, tenant_id
                     )
-
-                    if not produto:
-                        logger.warning(
-                            f"⚠️  Produto {item.produto_id} não encontrado ao criar venda"
+                    with contexto_tenant_estoque(
+                        tenant_estoque, tenant_id
+                    ) as tenant_estoque_uuid:
+                        produto = (
+                            db.query(Produto)
+                            .filter(
+                                Produto.id == item.produto_id,
+                                Produto.tenant_id == tenant_estoque_uuid,
+                            )
+                            .first()
                         )
-                        continue
 
-                    # Baixar estoque
-                    resultados = processar_baixa_estoque_item(
-                        produto=produto,
-                        quantidade_vendida=float(item.quantidade),
-                        venda_id=venda.id,
-                        user_id=user_id,
-                        tenant_id=tenant_id,
-                        db=db,
-                        product_variation_id=None,
-                        venda_codigo=numero_venda,
-                    )
+                        if not produto:
+                            logger.warning(
+                                f"⚠️  Produto {item.produto_id} não encontrado ao criar venda"
+                            )
+                            continue
+
+                        # A movimentação e a fila do Bling pertencem ao tenant de origem.
+                        resultados = processar_baixa_estoque_item(
+                            produto=produto,
+                            quantidade_vendida=float(item.quantidade),
+                            venda_id=venda.id,
+                            user_id=0 if compartilhado else user_id,
+                            tenant_id=tenant_estoque_uuid,
+                            db=db,
+                            product_variation_id=None,
+                            venda_codigo=numero_venda,
+                            observacao=(
+                                f"Venda em estoque compartilhado pelo tenant {tenant_id}"
+                                if compartilhado
+                                else None
+                            ),
+                        )
 
                     estoque_baixado.extend(resultados)
                     logger.info(

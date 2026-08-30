@@ -72,6 +72,10 @@ export function usePDVCarrinhoItens({
         estoque_atual: produto.estoque_atual,
         estoque_virtual: produto.estoque_virtual,
         controlar_estoque: produto.controlar_estoque !== false && produto.tipo !== "servico",
+        estoque_compartilhado: Boolean(produto.estoque_compartilhado),
+        estoque_compartilhado_id: produto.estoque_compartilhado_id || null,
+        estoque_origem_empresa_id: produto.estoque_origem_empresa_id || null,
+        estoque_origem_nome: produto.estoque_origem_nome || null,
       });
     }
 

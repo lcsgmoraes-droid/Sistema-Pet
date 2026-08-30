@@ -27,6 +27,9 @@ from app.produtos.schemas import ProdutosPaginadosResponse
 from app.produtos.validade import _mapa_validade_proxima_produtos
 from app.produtos.validators import _validar_tenant_e_obter_usuario
 from app.security.permissions_decorator import require_permission
+from app.empresa_grupo_estoque_compartilhado_service import (
+    EmpresaGrupoEstoqueCompartilhadoService,
+)
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -105,6 +108,11 @@ def listar_produtos_vendaveis(
         incluir_lotes=False,
         contar_total=contar_total,
     )
+    compartilhamentos = (
+        EmpresaGrupoEstoqueCompartilhadoService.mapa_ativos_para_consumidora(
+            db, tenant_id, [produto.id for produto in produtos]
+        )
+    )
 
     # Ordenação inteligente: prioriza match exato no código
 
@@ -119,6 +127,7 @@ def listar_produtos_vendaveis(
             tenant_id,
             {},
             incluir_detalhes_composto=False,
+            estoque_compartilhado_por_produto=compartilhamentos,
         )
 
     return _montar_resposta_produtos_paginados(

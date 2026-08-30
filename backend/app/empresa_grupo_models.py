@@ -246,3 +246,61 @@ class EmpresaGrupoProdutoVinculo(Base):
         onupdate=func.now(),
     )
     removido_em = Column(DateTime(timezone=True), nullable=True)
+
+
+class EmpresaGrupoEstoqueCompartilhado(Base):
+    """Autoriza uma empresa do grupo a vender o saldo de outra empresa.
+
+    O produto e o estoque continuam pertencendo exclusivamente ao tenant de
+    origem. Este registro apenas concede leitura e uso no PDV da empresa
+    consumidora; ele nunca transfere saldo entre empresas.
+    """
+
+    __tablename__ = "empresa_grupo_estoques_compartilhados"
+    __table_args__ = (
+        UniqueConstraint(
+            "grupo_id",
+            "empresa_origem_id",
+            "produto_origem_id",
+            "empresa_consumidora_id",
+            name="uq_empresa_grupo_estoque_compartilhado",
+        ),
+        Index(
+            "ix_empresa_grupo_estoque_compartilhado_consumidora_status",
+            "empresa_consumidora_id",
+            "status",
+        ),
+        Index(
+            "ix_empresa_grupo_estoque_compartilhado_origem_status",
+            "empresa_origem_id",
+            "status",
+        ),
+    )
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    grupo_id = Column(
+        Integer,
+        ForeignKey("empresa_grupos.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    empresa_origem_id = Column(
+        String(36), ForeignKey("tenants.id", ondelete="RESTRICT"), nullable=False
+    )
+    produto_origem_id = Column(
+        Integer, ForeignKey("produtos.id", ondelete="RESTRICT"), nullable=False
+    )
+    empresa_consumidora_id = Column(
+        String(36), ForeignKey("tenants.id", ondelete="RESTRICT"), nullable=False
+    )
+    status = Column(String(20), nullable=False, default="ativo", server_default="ativo")
+    criado_por_usuario_id = Column(Integer, nullable=False)
+    criado_em = Column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+    atualizado_em = Column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+        onupdate=func.now(),
+    )
+    removido_em = Column(DateTime(timezone=True), nullable=True)

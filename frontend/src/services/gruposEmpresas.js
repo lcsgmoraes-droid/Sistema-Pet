@@ -93,3 +93,30 @@ export async function removerEmpresaGrupo(grupoId, empresaId) {
   );
   return data;
 }
+
+export async function listarEstoqueCompartilhadoGrupo(grupoId) {
+  const { data } = await api.get(`/grupos-empresas/${grupoId}/estoque-compartilhado`);
+  return data;
+}
+
+export async function buscarProdutosEstoqueCompartilhado(grupoId, params = {}) {
+  const { data } = await api.get(`/grupos-empresas/${grupoId}/estoque-compartilhado/produtos`, {
+    params,
+  });
+  return data;
+}
+
+export async function compartilharEstoqueGrupo(grupoId, empresaConsumidoraId, produtoIds) {
+  const { data } = await api.post(`/grupos-empresas/${grupoId}/estoque-compartilhado`, {
+    empresa_consumidora_id: empresaConsumidoraId,
+    produto_ids: produtoIds,
+  });
+  return data;
+}
+
+export async function removerEstoqueCompartilhadoGrupo(grupoId, compartilhamentoId) {
+  const { data } = await api.delete(
+    `/grupos-empresas/${grupoId}/estoque-compartilhado/${compartilhamentoId}`,
+  );
+  return data;
+}

@@ -10,6 +10,7 @@ from app.empresa_grupo_models import (
     EmpresaGrupo,
     EmpresaGrupoCodigo,
     EmpresaGrupoConvite,
+    EmpresaGrupoEstoqueCompartilhado,
     EmpresaGrupoMembro,
 )
 from app.empresa_grupo_service import EmpresaGrupoService
@@ -33,6 +34,7 @@ def db(monkeypatch):
             EmpresaGrupoMembro.__table__,
             EmpresaGrupoCodigo.__table__,
             EmpresaGrupoConvite.__table__,
+            EmpresaGrupoEstoqueCompartilhado.__table__,
         ],
     )
     session = Session(engine)

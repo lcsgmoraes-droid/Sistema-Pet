@@ -93,6 +93,14 @@ function ProdutoSugestaoPDV({
               <span className="min-w-0 truncate" title={produto.nome}>
                 {produto.nome}
               </span>
+              {produto.estoque_compartilhado && (
+                <span
+                  className="shrink-0 rounded-full bg-violet-100 px-2 py-0.5 text-[11px] font-semibold text-violet-700"
+                  title="O saldo será baixado na empresa de origem e sincronizado com o Bling dela"
+                >
+                  Estoque · {produto.estoque_origem_nome || "outra empresa"}
+                </span>
+              )}
               {estoqueZerado && vendaAtual.cliente && (
                 <span
                   onClick={(e) => onAdicionarNaListaEsperaRapido(produto, e)}
@@ -328,6 +336,14 @@ export default function PDVProdutosCard({
                             className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold uppercase tracking-wide text-amber-700"
                           >
                             promocao
+                          </span>
+                        )}
+                        {item.estoque_compartilhado && (
+                          <span
+                            className="inline-flex items-center rounded-full bg-violet-100 px-2 py-0.5 text-xs font-semibold text-violet-700"
+                            title="A baixa deste item acontece no estoque da empresa de origem"
+                          >
+                            Estoque · {item.estoque_origem_nome || "outra empresa"}
                           </span>
                         )}
                         {vendaAtual.cliente && itemSemEstoque && (

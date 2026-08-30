@@ -434,6 +434,16 @@ class EstoqueService:
         )
         estoque_novo = produto.estoque_atual
 
+        user_id_movimentacao = (
+            user_id
+            if user_id and user_id > 0
+            else EstoqueService._resolver_user_id_operacao(
+                db=db,
+                tenant_id=tenant_id,
+                user_id=user_id,
+            )
+        )
+
         # Criar movimentação de estoque (entrada)
         movimentacao = EstoqueMovimentacao(
             produto_id=produto.id,
@@ -462,7 +472,7 @@ class EstoqueService:
             referencia_id=referencia_id,
             referencia_tipo=referencia_tipo,
             observacao=observacao,
-            user_id=user_id,
+            user_id=user_id_movimentacao,
             tenant_id=tenant_id,
         )
         db.add(movimentacao)
