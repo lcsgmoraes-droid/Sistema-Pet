@@ -31,6 +31,10 @@ const params = montarParamsFiltrosContasReceber(todosPeriodos);
 assert.equal(params.get("cliente_id"), "42");
 assert.equal(params.get("status"), "em_aberto");
 
+const paramsBusca = montarParamsFiltrosContasReceber(todosPeriodos, "  Maria 1199999  ");
+assert.equal(paramsBusca.get("busca"), "Maria 1199999");
+assert.equal(paramsBusca.has("numero_venda"), false);
+
 assert.deepEqual(normalizarListaClientes([{ id: 1 }]), [{ id: 1 }]);
 assert.deepEqual(normalizarListaClientes({ items: [{ id: 2 }] }), [{ id: 2 }]);
 assert.deepEqual(normalizarListaClientes({ clientes: [{ id: 3 }] }), [{ id: 3 }]);

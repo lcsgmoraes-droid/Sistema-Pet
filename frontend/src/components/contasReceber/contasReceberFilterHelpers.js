@@ -41,7 +41,7 @@ export function aplicarPeriodoRapidoContasReceber(filtros, periodo) {
   return novosFiltros;
 }
 
-export function montarParamsFiltrosContasReceber(filtros = {}, numeroVenda = "") {
+export function montarParamsFiltrosContasReceber(filtros = {}, busca = "") {
   const params = new URLSearchParams();
   if (filtros.status && filtros.status !== "todos") params.append("status", filtros.status);
   if (filtros.cliente_id) params.append("cliente_id", filtros.cliente_id);
@@ -49,6 +49,7 @@ export function montarParamsFiltrosContasReceber(filtros = {}, numeroVenda = "")
   if (filtros.data_fim) params.append("data_fim", filtros.data_fim);
   if (filtros.apenas_vencidas) params.append("apenas_vencidas", "true");
   if (filtros.apenas_vencer) params.append("apenas_vencer", "true");
-  if (numeroVenda) params.append("numero_venda", numeroVenda);
+  const termoBusca = String(busca || "").trim();
+  if (termoBusca) params.append("busca", termoBusca);
   return params;
 }

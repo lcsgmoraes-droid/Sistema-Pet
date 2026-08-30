@@ -4,7 +4,7 @@ from datetime import date, timedelta
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import and_, desc, func
+from sqlalchemy import and_, desc, func, or_, select
 from sqlalchemy.orm import Session, joinedload
 
 from .auth.dependencies import get_current_user_and_tenant
@@ -15,6 +15,11 @@ from .contas_receber_encargos import (
 )
 from .contas_receber_schemas import ContaReceberResponse
 from .db import get_session
+from .clientes.common import _somente_digitos_coluna
+from .financeiro.contas_pagar_common import (
+    _expressao_texto_busca,
+    _normalizar_texto_busca,
+)
 from .financeiro_models import ContaReceber
 from .models import Cliente
 from .utils.timezone import now_brasilia
@@ -22,6 +27,48 @@ from .utils.timezone import now_brasilia
 router = APIRouter()
 
 STATUS_CONTAS_RECEBER_EM_ABERTO = ("pendente", "parcial", "vencido", "vencida")
+
+
+def _montar_condicao_busca_contas_receber(tenant_id, busca: str):
+    """Monta a busca geral sem permitir resultados de outra empresa."""
+    from .vendas_models import Venda
+
+    termo_busca = (busca or "").strip()
+    busca_pattern = f"%{_normalizar_texto_busca(termo_busca)}%"
+    termo_digitos = "".join(ch for ch in termo_busca if ch.isdigit())
+
+    filtros_cliente = [
+        _expressao_texto_busca(Cliente.codigo).like(busca_pattern),
+        _expressao_texto_busca(Cliente.nome).like(busca_pattern),
+        _expressao_texto_busca(Cliente.nome_fantasia).like(busca_pattern),
+        _expressao_texto_busca(Cliente.razao_social).like(busca_pattern),
+        _expressao_texto_busca(Cliente.telefone).like(busca_pattern),
+        _expressao_texto_busca(Cliente.celular).like(busca_pattern),
+    ]
+    if termo_digitos:
+        digitos_pattern = f"%{termo_digitos}%"
+        filtros_cliente.extend(
+            [
+                _somente_digitos_coluna(Cliente.telefone).like(digitos_pattern),
+                _somente_digitos_coluna(Cliente.celular).like(digitos_pattern),
+            ]
+        )
+
+    clientes_match = select(Cliente.id).where(
+        Cliente.tenant_id == tenant_id,
+        or_(*filtros_cliente),
+    )
+    vendas_match = select(Venda.id).where(
+        Venda.tenant_id == tenant_id,
+        _expressao_texto_busca(Venda.numero_venda).like(busca_pattern),
+    )
+
+    return or_(
+        _expressao_texto_busca(ContaReceber.descricao).like(busca_pattern),
+        _expressao_texto_busca(ContaReceber.documento).like(busca_pattern),
+        ContaReceber.cliente_id.in_(clientes_match),
+        ContaReceber.venda_id.in_(vendas_match),
+    )
 
 
 @router.get("/", response_model=List[ContaReceberResponse])
@@ -33,6 +80,7 @@ def listar_contas_receber(
     data_fim: Optional[date] = Query(None),
     apenas_vencidas: bool = Query(False),
     apenas_vencer: bool = Query(False),
+    busca: Optional[str] = Query(None),
     numero_venda: Optional[str] = Query(None),  # Filtro por número da venda
     limit: int = Query(500, le=1000),  # Aumentado para 500 registros por padrão
     offset: int = Query(0, ge=0),
@@ -71,6 +119,12 @@ def listar_contas_receber(
         query = query.filter(ContaReceber.data_vencimento >= data_inicio)
     if data_fim:
         query = query.filter(ContaReceber.data_vencimento <= data_fim)
+
+    termo_busca = (busca or "").strip()
+    if termo_busca:
+        query = query.filter(
+            _montar_condicao_busca_contas_receber(tenant_id, termo_busca)
+        )
 
     # Filtro por número de venda
     if numero_venda:
