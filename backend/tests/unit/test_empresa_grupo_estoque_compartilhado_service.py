@@ -2,7 +2,8 @@ from uuid import UUID
 
 import pytest
 from fastapi import HTTPException
-from sqlalchemy import create_engine
+from sqlalchemy import Column, String, create_engine
+from sqlalchemy.dialects.postgresql import UUID as PostgresUUID
 from sqlalchemy.orm import Session
 from sqlalchemy.pool import StaticPool
 
@@ -24,6 +25,15 @@ from app.vendas.estoque_baixa import processar_baixa_estoque_item
 
 ORIGEM = "71111111-1111-1111-1111-111111111111"
 CONSUMIDORA = "72222222-2222-2222-2222-222222222222"
+
+
+def test_id_de_empresa_se_adapta_ao_tipo_fisico_do_banco():
+    service = EmpresaGrupoEstoqueCompartilhadoService(None)
+
+    assert service._valor_empresa_para_coluna(ORIGEM, Column(String(36))) == ORIGEM
+    assert service._valor_empresa_para_coluna(
+        ORIGEM, Column(PostgresUUID(as_uuid=True))
+    ) == UUID(ORIGEM)
 
 
 @pytest.fixture()
