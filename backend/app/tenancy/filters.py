@@ -12,15 +12,14 @@ WHITELIST:
 - Tabelas que NÃO herdam de BaseTenantModel naturalmente (Tenant, Permission, UserSession)
 """
 
-from sqlalchemy.orm import Session, aliased
-from sqlalchemy import event, or_, select
-from sqlalchemy.orm import with_loader_criteria
 import logging
 
-from app.tenancy.context import get_current_tenant
-from app.empresa_grupo_sql import empresa_id_igual, empresa_id_sql
-from app.tenancy.rls import sync_rls_tenant
+from sqlalchemy import String, cast, event, func, or_, select
+from sqlalchemy.orm import Session, aliased, with_loader_criteria
 
+from app.empresa_grupo_sql import empresa_id_sql
+from app.tenancy.context import get_current_tenant
+from app.tenancy.rls import sync_rls_tenant
 
 logger = logging.getLogger(__name__)
 
@@ -143,10 +142,8 @@ def _tenant_read_filter(cls, tenant_id):
                 EmpresaGrupoEstoqueCompartilhado.produto_origem_id == cls.id,
                 empresa_id_sql(EmpresaGrupoEstoqueCompartilhado.empresa_origem_id)
                 == empresa_id_sql(cls.tenant_id),
-                empresa_id_igual(
-                    EmpresaGrupoEstoqueCompartilhado.empresa_consumidora_id,
-                    tenant_id,
-                ),
+                empresa_id_sql(EmpresaGrupoEstoqueCompartilhado.empresa_consumidora_id)
+                == func.replace(cast(tenant_id, String), "-", ""),
                 EmpresaGrupoEstoqueCompartilhado.status == "ativo",
                 EmpresaGrupo.status == "ativo",
                 membro_origem.status == "ativo",
