@@ -6,7 +6,7 @@ from decimal import Decimal
 from typing import Any, List, Optional
 
 from fastapi import HTTPException
-from sqlalchemy import and_, func, or_
+from sqlalchemy import String, and_, cast, func, or_
 from sqlalchemy import select
 from sqlalchemy.orm import Session, aliased, joinedload, noload
 
@@ -80,20 +80,36 @@ def _montar_query_produtos_vendaveis(
             membro_origem,
             (membro_origem.grupo_id == EmpresaGrupoEstoqueCompartilhado.grupo_id)
             & (
-                membro_origem.empresa_id
-                == EmpresaGrupoEstoqueCompartilhado.empresa_origem_id
+                func.replace(cast(membro_origem.empresa_id, String), "-", "")
+                == func.replace(
+                    cast(EmpresaGrupoEstoqueCompartilhado.empresa_origem_id, String),
+                    "-",
+                    "",
+                )
             ),
         )
         .join(
             membro_consumidora,
             (membro_consumidora.grupo_id == EmpresaGrupoEstoqueCompartilhado.grupo_id)
             & (
-                membro_consumidora.empresa_id
-                == EmpresaGrupoEstoqueCompartilhado.empresa_consumidora_id
+                func.replace(cast(membro_consumidora.empresa_id, String), "-", "")
+                == func.replace(
+                    cast(
+                        EmpresaGrupoEstoqueCompartilhado.empresa_consumidora_id,
+                        String,
+                    ),
+                    "-",
+                    "",
+                )
             ),
         )
         .where(
-            EmpresaGrupoEstoqueCompartilhado.empresa_consumidora_id == str(tenant_id),
+            func.replace(
+                cast(EmpresaGrupoEstoqueCompartilhado.empresa_consumidora_id, String),
+                "-",
+                "",
+            )
+            == str(tenant_id).replace("-", ""),
             EmpresaGrupoEstoqueCompartilhado.status == "ativo",
             EmpresaGrupo.status == "ativo",
             membro_origem.status == "ativo",

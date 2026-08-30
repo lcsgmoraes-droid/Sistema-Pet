@@ -13,7 +13,7 @@ WHITELIST:
 """
 
 from sqlalchemy.orm import Session, aliased
-from sqlalchemy import String, cast, event, or_, select
+from sqlalchemy import String, cast, event, func, or_, select
 from sqlalchemy.orm import with_loader_criteria
 import logging
 
@@ -119,8 +119,15 @@ def _tenant_read_filter(cls, tenant_id):
                 membro_origem,
                 (membro_origem.grupo_id == EmpresaGrupoEstoqueCompartilhado.grupo_id)
                 & (
-                    membro_origem.empresa_id
-                    == EmpresaGrupoEstoqueCompartilhado.empresa_origem_id
+                    func.replace(cast(membro_origem.empresa_id, String), "-", "")
+                    == func.replace(
+                        cast(
+                            EmpresaGrupoEstoqueCompartilhado.empresa_origem_id,
+                            String,
+                        ),
+                        "-",
+                        "",
+                    )
                 ),
             )
             .join(
@@ -130,22 +137,37 @@ def _tenant_read_filter(cls, tenant_id):
                     == EmpresaGrupoEstoqueCompartilhado.grupo_id
                 )
                 & (
-                    membro_consumidora.empresa_id
-                    == EmpresaGrupoEstoqueCompartilhado.empresa_consumidora_id
+                    func.replace(cast(membro_consumidora.empresa_id, String), "-", "")
+                    == func.replace(
+                        cast(
+                            EmpresaGrupoEstoqueCompartilhado.empresa_consumidora_id,
+                            String,
+                        ),
+                        "-",
+                        "",
+                    )
                 ),
             )
             .where(
                 EmpresaGrupoEstoqueCompartilhado.produto_origem_id == cls.id,
-                cast(
-                    EmpresaGrupoEstoqueCompartilhado.empresa_origem_id,
-                    String,
+                func.replace(
+                    cast(
+                        EmpresaGrupoEstoqueCompartilhado.empresa_origem_id,
+                        String,
+                    ),
+                    "-",
+                    "",
                 )
-                == cast(cls.tenant_id, String),
-                cast(
-                    EmpresaGrupoEstoqueCompartilhado.empresa_consumidora_id,
-                    String,
+                == func.replace(cast(cls.tenant_id, String), "-", ""),
+                func.replace(
+                    cast(
+                        EmpresaGrupoEstoqueCompartilhado.empresa_consumidora_id,
+                        String,
+                    ),
+                    "-",
+                    "",
                 )
-                == str(tenant_id),
+                == str(tenant_id).replace("-", ""),
                 EmpresaGrupoEstoqueCompartilhado.status == "ativo",
                 EmpresaGrupo.status == "ativo",
                 membro_origem.status == "ativo",

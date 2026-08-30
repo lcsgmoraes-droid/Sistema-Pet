@@ -8,6 +8,7 @@ from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
 
 from fastapi import HTTPException, status
+from sqlalchemy import String, cast, func
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -454,12 +455,26 @@ class EmpresaGrupoService:
                 EmpresaGrupoEstoqueCompartilhado.grupo_id == grupo.id,
                 EmpresaGrupoEstoqueCompartilhado.status == "ativo",
                 (
-                    EmpresaGrupoEstoqueCompartilhado.empresa_origem_id
-                    == str(membro_empresa_id)
+                    func.replace(
+                        cast(
+                            EmpresaGrupoEstoqueCompartilhado.empresa_origem_id,
+                            String,
+                        ),
+                        "-",
+                        "",
+                    )
+                    == str(membro_empresa_id).replace("-", "")
                 )
                 | (
-                    EmpresaGrupoEstoqueCompartilhado.empresa_consumidora_id
-                    == str(membro_empresa_id)
+                    func.replace(
+                        cast(
+                            EmpresaGrupoEstoqueCompartilhado.empresa_consumidora_id,
+                            String,
+                        ),
+                        "-",
+                        "",
+                    )
+                    == str(membro_empresa_id).replace("-", "")
                 ),
             )
             .all()

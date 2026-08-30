@@ -70,6 +70,7 @@ def test_product_filter_requires_explicit_active_group_stock_share():
         in compiled
     )
     assert "CAST(produtos.tenant_id AS VARCHAR)" in compiled
+    assert "replace(" in compiled.lower()
     assert compiled.count("status =") >= 3
 
 

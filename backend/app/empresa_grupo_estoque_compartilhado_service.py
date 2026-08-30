@@ -9,7 +9,7 @@ from typing import Iterable
 from uuid import UUID
 
 from fastapi import HTTPException, status
-from sqlalchemy import func, or_
+from sqlalchemy import MetaData, String, Table, cast, func, or_
 from sqlalchemy.orm import Session, aliased
 
 from app.empresa_grupo_models import (
@@ -76,6 +76,60 @@ class EmpresaGrupoEstoqueCompartilhadoService:
             # Compatibilidade com bancos/testes legados que ainda usam IDs inteiros.
             return value
 
+    @staticmethod
+    def _valor_empresa_para_coluna(value: str, coluna):
+        """Adapta o ID ao tipo físico do banco (UUID ou VARCHAR legado)."""
+        try:
+            if coluna.type.python_type is UUID:
+                return UUID(str(value))
+        except (AttributeError, NotImplementedError):
+            pass
+        return str(value)
+
+    @staticmethod
+    def _empresa_coluna_igual(coluna, value):
+        return func.replace(cast(coluna, String), "-", "") == str(value).replace(
+            "-", ""
+        )
+
+    def _inserir_novos_compartilhamentos(
+        self,
+        *,
+        grupo_id: int,
+        origem: str,
+        consumidora: str,
+        usuario_id: int,
+        produto_ids: list[int],
+    ) -> None:
+        if not produto_ids:
+            return
+        tabela = Table(
+            EmpresaGrupoEstoqueCompartilhado.__tablename__,
+            MetaData(),
+            autoload_with=self.db.get_bind(),
+            resolve_fks=False,
+        )
+        origem_valor = self._valor_empresa_para_coluna(
+            origem, tabela.c.empresa_origem_id
+        )
+        consumidora_valor = self._valor_empresa_para_coluna(
+            consumidora, tabela.c.empresa_consumidora_id
+        )
+        self.db.execute(
+            tabela.insert(),
+            [
+                {
+                    "grupo_id": grupo_id,
+                    "empresa_origem_id": origem_valor,
+                    "produto_origem_id": produto_id,
+                    "empresa_consumidora_id": consumidora_valor,
+                    "status": "ativo",
+                    "criado_por_usuario_id": usuario_id,
+                }
+                for produto_id in produto_ids
+            ],
+        )
+
     def _grupo_ativo(self, grupo_id: int) -> EmpresaGrupo:
         grupo = (
             self.db.query(EmpresaGrupo)
@@ -128,10 +182,11 @@ class EmpresaGrupoEstoqueCompartilhadoService:
     ) -> list[dict]:
         origem = self._empresa_id(empresa_origem_id)
         consumidora = self._empresa_id(empresa_consumidora_id)
+        origem_uuid = self._produto_tenant_id(origem)
         self._validar_par(grupo_id, origem, consumidora)
 
         query = self.db.query(Produto).filter(
-            Produto.tenant_id == self._produto_tenant_id(origem),
+            Produto.tenant_id == origem_uuid,
             Produto.ativo.is_(True),
             or_(Produto.tipo.is_(None), func.lower(Produto.tipo) != "servico"),
             Produto.tipo_produto.in_(self.TIPOS_COMPARTILHAVEIS),
@@ -152,8 +207,13 @@ class EmpresaGrupoEstoqueCompartilhadoService:
             self.db.query(EmpresaGrupoEstoqueCompartilhado)
             .filter(
                 EmpresaGrupoEstoqueCompartilhado.grupo_id == grupo_id,
-                EmpresaGrupoEstoqueCompartilhado.empresa_origem_id == origem,
-                EmpresaGrupoEstoqueCompartilhado.empresa_consumidora_id == consumidora,
+                self._empresa_coluna_igual(
+                    EmpresaGrupoEstoqueCompartilhado.empresa_origem_id, origem
+                ),
+                self._empresa_coluna_igual(
+                    EmpresaGrupoEstoqueCompartilhado.empresa_consumidora_id,
+                    consumidora,
+                ),
                 EmpresaGrupoEstoqueCompartilhado.produto_origem_id.in_(
                     [produto.id for produto in produtos] or [-1]
                 ),
@@ -192,20 +252,37 @@ class EmpresaGrupoEstoqueCompartilhadoService:
             )
             .join(
                 origem_tenant,
-                origem_tenant.id == EmpresaGrupoEstoqueCompartilhado.empresa_origem_id,
+                func.replace(cast(origem_tenant.id, String), "-", "")
+                == func.replace(
+                    cast(EmpresaGrupoEstoqueCompartilhado.empresa_origem_id, String),
+                    "-",
+                    "",
+                ),
             )
             .join(
                 consumidora_tenant,
-                consumidora_tenant.id
-                == EmpresaGrupoEstoqueCompartilhado.empresa_consumidora_id,
+                func.replace(cast(consumidora_tenant.id, String), "-", "")
+                == func.replace(
+                    cast(
+                        EmpresaGrupoEstoqueCompartilhado.empresa_consumidora_id,
+                        String,
+                    ),
+                    "-",
+                    "",
+                ),
             )
             .filter(
                 EmpresaGrupoEstoqueCompartilhado.grupo_id == grupo_id,
                 EmpresaGrupoEstoqueCompartilhado.status == "ativo",
                 or_(
-                    EmpresaGrupoEstoqueCompartilhado.empresa_origem_id == empresa_atual,
-                    EmpresaGrupoEstoqueCompartilhado.empresa_consumidora_id
-                    == empresa_atual,
+                    self._empresa_coluna_igual(
+                        EmpresaGrupoEstoqueCompartilhado.empresa_origem_id,
+                        empresa_atual,
+                    ),
+                    self._empresa_coluna_igual(
+                        EmpresaGrupoEstoqueCompartilhado.empresa_consumidora_id,
+                        empresa_atual,
+                    ),
                 ),
             )
             .order_by(EmpresaGrupoEstoqueCompartilhado.criado_em.desc())
@@ -255,6 +332,7 @@ class EmpresaGrupoEstoqueCompartilhadoService:
     ) -> dict:
         origem = self._empresa_id(empresa_origem_id)
         consumidora = self._empresa_id(empresa_consumidora_id)
+        origem_uuid = self._produto_tenant_id(origem)
         self._validar_par(grupo_id, origem, consumidora)
         ids = sorted(
             {int(produto_id) for produto_id in produto_ids if int(produto_id) > 0}
@@ -268,7 +346,7 @@ class EmpresaGrupoEstoqueCompartilhadoService:
             self.db.query(Produto)
             .filter(
                 Produto.id.in_(ids),
-                Produto.tenant_id == self._produto_tenant_id(origem),
+                Produto.tenant_id == origem_uuid,
                 Produto.ativo.is_(True),
                 or_(Produto.tipo.is_(None), func.lower(Produto.tipo) != "servico"),
                 Produto.tipo_produto.in_(self.TIPOS_COMPARTILHAVEIS),
@@ -285,27 +363,25 @@ class EmpresaGrupoEstoqueCompartilhadoService:
 
         agora = datetime.now(timezone.utc)
         ativados = 0
+        novos: list[int] = []
         for produto_id in ids:
             item = (
                 self.db.query(EmpresaGrupoEstoqueCompartilhado)
                 .filter(
                     EmpresaGrupoEstoqueCompartilhado.grupo_id == grupo_id,
-                    EmpresaGrupoEstoqueCompartilhado.empresa_origem_id == origem,
+                    self._empresa_coluna_igual(
+                        EmpresaGrupoEstoqueCompartilhado.empresa_origem_id, origem
+                    ),
                     EmpresaGrupoEstoqueCompartilhado.produto_origem_id == produto_id,
-                    EmpresaGrupoEstoqueCompartilhado.empresa_consumidora_id
-                    == consumidora,
+                    self._empresa_coluna_igual(
+                        EmpresaGrupoEstoqueCompartilhado.empresa_consumidora_id,
+                        consumidora,
+                    ),
                 )
                 .first()
             )
             if item is None:
-                item = EmpresaGrupoEstoqueCompartilhado(
-                    grupo_id=grupo_id,
-                    empresa_origem_id=origem,
-                    produto_origem_id=produto_id,
-                    empresa_consumidora_id=consumidora,
-                    criado_por_usuario_id=usuario_id,
-                )
-                self.db.add(item)
+                novos.append(produto_id)
                 ativados += 1
             elif item.status != "ativo":
                 item.status = "ativo"
@@ -313,6 +389,14 @@ class EmpresaGrupoEstoqueCompartilhadoService:
                 item.atualizado_em = agora
                 item.criado_por_usuario_id = usuario_id
                 ativados += 1
+
+        self._inserir_novos_compartilhamentos(
+            grupo_id=grupo_id,
+            origem=origem,
+            consumidora=consumidora,
+            usuario_id=usuario_id,
+            produto_ids=novos,
+        )
 
         log_business_event(
             db=self.db,
@@ -343,7 +427,9 @@ class EmpresaGrupoEstoqueCompartilhadoService:
             .filter(
                 EmpresaGrupoEstoqueCompartilhado.id == compartilhamento_id,
                 EmpresaGrupoEstoqueCompartilhado.grupo_id == grupo_id,
-                EmpresaGrupoEstoqueCompartilhado.empresa_origem_id == origem,
+                self._empresa_coluna_igual(
+                    EmpresaGrupoEstoqueCompartilhado.empresa_origem_id, origem
+                ),
                 EmpresaGrupoEstoqueCompartilhado.status == "ativo",
             )
             .first()
@@ -383,8 +469,15 @@ class EmpresaGrupoEstoqueCompartilhadoService:
                 membro_origem,
                 (membro_origem.grupo_id == EmpresaGrupoEstoqueCompartilhado.grupo_id)
                 & (
-                    membro_origem.empresa_id
-                    == EmpresaGrupoEstoqueCompartilhado.empresa_origem_id
+                    func.replace(cast(membro_origem.empresa_id, String), "-", "")
+                    == func.replace(
+                        cast(
+                            EmpresaGrupoEstoqueCompartilhado.empresa_origem_id,
+                            String,
+                        ),
+                        "-",
+                        "",
+                    )
                 ),
             )
             .join(
@@ -394,16 +487,31 @@ class EmpresaGrupoEstoqueCompartilhadoService:
                     == EmpresaGrupoEstoqueCompartilhado.grupo_id
                 )
                 & (
-                    membro_consumidora.empresa_id
-                    == EmpresaGrupoEstoqueCompartilhado.empresa_consumidora_id
+                    func.replace(cast(membro_consumidora.empresa_id, String), "-", "")
+                    == func.replace(
+                        cast(
+                            EmpresaGrupoEstoqueCompartilhado.empresa_consumidora_id,
+                            String,
+                        ),
+                        "-",
+                        "",
+                    )
                 ),
             )
             .join(
-                Tenant, Tenant.id == EmpresaGrupoEstoqueCompartilhado.empresa_origem_id
+                Tenant,
+                func.replace(cast(Tenant.id, String), "-", "")
+                == func.replace(
+                    cast(EmpresaGrupoEstoqueCompartilhado.empresa_origem_id, String),
+                    "-",
+                    "",
+                ),
             )
             .filter(
-                EmpresaGrupoEstoqueCompartilhado.empresa_consumidora_id
-                == str(empresa_consumidora_id),
+                cls._empresa_coluna_igual(
+                    EmpresaGrupoEstoqueCompartilhado.empresa_consumidora_id,
+                    empresa_consumidora_id,
+                ),
                 EmpresaGrupoEstoqueCompartilhado.status == "ativo",
                 EmpresaGrupo.status == "ativo",
                 membro_origem.status == "ativo",
