@@ -4,7 +4,7 @@ Rotas para Configuração Geral da Empresa
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Optional
 
 from app.db import get_session
@@ -41,6 +41,9 @@ class EmpresaConfigGeralCreate(BaseModel):
     mensagem_venda_alerta: str = "⚠️ ATENÇÃO: Margem reduzida! Revisar preço."
     mensagem_venda_critica: str = "🚨 CRÍTICO: Margem muito baixa! Venda com prejuízo!"
     dias_tolerancia_atraso: int = 5
+    crediario_encargos_automaticos: bool = False
+    crediario_multa_percentual: float = Field(default=2.0, ge=0, le=2)
+    crediario_juros_mensal_percentual: float = Field(default=1.0, ge=0, le=100)
     meta_faturamento_mensal: float = 0
     alerta_estoque_percentual: int = 20
     dias_produto_parado: int = 90
@@ -69,6 +72,11 @@ class EmpresaConfigGeralUpdate(BaseModel):
     mensagem_venda_alerta: Optional[str] = None
     mensagem_venda_critica: Optional[str] = None
     dias_tolerancia_atraso: Optional[int] = None
+    crediario_encargos_automaticos: Optional[bool] = None
+    crediario_multa_percentual: Optional[float] = Field(default=None, ge=0, le=2)
+    crediario_juros_mensal_percentual: Optional[float] = Field(
+        default=None, ge=0, le=100
+    )
     meta_faturamento_mensal: Optional[float] = None
     alerta_estoque_percentual: Optional[int] = None
     dias_produto_parado: Optional[int] = None
@@ -86,9 +94,59 @@ class EmpresaConfigGeralResponse(BaseModel):
     mensagem_venda_alerta: str
     mensagem_venda_critica: str
     aliquota_imposto_padrao: float
+    dias_tolerancia_atraso: Optional[int] = 5
+    crediario_encargos_automaticos: bool
+    crediario_multa_percentual: float
+    crediario_juros_mensal_percentual: float
+    meta_faturamento_mensal: Optional[float] = 0
+    alerta_estoque_percentual: Optional[int] = 20
+    dias_produto_parado: Optional[int] = 90
 
     class Config:
         from_attributes = True
+
+
+def _serializar_config(config: EmpresaConfigGeral) -> EmpresaConfigGeralResponse:
+    """Mantem a API compativel com configuracoes antigas que possuem campos nulos."""
+    return EmpresaConfigGeralResponse(
+        id=config.id,
+        razao_social=config.razao_social,
+        nome_fantasia=config.nome_fantasia,
+        cnpj=config.cnpj,
+        margem_saudavel_minima=float(config.margem_saudavel_minima or 30),
+        margem_alerta_minima=float(config.margem_alerta_minima or 15),
+        mensagem_venda_saudavel=(
+            config.mensagem_venda_saudavel or "✅ Venda Saudável! Margem excelente."
+        ),
+        mensagem_venda_alerta=(
+            config.mensagem_venda_alerta
+            or "⚠️ ATENÇÃO: Margem reduzida! Revisar preço."
+        ),
+        mensagem_venda_critica=(
+            config.mensagem_venda_critica
+            or "🚨 CRÍTICO: Margem muito baixa! Venda com prejuízo!"
+        ),
+        aliquota_imposto_padrao=float(config.aliquota_imposto_padrao or 7),
+        dias_tolerancia_atraso=(
+            config.dias_tolerancia_atraso
+            if config.dias_tolerancia_atraso is not None
+            else 5
+        ),
+        crediario_encargos_automaticos=bool(config.crediario_encargos_automaticos),
+        crediario_multa_percentual=float(config.crediario_multa_percentual or 0),
+        crediario_juros_mensal_percentual=float(
+            config.crediario_juros_mensal_percentual or 0
+        ),
+        meta_faturamento_mensal=float(config.meta_faturamento_mensal or 0),
+        alerta_estoque_percentual=(
+            config.alerta_estoque_percentual
+            if config.alerta_estoque_percentual is not None
+            else 20
+        ),
+        dias_produto_parado=(
+            config.dias_produto_parado if config.dias_produto_parado is not None else 90
+        ),
+    )
 
 
 # ===== ENDPOINTS =====
@@ -125,9 +183,16 @@ def get_config_empresa(
             mensagem_venda_alerta="⚠️ ATENÇÃO: Margem reduzida! Revisar preço.",
             mensagem_venda_critica="🚨 CRÍTICO: Margem muito baixa! Venda com prejuízo!",
             aliquota_imposto_padrao=7.0,
+            dias_tolerancia_atraso=5,
+            crediario_encargos_automaticos=False,
+            crediario_multa_percentual=2.0,
+            crediario_juros_mensal_percentual=1.0,
+            meta_faturamento_mensal=0,
+            alerta_estoque_percentual=20,
+            dias_produto_parado=90,
         )
 
-    return config
+    return _serializar_config(config)
 
 
 @router.post("/", response_model=EmpresaConfigGeralResponse)
@@ -161,7 +226,7 @@ def create_config_empresa(
 
     logger.info(f"Configuração da empresa criada para tenant {tenant_id}")
 
-    return config
+    return _serializar_config(config)
 
 
 @router.put("/", response_model=EmpresaConfigGeralResponse)
@@ -195,7 +260,7 @@ def update_config_empresa(
 
     logger.info(f"Configuração da empresa atualizada para tenant {tenant_id}")
 
-    return config
+    return _serializar_config(config)
 
 
 @router.delete("/")

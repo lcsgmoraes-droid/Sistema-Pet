@@ -17,7 +17,10 @@ export function usePDVClienteContexto({ vendaAtual, setVendaAtual }) {
 
     try {
       const response = await api.get(`/clientes/${clienteId}/vendas-em-aberto`);
-      if (response.data.resumo.total_vendas > 0) {
+      if (
+        response.data.resumo.total_vendas > 0 ||
+        response.data.resumo.total_parcelas_crediario > 0
+      ) {
         setVendasEmAbertoInfo(response.data.resumo);
       } else {
         setVendasEmAbertoInfo(null);

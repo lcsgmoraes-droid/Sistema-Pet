@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import toast from "react-hot-toast";
-import { FiChevronLeft, FiSave, FiSliders } from "react-icons/fi";
+import { FiChevronLeft, FiCreditCard, FiSave, FiSliders } from "react-icons/fi";
 import api from "../../api";
 import {
   getGuiaAtiva,
@@ -18,6 +18,9 @@ const DEFAULT_FORM = {
   mensagem_venda_critica: "🚨 CRITICO: Margem muito baixa! Venda com prejuizo!",
   aliquota_imposto_padrao: 7,
   dias_tolerancia_atraso: 5,
+  crediario_encargos_automaticos: false,
+  crediario_multa_percentual: 2,
+  crediario_juros_mensal_percentual: 1,
   meta_faturamento_mensal: 0,
   alerta_estoque_percentual: 20,
   dias_produto_parado: 90,
@@ -59,6 +62,11 @@ export default function ConfiguracaoGeralNegocio() {
           margem_alerta_minima: Number(data.margem_alerta_minima ?? 15),
           aliquota_imposto_padrao: Number(data.aliquota_imposto_padrao ?? 7),
           dias_tolerancia_atraso: Number(data.dias_tolerancia_atraso ?? 5),
+          crediario_encargos_automaticos: Boolean(data.crediario_encargos_automaticos),
+          crediario_multa_percentual: Number(data.crediario_multa_percentual ?? 2),
+          crediario_juros_mensal_percentual: Number(
+            data.crediario_juros_mensal_percentual ?? 1,
+          ),
           meta_faturamento_mensal: Number(data.meta_faturamento_mensal ?? 0),
           alerta_estoque_percentual: Number(data.alerta_estoque_percentual ?? 20),
           dias_produto_parado: Number(data.dias_produto_parado ?? 90),
@@ -106,6 +114,16 @@ export default function ConfiguracaoGeralNegocio() {
       return;
     }
 
+    if (form.crediario_multa_percentual < 0 || form.crediario_multa_percentual > 2) {
+      toast.error("A multa do crediario deve ficar entre 0% e 2%");
+      return;
+    }
+
+    if (form.crediario_juros_mensal_percentual < 0) {
+      toast.error("Os juros do crediario nao podem ser negativos");
+      return;
+    }
+
     setSalvando(true);
     try {
       await api.put("/empresa/config/", {
@@ -116,6 +134,11 @@ export default function ConfiguracaoGeralNegocio() {
         mensagem_venda_critica: form.mensagem_venda_critica,
         aliquota_imposto_padrao: Number(form.aliquota_imposto_padrao),
         dias_tolerancia_atraso: Number(form.dias_tolerancia_atraso),
+        crediario_encargos_automaticos: Boolean(form.crediario_encargos_automaticos),
+        crediario_multa_percentual: Number(form.crediario_multa_percentual),
+        crediario_juros_mensal_percentual: Number(
+          form.crediario_juros_mensal_percentual,
+        ),
         meta_faturamento_mensal: Number(form.meta_faturamento_mensal),
         alerta_estoque_percentual: Number(form.alerta_estoque_percentual),
         dias_produto_parado: Number(form.dias_produto_parado),
@@ -191,6 +214,79 @@ export default function ConfiguracaoGeralNegocio() {
             </label>
           ))}
         </div>
+      </div>
+
+      <div className="bg-white rounded-lg shadow-md p-6">
+        <div className="mb-4 flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <h2 className="flex items-center gap-2 text-xl font-semibold text-gray-800">
+              <FiCreditCard /> Crediario e atraso
+            </h2>
+            <p className="mt-1 text-sm text-gray-600">
+              A multa e cobrada uma vez. Os juros mensais sao calculados proporcionalmente por dia.
+            </p>
+          </div>
+          <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-gray-200 px-3 py-2">
+            <input
+              type="checkbox"
+              checked={form.crediario_encargos_automaticos}
+              onChange={(e) => onChange("crediario_encargos_automaticos", e.target.checked)}
+              className="h-4 w-4"
+            />
+            <span className="text-sm font-semibold text-gray-800">Cobrar automaticamente</span>
+          </label>
+        </div>
+
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+          <div>
+            <label htmlFor="dias-tolerancia-atraso" className="mb-1 block text-sm font-medium text-gray-700">
+              Tolerancia apos o vencimento (dias)
+            </label>
+            <input
+              id="dias-tolerancia-atraso"
+              type="number"
+              min="0"
+              value={form.dias_tolerancia_atraso}
+              onChange={(e) => onChange("dias_tolerancia_atraso", e.target.value, true)}
+              className={campoClass("dias_tolerancia_atraso")}
+            />
+          </div>
+          <div>
+            <label htmlFor="crediario-multa" className="mb-1 block text-sm font-medium text-gray-700">
+              Multa unica (%)
+            </label>
+            <input
+              id="crediario-multa"
+              type="number"
+              min="0"
+              max="2"
+              step="0.01"
+              value={form.crediario_multa_percentual}
+              onChange={(e) => onChange("crediario_multa_percentual", e.target.value, true)}
+              className={campoClass("crediario_multa_percentual")}
+            />
+          </div>
+          <div>
+            <label htmlFor="crediario-juros" className="mb-1 block text-sm font-medium text-gray-700">
+              Juros ao mes (%)
+            </label>
+            <input
+              id="crediario-juros"
+              type="number"
+              min="0"
+              step="0.01"
+              value={form.crediario_juros_mensal_percentual}
+              onChange={(e) =>
+                onChange("crediario_juros_mensal_percentual", e.target.value, true)
+              }
+              className={campoClass("crediario_juros_mensal_percentual")}
+            />
+          </div>
+        </div>
+        <p className="mt-4 text-xs leading-relaxed text-gray-500">
+          Informe estas condicoes ao cliente na venda a prazo. A multa de mora fica limitada a 2%
+          no sistema.
+        </p>
       </div>
 
       <div className={blocoClass(["margem_saudavel_minima", "margem_alerta_minima"])}>
@@ -338,22 +434,6 @@ export default function ConfiguracaoGeralNegocio() {
               value={form.aliquota_imposto_padrao}
               onChange={(e) => onChange("aliquota_imposto_padrao", e.target.value, true)}
               className={campoClass("aliquota_imposto_padrao")}
-            />
-          </div>
-          <div>
-            <label
-              htmlFor="dias-tolerancia-atraso"
-              className="block text-sm font-medium text-gray-700 mb-1"
-            >
-              Tolerancia de atraso (dias)
-            </label>
-            <input
-              id="dias-tolerancia-atraso"
-              type="number"
-              min="0"
-              value={form.dias_tolerancia_atraso}
-              onChange={(e) => onChange("dias_tolerancia_atraso", e.target.value, true)}
-              className={campoClass("dias_tolerancia_atraso")}
             />
           </div>
           <div>

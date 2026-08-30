@@ -9,6 +9,10 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.db import get_session
+from app.contas_receber_encargos import (
+    calcular_encargos_automaticos,
+    carregar_config_encargos,
+)
 from app.evolucao_corepet import registrar_uso_funcionalidade
 from app.financeiro_models import FormaPagamento
 from app.financeiro_models import ContaReceber
@@ -53,7 +57,6 @@ from app.tenancy.context import (
     set_current_tenant,
 )
 from app.utils.timezone import now_brasilia
-
 
 logger = logging.getLogger(__name__)
 
@@ -597,11 +600,14 @@ def listar_crediario_cliente(
         .all()
     )
     hoje = date.today()
+    config_encargos = carregar_config_encargos(db, tenant_id)
     itens = []
     em_aberto = 0.0
     vencido = 0.0
     for conta in contas:
-        saldo = max(float(conta.valor_final or 0) - float(conta.valor_recebido or 0), 0)
+        calculo_encargos = calcular_encargos_automaticos(conta, hoje, config_encargos)
+        saldo_sem_encargos = float(calculo_encargos["saldo_atual"])
+        saldo = float(calculo_encargos["saldo_atualizado"])
         esta_aberta = (
             conta.status
             not in {
@@ -627,6 +633,13 @@ def listar_crediario_cliente(
                 "valor_original": float(conta.valor_original or 0),
                 "valor_recebido": float(conta.valor_recebido or 0),
                 "saldo": saldo,
+                "saldo_sem_encargos": saldo_sem_encargos,
+                "juros_calculado": float(calculo_encargos["valor_juros_calculado"]),
+                "multa_calculada": float(calculo_encargos["valor_multa_calculada"]),
+                "dias_atraso": calculo_encargos["dias_atraso"],
+                "encargos_automaticos_ativos": calculo_encargos[
+                    "encargos_automaticos_ativos"
+                ],
                 "data_vencimento": conta.data_vencimento.isoformat(),
                 "status": "vencido" if esta_vencida else conta.status,
             }
@@ -738,12 +751,12 @@ def consultar_status_pedido(
         "tem_entrega": venda_info["tem_entrega"],
         "tipo_retirada": pedido.tipo_retirada,
         "is_drive": pedido.is_drive,
-        "drive_chegou_at": pedido.drive_chegou_at.isoformat()
-        if pedido.drive_chegou_at
-        else None,
-        "drive_entregue_at": pedido.drive_entregue_at.isoformat()
-        if pedido.drive_entregue_at
-        else None,
+        "drive_chegou_at": (
+            pedido.drive_chegou_at.isoformat() if pedido.drive_chegou_at else None
+        ),
+        "drive_entregue_at": (
+            pedido.drive_entregue_at.isoformat() if pedido.drive_entregue_at else None
+        ),
         "palavra_chave_retirada": pedido.palavra_chave_retirada,
         "endereco_entrega": pedido.endereco_entrega,
         "frete_valor": float(pedido.frete_valor or 0),

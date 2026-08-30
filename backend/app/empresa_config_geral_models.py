@@ -70,6 +70,13 @@ class EmpresaConfigGeral(BaseTenantModel):
     # Dias para considerar contas como vencidas
     dias_tolerancia_atraso = Column(Integer, default=5)
 
+    # Encargos do crediário. Permanecem desativados até a empresa optar pela cobrança.
+    crediario_encargos_automaticos = Column(Boolean, default=False, nullable=False)
+    crediario_multa_percentual = Column(Numeric(5, 2), default=2.0, nullable=False)
+    crediario_juros_mensal_percentual = Column(
+        Numeric(6, 3), default=1.0, nullable=False
+    )
+
     # Meta de faturamento mensal (para dashboard)
     meta_faturamento_mensal = Column(Numeric(12, 2), default=0)
 
@@ -112,24 +119,48 @@ class EmpresaConfigGeral(BaseTenantModel):
             "telefone": self.telefone,
             "email": self.email,
             "site": self.site,
-            "margem_saudavel_minima": float(self.margem_saudavel_minima)
-            if self.margem_saudavel_minima
-            else 30.0,
-            "margem_alerta_minima": float(self.margem_alerta_minima)
-            if self.margem_alerta_minima
-            else 15.0,
-            "mensagem_venda_saudavel": self.mensagem_venda_saudavel,
-            "mensagem_venda_alerta": self.mensagem_venda_alerta,
-            "mensagem_venda_critica": self.mensagem_venda_critica,
-            "dias_tolerancia_atraso": self.dias_tolerancia_atraso,
-            "meta_faturamento_mensal": float(self.meta_faturamento_mensal)
-            if self.meta_faturamento_mensal
-            else 0,
-            "alerta_estoque_percentual": self.alerta_estoque_percentual,
-            "dias_produto_parado": self.dias_produto_parado,
-            "aliquota_imposto_padrao": float(self.aliquota_imposto_padrao)
-            if self.aliquota_imposto_padrao
-            else 7.0,
+            "margem_saudavel_minima": (
+                float(self.margem_saudavel_minima)
+                if self.margem_saudavel_minima
+                else 30.0
+            ),
+            "margem_alerta_minima": (
+                float(self.margem_alerta_minima) if self.margem_alerta_minima else 15.0
+            ),
+            "mensagem_venda_saudavel": self.mensagem_venda_saudavel
+            or "✅ Venda Saudável! Margem excelente.",
+            "mensagem_venda_alerta": self.mensagem_venda_alerta
+            or "⚠️ ATENÇÃO: Margem reduzida! Revisar preço.",
+            "mensagem_venda_critica": self.mensagem_venda_critica
+            or "🚨 CRÍTICO: Margem muito baixa! Venda com prejuízo!",
+            "dias_tolerancia_atraso": (
+                self.dias_tolerancia_atraso
+                if self.dias_tolerancia_atraso is not None
+                else 5
+            ),
+            "crediario_encargos_automaticos": bool(self.crediario_encargos_automaticos),
+            "crediario_multa_percentual": float(self.crediario_multa_percentual or 0),
+            "crediario_juros_mensal_percentual": float(
+                self.crediario_juros_mensal_percentual or 0
+            ),
+            "meta_faturamento_mensal": (
+                float(self.meta_faturamento_mensal)
+                if self.meta_faturamento_mensal
+                else 0
+            ),
+            "alerta_estoque_percentual": (
+                self.alerta_estoque_percentual
+                if self.alerta_estoque_percentual is not None
+                else 20
+            ),
+            "dias_produto_parado": (
+                self.dias_produto_parado if self.dias_produto_parado is not None else 90
+            ),
+            "aliquota_imposto_padrao": (
+                float(self.aliquota_imposto_padrao)
+                if self.aliquota_imposto_padrao
+                else 7.0
+            ),
             "ativo": self.ativo,
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
@@ -162,7 +193,8 @@ class EmpresaConfigGeral(BaseTenantModel):
         elif margem_percentual >= margem_alerta:
             return {
                 "status": "alerta",
-                "mensagem": self.mensagem_venda_alerta or "⚠️ ATENÇÃO: Margem reduzida!",
+                "mensagem": self.mensagem_venda_alerta
+                or "⚠️ ATENÇÃO: Margem reduzida!",
                 "cor": "warning",
                 "icone": "⚠️",
             }

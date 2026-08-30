@@ -169,6 +169,10 @@ class ContaReceber(BaseTenantModel):
     valor_multa = Column(Numeric(10, 2), default=0)
     valor_final = Column(Numeric(10, 2), nullable=False)
 
+    # Controle incremental dos encargos automáticos do crediário.
+    data_ultimo_calculo_encargos = Column(Date)
+    multa_atraso_aplicada = Column(Boolean, default=False, nullable=False)
+
     # Datas
     data_emissao = Column(Date, nullable=False)
     data_vencimento = Column(Date, nullable=False, index=True)

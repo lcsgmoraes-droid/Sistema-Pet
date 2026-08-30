@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { ArrowDownUp, Plus, Receipt } from "lucide-react";
+import { ArrowDownUp, CheckSquare, Plus, Receipt } from "lucide-react";
 import api from "../api";
 import { getAccessToken } from "../auth/tokenStorage";
 import { toast } from "react-hot-toast";
@@ -19,12 +19,15 @@ import StatusBadge from "./ui/StatusBadge";
 import {
   ContasReceberDetalhesModal,
   ContasReceberFilters,
+  ContasReceberRecebimentoLoteModal,
   ContasReceberRecebimentoModal,
 } from "./contasReceber/ContasReceberPanels";
 import ContasReceberAnalise from "./contasReceber/ContasReceberAnalise";
 import {
+  aplicarPeriodoRapidoContasReceber,
   criarFiltrosContasReceberDaUrl,
   montarParamsFiltrosContasReceber,
+  normalizarListaClientes,
 } from "./contasReceber/contasReceberFilterHelpers";
 
 const formatarDataISO = (data) => {
@@ -79,7 +82,10 @@ const ContasReceber = () => {
   const [contaSelecionada, setContaSelecionada] = useState(null);
   const [detalhesCompletos, setDetalhesCompletos] = useState(null);
   const [mostrarModalRecebimento, setMostrarModalRecebimento] = useState(false);
+  const [mostrarModalRecebimentoLote, setMostrarModalRecebimentoLote] = useState(false);
   const [mostrarDetalhes, setMostrarDetalhes] = useState(false);
+  const [contasSelecionadas, setContasSelecionadas] = useState(() => new Set());
+  const [calculoEncargos, setCalculoEncargos] = useState(null);
   const [formasPagamento, setFormasPagamento] = useState([]);
   const [contasBancarias, setContasBancarias] = useState([]);
 
@@ -92,6 +98,14 @@ const ContasReceber = () => {
     valor_multa: 0,
     valor_desconto: 0,
     observacoes: "",
+    aplicar_encargos_automaticos: false,
+    quitar: true,
+  });
+  const [dadosRecebimentoLote, setDadosRecebimentoLote] = useState({
+    data_recebimento: new Date().toISOString().split("T")[0],
+    forma_pagamento_id: null,
+    observacoes: "",
+    aplicar_encargos_automaticos: true,
   });
 
   useEffect(() => {
@@ -143,7 +157,8 @@ const ContasReceber = () => {
       // Ordenar por ID (mais recentes primeiro por padrao)
       const contasOrdenadas = [...safeArray(contasRes.value.data)].sort((a, b) => b.id - a.id);
       setContas(contasOrdenadas);
-      setClientes(safeArray(clientesRes.value.data));
+      setContasSelecionadas(new Set());
+      setClientes(normalizarListaClientes(clientesRes.value.data));
 
       if (formasRes.status === "fulfilled") {
         setFormasPagamento(safeArray(formasRes.value));
@@ -172,6 +187,7 @@ const ContasReceber = () => {
       const response = await api.get(`/contas-receber/?${params}`);
 
       setContas(response.data);
+      setContasSelecionadas(new Set());
     } catch (error) {
       console.error("Erro ao filtrar:", error);
       toast.error("Erro ao aplicar filtros");
@@ -181,6 +197,12 @@ const ContasReceber = () => {
   };
 
   const aplicarFiltros = async () => carregarContasComFiltros(filtros, buscaNumeroVenda);
+
+  const aplicarPeriodoRapido = (periodo) => {
+    const novosFiltros = aplicarPeriodoRapidoContasReceber(filtros, periodo);
+    setFiltros(novosFiltros);
+    void carregarContasComFiltros(novosFiltros, buscaNumeroVenda);
+  };
 
   const abrirListaComFiltrosAnalise = (filtrosAnalise = {}) => {
     const novosFiltros = {
@@ -252,19 +274,64 @@ const ContasReceber = () => {
     );
   };
 
+  const carregarCalculoEncargos = async (conta, dataCalculo) => {
+    try {
+      const response = await api.get(`/contas-receber/${conta.id}/encargos`, {
+        params: { data_calculo: dataCalculo },
+      });
+      const calculo = response.data || null;
+      setCalculoEncargos(calculo);
+      setDadosRecebimento((prev) => ({
+        ...prev,
+        valor_recebido: prev.quitar
+          ? Number(
+              calculo?.encargos_automaticos_ativos && prev.aplicar_encargos_automaticos
+                ? calculo.saldo_atualizado
+                : calculo?.saldo_atual,
+            )
+          : prev.valor_recebido,
+      }));
+    } catch (error) {
+      console.error("Erro ao calcular encargos:", error);
+      setCalculoEncargos(null);
+    }
+  };
+
   const abrirModalRecebimento = (conta) => {
+    const dataHoje = new Date().toISOString().split("T")[0];
+    const aplicarAutomaticos = Boolean(conta.encargos_automaticos_ativos && conta.eh_crediario);
     setContaSelecionada(conta);
     setDadosRecebimento({
-      valor_recebido: parseFloat((conta.valor_final - conta.valor_recebido).toFixed(2)),
-      data_recebimento: new Date().toISOString().split("T")[0],
+      valor_recebido: Number(
+        aplicarAutomaticos
+          ? conta.saldo_atualizado
+          : (conta.valor_final - conta.valor_recebido).toFixed(2),
+      ),
+      data_recebimento: dataHoje,
       forma_pagamento_id: conta.forma_pagamento_id || null,
       conta_bancaria_id: null,
       valor_juros: 0,
       valor_multa: 0,
       valor_desconto: 0,
       observacoes: "",
+      aplicar_encargos_automaticos: aplicarAutomaticos,
+      quitar: true,
+    });
+    setCalculoEncargos({
+      eh_crediario: conta.eh_crediario,
+      encargos_automaticos_ativos: conta.encargos_automaticos_ativos,
+      dias_atraso: conta.dias_atraso,
+      valor_juros_calculado: conta.valor_juros_calculado,
+      valor_multa_calculada: conta.valor_multa_calculada,
+      saldo_atual: conta.valor_final - conta.valor_recebido,
+      saldo_atualizado: conta.saldo_atualizado,
     });
     setMostrarModalRecebimento(true);
+  };
+
+  const atualizarDataRecebimento = (data_recebimento) => {
+    setDadosRecebimento((prev) => ({ ...prev, data_recebimento }));
+    if (contaSelecionada) void carregarCalculoEncargos(contaSelecionada, data_recebimento);
   };
 
   const abrirDetalhes = async (conta) => {
@@ -298,6 +365,60 @@ const ContasReceber = () => {
     }
   };
 
+  const contasReceberExibidas = safeArray(contas).filter((conta) => {
+    if (!buscaNumeroVenda) return true;
+
+    const numeroVenda = String(conta.numero_venda || "");
+    const descricao = String(conta.descricao || "");
+    const busca = buscaNumeroVenda.toLowerCase();
+
+    return numeroVenda.toLowerCase().includes(busca) || descricao.toLowerCase().includes(busca);
+  });
+
+  const contasAbertasExibidas = contasReceberExibidas.filter(
+    (conta) => conta.status !== "recebido" && !ehLancamentoFinanceiroCancelado(conta),
+  );
+
+  const contasSelecionadasDetalhes = contasAbertasExibidas.filter((conta) =>
+    contasSelecionadas.has(conta.id),
+  );
+
+  const alternarContaSelecionada = (contaId) => {
+    setContasSelecionadas((anteriores) => {
+      const proximas = new Set(anteriores);
+      if (proximas.has(contaId)) proximas.delete(contaId);
+      else proximas.add(contaId);
+      return proximas;
+    });
+  };
+
+  const alternarTodasContas = () => {
+    setContasSelecionadas((anteriores) => {
+      const todasSelecionadas =
+        contasAbertasExibidas.length > 0 &&
+        contasAbertasExibidas.every((conta) => anteriores.has(conta.id));
+      return todasSelecionadas
+        ? new Set()
+        : new Set(contasAbertasExibidas.map((conta) => conta.id));
+    });
+  };
+
+  const registrarRecebimentosLote = async () => {
+    try {
+      const response = await api.post("/contas-receber/receber-lote", {
+        ...dadosRecebimentoLote,
+        conta_ids: contasSelecionadasDetalhes.map((conta) => conta.id),
+      });
+      toast.success(response.data?.message || "Parcelas recebidas com sucesso!");
+      setMostrarModalRecebimentoLote(false);
+      setContasSelecionadas(new Set());
+      await carregarDados();
+    } catch (error) {
+      console.error("Erro ao receber parcelas em lote:", error);
+      toast.error(error.response?.data?.detail || "Erro ao receber parcelas selecionadas");
+    }
+  };
+
   const formatarData = (data) => {
     if (!data) return "-";
     // Evita problemas de timezone ao criar data diretamente dos componentes
@@ -320,17 +441,30 @@ const ContasReceber = () => {
     return <StatusBadge status="pendente" />;
   };
 
-  const contasReceberExibidas = safeArray(contas).filter((conta) => {
-    if (!buscaNumeroVenda) return true;
-
-    const numeroVenda = String(conta.numero_venda || "");
-    const descricao = String(conta.descricao || "");
-    const busca = buscaNumeroVenda.toLowerCase();
-
-    return numeroVenda.toLowerCase().includes(busca) || descricao.toLowerCase().includes(busca);
-  });
-
   const contasReceberColumns = [
+    {
+      key: "selecao",
+      header: (
+        <input
+          type="checkbox"
+          aria-label="Selecionar todas as contas em aberto"
+          checked={
+            contasAbertasExibidas.length > 0 &&
+            contasAbertasExibidas.every((conta) => contasSelecionadas.has(conta.id))
+          }
+          onChange={alternarTodasContas}
+        />
+      ),
+      render: (conta) =>
+        conta.status !== "recebido" && !ehLancamentoFinanceiroCancelado(conta) ? (
+          <input
+            type="checkbox"
+            aria-label={`Selecionar conta ${conta.id}`}
+            checked={contasSelecionadas.has(conta.id)}
+            onChange={() => alternarContaSelecionada(conta.id)}
+          />
+        ) : null,
+    },
     {
       key: "id",
       header: "ID",
@@ -503,6 +637,16 @@ const ContasReceber = () => {
             >
               {ordenacao === "desc" ? "Mais recentes" : "Mais antigas"}
             </ActionButton>
+            {contasSelecionadasDetalhes.length > 0 && (
+              <ActionButton
+                onClick={() => setMostrarModalRecebimentoLote(true)}
+                intent="create"
+                size="md"
+                icon={CheckSquare}
+              >
+                Baixar selecionadas ({contasSelecionadasDetalhes.length})
+              </ActionButton>
+            )}
             <ActionButton intent="create" size="md" icon={Plus}>
               Nova Conta
             </ActionButton>
@@ -549,6 +693,7 @@ const ContasReceber = () => {
         <>
           <ContasReceberFilters
             aplicarFiltros={aplicarFiltros}
+            aplicarPeriodoRapido={aplicarPeriodoRapido}
             buscaNumeroVenda={buscaNumeroVenda}
             clientes={clientes}
             filtros={filtros}
@@ -586,6 +731,7 @@ const ContasReceber = () => {
       )}
 
       <ContasReceberRecebimentoModal
+        calculoEncargos={calculoEncargos}
         contaSelecionada={contaSelecionada}
         contasBancarias={contasBancarias}
         dadosRecebimento={dadosRecebimento}
@@ -593,8 +739,20 @@ const ContasReceber = () => {
         formatarMoeda={formatarMoeda}
         mostrarModalRecebimento={mostrarModalRecebimento}
         registrarRecebimento={registrarRecebimento}
+        onDataRecebimentoChange={atualizarDataRecebimento}
         setDadosRecebimento={setDadosRecebimento}
         setMostrarModalRecebimento={setMostrarModalRecebimento}
+      />
+
+      <ContasReceberRecebimentoLoteModal
+        contasSelecionadas={contasSelecionadasDetalhes}
+        dadosRecebimento={dadosRecebimentoLote}
+        formasPagamento={formasPagamento}
+        formatarMoeda={formatarMoeda}
+        mostrar={mostrarModalRecebimentoLote}
+        onConfirmar={registrarRecebimentosLote}
+        onFechar={() => setMostrarModalRecebimentoLote(false)}
+        setDadosRecebimento={setDadosRecebimentoLote}
       />
       <ContasReceberDetalhesModal
         abrirFluxoDeCaixa={abrirFluxoDeCaixa}

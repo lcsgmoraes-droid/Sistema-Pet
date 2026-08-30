@@ -151,9 +151,9 @@ async def get_historico_financeiro_cliente(
                         "venda_id": venda.id,
                         "numero_venda": venda.numero_venda,
                         "subtotal": float(venda.subtotal) if venda.subtotal else 0,
-                        "desconto": float(venda.desconto_valor)
-                        if venda.desconto_valor
-                        else 0,
+                        "desconto": (
+                            float(venda.desconto_valor) if venda.desconto_valor else 0
+                        ),
                         "total": float(venda.total) if venda.total else 0,
                         "canal": venda.canal,
                         "forma_pagamento": forma_pagamento,
@@ -242,14 +242,13 @@ async def get_historico_financeiro_cliente(
     total_em_aberto = (
         db.query(
             func.sum(
-                ContaReceber.valor_original
-                - func.coalesce(ContaReceber.valor_recebido, 0)
+                ContaReceber.valor_final - func.coalesce(ContaReceber.valor_recebido, 0)
             )
         )
         .filter(
             ContaReceber.cliente_id == cliente_id,
             ContaReceber.tenant_id == tenant_id,
-            ContaReceber.status == "pendente",
+            ContaReceber.status.in_(("pendente", "parcial", "vencido", "vencida")),
         )
         .scalar()
         or 0
@@ -270,9 +269,9 @@ async def get_historico_financeiro_cliente(
     ultima_compra = None
     if ultima_venda:
         ultima_compra = {
-            "data": ultima_venda.data_venda.isoformat()
-            if ultima_venda.data_venda
-            else None,
+            "data": (
+                ultima_venda.data_venda.isoformat() if ultima_venda.data_venda else None
+            ),
             "valor": float(ultima_venda.total) if ultima_venda.total else 0,
             "numero_venda": ultima_venda.numero_venda,
         }
@@ -386,14 +385,13 @@ async def get_resumo_financeiro_cliente(
     total_em_aberto = (
         db.query(
             func.sum(
-                ContaReceber.valor_original
-                - func.coalesce(ContaReceber.valor_recebido, 0)
+                ContaReceber.valor_final - func.coalesce(ContaReceber.valor_recebido, 0)
             )
         )
         .filter(
             ContaReceber.cliente_id == cliente_id,
             ContaReceber.tenant_id == tenant_id,
-            ContaReceber.status == "pendente",
+            ContaReceber.status.in_(("pendente", "parcial", "vencido", "vencida")),
         )
         .scalar()
         or 0
@@ -403,14 +401,13 @@ async def get_resumo_financeiro_cliente(
     total_vencido = (
         db.query(
             func.sum(
-                ContaReceber.valor_original
-                - func.coalesce(ContaReceber.valor_recebido, 0)
+                ContaReceber.valor_final - func.coalesce(ContaReceber.valor_recebido, 0)
             )
         )
         .filter(
             ContaReceber.cliente_id == cliente_id,
             ContaReceber.tenant_id == tenant_id,
-            ContaReceber.status == "pendente",
+            ContaReceber.status.in_(("pendente", "parcial", "vencido", "vencida")),
             ContaReceber.data_vencimento < date.today(),
         )
         .scalar()
@@ -437,9 +434,9 @@ async def get_resumo_financeiro_cliente(
             else None
         )
         ultima_compra = {
-            "data": ultima_venda.data_venda.isoformat()
-            if ultima_venda.data_venda
-            else None,
+            "data": (
+                ultima_venda.data_venda.isoformat() if ultima_venda.data_venda else None
+            ),
             "valor": float(ultima_venda.total) if ultima_venda.total else 0,
             "numero_venda": ultima_venda.numero_venda,
             "dias_atras": dias_desde_ultima,
