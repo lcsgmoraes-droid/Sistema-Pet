@@ -193,8 +193,7 @@ class EmpresaConfigGeral(BaseTenantModel):
         elif margem_percentual >= margem_alerta:
             return {
                 "status": "alerta",
-                "mensagem": self.mensagem_venda_alerta
-                or "⚠️ ATENÇÃO: Margem reduzida!",
+                "mensagem": self.mensagem_venda_alerta or "⚠️ ATENÇÃO: Margem reduzida!",
                 "cor": "warning",
                 "icone": "⚠️",
             }

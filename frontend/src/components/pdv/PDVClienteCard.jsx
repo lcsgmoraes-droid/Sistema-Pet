@@ -355,7 +355,12 @@ function ClienteAcoesResumo({
               </div>
             </div>
           </div>
-          <ActionButton onClick={onVerCrediario} intent="neutral" size="sm" className="w-full sm:w-auto sm:min-w-[128px]">
+          <ActionButton
+            onClick={onVerCrediario}
+            intent="neutral"
+            size="sm"
+            className="w-full sm:w-auto sm:min-w-[128px]"
+          >
             Ver parcelas
           </ActionButton>
         </div>

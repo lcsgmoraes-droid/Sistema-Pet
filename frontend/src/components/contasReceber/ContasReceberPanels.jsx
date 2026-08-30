@@ -26,13 +26,28 @@ export function ContasReceberFilters({
 
         <div className="mb-4 flex flex-wrap items-center gap-2">
           <span className="mr-1 text-sm font-medium text-gray-700">Periodo rapido:</span>
-          <ActionButton intent="neutral" tone="soft" size="xs" onClick={() => aplicarPeriodoRapido("todos")}>
+          <ActionButton
+            intent="neutral"
+            tone="soft"
+            size="xs"
+            onClick={() => aplicarPeriodoRapido("todos")}
+          >
             Todos os periodos
           </ActionButton>
-          <ActionButton intent="warning" tone="soft" size="xs" onClick={() => aplicarPeriodoRapido("vencidas")}>
+          <ActionButton
+            intent="warning"
+            tone="soft"
+            size="xs"
+            onClick={() => aplicarPeriodoRapido("vencidas")}
+          >
             Vencidas
           </ActionButton>
-          <ActionButton intent="neutral" tone="soft" size="xs" onClick={() => aplicarPeriodoRapido("a_vencer")}>
+          <ActionButton
+            intent="neutral"
+            tone="soft"
+            size="xs"
+            onClick={() => aplicarPeriodoRapido("a_vencer")}
+          >
             A vencer
           </ActionButton>
         </div>
@@ -202,7 +217,9 @@ export function ContasReceberRecebimentoModal({
                     <div>
                       <strong>Encargos do crediario</strong>
                       <div className="mt-1 text-xs text-amber-800">
-                        {calculoEncargos.dias_atraso || 0} dia(s) de atraso · Juros {formatarMoeda(calculoEncargos.valor_juros_calculado || 0)} · Multa {formatarMoeda(calculoEncargos.valor_multa_calculada || 0)}
+                        {calculoEncargos.dias_atraso || 0} dia(s) de atraso · Juros{" "}
+                        {formatarMoeda(calculoEncargos.valor_juros_calculado || 0)} · Multa{" "}
+                        {formatarMoeda(calculoEncargos.valor_multa_calculada || 0)}
                       </div>
                     </div>
                     <label className="inline-flex items-center gap-2">
@@ -455,21 +472,42 @@ export function ContasReceberRecebimentoLoteModal({
             <h5 className="text-xl font-bold">Baixar parcelas selecionadas</h5>
             <p className="text-sm text-gray-500">{contasSelecionadas.length} parcela(s)</p>
           </div>
-          <ActionButton intent="neutral" tone="ghost" size="sm" icon={X} onClick={onFechar} aria-label="Fechar baixa em lote" />
+          <ActionButton
+            intent="neutral"
+            tone="ghost"
+            size="sm"
+            icon={X}
+            onClick={onFechar}
+            aria-label="Fechar baixa em lote"
+          />
         </div>
 
         <div className="space-y-4 p-6">
           <div className="grid grid-cols-1 gap-3 rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm sm:grid-cols-3">
-            <div><span className="block text-blue-700">Saldo</span><strong>{formatarMoeda(saldoSemEncargos)}</strong></div>
-            <div><span className="block text-blue-700">Juros + multa</span><strong>{formatarMoeda(juros + multa)}</strong></div>
-            <div><span className="block text-blue-700">Total previsto</span><strong>{formatarMoeda(totalAtualizado)}</strong></div>
+            <div>
+              <span className="block text-blue-700">Saldo</span>
+              <strong>{formatarMoeda(saldoSemEncargos)}</strong>
+            </div>
+            <div>
+              <span className="block text-blue-700">Juros + multa</span>
+              <strong>{formatarMoeda(juros + multa)}</strong>
+            </div>
+            <div>
+              <span className="block text-blue-700">Total previsto</span>
+              <strong>{formatarMoeda(totalAtualizado)}</strong>
+            </div>
           </div>
 
           <label className="flex items-center gap-2 rounded border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950">
             <input
               type="checkbox"
               checked={dadosRecebimento.aplicar_encargos_automaticos}
-              onChange={(e) => setDadosRecebimento({ ...dadosRecebimento, aplicar_encargos_automaticos: e.target.checked })}
+              onChange={(e) =>
+                setDadosRecebimento({
+                  ...dadosRecebimento,
+                  aplicar_encargos_automaticos: e.target.checked,
+                })
+              }
             />
             Aplicar juros e multa automaticos nas parcelas de crediario vencidas
           </label>
@@ -477,27 +515,60 @@ export function ContasReceberRecebimentoLoteModal({
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
               <label className="mb-1 block text-sm font-medium">Data do recebimento</label>
-              <input type="date" className="w-full rounded border border-gray-300 px-3 py-2" value={dadosRecebimento.data_recebimento} onChange={(e) => setDadosRecebimento({ ...dadosRecebimento, data_recebimento: e.target.value })} />
+              <input
+                type="date"
+                className="w-full rounded border border-gray-300 px-3 py-2"
+                value={dadosRecebimento.data_recebimento}
+                onChange={(e) =>
+                  setDadosRecebimento({ ...dadosRecebimento, data_recebimento: e.target.value })
+                }
+              />
             </div>
             <div>
               <label className="mb-1 block text-sm font-medium">Forma de pagamento</label>
-              <select className="w-full rounded border border-gray-300 px-3 py-2" value={dadosRecebimento.forma_pagamento_id || ""} onChange={(e) => setDadosRecebimento({ ...dadosRecebimento, forma_pagamento_id: parseInt(e.target.value) || null })}>
+              <select
+                className="w-full rounded border border-gray-300 px-3 py-2"
+                value={dadosRecebimento.forma_pagamento_id || ""}
+                onChange={(e) =>
+                  setDadosRecebimento({
+                    ...dadosRecebimento,
+                    forma_pagamento_id: parseInt(e.target.value) || null,
+                  })
+                }
+              >
                 <option value="">Selecione...</option>
-                {safeArray(formasPagamento).map((forma) => <option key={forma.id} value={forma.id}>{forma.nome}</option>)}
+                {safeArray(formasPagamento).map((forma) => (
+                  <option key={forma.id} value={forma.id}>
+                    {forma.nome}
+                  </option>
+                ))}
               </select>
             </div>
           </div>
 
           <div>
             <label className="mb-1 block text-sm font-medium">Observacoes</label>
-            <textarea className="w-full rounded border border-gray-300 px-3 py-2" rows="2" value={dadosRecebimento.observacoes} onChange={(e) => setDadosRecebimento({ ...dadosRecebimento, observacoes: e.target.value })} />
+            <textarea
+              className="w-full rounded border border-gray-300 px-3 py-2"
+              rows="2"
+              value={dadosRecebimento.observacoes}
+              onChange={(e) =>
+                setDadosRecebimento({ ...dadosRecebimento, observacoes: e.target.value })
+              }
+            />
           </div>
-          <p className="text-xs text-gray-500">Os valores sao recalculados no servidor para a data escolhida antes da baixa.</p>
+          <p className="text-xs text-gray-500">
+            Os valores sao recalculados no servidor para a data escolhida antes da baixa.
+          </p>
         </div>
 
         <div className="flex justify-end gap-3 border-t p-4">
-          <ActionButton intent="neutral" tone="soft" size="md" onClick={onFechar}>Cancelar</ActionButton>
-          <ActionButton intent="create" size="md" onClick={onConfirmar}>Quitar {contasSelecionadas.length} parcela(s)</ActionButton>
+          <ActionButton intent="neutral" tone="soft" size="md" onClick={onFechar}>
+            Cancelar
+          </ActionButton>
+          <ActionButton intent="create" size="md" onClick={onConfirmar}>
+            Quitar {contasSelecionadas.length} parcela(s)
+          </ActionButton>
         </div>
       </div>
     </div>

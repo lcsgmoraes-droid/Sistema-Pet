@@ -64,9 +64,7 @@ export default function ConfiguracaoGeralNegocio() {
           dias_tolerancia_atraso: Number(data.dias_tolerancia_atraso ?? 5),
           crediario_encargos_automaticos: Boolean(data.crediario_encargos_automaticos),
           crediario_multa_percentual: Number(data.crediario_multa_percentual ?? 2),
-          crediario_juros_mensal_percentual: Number(
-            data.crediario_juros_mensal_percentual ?? 1,
-          ),
+          crediario_juros_mensal_percentual: Number(data.crediario_juros_mensal_percentual ?? 1),
           meta_faturamento_mensal: Number(data.meta_faturamento_mensal ?? 0),
           alerta_estoque_percentual: Number(data.alerta_estoque_percentual ?? 20),
           dias_produto_parado: Number(data.dias_produto_parado ?? 90),
@@ -136,9 +134,7 @@ export default function ConfiguracaoGeralNegocio() {
         dias_tolerancia_atraso: Number(form.dias_tolerancia_atraso),
         crediario_encargos_automaticos: Boolean(form.crediario_encargos_automaticos),
         crediario_multa_percentual: Number(form.crediario_multa_percentual),
-        crediario_juros_mensal_percentual: Number(
-          form.crediario_juros_mensal_percentual,
-        ),
+        crediario_juros_mensal_percentual: Number(form.crediario_juros_mensal_percentual),
         meta_faturamento_mensal: Number(form.meta_faturamento_mensal),
         alerta_estoque_percentual: Number(form.alerta_estoque_percentual),
         dias_produto_parado: Number(form.dias_produto_parado),
@@ -239,7 +235,10 @@ export default function ConfiguracaoGeralNegocio() {
 
         <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
           <div>
-            <label htmlFor="dias-tolerancia-atraso" className="mb-1 block text-sm font-medium text-gray-700">
+            <label
+              htmlFor="dias-tolerancia-atraso"
+              className="mb-1 block text-sm font-medium text-gray-700"
+            >
               Tolerancia apos o vencimento (dias)
             </label>
             <input
@@ -252,7 +251,10 @@ export default function ConfiguracaoGeralNegocio() {
             />
           </div>
           <div>
-            <label htmlFor="crediario-multa" className="mb-1 block text-sm font-medium text-gray-700">
+            <label
+              htmlFor="crediario-multa"
+              className="mb-1 block text-sm font-medium text-gray-700"
+            >
               Multa unica (%)
             </label>
             <input
@@ -267,7 +269,10 @@ export default function ConfiguracaoGeralNegocio() {
             />
           </div>
           <div>
-            <label htmlFor="crediario-juros" className="mb-1 block text-sm font-medium text-gray-700">
+            <label
+              htmlFor="crediario-juros"
+              className="mb-1 block text-sm font-medium text-gray-700"
+            >
               Juros ao mes (%)
             </label>
             <input
@@ -276,16 +281,14 @@ export default function ConfiguracaoGeralNegocio() {
               min="0"
               step="0.01"
               value={form.crediario_juros_mensal_percentual}
-              onChange={(e) =>
-                onChange("crediario_juros_mensal_percentual", e.target.value, true)
-              }
+              onChange={(e) => onChange("crediario_juros_mensal_percentual", e.target.value, true)}
               className={campoClass("crediario_juros_mensal_percentual")}
             />
           </div>
         </div>
         <p className="mt-4 text-xs leading-relaxed text-gray-500">
-          Informe estas condicoes ao cliente na venda a prazo. A multa de mora fica limitada a 2%
-          no sistema.
+          Informe estas condicoes ao cliente na venda a prazo. A multa de mora fica limitada a 2% no
+          sistema.
         </p>
       </div>
 
