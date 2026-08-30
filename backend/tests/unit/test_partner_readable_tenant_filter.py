@@ -5,7 +5,6 @@ from sqlalchemy import select
 from sqlalchemy.dialects import postgresql
 from sqlalchemy.orm import with_loader_criteria
 
-
 APP_DIR = Path(__file__).resolve().parents[2] / "app"
 TENANT_ID = UUID("11111111-1111-1111-1111-111111111111")
 
