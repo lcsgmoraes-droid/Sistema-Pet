@@ -27,7 +27,7 @@ def test_tenant_filter_declares_partner_readable_models_and_vet_link_guard():
     source = _source("tenancy/filters.py")
 
     assert "PARTNER_READABLE_TENANT_TABLES" in source
-    for table_name in ("clientes", "pets", "produtos"):
+    for table_name in ("clientes", "pets", "produtos", "produto_imagens"):
         assert table_name in source
 
     assert "VetPartnerLink" in source
@@ -71,6 +71,21 @@ def test_product_filter_requires_explicit_active_group_stock_share():
         in compiled
     )
     assert "CAST(produtos.tenant_id AS VARCHAR)" in compiled
+    assert "replace(" in compiled.lower()
+    assert compiled.count("status =") >= 3
+
+
+def test_product_image_filter_follows_the_explicit_shared_product_scope():
+    from app.produtos_models import ProdutoImagem
+
+    compiled = _compiled_filter_for(ProdutoImagem)
+
+    assert "empresa_grupo_estoques_compartilhados" in compiled
+    assert "empresa_grupos" in compiled
+    assert "empresa_grupo_membros" in compiled
+    assert "produto_origem_id = produto_imagens.produto_id" in compiled
+    assert "empresa_consumidora_id" in compiled
+    assert "CAST(produto_imagens.tenant_id AS VARCHAR)" in compiled
     assert "replace(" in compiled.lower()
     assert compiled.count("status =") >= 3
 
