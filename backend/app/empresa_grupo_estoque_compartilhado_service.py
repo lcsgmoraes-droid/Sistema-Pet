@@ -218,9 +218,7 @@ class EmpresaGrupoEstoqueCompartilhadoService:
             )
             .all()
         )
-        por_produto = {
-            int(item.produto_origem_id): item for item in compartilhamentos
-        }
+        por_produto = {int(item.produto_origem_id): item for item in compartilhamentos}
         return [
             {
                 "id": produto.id,
@@ -660,9 +658,7 @@ class EmpresaGrupoEstoqueCompartilhadoService:
         if imagem_local is not None:
             return consumidor
 
-        compartilhamentos = cls.mapa_catalogo_completo_para_consumidora(
-            db, consumidor
-        )
+        compartilhamentos = cls.mapa_catalogo_completo_para_consumidora(db, consumidor)
         produtos_por_origem: dict[str, list[int]] = {}
         for produto_id, compartilhamento in compartilhamentos.items():
             origem = str(compartilhamento["estoque_origem_empresa_id"])
