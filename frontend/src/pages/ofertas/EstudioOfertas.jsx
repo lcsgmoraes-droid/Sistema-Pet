@@ -4,6 +4,7 @@ import {
   FileDown,
   ImageDown,
   Link2,
+  Plus,
   RefreshCw,
   Sparkles,
 } from "lucide-react";
@@ -419,12 +420,28 @@ export default function EstudioOfertas() {
       setPublicacoes((atuais) => [data, ...atuais.filter((item) => item.id !== data.id)]);
       const link = `${window.location.origin}${data.link_path}`;
       await navigator.clipboard?.writeText(link).catch(() => {});
-      toast.success("Link publicado e copiado. Ele poderá ser desativado a qualquer momento.");
+      toast.success(
+        "Campanha salva e publicada. O link foi copiado e você pode criar outras campanhas.",
+      );
     } catch (error) {
       toast.error(detalheErro(error, error.message || "Não foi possível publicar o link."));
     } finally {
       setPublicando(false);
     }
+  }
+
+  async function iniciarNovaCampanha() {
+    if (
+      selecionados.length &&
+      !(await confirmarCorePet(
+        "Começar uma nova campanha? A seleção e as configurações atuais serão limpas, mas as campanhas já salvas continuarão publicadas.",
+      ))
+    ) {
+      return;
+    }
+    setSelecionados([]);
+    setConfig(criarConfigInicial());
+    toast.success("Nova campanha iniciada. As campanhas anteriores continuam salvas.");
   }
 
   async function desativar(id) {
@@ -470,13 +487,22 @@ export default function EstudioOfertas() {
               quando desejar e compartilhe por link, WhatsApp ou Instagram.
             </p>
           </div>
-          <button
-            type="button"
-            onClick={() => carregarProdutos(busca)}
-            className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-bold text-slate-700"
-          >
-            <RefreshCw size={16} /> Atualizar produtos
-          </button>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={iniciarNovaCampanha}
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-violet-700 px-4 py-2 text-sm font-bold text-white"
+            >
+              <Plus size={16} /> Nova campanha
+            </button>
+            <button
+              type="button"
+              onClick={() => carregarProdutos(busca)}
+              className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-bold text-slate-700"
+            >
+              <RefreshCw size={16} /> Atualizar produtos
+            </button>
+          </div>
         </header>
 
         <div className="grid items-start gap-6 2xl:grid-cols-[minmax(0,1.15fr)_minmax(480px,.85fr)]">
@@ -589,7 +615,8 @@ export default function EstudioOfertas() {
                   onClick={publicarLink}
                   className="inline-flex items-center justify-center gap-2 rounded-xl bg-teal-700 px-3 py-3 text-xs font-black text-white disabled:opacity-50"
                 >
-                  <Link2 size={17} /> {publicando ? "Publicando..." : "Gerar link"}
+                  <Link2 size={17} />
+                  {publicando ? "Salvando..." : "Salvar campanha e gerar link"}
                 </button>
               </div>
               {(exportando || publicando) && (

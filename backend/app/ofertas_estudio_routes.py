@@ -80,6 +80,8 @@ def _serializar_publicacao(
     token = publicacao.indice_publico.token if publicacao.indice_publico else None
     imagens_urls = list(publicacao.imagens_urls or [])
     produtos_snapshot = list(publicacao.produtos_snapshot or [])
+    configuracao = dict(publicacao.configuracao or {})
+    canais_configurados = dict(configuracao.get("canais") or {})
     payload = {
         "id": int(publicacao.id),
         "titulo": publicacao.titulo,
@@ -96,6 +98,10 @@ def _serializar_publicacao(
         "token": token,
         "link_path": f"/oferta/{token}" if token else None,
         "imagens_urls": imagens_urls,
+        "canais": {
+            "app": bool(canais_configurados.get("app")),
+            "ecommerce": bool(canais_configurados.get("ecommerce")),
+        },
         **resumir_navegacao_publicacao(
             publicacao.tipo_arte,
             imagens_urls,
@@ -107,7 +113,7 @@ def _serializar_publicacao(
     }
     if incluir_snapshot:
         payload["produtos"] = produtos_snapshot
-        payload["configuracao"] = dict(publicacao.configuracao or {})
+        payload["configuracao"] = configuracao
     return payload
 
 

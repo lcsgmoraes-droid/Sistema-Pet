@@ -9,6 +9,8 @@ const ecommerce = fs.readFileSync(
   path.resolve(pasta, "../ecommerce/EcommerceStorefrontChrome.jsx"),
   "utf8",
 );
+const estudio = fs.readFileSync(path.join(pasta, "EstudioOfertas.jsx"), "utf8");
+const publicacoes = fs.readFileSync(path.join(pasta, "OfertaPublicacoes.jsx"), "utf8");
 
 assert.match(ofertaPublica, /const \[paginaAtual, setPaginaAtual\]/);
 assert.match(ofertaPublica, /ArrowLeft/);
@@ -18,5 +20,10 @@ assert.match(ofertaPublica, /requestFullscreen/);
 assert.match(ofertaPublica, /\{paginaExibida \+ 1\} de \{totalPaginas\}/);
 assert.match(ecommerce, /1 de \{banner\.pageCount\}/);
 assert.match(ecommerce, /banner\.ctaLabel/);
+assert.match(estudio, /Nova campanha/);
+assert.match(estudio, /Salvar campanha e gerar link/);
+assert.match(estudio, /setSelecionados\(\[\]\)/);
+assert.match(publicacoes, /Campanhas salvas/);
+assert.match(publicacoes, /várias ativas ao mesmo tempo/);
 
 console.log("ofertaPublicaNavigation: ok");
