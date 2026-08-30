@@ -183,6 +183,11 @@ def listar_produtos(
 
     # Incluir produtos de tenants parceiros (ex.: pet shop parceiro da clínica)
     access_ids = get_all_accessible_tenant_ids(db, tenant_id)
+    compartilhamentos_catalogo = (
+        EmpresaGrupoEstoqueCompartilhadoService.mapa_catalogo_completo_para_consumidora(
+            db, tenant_id
+        )
+    )
 
     # QUERY BASE
     # - include_variations=True: inclui PAI para permitir visualização da hierarquia
@@ -196,6 +201,7 @@ def listar_produtos(
         produto_predecessor_id=produto_predecessor_id,
         include_variations=include_variations,
         busca_completa=busca_completa,
+        produto_ids_compartilhados=list(compartilhamentos_catalogo),
     )
 
     query = _aplicar_filtros_basicos_produtos(
@@ -256,6 +262,7 @@ def listar_produtos(
         load_options=load_options,
         validade_por_produto=validade_por_produto,
         incluir_bling_sync=incluir_bling_sync,
+        estoque_compartilhado_por_produto=compartilhamentos_catalogo,
     )
     return _montar_resposta_produtos_paginados(
         produtos_expandidos,

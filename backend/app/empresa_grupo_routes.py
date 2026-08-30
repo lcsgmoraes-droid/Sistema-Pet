@@ -17,6 +17,7 @@ from app.empresa_grupo_estoque_compartilhado_service import (
     EmpresaGrupoEstoqueCompartilhadoService,
 )
 from app.empresa_grupo_schemas import (
+    EmpresaGrupoEstoqueAcessoCatalogoAtualizar,
     EmpresaGrupoConvidar,
     EmpresaGrupoCriar,
     EmpresaGrupoEstoqueCompartilhar,
@@ -77,6 +78,26 @@ def compartilhar_estoque_grupo(
         usuario.id,
         payload.empresa_consumidora_id,
         payload.produto_ids,
+        acesso_catalogo_completo=payload.acesso_catalogo_completo,
+    )
+
+
+@router.patch("/{grupo_id}/estoque-compartilhado/{compartilhamento_id}/catalogo")
+@require_any_permission(PERMISSOES_CONFIG_EMPRESA)
+def atualizar_acesso_catalogo_estoque_compartilhado(
+    grupo_id: int,
+    compartilhamento_id: int,
+    payload: EmpresaGrupoEstoqueAcessoCatalogoAtualizar,
+    db: Session = Depends(get_session),
+    user_and_tenant=Depends(get_current_user_and_tenant),
+):
+    usuario, empresa_id = user_and_tenant
+    return EmpresaGrupoEstoqueCompartilhadoService(db).atualizar_acesso_catalogo(
+        grupo_id,
+        compartilhamento_id,
+        empresa_id,
+        usuario.id,
+        acesso_catalogo_completo=payload.acesso_catalogo_completo,
     )
 
 

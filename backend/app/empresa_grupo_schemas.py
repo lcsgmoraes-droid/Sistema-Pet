@@ -42,6 +42,7 @@ class EmpresaGrupoProdutoVincular(BaseModel):
 class EmpresaGrupoEstoqueCompartilhar(BaseModel):
     empresa_consumidora_id: str = Field(min_length=36, max_length=36)
     produto_ids: list[int] = Field(min_length=1, max_length=200)
+    acesso_catalogo_completo: bool = False
 
     @field_validator("produto_ids")
     @classmethod
@@ -50,3 +51,7 @@ class EmpresaGrupoEstoqueCompartilhar(BaseModel):
         if not ids:
             raise ValueError("Selecione ao menos um produto.")
         return ids
+
+
+class EmpresaGrupoEstoqueAcessoCatalogoAtualizar(BaseModel):
+    acesso_catalogo_completo: bool

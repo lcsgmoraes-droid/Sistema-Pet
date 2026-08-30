@@ -2,6 +2,7 @@
 
 import logging
 from datetime import datetime
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session, joinedload
@@ -28,6 +29,10 @@ from app.produtos_models import Categoria, Marca, Produto, ProdutoKitComponente
 from app.security.permissions_decorator import require_permission
 from app.services.produto_service import ProdutoService
 from app.produtos.tipos import aplicar_regras_servico_dados
+from app.empresa_grupo_estoque_compartilhado_service import (
+    EmpresaGrupoEstoqueCompartilhadoService,
+)
+from app.tenancy.context import set_current_tenant
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -221,7 +226,14 @@ def obter_produto(
     - Retorna estoque_virtual (calculado automaticamente se tipo_kit=VIRTUAL)
     """
 
-    current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
+    current_user, tenant_solicitante_id = _validar_tenant_e_obter_usuario(
+        user_and_tenant
+    )
+    acesso_catalogo = EmpresaGrupoEstoqueCompartilhadoService.resolver_produto_catalogo(
+        db, tenant_solicitante_id, produto_id
+    )
+    tenant_id = UUID(str(acesso_catalogo.tenant_origem_id))
+    set_current_tenant(tenant_id)
 
     produto = (
         db.query(Produto)
@@ -247,6 +259,13 @@ def obter_produto(
         "composicao_kit": [],
         "estoque_virtual": None,
         "estoque_disponivel": None,
+        "estoque_compartilhado": acesso_catalogo.compartilhado,
+        "estoque_compartilhado_id": acesso_catalogo.compartilhamento_id,
+        "estoque_origem_empresa_id": (
+            acesso_catalogo.tenant_origem_id if acesso_catalogo.compartilhado else None
+        ),
+        "estoque_origem_nome": acesso_catalogo.empresa_origem_nome,
+        "acesso_catalogo_completo": acesso_catalogo.compartilhado,
     }
 
     # ========================================
@@ -331,7 +350,12 @@ def preview_precos_venda_produtos_compostos(
 ):
     """Mostra os precos de venda sugeridos sem alterar nenhum produto."""
 
-    _, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
+    _, tenant_solicitante_id = _validar_tenant_e_obter_usuario(user_and_tenant)
+    acesso_catalogo = EmpresaGrupoEstoqueCompartilhadoService.resolver_produto_catalogo(
+        db, tenant_solicitante_id, produto_id
+    )
+    tenant_id = UUID(str(acesso_catalogo.tenant_origem_id))
+    set_current_tenant(tenant_id)
     produto = (
         db.query(Produto)
         .filter(Produto.id == produto_id, Produto.tenant_id == tenant_id)
@@ -369,7 +393,14 @@ def atualizar_produto(
     - Pode atualizar composicao_kit (diff inteligente)
     - Pode alterar tipo_kit (VIRTUAL <-> FISICO)
     """
-    current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
+    current_user, tenant_solicitante_id = _validar_tenant_e_obter_usuario(
+        user_and_tenant
+    )
+    acesso_catalogo = EmpresaGrupoEstoqueCompartilhadoService.resolver_produto_catalogo(
+        db, tenant_solicitante_id, produto_id
+    )
+    tenant_id = UUID(str(acesso_catalogo.tenant_origem_id))
+    set_current_tenant(tenant_id)
 
     produto = (
         db.query(Produto)

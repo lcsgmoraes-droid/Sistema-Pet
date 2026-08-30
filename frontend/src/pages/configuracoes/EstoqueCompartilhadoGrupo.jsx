@@ -5,6 +5,7 @@ import ActionButton from "../../components/ui/ActionButton";
 import { confirmarCorePet } from "../../services/corepetDialog";
 import {
   buscarProdutosEstoqueCompartilhado,
+  atualizarAcessoCatalogoCompartilhado,
   compartilharEstoqueGrupo,
   listarEstoqueCompartilhadoGrupo,
   removerEstoqueCompartilhadoGrupo,
@@ -30,6 +31,7 @@ export default function EstoqueCompartilhadoGrupo({ empresaAtualId, grupo }) {
   const [selecionados, setSelecionados] = useState(new Set());
   const [carregando, setCarregando] = useState(false);
   const [acao, setAcao] = useState("");
+  const [acessoCatalogoCompleto, setAcessoCatalogoCompleto] = useState(false);
 
   const carregarCompartilhamentos = useCallback(async () => {
     try {
@@ -107,18 +109,48 @@ export default function EstoqueCompartilhadoGrupo({ empresaAtualId, grupo }) {
     const destino = destinos.find((item) => item.empresa_id === destinoId);
     if (
       !(await confirmarCorePet(
-        `Autorizar ${destino?.empresa_nome || "a outra empresa"} a vender o saldo de ${ids.length} produto(s)?`,
+        `Autorizar ${destino?.empresa_nome || "a outra empresa"} a ${
+          acessoCatalogoCompleto
+            ? "vender o saldo e editar o cadastro completo de"
+            : "vender o saldo de"
+        } ${ids.length} produto(s)?`,
       ))
     ) {
       return;
     }
     setAcao("compartilhar");
     try {
-      await compartilharEstoqueGrupo(grupo.id, destinoId, ids);
+      await compartilharEstoqueGrupo(grupo.id, destinoId, ids, acessoCatalogoCompleto);
       toast.success("Estoque autorizado para a empresa selecionada.");
       await Promise.all([buscarProdutos(), carregarCompartilhamentos()]);
     } catch (error) {
       toast.error(mensagemErro(error, "Não foi possível compartilhar os produtos."));
+    } finally {
+      setAcao("");
+    }
+  }
+
+  async function alternarAcessoCatalogo(item) {
+    const proximo = !item.acesso_catalogo_completo;
+    const acaoLabel = proximo ? "liberar" : "retirar";
+    if (
+      !(await confirmarCorePet(
+        `${acaoLabel === "liberar" ? "Liberar" : "Retirar"} acesso completo ao cadastro de ${
+          item.produto_nome
+        } para ${item.empresa_consumidora_nome}? O compartilhamento do saldo continuará ativo.`,
+      ))
+    ) {
+      return;
+    }
+    setAcao(`catalogo-${item.id}`);
+    try {
+      await atualizarAcessoCatalogoCompartilhado(grupo.id, item.id, proximo);
+      toast.success(
+        proximo ? "Acesso completo ao catálogo liberado." : "Acesso ao catálogo retirado.",
+      );
+      await Promise.all([buscarProdutos(), carregarCompartilhamentos()]);
+    } catch (error) {
+      toast.error(mensagemErro(error, "Não foi possível atualizar o acesso ao catálogo."));
     } finally {
       setAcao("");
     }
@@ -184,6 +216,28 @@ export default function EstoqueCompartilhadoGrupo({ empresaAtualId, grupo }) {
         </ActionButton>
       </div>
 
+      <label className="mt-3 flex cursor-pointer items-start gap-2 rounded-lg border border-violet-200 bg-violet-50 px-3 py-2.5">
+        <input
+          type="checkbox"
+          className="mt-0.5"
+          checked={acessoCatalogoCompleto}
+          onChange={(event) => {
+            setAcessoCatalogoCompleto(event.target.checked);
+            setSelecionados(new Set());
+          }}
+        />
+        <span>
+          <span className="block text-sm font-semibold text-violet-900">
+            Acesso completo ao catálogo
+          </span>
+          <span className="block text-xs text-violet-700">
+            O produto aparece na lista normal e a empresa selecionada pode editar cadastro e fotos.
+            As opções “anunciar no app” e “anunciar no e-commerce” continuam sendo definidas no
+            produto.
+          </span>
+        </span>
+      </label>
+
       {produtos.length > 0 ? (
         <div className="mt-3 max-h-72 overflow-auto rounded-lg border border-slate-200">
           {produtos.map((produto) => (
@@ -193,8 +247,15 @@ export default function EstoqueCompartilhadoGrupo({ empresaAtualId, grupo }) {
             >
               <input
                 type="checkbox"
-                checked={produto.compartilhado || selecionados.has(produto.id)}
-                disabled={produto.compartilhado}
+                checked={
+                  produto.acesso_catalogo_completo ||
+                  (!acessoCatalogoCompleto && produto.compartilhado) ||
+                  selecionados.has(produto.id)
+                }
+                disabled={
+                  produto.acesso_catalogo_completo ||
+                  (!acessoCatalogoCompleto && produto.compartilhado)
+                }
                 onChange={() => alternarProduto(produto.id)}
               />
               <span className="min-w-0 flex-1">
@@ -205,9 +266,13 @@ export default function EstoqueCompartilhadoGrupo({ empresaAtualId, grupo }) {
                   {produto.codigo || "Sem SKU"} · saldo {formatarEstoque(produto.estoque_atual)}
                 </span>
               </span>
-              {produto.compartilhado ? (
+              {produto.acesso_catalogo_completo ? (
+                <span className="rounded-full bg-violet-100 px-2 py-1 text-xs font-semibold text-violet-700">
+                  Catálogo completo
+                </span>
+              ) : produto.compartilhado ? (
                 <span className="rounded-full bg-emerald-100 px-2 py-1 text-xs font-semibold text-emerald-700">
-                  Já compartilhado
+                  Saldo compartilhado
                 </span>
               ) : null}
             </label>
@@ -243,6 +308,18 @@ export default function EstoqueCompartilhadoGrupo({ empresaAtualId, grupo }) {
                     {item.empresa_origem_nome} → {item.empresa_consumidora_nome} · saldo{" "}
                     {formatarEstoque(item.estoque_atual)}
                   </div>
+                  <button
+                    type="button"
+                    className="mt-1 text-xs font-semibold text-violet-700 hover:text-violet-900 disabled:opacity-50"
+                    disabled={!item.pode_remover || acao === `catalogo-${item.id}`}
+                    onClick={() => alternarAcessoCatalogo(item)}
+                  >
+                    {acao === `catalogo-${item.id}`
+                      ? "Atualizando..."
+                      : item.acesso_catalogo_completo
+                        ? "Retirar acesso ao cadastro (manter saldo)"
+                        : "Liberar cadastro, fotos, app e e-commerce"}
+                  </button>
                 </div>
                 {item.pode_remover ? (
                   <ActionButton

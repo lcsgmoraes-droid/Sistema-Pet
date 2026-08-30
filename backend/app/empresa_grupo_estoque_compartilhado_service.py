@@ -95,6 +95,7 @@ class EmpresaGrupoEstoqueCompartilhadoService:
         consumidora: str,
         usuario_id: int,
         produto_ids: list[int],
+        acesso_catalogo_completo: bool,
     ) -> None:
         if not produto_ids:
             return
@@ -118,6 +119,7 @@ class EmpresaGrupoEstoqueCompartilhadoService:
                     "empresa_origem_id": origem_valor,
                     "produto_origem_id": produto_id,
                     "empresa_consumidora_id": consumidora_valor,
+                    "acesso_catalogo_completo": bool(acesso_catalogo_completo),
                     "status": "ativo",
                     "criado_por_usuario_id": usuario_id,
                 }
@@ -217,7 +219,7 @@ class EmpresaGrupoEstoqueCompartilhadoService:
             .all()
         )
         por_produto = {
-            int(item.produto_origem_id): item.id for item in compartilhamentos
+            int(item.produto_origem_id): item for item in compartilhamentos
         }
         return [
             {
@@ -228,7 +230,14 @@ class EmpresaGrupoEstoqueCompartilhadoService:
                 "estoque_atual": float(produto.estoque_atual or 0),
                 "preco_venda": float(produto.preco_venda or 0),
                 "compartilhado": produto.id in por_produto,
-                "compartilhamento_id": por_produto.get(produto.id),
+                "compartilhamento_id": (
+                    por_produto[produto.id].id if produto.id in por_produto else None
+                ),
+                "acesso_catalogo_completo": bool(
+                    por_produto[produto.id].acesso_catalogo_completo
+                    if produto.id in por_produto
+                    else False
+                ),
             }
             for produto in produtos
         ]
@@ -302,6 +311,9 @@ class EmpresaGrupoEstoqueCompartilhadoService:
                         compartilhamento.empresa_consumidora_id
                     ),
                     "empresa_consumidora_nome": consumidora_nome,
+                    "acesso_catalogo_completo": bool(
+                        compartilhamento.acesso_catalogo_completo
+                    ),
                     "pode_remover": str(compartilhamento.empresa_origem_id)
                     == empresa_atual,
                 }
@@ -315,6 +327,8 @@ class EmpresaGrupoEstoqueCompartilhadoService:
         usuario_id: int,
         empresa_consumidora_id,
         produto_ids: Iterable[int],
+        *,
+        acesso_catalogo_completo: bool = False,
     ) -> dict:
         origem = self._empresa_id(empresa_origem_id)
         consumidora = self._empresa_id(empresa_consumidora_id)
@@ -374,7 +388,11 @@ class EmpresaGrupoEstoqueCompartilhadoService:
                 item.removido_em = None
                 item.atualizado_em = agora
                 item.criado_por_usuario_id = usuario_id
+                item.acesso_catalogo_completo = bool(acesso_catalogo_completo)
                 ativados += 1
+            elif acesso_catalogo_completo and not item.acesso_catalogo_completo:
+                item.acesso_catalogo_completo = True
+                item.atualizado_em = agora
 
         self._inserir_novos_compartilhamentos(
             grupo_id=grupo_id,
@@ -382,6 +400,7 @@ class EmpresaGrupoEstoqueCompartilhadoService:
             consumidora=consumidora,
             usuario_id=usuario_id,
             produto_ids=novos,
+            acesso_catalogo_completo=acesso_catalogo_completo,
         )
 
         log_business_event(
@@ -397,6 +416,55 @@ class EmpresaGrupoEstoqueCompartilhadoService:
         self.db.commit()
         registrar_uso_funcionalidade(self.db, "grupos-empresas-estoque-compartilhado")
         return {"ativados": ativados, "selecionados": len(ids)}
+
+    def atualizar_acesso_catalogo(
+        self,
+        grupo_id: int,
+        compartilhamento_id: int,
+        empresa_origem_id,
+        usuario_id: int,
+        *,
+        acesso_catalogo_completo: bool,
+    ) -> dict:
+        origem = self._empresa_id(empresa_origem_id)
+        self._grupo_ativo(grupo_id)
+        self._membro_ativo(grupo_id, origem)
+        item = (
+            self.db.query(EmpresaGrupoEstoqueCompartilhado)
+            .filter(
+                EmpresaGrupoEstoqueCompartilhado.id == compartilhamento_id,
+                EmpresaGrupoEstoqueCompartilhado.grupo_id == grupo_id,
+                empresa_id_igual(
+                    EmpresaGrupoEstoqueCompartilhado.empresa_origem_id, origem
+                ),
+                EmpresaGrupoEstoqueCompartilhado.status == "ativo",
+            )
+            .first()
+        )
+        if item is None:
+            raise HTTPException(
+                status_code=404, detail="Compartilhamento não encontrado."
+            )
+        item.acesso_catalogo_completo = bool(acesso_catalogo_completo)
+        item.atualizado_em = datetime.now(timezone.utc)
+        log_business_event(
+            db=self.db,
+            tenant_id=origem,
+            user_id=usuario_id,
+            event="empresa_grupo_catalogo_compartilhado_atualizado",
+            entity_type="empresa_grupo_estoque_compartilhado",
+            entity_id=item.id,
+            metadata={
+                "produto_id": item.produto_origem_id,
+                "acesso_catalogo_completo": bool(acesso_catalogo_completo),
+            },
+            commit=False,
+        )
+        self.db.commit()
+        return {
+            "mensagem": "Acesso ao catálogo atualizado.",
+            "acesso_catalogo_completo": bool(item.acesso_catalogo_completo),
+        }
 
     def remover(
         self,
@@ -441,7 +509,12 @@ class EmpresaGrupoEstoqueCompartilhadoService:
 
     @classmethod
     def _consulta_compartilhamento_ativo(
-        cls, db: Session, empresa_consumidora_id, produto_id: int | None = None
+        cls,
+        db: Session,
+        empresa_consumidora_id,
+        produto_id: int | None = None,
+        *,
+        exigir_catalogo_completo: bool = False,
     ):
         membro_origem = aliased(EmpresaGrupoMembro)
         membro_consumidora = aliased(EmpresaGrupoMembro)
@@ -494,7 +567,121 @@ class EmpresaGrupoEstoqueCompartilhadoService:
             query = query.filter(
                 EmpresaGrupoEstoqueCompartilhado.produto_origem_id == produto_id
             )
+        if exigir_catalogo_completo:
+            query = query.filter(
+                EmpresaGrupoEstoqueCompartilhado.acesso_catalogo_completo.is_(True)
+            )
         return query
+
+    @classmethod
+    def resolver_produto_catalogo(
+        cls, db: Session, empresa_consumidora_id, produto_id: int
+    ) -> ProdutoVendaResolvido:
+        consumidor = str(empresa_consumidora_id)
+        produto_local = (
+            db.query(Produto)
+            .filter(
+                Produto.id == produto_id,
+                Produto.tenant_id == cls._produto_tenant_id(consumidor),
+            )
+            .first()
+        )
+        if produto_local is not None:
+            return ProdutoVendaResolvido(
+                produto=produto_local,
+                tenant_origem_id=consumidor,
+                empresa_origem_nome=None,
+            )
+
+        linha = cls._consulta_compartilhamento_ativo(
+            db,
+            consumidor,
+            produto_id,
+            exigir_catalogo_completo=True,
+        ).first()
+        if linha is None:
+            raise HTTPException(status_code=404, detail="Produto não encontrado")
+        compartilhamento, origem_nome = linha
+        with tenant_context(compartilhamento.empresa_origem_id) as tenant_origem:
+            produto = (
+                db.query(Produto)
+                .filter(Produto.id == produto_id, Produto.tenant_id == tenant_origem)
+                .first()
+            )
+        if produto is None:
+            raise HTTPException(status_code=404, detail="Produto não encontrado")
+        return ProdutoVendaResolvido(
+            produto=produto,
+            tenant_origem_id=str(compartilhamento.empresa_origem_id),
+            compartilhamento_id=compartilhamento.id,
+            empresa_origem_nome=origem_nome,
+        )
+
+    @classmethod
+    def mapa_catalogo_completo_para_consumidora(
+        cls, db: Session, empresa_consumidora_id
+    ) -> dict[int, dict]:
+        resultados: dict[int, dict] = {}
+        query = cls._consulta_compartilhamento_ativo(
+            db,
+            empresa_consumidora_id,
+            exigir_catalogo_completo=True,
+        )
+        for compartilhamento, origem_nome in query.all():
+            resultados.setdefault(
+                int(compartilhamento.produto_origem_id),
+                {
+                    "estoque_compartilhado": True,
+                    "estoque_compartilhado_id": compartilhamento.id,
+                    "estoque_origem_empresa_id": str(
+                        compartilhamento.empresa_origem_id
+                    ),
+                    "estoque_origem_nome": origem_nome,
+                    "acesso_catalogo_completo": True,
+                },
+            )
+        return resultados
+
+    @classmethod
+    def resolver_tenant_imagem_catalogo(
+        cls, db: Session, empresa_consumidora_id, imagem_id: int
+    ) -> str:
+        from app.produtos_models import ProdutoImagem
+
+        consumidor = str(empresa_consumidora_id)
+        imagem_local = (
+            db.query(ProdutoImagem)
+            .filter(
+                ProdutoImagem.id == imagem_id,
+                ProdutoImagem.tenant_id == cls._produto_tenant_id(consumidor),
+            )
+            .first()
+        )
+        if imagem_local is not None:
+            return consumidor
+
+        compartilhamentos = cls.mapa_catalogo_completo_para_consumidora(
+            db, consumidor
+        )
+        produtos_por_origem: dict[str, list[int]] = {}
+        for produto_id, compartilhamento in compartilhamentos.items():
+            origem = str(compartilhamento["estoque_origem_empresa_id"])
+            produtos_por_origem.setdefault(origem, []).append(int(produto_id))
+
+        for origem, produto_ids in produtos_por_origem.items():
+            with tenant_context(origem) as tenant_origem:
+                imagem = (
+                    db.query(ProdutoImagem)
+                    .filter(
+                        ProdutoImagem.id == imagem_id,
+                        ProdutoImagem.tenant_id == tenant_origem,
+                        ProdutoImagem.produto_id.in_(produto_ids),
+                    )
+                    .first()
+                )
+            if imagem is not None:
+                return origem
+        raise HTTPException(status_code=404, detail="Imagem não encontrada")
 
     @classmethod
     def resolver_produto_venda(
@@ -595,6 +782,9 @@ class EmpresaGrupoEstoqueCompartilhadoService:
                         compartilhamento.empresa_origem_id
                     ),
                     "estoque_origem_nome": origem_nome,
+                    "acesso_catalogo_completo": bool(
+                        compartilhamento.acesso_catalogo_completo
+                    ),
                 },
             )
         return resultados

@@ -6,6 +6,7 @@ import logging
 import traceback
 from datetime import datetime
 from typing import List
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from sqlalchemy import func
@@ -22,6 +23,10 @@ from app.services.product_image_storage import (
     prepare_product_image_variants,
     save_product_image_variants,
 )
+from app.empresa_grupo_estoque_compartilhado_service import (
+    EmpresaGrupoEstoqueCompartilhadoService,
+)
+from app.tenancy.context import set_current_tenant
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -49,7 +54,14 @@ async def upload_imagem_produto(
     - Primeira imagem é automaticamente marcada como principal
     """
     try:
-        current_user, tenant_id = user_and_tenant
+        current_user, tenant_solicitante_id = user_and_tenant
+        acesso_catalogo = (
+            EmpresaGrupoEstoqueCompartilhadoService.resolver_produto_catalogo(
+                db, tenant_solicitante_id, produto_id
+            )
+        )
+        tenant_id = UUID(str(acesso_catalogo.tenant_origem_id))
+        set_current_tenant(tenant_id)
         logger.info(f"[UPLOAD] Iniciando upload para produto {produto_id}")
 
         # Imagens podem ser preparadas mesmo em produtos inativos/descontinuados.
@@ -178,7 +190,14 @@ def listar_imagens_produto(
     Listar todas as imagens de um produto
     Ordenadas por: principal DESC, ordem ASC
     """
-    current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
+    current_user, tenant_solicitante_id = _validar_tenant_e_obter_usuario(
+        user_and_tenant
+    )
+    acesso_catalogo = EmpresaGrupoEstoqueCompartilhadoService.resolver_produto_catalogo(
+        db, tenant_solicitante_id, produto_id
+    )
+    tenant_id = UUID(str(acesso_catalogo.tenant_origem_id))
+    set_current_tenant(tenant_id)
 
     # Verificar se produto existe e pertence ao usuário
     produto = (
@@ -214,7 +233,13 @@ def atualizar_imagem(
     """
     Atualizar dados da imagem (ordem, se é principal)
     """
-    user, tenant_id = user_and_tenant
+    user, tenant_solicitante_id = user_and_tenant
+    tenant_id = UUID(
+        EmpresaGrupoEstoqueCompartilhadoService.resolver_tenant_imagem_catalogo(
+            db, tenant_solicitante_id, imagem_id
+        )
+    )
+    set_current_tenant(tenant_id)
 
     # Buscar imagem e verificar permissão
     imagem = (
@@ -287,7 +312,13 @@ def deletar_imagem(
     Deletar imagem do produto
     Remove o arquivo físico e o registro do banco
     """
-    current_user, tenant_id = user_and_tenant
+    current_user, tenant_solicitante_id = user_and_tenant
+    tenant_id = UUID(
+        EmpresaGrupoEstoqueCompartilhadoService.resolver_tenant_imagem_catalogo(
+            db, tenant_solicitante_id, imagem_id
+        )
+    )
+    set_current_tenant(tenant_id)
 
     # Buscar imagem e verificar permissão
     imagem = (

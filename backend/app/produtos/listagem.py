@@ -136,20 +136,28 @@ def _montar_query_listagem_produtos(
     produto_predecessor_id: Optional[int],
     include_variations: bool,
     busca_completa: bool,
+    produto_ids_compartilhados: Optional[list[int]] = None,
 ) -> Any:
+    ids_compartilhados = [
+        int(produto_id) for produto_id in (produto_ids_compartilhados or [])
+    ]
+    escopo_tenant = or_(
+        Produto.tenant_id.in_(tenant_ids),
+        Produto.id.in_(ids_compartilhados or [-1]),
+    )
     if produto_predecessor_id:
         query = db.query(Produto).filter(
-            Produto.tenant_id.in_(tenant_ids),
+            escopo_tenant,
             Produto.produto_predecessor_id == produto_predecessor_id,
         )
     elif tipo_produto:
         query = db.query(Produto).filter(
-            Produto.tenant_id.in_(tenant_ids),
+            escopo_tenant,
             Produto.tipo_produto == tipo_produto,
         )
     else:
         query = db.query(Produto).filter(
-            Produto.tenant_id.in_(tenant_ids),
+            escopo_tenant,
             Produto.tipo_produto.in_(
                 _tipos_base_listagem(include_variations, termo_busca)
             ),
@@ -322,6 +330,7 @@ def _expandir_produtos_listagem(
     load_options: list[Any],
     validade_por_produto: dict[int, dict[str, Any]],
     incluir_bling_sync: bool = False,
+    estoque_compartilhado_por_produto: dict[int, dict] | None = None,
 ) -> list[Produto]:
     produtos_expandidos = []
     total_variacoes_por_pai = _mapa_total_variacoes_por_pai(db, produtos)
@@ -363,6 +372,7 @@ def _expandir_produtos_listagem(
             validade_por_produto=validade_por_produto,
             incluir_bling_sync=incluir_bling_sync,
             custos_compostos=custos_compostos,
+            estoque_compartilhado_por_produto=estoque_compartilhado_por_produto,
         )
         produtos_expandidos.append(produto)
 
@@ -379,6 +389,7 @@ def _expandir_produtos_listagem(
                     validade_por_produto=validade_por_variacao,
                     incluir_bling_sync=incluir_bling_sync,
                     custos_compostos=custos_compostos,
+                    estoque_compartilhado_por_produto=estoque_compartilhado_por_produto,
                 )
                 produtos_expandidos.append(variacao)
 
@@ -741,6 +752,9 @@ def _enriquecer_produto_listagem(
         "estoque_origem_empresa_id"
     )
     produto.estoque_origem_nome = compartilhamento.get("estoque_origem_nome")
+    produto.acesso_catalogo_completo = bool(
+        compartilhamento.get("acesso_catalogo_completo", False)
+    )
     if incluir_bling_sync:
         sync = getattr(produto, "bling_sync", None)
         produto.bling_produto_id = (
