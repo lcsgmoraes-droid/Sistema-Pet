@@ -16,3 +16,12 @@ export function calcularSaldoFinanceiro(conta, campoPago) {
   const valorPago = Number(conta?.[campoPago] ?? 0);
   return valorFinal - valorPago;
 }
+
+export function calcularSaldoAtualizadoFinanceiro(conta, campoPago) {
+  if (ehLancamentoFinanceiroCancelado(conta)) return 0;
+
+  const saldoAtualizado = Number(conta?.saldo_atualizado);
+  if (Number.isFinite(saldoAtualizado)) return saldoAtualizado;
+
+  return calcularSaldoFinanceiro(conta, campoPago);
+}

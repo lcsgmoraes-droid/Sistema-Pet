@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 
-import { calcularSaldoFinanceiro, ehLancamentoFinanceiroCancelado } from "./financeiroStatus.js";
+import {
+  calcularSaldoAtualizadoFinanceiro,
+  calcularSaldoFinanceiro,
+  ehLancamentoFinanceiroCancelado,
+} from "./financeiroStatus.js";
 
 assert.equal(ehLancamentoFinanceiroCancelado("cancelado"), true);
 assert.equal(ehLancamentoFinanceiroCancelado({ status: "cancelada" }), true);
@@ -19,6 +23,25 @@ assert.equal(
     "valor_recebido",
   ),
   0,
+);
+assert.equal(
+  calcularSaldoAtualizadoFinanceiro(
+    {
+      status: "vencido",
+      valor_final: 26.65,
+      valor_recebido: 0,
+      saldo_atualizado: 27.22,
+    },
+    "valor_recebido",
+  ),
+  27.22,
+);
+assert.equal(
+  calcularSaldoAtualizadoFinanceiro(
+    { status: "pendente", valor_final: 26.65, valor_recebido: 0 },
+    "valor_recebido",
+  ),
+  26.65,
 );
 assert.equal(
   calcularSaldoFinanceiro({ status: "cancelado", valor_final: 10.66, valor_pago: 0 }, "valor_pago"),

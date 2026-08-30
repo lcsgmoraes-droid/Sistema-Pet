@@ -3,7 +3,7 @@
 import logging
 from datetime import date
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm import Session, joinedload, selectinload
 
 from app.auth.dependencies import get_current_user_and_tenant
 from app.clientes.financeiro_baixa_lote_routes import (
@@ -89,6 +89,7 @@ async def get_historico_compras(
 ):
     """Retorna o histórico de compras do cliente"""
     from app.vendas_models import Venda
+    from app.vendas.status_pagamento import calcular_resumo_pagamento_venda
     from sqlalchemy import desc
 
     current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
@@ -97,6 +98,7 @@ async def get_historico_compras(
     # Buscar vendas do cliente
     vendas = (
         db.query(Venda)
+        .options(selectinload(Venda.contas_receber))
         .filter(Venda.cliente_id == cliente_id, Venda.tenant_id == tenant_id)
         .order_by(desc(Venda.data_venda))
         .all()
@@ -109,6 +111,14 @@ async def get_historico_compras(
 
     # Última compra
     ultima_compra = vendas[0].data_venda if vendas else None
+    resumo_pagamento_por_venda = {
+        venda.id: calcular_resumo_pagamento_venda(
+            total=venda.total,
+            contas_receber=venda.contas_receber,
+            pagamentos=venda.pagamentos,
+        )
+        for venda in vendas
+    }
 
     return {
         "cliente_id": cliente.id,
@@ -150,13 +160,14 @@ async def get_historico_compras(
                 "taxa_entrega": (
                     float(v.taxa_entrega or 0) if hasattr(v, "taxa_entrega") else 0
                 ),
-                "saldo_devedor": float(v.total or 0)
-                - (
-                    sum(float(pag.valor or 0) for pag in v.pagamentos)
-                    if hasattr(v, "pagamentos") and v.pagamentos
-                    else 0
+                "valor_pago": float(resumo_pagamento_por_venda[v.id]["valor_pago"]),
+                "saldo_devedor": float(
+                    resumo_pagamento_por_venda[v.id]["valor_restante"]
                 ),
                 "status": v.status,
+                "status_pagamento": resumo_pagamento_por_venda[v.id][
+                    "status_pagamento"
+                ],
                 "total_itens": len(v.itens) if v.itens else 0,
                 "vendedor_nome": (
                     v.vendedor_nome if hasattr(v, "vendedor_nome") else None

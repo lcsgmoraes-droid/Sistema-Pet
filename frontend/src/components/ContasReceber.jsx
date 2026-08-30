@@ -5,7 +5,7 @@ import api from "../api";
 import { getAccessToken } from "../auth/tokenStorage";
 import { toast } from "react-hot-toast";
 import {
-  calcularSaldoFinanceiro,
+  calcularSaldoAtualizadoFinanceiro,
   ehLancamentoFinanceiroCancelado,
 } from "../utils/financeiroStatus";
 import { safeArray } from "../utils/safeArray";
@@ -508,7 +508,7 @@ const ContasReceber = () => {
       align: "right",
       className: "font-bold",
       render: (conta) => (
-        <MoneyCell value={calcularSaldoFinanceiro(conta, "valor_recebido")} zeroAsDash />
+        <MoneyCell value={calcularSaldoAtualizadoFinanceiro(conta, "valor_recebido")} zeroAsDash />
       ),
     },
     {
@@ -711,7 +711,7 @@ const ContasReceber = () => {
                 <strong className="ml-3">Saldo a Receber:</strong>{" "}
                 <MoneyCell
                   value={contasReceberExibidas.reduce(
-                    (sum, c) => sum + calcularSaldoFinanceiro(c, "valor_recebido"),
+                    (sum, c) => sum + calcularSaldoAtualizadoFinanceiro(c, "valor_recebido"),
                     0,
                   )}
                   zeroAsDash

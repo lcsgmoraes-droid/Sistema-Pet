@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Check, Copy } from "lucide-react";
+import { copyTextToClipboard } from "../../utils/clipboard";
 
 export default function CopyableValue({
   buttonClassName = "",
@@ -33,7 +34,7 @@ export default function CopyableValue({
       if (onCopy) {
         await Promise.resolve(onCopy(copyValue));
       } else {
-        await navigator.clipboard?.writeText(String(copyValue));
+        await copyTextToClipboard(copyValue);
       }
       setCopiedState(true);
       setTimeout(() => setCopiedState(false), 1400);
