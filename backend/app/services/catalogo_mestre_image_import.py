@@ -565,10 +565,13 @@ def _load_image_rows(
     if candidate_hashes:
         filters.append("hash_arquivo IN :candidate_hashes")
         params["candidate_hashes"] = sorted(candidate_hashes)
-    statement = text("""
+    statement = text(
+        """
         SELECT produto_id, hash_arquivo, ordem, ativo, status_revisao
           FROM catalogo_mestre_imagens
-         WHERE """ + " OR ".join(filters))
+         WHERE """
+        + " OR ".join(filters)
+    )
     if product_ids:
         statement = statement.bindparams(bindparam("product_ids", expanding=True))
     if candidate_hashes:

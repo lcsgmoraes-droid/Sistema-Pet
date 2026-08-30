@@ -215,7 +215,8 @@ def test_stage_keeps_file_private_inactive_and_pending(tmp_path):
 
     engine = create_engine("sqlite+pysqlite:///:memory:")
     with engine.begin() as connection:
-        connection.execute(text("""
+        connection.execute(
+            text("""
                 CREATE TABLE catalogo_mestre_imagens (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     produto_id INTEGER NOT NULL,
@@ -234,7 +235,8 @@ def test_stage_keeps_file_private_inactive_and_pending(tmp_path):
                     metadados JSON,
                     ativo BOOLEAN NOT NULL
                 )
-                """))
+                """)
+        )
     with Session(engine) as db:
         staged = stage_image_import(
             db,
@@ -265,7 +267,8 @@ def test_stage_unmatched_candidate_never_creates_master_product(tmp_path):
 
     engine = create_engine("sqlite+pysqlite:///:memory:")
     with engine.begin() as connection:
-        connection.execute(text("""
+        connection.execute(
+            text("""
                 CREATE TABLE catalogo_mestre_produto_candidatos (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     gtin TEXT NOT NULL UNIQUE,
@@ -277,8 +280,10 @@ def test_stage_unmatched_candidate_never_creates_master_product(tmp_path):
                     fonte_identidade_status TEXT NOT NULL,
                     metadados JSON
                 )
-                """))
-        connection.execute(text("""
+                """)
+        )
+        connection.execute(
+            text("""
                 CREATE TABLE catalogo_mestre_candidato_evidencias (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     candidato_id INTEGER NOT NULL,
@@ -295,7 +300,8 @@ def test_stage_unmatched_candidate_never_creates_master_product(tmp_path):
                     metadados JSON,
                     UNIQUE (candidato_id, hash_arquivo)
                 )
-                """))
+                """)
+        )
 
     with Session(engine) as db:
         first = stage_unmatched_candidate_import(
