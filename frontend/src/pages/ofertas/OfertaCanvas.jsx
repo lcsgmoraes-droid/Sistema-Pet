@@ -132,9 +132,9 @@ function Cabecalho({ contexto, titulo, periodoLabel, tema }) {
   return (
     <header
       data-oferta-header
-      className="relative z-10 flex min-h-0 shrink-0 items-center justify-between gap-4 overflow-hidden"
+      className="relative z-10 flex min-h-0 shrink-0 items-center justify-between gap-4 pb-[1.5%]"
     >
-      <div className="flex min-w-0 items-center gap-3">
+      <div className="flex min-w-0 flex-1 items-center gap-3">
         {logo ? (
           <div className="flex h-14 w-20 shrink-0 items-center justify-center rounded-xl bg-white p-2 shadow-lg">
             <img
@@ -145,7 +145,7 @@ function Cabecalho({ contexto, titulo, periodoLabel, tema }) {
             />
           </div>
         ) : null}
-        <div className="min-w-0 text-left">
+        <div className="min-w-0 flex-1 text-left">
           <p className="whitespace-nowrap text-[10px] font-black uppercase tracking-[0.18em] text-white/75">
             {nomeLojaResumo}
           </p>
