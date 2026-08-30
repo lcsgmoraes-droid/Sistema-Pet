@@ -143,6 +143,10 @@ def _load_bling_runtime_config(*, lock_held: bool = False) -> dict[str, Any]:
             (tenant_credentials or {}).get("source")
             or ("legacy" if legacy_allowed else "")
         ),
+        "stock_deposit_id": (
+            (tenant_credentials or {}).get("stock_deposit_id")
+            or (pick("BLING_DEPOSITO_ID") if legacy_allowed else None)
+        ),
         "expires_at": (tenant_credentials or {}).get("expires_at"),
     }
 
@@ -218,6 +222,7 @@ class BlingAPIBase:
         self.client_secret = runtime_config["client_secret"]
         self.enable_jwt = runtime_config["enable_jwt"]
         self.token_source = runtime_config.get("source") or ""
+        self.stock_deposit_id = runtime_config.get("stock_deposit_id")
         self.expires_at = runtime_config.get("expires_at")
         # Ambiente: 'rascunho', 'homologacao' ou 'producao'
         self.ambiente = runtime_config["ambiente"]
@@ -336,6 +341,9 @@ class BlingAPIBase:
             self.refresh_token = refresh_token
         self.token_source = runtime_config.get("source") or getattr(
             self, "token_source", ""
+        )
+        self.stock_deposit_id = runtime_config.get("stock_deposit_id") or getattr(
+            self, "stock_deposit_id", None
         )
         self.expires_at = runtime_config.get("expires_at") or getattr(
             self, "expires_at", None

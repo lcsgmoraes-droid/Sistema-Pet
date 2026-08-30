@@ -7,7 +7,9 @@ from uuid import uuid4
 from app.services.bling_connection_service import (
     extract_bling_company_id,
     get_bling_connection,
+    load_bling_credentials,
     resolve_bling_webhook_tenant,
+    save_bling_stock_deposit_id,
     save_bling_tokens,
 )
 
@@ -99,3 +101,26 @@ def test_company_cannot_be_linked_to_two_tenants(db_session, monkeypatch):
         assert "outro tenant" in str(exc)
     else:  # pragma: no cover - assertion guard
         raise AssertionError("A mesma empresa Bling foi vinculada a dois tenants")
+
+
+def test_stock_deposit_is_persisted_per_tenant(db_session, monkeypatch):
+    monkeypatch.setenv("PAYMENT_CONFIG_ENCRYPTION_KEY", "bling-test-master-key")
+    monkeypatch.setattr(
+        "app.services.bling_connection_service.SessionLocal", lambda: db_session
+    )
+    tenant_id = uuid4()
+    save_bling_tokens(
+        tenant_id=tenant_id,
+        access_token=_jwt_with_company("company-deposit"),
+        refresh_token="refresh-deposit",
+        db=db_session,
+    )
+
+    connection = save_bling_stock_deposit_id(
+        tenant_id=tenant_id,
+        stock_deposit_id=14_888_055_408,
+        db=db_session,
+    )
+
+    assert connection.stock_deposit_id == 14_888_055_408
+    assert load_bling_credentials(tenant_id)["stock_deposit_id"] == 14_888_055_408
