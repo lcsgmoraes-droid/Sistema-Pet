@@ -1,5 +1,3 @@
-import html2canvas from "html2canvas";
-import { jsPDF } from "jspdf";
 import {
   AlertTriangle,
   Download,
@@ -29,8 +27,8 @@ import OfertaConfiguracao from "./OfertaConfiguracao";
 import OfertaEditorItens from "./OfertaEditorItens";
 import OfertaPublicacoes from "./OfertaPublicacoes";
 import OfertaSelecao from "./OfertaSelecao";
+import { capturarPaginasOferta, criarPdfOferta } from "./ofertaCaptura";
 import {
-  FORMATOS_OFERTA,
   PERIODICIDADES,
   criarItemSelecionado,
   criarPeriodo,
@@ -91,28 +89,6 @@ function canvasParaBlob(canvas) {
       1,
     );
   });
-}
-
-async function aguardarImagens(elemento) {
-  const imagens = Array.from(elemento.querySelectorAll("img"));
-  await Promise.all(
-    imagens.map(
-      (imagem) =>
-        new Promise((resolve, reject) => {
-          if (imagem.complete) {
-            if (imagem.naturalWidth > 0) resolve();
-            else reject(new Error("Uma imagem da arte não pôde ser carregada."));
-            return;
-          }
-          imagem.addEventListener("load", resolve, { once: true });
-          imagem.addEventListener(
-            "error",
-            () => reject(new Error("Uma imagem da arte não pôde ser carregada.")),
-            { once: true },
-          );
-        }),
-    ),
-  );
 }
 
 export default function EstudioOfertas() {
@@ -365,21 +341,7 @@ export default function EstudioOfertas() {
   }
 
   async function capturarPaginas() {
-    const elementos = Array.from(previewRef.current?.querySelectorAll("[data-oferta-page]") || []);
-    if (!elementos.length) throw new Error("Selecione ao menos um produto.");
-    const formato = FORMATOS_OFERTA[config.formato];
-    return Promise.all(
-      elementos.map(async (elemento) => {
-        await aguardarImagens(elemento);
-        const larguraVisual = elemento.getBoundingClientRect().width;
-        return html2canvas(elemento, {
-          scale: larguraVisual > 0 ? formato.width / larguraVisual : 2,
-          useCORS: true,
-          backgroundColor: "#ffffff",
-          logging: false,
-        });
-      }),
-    );
+    return capturarPaginasOferta(previewRef.current, config.formato);
   }
 
   function validarGeracao() {
@@ -431,24 +393,7 @@ export default function EstudioOfertas() {
     try {
       validarGeracao();
       const canvases = await capturarPaginas();
-      const primeiro = FORMATOS_OFERTA[config.formato];
-      const pdf = new jsPDF({
-        orientation: primeiro.width > primeiro.height ? "landscape" : "portrait",
-        unit: "px",
-        format: [primeiro.width, primeiro.height],
-        hotfixes: ["px_scaling"],
-      });
-      canvases.forEach((canvas, indice) => {
-        if (indice) pdf.addPage([primeiro.width, primeiro.height]);
-        pdf.addImage(
-          canvas.toDataURL("image/png", 1),
-          "PNG",
-          0,
-          0,
-          primeiro.width,
-          primeiro.height,
-        );
-      });
+      const pdf = criarPdfOferta(canvases, config.formato);
       pdf.save(nomeArquivo(config.titulo, 0, "pdf").replace("-pagina-1", ""));
       toast.success("PDF gerado.");
     } catch (error) {

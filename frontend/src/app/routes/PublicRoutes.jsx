@@ -10,6 +10,7 @@ import {
   LegalPage,
   Login,
   OfertaPublica,
+  OfertaCanvasPreview,
   Planos,
   RastreioPublico,
   Register,
@@ -36,6 +37,9 @@ export function createPublicRoutes() {
       <Route path="/ecommerce" element={<EcommerceMVP />} />
       {VendasCanaisPreview && (
         <Route path="/dev/vendas-canais-preview" element={<VendasCanaisPreview />} />
+      )}
+      {OfertaCanvasPreview && (
+        <Route path="/dev/ofertas-canvas-preview" element={<OfertaCanvasPreview />} />
       )}
       <Route path="/:tenantId" element={<EcommerceMVP />} />
     </>

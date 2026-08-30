@@ -161,6 +161,9 @@ export const EcommerceDivulgacao = lazy(() => import("../pages/ecommerce/Ecommer
 export const Campanhas = lazy(() => import("../pages/Campanhas"));
 export const EstudioOfertas = lazy(() => import("../pages/ofertas/EstudioOfertas"));
 export const OfertaPublica = lazy(() => import("../pages/ofertas/OfertaPublica"));
+export const OfertaCanvasPreview = import.meta.env.DEV
+  ? lazy(() => import("../pages/ofertas/OfertaCanvasPreview"))
+  : null;
 export const CanalDescontos = lazy(() => import("../pages/CanalDescontos"));
 export const Ajuda = lazy(() => import("../pages/Ajuda"));
 export const EvolucaoCorePet = lazy(() => import("../pages/EvolucaoCorePet"));

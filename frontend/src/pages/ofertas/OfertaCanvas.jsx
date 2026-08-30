@@ -2,7 +2,12 @@ import { ImageOff, PackageCheck } from "lucide-react";
 
 import { formatMoneyBRL } from "../../utils/formatters";
 import { resolveMediaUrl } from "../../utils/mediaUrl";
-import { agruparPaginas, FORMATOS_OFERTA, layoutJornal } from "./ofertasEstudioUtils";
+import {
+  agruparPaginas,
+  FORMATOS_OFERTA,
+  layoutJornal,
+  resumirTextoArte,
+} from "./ofertasEstudioUtils";
 
 const TEMAS = {
   premium: { acento: "#f59e0b", fundo: "#052e2b", fundo2: "#0f766e", texto: "#ffffff" },
@@ -25,32 +30,52 @@ function ImagemProduto({ item, className = "" }) {
     );
   }
   return (
-    <img
-      src={url}
-      alt=""
-      crossOrigin="anonymous"
-      className={`block max-h-full max-w-full object-contain ${className}`}
+    <div
+      role="img"
+      aria-label={item.nome || "Imagem do produto"}
+      data-oferta-image-url={url}
+      style={{
+        backgroundImage: `url(${JSON.stringify(url)})`,
+        backgroundPosition: "center",
+        backgroundRepeat: "no-repeat",
+        backgroundSize: "contain",
+      }}
+      className={`block ${className}`}
     />
   );
 }
 
 function Validade({ item, compacto = false }) {
   if (!item.mostrar_validade || !item.lote_validade) return null;
+  if (compacto) {
+    return (
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[8px] font-bold leading-none text-amber-950">
+        <span className="rounded-full bg-amber-300 px-2 py-1">
+          Validade: {formatarData(item.lote_validade.data_validade)}
+        </span>
+        <span>Quantidade limitada ao lote</span>
+      </div>
+    );
+  }
   return (
-    <div className={`font-bold text-amber-950 ${compacto ? "text-[9px]" : "text-sm"}`}>
+    <div className="text-sm font-bold text-amber-950">
       <span className="rounded-full bg-amber-300 px-2 py-1">
         Validade: {formatarData(item.lote_validade.data_validade)}
       </span>
-      <p className={compacto ? "mt-1" : "mt-2"}>Quantidade limitada ao lote</p>
+      <p className="mt-2">Quantidade limitada ao lote</p>
     </div>
   );
 }
 
 function JornalCard({ item, tema }) {
+  const precoFormatado = formatMoneyBRL(item.preco_arte);
+  const fontePreco =
+    precoFormatado.length >= 11 ? "clamp(12px, 7.5cqw, 22px)" : "clamp(14px, 10cqw, 28px)";
   return (
     <article
+      data-oferta-card
       style={{ containerType: "size" }}
-      className="relative flex min-h-0 min-w-0 flex-col overflow-hidden rounded-[1.1rem] bg-white p-[5%] text-slate-900 shadow-xl"
+      className="relative flex min-h-0 min-w-0 flex-col overflow-hidden rounded-[1.1rem] bg-white p-[4%] text-slate-900 shadow-xl"
     >
       {item.motivo_sugestao ? (
         <span
@@ -60,32 +85,40 @@ function JornalCard({ item, tema }) {
           {item.motivo_sugestao}
         </span>
       ) : null}
-      <div className="flex min-h-0 flex-1 items-center justify-center overflow-hidden">
+      <div
+        data-oferta-image
+        className="flex min-h-0 flex-1 items-center justify-center overflow-hidden"
+      >
         <ImagemProduto item={item} className="h-full w-full" />
       </div>
       <h3
-        style={{ fontSize: "clamp(10px, 7cqw, 18px)", overflowWrap: "break-word" }}
-        className="mt-[3cqh] line-clamp-2 min-h-[2.2em] shrink-0 overflow-hidden font-black leading-[1.08]"
+        data-oferta-product-title
+        style={{ fontSize: "clamp(10px, 6.4cqw, 16px)", overflowWrap: "break-word" }}
+        className="mt-[2%] h-[2.6em] shrink-0 overflow-hidden font-black leading-[1.12]"
       >
-        {item.nome}
+        {resumirTextoArte(item.nome, 54)}
       </h3>
-      <div className="mt-[2cqh] flex shrink-0 items-end justify-between gap-2 overflow-hidden">
-        <div>
+      <div
+        data-oferta-price-row
+        className="mt-[1.5%] flex min-w-0 shrink-0 items-end justify-between gap-2 pb-2"
+      >
+        <div className="min-w-0">
           {Number(item.preco_arte) < Number(item.preco_erp) ? (
             <p className="text-[9px] font-semibold text-slate-400 line-through">
               {formatMoneyBRL(item.preco_erp)}
             </p>
           ) : null}
           <p
-            style={{ fontSize: "clamp(15px, 12cqw, 30px)" }}
-            className="whitespace-nowrap font-black leading-none text-red-600"
+            data-oferta-price
+            style={{ fontSize: fontePreco }}
+            className="whitespace-nowrap font-black leading-[1.06] text-red-600"
           >
-            {formatMoneyBRL(item.preco_arte)}
+            {precoFormatado}
           </p>
         </div>
         <PackageCheck className="h-5 w-5 shrink-0" style={{ color: tema.fundo2 }} />
       </div>
-      <div className="mt-[2cqh] shrink-0 overflow-hidden">
+      <div className="mt-[1.5%] shrink-0">
         <Validade item={item} compacto />
       </div>
     </article>
@@ -94,8 +127,13 @@ function JornalCard({ item, tema }) {
 
 function Cabecalho({ contexto, titulo, periodoLabel, tema }) {
   const logo = resolveMediaUrl(contexto?.logo_url);
+  const tituloResumo = resumirTextoArte(titulo || "Ofertas especiais", 26);
+  const nomeLojaResumo = resumirTextoArte(contexto?.nome || "Sua loja", 32);
   return (
-    <header className="relative z-10 flex items-center justify-between gap-4">
+    <header
+      data-oferta-header
+      className="relative z-10 flex min-h-0 shrink-0 items-center justify-between gap-4 overflow-hidden"
+    >
       <div className="flex min-w-0 items-center gap-3">
         {logo ? (
           <div className="flex h-14 w-20 shrink-0 items-center justify-center rounded-xl bg-white p-2 shadow-lg">
@@ -108,14 +146,20 @@ function Cabecalho({ contexto, titulo, periodoLabel, tema }) {
           </div>
         ) : null}
         <div className="min-w-0 text-left">
-          <p className="truncate text-[10px] font-black uppercase tracking-[0.18em] text-white/75">
-            {contexto?.nome || "Sua loja"}
+          <p className="whitespace-nowrap text-[10px] font-black uppercase tracking-[0.18em] text-white/75">
+            {nomeLojaResumo}
           </p>
           <h2
-            style={{ fontSize: "clamp(20px, 5cqw, 42px)", overflowWrap: "break-word" }}
-            className="line-clamp-2 overflow-hidden font-black leading-[.95]"
+            data-oferta-header-title
+            style={{
+              fontSize:
+                tituloResumo.length > 24
+                  ? "clamp(18px, 3.8cqw, 30px)"
+                  : "clamp(20px, 4.2cqw, 34px)",
+            }}
+            className="whitespace-nowrap font-black leading-[1.2]"
           >
-            {titulo || "Ofertas especiais"}
+            {tituloResumo}
           </h2>
         </div>
       </div>
@@ -136,17 +180,18 @@ function PaginaJornal({ itens, contexto, titulo, periodoLabel, tema, pagina, tot
     <>
       <Cabecalho contexto={contexto} titulo={titulo} periodoLabel={periodoLabel} tema={tema} />
       <div
+        data-oferta-grid
         style={{
           gridTemplateColumns: `repeat(${layout.colunas}, minmax(0, 1fr))`,
           gridTemplateRows: `repeat(${Math.min(layout.linhas, linhasUsadas)}, minmax(0, 1fr))`,
         }}
-        className="relative z-10 my-[4%] grid min-h-0 flex-1 gap-[2.6%] overflow-hidden"
+        className="relative z-10 my-[2.5%] grid min-h-0 flex-1 gap-[2.6%] overflow-hidden"
       >
         {itens.map((item) => (
           <JornalCard key={item.produto_id} item={item} tema={tema} />
         ))}
       </div>
-      <footer className="relative z-10 flex items-center justify-between text-[10px] font-semibold text-white/80">
+      <footer className="relative z-10 flex shrink-0 items-center justify-between text-[10px] font-semibold text-white/80">
         <span>Preços válidos durante o período indicado ou enquanto durarem os estoques.</span>
         {total > 1 ? (
           <span>
@@ -158,19 +203,41 @@ function PaginaJornal({ itens, contexto, titulo, periodoLabel, tema, pagina, tot
   );
 }
 
-function PaginaIndividual({ item, contexto, titulo, periodoLabel, tema }) {
+function PaginaIndividual({ item, contexto, titulo, periodoLabel, tema, formato }) {
+  const compacto = formato === "quadrado";
+  const nomeProduto = resumirTextoArte(item.nome, compacto ? 56 : 82);
+  const precoFormatado = formatMoneyBRL(item.preco_arte);
+  const fontePreco =
+    precoFormatado.length >= 11
+      ? compacto
+        ? "clamp(30px, 7.4cqw, 54px)"
+        : "clamp(34px, 8.6cqw, 64px)"
+      : compacto
+        ? "clamp(34px, 8.6cqw, 62px)"
+        : "clamp(38px, 10cqw, 76px)";
   return (
     <>
       <Cabecalho contexto={contexto} titulo={titulo} periodoLabel={periodoLabel} tema={tema} />
-      <div className="relative z-10 my-[4%] flex min-h-0 flex-1 flex-col items-center justify-center overflow-hidden rounded-[2rem] bg-white/95 p-[7%] text-center text-slate-900 shadow-2xl">
-        <div className="flex min-h-0 w-full flex-1 items-center justify-center overflow-hidden">
+      <div
+        data-oferta-individual
+        className={`relative z-10 my-[3%] flex min-h-0 flex-1 flex-col items-center overflow-hidden rounded-[2rem] bg-white/95 text-center text-slate-900 shadow-2xl ${compacto ? "p-[5%]" : "p-[6%]"}`}
+      >
+        <div
+          data-oferta-image
+          style={{ height: compacto ? "42%" : "48%" }}
+          className="flex w-full shrink-0 items-center justify-center overflow-hidden"
+        >
           <ImagemProduto item={item} className="h-full w-full" />
         </div>
         <p
-          style={{ fontSize: "clamp(18px, 5cqw, 40px)", overflowWrap: "break-word" }}
-          className="mt-[2.5cqw] line-clamp-3 max-w-[92%] shrink-0 overflow-hidden font-black leading-[1.08]"
+          data-oferta-product-title
+          style={{
+            fontSize: compacto ? "clamp(17px, 3.8cqw, 28px)" : "clamp(18px, 4.5cqw, 34px)",
+            overflowWrap: "break-word",
+          }}
+          className="mt-[2.5%] max-w-[94%] shrink-0 font-black leading-[1.14]"
         >
-          {item.nome}
+          {nomeProduto}
         </p>
         {Number(item.preco_arte) < Number(item.preco_erp) ? (
           <p className="mt-2 text-sm font-bold text-slate-400 line-through">
@@ -178,12 +245,13 @@ function PaginaIndividual({ item, contexto, titulo, periodoLabel, tema }) {
           </p>
         ) : null}
         <p
-          style={{ fontSize: "clamp(34px, 10cqw, 76px)" }}
-          className="mt-1 shrink-0 whitespace-nowrap font-black leading-none text-red-600"
+          data-oferta-price
+          style={{ fontSize: fontePreco }}
+          className="mt-1 shrink-0 whitespace-nowrap font-black leading-[1.18] text-red-600"
         >
-          {formatMoneyBRL(item.preco_arte)}
+          {precoFormatado}
         </p>
-        <div className="mt-4">
+        <div className={`${compacto ? "mt-8" : "mt-6"} shrink-0`}>
           <Validade item={item} />
         </div>
       </div>
@@ -239,7 +307,7 @@ export default function OfertaCanvas({
                   ? "#ffffff"
                   : `linear-gradient(145deg, ${tema.fundo} 0%, ${tema.fundo2} 72%, ${tema.acento} 165%)`,
             }}
-            className={`relative flex w-full flex-col overflow-hidden rounded-2xl shadow-2xl ${tipoArte === "produto" ? "p-0" : "p-[5%]"}`}
+            className={`relative flex w-full flex-col overflow-hidden rounded-2xl shadow-2xl ${tipoArte === "produto" ? "p-0" : "p-[4%]"}`}
           >
             {tipoArte !== "produto" ? (
               <>
@@ -247,27 +315,32 @@ export default function OfertaCanvas({
                 <div className="absolute -bottom-[15%] -left-[8%] h-[36%] w-[45%] rounded-full bg-black/10" />
               </>
             ) : null}
-            {tipoArte === "jornal" ? (
-              <PaginaJornal
-                itens={paginaItens}
-                contexto={contexto}
-                titulo={titulo}
-                periodoLabel={periodicidadeLabel}
-                tema={tema}
-                pagina={index + 1}
-                total={paginas.length}
-                formato={formato}
-              />
-            ) : tipoArte === "individual" ? (
-              <PaginaIndividual
-                item={paginaItens[0]}
-                contexto={contexto}
-                titulo={titulo}
-                periodoLabel={periodicidadeLabel}
-                tema={tema}
-              />
-            ) : (
+            {tipoArte === "produto" ? (
               <PaginaProduto item={paginaItens[0]} />
+            ) : (
+              <div data-oferta-content className="relative z-10 flex min-h-0 flex-1 flex-col">
+                {tipoArte === "jornal" ? (
+                  <PaginaJornal
+                    itens={paginaItens}
+                    contexto={contexto}
+                    titulo={titulo}
+                    periodoLabel={periodicidadeLabel}
+                    tema={tema}
+                    pagina={index + 1}
+                    total={paginas.length}
+                    formato={formato}
+                  />
+                ) : (
+                  <PaginaIndividual
+                    item={paginaItens[0]}
+                    contexto={contexto}
+                    titulo={titulo}
+                    periodoLabel={periodicidadeLabel}
+                    tema={tema}
+                    formato={formato}
+                  />
+                )}
+              </div>
             )}
           </section>
         </div>
