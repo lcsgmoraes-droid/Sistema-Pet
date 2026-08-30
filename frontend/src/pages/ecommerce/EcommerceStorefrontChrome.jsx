@@ -313,6 +313,9 @@ function StoreBanner({
   onBannerSlideChange,
   onNavigate,
 }) {
+  const hasPublishedCampaign = activeBanners.some((banner) => banner.campaign);
+  const useExpandedDesktopCanvas = !isMobile && hasPublishedCampaign;
+
   return (
     <div
       style={{
@@ -326,7 +329,12 @@ function StoreBanner({
           borderRadius: isMobile ? 12 : 16,
           maxWidth: 1280,
           margin: "0 auto",
-          height: isMobile ? "clamp(132px, 38vw, 150px)" : 260,
+          height: isMobile
+            ? "clamp(132px, 38vw, 150px)"
+            : useExpandedDesktopCanvas
+              ? "clamp(420px, 42vw, 560px)"
+              : 260,
+          transition: "height 0.3s ease",
         }}
       >
         {activeBanners.map((banner, index) => (
@@ -360,19 +368,19 @@ function StoreBanner({
                   cursor: banner.href ? "pointer" : "default",
                 }}
               >
-                {isMobile && (
+                {(isMobile || useExpandedDesktopCanvas) && (
                   <>
                     <div
                       aria-hidden="true"
                       style={{
                         position: "absolute",
-                        inset: -18,
+                        inset: useExpandedDesktopCanvas ? -32 : -18,
                         backgroundImage: `url("${resolveMediaUrl(banner.url)}")`,
                         backgroundPosition: "center",
                         backgroundSize: "cover",
-                        filter: "blur(16px)",
-                        opacity: 0.72,
-                        transform: "scale(1.08)",
+                        filter: useExpandedDesktopCanvas ? "blur(28px)" : "blur(16px)",
+                        opacity: useExpandedDesktopCanvas ? 0.58 : 0.72,
+                        transform: useExpandedDesktopCanvas ? "scale(1.12)" : "scale(1.08)",
                       }}
                     />
                     <div
@@ -380,8 +388,9 @@ function StoreBanner({
                       style={{
                         position: "absolute",
                         inset: 0,
-                        background:
-                          "linear-gradient(90deg, rgba(15,12,9,0.3), rgba(15,12,9,0.08) 45%, rgba(15,12,9,0.3))",
+                        background: useExpandedDesktopCanvas
+                          ? "linear-gradient(90deg, rgba(15,12,9,0.42), rgba(15,12,9,0.08) 42%, rgba(15,12,9,0.08) 58%, rgba(15,12,9,0.42))"
+                          : "linear-gradient(90deg, rgba(15,12,9,0.3), rgba(15,12,9,0.08) 45%, rgba(15,12,9,0.3))",
                       }}
                     />
                   </>
@@ -393,10 +402,15 @@ function StoreBanner({
                     width: "100%",
                     height: "100%",
                     position: "relative",
-                    objectFit: banner.fit || (isMobile ? "contain" : "cover"),
+                    objectFit: useExpandedDesktopCanvas
+                      ? "contain"
+                      : banner.fit || (isMobile ? "contain" : "cover"),
                     objectPosition: "center",
                     display: "block",
-                    filter: isMobile ? "drop-shadow(0 6px 14px rgba(0,0,0,0.24))" : "none",
+                    filter:
+                      isMobile || useExpandedDesktopCanvas
+                        ? "drop-shadow(0 8px 22px rgba(0,0,0,0.28))"
+                        : "none",
                   }}
                 />
                 {banner.campaign && Number(banner.pageCount || 1) > 1 && (
