@@ -252,11 +252,15 @@ export function createProdutosColunas() {
                         Descontinuado
                       </span>
                     )}
-                    {produto.de_parceiro && (
+                    {produto.acesso_catalogo_completo ? (
+                      <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-violet-100 text-violet-700">
+                        Catálogo de {produto.estoque_origem_nome || "empresa do grupo"}
+                      </span>
+                    ) : produto.de_parceiro ? (
                       <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-700">
                         Pet Shop Parceiro
                       </span>
-                    )}
+                    ) : null}
                   </div>
                 </div>
                 {produto.descricao && (
@@ -546,7 +550,7 @@ export function createProdutosColunas() {
                   />
                 </svg>
               </button>
-              {!produto.de_parceiro && (
+              {(!produto.de_parceiro || produto.acesso_catalogo_completo) && (
                 <button
                   onClick={(e) => {
                     e.stopPropagation();

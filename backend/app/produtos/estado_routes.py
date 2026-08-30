@@ -3,6 +3,7 @@
 import logging
 from datetime import datetime
 from typing import Optional
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
@@ -19,6 +20,10 @@ from app.produtos.validators import (
 from app.produtos_models import Produto
 from app.security.permissions_decorator import require_permission
 from app.services.kit_custo_service import KitCustoService
+from app.empresa_grupo_estoque_compartilhado_service import (
+    EmpresaGrupoEstoqueCompartilhadoService,
+)
+from app.tenancy.context import set_current_tenant
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -35,7 +40,12 @@ def atualizar_preco_produto(
 ):
     """Atualiza apenas o preço de um produto (edição rápida)"""
 
-    current_user, tenant_id = user_and_tenant
+    current_user, tenant_solicitante_id = user_and_tenant
+    acesso_catalogo = EmpresaGrupoEstoqueCompartilhadoService.resolver_produto_catalogo(
+        db, tenant_solicitante_id, produto_id
+    )
+    tenant_id = UUID(str(acesso_catalogo.tenant_origem_id))
+    set_current_tenant(tenant_id)
     logger.info(f"🏷️ Atualizando preço do produto {produto_id}")
 
     produto = (
@@ -79,7 +89,14 @@ def deletar_produto(
 ):
     """Deleta (soft delete) um produto"""
 
-    current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
+    current_user, tenant_solicitante_id = _validar_tenant_e_obter_usuario(
+        user_and_tenant
+    )
+    acesso_catalogo = EmpresaGrupoEstoqueCompartilhadoService.resolver_produto_catalogo(
+        db, tenant_solicitante_id, produto_id
+    )
+    tenant_id = UUID(str(acesso_catalogo.tenant_origem_id))
+    set_current_tenant(tenant_id)
 
     produto = (
         db.query(Produto)
@@ -110,7 +127,12 @@ def atualizar_status_ativo_produto(
 ):
     """Ativa ou desativa produto sem removê-lo do sistema."""
 
-    _, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
+    _, tenant_solicitante_id = _validar_tenant_e_obter_usuario(user_and_tenant)
+    acesso_catalogo = EmpresaGrupoEstoqueCompartilhadoService.resolver_produto_catalogo(
+        db, tenant_solicitante_id, produto_id
+    )
+    tenant_id = UUID(str(acesso_catalogo.tenant_origem_id))
+    set_current_tenant(tenant_id)
     produto = _obter_produto_ou_404(db, produto_id, tenant_id)
 
     if payload.ativo == bool(produto.ativo):

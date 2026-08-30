@@ -106,11 +106,29 @@ export async function buscarProdutosEstoqueCompartilhado(grupoId, params = {}) {
   return data;
 }
 
-export async function compartilharEstoqueGrupo(grupoId, empresaConsumidoraId, produtoIds) {
+export async function compartilharEstoqueGrupo(
+  grupoId,
+  empresaConsumidoraId,
+  produtoIds,
+  acessoCatalogoCompleto = false,
+) {
   const { data } = await api.post(`/grupos-empresas/${grupoId}/estoque-compartilhado`, {
     empresa_consumidora_id: empresaConsumidoraId,
     produto_ids: produtoIds,
+    acesso_catalogo_completo: acessoCatalogoCompleto,
   });
+  return data;
+}
+
+export async function atualizarAcessoCatalogoCompartilhado(
+  grupoId,
+  compartilhamentoId,
+  acessoCatalogoCompleto,
+) {
+  const { data } = await api.patch(
+    `/grupos-empresas/${grupoId}/estoque-compartilhado/${compartilhamentoId}/catalogo`,
+    { acesso_catalogo_completo: acessoCatalogoCompleto },
+  );
   return data;
 }
 

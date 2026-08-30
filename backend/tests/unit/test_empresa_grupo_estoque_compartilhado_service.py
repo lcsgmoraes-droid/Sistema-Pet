@@ -221,6 +221,53 @@ def test_baixa_e_estorno_ocorrem_no_tenant_de_origem_e_disparam_sync(db):
     assert syncs[-1] == (produto.id, 10.0, "cancelamento_venda")
 
 
+def test_acesso_completo_ao_catalogo_e_independente_do_uso_do_saldo(db):
+    session, _syncs = db
+    grupo, produto, _usuario = _preparar_cenario(session)
+    service = EmpresaGrupoEstoqueCompartilhadoService(session)
+
+    with tenant_context(ORIGEM):
+        service.compartilhar(grupo.id, ORIGEM, 1, CONSUMIDORA, [produto.id])
+
+    with tenant_context(CONSUMIDORA):
+        service.resolver_produto_venda(session, CONSUMIDORA, produto.id)
+        with pytest.raises(HTTPException) as sem_catalogo:
+            service.resolver_produto_catalogo(session, CONSUMIDORA, produto.id)
+    assert sem_catalogo.value.status_code == 404
+
+    with tenant_context(ORIGEM):
+        service.compartilhar(
+            grupo.id,
+            ORIGEM,
+            1,
+            CONSUMIDORA,
+            [produto.id],
+            acesso_catalogo_completo=True,
+        )
+
+    with tenant_context(CONSUMIDORA):
+        catalogo = service.resolver_produto_catalogo(session, CONSUMIDORA, produto.id)
+        mapa = service.mapa_catalogo_completo_para_consumidora(session, CONSUMIDORA)
+    assert catalogo.compartilhado is True
+    assert catalogo.tenant_origem_id == ORIGEM
+    assert mapa[produto.id]["acesso_catalogo_completo"] is True
+
+    with tenant_context(ORIGEM):
+        item = service.listar(grupo.id, ORIGEM)[0]
+        service.atualizar_acesso_catalogo(
+            grupo.id,
+            item["id"],
+            ORIGEM,
+            1,
+            acesso_catalogo_completo=False,
+        )
+
+    with tenant_context(CONSUMIDORA):
+        service.resolver_produto_venda(session, CONSUMIDORA, produto.id)
+        with pytest.raises(HTTPException):
+            service.resolver_produto_catalogo(session, CONSUMIDORA, produto.id)
+
+
 def test_remover_compartilhamento_bloqueia_nova_venda_sem_apagar_historico(db):
     session, _syncs = db
     grupo, produto, _usuario = _preparar_cenario(session)

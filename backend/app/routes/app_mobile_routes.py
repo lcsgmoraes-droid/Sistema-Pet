@@ -8,6 +8,7 @@ Auth    : token JWT "ecommerce_customer" (mesmo fluxo do e-commerce)
 
 from datetime import datetime
 from typing import Optional
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
@@ -18,6 +19,10 @@ from app.db import get_session
 from app.evolucao_corepet import listar_evolucao_corepet
 from app.models import AppNotification, Cliente, User, UserPushDevice
 from app.produtos_models import Produto
+from app.empresa_grupo_estoque_compartilhado_service import (
+    EmpresaGrupoEstoqueCompartilhadoService,
+)
+from app.tenancy.context import set_current_tenant
 from app.routes.ecommerce_auth import (
     _activate_user_tenant_context,
     _get_current_ecommerce_user,
@@ -553,6 +558,11 @@ def buscar_produto_app_por_id(
     estao anunciados no app, para orientar compra no e-commerce ou loja fisica.
     """
     tenant_id = _activate_user_tenant_context(current_user)
+    acesso_catalogo = EmpresaGrupoEstoqueCompartilhadoService.resolver_produto_catalogo(
+        db, tenant_id, produto_id
+    )
+    tenant_produto_id = UUID(str(acesso_catalogo.tenant_origem_id))
+    set_current_tenant(tenant_produto_id)
     produto = (
         db.query(Produto)
         .options(
@@ -561,7 +571,7 @@ def buscar_produto_app_por_id(
             selectinload(Produto.imagens),
         )
         .filter(
-            Produto.tenant_id == tenant_id,
+            Produto.tenant_id == tenant_produto_id,
             Produto.id == produto_id,
             Produto.ativo.is_(True),
             Produto.situacao.is_not(False),
@@ -598,10 +608,18 @@ def buscar_produto_barcode(
 
     prioridade_estoque = case((func.coalesce(Produto.estoque_atual, 0) > 0, 0), else_=1)
 
+    compartilhados = (
+        EmpresaGrupoEstoqueCompartilhadoService.mapa_catalogo_completo_para_consumidora(
+            db, tenant_id
+        )
+    )
     produto = (
         db.query(Produto)
         .filter(
-            Produto.tenant_id == tenant_id,
+            or_(
+                Produto.tenant_id == tenant_id,
+                Produto.id.in_(list(compartilhados) or [-1]),
+            ),
             Produto.ativo.is_(True),
             Produto.situacao.is_not(False),
             Produto.is_sellable.is_(True),
@@ -618,6 +636,16 @@ def buscar_produto_barcode(
             detail="Produto não encontrado para este código de barras.",
         )
 
+    acesso_catalogo = EmpresaGrupoEstoqueCompartilhadoService.resolver_produto_catalogo(
+        db, tenant_id, produto.id
+    )
+    tenant_produto_id = UUID(str(acesso_catalogo.tenant_origem_id))
+    set_current_tenant(tenant_produto_id)
+    produto = (
+        db.query(Produto)
+        .filter(Produto.id == produto.id, Produto.tenant_id == tenant_produto_id)
+        .first()
+    )
     oferta_validade = mapear_ofertas_validade_por_produto(db, [produto], "app").get(
         produto.id
     )

@@ -24,6 +24,10 @@ from app.services.validade_campanha_service import (
 )
 from app.services.sales_channel import normalize_online_sales_channel
 from app.tenancy.context import set_current_tenant
+from app.tenancy.context import tenant_context
+from app.empresa_grupo_estoque_compartilhado_service import (
+    EmpresaGrupoEstoqueCompartilhadoService,
+)
 
 
 router = APIRouter(prefix="/carrinho", tags=["ecommerce-cart"])
@@ -183,7 +187,7 @@ def _serialize_carrinho(db: Session, carrinho: Pedido) -> dict:
     produto_ids = {item.produto_id for item in itens if item.produto_id is not None}
     produtos_por_id = {}
     if produto_ids:
-        produtos = (
+        produtos_locais = (
             db.query(Produto)
             .filter(
                 Produto.id.in_(produto_ids),
@@ -191,7 +195,17 @@ def _serialize_carrinho(db: Session, carrinho: Pedido) -> dict:
             )
             .all()
         )
-        produtos_por_id = {produto.id: produto for produto in produtos}
+        produtos_por_id = {produto.id: produto for produto in produtos_locais}
+    for produto_id in produto_ids - set(produtos_por_id):
+        try:
+            resolvido = (
+                EmpresaGrupoEstoqueCompartilhadoService.resolver_produto_catalogo(
+                    db, carrinho.tenant_id, produto_id
+                )
+            )
+            produtos_por_id[produto_id] = resolvido.produto
+        except HTTPException:
+            continue
 
     subtotal = round(sum((item.subtotal or 0.0) for item in itens), 2)
     return {
@@ -271,15 +285,25 @@ def adicionar_item_carrinho(
     tenant_id = _activate_cart_tenant_context(identity)
     _expirar_reservas_automaticamente(db, tenant_id)
 
-    produto = (
-        db.query(Produto)
-        .filter(
-            Produto.id == payload.produto_id,
-            Produto.tenant_id == tenant_id,
-            Produto.situacao.is_not(False),  # aceita True e NULL (produtos importados)
-        )
-        .first()
+    acesso_catalogo = EmpresaGrupoEstoqueCompartilhadoService.resolver_produto_catalogo(
+        db, tenant_id, payload.produto_id
     )
+    with tenant_context(acesso_catalogo.tenant_origem_id) as tenant_origem:
+        produto = (
+            db.query(Produto)
+            .filter(
+                Produto.id == payload.produto_id,
+                Produto.tenant_id == tenant_origem,
+                Produto.situacao.is_not(False),
+            )
+            .first()
+        )
+        canal_venda = _normalize_sales_channel(request.headers.get("X-Canal-Venda"))
+        pricing = (
+            _resolver_precificacao_produto(db, produto, canal_venda)
+            if produto is not None
+            else None
+        )
 
     if not produto:
         raise HTTPException(
@@ -291,7 +315,6 @@ def adicionar_item_carrinho(
             status_code=status.HTTP_400_BAD_REQUEST, detail="Produto não vendável"
         )
 
-    canal_venda = _normalize_sales_channel(request.headers.get("X-Canal-Venda"))
     if not _produto_disponivel_no_canal(produto, canal_venda):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -318,7 +341,6 @@ def adicionar_item_carrinho(
         .first()
     )
 
-    pricing = _resolver_precificacao_produto(db, produto, canal_venda)
     preco_unitario = float(
         pricing.promotional_price
         if pricing.promotional_price is not None
@@ -414,21 +436,30 @@ def atualizar_item_carrinho(
             detail="Item do carrinho não encontrado",
         )
 
-    produto = (
-        db.query(Produto)
-        .filter(
-            Produto.id == item.produto_id,
-            Produto.tenant_id == tenant_id,
-            Produto.situacao.is_not(False),  # aceita True e NULL (produtos importados)
-        )
-        .first()
+    acesso_catalogo = EmpresaGrupoEstoqueCompartilhadoService.resolver_produto_catalogo(
+        db, tenant_id, item.produto_id
     )
+    with tenant_context(acesso_catalogo.tenant_origem_id) as tenant_origem:
+        produto = (
+            db.query(Produto)
+            .filter(
+                Produto.id == item.produto_id,
+                Produto.tenant_id == tenant_origem,
+                Produto.situacao.is_not(False),
+            )
+            .first()
+        )
+        canal_venda = _normalize_sales_channel(request.headers.get("X-Canal-Venda"))
+        pricing = (
+            _resolver_precificacao_produto(db, produto, canal_venda)
+            if produto is not None
+            else None
+        )
     if not produto:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Produto não encontrado"
         )
 
-    canal_venda = _normalize_sales_channel(request.headers.get("X-Canal-Venda"))
     if not _produto_disponivel_no_canal(produto, canal_venda):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -459,7 +490,6 @@ def atualizar_item_carrinho(
             detail="Quantidade indisponível em estoque (reserva ativa)",
         )
 
-    pricing = _resolver_precificacao_produto(db, produto, canal_venda)
     preco_unitario = float(
         pricing.promotional_price
         if pricing.promotional_price is not None

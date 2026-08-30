@@ -21,6 +21,9 @@ from app.services.validade_campanha_service import (
 from app.services.ofertas_estudio_service import resumir_navegacao_publicacao
 from app.tenant_identity import normalize_tenant_name
 from app.tenancy.context import set_current_tenant
+from app.empresa_grupo_estoque_compartilhado_service import (
+    EmpresaGrupoEstoqueCompartilhadoService,
+)
 
 
 router = APIRouter(prefix="/ecommerce", tags=["ecommerce-public"])
@@ -47,6 +50,18 @@ _ANALYTICS_EVENT_NAMES = {
     "checkout_submitted",
     "purchase",
 }
+
+
+def _escopo_catalogo_publico(db: Session, tenant_id):
+    compartilhados = (
+        EmpresaGrupoEstoqueCompartilhadoService.mapa_catalogo_completo_para_consumidora(
+            db, tenant_id
+        )
+    )
+    return or_(
+        Produto.tenant_id == tenant_id,
+        Produto.id.in_(list(compartilhados) or [-1]),
+    )
 
 
 def _normalize_location_text(value: str | None) -> str:
@@ -699,7 +714,7 @@ def listar_filtros_produtos_publicos(
     canal_normalizado = _normalize_sales_channel(canal_resolvido)
 
     base_filters = [
-        Produto.tenant_id == tenant.id,
+        _escopo_catalogo_publico(db, tenant.id),
         Produto.ativo.is_(True),
         Produto.situacao.is_not(False),
         Produto.tipo_produto.in_(["SIMPLES", "VARIACAO", "KIT"]),
@@ -798,7 +813,7 @@ def obter_produto_publico_por_id(
             selectinload(Produto.imagens),
         )
         .filter(
-            Produto.tenant_id == tenant.id,
+            _escopo_catalogo_publico(db, tenant.id),
             Produto.id == produto_id,
             Produto.ativo.is_(True),
             Produto.situacao.is_not(False),
@@ -911,7 +926,7 @@ def listar_produtos_publicos(
         preco_catalogo = func.coalesce(Produto.preco_ecommerce, Produto.preco_venda, 0)
 
     base_filters = [
-        Produto.tenant_id == tenant.id,
+        _escopo_catalogo_publico(db, tenant.id),
         Produto.ativo.is_(True),
         Produto.situacao.is_not(False),
         Produto.tipo_produto.in_(["SIMPLES", "VARIACAO", "KIT"]),

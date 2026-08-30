@@ -6,6 +6,7 @@ o tenant ator em todas as consultas e mutacoes.
 """
 
 from sqlalchemy import (
+    Boolean,
     Column,
     DateTime,
     ForeignKey,
@@ -291,6 +292,9 @@ class EmpresaGrupoEstoqueCompartilhado(Base):
     )
     empresa_consumidora_id = Column(
         String(36), ForeignKey("tenants.id", ondelete="RESTRICT"), nullable=False
+    )
+    acesso_catalogo_completo = Column(
+        Boolean, nullable=False, default=False, server_default="false"
     )
     status = Column(String(20), nullable=False, default="ativo", server_default="ativo")
     criado_por_usuario_id = Column(Integer, nullable=False)
