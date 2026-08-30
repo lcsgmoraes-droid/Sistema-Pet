@@ -13,7 +13,7 @@ WHITELIST:
 """
 
 from sqlalchemy.orm import Session, aliased
-from sqlalchemy import event, or_, select
+from sqlalchemy import String, cast, event, or_, select
 from sqlalchemy.orm import with_loader_criteria
 import logging
 
@@ -136,8 +136,16 @@ def _tenant_read_filter(cls, tenant_id):
             )
             .where(
                 EmpresaGrupoEstoqueCompartilhado.produto_origem_id == cls.id,
-                EmpresaGrupoEstoqueCompartilhado.empresa_origem_id == cls.tenant_id,
-                EmpresaGrupoEstoqueCompartilhado.empresa_consumidora_id == tenant_id,
+                cast(
+                    EmpresaGrupoEstoqueCompartilhado.empresa_origem_id,
+                    String,
+                )
+                == cast(cls.tenant_id, String),
+                cast(
+                    EmpresaGrupoEstoqueCompartilhado.empresa_consumidora_id,
+                    String,
+                )
+                == str(tenant_id),
                 EmpresaGrupoEstoqueCompartilhado.status == "ativo",
                 EmpresaGrupo.status == "ativo",
                 membro_origem.status == "ativo",
