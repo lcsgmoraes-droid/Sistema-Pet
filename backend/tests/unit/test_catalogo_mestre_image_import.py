@@ -9,6 +9,8 @@ from app.services.catalogo_mestre_image_import import (
     CatalogImageCandidate,
     build_image_import_plan,
     discover_image_candidates,
+    stage_unmatched_candidate_import,
+    suggest_candidate_scope,
 )
 
 
@@ -149,6 +151,47 @@ def test_plan_blocks_duplicate_hash_and_ambiguous_gtin():
     assert plan[1].status == "gtin_ambiguo_no_mestre"
 
 
+def test_candidate_scope_suggestion_is_conservative():
+    assert suggest_candidate_scope("AREIA PIPICAT 4KG").catalog_type == (
+        "areia_sanitaria"
+    )
+    assert suggest_candidate_scope("PETISCO CHURU FRANGO").catalog_type == "petisco"
+    assert suggest_candidate_scope("ROYAL CANIN GATOS 2KG").catalog_type == "racao"
+    assert suggest_candidate_scope("CAPSTAR 11,4MG").catalog_type == "medicamento"
+    assert suggest_candidate_scope("COMEDOURO PLASTICO 1L").decision == (
+        "provavel_fora_escopo"
+    )
+    assert suggest_candidate_scope("PRODUTO DE MARCA 100G").decision == (
+        "revisao_necessaria"
+    )
+
+
+def test_plan_recognizes_candidate_evidence_already_staged():
+    candidate = _candidate("4007221055259_DRONTAL.jpg", "4007221055259", "d" * 64)
+
+    plan = build_image_import_plan(
+        [candidate],
+        [],
+        [],
+        candidate_evidence_keys={("4007221055259", "d" * 64)},
+    )
+
+    assert plan[0].status == "candidato_ja_estagiado"
+
+
+def test_plan_does_not_reuse_candidate_evidence_from_another_gtin():
+    candidate = _candidate("4007221055259_DRONTAL.jpg", "4007221055259", "d" * 64)
+
+    plan = build_image_import_plan(
+        [candidate],
+        [],
+        [],
+        candidate_evidence_keys={("7890000000000", "d" * 64)},
+    )
+
+    assert plan[0].status == "sem_produto_no_mestre"
+
+
 def test_stage_keeps_file_private_inactive_and_pending(tmp_path):
     source = tmp_path / "5420036914952_CAPSTAR.jpg"
     Image.new("RGB", (20, 30), "white").save(source)
@@ -172,9 +215,7 @@ def test_stage_keeps_file_private_inactive_and_pending(tmp_path):
 
     engine = create_engine("sqlite+pysqlite:///:memory:")
     with engine.begin() as connection:
-        connection.execute(
-            text(
-                """
+        connection.execute(text("""
                 CREATE TABLE catalogo_mestre_imagens (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     produto_id INTEGER NOT NULL,
@@ -193,9 +234,7 @@ def test_stage_keeps_file_private_inactive_and_pending(tmp_path):
                     metadados JSON,
                     ativo BOOLEAN NOT NULL
                 )
-                """
-            )
-        )
+                """))
     with Session(engine) as db:
         staged = stage_image_import(
             db,
@@ -214,4 +253,82 @@ def test_stage_keeps_file_private_inactive_and_pending(tmp_path):
     assert image["direitos_uso_status"] == "nao_verificado"
     assert image["arquivo_url"] is None
     assert json.loads(image["metadados"])["protegida_de_publicacao"] is True
+    assert len(list(staging_root.rglob("*.jpg"))) == 1
+
+
+def test_stage_unmatched_candidate_never_creates_master_product(tmp_path):
+    source = tmp_path / "5420036914839_CAPSTAR 11,4MG.jpg"
+    Image.new("RGB", (20, 30), "white").save(source)
+    discovered = discover_image_candidates(tmp_path)[0]
+    plan = build_image_import_plan([discovered], [], [])
+    staging_root = tmp_path / "seguro" / "catalogo_mestre_pendente"
+
+    engine = create_engine("sqlite+pysqlite:///:memory:")
+    with engine.begin() as connection:
+        connection.execute(text("""
+                CREATE TABLE catalogo_mestre_produto_candidatos (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    gtin TEXT NOT NULL UNIQUE,
+                    nome_sugerido TEXT NOT NULL,
+                    tipo_catalogo_sugerido TEXT,
+                    decisao_escopo_sugerida TEXT NOT NULL,
+                    motivo_sugestao TEXT,
+                    status TEXT NOT NULL,
+                    fonte_identidade_status TEXT NOT NULL,
+                    metadados JSON
+                )
+                """))
+        connection.execute(text("""
+                CREATE TABLE catalogo_mestre_candidato_evidencias (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    candidato_id INTEGER NOT NULL,
+                    source_ref TEXT NOT NULL,
+                    fonte_relatorio TEXT,
+                    nome_arquivo_original TEXT NOT NULL,
+                    hash_arquivo TEXT NOT NULL,
+                    staging_path TEXT NOT NULL,
+                    formato TEXT NOT NULL,
+                    largura INTEGER,
+                    altura INTEGER,
+                    tamanho_bytes INTEGER,
+                    direitos_uso_status TEXT NOT NULL,
+                    metadados JSON,
+                    UNIQUE (candidato_id, hash_arquivo)
+                )
+                """))
+
+    with Session(engine) as db:
+        first = stage_unmatched_candidate_import(
+            db,
+            plan,
+            source_ref="drive-folder-id",
+            staging_dir=staging_root,
+        )
+        db.commit()
+        second = stage_unmatched_candidate_import(
+            db,
+            plan,
+            source_ref="drive-folder-id",
+            staging_dir=staging_root,
+        )
+        db.commit()
+        candidate = (
+            db.execute(text("SELECT * FROM catalogo_mestre_produto_candidatos"))
+            .mappings()
+            .one()
+        )
+        evidence = (
+            db.execute(text("SELECT * FROM catalogo_mestre_candidato_evidencias"))
+            .mappings()
+            .one()
+        )
+
+    assert first.created_candidates == 1
+    assert first.staged_evidences == 1
+    assert second.created_candidates == 0
+    assert second.staged_evidences == 0
+    assert candidate["tipo_catalogo_sugerido"] == "medicamento"
+    assert candidate["status"] == "pendente"
+    assert evidence["direitos_uso_status"] == "nao_verificado"
+    assert json.loads(evidence["metadados"])["protegida_de_publicacao"] is True
     assert len(list(staging_root.rglob("*.jpg"))) == 1

@@ -61,6 +61,10 @@ filtro e, portanto, não devem ser usados como tamanho final da fila inicial.
 - `catalogo_mestre_pendencias`: fila idempotente de melhoria por produto e
   posição.
 - `catalogo_mestre_sincronizacoes`: auditoria das cargas efetivamente aplicadas.
+- `catalogo_mestre_produto_candidatos`: EANs ainda sem identidade oficial
+  suficiente para criar um produto mestre.
+- `catalogo_mestre_candidato_evidencias`: arquivos privados que ajudam a
+  identificar candidatos, sem publicação e sem vínculo com lojas.
 
 A identificação da origem usa `origem_tenant_id` e `origem_produto_id`, sem
 alterar nem adicionar vínculo ao registro original.
@@ -160,3 +164,20 @@ nao preenche automaticamente as cinco posicoes e nao altera nenhum cadastro de
 loja. Em producao, a aplicacao ainda exige `--allow-production-apply` e
 autorizacao operacional explicita.
 
+Arquivos validos cujo EAN ainda nao existe no catalogo mestre podem ser
+preservados para pesquisa posterior com a opcao explicita:
+
+```powershell
+python -m app.scripts.run_catalogo_mestre_image_import `
+  --source-dir C:\caminho\para\imagens `
+  --source-ref identificador-do-lote `
+  --stage-unmatched-candidates `
+  --apply
+```
+
+Essa opcao tambem nao cria produtos. Ela registra o EAN e o nome do arquivo como
+sugestoes nao verificadas, guarda a imagem no mesmo prefixo privado e abre uma
+fila de identificacao. Marcadores deterministas apenas sugerem prioridade e
+escopo; produto, marca, variante, bula e dados fiscais continuam dependendo de
+fonte oficial ou licenciada e de revisao. Repetir o mesmo lote nao duplica o
+candidato nem sua evidencia.

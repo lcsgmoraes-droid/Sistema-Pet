@@ -6,6 +6,9 @@ WORKER_MIGRATION = (
     BACKEND_ROOT
     / "alembic/versions/zxp20260829a1_fila_enriquecimento_catalogo_mestre.py"
 )
+CANDIDATE_MIGRATION = (
+    BACKEND_ROOT / "alembic/versions/zys20260829a1_catalogo_mestre_candidatos_ean.py"
+)
 
 
 def test_catalogo_mestre_migration_is_linear_and_reversible():
@@ -53,3 +56,17 @@ def test_catalog_worker_migration_adds_lease_and_execution_audit():
     assert '"catalogo_mestre_enriquecimento_execucoes"' in source
     assert 'op.drop_table("catalogo_mestre_enriquecimento_execucoes")' in source
     assert '"produtos"' not in source
+
+
+def test_catalog_candidate_migration_keeps_unverified_eans_outside_master():
+    source = CANDIDATE_MIGRATION.read_text(encoding="utf-8")
+
+    assert 'revision = "zys20260829a1"' in source
+    assert 'down_revision = "zyr20260829a1"' in source
+    assert '"catalogo_mestre_produto_candidatos"' in source
+    assert '"catalogo_mestre_candidato_evidencias"' in source
+    assert '"fonte_identidade_status"' in source
+    assert '"direitos_uso_status"' in source
+    assert '"staging_path"' in source
+    assert '"preco_venda"' not in source
+    assert '"estoque_atual"' not in source

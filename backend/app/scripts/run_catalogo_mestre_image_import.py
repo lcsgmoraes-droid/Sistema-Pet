@@ -18,10 +18,12 @@ if __package__ in {None, ""}:
 
 from app.db import SessionLocal
 from app.services.catalogo_mestre_image_import import (
+    CandidateStageResult,
     DEFAULT_IMAGE_MAX_BYTES,
     DEFAULT_PROTECTED_STAGING_DIR,
     prepare_image_import,
     stage_image_import,
+    stage_unmatched_candidate_import,
     summarize_image_import_plan,
 )
 
@@ -54,6 +56,14 @@ def _build_parser() -> argparse.ArgumentParser:
         "--apply",
         action="store_true",
         help="Copia para estagio protegido e cria registros inativos/pendentes.",
+    )
+    parser.add_argument(
+        "--stage-unmatched-candidates",
+        action="store_true",
+        help=(
+            "Preserva EANs sem produto em uma fila privada de identificacao. "
+            "Nunca cria produto mestre."
+        ),
     )
     parser.add_argument(
         "--allow-production-apply",
@@ -106,8 +116,10 @@ def main(argv: list[str] | None = None) -> int:
             image_target=args.image_target,
             max_bytes=args.max_bytes,
             lock_products=args.apply,
+            include_unmatched_candidates=args.stage_unmatched_candidates,
         )
         staged = 0
+        candidate_stage_result = CandidateStageResult()
         if args.apply:
             staged = stage_image_import(
                 db,
@@ -115,6 +127,13 @@ def main(argv: list[str] | None = None) -> int:
                 source_ref=args.source_ref,
                 staging_dir=args.staging_dir,
             )
+            if args.stage_unmatched_candidates:
+                candidate_stage_result = stage_unmatched_candidate_import(
+                    db,
+                    plan,
+                    source_ref=args.source_ref,
+                    staging_dir=args.staging_dir,
+                )
             db.commit()
         else:
             db.rollback()
@@ -122,6 +141,8 @@ def main(argv: list[str] | None = None) -> int:
             plan,
             dry_run=dry_run,
             staged_images=staged,
+            stage_unmatched_candidates=args.stage_unmatched_candidates,
+            candidate_stage_result=candidate_stage_result,
         )
         print(json.dumps(result, ensure_ascii=False, indent=2, sort_keys=True))
         return 0

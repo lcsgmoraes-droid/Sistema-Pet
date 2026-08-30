@@ -77,3 +77,7 @@ revisao especializada.
 4. Dados de racao extraidos do rotulo oficial.
 5. Medicamentos vinculados a registro e bula oficiais, com revisao veterinaria.
 6. Dados fiscais tratados como referencia e validados por operacao, UF e regime.
+
+EANs recebidos antes dessa identificacao ficam na fila privada de candidatos.
+Essa fila nao e consumida pelo worker de descricoes e nao cria produto por nome
+de arquivo: primeiro exige fonte oficial de identidade e decisao de escopo.

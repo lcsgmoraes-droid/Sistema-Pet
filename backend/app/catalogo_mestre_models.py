@@ -191,6 +191,100 @@ class CatalogoMestreImagem(Base):
     produto = relationship("CatalogoMestreProduto", back_populates="imagens")
 
 
+class CatalogoMestreProdutoCandidato(Base):
+    """EAN ainda sem identidade oficial suficiente para virar produto mestre."""
+
+    __tablename__ = "catalogo_mestre_produto_candidatos"
+    __table_args__ = (
+        UniqueConstraint("gtin", name="uq_cat_mestre_candidato_gtin"),
+        CheckConstraint(
+            "decisao_escopo_sugerida IN "
+            "('provavel_elegivel', 'provavel_fora_escopo', 'revisao_necessaria')",
+            name="ck_cat_mestre_cand_escopo",
+        ),
+        Index("ix_cat_mestre_cand_status", "status", "decisao_escopo_sugerida"),
+    )
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    gtin = Column(String(14), nullable=False)
+    nome_sugerido = Column(String(500), nullable=False)
+    tipo_catalogo_sugerido = Column(String(30), nullable=True, index=True)
+    decisao_escopo_sugerida = Column(
+        String(30), nullable=False, default="revisao_necessaria"
+    )
+    motivo_sugestao = Column(Text, nullable=True)
+    status = Column(String(30), nullable=False, default="pendente")
+    produto_mestre_id = Column(
+        Integer,
+        ForeignKey("catalogo_mestre_produtos.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    fonte_identidade_status = Column(
+        String(40), nullable=False, default="nao_verificada"
+    )
+    metadados = Column(JSON, nullable=True)
+    revisada_por_id = Column(Integer, nullable=True)
+    revisada_em = Column(DateTime(timezone=True), nullable=True)
+    created_at = Column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+    updated_at = Column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+        onupdate=func.now(),
+    )
+
+    produto_mestre = relationship("CatalogoMestreProduto")
+    evidencias = relationship(
+        "CatalogoMestreCandidatoEvidencia",
+        back_populates="candidato",
+        cascade="all, delete-orphan",
+    )
+
+
+class CatalogoMestreCandidatoEvidencia(Base):
+    """Arquivo privado que ajuda a identificar um candidato, sem publica-lo."""
+
+    __tablename__ = "catalogo_mestre_candidato_evidencias"
+    __table_args__ = (
+        UniqueConstraint(
+            "candidato_id",
+            "hash_arquivo",
+            name="uq_cat_mestre_cand_evid_hash",
+        ),
+    )
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    candidato_id = Column(
+        Integer,
+        ForeignKey("catalogo_mestre_produto_candidatos.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    source_ref = Column(String(300), nullable=False)
+    fonte_relatorio = Column(String(100), nullable=True)
+    nome_arquivo_original = Column(String(500), nullable=False)
+    hash_arquivo = Column(String(64), nullable=False, index=True)
+    staging_path = Column(String(1000), nullable=False)
+    formato = Column(String(20), nullable=False)
+    largura = Column(Integer, nullable=True)
+    altura = Column(Integer, nullable=True)
+    tamanho_bytes = Column(Integer, nullable=True)
+    direitos_uso_status = Column(
+        String(30), nullable=False, default="nao_verificado", index=True
+    )
+    metadados = Column(JSON, nullable=True)
+    created_at = Column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+
+    candidato = relationship(
+        "CatalogoMestreProdutoCandidato", back_populates="evidencias"
+    )
+
+
 class CatalogoMestrePendencia(Base):
     """Fila continua de enriquecimento; uma posicao representa uma lacuna."""
 
