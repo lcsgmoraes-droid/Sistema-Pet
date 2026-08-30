@@ -1,5 +1,5 @@
-import { AlertTriangle, Check, Copy, History, Plus, User, Wallet } from "lucide-react";
-import { useLocation } from "react-router-dom";
+import { AlertTriangle, Check, Copy, CreditCard, History, Plus, User, Wallet } from "lucide-react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { formatBRL, formatMoneyBRL } from "../../utils/formatters";
 import { getClienteAlertasPdvAtivos } from "../../utils/clienteAlertasPdv";
 import { buildPdvCouponTooltip } from "../../utils/pdvCouponTooltip";
@@ -302,10 +302,12 @@ function ClienteResumoSelecionado({
 }
 
 function ClienteAcoesResumo({
+  crediarioInfo,
   modoVisualizacao,
   onAbrirHistoricoCliente,
   onAbrirModalAdicionarCredito,
   onAbrirVendasEmAberto,
+  onVerCrediario,
   totalVendasAbertas,
   vendasEmAbertoInfo,
 }) {
@@ -335,6 +337,33 @@ function ClienteAcoesResumo({
         </div>
       ) : (
         <div />
+      )}
+
+      {Number(crediarioInfo?.total_parcelas || 0) > 0 && (
+        <div className="flex min-h-[46px] w-full min-w-0 flex-col gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-800 sm:flex-row sm:items-center sm:justify-between md:w-auto md:flex-none">
+          <div className="flex min-w-0 items-center gap-2">
+            <CreditCard className="h-5 w-5 flex-shrink-0 text-blue-600" />
+            <div className="min-w-0">
+              <div className="text-sm font-semibold leading-tight">
+                {crediarioInfo.total_parcelas} parcela(s) do crediario
+              </div>
+              <div className="truncate leading-tight">
+                Em aberto: {formatMoneyBRL(crediarioInfo.total_em_aberto || 0)}
+                {Number(crediarioInfo.total_vencido || 0) > 0
+                  ? ` · Vencido: ${formatMoneyBRL(crediarioInfo.total_vencido)}`
+                  : ""}
+              </div>
+            </div>
+          </div>
+          <ActionButton
+            onClick={onVerCrediario}
+            intent="neutral"
+            size="sm"
+            className="w-full sm:w-auto sm:min-w-[128px]"
+          >
+            Ver parcelas
+          </ActionButton>
+        </div>
       )}
 
       <div className="hidden min-w-0 flex-1 md:block" />
@@ -413,6 +442,7 @@ export default function PDVClienteCard({
   vendaGuiaClasses,
   vendasEmAbertoInfo,
 }) {
+  const navigate = useNavigate();
   const cliente = vendaAtual.cliente;
   const saldoCarimbos = Number(saldoCampanhas?.total_carimbos || 0);
   const debitoFidelidade = Math.max(
@@ -422,6 +452,11 @@ export default function PDVClienteCard({
   const creditoCliente = Number(cliente?.credito || 0);
   const cuponsAtivos = saldoCampanhas?.cupons_ativos || [];
   const totalVendasAbertas = Number(vendasEmAbertoInfo?.total_vendas || 0);
+  const crediarioInfo = {
+    total_parcelas: Number(vendasEmAbertoInfo?.total_parcelas_crediario || 0),
+    total_em_aberto: Number(vendasEmAbertoInfo?.total_crediario_em_aberto || 0),
+    total_vencido: Number(vendasEmAbertoInfo?.total_crediario_vencido || 0),
+  };
   const telefoneCliente = cliente?.telefone || cliente?.celular || cliente?.whatsapp || "";
   const codigoCliente = cliente?.codigo || cliente?.id || "";
   const nivelFidelidade = saldoCampanhas?.rank_level || "bronze";
@@ -474,10 +509,16 @@ export default function PDVClienteCard({
           <ClienteAlertasPdv cliente={cliente} />
 
           <ClienteAcoesResumo
+            crediarioInfo={crediarioInfo}
             modoVisualizacao={modoVisualizacao}
             onAbrirHistoricoCliente={onAbrirHistoricoCliente}
             onAbrirModalAdicionarCredito={onAbrirModalAdicionarCredito}
             onAbrirVendasEmAberto={onAbrirVendasEmAberto}
+            onVerCrediario={() =>
+              navigate(
+                `/financeiro/contas-receber?cliente_id=${cliente.id}&filtro=em_aberto&periodo=todos`,
+              )
+            }
             totalVendasAbertas={totalVendasAbertas}
             vendasEmAbertoInfo={vendasEmAbertoInfo}
           />

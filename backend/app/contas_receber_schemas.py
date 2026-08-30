@@ -1,9 +1,9 @@
 """Schemas das rotas de contas a receber."""
 
 from datetime import date
-from typing import Optional
+from typing import List, Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, field_validator
 
 
 class ContaReceberCreate(BaseModel):
@@ -44,18 +44,38 @@ class ContaReceberCreate(BaseModel):
 
 
 class RecebimentoCreate(BaseModel):
-    valor_recebido: float
+    valor_recebido: float = Field(ge=0)
     data_recebimento: date
     forma_pagamento_id: Optional[int] = None
-    valor_juros: float = 0
-    valor_multa: float = 0
-    valor_desconto: float = 0
+    valor_juros: float = Field(default=0, ge=0)
+    valor_multa: float = Field(default=0, ge=0)
+    valor_desconto: float = Field(default=0, ge=0)
     observacoes: Optional[str] = None
+    aplicar_encargos_automaticos: bool = False
+    quitar: bool = False
+
+
+class RecebimentoLoteCreate(BaseModel):
+    conta_ids: List[int] = Field(min_length=1, max_length=500)
+    data_recebimento: date
+    forma_pagamento_id: Optional[int] = None
+    observacoes: Optional[str] = None
+    aplicar_encargos_automaticos: bool = True
+
+    @field_validator("conta_ids")
+    @classmethod
+    def validar_contas_unicas(cls, value: List[int]) -> List[int]:
+        if any(conta_id <= 0 for conta_id in value):
+            raise ValueError("Todos os IDs de contas devem ser positivos")
+        if len(value) != len(set(value)):
+            raise ValueError("A lista de contas não pode conter IDs repetidos")
+        return value
 
 
 class ContaReceberResponse(BaseModel):
     id: int
     descricao: str
+    cliente_id: Optional[int] = None
     cliente_nome: Optional[str] = None
     categoria_nome: Optional[str] = None
     valor_original: float
@@ -72,6 +92,14 @@ class ContaReceberResponse(BaseModel):
     documento: Optional[str] = None
     venda_id: Optional[int] = None
     numero_venda: Optional[str] = None  # ✅ CAMPO ADICIONADO
+    forma_pagamento_id: Optional[int] = None
+    forma_pagamento_tipo: Optional[str] = None
+    eh_crediario: bool = False
+    encargos_automaticos_ativos: bool = False
+    dias_atraso: int = 0
+    valor_juros_calculado: float = 0
+    valor_multa_calculada: float = 0
+    saldo_atualizado: float = 0
 
     # ============================
     # CONCILIAÇÃO DE CARTÃO

@@ -8,6 +8,11 @@ from sqlalchemy import and_, desc, func
 from sqlalchemy.orm import Session, joinedload
 
 from .auth.dependencies import get_current_user_and_tenant
+from .contas_receber_encargos import (
+    calcular_encargos_automaticos,
+    carregar_config_encargos,
+    serializar_calculo_encargos,
+)
 from .contas_receber_schemas import ContaReceberResponse
 from .db import get_session
 from .financeiro_models import ContaReceber
@@ -42,7 +47,10 @@ def listar_contas_receber(
 
     query = (
         db.query(ContaReceber)
-        .options(joinedload(ContaReceber.categoria))
+        .options(
+            joinedload(ContaReceber.categoria),
+            joinedload(ContaReceber.forma_pagamento),
+        )
         .filter(ContaReceber.tenant_id == tenant_id)
     )
 
@@ -96,10 +104,14 @@ def listar_contas_receber(
     # Ordenar por ID DESC (mais recentes primeiro) e depois por data de vencimento
     query = query.order_by(desc(ContaReceber.id))
     contas = query.limit(limit).offset(offset).all()
+    config_encargos = carregar_config_encargos(db, tenant_id)
 
     # Montar response
     resultado = []
     for conta in contas:
+        calculo_encargos = serializar_calculo_encargos(
+            calcular_encargos_automaticos(conta, hoje, config_encargos)
+        )
         # Calcular dias para vencimento
         dias_venc = None
         if conta.status == "pendente":
@@ -139,6 +151,7 @@ def listar_contas_receber(
             {
                 "id": conta.id,
                 "descricao": conta.descricao,
+                "cliente_id": conta.cliente_id,
                 "cliente_nome": cliente_nome,
                 "categoria_nome": conta.categoria.nome if conta.categoria else None,
                 "valor_original": float(conta.valor_original),
@@ -155,6 +168,11 @@ def listar_contas_receber(
                 "documento": conta.documento,
                 "venda_id": conta.venda_id,
                 "numero_venda": numero_venda,
+                "forma_pagamento_id": conta.forma_pagamento_id,
+                "forma_pagamento_tipo": (
+                    conta.forma_pagamento.tipo if conta.forma_pagamento else None
+                ),
+                **calculo_encargos,
                 "observacoes": conta.observacoes,
                 # Conciliação de cartão
                 "nsu": conta.nsu,
@@ -189,7 +207,9 @@ def buscar_conta_receber(
     conta = (
         db.query(ContaReceber)
         .options(
-            joinedload(ContaReceber.categoria), joinedload(ContaReceber.recebimentos)
+            joinedload(ContaReceber.categoria),
+            joinedload(ContaReceber.recebimentos),
+            joinedload(ContaReceber.forma_pagamento),
         )
         .filter(
             ContaReceber.id == conta_id,
@@ -200,6 +220,14 @@ def buscar_conta_receber(
 
     if not conta:
         raise HTTPException(status_code=404, detail="Conta não encontrada")
+
+    calculo_encargos = serializar_calculo_encargos(
+        calcular_encargos_automaticos(
+            conta,
+            now_brasilia().date(),
+            carregar_config_encargos(db, tenant_id),
+        )
+    )
 
     # Buscar cliente
     cliente = None
@@ -255,26 +283,32 @@ def buscar_conta_receber(
     return {
         "id": conta.id,
         "descricao": conta.descricao,
-        "cliente": {
-            "id": cliente.id if cliente else None,
-            "nome": cliente.nome if cliente else None,
-            "cpf": cliente.cpf if cliente else None,
-        }
-        if cliente
-        else None,
-        "venda": {
-            "id": venda.id if venda else None,
-            "numero_venda": venda.numero_venda if venda else None,
-        }
-        if venda
-        else None,
-        "categoria": {
-            "id": conta.categoria.id if conta.categoria else None,
-            "nome": conta.categoria.nome if conta.categoria else None,
-            "cor": conta.categoria.cor if conta.categoria else None,
-        }
-        if conta.categoria
-        else None,
+        "cliente": (
+            {
+                "id": cliente.id if cliente else None,
+                "nome": cliente.nome if cliente else None,
+                "cpf": cliente.cpf if cliente else None,
+            }
+            if cliente
+            else None
+        ),
+        "venda": (
+            {
+                "id": venda.id if venda else None,
+                "numero_venda": venda.numero_venda if venda else None,
+            }
+            if venda
+            else None
+        ),
+        "categoria": (
+            {
+                "id": conta.categoria.id if conta.categoria else None,
+                "nome": conta.categoria.nome if conta.categoria else None,
+                "cor": conta.categoria.cor if conta.categoria else None,
+            }
+            if conta.categoria
+            else None
+        ),
         "valores": {
             "original": float(conta.valor_original),
             "recebido": float(conta.valor_recebido),
@@ -290,13 +324,16 @@ def buscar_conta_receber(
             "recebimento": conta.data_recebimento,
         },
         "status": conta.status,
-        "parcelamento": {
-            "eh_parcelado": conta.eh_parcelado,
-            "numero_parcela": conta.numero_parcela,
-            "total_parcelas": conta.total_parcelas,
-        }
-        if conta.eh_parcelado
-        else None,
+        "encargos": calculo_encargos,
+        "parcelamento": (
+            {
+                "eh_parcelado": conta.eh_parcelado,
+                "numero_parcela": conta.numero_parcela,
+                "total_parcelas": conta.total_parcelas,
+            }
+            if conta.eh_parcelado
+            else None
+        ),
         "documento": conta.documento,
         "observacoes": conta.observacoes,
         "recebimentos": recebimentos_detalhados,

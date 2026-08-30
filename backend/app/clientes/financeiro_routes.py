@@ -1,8 +1,9 @@
 """Rotas financeiras e historicos legados de clientes."""
 
 import logging
+from datetime import date
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from app.auth.dependencies import get_current_user_and_tenant
 from app.clientes.financeiro_baixa_lote_routes import (
@@ -10,6 +11,11 @@ from app.clientes.financeiro_baixa_lote_routes import (
     router as financeiro_baixa_lote_router,
 )
 from app.db import get_session
+from app.contas_receber_encargos import (
+    calcular_encargos_automaticos,
+    carregar_config_encargos,
+)
+from app.financeiro_models import ContaReceber, FormaPagamento
 from app.models import Cliente
 
 logger = logging.getLogger(__name__)
@@ -122,22 +128,28 @@ async def get_historico_compras(
         "vendas": [
             {
                 "id": v.id,
-                "numero_venda": v.numero_venda
-                if hasattr(v, "numero_venda") and v.numero_venda
-                else v.id,
-                "data_venda": v.data_venda.isoformat()
-                if hasattr(v.data_venda, "isoformat")
-                else str(v.data_venda),
+                "numero_venda": (
+                    v.numero_venda
+                    if hasattr(v, "numero_venda") and v.numero_venda
+                    else v.id
+                ),
+                "data_venda": (
+                    v.data_venda.isoformat()
+                    if hasattr(v.data_venda, "isoformat")
+                    else str(v.data_venda)
+                ),
                 "total": float(v.total or 0),
-                "subtotal": float(v.subtotal or 0)
-                if hasattr(v, "subtotal")
-                else float(v.total or 0),
-                "desconto_valor": float(v.desconto_valor or 0)
-                if hasattr(v, "desconto_valor")
-                else 0,
-                "taxa_entrega": float(v.taxa_entrega or 0)
-                if hasattr(v, "taxa_entrega")
-                else 0,
+                "subtotal": (
+                    float(v.subtotal or 0)
+                    if hasattr(v, "subtotal")
+                    else float(v.total or 0)
+                ),
+                "desconto_valor": (
+                    float(v.desconto_valor or 0) if hasattr(v, "desconto_valor") else 0
+                ),
+                "taxa_entrega": (
+                    float(v.taxa_entrega or 0) if hasattr(v, "taxa_entrega") else 0
+                ),
                 "saldo_devedor": float(v.total or 0)
                 - (
                     sum(float(pag.valor or 0) for pag in v.pagamentos)
@@ -146,9 +158,9 @@ async def get_historico_compras(
                 ),
                 "status": v.status,
                 "total_itens": len(v.itens) if v.itens else 0,
-                "vendedor_nome": v.vendedor_nome
-                if hasattr(v, "vendedor_nome")
-                else None,
+                "vendedor_nome": (
+                    v.vendedor_nome if hasattr(v, "vendedor_nome") else None
+                ),
                 "observacoes": v.observacoes if hasattr(v, "observacoes") else None,
                 # Lista completa de formas de pagamento
                 "pagamentos": [
@@ -159,9 +171,11 @@ async def get_historico_compras(
                                 pag.forma_pagamento
                                 and hasattr(pag.forma_pagamento, "nome")
                             )
-                            else str(pag.forma_pagamento)
-                            if pag.forma_pagamento
-                            else "Não informado"
+                            else (
+                                str(pag.forma_pagamento)
+                                if pag.forma_pagamento
+                                else "Não informado"
+                            )
                         ),
                         "valor": float(pag.valor or 0),
                     }
@@ -253,6 +267,53 @@ async def get_vendas_em_aberto(
 
     saldo_pendente = valor_total - valor_pago
 
+    contas_crediario = (
+        db.query(ContaReceber)
+        .join(FormaPagamento, FormaPagamento.id == ContaReceber.forma_pagamento_id)
+        .options(joinedload(ContaReceber.forma_pagamento))
+        .filter(
+            ContaReceber.cliente_id == cliente_id,
+            ContaReceber.tenant_id == tenant_id,
+            FormaPagamento.tenant_id == tenant_id,
+            FormaPagamento.tipo == "crediario",
+            ContaReceber.status.in_(("pendente", "parcial", "vencido", "vencida")),
+        )
+        .order_by(ContaReceber.data_vencimento.asc())
+        .all()
+    )
+    hoje = date.today()
+    config_encargos = carregar_config_encargos(db, tenant_id)
+    parcelas_crediario = []
+    for conta in contas_crediario:
+        calculo = calcular_encargos_automaticos(conta, hoje, config_encargos)
+        saldo = float(calculo["saldo_atualizado"])
+        if saldo <= 0.009:
+            continue
+        parcelas_crediario.append(
+            {
+                "id": conta.id,
+                "venda_id": conta.venda_id,
+                "descricao": conta.descricao,
+                "numero_parcela": conta.numero_parcela,
+                "total_parcelas": conta.total_parcelas,
+                "data_vencimento": conta.data_vencimento.isoformat(),
+                "saldo_atualizado": saldo,
+                "vencida": conta.data_vencimento < hoje,
+            }
+        )
+
+    total_crediario = round(
+        sum(parcela["saldo_atualizado"] for parcela in parcelas_crediario), 2
+    )
+    total_crediario_vencido = round(
+        sum(
+            parcela["saldo_atualizado"]
+            for parcela in parcelas_crediario
+            if parcela["vencida"]
+        ),
+        2,
+    )
+
     return {
         "cliente_id": cliente.id,
         "cliente_nome": cliente.nome,
@@ -263,18 +324,31 @@ async def get_vendas_em_aberto(
             "valor_pago": round(valor_pago, 2),
             "saldo_pendente": round(saldo_pendente, 2),
             "total_em_aberto": round(saldo_pendente, 2),  # Compatibilidade com frontend
+            "total_parcelas_crediario": len(parcelas_crediario),
+            "total_crediario_em_aberto": total_crediario,
+            "total_crediario_vencido": total_crediario_vencido,
         },
+        "resumo_crediario": {
+            "total_parcelas": len(parcelas_crediario),
+            "total_em_aberto": total_crediario,
+            "total_vencido": total_crediario_vencido,
+        },
+        "parcelas_crediario": parcelas_crediario,
         "vendas": [
             {
                 "id": v.id,
                 "numero_venda": v.numero_venda,  # Número formatado da venda (ex: 202601190004)
-                "data_venda": v.data_venda.isoformat()
-                if hasattr(v.data_venda, "isoformat")
-                else str(v.data_venda),
+                "data_venda": (
+                    v.data_venda.isoformat()
+                    if hasattr(v.data_venda, "isoformat")
+                    else str(v.data_venda)
+                ),
                 "total": float(v.total or 0),
-                "total_pago": sum(float(pag.valor or 0) for pag in v.pagamentos)
-                if hasattr(v, "pagamentos") and v.pagamentos
-                else 0,
+                "total_pago": (
+                    sum(float(pag.valor or 0) for pag in v.pagamentos)
+                    if hasattr(v, "pagamentos") and v.pagamentos
+                    else 0
+                ),
                 "saldo_devedor": float(v.total or 0)
                 - (
                     sum(float(pag.valor or 0) for pag in v.pagamentos)
@@ -364,9 +438,9 @@ async def get_cliente_historico(
                     "venda_id": venda.id,
                     "numero_venda": venda.numero_venda,
                     "subtotal": float(venda.subtotal),
-                    "desconto": float(venda.desconto_valor)
-                    if venda.desconto_valor
-                    else 0,
+                    "desconto": (
+                        float(venda.desconto_valor) if venda.desconto_valor else 0
+                    ),
                     "total": float(venda.total),
                     "status": venda.status,
                     "canal": venda.canal,
@@ -389,9 +463,9 @@ async def get_cliente_historico(
         historico.append(
             {
                 "tipo": "devolucao",
-                "data": devolucao.data_venda.isoformat()
-                if devolucao.data_venda
-                else None,
+                "data": (
+                    devolucao.data_venda.isoformat() if devolucao.data_venda else None
+                ),
                 "descricao": f"Devolução - Venda #{devolucao.numero_venda}",
                 "valor": -float(devolucao.total),
                 "status": devolucao.status,
@@ -423,9 +497,11 @@ async def get_cliente_historico(
                 "valor": float(conta.valor_original),
                 "status": conta.status,
                 "detalhes": {
-                    "vencimento": conta.data_vencimento.isoformat()
-                    if conta.data_vencimento
-                    else None,
+                    "vencimento": (
+                        conta.data_vencimento.isoformat()
+                        if conta.data_vencimento
+                        else None
+                    ),
                     "valor_original": float(conta.valor_original),
                     "valor_recebido": valor_recebido,
                     "valor_pendente": valor_pendente,
@@ -449,17 +525,17 @@ async def get_cliente_historico(
         historico.append(
             {
                 "tipo": "recebimento",
-                "data": rec.data_recebimento.isoformat()
-                if rec.data_recebimento
-                else None,
+                "data": (
+                    rec.data_recebimento.isoformat() if rec.data_recebimento else None
+                ),
                 "descricao": f"Recebimento - {rec.conta.descricao if rec.conta else 'Conta'}",
                 "valor": float(rec.valor_recebido),
                 "status": "efetivado",
                 "detalhes": {
                     "valor": float(rec.valor_recebido),
-                    "forma_pagamento": rec.forma_pagamento.nome
-                    if rec.forma_pagamento
-                    else None,
+                    "forma_pagamento": (
+                        rec.forma_pagamento.nome if rec.forma_pagamento else None
+                    ),
                     "observacoes": rec.observacoes,
                 },
             }

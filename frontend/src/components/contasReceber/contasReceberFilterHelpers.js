@@ -12,11 +12,33 @@ export function criarFiltrosPadraoContasReceber() {
 export function criarFiltrosContasReceberDaUrl(searchParams) {
   const filtros = criarFiltrosPadraoContasReceber();
   const filtro = searchParams?.get?.("filtro");
+  const clienteId = searchParams?.get?.("cliente_id");
 
   if (filtro === "em_aberto") filtros.status = "em_aberto";
   if (filtro === "vencidas") filtros.apenas_vencidas = true;
+  if (clienteId && /^\d+$/.test(clienteId)) filtros.cliente_id = clienteId;
 
   return filtros;
+}
+
+export function normalizarListaClientes(payload) {
+  if (Array.isArray(payload)) return payload;
+  if (Array.isArray(payload?.items)) return payload.items;
+  if (Array.isArray(payload?.clientes)) return payload.clientes;
+  return [];
+}
+
+export function aplicarPeriodoRapidoContasReceber(filtros, periodo) {
+  const novosFiltros = {
+    ...filtros,
+    data_inicio: "",
+    data_fim: "",
+    apenas_vencidas: false,
+    apenas_vencer: false,
+  };
+  if (periodo === "vencidas") novosFiltros.apenas_vencidas = true;
+  if (periodo === "a_vencer") novosFiltros.apenas_vencer = true;
+  return novosFiltros;
 }
 
 export function montarParamsFiltrosContasReceber(filtros = {}, numeroVenda = "") {

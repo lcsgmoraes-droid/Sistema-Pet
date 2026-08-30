@@ -229,19 +229,33 @@ const ClientesNovoFinanceiroStep = ({
                   </div>
                 )}
 
-                <button
-                  type="button"
-                  onClick={() => navigate(`/clientes/${editingCliente.id}/financeiro`)}
-                  className="w-full py-3 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white rounded-lg transition-all flex items-center justify-center gap-2 font-semibold shadow-md"
-                >
-                  <FiCreditCard />
-                  Ver historico financeiro completo
-                  {resumoFinanceiro && (
-                    <span className="text-xs bg-white bg-opacity-20 px-2 py-1 rounded">
-                      {resumoFinanceiro.total_transacoes_historico || 0} transacoes
-                    </span>
-                  )}
-                </button>
+                <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                  <button
+                    type="button"
+                    onClick={() => navigate(`/clientes/${editingCliente.id}/financeiro`)}
+                    className="w-full py-3 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white rounded-lg transition-all flex items-center justify-center gap-2 font-semibold shadow-md"
+                  >
+                    <FiCreditCard />
+                    Ver historico financeiro completo
+                    {resumoFinanceiro && (
+                      <span className="text-xs bg-white bg-opacity-20 px-2 py-1 rounded">
+                        {resumoFinanceiro.total_transacoes_historico || 0} transacoes
+                      </span>
+                    )}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      navigate(
+                        `/financeiro/contas-receber?cliente_id=${editingCliente.id}&filtro=em_aberto&periodo=todos`,
+                      )
+                    }
+                    className="flex w-full items-center justify-center gap-2 rounded-lg border-2 border-blue-600 bg-white py-3 font-semibold text-blue-700 shadow-sm transition-colors hover:bg-blue-50"
+                  >
+                    <FiDollarSign />
+                    Ver parcelas em aberto
+                  </button>
+                </div>
               </>
             )}
           </div>
