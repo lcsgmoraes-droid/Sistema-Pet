@@ -75,7 +75,7 @@ const ContasReceber = () => {
   const [abaAtivaContasReceber, setAbaAtivaContasReceber] = useState("lancamentos");
   const [filtros, setFiltros] = useState(() => criarFiltrosContasReceberDaUrl(searchParams));
 
-  const [buscaNumeroVenda, setBuscaNumeroVenda] = useState("");
+  const [busca, setBusca] = useState("");
   const [ordenacao, setOrdenacao] = useState("desc"); // 'asc' = mais antiga primeiro, 'desc' = mais nova primeiro
 
   const [clientes, setClientes] = useState([]);
@@ -123,18 +123,18 @@ const ContasReceber = () => {
     }));
   };
 
-  // Aplicar filtro automaticamente quando buscaNumeroVenda mudar
+  // Aplicar a busca automaticamente depois que o usuario parar de digitar.
   useEffect(() => {
-    if (buscaNumeroVenda.trim().length > 0) {
+    if (busca.trim().length > 0) {
       const timer = setTimeout(() => {
         aplicarFiltros();
       }, 500); // Debounce de 500ms
       return () => clearTimeout(timer);
-    } else if (buscaNumeroVenda === "") {
+    } else if (busca === "") {
       // Se limpar o campo, recarregar tudo
       carregarDados();
     }
-  }, [buscaNumeroVenda]);
+  }, [busca]);
 
   const carregarDados = async () => {
     try {
@@ -178,7 +178,7 @@ const ContasReceber = () => {
 
   const carregarContasComFiltros = async (
     filtrosParaAplicar = filtros,
-    buscaParaAplicar = buscaNumeroVenda,
+    buscaParaAplicar = busca,
   ) => {
     try {
       setLoading(true);
@@ -196,12 +196,12 @@ const ContasReceber = () => {
     }
   };
 
-  const aplicarFiltros = async () => carregarContasComFiltros(filtros, buscaNumeroVenda);
+  const aplicarFiltros = async () => carregarContasComFiltros(filtros, busca);
 
   const aplicarPeriodoRapido = (periodo) => {
     const novosFiltros = aplicarPeriodoRapidoContasReceber(filtros, periodo);
     setFiltros(novosFiltros);
-    void carregarContasComFiltros(novosFiltros, buscaNumeroVenda);
+    void carregarContasComFiltros(novosFiltros, busca);
   };
 
   const abrirListaComFiltrosAnalise = (filtrosAnalise = {}) => {
@@ -230,7 +230,7 @@ const ContasReceber = () => {
 
     setFiltros(novosFiltros);
     setAbaAtivaContasReceber("lancamentos");
-    void carregarContasComFiltros(novosFiltros, buscaNumeroVenda);
+    void carregarContasComFiltros(novosFiltros, busca);
   };
 
   const abrirVendaNoPDV = (vendaId) => {
@@ -365,15 +365,7 @@ const ContasReceber = () => {
     }
   };
 
-  const contasReceberExibidas = safeArray(contas).filter((conta) => {
-    if (!buscaNumeroVenda) return true;
-
-    const numeroVenda = String(conta.numero_venda || "");
-    const descricao = String(conta.descricao || "");
-    const busca = buscaNumeroVenda.toLowerCase();
-
-    return numeroVenda.toLowerCase().includes(busca) || descricao.toLowerCase().includes(busca);
-  });
+  const contasReceberExibidas = safeArray(contas);
 
   const contasAbertasExibidas = contasReceberExibidas.filter(
     (conta) => conta.status !== "recebido" && !ehLancamentoFinanceiroCancelado(conta),
@@ -694,11 +686,11 @@ const ContasReceber = () => {
           <ContasReceberFilters
             aplicarFiltros={aplicarFiltros}
             aplicarPeriodoRapido={aplicarPeriodoRapido}
-            buscaNumeroVenda={buscaNumeroVenda}
+            busca={busca}
             clientes={clientes}
             filtros={filtros}
             handleFiltrosSubmit={handleFiltrosSubmit}
-            setBuscaNumeroVenda={setBuscaNumeroVenda}
+            setBusca={setBusca}
             setFiltros={setFiltros}
           />
           {/* Tabela de Contas */}

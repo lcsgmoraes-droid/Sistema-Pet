@@ -11,11 +11,11 @@ import StatusBadge from "../ui/StatusBadge";
 export function ContasReceberFilters({
   aplicarFiltros,
   aplicarPeriodoRapido,
-  buscaNumeroVenda,
+  busca,
   clientes,
   filtros,
   handleFiltrosSubmit,
-  setBuscaNumeroVenda,
+  setBusca,
   setFiltros,
 }) {
   return (
@@ -52,20 +52,16 @@ export function ContasReceberFilters({
           </ActionButton>
         </div>
 
-        {/* Campo de busca por numero de venda */}
+        {/* Busca geral das contas e da pessoa vinculada */}
         <div className="mb-4">
-          <label className="block text-sm font-medium mb-1">Buscar por Numero da Venda</label>
+          <label className="block text-sm font-medium mb-1">Buscar conta ou pessoa</label>
           <input
             type="text"
-            placeholder="Digite o numero da venda (ex: 202601100003) e pressione Enter"
+            placeholder="Nome, telefone, codigo da pessoa, venda ou documento"
             className="w-full border border-gray-300 rounded px-3 py-2"
-            value={buscaNumeroVenda}
-            onChange={(e) => {
-              // Remove # automaticamente
-              const valor = e.target.value.replace("#", "");
-              setBuscaNumeroVenda(valor);
-            }}
-            onKeyPress={(e) => {
+            value={busca}
+            onChange={(e) => setBusca(e.target.value)}
+            onKeyDown={(e) => {
               if (e.key === "Enter") {
                 aplicarFiltros();
               }
