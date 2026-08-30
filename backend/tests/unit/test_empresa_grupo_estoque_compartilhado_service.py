@@ -246,12 +246,8 @@ def test_acesso_completo_ao_catalogo_e_independente_do_uso_do_saldo(db):
         )
 
     with tenant_context(CONSUMIDORA):
-        catalogo = service.resolver_produto_catalogo(
-            session, CONSUMIDORA, produto.id
-        )
-        mapa = service.mapa_catalogo_completo_para_consumidora(
-            session, CONSUMIDORA
-        )
+        catalogo = service.resolver_produto_catalogo(session, CONSUMIDORA, produto.id)
+        mapa = service.mapa_catalogo_completo_para_consumidora(session, CONSUMIDORA)
     assert catalogo.compartilhado is True
     assert catalogo.tenant_origem_id == ORIGEM
     assert mapa[produto.id]["acesso_catalogo_completo"] is True
