@@ -29,6 +29,8 @@ def test_image_import_script_defaults_to_dry_run(monkeypatch, capsys, tmp_path):
     assert payload["dry_run"] is True
     assert payload["imagens_estagiadas"] == 0
     assert payload["imagens_publicadas"] == 0
+    assert payload["candidatos_criados"] == 0
+    assert payload["evidencias_candidato_estagiadas"] == 0
     assert payload["produtos_criados"] == 0
     assert payload["cadastros_de_lojas_alterados"] == 0
 
