@@ -20,6 +20,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
+from sqlalchemy.dialects.postgresql import UUID
 from datetime import datetime
 from app.base_models import BaseTenantModel
 from app.utils.serialization import safe_decimal_to_float, safe_datetime_to_iso
@@ -354,6 +355,15 @@ class VendaItem(BaseTenantModel):
     # Produto ou Serviço
     tipo = Column(String(20), nullable=False)  # produto, servico
     produto_id = Column(Integer, ForeignKey("produtos.id"), nullable=True)
+    estoque_origem_tenant_id = Column(
+        UUID(as_uuid=True), ForeignKey("tenants.id", ondelete="RESTRICT"), nullable=True
+    )
+    estoque_compartilhado_id = Column(
+        Integer,
+        ForeignKey("empresa_grupo_estoques_compartilhados.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    estoque_origem_nome = Column(String(150), nullable=True)
 
     # ========== SPRINT 2: SUPORTE A VARIAÇÕES ==========
     # CORRIGIDO: Não existe tabela product_variations separada
@@ -402,6 +412,14 @@ class VendaItem(BaseTenantModel):
             "id": self.id,
             "tipo": self.tipo,
             "produto_id": self.produto_id,
+            "estoque_compartilhado": bool(self.estoque_origem_tenant_id),
+            "estoque_origem_tenant_id": (
+                str(self.estoque_origem_tenant_id)
+                if self.estoque_origem_tenant_id
+                else None
+            ),
+            "estoque_compartilhado_id": self.estoque_compartilhado_id,
+            "estoque_origem_nome": self.estoque_origem_nome,
             "produto_nome": self.produto.nome
             if self.produto
             else self.servico_descricao,

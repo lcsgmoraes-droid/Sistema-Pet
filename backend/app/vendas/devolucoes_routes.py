@@ -13,6 +13,10 @@ from app.audit_log import log_action
 from app.auth.dependencies import get_current_user_and_tenant
 from app.caixa.service import CaixaService
 from app.db import get_session
+from app.empresa_grupo_estoque_compartilhado_service import (
+    contexto_tenant_estoque,
+    resolver_tenant_estoque_item,
+)
 from app.estoque.service import EstoqueService
 from app.produtos_models import EstoqueMovimentacao
 from app.utils.security_helpers import safe_get_cliente
@@ -151,7 +155,10 @@ def registrar_devolucao(
         vendido_por_produto = defaultdict(float)
         for item_venda in db.query(VendaItem).filter_by(venda_id=venda_id).all():
             if item_venda.produto_id:
-                vendido_por_produto[item_venda.produto_id] += float(
+                origem, _compartilhado = resolver_tenant_estoque_item(
+                    item_venda, tenant_id
+                )
+                vendido_por_produto[(item_venda.produto_id, origem)] += float(
                     item_venda.quantidade or 0
                 )
 
@@ -168,24 +175,35 @@ def registrar_devolucao(
                     ),
                 )
             if item_venda.produto_id:
-                solicitado_por_produto[item_venda.produto_id] += quantidade_devolvida
-
-        for produto_id, quantidade_solicitada in solicitado_por_produto.items():
-            quantidade_ja_devolvida = float(
-                db.query(func.coalesce(func.sum(EstoqueMovimentacao.quantidade), 0))
-                .filter(
-                    EstoqueMovimentacao.tenant_id == tenant_id,
-                    EstoqueMovimentacao.produto_id == produto_id,
-                    EstoqueMovimentacao.referencia_tipo == "venda",
-                    EstoqueMovimentacao.referencia_id == venda_id,
-                    EstoqueMovimentacao.motivo == "devolucao",
-                    EstoqueMovimentacao.status != "cancelado",
+                origem, _compartilhado = resolver_tenant_estoque_item(
+                    item_venda, tenant_id
                 )
-                .scalar()
-                or 0
-            )
+                solicitado_por_produto[(item_venda.produto_id, origem)] += (
+                    quantidade_devolvida
+                )
+
+        for (
+            produto_id,
+            tenant_estoque,
+        ), quantidade_solicitada in solicitado_por_produto.items():
+            with contexto_tenant_estoque(
+                tenant_estoque, tenant_id
+            ) as tenant_estoque_uuid:
+                quantidade_ja_devolvida = float(
+                    db.query(func.coalesce(func.sum(EstoqueMovimentacao.quantidade), 0))
+                    .filter(
+                        EstoqueMovimentacao.tenant_id == tenant_estoque_uuid,
+                        EstoqueMovimentacao.produto_id == produto_id,
+                        EstoqueMovimentacao.referencia_tipo == "venda",
+                        EstoqueMovimentacao.referencia_id == venda_id,
+                        EstoqueMovimentacao.motivo == "devolucao",
+                        EstoqueMovimentacao.status != "cancelado",
+                    )
+                    .scalar()
+                    or 0
+                )
             _validar_saldo_devolucao(
-                vendido_por_produto[produto_id],
+                vendido_por_produto[(produto_id, tenant_estoque)],
                 quantidade_ja_devolvida,
                 quantidade_solicitada,
             )
@@ -281,18 +299,28 @@ def registrar_devolucao(
                 # Devolver ao estoque
                 if item_venda.produto_id:
                     try:
-                        EstoqueService.estornar_estoque(
-                            produto_id=item_venda.produto_id,
-                            quantidade=quantidade_devolvida,
-                            motivo="devolucao",
-                            referencia_id=venda_id,
-                            referencia_tipo="venda",
-                            user_id=current_user.id,
-                            tenant_id=tenant_id,
-                            db=db,
-                            documento=None,
-                            observacao=motivo,
+                        tenant_estoque, compartilhado = resolver_tenant_estoque_item(
+                            item_venda, tenant_id
                         )
+                        with contexto_tenant_estoque(
+                            tenant_estoque, tenant_id
+                        ) as tenant_estoque_uuid:
+                            EstoqueService.estornar_estoque(
+                                produto_id=item_venda.produto_id,
+                                quantidade=quantidade_devolvida,
+                                motivo="devolucao",
+                                referencia_id=venda_id,
+                                referencia_tipo="venda",
+                                user_id=0 if compartilhado else current_user.id,
+                                tenant_id=tenant_estoque_uuid,
+                                db=db,
+                                documento=None,
+                                observacao=(
+                                    f"{motivo}. Venda originada no tenant {tenant_id}."
+                                    if compartilhado
+                                    else motivo
+                                ),
+                            )
                         # Registrar auditoria
                         log_action(
                             db=db,

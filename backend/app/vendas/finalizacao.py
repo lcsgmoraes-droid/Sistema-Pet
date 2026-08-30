@@ -333,61 +333,66 @@ def finalizar_venda(
 
         for item in venda.itens:
             if item.tipo == "produto":
-                # Determinar se é produto simples ou variação
+                from app.produtos_models import Produto
+                from app.empresa_grupo_estoque_compartilhado_service import (
+                    contexto_tenant_estoque,
+                    resolver_tenant_estoque_item,
+                )
+
                 produto_id = item.produto_id
                 product_variation_id = item.product_variation_id
+                tenant_estoque, compartilhado = resolver_tenant_estoque_item(
+                    item, tenant_id
+                )
 
-                # Buscar produto (simples ou da variação)
-                from app.produtos_models import Produto
-
-                if product_variation_id:
-                    # Item com variação: buscar o produto da variação
-                    variacao = (
-                        db.query(Produto)
-                        .filter(
-                            Produto.id == product_variation_id,
-                            Produto.tipo_produto == "VARIACAO",
+                with contexto_tenant_estoque(
+                    tenant_estoque, tenant_id
+                ) as tenant_estoque_uuid:
+                    if product_variation_id:
+                        variacao = (
+                            db.query(Produto)
+                            .filter(
+                                Produto.id == product_variation_id,
+                                Produto.tipo_produto == "VARIACAO",
+                            )
+                            .first()
                         )
-                        .first()
-                    )
-
-                    if not variacao:
-                        raise ValueError(
-                            f"Variação ID {product_variation_id} não encontrada"
+                        if not variacao:
+                            raise ValueError(
+                                f"Variação ID {product_variation_id} não encontrada"
+                            )
+                        produto = variacao
+                    elif produto_id:
+                        produto = (
+                            db.query(Produto)
+                            .filter(
+                                Produto.id == produto_id,
+                                Produto.tenant_id == tenant_estoque_uuid,
+                            )
+                            .first()
                         )
+                        if not produto:
+                            raise ValueError(f"Produto ID {produto_id} não encontrado")
+                    else:
+                        continue
 
-                    produto = variacao
-                elif produto_id:
-                    # Item com produto simples
-                    produto = (
-                        db.query(Produto)
-                        .filter(
-                            Produto.id == produto_id, Produto.tenant_id == tenant_id
+                    if deve_baixar_estoque:
+                        resultados = processar_baixa_estoque_item(
+                            produto=produto,
+                            quantidade_vendida=float(item.quantidade),
+                            venda_id=venda.id,
+                            user_id=0 if compartilhado else user_id,
+                            tenant_id=tenant_estoque_uuid,
+                            db=db,
+                            product_variation_id=product_variation_id,
+                            venda_codigo=venda.numero_venda,
+                            observacao=(
+                                f"Venda em estoque compartilhado pelo tenant {tenant_id}"
+                                if compartilhado
+                                else None
+                            ),
                         )
-                        .first()
-                    )
-
-                    if not produto:
-                        raise ValueError(f"Produto ID {produto_id} não encontrado")
-                else:
-                    continue  # Item sem produto (serviço)
-
-                # 🎯 Só baixar se deve_baixar_estoque=True
-                if deve_baixar_estoque:
-                    # Baixar estoque conforme tipo do produto
-                    resultados = processar_baixa_estoque_item(
-                        produto=produto,
-                        quantidade_vendida=float(item.quantidade),
-                        venda_id=venda.id,
-                        user_id=user_id,
-                        tenant_id=tenant_id,
-                        db=db,
-                        product_variation_id=product_variation_id,
-                        venda_codigo=venda.numero_venda,
-                    )
-
-                    # Acumular resultados
-                    estoque_baixado.extend(resultados)
+                        estoque_baixado.extend(resultados)
 
         # ============================================================
         # ETAPA 5: VINCULAR AO CAIXA

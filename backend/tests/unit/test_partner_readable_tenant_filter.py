@@ -51,6 +51,19 @@ def test_partner_readable_models_compile_with_partner_tenant_subquery():
         assert "vet_tenant_id" in compiled
 
 
+def test_product_filter_requires_explicit_active_group_stock_share():
+    from app.produtos_models import Produto
+
+    compiled = _compiled_filter_for(Produto)
+
+    assert "empresa_grupo_estoques_compartilhados" in compiled
+    assert "empresa_grupos" in compiled
+    assert "empresa_grupo_membros" in compiled
+    assert "produto_origem_id = produtos.id" in compiled
+    assert "empresa_consumidora_id" in compiled
+    assert compiled.count("status =") >= 3
+
+
 def test_global_user_identity_accepts_active_membership_in_current_tenant():
     from app.models import User
 

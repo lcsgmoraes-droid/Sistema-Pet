@@ -471,6 +471,10 @@ class ProdutoResponse(ProdutoBase):
     sucessor_nome: Optional[str] = None  # Nome do sucessor (se existir)
     # Campo de parceria (True = pertence ao tenant parceiro)
     de_parceiro: bool = False
+    estoque_compartilhado: bool = False
+    estoque_compartilhado_id: Optional[int] = None
+    estoque_origem_empresa_id: Optional[str] = None
+    estoque_origem_nome: Optional[str] = None
     # Preco efetivo para PDV/loja fisica quando houver promocao ERP ativa
     preco_venda_original: Optional[float] = None
     preco_venda_pdv: Optional[float] = None

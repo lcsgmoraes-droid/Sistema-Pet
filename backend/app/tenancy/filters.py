@@ -12,7 +12,7 @@ WHITELIST:
 - Tabelas que NÃO herdam de BaseTenantModel naturalmente (Tenant, Permission, UserSession)
 """
 
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, aliased
 from sqlalchemy import event, or_, select
 from sqlalchemy.orm import with_loader_criteria
 import logging
@@ -99,7 +99,53 @@ def _tenant_read_filter(cls, tenant_id):
         VetPartnerLink.vet_tenant_id == tenant_id,
         VetPartnerLink.ativo.is_(True),
     )
-    return or_(cls.tenant_id == tenant_id, cls.tenant_id.in_(partner_tenant_ids))
+    criterios = [cls.tenant_id == tenant_id, cls.tenant_id.in_(partner_tenant_ids)]
+    if table_name == "produtos":
+        from app.empresa_grupo_models import (
+            EmpresaGrupo,
+            EmpresaGrupoEstoqueCompartilhado,
+            EmpresaGrupoMembro,
+        )
+
+        membro_origem = aliased(EmpresaGrupoMembro)
+        membro_consumidora = aliased(EmpresaGrupoMembro)
+        compartilhamento_ativo = (
+            select(EmpresaGrupoEstoqueCompartilhado.id)
+            .join(
+                EmpresaGrupo,
+                EmpresaGrupo.id == EmpresaGrupoEstoqueCompartilhado.grupo_id,
+            )
+            .join(
+                membro_origem,
+                (membro_origem.grupo_id == EmpresaGrupoEstoqueCompartilhado.grupo_id)
+                & (
+                    membro_origem.empresa_id
+                    == EmpresaGrupoEstoqueCompartilhado.empresa_origem_id
+                ),
+            )
+            .join(
+                membro_consumidora,
+                (
+                    membro_consumidora.grupo_id
+                    == EmpresaGrupoEstoqueCompartilhado.grupo_id
+                )
+                & (
+                    membro_consumidora.empresa_id
+                    == EmpresaGrupoEstoqueCompartilhado.empresa_consumidora_id
+                ),
+            )
+            .where(
+                EmpresaGrupoEstoqueCompartilhado.produto_origem_id == cls.id,
+                EmpresaGrupoEstoqueCompartilhado.empresa_origem_id == cls.tenant_id,
+                EmpresaGrupoEstoqueCompartilhado.empresa_consumidora_id == tenant_id,
+                EmpresaGrupoEstoqueCompartilhado.status == "ativo",
+                EmpresaGrupo.status == "ativo",
+                membro_origem.status == "ativo",
+                membro_consumidora.status == "ativo",
+            )
+        )
+        criterios.append(compartilhamento_ativo.exists())
+    return or_(*criterios)
 
 
 def _supports_partner_read_filter(session) -> bool:

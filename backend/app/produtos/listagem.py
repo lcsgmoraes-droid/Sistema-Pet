@@ -7,7 +7,8 @@ from typing import Any, List, Optional
 
 from fastapi import HTTPException
 from sqlalchemy import and_, func, or_
-from sqlalchemy.orm import Session, joinedload, noload
+from sqlalchemy import select
+from sqlalchemy.orm import Session, aliased, joinedload, noload
 
 from app.models import Cliente, FornecedorGrupo
 from app.partner_utils import is_partner_owned
@@ -61,8 +62,49 @@ def _montar_query_produtos_vendaveis(
     termo_busca: Optional[str],
     contar_total: bool,
 ) -> Any:
+    from app.empresa_grupo_models import (
+        EmpresaGrupo,
+        EmpresaGrupoEstoqueCompartilhado,
+        EmpresaGrupoMembro,
+    )
+
+    membro_origem = aliased(EmpresaGrupoMembro)
+    membro_consumidora = aliased(EmpresaGrupoMembro)
+    produtos_compartilhados = (
+        select(EmpresaGrupoEstoqueCompartilhado.produto_origem_id)
+        .join(
+            EmpresaGrupo,
+            EmpresaGrupo.id == EmpresaGrupoEstoqueCompartilhado.grupo_id,
+        )
+        .join(
+            membro_origem,
+            (membro_origem.grupo_id == EmpresaGrupoEstoqueCompartilhado.grupo_id)
+            & (
+                membro_origem.empresa_id
+                == EmpresaGrupoEstoqueCompartilhado.empresa_origem_id
+            ),
+        )
+        .join(
+            membro_consumidora,
+            (membro_consumidora.grupo_id == EmpresaGrupoEstoqueCompartilhado.grupo_id)
+            & (
+                membro_consumidora.empresa_id
+                == EmpresaGrupoEstoqueCompartilhado.empresa_consumidora_id
+            ),
+        )
+        .where(
+            EmpresaGrupoEstoqueCompartilhado.empresa_consumidora_id == str(tenant_id),
+            EmpresaGrupoEstoqueCompartilhado.status == "ativo",
+            EmpresaGrupo.status == "ativo",
+            membro_origem.status == "ativo",
+            membro_consumidora.status == "ativo",
+        )
+    )
     query = db.query(Produto).filter(
-        Produto.tenant_id == tenant_id,
+        or_(
+            Produto.tenant_id == tenant_id,
+            Produto.id.in_(produtos_compartilhados),
+        ),
         Produto.ativo.is_(True),
         Produto.tipo_produto.in_(["SIMPLES", "VARIACAO", "KIT"]),
     )
@@ -576,10 +618,12 @@ def _enriquecer_produto_listagem(
     validade_por_produto: dict[int, dict[str, Any]] | None = None,
     incluir_bling_sync: bool = False,
     custos_compostos: dict[int, Decimal] | None = None,
+    estoque_compartilhado_por_produto: dict[int, dict] | None = None,
 ):
     """Padroniza dados de listagem para produtos simples, kits e variacoes-kit."""
     reservas_por_produto = reservas_por_produto or {}
     validade_por_produto = validade_por_produto or {}
+    estoque_compartilhado_por_produto = estoque_compartilhado_por_produto or {}
     tenant_produto = getattr(produto, "tenant_id", tenant_id)
     reservas_mesmo_tenant = str(tenant_produto) == str(tenant_id)
     estoque_reservado = (
@@ -685,6 +729,13 @@ def _enriquecer_produto_listagem(
             0.0,
         )
     produto.de_parceiro = is_partner_owned(tenant_id, produto.tenant_id)
+    compartilhamento = estoque_compartilhado_por_produto.get(int(produto.id), {})
+    produto.estoque_compartilhado = bool(compartilhamento)
+    produto.estoque_compartilhado_id = compartilhamento.get("estoque_compartilhado_id")
+    produto.estoque_origem_empresa_id = compartilhamento.get(
+        "estoque_origem_empresa_id"
+    )
+    produto.estoque_origem_nome = compartilhamento.get("estoque_origem_nome")
     if incluir_bling_sync:
         sync = getattr(produto, "bling_sync", None)
         produto.bling_produto_id = (

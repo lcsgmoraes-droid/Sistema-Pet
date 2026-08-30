@@ -15,6 +15,7 @@ from app.empresa_grupo_models import (
     EmpresaGrupo,
     EmpresaGrupoCodigo,
     EmpresaGrupoConvite,
+    EmpresaGrupoEstoqueCompartilhado,
     EmpresaGrupoMembro,
 )
 from app.models import Tenant
@@ -447,6 +448,26 @@ class EmpresaGrupoService:
             )
         membro.status = "removido"
         membro.removido_em = self.agora
+        compartilhamentos = (
+            self.db.query(EmpresaGrupoEstoqueCompartilhado)
+            .filter(
+                EmpresaGrupoEstoqueCompartilhado.grupo_id == grupo.id,
+                EmpresaGrupoEstoqueCompartilhado.status == "ativo",
+                (
+                    EmpresaGrupoEstoqueCompartilhado.empresa_origem_id
+                    == str(membro_empresa_id)
+                )
+                | (
+                    EmpresaGrupoEstoqueCompartilhado.empresa_consumidora_id
+                    == str(membro_empresa_id)
+                ),
+            )
+            .all()
+        )
+        for compartilhamento in compartilhamentos:
+            compartilhamento.status = "removido"
+            compartilhamento.removido_em = self.agora
+            compartilhamento.atualizado_em = self.agora
         grupo.versao_membros = int(grupo.versao_membros or 1) + 1
         self._auditar(
             empresa_id=empresa_id,
@@ -488,6 +509,7 @@ class EmpresaGrupoService:
             .all()
         )
         return {
+            "empresa_atual_id": empresa_id,
             "codigo_empresa": codigo,
             "convites_pendentes": [
                 self._serializar_convite_recebido(convite, grupo)

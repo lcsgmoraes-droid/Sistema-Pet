@@ -49,6 +49,7 @@ from app.empresa_grupo_models import (
     EmpresaGrupo,
     EmpresaGrupoCodigo,
     EmpresaGrupoConvite,
+    EmpresaGrupoEstoqueCompartilhado,
     EmpresaGrupoMembro,
     EmpresaGrupoTransferencia,
 )

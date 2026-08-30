@@ -79,6 +79,10 @@ def cancelar_venda(
         ContaBancaria,
     )
     from app.audit_log import log_action
+    from app.empresa_grupo_estoque_compartilhado_service import (
+        contexto_tenant_estoque,
+        resolver_tenant_estoque_item,
+    )
     from app.tenancy.context import set_tenant_context
 
     set_tenant_context(
@@ -114,18 +118,28 @@ def cancelar_venda(
         for item in itens:
             if item.produto_id and tipo_controla_estoque(item.tipo):
                 try:
-                    resultado = EstoqueService.estornar_estoque(
-                        produto_id=item.produto_id,
-                        quantidade=item.quantidade,
-                        motivo="cancelamento_venda",
-                        referencia_id=venda_id,
-                        referencia_tipo="venda",
-                        user_id=user_id,
-                        tenant_id=tenant_id,
-                        db=db,
-                        documento=venda.numero_venda,
-                        observacao=f"Cancelamento: {motivo}",
+                    tenant_estoque, compartilhado = resolver_tenant_estoque_item(
+                        item, tenant_id
                     )
+                    with contexto_tenant_estoque(
+                        tenant_estoque, tenant_id
+                    ) as tenant_estoque_uuid:
+                        resultado = EstoqueService.estornar_estoque(
+                            produto_id=item.produto_id,
+                            quantidade=item.quantidade,
+                            motivo="cancelamento_venda",
+                            referencia_id=venda_id,
+                            referencia_tipo="venda",
+                            user_id=0 if compartilhado else user_id,
+                            tenant_id=tenant_estoque_uuid,
+                            db=db,
+                            documento=venda.numero_venda,
+                            observacao=(
+                                f"Cancelamento: {motivo}. Venda originada no tenant {tenant_id}."
+                                if compartilhado
+                                else f"Cancelamento: {motivo}"
+                            ),
+                        )
                     itens_estornados += 1
                     logger.info(
                         f"  ✅ Estoque estornado: {resultado['produto_nome']} "

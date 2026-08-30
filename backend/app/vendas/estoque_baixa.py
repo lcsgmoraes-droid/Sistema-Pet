@@ -24,6 +24,7 @@ def processar_baixa_estoque_item(
     db: Session,
     product_variation_id: int = None,
     venda_codigo: str = None,
+    observacao: str = None,
 ) -> List[Dict[str, Any]]:
     """
     Processa a baixa de estoque de um item de venda.
@@ -90,7 +91,7 @@ def processar_baixa_estoque_item(
             tenant_id=tenant_id,
             db=db,
             documento=venda_codigo,
-            observacao=None,
+            observacao=observacao,
         )
 
         resultados.append(
