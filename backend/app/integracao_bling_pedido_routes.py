@@ -690,8 +690,14 @@ def _bling_webhook_tenant_uuid() -> UUID | None:
         return None
 
 
-def _set_bling_request_tenant(request: Request | None = None) -> UUID | None:
-    tenant_id = _bling_webhook_tenant_uuid()
+def _set_bling_request_tenant(
+    request: Request | None = None,
+    payload: dict | None = None,
+    db: Session | None = None,
+) -> UUID | None:
+    from app.services.bling_tenant_guard import resolver_tenant_bling
+
+    tenant_id = resolver_tenant_bling(payload, db=db)
     if tenant_id:
         set_current_tenant(tenant_id)
         if request is not None:
@@ -707,9 +713,14 @@ async def receber_pedido_bling(
     _signature_verified: None = Depends(require_bling_webhook_signature),
 ):
     """Recebe webhooks do Bling e enfileira o trabalho pesado fora da request."""
-    _set_bling_request_tenant(request)
     body = await request.json()
     body = body if isinstance(body, dict) else {}
+    tenant_id = _set_bling_request_tenant(request, body, db)
+    if not tenant_id:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Empresa do webhook Bling ainda nao vinculada ao CorePet.",
+        )
 
     if not _bling_pedido_webhook_async_enabled():
         return processar_pedido_bling_payload(body, db)

@@ -99,6 +99,9 @@ INTENTIONALLY_GLOBAL_TENANT_TABLES = frozenset(
         # Espelhado na whitelist do ORM e na catraca PostgreSQL sem RLS.
         "ecommerceai_connection_requests",
         "ecommerceai_connections",
+        # Resolve o companyId autenticado do webhook antes de estabelecer o tenant.
+        # A tabela contem apenas company_id e tenant_id; credenciais ficam sob RLS.
+        "bling_company_tenant_links",
     }
 )
 

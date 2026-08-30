@@ -7,8 +7,8 @@ backend. A ativacao/publicacao deve ser feita por um fluxo de curadoria futuro.
 
 from __future__ import annotations
 
-import hashlib
 import csv
+import hashlib
 import re
 import shutil
 import warnings
@@ -19,9 +19,8 @@ from typing import Any, Iterable, Mapping
 from urllib.parse import quote
 
 from PIL import Image, UnidentifiedImageError
-from sqlalchemy import bindparam, text
+from sqlalchemy import JSON, bindparam, text
 
-from app.catalogo_mestre_models import CatalogoMestreImagem
 from app.services.catalogo_mestre_core import INITIAL_CATALOG_TYPES, normalize_gtin
 
 SUPPORTED_IMAGE_SUFFIXES = frozenset({".jpg", ".jpeg", ".png", ".webp"})
@@ -508,7 +507,7 @@ def stage_image_import(
 
     root = _validate_staging_root(staging_dir)
     root.mkdir(parents=True, exist_ok=True)
-    staged = 0
+    insert_rows: list[dict[str, Any]] = []
 
     for item in plan:
         if item.status != READY_STATUS:
@@ -536,22 +535,22 @@ def stage_image_import(
         source_url = (
             f"usuario-ean://{quote(normalized_source_ref, safe='')}/{candidate.sha256}"
         )
-        db.add(
-            CatalogoMestreImagem(
-                produto_id=item.product_id,
-                tipo_origem="fornecida_usuario_ean",
-                url_origem=source_url,
-                arquivo_url=None,
-                hash_arquivo=candidate.sha256,
-                ordem=int(item.order or 0),
-                e_principal=False,
-                gerada_por_ia=False,
-                direitos_uso_status="nao_verificado",
-                status_revisao="pendente",
-                largura=candidate.width,
-                altura=candidate.height,
-                tamanho_bytes=candidate.size_bytes,
-                metadados={
+        insert_rows.append(
+            {
+                "produto_id": item.product_id,
+                "tipo_origem": "fornecida_usuario_ean",
+                "url_origem": source_url,
+                "arquivo_url": None,
+                "hash_arquivo": candidate.sha256,
+                "ordem": int(item.order or 0),
+                "e_principal": False,
+                "gerada_por_ia": False,
+                "direitos_uso_status": "nao_verificado",
+                "status_revisao": "pendente",
+                "largura": candidate.width,
+                "altura": candidate.height,
+                "tamanho_bytes": candidate.size_bytes,
+                "metadados": {
                     "nome_arquivo_original": candidate.filename,
                     "rotulo_arquivo": candidate.label,
                     "source_ref": normalized_source_ref,
@@ -561,10 +560,24 @@ def stage_image_import(
                     ).replace("\\", "/"),
                     "protegida_de_publicacao": True,
                 },
-                ativo=False,
-            )
+                "ativo": False,
+            }
         )
-        staged += 1
-    if staged:
-        db.flush()
-    return staged
+
+    if insert_rows:
+        statement = text(
+            """
+            INSERT INTO catalogo_mestre_imagens (
+                produto_id, tipo_origem, url_origem, arquivo_url, hash_arquivo,
+                ordem, e_principal, gerada_por_ia, direitos_uso_status,
+                status_revisao, largura, altura, tamanho_bytes, metadados, ativo
+            ) VALUES (
+                :produto_id, :tipo_origem, :url_origem, :arquivo_url,
+                :hash_arquivo, :ordem, :e_principal, :gerada_por_ia,
+                :direitos_uso_status, :status_revisao, :largura, :altura,
+                :tamanho_bytes, :metadados, :ativo
+            )
+            """
+        ).bindparams(bindparam("metadados", type_=JSON))
+        db.execute(statement, insert_rows)
+    return len(insert_rows)

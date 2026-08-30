@@ -69,7 +69,8 @@ async def test_testar_conexao_loads_token_control_via_helper(monkeypatch):
     calls: list[Path] = []
 
     class FakeBlingAPI:
-        def listar_naturezas_operacoes(self):
+        def listar_produtos(self, limite):
+            assert limite == 1
             return {"data": [{"id": 1}, {"id": 2}]}
 
     def fake_carregar_controle_token_bling(token_control_file: Path):
@@ -82,12 +83,20 @@ async def test_testar_conexao_loads_token_control_via_helper(monkeypatch):
 
     monkeypatch.setattr(bling_routes, "BlingAPI", FakeBlingAPI)
     monkeypatch.setattr(
+        bling_routes, "get_bling_connection", lambda *_args, **_kwargs: None
+    )
+    monkeypatch.setattr(
+        bling_routes, "tenant_pode_usar_bling_global", lambda _tenant_id: True
+    )
+    monkeypatch.setattr(
         bling_routes,
         "_carregar_controle_token_bling",
         fake_carregar_controle_token_bling,
     )
 
-    response = await bling_routes.testar_conexao()
+    response = await bling_routes.testar_conexao(
+        db=object(), user_and_tenant=(object(), "00000000-0000-0000-0000-000000000001")
+    )
 
     assert calls == [Path("bling_token_control.json")]
     assert response["conectado"] is True
@@ -95,3 +104,54 @@ async def test_testar_conexao_loads_token_control_via_helper(monkeypatch):
     assert response["ultima_renovacao"] == "agora"
     assert response["proxima_renovacao"] == "depois"
     assert response["renovacoes_automaticas"] == 3
+
+
+@pytest.mark.asyncio
+async def test_renovar_token_nao_expoe_tokens_na_resposta(monkeypatch):
+    class FakeBlingAPI:
+        def renovar_access_token(self):
+            return {
+                "access_token": "access-super-secreto",
+                "refresh_token": "refresh-super-secreto",
+                "expires_in": 21600,
+            }
+
+    monkeypatch.setattr(bling_routes, "BlingAPI", FakeBlingAPI)
+    monkeypatch.setattr(
+        bling_routes, "get_bling_connection", lambda *_args, **_kwargs: object()
+    )
+
+    response = await bling_routes.renovar_token(
+        db=object(), user_and_tenant=(object(), "00000000-0000-0000-0000-000000000001")
+    )
+
+    assert response == {
+        "success": True,
+        "message": "Token renovado com sucesso!",
+        "expires_in_hours": 6,
+    }
+
+
+@pytest.mark.asyncio
+async def test_testar_conexao_isola_tenant_sem_bling(monkeypatch):
+    monkeypatch.setattr(
+        bling_routes, "get_bling_connection", lambda *_args, **_kwargs: None
+    )
+    monkeypatch.setattr(
+        bling_routes, "tenant_pode_usar_bling_global", lambda _tenant_id: False
+    )
+    monkeypatch.setattr(
+        bling_routes,
+        "BlingAPI",
+        lambda: (_ for _ in ()).throw(
+            AssertionError("BlingAPI nao deveria usar credencial de outro tenant")
+        ),
+    )
+
+    response = await bling_routes.testar_conexao(
+        db=object(), user_and_tenant=(object(), "00000000-0000-0000-0000-000000000002")
+    )
+
+    assert response["conectado"] is False
+    assert response["status"] == "desconectado"
+    assert response["total_produtos_bling"] == 0

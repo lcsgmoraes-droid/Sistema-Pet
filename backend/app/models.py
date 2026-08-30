@@ -52,6 +52,7 @@ from app.empresa_grupo_models import (
     EmpresaGrupoMembro,
     EmpresaGrupoTransferencia,
 )
+from app.bling_connection_models import BlingCompanyTenantLink, BlingConnection
 from app.models_cadastros import (
     Cliente,
     Especie,

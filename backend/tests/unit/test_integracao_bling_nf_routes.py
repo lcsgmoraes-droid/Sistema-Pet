@@ -1,8 +1,9 @@
 import json
 from types import SimpleNamespace
-from unittest.mock import Mock
+from unittest.mock import AsyncMock, Mock
 
 import pytest
+from fastapi import HTTPException
 
 from app.integracao_bling_nf_routes import (
     _registrar_nf_no_pedido,
@@ -10,6 +11,7 @@ from app.integracao_bling_nf_routes import (
     _localizar_pedido_local_por_numero_loja,
     _remover_nf_do_pedido,
     _nf_webhook_autorizada,
+    receber_nf_bling,
 )
 from app.services.bling_nf_service import (
     processar_nf_autorizada,
@@ -99,6 +101,20 @@ def test_nf_autorizada_baixa_estoque_uma_vez(monkeypatch):
     assert chamadas_baixa[0]["documento"] == "010001"
     assert chamadas_baixa[0]["motivo"] == "venda_bling"
     assert chamadas_baixa[0]["user_id"] == 99
+
+
+@pytest.mark.asyncio
+async def test_webhook_nf_rejeita_empresa_sem_vinculo(monkeypatch):
+    request = SimpleNamespace(json=AsyncMock(return_value={"companyId": "unknown"}))
+    monkeypatch.setattr(
+        "app.integracao_bling_nf_routes._set_bling_request_tenant",
+        lambda *_args, **_kwargs: None,
+    )
+
+    with pytest.raises(HTTPException) as exc_info:
+        await receber_nf_bling(request=request, db=Mock())
+
+    assert getattr(exc_info.value, "status_code", None) == 409
 
 
 def test_nf_autorizada_reaproveita_baixa_legada_e_normaliza_para_nf(monkeypatch):
