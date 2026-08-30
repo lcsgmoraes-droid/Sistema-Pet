@@ -311,6 +311,7 @@ export default function PDVVendasRecentesSidebar({
               </div>
             ) : (
               vendasRecentesVisiveis.map((venda) => {
+                const statusPagamento = venda.status_pagamento || venda.status;
                 const canalInfo = getCanalInfo(venda.canal);
                 const CanalIcon = canalInfo.Icon;
                 const entregaStatus = getEntregaStatusInfo(venda);
@@ -402,7 +403,7 @@ export default function PDVVendasRecentesSidebar({
 
                       <div className="mt-1 flex justify-end">
                         <div className="text-right">
-                          {venda.status === "baixa_parcial" ? (
+                          {["parcial", "baixa_parcial"].includes(statusPagamento) ? (
                             <>
                               <div className="text-[10px] text-gray-500">Pago</div>
                               <div className="text-xs font-semibold text-green-600">
@@ -417,7 +418,7 @@ export default function PDVVendasRecentesSidebar({
                               {formatMoneyBRL(venda.total || 0)}
                             </div>
                           )}
-                          <StatusBadge status={venda.status} size="xs" className="mt-1" />
+                          <StatusBadge status={statusPagamento} size="xs" className="mt-1" />
                         </div>
                       </div>
                     </div>

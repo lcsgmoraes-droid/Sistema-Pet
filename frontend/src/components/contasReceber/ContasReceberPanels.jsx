@@ -344,7 +344,11 @@ export function ContasReceberRecebimentoModal({
                     type="number"
                     className="w-full border border-gray-300 rounded px-3 py-2"
                     step="0.01"
-                    value={dadosRecebimento.valor_juros}
+                    value={
+                      dadosRecebimento.aplicar_encargos_automaticos
+                        ? Number(calculoEncargos?.valor_juros_calculado || 0)
+                        : dadosRecebimento.valor_juros
+                    }
                     disabled={dadosRecebimento.aplicar_encargos_automaticos}
                     onChange={(e) =>
                       setDadosRecebimento({
@@ -361,7 +365,11 @@ export function ContasReceberRecebimentoModal({
                     type="number"
                     className="w-full border border-gray-300 rounded px-3 py-2"
                     step="0.01"
-                    value={dadosRecebimento.valor_multa}
+                    value={
+                      dadosRecebimento.aplicar_encargos_automaticos
+                        ? Number(calculoEncargos?.valor_multa_calculada || 0)
+                        : dadosRecebimento.valor_multa
+                    }
                     disabled={dadosRecebimento.aplicar_encargos_automaticos}
                     onChange={(e) =>
                       setDadosRecebimento({

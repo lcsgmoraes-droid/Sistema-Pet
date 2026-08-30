@@ -170,6 +170,9 @@ export default function HistoricoCliente({ cliente, clienteId, clienteNome, onCl
 
   const getStatusBadge = (status) => {
     const badges = {
+      em_aberto: "bg-blue-100 text-blue-800",
+      pago: "bg-green-100 text-green-800",
+      parcial: "bg-yellow-100 text-yellow-800",
       aberta: "bg-blue-100 text-blue-800",
       finalizada: "bg-green-100 text-green-800",
       baixa_parcial: "bg-yellow-100 text-yellow-800",
@@ -179,6 +182,9 @@ export default function HistoricoCliente({ cliente, clienteId, clienteNome, onCl
       finalizada_devolucao_total: "bg-gray-100 text-gray-800",
     };
     const labels = {
+      em_aberto: "Em aberto",
+      pago: "Pago",
+      parcial: "Parcial",
       aberta: "Aberta",
       finalizada: "Finalizada",
       baixa_parcial: "Baixa Parcial",
@@ -199,7 +205,7 @@ export default function HistoricoCliente({ cliente, clienteId, clienteNome, onCl
   const vendasFiltradas =
     historico?.vendas?.filter((venda) => {
       if (filtroStatus === "todos") return true;
-      return venda.status === filtroStatus;
+      return (venda.status_pagamento || venda.status) === filtroStatus;
     }) || [];
 
   const valorResumo = (valor) => (mostrarResumoGerencial ? valor : "••••");
@@ -329,10 +335,9 @@ export default function HistoricoCliente({ cliente, clienteId, clienteNome, onCl
               className="px-3 py-1 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
             >
               <option value="todos">Todos ({historico.vendas?.length || 0})</option>
-              <option value="aberta">Abertas</option>
-              <option value="finalizada">Finalizadas</option>
-              <option value="baixa_parcial">Baixa Parcial</option>
-              <option value="pendente">Pendentes</option>
+              <option value="em_aberto">Em aberto</option>
+              <option value="parcial">Parcial</option>
+              <option value="pago">Pago</option>
               <option value="cancelada">Canceladas</option>
             </select>
           </div>
@@ -373,7 +378,7 @@ export default function HistoricoCliente({ cliente, clienteId, clienteNome, onCl
                                 <h3 className="text-lg font-semibold text-gray-900">
                                   <SaleReference sale={venda} />
                                 </h3>
-                                {getStatusBadge(venda.status)}
+                                {getStatusBadge(venda.status_pagamento || venda.status)}
                               </div>
 
                               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">

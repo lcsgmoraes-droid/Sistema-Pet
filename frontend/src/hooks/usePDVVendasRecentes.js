@@ -49,12 +49,6 @@ export function usePDVVendasRecentes() {
         delete params.data_inicio;
         delete params.data_fim;
       } else {
-        if (filtroStatus === "pago") {
-          params.status = "finalizada";
-        } else if (filtroStatus === "aberta") {
-          params.status = "aberta";
-        }
-
         if (filtroTemEntrega === true) {
           params.tem_entrega = true;
         }
@@ -62,7 +56,15 @@ export function usePDVVendasRecentes() {
 
       debugLog("📊 Parâmetros de busca de vendas:", params);
       const resultado = await listarVendas(params);
-      setVendasRecentes(resultado.vendas || []);
+      let vendas = resultado.vendas || [];
+      if (filtroStatus === "pago") {
+        vendas = vendas.filter((venda) => venda.status_pagamento === "pago");
+      } else if (filtroStatus === "aberta") {
+        vendas = vendas.filter((venda) =>
+          ["em_aberto", "parcial"].includes(venda.status_pagamento || venda.status),
+        );
+      }
+      setVendasRecentes(vendas);
     } catch (error) {
       console.error("Erro ao carregar vendas:", error);
     } finally {

@@ -192,17 +192,24 @@ class Venda(BaseTenantModel):
     pagamentos = relationship(
         "VendaPagamento", back_populates="venda", cascade="all, delete-orphan"
     )
+    contas_receber = relationship("ContaReceber", viewonly=True, lazy="selectin")
     baixas = relationship(
         "VendaBaixa", back_populates="venda", cascade="all, delete-orphan"
     )
 
     def to_dict(self):
-        # Calcular valor pago
-        valor_pago = (
-            sum(float(pag.valor) for pag in self.pagamentos)
-            if hasattr(self, "pagamentos")
-            else 0
+        from app.vendas.status_pagamento import calcular_resumo_pagamento_venda
+
+        resumo_pagamento = calcular_resumo_pagamento_venda(
+            total=self.total,
+            contas_receber=getattr(self, "contas_receber", None),
+            pagamentos=getattr(self, "pagamentos", None),
         )
+        valor_pago = float(resumo_pagamento["valor_pago"])
+        valor_restante = float(resumo_pagamento["valor_restante"])
+        status_pagamento = resumo_pagamento["status_pagamento"]
+        if str(self.status or "").lower() in {"cancelada", "cancelado"}:
+            status_pagamento = "cancelado"
 
         # Desserializar enderecos_adicionais do cliente
         import json
@@ -258,7 +265,7 @@ class Venda(BaseTenantModel):
                 self.total
             ),  # Alias para compatibilidade
             "valor_pago": valor_pago,
-            "valor_restante": safe_decimal_to_float(self.total) - valor_pago,
+            "valor_restante": valor_restante,
             "tem_entrega": self.tem_entrega,
             "taxa_entrega": safe_decimal_to_float(self.taxa_entrega) or 0,
             "entrega": {
@@ -288,12 +295,9 @@ class Venda(BaseTenantModel):
             if self.tem_entrega
             else None,
             "status": self.status,
+            "status_operacional": self.status,
             "status_entrega": self.status_entrega,
-            "status_pagamento": "pago"
-            if valor_pago >= safe_decimal_to_float(self.total)
-            else "parcial"
-            if valor_pago > 0
-            else "pendente",
+            "status_pagamento": status_pagamento,
             "forma_pagamento": self.pagamentos[0].forma_pagamento
             if (
                 hasattr(self, "pagamentos")

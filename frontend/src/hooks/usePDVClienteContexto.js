@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import api from "../api";
 import { useModulos } from "../contexts/ModulosContext";
+import { copyTextToClipboard } from "../utils/clipboard";
 
 export function usePDVClienteContexto({ vendaAtual, setVendaAtual }) {
   const { moduloAtivo } = useModulos();
@@ -69,11 +70,15 @@ export function usePDVClienteContexto({ vendaAtual, setVendaAtual }) {
     setVendaAtual((prev) => ({ ...prev, pet }));
   };
 
-  const copiarCampoCliente = (valor, campo) => {
+  const copiarCampoCliente = async (valor, campo) => {
     if (!valor) return;
-    navigator.clipboard.writeText(String(valor));
-    setCopiadoClienteCampo(campo);
-    setTimeout(() => setCopiadoClienteCampo(""), 2000);
+    try {
+      await copyTextToClipboard(valor);
+      setCopiadoClienteCampo(campo);
+      setTimeout(() => setCopiadoClienteCampo(""), 2000);
+    } catch (error) {
+      console.error("Erro ao copiar campo do cliente:", error);
+    }
   };
 
   const recarregarVendasEmAbertoClienteAtual = async () => {
