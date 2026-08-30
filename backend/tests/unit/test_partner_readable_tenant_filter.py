@@ -1,7 +1,9 @@
 from pathlib import Path
 from uuid import UUID
 
+from sqlalchemy import select
 from sqlalchemy.dialects import postgresql
+from sqlalchemy.orm import with_loader_criteria
 
 
 APP_DIR = Path(__file__).resolve().parents[2] / "app"
@@ -72,6 +74,30 @@ def test_product_filter_requires_explicit_active_group_stock_share():
     assert "CAST(produtos.tenant_id AS VARCHAR)" in compiled
     assert "replace(" in compiled.lower()
     assert compiled.count("status =") >= 3
+
+
+def test_product_filter_binds_group_consumer_tenant_inside_loader_lambda():
+    from app.base_models import BaseTenantModel
+    from app.produtos_models import Produto
+    from app.tenancy.filters import _tenant_read_filter
+
+    tenant_id = TENANT_ID
+
+    def tenant_filter(model):
+        return _tenant_read_filter(model, tenant_id)
+
+    statement = select(Produto).options(
+        with_loader_criteria(
+            BaseTenantModel,
+            tenant_filter,
+            include_aliases=True,
+            track_closure_variables=False,
+        )
+    )
+    compiled = statement.compile(dialect=postgresql.dialect())
+
+    assert TENANT_ID in compiled.params.values()
+    assert all("PyWrapper" not in str(value) for value in compiled.params.values())
 
 
 def test_global_user_identity_accepts_active_membership_in_current_tenant():
