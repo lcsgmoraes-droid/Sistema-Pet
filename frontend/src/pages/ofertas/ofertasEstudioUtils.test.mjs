@@ -10,6 +10,7 @@ import {
   itensPorPagina,
   layoutJornal,
   montarPayloadPublicacao,
+  obterTituloProdutoArte,
   resumirTextoArte,
 } from "./ofertasEstudioUtils.js";
 
@@ -29,6 +30,35 @@ for (const formato of ["quadrado", "retrato", "story", "a4"]) {
 }
 assert.equal(resumirTextoArte(" Produto   com   espaços ", 40), "Produto com espaços");
 assert.equal(resumirTextoArte("abcdefghij", 6), "abcde…");
+assert.equal(resumirTextoArte("Ração super premium para cães adultos", 25), "Ração super premium…");
+
+const tituloJornalLongo = obterTituloProdutoArte(
+  "SUPLEMENTO ALIMENTAR SUPER PREMIUM PARA CÃES ADULTOS DE RAÇAS GRANDES 15KG",
+  "jornal",
+  "quadrado",
+);
+assert.equal(tituloJornalLongo.linhas, 2);
+assert.equal(tituloJornalLongo.tamanho, "longo");
+assert.ok(tituloJornalLongo.texto.endsWith("…"));
+
+const tituloIndividualLongo = obterTituloProdutoArte(
+  "Antipulgas, carrapatos e vermes para cães adultos de 10,1 a 25kg com três tabletes mastigáveis em embalagem econômica",
+  "individual",
+  "story",
+);
+assert.equal(tituloIndividualLongo.linhas, 3);
+assert.equal(tituloIndividualLongo.tamanho, "longo");
+assert.equal(tituloIndividualLongo.texto.endsWith("…"), false);
+
+const tituloIndividualExtenso = obterTituloProdutoArte(
+  "Ração Super Premium para Cães Adultos de Raças Grandes com Frango, Arroz, Ômega 3 e Controle de Peso - Embalagem Econômica 15kg com Fórmula Especial",
+  "individual",
+  "quadrado",
+);
+assert.equal(tituloIndividualExtenso.tamanho, "longo");
+assert.ok(tituloIndividualExtenso.texto.endsWith("…"));
+assert.equal(tituloIndividualExtenso.texto.endsWith(" Fórm…"), false);
+assert.equal(tituloIndividualExtenso.texto.includes("-…"), false);
 
 const selecionado = criarItemSelecionado(
   {

@@ -124,12 +124,109 @@ export function calcularDimensoesCaptura(formato) {
   };
 }
 
-export function resumirTextoArte(texto, limite) {
-  const valor = String(texto || "")
+function normalizarTextoArte(texto) {
+  return String(texto || "")
     .replace(/\s+/g, " ")
     .trim();
+}
+
+function pesoCaractereArte(caractere) {
+  if (/\s/.test(caractere)) return 0.45;
+  if (/[MW@#%&]/i.test(caractere)) return 1.35;
+  if (/[Iil1.,:'|]/.test(caractere)) return 0.55;
+  if (/[A-Z0-9]/.test(caractere)) return 1.08;
+  return 0.95;
+}
+
+function estimarPesoTextoArte(texto) {
+  return Array.from(texto).reduce((total, caractere) => total + pesoCaractereArte(caractere), 0);
+}
+
+function resumirTextoArtePorPeso(texto, limitePeso) {
+  const valor = normalizarTextoArte(texto);
+  if (!valor || estimarPesoTextoArte(valor) <= limitePeso) return valor;
+
+  const pesoDisponivel = Math.max(1, limitePeso - pesoCaractereArte("…"));
+  let pesoAtual = 0;
+  let indiceFinal = 0;
+  for (const caractere of valor) {
+    const proximoPeso = pesoAtual + pesoCaractereArte(caractere);
+    if (proximoPeso > pesoDisponivel) break;
+    pesoAtual = proximoPeso;
+    indiceFinal += caractere.length;
+  }
+
+  let resumo = valor.slice(0, indiceFinal).trimEnd();
+  const ultimoEspaco = resumo.lastIndexOf(" ");
+  if (ultimoEspaco >= Math.floor(resumo.length * 0.58)) {
+    resumo = resumo.slice(0, ultimoEspaco).trimEnd();
+  }
+  resumo = resumo.replace(/[\s,;:–—-]+$/u, "");
+  return `${resumo || valor.slice(0, 1)}…`;
+}
+
+export function resumirTextoArte(texto, limite) {
+  const valor = normalizarTextoArte(texto);
   if (valor.length <= limite) return valor;
-  return `${valor.slice(0, Math.max(1, limite - 1)).trimEnd()}…`;
+  let resumo = valor.slice(0, Math.max(1, limite - 1)).trimEnd();
+  const ultimoEspaco = resumo.lastIndexOf(" ");
+  if (ultimoEspaco >= Math.floor(resumo.length * 0.58)) {
+    resumo = resumo.slice(0, ultimoEspaco).trimEnd();
+  }
+  resumo = resumo.replace(/[\s,;:–—-]+$/u, "");
+  return `${resumo}…`;
+}
+
+export function obterTituloProdutoArte(texto, tipoArte, formato) {
+  const individual = tipoArte === "individual";
+  const compacto = formato === "quadrado";
+  const perfil = individual
+    ? compacto
+      ? {
+          limitePeso: 100,
+          limiteCurto: 42,
+          limiteMedio: 72,
+          linhas: 3,
+          fontes: {
+            curto: "clamp(18px, 4.1cqw, 29px)",
+            medio: "clamp(16px, 3.45cqw, 25px)",
+            longo: "clamp(15px, 2.85cqw, 21px)",
+          },
+        }
+      : {
+          limitePeso: 115,
+          limiteCurto: 48,
+          limiteMedio: 82,
+          linhas: 3,
+          fontes: {
+            curto: "clamp(19px, 4.6cqw, 34px)",
+            medio: "clamp(18px, 3.9cqw, 29px)",
+            longo: "clamp(17px, 3.2cqw, 23px)",
+          },
+        }
+    : {
+        limitePeso: 70,
+        limiteCurto: 30,
+        limiteMedio: 48,
+        linhas: 2,
+        fontes: {
+          curto: "clamp(10px, 6.4cqw, 16px)",
+          medio: "clamp(9.5px, 5.6cqw, 14px)",
+          longo: "clamp(9px, 4.8cqw, 12px)",
+        },
+      };
+
+  const valor = normalizarTextoArte(texto);
+  const peso = estimarPesoTextoArte(valor);
+  const tamanho =
+    peso <= perfil.limiteCurto ? "curto" : peso <= perfil.limiteMedio ? "medio" : "longo";
+
+  return {
+    texto: resumirTextoArtePorPeso(valor, perfil.limitePeso),
+    linhas: perfil.linhas,
+    fonte: perfil.fontes[tamanho],
+    tamanho,
+  };
 }
 
 export function montarPayloadPublicacao({

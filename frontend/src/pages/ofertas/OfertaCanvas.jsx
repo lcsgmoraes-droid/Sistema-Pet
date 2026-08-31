@@ -6,6 +6,7 @@ import {
   agruparPaginas,
   FORMATOS_OFERTA,
   layoutJornal,
+  obterTituloProdutoArte,
   resumirTextoArte,
 } from "./ofertasEstudioUtils";
 
@@ -69,6 +70,7 @@ function Validade({ item, compacto = false }) {
 
 function JornalCard({ item, tema }) {
   const precoFormatado = formatMoneyBRL(item.preco_arte);
+  const tituloProduto = obterTituloProdutoArte(item.nome, "jornal", "quadrado");
   const fontePreco =
     precoFormatado.length >= 11 ? "clamp(12px, 7.5cqw, 22px)" : "clamp(14px, 10cqw, 28px)";
   return (
@@ -93,10 +95,16 @@ function JornalCard({ item, tema }) {
       </div>
       <h3
         data-oferta-product-title
-        style={{ fontSize: "clamp(10px, 6.4cqw, 16px)", overflowWrap: "break-word" }}
-        className="mt-[2%] h-[2.6em] shrink-0 overflow-hidden font-black leading-[1.12]"
+        data-oferta-title-size={tituloProduto.tamanho}
+        style={{
+          fontSize: tituloProduto.fonte,
+          lineHeight: 1.18,
+          height: `${tituloProduto.linhas * 1.2}em`,
+          overflowWrap: "anywhere",
+        }}
+        className="mt-[2%] w-full shrink-0 font-black"
       >
-        {resumirTextoArte(item.nome, 54)}
+        {tituloProduto.texto}
       </h3>
       <div
         data-oferta-price-row
@@ -205,7 +213,7 @@ function PaginaJornal({ itens, contexto, titulo, periodoLabel, tema, pagina, tot
 
 function PaginaIndividual({ item, contexto, titulo, periodoLabel, tema, formato }) {
   const compacto = formato === "quadrado";
-  const nomeProduto = resumirTextoArte(item.nome, compacto ? 56 : 82);
+  const tituloProduto = obterTituloProdutoArte(item.nome, "individual", formato);
   const precoFormatado = formatMoneyBRL(item.preco_arte);
   const fontePreco =
     precoFormatado.length >= 11
@@ -224,20 +232,23 @@ function PaginaIndividual({ item, contexto, titulo, periodoLabel, tema, formato 
       >
         <div
           data-oferta-image
-          style={{ height: compacto ? "42%" : "48%" }}
+          style={{ height: compacto ? "38%" : "46%" }}
           className="flex w-full shrink-0 items-center justify-center overflow-hidden"
         >
           <ImagemProduto item={item} className="h-full w-full" />
         </div>
         <p
           data-oferta-product-title
+          data-oferta-title-size={tituloProduto.tamanho}
           style={{
-            fontSize: compacto ? "clamp(17px, 3.8cqw, 28px)" : "clamp(18px, 4.5cqw, 34px)",
-            overflowWrap: "break-word",
+            fontSize: tituloProduto.fonte,
+            lineHeight: 1.18,
+            height: `${tituloProduto.linhas * 1.2}em`,
+            overflowWrap: "anywhere",
           }}
-          className="mt-[2.5%] max-w-[94%] shrink-0 font-black leading-[1.14]"
+          className="mt-[2.5%] max-w-[94%] shrink-0 font-black"
         >
-          {nomeProduto}
+          {tituloProduto.texto}
         </p>
         {Number(item.preco_arte) < Number(item.preco_erp) ? (
           <p className="mt-2 text-sm font-bold text-slate-400 line-through">
@@ -251,7 +262,7 @@ function PaginaIndividual({ item, contexto, titulo, periodoLabel, tema, formato 
         >
           {precoFormatado}
         </p>
-        <div className={`${compacto ? "mt-8" : "mt-6"} shrink-0`}>
+        <div className="mt-auto shrink-0 pt-[2%]">
           <Validade item={item} />
         </div>
       </div>
