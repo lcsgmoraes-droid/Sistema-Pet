@@ -4,6 +4,7 @@ import logging
 from typing import Literal, Optional
 
 from fastapi import APIRouter, Depends
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.auth.dependencies import get_current_user_and_tenant
@@ -33,6 +34,24 @@ from app.empresa_grupo_estoque_compartilhado_service import (
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
+
+
+def _desativar_jit_busca_rapida_produtos(
+    db: Session,
+    *,
+    termo_busca: str,
+    contar_total: bool,
+) -> None:
+    """Evita o custo de compilacao JIT por tecla no autocomplete do PDV."""
+    if not termo_busca or contar_total:
+        return
+
+    bind = db.get_bind()
+    if bind.dialect.name == "postgresql":
+        # Com estoque compartilhado, o planner superestima o custo da consulta
+        # e gasta segundos compilando JIT, embora a execucao real leve milissegundos.
+        # SET LOCAL vale somente para a transacao desta requisicao.
+        db.execute(text("SET LOCAL jit = off"))
 
 
 @router.get("/vendaveis", response_model=ProdutosPaginadosResponse)
@@ -66,6 +85,11 @@ def listar_produtos_vendaveis(
         max_page_size=100,
     )
     termo_busca = (busca or "").strip()
+    _desativar_jit_busca_rapida_produtos(
+        db,
+        termo_busca=termo_busca,
+        contar_total=contar_total,
+    )
 
     # QUERY BASE - Produtos vendáveis (incluindo KIT)
     query = _montar_query_produtos_vendaveis(
