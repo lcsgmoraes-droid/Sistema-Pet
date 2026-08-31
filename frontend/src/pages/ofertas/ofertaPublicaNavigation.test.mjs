@@ -26,6 +26,14 @@ assert.match(ecommerce, /objectFit:\s*useExpandedDesktopCanvas\s*\?\s*"contain"/
 assert.match(estudio, /Nova campanha/);
 assert.match(estudio, /Salvar campanha e gerar link/);
 assert.match(estudio, /setSelecionados\(\[\]\)/);
+assert.match(estudio, /formData\.append\("imagem_url", imagemOrigem\)/);
+assert.doesNotMatch(
+  estudio.slice(
+    estudio.indexOf("async function gerarImagemProfissional"),
+    estudio.indexOf("async function salvarImagemGeradaNoProduto"),
+  ),
+  /fetch\(/,
+);
 assert.match(publicacoes, /Campanhas salvas/);
 assert.match(publicacoes, /várias ativas ao mesmo tempo/);
 

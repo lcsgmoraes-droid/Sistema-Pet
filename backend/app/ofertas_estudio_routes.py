@@ -7,6 +7,8 @@ import secrets
 import shutil
 from datetime import datetime, timezone
 from io import BytesIO
+from pathlib import PurePosixPath
+from urllib.parse import urlparse
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
@@ -36,6 +38,7 @@ from app.services.ofertas_estudio_service import (
     serializar_produto_oferta,
     validar_snapshot_publicacao,
 )
+from app.services.product_image_storage import read_product_image_by_public_url
 from app.services.validade_campanha_service import obter_campanha_validade_config
 from app.tenancy.context import tenant_context
 
@@ -117,10 +120,9 @@ def _serializar_publicacao(
     return payload
 
 
-async def _ler_imagem(file: UploadFile) -> bytes:
-    if file.content_type not in ALLOWED_IMAGE_TYPES:
+def _validar_imagem_bytes(content: bytes, content_type: str) -> bytes:
+    if content_type not in ALLOWED_IMAGE_TYPES:
         raise HTTPException(status_code=400, detail="Use imagens JPG, PNG ou WebP.")
-    content = await file.read()
     if not content or len(content) > MAX_IMAGE_BYTES:
         raise HTTPException(
             status_code=400, detail="A imagem deve ter no maximo 15 MB."
@@ -140,6 +142,71 @@ async def _ler_imagem(file: UploadFile) -> bytes:
             status_code=400, detail="O arquivo enviado nao e uma imagem valida."
         ) from exc
     return content
+
+
+async def _ler_imagem(file: UploadFile) -> bytes:
+    content = await file.read()
+    return _validar_imagem_bytes(content, file.content_type or "")
+
+
+def _ler_imagem_ia_do_tenant(produto: Produto, tenant_id, imagem_url: str) -> bytes:
+    parsed = urlparse(imagem_url)
+    tenant_segmento = segmento_tenant_storage(tenant_id)
+    prefixo = f"/uploads/ofertas/{tenant_segmento}/ia/"
+    nome_arquivo = PurePosixPath(parsed.path).name
+    if (
+        parsed.scheme
+        or parsed.netloc
+        or parsed.query
+        or parsed.fragment
+        or not parsed.path.startswith(prefixo)
+        or parsed.path != f"{prefixo}{nome_arquivo}"
+        or not nome_arquivo.startswith(f"produto-{produto.id}-")
+    ):
+        raise HTTPException(
+            status_code=400, detail="A foto escolhida nao pertence ao produto."
+        )
+    caminho = diretorio_storage_tenant(tenant_id, "ia", nome_arquivo)
+    if not caminho.is_file():
+        raise HTTPException(
+            status_code=404, detail="A foto escolhida nao foi encontrada."
+        )
+    return caminho.read_bytes()
+
+
+def _ler_imagem_referencia_produto(
+    produto: Produto,
+    tenant_id,
+    imagem_url: str,
+) -> tuple[bytes, str]:
+    origem = str(imagem_url or "").strip()
+    urls_permitidas = {
+        str(url).strip()
+        for url in [
+            getattr(produto, "imagem_principal", None),
+            *[
+                getattr(imagem, "url", None)
+                for imagem in (getattr(produto, "imagens", None) or [])
+            ],
+        ]
+        if str(url or "").strip()
+    }
+    if origem in urls_permitidas:
+        try:
+            imagem = read_product_image_by_public_url(origem)
+        except FileNotFoundError as exc:
+            raise HTTPException(
+                status_code=404, detail="A foto escolhida nao foi encontrada."
+            ) from exc
+        except (OSError, ValueError) as exc:
+            raise HTTPException(
+                status_code=400,
+                detail="A foto escolhida nao pode ser lida pelo servidor.",
+            ) from exc
+        return imagem.content, imagem.content_type
+
+    content = _ler_imagem_ia_do_tenant(produto, tenant_id, origem)
+    return content, "image/png"
 
 
 @router.get("/contexto")
@@ -210,7 +277,8 @@ async def gerar_imagem(
     estilo: str = Form(default="profissional"),
     orientacao: str = Form(default="quadrada"),
     prompt_usuario: str = Form(default="", max_length=800),
-    file: UploadFile = File(...),
+    imagem_url: str = Form(default="", max_length=2048),
+    file: UploadFile | None = File(default=None),
     db: Session = Depends(get_session),
     user_and_tenant=Depends(get_current_user_and_tenant),
 ):
@@ -233,7 +301,21 @@ async def gerar_imagem(
                 "Configure a integracao da empresa ou a chave do servidor."
             ),
         )
-    content = await _ler_imagem(file)
+    if file is not None:
+        content = await _ler_imagem(file)
+        content_type = file.content_type or "image/png"
+    elif imagem_url.strip():
+        content, content_type = await run_in_threadpool(
+            _ler_imagem_referencia_produto,
+            produto,
+            tenant_id,
+            imagem_url,
+        )
+        content = _validar_imagem_bytes(content, content_type)
+    else:
+        raise HTTPException(
+            status_code=400, detail="Escolha ou envie uma foto real do produto."
+        )
     url = await run_in_threadpool(
         gerar_imagem_profissional,
         api_key=api_key,
@@ -241,7 +323,7 @@ async def gerar_imagem(
         produto_id=produto.id,
         produto_nome=produto.nome,
         file_bytes=content,
-        content_type=file.content_type or "image/png",
+        content_type=content_type,
         estilo=estilo,
         orientacao=orientacao,
         prompt_usuario=prompt_usuario,

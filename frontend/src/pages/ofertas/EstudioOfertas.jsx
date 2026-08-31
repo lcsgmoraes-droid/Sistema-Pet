@@ -288,19 +288,16 @@ export default function EstudioOfertas() {
   async function gerarImagemProfissional(item) {
     setGerandoImagemId(item.produto_id);
     try {
-      const origem = resolveMediaUrl(item.imagem_url_arte || item.imagem_url);
-      if (!origem) throw new Error("Envie primeiro uma foto real do produto.");
-      const imagemResponse = await fetch(origem, { credentials: "include" });
-      if (!imagemResponse.ok) throw new Error("Não foi possível ler a foto escolhida.");
-      const blob = await imagemResponse.blob();
+      const imagemOrigem = item.imagem_url_arte || item.imagem_url;
+      if (!imagemOrigem) throw new Error("Envie primeiro uma foto real do produto.");
       const formData = new FormData();
       formData.append("produto_id", String(item.produto_id));
       formData.append("estilo", config.tema === "natural" ? "natural" : "profissional");
       formData.append("orientacao", config.formato === "quadrado" ? "quadrada" : "vertical");
+      formData.append("imagem_url", imagemOrigem);
       if (item.prompt_criacao?.trim()) {
         formData.append("prompt_usuario", item.prompt_criacao.trim());
       }
-      formData.append("file", blob, "produto.png");
       const { data } = await gerarImagemOferta(formData);
       atualizarItem(item.produto_id, {
         imagem_gerada_url: data.url,

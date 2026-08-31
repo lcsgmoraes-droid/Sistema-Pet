@@ -157,6 +157,43 @@ def test_read_public_s3_product_image_fetches_allowed_key(monkeypatch):
     assert image.last_modified == "Tue, 28 Apr 2026 11:58:04 GMT"
 
 
+def test_read_product_image_by_public_url_uses_configured_s3(monkeypatch):
+    fake_client = _FakeS3Client()
+    monkeypatch.setattr(storage, "_get_s3_client", lambda: fake_client)
+    monkeypatch.setattr(storage.settings, "PRODUCT_IMAGE_STORAGE_BACKEND", "s3")
+    monkeypatch.setattr(
+        storage.settings, "PRODUCT_IMAGE_S3_BUCKET", "petshop-produtos-prod"
+    )
+    monkeypatch.setattr(storage.settings, "PRODUCT_IMAGE_S3_PREFIX", "produtos")
+    monkeypatch.setattr(
+        storage.settings,
+        "PRODUCT_IMAGE_S3_PUBLIC_BASE_URL",
+        "https://img.corepet.com.br",
+    )
+
+    image = storage.read_product_image_by_public_url(
+        "https://img.corepet.com.br/produtos/tenant-1/42/originais/foto.webp"
+    )
+
+    assert image.content == b"imagem-webp"
+    assert fake_client.calls == [
+        ("petshop-produtos-prod", "produtos/tenant-1/42/originais/foto.webp")
+    ]
+
+
+def test_read_product_image_by_public_url_rejects_external_host(monkeypatch):
+    monkeypatch.setattr(
+        storage.settings,
+        "PRODUCT_IMAGE_S3_PUBLIC_BASE_URL",
+        "https://img.corepet.com.br",
+    )
+
+    with pytest.raises(ValueError):
+        storage.read_product_image_by_public_url(
+            "https://exemplo.com/produtos/tenant-1/42/originais/foto.webp"
+        )
+
+
 @pytest.mark.parametrize(
     "storage_key",
     [

@@ -3,8 +3,10 @@ from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 
 import pytest
+from fastapi import HTTPException
 from pydantic import ValidationError
 
+from app import ofertas_estudio_routes
 from app.ofertas_estudio_routes import _serializar_publicacao, _status_publicacao
 from app.ofertas_estudio_schemas import OfertaPublicacaoCreate
 from app.routes.ecommerce_public import _publicacao_habilitada_no_canal
@@ -103,6 +105,42 @@ def test_produto_expoe_galeria_ordenada_sem_duplicar_a_principal():
         "/uploads/produtos/racao.webp",
         "/uploads/produtos/lateral.webp",
     ]
+
+
+def test_geracao_le_imagem_cadastrada_pelo_backend(monkeypatch):
+    produto = _produto(
+        imagem_principal=(
+            "https://img.corepet.com.br/produtos/tenant/10/originais/racao.webp"
+        )
+    )
+    imagem_lida = SimpleNamespace(content=b"imagem-webp", content_type="image/webp")
+    monkeypatch.setattr(
+        ofertas_estudio_routes,
+        "read_product_image_by_public_url",
+        lambda _url: imagem_lida,
+    )
+
+    content, content_type = ofertas_estudio_routes._ler_imagem_referencia_produto(
+        produto,
+        "12345678-1234-5678-1234-567812345678",
+        produto.imagem_principal,
+    )
+
+    assert content == b"imagem-webp"
+    assert content_type == "image/webp"
+
+
+def test_geracao_rejeita_url_que_nao_pertence_ao_produto():
+    produto = _produto()
+
+    with pytest.raises(HTTPException) as exc_info:
+        ofertas_estudio_routes._ler_imagem_referencia_produto(
+            produto,
+            "12345678-1234-5678-1234-567812345678",
+            "https://exemplo.com/imagem-nao-cadastrada.webp",
+        )
+
+    assert getattr(exc_info.value, "status_code", None) == 400
 
 
 def test_prompt_usuario_preserva_identidade_real_do_produto():
