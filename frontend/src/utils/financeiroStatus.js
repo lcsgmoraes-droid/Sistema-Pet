@@ -1,9 +1,18 @@
 const STATUS_CANCELADOS = new Set(["cancelado", "cancelada"]);
+const TIPOS_REPASSE_CARTAO = new Set(["cartao_credito", "cartao_debito"]);
 
 export function ehLancamentoFinanceiroCancelado(contaOuStatus) {
   const status = typeof contaOuStatus === "string" ? contaOuStatus : contaOuStatus?.status;
   return STATUS_CANCELADOS.has(
     String(status || "")
+      .trim()
+      .toLowerCase(),
+  );
+}
+
+export function ehContaDeRepasseCartao(conta) {
+  return TIPOS_REPASSE_CARTAO.has(
+    String(conta?.forma_pagamento_tipo || "")
       .trim()
       .toLowerCase(),
   );
