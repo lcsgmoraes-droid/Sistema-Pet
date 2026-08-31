@@ -693,8 +693,3 @@ def atualizar_produto(
         raise HTTPException(
             status_code=500, detail=f"Erro ao atualizar produto: {str(e)}"
         )
-
-
-# ============================================================================
-# ATUALIZAÇÃO EM LOTE
-# ============================================================================

@@ -323,8 +323,13 @@ export default function useProdutosNovoCarregamento({
         setLotes([]);
       }
 
-      const fornecedoresResponse = await getFornecedoresProduto(id);
-      setFornecedores(fornecedoresResponse.data);
+      try {
+        const fornecedoresResponse = await getFornecedoresProduto(id);
+        setFornecedores(fornecedoresResponse.data || []);
+      } catch (error) {
+        console.error("Erro ao carregar fornecedores:", error);
+        setFornecedores([]);
+      }
 
       await carregarFiscal(produto);
     } catch (error) {

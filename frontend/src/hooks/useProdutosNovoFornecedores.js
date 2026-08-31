@@ -65,7 +65,7 @@ export default function useProdutosNovoFornecedores({ id }) {
       };
 
       if (fornecedorEdit) {
-        await updateFornecedorProduto(fornecedorEdit.id, dados);
+        await updateFornecedorProduto(fornecedorEdit.id, dados, id);
         alert("Fornecedor atualizado!");
       } else {
         await addFornecedorProduto(id, dados);
@@ -86,7 +86,7 @@ export default function useProdutosNovoFornecedores({ id }) {
     }
 
     try {
-      await deleteFornecedorProduto(fornecedorId);
+      await deleteFornecedorProduto(fornecedorId, id);
       await recarregarFornecedores();
       alert("Fornecedor desvinculado!");
     } catch (error) {

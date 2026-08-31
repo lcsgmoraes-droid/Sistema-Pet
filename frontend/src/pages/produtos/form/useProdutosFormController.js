@@ -304,7 +304,7 @@ export function useProdutosFormController() {
   const handleSaveFornecedor = async (dados) => {
     try {
       if (fornecedorEdit) {
-        await updateFornecedorProduto(fornecedorEdit.id, dados);
+        await updateFornecedorProduto(fornecedorEdit.id, dados, id);
         alert("Fornecedor atualizado!");
       } else {
         await addFornecedorProduto(id, dados);
@@ -323,7 +323,7 @@ export function useProdutosFormController() {
     if (!(await confirmarCorePet("Deseja realmente desvincular este fornecedor?"))) return;
 
     try {
-      await deleteFornecedorProduto(fornecedorId);
+      await deleteFornecedorProduto(fornecedorId, id);
       carregarFornecedores();
       alert("Fornecedor desvinculado!");
     } catch (error) {

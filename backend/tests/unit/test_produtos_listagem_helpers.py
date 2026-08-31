@@ -78,6 +78,9 @@ class _FakeHierarchyQuery:
         self.options_args.extend(options)
         return self
 
+    def group_by(self, *_expressions):
+        return self
+
     def order_by(self, *expressions):
         self.order_by_args.extend(expressions)
         return self
@@ -281,6 +284,7 @@ def test_expandir_produtos_listagem_conta_e_inclui_variacoes_quando_solicitado(
     variacao = SimpleNamespace(
         id=11,
         tipo_produto="VARIACAO",
+        produto_pai_id=10,
         tenant_id="tenant-principal",
         categoria=None,
     )
@@ -290,7 +294,7 @@ def test_expandir_produtos_listagem_conta_e_inclui_variacoes_quando_solicitado(
         tenant_id="tenant-principal",
         categoria=None,
     )
-    count_query = _FakeHierarchyQuery(scalar_result=1)
+    count_query = _FakeHierarchyQuery(all_result=[(10, 1)])
     variations_query = _FakeHierarchyQuery(all_result=[variacao])
     db = _FakeDb(count_query, variations_query)
     enriquecidos = []
@@ -345,7 +349,7 @@ def test_expandir_produtos_listagem_nao_busca_variacoes_durante_busca(monkeypatc
         tenant_id="tenant-principal",
         categoria=None,
     )
-    count_query = _FakeHierarchyQuery(scalar_result=3)
+    count_query = _FakeHierarchyQuery(all_result=[(10, 3)])
     db = _FakeDb(count_query)
 
     monkeypatch.setattr(
@@ -392,7 +396,7 @@ def test_buscar_pagina_produtos_listagem_aplica_total_ordenacao_e_paginacao():
     assert query.count_calls == 1
     assert query.offset_arg == 20
     assert query.limit_arg == 10
-    assert len(load_options) == 4
+    assert len(load_options) == 5
     assert query.options_args == load_options
     assert query.order_by_args
 
@@ -669,7 +673,7 @@ def test_load_options_listagem_produtos_monta_lista_nova_com_relacionamentos_bas
     )
 
     assert opcoes is not outra_lista
-    assert len(opcoes) == 4
+    assert len(opcoes) == 5
     assert all(
         str(opcao.path).startswith("ORM Path[Mapper[Produto(produtos)]")
         for opcao in opcoes
@@ -682,4 +686,4 @@ def test_load_options_listagem_produtos_preserva_quantidade_ao_alternar_flags():
         incluir_lotes=True,
     )
 
-    assert len(sem_imagens_com_lotes) == 4
+    assert len(sem_imagens_com_lotes) == 5

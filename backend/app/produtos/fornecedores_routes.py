@@ -19,7 +19,10 @@ from app.produtos.schemas import (
     FornecedorVinculoResponse,
     FornecedorVinculoUpdate,
 )
-from app.produtos.validators import _validar_tenant_e_obter_usuario
+from app.produtos.validators import (
+    _resolver_tenant_produto_catalogo,
+    _validar_tenant_e_obter_usuario,
+)
 from app.produtos_models import Produto, ProdutoFornecedor
 
 logger = logging.getLogger(__name__)
@@ -45,7 +48,12 @@ def vincular_fornecedor(
     - Apenas 1 pode ser principal
     - Fornecedor deve ser do tipo 'fornecedor' no cadastro de clientes
     """
-    current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
+    _current_user, tenant_solicitante_id = _validar_tenant_e_obter_usuario(
+        user_and_tenant
+    )
+    tenant_id, _ = _resolver_tenant_produto_catalogo(
+        db, tenant_solicitante_id, produto_id
+    )
 
     try:
         logger.info(
@@ -203,7 +211,12 @@ def listar_fornecedores_produto(
     Listar todos os fornecedores vinculados a um produto
     Ordenados por: principal DESC, created_at ASC
     """
-    current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
+    _current_user, tenant_solicitante_id = _validar_tenant_e_obter_usuario(
+        user_and_tenant
+    )
+    tenant_id, _ = _resolver_tenant_produto_catalogo(
+        db, tenant_solicitante_id, produto_id
+    )
 
     # Verificar se produto existe e pertence ao usuário
     produto = (
@@ -272,21 +285,34 @@ def listar_fornecedores_produto(
 def atualizar_vinculo_fornecedor(
     vinculo_id: int,
     dados: FornecedorVinculoUpdate,
+    produto_id: int | None = None,
     db: Session = Depends(get_session),
     user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     """
     Atualizar dados do vínculo fornecedor-produto
     """
-    current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
+    _current_user, tenant_solicitante_id = _validar_tenant_e_obter_usuario(
+        user_and_tenant
+    )
+    tenant_id = tenant_solicitante_id
+    if produto_id is not None:
+        tenant_id, _ = _resolver_tenant_produto_catalogo(
+            db, tenant_solicitante_id, produto_id
+        )
 
     # Buscar vínculo e verificar permissão
-    vinculo = (
+    query_vinculo = (
         db.query(ProdutoFornecedor)
         .join(Produto)
-        .filter(ProdutoFornecedor.id == vinculo_id, Produto.tenant_id == tenant_id)
-        .first()
+        .filter(
+            ProdutoFornecedor.id == vinculo_id,
+            Produto.tenant_id == tenant_id,
+        )
     )
+    if produto_id is not None:
+        query_vinculo = query_vinculo.filter(Produto.id == produto_id)
+    vinculo = query_vinculo.first()
 
     if not vinculo:
         raise HTTPException(
@@ -368,6 +394,7 @@ def atualizar_vinculo_fornecedor(
 @router.delete("/fornecedores/{vinculo_id}")
 def desvincular_fornecedor(
     vinculo_id: int,
+    produto_id: int | None = None,
     db: Session = Depends(get_session),
     user_and_tenant=Depends(get_current_user_and_tenant),
 ):
@@ -375,15 +402,27 @@ def desvincular_fornecedor(
     Desvincular fornecedor de um produto
     Remove o vínculo do banco de dados
     """
-    current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
+    _current_user, tenant_solicitante_id = _validar_tenant_e_obter_usuario(
+        user_and_tenant
+    )
+    tenant_id = tenant_solicitante_id
+    if produto_id is not None:
+        tenant_id, _ = _resolver_tenant_produto_catalogo(
+            db, tenant_solicitante_id, produto_id
+        )
 
     # Buscar vínculo e verificar permissão
-    vinculo = (
+    query_vinculo = (
         db.query(ProdutoFornecedor)
         .join(Produto)
-        .filter(ProdutoFornecedor.id == vinculo_id, Produto.tenant_id == tenant_id)
-        .first()
+        .filter(
+            ProdutoFornecedor.id == vinculo_id,
+            Produto.tenant_id == tenant_id,
+        )
     )
+    if produto_id is not None:
+        query_vinculo = query_vinculo.filter(Produto.id == produto_id)
+    vinculo = query_vinculo.first()
 
     if not vinculo:
         raise HTTPException(
