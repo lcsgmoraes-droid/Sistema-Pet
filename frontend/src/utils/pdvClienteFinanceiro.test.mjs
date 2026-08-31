@@ -29,6 +29,15 @@ assert.deepEqual(calcularResumoEmAbertoCliente(), {
   total_geral_em_aberto: 0,
 });
 
+assert.deepEqual(calcularResumoEmAbertoCliente(null), {
+  total_vendas: 0,
+  total_parcelas_crediario: 0,
+  total_vendas_em_aberto: 0,
+  total_crediario_em_aberto: 0,
+  total_crediario_vencido: 0,
+  total_geral_em_aberto: 0,
+});
+
 assert.deepEqual(
   calcularResumoEmAbertoCliente({
     total_vendas: "2.9",
