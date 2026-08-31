@@ -127,6 +127,44 @@ def test_global_user_identity_accepts_active_membership_in_current_tenant():
     assert "vet_partner_link" not in compiled
 
 
+def test_user_filter_compiles_when_query_already_joins_user_tenants():
+    from app.base_models import BaseTenantModel
+    from app.models import Role, User, UserTenant
+    from app.tenancy.filters import _tenant_read_filter
+
+    tenant_id = TENANT_ID
+
+    def tenant_filter(model):
+        return _tenant_read_filter(model, tenant_id)
+
+    statement = (
+        select(
+            User.id.label("user_id"),
+            User.username,
+            User.email,
+            User.nome,
+            Role.name.label("role"),
+            UserTenant.is_active,
+        )
+        .join(UserTenant, UserTenant.user_id == User.id)
+        .join(Role, Role.id == UserTenant.role_id)
+        .where(UserTenant.tenant_id == tenant_id)
+        .options(
+            with_loader_criteria(
+                BaseTenantModel,
+                tenant_filter,
+                include_aliases=True,
+                track_closure_variables=False,
+            )
+        )
+    )
+
+    compiled = str(statement.compile(dialect=postgresql.dialect()))
+
+    assert "EXISTS (SELECT user_tenants.id" in compiled
+    assert "user_tenants.user_id = users.id" in compiled
+
+
 def test_non_partner_readable_models_keep_strict_current_tenant_filter():
     from app.models_authz import Role
 
