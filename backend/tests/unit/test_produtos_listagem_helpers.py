@@ -101,6 +101,7 @@ class _FakePageQuery:
         self.order_by_args = []
         self.offset_arg = None
         self.limit_arg = None
+        self.filters = []
 
     def count(self):
         self.count_calls += 1
@@ -108,6 +109,10 @@ class _FakePageQuery:
 
     def options(self, *options):
         self.options_args.extend(options)
+        return self
+
+    def filter(self, *expressions):
+        self.filters.extend(expressions)
         return self
 
     def order_by(self, *expressions):
@@ -421,6 +426,42 @@ def test_buscar_pagina_produtos_listagem_permite_total_posterior():
     assert query.count_calls == 0
     assert query.offset_arg == 0
     assert query.limit_arg == 50
+
+
+def test_buscar_pagina_produtos_listagem_rapida_ordena_candidatos_em_memoria():
+    produto_nome = SimpleNamespace(
+        id=10,
+        nome="Premier Gatos",
+        codigo="SKU-10",
+        codigo_barras=None,
+        codigos_barras_alternativos=None,
+    )
+    produto_codigo = SimpleNamespace(
+        id=11,
+        nome="Outro produto",
+        codigo="premier",
+        codigo_barras=None,
+        codigos_barras_alternativos=None,
+    )
+    query = _FakePageQuery([produto_nome, produto_codigo], total=99)
+
+    produtos, total, _load_options = produtos_listagem._buscar_pagina_produtos_listagem(
+        query,
+        termo_busca="premier",
+        offset=0,
+        page_size=12,
+        incluir_imagens=False,
+        incluir_lotes=False,
+        contar_total=False,
+        busca_rapida=True,
+    )
+
+    assert produtos == [produto_codigo, produto_nome]
+    assert total is None
+    assert query.count_calls == 0
+    assert query.order_by_args == []
+    assert query.filters
+    assert query.limit_arg == 120
 
 
 @pytest.mark.parametrize("ordenacao", ["estoque_desc", "estoque_asc"])

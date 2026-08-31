@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from typing import Optional
 
 from sqlalchemy import case, func, or_
@@ -106,6 +107,76 @@ def _build_produto_search_order_clause(termo_busca: Optional[str]):
         Produto.nome.asc(),
         Produto.created_at.desc(),
     ]
+
+
+def _produto_search_exact_conditions(termo_busca: Optional[str]):
+    """Condições enxutas para garantir que um código exato entre no autocomplete."""
+    termo = (termo_busca or "").strip()
+    if not termo:
+        return False
+
+    termo_lower = termo.lower()
+    conditions = []
+    for column in PRODUTO_CODIGO_EXATO_COLUMNS:
+        conditions.extend(
+            [
+                column == termo,
+                func.lower(func.coalesce(column, "")) == termo_lower,
+            ]
+        )
+    if PRODUTO_EAN_ALTERNATIVO_COLUMN is not None:
+        conditions.append(PRODUTO_EAN_ALTERNATIVO_COLUMN.ilike(f'%"{termo}"%'))
+    conditions.append(func.lower(func.coalesce(Produto.nome, "")) == termo_lower)
+    return or_(*conditions)
+
+
+def _valores_codigo_produto(produto) -> list[str]:
+    valores = [
+        getattr(produto, "codigo", None),
+        getattr(produto, "sku", None),
+        getattr(produto, "codigo_barras", None),
+        getattr(produto, "gtin_ean", None),
+        getattr(produto, "gtin_ean_tributario", None),
+    ]
+    alternativos = getattr(produto, "codigos_barras_alternativos", None)
+    if alternativos:
+        try:
+            parsed = (
+                json.loads(alternativos)
+                if isinstance(alternativos, str)
+                else alternativos
+            )
+            if isinstance(parsed, list):
+                valores.extend(parsed)
+            else:
+                valores.append(parsed)
+        except (TypeError, ValueError):
+            valores.append(alternativos)
+    return [str(valor).strip().lower() for valor in valores if str(valor or "").strip()]
+
+
+def _produto_search_sort_key(produto, termo_busca: Optional[str]):
+    """Replica em memória a prioridade da busca sem ordenar milhares de linhas no banco."""
+    termo = (termo_busca or "").strip().lower()
+    nome = str(getattr(produto, "nome", "") or "").strip().lower()
+    codigos = _valores_codigo_produto(produto)
+
+    if termo and termo in codigos:
+        prioridade = 0
+    elif termo and nome == termo:
+        prioridade = 1
+    elif termo and any(codigo.startswith(termo) for codigo in codigos):
+        prioridade = 2
+    elif termo and nome.startswith(termo):
+        prioridade = 3
+    elif termo and any(termo in codigo for codigo in codigos):
+        prioridade = 4
+    elif termo and termo in nome:
+        prioridade = 5
+    else:
+        prioridade = 6
+
+    return prioridade, nome, -int(getattr(produto, "id", 0) or 0)
 
 
 def _only_digits(value: Optional[str]) -> str:

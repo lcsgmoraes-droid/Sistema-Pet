@@ -7,6 +7,14 @@ const PRODUTOS_PERSISTIR_KEY = "produtos_persistir_busca";
 const PRODUTOS_FILTROS_KEY = "produtos_filtros_v2";
 const PRODUTOS_FILTRO_BUSCA_LEGADO_KEY = "produtos_filtro_busca";
 
+function isCarregamentoCancelado(error) {
+  return (
+    error?.code === "ERR_CANCELED" ||
+    error?.name === "CanceledError" ||
+    error?.name === "AbortError"
+  );
+}
+
 const FILTROS_PADRAO = {
   busca: "",
   ativo: "ativos",
@@ -154,6 +162,8 @@ export default function useProdutosListagem({
   const [totalPaginasServidor, setTotalPaginasServidor] = useState(1);
   const produtosVisiveisRef = useRef([]);
   const filtrosMontadosRef = useRef(false);
+  const requisicaoProdutosIdRef = useRef(0);
+  const produtosAbortControllerRef = useRef(null);
 
   const produtosFiltrados = useMemo(() => {
     let produtosTemp = [...produtosBrutos];
@@ -232,6 +242,12 @@ export default function useProdutosListagem({
   }, [produtos]);
 
   const carregarDados = async (filtrosAtuais = filtros) => {
+    produtosAbortControllerRef.current?.abort();
+    const controller = new AbortController();
+    const requisicaoId = requisicaoProdutosIdRef.current + 1;
+    requisicaoProdutosIdRef.current = requisicaoId;
+    produtosAbortControllerRef.current = controller;
+
     try {
       setLoading(true);
       const filtrosLimpos = {};
@@ -267,7 +283,11 @@ export default function useProdutosListagem({
       filtrosLimpos.incluir_bling_sync = true;
       filtrosLimpos.incluir_detalhes_composto = false;
 
-      const response = await getProdutos(filtrosLimpos);
+      const response = await getProdutos(filtrosLimpos, { signal: controller.signal });
+
+      if (requisicaoProdutosIdRef.current !== requisicaoId) {
+        return;
+      }
 
       let produtosData;
       let totalApi = 0;
@@ -308,10 +328,18 @@ export default function useProdutosListagem({
       setTotalItensServidor(totalApi);
       setTotalPaginasServidor(Math.max(pagesApi, 1));
     } catch (error) {
+      if (isCarregamentoCancelado(error) || requisicaoProdutosIdRef.current !== requisicaoId) {
+        return;
+      }
       console.error("Erro ao carregar produtos:", error);
       alert("Erro ao carregar produtos");
     } finally {
-      setLoading(false);
+      if (requisicaoProdutosIdRef.current === requisicaoId) {
+        setLoading(false);
+        if (produtosAbortControllerRef.current === controller) {
+          produtosAbortControllerRef.current = null;
+        }
+      }
     }
   };
 
@@ -320,10 +348,13 @@ export default function useProdutosListagem({
       () => {
         carregarDados();
       },
-      filtros.busca ? 250 : 0,
+      filtros.busca ? 350 : 0,
     );
 
-    return () => clearTimeout(timer);
+    return () => {
+      clearTimeout(timer);
+      produtosAbortControllerRef.current?.abort();
+    };
   }, [
     filtros.ativo,
     filtros.busca,
@@ -339,6 +370,14 @@ export default function useProdutosListagem({
     itensPorPagina,
     paginaAtual,
   ]);
+
+  useEffect(
+    () => () => {
+      requisicaoProdutosIdRef.current += 1;
+      produtosAbortControllerRef.current?.abort();
+    },
+    [],
+  );
 
   useEffect(() => {
     localStorage.setItem(PRODUTOS_PERSISTIR_KEY, String(persistirBusca));

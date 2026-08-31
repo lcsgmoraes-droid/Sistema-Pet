@@ -14,6 +14,9 @@ function isBuscaCancelada(error) {
   );
 }
 
+const BUSCA_PRODUTO_CACHE_MS = 2000;
+const BUSCA_PRODUTO_CACHE_MAX = 20;
+
 export function usePDVProdutoBusca({
   modoVisualizacao,
   adicionarProdutoAoCarrinho,
@@ -33,42 +36,63 @@ export function usePDVProdutoBusca({
   const buscaProdutoAtualRef = useRef("");
   const focoProdutoTimeoutRef = useRef(null);
   const adicionarProdutoAoCarrinhoRef = useRef(adicionarProdutoAoCarrinho);
-  const buscaProdutoAbortControllerRef = useRef(null);
+  const buscaProdutoPendenteRef = useRef(null);
+  const buscaProdutoCacheRef = useRef(new Map());
 
   useEffect(() => {
     adicionarProdutoAoCarrinhoRef.current = adicionarProdutoAoCarrinho;
   }, [adicionarProdutoAoCarrinho]);
 
   const cancelarBuscaProdutoPendente = () => {
-    if (buscaProdutoAbortControllerRef.current) {
-      buscaProdutoAbortControllerRef.current.abort();
-      buscaProdutoAbortControllerRef.current = null;
+    if (buscaProdutoPendenteRef.current) {
+      buscaProdutoPendenteRef.current.controller.abort();
+      buscaProdutoPendenteRef.current = null;
     }
   };
 
   const buscarProdutosAtualizados = async (termo) => {
+    const termoNormalizado = String(termo || "").trim();
+    const chaveBusca = termoNormalizado.toLocaleLowerCase("pt-BR");
+    const cacheAtual = buscaProdutoCacheRef.current.get(chaveBusca);
+
+    if (cacheAtual && Date.now() - cacheAtual.criadoEm < BUSCA_PRODUTO_CACHE_MS) {
+      return cacheAtual.produtos;
+    }
+
+    if (buscaProdutoPendenteRef.current?.chaveBusca === chaveBusca) {
+      return buscaProdutoPendenteRef.current.promise;
+    }
+
     cancelarBuscaProdutoPendente();
     const controller = new AbortController();
-    buscaProdutoAbortControllerRef.current = controller;
-
-    try {
+    const promise = (async () => {
       const response = await getProdutosVendaveis(
         {
-          busca: termo,
+          busca: termoNormalizado,
           page_size: 12,
           contar_total: false,
           incluir_imagens: false,
-          _ts: Date.now(),
         },
         {
           signal: controller.signal,
         },
       );
+      const produtos = response.data.items || [];
+      const cache = buscaProdutoCacheRef.current;
 
-      return response.data.items || [];
+      if (cache.size >= BUSCA_PRODUTO_CACHE_MAX && !cache.has(chaveBusca)) {
+        cache.delete(cache.keys().next().value);
+      }
+      cache.set(chaveBusca, { criadoEm: Date.now(), produtos });
+      return produtos;
+    })();
+    buscaProdutoPendenteRef.current = { chaveBusca, controller, promise };
+
+    try {
+      return await promise;
     } finally {
-      if (buscaProdutoAbortControllerRef.current === controller) {
-        buscaProdutoAbortControllerRef.current = null;
+      if (buscaProdutoPendenteRef.current?.controller === controller) {
+        buscaProdutoPendenteRef.current = null;
       }
     }
   };

@@ -239,18 +239,35 @@ export const CONFERENCIA_STATUS_META = {
   },
 };
 
-export const BASE_CALCULO_MARGEM_OPCOES = [
-  {
-    value: "nf",
-    label: "Custo da NF",
-    descricao: "Padrao. Usa o custo fiscal da NF como base da margem.",
-  },
-  {
-    value: "sistema",
-    label: "Custo no sistema",
-    descricao: "Usa o custo que sera aplicado no processamento da entrada.",
-  },
-];
+export function obterBaseMargemEntrada({ custoNF = 0, custoSistema = 0 } = {}) {
+  const custoNFNormalizado = Number(custoNF || 0);
+  const custoSistemaNormalizado = Number(custoSistema || 0);
+  const temCustoSistema = Number.isFinite(custoSistemaNormalizado) && custoSistemaNormalizado > 0;
+
+  return {
+    value: temCustoSistema ? "sistema" : "nf",
+    label: temCustoSistema ? "Custo no sistema" : "Custo da NF",
+    valor: temCustoSistema ? custoSistemaNormalizado : custoNFNormalizado,
+    fallback: !temCustoSistema,
+    descricao: temCustoSistema
+      ? "Calculando sobre o custo informado no sistema."
+      : "Sem custo informado no sistema; usando o custo da NF.",
+  };
+}
+
+export function calcularPrecoVendaPorMargem(custo, margemDesejada) {
+  const custoNormalizado = Number(custo || 0);
+  const margemNormalizada = Number(margemDesejada || 0);
+  if (margemNormalizada >= 100) return custoNormalizado * 2;
+  return custoNormalizado / (1 - margemNormalizada / 100);
+}
+
+export function calcularMargemPorPrecoVenda(precoVenda, custo) {
+  const precoNormalizado = Number(precoVenda || 0);
+  const custoNormalizado = Number(custo || 0);
+  if (precoNormalizado <= 0) return 0;
+  return ((precoNormalizado - custoNormalizado) / precoNormalizado) * 100;
+}
 
 export const ACAO_CONFERENCIA_OPCOES = [
   { value: "sem_acao", label: "Sem acao" },

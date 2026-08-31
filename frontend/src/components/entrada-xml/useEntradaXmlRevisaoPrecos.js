@@ -5,9 +5,11 @@ import {
   exportarRelatorioCustosMaioresPDF as exportarRelatorioCustosMaioresPDFArquivo,
 } from "./entradaXmlRelatorioCustos";
 import {
-  BASE_CALCULO_MARGEM_OPCOES,
   aplicarOverridesPackNoPreview,
+  calcularMargemPorPrecoVenda,
+  calcularPrecoVendaPorMargem,
   normalizarProdutoPreview,
+  obterBaseMargemEntrada,
   obterCustoBasePreviewItem,
 } from "./entradaXmlUtils";
 
@@ -38,13 +40,9 @@ export default function useEntradaXmlRevisaoPrecos({
   const [inputsRevisaoPrecos, setInputsRevisaoPrecos] = useState({});
   const [filtroCusto, setFiltroCusto] = useState("todos");
   const [gerandoRelatorioCustos, setGerandoRelatorioCustos] = useState(false);
-  const [baseCalculoMargem, setBaseCalculoMargem] = useState("nf");
   const [acoesProcessamento, setAcoesProcessamento] = useState(ACOES_PROCESSAMENTO_PADRAO);
 
-  const calcularPrecoVenda = (custoNovo, margemDesejada) => {
-    if (margemDesejada >= 100) return custoNovo * 2;
-    return custoNovo / (1 - margemDesejada / 100);
-  };
+  const calcularPrecoVenda = calcularPrecoVendaPorMargem;
 
   const parseNumeroFlexivel = (valor) => {
     if (typeof valor === "number") {
@@ -71,10 +69,7 @@ export default function useEntradaXmlRevisaoPrecos({
     return Number.isFinite(numero) ? numero : 0;
   };
 
-  const calcularMargem = (precoVenda, custoNovo) => {
-    if (precoVenda <= 0) return 0;
-    return ((precoVenda - custoNovo) / precoVenda) * 100;
-  };
+  const calcularMargem = calcularMargemPorPrecoVenda;
 
   const obterCustoSistemaItem = (item) => {
     const itemId = item?.item_id ?? item?.id;
@@ -86,39 +81,13 @@ export default function useEntradaXmlRevisaoPrecos({
     return obterCustoBasePreviewItem(item);
   };
 
-  const obterInfoBaseCalculoMargem = ({ custoNF = 0, custoSistema = 0 }) => {
-    const custoNFNormalizado = Number(custoNF || 0);
-    const custoSistemaNormalizado = Number(custoSistema || 0);
-
-    if (baseCalculoMargem === "sistema") {
-      return {
-        value: "sistema",
-        label: "Custo no sistema",
-        valor: custoSistemaNormalizado > 0 ? custoSistemaNormalizado : custoNFNormalizado,
-        fallback: !(custoSistemaNormalizado > 0),
-        descricao:
-          custoSistemaNormalizado > 0
-            ? "Calculando sobre o custo informado no sistema."
-            : "Sem custo informado no sistema; usando o custo da NF.",
-      };
-    }
-
-    return {
-      value: "nf",
-      label: "Custo da NF",
-      valor: custoNFNormalizado,
-      fallback: false,
-      descricao: "Calculando sobre o custo fiscal da NF.",
-    };
-  };
-
   const obterResumoCustoItem = (item) => {
     const produto = normalizarProdutoPreview(item);
     const custoAnterior = Number(produto.custo_anterior || 0);
     const custoNF = obterCustoBasePreviewItem(item);
     const custoSistema = obterCustoSistemaItem(item);
     const precoVendaAtual = Number(produto.preco_venda_atual || 0);
-    const baseMargem = obterInfoBaseCalculoMargem({ custoNF, custoSistema });
+    const baseMargem = obterBaseMargemEntrada({ custoNF, custoSistema });
     const variacaoCustoPercentual =
       custoAnterior > 0
         ? Number((((custoSistema - custoAnterior) / custoAnterior) * 100).toFixed(2))
@@ -155,7 +124,6 @@ export default function useEntradaXmlRevisaoPrecos({
 
       const previewComOverrides = aplicarOverridesPackNoPreview(response.data, multiplicadoresPack);
 
-      setBaseCalculoMargem("nf");
       setAcoesProcessamento({
         ...ACOES_PROCESSAMENTO_PADRAO,
         ...(previewComOverrides.acoes_processamento_sugeridas || {}),
@@ -279,7 +247,6 @@ export default function useEntradaXmlRevisaoPrecos({
       setNotaSelecionada(null);
       setMostrarRevisaoPrecos(false);
       setPreviewProcessamento(null);
-      setBaseCalculoMargem("nf");
       setCustosAjustados({});
       setInputsRevisaoCustos({});
       setInputsRevisaoPrecos({});
@@ -366,9 +333,9 @@ export default function useEntradaXmlRevisaoPrecos({
     const precoAtual = Number(
       precosAjustados[produto.produto_id]?.preco_venda ?? produto.preco_venda_atual ?? 0,
     );
-    const baseMargem = obterInfoBaseCalculoMargem({
+    const baseMargem = obterBaseMargemEntrada({
       custoNF: custoBase,
-      custoSistema: custoAplicado || custoBase,
+      custoSistema: custoAplicado,
     });
     const margemAtualizada = calcularMargem(precoAtual, baseMargem.valor);
 
@@ -411,7 +378,7 @@ export default function useEntradaXmlRevisaoPrecos({
     const precoAtual = Number(
       precosAjustados[produto.produto_id]?.preco_venda ?? produto.preco_venda_atual ?? 0,
     );
-    const baseMargem = obterInfoBaseCalculoMargem({
+    const baseMargem = obterBaseMargemEntrada({
       custoNF: custoBase,
       custoSistema: custoNormalizado,
     });
@@ -499,7 +466,7 @@ export default function useEntradaXmlRevisaoPrecos({
 
       return mudou ? proximo : prev;
     });
-  }, [baseCalculoMargem, mostrarRevisaoPrecos, previewProcessamento]);
+  }, [mostrarRevisaoPrecos, previewProcessamento]);
 
   const exportarRelatorioCustosMaioresCSV = () =>
     exportarRelatorioCustosMaioresCSVArquivo({
@@ -525,7 +492,6 @@ export default function useEntradaXmlRevisaoPrecos({
     setInputsRevisaoPrecos({});
     setInputsRevisaoCustos({});
     setAcoesProcessamento(ACOES_PROCESSAMENTO_PADRAO);
-    setBaseCalculoMargem("nf");
     if (notaSelecionada) {
       setMostrarVisualizacao(true);
     }
@@ -543,8 +509,6 @@ export default function useEntradaXmlRevisaoPrecos({
     atualizarCustoSistema,
     atualizarMargem,
     atualizarPrecoVenda,
-    baseCalculoMargem,
-    baseCalculoMargemOpcoes: BASE_CALCULO_MARGEM_OPCOES,
     calcularPrecoVenda,
     carregarPreviewProcessamento: processarNota,
     confirmarProcessamento,
@@ -561,7 +525,6 @@ export default function useEntradaXmlRevisaoPrecos({
     precosAjustados,
     previewProcessamento,
     processarNota,
-    setBaseCalculoMargem,
     setAcaoProcessamento,
     setFiltroCusto,
     setMostrarRevisaoPrecos,

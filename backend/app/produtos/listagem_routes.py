@@ -107,6 +107,7 @@ def listar_produtos_vendaveis(
         incluir_imagens=incluir_imagens,
         incluir_lotes=False,
         contar_total=contar_total,
+        busca_rapida=not contar_total,
     )
     compartilhamentos = (
         EmpresaGrupoEstoqueCompartilhadoService.mapa_ativos_para_consumidora(

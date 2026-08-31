@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import toast from "react-hot-toast";
-import api from "../api";
+import { obterCaixaAberto } from "../api/caixa";
 import { contarRacoes, ehRacao } from "../helpers/deteccaoRacao";
 import { debugLog } from "../utils/debug";
 
@@ -34,8 +34,8 @@ export function usePDVCaixaRacao({ vendaAtual, destaqueAbrirCaixa }) {
 
     verificandoCaixaRef.current = true;
     try {
-      const response = await api.get("/caixas/aberto");
-      setTemCaixaAberto(!!response.data);
+      const caixa = await obterCaixaAberto();
+      setTemCaixaAberto(!!caixa);
     } catch {
       setTemCaixaAberto(false);
     } finally {
