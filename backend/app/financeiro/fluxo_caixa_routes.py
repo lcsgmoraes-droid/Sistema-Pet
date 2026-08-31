@@ -3,10 +3,11 @@
 from datetime import date, datetime
 from decimal import Decimal
 from typing import Optional
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import and_
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from app.auth.dependencies import get_current_user_and_tenant
 from app.db import get_session
@@ -19,6 +20,28 @@ from app.financeiro.fluxo_caixa_schemas import (
 from app.tenancy.context import set_current_tenant
 
 router = APIRouter()
+
+
+def _mapa_numeros_venda_por_conta(db: Session, tenant_id, conta_ids) -> dict[int, str]:
+    """Busca os numeros de venda de varias contas em uma unica consulta."""
+    ids = {int(conta_id) for conta_id in conta_ids if conta_id is not None}
+    if not ids:
+        return {}
+    tenant_uuid = tenant_id if isinstance(tenant_id, UUID) else UUID(str(tenant_id))
+
+    from app.financeiro_models import ContaReceber
+    from app.vendas_models import Venda
+
+    return {
+        conta_id: numero_venda
+        for conta_id, numero_venda in db.query(ContaReceber.id, Venda.numero_venda)
+        .outerjoin(
+            Venda,
+            and_(Venda.id == ContaReceber.venda_id, Venda.tenant_id == tenant_uuid),
+        )
+        .filter(ContaReceber.tenant_id == tenant_uuid, ContaReceber.id.in_(ids))
+        .all()
+    }
 
 
 @router.get("/fluxo-caixa", response_model=FluxoCaixaResponse)
@@ -68,37 +91,16 @@ def get_fluxo_caixa(
             status_code=400, detail="Agrupamento deve ser 'dia', 'semana' ou 'mes'"
         )
 
-    # Filtro de conta bancária
-    filtro_conta = []
+    # Filtro de conta bancária e saldo inicial na mesma consulta.
+    contas_query = db.query(ContaBancaria).filter(ContaBancaria.tenant_id == tenant_id)
     if conta_bancaria_id:
-        filtro_conta = [conta_bancaria_id]
-    else:
-        # Todas as contas do usuário e tenant
-        contas = (
-            db.query(ContaBancaria)
-            .filter(
-                ContaBancaria.tenant_id == tenant_id,
-            )
-            .all()
-        )
-        filtro_conta = [c.id for c in contas]
+        contas_query = contas_query.filter(ContaBancaria.id == conta_bancaria_id)
+    contas_obj = contas_query.all()
 
     # ========== SALDO INICIAL ==========
-    saldo_inicial = Decimal(0)
-    if filtro_conta:
-        contas_obj = (
-            db.query(ContaBancaria)
-            .filter(
-                and_(
-                    ContaBancaria.id.in_(filtro_conta),
-                    ContaBancaria.tenant_id == tenant_id,
-                )
-            )
-            .all()
-        )
-
-        for conta in contas_obj:
-            saldo_inicial += Decimal(str(conta.saldo_atual or 0))
+    saldo_inicial = sum(
+        (Decimal(str(conta.saldo_atual or 0)) for conta in contas_obj), Decimal(0)
+    )
 
     # ========== MOVIMENTAÇÕES ==========
     movimentacoes = []
@@ -195,6 +197,7 @@ def get_fluxo_caixa(
     # 3. CONTAS A PAGAR PAGAS (Saídas Realizadas)
     contas_pagas = (
         db.query(ContaPagar)
+        .options(joinedload(ContaPagar.fornecedor))
         .filter(
             and_(
                 ContaPagar.tenant_id == tenant_id,
@@ -226,6 +229,7 @@ def get_fluxo_caixa(
     # 4. LANÇAMENTOS MANUAIS REALIZADOS
     lancamentos_realizados = (
         db.query(LancamentoManual)
+        .options(joinedload(LancamentoManual.categoria))
         .filter(
             and_(
                 LancamentoManual.tenant_id == tenant_id,
@@ -272,27 +276,18 @@ def get_fluxo_caixa(
         )
         .all()
     )
+    numeros_venda_por_conta = _mapa_numeros_venda_por_conta(
+        db,
+        tenant_id,
+        (
+            fluxo.origem_id
+            for fluxo in fluxos_realizados
+            if fluxo.origem_tipo == "conta_receber"
+        ),
+    )
 
     for fluxo in fluxos_realizados:
-        # Buscar número da venda se a origem for conta_receber
-        numero_venda_fluxo = None
-        if fluxo.origem_tipo == "conta_receber" and fluxo.origem_id:
-            conta = (
-                db.query(ContaReceber)
-                .filter(
-                    ContaReceber.id == fluxo.origem_id,
-                    ContaReceber.tenant_id == tenant_id,
-                )
-                .first()
-            )
-            if conta and conta.venda_id:
-                venda = (
-                    db.query(Venda)
-                    .filter(Venda.id == conta.venda_id, Venda.tenant_id == tenant_id)
-                    .first()
-                )
-                if venda:
-                    numero_venda_fluxo = venda.numero_venda
+        numero_venda_fluxo = numeros_venda_por_conta.get(fluxo.origem_id)
 
         movimentacoes.append(
             FluxoCaixaMovimentacao(
@@ -350,8 +345,8 @@ def get_fluxo_caixa(
 
     # 6. CONTAS A PAGAR PENDENTES (Saídas Previstas)
     # Recebiveis e pagaveis abaixo usam tenant_id e pulam titulos ja previstos.
-    fluxos_previstos_origens = (
-        db.query(FluxoCaixa.origem_tipo, FluxoCaixa.origem_id)
+    fluxos_previstos = (
+        db.query(FluxoCaixa)
         .filter(
             and_(
                 FluxoCaixa.tenant_id == tenant_id,
@@ -365,18 +360,19 @@ def get_fluxo_caixa(
         .all()
     )
     contas_receber_com_fluxo_previsto = {
-        origem_id
-        for origem_tipo, origem_id in fluxos_previstos_origens
-        if origem_tipo == "conta_receber"
+        fluxo.origem_id
+        for fluxo in fluxos_previstos
+        if fluxo.origem_tipo == "conta_receber"
     }
     contas_pagar_com_fluxo_previsto = {
-        origem_id
-        for origem_tipo, origem_id in fluxos_previstos_origens
-        if origem_tipo == "conta_pagar"
+        fluxo.origem_id
+        for fluxo in fluxos_previstos
+        if fluxo.origem_tipo == "conta_pagar"
     }
 
     contas_receber_pendentes = (
         db.query(ContaReceber)
+        .options(joinedload(ContaReceber.cliente))
         .filter(
             and_(
                 ContaReceber.tenant_id == tenant_id,
@@ -389,6 +385,13 @@ def get_fluxo_caixa(
         )
         .all()
     )
+    numeros_venda_por_conta.update(
+        _mapa_numeros_venda_por_conta(
+            db,
+            tenant_id,
+            (conta.id for conta in contas_receber_pendentes if conta.venda_id),
+        )
+    )
 
     for conta in contas_receber_pendentes:
         if conta.id in contas_receber_com_fluxo_previsto:
@@ -396,15 +399,7 @@ def get_fluxo_caixa(
 
         valor_restante = (conta.valor_final or 0) - (conta.valor_recebido or 0)
         if valor_restante > 0:
-            numero_venda_conta = None
-            if conta.venda_id:
-                venda = (
-                    db.query(Venda)
-                    .filter(Venda.id == conta.venda_id, Venda.tenant_id == tenant_id)
-                    .first()
-                )
-                if venda:
-                    numero_venda_conta = venda.numero_venda
+            numero_venda_conta = numeros_venda_por_conta.get(conta.id)
 
             cliente_nome = conta.cliente.nome if conta.cliente else "Cliente"
             movimentacoes.append(
@@ -423,6 +418,7 @@ def get_fluxo_caixa(
 
     contas_pagar_pendentes = (
         db.query(ContaPagar)
+        .options(joinedload(ContaPagar.fornecedor))
         .filter(
             and_(
                 ContaPagar.tenant_id == tenant_id,
@@ -459,6 +455,7 @@ def get_fluxo_caixa(
     # 7. LANÇAMENTOS MANUAIS PREVISTOS
     lancamentos_previstos = (
         db.query(LancamentoManual)
+        .options(joinedload(LancamentoManual.categoria))
         .filter(
             and_(
                 LancamentoManual.tenant_id == tenant_id,
@@ -485,39 +482,20 @@ def get_fluxo_caixa(
         )
 
     # 🆕 LANÇAMENTOS DA TABELA FLUXO_CAIXA (PREVISTOS)
-    fluxos_previstos = (
-        db.query(FluxoCaixa)
-        .filter(
-            and_(
-                FluxoCaixa.tenant_id == tenant_id,
-                FluxoCaixa.data_prevista >= dt_inicio_datetime,
-                FluxoCaixa.data_prevista <= dt_fim_datetime,
-                FluxoCaixa.status == "previsto",
-            )
+    numeros_venda_por_conta.update(
+        _mapa_numeros_venda_por_conta(
+            db,
+            tenant_id,
+            (
+                fluxo.origem_id
+                for fluxo in fluxos_previstos
+                if fluxo.origem_tipo == "conta_receber"
+            ),
         )
-        .all()
     )
 
     for fluxo in fluxos_previstos:
-        # Buscar número da venda se a origem for conta_receber
-        numero_venda_fluxo = None
-        if fluxo.origem_tipo == "conta_receber" and fluxo.origem_id:
-            conta = (
-                db.query(ContaReceber)
-                .filter(
-                    ContaReceber.id == fluxo.origem_id,
-                    ContaReceber.tenant_id == tenant_id,
-                )
-                .first()
-            )
-            if conta and conta.venda_id:
-                venda = (
-                    db.query(Venda)
-                    .filter(Venda.id == conta.venda_id, Venda.tenant_id == tenant_id)
-                    .first()
-                )
-                if venda:
-                    numero_venda_fluxo = venda.numero_venda
+        numero_venda_fluxo = numeros_venda_por_conta.get(fluxo.origem_id)
 
         movimentacoes.append(
             FluxoCaixaMovimentacao(
@@ -563,16 +541,10 @@ def get_fluxo_caixa(
                     movimentacoes_filtradas.append(mov)
                 # Ou se é conta a receber vinculada à venda
                 elif mov.origem_tipo == "conta_receber":
-                    # Buscar a conta para verificar venda_id
-                    conta = (
-                        db.query(ContaReceber)
-                        .filter(
-                            ContaReceber.id == mov.origem_id,
-                            ContaReceber.tenant_id == tenant_id,
-                        )
-                        .first()
-                    )
-                    if conta and conta.venda_id in vendas_ids:
+                    numero_movimento = numeros_venda_por_conta.get(mov.origem_id)
+                    if numero_movimento and str(numero_venda).lower() in str(
+                        numero_movimento
+                    ).lower():
                         movimentacoes_filtradas.append(mov)
 
             movimentacoes = movimentacoes_filtradas

@@ -92,6 +92,7 @@ def listar_contas_receber(
     """
     _current_user, tenant_id = user_and_tenant
     hoje = now_brasilia().date()
+    from app.vendas_models import Venda
 
     query = (
         db.query(ContaReceber)
@@ -128,8 +129,6 @@ def listar_contas_receber(
 
     # Filtro por número de venda
     if numero_venda:
-        from app.vendas_models import Venda
-
         vendas_ids = (
             db.query(Venda.id)
             .filter(
@@ -160,6 +159,29 @@ def listar_contas_receber(
     contas = query.limit(limit).offset(offset).all()
     config_encargos = carregar_config_encargos(db, tenant_id)
 
+    cliente_ids = {conta.cliente_id for conta in contas if conta.cliente_id}
+    clientes_por_id = (
+        {
+            cliente.id: cliente
+            for cliente in db.query(Cliente)
+            .filter(Cliente.tenant_id == tenant_id, Cliente.id.in_(cliente_ids))
+            .all()
+        }
+        if cliente_ids
+        else {}
+    )
+    venda_ids = {conta.venda_id for conta in contas if conta.venda_id}
+    numeros_venda_por_id = (
+        {
+            venda_id: numero
+            for venda_id, numero in db.query(Venda.id, Venda.numero_venda)
+            .filter(Venda.tenant_id == tenant_id, Venda.id.in_(venda_ids))
+            .all()
+        }
+        if venda_ids
+        else {}
+    )
+
     # Montar response
     resultado = []
     for conta in contas:
@@ -172,34 +194,11 @@ def listar_contas_receber(
             dias_venc = (conta.data_vencimento - hoje).days
 
         # Buscar nome do cliente
-        cliente_nome = None
-        if conta.cliente_id:
-            cliente = (
-                db.query(Cliente)
-                .filter(
-                    Cliente.id == conta.cliente_id,
-                    Cliente.tenant_id == tenant_id,
-                )
-                .first()
-            )
-            if cliente:
-                cliente_nome = cliente.nome
+        cliente = clientes_por_id.get(conta.cliente_id)
+        cliente_nome = cliente.nome if cliente else None
 
         # Buscar número da venda se existir venda_id
-        numero_venda = None
-        if conta.venda_id:
-            from app.vendas_models import Venda
-
-            venda = (
-                db.query(Venda)
-                .filter(
-                    Venda.id == conta.venda_id,
-                    Venda.tenant_id == tenant_id,
-                )
-                .first()
-            )
-            if venda:
-                numero_venda = venda.numero_venda
+        numero_venda = numeros_venda_por_id.get(conta.venda_id)
 
         resultado.append(
             {

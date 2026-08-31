@@ -110,6 +110,7 @@ const ContasReceber = () => {
 
   useEffect(() => {
     carregarDados();
+    carregarDadosAuxiliares();
   }, []);
 
   const carregarFormasPagamento = async (headers) => {
@@ -121,6 +122,35 @@ const ContasReceber = () => {
       icone: forma.icone || "",
       conta_bancaria_destino_id: forma.conta_bancaria_destino_id || null,
     }));
+  };
+
+  const carregarDadosAuxiliares = async () => {
+    const token = getAccessToken();
+    const headers = { Authorization: `Bearer ${token}` };
+    const [clientesRes, formasRes, bancariasRes] = await Promise.allSettled([
+      api.get(`/clientes/`, { headers }),
+      carregarFormasPagamento(headers),
+      api.get(`/contas-bancarias?apenas_ativas=true`, { headers }),
+    ]);
+
+    if (clientesRes.status === "fulfilled") {
+      setClientes(normalizarListaClientes(clientesRes.value.data));
+    } else {
+      console.warn("Nao foi possivel carregar a lista de clientes.", clientesRes.reason);
+    }
+
+    if (formasRes.status === "fulfilled") {
+      setFormasPagamento(safeArray(formasRes.value));
+    } else {
+      setFormasPagamento([]);
+      console.warn("Nao foi possivel carregar formas de pagamento.", formasRes.reason);
+    }
+
+    if (bancariasRes.status === "fulfilled") {
+      setContasBancarias(safeArray(bancariasRes.value.data));
+    } else {
+      console.warn("Nao foi possivel carregar contas bancarias.", bancariasRes.reason);
+    }
   };
 
   // Aplicar a busca automaticamente depois que o usuario parar de digitar.
@@ -138,36 +168,18 @@ const ContasReceber = () => {
 
   const carregarDados = async () => {
     try {
+      setLoading(true);
       const token = getAccessToken();
       const headers = { Authorization: `Bearer ${token}` };
-
-      const [contasRes, clientesRes, formasRes, bancariasRes] = await Promise.allSettled([
-        api.get(`/contas-receber/?${montarParamsFiltrosContasReceber(filtros)}`, {
-          headers,
-        }),
-        api.get(`/clientes/`, { headers }),
-        carregarFormasPagamento(headers),
-        api.get(`/contas-bancarias?apenas_ativas=true`, { headers }),
-      ]);
-
-      if (contasRes.status !== "fulfilled") throw contasRes.reason;
-      if (clientesRes.status !== "fulfilled") throw clientesRes.reason;
-      if (bancariasRes.status !== "fulfilled") throw bancariasRes.reason;
+      const contasRes = await api.get(
+        `/contas-receber/?${montarParamsFiltrosContasReceber(filtros)}`,
+        { headers },
+      );
 
       // Ordenar por ID (mais recentes primeiro por padrao)
-      const contasOrdenadas = [...safeArray(contasRes.value.data)].sort((a, b) => b.id - a.id);
+      const contasOrdenadas = [...safeArray(contasRes.data)].sort((a, b) => b.id - a.id);
       setContas(contasOrdenadas);
       setContasSelecionadas(new Set());
-      setClientes(normalizarListaClientes(clientesRes.value.data));
-
-      if (formasRes.status === "fulfilled") {
-        setFormasPagamento(safeArray(formasRes.value));
-      } else {
-        setFormasPagamento([]);
-        console.warn("Nao foi possivel carregar formas de pagamento. Usando lista vazia.");
-      }
-
-      setContasBancarias(safeArray(bancariasRes.value.data));
     } catch (error) {
       console.error("Erro ao carregar dados:", error);
       toast.error("Erro ao carregar contas a receber");

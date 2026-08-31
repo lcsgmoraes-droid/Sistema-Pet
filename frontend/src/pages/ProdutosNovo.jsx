@@ -166,6 +166,7 @@ export default function ProdutosNovo() {
   const [opcoesApresentacoes, setOpcoesApresentacoes] = useState([]);
 
   const [loading, setLoading] = useState(false);
+  const [erroCarregamento, setErroCarregamento] = useState(null);
   const [salvando, setSalvando] = useState(false);
 
   // Estados para controlar edição de campos monetários
@@ -260,7 +261,7 @@ export default function ProdutosNovo() {
     handleDeleteFornecedor,
   } = useProdutosNovoFornecedores({ id });
 
-  const { salvarFiscal } = useProdutosNovoCarregamento({
+  const { carregarProduto, carregarProdutoParaClone, salvarFiscal } = useProdutosNovoCarregamento({
     cloneId,
     id,
     isEdicao,
@@ -277,6 +278,7 @@ export default function ProdutosNovo() {
     setOpcoesSabores,
     setOpcoesApresentacoes,
     setLoading,
+    setErroCarregamento,
     setFormData,
     setPredecessorInfo,
     setSucessorInfo,
@@ -664,6 +666,33 @@ export default function ProdutosNovo() {
       <div className="p-6 flex justify-center items-center h-96">
         <div className="text-gray-600">
           {isClone ? "Preparando clone do produto..." : "Carregando produto..."}
+        </div>
+      </div>
+    );
+  }
+
+  if (erroCarregamento) {
+    return (
+      <div className="flex h-96 items-center justify-center p-6">
+        <div className="w-full max-w-lg rounded-xl border border-red-200 bg-white p-6 text-center shadow-sm">
+          <h2 className="text-lg font-semibold text-gray-900">Não foi possível abrir o produto</h2>
+          <p className="mt-2 text-sm text-gray-600">{erroCarregamento}</p>
+          <div className="mt-5 flex justify-center gap-3">
+            <button
+              type="button"
+              className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+              onClick={() => navigate("/produtos")}
+            >
+              Voltar para produtos
+            </button>
+            <button
+              type="button"
+              className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+              onClick={() => (isClone ? carregarProdutoParaClone() : carregarProduto())}
+            >
+              Tentar novamente
+            </button>
+          </div>
         </div>
       </div>
     );
