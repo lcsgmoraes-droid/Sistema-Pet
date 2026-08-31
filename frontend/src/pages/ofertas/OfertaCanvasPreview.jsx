@@ -25,7 +25,7 @@ const NOMES = [
   "Areia Sanitária Biodegradável com Controle Prolongado de Odores 12kg",
   "BISCOITO SPECIALDOG ULTRALIFE EDIÇÃO LIMITADA BANANA 10X250G",
   "Aditivo Antiodor Antibacterial para Areia de Gatos - Embalagem 500g",
-  "SUPERPREMIUMSEMESPACOSPARATESTEAUTOMATICODEQUEBRADELINHA",
+  "Ração Super Premium para Cães Adultos de Raças Grandes com Frango, Arroz, Ômega 3 e Controle de Peso - Embalagem Econômica 15kg",
 ];
 
 const ITENS_QA = NOMES.map((nome, index) => ({
