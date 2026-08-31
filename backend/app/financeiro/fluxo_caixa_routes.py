@@ -542,9 +542,10 @@ def get_fluxo_caixa(
                 # Ou se é conta a receber vinculada à venda
                 elif mov.origem_tipo == "conta_receber":
                     numero_movimento = numeros_venda_por_conta.get(mov.origem_id)
-                    if numero_movimento and str(numero_venda).lower() in str(
+                    if (
                         numero_movimento
-                    ).lower():
+                        and str(numero_venda).lower() in str(numero_movimento).lower()
+                    ):
                         movimentacoes_filtradas.append(mov)
 
             movimentacoes = movimentacoes_filtradas

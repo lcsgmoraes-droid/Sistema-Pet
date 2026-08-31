@@ -29,9 +29,9 @@ def test_editor_e_balanco_nao_recarregam_catalogos_a_cada_produto_ou_pagina():
     balanco = _source("frontend/src/hooks/useProdutosBalancoPage.js")
 
     assert "useEffect(() => {\n    carregarDadosAuxiliares();\n  }, []);" in editor
-    carregar_balanco = balanco.split(
-        "const carregarDadosComFiltros = async", 1
-    )[1].split("const carregarCatalogos", 1)[0]
+    carregar_balanco = balanco.split("const carregarDadosComFiltros = async", 1)[
+        1
+    ].split("const carregarCatalogos", 1)[0]
     assert "getProdutos(params)" in carregar_balanco
     assert "getMarcas()" not in carregar_balanco
     assert 'api.get("/clientes/"' not in carregar_balanco
@@ -41,7 +41,8 @@ def test_contas_receber_busca_relacoes_em_lote_e_frontend_nao_bloqueia_auxiliare
     backend = _source("backend/app/contas_receber_consulta_routes.py")
     frontend = _source("frontend/src/components/ContasReceber.jsx")
     listar = backend.split("def listar_contas_receber(", 1)[1].split(
-        "# ============================================================================", 1
+        "# ============================================================================",
+        1,
     )[0]
     serializacao = listar.split("for conta in contas:", 1)[1]
     carregar_principal = frontend.split("const carregarDados = async () => {", 1)[
