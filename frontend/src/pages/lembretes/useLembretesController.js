@@ -4,63 +4,72 @@ import { useNavigate } from "react-router-dom";
 import api from "../../api";
 import { useModulos } from "../../contexts/ModulosContext";
 import { confirmarCorePet } from "../../services/corepetDialog";
+import { contarPorPrazo, filtrarLembretes, whatsappUrl } from "./lembretesUtils";
+
+const initialValidityConfig = { carregado: false, ativa: null, dias: 15 };
+
+function errorDetail(error, fallback) {
+  return error?.response?.data?.detail || fallback;
+}
 
 export default function useLembretesController() {
   const { moduloAtivo } = useModulos();
   const navigate = useNavigate();
+  const [abaAtiva, setAbaAtiva] = useState("recompras");
   const [lembretes, setLembretes] = useState([]);
   const [loading, setLoading] = useState(false);
   const [alertasCampanhas, setAlertasCampanhas] = useState(null);
-  const [dresPendentes, setDresPendentes] = useState(0);
-  const [autocadastrosBling, setAutocadastrosBling] = useState({ total: 0, items: [] });
   const [validadePendencias, setValidadePendencias] = useState([]);
-  const [validadeConfig, setValidadeConfig] = useState({
-    carregado: false,
-    ativa: null,
-    dias: 15,
-  });
+  const [validadeConfig, setValidadeConfig] = useState(initialValidityConfig);
   const [processandoValidade, setProcessandoValidade] = useState(false);
+  const [filtroPrazo, setFiltroPrazo] = useState("todos");
+  const [filtroTipo, setFiltroTipo] = useState("todos");
+  const [busca, setBusca] = useState("");
+  const [contatoAberto, setContatoAberto] = useState(null);
+  const [mensagemContato, setMensagemContato] = useState("");
+  const [contatos, setContatos] = useState([]);
+  const [carregandoContatos, setCarregandoContatos] = useState(false);
+  const [acaoContato, setAcaoContato] = useState("");
+  const [relatorio, setRelatorio] = useState(null);
 
   const campanhasAtivo = moduloAtivo("campanhas");
-  const financeiroErpAtivo = moduloAtivo("financeiro_erp");
-  const blingAtivo = moduloAtivo("bling");
 
-  const carregarAutocadastrosBling = useCallback(async () => {
+  const carregarLembretes = useCallback(async () => {
+    setLoading(true);
     try {
-      const res = await api.get("/integracoes/bling/nf/autocadastros-recentes", {
-        params: { horas: 24, limite: 20 },
-      });
-      setAutocadastrosBling({
-        total: Number(res.data?.total || 0),
-        items: Array.isArray(res.data?.items) ? res.data.items : [],
-      });
-    } catch {
-      setAutocadastrosBling({ total: 0, items: [] });
+      const response = await api.get("/lembretes/pendentes");
+      setLembretes(response.data?.lembretes || []);
+    } catch (error) {
+      console.error("Erro ao carregar lembretes:", error);
+      toast.error("Erro ao carregar lembretes");
+    } finally {
+      setLoading(false);
     }
   }, []);
 
   const carregarAlertasCampanhas = useCallback(async () => {
     try {
-      const res = await api.get("/campanhas/dashboard");
-      setAlertasCampanhas(res.data);
+      const response = await api.get("/campanhas/dashboard");
+      setAlertasCampanhas(response.data);
     } catch {
-      // Alertas de campanhas sao informativos.
+      setAlertasCampanhas(null);
     }
   }, []);
 
-  const carregarDresPendentes = useCallback(async () => {
+  const carregarRelatorio = useCallback(async () => {
     try {
-      const res = await api.get("/dre/classificar/pendentes");
-      setDresPendentes(res.data?.total_pendentes || 0);
+      const response = await api.get("/lembretes/relatorios/resumo", {
+        params: { dias: 30 },
+      });
+      setRelatorio(response.data);
     } catch {
-      // Silencioso: o card e apenas um aviso.
+      setRelatorio(null);
     }
   }, []);
 
   const carregarValidadePendencias = useCallback(
     async ({ processar = false, mostrarToast = false } = {}) => {
-      let configAtual = { carregado: false, ativa: null, dias: 15 };
-
+      let configAtual = initialValidityConfig;
       try {
         const configRes = await api.get("/empresa/config-estoque");
         configAtual = {
@@ -70,34 +79,34 @@ export default function useLembretesController() {
         };
         setValidadeConfig(configAtual);
       } catch {
-        setValidadeConfig((prev) => ({ ...prev, carregado: false, ativa: null }));
+        setValidadeConfig((previous) => ({ ...previous, carregado: false, ativa: null }));
       }
 
       if (processar && configAtual.ativa === true) {
         setProcessandoValidade(true);
         try {
           const processRes = await api.post("/estoque/validade/processar");
-          const processados = Number(processRes.data?.processados || 0);
+          const processed = Number(processRes.data?.processados || 0);
           if (mostrarToast) {
             toast.success(
-              processados > 0
-                ? `${processados} lote(s) removido(s) do estoque vendavel`
+              processed > 0
+                ? `${processed} lote(s) removido(s) do estoque vendável`
                 : "Nenhum lote novo em risco encontrado",
             );
           }
         } catch (error) {
           console.error("Erro ao processar validade:", error);
-          if (mostrarToast) toast.error("Nao foi possivel verificar validade agora");
+          if (mostrarToast) toast.error("Não foi possível verificar a validade agora");
         } finally {
           setProcessandoValidade(false);
         }
       } else if (processar && mostrarToast && configAtual.ativa === false) {
-        toast("Ative a protecao por validade nas configuracoes de estoque.");
+        toast("Ative a proteção por validade nas configurações de estoque.");
       }
 
       try {
-        const res = await api.get("/estoque/validade/pendencias");
-        setValidadePendencias(Array.isArray(res.data?.items) ? res.data.items : []);
+        const response = await api.get("/estoque/validade/pendencias");
+        setValidadePendencias(Array.isArray(response.data?.items) ? response.data.items : []);
       } catch {
         setValidadePendencias([]);
       }
@@ -105,81 +114,61 @@ export default function useLembretesController() {
     [],
   );
 
-  const carregarLembretes = useCallback(async () => {
-    setLoading(true);
-    try {
-      const response = await api.get("/lembretes/pendentes");
-      setLembretes(response.data.lembretes || []);
-    } catch (error) {
-      console.error("Erro ao carregar lembretes:", error);
-      toast.error("Erro ao carregar lembretes");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
   useEffect(() => {
     void carregarLembretes();
+    void carregarRelatorio();
     if (campanhasAtivo) void carregarAlertasCampanhas();
     else setAlertasCampanhas(null);
-    if (financeiroErpAtivo) void carregarDresPendentes();
-    else setDresPendentes(0);
-    if (blingAtivo) void carregarAutocadastrosBling();
-    else setAutocadastrosBling({ total: 0, items: [] });
     void carregarValidadePendencias({ processar: true });
-
     const interval = setInterval(() => {
       void carregarLembretes();
-      if (blingAtivo) void carregarAutocadastrosBling();
+      void carregarRelatorio();
       void carregarValidadePendencias();
     }, 60000);
     return () => clearInterval(interval);
   }, [
-    blingAtivo,
     campanhasAtivo,
     carregarAlertasCampanhas,
-    carregarAutocadastrosBling,
-    carregarDresPendentes,
     carregarLembretes,
+    carregarRelatorio,
     carregarValidadePendencias,
-    financeiroErpAtivo,
   ]);
 
   const completarLembrete = useCallback(
-    async (lembrete_id) => {
+    async (id) => {
       try {
-        await api.post(`/lembretes/${lembrete_id}/completar`, {});
-        toast.success("Lembrete marcado como completado");
-        void carregarLembretes();
-      } catch {
-        toast.error("Erro ao completar lembrete");
+        await api.post(`/lembretes/${id}/completar`, {});
+        toast.success("Recompra registrada");
+        await Promise.all([carregarLembretes(), carregarRelatorio()]);
+      } catch (error) {
+        toast.error(errorDetail(error, "Erro ao registrar recompra"));
       }
     },
-    [carregarLembretes],
+    [carregarLembretes, carregarRelatorio],
   );
 
   const renovarLembrete = useCallback(
-    async (lembrete_id) => {
+    async (id) => {
       try {
-        await api.post(`/lembretes/${lembrete_id}/renovar`, {});
-        toast.success("Lembrete renovado com sucesso");
+        await api.post(`/lembretes/${id}/renovar`, {});
+        toast.success("Próximo lembrete criado");
         void carregarLembretes();
-      } catch {
-        toast.error("Erro ao renovar lembrete");
+      } catch (error) {
+        toast.error(errorDetail(error, "Erro ao renovar lembrete"));
       }
     },
     [carregarLembretes],
   );
 
   const cancelarLembrete = useCallback(
-    async (lembrete_id) => {
+    async (id) => {
       if (!(await confirmarCorePet("Tem certeza que deseja cancelar este lembrete?"))) return;
       try {
-        await api.delete(`/lembretes/${lembrete_id}`);
+        await api.delete(`/lembretes/${id}`);
         toast.success("Lembrete cancelado");
         void carregarLembretes();
-      } catch {
-        toast.error("Erro ao cancelar lembrete");
+      } catch (error) {
+        toast.error(errorDetail(error, "Erro ao cancelar lembrete"));
       }
     },
     [carregarLembretes],
@@ -193,60 +182,160 @@ export default function useLembretesController() {
         retornar: "retornar-vendavel",
       };
       const mensagens = {
-        descartar: "Registrar este lote como descartado e prejuizo?",
+        descartar: "Registrar este lote como descartado e prejuízo?",
         trocar: "Registrar este lote como trocado com o fornecedor?",
-        retornar: "Retornar este lote para o estoque vendavel?",
+        retornar: "Retornar este lote para o estoque vendável?",
       };
-
-      if (!endpoints[acao]) return;
-      if (!(await confirmarCorePet(mensagens[acao]))) return;
-
+      if (!endpoints[acao] || !(await confirmarCorePet(mensagens[acao]))) return;
       try {
         await api.post(`/estoque/validade/${item.id}/${endpoints[acao]}`, {
           observacao: null,
         });
-        toast.success("Pendencia de validade atualizada");
+        toast.success("Pendência de validade atualizada");
         void carregarValidadePendencias();
       } catch (error) {
-        console.error("Erro ao resolver pendencia de validade:", error);
-        toast.error("Erro ao atualizar pendencia de validade");
+        console.error("Erro ao resolver pendência de validade:", error);
+        toast.error("Erro ao atualizar pendência de validade");
       }
     },
     [carregarValidadePendencias],
   );
 
-  const vencidos = useMemo(() => lembretes.filter((l) => l.dias_restantes < 0), [lembretes]);
+  const carregarContatos = useCallback(async (id) => {
+    setCarregandoContatos(true);
+    try {
+      const response = await api.get(`/lembretes/${id}/contatos`);
+      setContatos(response.data?.contatos || []);
+    } catch {
+      setContatos([]);
+    } finally {
+      setCarregandoContatos(false);
+    }
+  }, []);
+
+  const abrirContato = useCallback(
+    (lembrete) => {
+      setContatoAberto(lembrete);
+      setMensagemContato(lembrete.mensagem_sugerida || "");
+      setContatos([]);
+      void carregarContatos(lembrete.id);
+    },
+    [carregarContatos],
+  );
+
+  const atualizarAposContato = useCallback(
+    async (id) => {
+      await Promise.all([carregarContatos(id), carregarLembretes(), carregarRelatorio()]);
+    },
+    [carregarContatos, carregarLembretes, carregarRelatorio],
+  );
+
+  const enviarPush = useCallback(
+    async (lembrete, mensagem = lembrete.mensagem_sugerida) => {
+      setAcaoContato(`push-${lembrete.id}`);
+      try {
+        await api.post(`/lembretes/${lembrete.id}/notificar-app`, {
+          mensagem,
+          chave_cliente: crypto.randomUUID(),
+        });
+        toast.success("Notificação adicionada à fila de envio");
+        await atualizarAposContato(lembrete.id);
+      } catch (error) {
+        toast.error(errorDetail(error, "Não foi possível enviar a notificação"));
+      } finally {
+        setAcaoContato("");
+      }
+    },
+    [atualizarAposContato],
+  );
+
+  const abrirWhatsApp = useCallback(async () => {
+    if (!contatoAberto) return;
+    const url = whatsappUrl(contatoAberto.cliente_telefone, mensagemContato);
+    if (!url) {
+      toast.error("Cliente sem telefone válido");
+      return;
+    }
+    const popup = window.open("about:blank", "_blank");
+    if (!popup) {
+      toast.error("O navegador bloqueou a nova aba do WhatsApp");
+      return;
+    }
+    popup.opener = null;
+    setAcaoContato("whatsapp");
+    try {
+      await api.post(`/lembretes/${contatoAberto.id}/contatos/whatsapp`, {
+        mensagem: mensagemContato,
+        chave_cliente: crypto.randomUUID(),
+      });
+      popup.location.replace(url);
+      toast.success("Conversa aberta e registrada no histórico");
+      await atualizarAposContato(contatoAberto.id);
+    } catch (error) {
+      popup.close();
+      toast.error(errorDetail(error, "Não foi possível abrir o WhatsApp"));
+    } finally {
+      setAcaoContato("");
+    }
+  }, [atualizarAposContato, contatoAberto, mensagemContato]);
+
+  const copiarMensagem = useCallback(async () => {
+    try {
+      await navigator.clipboard.writeText(mensagemContato);
+      toast.success("Mensagem copiada");
+    } catch {
+      toast.error("Não foi possível copiar a mensagem");
+    }
+  }, [mensagemContato]);
+
+  const vencidos = useMemo(() => lembretes.filter((item) => item.dias_restantes < 0), [lembretes]);
   const proximosEmBreve = useMemo(
-    () => lembretes.filter((l) => l.dias_restantes <= 7),
+    () => lembretes.filter((item) => item.dias_restantes >= 0 && item.dias_restantes <= 7),
     [lembretes],
   );
-  const futuros = useMemo(() => lembretes.filter((l) => l.dias_restantes > 7), [lembretes]);
-  const semPendencias = lembretes.length === 0 && validadePendencias.length === 0;
-  const validadeInativa = validadeConfig.carregado && validadeConfig.ativa === false;
-  const validadeAtivaSemPendencias =
-    validadeConfig.ativa === true && validadePendencias.length === 0;
+  const contadoresPrazo = useMemo(() => contarPorPrazo(lembretes), [lembretes]);
+  const lembretesFiltrados = useMemo(
+    () => filtrarLembretes(lembretes, { busca, prazo: filtroPrazo, tipo: filtroTipo }),
+    [busca, filtroPrazo, filtroTipo, lembretes],
+  );
 
   return {
+    abaAtiva,
+    acaoContato,
     alertasCampanhas,
-    autocadastrosBling,
+    abrirContato,
+    abrirWhatsApp,
+    busca,
     cancelarLembrete,
+    carregandoContatos,
     carregarValidadePendencias,
     completarLembrete,
-    dresPendentes,
-    futuros,
+    contatoAberto,
+    contatos,
+    contadoresPrazo,
+    copiarMensagem,
+    enviarPush,
+    fecharContato: () => setContatoAberto(null),
+    filtroPrazo,
+    filtroTipo,
     irConfiguracoesEstoque: () => navigate("/configuracoes/estoque"),
-    irDre: () => navigate("/financeiro/dre"),
-    irProdutoBling: (item) => navigate(`/produtos?busca=${encodeURIComponent(item.codigo || "")}`),
     lembretes,
+    lembretesFiltrados,
     loading,
+    mensagemContato,
     processandoValidade,
     proximosEmBreve,
+    relatorio,
     renovarLembrete,
     resolverValidade,
-    semPendencias,
-    validadeAtivaSemPendencias,
+    setAbaAtiva,
+    setBusca,
+    setFiltroPrazo,
+    setFiltroTipo,
+    setMensagemContato,
+    validadeAtivaSemPendencias: validadeConfig.ativa === true && validadePendencias.length === 0,
     validadeConfig,
-    validadeInativa,
+    validadeInativa: validadeConfig.carregado && validadeConfig.ativa === false,
     validadePendencias,
     vencidos,
   };

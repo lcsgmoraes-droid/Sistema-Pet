@@ -6,43 +6,45 @@ const read = (name) => readFileSync(new URL(`./${name}`, import.meta.url), "utf8
 
 const cardSource = read("LembreteCard.jsx");
 const listSource = read("LembretesList.jsx");
-const headerSource = read("LembretesHeader.jsx");
-const campaignsSource = read("LembretesCampanhasAlertas.jsx");
-const blingSource = read("LembretesBlingAutocadastros.jsx");
-const dreSource = read("LembretesDrePendentes.jsx");
+const pageSource = read("LembretesPage.jsx");
+const modalSource = read("LembreteContatoModal.jsx");
+const tabsSource = read("LembretesTabs.jsx");
 const styleSource = read("../../styles/Lembretes.css");
 
-test("recorrencias seguem o mesmo cartao clean da area de validade", () => {
-  assert.match(cardSource, /rounded-xl border border-slate-200 bg-white/);
-  assert.match(cardSource, /dark:border-slate-700 dark:bg-slate-900/);
-  assert.match(cardSource, /formatarMoeda\(lembrete\.preco_estimado\)/);
-  assert.doesNotMatch(cardSource, /className="btn /);
-  assert.doesNotMatch(cardSource, /toFixed\(2\)/);
+test("central separa recompra, validade, relacionamento e relatórios", () => {
+  for (const literal of ["Recompras", "Validade", "Relacionamento", "Histórico e relatórios"]) {
+    assert.match(tabsSource, new RegExp(literal));
+  }
+  assert.match(pageSource, /Central de lembretes/);
+  assert.doesNotMatch(pageSource, /LembretesBlingAutocadastros/);
+  assert.doesNotMatch(pageSource, /LembretesDrePendentes/);
 });
 
-test("secoes de recorrencia usam cabecalho, contador e grade padronizados", () => {
+test("fila apresenta filtros exclusivos de prazo e tipo", () => {
+  assert.match(listSource, /Cada faixa de prazo é exclusiva/);
+  assert.match(listSource, /PRAZOS\.map/);
+  assert.match(listSource, /Todos os tipos/);
   assert.match(listSource, /rounded-2xl border border-slate-200 bg-white/);
-  assert.match(listSource, /\{lembretes\.length\} \{lembretes\.length === 1/);
-  assert.match(listSource, /dark:border-slate-700 dark:bg-slate-900/);
-  assert.doesNotMatch(listSource, /className="section/);
 });
 
-test("folha da pagina nao conserva seletores visuais do cartao antigo", () => {
+test("ações principais priorizam mensagem, push e histórico do ciclo", () => {
+  assert.match(cardSource, /> Criar mensagem/);
+  assert.match(cardSource, /Enviar notificação no app/);
+  assert.match(cardSource, /contato\(s\) neste ciclo/);
+  assert.match(cardSource, /Registrar recompra/);
+  assert.doesNotMatch(cardSource, /className="btn /);
+});
+
+test("compositor deixa sugestão editável e distingue abertura do WhatsApp", () => {
+  assert.match(modalSource, /textarea/);
+  assert.match(modalSource, /Abrir WhatsApp/);
+  assert.match(modalSource, /Enviar push/);
+  assert.match(modalSource, /Conversa aberta/);
+  assert.match(modalSource, /Histórico deste ciclo/);
+});
+
+test("folha da página continua sem estilos legados de cartão", () => {
   assert.doesNotMatch(styleSource, /\.lembrete-card/);
   assert.doesNotMatch(styleSource, /\.section-title/);
   assert.doesNotMatch(styleSource, /\.btn-primary/);
-});
-
-test("cabecalho e paineis auxiliares abandonam estilos antigos em linha", () => {
-  assert.match(headerSource, /rounded-2xl border border-slate-200/);
-  assert.doesNotMatch(campaignsSource, /style=\{\{/);
-  assert.doesNotMatch(blingSource, /style=\{\{/);
-  assert.doesNotMatch(dreSource, /style=\{\{/);
-});
-
-test("acoes mantem semantica com visual operacional consistente", () => {
-  assert.match(cardSource, />\s*Comprado\s*</);
-  assert.match(cardSource, />\s*Renovar\s*</);
-  assert.match(cardSource, /rounded-lg border border-teal-700 bg-teal-700/);
-  assert.match(cardSource, /rounded-lg border border-slate-200 bg-white/);
 });

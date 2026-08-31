@@ -30,6 +30,10 @@ const expectedFiles = [
   "src/pages/lembretes/LembretesValidadeSection.jsx",
   "src/pages/lembretes/LembretesList.jsx",
   "src/pages/lembretes/LembreteCard.jsx",
+  "src/pages/lembretes/LembretesTabs.jsx",
+  "src/pages/lembretes/LembreteContatoModal.jsx",
+  "src/pages/lembretes/LembretesRelatorios.jsx",
+  "src/pages/lembretes/lembretesUtils.js",
 ];
 
 for (const relativePath of expectedFiles) {
@@ -54,15 +58,13 @@ const featureSource = expectedFiles
 for (const literal of [
   "/lembretes/pendentes",
   "/campanhas/dashboard",
-  "/dre/classificar/pendentes",
-  "/integracoes/bling/nf/autocadastros-recentes",
   "/empresa/config-estoque",
   "/estoque/validade/processar",
   "/estoque/validade/pendencias",
-  "/lembretes/${lembrete_id}/completar",
-  "/lembretes/${lembrete_id}/renovar",
+  "/lembretes/${id}/completar",
+  "/lembretes/${id}/renovar",
   "/estoque/validade/${item.id}/${endpoints[acao]}",
-  "Lembretes de Recorr",
+  "Central de lembretes",
   "Alertas de Campanhas",
   "Auto cadastro Bling",
   "DRE",
@@ -70,6 +72,8 @@ for (const literal of [
   "Produtos removidos por validade",
   "Verificar validade agora",
   "LembreteCard",
+  "Criar mensagem",
+  "/lembretes/${lembrete.id}/notificar-app",
   "formatarDataValidade",
   "formatarMoeda",
 ]) {
