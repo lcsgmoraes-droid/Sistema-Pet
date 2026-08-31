@@ -12,11 +12,12 @@ function arredondarMoeda(valor) {
 }
 
 export function calcularResumoEmAbertoCliente(resumo = {}) {
-  const totalVendas = inteiroSeguro(resumo.total_vendas);
-  const totalParcelasCrediario = inteiroSeguro(resumo.total_parcelas_crediario);
-  const totalVendasEmAberto = numeroFinanceiroSeguro(resumo.total_em_aberto);
-  const totalCrediarioEmAberto = numeroFinanceiroSeguro(resumo.total_crediario_em_aberto);
-  const totalCrediarioVencido = numeroFinanceiroSeguro(resumo.total_crediario_vencido);
+  const dados = resumo ?? {};
+  const totalVendas = inteiroSeguro(dados.total_vendas);
+  const totalParcelasCrediario = inteiroSeguro(dados.total_parcelas_crediario);
+  const totalVendasEmAberto = numeroFinanceiroSeguro(dados.total_em_aberto);
+  const totalCrediarioEmAberto = numeroFinanceiroSeguro(dados.total_crediario_em_aberto);
+  const totalCrediarioVencido = numeroFinanceiroSeguro(dados.total_crediario_vencido);
 
   return {
     total_vendas: totalVendas,
