@@ -65,37 +65,16 @@ export default function useProdutosNovoCarregamento({
 
   const carregarOpcoesRacao = async () => {
     try {
-      const [
-        linhasResult,
-        portesResult,
-        fasesResult,
-        tratamentosResult,
-        saboresResult,
-        apresentacoesResult,
-      ] = await Promise.allSettled([
-        api.get("/opcoes-racao/linhas", { params: { apenas_ativos: true } }),
-        api.get("/opcoes-racao/portes", { params: { apenas_ativos: true } }),
-        api.get("/opcoes-racao/fases", { params: { apenas_ativos: true } }),
-        api.get("/opcoes-racao/tratamentos", { params: { apenas_ativos: true } }),
-        api.get("/opcoes-racao/sabores", { params: { apenas_ativos: true } }),
-        api.get("/opcoes-racao/apresentacoes", { params: { apenas_ativos: true } }),
-      ]);
+      const { data } = await api.get("/opcoes-racao/resumo", {
+        params: { apenas_ativos: true },
+      });
 
-      const aplicarResultado = (resultado, setter, nome) => {
-        if (resultado.status === "fulfilled") {
-          setter(Array.isArray(resultado.value.data) ? resultado.value.data : []);
-          return;
-        }
-
-        console.error(`Erro ao carregar opcoes de racao (${nome}):`, resultado.reason);
-      };
-
-      aplicarResultado(linhasResult, setOpcoesLinhas, "linhas");
-      aplicarResultado(portesResult, setOpcoesPortes, "portes");
-      aplicarResultado(fasesResult, setOpcoesFases, "fases");
-      aplicarResultado(tratamentosResult, setOpcoesTratamentos, "tratamentos");
-      aplicarResultado(saboresResult, setOpcoesSabores, "sabores");
-      aplicarResultado(apresentacoesResult, setOpcoesApresentacoes, "apresentacoes");
+      setOpcoesLinhas(Array.isArray(data?.linhas) ? data.linhas : []);
+      setOpcoesPortes(Array.isArray(data?.portes) ? data.portes : []);
+      setOpcoesFases(Array.isArray(data?.fases) ? data.fases : []);
+      setOpcoesTratamentos(Array.isArray(data?.tratamentos) ? data.tratamentos : []);
+      setOpcoesSabores(Array.isArray(data?.sabores) ? data.sabores : []);
+      setOpcoesApresentacoes(Array.isArray(data?.apresentacoes) ? data.apresentacoes : []);
     } catch (error) {
       console.error("Erro ao carregar opções de ração:", error);
     }
