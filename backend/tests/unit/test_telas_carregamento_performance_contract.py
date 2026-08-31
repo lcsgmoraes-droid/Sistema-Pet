@@ -37,6 +37,23 @@ def test_editor_e_balanco_nao_recarregam_catalogos_a_cada_produto_ou_pagina():
     assert 'api.get("/clientes/"' not in carregar_balanco
 
 
+def test_editor_e_edicao_em_lote_usam_resumo_unico_das_opcoes_de_racao():
+    editor = _source("frontend/src/hooks/useProdutosNovoCarregamento.js")
+    edicao_lote = _source(
+        "frontend/src/components/produtos/ProdutosEdicaoLoteModal.jsx"
+    )
+    backend = _source("backend/app/opcoes_racao_routes.py")
+
+    for frontend in (editor, edicao_lote):
+        assert 'api.get("/opcoes-racao/resumo"' in frontend
+        assert 'api.get("/opcoes-racao/linhas"' not in frontend
+        assert 'api.get("/opcoes-racao/apresentacoes"' not in frontend
+
+    assert '@router.get("/resumo", response_model=OpcoesRacaoResumoResponse)' in backend
+    assert '"linhas": _listar_opcoes(' in backend
+    assert '"apresentacoes": _listar_opcoes(' in backend
+
+
 def test_contas_receber_busca_relacoes_em_lote_e_frontend_nao_bloqueia_auxiliares():
     backend = _source("backend/app/contas_receber_consulta_routes.py")
     frontend = _source("frontend/src/components/ContasReceber.jsx")

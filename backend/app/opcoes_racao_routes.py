@@ -55,6 +55,15 @@ class ApresentacaoPesoResponse(ApresentacaoPesoBase):
         from_attributes = True
 
 
+class OpcoesRacaoResumoResponse(BaseModel):
+    linhas: List[OpcaoResponse]
+    portes: List[OpcaoResponse]
+    fases: List[OpcaoResponse]
+    tratamentos: List[OpcaoResponse]
+    sabores: List[OpcaoResponse]
+    apresentacoes: List[ApresentacaoPesoResponse]
+
+
 # ==================== HELPERS ====================
 
 
@@ -78,6 +87,69 @@ def _verificar_duplicata(
         query = query.filter(model.id != id_excluir)
 
     return query.first() is not None
+
+
+def _listar_opcoes(db: Session, model, tenant_id, apenas_ativos: bool, ordenacao):
+    query = db.query(model).filter(model.tenant_id == tenant_id)
+    if apenas_ativos:
+        query = query.filter(model.ativo.is_(True))
+    return query.order_by(*ordenacao).all()
+
+
+@router.get("/resumo", response_model=OpcoesRacaoResumoResponse)
+@require_permission("produtos.visualizar")
+async def listar_resumo_opcoes_racao(
+    apenas_ativos: bool = True,
+    db: Session = Depends(get_session),
+    user_and_tenant=Depends(get_current_user_and_tenant),
+):
+    """Agrupa os catalogos usados pelo editor para evitar seis requisicoes HTTP."""
+    _current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
+
+    return {
+        "linhas": _listar_opcoes(
+            db,
+            LinhaRacao,
+            tenant_id,
+            apenas_ativos,
+            (LinhaRacao.ordem, LinhaRacao.nome),
+        ),
+        "portes": _listar_opcoes(
+            db,
+            PorteAnimal,
+            tenant_id,
+            apenas_ativos,
+            (PorteAnimal.ordem, PorteAnimal.nome),
+        ),
+        "fases": _listar_opcoes(
+            db,
+            FasePublico,
+            tenant_id,
+            apenas_ativos,
+            (FasePublico.ordem, FasePublico.nome),
+        ),
+        "tratamentos": _listar_opcoes(
+            db,
+            TipoTratamento,
+            tenant_id,
+            apenas_ativos,
+            (TipoTratamento.ordem, TipoTratamento.nome),
+        ),
+        "sabores": _listar_opcoes(
+            db,
+            SaborProteina,
+            tenant_id,
+            apenas_ativos,
+            (SaborProteina.ordem, SaborProteina.nome),
+        ),
+        "apresentacoes": _listar_opcoes(
+            db,
+            ApresentacaoPeso,
+            tenant_id,
+            apenas_ativos,
+            (ApresentacaoPeso.ordem, ApresentacaoPeso.peso_kg),
+        ),
+    }
 
 
 # ==================== LINHAS DE RAÇÃO ====================
