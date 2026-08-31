@@ -6,6 +6,7 @@ import {
   getKitCompositionFromResponse,
   isExpandIdSelected,
   normalizeExpandId,
+  obterFontesImagemProduto,
 } from "./produtosUtils.js";
 
 test("normaliza ids de expansao vindos como numero ou texto", () => {
@@ -40,4 +41,33 @@ test("usa o estoque disponivel informado para cada componente", () => {
   assert.equal(getKitComponentAvailableStock({ produto_estoque: 2 }), 2);
   assert.equal(getKitComponentAvailableStock({ estoque_disponivel: "invalido" }), null);
   assert.equal(getKitComponentAvailableStock({}), null);
+});
+
+test("prioriza miniatura e preserva a imagem original como fallback", () => {
+  assert.deepEqual(
+    obterFontesImagemProduto(
+      {
+        imagem_principal: "/produtos/1/originais/foto.webp",
+        imagem_principal_thumbnail: "/produtos/1/thumbs/foto.webp",
+      },
+      "https://img.corepet.com.br",
+    ),
+    {
+      src: "https://img.corepet.com.br/produtos/1/thumbs/foto.webp",
+      fallbackSrc: "https://img.corepet.com.br/produtos/1/originais/foto.webp",
+    },
+  );
+});
+
+test("deriva a miniatura de imagens antigas sem campo dedicado", () => {
+  assert.deepEqual(
+    obterFontesImagemProduto(
+      { imagem_principal: "https://img.corepet.com.br/produtos/1/originais/foto.webp" },
+      "https://corepet.com.br",
+    ),
+    {
+      src: "https://img.corepet.com.br/produtos/1/thumbs/foto.webp",
+      fallbackSrc: "https://img.corepet.com.br/produtos/1/originais/foto.webp",
+    },
+  );
 });

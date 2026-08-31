@@ -8,6 +8,33 @@ export const normalizeSearchText = (value) => {
 
 export const normalizeExpandId = (value) => String(value ?? "");
 
+const normalizarUrlImagemProduto = (url, origin) => {
+  if (!url) return null;
+  if (/^https?:\/\//i.test(url)) return url;
+  if (!origin) return url;
+  return `${origin}${url.startsWith("/") ? "" : "/"}${url}`;
+};
+
+export const obterFontesImagemProduto = (
+  produto,
+  origin = typeof window !== "undefined" ? window.location.origin : "",
+) => {
+  const original = normalizarUrlImagemProduto(produto?.imagem_principal, origin);
+  const miniaturaInformada = normalizarUrlImagemProduto(
+    produto?.imagem_principal_thumbnail,
+    origin,
+  );
+  const miniaturaDerivada = original?.includes("/originais/")
+    ? original.replace("/originais/", "/thumbs/")
+    : null;
+  const src = miniaturaInformada || miniaturaDerivada || original;
+
+  return {
+    src,
+    fallbackSrc: original && original !== src ? original : null,
+  };
+};
+
 export const isExpandIdSelected = (expandedIds, value) => {
   const normalizedId = normalizeExpandId(value);
   return (expandedIds || []).some((id) => normalizeExpandId(id) === normalizedId);

@@ -375,15 +375,19 @@ export const addFornecedorProduto = (produtoId, data) => {
 /**
  * Atualizar fornecedor do produto
  */
-export const updateFornecedorProduto = (id, data) => {
-  return api.put(`/produtos/fornecedores/${id}`, data);
+export const updateFornecedorProduto = (id, data, produtoId = null) => {
+  return api.put(`/produtos/fornecedores/${id}`, data, {
+    params: produtoId ? { produto_id: produtoId } : undefined,
+  });
 };
 
 /**
  * Remover fornecedor do produto
  */
-export const deleteFornecedorProduto = (id) => {
-  return api.delete(`/produtos/fornecedores/${id}`);
+export const deleteFornecedorProduto = (id, produtoId = null) => {
+  return api.delete(`/produtos/fornecedores/${id}`, {
+    params: produtoId ? { produto_id: produtoId } : undefined,
+  });
 };
 
 // ========================================

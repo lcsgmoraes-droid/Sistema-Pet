@@ -12,6 +12,7 @@ import {
   normalizeExpandId,
   obterCanaisAtivosProduto,
   obterEstoqueVisualProduto,
+  obterFontesImagemProduto,
   obterLotesValidadeDisponiveis,
 } from "./produtosUtils";
 
@@ -77,13 +78,6 @@ function obterValidadeResumoProduto(produto) {
     surfaceClassName: "bg-gray-50 border-gray-200",
     tooltip,
   };
-}
-
-function obterImagemProduto(produto) {
-  if (!produto?.imagem_principal) return null;
-  return produto.imagem_principal.startsWith("http")
-    ? produto.imagem_principal
-    : `${window.location.origin}${produto.imagem_principal}`;
 }
 
 const getProdutoBlingId = (produto) => String(produto?.bling_produto_id || "").trim();
@@ -297,7 +291,7 @@ export default function ProdutosTabelaSection({
                 const estoqueAtual = obterEstoqueVisualProduto(produto);
                 const reservado = Number(produto.estoque_reservado || 0);
                 const estoqueDisponivel = Number((estoqueAtual - reservado).toFixed(2));
-                const imagem = obterImagemProduto(produto);
+                const imagem = obterFontesImagemProduto(produto);
                 const codigo = produto.codigo || produto.sku || produto.codigo_barras;
                 const canaisAtivos = obterCanaisAtivosProduto(produto);
                 const blingId = getProdutoBlingId(produto);
@@ -320,11 +314,26 @@ export default function ProdutosTabelaSection({
                   >
                     <div className="flex gap-3">
                       <div className="h-16 w-16 shrink-0 overflow-hidden rounded-lg border border-gray-200 bg-gray-100">
-                        {imagem ? (
+                        {imagem.src ? (
                           <img
-                            src={imagem}
+                            src={imagem.src}
                             alt={produto.nome}
+                            width="64"
+                            height="64"
+                            loading="lazy"
+                            decoding="async"
+                            fetchPriority="low"
                             className="h-full w-full object-cover"
+                            onError={(event) => {
+                              if (
+                                imagem.fallbackSrc &&
+                                event.currentTarget.src !== imagem.fallbackSrc
+                              ) {
+                                event.currentTarget.src = imagem.fallbackSrc;
+                                return;
+                              }
+                              event.currentTarget.style.display = "none";
+                            }}
                           />
                         ) : (
                           <div className="flex h-full w-full items-center justify-center text-xs text-gray-400">

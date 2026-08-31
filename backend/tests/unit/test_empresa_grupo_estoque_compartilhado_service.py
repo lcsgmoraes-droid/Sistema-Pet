@@ -18,7 +18,13 @@ from app.empresa_grupo_models import (
 )
 from app.estoque.service import EstoqueService
 from app.models import Tenant, User
-from app.produtos_models import EstoqueMovimentacao, Produto, ProdutoLote
+from app.produto_config_fiscal_models import ProdutoConfigFiscal
+from app.produtos_models import (
+    EstoqueMovimentacao,
+    Produto,
+    ProdutoFornecedor,
+    ProdutoLote,
+)
 from app.tenancy.context import clear_current_tenant, tenant_context
 from app.vendas.estoque_baixa import processar_baixa_estoque_item
 
@@ -51,6 +57,8 @@ def db(monkeypatch):
             User.__table__,
             Produto.__table__,
             ProdutoLote.__table__,
+            ProdutoFornecedor.__table__,
+            ProdutoConfigFiscal.__table__,
             EstoqueMovimentacao.__table__,
             EmpresaGrupo.__table__,
             EmpresaGrupoMembro.__table__,
@@ -266,6 +274,97 @@ def test_acesso_completo_ao_catalogo_e_independente_do_uso_do_saldo(db):
         service.resolver_produto_venda(session, CONSUMIDORA, produto.id)
         with pytest.raises(HTTPException):
             service.resolver_produto_catalogo(session, CONSUMIDORA, produto.id)
+
+
+def test_tela_compartilhada_le_lotes_fornecedores_e_fiscal_da_origem(db):
+    from app.api.v1.produto_fiscal_v2 import get_fiscal_produto, put_fiscal_produto
+    from app.produtos.fornecedores_routes import listar_fornecedores_produto
+    from app.produtos.lotes_routes import atualizar_lote, listar_lotes
+    from app.produtos.schemas import LoteBase
+
+    session, _syncs = db
+    grupo, produto, usuario = _preparar_cenario(session)
+    service = EmpresaGrupoEstoqueCompartilhadoService(session)
+
+    with tenant_context(ORIGEM):
+        service.compartilhar(
+            grupo.id,
+            ORIGEM,
+            usuario.id,
+            CONSUMIDORA,
+            [produto.id],
+            acesso_catalogo_completo=True,
+        )
+        produto.ncm = "23099010"
+        session.add(
+            ProdutoLote(
+                produto_id=produto.id,
+                nome_lote="LOTE-GABI-01",
+                quantidade_inicial=8,
+                quantidade_disponivel=8,
+                ordem_entrada=1,
+            )
+        )
+        session.commit()
+
+    credencial_consumidora = (usuario, UUID(CONSUMIDORA))
+    with tenant_context(CONSUMIDORA):
+        lotes = listar_lotes(
+            produto.id,
+            db=session,
+            user_and_tenant=credencial_consumidora,
+        )
+    with tenant_context(CONSUMIDORA):
+        fornecedores = listar_fornecedores_produto(
+            produto.id,
+            db=session,
+            user_and_tenant=credencial_consumidora,
+        )
+    with tenant_context(CONSUMIDORA):
+        fiscal = get_fiscal_produto(
+            produto.id,
+            db=session,
+            tenant_id=UUID(CONSUMIDORA),
+        )
+    with tenant_context(CONSUMIDORA):
+        put_fiscal_produto(
+            produto.id,
+            {"ncm": "23099020", "origem_mercadoria": "0"},
+            db=session,
+            tenant_id=UUID(CONSUMIDORA),
+        )
+    with tenant_context(CONSUMIDORA):
+        lote_atualizado = atualizar_lote(
+            produto.id,
+            lotes[0].id,
+            LoteBase(
+                nome_lote="LOTE-GABI-01",
+                quantidade_inicial=10,
+                custo_unitario=62,
+            ),
+            db=session,
+            user_and_tenant=credencial_consumidora,
+        )
+    with tenant_context(ORIGEM):
+        estoque_origem = (
+            session.query(Produto.estoque_atual)
+            .filter(Produto.id == produto.id)
+            .scalar()
+        )
+        fiscal_origem = (
+            session.query(ProdutoConfigFiscal)
+            .filter(ProdutoConfigFiscal.produto_id == produto.id)
+            .one()
+        )
+
+    assert [lote.nome_lote for lote in lotes] == ["LOTE-GABI-01"]
+    assert lote_atualizado.quantidade_inicial == 10
+    assert estoque_origem == 12
+    assert fornecedores == []
+    assert fiscal["origem"] == "produto_legado"
+    assert fiscal["ncm"] == "23099010"
+    assert str(fiscal_origem.tenant_id) == ORIGEM
+    assert fiscal_origem.ncm == "23099020"
 
 
 def test_remover_compartilhamento_bloqueia_nova_venda_sem_apagar_historico(db):
