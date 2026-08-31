@@ -136,8 +136,8 @@ export const deleteDepartamento = (id) => {
  * @param {Object} params - Filtros: busca, categoria_id, marca_id, departamento_id,
  * estoque_baixo, estoque_situacao, imagem_situacao, ordenacao, em_promocao
  */
-export const getProdutos = (params = {}) => {
-  return api.get("/produtos/", { params });
+export const getProdutos = (params = {}, config = {}) => {
+  return api.get("/produtos/", { ...config, params });
 };
 
 export const exportarProdutoBling = (produtoId, enviarEstoque = true) => {

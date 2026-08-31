@@ -4,6 +4,8 @@
 
 import api from "../api";
 
+let caixaAbertoEmAndamento = null;
+
 /**
  * Abrir novo caixa
  */
@@ -15,9 +17,17 @@ export const abrirCaixa = async (dados) => {
 /**
  * Obter caixa aberto do usuário atual
  */
-export const obterCaixaAberto = async () => {
-  const response = await api.get("/caixas/aberto");
-  return response.data;
+export const obterCaixaAberto = () => {
+  if (!caixaAbertoEmAndamento) {
+    caixaAbertoEmAndamento = api
+      .get("/caixas/aberto")
+      .then((response) => response.data)
+      .finally(() => {
+        caixaAbertoEmAndamento = null;
+      });
+  }
+
+  return caixaAbertoEmAndamento;
 };
 
 /**

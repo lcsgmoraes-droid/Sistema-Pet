@@ -16,8 +16,10 @@ from app.partner_utils import is_partner_owned
 from app.produtos_models import Produto, ProdutoFornecedor
 from app.produtos.search import (
     _build_produto_search_order_clause,
+    _produto_search_exact_conditions,
     _produto_search_conditions,
     _produto_search_conditions_fast,
+    _produto_search_sort_key,
 )
 from app.produtos.validade import _mapa_validade_proxima_produtos
 from app.services.kit_custo_service import KitCustoService
@@ -209,8 +211,10 @@ def _buscar_pagina_produtos_listagem(
     incluir_lotes: bool,
     incluir_bling_sync: bool = False,
     contar_total: bool = True,
+    busca_rapida: bool = False,
 ) -> tuple[list[Produto], Optional[int], list[Any]]:
     total = query.count() if contar_total else None
+    usar_busca_rapida = bool(busca_rapida and termo_busca and offset == 0)
     if ordenacao == "estoque_desc":
         order_clause = [
             func.coalesce(Produto.estoque_atual, 0).desc(),
@@ -230,6 +234,29 @@ def _buscar_pagina_produtos_listagem(
         incluir_lotes=incluir_lotes,
         incluir_bling_sync=incluir_bling_sync,
     )
+
+    if usar_busca_rapida:
+        # O ORDER BY de relevancia com varios CASE/ILIKE levava mais de dois
+        # segundos no PDV. Buscamos um conjunto pequeno sem ordenar no banco,
+        # mas garantimos antes os matches exatos de codigo usados pelo leitor.
+        produtos_exatos = (
+            query.filter(_produto_search_exact_conditions(termo_busca))
+            .options(*load_options)
+            .limit(page_size)
+            .all()
+        )
+        limite_candidatos = min(max(page_size * 10, 120), 500)
+        candidatos = query.options(*load_options).limit(limite_candidatos).all()
+        produtos_unicos = {
+            produto.id: produto
+            for produto in [*produtos_exatos, *candidatos]
+            if produto is not None
+        }
+        produtos = sorted(
+            produtos_unicos.values(),
+            key=lambda produto: _produto_search_sort_key(produto, termo_busca),
+        )[:page_size]
+        return produtos, total, load_options
 
     produtos = (
         query.options(*load_options)

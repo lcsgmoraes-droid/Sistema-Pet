@@ -259,8 +259,6 @@ const EntradaXML = () => {
     atualizarMargem,
     atualizarPrecoVenda,
     acoesProcessamento,
-    baseCalculoMargem,
-    baseCalculoMargemOpcoes,
     calcularPrecoVenda,
     carregarPreviewProcessamento,
     confirmarProcessamento,
@@ -276,7 +274,6 @@ const EntradaXML = () => {
     obterResumoCustoItem,
     precosAjustados,
     previewProcessamento,
-    setBaseCalculoMargem,
     setAcaoProcessamento,
     setFiltroCusto,
     voltarParaVisualizacao,
@@ -603,10 +600,7 @@ const EntradaXML = () => {
         exportarRelatorioCustosMaioresCSV={exportarRelatorioCustosMaioresCSV}
         exportarRelatorioCustosMaioresPDF={exportarRelatorioCustosMaioresPDF}
         gerandoRelatorioCustos={gerandoRelatorioCustos}
-        baseCalculoMargem={baseCalculoMargem}
-        setBaseCalculoMargem={setBaseCalculoMargem}
         setAcaoProcessamento={setAcaoProcessamento}
-        baseCalculoMargemOpcoes={baseCalculoMargemOpcoes}
         precosAjustados={precosAjustados}
         inputsRevisaoPrecos={inputsRevisaoPrecos}
         inputsRevisaoCustos={inputsRevisaoCustos}
