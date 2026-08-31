@@ -302,9 +302,13 @@ def atualizar_vinculo_fornecedor(
         )
 
     # Buscar vínculo e verificar permissão
-    query_vinculo = db.query(ProdutoFornecedor).join(Produto).filter(
-        ProdutoFornecedor.id == vinculo_id,
-        Produto.tenant_id == tenant_id,
+    query_vinculo = (
+        db.query(ProdutoFornecedor)
+        .join(Produto)
+        .filter(
+            ProdutoFornecedor.id == vinculo_id,
+            Produto.tenant_id == tenant_id,
+        )
     )
     if produto_id is not None:
         query_vinculo = query_vinculo.filter(Produto.id == produto_id)
@@ -408,9 +412,13 @@ def desvincular_fornecedor(
         )
 
     # Buscar vínculo e verificar permissão
-    query_vinculo = db.query(ProdutoFornecedor).join(Produto).filter(
-        ProdutoFornecedor.id == vinculo_id,
-        Produto.tenant_id == tenant_id,
+    query_vinculo = (
+        db.query(ProdutoFornecedor)
+        .join(Produto)
+        .filter(
+            ProdutoFornecedor.id == vinculo_id,
+            Produto.tenant_id == tenant_id,
+        )
     )
     if produto_id is not None:
         query_vinculo = query_vinculo.filter(Produto.id == produto_id)
