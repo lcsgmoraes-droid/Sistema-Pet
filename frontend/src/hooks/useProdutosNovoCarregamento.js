@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import api from "../api";
 import { normalizeMarkdownContent } from "../utils/safeMarkdown";
 import {
@@ -53,6 +53,7 @@ export default function useProdutosNovoCarregamento({
   setOpcoesSabores,
   setOpcoesApresentacoes,
   setLoading,
+  setErroCarregamento,
   setFormData,
   setPredecessorInfo,
   setSucessorInfo,
@@ -60,6 +61,8 @@ export default function useProdutosNovoCarregamento({
   setLotes,
   setFornecedores,
 }) {
+  const produtoRequestRef = useRef(0);
+
   const carregarOpcoesRacao = async () => {
     try {
       const [
@@ -99,68 +102,90 @@ export default function useProdutosNovoCarregamento({
   };
 
   const carregarDadosAuxiliares = async () => {
-    await carregarOpcoesRacao();
+    const [categoriasResult, marcasResult, departamentosResult, clientesResult] =
+      await Promise.allSettled([
+        getCategorias(),
+        getMarcas(),
+        getDepartamentos(),
+        api.get("/clientes/", {
+          params: { tipo_cadastro: "fornecedor", apenas_ativos: true },
+        }),
+        carregarOpcoesRacao(),
+      ]);
 
-    try {
-      const [categoriasResponse, marcasResponse, departamentosResponse, clientesResponse] =
-        await Promise.all([
-          getCategorias(),
-          getMarcas(),
-          getDepartamentos(),
-          api.get("/clientes/", {
-            params: { tipo_cadastro: "fornecedor", apenas_ativos: true },
-          }),
-        ]);
+    if (categoriasResult.status === "fulfilled") {
+      const categoriasCarregadas = categoriasResult.value.data || [];
+      setCategorias(categoriasCarregadas);
+      setCategoriasHierarquicas(construirListaHierarquica(categoriasCarregadas));
+    } else {
+      console.error("Erro ao carregar categorias:", categoriasResult.reason);
+    }
 
-      setCategorias(categoriasResponse.data);
-      setCategoriasHierarquicas(construirListaHierarquica(categoriasResponse.data));
-      setMarcas(marcasResponse.data);
-      setDepartamentos(departamentosResponse.data);
-      setClientes(
-        Array.isArray(clientesResponse.data)
-          ? clientesResponse.data
-          : clientesResponse.data.items || [],
-      );
-    } catch (error) {
-      console.error("Erro ao carregar dados auxiliares:", error);
+    if (marcasResult.status === "fulfilled") {
+      setMarcas(marcasResult.value.data || []);
+    } else {
+      console.error("Erro ao carregar marcas:", marcasResult.reason);
+    }
+
+    if (departamentosResult.status === "fulfilled") {
+      setDepartamentos(departamentosResult.value.data || []);
+    } else {
+      console.error("Erro ao carregar departamentos:", departamentosResult.reason);
+    }
+
+    if (clientesResult.status === "fulfilled") {
+      const clientesData = clientesResult.value.data;
+      setClientes(Array.isArray(clientesData) ? clientesData : clientesData?.items || []);
+    } else {
+      console.error("Erro ao carregar fornecedores:", clientesResult.reason);
     }
   };
 
-  const carregarFiscal = async (produto) => {
+  const carregarFiscal = async (produto, requestAindaAtiva = () => true) => {
     try {
       const isKit = produto.tipo_produto === "KIT";
       const { data } = isKit
         ? await api.get(`/produtos/${produto.id}/kit/fiscal`)
         : await api.get(`/produtos/${produto.id}/fiscal`);
 
-      setFormData((prev) => ({
-        ...prev,
-        tributacao: {
-          origem: data.origem,
-          herdado_da_empresa: data.herdado_da_empresa,
-          origem_mercadoria: data.origem_mercadoria ?? "0",
-          ncm: data.ncm ?? "",
-          cest: data.cest ?? "",
-          cfop: data.cfop ?? "",
-          cst_icms: data.cst_icms ?? "",
-          icms_aliquota: data.icms_aliquota ?? "",
-          icms_st: data.icms_st ?? false,
-          pis_aliquota: data.pis_aliquota ?? "",
-          cofins_aliquota: data.cofins_aliquota ?? "",
-        },
-      }));
+      if (requestAindaAtiva()) {
+        setFormData((prev) => ({
+          ...prev,
+          tributacao: {
+            origem: data.origem,
+            herdado_da_empresa: data.herdado_da_empresa,
+            origem_mercadoria: data.origem_mercadoria ?? "0",
+            ncm: data.ncm ?? "",
+            cest: data.cest ?? "",
+            cfop: data.cfop ?? "",
+            cst_icms: data.cst_icms ?? "",
+            icms_aliquota: data.icms_aliquota ?? "",
+            icms_st: data.icms_st ?? false,
+            pis_aliquota: data.pis_aliquota ?? "",
+            cofins_aliquota: data.cofins_aliquota ?? "",
+          },
+        }));
+      }
     } catch (error) {
       console.error("Erro ao carregar fiscal:", error);
     }
   };
 
   const carregarProduto = async () => {
+    const requestId = ++produtoRequestRef.current;
+    const requestAindaAtiva = () => produtoRequestRef.current === requestId;
+
     try {
       setLoading(true);
+      setErroCarregamento(null);
       setPredecessorInfo(null);
       setSucessorInfo(null);
+      setImagens([]);
+      setLotes([]);
+      setFornecedores([]);
 
       const response = await getProduto(id);
+      if (!requestAindaAtiva()) return;
       const produto = response.data;
 
       let markup = "";
@@ -259,90 +284,91 @@ export default function useProdutosNovoCarregamento({
         sabor_proteina_id: produto.sabor_proteina_id || "",
         apresentacao_peso_id: produto.apresentacao_peso_id || "",
       });
+      setLoading(false);
 
-      if (produto.produto_predecessor_id) {
-        try {
-          const predecessorRes = await getProduto(produto.produto_predecessor_id);
-          setPredecessorInfo({
-            id: predecessorRes.data.id,
-            codigo: predecessorRes.data.codigo,
-            nome: predecessorRes.data.nome,
+      const carregarPredecessor = async () => {
+        if (!produto.produto_predecessor_id) return;
+        const predecessorRes = await getProduto(produto.produto_predecessor_id);
+        if (!requestAindaAtiva()) return;
+        setPredecessorInfo({
+          id: predecessorRes.data.id,
+          codigo: predecessorRes.data.codigo,
+          nome: predecessorRes.data.nome,
+          motivo_descontinuacao: produto.motivo_descontinuacao,
+          data_descontinuacao: produto.predecessor?.data_descontinuacao,
+        });
+      };
+
+      const carregarSucessor = async () => {
+        if (!produto.data_descontinuacao) return;
+        const sucessoresResponse = await api.get("/produtos/", {
+          params: { produto_predecessor_id: produto.id, ativo: null },
+        });
+        if (!requestAindaAtiva()) return;
+        const sucessores = Array.isArray(sucessoresResponse.data)
+          ? sucessoresResponse.data
+          : sucessoresResponse.data.items || [];
+        if (sucessores.length > 0) {
+          const sucessor = sucessores[0];
+          setSucessorInfo({
+            id: sucessor.id,
+            codigo: sucessor.codigo,
+            nome: sucessor.nome,
             motivo_descontinuacao: produto.motivo_descontinuacao,
-            data_descontinuacao: produto.predecessor?.data_descontinuacao,
+            data_descontinuacao: produto.data_descontinuacao,
           });
-        } catch (error) {
-          console.error("Erro ao carregar predecessor:", error);
         }
-      }
+      };
 
-      if (produto.data_descontinuacao) {
-        try {
-          const sucessoresResponse = await api.get("/produtos/", {
-            params: {
-              produto_predecessor_id: produto.id,
-              ativo: null,
-            },
-          });
-
-          const sucessores = Array.isArray(sucessoresResponse.data)
-            ? sucessoresResponse.data
-            : sucessoresResponse.data.items || [];
-
-          if (sucessores.length > 0) {
-            const sucessor = sucessores[0];
-            setSucessorInfo({
-              id: sucessor.id,
-              codigo: sucessor.codigo,
-              nome: sucessor.nome,
-              motivo_descontinuacao: produto.motivo_descontinuacao,
-              data_descontinuacao: produto.data_descontinuacao,
-            });
-          }
-        } catch (error) {
-          console.error("❌ Erro ao carregar sucessor:", error);
-        }
-      }
-
-      try {
+      const carregarImagens = async () => {
         const imagensRes = await api.get(`/produtos/${id}/imagens`);
-        setImagens(imagensRes.data || []);
-      } catch (error) {
-        console.error("Erro ao carregar imagens:", error);
-        setImagens([]);
-      }
+        if (requestAindaAtiva()) setImagens(imagensRes.data || []);
+      };
 
-      try {
+      const carregarLotesProduto = async () => {
         const lotesRes = await getLotes(id);
+        if (!requestAindaAtiva()) return;
         const lotesCarregados = lotesRes.data || [];
         setLotes(lotesCarregados);
         if (lotesCarregados.length > 0 && !produto.controle_lote) {
           setFormData((prev) => ({ ...prev, controle_lote: true }));
         }
-      } catch (error) {
-        console.error("Erro ao carregar lotes:", error);
-        setLotes([]);
-      }
+      };
 
-      try {
+      const carregarFornecedoresProduto = async () => {
         const fornecedoresResponse = await getFornecedoresProduto(id);
-        setFornecedores(fornecedoresResponse.data || []);
-      } catch (error) {
-        console.error("Erro ao carregar fornecedores:", error);
-        setFornecedores([]);
-      }
+        if (requestAindaAtiva()) setFornecedores(fornecedoresResponse.data || []);
+      };
 
-      await carregarFiscal(produto);
+      const resultadosComplementares = await Promise.allSettled([
+        carregarPredecessor(),
+        carregarSucessor(),
+        carregarImagens(),
+        carregarLotesProduto(),
+        carregarFornecedoresProduto(),
+        carregarFiscal(produto, requestAindaAtiva),
+      ]);
+
+      resultadosComplementares.forEach((resultado, indice) => {
+        if (resultado.status === "rejected") {
+          console.error(`Erro ao carregar complemento ${indice + 1} do produto:`, resultado.reason);
+        }
+      });
     } catch (error) {
+      if (!requestAindaAtiva()) return;
       console.error("❌ Erro ao carregar produto:", error);
-      alert("Erro ao carregar produto: " + (error.response?.data?.detail || error.message));
+      setErroCarregamento(
+        error.response?.data?.detail || error.message || "Produto não encontrado.",
+      );
     } finally {
-      setLoading(false);
+      if (requestAindaAtiva()) setLoading(false);
     }
   };
 
   const carregarProdutoParaClone = async () => {
     try {
       setLoading(true);
+      setErroCarregamento(null);
       setPredecessorInfo(null);
       setSucessorInfo(null);
       setImagens([]);
@@ -365,8 +391,8 @@ export default function useProdutosNovoCarregamento({
       }));
     } catch (error) {
       console.error("Erro ao carregar produto para clone:", error);
-      alert(
-        "Erro ao carregar produto para clonar: " + (error.response?.data?.detail || error.message),
+      setErroCarregamento(
+        error.response?.data?.detail || error.message || "Produto não encontrado.",
       );
     } finally {
       setLoading(false);
@@ -395,15 +421,18 @@ export default function useProdutosNovoCarregamento({
 
   useEffect(() => {
     carregarDadosAuxiliares();
+  }, []);
 
+  useEffect(() => {
     if (isEdicao) {
       carregarProduto();
-      return;
-    }
-
-    if (cloneId) {
+    } else if (cloneId) {
       carregarProdutoParaClone();
     }
+
+    return () => {
+      produtoRequestRef.current += 1;
+    };
   }, [id, isEdicao, cloneId]);
 
   return {

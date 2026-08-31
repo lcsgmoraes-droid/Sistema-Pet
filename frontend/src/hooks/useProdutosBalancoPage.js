@@ -45,13 +45,7 @@ export function useProdutosBalancoPage() {
       if (filtrosAtuais.marca_id) params.marca_id = filtrosAtuais.marca_id;
       if (filtrosAtuais.fornecedor_id) params.fornecedor_id = filtrosAtuais.fornecedor_id;
 
-      const [prodRes, marcasRes, cliRes] = await Promise.all([
-        getProdutos(params),
-        getMarcas(),
-        api.get("/clientes/", {
-          params: { tipo_cadastro: "fornecedor", apenas_ativos: true, page_size: 1000 },
-        }),
-      ]);
+      const prodRes = await getProdutos(params);
 
       const items = prodRes.data?.items || [];
       const total = prodRes.data?.total || items.length;
@@ -60,8 +54,6 @@ export function useProdutosBalancoPage() {
       setProdutos(items);
       setTotalItensServidor(total);
       setTotalPaginasServidor(Math.max(pages, 1));
-      setMarcas(marcasRes.data || []);
-      setFornecedores(Array.isArray(cliRes.data) ? cliRes.data : cliRes.data?.items || []);
     } catch (error) {
       console.error("Erro ao carregar balanco:", error);
       toast.error("Erro ao carregar produtos para balanco.");
@@ -69,6 +61,32 @@ export function useProdutosBalancoPage() {
       setCarregando(false);
     }
   };
+
+  const carregarCatalogos = async () => {
+    const [marcasResult, fornecedoresResult] = await Promise.allSettled([
+      getMarcas(),
+      api.get("/clientes/", {
+        params: { tipo_cadastro: "fornecedor", apenas_ativos: true, page_size: 1000 },
+      }),
+    ]);
+
+    if (marcasResult.status === "fulfilled") {
+      setMarcas(marcasResult.value.data || []);
+    } else {
+      console.error("Erro ao carregar marcas do balanco:", marcasResult.reason);
+    }
+
+    if (fornecedoresResult.status === "fulfilled") {
+      const data = fornecedoresResult.value.data;
+      setFornecedores(Array.isArray(data) ? data : data?.items || []);
+    } else {
+      console.error("Erro ao carregar fornecedores do balanco:", fornecedoresResult.reason);
+    }
+  };
+
+  useEffect(() => {
+    carregarCatalogos();
+  }, []);
 
   useEffect(() => {
     carregarDadosComFiltros(filtros, paginaAtual);
