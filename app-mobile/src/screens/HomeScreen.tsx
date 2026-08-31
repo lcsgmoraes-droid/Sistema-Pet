@@ -15,10 +15,6 @@ import Svg, { Circle, Path } from 'react-native-svg';
 import HeaderProfileActions from '../components/HeaderProfileActions';
 import StoreContextBadge from '../components/StoreContextBadge';
 import { listarNotificacoesApp } from '../services/appNotifications.service';
-import {
-  contarNovidadesAppNaoVistas,
-  listarEvolucaoCorePetApp,
-} from '../services/evolucaoCorePet.service';
 import { listarOfertasAtivas, listarProdutos, OfertaAtiva } from '../services/shop.service';
 import { useAuthStore } from '../store/auth.store';
 import { CORES, ESPACO, FONTE, RAIO, SOMBRA } from '../theme';
@@ -64,23 +60,12 @@ export default function HomeScreen() {
       return;
     }
     try {
-      const [notificacoes, evolucao] = await Promise.allSettled([
-        listarNotificacoesApp(),
-        listarEvolucaoCorePetApp(),
-      ]);
-      const avisosNaoLidos =
-        notificacoes.status === 'fulfilled'
-          ? Math.max(0, Number(notificacoes.value.unread_count ?? 0))
-          : 0;
-      const novidadesNaoVistas =
-        evolucao.status === 'fulfilled'
-          ? await contarNovidadesAppNaoVistas(evolucao.value.itens, user?.id)
-          : 0;
-      setUnreadNotifications(avisosNaoLidos + novidadesNaoVistas);
+      const notificacoes = await listarNotificacoesApp();
+      setUnreadNotifications(Math.max(0, Number(notificacoes.unread_count ?? 0)));
     } catch {
       setUnreadNotifications(0);
     }
-  }, [isAuthenticated, user?.id]);
+  }, [isAuthenticated]);
 
   useFocusEffect(
     useCallback(() => {
