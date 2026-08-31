@@ -6,6 +6,7 @@ import { getAccessToken } from "../auth/tokenStorage";
 import { toast } from "react-hot-toast";
 import {
   calcularSaldoAtualizadoFinanceiro,
+  ehContaDeRepasseCartao,
   ehLancamentoFinanceiroCancelado,
 } from "../utils/financeiroStatus";
 import { safeArray } from "../utils/safeArray";
@@ -440,6 +441,27 @@ const ContasReceber = () => {
     const vencimento = new Date(conta.data_vencimento);
     if (ehLancamentoFinanceiroCancelado(conta)) return <StatusBadge status="cancelado" />;
     if (conta.status === "recebido") return <StatusBadge status="recebido" />;
+    if (ehContaDeRepasseCartao(conta)) {
+      if (conta.status === "parcial") {
+        return (
+          <StatusBadge intent="info" title="Cliente pagou; a operadora repassou parte do valor">
+            Pago · repasse parcial
+          </StatusBadge>
+        );
+      }
+      if (vencimento < hoje) {
+        return (
+          <StatusBadge intent="danger" title="Cliente pagou; o repasse da operadora está atrasado">
+            Pago · repasse atrasado
+          </StatusBadge>
+        );
+      }
+      return (
+        <StatusBadge intent="warning" title="Cliente pagou; aguardando repasse da operadora">
+          Pago · repasse pendente
+        </StatusBadge>
+      );
+    }
     if (vencimento < hoje) return <StatusBadge status="vencida" />;
     if (conta.status === "parcial") return <StatusBadge status="parcial" />;
     return <StatusBadge status="pendente" />;

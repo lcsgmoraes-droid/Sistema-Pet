@@ -3,12 +3,18 @@ import assert from "node:assert/strict";
 import {
   calcularSaldoAtualizadoFinanceiro,
   calcularSaldoFinanceiro,
+  ehContaDeRepasseCartao,
   ehLancamentoFinanceiroCancelado,
 } from "./financeiroStatus.js";
 
 assert.equal(ehLancamentoFinanceiroCancelado("cancelado"), true);
 assert.equal(ehLancamentoFinanceiroCancelado({ status: "cancelada" }), true);
 assert.equal(ehLancamentoFinanceiroCancelado({ status: "pendente" }), false);
+
+assert.equal(ehContaDeRepasseCartao({ forma_pagamento_tipo: "cartao_debito" }), true);
+assert.equal(ehContaDeRepasseCartao({ forma_pagamento_tipo: "cartao_credito" }), true);
+assert.equal(ehContaDeRepasseCartao({ forma_pagamento_tipo: "crediario" }), false);
+assert.equal(ehContaDeRepasseCartao({ forma_pagamento_tipo: "pix" }), false);
 
 assert.equal(
   calcularSaldoFinanceiro(
