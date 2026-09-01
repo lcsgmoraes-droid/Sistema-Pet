@@ -4,16 +4,20 @@ from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy import and_, case, func, or_
-from sqlalchemy.orm import Session
+from sqlalchemy import and_, case, func
+from sqlalchemy.orm import Session, joinedload, selectinload
 
 from app.auth.dependencies import get_current_user_and_tenant
 from app.db import get_session
 from app.ecommerce_analytics_models import EcommerceAnalyticsEvent
-from app.models import EcommerceNotifyRequest
+from app.models import EcommerceNotifyRequest, Tenant
 from app.pedido_models import Pedido, PedidoItem
 from app.produtos_models import Produto
 from app.security.permissions_decorator import require_any_permission
+from app.services.ecommerce_catalog_health import (
+    catalog_published_expression,
+    classify_catalog_product,
+)
 
 router = APIRouter(prefix="/ecommerce-analytics", tags=["ecommerce-analytics"])
 
@@ -200,96 +204,172 @@ def get_funil(
     }
 
 
+def _catalog_health_data(
+    db: Session, tenant_id, channel: str
+) -> tuple[Tenant, list[dict]]:
+    tenant = db.query(Tenant).filter(Tenant.id == str(tenant_id)).first()
+    products = (
+        db.query(Produto)
+        .options(
+            joinedload(Produto.categoria),
+            joinedload(Produto.marca),
+            selectinload(Produto.imagens),
+        )
+        .filter(
+            Produto.tenant_id == tenant_id,
+            catalog_published_expression(channel),
+        )
+        .all()
+    )
+    waitlist = dict(
+        db.query(
+            EcommerceNotifyRequest.product_id,
+            func.count(EcommerceNotifyRequest.id),
+        )
+        .filter(
+            EcommerceNotifyRequest.tenant_id == tenant_id,
+            EcommerceNotifyRequest.notified.is_(False),
+        )
+        .group_by(EcommerceNotifyRequest.product_id)
+        .all()
+    )
+    rows = []
+    for product in products:
+        health = classify_catalog_product(
+            product,
+            tenant,
+            channel,
+            waitlist_count=int(waitlist.get(product.id, 0) or 0),
+        )
+        rows.append(
+            {
+                **health,
+                "id": product.id,
+                "codigo": product.codigo,
+                "nome": product.nome,
+                "imagem_principal": product.imagem_principal,
+                "categoria_nome": getattr(product.categoria, "nome", None),
+                "marca_nome": getattr(product.marca, "nome", None),
+            }
+        )
+    return tenant, rows
+
+
+def _catalog_health_summary(rows: list[dict]) -> dict:
+    published = len(rows)
+    issue_counts = {
+        "sem_estoque": sum(row["estoque"] <= 0 for row in rows),
+        "sem_preco": 0,
+        "sem_imagem": 0,
+        "sem_descricao": 0,
+        "sem_categoria": 0,
+        "sem_marca": 0,
+    }
+    for row in rows:
+        codes = {item["codigo"] for item in [*row["bloqueios"], *row["pendencias"]]}
+        issue_counts["sem_preco"] += "sem_preco" in codes
+        issue_counts["sem_imagem"] += bool(
+            {"sem_imagem", "sem_imagem_bloqueante"}.intersection(codes)
+        )
+        for code in ("sem_descricao", "sem_categoria", "sem_marca"):
+            issue_counts[code] += code in codes
+
+    purchasable = sum(bool(row["compravel"]) for row in rows)
+    return {
+        "publicados": published,
+        "visiveis": sum(bool(row["visivel"]) for row in rows),
+        "prontos_para_venda": purchasable,
+        "sem_pendencias": sum(row["status"] == "pronto" for row in rows),
+        "bloqueados": sum(row["status"] == "bloqueado" for row in rows),
+        "esgotados": sum(row["status"] == "esgotado" for row in rows),
+        "com_pendencias": sum(row["status"] == "pendencias" for row in rows),
+        "percentual_pronto": round(
+            (purchasable / published * 100) if published else 0,
+            2,
+        ),
+        **{key: int(value) for key, value in issue_counts.items()},
+    }
+
+
 @router.get("/catalogo-saude")
 @require_any_permission(_ANALYTICS_PERMISSIONS)
 def get_catalogo_saude(
+    canal: str = Query(default="ecommerce", pattern="^(ecommerce|app)$"),
     db: Session = Depends(get_session),
     user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     _, tenant_id = user_and_tenant
-    tem_imagem = or_(
-        and_(
-            Produto.imagem_principal.is_not(None),
-            func.length(func.trim(Produto.imagem_principal)) > 0,
-        ),
-        Produto.imagens.any(),
-    )
-    tem_descricao = or_(
-        and_(
-            Produto.descricao_curta.is_not(None),
-            func.length(func.trim(Produto.descricao_curta)) > 0,
-        ),
-        and_(
-            Produto.descricao_completa.is_not(None),
-            func.length(func.trim(Produto.descricao_completa)) > 0,
-        ),
-    )
-    row = (
-        db.query(
-            func.count(Produto.id).label("publicados"),
-            func.sum(
-                case((func.coalesce(Produto.estoque_atual, 0) <= 0, 1), else_=0)
-            ).label("sem_estoque"),
-            func.sum(case((~tem_imagem, 1), else_=0)).label("sem_imagem"),
-            func.sum(case((~tem_descricao, 1), else_=0)).label("sem_descricao"),
-            func.sum(case((Produto.categoria_id.is_(None), 1), else_=0)).label(
-                "sem_categoria"
-            ),
-            func.sum(case((Produto.marca_id.is_(None), 1), else_=0)).label("sem_marca"),
-            func.sum(
-                case(
-                    (
-                        func.coalesce(Produto.preco_ecommerce, Produto.preco_venda, 0)
-                        <= 0,
-                        1,
-                    ),
-                    else_=0,
-                )
-            ).label("sem_preco"),
-        )
-        .filter(
-            Produto.tenant_id == tenant_id,
-            Produto.ativo.is_(True),
-            Produto.situacao.is_not(False),
-            Produto.anunciar_ecommerce.is_(True),
-            Produto.tipo_produto.in_(("SIMPLES", "VARIACAO", "KIT")),
-        )
-        .one()
-    )
-    published = int(row.publicados or 0)
-    problems = {
-        "sem_estoque": int(row.sem_estoque or 0),
-        "sem_imagem": int(row.sem_imagem or 0),
-        "sem_descricao": int(row.sem_descricao or 0),
-        "sem_categoria": int(row.sem_categoria or 0),
-        "sem_marca": int(row.sem_marca or 0),
-        "sem_preco": int(row.sem_preco or 0),
-    }
-    ready = (
-        db.query(func.count(Produto.id))
-        .filter(
-            Produto.tenant_id == tenant_id,
-            Produto.ativo.is_(True),
-            Produto.situacao.is_not(False),
-            Produto.anunciar_ecommerce.is_(True),
-            Produto.tipo_produto.in_(("SIMPLES", "VARIACAO", "KIT")),
-            func.coalesce(Produto.estoque_atual, 0) > 0,
-            tem_imagem,
-            tem_descricao,
-            Produto.categoria_id.is_not(None),
-            Produto.marca_id.is_not(None),
-            func.coalesce(Produto.preco_ecommerce, Produto.preco_venda, 0) > 0,
-        )
-        .scalar()
-        or 0
-    )
+    tenant, rows = _catalog_health_data(db, tenant_id, canal)
     return {
-        "publicados": published,
-        "prontos_para_venda": int(ready),
-        "percentual_pronto": round(
-            (int(ready) / published * 100) if published else 0, 2
-        ),
-        **problems,
+        **_catalog_health_summary(rows),
+        "canal": canal,
+        "exibir_esgotados": not bool(tenant.ecommerce_ocultar_sem_estoque),
+    }
+
+
+@router.get("/catalogo-saude/produtos")
+@require_any_permission(_ANALYTICS_PERMISSIONS)
+def get_catalogo_saude_produtos(
+    canal: str = Query(default="ecommerce", pattern="^(ecommerce|app)$"),
+    situacao: str = Query(
+        default="todos", pattern="^(todos|bloqueado|esgotado|pendencias|pronto)$"
+    ),
+    problema: str | None = Query(default=None),
+    busca: str | None = Query(default=None),
+    offset: int = Query(default=0, ge=0),
+    limit: int = Query(default=50, ge=1, le=200),
+    db: Session = Depends(get_session),
+    user_and_tenant=Depends(get_current_user_and_tenant),
+):
+    _, tenant_id = user_and_tenant
+    tenant, rows = _catalog_health_data(db, tenant_id, canal)
+    summary = _catalog_health_summary(rows)
+
+    filtered = rows
+    if situacao != "todos":
+        filtered = [row for row in filtered if row["status"] == situacao]
+    if problema:
+        normalized_problem = problema.strip().lower()
+
+        def has_problem(row):
+            if normalized_problem == "sem_estoque":
+                return row["estoque"] <= 0
+            codes = {item["codigo"] for item in [*row["bloqueios"], *row["pendencias"]]}
+            if normalized_problem == "sem_imagem":
+                return bool({"sem_imagem", "sem_imagem_bloqueante"}.intersection(codes))
+            return normalized_problem in codes
+
+        filtered = [row for row in filtered if has_problem(row)]
+    if busca and busca.strip():
+        term = busca.strip().casefold()
+        filtered = [
+            row
+            for row in filtered
+            if term in str(row["nome"] or "").casefold()
+            or term in str(row["codigo"] or "").casefold()
+        ]
+
+    order = {"bloqueado": 0, "esgotado": 1, "pendencias": 2, "pronto": 3}
+    filtered.sort(
+        key=lambda row: (
+            -int(row["avise_me_pendentes"] or 0),
+            order.get(row["status"], 9),
+            str(row["nome"] or "").casefold(),
+        )
+    )
+    total = len(filtered)
+    return {
+        "canal": canal,
+        "configuracao": {
+            "exibir_esgotados": not bool(tenant.ecommerce_ocultar_sem_estoque),
+            "ocultar_sem_imagem": bool(tenant.ecommerce_ocultar_sem_imagem),
+            "ocultar_servicos": bool(tenant.ecommerce_ocultar_servicos),
+        },
+        "resumo": summary,
+        "total": total,
+        "offset": offset,
+        "limit": limit,
+        "itens": filtered[offset : offset + limit],
     }
 
 

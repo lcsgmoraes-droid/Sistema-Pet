@@ -19,6 +19,12 @@ from app.services.validade_campanha_service import (
     resolver_preco_publico_produto,
 )
 from app.services.ofertas_estudio_service import resumir_navegacao_publicacao
+from app.services.ecommerce_catalog_health import (
+    catalog_has_image_expression,
+    catalog_price_expression,
+    catalog_public_visibility_filters,
+    catalog_stock_expression,
+)
 from app.tenant_identity import normalize_tenant_name
 from app.tenancy.context import set_current_tenant
 from app.empresa_grupo_estoque_compartilhado_service import (
@@ -715,37 +721,8 @@ def listar_filtros_produtos_publicos(
 
     base_filters = [
         _escopo_catalogo_publico(db, tenant.id),
-        Produto.ativo.is_(True),
-        Produto.situacao.is_not(False),
-        Produto.tipo_produto.in_(["SIMPLES", "VARIACAO", "KIT"]),
+        *catalog_public_visibility_filters(tenant, canal_normalizado),
     ]
-    estoque_catalogo = func.coalesce(
-        Produto.estoque_ecommerce
-        if tenant.ecommerce_usar_estoque_canal
-        else Produto.estoque_atual,
-        0,
-    )
-    servico_expr = func.lower(func.coalesce(Produto.tipo, "produto")) == "servico"
-    tem_imagem_expr = or_(
-        and_(
-            Produto.imagem_principal.is_not(None),
-            func.length(func.trim(Produto.imagem_principal)) > 0,
-        ),
-        Produto.imagens.any(),
-    )
-    if tenant.ecommerce_ocultar_servicos:
-        base_filters.append(
-            func.lower(func.coalesce(Produto.tipo, "produto")) != "servico"
-        )
-    if tenant.ecommerce_ocultar_sem_estoque:
-        base_filters.append(or_(servico_expr, estoque_catalogo > 0))
-    if tenant.ecommerce_ocultar_sem_imagem:
-        base_filters.append(tem_imagem_expr)
-
-    if canal_normalizado == "app":
-        base_filters.append(Produto.anunciar_app.is_(True))
-    else:
-        base_filters.append(Produto.anunciar_ecommerce.is_(True))
 
     if busca:
         termo = busca.strip()
@@ -815,42 +792,9 @@ def obter_produto_publico_por_id(
         .filter(
             _escopo_catalogo_publico(db, tenant.id),
             Produto.id == produto_id,
-            Produto.ativo.is_(True),
-            Produto.situacao.is_not(False),
-            Produto.tipo_produto.in_(["SIMPLES", "VARIACAO", "KIT"]),
+            *catalog_public_visibility_filters(tenant, canal_normalizado),
         )
     )
-    if canal_normalizado == "app":
-        query = query.filter(Produto.anunciar_app.is_(True))
-    else:
-        query = query.filter(Produto.anunciar_ecommerce.is_(True))
-    if tenant.ecommerce_ocultar_servicos:
-        query = query.filter(
-            func.lower(func.coalesce(Produto.tipo, "produto")) != "servico"
-        )
-    if tenant.ecommerce_ocultar_sem_estoque:
-        estoque_catalogo = func.coalesce(
-            Produto.estoque_ecommerce
-            if tenant.ecommerce_usar_estoque_canal
-            else Produto.estoque_atual,
-            0,
-        )
-        query = query.filter(
-            or_(
-                func.lower(func.coalesce(Produto.tipo, "produto")) == "servico",
-                estoque_catalogo > 0,
-            )
-        )
-    if tenant.ecommerce_ocultar_sem_imagem:
-        query = query.filter(
-            or_(
-                and_(
-                    Produto.imagem_principal.is_not(None),
-                    func.length(func.trim(Produto.imagem_principal)) > 0,
-                ),
-                Produto.imagens.any(),
-            )
-        )
 
     produto = query.first()
     if not produto:
@@ -904,37 +848,17 @@ def listar_produtos_publicos(
         )
 
     # Fonte única de estoque: saldo oficial do Sistema Pet.
-    estoque_catalogo = func.coalesce(
-        Produto.estoque_ecommerce
-        if tenant.ecommerce_usar_estoque_canal
-        else Produto.estoque_atual,
-        0,
-    )
+    estoque_catalogo = catalog_stock_expression(tenant)
     servico_expr = func.lower(func.coalesce(Produto.tipo, "produto")) == "servico"
-    tem_imagem_expr = or_(
-        and_(
-            Produto.imagem_principal.is_not(None),
-            func.length(func.trim(Produto.imagem_principal)) > 0,
-        ),
-        Produto.imagens.any(),
-    )
+    tem_imagem_expr = catalog_has_image_expression()
     prioridade_estoque = case((or_(servico_expr, estoque_catalogo > 0), 0), else_=1)
     prioridade_imagem = case((tem_imagem_expr, 0), else_=1)
-    if canal_normalizado == "app":
-        preco_catalogo = func.coalesce(Produto.preco_app, Produto.preco_venda, 0)
-    else:
-        preco_catalogo = func.coalesce(Produto.preco_ecommerce, Produto.preco_venda, 0)
+    preco_catalogo = catalog_price_expression(canal_normalizado)
 
     base_filters = [
         _escopo_catalogo_publico(db, tenant.id),
-        Produto.ativo.is_(True),
-        Produto.situacao.is_not(False),
-        Produto.tipo_produto.in_(["SIMPLES", "VARIACAO", "KIT"]),
+        *catalog_public_visibility_filters(tenant, canal_normalizado),
     ]
-    if tenant.ecommerce_ocultar_servicos:
-        base_filters.append(
-            func.lower(func.coalesce(Produto.tipo, "produto")) != "servico"
-        )
 
     query = (
         db.query(Produto)
@@ -956,13 +880,6 @@ def listar_produtos_publicos(
         .filter(*base_filters)
     )
 
-    if canal_normalizado == "app":
-        query = query.filter(Produto.anunciar_app.is_(True))
-        categorias_query = categorias_query.filter(Produto.anunciar_app.is_(True))
-    else:
-        query = query.filter(Produto.anunciar_ecommerce.is_(True))
-        categorias_query = categorias_query.filter(Produto.anunciar_ecommerce.is_(True))
-
     if busca:
         termo = busca.strip()
         like_termo = f"%{termo}%"
@@ -974,12 +891,12 @@ def listar_produtos_publicos(
         query = query.filter(busca_filter)
         categorias_query = categorias_query.filter(busca_filter)
 
-    if apenas_com_estoque or tenant.ecommerce_ocultar_sem_estoque:
+    if apenas_com_estoque:
         disponivel_expr = or_(servico_expr, estoque_catalogo > 0)
         query = query.filter(disponivel_expr)
         categorias_query = categorias_query.filter(disponivel_expr)
 
-    if apenas_com_imagem or tenant.ecommerce_ocultar_sem_imagem:
+    if apenas_com_imagem:
         query = query.filter(tem_imagem_expr)
         categorias_query = categorias_query.filter(tem_imagem_expr)
 

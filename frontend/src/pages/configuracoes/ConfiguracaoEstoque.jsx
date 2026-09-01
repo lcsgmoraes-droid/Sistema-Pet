@@ -20,6 +20,7 @@ export default function ConfiguracaoEstoque() {
   const [loading, setLoading] = useState(true);
   const [salvando, setSalvando] = useState(false);
   const [permiteEstoqueNegativo, setPermiteEstoqueNegativo] = useState(false);
+  const [permiteEstoqueNegativoOnline, setPermiteEstoqueNegativoOnline] = useState(false);
   const [protecaoValidadeAtiva, setProtecaoValidadeAtiva] = useState(false);
   const [diasAlertaValidade, setDiasAlertaValidade] = useState(15);
   const [bloquearValidadePdv, setBloquearValidadePdv] = useState(true);
@@ -32,6 +33,7 @@ export default function ConfiguracaoEstoque() {
       try {
         const res = await api.get("/empresa/config-estoque");
         setPermiteEstoqueNegativo(res.data.permite_estoque_negativo);
+        setPermiteEstoqueNegativoOnline(Boolean(res.data.permite_estoque_negativo_online));
         setProtecaoValidadeAtiva(Boolean(res.data.protecao_validade_ativa));
         setDiasAlertaValidade(res.data.dias_alerta_validade || 15);
         setBloquearValidadePdv(res.data.bloquear_validade_pdv ?? true);
@@ -55,6 +57,7 @@ export default function ConfiguracaoEstoque() {
     try {
       await api.put("/empresa/config-estoque", {
         permite_estoque_negativo: permiteEstoqueNegativo,
+        permite_estoque_negativo_online: permiteEstoqueNegativoOnline,
         protecao_validade_ativa: protecaoValidadeAtiva,
         dias_alerta_validade: Number(diasAlertaValidade) || 15,
         bloquear_validade_pdv: bloquearValidadePdv,
@@ -116,11 +119,16 @@ export default function ConfiguracaoEstoque() {
             </div>
           </div>
 
+          <h3 className="mb-3 font-semibold text-gray-900">Loja física / ERP</h3>
+          <p className="mb-4 text-sm text-gray-600">
+            Controla o PDV e os lançamentos internos. Pode ficar flexível para o caixa não parar
+            quando houver uma divergência que será corrigida depois.
+          </p>
           <div className="space-y-4">
             <label className="flex items-start p-4 border-2 border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors">
               <input
                 type="radio"
-                name="estoque-negativo"
+                name="estoque-negativo-fisico"
                 checked={!permiteEstoqueNegativo}
                 onChange={() => setPermiteEstoqueNegativo(false)}
                 className="mt-1 mr-3 text-blue-600 focus:ring-blue-500"
@@ -139,7 +147,7 @@ export default function ConfiguracaoEstoque() {
             <label className="flex items-start p-4 border-2 border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors">
               <input
                 type="radio"
-                name="estoque-negativo"
+                name="estoque-negativo-fisico"
                 checked={permiteEstoqueNegativo}
                 onChange={() => setPermiteEstoqueNegativo(true)}
                 className="mt-1 mr-3 text-blue-600 focus:ring-blue-500"
@@ -155,6 +163,51 @@ export default function ConfiguracaoEstoque() {
                 </div>
               </div>
             </label>
+          </div>
+
+          <div className="mt-8 border-t border-gray-200 pt-6">
+            <h3 className="mb-3 font-semibold text-gray-900">App e e-commerce</h3>
+            <p className="mb-4 text-sm text-gray-600">
+              Regra independente para compras online. O recomendado é bloquear, evitando vender o
+              mesmo saldo para dois clientes enquanto o pagamento é processado.
+            </p>
+            <div className="space-y-4">
+              <label className="flex cursor-pointer items-start rounded-lg border-2 border-gray-200 p-4 transition-colors hover:bg-gray-50">
+                <input
+                  type="radio"
+                  name="estoque-negativo-online"
+                  checked={!permiteEstoqueNegativoOnline}
+                  onChange={() => setPermiteEstoqueNegativoOnline(false)}
+                  className="mr-3 mt-1 text-blue-600 focus:ring-blue-500"
+                />
+                <span>
+                  <span className="block font-semibold text-gray-900">
+                    🔒 Bloquear venda online sem estoque (Recomendado)
+                  </span>
+                  <span className="mt-1 block text-sm text-gray-600">
+                    Produtos esgotados continuam visíveis quando o Avise-me estiver habilitado, mas
+                    não podem ser adicionados ou finalizados.
+                  </span>
+                </span>
+              </label>
+              <label className="flex cursor-pointer items-start rounded-lg border-2 border-gray-200 p-4 transition-colors hover:bg-gray-50">
+                <input
+                  type="radio"
+                  name="estoque-negativo-online"
+                  checked={permiteEstoqueNegativoOnline}
+                  onChange={() => setPermiteEstoqueNegativoOnline(true)}
+                  className="mr-3 mt-1 text-blue-600 focus:ring-blue-500"
+                />
+                <span>
+                  <span className="block font-semibold text-gray-900">
+                    Permitir estoque negativo online
+                  </span>
+                  <span className="mt-1 block text-sm text-red-600">
+                    Use somente se a operação online trabalha deliberadamente com encomendas.
+                  </span>
+                </span>
+              </label>
+            </div>
           </div>
         </div>
 
@@ -294,10 +347,7 @@ export default function ConfiguracaoEstoque() {
             <strong>Estoque Negativo:</strong> O sistema permite a venda e o estoque ficará com
             valor negativo até a próxima reposição.
           </li>
-          <li>
-            Esta configuração é global e afeta todas as vendas realizadas no PDV e outros pontos de
-            venda.
-          </li>
+          <li>As regras da loja física e dos canais online são independentes.</li>
         </ul>
       </div>
     </div>

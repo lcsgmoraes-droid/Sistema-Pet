@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 
 from app.db import get_session
-from app.models import User
+from app.models import Tenant, User
 from app.pedido_models import Pedido, PedidoItem
 from app.produtos_models import Produto
 from app.routes.ecommerce_auth import (
@@ -23,6 +23,10 @@ from app.services.validade_campanha_service import (
     resolver_preco_publico_produto,
 )
 from app.services.sales_channel import normalize_online_sales_channel
+from app.services.ecommerce_catalog_health import (
+    catalog_price_value,
+    catalog_stock_value,
+)
 from app.tenancy.context import set_current_tenant
 from app.tenancy.context import tenant_context
 from app.empresa_grupo_estoque_compartilhado_service import (
@@ -32,9 +36,9 @@ from app.empresa_grupo_estoque_compartilhado_service import (
 
 router = APIRouter(prefix="/carrinho", tags=["ecommerce-cart"])
 
-# Carrinho de app/ecommerce nao reserva estoque. Estoque deve ser validado e
-# baixado somente depois de pagamento aprovado e geracao do pedido/venda.
-STATUS_RESERVA_ATIVA = ()
+# O carrinho aberto nao reserva. Depois de enviado ao pagamento, o pedido
+# pendente reserva o saldo por um periodo curto para evitar venda concorrente.
+STATUS_RESERVA_ATIVA = ("pendente",)
 
 
 class CarrinhoAdicionarRequest(BaseModel):
@@ -91,6 +95,8 @@ def _normalize_sales_channel(raw_channel: str | None) -> str:
 
 def _produto_disponivel_no_canal(produto: Produto, canal: str) -> bool:
     if not bool(produto.ativo) or produto.situacao is False:
+        return False
+    if catalog_price_value(produto, canal) <= 0:
         return False
     if canal == "app":
         return bool(getattr(produto, "anunciar_app", True))
@@ -256,6 +262,20 @@ def _resolver_precificacao_produto(db: Session, produto: Produto, canal: str):
     )
 
 
+def _resolver_preco_unitario_compravel(pricing) -> float:
+    value = float(
+        pricing.promotional_price
+        if pricing.promotional_price is not None
+        else pricing.regular_price or 0.0
+    )
+    if value <= 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Produto sem preço válido para venda neste canal",
+        )
+    return value
+
+
 def _validar_limite_promocao_validade(pricing, quantidade: float):
     oferta_validade = pricing.validity_offer
     if (
@@ -284,6 +304,7 @@ def adicionar_item_carrinho(
 ):
     tenant_id = _activate_cart_tenant_context(identity)
     _expirar_reservas_automaticamente(db, tenant_id)
+    tenant_config = db.query(Tenant).filter(Tenant.id == tenant_id).first()
 
     acesso_catalogo = EmpresaGrupoEstoqueCompartilhadoService.resolver_produto_catalogo(
         db, tenant_id, payload.produto_id
@@ -321,8 +342,10 @@ def adicionar_item_carrinho(
             detail="Produto indisponível neste canal",
         )
 
+    preco_unitario = _resolver_preco_unitario_compravel(pricing)
+
     controla_estoque = getattr(produto, "controlar_estoque", True)
-    estoque_disponivel = float(produto.estoque_atual or 0.0)
+    estoque_disponivel = catalog_stock_value(tenant_config, produto)
     if controla_estoque and payload.quantidade > estoque_disponivel:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -339,12 +362,6 @@ def adicionar_item_carrinho(
             PedidoItem.tenant_id == tenant_id,
         )
         .first()
-    )
-
-    preco_unitario = float(
-        pricing.promotional_price
-        if pricing.promotional_price is not None
-        else pricing.regular_price or 0.0
     )
 
     nova_quantidade = payload.quantidade
@@ -417,6 +434,7 @@ def atualizar_item_carrinho(
 ):
     tenant_id = _activate_cart_tenant_context(identity)
     _expirar_reservas_automaticamente(db, tenant_id)
+    tenant_config = db.query(Tenant).filter(Tenant.id == tenant_id).first()
 
     carrinho = _find_or_create_carrinho(db, identity)
 
@@ -466,8 +484,10 @@ def atualizar_item_carrinho(
             detail="Produto indisponível neste canal",
         )
 
+    preco_unitario = _resolver_preco_unitario_compravel(pricing)
+
     controla_estoque = getattr(produto, "controlar_estoque", True)
-    estoque_disponivel = float(produto.estoque_atual or 0.0)
+    estoque_disponivel = catalog_stock_value(tenant_config, produto)
     reservado_outros = (
         _quantidade_reservada_produto(
             db,
@@ -490,11 +510,6 @@ def atualizar_item_carrinho(
             detail="Quantidade indisponível em estoque (reserva ativa)",
         )
 
-    preco_unitario = float(
-        pricing.promotional_price
-        if pricing.promotional_price is not None
-        else pricing.regular_price or 0.0
-    )
     _validar_limite_promocao_validade(pricing, payload.quantidade)
 
     item.preco_unitario = preco_unitario

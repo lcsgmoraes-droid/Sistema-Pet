@@ -11,13 +11,14 @@ from app.routes.ecommerce_cart import (
 from app.pedido_models import PedidoItem
 from app.produtos_models import Produto
 from app.routes.ecommerce_checkout_support import _expirar_reservas_automaticamente
+from app.routes.ecommerce_checkout import _revalidar_itens_checkout
 
 
 ROOT = Path(__file__).resolve().parents[3]
 
 
-def test_carrinho_e_pendente_nao_reservam_estoque():
-    assert STATUS_RESERVA_ATIVA == ()
+def test_apenas_pedido_enviado_ao_pagamento_reserva_estoque():
+    assert STATUS_RESERVA_ATIVA == ("pendente",)
 
 
 def test_carrinho_nao_expira_automaticamente_quando_cliente_fecha_o_app():
@@ -25,6 +26,7 @@ def test_carrinho_nao_expira_automaticamente_quando_cliente_fecha_o_app():
 
     assert 'Pedido.status == "carrinho"' not in function_source
     assert 'Pedido.status == "pendente"' in function_source
+    assert "Pedido.reserva_estoque_iniciada_at" in function_source
 
 
 def test_ultimo_carrinho_expirado_e_restaurado_para_o_mesmo_cliente():
@@ -61,18 +63,28 @@ def test_ultimo_carrinho_expirado_e_restaurado_para_o_mesmo_cliente():
     assert db.committed is True
 
 
-def test_quantidade_reservada_sem_status_ativo_retorna_zero_sem_consultar_db():
-    class DbQueFalhaSeConsultar:
+def test_quantidade_reservada_considera_pedidos_pendentes():
+    class QueryStub:
+        def join(self, *_args, **_kwargs):
+            return self
+
+        def filter(self, *_args, **_kwargs):
+            return self
+
+        def scalar(self):
+            return 3
+
+    class DbStub:
         def query(self, *_args, **_kwargs):
-            raise AssertionError("Carrinho nao deve consultar reservas de estoque")
+            return QueryStub()
 
     assert (
         _quantidade_reservada_produto(
-            DbQueFalhaSeConsultar(),
+            DbStub(),
             tenant_id="tenant-1",
             produto_id=123,
         )
-        == 0.0
+        == 3.0
     )
 
 
@@ -128,6 +140,15 @@ def test_carrinho_serializado_inclui_imagem_principal_do_produto():
     payload = _serialize_carrinho(DbStub(), carrinho)
 
     assert payload["itens"][0]["foto_url"] == "/uploads/produtos/racao.jpg"
+
+
+def test_checkout_revalida_preco_e_reserva_sob_lock_antes_do_pagamento():
+    source = inspect.getsource(_revalidar_itens_checkout)
+
+    assert ".with_for_update()" in source
+    assert "_resolver_preco_unitario_compravel" in source
+    assert "_quantidade_reservada_produto" in source
+    assert "catalog_stock_value" in source
 
 
 def test_frontend_carrinho_atualiza_servidor_por_produto_id_e_nao_item_id():

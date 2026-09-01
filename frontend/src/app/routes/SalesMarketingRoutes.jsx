@@ -5,6 +5,7 @@ import {
   CanalDescontos,
   CentralNFSaida,
   EcommerceAnalytics,
+  EcommerceCatalogHealth,
   EcommerceAparencia,
   EcommerceConfig,
   EcommerceDivulgacao,
@@ -115,6 +116,16 @@ export function createSalesMarketingRoutes() {
           <ModuleGate modulo="ecommerce">
             <ProtectedRoute permission="configuracoes.editar">
               <EcommerceConfig />
+            </ProtectedRoute>
+          </ModuleGate>
+        }
+      />
+      <Route
+        path="ecommerce/catalogo-saude"
+        element={
+          <ModuleGate modulo="ecommerce">
+            <ProtectedRoute anyOfPermissions={["relatorios.gerencial", "vendas.visualizar"]}>
+              <EcommerceCatalogHealth />
             </ProtectedRoute>
           </ModuleGate>
         }

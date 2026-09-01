@@ -10,6 +10,7 @@ import unicodedata
 
 from fastapi import Depends, HTTPException, Request, status
 from pydantic import BaseModel, Field
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.models import ConfiguracaoEntrega, Tenant, User
@@ -229,7 +230,8 @@ def _expirar_reservas_automaticamente(db: Session, tenant_id: str) -> None:
         .filter(
             Pedido.tenant_id == tenant_id,
             Pedido.status == "pendente",
-            Pedido.created_at < limite_pendente,
+            func.coalesce(Pedido.reserva_estoque_iniciada_at, Pedido.created_at)
+            < limite_pendente,
         )
         .all()
     )

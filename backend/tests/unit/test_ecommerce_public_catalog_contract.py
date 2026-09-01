@@ -43,3 +43,15 @@ def test_public_products_route_exposes_category_filter_and_facets():
     assert "Produto.categoria_id.in_(selected_category_ids)" in source
     assert '"categorias"' in source
     assert "_build_category_path_map" in source
+
+
+def test_public_catalog_uses_shared_visibility_rule_that_blocks_zero_price():
+    filters_source = inspect.getsource(
+        ecommerce_public.listar_filtros_produtos_publicos
+    )
+    detail_source = inspect.getsource(ecommerce_public.obter_produto_publico_por_id)
+    list_source = inspect.getsource(ecommerce_public.listar_produtos_publicos)
+
+    assert "catalog_public_visibility_filters" in filters_source
+    assert "catalog_public_visibility_filters" in detail_source
+    assert "catalog_public_visibility_filters" in list_source

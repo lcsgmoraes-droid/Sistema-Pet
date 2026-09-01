@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.auth.dependencies import get_current_user_and_tenant
 from app.db import get_session
+from app.models import Tenant
 from app.partner_utils import get_all_accessible_tenant_ids
 from app.produtos.core import _normalizar_filtro_ativo_produtos
 from app.produtos.listagem import (
@@ -25,9 +26,11 @@ from app.produtos.listagem import (
     _resolver_fornecedor_ids_filtro_produto,
 )
 from app.produtos.schemas import ProdutosPaginadosResponse
+from app.produtos_models import Produto
 from app.produtos.validade import _mapa_validade_proxima_produtos
 from app.produtos.validators import _validar_tenant_e_obter_usuario
 from app.security.permissions_decorator import require_permission
+from app.services.ecommerce_catalog_health import catalog_health_filter_expression
 from app.empresa_grupo_estoque_compartilhado_service import (
     EmpresaGrupoEstoqueCompartilhadoService,
 )
@@ -179,6 +182,16 @@ def listar_produtos(
     estoque_situacao: Literal["todos", "com_estoque", "sem_estoque"] = "todos",
     imagem_situacao: Literal["todas", "com_foto", "sem_foto"] = "todas",
     ordenacao: Literal["recentes", "estoque_desc", "estoque_asc"] = "recentes",
+    catalogo_online_situacao: Literal[
+        "todos",
+        "publicado",
+        "nao_publicado",
+        "bloqueado",
+        "esgotado",
+        "pendencias",
+        "pronto",
+    ] = "todos",
+    catalogo_online_canal: Literal["ecommerce", "app"] = "ecommerce",
     em_promocao: Optional[bool] = False,
     ativo: Optional[bool] = True,
     tipo_produto: Optional[str] = None,  # Filtro por tipo de produto
@@ -239,6 +252,15 @@ def listar_produtos(
         estoque_situacao=estoque_situacao,
         imagem_situacao=imagem_situacao,
     )
+
+    if catalogo_online_situacao != "todos":
+        tenant_config = db.query(Tenant).filter(Tenant.id == str(tenant_id)).first()
+        catalog_filter = catalog_health_filter_expression(
+            tenant_config,
+            catalogo_online_canal,
+            catalogo_online_situacao,
+        )
+        query = query.filter(Produto.tenant_id == tenant_id, catalog_filter)
 
     fornecedor_ids_filtro, filtro_fornecedor_por_grupo = (
         _resolver_fornecedor_ids_filtro_produto(
