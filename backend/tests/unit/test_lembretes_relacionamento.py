@@ -78,6 +78,9 @@ def test_contact_migration_follows_current_head_and_is_reversible():
     assert 'down_revision = "zyw20260830a1"' in source
     assert '"lembretes_contatos"' in source
     assert "legacy_notification:" in source
+    assert "ALTER TABLE {TABLE_NAME} ENABLE ROW LEVEL SECURITY" in source
+    assert "ALTER TABLE {TABLE_NAME} FORCE ROW LEVEL SECURITY" in source
+    assert "CREATE POLICY {POLICY_NAME} ON {TABLE_NAME}" in source
     assert 'op.drop_table("lembretes_contatos")' in source
 
 

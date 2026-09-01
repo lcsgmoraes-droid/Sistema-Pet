@@ -13,6 +13,10 @@ down_revision = "zyw20260830a1"
 branch_labels = None
 depends_on = None
 
+TABLE_NAME = "lembretes_contatos"
+POLICY_NAME = f"{TABLE_NAME}_tenant_isolation"
+TENANT_GUARD = "tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uuid"
+
 
 def upgrade() -> None:
     op.create_table(
@@ -116,6 +120,15 @@ def upgrade() -> None:
             WHERE notificacao_enviada IS TRUE
               AND data_notificacao_enviada IS NOT NULL
             """))
+
+    if op.get_bind().dialect.name == "postgresql":
+        op.execute(f"ALTER TABLE {TABLE_NAME} ENABLE ROW LEVEL SECURITY")
+        op.execute(f"ALTER TABLE {TABLE_NAME} FORCE ROW LEVEL SECURITY")
+        op.execute(f"DROP POLICY IF EXISTS {POLICY_NAME} ON {TABLE_NAME}")
+        op.execute(
+            f"CREATE POLICY {POLICY_NAME} ON {TABLE_NAME} "
+            f"USING ({TENANT_GUARD}) WITH CHECK ({TENANT_GUARD})"
+        )
 
 
 def downgrade() -> None:
