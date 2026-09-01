@@ -14,6 +14,8 @@ export default function LembreteCard({ controller, lembrete }) {
   const dueDate = new Date(lembrete.data_proxima_dose).toLocaleDateString("pt-BR");
   const lastContact = lembrete.ultimo_contato;
   const pushLoading = controller.acaoContato === `push-${lembrete.id}`;
+  const pushUnavailable = !lembrete.cliente_tem_app;
+  const pushHelpId = `lembrete-push-help-${lembrete.id}`;
 
   return (
     <article className="grid gap-4 p-4 transition hover:bg-slate-50/70 dark:hover:bg-slate-800/30 sm:p-5 xl:grid-cols-[160px_minmax(0,1fr)_auto] xl:items-center">
@@ -76,20 +78,35 @@ export default function LembreteCard({ controller, lembrete }) {
         >
           <FiMessageCircle aria-hidden="true" /> Criar mensagem
         </button>
-        <button
-          className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-45 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
-          disabled={!lembrete.cliente_tem_app || pushLoading}
-          onClick={() => controller.enviarPush(lembrete)}
-          title={
-            lembrete.cliente_tem_app
-              ? "Enviar notificação no app"
-              : "Cliente sem conta vinculada no app"
-          }
-          type="button"
+        <span
+          aria-describedby={pushUnavailable ? pushHelpId : undefined}
+          className="group relative inline-flex"
+          tabIndex={pushUnavailable ? 0 : undefined}
         >
-          <FiBell className={pushLoading ? "animate-pulse" : ""} aria-hidden="true" />
-          {pushLoading ? "Enviando..." : "Push"}
-        </button>
+          <button
+            className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-45 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+            disabled={pushUnavailable || pushLoading}
+            onClick={() => controller.enviarPush(lembrete)}
+            title={
+              lembrete.cliente_tem_app
+                ? "Enviar notificação no app"
+                : "Push indisponível: será habilitado quando o cliente tiver uma conta vinculada no app."
+            }
+            type="button"
+          >
+            <FiBell className={pushLoading ? "animate-pulse" : ""} aria-hidden="true" />
+            {pushLoading ? "Enviando..." : "Push"}
+          </button>
+          {pushUnavailable && (
+            <span
+              className="pointer-events-none absolute bottom-full right-0 z-30 mb-2 hidden w-72 rounded-lg bg-slate-900 px-3 py-2 text-xs font-medium leading-relaxed text-white shadow-xl group-focus:block group-hover:block dark:bg-slate-100 dark:text-slate-900"
+              id={pushHelpId}
+              role="tooltip"
+            >
+              Push indisponível. Será habilitado quando o cliente tiver uma conta vinculada no app.
+            </span>
+          )}
+        </span>
         <details className="relative">
           <summary className="flex cursor-pointer list-none items-center gap-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800">
             Mais <FiChevronDown aria-hidden="true" />
