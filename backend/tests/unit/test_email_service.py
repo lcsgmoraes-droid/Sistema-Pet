@@ -25,9 +25,16 @@ def test_build_email_message_adds_transactional_delivery_headers():
     assert msg["Date"]
     assert msg["Message-ID"]
     assert "@mlprohub.com.br" in msg["Message-ID"]
-    assert msg["Reply-To"] == "noreply@mlprohub.com.br"
+    assert msg["Reply-To"] == "corepeterp@gmail.com"
     assert msg["X-Mailer"] == "CorePet"
     assert msg["X-Correlation-ID"] == "req-email-123"
+
+    text_body = msg.get_body(preferencelist=("plain",)).get_content()
+    html_body = msg.get_body(preferencelist=("html",)).get_content()
+    assert "Não responda a esta mensagem" in text_body
+    assert "corepeterp@gmail.com" in text_body
+    assert 'id="corepet-email-automatic-notice"' in html_body
+    assert 'href="mailto:corepeterp@gmail.com"' in html_body
 
 
 def test_send_email_uses_smtp_policy_and_clean_envelope_sender(monkeypatch):
@@ -63,6 +70,7 @@ def test_send_email_uses_smtp_policy_and_clean_envelope_sender(monkeypatch):
         "port": 587,
         "user": "smtp-user@example.com",
         "from_addr": "CorePet <noreply@mlprohub.com.br>",
+        "reply_to": "corepeterp@gmail.com",
         "use_tls": True,
     }
     fake_settings["pass" + "word"] = "unit-test-only"
@@ -81,6 +89,7 @@ def test_send_email_uses_smtp_policy_and_clean_envelope_sender(monkeypatch):
     assert isinstance(sent["message"], bytes)
     assert b"\r\nDate: " in b"\r\n" + sent["message"]
     assert b"\r\nMessage-ID: " in b"\r\n" + sent["message"]
+    assert b"\r\nReply-To: corepeterp@gmail.com\r\n" in sent["message"]
     assert b"\r\n" in sent["message"]
     assert policy.SMTP.linesep.encode() == b"\r\n"
 
@@ -117,6 +126,7 @@ def test_send_email_accepts_multiple_recipients(monkeypatch, caplog):
         "port": 587,
         "user": "smtp-user@example.com",
         "from_addr": "CorePet <noreply@mlprohub.com.br>",
+        "reply_to": "corepeterp@gmail.com",
         "use_tls": True,
     }
     fake_settings["pass" + "word"] = "unit-test-only"
