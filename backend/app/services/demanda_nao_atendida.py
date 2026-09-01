@@ -16,9 +16,7 @@ def _texto(valor: Any) -> str:
 
 def _normalizar(valor: Any) -> str:
     texto = unicodedata.normalize("NFKD", _texto(valor).casefold())
-    sem_acentos = "".join(
-        char for char in texto if not unicodedata.combining(char)
-    )
+    sem_acentos = "".join(char for char in texto if not unicodedata.combining(char))
     return " ".join(sem_acentos.split())
 
 
@@ -153,9 +151,13 @@ def montar_central_demanda_nao_atendida(
         for item_origem in list(getattr(registro, "itens", None) or []):
             produto_id_raw = getattr(item_origem, "produto_id", None)
             produto_id = int(produto_id_raw) if produto_id_raw is not None else None
-            chave = ("produto", produto_id) if produto_id is not None else (
-                "livre",
-                *_chave_produto_livre(item_origem),
+            chave = (
+                ("produto", produto_id)
+                if produto_id is not None
+                else (
+                    "livre",
+                    *_chave_produto_livre(item_origem),
+                )
             )
             item = consolidados.setdefault(
                 chave,
