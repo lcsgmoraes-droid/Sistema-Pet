@@ -293,6 +293,11 @@ export function createLayoutMenuItems({ lembretesCount = 0, convitesGruposCount 
           permission: "configuracoes.editar",
         },
         {
+          path: "/ecommerce/catalogo-saude",
+          label: "🩺 Saúde do Catálogo",
+          permission: "vendas.visualizar",
+        },
+        {
           path: "/ecommerce/analytics",
           label: "📊 Analytics",
           permission: "vendas.visualizar",

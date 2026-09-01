@@ -309,6 +309,7 @@ def atualizar_dados_cadastrais(
 
 class ConfigEstoqueResponse(BaseModel):
     permite_estoque_negativo: bool
+    permite_estoque_negativo_online: bool = False
     protecao_validade_ativa: bool = False
     dias_alerta_validade: int = 15
     bloquear_validade_pdv: bool = True
@@ -322,6 +323,7 @@ class ConfigEstoqueResponse(BaseModel):
 
 class ConfigEstoqueUpdate(BaseModel):
     permite_estoque_negativo: bool
+    permite_estoque_negativo_online: bool = False
     protecao_validade_ativa: bool = False
     dias_alerta_validade: int = 15
     bloquear_validade_pdv: bool = True
@@ -333,6 +335,9 @@ class ConfigEstoqueUpdate(BaseModel):
 def _config_estoque_response(tenant: Tenant) -> ConfigEstoqueResponse:
     return ConfigEstoqueResponse(
         permite_estoque_negativo=tenant.permite_estoque_negativo,
+        permite_estoque_negativo_online=bool(
+            getattr(tenant, "permite_estoque_negativo_online", False)
+        ),
         protecao_validade_ativa=bool(getattr(tenant, "protecao_validade_ativa", False)),
         dias_alerta_validade=int(getattr(tenant, "dias_alerta_validade", 15) or 15),
         bloquear_validade_pdv=bool(getattr(tenant, "bloquear_validade_pdv", True)),
@@ -380,8 +385,8 @@ def atualizar_config_estoque(
     Atualiza configurações de estoque do tenant.
 
     IMPORTANTE:
-    - Se permite_estoque_negativo = True: Sistema permite vendas mesmo sem estoque
-    - Se permite_estoque_negativo = False: Sistema bloqueia vendas quando estoque insuficiente (padrão)
+    A loja fisica e os canais online possuem politicas independentes. Assim, o
+    caixa pode continuar operando sem liberar saldo negativo no app/e-commerce.
     """
     _current_user, tenant_id = user_and_tenant
 
@@ -394,6 +399,7 @@ def atualizar_config_estoque(
 
     # Atualizar configuração
     tenant.permite_estoque_negativo = config.permite_estoque_negativo
+    tenant.permite_estoque_negativo_online = config.permite_estoque_negativo_online
     tenant.protecao_validade_ativa = config.protecao_validade_ativa
     tenant.dias_alerta_validade = max(
         1, min(int(config.dias_alerta_validade or 15), 365)
@@ -433,7 +439,8 @@ def atualizar_config_estoque(
 
     logger.info(
         f"✅ Configuração de estoque atualizada - Tenant: {tenant.name}, "
-        f"Permite Estoque Negativo: {tenant.permite_estoque_negativo}"
+        f"Permite Estoque Negativo ERP: {tenant.permite_estoque_negativo}, "
+        f"Online: {tenant.permite_estoque_negativo_online}"
     )
 
     return _config_estoque_response(tenant)

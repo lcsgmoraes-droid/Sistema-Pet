@@ -25,6 +25,8 @@ const FILTROS_PADRAO = {
   estoque_situacao: "todos",
   imagem_situacao: "todas",
   ordenacao: "recentes",
+  catalogo_online_situacao: "todos",
+  catalogo_online_canal: "ecommerce",
   em_promocao: false,
   mostrarPaisVariacoes: false,
 };
@@ -48,6 +50,18 @@ function normalizarFiltrosSalvos(filtros = {}) {
     ordenacao: ["recentes", "estoque_desc", "estoque_asc"].includes(filtros.ordenacao)
       ? filtros.ordenacao
       : "recentes",
+    catalogo_online_situacao: [
+      "todos",
+      "publicado",
+      "nao_publicado",
+      "bloqueado",
+      "esgotado",
+      "pendencias",
+      "pronto",
+    ].includes(filtros.catalogo_online_situacao)
+      ? filtros.catalogo_online_situacao
+      : "todos",
+    catalogo_online_canal: filtros.catalogo_online_canal === "app" ? "app" : "ecommerce",
     em_promocao: Boolean(filtros.em_promocao),
     mostrarPaisVariacoes: Boolean(filtros.mostrarPaisVariacoes),
   };
@@ -359,6 +373,8 @@ export default function useProdutosListagem({
     filtros.ativo,
     filtros.busca,
     filtros.categoria_id,
+    filtros.catalogo_online_canal,
+    filtros.catalogo_online_situacao,
     filtros.em_promocao,
     filtros.estoque_baixo,
     filtros.estoque_situacao,

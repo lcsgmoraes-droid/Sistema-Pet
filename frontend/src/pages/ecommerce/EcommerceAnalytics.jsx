@@ -1,5 +1,12 @@
 import { useEffect, useState } from "react";
-import { AlertTriangle, BarChart3, PackageCheck, RefreshCw, ShoppingBag } from "lucide-react";
+import {
+  AlertTriangle,
+  BarChart3,
+  ExternalLink,
+  PackageCheck,
+  RefreshCw,
+  ShoppingBag,
+} from "lucide-react";
 import { api } from "../../services/api";
 import { formatMoneyBRL } from "../../utils/formatters";
 
@@ -246,7 +253,15 @@ export default function EcommerceAnalytics() {
               title="Saúde do catálogo"
               subtitle="Itens publicados e o que falta para vender com confiança."
             >
-              <div className="grid grid-cols-2 gap-3 p-5 sm:grid-cols-3">
+              <div className="flex justify-end px-5 pt-4">
+                <a
+                  href="/ecommerce/catalogo-saude"
+                  className="inline-flex items-center gap-1 text-sm font-semibold text-indigo-700 hover:text-indigo-900"
+                >
+                  Abrir diagnóstico detalhado <ExternalLink size={14} />
+                </a>
+              </div>
+              <div className="grid grid-cols-2 gap-3 p-5 pt-3 sm:grid-cols-3">
                 <MetricCard
                   label="Prontos"
                   value={saude?.prontos_para_venda ?? 0}
@@ -258,6 +273,7 @@ export default function EcommerceAnalytics() {
                   ["Sem imagem", "sem_imagem"],
                   ["Sem descrição", "sem_descricao"],
                   ["Sem categoria", "sem_categoria"],
+                  ["Sem marca", "sem_marca"],
                   ["Sem preço", "sem_preco"],
                 ].map(([label, key]) => (
                   <MetricCard key={key} label={label} value={saude?.[key] ?? 0} tone="amber" />

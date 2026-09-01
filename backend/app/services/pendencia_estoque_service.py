@@ -51,6 +51,25 @@ def verificar_e_notificar_pendencias(
         logger.warning(f"❌ Produto {produto_id} não encontrado")
         return {"sucesso": False, "erro": "Produto não encontrado"}
 
+    notificacoes_ecommerce = 0
+    try:
+        from app.routes.ecommerce_notify_routes import (
+            notificar_clientes_estoque_disponivel,
+        )
+
+        notificacoes_ecommerce = notificar_clientes_estoque_disponivel(
+            db,
+            str(tenant_id),
+            produto_id,
+            produto.nome or "Produto",
+        )
+    except Exception:
+        logger.exception(
+            "[AVISE-ME] Falha ao processar lista online tenant=%s produto=%s",
+            tenant_id,
+            produto_id,
+        )
+
     # Buscar pendências ativas ordenadas por prioridade e data
     pendencias = (
         db.query(PendenciaEstoque)
@@ -74,7 +93,8 @@ def verificar_e_notificar_pendencias(
             "produto_id": produto_id,
             "produto_nome": produto.nome,
             "pendencias_encontradas": 0,
-            "notificacoes_enviadas": 0,
+            "notificacoes_enviadas": notificacoes_ecommerce,
+            "notificacoes_ecommerce": notificacoes_ecommerce,
         }
 
     logger.info(f"📋 Encontradas {len(pendencias)} pendências para notificar")
@@ -105,7 +125,8 @@ def verificar_e_notificar_pendencias(
         "produto_id": produto_id,
         "produto_nome": produto.nome,
         "pendencias_encontradas": len(pendencias),
-        "notificacoes_enviadas": notificacoes_enviadas,
+        "notificacoes_enviadas": notificacoes_enviadas + notificacoes_ecommerce,
+        "notificacoes_ecommerce": notificacoes_ecommerce,
         "notificacoes_falhas": notificacoes_falhas,
     }
 

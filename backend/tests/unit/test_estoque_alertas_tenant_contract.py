@@ -1,9 +1,11 @@
 from types import SimpleNamespace
 from uuid import UUID
+import pytest
 
 from app.estoque import service as estoque_service
 from app.estoque.service import EstoqueService
 from app import vendas_models  # noqa: F401
+from app import financeiro_models  # noqa: F401
 
 
 TENANT_ID = UUID("11111111-1111-4111-8111-111111111111")
@@ -80,3 +82,69 @@ def test_registrar_alerta_estoque_negativo_syncs_explicit_tenant_before_query(
     assert db.added[0].estoque_resultante == -3
     assert db.added[0].venda_id == 123
     assert db.flushed is True
+
+
+def test_venda_online_bloqueia_negativo_mesmo_quando_loja_fisica_permite(
+    monkeypatch,
+):
+    events = []
+
+    class ScalarResult:
+        def scalar(self):
+            return "ecommerce"
+
+    class OnlineDB(_FakeDB):
+        def execute(self, *_args, **_kwargs):
+            return ScalarResult()
+
+    db = OnlineDB(
+        events,
+        first_result=SimpleNamespace(
+            permite_estoque_negativo=True,
+            permite_estoque_negativo_online=False,
+        ),
+    )
+    _capture_rls_sync(monkeypatch, events)
+
+    with pytest.raises(ValueError, match="canal online"):
+        EstoqueService._validar_ou_registrar_estoque_negativo(
+            produto=SimpleNamespace(id=77, nome="Racao especial"),
+            quantidade=5,
+            estoque_anterior=2,
+            tenant_id=TENANT_ID,
+            referencia_id=123,
+            referencia_tipo="venda",
+            documento="VENDA-123",
+            db=db,
+        )
+
+
+def test_baixa_online_atualiza_saldo_reservado_do_canal():
+    class ScalarResult:
+        def scalar(self):
+            return "app"
+
+    class OnlineDB(_FakeDB):
+        def execute(self, *_args, **_kwargs):
+            return ScalarResult()
+
+    db = OnlineDB(
+        [],
+        first_result=SimpleNamespace(
+            ecommerce_usar_estoque_canal=True,
+            permite_estoque_negativo_online=False,
+        ),
+    )
+    produto = SimpleNamespace(nome="Racao", estoque_ecommerce=3)
+
+    EstoqueService._ajustar_estoque_canal_online(
+        produto,
+        2,
+        entrada=False,
+        tenant_id=TENANT_ID,
+        referencia_id=123,
+        referencia_tipo="venda",
+        db=db,
+    )
+
+    assert produto.estoque_ecommerce == 1
