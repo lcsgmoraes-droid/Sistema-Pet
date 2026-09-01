@@ -8,6 +8,7 @@ from fastapi import HTTPException, Request
 from app.config import settings
 from app.routes.asaas_billing_routes import (
     SubscriptionCreateRequest,
+    _initial_webhook_tenant_reference,
     _validate_webhook_token,
     subscribe,
 )
@@ -132,6 +133,21 @@ def test_webhook_rejeita_token_incorreto(monkeypatch):
         _validate_webhook_token("token-incorreto")
 
     assert exc_info.value.status_code == 401
+
+
+def test_recibo_webhook_descarta_referencia_de_oferta_maior_que_coluna_tenant():
+    tenant_id = "4c48c5c9-bf40-49a8-b323-7b8fb8b3dc8f"
+
+    assert (
+        _initial_webhook_tenant_reference({"externalReference": tenant_id})
+        == tenant_id
+    )
+    assert (
+        _initial_webhook_tenant_reference(
+            {"externalReference": f"billing_offer:{tenant_id}"}
+        )
+        is None
+    )
 
 
 def test_cliente_asaas_separa_sandbox_de_producao(monkeypatch):

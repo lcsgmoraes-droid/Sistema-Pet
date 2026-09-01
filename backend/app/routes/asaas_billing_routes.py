@@ -228,6 +228,18 @@ def _validate_webhook_token(received_token: str | None) -> None:
         )
 
 
+def _initial_webhook_tenant_reference(payment: dict) -> str | None:
+    """Preserva apenas referencias que cabem na coluna de tenant do recibo."""
+
+    reference = str(payment.get("externalReference") or "").strip()
+    if not reference:
+        return None
+    max_length = BillingWebhookEvent.__table__.c.tenant_reference.type.length
+    if max_length is not None and len(reference) > max_length:
+        return None
+    return reference
+
+
 @router.post("/webhook")
 async def asaas_webhook(
     request: Request,
@@ -275,7 +287,7 @@ async def asaas_webhook(
             provider="asaas",
             event_id=event_id,
             event_type=event_type,
-            tenant_reference=str(payment.get("externalReference") or "") or None,
+            tenant_reference=_initial_webhook_tenant_reference(payment),
             provider_payment_id=str(payment.get("id") or "") or None,
             payload_sha256=payload_hash,
             processing_status="processing",
