@@ -139,8 +139,7 @@ def test_recibo_webhook_descarta_referencia_de_oferta_maior_que_coluna_tenant():
     tenant_id = "4c48c5c9-bf40-49a8-b323-7b8fb8b3dc8f"
 
     assert (
-        _initial_webhook_tenant_reference({"externalReference": tenant_id})
-        == tenant_id
+        _initial_webhook_tenant_reference({"externalReference": tenant_id}) == tenant_id
     )
     assert (
         _initial_webhook_tenant_reference(
