@@ -32,6 +32,7 @@ from .funcionario_contagem_models import (
 )
 from .produtos_lembretes_variacoes_models import (
     Lembrete,
+    LembreteContato,
     ProdutoAtributo,
     ProdutoAtributoOpcao,
     ProdutoVariacaoAtributo,
@@ -47,6 +48,7 @@ __all__ = [
     "FuncionarioContagemItem",
     "GranelConversao",
     "Lembrete",
+    "LembreteContato",
     "ListaPreco",
     "Marca",
     "NotaEntrada",
