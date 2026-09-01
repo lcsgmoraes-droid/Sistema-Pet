@@ -6,6 +6,7 @@ Configuração via variáveis de ambiente:
   SMTP_USER        — endereço de login
   SMTP_PASSWORD    — senha / app password
   SMTP_FROM        — endereço de exibição (padrão: SMTP_USER)
+  SMTP_REPLY_TO    — endereço que recebe respostas (padrão: corepeterp@gmail.com)
   SMTP_TLS         — 'true' (padrão) ou 'false'
 
 Se nenhuma variável estiver configurada, o envio é apenas simulado
@@ -17,16 +18,20 @@ import os
 import smtplib
 import ssl
 from email import policy
-from pathlib import Path
 from email.message import EmailMessage
 from email.utils import formataddr, formatdate, make_msgid, parseaddr
-from typing import Iterable, Mapping, Any
+from html import escape
+from pathlib import Path
+from typing import Any, Iterable, Mapping
+
 from dotenv import load_dotenv
 
 from app.utils.correlation import current_correlation_id
 
 logger = logging.getLogger(__name__)
 DEFAULT_SENDER_NAME = "CorePet"
+DEFAULT_REPLY_TO = "corepeterp@gmail.com"
+AUTOMATIC_NOTICE_ID = "corepet-email-automatic-notice"
 
 
 for env_path in (Path("/opt/petshop/.env"), Path(".env")):
@@ -47,6 +52,7 @@ def _smtp_settings() -> dict[str, object]:
     user = _env_first("SMTP_USER", "SMTP_EMAIL")
     password = _env_first("SMTP_PASSWORD")
     from_addr = _env_first("SMTP_FROM", "SMTP_EMAIL", "SMTP_USER", default=user)
+    reply_to = _env_first("SMTP_REPLY_TO", default=DEFAULT_REPLY_TO)
     port_raw = _env_first("SMTP_PORT", default="587")
     use_tls_raw = _env_first("SMTP_TLS", default="true")
 
@@ -61,6 +67,7 @@ def _smtp_settings() -> dict[str, object]:
         "user": user,
         "password": password,
         "from_addr": from_addr,
+        "reply_to": reply_to,
         "use_tls": str(use_tls_raw).lower() != "false",
     }
 
@@ -131,6 +138,41 @@ def _smtp_tls_context() -> ssl.SSLContext:
     return context
 
 
+def _automatic_notice_text(reply_to: str) -> str:
+    contact_address = _email_address(reply_to) or DEFAULT_REPLY_TO
+    return (
+        "Este é um e-mail automático. Não responda a esta mensagem. "
+        f"Para falar com a CorePet, escreva para {contact_address}."
+    )
+
+
+def _append_automatic_notice_text(text_body: str, reply_to: str) -> str:
+    notice = _automatic_notice_text(reply_to)
+    body = str(text_body or "").rstrip()
+    if notice in body:
+        return body
+    return f"{body}\n\n---\n{notice}" if body else notice
+
+
+def _append_automatic_notice_html(html_body: str, reply_to: str) -> str:
+    body = str(html_body or "")
+    if f'id="{AUTOMATIC_NOTICE_ID}"' in body:
+        return body
+
+    contact_address = _email_address(reply_to) or DEFAULT_REPLY_TO
+    safe_contact_address = escape(contact_address)
+    footer = f"""
+<div id="{AUTOMATIC_NOTICE_ID}" style="max-width:560px;margin:16px auto 0;padding:16px 24px;border-top:1px solid #e5e7eb;text-align:center;font-family:Arial,sans-serif;font-size:12px;line-height:1.5;color:#6b7280">
+  Este é um e-mail automático. Não responda a esta mensagem.<br>
+  Para falar com a CorePet, escreva para
+  <a href="mailto:{safe_contact_address}" style="color:#2563eb;text-decoration:none">{safe_contact_address}</a>.
+</div>"""
+    closing_body_index = body.lower().rfind("</body>")
+    if closing_body_index >= 0:
+        return f"{body[:closing_body_index]}{footer}\n{body[closing_body_index:]}"
+    return f"{body.rstrip()}\n{footer}" if body.strip() else footer.lstrip()
+
+
 def _build_email_message(
     *,
     from_addr: str,
@@ -138,6 +180,7 @@ def _build_email_message(
     subject: str,
     html_body: str,
     text_body: str | None = None,
+    reply_to: str = DEFAULT_REPLY_TO,
     attachments: Iterable[Mapping[str, Any]] | None = None,
     correlation_id: str | None = None,
 ) -> EmailMessage:
@@ -152,15 +195,17 @@ def _build_email_message(
     msg["To"] = to
     msg["Date"] = formatdate(localtime=True)
     msg["Message-ID"] = make_msgid(domain=_sender_domain(from_addr))
-    msg["Reply-To"] = _email_address(from_addr)
+    msg["Reply-To"] = _email_address(reply_to) or DEFAULT_REPLY_TO
     msg["X-Mailer"] = DEFAULT_SENDER_NAME
     msg["X-Correlation-ID"] = resolved_correlation_id
 
-    texto_fallback = (
+    texto_fallback_base = (
         text_body or "Seu cliente de e-mail nao exibiu o conteudo HTML desta mensagem."
     )
+    texto_fallback = _append_automatic_notice_text(texto_fallback_base, reply_to)
+    html_with_notice = _append_automatic_notice_html(html_body, reply_to)
     msg.set_content(texto_fallback, subtype="plain", charset="utf-8")
-    msg.add_alternative(html_body, subtype="html", charset="utf-8")
+    msg.add_alternative(html_with_notice, subtype="html", charset="utf-8")
 
     for attachment in attachments or []:
         filename = str(attachment.get("filename") or "anexo.bin")
@@ -215,6 +260,7 @@ def send_email(
     user = str(config["user"])
     password = str(config["password"])
     from_addr = str(config["from_addr"])
+    reply_to = str(config.get("reply_to") or DEFAULT_REPLY_TO)
     use_tls = bool(config["use_tls"])
     envelope_from = _email_address(from_addr) or user
 
@@ -224,6 +270,7 @@ def send_email(
         subject=subject,
         html_body=html_body,
         text_body=text_body,
+        reply_to=reply_to,
         attachments=attachments,
         correlation_id=correlation_id,
     )
