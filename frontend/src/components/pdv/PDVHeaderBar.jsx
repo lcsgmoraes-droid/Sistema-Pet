@@ -112,7 +112,7 @@ export default function PDVHeaderBar({
             className="w-full sm:w-auto sm:min-w-[132px]"
             title="Registrar cliente que não comprou ou produto procurado"
           >
-            <span>Não venda</span>
+            <span>Registrar procura</span>
           </ActionButton>
 
           <IconActionButton
