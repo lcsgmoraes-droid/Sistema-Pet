@@ -30,6 +30,10 @@ test("fila apresenta filtros exclusivos de prazo e tipo", () => {
 test("ações principais priorizam mensagem, push e histórico do ciclo", () => {
   assert.match(cardSource, /> Criar mensagem/);
   assert.match(cardSource, /Enviar notificação no app/);
+  assert.match(
+    cardSource,
+    /Push indisponível\. Será habilitado quando o cliente tiver uma conta vinculada no app\./,
+  );
   assert.match(cardSource, /contato\(s\) neste ciclo/);
   assert.match(cardSource, /Registrar recompra/);
   assert.doesNotMatch(cardSource, /className="btn /);
