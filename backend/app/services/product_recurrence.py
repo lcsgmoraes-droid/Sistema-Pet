@@ -202,9 +202,11 @@ def process_finalized_sale_recurrence(
         else:
             estimate = estimate_recurrence(
                 purchase_dates,
-                configured_interval_days=configured_interval
-                if getattr(produto, "tem_recorrencia", False)
-                else None,
+                configured_interval_days=(
+                    configured_interval
+                    if getattr(produto, "tem_recorrencia", False)
+                    else None
+                ),
             )
 
         active_query = db.query(Lembrete).filter(
@@ -308,7 +310,7 @@ def run_due_recurrence_notifications(*, db_factory, logger_override=None) -> dic
     from app.campaigns.notification_service import enqueue_push
     from app.models import Tenant
     from app.services.app_notifications import resolve_customer_app_user_id
-    from app.produtos_models import Lembrete
+    from app.produtos_models import Lembrete, LembreteContato
     from app.tenancy.context import tenant_context
     from app.vendas_models import Venda  # noqa: F401 - registra a FK de lembretes
 
@@ -370,14 +372,48 @@ def run_due_recurrence_notifications(*, db_factory, logger_override=None) -> dic
                                 "product_id": reminder.produto_id,
                             },
                         )
-                        exists = (
-                            queued
-                            or db.query(NotificationQueue.id)
+                        queue = (
+                            db.query(NotificationQueue)
                             .filter(NotificationQueue.idempotency_key == key)
                             .first()
-                            is not None
                         )
+                        exists = queued or queue is not None
                         if exists:
+                            if queue is None:
+                                db.flush()
+                                queue = (
+                                    db.query(NotificationQueue)
+                                    .filter(NotificationQueue.idempotency_key == key)
+                                    .first()
+                                )
+                            contact_key = f"contact:{key}"
+                            contact_exists = (
+                                db.query(LembreteContato.id)
+                                .filter(
+                                    LembreteContato.tenant_id == tenant_id,
+                                    LembreteContato.idempotency_key == contact_key,
+                                )
+                                .first()
+                            )
+                            if not contact_exists:
+                                db.add(
+                                    LembreteContato(
+                                        tenant_id=tenant_id,
+                                        lembrete_id=reminder.id,
+                                        cliente_id=reminder.cliente_id,
+                                        produto_id=reminder.produto_id,
+                                        usuario_id=None,
+                                        notification_queue_id=(
+                                            queue.id if queue is not None else None
+                                        ),
+                                        canal="push",
+                                        acao="push_automatico",
+                                        status="pendente",
+                                        mensagem=body,
+                                        resultado="Notificação automática enfileirada",
+                                        idempotency_key=contact_key,
+                                    )
+                                )
                             reminder.notificacao_enviada = True
                             reminder.data_notificacao_enviada = datetime.utcnow()
                             reminder.status = "notificado"

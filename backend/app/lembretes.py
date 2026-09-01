@@ -11,6 +11,7 @@ from .db import get_session
 from .auth import get_current_user_and_tenant
 from .models import Cliente, Pet
 from .produtos_models import Produto, Lembrete
+from .services.lembretes_relacionamento import list_active_reminders
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/lembretes", tags=["lembretes"])
@@ -153,9 +154,11 @@ async def criar_lembrete(
             "notificacao_7_dias": lembrete.data_notificacao_7_dias.isoformat(),
             "dose_atual": lembrete.dose_atual,
             "dose_total": lembrete.dose_total,
-            "progresso": f"{lembrete.dose_atual}/{lembrete.dose_total}"
-            if lembrete.dose_total
-            else "infinito",
+            "progresso": (
+                f"{lembrete.dose_atual}/{lembrete.dose_total}"
+                if lembrete.dose_total
+                else "infinito"
+            ),
         }
 
     except HTTPException:
@@ -179,44 +182,7 @@ async def listar_lembretes_pendentes(
         if not current_user or not hasattr(current_user, "id") or not current_user.id:
             return {"total": 0, "lembretes": []}
 
-        lembretes = (
-            db.query(Lembrete)
-            .filter(Lembrete.tenant_id == tenant_id, Lembrete.status == "pendente")
-            .order_by(Lembrete.data_proxima_dose)
-            .all()
-        )
-
-        return {
-            "total": len(lembretes),
-            "lembretes": [
-                {
-                    "id": lembrete.id,
-                    "cliente_id": lembrete.cliente_id,
-                    "cliente_nome": lembrete.cliente.nome if lembrete.cliente else None,
-                    "cliente_telefone": (
-                        lembrete.cliente.celular or lembrete.cliente.telefone
-                        if lembrete.cliente
-                        else None
-                    ),
-                    "pet_nome": lembrete.pet.nome if lembrete.pet else None,
-                    "produto_nome": lembrete.produto.nome,
-                    "data_proxima_dose": lembrete.data_proxima_dose.isoformat(),
-                    "dias_restantes": (
-                        lembrete.data_proxima_dose.date() - datetime.utcnow().date()
-                    ).days,
-                    "status": lembrete.status,
-                    "quantidade": lembrete.quantidade_recomendada,
-                    "preco_estimado": lembrete.preco_estimado,
-                    "dose_atual": lembrete.dose_atual,
-                    "dose_total": lembrete.dose_total,
-                    "origem_intervalo": lembrete.origem_intervalo,
-                    "intervalo_estimado_dias": lembrete.intervalo_estimado_dias,
-                    "confianca_recorrencia": lembrete.confianca_recorrencia,
-                    "amostras_recorrencia": lembrete.amostras_recorrencia,
-                }
-                for lembrete in lembretes
-            ],
-        }
+        return list_active_reminders(db, tenant_id=tenant_id)
 
     except Exception as e:
         logger.error(f"Erro ao listar lembretes: {e}")
@@ -456,9 +422,11 @@ async def renovar_lembrete(
             "proxima_dose": novo_lembrete.data_proxima_dose.isoformat(),
             "dose_atual": novo_lembrete.dose_atual,
             "dose_total": novo_lembrete.dose_total,
-            "progresso": f"{novo_lembrete.dose_atual}/{novo_lembrete.dose_total}"
-            if novo_lembrete.dose_total
-            else f"{novo_lembrete.dose_atual} (infinito)",
+            "progresso": (
+                f"{novo_lembrete.dose_atual}/{novo_lembrete.dose_total}"
+                if novo_lembrete.dose_total
+                else f"{novo_lembrete.dose_atual} (infinito)"
+            ),
             "historico": historico,
         }
 

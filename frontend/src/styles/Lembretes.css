@@ -1,8 +1,16 @@
 .lembretes-container {
   width: 100%;
-  max-width: 1400px;
+  max-width: 1600px;
   margin: 0 auto;
   padding: 20px;
+}
+
+.lembretes-tabs {
+  scrollbar-width: none;
+}
+
+.lembretes-tabs::-webkit-scrollbar {
+  display: none;
 }
 
 @media (max-width: 640px) {
