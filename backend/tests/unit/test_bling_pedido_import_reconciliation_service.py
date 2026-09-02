@@ -1,7 +1,10 @@
 from types import SimpleNamespace
 from uuid import UUID
 
+import pytest
+
 from app.services import bling_pedido_import_reconciliation_service as service
+from app.tenancy.context import get_current_tenant, set_current_tenant
 
 
 class _FakeAPI:
@@ -17,6 +20,49 @@ class _FakeAPI:
                 {"id": "ML-3", "situacao": {"id": 9}},
             ]
         }
+
+
+@pytest.mark.parametrize(
+    "tenant_anterior",
+    [None, UUID("22222222-2222-2222-2222-222222222222")],
+)
+@pytest.mark.parametrize("falha_na_construcao", [False, True])
+def test_cliente_bling_usa_tenant_configurado_e_restaura_contexto(
+    monkeypatch, tenant_anterior, falha_na_construcao
+):
+    tenant_id = UUID("11111111-1111-1111-1111-111111111111")
+    if tenant_anterior:
+        set_current_tenant(tenant_anterior)
+    chamadas = []
+
+    class APIComContexto:
+        def __init__(self):
+            assert get_current_tenant() == tenant_id
+            chamadas.append("construcao")
+            if falha_na_construcao:
+                raise ValueError("credenciais indisponiveis")
+
+        def listar_pedidos_vendas(self, **kwargs):
+            assert get_current_tenant() == tenant_id
+            chamadas.append("consulta")
+            return {"data": []}
+
+    monkeypatch.setattr(service, "_tenant_bling_configurado", lambda: tenant_id)
+    monkeypatch.setattr("app.bling_integration.BlingAPI", APIComContexto)
+
+    if falha_na_construcao:
+        with pytest.raises(ValueError, match="credenciais indisponiveis"):
+            service.reconciliar_importacao_pedidos_bling_recentes(SimpleNamespace())
+        assert chamadas == ["construcao"]
+    else:
+        resultado = service.reconciliar_importacao_pedidos_bling_recentes(
+            SimpleNamespace()
+        )
+        assert resultado["success"] is True
+        assert resultado["avaliados"] == 0
+        assert chamadas == ["construcao", "consulta"]
+
+    assert get_current_tenant() == tenant_anterior
 
 
 def test_reconciliacao_importa_ausente_e_atualiza_status_divergente(monkeypatch):

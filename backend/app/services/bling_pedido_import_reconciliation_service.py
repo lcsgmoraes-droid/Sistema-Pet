@@ -85,7 +85,6 @@ def reconciliar_importacao_pedidos_bling_recentes(
     data_inicial = (agora - timedelta(days=dias)).date().isoformat()
     data_final = (agora + timedelta(days=1)).date().isoformat()
 
-    api = BlingAPI()
     avaliados = 0
     importados = 0
     atualizados = 0
@@ -93,6 +92,8 @@ def reconciliar_importacao_pedidos_bling_recentes(
     erros: list[dict] = []
 
     with tenant_context(tenant_id):
+        # O cliente carrega as credenciais da empresa durante a construcao.
+        api = BlingAPI()
         for pagina in range(1, limite_paginas + 1):
             resposta = api.listar_pedidos_vendas(
                 data_alteracao_inicial=data_inicial,
