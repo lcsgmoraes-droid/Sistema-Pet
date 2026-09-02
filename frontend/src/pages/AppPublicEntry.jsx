@@ -1,7 +1,13 @@
 import { ArrowRight, Search, ShieldCheck, Smartphone, XCircle } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import ecommerceApi from "../services/ecommerceApi";
+import {
+  COREPET_STORE_URLS,
+  buildAppInstallLinks,
+  getAppInstallPlatform,
+  openAppWithStoreFallback,
+} from "../utils/appInstallLinks";
 
 function extractStoreSlug(input) {
   const raw = String(input || "").trim();
@@ -56,8 +62,19 @@ export default function AppPublicEntry() {
   const [store, setStore] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [appHint, setAppHint] = useState("");
+  const cancelAppOpening = useRef(null);
+
+  function stopAppOpening() {
+    cancelAppOpening.current?.();
+    cancelAppOpening.current = null;
+  }
+
+  useEffect(() => () => cancelAppOpening.current?.(), []);
 
   async function searchStore(nextCode = storeCode) {
+    stopAppOpening();
+    setAppHint("");
     const slug = extractStoreSlug(nextCode);
     setError("");
     setStore(null);
@@ -81,6 +98,7 @@ export default function AppPublicEntry() {
   }
 
   function enterStore() {
+    stopAppOpening();
     const slug = store?.slug || extractStoreSlug(storeCode);
     if (slug) {
       navigate(`/${slug}`);
@@ -88,9 +106,16 @@ export default function AppPublicEntry() {
   }
 
   function openCorePetApp() {
+    stopAppOpening();
     const slug = store?.slug || extractStoreSlug(storeCode);
     if (slug) {
-      window.location.href = `corepet://app?loja=${encodeURIComponent(slug)}`;
+      const platform = getAppInstallPlatform(navigator);
+      if (!platform) {
+        setAppHint("Use os botões de download para escolher a loja do seu celular.");
+        return;
+      }
+      setAppHint("Se o app não abrir, use um dos botões de download.");
+      cancelAppOpening.current = openAppWithStoreFallback(buildAppInstallLinks(slug, platform));
     }
   }
 
@@ -130,6 +155,8 @@ export default function AppPublicEntry() {
               <input
                 value={storeCode}
                 onChange={(event) => {
+                  stopAppOpening();
+                  setAppHint("");
                   setStoreCode(event.target.value);
                   setStore(null);
                   setError("");
@@ -200,6 +227,35 @@ export default function AppPublicEntry() {
               </div>
             </div>
           ) : null}
+
+          <div className="mt-5 border-t border-slate-200 pt-5">
+            <p className="text-sm font-semibold text-slate-800">Ainda não tem o CorePet?</p>
+            <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+              <a
+                href={COREPET_STORE_URLS.android}
+                onClick={stopAppOpening}
+                className="inline-flex min-h-11 items-center justify-center rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-700"
+              >
+                Baixar na Google Play
+              </a>
+              <a
+                href={COREPET_STORE_URLS.ios}
+                onClick={stopAppOpening}
+                className="inline-flex min-h-11 items-center justify-center rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-700"
+              >
+                Baixar na App Store
+              </a>
+            </div>
+            <p className="mt-3 text-xs leading-relaxed text-slate-600">
+              Depois de instalar, volte a este link e toque em “Abrir no app” para acessar a loja
+              escolhida.
+            </p>
+            {appHint ? (
+              <p role="status" className="mt-2 text-sm text-blue-700">
+                {appHint}
+              </p>
+            ) : null}
+          </div>
         </div>
       </section>
     </main>
