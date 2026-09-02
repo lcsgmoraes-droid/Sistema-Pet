@@ -67,3 +67,13 @@ def test_produtos_routes_mantem_corte_grande_de_lotes():
     assert "def saida_estoque_fifo(" not in produtos_source
     assert len(produtos_source.splitlines()) < 1700
     assert len(lotes_source.splitlines()) < 550
+
+
+def test_todas_as_rotas_de_lote_resolvem_o_tenant_do_catalogo():
+    lotes_source = (BACKEND_ROOT / "app/produtos/lotes_routes.py").read_text(
+        encoding="utf-8"
+    )
+
+    assert lotes_source.count("_resolver_tenant_produto_catalogo(") == len(
+        EXPECTED_LOTES_ROUTES
+    )

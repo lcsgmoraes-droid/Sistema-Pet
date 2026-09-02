@@ -1,11 +1,17 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../api";
+import { useAuth } from "../contexts/AuthContext";
 import { debugLog } from "../utils/debug";
 import { useModulos } from "../contexts/ModulosContext";
 import { useClientesNovoEnderecos } from "./useClientesNovoEnderecos";
 import { normalizeClienteAlertasPdv } from "../utils/clienteAlertasPdv";
+import { canManageAppAccessProfiles } from "../utils/appAccessProfiles";
 import { normalizePessoaAppLogin } from "../utils/pessoaAppLogin";
+import {
+  buildInitialAccessCredentials,
+  resolveTenantLoginReference,
+} from "../utils/usuarioAcessoInicial";
 
 const STEPS = [
   { number: 1, title: "Dados da pessoa" },
@@ -146,6 +152,8 @@ export function useClientesNovoCadastro({
   error,
   setError,
 }) {
+  const { user } = useAuth();
+  const canManageAppAccess = canManageAppAccessProfiles(user);
   const { moduloAtivo } = useModulos();
   const moduloCampanhasAtivo = moduloAtivo("campanhas");
   const navigate = useNavigate();
@@ -169,7 +177,12 @@ export function useClientesNovoCadastro({
   const [usuariosAcessoApp, setUsuariosAcessoApp] = useState([]);
   const [rolesAcessoApp, setRolesAcessoApp] = useState([]);
   const [loadingUsuariosAcessoApp, setLoadingUsuariosAcessoApp] = useState(false);
+  const [initialAccessCredentials, setInitialAccessCredentials] = useState(null);
   const [formData, setFormData] = useState(buildNovoClienteFormData("cliente", "PF"));
+  const tenantLoginReference = resolveTenantLoginReference(
+    user,
+    typeof window === "undefined" ? null : window.localStorage.getItem("selectedTenant"),
+  );
   const steps = useMemo(() => {
     const etapas = formData.tipo_cadastro === "veterinario" ? VETERINARIO_STEPS : STEPS;
     return editingCliente ? etapas : etapas.filter((step) => step.number <= 4);
@@ -253,6 +266,7 @@ export function useClientesNovoCadastro({
   };
 
   const loadUsuariosAcessoApp = async (clienteId = null) => {
+    if (!canManageAppAccess) return;
     try {
       setLoadingUsuariosAcessoApp(true);
       const response = await api.get("/clientes/acessos-app/usuarios", {
@@ -268,6 +282,7 @@ export function useClientesNovoCadastro({
   };
 
   const loadRolesAcessoApp = async () => {
+    if (!canManageAppAccess) return;
     try {
       const response = await api.get("/roles");
       setRolesAcessoApp(response.data || []);
@@ -422,6 +437,7 @@ export function useClientesNovoCadastro({
 
     try {
       const isEdicao = Boolean(editingCliente);
+      const appLoginInicial = !isEdicao ? formData.app_login : null;
       const errosValidacao = [];
 
       if (!formData.nome || formData.nome.trim() === "") {
@@ -490,6 +506,12 @@ export function useClientesNovoCadastro({
       const { celular_whatsapp: _celular_whatsapp, tags: _tags, ...clienteData } = formData;
       clienteData.alertas_pdv = normalizeClienteAlertasPdv(clienteData.alertas_pdv);
       clienteData.app_login = normalizePessoaAppLogin(clienteData.app_login);
+
+      if (!canManageAppAccess) {
+        delete clienteData.auth_user_id;
+        delete clienteData.app_login;
+        delete clienteData.app_access_profiles;
+      }
 
       if (clienteData.is_entregador) {
         if (clienteData.tipo_cadastro === "funcionario") {
@@ -560,6 +582,16 @@ export function useClientesNovoCadastro({
       }
 
       closeModal();
+
+      const createdCredentials = buildInitialAccessCredentials({
+        tenant: tenantLoginReference,
+        username: appLoginInicial?.username,
+        password: appLoginInicial?.password,
+        personName: clienteSalvo?.nome || formData.nome,
+      });
+      if (createdCredentials) {
+        setInitialAccessCredentials(createdCredentials);
+      }
 
       if (!isEdicao && typeof onClienteCriado === "function") {
         await Promise.resolve(onClienteCriado(clienteSalvo));
@@ -661,6 +693,8 @@ export function useClientesNovoCadastro({
       setFormData,
       usuariosAcessoApp,
       rolesAcessoApp,
+      initialAccessCredentials,
+      setInitialAccessCredentials,
       loadingUsuariosAcessoApp,
       buscarCep,
       loadingCep,
@@ -740,6 +774,9 @@ export function useClientesNovoCadastro({
       steps,
       usuariosAcessoApp,
       rolesAcessoApp,
+      initialAccessCredentials,
+      setInitialAccessCredentials,
+      tenantLoginReference,
     ],
   );
 

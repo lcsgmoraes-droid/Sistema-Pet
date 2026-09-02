@@ -217,6 +217,41 @@ def test_refresh_fails_after_logout(client, tenant_factory, user_factory):
     assert refresh_response.status_code == 401
 
 
+def test_logout_revokes_only_current_session(client, tenant_factory, user_factory):
+    """
+    Protege o uso do mesmo usuario em navegadores e tenants diferentes.
+    """
+    tenant = tenant_factory(nome="Tenant Logout Isolado Test")
+    password = "Pass@123"
+    email = "logout-isolado@test.com"
+    user_factory(tenant_id=tenant.id, email=email, password=password)
+
+    first_login = _login_and_select_tenant(client, email, password, tenant.id)
+    second_login = _login_and_select_tenant(client, email, password, tenant.id)
+
+    assert first_login.status_code == 200
+    assert second_login.status_code == 200
+
+    first_tokens = first_login.json()
+    second_tokens = second_login.json()
+
+    logout_response = client.post(
+        "/auth/logout-multitenant",
+        headers={"Authorization": f"Bearer {first_tokens['access_token']}"},
+    )
+    assert logout_response.status_code == 200
+
+    revoked_refresh = client.post(
+        "/auth/refresh", json={"refresh_token": first_tokens["refresh_token"]}
+    )
+    active_refresh = client.post(
+        "/auth/refresh", json={"refresh_token": second_tokens["refresh_token"]}
+    )
+
+    assert revoked_refresh.status_code == 401
+    assert active_refresh.status_code == 200
+
+
 def test_login_with_invalid_credentials_fails(client, tenant_factory, user_factory):
     """
     Testa que login com credenciais inválidas falha.

@@ -14,7 +14,6 @@ from app.auth.dependencies import get_current_user_and_tenant
 from app.db import get_session
 from app.idempotency import idempotent
 from app.models import Cliente
-from app.produtos_models import Produto
 from app.security.permissions_decorator import require_permission
 from app.services.opportunity_background_processor import get_opportunity_processor
 from app.services.venda_rentabilidade_snapshot_service import (
@@ -196,13 +195,16 @@ async def criar_venda(
     # ========================================
     # 🔒 TRAVA 1 — VALIDAÇÃO: PRODUTO PAI NÃO PODE SER VENDIDO
     # ========================================
+    from app.empresa_grupo_estoque_compartilhado_service import (
+        EmpresaGrupoEstoqueCompartilhadoService,
+    )
+
     for item in dados.itens:
         if item.produto_id:
-            produto = (
-                db.query(Produto)
-                .filter(Produto.id == item.produto_id, Produto.tenant_id == tenant_id)
-                .first()
+            produto = EmpresaGrupoEstoqueCompartilhadoService.resolver_produto_venda(
+                db, tenant_id, item.produto_id
             )
+            produto = produto.produto
 
             if produto and produto.is_parent:
                 raise HTTPException(
@@ -421,7 +423,7 @@ def atualizar_venda(
     # Ajustar o estoque pela diferença entre os itens antigos e os novos.
     # A finalização não baixa novamente vendas que já estavam abertas.
     itens_antigos = db.query(VendaItem).filter_by(venda_id=venda.id).all()
-    ajustar_estoque_edicao_venda(
+    resolucoes_produtos = ajustar_estoque_edicao_venda(
         venda=venda,
         itens_antigos=itens_antigos,
         itens_novos=dados.itens,
@@ -434,20 +436,15 @@ def atualizar_venda(
     db.query(VendaItem).filter_by(venda_id=venda.id).delete()
 
     # Criar novos itens
-    from app.produtos_models import Produto
     from app.vendas.racao_previsao import validar_previsao_fim_racao
 
     for item_data in dados.itens:
         produto_catalogo = None
         if item_data.produto_id:
-            produto_catalogo = (
-                db.query(Produto)
-                .filter(
-                    Produto.id == item_data.produto_id,
-                    Produto.tenant_id == tenant_id,
-                )
-                .first()
-            )
+            produto_resolvido = resolucoes_produtos.get(int(item_data.produto_id))
+            produto_catalogo = produto_resolvido.produto if produto_resolvido else None
+        else:
+            produto_resolvido = None
         previsao_racao = validar_previsao_fim_racao(
             item_data,
             produto=produto_catalogo,
@@ -460,7 +457,27 @@ def atualizar_venda(
             tenant_id=tenant_id,  # ✅ Garantir isolamento entre empresas
             tipo=item_data.tipo,
             produto_id=item_data.produto_id,
-            servico_descricao=item_data.servico_descricao,
+            servico_descricao=item_data.servico_descricao
+            or (
+                produto_catalogo.nome
+                if produto_resolvido is not None and produto_resolvido.compartilhado
+                else None
+            ),
+            estoque_origem_tenant_id=(
+                produto_resolvido.tenant_origem_id
+                if produto_resolvido is not None and produto_resolvido.compartilhado
+                else None
+            ),
+            estoque_compartilhado_id=(
+                produto_resolvido.compartilhamento_id
+                if produto_resolvido is not None
+                else None
+            ),
+            estoque_origem_nome=(
+                produto_resolvido.empresa_origem_nome
+                if produto_resolvido is not None
+                else None
+            ),
             quantidade=item_data.quantidade,
             preco_unitario=item_data.preco_unitario,
             desconto_item=item_data.desconto_item or 0,

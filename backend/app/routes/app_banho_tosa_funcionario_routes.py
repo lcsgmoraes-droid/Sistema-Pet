@@ -75,11 +75,19 @@ def _get_mobile_funcionario_or_403(
     current_user: User,
 ) -> tuple[Cliente, str]:
     tenant_id = str(_activate_user_tenant_context(current_user))
-    funcionario = get_cliente_for_app_profile_or_none(db, current_user, "funcionario")
+    active_profile = str(
+        getattr(current_user, "_active_app_profile", None) or "funcionario"
+    )
+    if active_profile not in {"funcionario", "banho_tosa"}:
+        raise HTTPException(
+            status_code=403,
+            detail="Selecione o perfil Banho & Tosa ou Funcionario.",
+        )
+    funcionario = get_cliente_for_app_profile_or_none(db, current_user, active_profile)
     if not funcionario:
         raise HTTPException(
             status_code=403,
-            detail="Acesso exclusivo para funcionario operacional.",
+            detail="Acesso ao Banho & Tosa nao liberado para esta pessoa.",
         )
     return funcionario, tenant_id
 
@@ -89,11 +97,19 @@ def _get_mobile_entregador_or_403(
     current_user: User,
 ) -> tuple[Cliente, str]:
     tenant_id = str(_activate_user_tenant_context(current_user))
-    entregador = get_cliente_for_app_profile_or_none(db, current_user, "entregador")
+    active_profile = str(
+        getattr(current_user, "_active_app_profile", None) or "entregador"
+    )
+    if active_profile not in {"entregador", "taxi_dog"}:
+        raise HTTPException(
+            status_code=403,
+            detail="Selecione o perfil Taxi Dog ou Entregador.",
+        )
+    entregador = get_cliente_for_app_profile_or_none(db, current_user, active_profile)
     if not entregador:
         raise HTTPException(
             status_code=403,
-            detail="Acesso exclusivo para entregador.",
+            detail="Acesso ao Taxi Dog nao liberado para esta pessoa.",
         )
     return entregador, tenant_id
 

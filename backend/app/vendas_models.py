@@ -20,6 +20,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
+from sqlalchemy.dialects.postgresql import UUID
 from datetime import datetime
 from app.base_models import BaseTenantModel
 from app.utils.serialization import safe_decimal_to_float, safe_datetime_to_iso
@@ -192,17 +193,24 @@ class Venda(BaseTenantModel):
     pagamentos = relationship(
         "VendaPagamento", back_populates="venda", cascade="all, delete-orphan"
     )
+    contas_receber = relationship("ContaReceber", viewonly=True, lazy="selectin")
     baixas = relationship(
         "VendaBaixa", back_populates="venda", cascade="all, delete-orphan"
     )
 
     def to_dict(self):
-        # Calcular valor pago
-        valor_pago = (
-            sum(float(pag.valor) for pag in self.pagamentos)
-            if hasattr(self, "pagamentos")
-            else 0
+        from app.vendas.status_pagamento import calcular_resumo_pagamento_venda
+
+        resumo_pagamento = calcular_resumo_pagamento_venda(
+            total=self.total,
+            contas_receber=getattr(self, "contas_receber", None),
+            pagamentos=getattr(self, "pagamentos", None),
         )
+        valor_pago = float(resumo_pagamento["valor_pago"])
+        valor_restante = float(resumo_pagamento["valor_restante"])
+        status_pagamento = resumo_pagamento["status_pagamento"]
+        if str(self.status or "").lower() in {"cancelada", "cancelado"}:
+            status_pagamento = "cancelado"
 
         # Desserializar enderecos_adicionais do cliente
         import json
@@ -258,7 +266,7 @@ class Venda(BaseTenantModel):
                 self.total
             ),  # Alias para compatibilidade
             "valor_pago": valor_pago,
-            "valor_restante": safe_decimal_to_float(self.total) - valor_pago,
+            "valor_restante": valor_restante,
             "tem_entrega": self.tem_entrega,
             "taxa_entrega": safe_decimal_to_float(self.taxa_entrega) or 0,
             "entrega": {
@@ -288,12 +296,9 @@ class Venda(BaseTenantModel):
             if self.tem_entrega
             else None,
             "status": self.status,
+            "status_operacional": self.status,
             "status_entrega": self.status_entrega,
-            "status_pagamento": "pago"
-            if valor_pago >= safe_decimal_to_float(self.total)
-            else "parcial"
-            if valor_pago > 0
-            else "pendente",
+            "status_pagamento": status_pagamento,
             "forma_pagamento": self.pagamentos[0].forma_pagamento
             if (
                 hasattr(self, "pagamentos")
@@ -350,6 +355,15 @@ class VendaItem(BaseTenantModel):
     # Produto ou Serviço
     tipo = Column(String(20), nullable=False)  # produto, servico
     produto_id = Column(Integer, ForeignKey("produtos.id"), nullable=True)
+    estoque_origem_tenant_id = Column(
+        UUID(as_uuid=True), ForeignKey("tenants.id", ondelete="RESTRICT"), nullable=True
+    )
+    estoque_compartilhado_id = Column(
+        Integer,
+        ForeignKey("empresa_grupo_estoques_compartilhados.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    estoque_origem_nome = Column(String(150), nullable=True)
 
     # ========== SPRINT 2: SUPORTE A VARIAÇÕES ==========
     # CORRIGIDO: Não existe tabela product_variations separada
@@ -398,6 +412,14 @@ class VendaItem(BaseTenantModel):
             "id": self.id,
             "tipo": self.tipo,
             "produto_id": self.produto_id,
+            "estoque_compartilhado": bool(self.estoque_origem_tenant_id),
+            "estoque_origem_tenant_id": (
+                str(self.estoque_origem_tenant_id)
+                if self.estoque_origem_tenant_id
+                else None
+            ),
+            "estoque_compartilhado_id": self.estoque_compartilhado_id,
+            "estoque_origem_nome": self.estoque_origem_nome,
             "produto_nome": self.produto.nome
             if self.produto
             else self.servico_descricao,

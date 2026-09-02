@@ -8,6 +8,7 @@ import {
   FiUsers,
 } from "react-icons/fi";
 import { Link } from "react-router-dom";
+import { isAdminRole } from "../auth/userRole";
 import PageHeader from "../components/ui/PageHeader";
 import Panel from "../components/ui/Panel";
 import { useAuth } from "../contexts/AuthContext";
@@ -104,8 +105,7 @@ export default function Configuracoes() {
   const { moduloAtivo } = useModulos();
 
   const permissions = user?.permissions || [];
-  const roleName = user?.role?.name?.toLowerCase();
-  const isAdmin = roleName === "admin";
+  const isAdmin = isAdminRole(user);
 
   const hasPermission = (permission) => !permission || isAdmin || permissions.includes(permission);
 

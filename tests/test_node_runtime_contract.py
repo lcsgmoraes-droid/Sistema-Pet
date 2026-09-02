@@ -37,6 +37,17 @@ def test_github_actions_use_node_22():
     assert "node-version: 20" not in eas_build
 
 
+def test_eas_preview_build_requires_manual_confirmation():
+    eas_build = (ROOT / ".github" / "workflows" / "eas-build.yml").read_text(
+        encoding="utf-8"
+    )
+
+    assert "\n  workflow_dispatch:\n" in eas_build
+    assert "\n  push:\n" not in eas_build
+    assert "confirmar_necessidade_build:" in eas_build
+    assert "if: ${{ inputs.confirmar_necessidade_build }}" in eas_build
+
+
 def test_deploy_checks_node_before_git_reset():
     deploy_script = (ROOT / "scripts" / "deploy_producao_seguro.sh").read_text(
         encoding="utf-8"

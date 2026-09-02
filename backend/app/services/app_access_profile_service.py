@@ -1,18 +1,28 @@
 from __future__ import annotations
 
 from typing import Any, Iterable
-
 from sqlalchemy import or_
 from sqlalchemy.orm import Session, joinedload
 
 from app.models import AppAccessProfile, Cliente, User
 
 
-PROFILE_ORDER = ("cliente", "funcionario", "entregador", "veterinario")
+PROFILE_ORDER = (
+    "cliente",
+    "gestor",
+    "funcionario",
+    "banho_tosa",
+    "entregador",
+    "taxi_dog",
+    "veterinario",
+)
 PROFILE_LABELS = {
     "cliente": "Cliente",
+    "gestor": "Gestor",
     "funcionario": "Funcionario",
+    "banho_tosa": "Banho & Tosa",
     "entregador": "Entregador",
+    "taxi_dog": "Taxi Dog",
     "veterinario": "Veterinario",
 }
 
@@ -134,8 +144,9 @@ def apply_selected_profile_flags(
             "cliente_id": cliente_id,
             "is_entregador": profile_type == "entregador",
             "is_funcionario": profile_type == "funcionario",
+            "is_gestor": profile_type == "gestor",
             "funcionario_id": cliente_id
-            if profile_type in {"entregador", "funcionario"}
+            if profile_type in {"entregador", "funcionario", "banho_tosa", "taxi_dog"}
             else None,
             "is_veterinario": profile_type == "veterinario",
             "veterinario_id": cliente_id if profile_type == "veterinario" else None,
@@ -244,7 +255,11 @@ def resolve_user_app_profiles(
         user_id=user.id,
         cliente_ids=[cliente.id for cliente in clientes],
     )
-    return build_available_profiles_for_clientes(user, clientes, explicit_grants=grants)
+    return build_available_profiles_for_clientes(
+        user,
+        clientes,
+        explicit_grants=grants,
+    )
 
 
 def get_cliente_for_app_profile_or_none(

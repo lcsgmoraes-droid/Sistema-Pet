@@ -8,6 +8,7 @@ from app.auth.dependencies import get_current_tenant
 from app.produtos_models import Produto
 from app.produto_config_fiscal_models import ProdutoConfigFiscal
 from app.kit_config_fiscal_models import KitConfigFiscal
+from app.produtos.validators import _resolver_tenant_produto_catalogo
 
 router = APIRouter(prefix="/produtos", tags=["Fiscal Produto V2"])
 
@@ -24,6 +25,8 @@ def get_fiscal_produto(
     1. produto_config_fiscal (V2)
     2. campos fiscais legados da tabela produtos
     """
+    tenant_id, _ = _resolver_tenant_produto_catalogo(db, tenant_id, produto_id)
+
     try:
         fiscal_v2 = (
             db.query(ProdutoConfigFiscal)
@@ -130,6 +133,8 @@ def get_fiscal_kit(
     1. kit_config_fiscal (V2)
     2. fallback para fiscal do produto (se não existir config de kit)
     """
+    tenant_id, _ = _resolver_tenant_produto_catalogo(db, tenant_id, produto_id)
+
     try:
         # Verificar se é KIT
         produto = (
@@ -212,6 +217,8 @@ def put_fiscal_produto(
     Salva configuração fiscal V2 do produto.
     Sempre grava em produto_config_fiscal.
     """
+    tenant_id, _ = _resolver_tenant_produto_catalogo(db, tenant_id, produto_id)
+
     fiscal = (
         db.query(ProdutoConfigFiscal)
         .filter(
@@ -277,6 +284,8 @@ def put_fiscal_kit(
     Salva configuração fiscal V2 do KIT.
     Só permitido para produtos do tipo KIT.
     """
+    tenant_id, _ = _resolver_tenant_produto_catalogo(db, tenant_id, produto_id)
+
     produto = (
         db.query(Produto)
         .filter(

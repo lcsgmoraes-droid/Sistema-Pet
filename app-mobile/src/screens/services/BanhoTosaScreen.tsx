@@ -15,6 +15,7 @@ import {
 import * as Clipboard from "expo-clipboard";
 import {
   avaliarBanhoTosaAtendimento,
+  criarAgendamentoBanhoTosa,
   listarCalendarioBanhoTosa,
   listarStatusBanhoTosa,
 } from "../../services/banhoTosa.service";
@@ -47,8 +48,9 @@ export default function BanhoTosaScreen() {
   const [dataSelecionada, setDataSelecionada] = useState<string | null>(null);
   const [agendaAberta, setAgendaAberta] = useState(true);
   const [servicoListaAberta, setServicoListaAberta] = useState(false);
+  const [agendandoSlot, setAgendandoSlot] = useState<string | null>(null);
 
-  async function carregar() {
+  const carregar = useCallback(async (servicoAlvo: number | null = null) => {
     try {
       const response = await listarStatusBanhoTosa();
       setItens(response.itens || []);
@@ -58,25 +60,36 @@ export default function BanhoTosaScreen() {
 
     try {
       const [calendarioResponse, petsResponse] = await Promise.all([
-        listarCalendarioBanhoTosa(),
+        listarCalendarioBanhoTosa({ servico_id: servicoAlvo }),
         listarPets().catch(() => []),
       ]);
       setCalendario(calendarioResponse);
       setPets(petsResponse);
-      if (!servicoId && calendarioResponse.servicos?.[0]?.id) setServicoId(calendarioResponse.servicos[0].id);
-      if (!petId && petsResponse?.[0]?.id) setPetId(petsResponse[0].id);
-      const primeiroDia = calendarioResponse.dias?.find((dia) => dia.funciona)?.data || calendarioResponse.dias?.[0]?.data || null;
-      setDataSelecionada((atual) => (
-        atual && calendarioResponse.dias?.some((dia) => dia.data === atual) ? atual : primeiroDia
-      ));
+      setServicoId(
+        (atual) => atual || calendarioResponse.servicos?.[0]?.id || null,
+      );
+      setPetId((atual) => atual || petsResponse?.[0]?.id || null);
+      const primeiroDia =
+        calendarioResponse.dias?.find((dia) => dia.funciona)?.data ||
+        calendarioResponse.dias?.[0]?.data ||
+        null;
+      setDataSelecionada((atual) =>
+        atual && calendarioResponse.dias?.some((dia) => dia.data === atual)
+          ? atual
+          : primeiroDia,
+      );
     } catch {
       setCalendario(null);
     } finally {
       setLoading(false);
     }
-  }
+  }, []);
 
-  useFocusEffect(useCallback(() => { carregar(); }, []));
+  useFocusEffect(
+    useCallback(() => {
+      void carregar(servicoId);
+    }, [carregar, servicoId]),
+  );
 
   useEffect(() => {
     if (!calendario?.dias?.length) return;
@@ -86,7 +99,7 @@ export default function BanhoTosaScreen() {
 
   async function onRefresh() {
     setRefreshing(true);
-    await carregar();
+    await carregar(servicoId);
     setRefreshing(false);
   }
 
@@ -95,25 +108,64 @@ export default function BanhoTosaScreen() {
     setAvaliandoId(item.atendimento_id);
     try {
       await avaliarBanhoTosaAtendimento(item.atendimento_id, nota);
-      await carregar();
+      await carregar(servicoId);
     } finally {
       setAvaliandoId(null);
     }
   }
 
-  async function pedirAgendamento(data: string, horario: string) {
+  function pedirAgendamento(data: string, horario: string) {
     const servico = calendario?.servicos.find((item) => item.id === servicoId);
     const pet = pets.find((item) => item.id === petId);
     if (!servico) {
-      Alert.alert("Escolha o servico", "Selecione o servico antes de pedir o horario.");
+      Alert.alert(
+        "Escolha o servico",
+        "Selecione o servico antes de pedir o horario.",
+      );
       return;
     }
     if (!pet) {
       Alert.alert("Escolha o pet", "Selecione o pet antes de pedir o horario.");
       return;
     }
-    const mensagem = `Ola! Gostaria de marcar ${servico.nome} para o pet ${pet.nome} no dia ${formatarDataCurta(data)} as ${horario}.`;
-    await abrirWhatsappLoja(mensagem);
+    const slotId = `${data}-${horario}`;
+    Alert.alert(
+      "Confirmar agendamento",
+      `${servico.nome} para ${pet.nome}\n${formatarDataCurta(data)} as ${horario}`,
+      [
+        { text: "Cancelar", style: "cancel" },
+        {
+          text: "Agendar",
+          onPress: () => {
+            void (async () => {
+              setAgendandoSlot(slotId);
+              try {
+                await criarAgendamentoBanhoTosa({
+                  pet_id: pet.id,
+                  servico_id: servico.id,
+                  data_agendamento: data,
+                  horario_inicio: horario,
+                });
+                await carregar(servico.id);
+                Alert.alert(
+                  "Agendamento realizado",
+                  `${pet.nome} foi agendado para ${formatarDataCurta(data)} as ${horario}.`,
+                );
+              } catch (error: any) {
+                Alert.alert(
+                  "Nao foi possivel agendar",
+                  error?.response?.data?.detail ||
+                    "O horario pode ter sido ocupado. Atualize a agenda e tente novamente.",
+                );
+                await carregar(servico.id);
+              } finally {
+                setAgendandoSlot(null);
+              }
+            })();
+          },
+        },
+      ],
+    );
   }
 
   async function abrirWhatsappLoja(mensagem?: string) {
@@ -160,7 +212,7 @@ export default function BanhoTosaScreen() {
         </View>
         <Text style={styles.heroTitle}>Banho & Tosa</Text>
         <Text style={styles.heroText}>
-          Acompanhe agendamentos, andamento do atendimento e avalie quando seu pet for entregue.
+          Agende um horario, acompanhe o atendimento e avalie quando seu pet for entregue.
         </Text>
       </View>
 
@@ -176,8 +228,8 @@ export default function BanhoTosaScreen() {
                 <Text style={styles.sectionTitle}>Agenda disponivel</Text>
                 <Text style={styles.sectionTextCompact}>
                   {agendaAberta
-                    ? "Escolha dia, horario, servico e pet para falar com a loja."
-                    : "Toque para abrir os horarios e pedir agendamento pelo WhatsApp."}
+                    ? "Escolha servico, pet, dia e horario para agendar agora."
+                    : "Toque para abrir os horarios e fazer um agendamento."}
                 </Text>
               </View>
               <View style={styles.calendarToggle}>
@@ -191,7 +243,7 @@ export default function BanhoTosaScreen() {
                 <TouchableOpacity style={styles.whatsappBox} onPress={() => abrirWhatsappLoja()} activeOpacity={0.86}>
                   <Ionicons name="logo-whatsapp" size={20} color="#16A34A" />
                   <View style={{ flex: 1 }}>
-                    <Text style={styles.whatsappLabel}>WhatsApp da loja</Text>
+                    <Text style={styles.whatsappLabel}>Precisa de ajuda?</Text>
                     <Text style={styles.whatsappNumero}>{whatsappFormatado || "Nao configurado"}</Text>
                   </View>
                   <Text style={styles.whatsappAction}>Abrir</Text>
@@ -277,17 +329,48 @@ export default function BanhoTosaScreen() {
                       <View style={styles.slotsGrid}>
                         {diaSelecionado.slots.map((slot) => {
                           const disponivel = slot.status === "disponivel";
+                          const slotId = `${diaSelecionado.data}-${slot.horario_inicio}`;
+                          const agendando = agendandoSlot === slotId;
                           return (
                             <TouchableOpacity
-                              key={`${diaSelecionado.data}-${slot.horario_inicio}`}
-                              disabled={!disponivel}
-                              style={[styles.slot, !disponivel && styles.slotBusy]}
-                              onPress={() => pedirAgendamento(diaSelecionado.data, slot.horario_inicio)}
+                              key={slotId}
+                              disabled={!disponivel || !!agendandoSlot}
+                              style={[
+                                styles.slot,
+                                (!disponivel || agendando) && styles.slotBusy,
+                              ]}
+                              onPress={() =>
+                                pedirAgendamento(
+                                  diaSelecionado.data,
+                                  slot.horario_inicio,
+                                )
+                              }
                             >
-                              <Text style={[styles.slotText, !disponivel && styles.slotTextBusy]}>{slot.horario_inicio}</Text>
-                              <Text style={[styles.slotSub, !disponivel && styles.slotTextBusy]}>
-                                {disponivel ? "Livre" : "Ocupado"}
-                              </Text>
+                              {agendando ? (
+                                <ActivityIndicator
+                                  size="small"
+                                  color={CORES.primario}
+                                />
+                              ) : (
+                                <>
+                                  <Text
+                                    style={[
+                                      styles.slotText,
+                                      !disponivel && styles.slotTextBusy,
+                                    ]}
+                                  >
+                                    {slot.horario_inicio}
+                                  </Text>
+                                  <Text
+                                    style={[
+                                      styles.slotSub,
+                                      !disponivel && styles.slotTextBusy,
+                                    ]}
+                                  >
+                                    {disponivel ? "Agendar" : "Ocupado"}
+                                  </Text>
+                                </>
+                              )}
                             </TouchableOpacity>
                           );
                         })}
@@ -313,7 +396,7 @@ export default function BanhoTosaScreen() {
           <Ionicons name="calendar-outline" size={38} color={CORES.textoClaro} />
           <Text style={styles.emptyTitle}>Nenhum atendimento em aberto</Text>
           <Text style={styles.emptyText}>
-            Quando a loja agendar ou receber seu pet, o status aparece aqui.
+            Escolha um horario acima. Assim que agendar, o status aparece aqui.
           </Text>
         </View>
       ) : (

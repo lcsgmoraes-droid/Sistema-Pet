@@ -62,6 +62,7 @@ class Pedido(TenantScoped, Base):
     drive_entregue_at = Column(DateTime(timezone=True), nullable=True)
 
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+    reserva_estoque_iniciada_at = Column(DateTime(timezone=True), nullable=True)
 
     # =====================================
     # DDD Aggregate Methods (SAFE VERSION)

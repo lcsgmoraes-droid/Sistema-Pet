@@ -37,3 +37,21 @@ class EmpresaGrupoProdutoVincular(BaseModel):
         if produto_a and produto_a.empresa_id == value.empresa_id:
             raise ValueError("Escolha produtos de empresas diferentes.")
         return value
+
+
+class EmpresaGrupoEstoqueCompartilhar(BaseModel):
+    empresa_consumidora_id: str = Field(min_length=36, max_length=36)
+    produto_ids: list[int] = Field(min_length=1, max_length=200)
+    acesso_catalogo_completo: bool = False
+
+    @field_validator("produto_ids")
+    @classmethod
+    def validar_produtos(cls, value: list[int]) -> list[int]:
+        ids = sorted({int(produto_id) for produto_id in value if int(produto_id) > 0})
+        if not ids:
+            raise ValueError("Selecione ao menos um produto.")
+        return ids
+
+
+class EmpresaGrupoEstoqueAcessoCatalogoAtualizar(BaseModel):
+    acesso_catalogo_completo: bool

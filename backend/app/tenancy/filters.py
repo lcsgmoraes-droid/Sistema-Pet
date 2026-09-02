@@ -12,14 +12,14 @@ WHITELIST:
 - Tabelas que NÃO herdam de BaseTenantModel naturalmente (Tenant, Permission, UserSession)
 """
 
-from sqlalchemy.orm import Session
-from sqlalchemy import event, or_, select
-from sqlalchemy.orm import with_loader_criteria
 import logging
 
+from sqlalchemy import String, cast, event, func, or_, select
+from sqlalchemy.orm import Session, aliased, with_loader_criteria
+
+from app.empresa_grupo_sql import empresa_id_sql
 from app.tenancy.context import get_current_tenant
 from app.tenancy.rls import sync_rls_tenant
-
 
 logger = logging.getLogger(__name__)
 
@@ -53,11 +53,16 @@ TENANT_WHITELIST_TABLES = {
     "notification_queue",  # fila de notificações: notification_sender claim cross-tenant
     # Indice minimo de capacidade publica: token aleatorio -> tenant/rota.
     "rotas_entrega_rastreio_tokens",
+    # Resolve o token opaco de uma oferta; depois a rota entra no contexto do tenant.
+    "oferta_publicacao_tokens",
     # Bootstrap da integração: a solicitação ainda não pertence a um tenant antes
     # do aceite, e a conexão resolve o token opaco para descobrir o tenant. As
     # rotas públicas exigem HMAC/token e, após a resolução, estabelecem o contexto.
     "ecommerceai_connection_requests",
     "ecommerceai_connections",
+    # Indice minimo autenticado do webhook Bling: companyId -> tenant. Nao guarda
+    # tokens nem dados comerciais; resolve o tenant antes de ativar o contexto RLS.
+    "bling_company_tenant_links",
 }
 
 
@@ -65,11 +70,29 @@ PARTNER_READABLE_TENANT_TABLES = {
     "clientes",
     "pets",
     "produtos",
+    "produto_imagens",
 }
 
 
 def _tenant_read_filter(cls, tenant_id):
-    if getattr(cls, "__tablename__", None) not in PARTNER_READABLE_TENANT_TABLES:
+    table_name = getattr(cls, "__tablename__", None)
+
+    if table_name == "users":
+        # User e uma identidade global legada com tenant_id de origem. O acesso
+        # atual a cada empresa e definido por UserTenant; limitar apenas pelo
+        # tenant_id de origem impede o mesmo login de operar outro tenant ao qual
+        # possui vinculo ativo.
+        from app.models_authz import UserTenant
+
+        active_membership = select(UserTenant.id).where(
+            UserTenant.user_id == cls.id,
+            UserTenant.tenant_id == tenant_id,
+            UserTenant.is_active.is_(True),
+        )
+        active_membership = active_membership.correlate_except(UserTenant)
+        return or_(cls.tenant_id == tenant_id, active_membership.exists())
+
+    if table_name not in PARTNER_READABLE_TENANT_TABLES:
         return cls.tenant_id == tenant_id
 
     from app.veterinario_models import VetPartnerLink
@@ -78,7 +101,60 @@ def _tenant_read_filter(cls, tenant_id):
         VetPartnerLink.vet_tenant_id == tenant_id,
         VetPartnerLink.ativo.is_(True),
     )
-    return or_(cls.tenant_id == tenant_id, cls.tenant_id.in_(partner_tenant_ids))
+    criterios = [cls.tenant_id == tenant_id, cls.tenant_id.in_(partner_tenant_ids)]
+    if table_name in {"produtos", "produto_imagens"}:
+        from app.empresa_grupo_models import (
+            EmpresaGrupo,
+            EmpresaGrupoEstoqueCompartilhado,
+            EmpresaGrupoMembro,
+        )
+
+        membro_origem = aliased(EmpresaGrupoMembro)
+        membro_consumidora = aliased(EmpresaGrupoMembro)
+        compartilhamento_ativo = (
+            select(EmpresaGrupoEstoqueCompartilhado.id)
+            .join(
+                EmpresaGrupo,
+                EmpresaGrupo.id == EmpresaGrupoEstoqueCompartilhado.grupo_id,
+            )
+            .join(
+                membro_origem,
+                (membro_origem.grupo_id == EmpresaGrupoEstoqueCompartilhado.grupo_id)
+                & (
+                    empresa_id_sql(membro_origem.empresa_id)
+                    == empresa_id_sql(
+                        EmpresaGrupoEstoqueCompartilhado.empresa_origem_id
+                    )
+                ),
+            )
+            .join(
+                membro_consumidora,
+                (
+                    membro_consumidora.grupo_id
+                    == EmpresaGrupoEstoqueCompartilhado.grupo_id
+                )
+                & (
+                    empresa_id_sql(membro_consumidora.empresa_id)
+                    == empresa_id_sql(
+                        EmpresaGrupoEstoqueCompartilhado.empresa_consumidora_id
+                    )
+                ),
+            )
+            .where(
+                EmpresaGrupoEstoqueCompartilhado.produto_origem_id
+                == (cls.id if table_name == "produtos" else cls.produto_id),
+                empresa_id_sql(EmpresaGrupoEstoqueCompartilhado.empresa_origem_id)
+                == empresa_id_sql(cls.tenant_id),
+                empresa_id_sql(EmpresaGrupoEstoqueCompartilhado.empresa_consumidora_id)
+                == func.replace(cast(tenant_id, String), "-", ""),
+                EmpresaGrupoEstoqueCompartilhado.status == "ativo",
+                EmpresaGrupo.status == "ativo",
+                membro_origem.status == "ativo",
+                membro_consumidora.status == "ativo",
+            )
+        )
+        criterios.append(compartilhamento_ativo.exists())
+    return or_(*criterios)
 
 
 def _supports_partner_read_filter(session) -> bool:

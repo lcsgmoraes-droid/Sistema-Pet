@@ -23,6 +23,31 @@ def test_listar_contas_receber_usa_tenant_e_busca_relacoes_no_tenant():
     assert "Venda.user_id == current_user.id" not in listar
 
 
+def test_busca_geral_cobre_identificacao_e_contato_da_pessoa():
+    source = _source("app/contas_receber_consulta_routes.py")
+    busca = source.split("def _montar_condicao_busca_contas_receber(", 1)[1].split(
+        "@router.get", 1
+    )[0]
+
+    for campo in (
+        "Cliente.codigo",
+        "Cliente.nome",
+        "Cliente.nome_fantasia",
+        "Cliente.razao_social",
+        "Cliente.telefone",
+        "Cliente.celular",
+        "Venda.numero_venda",
+        "ContaReceber.descricao",
+        "ContaReceber.documento",
+    ):
+        assert campo in busca
+
+    assert "_somente_digitos_coluna(Cliente.telefone)" in busca
+    assert "_somente_digitos_coluna(Cliente.celular)" in busca
+    assert "Cliente.tenant_id == tenant_id" in busca
+    assert "Venda.tenant_id == tenant_id" in busca
+
+
 def test_buscar_conta_receber_exige_tenant_em_todas_as_relacoes():
     source = _source("app/contas_receber_consulta_routes.py")
     buscar = source.split("def buscar_conta_receber(", 1)[1].split(

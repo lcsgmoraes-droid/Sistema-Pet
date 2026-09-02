@@ -5,10 +5,12 @@ import {
   CanalDescontos,
   CentralNFSaida,
   EcommerceAnalytics,
+  EcommerceCatalogHealth,
   EcommerceAparencia,
   EcommerceConfig,
   EcommerceDivulgacao,
   EcommercePreview,
+  EstudioOfertas,
   MeusCaixas,
   NFEntrada,
   PDV,
@@ -69,6 +71,16 @@ export function createSalesMarketingRoutes() {
         }
       />
       <Route
+        path="campanhas/estudio-ofertas"
+        element={
+          <ModuleGate modulo="campanhas">
+            <ProtectedRoute permission="vendas.criar">
+              <EstudioOfertas />
+            </ProtectedRoute>
+          </ModuleGate>
+        }
+      />
+      <Route
         path="ecommerce/preview"
         element={
           <ModuleGate modulo="ecommerce">
@@ -104,6 +116,16 @@ export function createSalesMarketingRoutes() {
           <ModuleGate modulo="ecommerce">
             <ProtectedRoute permission="configuracoes.editar">
               <EcommerceConfig />
+            </ProtectedRoute>
+          </ModuleGate>
+        }
+      />
+      <Route
+        path="ecommerce/catalogo-saude"
+        element={
+          <ModuleGate modulo="ecommerce">
+            <ProtectedRoute anyOfPermissions={["relatorios.gerencial", "vendas.visualizar"]}>
+              <EcommerceCatalogHealth />
             </ProtectedRoute>
           </ModuleGate>
         }

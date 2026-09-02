@@ -71,6 +71,9 @@ from app.tributacao_routes import router as tributacao_router
 from app.importacao_produtos import router as importacao_router
 from app.importacao_pessoas import router as importacao_pessoas_router
 from app.lembretes import router as lembretes_router
+from app.lembretes_relacionamento_routes import (
+    router as lembretes_relacionamento_router,
+)
 from app.calculadora_racao import router as calculadora_racao_router
 from app.cliente_info_pdv import router as cliente_info_pdv_router
 from app.opcoes_racao_routes import router as opcoes_racao_router
@@ -217,6 +220,8 @@ from app.routes.ecommerceai_integration_routes import (
 )
 from app.routes.ifood_integration_routes import router as ifood_integration_router
 from app.routes.ifood_order_routes import router as ifood_order_router
+from app.ofertas_estudio_routes import public_router as ofertas_estudio_public_router
+from app.ofertas_estudio_routes import router as ofertas_estudio_router
 from app.security.module_access import require_active_entitlement, require_active_module
 from app.veterinario_routes import router as veterinario_router  # Módulo Veterinário
 from app.banho_tosa_routes import router as banho_tosa_router  # Modulo Banho & Tosa
@@ -250,6 +255,7 @@ def register_routers(app: FastAPI) -> None:
     app.include_router(ops_tenants_router)
     app.include_router(evolucao_router)
     app.include_router(product_images_public_router)
+    app.include_router(ofertas_estudio_public_router)
 
     app.include_router(auth_router, tags=["Autenticação Multi-Tenant"])
     app.include_router(usuarios_router, tags=["Usuários & RBAC"])
@@ -292,6 +298,10 @@ def register_routers(app: FastAPI) -> None:
     app.include_router(variacoes_router, tags=["Produtos - Variações"])  # Sprint 2
     app.include_router(calculadora_racao_router, tags=["Calculadora de Ração"])
     app.include_router(lembretes_router, tags=["Lembretes de Recorrência"])
+    app.include_router(
+        lembretes_relacionamento_router,
+        tags=["Lembretes de Recorrência"],
+    )
     app.include_router(
         relatorio_vendas_router, tags=["Relatório de Vendas"]
     )  # ANTES de vendas_router!
@@ -653,6 +663,9 @@ def register_routers(app: FastAPI) -> None:
     app.include_router(
         canal_descontos_router, dependencies=_module_dependencies("campanhas")
     )  # Descontos Globais por Canal (Ecommerce / App)
+    app.include_router(
+        ofertas_estudio_router, dependencies=_module_dependencies("campanhas")
+    )  # Artes e jornais promocionais
     app.include_router(asaas_billing_router)
     app.include_router(ecommerceai_integration_router)
     app.include_router(ifood_integration_router)

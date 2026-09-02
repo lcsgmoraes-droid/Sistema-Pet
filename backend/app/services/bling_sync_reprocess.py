@@ -36,7 +36,11 @@ class BlingSyncReprocessMixin:
         now = utc_now()
         try:
             try:
-                BlingAPI().listar_naturezas_operacoes()
+                # O reprocessamento de estoque deve validar apenas o escopo de
+                # catalogo. Naturezas de operacao pertencem ao escopo fiscal e
+                # podem responder 401 em uma conexao de estoque perfeitamente
+                # valida.
+                BlingAPI().listar_produtos(limite=1)
             except Exception as error:
                 if _erro_autenticacao_bling(error):
                     detail = _mensagem_autenticacao_bling(error)

@@ -10,6 +10,7 @@ REGRAS:
 """
 
 from sqlalchemy.orm import Session
+from sqlalchemy import text
 from typing import Dict, List, Optional
 from decimal import Decimal
 import json
@@ -49,6 +50,67 @@ def _agenda_sync_bling(produto_id: int, estoque_novo: float, motivo: str) -> Non
 
 class EstoqueService:
     """Service isolado para operações de estoque"""
+
+    @staticmethod
+    def _resolver_tenant_e_venda_online(
+        db: Session,
+        *,
+        tenant_id: str,
+        referencia_id: int,
+        referencia_tipo: str,
+    ):
+        from app.models import Tenant
+        from app.services.sales_channel import is_online_sales_channel
+
+        tenant = db.query(Tenant).filter(Tenant.id == str(tenant_id)).first()
+        channel = None
+        if referencia_tipo == "venda" and referencia_id and hasattr(db, "execute"):
+            channel = db.execute(
+                text(
+                    "SELECT canal FROM vendas "
+                    "WHERE id = :venda_id AND tenant_id = :tenant_id"
+                ),
+                {"venda_id": referencia_id, "tenant_id": str(tenant_id)},
+            ).scalar()
+        return tenant, bool(channel and is_online_sales_channel(channel))
+
+    @staticmethod
+    def _ajustar_estoque_canal_online(
+        produto,
+        quantidade: float,
+        *,
+        entrada: bool,
+        tenant_id: str,
+        referencia_id: int,
+        referencia_tipo: str,
+        db: Session,
+    ) -> None:
+        tenant, venda_online = EstoqueService._resolver_tenant_e_venda_online(
+            db,
+            tenant_id=tenant_id,
+            referencia_id=referencia_id,
+            referencia_tipo=referencia_tipo,
+        )
+        if not (
+            tenant
+            and venda_online
+            and bool(getattr(tenant, "ecommerce_usar_estoque_canal", False))
+        ):
+            return
+
+        channel_stock = _normalizar_quantidade_estoque(produto.estoque_ecommerce)
+        if entrada:
+            produto.estoque_ecommerce = channel_stock + quantidade
+            return
+
+        if channel_stock < quantidade and not bool(
+            getattr(tenant, "permite_estoque_negativo_online", False)
+        ):
+            raise ValueError(
+                f"Estoque online insuficiente para produto {produto.nome}. "
+                f"Disponível: {channel_stock}, Necessário: {quantidade}"
+            )
+        produto.estoque_ecommerce = channel_stock - quantidade
 
     @staticmethod
     def _resolver_user_id_operacao(
@@ -96,13 +158,26 @@ class EstoqueService:
 
         sync_rls_tenant(db, tenant_id)
 
-        from app.models import Tenant
+        tenant, venda_online = EstoqueService._resolver_tenant_e_venda_online(
+            db,
+            tenant_id=tenant_id,
+            referencia_id=referencia_id,
+            referencia_tipo=referencia_tipo,
+        )
+        permite_negativo = bool(
+            getattr(
+                tenant,
+                "permite_estoque_negativo_online"
+                if venda_online
+                else "permite_estoque_negativo",
+                False,
+            )
+        )
 
-        tenant = db.query(Tenant).filter(Tenant.id == str(tenant_id)).first()
-
-        if not tenant or not tenant.permite_estoque_negativo:
+        if not tenant or not permite_negativo:
+            contexto = " no canal online" if venda_online else ""
             raise ValueError(
-                f"Estoque insuficiente para produto {produto.nome}. "
+                f"Estoque insuficiente{contexto} para produto {produto.nome}. "
                 f"Disponível: {estoque_anterior}, Necessário: {quantidade}"
             )
 
@@ -309,6 +384,15 @@ class EstoqueService:
         )
 
         # Baixar estoque total do produto
+        EstoqueService._ajustar_estoque_canal_online(
+            produto,
+            quantidade_estoque,
+            entrada=False,
+            tenant_id=tenant_id,
+            referencia_id=referencia_id,
+            referencia_tipo=referencia_tipo,
+            db=db,
+        )
         produto.estoque_atual = estoque_anterior - quantidade_estoque
         estoque_novo = produto.estoque_atual
 
@@ -432,7 +516,26 @@ class EstoqueService:
         produto.estoque_atual = _somar_quantidade_estoque(
             estoque_anterior, quantidade_estoque
         )
+        EstoqueService._ajustar_estoque_canal_online(
+            produto,
+            quantidade_estoque,
+            entrada=True,
+            tenant_id=tenant_id,
+            referencia_id=referencia_id,
+            referencia_tipo=referencia_tipo,
+            db=db,
+        )
         estoque_novo = produto.estoque_atual
+
+        user_id_movimentacao = (
+            user_id
+            if user_id and user_id > 0
+            else EstoqueService._resolver_user_id_operacao(
+                db=db,
+                tenant_id=tenant_id,
+                user_id=user_id,
+            )
+        )
 
         # Criar movimentação de estoque (entrada)
         movimentacao = EstoqueMovimentacao(
@@ -462,7 +565,7 @@ class EstoqueService:
             referencia_id=referencia_id,
             referencia_tipo=referencia_tipo,
             observacao=observacao,
-            user_id=user_id,
+            user_id=user_id_movimentacao,
             tenant_id=tenant_id,
         )
         db.add(movimentacao)

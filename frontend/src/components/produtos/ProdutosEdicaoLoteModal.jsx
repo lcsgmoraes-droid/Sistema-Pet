@@ -88,24 +88,19 @@ export default function ProdutosEdicaoLoteModal({
     const carregarOpcoesRacao = async () => {
       try {
         setLoadingOpcoesRacao(true);
-        const [linhas, portes, fases, tratamentos, sabores, apresentacoes] = await Promise.all([
-          api.get("/opcoes-racao/linhas", { params: { apenas_ativos: true } }),
-          api.get("/opcoes-racao/portes", { params: { apenas_ativos: true } }),
-          api.get("/opcoes-racao/fases", { params: { apenas_ativos: true } }),
-          api.get("/opcoes-racao/tratamentos", { params: { apenas_ativos: true } }),
-          api.get("/opcoes-racao/sabores", { params: { apenas_ativos: true } }),
-          api.get("/opcoes-racao/apresentacoes", { params: { apenas_ativos: true } }),
-        ]);
+        const { data } = await api.get("/opcoes-racao/resumo", {
+          params: { apenas_ativos: true },
+        });
 
         if (!ativo) return;
 
         setOpcoesRacao({
-          linhas: linhas.data || [],
-          portes: portes.data || [],
-          fases: fases.data || [],
-          tratamentos: tratamentos.data || [],
-          sabores: sabores.data || [],
-          apresentacoes: apresentacoes.data || [],
+          linhas: Array.isArray(data?.linhas) ? data.linhas : [],
+          portes: Array.isArray(data?.portes) ? data.portes : [],
+          fases: Array.isArray(data?.fases) ? data.fases : [],
+          tratamentos: Array.isArray(data?.tratamentos) ? data.tratamentos : [],
+          sabores: Array.isArray(data?.sabores) ? data.sabores : [],
+          apresentacoes: Array.isArray(data?.apresentacoes) ? data.apresentacoes : [],
         });
       } catch (error) {
         console.error("Erro ao carregar opcoes de racao para edicao em lote:", error);

@@ -257,128 +257,144 @@ export default function GranelLancamentoModal({
             </div>
 
             <div className="mt-3 rounded-lg border border-slate-200 bg-white p-3">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <div>
-                  <div className="text-sm font-semibold text-slate-900">
-                    Preco de venda do granel
-                  </div>
-                  <div className="text-xs text-slate-500">
-                    Base: {baseMargemTexto} ({formatMoney(baseMargemGranel)})
-                  </div>
-                </div>
-                <label className="flex items-center gap-2 text-xs text-slate-600">
-                  <input
-                    type="checkbox"
-                    checked={atualizarPrecoGranel}
-                    onChange={(event) => setAtualizarPrecoGranel(event.target.checked)}
-                    className="rounded border-slate-300 text-orange-600 focus:ring-orange-500"
-                  />
-                  Atualizar ao lancar
-                </label>
-              </div>
-
-              <label className="mt-3 flex items-start gap-2 text-xs text-slate-600">
+              <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-slate-200 p-3 transition hover:bg-slate-50">
                 <input
                   type="checkbox"
-                  checked={margemBaseGranel === "preco_venda_kg"}
-                  onChange={(event) =>
-                    setMargemBaseGranel(event.target.checked ? "preco_venda_kg" : "custo_kg")
-                  }
+                  checked={atualizarPrecoGranel}
+                  onChange={(event) => setAtualizarPrecoGranel(event.target.checked)}
                   className="mt-0.5 rounded border-slate-300 text-orange-600 focus:ring-orange-500"
                 />
                 <span>
-                  Calcular margem sobre venda/kg do produto fechado. Desmarcado usa o custo/kg.
+                  <span className="block text-sm font-semibold text-slate-900">
+                    Deseja alterar o preço de venda do granel?
+                  </span>
+                  <span className="mt-1 block text-xs text-slate-500">
+                    Esta opção vem desmarcada. O preço só muda quando você escolher alterá-lo.
+                  </span>
                 </span>
               </label>
 
-              <div className="mt-3 grid grid-cols-2 rounded-lg border border-slate-200 bg-slate-100 p-1 text-xs">
-                <button
-                  type="button"
-                  onClick={() => handleAlterarModoPrecoGranel("margem")}
-                  className={`rounded-md px-2 py-1.5 font-medium transition-colors ${
-                    modoPrecoGranel === "margem"
-                      ? "bg-white text-orange-700 shadow-sm"
-                      : "text-slate-500 hover:text-slate-800"
-                  }`}
-                >
-                  Margem -&gt; preco
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleAlterarModoPrecoGranel("preco")}
-                  className={`rounded-md px-2 py-1.5 font-medium transition-colors ${
-                    modoPrecoGranel === "preco"
-                      ? "bg-white text-orange-700 shadow-sm"
-                      : "text-slate-500 hover:text-slate-800"
-                  }`}
-                >
-                  Preco -&gt; margem
-                </button>
-              </div>
-
-              {modoPrecoGranel === "margem" ? (
-                <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                  <div>
-                    <label className="mb-1 block text-xs font-medium text-slate-600">
-                      Margem desejada (%)
-                    </label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      value={margemGranel}
-                      onChange={(event) => setMargemGranel(event.target.value)}
-                      className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-transparent focus:ring-2 focus:ring-orange-500"
-                    />
-                  </div>
-                  <div className="rounded-lg bg-orange-50 p-3">
-                    <div className="text-xs font-medium text-orange-700">Preco sugerido</div>
-                    <div className="mt-1 text-lg font-semibold text-orange-900">
-                      {formatMoney(precoVendaSugeridoGranel)}
-                    </div>
-                  </div>
+              {!atualizarPrecoGranel ? (
+                <div className="mt-3 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-800">
+                  O preço de venda será mantido em {formatMoney(precoVendaAtualGranel)}. Nenhum
+                  preço calculado será enviado neste lançamento.
                 </div>
               ) : (
-                <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                  <div>
-                    <label className="mb-1 block text-xs font-medium text-slate-600">
-                      Preco de venda por kg
-                    </label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      value={precoVendaGranel}
-                      onChange={(event) => setPrecoVendaGranel(event.target.value)}
-                      className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-transparent focus:ring-2 focus:ring-orange-500"
-                    />
+                <>
+                  <div className="mt-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                    Você escolheu alterar o preço. Revise o novo valor antes de lançar o granel.
                   </div>
-                  <div className="rounded-lg bg-blue-50 p-3">
-                    <div className="text-xs font-medium text-blue-700">Margem calculada</div>
-                    <div className="mt-1 text-lg font-semibold text-blue-900">
-                      {formatPercentual(margemCalculadaGranel)}%
-                    </div>
-                  </div>
-                </div>
-              )}
 
-              <div
-                className={`mt-3 rounded-md border px-3 py-2 text-xs ${
-                  granelDentroMargemEsperada
-                    ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-                    : "border-amber-200 bg-amber-50 text-amber-700"
-                }`}
-              >
-                {granelDentroMargemEsperada ? "Dentro da meta inicial" : "Abaixo da meta inicial"}:{" "}
-                minimo {formatMoney(precoMinimoEsperadoGranel)} por kg (20% acima da venda/kg do
-                pai).
-                {precoVendaAtualGranel > 0 && precoVendaSugeridoGranel > 0 && (
-                  <span className="ml-1 text-slate-600">
-                    Diferenca vs atual: {diferencaPrecoGranel >= 0 ? "+" : "-"}
-                    {formatMoney(Math.abs(diferencaPrecoGranel))}.
-                  </span>
-                )}
-              </div>
+                  <div className="mt-3 text-xs text-slate-500">
+                    Base: {baseMargemTexto} ({formatMoney(baseMargemGranel)})
+                  </div>
+
+                  <label className="mt-3 flex items-start gap-2 text-xs text-slate-600">
+                    <input
+                      type="checkbox"
+                      checked={margemBaseGranel === "preco_venda_kg"}
+                      onChange={(event) =>
+                        setMargemBaseGranel(event.target.checked ? "preco_venda_kg" : "custo_kg")
+                      }
+                      className="mt-0.5 rounded border-slate-300 text-orange-600 focus:ring-orange-500"
+                    />
+                    <span>
+                      Calcular margem sobre venda/kg do produto fechado. Desmarcado usa o custo/kg.
+                    </span>
+                  </label>
+
+                  <div className="mt-3 grid grid-cols-2 rounded-lg border border-slate-200 bg-slate-100 p-1 text-xs">
+                    <button
+                      type="button"
+                      onClick={() => handleAlterarModoPrecoGranel("margem")}
+                      className={`rounded-md px-2 py-1.5 font-medium transition-colors ${
+                        modoPrecoGranel === "margem"
+                          ? "bg-white text-orange-700 shadow-sm"
+                          : "text-slate-500 hover:text-slate-800"
+                      }`}
+                    >
+                      Margem -&gt; preço
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleAlterarModoPrecoGranel("preco")}
+                      className={`rounded-md px-2 py-1.5 font-medium transition-colors ${
+                        modoPrecoGranel === "preco"
+                          ? "bg-white text-orange-700 shadow-sm"
+                          : "text-slate-500 hover:text-slate-800"
+                      }`}
+                    >
+                      Preço -&gt; margem
+                    </button>
+                  </div>
+
+                  {modoPrecoGranel === "margem" ? (
+                    <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                      <div>
+                        <label className="mb-1 block text-xs font-medium text-slate-600">
+                          Margem desejada (%)
+                        </label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={margemGranel}
+                          onChange={(event) => setMargemGranel(event.target.value)}
+                          className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-transparent focus:ring-2 focus:ring-orange-500"
+                        />
+                      </div>
+                      <div className="rounded-lg bg-orange-50 p-3">
+                        <div className="text-xs font-medium text-orange-700">Novo preço</div>
+                        <div className="mt-1 text-lg font-semibold text-orange-900">
+                          {formatMoney(precoVendaSugeridoGranel)}
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                      <div>
+                        <label className="mb-1 block text-xs font-medium text-slate-600">
+                          Novo preço de venda por kg
+                        </label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0.01"
+                          value={precoVendaGranel}
+                          onChange={(event) => setPrecoVendaGranel(event.target.value)}
+                          className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-transparent focus:ring-2 focus:ring-orange-500"
+                        />
+                      </div>
+                      <div className="rounded-lg bg-blue-50 p-3">
+                        <div className="text-xs font-medium text-blue-700">Margem calculada</div>
+                        <div className="mt-1 text-lg font-semibold text-blue-900">
+                          {formatPercentual(margemCalculadaGranel)}%
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  <div
+                    className={`mt-3 rounded-md border px-3 py-2 text-xs ${
+                      granelDentroMargemEsperada
+                        ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                        : "border-amber-200 bg-amber-50 text-amber-700"
+                    }`}
+                  >
+                    {granelDentroMargemEsperada
+                      ? "Dentro da meta inicial"
+                      : "Abaixo da meta inicial"}
+                    : mínimo {formatMoney(precoMinimoEsperadoGranel)} por kg (20% acima da venda/kg
+                    do pai).
+                    {precoVendaAtualGranel > 0 && precoVendaSugeridoGranel > 0 && (
+                      <span className="ml-1 text-slate-600">
+                        Diferença vs atual: {diferencaPrecoGranel >= 0 ? "+" : "-"}
+                        {formatMoney(Math.abs(diferencaPrecoGranel))}.
+                      </span>
+                    )}
+                  </div>
+                </>
+              )}
             </div>
           </div>
 
@@ -388,6 +404,13 @@ export default function GranelLancamentoModal({
               Baixa {formatarQuantidade(quantidadeGranelNumero)} pacote(s) da origem e entra{" "}
               {formatarQuantidade(kgGranelPrevisto)} kg no granel. Custo estimado:{" "}
               {formatMoney(custoKgGranel)} por kg.
+            </div>
+            <div className="mt-1 text-xs font-medium">
+              {atualizarPrecoGranel
+                ? `Preço de venda: ${formatMoney(precoVendaAtualGranel)} para ${formatMoney(
+                    precoVendaSugeridoGranel,
+                  )}.`
+                : `Preço de venda mantido em ${formatMoney(precoVendaAtualGranel)}.`}
             </div>
           </div>
 
@@ -419,7 +442,11 @@ export default function GranelLancamentoModal({
               loading={loadingGranel}
               type="submit"
             >
-              {loadingGranel ? "Lancando..." : "Lancar granel"}
+              {loadingGranel
+                ? "Lançando..."
+                : atualizarPrecoGranel
+                  ? "Lançar e alterar preço"
+                  : "Lançar sem alterar preço"}
             </ActionButton>
           </div>
         </form>

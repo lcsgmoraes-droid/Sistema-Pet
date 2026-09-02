@@ -2,6 +2,7 @@ from datetime import date, datetime, time, timedelta
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy import or_
 from sqlalchemy.orm import Session, joinedload
 
 from app.auth.dependencies import get_current_user_and_tenant
@@ -11,6 +12,7 @@ from app.banho_tosa_api.agenda_helpers import (
 )
 from app.banho_tosa_api.utils import (
     STATUS_AGENDAMENTO_FINAIS,
+    STATUS_ATENDIMENTO_FINAIS,
     calcular_total_servicos,
     obter_ou_criar_configuracao,
     serializar_agendamento,
@@ -258,6 +260,26 @@ def realizar_checkin_agendamento(
     if agendamento.status in STATUS_AGENDAMENTO_FINAIS:
         raise HTTPException(
             status_code=422, detail="Agendamento finalizado nao pode receber check-in"
+        )
+
+    outro_atendimento_ativo = (
+        db.query(BanhoTosaAtendimento)
+        .filter(
+            BanhoTosaAtendimento.tenant_id == tenant_id,
+            BanhoTosaAtendimento.pet_id == agendamento.pet_id,
+            or_(
+                BanhoTosaAtendimento.agendamento_id.is_(None),
+                BanhoTosaAtendimento.agendamento_id != agendamento.id,
+            ),
+            BanhoTosaAtendimento.status.notin_(list(STATUS_ATENDIMENTO_FINAIS)),
+        )
+        .first()
+    )
+    if outro_atendimento_ativo:
+        pet_nome = agendamento.pet.nome if agendamento.pet else "Este pet"
+        raise HTTPException(
+            status_code=409,
+            detail=f"{pet_nome} ja esta em atendimento na fila do Banho & Tosa.",
         )
 
     atendimento = (

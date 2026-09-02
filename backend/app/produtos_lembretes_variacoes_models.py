@@ -4,6 +4,7 @@
 from datetime import datetime
 
 from sqlalchemy import (
+    BigInteger,
     Boolean,
     Column,
     DateTime,
@@ -13,11 +14,11 @@ from sqlalchemy import (
     Integer,
     String,
     Text,
+    UniqueConstraint,
 )
 from sqlalchemy.orm import relationship
 
 from .base_models import BaseTenantModel
-
 
 # ====================
 # LEMBRETES E NOTIFICAÇÕES
@@ -92,6 +93,67 @@ class Lembrete(BaseTenantModel):
     cliente = relationship("Cliente")
     pet = relationship("Pet")
     produto = relationship("Produto")
+    contatos = relationship(
+        "LembreteContato", back_populates="lembrete", cascade="all, delete-orphan"
+    )
+
+
+class LembreteContato(BaseTenantModel):
+    """Contato feito para uma oportunidade de recompra."""
+
+    __tablename__ = "lembretes_contatos"
+
+    lembrete_id = Column(
+        Integer,
+        ForeignKey("lembretes.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    cliente_id = Column(
+        Integer, ForeignKey("clientes.id", ondelete="CASCADE"), nullable=False
+    )
+    produto_id = Column(
+        Integer, ForeignKey("produtos.id", ondelete="CASCADE"), nullable=False
+    )
+    usuario_id = Column(
+        Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    notification_queue_id = Column(
+        BigInteger,
+        ForeignKey("notification_queue.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    canal = Column(String(20), nullable=False)
+    acao = Column(String(40), nullable=False)
+    status = Column(String(30), nullable=False, default="registrado")
+    mensagem = Column(Text, nullable=False)
+    resultado = Column(String(120), nullable=True)
+    idempotency_key = Column(String(300), nullable=True)
+
+    lembrete = relationship("Lembrete", back_populates="contatos")
+    cliente = relationship("Cliente")
+    produto = relationship("Produto")
+    operador = relationship("User")
+
+    __table_args__ = (
+        UniqueConstraint(
+            "tenant_id",
+            "idempotency_key",
+            name="uq_lembretes_contatos_tenant_idempotency",
+        ),
+        Index(
+            "ix_lembretes_contatos_tenant_lembrete_created",
+            "tenant_id",
+            "lembrete_id",
+            "created_at",
+        ),
+        Index(
+            "ix_lembretes_contatos_tenant_canal_created",
+            "tenant_id",
+            "canal",
+            "created_at",
+        ),
+    )
 
 
 # ============================================================================

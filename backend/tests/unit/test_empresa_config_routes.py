@@ -5,7 +5,7 @@ from uuid import uuid4
 os.environ["DATABASE_URL"] = os.environ.get("DATABASE_URL") or "sqlite:///./test.db"
 os.environ["DEBUG"] = "false"
 
-from app.empresa_config_routes import get_config_empresa
+from app.empresa_config_routes import _serializar_config, get_config_empresa
 from app.empresa_routes import ConfigEstoqueUpdate, atualizar_config_estoque
 
 
@@ -121,3 +121,34 @@ def test_atualizar_config_estoque_processa_validade_ao_ativar(monkeypatch):
     assert chamadas[0]["tenant"] is tenant
     assert chamadas[0]["user_id"] == 42
     assert chamadas[0]["origem"] == "configuracao"
+
+
+def test_serializar_config_antiga_aplica_defaults_sem_apagar_crediario():
+    config = SimpleNamespace(
+        id=10,
+        razao_social=None,
+        nome_fantasia=None,
+        cnpj=None,
+        margem_saudavel_minima=None,
+        margem_alerta_minima=None,
+        mensagem_venda_saudavel=None,
+        mensagem_venda_alerta=None,
+        mensagem_venda_critica=None,
+        aliquota_imposto_padrao=None,
+        dias_tolerancia_atraso=5,
+        crediario_encargos_automaticos=True,
+        crediario_multa_percentual=2,
+        crediario_juros_mensal_percentual=1,
+        meta_faturamento_mensal=None,
+        alerta_estoque_percentual=None,
+        dias_produto_parado=None,
+    )
+
+    resposta = _serializar_config(config)
+
+    assert resposta.mensagem_venda_saudavel
+    assert resposta.mensagem_venda_alerta
+    assert resposta.mensagem_venda_critica
+    assert resposta.crediario_encargos_automaticos is True
+    assert resposta.crediario_multa_percentual == 2
+    assert resposta.crediario_juros_mensal_percentual == 1

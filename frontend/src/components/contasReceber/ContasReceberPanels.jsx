@@ -10,11 +10,12 @@ import StatusBadge from "../ui/StatusBadge";
 
 export function ContasReceberFilters({
   aplicarFiltros,
-  buscaNumeroVenda,
+  aplicarPeriodoRapido,
+  busca,
   clientes,
   filtros,
   handleFiltrosSubmit,
-  setBuscaNumeroVenda,
+  setBusca,
   setFiltros,
 }) {
   return (
@@ -23,20 +24,44 @@ export function ContasReceberFilters({
       <FilterBar className="mb-6" onSubmit={handleFiltrosSubmit}>
         <h5 className="text-lg font-semibold mb-4">Filtros</h5>
 
-        {/* Campo de busca por numero de venda */}
+        <div className="mb-4 flex flex-wrap items-center gap-2">
+          <span className="mr-1 text-sm font-medium text-gray-700">Periodo rapido:</span>
+          <ActionButton
+            intent="neutral"
+            tone="soft"
+            size="xs"
+            onClick={() => aplicarPeriodoRapido("todos")}
+          >
+            Todos os periodos
+          </ActionButton>
+          <ActionButton
+            intent="warning"
+            tone="soft"
+            size="xs"
+            onClick={() => aplicarPeriodoRapido("vencidas")}
+          >
+            Vencidas
+          </ActionButton>
+          <ActionButton
+            intent="neutral"
+            tone="soft"
+            size="xs"
+            onClick={() => aplicarPeriodoRapido("a_vencer")}
+          >
+            A vencer
+          </ActionButton>
+        </div>
+
+        {/* Busca geral das contas e da pessoa vinculada */}
         <div className="mb-4">
-          <label className="block text-sm font-medium mb-1">Buscar por Numero da Venda</label>
+          <label className="block text-sm font-medium mb-1">Buscar conta ou pessoa</label>
           <input
             type="text"
-            placeholder="Digite o numero da venda (ex: 202601100003) e pressione Enter"
+            placeholder="Nome, telefone, codigo da pessoa, venda ou documento"
             className="w-full border border-gray-300 rounded px-3 py-2"
-            value={buscaNumeroVenda}
-            onChange={(e) => {
-              // Remove # automaticamente
-              const valor = e.target.value.replace("#", "");
-              setBuscaNumeroVenda(valor);
-            }}
-            onKeyPress={(e) => {
+            value={busca}
+            onChange={(e) => setBusca(e.target.value)}
+            onKeyDown={(e) => {
               if (e.key === "Enter") {
                 aplicarFiltros();
               }
@@ -140,12 +165,14 @@ export function ContasReceberFilters({
 }
 
 export function ContasReceberRecebimentoModal({
+  calculoEncargos,
   contaSelecionada,
   contasBancarias,
   dadosRecebimento,
   formasPagamento,
   formatarMoeda,
   mostrarModalRecebimento,
+  onDataRecebimentoChange,
   registrarRecebimento,
   setDadosRecebimento,
   setMostrarModalRecebimento,
@@ -180,6 +207,47 @@ export function ContasReceberRecebimentoModal({
                 {formatarMoeda(calcularSaldoFinanceiro(contaSelecionada, "valor_recebido"))}
               </div>
 
+              {calculoEncargos?.eh_crediario && (
+                <div className="mb-4 rounded border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <strong>Encargos do crediario</strong>
+                      <div className="mt-1 text-xs text-amber-800">
+                        {calculoEncargos.dias_atraso || 0} dia(s) de atraso · Juros{" "}
+                        {formatarMoeda(calculoEncargos.valor_juros_calculado || 0)} · Multa{" "}
+                        {formatarMoeda(calculoEncargos.valor_multa_calculada || 0)}
+                      </div>
+                    </div>
+                    <label className="inline-flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={Boolean(dadosRecebimento.aplicar_encargos_automaticos)}
+                        disabled={!calculoEncargos.encargos_automaticos_ativos}
+                        onChange={(e) =>
+                          setDadosRecebimento({
+                            ...dadosRecebimento,
+                            aplicar_encargos_automaticos: e.target.checked,
+                            valor_recebido: dadosRecebimento.quitar
+                              ? Number(
+                                  e.target.checked
+                                    ? calculoEncargos.saldo_atualizado
+                                    : calculoEncargos.saldo_atual,
+                                )
+                              : dadosRecebimento.valor_recebido,
+                          })
+                        }
+                      />
+                      <span className="font-medium">Aplicar automaticamente</span>
+                    </label>
+                  </div>
+                  {!calculoEncargos.encargos_automaticos_ativos && (
+                    <p className="mt-2 text-xs">
+                      A cobranca automatica esta desligada nas Configuracoes Gerais do Negocio.
+                    </p>
+                  )}
+                </div>
+              )}
+
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium mb-1">Valor a Receber *</label>
@@ -187,6 +255,7 @@ export function ContasReceberRecebimentoModal({
                     type="number"
                     className="w-full border border-gray-300 rounded px-3 py-2"
                     step="0.01"
+                    disabled={dadosRecebimento.quitar}
                     value={dadosRecebimento.valor_recebido}
                     onChange={(e) =>
                       setDadosRecebimento({
@@ -195,6 +264,26 @@ export function ContasReceberRecebimentoModal({
                       })
                     }
                   />
+                  <label className="mt-2 inline-flex items-center gap-2 text-xs text-gray-700">
+                    <input
+                      type="checkbox"
+                      checked={Boolean(dadosRecebimento.quitar)}
+                      onChange={(e) =>
+                        setDadosRecebimento({
+                          ...dadosRecebimento,
+                          quitar: e.target.checked,
+                          valor_recebido: e.target.checked
+                            ? Number(
+                                dadosRecebimento.aplicar_encargos_automaticos
+                                  ? calculoEncargos?.saldo_atualizado
+                                  : calculoEncargos?.saldo_atual,
+                              )
+                            : dadosRecebimento.valor_recebido,
+                        })
+                      }
+                    />
+                    Quitar a parcela inteira
+                  </label>
                 </div>
 
                 <div>
@@ -203,9 +292,7 @@ export function ContasReceberRecebimentoModal({
                     type="date"
                     className="w-full border border-gray-300 rounded px-3 py-2"
                     value={dadosRecebimento.data_recebimento}
-                    onChange={(e) =>
-                      setDadosRecebimento({ ...dadosRecebimento, data_recebimento: e.target.value })
-                    }
+                    onChange={(e) => onDataRecebimentoChange(e.target.value)}
                   />
                 </div>
 
@@ -257,7 +344,12 @@ export function ContasReceberRecebimentoModal({
                     type="number"
                     className="w-full border border-gray-300 rounded px-3 py-2"
                     step="0.01"
-                    value={dadosRecebimento.valor_juros}
+                    value={
+                      dadosRecebimento.aplicar_encargos_automaticos
+                        ? Number(calculoEncargos?.valor_juros_calculado || 0)
+                        : dadosRecebimento.valor_juros
+                    }
+                    disabled={dadosRecebimento.aplicar_encargos_automaticos}
                     onChange={(e) =>
                       setDadosRecebimento({
                         ...dadosRecebimento,
@@ -273,7 +365,12 @@ export function ContasReceberRecebimentoModal({
                     type="number"
                     className="w-full border border-gray-300 rounded px-3 py-2"
                     step="0.01"
-                    value={dadosRecebimento.valor_multa}
+                    value={
+                      dadosRecebimento.aplicar_encargos_automaticos
+                        ? Number(calculoEncargos?.valor_multa_calculada || 0)
+                        : dadosRecebimento.valor_multa
+                    }
+                    disabled={dadosRecebimento.aplicar_encargos_automaticos}
                     onChange={(e) =>
                       setDadosRecebimento({
                         ...dadosRecebimento,
@@ -313,12 +410,12 @@ export function ContasReceberRecebimentoModal({
               </div>
 
               <div className="bg-green-50 border border-green-200 rounded p-3 mt-4">
-                <strong>Valor Final do Recebimento:</strong>{" "}
-                {formatarMoeda(
-                  (dadosRecebimento.valor_recebido || 0) +
-                    (dadosRecebimento.valor_juros || 0) +
-                    (dadosRecebimento.valor_multa || 0) -
-                    (dadosRecebimento.valor_desconto || 0),
+                <strong>Valor que sera recebido:</strong>{" "}
+                {formatarMoeda(dadosRecebimento.valor_recebido || 0)}
+                {dadosRecebimento.quitar && (
+                  <div className="mt-1 text-xs text-green-800">
+                    O servidor recalcula o saldo exato antes de quitar.
+                  </div>
                 )}
               </div>
             </div>
@@ -340,6 +437,145 @@ export function ContasReceberRecebimentoModal({
         </div>
       )}
     </>
+  );
+}
+
+export function ContasReceberRecebimentoLoteModal({
+  contasSelecionadas,
+  dadosRecebimento,
+  formasPagamento,
+  formatarMoeda,
+  mostrar,
+  onConfirmar,
+  onFechar,
+  setDadosRecebimento,
+}) {
+  if (!mostrar) return null;
+
+  const saldoSemEncargos = safeArray(contasSelecionadas).reduce(
+    (total, conta) => total + Number(conta.valor_final || 0) - Number(conta.valor_recebido || 0),
+    0,
+  );
+  const juros = safeArray(contasSelecionadas).reduce(
+    (total, conta) => total + Number(conta.valor_juros_calculado || 0),
+    0,
+  );
+  const multa = safeArray(contasSelecionadas).reduce(
+    (total, conta) => total + Number(conta.valor_multa_calculada || 0),
+    0,
+  );
+  const totalAtualizado = dadosRecebimento.aplicar_encargos_automaticos
+    ? saldoSemEncargos + juros + multa
+    : saldoSemEncargos;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+      <div className="mx-4 w-full max-w-2xl rounded-lg bg-white shadow-xl">
+        <div className="flex items-center justify-between border-b p-4">
+          <div>
+            <h5 className="text-xl font-bold">Baixar parcelas selecionadas</h5>
+            <p className="text-sm text-gray-500">{contasSelecionadas.length} parcela(s)</p>
+          </div>
+          <ActionButton
+            intent="neutral"
+            tone="ghost"
+            size="sm"
+            icon={X}
+            onClick={onFechar}
+            aria-label="Fechar baixa em lote"
+          />
+        </div>
+
+        <div className="space-y-4 p-6">
+          <div className="grid grid-cols-1 gap-3 rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm sm:grid-cols-3">
+            <div>
+              <span className="block text-blue-700">Saldo</span>
+              <strong>{formatarMoeda(saldoSemEncargos)}</strong>
+            </div>
+            <div>
+              <span className="block text-blue-700">Juros + multa</span>
+              <strong>{formatarMoeda(juros + multa)}</strong>
+            </div>
+            <div>
+              <span className="block text-blue-700">Total previsto</span>
+              <strong>{formatarMoeda(totalAtualizado)}</strong>
+            </div>
+          </div>
+
+          <label className="flex items-center gap-2 rounded border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950">
+            <input
+              type="checkbox"
+              checked={dadosRecebimento.aplicar_encargos_automaticos}
+              onChange={(e) =>
+                setDadosRecebimento({
+                  ...dadosRecebimento,
+                  aplicar_encargos_automaticos: e.target.checked,
+                })
+              }
+            />
+            Aplicar juros e multa automaticos nas parcelas de crediario vencidas
+          </label>
+
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div>
+              <label className="mb-1 block text-sm font-medium">Data do recebimento</label>
+              <input
+                type="date"
+                className="w-full rounded border border-gray-300 px-3 py-2"
+                value={dadosRecebimento.data_recebimento}
+                onChange={(e) =>
+                  setDadosRecebimento({ ...dadosRecebimento, data_recebimento: e.target.value })
+                }
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium">Forma de pagamento</label>
+              <select
+                className="w-full rounded border border-gray-300 px-3 py-2"
+                value={dadosRecebimento.forma_pagamento_id || ""}
+                onChange={(e) =>
+                  setDadosRecebimento({
+                    ...dadosRecebimento,
+                    forma_pagamento_id: parseInt(e.target.value) || null,
+                  })
+                }
+              >
+                <option value="">Selecione...</option>
+                {safeArray(formasPagamento).map((forma) => (
+                  <option key={forma.id} value={forma.id}>
+                    {forma.nome}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div>
+            <label className="mb-1 block text-sm font-medium">Observacoes</label>
+            <textarea
+              className="w-full rounded border border-gray-300 px-3 py-2"
+              rows="2"
+              value={dadosRecebimento.observacoes}
+              onChange={(e) =>
+                setDadosRecebimento({ ...dadosRecebimento, observacoes: e.target.value })
+              }
+            />
+          </div>
+          <p className="text-xs text-gray-500">
+            Os valores sao recalculados no servidor para a data escolhida antes da baixa.
+          </p>
+        </div>
+
+        <div className="flex justify-end gap-3 border-t p-4">
+          <ActionButton intent="neutral" tone="soft" size="md" onClick={onFechar}>
+            Cancelar
+          </ActionButton>
+          <ActionButton intent="create" size="md" onClick={onConfirmar}>
+            Quitar {contasSelecionadas.length} parcela(s)
+          </ActionButton>
+        </div>
+      </div>
+    </div>
   );
 }
 

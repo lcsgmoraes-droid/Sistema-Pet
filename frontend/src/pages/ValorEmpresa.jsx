@@ -107,14 +107,10 @@ export default function ValorEmpresa() {
   const carregar = async () => {
     setLoading(true);
     try {
-      const [avaliacao, listaFornecedores] = await Promise.all([
-        api.get("/financeiro/valor-empresa"),
-        api.get("/financeiro/valor-empresa/fornecedores"),
-      ]);
+      const avaliacao = await api.get("/financeiro/valor-empresa");
       setDados(avaliacao.data);
       setForm(avaliacao.data.configuracao);
       setFaturamentoSimulado(avaliacao.data.operacao.faturamento_mensal_normalizado || 0);
-      setFornecedores(listaFornecedores.data || []);
     } catch (error) {
       console.error("Erro ao carregar valor da empresa:", error);
       toast.error(mensagemErro(error, "Não foi possível calcular o valor da empresa."));
@@ -123,8 +119,18 @@ export default function ValorEmpresa() {
     }
   };
 
+  const carregarFornecedores = async () => {
+    try {
+      const response = await api.get("/financeiro/valor-empresa/fornecedores");
+      setFornecedores(response.data || []);
+    } catch (error) {
+      console.warn("Não foi possível carregar os fornecedores da avaliação.", error);
+    }
+  };
+
   useEffect(() => {
     carregar();
+    carregarFornecedores();
   }, []);
 
   const atualizar = (campo, valor) => setForm((atual) => ({ ...atual, [campo]: valor }));

@@ -13,9 +13,14 @@ from app.empresa_grupo_planejamento_service import (
 from app.empresa_grupo_produto_vinculo_service import (
     EmpresaGrupoProdutoVinculoService,
 )
+from app.empresa_grupo_estoque_compartilhado_service import (
+    EmpresaGrupoEstoqueCompartilhadoService,
+)
 from app.empresa_grupo_schemas import (
+    EmpresaGrupoEstoqueAcessoCatalogoAtualizar,
     EmpresaGrupoConvidar,
     EmpresaGrupoCriar,
+    EmpresaGrupoEstoqueCompartilhar,
     EmpresaGrupoProdutoVincular,
 )
 from app.empresa_grupo_service import EmpresaGrupoService
@@ -25,6 +30,89 @@ from app.security.permissions_decorator import require_any_permission
 router = APIRouter(prefix="/grupos-empresas", tags=["Grupos de empresas"])
 PERMISSOES_CONFIG_EMPRESA = ("configuracoes.empresa", "configuracoes.editar")
 PERMISSOES_ANALISE_GRUPO = ("relatorios.gerencial", "relatorios.financeiro")
+
+
+@router.get("/{grupo_id}/estoque-compartilhado")
+@require_any_permission(PERMISSOES_CONFIG_EMPRESA)
+def listar_estoque_compartilhado_grupo(
+    grupo_id: int,
+    db: Session = Depends(get_session),
+    user_and_tenant=Depends(get_current_user_and_tenant),
+):
+    _usuario, empresa_id = user_and_tenant
+    return EmpresaGrupoEstoqueCompartilhadoService(db).listar(grupo_id, empresa_id)
+
+
+@router.get("/{grupo_id}/estoque-compartilhado/produtos")
+@require_any_permission(PERMISSOES_CONFIG_EMPRESA)
+def buscar_produtos_para_estoque_compartilhado(
+    grupo_id: int,
+    empresa_consumidora_id: str = Query(...),
+    busca: str = Query("", max_length=120),
+    limite: int = Query(80, ge=10, le=200),
+    db: Session = Depends(get_session),
+    user_and_tenant=Depends(get_current_user_and_tenant),
+):
+    _usuario, empresa_id = user_and_tenant
+    return EmpresaGrupoEstoqueCompartilhadoService(db).buscar_produtos_compartilhaveis(
+        grupo_id,
+        empresa_id,
+        empresa_consumidora_id,
+        busca=busca,
+        limite=limite,
+    )
+
+
+@router.post("/{grupo_id}/estoque-compartilhado", status_code=status.HTTP_201_CREATED)
+@require_any_permission(PERMISSOES_CONFIG_EMPRESA)
+def compartilhar_estoque_grupo(
+    grupo_id: int,
+    payload: EmpresaGrupoEstoqueCompartilhar,
+    db: Session = Depends(get_session),
+    user_and_tenant=Depends(get_current_user_and_tenant),
+):
+    usuario, empresa_id = user_and_tenant
+    return EmpresaGrupoEstoqueCompartilhadoService(db).compartilhar(
+        grupo_id,
+        empresa_id,
+        usuario.id,
+        payload.empresa_consumidora_id,
+        payload.produto_ids,
+        acesso_catalogo_completo=payload.acesso_catalogo_completo,
+    )
+
+
+@router.patch("/{grupo_id}/estoque-compartilhado/{compartilhamento_id}/catalogo")
+@require_any_permission(PERMISSOES_CONFIG_EMPRESA)
+def atualizar_acesso_catalogo_estoque_compartilhado(
+    grupo_id: int,
+    compartilhamento_id: int,
+    payload: EmpresaGrupoEstoqueAcessoCatalogoAtualizar,
+    db: Session = Depends(get_session),
+    user_and_tenant=Depends(get_current_user_and_tenant),
+):
+    usuario, empresa_id = user_and_tenant
+    return EmpresaGrupoEstoqueCompartilhadoService(db).atualizar_acesso_catalogo(
+        grupo_id,
+        compartilhamento_id,
+        empresa_id,
+        usuario.id,
+        acesso_catalogo_completo=payload.acesso_catalogo_completo,
+    )
+
+
+@router.delete("/{grupo_id}/estoque-compartilhado/{compartilhamento_id}")
+@require_any_permission(PERMISSOES_CONFIG_EMPRESA)
+def remover_estoque_compartilhado_grupo(
+    grupo_id: int,
+    compartilhamento_id: int,
+    db: Session = Depends(get_session),
+    user_and_tenant=Depends(get_current_user_and_tenant),
+):
+    usuario, empresa_id = user_and_tenant
+    return EmpresaGrupoEstoqueCompartilhadoService(db).remover(
+        grupo_id, compartilhamento_id, empresa_id, usuario.id
+    )
 
 
 @router.get("/resumo")

@@ -19,7 +19,10 @@ from app.produtos.schemas import (
     LoteResponse,
     SaidaEstoqueRequest,
 )
-from app.produtos.validators import _validar_tenant_e_obter_usuario
+from app.produtos.validators import (
+    _resolver_tenant_produto_catalogo,
+    _validar_tenant_e_obter_usuario,
+)
 from app.produtos_models import EstoqueMovimentacao, Produto, ProdutoLote
 
 logger = logging.getLogger(__name__)
@@ -53,7 +56,10 @@ def criar_lote(
 ):
     """Cria um novo lote para o produto"""
 
-    _, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
+    _, tenant_solicitante_id = _validar_tenant_e_obter_usuario(user_and_tenant)
+    tenant_id, _ = _resolver_tenant_produto_catalogo(
+        db, tenant_solicitante_id, produto_id
+    )
 
     # Verificar se produto existe
     produto = (
@@ -126,7 +132,12 @@ def listar_lotes(
 ):
     """Lista lotes de um produto"""
 
-    current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
+    _current_user, tenant_solicitante_id = _validar_tenant_e_obter_usuario(
+        user_and_tenant
+    )
+    tenant_id, _ = _resolver_tenant_produto_catalogo(
+        db, tenant_solicitante_id, produto_id
+    )
 
     logger.info(
         f"📦 Listando lotes do produto {produto_id} - apenas_disponiveis={apenas_disponiveis}"
@@ -171,7 +182,10 @@ def atualizar_lote(
 ):
     """Atualiza informações de um lote"""
 
-    _, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
+    _, tenant_solicitante_id = _validar_tenant_e_obter_usuario(user_and_tenant)
+    tenant_id, _ = _resolver_tenant_produto_catalogo(
+        db, tenant_solicitante_id, produto_id
+    )
 
     # Buscar lote
     lote = (
@@ -233,7 +247,10 @@ def excluir_lote(
 ):
     """Exclui um lote (soft delete)"""
 
-    _, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
+    _, tenant_solicitante_id = _validar_tenant_e_obter_usuario(user_and_tenant)
+    tenant_id, _ = _resolver_tenant_produto_catalogo(
+        db, tenant_solicitante_id, produto_id
+    )
 
     # Buscar lote
     lote = (
@@ -286,7 +303,12 @@ def entrada_estoque(
 ):
     """Registra entrada de estoque criando um lote"""
 
-    current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
+    current_user, tenant_solicitante_id = _validar_tenant_e_obter_usuario(
+        user_and_tenant
+    )
+    tenant_id, _ = _resolver_tenant_produto_catalogo(
+        db, tenant_solicitante_id, produto_id
+    )
 
     # Verificar se produto existe
     produto = (
@@ -415,7 +437,12 @@ def saida_estoque_fifo(
     Consome lotes mais antigos primeiro
     """
 
-    current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
+    current_user, tenant_solicitante_id = _validar_tenant_e_obter_usuario(
+        user_and_tenant
+    )
+    tenant_id, _ = _resolver_tenant_produto_catalogo(
+        db, tenant_solicitante_id, produto_id
+    )
 
     # Verificar se produto existe
     produto = (

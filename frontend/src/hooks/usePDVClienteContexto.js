@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import api from "../api";
 import { useModulos } from "../contexts/ModulosContext";
+import { copyTextToClipboard } from "../utils/clipboard";
 
 export function usePDVClienteContexto({ vendaAtual, setVendaAtual }) {
   const { moduloAtivo } = useModulos();
@@ -17,8 +18,9 @@ export function usePDVClienteContexto({ vendaAtual, setVendaAtual }) {
 
     try {
       const response = await api.get(`/clientes/${clienteId}/vendas-em-aberto`);
-      if (response.data.resumo.total_vendas > 0) {
-        setVendasEmAbertoInfo(response.data.resumo);
+      const resumo = response.data?.resumo;
+      if (resumo?.total_vendas > 0 || resumo?.total_parcelas_crediario > 0) {
+        setVendasEmAbertoInfo(resumo);
       } else {
         setVendasEmAbertoInfo(null);
       }
@@ -66,11 +68,15 @@ export function usePDVClienteContexto({ vendaAtual, setVendaAtual }) {
     setVendaAtual((prev) => ({ ...prev, pet }));
   };
 
-  const copiarCampoCliente = (valor, campo) => {
+  const copiarCampoCliente = async (valor, campo) => {
     if (!valor) return;
-    navigator.clipboard.writeText(String(valor));
-    setCopiadoClienteCampo(campo);
-    setTimeout(() => setCopiadoClienteCampo(""), 2000);
+    try {
+      await copyTextToClipboard(valor);
+      setCopiadoClienteCampo(campo);
+      setTimeout(() => setCopiadoClienteCampo(""), 2000);
+    } catch (error) {
+      console.error("Erro ao copiar campo do cliente:", error);
+    }
   };
 
   const recarregarVendasEmAbertoClienteAtual = async () => {

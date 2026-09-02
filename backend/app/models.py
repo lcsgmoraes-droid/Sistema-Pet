@@ -49,9 +49,11 @@ from app.empresa_grupo_models import (
     EmpresaGrupo,
     EmpresaGrupoCodigo,
     EmpresaGrupoConvite,
+    EmpresaGrupoEstoqueCompartilhado,
     EmpresaGrupoMembro,
     EmpresaGrupoTransferencia,
 )
+from app.bling_connection_models import BlingCompanyTenantLink, BlingConnection
 from app.models_cadastros import (
     Cliente,
     Especie,
@@ -625,6 +627,9 @@ class Tenant(Base):
 
     # Configurações operacionais
     permite_estoque_negativo = Column(Boolean, nullable=False, server_default="false")
+    permite_estoque_negativo_online = Column(
+        Boolean, nullable=False, server_default="false"
+    )
     protecao_validade_ativa = Column(Boolean, nullable=False, server_default="false")
     dias_alerta_validade = Column(Integer, nullable=False, server_default="15")
     bloquear_validade_pdv = Column(Boolean, nullable=False, server_default="true")
@@ -653,7 +658,7 @@ class Tenant(Base):
         Boolean, nullable=False, server_default="false"
     )
     ecommerce_ocultar_sem_estoque = Column(
-        Boolean, nullable=False, server_default="true"
+        Boolean, nullable=False, server_default="false"
     )
     ecommerce_ocultar_sem_imagem = Column(
         Boolean, nullable=False, server_default="false"

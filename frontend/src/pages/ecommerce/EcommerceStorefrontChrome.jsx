@@ -128,6 +128,27 @@ function BoxIcon() {
   );
 }
 
+function ExpandIcon({ size = 15 }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <polyline points="15 3 21 3 21 9" />
+      <polyline points="9 21 3 21 3 15" />
+      <line x1="21" y1="3" x2="14" y2="10" />
+      <line x1="3" y1="21" x2="10" y2="14" />
+    </svg>
+  );
+}
+
 function StoreTopbar({ cart, cartTotal, isMobile, styles: S, tenantContext }) {
   const cartCount = cart?.itens?.length || 0;
   const freeShippingThreshold = Number(tenantContext?.ecommerce_frete_gratis_acima || 0);
@@ -292,6 +313,9 @@ function StoreBanner({
   onBannerSlideChange,
   onNavigate,
 }) {
+  const hasPublishedCampaign = activeBanners.some((banner) => banner.campaign);
+  const useExpandedDesktopCanvas = !isMobile && hasPublishedCampaign;
+
   return (
     <div
       style={{
@@ -305,7 +329,12 @@ function StoreBanner({
           borderRadius: isMobile ? 12 : 16,
           maxWidth: 1280,
           margin: "0 auto",
-          height: isMobile ? "clamp(132px, 38vw, 150px)" : 260,
+          height: isMobile
+            ? "clamp(132px, 38vw, 150px)"
+            : useExpandedDesktopCanvas
+              ? "clamp(420px, 42vw, 560px)"
+              : 260,
+          transition: "height 0.3s ease",
         }}
       >
         {activeBanners.map((banner, index) => (
@@ -320,28 +349,38 @@ function StoreBanner({
             }}
           >
             {banner.type === "image" ? (
-              <div
+              <a
+                href={banner.href || undefined}
+                aria-label={
+                  banner.href
+                    ? `${banner.ctaLabel || "Abrir oferta"}: ${banner.title || `oferta ${index + 1}`}`
+                    : undefined
+                }
+                target={banner.href ? "_blank" : undefined}
+                rel={banner.href ? "noreferrer" : undefined}
                 style={{
+                  display: "block",
                   width: "100%",
                   height: "100%",
                   position: "relative",
                   overflow: "hidden",
                   background: "#17130f",
+                  cursor: banner.href ? "pointer" : "default",
                 }}
               >
-                {isMobile && (
+                {(isMobile || useExpandedDesktopCanvas) && (
                   <>
                     <div
                       aria-hidden="true"
                       style={{
                         position: "absolute",
-                        inset: -18,
+                        inset: useExpandedDesktopCanvas ? -32 : -18,
                         backgroundImage: `url("${resolveMediaUrl(banner.url)}")`,
                         backgroundPosition: "center",
                         backgroundSize: "cover",
-                        filter: "blur(16px)",
-                        opacity: 0.72,
-                        transform: "scale(1.08)",
+                        filter: useExpandedDesktopCanvas ? "blur(28px)" : "blur(16px)",
+                        opacity: useExpandedDesktopCanvas ? 0.58 : 0.72,
+                        transform: useExpandedDesktopCanvas ? "scale(1.12)" : "scale(1.08)",
                       }}
                     />
                     <div
@@ -349,26 +388,80 @@ function StoreBanner({
                       style={{
                         position: "absolute",
                         inset: 0,
-                        background:
-                          "linear-gradient(90deg, rgba(15,12,9,0.3), rgba(15,12,9,0.08) 45%, rgba(15,12,9,0.3))",
+                        background: useExpandedDesktopCanvas
+                          ? "linear-gradient(90deg, rgba(15,12,9,0.42), rgba(15,12,9,0.08) 42%, rgba(15,12,9,0.08) 58%, rgba(15,12,9,0.42))"
+                          : "linear-gradient(90deg, rgba(15,12,9,0.3), rgba(15,12,9,0.08) 45%, rgba(15,12,9,0.3))",
                       }}
                     />
                   </>
                 )}
                 <img
                   src={resolveMediaUrl(banner.url)}
-                  alt={`Banner ${index + 1}`}
+                  alt={banner.title || `Banner ${index + 1}`}
                   style={{
                     width: "100%",
                     height: "100%",
                     position: "relative",
-                    objectFit: isMobile ? "contain" : "cover",
+                    objectFit: useExpandedDesktopCanvas
+                      ? "contain"
+                      : banner.fit || (isMobile ? "contain" : "cover"),
                     objectPosition: "center",
                     display: "block",
-                    filter: isMobile ? "drop-shadow(0 6px 14px rgba(0,0,0,0.24))" : "none",
+                    filter:
+                      isMobile || useExpandedDesktopCanvas
+                        ? "drop-shadow(0 8px 22px rgba(0,0,0,0.28))"
+                        : "none",
                   }}
                 />
-              </div>
+                {banner.campaign && Number(banner.pageCount || 1) > 1 && (
+                  <span
+                    style={{
+                      position: "absolute",
+                      top: isMobile ? 9 : 14,
+                      right: isMobile ? 9 : 14,
+                      zIndex: 2,
+                      padding: isMobile ? "5px 8px" : "7px 11px",
+                      borderRadius: 999,
+                      background: "rgba(15, 23, 42, 0.84)",
+                      color: "#fff",
+                      fontSize: isMobile ? 10 : 12,
+                      fontWeight: 800,
+                      boxShadow: "0 4px 14px rgba(0,0,0,0.18)",
+                    }}
+                  >
+                    1 de {banner.pageCount}
+                  </span>
+                )}
+                {banner.campaign && (
+                  <span
+                    style={{
+                      position: "absolute",
+                      right: isMobile ? 9 : 14,
+                      bottom: isMobile ? 9 : 14,
+                      zIndex: 2,
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 6,
+                      maxWidth: "calc(100% - 28px)",
+                      padding: isMobile ? "7px 10px" : "9px 13px",
+                      borderRadius: 999,
+                      background: "rgba(255, 255, 255, 0.94)",
+                      color: "#0f766e",
+                      fontSize: isMobile ? 10 : 12,
+                      fontWeight: 800,
+                      lineHeight: 1.1,
+                      boxShadow: "0 6px 18px rgba(0,0,0,0.22)",
+                    }}
+                  >
+                    <ExpandIcon size={isMobile ? 13 : 15} />
+                    <span
+                      style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+                    >
+                      {banner.ctaLabel || "Ver oferta"}
+                    </span>
+                  </span>
+                )}
+              </a>
             ) : (
               <div
                 style={{

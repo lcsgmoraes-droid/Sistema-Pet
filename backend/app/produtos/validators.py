@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from typing import Optional
+from uuid import UUID
 
 from fastapi import HTTPException
 from sqlalchemy import func
@@ -10,12 +11,28 @@ from sqlalchemy.orm import Session
 
 from app.produtos.core import _normalizar_sku_produto
 from app.produtos_models import Categoria, Marca, Produto
+from app.empresa_grupo_estoque_compartilhado_service import (
+    EmpresaGrupoEstoqueCompartilhadoService,
+)
+from app.tenancy.context import set_current_tenant
 
 
 def _validar_tenant_e_obter_usuario(user_and_tenant):
     """Desempacota e valida user_and_tenant."""
     current_user, tenant_id = user_and_tenant
     return current_user, tenant_id
+
+
+def _resolver_tenant_produto_catalogo(
+    db: Session, tenant_solicitante_id, produto_id: int
+):
+    """Valida o acesso ao catalogo e entra no tenant que possui o produto."""
+    acesso_catalogo = EmpresaGrupoEstoqueCompartilhadoService.resolver_produto_catalogo(
+        db, tenant_solicitante_id, produto_id
+    )
+    tenant_origem_id = UUID(str(acesso_catalogo.tenant_origem_id))
+    set_current_tenant(tenant_origem_id)
+    return tenant_origem_id, acesso_catalogo
 
 
 def _obter_produto_ou_404(db: Session, produto_id: int, tenant_id: int):

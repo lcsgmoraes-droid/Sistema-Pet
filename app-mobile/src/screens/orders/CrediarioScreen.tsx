@@ -22,6 +22,11 @@ type ContaCrediario = {
   valor_original: number;
   valor_recebido: number;
   saldo: number;
+  saldo_sem_encargos?: number;
+  juros_calculado?: number;
+  multa_calculada?: number;
+  dias_atraso?: number;
+  encargos_automaticos_ativos?: boolean;
   data_vencimento: string;
   status: string;
 };
@@ -145,6 +150,18 @@ export default function CrediarioScreen() {
               <Text style={styles.valorLabel}>Valor {formatarMoeda(conta.valor_original)}</Text>
               <Text style={styles.saldo}>Saldo {formatarMoeda(conta.saldo)}</Text>
             </View>
+            {aberta &&
+            Number(conta.juros_calculado || 0) + Number(conta.multa_calculada || 0) > 0 ? (
+              <View style={styles.encargosBox}>
+                <Text style={styles.encargosTitulo}>
+                  Atualizado por {conta.dias_atraso || 0} dia(s) de atraso
+                </Text>
+                <Text style={styles.encargosTexto}>
+                  Juros {formatarMoeda(conta.juros_calculado || 0)} · Multa{" "}
+                  {formatarMoeda(conta.multa_calculada || 0)}
+                </Text>
+              </View>
+            ) : null}
           </View>
         );
       })}
@@ -204,6 +221,14 @@ const styles = StyleSheet.create({
   },
   valorLabel: { color: CORES.textoSecundario },
   saldo: { color: CORES.primario, fontWeight: "900" },
+  encargosBox: {
+    marginTop: ESPACO.sm,
+    borderRadius: RAIO.sm,
+    backgroundColor: "#FFF7ED",
+    padding: ESPACO.sm,
+  },
+  encargosTitulo: { color: "#9A3412", fontWeight: "800", fontSize: FONTE.pequena },
+  encargosTexto: { color: "#C2410C", marginTop: 2, fontSize: FONTE.pequena },
   erro: { color: CORES.erro, textAlign: "center", fontWeight: "700", padding: ESPACO.sm },
   vazio: { alignItems: "center", padding: ESPACO.xxl, gap: ESPACO.sm },
   vazioTitulo: { fontSize: FONTE.grande, fontWeight: "900", color: CORES.texto },

@@ -10,19 +10,37 @@ import logging
 import os
 import secrets
 import time
-from contextlib import nullcontext
 from datetime import datetime, timedelta
 from html import escape
-from pathlib import Path
 from typing import Annotated
 from urllib.parse import quote
+from uuid import UUID
 
 import requests
-from fastapi import APIRouter, Query, Request
+from fastapi import APIRouter, Depends, Query, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+from sqlalchemy.orm import Session
 
-from app.bling_integration_parts.core import BLING_OAUTH_TOKEN_URL, _bling_token_lock
+from app.auth.dependencies import get_current_user_and_tenant
+from app.bling_integration_parts.core import (
+    BLING_OAUTH_TOKEN_URL,
+    _bling_token_lock,
+    _load_bling_runtime_config,
+)
 from app.config import JWT_SECRET_KEY
+from app.db import get_session
+from app.services.bling_connection_service import (
+    load_bling_app_credentials,
+    load_bling_credentials,
+    save_bling_app_credentials,
+    save_bling_tokens,
+)
+from app.services.bling_tenant_guard import (
+    bling_tenant_id_configurado,
+    tenant_pode_usar_bling_global,
+)
+from app.tenancy.context import get_current_tenant
 
 
 logger = logging.getLogger(__name__)
@@ -30,20 +48,22 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/auth/bling", tags=["Bling OAuth"])
 public_router = APIRouter(prefix="/auth/bling", tags=["Bling OAuth"])
 
-ENV_PATHS = [
-    Path("/opt/petshop/.env"),
-    Path(__file__).parent.parent.parent / ".env",
-    Path(__file__).parent.parent / ".env",
-]
-
-TOKEN_CONTROL_PATHS = [
-    Path("/app/bling_token_control.json"),
-    Path(__file__).parent.parent.parent / "bling_token_control.json",
-    Path(__file__).parent.parent / "bling_token_control.json",
-]
-
-LAST_RENEWAL_PATH = Path("/tmp/bling_token_last_renewal.txt")
 OAUTH_STATE_TTL_SECONDS = 600
+
+
+class BlingOAuthAppConfigUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    client_id: str = Field(min_length=1, max_length=255)
+    client_secret: str = Field(min_length=1, max_length=1000)
+
+    @field_validator("client_id", "client_secret")
+    @classmethod
+    def strip_value(cls, value: str) -> str:
+        normalized = str(value or "").strip()
+        if not normalized:
+            raise ValueError("Campo obrigatorio")
+        return normalized
 
 
 def _bling_redirect_uri(request: Request) -> str:
@@ -71,11 +91,15 @@ def _b64url_decode(value: str) -> bytes:
     return base64.urlsafe_b64decode(padded.encode("ascii"))
 
 
-def _encode_oauth_state(*, expires_in: int = OAUTH_STATE_TTL_SECONDS) -> str:
+def _encode_oauth_state(
+    *, tenant_id: UUID | str | None = None, expires_in: int = OAUTH_STATE_TTL_SECONDS
+) -> str:
+    resolved_tenant = tenant_id or get_current_tenant()
     payload = {
         "exp": int(time.time()) + int(expires_in),
         "nonce": secrets.token_urlsafe(16),
         "purpose": "bling_oauth",
+        "tenant_id": str(resolved_tenant) if resolved_tenant else None,
     }
     payload_raw = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode(
         "utf-8"
@@ -89,10 +113,10 @@ def _encode_oauth_state(*, expires_in: int = OAUTH_STATE_TTL_SECONDS) -> str:
     return f"{payload_part}.{_b64url_encode(signature)}"
 
 
-def _validate_oauth_state(state: str | None) -> bool:
+def _decode_oauth_state(state: str | None) -> dict | None:
     raw = str(state or "").strip()
     if not raw or "." not in raw:
-        return False
+        return None
 
     payload_part, signature_part = raw.split(".", 1)
     expected = hmac.new(
@@ -104,59 +128,24 @@ def _validate_oauth_state(state: str | None) -> bool:
         received = _b64url_decode(signature_part)
         payload = json.loads(_b64url_decode(payload_part).decode("utf-8"))
     except Exception:
-        return False
+        return None
 
-    return (
+    valid = (
         hmac.compare_digest(expected, received)
         and payload.get("purpose") == "bling_oauth"
         and int(payload.get("exp") or 0) >= int(time.time())
     )
+    if not valid:
+        return None
+    try:
+        payload["tenant_id"] = str(UUID(str(payload.get("tenant_id"))))
+    except (TypeError, ValueError):
+        return None
+    return payload
 
 
-def _get_env_path() -> Path:
-    for path in ENV_PATHS:
-        if path.exists():
-            return path
-    return Path(".env")
-
-
-def _get_token_control_path() -> Path:
-    for path in TOKEN_CONTROL_PATHS:
-        if path.exists():
-            return path
-    return TOKEN_CONTROL_PATHS[0]
-
-
-def _sincronizar_controle_token(expires_in: int = 21600) -> None:
-    agora = datetime.now()
-    proxima_renovacao = agora + timedelta(seconds=max(expires_in - 1800, 60))
-    token_control_path = _get_token_control_path()
-    token_control_path.parent.mkdir(parents=True, exist_ok=True)
-
-    renovacoes_automaticas = 0
-    if token_control_path.exists():
-        try:
-            dados_atuais = json.loads(token_control_path.read_text(encoding="utf-8"))
-            renovacoes_automaticas = int(
-                dados_atuais.get("renovacoes_automaticas") or 0
-            )
-        except Exception:
-            renovacoes_automaticas = 0
-
-    token_control_path.write_text(
-        json.dumps(
-            {
-                "ultima_renovacao": agora.isoformat(),
-                "proxima_renovacao": proxima_renovacao.isoformat(),
-                "renovacoes_automaticas": renovacoes_automaticas,
-            },
-            indent=2,
-        ),
-        encoding="utf-8",
-    )
-
-    LAST_RENEWAL_PATH.write_text(str(agora.timestamp()), encoding="utf-8")
-    logger.info("Controle local do token Bling sincronizado")
+def _validate_oauth_state(state: str | None) -> bool:
+    return _decode_oauth_state(state) is not None
 
 
 def _salvar_tokens(
@@ -164,54 +153,78 @@ def _salvar_tokens(
     refresh_token: str,
     expires_in: int = 21600,
     *,
+    tenant_id: UUID | str | None = None,
+    increment_renewal: bool = False,
+    db: Session | None = None,
     lock_held: bool = False,
 ):
-    """Salva tokens no arquivo .env."""
-    lock_context = nullcontext() if lock_held else _bling_token_lock()
-    with lock_context:
-        env_path = _get_env_path()
-        logger.info("Salvando tokens Bling")
+    """Salva tokens criptografados no tenant correto."""
+    resolved_tenant = tenant_id or get_current_tenant() or bling_tenant_id_configurado()
+    if not resolved_tenant:
+        raise RuntimeError("Tenant nao identificado para salvar tokens do Bling")
 
-        if not env_path.exists():
-            logger.warning("Arquivo .env nao encontrado, criando")
-            env_path.write_text("")
+    if lock_held:
+        save_bling_tokens(
+            tenant_id=resolved_tenant,
+            access_token=access_token,
+            refresh_token=refresh_token,
+            expires_in=expires_in,
+            increment_renewal=increment_renewal,
+            db=db,
+        )
+    else:
+        with _bling_token_lock():
+            save_bling_tokens(
+                tenant_id=resolved_tenant,
+                access_token=access_token,
+                refresh_token=refresh_token,
+                expires_in=expires_in,
+                increment_renewal=increment_renewal,
+                db=db,
+            )
 
-        linhas = env_path.read_text(encoding="utf-8").splitlines()
-        novas_linhas = []
-        achou_access = False
-        achou_refresh = False
-
-        for linha in linhas:
-            if linha.startswith("BLING_ACCESS_TOKEN="):
-                novas_linhas.append(f"BLING_ACCESS_TOKEN={access_token}")
-                achou_access = True
-            elif linha.startswith("BLING_REFRESH_TOKEN="):
-                novas_linhas.append(f"BLING_REFRESH_TOKEN={refresh_token}")
-                achou_refresh = True
-            else:
-                novas_linhas.append(linha)
-
-        if not achou_access:
-            novas_linhas.append(f"BLING_ACCESS_TOKEN={access_token}")
-        if not achou_refresh:
-            novas_linhas.append(f"BLING_REFRESH_TOKEN={refresh_token}")
-
-        env_path.write_text("\n".join(novas_linhas) + "\n", encoding="utf-8")
-
-        os.environ["BLING_ACCESS_TOKEN"] = access_token
-        os.environ["BLING_REFRESH_TOKEN"] = refresh_token
-        _sincronizar_controle_token(expires_in=expires_in)
-
-    logger.info("Tokens Bling salvos com sucesso")
+    logger.info("Tokens Bling salvos com seguranca para o tenant %s", resolved_tenant)
 
 
-def _trocar_code_por_tokens(code: str, redirect_uri: str) -> dict:
-    """Troca o authorization code pelos tokens de acesso."""
+def _legacy_oauth_app_credentials(tenant_id: UUID | str) -> dict[str, str] | None:
+    if not tenant_pode_usar_bling_global(tenant_id):
+        return None
     client_id = os.getenv("BLING_CLIENT_ID", "").strip()
     client_secret = os.getenv("BLING_CLIENT_SECRET", "").strip()
-
     if not client_id or not client_secret:
-        raise RuntimeError("BLING_CLIENT_ID ou BLING_CLIENT_SECRET nao configurados")
+        return None
+    return {
+        "client_id": client_id,
+        "client_secret": client_secret,
+        "source": "legacy",
+    }
+
+
+def _oauth_app_credentials_for_tenant(
+    tenant_id: UUID | str,
+    *,
+    db: Session | None = None,
+) -> dict[str, str] | None:
+    return load_bling_app_credentials(
+        tenant_id, db=db
+    ) or _legacy_oauth_app_credentials(tenant_id)
+
+
+def _trocar_code_por_tokens(
+    code: str,
+    redirect_uri: str,
+    *,
+    tenant_id: UUID | str,
+    db: Session | None = None,
+) -> dict:
+    """Troca o authorization code pelos tokens de acesso."""
+    credentials = _oauth_app_credentials_for_tenant(tenant_id, db=db)
+    if not credentials:
+        raise RuntimeError(
+            "Aplicativo OAuth do Bling nao configurado para esta empresa"
+        )
+    client_id = credentials["client_id"]
+    client_secret = credentials["client_secret"]
 
     creds = base64.b64encode(f"{client_id}:{client_secret}".encode()).decode()
 
@@ -242,6 +255,7 @@ def bling_oauth_callback(
     code: str | None = None,
     error: str | None = None,
     state: str | None = None,
+    db: Session = Depends(get_session),
 ):
     """
     Endpoint de callback OAuth do Bling.
@@ -260,17 +274,24 @@ def bling_oauth_callback(
             status_code=400,
         )
 
-    if not _validate_oauth_state(state):
+    state_payload = _decode_oauth_state(state)
+    if not state_payload:
         return HTMLResponse(
             content=_html_erro("Estado de autorizacao invalido ou expirado"),
             status_code=400,
         )
 
     try:
+        tenant_id = UUID(state_payload["tenant_id"])
         redirect_uri = _bling_redirect_uri(request)
 
         logger.info("Trocando code por tokens Bling")
-        tokens = _trocar_code_por_tokens(code, redirect_uri)
+        tokens = _trocar_code_por_tokens(
+            code,
+            redirect_uri,
+            tenant_id=tenant_id,
+            db=db,
+        )
 
         access_token = tokens.get("access_token")
         refresh_token = tokens.get("refresh_token")
@@ -279,7 +300,13 @@ def bling_oauth_callback(
         if not access_token or not refresh_token:
             raise RuntimeError("Resposta invalida do Bling OAuth")
 
-        _salvar_tokens(access_token, refresh_token, expires_in=expires_in)
+        _salvar_tokens(
+            access_token,
+            refresh_token,
+            expires_in=expires_in,
+            tenant_id=tenant_id,
+            db=db,
+        )
 
         expira_em = datetime.now() + timedelta(seconds=expires_in)
         logger.info("Bling OAuth concluido")
@@ -303,17 +330,23 @@ def gerar_link_autorizacao(
             description="Quando true, redireciona direto para a autorizacao do Bling."
         ),
     ] = False,
+    user_and_tenant=Depends(get_current_user_and_tenant),
+    db: Session = Depends(get_session),
 ):
     """
     Retorna o link para o usuario autorizar o aplicativo no Bling.
     Acesse este endpoint para obter a URL de autorizacao.
     """
-    client_id = os.getenv("BLING_CLIENT_ID", "").strip()
-    if not client_id:
-        return {"erro": "BLING_CLIENT_ID nao configurado"}
-
     redirect_uri = _bling_redirect_uri(request)
-    state = _encode_oauth_state()
+    _current_user, tenant_id = user_and_tenant
+    credentials = _oauth_app_credentials_for_tenant(tenant_id, db=db)
+    if not credentials:
+        return {
+            "erro": "Configure o aplicativo OAuth do Bling para esta empresa",
+            "redirect_uri_configurado": redirect_uri,
+        }
+    client_id = credentials["client_id"]
+    state = _encode_oauth_state(tenant_id=tenant_id)
 
     auth_url = (
         "https://www.bling.com.br/Api/v3/oauth/authorize"
@@ -337,11 +370,96 @@ def gerar_link_autorizacao(
     }
 
 
+def _mask_client_id(value: str | None) -> str | None:
+    raw = str(value or "").strip()
+    if not raw:
+        return None
+    if len(raw) <= 10:
+        return f"{raw[:2]}...{raw[-2:]}"
+    return f"{raw[:6]}...{raw[-4:]}"
+
+
+@router.get("/configuracao")
+def buscar_configuracao_oauth_bling(
+    request: Request,
+    user_and_tenant=Depends(get_current_user_and_tenant),
+    db: Session = Depends(get_session),
+):
+    """Informa se o tenant possui aplicativo OAuth sem expor o segredo."""
+    current_user, tenant_id = user_and_tenant
+    if not current_user.is_admin:
+        return {
+            "configured": bool(_oauth_app_credentials_for_tenant(tenant_id, db=db)),
+            "can_manage": False,
+            "redirect_uri": _bling_redirect_uri(request),
+        }
+
+    tenant_credentials = load_bling_app_credentials(tenant_id, db=db)
+    effective_credentials = tenant_credentials or _legacy_oauth_app_credentials(
+        tenant_id
+    )
+    return {
+        "configured": bool(effective_credentials),
+        "can_manage": True,
+        "source": (effective_credentials or {}).get("source"),
+        "client_id_preview": _mask_client_id(
+            (effective_credentials or {}).get("client_id")
+        ),
+        "client_secret_configured": bool(
+            (effective_credentials or {}).get("client_secret")
+        ),
+        "redirect_uri": _bling_redirect_uri(request),
+    }
+
+
+@router.put("/configuracao")
+def salvar_configuracao_oauth_bling(
+    body: BlingOAuthAppConfigUpdate,
+    request: Request,
+    user_and_tenant=Depends(get_current_user_and_tenant),
+    db: Session = Depends(get_session),
+):
+    """Salva as credenciais do aplicativo Bling somente para o tenant atual."""
+    current_user, tenant_id = user_and_tenant
+    if not current_user.is_admin:
+        from fastapi import HTTPException, status
+
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Somente administradores podem configurar o aplicativo Bling.",
+        )
+
+    connection = save_bling_app_credentials(
+        tenant_id=tenant_id,
+        client_id=body.client_id,
+        client_secret=body.client_secret,
+        db=db,
+    )
+    return {
+        "configured": True,
+        "can_manage": True,
+        "source": "tenant",
+        "client_id_preview": _mask_client_id(connection.oauth_client_id),
+        "client_secret_configured": bool(connection.oauth_client_secret),
+        "redirect_uri": _bling_redirect_uri(request),
+    }
+
+
 @router.get("/status-token")
-def status_token():
+def status_token(user_and_tenant=Depends(get_current_user_and_tenant)):
     """Verifica se o token esta configurado e tenta uma chamada de teste."""
-    token = os.getenv("BLING_ACCESS_TOKEN", "").strip()
-    refresh = os.getenv("BLING_REFRESH_TOKEN", "").strip()
+    _current_user, tenant_id = user_and_tenant
+    credentials = load_bling_credentials(tenant_id)
+    if not credentials:
+        runtime_config = _load_bling_runtime_config()
+        if runtime_config.get("source") != "legacy":
+            return {
+                "status": "sem_token",
+                "mensagem": "Bling nao conectado para esta empresa",
+            }
+        credentials = runtime_config
+    token = str(credentials.get("access_token") or "").strip()
+    refresh = str(credentials.get("refresh_token") or "").strip()
 
     if not token:
         return {"status": "sem_token", "mensagem": "BLING_ACCESS_TOKEN nao configurado"}
@@ -360,7 +478,6 @@ def status_token():
             return {
                 "status": "ok",
                 "token_valido": True,
-                "token_preview": token[:15] + "...",
                 "refresh_token_configurado": bool(refresh),
             }
         if response.status_code == 401:

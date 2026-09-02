@@ -27,6 +27,7 @@ import {
 } from "../../services/gruposEmpresas";
 import { confirmarCorePet } from "../../services/corepetDialog";
 import { useAuth } from "../../contexts/AuthContext";
+import EstoqueCompartilhadoGrupo from "./EstoqueCompartilhadoGrupo";
 
 const resumoVazio = {
   codigo_empresa: null,
@@ -392,6 +393,7 @@ export default function GruposEmpresas() {
                   </div>
                 )}
               </div>
+              <EstoqueCompartilhadoGrupo empresaAtualId={resumo.empresa_atual_id} grupo={grupo} />
             </Panel>
           ))
         )}

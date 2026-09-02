@@ -2,21 +2,27 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime
+from decimal import Decimal
 from typing import Any, List, Optional
 
 from fastapi import HTTPException
 from sqlalchemy import and_, func, or_
-from sqlalchemy.orm import Session, joinedload, noload
+from sqlalchemy import select
+from sqlalchemy.orm import Session, aliased, joinedload, noload
 
 from app.models import Cliente, FornecedorGrupo
+from app.empresa_grupo_sql import empresa_id_igual, empresa_id_sql
 from app.partner_utils import is_partner_owned
 from app.produtos_models import Produto, ProdutoFornecedor
 from app.produtos.search import (
     _build_produto_search_order_clause,
+    _produto_search_exact_conditions,
     _produto_search_conditions,
     _produto_search_conditions_fast,
+    _produto_search_sort_key,
 )
 from app.produtos.validade import _mapa_validade_proxima_produtos
+from app.services.kit_custo_service import KitCustoService
 from app.services.kit_estoque_service import KitEstoqueService
 from app.utils.timezone import as_brasilia_naive, now_brasilia, wall_time_naive
 
@@ -59,8 +65,53 @@ def _montar_query_produtos_vendaveis(
     termo_busca: Optional[str],
     contar_total: bool,
 ) -> Any:
+    from app.empresa_grupo_models import (
+        EmpresaGrupo,
+        EmpresaGrupoEstoqueCompartilhado,
+        EmpresaGrupoMembro,
+    )
+
+    membro_origem = aliased(EmpresaGrupoMembro)
+    membro_consumidora = aliased(EmpresaGrupoMembro)
+    produtos_compartilhados = (
+        select(EmpresaGrupoEstoqueCompartilhado.produto_origem_id)
+        .join(
+            EmpresaGrupo,
+            EmpresaGrupo.id == EmpresaGrupoEstoqueCompartilhado.grupo_id,
+        )
+        .join(
+            membro_origem,
+            (membro_origem.grupo_id == EmpresaGrupoEstoqueCompartilhado.grupo_id)
+            & (
+                empresa_id_sql(membro_origem.empresa_id)
+                == empresa_id_sql(EmpresaGrupoEstoqueCompartilhado.empresa_origem_id)
+            ),
+        )
+        .join(
+            membro_consumidora,
+            (membro_consumidora.grupo_id == EmpresaGrupoEstoqueCompartilhado.grupo_id)
+            & (
+                empresa_id_sql(membro_consumidora.empresa_id)
+                == empresa_id_sql(
+                    EmpresaGrupoEstoqueCompartilhado.empresa_consumidora_id
+                )
+            ),
+        )
+        .where(
+            empresa_id_igual(
+                EmpresaGrupoEstoqueCompartilhado.empresa_consumidora_id, tenant_id
+            ),
+            EmpresaGrupoEstoqueCompartilhado.status == "ativo",
+            EmpresaGrupo.status == "ativo",
+            membro_origem.status == "ativo",
+            membro_consumidora.status == "ativo",
+        )
+    )
     query = db.query(Produto).filter(
-        Produto.tenant_id == tenant_id,
+        or_(
+            Produto.tenant_id == tenant_id,
+            Produto.id.in_(produtos_compartilhados),
+        ),
         Produto.ativo.is_(True),
         Produto.tipo_produto.in_(["SIMPLES", "VARIACAO", "KIT"]),
     )
@@ -87,20 +138,28 @@ def _montar_query_listagem_produtos(
     produto_predecessor_id: Optional[int],
     include_variations: bool,
     busca_completa: bool,
+    produto_ids_compartilhados: Optional[list[int]] = None,
 ) -> Any:
+    ids_compartilhados = [
+        int(produto_id) for produto_id in (produto_ids_compartilhados or [])
+    ]
+    escopo_tenant = or_(
+        Produto.tenant_id.in_(tenant_ids),
+        Produto.id.in_(ids_compartilhados or [-1]),
+    )
     if produto_predecessor_id:
         query = db.query(Produto).filter(
-            Produto.tenant_id.in_(tenant_ids),
+            escopo_tenant,
             Produto.produto_predecessor_id == produto_predecessor_id,
         )
     elif tipo_produto:
         query = db.query(Produto).filter(
-            Produto.tenant_id.in_(tenant_ids),
+            escopo_tenant,
             Produto.tipo_produto == tipo_produto,
         )
     else:
         query = db.query(Produto).filter(
-            Produto.tenant_id.in_(tenant_ids),
+            escopo_tenant,
             Produto.tipo_produto.in_(
                 _tipos_base_listagem(include_variations, termo_busca)
             ),
@@ -152,8 +211,10 @@ def _buscar_pagina_produtos_listagem(
     incluir_lotes: bool,
     incluir_bling_sync: bool = False,
     contar_total: bool = True,
+    busca_rapida: bool = False,
 ) -> tuple[list[Produto], Optional[int], list[Any]]:
     total = query.count() if contar_total else None
+    usar_busca_rapida = bool(busca_rapida and termo_busca and offset == 0)
     if ordenacao == "estoque_desc":
         order_clause = [
             func.coalesce(Produto.estoque_atual, 0).desc(),
@@ -173,6 +234,29 @@ def _buscar_pagina_produtos_listagem(
         incluir_lotes=incluir_lotes,
         incluir_bling_sync=incluir_bling_sync,
     )
+
+    if usar_busca_rapida:
+        # O ORDER BY de relevancia com varios CASE/ILIKE levava mais de dois
+        # segundos no PDV. Buscamos um conjunto pequeno sem ordenar no banco,
+        # mas garantimos antes os matches exatos de codigo usados pelo leitor.
+        produtos_exatos = (
+            query.filter(_produto_search_exact_conditions(termo_busca))
+            .options(*load_options)
+            .limit(page_size)
+            .all()
+        )
+        limite_candidatos = min(max(page_size * 10, 120), 500)
+        candidatos = query.options(*load_options).limit(limite_candidatos).all()
+        produtos_unicos = {
+            produto.id: produto
+            for produto in [*produtos_exatos, *candidatos]
+            if produto is not None
+        }
+        produtos = sorted(
+            produtos_unicos.values(),
+            key=lambda produto: _produto_search_sort_key(produto, termo_busca),
+        )[:page_size]
+        return produtos, total, load_options
 
     produtos = (
         query.options(*load_options)
@@ -273,6 +357,7 @@ def _expandir_produtos_listagem(
     load_options: list[Any],
     validade_por_produto: dict[int, dict[str, Any]],
     incluir_bling_sync: bool = False,
+    estoque_compartilhado_por_produto: dict[int, dict] | None = None,
 ) -> list[Produto]:
     produtos_expandidos = []
     total_variacoes_por_pai = _mapa_total_variacoes_por_pai(db, produtos)
@@ -289,6 +374,17 @@ def _expandir_produtos_listagem(
         if todas_variacoes
         else {}
     )
+    produtos_compostos = [
+        produto
+        for produto in [*produtos, *todas_variacoes]
+        if getattr(produto, "tipo_produto", None) in ("KIT", "VARIACAO")
+        and bool(getattr(produto, "tipo_kit", None))
+    ]
+    custos_compostos = (
+        KitCustoService.calcular_custos_kits_em_lote(db, produtos_compostos)
+        if produtos_compostos
+        else {}
+    )
 
     for produto in produtos:
         if produto.tipo_produto == "PAI":
@@ -302,6 +398,8 @@ def _expandir_produtos_listagem(
             incluir_detalhes_composto=incluir_detalhes_composto,
             validade_por_produto=validade_por_produto,
             incluir_bling_sync=incluir_bling_sync,
+            custos_compostos=custos_compostos,
+            estoque_compartilhado_por_produto=estoque_compartilhado_por_produto,
         )
         produtos_expandidos.append(produto)
 
@@ -317,6 +415,8 @@ def _expandir_produtos_listagem(
                     incluir_detalhes_composto=incluir_detalhes_composto,
                     validade_por_produto=validade_por_variacao,
                     incluir_bling_sync=incluir_bling_sync,
+                    custos_compostos=custos_compostos,
+                    estoque_compartilhado_por_produto=estoque_compartilhado_por_produto,
                 )
                 produtos_expandidos.append(variacao)
 
@@ -560,10 +660,13 @@ def _enriquecer_produto_listagem(
     incluir_detalhes_composto: bool = True,
     validade_por_produto: dict[int, dict[str, Any]] | None = None,
     incluir_bling_sync: bool = False,
+    custos_compostos: dict[int, Decimal] | None = None,
+    estoque_compartilhado_por_produto: dict[int, dict] | None = None,
 ):
     """Padroniza dados de listagem para produtos simples, kits e variacoes-kit."""
     reservas_por_produto = reservas_por_produto or {}
     validade_por_produto = validade_por_produto or {}
+    estoque_compartilhado_por_produto = estoque_compartilhado_por_produto or {}
     tenant_produto = getattr(produto, "tenant_id", tenant_id)
     reservas_mesmo_tenant = str(tenant_produto) == str(tenant_id)
     estoque_reservado = (
@@ -577,10 +680,13 @@ def _enriquecer_produto_listagem(
 
     produto_composto = produto.tipo_produto in ("KIT", "VARIACAO") and produto.tipo_kit
 
+    if produto_composto and custos_compostos is not None:
+        custo_efetivo = custos_compostos.get(int(produto.id))
+        if custo_efetivo is not None:
+            produto.preco_custo = float(custo_efetivo)
+
     if produto_composto and incluir_detalhes_composto:
         try:
-            from app.services.kit_custo_service import KitCustoService
-
             composicao = KitEstoqueService.obter_detalhes_composicao(
                 db,
                 produto.id,
@@ -606,9 +712,10 @@ def _enriquecer_produto_listagem(
                 }
                 for comp in composicao
             ]
-            produto.preco_custo = float(
-                KitCustoService.calcular_custo_kit(produto.id, db)
-            )
+            if custos_compostos is None:
+                produto.preco_custo = float(
+                    KitCustoService.calcular_custo_kit(produto.id, db)
+                )
 
             if produto.tipo_kit == "VIRTUAL":
                 produto.estoque_virtual = int(
@@ -665,6 +772,16 @@ def _enriquecer_produto_listagem(
             0.0,
         )
     produto.de_parceiro = is_partner_owned(tenant_id, produto.tenant_id)
+    compartilhamento = estoque_compartilhado_por_produto.get(int(produto.id), {})
+    produto.estoque_compartilhado = bool(compartilhamento)
+    produto.estoque_compartilhado_id = compartilhamento.get("estoque_compartilhado_id")
+    produto.estoque_origem_empresa_id = compartilhamento.get(
+        "estoque_origem_empresa_id"
+    )
+    produto.estoque_origem_nome = compartilhamento.get("estoque_origem_nome")
+    produto.acesso_catalogo_completo = bool(
+        compartilhamento.get("acesso_catalogo_completo", False)
+    )
     if incluir_bling_sync:
         sync = getattr(produto, "bling_sync", None)
         produto.bling_produto_id = (

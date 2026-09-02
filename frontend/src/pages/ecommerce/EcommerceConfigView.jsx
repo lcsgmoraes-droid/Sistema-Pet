@@ -251,9 +251,9 @@ export default function EcommerceConfigView({
             </p>
           </div>
           <ToggleSetting
-            configKey="ocultarSemEstoque"
-            label="Ocultar produtos sem estoque"
-            description="Recomendado para não mostrar milhares de itens indisponíveis."
+            configKey="exibirEsgotados"
+            label="Exibir produtos esgotados com a opção Avise-me"
+            description="Mantém a demanda visível e ajuda a decidir quais produtos repor."
           />
           <ToggleSetting
             configKey="ocultarSemImagem"
@@ -270,6 +270,13 @@ export default function EcommerceConfigView({
             label="Usar estoque reservado do e-commerce"
             description="Só ative depois de preencher o estoque do canal nos produtos."
           />
+          <a
+            href="/ecommerce/catalogo-saude"
+            className="inline-flex items-center gap-2 pt-2 text-sm font-semibold text-indigo-700 hover:text-indigo-900"
+          >
+            Ver produtos bloqueados e dados faltantes
+            <ExternalLink size={14} />
+          </a>
         </div>
 
         <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm space-y-4">

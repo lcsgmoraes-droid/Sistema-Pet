@@ -2,6 +2,11 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import {
+  addOperationalMinutes,
+  buildTaxiDogWindow,
+  toOperationalDateTimeInput,
+} from "../src/pages/banhoTosa/taxiDogDateTimeUtils.js";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const read = (path) => readFileSync(resolve(root, path), "utf8");
@@ -25,6 +30,8 @@ assert.match(
   /BanhoTosaTransicaoPanel/,
   "mudança de etapa deve passar pelo painel operacional",
 );
+assert.match(fila, /showCode=\{false\}/, "fila nao deve poluir o card com codigos");
+assert.match(fila, /atendimento\.pet_nome \|\| "Pet"\} →/, "acao deve identificar o pet");
 assert.match(
   transicao,
   /iniciar_timer: operacional/,
@@ -60,5 +67,11 @@ assert.match(
   "somente volta deve começar aguardando o retorno",
 );
 assert.match(taxiDog, /proximoStatus\(item\.status, item\.tipo\)/);
+assert.deepEqual(buildTaxiDogWindow("2026-08-29T15:30:00Z"), {
+  inicio: "2026-08-29T14:30",
+  fim: "2026-08-29T15:30",
+});
+assert.equal(addOperationalMinutes("2026-08-30T00:15:00-03:00", -60), "2026-08-29T23:15");
+assert.equal(toOperationalDateTimeInput("data-invalida"), "");
 
 console.log("Banho & Tosa fluid flow checks passed.");

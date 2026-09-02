@@ -1,9 +1,10 @@
-import { AlertTriangle, Check, Copy, History, Plus, User, Wallet } from "lucide-react";
-import { useLocation } from "react-router-dom";
+import { AlertTriangle, Check, Copy, CreditCard, History, Plus, User, Wallet } from "lucide-react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { formatBRL, formatMoneyBRL } from "../../utils/formatters";
 import { getClienteAlertasPdvAtivos } from "../../utils/clienteAlertasPdv";
 import { buildPdvCouponTooltip } from "../../utils/pdvCouponTooltip";
 import { buildReturnTo } from "../../utils/petReturnFlow";
+import { calcularResumoEmAbertoCliente } from "../../utils/pdvClienteFinanceiro";
 import PessoaSelector from "../clientes/PessoaSelector";
 import ActionButton from "../ui/ActionButton";
 import CustomerIdentity from "../ui/CustomerIdentity";
@@ -306,49 +307,88 @@ function ClienteAcoesResumo({
   onAbrirHistoricoCliente,
   onAbrirModalAdicionarCredito,
   onAbrirVendasEmAberto,
-  totalVendasAbertas,
-  vendasEmAbertoInfo,
+  onVerCrediario,
+  resumoEmAberto,
 }) {
+  const temVendasEmAberto = resumoEmAberto.total_vendas > 0;
+  const temCrediarioEmAberto = resumoEmAberto.total_parcelas_crediario > 0;
+  const temValorEmAberto = resumoEmAberto.total_geral_em_aberto > 0;
+
   return (
-    <div className="flex flex-col gap-2 md:flex-row md:items-center">
-      {totalVendasAbertas > 0 ? (
-        <div className="flex min-h-[46px] w-full min-w-0 flex-col gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 sm:flex-row sm:items-center sm:justify-between md:w-auto md:flex-none">
-          <div className="flex min-w-0 items-center gap-2">
-            <AlertTriangle className="h-5 w-5 flex-shrink-0 text-amber-600" />
-            <div className="min-w-0">
-              <div className="text-sm font-semibold leading-tight">
-                {totalVendasAbertas} venda(s) em aberto
-              </div>
-              <div className="truncate leading-tight">
-                Total: {formatMoneyBRL(vendasEmAbertoInfo?.total_em_aberto || 0)}
-              </div>
-            </div>
+    <div
+      className={`flex min-h-[64px] w-full min-w-0 flex-wrap items-center gap-3 rounded-lg border px-3 py-2.5 ${
+        temValorEmAberto
+          ? "border-amber-200 bg-amber-50 text-amber-900"
+          : "border-emerald-200 bg-emerald-50 text-emerald-900"
+      }`}
+    >
+      <div className="flex min-w-[220px] flex-1 items-center gap-2.5">
+        <AlertTriangle
+          className={`h-5 w-5 flex-shrink-0 ${
+            temValorEmAberto ? "text-amber-600" : "text-emerald-600"
+          }`}
+        />
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+            <span className="text-sm font-semibold leading-tight">Total em aberto</span>
+            <span className="text-lg font-bold leading-tight">
+              {formatMoneyBRL(resumoEmAberto.total_geral_em_aberto)}
+            </span>
           </div>
+          <div className="mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5 text-xs leading-tight">
+            {temVendasEmAberto && (
+              <span>
+                {resumoEmAberto.total_vendas} venda(s):{" "}
+                {formatMoneyBRL(resumoEmAberto.total_vendas_em_aberto)}
+              </span>
+            )}
+            {temCrediarioEmAberto && (
+              <span className="inline-flex items-center gap-1">
+                <CreditCard className="h-3.5 w-3.5" />
+                {resumoEmAberto.total_parcelas_crediario} parcela(s) do crediário:{" "}
+                {formatMoneyBRL(resumoEmAberto.total_crediario_em_aberto)}
+              </span>
+            )}
+            {resumoEmAberto.total_crediario_vencido > 0 && (
+              <span className="font-semibold text-red-700">
+                Vencido: {formatMoneyBRL(resumoEmAberto.total_crediario_vencido)}
+              </span>
+            )}
+            {!temValorEmAberto && <span>Nenhuma pendência financeira</span>}
+          </div>
+        </div>
+      </div>
+
+      <div className="flex w-full flex-wrap gap-2 lg:w-auto lg:justify-end">
+        {temVendasEmAberto && (
           <ActionButton
             onClick={onAbrirVendasEmAberto}
             intent="warning"
             size="sm"
-            className="w-full sm:w-auto sm:min-w-[128px]"
+            className="min-w-[128px] flex-1 lg:flex-none"
           >
-            Ver Vendas
+            Ver vendas
           </ActionButton>
-        </div>
-      ) : (
-        <div />
-      )}
-
-      <div className="hidden min-w-0 flex-1 md:block" />
-
-      <div className="grid min-h-[46px] w-full grid-cols-1 gap-2 sm:grid-cols-2 md:flex md:w-auto md:flex-none md:items-center md:justify-end">
+        )}
+        {temCrediarioEmAberto && (
+          <ActionButton
+            onClick={onVerCrediario}
+            intent="neutral"
+            size="sm"
+            className="min-w-[128px] flex-1 lg:flex-none"
+          >
+            Ver parcelas
+          </ActionButton>
+        )}
         <ActionButton
           onClick={onAbrirHistoricoCliente}
           icon={History}
           intent="neutral"
           tone="soft"
           size="sm"
-          className="w-full md:w-auto md:min-w-[132px]"
+          className="min-w-[128px] flex-1 lg:flex-none"
         >
-          Historico
+          Histórico
         </ActionButton>
         {!modoVisualizacao && (
           <ActionButton
@@ -356,9 +396,9 @@ function ClienteAcoesResumo({
             icon={Wallet}
             intent="create"
             size="sm"
-            className="w-full md:w-auto md:min-w-[150px]"
+            className="min-w-[144px] flex-1 lg:flex-none"
           >
-            Inserir Credito
+            Inserir crédito
           </ActionButton>
         )}
       </div>
@@ -413,6 +453,7 @@ export default function PDVClienteCard({
   vendaGuiaClasses,
   vendasEmAbertoInfo,
 }) {
+  const navigate = useNavigate();
   const cliente = vendaAtual.cliente;
   const saldoCarimbos = Number(saldoCampanhas?.total_carimbos || 0);
   const debitoFidelidade = Math.max(
@@ -421,7 +462,7 @@ export default function PDVClienteCard({
   );
   const creditoCliente = Number(cliente?.credito || 0);
   const cuponsAtivos = saldoCampanhas?.cupons_ativos || [];
-  const totalVendasAbertas = Number(vendasEmAbertoInfo?.total_vendas || 0);
+  const resumoEmAberto = calcularResumoEmAbertoCliente(vendasEmAbertoInfo);
   const telefoneCliente = cliente?.telefone || cliente?.celular || cliente?.whatsapp || "";
   const codigoCliente = cliente?.codigo || cliente?.id || "";
   const nivelFidelidade = saldoCampanhas?.rank_level || "bronze";
@@ -478,8 +519,12 @@ export default function PDVClienteCard({
             onAbrirHistoricoCliente={onAbrirHistoricoCliente}
             onAbrirModalAdicionarCredito={onAbrirModalAdicionarCredito}
             onAbrirVendasEmAberto={onAbrirVendasEmAberto}
-            totalVendasAbertas={totalVendasAbertas}
-            vendasEmAbertoInfo={vendasEmAbertoInfo}
+            onVerCrediario={() =>
+              navigate(
+                `/financeiro/contas-receber?cliente_id=${cliente.id}&filtro=em_aberto&periodo=todos`,
+              )
+            }
+            resumoEmAberto={resumoEmAberto}
           />
 
           <ClientePetSelector

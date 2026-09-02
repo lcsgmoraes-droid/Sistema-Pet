@@ -101,11 +101,23 @@ export default function EcommerceMVP() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [tenantContext, setTenantContext] = useState(null);
+  const [ofertasAtivas, setOfertasAtivas] = useState([]);
 
-  // Banners: usa URLs do tenant se configuradas, senão exibe os padrões
+  // Campanhas publicadas aparecem primeiro; os banners da loja continuam como apoio.
   const activeBanners = useMemo(() => {
-    return buildActiveBanners(tenantContext);
-  }, [tenantContext]);
+    const bannersDeOfertas = ofertasAtivas.map((oferta) => ({
+      type: "image",
+      url: oferta.imagem_url,
+      href: oferta.link_path,
+      fit: "contain",
+      title: oferta.titulo,
+      campaign: true,
+      pageCount: Number(oferta.total_paginas || oferta.imagens_urls?.length || 1),
+      productCount: Number(oferta.total_produtos || 0),
+      ctaLabel: oferta.cta_label || "Ver oferta",
+    }));
+    return [...bannersDeOfertas, ...buildActiveBanners(tenantContext)];
+  }, [ofertasAtivas, tenantContext]);
 
   const tenantRef = useMemo(() => {
     const query = new URLSearchParams(location.search);
@@ -124,6 +136,27 @@ export default function EcommerceMVP() {
   }, [customerToken]);
 
   const storefrontRef = tenantContext?.ecommerce_slug || tenantRef || "";
+
+  useEffect(() => {
+    if (!storefrontRef) {
+      setOfertasAtivas([]);
+      return;
+    }
+    let ativo = true;
+    ecommerceApi
+      .get("/api/ecommerce/ofertas-ativas", {
+        params: { tenant: storefrontRef, canal: "ecommerce" },
+      })
+      .then((response) => {
+        if (ativo) setOfertasAtivas(response?.data?.items || []);
+      })
+      .catch(() => {
+        if (ativo) setOfertasAtivas([]);
+      });
+    return () => {
+      ativo = false;
+    };
+  }, [storefrontRef]);
 
   useEffect(() => {
     setEcommerceAnalyticsContext({

@@ -4,12 +4,15 @@
 import { createContext, useContext, useEffect, useState } from "react";
 import api from "../api";
 import {
+  clearTempToken,
   clearAuthTokens,
   getAccessToken,
+  getTempToken,
   setAccessToken,
   setRefreshToken,
   setTempToken,
 } from "../auth/tokenStorage";
+import { findTenantOption, normalizeTenantOptions } from "../auth/tenantSelection";
 
 const AuthContext = createContext();
 
@@ -82,8 +85,8 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const completeTenantSelection = async (accessToken, tenants) => {
-    if (!accessToken || !tenants || tenants.length === 0) {
+  const completeTenantSelection = async (accessToken, tenant) => {
+    if (!accessToken || !tenant?.id) {
       return {
         success: false,
         error: "Nenhuma empresa disponivel para este usuario",
@@ -94,7 +97,7 @@ export const AuthProvider = ({ children }) => {
 
     const selectResponse = await api.post(
       "/auth/select-tenant",
-      { tenant_id: tenants[0].id },
+      { tenant_id: tenant.id },
       { headers: { Authorization: `Bearer ${accessToken}` } },
     );
 
@@ -104,13 +107,81 @@ export const AuthProvider = ({ children }) => {
     if (finalRefreshToken) {
       setRefreshToken(finalRefreshToken);
     }
-    localStorage.setItem("selectedTenant", JSON.stringify(tenants[0]));
+    localStorage.setItem("selectedTenant", JSON.stringify(tenant));
+    localStorage.removeItem("tenants");
+    clearTempToken();
 
     const userResponse = await api.get("/auth/me-multitenant");
     setUser(userResponse.data);
     localStorage.setItem("user", JSON.stringify(userResponse.data));
 
     return { success: true };
+  };
+
+  const prepareTenantSelection = async (accessToken, tenants) => {
+    const tenantOptions = normalizeTenantOptions(tenants);
+
+    if (!accessToken || tenantOptions.length === 0) {
+      return {
+        success: false,
+        error: "Nenhuma empresa disponivel para este usuario",
+      };
+    }
+
+    setTempToken(accessToken);
+
+    if (tenantOptions.length === 1) {
+      return completeTenantSelection(accessToken, tenantOptions[0]);
+    }
+
+    localStorage.setItem("tenants", JSON.stringify(tenantOptions));
+    return {
+      success: true,
+      requiresTenantSelection: true,
+      tenants: tenantOptions,
+    };
+  };
+
+  const selectTenant = async (tenantId) => {
+    try {
+      const accessToken = getTempToken();
+      const savedTenants = JSON.parse(localStorage.getItem("tenants") || "[]");
+      const tenant = findTenantOption(savedTenants, tenantId);
+
+      if (!accessToken || !tenant) {
+        return {
+          success: false,
+          error: "A selecao de empresa expirou. Faca login novamente.",
+        };
+      }
+
+      return await completeTenantSelection(accessToken, tenant);
+    } catch (error) {
+      console.error("Erro ao selecionar empresa:", error);
+      return {
+        success: false,
+        error: error.response?.data?.detail || "Erro ao selecionar empresa",
+      };
+    }
+  };
+
+  const cancelTenantSelection = async () => {
+    const accessToken = getTempToken();
+
+    try {
+      if (accessToken) {
+        await api.post(
+          "/auth/logout-multitenant",
+          {},
+          { headers: { Authorization: `Bearer ${accessToken}` } },
+        );
+      }
+    } catch (error) {
+      console.warn("Nao foi possivel encerrar a selecao de empresa:", error);
+    } finally {
+      clearTempToken();
+      localStorage.removeItem("tenants");
+    }
   };
 
   const login = async (identifier, password, tenant = null) => {
@@ -121,7 +192,7 @@ export const AuthProvider = ({ children }) => {
         tenant,
       });
       const { access_token, tenants } = response.data;
-      return await completeTenantSelection(access_token, tenants);
+      return await prepareTenantSelection(access_token, tenants);
     } catch (error) {
       console.error("Erro no login:", error);
       return {
@@ -162,7 +233,7 @@ export const AuthProvider = ({ children }) => {
       }
 
       const { access_token, tenants } = response.data;
-      return await completeTenantSelection(access_token, tenants);
+      return await prepareTenantSelection(access_token, tenants);
     } catch (error) {
       console.error("Erro no registro:", error);
       return {
@@ -191,6 +262,8 @@ export const AuthProvider = ({ children }) => {
     user,
     loading,
     login,
+    selectTenant,
+    cancelTenantSelection,
     register,
     logout,
     isAuthenticated: !!user,

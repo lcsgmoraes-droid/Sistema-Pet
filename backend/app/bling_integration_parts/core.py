@@ -8,12 +8,13 @@ from contextlib import contextmanager, nullcontext
 from datetime import datetime, timedelta
 from pathlib import Path
 from tempfile import gettempdir
-from typing import Dict, Iterator, Optional
+from typing import Any, Dict, Iterator, Optional
 
 import requests
 from dotenv import dotenv_values
 
 from app.utils.logger import logger
+from app.tenancy.context import get_current_tenant, tenant_context
 
 
 BLING_API_BASE_URL = "https://api.bling.com.br/Api/v3"
@@ -72,7 +73,7 @@ def _get_shared_env_path() -> Optional[Path]:
     return None
 
 
-def _load_bling_runtime_config(*, lock_held: bool = False) -> Dict[str, str]:
+def _load_bling_runtime_config(*, lock_held: bool = False) -> dict[str, Any]:
     values: Dict[str, str] = {}
     lock_context = nullcontext() if lock_held else _bling_token_lock()
 
@@ -94,13 +95,59 @@ def _load_bling_runtime_config(*, lock_held: bool = False) -> Dict[str, str]:
     def pick(name: str, default: str = "") -> str:
         return (values.get(name) or os.getenv(name) or default).strip()
 
+    tenant_id = get_current_tenant()
+    tenant_credentials = None
+    tenant_app_credentials = None
+    if tenant_id:
+        try:
+            from app.services.bling_connection_service import (
+                load_bling_app_credentials,
+                load_bling_credentials,
+            )
+
+            tenant_credentials = load_bling_credentials(tenant_id)
+            tenant_app_credentials = load_bling_app_credentials(tenant_id)
+        except Exception as error:
+            logger.warning(
+                "Nao foi possivel carregar a conexao Bling do tenant %s: %s",
+                tenant_id,
+                type(error).__name__,
+            )
+
+    legacy_allowed = False
+    if tenant_id:
+        from app.services.bling_tenant_guard import tenant_pode_usar_bling_global
+
+        legacy_allowed = tenant_pode_usar_bling_global(tenant_id)
+
     return {
-        "access_token": pick("BLING_ACCESS_TOKEN"),
-        "refresh_token": pick("BLING_REFRESH_TOKEN"),
-        "client_id": pick("BLING_CLIENT_ID"),
-        "client_secret": pick("BLING_CLIENT_SECRET"),
+        "access_token": str(
+            (tenant_credentials or {}).get("access_token")
+            or (pick("BLING_ACCESS_TOKEN") if legacy_allowed else "")
+        ).strip(),
+        "refresh_token": str(
+            (tenant_credentials or {}).get("refresh_token")
+            or (pick("BLING_REFRESH_TOKEN") if legacy_allowed else "")
+        ).strip(),
+        "client_id": str(
+            (tenant_app_credentials or {}).get("client_id")
+            or (pick("BLING_CLIENT_ID") if legacy_allowed else "")
+        ).strip(),
+        "client_secret": str(
+            (tenant_app_credentials or {}).get("client_secret")
+            or (pick("BLING_CLIENT_SECRET") if legacy_allowed else "")
+        ).strip(),
         "enable_jwt": pick("BLING_ENABLE_JWT", "1"),
         "ambiente": pick("BLING_NFE_AMBIENTE", "rascunho"),
+        "source": str(
+            (tenant_credentials or {}).get("source")
+            or ("legacy" if legacy_allowed else "")
+        ),
+        "stock_deposit_id": (
+            (tenant_credentials or {}).get("stock_deposit_id")
+            or (pick("BLING_DEPOSITO_ID") if legacy_allowed else None)
+        ),
+        "expires_at": (tenant_credentials or {}).get("expires_at"),
     }
 
 
@@ -161,19 +208,27 @@ def _montar_url_bling(base_url: str, endpoint: str) -> str:
 class BlingAPIBase:
     """Base compartilhada do cliente Bling: configuracao, token e request."""
 
-    def __init__(self):
-        runtime_config = _load_bling_runtime_config()
+    def __init__(self, tenant_id=None):
+        self.tenant_id = tenant_id or get_current_tenant()
+        if self.tenant_id and get_current_tenant() != self.tenant_id:
+            with tenant_context(self.tenant_id):
+                runtime_config = _load_bling_runtime_config()
+        else:
+            runtime_config = _load_bling_runtime_config()
         self.base_url = BLING_API_BASE_URL
         self.access_token = runtime_config["access_token"]
         self.refresh_token = runtime_config["refresh_token"]
         self.client_id = runtime_config["client_id"]
         self.client_secret = runtime_config["client_secret"]
         self.enable_jwt = runtime_config["enable_jwt"]
+        self.token_source = runtime_config.get("source") or ""
+        self.stock_deposit_id = runtime_config.get("stock_deposit_id")
+        self.expires_at = runtime_config.get("expires_at")
         # Ambiente: 'rascunho', 'homologacao' ou 'producao'
         self.ambiente = runtime_config["ambiente"]
 
         if not self.access_token:
-            raise ValueError("BLING_ACCESS_TOKEN não configurado no .env")
+            raise ValueError("Bling nao conectado para esta empresa")
 
     def _verificar_e_renovar_token(self):
         """
@@ -182,6 +237,13 @@ class BlingAPIBase:
         Refresh Token expira em 60 dias (se não for usado)
         """
         try:
+            if self.expires_at:
+                agora_utc = datetime.now(self.expires_at.tzinfo)
+                if (self.expires_at - agora_utc).total_seconds() < 3600:
+                    logger.info("Token Bling do tenant proximo de expirar; renovando")
+                    self._renovar_token_automatico()
+                return
+
             # Ler arquivo de controle
             if TOKEN_CONTROL_FILE.exists():
                 with open(TOKEN_CONTROL_FILE, "r") as f:
@@ -211,6 +273,8 @@ class BlingAPIBase:
     def _salvar_controle_token(self):
         """Salva informações de controle do token"""
         try:
+            if self.token_source == "tenant":
+                return
             agora = datetime.now()
             # Access token expira em 6 horas
             proxima_renovacao = agora + timedelta(
@@ -265,7 +329,7 @@ class BlingAPIBase:
         }
 
     def _recarregar_tokens_compartilhados(self) -> bool:
-        """Adota tokens renovados por outro processo ou container."""
+        """Adota tokens renovados para o mesmo tenant por outro processo."""
         runtime_config = _load_bling_runtime_config()
         access_token = runtime_config.get("access_token", "")
         refresh_token = runtime_config.get("refresh_token", "")
@@ -275,6 +339,15 @@ class BlingAPIBase:
             self.access_token = access_token
         if refresh_token:
             self.refresh_token = refresh_token
+        self.token_source = runtime_config.get("source") or getattr(
+            self, "token_source", ""
+        )
+        self.stock_deposit_id = runtime_config.get("stock_deposit_id") or getattr(
+            self, "stock_deposit_id", None
+        )
+        self.expires_at = runtime_config.get("expires_at") or getattr(
+            self, "expires_at", None
+        )
 
         return access_changed
 
@@ -389,8 +462,8 @@ class BlingAPIBase:
     def validar_conexao(self) -> bool:
         """Testa se a conexão com Bling está funcionando"""
         try:
-            # Tenta listar notas (limite 1 para ser rápido)
-            self._request("GET", "/nfe", data={"limite": 1})
+            # Produtos fazem parte do escopo minimo da integracao de estoque.
+            self._request("GET", "/produtos", data={"limite": 1})
             return True
         except Exception:
             return False
@@ -416,7 +489,9 @@ class BlingAPIBase:
                 or ""
             ).strip()
             if not refresh:
-                raise ValueError("BLING_REFRESH_TOKEN não configurado")
+                raise ValueError(
+                    "Refresh token do Bling nao configurado para esta empresa"
+                )
 
             self.client_id = runtime_config.get("client_id") or self.client_id
             self.client_secret = (
@@ -449,16 +524,18 @@ class BlingAPIBase:
             self.access_token = tokens["access_token"]
             self.refresh_token = tokens["refresh_token"]
 
-            try:
-                from app.bling_oauth_routes import _salvar_tokens
+            from app.bling_oauth_routes import _salvar_tokens
 
-                _salvar_tokens(
-                    tokens["access_token"],
-                    tokens["refresh_token"],
-                    tokens.get("expires_in", 21600),
-                    lock_held=True,
-                )
-            except Exception as e:
-                logger.info(f"⚠️ Não foi possível persistir tokens no .env: {e}")
+            # O refresh token anterior pode ser invalidado pelo Bling. Portanto,
+            # falhar ao persistir os novos tokens precisa interromper a renovacao;
+            # continuar silenciosamente deixaria a empresa sem credencial valida.
+            _salvar_tokens(
+                tokens["access_token"],
+                tokens["refresh_token"],
+                tokens.get("expires_in", 21600),
+                tenant_id=getattr(self, "tenant_id", None),
+                increment_renewal=True,
+                lock_held=True,
+            )
 
             return tokens

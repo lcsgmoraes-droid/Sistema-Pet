@@ -90,6 +90,35 @@ export default function ProdutosFiltrosPanel({
 
         <div>
           <select
+            aria-label="Canal do catálogo online"
+            value={filtros.catalogo_online_canal}
+            onChange={(event) => handleFiltroChange("catalogo_online_canal", event.target.value)}
+            className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="ecommerce">Canal: e-commerce</option>
+            <option value="app">Canal: app</option>
+          </select>
+        </div>
+
+        <div>
+          <select
+            aria-label="Situação no catálogo online"
+            value={filtros.catalogo_online_situacao}
+            onChange={(event) => handleFiltroChange("catalogo_online_situacao", event.target.value)}
+            className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="todos">Todo catálogo online</option>
+            <option value="publicado">Publicados no canal</option>
+            <option value="nao_publicado">Não publicados no canal</option>
+            <option value="bloqueado">Bloqueados</option>
+            <option value="esgotado">Esgotados</option>
+            <option value="pendencias">Vendáveis com dados faltantes</option>
+            <option value="pronto">Completos</option>
+          </select>
+        </div>
+
+        <div>
+          <select
             aria-label="Filtrar por estoque"
             value={filtros.estoque_situacao}
             onChange={(event) => handleFiltroChange("estoque_situacao", event.target.value)}

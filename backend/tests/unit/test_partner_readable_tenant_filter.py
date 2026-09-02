@@ -1,8 +1,9 @@
 from pathlib import Path
 from uuid import UUID
 
+from sqlalchemy import select
 from sqlalchemy.dialects import postgresql
-
+from sqlalchemy.orm import with_loader_criteria
 
 APP_DIR = Path(__file__).resolve().parents[2] / "app"
 TENANT_ID = UUID("11111111-1111-1111-1111-111111111111")
@@ -26,7 +27,7 @@ def test_tenant_filter_declares_partner_readable_models_and_vet_link_guard():
     source = _source("tenancy/filters.py")
 
     assert "PARTNER_READABLE_TENANT_TABLES" in source
-    for table_name in ("clientes", "pets", "produtos"):
+    for table_name in ("clientes", "pets", "produtos", "produto_imagens"):
         assert table_name in source
 
     assert "VetPartnerLink" in source
@@ -51,10 +52,124 @@ def test_partner_readable_models_compile_with_partner_tenant_subquery():
         assert "vet_tenant_id" in compiled
 
 
-def test_non_partner_readable_models_keep_strict_current_tenant_filter():
+def test_product_filter_requires_explicit_active_group_stock_share():
+    from app.produtos_models import Produto
+
+    compiled = _compiled_filter_for(Produto)
+
+    assert "empresa_grupo_estoques_compartilhados" in compiled
+    assert "empresa_grupos" in compiled
+    assert "empresa_grupo_membros" in compiled
+    assert "produto_origem_id = produtos.id" in compiled
+    assert "empresa_consumidora_id" in compiled
+    assert (
+        "CAST(empresa_grupo_estoques_compartilhados.empresa_origem_id AS VARCHAR)"
+        in compiled
+    )
+    assert (
+        "CAST(empresa_grupo_estoques_compartilhados.empresa_consumidora_id AS VARCHAR)"
+        in compiled
+    )
+    assert "CAST(produtos.tenant_id AS VARCHAR)" in compiled
+    assert "replace(" in compiled.lower()
+    assert compiled.count("status =") >= 3
+
+
+def test_product_image_filter_follows_the_explicit_shared_product_scope():
+    from app.produtos_models import ProdutoImagem
+
+    compiled = _compiled_filter_for(ProdutoImagem)
+
+    assert "empresa_grupo_estoques_compartilhados" in compiled
+    assert "empresa_grupos" in compiled
+    assert "empresa_grupo_membros" in compiled
+    assert "produto_origem_id = produto_imagens.produto_id" in compiled
+    assert "empresa_consumidora_id" in compiled
+    assert "CAST(produto_imagens.tenant_id AS VARCHAR)" in compiled
+    assert "replace(" in compiled.lower()
+    assert compiled.count("status =") >= 3
+
+
+def test_product_filter_binds_group_consumer_tenant_inside_loader_lambda():
+    from app.base_models import BaseTenantModel
+    from app.produtos_models import Produto
+    from app.tenancy.filters import _tenant_read_filter
+
+    tenant_id = TENANT_ID
+
+    def tenant_filter(model):
+        return _tenant_read_filter(model, tenant_id)
+
+    statement = select(Produto).options(
+        with_loader_criteria(
+            BaseTenantModel,
+            tenant_filter,
+            include_aliases=True,
+            track_closure_variables=False,
+        )
+    )
+    compiled = statement.compile(dialect=postgresql.dialect())
+
+    assert TENANT_ID in compiled.params.values()
+    assert all("PyWrapper" not in str(value) for value in compiled.params.values())
+
+
+def test_global_user_identity_accepts_active_membership_in_current_tenant():
     from app.models import User
 
     compiled = _compiled_filter_for(User)
 
     assert "users.tenant_id" in compiled
+    assert "user_tenants" in compiled
+    assert "user_tenants.user_id = users.id" in compiled
+    assert "user_tenants.tenant_id" in compiled
+    assert "user_tenants.is_active IS true" in compiled
+    assert "vet_partner_link" not in compiled
+
+
+def test_user_filter_compiles_when_query_already_joins_user_tenants():
+    from app.base_models import BaseTenantModel
+    from app.models import Role, User, UserTenant
+    from app.tenancy.filters import _tenant_read_filter
+
+    tenant_id = TENANT_ID
+
+    def tenant_filter(model):
+        return _tenant_read_filter(model, tenant_id)
+
+    statement = (
+        select(
+            User.id.label("user_id"),
+            User.username,
+            User.email,
+            User.nome,
+            Role.name.label("role"),
+            UserTenant.is_active,
+        )
+        .join(UserTenant, UserTenant.user_id == User.id)
+        .join(Role, Role.id == UserTenant.role_id)
+        .where(UserTenant.tenant_id == tenant_id)
+        .options(
+            with_loader_criteria(
+                BaseTenantModel,
+                tenant_filter,
+                include_aliases=True,
+                track_closure_variables=False,
+            )
+        )
+    )
+
+    compiled = str(statement.compile(dialect=postgresql.dialect()))
+
+    assert "EXISTS (SELECT user_tenants.id" in compiled
+    assert "user_tenants.user_id = users.id" in compiled
+
+
+def test_non_partner_readable_models_keep_strict_current_tenant_filter():
+    from app.models_authz import Role
+
+    compiled = _compiled_filter_for(Role)
+
+    assert "roles.tenant_id" in compiled
+    assert "user_tenants" not in compiled
     assert "vet_partner_link" not in compiled

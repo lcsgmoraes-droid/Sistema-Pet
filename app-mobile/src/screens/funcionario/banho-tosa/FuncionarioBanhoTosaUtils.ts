@@ -2,6 +2,7 @@ import {
   FuncionarioBanhoTosaAgendamento,
   FuncionarioBanhoTosaAtendimento,
 } from "../../../services/funcionarioBanhoTosa.service";
+import { formatOperationalTime } from "../../../utils/operationalDateTime";
 
 export type BanhoTosaAgendaModo = "dia" | "semana" | "mes";
 
@@ -106,11 +107,7 @@ export function formatarData(value?: string | null): string {
 }
 
 export function formatarHora(value?: string | null): string {
-  if (!value) return "--:--";
-  return new Date(value).toLocaleTimeString("pt-BR", {
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+  return formatOperationalTime(value);
 }
 
 export function formatarTempo(segundos?: number | null): string {

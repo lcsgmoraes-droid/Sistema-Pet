@@ -136,9 +136,8 @@ def receber_pedido(
         db.flush()
 
         # Atualizar estoque do produto
-        produto.estoque_atual = (
-            produto.estoque_atual or 0
-        ) + quantidade_recebida_unidades
+        estoque_anterior = float(produto.estoque_atual or 0)
+        produto.estoque_atual = estoque_anterior + quantidade_recebida_unidades
 
         # Recalcular custo médio ponderado
         if produto.custo_medio:
@@ -162,8 +161,7 @@ def receber_pedido(
             custo_unitario=lote.custo_unitario,
             motivo=f"Recebimento do pedido {pedido.numero_pedido}",
             documento=pedido.numero_pedido,
-            estoque_anterior=(produto.estoque_atual or 0)
-            - quantidade_recebida_unidades,
+            estoque_anterior=estoque_anterior,
             estoque_atual=produto.estoque_atual,
             user_id=current_user.id,
             tenant_id=tenant_id,
@@ -179,6 +177,7 @@ def receber_pedido(
                 "quantidade_recebida_unidades": quantidade_recebida_unidades,
                 "lote": numero_lote,
                 "status": item.status,
+                "voltou_ao_estoque": estoque_anterior <= 0 < produto.estoque_atual,
             }
         )
         para_sync_bling.append((produto.id, produto.estoque_atual))
@@ -203,6 +202,25 @@ def receber_pedido(
     pedido.updated_at = datetime.utcnow()
 
     db.commit()
+
+    try:
+        from app.services.pendencia_estoque_service import (
+            verificar_e_notificar_pendencias,
+        )
+
+        for recebido in itens_recebidos:
+            if recebido["voltou_ao_estoque"]:
+                verificar_e_notificar_pendencias(
+                    db=db,
+                    tenant_id=tenant_id,
+                    produto_id=recebido["produto_id"],
+                    quantidade_entrada=recebido["quantidade_recebida_unidades"],
+                )
+    except Exception as notify_error:
+        logger.warning(
+            "[LISTA-ESPERA] Erro ao notificar recebimento do pedido: %s",
+            notify_error,
+        )
 
     # SINCRONIZAR ESTOQUE COM BLING para todos os itens recebidos
     try:

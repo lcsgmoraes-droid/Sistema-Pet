@@ -4,12 +4,22 @@ from types import SimpleNamespace
 import pytest
 from fastapi import HTTPException
 
+from app.estoque import granel as granel_module
 from app.estoque.granel import (
+    _alterar_preco_venda_granel_com_historico,
     _normalizar_produto_granel,
     _produto_e_granel,
     _serializar_vinculo_granel,
     _validar_produto_origem_granel,
 )
+
+
+class _FakeDb:
+    def __init__(self):
+        self.adicionados = []
+
+    def add(self, item):
+        self.adicionados.append(item)
 
 
 def test_produto_e_granel_considera_flag_ou_nome():
@@ -113,3 +123,56 @@ def test_serializar_vinculo_granel_calcula_custo_por_kg():
     assert serializado["produto_granel_codigo"] == "GR"
     assert serializado["peso_por_unidade_kg"] == pytest.approx(15.0)
     assert serializado["custo_por_kg"] == pytest.approx(6.0)
+
+
+def test_alterar_preco_venda_granel_registra_escolha_no_historico(monkeypatch):
+    monkeypatch.setattr(
+        granel_module,
+        "ProdutoHistoricoPreco",
+        lambda **campos: SimpleNamespace(**campos),
+    )
+    db = _FakeDb()
+    produto = SimpleNamespace(id=38, preco_custo=10.0, preco_venda=15.0)
+
+    alterou = _alterar_preco_venda_granel_com_historico(
+        db=db,
+        tenant_id="tenant-aumigos",
+        current_user=SimpleNamespace(id=44),
+        produto_granel=produto,
+        preco_venda_anterior=15.0,
+        preco_custo_anterior=9.5,
+        preco_venda_novo=15.2,
+        conversao_id=84,
+    )
+
+    assert alterou is True
+    assert produto.preco_venda == pytest.approx(15.2)
+    assert len(db.adicionados) == 1
+    historico = db.adicionados[0]
+    assert historico.produto_id == 38
+    assert historico.preco_venda_anterior == pytest.approx(15.0)
+    assert historico.preco_venda_novo == pytest.approx(15.2)
+    assert historico.motivo == "conversao_granel"
+    assert historico.referencia == "Conversao granel #84"
+    assert historico.user_id == 44
+    assert str(historico.tenant_id) == "tenant-aumigos"
+
+
+def test_alterar_preco_venda_granel_nao_grava_quando_valor_em_centavos_e_igual():
+    db = _FakeDb()
+    produto = SimpleNamespace(id=4, preco_custo=10.0, preco_venda=15.4455)
+
+    alterou = _alterar_preco_venda_granel_com_historico(
+        db=db,
+        tenant_id="tenant-aumigos",
+        current_user=SimpleNamespace(id=44),
+        produto_granel=produto,
+        preco_venda_anterior=15.4455,
+        preco_custo_anterior=10.0,
+        preco_venda_novo=15.45,
+        conversao_id=86,
+    )
+
+    assert alterou is False
+    assert produto.preco_venda == pytest.approx(15.4455)
+    assert db.adicionados == []

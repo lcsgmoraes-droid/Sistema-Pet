@@ -37,9 +37,6 @@ import EvolucaoCorePetList from "./EvolucaoCorePetList";
 export default function NotificationsScreen({ navigation, route }: any) {
   const somenteNovidades = Boolean(route?.params?.somenteNovidades);
   const userId = useAuthStore((state) => state.user?.id);
-  const [secao, setSecao] = useState<"avisos" | "novidades">(
-    somenteNovidades ? "novidades" : "avisos",
-  );
   const [items, setItems] = useState<AppNotification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [evolucaoItems, setEvolucaoItems] = useState<EvolucaoCorePetItem[]>([]);
@@ -49,34 +46,34 @@ export default function NotificationsScreen({ navigation, route }: any) {
   const [clearing, setClearing] = useState(false);
 
   const carregar = useCallback(async () => {
-    const [notificacoes, evolucao] = await Promise.allSettled([
-      listarNotificacoesApp(),
-      listarEvolucaoCorePetApp(),
-    ]);
+    if (somenteNovidades) {
+      setItems([]);
+      setUnreadCount(0);
+      try {
+        const evolucao = await listarEvolucaoCorePetApp();
+        setEvolucaoItems(evolucao.itens);
+        setEvolucaoUnreadCount(await contarNovidadesAppNaoVistas(evolucao.itens, userId));
+      } catch {
+        setEvolucaoItems([]);
+        setEvolucaoUnreadCount(0);
+      }
+      return;
+    }
 
-    if (notificacoes.status === "fulfilled") {
-      setItems(notificacoes.value.items);
-      setUnreadCount(notificacoes.value.unread_count);
-    } else {
+    setEvolucaoItems([]);
+    setEvolucaoUnreadCount(0);
+    try {
+      const notificacoes = await listarNotificacoesApp();
+      setItems(notificacoes.items);
+      setUnreadCount(notificacoes.unread_count);
+    } catch {
       setItems([]);
       setUnreadCount(0);
     }
-
-    if (evolucao.status === "fulfilled") {
-      setEvolucaoItems(evolucao.value.itens);
-      setEvolucaoUnreadCount(await contarNovidadesAppNaoVistas(evolucao.value.itens, userId));
-    } else {
-      setEvolucaoItems([]);
-      setEvolucaoUnreadCount(0);
-    }
-  }, [userId]);
-
-  const abrirSecao = useCallback((proxima: "avisos" | "novidades") => {
-    setSecao(proxima);
-  }, []);
+  }, [somenteNovidades, userId]);
 
   useEffect(() => {
-    if (secao !== "novidades" || evolucaoItems.length === 0) return;
+    if (!somenteNovidades || evolucaoItems.length === 0) return;
     let active = true;
     marcarNovidadesAppComoVistas(evolucaoItems, userId)
       .then(() => {
@@ -88,7 +85,7 @@ export default function NotificationsScreen({ navigation, route }: any) {
     return () => {
       active = false;
     };
-  }, [evolucaoItems, secao, userId]);
+  }, [evolucaoItems, somenteNovidades, userId]);
 
   useFocusEffect(
     useCallback(() => {
@@ -201,15 +198,15 @@ export default function NotificationsScreen({ navigation, route }: any) {
       <View style={styles.summaryRow}>
         <View style={styles.summaryText}>
           <Text style={styles.summaryTitle}>
-            {somenteNovidades ? "Novidades" : "Avisos e novidades"}
+            {somenteNovidades ? "Novidades" : "Avisos"}
           </Text>
           <Text style={styles.summarySubtitle}>
-            {unreadCount + evolucaoUnreadCount > 0
-              ? `${unreadCount + evolucaoUnreadCount} não visto(s)`
+            {(somenteNovidades ? evolucaoUnreadCount : unreadCount) > 0
+              ? `${somenteNovidades ? evolucaoUnreadCount : unreadCount} não visto(s)`
               : "Tudo em dia"}
           </Text>
         </View>
-        {secao === "avisos" && items.length > 0 ? (
+        {!somenteNovidades && items.length > 0 ? (
           <TouchableOpacity
             style={[styles.clearButton, clearing && styles.clearButtonDisabled]}
             onPress={confirmarLimpeza}
@@ -225,44 +222,7 @@ export default function NotificationsScreen({ navigation, route }: any) {
         ) : null}
       </View>
 
-      {!somenteNovidades ? (
-        <View style={styles.sectionTabs}>
-          <TouchableOpacity
-            style={[styles.sectionTab, secao === "avisos" && styles.sectionTabActive]}
-            onPress={() => abrirSecao("avisos")}
-          >
-            <Ionicons
-              name="notifications-outline"
-              size={18}
-              color={secao === "avisos" ? CORES.primario : CORES.textoClaro}
-            />
-            <Text
-              style={[styles.sectionTabText, secao === "avisos" && styles.sectionTabTextActive]}
-            >
-              Avisos
-            </Text>
-            {unreadCount > 0 ? <View style={styles.sectionUnreadDot} /> : null}
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.sectionTab, secao === "novidades" && styles.sectionTabActive]}
-            onPress={() => abrirSecao("novidades")}
-          >
-            <Ionicons
-              name="sparkles-outline"
-              size={18}
-              color={secao === "novidades" ? CORES.primario : CORES.textoClaro}
-            />
-            <Text
-              style={[styles.sectionTabText, secao === "novidades" && styles.sectionTabTextActive]}
-            >
-              Novidades
-            </Text>
-            {evolucaoUnreadCount > 0 ? <View style={styles.sectionUnreadDot} /> : null}
-          </TouchableOpacity>
-        </View>
-      ) : null}
-
-      {secao === "novidades" ? (
+      {somenteNovidades ? (
         <EvolucaoCorePetList itens={evolucaoItems} refreshing={refreshing} onRefresh={onRefresh} />
       ) : (
         <FlatList
@@ -365,36 +325,6 @@ const styles = StyleSheet.create({
     marginTop: 2,
     fontSize: FONTE.normal,
     color: CORES.textoSecundario,
-  },
-  sectionTabs: {
-    flexDirection: "row",
-    padding: ESPACO.sm,
-    gap: ESPACO.sm,
-    backgroundColor: CORES.superficie,
-    borderBottomWidth: 1,
-    borderBottomColor: CORES.borda,
-  },
-  sectionTab: {
-    flex: 1,
-    minHeight: 42,
-    borderRadius: RAIO.md,
-    alignItems: "center",
-    justifyContent: "center",
-    flexDirection: "row",
-    gap: ESPACO.xs,
-  },
-  sectionTabActive: { backgroundColor: CORES.primarioClaro },
-  sectionTabText: {
-    fontSize: FONTE.normal,
-    fontWeight: "800",
-    color: CORES.textoSecundario,
-  },
-  sectionTabTextActive: { color: CORES.primario },
-  sectionUnreadDot: {
-    width: 7,
-    height: 7,
-    borderRadius: 4,
-    backgroundColor: CORES.erro,
   },
   clearButton: {
     minHeight: 38,

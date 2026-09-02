@@ -136,8 +136,8 @@ export const deleteDepartamento = (id) => {
  * @param {Object} params - Filtros: busca, categoria_id, marca_id, departamento_id,
  * estoque_baixo, estoque_situacao, imagem_situacao, ordenacao, em_promocao
  */
-export const getProdutos = (params = {}) => {
-  return api.get("/produtos/", { params });
+export const getProdutos = (params = {}, config = {}) => {
+  return api.get("/produtos/", { ...config, params });
 };
 
 export const exportarProdutoBling = (produtoId, enviarEstoque = true) => {
@@ -375,15 +375,19 @@ export const addFornecedorProduto = (produtoId, data) => {
 /**
  * Atualizar fornecedor do produto
  */
-export const updateFornecedorProduto = (id, data) => {
-  return api.put(`/produtos/fornecedores/${id}`, data);
+export const updateFornecedorProduto = (id, data, produtoId = null) => {
+  return api.put(`/produtos/fornecedores/${id}`, data, {
+    params: produtoId ? { produto_id: produtoId } : undefined,
+  });
 };
 
 /**
  * Remover fornecedor do produto
  */
-export const deleteFornecedorProduto = (id) => {
-  return api.delete(`/produtos/fornecedores/${id}`);
+export const deleteFornecedorProduto = (id, produtoId = null) => {
+  return api.delete(`/produtos/fornecedores/${id}`, {
+    params: produtoId ? { produto_id: produtoId } : undefined,
+  });
 };
 
 // ========================================

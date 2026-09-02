@@ -1,11 +1,12 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { ArrowDownUp, Plus, Receipt } from "lucide-react";
+import { ArrowDownUp, CheckSquare, Plus, Receipt } from "lucide-react";
 import api from "../api";
 import { getAccessToken } from "../auth/tokenStorage";
 import { toast } from "react-hot-toast";
 import {
-  calcularSaldoFinanceiro,
+  calcularSaldoAtualizadoFinanceiro,
+  ehContaDeRepasseCartao,
   ehLancamentoFinanceiroCancelado,
 } from "../utils/financeiroStatus";
 import { safeArray } from "../utils/safeArray";
@@ -19,12 +20,15 @@ import StatusBadge from "./ui/StatusBadge";
 import {
   ContasReceberDetalhesModal,
   ContasReceberFilters,
+  ContasReceberRecebimentoLoteModal,
   ContasReceberRecebimentoModal,
 } from "./contasReceber/ContasReceberPanels";
 import ContasReceberAnalise from "./contasReceber/ContasReceberAnalise";
 import {
+  aplicarPeriodoRapidoContasReceber,
   criarFiltrosContasReceberDaUrl,
   montarParamsFiltrosContasReceber,
+  normalizarListaClientes,
 } from "./contasReceber/contasReceberFilterHelpers";
 
 const formatarDataISO = (data) => {
@@ -72,14 +76,17 @@ const ContasReceber = () => {
   const [abaAtivaContasReceber, setAbaAtivaContasReceber] = useState("lancamentos");
   const [filtros, setFiltros] = useState(() => criarFiltrosContasReceberDaUrl(searchParams));
 
-  const [buscaNumeroVenda, setBuscaNumeroVenda] = useState("");
+  const [busca, setBusca] = useState("");
   const [ordenacao, setOrdenacao] = useState("desc"); // 'asc' = mais antiga primeiro, 'desc' = mais nova primeiro
 
   const [clientes, setClientes] = useState([]);
   const [contaSelecionada, setContaSelecionada] = useState(null);
   const [detalhesCompletos, setDetalhesCompletos] = useState(null);
   const [mostrarModalRecebimento, setMostrarModalRecebimento] = useState(false);
+  const [mostrarModalRecebimentoLote, setMostrarModalRecebimentoLote] = useState(false);
   const [mostrarDetalhes, setMostrarDetalhes] = useState(false);
+  const [contasSelecionadas, setContasSelecionadas] = useState(() => new Set());
+  const [calculoEncargos, setCalculoEncargos] = useState(null);
   const [formasPagamento, setFormasPagamento] = useState([]);
   const [contasBancarias, setContasBancarias] = useState([]);
 
@@ -92,10 +99,19 @@ const ContasReceber = () => {
     valor_multa: 0,
     valor_desconto: 0,
     observacoes: "",
+    aplicar_encargos_automaticos: false,
+    quitar: true,
+  });
+  const [dadosRecebimentoLote, setDadosRecebimentoLote] = useState({
+    data_recebimento: new Date().toISOString().split("T")[0],
+    forma_pagamento_id: null,
+    observacoes: "",
+    aplicar_encargos_automaticos: true,
   });
 
   useEffect(() => {
     carregarDados();
+    carregarDadosAuxiliares();
   }, []);
 
   const carregarFormasPagamento = async (headers) => {
@@ -109,50 +125,62 @@ const ContasReceber = () => {
     }));
   };
 
-  // Aplicar filtro automaticamente quando buscaNumeroVenda mudar
+  const carregarDadosAuxiliares = async () => {
+    const token = getAccessToken();
+    const headers = { Authorization: `Bearer ${token}` };
+    const [clientesRes, formasRes, bancariasRes] = await Promise.allSettled([
+      api.get(`/clientes/`, { headers }),
+      carregarFormasPagamento(headers),
+      api.get(`/contas-bancarias?apenas_ativas=true`, { headers }),
+    ]);
+
+    if (clientesRes.status === "fulfilled") {
+      setClientes(normalizarListaClientes(clientesRes.value.data));
+    } else {
+      console.warn("Nao foi possivel carregar a lista de clientes.", clientesRes.reason);
+    }
+
+    if (formasRes.status === "fulfilled") {
+      setFormasPagamento(safeArray(formasRes.value));
+    } else {
+      setFormasPagamento([]);
+      console.warn("Nao foi possivel carregar formas de pagamento.", formasRes.reason);
+    }
+
+    if (bancariasRes.status === "fulfilled") {
+      setContasBancarias(safeArray(bancariasRes.value.data));
+    } else {
+      console.warn("Nao foi possivel carregar contas bancarias.", bancariasRes.reason);
+    }
+  };
+
+  // Aplicar a busca automaticamente depois que o usuario parar de digitar.
   useEffect(() => {
-    if (buscaNumeroVenda.trim().length > 0) {
+    if (busca.trim().length > 0) {
       const timer = setTimeout(() => {
         aplicarFiltros();
       }, 500); // Debounce de 500ms
       return () => clearTimeout(timer);
-    } else if (buscaNumeroVenda === "") {
+    } else if (busca === "") {
       // Se limpar o campo, recarregar tudo
       carregarDados();
     }
-  }, [buscaNumeroVenda]);
+  }, [busca]);
 
   const carregarDados = async () => {
     try {
+      setLoading(true);
       const token = getAccessToken();
       const headers = { Authorization: `Bearer ${token}` };
-
-      const [contasRes, clientesRes, formasRes, bancariasRes] = await Promise.allSettled([
-        api.get(`/contas-receber/?${montarParamsFiltrosContasReceber(filtros)}`, {
-          headers,
-        }),
-        api.get(`/clientes/`, { headers }),
-        carregarFormasPagamento(headers),
-        api.get(`/contas-bancarias?apenas_ativas=true`, { headers }),
-      ]);
-
-      if (contasRes.status !== "fulfilled") throw contasRes.reason;
-      if (clientesRes.status !== "fulfilled") throw clientesRes.reason;
-      if (bancariasRes.status !== "fulfilled") throw bancariasRes.reason;
+      const contasRes = await api.get(
+        `/contas-receber/?${montarParamsFiltrosContasReceber(filtros)}`,
+        { headers },
+      );
 
       // Ordenar por ID (mais recentes primeiro por padrao)
-      const contasOrdenadas = [...safeArray(contasRes.value.data)].sort((a, b) => b.id - a.id);
+      const contasOrdenadas = [...safeArray(contasRes.data)].sort((a, b) => b.id - a.id);
       setContas(contasOrdenadas);
-      setClientes(safeArray(clientesRes.value.data));
-
-      if (formasRes.status === "fulfilled") {
-        setFormasPagamento(safeArray(formasRes.value));
-      } else {
-        setFormasPagamento([]);
-        console.warn("Nao foi possivel carregar formas de pagamento. Usando lista vazia.");
-      }
-
-      setContasBancarias(safeArray(bancariasRes.value.data));
+      setContasSelecionadas(new Set());
     } catch (error) {
       console.error("Erro ao carregar dados:", error);
       toast.error("Erro ao carregar contas a receber");
@@ -163,7 +191,7 @@ const ContasReceber = () => {
 
   const carregarContasComFiltros = async (
     filtrosParaAplicar = filtros,
-    buscaParaAplicar = buscaNumeroVenda,
+    buscaParaAplicar = busca,
   ) => {
     try {
       setLoading(true);
@@ -172,6 +200,7 @@ const ContasReceber = () => {
       const response = await api.get(`/contas-receber/?${params}`);
 
       setContas(response.data);
+      setContasSelecionadas(new Set());
     } catch (error) {
       console.error("Erro ao filtrar:", error);
       toast.error("Erro ao aplicar filtros");
@@ -180,7 +209,13 @@ const ContasReceber = () => {
     }
   };
 
-  const aplicarFiltros = async () => carregarContasComFiltros(filtros, buscaNumeroVenda);
+  const aplicarFiltros = async () => carregarContasComFiltros(filtros, busca);
+
+  const aplicarPeriodoRapido = (periodo) => {
+    const novosFiltros = aplicarPeriodoRapidoContasReceber(filtros, periodo);
+    setFiltros(novosFiltros);
+    void carregarContasComFiltros(novosFiltros, busca);
+  };
 
   const abrirListaComFiltrosAnalise = (filtrosAnalise = {}) => {
     const novosFiltros = {
@@ -208,7 +243,7 @@ const ContasReceber = () => {
 
     setFiltros(novosFiltros);
     setAbaAtivaContasReceber("lancamentos");
-    void carregarContasComFiltros(novosFiltros, buscaNumeroVenda);
+    void carregarContasComFiltros(novosFiltros, busca);
   };
 
   const abrirVendaNoPDV = (vendaId) => {
@@ -252,19 +287,64 @@ const ContasReceber = () => {
     );
   };
 
+  const carregarCalculoEncargos = async (conta, dataCalculo) => {
+    try {
+      const response = await api.get(`/contas-receber/${conta.id}/encargos`, {
+        params: { data_calculo: dataCalculo },
+      });
+      const calculo = response.data || null;
+      setCalculoEncargos(calculo);
+      setDadosRecebimento((prev) => ({
+        ...prev,
+        valor_recebido: prev.quitar
+          ? Number(
+              calculo?.encargos_automaticos_ativos && prev.aplicar_encargos_automaticos
+                ? calculo.saldo_atualizado
+                : calculo?.saldo_atual,
+            )
+          : prev.valor_recebido,
+      }));
+    } catch (error) {
+      console.error("Erro ao calcular encargos:", error);
+      setCalculoEncargos(null);
+    }
+  };
+
   const abrirModalRecebimento = (conta) => {
+    const dataHoje = new Date().toISOString().split("T")[0];
+    const aplicarAutomaticos = Boolean(conta.encargos_automaticos_ativos && conta.eh_crediario);
     setContaSelecionada(conta);
     setDadosRecebimento({
-      valor_recebido: parseFloat((conta.valor_final - conta.valor_recebido).toFixed(2)),
-      data_recebimento: new Date().toISOString().split("T")[0],
+      valor_recebido: Number(
+        aplicarAutomaticos
+          ? conta.saldo_atualizado
+          : (conta.valor_final - conta.valor_recebido).toFixed(2),
+      ),
+      data_recebimento: dataHoje,
       forma_pagamento_id: conta.forma_pagamento_id || null,
       conta_bancaria_id: null,
       valor_juros: 0,
       valor_multa: 0,
       valor_desconto: 0,
       observacoes: "",
+      aplicar_encargos_automaticos: aplicarAutomaticos,
+      quitar: true,
+    });
+    setCalculoEncargos({
+      eh_crediario: conta.eh_crediario,
+      encargos_automaticos_ativos: conta.encargos_automaticos_ativos,
+      dias_atraso: conta.dias_atraso,
+      valor_juros_calculado: conta.valor_juros_calculado,
+      valor_multa_calculada: conta.valor_multa_calculada,
+      saldo_atual: conta.valor_final - conta.valor_recebido,
+      saldo_atualizado: conta.saldo_atualizado,
     });
     setMostrarModalRecebimento(true);
+  };
+
+  const atualizarDataRecebimento = (data_recebimento) => {
+    setDadosRecebimento((prev) => ({ ...prev, data_recebimento }));
+    if (contaSelecionada) void carregarCalculoEncargos(contaSelecionada, data_recebimento);
   };
 
   const abrirDetalhes = async (conta) => {
@@ -298,6 +378,52 @@ const ContasReceber = () => {
     }
   };
 
+  const contasReceberExibidas = safeArray(contas);
+
+  const contasAbertasExibidas = contasReceberExibidas.filter(
+    (conta) => conta.status !== "recebido" && !ehLancamentoFinanceiroCancelado(conta),
+  );
+
+  const contasSelecionadasDetalhes = contasAbertasExibidas.filter((conta) =>
+    contasSelecionadas.has(conta.id),
+  );
+
+  const alternarContaSelecionada = (contaId) => {
+    setContasSelecionadas((anteriores) => {
+      const proximas = new Set(anteriores);
+      if (proximas.has(contaId)) proximas.delete(contaId);
+      else proximas.add(contaId);
+      return proximas;
+    });
+  };
+
+  const alternarTodasContas = () => {
+    setContasSelecionadas((anteriores) => {
+      const todasSelecionadas =
+        contasAbertasExibidas.length > 0 &&
+        contasAbertasExibidas.every((conta) => anteriores.has(conta.id));
+      return todasSelecionadas
+        ? new Set()
+        : new Set(contasAbertasExibidas.map((conta) => conta.id));
+    });
+  };
+
+  const registrarRecebimentosLote = async () => {
+    try {
+      const response = await api.post("/contas-receber/receber-lote", {
+        ...dadosRecebimentoLote,
+        conta_ids: contasSelecionadasDetalhes.map((conta) => conta.id),
+      });
+      toast.success(response.data?.message || "Parcelas recebidas com sucesso!");
+      setMostrarModalRecebimentoLote(false);
+      setContasSelecionadas(new Set());
+      await carregarDados();
+    } catch (error) {
+      console.error("Erro ao receber parcelas em lote:", error);
+      toast.error(error.response?.data?.detail || "Erro ao receber parcelas selecionadas");
+    }
+  };
+
   const formatarData = (data) => {
     if (!data) return "-";
     // Evita problemas de timezone ao criar data diretamente dos componentes
@@ -315,22 +441,56 @@ const ContasReceber = () => {
     const vencimento = new Date(conta.data_vencimento);
     if (ehLancamentoFinanceiroCancelado(conta)) return <StatusBadge status="cancelado" />;
     if (conta.status === "recebido") return <StatusBadge status="recebido" />;
+    if (ehContaDeRepasseCartao(conta)) {
+      if (conta.status === "parcial") {
+        return (
+          <StatusBadge intent="info" title="Cliente pagou; a operadora repassou parte do valor">
+            Pago · repasse parcial
+          </StatusBadge>
+        );
+      }
+      if (vencimento < hoje) {
+        return (
+          <StatusBadge intent="danger" title="Cliente pagou; o repasse da operadora está atrasado">
+            Pago · repasse atrasado
+          </StatusBadge>
+        );
+      }
+      return (
+        <StatusBadge intent="warning" title="Cliente pagou; aguardando repasse da operadora">
+          Pago · repasse pendente
+        </StatusBadge>
+      );
+    }
     if (vencimento < hoje) return <StatusBadge status="vencida" />;
     if (conta.status === "parcial") return <StatusBadge status="parcial" />;
     return <StatusBadge status="pendente" />;
   };
 
-  const contasReceberExibidas = safeArray(contas).filter((conta) => {
-    if (!buscaNumeroVenda) return true;
-
-    const numeroVenda = String(conta.numero_venda || "");
-    const descricao = String(conta.descricao || "");
-    const busca = buscaNumeroVenda.toLowerCase();
-
-    return numeroVenda.toLowerCase().includes(busca) || descricao.toLowerCase().includes(busca);
-  });
-
   const contasReceberColumns = [
+    {
+      key: "selecao",
+      header: (
+        <input
+          type="checkbox"
+          aria-label="Selecionar todas as contas em aberto"
+          checked={
+            contasAbertasExibidas.length > 0 &&
+            contasAbertasExibidas.every((conta) => contasSelecionadas.has(conta.id))
+          }
+          onChange={alternarTodasContas}
+        />
+      ),
+      render: (conta) =>
+        conta.status !== "recebido" && !ehLancamentoFinanceiroCancelado(conta) ? (
+          <input
+            type="checkbox"
+            aria-label={`Selecionar conta ${conta.id}`}
+            checked={contasSelecionadas.has(conta.id)}
+            onChange={() => alternarContaSelecionada(conta.id)}
+          />
+        ) : null,
+    },
     {
       key: "id",
       header: "ID",
@@ -382,7 +542,7 @@ const ContasReceber = () => {
       align: "right",
       className: "font-bold",
       render: (conta) => (
-        <MoneyCell value={calcularSaldoFinanceiro(conta, "valor_recebido")} zeroAsDash />
+        <MoneyCell value={calcularSaldoAtualizadoFinanceiro(conta, "valor_recebido")} zeroAsDash />
       ),
     },
     {
@@ -503,6 +663,16 @@ const ContasReceber = () => {
             >
               {ordenacao === "desc" ? "Mais recentes" : "Mais antigas"}
             </ActionButton>
+            {contasSelecionadasDetalhes.length > 0 && (
+              <ActionButton
+                onClick={() => setMostrarModalRecebimentoLote(true)}
+                intent="create"
+                size="md"
+                icon={CheckSquare}
+              >
+                Baixar selecionadas ({contasSelecionadasDetalhes.length})
+              </ActionButton>
+            )}
             <ActionButton intent="create" size="md" icon={Plus}>
               Nova Conta
             </ActionButton>
@@ -549,11 +719,12 @@ const ContasReceber = () => {
         <>
           <ContasReceberFilters
             aplicarFiltros={aplicarFiltros}
-            buscaNumeroVenda={buscaNumeroVenda}
+            aplicarPeriodoRapido={aplicarPeriodoRapido}
+            busca={busca}
             clientes={clientes}
             filtros={filtros}
             handleFiltrosSubmit={handleFiltrosSubmit}
-            setBuscaNumeroVenda={setBuscaNumeroVenda}
+            setBusca={setBusca}
             setFiltros={setFiltros}
           />
           {/* Tabela de Contas */}
@@ -574,7 +745,7 @@ const ContasReceber = () => {
                 <strong className="ml-3">Saldo a Receber:</strong>{" "}
                 <MoneyCell
                   value={contasReceberExibidas.reduce(
-                    (sum, c) => sum + calcularSaldoFinanceiro(c, "valor_recebido"),
+                    (sum, c) => sum + calcularSaldoAtualizadoFinanceiro(c, "valor_recebido"),
                     0,
                   )}
                   zeroAsDash
@@ -586,6 +757,7 @@ const ContasReceber = () => {
       )}
 
       <ContasReceberRecebimentoModal
+        calculoEncargos={calculoEncargos}
         contaSelecionada={contaSelecionada}
         contasBancarias={contasBancarias}
         dadosRecebimento={dadosRecebimento}
@@ -593,8 +765,20 @@ const ContasReceber = () => {
         formatarMoeda={formatarMoeda}
         mostrarModalRecebimento={mostrarModalRecebimento}
         registrarRecebimento={registrarRecebimento}
+        onDataRecebimentoChange={atualizarDataRecebimento}
         setDadosRecebimento={setDadosRecebimento}
         setMostrarModalRecebimento={setMostrarModalRecebimento}
+      />
+
+      <ContasReceberRecebimentoLoteModal
+        contasSelecionadas={contasSelecionadasDetalhes}
+        dadosRecebimento={dadosRecebimentoLote}
+        formasPagamento={formasPagamento}
+        formatarMoeda={formatarMoeda}
+        mostrar={mostrarModalRecebimentoLote}
+        onConfirmar={registrarRecebimentosLote}
+        onFechar={() => setMostrarModalRecebimentoLote(false)}
+        setDadosRecebimento={setDadosRecebimentoLote}
       />
       <ContasReceberDetalhesModal
         abrirFluxoDeCaixa={abrirFluxoDeCaixa}

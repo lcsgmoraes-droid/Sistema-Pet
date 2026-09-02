@@ -16,6 +16,7 @@ const STATUS_MAP = {
   cancelada: ["Cancelada", "danger"],
   cancelado: ["Cancelado", "danger"],
   entregue: ["Entregue", "success"],
+  em_aberto: ["Em aberto", "warning"],
   estornado: ["Estornado", "danger"],
   fechada: ["Fechada", "info"],
   finalizada: ["Pago", "success"],

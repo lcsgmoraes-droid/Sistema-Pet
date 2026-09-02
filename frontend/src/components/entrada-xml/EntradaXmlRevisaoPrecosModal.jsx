@@ -14,9 +14,6 @@ function EntradaXmlRevisaoPrecosModal({
   exportarRelatorioCustosMaioresCSV,
   exportarRelatorioCustosMaioresPDF,
   gerandoRelatorioCustos,
-  baseCalculoMargem,
-  setBaseCalculoMargem,
-  baseCalculoMargemOpcoes,
   precosAjustados,
   inputsRevisaoPrecos,
   inputsRevisaoCustos,
@@ -281,41 +278,13 @@ function EntradaXmlRevisaoPrecosModal({
         <div className="flex-1 overflow-y-auto p-4 md:p-6">
           <div className="space-y-6">
             <div className="rounded-xl border border-sky-200 bg-sky-50 p-4">
-              <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                <div className="max-w-3xl">
-                  <div className="flex items-center gap-2 text-sm font-semibold text-slate-800">
-                    <span>Base da margem</span>
-                    <span
-                      className="text-slate-400 cursor-help"
-                      title={
-                        'A base da margem muda a conta do preco e da margem nesta tela. O custo gravado ao processar continua sendo o campo "Custo no sistema".'
-                      }
-                    >
-                      i
-                    </span>
-                  </div>
-                  <p className="mt-1 text-xs text-slate-600">
-                    Padrao em custo da NF. Se quiser, voce pode recalcular usando o custo que vai
-                    para o sistema, sem alterar o valor fiscal da nota.
-                  </p>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {baseCalculoMargemOpcoes.map((opcao) => (
-                    <button
-                      key={opcao.value}
-                      onClick={() => setBaseCalculoMargem(opcao.value)}
-                      title={opcao.descricao}
-                      className={`rounded-full border px-3 py-1.5 text-sm font-semibold transition-colors ${
-                        baseCalculoMargem === opcao.value
-                          ? "border-slate-900 bg-slate-900 text-white"
-                          : "border-slate-300 bg-white text-slate-700 hover:bg-slate-100"
-                      }`}
-                    >
-                      {opcao.label}
-                    </button>
-                  ))}
-                </div>
+              <div className="text-sm font-semibold text-slate-800">
+                Margem e preco usam automaticamente o Custo no sistema
               </div>
+              <p className="mt-1 text-xs text-slate-600">
+                Ao digitar um custo manual, as contas sao atualizadas na hora. Se o campo ficar sem
+                um valor valido, o custo da NF sera usado como base, sem alterar o valor fiscal.
+              </p>
             </div>
 
             {renderAcoesProcessamento()}
@@ -343,10 +312,8 @@ function EntradaXmlRevisaoPrecosModal({
                   margem: formatBRL(precosAtuais.margem),
                 };
                 const custoTexto =
-                  inputsRevisaoCustos[custoItemId] || formatBRL(resumoCusto.custoSistema);
+                  inputsRevisaoCustos[custoItemId] ?? formatBRL(resumoCusto.custoSistema);
                 const custoBaseMargem = resumoCusto.baseMargem.valor;
-                const custoBaseMargemDiferenteDoSistema =
-                  Math.abs(custoBaseMargem - resumoCusto.custoSistema) > 0.0001;
                 const descricaoBaseMargem = resumoCusto.baseMargem.fallback
                   ? `${resumoCusto.baseMargem.label} (${formatMoneyBRL(custoBaseMargem || 0)}) - sem custo informado, usando a NF`
                   : `${resumoCusto.baseMargem.label} (${formatMoneyBRL(custoBaseMargem || 0)})`;
@@ -517,9 +484,6 @@ function EntradaXmlRevisaoPrecosModal({
                           </div>
                           <div className="mt-1 text-xs text-gray-500">
                             Base ativa: {descricaoBaseMargem}
-                            {baseCalculoMargem === "nf" && custoBaseMargemDiferenteDoSistema
-                              ? ` | O custo salvo no processamento continua sendo ${formatMoneyBRL(resumoCusto.custoSistema || 0)} em "Custo no sistema"`
-                              : ""}
                           </div>
                         </div>
                       </div>
@@ -657,9 +621,6 @@ EntradaXmlRevisaoPrecosModal.propTypes = {
   exportarRelatorioCustosMaioresCSV: PropTypes.func.isRequired,
   exportarRelatorioCustosMaioresPDF: PropTypes.func.isRequired,
   gerandoRelatorioCustos: PropTypes.bool.isRequired,
-  baseCalculoMargem: PropTypes.string.isRequired,
-  setBaseCalculoMargem: PropTypes.func.isRequired,
-  baseCalculoMargemOpcoes: PropTypes.arrayOf(PropTypes.object).isRequired,
   precosAjustados: PropTypes.objectOf(PropTypes.object).isRequired,
   inputsRevisaoPrecos: PropTypes.objectOf(PropTypes.object).isRequired,
   inputsRevisaoCustos: PropTypes.objectOf(PropTypes.string).isRequired,

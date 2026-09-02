@@ -5,7 +5,7 @@ Notification Sender — Despacho de Notificações da Fila
 Processa registros pendentes em `notification_queue` e realiza o envio real.
 
 Canais suportados:
-  - email : SMTP (via ia_config.SMTP_*)
+  - email : serviço SMTP central da CorePet
   - push  : placeholder (App ainda não publicado)
 
 Uso pelo scheduler (a cada 5 minutos):
@@ -15,10 +15,6 @@ Uso pelo scheduler (a cada 5 minutos):
 """
 
 import logging
-import smtplib
-import ssl
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
 from datetime import datetime
 from typing import Any
 
@@ -31,6 +27,7 @@ from app.services.push_devices import (
     load_customer_push_targets,
     mark_push_target_result,
 )
+from app.services import email_service
 
 logger = logging.getLogger(__name__)
 
@@ -41,9 +38,7 @@ EXPO_PUSH_URL = "https://exp.host/--/api/v2/push/send"
 
 def _smtp_config_ok() -> bool:
     """Retorna True somente se as variáveis SMTP estiverem configuradas."""
-    from app.ia_config import SMTP_SERVER, SMTP_EMAIL, SMTP_PASSWORD
-
-    return bool(SMTP_SERVER and SMTP_EMAIL and SMTP_PASSWORD)
+    return email_service.is_email_configured()
 
 
 def _render_email_html(
@@ -97,14 +92,6 @@ def _render_email_html(
             {paragraphs}
           </td>
         </tr>
-        <!-- Footer -->
-        <tr>
-          <td style="padding:16px 32px;background:#f9f9f9;border-top:1px solid #eee;text-align:center">
-            <p style="margin:0;font-size:12px;color:#999">
-              Esta mensagem foi enviada automaticamente pelo sistema de campanhas do seu petshop.
-            </p>
-          </td>
-        </tr>
       </table>
     </td></tr>
   </table>
@@ -116,30 +103,20 @@ def _send_email(
     to_address: str, subject: str, body_text: str, campaign_type: str | None = None
 ) -> None:
     """
-    Envia um e-mail via SMTP TLS com template HTML bonito por tipo de campanha.
+    Envia pelo serviço central, com remetente, Reply-To e aviso padronizados.
 
     Levanta exceção em caso de falha (tratada no chamador).
     """
-    from app.ia_config import SMTP_SERVER, SMTP_PORT, SMTP_EMAIL, SMTP_PASSWORD
-
-    msg = MIMEMultipart("alternative")
-    msg["Subject"] = subject
-    msg["From"] = SMTP_EMAIL
-    msg["To"] = to_address
-
-    # Corpo em texto simples e HTML bonito
-    part_text = MIMEText(body_text, "plain", "utf-8")
     html_body = _render_email_html(subject, body_text, campaign_type)
-    part_html = MIMEText(html_body, "html", "utf-8")
-    msg.attach(part_text)
-    msg.attach(part_html)
-
-    context = ssl.create_default_context()
-    with smtplib.SMTP(SMTP_SERVER, SMTP_PORT, timeout=15) as server:
-        server.ehlo()
-        server.starttls(context=context)
-        server.login(SMTP_EMAIL, SMTP_PASSWORD)
-        server.sendmail(SMTP_EMAIL, to_address, msg.as_string())
+    sent = email_service.send_email(
+        to=to_address,
+        subject=subject,
+        html_body=html_body,
+        text_body=body_text,
+        simulate_if_unconfigured=False,
+    )
+    if not sent:
+        raise RuntimeError("Falha ao enviar e-mail pelo serviço central")
 
 
 def _send_push(

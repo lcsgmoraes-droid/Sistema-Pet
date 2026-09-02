@@ -4,10 +4,12 @@ import logging
 from typing import Literal, Optional
 
 from fastapi import APIRouter, Depends
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.auth.dependencies import get_current_user_and_tenant
 from app.db import get_session
+from app.models import Tenant
 from app.partner_utils import get_all_accessible_tenant_ids
 from app.produtos.core import _normalizar_filtro_ativo_produtos
 from app.produtos.listagem import (
@@ -24,12 +26,35 @@ from app.produtos.listagem import (
     _resolver_fornecedor_ids_filtro_produto,
 )
 from app.produtos.schemas import ProdutosPaginadosResponse
+from app.produtos_models import Produto
 from app.produtos.validade import _mapa_validade_proxima_produtos
 from app.produtos.validators import _validar_tenant_e_obter_usuario
 from app.security.permissions_decorator import require_permission
+from app.services.ecommerce_catalog_health import catalog_health_filter_expression
+from app.empresa_grupo_estoque_compartilhado_service import (
+    EmpresaGrupoEstoqueCompartilhadoService,
+)
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
+
+
+def _desativar_jit_busca_rapida_produtos(
+    db: Session,
+    *,
+    termo_busca: str,
+    contar_total: bool,
+) -> None:
+    """Evita o custo de compilacao JIT por tecla no autocomplete do PDV."""
+    if not termo_busca or contar_total:
+        return
+
+    bind = db.get_bind()
+    if bind.dialect.name == "postgresql":
+        # Com estoque compartilhado, o planner superestima o custo da consulta
+        # e gasta segundos compilando JIT, embora a execucao real leve milissegundos.
+        # SET LOCAL vale somente para a transacao desta requisicao.
+        db.execute(text("SET LOCAL jit = off"))
 
 
 @router.get("/vendaveis", response_model=ProdutosPaginadosResponse)
@@ -63,6 +88,11 @@ def listar_produtos_vendaveis(
         max_page_size=100,
     )
     termo_busca = (busca or "").strip()
+    _desativar_jit_busca_rapida_produtos(
+        db,
+        termo_busca=termo_busca,
+        contar_total=contar_total,
+    )
 
     # QUERY BASE - Produtos vendáveis (incluindo KIT)
     query = _montar_query_produtos_vendaveis(
@@ -104,6 +134,12 @@ def listar_produtos_vendaveis(
         incluir_imagens=incluir_imagens,
         incluir_lotes=False,
         contar_total=contar_total,
+        busca_rapida=not contar_total,
+    )
+    compartilhamentos = (
+        EmpresaGrupoEstoqueCompartilhadoService.mapa_ativos_para_consumidora(
+            db, tenant_id, [produto.id for produto in produtos]
+        )
     )
 
     # Ordenação inteligente: prioriza match exato no código
@@ -119,6 +155,7 @@ def listar_produtos_vendaveis(
             tenant_id,
             {},
             incluir_detalhes_composto=False,
+            estoque_compartilhado_por_produto=compartilhamentos,
         )
 
     return _montar_resposta_produtos_paginados(
@@ -145,6 +182,16 @@ def listar_produtos(
     estoque_situacao: Literal["todos", "com_estoque", "sem_estoque"] = "todos",
     imagem_situacao: Literal["todas", "com_foto", "sem_foto"] = "todas",
     ordenacao: Literal["recentes", "estoque_desc", "estoque_asc"] = "recentes",
+    catalogo_online_situacao: Literal[
+        "todos",
+        "publicado",
+        "nao_publicado",
+        "bloqueado",
+        "esgotado",
+        "pendencias",
+        "pronto",
+    ] = "todos",
+    catalogo_online_canal: Literal["ecommerce", "app"] = "ecommerce",
     em_promocao: Optional[bool] = False,
     ativo: Optional[bool] = True,
     tipo_produto: Optional[str] = None,  # Filtro por tipo de produto
@@ -174,6 +221,11 @@ def listar_produtos(
 
     # Incluir produtos de tenants parceiros (ex.: pet shop parceiro da clínica)
     access_ids = get_all_accessible_tenant_ids(db, tenant_id)
+    compartilhamentos_catalogo = (
+        EmpresaGrupoEstoqueCompartilhadoService.mapa_catalogo_completo_para_consumidora(
+            db, tenant_id
+        )
+    )
 
     # QUERY BASE
     # - include_variations=True: inclui PAI para permitir visualização da hierarquia
@@ -187,6 +239,7 @@ def listar_produtos(
         produto_predecessor_id=produto_predecessor_id,
         include_variations=include_variations,
         busca_completa=busca_completa,
+        produto_ids_compartilhados=list(compartilhamentos_catalogo),
     )
 
     query = _aplicar_filtros_basicos_produtos(
@@ -199,6 +252,15 @@ def listar_produtos(
         estoque_situacao=estoque_situacao,
         imagem_situacao=imagem_situacao,
     )
+
+    if catalogo_online_situacao != "todos":
+        tenant_config = db.query(Tenant).filter(Tenant.id == str(tenant_id)).first()
+        catalog_filter = catalog_health_filter_expression(
+            tenant_config,
+            catalogo_online_canal,
+            catalogo_online_situacao,
+        )
+        query = query.filter(Produto.tenant_id == tenant_id, catalog_filter)
 
     fornecedor_ids_filtro, filtro_fornecedor_por_grupo = (
         _resolver_fornecedor_ids_filtro_produto(
@@ -247,6 +309,7 @@ def listar_produtos(
         load_options=load_options,
         validade_por_produto=validade_por_produto,
         incluir_bling_sync=incluir_bling_sync,
+        estoque_compartilhado_por_produto=compartilhamentos_catalogo,
     )
     return _montar_resposta_produtos_paginados(
         produtos_expandidos,

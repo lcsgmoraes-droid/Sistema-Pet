@@ -1,10 +1,12 @@
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 from app.nfe.listagem_sync import _sincronizar_cache_nfes_com_bling
 from app.services.bling_tenant_guard import (
     bling_tenant_id_configurado,
+    resolver_tenant_bling,
     tenant_pode_usar_bling_global,
 )
+from app.tenancy.context import clear_current_tenant
 
 
 def test_bling_global_so_pode_ser_usado_pelo_tenant_configurado(monkeypatch):
@@ -38,3 +40,16 @@ def test_configuracao_invalida_nega_acesso(monkeypatch):
 
     assert bling_tenant_id_configurado() is None
     assert tenant_pode_usar_bling_global(str(uuid4())) is False
+
+
+def test_company_id_desconhecido_nao_cai_no_tenant_legado(monkeypatch):
+    legacy_tenant = str(uuid4())
+    monkeypatch.setenv("BLING_WEBHOOK_TENANT_ID", legacy_tenant)
+    monkeypatch.setattr(
+        "app.services.bling_connection_service.resolve_bling_webhook_tenant",
+        lambda *_args, **_kwargs: None,
+    )
+    clear_current_tenant()
+
+    assert resolver_tenant_bling({"companyId": "empresa-desconhecida"}) is None
+    assert resolver_tenant_bling({}) == UUID(legacy_tenant)

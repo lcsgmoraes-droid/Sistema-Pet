@@ -14,6 +14,9 @@ def test_mobile_types_include_available_profiles():
     assert "AppAccessProfile" in source
     assert "available_profiles" in source
     assert "selected_profile" in source
+    assert '"gestor"' in source
+    assert '"banho_tosa"' in source
+    assert '"taxi_dog"' in source
 
 
 def test_mobile_auth_service_and_store_can_select_profile():
@@ -48,6 +51,9 @@ def test_operational_mobile_navigators_expose_profile_switch_in_header():
     funcionario = read_repo("app-mobile/src/navigation/FuncionarioNavigator.tsx")
     entregador = read_repo("app-mobile/src/navigation/EntregadorNavigator.tsx")
     veterinario = read_repo("app-mobile/src/navigation/VeterinarioNavigator.tsx")
+    gestor = read_repo("app-mobile/src/navigation/GestorNavigator.tsx")
+    banho_tosa = read_repo("app-mobile/src/navigation/BanhoTosaNavigator.tsx")
+    taxi_dog = read_repo("app-mobile/src/navigation/TaxiDogNavigator.tsx")
 
     assert "available_profiles" in actions
     assert "selectProfile" in actions
@@ -55,6 +61,30 @@ def test_operational_mobile_navigators_expose_profile_switch_in_header():
     assert "HeaderProfileActions" in funcionario
     assert "HeaderProfileActions" in entregador
     assert "HeaderProfileActions" in veterinario
+    assert "HeaderProfileActions" in gestor
+    assert "HeaderProfileActions" in banho_tosa
+    assert "HeaderProfileActions" in taxi_dog
+
+
+def test_dedicated_operational_profiles_open_only_their_work_screen():
+    navigator = read_repo("app-mobile/src/navigation/AppNavigator.tsx")
+    banho_tosa = read_repo("app-mobile/src/navigation/BanhoTosaNavigator.tsx")
+    taxi_dog = read_repo("app-mobile/src/navigation/TaxiDogNavigator.tsx")
+    customer_access = read_repo(
+        "frontend/src/components/clientes/ClientesNovoAcessoAppCard.jsx"
+    )
+    employee_access = read_repo("frontend/src/pages/RH/Funcionarios.jsx")
+
+    assert 'perfil_operacional === "banho_tosa"' in navigator
+    assert 'perfil_operacional === "taxi_dog"' in navigator
+    assert "FuncionarioBanhoTosaScreen" in banho_tosa
+    assert "FuncionarioHomeScreen" not in banho_tosa
+    assert "TaxiDogEntregador" in taxi_dog
+    assert "RotasDoEntregadorScreen" not in taxi_dog
+    assert 'value: "banho_tosa"' in customer_access
+    assert 'value: "taxi_dog"' in customer_access
+    assert '["banho_tosa", "Banho & Tosa"]' in employee_access
+    assert '["taxi_dog", "Taxi Dog"]' in employee_access
 
 
 def test_mobile_profile_switch_only_appears_for_multiple_profiles():
@@ -93,7 +123,10 @@ def test_mobile_logout_asks_explicit_push_consent():
     profile = read_repo("app-mobile/src/screens/profile/ProfileScreen.tsx")
 
     assert "unregisterPushToken" in service
-    assert "api.delete('/app/push-token'" in service
+    assert (
+        'api.delete("/app/push-token"' in service
+        or "api.delete('/app/push-token'" in service
+    )
     assert "confirmLogoutWithNotificationChoice" in helper
     assert "continuar recebendo notificacoes" in helper.lower()
     assert "outras pessoas" in helper.lower()

@@ -17,6 +17,7 @@ TENANT_TABLES = {
     "vendas_pagamentos",
     # Estoque
     "produtos",
+    "bling_connections",
     "produto_bling_sync",
     "produto_bling_sync_queue",
     "produto_granel_vinculos",

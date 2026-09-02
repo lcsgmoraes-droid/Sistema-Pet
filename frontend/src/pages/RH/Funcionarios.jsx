@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import api from "../../api";
 import EventosFuncionario from "./components/EventosFuncionario";
 import { confirmarCorePet } from "../../services/corepetDialog";
+import { useAuth } from "../../contexts/AuthContext";
+import { canManageAppAccessProfiles } from "../../utils/appAccessProfiles";
 
 const funcionarioPadrao = () => ({
   nome: "",
@@ -30,6 +32,8 @@ const formatarMoeda = (valor) =>
   }).format(Number(valor || 0));
 
 export default function Funcionarios() {
+  const { user } = useAuth();
+  const canManageAppAccess = canManageAppAccessProfiles(user);
   const [funcionarios, setFuncionarios] = useState([]);
   const [cargos, setCargos] = useState([]);
   const [form, setForm] = useState(null);
@@ -90,8 +94,10 @@ export default function Funcionarios() {
       complemento_modo: form.complemento_modo || "automatico",
       complemento_fixo_valor: Number(form.complemento_fixo_valor || 0),
       remuneracao_observacoes: form.remuneracao_observacoes?.trim() || null,
-      app_access_profiles: form.app_access_profiles || [],
     };
+    if (canManageAppAccess) {
+      payload.app_access_profiles = form.app_access_profiles || [];
+    }
 
     try {
       if (form.id) {
@@ -360,29 +366,37 @@ export default function Funcionarios() {
               ))}
             </select>
 
-            <div className="md:col-span-2 border rounded-md p-3 bg-gray-50">
-              <h4 className="font-semibold text-gray-800 mb-2">Acessos do app</h4>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
-                {[
-                  ["cliente", "Cliente"],
-                  ["funcionario", "Funcionario"],
-                  ["entregador", "Entregador"],
-                  ["veterinario", "Veterinario"],
-                ].map(([profileType, label]) => (
-                  <label
-                    key={profileType}
-                    className="flex items-center gap-2 rounded border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={(form.app_access_profiles || []).includes(profileType)}
-                      onChange={() => alternarAppAccess(profileType)}
-                    />
-                    <span>{label}</span>
-                  </label>
-                ))}
+            {canManageAppAccess && (
+              <div className="md:col-span-2 border rounded-md p-3 bg-gray-50">
+                <h4 className="font-semibold text-gray-800 mb-2">Acessos do app</h4>
+                <p className="mb-2 text-xs text-gray-500">
+                  Somente administradores podem alterar estes acessos.
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
+                  {[
+                    ["cliente", "Cliente"],
+                    ["gestor", "Gestor"],
+                    ["funcionario", "Funcionario"],
+                    ["banho_tosa", "Banho & Tosa"],
+                    ["entregador", "Entregador"],
+                    ["taxi_dog", "Taxi Dog"],
+                    ["veterinario", "Veterinario"],
+                  ].map(([profileType, label]) => (
+                    <label
+                      key={profileType}
+                      className="flex items-center gap-2 rounded border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={(form.app_access_profiles || []).includes(profileType)}
+                        onChange={() => alternarAppAccess(profileType)}
+                      />
+                      <span>{label}</span>
+                    </label>
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
 
             <div className="md:col-span-2 border-t pt-4">
               <h4 className="font-semibold text-gray-800 mb-3">Composicao de remuneracao</h4>

@@ -261,6 +261,60 @@ services:
         max-file: "3"
 
   # ========================================
+  # WORKER CATALOGO MESTRE - ENRIQUECIMENTO
+  # ========================================
+  worker-catalogo:
+    image: petshop-backend:prod
+    container_name: petshop-prod-worker-catalogo
+    restart: always
+    command: ["python", "scripts/run_catalogo_mestre_worker.py"]
+    environment:
+      DATABASE_URL: postgresql://petshop_admin:${POSTGRES_PASSWORD}@postgres:5432/petshop_prod
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY}
+      ENVIRONMENT: production
+      DEBUG: "false"
+      SQL_AUDIT_ENFORCE: "true"
+      SQL_AUDIT_ENFORCE_LEVEL: error
+      SQLALCHEMY_POOL_SIZE: ${CATALOGO_MESTRE_WORKER_SQLALCHEMY_POOL_SIZE:-2}
+      SQLALCHEMY_MAX_OVERFLOW: ${CATALOGO_MESTRE_WORKER_SQLALCHEMY_MAX_OVERFLOW:-2}
+      SQLALCHEMY_POOL_TIMEOUT: ${SQLALCHEMY_POOL_TIMEOUT:-10}
+      SQLALCHEMY_POOL_RECYCLE: ${SQLALCHEMY_POOL_RECYCLE:-1800}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      CATALOGO_MESTRE_OPENAI_MODEL: ${CATALOGO_MESTRE_OPENAI_MODEL:-gpt-5.6}
+      CATALOGO_MESTRE_OPENAI_REASONING_EFFORT: ${CATALOGO_MESTRE_OPENAI_REASONING_EFFORT:-low}
+      CATALOGO_MESTRE_WORKER_ENABLED: ${CATALOGO_MESTRE_WORKER_ENABLED:-false}
+      CATALOGO_MESTRE_WORKER_APPLY_ENABLED: ${CATALOGO_MESTRE_WORKER_APPLY_ENABLED:-false}
+      CATALOGO_MESTRE_WORKER_INTERVAL_SECONDS: ${CATALOGO_MESTRE_WORKER_INTERVAL_SECONDS:-60}
+      CATALOGO_MESTRE_WORKER_BATCH_SIZE: ${CATALOGO_MESTRE_WORKER_BATCH_SIZE:-1}
+      CATALOGO_MESTRE_WORKER_DAILY_LIMIT: ${CATALOGO_MESTRE_WORKER_DAILY_LIMIT:-25}
+      CATALOGO_MESTRE_WORKER_MAX_ATTEMPTS: ${CATALOGO_MESTRE_WORKER_MAX_ATTEMPTS:-5}
+      CATALOGO_MESTRE_WORKER_LEASE_SECONDS: ${CATALOGO_MESTRE_WORKER_LEASE_SECONDS:-900}
+      CATALOGO_MESTRE_WORKER_HEARTBEAT_PATH: ${CATALOGO_MESTRE_WORKER_HEARTBEAT_PATH:-/app/data/catalogo_mestre_worker_heartbeat}
+      TZ: America/Sao_Paulo
+    volumes:
+      - ./backend/uploads:/app/uploads
+      - ./backend/logs:/app/logs
+      - ./backend/data:/app/data
+      - ./backend/secrets:/app/secrets
+      - /opt/petshop/.env:/opt/petshop/.env:rw
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - petshop-network
+    healthcheck:
+      test: ["CMD-SHELL", "heartbeat_path=\"$${CATALOGO_MESTRE_WORKER_HEARTBEAT_PATH:-/app/data/catalogo_mestre_worker_heartbeat}\"; test -f \"$${heartbeat_path}\" && find \"$${heartbeat_path}\" -mmin -2 | grep -q ."]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "3"
+
+  # ========================================
   # NGINX - REVERSE PROXY
   # ========================================
   nginx:

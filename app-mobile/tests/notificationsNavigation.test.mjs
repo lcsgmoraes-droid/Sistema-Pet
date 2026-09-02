@@ -185,6 +185,28 @@ test("home mobile mostra badge vermelho com notificacoes nao lidas", () => {
   assert.match(homeSource, /99\+/);
 });
 
+test("novidades ficam exclusivas no perfil de funcionario", () => {
+  const homeSource = readFileSync(
+    path.resolve(__dirname, "../src/screens/HomeScreen.tsx"),
+    "utf8",
+  );
+  const notificationsSource = readFileSync(
+    path.resolve(__dirname, "../src/screens/notifications/NotificationsScreen.tsx"),
+    "utf8",
+  );
+  const funcionarioNavigatorSource = readFileSync(
+    path.resolve(__dirname, "../src/navigation/FuncionarioNavigator.tsx"),
+    "utf8",
+  );
+
+  assert.doesNotMatch(homeSource, /listarEvolucaoCorePetApp/);
+  assert.doesNotMatch(homeSource, /contarNovidadesAppNaoVistas/);
+  assert.match(notificationsSource, /somenteNovidades \? "Novidades" : "Avisos"/);
+  assert.doesNotMatch(notificationsSource, /Avisos e novidades/);
+  assert.doesNotMatch(notificationsSource, /sectionTabs/);
+  assert.match(funcionarioNavigatorSource, /initialParams=\{\{ somenteNovidades: true \}\}/);
+});
+
 test("detalhe do produto ignora produto antigo quando notificacao envia outro produtoId", () => {
   const { resolveProductDetailParams } = carregarModuloTs(
     "src/utils/productDetailRoute.ts",

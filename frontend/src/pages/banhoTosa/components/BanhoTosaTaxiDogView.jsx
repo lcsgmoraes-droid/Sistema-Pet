@@ -7,6 +7,7 @@ import MetricCard from "../../../components/ui/MetricCard";
 import MetricGrid from "../../../components/ui/MetricGrid";
 import Panel from "../../../components/ui/Panel";
 import { banhoTosaApi } from "../banhoTosaApi";
+import { buildTaxiDogWindow } from "../taxiDogDateTimeUtils";
 import { formatCurrency, getApiErrorMessage, toApiDecimal } from "../banhoTosaUtils";
 import BanhoTosaTaxiDogForm from "./BanhoTosaTaxiDogForm";
 import BanhoTosaTaxiDogList from "./BanhoTosaTaxiDogList";
@@ -62,13 +63,12 @@ export default function BanhoTosaTaxiDogView({ funcionarios = [], onChanged }) {
   function updateField(field, value) {
     if (field === "agendamento_id") {
       const agendamento = agendamentos.find((item) => String(item.id) === String(value));
+      const janela = agendamento ? buildTaxiDogWindow(agendamento.data_hora_inicio) : null;
       setForm((prev) => ({
         ...prev,
         agendamento_id: value,
-        janela_inicio: agendamento
-          ? toDateTimeInput(addMinutes(agendamento.data_hora_inicio, -60))
-          : prev.janela_inicio,
-        janela_fim: agendamento ? toDateTimeInput(agendamento.data_hora_inicio) : prev.janela_fim,
+        janela_inicio: janela ? janela.inicio : prev.janela_inicio,
+        janela_fim: janela ? janela.fim : prev.janela_fim,
       }));
       return;
     }
@@ -258,17 +258,4 @@ function montarResumo(items = []) {
 function normalizarDateTime(value) {
   if (!value) return null;
   return value.length === 16 ? `${value}:00` : value;
-}
-
-function addMinutes(value, minutes) {
-  const date = new Date(value);
-  date.setMinutes(date.getMinutes() + minutes);
-  return date;
-}
-
-function toDateTimeInput(value) {
-  const date = value instanceof Date ? value : new Date(value);
-  if (Number.isNaN(date.getTime())) return "";
-  const pad = (part) => String(part).padStart(2, "0");
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }

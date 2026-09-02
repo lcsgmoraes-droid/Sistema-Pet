@@ -4,7 +4,7 @@ from datetime import date, timedelta
 from decimal import Decimal, ROUND_HALF_UP
 
 from sqlalchemy import and_, func, or_
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, load_only
 
 from app.dashboard.ponto_equilibrio_routes import obter_ponto_equilibrio
 from app.financeiro.imobilizado_service import calcular_valores_bem
@@ -128,17 +128,31 @@ def _calcular_estoque(
     db: Session, tenant_id, fornecedor_ids: list[int], dias_lento: int
 ) -> dict:
     access_ids = get_all_accessible_tenant_ids(db, tenant_id)
-    query = db.query(Produto).filter(
-        Produto.tenant_id.in_(access_ids),
-        or_(Produto.ativo.is_(True), Produto.ativo.is_(None)),
-        or_(
-            Produto.tipo_produto.is_(None),
-            Produto.tipo_produto == "SIMPLES",
-            and_(
-                Produto.tipo_produto.in_(["KIT", "VARIACAO"]),
-                or_(Produto.tipo_kit.is_(None), Produto.tipo_kit != "VIRTUAL"),
+    query = (
+        db.query(Produto)
+        .options(
+            load_only(
+                Produto.id,
+                Produto.tenant_id,
+                Produto.estoque_atual,
+                Produto.preco_custo,
+                Produto.preco_venda,
+                Produto.tipo_produto,
+                Produto.tipo_kit,
+            )
+        )
+        .filter(
+            Produto.tenant_id.in_(access_ids),
+            or_(Produto.ativo.is_(True), Produto.ativo.is_(None)),
+            or_(
+                Produto.tipo_produto.is_(None),
+                Produto.tipo_produto == "SIMPLES",
+                and_(
+                    Produto.tipo_produto.in_(["KIT", "VARIACAO"]),
+                    or_(Produto.tipo_kit.is_(None), Produto.tipo_kit != "VIRTUAL"),
+                ),
             ),
-        ),
+        )
     )
     if fornecedor_ids:
         query = query.filter(
@@ -239,8 +253,10 @@ def _calcular_dividas(db: Session, tenant_id, fornecedor_ids: list[int]) -> dict
         )
     total = sum(
         (
-            max(moeda(conta.valor_final) - moeda(conta.valor_pago), Decimal("0"))
-            for conta in query.all()
+            max(moeda(valor_final) - moeda(valor_pago), Decimal("0"))
+            for valor_final, valor_pago in query.with_entities(
+                ContaPagar.valor_final, ContaPagar.valor_pago
+            ).all()
         ),
         Decimal("0"),
     )

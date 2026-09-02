@@ -3,7 +3,10 @@ from decimal import Decimal
 from pathlib import Path
 from uuid import UUID
 
-from app.financeiro.fluxo_caixa_routes import get_fluxo_caixa
+from app.financeiro.fluxo_caixa_routes import (
+    _mapa_numeros_venda_por_conta,
+    get_fluxo_caixa,
+)
 from app.financeiro_models import ContaPagar, ContaReceber, LancamentoManual
 from app.ia.aba5_models import FluxoCaixa
 from app.tenancy.context import set_current_tenant
@@ -392,3 +395,54 @@ def test_fluxo_caixa_inclui_contas_receber_abertas_sem_duplicar_fluxo_previsto(
         == 1
     )
     assert all(mov.valor != 999.99 for mov in resposta.movimentacoes)
+
+
+def test_fluxo_caixa_busca_numeros_de_venda_das_contas_em_lote_e_por_tenant(
+    db_session, tenant_factory, user_factory
+):
+    tenant = tenant_factory(nome="Atacadao")
+    usuario = user_factory(tenant_id=tenant.id, email="fluxo.lote@test.com")
+    outro_tenant = tenant_factory(nome="Clinica Sao Jose")
+    usuario_outro = user_factory(
+        tenant_id=outro_tenant.id, email="fluxo.lote.outro@test.com"
+    )
+
+    venda = _criar_venda_finalizada(
+        db_session,
+        tenant_id=tenant.id,
+        user_id=usuario.id,
+        numero_venda="VENDA-LOTE-1",
+        valor="50.00",
+    )
+    conta = _criar_conta_receber_pendente(
+        db_session,
+        tenant_id=tenant.id,
+        user_id=usuario.id,
+        descricao="Conta com venda",
+        valor_final="50.00",
+    )
+    conta.venda_id = venda.id
+
+    venda_outro = _criar_venda_finalizada(
+        db_session,
+        tenant_id=outro_tenant.id,
+        user_id=usuario_outro.id,
+        numero_venda="VENDA-OUTRO-TENANT",
+        valor="70.00",
+    )
+    conta_outro = _criar_conta_receber_pendente(
+        db_session,
+        tenant_id=outro_tenant.id,
+        user_id=usuario_outro.id,
+        descricao="Conta de outro tenant",
+        valor_final="70.00",
+    )
+    conta_outro.venda_id = venda_outro.id
+    db_session.flush()
+
+    set_current_tenant(UUID(str(tenant.id)))
+    mapa = _mapa_numeros_venda_por_conta(
+        db_session, tenant.id, [conta.id, conta_outro.id]
+    )
+
+    assert mapa == {conta.id: "VENDA-LOTE-1"}

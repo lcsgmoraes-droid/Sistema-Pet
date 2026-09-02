@@ -8,6 +8,7 @@ Auth    : token JWT "ecommerce_customer" (mesmo fluxo do e-commerce)
 
 from datetime import datetime
 from typing import Optional
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
@@ -18,6 +19,10 @@ from app.db import get_session
 from app.evolucao_corepet import listar_evolucao_corepet
 from app.models import AppNotification, Cliente, User, UserPushDevice
 from app.produtos_models import Produto
+from app.empresa_grupo_estoque_compartilhado_service import (
+    EmpresaGrupoEstoqueCompartilhadoService,
+)
+from app.tenancy.context import set_current_tenant
 from app.routes.ecommerce_auth import (
     _activate_user_tenant_context,
     _get_current_ecommerce_user,
@@ -101,6 +106,7 @@ from app.routes.app_mobile_funcionario_contagem_routes import (
     obter_contagem_funcionario as obter_contagem_funcionario,
     router as funcionario_contagem_router,
 )
+from app.routes.app_mobile_gestor_routes import router as gestor_router
 from app.services.validade_campanha_service import (
     mapear_ofertas_validade_por_produto,
     resolver_preco_publico_produto,
@@ -136,6 +142,7 @@ router.include_router(pets_router)
 router.include_router(funcionario_pdv_router)
 router.include_router(funcionario_estoque_router)
 router.include_router(funcionario_contagem_router)
+router.include_router(gestor_router)
 router.include_router(rastreio_router)
 
 
@@ -375,8 +382,11 @@ def listar_evolucao_app(
     perfil = str(getattr(current_user, "_active_app_profile", None) or "cliente")
     canais_por_perfil = {
         "cliente": "app_cliente",
+        "gestor": "app_funcionario",
         "funcionario": "app_funcionario",
+        "banho_tosa": "app_funcionario",
         "entregador": "app_entregador",
+        "taxi_dog": "app_entregador",
         "veterinario": "app_veterinario",
     }
     return listar_evolucao_corepet(canais_por_perfil.get(perfil, "app_cliente"), db)
@@ -548,6 +558,11 @@ def buscar_produto_app_por_id(
     estao anunciados no app, para orientar compra no e-commerce ou loja fisica.
     """
     tenant_id = _activate_user_tenant_context(current_user)
+    acesso_catalogo = EmpresaGrupoEstoqueCompartilhadoService.resolver_produto_catalogo(
+        db, tenant_id, produto_id
+    )
+    tenant_produto_id = UUID(str(acesso_catalogo.tenant_origem_id))
+    set_current_tenant(tenant_produto_id)
     produto = (
         db.query(Produto)
         .options(
@@ -556,7 +571,7 @@ def buscar_produto_app_por_id(
             selectinload(Produto.imagens),
         )
         .filter(
-            Produto.tenant_id == tenant_id,
+            Produto.tenant_id == tenant_produto_id,
             Produto.id == produto_id,
             Produto.ativo.is_(True),
             Produto.situacao.is_not(False),
@@ -593,10 +608,18 @@ def buscar_produto_barcode(
 
     prioridade_estoque = case((func.coalesce(Produto.estoque_atual, 0) > 0, 0), else_=1)
 
+    compartilhados = (
+        EmpresaGrupoEstoqueCompartilhadoService.mapa_catalogo_completo_para_consumidora(
+            db, tenant_id
+        )
+    )
     produto = (
         db.query(Produto)
         .filter(
-            Produto.tenant_id == tenant_id,
+            or_(
+                Produto.tenant_id == tenant_id,
+                Produto.id.in_(list(compartilhados) or [-1]),
+            ),
             Produto.ativo.is_(True),
             Produto.situacao.is_not(False),
             Produto.is_sellable.is_(True),
@@ -613,6 +636,16 @@ def buscar_produto_barcode(
             detail="Produto não encontrado para este código de barras.",
         )
 
+    acesso_catalogo = EmpresaGrupoEstoqueCompartilhadoService.resolver_produto_catalogo(
+        db, tenant_id, produto.id
+    )
+    tenant_produto_id = UUID(str(acesso_catalogo.tenant_origem_id))
+    set_current_tenant(tenant_produto_id)
+    produto = (
+        db.query(Produto)
+        .filter(Produto.id == produto.id, Produto.tenant_id == tenant_produto_id)
+        .first()
+    )
     oferta_validade = mapear_ofertas_validade_por_produto(db, [produto], "app").get(
         produto.id
     )

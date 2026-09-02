@@ -18,6 +18,7 @@ from .contas_receber_criacao_routes import (
 )
 from .contas_receber_recebimentos_routes import (
     registrar_recebimento,
+    registrar_recebimentos_lote,
     router as recebimentos_router,
 )
 from .contas_receber_recorrencias import calcular_proxima_recorrencia
@@ -29,6 +30,7 @@ from .contas_receber_schemas import (
     ContaReceberCreate,
     ContaReceberResponse,
     RecebimentoCreate,
+    RecebimentoLoteCreate,
 )
 
 router = APIRouter(prefix="/contas-receber", tags=["Contas a Receber"])
@@ -42,6 +44,7 @@ __all__ = [
     "ContaReceberCreate",
     "ContaReceberResponse",
     "RecebimentoCreate",
+    "RecebimentoLoteCreate",
     "analisar_contas_receber_abertas",
     "buscar_conta_receber",
     "calcular_proxima_recorrencia",
@@ -50,5 +53,6 @@ __all__ = [
     "listar_contas_receber",
     "processar_recorrencias_contas_receber",
     "registrar_recebimento",
+    "registrar_recebimentos_lote",
     "router",
 ]

@@ -9,12 +9,17 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.db import get_session
+from app.contas_receber_encargos import (
+    calcular_encargos_automaticos,
+    carregar_config_encargos,
+)
 from app.evolucao_corepet import registrar_uso_funcionalidade
 from app.financeiro_models import FormaPagamento
 from app.financeiro_models import ContaReceber
 from app.idempotency_models import IdempotencyKey
 from app.models import Cliente, Tenant
 from app.pedido_models import Pedido
+from app.produtos_models import Produto
 from app.rotas_entrega_models import EntregaAvaliacao
 from app.vendas_models import Venda
 from app.routes.ecommerce_checkout_support import (
@@ -47,13 +52,24 @@ from app.services.mercado_pago_checkout import (
     is_mercado_pago_provider,
 )
 from app.services.order_push_notifications import notify_order_event
+from app.services.ecommerce_catalog_health import catalog_stock_value
+from app.routes.ecommerce_cart import (
+    _produto_disponivel_no_canal,
+    _quantidade_reservada_produto,
+    _resolver_precificacao_produto,
+    _resolver_preco_unitario_compravel,
+    _validar_limite_promocao_validade,
+)
+from app.empresa_grupo_estoque_compartilhado_service import (
+    EmpresaGrupoEstoqueCompartilhadoService,
+)
 from app.tenancy.context import (
     clear_current_tenant,
     get_current_tenant,
     set_current_tenant,
+    tenant_context,
 )
 from app.utils.timezone import now_brasilia
-
 
 logger = logging.getLogger(__name__)
 
@@ -63,6 +79,68 @@ router = APIRouter(prefix="/checkout", tags=["ecommerce-checkout"])
 class EntregaAvaliacaoRequest(BaseModel):
     nota: int = Field(ge=1, le=5)
     comentario: str | None = Field(default=None, max_length=1000)
+
+
+def _revalidar_itens_checkout(
+    db: Session,
+    *,
+    tenant: Tenant,
+    tenant_id: str,
+    carrinho: Pedido,
+    itens: list,
+    canal: str,
+) -> float:
+    """Revalida preço e saldo sob lock antes de reservar o pedido pendente."""
+    for item in itens:
+        access = EmpresaGrupoEstoqueCompartilhadoService.resolver_produto_catalogo(
+            db, tenant_id, item.produto_id
+        )
+        with tenant_context(access.tenant_origem_id) as origin_tenant:
+            product = (
+                db.query(Produto)
+                .filter(
+                    Produto.id == item.produto_id,
+                    Produto.tenant_id == origin_tenant,
+                )
+                .with_for_update()
+                .first()
+            )
+            pricing = (
+                _resolver_precificacao_produto(db, product, canal) if product else None
+            )
+
+        if not product or not _produto_disponivel_no_canal(product, canal):
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"{item.nome}: produto não está mais disponível neste canal.",
+            )
+
+        unit_price = _resolver_preco_unitario_compravel(pricing)
+        _validar_limite_promocao_validade(pricing, item.quantidade)
+
+        if getattr(product, "controlar_estoque", True):
+            stock = catalog_stock_value(tenant, product)
+            reserved = _quantidade_reservada_produto(
+                db,
+                tenant_id=tenant_id,
+                produto_id=product.id,
+                excluir_pedido_id=carrinho.pedido_id,
+            )
+            available = max(stock - reserved, 0.0)
+            if float(item.quantidade or 0) > available:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail=(
+                        f"{item.nome}: estoque mudou durante a compra. "
+                        f"Disponível agora: {available:g}."
+                    ),
+                )
+
+        item.preco_unitario = unit_price
+        item.subtotal = round(float(item.quantidade or 0) * unit_price, 2)
+
+    db.flush()
+    return round(sum(float(item.subtotal or 0.0) for item in itens), 2)
 
 
 def _payment_info_for_pedido(db: Session, pedido: Pedido) -> dict[str, str | None]:
@@ -381,7 +459,14 @@ def finalizar_checkout(
             status_code=status.HTTP_400_BAD_REQUEST, detail="Carrinho vazio"
         )
 
-    subtotal = round(sum(float(item.subtotal or 0.0) for item in itens), 2)
+    subtotal = _revalidar_itens_checkout(
+        db,
+        tenant=tenant,
+        tenant_id=tenant_id,
+        carrinho=carrinho,
+        itens=itens,
+        canal=origem_checkout,
+    )
     cupom_codigo, cupom_percentual, desconto = _calcular_desconto(
         subtotal, payload.cupom
     )
@@ -435,6 +520,7 @@ def finalizar_checkout(
 
     carrinho.total = total
     carrinho.status = "pendente"
+    carrinho.reserva_estoque_iniciada_at = datetime.utcnow()
     carrinho.endereco_entrega = (
         payload.endereco_entrega
         if payload.tipo_retirada not in ("proprio", "terceiro", "app_loja")
@@ -597,11 +683,14 @@ def listar_crediario_cliente(
         .all()
     )
     hoje = date.today()
+    config_encargos = carregar_config_encargos(db, tenant_id)
     itens = []
     em_aberto = 0.0
     vencido = 0.0
     for conta in contas:
-        saldo = max(float(conta.valor_final or 0) - float(conta.valor_recebido or 0), 0)
+        calculo_encargos = calcular_encargos_automaticos(conta, hoje, config_encargos)
+        saldo_sem_encargos = float(calculo_encargos["saldo_atual"])
+        saldo = float(calculo_encargos["saldo_atualizado"])
         esta_aberta = (
             conta.status
             not in {
@@ -627,6 +716,13 @@ def listar_crediario_cliente(
                 "valor_original": float(conta.valor_original or 0),
                 "valor_recebido": float(conta.valor_recebido or 0),
                 "saldo": saldo,
+                "saldo_sem_encargos": saldo_sem_encargos,
+                "juros_calculado": float(calculo_encargos["valor_juros_calculado"]),
+                "multa_calculada": float(calculo_encargos["valor_multa_calculada"]),
+                "dias_atraso": calculo_encargos["dias_atraso"],
+                "encargos_automaticos_ativos": calculo_encargos[
+                    "encargos_automaticos_ativos"
+                ],
                 "data_vencimento": conta.data_vencimento.isoformat(),
                 "status": "vencido" if esta_vencida else conta.status,
             }
@@ -738,12 +834,12 @@ def consultar_status_pedido(
         "tem_entrega": venda_info["tem_entrega"],
         "tipo_retirada": pedido.tipo_retirada,
         "is_drive": pedido.is_drive,
-        "drive_chegou_at": pedido.drive_chegou_at.isoformat()
-        if pedido.drive_chegou_at
-        else None,
-        "drive_entregue_at": pedido.drive_entregue_at.isoformat()
-        if pedido.drive_entregue_at
-        else None,
+        "drive_chegou_at": (
+            pedido.drive_chegou_at.isoformat() if pedido.drive_chegou_at else None
+        ),
+        "drive_entregue_at": (
+            pedido.drive_entregue_at.isoformat() if pedido.drive_entregue_at else None
+        ),
         "palavra_chave_retirada": pedido.palavra_chave_retirada,
         "endereco_entrega": pedido.endereco_entrega,
         "frete_valor": float(pedido.frete_valor or 0),

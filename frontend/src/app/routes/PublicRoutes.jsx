@@ -9,6 +9,8 @@ import {
   LandingPage,
   LegalPage,
   Login,
+  OfertaPublica,
+  OfertaCanvasPreview,
   Planos,
   RastreioPublico,
   Register,
@@ -29,11 +31,15 @@ export function createPublicRoutes() {
       <Route path="/landing" element={<LandingPage />} />
       <Route path="/planos" element={<Planos />} />
       <Route path="/rastreio/:token" element={<RastreioPublico />} />
+      <Route path="/oferta/:token" element={<OfertaPublica />} />
       <Route path="/app" element={<AppPublicEntry />} />
       <Route path="/app/retorno-pagamento" element={<AppPaymentReturn />} />
       <Route path="/ecommerce" element={<EcommerceMVP />} />
       {VendasCanaisPreview && (
         <Route path="/dev/vendas-canais-preview" element={<VendasCanaisPreview />} />
+      )}
+      {OfertaCanvasPreview && (
+        <Route path="/dev/ofertas-canvas-preview" element={<OfertaCanvasPreview />} />
       )}
       <Route path="/:tenantId" element={<EcommerceMVP />} />
     </>

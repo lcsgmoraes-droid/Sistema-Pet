@@ -39,7 +39,7 @@ export const BASE_CONHECIMENTO = [
         titulo: "Como acompanhar Novidades e Projetos do CorePet",
         tags: ["novidades", "projetos", "evolucao", "em andamento", "em estudo"],
         conteudo: [
-          "Acesse **Novidades** no menu lateral do ERP. No aplicativo do cliente, abra o sino e escolha a aba **Novidades**. No app do funcionário, use o cartão **Novidades do CorePet**.",
+          "Acesse **Novidades** no menu lateral do ERP. No app do funcionário, use o cartão **Novidades do CorePet**. Essa área não é exibida no aplicativo do cliente.",
           "A aba **Novidades** mostra somente funções já disponíveis para usar.",
           "O selo **Disponível — em fase de teste** indica que a função já pode ser usada, mas ainda está no período inicial de acompanhamento e pode receber correções.",
           "Depois do tempo e da quantidade de usos programados, o selo muda automaticamente para **Implantado**.",

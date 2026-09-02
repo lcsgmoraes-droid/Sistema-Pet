@@ -251,6 +251,18 @@ export function createLayoutMenuItems({ lembretesCount = 0, convitesGruposCount 
       label: "Campanhas",
       modulo: "campanhas",
       permission: "vendas.criar",
+      submenu: [
+        {
+          path: "/campanhas",
+          label: "Visão geral",
+          permission: "vendas.criar",
+        },
+        {
+          path: "/campanhas/estudio-ofertas",
+          label: "Estúdio de Ofertas",
+          permission: "vendas.criar",
+        },
+      ],
     },
     {
       path: "/ecommerce",
@@ -279,6 +291,11 @@ export function createLayoutMenuItems({ lembretesCount = 0, convitesGruposCount 
           path: "/ecommerce/configuracoes",
           label: "⚙️ Configurações",
           permission: "configuracoes.editar",
+        },
+        {
+          path: "/ecommerce/catalogo-saude",
+          label: "🩺 Saúde do Catálogo",
+          permission: "vendas.visualizar",
         },
         {
           path: "/ecommerce/analytics",

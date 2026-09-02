@@ -15,6 +15,7 @@ from app.services.venda_rentabilidade_snapshot_service import (
     invalidate_venda_rentabilidade_snapshot,
 )
 from app.vendas.routes_common import _validar_tenant_e_obter_usuario
+from app.vendas.status_pagamento import calcular_resumo_pagamento_venda
 from app.vendas_models import Venda, VendaPagamento
 
 router = APIRouter()
@@ -125,16 +126,22 @@ def listar_pagamentos_venda(
         .all()
     )
 
-    total_pago = sum(float(p.valor) for p in pagamentos)
-    valor_restante = float(venda.total) - total_pago
+    resumo_pagamento = calcular_resumo_pagamento_venda(
+        total=venda.total,
+        contas_receber=venda.contas_receber,
+        pagamentos=pagamentos,
+    )
+    total_pago = float(resumo_pagamento["valor_pago"])
+    valor_restante = float(resumo_pagamento["valor_restante"])
 
     return {
         "venda_id": venda.id,
         "numero_venda": venda.numero_venda,
         "total_venda": float(venda.total),
         "total_pago": total_pago,
-        "valor_restante": max(0, valor_restante),
+        "valor_restante": valor_restante,
         "status": venda.status,
+        "status_pagamento": resumo_pagamento["status_pagamento"],
         "pagamentos": [p.to_dict() for p in pagamentos],
     }
 

@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from email.utils import format_datetime
 from io import BytesIO
+import mimetypes
 from pathlib import Path, PurePosixPath
 from typing import Optional
 from urllib.parse import urlparse
@@ -388,6 +389,26 @@ def read_local_product_image_bytes(public_url: str) -> bytes:
     if file_path is None or not file_path.exists():
         raise FileNotFoundError(f"Imagem local não encontrada: {public_url}")
     return file_path.read_bytes()
+
+
+def read_product_image_by_public_url(public_url: str) -> PublicProductImage:
+    """Le uma imagem somente quando ela pertence ao storage configurado do produto."""
+
+    normalized_url = str(public_url or "").strip()
+    if is_local_product_image_url(normalized_url):
+        content = read_local_product_image_bytes(normalized_url)
+        content_type = mimetypes.guess_type(urlparse(normalized_url).path)[0]
+        return PublicProductImage(
+            content=content,
+            content_type=content_type or WEBP_CONTENT_TYPE,
+        )
+
+    if is_s3_product_image_url(normalized_url):
+        base_url = _s3_public_base_url()
+        storage_key = normalized_url[len(base_url) + 1 :]
+        return read_public_s3_product_image(storage_key)
+
+    raise ValueError("URL fora do storage de imagens de produtos permitido.")
 
 
 def _delete_empty_parent_dirs(file_path: Path, stop_path: Path) -> None:
