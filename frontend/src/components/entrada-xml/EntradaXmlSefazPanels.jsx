@@ -30,6 +30,12 @@ export default function EntradaXmlSefazPanels({
   setConsultaExpandidaId,
   usarNaEntrada,
 }) {
+  const configuracaoSefazPronta = cfgSefaz.enabled && cfgSefaz.modo === "real" && cfgSefaz.cert_ok;
+  const pendenciasSefaz =
+    Array.isArray(cfgSefaz.pendencias) && cfgSefaz.pendencias.length > 0
+      ? cfgSefaz.pendencias
+      : [cfgSefaz.mensagem].filter(Boolean);
+
   return (
     <>
       {mostrarPainelSefaz && (
@@ -38,6 +44,38 @@ export default function EntradaXmlSefazPanels({
           padding="lg"
           title="Buscar NF-e pela SEFAZ"
         >
+          {configSefazLoading ? (
+            <div className="mb-4 rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
+              Verificando a configuração SEFAZ desta empresa...
+            </div>
+          ) : (
+            !configuracaoSefazPronta && (
+              <div
+                className="mb-4 rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900"
+                role="alert"
+              >
+                <strong>Consulta bloqueada: configuração SEFAZ incompleta.</strong>
+                <p className="mt-1">
+                  Antes de buscar uma NF-e, finalize o certificado digital e os dados fiscais desta
+                  empresa.
+                </p>
+                {pendenciasSefaz.length > 0 && (
+                  <ul className="mt-2 list-disc space-y-1 pl-5">
+                    {pendenciasSefaz.map((pendencia) => (
+                      <li key={pendencia}>{pendencia}</li>
+                    ))}
+                  </ul>
+                )}
+                <Link
+                  to="/configuracoes/integracoes"
+                  className="mt-3 inline-flex font-semibold text-amber-900 underline"
+                >
+                  Configurar certificado e integração SEFAZ
+                </Link>
+              </div>
+            )
+          )}
+
           <form onSubmit={consultarSefaz} className="mb-2 flex gap-3">
             <input
               type="text"
@@ -50,6 +88,7 @@ export default function EntradaXmlSefazPanels({
               placeholder="Chave de acesso (44 digitos)"
               className="flex-1 rounded-lg border border-gray-300 px-4 py-2 font-mono text-sm focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500"
               maxLength={80}
+              disabled={configSefazLoading || !configuracaoSefazPronta}
             />
             <ActionButton
               type="submit"
@@ -57,7 +96,12 @@ export default function EntradaXmlSefazPanels({
               intent="create"
               size="md"
               loading={loadingSefaz}
-              disabled={loadingSefaz || chaveSefaz.length !== 44}
+              disabled={
+                configSefazLoading ||
+                !configuracaoSefazPronta ||
+                loadingSefaz ||
+                chaveSefaz.length !== 44
+              }
             >
               {loadingSefaz ? "Consultando..." : "Consultar"}
             </ActionButton>
@@ -261,7 +305,9 @@ EntradaXmlSefazPanels.propTypes = {
     cert_ok: PropTypes.bool,
     enabled: PropTypes.bool,
     importacao_automatica: PropTypes.bool,
+    mensagem: PropTypes.string,
     modo: PropTypes.string,
+    pendencias: PropTypes.arrayOf(PropTypes.string),
     ultimo_sync_at: PropTypes.string,
     ultimo_sync_documentos: PropTypes.number,
     ultimo_sync_mensagem: PropTypes.string,

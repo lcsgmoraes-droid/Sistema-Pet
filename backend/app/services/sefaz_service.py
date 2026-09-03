@@ -593,6 +593,37 @@ class SefazService:
         )
 
     @classmethod
+    def pendencias_configuracao_real(
+        cls, config: Optional[dict[str, Any]] = None
+    ) -> list[str]:
+        """Lista pendencias em linguagem operacional, sem expor segredos."""
+        cfg = cls._read_config(config)
+        pendencias: list[str] = []
+
+        cert_path = cfg["cert_path"]
+        if not cert_path:
+            pendencias.append("enviar o certificado digital A1 (.pfx)")
+        elif not Path(cert_path).exists():
+            pendencias.append(
+                "reenviar o certificado digital A1 (.pfx), pois o arquivo configurado não foi encontrado"
+            )
+
+        if not cfg["cert_password"]:
+            pendencias.append("informar a senha do certificado digital")
+        if not cfg["enabled"]:
+            pendencias.append("ativar a integração SEFAZ para esta empresa")
+        if cfg["modo"] != "real":
+            pendencias.append("selecionar o modo Real")
+        if cfg["uf"] not in cls._UF_CODIGO:
+            pendencias.append("informar uma UF válida")
+
+        cnpj = cfg["cnpj"]
+        if not cnpj or not cnpj.isdigit() or len(cnpj) != 14:
+            pendencias.append("informar um CNPJ válido com 14 dígitos")
+
+        return pendencias
+
+    @classmethod
     def garantir_pronto_para_consulta_real(
         cls, config: Optional[dict[str, Any]] = None
     ) -> None:
@@ -601,42 +632,30 @@ class SefazService:
         cls._validar_modo(cfg["modo"])
         cls._validar_ambiente(cfg["ambiente"])
 
-        if not cfg["enabled"]:
+        pendencias = cls.pendencias_configuracao_real(cfg)
+        if pendencias:
             raise HTTPException(
-                status_code=503,
-                detail="SEFAZ está desabilitado. Defina SEFAZ_ENABLED=true.",
+                status_code=422,
+                detail=(
+                    "Não foi possível consultar a SEFAZ porque a integração desta empresa "
+                    "ainda não está pronta. Acesse Configurações > Integrações > SEFAZ e "
+                    f"conclua: {'; '.join(pendencias)}."
+                ),
             )
 
-        if cfg["modo"] != "real":
-            raise HTTPException(
-                status_code=503,
-                detail="SEFAZ está em modo mock. Defina SEFAZ_MODO=real.",
-            )
-
-        if not cfg["uf"]:
-            raise HTTPException(status_code=422, detail="SEFAZ_UF não configurada.")
         cls._codigo_uf_autor(cfg["uf"])
-
-        cnpj = cfg["cnpj"]
-        if not cnpj or not cnpj.isdigit() or len(cnpj) != 14:
-            raise HTTPException(
-                status_code=422, detail="SEFAZ_CNPJ deve ter 14 dígitos numéricos."
-            )
 
         cert_path = cfg["cert_path"]
         cert_pwd = cfg["cert_password"]
-        if not cert_path:
-            raise HTTPException(
-                status_code=422, detail="SEFAZ_CERT_PATH não configurado."
-            )
-        if not cert_pwd:
-            raise HTTPException(
-                status_code=422, detail="SEFAZ_CERT_PASSWORD não configurado."
-            )
-
         ok, msg = cls._validar_certificado(cert_path, cert_pwd)
         if not ok:
-            raise HTTPException(status_code=422, detail=msg)
+            raise HTTPException(
+                status_code=422,
+                detail=(
+                    "Não foi possível usar o certificado digital A1. "
+                    f"{msg} Revise o arquivo e a senha em Configurações > Integrações > SEFAZ."
+                ),
+            )
 
     @classmethod
     def consultar_nfe_por_chave(
@@ -649,51 +668,8 @@ class SefazService:
             "integration.sefaz.chave", reference=chave
         )
         cfg = cls._read_config(config)
-        modo = cls._validar_modo(cfg["modo"])
-        if not cfg["enabled"] or modo == "mock":
-            return {
-                "correlation_id": correlation_id,
-                "modo": "mock",
-                "chave_acesso": chave,
-                "numero_nf": "000123",
-                "serie": "001",
-                "data_emissao": "2025-01-15",
-                "emitente_cnpj": "12.345.678/0001-90",
-                "emitente_nome": "Fornecedor Simulado Ltda",
-                "destinatario_cnpj": None,
-                "destinatario_nome": "Petshop (Destinatário)",
-                "valor_total_nf": 1250.00,
-                "itens": [
-                    {
-                        "numero_item": 1,
-                        "codigo_produto": "PRD001",
-                        "descricao": "Ração Premium Cão Adulto 15kg",
-                        "ncm": "23091000",
-                        "cfop": "6102",
-                        "quantidade": 10.0,
-                        "unidade": "UN",
-                        "valor_unitario": 89.90,
-                        "valor_total": 899.00,
-                    },
-                    {
-                        "numero_item": 2,
-                        "codigo_produto": "PRD002",
-                        "descricao": "Antipulgas Spot-On Cão 10-25kg",
-                        "ncm": "30049099",
-                        "cfop": "6102",
-                        "quantidade": 5.0,
-                        "unidade": "UN",
-                        "valor_unitario": 70.20,
-                        "valor_total": 351.00,
-                    },
-                ],
-                "aviso": (
-                    "Modo mock ativo. Para consulta real configure: SEFAZ_ENABLED=true, "
-                    "SEFAZ_MODO=real e certificado A1 no .env."
-                ),
-            }
-
         cls.garantir_pronto_para_consulta_real(cfg)
+
         resultado = cls._consultar_por_chave_real(chave, cfg)
         resultado.setdefault("correlation_id", correlation_id)
         return resultado
