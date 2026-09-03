@@ -39,6 +39,7 @@ export function usePDVDescontos({ vendaAtual, setVendaAtual }) {
     erroCupom,
     aplicarCupom,
     removerCupom,
+    invalidarCupomPorMudancaCarrinho,
     handleCodigoCupomChange,
     handleCodigoCupomKeyDown,
   } = usePDVCupom({
@@ -71,6 +72,7 @@ export function usePDVDescontos({ vendaAtual, setVendaAtual }) {
     removerDescontoTotal,
     aplicarCupom,
     removerCupom,
+    invalidarCupomPorMudancaCarrinho,
     handleCodigoCupomChange,
     handleCodigoCupomKeyDown,
   };

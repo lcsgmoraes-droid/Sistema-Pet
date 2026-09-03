@@ -7,6 +7,8 @@ export function usePDVProdutos({
   modoVisualizacao,
   temCaixaAberto,
   recalcularTotais,
+  cupomAtivo,
+  onCupomInvalidado,
 }) {
   const {
     copiadoCodigoItem,
@@ -23,6 +25,8 @@ export function usePDVProdutos({
     setVendaAtual,
     temCaixaAberto,
     recalcularTotais,
+    cupomAtivo,
+    onCupomInvalidado,
   });
 
   const {

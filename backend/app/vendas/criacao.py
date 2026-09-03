@@ -9,6 +9,7 @@ from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
 from app.utils.timezone import now_brasilia
+from app.vendas.regras import validar_consistencia_desconto_cupom
 
 logger = logging.getLogger(__name__)
 
@@ -100,6 +101,14 @@ def criar_venda(
             if desconto_itens > 0
             else float(payload.get("desconto_valor", 0) or 0)
         )
+        try:
+            validar_consistencia_desconto_cupom(
+                cupom_code=payload.get("cupom_code"),
+                cupom_discount_applied=payload.get("cupom_discount_applied"),
+                desconto_total=desconto_valor,
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
         tem_entrega = bool(payload.get("tem_entrega", False))
         taxa_entrega = (payload.get("taxa_entrega", 0) or 0) if tem_entrega else 0
         total = subtotal_itens + taxa_entrega

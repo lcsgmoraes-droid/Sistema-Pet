@@ -338,6 +338,7 @@ export default function PDV() {
     removerDescontoTotal,
     aplicarCupom,
     removerCupom,
+    invalidarCupomPorMudancaCarrinho,
     handleCodigoCupomChange,
     handleCodigoCupomKeyDown,
   } = usePDVDescontos({
@@ -369,6 +370,8 @@ export default function PDV() {
     modoVisualizacao,
     temCaixaAberto,
     recalcularTotais,
+    cupomAtivo: Boolean(cupomAplicado || vendaAtual.cupom_code),
+    onCupomInvalidado: invalidarCupomPorMudancaCarrinho,
   });
   const {
     pendenciasCount,
