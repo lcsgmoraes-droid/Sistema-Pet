@@ -5,6 +5,7 @@ import pytest
 from app.vendas.regras import (
     _resolver_status_entrega_atualizacao,
     calcular_totais_venda,
+    validar_consistencia_desconto_cupom,
 )
 
 
@@ -49,3 +50,28 @@ def test_resolver_status_entrega_preserva_status_existente():
     assert _resolver_status_entrega_atualizacao(True, "entregue") == "entregue"
     assert _resolver_status_entrega_atualizacao(True, None) == "pendente"
     assert _resolver_status_entrega_atualizacao(False, "entregue") is None
+
+
+def test_valida_cupom_quando_desconto_real_cobre_o_valor_aplicado():
+    validar_consistencia_desconto_cupom(
+        cupom_code="FIEL-ABC123",
+        cupom_discount_applied=25,
+        desconto_total=25,
+    )
+
+
+def test_valida_cupom_com_desconto_manual_adicional():
+    validar_consistencia_desconto_cupom(
+        cupom_code="FIEL-ABC123",
+        cupom_discount_applied=25,
+        desconto_total=30,
+    )
+
+
+def test_rejeita_cupom_maior_que_o_desconto_real_da_venda():
+    with pytest.raises(ValueError, match="carrinho mudou"):
+        validar_consistencia_desconto_cupom(
+            cupom_code="FIEL-GT1B49",
+            cupom_discount_applied=25,
+            desconto_total=6.98,
+        )

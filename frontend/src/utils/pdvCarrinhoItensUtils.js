@@ -47,3 +47,38 @@ export function recalcularSubtotalItem(item, novaQuantidade) {
     subtotal: arredondarDinheiro(subtotalSemDesconto - novoDescontoValor),
   };
 }
+
+export function prepararItensAposMudancaCarrinho(itens, cupomAtivo = false) {
+  if (!cupomAtivo) {
+    return {
+      itens,
+      extras: {},
+      cupomInvalidado: false,
+    };
+  }
+
+  const itensSemDescontoDoCupom = itens.map((item) => {
+    const quantidade = normalizarQuantidadePDV(item.quantidade);
+    const precoUnitario = Number(item.preco_unitario ?? item.preco_venda ?? 0) || 0;
+
+    return {
+      ...item,
+      quantidade,
+      desconto_valor: 0,
+      desconto_item: 0,
+      desconto_percentual: 0,
+      tipo_desconto_aplicado: null,
+      preco_com_desconto: precoUnitario,
+      subtotal: arredondarDinheiro(precoUnitario * quantidade),
+    };
+  });
+
+  return {
+    itens: itensSemDescontoDoCupom,
+    extras: {
+      cupom_code: null,
+      cupom_discount_applied: null,
+    },
+    cupomInvalidado: true,
+  };
+}

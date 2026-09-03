@@ -54,6 +54,13 @@ export function usePDVCupom({ vendaAtual, aplicarDescontoTotal, removerDescontoT
     });
   };
 
+  const invalidarCupomPorMudancaCarrinho = () => {
+    const codigoAtual = String(cupomAplicado?.code || vendaAtual.cupom_code || "").toUpperCase();
+    setCupomAplicado(null);
+    setCodigoCupom(codigoAtual);
+    setErroCupom("O carrinho foi alterado. Confira os itens e aplique o cupom novamente.");
+  };
+
   const handleCodigoCupomChange = (valor) => {
     setCodigoCupom(String(valor || "").toUpperCase());
     setErroCupom("");
@@ -72,6 +79,7 @@ export function usePDVCupom({ vendaAtual, aplicarDescontoTotal, removerDescontoT
     erroCupom,
     aplicarCupom,
     removerCupom,
+    invalidarCupomPorMudancaCarrinho,
     handleCodigoCupomChange,
     handleCodigoCupomKeyDown,
   };

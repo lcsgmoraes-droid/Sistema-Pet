@@ -25,6 +25,7 @@ from app.vendas.edicao_estoque import ajustar_estoque_edicao_venda
 from app.vendas.regras import (
     _resolver_status_entrega_atualizacao,
     calcular_totais_venda,
+    validar_consistencia_desconto_cupom,
 )
 from app.vendas.routes_common import _validar_tenant_e_obter_usuario
 from app.vendas.schemas import CriarVendaRequest
@@ -380,6 +381,14 @@ def atualizar_venda(
         dados.desconto_percentual or 0,
         taxa_entrega,
     )
+    try:
+        validar_consistencia_desconto_cupom(
+            cupom_code=dados.cupom_code,
+            cupom_discount_applied=dados.cupom_discount_applied,
+            desconto_total=totais["desconto_valor"],
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     logger.info(f"\n🔄 ATUALIZANDO VENDA {venda_id}:")
     logger.info(f"   funcionario_id recebido: {dados.funcionario_id}")

@@ -14,6 +14,8 @@ from fastapi import HTTPException
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
+from app.vendas.regras import validar_consistencia_desconto_cupom
+
 logger = logging.getLogger(__name__)
 
 __all__ = [
@@ -114,6 +116,15 @@ def consumir_cupom_finalizacao(
 
     if not cupom_code_resolvido:
         return None
+
+    try:
+        validar_consistencia_desconto_cupom(
+            cupom_code=cupom_code_resolvido,
+            cupom_discount_applied=cupom_discount_resolvido,
+            desconto_total=float(venda.desconto_valor or 0),
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     venda_total_para_cupom = float(venda.total or 0)
     if cupom_discount_resolvido:

@@ -3,6 +3,7 @@ import { debugLog } from "../utils/debug";
 import {
   colocarItemProdutoNoTopo,
   obterPrecoVendaPDV,
+  prepararItensAposMudancaCarrinho,
   recalcularSubtotalItem,
 } from "../utils/pdvCarrinhoItensUtils";
 
@@ -11,9 +12,21 @@ export function usePDVCarrinhoItens({
   setVendaAtual,
   temCaixaAberto,
   recalcularTotais,
+  cupomAtivo = false,
+  onCupomInvalidado,
 }) {
   const [copiadoCodigoItem, setCopiadoCodigoItem] = useState("");
   const [itensKitExpandidos, setItensKitExpandidos] = useState({});
+
+  const recalcularAposMudancaCarrinho = (itens) => {
+    const resultado = prepararItensAposMudancaCarrinho(itens, cupomAtivo);
+
+    if (resultado.cupomInvalidado) {
+      onCupomInvalidado?.();
+    }
+
+    recalcularTotais(resultado.itens, resultado.extras);
+  };
 
   const adicionarProdutoAoCarrinho = (produto) => {
     if (!temCaixaAberto) {
@@ -79,7 +92,7 @@ export function usePDVCarrinhoItens({
       });
     }
 
-    recalcularTotais(novosItens);
+    recalcularAposMudancaCarrinho(novosItens);
     return true;
   };
 
@@ -88,7 +101,7 @@ export function usePDVCarrinhoItens({
       itemIndex === index ? recalcularSubtotalItem(item, item.quantidade + delta) : item,
     );
 
-    recalcularTotais(novosItens);
+    recalcularAposMudancaCarrinho(novosItens);
   };
 
   const atualizarQuantidadeItem = (index, novaQuantidade) => {
@@ -96,7 +109,7 @@ export function usePDVCarrinhoItens({
       itemIndex === index ? recalcularSubtotalItem(item, novaQuantidade) : item,
     );
 
-    recalcularTotais(novosItens);
+    recalcularAposMudancaCarrinho(novosItens);
   };
 
   const atualizarPetDoItem = (index, petId) => {
@@ -115,7 +128,7 @@ export function usePDVCarrinhoItens({
 
   const removerItem = (index) => {
     const novosItens = vendaAtual.itens.filter((_, itemIndex) => itemIndex !== index);
-    recalcularTotais(novosItens);
+    recalcularAposMudancaCarrinho(novosItens);
   };
 
   const toggleKitExpansion = (index) => {

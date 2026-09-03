@@ -3,6 +3,9 @@ from __future__ import annotations
 from typing import Any, Optional
 
 
+_CENTAVO = 0.01
+
+
 def calcular_totais_venda(
     itens: list[Any],
     desconto_valor: float,
@@ -28,6 +31,25 @@ def calcular_totais_venda(
         "desconto_valor": round(desconto_calculado, 2),
         "total": total,
     }
+
+
+def validar_consistencia_desconto_cupom(
+    *,
+    cupom_code: str | None,
+    cupom_discount_applied: float | None,
+    desconto_total: float,
+) -> None:
+    """Impede salvar ou receber cupom maior que o desconto real da venda."""
+    if not str(cupom_code or "").strip():
+        return
+
+    desconto_cupom = round(float(cupom_discount_applied or 0), 2)
+    desconto_real = round(float(desconto_total or 0), 2)
+    if desconto_cupom <= 0 or desconto_cupom > desconto_real + _CENTAVO:
+        raise ValueError(
+            "O carrinho mudou apos aplicar o cupom. "
+            "Confira os itens e aplique o cupom novamente."
+        )
 
 
 def _resolver_status_entrega_atualizacao(
