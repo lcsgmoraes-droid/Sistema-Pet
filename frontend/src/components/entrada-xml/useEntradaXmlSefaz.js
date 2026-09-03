@@ -10,6 +10,8 @@ const CONFIG_SEFAZ_INICIAL = {
   importacao_automatica: false,
   importacao_intervalo_min: 60,
   cert_ok: false,
+  mensagem: "",
+  pendencias: [],
   ultimo_sync_status: "nunca",
   ultimo_sync_mensagem: "Ainda nao sincronizado.",
   ultimo_sync_at: null,
@@ -69,6 +71,8 @@ export default function useEntradaXmlSefaz({ api, abrirDetalhes, carregarDados, 
         importacao_automatica: Boolean(data.importacao_automatica),
         importacao_intervalo_min: Number(data.importacao_intervalo_min || 15),
         cert_ok: Boolean(data.cert_ok),
+        mensagem: data.mensagem || "",
+        pendencias: Array.isArray(data.pendencias) ? data.pendencias : [],
         ultimo_sync_status: data.ultimo_sync_status || "nunca",
         ultimo_sync_mensagem: data.ultimo_sync_mensagem || "Ainda nao sincronizado.",
         ultimo_sync_at: data.ultimo_sync_at || null,
@@ -107,6 +111,16 @@ export default function useEntradaXmlSefaz({ api, abrirDetalhes, carregarDados, 
     event.preventDefault();
     setErroSefaz("");
     setAvisoConectorSefaz("");
+    const configuracaoPronta = cfgSefaz.enabled && cfgSefaz.modo === "real" && cfgSefaz.cert_ok;
+    if (!configuracaoPronta) {
+      const detalhes = cfgSefaz.pendencias.length
+        ? ` Pendencias: ${cfgSefaz.pendencias.join("; ")}.`
+        : "";
+      setErroSefaz(
+        `Consulta bloqueada. Configure o certificado digital e a integracao SEFAZ em Configuracoes > Integracoes.${detalhes}`,
+      );
+      return;
+    }
     if (chaveSefaz.length !== 44) {
       setErroSefaz("A chave de acesso deve ter exatamente 44 digitos.");
       return;
@@ -167,7 +181,11 @@ export default function useEntradaXmlSefaz({ api, abrirDetalhes, carregarDados, 
   };
 
   const alternarPainelSefaz = () => {
+    const deveCarregar = !mostrarPainelSefaz;
     setMostrarPainelSefaz((visivel) => !visivel);
+    if (deveCarregar) {
+      carregarConfigSefaz();
+    }
     setMostrarConfigSefaz(false);
   };
 

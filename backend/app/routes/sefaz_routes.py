@@ -123,6 +123,7 @@ def get_config(
         "cert_senha_configurada": status.cert_senha_configurada,
         "cert_ok": status.cert_ok,
         "mensagem": status.mensagem,
+        "pendencias": SefazService.pendencias_configuracao_real(cfg),
         "empresa": {
             "nome": tenant.name if tenant else None,
             "cnpj": SefazTenantConfigService.sanitize_cnpj(tenant.cnpj)

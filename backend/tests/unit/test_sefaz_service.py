@@ -26,26 +26,27 @@ def _config_real_base() -> dict:
     }
 
 
-def test_consultar_nfe_mock_retorna_sucesso_sem_soap() -> None:
-    set_request_id("req-sefaz-123")
+def test_consultar_nfe_sem_configuracao_bloqueia_mock_e_lista_pendencias() -> None:
+    with pytest.raises(HTTPException) as exc:
+        SefazService.consultar_nfe_por_chave(
+            "35250112345678000195550010000001231234567890",
+            {
+                "enabled": False,
+                "modo": "mock",
+                "ambiente": "homologacao",
+                "uf": "SP",
+                "cnpj": "12345678000195",
+                "cert_path": "",
+                "cert_password": "",
+            },
+        )
 
-    data = SefazService.consultar_nfe_por_chave(
-        "35250112345678000195550010000001231234567890",
-        {
-            "enabled": False,
-            "modo": "mock",
-            "ambiente": "homologacao",
-            "uf": "SP",
-            "cnpj": "",
-            "cert_path": "",
-            "cert_password": "",
-        },
-    )
-
-    assert data["modo"] == "mock"
-    assert data["correlation_id"] == "req-sefaz-123"
-    assert data["numero_nf"] == "000123"
-    assert data["chave_acesso"] == "35250112345678000195550010000001231234567890"
+    assert exc.value.status_code == 422
+    assert "certificado digital A1" in str(exc.value.detail)
+    assert "senha do certificado digital" in str(exc.value.detail)
+    assert "ativar a integração SEFAZ" in str(exc.value.detail)
+    assert "selecionar o modo Real" in str(exc.value.detail)
+    assert "Fornecedor Simulado" not in str(exc.value.detail)
 
 
 def test_consultar_nfe_real_chama_fluxo_real(monkeypatch: pytest.MonkeyPatch) -> None:
