@@ -1,6 +1,8 @@
 """Agregador das rotas do modulo veterinario."""
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
+
+from app.security.permissions_decorator import require_permission_dependency
 
 from .veterinario_acompanhamento_routes import router as acompanhamento_router
 from .veterinario_agenda_routes import router as agenda_router
@@ -15,14 +17,16 @@ from .veterinario_orcamentos_routes import router as orcamentos_router
 from .veterinario_relatorios_routes import router as relatorios_router
 
 router = APIRouter(prefix="/vet", tags=["Veterinario"])
-router.include_router(acompanhamento_router)
+_vet_access = [Depends(require_permission_dependency("veterinario.acessar"))]
+
+router.include_router(acompanhamento_router, dependencies=_vet_access)
 router.include_router(agenda_router)
-router.include_router(internacao_router)
-router.include_router(ia_router)
-router.include_router(consultas_router)
-router.include_router(exames_router)
-router.include_router(catalogo_router)
-router.include_router(orcamentos_router)
-router.include_router(extratos_router)
-router.include_router(relatorios_router)
-router.include_router(parcerias_router)
+router.include_router(internacao_router, dependencies=_vet_access)
+router.include_router(ia_router, dependencies=_vet_access)
+router.include_router(consultas_router, dependencies=_vet_access)
+router.include_router(exames_router, dependencies=_vet_access)
+router.include_router(catalogo_router, dependencies=_vet_access)
+router.include_router(orcamentos_router, dependencies=_vet_access)
+router.include_router(extratos_router, dependencies=_vet_access)
+router.include_router(relatorios_router, dependencies=_vet_access)
+router.include_router(parcerias_router, dependencies=_vet_access)

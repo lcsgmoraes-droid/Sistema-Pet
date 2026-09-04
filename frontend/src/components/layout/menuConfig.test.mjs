@@ -6,6 +6,8 @@ const findMenuItem = (items, path) => items.find((item) => item.path === path);
 
 test("createLayoutMenuItems preserva itens principais do menu", () => {
   const items = createLayoutMenuItems();
+  const veterinario = findMenuItem(items, "/veterinario");
+  const banhoTosa = findMenuItem(items, "/banho-tosa");
 
   assert.equal(findMenuItem(items, "/dashboard")?.permission, "relatorios.gerencial");
   assert.equal(findMenuItem(items, "/dashboard-gerencial"), undefined);
@@ -15,9 +17,17 @@ test("createLayoutMenuItems preserva itens principais do menu", () => {
     true,
   );
   assert.equal(
-    findMenuItem(items, "/veterinario")?.submenu?.some(
-      (item) => item.path === "/veterinario/agenda",
-    ),
+    veterinario?.submenu?.some((item) => item.path === "/veterinario/agenda"),
+    true,
+  );
+  assert.equal(veterinario?.permission, "veterinario.acessar");
+  assert.equal(
+    veterinario?.submenu?.every((item) => item.permission === "veterinario.acessar"),
+    true,
+  );
+  assert.equal(banhoTosa?.permission, "banho_tosa.acessar");
+  assert.equal(
+    banhoTosa?.submenu?.every((item) => item.permission === "banho_tosa.acessar"),
     true,
   );
 });

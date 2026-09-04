@@ -10,11 +10,18 @@ from app.veterinario_agenda_routes_parts import (
 
 
 def _route_pairs(router):
-    return {
-        (method, route.path)
-        for route in router.routes
-        for method in getattr(route, "methods", set())
-    }
+    pairs = set()
+    pending = list(router.routes)
+    while pending:
+        route = pending.pop()
+        effective_candidates = getattr(route, "effective_candidates", None)
+        if callable(effective_candidates):
+            pending.extend(effective_candidates())
+            continue
+        pairs.update(
+            (method, route.path) for method in getattr(route, "methods", set())
+        )
+    return pairs
 
 
 def test_veterinario_agenda_routes_preserva_endpoints_publicos():
