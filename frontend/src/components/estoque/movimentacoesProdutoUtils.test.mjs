@@ -4,6 +4,9 @@ import test from "node:test";
 import {
   CANAIS_DESTAQUE,
   LABELS_CANAIS,
+  getMotivoLabelMovimentacao,
+  getOrigemMovimentacao,
+  movimentacaoEstoqueProtegida,
   resolverEstoqueAtualMovimentacoes,
   resolverSaldoDisponivelMovimentacoes,
 } from "./movimentacoesProdutoUtils.js";
@@ -49,4 +52,18 @@ test("movimentacoes mantem estoque fisico para produto simples", () => {
 
   assert.equal(resolverEstoqueAtualMovimentacoes(produto), 12);
   assert.equal(resolverSaldoDisponivelMovimentacoes(produto), 10);
+});
+
+test("movimentacao clinica aponta para a consulta que consumiu o insumo", () => {
+  const origem = getOrigemMovimentacao({
+    referencia_tipo: "procedimento_veterinario",
+    referencia_id: 91,
+    documento: "42",
+    tipo: "saida",
+  });
+
+  assert.equal(origem.texto, "Consulta #42");
+  assert.equal(origem.link, "/veterinario/consultas/42");
+  assert.equal(getMotivoLabelMovimentacao("fracionamento_clinico"), "Fracionamento clinico");
+  assert.equal(movimentacaoEstoqueProtegida({ referencia_tipo: "procedimento_veterinario" }), true);
 });

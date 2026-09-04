@@ -24,6 +24,12 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/estoque", tags=["Estoque"])
 
+REFERENCIAS_AUTOMATICAS_PROTEGIDAS = {
+    "fracionamento_clinico",
+    "procedimento_veterinario",
+    "procedimento_internacao",
+}
+
 
 def _buscar_movimentacao(db: Session, movimentacao_id: int, tenant_id: int):
     movimentacao = (
@@ -37,6 +43,17 @@ def _buscar_movimentacao(db: Session, movimentacao_id: int, tenant_id: int):
     if not movimentacao:
         raise HTTPException(status_code=404, detail="Movimentacao nao encontrada")
     return movimentacao
+
+
+def _validar_movimentacao_editavel(movimentacao) -> None:
+    if movimentacao.referencia_tipo in REFERENCIAS_AUTOMATICAS_PROTEGIDAS:
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                "Movimentacao automatica protegida. Corrija ou estorne pelo fluxo "
+                "clinico que originou o lancamento."
+            ),
+        )
 
 
 def _buscar_produto(db: Session, produto_id: int, tenant_id: int):
@@ -254,6 +271,7 @@ def excluir_movimentacao(
     _current_user, tenant_id = user_and_tenant
     try:
         movimentacao = _buscar_movimentacao(db, movimentacao_id, tenant_id)
+        _validar_movimentacao_editavel(movimentacao)
         produto = _buscar_produto_obrigatorio(db, movimentacao.produto_id, tenant_id)
 
         logger.info(
@@ -311,6 +329,7 @@ def editar_movimentacao(
     _current_user, tenant_id = user_and_tenant
     try:
         movimentacao = _buscar_movimentacao(db, movimentacao_id, tenant_id)
+        _validar_movimentacao_editavel(movimentacao)
         produto = _buscar_produto_obrigatorio(db, movimentacao.produto_id, tenant_id)
 
         if dados.quantidade is not None and dados.quantidade != movimentacao.quantidade:

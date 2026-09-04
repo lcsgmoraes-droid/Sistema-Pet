@@ -4,6 +4,7 @@ import { formatMoneyBRL } from "../../utils/formatters";
 import ActionButton from "../ui/ActionButton";
 import PaginationControls from "../ui/PaginationControls";
 import StatusBadge from "../ui/StatusBadge";
+import { movimentacaoEstoqueProtegida } from "./movimentacoesProdutoUtils";
 
 const CANAL_CLASSES = {
   loja_fisica: "bg-emerald-100 text-emerald-700",
@@ -165,6 +166,9 @@ export default function MovimentacoesLancamentosTable({
 }) {
   const unidadeProduto = produto?.unidade || produto?.unidade_medida || "UN";
   const [observacoesExpandidas, setObservacoesExpandidas] = useState(() => new Set());
+  const movimentacoesEditaveis = movimentacoes.filter(
+    (item) => !movimentacaoEstoqueProtegida(item),
+  );
 
   const alternarObservacao = (event, movimentacaoId) => {
     event.stopPropagation();
@@ -207,7 +211,10 @@ export default function MovimentacoesLancamentosTable({
               <th className="w-12 px-4 py-3">
                 <input
                   type="checkbox"
-                  checked={selectedIds.length === movimentacoes.length && movimentacoes.length > 0}
+                  checked={
+                    selectedIds.length === movimentacoesEditaveis.length &&
+                    movimentacoesEditaveis.length > 0
+                  }
                   onChange={handleSelectAll}
                   className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
                 />
@@ -254,6 +261,7 @@ export default function MovimentacoesLancamentosTable({
             ) : (
               movimentacoes.map((movimentacao, index) => {
                 const origem = getOrigem(movimentacao);
+                const protegida = movimentacaoEstoqueProtegida(movimentacao);
                 const movCancelado = movimentacao.status === "cancelado";
                 const saldoAposLancamento = getSaldoAposLancamento(movimentacao);
                 const movAnterior = index > 0 ? movimentacoes[index - 1] : null;
@@ -269,19 +277,27 @@ export default function MovimentacoesLancamentosTable({
                 return (
                   <tr
                     key={movimentacao.id}
-                    className={`cursor-pointer ${
+                    className={`${protegida ? "cursor-default" : "cursor-pointer"} ${
                       movCancelado
                         ? "bg-slate-50/80 opacity-70 hover:bg-slate-100"
                         : "hover:bg-slate-50"
                     } ${mesmaVenda ? "border-l-4 border-l-blue-500 bg-blue-50" : ""}`}
-                    onClick={() => abrirModal(movimentacao.tipo, movimentacao)}
+                    onClick={() => {
+                      if (!protegida) abrirModal(movimentacao.tipo, movimentacao);
+                    }}
                   >
                     <td className="w-12 px-4 py-3" onClick={(event) => event.stopPropagation()}>
                       <input
                         type="checkbox"
                         checked={selectedIds.includes(movimentacao.id)}
+                        disabled={protegida}
                         onChange={(event) => handleSelectOne(movimentacao.id, event)}
-                        className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                        title={
+                          protegida
+                            ? "Lancamento automatico protegido; corrija pelo fluxo clinico"
+                            : undefined
+                        }
+                        className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 disabled:cursor-not-allowed disabled:opacity-40"
                       />
                     </td>
                     <td className="whitespace-nowrap px-4 py-3 text-sm text-slate-900">

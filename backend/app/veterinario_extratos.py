@@ -160,6 +160,11 @@ def _normalizar_insumos(insumos: Optional[object]) -> list[dict]:
                 "custo_unitario": custo_unitario,
                 "custo_total": custo_total,
                 "baixar_estoque": bool(item.get("baixar_estoque", True)),
+                "lotes_consumidos": (
+                    item.get("lotes_consumidos")
+                    if isinstance(item.get("lotes_consumidos"), list)
+                    else []
+                ),
             }
         )
     return normalizados

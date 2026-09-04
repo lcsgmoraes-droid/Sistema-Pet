@@ -78,6 +78,12 @@ export const vetApi = {
   listarProcedimentosConsulta: (consultaId) =>
     api.get(`${BASE}/consultas/${consultaId}/procedimentos`),
   adicionarProcedimento: (data) => api.post(`${BASE}/procedimentos`, data),
+  obterSugestaoFracionamentoClinico: (produtoId, quantidadeNecessaria) =>
+    api.get(`/estoque/fracionamento-clinico/destinos/${produtoId}/sugestao`, {
+      params: { quantidade_necessaria: quantidadeNecessaria },
+    }),
+  converterFracionamentoClinico: (data) =>
+    api.post("/estoque/fracionamento-clinico/converter", data),
   diagnosticoPushAgendamento: (agendamentoId) =>
     api.get(`${BASE}/agendamentos/${agendamentoId}/push-diagnostico`),
 

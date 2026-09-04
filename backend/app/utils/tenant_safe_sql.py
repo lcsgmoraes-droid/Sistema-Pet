@@ -60,6 +60,8 @@ TENANT_SCOPED_TABLES = {
     "ecommerce_payment_gateway_configs",
     "estoque_movimentacoes",
     "estoque_reservas",
+    "estoque_fracionamento_conversoes",
+    "estoque_fracionamento_vinculos",
     "especies",
     "formas_pagamento",
     "granel_conversoes",

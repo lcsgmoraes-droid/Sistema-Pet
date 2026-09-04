@@ -101,6 +101,12 @@ export function getSaldoAposLancamento(movimentacao) {
   return Number.isFinite(saldoNumerico) ? saldoNumerico : null;
 }
 
+export function movimentacaoEstoqueProtegida(movimentacao) {
+  return ["fracionamento_clinico", "procedimento_veterinario", "procedimento_internacao"].includes(
+    movimentacao?.referencia_tipo,
+  );
+}
+
 export function getMotivoLabelMovimentacao(motivo) {
   const labels = {
     compra: "Compra",
@@ -117,11 +123,41 @@ export function getMotivoLabelMovimentacao(motivo) {
     devolucao_fornecedor: "Devolucao ao fornecedor",
     transferencia: "Transferencia",
     balanco: "Balanco",
+    fracionamento_clinico: "Fracionamento clinico",
+    procedimento_veterinario: "Uso em atendimento veterinario",
+    procedimento_internacao: "Uso em internacao veterinaria",
   };
   return labels[motivo] || motivo;
 }
 
 export function getOrigemMovimentacao(mov) {
+  if (mov.referencia_tipo === "fracionamento_clinico") {
+    return {
+      texto: `Fracionamento clinico #${mov.referencia_id}`,
+      icone: "documento",
+      cor: "text-violet-600",
+      link: null,
+    };
+  }
+
+  if (mov.referencia_tipo === "procedimento_veterinario") {
+    return {
+      texto: `Consulta #${mov.documento || mov.referencia_id}`,
+      icone: "documento",
+      cor: "text-violet-600",
+      link: mov.documento ? `/veterinario/consultas/${mov.documento}` : null,
+    };
+  }
+
+  if (mov.referencia_tipo === "procedimento_internacao") {
+    return {
+      texto: `Internacao #${mov.documento || mov.referencia_id}`,
+      icone: "documento",
+      cor: "text-violet-600",
+      link: mov.documento ? `/veterinario/internacoes?internacao=${mov.documento}` : null,
+    };
+  }
+
   if (mov.referencia_tipo === "venda_excluida") {
     return {
       texto: `Venda Cancelada #${mov.referencia_id}`,
