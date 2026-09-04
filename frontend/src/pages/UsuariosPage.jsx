@@ -83,6 +83,7 @@ export default function UsuariosPage() {
         onClose={fecharCredenciais}
         onGenerate={gerarNovaSenha}
         onSubmit={salvarCredenciais}
+        roles={roles}
         tenantReference={tenantLoginReference}
         usuario={usuarioCredenciais}
       />

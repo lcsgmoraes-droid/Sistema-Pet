@@ -28,6 +28,18 @@ function FavoriteShortcut({ favorite, active, onClick }) {
     zIndex: isDragging ? 20 : undefined,
   };
 
+  const handleClickCapture = (event) => {
+    // Enquanto o item ainda esta sendo arrastado, o Link nao pode receber o
+    // clique sintetico do navegador. Depois do drop, o guard do Layout cobre
+    // o pequeno intervalo em que o dnd-kit ja removeu `isDragging`.
+    if (isDragging) {
+      event.preventDefault();
+      event.stopPropagation();
+      return;
+    }
+    onClick?.(event);
+  };
+
   return (
     <div
       ref={setNodeRef}
@@ -38,7 +50,9 @@ function FavoriteShortcut({ favorite, active, onClick }) {
     >
       <Link
         to={favorite.path}
-        onClick={onClick}
+        draggable={false}
+        onClickCapture={handleClickCapture}
+        onDragStart={(event) => event.preventDefault()}
         className={`inline-flex h-8 items-center gap-1.5 rounded-md border px-2.5 text-xs font-semibold shadow-sm transition-colors ${
           active
             ? "border-[#0f8b8d] bg-[#d8eee9] text-[#0f5f63]"

@@ -1,4 +1,5 @@
 export default function useProdutosNovoPageComposition({
+  assistenteIAState,
   catalogos,
   fornecedoresState,
   imagensState,
@@ -60,14 +61,17 @@ export default function useProdutosNovoPageComposition({
   const { handleClonarProduto, handleVoltar, navigate, setAbaAtiva } = navigationState;
   const {
     abaAtiva,
+    assistenteIAAviso,
     camposEmEdicao,
     formData,
     isClone,
     isEdicao,
+    preenchendoComIA,
     salvando,
     setCamposEmEdicao,
     setFormData,
   } = pageState;
+  const { onPreencherComIA } = assistenteIAState;
   const {
     buscaPredecessor,
     handleBuscaPredecessorChange,
@@ -159,6 +163,9 @@ export default function useProdutosNovoPageComposition({
     marcas,
     mostrarBuscaPredecessor,
     onNovoCatalogo,
+    assistenteIAAviso,
+    onPreencherComIA,
+    preenchendoComIA,
     parseNumber,
     predecessorSelecionado,
     produtosBusca,

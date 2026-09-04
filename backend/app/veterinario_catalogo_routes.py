@@ -51,6 +51,7 @@ from .veterinario_schemas import (
 )
 
 router = APIRouter()
+BULARIO_STATUS_IMPORTADO = "fonte_oficial_nao_revisado"
 
 
 @router.get(
@@ -530,7 +531,9 @@ def adicionar_produto_regulatorio_ao_catalogo(
         bula_url=produto.bula_url,
         pagina_fonte_url=produto.pagina_fonte_url,
         publicado_em=produto.publicado_em,
-        verificacao_status="fonte_oficial_nao_revisado_clinicamente",
+        # A coluna possui limite de 30 caracteres. O texto anterior excedia esse
+        # limite e fazia a inclusao pelo Bulario Oficial falhar com HTTP 500.
+        verificacao_status=BULARIO_STATUS_IMPORTADO,
         observacoes=(
             "Importado como referencia regulatoria internacional. "
             "Revisar indicacoes, especies, apresentacao e registro no MAPA antes de prescrever."

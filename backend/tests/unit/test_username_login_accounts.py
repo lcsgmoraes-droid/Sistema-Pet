@@ -290,6 +290,41 @@ def test_admin_generated_password_updates_hash_and_returns_plaintext_once(monkey
     assert verify_password(result["generated_password"], target_user.hashed_password)
 
 
+def test_admin_can_change_user_role_and_revoke_open_sessions(monkeypatch):
+    db = _session()
+    tenant = _tenant(db)
+    target_user, old_role = _account(db, tenant)
+    new_role = Role(tenant_id=tenant.id, name="Gerente")
+    actor = User(
+        tenant_id=tenant.id,
+        email="admin@loja.com",
+        hashed_password="irrelevante",
+        nome="Admin",
+        is_active=True,
+        email_verified=True,
+    )
+    db.add_all([new_role, actor])
+    db.commit()
+
+    monkeypatch.setattr("app.usuarios_routes.revoke_all_sessions", lambda **_kwargs: 3)
+    monkeypatch.setattr(
+        "app.usuarios_routes.log_business_event", lambda **_kwargs: None
+    )
+
+    result = atualizar_credenciais_usuario.__wrapped__(
+        user_id=target_user.id,
+        payload=UserCredentialsUpdate(role_id=new_role.id),
+        db=db,
+        user_and_tenant=(actor, UUID(str(tenant.id))),
+    )
+
+    vinculo = db.query(UserTenant).filter(UserTenant.user_id == target_user.id).one()
+    assert vinculo.role_id != old_role.id
+    assert vinculo.role_id == new_role.id
+    assert result["role_changed"] is True
+    assert result["sessions_revoked"] == 3
+
+
 def test_migration_makes_email_optional_and_username_unique_per_tenant():
     source = (REPO_ROOT / "alembic/versions/zxl20260828a1_username_login.py").read_text(
         encoding="utf-8"

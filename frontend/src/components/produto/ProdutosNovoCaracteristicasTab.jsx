@@ -20,6 +20,9 @@ export default function ProdutosNovoCaracteristicasTab(props) {
     marcas,
     mostrarBuscaPredecessor,
     onNovoCatalogo,
+    assistenteIAAviso,
+    onPreencherComIA,
+    preenchendoComIA,
     parseNumber,
     predecessorSelecionado,
     produtosBusca,
@@ -39,6 +42,9 @@ export default function ProdutosNovoCaracteristicasTab(props) {
         handleGerarSKU={handleGerarSKU}
         marcas={marcas}
         onNovoCatalogo={onNovoCatalogo}
+        assistenteIAAviso={assistenteIAAviso}
+        onPreencherComIA={onPreencherComIA}
+        preenchendoComIA={preenchendoComIA}
       />
 
       <ProdutosNovoPrecosSection

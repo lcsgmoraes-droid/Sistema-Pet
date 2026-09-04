@@ -331,7 +331,9 @@ export function descreverCupomMargem(cupomParaFinalizar, formatarValor = (valor)
     return "";
   }
 
-  return `A margem ficou baixa por conta do cupom ${String(cupomParaFinalizar.code).toUpperCase()} (${formatarValor(Number(cupomParaFinalizar.discount_applied || 0))} de desconto).`;
+  const codigos = String(cupomParaFinalizar.code).toUpperCase();
+  const rotulo = codigos.includes(",") ? "dos cupons" : "do cupom";
+  return `A margem ficou baixa por conta ${rotulo} ${codigos} (${formatarValor(Number(cupomParaFinalizar.discount_applied || 0))} de desconto).`;
 }
 
 export function montarObservacoesComJustificativaMargem({

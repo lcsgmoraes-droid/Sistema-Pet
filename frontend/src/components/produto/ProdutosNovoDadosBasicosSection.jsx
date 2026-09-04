@@ -1,4 +1,4 @@
-import { Plus } from "lucide-react";
+import { Loader2, Plus, Sparkles } from "lucide-react";
 import { useMemo, useState } from "react";
 import SafeMarkdown from "../ui/SafeMarkdown";
 import {
@@ -18,6 +18,9 @@ export default function ProdutosNovoDadosBasicosSection({
   handleGerarSKU,
   marcas,
   onNovoCatalogo,
+  assistenteIAAviso,
+  onPreencherComIA,
+  preenchendoComIA,
 }) {
   const [descricaoModo, setDescricaoModo] = useState("editar");
   const descricaoNormalizada = useMemo(
@@ -212,15 +215,27 @@ export default function ProdutosNovoDadosBasicosSection({
         <div className="md:col-span-3">
           <div className="mb-1 flex items-center justify-between gap-2">
             <label className="block text-sm font-medium text-gray-700">Descricao</label>
-            <SegmentedControl
-              ariaLabel="Modo da descricao do produto"
-              value={descricaoModo}
-              onChange={setDescricaoModo}
-              options={[
-                { value: "editar", label: "Editar" },
-                { value: "previa", label: "Previa" },
-              ]}
-            />
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              <ActionButton
+                type="button"
+                icon={preenchendoComIA ? Loader2 : Sparkles}
+                onClick={onPreencherComIA}
+                disabled={preenchendoComIA || !formData.codigo_barras}
+                intent="create"
+                size="sm"
+              >
+                {preenchendoComIA ? "Pesquisando..." : "Preencher com IA"}
+              </ActionButton>
+              <SegmentedControl
+                ariaLabel="Modo da descricao do produto"
+                value={descricaoModo}
+                onChange={setDescricaoModo}
+                options={[
+                  { value: "editar", label: "Editar" },
+                  { value: "previa", label: "Previa" },
+                ]}
+              />
+            </div>
           </div>
 
           {descricaoModo === "editar" ? (
@@ -237,6 +252,15 @@ export default function ProdutosNovoDadosBasicosSection({
               <SafeMarkdown value={descricaoNormalizada} empty="Sem descricao" />
             </div>
           )}
+          <p className="mt-1 text-xs text-gray-500">
+            A IA pesquisa pelo EAN, prepara a descricao e sugere NCM, CEST e origem. Revise os dados
+            fiscais antes de salvar.
+          </p>
+          {assistenteIAAviso ? (
+            <p className="mt-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+              {assistenteIAAviso}
+            </p>
+          ) : null}
         </div>
       </div>
     </>

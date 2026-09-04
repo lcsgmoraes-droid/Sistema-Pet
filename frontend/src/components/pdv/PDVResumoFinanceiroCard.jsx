@@ -28,6 +28,13 @@ export default function PDVResumoFinanceiroCard({
           discount_applied: vendaAtual.cupom_discount_applied ?? vendaAtual.desconto_valor ?? 0,
         }
       : null);
+  const cuponsExibicao = cupomExibicao
+    ? cupomExibicao.items ||
+      String(cupomExibicao.code || "")
+        .split(",")
+        .filter(Boolean)
+        .map((code) => ({ code, discount_applied: null }))
+    : [];
   const descontoPercentualTexto = cupomExibicao
     ? `Cupom ${String(cupomExibicao.code || "").toUpperCase()} aplicado:`
     : vendaAtual.desconto_valor > 0 && totalBruto > 0
@@ -75,29 +82,42 @@ export default function PDVResumoFinanceiroCard({
             <div className="border rounded-lg p-3 bg-purple-50 border-purple-200">
               <div className="flex items-center gap-1 mb-2">
                 <Tag className="w-3.5 h-3.5 text-purple-600" />
-                <span className="text-xs font-medium text-purple-700">Cupom de desconto</span>
+                <span className="text-xs font-medium text-purple-700">Cupons de desconto</span>
               </div>
               {cupomExibicao ? (
-                <div className="flex items-center justify-between">
-                  <div>
-                    <span className="text-xs font-bold text-purple-800 bg-purple-100 px-2 py-0.5 rounded font-mono">
-                      {cupomExibicao.code}
-                    </span>
-                    <span className="ml-2 text-xs text-green-700 font-medium">
-                      - {formatMoneyBRL(cupomExibicao.discount_applied)}
-                    </span>
-                  </div>
-                  {!modoVisualizacao && (
-                    <button
-                      onClick={onRemoverCupom}
-                      className="text-xs text-red-500 hover:text-red-700 flex items-center gap-0.5"
-                      title="Remover cupom"
-                    >
-                      <X className="w-3 h-3" /> Remover
-                    </button>
-                  )}
+                <div className="space-y-2">
+                  {cuponsExibicao.map((cupom) => (
+                    <div key={cupom.code} className="flex items-center justify-between gap-2">
+                      <div>
+                        <span className="text-xs font-bold text-purple-800 bg-purple-100 px-2 py-0.5 rounded font-mono">
+                          {cupom.code}
+                        </span>
+                        {Number(cupom.discount_applied || 0) > 0 ? (
+                          <span className="ml-2 text-xs text-green-700 font-medium">
+                            - {formatMoneyBRL(cupom.discount_applied)}
+                          </span>
+                        ) : null}
+                      </div>
+                      {!modoVisualizacao && (
+                        <button
+                          type="button"
+                          onClick={() => onRemoverCupom(cupom.code)}
+                          className="text-xs text-red-500 hover:text-red-700 flex items-center gap-0.5"
+                          title={`Remover cupom ${cupom.code}`}
+                        >
+                          <X className="w-3 h-3" /> Remover
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                  {cuponsExibicao.length > 1 ? (
+                    <p className="text-xs font-semibold text-green-700">
+                      Desconto total dos cupons: {formatMoneyBRL(cupomExibicao.discount_applied)}
+                    </p>
+                  ) : null}
                 </div>
-              ) : !modoVisualizacao ? (
+              ) : null}
+              {!modoVisualizacao ? (
                 <div className="flex gap-2">
                   <input
                     type="text"

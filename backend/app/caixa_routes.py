@@ -50,6 +50,36 @@ class MovimentacaoSchema(BaseModel):
     tipo_despesa_id: Optional[int] = None
 
 
+def _ultimo_caixa_fechado(db: Session, *, tenant_id, usuario_id: int):
+    return (
+        db.query(Caixa)
+        .filter(
+            Caixa.tenant_id == tenant_id,
+            Caixa.usuario_id == usuario_id,
+            Caixa.status == "fechado",
+            Caixa.valor_informado.is_not(None),
+        )
+        .order_by(Caixa.data_fechamento.desc(), Caixa.id.desc())
+        .first()
+    )
+
+
+def _anexar_conferencia_abertura(
+    observacoes: str | None, *, caixa_anterior: Caixa | None, valor_abertura: float
+) -> str | None:
+    if not caixa_anterior or caixa_anterior.valor_informado is None:
+        return observacoes
+    diferenca = float(valor_abertura) - float(caixa_anterior.valor_informado)
+    conferencia = (
+        f"[Conferencia de abertura] Caixa anterior #{caixa_anterior.numero_caixa}: "
+        f"R$ {float(caixa_anterior.valor_informado):.2f}; abertura: "
+        f"R$ {float(valor_abertura):.2f}; diferenca: R$ {diferenca:+.2f}."
+    )
+    return "\n".join(
+        parte for parte in ((observacoes or "").strip(), conferencia) if parte
+    )
+
+
 # Rotas
 @router.post("/abrir")
 @idempotent()  # 🔒 IDEMPOTÊNCIA: evita abertura duplicada de caixa
@@ -82,6 +112,9 @@ async def abrir_caixa(
         )
 
     # Gerar número do caixa (próximo número disponível por tenant)
+    caixa_anterior = _ultimo_caixa_fechado(
+        db, tenant_id=tenant_id, usuario_id=current_user.id
+    )
     ultimo_caixa = (
         db.query(func.max(Caixa.numero_caixa))
         .filter(Caixa.tenant_id == tenant_id)
@@ -104,7 +137,11 @@ async def abrir_caixa(
         valor_abertura=dados.valor_abertura,
         conta_origem_id=dados.conta_origem_id,
         conta_origem_nome=dados.conta_origem_nome,
-        observacoes_abertura=dados.observacoes_abertura,
+        observacoes_abertura=_anexar_conferencia_abertura(
+            dados.observacoes_abertura,
+            caixa_anterior=caixa_anterior,
+            valor_abertura=dados.valor_abertura,
+        ),
         status="aberto",
         tenant_id=tenant_id,
     )
@@ -140,6 +177,24 @@ def obter_caixa_aberto(
         return None
 
     return caixa.to_dict()
+
+
+@router.get("/conferencia-abertura")
+def obter_conferencia_abertura(
+    db: Session = Depends(get_session),
+    current_user_and_tenant=Depends(get_current_user_and_tenant),
+):
+    """Informa o ultimo fechamento do operador para conferir a proxima abertura."""
+    current_user, tenant_id = current_user_and_tenant
+    caixa = _ultimo_caixa_fechado(db, tenant_id=tenant_id, usuario_id=current_user.id)
+    if not caixa:
+        return None
+    return {
+        "caixa_id": caixa.id,
+        "numero_caixa": caixa.numero_caixa,
+        "valor_fechamento": float(caixa.valor_informado),
+        "data_fechamento": caixa.data_fechamento,
+    }
 
 
 @router.get("")
