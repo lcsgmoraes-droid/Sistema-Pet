@@ -1,9 +1,12 @@
 import { CheckCircle, FileText, Printer } from "lucide-react";
+import { useDadosCupomEmpresa } from "../hooks/useDadosCupomEmpresa";
 import { usePersistentBooleanState } from "../hooks/usePersistentBooleanState";
 import { concluirVendaComCupom } from "../utils/pdvCupomFinalizacao";
+import { ehVendaCrediario } from "../utils/pdvReceipt";
 import { CupomImpressao } from "./ImprimirCupom";
 
 const IMPRESSAO_CUPOM_STORAGE_KEY = "pdv_imprimir_cupom_ao_finalizar";
+const IMPRESSAO_CREDIARIO_STORAGE_KEY = "pdv_imprimir_crediario_ao_finalizar";
 
 export default function ModalPerguntaNFe({
   cliente,
@@ -13,12 +16,14 @@ export default function ModalPerguntaNFe({
   onEmitir,
   venda,
 }) {
+  const crediario = ehVendaCrediario(venda);
   const [imprimirCupom, setImprimirCupom] = usePersistentBooleanState(
-    IMPRESSAO_CUPOM_STORAGE_KEY,
-    false,
+    crediario ? IMPRESSAO_CREDIARIO_STORAGE_KEY : IMPRESSAO_CUPOM_STORAGE_KEY,
+    crediario,
   );
+  const { carregandoEmpresa, dadosEmpresa } = useDadosCupomEmpresa();
 
-  const handleEmitirCupomFiscal = () => {
+  const handleConcluirSemNota = () => {
     concluirVendaComCupom({
       imprimirCupom,
       onConcluir: onConfirmar,
@@ -35,7 +40,9 @@ export default function ModalPerguntaNFe({
             </div>
             <div>
               <h3 className="text-lg font-bold text-gray-900">Venda Finalizada!</h3>
-              <p className="text-sm text-gray-500">Deseja emitir nota fiscal?</p>
+              <p className="text-sm text-gray-500">
+                Deseja emitir nota fiscal ou concluir com recibo?
+              </p>
             </div>
           </div>
 
@@ -77,12 +84,18 @@ export default function ModalPerguntaNFe({
             )}
 
             <button
-              onClick={handleEmitirCupomFiscal}
-              disabled={loading}
+              onClick={handleConcluirSemNota}
+              disabled={loading || (imprimirCupom && carregandoEmpresa)}
               className="flex w-full items-center justify-center space-x-2 rounded-lg bg-gray-100 px-4 py-3 font-medium text-gray-700 transition-colors hover:bg-gray-200 disabled:opacity-50"
             >
               <Printer className="h-5 w-5" />
-              <span>Emitir cupom fiscal</span>
+              <span>
+                {imprimirCupom
+                  ? crediario
+                    ? "Imprimir 2 vias e concluir"
+                    : "Imprimir recibo e concluir"
+                  : "Concluir sem nota fiscal"}
+              </span>
             </button>
 
             <label
@@ -96,11 +109,15 @@ export default function ModalPerguntaNFe({
                 disabled={loading}
                 className="h-3.5 w-3.5 rounded border-gray-300 text-gray-500 focus:ring-1 focus:ring-gray-400 disabled:opacity-50"
               />
-              <span>Imprimir automaticamente</span>
+              <span>
+                {crediario
+                  ? "Imprimir comprovante de crediário em 2 vias"
+                  : "Imprimir recibo do PDV ao concluir"}
+              </span>
             </label>
           </div>
 
-          <CupomImpressao portal venda={venda} />
+          <CupomImpressao empresa={dadosEmpresa} portal venda={venda} />
         </div>
       </div>
     </div>

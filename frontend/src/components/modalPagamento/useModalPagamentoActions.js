@@ -9,6 +9,7 @@ import {
   extrairAcaoCorrecaoFiscal,
   extrairMensagemNFe,
 } from "../../utils/nfeFiscalAssistida";
+import { ehVendaCrediario } from "../../utils/pdvReceipt";
 import { montarPayloadVenda } from "../../utils/pdvVendaPayload";
 import {
   devePerguntarNotaFiscal,
@@ -243,8 +244,29 @@ export function useModalPagamentoActions({
         cupom_discount_applied: cupomParaFinalizar?.discount_applied ?? null,
       });
 
+      const tiposPorFormaId = new Map(
+        pagamentos
+          .filter((pagamento) => pagamento.forma_pagamento_id && pagamento.forma_pagamento_tipo)
+          .map((pagamento) => [
+            String(pagamento.forma_pagamento_id),
+            pagamento.forma_pagamento_tipo,
+          ]),
+      );
+      const pagamentosBase = resultado.pagamentos?.length ? resultado.pagamentos : pagamentos;
+      const pagamentosResultado = pagamentosBase.map((pagamento) => ({
+        ...pagamento,
+        forma_pagamento_tipo:
+          pagamento.forma_pagamento_tipo ||
+          tiposPorFormaId.get(String(pagamento.forma_pagamento_id || "")) ||
+          null,
+      }));
+      const vendaParaCupom = { ...resultado, pagamentos: pagamentosResultado };
+
       setVendaFinalizadaId(vendaId);
-      setVendaFinalizadaParaCupom(resultado);
+      setVendaFinalizadaParaCupom({
+        ...vendaParaCupom,
+        eh_crediario: ehVendaCrediario(vendaParaCupom),
+      });
 
       if (devePerguntarNotaFiscal(resultado)) {
         setMostrarPerguntaNFe(true);
