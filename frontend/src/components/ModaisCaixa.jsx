@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
-import { X, TrendingUp, TrendingDown, Receipt, AlertCircle } from "lucide-react";
+import { X, TrendingUp, TrendingDown, Receipt, AlertCircle, Plus } from "lucide-react";
 import { adicionarMovimentacao, obterCaixaAberto } from "../api/caixa";
 import api from "../api";
+import CurrencyInput from "./CurrencyInput";
 import FornecedorSelector from "./fornecedores/FornecedorSelector";
 import { useEscapeToClose } from "../utils/modalEscape";
 
@@ -247,14 +248,23 @@ export function ModalSangria({ caixaId, saldoAtual, onClose, onSucesso }) {
 export function ModalDespesa({ caixaId, onClose, onSucesso }) {
   const [tipoDespesaId, setTipoDespesaId] = useState("");
   const [tiposDespesa, setTiposDespesa] = useState([]);
+  const [subcategoriasDre, setSubcategoriasDre] = useState([]);
+  const [mostrarNovoTipo, setMostrarNovoTipo] = useState(false);
+  const [novoTipo, setNovoTipo] = useState({
+    nome: "",
+    e_custo_fixo: true,
+    dre_subcategoria_id: "",
+  });
   const [descricao, setDescricao] = useState("");
-  const [valor, setValor] = useState("");
+  const [valor, setValor] = useState(0);
   const [formaPagamento, setFormaPagamento] = useState("Dinheiro");
   const [fornecedor, setFornecedor] = useState("");
   const [documento, setDocumento] = useState("");
   const [carregandoTipos, setCarregandoTipos] = useState(false);
+  const [salvandoTipo, setSalvandoTipo] = useState(false);
   const [loading, setLoading] = useState(false);
   const [erro, setErro] = useState("");
+  const [mensagemTipo, setMensagemTipo] = useState("");
 
   useEffect(() => {
     let mounted = true;
@@ -262,10 +272,16 @@ export function ModalDespesa({ caixaId, onClose, onSucesso }) {
     const carregarTiposDespesa = async () => {
       try {
         setCarregandoTipos(true);
-        const res = await api.get("/cadastros/tipo-despesa/");
+        const [tiposRes, subcategoriasRes] = await Promise.allSettled([
+          api.get("/cadastros/tipo-despesa/"),
+          api.get("/dre/subcategorias"),
+        ]);
         if (!mounted) return;
-        const tiposAtivos = Array.isArray(res.data)
-          ? res.data.filter((item) => item?.ativo !== false)
+        const tiposData = tiposRes.status === "fulfilled" ? tiposRes.value.data : [];
+        const subcategoriasData =
+          subcategoriasRes.status === "fulfilled" ? subcategoriasRes.value.data : [];
+        const tiposAtivos = Array.isArray(tiposData)
+          ? tiposData.filter((item) => item?.ativo !== false)
           : [];
         tiposAtivos.sort((a, b) =>
           String(a?.nome || "").localeCompare(String(b?.nome || ""), "pt-BR", {
@@ -273,9 +289,15 @@ export function ModalDespesa({ caixaId, onClose, onSucesso }) {
           }),
         );
         setTiposDespesa(tiposAtivos);
+        setSubcategoriasDre(
+          Array.isArray(subcategoriasData)
+            ? subcategoriasData.filter((item) => item?.ativo !== false)
+            : [],
+        );
       } catch {
         if (!mounted) return;
         setTiposDespesa([]);
+        setSubcategoriasDre([]);
       } finally {
         if (mounted) setCarregandoTipos(false);
       }
@@ -286,6 +308,58 @@ export function ModalDespesa({ caixaId, onClose, onSucesso }) {
       mounted = false;
     };
   }, []);
+
+  const handleCriarTipoDespesa = async () => {
+    const nome = novoTipo.nome.trim();
+    if (!nome) {
+      setErro("Informe o nome do novo tipo de despesa");
+      return;
+    }
+    if (!novoTipo.dre_subcategoria_id) {
+      setErro("Selecione a categoria DRE do novo tipo de despesa");
+      return;
+    }
+
+    const existente = tiposDespesa.find(
+      (item) =>
+        String(item.nome || "")
+          .trim()
+          .toLocaleLowerCase("pt-BR") === nome.toLocaleLowerCase("pt-BR"),
+    );
+    if (existente) {
+      setTipoDespesaId(String(existente.id));
+      setMostrarNovoTipo(false);
+      setErro("");
+      setMensagemTipo(`O tipo "${existente.nome}" já existia e foi selecionado.`);
+      return;
+    }
+
+    try {
+      setSalvandoTipo(true);
+      setErro("");
+      setMensagemTipo("");
+      const response = await api.post("/cadastros/tipo-despesa/", {
+        nome,
+        e_custo_fixo: novoTipo.e_custo_fixo,
+        dre_subcategoria_id: Number(novoTipo.dre_subcategoria_id),
+      });
+      const tipoCriado = response.data;
+      const listaAtualizada = [...tiposDespesa, tipoCriado].sort((a, b) =>
+        String(a?.nome || "").localeCompare(String(b?.nome || ""), "pt-BR", {
+          sensitivity: "base",
+        }),
+      );
+      setTiposDespesa(listaAtualizada);
+      setTipoDespesaId(String(tipoCriado.id));
+      setNovoTipo({ nome: "", e_custo_fixo: true, dre_subcategoria_id: "" });
+      setMostrarNovoTipo(false);
+      setMensagemTipo(`Tipo "${tipoCriado.nome}" cadastrado e selecionado.`);
+    } catch (error) {
+      setErro(error.response?.data?.detail || "Erro ao cadastrar o tipo de despesa");
+    } finally {
+      setSalvandoTipo(false);
+    }
+  };
 
   const handleSalvar = async () => {
     const valorNum = parseFloat(valor);
@@ -344,11 +418,29 @@ export function ModalDespesa({ caixaId, onClose, onSucesso }) {
     >
       <div className="space-y-4">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Tipo de despesa*</label>
+          <div className="mb-2 flex items-center justify-between gap-3">
+            <label className="block text-sm font-medium text-gray-700">Tipo de despesa*</label>
+            <button
+              type="button"
+              onClick={() => {
+                setMostrarNovoTipo((atual) => !atual);
+                setErro("");
+                setMensagemTipo("");
+              }}
+              className="inline-flex items-center gap-1 rounded-lg border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700 hover:bg-blue-100"
+              aria-expanded={mostrarNovoTipo}
+              title="Cadastrar um novo tipo de despesa"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              Novo tipo
+            </button>
+          </div>
           <select
             value={tipoDespesaId}
             onChange={(e) => {
               setTipoDespesaId(e.target.value);
+              setErro("");
+              setMensagemTipo("");
             }}
             className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
             disabled={carregandoTipos}
@@ -360,10 +452,84 @@ export function ModalDespesa({ caixaId, onClose, onSucesso }) {
               </option>
             ))}
           </select>
+          {mensagemTipo && <p className="mt-2 text-xs text-green-700">{mensagemTipo}</p>}
           {!carregandoTipos && tiposDespesa.length === 0 && (
             <p className="text-xs text-amber-700 mt-2">
-              Nenhum tipo ativo encontrado. Cadastre em Cadastros &gt; Despesas Rapidas (PDV).
+              Nenhum tipo ativo encontrado. Use “Novo tipo” para cadastrar aqui mesmo.
             </p>
+          )}
+          {mostrarNovoTipo && (
+            <div className="mt-3 space-y-3 rounded-lg border border-blue-200 bg-blue-50 p-3">
+              <div>
+                <label className="mb-1 block text-xs font-semibold text-blue-900">Nome*</label>
+                <input
+                  type="text"
+                  value={novoTipo.nome}
+                  onChange={(e) => setNovoTipo((atual) => ({ ...atual, nome: e.target.value }))}
+                  className="w-full rounded-lg border border-blue-200 bg-white px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500"
+                  placeholder="Ex: Material de limpeza"
+                  autoFocus
+                />
+              </div>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div>
+                  <label className="mb-1 block text-xs font-semibold text-blue-900">Custo*</label>
+                  <select
+                    value={novoTipo.e_custo_fixo ? "fixo" : "variavel"}
+                    onChange={(e) =>
+                      setNovoTipo((atual) => ({
+                        ...atual,
+                        e_custo_fixo: e.target.value === "fixo",
+                      }))
+                    }
+                    className="w-full rounded-lg border border-blue-200 bg-white px-3 py-2 text-sm"
+                  >
+                    <option value="fixo">Fixo</option>
+                    <option value="variavel">Variável</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-semibold text-blue-900">
+                    Categoria DRE*
+                  </label>
+                  <select
+                    value={novoTipo.dre_subcategoria_id}
+                    onChange={(e) =>
+                      setNovoTipo((atual) => ({
+                        ...atual,
+                        dre_subcategoria_id: e.target.value,
+                      }))
+                    }
+                    className="w-full rounded-lg border border-blue-200 bg-white px-3 py-2 text-sm"
+                  >
+                    <option value="">Selecione...</option>
+                    {subcategoriasDre.map((subcategoria) => (
+                      <option key={subcategoria.id} value={String(subcategoria.id)}>
+                        {subcategoria.nome}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              <div className="flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setMostrarNovoTipo(false)}
+                  disabled={salvandoTipo}
+                  className="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-700"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={handleCriarTipoDespesa}
+                  disabled={salvandoTipo}
+                  className="rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-60"
+                >
+                  {salvandoTipo ? "Cadastrando..." : "Cadastrar e selecionar"}
+                </button>
+              </div>
+            </div>
           )}
         </div>
 
@@ -399,11 +565,9 @@ export function ModalDespesa({ caixaId, onClose, onSucesso }) {
             <label className="block text-sm font-medium text-gray-700 mb-2">Valor*</label>
             <div className="relative">
               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">R$</span>
-              <input
-                type="number"
-                step="0.01"
+              <CurrencyInput
                 value={valor}
-                onChange={(e) => setValor(e.target.value)}
+                onChange={setValor}
                 className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
               />
             </div>
@@ -483,7 +647,7 @@ function ModalBase({ titulo, icone: Icone, corIcone, children, onClose, erro }) 
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4">
+      <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-lg bg-white shadow-xl mx-4">
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b">
           <div className="flex items-center space-x-3">

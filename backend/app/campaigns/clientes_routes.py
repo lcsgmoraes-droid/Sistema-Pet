@@ -283,6 +283,7 @@ def saldo_cliente(
             Coupon.tenant_id == tenant_id,
             Coupon.customer_id == customer_id,
             Coupon.status == CouponStatusEnum.active,
+            sql_or_(Coupon.valid_until.is_(None), Coupon.valid_until >= now_utc),
         )
         .order_by(Coupon.id.desc())
         .limit(10)

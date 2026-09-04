@@ -327,6 +327,7 @@ async def registrar_recebimento(
     db.add(novo_recebimento)
 
     db.commit()
+    db.refresh(novo_recebimento)
 
     logger.info(f"✅ Recebimento registrado: R$ {valor_baixa} - Conta {conta_id}")
 
@@ -428,6 +429,13 @@ async def registrar_recebimento(
             if recebimento.aplicar_encargos_automaticos
             else None
         ),
+        "recebimento": {
+            "id": novo_recebimento.id,
+            "valor": float(novo_recebimento.valor_recebido),
+            "data": novo_recebimento.data_recebimento.isoformat(),
+            "forma_pagamento_id": novo_recebimento.forma_pagamento_id,
+            "observacoes": novo_recebimento.observacoes,
+        },
     }
 
     if comissao_gerada and comissao_info:

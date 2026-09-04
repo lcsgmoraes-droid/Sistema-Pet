@@ -2,9 +2,11 @@ import { AlertTriangle, Check, Copy, CreditCard, History, Plus, User, Wallet } f
 import { useLocation, useNavigate } from "react-router-dom";
 import { formatBRL, formatMoneyBRL } from "../../utils/formatters";
 import { getClienteAlertasPdvAtivos } from "../../utils/clienteAlertasPdv";
+import { filtrarCuponsValidosPdv } from "../../utils/pdvCuponsAtivos";
 import { buildPdvCouponTooltip } from "../../utils/pdvCouponTooltip";
 import { buildReturnTo } from "../../utils/petReturnFlow";
 import { calcularResumoEmAbertoCliente } from "../../utils/pdvClienteFinanceiro";
+import ImprimirSaldoCredito from "../ImprimirSaldoCredito";
 import PessoaSelector from "../clientes/PessoaSelector";
 import ActionButton from "../ui/ActionButton";
 import CustomerIdentity from "../ui/CustomerIdentity";
@@ -181,7 +183,7 @@ function ClienteFidelidadeResumo({
   );
 }
 
-function ClienteCreditoResumo({ creditoCliente }) {
+function ClienteCreditoResumo({ cliente, creditoCliente }) {
   return (
     <div>
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1 font-semibold text-blue-950">
@@ -195,6 +197,9 @@ function ClienteCreditoResumo({ creditoCliente }) {
       </div>
       <div className="mt-1 text-xs text-blue-700">
         Este credito pode ser usado como forma de pagamento
+      </div>
+      <div className="mt-2">
+        <ImprimirSaldoCredito cliente={cliente} saldo={creditoCliente} />
       </div>
     </div>
   );
@@ -296,7 +301,7 @@ function ClienteResumoSelecionado({
       </div>
 
       <div className="flex min-w-0 flex-col gap-2 bg-blue-50 px-3 py-3">
-        <ClienteCreditoResumo creditoCliente={creditoCliente} />
+        <ClienteCreditoResumo cliente={cliente} creditoCliente={creditoCliente} />
       </div>
     </EntityCard>
   );
@@ -461,7 +466,7 @@ export default function PDVClienteCard({
     saldoCarimbos < 0 ? Math.abs(saldoCarimbos) : 0,
   );
   const creditoCliente = Number(cliente?.credito || 0);
-  const cuponsAtivos = saldoCampanhas?.cupons_ativos || [];
+  const cuponsAtivos = filtrarCuponsValidosPdv(saldoCampanhas?.cupons_ativos);
   const resumoEmAberto = calcularResumoEmAbertoCliente(vendasEmAbertoInfo);
   const telefoneCliente = cliente?.telefone || cliente?.celular || cliente?.whatsapp || "";
   const codigoCliente = cliente?.codigo || cliente?.id || "";

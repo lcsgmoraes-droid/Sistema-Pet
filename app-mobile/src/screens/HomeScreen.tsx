@@ -14,6 +14,7 @@ import {
 import Svg, { Circle, Path } from 'react-native-svg';
 import HeaderProfileActions from '../components/HeaderProfileActions';
 import StoreContextBadge from '../components/StoreContextBadge';
+import * as AuthService from '../services/auth.service';
 import { listarNotificacoesApp } from '../services/appNotifications.service';
 import { listarOfertasAtivas, listarProdutos, OfertaAtiva } from '../services/shop.service';
 import { useAuthStore } from '../store/auth.store';
@@ -29,7 +30,7 @@ type HomeIconName =
   | 'food-bag-bone';
 
 export default function HomeScreen() {
-  const { user, isAuthenticated } = useAuthStore();
+  const { user, isAuthenticated, updateUser } = useAuthStore();
   const navigation = useNavigation<any>();
   const requireAuth = useRequireAuth(navigation);
   const [produtos, setProdutos] = useState<Produto[]>([]);
@@ -67,10 +68,21 @@ export default function HomeScreen() {
     }
   }, [isAuthenticated]);
 
+  const atualizarPerfil = useCallback(async () => {
+    if (!isAuthenticated) return;
+    try {
+      const perfil = await AuthService.getProfile();
+      updateUser(perfil);
+    } catch {
+      // Mantem os dados locais quando a atualizacao do perfil estiver indisponivel.
+    }
+  }, [isAuthenticated, updateUser]);
+
   useFocusEffect(
     useCallback(() => {
       void carregarNotificacoesNaoLidas();
-    }, [carregarNotificacoesNaoLidas]),
+      void atualizarPerfil();
+    }, [atualizarPerfil, carregarNotificacoesNaoLidas]),
   );
 
   async function onRefresh() {
@@ -78,6 +90,7 @@ export default function HomeScreen() {
     await Promise.all([
       carregar(),
       isAuthenticated ? carregarNotificacoesNaoLidas() : Promise.resolve(),
+      isAuthenticated ? atualizarPerfil() : Promise.resolve(),
     ]);
     setRefreshing(false);
   }
@@ -91,6 +104,7 @@ export default function HomeScreen() {
 
   const primeiroNome = user?.nome?.split(' ')[0];
   const pontos = user?.pontos ?? 0;
+  const creditoDisponivel = Math.max(0, Number(user?.credito ?? 0));
 
   return (
     <ScrollView
@@ -155,6 +169,19 @@ export default function HomeScreen() {
       <View style={styles.storeContext}>
         <StoreContextBadge />
       </View>
+
+      {isAuthenticated && creditoDisponivel > 0 ? (
+        <View style={styles.creditoCard}>
+          <View style={styles.creditoIcone}>
+            <Ionicons name="wallet-outline" size={24} color="#047857" />
+          </View>
+          <View style={styles.creditoInfo}>
+            <Text style={styles.creditoTitulo}>Você tem crédito disponível</Text>
+            <Text style={styles.creditoValor}>{formatarMoeda(creditoDisponivel)}</Text>
+            <Text style={styles.creditoTexto}>Use como forma de pagamento na loja.</Text>
+          </View>
+        </View>
+      ) : null}
 
       {ofertas.length > 0 ? (
         <View style={styles.ofertasSection}>
@@ -629,6 +656,39 @@ const styles = StyleSheet.create({
     marginHorizontal: ESPACO.lg,
     marginTop: ESPACO.md,
   },
+  creditoCard: {
+    marginHorizontal: ESPACO.lg,
+    marginTop: ESPACO.md,
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
+    backgroundColor: '#ECFDF5',
+    borderRadius: RAIO.md,
+    padding: ESPACO.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: ESPACO.sm,
+  },
+  creditoIcone: {
+    width: 44,
+    height: 44,
+    borderRadius: RAIO.circulo,
+    backgroundColor: '#D1FAE5',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  creditoInfo: { flex: 1 },
+  creditoTitulo: {
+    color: '#065F46',
+    fontSize: FONTE.pequena,
+    fontWeight: '700',
+  },
+  creditoValor: {
+    color: '#047857',
+    fontSize: FONTE.grande,
+    fontWeight: '900',
+    marginTop: 1,
+  },
+  creditoTexto: { color: '#047857', fontSize: FONTE.pequena, marginTop: 1 },
   ofertasSection: {
     marginTop: ESPACO.lg,
     marginBottom: ESPACO.md,

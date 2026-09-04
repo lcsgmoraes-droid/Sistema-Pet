@@ -4,6 +4,7 @@ from decimal import Decimal
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel
 from sqlalchemy import bindparam, case, exists, func, or_, select, text
 from sqlalchemy.orm import Query as SqlAlchemyQuery
 from sqlalchemy.orm import Session, joinedload, selectinload
@@ -25,6 +26,10 @@ from app.vendas.entrega_filters import filtros_venda_entrega_operacional
 from app.vendas_models import Venda
 
 router = APIRouter()
+
+
+class EntregadorVendaPendenteUpdate(BaseModel):
+    entregador_id: int
 
 
 def _hidratar_localizacao_rota(db: Session, rota: RotaEntrega, tenant_id: int) -> bool:
@@ -438,6 +443,60 @@ def listar_vendas_pendentes_entrega(
         }
         for v in vendas
     ]
+
+
+@router.patch("/vendas-pendentes/{venda_id}/entregador")
+def atualizar_entregador_venda_pendente(
+    venda_id: int,
+    payload: EntregadorVendaPendenteUpdate,
+    db: Session = Depends(get_session),
+    user_and_tenant=Depends(get_current_user_and_tenant),
+):
+    """Troca o entregador enquanto a entrega ainda nao foi vinculada a uma rota."""
+    _user, tenant_id = user_and_tenant
+    venda = (
+        db.query(Venda)
+        .filter(
+            Venda.id == venda_id,
+            Venda.tenant_id == tenant_id,
+            Venda.tem_entrega.is_(True),
+            or_(
+                Venda.status_entrega.in_(["pendente", "pronto"]),
+                Venda.status_entrega.is_(None),
+            ),
+        )
+        .first()
+    )
+    if not venda:
+        raise HTTPException(
+            status_code=404,
+            detail="Entrega pendente nao encontrada ou ja vinculada a uma rota",
+        )
+
+    entregador = (
+        db.query(Cliente)
+        .filter(
+            Cliente.id == payload.entregador_id,
+            Cliente.tenant_id == tenant_id,
+            Cliente.is_entregador.is_(True),
+            Cliente.ativo.is_(True),
+            Cliente.entregador_ativo.is_(True),
+        )
+        .first()
+    )
+    if not entregador:
+        raise HTTPException(status_code=400, detail="Entregador invalido ou inativo")
+
+    venda.entregador_id = entregador.id
+    db.commit()
+
+    return {
+        "id": venda.id,
+        "numero_venda": venda.numero_venda,
+        "entregador_id": entregador.id,
+        "entregador_nome": entregador.nome,
+        "status_entrega": venda.status_entrega or "pendente",
+    }
 
 
 @router.get("/{rota_id}", response_model=RotaEntregaResponse)
