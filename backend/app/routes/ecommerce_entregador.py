@@ -244,6 +244,7 @@ def listar_entregas_abertas(
         .options(joinedload(Venda.cliente), selectinload(Venda.pagamentos))
         .filter(
             Venda.tenant_id == tenant_id,
+            Venda.status != "cancelada",
             Venda.tem_entrega.is_(True),
             or_(
                 Venda.status_entrega.in_(["pendente", "pronto"]),
@@ -315,6 +316,7 @@ def otimizar_entregas_selecionadas(
         .filter(
             Venda.tenant_id == tenant_id,
             Venda.id.in_(payload.venda_ids),
+            Venda.status != "cancelada",
             Venda.tem_entrega.is_(True),
             or_(
                 Venda.status_entrega.in_(["pendente", "pronto"]),
@@ -370,6 +372,7 @@ def criar_rota_por_entregador(
         .filter(
             Venda.tenant_id == tenant_id,
             Venda.id.in_(payload.venda_ids),
+            Venda.status != "cancelada",
             Venda.tem_entrega.is_(True),
             or_(
                 Venda.status_entrega.in_(["pendente", "pronto"]),

@@ -64,6 +64,7 @@ def otimizar_vendas_pendentes(
         db.query(Venda)
         .filter(
             Venda.tenant_id == tenant_id,
+            Venda.status != "cancelada",
             Venda.tem_entrega.is_(True),
             ~Venda.status_entrega.in_(["entregue", "cancelada"]),
             Venda.endereco_entrega.isnot(None),
@@ -183,6 +184,7 @@ def otimizar_vendas_selecionadas(
         .filter(
             Venda.tenant_id == tenant_id,
             Venda.id.in_(payload.venda_ids),
+            Venda.status != "cancelada",
             Venda.tem_entrega.is_(True),
             Venda.endereco_entrega.isnot(None),
         )

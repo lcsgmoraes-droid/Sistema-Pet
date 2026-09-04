@@ -86,7 +86,7 @@ class Venda(BaseTenantModel):
     observacoes_entrega = Column(Text, nullable=True)
     status_entrega = Column(
         String(20), nullable=True
-    )  # pendente, em_rota, entregue, cancelado
+    )  # pendente, pronto, em_rota, entregue, cancelada
     data_entrega = Column(DateTime, nullable=True)
     ordem_entrega_otimizada = Column(
         Integer, nullable=True, index=True

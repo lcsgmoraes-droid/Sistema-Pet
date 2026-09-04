@@ -292,8 +292,12 @@ def cancelar_venda(
             logger.info(
                 f"📋 Total de paradas de entrega removidas: {paradas_removidas}"
             )
-            # Reverter status de entrega
-            venda.status_entrega = None
+
+        # A venda permanece no historico por auditoria, mas nao pode continuar
+        # disponivel nas filas operacionais de entrega.
+        if venda.tem_entrega:
+            venda.status_entrega = "cancelada"
+            venda.ordem_entrega_otimizada = None
 
         # ============================================================
         # ETAPA 7: ESTORNAR COMISSÕES

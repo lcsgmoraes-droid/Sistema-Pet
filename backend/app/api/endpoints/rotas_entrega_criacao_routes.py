@@ -81,16 +81,18 @@ def criar_rota(
     if vendas_ids and len(vendas_ids) > 0:
         # Buscar vendas
         vendas_query = db.query(Venda).filter(
-            Venda.id.in_(vendas_ids), Venda.tenant_id == tenant_id
+            Venda.id.in_(vendas_ids),
+            Venda.tenant_id == tenant_id,
+            Venda.status != "cancelada",
+            Venda.tem_entrega.is_(True),
+            or_(
+                Venda.status_entrega.in_(["pendente", "pronto"]),
+                Venda.status_entrega.is_(None),
+            ),
+            Venda.endereco_entrega.isnot(None),
         )
         if actor.entregador is not None:
             vendas_query = vendas_query.filter(
-                Venda.tem_entrega.is_(True),
-                or_(
-                    Venda.status_entrega.in_(["pendente", "pronto"]),
-                    Venda.status_entrega.is_(None),
-                ),
-                Venda.endereco_entrega.isnot(None),
                 or_(
                     Venda.entregador_id == actor.entregador.id,
                     Venda.entregador_id.is_(None),
@@ -243,16 +245,18 @@ def criar_rota(
     # Modo tradicional: rota com 1 venda apenas
     # Buscar venda para obter endereço de destino
     venda_query = db.query(Venda).filter(
-        Venda.id == payload.venda_id, Venda.tenant_id == tenant_id
+        Venda.id == payload.venda_id,
+        Venda.tenant_id == tenant_id,
+        Venda.status != "cancelada",
+        Venda.tem_entrega.is_(True),
+        or_(
+            Venda.status_entrega.in_(["pendente", "pronto"]),
+            Venda.status_entrega.is_(None),
+        ),
+        Venda.endereco_entrega.isnot(None),
     )
     if actor.entregador is not None:
         venda_query = venda_query.filter(
-            Venda.tem_entrega.is_(True),
-            or_(
-                Venda.status_entrega.in_(["pendente", "pronto"]),
-                Venda.status_entrega.is_(None),
-            ),
-            Venda.endereco_entrega.isnot(None),
             or_(
                 Venda.entregador_id == actor.entregador.id,
                 Venda.entregador_id.is_(None),

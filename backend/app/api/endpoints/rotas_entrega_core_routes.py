@@ -378,6 +378,7 @@ def listar_vendas_pendentes_entrega(
         db.query(Venda)
         .filter(
             Venda.tenant_id == tenant_id,
+            Venda.status != "cancelada",
             Venda.tem_entrega.is_(True),
             # Aceita vendas fora de rota, inclusive pedido online ja separado.
             Venda.status_entrega.in_(["pendente", "pronto"])
