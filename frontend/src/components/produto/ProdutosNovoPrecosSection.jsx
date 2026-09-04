@@ -1,11 +1,8 @@
 import PromocaoFields from "./PromocaoFields";
+import MargemPrecoField from "./MargemPrecoField";
 
 function formatMoeda(value, parseNumber) {
   return value ? `R$ ${parseNumber(value).toFixed(2).replace(".", ",")}` : "R$ 0,00";
-}
-
-function formatPercentual(value, parseNumber) {
-  return value ? `${parseNumber(value).toFixed(2).replace(".", ",")}%` : "0,00%";
 }
 
 export default function ProdutosNovoPrecosSection({
@@ -51,32 +48,12 @@ export default function ProdutosNovoPrecosSection({
           />
         </div>
 
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Markup</label>
-          <input
-            type="text"
-            value={
-              camposEmEdicao.markup
-                ? formData.markup || ""
-                : formatPercentual(formData.markup, parseNumber)
-            }
-            onChange={(e) => {
-              const value = e.target.value.replace(/[^\d.,]/g, "").replace(",", ".");
-              handleChange("markup", value);
-            }}
-            onFocus={(e) => {
-              setCamposEmEdicao((prev) => ({ ...prev, markup: true }));
-              e.target.select();
-            }}
-            onBlur={(e) => {
-              setCamposEmEdicao((prev) => ({ ...prev, markup: false }));
-              const value = parseNumber(e.target.value);
-              handleChange("markup", value >= 0 ? value.toFixed(2) : "");
-            }}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            placeholder="0,00%"
-          />
-        </div>
+        <MargemPrecoField
+          camposEmEdicao={camposEmEdicao}
+          formData={formData}
+          handleChange={handleChange}
+          setCamposEmEdicao={setCamposEmEdicao}
+        />
 
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Preco de Venda *</label>
