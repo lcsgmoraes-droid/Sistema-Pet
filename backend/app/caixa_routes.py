@@ -240,9 +240,7 @@ def listar_caixas(
 
     caixas = query.order_by(Caixa.data_abertura.desc()).all()
 
-    return [
-        _serializar_caixa(caixa, compartilhado=compartilhado) for caixa in caixas
-    ]
+    return [_serializar_caixa(caixa, compartilhado=compartilhado) for caixa in caixas]
 
 
 @router.get("/{caixa_id}")
