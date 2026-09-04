@@ -27,6 +27,7 @@ from app.utils.logger import configure_logging
 # Importar modelos para registrar no SQLAlchemy (IMPORTANTE: antes de criar o app)
 import app.pedido_models  # noqa: F401 - modelo base ecommerce
 import app.veterinario_models  # noqa: F401 — garante registro no SQLAlchemy
+import app.nfse_manual.models  # noqa: F401 - NFS-e emitida fora do CorePet
 import app.banho_tosa_models  # noqa: F401 - garante registro no SQLAlchemy
 import app.models  # noqa: F401 - modelos principais
 import app.template_models  # noqa: F401 - templates globais e auditoria de onboarding

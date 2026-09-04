@@ -494,6 +494,156 @@ export default function ConfiguracaoFiscalEmpresaView({
                 </div>
               </div>
             )}
+
+            <div className="border-t border-gray-200 pt-5 mt-5 space-y-4">
+              <div>
+                <h3 className="text-base font-semibold text-gray-900">
+                  Parâmetros para NFS-e e ISS
+                </h3>
+                <p className="mt-1 text-sm text-gray-600">
+                  O CorePet usa estes dados para preparar a emissão manual na Prefeitura. Confirme
+                  códigos e alíquotas com a contabilidade.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Município de incidência do ISS
+                  </label>
+                  <input
+                    type="text"
+                    name="municipio_iss"
+                    value={form.municipio_iss || ""}
+                    onChange={handleChange}
+                    placeholder="Presidente Prudente"
+                    className={classeCampo("municipio_iss")}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Código IBGE
+                  </label>
+                  <input
+                    type="text"
+                    name="municipio_iss_codigo"
+                    value={form.municipio_iss_codigo || ""}
+                    onChange={handleChange}
+                    maxLength="7"
+                    placeholder="3541406"
+                    className={classeCampo("municipio_iss_codigo")}
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Item da lista de serviços
+                  </label>
+                  <input
+                    type="text"
+                    name="nfse_item_lista_servico"
+                    value={form.nfse_item_lista_servico || ""}
+                    onChange={handleChange}
+                    placeholder="Ex.: 5.01"
+                    className={classeCampo("nfse_item_lista_servico")}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Alíquota de ISS (%)
+                  </label>
+                  <input
+                    type="number"
+                    name="iss_aliquota"
+                    value={form.iss_aliquota ?? ""}
+                    onChange={handleChange}
+                    min="0"
+                    max="100"
+                    step="0.01"
+                    placeholder="Ex.: 2,00"
+                    className={classeCampo("iss_aliquota")}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Natureza da operação
+                  </label>
+                  <select
+                    name="nfse_natureza_operacao"
+                    value={form.nfse_natureza_operacao || "1"}
+                    onChange={handleChange}
+                    className={classeCampo("nfse_natureza_operacao")}
+                  >
+                    <option value="1">Tributação no município</option>
+                    <option value="2">Tributação fora do município</option>
+                    <option value="3">Isenção</option>
+                    <option value="4">Imune</option>
+                    <option value="5">Exigibilidade suspensa</option>
+                    <option value="6">Não incidência</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Regime especial de tributação
+                  </label>
+                  <select
+                    name="nfse_regime_especial_tributacao"
+                    value={form.nfse_regime_especial_tributacao || ""}
+                    onChange={handleChange}
+                    className={classeCampo("nfse_regime_especial_tributacao")}
+                  >
+                    <option value="">Selecione com orientação contábil</option>
+                    <option value="1">Microempresa municipal</option>
+                    <option value="2">Estimativa</option>
+                    <option value="3">Sociedade de profissionais</option>
+                    <option value="4">Cooperativa</option>
+                    <option value="5">MEI</option>
+                    <option value="6">ME/EPP do Simples Nacional</option>
+                  </select>
+                </div>
+                <div className="flex flex-col justify-center gap-3 pt-2 md:pt-7">
+                  <label className="inline-flex items-center gap-2 text-sm text-gray-700">
+                    <input
+                      type="checkbox"
+                      name="iss_retido"
+                      checked={Boolean(form.iss_retido)}
+                      onChange={handleChange}
+                      className="h-4 w-4 accent-blue-600"
+                    />
+                    ISS retido pelo tomador
+                  </label>
+                  <label className="inline-flex items-center gap-2 text-sm text-gray-700">
+                    <input
+                      type="checkbox"
+                      name="nfse_incentivador_cultural"
+                      checked={Boolean(form.nfse_incentivador_cultural)}
+                      onChange={handleChange}
+                      className="h-4 w-4 accent-blue-600"
+                    />
+                    Incentivador cultural
+                  </label>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Endereço do portal municipal de NFS-e
+                </label>
+                <input
+                  type="url"
+                  name="nfse_portal_url"
+                  value={form.nfse_portal_url || ""}
+                  onChange={handleChange}
+                  placeholder="https://issprudente.sp.gov.br/"
+                  className={classeCampo("nfse_portal_url")}
+                />
+              </div>
+            </div>
           </div>
         </div>
 
