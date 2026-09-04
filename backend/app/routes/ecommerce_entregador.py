@@ -21,7 +21,7 @@ from sqlalchemy import or_
 from sqlalchemy.orm import Session, joinedload, selectinload
 
 from app.api.endpoints.rotas_entrega_core_routes import (
-    _hidratar_paradas_rota,
+    _hidratar_paradas_rotas,
     aplicar_filtros_ordenacao_rotas,
 )
 from app.api.endpoints.rotas_entrega_tracking import registrar_token_rastreio
@@ -228,8 +228,7 @@ def minhas_rotas(
     )
     rotas = query.limit(limite).all()
 
-    for rota in rotas:
-        _hidratar_paradas_rota(db, rota, tenant_id)
+    _hidratar_paradas_rotas(db, rotas, tenant_id)
 
     return rotas
 
