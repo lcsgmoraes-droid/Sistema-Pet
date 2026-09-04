@@ -189,7 +189,8 @@ def upgrade() -> None:
     )
 
     if op.get_bind().dialect.name == "postgresql":
-        op.execute(sa.text("""
+        op.execute(
+            sa.text("""
                 INSERT INTO produto_protocolos_recorrencia (
                     produto_id, nome, tipo, especie_compativel, fase_vida,
                     intervalo_recompra_dias, ajustar_ao_historico,
@@ -216,8 +217,10 @@ def upgrade() -> None:
                 FROM produtos
                 WHERE tem_recorrencia IS TRUE
                   AND intervalo_dias BETWEEN 1 AND 3650
-                """))
-        op.execute(sa.text("""
+                """)
+        )
+        op.execute(
+            sa.text("""
                 INSERT INTO produto_protocolo_doses (
                     protocolo_id, numero_dose, dias_desde_inicio, tenant_id
                 )
@@ -231,9 +234,11 @@ def upgrade() -> None:
                 CROSS JOIN LATERAL generate_series(1, produto.numero_doses)
                     AS serie(numero_dose)
                 WHERE protocolo.tipo = 'protocolo_doses'
-                """))
+                """)
+        )
 
-        op.execute(sa.text("""
+        op.execute(
+            sa.text("""
                 UPDATE lembretes lembrete
                 SET protocolo_recorrencia_id = protocolo.id,
                     tipo_lembrete = CASE
@@ -256,7 +261,8 @@ def upgrade() -> None:
                   AND protocolo.tenant_id = lembrete.tenant_id
                   AND produto.id = protocolo.produto_id
                   AND produto.tenant_id = protocolo.tenant_id
-                """))
+                """)
+        )
 
     _criar_politica_rls("produto_protocolos_recorrencia")
     _criar_politica_rls("produto_protocolo_doses")

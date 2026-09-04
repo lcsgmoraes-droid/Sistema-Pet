@@ -332,7 +332,9 @@ def process_finalized_sale_recurrence(
         completed_dose = (
             1
             if previous_kind == "reinicio_protocolo"
-            else previous.dose_atual if previous and is_protocol else 1
+            else previous.dose_atual
+            if previous and is_protocol
+            else 1
         )
         purchase_event = {
             "dose": completed_dose,
@@ -646,13 +648,9 @@ def _protocol_matches_pet(protocol, pet) -> bool:
 
 def _resolve_sale_protocol(protocols, *, requested_id, pet):
     if requested_id is not None:
-        return next(
-            (item for item in protocols if item.id == int(requested_id)), None
-        )
+        return next((item for item in protocols if item.id == int(requested_id)), None)
 
-    compatible = [
-        item for item in protocols if _protocol_matches_pet(item, pet)
-    ]
+    compatible = [item for item in protocols if _protocol_matches_pet(item, pet)]
     return compatible[0] if len(compatible) == 1 else None
 
 
