@@ -204,6 +204,24 @@ export default function ConfiguracaoFiscalEmpresaView({
               </div>
             </div>
 
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                E-mail para receber respostas
+              </label>
+              <input
+                type="email"
+                name="email_resposta"
+                value={dadosEmpresa.email_resposta}
+                onChange={handleDadosChange}
+                placeholder="compras@empresa.com.br"
+                className={classeCampo("email_resposta")}
+              />
+              <p className="mt-1 text-xs text-gray-500">
+                As respostas de fornecedores aos e-mails automáticos irão para este endereço. Se
+                ficar vazio, será usado o e-mail da empresa.
+              </p>
+            </div>
+
             {/* Linha 5: Endereço */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <div className="md:col-span-1">

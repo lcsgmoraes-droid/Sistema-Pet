@@ -26,6 +26,7 @@ from .compras_pendencias_serializacao import (
 from .compras_pendencias_utils import _normalizar_texto
 from .db import get_session
 from .services.email_service import is_email_configured, send_email
+from .services.tenant_email_settings import resolve_tenant_reply_to
 
 router = APIRouter()
 
@@ -107,6 +108,7 @@ def enviar_email_pendencia(
             }
         ],
         simulate_if_unconfigured=False,
+        reply_to=resolve_tenant_reply_to(db, tenant_id),
     )
 
     if not enviado:

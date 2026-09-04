@@ -5,7 +5,7 @@ Permite configurar tributação padrão e dados cadastrais da empresa
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from pydantic import BaseModel
+from pydantic import BaseModel, EmailStr, field_validator
 from typing import Optional
 from uuid import UUID
 
@@ -36,8 +36,16 @@ class EmpresaDadosBasicosUpdate(BaseModel):
     cep: Optional[str] = None
     telefone: Optional[str] = None
     email: Optional[str] = None
+    email_resposta: Optional[EmailStr] = None
     site: Optional[str] = None
     logo_url: Optional[str] = None
+
+    @field_validator("email_resposta", mode="before")
+    @classmethod
+    def empty_reply_email_as_none(cls, value):
+        if value is None or not str(value).strip():
+            return None
+        return str(value).strip()
 
 
 class EmpresaConfigFiscalUpdate(BaseModel):
@@ -96,6 +104,7 @@ def obter_dados_basicos_empresa(
         "cep": tenant.cep,
         "telefone": tenant.telefone,
         "email": tenant.email,
+        "email_resposta": tenant.email_resposta,
         "site": tenant.site,
         "logo_url": tenant.logo_url,
     }
