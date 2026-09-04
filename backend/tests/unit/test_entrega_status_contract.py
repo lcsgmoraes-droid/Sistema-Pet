@@ -6,6 +6,7 @@ from uuid import uuid4
 from app.api.endpoints import (
     rotas_entrega_core_routes,
     rotas_entrega_criacao_routes,
+    rotas_entrega_otimizacao_routes,
 )
 from app.api.endpoints.rotas_entrega import (
     DeliveryActor,
@@ -14,6 +15,7 @@ from app.api.endpoints.rotas_entrega import (
 )
 from app.routes import ecommerce_entregador
 from app.rotas_entrega_models import RotaEntrega, RotaEntregaParada
+from app.vendas.entrega_filters import filtros_venda_entrega_operacional
 from app.vendas_models import Venda
 from app.vendas_routes import _resolver_status_entrega_atualizacao
 
@@ -30,6 +32,8 @@ def test_atualizacao_de_venda_define_pendente_apenas_para_entrega_nova():
 
 
 def test_entregas_abertas_incluem_pedido_online_pronto_para_rota():
+    assert '"pronto"' in inspect.getsource(filtros_venda_entrega_operacional)
+
     funcoes = [
         rotas_entrega_core_routes.listar_vendas_pendentes_entrega,
         rotas_entrega_criacao_routes.criar_rota,
@@ -40,7 +44,28 @@ def test_entregas_abertas_incluem_pedido_online_pronto_para_rota():
 
     for funcao in funcoes:
         source = inspect.getsource(funcao)
-        assert '"pronto"' in source
+        assert "filtros_venda_entrega_operacional" in source
+
+
+def test_fluxos_operacionais_nao_reaproveitam_vendas_canceladas():
+    assert 'Venda.status != "cancelada"' in inspect.getsource(
+        filtros_venda_entrega_operacional
+    )
+
+    funcoes = [
+        rotas_entrega_core_routes.listar_vendas_pendentes_entrega,
+        rotas_entrega_otimizacao_routes.otimizar_vendas_pendentes,
+        rotas_entrega_otimizacao_routes.otimizar_vendas_selecionadas,
+        ecommerce_entregador.listar_entregas_abertas,
+        ecommerce_entregador.otimizar_entregas_selecionadas,
+        ecommerce_entregador.criar_rota_por_entregador,
+    ]
+
+    for funcao in funcoes:
+        assert "filtros_venda_entrega_operacional" in inspect.getsource(funcao)
+
+    source_criar_rota = inspect.getsource(rotas_entrega_criacao_routes.criar_rota)
+    assert source_criar_rota.count("filtros_venda_entrega_operacional") == 2
 
 
 def test_retirada_na_loja_exige_nome_de_quem_retirou():

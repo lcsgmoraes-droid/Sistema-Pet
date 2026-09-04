@@ -353,6 +353,9 @@ class TestCancelarVenda:
             patch("app.comissoes_estorno.estornar_comissoes_venda") as mock_estorno,
         ):
             fake_venda_model.status = "aberta"
+            fake_venda_model.tem_entrega = True
+            fake_venda_model.status_entrega = "pendente"
+            fake_venda_model.ordem_entrega_otimizada = 1
 
             # Configurar itens
             item_mock = MagicMock()
@@ -388,6 +391,8 @@ class TestCancelarVenda:
 
             # ASSERT
             assert fake_venda_model.status == "cancelada"
+            assert fake_venda_model.status_entrega == "cancelada"
+            assert fake_venda_model.ordem_entrega_otimizada is None
             assert fake_venda_model.motivo_cancelamento == "Cliente desistiu"
             assert fake_venda_model.data_cancelamento is not None
 
