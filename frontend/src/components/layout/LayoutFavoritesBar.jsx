@@ -123,6 +123,26 @@ export default function LayoutFavoritesBar({
     gesture.moved = false;
   };
 
+  const handleDndDragStart = (event) => {
+    // O callback do dnd-kit e a fonte mais confiavel para distinguir um drag
+    // de um clique. Em alguns navegadores, o DOM e reordenado antes do clique
+    // sintetico e os pointermove deixam de chegar ao container React.
+    pointerGestureRef.current.moved = true;
+    onDragStart?.(event);
+  };
+
+  const handleDndDragEnd = (event) => {
+    // Reafirma o bloqueio depois do drop, pois a reordenacao pode remontar o
+    // atalho arrastado antes de o navegador disparar o clique final.
+    pointerGestureRef.current.moved = true;
+    onDragEnd?.(event);
+  };
+
+  const handleDndDragCancel = (event) => {
+    pointerGestureRef.current.moved = true;
+    onDragCancel?.(event);
+  };
+
   const handleBarClickCapture = (event) => {
     const gesture = pointerGestureRef.current;
     if (!gesture.moved) return;
@@ -146,9 +166,9 @@ export default function LayoutFavoritesBar({
       <DndContext
         sensors={sensors}
         collisionDetection={closestCenter}
-        onDragStart={onDragStart}
-        onDragEnd={onDragEnd}
-        onDragCancel={onDragCancel}
+        onDragStart={handleDndDragStart}
+        onDragEnd={handleDndDragEnd}
+        onDragCancel={handleDndDragCancel}
       >
         <SortableContext
           items={favorites.map((favorite) => favorite.path)}
