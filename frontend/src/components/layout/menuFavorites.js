@@ -201,3 +201,27 @@ export function shouldBlockFavoriteShortcutClick({
 } = {}) {
   return Boolean(isDragging || suppressClickUntil > now);
 }
+
+export function createFavoriteDragClickGuard() {
+  let dragActive = false;
+  let suppressNextClick = false;
+
+  return {
+    pointerIntentStarted() {
+      if (!dragActive) suppressNextClick = false;
+    },
+    dragStarted() {
+      dragActive = true;
+      suppressNextClick = true;
+    },
+    dragFinished() {
+      dragActive = false;
+      suppressNextClick = true;
+    },
+    consumeClick() {
+      const shouldBlock = dragActive || suppressNextClick;
+      if (shouldBlock) suppressNextClick = false;
+      return shouldBlock;
+    },
+  };
+}
