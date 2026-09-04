@@ -5,7 +5,9 @@ import * as Notifications from "expo-notifications";
 import * as AuthService from "../services/auth.service";
 import { ensurePushNotificationsRegistered } from "../services/pushNotifications.service";
 import { useAuthStore } from "../store/auth.store";
+import type { AppAccessProfile } from "../types";
 import { confirmLogoutWithNotificationChoice } from "../utils/logoutNotifications";
+import ProfileSwitcherModal from "./ProfileSwitcherModal";
 
 type HeaderProfileActionsProps = {
   logoutContextLabel: string;
@@ -20,6 +22,8 @@ export default function HeaderProfileActions({
 }: HeaderProfileActionsProps) {
   const { user, logout, selectProfile, updateUser } = useAuthStore();
   const [loadingProfiles, setLoadingProfiles] = useState(false);
+  const [profileSwitcherVisible, setProfileSwitcherVisible] = useState(false);
+  const [profileSwitcherProfiles, setProfileSwitcherProfiles] = useState<AppAccessProfile[]>([]);
   const [activatingNotifications, setActivatingNotifications] = useState(false);
   const [notificacoesAtivadas, setNotificacoesAtivadas] = useState(false);
   const available_profiles = user?.available_profiles ?? [];
@@ -49,28 +53,31 @@ export default function HeaderProfileActions({
       updateUser(freshUser);
       const freshProfiles = freshUser.available_profiles ?? [];
       const freshCurrentProfile = freshUser.selected_profile ?? freshUser.perfil_operacional ?? currentProfile;
-      const profileOptions = freshProfiles
-        .filter((profile) => profile.type !== freshCurrentProfile)
-        .map((profile) => ({
-          text: profile.label,
-          onPress: () => {
-            selectProfile(profile.type).catch(() => {
-              Alert.alert("Erro", "Nao foi possivel trocar o perfil agora.");
-            });
-          },
-        }));
+      const profileOptions = freshProfiles.filter(
+        (profile) => profile.type !== freshCurrentProfile,
+      );
 
       if (profileOptions.length === 0) {
         Alert.alert("Trocar perfil", "Sem outros acessos liberados para esta conta.");
         return;
       }
 
-      Alert.alert("Trocar perfil", "Escolha como entrar no app.", [
-        ...profileOptions,
-        { text: "Cancelar", style: "cancel" },
-      ]);
+      setProfileSwitcherProfiles(profileOptions);
+      setProfileSwitcherVisible(true);
     } catch {
       Alert.alert("Erro", "Nao foi possivel carregar os acessos agora.");
+    } finally {
+      setLoadingProfiles(false);
+    }
+  };
+
+  const selecionarPerfil = async (profile: AppAccessProfile) => {
+    setProfileSwitcherVisible(false);
+    setLoadingProfiles(true);
+    try {
+      await selectProfile(profile.type);
+    } catch {
+      Alert.alert("Erro", "Nao foi possivel trocar o perfil agora.");
     } finally {
       setLoadingProfiles(false);
     }
@@ -98,43 +105,51 @@ export default function HeaderProfileActions({
   };
 
   return (
-    <View style={styles.container}>
-      <TouchableOpacity
-        accessibilityLabel="Ativar notificacoes"
-        onPress={ativarNotificacoes}
-        style={styles.action}
-        disabled={activatingNotifications}
-      >
-        {activatingNotifications ? (
-          <ActivityIndicator color={color} size="small" />
-        ) : (
-          <Ionicons name={notificacoesAtivadas ? "notifications" : "notifications-outline"} size={18} color={color} />
+    <>
+      <View style={styles.container}>
+        <TouchableOpacity
+          accessibilityLabel="Ativar notificacoes"
+          onPress={ativarNotificacoes}
+          style={styles.action}
+          disabled={activatingNotifications}
+        >
+          {activatingNotifications ? (
+            <ActivityIndicator color={color} size="small" />
+          ) : (
+            <Ionicons name={notificacoesAtivadas ? "notifications" : "notifications-outline"} size={18} color={color} />
+          )}
+          <Text style={[styles.text, { color }]}>Notif.</Text>
+        </TouchableOpacity>
+        {canSwitch && (
+          <TouchableOpacity
+            accessibilityLabel="Trocar perfil do app"
+            onPress={trocarPerfil}
+            style={styles.action}
+            disabled={loadingProfiles}
+          >
+            <Ionicons name="swap-horizontal-outline" size={18} color={color} />
+            <Text style={[styles.text, { color }]}>
+              {loadingProfiles ? "..." : "Trocar"}
+            </Text>
+          </TouchableOpacity>
         )}
-        <Text style={[styles.text, { color }]}>Notif.</Text>
-      </TouchableOpacity>
-      {canSwitch && (
-        <TouchableOpacity
-          accessibilityLabel="Trocar perfil do app"
-          onPress={trocarPerfil}
-          style={styles.action}
-          disabled={loadingProfiles}
-        >
-          <Ionicons name="swap-horizontal-outline" size={18} color={color} />
-          <Text style={[styles.text, { color }]}>
-            {loadingProfiles ? "..." : "Trocar"}
-          </Text>
-        </TouchableOpacity>
-      )}
-      {showLogout && (
-        <TouchableOpacity
-          accessibilityLabel="Sair da conta"
-          onPress={confirmarLogout}
-          style={styles.action}
-        >
-          <Text style={[styles.text, { color }]}>Sair</Text>
-        </TouchableOpacity>
-      )}
-    </View>
+        {showLogout && (
+          <TouchableOpacity
+            accessibilityLabel="Sair da conta"
+            onPress={confirmarLogout}
+            style={styles.action}
+          >
+            <Text style={[styles.text, { color }]}>Sair</Text>
+          </TouchableOpacity>
+        )}
+      </View>
+      <ProfileSwitcherModal
+        visible={profileSwitcherVisible}
+        profiles={profileSwitcherProfiles}
+        onSelect={selecionarPerfil}
+        onClose={() => setProfileSwitcherVisible(false)}
+      />
+    </>
   );
 }
 
