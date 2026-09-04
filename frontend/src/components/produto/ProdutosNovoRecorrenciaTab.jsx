@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { Plus, RotateCcw, Trash2 } from "lucide-react";
 import { TIPO_PROTOCOLO_DOSES, TIPO_RECOMPRA_CONTINUA } from "../../utils/produtoRecorrencia";
 
@@ -29,8 +30,13 @@ export default function ProdutosNovoRecorrenciaTab({
       <div className="rounded-lg border-l-4 border-purple-500 bg-purple-50 p-4">
         <h3 className="text-sm font-semibold text-purple-900">Recorrência inteligente</h3>
         <p className="mt-1 text-sm text-purple-800">
-          Configure uma recompra contínua ou um protocolo com doses em dias diferentes. O mesmo
-          produto pode ter protocolos distintos para filhotes e adultos, sem duplicar o estoque.
+          Use a recompra contínua quando a mesma compra se repete sem etapas, como ração ou
+          antipulgas mensal. Use o protocolo de doses quando houver Dose 1, Dose 2, Dose 3 etc.; ao
+          terminar, ele pode oferecer o mesmo protocolo novamente após o prazo escolhido.
+        </p>
+        <p className="mt-2 text-sm text-purple-800">
+          Não é necessário cadastrar as duas regras para o mesmo ciclo. O mesmo produto pode ter
+          protocolos distintos para filhotes e adultos, sem duplicar o estoque.
         </p>
         <p className="mt-2 text-xs text-purple-700">
           Os avisos são enviados pelo app. O disparo por WhatsApp fica preparado para ser ativado
@@ -61,14 +67,26 @@ export default function ProdutosNovoRecorrenciaTab({
               onClick={() => adicionarRegraRecorrencia(TIPO_RECOMPRA_CONTINUA)}
               className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg border border-purple-200 px-4 py-3 text-sm font-semibold text-purple-700 hover:bg-purple-50"
             >
-              <Plus className="h-4 w-4" /> Recompra contínua
+              <Plus className="h-4 w-4" />
+              <span>
+                <span className="block">Recompra contínua</span>
+                <span className="mt-1 block text-xs font-normal text-purple-600">
+                  Uma compra simples que se repete no mesmo intervalo, sem doses.
+                </span>
+              </span>
             </button>
             <button
               type="button"
               onClick={() => adicionarRegraRecorrencia(TIPO_PROTOCOLO_DOSES)}
               className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg bg-purple-600 px-4 py-3 text-sm font-semibold text-white hover:bg-purple-700"
             >
-              <Plus className="h-4 w-4" /> Protocolo de doses
+              <Plus className="h-4 w-4" />
+              <span>
+                <span className="block">Protocolo de doses</span>
+                <span className="mt-1 block text-xs font-normal text-purple-100">
+                  Um ciclo com Dose 1, Dose 2, Dose 3 e reinício opcional.
+                </span>
+              </span>
             </button>
           </div>
 
@@ -210,6 +228,37 @@ function ProgramacaoDoses({
   onAtualizarQuantidadeDoses,
   regra,
 }) {
+  const quantidadeAtual = regra.doses.length;
+  const [quantidadeEmEdicao, setQuantidadeEmEdicao] = useState(String(quantidadeAtual));
+
+  useEffect(() => {
+    setQuantidadeEmEdicao(String(quantidadeAtual));
+  }, [quantidadeAtual]);
+
+  const alterarQuantidadeEmEdicao = (valor) => {
+    setQuantidadeEmEdicao(valor);
+    if (valor === "") return;
+
+    const quantidade = Number(valor);
+    if (Number.isInteger(quantidade) && quantidade >= 1 && quantidade <= 50) {
+      onAtualizarQuantidadeDoses(index, quantidade);
+    }
+  };
+
+  const concluirQuantidadeEmEdicao = () => {
+    const quantidade = Number.parseInt(quantidadeEmEdicao, 10);
+    if (!Number.isInteger(quantidade)) {
+      setQuantidadeEmEdicao(String(quantidadeAtual));
+      return;
+    }
+
+    const quantidadeLimitada = Math.min(Math.max(quantidade, 1), 50);
+    setQuantidadeEmEdicao(String(quantidadeLimitada));
+    if (quantidadeLimitada !== quantidadeAtual) {
+      onAtualizarQuantidadeDoses(index, quantidadeLimitada);
+    }
+  };
+
   return (
     <div className="space-y-5">
       <div className="max-w-xs">
@@ -218,8 +267,10 @@ function ProgramacaoDoses({
           type="number"
           min="1"
           max="50"
-          value={regra.doses.length}
-          onChange={(event) => onAtualizarQuantidadeDoses(index, event.target.value)}
+          value={quantidadeEmEdicao}
+          onChange={(event) => alterarQuantidadeEmEdicao(event.target.value)}
+          onBlur={concluirQuantidadeEmEdicao}
+          onFocus={(event) => event.currentTarget.select()}
           className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:ring-2 focus:ring-purple-500"
         />
       </div>
