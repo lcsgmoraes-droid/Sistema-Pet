@@ -1,5 +1,5 @@
 export const MAX_MENU_FAVORITES = 8;
-export const FAVORITE_DRAG_CLICK_SUPPRESSION_MS = 350;
+export const FAVORITE_DRAG_CLICK_SUPPRESSION_MS = 1000;
 export const MENU_FAVORITES_RETRY_DELAYS_MS = [500, 1500];
 
 const MENU_FAVORITES_CACHE_PREFIX = "corepet:menu-favorites:v1";
