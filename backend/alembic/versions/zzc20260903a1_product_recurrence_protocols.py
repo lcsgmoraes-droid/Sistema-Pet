@@ -1,7 +1,7 @@
 """adiciona protocolos flexiveis de recorrencia por produto
 
-Revision ID: zzc20260903a1
-Revises: zzb20260903a1
+Revision ID: zze20260903a1
+Revises: zzd20260903a1
 Create Date: 2026-09-03
 """
 
@@ -9,8 +9,8 @@ from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
-revision = "zzc20260903a1"
-down_revision = "zzb20260903a1"
+revision = "zze20260903a1"
+down_revision = "zzd20260903a1"
 branch_labels = None
 depends_on = None
 

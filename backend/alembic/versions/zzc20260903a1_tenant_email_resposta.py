@@ -1,15 +1,15 @@
 """adiciona email de resposta por empresa
 
-Revision ID: zzc20260903a1
-Revises: zzb20260903a1
+Revision ID: zzd20260903a1
+Revises: zzc20260903a1
 Create Date: 2026-09-03
 """
 
 from alembic import op
 import sqlalchemy as sa
 
-revision = "zzc20260903a1"
-down_revision = "zzb20260903a1"
+revision = "zzd20260903a1"
+down_revision = "zzc20260903a1"
 branch_labels = None
 depends_on = None
 

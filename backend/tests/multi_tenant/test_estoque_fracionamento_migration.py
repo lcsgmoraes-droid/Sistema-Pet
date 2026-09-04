@@ -14,8 +14,8 @@ def test_migration_cria_tabelas_com_rls():
     migration = load_migration(MIGRATION_FILE)
     source = MIGRATION_FILE.read_text(encoding="utf-8")
 
-    assert migration["revision"] == "zzc20260903a1"
-    assert migration["down_revision"] == "zzb20260903a1"
+    assert migration["revision"] == "zzf20260903a1"
+    assert migration["down_revision"] == "zze20260903a1"
     assert migration["TABLES"] == TABLES
     assert "apply_tenant_rls(" in source
     assert "enable=True" in source

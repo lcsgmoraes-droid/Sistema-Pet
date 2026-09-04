@@ -1,7 +1,7 @@
 """adiciona fracionamento de estoque para uso clinico
 
-Revision ID: zzc20260903a1
-Revises: zzb20260903a1
+Revision ID: zzf20260903a1
+Revises: zze20260903a1
 Create Date: 2026-09-03
 """
 
@@ -12,8 +12,8 @@ from sqlalchemy.dialects import postgresql
 from app.tenant_rls_migration import apply_tenant_rls
 
 
-revision = "zzc20260903a1"
-down_revision = "zzb20260903a1"
+revision = "zzf20260903a1"
+down_revision = "zze20260903a1"
 branch_labels = None
 depends_on = None
 
