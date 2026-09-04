@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import CustomerIdentity from "../ui/CustomerIdentity";
 import DataTable from "../ui/DataTable";
+import { VENDAS_LISTA_TABLE_LAYOUT } from "./vendasListaLayout";
 import MoneyCell from "../ui/MoneyCell";
 import NumberCell from "../ui/NumberCell";
 import SaleReference from "../ui/SaleReference";
@@ -626,8 +627,9 @@ export default function VendasFinanceiroListaTable({
         <ItensVendaDetalhes colSpan={colSpan} formatarMoeda={formatarMoeda} venda={venda} />
       )}
       rowClassName={getVendaRowClassName}
+      scrollContainerClassName={VENDAS_LISTA_TABLE_LAYOUT.scrollContainerClassName}
       tableClassName="min-w-[1480px] text-xs"
-      theadClassName="bg-gray-100"
+      theadClassName={VENDAS_LISTA_TABLE_LAYOUT.theadClassName}
     />
   );
 }

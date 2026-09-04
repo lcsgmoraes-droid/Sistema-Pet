@@ -77,6 +77,7 @@ export default function DataTable({
   getCellContext,
   getRowRef,
   headerContext,
+  scrollContainerClassName = "",
   tableClassName = "",
   tbodyClassName = "",
   theadClassName = "",
@@ -154,7 +155,9 @@ export default function DataTable({
       <div
         ref={bottomScrollRef}
         onScroll={() => sincronizarRolagem(bottomScrollRef.current, topScrollRef.current)}
-        className="erp-data-table-wrap overflow-x-auto"
+        className={["erp-data-table-wrap overflow-x-auto", scrollContainerClassName]
+          .filter(Boolean)
+          .join(" ")}
       >
         <table
           ref={tableRef}

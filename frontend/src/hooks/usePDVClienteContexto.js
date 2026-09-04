@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import api from "../api";
 import { useModulos } from "../contexts/ModulosContext";
 import { copyTextToClipboard } from "../utils/clipboard";
+import { incluirPetNoClienteSelecionado } from "../utils/pdvClientePets";
 
 export function usePDVClienteContexto({ vendaAtual, setVendaAtual }) {
   const { moduloAtivo } = useModulos();
@@ -65,7 +66,11 @@ export function usePDVClienteContexto({ vendaAtual, setVendaAtual }) {
   };
 
   const selecionarPet = (pet) => {
-    setVendaAtual((prev) => ({ ...prev, pet }));
+    setVendaAtual((prev) => ({
+      ...prev,
+      cliente: pet ? incluirPetNoClienteSelecionado(prev.cliente, pet) : prev.cliente,
+      pet,
+    }));
   };
 
   const copiarCampoCliente = async (valor, campo) => {
