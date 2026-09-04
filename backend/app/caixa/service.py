@@ -122,8 +122,13 @@ class CaixaService:
         """
         # Import local para evitar circular dependency
         from app.caixa_models import Caixa
+        from app.caixa.escopo import caixa_compartilhado_habilitado
 
         logger.debug(f"🔍 Validando caixa aberto para user_id={user_id}")
+
+        compartilhado = bool(permitir_caixa_tenant)
+        if tenant_id and not compartilhado:
+            compartilhado = caixa_compartilhado_habilitado(db, tenant_id)
 
         query = db.query(Caixa).filter(Caixa.status == "aberto")
         if tenant_id:
@@ -131,9 +136,9 @@ class CaixaService:
 
         if caixa_id is not None:
             query = query.filter(Caixa.id == caixa_id)
-            if not permitir_caixa_tenant:
+            if not compartilhado:
                 query = query.filter(Caixa.usuario_id == user_id)
-        elif permitir_caixa_tenant and tenant_id:
+        elif compartilhado and tenant_id:
             query = query.order_by(Caixa.id.desc())
         else:
             query = query.filter(Caixa.usuario_id == user_id)

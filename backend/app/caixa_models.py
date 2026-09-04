@@ -19,6 +19,8 @@ class Caixa(BaseTenantModel):
     numero_caixa = Column(Integer, nullable=False)
     usuario_id = Column(Integer, nullable=False)
     usuario_nome = Column(String(200), nullable=False)
+    usuario_fechamento_id = Column(Integer)
+    usuario_fechamento_nome = Column(String(200))
     data_abertura = Column(DateTime, default=datetime.now, nullable=False)
     data_fechamento = Column(DateTime)
     valor_abertura = Column(Float, default=0.0, nullable=False)
@@ -42,6 +44,8 @@ class Caixa(BaseTenantModel):
             "numero_caixa": self.numero_caixa,
             "usuario_id": self.usuario_id,
             "usuario_nome": self.usuario_nome,
+            "usuario_fechamento_id": self.usuario_fechamento_id,
+            "usuario_fechamento_nome": self.usuario_fechamento_nome,
             "data_abertura": safe_datetime_to_iso(self.data_abertura),
             "data_fechamento": safe_datetime_to_iso(self.data_fechamento),
             "valor_abertura": safe_decimal_to_float(self.valor_abertura) or 0.0,

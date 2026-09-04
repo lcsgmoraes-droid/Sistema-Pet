@@ -11,6 +11,7 @@ import {
   List,
   Eye,
   EyeOff,
+  Users,
 } from "lucide-react";
 import { obterCaixaAberto, obterResumoCaixa } from "../api/caixa";
 import { ModalSuprimento, ModalSangria, ModalDespesa } from "./ModaisCaixa";
@@ -191,9 +192,18 @@ export default function MenuCaixa({
               <div className="p-4 border-b bg-gradient-to-r from-green-50 to-blue-50">
                 <div className="flex items-center justify-between mb-3">
                   <div>
-                    <div className="text-sm text-gray-600">Caixa #{caixaAberto.numero_caixa}</div>
+                    <div className="flex items-center gap-2 text-sm text-gray-600">
+                      <span>Caixa #{caixaAberto.numero_caixa}</span>
+                      {caixaAberto.compartilhado && (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-2 py-0.5 text-xs font-semibold text-blue-700">
+                          <Users className="h-3 w-3" /> Compartilhado
+                        </span>
+                      )}
+                    </div>
                     <div className="text-lg font-bold text-gray-900">
-                      {caixaAberto.usuario_nome}
+                      {caixaAberto.compartilhado
+                        ? `Aberto por ${caixaAberto.usuario_nome}`
+                        : caixaAberto.usuario_nome}
                     </div>
                   </div>
                   <button

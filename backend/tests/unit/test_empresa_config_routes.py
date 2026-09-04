@@ -48,6 +48,7 @@ def test_get_config_empresa_usa_tenant_da_dependencia_multitenant(monkeypatch):
     assert response.margem_saudavel_minima == 30.0
     assert response.margem_preco_sugestao_1 == 30.0
     assert response.margem_preco_sugestao_2 == 34.0
+    assert response.caixa_compartilhado is False
 
 
 class _FakeTenantQuery:
@@ -161,6 +162,7 @@ def test_serializar_config_antiga_aplica_defaults_sem_apagar_crediario():
     assert resposta.mensagem_venda_alerta
     assert resposta.mensagem_venda_critica
     assert resposta.crediario_encargos_automaticos is True
+    assert resposta.caixa_compartilhado is False
     assert resposta.crediario_multa_percentual == 2
     assert resposta.crediario_juros_mensal_percentual == 1
     assert resposta.margem_preco_sugestao_1 == 30

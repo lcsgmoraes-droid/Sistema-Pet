@@ -9,6 +9,7 @@ from typing import Optional
 
 from app.db import get_session
 from app.auth.dependencies import get_current_user_and_tenant
+from app.caixa_models import Caixa
 from app.empresa_config_geral_models import EmpresaConfigGeral
 from app.security.permissions_decorator import require_permission
 from app.utils.logger import logger
@@ -42,6 +43,7 @@ class EmpresaConfigGeralCreate(BaseModel):
     mensagem_venda_saudavel: str = "✅ Venda Saudável! Margem excelente."
     mensagem_venda_alerta: str = "⚠️ ATENÇÃO: Margem reduzida! Revisar preço."
     mensagem_venda_critica: str = "🚨 CRÍTICO: Margem muito baixa! Venda com prejuízo!"
+    caixa_compartilhado: bool = False
     dias_tolerancia_atraso: int = 5
     crediario_encargos_automaticos: bool = False
     crediario_multa_percentual: float = Field(default=2.0, ge=0, le=2)
@@ -75,6 +77,7 @@ class EmpresaConfigGeralUpdate(BaseModel):
     mensagem_venda_saudavel: Optional[str] = None
     mensagem_venda_alerta: Optional[str] = None
     mensagem_venda_critica: Optional[str] = None
+    caixa_compartilhado: Optional[bool] = None
     dias_tolerancia_atraso: Optional[int] = None
     crediario_encargos_automaticos: Optional[bool] = None
     crediario_multa_percentual: Optional[float] = Field(default=None, ge=0, le=2)
@@ -99,6 +102,7 @@ class EmpresaConfigGeralResponse(BaseModel):
     mensagem_venda_saudavel: str
     mensagem_venda_alerta: str
     mensagem_venda_critica: str
+    caixa_compartilhado: bool
     aliquota_imposto_padrao: float
     dias_tolerancia_atraso: Optional[int] = 5
     crediario_encargos_automaticos: bool
@@ -141,6 +145,7 @@ def _serializar_config(config: EmpresaConfigGeral) -> EmpresaConfigGeralResponse
             config.mensagem_venda_critica
             or "🚨 CRÍTICO: Margem muito baixa! Venda com prejuízo!"
         ),
+        caixa_compartilhado=bool(getattr(config, "caixa_compartilhado", False)),
         aliquota_imposto_padrao=float(config.aliquota_imposto_padrao or 7),
         dias_tolerancia_atraso=(
             config.dias_tolerancia_atraso
@@ -195,6 +200,23 @@ def _serializar_margens_preco(
         margem_preco_sugestao_1=float(margem_1 if margem_1 is not None else 30),
         margem_preco_sugestao_2=float(margem_2 if margem_2 is not None else 34),
     )
+
+
+def _validar_ativacao_caixa_compartilhado(db: Session, tenant_id) -> None:
+    """Impede ativar o modo enquanto houver mais de um caixa aberto na loja."""
+    caixas_abertos = (
+        db.query(Caixa.id)
+        .filter(Caixa.tenant_id == tenant_id, Caixa.status == "aberto")
+        .count()
+    )
+    if caixas_abertos > 1:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Para compartilhar o caixa, feche os caixas extras e mantenha "
+                "somente um caixa aberto na empresa."
+            ),
+        )
 
 
 # ===== ENDPOINTS =====
@@ -276,6 +298,7 @@ def get_config_empresa(
             mensagem_venda_saudavel="✅ Venda Saudável! Margem excelente.",
             mensagem_venda_alerta="⚠️ ATENÇÃO: Margem reduzida! Revisar preço.",
             mensagem_venda_critica="🚨 CRÍTICO: Margem muito baixa! Venda com prejuízo!",
+            caixa_compartilhado=False,
             aliquota_imposto_padrao=7.0,
             dias_tolerancia_atraso=5,
             crediario_encargos_automaticos=False,
@@ -311,6 +334,9 @@ def create_config_empresa(
             status_code=400, detail="Configuração já existe. Use PUT para atualizar."
         )
 
+    if config_data.caixa_compartilhado:
+        _validar_ativacao_caixa_compartilhado(db, tenant_id)
+
     # Cria nova configuração
     config = EmpresaConfigGeral(tenant_id=tenant_id, **config_data.model_dump())
 
@@ -336,6 +362,7 @@ def update_config_empresa(
     config = (
         db.query(EmpresaConfigGeral)
         .filter(EmpresaConfigGeral.tenant_id == tenant_id)
+        .with_for_update()
         .first()
     )
 
@@ -346,6 +373,10 @@ def update_config_empresa(
 
     # Atualiza apenas campos fornecidos
     update_data = config_data.model_dump(exclude_unset=True)
+    if update_data.get("caixa_compartilhado") and not bool(
+        getattr(config, "caixa_compartilhado", False)
+    ):
+        _validar_ativacao_caixa_compartilhado(db, tenant_id)
     for field, value in update_data.items():
         setattr(config, field, value)
 

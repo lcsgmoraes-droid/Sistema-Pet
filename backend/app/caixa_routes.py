@@ -4,7 +4,7 @@ Rotas para o Sistema de Controle de Caixa
 
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from fastapi.responses import StreamingResponse
-from sqlalchemy import and_, func
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 from typing import Optional
 from datetime import datetime, date
@@ -14,6 +14,12 @@ from app.db import get_session
 from app.auth.dependencies import get_current_user_and_tenant
 from app.idempotency import idempotent  # ← IDEMPOTÊNCIA
 from app.caixa_models import Caixa, MovimentacaoCaixa
+from app.caixa.escopo import (
+    aplicar_escopo_caixa,
+    buscar_caixa_aberto,
+    buscar_caixa_acessivel,
+    caixa_compartilhado_habilitado,
+)
 from app.financeiro_models import ContaPagar, TipoDespesa
 from app.domain.dre.lancamento_dre_sync import atualizar_dre_por_lancamento
 from app.pdf_caixa import gerar_pdf_fechamento_caixa
@@ -50,18 +56,25 @@ class MovimentacaoSchema(BaseModel):
     tipo_despesa_id: Optional[int] = None
 
 
-def _ultimo_caixa_fechado(db: Session, *, tenant_id, usuario_id: int):
-    return (
-        db.query(Caixa)
-        .filter(
-            Caixa.tenant_id == tenant_id,
-            Caixa.usuario_id == usuario_id,
+def _ultimo_caixa_fechado(
+    db: Session, *, tenant_id, usuario_id: int, compartilhado: bool = False
+):
+    query = aplicar_escopo_caixa(
+        db.query(Caixa).filter(
             Caixa.status == "fechado",
             Caixa.valor_informado.is_not(None),
-        )
-        .order_by(Caixa.data_fechamento.desc(), Caixa.id.desc())
-        .first()
+        ),
+        tenant_id=tenant_id,
+        usuario_id=usuario_id,
+        compartilhado=compartilhado,
     )
+    return query.order_by(Caixa.data_fechamento.desc(), Caixa.id.desc()).first()
+
+
+def _serializar_caixa(caixa: Caixa, *, compartilhado: bool) -> dict:
+    dados = caixa.to_dict()
+    dados["compartilhado"] = compartilhado
+    return dados
 
 
 def _anexar_conferencia_abertura(
@@ -92,28 +105,30 @@ async def abrir_caixa(
     """Abrir um novo caixa"""
     current_user, tenant_id = current_user_and_tenant
 
-    # Verificar se já existe caixa aberto para o usuário
-    caixa_aberto = (
-        db.query(Caixa)
-        .filter(
-            and_(
-                Caixa.usuario_id == current_user.id,
-                Caixa.tenant_id == tenant_id,
-                Caixa.status == "aberto",
-            )
-        )
-        .first()
+    # A trava na configuracao evita duas aberturas simultaneas no modo compartilhado.
+    caixa_aberto, compartilhado = buscar_caixa_aberto(
+        db,
+        tenant_id=tenant_id,
+        usuario_id=current_user.id,
+        bloquear_config=True,
     )
 
     if caixa_aberto:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Você já possui um caixa aberto. Feche-o antes de abrir outro.",
+            detail=(
+                "A empresa já possui um caixa compartilhado aberto. Use o caixa existente."
+                if compartilhado
+                else "Você já possui um caixa aberto. Feche-o antes de abrir outro."
+            ),
         )
 
     # Gerar número do caixa (próximo número disponível por tenant)
     caixa_anterior = _ultimo_caixa_fechado(
-        db, tenant_id=tenant_id, usuario_id=current_user.id
+        db,
+        tenant_id=tenant_id,
+        usuario_id=current_user.id,
+        compartilhado=compartilhado,
     )
     ultimo_caixa = (
         db.query(func.max(Caixa.numero_caixa))
@@ -150,7 +165,7 @@ async def abrir_caixa(
     db.commit()
     db.refresh(novo_caixa)
 
-    return novo_caixa.to_dict()
+    return _serializar_caixa(novo_caixa, compartilhado=compartilhado)
 
 
 @router.get("/aberto")
@@ -158,25 +173,17 @@ def obter_caixa_aberto(
     db: Session = Depends(get_session),
     current_user_and_tenant=Depends(get_current_user_and_tenant),
 ):
-    """Obter caixa aberto do usuário atual"""
+    """Obter o caixa aberto acessivel ao usuario atual."""
     current_user, tenant_id = current_user_and_tenant
 
-    caixa = (
-        db.query(Caixa)
-        .filter(
-            and_(
-                Caixa.usuario_id == current_user.id,
-                Caixa.tenant_id == tenant_id,
-                Caixa.status == "aberto",
-            )
-        )
-        .first()
+    caixa, compartilhado = buscar_caixa_aberto(
+        db, tenant_id=tenant_id, usuario_id=current_user.id
     )
 
     if not caixa:
         return None
 
-    return caixa.to_dict()
+    return _serializar_caixa(caixa, compartilhado=compartilhado)
 
 
 @router.get("/conferencia-abertura")
@@ -184,9 +191,15 @@ def obter_conferencia_abertura(
     db: Session = Depends(get_session),
     current_user_and_tenant=Depends(get_current_user_and_tenant),
 ):
-    """Informa o ultimo fechamento do operador para conferir a proxima abertura."""
+    """Informa o ultimo fechamento aplicavel para conferir a proxima abertura."""
     current_user, tenant_id = current_user_and_tenant
-    caixa = _ultimo_caixa_fechado(db, tenant_id=tenant_id, usuario_id=current_user.id)
+    compartilhado = caixa_compartilhado_habilitado(db, tenant_id)
+    caixa = _ultimo_caixa_fechado(
+        db,
+        tenant_id=tenant_id,
+        usuario_id=current_user.id,
+        compartilhado=compartilhado,
+    )
     if not caixa:
         return None
     return {
@@ -205,11 +218,15 @@ def listar_caixas(
     db: Session = Depends(get_session),
     current_user_and_tenant=Depends(get_current_user_and_tenant),
 ):
-    """Listar caixas do usuário"""
+    """Listar caixas acessiveis ao usuario conforme a configuracao da empresa."""
     current_user, tenant_id = current_user_and_tenant
 
-    query = db.query(Caixa).filter(
-        Caixa.usuario_id == current_user.id, Caixa.tenant_id == tenant_id
+    compartilhado = caixa_compartilhado_habilitado(db, tenant_id)
+    query = aplicar_escopo_caixa(
+        db.query(Caixa),
+        tenant_id=tenant_id,
+        usuario_id=current_user.id,
+        compartilhado=compartilhado,
     )
 
     if data_inicio:
@@ -223,7 +240,7 @@ def listar_caixas(
 
     caixas = query.order_by(Caixa.data_abertura.desc()).all()
 
-    return [caixa.to_dict() for caixa in caixas]
+    return [_serializar_caixa(caixa, compartilhado=compartilhado) for caixa in caixas]
 
 
 @router.get("/{caixa_id}")
@@ -235,21 +252,14 @@ def obter_caixa(
     """Obter detalhes de um caixa específico"""
     current_user, tenant_id = current_user_and_tenant
 
-    # 🔒 SEGURANÇA: Validar que o caixa pertence ao usuário e tenant
-    caixa = (
-        db.query(Caixa)
-        .filter(
-            Caixa.id == caixa_id,
-            Caixa.usuario_id == current_user.id,
-            Caixa.tenant_id == tenant_id,
-        )
-        .first()
+    caixa, compartilhado = buscar_caixa_acessivel(
+        db, caixa_id=caixa_id, tenant_id=tenant_id, usuario_id=current_user.id
     )
 
     if not caixa:
         raise HTTPException(status_code=404, detail="Caixa não encontrado")
 
-    return caixa.to_dict()
+    return _serializar_caixa(caixa, compartilhado=compartilhado)
 
 
 @router.post("/{caixa_id}/movimentacao")
@@ -264,15 +274,8 @@ async def criar_movimentacao(
     """Adicionar movimentação ao caixa"""
     current_user, tenant_id = current_user_and_tenant
 
-    # 🔒 SEGURANÇA: Validar que o caixa pertence ao usuário e tenant
-    caixa = (
-        db.query(Caixa)
-        .filter(
-            Caixa.id == caixa_id,
-            Caixa.usuario_id == current_user.id,
-            Caixa.tenant_id == tenant_id,
-        )
-        .first()
+    caixa, _ = buscar_caixa_acessivel(
+        db, caixa_id=caixa_id, tenant_id=tenant_id, usuario_id=current_user.id
     )
 
     if not caixa:
@@ -386,15 +389,8 @@ async def fechar_caixa(
     """Fechar caixa"""
     current_user, tenant_id = current_user_and_tenant
 
-    # 🔒 SEGURANÇA: Validar que o caixa pertence ao usuário e tenant
-    caixa = (
-        db.query(Caixa)
-        .filter(
-            Caixa.id == caixa_id,
-            Caixa.usuario_id == current_user.id,
-            Caixa.tenant_id == tenant_id,
-        )
-        .first()
+    caixa, compartilhado = buscar_caixa_acessivel(
+        db, caixa_id=caixa_id, tenant_id=tenant_id, usuario_id=current_user.id
     )
 
     if not caixa:
@@ -432,12 +428,18 @@ async def fechar_caixa(
     caixa.valor_informado = dados.valor_informado
     caixa.diferenca = diferenca
     caixa.observacoes_fechamento = dados.observacoes_fechamento
+    caixa.usuario_fechamento_id = current_user.id
+    caixa.usuario_fechamento_nome = (
+        current_user.nome
+        or getattr(current_user, "username", None)
+        or current_user.email
+    )
     caixa.status = "fechado"
 
     db.commit()
     db.refresh(caixa)
 
-    return caixa.to_dict()
+    return _serializar_caixa(caixa, compartilhado=compartilhado)
 
 
 @router.post("/{caixa_id}/reabrir")
@@ -449,34 +451,25 @@ def reabrir_caixa(
     """Reabrir um caixa fechado"""
     current_user, tenant_id = current_user_and_tenant
 
-    # Verificar se já existe caixa aberto
-    caixa_aberto = (
-        db.query(Caixa)
-        .filter(
-            and_(
-                Caixa.usuario_id == current_user.id,
-                Caixa.tenant_id == tenant_id,
-                Caixa.status == "aberto",
-            )
-        )
-        .first()
+    caixa_aberto, compartilhado = buscar_caixa_aberto(
+        db,
+        tenant_id=tenant_id,
+        usuario_id=current_user.id,
+        bloquear_config=True,
     )
 
     if caixa_aberto:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Você já possui um caixa aberto. Feche-o antes de reabrir outro.",
+            detail=(
+                "A empresa já possui um caixa compartilhado aberto. Feche-o antes de reabrir outro."
+                if compartilhado
+                else "Você já possui um caixa aberto. Feche-o antes de reabrir outro."
+            ),
         )
 
-    # 🔒 SEGURANÇA: Validar que o caixa pertence ao usuário e tenant
-    caixa = (
-        db.query(Caixa)
-        .filter(
-            Caixa.id == caixa_id,
-            Caixa.usuario_id == current_user.id,
-            Caixa.tenant_id == tenant_id,
-        )
-        .first()
+    caixa, _ = buscar_caixa_acessivel(
+        db, caixa_id=caixa_id, tenant_id=tenant_id, usuario_id=current_user.id
     )
 
     if not caixa:
@@ -495,11 +488,13 @@ def reabrir_caixa(
     caixa.valor_informado = None
     caixa.diferenca = None
     caixa.observacoes_fechamento = None
+    caixa.usuario_fechamento_id = None
+    caixa.usuario_fechamento_nome = None
 
     db.commit()
     db.refresh(caixa)
 
-    return caixa.to_dict()
+    return _serializar_caixa(caixa, compartilhado=compartilhado)
 
 
 @router.get("/{caixa_id}/resumo")
@@ -511,15 +506,8 @@ def obter_resumo_caixa(
     """Obter resumo do caixa com totais"""
     current_user, tenant_id = current_user_and_tenant
 
-    # 🔒 SEGURANÇA: Validar que o caixa pertence ao usuário e tenant
-    caixa = (
-        db.query(Caixa)
-        .filter(
-            Caixa.id == caixa_id,
-            Caixa.usuario_id == current_user.id,
-            Caixa.tenant_id == tenant_id,
-        )
-        .first()
+    caixa, compartilhado = buscar_caixa_acessivel(
+        db, caixa_id=caixa_id, tenant_id=tenant_id, usuario_id=current_user.id
     )
 
     if not caixa:
@@ -600,7 +588,7 @@ def obter_resumo_caixa(
     )
 
     return {
-        "caixa": caixa.to_dict(),
+        "caixa": _serializar_caixa(caixa, compartilhado=compartilhado),
         "totais": {
             "vendas": total_vendas,
             "suprimentos": total_suprimentos,
@@ -623,11 +611,8 @@ def listar_movimentacoes_caixa(
     """Lista todas as movimentações de um caixa (extrato completo)"""
     current_user, tenant_id = current_user_and_tenant
 
-    # Verificar se o caixa existe e pertence ao usuário e tenant
-    caixa = (
-        db.query(Caixa)
-        .filter_by(id=caixa_id, usuario_id=current_user.id, tenant_id=tenant_id)
-        .first()
+    caixa, _ = buscar_caixa_acessivel(
+        db, caixa_id=caixa_id, tenant_id=tenant_id, usuario_id=current_user.id
     )
 
     if not caixa:
@@ -704,10 +689,8 @@ def listar_vendas_caixa(
     """Lista as vendas de um caixa, opcionalmente filtradas por forma de pagamento"""
     current_user, tenant_id = current_user_and_tenant
 
-    caixa = (
-        db.query(Caixa)
-        .filter_by(id=caixa_id, usuario_id=current_user.id, tenant_id=tenant_id)
-        .first()
+    caixa, _ = buscar_caixa_acessivel(
+        db, caixa_id=caixa_id, tenant_id=tenant_id, usuario_id=current_user.id
     )
     if not caixa:
         raise HTTPException(status_code=404, detail="Caixa não encontrado")
@@ -765,11 +748,8 @@ def gerar_pdf_caixa(
     """
     current_user, tenant_id = current_user_and_tenant
 
-    # Buscar caixa
-    caixa = (
-        db.query(Caixa)
-        .filter_by(id=caixa_id, usuario_id=current_user.id, tenant_id=tenant_id)
-        .first()
+    caixa, _ = buscar_caixa_acessivel(
+        db, caixa_id=caixa_id, tenant_id=tenant_id, usuario_id=current_user.id
     )
 
     if not caixa:

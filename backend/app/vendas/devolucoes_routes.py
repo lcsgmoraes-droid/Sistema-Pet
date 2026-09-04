@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 from app.audit_log import log_action
 from app.auth.dependencies import get_current_user_and_tenant
 from app.caixa.service import CaixaService
+from app.caixa.escopo import buscar_caixa_acessivel
 from app.db import get_session
 from app.empresa_grupo_estoque_compartilhado_service import (
     contexto_tenant_estoque,
@@ -113,13 +114,16 @@ def registrar_devolucao(
             )
 
         # Verificar se o caixa existe e está aberto (apenas se for devolução em dinheiro)
-        from app.caixa_models import Caixa
-
         caixa = None
         if not gerar_credito:
-            caixa = db.query(Caixa).filter_by(id=caixa_id, status="aberto").first()
+            caixa, _ = buscar_caixa_acessivel(
+                db,
+                caixa_id=caixa_id,
+                tenant_id=tenant_id,
+                usuario_id=current_user.id,
+            )
 
-            if not caixa:
+            if not caixa or caixa.status != "aberto":
                 raise HTTPException(
                     status_code=400, detail="Caixa não encontrado ou não está aberto"
                 )
@@ -378,11 +382,14 @@ def registrar_devolucao(
         # 💵 OPÇÃO 2: DEVOLUÇÃO EM DINHEIRO
         else:
             # Verificar se o caixa existe e está aberto
-            from app.caixa_models import Caixa
+            caixa, _ = buscar_caixa_acessivel(
+                db,
+                caixa_id=caixa_id,
+                tenant_id=tenant_id,
+                usuario_id=current_user.id,
+            )
 
-            caixa = db.query(Caixa).filter_by(id=caixa_id, status="aberto").first()
-
-            if not caixa:
+            if not caixa or caixa.status != "aberto":
                 raise HTTPException(
                     status_code=400, detail="Caixa não encontrado ou não está aberto"
                 )

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import toast from "react-hot-toast";
-import { FiChevronLeft, FiCreditCard, FiSave, FiSliders } from "react-icons/fi";
+import { FiChevronLeft, FiCreditCard, FiSave, FiSliders, FiUsers } from "react-icons/fi";
 import api from "../../api";
 import {
   getGuiaAtiva,
@@ -17,6 +17,7 @@ const DEFAULT_FORM = {
   mensagem_venda_alerta: "⚠️ ATENCAO: Margem reduzida! Revisar preco.",
   mensagem_venda_critica: "🚨 CRITICO: Margem muito baixa! Venda com prejuizo!",
   aliquota_imposto_padrao: 7,
+  caixa_compartilhado: false,
   dias_tolerancia_atraso: 5,
   crediario_encargos_automaticos: false,
   crediario_multa_percentual: 2,
@@ -61,6 +62,7 @@ export default function ConfiguracaoGeralNegocio() {
           margem_saudavel_minima: Number(data.margem_saudavel_minima ?? 30),
           margem_alerta_minima: Number(data.margem_alerta_minima ?? 15),
           aliquota_imposto_padrao: Number(data.aliquota_imposto_padrao ?? 7),
+          caixa_compartilhado: Boolean(data.caixa_compartilhado),
           dias_tolerancia_atraso: Number(data.dias_tolerancia_atraso ?? 5),
           crediario_encargos_automaticos: Boolean(data.crediario_encargos_automaticos),
           crediario_multa_percentual: Number(data.crediario_multa_percentual ?? 2),
@@ -131,6 +133,7 @@ export default function ConfiguracaoGeralNegocio() {
         mensagem_venda_alerta: form.mensagem_venda_alerta,
         mensagem_venda_critica: form.mensagem_venda_critica,
         aliquota_imposto_padrao: Number(form.aliquota_imposto_padrao),
+        caixa_compartilhado: Boolean(form.caixa_compartilhado),
         dias_tolerancia_atraso: Number(form.dias_tolerancia_atraso),
         crediario_encargos_automaticos: Boolean(form.crediario_encargos_automaticos),
         crediario_multa_percentual: Number(form.crediario_multa_percentual),
@@ -187,6 +190,33 @@ export default function ConfiguracaoGeralNegocio() {
           Etapa da introducao guiada ativa. Os campos importantes desta etapa estao destacados.
         </div>
       )}
+
+      <div className="rounded-lg bg-white p-6 shadow-md">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="max-w-3xl">
+            <h2 className="flex items-center gap-2 text-xl font-semibold text-gray-800">
+              <FiUsers /> Caixa compartilhado
+            </h2>
+            <p className="mt-2 text-sm leading-relaxed text-gray-600">
+              Quando ativado, a empresa trabalha com um unico caixa aberto. O primeiro usuario abre
+              o caixa e os demais passam a usa-lo automaticamente ao entrar no PDV.
+            </p>
+          </div>
+          <label className="inline-flex cursor-pointer items-center gap-3 rounded-lg border border-gray-200 px-4 py-3">
+            <input
+              type="checkbox"
+              checked={form.caixa_compartilhado}
+              onChange={(e) => onChange("caixa_compartilhado", e.target.checked)}
+              className="h-4 w-4"
+            />
+            <span className="text-sm font-semibold text-gray-800">Compartilhar entre usuarios</span>
+          </label>
+        </div>
+        <p className="mt-4 rounded-lg bg-blue-50 px-4 py-3 text-sm text-blue-800">
+          Cada venda, suprimento, sangria, despesa e devolucao continua registrando qual usuario
+          realizou a operacao. Qualquer usuario com acesso ao caixa podera fecha-lo.
+        </p>
+      </div>
 
       <div className="bg-white rounded-lg shadow-md p-4">
         <div className="flex items-center gap-2 mb-2 text-gray-800 font-semibold">
