@@ -42,6 +42,7 @@ Guia mestre:
 | Proposta e suporte do piloto | `docs/comercial/PACOTE_PILOTO_PLANO_BASICO.md` | Checklist exclusivo do Plano Basico |
 | Implantar Plano Basico piloto | `docs/implantacao/CHECKLIST_PLANO_BASICO_PILOTO.md` | Pacote comercial aceito pelo cliente |
 | Implantacao inicial | `docs/implantacao/GUIA_IMPLANTACAO_INICIAL.md` | Introducao Guiada em `/ajuda` |
+| Consultar orientacoes para usuarios | `docs/ajuda/README.md` | Tela atual do sistema e validacao registrada no guia |
 | Criativos e videos do sistema | `docs/marketing/MATRIZ_CRIATIVOS_SISTEMA.md` | Guia de implantacao e telas reais |
 | Produzir videos com IA | `docs/marketing/GUIA_PRODUCAO_VIDEO_IA.md` | Roteiros de venda e demos por funcionalidade |
 | Preparar base demo para gravacao | `docs/marketing/BASE_DEMO_GRAVACAO.md` | Tenant/base demonstracao sem dados reais |
@@ -81,6 +82,7 @@ Guia mestre:
 | Importacao SimplesVet | `docs/IMPORTACAO_SIMPLESVET_SEGURA.md` |
 | Venda do Plano Basico | `docs/GUIA_VENDA_PLANO_BASICO.md` |
 | Implantacao inicial | `docs/implantacao/GUIA_IMPLANTACAO_INICIAL.md` |
+| Ajuda aos usuarios | `docs/ajuda/README.md` |
 | Criativos e videos | `docs/marketing/MATRIZ_CRIATIVOS_SISTEMA.md` |
 | Producao de videos com IA | `docs/marketing/GUIA_PRODUCAO_VIDEO_IA.md` |
 | Base demo para gravacao | `docs/marketing/BASE_DEMO_GRAVACAO.md` |
