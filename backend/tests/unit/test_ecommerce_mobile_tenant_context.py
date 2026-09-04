@@ -1,5 +1,6 @@
 import asyncio
 import inspect
+from decimal import Decimal
 from types import SimpleNamespace
 from uuid import uuid4
 
@@ -855,6 +856,39 @@ def test_serialize_profile_marks_veterinario_as_mobile_operational_profile():
     assert profile["is_veterinario"] is True
     assert profile["veterinario_id"] == cliente.id
     assert profile["perfil_operacional"] == "veterinario"
+
+
+def test_serialize_profile_includes_customer_credit_balance():
+    user = SimpleNamespace(
+        id=123,
+        email="cliente@example.com",
+        email_verified=True,
+        nome="Cliente Teste",
+        telefone=None,
+        cpf_cnpj=None,
+    )
+    cliente = SimpleNamespace(
+        id=456,
+        tipo_cadastro="cliente",
+        ativo=True,
+        is_entregador=False,
+        credito=Decimal("125.40"),
+        telefone=None,
+        cpf=None,
+        cep=None,
+        endereco=None,
+        numero=None,
+        complemento=None,
+        bairro=None,
+        cidade=None,
+        estado=None,
+        endereco_entrega=None,
+        enderecos_adicionais=None,
+    )
+
+    profile = _serialize_profile(user, cliente)
+
+    assert profile["credito"] == 125.4
 
 
 def test_get_active_public_tenant_sets_tenant_context():

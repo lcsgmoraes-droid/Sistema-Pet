@@ -1,6 +1,7 @@
-import { X } from "lucide-react";
+import { Printer, X } from "lucide-react";
 import { safeArray } from "../../utils/safeArray";
 import { calcularSaldoFinanceiro } from "../../utils/financeiroStatus";
+import CurrencyInput from "../CurrencyInput";
 import ActionButton from "../ui/ActionButton";
 import CustomerIdentity from "../ui/CustomerIdentity";
 import DataTable from "../ui/DataTable";
@@ -251,16 +252,14 @@ export function ContasReceberRecebimentoModal({
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium mb-1">Valor a Receber *</label>
-                  <input
-                    type="number"
+                  <CurrencyInput
                     className="w-full border border-gray-300 rounded px-3 py-2"
-                    step="0.01"
                     disabled={dadosRecebimento.quitar}
                     value={dadosRecebimento.valor_recebido}
-                    onChange={(e) =>
+                    onChange={(valor) =>
                       setDadosRecebimento({
                         ...dadosRecebimento,
-                        valor_recebido: parseFloat(e.target.value),
+                        valor_recebido: valor,
                       })
                     }
                   />
@@ -340,20 +339,18 @@ export function ContasReceberRecebimentoModal({
 
                 <div>
                   <label className="block text-sm font-medium mb-1">Juros</label>
-                  <input
-                    type="number"
+                  <CurrencyInput
                     className="w-full border border-gray-300 rounded px-3 py-2"
-                    step="0.01"
                     value={
                       dadosRecebimento.aplicar_encargos_automaticos
                         ? Number(calculoEncargos?.valor_juros_calculado || 0)
                         : dadosRecebimento.valor_juros
                     }
                     disabled={dadosRecebimento.aplicar_encargos_automaticos}
-                    onChange={(e) =>
+                    onChange={(valor) =>
                       setDadosRecebimento({
                         ...dadosRecebimento,
-                        valor_juros: parseFloat(e.target.value) || 0,
+                        valor_juros: valor,
                       })
                     }
                   />
@@ -361,20 +358,18 @@ export function ContasReceberRecebimentoModal({
 
                 <div>
                   <label className="block text-sm font-medium mb-1">Multa</label>
-                  <input
-                    type="number"
+                  <CurrencyInput
                     className="w-full border border-gray-300 rounded px-3 py-2"
-                    step="0.01"
                     value={
                       dadosRecebimento.aplicar_encargos_automaticos
                         ? Number(calculoEncargos?.valor_multa_calculada || 0)
                         : dadosRecebimento.valor_multa
                     }
                     disabled={dadosRecebimento.aplicar_encargos_automaticos}
-                    onChange={(e) =>
+                    onChange={(valor) =>
                       setDadosRecebimento({
                         ...dadosRecebimento,
-                        valor_multa: parseFloat(e.target.value) || 0,
+                        valor_multa: valor,
                       })
                     }
                   />
@@ -382,15 +377,13 @@ export function ContasReceberRecebimentoModal({
 
                 <div>
                   <label className="block text-sm font-medium mb-1">Desconto</label>
-                  <input
-                    type="number"
+                  <CurrencyInput
                     className="w-full border border-gray-300 rounded px-3 py-2"
-                    step="0.01"
                     value={dadosRecebimento.valor_desconto}
-                    onChange={(e) =>
+                    onChange={(valor) =>
                       setDadosRecebimento({
                         ...dadosRecebimento,
-                        valor_desconto: parseFloat(e.target.value) || 0,
+                        valor_desconto: valor,
                       })
                     }
                   />
@@ -587,6 +580,7 @@ export function ContasReceberDetalhesModal({
   formatarData,
   formatarMoeda,
   mostrarDetalhes,
+  onEmitirComprovante,
   setMostrarDetalhes,
 }) {
   return (
@@ -762,6 +756,23 @@ export function ContasReceberDetalhesModal({
                             ) : (
                               <span className="text-xs text-gray-400">Nao informada</span>
                             ),
+                        },
+                        {
+                          key: "comprovante",
+                          header: "Comprovante",
+                          align: "right",
+                          render: (recebimento) => (
+                            <ActionButton
+                              type="button"
+                              onClick={() => onEmitirComprovante(recebimento)}
+                              icon={Printer}
+                              intent="neutral"
+                              tone="soft"
+                              size="xs"
+                            >
+                              Emitir
+                            </ActionButton>
+                          ),
                         },
                       ]}
                       data={safeArray(detalhesCompletos?.recebimentos)}
