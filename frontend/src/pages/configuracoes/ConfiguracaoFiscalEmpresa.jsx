@@ -48,6 +48,8 @@ export default function ConfiguracaoFiscalEmpresa() {
     bairro: "",
     cidade: "",
     uf: "",
+    cupom_cabecalho: "",
+    cupom_mensagem_final: "",
   });
 
   // Dados Fiscais
@@ -115,6 +117,8 @@ export default function ConfiguracaoFiscalEmpresa() {
               bairro: resDados.data.bairro || "",
               cidade: resDados.data.cidade || "",
               uf: resDados.data.uf || "",
+              cupom_cabecalho: resDados.data.cupom_cabecalho || "",
+              cupom_mensagem_final: resDados.data.cupom_mensagem_final || "",
             });
           }
         } catch (e) {
@@ -161,6 +165,7 @@ export default function ConfiguracaoFiscalEmpresa() {
       "cidade",
       "uf",
     ]),
+    "empresa-cupom": new Set(["cupom_cabecalho", "cupom_mensagem_final"]),
     "empresa-fiscal": new Set(["cnae_principal", "regime_tributario"]),
   };
 

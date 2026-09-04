@@ -305,7 +305,62 @@ export default function ConfiguracaoFiscalEmpresaView({
           </div>
         </div>
 
-        {/* ===== SEÇÃO 2: CONFIGURAÇÃO FISCAL ===== */}
+        {/* ===== SEÇÃO 2: CUPOM/RECIBO DO PDV ===== */}
+        <div className="bg-white rounded-lg shadow">
+          <div className="border-b border-violet-100 bg-violet-50 px-6 py-4">
+            <h2 className="text-lg font-semibold text-violet-900">🧾 Cupom/recibo do PDV</h2>
+            <p className="mt-2 text-sm text-violet-700">
+              Personalize o texto do recibo não fiscal. Nome, CNPJ, endereço e contato serão
+              preenchidos automaticamente com os dados cadastrais acima.
+            </p>
+          </div>
+          <div className="grid grid-cols-1 gap-4 p-6 md:grid-cols-2">
+            <div>
+              <label
+                htmlFor="cupom-cabecalho"
+                className="mb-2 block text-sm font-medium text-gray-700"
+              >
+                Cabeçalho personalizado
+              </label>
+              <textarea
+                id="cupom-cabecalho"
+                name="cupom_cabecalho"
+                value={dadosEmpresa.cupom_cabecalho}
+                onChange={handleDadosChange}
+                rows={4}
+                maxLength={240}
+                placeholder="Ex.: Tudo para o bem-estar do seu pet"
+                className={classeCampo("cupom_cabecalho")}
+              />
+              <p className="mt-1 text-xs text-gray-500">
+                Opcional. Se ficar vazio, o nome fantasia ou a razão social será usado.
+              </p>
+            </div>
+            <div>
+              <label
+                htmlFor="cupom-mensagem-final"
+                className="mb-2 block text-sm font-medium text-gray-700"
+              >
+                Mensagem/nota final
+              </label>
+              <textarea
+                id="cupom-mensagem-final"
+                name="cupom_mensagem_final"
+                value={dadosEmpresa.cupom_mensagem_final}
+                onChange={handleDadosChange}
+                rows={4}
+                maxLength={500}
+                placeholder="Ex.: Obrigado pela preferência!"
+                className={classeCampo("cupom_mensagem_final")}
+              />
+              <p className="mt-1 text-xs text-gray-500">
+                Opcional. Se ficar vazia, será impresso um agradecimento padrão.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* ===== SEÇÃO 3: CONFIGURAÇÃO FISCAL ===== */}
         <div className="bg-white rounded-lg shadow">
           <div className="bg-green-50 px-6 py-4 border-b border-green-100">
             <h2 className="text-lg font-semibold text-green-900">

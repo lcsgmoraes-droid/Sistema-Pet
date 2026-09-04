@@ -445,6 +445,7 @@ export function montarPagamentoRecebido({
 
   return {
     forma_pagamento: formaPagamento.nome,
+    forma_pagamento_tipo: tipo,
     forma_id: formaPagamento.id,
     forma_pagamento_id: formaPagamentoId,
     nome: formaPagamento.nome,
