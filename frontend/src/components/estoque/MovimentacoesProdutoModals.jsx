@@ -1,4 +1,5 @@
 import EstoqueLancamentoModal from "./EstoqueLancamentoModal";
+import FracionamentoClinicoModal from "./FracionamentoClinicoModal";
 import GranelLancamentoModal from "./GranelLancamentoModal";
 import ReservasAtivasModal from "./ReservasAtivasModal";
 
@@ -16,6 +17,7 @@ export default function MovimentacoesProdutoModals({
   editingMovimentacao,
   estoqueAtual,
   formData,
+  fracionamentoClinico,
   formatMoney,
   formatPercentual,
   formatarQuantidade,
@@ -143,6 +145,10 @@ export default function MovimentacoesProdutoModals({
           pesoPacoteOrigem={pesoPacoteOrigem}
         />
       )}
+
+      {fracionamentoClinico?.aberto ? (
+        <FracionamentoClinicoModal fluxo={fracionamentoClinico} />
+      ) : null}
     </>
   );
 }

@@ -1,4 +1,13 @@
-import { ArrowLeft, Boxes, ExternalLink, Info, PackageOpen, Plus, RefreshCcw } from "lucide-react";
+import {
+  ArrowLeft,
+  Boxes,
+  ExternalLink,
+  Info,
+  PackageOpen,
+  Plus,
+  RefreshCcw,
+  Syringe,
+} from "lucide-react";
 import ActionButton from "../ui/ActionButton";
 
 function resolveEstoqueVisual(estoqueAtual, estoqueMinimo) {
@@ -121,10 +130,12 @@ export default function MovimentacoesProdutoHeader({
   formatarQuantidade,
   loadingReservas,
   onAbrirPainelBling,
+  onFracionarClinica,
   onForcarSyncProduto,
   onIncluirLancamento,
   onLancarGranel,
   onVoltarProdutos,
+  podeFracionarClinica,
   podeLancarGranel,
   produto,
   saldoAposReserva,
@@ -231,6 +242,17 @@ export default function MovimentacoesProdutoHeader({
                         tone="soft"
                       >
                         Lancar granel
+                      </ActionButton>
+                    ) : null}
+
+                    {podeFracionarClinica ? (
+                      <ActionButton
+                        icon={Syringe}
+                        intent="info"
+                        onClick={onFracionarClinica}
+                        tone="soft"
+                      >
+                        Destinar a clinica
                       </ActionButton>
                     ) : null}
 

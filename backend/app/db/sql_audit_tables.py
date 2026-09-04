@@ -27,6 +27,8 @@ TENANT_TABLES = {
     "locais_estoque",
     "estoque_movimentacoes",
     "estoque_reservas",
+    "estoque_fracionamento_conversoes",
+    "estoque_fracionamento_vinculos",
     # Financeiro
     "contas_pagar",
     "contas_receber",

@@ -2,14 +2,16 @@
 
 from datetime import date, datetime
 from decimal import Decimal
+import json
 from typing import Optional
 
 from fastapi import HTTPException
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from .dre_plano_contas_models import DRECategoria, DRESubcategoria, NaturezaDRE
 from .financeiro_models import CategoriaFinanceira, ContaReceber
-from .produtos_models import EstoqueMovimentacao, Produto
+from .produtos_models import EstoqueMovimentacao, Produto, ProdutoLote
 from .utils.timezone import to_brasilia
 from .veterinario_models import (
     CatalogoProcedimento,
@@ -62,6 +64,11 @@ def _normalizar_insumos(insumos: Optional[list]) -> list[dict]:
                 "baixar_estoque": bool(item.get("baixar_estoque", True)),
                 "custo_unitario": _as_float(item.get("custo_unitario")) or 0.0,
                 "custo_total": _as_float(item.get("custo_total")) or 0.0,
+                "lotes_consumidos": (
+                    item.get("lotes_consumidos")
+                    if isinstance(item.get("lotes_consumidos"), list)
+                    else []
+                ),
             }
         )
     return normalizados
@@ -72,20 +79,87 @@ def _round_money(value: Optional[float]) -> float:
 
 
 def _buscar_produtos_por_ids(
-    db: Session, tenant_id, produto_ids: list[int]
+    db: Session, tenant_id, produto_ids: list[int], *, bloquear: bool = False
 ) -> dict[int, Produto]:
     if not produto_ids:
         return {}
 
-    produtos = (
-        db.query(Produto)
+    query = db.query(Produto).filter(
+        Produto.tenant_id == str(tenant_id),
+        Produto.id.in_(produto_ids),
+    )
+    if bloquear:
+        query = query.with_for_update()
+    produtos = query.all()
+    return {produto.id: produto for produto in produtos}
+
+
+def _consumir_lotes_insumo(
+    db: Session,
+    *,
+    tenant_id,
+    produto: Produto,
+    quantidade: float,
+) -> list[dict]:
+    """Consome por validade/FIFO quando o produto clinico possui lotes abertos."""
+
+    if not getattr(produto, "controle_lote", False):
+        return []
+
+    lotes = (
+        db.query(ProdutoLote)
         .filter(
-            Produto.tenant_id == str(tenant_id),
-            Produto.id.in_(produto_ids),
+            ProdutoLote.tenant_id == tenant_id,
+            ProdutoLote.produto_id == produto.id,
+            ProdutoLote.status == "ativo",
+            ProdutoLote.quantidade_disponivel > 0,
+            or_(
+                ProdutoLote.data_validade.is_(None),
+                ProdutoLote.data_validade > datetime.utcnow(),
+            ),
         )
+        .order_by(
+            ProdutoLote.data_validade.asc().nullslast(),
+            ProdutoLote.ordem_entrada.asc(),
+            ProdutoLote.id.asc(),
+        )
+        .with_for_update()
         .all()
     )
-    return {produto.id: produto for produto in produtos}
+    saldo_lotes = sum(float(lote.quantidade_disponivel or 0) for lote in lotes)
+    if saldo_lotes + 1e-9 < quantidade:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"Lotes validos de {produto.nome} sem saldo suficiente. "
+                f"Disponivel nos lotes: {saldo_lotes:g}, necessario: {quantidade:g}"
+            ),
+        )
+    restante = quantidade
+    consumidos = []
+    for lote in lotes:
+        if restante <= 1e-9:
+            break
+        disponivel = float(lote.quantidade_disponivel or 0)
+        retirar = min(disponivel, restante)
+        if retirar <= 0:
+            continue
+        lote.quantidade_disponivel = max(0.0, disponivel - retirar)
+        if lote.quantidade_disponivel <= 1e-9:
+            lote.quantidade_disponivel = 0.0
+            lote.status = "esgotado"
+        restante -= retirar
+        consumidos.append(
+            {
+                "lote_id": lote.id,
+                "nome_lote": lote.nome_lote,
+                "quantidade": retirar,
+                "data_validade": (
+                    lote.data_validade.isoformat() if lote.data_validade else None
+                ),
+            }
+        )
+    return consumidos
 
 
 def _enriquecer_insumos_com_custos(
@@ -133,7 +207,10 @@ def _aplicar_baixa_estoque_itens(
 ) -> tuple[list[dict], list[int]]:
     itens = _normalizar_insumos(itens)
     produtos = _buscar_produtos_por_ids(
-        db, tenant_id, [item["produto_id"] for item in itens]
+        db,
+        tenant_id,
+        [item["produto_id"] for item in itens],
+        bloquear=True,
     )
     movimentacoes_ids = []
     for item in itens:
@@ -161,9 +238,15 @@ def _aplicar_baixa_estoque_itens(
 
         quantidade_anterior = estoque_atual
         quantidade_nova = estoque_atual - item["quantidade"]
-        produto.estoque_atual = quantidade_nova
         custo_unitario = _round_money(produto.preco_custo)
         custo_total = _round_money(custo_unitario * item["quantidade"])
+        lotes_consumidos = _consumir_lotes_insumo(
+            db,
+            tenant_id=tenant_id,
+            produto=produto,
+            quantidade=item["quantidade"],
+        )
+        produto.estoque_atual = quantidade_nova
 
         movimentacao = EstoqueMovimentacao(
             tenant_id=str(tenant_id),
@@ -175,6 +258,11 @@ def _aplicar_baixa_estoque_itens(
             quantidade_nova=quantidade_nova,
             custo_unitario=custo_unitario,
             valor_total=custo_total,
+            lotes_consumidos=(
+                json.dumps(lotes_consumidos, ensure_ascii=False)
+                if lotes_consumidos
+                else None
+            ),
             referencia_id=referencia_id,
             referencia_tipo=referencia_tipo,
             documento=documento,
@@ -188,6 +276,7 @@ def _aplicar_baixa_estoque_itens(
         item["unidade"] = item.get("unidade") or produto.unidade
         item["custo_unitario"] = custo_unitario
         item["custo_total"] = custo_total
+        item["lotes_consumidos"] = lotes_consumidos
 
     return itens, movimentacoes_ids
 
