@@ -13,7 +13,11 @@ import {
   useSortable,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import { useRef } from "react";
 import { Link } from "react-router-dom";
+
+const POINTER_DRAG_DISTANCE_PX = 6;
+const POINTER_CLICK_RESET_DELAY_MS = 1000;
 
 function FavoriteShortcut({ favorite, active, onClick }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
@@ -75,6 +79,12 @@ export default function LayoutFavoritesBar({
   onDragEnd,
   onDragCancel,
 }) {
+  const pointerGestureRef = useRef({
+    startX: null,
+    startY: null,
+    moved: false,
+    resetTimer: null,
+  });
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
     useSensor(KeyboardSensor, {
@@ -82,10 +92,55 @@ export default function LayoutFavoritesBar({
     }),
   );
 
+  const handlePointerDownCapture = (event) => {
+    const gesture = pointerGestureRef.current;
+    if (gesture.resetTimer) window.clearTimeout(gesture.resetTimer);
+    gesture.startX = event.clientX;
+    gesture.startY = event.clientY;
+    gesture.moved = false;
+    gesture.resetTimer = null;
+  };
+
+  const handlePointerMoveCapture = (event) => {
+    const gesture = pointerGestureRef.current;
+    if (gesture.startX == null || gesture.startY == null || gesture.moved) return;
+
+    const distance = Math.hypot(event.clientX - gesture.startX, event.clientY - gesture.startY);
+    if (distance >= POINTER_DRAG_DISTANCE_PX) gesture.moved = true;
+  };
+
+  const handlePointerUpCapture = () => {
+    const gesture = pointerGestureRef.current;
+    gesture.startX = null;
+    gesture.startY = null;
+    gesture.resetTimer = window.setTimeout(() => {
+      gesture.moved = false;
+      gesture.resetTimer = null;
+    }, POINTER_CLICK_RESET_DELAY_MS);
+  };
+
+  const handleBarClickCapture = (event) => {
+    const gesture = pointerGestureRef.current;
+    if (!gesture.moved) return;
+
+    event.preventDefault();
+    event.stopPropagation();
+    gesture.moved = false;
+    if (gesture.resetTimer) window.clearTimeout(gesture.resetTimer);
+    gesture.resetTimer = null;
+  };
+
   if (favorites.length === 0) return null;
 
   return (
-    <div className="shrink-0 border-b border-gray-200 bg-white/95 px-3 py-2 md:px-6 dark:border-slate-800 dark:bg-slate-950/95">
+    <div
+      className="shrink-0 border-b border-gray-200 bg-white/95 px-3 py-2 md:px-6 dark:border-slate-800 dark:bg-slate-950/95"
+      onPointerDownCapture={handlePointerDownCapture}
+      onPointerMoveCapture={handlePointerMoveCapture}
+      onPointerUpCapture={handlePointerUpCapture}
+      onPointerCancelCapture={handlePointerUpCapture}
+      onClickCapture={handleBarClickCapture}
+    >
       <DndContext
         sensors={sensors}
         collisionDetection={closestCenter}

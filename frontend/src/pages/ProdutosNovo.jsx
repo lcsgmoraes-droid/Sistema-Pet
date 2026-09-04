@@ -232,10 +232,14 @@ export default function ProdutosNovo() {
     setPreenchendoComIA(true);
     setAssistenteIAAviso("");
     try {
-      const response = await api.post("/produtos/assistente-ia/preencher-por-ean", {
-        codigo_barras: codigoBarras,
-        nome: formData.nome || null,
-      });
+      const response = await api.post(
+        "/produtos/assistente-ia/preencher-por-ean",
+        {
+          codigo_barras: codigoBarras,
+          nome: formData.nome || null,
+        },
+        { timeout: 90000 },
+      );
       const sugestao = response.data || {};
       setFormData((prev) => ({
         ...prev,
