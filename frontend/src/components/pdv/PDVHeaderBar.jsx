@@ -171,7 +171,7 @@ export default function PDVHeaderBar({
             className="w-full sm:w-auto sm:min-w-[120px]"
             title="Ver historico de caixas"
           >
-            <span>Meus Caixas</span>
+            <span>Caixas</span>
           </ActionButton>
 
           {!modoVisualizacao && vendaAtual.id && (

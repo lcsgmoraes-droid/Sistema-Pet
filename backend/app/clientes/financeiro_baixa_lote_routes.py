@@ -103,7 +103,8 @@ async def baixar_vendas_lote(
         logger.info(f"Dados recebidos: {dados}")
 
         from app.vendas_models import Venda, VendaPagamento
-        from app.caixa_models import Caixa, MovimentacaoCaixa
+        from app.caixa_models import MovimentacaoCaixa
+        from app.caixa.escopo import buscar_caixa_aberto
         from app.financeiro_models import Recebimento
         from app.ia.aba5_models import FluxoCaixa
 
@@ -118,14 +119,8 @@ async def baixar_vendas_lote(
         logger.info(f"Forma pagamento: {forma_pagamento}")
 
         # Validar se há caixa aberto
-        caixa_aberto = (
-            db.query(Caixa)
-            .filter(
-                Caixa.usuario_id == current_user.id,
-                Caixa.tenant_id == tenant_id,
-                Caixa.status == "aberto",
-            )
-            .first()
+        caixa_aberto, _ = buscar_caixa_aberto(
+            db, tenant_id=tenant_id, usuario_id=current_user.id
         )
 
         logger.info(f"Caixa aberto: {caixa_aberto}")

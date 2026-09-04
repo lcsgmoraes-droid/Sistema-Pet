@@ -516,10 +516,12 @@ export const BASE_CONHECIMENTO = [
       },
       {
         titulo: "Como abrir e fechar o caixa",
-        tags: ["caixa", "abrir", "fechar", "sangria", "suprimento"],
+        tags: ["caixa", "abrir", "fechar", "sangria", "suprimento", "compartilhado"],
         conteudo: [
-          "Acesse **PDV → Meus Caixas** no menu.",
+          "Acesse **PDV → Caixas** no menu.",
           "**Abrir caixa:** clique em 'Abrir Caixa' e informe o valor de troco inicial.",
+          "**Caixa compartilhado:** um administrador pode ativar em **Configurações → Parâmetros Gerais**. O primeiro usuário abre o caixa e os demais passam a usar o mesmo caixa automaticamente.",
+          "No modo compartilhado, cada operação continua identificando o usuário que a realizou.",
           "**Sangria:** retira dinheiro do caixa durante o dia. Registre o motivo.",
           "**Suprimento:** adiciona dinheiro ao caixa. Registre o motivo.",
           "**Fechar caixa:** conta o dinheiro físico, o sistema compara com o esperado e mostra a diferença.",

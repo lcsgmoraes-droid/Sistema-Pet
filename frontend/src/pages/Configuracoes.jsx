@@ -41,7 +41,7 @@ const cards = [
   },
   {
     title: "Parametros Gerais",
-    description: "Margens do PDV, mensagens, metas e alertas",
+    description: "Caixa, margens do PDV, mensagens, metas e alertas",
     icon: FiSettings,
     link: "/configuracoes/geral",
     color: "orange",

@@ -9,6 +9,7 @@ import {
   CheckCircle,
   RefreshCw,
   Download,
+  Users,
 } from "lucide-react";
 import { listarCaixas, reabrirCaixa } from "../api/caixa";
 import { getAccessToken } from "../auth/tokenStorage";
@@ -135,8 +136,8 @@ export default function MeusCaixas() {
     <div className="p-6">
       {/* Header */}
       <div className="mb-6">
-        <h1 className="text-3xl font-bold text-gray-900">Meus Caixas</h1>
-        <p className="text-gray-600 mt-1">Histórico e gestão dos seus caixas</p>
+        <h1 className="text-3xl font-bold text-gray-900">Caixas</h1>
+        <p className="text-gray-600 mt-1">Histórico e gestão dos caixas disponíveis</p>
       </div>
 
       {/* Filtros */}
@@ -231,7 +232,17 @@ export default function MeusCaixas() {
                         <h3 className="text-xl font-bold text-gray-900">
                           Caixa #{caixa.numero_caixa}
                         </h3>
-                        <p className="text-sm text-gray-600">{caixa.usuario_nome}</p>
+                        <p className="text-sm text-gray-600">Aberto por {caixa.usuario_nome}</p>
+                        {caixa.usuario_fechamento_nome && (
+                          <p className="text-sm text-gray-600">
+                            Fechado por {caixa.usuario_fechamento_nome}
+                          </p>
+                        )}
+                        {caixa.compartilhado && (
+                          <span className="mt-1 inline-flex items-center gap-1 rounded-full bg-blue-100 px-2 py-0.5 text-xs font-semibold text-blue-700">
+                            <Users className="h-3 w-3" /> Caixa compartilhado
+                          </span>
+                        )}
                       </div>
                     </div>
                     {getStatusBadge(caixa)}
