@@ -26,9 +26,7 @@ def upgrade() -> None:
         ),
     )
     op.add_column("caixas", sa.Column("usuario_fechamento_id", sa.Integer()))
-    op.add_column(
-        "caixas", sa.Column("usuario_fechamento_nome", sa.String(length=200))
-    )
+    op.add_column("caixas", sa.Column("usuario_fechamento_nome", sa.String(length=200)))
 
 
 def downgrade() -> None:
