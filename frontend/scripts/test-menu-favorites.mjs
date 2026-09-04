@@ -5,6 +5,7 @@ import {
   MAX_MENU_FAVORITES,
   buildMenuFavoritesCacheKey,
   buildVisibleMenuFavorites,
+  createFavoriteDragClickGuard,
   flattenMenuItemsForFavorites,
   isTransientMenuFavoritesError,
   loadMenuFavoritesWithRetry,
@@ -124,6 +125,21 @@ test("shouldBlockFavoriteShortcutClick bloqueia clique durante ou logo apos arra
   assert.equal(shouldBlockFavoriteShortcutClick({ isDragging: true, now: 1000 }), true);
   assert.equal(shouldBlockFavoriteShortcutClick({ suppressClickUntil: 1300, now: 1200 }), true);
   assert.equal(shouldBlockFavoriteShortcutClick({ suppressClickUntil: 1300, now: 1400 }), false);
+});
+
+test("guard de drag sobrevive a remontagem e bloqueia apenas o clique herdado", () => {
+  const guard = createFavoriteDragClickGuard();
+
+  guard.pointerIntentStarted();
+  guard.dragStarted();
+  guard.dragFinished();
+  assert.equal(guard.consumeClick(), true);
+  assert.equal(guard.consumeClick(), false);
+
+  guard.dragStarted();
+  guard.dragFinished();
+  guard.pointerIntentStarted();
+  assert.equal(guard.consumeClick(), false);
 });
 
 test("normalizeMenuFavorites limpa dados de API e remove duplicados", () => {

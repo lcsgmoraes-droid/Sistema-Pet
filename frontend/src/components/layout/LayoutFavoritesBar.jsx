@@ -16,7 +16,14 @@ import { CSS } from "@dnd-kit/utilities";
 import { useRef } from "react";
 import { Link } from "react-router-dom";
 
+import { createFavoriteDragClickGuard } from "./menuFavorites";
+
 const POINTER_DRAG_DISTANCE_PX = 6;
+
+// A lista e atualizada depois do drop e pode remontar a barra inteira antes
+// do clique sintetico do navegador. Este guard de modulo sobrevive a essa
+// remontagem e bloqueia exatamente o clique herdado do gesto de arraste.
+const favoriteDragClickGuard = createFavoriteDragClickGuard();
 
 function FavoriteShortcut({ favorite, active, onClick }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
@@ -35,7 +42,7 @@ function FavoriteShortcut({ favorite, active, onClick }) {
     // Enquanto o item ainda esta sendo arrastado, o Link nao pode receber o
     // clique sintetico do navegador. Depois do drop, o guard do Layout cobre
     // o pequeno intervalo em que o dnd-kit ja removeu `isDragging`.
-    if (isDragging) {
+    if (isDragging || favoriteDragClickGuard.consumeClick()) {
       event.preventDefault();
       event.stopPropagation();
       return;
@@ -92,6 +99,9 @@ export default function LayoutFavoritesBar({
 
   const handlePointerDownCapture = (event) => {
     const gesture = pointerGestureRef.current;
+    // Se o drag anterior nao gerou clique sintetico, um novo pointerdown
+    // representa uma intencao real e libera a navegacao normalmente.
+    favoriteDragClickGuard.pointerIntentStarted();
     gesture.startX = event.clientX;
     gesture.startY = event.clientY;
     // Um clique real posterior sempre comeca com um novo pointerdown. Por isso,
@@ -127,6 +137,7 @@ export default function LayoutFavoritesBar({
     // O callback do dnd-kit e a fonte mais confiavel para distinguir um drag
     // de um clique. Em alguns navegadores, o DOM e reordenado antes do clique
     // sintetico e os pointermove deixam de chegar ao container React.
+    favoriteDragClickGuard.dragStarted();
     pointerGestureRef.current.moved = true;
     onDragStart?.(event);
   };
@@ -134,18 +145,20 @@ export default function LayoutFavoritesBar({
   const handleDndDragEnd = (event) => {
     // Reafirma o bloqueio depois do drop, pois a reordenacao pode remontar o
     // atalho arrastado antes de o navegador disparar o clique final.
+    favoriteDragClickGuard.dragFinished();
     pointerGestureRef.current.moved = true;
     onDragEnd?.(event);
   };
 
   const handleDndDragCancel = (event) => {
+    favoriteDragClickGuard.dragFinished();
     pointerGestureRef.current.moved = true;
     onDragCancel?.(event);
   };
 
   const handleBarClickCapture = (event) => {
     const gesture = pointerGestureRef.current;
-    if (!gesture.moved) return;
+    if (!gesture.moved && !favoriteDragClickGuard.consumeClick()) return;
 
     event.preventDefault();
     event.stopPropagation();
