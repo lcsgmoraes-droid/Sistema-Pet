@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Alert } from "react-native";
 
+import ProfileSwitcherModal from "../../components/ProfileSwitcherModal";
 import * as AuthService from "../../services/auth.service";
 import { PONTOS } from "../../config";
 import { updateProfile } from "../../services/auth.service";
@@ -8,7 +9,7 @@ import { ensurePushNotificationsRegistered } from "../../services/pushNotificati
 import { useAuthStore } from "../../store/auth.store";
 import { useCartStore } from "../../store/cart.store";
 import { useWishlistStore } from "../../store/wishlist.store";
-import type { AppProfileType } from "../../types";
+import type { AppAccessProfile, AppProfileType } from "../../types";
 import { confirmLogoutWithNotificationChoice } from "../../utils/logoutNotifications";
 import { ProfileContent } from "./profile/ProfileContent";
 import {
@@ -50,6 +51,8 @@ export default function ProfileScreen() {
   const [buscandoCepEntrega, setBuscandoCepEntrega] = useState(false);
   const [salvando, setSalvando] = useState(false);
   const [trocandoPerfil, setTrocandoPerfil] = useState(false);
+  const [profileSwitcherVisible, setProfileSwitcherVisible] = useState(false);
+  const [profileSwitcherProfiles, setProfileSwitcherProfiles] = useState<AppAccessProfile[]>([]);
   const [ativandoNotificacoes, setAtivandoNotificacoes] = useState(false);
   const [statusNotificacoes, setStatusNotificacoes] = useState<string | null>(null);
   const [excluindoConta, setExcluindoConta] = useState(false);
@@ -237,24 +240,17 @@ export default function ProfileScreen() {
       updateUser(freshUser);
       const freshProfiles = freshUser.available_profiles ?? [];
       const freshCurrentProfile = freshUser.selected_profile ?? freshUser.perfil_operacional ?? perfilAtual;
-      const profileOptions = freshProfiles
-        .filter((profile) => profile.type !== freshCurrentProfile)
-        .map((profile) => ({
-          text: profile.label || profile.type,
-          onPress: () => {
-            trocarPerfil(profile.type).catch(() => undefined);
-          },
-        }));
+      const profileOptions = freshProfiles.filter(
+        (profile) => profile.type !== freshCurrentProfile,
+      );
 
       if (profileOptions.length === 0) {
         Alert.alert("Trocar perfil", "Sem outros acessos liberados para esta conta.");
         return;
       }
 
-      Alert.alert("Trocar perfil", "Escolha como entrar no app.", [
-        ...profileOptions,
-        { text: "Cancelar", style: "cancel" },
-      ]);
+      setProfileSwitcherProfiles(profileOptions);
+      setProfileSwitcherVisible(true);
     } catch (err: any) {
       const mensagem =
         err?.response?.data?.detail ||
@@ -309,7 +305,8 @@ export default function ProfileScreen() {
   }
 
   return (
-    <ProfileContent
+    <>
+      <ProfileContent
       user={user}
       pontos={pontos}
       valorPontos={valorPontos}
@@ -376,7 +373,17 @@ export default function ProfileScreen() {
       onAtivarNotificacoes={ativarNotificacoes}
       onLogout={handleLogout}
       excluindoConta={excluindoConta}
-      onExcluirConta={excluirConta}
-    />
+        onExcluirConta={excluirConta}
+      />
+      <ProfileSwitcherModal
+        visible={profileSwitcherVisible}
+        profiles={profileSwitcherProfiles}
+        onSelect={(profile) => {
+          setProfileSwitcherVisible(false);
+          trocarPerfil(profile.type).catch(() => undefined);
+        }}
+        onClose={() => setProfileSwitcherVisible(false)}
+      />
+    </>
   );
 }
