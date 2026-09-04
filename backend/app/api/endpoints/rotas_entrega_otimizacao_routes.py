@@ -8,6 +8,7 @@ from app.auth.dependencies import get_current_user_and_tenant
 from app.db import get_session
 from app.models import ConfiguracaoEntrega
 from app.utils.logger import logger
+from app.vendas.entrega_filters import filtros_venda_entrega_operacional
 from app.vendas_models import Venda
 
 router = APIRouter()
@@ -62,13 +63,7 @@ def otimizar_vendas_pendentes(
     # CRITÉRIO: tem_entrega = true E status_entrega NÃO é 'entregue' ou 'cancelada'
     vendas = (
         db.query(Venda)
-        .filter(
-            Venda.tenant_id == tenant_id,
-            Venda.status != "cancelada",
-            Venda.tem_entrega.is_(True),
-            ~Venda.status_entrega.in_(["entregue", "cancelada"]),
-            Venda.endereco_entrega.isnot(None),
-        )
+        .filter(*filtros_venda_entrega_operacional(tenant_id))
         .order_by(Venda.created_at.asc())
         .all()
     )
@@ -182,11 +177,8 @@ def otimizar_vendas_selecionadas(
     vendas = (
         db.query(Venda)
         .filter(
-            Venda.tenant_id == tenant_id,
             Venda.id.in_(payload.venda_ids),
-            Venda.status != "cancelada",
-            Venda.tem_entrega.is_(True),
-            Venda.endereco_entrega.isnot(None),
+            *filtros_venda_entrega_operacional(tenant_id),
         )
         .order_by(Venda.created_at.asc())
         .all()

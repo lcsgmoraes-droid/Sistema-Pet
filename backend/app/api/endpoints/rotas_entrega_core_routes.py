@@ -21,6 +21,7 @@ from app.db import get_session
 from app.models import Cliente
 from app.rotas_entrega_models import EntregaAvaliacao, RotaEntrega, RotaEntregaParada
 from app.schemas.rota_entrega import RotaEntregaResponse, RotaEntregaUpdate
+from app.vendas.entrega_filters import filtros_venda_entrega_operacional
 from app.vendas_models import Venda
 
 router = APIRouter()
@@ -376,14 +377,7 @@ def listar_vendas_pendentes_entrega(
     # Exclui: 'em_rota', 'entregue', 'cancelada'
     vendas = (
         db.query(Venda)
-        .filter(
-            Venda.tenant_id == tenant_id,
-            Venda.status != "cancelada",
-            Venda.tem_entrega.is_(True),
-            # Aceita vendas fora de rota, inclusive pedido online ja separado.
-            Venda.status_entrega.in_(["pendente", "pronto"])
-            | Venda.status_entrega.is_(None),
-        )
+        .filter(*filtros_venda_entrega_operacional(tenant_id))
         .order_by(
             # Primeiro: vendas com ordem otimizada
             Venda.ordem_entrega_otimizada.asc().nullslast(),

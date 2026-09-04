@@ -36,6 +36,7 @@ from app.routes.ecommerce_auth import (
 from app.schemas.rota_entrega import RotaEntregaResponse, RotaEntregaUpdate
 from app.services.google_maps_service import calcular_rota_otimizada
 from app.tenancy.context import set_current_tenant
+from app.vendas.entrega_filters import filtros_venda_entrega_operacional
 from app.vendas_models import Venda, VendaItem
 
 router = APIRouter(prefix="/ecommerce/entregador", tags=["ecommerce-entregador"])
@@ -243,14 +244,7 @@ def listar_entregas_abertas(
         db.query(Venda)
         .options(joinedload(Venda.cliente), selectinload(Venda.pagamentos))
         .filter(
-            Venda.tenant_id == tenant_id,
-            Venda.status != "cancelada",
-            Venda.tem_entrega.is_(True),
-            or_(
-                Venda.status_entrega.in_(["pendente", "pronto"]),
-                Venda.status_entrega.is_(None),
-            ),
-            Venda.endereco_entrega.isnot(None),
+            *filtros_venda_entrega_operacional(tenant_id),
             or_(Venda.entregador_id == cliente.id, Venda.entregador_id.is_(None)),
         )
         .order_by(
@@ -314,15 +308,8 @@ def otimizar_entregas_selecionadas(
     vendas = (
         db.query(Venda)
         .filter(
-            Venda.tenant_id == tenant_id,
             Venda.id.in_(payload.venda_ids),
-            Venda.status != "cancelada",
-            Venda.tem_entrega.is_(True),
-            or_(
-                Venda.status_entrega.in_(["pendente", "pronto"]),
-                Venda.status_entrega.is_(None),
-            ),
-            Venda.endereco_entrega.isnot(None),
+            *filtros_venda_entrega_operacional(tenant_id),
             or_(Venda.entregador_id == cliente.id, Venda.entregador_id.is_(None)),
         )
         .order_by(Venda.created_at.asc())
@@ -370,15 +357,8 @@ def criar_rota_por_entregador(
     vendas = (
         db.query(Venda)
         .filter(
-            Venda.tenant_id == tenant_id,
             Venda.id.in_(payload.venda_ids),
-            Venda.status != "cancelada",
-            Venda.tem_entrega.is_(True),
-            or_(
-                Venda.status_entrega.in_(["pendente", "pronto"]),
-                Venda.status_entrega.is_(None),
-            ),
-            Venda.endereco_entrega.isnot(None),
+            *filtros_venda_entrega_operacional(tenant_id),
             or_(Venda.entregador_id == cliente.id, Venda.entregador_id.is_(None)),
         )
         .order_by(
