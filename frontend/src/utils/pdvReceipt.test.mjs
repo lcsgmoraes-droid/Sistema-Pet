@@ -78,7 +78,7 @@ test("configuracoes opcionais vazias usam fallback sensato", () => {
   assert.match(recibo, /Volte sempre!/);
 });
 
-test("crediario imprime duas vias com parcelas, vencimentos e assinatura", () => {
+test("crediario imprime cupom e duas vias da nota promissoria em folhas separadas", () => {
   const vendaCrediario = {
     ...vendaBase,
     pagamentos: [
@@ -95,15 +95,18 @@ test("crediario imprime duas vias com parcelas, vencimentos e assinatura", () =>
   const comprovante = montarCupomCrediario(vendaCrediario, empresa);
 
   assert.equal(ehVendaCrediario(vendaCrediario), true);
+  assert.match(comprovante, /RECIBO DO PDV/);
   assert.match(comprovante, /VIA DO ESTABELECIMENTO/);
   assert.match(comprovante, /VIA DO CLIENTE/);
-  assert.equal((comprovante.match(/ASSINATURA DO CLIENTE/g) || []).length, 2);
-  assert.equal((comprovante.match(/COMPROVANTE DE CREDIARIO/g) || []).length, 2);
+  assert.equal((comprovante.match(/NOTA PROMISSORIA/g) || []).length, 2);
+  assert.equal((comprovante.match(/ASSINATURA DO EMITENTE/g) || []).length, 2);
+  assert.equal((comprovante.match(/\f/g) || []).length, 2);
   assert.match(comprovante, /1\/3 31\/01\/2027/);
   assert.match(comprovante, /2\/3 28\/02\/2027/);
   assert.match(comprovante, /3\/3 31\/03\/2027/);
   assert.match(comprovante, /R\$ 130,00/);
-  assert.match(comprovante, /CORTE AQUI/);
+  assert.match(comprovante, /trezentos e noventa reais/);
+  assert.doesNotMatch(comprovante, /CORTE AQUI/);
   assert.equal(montarConteudoCupom(vendaCrediario, empresa), comprovante);
 });
 

@@ -5,6 +5,7 @@ from datetime import datetime
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session, joinedload
 
 from app.auth.dependencies import get_current_user_and_tenant
@@ -34,6 +35,11 @@ from app.produtos_models import (
 )
 from app.security.permissions_decorator import require_permission
 from app.services.produto_service import ProdutoService
+from app.services.ofertas_estudio_ai import resolver_chave_openai_tenant
+from app.services.produto_ai_enrichment import (
+    ProdutoAIRascunho,
+    gerar_rascunho_produto_por_ean,
+)
 from app.produtos.tipos import aplicar_regras_servico_dados
 from app.empresa_grupo_estoque_compartilhado_service import (
     EmpresaGrupoEstoqueCompartilhadoService,
@@ -42,6 +48,36 @@ from app.tenancy.context import set_current_tenant
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
+
+
+class ProdutoAIPreencherRequest(BaseModel):
+    codigo_barras: str = Field(min_length=8, max_length=14, pattern=r"^\d+$")
+    nome: str | None = Field(default=None, max_length=255)
+
+
+@router.post(
+    "/assistente-ia/preencher-por-ean",
+    response_model=ProdutoAIRascunho,
+)
+@require_permission("produtos.editar")
+def preencher_produto_com_ia(
+    payload: ProdutoAIPreencherRequest,
+    db: Session = Depends(get_session),
+    user_and_tenant=Depends(get_current_user_and_tenant),
+):
+    """Gera um rascunho revisavel de descricao e dados fiscais por EAN."""
+    _, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
+    api_key = resolver_chave_openai_tenant(db, tenant_id)
+    if not api_key:
+        raise HTTPException(
+            status_code=400,
+            detail="Configure a chave da OpenAI em Configuracoes > Integracoes para usar este recurso.",
+        )
+    return gerar_rascunho_produto_por_ean(
+        api_key=api_key,
+        codigo_barras=payload.codigo_barras,
+        nome=payload.nome,
+    )
 
 
 @router.post("/", response_model=ProdutoResponse, status_code=status.HTTP_201_CREATED)

@@ -31,6 +31,14 @@ export const obterCaixaAberto = () => {
 };
 
 /**
+ * Obter o ultimo fechamento do usuario para conferir o valor da proxima abertura.
+ */
+export const obterConferenciaAbertura = async () => {
+  const response = await api.get("/caixas/conferencia-abertura");
+  return response.data;
+};
+
+/**
  * Valida se o caixa informado ainda e o caixa aberto atual do usuario.
  */
 export const validarCaixaAtual = async (caixaIdEsperado) => {

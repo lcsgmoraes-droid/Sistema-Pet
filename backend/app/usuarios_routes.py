@@ -52,6 +52,7 @@ class UsuarioListResponse(BaseModel):
     username: str | None = None
     email: str | None = None
     nome: str | None = None
+    role_id: int
     role: str
     is_active: bool
 
@@ -83,6 +84,7 @@ class UserCredentialsUpdate(BaseModel):
     username: str | None = Field(default=None, min_length=3, max_length=50)
     new_password: str | None = Field(default=None, min_length=8, max_length=72)
     generate_password: bool = False
+    role_id: int | None = None
 
     @model_validator(mode="after")
     def validate_change(self):
@@ -90,8 +92,9 @@ class UserCredentialsUpdate(BaseModel):
             self.username is None
             and self.new_password is None
             and not self.generate_password
+            and self.role_id is None
         ):
-            raise ValueError("Informe o nome de usuario ou uma nova senha")
+            raise ValueError("Informe o nome de usuario, uma nova senha ou um perfil")
         if self.new_password is not None and self.generate_password:
             raise ValueError("Escolha uma senha ou gere uma senha, nao as duas opcoes")
         return self
@@ -211,6 +214,7 @@ def listar_usuarios(
             User.username,
             User.email,
             User.nome,
+            Role.id.label("role_id"),
             Role.name.label("role"),
             UserTenant.is_active,
         )
@@ -306,9 +310,11 @@ def atualizar_credenciais_usuario(
     if not row:
         raise HTTPException(status_code=404, detail="Usuario nao encontrado nesta loja")
 
-    target_user, _vinculo = row
+    target_user, vinculo = row
     username_changed = False
     password_changed = False
+    role_changed = False
+    selected_role: Role | None = None
     generated_password: str | None = None
 
     try:
@@ -337,11 +343,25 @@ def atualizar_credenciais_usuario(
             register_password_changed(db, target_user, None, "admin_reset")
             password_changed = True
 
-        if password_changed:
+        if payload.role_id is not None:
+            selected_role = (
+                db.query(Role)
+                .filter(Role.id == payload.role_id, Role.tenant_id == tenant_id)
+                .first()
+            )
+            if not selected_role:
+                raise UserAccountError(
+                    "Perfil de acesso invalido para esta loja.",
+                    status_code=400,
+                )
+            role_changed = vinculo.role_id != selected_role.id
+            vinculo.role_id = selected_role.id
+
+        if password_changed or role_changed:
             sessions_revoked = revoke_all_sessions(
                 db=db,
                 user_id=target_user.id,
-                reason="admin_password_reset",
+                reason="admin_access_changed",
             )
         else:
             sessions_revoked = 0
@@ -357,10 +377,11 @@ def atualizar_credenciais_usuario(
                 actor=actor,
                 target_user=target_user,
                 tenant_id=tenant_id,
-                role=None,
+                role=selected_role,
                 extra={
                     "username_changed": username_changed,
                     "password_changed": password_changed,
+                    "role_changed": role_changed,
                     "sessions_revoked": sessions_revoked,
                 },
             ),
@@ -383,6 +404,8 @@ def atualizar_credenciais_usuario(
         "status": "ok",
         "username": target_user.username,
         "password_changed": password_changed,
+        "role_changed": role_changed,
+        "role_id": vinculo.role_id,
         "generated_password": generated_password,
         "sessions_revoked": sessions_revoked,
     }

@@ -12,6 +12,7 @@ export default function UsuarioCredenciaisModal({
   onClose,
   onGenerate,
   onSubmit,
+  roles,
   tenantReference,
   usuario,
 }) {
@@ -41,6 +42,29 @@ export default function UsuarioCredenciaisModal({
             <h2 className="text-lg font-semibold text-slate-950">Gerenciar acesso</h2>
             <p className="mt-1 text-sm text-slate-500">
               {usuario.nome || usuario.username || usuario.email}
+            </p>
+          </div>
+
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700" htmlFor="cred-role">
+              Perfil de acesso
+            </label>
+            <select
+              id="cred-role"
+              value={credenciais.role_id}
+              onChange={(event) => onChange({ ...credenciais, role_id: event.target.value })}
+              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
+              required
+            >
+              <option value="">Selecione um perfil</option>
+              {roles.map((role) => (
+                <option key={role.role_id} value={role.role_id}>
+                  {role.nome}
+                </option>
+              ))}
+            </select>
+            <p className="mt-1 text-xs text-slate-500">
+              Ao trocar o perfil, as sessoes abertas deste usuario serao encerradas.
             </p>
           </div>
           <IconActionButton

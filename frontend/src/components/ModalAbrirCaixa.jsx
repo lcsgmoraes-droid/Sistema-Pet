@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { X, DollarSign, Calculator, AlertCircle } from "lucide-react";
-import { abrirCaixa } from "../api/caixa";
+import { abrirCaixa, obterConferenciaAbertura } from "../api/caixa";
+import { atualizarObservacaoComContagem } from "../utils/caixaContagem";
 
 export default function ModalAbrirCaixa({ onClose, onSucesso }) {
   const [valorAbertura, setValorAbertura] = useState("");
@@ -19,6 +20,13 @@ export default function ModalAbrirCaixa({ onClose, onSucesso }) {
   const [mostrarContagem, setMostrarContagem] = useState(false);
   const [loading, setLoading] = useState(false);
   const [erro, setErro] = useState("");
+  const [ultimaConferencia, setUltimaConferencia] = useState(null);
+
+  useEffect(() => {
+    obterConferenciaAbertura()
+      .then(setUltimaConferencia)
+      .catch(() => setUltimaConferencia(null));
+  }, []);
 
   // Calcular total das notas
   const calcularTotalNotas = () => {
@@ -38,6 +46,7 @@ export default function ModalAbrirCaixa({ onClose, onSucesso }) {
   const aplicarContagem = () => {
     const total = calcularTotalNotas();
     setValorAbertura(total.toFixed(2));
+    setObservacoes((atual) => atualizarObservacaoComContagem(atual, notas));
     setMostrarContagem(false);
   };
 
@@ -50,7 +59,7 @@ export default function ModalAbrirCaixa({ onClose, onSucesso }) {
   const handleAbrirCaixa = async () => {
     const valor = parseFloat(valorAbertura);
 
-    if (!valor || valor < 0) {
+    if (!Number.isFinite(valor) || valor < 0) {
       setErro("Informe um valor válido para abertura");
       return;
     }
@@ -74,6 +83,12 @@ export default function ModalAbrirCaixa({ onClose, onSucesso }) {
       setLoading(false);
     }
   };
+
+  const valorAnterior = Number(ultimaConferencia?.valor_fechamento);
+  const valorAtual = Number.parseFloat(valorAbertura);
+  const diferencaAbertura =
+    Number.isFinite(valorAnterior) && Number.isFinite(valorAtual) ? valorAtual - valorAnterior : 0;
+  const aberturaDivergente = Math.abs(diferencaAbertura) > 0.01;
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -364,6 +379,23 @@ export default function ModalAbrirCaixa({ onClose, onSucesso }) {
             />
           </div>
 
+          {aberturaDivergente && (
+            <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+              <div className="flex items-start gap-2">
+                <AlertCircle className="mt-0.5 h-5 w-5 shrink-0" />
+                <div>
+                  <p className="font-semibold">Valor diferente do ultimo fechamento</p>
+                  <p>
+                    O caixa anterior foi fechado com R$ {valorAnterior.toFixed(2).replace(".", ",")}
+                    . Esta abertura tem uma diferenca de R${" "}
+                    {Math.abs(diferencaAbertura).toFixed(2).replace(".", ",")}{" "}
+                    {diferencaAbertura > 0 ? "a mais" : "a menos"}.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Conta de Origem */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Conta de Origem</label>
@@ -413,7 +445,7 @@ export default function ModalAbrirCaixa({ onClose, onSucesso }) {
 
             <button
               onClick={handleAbrirCaixa}
-              disabled={loading || !valorAbertura}
+              disabled={loading || valorAbertura === ""}
               className="px-8 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {loading ? "Abrindo..." : "Abrir Caixa"}

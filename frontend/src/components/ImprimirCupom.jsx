@@ -7,6 +7,7 @@ import ActionButton from "./ui/ActionButton";
 
 export function CupomImpressao({ empresa = {}, portal = false, venda }) {
   if (!venda) return null;
+  const paginas = montarConteudoCupom(venda, empresa).split("\f");
 
   const conteudo = (
     <>
@@ -32,6 +33,16 @@ export function CupomImpressao({ empresa = {}, portal = false, venda }) {
           .cupom-impressao * {
             color: #000 !important;
           }
+          .cupom-folha {
+            break-after: page;
+            page-break-after: always;
+            break-inside: avoid;
+            page-break-inside: avoid;
+          }
+          .cupom-folha:last-child {
+            break-after: auto;
+            page-break-after: auto;
+          }
 
           @page {
             size: 80mm auto;
@@ -40,24 +51,29 @@ export function CupomImpressao({ empresa = {}, portal = false, venda }) {
         }
       `}</style>
 
-      <pre
-        className="cupom-impressao hidden print:block"
-        style={{
-          width: "76mm",
-          fontFamily: 'Consolas, "Courier New", monospace',
-          fontSize: "13px",
-          lineHeight: 1.28,
-          letterSpacing: "0.1px",
-          fontWeight: 800,
-          whiteSpace: "pre",
-          margin: 0,
-          padding: 0,
-          textTransform: "none",
-          textRendering: "geometricPrecision",
-        }}
-      >
-        {montarConteudoCupom(venda, empresa)}
-      </pre>
+      <div className="cupom-impressao hidden print:block">
+        {paginas.map((pagina, index) => (
+          <pre
+            className="cupom-folha"
+            key={`${index}-${pagina.slice(0, 16)}`}
+            style={{
+              width: "76mm",
+              fontFamily: 'Consolas, "Courier New", monospace',
+              fontSize: "13px",
+              lineHeight: 1.28,
+              letterSpacing: "0.1px",
+              fontWeight: 800,
+              whiteSpace: "pre",
+              margin: 0,
+              padding: 0,
+              textTransform: "none",
+              textRendering: "geometricPrecision",
+            }}
+          >
+            {pagina}
+          </pre>
+        ))}
+      </div>
     </>
   );
 
@@ -87,7 +103,7 @@ export default function ImprimirCupom({ className = "", size = "md", venda }) {
         className={["print:hidden", className].filter(Boolean).join(" ")}
         title={carregandoEmpresa ? "Carregando dados da empresa para o recibo" : undefined}
       >
-        <span>{crediario ? "Imprimir 2 vias" : "Imprimir Recibo"}</span>
+        <span>{crediario ? "Imprimir cupom + 2 vias" : "Imprimir Recibo"}</span>
       </ActionButton>
 
       <CupomImpressao empresa={dadosEmpresa} venda={venda} />

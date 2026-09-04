@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { AlertCircle, X } from "lucide-react";
 import { fecharCaixa, obterResumoCaixa, obterVendasCaixa, validarCaixaAtual } from "../api/caixa";
 import ModalFecharCaixaContent from "./caixa/ModalFecharCaixaContent";
+import { atualizarObservacaoComContagem } from "../utils/caixaContagem";
 
 export default function ModalFecharCaixa({ caixaId, onClose, onSuccess }) {
   const [resumo, setResumo] = useState(null);
@@ -111,6 +112,7 @@ export default function ModalFecharCaixa({ caixaId, onClose, onSuccess }) {
   const aplicarContagem = () => {
     const total = calcularTotalNotas();
     setValorContado(total);
+    setObservacoes((atual) => atualizarObservacaoComContagem(atual, notas));
     setMostrarContagem(false);
   };
 

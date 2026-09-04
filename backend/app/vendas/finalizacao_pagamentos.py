@@ -6,6 +6,7 @@ deixar ``finalizacao.py`` focado na transacao principal da venda.
 """
 
 import logging
+import re
 from datetime import date as _date
 from decimal import Decimal
 from typing import Any, Dict, List, Optional
@@ -115,22 +116,64 @@ def consumir_cupom_finalizacao(
     if not cupom_code_resolvido:
         return None
 
+    codigos = list(
+        dict.fromkeys(
+            codigo.strip().upper()
+            for codigo in re.split(r"[,;|]+", str(cupom_code_resolvido))
+            if codigo.strip()
+        )
+    )
+    if len(codigos) > 5:
+        raise HTTPException(
+            status_code=400, detail="Use no maximo 5 cupons na mesma venda."
+        )
+    codigos_serializados = ",".join(codigos)
+    if len(codigos_serializados) > 100:
+        raise HTTPException(
+            status_code=400, detail="Os codigos de cupom informados sao muito longos."
+        )
+
     venda_total_para_cupom = float(venda.total or 0)
     if cupom_discount_resolvido:
         venda_total_para_cupom += float(cupom_discount_resolvido or 0)
 
-    cupom_consumido = consume_coupon_redemption(
-        db,
-        tenant_id=tenant_id,
-        code=cupom_code_resolvido,
-        venda_total=venda_total_para_cupom,
-        customer_id=venda.cliente_id,
-        venda_id=venda.id,
-        expected_discount_applied=cupom_discount_resolvido,
-    )
-    venda.cupom_code = cupom_code_resolvido
-    venda.cupom_discount_applied = cupom_consumido.get("discount_applied")
-    return cupom_consumido
+    consumidos: list[dict[str, Any]] = []
+    total_desconto = 0.0
+    total_restante = venda_total_para_cupom
+    for codigo in codigos:
+        consumido = consume_coupon_redemption(
+            db,
+            tenant_id=tenant_id,
+            code=codigo,
+            venda_total=total_restante,
+            customer_id=venda.cliente_id,
+            venda_id=venda.id,
+            expected_discount_applied=None,
+        )
+        desconto = float(consumido.get("discount_applied") or 0)
+        total_desconto += desconto
+        total_restante = max(0.0, total_restante - desconto)
+        consumidos.append(consumido)
+
+    if (
+        cupom_discount_resolvido is not None
+        and abs(total_desconto - float(cupom_discount_resolvido)) > 0.01
+    ):
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "O total da venda mudou apos aplicar os cupons. "
+                "Atualize a venda e aplique os cupons novamente."
+            ),
+        )
+
+    venda.cupom_code = codigos_serializados
+    venda.cupom_discount_applied = total_desconto
+    return {
+        "coupon_code": codigos_serializados,
+        "discount_applied": total_desconto,
+        "redemptions": consumidos,
+    }
 
 
 def processar_pagamentos_finalizacao(

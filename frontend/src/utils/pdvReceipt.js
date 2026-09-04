@@ -1,4 +1,5 @@
 import { formatMoneyBRL } from "./formatters.js";
+import { valorPorExtenso } from "./pdvPromissory.js";
 
 export const RECEIPT_WIDTH = 42;
 
@@ -177,6 +178,12 @@ function montarDadosCliente(venda = {}) {
     nome: venda?.cliente?.nome || venda?.cliente_nome || venda?.nome_cliente || "",
     telefone: telefoneCliente,
     endereco: enderecoCliente,
+    documento:
+      venda?.cliente?.cpf_cnpj ||
+      venda?.cliente?.cpf ||
+      venda?.cliente?.cnpj ||
+      venda?.cliente?.documento ||
+      "",
   };
 }
 
@@ -340,7 +347,7 @@ export function montarCupomVenda(venda = {}, empresa = {}) {
   return linhas.join("\n");
 }
 
-function montarViaCrediario(venda = {}, empresa = {}, via) {
+export function montarViaCrediario(venda = {}, empresa = {}, via) {
   const numeroVenda = venda.numero_venda || venda.id || "-";
   const cliente = montarDadosCliente(venda);
   const pagamentosCrediario = obterPagamentosCrediario(venda);
@@ -397,12 +404,75 @@ function montarViaCrediario(venda = {}, empresa = {}, via) {
   return linhas.join("\n");
 }
 
+function montarNotaPromissoria(venda = {}, empresa = {}, via) {
+  const numeroVenda = venda.numero_venda || venda.id || "-";
+  const cliente = montarDadosCliente(venda);
+  const pagamentos = obterPagamentosCrediario(venda);
+  const parcelas = pagamentos.flatMap(gerarParcelasCrediario);
+  const valor = pagamentos.reduce((total, pagamento) => total + Number(pagamento.valor || 0), 0);
+  const favorecido =
+    texto(empresa.razao_social || empresa.nome_fantasia || empresa.name) || "ESTABELECIMENTO";
+  const cnpj = texto(empresa.cnpj);
+  const cidade = texto(empresa.cidade) || "cidade do estabelecimento";
+  const vencimento = parcelas[0]?.data_vencimento || "Conforme combinado";
+  const linhas = [
+    center("NOTA PROMISSORIA"),
+    center(via),
+    "-".repeat(RECEIPT_WIDTH),
+    linePair("VENCIMENTO", vencimento),
+    linePair("NUMERO", String(numeroVenda)),
+    linePair("CUPOM", String(numeroVenda)),
+    linePair("VALOR", formatMoneyBRL(valor)),
+    "-".repeat(RECEIPT_WIDTH),
+    ...wrap(
+      "Pagarei por esta unica via de NOTA PROMISSORIA a " +
+        favorecido +
+        (cnpj ? " CNPJ " + cnpj : "") +
+        " ou a sua ordem a quantia de " +
+        valorPorExtenso(valor) +
+        " em moeda corrente deste PAIS.",
+    ),
+    "",
+    ...wrap(
+      "Pagavel em " + cidade + ". Emitida em " + formatarDataHoraVenda(venda.data_venda) + ".",
+    ),
+    "-".repeat(RECEIPT_WIDTH),
+    "PARCELAS DO CREDIARIO",
+  ];
+
+  if (parcelas.length) {
+    parcelas.forEach((parcela) => {
+      linhas.push(
+        linePair(
+          parcela.numero + "/" + parcela.total_parcelas + " " + parcela.data_vencimento,
+          formatMoneyBRL(parcela.valor),
+        ),
+      );
+    });
+  } else {
+    linhas.push("Vencimentos: conforme combinado");
+  }
+
+  linhas.push(
+    "-".repeat(RECEIPT_WIDTH),
+    ...wrap("EMITENTE: " + (cliente.nome || "________________________________")),
+    ...wrap("CPF/CNPJ: " + (cliente.documento || "____________________________")),
+    ...wrap("ENDERECO: " + (cliente.endereco || "___________________________")),
+    cliente.telefone ? clip("TELEFONE: " + cliente.telefone) : "",
+    "",
+    "",
+    "_".repeat(RECEIPT_WIDTH),
+    center("ASSINATURA DO EMITENTE"),
+  );
+  return linhas.filter((linha, index, lista) => linha !== "" || lista[index - 1] !== "").join("\n");
+}
+
 export function montarCupomCrediario(venda = {}, empresa = {}) {
-  const separador = ["", center("CORTE AQUI"), "- ".repeat(RECEIPT_WIDTH / 2), ""].join("\n");
   return [
-    montarViaCrediario(venda, empresa, "VIA DO ESTABELECIMENTO"),
-    montarViaCrediario(venda, empresa, "VIA DO CLIENTE"),
-  ].join(separador);
+    montarCupomVenda(venda, empresa),
+    montarNotaPromissoria(venda, empresa, "VIA DO ESTABELECIMENTO"),
+    montarNotaPromissoria(venda, empresa, "VIA DO CLIENTE"),
+  ].join("\f");
 }
 
 export function montarConteudoCupom(venda = {}, empresa = {}) {

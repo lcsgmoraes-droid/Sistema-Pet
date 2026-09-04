@@ -1,4 +1,4 @@
-import { normalizarProtocolosRecorrencia } from "../utils/produtoRecorrencia";
+import { normalizarProtocolosRecorrencia } from "../utils/produtoRecorrencia.js";
 
 export function organizarCategoriasHierarquicas(categorias) {
   if (!categorias || categorias.length === 0) return [];

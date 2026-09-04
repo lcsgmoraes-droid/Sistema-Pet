@@ -16,7 +16,7 @@ const USUARIO_INICIAL = {
   role_id: null,
 };
 
-const CREDENCIAIS_INICIAIS = { username: "", new_password: "" };
+const CREDENCIAIS_INICIAIS = { username: "", new_password: "", role_id: "" };
 
 function detalhesValidacaoParaMensagem(details) {
   const validationDetails = Array.isArray(details) ? details : [];
@@ -214,6 +214,7 @@ export default function useUsuariosPage() {
     setCredenciais({
       username: usuario.username || "",
       new_password: "",
+      role_id: usuario.role_id || "",
     });
     setCredenciaisError("");
     setGeneratedPassword("");
@@ -246,6 +247,10 @@ export default function useUsuariosPage() {
       setCredenciaisError("A nova senha deve ter no minimo 8 caracteres.");
       return;
     }
+    if (!credenciais.role_id) {
+      setCredenciaisError("Selecione um perfil de acesso para o usuario.");
+      return;
+    }
 
     setSavingCredentials(true);
     setCredenciaisError("");
@@ -255,6 +260,7 @@ export default function useUsuariosPage() {
         username,
         new_password: generatePassword ? null : credenciais.new_password || null,
         generate_password: generatePassword,
+        role_id: Number(credenciais.role_id),
       });
       setCredenciais((current) => ({ ...current, username, new_password: "" }));
       await carregarUsuarios();
