@@ -5,6 +5,7 @@ import {
   montarLinksDivulgacao,
   nomeArquivoDivulgacao,
   normalizarTelefoneWhatsApp,
+  telefoneWhatsAppValido,
 } from "./divulgacaoLojaUtils.js";
 
 test("monta links separados para acesso principal, ecommerce, app e WhatsApp", () => {
@@ -28,6 +29,13 @@ test("normaliza telefone nacional e preserva telefone com DDI", () => {
   assert.equal(normalizarTelefoneWhatsApp("18 99999-0000"), "5518999990000");
   assert.equal(normalizarTelefoneWhatsApp("+55 18 99999-0000"), "5518999990000");
   assert.equal(normalizarTelefoneWhatsApp(""), "");
+});
+
+test("valida o WhatsApp antes de salvar nos dados da empresa", () => {
+  assert.equal(telefoneWhatsAppValido("18 99643-5503"), true);
+  assert.equal(telefoneWhatsAppValido("+55 18 99643-5503"), true);
+  assert.equal(telefoneWhatsAppValido("1899"), false);
+  assert.equal(telefoneWhatsAppValido(""), false);
 });
 
 test("gera nome de arquivo seguro", () => {

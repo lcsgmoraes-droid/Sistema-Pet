@@ -41,6 +41,11 @@ export function normalizarTelefoneWhatsApp(telefone) {
   return digitos;
 }
 
+export function telefoneWhatsAppValido(telefone) {
+  const telefoneNormalizado = normalizarTelefoneWhatsApp(telefone);
+  return telefoneNormalizado.length >= 12 && telefoneNormalizado.length <= 15;
+}
+
 export function montarLinksDivulgacao({ origin, slug, telefone, mensagem }) {
   const origem = normalizarOrigemPublica(origin);
   const slugLimpo = normalizarSlugLoja(slug);
