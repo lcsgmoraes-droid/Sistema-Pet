@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { test } from "node:test";
 
 import {
@@ -29,6 +30,11 @@ const menuItems = [
   },
   { path: "/pdv", label: "PDV (Vendas)", iconKey: "shopping-cart" },
 ];
+
+const favoritesBarSource = readFileSync(
+  new URL("../src/components/layout/LayoutFavoritesBar.jsx", import.meta.url),
+  "utf8",
+);
 
 test("flattenMenuItemsForFavorites cria entradas favoritiveis para menu e submenu", () => {
   const entries = flattenMenuItemsForFavorites(menuItems);
@@ -140,6 +146,12 @@ test("guard de drag sobrevive a remontagem e bloqueia apenas o clique herdado", 
   guard.dragFinished();
   guard.pointerIntentStarted();
   assert.equal(guard.consumeClick(), false);
+});
+
+test("atalho arrastavel nao depende de navegacao nativa de link", () => {
+  assert.doesNotMatch(favoritesBarSource, /<Link\b/);
+  assert.match(favoritesBarSource, /<button\b/);
+  assert.match(favoritesBarSource, /navigate\(favorite\.path\)/);
 });
 
 test("normalizeMenuFavorites limpa dados de API e remove duplicados", () => {

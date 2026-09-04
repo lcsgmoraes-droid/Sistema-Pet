@@ -14,7 +14,7 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { useRef } from "react";
-import { Link } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 
 import { createFavoriteDragClickGuard } from "./menuFavorites";
 
@@ -26,6 +26,7 @@ const POINTER_DRAG_DISTANCE_PX = 6;
 const favoriteDragClickGuard = createFavoriteDragClickGuard();
 
 function FavoriteShortcut({ favorite, active, onClick }) {
+  const navigate = useNavigate();
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: favorite.path,
   });
@@ -39,15 +40,16 @@ function FavoriteShortcut({ favorite, active, onClick }) {
   };
 
   const handleClickCapture = (event) => {
-    // Enquanto o item ainda esta sendo arrastado, o Link nao pode receber o
-    // clique sintetico do navegador. Depois do drop, o guard do Layout cobre
-    // o pequeno intervalo em que o dnd-kit ja removeu `isDragging`.
+    // O atalho e um botao, sem href nativo: assim, se o DOM antigo for removido
+    // durante o drop, ele nao consegue navegar sozinho. A rota so e aberta
+    // aqui depois de confirmarmos que o gesto foi um clique real.
     if (isDragging || favoriteDragClickGuard.consumeClick()) {
       event.preventDefault();
       event.stopPropagation();
       return;
     }
     onClick?.(event);
+    if (!event.defaultPrevented) navigate(favorite.path);
   };
 
   return (
@@ -58,8 +60,8 @@ function FavoriteShortcut({ favorite, active, onClick }) {
       {...attributes}
       {...listeners}
     >
-      <Link
-        to={favorite.path}
+      <button
+        type="button"
         draggable={false}
         onClickCapture={handleClickCapture}
         onDragStart={(event) => event.preventDefault()}
@@ -72,7 +74,7 @@ function FavoriteShortcut({ favorite, active, onClick }) {
       >
         {Icon ? <Icon className="h-3.5 w-3.5 shrink-0" /> : null}
         <span className="whitespace-nowrap">{favorite.label}</span>
-      </Link>
+      </button>
     </div>
   );
 }
