@@ -145,9 +145,7 @@ def _serializar_config(config: EmpresaConfigGeral) -> EmpresaConfigGeralResponse
             config.mensagem_venda_critica
             or "🚨 CRÍTICO: Margem muito baixa! Venda com prejuízo!"
         ),
-        caixa_compartilhado=bool(
-            getattr(config, "caixa_compartilhado", False)
-        ),
+        caixa_compartilhado=bool(getattr(config, "caixa_compartilhado", False)),
         aliquota_imposto_padrao=float(config.aliquota_imposto_padrao or 7),
         dias_tolerancia_atraso=(
             config.dias_tolerancia_atraso
