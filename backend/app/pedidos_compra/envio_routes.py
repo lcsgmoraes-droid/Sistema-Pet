@@ -12,6 +12,7 @@ from ..auth.dependencies import get_current_user_and_tenant
 from ..db import get_session
 from ..produtos_models import PedidoCompra
 from ..services.email_service import is_email_configured, send_email
+from ..services.tenant_email_settings import resolve_tenant_reply_to
 from .exportacao import (
     _buscar_fornecedor_pedido,
     _gerar_excel_pedido_bytes,
@@ -164,6 +165,7 @@ def enviar_pedido(
         text_body=text_body,
         attachments=anexos,
         simulate_if_unconfigured=False,
+        reply_to=resolve_tenant_reply_to(db, tenant_id),
     )
 
     if not enviado:

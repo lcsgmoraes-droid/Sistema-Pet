@@ -138,33 +138,52 @@ def _smtp_tls_context() -> ssl.SSLContext:
     return context
 
 
-def _automatic_notice_text(reply_to: str) -> str:
+def _automatic_notice_text(reply_to: str, replies_enabled: bool = False) -> str:
     contact_address = _email_address(reply_to) or DEFAULT_REPLY_TO
+    if replies_enabled:
+        return (
+            "Este e-mail foi enviado automaticamente pelo CorePet. "
+            "Você pode responder normalmente; sua resposta será enviada para "
+            f"{contact_address}."
+        )
     return (
         "Este é um e-mail automático. Não responda a esta mensagem. "
         f"Para falar com a CorePet, escreva para {contact_address}."
     )
 
 
-def _append_automatic_notice_text(text_body: str, reply_to: str) -> str:
-    notice = _automatic_notice_text(reply_to)
+def _append_automatic_notice_text(
+    text_body: str, reply_to: str, replies_enabled: bool = False
+) -> str:
+    notice = _automatic_notice_text(reply_to, replies_enabled)
     body = str(text_body or "").rstrip()
     if notice in body:
         return body
     return f"{body}\n\n---\n{notice}" if body else notice
 
 
-def _append_automatic_notice_html(html_body: str, reply_to: str) -> str:
+def _append_automatic_notice_html(
+    html_body: str, reply_to: str, replies_enabled: bool = False
+) -> str:
     body = str(html_body or "")
     if f'id="{AUTOMATIC_NOTICE_ID}"' in body:
         return body
 
     contact_address = _email_address(reply_to) or DEFAULT_REPLY_TO
     safe_contact_address = escape(contact_address)
+    if replies_enabled:
+        notice_html = (
+            "Este e-mail foi enviado automaticamente pelo CorePet.<br>"
+            "Você pode responder normalmente; sua resposta será enviada para "
+        )
+    else:
+        notice_html = (
+            "Este é um e-mail automático. Não responda a esta mensagem.<br>"
+            "Para falar com a CorePet, escreva para "
+        )
     footer = f"""
 <div id="{AUTOMATIC_NOTICE_ID}" style="max-width:560px;margin:16px auto 0;padding:16px 24px;border-top:1px solid #e5e7eb;text-align:center;font-family:Arial,sans-serif;font-size:12px;line-height:1.5;color:#6b7280">
-  Este é um e-mail automático. Não responda a esta mensagem.<br>
-  Para falar com a CorePet, escreva para
+  {notice_html}
   <a href="mailto:{safe_contact_address}" style="color:#2563eb;text-decoration:none">{safe_contact_address}</a>.
 </div>"""
     closing_body_index = body.lower().rfind("</body>")
@@ -181,6 +200,7 @@ def _build_email_message(
     html_body: str,
     text_body: str | None = None,
     reply_to: str = DEFAULT_REPLY_TO,
+    replies_enabled: bool = False,
     attachments: Iterable[Mapping[str, Any]] | None = None,
     correlation_id: str | None = None,
 ) -> EmailMessage:
@@ -202,8 +222,12 @@ def _build_email_message(
     texto_fallback_base = (
         text_body or "Seu cliente de e-mail nao exibiu o conteudo HTML desta mensagem."
     )
-    texto_fallback = _append_automatic_notice_text(texto_fallback_base, reply_to)
-    html_with_notice = _append_automatic_notice_html(html_body, reply_to)
+    texto_fallback = _append_automatic_notice_text(
+        texto_fallback_base, reply_to, replies_enabled
+    )
+    html_with_notice = _append_automatic_notice_html(
+        html_body, reply_to, replies_enabled
+    )
     msg.set_content(texto_fallback, subtype="plain", charset="utf-8")
     msg.add_alternative(html_with_notice, subtype="html", charset="utf-8")
 
@@ -228,6 +252,7 @@ def send_email(
     text_body: str | None = None,
     attachments: Iterable[Mapping[str, Any]] | None = None,
     simulate_if_unconfigured: bool = True,
+    reply_to: str | None = None,
 ) -> bool:
     """Envia um e-mail. Retorna True se enviado com sucesso, False caso contrario."""
     recipients = _recipient_addresses(to)
@@ -260,7 +285,9 @@ def send_email(
     user = str(config["user"])
     password = str(config["password"])
     from_addr = str(config["from_addr"])
-    reply_to = str(config.get("reply_to") or DEFAULT_REPLY_TO)
+    configured_reply_to = str(config.get("reply_to") or DEFAULT_REPLY_TO)
+    requested_reply_to = _email_address(reply_to or "")
+    resolved_reply_to = requested_reply_to or configured_reply_to
     use_tls = bool(config["use_tls"])
     envelope_from = _email_address(from_addr) or user
 
@@ -270,7 +297,8 @@ def send_email(
         subject=subject,
         html_body=html_body,
         text_body=text_body,
-        reply_to=reply_to,
+        reply_to=resolved_reply_to,
+        replies_enabled=bool(requested_reply_to),
         attachments=attachments,
         correlation_id=correlation_id,
     )

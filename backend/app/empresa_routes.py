@@ -4,7 +4,7 @@ Rotas da Empresa - Configurações Gerais e Fiscais
 
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, EmailStr, Field, field_validator
 from sqlalchemy.orm import Session
 
 from app.auth.dependencies import get_current_user_and_tenant
@@ -37,6 +37,7 @@ class DadosCadastraisResponse(BaseModel):
     inscricao_estadual: Optional[str] = None
     inscricao_municipal: Optional[str] = None
     email: Optional[str] = None
+    email_resposta: Optional[str] = None
     telefone: Optional[str] = None
     cep: Optional[str] = None
     endereco: Optional[str] = None
@@ -59,6 +60,7 @@ class DadosCadastraisUpdate(BaseModel):
     inscricao_estadual: Optional[str] = None
     inscricao_municipal: Optional[str] = None
     email: Optional[str] = None
+    email_resposta: Optional[EmailStr] = None
     telefone: Optional[str] = None
     cep: Optional[str] = None
     endereco: Optional[str] = None
@@ -69,6 +71,13 @@ class DadosCadastraisUpdate(BaseModel):
     uf: Optional[str] = None
     cupom_cabecalho: Optional[str] = Field(default=None, max_length=240)
     cupom_mensagem_final: Optional[str] = Field(default=None, max_length=500)
+
+    @field_validator("email_resposta", mode="before")
+    @classmethod
+    def empty_reply_email_as_none(cls, value):
+        if value is None or not str(value).strip():
+            return None
+        return str(value).strip()
 
 
 class DadosCupomResponse(DadosCadastraisResponse):
@@ -233,6 +242,7 @@ def _serializar_dados_cadastrais(tenant: Tenant) -> DadosCadastraisResponse:
         inscricao_estadual=getattr(tenant, "inscricao_estadual", None),
         inscricao_municipal=getattr(tenant, "inscricao_municipal", None),
         email=getattr(tenant, "email", None),
+        email_resposta=getattr(tenant, "email_resposta", None),
         telefone=getattr(tenant, "telefone", None),
         cep=getattr(tenant, "cep", None),
         endereco=getattr(tenant, "endereco", None),

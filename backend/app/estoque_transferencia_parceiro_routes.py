@@ -66,6 +66,7 @@ from .estoque.transferencia_grupo_routes import (
 )
 from .security.permissions_decorator import require_permission
 from .services.email_service import is_email_configured, send_email
+from .services.tenant_email_settings import resolve_tenant_reply_to
 
 router = APIRouter(prefix="/estoque", tags=["Estoque - Transferencia Parceiro"])
 
@@ -428,6 +429,7 @@ def enviar_email_transferencia_parceiro(
             }
         ],
         simulate_if_unconfigured=False,
+        reply_to=resolve_tenant_reply_to(db, tenant_id),
     )
 
     if not enviado:

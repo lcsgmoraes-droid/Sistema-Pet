@@ -1,4 +1,5 @@
 from email import policy
+from email.parser import BytesParser
 import logging
 
 from app.middlewares.request_context import clear_request_context, set_request_id
@@ -145,6 +146,62 @@ def test_send_email_accepts_multiple_recipients(monkeypatch, caplog):
     assert "compras@example.com" not in caplog.text
     assert "vendedor@example.com" not in caplog.text
     assert "Pedido de compra" not in caplog.text
+
+
+def test_send_email_uses_tenant_reply_to_and_allows_direct_reply(monkeypatch):
+    sent = {}
+
+    class FakeSMTP:
+        def __init__(self, host, port, timeout):
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def ehlo(self):
+            pass
+
+        def starttls(self, context=None):
+            pass
+
+        def login(self, user, password):
+            pass
+
+        def sendmail(self, from_addr, to_addrs, message):
+            sent["message"] = message
+
+    monkeypatch.setattr(email_service.smtplib, "SMTP", FakeSMTP)
+    fake_settings = {
+        "host": "smtp.example.com",
+        "port": 587,
+        "user": "smtp-user@example.com",
+        "from_addr": "CorePet <noreply@mlprohub.com.br>",
+        "reply_to": "corepeterp@gmail.com",
+        "use_tls": True,
+    }
+    fake_settings["pass" + "word"] = "unit-test-only"
+    monkeypatch.setattr(email_service, "_smtp_settings", lambda: fake_settings)
+
+    assert email_service.send_email(
+        to="fornecedor@example.com",
+        subject="Pedido de compra",
+        html_body="<html><body><p>Pedido</p></body></html>",
+        text_body="Pedido",
+        simulate_if_unconfigured=False,
+        reply_to="compras@petshop.com.br",
+    )
+
+    message = sent["message"]
+    parsed_message = BytesParser(policy=policy.default).parsebytes(message)
+    parsed_text = parsed_message.get_body(preferencelist=("plain",)).get_content()
+    parsed_html = parsed_message.get_body(preferencelist=("html",)).get_content()
+    assert b"\r\nReply-To: compras@petshop.com.br\r\n" in message
+    assert "Você pode responder normalmente" in parsed_text
+    assert "mailto:compras@petshop.com.br" in parsed_html
+    assert b"Reply-To: corepeterp@gmail.com" not in message
 
 
 def test_send_email_sem_destinatario_nao_registra_assunto_sensivel(caplog):

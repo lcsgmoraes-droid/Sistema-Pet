@@ -595,6 +595,7 @@ class Tenant(Base):
     cep = Column(String(10), nullable=True)
     telefone = Column(String(20), nullable=True)
     email = Column(String(255), nullable=True)
+    email_resposta = Column(String(255), nullable=True)
     site = Column(String(255), nullable=True)
     cupom_cabecalho = Column(Text, nullable=True)
     cupom_mensagem_final = Column(Text, nullable=True)
