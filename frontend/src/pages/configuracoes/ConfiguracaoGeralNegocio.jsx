@@ -209,9 +209,7 @@ export default function ConfiguracaoGeralNegocio() {
               onChange={(e) => onChange("caixa_compartilhado", e.target.checked)}
               className="h-4 w-4"
             />
-            <span className="text-sm font-semibold text-gray-800">
-              Compartilhar entre usuarios
-            </span>
+            <span className="text-sm font-semibold text-gray-800">Compartilhar entre usuarios</span>
           </label>
         </div>
         <p className="mt-4 rounded-lg bg-blue-50 px-4 py-3 text-sm text-blue-800">

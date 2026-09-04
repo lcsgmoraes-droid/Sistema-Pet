@@ -2,11 +2,11 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 
-const configSource = readFileSync(new URL("./ConfiguracaoGeralNegocio.jsx", import.meta.url), "utf8");
-const menuSource = readFileSync(
-  new URL("../../components/MenuCaixa.jsx", import.meta.url),
+const configSource = readFileSync(
+  new URL("./ConfiguracaoGeralNegocio.jsx", import.meta.url),
   "utf8",
 );
+const menuSource = readFileSync(new URL("../../components/MenuCaixa.jsx", import.meta.url), "utf8");
 
 test("configuracao permite habilitar o caixa compartilhado pela empresa", () => {
   assert.match(configSource, /caixa_compartilhado: false/);
