@@ -4,7 +4,7 @@ Rotas da Empresa - Configurações Gerais e Fiscais
 
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, Field, field_validator
 from sqlalchemy.orm import Session
 
 from app.auth.dependencies import get_current_user_and_tenant
@@ -17,7 +17,6 @@ from app.security.permissions_decorator import (
     require_permission,
 )
 from app.utils.logger import logger
-
 
 router = APIRouter(prefix="/empresa", tags=["Empresa"])
 
@@ -46,6 +45,8 @@ class DadosCadastraisResponse(BaseModel):
     bairro: Optional[str] = None
     cidade: Optional[str] = None
     uf: Optional[str] = None
+    cupom_cabecalho: Optional[str] = None
+    cupom_mensagem_final: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -66,6 +67,12 @@ class DadosCadastraisUpdate(BaseModel):
     bairro: Optional[str] = None
     cidade: Optional[str] = None
     uf: Optional[str] = None
+    cupom_cabecalho: Optional[str] = Field(default=None, max_length=240)
+    cupom_mensagem_final: Optional[str] = Field(default=None, max_length=500)
+
+
+class DadosCupomResponse(DadosCadastraisResponse):
+    """Dados públicos da empresa necessários para imprimir o recibo do PDV."""
 
 
 class ConfigFiscalResponse(BaseModel):
@@ -218,6 +225,27 @@ def atualizar_config_fiscal(
 # ============================================================================
 
 
+def _serializar_dados_cadastrais(tenant: Tenant) -> DadosCadastraisResponse:
+    return DadosCadastraisResponse(
+        cnpj=getattr(tenant, "cnpj", None),
+        razao_social=getattr(tenant, "razao_social", None),
+        nome_fantasia=getattr(tenant, "name", None),
+        inscricao_estadual=getattr(tenant, "inscricao_estadual", None),
+        inscricao_municipal=getattr(tenant, "inscricao_municipal", None),
+        email=getattr(tenant, "email", None),
+        telefone=getattr(tenant, "telefone", None),
+        cep=getattr(tenant, "cep", None),
+        endereco=getattr(tenant, "endereco", None),
+        numero=getattr(tenant, "numero", None),
+        complemento=getattr(tenant, "complemento", None),
+        bairro=getattr(tenant, "bairro", None),
+        cidade=getattr(tenant, "cidade", None),
+        uf=getattr(tenant, "uf", None),
+        cupom_cabecalho=getattr(tenant, "cupom_cabecalho", None),
+        cupom_mensagem_final=getattr(tenant, "cupom_mensagem_final", None),
+    )
+
+
 @router.get("/dados-cadastrais", response_model=DadosCadastraisResponse)
 @require_any_permission(("configuracoes.empresa", "configuracoes.editar"))
 def buscar_dados_cadastrais(
@@ -236,22 +264,30 @@ def buscar_dados_cadastrais(
             status_code=status.HTTP_404_NOT_FOUND, detail="Empresa não encontrada"
         )
 
-    return DadosCadastraisResponse(
-        cnpj=getattr(tenant, "cnpj", None),
-        razao_social=getattr(tenant, "razao_social", None),
-        nome_fantasia=getattr(tenant, "name", None),
-        inscricao_estadual=getattr(tenant, "inscricao_estadual", None),
-        inscricao_municipal=getattr(tenant, "inscricao_municipal", None),
-        email=getattr(tenant, "email", None),
-        telefone=getattr(tenant, "telefone", None),
-        cep=getattr(tenant, "cep", None),
-        endereco=getattr(tenant, "endereco", None),
-        numero=getattr(tenant, "numero", None),
-        complemento=getattr(tenant, "complemento", None),
-        bairro=getattr(tenant, "bairro", None),
-        cidade=getattr(tenant, "cidade", None),
-        uf=getattr(tenant, "uf", None),
+    return _serializar_dados_cadastrais(tenant)
+
+
+@router.get("/dados-cupom", response_model=DadosCupomResponse)
+@require_any_permission(
+    (
+        "vendas.criar",
+        "vendas.visualizar",
+        "configuracoes.empresa",
+        "configuracoes.editar",
     )
+)
+def buscar_dados_cupom(
+    user_and_tenant=Depends(get_current_user_and_tenant),
+    db: Session = Depends(get_session),
+):
+    """Retorna somente dados públicos usados no recibo não fiscal do PDV."""
+    _current_user, tenant_id = user_and_tenant
+    tenant = _buscar_tenant_por_contexto(db, tenant_id)
+    if not tenant:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Empresa não encontrada"
+        )
+    return DadosCupomResponse(**_serializar_dados_cadastrais(tenant).model_dump())
 
 
 @router.put("/dados-cadastrais", response_model=DadosCadastraisResponse)
@@ -284,22 +320,7 @@ def atualizar_dados_cadastrais(
     db.commit()
     db.refresh(tenant)
 
-    return DadosCadastraisResponse(
-        cnpj=getattr(tenant, "cnpj", None),
-        razao_social=getattr(tenant, "razao_social", None),
-        nome_fantasia=getattr(tenant, "name", None),
-        inscricao_estadual=getattr(tenant, "inscricao_estadual", None),
-        inscricao_municipal=getattr(tenant, "inscricao_municipal", None),
-        email=getattr(tenant, "email", None),
-        telefone=getattr(tenant, "telefone", None),
-        cep=getattr(tenant, "cep", None),
-        endereco=getattr(tenant, "endereco", None),
-        numero=getattr(tenant, "numero", None),
-        complemento=getattr(tenant, "complemento", None),
-        bairro=getattr(tenant, "bairro", None),
-        cidade=getattr(tenant, "cidade", None),
-        uf=getattr(tenant, "uf", None),
-    )
+    return _serializar_dados_cadastrais(tenant)
 
 
 # ============================================================================

@@ -654,6 +654,7 @@ test("monta pagamento de cartao com valor efetivo limitado ao restante", () => {
 
   assert.deepEqual(pagamento, {
     forma_pagamento: "Credito",
+    forma_pagamento_tipo: "cartao_credito",
     forma_id: 2,
     forma_pagamento_id: 2,
     nome: "Credito",
@@ -709,6 +710,7 @@ test("monta crediario do ERP com vencimento informado em DD-MM-AAAA", () => {
   });
 
   assert.equal(pagamento.forma_pagamento_id, 9);
+  assert.equal(pagamento.forma_pagamento_tipo, "crediario");
   assert.equal(pagamento.data_recebimento_prevista, "2026-09-30");
   assert.equal(dataCrediarioParaIso("30-09-2026"), "2026-09-30");
   assert.equal(dataCrediarioParaIso("31-02-2026"), null);
