@@ -327,6 +327,9 @@ def buscar_conta_receber(
                 "valor": float(r.valor_recebido),
                 "data": r.data_recebimento,
                 "forma_pagamento_id": r.forma_pagamento_id,
+                "forma_pagamento_nome": (
+                    r.forma_pagamento.nome if r.forma_pagamento else None
+                ),
                 "conta_bancaria_id": conta_bancaria_id,
                 "conta_bancaria_nome": conta_bancaria.nome if conta_bancaria else None,
                 "observacoes": r.observacoes,

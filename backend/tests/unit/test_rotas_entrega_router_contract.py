@@ -12,3 +12,16 @@ def test_rotas_entrega_router_has_single_otimizar_selecionadas_route():
     ]
 
     assert len(routes) == 1
+
+
+def test_rotas_entrega_router_exposes_pending_sale_driver_update():
+    routes = [
+        route
+        for route in router.routes
+        if getattr(route, "path", "").endswith(
+            "/vendas-pendentes/{venda_id}/entregador"
+        )
+        and "PATCH" in getattr(route, "methods", set())
+    ]
+
+    assert len(routes) == 1

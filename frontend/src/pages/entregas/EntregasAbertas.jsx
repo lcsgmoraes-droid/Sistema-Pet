@@ -11,6 +11,8 @@ export default function EntregasAbertas() {
   const [loading, setLoading] = useState(true);
   const [vendas, setVendas] = useState([]);
   const [selecionadas, setSelecionadas] = useState([]);
+  const [entregadores, setEntregadores] = useState([]);
+  const [alterandoEntregadorVendaId, setAlterandoEntregadorVendaId] = useState(null);
   const [configEntrega, setConfigEntrega] = useState(null);
   const [otimizando, setOtimizando] = useState(false);
 
@@ -21,19 +23,59 @@ export default function EntregasAbertas() {
   async function carregarDados() {
     setLoading(true);
     try {
-      const [vendasRes, configRes] = await Promise.all([
+      const [vendasRes, configRes, entregadoresRes] = await Promise.all([
         api.get("/rotas-entrega/vendas-pendentes/listar"),
         api.get("/configuracoes/entregas").catch(() => ({ data: null })),
+        api.get("/clientes/", {
+          params: { is_entregador: true, limit: 200 },
+        }),
       ]);
 
       setVendas(Array.isArray(vendasRes.data) ? vendasRes.data : []);
       setConfigEntrega(configRes.data);
+      const listaEntregadores =
+        entregadoresRes.data?.items || entregadoresRes.data?.clientes || entregadoresRes.data || [];
+      setEntregadores(
+        Array.isArray(listaEntregadores)
+          ? listaEntregadores.filter(
+              (item) => item?.ativo !== false && item?.entregador_ativo !== false,
+            )
+          : [],
+      );
     } catch (err) {
       console.error(err);
       toast.error("Erro ao carregar vendas pendentes");
       setVendas([]);
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function handleAlterarEntregador(venda, entregadorId) {
+    if (!entregadorId || Number(entregadorId) === Number(venda.entregador_id)) return;
+
+    setAlterandoEntregadorVendaId(venda.id);
+    try {
+      const response = await api.patch(`/rotas-entrega/vendas-pendentes/${venda.id}/entregador`, {
+        entregador_id: Number(entregadorId),
+      });
+      setVendas((atuais) =>
+        atuais.map((item) =>
+          item.id === venda.id
+            ? {
+                ...item,
+                entregador_id: response.data.entregador_id,
+                entregador_nome: response.data.entregador_nome,
+              }
+            : item,
+        ),
+      );
+      toast.success(`Entregador da venda ${venda.numero_venda} alterado.`);
+    } catch (err) {
+      console.error("Erro ao alterar entregador:", err);
+      toast.error(err.response?.data?.detail || "Nao foi possivel alterar o entregador");
+    } finally {
+      setAlterandoEntregadorVendaId(null);
     }
   }
 
@@ -160,14 +202,25 @@ export default function EntregasAbertas() {
         return;
       }
 
-      await api.post("/rotas-entrega/", {
-        vendas_ids: selecionadas,
-        entregador_id: vendasSelecionadas[0].entregador_id,
-        moto_da_loja: false,
-      });
+      const entregasPorEntregador = vendasSelecionadas.reduce((grupos, venda) => {
+        const entregadorId = String(venda.entregador_id);
+        if (!grupos.has(entregadorId)) grupos.set(entregadorId, []);
+        grupos.get(entregadorId).push(venda.id);
+        return grupos;
+      }, new Map());
+
+      await Promise.all(
+        [...entregasPorEntregador.entries()].map(([entregadorId, vendaIds]) =>
+          api.post("/rotas-entrega/", {
+            vendas_ids: vendaIds,
+            entregador_id: Number(entregadorId),
+            moto_da_loja: false,
+          }),
+        ),
+      );
 
       toast.success(
-        `Rota criada com ${selecionadas.length} entrega(s). Ela ja aparece em Rotas de Entrega.`,
+        `${entregasPorEntregador.size} rota(s) criada(s), separadas por entregador, com ${selecionadas.length} entrega(s).`,
       );
       setSelecionadas([]);
       carregarDados();
@@ -301,14 +354,30 @@ export default function EntregasAbertas() {
                     <CustomerIdentity nameClassName="font-medium text-slate-800" venda={venda} />
                   </td>
                   <td>
-                    <span
+                    <select
+                      value={venda.entregador_id ? String(venda.entregador_id) : ""}
+                      onChange={(event) => handleAlterarEntregador(venda, event.target.value)}
+                      disabled={alterandoEntregadorVendaId === venda.id}
+                      aria-label={`Entregador da venda ${venda.numero_venda}`}
                       style={{
                         color: venda.entregador_nome ? "#28a745" : "#999",
                         fontWeight: venda.entregador_nome ? "600" : "normal",
+                        minWidth: 150,
+                        border: "1px solid #d1d5db",
+                        borderRadius: 6,
+                        background: "#fff",
+                        padding: "6px 8px",
                       }}
                     >
-                      {venda.entregador_nome || "Não atribuído"}
-                    </span>
+                      <option value="" disabled>
+                        {alterandoEntregadorVendaId === venda.id ? "Alterando..." : "Selecione..."}
+                      </option>
+                      {entregadores.map((entregador) => (
+                        <option key={entregador.id} value={String(entregador.id)}>
+                          {entregador.nome_fantasia || entregador.nome}
+                        </option>
+                      ))}
+                    </select>
                   </td>
                   <td style={{ maxWidth: 300, fontSize: "0.9em" }}>
                     {venda.endereco_entrega || "N/A"}

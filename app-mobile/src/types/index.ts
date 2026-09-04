@@ -51,6 +51,7 @@ export interface EcommerceUser {
   telefone?: string | null;
   cpf?: string | null;
   pontos?: number;
+  credito?: number;
   // endereço
   cep?: string | null;
   endereco?: string | null;

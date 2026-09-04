@@ -17,6 +17,7 @@ import LoadingState from "./ui/LoadingState";
 import MoneyCell, { formatMoneyCellValue } from "./ui/MoneyCell";
 import PageHeader from "./ui/PageHeader";
 import StatusBadge from "./ui/StatusBadge";
+import ComprovanteRecebimentoModal from "./contasReceber/ComprovanteRecebimentoModal";
 import {
   ContasReceberDetalhesModal,
   ContasReceberFilters,
@@ -30,6 +31,7 @@ import {
   montarParamsFiltrosContasReceber,
   normalizarListaClientes,
 } from "./contasReceber/contasReceberFilterHelpers";
+import { montarDadosComprovanteRecebimento } from "../utils/comprovanteRecebimento";
 
 const formatarDataISO = (data) => {
   const ano = data.getFullYear();
@@ -87,6 +89,7 @@ const ContasReceber = () => {
   const [mostrarDetalhes, setMostrarDetalhes] = useState(false);
   const [contasSelecionadas, setContasSelecionadas] = useState(() => new Set());
   const [calculoEncargos, setCalculoEncargos] = useState(null);
+  const [comprovanteRecebimento, setComprovanteRecebimento] = useState(null);
   const [formasPagamento, setFormasPagamento] = useState([]);
   const [contasBancarias, setContasBancarias] = useState([]);
 
@@ -367,7 +370,29 @@ const ContasReceber = () => {
 
   const registrarRecebimento = async () => {
     try {
-      await api.post(`/contas-receber/${contaSelecionada.id}/receber`, dadosRecebimento);
+      const response = await api.post(
+        `/contas-receber/${contaSelecionada.id}/receber`,
+        dadosRecebimento,
+      );
+
+      setComprovanteRecebimento(
+        montarDadosComprovanteRecebimento({
+          conta: contaSelecionada,
+          formasPagamento,
+          recebimento: {
+            ...(response.data?.recebimento || {}),
+            data: response.data?.recebimento?.data || dadosRecebimento.data_recebimento,
+            valor: response.data?.recebimento?.valor ?? dadosRecebimento.valor_recebido,
+            forma_pagamento_id:
+              response.data?.recebimento?.forma_pagamento_id || dadosRecebimento.forma_pagamento_id,
+            observacoes: response.data?.recebimento?.observacoes || dadosRecebimento.observacoes,
+            conta_bancaria_nome: contasBancarias.find(
+              (conta) => Number(conta.id) === Number(dadosRecebimento.conta_bancaria_id),
+            )?.nome,
+          },
+          saldoRestante: response.data?.saldo_restante,
+        }),
+      );
 
       toast.success("Recebimento registrado com sucesso!");
       setMostrarModalRecebimento(false);
@@ -422,6 +447,17 @@ const ContasReceber = () => {
       console.error("Erro ao receber parcelas em lote:", error);
       toast.error(error.response?.data?.detail || "Erro ao receber parcelas selecionadas");
     }
+  };
+
+  const emitirComprovanteHistorico = (recebimento) => {
+    setComprovanteRecebimento(
+      montarDadosComprovanteRecebimento({
+        conta: contaSelecionada,
+        detalhes: detalhesCompletos,
+        formasPagamento,
+        recebimento,
+      }),
+    );
   };
 
   const formatarData = (data) => {
@@ -788,7 +824,12 @@ const ContasReceber = () => {
         formatarData={formatarData}
         formatarMoeda={formatarMoeda}
         mostrarDetalhes={mostrarDetalhes}
+        onEmitirComprovante={emitirComprovanteHistorico}
         setMostrarDetalhes={setMostrarDetalhes}
+      />
+      <ComprovanteRecebimentoModal
+        comprovante={comprovanteRecebimento}
+        onClose={() => setComprovanteRecebimento(null)}
       />
     </div>
   );

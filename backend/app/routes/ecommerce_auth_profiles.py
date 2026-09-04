@@ -152,6 +152,7 @@ def _serialize_profile(
             "entrega_estado": delivery.get("entrega_estado", ""),
         },
         "cliente_id": cliente.id if cliente else None,
+        "credito": float(getattr(cliente, "credito", 0) or 0) if cliente else 0.0,
         # Perfil entregador — usado pelo app mobile para mostrar interface correta
         "is_entregador": is_entregador,
         "is_funcionario": is_funcionario,
