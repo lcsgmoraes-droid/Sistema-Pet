@@ -3,6 +3,10 @@ import { createProduto, previewPrecosVendaProdutosCompostos, updateProduto } fro
 import { normalizarCodigosBarrasAlternativosPayload } from "../pages/produtosFormUtils";
 import { debugLog } from "../utils/debug";
 import { normalizeMarkdownContent } from "../utils/safeMarkdown";
+import {
+  montarProtocolosRecorrenciaPayload,
+  validarProtocolosRecorrencia,
+} from "../utils/produtoRecorrencia";
 
 export default function useProdutosNovoSubmit({
   id,
@@ -70,6 +74,14 @@ export default function useProdutosNovoSubmit({
     if (!formData.codigo && !formData.sku) {
       alert("Preencha o campo SKU/Código");
       return;
+    }
+
+    if (formData.tem_recorrencia) {
+      const erroRecorrencia = validarProtocolosRecorrencia(formData.protocolos_recorrencia || []);
+      if (erroRecorrencia) {
+        alert(erroRecorrencia);
+        return;
+      }
     }
 
     try {
@@ -145,17 +157,14 @@ export default function useProdutosNovoSubmit({
         produto_predecessor_id: formData.produto_predecessor_id || null,
         motivo_descontinuacao: formData.motivo_descontinuacao || null,
         tem_recorrencia: formData.tem_recorrencia || false,
-        tipo_recorrencia: formData.tem_recorrencia ? formData.tipo_recorrencia : null,
-        intervalo_dias:
-          formData.tem_recorrencia && formData.intervalo_dias
-            ? parseInt(formData.intervalo_dias)
-            : null,
-        numero_doses:
-          formData.tem_recorrencia && formData.numero_doses
-            ? parseInt(formData.numero_doses)
-            : null,
-        especie_compativel: formData.tem_recorrencia ? formData.especie_compativel : null,
-        observacoes_recorrencia: formData.tem_recorrencia ? formData.observacoes_recorrencia : null,
+        tipo_recorrencia: null,
+        intervalo_dias: null,
+        numero_doses: null,
+        especie_compativel: null,
+        observacoes_recorrencia: null,
+        protocolos_recorrencia: formData.tem_recorrencia
+          ? montarProtocolosRecorrenciaPayload(formData.protocolos_recorrencia || [])
+          : [],
         eh_racao: Boolean(formData.eh_racao),
         classificacao_racao: formData.eh_racao ? formData.classificacao_racao || null : null,
         peso_embalagem:

@@ -387,6 +387,13 @@ class VendaItem(BaseTenantModel):
 
     # Vincular item a um pet específico
     pet_id = Column(Integer, ForeignKey("pets.id"), nullable=True)
+    protocolo_recorrencia_id = Column(
+        Integer,
+        ForeignKey("produto_protocolos_recorrencia.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    ignorar_recorrencia = Column(Boolean, nullable=False, default=False)
 
     # Previsao opcional informada no PDV para avisar quando a racao deve acabar.
     # Apenas um dos dois campos pode ser preenchido por item.
@@ -400,6 +407,7 @@ class VendaItem(BaseTenantModel):
     produto = relationship("Produto", backref="vendas_itens")
     lote = relationship("ProdutoLote", backref="vendas_itens")
     pet = relationship("Pet", backref="vendas_itens")
+    protocolo_recorrencia = relationship("ProdutoProtocoloRecorrencia")
 
     # ========== SPRINT 2: SUPORTE A VARIAÇÕES ==========
     # ❌ DESABILITADO: ProductVariation removido - causava conflitos
@@ -446,6 +454,38 @@ class VendaItem(BaseTenantModel):
             "desconto_item": safe_decimal_to_float(self.desconto_item) or 0,
             "subtotal": safe_decimal_to_float(self.subtotal),
             "pet_id": self.pet_id,
+            "protocolo_recorrencia_id": self.protocolo_recorrencia_id,
+            "ignorar_recorrencia": bool(self.ignorar_recorrencia),
+            "protocolo_recorrencia_nome": (
+                self.protocolo_recorrencia.nome if self.protocolo_recorrencia else None
+            ),
+            "protocolos_recorrencia": (
+                [
+                    {
+                        "id": protocolo.id,
+                        "nome": protocolo.nome,
+                        "tipo": protocolo.tipo,
+                        "especie_compativel": protocolo.especie_compativel,
+                        "fase_vida": protocolo.fase_vida,
+                        "intervalo_recompra_dias": protocolo.intervalo_recompra_dias,
+                        "ajustar_ao_historico": protocolo.ajustar_ao_historico,
+                        "reiniciar_apos_dias": protocolo.reiniciar_apos_dias,
+                        "observacoes": protocolo.observacoes,
+                        "doses": [
+                            {
+                                "id": dose.id,
+                                "numero_dose": dose.numero_dose,
+                                "dias_desde_inicio": dose.dias_desde_inicio,
+                            }
+                            for dose in protocolo.doses
+                        ],
+                    }
+                    for protocolo in (self.produto.protocolos_recorrencia or [])
+                    if protocolo.ativo
+                ]
+                if self.produto
+                else []
+            ),
             "pet_nome": self.pet.nome if self.pet else None,
             "pet_codigo": self.pet.codigo if self.pet else None,
             "racao_data_prevista_fim": self.racao_data_prevista_fim.isoformat()

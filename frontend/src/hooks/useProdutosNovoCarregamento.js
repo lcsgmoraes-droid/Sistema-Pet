@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import api from "../api";
 import { normalizeMarkdownContent } from "../utils/safeMarkdown";
+import { normalizarProtocolosRecorrencia } from "../utils/produtoRecorrencia";
 import {
   getCategorias,
   getDepartamentos,
@@ -239,6 +240,7 @@ export default function useProdutosNovoCarregamento({
         numero_doses: produto.numero_doses || "",
         especie_compativel: produto.especie_compativel || "both",
         observacoes_recorrencia: produto.observacoes_recorrencia || "",
+        protocolos_recorrencia: normalizarProtocolosRecorrencia(produto),
         eh_racao:
           typeof produto.eh_racao === "boolean"
             ? produto.eh_racao

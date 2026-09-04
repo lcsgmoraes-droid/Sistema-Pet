@@ -58,6 +58,7 @@ export function usePDVPageComposition({
   adicionarNaListaEsperaRapido,
   alterarQuantidade,
   atualizarPetDoItem,
+  atualizarProtocoloDoItem,
   atualizarQuantidadeItem,
   handleBuscarProdutoChange,
   handleBuscarProdutoFocus,
@@ -258,6 +259,7 @@ export function usePDVPageComposition({
     onAdicionarNaListaEsperaRapido: adicionarNaListaEsperaRapido,
     onAlterarQuantidade: alterarQuantidade,
     onAtualizarPetItem: atualizarPetDoItem,
+    onAtualizarProtocoloItem: atualizarProtocoloDoItem,
     onAtualizarQuantidadeItem: atualizarQuantidadeItem,
     onAtualizarPrevisaoFimRacao: (itemIndex, previsao) =>
       setVendaAtual((prev) => ({

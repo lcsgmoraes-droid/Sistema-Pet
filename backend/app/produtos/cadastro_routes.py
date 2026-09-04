@@ -25,7 +25,13 @@ from app.produtos.schemas import (
     ProdutoUpdate,
 )
 from app.produtos.validators import _validar_sku_unico, _validar_tenant_e_obter_usuario
-from app.produtos_models import Categoria, Marca, Produto, ProdutoKitComponente
+from app.produtos_models import (
+    Categoria,
+    Marca,
+    Produto,
+    ProdutoKitComponente,
+    ProdutoProtocoloRecorrencia,
+)
 from app.security.permissions_decorator import require_permission
 from app.services.produto_service import ProdutoService
 from app.produtos.tipos import aplicar_regras_servico_dados
@@ -183,6 +189,8 @@ def criar_produto(
         produto_data = _normalizar_promocao_erp_payload(
             _normalizar_payload_granel(_normalizar_payload_racao(produto.model_dump()))
         )
+        if "protocolos_recorrencia" not in produto.model_fields_set:
+            produto_data.pop("protocolos_recorrencia", None)
 
         # Adicionar user_id aos dados (necessário para o modelo)
         produto_data["user_id"] = current_user.id
@@ -242,6 +250,9 @@ def obter_produto(
             joinedload(Produto.imagens),
             joinedload(Produto.categoria),
             joinedload(Produto.marca),
+            joinedload(Produto.protocolos_recorrencia).joinedload(
+                ProdutoProtocoloRecorrencia.doses
+            ),
         )
         .first()
     )
@@ -443,6 +454,7 @@ def atualizar_produto(
     # Extrair dados
     dados_recebidos = produto_update.model_dump(exclude_unset=True)
     composicao_kit = dados_recebidos.pop("composicao_kit", None)
+    protocolos_recorrencia = dados_recebidos.pop("protocolos_recorrencia", None)
     produtos_compostos_preco_venda_ids = dados_recebidos.pop(
         "produtos_compostos_preco_venda_ids", None
     )
@@ -639,6 +651,17 @@ def atualizar_produto(
                 )
 
         db.flush()
+
+        if protocolos_recorrencia is not None:
+            from app.services.product_recurrence_protocols import (
+                sincronizar_protocolos_produto,
+            )
+
+            sincronizar_protocolos_produto(
+                db,
+                produto=produto,
+                protocolos=protocolos_recorrencia,
+            )
 
         if KitCustoService.produto_usa_custo_por_componentes(produto):
             KitCustoService.sincronizar_custo_kit(db, produto.id)

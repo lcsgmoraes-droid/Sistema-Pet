@@ -92,7 +92,13 @@ export default function useProdutosNovoPageComposition({
     opcoesSabores,
     opcoesTratamentos,
   } = racaoState;
-  const { handleTipoRecorrenciaChange } = recorrenciaState;
+  const {
+    adicionarRegraRecorrencia,
+    atualizarDoseRecorrencia,
+    atualizarQuantidadeDosesRecorrencia,
+    atualizarRegraRecorrencia,
+    removerRegraRecorrencia,
+  } = recorrenciaState;
   const { handleChangeTributacao, handlePersonalizarFiscal } = tributacaoState;
   const {
     formatarData,
@@ -198,9 +204,13 @@ export default function useProdutosNovoPageComposition({
   };
 
   const recorrenciaTabProps = {
+    adicionarRegraRecorrencia,
+    atualizarDoseRecorrencia,
+    atualizarQuantidadeDosesRecorrencia,
+    atualizarRegraRecorrencia,
     formData,
     handleChange,
-    handleTipoRecorrenciaChange,
+    removerRegraRecorrencia,
   };
 
   const racaoTabProps = {

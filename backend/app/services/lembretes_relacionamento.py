@@ -35,6 +35,11 @@ def _first_name(value) -> str:
 
 def classify_reminder(reminder) -> str:
     """Classifica a oportunidade sem confundir protocolo com ciclo aprendido."""
+    recurrence_kind = getattr(reminder, "tipo_lembrete", None)
+    if recurrence_kind == "reinicio_protocolo":
+        return "reinicio_protocolo"
+    if recurrence_kind == "proxima_dose":
+        return "proxima_dose"
     if (getattr(reminder, "dose_total", None) or 0) > 1:
         return "protocolo"
     product = getattr(reminder, "produto", None)
@@ -58,7 +63,12 @@ def suggested_message(reminder) -> str:
     searchable_name = _plain(product_name)
     reminder_type = classify_reminder(reminder)
 
-    if re.search(
+    if reminder_type == "reinicio_protocolo":
+        context = (
+            f"Está chegando o momento planejado para iniciar um novo protocolo de "
+            f"{product_name}{pet_reference}."
+        )
+    elif re.search(
         r"carrapat|pulga|antiparasit|nexgard|simparic|bravecto", searchable_name
     ):
         context = (
@@ -75,7 +85,7 @@ def suggested_message(reminder) -> str:
             f"Pela previsão de consumo, {product_name} pode estar perto de acabar. "
             "Evitar interrupções ajuda a manter a rotina de alimentação."
         )
-    elif reminder_type == "protocolo":
+    elif reminder_type in {"protocolo", "proxima_dose"}:
         context = (
             f"Está chegando a data da próxima etapa de {product_name}{pet_reference}. "
             "Manter o protocolo em dia ajuda a seguir o cuidado planejado."

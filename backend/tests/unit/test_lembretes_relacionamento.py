@@ -22,6 +22,7 @@ def _reminder(
     dose_total=None,
     eh_racao=False,
     source="configurado",
+    tipo_lembrete=None,
 ):
     return SimpleNamespace(
         cliente=SimpleNamespace(nome="Maria da Silva"),
@@ -29,6 +30,7 @@ def _reminder(
         produto=SimpleNamespace(nome=product_name, eh_racao=eh_racao),
         dose_total=dose_total,
         origem_intervalo=source,
+        tipo_lembrete=tipo_lembrete,
     )
 
 
@@ -39,6 +41,14 @@ def test_reminder_classification_keeps_protocol_ration_and_learned_cycle_distinc
         classify_reminder(_reminder(source="aprendido_historico")) == "ciclo_aprendido"
     )
     assert classify_reminder(_reminder()) == "recorrencia"
+    assert (
+        classify_reminder(_reminder(dose_total=3, tipo_lembrete="proxima_dose"))
+        == "proxima_dose"
+    )
+    assert (
+        classify_reminder(_reminder(dose_total=3, tipo_lembrete="reinicio_protocolo"))
+        == "reinicio_protocolo"
+    )
 
 
 def test_suggested_message_uses_product_context_and_remains_a_draft():
@@ -48,6 +58,14 @@ def test_suggested_message_uses_product_context_and_remains_a_draft():
     assert "pulgas e carrapatos" in message
     assert "Thor" in message
     assert message.endswith("Quer que eu separe para você?")
+
+
+def test_suggested_message_distinguishes_a_new_protocol_offer():
+    message = suggested_message(
+        _reminder("Vacina V10", tipo_lembrete="reinicio_protocolo")
+    )
+
+    assert "iniciar um novo protocolo" in message
 
 
 def test_notified_reminders_remain_active_until_repurchase():

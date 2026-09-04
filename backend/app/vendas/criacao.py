@@ -61,6 +61,9 @@ def criar_venda(
     from app.vendas_models import Venda, VendaItem
     from app.financeiro_models import LancamentoManual, CategoriaFinanceira
     from app.audit_log import log_action
+    from app.services.product_recurrence_protocols import (
+        obter_protocolo_ativo_do_produto,
+    )
     from app.vendas.racao_previsao import validar_previsao_fim_racao
 
     logger.info(f"📝 Criando nova venda para user_id={user_id}")
@@ -267,6 +270,36 @@ def criar_venda(
                 produto=produto_catalogo,
                 cliente_id=payload.get("cliente_id"),
             )
+            ignorar_recorrencia = bool(item_data.get("ignorar_recorrencia", False))
+            protocolo_recorrencia_id = (
+                None
+                if ignorar_recorrencia
+                else item_data.get("protocolo_recorrencia_id")
+            )
+            protocolo_recorrencia = (
+                obter_protocolo_ativo_do_produto(
+                    db,
+                    protocolo_id=protocolo_recorrencia_id,
+                    produto_id=produto_id,
+                    tenant_id=payload.get("tenant_id"),
+                )
+                if protocolo_recorrencia_id is not None
+                else None
+            )
+            if protocolo_recorrencia_id is not None and not protocolo_recorrencia:
+                raise HTTPException(
+                    status_code=400,
+                    detail="O protocolo de recorrência selecionado não pertence a este produto.",
+                )
+            if (
+                protocolo_recorrencia
+                and protocolo_recorrencia.tipo == "protocolo_doses"
+                and not item_data.get("pet_id")
+            ):
+                raise HTTPException(
+                    status_code=400,
+                    detail="Selecione o pet para iniciar este protocolo de doses.",
+                )
 
             # 🔒 ISOLAMENTO MULTI-TENANT: tenant_id obrigatório
             item = VendaItem(
@@ -311,6 +344,8 @@ def criar_venda(
                 subtotal=item_data["subtotal"],
                 lote_id=item_data.get("lote_id"),
                 pet_id=item_data.get("pet_id"),
+                protocolo_recorrencia_id=protocolo_recorrencia_id,
+                ignorar_recorrencia=ignorar_recorrencia,
                 racao_data_prevista_fim=previsao_racao.data_prevista,
                 racao_prazo_estimado_dias=previsao_racao.prazo_dias,
             )
