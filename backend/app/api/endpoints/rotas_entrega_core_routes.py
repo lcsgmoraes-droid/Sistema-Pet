@@ -4,9 +4,9 @@ from decimal import Decimal
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import case, exists, func, or_, select, text
+from sqlalchemy import bindparam, case, exists, func, or_, select, text
 from sqlalchemy.orm import Query as SqlAlchemyQuery
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm import Session, joinedload, selectinload
 
 from app.api.endpoints.rotas_entrega_auth import (
     DeliveryActor,
@@ -77,94 +77,128 @@ def _hidratar_localizacao_rota(db: Session, rota: RotaEntrega, tenant_id: int) -
     return False
 
 
-def _hidratar_paradas_rota(db: Session, rota: RotaEntrega, tenant_id: int) -> None:
-    paradas = sorted(rota.paradas or [], key=lambda p: p.ordem)
-    rota.paradas = paradas
-    rota.total_entregas = len(paradas) if paradas else (1 if rota.venda_id else 0)
-    rota.entregas_concluidas = sum(
-        1 for parada in paradas if parada.status == "entregue"
-    )
-    if not paradas:
+def _hidratar_paradas_rotas(
+    db: Session, rotas: list[RotaEntrega], tenant_id: int
+) -> None:
+    """Preenche os detalhes das rotas com consultas agrupadas por listagem."""
+    if not rotas:
+        return
+
+    todas_paradas: list[RotaEntregaParada] = []
+    rotas_sem_paradas: list[RotaEntrega] = []
+    venda_ids_legados: set[int] = set()
+
+    for rota in rotas:
+        paradas = sorted(rota.paradas or [], key=lambda p: p.ordem)
+        rota.paradas = paradas
+        rota.total_entregas = len(paradas) if paradas else (1 if rota.venda_id else 0)
+        rota.entregas_concluidas = sum(
+            1 for parada in paradas if parada.status == "entregue"
+        )
+        if paradas:
+            todas_paradas.extend(paradas)
+            continue
+
         rota.entregas_concluidas = (
             rota.total_entregas if rota.status == "concluida" else 0
         )
-        vendas_legadas = []
+        rotas_sem_paradas.append(rota)
         if rota.venda_id:
-            venda = (
-                db.query(Venda)
-                .options(joinedload(Venda.cliente), joinedload(Venda.pagamentos))
-                .filter(Venda.id == rota.venda_id, Venda.tenant_id == tenant_id)
-                .first()
+            venda_ids_legados.add(int(rota.venda_id))
+
+    vendas_legadas_por_id = {}
+    if venda_ids_legados:
+        vendas_legadas = (
+            db.query(Venda)
+            .options(joinedload(Venda.cliente), selectinload(Venda.pagamentos))
+            .filter(
+                Venda.id.in_(sorted(venda_ids_legados)),
+                Venda.tenant_id == tenant_id,
             )
-            if venda:
-                vendas_legadas.append(venda)
-        _hidratar_resumo_financeiro_rota(rota, vendas_legadas)
+            .all()
+        )
+        vendas_legadas_por_id = {int(venda.id): venda for venda in vendas_legadas}
+
+    for rota in rotas_sem_paradas:
+        venda = vendas_legadas_por_id.get(int(rota.venda_id)) if rota.venda_id else None
+        _hidratar_resumo_financeiro_rota(rota, [venda] if venda else [])
+
+    if not todas_paradas:
         return
 
+    rota_ids = sorted({int(parada.rota_id) for parada in todas_paradas})
     dist_rows = db.execute(
         text(
             """
             SELECT id, distancia_trecho_real_km, distancia_acumulada_real_km
             FROM rotas_entrega_paradas
-            WHERE rota_id = :rid AND tenant_id = :tenant
+            WHERE rota_id IN :rota_ids AND tenant_id = :tenant
             """
-        ),
-        {"rid": rota.id, "tenant": tenant_id},
+        ).bindparams(bindparam("rota_ids", expanding=True)),
+        {"rota_ids": rota_ids, "tenant": tenant_id},
     ).fetchall()
     dist_por_parada = {row[0]: row for row in dist_rows}
 
-    vendas_por_id = {}
+    venda_ids = sorted({int(parada.venda_id) for parada in todas_paradas})
     avaliacoes_por_venda = {
         int(avaliacao.venda_id): avaliacao
         for avaliacao in db.query(EntregaAvaliacao)
         .filter(
             EntregaAvaliacao.tenant_id == tenant_id,
-            EntregaAvaliacao.venda_id.in_([parada.venda_id for parada in paradas]),
+            EntregaAvaliacao.venda_id.in_(venda_ids),
         )
         .all()
     }
-    for parada in paradas:
-        dist_row = dist_por_parada.get(parada.id)
-        if dist_row:
-            parada.distancia_trecho_real_km = dist_row[1]
-            parada.distancia_acumulada_real_km = dist_row[2]
-        if parada.venda and parada.venda.cliente:
-            parada.cliente_nome = parada.venda.cliente.nome
-            parada.cliente_telefone = parada.venda.cliente.telefone
-            parada.cliente_celular = parada.venda.cliente.celular
-        if parada.venda:
-            venda = parada.venda
-            vendas_por_id[venda.id] = venda
-            pagamentos = list(venda.pagamentos or [])
-            valor_pago = sum(
-                (Decimal(str(pagamento.valor or 0)) for pagamento in pagamentos),
-                Decimal("0"),
-            )
-            total_venda = Decimal(str(venda.total or 0))
-            parada.numero_venda = venda.numero_venda
-            parada.valor_venda = total_venda
-            parada.taxa_entrega = Decimal(str(venda.taxa_entrega or 0))
-            parada.data_venda = venda.data_venda
-            parada.forma_pagamento = (
-                pagamentos[0].forma_pagamento if pagamentos else None
-            )
-            parada.valor_pago = valor_pago
-            parada.status_pagamento = (
-                "pago"
-                if valor_pago >= total_venda
-                else "parcial"
-                if valor_pago > 0
-                else "pendente"
-            )
-            parada.observacoes_entrega = venda.observacoes_entrega
-            parada.canal_venda = venda.canal
-            avaliacao = avaliacoes_por_venda.get(int(venda.id))
-            if avaliacao:
-                parada.avaliacao_entrega_nota = int(avaliacao.nota)
-                parada.avaliacao_entrega_comentario = avaliacao.comentario
-                parada.avaliacao_entrega_data = avaliacao.created_at
 
-    _hidratar_resumo_financeiro_rota(rota, list(vendas_por_id.values()))
+    for rota in rotas:
+        vendas_por_id = {}
+        for parada in rota.paradas:
+            dist_row = dist_por_parada.get(parada.id)
+            if dist_row:
+                parada.distancia_trecho_real_km = dist_row[1]
+                parada.distancia_acumulada_real_km = dist_row[2]
+            if parada.venda and parada.venda.cliente:
+                parada.cliente_nome = parada.venda.cliente.nome
+                parada.cliente_telefone = parada.venda.cliente.telefone
+                parada.cliente_celular = parada.venda.cliente.celular
+            if parada.venda:
+                venda = parada.venda
+                vendas_por_id[venda.id] = venda
+                pagamentos = list(venda.pagamentos or [])
+                valor_pago = sum(
+                    (Decimal(str(pagamento.valor or 0)) for pagamento in pagamentos),
+                    Decimal("0"),
+                )
+                total_venda = Decimal(str(venda.total or 0))
+                parada.numero_venda = venda.numero_venda
+                parada.valor_venda = total_venda
+                parada.taxa_entrega = Decimal(str(venda.taxa_entrega or 0))
+                parada.data_venda = venda.data_venda
+                parada.forma_pagamento = (
+                    pagamentos[0].forma_pagamento if pagamentos else None
+                )
+                parada.valor_pago = valor_pago
+                parada.status_pagamento = (
+                    "pago"
+                    if valor_pago >= total_venda
+                    else "parcial"
+                    if valor_pago > 0
+                    else "pendente"
+                )
+                parada.observacoes_entrega = venda.observacoes_entrega
+                parada.canal_venda = venda.canal
+                avaliacao = avaliacoes_por_venda.get(int(venda.id))
+                if avaliacao:
+                    parada.avaliacao_entrega_nota = int(avaliacao.nota)
+                    parada.avaliacao_entrega_comentario = avaliacao.comentario
+                    parada.avaliacao_entrega_data = avaliacao.created_at
+
+        if rota.paradas:
+            _hidratar_resumo_financeiro_rota(rota, list(vendas_por_id.values()))
+
+
+def _hidratar_paradas_rota(db: Session, rota: RotaEntrega, tenant_id: int) -> None:
+    _hidratar_paradas_rotas(db, [rota], tenant_id)
 
 
 def _hidratar_resumo_financeiro_rota(rota: RotaEntrega, vendas: list[Venda]) -> None:
@@ -347,7 +381,7 @@ def listar_rotas(
         # Carregar localização atual sem depender de mapeamento ORM de colunas legadas.
         _hidratar_localizacao_rota(db, rota, tenant_id)
 
-        _hidratar_paradas_rota(db, rota, tenant_id)
+    _hidratar_paradas_rotas(db, rotas, tenant_id)
 
     db.commit()
     return rotas

@@ -86,10 +86,28 @@ function badgeFor(status: string) {
   return BADGE[status] ?? { label: status, color: "#6b7280" };
 }
 
+function mensagemErroApi(error: unknown, fallback: string) {
+  const apiError = error as {
+    code?: string;
+    response?: { data?: { detail?: unknown } };
+  };
+  const detail = apiError?.response?.data?.detail;
+  if (typeof detail === "string" && detail.trim()) return detail;
+  if (apiError?.code === "ECONNABORTED") {
+    return "A comunicação demorou mais que o esperado. Atualize a tela e tente novamente.";
+  }
+  if (!apiError?.response) {
+    return "Não foi possível conectar ao sistema. Confira sua internet e tente novamente.";
+  }
+  return fallback;
+}
+
 export default function RotasDoEntregadorScreen() {
   const navigation = useNavigation<Nav>();
   const route = useRoute<RouteProps>();
-  const [aba, setAba] = useState<"abertas" | "rotas" | "taxi_dog" | "historico">("abertas");
+  const [aba, setAba] = useState<
+    "abertas" | "rotas" | "taxi_dog" | "historico"
+  >("abertas");
 
   const [entregasAbertas, setEntregasAbertas] = useState<EntregaAberta[]>([]);
   const [selecionadas, setSelecionadas] = useState<number[]>([]);
@@ -98,22 +116,17 @@ export default function RotasDoEntregadorScreen() {
 
   const [rotas, setRotas] = useState<Rota[]>([]);
   const [historico, setHistorico] = useState<RotaHistorico[]>([]);
+  const [historicoCarregado, setHistoricoCarregado] = useState(false);
+  const [historicoLoading, setHistoricoLoading] = useState(false);
+  const [historicoFalhou, setHistoricoFalhou] = useState(false);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
   const carregar = useCallback(async (mostrarErro = true) => {
     try {
-      const [rotasRes, abertasRes, historicoRes] = await Promise.allSettled([
+      const [rotasRes, abertasRes] = await Promise.allSettled([
         api.get<Rota[]>("/ecommerce/entregador/minhas-rotas"),
         api.get<EntregaAberta[]>("/ecommerce/entregador/entregas-abertas"),
-        api.get<RotaHistorico[]>("/ecommerce/entregador/minhas-rotas", {
-          params: {
-            status: "concluida",
-            ordenar_por: "data_conclusao",
-            direcao: "desc",
-            limite: 100,
-          },
-        }),
       ]);
       let carregouAlgumaLista = false;
 
@@ -127,22 +140,29 @@ export default function RotasDoEntregadorScreen() {
         carregouAlgumaLista = true;
       }
 
-      if (historicoRes.status === "fulfilled") {
-        setHistorico(historicoRes.value.data || []);
-        carregouAlgumaLista = true;
-      }
-
       if (!carregouAlgumaLista && mostrarErro) {
+        const erroCarregamento =
+          rotasRes.status === "rejected"
+            ? rotasRes.reason
+            : abertasRes.status === "rejected"
+              ? abertasRes.reason
+              : undefined;
         Alert.alert(
           "Erro",
-          "Nao foi possivel carregar as entregas. Tente novamente.",
+          mensagemErroApi(
+            erroCarregamento,
+            "Não foi possível carregar as entregas. Tente novamente.",
+          ),
         );
       }
-    } catch {
+    } catch (error: unknown) {
       if (mostrarErro) {
         Alert.alert(
           "Erro",
-          "Nao foi possivel carregar as entregas. Tente novamente.",
+          mensagemErroApi(
+            error,
+            "Não foi possível carregar as entregas. Tente novamente.",
+          ),
         );
       }
     } finally {
@@ -150,6 +170,47 @@ export default function RotasDoEntregadorScreen() {
       setRefreshing(false);
     }
   }, []);
+
+  const carregarHistorico = useCallback(async (mostrarErro = true) => {
+    setHistoricoLoading(true);
+    setHistoricoFalhou(false);
+    try {
+      const response = await api.get<RotaHistorico[]>(
+        "/ecommerce/entregador/minhas-rotas",
+        {
+          params: {
+            status: "concluida",
+            ordenar_por: "data_conclusao",
+            direcao: "desc",
+            limite: 100,
+          },
+        },
+      );
+      setHistorico(response.data || []);
+      setHistoricoCarregado(true);
+    } catch (error: unknown) {
+      setHistoricoFalhou(true);
+      if (mostrarErro) {
+        Alert.alert(
+          "Erro",
+          mensagemErroApi(
+            error,
+            "Não foi possível carregar o histórico de entregas.",
+          ),
+        );
+      }
+    } finally {
+      setHistoricoLoading(false);
+      setRefreshing(false);
+    }
+  }, []);
+
+  const abrirHistorico = useCallback(() => {
+    setAba("historico");
+    if (!historicoCarregado && !historicoLoading) {
+      void carregarHistorico();
+    }
+  }, [carregarHistorico, historicoCarregado, historicoLoading]);
 
   useEffect(() => {
     const rotaFinalizadaId = route.params?.rotaFinalizadaId;
@@ -171,8 +232,12 @@ export default function RotasDoEntregadorScreen() {
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
-    carregar();
-  }, [carregar]);
+    if (aba === "historico") {
+      void carregarHistorico();
+      return;
+    }
+    void carregar();
+  }, [aba, carregar, carregarHistorico]);
 
   function toggleEntrega(vendaId: number) {
     setSelecionadas((prev) =>
@@ -412,7 +477,7 @@ export default function RotasDoEntregadorScreen() {
         </TouchableOpacity>
         <TouchableOpacity
           style={[styles.tabBtn, aba === "historico" && styles.tabBtnAtivo]}
-          onPress={() => setAba("historico")}
+          onPress={abrirHistorico}
         >
           <Text
             style={[styles.tabText, aba === "historico" && styles.tabTextAtivo]}
@@ -499,19 +564,39 @@ export default function RotasDoEntregadorScreen() {
         />
       )}
 
-      {aba === "historico" && (
-        <HistoricoRotasEntregador
-          rotas={historico}
-          refreshing={refreshing}
-          onRefresh={onRefresh}
-          onOpen={(item) =>
-            navigation.navigate("DetalheEntrega", {
-              rotaId: item.id,
-              numero: item.numero,
-            })
-          }
-        />
+      {aba === "historico" && historicoLoading && !historicoCarregado && (
+        <View style={styles.center}>
+          <ActivityIndicator size="large" color="#2563eb" />
+          <Text style={styles.loadingText}>Carregando histórico…</Text>
+        </View>
       )}
+      {aba === "historico" && historicoFalhou && !historicoCarregado && (
+        <View style={styles.center}>
+          <Text style={styles.emptyIcon}>⚠️</Text>
+          <Text style={styles.emptyTitle}>Não foi possível carregar</Text>
+          <TouchableOpacity
+            style={styles.retryButton}
+            onPress={() => void carregarHistorico()}
+          >
+            <Text style={styles.actionBtnPrimaryText}>Tentar novamente</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+      {aba === "historico" &&
+        (!historicoLoading || historicoCarregado) &&
+        (!historicoFalhou || historicoCarregado) && (
+          <HistoricoRotasEntregador
+            rotas={historico}
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            onOpen={(item) =>
+              navigation.navigate("DetalheEntrega", {
+                rotaId: item.id,
+                numero: item.numero,
+              })
+            }
+          />
+        )}
       {aba === "taxi_dog" && <TaxiDogEntregador />}
     </View>
   );
@@ -571,6 +656,13 @@ const styles = StyleSheet.create({
   },
   actionBtnDisabled: {
     opacity: 0.6,
+  },
+  retryButton: {
+    backgroundColor: "#2563eb",
+    borderRadius: 8,
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+    marginTop: 8,
   },
   actionBtnText: {
     color: "#fff",
