@@ -1,3 +1,5 @@
+import { normalizarProtocolosRecorrencia } from "../utils/produtoRecorrencia";
+
 export function organizarCategoriasHierarquicas(categorias) {
   if (!categorias || categorias.length === 0) return [];
 
@@ -170,6 +172,11 @@ export function montarEstadoProdutoClonado(prod = {}) {
     numero_doses: prod.numero_doses || "",
     observacoes_recorrencia: prod.observacoes_recorrencia || "",
     especie_compativel: prod.especie_compativel || "both",
+    protocolos_recorrencia: normalizarProtocolosRecorrencia(prod).map((regra) => ({
+      ...regra,
+      id: undefined,
+      doses: regra.doses.map((dose) => ({ ...dose, id: undefined })),
+    })),
     eh_racao: Boolean(prod.eh_racao),
     e_granel: Boolean(prod.e_granel),
     classificacao_racao:

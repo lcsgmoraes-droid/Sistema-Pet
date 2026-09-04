@@ -14,6 +14,8 @@ export function montarItensVendaPayload(vendaAtual) {
     subtotal: normalizarNumero(item.subtotal),
     lote_id: item.lote_id ?? null,
     pet_id: item.pet_id || vendaAtual.pet?.id || null,
+    protocolo_recorrencia_id: item.protocolo_recorrencia_id || null,
+    ignorar_recorrencia: Boolean(item.ignorar_recorrencia),
     racao_data_prevista_fim: item.racao_data_prevista_fim || null,
     racao_prazo_estimado_dias: item.racao_prazo_estimado_dias || null,
   }));

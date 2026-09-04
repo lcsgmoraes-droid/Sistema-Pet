@@ -128,6 +128,7 @@ export default function ProdutosNovo() {
     numero_doses: "",
     observacoes_recorrencia: "",
     especie_compativel: "both",
+    protocolos_recorrencia: [],
 
     // Aba 7: Ração - Calculadora (Fase 2)
     eh_racao: false,
@@ -333,7 +334,14 @@ export default function ProdutosNovo() {
     navigate,
   });
 
-  const { handleTipoRecorrenciaChange } = useProdutosNovoRecorrencia({
+  const {
+    adicionarRegraRecorrencia,
+    atualizarDoseRecorrencia,
+    atualizarQuantidadeDosesRecorrencia,
+    atualizarRegraRecorrencia,
+    removerRegraRecorrencia,
+  } = useProdutosNovoRecorrencia({
+    formData,
     handleChange,
   });
 
@@ -575,7 +583,11 @@ export default function ProdutosNovo() {
       handlePersonalizarFiscal,
     },
     recorrenciaState: {
-      handleTipoRecorrenciaChange,
+      adicionarRegraRecorrencia,
+      atualizarDoseRecorrencia,
+      atualizarQuantidadeDosesRecorrencia,
+      atualizarRegraRecorrencia,
+      removerRegraRecorrencia,
     },
     racaoState: {
       handleCriarOpcaoRacao,

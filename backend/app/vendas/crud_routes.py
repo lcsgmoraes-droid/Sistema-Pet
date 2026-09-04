@@ -16,6 +16,7 @@ from app.idempotency import idempotent
 from app.models import Cliente
 from app.security.permissions_decorator import require_permission
 from app.services.opportunity_background_processor import get_opportunity_processor
+from app.services.product_recurrence_protocols import obter_protocolo_ativo_do_produto
 from app.services.venda_rentabilidade_snapshot_service import (
     get_or_build_venda_rentabilidade_snapshot,
 )
@@ -328,6 +329,34 @@ def atualizar_venda(
             status_code=400, detail="A venda deve ter pelo menos um item"
         )
 
+    for item_data in dados.itens:
+        if item_data.ignorar_recorrencia:
+            continue
+        protocolo_recorrencia = (
+            obter_protocolo_ativo_do_produto(
+                db,
+                protocolo_id=item_data.protocolo_recorrencia_id,
+                produto_id=item_data.produto_id,
+                tenant_id=tenant_id,
+            )
+            if item_data.protocolo_recorrencia_id is not None
+            else None
+        )
+        if item_data.protocolo_recorrencia_id is not None and not protocolo_recorrencia:
+            raise HTTPException(
+                status_code=400,
+                detail="O protocolo de recorrência selecionado não pertence a este produto.",
+            )
+        if (
+            protocolo_recorrencia
+            and protocolo_recorrencia.tipo == "protocolo_doses"
+            and not item_data.pet_id
+        ):
+            raise HTTPException(
+                status_code=400,
+                detail="Selecione o pet para iniciar este protocolo de doses.",
+            )
+
     # Validar endereço obrigatório quando tem entrega
     if dados.tem_entrega and not dados.endereco_entrega:
         raise HTTPException(
@@ -484,6 +513,12 @@ def atualizar_venda(
             subtotal=item_data.subtotal,
             lote_id=item_data.lote_id,
             pet_id=item_data.pet_id,
+            protocolo_recorrencia_id=(
+                None
+                if item_data.ignorar_recorrencia
+                else item_data.protocolo_recorrencia_id
+            ),
+            ignorar_recorrencia=item_data.ignorar_recorrencia,
             racao_data_prevista_fim=previsao_racao.data_prevista,
             racao_prazo_estimado_dias=previsao_racao.prazo_dias,
         )

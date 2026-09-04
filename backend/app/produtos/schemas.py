@@ -5,7 +5,7 @@ A ordem das classes preserva o comportamento historico de ProdutoResponse e Lote
 """
 
 from datetime import datetime
-from typing import List, Optional
+from typing import List, Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -163,6 +163,66 @@ class KitComponenteResponse(BaseModel):
 # ==========================================
 
 
+class ProdutoProtocoloDoseSchema(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: Optional[int] = None
+    numero_dose: int = Field(..., ge=1, le=50)
+    dias_desde_inicio: int = Field(..., ge=0, le=3650)
+
+
+class ProdutoProtocoloRecorrenciaSchema(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: Optional[int] = None
+    nome: str = Field(..., min_length=1, max_length=160)
+    tipo: Literal["recompra_continua", "protocolo_doses"]
+    especie_compativel: Literal["both", "dog", "cat"] = "both"
+    fase_vida: Literal["all", "puppy", "adult"] = "all"
+    intervalo_recompra_dias: Optional[int] = Field(default=None, ge=1, le=3650)
+    ajustar_ao_historico: bool = True
+    reiniciar_apos_dias: Optional[int] = Field(default=None, ge=1, le=3650)
+    observacoes: Optional[str] = None
+    ativo: bool = True
+    doses: List[ProdutoProtocoloDoseSchema] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def validar_programacao(self):
+        self.nome = self.nome.strip()
+        if not self.nome:
+            raise ValueError("Informe o nome do protocolo de recorrência.")
+
+        if self.tipo == "recompra_continua":
+            if not self.intervalo_recompra_dias:
+                raise ValueError("Informe o intervalo inicial da recompra contínua.")
+            self.doses = []
+            self.reiniciar_apos_dias = None
+            return self
+
+        if not self.doses:
+            raise ValueError("O protocolo precisa ter ao menos a Dose 1.")
+
+        doses = sorted(self.doses, key=lambda dose: dose.numero_dose)
+        numeros = [dose.numero_dose for dose in doses]
+        esperados = list(range(1, len(doses) + 1))
+        if numeros != esperados:
+            raise ValueError(
+                "As doses devem estar numeradas em sequência a partir de 1."
+            )
+        if doses[0].dias_desde_inicio != 0:
+            raise ValueError("A Dose 1 deve acontecer no dia da venda.")
+
+        dias = [dose.dias_desde_inicio for dose in doses]
+        if any(atual <= anterior for anterior, atual in zip(dias, dias[1:])):
+            raise ValueError(
+                "Os dias das doses devem ser crescentes a partir do início."
+            )
+
+        self.intervalo_recompra_dias = None
+        self.ajustar_ao_historico = False
+        return self
+
+
 class ProdutoBase(BaseModel):
     codigo: str  # SKU
     nome: str
@@ -255,6 +315,9 @@ class ProdutoCreate(ProdutoBase):
     """
 
     composicao_kit: Optional[List[KitComponenteCreate]] = Field(default_factory=list)
+    protocolos_recorrencia: Optional[List[ProdutoProtocoloRecorrenciaSchema]] = Field(
+        default_factory=list
+    )
 
 
 class ProdutoUpdate(BaseModel):
@@ -308,6 +371,7 @@ class ProdutoUpdate(BaseModel):
     numero_doses: Optional[int] = None
     especie_compativel: Optional[str] = None
     observacoes_recorrencia: Optional[str] = None
+    protocolos_recorrencia: Optional[List[ProdutoProtocoloRecorrenciaSchema]] = None
     # Ração - Calculadora (Fase 2)
     eh_racao: Optional[bool] = None
     classificacao_racao: Optional[str] = None
@@ -443,6 +507,9 @@ class ProdutoResponse(ProdutoBase):
     marca: Optional[MarcaResponse] = None
     imagens: List[ImagemUploadResponse] = Field(default_factory=list)
     lotes: List[LoteResponse] = Field(default_factory=list)
+    protocolos_recorrencia: List[ProdutoProtocoloRecorrenciaSchema] = Field(
+        default_factory=list
+    )
     imagem_principal: Optional[str] = None  # URL da imagem principal
     imagem_principal_thumbnail: Optional[str] = None
     total_variacoes: Optional[int] = 0  # Número de variações (para produtos PAI)

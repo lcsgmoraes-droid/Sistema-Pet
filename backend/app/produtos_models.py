@@ -35,6 +35,8 @@ from .produtos_lembretes_variacoes_models import (
     LembreteContato,
     ProdutoAtributo,
     ProdutoAtributoOpcao,
+    ProdutoProtocoloDose,
+    ProdutoProtocoloRecorrencia,
     ProdutoVariacaoAtributo,
 )
 
@@ -69,5 +71,7 @@ __all__ = [
     "ProdutoKitComponente",
     "ProdutoListaPreco",
     "ProdutoLote",
+    "ProdutoProtocoloDose",
+    "ProdutoProtocoloRecorrencia",
     "ProdutoVariacaoAtributo",
 ]
