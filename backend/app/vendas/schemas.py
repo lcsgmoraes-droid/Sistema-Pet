@@ -16,6 +16,8 @@ class VendaItemSchema(BaseModel):
     subtotal: float
     lote_id: Optional[int] = None
     pet_id: Optional[int] = None
+    protocolo_recorrencia_id: Optional[int] = None
+    ignorar_recorrencia: bool = False
     is_kit: Optional[bool] = None
     racao_data_prevista_fim: Optional[date] = None
     racao_prazo_estimado_dias: Optional[int] = Field(default=None, ge=1, le=365)

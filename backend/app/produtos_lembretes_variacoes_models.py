@@ -25,6 +25,70 @@ from .base_models import BaseTenantModel
 # ====================
 
 
+class ProdutoProtocoloRecorrencia(BaseTenantModel):
+    """Regra de recompra ou protocolo de doses vinculada a um produto."""
+
+    __tablename__ = "produto_protocolos_recorrencia"
+
+    produto_id = Column(
+        Integer,
+        ForeignKey("produtos.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    nome = Column(String(160), nullable=False)
+    tipo = Column(String(30), nullable=False)  # recompra_continua, protocolo_doses
+    especie_compativel = Column(String(20), nullable=False, default="both")
+    fase_vida = Column(String(20), nullable=False, default="all")
+    intervalo_recompra_dias = Column(Integer, nullable=True)
+    ajustar_ao_historico = Column(Boolean, nullable=False, default=True)
+    reiniciar_apos_dias = Column(Integer, nullable=True)
+    observacoes = Column(Text, nullable=True)
+    ativo = Column(Boolean, nullable=False, default=True)
+
+    produto = relationship("Produto", back_populates="protocolos_recorrencia")
+    doses = relationship(
+        "ProdutoProtocoloDose",
+        back_populates="protocolo",
+        cascade="all, delete-orphan",
+        order_by="ProdutoProtocoloDose.numero_dose",
+    )
+
+    __table_args__ = (
+        Index(
+            "ix_produto_protocolos_recorrencia_tenant_produto_ativo",
+            "tenant_id",
+            "produto_id",
+            "ativo",
+        ),
+    )
+
+
+class ProdutoProtocoloDose(BaseTenantModel):
+    """Dose de um protocolo, posicionada em dias desde a primeira dose."""
+
+    __tablename__ = "produto_protocolo_doses"
+
+    protocolo_id = Column(
+        Integer,
+        ForeignKey("produto_protocolos_recorrencia.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    numero_dose = Column(Integer, nullable=False)
+    dias_desde_inicio = Column(Integer, nullable=False)
+
+    protocolo = relationship("ProdutoProtocoloRecorrencia", back_populates="doses")
+
+    __table_args__ = (
+        UniqueConstraint(
+            "protocolo_id",
+            "numero_dose",
+            name="uq_produto_protocolo_dose_numero",
+        ),
+    )
+
+
 class Lembrete(BaseTenantModel):
     """Sistema de lembretes para produtos recorrentes (medicamentos, rações, etc)"""
 
@@ -42,6 +106,12 @@ class Lembrete(BaseTenantModel):
     venda_id = Column(
         Integer, ForeignKey("vendas.id"), nullable=True, index=True
     )  # Venda que originou o lembrete
+    protocolo_recorrencia_id = Column(
+        Integer,
+        ForeignKey("produto_protocolos_recorrencia.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
 
     # Datas
     data_compra = Column(DateTime, nullable=True)  # Quando foi comprado
@@ -57,6 +127,7 @@ class Lembrete(BaseTenantModel):
     data_completado = Column(
         DateTime, nullable=True
     )  # Quando o cliente confirmou a compra/dose
+    data_inicio_protocolo = Column(DateTime, nullable=True)
 
     # Status
     status = Column(
@@ -64,6 +135,9 @@ class Lembrete(BaseTenantModel):
     )  # pendente, notificado, completado, cancelado
     metodo_notificacao = Column(String(50), default="app")
     notificacao_enviada = Column(Boolean, default=False)
+    tipo_lembrete = Column(
+        String(30), nullable=False, default="recompra"
+    )  # recompra, proxima_dose, reinicio_protocolo
 
     # Como o intervalo foi definido. Estes campos deixam a previsao auditavel
     # para a loja e evitam tratar uma estimativa como se fosse um protocolo.
@@ -93,6 +167,7 @@ class Lembrete(BaseTenantModel):
     cliente = relationship("Cliente")
     pet = relationship("Pet")
     produto = relationship("Produto")
+    protocolo_recorrencia = relationship("ProdutoProtocoloRecorrencia")
     contatos = relationship(
         "LembreteContato", back_populates="lembrete", cascade="all, delete-orphan"
     )

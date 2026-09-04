@@ -30,11 +30,17 @@ from .funcionario_contagem_models import (
     FuncionarioContagem,
     FuncionarioContagemItem,
 )
+from .estoque_fracionamento_models import (
+    EstoqueFracionamentoConversao,
+    EstoqueFracionamentoVinculo,
+)
 from .produtos_lembretes_variacoes_models import (
     Lembrete,
     LembreteContato,
     ProdutoAtributo,
     ProdutoAtributoOpcao,
+    ProdutoProtocoloDose,
+    ProdutoProtocoloRecorrencia,
     ProdutoVariacaoAtributo,
 )
 
@@ -44,6 +50,8 @@ __all__ = [
     "Categoria",
     "Departamento",
     "EstoqueMovimentacao",
+    "EstoqueFracionamentoConversao",
+    "EstoqueFracionamentoVinculo",
     "FuncionarioContagem",
     "FuncionarioContagemItem",
     "GranelConversao",
@@ -69,5 +77,7 @@ __all__ = [
     "ProdutoKitComponente",
     "ProdutoListaPreco",
     "ProdutoLote",
+    "ProdutoProtocoloDose",
+    "ProdutoProtocoloRecorrencia",
     "ProdutoVariacaoAtributo",
 ]

@@ -7,6 +7,8 @@ import {
 } from "./consultaFormState";
 import { parseNumero } from "./consultaFormUtils";
 import { buildAgendarRetornoConsultaLink, buildInternacaoConsultaLink } from "./consultaFluxoLinks";
+import { confirmarCorePet } from "../../../services/corepetDialog";
+import { garantirSaldoClinicoParaInsumo } from "./fracionamentoClinicoInsumo";
 
 export default function useConsultaFluxosActions({
   agendamentoIdQuery,
@@ -177,6 +179,16 @@ export default function useConsultaFluxosActions({
     setSalvandoInsumoRapido(true);
     setErro(null);
     try {
+      const preparoSaldo = await garantirSaldoClinicoParaInsumo({
+        api: vetApi,
+        confirmar: confirmarCorePet,
+        documento: `CONSULTA-${consultaIdAtual}`,
+        observacao: `Abertura automatica para consumo na consulta ${consultaIdAtual}`,
+        produto: insumoRapidoSelecionado,
+        quantidade: quantidadeConsumida,
+      });
+      if (preparoSaldo.cancelado) return;
+
       await vetApi.adicionarProcedimento(
         buildInsumoProcedimentoPayload({
           consultaIdAtual,
@@ -191,10 +203,16 @@ export default function useConsultaFluxosActions({
       setModalInsumoAberto(false);
       setInsumoRapidoSelecionado(null);
       setInsumoRapidoForm(criarInsumoRapidoFormInicial());
-      setSucesso("Insumo lancado com sucesso na consulta.");
+      setSucesso(
+        preparoSaldo.conversao
+          ? "Embalagem aberta e insumo lancado com rastreabilidade na consulta."
+          : "Insumo lancado com sucesso na consulta.",
+      );
       await carregarTimelineConsulta();
     } catch (error) {
-      setErro(error?.response?.data?.detail ?? "Nao foi possivel lancar o insumo.");
+      setErro(
+        error?.response?.data?.detail ?? error?.message ?? "Nao foi possivel lancar o insumo.",
+      );
     } finally {
       setSalvandoInsumoRapido(false);
     }

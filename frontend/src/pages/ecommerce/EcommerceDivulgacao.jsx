@@ -9,6 +9,7 @@ import {
   ImageDown,
   MessageCircle,
   QrCode,
+  Save,
   Smartphone,
   Store,
 } from "lucide-react";
@@ -23,6 +24,7 @@ import {
   DIVULGACAO_DESTINOS,
   montarLinksDivulgacao,
   nomeArquivoDivulgacao,
+  telefoneWhatsAppValido,
 } from "./divulgacaoLojaUtils";
 
 const FORMATOS = {
@@ -62,6 +64,8 @@ export default function EcommerceDivulgacao() {
   const [destino, setDestino] = useState("smart");
   const [formato, setFormato] = useState("a4");
   const [telefone, setTelefone] = useState("");
+  const [telefoneSalvo, setTelefoneSalvo] = useState("");
+  const [salvandoTelefone, setSalvandoTelefone] = useState(false);
   const [chamada, setChamada] = useState("Tudo para o seu pet, a poucos toques de distância.");
   const [mensagemWhatsApp, setMensagemWhatsApp] = useState(
     "Olá! Encontrei a loja pelo QR Code e gostaria de fazer um pedido.",
@@ -75,6 +79,7 @@ export default function EcommerceDivulgacao() {
       .then(({ data }) => {
         setContexto(data);
         setTelefone(data?.telefone || "");
+        setTelefoneSalvo(data?.telefone || "");
       })
       .catch((requestError) => {
         setErro(
@@ -96,6 +101,8 @@ export default function EcommerceDivulgacao() {
     [contexto?.ecommerce_slug, mensagemWhatsApp, telefone],
   );
   const linkAtual = links[destino] || "";
+  const telefoneAlterado = telefone.trim() !== telefoneSalvo.trim();
+  const telefoneValido = telefoneWhatsAppValido(telefone);
 
   useEffect(() => {
     let ativo = true;
@@ -127,6 +134,32 @@ export default function EcommerceDivulgacao() {
       toast.success("Link copiado.");
     } catch {
       toast.error("Não foi possível copiar automaticamente.");
+    }
+  }
+
+  async function salvarTelefone() {
+    if (!telefoneValido) {
+      toast.error("Informe um telefone com DDD válido.");
+      return;
+    }
+
+    setSalvandoTelefone(true);
+    try {
+      const valorInformado = telefone.trim();
+      const { data } = await api.put("/empresa/dados-cadastrais", {
+        telefone: valorInformado,
+      });
+      const telefonePersistido = data?.telefone || valorInformado;
+      setTelefone(telefonePersistido);
+      setTelefoneSalvo(telefonePersistido);
+      setContexto((anterior) => ({ ...anterior, telefone: telefonePersistido }));
+      toast.success("WhatsApp da loja salvo.");
+    } catch (requestError) {
+      toast.error(
+        requestError?.response?.data?.detail || "Não foi possível salvar o WhatsApp da loja.",
+      );
+    } finally {
+      setSalvandoTelefone(false);
     }
   }
 
@@ -302,12 +335,33 @@ export default function EcommerceDivulgacao() {
             <label className="mt-4 block text-sm font-semibold text-slate-700">
               Telefone/WhatsApp
             </label>
-            <input
-              value={telefone}
-              onChange={(event) => setTelefone(event.target.value)}
-              placeholder="(18) 99999-0000"
-              className="mt-1 h-10 w-full rounded-lg border border-slate-300 px-3 text-sm"
-            />
+            <div className="mt-1 flex gap-2">
+              <input
+                value={telefone}
+                onChange={(event) => setTelefone(event.target.value)}
+                placeholder="(18) 99999-0000"
+                className="h-10 min-w-0 flex-1 rounded-lg border border-slate-300 px-3 text-sm"
+              />
+              <button
+                type="button"
+                onClick={salvarTelefone}
+                disabled={salvandoTelefone || !telefoneAlterado || !telefoneValido}
+                className="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-lg bg-teal-700 px-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <Save size={16} /> {salvandoTelefone ? "Salvando..." : "Salvar"}
+              </button>
+            </div>
+            <p
+              className={`mt-1 text-xs ${
+                telefoneAlterado && !telefoneValido ? "text-red-600" : "text-slate-500"
+              }`}
+            >
+              {telefoneAlterado
+                ? telefoneValido
+                  ? "Clique em Salvar para manter este número ao voltar à tela."
+                  : "Informe um telefone com DDD válido."
+                : "Número salvo nos dados da empresa."}
+            </p>
             <label className="mt-4 block text-sm font-semibold text-slate-700">
               Mensagem do WhatsApp
             </label>

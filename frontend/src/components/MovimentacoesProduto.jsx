@@ -19,6 +19,7 @@ import {
   getMotivoLabelMovimentacao,
   getOrigemMovimentacao,
   getSaldoAposLancamento,
+  movimentacaoEstoqueProtegida,
   parseNumeroInputMovimentacao as parseNumeroInput,
   resolverEstoqueAtualMovimentacoes,
   resolverSaldoDisponivelMovimentacoes,
@@ -26,10 +27,13 @@ import {
 import { montarMovimentoBalanco } from "./produtoBalanco/produtosBalancoUtils";
 import VendasPorCanalPanel from "./estoque/VendasPorCanalPanel";
 import { useMovimentacoesProdutoGranel } from "./estoque/useMovimentacoesProdutoGranel";
+import { useMovimentacoesProdutoFracionamento } from "./estoque/useMovimentacoesProdutoFracionamento";
 import useMovimentacoesProdutoListagem from "./estoque/useMovimentacoesProdutoListagem";
 import { useModulos } from "../contexts/ModulosContext";
 import { confirmarCorePet } from "../services/corepetDialog";
 import useShiftRangeSelection from "../hooks/useShiftRangeSelection";
+
+const movimentacaoPodeSerSelecionada = (item) => !movimentacaoEstoqueProtegida(item);
 
 export default function MovimentacoesProduto() {
   const { id } = useParams();
@@ -129,6 +133,11 @@ export default function MovimentacoesProduto() {
     setShowGranelModal,
     showGranelModal,
   } = useMovimentacoesProdutoGranel({ carregarDados, id, produto });
+  const fracionamentoClinico = useMovimentacoesProdutoFracionamento({
+    carregarDados,
+    id,
+    produto,
+  });
 
   const handleForcarSyncProduto = async () => {
     if (!moduloBlingAtivo) {
@@ -260,15 +269,17 @@ export default function MovimentacoesProduto() {
   };
 
   const handleSelectAll = () => {
-    if (selectedIds.length === movimentacoes.length) {
+    const editaveis = movimentacoes.filter((item) => !movimentacaoEstoqueProtegida(item));
+    if (selectedIds.length === editaveis.length) {
       setSelectedIds([]);
     } else {
-      setSelectedIds(movimentacoes.map((m) => m.id));
+      setSelectedIds(editaveis.map((m) => m.id));
     }
   };
 
   const handleSelectOne = useShiftRangeSelection({
     items: movimentacoes,
+    isItemSelectable: movimentacaoPodeSerSelecionada,
     setSelectedIds,
   });
 
@@ -534,10 +545,12 @@ export default function MovimentacoesProduto() {
         formatarQuantidade={formatarQuantidade}
         loadingReservas={loadingReservas}
         onAbrirPainelBling={() => navigate("/produtos/sinc-bling")}
+        onFracionarClinica={fracionamentoClinico.onAbrir}
         onForcarSyncProduto={handleAcaoPrincipalBling}
         onIncluirLancamento={handleIncluirLancamento}
         onLancarGranel={abrirModalGranel}
         onVoltarProdutos={() => navigate("/produtos")}
+        podeFracionarClinica={fracionamentoClinico.podeFracionarClinica}
         podeLancarGranel={podeLancarGranel}
         produto={produto}
         saldoAposReserva={saldoAposReserva}
@@ -597,6 +610,7 @@ export default function MovimentacoesProduto() {
         editingMovimentacao={editingMovimentacao}
         estoqueAtual={estoqueAtual}
         formData={formData}
+        fracionamentoClinico={fracionamentoClinico}
         formatMoney={formatMoneyBRL}
         formatPercentual={formatBRL}
         formatarQuantidade={formatarQuantidade}

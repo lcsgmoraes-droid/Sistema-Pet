@@ -57,6 +57,7 @@ def _tenant(**overrides):
         "cep": "16900-000",
         "telefone": "(18) 99999-0000",
         "email": "contato@teste.local",
+        "email_resposta": "compras@teste.local",
         "inscricao_estadual": None,
         "inscricao_municipal": None,
         "cupom_cabecalho": "Amor em cada atendimento",
@@ -123,3 +124,30 @@ def test_limites_dos_textos_do_cupom_sao_validados():
 def test_modelo_tenant_declara_colunas_da_configuracao_do_cupom():
     assert "cupom_cabecalho" in Tenant.__table__.columns
     assert "cupom_mensagem_final" in Tenant.__table__.columns
+
+
+def test_configuracao_da_empresa_salva_email_de_resposta(monkeypatch):
+    _liberar_permissao(monkeypatch)
+    tenant = _tenant(email_resposta=None)
+    db = _FakeSession(tenant)
+
+    response = atualizar_dados_cadastrais(
+        DadosCadastraisUpdate(email_resposta="compras@petshop.com.br"),
+        user_and_tenant=(SimpleNamespace(id=42), tenant.id),
+        db=db,
+    )
+
+    assert db.commits == 1
+    assert tenant.email_resposta == "compras@petshop.com.br"
+    assert response.email_resposta == "compras@petshop.com.br"
+
+
+def test_email_de_resposta_vazio_e_convertido_para_none():
+    assert DadosCadastraisUpdate(email_resposta="  ").email_resposta is None
+
+    with pytest.raises(ValidationError):
+        DadosCadastraisUpdate(email_resposta="email-invalido")
+
+
+def test_modelo_tenant_declara_email_de_resposta():
+    assert "email_resposta" in Tenant.__table__.columns

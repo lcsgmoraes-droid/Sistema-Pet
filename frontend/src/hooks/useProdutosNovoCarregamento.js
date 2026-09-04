@@ -1,8 +1,8 @@
 import { useEffect, useRef } from "react";
 import api from "../api";
 import { normalizeMarkdownContent } from "../utils/safeMarkdown";
+import { normalizarProtocolosRecorrencia } from "../utils/produtoRecorrencia";
 import {
-  calcularMarkup,
   getCategorias,
   getDepartamentos,
   getFornecedoresProduto,
@@ -10,6 +10,7 @@ import {
   getMarcas,
   getProduto,
 } from "../api/produtos";
+import { calcularMargemSobreVenda } from "../utils/produtoMargem";
 import {
   montarEstadoProdutoClonado,
   normalizarCodigosBarrasAlternativosCampo,
@@ -167,9 +168,10 @@ export default function useProdutosNovoCarregamento({
       if (!requestAindaAtiva()) return;
       const produto = response.data;
 
-      let markup = "";
+      let margem = "";
       if (produto.preco_custo && produto.preco_venda && produto.preco_custo > 0) {
-        markup = calcularMarkup(produto.preco_custo, produto.preco_venda).toFixed(2);
+        const margemCalculada = calcularMargemSobreVenda(produto.preco_custo, produto.preco_venda);
+        margem = margemCalculada === null ? "" : margemCalculada.toFixed(2);
       }
 
       setFormData({
@@ -210,7 +212,7 @@ export default function useProdutosNovoCarregamento({
         estoque_maximo: produto.estoque_maximo || "",
         participa_sugestao_compra: produto.participa_sugestao_compra ?? true,
         controle_lote: produto.controle_lote ?? true,
-        markup,
+        margem,
         tipo_produto:
           Boolean(produto.e_granel) || (produto.nome || "").toLowerCase().includes("granel")
             ? "SIMPLES"
@@ -238,6 +240,7 @@ export default function useProdutosNovoCarregamento({
         numero_doses: produto.numero_doses || "",
         especie_compativel: produto.especie_compativel || "both",
         observacoes_recorrencia: produto.observacoes_recorrencia || "",
+        protocolos_recorrencia: normalizarProtocolosRecorrencia(produto),
         eh_racao:
           typeof produto.eh_racao === "boolean"
             ? produto.eh_racao
@@ -358,15 +361,19 @@ export default function useProdutosNovoCarregamento({
       const produto = response.data;
       const clone = montarEstadoProdutoClonado(produto);
 
-      let markup = "";
+      let margem = "";
       if (clone.preco_custo && clone.preco_venda && Number(clone.preco_custo) > 0) {
-        markup = calcularMarkup(Number(clone.preco_custo), Number(clone.preco_venda)).toFixed(2);
+        const margemCalculada = calcularMargemSobreVenda(
+          Number(clone.preco_custo),
+          Number(clone.preco_venda),
+        );
+        margem = margemCalculada === null ? "" : margemCalculada.toFixed(2);
       }
 
       setFormData((prev) => ({
         ...prev,
         ...clone,
-        markup,
+        margem,
       }));
     } catch (error) {
       console.error("Erro ao carregar produto para clone:", error);

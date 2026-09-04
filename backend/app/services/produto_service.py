@@ -132,6 +132,7 @@ class ProdutoService:
         composicao_kit = dados.pop(
             "composicao_kit", None
         )  # Extrair composição antes de criar produto
+        protocolos_recorrencia = dados.pop("protocolos_recorrencia", None)
 
         tipo_kit_informado = dados.get("tipo_kit")
         e_kit_fisico = dados.pop("e_kit_fisico", None)
@@ -190,6 +191,17 @@ class ProdutoService:
 
         try:
             db.flush()  # Flush para obter ID sem commit completo
+
+            if protocolos_recorrencia is not None:
+                from .product_recurrence_protocols import (
+                    sincronizar_protocolos_produto,
+                )
+
+                sincronizar_protocolos_produto(
+                    db,
+                    produto=novo_produto,
+                    protocolos=protocolos_recorrencia,
+                )
 
             # ========================================
             # PROCESSAR COMPOSIÇÃO (KIT e VARIACAO-KIT) - TRANSAÇÃO ATÔMICA

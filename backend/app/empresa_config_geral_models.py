@@ -50,6 +50,12 @@ class EmpresaConfigGeral(BaseTenantModel):
     margem_alerta_minima = Column(
         Numeric(5, 2), default=15.0
     )  # % mínima para ser "alerta" (abaixo é "crítico")
+    margem_preco_sugestao_1 = Column(
+        Numeric(5, 2), default=30.0, nullable=False, server_default="30.00"
+    )
+    margem_preco_sugestao_2 = Column(
+        Numeric(5, 2), default=34.0, nullable=False, server_default="34.00"
+    )
 
     # Margem crítica é automática: < margem_alerta_minima
 
@@ -126,6 +132,16 @@ class EmpresaConfigGeral(BaseTenantModel):
             ),
             "margem_alerta_minima": (
                 float(self.margem_alerta_minima) if self.margem_alerta_minima else 15.0
+            ),
+            "margem_preco_sugestao_1": (
+                float(self.margem_preco_sugestao_1)
+                if self.margem_preco_sugestao_1 is not None
+                else 30.0
+            ),
+            "margem_preco_sugestao_2": (
+                float(self.margem_preco_sugestao_2)
+                if self.margem_preco_sugestao_2 is not None
+                else 34.0
             ),
             "mensagem_venda_saudavel": self.mensagem_venda_saudavel
             or "✅ Venda Saudável! Margem excelente.",

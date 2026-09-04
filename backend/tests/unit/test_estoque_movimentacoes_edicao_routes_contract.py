@@ -3,6 +3,9 @@ import importlib
 import importlib.util
 import os
 
+import pytest
+from fastapi import HTTPException
+
 os.environ["DATABASE_URL"] = os.environ.get("DATABASE_URL") or "sqlite:///./test.db"
 os.environ["DEBUG"] = "false"
 
@@ -49,3 +52,22 @@ def test_main_registra_router_de_edicao_movimentacoes():
         'estoque_movimentacoes_edicao_router, tags=["Estoque - Movimentacoes Edicao"]'
         in normalized_source
     )
+
+
+@pytest.mark.parametrize(
+    "referencia_tipo",
+    [
+        "fracionamento_clinico",
+        "procedimento_veterinario",
+        "procedimento_internacao",
+    ],
+)
+def test_movimentacoes_clinicas_automaticas_nao_podem_ser_editadas(referencia_tipo):
+    module = importlib.import_module("app.estoque_movimentacoes_edicao_routes")
+
+    with pytest.raises(HTTPException) as exc:
+        module._validar_movimentacao_editavel(
+            type("Movimentacao", (), {"referencia_tipo": referencia_tipo})()
+        )
+
+    assert exc.value.status_code == 409

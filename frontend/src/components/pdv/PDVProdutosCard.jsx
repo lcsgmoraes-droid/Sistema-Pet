@@ -24,6 +24,7 @@ import Panel from "../ui/Panel";
 import { ehRacao } from "../../helpers/deteccaoRacao";
 import ModalPrevisaoFimRacao from "./ModalPrevisaoFimRacao";
 import { resumirPrevisaoFimRacao } from "./pdvPrevisaoFimRacao";
+import { rotuloProtocoloRecorrencia } from "../../utils/pdvProtocolosRecorrencia";
 
 function obterImagemMiniaturaItem(item) {
   return (
@@ -163,6 +164,7 @@ export default function PDVProdutosCard({
   onAdicionarNaListaEsperaRapido,
   onAlterarQuantidade,
   onAtualizarPetItem,
+  onAtualizarProtocoloItem,
   onAtualizarQuantidadeItem,
   onAtualizarPrevisaoFimRacao,
   onBuscarProdutoChange,
@@ -539,6 +541,38 @@ export default function PDVProdutosCard({
                           {pet.codigo} - {pet.nome}
                         </option>
                       ))}
+                    </select>
+                  </div>
+                )}
+
+                {(item.protocolos_recorrencia || item.produto?.protocolos_recorrencia || [])
+                  .length > 0 && (
+                  <div
+                    className="flex flex-col gap-2 sm:flex-row sm:items-center"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <label className="text-sm font-medium text-gray-600 sm:w-24">
+                      Recorrência:
+                    </label>
+                    <select
+                      value={item.protocolo_recorrencia_id || ""}
+                      onChange={(e) =>
+                        onAtualizarProtocoloItem(
+                          index,
+                          e.target.value ? parseInt(e.target.value, 10) : null,
+                        )
+                      }
+                      disabled={modoVisualizacao}
+                      className="h-9 flex-1 rounded-lg border border-purple-200 bg-purple-50 px-3 text-sm focus:border-transparent focus:ring-2 focus:ring-purple-500 disabled:cursor-not-allowed disabled:bg-gray-50"
+                    >
+                      <option value="">Não iniciar protocolo nesta venda</option>
+                      {(item.protocolos_recorrencia || item.produto?.protocolos_recorrencia || [])
+                        .filter((protocolo) => protocolo.ativo !== false)
+                        .map((protocolo) => (
+                          <option key={protocolo.id} value={protocolo.id}>
+                            {rotuloProtocoloRecorrencia(protocolo)}
+                          </option>
+                        ))}
                     </select>
                   </div>
                 )}

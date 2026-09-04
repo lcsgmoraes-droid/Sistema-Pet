@@ -3,6 +3,8 @@ import { useCallback } from "react";
 import { vetApi } from "../vetApi";
 import { FORM_INSUMO_RAPIDO_INICIAL } from "./internacoesInitialState";
 import { formatQuantity, parseQuantity } from "./internacaoUtils";
+import { confirmarCorePet } from "../../../services/corepetDialog";
+import { garantirSaldoClinicoParaInsumo } from "../consultaForm/fracionamentoClinicoInsumo";
 
 export function useInternacoesInsumoRapidoAcoes({
   carregarDetalheInternacao,
@@ -61,6 +63,16 @@ export function useInternacoesInsumoRapidoAcoes({
       const unidade = insumoRapidoSelecionado.unidade || "un";
       const internacaoId = String(formInsumoRapido.internacao_id);
 
+      const preparoSaldo = await garantirSaldoClinicoParaInsumo({
+        api: vetApi,
+        confirmar: confirmarCorePet,
+        documento: `INTERNACAO-${internacaoId}`,
+        observacao: `Abertura automatica para consumo na internacao ${internacaoId}`,
+        produto: insumoRapidoSelecionado,
+        quantidade: quantidadeConsumida,
+      });
+      if (preparoSaldo.cancelado) return;
+
       await vetApi.registrarProcedimentoInternacao(internacaoId, {
         status: "concluido",
         tipo_registro: "insumo",
@@ -92,7 +104,7 @@ export function useInternacoesInsumoRapidoAcoes({
         horario_execucao: sugestaoHorario,
       });
     } catch (e) {
-      setErro(e?.response?.data?.detail ?? "Erro ao lancar insumo rapido.");
+      setErro(e?.response?.data?.detail ?? e?.message ?? "Erro ao lancar insumo rapido.");
     } finally {
       setSalvando(false);
     }

@@ -8,12 +8,16 @@ from typing import Any, List, Optional
 from fastapi import HTTPException
 from sqlalchemy import and_, func, or_
 from sqlalchemy import select
-from sqlalchemy.orm import Session, aliased, joinedload, noload
+from sqlalchemy.orm import Session, aliased, joinedload, noload, selectinload
 
 from app.models import Cliente, FornecedorGrupo
 from app.empresa_grupo_sql import empresa_id_igual, empresa_id_sql
 from app.partner_utils import is_partner_owned
-from app.produtos_models import Produto, ProdutoFornecedor
+from app.produtos_models import (
+    Produto,
+    ProdutoFornecedor,
+    ProdutoProtocoloRecorrencia,
+)
 from app.produtos.search import (
     _build_produto_search_order_clause,
     _produto_search_exact_conditions,
@@ -197,6 +201,9 @@ def _load_options_listagem_produtos(
         joinedload(Produto.bling_sync)
         if incluir_bling_sync
         else noload(Produto.bling_sync),
+        selectinload(Produto.protocolos_recorrencia).selectinload(
+            ProdutoProtocoloRecorrencia.doses
+        ),
     ]
 
 

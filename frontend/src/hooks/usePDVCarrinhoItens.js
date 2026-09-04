@@ -5,6 +5,7 @@ import {
   obterPrecoVendaPDV,
   recalcularSubtotalItem,
 } from "../utils/pdvCarrinhoItensUtils";
+import { sugerirProtocoloRecorrencia } from "../utils/pdvProtocolosRecorrencia";
 
 export function usePDVCarrinhoItens({
   vendaAtual,
@@ -60,6 +61,12 @@ export function usePDVCarrinhoItens({
         desconto_item: 0,
         subtotal: precoUnitario,
         pet_id: vendaAtual.pet?.id || null,
+        protocolo_recorrencia_id: sugerirProtocoloRecorrencia(
+          produto.protocolos_recorrencia || [],
+          vendaAtual.pet,
+        ),
+        ignorar_recorrencia: false,
+        protocolos_recorrencia: produto.protocolos_recorrencia || [],
         tipo_produto: produto.tipo_produto,
         tipo_kit: produto.tipo_kit,
         composicao_kit: produto.composicao_kit || [],
@@ -107,6 +114,26 @@ export function usePDVCarrinhoItens({
           ? {
               ...item,
               pet_id: petId,
+              protocolo_recorrencia_id: sugerirProtocoloRecorrencia(
+                item.protocolos_recorrencia || item.produto?.protocolos_recorrencia || [],
+                prev.cliente?.pets?.find((pet) => Number(pet.id) === Number(petId)) || null,
+              ),
+              ignorar_recorrencia: false,
+            }
+          : item,
+      ),
+    }));
+  };
+
+  const atualizarProtocoloDoItem = (index, protocoloId) => {
+    setVendaAtual((prev) => ({
+      ...prev,
+      itens: prev.itens.map((item, itemIndex) =>
+        itemIndex === index
+          ? {
+              ...item,
+              protocolo_recorrencia_id: protocoloId,
+              ignorar_recorrencia: protocoloId === null,
             }
           : item,
       ),
@@ -138,6 +165,7 @@ export function usePDVCarrinhoItens({
     adicionarProdutoAoCarrinho,
     alterarQuantidade,
     atualizarPetDoItem,
+    atualizarProtocoloDoItem,
     atualizarQuantidadeItem,
     copiarCodigoProdutoCarrinho,
     removerItem,

@@ -394,6 +394,12 @@ class Produto(BaseTenantModel):
     bling_sync_queue_items = relationship(
         "ProdutoBlingSyncQueue", back_populates="produto"
     )
+    protocolos_recorrencia = relationship(
+        "ProdutoProtocoloRecorrencia",
+        back_populates="produto",
+        cascade="all, delete-orphan",
+        order_by="ProdutoProtocoloRecorrencia.id",
+    )
     user = relationship("User")
 
     # ========== PREDECESSOR/SUCESSOR ==========

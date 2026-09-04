@@ -16,6 +16,8 @@ export const PRAZOS = [
 
 export const TIPOS_LEMBRETE = {
   protocolo: "Protocolo",
+  proxima_dose: "Próxima dose",
+  reinicio_protocolo: "Novo protocolo",
   racao: "Ração",
   recorrencia: "Recorrência cadastrada",
   ciclo_aprendido: "Ciclo aprendido",

@@ -18,6 +18,7 @@ from app.estoque_movimentacoes_manuais_routes import (
 from app.estoque_entrada_manual_routes import router as estoque_entrada_manual_router
 from app.estoque_saida_manual_routes import router as estoque_saida_manual_router
 from app.estoque_granel_routes import router as estoque_granel_router
+from app.estoque_fracionamento_routes import router as estoque_fracionamento_router
 from app.estoque_transferencia_routes import router as estoque_transferencia_router
 from app.estoque_transferencia_parceiro_routes import (
     router as estoque_transferencia_parceiro_router,
@@ -319,6 +320,9 @@ def register_routers(app: FastAPI) -> None:
     app.include_router(estoque_entrada_manual_router, tags=["Estoque - Entrada Manual"])
     app.include_router(estoque_saida_manual_router, tags=["Estoque - Saida Manual"])
     app.include_router(estoque_granel_router, tags=["Estoque - Granel"])
+    app.include_router(
+        estoque_fracionamento_router, tags=["Estoque - Fracionamento Clinico"]
+    )
     app.include_router(estoque_transferencia_router, tags=["Estoque - Transferencia"])
     app.include_router(
         estoque_transferencia_parceiro_router, tags=["Estoque - Transferencia Parceiro"]

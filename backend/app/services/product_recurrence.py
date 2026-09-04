@@ -15,6 +15,7 @@ logger = logging.getLogger(__name__)
 
 MIN_INTERVAL_DAYS = 3
 MAX_INTERVAL_DAYS = 365
+MAX_CONFIGURED_INTERVAL_DAYS = 3650
 MIN_LEARNED_CONFIDENCE = 0.65
 MAX_HISTORY_INTERVALS = 6
 
@@ -25,6 +26,58 @@ class RecurrenceEstimate:
     confidence: float
     sample_count: int
     source: str | None
+
+
+@dataclass(frozen=True)
+class ProtocolNextStep:
+    kind: str
+    due_at: datetime
+    dose_number: int
+    dose_total: int
+    protocol_start_at: datetime | None
+    interval_days: int
+
+
+def calculate_next_protocol_step(
+    dose_offsets: Iterable[int],
+    *,
+    completed_dose: int,
+    protocol_start_at: datetime,
+    completed_at: datetime,
+    restart_after_days: int | None = None,
+) -> ProtocolNextStep | None:
+    """Calcula a proxima etapa sem deslocar o protocolo por compra antecipada."""
+    offsets = [int(value) for value in dose_offsets]
+    if not offsets or offsets[0] != 0:
+        return None
+
+    if completed_dose < len(offsets):
+        next_index = completed_dose
+        interval_days = offsets[next_index] - offsets[next_index - 1]
+        return ProtocolNextStep(
+            kind="proxima_dose",
+            due_at=protocol_start_at + timedelta(days=offsets[next_index]),
+            dose_number=completed_dose + 1,
+            dose_total=len(offsets),
+            protocol_start_at=protocol_start_at,
+            interval_days=max(interval_days, 1),
+        )
+
+    restart_days = _valid_interval(
+        restart_after_days,
+        minimum_days=1,
+        maximum_days=MAX_CONFIGURED_INTERVAL_DAYS,
+    )
+    if not restart_days:
+        return None
+    return ProtocolNextStep(
+        kind="reinicio_protocolo",
+        due_at=completed_at + timedelta(days=restart_days),
+        dose_number=1,
+        dose_total=len(offsets),
+        protocol_start_at=None,
+        interval_days=restart_days,
+    )
 
 
 def estimate_recurrence(
@@ -46,7 +99,11 @@ def estimate_recurrence(
         if MIN_INTERVAL_DAYS <= (current - previous).days <= MAX_INTERVAL_DAYS
     ][-MAX_HISTORY_INTERVALS:]
 
-    configured = _valid_interval(configured_interval_days)
+    configured = _valid_interval(
+        configured_interval_days,
+        minimum_days=1,
+        maximum_days=MAX_CONFIGURED_INTERVAL_DAYS,
+    )
     if len(intervals) < 2:
         return RecurrenceEstimate(
             configured,
@@ -87,7 +144,7 @@ def process_finalized_sale_recurrence(
 ) -> dict:
     """Completa o ciclo anterior e cria a proxima oportunidade de recompra."""
     from app.models import Pet
-    from app.produtos_models import Lembrete, Produto
+    from app.produtos_models import Lembrete, Produto, ProdutoProtocoloRecorrencia
     from app.vendas.racao_previsao import resolver_previsao_fim_racao
     from app.vendas_models import Venda, VendaItem
 
@@ -96,7 +153,7 @@ def process_finalized_sale_recurrence(
         return result
 
     purchase_at = getattr(venda, "data_finalizacao", None) or datetime.utcnow()
-    processed: set[tuple[int, int | None]] = set()
+    processed: set[tuple[int, int | None, int | None]] = set()
 
     sale_items = (
         db.query(VendaItem)
@@ -120,9 +177,45 @@ def process_finalized_sale_recurrence(
         )
         if not produto:
             continue
+        if bool(getattr(item, "ignorar_recorrencia", False)):
+            result["skipped"].append(
+                {"produto": produto.nome, "motivo": "recorrencia_ignorada_na_venda"}
+            )
+            continue
 
-        is_protocol = bool(
-            getattr(produto, "numero_doses", None) and produto.numero_doses > 1
+        protocolos = (
+            db.query(ProdutoProtocoloRecorrencia)
+            .filter(
+                ProdutoProtocoloRecorrencia.tenant_id == tenant_id,
+                ProdutoProtocoloRecorrencia.produto_id == produto.id,
+                ProdutoProtocoloRecorrencia.ativo.is_(True),
+            )
+            .all()
+        )
+        pet = _load_sale_pet(
+            db,
+            Pet,
+            tenant_id=tenant_id,
+            cliente_id=venda.cliente_id,
+            pet_id=getattr(item, "pet_id", None),
+        )
+        protocolo = _resolve_sale_protocol(
+            protocolos,
+            requested_id=getattr(item, "protocolo_recorrencia_id", None),
+            pet=pet,
+        )
+        if protocolos and not protocolo:
+            result["skipped"].append(
+                {"produto": produto.nome, "motivo": "protocolo_nao_selecionado"}
+            )
+            continue
+
+        is_protocol = (
+            protocolo.tipo == "protocolo_doses"
+            if protocolo
+            else bool(
+                getattr(produto, "numero_doses", None) and produto.numero_doses > 1
+            )
         )
         previsao_manual = (
             resolver_previsao_fim_racao(item, data_compra=purchase_at)
@@ -130,22 +223,12 @@ def process_finalized_sale_recurrence(
             else None
         )
         pet_id = item.pet_id if is_protocol else None
-        key = (produto.id, pet_id)
+        protocolo_id = protocolo.id if protocolo else None
+        key = (produto.id, pet_id, protocolo_id)
         if key in processed:
             continue
         processed.add(key)
 
-        pet = None
-        if pet_id:
-            pet = (
-                db.query(Pet)
-                .filter(
-                    Pet.id == pet_id,
-                    Pet.cliente_id == venda.cliente_id,
-                    Pet.tenant_id == tenant_id,
-                )
-                .first()
-            )
         if is_protocol and not pet:
             result["skipped"].append(
                 {"produto": produto.nome, "motivo": "protocolo_sem_pet"}
@@ -159,6 +242,10 @@ def process_finalized_sale_recurrence(
         )
         if is_protocol:
             processed_query = processed_query.filter(Lembrete.pet_id == pet_id)
+        if protocolo:
+            processed_query = processed_query.filter(
+                Lembrete.protocolo_recorrencia_id == protocolo.id
+            )
         if processed_query.first():
             result["skipped"].append(
                 {"produto": produto.nome, "motivo": "venda_ja_processada"}
@@ -182,8 +269,13 @@ def process_finalized_sale_recurrence(
         ]
 
         configured_interval = _valid_interval(
-            getattr(produto, "intervalo_dias", None),
-            minimum_days=1 if is_protocol else MIN_INTERVAL_DAYS,
+            (
+                protocolo.intervalo_recompra_dias
+                if protocolo and protocolo.tipo == "recompra_continua"
+                else getattr(produto, "intervalo_dias", None)
+            ),
+            minimum_days=1 if protocolo or is_protocol else MIN_INTERVAL_DAYS,
+            maximum_days=MAX_CONFIGURED_INTERVAL_DAYS,
         )
         if previsao_manual:
             estimate = RecurrenceEstimate(
@@ -194,19 +286,29 @@ def process_finalized_sale_recurrence(
             )
         elif is_protocol:
             estimate = RecurrenceEstimate(
-                configured_interval,
-                1.0 if configured_interval else 0.0,
+                None,
+                1.0,
                 len({value.date() for value in purchase_dates}),
-                "configurado" if configured_interval else None,
+                "configurado",
             )
         else:
-            estimate = estimate_recurrence(
-                purchase_dates,
-                configured_interval_days=(
-                    configured_interval
-                    if getattr(produto, "tem_recorrencia", False)
-                    else None
-                ),
+            ajustar_ao_historico = protocolo.ajustar_ao_historico if protocolo else True
+            estimate = (
+                estimate_recurrence(
+                    purchase_dates,
+                    configured_interval_days=(
+                        configured_interval
+                        if protocolo or getattr(produto, "tem_recorrencia", False)
+                        else None
+                    ),
+                )
+                if ajustar_ao_historico
+                else RecurrenceEstimate(
+                    configured_interval,
+                    1.0 if configured_interval else 0.0,
+                    len({value.date() for value in purchase_dates}),
+                    "configurado" if configured_interval else None,
+                )
             )
 
         active_query = db.query(Lembrete).filter(
@@ -217,13 +319,25 @@ def process_finalized_sale_recurrence(
         )
         if is_protocol:
             active_query = active_query.filter(Lembrete.pet_id == pet_id)
+        if protocolo:
+            active_query = active_query.filter(
+                Lembrete.protocolo_recorrencia_id == protocolo.id
+            )
         active = active_query.order_by(
             Lembrete.created_at.desc(), Lembrete.id.desc()
         ).all()
         previous = active[0] if active else None
         history = _history_from(previous)
+        previous_kind = getattr(previous, "tipo_lembrete", None)
+        completed_dose = (
+            1
+            if previous_kind == "reinicio_protocolo"
+            else previous.dose_atual
+            if previous and is_protocol
+            else 1
+        )
         purchase_event = {
-            "dose": previous.dose_atual if previous else 1,
+            "dose": completed_dose,
             "data": purchase_at.isoformat(),
             "comprou": True,
             "status": "completado" if previous else "criado",
@@ -236,29 +350,60 @@ def process_finalized_sale_recurrence(
             reminder.historico_doses = json.dumps(updated_history, ensure_ascii=False)
             result["completed"].append(reminder.id)
 
+        next_step = None
         if is_protocol:
-            next_dose = previous.dose_atual + 1 if previous else 2
-        else:
-            next_dose = 1
-        if (
-            is_protocol
-            and previous
-            and previous.dose_total
-            and previous.dose_atual >= previous.dose_total
-        ):
-            continue
-        if not estimate.interval_days:
+            if protocolo:
+                dose_offsets = [
+                    dose.dias_desde_inicio
+                    for dose in sorted(
+                        protocolo.doses, key=lambda dose: dose.numero_dose
+                    )
+                ]
+                restart_after_days = protocolo.reiniciar_apos_dias
+            else:
+                total_doses = int(getattr(produto, "numero_doses", 0) or 0)
+                dose_offsets = (
+                    [index * configured_interval for index in range(total_doses)]
+                    if configured_interval and total_doses > 0
+                    else []
+                )
+                restart_after_days = None
+
+            protocol_start_at = (
+                purchase_at
+                if not previous or previous_kind == "reinicio_protocolo"
+                else getattr(previous, "data_inicio_protocolo", None)
+                or previous.data_compra
+                or purchase_at
+            )
+            next_step = calculate_next_protocol_step(
+                dose_offsets,
+                completed_dose=completed_dose,
+                protocol_start_at=protocol_start_at,
+                completed_at=purchase_at,
+                restart_after_days=restart_after_days,
+            )
+            if not next_step:
+                continue
+        elif not estimate.interval_days:
             result["skipped"].append(
                 {"produto": produto.nome, "motivo": "historico_insuficiente"}
             )
             continue
 
         next_at = (
-            previsao_manual.data_prevista
-            if previsao_manual
-            else purchase_at + timedelta(days=estimate.interval_days)
+            next_step.due_at
+            if next_step
+            else (
+                previsao_manual.data_prevista
+                if previsao_manual
+                else purchase_at + timedelta(days=estimate.interval_days)
+            )
         )
-        lead_days = notification_lead_days(estimate.interval_days)
+        interval_days = (
+            next_step.interval_days if next_step else int(estimate.interval_days)
+        )
+        lead_days = notification_lead_days(interval_days)
         reminder = Lembrete(
             tenant_id=tenant_id,
             user_id=user_id,
@@ -266,24 +411,31 @@ def process_finalized_sale_recurrence(
             pet_id=pet_id,
             produto_id=produto.id,
             venda_id=venda.id,
+            protocolo_recorrencia_id=protocolo_id,
             data_compra=purchase_at,
             data_proxima_dose=next_at,
             data_notificacao_7_dias=next_at - timedelta(days=lead_days),
+            data_inicio_protocolo=(next_step.protocol_start_at if next_step else None),
             status="pendente",
             metodo_notificacao="app",
             notificacao_enviada=False,
+            tipo_lembrete=next_step.kind if next_step else "recompra",
             quantidade_recomendada=float(item.quantidade),
             preco_estimado=float(produto.preco_venda or 0),
             observacoes=(
-                "Previsão de término da ração informada no PDV."
-                if previsao_manual
-                else None
+                protocolo.observacoes
+                if protocolo and protocolo.observacoes
+                else (
+                    "Previsão de término da ração informada no PDV."
+                    if previsao_manual
+                    else None
+                )
             ),
-            dose_atual=next_dose,
-            dose_total=produto.numero_doses if is_protocol else None,
+            dose_atual=next_step.dose_number if next_step else 1,
+            dose_total=next_step.dose_total if next_step else None,
             historico_doses=json.dumps(updated_history, ensure_ascii=False),
             origem_intervalo=estimate.source,
-            intervalo_estimado_dias=estimate.interval_days,
+            intervalo_estimado_dias=interval_days,
             confianca_recorrencia=estimate.confidence,
             amostras_recorrencia=estimate.sample_count,
         )
@@ -294,8 +446,10 @@ def process_finalized_sale_recurrence(
                 "id": reminder.id,
                 "produto": produto.nome,
                 "pet": pet.nome if pet else None,
+                "protocolo": protocolo.nome if protocolo else None,
                 "proxima_data": next_at.isoformat(),
-                "intervalo_dias": estimate.interval_days,
+                "intervalo_dias": interval_days,
+                "tipo_lembrete": reminder.tipo_lembrete,
                 "origem": estimate.source,
                 "confianca": estimate.confidence,
             }
@@ -348,14 +502,22 @@ def run_due_recurrence_notifications(*, db_factory, logger_override=None) -> dic
 
                         key = f"product_recurrence:{tenant_id}:{reminder.id}:app"
                         product_name = getattr(reminder.produto, "nome", "seu produto")
-                        is_protocol = bool(
-                            reminder.dose_total and reminder.dose_total > 1
-                        )
-                        body = (
-                            f"A próxima dose de {product_name} está chegando. Confira no app."
-                            if is_protocol
-                            else f"Está na hora de repor {product_name}? Confira no app antes que acabe."
-                        )
+                        reminder_kind = getattr(reminder, "tipo_lembrete", "recompra")
+                        if reminder_kind == "reinicio_protocolo":
+                            body = (
+                                f"Está na hora de iniciar um novo protocolo de "
+                                f"{product_name}. Confira no app."
+                            )
+                        elif reminder_kind == "proxima_dose":
+                            body = (
+                                f"A dose {reminder.dose_atual}/{reminder.dose_total} "
+                                f"de {product_name} está chegando. Confira no app."
+                            )
+                        else:
+                            body = (
+                                f"Está na hora de repor {product_name}? "
+                                "Confira no app antes que acabe."
+                            )
                         queued = enqueue_push(
                             db,
                             tenant_id=tenant_id,
@@ -370,8 +532,12 @@ def run_due_recurrence_notifications(*, db_factory, logger_override=None) -> dic
                                 "reminder_id": reminder.id,
                                 "produto_id": reminder.produto_id,
                                 "product_id": reminder.produto_id,
+                                "recurrence_kind": reminder_kind,
                             },
                         )
+                        # TODO(WhatsApp): quando o modulo estiver operacional,
+                        # enfileirar este mesmo evento no canal WhatsApp, com a
+                        # mesma idempotencia e respeitando o consentimento.
                         queue = (
                             db.query(NotificationQueue)
                             .filter(NotificationQueue.idempotency_key == key)
@@ -431,12 +597,74 @@ def run_due_recurrence_notifications(*, db_factory, logger_override=None) -> dic
         db.close()
 
 
-def _valid_interval(value, *, minimum_days: int = MIN_INTERVAL_DAYS) -> int | None:
+def _load_sale_pet(db, Pet, *, tenant_id, cliente_id, pet_id):
+    if not pet_id:
+        return None
+    return (
+        db.query(Pet)
+        .filter(
+            Pet.id == pet_id,
+            Pet.cliente_id == cliente_id,
+            Pet.tenant_id == tenant_id,
+        )
+        .first()
+    )
+
+
+def _normalize_species(value: str | None) -> str | None:
+    normalized = str(value or "").strip().lower()
+    if normalized in {"dog", "cao", "cão", "canino", "cachorro"}:
+        return "dog"
+    if normalized in {"cat", "gato", "felino"}:
+        return "cat"
+    return normalized or None
+
+
+def _pet_life_stage(pet) -> str | None:
+    months = getattr(pet, "idade_aproximada", None)
+    if months is None and getattr(pet, "data_nascimento", None):
+        born = pet.data_nascimento
+        born_date = born.date() if isinstance(born, datetime) else born
+        months = max((date.today() - born_date).days // 30, 0)
+    if months is None:
+        return None
+    return "puppy" if int(months) < 12 else "adult"
+
+
+def _protocol_matches_pet(protocol, pet) -> bool:
+    species = getattr(protocol, "especie_compativel", "both") or "both"
+    if species != "both":
+        if not pet or _normalize_species(getattr(pet, "especie", None)) != species:
+            return False
+
+    phase = getattr(protocol, "fase_vida", "all") or "all"
+    if phase == "all":
+        return True
+    stage = _pet_life_stage(pet) if pet else None
+    if stage is None:
+        return False
+    return stage == phase
+
+
+def _resolve_sale_protocol(protocols, *, requested_id, pet):
+    if requested_id is not None:
+        return next((item for item in protocols if item.id == int(requested_id)), None)
+
+    compatible = [item for item in protocols if _protocol_matches_pet(item, pet)]
+    return compatible[0] if len(compatible) == 1 else None
+
+
+def _valid_interval(
+    value,
+    *,
+    minimum_days: int = MIN_INTERVAL_DAYS,
+    maximum_days: int = MAX_INTERVAL_DAYS,
+) -> int | None:
     try:
         parsed = int(value)
     except (TypeError, ValueError):
         return None
-    return parsed if minimum_days <= parsed <= MAX_INTERVAL_DAYS else None
+    return parsed if minimum_days <= parsed <= maximum_days else None
 
 
 def _history_from(reminder) -> list[dict]:
@@ -450,7 +678,9 @@ def _history_from(reminder) -> list[dict]:
 
 
 __all__ = [
+    "ProtocolNextStep",
     "RecurrenceEstimate",
+    "calculate_next_protocol_step",
     "estimate_recurrence",
     "notification_lead_days",
     "process_finalized_sale_recurrence",

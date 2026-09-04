@@ -20,7 +20,8 @@ import useProdutosNovoTributacao from "../hooks/useProdutosNovoTributacao";
 import useProdutosNovoVariacoes from "../hooks/useProdutosNovoVariacoes";
 import useProdutosNovoPageComposition from "../hooks/useProdutosNovoPageComposition";
 import api from "../api";
-import { calcularPrecoVenda, calcularMarkup, formatarMoeda, formatarData } from "../api/produtos";
+import { formatarMoeda, formatarData } from "../api/produtos";
+import { calcularMargemSobreVenda, calcularPrecoVendaPorMargem } from "../utils/produtoMargem";
 
 // Função auxiliar para converter valores sem retornar NaN
 const parseNumber = (valor) => {
@@ -77,7 +78,7 @@ export default function ProdutosNovo() {
     anunciar_app: true,
     ativo: true,
     situacao: true,
-    markup: "",
+    margem: "",
 
     // Sprint 2: Produtos com variação
     tipo_produto: "SIMPLES", // SIMPLES, PAI (variação), KIT (composição), VARIACAO
@@ -128,6 +129,7 @@ export default function ProdutosNovo() {
     numero_doses: "",
     observacoes_recorrencia: "",
     especie_compativel: "both",
+    protocolos_recorrencia: [],
 
     // Aba 7: Ração - Calculadora (Fase 2)
     eh_racao: false,
@@ -172,7 +174,7 @@ export default function ProdutosNovo() {
   // Estados para controlar edição de campos monetários
   const [camposEmEdicao, setCamposEmEdicao] = useState({
     preco_custo: false,
-    markup: false,
+    margem: false,
     preco_venda: false,
     preco_promocional: false,
   });
@@ -187,24 +189,28 @@ export default function ProdutosNovo() {
         novosDados.codigo = skuNormalizado;
       }
 
-      // Calcular markup automaticamente quando mudar preço
+      // Ao editar custo ou venda, apenas mostra a margem real do preço informado.
+      // Isso preserva os preços existentes ao abrir ou editar um produto.
       if (campo === "preco_custo" || campo === "preco_venda") {
         const custo = parseNumber(campo === "preco_custo" ? valor : prev.preco_custo);
         const venda = parseNumber(campo === "preco_venda" ? valor : prev.preco_venda);
 
-        if (custo && venda && custo > 0) {
-          const markup = calcularMarkup(custo, venda);
-          novosDados.markup = markup.toFixed(2);
-        }
+        const margem = calcularMargemSobreVenda(custo, venda);
+        novosDados.margem = margem === null ? "" : margem.toFixed(2);
       }
 
-      // Calcular preço de venda pelo markup
-      if (campo === "markup") {
+      // O preço só é recalculado quando a margem é alterada diretamente.
+      if (campo === "margem") {
         const custo = parseNumber(prev.preco_custo);
-        const markupVal = parseNumber(valor);
+        const margemTexto = String(valor ?? "").trim();
+        if (!margemTexto || margemTexto === "-") {
+          return novosDados;
+        }
 
-        if (custo && custo > 0 && markupVal >= 0) {
-          const venda = calcularPrecoVenda(custo, markupVal);
+        const margem = Number(margemTexto.replace(",", "."));
+        const venda = calcularPrecoVendaPorMargem(custo, margem);
+
+        if (venda !== null) {
           novosDados.preco_venda = venda.toFixed(2);
         }
       }
@@ -333,7 +339,14 @@ export default function ProdutosNovo() {
     navigate,
   });
 
-  const { handleTipoRecorrenciaChange } = useProdutosNovoRecorrencia({
+  const {
+    adicionarRegraRecorrencia,
+    atualizarDoseRecorrencia,
+    atualizarQuantidadeDosesRecorrencia,
+    atualizarRegraRecorrencia,
+    removerRegraRecorrencia,
+  } = useProdutosNovoRecorrencia({
+    formData,
     handleChange,
   });
 
@@ -575,7 +588,11 @@ export default function ProdutosNovo() {
       handlePersonalizarFiscal,
     },
     recorrenciaState: {
-      handleTipoRecorrenciaChange,
+      adicionarRegraRecorrencia,
+      atualizarDoseRecorrencia,
+      atualizarQuantidadeDosesRecorrencia,
+      atualizarRegraRecorrencia,
+      removerRegraRecorrencia,
     },
     racaoState: {
       handleCriarOpcaoRacao,
