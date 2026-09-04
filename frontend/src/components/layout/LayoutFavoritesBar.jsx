@@ -17,7 +17,6 @@ import { useRef } from "react";
 import { Link } from "react-router-dom";
 
 const POINTER_DRAG_DISTANCE_PX = 6;
-const POINTER_CLICK_RESET_DELAY_MS = 1000;
 
 function FavoriteShortcut({ favorite, active, onClick }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
@@ -83,7 +82,6 @@ export default function LayoutFavoritesBar({
     startX: null,
     startY: null,
     moved: false,
-    resetTimer: null,
   });
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
@@ -94,11 +92,12 @@ export default function LayoutFavoritesBar({
 
   const handlePointerDownCapture = (event) => {
     const gesture = pointerGestureRef.current;
-    if (gesture.resetTimer) window.clearTimeout(gesture.resetTimer);
     gesture.startX = event.clientX;
     gesture.startY = event.clientY;
+    // Um clique real posterior sempre comeca com um novo pointerdown. Por isso,
+    // podemos liberar aqui o bloqueio deixado pelo gesto anterior sem depender
+    // de um prazo arbitrario.
     gesture.moved = false;
-    gesture.resetTimer = null;
   };
 
   const handlePointerMoveCapture = (event) => {
@@ -113,10 +112,15 @@ export default function LayoutFavoritesBar({
     const gesture = pointerGestureRef.current;
     gesture.startX = null;
     gesture.startY = null;
-    gesture.resetTimer = window.setTimeout(() => {
-      gesture.moved = false;
-      gesture.resetTimer = null;
-    }, POINTER_CLICK_RESET_DELAY_MS);
+    // `moved` permanece ativo ate o clique sintetico deste mesmo gesto. Se nao
+    // houver clique, o proximo pointerdown real o limpa acima.
+  };
+
+  const handlePointerCancelCapture = () => {
+    const gesture = pointerGestureRef.current;
+    gesture.startX = null;
+    gesture.startY = null;
+    gesture.moved = false;
   };
 
   const handleBarClickCapture = (event) => {
@@ -126,8 +130,6 @@ export default function LayoutFavoritesBar({
     event.preventDefault();
     event.stopPropagation();
     gesture.moved = false;
-    if (gesture.resetTimer) window.clearTimeout(gesture.resetTimer);
-    gesture.resetTimer = null;
   };
 
   if (favorites.length === 0) return null;
@@ -138,7 +140,7 @@ export default function LayoutFavoritesBar({
       onPointerDownCapture={handlePointerDownCapture}
       onPointerMoveCapture={handlePointerMoveCapture}
       onPointerUpCapture={handlePointerUpCapture}
-      onPointerCancelCapture={handlePointerUpCapture}
+      onPointerCancelCapture={handlePointerCancelCapture}
       onClickCapture={handleBarClickCapture}
     >
       <DndContext
