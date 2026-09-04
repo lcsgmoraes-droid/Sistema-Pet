@@ -4,7 +4,7 @@ Rotas para Configuração Geral da Empresa
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 from typing import Optional
 
 from app.db import get_session
@@ -37,6 +37,8 @@ class EmpresaConfigGeralCreate(BaseModel):
     site: Optional[str] = None
     margem_saudavel_minima: float = 30.0
     margem_alerta_minima: float = 15.0
+    margem_preco_sugestao_1: float = Field(default=30.0, ge=0, lt=100)
+    margem_preco_sugestao_2: float = Field(default=34.0, ge=0, lt=100)
     mensagem_venda_saudavel: str = "✅ Venda Saudável! Margem excelente."
     mensagem_venda_alerta: str = "⚠️ ATENÇÃO: Margem reduzida! Revisar preço."
     mensagem_venda_critica: str = "🚨 CRÍTICO: Margem muito baixa! Venda com prejuízo!"
@@ -68,6 +70,8 @@ class EmpresaConfigGeralUpdate(BaseModel):
     site: Optional[str] = None
     margem_saudavel_minima: Optional[float] = None
     margem_alerta_minima: Optional[float] = None
+    margem_preco_sugestao_1: Optional[float] = Field(default=None, ge=0, lt=100)
+    margem_preco_sugestao_2: Optional[float] = Field(default=None, ge=0, lt=100)
     mensagem_venda_saudavel: Optional[str] = None
     mensagem_venda_alerta: Optional[str] = None
     mensagem_venda_critica: Optional[str] = None
@@ -90,6 +94,8 @@ class EmpresaConfigGeralResponse(BaseModel):
     cnpj: Optional[str]
     margem_saudavel_minima: float
     margem_alerta_minima: float
+    margem_preco_sugestao_1: float
+    margem_preco_sugestao_2: float
     mensagem_venda_saudavel: str
     mensagem_venda_alerta: str
     mensagem_venda_critica: str
@@ -115,6 +121,16 @@ def _serializar_config(config: EmpresaConfigGeral) -> EmpresaConfigGeralResponse
         cnpj=config.cnpj,
         margem_saudavel_minima=float(config.margem_saudavel_minima or 30),
         margem_alerta_minima=float(config.margem_alerta_minima or 15),
+        margem_preco_sugestao_1=float(
+            getattr(config, "margem_preco_sugestao_1", None)
+            if getattr(config, "margem_preco_sugestao_1", None) is not None
+            else 30
+        ),
+        margem_preco_sugestao_2=float(
+            getattr(config, "margem_preco_sugestao_2", None)
+            if getattr(config, "margem_preco_sugestao_2", None) is not None
+            else 34
+        ),
         mensagem_venda_saudavel=(
             config.mensagem_venda_saudavel or "✅ Venda Saudável! Margem excelente."
         ),
@@ -148,7 +164,84 @@ def _serializar_config(config: EmpresaConfigGeral) -> EmpresaConfigGeralResponse
     )
 
 
+class EmpresaConfigMargensPrecoUpdate(BaseModel):
+    margem_preco_sugestao_1: float = Field(ge=0, lt=100)
+    margem_preco_sugestao_2: float = Field(ge=0, lt=100)
+
+    @model_validator(mode="after")
+    def validar_sugestoes_diferentes(self):
+        if self.margem_preco_sugestao_1 == self.margem_preco_sugestao_2:
+            raise ValueError("As duas sugestões de margem precisam ser diferentes.")
+        return self
+
+
+class EmpresaConfigMargensPrecoResponse(BaseModel):
+    margem_preco_sugestao_1: float = Field(ge=0, lt=100)
+    margem_preco_sugestao_2: float = Field(ge=0, lt=100)
+
+
+def _serializar_margens_preco(
+    config: Optional[EmpresaConfigGeral],
+) -> EmpresaConfigMargensPrecoResponse:
+    if not config:
+        return EmpresaConfigMargensPrecoResponse(
+            margem_preco_sugestao_1=30.0,
+            margem_preco_sugestao_2=34.0,
+        )
+
+    margem_1 = getattr(config, "margem_preco_sugestao_1", None)
+    margem_2 = getattr(config, "margem_preco_sugestao_2", None)
+    return EmpresaConfigMargensPrecoResponse(
+        margem_preco_sugestao_1=float(margem_1 if margem_1 is not None else 30),
+        margem_preco_sugestao_2=float(margem_2 if margem_2 is not None else 34),
+    )
+
+
 # ===== ENDPOINTS =====
+
+
+@router.get("/margens-preco", response_model=EmpresaConfigMargensPrecoResponse)
+@require_permission("produtos.editar")
+def get_margens_preco(
+    user_and_tenant=Depends(get_current_user_and_tenant),
+    db: Session = Depends(get_session),
+):
+    """Busca as duas margens sugeridas no cadastro de produtos."""
+    _, tenant_id = user_and_tenant
+    config = (
+        db.query(EmpresaConfigGeral)
+        .filter(EmpresaConfigGeral.tenant_id == tenant_id)
+        .first()
+    )
+    return _serializar_margens_preco(config)
+
+
+@router.put("/margens-preco", response_model=EmpresaConfigMargensPrecoResponse)
+@require_permission("produtos.editar")
+def update_margens_preco(
+    config_data: EmpresaConfigMargensPrecoUpdate,
+    user_and_tenant=Depends(get_current_user_and_tenant),
+    db: Session = Depends(get_session),
+):
+    """Atualiza as sugestões sem alterar custos ou preços de produtos."""
+    _, tenant_id = user_and_tenant
+    config = (
+        db.query(EmpresaConfigGeral)
+        .filter(EmpresaConfigGeral.tenant_id == tenant_id)
+        .first()
+    )
+
+    if not config:
+        config = EmpresaConfigGeral(tenant_id=tenant_id)
+        db.add(config)
+
+    config.margem_preco_sugestao_1 = config_data.margem_preco_sugestao_1
+    config.margem_preco_sugestao_2 = config_data.margem_preco_sugestao_2
+    db.commit()
+    db.refresh(config)
+
+    logger.info("Margens sugeridas de preço atualizadas para tenant %s", tenant_id)
+    return _serializar_margens_preco(config)
 
 
 @router.get("/", response_model=EmpresaConfigGeralResponse)
@@ -178,6 +271,8 @@ def get_config_empresa(
             cnpj=None,
             margem_saudavel_minima=30.0,
             margem_alerta_minima=15.0,
+            margem_preco_sugestao_1=30.0,
+            margem_preco_sugestao_2=34.0,
             mensagem_venda_saudavel="✅ Venda Saudável! Margem excelente.",
             mensagem_venda_alerta="⚠️ ATENÇÃO: Margem reduzida! Revisar preço.",
             mensagem_venda_critica="🚨 CRÍTICO: Margem muito baixa! Venda com prejuízo!",

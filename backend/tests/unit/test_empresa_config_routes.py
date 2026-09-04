@@ -2,10 +2,19 @@ import os
 from types import SimpleNamespace
 from uuid import uuid4
 
+import pytest
+from pydantic import ValidationError
+
 os.environ["DATABASE_URL"] = os.environ.get("DATABASE_URL") or "sqlite:///./test.db"
 os.environ["DEBUG"] = "false"
 
-from app.empresa_config_routes import _serializar_config, get_config_empresa
+from app.empresa_config_routes import (
+    EmpresaConfigMargensPrecoUpdate,
+    _serializar_config,
+    _serializar_margens_preco,
+    get_config_empresa,
+    update_margens_preco,
+)
 from app.empresa_routes import ConfigEstoqueUpdate, atualizar_config_estoque
 
 
@@ -37,6 +46,8 @@ def test_get_config_empresa_usa_tenant_da_dependencia_multitenant(monkeypatch):
 
     assert response.id == 0
     assert response.margem_saudavel_minima == 30.0
+    assert response.margem_preco_sugestao_1 == 30.0
+    assert response.margem_preco_sugestao_2 == 34.0
 
 
 class _FakeTenantQuery:
@@ -152,3 +163,48 @@ def test_serializar_config_antiga_aplica_defaults_sem_apagar_crediario():
     assert resposta.crediario_encargos_automaticos is True
     assert resposta.crediario_multa_percentual == 2
     assert resposta.crediario_juros_mensal_percentual == 1
+    assert resposta.margem_preco_sugestao_1 == 30
+    assert resposta.margem_preco_sugestao_2 == 34
+
+
+def test_atualizar_margens_preco_nao_toca_em_preco_de_produto(monkeypatch):
+    tenant_id = uuid4()
+    config = SimpleNamespace(
+        margem_preco_sugestao_1=30,
+        margem_preco_sugestao_2=34,
+    )
+    db = _FakeTenantSession(config)
+    monkeypatch.setattr(
+        "app.security.permissions_decorator.check_permission",
+        lambda *args, **kwargs: True,
+    )
+
+    resposta = update_margens_preco(
+        EmpresaConfigMargensPrecoUpdate(
+            margem_preco_sugestao_1=25,
+            margem_preco_sugestao_2=40,
+        ),
+        user_and_tenant=(SimpleNamespace(id=42), tenant_id),
+        db=db,
+    )
+
+    assert resposta.margem_preco_sugestao_1 == 25
+    assert resposta.margem_preco_sugestao_2 == 40
+    assert db.commits == 1
+    assert db.refreshed == [config]
+    assert not hasattr(config, "preco_venda")
+
+
+def test_serializar_margens_preco_usa_defaults_para_empresa_sem_configuracao():
+    resposta = _serializar_margens_preco(None)
+
+    assert resposta.margem_preco_sugestao_1 == 30
+    assert resposta.margem_preco_sugestao_2 == 34
+
+
+def test_margens_preco_exige_duas_sugestoes_diferentes():
+    with pytest.raises(ValidationError):
+        EmpresaConfigMargensPrecoUpdate(
+            margem_preco_sugestao_1=30,
+            margem_preco_sugestao_2=30,
+        )
