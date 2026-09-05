@@ -3,9 +3,9 @@
 from decimal import Decimal
 import logging
 from typing import Literal
-from uuid import UUID, uuid4
+from uuid import UUID, uuid4, uuid5
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 from sqlalchemy import func, or_, text
 from sqlalchemy.orm import Session
@@ -29,9 +29,10 @@ logger = logging.getLogger(__name__)
 class ProdutoRapidoRequest(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
 
-    codigo_barras: str = Field(
-        min_length=1, max_length=20, pattern=r"^[A-Za-z0-9 ._/-]+$"
+    codigo_barras: str | None = Field(
+        default=None, min_length=1, max_length=20, pattern=r"^[A-Za-z0-9 ._/-]+$"
     )
+    chave_cadastro: UUID | None = None
     nome: str = Field(min_length=1, max_length=200)
     codigo: str | None = Field(default=None, max_length=50)
     descricao_curta: str | None = Field(default=None, max_length=1000)
@@ -40,6 +41,11 @@ class ProdutoRapidoRequest(BaseModel):
         default=Decimal("0"), ge=0, max_digits=10, decimal_places=2
     )
     unidade: Literal["UN", "KG", "CX", "PC", "LT"] = "UN"
+
+    @field_validator("codigo_barras", mode="before")
+    @classmethod
+    def normalizar_codigo_barras(cls, valor):
+        return None if isinstance(valor, str) and not valor.strip() else valor
 
     @field_validator("codigo", mode="before")
     @classmethod
@@ -147,6 +153,7 @@ def _buscar_sku(db: Session, tenant_id: UUID, codigo: str) -> Produto | None:
 class SkuDisponibilidadeResponse(BaseModel):
     codigo: str
     disponivel: bool
+    produto: ProdutoRapidoResponse | None = None
 
 
 @router.get("/consultar-sku", response_model=SkuDisponibilidadeResponse)
@@ -159,9 +166,11 @@ def consultar_sku_produto_rapido(
     if not codigo.strip():
         raise HTTPException(status_code=400, detail="Informe o SKU para consultar.")
     codigo = normalizar_sku_produto(codigo)
+    produto = _buscar_sku(db, UUID(tenant_id), codigo)
     return {
         "codigo": codigo,
-        "disponivel": _buscar_sku(db, UUID(tenant_id), codigo) is None,
+        "disponivel": produto is None,
+        "produto": produto,
     }
 
 
@@ -178,6 +187,7 @@ def _sku_indisponivel() -> HTTPException:
 @router.post("/rapido", response_model=ProdutoRapidoResponse, status_code=201)
 def criar_produto_rapido(
     payload: ProdutoRapidoRequest,
+    response: Response,
     current_user: User = Depends(_get_current_ecommerce_user),
     db: Session = Depends(get_session),
 ):
@@ -190,7 +200,24 @@ def criar_produto_rapido(
             text("SELECT pg_advisory_xact_lock(hashtextextended(:chave, 0))"),
             {"chave": f"produto-rapido:{tenant_id}"},
         )
-    existente = _buscar_produto_existente(db, tenant_uuid, payload.codigo_barras)
+    # Sem SKU manual, a mesma tentativa conserva a identidade mesmo sem EAN.
+    # A chave fica representada no SKU normal, sem nova tabela ou migration.
+    sku_repetivel = (
+        f"APP-{uuid5(tenant_uuid, str(payload.chave_cadastro)).hex.upper()}"
+        if payload.chave_cadastro and not payload.codigo
+        else None
+    )
+    if sku_repetivel:
+        confirmado = _buscar_sku(db, tenant_uuid, sku_repetivel)
+        if confirmado:
+            response.status_code = 200
+            return confirmado
+
+    existente = (
+        _buscar_produto_existente(db, tenant_uuid, payload.codigo_barras)
+        if payload.codigo_barras
+        else None
+    )
     if existente:
         raise HTTPException(
             status_code=409,
@@ -201,12 +228,12 @@ def criar_produto_rapido(
             },
         )
 
-    codigo = payload.codigo or f"APP-{uuid4().hex[:16].upper()}"
+    codigo = payload.codigo or sku_repetivel or f"APP-{uuid4().hex[:16].upper()}"
     if _buscar_sku(db, tenant_uuid, codigo):
         raise _sku_indisponivel()
 
     dados = {
-        **payload.model_dump(),
+        **payload.model_dump(exclude={"chave_cadastro"}),
         "preco_venda": float(payload.preco_venda),
         "preco_custo": float(payload.preco_custo),
         "codigo": codigo,

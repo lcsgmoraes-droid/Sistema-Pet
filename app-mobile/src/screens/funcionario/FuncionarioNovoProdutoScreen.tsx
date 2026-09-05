@@ -9,12 +9,12 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import KeyboardSafeScrollView from "../../components/KeyboardSafeScrollView";
 import {
-  consultarCodigoProdutoRapido, criarProdutoRapido, ProdutoRapido, ProdutoRapidoPayload,
+  consultarCodigoProdutoRapido, consultarSkuProdutoRapido, criarProdutoRapido, ProdutoRapido, ProdutoRapidoPayload,
 } from "../../services/funcionarioProdutos.service";
 import { CORES } from "../../theme";
 import { formatarMoeda } from "../../utils/format";
 import {
-  erroCadastroProduto, formatarCampoMonetarioProduto, valorMonetarioProduto,
+  erroCadastroProduto, formatarCampoMonetarioProduto, gerarChaveCadastroProduto, valorMonetarioProduto,
 } from "../../utils/produtoRapido";
 import { FuncionarioPdvScanner } from "./pdv/FuncionarioPdvScanner";
 import { novoProdutoStyles as styles } from "./produto/NovoProdutoStyles";
@@ -33,6 +33,8 @@ export default function FuncionarioNovoProdutoScreen() {
   const insets = useSafeAreaInsets();
   const [scannerAberto, setScannerAberto] = useState(false);
   const [etapa, setEtapa] = useState<"codigo" | "formulario" | "existente" | "salvo">("codigo");
+  const [tipoBusca, setTipoBusca] = useState<"barras" | "sku">("barras");
+  const [busca, setBusca] = useState("");
   const [codigo, setCodigo] = useState("");
   const [nome, setNome] = useState("");
   const [sku, setSku] = useState("");
@@ -47,6 +49,7 @@ export default function FuncionarioNovoProdutoScreen() {
   const ocupado = salvando || fotos.ocupado;
   const [erro, setErro] = useState("");
   const operacaoEmCurso = useRef(false);
+  const chaveCadastro = useRef<string | null>(null);
   const montado = useRef(true);
   const navigation = useNavigation<any>();
   const descartarSaida = useRef(false);
@@ -63,7 +66,7 @@ export default function FuncionarioNovoProdutoScreen() {
       Alert.alert("Aguarde", "Estamos concluindo a operação. Aguarde antes de sair.");
       return;
     }
-    if (fotos.pendentes || (etapa === "formulario" && (nome || sku || descricao || preco || custo))) {
+    if (fotos.pendentes || ((etapa === "formulario" || etapa === "codigo") && (nome || sku || descricao || preco || custo))) {
       event.preventDefault();
       Alert.alert("Há dados sem enviar", "Se sair agora, os dados e fotos pendentes desta tela serão descartados.", [
         { text: "Continuar aqui", style: "cancel" },
@@ -72,21 +75,29 @@ export default function FuncionarioNovoProdutoScreen() {
     }
   }), [navigation, ocupado, fotos.pendentes, etapa, nome, sku, descricao, preco, custo]);
 
-  async function consultar(valor: string) {
+  async function consultar(valor: string, tipo = tipoBusca) {
     if (operacaoEmCurso.current) return;
     const codigoLimpo = valor.trim();
     setScannerAberto(false);
-    if (!codigoLimpo || codigoLimpo.length > 20 || !/^[A-Za-z0-9 ._/-]+$/.test(codigoLimpo)) {
-      setErro("Informe um código de barras válido, com até 20 caracteres.");
+    if (!codigoLimpo || codigoLimpo.length > (tipo === "sku" ? 50 : 20)
+      || (tipo === "barras" && !/^[A-Za-z0-9 ._/-]+$/.test(codigoLimpo))) {
+      setErro(tipo === "sku" ? "Informe um SKU com até 50 caracteres." : "Informe um código de barras válido, com até 20 caracteres.");
       return;
     }
     operacaoEmCurso.current = true;
     setOcupado(true);
     setErro("");
-    setCodigo(codigoLimpo);
+    setBusca(codigoLimpo);
     try {
-      const encontrado = await consultarCodigoProdutoRapido(codigoLimpo);
+      const resultadoSku = tipo === "sku" ? await consultarSkuProdutoRapido(codigoLimpo) : null;
+      const encontrado = tipo === "sku" ? resultadoSku!.produto : await consultarCodigoProdutoRapido(codigoLimpo);
       if (!montado.current) return;
+      if (resultadoSku && !resultadoSku.disponivel && !encontrado) {
+        setErro("Este SKU já está cadastrado. Consulte o produto no ERP.");
+        return;
+      }
+      setCodigo(tipo === "barras" ? codigoLimpo : "");
+      if (resultadoSku) setSku(resultadoSku.codigo);
       setProduto(encontrado);
       setEtapa(encontrado ? "existente" : "formulario");
     } catch (error) {
@@ -97,6 +108,11 @@ export default function FuncionarioNovoProdutoScreen() {
       operacaoEmCurso.current = false;
       if (montado.current) setOcupado(false);
     }
+  }
+
+  function continuarSemCodigo() {
+    if (operacaoEmCurso.current || ocupado) return;
+    setCodigo(""); setProduto(null); setErro(""); setEtapa("formulario");
   }
 
   async function abrirScanner() {
@@ -130,12 +146,18 @@ export default function FuncionarioNovoProdutoScreen() {
       setErro("O valor máximo por campo é R$ 99.999.999,99.");
       return;
     }
+    if (codigo.trim() && !/^[A-Za-z0-9 ._/-]{1,20}$/.test(codigo.trim())) {
+      setErro("Informe um código de barras válido ou deixe esse campo vazio.");
+      return;
+    }
     operacaoEmCurso.current = true;
     setOcupado(true);
     setErro("");
     try {
+      chaveCadastro.current ??= gerarChaveCadastroProduto();
       const criado = await criarProdutoRapido({
-        codigo_barras: codigo, nome: nome.trim(), preco_venda: precoVenda,
+        codigo_barras: codigo.trim() || undefined, chave_cadastro: chaveCadastro.current,
+        nome: nome.trim(), preco_venda: precoVenda,
         preco_custo: precoCusto, unidade,
         codigo: sku.trim().toUpperCase() || undefined,
         descricao_curta: descricao.trim() || undefined,
@@ -164,6 +186,7 @@ export default function FuncionarioNovoProdutoScreen() {
   function limparFormulario() {
     setEtapa("codigo"); setCodigo(""); setNome(""); setPreco(""); setCusto("");
     setUnidade("UN"); setProduto(null); setErro(""); setSku(""); setDescricao(""); fotos.limpar();
+    setBusca(""); setTipoBusca("barras"); chaveCadastro.current = null;
   }
 
   function reiniciar() {
@@ -191,22 +214,38 @@ export default function FuncionarioNovoProdutoScreen() {
 
         {etapa === "codigo" ? (
           <View style={styles.card}>
-            <Text style={styles.subtitulo}>1. Leia o código de barras</Text>
-            <TouchableOpacity accessibilityRole="button" style={[styles.primario, ocupado && styles.desabilitado]} disabled={ocupado} onPress={abrirScanner}>
+            <Text style={styles.subtitulo}>1. Identifique o produto</Text>
+            <View style={styles.unidades}>
+              {([{ tipo: "barras", nome: "Código de barras" }, { tipo: "sku", nome: "SKU / código interno" }] as const).map((item) => (
+                <TouchableOpacity
+                  key={item.tipo} accessibilityRole="radio" accessibilityLabel={item.nome}
+                  accessibilityState={{ checked: tipoBusca === item.tipo }} disabled={ocupado}
+                  style={[styles.unidade, tipoBusca === item.tipo && styles.unidadeAtiva]}
+                  onPress={() => { setTipoBusca(item.tipo); setBusca(""); setErro(""); }}
+                >
+                  <Text style={tipoBusca === item.tipo ? styles.unidadeTextoAtivo : styles.texto}>{item.nome}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            {tipoBusca === "barras" ? <TouchableOpacity accessibilityRole="button" style={[styles.primario, ocupado && styles.desabilitado]} disabled={ocupado} onPress={abrirScanner}>
               <Ionicons name="scan-outline" size={22} color="#fff" />
               <Text style={styles.primarioTexto}>Ler código de barras</Text>
-            </TouchableOpacity>
-            <Text style={styles.label}>Ou digite o código</Text>
+            </TouchableOpacity> : null}
+            <Text style={styles.label}>{tipoBusca === "sku" ? "Digite o SKU" : "Ou digite o código de barras"}</Text>
             <TextInput
-              accessibilityLabel="Código de barras" style={styles.input} value={codigo}
-              onChangeText={(valor) => { setCodigo(valor); setErro(""); }} maxLength={20}
-              placeholder="Ex.: 7891234567890" placeholderTextColor={CORES.textoClaro}
-              autoCapitalize="none" autoCorrect={false} editable={!ocupado}
-              returnKeyType="search" onSubmitEditing={() => consultar(codigo)}
+              accessibilityLabel={tipoBusca === "sku" ? "SKU para consulta" : "Código de barras"} style={styles.input} value={busca}
+              onChangeText={(valor) => { setBusca(valor); setErro(""); }} maxLength={tipoBusca === "sku" ? 50 : 20}
+              placeholder={tipoBusca === "sku" ? "Ex.: PET-001" : "Ex.: 7891234567890"} placeholderTextColor={CORES.textoClaro}
+              autoCapitalize={tipoBusca === "sku" ? "characters" : "none"} autoCorrect={false} editable={!ocupado}
+              returnKeyType="search" onSubmitEditing={() => consultar(busca)}
             />
-            <TouchableOpacity accessibilityRole="button" style={[styles.secundario, (ocupado || !codigo.trim()) && styles.desabilitado]} disabled={ocupado || !codigo.trim()} onPress={() => consultar(codigo)}>
-              <Text style={styles.secundarioTexto}>Consultar código</Text>
+            <TouchableOpacity accessibilityRole="button" style={[styles.secundario, (ocupado || !busca.trim()) && styles.desabilitado]} disabled={ocupado || !busca.trim()} onPress={() => consultar(busca)}>
+              <Text style={styles.secundarioTexto}>{tipoBusca === "sku" ? "Consultar SKU" : "Consultar código"}</Text>
             </TouchableOpacity>
+            <TouchableOpacity accessibilityRole="button" style={[styles.secundario, ocupado && styles.desabilitado]} disabled={ocupado} onPress={continuarSemCodigo}>
+              <Text style={styles.secundarioTexto}>Adicionar sem código de barras</Text>
+            </TouchableOpacity>
+            <Text style={styles.texto}>Se também não tiver SKU, deixe vazio para gerar automaticamente.</Text>
           </View>
         ) : null}
 
@@ -214,10 +253,10 @@ export default function FuncionarioNovoProdutoScreen() {
           <View style={styles.card}>
             <Text style={styles.subtitulo}>2. Preencha os dados essenciais</Text>
             <View style={styles.aviso}>
-              <Text style={styles.avisoTexto}>Código {codigo} ainda não cadastrado.</Text>
+              <Text style={styles.avisoTexto}>{codigo ? `Código ${codigo}. Será conferido novamente ao salvar.` : "Cadastro sem código de barras. Você pode adicioná-lo agora ou depois no ERP."}</Text>
             </View>
             <TouchableOpacity accessibilityRole="button" disabled={ocupado} onPress={() => { setEtapa("codigo"); setErro(""); }}>
-              <Text style={styles.secundarioTexto}>Corrigir código</Text>
+              <Text style={styles.secundarioTexto}>Voltar à consulta</Text>
             </TouchableOpacity>
             <Text style={styles.label}>Nome do produto *</Text>
             <TextInput
@@ -233,6 +272,13 @@ export default function FuncionarioNovoProdutoScreen() {
               placeholder="Gerado automaticamente se ficar vazio" placeholderTextColor={CORES.textoClaro}
             />
             <Text accessibilityLiveRegion="polite" style={skuInfo.status === "ocupado" ? styles.erro : styles.texto}>{skuInfo.mensagem}</Text>
+            <Text style={styles.label}>Código de barras · opcional</Text>
+            <TextInput
+              accessibilityLabel="Código de barras do produto" style={styles.input} value={codigo}
+              onChangeText={(valor) => { setCodigo(valor); setErro(""); }} editable={!ocupado}
+              maxLength={20} autoCapitalize="none" autoCorrect={false}
+              placeholder="Deixe vazio se o produto não tiver" placeholderTextColor={CORES.textoClaro}
+            />
             <Text style={styles.label}>Descrição · opcional</Text>
             <TextInput
               accessibilityLabel="Descrição do produto" style={[styles.input, styles.descricao]} value={descricao}
@@ -279,7 +325,7 @@ export default function FuncionarioNovoProdutoScreen() {
             <Text style={styles.titulo}>{etapa === "salvo" ? "Produto cadastrado!" : "Este produto já existe"}</Text>
             <Text style={styles.subtitulo}>{produto.nome}</Text>
             <Text style={styles.texto}>Código interno: {produto.codigo}</Text>
-            <Text style={styles.texto}>Código de barras: {produto.codigo_barras || codigo}</Text>
+            <Text style={styles.texto}>Código de barras: {produto.codigo_barras || "Não informado"}</Text>
             <Text style={styles.preco}>{formatarMoeda(produto.preco_venda)} / {produto.unidade}</Text>
             {produto.descricao_curta ? <Text style={styles.texto}>{produto.descricao_curta}</Text> : null}
             {etapa === "salvo" && fotos.fotos.length > 0 ? <>
@@ -312,7 +358,7 @@ export default function FuncionarioNovoProdutoScreen() {
           {scannerAberto && isFocused ? (
             <FuncionarioPdvScanner
               scanAtivo={!ocupado} buscandoProduto={ocupado}
-              onBarcodeScanned={({ data }) => consultar(data)} onClose={() => setScannerAberto(false)}
+              onBarcodeScanned={({ data }) => consultar(data, "barras")} onClose={() => setScannerAberto(false)}
               onResetScan={() => {}}
             />
           ) : null}

@@ -43,6 +43,7 @@ def test_sku_manual_e_descricao_sao_salvos_no_cadastro_normal(ambiente):
     assert consultar_sku(client, " sku-123 ").json() == {
         "codigo": "SKU-123",
         "disponivel": True,
+        "produto": None,
     }
     criado = cadastrar(
         client, codigo=" sku-123 ", descricao_curta="  Ração sabor frango.  "
