@@ -4,7 +4,7 @@ Models para o Sistema de Controle de Caixa
 
 from datetime import datetime
 
-from sqlalchemy import Column, DateTime, Float, ForeignKey, Integer, String, Text
+from sqlalchemy import Column, DateTime, Float, ForeignKey, Integer, String, Text, JSON
 from sqlalchemy.orm import relationship
 
 from app.base_models import BaseTenantModel
@@ -23,6 +23,7 @@ class Caixa(BaseTenantModel):
     usuario_fechamento_nome = Column(String(200))
     data_abertura = Column(DateTime, default=datetime.now, nullable=False)
     data_fechamento = Column(DateTime)
+    fechamento_em = Column(DateTime(timezone=True), nullable=True)
     valor_abertura = Column(Float, default=0.0, nullable=False)
     valor_esperado = Column(Float)
     valor_informado = Column(Float)
@@ -32,6 +33,7 @@ class Caixa(BaseTenantModel):
     conta_origem_nome = Column(String(200))
     observacoes_abertura = Column(Text)
     observacoes_fechamento = Column(Text)
+    conferencia_abertura = Column(JSON, nullable=True)
 
     # Relacionamentos
     movimentacoes = relationship(
@@ -57,6 +59,7 @@ class Caixa(BaseTenantModel):
             "conta_origem_nome": self.conta_origem_nome,
             "observacoes_abertura": self.observacoes_abertura,
             "observacoes_fechamento": self.observacoes_fechamento,
+            "conferencia_abertura": self.conferencia_abertura,
             "created_at": safe_datetime_to_iso(self.created_at),
             "updated_at": safe_datetime_to_iso(self.updated_at),
             "movimentacoes": [m.to_dict() for m in self.movimentacoes]

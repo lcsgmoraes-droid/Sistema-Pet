@@ -21,7 +21,7 @@ export const LAYOUT_MENU_GROUPS = [
   },
   {
     label: "Gestão",
-    paths: ["/cadastros", "/rh", "/ia", "/admin", "/configuracoes"],
+    paths: ["/alertas-gestor", "/cadastros", "/rh", "/ia", "/admin", "/configuracoes"],
   },
 ];
 

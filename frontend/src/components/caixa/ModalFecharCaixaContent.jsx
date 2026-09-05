@@ -10,6 +10,7 @@ import {
   X,
 } from "lucide-react";
 import CurrencyInput from "../CurrencyInput";
+import { formatBRL } from "../../utils/formatters";
 import {
   CashCountPanel,
   DifferenceTipsModal,
@@ -88,7 +89,7 @@ export default function ModalFecharCaixaContent({
                 <div className="bg-white rounded-lg p-4 border border-gray-200">
                   <div className="text-sm text-gray-600 mb-1">Valor de Abertura</div>
                   <div className="text-2xl font-bold text-gray-900">
-                    R$ {resumo.caixa.valor_abertura.toFixed(2)}
+                    R$ {formatBRL(resumo.caixa.valor_abertura)}
                   </div>
                   <div className="text-xs text-gray-500 mt-1">
                     {new Date(resumo.caixa.data_abertura).toLocaleString("pt-BR")}
@@ -102,7 +103,7 @@ export default function ModalFecharCaixaContent({
                     Entradas
                   </div>
                   <div className="text-2xl font-bold text-green-600">
-                    + R$ {resumo.totais.vendas.toFixed(2)}
+                    + R$ {formatBRL(resumo.totais.vendas)}
                   </div>
                   <div className="text-xs text-gray-500 mt-1">Movimento de entrada</div>
                 </div>
@@ -114,7 +115,7 @@ export default function ModalFecharCaixaContent({
                     Suprimentos
                   </div>
                   <div className="text-2xl font-bold text-blue-600">
-                    + R$ {resumo.totais.suprimentos.toFixed(2)}
+                    + R$ {formatBRL(resumo.totais.suprimentos)}
                   </div>
                 </div>
 
@@ -125,10 +126,19 @@ export default function ModalFecharCaixaContent({
                     Sangrias
                   </div>
                   <div className="text-2xl font-bold text-orange-600">
-                    - R$ {resumo.totais.sangrias.toFixed(2)}
+                    - R$ {formatBRL(resumo.totais.sangrias)}
                   </div>
                 </div>
 
+                {[
+                  ["Devoluções em dinheiro", resumo.totais.devolucoes],
+                  ["Transferências", resumo.totais.transferencias],
+                ].map(([titulo, valor]) => (
+                  <div key={titulo} className="bg-white rounded-lg p-4 border border-red-200">
+                    <div className="text-sm text-red-700 mb-1">{titulo}</div>
+                    <div className="text-2xl font-bold text-red-600">- R$ {formatBRL(valor)}</div>
+                  </div>
+                ))}
                 {/* Despesas */}
                 <div className="bg-white rounded-lg p-4 border border-red-200">
                   <div className="flex items-center text-sm text-red-700 mb-1">
@@ -136,7 +146,7 @@ export default function ModalFecharCaixaContent({
                     Despesas
                   </div>
                   <div className="text-2xl font-bold text-red-600">
-                    - R$ {resumo.totais.despesas.toFixed(2)}
+                    - R$ {formatBRL(resumo.totais.despesas)}
                   </div>
                 </div>
               </div>
@@ -205,7 +215,7 @@ export default function ModalFecharCaixaContent({
                             diferenca > 0 ? "text-blue-600" : "text-yellow-700"
                           }`}
                         >
-                          R$ {Math.abs(diferenca).toFixed(2)}
+                          R$ {formatBRL(Math.abs(diferenca))}
                         </span>
                         <span
                           className={`text-xs px-2 py-0.5 rounded-full font-medium ${
@@ -287,7 +297,7 @@ export default function ModalFecharCaixaContent({
                     <div>
                       <div className="font-bold text-amber-800">Diferença de caixa detectada</div>
                       <div className="text-amber-700 text-sm mt-1">
-                        Existe uma diferença de <strong>R$ {Math.abs(diferenca).toFixed(2)}</strong>{" "}
+                        Existe uma diferença de <strong>R$ {formatBRL(Math.abs(diferenca))}</strong>{" "}
                         <strong>{diferenca > 0 ? "a mais" : "a menos"}</strong> no caixa. A
                         diferença ficará registrada no histórico.
                       </div>
