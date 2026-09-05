@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { X, DollarSign, Calculator, AlertCircle } from "lucide-react";
 import { abrirCaixa, obterConferenciaAbertura } from "../api/caixa";
 import { atualizarObservacaoComContagem } from "../utils/caixaContagem";
+import CurrencyInput from "./CurrencyInput";
+import { formatBRL, formatMoneyBRL } from "../utils/formatters";
 
 export default function ModalAbrirCaixa({ onClose, onSucesso }) {
   const [valorAbertura, setValorAbertura] = useState("");
@@ -21,11 +23,23 @@ export default function ModalAbrirCaixa({ onClose, onSucesso }) {
   const [loading, setLoading] = useState(false);
   const [erro, setErro] = useState("");
   const [ultimaConferencia, setUltimaConferencia] = useState(null);
+  const [carregandoConferencia, setCarregandoConferencia] = useState(true);
+  const [erroConferencia, setErroConferencia] = useState(false);
+
+  const carregarConferencia = async () => {
+    setCarregandoConferencia(true);
+    setErroConferencia(false);
+    try {
+      setUltimaConferencia(await obterConferenciaAbertura());
+    } catch {
+      setErroConferencia(true);
+    } finally {
+      setCarregandoConferencia(false);
+    }
+  };
 
   useEffect(() => {
-    obterConferenciaAbertura()
-      .then(setUltimaConferencia)
-      .catch(() => setUltimaConferencia(null));
+    carregarConferencia();
   }, []);
 
   // Calcular total das notas
@@ -70,6 +84,9 @@ export default function ModalAbrirCaixa({ onClose, onSucesso }) {
     try {
       const dados = {
         valor_abertura: valor,
+        caixa_anterior_id: ultimaConferencia?.caixa_id ?? null,
+        valor_fechamento_anterior: ultimaConferencia?.valor_fechamento ?? null,
+        data_fechamento_anterior: ultimaConferencia?.data_fechamento ?? null,
         conta_origem_nome: contaOrigem || "Dinheiro em mãos",
         observacoes_abertura: observacoes,
       };
@@ -79,6 +96,7 @@ export default function ModalAbrirCaixa({ onClose, onSucesso }) {
     } catch (error) {
       console.error("Erro ao abrir caixa:", error);
       setErro(error.response?.data?.detail || "Erro ao abrir caixa");
+      if (error.response?.status === 409) await carregarConferencia();
     } finally {
       setLoading(false);
     }
@@ -88,7 +106,7 @@ export default function ModalAbrirCaixa({ onClose, onSucesso }) {
   const valorAtual = Number.parseFloat(valorAbertura);
   const diferencaAbertura =
     Number.isFinite(valorAnterior) && Number.isFinite(valorAtual) ? valorAtual - valorAnterior : 0;
-  const aberturaDivergente = Math.abs(diferencaAbertura) > 0.01;
+  const aberturaDivergente = Math.abs(Math.round(diferencaAbertura * 100)) > 0;
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -160,7 +178,7 @@ export default function ModalAbrirCaixa({ onClose, onSucesso }) {
                       <span className="text-xs text-gray-500">×</span>
                     </div>
                     <span className="text-lg font-bold text-gray-600">
-                      R$ {(notas.n2 * 2).toFixed(2)}
+                      R$ {formatBRL(notas.n2 * 2)}
                     </span>
                   </div>
                 </div>
@@ -183,7 +201,7 @@ export default function ModalAbrirCaixa({ onClose, onSucesso }) {
                       <span className="text-xs text-gray-500">×</span>
                     </div>
                     <span className="text-lg font-bold text-purple-600">
-                      R$ {(notas.n5 * 5).toFixed(2)}
+                      R$ {formatBRL(notas.n5 * 5)}
                     </span>
                   </div>
                 </div>
@@ -206,7 +224,7 @@ export default function ModalAbrirCaixa({ onClose, onSucesso }) {
                       <span className="text-xs text-gray-500">×</span>
                     </div>
                     <span className="text-lg font-bold text-red-600">
-                      R$ {(notas.n10 * 10).toFixed(2)}
+                      R$ {formatBRL(notas.n10 * 10)}
                     </span>
                   </div>
                 </div>
@@ -229,7 +247,7 @@ export default function ModalAbrirCaixa({ onClose, onSucesso }) {
                       <span className="text-xs text-gray-500">×</span>
                     </div>
                     <span className="text-lg font-bold text-yellow-600">
-                      R$ {(notas.n20 * 20).toFixed(2)}
+                      R$ {formatBRL(notas.n20 * 20)}
                     </span>
                   </div>
                 </div>
@@ -252,7 +270,7 @@ export default function ModalAbrirCaixa({ onClose, onSucesso }) {
                       <span className="text-xs text-gray-500">×</span>
                     </div>
                     <span className="text-lg font-bold text-blue-600">
-                      R$ {(notas.n50 * 50).toFixed(2)}
+                      R$ {formatBRL(notas.n50 * 50)}
                     </span>
                   </div>
                 </div>
@@ -277,7 +295,7 @@ export default function ModalAbrirCaixa({ onClose, onSucesso }) {
                       <span className="text-xs text-gray-500">×</span>
                     </div>
                     <span className="text-lg font-bold text-green-600">
-                      R$ {(notas.n100 * 100).toFixed(2)}
+                      R$ {formatBRL(notas.n100 * 100)}
                     </span>
                   </div>
                 </div>
@@ -302,7 +320,7 @@ export default function ModalAbrirCaixa({ onClose, onSucesso }) {
                       <span className="text-xs text-gray-500">×</span>
                     </div>
                     <span className="text-lg font-bold text-orange-600">
-                      R$ {(notas.n200 * 200).toFixed(2)}
+                      R$ {formatBRL(notas.n200 * 200)}
                     </span>
                   </div>
                 </div>
@@ -318,17 +336,12 @@ export default function ModalAbrirCaixa({ onClose, onSucesso }) {
                       </div>
                     </div>
                     <span className="text-lg font-bold text-amber-600">
-                      R$ {parseFloat(notas.moedas || 0).toFixed(2)}
+                      R$ {formatBRL(notas.moedas)}
                     </span>
                   </div>
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0"
+                  <CurrencyInput
                     value={notas.moedas}
-                    onChange={(e) =>
-                      setNotas({ ...notas, moedas: parseFloat(e.target.value) || 0 })
-                    }
+                    onChange={(valor) => setNotas({ ...notas, moedas: valor })}
                     className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg text-center font-bold text-lg focus:border-amber-500 focus:ring-2 focus:ring-amber-200"
                     placeholder="0.00"
                   />
@@ -340,7 +353,7 @@ export default function ModalAbrirCaixa({ onClose, onSucesso }) {
                 <div className="flex items-center justify-between">
                   <span className="text-white font-semibold text-sm">TOTAL CONTADO</span>
                   <span className="text-3xl font-bold text-white">
-                    R$ {calcularTotalNotas().toFixed(2)}
+                    R$ {formatBRL(calcularTotalNotas())}
                   </span>
                 </div>
               </div>
@@ -368,27 +381,53 @@ export default function ModalAbrirCaixa({ onClose, onSucesso }) {
           {/* Campo de Valor de Abertura */}
           <div className="relative mt-2">
             <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">R$</span>
-            <input
-              type="number"
-              step="0.01"
+            <CurrencyInput
               value={valorAbertura}
-              onChange={(e) => setValorAbertura(e.target.value)}
+              onChange={setValorAbertura}
+              aria-label="Valor de abertura"
               placeholder="0,00"
               className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-lg font-semibold"
               autoFocus
             />
           </div>
 
-          {aberturaDivergente && (
+          {carregandoConferencia && <p role="status">Conferindo o último fechamento...</p>}
+          {erroConferencia && (
+            <div role="alert" className="rounded-lg bg-red-50 p-3 text-red-800">
+              Não foi possível consultar o último fechamento.
+              <button type="button" className="ml-2 underline" onClick={carregarConferencia}>
+                Tentar novamente
+              </button>
+            </div>
+          )}
+          {!carregandoConferencia && !erroConferencia && ultimaConferencia && (
+            <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900">
+              <p className="font-semibold">
+                Último fechamento: caixa #{ultimaConferencia.numero_caixa}
+              </p>
+              <p>Dinheiro contado: {formatMoneyBRL(valorAnterior)}</p>
+              <p>
+                {ultimaConferencia.usuario_fechamento_nome} ·{" "}
+                {new Date(ultimaConferencia.data_fechamento).toLocaleString("pt-BR", {
+                  timeZone: "America/Sao_Paulo",
+                })}
+              </p>
+            </div>
+          )}
+          {!carregandoConferencia && !erroConferencia && !ultimaConferencia && (
+            <p className="text-sm text-gray-600">
+              Nenhum fechamento anterior disponível para comparação.
+            </p>
+          )}
+          {!carregandoConferencia && !erroConferencia && aberturaDivergente && (
             <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
               <div className="flex items-start gap-2">
                 <AlertCircle className="mt-0.5 h-5 w-5 shrink-0" />
                 <div>
                   <p className="font-semibold">Valor diferente do ultimo fechamento</p>
                   <p>
-                    O caixa anterior foi fechado com R$ {valorAnterior.toFixed(2).replace(".", ",")}
-                    . Esta abertura tem uma diferenca de R${" "}
-                    {Math.abs(diferencaAbertura).toFixed(2).replace(".", ",")}{" "}
+                    O caixa anterior foi fechado com {formatMoneyBRL(valorAnterior)}. Esta abertura
+                    tem uma diferenca de R$ {formatBRL(Math.abs(diferencaAbertura))}{" "}
                     {diferencaAbertura > 0 ? "a mais" : "a menos"}.
                   </p>
                 </div>
@@ -445,7 +484,7 @@ export default function ModalAbrirCaixa({ onClose, onSucesso }) {
 
             <button
               onClick={handleAbrirCaixa}
-              disabled={loading || valorAbertura === ""}
+              disabled={loading || carregandoConferencia || erroConferencia || valorAbertura === ""}
               className="px-8 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {loading ? "Abrindo..." : "Abrir Caixa"}

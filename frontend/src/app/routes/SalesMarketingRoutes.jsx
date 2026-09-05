@@ -12,6 +12,7 @@ import {
   EcommercePreview,
   EstudioOfertas,
   MeusCaixas,
+  AlertasGestor,
   NFEntrada,
   PDV,
 } from "../lazyPages";
@@ -20,6 +21,14 @@ import { ModuleGate } from "./RouteGates";
 export function createSalesMarketingRoutes() {
   return (
     <>
+      <Route
+        path="alertas-gestor"
+        element={
+          <ProtectedRoute permission="relatorios.gerencial">
+            <AlertasGestor />
+          </ProtectedRoute>
+        }
+      />
       <Route
         path="pdv"
         element={

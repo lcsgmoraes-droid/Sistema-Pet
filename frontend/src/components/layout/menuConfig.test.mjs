@@ -44,6 +44,7 @@ test("createLayoutMenuItems organiza a rotina e agrupa as telas do Bling", () =>
     "/entregas",
   ]);
   assert.deepEqual(pathsBySection("Gestão"), [
+    "/alertas-gestor",
     "/cadastros",
     "/rh",
     "/ia",
