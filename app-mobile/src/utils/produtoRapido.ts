@@ -13,5 +13,7 @@ export function formatarCampoMonetarioProduto(texto: string): string {
 
 export function erroCadastroProduto(error: unknown, fallback: string): string {
   const detail = (error as { response?: { data?: { detail?: unknown } } })?.response?.data?.detail;
-  return typeof detail === "string" ? detail : fallback;
+  if (typeof detail === "string") return detail;
+  if (detail && typeof detail === "object" && "mensagem" in detail && typeof detail.mensagem === "string") return detail.mensagem;
+  return fallback;
 }

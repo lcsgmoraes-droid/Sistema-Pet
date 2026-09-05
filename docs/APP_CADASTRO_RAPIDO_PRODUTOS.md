@@ -5,11 +5,18 @@ câmera ou digite o código e toque em **Consultar código**.
 
 - Se o produto já existir, o app mostra nome, código interno, preço e eventual
   status inativo. O cadastro existente é preservado.
-- Se não existir, informe nome e preço de venda. Custo é opcional e a unidade
-  começa em UN. Toque em **Cadastrar produto**.
-- O produto é salvo no cadastro de Produtos do ERP, com um código interno
-  automático, estoque zero e anúncios no app/loja online desativados. Fotos,
-  categoria, marca e dados fiscais podem ser completados pelo ERP.
+- Se não existir, informe nome e preço de venda. Custo e descrição são opcionais;
+  a unidade começa em UN. Toque em **Cadastrar produto**.
+- O SKU/código interno é opcional: o app consulta a disponibilidade do valor
+  digitado, incluindo produtos inativos. Vazio gera um SKU automático. O servidor
+  verifica novamente ao salvar, e o índice único do ERP impede colisões.
+- Em **Fotos**, use **Tirar foto** ou **Galeria**, confira o enquadramento e adicione
+  até cinco fotos. A primeira vira principal; elas aparecem na galeria do ERP.
+- O produto é salvo no cadastro de Produtos do ERP, com estoque zero e anúncios
+  no app/loja online desativados. Categoria, marca e dados fiscais podem ser
+  completados pelo ERP.
+- Se o envio das fotos falhar, o produto continua salvo. Use **Tentar enviar fotos
+  novamente** para enviar as pendentes, sem criar outro produto ou duplicar fotos.
 - Para informar estoque, use a operação existente **Balanço de estoque**.
 
 O preço de venda é obrigatório porque essa já é uma regra do ERP para produtos
@@ -26,6 +33,11 @@ Clientes sem esse perfil não podem consultar ou cadastrar por essas rotas.
 5. Negar a câmera e seguir digitando o código. Simular falta de conexão na busca
    e ao salvar: o app deve mostrar erro e manter os dados para nova tentativa.
 6. Verificar digitação de preços com vírgula fixa e separador de milhar.
+7. Testar SKU livre, ocupado por inativo, com espaços/letras minúsculas e vazio.
+8. Preencher descrição; tirar uma foto e selecionar outra na galeria. Remover
+   antes de salvar e conferir a ordem, principal e imagens no ERP.
+9. Simular falha durante envio de fotos. Conferir produto já salvo, fotos
+   pendentes e reenvio. Sair ou iniciar outro cadastro deve avisar sobre pendências.
 
 ## Entrega
 
@@ -50,14 +62,16 @@ entre aparelhos ou novas tentativas após timeout.
 
 Funcionários precisam cadastrar um produto sem voltar ao computador. O aceite
 é consultar por câmera ou digitação, reconhecer duplicados e gravar o mínimo
-no mesmo catálogo do ERP. Estoque inicial, fotos, tributação, variações e kits
+no mesmo catálogo do ERP, incluindo descrição e fotos opcionais. Estoque inicial, tributação, variações e kits
 continuam nos fluxos existentes. O formulário permite digitação sem câmera,
 acomoda teclado e apresenta valores em formato brasileiro.
 
 ### 2. Regras e dados
 
-Nome, código e preço de venda positivo são obrigatórios. Custo é opcional.
-SKU é automático. Não há migration, importação ou novo dado pessoal; o usuário
+Nome, código de barras e preço de venda positivo são obrigatórios. Custo,
+descrição de até 1.000 caracteres e fotos são opcionais. SKU pode ser informado
+ou automático e respeita o limite de 50 caracteres do ERP. Não há migration;
+o usuário
 criador permanece em `user_id` do produto. Empresa vem da sessão autenticada.
 Campos fora do cadastro rápido são rejeitados. Consulta e gravação consideram
 inativos, GTIN comercial/tributário, SKU e códigos alternativos completos.
@@ -67,25 +81,32 @@ inativos, GTIN comercial/tributário, SKU e códigos alternativos completos.
 Rotas novas sob `/api/app/funcionario/produtos`, com tela e serviço mobile próprios.
 A criação reutiliza `ProdutoService`; não chama a rota administrativa com token
 de cliente. API usa a sessão e o timeout já existentes no app. Uma falha mantém
-o formulário; uma nova tentativa verifica duplicidade antes de gravar.
-Não há integração externa adicional.
+o formulário; uma nova tentativa verifica duplicidade antes de gravar. O envio
+de fotos usa multipart, timeout de 60 segundos e o storage normal de produtos.
+Hash do arquivo evita duplicação em reenvios; a primeira foto é principal.
+Não há integração externa adicional nem mudança em dependências nativas.
 
 ### 4. Segurança e privacidade
 
-Autenticação mobile e perfil operacional são obrigatórios nas duas rotas.
+Autenticação mobile e perfil operacional são obrigatórios em todas as rotas.
 Consultas e gravações têm tenant explícito. Testes verificam negação de acesso
 e ausência de exposição/conflito com outra empresa. Nenhum segredo ou nova
 configuração é necessário; não registrar tokens ou dados pessoais em logs.
-Finalidade e retenção seguem o cadastro de produtos existente.
+Finalidade e retenção seguem o cadastro de produtos existente. Upload tem
+limites de tamanho/quantidade, validação real de imagem, proteção contra imagens
+de dimensões excessivas e reencodificação WebP. Arquivos são separados por empresa
+e produto. Falha de gravação no banco remove arquivos sem registro.
 
 ### 5. Qualidade
 
-- 27 testes de API com banco SQLite isolado: criação, reenvio, inativos, GTIN,
-  UPC/EAN com zeros, código alternativo completo, campos inválidos e acesso.
+- 46 testes de API com banco SQLite isolado: criação, reenvio, inativos, GTIN,
+  SKU, descrição, galeria, acesso, imagens inválidas, falha de storage/banco,
+  isolamento e recuperação do envio.
 - 40 testes existentes de estoque/PDV, SKU, EAN e tipo de produto passaram.
-- 3 testes mobile de moeda e mensagens de erro passaram.
+- 7 testes mobile de moeda, mensagens, fotos pendentes, negação/cancelamento de
+  câmera, limite/remoção e resposta atrasada de SKU passaram.
 - `npm run typecheck`, Ruff e exportação Expo para Android/iOS passaram.
-- Exportação local em `runtime/qa-produto-rapido`, fora do Git.
+- Exportação local em `runtime/qa-produto-rapido-fotos`, fora do Git.
 
 ### 6. Ambiente e homologação
 

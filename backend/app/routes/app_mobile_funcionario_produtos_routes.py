@@ -1,6 +1,7 @@
 """Cadastro rapido de produtos no perfil operacional, para completar no ERP."""
 
 from decimal import Decimal
+import logging
 from typing import Literal
 from uuid import UUID, uuid4
 
@@ -17,9 +18,12 @@ from app.routes.app_mobile_funcionario_pdv.auth import (
     _get_funcionario_operacional_or_403,
 )
 from app.routes.ecommerce_auth import _get_current_ecommerce_user
-from app.services.produto_service import ProdutoService
+from app.services.produto_service import ProdutoService, normalizar_sku_produto
+from app.routes.app_mobile_funcionario_produto_imagens import router as imagens_router
 
 router = APIRouter(prefix="/funcionario/produtos")
+router.include_router(imagens_router)
+logger = logging.getLogger(__name__)
 
 
 class ProdutoRapidoRequest(BaseModel):
@@ -29,11 +33,18 @@ class ProdutoRapidoRequest(BaseModel):
         min_length=1, max_length=20, pattern=r"^[A-Za-z0-9 ._/-]+$"
     )
     nome: str = Field(min_length=1, max_length=200)
+    codigo: str | None = Field(default=None, max_length=50)
+    descricao_curta: str | None = Field(default=None, max_length=1000)
     preco_venda: Decimal = Field(gt=0, max_digits=10, decimal_places=2)
     preco_custo: Decimal = Field(
         default=Decimal("0"), ge=0, max_digits=10, decimal_places=2
     )
     unidade: Literal["UN", "KG", "CX", "PC", "LT"] = "UN"
+
+    @field_validator("codigo", mode="before")
+    @classmethod
+    def normalizar_codigo(cls, valor):
+        return normalizar_sku_produto(valor) if str(valor or "").strip() else None
 
 
 class ProdutoRapidoResponse(BaseModel):
@@ -47,6 +58,8 @@ class ProdutoRapidoResponse(BaseModel):
     preco_venda: float | None = None
     ativo: bool
     situacao: bool | None = None
+    descricao_curta: str | None = None
+    imagem_principal: str | None = None
 
     @field_validator("unidade", mode="before")
     @classmethod
@@ -120,6 +133,48 @@ def consultar_codigo_produto_rapido(
     return _buscar_produto_existente(db, UUID(tenant_id), codigo)
 
 
+def _buscar_sku(db: Session, tenant_id: UUID, codigo: str) -> Produto | None:
+    return (
+        db.query(Produto)
+        .filter(
+            Produto.tenant_id == tenant_id,
+            func.lower(func.trim(Produto.codigo)) == codigo.lower(),
+        )
+        .first()
+    )
+
+
+class SkuDisponibilidadeResponse(BaseModel):
+    codigo: str
+    disponivel: bool
+
+
+@router.get("/consultar-sku", response_model=SkuDisponibilidadeResponse)
+def consultar_sku_produto_rapido(
+    codigo: str = Query(min_length=1, max_length=50),
+    current_user: User = Depends(_get_current_ecommerce_user),
+    db: Session = Depends(get_session),
+):
+    _, tenant_id = _get_funcionario_operacional_or_403(db, current_user)
+    if not codigo.strip():
+        raise HTTPException(status_code=400, detail="Informe o SKU para consultar.")
+    codigo = normalizar_sku_produto(codigo)
+    return {
+        "codigo": codigo,
+        "disponivel": _buscar_sku(db, UUID(tenant_id), codigo) is None,
+    }
+
+
+def _sku_indisponivel() -> HTTPException:
+    return HTTPException(
+        status_code=409,
+        detail={
+            "campo": "codigo",
+            "mensagem": "Este SKU ja esta em uso. Escolha outro ou deixe vazio para gerar automaticamente.",
+        },
+    )
+
+
 @router.post("/rapido", response_model=ProdutoRapidoResponse, status_code=201)
 def criar_produto_rapido(
     payload: ProdutoRapidoRequest,
@@ -141,15 +196,20 @@ def criar_produto_rapido(
             status_code=409,
             detail={
                 "mensagem": "Este codigo ja esta cadastrado no ERP.",
+                "campo": "codigo_barras",
                 "produto": ProdutoRapidoResponse.model_validate(existente).model_dump(),
             },
         )
+
+    codigo = payload.codigo or f"APP-{uuid4().hex[:16].upper()}"
+    if _buscar_sku(db, tenant_uuid, codigo):
+        raise _sku_indisponivel()
 
     dados = {
         **payload.model_dump(),
         "preco_venda": float(payload.preco_venda),
         "preco_custo": float(payload.preco_custo),
-        "codigo": f"APP-{uuid4().hex[:16].upper()}",
+        "codigo": codigo,
         "user_id": current_user.id,
         "tipo": "produto",
         "tipo_produto": "SIMPLES",
@@ -159,4 +219,16 @@ def criar_produto_rapido(
         "anunciar_app": False,
         "anunciar_ecommerce": False,
     }
-    return ProdutoService.create_produto(dados=dados, db=db, tenant_id=tenant_uuid)
+    try:
+        return ProdutoService.create_produto(dados=dados, db=db, tenant_id=tenant_uuid)
+    except ValueError as exc:
+        # O indice unico do ERP continua sendo a barreira final para outra criacao
+        # que ocorrer entre a consulta e o commit, inclusive fora do app.
+        db.rollback()
+        if _buscar_sku(db, tenant_uuid, codigo):
+            raise _sku_indisponivel() from exc
+        logger.exception("Falha ao cadastrar produto pelo app")
+        raise HTTPException(
+            status_code=500,
+            detail="Nao foi possivel salvar o produto. Tente novamente.",
+        ) from exc

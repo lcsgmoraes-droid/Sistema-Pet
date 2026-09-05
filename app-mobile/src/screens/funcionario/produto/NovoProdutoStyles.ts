@@ -34,4 +34,11 @@ export const novoProdutoStyles = StyleSheet.create({
   unidadeAtiva: { borderColor: CORES.primario, backgroundColor: CORES.primarioClaro },
   unidadeTextoAtivo: { color: CORES.primarioEscuro, fontWeight: "700", fontSize: FONTE.normal },
   preco: { color: CORES.primario, fontSize: FONTE.titulo, fontWeight: "800" },
+  descricao: { minHeight: 100, textAlignVertical: "top" },
+  fotosSection: { gap: ESPACO.md },
+  fotoCard: { width: 112, gap: 4 },
+  foto: { width: 112, height: 112, borderRadius: RAIO.sm, backgroundColor: CORES.fundo },
+  fotoLegenda: { fontSize: FONTE.pequena, color: CORES.textoSecundario },
+  removerFoto: { minHeight: 44, justifyContent: "center" },
+  botaoFoto: { minHeight: 48, flexDirection: "row", gap: ESPACO.sm, alignItems: "center", padding: ESPACO.sm, borderWidth: 1, borderColor: CORES.borda, borderRadius: RAIO.sm },
 });

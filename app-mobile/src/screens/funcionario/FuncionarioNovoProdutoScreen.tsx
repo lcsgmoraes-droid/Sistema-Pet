@@ -1,5 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useIsFocused } from "@react-navigation/native";
+import { useIsFocused, useNavigation } from "@react-navigation/native";
 import { useCameraPermissions } from "expo-camera";
 import React, { useEffect, useRef, useState } from "react";
 import {
@@ -18,6 +18,9 @@ import {
 } from "../../utils/produtoRapido";
 import { FuncionarioPdvScanner } from "./pdv/FuncionarioPdvScanner";
 import { novoProdutoStyles as styles } from "./produto/NovoProdutoStyles";
+import { ProdutoRapidoFotos } from "./produto/ProdutoRapidoFotos";
+import { useProdutoRapidoFotos } from "./produto/useProdutoRapidoFotos";
+import { useSkuProdutoRapido } from "./produto/useSkuProdutoRapido";
 
 const UNIDADES: { valor: ProdutoRapidoPayload["unidade"]; nome: string }[] = [
   { valor: "UN", nome: "Unidade" }, { valor: "KG", nome: "Quilo" },
@@ -32,19 +35,42 @@ export default function FuncionarioNovoProdutoScreen() {
   const [etapa, setEtapa] = useState<"codigo" | "formulario" | "existente" | "salvo">("codigo");
   const [codigo, setCodigo] = useState("");
   const [nome, setNome] = useState("");
+  const [sku, setSku] = useState("");
+  const [descricao, setDescricao] = useState("");
+  const skuInfo = useSkuProdutoRapido(sku);
+  const fotos = useProdutoRapidoFotos();
   const [preco, setPreco] = useState("");
   const [custo, setCusto] = useState("");
   const [unidade, setUnidade] = useState<ProdutoRapidoPayload["unidade"]>("UN");
   const [produto, setProduto] = useState<ProdutoRapido | null>(null);
-  const [ocupado, setOcupado] = useState(false);
+  const [salvando, setOcupado] = useState(false);
+  const ocupado = salvando || fotos.ocupado;
   const [erro, setErro] = useState("");
   const operacaoEmCurso = useRef(false);
   const montado = useRef(true);
+  const navigation = useNavigation<any>();
+  const descartarSaida = useRef(false);
 
   useEffect(() => {
     montado.current = true;
     return () => { montado.current = false; };
   }, []);
+
+  useEffect(() => navigation.addListener("beforeRemove", (event: any) => {
+    if (descartarSaida.current) return;
+    if (ocupado) {
+      event.preventDefault();
+      Alert.alert("Aguarde", "Estamos concluindo a operação. Aguarde antes de sair.");
+      return;
+    }
+    if (fotos.pendentes || (etapa === "formulario" && (nome || sku || descricao || preco || custo))) {
+      event.preventDefault();
+      Alert.alert("Há dados sem enviar", "Se sair agora, os dados e fotos pendentes desta tela serão descartados.", [
+        { text: "Continuar aqui", style: "cancel" },
+        { text: "Sair", style: "destructive", onPress: () => { descartarSaida.current = true; navigation.dispatch(event.data.action); } },
+      ]);
+    }
+  }), [navigation, ocupado, fotos.pendentes, etapa, nome, sku, descricao, preco, custo]);
 
   async function consultar(valor: string) {
     if (operacaoEmCurso.current) return;
@@ -92,7 +118,8 @@ export default function FuncionarioNovoProdutoScreen() {
   }
 
   async function salvar() {
-    if (operacaoEmCurso.current) return;
+    if (operacaoEmCurso.current || fotos.ocupado) return;
+    if (skuInfo.status === "ocupado") { setErro(skuInfo.mensagem); return; }
     const precoVenda = valorMonetarioProduto(preco);
     const precoCusto = valorMonetarioProduto(custo);
     if (!nome.trim() || precoVenda <= 0) {
@@ -110,14 +137,19 @@ export default function FuncionarioNovoProdutoScreen() {
       const criado = await criarProdutoRapido({
         codigo_barras: codigo, nome: nome.trim(), preco_venda: precoVenda,
         preco_custo: precoCusto, unidade,
+        codigo: sku.trim().toUpperCase() || undefined,
+        descricao_curta: descricao.trim() || undefined,
       });
       if (!montado.current) return;
       setProduto(criado);
       setEtapa("salvo");
+      await fotos.enviar(criado.id);
     } catch (error) {
       if (!montado.current) return;
-      const resposta = (error as { response?: { status?: number; data?: { detail?: { produto?: ProdutoRapido } } } }).response;
-      if (resposta?.status === 409 && resposta.data?.detail?.produto) {
+      const resposta = (error as { response?: { status?: number; data?: { detail?: { produto?: ProdutoRapido; campo?: string } } } }).response;
+      if (resposta?.status === 409 && resposta.data?.detail?.campo === "codigo") {
+        setErro(erroCadastroProduto(error, "Este SKU já está em uso. Escolha outro ou deixe vazio."));
+      } else if (resposta?.status === 409 && resposta.data?.detail?.produto) {
         setProduto(resposta.data.detail.produto);
         setEtapa("existente");
       } else {
@@ -129,9 +161,21 @@ export default function FuncionarioNovoProdutoScreen() {
     }
   }
 
-  function reiniciar() {
+  function limparFormulario() {
     setEtapa("codigo"); setCodigo(""); setNome(""); setPreco(""); setCusto("");
-    setUnidade("UN"); setProduto(null); setErro("");
+    setUnidade("UN"); setProduto(null); setErro(""); setSku(""); setDescricao(""); fotos.limpar();
+  }
+
+  function reiniciar() {
+    if (ocupado) return;
+    if (fotos.pendentes) {
+      Alert.alert("Fotos pendentes", "Ainda há fotos sem enviar. Deseja descartá-las e começar outro cadastro?", [
+        { text: "Voltar às fotos", style: "cancel" },
+        { text: "Descartar fotos", style: "destructive", onPress: limparFormulario },
+      ]);
+      return;
+    }
+    limparFormulario();
   }
 
   return (
@@ -181,6 +225,20 @@ export default function FuncionarioNovoProdutoScreen() {
               maxLength={200} editable={!ocupado} placeholder="Ex.: Ração para cães adultos 10 kg"
               placeholderTextColor={CORES.textoClaro} autoCapitalize="sentences"
             />
+            <Text style={styles.label}>SKU / código interno · opcional</Text>
+            <TextInput
+              accessibilityLabel="SKU do produto" style={styles.input} value={sku}
+              onChangeText={(valor) => { setSku(valor); setErro(""); }} editable={!ocupado}
+              maxLength={50} autoCapitalize="characters" autoCorrect={false}
+              placeholder="Gerado automaticamente se ficar vazio" placeholderTextColor={CORES.textoClaro}
+            />
+            <Text accessibilityLiveRegion="polite" style={skuInfo.status === "ocupado" ? styles.erro : styles.texto}>{skuInfo.mensagem}</Text>
+            <Text style={styles.label}>Descrição · opcional</Text>
+            <TextInput
+              accessibilityLabel="Descrição do produto" style={[styles.input, styles.descricao]} value={descricao}
+              onChangeText={setDescricao} editable={!ocupado} maxLength={1000} multiline
+              placeholder="Ex.: sabor, tamanho, indicação de uso..." placeholderTextColor={CORES.textoClaro}
+            />
             <Text style={styles.label}>Preço de venda (R$) *</Text>
             <TextInput
               accessibilityLabel="Preço de venda" style={styles.input} value={preco}
@@ -207,8 +265,9 @@ export default function FuncionarioNovoProdutoScreen() {
                 </TouchableOpacity>
               ))}
             </View>
-            <Text style={styles.texto}>O estoque começa em zero. Depois, registre o saldo em Balanço de estoque. Fotos, categoria e dados fiscais podem ser preenchidos no ERP.</Text>
-            <TouchableOpacity accessibilityRole="button" style={[styles.primario, ocupado && styles.desabilitado]} disabled={ocupado} onPress={salvar}>
+            <ProdutoRapidoFotos fotos={fotos.fotos} ocupado={ocupado} salvo={false} adicionar={fotos.adicionar} remover={fotos.remover} />
+            <Text style={styles.texto}>O estoque começa em zero. Depois, registre o saldo em Balanço de estoque. Categoria e dados fiscais podem ser preenchidos no ERP.</Text>
+            <TouchableOpacity accessibilityRole="button" style={[styles.primario, (ocupado || skuInfo.status === "ocupado") && styles.desabilitado]} disabled={ocupado || skuInfo.status === "ocupado"} onPress={salvar}>
               <Text style={styles.primarioTexto}>{ocupado ? "Salvando..." : "Cadastrar produto"}</Text>
             </TouchableOpacity>
           </View>
@@ -222,6 +281,13 @@ export default function FuncionarioNovoProdutoScreen() {
             <Text style={styles.texto}>Código interno: {produto.codigo}</Text>
             <Text style={styles.texto}>Código de barras: {produto.codigo_barras || codigo}</Text>
             <Text style={styles.preco}>{formatarMoeda(produto.preco_venda)} / {produto.unidade}</Text>
+            {produto.descricao_curta ? <Text style={styles.texto}>{produto.descricao_curta}</Text> : null}
+            {etapa === "salvo" && fotos.fotos.length > 0 ? <>
+              <ProdutoRapidoFotos fotos={fotos.fotos} ocupado={ocupado} salvo adicionar={fotos.adicionar} remover={fotos.remover} />
+              {fotos.pendentes ? <TouchableOpacity accessibilityRole="button" style={[styles.secundario, ocupado && styles.desabilitado]} disabled={ocupado} onPress={() => fotos.enviar(produto.id)}>
+                <Text style={styles.secundarioTexto}>{ocupado ? "Enviando fotos..." : "Tentar enviar fotos novamente"}</Text>
+              </TouchableOpacity> : <Text style={styles.texto}>Fotos salvas na galeria do produto no ERP.</Text>}
+            </> : null}
             {!produto.ativo || produto.situacao === false ? (
               <Text style={styles.erro}>Produto inativo. Revise o cadastro no ERP para reativá-lo.</Text>
             ) : null}
@@ -238,6 +304,7 @@ export default function FuncionarioNovoProdutoScreen() {
 
         {ocupado ? <View style={styles.heading}><ActivityIndicator color={CORES.primario} /><Text style={styles.texto}>{etapa === "codigo" ? "Consultando o ERP..." : "Aguarde..."}</Text></View> : null}
         {erro ? <Text accessibilityRole="alert" accessibilityLiveRegion="polite" style={styles.erro}>{erro}</Text> : null}
+        {fotos.erro ? <Text accessibilityRole="alert" accessibilityLiveRegion="polite" style={styles.erro}>{fotos.erro}</Text> : null}
       </KeyboardSafeScrollView>
 
       <Modal visible={scannerAberto && isFocused} animationType="slide" onRequestClose={() => setScannerAberto(false)}>
