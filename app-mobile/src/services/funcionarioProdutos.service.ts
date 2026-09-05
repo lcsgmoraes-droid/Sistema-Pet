@@ -14,7 +14,8 @@ export type ProdutoRapido = {
 };
 
 export type ProdutoRapidoPayload = {
-  codigo_barras: string;
+  codigo_barras?: string;
+  chave_cadastro?: string;
   nome: string;
   preco_venda: number;
   preco_custo: number;
@@ -25,7 +26,7 @@ export type ProdutoRapidoPayload = {
 
 export type FotoProdutoRapido = { uri: string; name: string; type: string; enviada?: boolean };
 
-export async function consultarSkuProdutoRapido(codigo: string): Promise<{ codigo: string; disponivel: boolean }> {
+export async function consultarSkuProdutoRapido(codigo: string): Promise<{ codigo: string; disponivel: boolean; produto: ProdutoRapido | null }> {
   const { data } = await api.get("/app/funcionario/produtos/consultar-sku", { params: { codigo: codigo.trim() } });
   return data;
 }

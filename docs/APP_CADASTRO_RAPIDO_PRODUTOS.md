@@ -1,7 +1,12 @@
 # Cadastro rápido de produtos no app
 
-No perfil **Funcionário**, abra **Novo produto**. Leia o código de barras pela
-câmera ou digite o código e toque em **Consultar código**.
+No perfil **Funcionário**, abra **Novo produto** e escolha como começar:
+
+- **Código de barras**: leia pela câmera ou digite e toque em **Consultar código**.
+- **SKU / código interno**: digite o SKU e toque em **Consultar SKU**. A busca
+  aceita até 50 caracteres, mantém zeros à esquerda e compara o SKU exato.
+- **Adicionar sem código de barras**: abre o formulário diretamente. Informe um
+  SKU se tiver ou deixe vazio para gerar automaticamente.
 
 - Se o produto já existir, o app mostra nome, código interno, preço e eventual
   status inativo. O cadastro existente é preservado.
@@ -10,6 +15,8 @@ câmera ou digite o código e toque em **Consultar código**.
 - O SKU/código interno é opcional: o app consulta a disponibilidade do valor
   digitado, incluindo produtos inativos. Vazio gera um SKU automático. O servidor
   verifica novamente ao salvar, e o índice único do ERP impede colisões.
+- Código de barras é opcional também no formulário e fica vazio no ERP quando
+  ausente. Pode ser adicionado depois, sem copiar o SKU para esse campo.
 - Em **Fotos**, use **Tirar foto** ou **Galeria**, confira o enquadramento e adicione
   até cinco fotos. A primeira vira principal; elas aparecem na galeria do ERP.
 - O produto é salvo no cadastro de Produtos do ERP, com estoque zero e anúncios
@@ -38,6 +45,11 @@ Clientes sem esse perfil não podem consultar ou cadastrar por essas rotas.
    antes de salvar e conferir a ordem, principal e imagens no ERP.
 9. Simular falha durante envio de fotos. Conferir produto já salvo, fotos
    pendentes e reenvio. Sair ou iniciar outro cadastro deve avisar sobre pendências.
+10. Iniciar por SKU livre e conferir que preenche somente o código interno.
+    Consultar SKU existente/inativo, com zeros à esquerda e com 50 caracteres.
+11. Cadastrar sem código de barras, com e sem SKU manual. Conferir EAN vazio no ERP.
+12. Simular resposta perdida após gravar um produto sem códigos: salvar novamente
+    deve confirmar o mesmo produto. Cadastrar outro deve gerar outra identidade.
 
 ## Entrega
 
@@ -68,7 +80,7 @@ acomoda teclado e apresenta valores em formato brasileiro.
 
 ### 2. Regras e dados
 
-Nome, código de barras e preço de venda positivo são obrigatórios. Custo,
+Nome e preço de venda positivo são obrigatórios. Código de barras, custo,
 descrição de até 1.000 caracteres e fotos são opcionais. SKU pode ser informado
 ou automático e respeita o limite de 50 caracteres do ERP. Não há migration;
 o usuário
@@ -85,6 +97,12 @@ o formulário; uma nova tentativa verifica duplicidade antes de gravar. O envio
 de fotos usa multipart, timeout de 60 segundos e o storage normal de produtos.
 Hash do arquivo evita duplicação em reenvios; a primeira foto é principal.
 Não há integração externa adicional nem mudança em dependências nativas.
+
+O app conserva uma chave por tentativa até iniciar outro cadastro. Quando o SKU
+é automático, o servidor deriva o código dessa chave e da empresa, confirmando
+o mesmo produto em reenvios após timeout. Os dados já gravados são preservados.
+A chave não é credencial nem vira campo novo no banco. Versões anteriores do
+app continuam compatíveis; o campo é opcional na API.
 
 ### 4. Segurança e privacidade
 
@@ -153,3 +171,13 @@ A validação de câmera e aparência em aparelho real permanece no roteiro acim
   ambos com Android e iOS. Manter esses alvos ao publicar a OTA.
 - Executar o gate completo no código integrado; depois juntar o PR, publicar o
   backend pelo launcher oficial e verificar saúde/commit antes das OTAs.
+
+### Complemento: produto sem código de barras — 05/09/2026
+
+O início passa a aceitar consulta por barras, consulta por SKU ou abertura direta
+sem barras. Nome e preço continuam obrigatórios; SKU pode ser automático. A
+consulta de SKU agora retorna também o produto da própria empresa, permitindo
+mostrar o cadastro existente. Campos e respostas dos apps anteriores continuam
+aceitos. O backend deve ser publicado antes da OTA; não há migration nem mudança
+nativa. Validação: 56 testes da API, 13 testes mobile focados e TypeScript passaram.
+O teste no aparelho permanece no roteiro acima.

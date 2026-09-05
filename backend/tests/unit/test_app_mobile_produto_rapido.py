@@ -176,7 +176,7 @@ def test_cliente_sem_perfil_operacional_nao_consulta_nem_cadastra(ambiente):
     [
         {"nome": "   "},
         {"nome": "a" * 201},
-        {"codigo_barras": " "},
+        {"codigo_barras": "@invalido"},
         {"codigo_barras": "1" * 21},
         {"preco_venda": 0},
         {"preco_venda": -1},

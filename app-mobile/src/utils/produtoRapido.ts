@@ -17,3 +17,11 @@ export function erroCadastroProduto(error: unknown, fallback: string): string {
   if (detail && typeof detail === "object" && "mensagem" in detail && typeof detail.mensagem === "string") return detail.mensagem;
   return fallback;
 }
+
+/** Identifica uma tentativa de cadastro; nao e um token de acesso. */
+export function gerarChaveCadastroProduto(): string {
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (caractere) => {
+    const aleatorio = Math.floor(Math.random() * 16);
+    return (caractere === "x" ? aleatorio : (aleatorio & 3) | 8).toString(16);
+  });
+}
