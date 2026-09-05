@@ -4,7 +4,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import api from "../api";
 import { useAuth } from "../contexts/AuthContext";
 import VendasFinanceiroView from "./financeiro/VendasFinanceiroView";
-import { CANAL_LOJA_FISICA, normalizeSalesChannel } from "../utils/salesChannel";
+import { obterCanalVendaFinanceiro } from "./financeiro/vendasFinanceiroChannels";
 import {
   REPROCESSAMENTO_DESTAQUE_MS,
   montarFeedbackReprocessamentoVendas,
@@ -35,34 +35,19 @@ import {
   montarFeriadosPeriodoFinanceiro,
   montarVendasPorDataCalendarioFinanceiro,
   sanitizarNumero,
+  RESUMO_VENDAS_VAZIO,
   vendaEstaEmAberto,
 } from "./financeiro/vendasFinanceiroUtils";
 import { useVendasFinanceiroActions } from "./financeiro/vendasFinanceiro/useVendasFinanceiroActions";
 import { formatMoneyCellValue, isZeroMoneyValue } from "./ui/MoneyCell";
 import { getDashboardPeriodFromSearch } from "../pages/dashboard/dashboardOverview";
-
-function obterCanalVendaFinanceiro(venda) {
-  return normalizeSalesChannel(
-    venda?.canal_venda ||
-      venda?.origem_canal_venda ||
-      venda?.canal ||
-      venda?.origem ||
-      venda?.origem_loja_virtual,
-    CANAL_LOJA_FISICA,
-  );
-}
-
-const RESUMO_VENDAS_VAZIO = {
-  venda_bruta: 0,
-  taxa_entrega: 0,
-  desconto: 0,
-  venda_liquida: 0,
-  valor_recebido: 0,
-  em_aberto: 0,
-  quantidade_vendas: 0,
-};
+import VisaoVendasFinanceiro from "./financeiro/VisaoVendasFinanceiro";
 
 export default function VendasFinanceiro() {
+  return <VisaoVendasFinanceiro PorVenda={VendasFinanceiroPorVenda} />;
+}
+
+function VendasFinanceiroPorVenda() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();

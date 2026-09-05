@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from .auth.dependencies import get_current_user_and_tenant
 from .db import get_session
+from .financeiro.recebimentos_vendas_routes import router as recebimentos_router
 from .relatorio_vendas_builder import montar_relatorio_vendas
 from .relatorio_vendas_common import _normalizar_canal_venda_relatorio
 from .relatorio_vendas_pdf import exportar_vendas_pdf as exportar_vendas_pdf
@@ -19,6 +20,7 @@ from .services.venda_rentabilidade_reprocessamento_service import (
 
 router = APIRouter(prefix="/relatorios")
 router.include_router(relatorio_vendas_pdf_router)
+router.include_router(recebimentos_router)
 
 
 class ReprocessarRentabilidadeVendasRequest(BaseModel):
