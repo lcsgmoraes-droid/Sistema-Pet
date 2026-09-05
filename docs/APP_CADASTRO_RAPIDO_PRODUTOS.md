@@ -141,5 +141,15 @@ do roteiro deste documento.
 ### 10. Fechamento
 
 Implementação e testes automatizados concluídos. Segurança, dados, documentação,
-publicação e rollback avaliados. Decisão: pronta para revisão, com validação em
-aparelho e autorização de produção pendentes do Lucas antes da publicação.
+publicação e rollback avaliados. Lucas autorizou a publicação em 05/09/2026.
+A validação de câmera e aparência em aparelho real permanece no roteiro acima.
+
+### Preparação da publicação autorizada
+
+- PR #1303 integrado à `main` que já contém caixa/alertas (#1305) e limites de
+  estoque (#1304), preservando os registros de publicação dessas entregas.
+- Cadastro rápido não acrescenta migration nem altera dependências nativas.
+- Histórico EAS consultado: o canal `production` atende runtimes `1.0.3` e `1.0.4`,
+  ambos com Android e iOS. Manter esses alvos ao publicar a OTA.
+- Executar o gate completo no código integrado; depois juntar o PR, publicar o
+  backend pelo launcher oficial e verificar saúde/commit antes das OTAs.
