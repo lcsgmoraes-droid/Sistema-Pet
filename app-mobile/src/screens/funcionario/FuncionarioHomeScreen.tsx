@@ -78,6 +78,21 @@ export default function FuncionarioHomeScreen() {
 
       <TouchableOpacity
         style={styles.acao}
+        onPress={() => navigation.navigate("FuncionarioNovoProduto")}
+        accessibilityLabel="Novo produto"
+      >
+        <View style={[styles.acaoIcone, { backgroundColor: "#ECFDF5" }]}>
+          <Ionicons name="add-circle-outline" size={24} color={CORES.sucesso} />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.acaoTitulo}>Novo produto</Text>
+          <Text style={styles.acaoTexto}>Leia o código e faça um cadastro rápido no ERP.</Text>
+        </View>
+        <Ionicons name="chevron-forward" size={20} color={CORES.textoClaro} />
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        style={styles.acao}
         onPress={() => navigation.navigate("FuncionarioBanhoTosa")}
       >
         <View style={[styles.acaoIcone, { backgroundColor: "#CCFBF1" }]}>
