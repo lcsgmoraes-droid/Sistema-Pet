@@ -23,8 +23,9 @@ import {
 import { getProdutos } from "../api/produtos";
 import { formatBRL, formatMoneyBRL } from "../utils/formatters";
 import ProdutosValidadeProxima from "./ProdutosValidadeProxima";
+import ProdutosLimitesEstoque from "./ProdutosLimitesEstoque";
 
-const ABAS_VALIDAS = ["pendentes", "dashboard", "historico", "validade"];
+const ABAS_VALIDAS = ["pendentes", "dashboard", "historico", "validade", "limites"];
 
 const obterAbaDaQuery = (search) => {
   const aba = new URLSearchParams(search).get("aba");
@@ -39,12 +40,12 @@ export default function AlertasEstoque() {
   const [dashboard, setDashboard] = useState(null);
   const [loading, setLoading] = useState(false);
   const [reloadValidade, setReloadValidade] = useState(0);
-  const [abaAtiva, setAbaAtiva] = useState(() => obterAbaDaQuery(location.search)); // 'pendentes' | 'historico' | 'dashboard' | 'validade'
+  const [abaAtiva, setAbaAtiva] = useState(() => obterAbaDaQuery(location.search));
   const [produtosBrutos, setProdutosBrutos] = useState([]);
   const [alertasPrecoGranel, setAlertasPrecoGranel] = useState([]);
 
   useEffect(() => {
-    if (abaAtiva !== "validade") {
+    if (abaAtiva !== "validade" && abaAtiva !== "limites") {
       carregarDados();
     }
   }, [abaAtiva]);
@@ -57,7 +58,7 @@ export default function AlertasEstoque() {
   }, [location.search, abaAtiva]);
 
   useEffect(() => {
-    if (abaAtiva === "validade" || produtosBrutos.length > 0) return;
+    if (abaAtiva === "validade" || abaAtiva === "limites" || produtosBrutos.length > 0) return;
 
     getProdutos({ page_size: 500, ativo: true })
       .then((res) => {
@@ -121,6 +122,7 @@ export default function AlertasEstoque() {
   }, [produtosBrutos]);
 
   const carregarDados = async () => {
+    if (abaAtiva === "limites") return;
     if (abaAtiva === "validade") {
       setReloadValidade((prev) => prev + 1);
       return;
@@ -240,7 +242,7 @@ export default function AlertasEstoque() {
       </div>
 
       {/* Análises Inteligentes */}
-      {abaAtiva !== "validade" && produtosBrutos.length > 0 && (
+      {abaAtiva !== "validade" && abaAtiva !== "limites" && produtosBrutos.length > 0 && (
         <div className="mb-4 rounded-lg border border-indigo-100 bg-white p-4 shadow-sm md:mb-6 md:p-5">
           <h2 className="text-base font-semibold text-gray-800 mb-4">Análises Inteligentes</h2>
           <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-5">
@@ -350,7 +352,7 @@ export default function AlertasEstoque() {
                         {p.nome}
                       </button>
                       <span className="text-red-700 whitespace-nowrap">
-                        margem <strong>{p.margem.toFixed(1)}%</strong>
+                        margem <strong>{formatBRL(p.margem)}%</strong>
                       </span>
                     </div>
                   ))}
@@ -381,6 +383,19 @@ export default function AlertasEstoque() {
                     {alertasPendentes.length}
                   </span>
                 )}
+              </div>
+            </button>
+            <button
+              onClick={() => handleMudarAba("limites")}
+              className={`px-6 py-4 text-sm font-medium border-b-2 transition-colors ${
+                abaAtiva === "limites"
+                  ? "border-blue-500 text-blue-600"
+                  : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+              }`}
+            >
+              <div className="flex items-center gap-2 whitespace-nowrap">
+                <Package size={18} />
+                Mínimo e máximo
               </div>
             </button>
             <button
@@ -427,19 +442,21 @@ export default function AlertasEstoque() {
       </div>
 
       {/* Botão Atualizar */}
-      <div className="mb-4 flex justify-end">
-        <button
-          onClick={carregarDados}
-          disabled={loading}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 transition-colors"
-        >
-          <RefreshCw size={18} className={loading ? "animate-spin" : ""} />
-          Atualizar
-        </button>
-      </div>
+      {abaAtiva !== "limites" && (
+        <div className="mb-4 flex justify-end">
+          <button
+            onClick={carregarDados}
+            disabled={loading}
+            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 transition-colors"
+          >
+            <RefreshCw size={18} className={loading ? "animate-spin" : ""} />
+            Atualizar
+          </button>
+        </div>
+      )}
 
       {/* Conteúdo das Abas */}
-      {loading && abaAtiva !== "validade" ? (
+      {loading && abaAtiva !== "validade" && abaAtiva !== "limites" ? (
         <div className="bg-white rounded-lg shadow-sm p-12 text-center">
           <RefreshCw className="animate-spin mx-auto text-gray-400" size={48} />
           <p className="text-gray-600 mt-4">Carregando...</p>
@@ -736,6 +753,7 @@ export default function AlertasEstoque() {
           {abaAtiva === "validade" && (
             <ProdutosValidadeProxima embedded reloadSignal={reloadValidade} />
           )}
+          {abaAtiva === "limites" && <ProdutosLimitesEstoque embedded />}
         </>
       )}
     </div>

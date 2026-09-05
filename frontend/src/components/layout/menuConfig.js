@@ -202,11 +202,6 @@ export function createLayoutMenuItems({ lembretesCount = 0, convitesGruposCount 
           permission: "produtos.visualizar",
         },
         {
-          path: "/produtos/limites-estoque",
-          label: "Estoque mínimo e máximo",
-          permission: "produtos.visualizar",
-        },
-        {
           path: "/produtos/balanco",
           label: "Balanço",
           permission: "produtos.editar",
