@@ -1,5 +1,15 @@
 import { calcularValorRecebidoVenda } from "./vendasFinanceiroRelatorio.js";
 
+export const RESUMO_VENDAS_VAZIO = {
+  venda_bruta: 0,
+  taxa_entrega: 0,
+  desconto: 0,
+  venda_liquida: 0,
+  valor_recebido: 0,
+  em_aberto: 0,
+  quantidade_vendas: 0,
+};
+
 function arredondarMoeda(valor) {
   return Math.round((Number(valor) || 0) * 100) / 100;
 }

@@ -12,9 +12,14 @@ function assert(condition, message) {
   if (!condition) throw new Error(message);
 }
 
-for (const label of ["Faturamento", "Pedidos / unidades", "Lucro das vendas"]) {
+for (const label of ["Pedidos / unidades", "Lucro das vendas"]) {
   assert(dashboardSource.includes(`label="${label}"`), `Card principal ausente: ${label}`);
 }
+
+assert(
+  dashboardSource.includes('label={porRecebimento ? "Recebimentos de vendas" : "Faturamento"}'),
+  "Indicador principal deve acompanhar a visão da empresa, preservando Faturamento no padrão",
+);
 
 assert(
   dashboardSource.includes('onClick={() => navigate("/financeiro/dre")}'),

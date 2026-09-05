@@ -30,6 +30,7 @@ import api from "../api";
 import { useTour } from "../hooks/useTour";
 import { tourDashboard } from "../tours/tourDefinitions";
 import { formatMoneyBRL } from "../utils/formatters";
+import { formatarDataLocal } from "../components/financeiro/vendasFinanceiro/vendasFinanceiroDatas";
 import {
   CompactMetricCard,
   DashboardLoading,
@@ -67,7 +68,7 @@ const STATUS_STYLES = {
 
 function formatDate(dateValue) {
   if (!dateValue) return "-";
-  return new Date(dateValue).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
+  return formatarDataLocal(dateValue, { day: "2-digit", month: "2-digit" });
 }
 
 function formatQuantity(value) {
@@ -155,6 +156,8 @@ export default function DashboardFinanceiro() {
   const StatusIcon = statusIcon;
   const periodLabel = getPeriodLabel(periodDays);
   const grossSales = Number(summary?.vendas_periodo?.faturamento_bruto || 0);
+  const porRecebimento = summary?.visao_comercial === "recebimento";
+  const commercialValue = summary?.indicador_comercial ?? grossSales;
   const cashResult = Number(summary?.fluxo_periodo?.lucro || 0);
   const salesCount = Number(summary?.vendas_periodo?.quantidade || 0);
   const unitsSold = Number(summary?.vendas_periodo?.unidades || 0);
@@ -265,8 +268,8 @@ export default function DashboardFinanceiro() {
         <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
           <MetricCard
             icon={TrendingUp}
-            label="Faturamento"
-            value={formatMoneyBRL(grossSales)}
+            label={porRecebimento ? "Recebimentos de vendas" : "Faturamento"}
+            value={formatMoneyBRL(commercialValue)}
             detail={periodLabel}
             tone="violet"
             onClick={() => navigate(getDashboardDetailPath("sales", periodDays))}
@@ -275,7 +278,9 @@ export default function DashboardFinanceiro() {
             icon={ShoppingBag}
             label="Pedidos / unidades"
             value={`${formatQuantity(salesCount)} / ${formatQuantity(unitsSold)}`}
-            detail="Vendas e itens movimentados"
+            detail={
+              porRecebimento ? "Vendas e itens pela data da venda" : "Vendas e itens movimentados"
+            }
             tone="cyan"
             onClick={() => navigate(getDashboardDetailPath("sales", periodDays))}
           />
