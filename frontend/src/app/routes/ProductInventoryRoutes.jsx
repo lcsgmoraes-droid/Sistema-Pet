@@ -12,6 +12,7 @@ import {
   ProdutosNovo,
   ProdutosRelatorio,
   ProdutosValorizacaoEstoque,
+  ProdutosLimitesEstoque,
 } from "../lazyPages";
 
 export function createProductInventoryRoutes() {
@@ -74,6 +75,14 @@ export function createProductInventoryRoutes() {
         element={
           <ProtectedRoute permission="produtos.editar">
             <ProdutosBalanco />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="produtos/limites-estoque"
+        element={
+          <ProtectedRoute permission="produtos.visualizar">
+            <ProdutosLimitesEstoque />
           </ProtectedRoute>
         }
       />
