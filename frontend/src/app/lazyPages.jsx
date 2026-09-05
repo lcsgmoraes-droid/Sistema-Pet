@@ -54,6 +54,7 @@ export const BanhoTosaPage = lazy(() => import("../pages/banhoTosa/BanhoTosaPage
 export const preloadPDV = () => import("../pages/PDV");
 export const PDV = lazy(preloadPDV);
 export const MeusCaixas = lazy(() => import("../pages/MeusCaixas"));
+export const AlertasGestor = lazy(() => import("../pages/AlertasGestor"));
 export const NFEntrada = lazy(() => import("../pages/NFEntrada"));
 export const CentralNFSaida = lazy(() => import("../pages/CentralNFSaida"));
 

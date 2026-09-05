@@ -10,6 +10,7 @@ from app.produtos_routes import router as produtos_router
 from app.variacoes_routes import router as variacoes_router  # Sprint 2: Variações
 from app.vendas_routes import router as vendas_router
 from app.caixa_routes import router as caixa_router
+from app.alertas_gestor_routes import router as alertas_gestor_router
 from app.nfe_routes import router as nfe_router
 from app.estoque_routes import router as estoque_router
 from app.estoque_movimentacoes_manuais_routes import (
@@ -308,6 +309,7 @@ def register_routers(app: FastAPI) -> None:
     )  # ANTES de vendas_router!
     app.include_router(vendas_router, tags=["Vendas & PDV"])
     app.include_router(caixa_router, tags=["Controle de Caixa"])
+    app.include_router(alertas_gestor_router)
     app.include_router(
         nfe_router,
         tags=["Nota Fiscal Eletrônica (NF-e)"],

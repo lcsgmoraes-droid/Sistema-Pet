@@ -24,6 +24,13 @@ import { applyLayoutMenuStructure } from "./menuStructure.js";
 export function createLayoutMenuItems({ lembretesCount = 0, convitesGruposCount = 0 } = {}) {
   const items = [
     {
+      path: "/alertas-gestor",
+      icon: FiBell,
+      iconKey: "bell",
+      label: "Alertas do gestor",
+      permission: "relatorios.gerencial",
+    },
+    {
       path: "/dashboard",
       icon: FiHome,
       iconKey: "home",

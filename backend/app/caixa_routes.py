@@ -7,13 +7,20 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 from typing import Optional
-from datetime import datetime, date
-from pydantic import BaseModel
+from datetime import datetime, date, timezone
+from pydantic import BaseModel, Field
 
 from app.db import get_session
 from app.auth.dependencies import get_current_user_and_tenant
 from app.idempotency import idempotent  # ← IDEMPOTÊNCIA
 from app.caixa_models import Caixa, MovimentacaoCaixa
+from app.caixa.conferencia import (
+    instante_fechamento_sql,
+    moeda,
+    referencia_fechamento,
+    snapshot_abertura,
+    totais_dinheiro,
+)
 from app.caixa.escopo import (
     aplicar_escopo_caixa,
     buscar_caixa_aberto,
@@ -29,14 +36,19 @@ router = APIRouter(prefix="/caixas", tags=["caixas"])
 
 # Schemas
 class AbrirCaixaSchema(BaseModel):
-    valor_abertura: float
+    valor_abertura: float = Field(ge=0, allow_inf_nan=False)
+    caixa_anterior_id: Optional[int] = None
+    valor_fechamento_anterior: Optional[float] = Field(
+        default=None, ge=0, allow_inf_nan=False
+    )
+    data_fechamento_anterior: Optional[datetime] = None
     conta_origem_id: Optional[int] = None
     conta_origem_nome: Optional[str] = None
     observacoes_abertura: Optional[str] = None
 
 
 class FecharCaixaSchema(BaseModel):
-    valor_informado: float
+    valor_informado: float = Field(ge=0, allow_inf_nan=False)
     observacoes_fechamento: Optional[str] = None
 
 
@@ -63,12 +75,41 @@ def _ultimo_caixa_fechado(
         db.query(Caixa).filter(
             Caixa.status == "fechado",
             Caixa.valor_informado.is_not(None),
+            Caixa.data_fechamento.is_not(None),
         ),
         tenant_id=tenant_id,
         usuario_id=usuario_id,
         compartilhado=compartilhado,
     )
-    return query.order_by(Caixa.data_fechamento.desc(), Caixa.id.desc()).first()
+    return query.order_by(
+        instante_fechamento_sql().desc().nullslast(), Caixa.id.desc()
+    ).first()
+
+
+def _validar_referencia_abertura(dados: AbrirCaixaSchema, caixa_anterior) -> None:
+    # Clientes antigos continuam compatíveis; o novo formulário envia a referência exibida.
+    if "caixa_anterior_id" not in dados.model_fields_set:
+        return
+    atual = referencia_fechamento(caixa_anterior)
+    esperado = (
+        None
+        if dados.caixa_anterior_id is None
+        else {
+            "caixa_id": dados.caixa_anterior_id,
+            "valor_fechamento": dados.valor_fechamento_anterior,
+            "data_fechamento": dados.data_fechamento_anterior.isoformat()
+            if dados.data_fechamento_anterior
+            else None,
+        }
+    )
+    referencia = (
+        {chave: atual[chave] for chave in esperado} if atual and esperado else atual
+    )
+    if referencia != esperado:
+        raise HTTPException(
+            status_code=409,
+            detail="O último fechamento mudou. Confira a referência atualizada e tente abrir novamente.",
+        )
 
 
 def _serializar_caixa(caixa: Caixa, *, compartilhado: bool) -> dict:
@@ -130,6 +171,7 @@ async def abrir_caixa(
         usuario_id=current_user.id,
         compartilhado=compartilhado,
     )
+    _validar_referencia_abertura(dados, caixa_anterior)
     ultimo_caixa = (
         db.query(func.max(Caixa.numero_caixa))
         .filter(Caixa.tenant_id == tenant_id)
@@ -150,6 +192,7 @@ async def abrir_caixa(
         usuario_id=current_user.id,
         usuario_nome=usuario_nome,
         valor_abertura=dados.valor_abertura,
+        conferencia_abertura=snapshot_abertura(caixa_anterior, dados.valor_abertura),
         conta_origem_id=dados.conta_origem_id,
         conta_origem_nome=dados.conta_origem_nome,
         observacoes_abertura=_anexar_conferencia_abertura(
@@ -202,12 +245,7 @@ def obter_conferencia_abertura(
     )
     if not caixa:
         return None
-    return {
-        "caixa_id": caixa.id,
-        "numero_caixa": caixa.numero_caixa,
-        "valor_fechamento": float(caixa.valor_informado),
-        "data_fechamento": caixa.data_fechamento,
-    }
+    return referencia_fechamento(caixa)
 
 
 @router.get("")
@@ -411,19 +449,14 @@ async def fechar_caixa(
         .all()
     )
 
-    valor_esperado = caixa.valor_abertura
-
-    for mov in movimentacoes:
-        if mov.tipo in ["venda", "suprimento", "devolucao"]:
-            valor_esperado += mov.valor
-        elif mov.tipo in ["sangria", "despesa", "transferencia"]:
-            valor_esperado -= mov.valor
+    valor_esperado = totais_dinheiro(caixa.valor_abertura, movimentacoes)["saldo_atual"]
 
     # Calcular diferença (registrada no banco para auditoria)
-    diferenca = dados.valor_informado - valor_esperado
+    diferenca = float(moeda(dados.valor_informado) - moeda(valor_esperado))
 
     # Atualizar caixa
     caixa.data_fechamento = datetime.now()
+    caixa.fechamento_em = datetime.now(timezone.utc)
     caixa.valor_esperado = valor_esperado
     caixa.valor_informado = dados.valor_informado
     caixa.diferenca = diferenca
@@ -484,6 +517,7 @@ def reabrir_caixa(
     # Reabrir caixa
     caixa.status = "aberto"
     caixa.data_fechamento = None
+    caixa.fechamento_em = None
     caixa.valor_esperado = None
     caixa.valor_informado = None
     caixa.diferenca = None
@@ -523,18 +557,7 @@ def obter_resumo_caixa(
         .all()
     )
 
-    total_vendas = sum(
-        m.valor
-        for m in movimentacoes
-        if m.tipo == "venda" and m.forma_pagamento == "Dinheiro"
-    )
-    total_suprimentos = sum(m.valor for m in movimentacoes if m.tipo == "suprimento")
-    total_sangrias = sum(m.valor for m in movimentacoes if m.tipo == "sangria")
-    total_despesas = sum(m.valor for m in movimentacoes if m.tipo == "despesa")
-    total_transferencias = sum(
-        m.valor for m in movimentacoes if m.tipo == "transferencia"
-    )
-    total_devolucoes = sum(m.valor for m in movimentacoes if m.tipo == "devolucao")
+    totais = totais_dinheiro(caixa.valor_abertura, movimentacoes)
 
     # 💰 Calcular totais por forma de pagamento de TODAS as vendas DESTE CAIXA
     # Buscar vendas vinculadas a este caixa específico (não apenas do dia)
@@ -577,27 +600,9 @@ def obter_resumo_caixa(
             "total": float(total) if total else 0.0,
         }
 
-    saldo_atual = (
-        caixa.valor_abertura
-        + total_vendas
-        + total_suprimentos
-        + total_devolucoes
-        - total_sangrias
-        - total_despesas
-        - total_transferencias
-    )
-
     return {
         "caixa": _serializar_caixa(caixa, compartilhado=compartilhado),
-        "totais": {
-            "vendas": total_vendas,
-            "suprimentos": total_suprimentos,
-            "sangrias": total_sangrias,
-            "despesas": total_despesas,
-            "transferencias": total_transferencias,
-            "devolucoes": total_devolucoes,
-            "saldo_atual": saldo_atual,
-        },
+        "totais": totais,
         "vendas_por_forma_pagamento": vendas_por_forma,
     }
 
