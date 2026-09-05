@@ -5,6 +5,7 @@ import FuncionarioBalancoScreen from "../screens/funcionario/FuncionarioBalancoS
 import FuncionarioBanhoTosaScreen from "../screens/funcionario/FuncionarioBanhoTosaScreen";
 import FuncionarioContagemScreen from "../screens/funcionario/FuncionarioContagemScreen";
 import FuncionarioHomeScreen from "../screens/funcionario/FuncionarioHomeScreen";
+import FuncionarioNovoProdutoScreen from "../screens/funcionario/FuncionarioNovoProdutoScreen";
 import FuncionarioGranelScreen from "../screens/funcionario/FuncionarioGranelScreen";
 import FuncionarioPdvScreen from "../screens/funcionario/FuncionarioPdvScreen";
 import NotificationsScreen from "../screens/notifications/NotificationsScreen";
@@ -53,6 +54,11 @@ export default function FuncionarioNavigator() {
         name="FuncionarioBanhoTosa"
         component={FuncionarioBanhoTosaScreen}
         options={{ title: "Banho & Tosa" }}
+      />
+      <Stack.Screen
+        name="FuncionarioNovoProduto"
+        component={FuncionarioNovoProdutoScreen}
+        options={{ title: "Novo produto" }}
       />
       <Stack.Screen
         name="FuncionarioNovidades"

@@ -107,6 +107,9 @@ from app.routes.app_mobile_funcionario_contagem_routes import (
     router as funcionario_contagem_router,
 )
 from app.routes.app_mobile_gestor_routes import router as gestor_router
+from app.routes.app_mobile_funcionario_produtos_routes import (
+    router as funcionario_produtos_router,
+)
 from app.services.validade_campanha_service import (
     mapear_ofertas_validade_por_produto,
     resolver_preco_publico_produto,
@@ -141,6 +144,7 @@ router = APIRouter(prefix="/app", tags=["App Mobile"])
 router.include_router(pets_router)
 router.include_router(funcionario_pdv_router)
 router.include_router(funcionario_estoque_router)
+router.include_router(funcionario_produtos_router)
 router.include_router(funcionario_contagem_router)
 router.include_router(gestor_router)
 router.include_router(rastreio_router)

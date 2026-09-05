@@ -1,5 +1,6 @@
 export type FuncionarioStackParamList = {
   FuncionarioHome: undefined;
+  FuncionarioNovoProduto: undefined;
   FuncionarioBalanco: undefined;
   FuncionarioContagem: undefined;
   FuncionarioPdv: undefined;
