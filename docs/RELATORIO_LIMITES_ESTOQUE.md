@@ -1,6 +1,9 @@
 # Estoque mínimo e máximo
 
-Acesso: **Produtos / Estoque → Estoque mínimo e máximo**.
+Acesso: **Produtos / Estoque → Alertas de Estoque → Mínimo e máximo**.
+
+O relatório fica em uma aba de Alertas de Estoque. O endereço antigo
+`/produtos/limites-estoque` redireciona para `/estoque/alertas?aba=limites`.
 
 O relatório compara o saldo atual com os limites cadastrados em cada produto.
 Mostra código, categoria, marca, fornecedor principal, unidade, saldo, mínimo,
@@ -75,7 +78,7 @@ migração nem alteração nos aplicativos mobile.
 - Sustentação: sucesso comprovado pela consulta e filtros sem erro, com totais
   coerentes. Em indisponibilidade, usar a listagem de produtos existente. Lentidão
   recorrente exige medição da consulta antes de alterar a implementação.
-- Comunicação: orientar usuários em Produtos / Estoque → Estoque mínimo e máximo
+- Comunicação: orientar usuários em Produtos / Estoque → Alertas de Estoque → Mínimo e máximo
   e no botão Exportar Excel; regras e limites estão neste manual e na própria tela.
 - Fechamento: critérios de aceite, testes, isolamento, documentação, homologação,
   publicação, rollback e comunicação revisados; PR sem artefatos ou segredos.

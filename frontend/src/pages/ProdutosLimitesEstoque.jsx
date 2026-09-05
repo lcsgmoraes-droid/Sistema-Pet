@@ -23,7 +23,8 @@ import {
 const ENDPOINT = "/produtos/relatorio/limites-estoque";
 const campoClasse = "w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm";
 
-export default function ProdutosLimitesEstoque() {
+export default function ProdutosLimitesEstoque({ embedded = false }) {
+  const Titulo = embedded ? "h2" : "h1";
   const [filtros, setFiltros] = useState(FILTROS_INICIAIS);
   const [dados, setDados] = useState(null);
   const [carregando, setCarregando] = useState(true);
@@ -89,10 +90,10 @@ export default function ProdutosLimitesEstoque() {
   };
 
   return (
-    <div className="space-y-5 p-0 md:p-6">
+    <div className={embedded ? "space-y-5" : "space-y-5 p-0 md:p-6"}>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Estoque mínimo e máximo</h1>
+          <Titulo className="text-2xl font-bold text-gray-900">Estoque mínimo e máximo</Titulo>
           <p className="mt-1 text-sm text-gray-600">
             Veja o que precisa de reposição e o que está em excesso.
           </p>

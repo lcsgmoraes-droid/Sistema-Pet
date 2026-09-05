@@ -12,7 +12,6 @@ import {
   ProdutosNovo,
   ProdutosRelatorio,
   ProdutosValorizacaoEstoque,
-  ProdutosLimitesEstoque,
 } from "../lazyPages";
 
 export function createProductInventoryRoutes() {
@@ -80,11 +79,7 @@ export function createProductInventoryRoutes() {
       />
       <Route
         path="produtos/limites-estoque"
-        element={
-          <ProtectedRoute permission="produtos.visualizar">
-            <ProdutosLimitesEstoque />
-          </ProtectedRoute>
-        }
+        element={<Navigate to="/estoque/alertas?aba=limites" replace />}
       />
       <Route
         path="estoque/alertas"
