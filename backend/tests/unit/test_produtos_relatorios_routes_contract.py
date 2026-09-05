@@ -3,6 +3,7 @@ EXPECTED_RELATORIO_PATHS = {
     "/relatorio/produto-vendas",
     "/relatorio/validade-proxima",
     "/relatorio/valorizacao-estoque",
+    "/relatorio/limites-estoque",
 }
 EXPECTED_PRODUTOS_RELATORIO_PATHS = {
     f"/produtos{path}" for path in EXPECTED_RELATORIO_PATHS
@@ -10,7 +11,11 @@ EXPECTED_PRODUTOS_RELATORIO_PATHS = {
 
 
 def _route_paths(router):
-    return {getattr(route, "path", None) for route in router.routes}
+    from fastapi import FastAPI
+
+    app = FastAPI()
+    app.include_router(router)
+    return set(app.openapi()["paths"])
 
 
 def _read_repo(path):
