@@ -5,7 +5,7 @@
 | Campo | Valor |
 |---|---|
 | Entrega | [Visão comercial por empresa](../entregas/2026-09-05-visao-comercial-tenant.md) |
-| PR | PR que contém esta entrega |
+| PR | [#1308](https://github.com/lcsgmoraes-droid/Sistema-Pet/pull/1308) |
 | Versão testada | Alterações desta entrega sobre `23eadc2b5`, com build local atualizado |
 | Data | 2026-09-05 |
 | Ambiente | HOMOLOG local, `http://127.0.0.1:18080` |
@@ -80,8 +80,67 @@ Impacto: código e massa fictícia de homologação local; nenhum deploy em prod
 Hash final e resultados do CI ficam no PR que contém este registro. Arquivos
 temporários, credenciais e massa de testes não foram versionados.
 
-## Decisão
+## Decisão da homologação local (2026-09-05)
 
-Homologação técnica local aprovada nos cenários listados. Aceite de negócio
-pendente com Lucas. Próxima ação: revisar o PR e obter autorização explícita
-para publicar pelo fluxo oficial e testar na conta demo de produção.
+Homologação técnica local aprovada nos cenários listados. Naquela data, a próxima
+ação era revisar o PR e obter autorização para publicar e testar na demo.
+A publicação autorizada e sua validação estão registradas abaixo.
+
+## Publicação e validação na demo de produção (2026-09-07)
+
+| Campo | Valor |
+|---|---|
+| Data | 2026-09-07; deploy concluído às 15:07, testes entre 15:09 e 15:18 (Brasília) |
+| PR | #1308, juntado à main após checks aprovados |
+| Commit | `6bdb6e1e1816131a1996f2d05490a06680dd4507` |
+| Ambiente | Produção, `https://corepet.com.br`; lançamentos somente na conta demo disponibilizada por Lucas |
+| Responsável | Codex; autorização de Lucas: “vamos publicar” em 2026-09-07 |
+| Comando | `powershell -ExecutionPolicy Bypass -File .\scripts\deploy_producao_remoto.ps1` |
+| Resultado | Deploy concluído com repositório limpo; cinco serviços saudáveis; migration no head `zzj20260905a1` |
+| Evidência | `/api/health`: `status=ok`; `/health/watchdog`: `healthy`; `/release-commit.txt` igual ao commit publicado; wrapper oficial `petshop-status-producao`: `STATUS PRODUCAO: OK` |
+| Impacto | Preferência disponível por empresa; padrão `venda` preservado. Somente a demo foi configurada para `recebimento` nesta validação. |
+| Próxima ação | Lucas pode revisar os lançamentos demo e ativar a preferência no tenant interessado em Configurações → Parâmetros Gerais. |
+
+Pré-publicação: `FLUXO_UNICO.bat check` e `FLUXO_UNICO.bat release-check` passaram.
+O gate completo incluiu lint, formatação, build frontend, auditorias de dependências,
+189 testes gerais (2 ignorados), 758 testes da suíte multi-tenant e 71 testes mobile.
+`scripts/validate_release_gate.py` aprovou os oito checks obrigatórios do commit
+final da main antes do deploy. Não houve alteração ou publicação do app mobile.
+
+Versão anterior: `23eadc2b5dd2786671d92905836f6149b3b4c9ff`.
+Backup operacional: `/opt/petshop/backups/deploy_20260907_150359`.
+Backup do banco anterior à migration:
+`/opt/petshop/backups/db/petshop_prod_20260907_150617.dump`.
+Guard RLS aprovado; disco após deploy em 33%. Rollback não necessário.
+Em eventual rollback de código, a coluna aditiva pode permanecer no banco.
+
+### Cenários executados pelo Chrome autenticado
+
+Conta demo: `corepeterp@gmail.com`, perfil Chrome CorePet reaberto por Lucas.
+Saldo inicial do indicador de hoje: zero. Caixa #9905 já estava aberto e foi
+preservado. Produto fictício `DEMO-MARGEM-VERDE`, preço R$ 100.
+Observações dos novos lançamentos e baixas identificam
+`TESTE VISAO COMERCIAL 07/09/2026`.
+
+| Cenário | Resultado observado em produção |
+|---|---|
+| Venda a prazo #202609070001, 10 unidades, R$ 1.000 | Recebimentos de hoje R$ 0; 1 pedido / 10 unidades; conta #7872 pendente em R$ 1.000 |
+| Baixa parcial #6234 da conta #7872, Pix R$ 300 | Comprovante de R$ 300; conta parcial com saldo R$ 700 |
+| Baixa #6235 da conta #7146, Pix R$ 47,48 | Venda #202608300002 emitida em 30/08/2026; recebimento em 07/09/2026; relatório mostra ambas as datas |
+| Conferência das duas baixas | Dashboard e relatório de hoje R$ 347,48, com dois movimentos individuais |
+| Venda Pix #202609070002, 2 unidades, R$ 200 | Recebimentos de hoje R$ 547,48, sem duplicação; 2 pedidos / 12 unidades |
+| Troca para data da venda e retorno a recebimento | Pela venda: faturamento de hoje R$ 1.200. Pela baixa: R$ 547,48. Preferência salva e persistida após navegação/recarregamento. |
+| Devolução em dinheiro de R$ 200 da venda #202609070002 | Recebimentos líquidos R$ 347,48; relatório mantém entrada Pix +R$ 200 e devolução −R$ 200 separadas |
+| Conferência final | Dashboard, relatório e gráfico de hoje concordam: R$ 547,48 recebidos − R$ 200 devolvidos = R$ 347,48; quatro movimentos |
+| Exportação pelos botões | Arquivos `recebimentos_2026-09-07_2026-09-07.xlsx` (4.258 bytes) e `.pdf` (2.266 bytes) gerados e baixados; conteúdo exportado já validado na homologação local H12 |
+
+Estado final: demo na visão por recebimento; lançamentos preservados para revisão.
+Nenhuma nota fiscal foi emitida. Não foram enviadas mensagens a clientes nem
+transferidos dados da homologação local. Após os testes, health e watchdog
+públicos continuaram saudáveis. Não foi necessária correção de código durante
+a validação em produção.
+
+Logs locais ignorados: `runtime/visao-comercial-release-20260907.log`,
+`runtime/visao-comercial-main-gate-20260907.json` e
+`runtime/visao-comercial-deploy-20260907.log`. Backups, credenciais, arquivos
+baixados e massa de teste não são versionados.

@@ -2,7 +2,8 @@
 
 Data: 2026-09-05. Responsável de negócio: Lucas. Executor: Codex.
 Prioridade: P2. Risco: médio (leitura de valores financeiros e isolamento).
-Domínios: configuração geral, dashboard e relatório comercial web. PR: associado a esta entrega.
+Domínios: configuração geral, dashboard e relatório comercial web.
+PR: [#1308](https://github.com/lcsgmoraes-droid/Sistema-Pet/pull/1308), publicado em 2026-09-07.
 
 ## 1. Necessidade e requisitos
 
@@ -53,9 +54,9 @@ limpo, histórico e cenário de tenants UUID.
 
 ## 6. Ambientes e homologação
 
-Validação inicial em DEV/local com dados fictícios. O usuário autorizou
-lançamentos de teste no usuário demo; a aba disponibilizada é de produção.
-Conferência da versão nova nessa aba depende da publicação autorizada.
+Validação inicial em DEV/local com dados fictícios. Lucas autorizou a publicação
+em 2026-09-07 com “vamos publicar”, além dos lançamentos na conta demo.
+Publicação e testes nessa conta concluídos pelo navegador autenticado em produção.
 Homologação local executada pelo fluxo oficial, em `127.0.0.1:18080`, com
 quatro vendas fictícias, duas baixas posteriores e uma devolução.
 Evidências: [registro de homologação](../homologacao/2026-09-05-visao-comercial-tenant.md).
@@ -97,6 +98,16 @@ R$ 2.000 em vendas sem recebimentos. Uma devolução posterior de R$ 200 reduziu
 o indicador de recebimentos para R$ 1.300. Saldo parcial de R$ 700 confirmado
 na própria venda pelo navegador.
 
-Pendente: aceite de negócio, checks do PR e autorização explícita para publicar
-em produção e repetir os lançamentos na conta demo disponibilizada pelo Lucas.
-Nenhuma alteração ou lançamento foi realizado em produção durante esta entrega.
+Publicado em produção em 2026-09-07 às 15:07 (Brasília), commit
+`6bdb6e1e1816131a1996f2d05490a06680dd4507`, após gate completo, oito checks
+obrigatórios do commit final e backup. Migration `zzj20260905a1` aplicada;
+backend, banco, nginx, workers e verificações públicas de saúde aprovados.
+
+Na demo de produção, uma venda a prazo de R$ 1.000 manteve recebimentos em zero.
+A baixa parcial de R$ 300 deixou R$ 700 em aberto. Uma parcela de venda de agosto
+recebida hoje acrescentou R$ 47,48; uma venda Pix acrescentou R$ 200.
+Antes da devolução, a visão por venda mostrou R$ 1.200 e a de recebimentos
+R$ 547,48. A devolução de R$ 200 reduziu recebimentos para R$ 347,48.
+Dashboard e relatório concordaram; Excel/PDF gerados. A demo ficou na visão
+por recebimento, com os lançamentos identificados como teste.
+Evidência operacional e IDs constam no registro de homologação vinculado acima.
