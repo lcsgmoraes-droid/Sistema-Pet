@@ -11,6 +11,7 @@ import {
 } from "../../utils/guiaHighlight";
 
 const DEFAULT_FORM = {
+  visao_comercial: "venda",
   margem_saudavel_minima: 30,
   margem_alerta_minima: 15,
   mensagem_venda_saudavel: "✅ Venda Saudavel! Margem excelente.",
@@ -127,6 +128,7 @@ export default function ConfiguracaoGeralNegocio() {
     setSalvando(true);
     try {
       await api.put("/empresa/config/", {
+        visao_comercial: form.visao_comercial,
         margem_saudavel_minima: Number(form.margem_saudavel_minima),
         margem_alerta_minima: Number(form.margem_alerta_minima),
         mensagem_venda_saudavel: form.mensagem_venda_saudavel,
@@ -143,6 +145,7 @@ export default function ConfiguracaoGeralNegocio() {
         dias_produto_parado: Number(form.dias_produto_parado),
       });
       toast.success("Configuracoes gerais salvas com sucesso");
+      globalThis.dispatchEvent(new Event("visao-comercial-atualizada"));
     } catch (error) {
       console.error("Erro ao salvar configuração geral:", error);
       const detalhe = error?.response?.data?.detail;
@@ -190,6 +193,52 @@ export default function ConfiguracaoGeralNegocio() {
           Etapa da introducao guiada ativa. Os campos importantes desta etapa estao destacados.
         </div>
       )}
+
+      <fieldset className="rounded-lg bg-white p-6 shadow-md">
+        <legend className="sr-only">Visão padrão dos indicadores comerciais</legend>
+        <h2 className="text-xl font-semibold text-gray-800">Visão dos indicadores comerciais</h2>
+        <p className="mt-2 text-sm text-gray-600">
+          Escolha como esta empresa acompanha o indicador principal do dashboard e o relatório
+          comercial.
+        </p>
+        <div className="mt-4 grid gap-3 md:grid-cols-2">
+          {[
+            {
+              value: "venda",
+              title: "Pela data da venda",
+              description:
+                "Vendas realizadas no período, mesmo que ainda não tenham sido recebidas.",
+            },
+            {
+              value: "recebimento",
+              title: "Pela data do recebimento",
+              description: "Valores recebidos no período, inclusive de vendas de meses anteriores.",
+            },
+          ].map((opcao) => (
+            <label
+              key={opcao.value}
+              className={`flex cursor-pointer gap-3 rounded-xl border p-4 ${form.visao_comercial === opcao.value ? "border-teal-600 bg-teal-50" : "border-gray-200"}`}
+            >
+              <input
+                type="radio"
+                name="visao-comercial"
+                value={opcao.value}
+                checked={form.visao_comercial === opcao.value}
+                onChange={() => onChange("visao_comercial", opcao.value)}
+                className="mt-1 h-4 w-4"
+              />
+              <span>
+                <strong className="block text-sm text-gray-900">{opcao.title}</strong>
+                <span className="mt-1 block text-sm text-gray-600">{opcao.description}</span>
+              </span>
+            </label>
+          ))}
+        </div>
+        <p className="mt-3 text-xs text-gray-500">
+          A preferência vale para todos os usuários desta empresa. Quantidade, ticket médio e lucro
+          continuam baseados nas vendas realizadas.
+        </p>
+      </fieldset>
 
       <div className="rounded-lg bg-white p-6 shadow-md">
         <div className="flex flex-wrap items-start justify-between gap-4">

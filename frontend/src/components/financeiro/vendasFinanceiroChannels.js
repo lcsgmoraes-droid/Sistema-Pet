@@ -3,7 +3,19 @@ import {
   CANAL_ECOMMERCE,
   CANAL_LOJA_FISICA,
   CANAL_WHATSAPP,
+  normalizeSalesChannel,
 } from "../../utils/salesChannel";
+
+export function obterCanalVendaFinanceiro(venda) {
+  return normalizeSalesChannel(
+    venda?.canal_venda ||
+      venda?.origem_canal_venda ||
+      venda?.canal ||
+      venda?.origem ||
+      venda?.origem_loja_virtual,
+    CANAL_LOJA_FISICA,
+  );
+}
 
 export const VENDAS_FINANCEIRO_CHANNEL_FILTERS = [
   {

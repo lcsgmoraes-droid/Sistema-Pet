@@ -3,7 +3,7 @@ Modelo de Configuração Geral da Empresa
 Contém parâmetros de negócio, margens e indicadores
 """
 
-from sqlalchemy import Column, Integer, String, Numeric, Boolean, Text
+from sqlalchemy import Column, Integer, String, Numeric, Boolean, Text, CheckConstraint
 from .base_models import BaseTenantModel
 
 
@@ -14,6 +14,12 @@ class EmpresaConfigGeral(BaseTenantModel):
     """
 
     __tablename__ = "empresa_config_geral"
+    __table_args__ = (
+        CheckConstraint(
+            "visao_comercial IN ('venda', 'recebimento')",
+            name="ck_empresa_config_visao_comercial",
+        ),
+    )
 
     # ID, tenant_id, created_at e updated_at já vêm do BaseTenantModel
 
@@ -73,6 +79,10 @@ class EmpresaConfigGeral(BaseTenantModel):
     # ============================
     # PARÂMETROS FINANCEIROS
     # ============================
+    visao_comercial = Column(
+        String(20), default="venda", nullable=False, server_default="venda"
+    )
+
     # Quando ativo, todos os usuarios operacionais usam o mesmo caixa aberto.
     caixa_compartilhado = Column(
         Boolean, default=False, nullable=False, server_default="false"

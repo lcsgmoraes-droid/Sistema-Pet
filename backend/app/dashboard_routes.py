@@ -17,6 +17,8 @@ from .auth.dependencies import get_current_user_and_tenant
 from .models import Cliente
 from .vendas_models import Venda, VendaItem
 from .financeiro_models import ContaReceber, ContaPagar
+from .financeiro.visao_comercial import obter_visao_comercial
+from .financeiro.recebimentos_vendas_service import montar_relatorio_recebimentos
 from .produtos_models import Produto
 from .relatorio_vendas_common import (
     _snapshot_dict,
@@ -293,9 +295,25 @@ async def obter_resumo_dashboard(
         )
 
         # ========================================
+        # Alinha as entradas do painel às baixas, preservando os indicadores de vendas.
+        visao_comercial = obter_visao_comercial(db, tenant_id)
+        indicador_comercial = faturamento_bruto_periodo
+        if visao_comercial == "recebimento":
+            recebimentos = montar_relatorio_recebimentos(
+                db,
+                tenant_id,
+                inicio_periodo.date(),
+                (fim_periodo - timedelta(days=1)).date(),
+            )
+            indicador_comercial = recebimentos["resumo"]["total"]
+            entradas_periodo = recebimentos["resumo"]["recebimentos"]
+            saidas_periodo += recebimentos["resumo"]["devolucoes"]
+            lucro_periodo = entradas_periodo - saidas_periodo
         # RETORNO
         # ========================================
         return {
+            "visao_comercial": visao_comercial,
+            "indicador_comercial": indicador_comercial,
             "saldo_atual": round(saldo_atual, 2),
             "contas_receber": {
                 "total": round(contas_receber_total, 2),
@@ -399,6 +417,18 @@ async def obter_entradas_saidas_por_dia(
             )
             if data_str in dados_por_dia:
                 dados_por_dia[data_str]["saidas"] = float(pagamento.total or 0)
+
+        if obter_visao_comercial(db, tenant_id) == "recebimento":
+            recebimentos = montar_relatorio_recebimentos(
+                db,
+                tenant_id,
+                inicio_periodo.date(),
+                (fim_periodo - timedelta(days=1)).date(),
+            )
+            for dia in recebimentos["por_dia"]:
+                if dia["data"] in dados_por_dia:
+                    dados_por_dia[dia["data"]]["entradas"] = dia["entradas"]
+                    dados_por_dia[dia["data"]]["saidas"] += dia["devolucoes"]
 
         # Converter para lista ordenada
         resultado = sorted(dados_por_dia.values(), key=lambda x: x["data"])

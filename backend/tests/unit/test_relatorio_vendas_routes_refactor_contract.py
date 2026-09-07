@@ -1,4 +1,5 @@
 from pathlib import Path
+from fastapi import FastAPI
 
 from app import relatorio_vendas_routes
 from app import relatorio_vendas_builder, relatorio_vendas_pdf
@@ -8,10 +9,12 @@ BACKEND_ROOT = Path(__file__).resolve().parents[2]
 
 
 def _route_signatures(router):
+    app = FastAPI()
+    app.include_router(router)
     return {
-        (route.path, ",".join(sorted(route.methods)))
-        for route in router.routes
-        if hasattr(route, "methods")
+        (path, method.upper())
+        for path, operations in app.openapi()["paths"].items()
+        for method in operations
     }
 
 

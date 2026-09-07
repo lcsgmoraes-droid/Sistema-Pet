@@ -13,6 +13,8 @@ from app.caixa_models import Caixa
 from app.empresa_config_geral_models import EmpresaConfigGeral
 from app.security.permissions_decorator import require_permission
 from app.utils.logger import logger
+from app.financeiro.visao_comercial import VisaoComercial, obter_visao_comercial
+from app.audit_log import log_action
 
 router = APIRouter(prefix="/empresa/config", tags=["Configuração da Empresa"])
 
@@ -21,6 +23,7 @@ router = APIRouter(prefix="/empresa/config", tags=["Configuração da Empresa"])
 
 
 class EmpresaConfigGeralCreate(BaseModel):
+    visao_comercial: VisaoComercial = "venda"
     razao_social: Optional[str] = None
     nome_fantasia: Optional[str] = None
     cnpj: Optional[str] = None
@@ -55,6 +58,7 @@ class EmpresaConfigGeralCreate(BaseModel):
 
 
 class EmpresaConfigGeralUpdate(BaseModel):
+    visao_comercial: VisaoComercial = "venda"
     razao_social: Optional[str] = None
     nome_fantasia: Optional[str] = None
     cnpj: Optional[str] = None
@@ -91,6 +95,7 @@ class EmpresaConfigGeralUpdate(BaseModel):
 
 
 class EmpresaConfigGeralResponse(BaseModel):
+    visao_comercial: VisaoComercial = "venda"
     id: int
     razao_social: Optional[str]
     nome_fantasia: Optional[str]
@@ -119,6 +124,7 @@ class EmpresaConfigGeralResponse(BaseModel):
 def _serializar_config(config: EmpresaConfigGeral) -> EmpresaConfigGeralResponse:
     """Mantem a API compativel com configuracoes antigas que possuem campos nulos."""
     return EmpresaConfigGeralResponse(
+        visao_comercial=getattr(config, "visao_comercial", None) or "venda",
         id=config.id,
         razao_social=config.razao_social,
         nome_fantasia=config.nome_fantasia,
@@ -266,6 +272,16 @@ def update_margens_preco(
     return _serializar_margens_preco(config)
 
 
+@router.get("/visao-comercial")
+def get_visao_comercial(
+    user_and_tenant=Depends(get_current_user_and_tenant),
+    db: Session = Depends(get_session),
+):
+    """Leitura da preferência também para usuários sem permissão de configuração."""
+    _user, tenant_id = user_and_tenant
+    return {"visao_comercial": obter_visao_comercial(db, tenant_id)}
+
+
 @router.get("/", response_model=EmpresaConfigGeralResponse)
 @require_permission("configuracoes.editar")
 def get_config_empresa(
@@ -373,6 +389,7 @@ def update_config_empresa(
 
     # Atualiza apenas campos fornecidos
     update_data = config_data.model_dump(exclude_unset=True)
+    visao_anterior = getattr(config, "visao_comercial", None) or "venda"
     if update_data.get("caixa_compartilhado") and not bool(
         getattr(config, "caixa_compartilhado", False)
     ):
@@ -380,6 +397,19 @@ def update_config_empresa(
     for field, value in update_data.items():
         setattr(config, field, value)
 
+    if (getattr(config, "visao_comercial", None) or "venda") != visao_anterior:
+        db.flush()
+        log_action(
+            db,
+            current_user.id,
+            action="update_visao_comercial",
+            entity_type="empresa_config_geral",
+            entity_id=config.id,
+            old_value={"visao_comercial": visao_anterior},
+            new_value={"visao_comercial": config.visao_comercial},
+            tenant_id=tenant_id,
+            commit=False,
+        )
     db.commit()
     db.refresh(config)
 
