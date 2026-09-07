@@ -669,6 +669,37 @@ def receive_event(
     }
 
 
+@router.get("/catalog/marketplace-products")
+def read_marketplace_catalog_products(
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=100, ge=1, le=200),
+    q: str | None = Query(default=None, max_length=200),
+    authorization: str | None = Header(default=None, alias="Authorization"),
+    db: Session = Depends(get_session),
+):
+    from sqlalchemy.exc import SQLAlchemyError
+
+    from app.services.ecommerceai_catalog_service import (
+        EcommerceAICatalogService,
+        marketplace_catalog_read_session,
+    )
+
+    try:
+        with marketplace_catalog_read_session(db) as snapshot:
+            connection = _connection_for_token(snapshot, authorization)
+            _require_scope(connection, "catalog:read")
+            return EcommerceAICatalogService(
+                snapshot,
+                tenant_id=connection.tenant_id,
+                public_api_url=str(settings.COREPET_PUBLIC_API_URL),
+            ).list_products(page=page, page_size=page_size, q=q)
+    except SQLAlchemyError as exc:
+        raise HTTPException(
+            status_code=503,
+            detail="Nao foi possivel confirmar o catalogo e as reservas do CorePet.",
+        ) from exc
+
+
 @router.get("/catalog/products")
 def read_catalog_products(
     page: int = Query(default=1, ge=1),
