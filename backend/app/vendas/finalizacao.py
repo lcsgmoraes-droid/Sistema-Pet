@@ -25,6 +25,10 @@ from app.vendas.finalizacao_pagamentos import (
     processar_pagamentos_finalizacao,
 )
 from app.vendas.finalizacao_pos_commit import processar_pos_commit_finalizacao
+from app.vendas.finalizacao_recebiveis import (
+    cancelar_previsoes_apos_desconto,
+    criar_recebiveis_dos_novos_pagamentos,
+)
 from app.vendas.pos_processamento import gerar_dre_competencia_venda
 
 logger = logging.getLogger(__name__)
@@ -58,9 +62,9 @@ def finalizar_venda(
     3. Atualização de status da venda
     4. Baixa de estoque
     5. Vinculação ao caixa
-    6. Baixa de contas a receber existentes
+    6. Baixa de contas existentes e criacao dos recebiveis dos pagamentos novos
     7. COMMIT ÚNICO ✅
-    8. Operações pós-commit (contas novas, comissões, lembretes)
+    8. Operações pós-commit (notificacoes, comissões, lembretes)
 
     TRANSAÇÃO ATÔMICA:
     - Se qualquer etapa 1-6 falhar → ROLLBACK completo
@@ -146,7 +150,13 @@ def finalizar_venda(
         logger.debug(f"✅ Caixa validado: ID={caixa_aberto_id}")
 
         # Buscar venda
-        venda = db.query(Venda).filter_by(id=venda_id, tenant_id=tenant_id).first()
+        venda = (
+            db.query(Venda)
+            .filter_by(id=venda_id, tenant_id=tenant_id)
+            .populate_existing()
+            .with_for_update()
+            .first()
+        )
         if not venda:
             raise HTTPException(status_code=404, detail="Venda não encontrada")
 
@@ -159,7 +169,9 @@ def finalizar_venda(
 
         # Calcular totais
         pagamentos_existentes = (
-            db.query(VendaPagamento).filter_by(venda_id=venda.id).all()
+            db.query(VendaPagamento)
+            .filter_by(venda_id=venda.id, tenant_id=tenant_id)
+            .all()
         )
         total_venda = float(venda.total)
         totais_pagamento = _calcular_pagamentos_finalizacao(
@@ -409,6 +421,7 @@ def finalizar_venda(
         # ============================================================
 
         contas_baixadas = []
+        valor_ja_baixado = Decimal("0")
         if total_novos_pagamentos > 0.01:
             forma_pag_nome = (
                 pagamentos[0]["forma_pagamento"] if pagamentos else "Diversos"
@@ -425,6 +438,7 @@ def finalizar_venda(
             )
 
             contas_baixadas = resultado_baixa["contas_baixadas"]
+            valor_ja_baixado = resultado_baixa["valor_distribuido"]
 
             if contas_baixadas:
                 logger.info(
@@ -448,6 +462,17 @@ def finalizar_venda(
                 f"📝 Lançamentos: {len(resultado_lancamentos['lancamentos_atualizados'])} atualizado(s), "
                 f"Status: {resultado_lancamentos['status']}"
             )
+
+        contas_criadas_ids = criar_recebiveis_dos_novos_pagamentos(
+            db=db,
+            venda=venda,
+            tenant_id=tenant_id,
+            user_id=user_id,
+            pagamentos_anteriores=pagamentos_existentes,
+            valor_ja_baixado=valor_ja_baixado,
+        )
+        if not pagamentos and total_pagamentos >= total_venda - 0.01:
+            cancelar_previsoes_apos_desconto(db=db, venda=venda, tenant_id=tenant_id)
 
         # ============================================================
         # 🔥 COMMIT ÚNICO - TRANSAÇÃO ATÔMICA 🔥
@@ -551,12 +576,13 @@ def finalizar_venda(
             user_nome=user_nome,
         )
 
-        contas_criadas_ids = processar_pos_commit_finalizacao(
+        processar_pos_commit_finalizacao(
             venda=venda,
             pagamentos=pagamentos,
             user_id=user_id,
             tenant_id=tenant_id,
             db=db,
+            contas_criadas_ids=contas_criadas_ids,
         )
 
         # Preparar retorno

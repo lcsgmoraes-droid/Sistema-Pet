@@ -1,4 +1,5 @@
 from pathlib import Path
+from fastapi import FastAPI
 
 from app import vendas_routes
 from app.vendas import (
@@ -58,7 +59,9 @@ def test_vendas_routes_reexports_extracted_core_handlers():
 
 
 def test_extracted_routes_are_registered_on_main_router():
-    paths = {route.path for route in vendas_routes.router.routes}
+    app = FastAPI()
+    app.include_router(vendas_routes.router)
+    paths = set(app.openapi()["paths"])
 
     assert "/vendas" in paths
     assert "/vendas/{venda_id}" in paths

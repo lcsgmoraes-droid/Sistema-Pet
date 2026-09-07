@@ -6,7 +6,6 @@ from typing import Any, Dict, List
 
 from sqlalchemy.orm import Session
 
-from app.financeiro import ContasReceberService
 from app.vendas.pos_processamento import (
     processar_contas_pagar_entrega,
     processar_contas_pagar_taxas,
@@ -24,20 +23,14 @@ def processar_pos_commit_finalizacao(
     user_id: int,
     tenant_id: str,
     db: Session,
+    contas_criadas_ids: List[int] | None = None,
 ) -> List[int]:
     # ETAPA 8: OPERAÇÕES PÓS-COMMIT (não abortam se falharem)
     # ============================================================
 
-    # Criar novas contas a receber
-    contas_criadas_ids = []
+    # As contas ja foram persistidas atomicamente com os pagamentos da venda.
+    contas_criadas_ids = list(contas_criadas_ids or [])
     try:
-        resultado_contas = ContasReceberService.criar_de_venda(
-            venda=venda,
-            pagamentos=list(getattr(venda, "pagamentos", []) or pagamentos),
-            user_id=user_id,
-            db=db,
-        )
-        contas_criadas_ids = resultado_contas["contas_criadas"]
         from app.services.crediario_notifications import (
             criar_notificacoes_parcelas_crediario,
         )
@@ -48,18 +41,14 @@ def processar_pos_commit_finalizacao(
             contas_ids=contas_criadas_ids,
             tenant_id=tenant_id,
         )
-        db.commit()  # Commit separado para contas
-        logger.info(
-            f"📋 Contas a receber criadas: {resultado_contas['total_contas']} conta(s), "
-            f"{len(resultado_contas['lancamentos_criados'])} lançamento(s)"
-        )
+        db.commit()  # Somente notificacoes; recebiveis ja confirmados.
         if notificacoes_crediario:
             logger.info(
                 "🔔 Notificacoes de crediario criadas: %s", notificacoes_crediario
             )
     except Exception as e:
-        logger.error(f"⚠️ Erro ao criar contas a receber: {str(e)}", exc_info=True)
-        db.rollback()  # Rollback apenas das contas (venda já commitada)
+        logger.error(f"Erro nas notificacoes do crediario: {str(e)}", exc_info=True)
+        db.rollback()
 
     # 🚚 Criar contas a pagar de entrega (taxa entregador + custo operacional)
     try:

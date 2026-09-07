@@ -40,7 +40,13 @@ def reabrir_venda(
     """Reabre uma venda finalizada (muda status para aberta)"""
     current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
 
-    venda = db.query(Venda).filter_by(id=venda_id, tenant_id=tenant_id).first()
+    venda = (
+        db.query(Venda)
+        .filter_by(id=venda_id, tenant_id=tenant_id)
+        .populate_existing()
+        .with_for_update()
+        .first()
+    )
 
     if not venda:
         raise HTTPException(status_code=404, detail="Venda não encontrada")
