@@ -10,7 +10,9 @@ from app.financeiro import ContasReceberService
 from app.financeiro_models import ContaReceber, Recebimento
 from app.models import AuditLog
 from app.scripts.reparar_recebimento_duplicado import reparar
-from tests.unit.test_finalizacao_recebiveis_atomicidade import cenario  # noqa: F401
+from tests.unit.test_finalizacao_recebiveis_atomicidade import cenario as _cenario
+
+cenario = _cenario
 
 
 @pytest.fixture
