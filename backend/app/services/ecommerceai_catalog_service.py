@@ -148,7 +148,15 @@ class EcommerceAICatalogService:
                         or product.deleted_at is not None
                         or product.is_parent
                         or product.tipo_produto not in {"SIMPLES", "VARIACAO"}
-                        or product.tipo_kit
+                        # The central reservation policy treats legacy
+                        # SIMPLES + VIRTUAL as a leaf, never a virtual composition.
+                        or (
+                            product.tipo_kit
+                            and not (
+                                product.tipo_produto == "SIMPLES"
+                                and product.tipo_kit == "VIRTUAL"
+                            )
+                        )
                         or quantity is None
                         or quantity <= 0
                     ):
