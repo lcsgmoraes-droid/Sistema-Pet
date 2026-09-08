@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from ..bling_integration import BlingAPI
 from ..produtos_models import Produto, ProdutoBlingSync
+from ..services.produto_bling_identity_service import ids_bling_retirados
 from .product_matching import (
     _acao_faltante_bling,
     _barcode_bling,
@@ -246,13 +247,37 @@ def _get_catalogo_bling_snapshot(tenant_id: int, force_refresh: bool = False) ->
     }
 
 
+def _itens_bling_ativos(
+    db: Session, tenant_id, items: list[dict], *, key="id"
+) -> list[dict]:
+    retirados = ids_bling_retirados(db, tenant_id)
+    return [item for item in items if str(item.get(key) or "").strip() not in retirados]
+
+
+def _filtrar_snapshot_retirados(
+    db: Session, tenant_id, payload: dict, *, key="id"
+) -> dict:
+    items = _itens_bling_ativos(
+        db, tenant_id, list(payload.get("items") or []), key=key
+    )
+    return {**payload, "items": items, "total": len(items)}
+
+
 def _calcular_resumo_cobertura_bling(
     db: Session,
     tenant_id: int,
     bling_itens: list[dict],
     coleta_completa: bool,
 ) -> dict:
-    produtos_locais = db.query(Produto).filter(Produto.tenant_id == tenant_id).all()
+    bling_itens = _itens_bling_ativos(db, tenant_id, bling_itens)
+    produtos_locais = (
+        db.query(Produto)
+        .filter(
+            Produto.tenant_id == tenant_id,
+            Produto.deleted_at.is_(None),
+        )
+        .all()
+    )
 
     produtos_por_id = {produto.id: produto for produto in produtos_locais}
     codigos_para_produto = _indexar_produtos_locais_por_codigo(produtos_locais)
@@ -423,7 +448,15 @@ def _calcular_snapshot_faltantes_bling(
     bling_itens: list[dict],
     coleta_completa: bool,
 ) -> dict:
-    produtos_locais = db.query(Produto).filter(Produto.tenant_id == tenant_id).all()
+    bling_itens = _itens_bling_ativos(db, tenant_id, bling_itens)
+    produtos_locais = (
+        db.query(Produto)
+        .filter(
+            Produto.tenant_id == tenant_id,
+            Produto.deleted_at.is_(None),
+        )
+        .all()
+    )
     codigos_locais = set(_indexar_produtos_locais_por_codigo(produtos_locais).keys())
 
     faltantes: list[dict] = []
@@ -470,6 +503,13 @@ def _calcular_snapshot_faltantes_bling(
 
 
 def _get_snapshot_faltantes_bling(
+    db: Session, tenant_id: int, force_refresh: bool = False
+) -> dict:
+    payload = _get_snapshot_faltantes_bling_base(db, tenant_id, force_refresh)
+    return _filtrar_snapshot_retirados(db, tenant_id, payload)
+
+
+def _get_snapshot_faltantes_bling_base(
     db: Session,
     tenant_id: int,
     force_refresh: bool = False,
@@ -555,6 +595,7 @@ def _calcular_snapshot_sem_vinculo_com_match_bling(
     bling_itens: list[dict],
     coleta_completa: bool,
 ) -> dict:
+    bling_itens = _itens_bling_ativos(db, tenant_id, bling_itens)
     subq_vinculados = (
         db.query(ProdutoBlingSync.produto_id)
         .filter(
@@ -578,6 +619,7 @@ def _calcular_snapshot_sem_vinculo_com_match_bling(
         )
         .filter(
             Produto.tenant_id == tenant_id,
+            Produto.deleted_at.is_(None),
             Produto.codigo.isnot(None),
             Produto.codigo != "",
         )
@@ -667,6 +709,15 @@ def _calcular_snapshot_sem_vinculo_com_match_bling(
 
 
 def _get_snapshot_sem_vinculo_com_match_bling(
+    db: Session, tenant_id: int, force_refresh: bool = False
+) -> dict:
+    payload = _get_snapshot_sem_vinculo_com_match_bling_base(
+        db, tenant_id, force_refresh
+    )
+    return _filtrar_snapshot_retirados(db, tenant_id, payload, key="bling_id")
+
+
+def _get_snapshot_sem_vinculo_com_match_bling_base(
     db: Session,
     tenant_id: int,
     force_refresh: bool = False,

@@ -114,6 +114,7 @@ from .produtos.variacoes_fusao_routes import (
     router as variacoes_fusao_router,
 )
 from .produtos_models import Produto
+from .produtos.aliases_sku_routes import router as aliases_sku_router
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/produtos", tags=["produtos"])
@@ -128,6 +129,7 @@ router.include_router(lotes_router)
 router.include_router(codigo_sku_router)
 router.include_router(listagem_router)
 router.include_router(variacoes_fusao_router)
+router.include_router(aliases_sku_router)
 router.include_router(cadastro_router)
 router.include_router(atualizacao_lote_router)
 router.include_router(estado_router)

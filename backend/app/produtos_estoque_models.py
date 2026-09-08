@@ -448,6 +448,8 @@ class ProdutoBlingSync(BaseTenantModel):
     id = Column(Integer, primary_key=True)
     produto_id = Column(Integer, ForeignKey("produtos.id"), nullable=False, unique=True)
     bling_produto_id = Column(String(50), nullable=True)
+    # Retained source identity for historical orders, never an inventory publisher.
+    retirado_para_produto_id = Column(Integer, ForeignKey("produtos.id"), nullable=True)
     sincronizar = Column(Boolean, default=True)
     estoque_compartilhado = Column(Boolean, default=True)
     ultima_sincronizacao = Column(DateTime, nullable=True)
@@ -464,7 +466,9 @@ class ProdutoBlingSync(BaseTenantModel):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     # Relationships
-    produto = relationship("Produto", back_populates="bling_sync")
+    produto = relationship(
+        "Produto", back_populates="bling_sync", foreign_keys=[produto_id]
+    )
     fila = relationship(
         "ProdutoBlingSyncQueue", back_populates="sync", cascade="all, delete-orphan"
     )

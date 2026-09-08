@@ -9,6 +9,7 @@ from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
 from app.produtos_models import Produto
+from app.produto_identity_models import ProdutoSkuAlias
 
 
 def normalizar_sku(valor: object) -> str:
@@ -114,10 +115,38 @@ def buscar_produtos_por_skus(
         if produto not in produtos
     )
 
+    explicit_aliases = (
+        db.query(ProdutoSkuAlias, Produto)
+        .join(
+            Produto,
+            (Produto.id == ProdutoSkuAlias.produto_id)
+            & (Produto.tenant_id == ProdutoSkuAlias.tenant_id),
+        )
+        .filter(
+            ProdutoSkuAlias.tenant_id == tenant_id,
+            ProdutoSkuAlias.sku_normalizado.in_(normalizados),
+            Produto.deleted_at.is_(None),
+        )
+        .all()
+    )
     por_chave: dict[str, Produto] = {}
     for produto in produtos:
+        if produto.deleted_at is not None:
+            continue
         for chave in chaves_sku_produto(produto):
-            por_chave.setdefault(normalizar_sku(chave), produto)
+            normalized = normalizar_sku(chave)
+            if (
+                normalized in normalizados
+                and normalized in por_chave
+                and por_chave[normalized].id != produto.id
+            ):
+                raise ValueError("Identidade SKU ambigua neste tenant.")
+            por_chave.setdefault(normalized, produto)
+    for alias, produto in explicit_aliases:
+        existing = por_chave.get(alias.sku_normalizado)
+        if existing and existing.id != produto.id:
+            raise ValueError("Alias SKU em conflito com outro produto neste tenant.")
+        por_chave[alias.sku_normalizado] = produto
 
     return {
         sku: por_chave[chave]

@@ -12,6 +12,8 @@ def _produto(**overrides):
         "codigo": "647",
         "codigo_barras": "7898349701213",
         "codigos_barras_alternativos": '["ATC647"]',
+        "id": 1,
+        "deleted_at": None,
     }
     dados.update(overrides)
     return SimpleNamespace(**dados)
@@ -24,7 +26,9 @@ def test_buscar_produto_por_sku_encontra_codigo_alternativo_exato():
     consulta_alias = Mock()
     consulta_alias.filter.return_value.all.return_value = [produto]
     db = Mock()
-    db.query.side_effect = [consulta_exata, consulta_alias]
+    consulta_sku = Mock()
+    consulta_sku.join.return_value.filter.return_value.all.return_value = []
+    db.query.side_effect = [consulta_exata, consulta_alias, consulta_sku]
 
     encontrado = buscar_produto_por_sku(
         db,
@@ -42,7 +46,9 @@ def test_buscar_produtos_por_skus_nao_aceita_substring_do_codigo_alternativo():
     consulta_alias = Mock()
     consulta_alias.filter.return_value.all.return_value = [produto]
     db = Mock()
-    db.query.side_effect = [consulta_exata, consulta_alias]
+    consulta_sku = Mock()
+    consulta_sku.join.return_value.filter.return_value.all.return_value = []
+    db.query.side_effect = [consulta_exata, consulta_alias, consulta_sku]
 
     encontrados = buscar_produtos_por_skus(
         db,

@@ -68,7 +68,15 @@ class FakeQuery:
         return []
 
     def first(self):
+        if self.kind == "produto":
+            return self.db.produtos[0]
         return None
+
+    def populate_existing(self):
+        return self
+
+    def with_for_update(self, **kwargs):
+        return self
 
 
 class FakeSession:

@@ -252,6 +252,14 @@ export const executarFusaoProdutos = (data) => {
   return api.post("/produtos/fusao/executar", data);
 };
 
+export const previewAliasSkuProduto = (id, sku) => {
+  return api.post(`/produtos/${id}/aliases-sku/preview`, { sku });
+};
+
+export const aplicarAliasSkuProduto = (id, data) => {
+  return api.post(`/produtos/${id}/aliases-sku/aplicar`, data);
+};
+
 /**
  * Gerar SKU automático
  * @param {string} prefixo - Prefixo opcional para o SKU

@@ -267,6 +267,8 @@ class BlingCostSyncService:
                 Produto.id == queue.produto_id,
                 Produto.tenant_id == queue.tenant_id,
             )
+            .with_for_update(of=Produto)
+            .populate_existing()
             .first()
         )
         sync = (
@@ -275,6 +277,8 @@ class BlingCostSyncService:
                 ProdutoBlingSync.produto_id == queue.produto_id,
                 ProdutoBlingSync.tenant_id == queue.tenant_id,
             )
+            .with_for_update()
+            .populate_existing()
             .first()
         )
         return product, sync
@@ -414,6 +418,24 @@ class BlingCostSyncService:
         queue: ProdutoBlingCostSyncQueue,
     ) -> dict[str, Any]:
         product, sync = cls._load_product_and_sync(db, queue)
+        from app.services.produto_bling_identity_service import (
+            produto_arquivado,
+            vinculo_retirado,
+        )
+
+        if produto_arquivado(product) or vinculo_retirado(sync):
+            if queue.status in {"pendente", "processando", "erro"}:
+                queue.status = "cancelado_fusao"
+                queue.ultimo_erro = (
+                    "Origem Bling retirada por fusao; custo nao publicado."
+                )
+                queue.proxima_tentativa_em = None
+            return {
+                "ok": False,
+                "queue_id": queue.id,
+                "status": queue.status,
+                "produto_id": queue.produto_id,
+            }
         if (
             not product
             or not sync

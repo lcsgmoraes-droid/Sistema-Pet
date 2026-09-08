@@ -430,11 +430,15 @@ class ProdutoAtivoUpdate(BaseModel):
 class ProdutoFusaoPreviewRequest(BaseModel):
     produto_principal_id: int = Field(..., gt=0)
     produto_duplicado_id: int = Field(..., gt=0)
+    estrategia_estoque: Literal["somar", "manter_principal"] = "somar"
 
 
 class ProdutoFusaoExecutarRequest(ProdutoFusaoPreviewRequest):
     decisoes_campos: dict[str, str] = Field(default_factory=dict)
     observacao: Optional[str] = None
+    preview_token: str = Field(min_length=64, max_length=64)
+    preservar_vinculo_bling_duplicado: bool = False
+    aliases_sku: list[str] = Field(default_factory=list, max_length=20)
 
 
 # ==========================================

@@ -266,13 +266,24 @@ def _atualizar_cache_nota_webhook(
 
 def _query_itens_sem_produto(db: Session, tenant_id):
     from app.produtos_models import Produto
+    from app.produto_identity_models import ProdutoSkuAlias
+    from sqlalchemy import func
 
     produto_existe = exists().where(
         Produto.tenant_id == tenant_id,
+        Produto.deleted_at.is_(None),
         or_(
             Produto.codigo == PedidoIntegradoItem.sku,
             Produto.codigo_barras == PedidoIntegradoItem.sku,
         ),
+    )
+    alias_existe = exists().where(
+        ProdutoSkuAlias.tenant_id == tenant_id,
+        ProdutoSkuAlias.sku_normalizado
+        == func.lower(func.trim(PedidoIntegradoItem.sku)),
+        Produto.id == ProdutoSkuAlias.produto_id,
+        Produto.tenant_id == tenant_id,
+        Produto.deleted_at.is_(None),
     )
 
     return (
@@ -283,7 +294,7 @@ def _query_itens_sem_produto(db: Session, tenant_id):
         )
         .filter(
             PedidoIntegradoItem.tenant_id == tenant_id,
-            not_(produto_existe),
+            not_(or_(produto_existe, alias_existe)),
         )
         .order_by(PedidoIntegradoItem.reservado_em.desc())
     )

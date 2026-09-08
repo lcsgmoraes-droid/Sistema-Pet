@@ -20,6 +20,12 @@ class FakeQuery:
     def first(self):
         return self.result
 
+    def populate_existing(self):
+        return self
+
+    def with_for_update(self, **kwargs):
+        return self
+
 
 class FakeDb:
     def __init__(self, results):
@@ -45,7 +51,7 @@ def test_upsert_sync_vinculo_bloqueia_bling_id_ja_vinculado_a_outro_produto():
         tenant_id=TENANT_ID,
         tipo_produto="SIMPLES",
     )
-    db = FakeDb([conflito])
+    db = FakeDb([produto, None, conflito])
 
     with pytest.raises(HTTPException) as exc:
         _upsert_sync_vinculo(db, TENANT_ID, produto, "123456")

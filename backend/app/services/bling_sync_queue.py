@@ -14,6 +14,10 @@ from app.bling_integration import BlingAPI
 from app.db import SessionLocal
 from app.models import Tenant
 from app.produtos_models import Produto, ProdutoBlingSync, ProdutoBlingSyncQueue
+from app.services.produto_bling_identity_service import (
+    produto_arquivado,
+    vinculo_retirado,
+)
 from app.tenancy.context import tenant_context
 from app.utils.tenant_safe_sql import execute_tenant_safe_one
 
@@ -129,15 +133,26 @@ class BlingSyncQueueMixin:
     def _load_produto_sync(
         cls, db: Session, produto_id: int
     ) -> tuple[Optional[Produto], Optional[ProdutoBlingSync]]:
-        produto = db.query(Produto).filter(Produto.id == produto_id).first()
+        # Mesma ordem da fusao: produto antes de vinculo, ate o commit da operacao.
+        produto = (
+            db.query(Produto)
+            .filter(Produto.id == produto_id)
+            .populate_existing()
+            .with_for_update(of=Produto)
+            .first()
+        )
         if not produto:
             return None, None
 
         sync = (
             db.query(ProdutoBlingSync)
             .filter(ProdutoBlingSync.produto_id == produto_id)
+            .populate_existing()
+            .with_for_update(of=ProdutoBlingSync)
             .first()
         )
+        if produto_arquivado(produto) or vinculo_retirado(sync):
+            return produto, None
         return produto, sync
 
     @classmethod
@@ -155,7 +170,13 @@ class BlingSyncQueueMixin:
         if not produto:
             return {"ok": False, "detail": "Produto não encontrado"}
 
-        if not sync or not sync.sincronizar or not sync.bling_produto_id:
+        if (
+            not sync
+            or not sync.sincronizar
+            or not sync.bling_produto_id
+            or vinculo_retirado(sync)
+            or produto_arquivado(produto)
+        ):
             return {
                 "ok": False,
                 "detail": "Produto não configurado para sincronização com Bling",
@@ -379,13 +400,34 @@ class BlingSyncQueueMixin:
     def process_queue_item(
         cls, db: Session, fila: ProdutoBlingSyncQueue
     ) -> Dict[str, Any]:
+        produto = (
+            db.query(Produto)
+            .filter(Produto.id == fila.produto_id)
+            .populate_existing()
+            .with_for_update(of=Produto)
+            .first()
+        )
         sync = (
             db.query(ProdutoBlingSync)
             .filter(ProdutoBlingSync.id == fila.sync_id)
+            .populate_existing()
+            .with_for_update(of=ProdutoBlingSync)
             .first()
         )
-        produto = db.query(Produto).filter(Produto.id == fila.produto_id).first()
 
+        if vinculo_retirado(sync) or produto_arquivado(produto):
+            # Filas historicas de um produto fundido permanecem terminais.
+            if fila.status not in {"cancelado_fusao", "sucesso", "falha_final"}:
+                fila.status = "cancelado_fusao"
+                fila.ultimo_erro = "Origem Bling retirada por fusao"
+                fila.processado_em = utc_now()
+            return {
+                "ok": False,
+                "queue_id": fila.id,
+                "produto_id": fila.produto_id,
+                "status": fila.status,
+                "erro": "Origem Bling retirada por fusao",
+            }
         if not sync or not produto or not sync.sincronizar or not sync.bling_produto_id:
             fila.status = "falha_final"
             fila.ultimo_erro = "Produto sem vínculo ativo com o Bling"
@@ -487,7 +529,7 @@ class BlingSyncQueueMixin:
         repaired_error = 0
 
         for sync, fila in query.all():
-            if not fila:
+            if not fila or vinculo_retirado(sync):
                 continue
 
             if fila.status == "sucesso" and sync.status != "ativo":

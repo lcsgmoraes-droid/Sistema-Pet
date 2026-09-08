@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session, aliased
 from app.bling_integration import BlingAPI
 from app.db import SessionLocal
 from app.produtos_models import Produto, ProdutoBlingSync, ProdutoBlingSyncQueue
+from app.services.produto_bling_identity_service import validar_origem_bling_ativa
 from app.tenancy.context import tenant_context
 
 from .bling_sync_shared import (
@@ -29,11 +30,30 @@ class BlingSyncAutoLinkMixin:
 
     @staticmethod
     def _get_or_create_sync(db: Session, produto: Produto) -> ProdutoBlingSync:
+        produto = (
+            db.query(Produto)
+            .filter(Produto.id == produto.id, Produto.tenant_id == produto.tenant_id)
+            .populate_existing()
+            .with_for_update(of=Produto)
+            .first()
+        )
+        if not produto:
+            raise ValueError("Produto não encontrado após revisar o vínculo Bling.")
         query = db.query(ProdutoBlingSync).filter(
             ProdutoBlingSync.produto_id == produto.id,
             ProdutoBlingSync.tenant_id == produto.tenant_id,
         )
-        sync = query.first()
+        sync = query.populate_existing().with_for_update(of=ProdutoBlingSync).first()
+        validar_origem_bling_ativa(
+            db,
+            tenant_id=produto.tenant_id,
+            produto=produto,
+            sync=sync,
+        )
+        if sync and sync.bling_produto_id:
+            raise ValueError(
+                "Produto já vinculado ao Bling; auto-vínculo não altera vínculo existente."
+            )
         if not sync:
             sync = ProdutoBlingSync(tenant_id=produto.tenant_id, produto_id=produto.id)
             db.add(sync)
@@ -63,6 +83,8 @@ class BlingSyncAutoLinkMixin:
                 )
                 .filter(
                     Produto.tenant_id == tenant_id,
+                    Produto.deleted_at.is_(None),
+                    sync_candidato.retirado_para_produto_id.is_(None),
                     Produto.codigo.isnot(None),
                     Produto.codigo != "",
                     Produto.tipo_produto != "PAI",
@@ -88,8 +110,10 @@ class BlingSyncAutoLinkMixin:
             nao_encontrados = 0
             erros = 0
 
-            for produto in produtos:
+            # O lote segura locks até commit; seguir IDs crescentes como a fusão.
+            for produto in sorted(produtos, key=lambda item: item.id):
                 try:
+                    validar_origem_bling_ativa(db, tenant_id=tenant_id, produto=produto)
                     item = _buscar_item_bling_para_produto(
                         bling,
                         codigo_busca=produto.codigo or "",
@@ -107,6 +131,13 @@ class BlingSyncAutoLinkMixin:
                         continue
 
                     sync = cls._get_or_create_sync(db, produto)
+                    validar_origem_bling_ativa(
+                        db,
+                        tenant_id=tenant_id,
+                        produto=produto,
+                        sync=sync,
+                        bling_produto_id=bling_id,
+                    )
                     sync.bling_produto_id = bling_id
                     sync.sincronizar = True
                     sync.estoque_compartilhado = True

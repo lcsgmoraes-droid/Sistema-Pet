@@ -24,6 +24,7 @@ from app.variacao_config_fiscal_models import VariacaoConfigFiscal  # noqa
 
 # Importando produtos
 from app.produtos_models import Produto, Marca, Categoria  # noqa
+from app.produto_identity_models import ProdutoSkuAlias, ProdutoFusaoLog  # noqa
 
 # Importando vendas
 from app.vendas_models import Venda, VendaItem  # noqa

@@ -11,6 +11,7 @@ from sqlalchemy.orm import aliased
 from app.bling_integration import BlingAPI
 from app.db import SessionLocal
 from app.produtos_models import ProdutoBlingSync, ProdutoBlingSyncQueue
+from app.services.produto_bling_identity_service import vinculo_retirado
 
 from .bling_sync_shared import (
     BLING_REPROCESS_IMMEDIATE_LIMIT,
@@ -81,6 +82,13 @@ class BlingSyncReprocessMixin:
             sem_fila_reenfileirados = 0
             produtos_reenfileirados: set[int] = set()
             for index, fila in enumerate(filas):
+                sync = (
+                    db.query(ProdutoBlingSync)
+                    .filter(ProdutoBlingSync.id == fila.sync_id)
+                    .first()
+                )
+                if vinculo_retirado(sync):
+                    continue
                 if index < BLING_REPROCESS_IMMEDIATE_LIMIT:
                     proxima_tentativa = now
                 else:
@@ -94,11 +102,6 @@ class BlingSyncReprocessMixin:
                 fila.processado_em = None
                 fila.forcar_sync = True
 
-                sync = (
-                    db.query(ProdutoBlingSync)
-                    .filter(ProdutoBlingSync.id == fila.sync_id)
-                    .first()
-                )
                 if sync:
                     sync.status = "pendente"
                     sync.proxima_tentativa_sync = proxima_tentativa
@@ -117,6 +120,7 @@ class BlingSyncReprocessMixin:
                     .outerjoin(fila_atual, fila_atual.id == latest_ids.c.queue_id)
                     .filter(
                         ProdutoBlingSync.sincronizar.is_(True),
+                        ProdutoBlingSync.retirado_para_produto_id.is_(None),
                         ProdutoBlingSync.status == "erro",
                         ProdutoBlingSync.erro_mensagem.isnot(None),
                         ProdutoBlingSync.erro_mensagem != "",
@@ -143,6 +147,8 @@ class BlingSyncReprocessMixin:
                 )
 
                 for sync in syncs_sem_fila:
+                    if vinculo_retirado(sync):
+                        continue
                     queue_result = cls.queue_product_sync(
                         db,
                         produto_id=int(sync.produto_id),

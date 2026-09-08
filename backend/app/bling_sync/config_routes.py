@@ -15,6 +15,7 @@ from app.bling_sync.routes_common import (
     PRODUTO_NAO_ENCONTRADO,
     _buscar_item_bling_para_vinculo,
     _upsert_sync_vinculo,
+    _validar_origem_bling_ativa_http,
     utc_now,
 )
 from app.bling_sync.schemas import ConfigSyncRequest, VincularProdutoRequest
@@ -49,6 +50,8 @@ def configurar_sincronizacao(
             Produto.id == config.produto_id,
             Produto.tenant_id == tenant_id,
         )
+        .populate_existing()
+        .with_for_update(of=Produto)
         .first()
     )
     if not produto:
@@ -61,24 +64,22 @@ def configurar_sincronizacao(
             ProdutoBlingSync.produto_id == config.produto_id,
             ProdutoBlingSync.tenant_id == tenant_id,
         )
+        .populate_existing()
+        .with_for_update(of=ProdutoBlingSync)
         .first()
     )
 
-    if not sync:
-        sync = ProdutoBlingSync(
-            tenant_id=produto.tenant_id, produto_id=config.produto_id
-        )
-        db.add(sync)
-
-    # Atualizar configuração
-    sync.bling_produto_id = config.bling_produto_id
-    sync.sincronizar = config.sincronizar
-    sync.estoque_compartilhado = config.estoque_compartilhado
-    sync.status = "ativo" if config.sincronizar else "pausado"
-    sync.updated_at = utc_now()
+    _validar_origem_bling_ativa_http(
+        db,
+        tenant_id=tenant_id,
+        produto=produto,
+        sync=sync,
+    )
+    bling_id = config.bling_produto_id
+    erro_busca = None
 
     # Se não tem bling_produto_id, tentar buscar automaticamente
-    if not sync.bling_produto_id and config.sincronizar:
+    if not bling_id and config.sincronizar:
         try:
             # Buscar no Bling por SKU ou código de barras
             bling = BlingAPI()
@@ -88,18 +89,37 @@ def configurar_sincronizacao(
 
             produtos_bling = resultado.get("data", [])
             if produtos_bling and len(produtos_bling) > 0:
-                sync.bling_produto_id = str(produtos_bling[0].get("id"))
+                bling_id = str(produtos_bling[0].get("id"))
                 logger.info(
-                    f"✅ Produto vinculado automaticamente: Bling ID {sync.bling_produto_id}"
+                    f"✅ Produto encontrado automaticamente: Bling ID {bling_id}"
                 )
             else:
-                sync.status = "erro"
-                sync.erro_mensagem = "Produto não encontrado no Bling"
+                erro_busca = "Produto não encontrado no Bling"
                 logger.warning("⚠️ Produto não encontrado no Bling")
         except Exception as e:
             logger.error(f"❌ Erro ao buscar produto no Bling: {e}")
-            sync.status = "erro"
-            sync.erro_mensagem = str(e)
+            erro_busca = str(e)
+
+    _validar_origem_bling_ativa_http(
+        db,
+        tenant_id=tenant_id,
+        produto=produto,
+        sync=sync,
+        bling_produto_id=bling_id,
+    )
+    if not sync:
+        sync = ProdutoBlingSync(
+            tenant_id=produto.tenant_id, produto_id=config.produto_id
+        )
+        db.add(sync)
+    sync.bling_produto_id = bling_id
+    sync.sincronizar = config.sincronizar
+    sync.estoque_compartilhado = config.estoque_compartilhado
+    sync.status = (
+        "erro" if erro_busca else ("ativo" if config.sincronizar else "pausado")
+    )
+    sync.erro_mensagem = erro_busca
+    sync.updated_at = utc_now()
 
     db.commit()
     _invalidate_bling_snapshots(tenant_id)
@@ -134,22 +154,6 @@ def vincular_produto_bling(
     if not produto:
         raise HTTPException(status_code=404, detail=PRODUTO_NAO_ENCONTRADO)
 
-    sync = (
-        db.query(ProdutoBlingSync)
-        .filter(
-            ProdutoBlingSync.produto_id == body.produto_id,
-            ProdutoBlingSync.tenant_id == tenant_id,
-        )
-        .first()
-    )
-
-    if not sync:
-        sync = ProdutoBlingSync(
-            tenant_id=produto.tenant_id,
-            produto_id=produto.id,
-        )
-        db.add(sync)
-
     _upsert_sync_vinculo(db, tenant_id, produto, str(body.bling_id))
 
     db.commit()
@@ -183,6 +187,7 @@ def vincular_produto_bling_automatico(
     if not produto:
         raise HTTPException(status_code=404, detail=PRODUTO_NAO_ENCONTRADO)
 
+    _validar_origem_bling_ativa_http(db, tenant_id=tenant_id, produto=produto)
     bling = BlingAPI()
 
     codigo_busca = (produto.codigo or "").strip()
