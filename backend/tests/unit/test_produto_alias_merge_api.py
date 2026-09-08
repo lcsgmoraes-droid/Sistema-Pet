@@ -15,6 +15,7 @@ from app.security import permissions_decorator
 from tests.unit.test_produto_alias_merge import case as _case_fixture
 from tests.unit.test_produto_alias_merge import merge
 from app.produtos_models import Produto
+from app.bling_sync.habilitacao_routes import router as habilitacao_router
 
 case = _case_fixture
 
@@ -25,6 +26,7 @@ def api(case, monkeypatch):
     app.include_router(alias_router, prefix="/produtos")
     app.include_router(merge_router, prefix="/produtos")
     app.include_router(cadastro_router, prefix="/produtos")
+    app.include_router(habilitacao_router, prefix="/estoque/sync")
     app.dependency_overrides[get_session] = lambda: case.db
     state = {"tenant": case.tenant, "allow": True}
 

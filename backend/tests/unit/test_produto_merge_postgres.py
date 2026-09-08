@@ -103,6 +103,94 @@ def test_stock_queue_savepoint_failure_does_not_rollback_the_sale(case, monkeypa
         assert observer.query(ProdutoBlingSyncQueue).count() == 0
 
 
+def test_pause_waits_for_running_worker_then_blocks_next_send_preserving_null(
+    case, monkeypatch
+):
+    from app.bling_sync.habilitacao_routes import (
+        alterar_habilitacao_bling,
+        HabilitacaoSyncRequest,
+    )
+    from app.services import bling_sync_queue
+    from app.services.bling_sync_service import BlingSyncService
+
+    case.a.estoque_compartilhado = None
+    queue = ProdutoBlingSyncQueue(
+        tenant_id=case.tenant,
+        produto_id=case.primary.id,
+        sync_id=case.a.id,
+        estoque_novo=50,
+        status="pendente",
+        tentativas=0,
+    )
+    case.db.add(queue)
+    case.db.commit()
+    product_id, queue_id = case.primary.id, queue.id
+    sending, release, pause_waiting = Event(), Event(), Event()
+    sent = []
+
+    class FakeBling:
+        def atualizar_estoque_produto(self, **kwargs):
+            sent.append(kwargs)
+            sending.set()
+            assert release.wait(5)
+
+    monkeypatch.setattr(bling_sync_queue, "BlingAPI", FakeBling)
+    monkeypatch.setattr(bling_sync_queue, "_reservar_janela_envio_bling", lambda: None)
+
+    def worker():
+        set_current_tenant(case.tenant)
+        with Session(case.engine) as db:
+            result = BlingSyncService.process_queue_item(
+                db, db.get(ProdutoBlingSyncQueue, queue_id)
+            )
+            db.commit()
+            return result
+
+    def pause():
+        set_current_tenant(case.tenant)
+        with Session(case.engine) as db:
+            return alterar_habilitacao_bling.__wrapped__(
+                product_id,
+                HabilitacaoSyncRequest(sincronizar=False),
+                db,
+                (SimpleNamespace(id=1), case.tenant),
+            )
+
+    def query_started(conn, cursor, statement, parameters, context, many):
+        if sending.is_set() and "FOR UPDATE" in statement and "produtos" in statement:
+            pause_waiting.set()
+
+    event.listen(case.engine, "before_cursor_execute", query_started)
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        processing = pool.submit(worker)
+        assert sending.wait(3)
+        pausing = pool.submit(pause)
+        try:
+            assert pause_waiting.wait(3) and not pausing.done()
+        finally:
+            release.set()
+        assert processing.result(timeout=5)["ok"] is True
+        result = pausing.result(timeout=5)
+        assert (
+            result["sincronizar"] is False and result["estoque_compartilhado"] is None
+        )
+    event.remove(case.engine, "before_cursor_execute", query_started)
+    case.db.expire_all()
+    another = ProdutoBlingSyncQueue(
+        tenant_id=case.tenant,
+        produto_id=product_id,
+        sync_id=case.a.id,
+        estoque_novo=50,
+        status="pendente",
+        tentativas=0,
+    )
+    case.db.add(another)
+    case.db.commit()
+    assert BlingSyncService.process_queue_item(case.db, another)["ok"] is False
+    assert len(sent) == 1 and case.primary.estoque_atual == 50
+    assert case.a.bling_produto_id == "BLING-A" and case.a.estoque_compartilhado is None
+
+
 @pytest.mark.parametrize(
     "operation", ["stock_worker", "cost_worker", "config", "reconcile"]
 )

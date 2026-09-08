@@ -51,6 +51,19 @@ com SKU alternativo.
 
 ## Transacao, reservas e Bling
 
+Na edicao de um produto, `Sincronizacao Bling` permite pausar ou retomar o envio
+automatico desse cadastro. `GET /api/estoque/sync/habilitacao/{produto_id}` consulta
+o estado e `PATCH` no mesmo caminho recebe somente `{ "sincronizar": false }`
+(ou `true`). Ambos exigem sessao do tenant e `produtos.editar`. A acao preserva o
+ID Bling e `estoque_compartilhado`, inclusive `NULL`, e nao altera estoque/precos.
+Sem vinculo ou com origem retirada, nao cria ligacao nem permite retomada.
+
+A pausa espera eventual worker em andamento terminar sob os mesmos locks e
+impede envios seguintes. A retomada apenas habilita a rotina existente, que pode
+enfileirar o saldo atual; nao comprova sincronizacao concluida. Durante saneamento
+de carrinhos, manter o produto pausado ate definir o saldo e validar os pedidos.
+O controle nao seleciona a autoridade Bling/EcommerceAI do projeto de integracao.
+
 A ordem de locks e namespace de aliases do tenant, produtos em ordem de ID e
 vinculos Bling. Os caminhos de fila, configuracao e reconciliacao recarregam os
 objetos sob lock antes de usar sua autoridade. Filas de estoque ou custo em

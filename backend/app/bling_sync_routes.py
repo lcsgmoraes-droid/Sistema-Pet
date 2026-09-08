@@ -38,6 +38,7 @@ from .bling_sync.custos_routes import (
     router as custos_bling_router,
     sincronizar_custos_marca_bling,
 )
+from .bling_sync.habilitacao_routes import router as habilitacao_router
 from .bling_sync.exportacao_produtos_routes import (
     exportar_produto_local_para_bling,
     exportar_produtos_locais_para_bling_lote,
@@ -101,6 +102,7 @@ router.include_router(produtos_bling_router)
 router.include_router(exportacao_produtos_bling_router)
 router.include_router(custos_bling_router)
 router.include_router(config_router)
+router.include_router(habilitacao_router)
 router.include_router(dashboard_router)
 router.include_router(operational_router)
 router.include_router(webhook_router)

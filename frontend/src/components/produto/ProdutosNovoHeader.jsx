@@ -1,5 +1,6 @@
 import { useParams } from "react-router-dom";
 import ProdutoSkuAliasAction from "../produtos/ProdutoSkuAliasAction";
+import ProdutoBlingSyncAction from "../produtos/ProdutoBlingSyncAction";
 
 export default function ProdutosNovoHeader({ formData, isClone, isEdicao, onClonar, onVoltar }) {
   const { id } = useParams();
@@ -50,6 +51,7 @@ export default function ProdutosNovoHeader({ formData, isClone, isEdicao, onClon
           {isEdicao && id && (
             <ProdutoSkuAliasAction key={id} produtoId={Number(id)} nome={formData.nome} />
           )}
+          {isEdicao && id && <ProdutoBlingSyncAction key={`bling-${id}`} produtoId={Number(id)} />}
           {isEdicao && onClonar && (
             <button
               type="button"

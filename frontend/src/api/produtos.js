@@ -260,6 +260,14 @@ export const aplicarAliasSkuProduto = (id, data) => {
   return api.post(`/produtos/${id}/aliases-sku/aplicar`, data);
 };
 
+export const getHabilitacaoBlingProduto = (id) => {
+  return api.get(`/estoque/sync/habilitacao/${id}`);
+};
+
+export const alterarHabilitacaoBlingProduto = (id, sincronizar) => {
+  return api.patch(`/estoque/sync/habilitacao/${id}`, { sincronizar });
+};
+
 /**
  * Gerar SKU automático
  * @param {string} prefixo - Prefixo opcional para o SKU
