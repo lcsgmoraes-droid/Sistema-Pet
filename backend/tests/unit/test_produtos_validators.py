@@ -1,5 +1,7 @@
 import pytest
+from types import SimpleNamespace
 from fastapi import HTTPException
+from app.produto_identity_models import ProdutoSkuAlias
 
 from app.produtos.validators import (
     _obter_produto_ou_404,
@@ -34,7 +36,12 @@ class FakeDb:
 
     def query(self, model):
         self.queried_models.append(model)
+        if model is ProdutoSkuAlias:
+            return FakeQuery()
         return self.query_instance
+
+    def get_bind(self):
+        return SimpleNamespace(dialect=SimpleNamespace(name="sqlite"))
 
 
 class ProdutoFake:

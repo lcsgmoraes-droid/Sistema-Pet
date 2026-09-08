@@ -389,7 +389,10 @@ class Produto(BaseTenantModel):
     )
     movimentacoes = relationship("EstoqueMovimentacao", back_populates="produto")
     bling_sync = relationship(
-        "ProdutoBlingSync", back_populates="produto", uselist=False
+        "ProdutoBlingSync",
+        back_populates="produto",
+        uselist=False,
+        foreign_keys="ProdutoBlingSync.produto_id",
     )
     bling_sync_queue_items = relationship(
         "ProdutoBlingSyncQueue", back_populates="produto"

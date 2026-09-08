@@ -179,12 +179,45 @@ def _consultar_produto_bling_com_retry(
     return None
 
 
+def _validar_origem_bling_ativa_http(db: Session, *, tenant_id, **kwargs) -> None:
+    from app.services.produto_bling_identity_service import validar_origem_bling_ativa
+
+    try:
+        validar_origem_bling_ativa(db, tenant_id=tenant_id, **kwargs)
+    except ValueError as error:
+        raise HTTPException(status_code=409, detail=str(error)) from error
+
+
 def _upsert_sync_vinculo(
     db: Session,
     tenant_id,
     produto: Produto,
     bling_produto_id: str,
 ) -> None:
+    # A busca remota pode ter começado antes de uma fusão. Recarregar sob lock
+    # na mesma ordem da fusão impede regravar uma identidade já retirada.
+    produto = (
+        db.query(Produto)
+        .filter(Produto.id == produto.id, Produto.tenant_id == tenant_id)
+        .populate_existing()
+        .with_for_update(of=Produto)
+        .first()
+    )
+    if not produto:
+        raise HTTPException(status_code=404, detail=PRODUTO_NAO_ENCONTRADO)
+    sync = (
+        db.query(ProdutoBlingSync)
+        .filter(
+            ProdutoBlingSync.produto_id == produto.id,
+            ProdutoBlingSync.tenant_id == tenant_id,
+        )
+        .populate_existing()
+        .with_for_update(of=ProdutoBlingSync)
+        .first()
+    )
+    _validar_origem_bling_ativa_http(
+        db, tenant_id=tenant_id, produto=produto, sync=sync
+    )
     bling_produto_id = str(bling_produto_id or "").strip()
     if bling_produto_id:
         conflito = (
@@ -205,15 +238,13 @@ def _upsert_sync_vinculo(
                 ),
             )
 
-    sync = (
-        db.query(ProdutoBlingSync)
-        .filter(
-            ProdutoBlingSync.produto_id == produto.id,
-            ProdutoBlingSync.tenant_id == tenant_id,
-        )
-        .first()
+    _validar_origem_bling_ativa_http(
+        db,
+        tenant_id=tenant_id,
+        produto=produto,
+        sync=sync,
+        bling_produto_id=bling_produto_id,
     )
-
     if not sync:
         sync = ProdutoBlingSync(tenant_id=produto.tenant_id, produto_id=produto.id)
         db.add(sync)

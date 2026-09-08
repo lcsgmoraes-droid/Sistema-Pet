@@ -25,7 +25,13 @@ from app.produtos.schemas import (
     ProdutoResponse,
     ProdutoUpdate,
 )
-from app.produtos.validators import _validar_sku_unico, _validar_tenant_e_obter_usuario
+from app.produtos.validators import (
+    _validar_sku_unico,
+    _validar_tenant_e_obter_usuario,
+    _validar_chaves_aliases,
+)
+from app.services.produto_sku_service import chaves_sku_produto
+from app.services.produto_alias_service import _lock_alias_namespace
 from app.produtos_models import (
     Categoria,
     Marca,
@@ -101,6 +107,7 @@ def criar_produto(
     # ========================================
 
     _validar_sku_unico(db, produto.codigo, tenant_id)
+    _validar_chaves_aliases(db, chaves_sku_produto(produto), tenant_id)
 
     # Verificar se código de barras já existe
     if produto.codigo_barras:
@@ -448,15 +455,32 @@ def atualizar_produto(
     )
     tenant_id = UUID(str(acesso_catalogo.tenant_origem_id))
     set_current_tenant(tenant_id)
-
-    produto = (
-        db.query(Produto)
-        .filter(Produto.id == produto_id, Produto.tenant_id == tenant_id)
-        .first()
+    identity_changed = bool(
+        {"codigo", "codigo_barras", "codigos_barras_alternativos"}
+        & produto_update.model_fields_set
     )
+    if identity_changed:
+        _lock_alias_namespace(db, tenant_id)
+
+    product_query = db.query(Produto).filter(
+        Produto.id == produto_id, Produto.tenant_id == tenant_id
+    )
+    if identity_changed:
+        product_query = product_query.with_for_update().populate_existing()
+    produto = product_query.first()
 
     if not produto:
         raise HTTPException(status_code=404, detail="Produto não encontrado")
+
+    if identity_changed:
+        if produto.deleted_at is not None:
+            raise HTTPException(
+                status_code=409,
+                detail="Produto arquivado por fusao; edite o cadastro sobrevivente.",
+            )
+        _validar_chaves_aliases(
+            db, chaves_sku_produto(produto_update), tenant_id, produto_id=produto_id
+        )
 
     # Verificar se novo SKU já existe
     if produto_update.codigo is not None:

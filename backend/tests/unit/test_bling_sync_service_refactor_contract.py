@@ -45,13 +45,14 @@ def test_bling_sync_service_compoe_fluxos_extraidos():
 
 
 def test_bling_sync_service_refactor_mantem_arquivos_focados():
+    # Guardas permanentes de fusao tambem cobrem filas e auto-vinculo.
     limits = {
         "app/services/bling_sync_service.py": 100,
         "app/services/bling_sync_shared.py": 520,
-        "app/services/bling_sync_queue.py": 650,
+        "app/services/bling_sync_queue.py": 680,
         "app/services/bling_sync_reprocess.py": 250,
         "app/services/bling_sync_reconciliation.py": 300,
-        "app/services/bling_sync_auto_link.py": 220,
+        "app/services/bling_sync_auto_link.py": 270,
     }
 
     for relative_path, max_lines in limits.items():

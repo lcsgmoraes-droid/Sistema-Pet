@@ -24,7 +24,11 @@ from app.bling_sync.product_matching import (
     _sku_bling,
     _texto_limpo,
 )
-from app.bling_sync.routes_common import _upsert_sync_vinculo, utc_now
+from app.bling_sync.routes_common import (
+    _upsert_sync_vinculo,
+    _validar_origem_bling_ativa_http,
+    utc_now,
+)
 from app.bling_sync.schemas import CriarProdutoBlingFaltanteRequest
 from app.db import get_session
 from app.produtos_models import Produto, ProdutoBlingSync
@@ -318,6 +322,12 @@ def criar_produto_local_para_faltante_bling(
     bling_id = _texto_limpo(body.bling_id)
     if not bling_id:
         raise HTTPException(status_code=400, detail="bling_id e obrigatorio")
+
+    _validar_origem_bling_ativa_http(
+        db,
+        tenant_id=tenant_id,
+        bling_produto_id=bling_id,
+    )
 
     try:
         item_bling = BlingAPI().consultar_produto(bling_id)

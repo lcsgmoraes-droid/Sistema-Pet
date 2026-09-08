@@ -184,6 +184,7 @@ def preview_fusao_produtos(
             tenant_id=tenant_id,
             principal_id=payload.produto_principal_id,
             duplicado_id=payload.produto_duplicado_id,
+            estrategia_estoque=payload.estrategia_estoque,
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
@@ -207,6 +208,10 @@ def executar_fusao_produtos_endpoint(
             decisoes_campos=payload.decisoes_campos,
             user_id=current_user.id,
             observacao=payload.observacao,
+            estrategia_estoque=payload.estrategia_estoque,
+            preview_token=payload.preview_token,
+            preservar_vinculo_bling_duplicado=payload.preservar_vinculo_bling_duplicado,
+            aliases_sku=payload.aliases_sku,
         )
     except ValueError as exc:
         db.rollback()

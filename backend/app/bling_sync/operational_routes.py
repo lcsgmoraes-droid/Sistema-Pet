@@ -13,7 +13,11 @@ from sqlalchemy.orm import Session
 from app.auth.dependencies import get_current_user_and_tenant
 from app.bling_integration import BlingAPI
 from app.bling_sync.product_matching import _coerce_float
-from app.bling_sync.routes_common import PRODUTO_NAO_ENCONTRADO, utc_now
+from app.bling_sync.routes_common import (
+    PRODUTO_NAO_ENCONTRADO,
+    _validar_origem_bling_ativa_http,
+    utc_now,
+)
 from app.bling_sync.schemas import ReconciliarBatchRequest, SyncStatusResponse
 from app.bling_sync.status_queries import _build_sync_problem_query
 from app.db import get_session
@@ -412,7 +416,41 @@ def reconciliar_estoque(
     """
     logger.info("Reconciliando estoque manual")
 
-    current_user, _tenant = user_and_tenant
+    current_user, tenant_id = user_and_tenant
+
+    produto_query = (
+        db.query(Produto)
+        .filter(
+            Produto.id == produto_id,
+            Produto.tenant_id == tenant_id,
+        )
+        .populate_existing()
+    )
+    # O ramo sistema usa sessão própria no serviço, que adquire estes locks.
+    # Bloqueá-los também aqui faria a chamada esperar pela própria requisição.
+    if origem != "sistema":
+        produto_query = produto_query.with_for_update(of=Produto)
+    produto = produto_query.first()
+    if not produto:
+        raise HTTPException(status_code=404, detail=PRODUTO_NAO_ENCONTRADO)
+    sync_query = (
+        db.query(ProdutoBlingSync)
+        .filter(
+            ProdutoBlingSync.produto_id == produto_id,
+            ProdutoBlingSync.tenant_id == tenant_id,
+        )
+        .populate_existing()
+    )
+    if origem != "sistema":
+        sync_query = sync_query.with_for_update(of=ProdutoBlingSync)
+    sync = sync_query.first()
+    _validar_origem_bling_ativa_http(
+        db,
+        tenant_id=tenant_id,
+        produto=produto,
+        sync=sync,
+        bling_produto_id=sync.bling_produto_id if sync else None,
+    )
 
     if origem == "sistema":
         resultado = BlingSyncService.reconcile_product(
@@ -426,17 +464,6 @@ def reconciliar_estoque(
             "message": "Reconciliação executada com sucesso",
             **resultado,
         }
-
-    # Buscar produto e sync
-    produto = db.query(Produto).filter(Produto.id == produto_id).first()
-    if not produto:
-        raise HTTPException(status_code=404, detail=PRODUTO_NAO_ENCONTRADO)
-
-    sync = (
-        db.query(ProdutoBlingSync)
-        .filter(ProdutoBlingSync.produto_id == produto_id)
-        .first()
-    )
 
     if not sync or not sync.bling_produto_id:
         raise HTTPException(

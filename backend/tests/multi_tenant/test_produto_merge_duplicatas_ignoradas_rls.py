@@ -47,11 +47,36 @@ def test_fusao_produtos_remove_duplicatas_ignoradas_com_sql_tenant_safe(monkeypa
     principal = _produto(10, "SKU-10")
     duplicado = _produto(20, "SKU-20")
     chamadas = []
+    # Isolate the tenant-safe delete; actual transaction/alias/audit behavior is
+    # exercised with ORM rows in test_produto_alias_merge.
+    monkeypatch.setattr(
+        produto_merge_service, "_lock_alias_namespace", lambda *args: None
+    )
+    monkeypatch.setattr(
+        produto_merge_service, "prepare_merge", lambda *args, **kwargs: {}
+    )
+    monkeypatch.setattr(
+        produto_merge_service, "reference_snapshot", lambda *args, **kwargs: []
+    )
+    monkeypatch.setattr(
+        produto_merge_service, "preserve_aliases", lambda *args, **kwargs: []
+    )
+    monkeypatch.setattr(
+        produto_merge_service, "_consultar_fks_produto", lambda *args: []
+    )
+    monkeypatch.setattr(
+        produto_merge_service,
+        "record_merge",
+        lambda *args, **kwargs: SimpleNamespace(id=1),
+    )
 
     monkeypatch.setattr(
         produto_merge_service,
         "_obter_produtos",
-        lambda db, tenant_id, principal_id, duplicado_id: (principal, duplicado),
+        lambda db, tenant_id, principal_id, duplicado_id, **kwargs: (
+            principal,
+            duplicado,
+        ),
     )
     monkeypatch.setattr(produto_merge_service, "_mesclar_fornecedores", lambda *args: 0)
     monkeypatch.setattr(produto_merge_service, "_mesclar_listas_preco", lambda *args: 0)

@@ -81,7 +81,7 @@ def db(monkeypatch):
     syncs = []
     monkeypatch.setattr(
         "app.estoque.service._agenda_sync_bling",
-        lambda produto_id, estoque_novo, motivo: syncs.append(
+        lambda produto_id, estoque_novo, motivo, *, db: syncs.append(
             (produto_id, estoque_novo, motivo)
         ),
     )

@@ -26,6 +26,7 @@ from app.pedido_integrado_models import (
     PedidoIntegrado,  # noqa: F401 - register FK target for SQLite
 )
 from app.produtos_models import Produto, ProdutoImagem, ProdutoKitComponente
+from app.produto_identity_models import ProdutoSkuAlias
 from app.routes.ecommerceai_integration_routes import router
 from app.services.ecommerceai_catalog_service import (
     EcommerceAICatalogService,
@@ -45,6 +46,7 @@ def db_session():
         Produto,
         ProdutoImagem,
         ProdutoKitComponente,
+        ProdutoSkuAlias,
         PedidoIntegradoItem,
         EmpresaGrupoEstoqueCompartilhado,
         EcommerceAIConnectionRequest,

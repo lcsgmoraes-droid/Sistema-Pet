@@ -19,6 +19,7 @@ from app.models import Tenant
 from app.produtos.tipos import tipo_controla_estoque
 from app.produtos_catalogo_models import Produto
 from app.services.produto_sku_service import chaves_sku_produto, normalizar_sku
+from app.services.produto_alias_service import aliases_por_produto
 
 
 @contextmanager
@@ -99,8 +100,12 @@ class EcommerceAICatalogService:
         )
         candidates: dict[str, dict[int, Any]] = defaultdict(dict)
         identities_by_id = {product.id: product for product in identities}
+        explicit_aliases = aliases_por_produto(self.db, self.tenant_id)
         for product in identities:
-            for alias in chaves_sku_produto(product):
+            for alias in [
+                *chaves_sku_produto(product),
+                *explicit_aliases.get(product.id, []),
+            ]:
                 candidates[normalizar_sku(alias)][product.id] = product
         reservations: dict[int, Decimal] = defaultdict(Decimal)
         blocked_ids: set[int] = set()

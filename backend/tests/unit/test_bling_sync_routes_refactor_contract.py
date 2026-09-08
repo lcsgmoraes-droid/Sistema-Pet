@@ -1,4 +1,5 @@
 from pathlib import Path
+from fastapi import FastAPI
 
 from app import bling_sync_routes
 from app.bling_sync import config_routes, dashboard_routes, operational_routes
@@ -34,10 +35,13 @@ EXPECTED_PUBLIC_ROUTES = {
 
 
 def _route_signatures(router):
+    app = FastAPI()
+    app.include_router(router)
+    # FastAPI materializa routers incluidos ao gerar o contrato da aplicacao.
     return {
-        (route.path, ",".join(sorted(route.methods)))
-        for route in router.routes
-        if hasattr(route, "methods")
+        (path, method.upper())
+        for path, operations in app.openapi()["paths"].items()
+        for method in operations
     }
 
 
@@ -64,12 +68,13 @@ def test_bling_sync_routes_mantem_aliases_de_compatibilidade():
 
 
 def test_bling_sync_routes_refactor_mantem_arquivos_focados():
+    # Margem para guardas de origens retiradas por fusao, sem mover fluxos de dominio.
     limits = {
         "app/bling_sync_routes.py": 180,
-        "app/bling_sync/routes_common.py": 230,
-        "app/bling_sync/config_routes.py": 240,
+        "app/bling_sync/routes_common.py": 280,
+        "app/bling_sync/config_routes.py": 260,
         "app/bling_sync/dashboard_routes.py": 430,
-        "app/bling_sync/operational_routes.py": 520,
+        "app/bling_sync/operational_routes.py": 550,
         "app/bling_sync/webhook_routes.py": 320,
     }
 

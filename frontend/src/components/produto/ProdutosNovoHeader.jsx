@@ -1,4 +1,9 @@
+import { useParams } from "react-router-dom";
+import ProdutoSkuAliasAction from "../produtos/ProdutoSkuAliasAction";
+import ProdutoBlingSyncAction from "../produtos/ProdutoBlingSyncAction";
+
 export default function ProdutosNovoHeader({ formData, isClone, isEdicao, onClonar, onVoltar }) {
+  const { id } = useParams();
   const titulo = isClone ? "Clonar Produto" : isEdicao ? "Editar Produto" : "Novo Produto";
 
   return (
@@ -42,7 +47,11 @@ export default function ProdutosNovoHeader({ formData, isClone, isEdicao, onClon
             </p>
           )}
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          {isEdicao && id && (
+            <ProdutoSkuAliasAction key={id} produtoId={Number(id)} nome={formData.nome} />
+          )}
+          {isEdicao && id && <ProdutoBlingSyncAction key={`bling-${id}`} produtoId={Number(id)} />}
           {isEdicao && onClonar && (
             <button
               type="button"

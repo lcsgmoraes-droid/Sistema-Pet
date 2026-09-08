@@ -90,6 +90,7 @@ def _validar_sku_unico(
     produto_id: Optional[int] = None,
 ):
     sku_normalizado = _normalizar_sku_produto(sku)
+    _validar_chaves_aliases(db, [sku_normalizado], tenant_id, produto_id=produto_id)
 
     query = db.query(Produto).filter(
         func.lower(func.trim(Produto.codigo)) == sku_normalizado.lower(),
@@ -112,6 +113,7 @@ def _validar_codigo_barras_unico(
     tenant_id: int,
     produto_id: Optional[int] = None,
 ):
+    _validar_chaves_aliases(db, [codigo_barras], tenant_id, produto_id=produto_id)
     query = db.query(Produto).filter(
         Produto.codigo_barras == codigo_barras,
         Produto.tenant_id == tenant_id,
@@ -125,6 +127,17 @@ def _validar_codigo_barras_unico(
             status_code=400,
             detail=f"Codigo de barras '{codigo_barras}' ja esta em uso",
         )
+
+
+def _validar_chaves_aliases(db, chaves, tenant_id, produto_id=None):
+    from app.services.produto_alias_service import validar_chaves_sem_alias_alheio
+
+    try:
+        validar_chaves_sem_alias_alheio(
+            db, tenant_id=tenant_id, chaves=chaves, produto_id=produto_id
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 def _validar_pode_inativar_produto(db: Session, produto: Produto, tenant_id):
