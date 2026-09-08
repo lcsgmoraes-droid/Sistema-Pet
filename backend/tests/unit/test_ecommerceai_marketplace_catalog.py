@@ -385,6 +385,42 @@ def test_physical_kit_reservation_does_not_reserve_components(
     assert rows[str(component_product.id)]["stock"]["reserved"] == "0"
 
 
+@pytest.mark.parametrize("parent_type", ["KIT", "VARIACAO"])
+@pytest.mark.parametrize("component_quantity", [1, 2, 4])
+def test_legacy_simple_virtual_component_does_not_block_unrelated_stock(
+    catalog, db_session, monkeypatch, parent_type, component_quantity
+):
+    service, product, kit, component_product, component = _reserved_kit(
+        catalog, db_session, monkeypatch
+    )
+    kit.tipo_produto = parent_type
+    component_product.tipo_kit = "VIRTUAL"
+    component.quantidade = component_quantity
+    db_session.flush()
+    assert not EstoqueReservaService._usa_composicao_virtual(component_product)
+
+    reservations, blocked_ids, reason = service._reservations()
+    assert reason is None
+    assert reservations[product.id] == 2
+    assert {kit.id, component_product.id} <= blocked_ids
+
+    rows = {row["corepet_id"]: row for row in service.list_products()["products"]}
+    unaffected = rows[str(product.id)]["stock"]
+    assert unaffected["status"] == "ready"
+    assert unaffected["reserved"] == "2"
+    assert unaffected["available"] == "8.5"
+    affected = rows[str(component_product.id)]["stock"]
+    assert affected["status"] == "unavailable"
+    assert affected["physical"] is affected["reserved"] is affected["available"] is None
+    # A exceção identifica a folha; não libera sua própria política de estoque.
+    assert affected["reason"] == "kit_policy_unsupported"
+    assert rows[str(component_product.id)]["cost"]["status"] == "unavailable"
+    assert rows[str(kit.id)]["stock"]["status"] == "unavailable"
+    assert (
+        service.list_products(q="SKU-01")["products"][0]["stock"]["status"] == "ready"
+    )
+
+
 @pytest.mark.parametrize(
     "failure",
     [
@@ -392,8 +428,13 @@ def test_physical_kit_reservation_does_not_reserve_components(
         "missing_product",
         "deleted_product",
         "nested_kit",
+        "nested_virtual_variation",
+        "physical_simple_component",
+        "unknown_simple_component_policy",
         "zero_quantity",
         "invalid_quantity",
+        "zero_legacy_quantity",
+        "invalid_legacy_quantity",
     ],
 )
 def test_unverified_virtual_composition_still_blocks_unrelated_stock(
@@ -413,9 +454,27 @@ def test_unverified_virtual_composition_still_blocks_unrelated_stock(
         component_product.tipo_produto = "KIT"
         component_product.tipo_kit = "VIRTUAL"
         db_session.flush()
+    elif failure == "nested_virtual_variation":
+        component_product.tipo_produto = "VARIACAO"
+        component_product.tipo_kit = "VIRTUAL"
+        db_session.flush()
+    elif failure == "physical_simple_component":
+        component_product.tipo_kit = "FISICO"
+        db_session.flush()
+    elif failure == "unknown_simple_component_policy":
+        component_product.tipo_kit = "DESCONHECIDO"
+        db_session.flush()
     elif failure == "zero_quantity":
         component.quantidade = 0
     elif failure == "invalid_quantity":
+        component.quantidade = float("nan")
+    elif failure == "zero_legacy_quantity":
+        component_product.tipo_kit = "VIRTUAL"
+        component.quantidade = 0
+        db_session.flush()
+    elif failure == "invalid_legacy_quantity":
+        component_product.tipo_kit = "VIRTUAL"
+        db_session.flush()
         component.quantidade = float("nan")
     row = service.list_products(q="SKU-01")["products"][0]
     assert row["stock"]["reason"] == "reservation_composition_unverified"
