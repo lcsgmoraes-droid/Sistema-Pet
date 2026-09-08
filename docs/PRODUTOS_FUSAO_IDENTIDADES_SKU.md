@@ -56,6 +56,12 @@ vinculos Bling. Os caminhos de fila, configuracao e reconciliacao recarregam os
 objetos sob lock antes de usar sua autoridade. Filas de estoque ou custo em
 `pendente`, `processando` ou `erro` impedem a fusao.
 
+Baixa e estorno do EstoqueService enfileiram o Bling na mesma transacao do estoque,
+sem abrir outra conexao que espere o proprio produto. O commit torna saldo e fila
+visiveis juntos; rollback remove ambos. O enfileiramento usa savepoint: falha na
+fila registra aviso e preserva a operacao de estoque, conforme a politica existente
+de reconciliacao posterior. Nao ha chamada remota durante essa transacao.
+
 O autocadastro por nota repete a resolucao de identidade apos a consulta remota,
 sob o namespace. Como a nota pode ja ter locks de outros itens, essa aquisicao e
 nao bloqueante: identidade em revisao deixa o autocadastro pendente para repetir,

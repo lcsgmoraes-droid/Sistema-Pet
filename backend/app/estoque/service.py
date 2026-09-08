@@ -38,12 +38,14 @@ def _somar_quantidade_estoque(estoque_atual, quantidade) -> float:
     ) + _normalizar_quantidade_estoque(quantidade)
 
 
-def _agenda_sync_bling(produto_id: int, estoque_novo: float, motivo: str) -> None:
-    """Enfileira sync de estoque com o Bling (fila persistente, fire-and-forget)."""
+def _agenda_sync_bling(
+    produto_id: int, estoque_novo: float, motivo: str, *, db: Session
+) -> None:
+    """Enfileira o saldo na mesma transação da baixa ou do estorno."""
     try:
         from app.bling_estoque_sync import sincronizar_bling_background
 
-        sincronizar_bling_background(produto_id, estoque_novo, motivo)
+        sincronizar_bling_background(produto_id, estoque_novo, motivo, db=db)
     except Exception:
         pass  # Não deixar erro de import/import-circular travar operações de estoque
 
@@ -441,9 +443,9 @@ class EstoqueService:
             f"Qtd: {quantidade_estoque} ({estoque_anterior} → {estoque_novo})"
         )
 
-        # 🔄 Enfileirar sync com Bling (não bloqueia, não falha a operação)
+        # Enfileirar na transação da baixa, sem consultar a API do Bling.
         if sincronizar:
-            _agenda_sync_bling(produto.id, float(estoque_novo), motivo)
+            _agenda_sync_bling(produto.id, float(estoque_novo), motivo, db=db)
 
         return {
             "sucesso": True,
@@ -576,8 +578,8 @@ class EstoqueService:
             f"Qtd: +{quantidade_estoque} ({estoque_anterior} → {estoque_novo})"
         )
 
-        # 🔄 Enfileirar sync com Bling (não bloqueia, não falha o estorno)
-        _agenda_sync_bling(produto.id, float(estoque_novo), motivo)
+        # Enfileirar na transação do estorno, sem consultar a API do Bling.
+        _agenda_sync_bling(produto.id, float(estoque_novo), motivo, db=db)
 
         return {
             "sucesso": True,

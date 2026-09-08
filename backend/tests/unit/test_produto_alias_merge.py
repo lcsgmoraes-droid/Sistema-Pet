@@ -26,6 +26,7 @@ from app.produtos_models import (
     ProdutoImagem,
     ProdutoKitComponente,
     ProdutoListaPreco,
+    ProdutoLote,
     EstoqueMovimentacao,
 )
 from app.produtos_estoque_models import ProdutoBlingCostSyncQueue
@@ -68,6 +69,7 @@ def case():
         ProdutoGranelVinculo,
         ProdutoKitComponente,
         ProdutoListaPreco,
+        ProdutoLote,
         ProdutoConfigFiscal,
         PedidoIntegrado,
         PedidoIntegradoItem,
@@ -92,8 +94,15 @@ def case():
         tables = {model.__table__ for model in models}
         from app.veterinario_models import VetPartnerLink
         from app.empresa_grupo_models import EmpresaGrupoMembro
+        from app.models import UserTenant
 
-        tables.update((VetPartnerLink.__table__, EmpresaGrupoMembro.__table__))
+        tables.update(
+            (
+                VetPartnerLink.__table__,
+                EmpresaGrupoMembro.__table__,
+                UserTenant.__table__,
+            )
+        )
         while True:
             targets = {fk.column.table for table in tables for fk in table.foreign_keys}
             if targets.issubset(tables):

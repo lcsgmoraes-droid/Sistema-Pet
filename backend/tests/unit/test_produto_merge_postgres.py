@@ -36,6 +36,73 @@ pytestmark = pytest.mark.skipif(
 )
 
 
+@pytest.mark.parametrize("commit", [False, True])
+def test_stock_sale_and_bling_queue_share_transaction_without_self_deadlock(
+    case, monkeypatch, commit
+):
+    from app.estoque.service import EstoqueService
+    from app.services import bling_sync_queue
+
+    opened = []
+
+    def forbid_second_session():
+        opened.append(True)
+        raise AssertionError("Stock transaction must enqueue in its own session")
+
+    monkeypatch.setattr(bling_sync_queue, "SessionLocal", forbid_second_session)
+    result = EstoqueService.baixar_estoque(
+        produto_id=case.primary.id,
+        quantidade=1,
+        motivo="venda",
+        referencia_id=999,
+        referencia_tipo="teste_fusao",
+        user_id=1,
+        db=case.db,
+        tenant_id=case.tenant,
+    )
+    assert result["estoque_novo"] == 49
+    assert not opened
+    queued = case.db.query(ProdutoBlingSyncQueue).one()
+    assert queued.estoque_novo == 49 and queued.status == "pendente"
+    with Session(case.engine) as observer:
+        assert observer.get(Produto, case.primary.id).estoque_atual == 50
+        assert observer.query(ProdutoBlingSyncQueue).count() == 0
+    if commit:
+        case.db.commit()
+    else:
+        case.db.rollback()
+    with Session(case.engine) as observer:
+        assert observer.get(Produto, case.primary.id).estoque_atual == (
+            49 if commit else 50
+        )
+        assert observer.query(ProdutoBlingSyncQueue).count() == int(commit)
+
+
+def test_stock_queue_savepoint_failure_does_not_rollback_the_sale(case, monkeypatch):
+    from app.estoque.service import EstoqueService
+    from app.services.bling_sync_service import BlingSyncService
+
+    def database_error(db, **kwargs):
+        db.execute(text("SELECT 1 / 0"))
+
+    monkeypatch.setattr(BlingSyncService, "queue_product_sync", database_error)
+    result = EstoqueService.baixar_estoque(
+        produto_id=case.primary.id,
+        quantidade=1,
+        motivo="venda",
+        referencia_id=999,
+        referencia_tipo="teste_fusao",
+        user_id=1,
+        db=case.db,
+        tenant_id=case.tenant,
+    )
+    assert result["estoque_novo"] == 49 and case.db.is_active
+    case.db.commit()
+    with Session(case.engine) as observer:
+        assert observer.get(Produto, case.primary.id).estoque_atual == 49
+        assert observer.query(ProdutoBlingSyncQueue).count() == 0
+
+
 @pytest.mark.parametrize(
     "operation", ["stock_worker", "cost_worker", "config", "reconcile"]
 )
