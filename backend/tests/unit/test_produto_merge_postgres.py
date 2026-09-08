@@ -192,6 +192,47 @@ def test_product_lock_serializes_stock_change_and_rejects_old_preview(case):
     assert case.db.query(ProdutoSkuAlias).count() == 0
 
 
+@pytest.mark.parametrize("by_item", [False, True])
+def test_autocreate_never_waits_for_namespace_while_invoice_holds_product_lock(
+    case, monkeypatch, by_item
+):
+    from app.services.bling_nf import autocadastro
+
+    remote = {
+        "id": "UNREGISTERED",
+        "codigo": "MISSING-SKU",
+        "nome": "Synthetic product",
+    }
+    monkeypatch.setattr(autocadastro, "_buscar_produto_bling_por_sku", lambda _: remote)
+    _lock_alias_namespace(case.db, case.tenant)
+
+    def process_invoice_item():
+        set_current_tenant(case.tenant)
+        with Session(case.engine) as db:
+            db.query(Produto).filter(
+                Produto.id == case.primary.id
+            ).with_for_update().all()
+            try:
+                if by_item:
+                    autocadastro.criar_produto_automatico_do_bling_por_item(
+                        db, case.tenant, remote
+                    )
+                else:
+                    autocadastro.criar_produto_automatico_do_bling(
+                        db, case.tenant, "MISSING-SKU"
+                    )
+            except ValueError as exc:
+                return str(exc)
+
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        future = pool.submit(process_invoice_item)
+        try:
+            assert "repetir o autocadastro" in future.result(timeout=3)
+        finally:
+            case.db.rollback()
+    assert case.db.query(Produto).count() == 2
+
+
 @pytest.mark.parametrize("operation", ["alias", "create_sku"])
 def test_alias_namespace_serializes_conflicting_concurrent_registration(
     case, operation

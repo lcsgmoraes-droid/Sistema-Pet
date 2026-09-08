@@ -44,7 +44,7 @@ def validar_chaves_sem_alias_alheio(db, *, tenant_id, chaves, produto_id=None):
         )
 
 
-def _lock_alias_namespace(db, tenant_id):
+def _lock_alias_namespace(db, tenant_id, *, wait=True):
     # Serialize alias creation/merges per company, including a currently absent alias.
     if db.get_bind().dialect.name == "postgresql":
         key = int.from_bytes(
@@ -52,7 +52,16 @@ def _lock_alias_namespace(db, tenant_id):
             "big",
             signed=True,
         )
-        db.execute(text("SELECT pg_advisory_xact_lock(:key)"), {"key": key})
+        if wait:
+            db.execute(text("SELECT pg_advisory_xact_lock(:key)"), {"key": key})
+        elif not db.execute(
+            text("SELECT pg_try_advisory_xact_lock(:key)"), {"key": key}
+        ).scalar():
+            # Importers may already hold product locks from previous invoice items.
+            # Do not invert the namespace -> product order while a merge is waiting.
+            raise ValueError(
+                "Identidades de SKU em revisao; repetir o autocadastro apos a operacao."
+            )
 
 
 def validar_alias(db, *, tenant_id, produto_id, sku, absorvido_id=None):

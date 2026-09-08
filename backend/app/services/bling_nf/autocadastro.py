@@ -10,6 +10,7 @@ from app.utils.logger import logger
 from app.services.produto_bling_identity_service import (
     produto_pedido_por_bling_retirado,
 )
+from app.services.produto_alias_service import _lock_alias_namespace
 
 from .common import AUTO_CADASTRO_BING_TAG, _texto, _to_float
 from .estoque import buscar_produto_do_item
@@ -234,6 +235,7 @@ def criar_produto_automatico_do_bling_por_item(
     item_bling: dict | None,
     sku_preferencial: str | None = None,
 ):
+    _lock_alias_namespace(db, tenant_id, wait=False)
     item_bling = item_bling or {}
     retirado = produto_pedido_por_bling_retirado(
         db, tenant_id=tenant_id, bling_produto_id=item_bling.get("id")
@@ -289,11 +291,21 @@ def criar_produto_automatico_do_bling(db: Session, tenant_id, sku: str):
         )
         return None
 
+    _lock_alias_namespace(db, tenant_id, wait=False)
     retirado = produto_pedido_por_bling_retirado(
         db, tenant_id=tenant_id, bling_produto_id=item_bling.get("id")
     )
     if retirado:
         return retirado
+    existente = _buscar_produto_existente_por_chaves(
+        db,
+        tenant_id,
+        sku_limpo,
+        item_bling.get("sku") or item_bling.get("codigo"),
+        item_bling.get("codigoBarras") or item_bling.get("gtin"),
+    )
+    if existente:
+        return existente
     novo_produto = _preparar_produto_automatico(
         db,
         tenant_id=tenant_id,

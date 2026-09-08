@@ -56,6 +56,11 @@ vinculos Bling. Os caminhos de fila, configuracao e reconciliacao recarregam os
 objetos sob lock antes de usar sua autoridade. Filas de estoque ou custo em
 `pendente`, `processando` ou `erro` impedem a fusao.
 
+O autocadastro por nota repete a resolucao de identidade apos a consulta remota,
+sob o namespace. Como a nota pode ja ter locks de outros itens, essa aquisicao e
+nao bloqueante: identidade em revisao deixa o autocadastro pendente para repetir,
+evitando inversao de locks ou recriacao de SKU durante a fusao.
+
 O SKU original do duplicado e seus aliases anteriores passam ao principal.
 Aliases extras exigem identidade confirmada, nunca aproximacao pelo titulo.
 Reservas mantem SKU original, quantidade, timestamps e estado; o resolvedor central

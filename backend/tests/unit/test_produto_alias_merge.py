@@ -354,6 +354,40 @@ def test_stale_preview_rejected_before_alias_or_archive(case):
     assert case.db.query(ProdutoSkuAlias).count() == 0
 
 
+def test_autocreate_rechecks_alias_registered_while_fetching_bling(case, monkeypatch):
+    from app.services.bling_nf import autocadastro
+
+    def remote_reply(_sku):
+        with Session(case.engine) as concurrent:
+            registrar_alias(
+                concurrent,
+                tenant_id=case.tenant,
+                produto_id=case.primary.id,
+                sku="LATE-ALIAS",
+                user_id=1,
+                motivo="Identidade confirmada enquanto a consulta remota aguardava.",
+            )
+            concurrent.commit()
+        return {
+            "id": "NEW-BLING",
+            "codigo": "LATE-ALIAS",
+            "saldoFisicoTotal": 2,
+            "preco": 1,
+        }
+
+    monkeypatch.setattr(autocadastro, "_buscar_produto_bling_por_sku", remote_reply)
+    result = autocadastro.criar_produto_automatico_do_bling(
+        case.db, case.tenant, "LATE-ALIAS"
+    )
+    assert result.id == case.primary.id
+    assert case.db.query(Produto).count() == 2
+    assert (result.estoque_atual, result.preco_custo, result.preco_venda) == (
+        50,
+        49.94,
+        79.9,
+    )
+
+
 @pytest.mark.parametrize("status", ["pendente", "processando", "erro"])
 def test_pending_queue_blocks_merge(case, status):
     case.db.add(
