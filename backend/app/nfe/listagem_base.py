@@ -149,6 +149,9 @@ def _canal_slug(value) -> str:
     if not texto:
         return ""
 
+    if texto in {"pdv", "loja fisica", "loja física", "loja_fisica"}:
+        return "loja_fisica"
+
     if (
         any(
             chave in texto
@@ -183,7 +186,7 @@ def _canal_label(slug: str, fallback: str | None = None) -> str | None:
         "app": "App",
         "whatsapp": "WhatsApp",
         "bling": "Bling",
-        "loja_fisica": "Loja fisica",
+        "loja_fisica": "PDV / Loja física",
     }
     return mapa.get(slug) or _texto(fallback) or None
 
