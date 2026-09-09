@@ -126,6 +126,19 @@ class BlingNotasMixin:
                     f"\n{'⚠️' if self.ambiente == 'homologacao' else '🚨'} Enviando nota #{nota_id} para SEFAZ..."
                 )
                 try:
+                    # O Bling pode arredondar quantidades conforme a conta.
+                    # Preservar o ID criado e bloquear apenas a transmissao.
+                    consulta = self._request("GET", f"{endpoint}/{nota_id}")
+                    nota = consulta.get("data", consulta)
+                    total_bling = nota.get("valorNota")
+                    if total_bling is None or Decimal(str(total_bling)).quantize(
+                        Decimal("0.01"), rounding=ROUND_HALF_UP
+                    ) != Decimal(str(payload["totais"]["valorTotal"])):
+                        raise ValueError(
+                            "O valor da nota no Bling difere do total da venda. "
+                            "Confira a nota e as casas decimais da quantidade "
+                            "nas configuracoes do Bling antes de transmitir."
+                        )
                     # Endpoint para enviar nota para SEFAZ (mesmo endpoint base)
                     envio_response = self._request(
                         "POST", f"{endpoint}/{nota_id}/enviar"
@@ -183,7 +196,7 @@ class BlingNotasMixin:
 
             if tipo_nota == "nfe" or tem_endereco_completo:
                 contato["endereco"] = {
-                    "logradouro": cliente.endereco or "",
+                    "endereco": cliente.endereco or "",
                     "numero": cliente.numero or "S/N",
                     "complemento": cliente.complemento or "",
                     "bairro": cliente.bairro or "",
@@ -229,7 +242,9 @@ class BlingNotasMixin:
                 "quantidade": float(quantidade),
                 "unidade": produto.unidade or "UN",
                 "valor": float(valor_unitario),
-                "ncm": _ncm_normalizado(fiscal_item.get("ncm")) or "",
+                "classificacaoFiscal": _ncm_normalizado(fiscal_item.get("ncm")) or "",
+                "cest": fiscal_item.get("cest") or "",
+                "origem": int(fiscal_item.get("origem_mercadoria") or "0"),
                 "cfop": fiscal_item.get("cfop") or "5102",
                 "icms": {
                     "situacaoTributaria": fiscal_item.get("cst_icms") or "102",

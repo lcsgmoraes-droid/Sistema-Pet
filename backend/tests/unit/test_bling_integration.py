@@ -466,3 +466,75 @@ def test_emissao_bloqueia_total_divergente_antes_de_criar_nota(monkeypatch):
         api.emitir_nota_fiscal(venda, "nfce")
 
     assert chamadas == []
+
+
+def test_payload_envia_campos_fiscais_e_endereco_no_formato_bling():
+    venda = _make_venda_nfce()
+    venda.itens[0].produto.cest = "2200100"
+    venda.cliente = SimpleNamespace(
+        nome="Cliente teste",
+        cpf="",
+        cnpj="",
+        email="",
+        telefone="",
+        endereco="Rua Teste",
+        numero="123",
+        complemento="",
+        bairro="Centro",
+        cidade="Presidente Prudente",
+        estado="SP",
+        cep="19010-000",
+    )
+
+    payload = _make_api()._montar_payload(venda, "nfce")
+
+    item = payload["itens"][0]
+    assert item["classificacaoFiscal"] == "30049099"
+    assert item["cest"] == "2200100"
+    assert item["origem"] == 0
+    assert "ncm" not in item
+    assert payload["contato"]["endereco"]["endereco"] == "Rua Teste"
+    assert "logradouro" not in payload["contato"]["endereco"]
+
+
+@pytest.mark.parametrize("valor_bling", [100.03, None])
+def test_emissao_preserva_id_sem_transmitir_total_bling_divergente(
+    monkeypatch, valor_bling
+):
+    api = _make_api()
+    chamadas = []
+
+    def fake_request(method, endpoint, **kwargs):
+        chamadas.append((method, endpoint))
+        if method == "GET":
+            return {"data": {"valorNota": valor_bling}}
+        return {"data": {"id": 123, "numero": "000043"}}
+
+    monkeypatch.setattr(api, "_request", fake_request)
+    resposta = api.emitir_nota_fiscal(_make_venda_nfce(), "nfce", transmitir=True)
+
+    assert resposta["data"]["id"] == 123
+    assert resposta["transmissao"]["success"] is False
+    assert "difere do total da venda" in resposta["transmissao"]["erro"]
+    assert chamadas == [("POST", "/nfce"), ("GET", "/nfce/123")]
+
+
+def test_emissao_transmite_quando_total_bling_confere(monkeypatch):
+    api = _make_api()
+    chamadas = []
+
+    def fake_request(method, endpoint, **kwargs):
+        chamadas.append((method, endpoint))
+        if method == "GET":
+            return {"data": {"valorNota": 100.0}}
+        return {"data": {"id": 123}}
+
+    monkeypatch.setattr(api, "_request", fake_request)
+    resposta = api.emitir_nota_fiscal(_make_venda_nfce(), "nfce", transmitir=True)
+
+    assert resposta["transmissao"]["success"] is True
+    assert chamadas == [
+        ("POST", "/nfce"),
+        ("GET", "/nfce/123"),
+        ("POST", "/nfce/123/enviar"),
+    ]
