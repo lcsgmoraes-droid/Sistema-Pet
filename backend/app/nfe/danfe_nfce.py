@@ -15,9 +15,10 @@ from reportlab.lib.units import mm
 from reportlab.pdfgen import canvas
 from reportlab.platypus import Paragraph
 
-NS = {
-    "n": "http://www.portalfiscal.inf.br/nfe"  # NOSONAR: namespace XML, sem acesso HTTP.
-}
+from app.nfe.listagem_base import _XML_NS
+
+# O namespace identifica o formato do XML; nenhuma requisicao usa esse valor.
+NS = {"n": _XML_NS["nfe"]}
 XML_NOME = "n:xNome"
 PAGAMENTOS = {
     "01": "Dinheiro",
