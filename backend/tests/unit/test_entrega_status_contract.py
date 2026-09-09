@@ -1,4 +1,5 @@
 import inspect
+import pytest
 from datetime import datetime
 from types import SimpleNamespace
 from uuid import uuid4
@@ -139,6 +140,12 @@ class _EntregaQueryFake:
             return len(self.db.paradas_restantes)
         return 0
 
+    def order_by(self, *args):
+        return self
+
+    def all(self):
+        return sorted(self.db.paradas_restantes, key=lambda parada: (parada.ordem, parada.id))
+
 
 class _EntregaDbFake:
     def __init__(self, rota, parada, venda, paradas_restantes):
@@ -181,7 +188,7 @@ def test_nao_entregue_remove_rota_quando_ultima_parada_fica_fora_da_rota():
         tenant_id=tenant_id,
         observacoes=None,
     )
-    venda = SimpleNamespace(id=20, tenant_id=tenant_id, status_entrega="em_rota")
+    venda = SimpleNamespace(id=20, tenant_id=tenant_id, status_entrega="em_rota", observacoes_entrega=None)
     db = _EntregaDbFake(
         rota=rota, parada=parada, venda=venda, paradas_restantes=[parada]
     )
@@ -216,8 +223,9 @@ def test_nao_entregue_preserva_rota_quando_ainda_tem_paradas():
         venda_id=22,
         tenant_id=tenant_id,
         observacoes=None,
+        ordem=3,
     )
-    venda = SimpleNamespace(id=21, tenant_id=tenant_id, status_entrega="em_rota")
+    venda = SimpleNamespace(id=21, tenant_id=tenant_id, status_entrega="em_rota", observacoes_entrega=None)
     db = _EntregaDbFake(
         rota=rota,
         parada=parada_removida,
@@ -236,3 +244,52 @@ def test_nao_entregue_preserva_rota_quando_ainda_tem_paradas():
     assert parada_removida in db.deleted
     assert rota not in db.deleted
     assert resposta["rota_removida"] is False
+    assert parada_restante.ordem == 1
+    assert "cliente ausente" in venda.observacoes_entrega
+
+
+@pytest.mark.parametrize("ultima_parada", [False, True])
+@pytest.mark.parametrize("usar_payload", [False, True])
+def test_app_nao_entregue_preserva_motivo_e_reorganiza_rota(monkeypatch, ultima_parada, usar_payload):
+    from app.api.endpoints import rotas_entrega
+
+    monkeypatch.setattr(rotas_entrega, "ensure_rotas_entrega_schema", lambda db: None)
+    tenant_id = uuid4()
+    cliente = SimpleNamespace(id=100, auth_user_id=1, tenant_id=tenant_id)
+    rota = SimpleNamespace(id=600, tenant_id=tenant_id, status="em_rota")
+    parada = SimpleNamespace(id=11, rota_id=600, venda_id=21, ordem=2, tenant_id=tenant_id)
+    outras = [] if ultima_parada else [
+        SimpleNamespace(id=12, ordem=3), SimpleNamespace(id=10, ordem=1),
+    ]
+    venda = SimpleNamespace(id=21, status_entrega="em_rota", observacoes_entrega="Entregar na portaria")
+    db = _EntregaDbFake(rota, parada, venda, [*outras, parada])
+    motivo = "  TESTE cliente ausente  "
+
+    resposta = ecommerce_entregador.marcar_parada_nao_entregue_entregador(
+        rota_id="600", parada_id=11,
+        motivo=None if usar_payload else motivo,
+        payload=ecommerce_entregador.NaoEntreguePayload(motivo=motivo) if usar_payload else None,
+        cliente=cliente, db=db,
+    )
+
+    assert venda.status_entrega == "pendente"
+    assert venda.observacoes_entrega.startswith("Entregar na portaria\n")
+    assert "Não entregue (rota 600): TESTE cliente ausente" in venda.observacoes_entrega
+    assert parada in db.deleted
+    assert resposta["rota_removida"] is ultima_parada
+    assert resposta["paradas_restantes"] == len(outras)
+    assert sorted(p.ordem for p in outras) == list(range(1, len(outras) + 1))
+    assert db.commits == 1
+
+
+@pytest.mark.parametrize("status", ["concluida", "cancelada"])
+def test_nao_entregue_nao_altera_rota_encerrada(status):
+    from fastapi import HTTPException
+
+    tenant_id = uuid4()
+    db = _EntregaDbFake(SimpleNamespace(id=600, status=status), None, None, [])
+    with pytest.raises(HTTPException) as erro:
+        marcar_parada_nao_entregue("600", 11, "cliente ausente", db, _actor(tenant_id))
+    assert erro.value.status_code == 400
+    assert db.deleted == []
+    assert db.commits == 0

@@ -655,70 +655,24 @@ def marcar_parada_nao_entregue_entregador(
     cliente: Cliente = Depends(_get_entregador_cliente),
     db: Session = Depends(get_session),
 ):
-    from app.api.endpoints.rotas_entrega import ensure_rotas_entrega_schema
+    from app.api.endpoints import rotas_entrega as rotas_admin
 
     tenant_id = _activate_cliente_tenant_context(cliente)
-    ensure_rotas_entrega_schema(db)
-
-    rota_ref = str(rota_id).strip()
-    rota_filter = (
-        RotaEntrega.id == int(rota_ref)
-        if _is_int_like(rota_ref)
-        else RotaEntrega.numero == rota_ref
+    rotas_admin.ensure_rotas_entrega_schema(db)
+    parada = _get_parada_do_entregador_or_404(
+        db,
+        rota_id=rota_id,
+        parada_id=parada_id,
+        tenant_id=tenant_id,
+        cliente=cliente,
     )
-    rota = (
-        db.query(RotaEntrega)
-        .filter(
-            rota_filter,
-            RotaEntrega.tenant_id == tenant_id,
-            RotaEntrega.entregador_id == cliente.id,
-        )
-        .first()
+    return rotas_admin.marcar_parada_nao_entregue(
+        rota_id=str(parada.rota_id),
+        parada_id=parada_id,
+        motivo=(motivo or (payload.motivo if payload else "") or "").strip(),
+        db=db,
+        actor=_delivery_actor(cliente, tenant_id),
     )
-    if not rota:
-        raise HTTPException(status_code=404, detail="Rota nao encontrada")
-    if rota.status in ("concluida", "cancelada"):
-        raise HTTPException(status_code=400, detail="Rota ja foi encerrada")
-
-    parada = (
-        db.query(RotaEntregaParada)
-        .filter(
-            RotaEntregaParada.id == parada_id,
-            RotaEntregaParada.rota_id == rota.id,
-            RotaEntregaParada.tenant_id == tenant_id,
-        )
-        .first()
-    )
-    if not parada:
-        raise HTTPException(status_code=404, detail="Parada nao encontrada")
-
-    motivo_final = (motivo or (payload.motivo if payload else "") or "").strip()
-    if motivo_final:
-        obs_existente = parada.observacoes or ""
-        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M")
-        parada.observacoes = (
-            f"{obs_existente}\n[{timestamp}] Nao entregue: {motivo_final}".strip()
-        )
-
-    venda_id = parada.venda_id
-    venda = (
-        db.query(Venda)
-        .filter(
-            Venda.id == venda_id,
-            Venda.tenant_id == tenant_id,
-        )
-        .first()
-    )
-    if venda:
-        venda.status_entrega = "pendente"
-
-    db.delete(parada)
-    db.commit()
-
-    return {
-        "message": "Entrega marcada como nao realizada. Venda voltou para entregas em aberto.",
-        "venda_id": venda_id,
-    }
 
 
 @router.get("/vendas/{venda_id}/detalhes")

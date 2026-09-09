@@ -1,62 +1,68 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { createRequire } from "node:module";
+import { registerHooks } from "node:module";
 import { resolve } from "node:path";
-import { runInNewContext } from "node:vm";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { test } from "node:test";
+import React from "react";
 import ts from "typescript";
 
 // Testa a composicao e os callbacks reais, sem fingir executar gestos nativos.
 // A rolagem por toque ainda precisa ser validada no Android/iOS.
-const require = createRequire(import.meta.url);
-const React = require("react");
 const screenDir = resolve(import.meta.dirname, "../src/screens/entregador/detalhe");
-const native = Object.fromEntries(
-  ["View", "Text", "TouchableOpacity", "ActivityIndicator", "FlatList"].map(
-    (name) => [name, name],
-  ),
-);
-native.StyleSheet = { create: (styles) => styles };
-
-function loadScreen(file, dependencies = {}, extension = "tsx") {
-  const filename = resolve(screenDir, `${file}.${extension}`);
-  const source = readFileSync(filename, "utf8");
-  const output = ts.transpileModule(source, {
-    compilerOptions: {
-      module: ts.ModuleKind.CommonJS,
-      jsx: ts.JsxEmit.React,
-      esModuleInterop: true,
-    },
-  }).outputText;
-  const module = { exports: {} };
-  runInNewContext(output, {
-    module,
-    exports: module.exports,
-    require: (name) => {
-      if (name === "react") return React;
-      if (name === "react-native") return native;
-      if (Object.hasOwn(dependencies, name)) return dependencies[name];
-      throw new Error(`Dependencia nao declarada: ${name}`);
-    },
-  }, { filename });
-  return module.exports;
-}
-
-const styles = new Proxy({}, { get: (_, name) => ({ name }) });
-const shared = {
-  "./DetalheEntregaStyles": { detalheEntregaStyles: styles },
-  "./DetalheEntregaUtils": loadScreen("DetalheEntregaUtils", {
-    "expo-location": {},
-    "@/utils/mapsAddress": {},
-  }, "ts"),
+const nativeMocks = {
+  "react-native": `
+    export const View = 'View', Text = 'Text', TouchableOpacity = 'TouchableOpacity';
+    export const ActivityIndicator = 'ActivityIndicator', FlatList = 'FlatList';
+    export const StyleSheet = {create: styles => styles};
+    export const Alert = {}, Linking = {};
+  `,
+  "react-native-draggable-flatlist": "export default 'DraggableFlatList';",
+  "expo-location": "export {};",
+  "@/utils/mapsAddress": "export const limparEnderecoParaMaps = value => value;",
+  "./DetalheEntregaModals": "export const DetalheEntregaModals = 'Modals';",
 };
-const { DetalheEntregaStopCard } = loadScreen("DetalheEntregaStopCard", shared);
-const { DetalheEntregaContent } = loadScreen("DetalheEntregaContent", {
-  ...shared,
-  "react-native-draggable-flatlist": "DraggableFlatList",
-  "./DetalheEntregaStopCard": { DetalheEntregaStopCard },
-  "./DetalheEntregaModals": { DetalheEntregaModals: "Modals" },
+const screenFiles = new Map([
+  ["./DetalheEntregaContent", "DetalheEntregaContent.tsx"],
+  ["./DetalheEntregaStopCard", "DetalheEntregaStopCard.tsx"],
+  ["./DetalheEntregaStyles", "DetalheEntregaStyles.ts"],
+  ["./DetalheEntregaUtils", "DetalheEntregaUtils.ts"],
+].map(([specifier, file]) => [specifier, pathToFileURL(resolve(screenDir, file)).href]));
+const sourceUrls = new Set(screenFiles.values());
+
+// O carregador transforma apenas estes quatro arquivos locais conhecidos.
+// Usa o importador do Node, com componentes nativos substituidos durante o teste.
+const hooks = registerHooks({
+  resolve(specifier, context, nextResolve) {
+    if (Object.hasOwn(nativeMocks, specifier)) {
+      return {url: `corepet-test:${specifier}`, shortCircuit: true};
+    }
+    if (sourceUrls.has(context.parentURL) && screenFiles.has(specifier)) {
+      return {url: screenFiles.get(specifier), shortCircuit: true};
+    }
+    return nextResolve(specifier, context);
+  },
+  load(url, context, nextLoad) {
+    if (url.startsWith("corepet-test:")) {
+      return {format: "module", source: nativeMocks[url.slice("corepet-test:".length)], shortCircuit: true};
+    }
+    if (sourceUrls.has(url)) {
+      const {outputText} = ts.transpileModule(readFileSync(fileURLToPath(url), "utf8"), {
+        compilerOptions: {module: ts.ModuleKind.ESNext, jsx: ts.JsxEmit.React},
+      });
+      return {format: "module", source: outputText, shortCircuit: true};
+    }
+    return nextLoad(url, context);
+  },
 });
+let DetalheEntregaContent;
+let DetalheEntregaStopCard;
+try {
+  ({DetalheEntregaContent} = await import(screenFiles.get("./DetalheEntregaContent")));
+  ({DetalheEntregaStopCard} = await import(screenFiles.get("./DetalheEntregaStopCard")));
+} finally {
+  hooks.deregister();
+}
 
 function elements(node) {
   if (Array.isArray(node)) return node.flatMap(elements);
