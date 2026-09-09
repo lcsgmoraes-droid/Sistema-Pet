@@ -144,7 +144,9 @@ class _EntregaQueryFake:
         return self
 
     def all(self):
-        return sorted(self.db.paradas_restantes, key=lambda parada: (parada.ordem, parada.id))
+        return sorted(
+            self.db.paradas_restantes, key=lambda parada: (parada.ordem, parada.id)
+        )
 
 
 class _EntregaDbFake:
@@ -188,7 +190,9 @@ def test_nao_entregue_remove_rota_quando_ultima_parada_fica_fora_da_rota():
         tenant_id=tenant_id,
         observacoes=None,
     )
-    venda = SimpleNamespace(id=20, tenant_id=tenant_id, status_entrega="em_rota", observacoes_entrega=None)
+    venda = SimpleNamespace(
+        id=20, tenant_id=tenant_id, status_entrega="em_rota", observacoes_entrega=None
+    )
     db = _EntregaDbFake(
         rota=rota, parada=parada, venda=venda, paradas_restantes=[parada]
     )
@@ -225,7 +229,9 @@ def test_nao_entregue_preserva_rota_quando_ainda_tem_paradas():
         observacoes=None,
         ordem=3,
     )
-    venda = SimpleNamespace(id=21, tenant_id=tenant_id, status_entrega="em_rota", observacoes_entrega=None)
+    venda = SimpleNamespace(
+        id=21, tenant_id=tenant_id, status_entrega="em_rota", observacoes_entrega=None
+    )
     db = _EntregaDbFake(
         rota=rota,
         parada=parada_removida,
@@ -250,26 +256,41 @@ def test_nao_entregue_preserva_rota_quando_ainda_tem_paradas():
 
 @pytest.mark.parametrize("ultima_parada", [False, True])
 @pytest.mark.parametrize("usar_payload", [False, True])
-def test_app_nao_entregue_preserva_motivo_e_reorganiza_rota(monkeypatch, ultima_parada, usar_payload):
+def test_app_nao_entregue_preserva_motivo_e_reorganiza_rota(
+    monkeypatch, ultima_parada, usar_payload
+):
     from app.api.endpoints import rotas_entrega
 
     monkeypatch.setattr(rotas_entrega, "ensure_rotas_entrega_schema", lambda db: None)
     tenant_id = uuid4()
     cliente = SimpleNamespace(id=100, auth_user_id=1, tenant_id=tenant_id)
     rota = SimpleNamespace(id=600, tenant_id=tenant_id, status="em_rota")
-    parada = SimpleNamespace(id=11, rota_id=600, venda_id=21, ordem=2, tenant_id=tenant_id)
-    outras = [] if ultima_parada else [
-        SimpleNamespace(id=12, ordem=3), SimpleNamespace(id=10, ordem=1),
-    ]
-    venda = SimpleNamespace(id=21, status_entrega="em_rota", observacoes_entrega="Entregar na portaria")
+    parada = SimpleNamespace(
+        id=11, rota_id=600, venda_id=21, ordem=2, tenant_id=tenant_id
+    )
+    outras = (
+        []
+        if ultima_parada
+        else [
+            SimpleNamespace(id=12, ordem=3),
+            SimpleNamespace(id=10, ordem=1),
+        ]
+    )
+    venda = SimpleNamespace(
+        id=21, status_entrega="em_rota", observacoes_entrega="Entregar na portaria"
+    )
     db = _EntregaDbFake(rota, parada, venda, [*outras, parada])
     motivo = "  TESTE cliente ausente  "
 
     resposta = ecommerce_entregador.marcar_parada_nao_entregue_entregador(
-        rota_id="600", parada_id=11,
+        rota_id="600",
+        parada_id=11,
         motivo=None if usar_payload else motivo,
-        payload=ecommerce_entregador.NaoEntreguePayload(motivo=motivo) if usar_payload else None,
-        cliente=cliente, db=db,
+        payload=ecommerce_entregador.NaoEntreguePayload(motivo=motivo)
+        if usar_payload
+        else None,
+        cliente=cliente,
+        db=db,
     )
 
     assert venda.status_entrega == "pendente"
