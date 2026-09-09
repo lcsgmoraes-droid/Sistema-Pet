@@ -140,7 +140,9 @@ async def consultar_nfe(
         )
 
 
-@router.get("/{nfe_id}/xml")
+@router.get(
+    "/{nfe_id}/xml", responses={502: {"description": "Documento indisponível no Bling"}}
+)
 def baixar_xml(
     nfe_id: int,
     db: Session = Depends(get_session),
@@ -584,7 +586,10 @@ async def sincronizar_todos_status(
         raise HTTPException(status_code=500, detail=f"Erro ao sincronizar: {str(e)}")
 
 
-@router.get("/{nfe_id}/danfe")
+@router.get(
+    "/{nfe_id}/danfe",
+    responses={502: {"description": "Documento indisponível no Bling"}},
+)
 def baixar_danfe(
     nfe_id: int,
     db: Session = Depends(get_session),
@@ -613,7 +618,13 @@ def baixar_danfe(
         ) from e
 
 
-@router.get("/{nfe_id}/compartilhar")
+@router.get(
+    "/{nfe_id}/compartilhar",
+    responses={
+        409: {"description": "Nota sem autorização"},
+        502: {"description": "Documento indisponível no Bling"},
+    },
+)
 def preparar_compartilhamento(
     nfe_id: int,
     db: Session = Depends(get_session),

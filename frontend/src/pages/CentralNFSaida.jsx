@@ -6,6 +6,29 @@ import { montarDetalheFallback, soDigitos } from "./centralNFSaida/centralNFSaid
 import { confirmarCorePet } from "../services/corepetDialog";
 import NFSaidaCompartilharModal from "./centralNFSaida/NFSaidaCompartilharModal";
 
+function salvarArquivo(blob, nome) {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = nome;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+async function mensagemDocumento(error, padrao) {
+  let dados = error.response?.data;
+  if (dados instanceof Blob) {
+    try {
+      dados = JSON.parse(await dados.text());
+    } catch {
+      dados = null;
+    }
+  }
+  return typeof dados?.detail === "string" ? dados.detail : padrao;
+}
+
 export default function CentralNFSaida() {
   const [notas, setNotas] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -132,29 +155,6 @@ export default function CentralNFSaida() {
       atualizacaoEmCursoRef.current = false;
       setAtualizandoNotas(false);
     }
-  }
-
-  function salvarArquivo(blob, nome) {
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = nome;
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
-  }
-
-  async function mensagemDocumento(error, padrao) {
-    let dados = error.response?.data;
-    if (dados instanceof Blob) {
-      try {
-        dados = JSON.parse(await dados.text());
-      } catch {
-        dados = null;
-      }
-    }
-    return typeof dados?.detail === "string" ? dados.detail : padrao;
   }
 
   async function baixarDanfe(nfeId, numero) {

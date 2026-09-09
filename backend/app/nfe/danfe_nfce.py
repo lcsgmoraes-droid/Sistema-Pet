@@ -15,7 +15,10 @@ from reportlab.lib.units import mm
 from reportlab.pdfgen import canvas
 from reportlab.platypus import Paragraph
 
-NS = {"n": "http://www.portalfiscal.inf.br/nfe"}
+NS = {
+    "n": "http://www.portalfiscal.inf.br/nfe"  # NOSONAR: namespace XML, sem acesso HTTP.
+}
+XML_NOME = "n:xNome"
 PAGAMENTOS = {
     "01": "Dinheiro",
     "02": "Cheque",
@@ -68,6 +71,57 @@ def validar_xml_nota(xml, chave, modelo):
     return root
 
 
+def _adicionar_totais_pagamentos(info, total, quantidade_itens, adicionar):
+    adicionar(f"Quantidade total de itens: {quantidade_itens}")
+    adicionar(f"Valor total R$: {numero_br(texto(total, 'n:vProd'))}")
+    for tag, label in [
+        ("vDesc", "Descontos"),
+        ("vFrete", "Frete"),
+        ("vSeg", "Seguro"),
+        ("vOutro", "Outras despesas"),
+    ]:
+        if Decimal(texto(total, f"n:{tag}", "0")):
+            adicionar(f"{label} R$: {numero_br(texto(total, f'n:{tag}'))}")
+    adicionar(f"VALOR A PAGAR R$: {numero_br(texto(total, 'n:vNF'))}", negrito=True)
+    pagamentos = info.findall("n:pag/n:detPag", NS)
+    for pagamento in pagamentos:
+        forma = texto(pagamento, "n:xPag") or PAGAMENTOS.get(
+            texto(pagamento, "n:tPag"), f"Pagamento {texto(pagamento, 'n:tPag')}"
+        )
+        adicionar(f"{forma}: R$ {numero_br(texto(pagamento, 'n:vPag'))}")
+    troco = texto(info, "n:pag/n:vTroco", "0")
+    if Decimal(troco):
+        adicionar(f"Troco R$: {numero_br(troco)}")
+
+
+def _adicionar_consumidor(info, adicionar):
+    dest = info.find("n:dest", NS)
+    documento = (
+        texto(dest, "n:CPF") or texto(dest, "n:CNPJ") or texto(dest, "n:idEstrangeiro")
+    )
+    adicionar("CONSUMIDOR", True, True)
+    adicionar(
+        f"CPF/CNPJ: {documento}" if documento else "Consumidor não identificado", True
+    )
+    if texto(dest, XML_NOME):
+        adicionar(texto(dest, XML_NOME), True)
+    if dest is not None:
+        end_dest = dest.find("n:enderDest", NS)
+        if end_dest is not None:
+            adicionar(
+                ", ".join(
+                    filter(
+                        None,
+                        [
+                            texto(end_dest, f"n:{tag}")
+                            for tag in ["xLgr", "nro", "xBairro", "xMun", "UF"]
+                        ],
+                    )
+                ),
+                True,
+            )
+
+
 def gerar_danfe_nfce(xml: bytes, chave: str) -> bytes:
     root = validar_xml_nota(xml, chave, 65)
     info = root.find(".//n:infNFe", NS)
@@ -99,7 +153,7 @@ def gerar_danfe_nfce(xml: bytes, chave: str) -> bytes:
 
     emit = info.find("n:emit", NS)
     endereco = emit.find("n:enderEmit", NS)
-    adicionar(texto(emit, "n:xNome"), True, True)
+    adicionar(texto(emit, XML_NOME), True, True)
     adicionar(
         f"CNPJ/CPF: {texto(emit, 'n:CNPJ') or texto(emit, 'n:CPF')}  IE: {texto(emit, 'n:IE')}",
         True,
@@ -135,55 +189,12 @@ def gerar_danfe_nfce(xml: bytes, chave: str) -> bytes:
             f"{quantidade} {texto(item, 'n:uCom')} x {numero_br(unitario, casas)} = R$ {numero_br(texto(item, 'n:vProd'))}"
         )
     total = info.find("n:total/n:ICMSTot", NS)
-    adicionar(f"Quantidade total de itens: {len(itens)}")
-    adicionar(f"Valor total R$: {numero_br(texto(total, 'n:vProd'))}")
-    for tag, label in [
-        ("vDesc", "Descontos"),
-        ("vFrete", "Frete"),
-        ("vSeg", "Seguro"),
-        ("vOutro", "Outras despesas"),
-    ]:
-        if Decimal(texto(total, f"n:{tag}", "0")):
-            adicionar(f"{label} R$: {numero_br(texto(total, f'n:{tag}'))}")
-    adicionar(f"VALOR A PAGAR R$: {numero_br(texto(total, 'n:vNF'))}", negrito=True)
-    pagamentos = info.findall("n:pag/n:detPag", NS)
-    for pagamento in pagamentos:
-        forma = texto(pagamento, "n:xPag") or PAGAMENTOS.get(
-            texto(pagamento, "n:tPag"), f"Pagamento {texto(pagamento, 'n:tPag')}"
-        )
-        adicionar(f"{forma}: R$ {numero_br(texto(pagamento, 'n:vPag'))}")
-    troco = texto(info, "n:pag/n:vTroco", "0")
-    if Decimal(troco):
-        adicionar(f"Troco R$: {numero_br(troco)}")
+    _adicionar_totais_pagamentos(info, total, len(itens), adicionar)
     consulta = texto(root, ".//n:infNFeSupl/n:urlChave")
     adicionar("Consulte pela chave de acesso em:", True)
     adicionar(consulta, True)
     adicionar(" ".join(chave[i : i + 4] for i in range(0, 44, 4)), True)
-    dest = info.find("n:dest", NS)
-    documento = (
-        texto(dest, "n:CPF") or texto(dest, "n:CNPJ") or texto(dest, "n:idEstrangeiro")
-    )
-    adicionar("CONSUMIDOR", True, True)
-    adicionar(
-        f"CPF/CNPJ: {documento}" if documento else "Consumidor não identificado", True
-    )
-    if texto(dest, "n:xNome"):
-        adicionar(texto(dest, "n:xNome"), True)
-    if dest is not None:
-        end_dest = dest.find("n:enderDest", NS)
-        if end_dest is not None:
-            adicionar(
-                ", ".join(
-                    filter(
-                        None,
-                        [
-                            texto(end_dest, f"n:{tag}")
-                            for tag in ["xLgr", "nro", "xBairro", "xMun", "UF"]
-                        ],
-                    )
-                ),
-                True,
-            )
+    _adicionar_consumidor(info, adicionar)
     adicionar(
         f"NFC-e nº {texto(info, 'n:ide/n:nNF')}  Série {texto(info, 'n:ide/n:serie')}",
         True,
