@@ -1,5 +1,9 @@
 import { formatarMoeda } from "../../api/produtos";
 import { formatarData, normalizarNumero } from "./transferenciaParceiroUtils";
+import CurrencyInput from "../../components/CurrencyInput";
+import { formatMoneyBRL } from "../../utils/formatters";
+import { calcularDevolucaoParceiro } from "./devolucaoParceiroUtils";
+import DevolucaoParceiroItens from "./DevolucaoParceiroItens";
 
 function CompensacaoContasPagar({
   contasPagarCompensacao,
@@ -68,13 +72,10 @@ function CompensacaoContasPagar({
                 <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-500">
                   Valor a compensar
                 </label>
-                <input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={formBaixa.compensacoes?.[contaPagar.conta_pagar_id] || ""}
-                  onChange={(event) =>
-                    onAtualizarValorCompensacao(contaPagar.conta_pagar_id, event.target.value)
+                <CurrencyInput
+                  value={normalizarNumero(formBaixa.compensacoes?.[contaPagar.conta_pagar_id]) || 0}
+                  onChange={(valor) =>
+                    onAtualizarValorCompensacao(contaPagar.conta_pagar_id, valor)
                   }
                   className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-gray-900 outline-none transition focus:border-amber-500 focus:ring-4 focus:ring-amber-100"
                 />
@@ -103,7 +104,12 @@ export default function HistoricoTransferenciaBaixaPanel({
   onFecharBaixaTransferencia,
   onRegistrarBaixaTransferencia,
 }) {
-  const valorBaixa = normalizarNumero(formBaixa.valor_recebido) || 0;
+  const devolucaoComEstoque =
+    formBaixa.modo_baixa === "produto_devolvido" && formBaixa.devolver_estoque;
+  const devolucao = calcularDevolucaoParceiro(registro, formBaixa.itens_devolucao);
+  const valorBaixa = devolucaoComEstoque
+    ? devolucao.total
+    : normalizarNumero(formBaixa.valor_recebido) || 0;
 
   return (
     <div className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
@@ -298,8 +304,8 @@ export default function HistoricoTransferenciaBaixaPanel({
                 <span>
                   <span className="block font-semibold">Voltar produto ao estoque</span>
                   <span className="mt-1 block text-xs text-sky-800">
-                    Marcado: devolve os itens e exige baixa total. Desmarcado: apenas baixa o saldo
-                    com observacao.
+                    Marcado: escolha as quantidades que voltam agora, com baixa total ou parcial.
+                    Desmarcado: apenas baixa o saldo com observacao.
                   </span>
                 </span>
               </label>
@@ -311,26 +317,44 @@ export default function HistoricoTransferenciaBaixaPanel({
           <p className="font-semibold">Saldo atual</p>
           <p className="mt-1 text-lg font-bold">{formatarMoeda(registro.saldo_aberto)}</p>
           <p className="mt-2 text-xs text-emerald-700">
-            Pode ser baixa total ou parcial, conforme o valor informado.
+            {devolucaoComEstoque
+              ? "A baixa é calculada pelas quantidades devolvidas."
+              : "Pode ser baixa total ou parcial, conforme o valor informado."}
           </p>
+          {devolucaoComEstoque && (
+            <p className="mt-3 text-sm font-semibold">
+              Saldo após esta devolução:{" "}
+              {formatMoneyBRL(Math.max(0, Number(registro.saldo_aberto) - valorBaixa))}
+            </p>
+          )}
         </div>
       </div>
+
+      {devolucaoComEstoque && (
+        <DevolucaoParceiroItens
+          registro={registro}
+          formBaixa={formBaixa}
+          setFormBaixa={setFormBaixa}
+          resumo={devolucao}
+        />
+      )}
 
       <div className="mt-4 grid gap-4 md:grid-cols-2">
         <div>
           <label className="mb-2 block text-sm font-medium text-emerald-900">
             {formBaixa.modo_baixa === "produto_devolvido" ? "Valor a baixar" : "Valor recebido"}
           </label>
-          <input
-            type="number"
-            min="0.01"
-            step="0.01"
-            value={formBaixa.valor_recebido}
-            onChange={(event) =>
-              setFormBaixa((prev) => ({ ...prev, valor_recebido: event.target.value }))
-            }
-            className="w-full rounded-xl border border-emerald-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
-          />
+          {devolucaoComEstoque ? (
+            <output className="block w-full rounded-xl border border-emerald-200 bg-white px-3 py-2 text-sm font-semibold text-emerald-900">
+              {formatMoneyBRL(valorBaixa)}
+            </output>
+          ) : (
+            <CurrencyInput
+              value={normalizarNumero(formBaixa.valor_recebido) || 0}
+              onChange={(valor) => setFormBaixa((prev) => ({ ...prev, valor_recebido: valor }))}
+              className="w-full rounded-xl border border-emerald-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
+            />
+          )}
         </div>
         <div>
           <label className="mb-2 block text-sm font-medium text-emerald-900">
@@ -379,7 +403,11 @@ export default function HistoricoTransferenciaBaixaPanel({
         <button
           type="button"
           onClick={() => onRegistrarBaixaTransferencia(registro)}
-          disabled={contaRecebendo === registro.conta_receber_id}
+          disabled={
+            contaRecebendo === registro.conta_receber_id ||
+            (devolucaoComEstoque &&
+              (Boolean(devolucao.erro) || valorBaixa <= 0 || !devolucao.itens.length))
+          }
           className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-emerald-300"
         >
           {contaRecebendo === registro.conta_receber_id

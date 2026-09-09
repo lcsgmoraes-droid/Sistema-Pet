@@ -512,6 +512,7 @@ test("montarBaixaTransferenciaPayload inclui devolucao de estoque na baixa indiv
         devolver_estoque: true,
       },
       compensacoesPayload: [{ conta_pagar_id: 1, valor_compensado: 100 }],
+      itensDevolucao: [{ produto_id: 10, quantidade: 2, valor_total: 100 }],
     }),
     {
       valor_recebido: 100,
@@ -520,6 +521,7 @@ test("montarBaixaTransferenciaPayload inclui devolucao de estoque na baixa indiv
       compensacoes: undefined,
       observacao: "Produto retornou",
       devolver_estoque: true,
+      itens_devolucao: [{ produto_id: 10, quantidade: 2 }],
     },
   );
 });

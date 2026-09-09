@@ -122,6 +122,7 @@ export function criarFormBaixaTransferencia(overrides = {}) {
     modo_baixa: "recebimento",
     forma_pagamento_id: "",
     devolver_estoque: false,
+    itens_devolucao: {},
     observacao: "",
     ...overrides,
     compensacoes: overrides.compensacoes || {},
@@ -391,6 +392,7 @@ export function montarBaixaTransferenciaPayload({
   form = {},
   valorRecebido,
   compensacoesPayload = [],
+  itensDevolucao = [],
 } = {}) {
   const modoBaixa = form.modo_baixa || "recebimento";
   const payload = {
@@ -408,6 +410,12 @@ export function montarBaixaTransferenciaPayload({
   }
   if (modoBaixa === "produto_devolvido") {
     payload.devolver_estoque = Boolean(form.devolver_estoque);
+    if (payload.devolver_estoque) {
+      payload.itens_devolucao = itensDevolucao.map(({ produto_id, quantidade }) => ({
+        produto_id,
+        quantidade,
+      }));
+    }
   }
 
   return payload;

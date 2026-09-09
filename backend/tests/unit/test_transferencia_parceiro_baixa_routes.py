@@ -334,7 +334,7 @@ def test_recebimento_individual_cartao_respeita_data_financeira(monkeypatch):
     assert lancamentos[0].data_lancamento == date(2026, 7, 31)
 
 
-def test_produto_devolvido_individual_com_estoque_exige_baixa_integral(monkeypatch):
+def test_produto_devolvido_parcial_exige_quantidades(monkeypatch):
     conta = SimpleNamespace(
         id=125,
         status="pendente",
@@ -349,6 +349,10 @@ def test_produto_devolvido_individual_com_estoque_exige_baixa_integral(monkeypat
         routes, "_buscar_conta_transferencia_parceiro", lambda *_args: conta
     )
     monkeypatch.setattr(routes, "_saldo_conta_receber", lambda _conta: 100.0)
+
+    monkeypatch.setattr(
+        routes, "buscar_resumos_devolucao", lambda *_args, **_kwargs: {}
+    )
 
     payload = SimpleNamespace(
         valor_recebido=50,
@@ -369,4 +373,4 @@ def test_produto_devolvido_individual_com_estoque_exige_baixa_integral(monkeypat
         )
 
     assert exc_info.value.status_code == 400
-    assert "baixa integral" in exc_info.value.detail.lower()
+    assert "quantidades" in exc_info.value.detail.lower()

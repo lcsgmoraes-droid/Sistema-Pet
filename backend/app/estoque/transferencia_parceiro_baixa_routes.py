@@ -11,6 +11,11 @@ from app.auth.dependencies import get_current_user_and_tenant
 from app.bling_estoque_sync import sincronizar_bling_background
 from app.db import get_session
 from app.estoque.service import EstoqueService
+from app.estoque.transferencia_parceiro_devolucao_service import (
+    buscar_resumos_devolucao,
+    preparar_devolucao,
+    registrar_entrada_devolucao,
+)
 from app.estoque.transferencia_parceiro_documents import (
     _saldo_conta_receber,
     _status_transferencia_parceiro,
@@ -52,52 +57,6 @@ from app.security.permissions_decorator import require_permission
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
-
-_MOTIVO_DEVOLUCAO_TRANSFERENCIA_PARCEIRO = "transf_dev"
-_REFERENCIA_DEVOLUCAO_TRANSFERENCIA_PARCEIRO = "transf_devolucao"
-
-
-def _estornar_estoque_transferencia_devolvida(
-    db: Session,
-    *,
-    conta,
-    user_id: int,
-    tenant_id,
-    observacao: str,
-) -> list[int]:
-    movimentacoes = (
-        db.query(EstoqueMovimentacao)
-        .filter(
-            EstoqueMovimentacao.tenant_id == str(tenant_id),
-            EstoqueMovimentacao.referencia_id == conta.id,
-            EstoqueMovimentacao.tipo == "saida",
-            EstoqueMovimentacao.motivo.in_(
-                [_MOTIVO_TRANSFERENCIA_PARCEIRO_ESTOQUE, "transferencia_parceiro"]
-            ),
-        )
-        .order_by(EstoqueMovimentacao.id.asc())
-        .all()
-    )
-
-    movimentos_criados: list[int] = []
-    for movimentacao in movimentacoes:
-        resultado = EstoqueService.estornar_estoque(
-            produto_id=movimentacao.produto_id,
-            quantidade=float(movimentacao.quantidade or 0),
-            motivo=_MOTIVO_DEVOLUCAO_TRANSFERENCIA_PARCEIRO,
-            referencia_id=conta.id,
-            referencia_tipo=_REFERENCIA_DEVOLUCAO_TRANSFERENCIA_PARCEIRO,
-            user_id=user_id,
-            db=db,
-            tenant_id=str(tenant_id),
-            documento=conta.documento,
-            observacao=observacao,
-            custo_unitario_override=float(movimentacao.custo_unitario or 0),
-            valor_total_override=float(movimentacao.valor_total or 0),
-        )
-        movimentos_criados.append(resultado["movimentacao_id"])
-
-    return movimentos_criados
 
 
 @router.get(
@@ -162,7 +121,7 @@ def registrar_recebimento_transferencia_parceiro(
 ):
     """Registra baixa financeira de uma transferencia com ressarcimento."""
     current_user, tenant_id = user_and_tenant
-    conta = _buscar_conta_transferencia_parceiro(db, tenant_id, conta_receber_id)
+    conta = _buscar_conta_transferencia_parceiro(db, tenant_id, conta_receber_id, True)
     modo_baixa = _normalizar_modo_baixa_transferencia(payload.modo_baixa)
     if modo_baixa == "recebimento" and not payload.forma_pagamento_id:
         raise HTTPException(
@@ -202,14 +161,46 @@ def registrar_recebimento_transferencia_parceiro(
         )
 
     observacao_recebimento = _texto_limpo(payload.observacao)
+    itens_devolucao = []
     if modo_baixa == "produto_devolvido" and devolver_estoque:
-        if saldo_aberto - valor_recebido > 0.01:
+        resumo = buscar_resumos_devolucao(
+            db, tenant_id=tenant_id, conta_ids=[conta.id]
+        ).get(conta.id, {"itens": []})
+        solicitados = getattr(payload, "itens_devolucao", None)
+        if solicitados is None:
+            # Clientes antigos so podem devolver integralmente uma remessa sem baixas.
+            if (
+                float(conta.valor_recebido or 0) > 0
+                or abs(saldo_aberto - valor_recebido) > 0.001
+            ):
+                raise HTTPException(
+                    400,
+                    "Selecione as quantidades dos produtos para registrar a devolucao parcial.",
+                )
+            from app.estoque.transferencia_parceiro_schemas import (
+                TransferenciaParceiroDevolucaoItemRequest,
+            )
+
+            solicitados = [
+                TransferenciaParceiroDevolucaoItemRequest(
+                    produto_id=item["produto_id"],
+                    quantidade=item["quantidade_disponivel"],
+                )
+                for item in resumo["itens"]
+                if item["quantidade_disponivel"] > 0
+            ]
+        itens_devolucao, total_devolucao = preparar_devolucao(
+            resumo["itens"], solicitados
+        )
+        if total_devolucao != Decimal(str(valor_recebido)):
             raise HTTPException(
-                status_code=400,
-                detail=(
-                    "Produto devolvido com volta ao estoque exige baixa integral "
-                    "da transferencia."
-                ),
+                400,
+                "O valor da baixa deve corresponder aos produtos devolvidos. Atualize a tela e confira as quantidades.",
+            )
+        if total_devolucao > Decimal(str(saldo_aberto)):
+            raise HTTPException(
+                400,
+                "O valor dos produtos devolvidos ultrapassa o saldo da transferencia.",
             )
     if (
         modo_baixa == "produto_devolvido"
@@ -310,6 +301,11 @@ def registrar_recebimento_transferencia_parceiro(
         f"{modo_label} {conta.data_recebimento.strftime('%d/%m/%Y')}: "
         f"R$ {valor_recebido:.2f}{detalhe_forma}{detalhe_compensacao}{detalhe_observacao}"
     )
+    if itens_devolucao:
+        historico += " | Itens devolvidos: " + "; ".join(
+            f"{item['produto_nome']} x {item['quantidade']:g}"
+            for item in itens_devolucao
+        )
     conta.observacoes = (
         f"{conta.observacoes}\n\n{historico}".strip()
         if conta.observacoes
@@ -341,16 +337,20 @@ def registrar_recebimento_transferencia_parceiro(
             historico=historico,
         )
 
-    if modo_baixa == "produto_devolvido" and devolver_estoque:
-        movimentacoes_estoque = _estornar_estoque_transferencia_devolvida(
-            db,
-            conta=conta,
-            user_id=current_user.id,
-            tenant_id=tenant_id,
-            observacao=historico,
-        )
-
-    db.commit()
+    try:
+        if modo_baixa == "produto_devolvido" and devolver_estoque:
+            movimentacoes_estoque = registrar_entrada_devolucao(
+                db,
+                conta=conta,
+                user_id=current_user.id,
+                tenant_id=tenant_id,
+                observacao=historico,
+                itens=itens_devolucao,
+            )
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
     db.refresh(conta)
 
     if modo_baixa == "recebimento" and getattr(conta, "dre_subcategoria_id", None):
