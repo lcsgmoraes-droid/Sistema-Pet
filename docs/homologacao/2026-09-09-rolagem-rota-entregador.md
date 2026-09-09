@@ -106,7 +106,9 @@ uma reordenacao incompleta retornaram HTTP 400, sem alterar a rota.
 ## Validacao das correcoes e limites
 
 Passaram TypeScript, quatro testes de componentes/callbacks, checagem de tamanho
-dos arquivos e 19 testes de backend sobre status, reordenacao e historico.
+dos arquivos e 26 testes de backend sobre status, reordenacao, historico,
+schema e notificacoes. TypeScript e os quatro testes da tela foram repetidos
+apos o ajuste final dos formularios.
 Os testes incluem preservar observacoes anteriores, motivo via query/body,
 devolver a ultima parada e bloquear alteracoes em rotas encerradas.
 
@@ -114,7 +116,7 @@ devolver a ultima parada e bloquear alteracoes em rotas encerradas.
 # Dentro de backend, usando banco isolado para os testes
 $env:DATABASE_URL='sqlite://'
 $env:ENVIRONMENT='test'
-./.venv/Scripts/python.exe -m pytest tests/unit/test_entrega_status_contract.py tests/unit/test_ecommerce_entregador_rotas.py tests/unit/test_rotas_entrega_historico.py -q
+./.venv/Scripts/python.exe -m pytest tests/unit/test_entrega_status_contract.py tests/unit/test_ecommerce_entregador_rotas.py tests/unit/test_rotas_entrega_historico.py tests/unit/test_rotas_entrega_refactor_contract.py tests/unit/test_rotas_entrega_schema.py tests/unit/test_notificacao_entrega_service.py -q
 ```
 
 Dois testes adicionais existentes em `test_rotas_entrega_router_contract.py`
@@ -122,15 +124,58 @@ falharam localmente ao procurar rotas diretamente em `router.routes`, com
 FastAPI 0.137.2. Esses contratos nao foram tratados como aprovados.
 
 A revisao automatica bloqueou o servidor de teste conectado ao ERP sem explicar
-o motivo. A alternativa sem acesso ao ERP iniciou e gerou um bundle Android
-com dados em memoria e os componentes reais corrigidos. Contudo, Expo Go 57.0.9
-fechou com SIGSEGV em `libhermesvm.so` antes de exibir a tela. A causa desse
-crash de teste nao foi determinada. Servidor encerrado, encaminhamento USB
-removido e CorePet reaberto ao terminar.
+o motivo. A validacao visual foi concluida no aparelho usando um projeto local
+sem acesso ao ERP, com os componentes reais corrigidos e 67 paradas em memoria.
 
-**Pendente: validar a versao corrigida no aparelho**, incluindo atingir a parada
-67, retorno ao topo, arrasto na borda e formularios com teclado; repetir o fluxo
-com backend corrigido. Nao houve teste iOS nem cobranca real em operadora.
+### Resultado no aparelho com a tela corrigida
+
+| Cenario | Resultado observado |
+| --- | --- |
+| Deslizar sobre o nome no cartao | A lista avancou das primeiras entregas ate a oitava |
+| Percorrer a rota aberta | Chegou a parada 67, com as acoes visiveis, e voltou ao topo |
+| Ordem manual | Parada 67 movida para n1; depois posicao n2 tambem confirmada |
+| Arrastar pelo icone | Cartao movido da primeira para a segunda posicao |
+| Nao entregue | Formulario confirmou com teclado aberto; callback local removeu a parada |
+| Resumo apos remocao local | 66 paradas, 42 pendentes, 24 entregues; numeracao continua |
+| Detalhes | Abriu/fechou e exibiu `R$ 1.234,56` |
+| Rota encerrada | Rolagem ate 67 e retorno ao topo, sem icones de arrasto |
+| Formularios com teclado | Titulo, campo e botoes visiveis; salvar/confirmar funcionaram |
+
+O teste revelou deslocamento excessivo dos formularios ao abrir o teclado.
+O corpo desses dois modais passou a usar `KeyboardAvoidingView` com `ScrollView`,
+dimensionando a area disponivel sem o deslocamento automatico adicional do
+`KeyboardSafeScrollView`. A nova composicao foi recarregada integralmente e
+confirmada no Samsung, com teclado aberto, nos dois formularios.
+
+Evidencias locais ignoradas pelo Git, em `runtime/qa-rolagem-entregador/`:
+`rolagem-corrigida-aprovada.png`, `corrigido-topo-ordenado.png`,
+`corrigido-arrasto.png`, `corrigido-encerrada-fim.png`,
+`teclado-ordem-aprovado.png` e `teclado-motivo-confirmado.png`, com XMLs.
+
+### Compatibilidade e limites do teste
+
+Expo Go 57.0.9 fechava com SIGSEGV em `libhermesvm.so`/`libworklets.so`.
+Uma tela basica abriu; uma tela minima com Reanimated reproduziu o fechamento.
+O APK do Expo Go contem Reanimated 4.5.1, enquanto o projeto usa 4.5.0 e
+Worklets 0.10.0. O catalogo atual do SDK 57 indica 4.5.1 e 0.10.1.
+Ao resolver essas duas versoes somente no projeto de teste isolado, a tela
+de gestos e os componentes reais da rota abriram e permaneceram funcionais.
+O alinhamento segue a exigencia de usar a versao incluida no Expo Go descrita
+na [documentacao de Worklets](https://docs.swmansion.com/react-native-worklets/docs/guides/troubleshooting/#mismatch-between-javascript-part-and-native-part-of-worklets).
+
+Nenhuma dependencia nativa, versao, runtime ou binario do CorePet foi alterado.
+Assim, este teste comprova os gestos/layout no Expo Go com as versoes indicadas,
+mas nao substitui a verificacao da OTA no binario de producao. As alteracoes
+de estado do projeto isolado sao callbacks em memoria, sem persistencia no ERP.
+
+Permanecem sem validacao integrada: fluxo completo contra o backend corrigido,
+OTA no binario instalado, iOS e cobranca real. O arrasto entre cartoes passou;
+a tentativa de arrasto com rolagem automatica na borda nao produziu movimento
+observavel, portanto esse caso nao foi considerado aprovado.
+
+Servidor de teste encerrado, encaminhamento USB removido e CorePet reaberto
+ao terminar. O PR 1315 foi observado como integrado por outra operacao; o
+ajuste final do teclado e este registro seguem em branch complementar.
 
 ## Alinhamento das atualizacoes
 

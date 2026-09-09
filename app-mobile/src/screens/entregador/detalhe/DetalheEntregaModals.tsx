@@ -1,14 +1,15 @@
 import React, { type Dispatch, type SetStateAction } from "react";
 import {
   ActivityIndicator,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   ScrollView,
   Text,
   TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
-import KeyboardSafeScrollView from "../../../components/KeyboardSafeScrollView";
 import { formatarMoeda } from "../../../utils/format";
 
 import { detalheEntregaStyles as styles } from "./DetalheEntregaStyles";
@@ -51,13 +52,17 @@ export type DetalheEntregaModalsProps = {
 
 function FormModalBody({ children }: { children: React.ReactNode }) {
   return (
-    <KeyboardSafeScrollView
+    <KeyboardAvoidingView
       style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.4)" }}
-      contentContainerStyle={{ flexGrow: 1, justifyContent: "center", padding: 20 }}
-      keyboardShouldPersistTaps="handled"
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
     >
-      {children}
-    </KeyboardSafeScrollView>
+      <ScrollView
+        contentContainerStyle={{ flexGrow: 1, justifyContent: "center", padding: 20 }}
+        keyboardShouldPersistTaps="handled"
+      >
+        {children}
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 
