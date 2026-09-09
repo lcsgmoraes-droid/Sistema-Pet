@@ -1,10 +1,9 @@
 import React, { type Dispatch, type SetStateAction } from "react";
-import { ActivityIndicator, Text, TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, FlatList, Text, TouchableOpacity, View } from "react-native";
 import DraggableFlatList, {
   type RenderItemParams,
 } from "react-native-draggable-flatlist";
 
-import KeyboardSafeScrollView from "../../../components/KeyboardSafeScrollView";
 import { detalheEntregaStyles as styles } from "./DetalheEntregaStyles";
 import { DetalheEntregaModals } from "./DetalheEntregaModals";
 import { DetalheEntregaStopCard } from "./DetalheEntregaStopCard";
@@ -141,8 +140,8 @@ export function DetalheEntregaContent({
     />
   );
 
-  return (
-    <KeyboardSafeScrollView style={styles.container} contentContainerStyle={styles.content}>
+  const cabecalho = (
+    <>
       <View style={styles.resumo}>
         <View style={styles.resumoItem}>
           <Text style={styles.resumoValor}>{rota.paradas.length}</Text>
@@ -222,29 +221,49 @@ export function DetalheEntregaContent({
         </TouchableOpacity>
       )}
 
+      {podeReordenar && (
+        <Text style={styles.dragHint}>
+          Segure o ícone para arrastar ou toque no número azul para definir a ordem
+          manualmente. Você pode digitar n1, n2 ou apenas 1, 2.
+        </Text>
+      )}
+    </>
+  );
+
+  const listaProps = {
+    data: [...rota.paradas].sort((a, b) => a.ordem - b.ordem),
+    keyExtractor: (item: Parada) => String(item.id),
+    style: styles.container,
+    contentContainerStyle: styles.content,
+    ListHeaderComponent: cabecalho,
+    keyboardShouldPersistTaps: "handled" as const,
+    showsVerticalScrollIndicator: true,
+    extraData: { processando, rotaStatus: rota.status },
+  };
+
+  return (
+    <View style={styles.container}>
+      {/* A lista controla toda a rolagem; um ScrollView externo disputa o gesto no Android. */}
       {podeReordenar ? (
-        <>
-          <Text style={styles.dragHint}>
-            Arraste pelo icone ou toque no numero azul para definir a ordem manualmente. Voce pode digitar n1, n2 ou apenas 1, 2.
-          </Text>
-          <DraggableFlatList
-            data={[...rota.paradas].sort((a, b) => a.ordem - b.ordem)}
-            keyExtractor={(item) => String(item.id)}
-            activationDistance={4}
-            autoscrollThreshold={60}
-            autoscrollSpeed={80}
-            dragItemOverflow={false}
-            onDragEnd={({ data }) => {
-              void salvarNovaOrdemParadas(data);
-            }}
-            renderItem={({ item, drag, isActive }: RenderItemParams<Parada>) =>
-              renderParada(item, drag, isActive)
-            }
-            scrollEnabled={false}
-          />
-        </>
+        <DraggableFlatList
+          {...listaProps}
+          containerStyle={styles.container}
+          activationDistance={4}
+          autoscrollThreshold={60}
+          autoscrollSpeed={80}
+          dragItemOverflow={false}
+          onDragEnd={({ data }) => {
+            void salvarNovaOrdemParadas(data);
+          }}
+          renderItem={({ item, drag, isActive }: RenderItemParams<Parada>) =>
+            renderParada(item, drag, isActive)
+          }
+        />
       ) : (
-        rota.paradas.map((parada) => renderParada(parada))
+        <FlatList
+          {...listaProps}
+          renderItem={({ item }) => renderParada(item)}
+        />
       )}
 
       <DetalheEntregaModals
@@ -276,6 +295,6 @@ export function DetalheEntregaContent({
         loadingVenda={loadingVenda}
         vendaDetalhes={vendaDetalhes}
       />
-    </KeyboardSafeScrollView>
+    </View>
   );
 }
