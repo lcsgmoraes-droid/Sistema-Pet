@@ -22,6 +22,7 @@ import KeyboardSafeScrollView from "../../components/KeyboardSafeScrollView";
 import { CORES, ESPACO, FONTE, RAIO, SOMBRA } from "../../theme";
 import { FuncionarioProdutoEstoque } from "../../types";
 import { formatarMoeda } from "../../utils/format";
+import EditarProdutoBalanco from "./produto/EditarProdutoBalanco";
 
 type HistoricoBalancoSessao = {
   id: string;
@@ -78,6 +79,7 @@ export default function FuncionarioBalancoScreen() {
   const [buscaManual, setBuscaManual] = useState("");
   const [sugestoes, setSugestoes] = useState<FuncionarioProdutoEstoque[]>([]);
   const [produto, setProduto] = useState<FuncionarioProdutoEstoque | null>(null);
+  const [editandoCadastro, setEditandoCadastro] = useState(false);
   const [saldoFinal, setSaldoFinal] = useState("");
   const [numeroLote, setNumeroLote] = useState("");
   const [dataValidade, setDataValidade] = useState("");
@@ -319,11 +321,22 @@ export default function FuncionarioBalancoScreen() {
               <View style={{ flex: 1 }}>
                 <Text style={styles.produtoNome}>{produto.nome}</Text>
                 <Text style={styles.produtoMeta}>SKU {produto.codigo || "-"} | {produto.unidade || "UN"}</Text>
+                <Text style={styles.produtoMeta}>EAN {produto.codigo_barras || "Não informado"}</Text>
               </View>
               <TouchableOpacity style={styles.botaoLimpar} onPress={() => setProduto(null)}>
                 <Ionicons name="close" size={18} color={CORES.erro} />
               </TouchableOpacity>
             </View>
+
+            <TouchableOpacity
+              accessibilityRole="button"
+              style={styles.botaoEditar}
+              onPress={() => setEditandoCadastro(true)}
+              disabled={salvando}
+            >
+              <Ionicons name="create-outline" size={20} color={CORES.primario} />
+              <Text style={styles.botaoEditarTexto}>Editar cadastro</Text>
+            </TouchableOpacity>
 
             {produto.aviso ? (
               <View style={styles.aviso}>
@@ -432,12 +445,27 @@ export default function FuncionarioBalancoScreen() {
             ))}
           </View>
         ) : null}
+        {editandoCadastro && produto ? (
+          <EditarProdutoBalanco
+            produtoId={produto.id}
+            onClose={() => setEditandoCadastro(false)}
+            onSaved={(atualizado) => {
+              setProduto((atual) => atual?.id === atualizado.id
+                ? { ...atual, nome: atualizado.nome, codigo_barras: atualizado.codigo_barras }
+                : atual);
+              setEditandoCadastro(false);
+              Alert.alert("Cadastro atualizado", "As alterações foram salvas no ERP. Você pode continuar o balanço.");
+            }}
+          />
+        ) : null}
     </KeyboardSafeScrollView>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: CORES.fundo },
+  botaoEditar: { minHeight: 44, flexDirection: "row", alignItems: "center", gap: ESPACO.sm },
+  botaoEditarTexto: { color: CORES.primario, fontWeight: "700", fontSize: FONTE.normal },
   conteudo: { padding: ESPACO.md, gap: ESPACO.md, paddingBottom: ESPACO.xxl },
   centrado: { flex: 1, alignItems: "center", justifyContent: "center", padding: ESPACO.lg, backgroundColor: CORES.fundo },
   tituloPermissao: { fontSize: FONTE.titulo, fontWeight: "700", color: CORES.texto, marginVertical: ESPACO.md },
