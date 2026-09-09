@@ -16,7 +16,7 @@ O [estudo do Bling e da estrutura fiscal do CorePet](ESTUDO_BLING_E_ESTRUTURA_FI
 - Na sessão do Bling já aberta pelo Lucas, foram conferidos os dados da **LJ Comercio de Rações e Pet Shop LTDA**, empresa indicada para o teste. O corpo mínimo de cadastro foi preparado localmente em `runtime/analises/fiscal/2026-09-09/cadastro_emitente_pet.json`, fora do Git.
 - A autenticação própria da API em `POST /integrador/auth/token` retornou HTTP 200 e validade de 43.200 segundos. Não foi necessário extrair o token do navegador.
 - Credenciais e token foram guardados localmente com proteção DPAPI do Windows, em arquivos ignorados pelo Git. Nenhum segredo foi copiado para esta documentação.
-- `GET /integrador/emitentes` retornou HTTP 200 e apenas **Ze Pet**. O cadastro da LJ retornou HTTP 409 `EmitenteDuplicado`; a consulta posterior continuou sem a LJ. A API confirma a existência do CNPJ, mas não informa aqui a conta à qual ele pertence.
+- Na primeira execução, `GET /integrador/emitentes` retornou HTTP 200 e apenas **Ze Pet**. O cadastro da LJ retornou HTTP 409 `EmitenteDuplicado`; a consulta posterior continuou sem a LJ. Após Lucas informar a exclusão do Ze Pet, a lista passou a vazia, mas uma nova tentativa continuou retornando o mesmo conflito. A API considera o CNPJ existente, mas não informa aqui a conta à qual ele pertence nem a situação desse registro.
 - Nenhuma empresa/destinatário foi cadastrado e nenhuma NF-e foi transmitida nesta preparação.
 
 ## Acesso, empresa e cliente são coisas diferentes
@@ -104,6 +104,7 @@ Nenhum dos assuntos futuros será usado para exigir a integração completa ante
 | Acesso ao portal | Confirmado, conta PetSys (smoke test) |
 | Acesso à API do integrador | Autenticação HTTP 200 e consulta HTTP 200 confirmadas |
 | Empresa | Cadastro retornou HTTP 409 `EmitenteDuplicado`; CNPJ existe, mas a LJ não aparece na conta PetSys |
+| Nova tentativa após exclusão do Ze Pet | Consulta HTTP 200 com zero emitentes; novo cadastro novamente recusado com HTTP 409 |
 | Certificado | Ainda não disponibilizado/consultado para a LJ na IntNFe |
 | Destinatário | Não cadastrado nem transmitido |
 | Nota enviada/autorizada | Não executado |
@@ -120,6 +121,16 @@ Nenhum dos assuntos futuros será usado para exigir a integração completa ante
 - Duas solicitações de cadastro receberam 409; a segunda capturou a mensagem e o identificador para diagnóstico. Não houve resposta de criação nem credenciais de emitente retornadas.
 - Arquivos locais de evidência: `runtime/analises/fiscal/2026-09-09/cadastro_emitente_resultado.json` e `cadastro_emitente_erro.json`. Não contêm o segredo de acesso.
 
-O próximo passo é a equipe da IntNFe localizar esse cadastro e disponibilizá-lo à PetSys, ou fornecer as credenciais próprias da LJ. A hipótese de vínculo com outro integrador precisa ser confirmada pela equipe; o teste não comprova em qual conta o CNPJ está. Não trocar o CNPJ por um fictício nem alterar o emitente Ze Pet para contornar o conflito.
+### Nova tentativa após a exclusão informada pelo Lucas
+
+- Lucas informou que Ze Pet era seu cadastro e que ele foi excluído, autorizando nova tentativa.
+- A consulta autenticada confirmou **zero emitentes** visíveis na PetSys, com HTTP 200.
+- Uma nova chamada de cadastro com o mesmo CNPJ da LJ retornou HTTP 409 `EmitenteDuplicado` e a mesma mensagem de CNPJ existente.
+- Identificador de diagnóstico desta tentativa: `37c1b0a98cc14bd691857bb51c9a2077`.
+- Início registrado: 09/09/2026 às 23:20:58 UTC (20:20:58 em Brasília).
+- Evidência local: `runtime/analises/fiscal/2026-09-09/cadastro-20260909T232058Z.json`. O arquivo `cadastro_emitente_resultado.json` também aponta para esse resultado mais recente.
+- Não foram criados emitente, credenciais de emissão ou nota nessa tentativa.
+
+O próximo passo é a equipe da IntNFe localizar o registro/validação que ainda reserva o CNPJ `33590794000140`. Pode haver outro vínculo ou um registro excluído ainda considerado na duplicidade; são hipóteses, não causas comprovadas pelo teste. Depois da verificação, disponibilizar o emitente à PetSys ou corrigir o cadastro para permitir sua criação, conforme o estado real da base. Não substituir o CNPJ da empresa por um fictício para contornar o conflito.
 
 Depois de resolver o acesso, conferir certificado, dados fiscais e série de homologação antes de preparar a emissão. Não houve alteração de aplicação, banco, estoque, caixa ou implantação em produção.
