@@ -2,6 +2,7 @@ import React, { type Dispatch, type SetStateAction } from "react";
 import { Text, View } from "react-native";
 
 import KeyboardSafeScrollView from "../../../components/KeyboardSafeScrollView";
+import AppUpdatesEntry from "../../../components/AppUpdatesEntry";
 import { ESPACO } from "../../../theme";
 import type { AppAccessProfile, AppProfileType, EcommerceDeliveryAddress, EcommerceUser } from "../../../types";
 import { DefaultAddressSection, DeliveryAddressSection } from "./ProfileAddressSections";
@@ -90,6 +91,7 @@ export function ProfileContent(props: ProfileContentProps) {
   return (
     <KeyboardSafeScrollView style={styles.container} contentContainerStyle={styles.content}>
       <ProfileAvatarSection user={props.user} />
+      <AppUpdatesEntry />
       <ProfilePointsCard pontos={props.pontos} valorPontos={props.valorPontos} />
       <ProfileSwitcherSection
         availableProfiles={props.availableProfiles}

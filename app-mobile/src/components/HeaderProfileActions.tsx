@@ -24,11 +24,11 @@ export default function HeaderProfileActions({
   const [loadingProfiles, setLoadingProfiles] = useState(false);
   const [profileSwitcherVisible, setProfileSwitcherVisible] = useState(false);
   const [profileSwitcherProfiles, setProfileSwitcherProfiles] = useState<AppAccessProfile[]>([]);
+  const [profilesError, setProfilesError] = useState<string | null>(null);
   const [activatingNotifications, setActivatingNotifications] = useState(false);
   const [notificacoesAtivadas, setNotificacoesAtivadas] = useState(false);
   const available_profiles = user?.available_profiles ?? [];
   const currentProfile = user?.selected_profile ?? user?.perfil_operacional ?? "cliente";
-  const canSwitch = available_profiles.length > 1;
 
   useEffect(() => {
     let mounted = true;
@@ -46,7 +46,10 @@ export default function HeaderProfileActions({
     };
   }, []);
 
-  const trocarPerfil = async () => {
+  const abrirPerfil = async () => {
+    setProfileSwitcherProfiles(available_profiles.filter((profile) => profile.type !== currentProfile));
+    setProfilesError(null);
+    setProfileSwitcherVisible(true);
     setLoadingProfiles(true);
     try {
       const freshUser = await AuthService.getProfile();
@@ -57,15 +60,9 @@ export default function HeaderProfileActions({
         (profile) => profile.type !== freshCurrentProfile,
       );
 
-      if (profileOptions.length === 0) {
-        Alert.alert("Trocar perfil", "Sem outros acessos liberados para esta conta.");
-        return;
-      }
-
       setProfileSwitcherProfiles(profileOptions);
-      setProfileSwitcherVisible(true);
     } catch {
-      Alert.alert("Erro", "Nao foi possivel carregar os acessos agora.");
+      setProfilesError("Não foi possível atualizar os acessos. As opções já carregadas continuam disponíveis.");
     } finally {
       setLoadingProfiles(false);
     }
@@ -120,19 +117,17 @@ export default function HeaderProfileActions({
           )}
           <Text style={[styles.text, { color }]}>Notif.</Text>
         </TouchableOpacity>
-        {canSwitch && (
-          <TouchableOpacity
-            accessibilityLabel="Trocar perfil do app"
-            onPress={trocarPerfil}
-            style={styles.action}
-            disabled={loadingProfiles}
-          >
-            <Ionicons name="swap-horizontal-outline" size={18} color={color} />
-            <Text style={[styles.text, { color }]}>
-              {loadingProfiles ? "..." : "Trocar"}
-            </Text>
-          </TouchableOpacity>
-        )}
+        <TouchableOpacity
+          accessibilityLabel="Abrir perfil do app"
+          onPress={abrirPerfil}
+          style={styles.action}
+          disabled={loadingProfiles}
+        >
+          <Ionicons name="person-circle-outline" size={18} color={color} />
+          <Text style={[styles.text, { color }]}>
+            Perfil
+          </Text>
+        </TouchableOpacity>
         {showLogout && (
           <TouchableOpacity
             accessibilityLabel="Sair da conta"
@@ -144,6 +139,9 @@ export default function HeaderProfileActions({
         )}
       </View>
       <ProfileSwitcherModal
+        showUpdates
+        loadingProfiles={loadingProfiles}
+        profilesError={profilesError}
         visible={profileSwitcherVisible}
         profiles={profileSwitcherProfiles}
         onSelect={selecionarPerfil}
