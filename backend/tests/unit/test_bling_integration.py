@@ -1,4 +1,5 @@
 from contextlib import nullcontext
+from decimal import Decimal
 from types import SimpleNamespace
 
 import pytest
@@ -395,3 +396,73 @@ def test_payload_nfce_usa_taxa_entrega_da_venda_sem_campo_legado():
 
     assert payload["totais"]["valorFrete"] == 12.5
     assert payload["totais"]["valorTotal"] == 112.5
+    assert payload["transporte"]["frete"] == 12.5
+
+
+def test_payload_desconto_rateado_nao_multiplica_nem_desconta_duas_vezes():
+    venda = _make_venda_nfce()
+    item = venda.itens[0]
+    item.quantidade = Decimal("2.000")
+    item.preco_unitario = Decimal("179.90")
+    item.desconto_item = Decimal("25.00")
+    venda.desconto_valor = Decimal("25.00")
+    venda.total = Decimal("334.80")
+
+    payload = _make_api()._montar_payload(venda, "nfce")
+
+    assert payload["itens"][0]["valor"] == 179.9
+    assert "desconto" not in payload["itens"][0]
+    assert payload["desconto"] == 25.0
+    assert payload["totais"] == {
+        "valorProdutos": 359.8,
+        "valorFrete": 0.0,
+        "valorDesconto": 25.0,
+        "valorTotal": 334.8,
+    }
+
+
+def test_payload_preserva_desconto_global_sem_rateio_e_frete():
+    venda = _make_venda_nfce()
+    venda.desconto_valor = Decimal("10.00")
+    venda.tem_entrega = True
+    venda.taxa_entrega = Decimal("12.50")
+    venda.total = Decimal("102.50")
+
+    payload = _make_api()._montar_payload(venda, "nfce")
+
+    assert payload["desconto"] == 10.0
+    assert payload["transporte"]["frete"] == 12.5
+    assert payload["totais"]["valorTotal"] == 102.5
+
+
+def test_payload_arredonda_cada_item_vendido_por_peso():
+    venda = _make_venda_nfce()
+    modelo = venda.itens[0]
+    venda.itens = [
+        SimpleNamespace(
+            produto=modelo.produto,
+            quantidade=Decimal(q),
+            preco_unitario=Decimal(p),
+            desconto_item=0,
+        )
+        for q, p in [("1.097", "9.30"), ("1", "139.90"), ("1", "149.90")]
+    ]
+    venda.total = Decimal("300.00")
+
+    payload = _make_api()._montar_payload(venda, "nfce")
+
+    assert payload["totais"]["valorProdutos"] == 300.0
+    assert payload["totais"]["valorTotal"] == 300.0
+
+
+def test_emissao_bloqueia_total_divergente_antes_de_criar_nota(monkeypatch):
+    venda = _make_venda_nfce()
+    venda.total = Decimal("90.00")
+    api = _make_api()
+    chamadas = []
+    monkeypatch.setattr(api, "_request", lambda *a, **kw: chamadas.append((a, kw)))
+
+    with pytest.raises(ValueError, match="difere do total da venda"):
+        api.emitir_nota_fiscal(venda, "nfce")
+
+    assert chamadas == []
