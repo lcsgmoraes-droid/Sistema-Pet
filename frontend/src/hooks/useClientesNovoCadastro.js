@@ -35,6 +35,7 @@ function buildNovoClienteFormData(tipoCadastro, tipoPessoa) {
     : [];
   return {
     tipo_cadastro: tipoCadastro,
+    origem_cliente: "loja_fisica",
     tipo_pessoa: tipoPessoa,
     nome: "",
     data_nascimento: "",
@@ -91,6 +92,7 @@ function buildNovoClienteFormData(tipoCadastro, tipoPessoa) {
 function buildClienteFormData(cliente) {
   return {
     tipo_cadastro: cliente.tipo_cadastro || "cliente",
+    origem_cliente: cliente.origem_cliente ?? null,
     tipo_pessoa: cliente.tipo_pessoa || "PF",
     nome: cliente.nome || "",
     data_nascimento: cliente.data_nascimento ? String(cliente.data_nascimento).slice(0, 10) : "",
@@ -454,6 +456,9 @@ export function useClientesNovoCadastro({
       }
 
       if (formData.tipo_cadastro === "cliente") {
+        if (formData.origem_cliente !== null && !formData.origem_cliente?.trim()) {
+          errosValidacao.push("Origem do cliente");
+        }
         const telefoneDigits = `${formData.telefone || ""}${formData.celular || ""}`.replace(
           /\D/g,
           "",
@@ -629,6 +634,7 @@ export function useClientesNovoCadastro({
         dia_mes_acerto: "Dia do Mes para Acerto",
         tipo_vinculo_entrega: "Tipo de Vinculo",
         alertas_pdv: "Alertas do PDV",
+        origem_cliente: "Origem do cliente",
       };
 
       let mensagemErro = "";

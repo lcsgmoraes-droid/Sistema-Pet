@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import api from "../api";
 
 export function useClientesNovoListagem({ tipoFiltro, visaoDashboard = "", setError }) {
@@ -10,6 +10,13 @@ export function useClientesNovoListagem({ tipoFiltro, visaoDashboard = "", setEr
   const [totalRegistros, setTotalRegistros] = useState(0);
   const [registrosPorPagina, setRegistrosPorPagina] = useState(20);
   const [searchTermAplicado, setSearchTermAplicado] = useState("");
+  const [filtrosOrigem, setFiltrosOrigem] = useState({ origem: "", inicio: "", fim: "" });
+  const [resumoOrigens, setResumoOrigens] = useState([]);
+  const requisicaoAtual = useRef(0);
+  const alterarFiltrosOrigem = (filtros) => {
+    setPaginaAtual(1);
+    setFiltrosOrigem(filtros);
+  };
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
@@ -23,6 +30,7 @@ export function useClientesNovoListagem({ tipoFiltro, visaoDashboard = "", setEr
 
   const loadClientes = useCallback(
     async (options = {}) => {
+      const requisicao = ++requisicaoAtual.current;
       const paginaDesejada = options.paginaAtual ?? paginaAtual;
       const limiteDesejado = options.registrosPorPagina ?? registrosPorPagina;
       const termoBusca =
@@ -47,8 +55,17 @@ export function useClientesNovoListagem({ tipoFiltro, visaoDashboard = "", setEr
         if (visaoDashboard) {
           params.append("visao_dashboard", visaoDashboard);
         }
+        if (tipoFiltro === "cliente") {
+          params.append("resumo_por_origem", "true");
+          if (filtrosOrigem.origem) params.append("origem_cliente", filtrosOrigem.origem);
+          if (filtrosOrigem.inicio) params.append("cadastro_inicio", filtrosOrigem.inicio);
+          if (filtrosOrigem.fim) params.append("cadastro_fim", filtrosOrigem.fim);
+        }
 
         const response = await api.get(`/clientes/?${params.toString()}`);
+        if (requisicao !== requisicaoAtual.current) return [];
+        setError("");
+        setResumoOrigens(response.data.resumo_origens || []);
 
         if (response.data.items) {
           setClientes(response.data.items);
@@ -61,15 +78,30 @@ export function useClientesNovoListagem({ tipoFiltro, visaoDashboard = "", setEr
         setTotalRegistros(listaClientes.length);
         return listaClientes;
       } catch (err) {
-        setError("Erro ao carregar pessoas");
+        if (requisicao !== requisicaoAtual.current) return [];
+        const detalhe = err?.response?.data?.detail;
+        setError(typeof detalhe === "string" ? detalhe : "Erro ao carregar pessoas");
+        setClientes([]);
+        setTotalRegistros(0);
+        setResumoOrigens([]);
         console.error(err);
         return [];
       } finally {
-        setLoading(false);
-        setCarregamentoInicialConcluido(true);
+        if (requisicao === requisicaoAtual.current) {
+          setLoading(false);
+          setCarregamentoInicialConcluido(true);
+        }
       }
     },
-    [paginaAtual, registrosPorPagina, searchTermAplicado, setError, tipoFiltro, visaoDashboard],
+    [
+      paginaAtual,
+      registrosPorPagina,
+      searchTermAplicado,
+      setError,
+      tipoFiltro,
+      visaoDashboard,
+      filtrosOrigem,
+    ],
   );
 
   useEffect(() => {
@@ -92,6 +124,9 @@ export function useClientesNovoListagem({ tipoFiltro, visaoDashboard = "", setEr
   );
 
   return {
+    filtrosOrigem,
+    alterarFiltrosOrigem,
+    resumoOrigens,
     clientes,
     loading,
     carregamentoInicialConcluido,

@@ -7,6 +7,7 @@ from app.clientes.common import gerar_codigo_cliente
 from app.models import Cliente, User
 from app.routes.ecommerce_auth_common import _activate_user_tenant_context
 from app.services.pessoa_merge_service import transferir_referencias_pessoa
+from app.services.cliente_origem import normalizar_origem_cliente
 
 
 def _digits_only(value: str | None) -> str:
@@ -359,7 +360,9 @@ def _transfer_cliente_relations_for_ecommerce_merge(
     return transferred
 
 
-def _get_or_create_cliente_for_user(db: Session, user: User) -> Cliente:
+def _get_or_create_cliente_for_user(
+    db: Session, user: User, *, origem_cliente=None
+) -> Cliente:
     tenant_id = _activate_user_tenant_context(user)
     clientes_vinculados = (
         db.query(Cliente)
@@ -398,6 +401,7 @@ def _get_or_create_cliente_for_user(db: Session, user: User) -> Cliente:
 
     if not cliente:
         cliente = Cliente(
+            origem_cliente=normalizar_origem_cliente(origem_cliente),
             tenant_id=tenant_id,
             user_id=user.id,
             auth_user_id=user.id,

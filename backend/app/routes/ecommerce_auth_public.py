@@ -109,7 +109,7 @@ def registrar_cliente(
     db.commit()
     db.refresh(user)
 
-    cliente = _get_or_create_cliente_for_user(db, user)
+    cliente = _get_or_create_cliente_for_user(db, user, origem_cliente=canal_registro)
     if nome:
         cliente.nome = nome
     if cpf_normalizado and not cliente.cpf:

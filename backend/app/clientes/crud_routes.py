@@ -1,6 +1,6 @@
 """CRUD principal de clientes, fornecedores e pessoas operacionais."""
 
-from datetime import datetime as dt, timedelta
+from datetime import date, datetime as dt, timedelta
 import json
 import logging
 from typing import List, Optional
@@ -10,7 +10,7 @@ from sqlalchemy import Float, Integer, and_, case, cast, func, or_
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.audit_log import log_create, log_delete, log_update
+from app.audit_log import log_action, log_create, log_delete, log_update
 from app.auth.dependencies import get_current_user_and_tenant
 from app.clientes.common import (
     _anexar_metadados_criacao_cliente,
@@ -34,6 +34,11 @@ from app.partner_utils import get_all_accessible_tenant_ids
 from app.security.permissions_decorator import require_permission
 from app.security.permissions_service import check_permission
 from app.services.cliente_alertas_pdv import normalizar_alertas_pdv
+from app.services.cliente_origem import (
+    filtrar_origem_periodo,
+    opcoes_origem_cliente,
+    resumir_origens,
+)
 from app.services.app_access_profile_service import sync_cliente_app_access_profiles
 from app.services.business_audit_service import (
     build_user_access_metadata,
@@ -245,6 +250,17 @@ def listar_usuarios_para_acesso_app(
     ]
 
 
+@base_router.get("/origens")
+def listar_origens_cliente(
+    db: Session = Depends(get_session),
+    user_and_tenant=Depends(get_current_user_and_tenant),
+):
+    """Opcoes padrao e origens ja registradas nas lojas acessiveis."""
+    _current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
+    access_ids = get_all_accessible_tenant_ids(db, tenant_id)
+    return opcoes_origem_cliente(db, Cliente, access_ids)
+
+
 @base_router.get("/", response_model=ClientesListResponse)
 @require_permission("clientes.visualizar")
 def list_clientes(
@@ -256,6 +272,10 @@ def list_clientes(
     tipo_cadastro: Optional[List[str]] = Query(None),
     is_entregador: Optional[bool] = None,
     visao_dashboard: Optional[str] = Query(None),
+    origem_cliente: Optional[str] = None,
+    cadastro_inicio: Optional[date] = None,
+    cadastro_fim: Optional[date] = None,
+    resumo_por_origem: bool = False,
     db: Session = Depends(get_session),
     user_and_tenant=Depends(get_current_user_and_tenant),
 ):
@@ -273,12 +293,31 @@ def list_clientes(
             incluir_inativos=incluir_inativos,
             visao_dashboard=visao_dashboard,
         )
+        try:
+            query = filtrar_origem_periodo(
+                query,
+                Cliente,
+                origem=origem_cliente,
+                inicio=cadastro_inicio,
+                fim=cadastro_fim,
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        resumo = (
+            resumir_origens(query.filter(Cliente.tipo_cadastro == "cliente"), Cliente)
+            if resumo_por_origem
+            else []
+        )
         total = query.count()
         query = _ordenar_query_listagem(query, search)
         clientes = query.offset(skip).limit(limit).all()
         _marcar_clientes_de_parceiro(clientes, tenant_id)
         _anexar_metadados_criacao_cliente(db, clientes)
-        return ClientesListResponse(items=clientes, total=total, skip=skip, limit=limit)
+        return ClientesListResponse(
+            items=clientes, total=total, skip=skip, limit=limit, resumo_origens=resumo
+        )
+    except HTTPException:
+        raise
     except Exception as exc:
         logger.exception("Erro ao listar clientes")
         raise HTTPException(
@@ -398,6 +437,22 @@ def update_cliente(
     )
 
     old_data = {field: getattr(cliente, field) for field in update_data.keys()}
+    if (
+        "origem_cliente" in update_data
+        and old_data["origem_cliente"] != update_data["origem_cliente"]
+    ):
+        log_action(
+            db,
+            current_user.id,
+            action="update_cliente_origem",
+            entity_type="cliente",
+            entity_id=cliente.id,
+            tenant_id=tenant_id,
+            commit=False,
+            old_value={"origem_cliente": old_data["origem_cliente"]},
+            new_value={"origem_cliente": update_data["origem_cliente"]},
+            details="Origem do cliente corrigida no cadastro",
+        )
     for field, value in update_data.items():
         setattr(cliente, field, value)
 
@@ -960,6 +1015,7 @@ def _desativar_comissoes_ativas(
 
 def _montar_resposta_update(cliente: Cliente) -> dict:
     return {
+        "origem_cliente": getattr(cliente, "origem_cliente", None),
         "id": cliente.id,
         "codigo": cliente.codigo,
         "nome": cliente.nome,
