@@ -120,8 +120,8 @@ cd app-mobile
 eas update --channel preview --platform all --environment preview --message "mensagem curta"
 ```
 
-Para build de loja/producao, somente quando a decisao acima comprovar mudanca
-nativa:
+Para atualizar por OTA um app de loja/producao com mudancas JavaScript/assets
+compativeis com o runtime instalado:
 
 ```bash
 cd app-mobile
@@ -219,11 +219,38 @@ credenciais APNs/Apple Push no fluxo de credenciais do EAS.
 
 ## Orientacao para teste no aparelho
 
-Depois de publicar OTA, pedir para o usuario:
+Publicar no EAS, baixar no aparelho e executar a nova versao sao tres estados
+diferentes. Nao declarar o problema resolvido no celular apenas porque o EAS
+publicou, o manifesto responde ou o Expo Go exibe a tela correta.
 
-1. fechar totalmente o app;
-2. abrir com internet e esperar alguns segundos;
-3. fechar totalmente de novo;
-4. abrir novamente.
+No CorePet, abrir **Perfil > Atualizacoes do app** e tocar em **Verificar agora**.
+Para os perfis de equipe, usar **Perfil** no cabecalho; para o cliente, usar a aba
+**Perfil**. A consulta e o download automaticos continuam ativos sem ocupar as
+telas de trabalho com um botao fixo.
+Quando aparecer **Atualizacao pronta para aplicar**, terminar/salvar o trabalho
+atual, tocar em **Aplicar atualizacao** e confirmar o reinicio. A opcao
+**Continuar trabalhando** preserva a sessao. A consulta tambem acontece ao voltar
+ao app, com intervalo minimo de 15 minutos entre consultas automaticas.
 
-O Expo pode baixar o update em uma abertura e aplicar na proxima.
+Depois de aplicar, comparar a identificacao em **Versao em uso** com o update ID
+da plataforma e runtime publicados no EAS. O numero 1.0.4 sozinho identifica o
+binario/runtime e nao comprova qual OTA esta executando. Registrar grupo EAS,
+update ID por plataforma/runtime, commit, aparelho e resultado do fluxo testado.
+Se nao houver aparelho disponivel, informar explicitamente que a verificacao
+fisica continua pendente, distinguindo-a da publicacao.
+
+Em Android conectado e autorizado pelo Lucas, o log de inicializacao
+`adb -s <SERIAL> logcat -d -s ReactNativeJS:I` contem `[CorePetUpdate]` com update ID,
+runtime, canal e indicadores de versao embutida/recuperacao. Filtrar esse marcador
+para nao coletar outros dados do app. Conferir tambem a tela funcional solicitada;
+registro de download concluido (`dev.expo.updates`) sozinho nao comprova execucao.
+
+Para versoes antigas, ainda sem a opcao de atualizacao: sair pelo botao Home ou reabrir pelo
+icone pode manter o mesmo processo. Primeiro terminar/salvar o trabalho; depois
+encerrar o CorePet nas configuracoes do Android e abrir com internet. Se a OTA
+ainda estiver baixando, aguardar o termino antes de encerrar e abrir novamente.
+Com ADB autorizado, o equivalente e `adb -s <SERIAL> shell am force-stop br.com.corepet.app`
+seguido de `adb -s <SERIAL> shell am start -n br.com.corepet.app/.MainActivity`.
+Nunca limpar dados, reinstalar nem alterar o runtime para resolver uma sessao antiga.
+
+Referencia: [API expo-updates](https://docs.expo.dev/versions/latest/sdk/updates/).

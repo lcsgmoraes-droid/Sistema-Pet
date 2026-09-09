@@ -6,6 +6,7 @@ import {
   ActivityIndicator,
   Alert,
   Image,
+  Keyboard,
   StyleSheet,
   Text,
   TextInput,
@@ -113,6 +114,7 @@ export default function FuncionarioBalancoScreen() {
   const saldoFinalNumero = useMemo(() => parseNumero(saldoFinal), [saldoFinal]);
 
   function selecionarProduto(item: FuncionarioProdutoEstoque) {
+    Keyboard.dismiss();
     setProduto(item);
     setSaldoFinal("");
     setSugestoes([]);
