@@ -4,6 +4,7 @@ import api from "../api";
 import CentralNFSaidaView from "./centralNFSaida/CentralNFSaidaView";
 import { montarDetalheFallback, soDigitos } from "./centralNFSaida/centralNFSaidaUtils";
 import { confirmarCorePet } from "../services/corepetDialog";
+import NFSaidaCompartilharModal from "./centralNFSaida/NFSaidaCompartilharModal";
 
 export default function CentralNFSaida() {
   const [notas, setNotas] = useState([]);
@@ -12,6 +13,18 @@ export default function CentralNFSaida() {
   const [dataInicial, setDataInicial] = useState("");
   const [dataFinal, setDataFinal] = useState("");
   const [busca, setBusca] = useState("");
+  const [buscaAplicada, setBuscaAplicada] = useState("");
+  const [filtroCanal, setFiltroCanal] = useState("");
+  const [canais, setCanais] = useState([]);
+  const [pagina, setPagina] = useState(1);
+  const [totalNotas, setTotalNotas] = useState(0);
+  const [versaoLista, setVersaoLista] = useState(0);
+  const [atualizandoNotas, setAtualizandoNotas] = useState(false);
+  const [avisoLista, setAvisoLista] = useState("");
+  const [documentoEmCurso, setDocumentoEmCurso] = useState("");
+  const [compartilharNota, setCompartilharNota] = useState(null);
+  const requisicaoListaRef = useRef(0);
+  const atualizacaoEmCursoRef = useRef(false);
   const [erro, setErro] = useState("");
   const [notaSelecionada, setNotaSelecionada] = useState(null);
   const [detalheNota, setDetalheNota] = useState(null);
@@ -49,7 +62,19 @@ export default function CentralNFSaida() {
 
   useEffect(() => {
     carregarNotas(false);
-  }, [filtroSituacao, dataInicial, dataFinal]);
+  }, [filtroSituacao, filtroCanal, buscaAplicada, pagina, dataInicial, dataFinal, versaoLista]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setBuscaAplicada(busca);
+      setPagina(1);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [busca]);
+
+  useEffect(() => {
+    atualizarLista(false);
+  }, []);
 
   useEffect(() => {
     if (painelSefazAberto && cfgLoading) {
@@ -63,54 +88,97 @@ export default function CentralNFSaida() {
   }, [consultasSessao.length]);
 
   async function carregarNotas(forceRefresh = false) {
+    if (forceRefresh) return atualizarLista(true);
+    const requisicao = ++requisicaoListaRef.current;
     try {
       setLoading(true);
       setErro("");
-      if (forceRefresh) {
-        detalhesNotasCacheRef.current.clear();
-      }
       const params = new URLSearchParams();
       if (filtroSituacao) params.append("situacao", filtroSituacao);
       if (dataInicial) params.append("data_inicial", dataInicial);
       if (dataFinal) params.append("data_final", dataFinal);
-      if (forceRefresh) params.append("force_refresh", "true");
-      const response = await api.get(`/nfe/?${params.toString()}`);
+      params.set("pagina", String(pagina));
+      params.set("por_pagina", "50");
+      if (filtroCanal) params.set("canal", filtroCanal);
+      if (buscaAplicada) params.set("busca", buscaAplicada);
+      const response = await api.get(`/nfe/lista?${params.toString()}`);
+      if (requisicao !== requisicaoListaRef.current) return;
       setNotas(response.data.notas || []);
+      setTotalNotas(response.data.total || 0);
+      setCanais(response.data.canais || []);
     } catch {
-      setErro("Erro ao carregar notas fiscais");
+      if (requisicao === requisicaoListaRef.current) setErro("Erro ao carregar notas fiscais");
     } finally {
-      setLoading(false);
+      if (requisicao === requisicaoListaRef.current) setLoading(false);
     }
   }
 
+  async function atualizarLista(forceRefresh) {
+    if (atualizacaoEmCursoRef.current) return;
+    atualizacaoEmCursoRef.current = true;
+    setAtualizandoNotas(true);
+    setAvisoLista("");
+    try {
+      const { data } = await api.post("/nfe/atualizar-lista", null, {
+        params: { force_refresh: forceRefresh },
+        timeout: 90000,
+      });
+      setAvisoLista(data.mensagem || "Notas atualizadas.");
+      detalhesNotasCacheRef.current.clear();
+      setVersaoLista((versao) => versao + 1);
+    } catch {
+      setAvisoLista("Não foi possível atualizar o Bling. Você pode usar as notas já disponíveis.");
+    } finally {
+      atualizacaoEmCursoRef.current = false;
+      setAtualizandoNotas(false);
+    }
+  }
+
+  function salvarArquivo(blob, nome) {
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = nome;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+
+  async function mensagemDocumento(error, padrao) {
+    let dados = error.response?.data;
+    if (dados instanceof Blob) {
+      try {
+        dados = JSON.parse(await dados.text());
+      } catch {
+        dados = null;
+      }
+    }
+    return typeof dados?.detail === "string" ? dados.detail : padrao;
+  }
+
   async function baixarDanfe(nfeId, numero) {
+    setDocumentoEmCurso(String(nfeId));
     try {
       const response = await api.get(`/nfe/${nfeId}/danfe`, { responseType: "blob" });
-      const url = URL.createObjectURL(new Blob([response.data]));
-      const link = document.createElement("a");
-      link.href = url;
-      link.setAttribute("download", `danfe_${numero}.pdf`);
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-    } catch {
-      alert("Erro ao baixar DANFE");
+      salvarArquivo(new Blob([response.data], { type: "application/pdf" }), `danfe_${numero}.pdf`);
+    } catch (error) {
+      alert(await mensagemDocumento(error, "Erro ao baixar DANFE"));
+    } finally {
+      setDocumentoEmCurso("");
     }
   }
 
   async function baixarXml(nfeId, numero) {
+    setDocumentoEmCurso(String(nfeId));
     try {
       const response = await api.get(`/nfe/${nfeId}/xml`);
       const blob = new Blob([response.data.xml], { type: "application/xml" });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.setAttribute("download", `nfe_${numero}.xml`);
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-    } catch {
-      alert("Erro ao baixar XML");
+      salvarArquivo(blob, `nfe_${numero}.xml`);
+    } catch (error) {
+      alert(await mensagemDocumento(error, "Erro ao baixar XML"));
+    } finally {
+      setDocumentoEmCurso("");
     }
   }
 
@@ -298,70 +366,88 @@ export default function CentralNFSaida() {
     }
   }
 
-  const notasFiltradas = notas.filter((nota) => {
-    if (!busca) return true;
-    const buscaNormalizada = busca.toLowerCase();
-    return (
-      nota.numero?.toLowerCase().includes(buscaNormalizada) ||
-      nota.serie?.toLowerCase().includes(buscaNormalizada) ||
-      nota.cliente?.nome?.toLowerCase().includes(buscaNormalizada) ||
-      nota.cliente?.cpf_cnpj?.toLowerCase().includes(buscaNormalizada) ||
-      nota.canal_label?.toLowerCase().includes(buscaNormalizada) ||
-      nota.loja?.nome?.toLowerCase().includes(buscaNormalizada) ||
-      nota.numero_pedido_loja?.toLowerCase().includes(buscaNormalizada)
-    );
-  });
-
   return (
-    <CentralNFSaidaView
-      painelSefazAberto={painelSefazAberto}
-      setPainelSefazAberto={setPainelSefazAberto}
-      consultarChave={consultarChave}
-      chave={chave}
-      setChave={setChave}
-      consultando={consultando}
-      erroConsulta={erroConsulta}
-      cfgLoading={cfgLoading}
-      cfg={cfg}
-      setCfg={setCfg}
-      msgRotina={msgRotina}
-      salvarRotina={salvarRotina}
-      salvandoRotina={salvandoRotina}
-      sincronizarAgora={sincronizarAgora}
-      sincronizando={sincronizando}
-      consultasSessao={consultasSessao}
-      listaConsultasRef={listaConsultasRef}
-      consultaExpandidaId={consultaExpandidaId}
-      setConsultaExpandidaId={setConsultaExpandidaId}
-      busca={busca}
-      setBusca={setBusca}
-      dataInicial={dataInicial}
-      setDataInicial={setDataInicial}
-      dataFinal={dataFinal}
-      setDataFinal={setDataFinal}
-      filtroSituacao={filtroSituacao}
-      setFiltroSituacao={setFiltroSituacao}
-      carregarNotas={carregarNotas}
-      loading={loading}
-      erro={erro}
-      notasFiltradas={notasFiltradas}
-      setModalCancelar={setModalCancelar}
-      excluirNota={excluirNota}
-      reconciliarFluxoNota={reconciliarFluxoNota}
-      reconciliandoNotaId={reconciliandoNotaId}
-      baixarDanfe={baixarDanfe}
-      baixarXml={baixarXml}
-      abrirDetalhes={abrirDetalhes}
-      notaSelecionada={notaSelecionada}
-      detalheNota={detalheNota}
-      carregandoDetalhe={carregandoDetalhe}
-      erroDetalhe={erroDetalhe}
-      fecharDetalhes={fecharDetalhes}
-      modalCancelar={modalCancelar}
-      justificativa={justificativa}
-      setJustificativa={setJustificativa}
-      cancelando={cancelando}
-      cancelarNota={cancelarNota}
-    />
+    <>
+      <CentralNFSaidaView
+        painelSefazAberto={painelSefazAberto}
+        setPainelSefazAberto={setPainelSefazAberto}
+        consultarChave={consultarChave}
+        chave={chave}
+        setChave={setChave}
+        consultando={consultando}
+        erroConsulta={erroConsulta}
+        cfgLoading={cfgLoading}
+        cfg={cfg}
+        setCfg={setCfg}
+        msgRotina={msgRotina}
+        salvarRotina={salvarRotina}
+        salvandoRotina={salvandoRotina}
+        sincronizarAgora={sincronizarAgora}
+        sincronizando={sincronizando}
+        consultasSessao={consultasSessao}
+        listaConsultasRef={listaConsultasRef}
+        consultaExpandidaId={consultaExpandidaId}
+        setConsultaExpandidaId={setConsultaExpandidaId}
+        busca={busca}
+        setBusca={setBusca}
+        dataInicial={dataInicial}
+        setDataInicial={(valor) => {
+          setDataInicial(valor);
+          setPagina(1);
+        }}
+        dataFinal={dataFinal}
+        setDataFinal={(valor) => {
+          setDataFinal(valor);
+          setPagina(1);
+        }}
+        filtroSituacao={filtroSituacao}
+        setFiltroSituacao={(valor) => {
+          setFiltroSituacao(valor);
+          setPagina(1);
+        }}
+        filtroCanal={filtroCanal}
+        setFiltroCanal={(valor) => {
+          setFiltroCanal(valor);
+          setPagina(1);
+        }}
+        canais={canais}
+        pagina={pagina}
+        setPagina={setPagina}
+        totalNotas={totalNotas}
+        atualizandoNotas={atualizandoNotas}
+        avisoLista={avisoLista}
+        compartilharNota={setCompartilharNota}
+        documentoEmCurso={documentoEmCurso}
+        carregarNotas={carregarNotas}
+        loading={loading}
+        erro={erro}
+        notasFiltradas={notas}
+        setModalCancelar={setModalCancelar}
+        excluirNota={excluirNota}
+        reconciliarFluxoNota={reconciliarFluxoNota}
+        reconciliandoNotaId={reconciliandoNotaId}
+        baixarDanfe={baixarDanfe}
+        baixarXml={baixarXml}
+        abrirDetalhes={abrirDetalhes}
+        notaSelecionada={notaSelecionada}
+        detalheNota={detalheNota}
+        carregandoDetalhe={carregandoDetalhe}
+        erroDetalhe={erroDetalhe}
+        fecharDetalhes={fecharDetalhes}
+        modalCancelar={modalCancelar}
+        justificativa={justificativa}
+        setJustificativa={setJustificativa}
+        cancelando={cancelando}
+        cancelarNota={cancelarNota}
+      />
+      {compartilharNota && (
+        <NFSaidaCompartilharModal
+          nota={compartilharNota}
+          fechar={() => setCompartilharNota(null)}
+          baixarDanfe={baixarDanfe}
+          documentoEmCurso={documentoEmCurso}
+        />
+      )}
+    </>
   );
 }

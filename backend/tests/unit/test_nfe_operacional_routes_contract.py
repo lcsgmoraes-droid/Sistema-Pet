@@ -1,6 +1,7 @@
 from app import nfe_routes
 from app.nfe import listagem
 from app.nfe import operacional_routes
+from fastapi import FastAPI
 
 
 EXPECTED_SUBROUTES = {
@@ -23,10 +24,12 @@ EXPECTED_PUBLIC_ROUTES = {
 
 
 def _route_signatures(router):
+    app = FastAPI()
+    app.include_router(router)
     return {
-        (route.path, ",".join(sorted(route.methods)))
-        for route in router.routes
-        if hasattr(route, "methods")
+        (path, method.upper())
+        for path, methods in app.openapi()["paths"].items()
+        for method in methods
     }
 
 

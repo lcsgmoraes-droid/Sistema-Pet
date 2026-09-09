@@ -9,6 +9,12 @@ from app.auth.dependencies import get_current_user_and_tenant
 from app.bling_integration import BlingAPI
 from app.db import get_session
 from app.nfe_cache_models import BlingNotaFiscalCache
+from app.nfe.documentos import (
+    obter_nota_documento,
+    obter_pdf_documento,
+    obter_xml_documento,
+    validar_link_documento,
+)
 from app.produtos_models import EstoqueMovimentacao, Produto
 from app.services.bling_sync_service import BlingSyncService
 from app.services.bling_tenant_guard import (
@@ -135,7 +141,7 @@ async def consultar_nfe(
 
 
 @router.get("/{nfe_id}/xml")
-async def baixar_xml(
+def baixar_xml(
     nfe_id: int,
     db: Session = Depends(get_session),
     user_and_tenant=Depends(get_current_user_and_tenant),
@@ -144,11 +150,17 @@ async def baixar_xml(
     _, tenant_id = user_and_tenant
     _exigir_bling_configurado_para_tenant(tenant_id)
     try:
-        bling = BlingAPI()
-        xml = bling.baixar_xml(nfe_id)
-        return {"xml": xml}
+        detalhe, modelo, _ = obter_nota_documento(db, tenant_id, nfe_id)
+        return {"xml": obter_xml_documento(detalhe, modelo).decode("utf-8-sig")}
+    except HTTPException:
+        raise
+    except ValueError as e:
+        raise HTTPException(status_code=502, detail=str(e))
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Erro ao baixar XML: {str(e)}")
+        raise HTTPException(
+            status_code=502,
+            detail="Não foi possível baixar o XML no Bling. Tente novamente.",
+        ) from e
 
 
 @router.post("/{nfe_id}/cancelar")
@@ -573,7 +585,7 @@ async def sincronizar_todos_status(
 
 
 @router.get("/{nfe_id}/danfe")
-async def baixar_danfe(
+def baixar_danfe(
     nfe_id: int,
     db: Session = Depends(get_session),
     user_and_tenant=Depends(get_current_user_and_tenant),
@@ -582,16 +594,63 @@ async def baixar_danfe(
     _, tenant_id = user_and_tenant
     _exigir_bling_configurado_para_tenant(tenant_id)
     try:
-        bling = BlingAPI()
-        pdf_content = bling.baixar_danfe(nfe_id)
+        detalhe, modelo, _ = obter_nota_documento(db, tenant_id, nfe_id)
+        pdf_content = obter_pdf_documento(detalhe, modelo)
 
         return Response(
             content=pdf_content,
             media_type="application/pdf",
             headers={"Content-Disposition": f"attachment; filename=danfe_{nfe_id}.pdf"},
         )
+    except HTTPException:
+        raise
+    except ValueError as e:
+        raise HTTPException(status_code=502, detail=str(e))
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Erro ao baixar DANFE: {str(e)}")
+        raise HTTPException(
+            status_code=502,
+            detail="Não foi possível baixar o PDF no Bling. Tente novamente.",
+        ) from e
+
+
+@router.get("/{nfe_id}/compartilhar")
+def preparar_compartilhamento(
+    nfe_id: int,
+    db: Session = Depends(get_session),
+    user_and_tenant=Depends(get_current_user_and_tenant),
+):
+    _, tenant_id = user_and_tenant
+    _exigir_bling_configurado_para_tenant(tenant_id)
+    try:
+        detalhe, modelo, venda = obter_nota_documento(db, tenant_id, nfe_id)
+        if detalhe.get("situacao") != 5:
+            raise HTTPException(409, "Compartilhe a nota após a autorização.")
+        link = validar_link_documento(
+            detalhe.get("linkDanfe") or detalhe.get("linkPDF")
+        )
+        cliente = venda.cliente if venda else None
+        contato = detalhe.get("contato") or {}
+        telefone = (
+            getattr(cliente, "celular", None)
+            or getattr(cliente, "telefone", None)
+            or contato.get("telefone")
+            or ""
+        )
+        return {
+            "link": link,
+            "telefone": telefone,
+            "cliente": contato.get("nome") or "",
+            "numero": detalhe.get("numero"),
+            "modelo": modelo,
+        }
+    except HTTPException:
+        raise
+    except ValueError as e:
+        raise HTTPException(502, str(e))
+    except Exception as e:
+        raise HTTPException(
+            502, "Não foi possível preparar o compartilhamento. Tente novamente."
+        ) from e
 
 
 @router.get("/config/testar-conexao")

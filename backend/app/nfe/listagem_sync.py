@@ -371,6 +371,7 @@ def _sincronizar_cache_nfes_com_bling(
     data_inicial: str | None = None,
     data_final: str | None = None,
     situacao: str | None = None,
+    enriquecer_detalhes: bool = True,
 ) -> tuple[bool, list[dict]]:
     if not tenant_pode_usar_bling_global(tenant_id):
         logger.warning(
@@ -415,13 +416,14 @@ def _sincronizar_cache_nfes_com_bling(
 
     _enriquecer_notas_com_vendas(db, tenant_id, notas_sincronizadas)
     _enriquecer_notas_com_pedidos_integrados(db, tenant_id, notas_sincronizadas)
-    _enriquecer_notas_com_detalhes_bling(
-        bling,
-        db,
-        tenant_id,
-        notas_sincronizadas[:20],
-        limite_consultas=8,
-    )
+    if enriquecer_detalhes:
+        _enriquecer_notas_com_detalhes_bling(
+            bling,
+            db,
+            tenant_id,
+            notas_sincronizadas[:20],
+            limite_consultas=8,
+        )
     for nota in notas_sincronizadas:
         upsert_nota_cache(
             db,

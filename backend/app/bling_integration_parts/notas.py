@@ -396,9 +396,9 @@ class BlingNotasMixin:
         """Lista NF-es (modelo 55) com filtros"""
         params = {}
         if data_inicial:
-            params["dataInicial"] = data_inicial
+            params["dataEmissaoInicial"] = f"{data_inicial[:10]} 00:00:00"
         if data_final:
-            params["dataFinal"] = data_final
+            params["dataEmissaoFinal"] = f"{data_final[:10]} 23:59:59"
         if situacao:
             params["situacao"] = situacao
 
@@ -410,9 +410,9 @@ class BlingNotasMixin:
         """Lista NFC-es (modelo 65) com filtros"""
         params = {}
         if data_inicial:
-            params["dataInicial"] = data_inicial
+            params["dataEmissaoInicial"] = f"{data_inicial[:10]} 00:00:00"
         if data_final:
-            params["dataFinal"] = data_final
+            params["dataEmissaoFinal"] = f"{data_final[:10]} 23:59:59"
         if situacao:
             params["situacao"] = situacao
 

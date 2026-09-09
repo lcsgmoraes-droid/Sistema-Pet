@@ -1,4 +1,14 @@
-import { AlertCircle, Download, Eye, FileText, Printer, Trash2, XCircle, Zap } from "lucide-react";
+import {
+  AlertCircle,
+  Download,
+  Eye,
+  FileText,
+  Printer,
+  Trash2,
+  XCircle,
+  Zap,
+  Share2,
+} from "lucide-react";
 
 import CustomerIdentity from "../../components/ui/CustomerIdentity";
 import { formatMoneyBRL } from "../../utils/formatters";
@@ -19,6 +29,12 @@ export default function NFSaidaList({
   baixarDanfe,
   baixarXml,
   abrirDetalhes,
+  filtroCanal,
+  pagina,
+  setPagina,
+  totalNotas,
+  compartilharNota,
+  documentoEmCurso,
 }) {
   return (
     <>
@@ -39,13 +55,13 @@ export default function NFSaidaList({
           <FileText className="w-16 h-16 text-gray-400 mx-auto mb-4" />
           <h3 className="text-xl font-semibold text-gray-800 mb-2">Nenhuma nota encontrada</h3>
           <p className="text-gray-600">
-            {busca || filtroSituacao || dataInicial || dataFinal
+            {busca || filtroSituacao || filtroCanal || dataInicial || dataFinal
               ? "Tente ajustar os filtros"
               : "Emita sua primeira nota fiscal em uma venda"}
           </p>
         </div>
       ) : (
-        <div className="bg-white rounded-lg shadow-sm overflow-hidden">
+        <div className="bg-white rounded-lg shadow-sm overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
@@ -74,7 +90,7 @@ export default function NFSaidaList({
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
               {notasFiltradas.map((nota) => (
-                <tr key={nota.id} className="hover:bg-gray-50">
+                <tr key={`${nota.id}:${nota.modelo}`} className="hover:bg-gray-50">
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="text-sm font-medium text-gray-900">{nota.numero}</div>
                     <div className="text-sm text-gray-500">Série {nota.serie}</div>
@@ -159,6 +175,7 @@ export default function NFSaidaList({
                       </button>
                       <button
                         onClick={() => baixarDanfe(nota.id, nota.numero)}
+                        disabled={documentoEmCurso === String(nota.id)}
                         className="text-blue-600 hover:text-blue-900 p-1 hover:bg-blue-50 rounded"
                         title="Baixar DANFE"
                       >
@@ -166,11 +183,21 @@ export default function NFSaidaList({
                       </button>
                       <button
                         onClick={() => baixarXml(nota.id, nota.numero)}
+                        disabled={documentoEmCurso === String(nota.id)}
                         className="text-green-600 hover:text-green-900 p-1 hover:bg-green-50 rounded"
                         title="Baixar XML"
                       >
                         <Download className="w-5 h-5" />
                       </button>
+                      {nota.status?.toLowerCase() === "autorizada" && (
+                        <button
+                          onClick={() => compartilharNota(nota)}
+                          title="Compartilhar nota"
+                          className="text-green-700 hover:bg-green-50 p-1 rounded"
+                        >
+                          <Share2 className="w-5 h-5" />
+                        </button>
+                      )}
                       <button
                         onClick={() => abrirDetalhes(nota)}
                         className="text-gray-600 hover:text-gray-900 p-1 hover:bg-gray-50 rounded"
@@ -187,10 +214,28 @@ export default function NFSaidaList({
         </div>
       )}
 
-      {!loading && notasFiltradas.length > 0 && (
-        <div className="mt-4 text-sm text-gray-600 text-center">
-          {notasFiltradas.length}{" "}
-          {notasFiltradas.length === 1 ? "nota encontrada" : "notas encontradas"}
+      {!loading && totalNotas > 0 && (
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-sm text-gray-600">
+          <span>
+            {totalNotas} notas encontradas · Página {pagina} de{" "}
+            {Math.max(1, Math.ceil(totalNotas / 50))}
+          </span>
+          <div className="flex gap-2">
+            <button
+              disabled={pagina <= 1}
+              onClick={() => setPagina(pagina - 1)}
+              className="border rounded px-3 py-2 disabled:opacity-40"
+            >
+              Anterior
+            </button>
+            <button
+              disabled={pagina * 50 >= totalNotas}
+              onClick={() => setPagina(pagina + 1)}
+              className="border rounded px-3 py-2 disabled:opacity-40"
+            >
+              Próxima
+            </button>
+          </div>
         </div>
       )}
     </>

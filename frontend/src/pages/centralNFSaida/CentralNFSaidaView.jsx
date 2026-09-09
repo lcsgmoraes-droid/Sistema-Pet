@@ -35,6 +35,16 @@ export default function CentralNFSaidaView({
   filtroSituacao,
   setFiltroSituacao,
   carregarNotas,
+  filtroCanal,
+  setFiltroCanal,
+  canais,
+  pagina,
+  setPagina,
+  totalNotas,
+  atualizandoNotas,
+  avisoLista,
+  compartilharNota,
+  documentoEmCurso,
   loading,
   erro,
   notasFiltradas,
@@ -86,6 +96,11 @@ export default function CentralNFSaidaView({
       />
 
       <NFSaidaFilters
+        filtroCanal={filtroCanal}
+        setFiltroCanal={setFiltroCanal}
+        canais={canais}
+        atualizandoNotas={atualizandoNotas}
+        avisoLista={avisoLista}
         busca={busca}
         setBusca={setBusca}
         dataInicial={dataInicial}
@@ -99,6 +114,12 @@ export default function CentralNFSaidaView({
       />
 
       <NFSaidaList
+        filtroCanal={filtroCanal}
+        pagina={pagina}
+        setPagina={setPagina}
+        totalNotas={totalNotas}
+        compartilharNota={compartilharNota}
+        documentoEmCurso={documentoEmCurso}
         erro={erro}
         loading={loading}
         notasFiltradas={notasFiltradas}
