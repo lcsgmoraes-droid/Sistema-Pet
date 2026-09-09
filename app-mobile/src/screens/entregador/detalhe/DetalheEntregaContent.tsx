@@ -248,7 +248,8 @@ export function DetalheEntregaContent({
         <DraggableFlatList
           {...listaProps}
           containerStyle={styles.container}
-          activationDistance={4}
+          // O arrasto precisa esperar a rolagem nativa reconhecer um deslize comum.
+          activationDistance={24}
           autoscrollThreshold={60}
           autoscrollSpeed={80}
           dragItemOverflow={false}
