@@ -1,0 +1,60 @@
+{
+  "serie": "PREENCHER_SERIE_COMBINADA",
+  "ambienteCodigo": 2,
+  "naturezaOperacao": "Venda de mercadoria",
+  "emitente": {
+    "cnpj": "PREENCHER_CNPJ_EMITENTE",
+    "razaoSocial": "PREENCHER_RAZAO_SOCIAL",
+    "nomeFantasia": "PREENCHER_NOME_FANTASIA",
+    "inscricaoEstadual": "PREENCHER_IE",
+    "crt": "PREENCHER_CRT",
+    "endereco": {
+      "logradouro": "PREENCHER_LOGRADOURO",
+      "numero": "PREENCHER_NUMERO",
+      "bairro": "PREENCHER_BAIRRO",
+      "municipio": "PREENCHER_MUNICIPIO",
+      "codigoMunicipio": "PREENCHER_IBGE_7_DIGITOS",
+      "uf": "PREENCHER_UF",
+      "cep": "PREENCHER_CEP_8_DIGITOS"
+    }
+  },
+  "destinatario": {
+    "razaoSocial": "PREENCHER_NOME_DESTINATARIO_TESTE",
+    "indicadorIe": "PREENCHER_INDICADOR_IE",
+    "cpf": "PREENCHER_CPF_OU_TROCAR_CAMPO_PARA_CNPJ",
+    "endereco": {
+      "logradouro": "PREENCHER_LOGRADOURO",
+      "numero": "PREENCHER_NUMERO",
+      "bairro": "PREENCHER_BAIRRO",
+      "municipio": "PREENCHER_MUNICIPIO",
+      "codigoMunicipio": "PREENCHER_IBGE_7_DIGITOS",
+      "uf": "PREENCHER_UF",
+      "cep": "PREENCHER_CEP_8_DIGITOS"
+    }
+  },
+  "produtos": [
+    {
+      "codigoProduto": "TESTE-COREPET-001",
+      "descricao": "PREENCHER_DESCRICAO_PRODUTO_TESTE",
+      "ncm": "PREENCHER_NCM_8_DIGITOS",
+      "cfop": "PREENCHER_CFOP_4_DIGITOS",
+      "unidade": "UN",
+      "quantidade": 1,
+      "valorUnitario": 1.00,
+      "valorTotal": 1.00,
+      "impostos": {
+        "icms": {
+          "cst": "PREENCHER_CST_OU_CSOSN",
+          "origem": "PREENCHER_ORIGEM"
+        },
+        "pis": { "cst": "PREENCHER_CST_PIS" },
+        "cofins": { "cst": "PREENCHER_CST_COFINS" }
+      }
+    }
+  ],
+  "pagamentos": [ { "formaPagamento": "01", "valor": 1.00 } ],
+  "informacoesAdicionais": "Teste preliminar CorePet / IntNFe em homologacao, sem valor fiscal.",
+  "indicadorPresenca": "9",
+  "frete": { "modalidade": "9" },
+  "documentosReferenciados": []
+}
