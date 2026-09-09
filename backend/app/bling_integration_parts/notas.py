@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from decimal import Decimal, ROUND_HALF_UP
 from typing import Dict, Optional
 
 import requests
@@ -194,24 +195,40 @@ class BlingNotasMixin:
 
         # Itens
         itens = []
+        centavo = Decimal("0.01")
+        valor_produtos = Decimal("0")
+        desconto_itens = Decimal("0")
         for idx, item_venda in enumerate(venda.itens, start=1):
             produto = item_venda.produto
             fiscal_item = _resolver_fiscal_item_nfe(db, venda, item_venda)
 
-            valor_unitario = float(item_venda.preco_unitario or 0)
-            desconto = float(item_venda.desconto_item or 0)
-            quantidade = float(item_venda.quantidade or 1)
-            valor_total = (valor_unitario - desconto) * quantidade
+            valor_unitario = Decimal(str(item_venda.preco_unitario or 0))
+            quantidade = Decimal(str(item_venda.quantidade or 0))
+            # desconto_item e o desconto da linha inteira, ja rateado pelo PDV.
+            desconto = Decimal(str(item_venda.desconto_item or 0)).quantize(
+                centavo, rounding=ROUND_HALF_UP
+            )
+            valor_bruto = (valor_unitario * quantidade).quantize(
+                centavo, rounding=ROUND_HALF_UP
+            )
+            if (
+                quantidade <= 0
+                or valor_unitario < 0
+                or not 0 <= desconto <= valor_bruto
+            ):
+                raise ValueError(
+                    "Item da venda possui quantidade, valor ou desconto invalido."
+                )
+            valor_produtos += valor_bruto
+            desconto_itens += desconto
 
             item = {
                 "numero": idx,
                 "codigo": produto.codigo,
                 "descricao": produto.nome,
-                "quantidade": quantidade,
+                "quantidade": float(quantidade),
                 "unidade": produto.unidade or "UN",
-                "valor": valor_unitario,
-                "desconto": desconto * quantidade,
-                "total": valor_total,
+                "valor": float(valor_unitario),
                 "ncm": _ncm_normalizado(fiscal_item.get("ncm")) or "",
                 "cfop": fiscal_item.get("cfop") or "5102",
                 "icms": {
@@ -222,17 +239,28 @@ class BlingNotasMixin:
             itens.append(item)
 
         # Totais
-        valor_produtos = sum(
-            (float(i.preco_unitario or 0) - float(i.desconto_item or 0))
-            * float(i.quantidade or 1)
-            for i in venda.itens
-        )
-        desconto_total = float(venda.desconto_valor or 0)
+        # O desconto geral repete o rateio dos itens nas vendas atuais.
+        # Na API Bling o desconto monetario e enviado na raiz da nota.
+        desconto_total = (
+            desconto_itens
+            if desconto_itens > 0
+            else Decimal(str(venda.desconto_valor or 0))
+        ).quantize(centavo, rounding=ROUND_HALF_UP)
         taxa_entrega = getattr(venda, "taxa_entrega_total", None)
         if taxa_entrega is None:
             taxa_entrega = getattr(venda, "taxa_entrega", 0)
-        valor_frete = float(taxa_entrega or 0) if venda.tem_entrega else 0
+        valor_frete = (
+            Decimal(str(taxa_entrega or 0)) if venda.tem_entrega else Decimal("0")
+        ).quantize(centavo, rounding=ROUND_HALF_UP)
         valor_total = valor_produtos - desconto_total + valor_frete
+        total_venda = getattr(venda, "total", None)
+        if total_venda is not None and valor_total != Decimal(
+            str(total_venda)
+        ).quantize(centavo, rounding=ROUND_HALF_UP):
+            raise ValueError(
+                "O total fiscal calculado difere do total da venda. "
+                "Confira os valores e descontos antes de emitir a nota."
+            )
 
         # Definir situação e finalidade conforme ambiente configurado
         situacao = 0  # 0 = Rascunho (pendente)
@@ -263,20 +291,24 @@ class BlingNotasMixin:
             # Numero em branco deixa o Bling aplicar a proxima sequencia configurada.
             "numero": None,
             "dataEmissao": datetime.now().strftime("%Y-%m-%d"),
-            "dataOperacao": venda.data_venda.strftime("%Y-%m-%d")
-            if venda.data_venda
-            else datetime.now().strftime("%Y-%m-%d"),
+            "dataOperacao": (
+                venda.data_venda.strftime("%Y-%m-%d")
+                if venda.data_venda
+                else datetime.now().strftime("%Y-%m-%d")
+            ),
             # ✅ RASTREAMENTO: Vincula venda do nosso sistema com nota no Bling
             "numeroPedidoLoja": f"VENDA-{venda.id}",
             # ✅ NATUREZA DE OPERAÇÃO: ID da natureza cadastrada no Bling
             # ID 15103736273 = "Venda de mercadoria - NFC-e" (descoberto automaticamente)
             "naturezaOperacao": {"id": 15103736273},
             "itens": itens,
+            "desconto": float(desconto_total),
+            "transporte": {"frete": float(valor_frete)},
             "totais": {
-                "valorProdutos": valor_produtos,
-                "valorFrete": valor_frete,
-                "valorDesconto": desconto_total,
-                "valorTotal": valor_total,
+                "valorProdutos": float(valor_produtos),
+                "valorFrete": float(valor_frete),
+                "valorDesconto": float(desconto_total),
+                "valorTotal": float(valor_total),
             },
             "informacoesAdicionais": {
                 "informacoesComplementares": f"Venda #{venda.id} - CorePet - Emitida em {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}"

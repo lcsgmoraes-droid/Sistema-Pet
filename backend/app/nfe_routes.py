@@ -282,9 +282,9 @@ async def emitir_nfe(
             "serie": dados_nota.get("serie"),
             "chave_acesso": dados_nota.get("chaveAcesso"),
             "situacao": dados_nota.get("situacao", "Pendente"),
-            "transmissao": resultado.get("transmissao")
-            if isinstance(resultado, dict)
-            else None,
+            "transmissao": (
+                resultado.get("transmissao") if isinstance(resultado, dict) else None
+            ),
         }
 
     except HTTPException:
@@ -295,6 +295,22 @@ async def emitir_nfe(
     except Exception as e:
         erro_msg = str(e)
         erro_upper = erro_msg.upper()
+        if "INVALID_TOKEN" in erro_upper or "INVALID_GRANT" in erro_upper:
+            logger.warning(
+                "emitir_nfe_bling_desconectado",
+                "Conexao Bling invalida; e necessario reconectar antes de emitir.",
+            )
+            raise HTTPException(
+                status_code=503,
+                detail={
+                    "erro": "bling_reconexao_necessaria",
+                    "mensagem": (
+                        "A conexao com o Bling expirou ou foi invalidada. "
+                        "Acesse Configuracoes > Integracoes > Bling e clique em "
+                        "Reconectar Bling antes de tentar emitir novamente."
+                    ),
+                },
+            ) from e
         if (
             "TOO_MANY_REQUESTS" in erro_upper
             or "HTTP 429" in erro_upper
