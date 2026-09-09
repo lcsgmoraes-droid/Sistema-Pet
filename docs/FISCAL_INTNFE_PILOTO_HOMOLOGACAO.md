@@ -1,6 +1,6 @@
 # IntNFe — primeiro teste de NF-e de produto
 
-Registro: 09/09/2026. Situação: acesso ao portal confirmado; cadastro pela API e envio ainda não realizados.
+Registro: 09/09/2026. Situação: autenticação na API confirmada; cadastro recusado porque o CNPJ já existe e não aparece entre os emitentes da PetSys. Nenhuma nota enviada.
 
 ## Decisão registrada
 
@@ -12,10 +12,11 @@ O [estudo do Bling e da estrutura fiscal do CorePet](ESTUDO_BLING_E_ESTRUTURA_FI
 
 - [Documentação oficial](https://intnfe.com.br/api/doc): NF-e modelo 55, emissão assíncrona, consulta, XML autorizado e DANFE em HTML.
 - [Portal do cliente](https://app.intnfe.com.br/login): página acessível. Pede usuário e senha fornecidos pela equipe; a tela examinada não oferece cadastro público e se identifica como ambiente de homologação.
-- Lucas entrou no portal. A sessão autenticada identifica a conta **PetSys (smoke test)** e mostra apenas o emitente de exemplo **Ze Pet**. O menu do integrador exibe acompanhamento de clientes e sala de situação; não apresenta cadastro de emitentes nem credenciais de API.
+- Lucas entrou no portal. A sessão autenticada identifica a conta **PetSys (smoke test)**. Inicialmente o menu oferecia apenas acompanhamento; depois o portal passou a exibir o ID do integrador e a geração de segredo. Lucas disponibilizou as credenciais para execução do teste.
 - Na sessão do Bling já aberta pelo Lucas, foram conferidos os dados da **LJ Comercio de Rações e Pet Shop LTDA**, empresa indicada para o teste. O corpo mínimo de cadastro foi preparado localmente em `runtime/analises/fiscal/2026-09-09/cadastro_emitente_pet.json`, fora do Git.
-- O código público do portal consultado usa `/portal/auth/login`. A documentação da integração usa `/integrador/auth/token` com `integradorId` e `integradorSecret`. Não foi comprovada intercambialidade entre esses acessos; não houve tentativa de extrair ou reaproveitar o token interno da sessão. As credenciais próprias do integrador continuam pendentes.
-- Os arquivos de ambiente conhecidos do projeto e as variáveis da sessão não indicaram credenciais `INTNFE_*`. Nenhum segredo foi copiado para esta documentação.
+- A autenticação própria da API em `POST /integrador/auth/token` retornou HTTP 200 e validade de 43.200 segundos. Não foi necessário extrair o token do navegador.
+- Credenciais e token foram guardados localmente com proteção DPAPI do Windows, em arquivos ignorados pelo Git. Nenhum segredo foi copiado para esta documentação.
+- `GET /integrador/emitentes` retornou HTTP 200 e apenas **Ze Pet**. O cadastro da LJ retornou HTTP 409 `EmitenteDuplicado`; a consulta posterior continuou sem a LJ. A API confirma a existência do CNPJ, mas não informa aqui a conta à qual ele pertence.
 - Nenhuma empresa/destinatário foi cadastrado e nenhuma NF-e foi transmitida nesta preparação.
 
 ## Acesso, empresa e cliente são coisas diferentes
@@ -35,8 +36,9 @@ Se já houver empresa cadastrada, consultar e reutilizar seu cadastro. Não rota
 
 | Pendência | Informação/ação necessária | Responsável sugerido |
 |---|---|---|
-| Acesso à API IntNFe | Portal já acessível; faltam `integradorId` e `integradorSecret` da PetSys ou um fluxo de cadastro que a equipe libere no portal | Irmão/IntNFe e Lucas |
-| Cadastro da empresa piloto | LJ identificada; CNPJ e nomes necessários à criação já preenchidos no arquivo local. Antes da nota, conferir endereço/IBGE: o bairro no Bling aparece como `SP` e precisa ser esclarecido | Lucas/empresa piloto |
+| Acesso à API IntNFe | Concluído: autenticação e consulta de emitentes funcionando | Lucas/IntNFe |
+| Acesso ao emitente LJ | CNPJ já existe, mas não está na lista visível da PetSys. Vincular o cadastro existente à conta correta ou disponibilizar as credenciais próprias desse emitente | Irmão/IntNFe |
+| Dados da empresa piloto | CNPJ e nomes conferidos. Antes da nota, conferir endereço/IBGE: o bairro no Bling aparece como `SP` e precisa ser esclarecido | Lucas/empresa piloto |
 | Certificado | A1 válido do mesmo CNPJ, já instalado na IntNFe ou arquivo `.pfx`/`.p12` e senha para cadastro protegido | Lucas/empresa piloto |
 | Habilitação e série | Confirmar que o emitente pode emitir em homologação na sua UF e qual série de teste utilizar | Irmão/empresa piloto |
 | Destinatário | Dados aprovados para o teste: CPF/CNPJ, endereço, indicador de IE e IE quando aplicável | Lucas/irmão |
@@ -100,11 +102,24 @@ Nenhum dos assuntos futuros será usado para exigir a integração completa ante
 | Documentação pública e portal | Consultados |
 | Corpo mínimo | Modelo com marcadores preparado e JSON validado localmente |
 | Acesso ao portal | Confirmado, conta PetSys (smoke test) |
-| Acesso à API do integrador | Credenciais ainda não disponibilizadas |
-| Empresa | LJ identificada no Bling e corpo mínimo de cadastro preparado; ainda não criada na IntNFe |
+| Acesso à API do integrador | Autenticação HTTP 200 e consulta HTTP 200 confirmadas |
+| Empresa | Cadastro retornou HTTP 409 `EmitenteDuplicado`; CNPJ existe, mas a LJ não aparece na conta PetSys |
 | Certificado | Ainda não disponibilizado/consultado para a LJ na IntNFe |
 | Destinatário | Não cadastrado nem transmitido |
 | Nota enviada/autorizada | Não executado |
 | Chave/XML/DANFE de teste | Ainda não obtidos |
 
-O próximo passo operacional é receber as credenciais de API da PetSys ou a liberação do cadastro no portal. Com acesso, consultar os emitentes atuais novamente e criar a LJ se ela ainda não existir, guardando com segurança as credenciais retornadas. Não houve alteração de aplicação, banco, estoque, caixa ou implantação em produção.
+### Evidência do impedimento no cadastro
+
+- Rota: `POST /integrador/emitentes`.
+- CNPJ preparado para o teste: `33590794000140`.
+- Resultado: HTTP 409, código `EmitenteDuplicado`.
+- Mensagem retornada: “Já existe um emitente com o CNPJ 33590794000140.”
+- Identificador de diagnóstico `X-Correlation-Id`: `e88892115c064c68b697401fe1e7b79d`.
+- Horário do retorno registrado: 09/09/2026 às 22:48:47 UTC (19:48:47 em Brasília).
+- Duas solicitações de cadastro receberam 409; a segunda capturou a mensagem e o identificador para diagnóstico. Não houve resposta de criação nem credenciais de emitente retornadas.
+- Arquivos locais de evidência: `runtime/analises/fiscal/2026-09-09/cadastro_emitente_resultado.json` e `cadastro_emitente_erro.json`. Não contêm o segredo de acesso.
+
+O próximo passo é a equipe da IntNFe localizar esse cadastro e disponibilizá-lo à PetSys, ou fornecer as credenciais próprias da LJ. A hipótese de vínculo com outro integrador precisa ser confirmada pela equipe; o teste não comprova em qual conta o CNPJ está. Não trocar o CNPJ por um fictício nem alterar o emitente Ze Pet para contornar o conflito.
+
+Depois de resolver o acesso, conferir certificado, dados fiscais e série de homologação antes de preparar a emissão. Não houve alteração de aplicação, banco, estoque, caixa ou implantação em produção.
