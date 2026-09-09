@@ -223,7 +223,10 @@ Publicar no EAS, baixar no aparelho e executar a nova versao sao tres estados
 diferentes. Nao declarar o problema resolvido no celular apenas porque o EAS
 publicou, o manifesto responde ou o Expo Go exibe a tela correta.
 
-No CorePet, abrir **Atualizacoes do app**, no rodape, e tocar em **Verificar agora**.
+No CorePet, abrir **Perfil > Atualizacoes do app** e tocar em **Verificar agora**.
+Para os perfis de equipe, usar **Perfil** no cabecalho; para o cliente, usar a aba
+**Perfil**. A consulta e o download automaticos continuam ativos sem ocupar as
+telas de trabalho com um botao fixo.
 Quando aparecer **Atualizacao pronta para aplicar**, terminar/salvar o trabalho
 atual, tocar em **Aplicar atualizacao** e confirmar o reinicio. A opcao
 **Continuar trabalhando** preserva a sessao. A consulta tambem acontece ao voltar
@@ -242,7 +245,7 @@ runtime, canal e indicadores de versao embutida/recuperacao. Filtrar esse marcad
 para nao coletar outros dados do app. Conferir tambem a tela funcional solicitada;
 registro de download concluido (`dev.expo.updates`) sozinho nao comprova execucao.
 
-Para versoes antigas, ainda sem o rodape: sair pelo botao Home ou reabrir pelo
+Para versoes antigas, ainda sem a opcao de atualizacao: sair pelo botao Home ou reabrir pelo
 icone pode manter o mesmo processo. Primeiro terminar/salvar o trabalho; depois
 encerrar o CorePet nas configuracoes do Android e abrir com internet. Se a OTA
 ainda estiver baixando, aguardar o termino antes de encerrar e abrir novamente.

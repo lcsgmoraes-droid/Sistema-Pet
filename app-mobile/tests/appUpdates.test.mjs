@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import ts from "typescript";
 
-function executar(arquivo, deps, dev = false) {
+function executar(arquivo, deps, dev = false, props = {}) {
   const slots = [];
   let cursor = 0;
   let efeitos = [];
@@ -39,7 +39,7 @@ function executar(arquivo, deps, dev = false) {
   return {
     render() {
       cursor = 0; efeitos = [];
-      const resultado = (modulo.exports.default ?? modulo.exports.useAppUpdates)();
+      const resultado = (modulo.exports.default ?? modulo.exports.useAppUpdates)(props);
       efeitos.forEach((fn) => fn());
       return resultado;
     },
@@ -168,13 +168,13 @@ test("aplicar na interface exige confirmação e continuar trabalhando não rein
   let confirmacao;
   const update = { enabled: true, pronto: true, versao: {}, verificar() {}, aplicar() { applied++; } };
   const componentes = Object.fromEntries(["ActivityIndicator", "Modal", "ScrollView", "Text", "TouchableOpacity", "View"].map((k) => [k, k]));
-  const e = executar("components/AppUpdateBar.tsx", {
-    "../hooks/useAppUpdates": { useAppUpdates: () => update },
+  const e = executar("components/AppUpdatesScreen.tsx", {
+    "./AppUpdatesProvider": { useAppUpdatesContext: () => update },
     "@expo/vector-icons": { Ionicons: "Icon" },
     "react-native-safe-area-context": { SafeAreaView: "SafeAreaView" },
     "react-native": { ...componentes, StyleSheet: { create: (v) => v },
       Keyboard: { addListener: () => ({ remove() {} }) }, Alert: { alert: (...args) => { confirmacao = args; } } },
-  });
+  }, false, { onClose() {} });
   const nos = (n) => !n || typeof n !== "object" ? [] : [n, ...(n.props?.children ?? []).flat(Infinity).flatMap(nos)];
   const botao = (texto) => nos(e.render()).find((n) => n.type === "TouchableOpacity" && JSON.stringify(n.props.children).includes(texto)).props;
   botao("Continuar trabalhando").onPress(); assert.equal(applied, 0);
@@ -182,4 +182,49 @@ test("aplicar na interface exige confirmação e continuar trabalhando não rein
   assert.match(confirmacao[1], /Salve qualquer alteração/);
   confirmacao[2].find((b) => b.text === "Reiniciar e aplicar").onPress();
   assert.equal(applied, 1);
+});
+
+test("perfil abre atualizações na mesma janela e voltar preserva a escolha dos acessos", () => {
+  let fechados = 0;
+  const props = { visible: true, profiles: [{ type: "funcionario", label: "Funcionário" }], showUpdates: true, onClose: () => fechados++, onSelect() {} };
+  const componentes = Object.fromEntries(["Modal", "Pressable", "ScrollView", "Text", "TouchableOpacity", "View"].map((k) => [k, k]));
+  const e = executar("components/ProfileSwitcherModal.tsx", {
+    "react-native": { ...componentes, StyleSheet: { create: (v) => v } },
+    "../theme": { CORES: {}, ESPACO: {}, FONTE: {}, RAIO: {}, SOMBRA: {} },
+    "./AppUpdatesEntry": "UpdateEntry",
+    "./AppUpdatesScreen": "UpdateScreen",
+  }, false, props);
+  const nos = (n) => !n || typeof n !== "object" ? [] : [n, ...(n.props?.children ?? []).flat(Infinity).flatMap(nos)];
+  const find = (type) => nos(e.render()).find((n) => n.type === type);
+  find("UpdateEntry").props.onPress();
+  assert.ok(find("UpdateScreen"));
+  assert.equal(nos(e.render()).filter((n) => n.type === "Modal").length, 1);
+  find("Modal").props.onRequestClose();
+  assert.equal(fechados, 0);
+  assert.ok(find("UpdateEntry"));
+  assert.match(JSON.stringify(e.render()), /Funcionário/);
+  find("UpdateEntry").props.onPress();
+  props.visible = false; e.render(); props.visible = true; e.render();
+  assert.ok(find("UpdateEntry"));
+});
+
+test("entrada do perfil consulta manualmente e fechar mantém o estado da atualização", () => {
+  let consultas = 0;
+  const update = { enabled: true, pronto: true, verificar(manual) { assert.equal(manual, true); consultas++; } };
+  const componentes = Object.fromEntries(["Modal", "Text", "TouchableOpacity", "View"].map((k) => [k, k]));
+  const e = executar("components/AppUpdatesEntry.tsx", {
+    "react-native": { ...componentes, StyleSheet: { create: (v) => v } },
+    "@expo/vector-icons": { Ionicons: "Icon" },
+    "./AppUpdatesProvider": { useAppUpdatesContext: () => update },
+    "./AppUpdatesScreen": "UpdateScreen",
+  });
+  const nos = (n) => !n || typeof n !== "object" ? [] : [n, ...(n.props?.children ?? []).flat(Infinity).flatMap(nos)];
+  const find = (type) => nos(e.render()).find((n) => n.type === type);
+  assert.equal(find("Modal").props.visible, false);
+  find("TouchableOpacity").props.onPress();
+  assert.equal(consultas, 1);
+  assert.equal(find("Modal").props.visible, true);
+  find("UpdateScreen").props.onClose();
+  assert.equal(find("Modal").props.visible, false);
+  assert.equal(update.pronto, true);
 });
