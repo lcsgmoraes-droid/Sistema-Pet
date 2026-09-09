@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import hashlib
 import secrets
 import shutil
 from datetime import datetime, timezone
@@ -41,6 +42,12 @@ from app.services.ofertas_estudio_service import (
 from app.services.product_image_storage import read_product_image_by_public_url
 from app.services.validade_campanha_service import obter_campanha_validade_config
 from app.tenancy.context import tenant_context
+from app.creditos_schemas import normalizar_credit_payload
+from app.services.creditos_execution import (
+    begin_credit_operation,
+    complete_credit_operation,
+    fail_credit_operation,
+)
 
 
 router = APIRouter(prefix="/ofertas", tags=["Estudio de Ofertas"])
@@ -279,10 +286,11 @@ async def gerar_imagem(
     prompt_usuario: str = Form(default="", max_length=800),
     imagem_url: str = Form(default="", max_length=2048),
     file: UploadFile | None = File(default=None),
+    credit_operation_id: str | None = Form(default=None, max_length=36),
     db: Session = Depends(get_session),
     user_and_tenant=Depends(get_current_user_and_tenant),
 ):
-    _, tenant_id = user_and_tenant
+    user, tenant_id = user_and_tenant
     produto = (
         db.query(Produto)
         .filter(Produto.tenant_id == tenant_id, Produto.id == produto_id)
@@ -316,19 +324,57 @@ async def gerar_imagem(
         raise HTTPException(
             status_code=400, detail="Escolha ou envie uma foto real do produto."
         )
-    url = await run_in_threadpool(
-        gerar_imagem_profissional,
-        api_key=api_key,
-        tenant_id=tenant_id,
-        produto_id=produto.id,
-        produto_nome=produto.nome,
-        file_bytes=content,
-        content_type=content_type,
-        estilo=estilo,
-        orientacao=orientacao,
-        prompt_usuario=prompt_usuario,
+    request_payload = normalizar_credit_payload(
+        "oferta.imagem",
+        {
+            "produto_id": produto_id,
+            "estilo": estilo,
+            "orientacao": orientacao,
+            "prompt_usuario": prompt_usuario,
+            "imagem_url": imagem_url,
+            "file_sha256": hashlib.sha256(content).hexdigest()
+            if file is not None
+            else None,
+        },
     )
-    return {"url": url, "estilo": estilo, "modelo": "gpt-image-2"}
+    operation = begin_credit_operation(
+        db,
+        tenant_id,
+        user.id,
+        credit_operation_id if isinstance(credit_operation_id, str) else None,
+        "oferta.imagem",
+        request_payload,
+    )
+    if not operation["should_execute"]:
+        return operation["result_payload"]
+    operation_id = operation["operation_id"]
+    usage = {}
+    try:
+        options = {"usage_metadata": usage} if operation_id else {}
+        url = await run_in_threadpool(
+            gerar_imagem_profissional,
+            api_key=api_key,
+            tenant_id=tenant_id,
+            produto_id=produto.id,
+            produto_nome=produto.nome,
+            file_bytes=content,
+            content_type=content_type,
+            estilo=estilo,
+            orientacao=orientacao,
+            prompt_usuario=prompt_usuario,
+            **options,
+        )
+    except Exception as exc:
+        fail_credit_operation(db, tenant_id, user.id, operation_id, exc, usage)
+        raise
+    return complete_credit_operation(
+        db,
+        tenant_id,
+        user.id,
+        operation_id,
+        {"url": url, "estilo": estilo, "modelo": "gpt-image-2"},
+        usage,
+    )
 
 
 @router.post("/publicacoes")

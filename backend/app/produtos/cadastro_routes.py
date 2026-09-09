@@ -51,6 +51,12 @@ from app.empresa_grupo_estoque_compartilhado_service import (
     EmpresaGrupoEstoqueCompartilhadoService,
 )
 from app.tenancy.context import set_current_tenant
+from app.creditos_schemas import normalizar_credit_payload
+from app.services.creditos_execution import (
+    begin_credit_operation,
+    complete_credit_operation,
+    fail_credit_operation,
+)
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -59,6 +65,7 @@ logger = logging.getLogger(__name__)
 class ProdutoAIPreencherRequest(BaseModel):
     codigo_barras: str = Field(min_length=8, max_length=14, pattern=r"^\d+$")
     nome: str | None = Field(default=None, max_length=255)
+    credit_operation_id: UUID | None = None
 
 
 @router.post(
@@ -72,17 +79,49 @@ def preencher_produto_com_ia(
     user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     """Gera um rascunho revisavel de descricao e dados fiscais por EAN."""
-    _, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
+    user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
+    request_payload = normalizar_credit_payload(
+        "produto.descricao_fiscal",
+        payload.model_dump(exclude={"credit_operation_id"}),
+    )
+    operation = begin_credit_operation(
+        db,
+        tenant_id,
+        user.id,
+        payload.credit_operation_id,
+        "produto.descricao_fiscal",
+        request_payload,
+    )
+    if not operation["should_execute"]:
+        return operation["result_payload"]
+    operation_id = operation["operation_id"]
+    usage = {}
     api_key = resolver_chave_openai_tenant(db, tenant_id)
     if not api_key:
-        raise HTTPException(
+        exc = HTTPException(
             status_code=400,
             detail="Configure a chave da OpenAI em Configuracoes > Integracoes para usar este recurso.",
         )
-    return gerar_rascunho_produto_por_ean(
-        api_key=api_key,
-        codigo_barras=payload.codigo_barras,
-        nome=payload.nome,
+        fail_credit_operation(db, tenant_id, user.id, operation_id, exc, usage)
+        raise exc
+    try:
+        options = {"usage_metadata": usage} if operation_id else {}
+        result = gerar_rascunho_produto_por_ean(
+            api_key=api_key,
+            codigo_barras=payload.codigo_barras,
+            nome=payload.nome,
+            **options,
+        )
+    except Exception as exc:
+        fail_credit_operation(db, tenant_id, user.id, operation_id, exc, usage)
+        raise
+    return complete_credit_operation(
+        db,
+        tenant_id,
+        user.id,
+        operation_id,
+        result.model_dump(mode="json"),
+        usage,
     )
 
 

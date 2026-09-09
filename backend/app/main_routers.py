@@ -217,6 +217,7 @@ from app.routes.product_images_public import router as product_images_public_rou
 from app.routes.sefaz_routes import router as sefaz_router
 from app.routes.modulos_routes import router as modulos_router
 from app.routes.asaas_billing_routes import router as asaas_billing_router
+from app.routes.creditos_routes import router as creditos_router
 from app.routes.ecommerceai_integration_routes import (
     router as ecommerceai_integration_router,
 )
@@ -673,6 +674,7 @@ def register_routers(app: FastAPI) -> None:
         ofertas_estudio_router, dependencies=_module_dependencies("campanhas")
     )  # Artes e jornais promocionais
     app.include_router(asaas_billing_router)
+    app.include_router(creditos_router)
     app.include_router(ecommerceai_integration_router)
     app.include_router(ifood_integration_router)
     app.include_router(ifood_order_router)

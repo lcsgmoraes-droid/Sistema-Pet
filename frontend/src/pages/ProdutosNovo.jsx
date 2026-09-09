@@ -1,12 +1,14 @@
 /**
  * Formulário de Cadastro/Edição de Produtos - Layout em Abas
  */
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import toast from "react-hot-toast";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import ProdutosNovoMainContent from "../components/produto/ProdutosNovoMainContent";
 import ProdutosNovoModalsLayer from "../components/produto/ProdutosNovoModalsLayer";
 import CatalogoProdutoModal from "../components/produtos/CatalogoProdutoModal";
+import CreditoFontes from "../components/creditos/CreditoFontes";
+import useCreditOperation from "../components/creditos/useCreditOperation";
 import useProdutosNovoCarregamento from "../hooks/useProdutosNovoCarregamento";
 import useProdutosNovoCodigos from "../hooks/useProdutosNovoCodigos";
 import useProdutosNovoFornecedores from "../hooks/useProdutosNovoFornecedores";
@@ -36,6 +38,7 @@ const parseNumber = (valor) => {
 };
 
 export default function ProdutosNovo() {
+  const creditosIA = useCreditOperation();
   const navigate = useNavigate();
   const { id } = useParams();
   const [searchParams] = useSearchParams();
@@ -150,6 +153,8 @@ export default function ProdutosNovo() {
     sabor_proteina_id: "",
     apresentacao_peso_id: "",
   });
+  const codigoBarrasAtualRef = useRef("");
+  codigoBarrasAtualRef.current = String(formData.codigo_barras || "").replace(/\D/g, "");
 
   // Dados auxiliares
   const [, setCategorias] = useState([]);
@@ -173,6 +178,7 @@ export default function ProdutosNovo() {
   const [salvando, setSalvando] = useState(false);
   const [preenchendoComIA, setPreenchendoComIA] = useState(false);
   const [assistenteIAAviso, setAssistenteIAAviso] = useState("");
+  const [assistenteIAFontes, setAssistenteIAFontes] = useState([]);
 
   // Estados para controlar edição de campos monetários
   const [camposEmEdicao, setCamposEmEdicao] = useState({
@@ -223,6 +229,7 @@ export default function ProdutosNovo() {
   };
 
   const handlePreencherComIA = async () => {
+    if (preenchendoComIA || creditosIA.busy) return;
     const codigoBarras = String(formData.codigo_barras || "").replace(/\D/g, "");
     if (codigoBarras.length < 8 || codigoBarras.length > 14) {
       toast.error("Informe um codigo de barras valido antes de usar a IA.");
@@ -232,42 +239,55 @@ export default function ProdutosNovo() {
     setPreenchendoComIA(true);
     setAssistenteIAAviso("");
     try {
-      const response = await api.post(
-        "/produtos/assistente-ia/preencher-por-ean",
-        {
-          codigo_barras: codigoBarras,
-          nome: formData.nome || null,
+      const payload = { codigo_barras: codigoBarras, nome: formData.nome || null };
+      await creditosIA.run({
+        serviceCode: "produto.descricao_fiscal",
+        contextKey: codigoBarras,
+        payload,
+        request: async (operationId) => {
+          const response = await api.post(
+            "/produtos/assistente-ia/preencher-por-ean",
+            { ...payload, ...(operationId ? { credit_operation_id: operationId } : {}) },
+            { timeout: 90000 },
+          );
+          return response.data;
         },
-        { timeout: 90000 },
-      );
-      const sugestao = response.data || {};
-      setFormData((prev) => ({
-        ...prev,
-        descricao: sugestao.descricao || prev.descricao,
-        tributacao: {
-          ...prev.tributacao,
-          herdado_da_empresa:
-            sugestao.ncm || sugestao.cest ? false : prev.tributacao.herdado_da_empresa,
-          ncm: sugestao.ncm || prev.tributacao.ncm,
-          cest: sugestao.cest || prev.tributacao.cest,
-          origem_mercadoria: sugestao.origem_mercadoria || prev.tributacao.origem_mercadoria,
+        onResult: (sugestao = {}) => {
+          if (codigoBarrasAtualRef.current !== codigoBarras) {
+            throw new Error(
+              "O EAN do formulário mudou. Volte ao EAN anterior para recuperar o resultado sem gerar novamente.",
+            );
+          }
+          setFormData((prev) => ({
+            ...prev,
+            descricao: sugestao.descricao || prev.descricao,
+            tributacao: {
+              ...prev.tributacao,
+              herdado_da_empresa:
+                sugestao.ncm || sugestao.cest ? false : prev.tributacao.herdado_da_empresa,
+              ncm: sugestao.ncm || prev.tributacao.ncm,
+              cest: sugestao.cest || prev.tributacao.cest,
+              origem_mercadoria: sugestao.origem_mercadoria || prev.tributacao.origem_mercadoria,
+            },
+          }));
+          setAssistenteIAFontes(sugestao.fontes || []);
+          const alertas = Array.isArray(sugestao.alertas_revisao)
+            ? sugestao.alertas_revisao.join(" ")
+            : "";
+          setAssistenteIAAviso(
+            [
+              `Rascunho preenchido. Confianca fiscal: ${sugestao.confianca_fiscal || "nao informada"}.`,
+              alertas,
+              "Confira NCM, CEST e origem antes de emitir nota fiscal.",
+            ]
+              .filter(Boolean)
+              .join(" "),
+          );
+          toast.success("Descricao e sugestoes fiscais preenchidas pela IA.");
         },
-      }));
-      const alertas = Array.isArray(sugestao.alertas_revisao)
-        ? sugestao.alertas_revisao.join(" ")
-        : "";
-      setAssistenteIAAviso(
-        [
-          `Rascunho preenchido. Confianca fiscal: ${sugestao.confianca_fiscal || "nao informada"}.`,
-          alertas,
-          "Confira NCM, CEST e origem antes de emitir nota fiscal.",
-        ]
-          .filter(Boolean)
-          .join(" "),
-      );
-      toast.success("Descricao e sugestoes fiscais preenchidas pela IA.");
+      });
     } catch (error) {
-      toast.error(error.response?.data?.detail || "Nao foi possivel preencher o produto com IA.");
+      toast.error(error.message || "Nao foi possivel preencher o produto com IA.");
     } finally {
       setPreenchendoComIA(false);
     }
@@ -787,7 +807,9 @@ export default function ProdutosNovo() {
 
   return (
     <>
+      <div className="mx-6">{creditosIA.ui}</div>
       <ProdutosNovoMainContent handleSubmit={handleSubmit} {...mainContentProps} />
+      <CreditoFontes fontes={assistenteIAFontes} />
 
       <ProdutosNovoModalsLayer
         {...modalsLayerProps}

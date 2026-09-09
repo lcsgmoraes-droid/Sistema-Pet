@@ -11,6 +11,8 @@ from typing import Literal
 from fastapi import HTTPException
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from app.services.ai_usage import record_openai_usage
+
 logger = logging.getLogger(__name__)
 
 
@@ -72,7 +74,12 @@ PRODUTO_AI_SCHEMA = {
 
 
 def gerar_rascunho_produto_por_ean(
-    *, api_key: str, codigo_barras: str, nome: str | None = None, client=None
+    *,
+    api_key: str,
+    codigo_barras: str,
+    nome: str | None = None,
+    client=None,
+    usage_metadata: dict | None = None,
 ) -> ProdutoAIRascunho:
     """Pesquisa o EAN e devolve somente um rascunho sujeito a revisao humana."""
     if not re.fullmatch(r"\d{8,14}", codigo_barras):
@@ -84,7 +91,7 @@ def gerar_rascunho_produto_por_ean(
     if client is None:
         from openai import OpenAI
 
-        client = OpenAI(api_key=api_key, timeout=90)
+        client = OpenAI(api_key=api_key, timeout=90, max_retries=0)
 
     # Nao herdar OPENAI_MODEL: essa variavel global ainda pode apontar para um
     # modelo legado sem suporte ao web_search/JSON Schema. Este recurso tem uma
@@ -129,6 +136,7 @@ rascunho que precisa ser conferido antes da emissao fiscal.
             max_output_tokens=2200,
             store=False,
         )
+        record_openai_usage(usage_metadata, response, model=model)
         return ProdutoAIRascunho.model_validate(json.loads(response.output_text))
     except HTTPException:
         raise

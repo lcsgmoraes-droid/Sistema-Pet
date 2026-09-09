@@ -21,6 +21,8 @@ import {
   publicarOferta,
 } from "../../api/ofertas";
 import { uploadImagemProduto } from "../../api/produtos";
+import useCreditOperation from "../../components/creditos/useCreditOperation";
+import { payloadImagemCredito } from "../../components/creditos/creditosModel";
 import { confirmarCorePet } from "../../services/corepetDialog";
 import { resolveMediaUrl } from "../../utils/mediaUrl";
 import OfertaCanvas from "./OfertaCanvas";
@@ -93,10 +95,13 @@ function canvasParaBlob(canvas) {
 }
 
 export default function EstudioOfertas() {
+  const creditosIA = useCreditOperation();
   const previewRef = useRef(null);
   const [contexto, setContexto] = useState(null);
   const [produtos, setProdutos] = useState([]);
   const [selecionados, setSelecionados] = useState([]);
+  const selecionadosAtualRef = useRef(selecionados);
+  selecionadosAtualRef.current = selecionados;
   const [publicacoes, setPublicacoes] = useState([]);
   const [config, setConfig] = useState(criarConfigInicial);
   const [busca, setBusca] = useState("");
@@ -286,25 +291,38 @@ export default function EstudioOfertas() {
   }
 
   async function gerarImagemProfissional(item) {
+    if (gerandoImagemId || creditosIA.busy) return;
     setGerandoImagemId(item.produto_id);
     try {
       const imagemOrigem = item.imagem_url_arte || item.imagem_url;
       if (!imagemOrigem) throw new Error("Envie primeiro uma foto real do produto.");
-      const formData = new FormData();
-      formData.append("produto_id", String(item.produto_id));
-      formData.append("estilo", config.tema === "natural" ? "natural" : "profissional");
-      formData.append("orientacao", config.formato === "quadrado" ? "quadrada" : "vertical");
-      formData.append("imagem_url", imagemOrigem);
-      if (item.prompt_criacao?.trim()) {
-        formData.append("prompt_usuario", item.prompt_criacao.trim());
-      }
-      const { data } = await gerarImagemOferta(formData);
-      atualizarItem(item.produto_id, {
-        imagem_gerada_url: data.url,
-        imagem_gerada_salva: false,
-        imagem_url_arte: data.url,
+      const payload = payloadImagemCredito(item, config);
+      await creditosIA.run({
+        serviceCode: "oferta.imagem",
+        contextKey: String(item.produto_id),
+        payload,
+        request: async (operationId) => {
+          const formData = new FormData();
+          Object.entries(payload).forEach(([key, value]) => {
+            if (key !== "file_sha256") formData.append(key, String(value));
+          });
+          if (operationId) formData.append("credit_operation_id", operationId);
+          return (await gerarImagemOferta(formData)).data;
+        },
+        onResult: (data) => {
+          if (!selecionadosAtualRef.current.some((atual) => atual.produto_id === item.produto_id)) {
+            throw new Error(
+              "O produto foi retirado da arte. Selecione-o novamente antes de aplicar a imagem.",
+            );
+          }
+          atualizarItem(item.produto_id, {
+            imagem_gerada_url: data.url,
+            imagem_gerada_salva: false,
+            imagem_url_arte: data.url,
+          });
+          toast.success("Versão profissional criada. Confira a embalagem antes de publicar.");
+        },
       });
-      toast.success("Versão profissional criada. Confira a embalagem antes de publicar.");
     } catch (error) {
       toast.error(detalheErro(error, error.message || "Não foi possível gerar a imagem."));
     } finally {
@@ -501,6 +519,8 @@ export default function EstudioOfertas() {
             </button>
           </div>
         </header>
+
+        {creditosIA.ui}
 
         <div className="grid items-start gap-6 2xl:grid-cols-[minmax(0,1.15fr)_minmax(480px,.85fr)]">
           <div className="space-y-6">

@@ -11,6 +11,8 @@ from uuid import UUID, uuid4
 
 from fastapi import HTTPException
 
+from app.services.ai_usage import record_openai_usage
+
 
 UPLOAD_DIR = Path("uploads/ofertas")
 ESTILOS = {"profissional", "natural", "fundo_limpo"}
@@ -105,6 +107,7 @@ def gerar_imagem_profissional(
     estilo: str,
     orientacao: str,
     prompt_usuario: str | None = None,
+    usage_metadata: dict | None = None,
 ) -> str:
     from openai import (
         APIConnectionError,
@@ -120,7 +123,7 @@ def gerar_imagem_profissional(
     orientacao = orientacao if orientacao in {"quadrada", "vertical"} else "quadrada"
     size = "1024x1536" if orientacao == "vertical" else "1024x1024"
     try:
-        resposta = OpenAI(api_key=api_key, timeout=120.0).images.edit(
+        resposta = OpenAI(api_key=api_key, timeout=120.0, max_retries=0).images.edit(
             model="gpt-image-2",
             image=("produto.png", file_bytes, content_type),
             prompt=_prompt(produto_nome, estilo, orientacao, prompt_usuario),
@@ -128,6 +131,7 @@ def gerar_imagem_profissional(
             quality="high",
             output_format="png",
         )
+        record_openai_usage(usage_metadata, resposta, model="gpt-image-2")
         payload = resposta.data[0].b64_json if resposta.data else None
         if not payload:
             raise HTTPException(status_code=502, detail="A IA nao retornou uma imagem.")
