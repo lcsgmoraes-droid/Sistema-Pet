@@ -1,6 +1,6 @@
 # IntNFe — primeiro teste de NF-e de produto
 
-Registro: 09/09/2026. Situação: roteiro preparado; acesso autenticado e envio ainda não realizados.
+Registro: 09/09/2026. Situação: acesso ao portal confirmado; cadastro pela API e envio ainda não realizados.
 
 ## Decisão registrada
 
@@ -12,7 +12,9 @@ O [estudo do Bling e da estrutura fiscal do CorePet](ESTUDO_BLING_E_ESTRUTURA_FI
 
 - [Documentação oficial](https://intnfe.com.br/api/doc): NF-e modelo 55, emissão assíncrona, consulta, XML autorizado e DANFE em HTML.
 - [Portal do cliente](https://app.intnfe.com.br/login): página acessível. Pede usuário e senha fornecidos pela equipe; a tela examinada não oferece cadastro público e se identifica como ambiente de homologação.
-- Ainda não há uma sessão autenticada da IntNFe disponível para este teste. Não foram fornecidos CNPJ/certificado nem credenciais específicos do piloto.
+- Lucas entrou no portal. A sessão autenticada identifica a conta **PetSys (smoke test)** e mostra apenas o emitente de exemplo **Ze Pet**. O menu do integrador exibe acompanhamento de clientes e sala de situação; não apresenta cadastro de emitentes nem credenciais de API.
+- Na sessão do Bling já aberta pelo Lucas, foram conferidos os dados da **LJ Comercio de Rações e Pet Shop LTDA**, empresa indicada para o teste. O corpo mínimo de cadastro foi preparado localmente em `runtime/analises/fiscal/2026-09-09/cadastro_emitente_pet.json`, fora do Git.
+- O código público do portal consultado usa `/portal/auth/login`. A documentação da integração usa `/integrador/auth/token` com `integradorId` e `integradorSecret`. Não foi comprovada intercambialidade entre esses acessos; não houve tentativa de extrair ou reaproveitar o token interno da sessão. As credenciais próprias do integrador continuam pendentes.
 - Os arquivos de ambiente conhecidos do projeto e as variáveis da sessão não indicaram credenciais `INTNFE_*`. Nenhum segredo foi copiado para esta documentação.
 - Nenhuma empresa/destinatário foi cadastrado e nenhuma NF-e foi transmitida nesta preparação.
 
@@ -24,7 +26,7 @@ O [estudo do Bling e da estrutura fiscal do CorePet](ESTUDO_BLING_E_ESTRUTURA_FI
 | Credencial de integrador | `integradorId` e `integradorSecret`; permitem gerenciar as empresas vinculadas ao integrador. |
 | Empresa emitente | O CNPJ que assina e emite a NF-e, com IE, regime tributário, endereço e certificado A1. A API chama essa empresa de emitente/tenant. |
 | Credencial do emitente | `clientId` e `clientSecret`; servem para obter o token de emissão da empresa. |
-| Destinatário da nota | O comprador/cliente informado no grupo `destinatario`. A documentação consultada não descreve um endpoint separado de cadastro de compradores. O portal autenticado ainda precisa ser examinado. |
+| Destinatário da nota | O comprador/cliente informado no grupo `destinatario`. A documentação consultada não descreve um endpoint separado de cadastro de compradores; o portal autenticado examinado não mostrou essa função. |
 | Chave de acesso da NF-e | Os 44 dígitos que identificam a nota; no fluxo documentado são retornados com a autorização. Não substituem a credencial de acesso à API. |
 
 Se já houver empresa cadastrada, consultar e reutilizar seu cadastro. Não rotacionar segredos nem recriar a empresa para simplesmente testar. Caso o irmão forneça somente acesso de emitente, o cadastro dessa empresa precisa ter sido preparado por ele; o cadastro de empresas pela API exige acesso de integrador.
@@ -33,8 +35,8 @@ Se já houver empresa cadastrada, consultar e reutilizar seu cadastro. Não rota
 
 | Pendência | Informação/ação necessária | Responsável sugerido |
 |---|---|---|
-| Acesso à IntNFe | Login do portal ou credenciais próprias da API, fornecidas pela equipe | Irmão/IntNFe e Lucas |
-| Definir a empresa piloto | CNPJ, razão social, nome fantasia, IE, regime e endereço com código IBGE | Lucas/empresa piloto |
+| Acesso à API IntNFe | Portal já acessível; faltam `integradorId` e `integradorSecret` da PetSys ou um fluxo de cadastro que a equipe libere no portal | Irmão/IntNFe e Lucas |
+| Cadastro da empresa piloto | LJ identificada; CNPJ e nomes necessários à criação já preenchidos no arquivo local. Antes da nota, conferir endereço/IBGE: o bairro no Bling aparece como `SP` e precisa ser esclarecido | Lucas/empresa piloto |
 | Certificado | A1 válido do mesmo CNPJ, já instalado na IntNFe ou arquivo `.pfx`/`.p12` e senha para cadastro protegido | Lucas/empresa piloto |
 | Habilitação e série | Confirmar que o emitente pode emitir em homologação na sua UF e qual série de teste utilizar | Irmão/empresa piloto |
 | Destinatário | Dados aprovados para o teste: CPF/CNPJ, endereço, indicador de IE e IE quando aplicável | Lucas/irmão |
@@ -79,12 +81,13 @@ Releitura da [documentação da IntNFe](https://intnfe.com.br/api/doc) em 09/09/
 | Reenvio seguro | Header `Idempotency-Key`, cache de 24 h e conflitos descritos | Usar desde o primeiro envio; validar repetição controlada depois da emissão inicial |
 | Reconciliação | `GET /nfe` com período, situação e paginação | Recuperação documentada; comprovar correspondência de uma tentativa incerta |
 | Eventos e comprovantes | `GET /nfe/{correlationId}/eventos`, XML e protocolo | Testar cancelamento/CC-e em etapa seguinte |
-| ICMS e ICMS-ST | Mais CST/CSOSN, origem e CEST descritos | Testar por cenário; a própria documentação ainda exclui CST 20/51/90 e IBS/CBS |
+| ICMS e ICMS-ST | Na releitura após o login, a documentação passou a incluir CST 20/51/90, FCP, redução/diferimento, IPI e DIFAL | Passam a documentados; validar campos, cálculos e XML por cenário |
 | Descontos e frete | Desconto por item e grupo de frete/transportadora descritos | Testar totais e arredondamentos em etapa seguinte |
 | Referências a notas | `documentosReferenciados` descrito | Referenciar uma chave não comprova fluxo completo de devolução/finalidade e impostos |
 | Webhook e recuperação | HMAC, até cinco tentativas, reenvio e reconciliação descritos | Primeiro teste pode usar consulta; validar eventos e recuperação depois |
 | Retenção e arquivos | Prazos e download descritos; DANFE em HTML | Validar arquivo local; há aparente divergência entre XML “só autorizada” e menção posterior a canceladas/denegadas, a esclarecer antes de depender desse acesso |
-| NFC-e, NFS-e e reforma tributária | Não comprovadas para este piloto; IBS/CBS explicitamente não suportados no texto | Desenvolvimento/cobertura futuros, sem promessa de prontidão comercial |
+| NFC-e e reforma tributária | Na releitura após o login, surgiram `POST /nfce` e IBS/CBS com valores calculados pelo integrador. NFC-e pede CSC e descreve DANFE provisório | Novidades documentais, ainda não testadas. O primeiro envio continua NF-e modelo 55 |
+| NFS-e | Não confirmada na documentação consultada | Cobertura futura a verificar |
 | Preço, suporte e operação | Não validados por este teste | Definir antes de contratar/ativar clientes em produção |
 
 Nenhum dos assuntos futuros será usado para exigir a integração completa antes da primeira nota simples. Continuam obrigatórios os dados, o certificado e a compatibilidade do cenário que será efetivamente enviado.
@@ -96,10 +99,12 @@ Nenhum dos assuntos futuros será usado para exigir a integração completa ante
 | Estudo e decisão preservados no projeto | Registrados |
 | Documentação pública e portal | Consultados |
 | Corpo mínimo | Modelo com marcadores preparado e JSON validado localmente |
-| Acesso de teste | Aguardando dados fornecidos pelo irmão/Lucas |
-| Empresa e certificado | Não consultados em sessão autenticada |
+| Acesso ao portal | Confirmado, conta PetSys (smoke test) |
+| Acesso à API do integrador | Credenciais ainda não disponibilizadas |
+| Empresa | LJ identificada no Bling e corpo mínimo de cadastro preparado; ainda não criada na IntNFe |
+| Certificado | Ainda não disponibilizado/consultado para a LJ na IntNFe |
 | Destinatário | Não cadastrado nem transmitido |
 | Nota enviada/autorizada | Não executado |
 | Chave/XML/DANFE de teste | Ainda não obtidos |
 
-O próximo passo operacional é receber/abrir o acesso liberado pelo irmão e identificar a empresa de teste. Não houve alteração de aplicação, banco, estoque, caixa ou implantação em produção.
+O próximo passo operacional é receber as credenciais de API da PetSys ou a liberação do cadastro no portal. Com acesso, consultar os emitentes atuais novamente e criar a LJ se ela ainda não existir, guardando com segurança as credenciais retornadas. Não houve alteração de aplicação, banco, estoque, caixa ou implantação em produção.
