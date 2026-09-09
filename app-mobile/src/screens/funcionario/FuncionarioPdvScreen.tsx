@@ -529,6 +529,7 @@ export default function FuncionarioPdvScreen() {
   }
 
   async function criarClienteRapido(payload: {
+    origem_cliente?: string | null;
     nome?: string | null;
     telefone?: string | null;
     endereco?: string | null;

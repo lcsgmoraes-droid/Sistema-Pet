@@ -86,6 +86,11 @@ export async function buscarClientesPdv(termo: string): Promise<FuncionarioPdvCl
   return Array.isArray(response.data) ? response.data.map(normalizarClientePdv) : [];
 }
 
+export async function listarOrigensClientePdv(): Promise<{ value: string; label: string }[]> {
+  const response = await api.get("/app/funcionario/pdv/clientes/origens");
+  return response.data;
+}
+
 export async function criarClienteRapidoPdv(
   payload: FuncionarioPdvClienteRapidoPayload,
 ): Promise<FuncionarioPdvCliente> {

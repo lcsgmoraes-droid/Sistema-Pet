@@ -13,6 +13,7 @@ import CopyableValue from "../ui/CopyableValue";
 import IconActionButton from "../ui/IconActionButton";
 import PaginationControls from "../ui/PaginationControls";
 import Panel from "../ui/Panel";
+import { nomeOrigemCliente } from "../../utils/clienteOrigem";
 
 function formatarDocumentoPessoa(cliente) {
   if (cliente.tipo_pessoa === "PF") return cliente.cpf || "-";
@@ -109,6 +110,12 @@ function PessoaMobileCard({
       </div>
 
       <dl className="mt-3 grid grid-cols-2 gap-2 text-xs">
+        {cliente.tipo_cadastro === "cliente" && (
+          <div>
+            <dt className="text-slate-500">Origem</dt>
+            <dd className="text-slate-700">{nomeOrigemCliente(cliente.origem_cliente)}</dd>
+          </div>
+        )}
         <div className="rounded-lg border border-slate-200 bg-slate-50 p-2">
           <dt className="font-semibold uppercase text-slate-500">Documento</dt>
           <dd className="mt-1 break-words text-slate-800">{formatarDocumentoPessoa(cliente)}</dd>
@@ -326,7 +333,7 @@ const ClientesNovoTabelaSection = ({
                       Pets
                     </th>
                     <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">
-                      Segmento
+                      Origem
                     </th>
                     <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-slate-500">
                       Acoes
@@ -444,7 +451,11 @@ const ClientesNovoTabelaSection = ({
                             </button>
                           </td>
                           <td className="px-4 py-3 whitespace-nowrap">
-                            <span className="text-xs text-gray-400">-</span>
+                            <span className="text-xs text-gray-600">
+                              {cliente.tipo_cadastro === "cliente"
+                                ? nomeOrigemCliente(cliente.origem_cliente)
+                                : "-"}
+                            </span>
                           </td>
                           <td
                             className="px-4 py-3 whitespace-nowrap text-right text-sm font-medium"

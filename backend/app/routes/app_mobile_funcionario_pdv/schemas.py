@@ -4,6 +4,7 @@ from datetime import date
 from typing import Literal, Optional
 
 from pydantic import BaseModel, Field
+from app.services.cliente_origem import OrigemCliente
 
 
 class FuncionarioPdvProdutoResponse(BaseModel):
@@ -22,6 +23,7 @@ class FuncionarioPdvProdutoResponse(BaseModel):
 
 
 class FuncionarioPdvClienteResponse(BaseModel):
+    origem_cliente: Optional[str] = None
     id: int
     codigo: Optional[str] = None
     nome: str
@@ -37,6 +39,7 @@ class FuncionarioPdvClienteResponse(BaseModel):
 
 
 class FuncionarioPdvClienteRapidoRequest(BaseModel):
+    origem_cliente: OrigemCliente = "loja_fisica"
     nome: Optional[str] = Field(default=None, max_length=255)
     telefone: Optional[str] = Field(default=None, max_length=50)
     endereco: Optional[str] = Field(default=None, max_length=500)

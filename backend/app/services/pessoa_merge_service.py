@@ -18,6 +18,7 @@ logger = logging.getLogger(__name__)
 
 CAMPOS_CADASTRAIS_PESSOA: list[tuple[str, str]] = [
     ("tipo_cadastro", "Tipo de cadastro"),
+    ("origem_cliente", "Origem do cliente"),
     ("tipo_pessoa", "Tipo de pessoa"),
     ("fornecedor_grupo_id", "Grupo de fornecedor"),
     ("nome", "Nome"),

@@ -451,6 +451,7 @@ export interface FuncionarioPdvCliente {
 }
 
 export interface FuncionarioPdvClienteRapidoPayload {
+  origem_cliente?: string | null;
   nome?: string | null;
   telefone?: string | null;
   endereco?: string | null;

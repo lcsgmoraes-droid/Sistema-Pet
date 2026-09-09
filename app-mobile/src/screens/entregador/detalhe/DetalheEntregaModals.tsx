@@ -8,6 +8,8 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import KeyboardSafeScrollView from "../../../components/KeyboardSafeScrollView";
+import { formatarMoeda } from "../../../utils/format";
 
 import { detalheEntregaStyles as styles } from "./DetalheEntregaStyles";
 import type {
@@ -47,6 +49,18 @@ export type DetalheEntregaModalsProps = {
   vendaDetalhes: VendaDetalhes | null;
 };
 
+function FormModalBody({ children }: { children: React.ReactNode }) {
+  return (
+    <KeyboardSafeScrollView
+      style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.4)" }}
+      contentContainerStyle={{ flexGrow: 1, justifyContent: "center", padding: 20 }}
+      keyboardShouldPersistTaps="handled"
+    >
+      {children}
+    </KeyboardSafeScrollView>
+  );
+}
+
 export function DetalheEntregaModals({
   rota,
   processando,
@@ -84,7 +98,7 @@ export function DetalheEntregaModals({
         animationType="fade"
         onRequestClose={fecharModalOrdem}
       >
-        <View style={styles.modalOverlay}>
+        <FormModalBody>
           <View style={styles.modalCard}>
             <Text style={styles.modalTitulo}>Reordenar entrega</Text>
             <Text style={styles.modalSubtitulo}>
@@ -143,7 +157,7 @@ export function DetalheEntregaModals({
               </TouchableOpacity>
             </View>
           </View>
-        </View>
+        </FormModalBody>
       </Modal>
 
       <Modal
@@ -152,7 +166,7 @@ export function DetalheEntregaModals({
         animationType="fade"
         onRequestClose={fecharModalNaoEntregue}
       >
-        <View style={styles.modalOverlay}>
+        <FormModalBody>
           <View style={styles.modalCard}>
             <Text style={styles.modalTitulo}>Registrar nao entrega</Text>
             <Text style={styles.modalSubtitulo}>
@@ -196,7 +210,7 @@ export function DetalheEntregaModals({
               </TouchableOpacity>
             </View>
           </View>
-        </View>
+        </FormModalBody>
       </Modal>
 
       <Modal
@@ -377,7 +391,7 @@ export function DetalheEntregaModals({
                 </Text>
                 <Text style={styles.detalheLinha}>
                   <Text style={styles.detalheLabel}>Total: </Text>
-                  R$ {Number(vendaDetalhes?.valor_total ?? vendaDetalhes?.total ?? 0).toFixed(2)}
+                  {formatarMoeda(Number(vendaDetalhes?.valor_total ?? vendaDetalhes?.total ?? 0))}
                 </Text>
 
                 <Text style={[styles.detalheLabel, { marginTop: 12, marginBottom: 8 }]}>Itens da venda:</Text>
@@ -390,8 +404,8 @@ export function DetalheEntregaModals({
                       {item.produto_nome || item.servico_descricao || "Item"}
                     </Text>
                     <Text style={styles.itemVendaValor}>
-                      {Number(item.quantidade || 0)} x R$ {Number(item.preco_unitario || 0).toFixed(2)}
-                      {" • "}R$ {Number(item.subtotal || 0).toFixed(2)}
+                      {Number(item.quantidade || 0)} x {formatarMoeda(Number(item.preco_unitario || 0))}
+                      {" • "}{formatarMoeda(Number(item.subtotal || 0))}
                     </Text>
                   </View>
                 ))}

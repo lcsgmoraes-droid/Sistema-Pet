@@ -9,6 +9,7 @@ from typing import Dict, List, Optional
 from pydantic import BaseModel, EmailStr, Field, validator
 
 from app.services.cliente_alertas_pdv import normalizar_alertas_pdv
+from app.services.cliente_origem import OrigemCliente
 
 __all__ = [
     "AppLoginCreate",
@@ -145,6 +146,7 @@ class AppLoginCreate(BaseModel):
 
 
 class ClienteCreate(BaseModel):
+    origem_cliente: OrigemCliente = "loja_fisica"
     # Tipo de cadastro
     tipo_cadastro: str = "cliente"  # cliente, fornecedor, veterinario, funcionario
     tipo_pessoa: str = "PF"  # PF ou PJ
@@ -280,6 +282,7 @@ class ClienteCreate(BaseModel):
 
 
 class ClienteUpdate(BaseModel):
+    origem_cliente: OrigemCliente = None
     tipo_cadastro: Optional[str] = None
     tipo_pessoa: Optional[str] = None
     nome: Optional[str] = None
@@ -398,6 +401,7 @@ class ClienteUpdate(BaseModel):
 
 
 class ClienteResponse(BaseModel):
+    origem_cliente: Optional[str] = None
     id: int
     codigo: Optional[str] = None
     tipo_cadastro: str
@@ -538,6 +542,7 @@ class ClienteResponse(BaseModel):
 
 
 class ClientesListResponse(BaseModel):
+    resumo_origens: List[dict] = Field(default_factory=list)
     items: List[ClienteResponse]
     total: int
     skip: int

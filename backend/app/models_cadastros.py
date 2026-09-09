@@ -59,6 +59,12 @@ class Cliente(BaseTenantModel):
     __table_args__ = (
         UniqueConstraint("tenant_id", "codigo", name="uq_clientes_tenant_codigo"),
         Index(
+            "ix_clientes_tenant_origem_cadastro",
+            "tenant_id",
+            "origem_cliente",
+            "created_at",
+        ),
+        Index(
             "uq_clientes_tenant_auth_user_ativo",
             "tenant_id",
             "auth_user_id",
@@ -94,6 +100,8 @@ class Cliente(BaseTenantModel):
     )  # Código único do cliente por tenant (ex: 9923)
 
     # Tipo de cadastro e pessoa
+    # Sem default global: importacoes e registros antigos nao comprovam origem.
+    origem_cliente = Column(String(50), nullable=True)
     tipo_cadastro = Column(
         String(50), nullable=False, default="cliente", index=True
     )  # cliente, fornecedor, veterinario

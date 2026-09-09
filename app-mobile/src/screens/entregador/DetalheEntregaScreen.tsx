@@ -265,7 +265,7 @@ export default function DetalheEntregaScreen() {
     const paradaId = paradaNaoEntregueId;
     setProcessando(paradaId);
     try {
-      await api.post(
+      const { data } = await api.post<{ rota_removida?: boolean }>(
         `/ecommerce/entregador/rotas/${rotaId}/paradas/${paradaId}/nao-entregue`,
         {},
         {
@@ -275,6 +275,14 @@ export default function DetalheEntregaScreen() {
         },
       );
       limparModalNaoEntregue();
+      if (data.rota_removida) {
+        localizacaoSubscriptionRef.current?.remove();
+        localizacaoSubscriptionRef.current = null;
+        await pararRastreamentoEntregaEmSegundoPlano(rotaId);
+        setRota(null);
+        navigation.navigate("MinhasRotas", { refreshKey: Date.now() });
+        return;
+      }
       await carregar();
     } catch {
       Alert.alert("Erro", "Nao foi possivel registrar a ocorrencia.");

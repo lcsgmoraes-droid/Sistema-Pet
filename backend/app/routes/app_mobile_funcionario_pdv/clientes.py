@@ -13,6 +13,7 @@ from app.db import get_session
 from app.evolucao_corepet import registrar_uso_funcionalidade
 from app.models import Cliente, User
 from app.routes.ecommerce_auth import _get_current_ecommerce_user
+from app.services.cliente_origem import opcoes_origem_cliente
 
 from .auth import _get_funcionario_operacional_or_403
 from .common import _somente_digitos_funcionario_pdv
@@ -22,6 +23,15 @@ from .schemas import (
 )
 
 router = APIRouter()
+
+
+@router.get("/funcionario/pdv/clientes/origens")
+def listar_origens_cliente_funcionario_pdv(
+    current_user: User = Depends(_get_current_ecommerce_user),
+    db: Session = Depends(get_session),
+):
+    _funcionario, tenant_id = _get_funcionario_operacional_or_403(db, current_user)
+    return opcoes_origem_cliente(db, Cliente, [tenant_id])
 
 
 def _serialize_funcionario_pdv_cliente(cliente: Cliente) -> dict:
@@ -58,6 +68,7 @@ def _serialize_funcionario_pdv_cliente(cliente: Cliente) -> dict:
         ),
     }
     return {
+        "origem_cliente": getattr(cliente, "origem_cliente", None),
         "id": cliente.id,
         "codigo": cliente.codigo,
         "nome": cliente.nome
@@ -170,6 +181,7 @@ def criar_cliente_rapido_funcionario_pdv(
     telefone = _somente_digitos_funcionario_pdv(payload.telefone) or None
     endereco = (payload.endereco or "").strip() or None
     cliente = Cliente(
+        origem_cliente=payload.origem_cliente,
         tenant_id=tenant_id,
         user_id=current_user.id,
         codigo=codigo,
@@ -198,6 +210,7 @@ def criar_cliente_rapido_funcionario_pdv(
         cliente.id,
         {
             "origem": "app_funcionario_pdv",
+            "origem_cliente": payload.origem_cliente,
             "nome": nome,
             "telefone": telefone,
             "endereco": endereco,

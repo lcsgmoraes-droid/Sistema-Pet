@@ -4,6 +4,7 @@ import { AlertCircle, UsersRound } from "lucide-react";
 import toast from "react-hot-toast";
 import api from "../api";
 import ClientesNovoActionsBar from "../components/clientes/ClientesNovoActionsBar";
+import ClientesOrigemResumo from "../components/clientes/ClientesOrigemResumo";
 import ClientesNovoCadastroRecenteBanner from "../components/clientes/ClientesNovoCadastroRecenteBanner";
 import ClientesNovoModalsLayer from "../components/clientes/ClientesNovoModalsLayer";
 import ClientesNovoTabelaSection from "../components/clientes/ClientesNovoTabelaSection";
@@ -72,6 +73,9 @@ const Pessoas = () => {
     filteredClientes,
     loadClientes,
     getClientePorCodigoExato,
+    filtrosOrigem,
+    alterarFiltrosOrigem,
+    resumoOrigens,
   } = useClientesNovoListagem({ tipoFiltro, visaoDashboard, setError });
 
   const setTipoFiltroComContexto = (proximoTipo) => {
@@ -552,6 +556,14 @@ const Pessoas = () => {
         onCopiarCampo={handleCopiarCampoRecente}
         onLimparFiltro={handleLimparFiltroRecente}
       />
+      {tipoFiltro === "cliente" && (
+        <ClientesOrigemResumo
+          filtros={filtrosOrigem}
+          onChange={alterarFiltrosOrigem}
+          resumo={resumoOrigens}
+          loading={loading}
+        />
+      )}
       <PessoasDuplicidadeBanner
         sugestoes={duplicidade.sugestoes}
         totalSugestoes={duplicidade.totalSugestoes}

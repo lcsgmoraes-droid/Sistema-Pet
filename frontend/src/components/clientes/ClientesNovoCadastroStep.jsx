@@ -1,4 +1,5 @@
 import { FiCheck, FiDollarSign } from "react-icons/fi";
+import ClienteOrigemSelect from "./ClienteOrigemSelect";
 
 function formatarDataHoraCadastro(valor) {
   if (!valor) return "Data nao registrada";
@@ -38,6 +39,12 @@ const ClientesNovoCadastroStep = ({
   return (
     <div className="space-y-4">
       <h3 className="text-lg font-semibold text-gray-900 mb-4">Informações do cadastro</h3>
+      {formData.tipo_cadastro === "cliente" && (
+        <ClienteOrigemSelect
+          value={formData.origem_cliente}
+          onChange={(origem_cliente) => setFormData((prev) => ({ ...prev, origem_cliente }))}
+        />
+      )}
 
       {editingCliente?.id && (
         <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">

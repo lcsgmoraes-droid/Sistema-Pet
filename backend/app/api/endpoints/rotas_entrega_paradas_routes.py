@@ -452,6 +452,8 @@ def marcar_parada_nao_entregue(
 
     if not rota:
         raise HTTPException(status_code=404, detail="Rota não encontrada")
+    if rota.status in ("concluida", "cancelada"):
+        raise HTTPException(status_code=400, detail="Rota ja foi encerrada")
 
     # Validar parada
     parada = (
@@ -467,14 +469,6 @@ def marcar_parada_nao_entregue(
     if not parada:
         raise HTTPException(status_code=404, detail="Parada não encontrada")
 
-    # Salvar motivo como observação
-    if motivo:
-        obs_existente = parada.observacoes or ""
-        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M")
-        parada.observacoes = (
-            f"{obs_existente}\n[{timestamp}] Não entregue: {motivo}".strip()
-        )
-
     # Reverter venda para status pendente (para aparecer na lista de entregas em aberto)
     venda = (
         db.query(Venda)
@@ -486,6 +480,13 @@ def marcar_parada_nao_entregue(
     )
     if venda:
         venda.status_entrega = "pendente"
+        # A parada sera removida; o motivo precisa permanecer na venda.
+        motivo_final = (motivo or "").strip()
+        if motivo_final:
+            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M")
+            registro = f"[{timestamp}] Não entregue (rota {rota.id}): {motivo_final}"
+            observacoes = venda.observacoes_entrega or ""
+            venda.observacoes_entrega = f"{observacoes}\n{registro}".strip()
 
     # Remover parada da rota
     venda_id = parada.venda_id
@@ -497,9 +498,12 @@ def marcar_parada_nao_entregue(
             RotaEntregaParada.rota_id == rota.id,
             RotaEntregaParada.tenant_id == tenant_id,
         )
-        .count()
+        .order_by(RotaEntregaParada.ordem, RotaEntregaParada.id)
+        .all()
     )
-    rota_removida = paradas_restantes == 0
+    for ordem, parada_restante in enumerate(paradas_restantes, start=1):
+        parada_restante.ordem = ordem
+    rota_removida = not paradas_restantes
     if rota_removida:
         db.delete(rota)
 
@@ -513,5 +517,5 @@ def marcar_parada_nao_entregue(
         "message": "Entrega marcada como não realizada. Venda voltou para entregas em aberto.",
         "venda_id": venda_id,
         "rota_removida": rota_removida,
-        "paradas_restantes": paradas_restantes,
+        "paradas_restantes": len(paradas_restantes),
     }

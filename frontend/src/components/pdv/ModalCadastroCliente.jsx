@@ -1,6 +1,7 @@
 import { CheckCircle, X } from "lucide-react";
 import { useState } from "react";
 import { criarCliente } from "../../api/clientes";
+import ClienteOrigemSelect from "../clientes/ClienteOrigemSelect";
 
 function validarCpf(cpf) {
   const digits = String(cpf || "").replace(/\D/g, "");
@@ -78,6 +79,7 @@ function extrairMensagemErroCadastroCliente(error) {
 export default function ModalCadastroCliente({ onClose, onClienteCriado, valorBuscaInicial }) {
   const [formData, setFormData] = useState({
     ...inferirDadosIniciais(valorBuscaInicial),
+    origem_cliente: "loja_fisica",
   });
   const [loading, setLoading] = useState(false);
   const [erro, setErro] = useState("");
@@ -96,6 +98,7 @@ export default function ModalCadastroCliente({ onClose, onClienteCriado, valorBu
     try {
       const clienteCriado = await criarCliente({
         nome: formData.nome,
+        origem_cliente: formData.origem_cliente,
         celular: formData.celular,
         cpf: formData.cpf,
         email: formData.email,
@@ -116,7 +119,7 @@ export default function ModalCadastroCliente({ onClose, onClienteCriado, valorBu
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-      <div className="mx-4 w-full max-w-md rounded-lg bg-white shadow-xl">
+      <div className="mx-4 max-h-[90dvh] w-full max-w-md overflow-y-auto rounded-lg bg-white shadow-xl">
         <div className="flex items-center justify-between border-b p-6">
           <h2 className="text-xl font-bold text-gray-900">Cadastro rapido</h2>
           <button
@@ -129,6 +132,11 @@ export default function ModalCadastroCliente({ onClose, onClienteCriado, valorBu
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4 p-6">
+          <ClienteOrigemSelect
+            value={formData.origem_cliente}
+            disabled={loading}
+            onChange={(origem_cliente) => setFormData((prev) => ({ ...prev, origem_cliente }))}
+          />
           {erro && (
             <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
               {erro}

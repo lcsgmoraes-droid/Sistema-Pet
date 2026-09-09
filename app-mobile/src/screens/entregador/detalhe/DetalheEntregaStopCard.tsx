@@ -79,7 +79,10 @@ export function DetalheEntregaStopCard({
           <TouchableOpacity
             style={[styles.btnDrag, isActive && styles.btnDragAtivo]}
             onLongPress={drag}
-            delayLongPress={70}
+            delayLongPress={300}
+            accessibilityRole="button"
+            accessibilityLabel={`Reordenar entrega ${parada.ordem}`}
+            accessibilityHint="Segure e arraste para mudar a posição da entrega."
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
             <Text style={styles.btnDragText}>☰</Text>
