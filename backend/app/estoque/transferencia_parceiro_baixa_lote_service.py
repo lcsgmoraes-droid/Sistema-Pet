@@ -9,7 +9,14 @@ from fastapi import HTTPException
 from sqlalchemy.orm import Session, joinedload
 
 from app.domain.dre.lancamento_dre_sync import atualizar_dre_por_lancamento
-from app.estoque.service import EstoqueService
+from app.estoque.transferencia_parceiro_devolucao_service import (
+    buscar_resumos_devolucao,
+    preparar_devolucao,
+    registrar_entrada_devolucao,
+)
+from app.estoque.transferencia_parceiro_schemas import (
+    TransferenciaParceiroDevolucaoItemRequest,
+)
 from app.estoque.transferencia_parceiro_baixa_lote_acerto import (
     criar_conta_pagar_acerto_lote,
     valor_conta_pagar_acerto_payload,
@@ -19,7 +26,6 @@ from app.estoque.transferencia_parceiro_documents import (
     _status_transferencia_parceiro,
 )
 from app.estoque.transferencia_parceiro_support import (
-    _MOTIVO_TRANSFERENCIA_PARCEIRO_ESTOQUE,
     _buscar_forma_pagamento_transferencia,
     _obter_ou_criar_forma_pagamento_acerto,
     _saldo_conta_pagar,
@@ -32,7 +38,6 @@ from app.financeiro_models import (
     Pagamento,
     Recebimento,
 )
-from app.produtos_models import EstoqueMovimentacao
 
 
 CENTAVO = Decimal("0.01")
@@ -43,8 +48,6 @@ _MODOS_BAIXA_LOTE = {
     "acerto": "Acerto / compensacao",
     "produto_devolvido": "Produto devolvido",
 }
-_MOTIVO_DEVOLUCAO_TRANSFERENCIA_PARCEIRO = "transf_dev"
-_REFERENCIA_DEVOLUCAO_TRANSFERENCIA_PARCEIRO = "transf_devolucao"
 
 
 def _texto_ascii(valor) -> str:
@@ -212,6 +215,9 @@ def _buscar_contas_aplicacao(
             ContaReceber.cliente_id == parceiro_id,
             ContaReceber.id.in_(conta_ids),
         )
+        .order_by(ContaReceber.id.asc())
+        .with_for_update(of=ContaReceber)
+        .populate_existing()
         .all()
     )
     contas_por_id = {int(conta.id): conta for conta in contas}
@@ -396,39 +402,25 @@ def _estornar_estoque_transferencia(
     tenant_id,
     observacao: str,
 ) -> list[int]:
-    movimentacoes = (
-        db.query(EstoqueMovimentacao)
-        .filter(
-            EstoqueMovimentacao.tenant_id == str(tenant_id),
-            EstoqueMovimentacao.referencia_id == conta.id,
-            EstoqueMovimentacao.tipo == "saida",
-            EstoqueMovimentacao.motivo.in_(
-                [_MOTIVO_TRANSFERENCIA_PARCEIRO_ESTOQUE, "transferencia_parceiro"]
-            ),
+    resumo = buscar_resumos_devolucao(
+        db, tenant_id=tenant_id, conta_ids=[conta.id]
+    ).get(conta.id, {"itens": []})
+    solicitados = [
+        TransferenciaParceiroDevolucaoItemRequest(
+            produto_id=item["produto_id"], quantidade=item["quantidade_disponivel"]
         )
-        .order_by(EstoqueMovimentacao.id.asc())
-        .all()
+        for item in resumo["itens"]
+        if item["quantidade_disponivel"] > 0
+    ]
+    itens, _total = preparar_devolucao(resumo["itens"], solicitados)
+    return registrar_entrada_devolucao(
+        db,
+        conta=conta,
+        itens=itens,
+        user_id=user_id,
+        tenant_id=tenant_id,
+        observacao=observacao,
     )
-
-    movimentos_criados: list[int] = []
-    for movimentacao in movimentacoes:
-        resultado = EstoqueService.estornar_estoque(
-            produto_id=movimentacao.produto_id,
-            quantidade=float(movimentacao.quantidade or 0),
-            motivo=_MOTIVO_DEVOLUCAO_TRANSFERENCIA_PARCEIRO,
-            referencia_id=conta.id,
-            referencia_tipo=_REFERENCIA_DEVOLUCAO_TRANSFERENCIA_PARCEIRO,
-            user_id=user_id,
-            db=db,
-            tenant_id=str(tenant_id),
-            documento=conta.documento,
-            observacao=observacao,
-            custo_unitario_override=float(movimentacao.custo_unitario or 0),
-            valor_total_override=float(movimentacao.valor_total or 0),
-        )
-        movimentos_criados.append(resultado["movimentacao_id"])
-
-    return movimentos_criados
 
 
 def aplicar_baixa_lote_transferencia(

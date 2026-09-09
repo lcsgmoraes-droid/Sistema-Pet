@@ -83,9 +83,22 @@ function HistoricoBaixasTransferencia({ registro }) {
             </div>
           ))}
         </div>
-      ) : (
+      ) : !registro.devolucoes?.length ? (
         <p className="mt-2 text-xs text-emerald-800">Nenhuma baixa registrada.</p>
-      )}
+      ) : null}
+      {registro.devolucoes?.map((devolucao) => (
+        <div
+          key={`devolucao-${devolucao.movimentacao_id}`}
+          className="mt-2 rounded-xl bg-white px-4 py-3 text-sm shadow-sm"
+        >
+          <p className="font-semibold text-sky-900">Produto devolvido: {devolucao.produto_nome}</p>
+          <p className="mt-1 text-slate-600">
+            {formatarQuantidade(devolucao.quantidade)} devolvido(s) ao estoque |{" "}
+            {formatarMoeda(devolucao.valor_total)}
+          </p>
+          <p className="mt-1 text-xs text-slate-500">{devolucao.observacao}</p>
+        </div>
+      ))}
     </div>
   );
 }

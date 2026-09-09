@@ -24,6 +24,7 @@ import {
 import useTransferenciaBaixaLoteController from "./useTransferenciaBaixaLoteController";
 import { confirmarCorePet } from "../../services/corepetDialog";
 import useShiftRangeSelection from "../../hooks/useShiftRangeSelection";
+import { calcularDevolucaoParceiro } from "./devolucaoParceiroUtils";
 export default function useTransferenciaHistoricoController({
   parceiroSelecionado,
   transferenciaEditando,
@@ -529,7 +530,16 @@ export default function useTransferenciaHistoricoController({
   };
 
   const registrarBaixaTransferencia = async (registro) => {
-    const valorRecebido = normalizarNumero(formBaixa.valor_recebido);
+    const devolucaoComEstoque =
+      formBaixa.modo_baixa === "produto_devolvido" && formBaixa.devolver_estoque;
+    const devolucao = calcularDevolucaoParceiro(registro, formBaixa.itens_devolucao);
+    if (devolucaoComEstoque && (devolucao.erro || !devolucao.itens.length)) {
+      toast.error(devolucao.erro || "Informe a quantidade de pelo menos um produto a devolver.");
+      return;
+    }
+    const valorRecebido = devolucaoComEstoque
+      ? devolucao.total
+      : normalizarNumero(formBaixa.valor_recebido);
     if (!Number.isFinite(valorRecebido) || valorRecebido <= 0) {
       toast.error("Informe um valor recebido maior que zero.");
       return;
@@ -556,14 +566,6 @@ export default function useTransferenciaHistoricoController({
     }
     if (
       formBaixa.modo_baixa === "produto_devolvido" &&
-      formBaixa.devolver_estoque &&
-      Math.abs(valorRecebido - Number(registro.saldo_aberto || 0)) > 0.01
-    ) {
-      toast.error("Produto devolvido com volta ao estoque exige baixa integral da transferencia.");
-      return;
-    }
-    if (
-      formBaixa.modo_baixa === "produto_devolvido" &&
       !formBaixa.devolver_estoque &&
       !formBaixa.observacao.trim()
     ) {
@@ -575,6 +577,7 @@ export default function useTransferenciaHistoricoController({
       form: formBaixa,
       valorRecebido,
       compensacoesPayload,
+      itensDevolucao: devolucao.itens,
     });
 
     try {

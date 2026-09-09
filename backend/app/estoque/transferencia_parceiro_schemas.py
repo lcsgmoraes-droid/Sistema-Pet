@@ -53,22 +53,22 @@ class TransferenciaParceiroCompensacaoContaRequest(BaseModel):
     valor_compensado: float = Field(gt=0)
 
 
+class TransferenciaParceiroDevolucaoItemRequest(BaseModel):
+    produto_id: int = Field(gt=0)
+    quantidade: float = Field(gt=0, allow_inf_nan=False)
+
+
 class TransferenciaParceiroRecebimentoRequest(BaseModel):
     valor_recebido: float = Field(gt=0)
     data_recebimento: date = Field(default_factory=date.today)
     modo_baixa: str = Field(default="recebimento")
     forma_pagamento_id: Optional[int] = None
     devolver_estoque: bool = False
-    itens_devolucao: Optional[List["TransferenciaParceiroDevolucaoItemRequest"]] = None
+    itens_devolucao: Optional[List[TransferenciaParceiroDevolucaoItemRequest]] = None
     compensacoes: List[TransferenciaParceiroCompensacaoContaRequest] = Field(
         default_factory=list
     )
     observacao: Optional[str] = None
-
-
-class TransferenciaParceiroDevolucaoItemRequest(BaseModel):
-    produto_id: int = Field(gt=0)
-    quantidade: float = Field(gt=0, allow_inf_nan=False)
 
 
 class TransferenciaParceiroDevolucaoItem(BaseModel):
@@ -181,8 +181,12 @@ class TransferenciaParceiroHistoricoItem(BaseModel):
     observacoes: Optional[str] = None
     baixas: List[TransferenciaParceiroBaixaHistoricoItem] = Field(default_factory=list)
     itens: List[TransferenciaParceiroHistoricoMovItem] = Field(default_factory=list)
-    itens_devolucao: List[TransferenciaParceiroDevolucaoItem] = Field(default_factory=list)
-    devolucoes: List[TransferenciaParceiroDevolucaoHistoricoItem] = Field(default_factory=list)
+    itens_devolucao: List[TransferenciaParceiroDevolucaoItem] = Field(
+        default_factory=list
+    )
+    devolucoes: List[TransferenciaParceiroDevolucaoHistoricoItem] = Field(
+        default_factory=list
+    )
 
 
 class TransferenciaParceiroHistoricoTotais(BaseModel):

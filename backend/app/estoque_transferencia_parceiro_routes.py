@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 from .auth.dependencies import get_current_user_and_tenant
 from .db import get_session
 from .empresa_grupo_models import EmpresaGrupoTransferencia
+from .estoque.transferencia_parceiro_devolucao_service import buscar_resumos_devolucao
 from .estoque.transferencia_parceiro_documents import (
     _gerar_pdf_transferencia_parceiro_bytes,
     _gerar_pdf_transferencias_parceiro_consolidado_bytes,
@@ -21,6 +22,8 @@ from .estoque.transferencia_parceiro_documents import (
 from .estoque.transferencia_parceiro_schemas import (
     TransferenciaParceiroContaPagarCompensacaoItem,
     TransferenciaParceiroContaPagarCompensacaoResponse,
+    TransferenciaParceiroDevolucaoItem,
+    TransferenciaParceiroDevolucaoHistoricoItem,
     TransferenciaParceiroEnviarEmailRequest,
     TransferenciaParceiroEntradaHistoricoItem,
     TransferenciaParceiroEntradaHistoricoResponse,
@@ -250,6 +253,21 @@ def listar_transferencias_para_parceiro(
     pages = (total + page_size - 1) // page_size if total else 0
     offset = (page - 1) * page_size
     pagina_items = registros_filtrados[offset : offset + page_size]
+    resumos_devolucao = buscar_resumos_devolucao(
+        db,
+        tenant_id=tenant_id,
+        conta_ids=[item.conta_receber_id for item in pagina_items],
+    )
+    for item in pagina_items:
+        resumo = resumos_devolucao.get(item.conta_receber_id, {})
+        item.itens_devolucao = [
+            TransferenciaParceiroDevolucaoItem(**produto)
+            for produto in resumo.get("itens", [])
+        ]
+        item.devolucoes = [
+            TransferenciaParceiroDevolucaoHistoricoItem(**devolucao)
+            for devolucao in resumo.get("devolucoes", [])
+        ]
 
     return TransferenciaParceiroHistoricoResponse(
         items=pagina_items,
