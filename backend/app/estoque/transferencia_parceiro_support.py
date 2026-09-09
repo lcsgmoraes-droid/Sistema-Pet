@@ -221,8 +221,9 @@ def _buscar_conta_transferencia_parceiro(
     db: Session,
     tenant_id: int | str,
     conta_receber_id: int,
+    bloquear: bool = False,
 ) -> ContaReceber:
-    conta = (
+    query = (
         db.query(ContaReceber)
         .options(
             joinedload(ContaReceber.cliente),
@@ -232,8 +233,10 @@ def _buscar_conta_transferencia_parceiro(
             ContaReceber.tenant_id == str(tenant_id),
             ContaReceber.canal == "transferencia_parceiro",
         )
-        .first()
     )
+    if bloquear:
+        query = query.with_for_update(of=ContaReceber).populate_existing()
+    conta = query.first()
 
     if not conta:
         raise HTTPException(status_code=404, detail="Transferencia nao encontrada")
