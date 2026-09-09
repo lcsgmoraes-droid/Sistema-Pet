@@ -10,6 +10,7 @@ from app.estoque import (
     transferencia_parceiro_schemas,
     transferencia_parceiro_support,
 )
+from tests.route_contract_helpers import method_routes
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -20,10 +21,7 @@ def _source(relative: str) -> str:
 
 
 def test_transferencia_parceiro_routes_ficam_em_router_dedicado():
-    routes = {
-        (route.path, ",".join(sorted(route.methods)))
-        for route in estoque_transferencia_parceiro_routes.router.routes
-    }
+    routes = set(method_routes(estoque_transferencia_parceiro_routes.router))
 
     assert ("/estoque/transferencia-parceiro", "POST") in routes
     assert ("/estoque/transferencia-parceiro/{conta_receber_id}", "PUT") in routes
