@@ -1,5 +1,25 @@
 import api from "./api";
 
+export type ProdutoCadastro = {
+  id: number;
+  nome: string;
+  codigo: string | null;
+  codigo_barras: string | null;
+  descricao_curta: string | null;
+};
+
+export type ProdutoCadastroPayload = Partial<Pick<ProdutoCadastro, "nome" | "codigo_barras" | "descricao_curta">>;
+
+export async function obterCadastroProdutoFuncionario(produtoId: number): Promise<ProdutoCadastro> {
+  const { data } = await api.get<ProdutoCadastro>(`/app/funcionario/produtos/${produtoId}/cadastro`);
+  return data;
+}
+
+export async function atualizarCadastroProdutoFuncionario(produtoId: number, payload: ProdutoCadastroPayload): Promise<ProdutoCadastro> {
+  const { data } = await api.patch<ProdutoCadastro>(`/app/funcionario/produtos/${produtoId}/cadastro`, payload);
+  return data;
+}
+
 export type ProdutoRapido = {
   id: number;
   nome: string;

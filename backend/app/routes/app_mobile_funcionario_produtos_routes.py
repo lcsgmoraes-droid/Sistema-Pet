@@ -9,6 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 from sqlalchemy import func, or_, text
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import SQLAlchemyError
 
 from app.db import get_session
 from app.models import User
@@ -19,6 +20,10 @@ from app.routes.app_mobile_funcionario_pdv.auth import (
 )
 from app.routes.ecommerce_auth import _get_current_ecommerce_user
 from app.services.produto_service import ProdutoService, normalizar_sku_produto
+from app.services.produto_alias_service import (
+    _lock_alias_namespace,
+    validar_chaves_sem_alias_alheio,
+)
 from app.routes.app_mobile_funcionario_produto_imagens import router as imagens_router
 
 router = APIRouter(prefix="/funcionario/produtos")
@@ -87,7 +92,7 @@ def _codigo_comparavel(valor: str) -> str:
 
 
 def _buscar_produto_existente(
-    db: Session, tenant_id: UUID, codigo: str
+    db: Session, tenant_id: UUID, codigo: str, excluir_produto_id: int | None = None
 ) -> Produto | None:
     codigo = codigo.strip()
     chave = _codigo_comparavel(codigo)
@@ -106,12 +111,10 @@ def _buscar_produto_existente(
     filtros.append(
         func.lower(Produto.codigos_barras_alternativos).contains(chave, autoescape=True)
     )
-    candidatos = (
-        db.query(Produto)
-        .filter(Produto.tenant_id == tenant_id, or_(*filtros))
-        .order_by(Produto.id.asc())
-        .all()
-    )
+    query = db.query(Produto).filter(Produto.tenant_id == tenant_id, or_(*filtros))
+    if excluir_produto_id is not None:
+        query = query.filter(Produto.id != excluir_produto_id)
+    candidatos = query.order_by(Produto.id.asc()).all()
     # Conferir cada codigo completo: um EAN alternativo nao pode casar por trecho.
     return next(
         (
@@ -124,6 +127,129 @@ def _buscar_produto_existente(
         ),
         None,
     )
+
+
+class ProdutoCadastroUpdate(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
+
+    nome: str | None = Field(default=None, min_length=1, max_length=200)
+    codigo_barras: str | None = Field(
+        default=None, min_length=1, max_length=20, pattern=r"^[A-Za-z0-9 ._/-]+$"
+    )
+    descricao_curta: str | None = Field(default=None, max_length=1000)
+
+    @field_validator("nome")
+    @classmethod
+    def nome_obrigatorio(cls, valor):
+        if valor is None:
+            raise ValueError("Informe o nome do produto.")
+        return valor
+
+    @field_validator("codigo_barras", "descricao_curta", mode="before")
+    @classmethod
+    def normalizar_opcionais(cls, valor):
+        return None if isinstance(valor, str) and not valor.strip() else valor
+
+
+class ProdutoCadastroResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    nome: str
+    codigo: str | None = None
+    codigo_barras: str | None = None
+    descricao_curta: str | None = None
+
+
+def _obter_produto_cadastro(db, tenant_id, produto_id, *, bloquear=False):
+    query = db.query(Produto).filter(
+        Produto.tenant_id == tenant_id,
+        Produto.id == produto_id,
+        Produto.deleted_at.is_(None),
+    )
+    if bloquear:
+        query = query.with_for_update().populate_existing()
+    produto = query.first()
+    if not produto:
+        raise HTTPException(status_code=404, detail="Produto nao encontrado.")
+    return produto
+
+
+def _lock_cadastro_mobile(db, tenant_id):
+    if db.get_bind().dialect.name == "postgresql":
+        db.execute(
+            text("SELECT pg_advisory_xact_lock(hashtextextended(:chave, 0))"),
+            {"chave": f"produto-rapido:{tenant_id}"},
+        )
+
+
+@router.get("/{produto_id}/cadastro", response_model=ProdutoCadastroResponse)
+def obter_cadastro_produto_funcionario(
+    produto_id: int,
+    current_user: User = Depends(_get_current_ecommerce_user),
+    db: Session = Depends(get_session),
+):
+    _, tenant_id = _get_funcionario_operacional_or_403(db, current_user)
+    return _obter_produto_cadastro(db, UUID(tenant_id), produto_id)
+
+
+@router.patch("/{produto_id}/cadastro", response_model=ProdutoCadastroResponse)
+def atualizar_cadastro_produto_funcionario(
+    produto_id: int,
+    payload: ProdutoCadastroUpdate,
+    current_user: User = Depends(_get_current_ecommerce_user),
+    db: Session = Depends(get_session),
+):
+    _, tenant_id = _get_funcionario_operacional_or_403(db, current_user)
+    tenant_uuid = UUID(tenant_id)
+    dados = payload.model_dump(exclude_unset=True)
+    # Serializa com o cadastro rapido antes de consultar duplicidade e segue
+    # a ordem do ERP: identidade da empresa antes da linha do produto.
+    _lock_cadastro_mobile(db, tenant_id)
+    _lock_alias_namespace(db, tenant_uuid)
+    produto = _obter_produto_cadastro(db, tenant_uuid, produto_id, bloquear=True)
+    codigo = dados.get("codigo_barras")
+    if codigo and codigo != produto.codigo_barras:
+        existente = _buscar_produto_existente(
+            db, tenant_uuid, codigo, excluir_produto_id=produto_id
+        )
+        if existente:
+            raise HTTPException(
+                status_code=409,
+                detail=f"Este codigo ja pertence ao produto {existente.nome} (SKU {existente.codigo}).",
+            )
+        try:
+            validar_chaves_sem_alias_alheio(
+                db, tenant_id=tenant_uuid, chaves=[codigo], produto_id=produto_id
+            )
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=409,
+                detail="Este codigo ja identifica outro produto no ERP.",
+            ) from exc
+
+    # Somente os campos de identificacao enviados; nao movimenta estoque nem
+    # altera precos, composicoes, SKU, EAN fiscal ou codigos alternativos.
+    for campo, valor in dados.items():
+        setattr(produto, campo, valor)
+    try:
+        db.commit()
+        db.refresh(produto)
+    except SQLAlchemyError as exc:
+        db.rollback()
+        logger.exception("Falha ao editar cadastro de produto pelo app")
+        raise HTTPException(
+            status_code=500,
+            detail="Nao foi possivel salvar o cadastro. Tente novamente.",
+        ) from exc
+    logger.info(
+        "Cadastro mobile atualizado: produto=%s tenant=%s usuario=%s campos=%s",
+        produto_id,
+        tenant_id,
+        current_user.id,
+        sorted(dados),
+    )
+    return produto
 
 
 @router.get("/consultar-codigo", response_model=ProdutoRapidoResponse | None)
@@ -195,11 +321,7 @@ def criar_produto_rapido(
     tenant_uuid = UUID(tenant_id)
     # Serializa cadastros mobile da empresa ate o commit do service, inclusive
     # tentativas repetidas depois de timeout e leituras simultaneas em dois aparelhos.
-    if db.get_bind().dialect.name == "postgresql":
-        db.execute(
-            text("SELECT pg_advisory_xact_lock(hashtextextended(:chave, 0))"),
-            {"chave": f"produto-rapido:{tenant_id}"},
-        )
+    _lock_cadastro_mobile(db, tenant_id)
     # Sem SKU manual, a mesma tentativa conserva a identidade mesmo sem EAN.
     # A chave fica representada no SKU normal, sem nova tabela ou migration.
     sku_repetivel = (
