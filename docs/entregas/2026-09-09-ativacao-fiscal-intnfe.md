@@ -67,9 +67,9 @@ apagar vínculos para contornar conflitos ou repetir uma criação incerta.
   formulário de credenciais e transição simulada para certificado pendente.
   Rótulos acessíveis, segredo do formulário mascarado e mensagens de homologação.
   A prévia usa dados fictícios, sem backend/IntNFe real; não é E2E autenticado.
-- Não foi realizado teste de carga nem obtida autorização SEFAZ. O piloto
-  direto de API posterior enviou uma solicitação em homologação, rejeitada
-  pelo schema do XML; isso não valida emissão pelo CorePet.
+- Não foi realizado teste de carga. O piloto direto de API obteve autorização
+  em homologação na nota 1/003, com XML conferido; isso não valida emissão
+  pelo CorePet. O DANFE apresentou divergência de formatação numérica.
 
 ## 6. Ambientes e homologação
 
@@ -86,9 +86,11 @@ HTTP 200, válido até 02/04/2027. Houve recuperação controlada da credencial 
 emitente recém-criado após perda da resposta de cadastro. A primeira nota
 direta de API, 1/001 em homologação, foi aceita com HTTP 202 e depois rejeitada
 com `SCHEMA` em ICMS-ST e PIS/COFINS. O reteste com dados idênticos gerou a
-nota 2/001 e retornou 539 (duplicidade), sem repetir os erros de XML. Falta
-reconciliar a numeração; chave gerada sem autorização, protocolo ou XML/DANFE
-autorizados.
+nota 2/001 e retornou 539 (duplicidade), sem repetir os erros de XML. Por
+sugestão de Lucas, somente a série foi alterada para 3 e a nota 1/003 foi
+autorizada. XML conferido, com protocolo, cStat 100 e tpAmb 2. O DANFE foi
+obtido, mas tem números divergentes do XML: total 7.123,00 em lugar de 71,23.
+Corrigir o DANFE; a conciliação da série 001 segue pendente antes de reutilizá-la.
 Detalhes no [registro](../FISCAL_INTNFE_PILOTO_HOMOLOGACAO.md) e no
 [diagnóstico](../DIAGNOSTICO_INTNFE_NFE_HOMOLOGACAO_2026-09-09.md).
 Esta ficha registra a validação técnica parcial; homologação operacional com
@@ -138,8 +140,9 @@ Marco de comunicação aos clientes: liberação futura da funcionalidade.
 - [ ] E2E autenticado do fluxo completo com conta DEV autorizada e emissor real.
 - [x] Emissor real e certificado reconhecidos no piloto direto da API IntNFe.
 - [x] Retestar os mesmos dados: erros anteriores de schema não se repetiram.
-- [ ] Resolver duplicidade 539 e reconciliar a numeração de homologação.
-- [ ] Primeira nota de produto autorizada em homologação.
+- [ ] Conciliar duplicidade 539 antes de reutilizar a série 001 em homologação.
+- [x] Primeira nota de produto autorizada em homologação: 1/003, XML conferido.
+- [ ] Corrigir os números no DANFE e conferir novamente contra o XML autorizado.
 
 Decisão: preparada para revisão, com pendências de homologação. Não liberada
 para produção. Responsáveis: equipe IntNFe pelo contrato; Lucas e Codex

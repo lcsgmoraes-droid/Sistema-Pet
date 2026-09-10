@@ -538,11 +538,11 @@ Toda integração nova ou alterada deve registrar, antes da homologação:
   externos ou credenciais. Exclusão/inativação externa pede revisão de suporte.
 - **Responsável:** Lucas pelo piloto; equipe IntNFe pelo conflito/contrato
   externo; Codex pela implementação e testes.
-- **Lacuna prioritária:** homologar o fluxo integrado DEV e reconciliar a
-  numeração de homologação após rejeição 539 (duplicidade) na nota 2/001.
-  Os erros de XML da primeira nota não se repetiram no reteste com os mesmos
-  dados. Cadastro da LJ, autenticação e A1 confirmados em 09/09/2026;
-  conflito 409 superado. Ainda sem autorização fiscal no piloto.
+- **Lacuna prioritária:** homologar o fluxo integrado DEV e corrigir o DANFE
+  numérico da IntNFe: a nota 1/003 foi autorizada em homologação, XML total
+  71.23 correto, mas HTML total 7.123,00. Cadastro, autenticação, A1 e primeira
+  autorização confirmados em 09/09/2026. Conciliar a duplicidade 539 da série
+  001 antes de reutilizá-la; não impediu a autorização na série 003.
   Emissão pelo CorePet não implementada nesta etapa. Flag desligada por padrão.
 - **Evidência:** `backend/app/intnfe/`, `backend/tests/unit/test_intnfe_*.py`,
   `backend/tests/integration/test_intnfe_postgres.py`,

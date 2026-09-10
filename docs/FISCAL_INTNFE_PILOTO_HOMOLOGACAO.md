@@ -1,6 +1,6 @@
 # IntNFe — primeiro teste de NF-e de produto
 
-Registro: 09/09/2026. Situação atual às 22:39 de Brasília: integrador **CorePet — Lucas Guerra**, emitente LJ ativo e A1 aceito, válido até 02/04/2027. O reteste com dados idênticos gerou a nota **2, série 001**, em **homologação**. Os erros anteriores de XML não se repetiram; o novo retorno foi **539 — duplicidade com diferença na chave de acesso**. Falta reconciliar a numeração e obter autorização, XML e DANFE. [Diagnóstico atualizado para a IntNFe](DIAGNOSTICO_INTNFE_NFE_HOMOLOGACAO_2026-09-09.md).
+Registro: 09/09/2026. Situação atual às 23:05 de Brasília: **primeira NF-e autorizada em homologação**, número **1, série 003**, total **R$ 71,23**. Integrador **CorePet — Lucas Guerra**, emitente LJ ativo e A1 aceito. Chave, protocolo e XML autorizado conferidos. O DANFE foi baixado, mas exibe valores/quantidade incorretos; precisa de correção na IntNFe. [Diagnóstico atualizado](DIAGNOSTICO_INTNFE_NFE_HOMOLOGACAO_2026-09-09.md).
 
 ## Decisão registrada
 
@@ -25,7 +25,8 @@ O [estudo do Bling e da estrutura fiscal do CorePet](ESTUDO_BLING_E_ESTRUTURA_FI
   um cadastro separado de compradores na IntNFe. O envio recebeu HTTP 202 e depois
   rejeição `SCHEMA`, sem chave ou protocolo de autorização. O reteste posterior
   com dados idênticos recebeu rejeição `539`; a chave gerada nesse retorno
-  não representa autorização.
+  não representa autorização. Após Lucas sugerir outra série, o mesmo cenário
+  na série 3 foi autorizado; XML conferido e erro de formatação encontrado no DANFE.
 
 ## Acesso, empresa e cliente são coisas diferentes
 
@@ -48,12 +49,13 @@ Se já houver empresa cadastrada, consultar e reutilizar seu cadastro. Não rota
 | Acesso ao emitente LJ | Concluído: emitente criado e ativo sob CorePet — Lucas Guerra; credencial própria protegida e autenticação HTTP 200 | Codex/IntNFe |
 | Dados da empresa piloto | Concluído: CNPJ, IE, CRT, endereço e IBGE conferidos. Bairro usado: Vila Industrial, confirmado por consultas de CNPJ e CEP | Codex |
 | Certificado | Concluído: A1 do mesmo CNPJ enviado e reconhecido, HTTP 200, não expirado, válido até 02/04/2027 | Lucas/Codex/IntNFe |
-| Habilitação e série | Série 1 de homologação iniciada automaticamente pela API, sem alterar sequência. Autorização pela SEFAZ ainda não comprovada | IntNFe |
+| Habilitação e série | Concluído para o piloto: nota 1/003 autorizada em homologação, após Lucas sugerir outra série | IntNFe/Codex |
 | Destinatário | Concluído para o envio: cadastro do Bling autorizado por Lucas, CPF válido e endereço/IBGE conferidos, indicador IE 9, sem e-mail | Codex |
 | Um produto simples | Concluído para o envio: um item da NF-e 017697 do Bling, com NCM, CFOP, CEST, origem e tributação da referência | Codex |
-| XML dos impostos | Erros anteriores não se repetiram no reteste com os mesmos dados; a nova rejeição é de duplicidade. XML autorizado ainda não validado | Equipe IntNFe |
-| Numeração em homologação | Resolver retorno 539 para a nota 2/001; chave preexistente não encontrada na API do emitente atual. API aponta próximo número 3, ainda sem comprovação de disponibilidade na SEFAZ | Equipe IntNFe |
-| Nota autorizada e arquivos | Após a correção, repetir de forma controlada em homologação; conferir chave, protocolo, XML e DANFE | Lucas/Codex/IntNFe |
+| XML dos impostos | Concluído para o cenário: XML autorizado contém ICMSSN500, PISOutr e COFINSOutr, preservando CSOSN 500/CST 49 | Equipe IntNFe/Codex |
+| Numeração em homologação | Série 3 permitiu emitir. Conciliar o histórico da duplicidade 539 da série 1 antes de reutilizá-la | Equipe IntNFe |
+| Nota autorizada e XML | Concluído: nota 1/003, cStat 100, tpAmb 2, chave/protocolo/destinatário/item/totais conferidos | Codex |
+| DANFE | Corrigir formatação: XML total 71.23, HTML exibe 7.123,00; produtos, desconto e quantidade também divergem. Regenerar para a mesma nota autorizada | Equipe IntNFe |
 
 Solicitar credenciais por meio protegido ou entrada direta no portal; não colocar segredos/certificados em documentos, commits ou mensagens de diagnóstico. Os exemplos públicos da API não são credenciais de teste liberadas para uso.
 
@@ -118,8 +120,8 @@ Nenhum dos assuntos futuros será usado para exigir a integração completa ante
 | Autenticação do emitente | HTTP 200, credencial própria armazenada com DPAPI |
 | Certificado | Upload e consulta HTTP 200; CNPJ correto, válido até 02/04/2027 |
 | Destinatário | Enviado no corpo da NF-e; não foi comprovado cadastro separado de comprador |
-| Nota enviada/autorizada | Nº 1/001 rejeitada com `SCHEMA`; reteste nº 2/001 rejeitado com `539`, ambos em homologação |
-| Chave/XML/DANFE de teste | Chave gerada na nota 2/001, sem autorização/protocolo; XML autorizado e DANFE não obtidos |
+| Nota enviada/autorizada | 1/001 rejeitada SCHEMA; 2/001 rejeitada 539; 1/003 autorizada. Todos em homologação |
+| Chave/XML/DANFE de teste | Chave/protocolo/XML autorizado da 1/003 conferidos. DANFE obtido, com divergências numéricas |
 
 ### Evidência do impedimento no cadastro
 
@@ -294,5 +296,38 @@ piloto direto de API e ainda precisa de validação ponta a ponta.
 - Evidências em `runtime/analises/fiscal/2026-09-09/reteste-02/`, ignorado pelo
   Git. Ainda sem protocolo, autorização, XML autorizado ou DANFE.
 
-**Próxima ação:** reconciliar a numeração de homologação e então retomar o teste
-de forma controlada, mantendo o cenário fiscal.
+Naquele momento, a próxima ação era reconciliar a numeração antes de reutilizar
+a série 001. Lucas sugeriu uma série diferente no teste seguinte.
+
+### Série 3 — primeira autorização e validação dos arquivos
+
+- Lucas sugeriu testar outra série, como 3 ou 4. Somente `serie` foi alterada
+  de `"1"` para `"3"`; comparação do JSON confirmou os demais campos mantidos.
+  Consulta prévia: última tentativa rejeitada, A1 válido, sem série 3 na
+  numeração da API. Nenhuma sequência foi editada.
+- **23:04:08 de Brasília:** POST com nova chave de idempotência, HTTP 202,
+  correlação `3a6cea68-0a2d-4b1d-b7db-aff339a30497`.
+- **23:04:11:** status 3, **Autorizada**, nota **1/003**, modelo 55, homologação.
+  Protocolo `135260008437173`, chave
+  `35260933590794000140550030000000011158859473`.
+- XML e DANFE baixados via API. No `nfeProc`, confirmados `cStat=100`, `tpAmb=2`
+  na NF-e e no protocolo, CNPJ correto, chave e protocolo iguais à consulta,
+  destinatário, um item, códigos fiscais, quantidade, valores e total R$ 71,23.
+  Grupos gerados: ICMSSN500, PISOutr e COFINSOutr, com CSOSN 500 e CST 49.
+- **Nova pendência do DANFE:** o HTML contém chave correta e aviso sem valor
+  fiscal, mas total `7.123,00` no lugar de `71,23`, produtos `19.900,00` no lugar
+  de `199,00`, desconto `12.777,00` no lugar de `127,77` e quantidade `100.000`
+  no lugar de 1. O XML autorizado tem os valores corretos. Hipótese: conversão
+  de separadores decimais; a causa interna cabe à IntNFe confirmar.
+- Evidências originais em `runtime/analises/fiscal/2026-09-09/reteste-03-serie3/`:
+  `NF-e-LJ-HOMOLOGACAO-1-003.xml`, `NF-e-LJ-HOMOLOGACAO-1-003.html`,
+  `validacao-arquivos.json`, payload, controle, preflight e respostas. Dados
+  pessoais e arquivos fiscais não foram incluídos no Git.
+- O teste comprova primeira autorização direta pela API, sem emissão pelo
+  CorePet/PDV e sem produção. A emissão autorizada está concluída; o DANFE
+  ainda não passou na conferência de correspondência com o XML.
+
+**Próxima ação:** corrigir e regenerar o DANFE da mesma nota autorizada, sem
+nova emissão para esse ajuste. Manter a conciliação da série 001 como pendência
+antes de voltar a usá-la. Para produção, levantar a sequência do Bling por
+CNPJ/série/ambiente: a numeração real é independente da homologação.

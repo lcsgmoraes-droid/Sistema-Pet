@@ -1,9 +1,86 @@
 # IntNFe — diagnóstico e reteste da NF-e de homologação
 
-**Atualização em 09/09/2026 às 22:39 de Brasília:** o reteste com os mesmos dados
-não repetiu os erros de XML. A nota **2/001** foi rejeitada com **539 — duplicidade
-de NF-e com diferença na chave de acesso**. A pendência atual é reconciliar a
-numeração de homologação com o histórico já existente. Ainda sem autorização.
+**Atualização em 09/09/2026 às 23:05 de Brasília:** a primeira NF-e foi
+**autorizada em homologação**, número **1, série 003**, com o mesmo cenário
+fiscal e total de **R$ 71,23**. XML autorizado baixado e conferido. O DANFE
+também foi obtido, mas apresenta números incorretos: total **R$ 7.123,00**.
+A pendência imediata passou a ser a formatação numérica do DANFE.
+
+## Teste com série 3 — autorizado, DANFE divergente
+
+Lucas sugeriu testar outra série, como 3 ou 4. Foi alterado **somente** o campo
+`serie` de `"1"` para `"3"`. Comparação do JSON confirmou os demais dados
+preservados. Antes do POST, a tentativa anterior continuava rejeitada, o A1
+seguia válido e a série 3 não constava na numeração da API. Nova chave de
+idempotência foi persistida antes do envio; nenhuma sequência existente foi
+editada. O ambiente permaneceu `2`, sem e-mail ao destinatário.
+
+| Campo | Resultado |
+|---|---|
+| Correlation ID | `3a6cea68-0a2d-4b1d-b7db-aff339a30497` |
+| ID da nota | `1be5fe0e-aa71-4077-82db-bfb00806546b` |
+| Número/série | 1 / 003 |
+| Aceite | HTTP 202, 09/09/2026 23:04:08 de Brasília |
+| Autorização | Status 3, Autorizada, às 23:04:11; modelo 55, homologação |
+| Chave | `35260933590794000140550030000000011158859473` |
+| Protocolo | `135260008437173` |
+| XML | `nfeProc`, `cStat=100`, `tpAmb=2` na nota e no protocolo |
+
+O XML contém um item e os mesmos códigos/valores enviados. Foram conferidos
+CNPJ, destinatário, nome padrão de homologação, modelo, chave, protocolo,
+quantidade, produto, NCM, CFOP, CEST e total. Os grupos de impostos agora são
+`ICMSSN500`, `PISOutr` e `COFINSOutr`, com CSOSN 500 e CST 49 preservados.
+
+### Novo problema: números no DANFE
+
+Comparação do XML autorizado com o texto do HTML devolvido por
+`GET /nfe/{correlationId}/danfe`:
+
+| Campo | XML correto | Texto exibido no DANFE |
+|---|---|---|
+| Produtos | `199.00` (R$ 199,00) | `19.900,00` |
+| Desconto | `127.77` (R$ 127,77) | `12.777,00` |
+| Total da nota | `71.23` (R$ 71,23) | `7.123,00` |
+| Quantidade do item | 1 | `100.000` |
+
+O DANFE contém a chave correta e o aviso sem valor fiscal. Seus números,
+porém, não correspondem ao XML. O comportamento é compatível com problema
+de interpretação de separadores decimais; a causa interna ainda exige
+verificação na IntNFe. Conferir conversão dos decimais do XML e formatação
+em português do Brasil, incluindo quantidades, valores, descontos e totais.
+O HTML original foi preservado sem correção local.
+
+**Próxima ação da equipe IntNFe:** corrigir o DANFE e regenerá-lo para esta
+mesma nota autorizada. Não é necessário emitir outra NF-e para validar a
+representação, pois XML, chave e protocolo já existem. Depois comparar de
+novo os totais e a quantidade com o XML.
+
+Evidências privadas em `runtime/analises/fiscal/2026-09-09/reteste-03-serie3/`:
+`NF-e-LJ-HOMOLOGACAO-1-003.xml`, `NF-e-LJ-HOMOLOGACAO-1-003.html`,
+`validacao-arquivos.json`, payload, controle, resposta, status e preflight.
+Arquivos com dados pessoais permanecem fora do Git.
+
+### Como localizar e preparar a numeração
+
+A [IntNFe documenta](https://intnfe.com.br/api/doc) numeração independente por
+emitente, série e ambiente. A última NF-e **de produção** do Bling não resolve
+a colisão dos testes de **homologação**. O uso da série 3 permitiu prosseguir
+com este piloto, sem alterar o histórico da série 1 ou as notas do Bling.
+
+Para preparar uma futura migração de produção, consultar no Bling **Vendas →
+Notas Fiscais de Saída**, conferir CNPJ, ambiente, séries utilizadas e a
+numeração já consumida, incluindo situações e faixas inutilizadas. O XML
+mostra `emit/CNPJ`, `ide/serie`, `ide/nNF` e `ide/tpAmb`. Conferir a sequência
+vigente no momento da mudança de emissor e coordenar emissões simultâneas.
+O [Bling descreve a sequência por série](https://ajuda.bling.com.br/hc/pt-br/articles/360035907793-Como-preencher-os-dados-da-nota-fiscal).
+Depois desse levantamento, a IntNFe oferece `PUT /painel/numeracao` com
+último número, série e ambiente. Esse ajuste de produção não foi executado.
+
+O histórico da duplicidade da série 001 em homologação continua pendente
+de conciliação se essa série voltar a ser usada. Não bloqueia a nota já
+autorizada na série 003. Os testes anteriores estão preservados abaixo.
+
+## Histórico do segundo teste — erro de duplicidade
 
 ## Reteste com dados idênticos
 
