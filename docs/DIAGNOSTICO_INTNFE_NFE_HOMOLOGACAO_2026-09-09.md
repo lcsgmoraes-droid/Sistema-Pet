@@ -1,10 +1,47 @@
 # IntNFe — diagnóstico e reteste da NF-e de homologação
 
-**Atualização em 09/09/2026 às 23:05 de Brasília:** a primeira NF-e foi
-**autorizada em homologação**, número **1, série 003**, com o mesmo cenário
-fiscal e total de **R$ 71,23**. XML autorizado baixado e conferido. O DANFE
-também foi obtido, mas apresenta números incorretos: total **R$ 7.123,00**.
-A pendência imediata passou a ser a formatação numérica do DANFE.
+**Atualização em 09/09/2026 às 23:19 de Brasília:** a correção dos valores e
+da quantidade do DANFE foi confirmada por nova consulta da nota **1/003**,
+já autorizada em homologação. Total agora **R$ 71,23**, com XML e autorização
+intactos. A conferência adicional identificou divergência no **frete**:
+XML com modalidade 9; DANFE exibe 0 (emitente).
+
+## DANFE após a correção — valores corrigidos, frete pendente
+
+Lucas informou a publicação da correção. Às **23:19:40 de Brasília**, foi
+repetido somente `GET /nfe/3a6cea68-0a2d-4b1d-b7db-aff339a30497/danfe`, após
+autenticação e consulta da nota. Retorno HTTP 200, com HTML diferente do
+anterior. O mesmo endpoint entregou a versão corrigida para a nota existente,
+sem nova emissão ou autorização. Estado, chave, protocolo e XML mantidos.
+
+| Campo | Antes | Agora | Resultado |
+|---|---|---|---|
+| Produtos | 19.900,00 | 199,00 | Igual ao XML |
+| Desconto | 12.777,00 | 127,77 | Igual ao XML |
+| Total | 7.123,00 | 71,23 | Igual ao XML |
+| Quantidade | 100.000 | 1,000 | Corresponde a uma unidade |
+
+### Pendências restantes do DANFE
+
+1. **Modalidade do frete divergente:** JSON enviado `frete.modalidade: "9"`;
+   XML autorizado `<modFrete>9</modFrete>`; HTML no campo `FRETE POR CONTA`
+   contém `<span class="info">0</span>` e legenda `0 - Emitente`. Representar
+   a modalidade 9 (sem ocorrência de transporte) conforme o XML, incluindo
+   o código e a legenda corretos. O valor do frete é zero; a divergência é
+   o responsável/modalidade exibido, não o total financeiro da nota.
+2. **Padronização decimal na linha do item:** valor unitário e total do item
+   continuam como `199.00`, e impostos como `0.00`. Os valores são corretos,
+   mas a apresentação ainda mistura ponto com a vírgula dos totais; usar
+   formatação brasileira consistente, preservando a precisão de cada campo.
+
+Para validar esses ajustes, consultar de novo o DANFE da **mesma nota 1/003**.
+O XML autorizado permanece correto; não é necessário emitir outra nota.
+Evidências privadas em `reteste-03-serie3/` na pasta local do piloto:
+`DANFE-1-003-reconsulta-20260910T021940Z.html`,
+`danfe-reconsulta-20260910T021940Z.json` e
+`validacao-danfe-20260910T021940Z.json`. O HTML original e as versões anteriores
+foram preservados, sem edição local. O histórico abaixo registra os problemas
+anteriores e sua investigação.
 
 ## Teste com série 3 — autorizado, DANFE divergente
 

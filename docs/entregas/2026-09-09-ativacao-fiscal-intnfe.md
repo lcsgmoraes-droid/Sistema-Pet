@@ -88,9 +88,10 @@ direta de API, 1/001 em homologação, foi aceita com HTTP 202 e depois rejeitad
 com `SCHEMA` em ICMS-ST e PIS/COFINS. O reteste com dados idênticos gerou a
 nota 2/001 e retornou 539 (duplicidade), sem repetir os erros de XML. Por
 sugestão de Lucas, somente a série foi alterada para 3 e a nota 1/003 foi
-autorizada. XML conferido, com protocolo, cStat 100 e tpAmb 2. O DANFE foi
-obtido, mas tem números divergentes do XML: total 7.123,00 em lugar de 71,23.
-Corrigir o DANFE; a conciliação da série 001 segue pendente antes de reutilizá-la.
+autorizada. XML conferido, com protocolo, cStat 100 e tpAmb 2. O DANFE teve
+produtos/desconto/total/quantidade corrigidos, confirmados por nova consulta
+às 23:19, sem emissão. Restam modalidade do frete (XML 9, HTML 0) e formatação
+decimal do item. A série 001 segue pendente de conciliação antes de reutilizá-la.
 Detalhes no [registro](../FISCAL_INTNFE_PILOTO_HOMOLOGACAO.md) e no
 [diagnóstico](../DIAGNOSTICO_INTNFE_NFE_HOMOLOGACAO_2026-09-09.md).
 Esta ficha registra a validação técnica parcial; homologação operacional com
@@ -142,7 +143,8 @@ Marco de comunicação aos clientes: liberação futura da funcionalidade.
 - [x] Retestar os mesmos dados: erros anteriores de schema não se repetiram.
 - [ ] Conciliar duplicidade 539 antes de reutilizar a série 001 em homologação.
 - [x] Primeira nota de produto autorizada em homologação: 1/003, XML conferido.
-- [ ] Corrigir os números no DANFE e conferir novamente contra o XML autorizado.
+- [x] Corrigir produtos, desconto, total e quantidade no DANFE; nova consulta confirmada.
+- [ ] Corrigir modalidade do frete no DANFE e padronizar decimais da linha do item.
 
 Decisão: preparada para revisão, com pendências de homologação. Não liberada
 para produção. Responsáveis: equipe IntNFe pelo contrato; Lucas e Codex

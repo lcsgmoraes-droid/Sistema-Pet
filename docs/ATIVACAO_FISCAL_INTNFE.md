@@ -114,9 +114,10 @@ Validação desta entrega e limites estão na
    grupos ICMS-ST e PIS/COFINS. No reteste com o mesmo JSON, a nota 2/001
    retornou 539 (duplicidade), sem repetir os erros de XML. Lucas sugeriu outra
    série: alterando somente para série 3, a nota 1/003 foi autorizada, com
-   protocolo e XML conferidos. O DANFE obtido exibe total 7.123,00 em lugar de
-   71,23 e outros números divergentes; corrigir sua formatação e regenerar
-   para a mesma nota. Conciliar a série 001 antes de reutilizá-la.
+   protocolo e XML conferidos. A reconsulta do DANFE às 23:19 confirmou
+   produtos 199,00, desconto 127,77, total 71,23 e quantidade 1,000 corrigidos.
+   Restam modalidade de frete (XML 9, HTML 0) e padronização decimal da linha
+   do item; validar na mesma nota. Conciliar a série 001 antes de reutilizá-la.
    [Diagnóstico](DIAGNOSTICO_INTNFE_NFE_HOMOLOGACAO_2026-09-09.md)
    e [registro do piloto](FISCAL_INTNFE_PILOTO_HOMOLOGACAO.md).
 
