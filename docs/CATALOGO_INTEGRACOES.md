@@ -1,6 +1,6 @@
 # Catálogo de integrações do Sistema Pet
 
-Atualizado em: 2026-08-26
+Atualizado em: 2026-09-09
 
 Status: fonte oficial para conhecer as integrações externas implementadas no
 código, seus controles e os modos de falha que precisam ser considerados na
@@ -72,6 +72,7 @@ formam a trilha de conhecimento.
 | INT-015 | Operadoras e bancos por arquivo | Arquivo | Alta | Conciliação por CSV/OFX. |
 | INT-016 | XML/CSV e SimplesVet | Arquivo | Média | Entrada fiscal, produtos e migração controlada. |
 | INT-017 | Pagar.me | Compatibilidade | Alta | Webhook de pagamento legado/condicional. |
+| INT-018 | IntNFe | Condicional | Média | Ativação opcional do emitente e consulta do certificado, sem emissão nesta etapa. |
 
 ## Contrato mínimo por integração
 
@@ -514,6 +515,35 @@ Toda integração nova ou alterada deve registrar, antes da homologação:
 - **Lacuna prioritária:** decidir entre aposentar o código ou formalizar cliente,
   consulta ao provedor, reconciliação, alertas e testes completos antes do uso.
 - **Evidência no código:** `backend/app/routes/ecommerce_webhooks.py`.
+
+## Ativação fiscal opcional
+
+### INT-018 — IntNFe: ativação fiscal opcional
+
+- **Finalidade e direção:** enviar CNPJ, razão social e nome fantasia para criar
+  emitente quando o usuário optar pela integração; consultar vínculo e A1.
+- **Autenticação e segredos:** token do integrador com variáveis exclusivas do
+  backend; token do emitente com `clientSecret` cifrado por empresa. Respostas
+  públicas sem segredos. Permissão `configuracoes.editar` e módulo `integracoes`.
+- **Timeout:** 3s conexão/15s leitura; origem fixa e redirecionamentos bloqueados.
+- **Retry:** sem repetição automática. Recusa confirmada permite nova tentativa
+  manual após correção; resposta perdida exige consulta/reconciliação.
+- **Idempotência:** não documentada no cadastro remoto. Reserva durável local,
+  unicidade de tenant/CNPJ/emitente e proteção por operação; resultado incerto
+  nunca libera outro POST automaticamente.
+- **Fallback:** manter operação comercial e mostrar pendência fiscal.
+- **Reconciliação:** consultar emitentes antes de criar e após falhas. Cadastro
+  existente exige autenticar credenciais próprias; não há rotação automática.
+- **Observabilidade:** auditoria de ação, estado, código e correlação, sem corpos
+  externos ou credenciais. Exclusão/inativação externa pede revisão de suporte.
+- **Responsável:** Lucas pelo piloto; equipe IntNFe pelo conflito/contrato
+  externo; Codex pela implementação e testes.
+- **Lacuna prioritária:** homologar o fluxo completo/contrato real, resolver o 409 do
+  piloto e disponibilizar A1 antes da primeira NF-e. Emissão não implementada
+  nesta etapa, mesmo com certificado validado. Flag desligada por padrão.
+- **Evidência:** `backend/app/intnfe/`, `backend/tests/unit/test_intnfe_*.py`,
+  `backend/tests/integration/test_intnfe_postgres.py`,
+  `docs/ATIVACAO_FISCAL_INTNFE.md` e ficha de entrega de 2026-09-09.
 
 ## Itens não classificados como integração ativa
 

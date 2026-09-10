@@ -22,6 +22,7 @@ Guia mestre:
 | Consultar SLOs e indicadores | `docs/SLOS_INDICADORES_JORNADAS.md` | Metas tecnicas, jornadas, KPIs, alertas e lacunas de medicao |
 | Consultar dados criticos e LGPD | `docs/CATALOGO_DADOS_CRITICOS_LGPD.md` | Dominios, classificacao, finalidade, retencao, direitos e lacunas |
 | Consultar integracoes externas | `docs/CATALOGO_INTEGRACOES.md` | Controles, modos de falha, responsaveis e lacunas |
+| Ativar vinculo fiscal IntNFe | `docs/ATIVACAO_FISCAL_INTNFE.md` | Configuracao, estados, recuperacao e ficha de entrega |
 | Testar NF-e de produto na IntNFe | `docs/FISCAL_INTNFE_PILOTO_HOMOLOGACAO.md` | Acesso, empresa/certificado e evidencias do teste em homologacao |
 | Planejar o modulo fiscal do CorePet | `docs/ESTUDO_BLING_E_ESTRUTURA_FISCAL_COREPET.md` | Estudo do Bling, capacidades do emissor e resultados do piloto |
 | Preparar entrega relevante | `docs/templates/FICHA_ENTREGA.md` | Criterios de aceite, risco, testes e rollback |
