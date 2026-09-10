@@ -70,6 +70,16 @@ class IntNFeClient:
                 422: "DadosRecusados",
                 429: "LimiteDeRequisicoes",
             }.get(response.status_code, "EmissorIndisponivel")
+            if response.status_code == 422 and path.endswith("/numeracao"):
+                try:
+                    error = response.json()
+                except ValueError:
+                    error = None
+                if (
+                    isinstance(error, dict)
+                    and error.get("erro") == "NumeracaoRetrocede"
+                ):
+                    code = "NumeracaoRetrocede"
             raise IntNFeError(
                 code,
                 status=response.status_code,
@@ -166,3 +176,27 @@ class IntNFeClient:
         if not isinstance(result, dict):
             raise IntNFeError("RespostaInvalida")
         return result
+
+    @staticmethod
+    def _numbering_path(emitter_id):
+        if not isinstance(emitter_id, str) or not re.fullmatch(
+            r"[A-Za-z0-9-]{1,128}", emitter_id
+        ):
+            raise IntNFeError("RespostaInvalida")
+        return f"/integrador/emitentes/{emitter_id}/numeracao"
+
+    def numbering(self, token, emitter_id):
+        result = self._request("GET", self._numbering_path(emitter_id), token=token)
+        if not isinstance(result, list):
+            raise IntNFeError("RespostaInvalida")
+        return result
+
+    def set_numbering(self, token, emitter_id, body):
+        # Assim como a criacao, um PUT pode ser aplicado antes de perder a resposta.
+        return self._request(
+            "PUT",
+            self._numbering_path(emitter_id),
+            token=token,
+            body=body,
+            creating=True,
+        )

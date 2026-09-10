@@ -1,4 +1,4 @@
-# Ficha de entrega — ativação fiscal opcional IntNFe
+# Ficha de entrega — ativação fiscal e numeração IntNFe
 
 ## Identificação
 
@@ -18,7 +18,9 @@ Preparar o vínculo fiscal quando o usuário optar pela emissão, sem depender d
 IntNFe no cadastro inicial da conta. Aceite desta etapa: ação em Integrações,
 validação cadastral, criação/vínculo, credenciais protegidas, situação do A1 e
 tratamento de conflito/resposta perdida. O restante do CorePet continua operando.
-Emitir notas e habilitar produção estão fora do escopo desta entrega.
+Inclui configuração do próximo número de NF-e por série, com escolha explícita
+de homologação ou produção, revisão antes de salvar e regra de só avançar.
+Emitir notas e publicar em produção estão fora do escopo desta entrega.
 
 ## 2. Regras de negócio e dados
 
@@ -36,6 +38,9 @@ rotas autenticadas. Ativação opcional escolhida porque a conta comercial pode
 existir sem necessidade fiscal imediata. Contratos, timeout, ausência de retry e
 reconciliação estão no [guia](../ATIVACAO_FISCAL_INTNFE.md) e no catálogo INT-018.
 Não há criação alternativa quando o provedor estiver indisponível.
+GET/PUT de numeração usam a rota do integrador e o emitente salvo da empresa;
+revalidam posse do vínculo. A sequência permanece no provedor, sem migration
+adicional, com consulta anterior/posterior e auditoria do avanço.
 
 ## 4. Segurança e privacidade
 
@@ -50,12 +55,19 @@ apagar vínculos para contornar conflitos ou repetir uma criação incerta.
 
 ## 5. Desenvolvimento e qualidade
 
-- 37 testes aprovados: serviço, cliente HTTP simulado, rotas autenticadas,
+- Validação anterior de ativação: 37 testes aprovados, incluindo serviço,
+  cliente HTTP simulado, rotas autenticadas,
   permissões, isolamento ORM, segredo protegido, concorrência/recuperação,
   roundtrip da migration SQLite e geração do DDL PostgreSQL com política RLS.
   Inclui 3 testes com PostgreSQL 14 descartável: upgrade/downgrade real,
   leitura/escrita entre empresas com papel sem bypass e reserva simultânea em
   duas conexões, com somente uma operação vencedora.
+- Validação do acréscimo de numeração: 74 testes de backend aprovados (ativação,
+  cliente e numeração) e 4 de regras do frontend. Cobrem conversão, ambientes,
+  séries, limites, tenant/permissão, tela desatualizada, 422/404, falha de auditoria,
+  resposta perdida, confirmação inválida e consulta após avanço concorrente.
+  Comando: `python -m pytest tests/unit/test_intnfe_activation.py tests/unit/test_intnfe_client.py tests/unit/test_intnfe_numbering.py -q --tb=short -x`.
+  Frontend: `node --test src/pages/configuracoes/intnfeNumeracao.test.mjs`.
 - Comando, a partir de `backend`, com `DATABASE_URL=sqlite://` e `ENVIRONMENT=test`:
   `python -m pytest tests/unit/test_intnfe_activation.py tests/unit/test_intnfe_client.py tests/unit/test_intnfe_migration.py -q --tb=short -x`.
 - Os 3 testes adicionais estão em `tests/integration/test_intnfe_postgres.py`;
@@ -67,6 +79,13 @@ apagar vínculos para contornar conflitos ou repetir uma criação incerta.
   formulário de credenciais e transição simulada para certificado pendente.
   Rótulos acessíveis, segredo do formulário mascarado e mensagens de homologação.
   A prévia usa dados fictícios, sem backend/IntNFe real; não é E2E autenticado.
+- Prévia adicional do componente real de numeração: revisão e gravação simuladas,
+  seleção explícita de produção, timeout após aplicação com reconciliação por GET
+  e bloqueio de reenvio igual; troca de empresa descarta dados anteriores.
+- GET real da nova rota do integrador: HTTP 200 e contrato validado. Série 001
+  de homologação configurada em 1.000.000 (próxima 1.000.001), série 003 em 1
+  (próxima 2); nenhuma linha de produção retornada. Nenhum PUT real nesta etapa.
+  Escrita no provedor e E2E autenticado de configuração continuam pendentes.
 - Não foi realizado teste de carga. O piloto direto de API obteve autorização
   em homologação na nota 1/003, com XML conferido; isso não valida emissão
   pelo CorePet. O DANFE apresentou divergência de formatação numérica.
@@ -124,6 +143,8 @@ acesso cruzado exige tratamento de incidente de segurança. Alternativa segura:
 continuar operação comercial e corrigir o cadastro externo com suporte.
 Reincidência de resposta perdida exige contrato de idempotência/recuperação com
 o fornecedor antes de expandir a ativação aos clientes.
+`intnfe_numeracao` registra intenção/resultado e valores da sequência. Conferência
+remota evita repetição/retrocesso, sem prometer reserva de um número para venda.
 
 ## 9. Mudança, comunicação e treinamento
 
@@ -137,6 +158,8 @@ Marco de comunicação aos clientes: liberação futura da funcionalidade.
 - [x] Implementação da etapa de vínculo e validações locais registradas.
 - [x] Proteções de tenant, permissões, segredos e auditoria implementadas/testadas localmente.
 - [x] Documentação, observabilidade, comunicação e rollback definidos.
+- [x] Configuração da sequência de NF-e em homologação/produção, com testes simulados e GET real.
+- [ ] Homologar escrita de numeração no provedor com uma sequência escolhida para o piloto.
 - [x] RLS/concorrência e migration validadas em PostgreSQL.
 - [ ] E2E autenticado do fluxo completo com conta DEV autorizada e emissor real.
 - [x] Emissor real e certificado reconhecidos no piloto direto da API IntNFe.

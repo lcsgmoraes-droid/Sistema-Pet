@@ -72,7 +72,7 @@ formam a trilha de conhecimento.
 | INT-015 | Operadoras e bancos por arquivo | Arquivo | Alta | Conciliação por CSV/OFX. |
 | INT-016 | XML/CSV e SimplesVet | Arquivo | Média | Entrada fiscal, produtos e migração controlada. |
 | INT-017 | Pagar.me | Compatibilidade | Alta | Webhook de pagamento legado/condicional. |
-| INT-018 | IntNFe | Condicional | Média | Ativação opcional do emitente e consulta do certificado, sem emissão nesta etapa. |
+| INT-018 | IntNFe | Condicional | Média | Ativação do emitente, consulta do A1 e ajuste da sequência de NF-e por série/ambiente. |
 
 ## Contrato mínimo por integração
 
@@ -518,10 +518,12 @@ Toda integração nova ou alterada deve registrar, antes da homologação:
 
 ## Ativação fiscal opcional
 
-### INT-018 — IntNFe: ativação fiscal opcional
+### INT-018 — IntNFe: ativação fiscal e numeração
 
 - **Finalidade e direção:** enviar CNPJ, razão social e nome fantasia para criar
   emitente quando o usuário optar pela integração; consultar vínculo e A1.
+  Consultar/avançar a numeração de NF-e com GET/PUT de integrador, por série e
+  ambiente (homologação/produção explicitamente escolhidos), sem emitir notas.
 - **Autenticação e segredos:** token do integrador com variáveis exclusivas do
   backend; token do emitente com `clientSecret` cifrado por empresa. Respostas
   públicas sem segredos. Permissão `configuracoes.editar` e módulo `integracoes`.
@@ -531,11 +533,17 @@ Toda integração nova ou alterada deve registrar, antes da homologação:
 - **Idempotência:** não documentada no cadastro remoto. Reserva durável local,
   unicidade de tenant/CNPJ/emitente e proteção por operação; resultado incerto
   nunca libera outro POST automaticamente.
+- **Numeração:** fonte remota, conversão de próximo número para `ultimoNumero`,
+  bloqueio de repetição/retrocesso e conferência antes/depois do PUT. A garantia
+  monotônica vem da IntNFe; não há reserva do número para venda ou compare-and-set
+  documentado. Resposta perdida exige GET e revisão, sem retry automático.
 - **Fallback:** manter operação comercial e mostrar pendência fiscal.
 - **Reconciliação:** consultar emitentes antes de criar e após falhas. Cadastro
   existente exige autenticar credenciais próprias; não há rotação automática.
 - **Observabilidade:** auditoria de ação, estado, código e correlação, sem corpos
   externos ou credenciais. Exclusão/inativação externa pede revisão de suporte.
+  `intnfe_numeracao` registra série/modelo/ambiente e números consultado/solicitado;
+  falha de auditoria antes do PUT impede o ajuste.
 - **Responsável:** Lucas pelo piloto; equipe IntNFe pelo conflito/contrato
   externo; Codex pela implementação e testes.
 - **Lacuna prioritária:** homologar o fluxo integrado DEV e corrigir modalidade

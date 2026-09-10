@@ -93,3 +93,46 @@ def test_disabled_integration_does_not_open_network(monkeypatch):
     monkeypatch.setattr(settings, "INTNFE_ACTIVATION_ENABLED", False)
     with pytest.raises(IntNFeError, match="IntegracaoNaoConfigurada"):
         IntNFeClient(session=Mock())
+
+
+def test_numbering_uses_integrator_get_and_put_with_exact_body(api):
+    api.session.request.return_value = response(body=[])
+    assert api.numbering("token", "emitente-teste") == []
+    assert api.session.request.call_args.args == (
+        "GET",
+        BASE_URL + "/integrador/emitentes/emitente-teste/numeracao",
+    )
+    payload = {"serie": "3", "ultimoNumero": 4500, "ambienteCodigo": 1, "modelo": 55}
+    api.session.request.return_value = response(body={"proximoNumero": 4501})
+    api.set_numbering("token", "emitente-teste", payload)
+    assert api.session.request.call_args.args == (
+        "PUT",
+        BASE_URL + "/integrador/emitentes/emitente-teste/numeracao",
+    )
+    assert api.session.request.call_args.kwargs["json"] == payload
+    assert api.session.request.call_args.kwargs["allow_redirects"] is False
+
+
+def test_numbering_error_only_exposes_allowlisted_code(api):
+    api.session.request.return_value = response(
+        422, {"erro": "NumeracaoRetrocede", "mensagem": "segredo-nao-expor"}
+    )
+    with pytest.raises(IntNFeError) as error:
+        api.set_numbering("token", "emitente-teste", {})
+    assert error.value.code == "NumeracaoRetrocede"
+    assert not error.value.uncertain
+    assert "segredo" not in str(error.value)
+
+
+def test_numbering_timeout_is_uncertain_and_never_retries(api):
+    api.session.request.side_effect = requests.Timeout("nao-expor")
+    with pytest.raises(IntNFeError) as error:
+        api.set_numbering("token", "emitente-teste", {})
+    assert error.value.uncertain
+    assert api.session.request.call_count == 1
+
+
+def test_numbering_invalid_path_is_rejected_before_network(api):
+    with pytest.raises(IntNFeError):
+        api.numbering("token", "../outra-rota?tenant=outro")
+    assert api.session.request.call_count == 0
