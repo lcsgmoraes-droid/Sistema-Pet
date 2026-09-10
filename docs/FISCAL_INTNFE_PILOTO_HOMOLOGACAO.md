@@ -165,3 +165,20 @@ e [ficha de entrega](entregas/2026-09-09-ativacao-fiscal-intnfe.md).
 - Nenhum emitente ou segredo de emitente foi retornado. A alteração do painel
   foi conferida; o conflito na criação pela API ainda depende de verificação
   da equipe IntNFe. Não repetir automaticamente nem usar CNPJ fictício.
+
+### Nova versão: login pelo CNPJ
+
+- A atualização seguinte foi confirmada no painel: o login da conta de
+  integrador PetSys é `11.444.777/0001-61`; a tela agora permite trocar somente
+  a senha, sem editar o login. A sessão existente permaneceu válida. Não foi
+  realizado um novo login por senha nem alterada a senha.
+- O CNPJ da empresa que se pretende cadastrar como emitente continua sendo
+  `33.590.794/0001-40`, da LJ. Os dois papéis não foram confundidos no POST.
+- Após a atualização, autenticação e consulta da API retornaram HTTP 200,
+  novamente sem emitentes visíveis. Uma nova tentativa manual de criação
+  retornou **HTTP 409, `EmitenteDuplicado`**.
+- Horário: 09/09/2026 às **21:09:30 em Brasília** (10/09/2026 00:09:30 UTC).
+- Protocolo: `fa91fa6b79e541d082ae9b6e5436f47f`.
+- Evidência: `runtime/analises/fiscal/2026-09-09/cadastro-20260910T000930Z.json`.
+- A alteração de login foi observada; o vínculo do emitente continua pendente
+  de correção/verificação pela IntNFe. Nenhum documento fiscal foi enviado.
