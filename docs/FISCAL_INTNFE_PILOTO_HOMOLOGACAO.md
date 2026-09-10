@@ -1,6 +1,6 @@
 # IntNFe — primeiro teste de NF-e de produto
 
-Registro: 09/09/2026. Situação: autenticação na API confirmada; cadastro recusado porque o CNPJ já existe e não aparece entre os emitentes da PetSys. Nenhuma nota enviada.
+Registro: 09/09/2026. Situação atual: integrador **CorePet — Lucas Guerra**, emitente LJ ativo e A1 aceito, válido até 02/04/2027. A primeira solicitação de NF-e foi aceita e processada em **homologação**, mas a nota **1, série 001**, foi rejeitada com código `SCHEMA`. Faltam corrigir a geração do XML de ICMS-ST e PIS/COFINS e obter autorização, XML e DANFE. [Diagnóstico para a IntNFe](DIAGNOSTICO_INTNFE_NFE_HOMOLOGACAO_2026-09-09.md).
 
 ## Decisão registrada
 
@@ -17,7 +17,13 @@ O [estudo do Bling e da estrutura fiscal do CorePet](ESTUDO_BLING_E_ESTRUTURA_FI
 - A autenticação própria da API em `POST /integrador/auth/token` retornou HTTP 200 e validade de 43.200 segundos. Não foi necessário extrair o token do navegador.
 - Credenciais e token foram guardados localmente com proteção DPAPI do Windows, em arquivos ignorados pelo Git. Nenhum segredo foi copiado para esta documentação.
 - Na primeira execução, `GET /integrador/emitentes` retornou HTTP 200 e apenas **Ze Pet**. O cadastro da LJ retornou HTTP 409 `EmitenteDuplicado`; a consulta posterior continuou sem a LJ. Após Lucas informar a exclusão do Ze Pet, a lista passou a vazia, mas uma nova tentativa continuou retornando o mesmo conflito. A API considera o CNPJ existente, mas não informa aqui a conta à qual ele pertence nem a situação desse registro.
-- Nenhuma empresa/destinatário foi cadastrado e nenhuma NF-e foi transmitida nesta preparação.
+- Após a equipe informar a remoção de todos os emitentes, o cadastro da LJ foi
+  concluído e confirmado por consulta. A autenticação própria do emitente
+  retornou HTTP 200. O histórico de recusas abaixo está superado para este CNPJ.
+- Lucas autorizou usar os cadastros do Bling apenas em homologação. Um destinatário
+  e um produto foram enviados dentro do corpo da primeira nota. Isso não confirma
+  um cadastro separado de compradores na IntNFe. O envio recebeu HTTP 202 e depois
+  rejeição `SCHEMA`, sem chave ou protocolo de autorização.
 
 ## Acesso, empresa e cliente são coisas diferentes
 
@@ -37,12 +43,14 @@ Se já houver empresa cadastrada, consultar e reutilizar seu cadastro. Não rota
 | Pendência | Informação/ação necessária | Responsável sugerido |
 |---|---|---|
 | Acesso à API IntNFe | Concluído: autenticação e consulta de emitentes funcionando | Lucas/IntNFe |
-| Acesso ao emitente LJ | CNPJ já existe, mas não está na lista visível da PetSys. Vincular o cadastro existente à conta correta ou disponibilizar as credenciais próprias desse emitente | Irmão/IntNFe |
-| Dados da empresa piloto | CNPJ e nomes conferidos. Antes da nota, conferir endereço/IBGE: o bairro no Bling aparece como `SP` e precisa ser esclarecido | Lucas/empresa piloto |
-| Certificado | A1 válido do mesmo CNPJ, já instalado na IntNFe ou arquivo `.pfx`/`.p12` e senha para cadastro protegido | Lucas/empresa piloto |
-| Habilitação e série | Confirmar que o emitente pode emitir em homologação na sua UF e qual série de teste utilizar | Irmão/empresa piloto |
-| Destinatário | Dados aprovados para o teste: CPF/CNPJ, endereço, indicador de IE e IE quando aplicável | Lucas/irmão |
-| Um produto simples | SKU, descrição, NCM, CFOP e tributação compatíveis com o regime escolhido | Irmão; revisão fiscal da empresa quando usar cenário real |
+| Acesso ao emitente LJ | Concluído: emitente criado e ativo sob CorePet — Lucas Guerra; credencial própria protegida e autenticação HTTP 200 | Codex/IntNFe |
+| Dados da empresa piloto | Concluído: CNPJ, IE, CRT, endereço e IBGE conferidos. Bairro usado: Vila Industrial, confirmado por consultas de CNPJ e CEP | Codex |
+| Certificado | Concluído: A1 do mesmo CNPJ enviado e reconhecido, HTTP 200, não expirado, válido até 02/04/2027 | Lucas/Codex/IntNFe |
+| Habilitação e série | Série 1 de homologação iniciada automaticamente pela API, sem alterar sequência. Autorização pela SEFAZ ainda não comprovada | IntNFe |
+| Destinatário | Concluído para o envio: cadastro do Bling autorizado por Lucas, CPF válido e endereço/IBGE conferidos, indicador IE 9, sem e-mail | Codex |
+| Um produto simples | Concluído para o envio: um item da NF-e 017697 do Bling, com NCM, CFOP, CEST, origem e tributação da referência | Codex |
+| XML dos impostos | Corrigir o grupo ICMSSN500 e o tratamento do CST 49 de PIS/COFINS, rejeitados pelo schema | Equipe IntNFe |
+| Nota autorizada e arquivos | Após a correção, repetir de forma controlada em homologação; conferir chave, protocolo, XML e DANFE | Lucas/Codex/IntNFe |
 
 Solicitar credenciais por meio protegido ou entrada direta no portal; não colocar segredos/certificados em documentos, commits ou mensagens de diagnóstico. Os exemplos públicos da API não são credenciais de teste liberadas para uso.
 
@@ -101,13 +109,13 @@ Nenhum dos assuntos futuros será usado para exigir a integração completa ante
 | Estudo e decisão preservados no projeto | Registrados |
 | Documentação pública e portal | Consultados |
 | Corpo mínimo | Modelo com marcadores preparado e JSON validado localmente |
-| Acesso ao portal | Confirmado, conta PetSys (smoke test) |
+| Acesso ao portal | Confirmado; integrador renomeado de PetSys (smoke test) para CorePet — Lucas Guerra |
 | Acesso à API do integrador | Autenticação HTTP 200 e consulta HTTP 200 confirmadas |
-| Empresa | Cadastro retornou HTTP 409 `EmitenteDuplicado`; CNPJ existe, mas a LJ não aparece na conta PetSys |
-| Nova tentativa após exclusão do Ze Pet | Consulta HTTP 200 com zero emitentes; novo cadastro novamente recusado com HTTP 409 |
-| Certificado | Ainda não disponibilizado/consultado para a LJ na IntNFe |
-| Destinatário | Não cadastrado nem transmitido |
-| Nota enviada/autorizada | Não executado |
+| Empresa | LJ criada e ativa; `tenantId` 4ef8812e-51da-4dd7-85dc-8b47df8c5148 |
+| Autenticação do emitente | HTTP 200, credencial própria armazenada com DPAPI |
+| Certificado | Upload e consulta HTTP 200; CNPJ correto, válido até 02/04/2027 |
+| Destinatário | Enviado no corpo da NF-e; não foi comprovado cadastro separado de comprador |
+| Nota enviada/autorizada | HTTP 202; nº 1, série 001, homologação; rejeitada com `SCHEMA`, sem autorização |
 | Chave/XML/DANFE de teste | Ainda não obtidos |
 
 ### Evidência do impedimento no cadastro
@@ -131,9 +139,9 @@ Nenhum dos assuntos futuros será usado para exigir a integração completa ante
 - Evidência local: `runtime/analises/fiscal/2026-09-09/cadastro-20260909T232058Z.json`. O arquivo `cadastro_emitente_resultado.json` também aponta para esse resultado mais recente.
 - Não foram criados emitente, credenciais de emissão ou nota nessa tentativa.
 
-O próximo passo é a equipe da IntNFe localizar o registro/validação que ainda reserva o CNPJ `33590794000140`. Pode haver outro vínculo ou um registro excluído ainda considerado na duplicidade; são hipóteses, não causas comprovadas pelo teste. Depois da verificação, disponibilizar o emitente à PetSys ou corrigir o cadastro para permitir sua criação, conforme o estado real da base. Não substituir o CNPJ da empresa por um fictício para contornar o conflito.
+Naquele momento, o próximo passo era a equipe da IntNFe localizar o registro/validação que reservava o CNPJ `33590794000140`. Outro vínculo ou registro excluído eram hipóteses, não causas comprovadas. O bloqueio foi superado no cadastro confirmado às 21:19, registrado ao final. O CNPJ da empresa não foi substituído por um fictício.
 
-Depois de resolver o acesso, conferir certificado, dados fiscais e série de homologação antes de preparar a emissão. As tentativas remotas descritas acima não alteraram aplicação, banco, estoque, caixa ou produção.
+Na sequência, foram conferidos certificado, dados fiscais e série de homologação, conforme o registro final. As tentativas remotas descritas acima não alteraram aplicação, banco, estoque, caixa ou produção.
 
 ### Preparação do vínculo no CorePet
 
@@ -143,9 +151,9 @@ consulta/cria o emitente, protege as credenciais por empresa e mostra a situaç�
 do certificado. Conflito de CNPJ e resposta perdida têm recuperação controlada.
 
 O código e a nova migration estão preparados para revisão. As validações locais
-usaram dados fictícios/respostas simuladas; não alteram o resultado do piloto
-real acima e não significam que o 409 foi resolvido. Não houve emissão ou
-habilitação/deploy em produção.
+usaram dados fictícios/respostas simuladas. O piloto remoto posterior resolveu
+o cadastro, validou o A1 e chegou à rejeição de schema detalhada abaixo.
+Não houve emissão, habilitação ou deploy em produção.
 
 Configuração, contrato e pendências: [guia da ativação](ATIVACAO_FISCAL_INTNFE.md)
 e [ficha de entrega](entregas/2026-09-09-ativacao-fiscal-intnfe.md).
@@ -182,3 +190,83 @@ e [ficha de entrega](entregas/2026-09-09-ativacao-fiscal-intnfe.md).
 - Evidência: `runtime/analises/fiscal/2026-09-09/cadastro-20260910T000930Z.json`.
 - A alteração de login foi observada; o vínculo do emitente continua pendente
   de correção/verificação pela IntNFe. Nenhum documento fiscal foi enviado.
+
+### Cadastro concluído após remoção dos emitentes
+
+- Às 21:18, Lucas informou que seu irmão removeu todos os emitentes e pediu
+  identificar melhor a conta de integrador.
+- No site, o nome foi alterado de **PetSys (smoke test)** para
+  **CorePet — Lucas Guerra**. A tela confirmou “Dados de cadastro salvos”.
+  CNPJ, login e senha do integrador não foram alterados.
+- Às **21:19:43 de Brasília** (10/09/2026 00:19:43 UTC), foi iniciada uma única
+  criação da LJ após autenticação HTTP 200 e lista vazia. O cliente HTTP usado
+  no teste recusou seguir um redirecionamento inseguro no retorno; o status/corpo
+  original não foi capturado. Não foi seguida conexão HTTP sem TLS.
+- Foi feita **consulta, sem repetir o POST de criação**. Ela confirmou a LJ
+  ativa, e o painel mostrou **1 emitente e zero notas**. Identificador:
+  `4ef8812e-51da-4dd7-85dc-8b47df8c5148`, CNPJ `33590794000140`.
+- Como o segredo retornado uma única vez não foi recebido, foi recuperado o
+  acesso **somente ao emitente recém-criado neste teste**: rotação controlada de
+  seu `clientSecret`, HTTP 200, seguida de armazenamento local DPAPI. Essa
+  recuperação pontual não muda a regra de não rotacionar contas existentes
+  automaticamente, nem a implementação do CorePet. O segredo do integrador não
+  foi rotacionado.
+- Às **21:22:29**, a autenticação própria da LJ em `/auth/token` retornou HTTP
+  200. `GET /certificados` retornou **404 `SemCertificado`**.
+- `GET /painel/numeracao` retornou HTTP 200, sem registros de numeração
+  identificados. Nenhuma série/numeração foi alterada.
+- Evidências locais: `cadastro-20260910T001943Z.json` registra o envio iniciado;
+  `emissor-lj-vinculado.json` registra a confirmação e consultas. Ambos em
+  `runtime/analises/fiscal/2026-09-09/`. A credencial fica somente em
+  `intnfe-emitente.dpapi`, protegida e ignorada pelo Git.
+- Naquele momento, faltavam o A1 e a preparação da nota. As etapas seguintes
+  foram executadas conforme o registro abaixo.
+
+### Certificado aceito e primeira NF-e processada
+
+- Lucas forneceu o arquivo PFX da LJ e sua senha e autorizou usar um cliente e
+  um produto já cadastrados no Bling **apenas em homologação**.
+- O PFX foi aberto localmente com chave efêmera, sem instalar certificado no
+  Windows. CNPJ correto, chave privada presente e validade conferida. A senha
+  foi protegida com DPAPI; arquivo e senha não entram no Git.
+- Às **21:27:24 de Brasília**, `POST /certificados` e a consulta posterior
+  retornaram HTTP 200. Validade de 02/04/2026 a **02/04/2027**, `expirado: false`.
+- Cadastro fiscal: CRT Simples Nacional (`"1"`), IE `562465456112`, Avenida
+  Brasil 2550, CEP 19013-002, Presidente Prudente/SP, IBGE `3541406`. O bairro
+  **Vila Industrial** foi confirmado na [consulta do CNPJ](https://brasilapi.com.br/api/cnpj/v1/33590794000140)
+  e na [consulta do CEP](https://viacep.com.br/ws/19013002/json/). O Bling mostrava
+  `SP` no bairro; seu cadastro foi apenas consultado, sem edição.
+- Referência somente para leitura: NF-e **017697, série 2**, já autorizada no
+  Bling. Um item, SKU `022860.1/1`, MGZ EXT COELHOS ORNAMENTAIS 1,2 KG, quantidade
+  1, valor R$ 199,00, desconto R$ 127,77, total R$ 71,23. NCM `23099010`, CFOP
+  `5405`, CEST `2200100`, origem 0, CSOSN 500, PIS/COFINS CST 49 com valores
+  zerados, sem IPI. Foram mantidos os códigos fiscais da referência.
+- Destinatário da referência: CPF com dígitos verificadores válidos, endereço
+  em Mauá/SP conferido por CEP, IBGE `3529401`, indicador IE 9. Dados pessoais
+  completos ficam somente no payload local ignorado. Nome de homologação
+  explícito e e-mail omitido. Não houve emissão, salvamento ou outra alteração
+  na nota original do Bling.
+- O primeiro pedido HTTP foi recusado com **400**, pois o teste enviou `crt`
+  como número. Corrigido para string `"1"`, conforme o exemplo oficial. Uma
+  consulta confirmou lista vazia antes do novo envio. Payload, chave e resposta
+  da tentativa recusada foram preservados; ela não criou uma nota.
+- Às **21:37:43**, a solicitação corrigida recebeu **HTTP 202**. Identificador
+  `d8026b27-c1e9-441f-b8a0-8f667a901376`; ambiente enviado `2`; numeração atribuída
+  **1/001**. O payload e a chave de idempotência foram gravados antes do POST.
+- Às **21:37:45**, o processamento terminou com **status 4 — Rejeitada**,
+  código `SCHEMA`. O XML de `ICMSSN500` apresenta `vICMSSTRet` onde o schema
+  espera `pST`; os grupos gerados para PIS/COFINS também rejeitam o CST `49`.
+  [Retorno e parâmetros para diagnóstico](DIAGNOSTICO_INTNFE_NFE_HOMOLOGACAO_2026-09-09.md).
+- O portal confirmou **1 nota e 1 rejeição** para a LJ. Chave, protocolo e
+  autorização permanecem ausentes; XML autorizado e DANFE não foram obtidos.
+  A nota rejeitada não foi reenviada nem teve a tributação trocada para passar.
+- Evidências privadas em `runtime/analises/fiscal/2026-09-09/`:
+  `certificado-lj-validado.json`, `nota-lj-piloto-payload.json`,
+  `nota-lj-piloto-controle.json`, `nota-lj-piloto-resposta.json` e
+  `nota-lj-piloto-status.json`. O script de envio bloqueia nova transmissão
+  depois de iniciado o pedido; uma retomada exige consultar e revisar o estado.
+
+**Próxima ação:** equipe IntNFe corrigir/validar a montagem desses grupos de
+impostos; depois executar nova tentativa controlada, ainda em homologação.
+O vínculo real pelo fluxo autenticado do CorePet DEV continua separado deste
+piloto direto de API e ainda precisa de validação ponta a ponta.

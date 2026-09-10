@@ -67,7 +67,9 @@ apagar vínculos para contornar conflitos ou repetir uma criação incerta.
   formulário de credenciais e transição simulada para certificado pendente.
   Rótulos acessíveis, segredo do formulário mascarado e mensagens de homologação.
   A prévia usa dados fictícios, sem backend/IntNFe real; não é E2E autenticado.
-- Não foram realizados teste de carga, homologação SEFAZ ou emissão de nota.
+- Não foi realizado teste de carga nem obtida autorização SEFAZ. O piloto
+  direto de API posterior enviou uma solicitação em homologação, rejeitada
+  pelo schema do XML; isso não valida emissão pelo CorePet.
 
 ## 6. Ambientes e homologação
 
@@ -77,8 +79,15 @@ pela tarefa de infraestrutura, os testes de RLS/concorrência em PostgreSQL
 passaram. Executados `FLUXO_UNICO.bat dev-up` e upgrade das migrations pendentes
 `zzm20260909a1`/`zzn20260909a1` no PostgreSQL 16 DEV, sem alterar produção.
 Smoke no backend DEV: `/health` HTTP 200 e `/intnfe/status` sem sessão HTTP 403.
-O piloto remoto segue bloqueado por HTTP 409, inclusive após a mudança de painel
-informada por Lucas, conforme [registro](../FISCAL_INTNFE_PILOTO_HOMOLOGACAO.md).
+No piloto remoto, o conflito HTTP 409 foi superado após a equipe IntNFe remover
+os emitentes. A LJ foi criada sob **CorePet — Lucas Guerra**, com autenticação
+própria HTTP 200. Após Lucas fornecer o PFX, o A1 foi enviado e reconhecido:
+HTTP 200, válido até 02/04/2027. Houve recuperação controlada da credencial do
+emitente recém-criado após perda da resposta de cadastro. A primeira nota
+direta de API, 1/001 em homologação, foi aceita com HTTP 202 e depois rejeitada
+com `SCHEMA` em ICMS-ST e PIS/COFINS. Ainda sem chave/protocolo/XML/DANFE.
+Detalhes no [registro](../FISCAL_INTNFE_PILOTO_HOMOLOGACAO.md) e no
+[diagnóstico](../DIAGNOSTICO_INTNFE_NFE_HOMOLOGACAO_2026-09-09.md).
 Esta ficha registra a validação técnica parcial; homologação operacional com
 Lucas e IntNFe continua pendente e não foi dispensada.
 
@@ -124,10 +133,11 @@ Marco de comunicação aos clientes: liberação futura da funcionalidade.
 - [x] Documentação, observabilidade, comunicação e rollback definidos.
 - [x] RLS/concorrência e migration validadas em PostgreSQL.
 - [ ] E2E autenticado do fluxo completo com conta DEV autorizada e emissor real.
-- [ ] Contrato real de criação/vínculo e certificado homologado com a IntNFe.
+- [x] Emissor real e certificado reconhecidos no piloto direto da API IntNFe.
+- [ ] Resolver rejeição de schema em ICMS-ST e PIS/COFINS na IntNFe.
 - [ ] Primeira nota de produto autorizada em homologação.
 
 Decisão: preparada para revisão, com pendências de homologação. Não liberada
-para produção. Responsáveis: equipe IntNFe pelo conflito/contrato; Lucas e Codex
+para produção. Responsáveis: equipe IntNFe pelo contrato; Lucas e Codex
 pela execução do piloto integrado e primeiro documento em homologação.
 Prazo: antes da ativação de clientes reais; primeira nota conforme roteiro do piloto.

@@ -101,15 +101,20 @@ Validação desta entrega e limites estão na
 
 ## Próximas etapas do piloto
 
-1. Equipe IntNFe corrigir o conflito do CNPJ da LJ/PetSys e homologar a criação
-   ou vínculo com as respostas reais da versão atual da API.
+1. Vincular a conta DEV autorizada ao emitente real já criado para a LJ, sob
+   **CorePet — Lucas Guerra**. O conflito de CNPJ foi superado e a autenticação
+   própria do emitente foi confirmada; credenciais permanecem protegidas localmente.
 2. Concluir o teste do fluxo completo na conta DEV autorizada. A migration,
    o isolamento RLS e reservas simultâneas já passaram no PostgreSQL descartável;
    as migrations também foram aplicadas no DEV local.
-3. Disponibilizar o certificado A1 no emissor e conferir sua validade/CNPJ.
-4. Conferir cadastro fiscal, destinatário, produto e numeração de homologação;
-   realizar a primeira NF-e conforme o
-   [roteiro do piloto](FISCAL_INTNFE_PILOTO_HOMOLOGACAO.md).
+3. A1 já enviado e reconhecido no piloto direto de API: CNPJ correto, HTTP 200,
+   válido até 02/04/2027. Conferir esse estado também no fluxo integrado DEV.
+4. A primeira NF-e direta, com um item e total de R$ 71,23, recebeu HTTP 202 e
+   tornou-se a nota 1/001 em homologação. O resultado foi rejeição `SCHEMA` nos
+   grupos ICMS-ST e PIS/COFINS. Corrigir o XML na IntNFe e repetir o teste de
+   forma controlada antes de considerar autorização, chave, XML e DANFE
+   concluídos. [Diagnóstico](DIAGNOSTICO_INTNFE_NFE_HOMOLOGACAO_2026-09-09.md)
+   e [registro do piloto](FISCAL_INTNFE_PILOTO_HOMOLOGACAO.md).
 
 Upload de A1 dentro do CorePet, emissão pelo PDV, cadastro/sincronização de
 destinatários, eventos, webhooks, XML/DANFE e passagem para produção são etapas
