@@ -1,6 +1,6 @@
 # IntNFe — primeiro teste de NF-e de produto
 
-Registro: 09/09/2026. Situação atual: integrador **CorePet — Lucas Guerra**, emitente LJ ativo e A1 aceito, válido até 02/04/2027. A primeira solicitação de NF-e foi aceita e processada em **homologação**, mas a nota **1, série 001**, foi rejeitada com código `SCHEMA`. Faltam corrigir a geração do XML de ICMS-ST e PIS/COFINS e obter autorização, XML e DANFE. [Diagnóstico para a IntNFe](DIAGNOSTICO_INTNFE_NFE_HOMOLOGACAO_2026-09-09.md).
+Registro: 09/09/2026. Situação atual às 22:39 de Brasília: integrador **CorePet — Lucas Guerra**, emitente LJ ativo e A1 aceito, válido até 02/04/2027. O reteste com dados idênticos gerou a nota **2, série 001**, em **homologação**. Os erros anteriores de XML não se repetiram; o novo retorno foi **539 — duplicidade com diferença na chave de acesso**. Falta reconciliar a numeração e obter autorização, XML e DANFE. [Diagnóstico atualizado para a IntNFe](DIAGNOSTICO_INTNFE_NFE_HOMOLOGACAO_2026-09-09.md).
 
 ## Decisão registrada
 
@@ -23,7 +23,9 @@ O [estudo do Bling e da estrutura fiscal do CorePet](ESTUDO_BLING_E_ESTRUTURA_FI
 - Lucas autorizou usar os cadastros do Bling apenas em homologação. Um destinatário
   e um produto foram enviados dentro do corpo da primeira nota. Isso não confirma
   um cadastro separado de compradores na IntNFe. O envio recebeu HTTP 202 e depois
-  rejeição `SCHEMA`, sem chave ou protocolo de autorização.
+  rejeição `SCHEMA`, sem chave ou protocolo de autorização. O reteste posterior
+  com dados idênticos recebeu rejeição `539`; a chave gerada nesse retorno
+  não representa autorização.
 
 ## Acesso, empresa e cliente são coisas diferentes
 
@@ -34,7 +36,7 @@ O [estudo do Bling e da estrutura fiscal do CorePet](ESTUDO_BLING_E_ESTRUTURA_FI
 | Empresa emitente | O CNPJ que assina e emite a NF-e, com IE, regime tributário, endereço e certificado A1. A API chama essa empresa de emitente/tenant. |
 | Credencial do emitente | `clientId` e `clientSecret`; servem para obter o token de emissão da empresa. |
 | Destinatário da nota | O comprador/cliente informado no grupo `destinatario`. A documentação consultada não descreve um endpoint separado de cadastro de compradores; o portal autenticado examinado não mostrou essa função. |
-| Chave de acesso da NF-e | Os 44 dígitos que identificam a nota; no fluxo documentado são retornados com a autorização. Não substituem a credencial de acesso à API. |
+| Chave de acesso da NF-e | Os 44 dígitos que identificam a nota. No reteste a API também retornou chave para uma nota rejeitada; conferir status e protocolo, pois a chave isolada não comprova autorização. Não substitui a credencial da API. |
 
 Se já houver empresa cadastrada, consultar e reutilizar seu cadastro. Não rotacionar segredos nem recriar a empresa para simplesmente testar. Caso o irmão forneça somente acesso de emitente, o cadastro dessa empresa precisa ter sido preparado por ele; o cadastro de empresas pela API exige acesso de integrador.
 
@@ -49,7 +51,8 @@ Se já houver empresa cadastrada, consultar e reutilizar seu cadastro. Não rota
 | Habilitação e série | Série 1 de homologação iniciada automaticamente pela API, sem alterar sequência. Autorização pela SEFAZ ainda não comprovada | IntNFe |
 | Destinatário | Concluído para o envio: cadastro do Bling autorizado por Lucas, CPF válido e endereço/IBGE conferidos, indicador IE 9, sem e-mail | Codex |
 | Um produto simples | Concluído para o envio: um item da NF-e 017697 do Bling, com NCM, CFOP, CEST, origem e tributação da referência | Codex |
-| XML dos impostos | Corrigir o grupo ICMSSN500 e o tratamento do CST 49 de PIS/COFINS, rejeitados pelo schema | Equipe IntNFe |
+| XML dos impostos | Erros anteriores não se repetiram no reteste com os mesmos dados; a nova rejeição é de duplicidade. XML autorizado ainda não validado | Equipe IntNFe |
+| Numeração em homologação | Resolver retorno 539 para a nota 2/001; chave preexistente não encontrada na API do emitente atual. API aponta próximo número 3, ainda sem comprovação de disponibilidade na SEFAZ | Equipe IntNFe |
 | Nota autorizada e arquivos | Após a correção, repetir de forma controlada em homologação; conferir chave, protocolo, XML e DANFE | Lucas/Codex/IntNFe |
 
 Solicitar credenciais por meio protegido ou entrada direta no portal; não colocar segredos/certificados em documentos, commits ou mensagens de diagnóstico. Os exemplos públicos da API não são credenciais de teste liberadas para uso.
@@ -115,8 +118,8 @@ Nenhum dos assuntos futuros será usado para exigir a integração completa ante
 | Autenticação do emitente | HTTP 200, credencial própria armazenada com DPAPI |
 | Certificado | Upload e consulta HTTP 200; CNPJ correto, válido até 02/04/2027 |
 | Destinatário | Enviado no corpo da NF-e; não foi comprovado cadastro separado de comprador |
-| Nota enviada/autorizada | HTTP 202; nº 1, série 001, homologação; rejeitada com `SCHEMA`, sem autorização |
-| Chave/XML/DANFE de teste | Ainda não obtidos |
+| Nota enviada/autorizada | Nº 1/001 rejeitada com `SCHEMA`; reteste nº 2/001 rejeitado com `539`, ambos em homologação |
+| Chave/XML/DANFE de teste | Chave gerada na nota 2/001, sem autorização/protocolo; XML autorizado e DANFE não obtidos |
 
 ### Evidência do impedimento no cadastro
 
@@ -266,7 +269,30 @@ e [ficha de entrega](entregas/2026-09-09-ativacao-fiscal-intnfe.md).
   `nota-lj-piloto-status.json`. O script de envio bloqueia nova transmissão
   depois de iniciado o pedido; uma retomada exige consultar e revisar o estado.
 
-**Próxima ação:** equipe IntNFe corrigir/validar a montagem desses grupos de
-impostos; depois executar nova tentativa controlada, ainda em homologação.
+Naquele momento, a próxima ação era corrigir/validar a montagem dos impostos.
 O vínculo real pelo fluxo autenticado do CorePet DEV continua separado deste
 piloto direto de API e ainda precisa de validação ponta a ponta.
+
+### Reteste solicitado por Lucas — retorno mudou para duplicidade
+
+- Às **22:38:58 de Brasília**, novo POST com o mesmo JSON recebeu HTTP 202.
+  Antes dele, a nota anterior foi consultada e seguia rejeitada. Hash SHA-256
+  confirmou payload idêntico; nova chave de idempotência e evidência própria
+  foram gravadas sem sobrescrever a tentativa anterior.
+- Correlação: `9b91430f-836f-4e50-9b87-18d3c621ae00`. A API atribuiu **2/001**,
+  ambiente homologação. Não houve alteração de cliente, item, impostos,
+  total, série ou ambiente no corpo enviado.
+- Às **22:39:03**, status 4, código **539**, mensagem de duplicidade de NF-e
+  com diferença na chave de acesso. Os erros de XML anteriores não apareceram.
+  [Comparação, chaves e recibo](DIAGNOSTICO_INTNFE_NFE_HOMOLOGACAO_2026-09-09.md).
+- A consulta da chave preexistente retornou 404 no emitente atual. Sua lista
+  contém somente as notas 1 e 2 rejeitadas. A numeração local aponta último 2,
+  próximo 3; isso não confirma que o próximo esteja livre na SEFAZ.
+- Nenhuma sequência foi alterada e não houve nova emissão após a rejeição.
+  O histórico anterior à remoção dos emitentes precisa ser conciliado pela
+  equipe IntNFe. A existência de uso antigo dessa série é hipótese a verificar.
+- Evidências em `runtime/analises/fiscal/2026-09-09/reteste-02/`, ignorado pelo
+  Git. Ainda sem protocolo, autorização, XML autorizado ou DANFE.
+
+**Próxima ação:** reconciliar a numeração de homologação e então retomar o teste
+de forma controlada, mantendo o cenário fiscal.

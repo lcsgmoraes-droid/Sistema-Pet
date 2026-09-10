@@ -1,9 +1,65 @@
-# IntNFe — rejeição de XML na primeira NF-e de homologação
+# IntNFe — diagnóstico e reteste da NF-e de homologação
 
-A primeira solicitação de NF-e do piloto CorePet foi aceita com HTTP 202, mas
-o processamento terminou em `SCHEMA`, sem autorização. Cadastro do emitente,
-autenticação e certificado A1 já funcionam. A pendência atual é a geração dos
-grupos de ICMS-ST e PIS/COFINS.
+**Atualização em 09/09/2026 às 22:39 de Brasília:** o reteste com os mesmos dados
+não repetiu os erros de XML. A nota **2/001** foi rejeitada com **539 — duplicidade
+de NF-e com diferença na chave de acesso**. A pendência atual é reconciliar a
+numeração de homologação com o histórico já existente. Ainda sem autorização.
+
+## Reteste com dados idênticos
+
+Lucas pediu nova tentativa sem alterar os dados. A nota anterior foi consultada
+e continuava rejeitada. O JSON original foi copiado sem alteração, com hash
+SHA-256 idêntico; foi usada nova chave de idempotência, registrada antes do POST.
+Cliente, item, impostos, total de R$ 71,23, série 1 e ambiente 2 foram mantidos.
+
+| Campo | Reteste |
+|---|---|
+| Correlation ID | `9b91430f-836f-4e50-9b87-18d3c621ae00` |
+| ID da nota | `65e07293-430b-4eef-9e1c-99e96196872c` |
+| Número/série | 2 / 001, atribuídos pela IntNFe |
+| Aceite | HTTP 202, 09/09/2026 22:38:58 de Brasília |
+| Resultado | Status 4, Rejeitada, código `539`, às 22:39:03 |
+| Chave gerada para a tentativa | `35260933590794000140550010000000021129399375` |
+| Chave preexistente indicada no retorno | `35260933590794000140550010000000021831593887` |
+| Recibo indicado no retorno | `351000217826821` |
+| Protocolo/autorizadoEm | Nulos |
+
+Mensagem recebida:
+
+```text
+Rejeição: Duplicidade de NF-e com diferença na Chave de Acesso [chNFe:35260933590794000140550010000000021831593887][nRec:351000217826821]
+```
+
+Os erros anteriores de `ICMSSN500` e CST 49 não apareceram no novo retorno.
+Isso indica avanço da validação do XML para uma rejeição de duplicidade neste
+cenário; não comprova autorização nem valida todos os cenários tributários.
+
+Conferências posteriores, somente leitura:
+
+- `GET /painel/numeracao`: série 001, ambiente 2, último número 2, próximo 3.
+- `GET /nfe/chave/{chavePreexistente}`: HTTP 404 `NfeNaoEncontrada` no emitente
+  atual. A API não recuperou a nota que o retorno de duplicidade referencia.
+- `GET /nfe`: apenas as notas 1/001 (`SCHEMA`) e 2/001 (`539`), ambas rejeitadas.
+
+**Próxima ação da equipe IntNFe:** localizar o histórico da chave preexistente
+e reconciliar a sequência de homologação antes do próximo envio. Uso anterior
+da numeração antes da remoção dos emitentes é uma hipótese, não uma causa
+confirmada. O próximo número 3 informado pela API não comprova disponibilidade
+na SEFAZ. Nenhuma sequência foi alterada e não foram feitas outras emissões
+para tentar ultrapassar o conflito.
+
+O retorno desta nota rejeitada já contém uma chave gerada. Portanto, a presença
+de `chaveAcesso` sozinha não significa autorização: conferir também status,
+protocolo e XML autorizado. XML/DANFE autorizado permanecem pendentes.
+
+Evidências privadas em `runtime/analises/fiscal/2026-09-09/reteste-02/`, incluindo
+payload, controle, resposta, status e `conciliacao-duplicidade.json`. O erro
+original segue abaixo como histórico para comparação.
+
+## Histórico: primeira tentativa com erro de XML
+
+A primeira solicitação foi aceita com HTTP 202 e terminou em `SCHEMA`.
+Cadastro do emitente, autenticação e certificado A1 já estavam funcionando.
 
 ## Identificação para localizar o processamento
 
@@ -65,7 +121,7 @@ O retorno aponta para a estrutura do XML gerado. O XML rejeitado não foi
 obtido pelo piloto; a confirmação da causa interna exige a equipe IntNFe
 examinar esse processamento e o código que constrói os grupos.
 
-## Pendências para a equipe IntNFe
+## Pendências levantadas na primeira tentativa (histórico)
 
 1. Conferir campos e ordem de `ICMSSN500`: o schema espera `pST` antes do
    `vICMSSTRet` que foi gerado. Verificar o contrato necessário para a retenção,
