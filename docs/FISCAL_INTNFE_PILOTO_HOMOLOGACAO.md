@@ -1,6 +1,6 @@
 # IntNFe — primeiro teste de NF-e de produto
 
-Registro: 09/09/2026. Situação atual às 23:05 de Brasília: **primeira NF-e autorizada em homologação**, número **1, série 003**, total **R$ 71,23**. Integrador **CorePet — Lucas Guerra**, emitente LJ ativo e A1 aceito. Chave, protocolo e XML autorizado conferidos. O DANFE foi baixado, mas exibe valores/quantidade incorretos; precisa de correção na IntNFe. [Diagnóstico atualizado](DIAGNOSTICO_INTNFE_NFE_HOMOLOGACAO_2026-09-09.md).
+Registro: 09/09/2026. Situação atual às 23:19 de Brasília: **NF-e 1/003 autorizada em homologação**, total **R$ 71,23**, XML e protocolo conferidos. A nova consulta do DANFE confirmou a correção dos valores e da quantidade, sem nova emissão. Restam ajustar a modalidade do frete exibida (XML 9, HTML 0) e padronizar decimais da linha do item. [Diagnóstico atualizado](DIAGNOSTICO_INTNFE_NFE_HOMOLOGACAO_2026-09-09.md).
 
 ## Decisão registrada
 
@@ -55,7 +55,7 @@ Se já houver empresa cadastrada, consultar e reutilizar seu cadastro. Não rota
 | XML dos impostos | Concluído para o cenário: XML autorizado contém ICMSSN500, PISOutr e COFINSOutr, preservando CSOSN 500/CST 49 | Equipe IntNFe/Codex |
 | Numeração em homologação | Série 3 permitiu emitir. Conciliar o histórico da duplicidade 539 da série 1 antes de reutilizá-la | Equipe IntNFe |
 | Nota autorizada e XML | Concluído: nota 1/003, cStat 100, tpAmb 2, chave/protocolo/destinatário/item/totais conferidos | Codex |
-| DANFE | Corrigir formatação: XML total 71.23, HTML exibe 7.123,00; produtos, desconto e quantidade também divergem. Regenerar para a mesma nota autorizada | Equipe IntNFe |
+| DANFE | Valores e quantidade corrigidos, confirmados às 23:19. Corrigir modalidade do frete (XML 9, DANFE 0) e uniformizar decimais dos itens. Validar na mesma nota | Equipe IntNFe |
 
 Solicitar credenciais por meio protegido ou entrada direta no portal; não colocar segredos/certificados em documentos, commits ou mensagens de diagnóstico. Os exemplos públicos da API não são credenciais de teste liberadas para uso.
 
@@ -121,7 +121,7 @@ Nenhum dos assuntos futuros será usado para exigir a integração completa ante
 | Certificado | Upload e consulta HTTP 200; CNPJ correto, válido até 02/04/2027 |
 | Destinatário | Enviado no corpo da NF-e; não foi comprovado cadastro separado de comprador |
 | Nota enviada/autorizada | 1/001 rejeitada SCHEMA; 2/001 rejeitada 539; 1/003 autorizada. Todos em homologação |
-| Chave/XML/DANFE de teste | Chave/protocolo/XML autorizado da 1/003 conferidos. DANFE obtido, com divergências numéricas |
+| Chave/XML/DANFE de teste | Chave/protocolo/XML da 1/003 conferidos. Valores e quantidade do DANFE corrigidos; frete e padronização decimal do item pendentes |
 
 ### Evidência do impedimento no cadastro
 
@@ -344,3 +344,18 @@ CNPJ/série/ambiente: a numeração real é independente da homologação.
   continuar antigo depois da alteração.
 - Reconsulta e evidências privadas detalhadas no
   [diagnóstico](DIAGNOSTICO_INTNFE_NFE_HOMOLOGACAO_2026-09-09.md).
+
+### Correção do DANFE conferida às 23:19
+
+- Após Lucas informar a publicação da correção, nova consulta do DANFE retornou
+  HTTP 200 para a mesma nota 1/003. Chave, protocolo, horário de autorização,
+  estado da nota e XML permaneceram iguais. Nenhum novo POST de emissão.
+- Produtos 199,00, desconto 127,77, total 71,23 e quantidade 1,000 agora
+  correspondem ao XML. A versão nova do HTML foi preservada separadamente.
+- Conferência adicional: o XML tem `modFrete=9` e o DANFE exibe 0, emitente.
+  Corrigir código/legenda da modalidade de transporte. A linha do item ainda
+  apresenta 199.00/0.00, precisando padronizar o separador decimal sem mudar
+  os valores. [Evidências e detalhes](DIAGNOSTICO_INTNFE_NFE_HOMOLOGACAO_2026-09-09.md).
+- Arquivos em `runtime/analises/fiscal/2026-09-09/reteste-03-serie3/`, com
+  sufixo `20260910T021940Z`. A próxima validação pode novamente buscar o
+  DANFE dessa nota, sem emissão adicional.
