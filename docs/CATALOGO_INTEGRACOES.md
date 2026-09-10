@@ -538,9 +538,11 @@ Toda integração nova ou alterada deve registrar, antes da homologação:
   externos ou credenciais. Exclusão/inativação externa pede revisão de suporte.
 - **Responsável:** Lucas pelo piloto; equipe IntNFe pelo conflito/contrato
   externo; Codex pela implementação e testes.
-- **Lacuna prioritária:** homologar o fluxo completo/contrato real, resolver o 409 do
-  piloto e disponibilizar A1 antes da primeira NF-e. Emissão não implementada
-  nesta etapa, mesmo com certificado validado. Flag desligada por padrão.
+- **Lacuna prioritária:** homologar o fluxo integrado DEV e corrigir a rejeição
+  `SCHEMA` de ICMS-ST/PIS/COFINS no piloto direto da IntNFe. O cadastro da LJ,
+  sua autenticação e o A1 foram confirmados em 09/09/2026; o conflito 409 foi
+  superado. A nota 1/001 em homologação foi processada e rejeitada, sem autorização.
+  Emissão pelo CorePet não implementada nesta etapa. Flag desligada por padrão.
 - **Evidência:** `backend/app/intnfe/`, `backend/tests/unit/test_intnfe_*.py`,
   `backend/tests/integration/test_intnfe_postgres.py`,
   `docs/ATIVACAO_FISCAL_INTNFE.md` e ficha de entrega de 2026-09-09.
