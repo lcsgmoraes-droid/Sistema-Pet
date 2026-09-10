@@ -112,9 +112,11 @@ Validação desta entrega e limites estão na
 4. A primeira NF-e direta, com um item e total de R$ 71,23, recebeu HTTP 202 e
    tornou-se a nota 1/001 em homologação. O resultado foi rejeição `SCHEMA` nos
    grupos ICMS-ST e PIS/COFINS. No reteste com o mesmo JSON, a nota 2/001
-   retornou 539 (duplicidade), sem repetir os erros de XML. Reconciliar a
-   numeração de homologação antes de novo envio. Autorização, XML e DANFE
-   seguem pendentes; a chave gerada na rejeição não comprova autorização.
+   retornou 539 (duplicidade), sem repetir os erros de XML. Lucas sugeriu outra
+   série: alterando somente para série 3, a nota 1/003 foi autorizada, com
+   protocolo e XML conferidos. O DANFE obtido exibe total 7.123,00 em lugar de
+   71,23 e outros números divergentes; corrigir sua formatação e regenerar
+   para a mesma nota. Conciliar a série 001 antes de reutilizá-la.
    [Diagnóstico](DIAGNOSTICO_INTNFE_NFE_HOMOLOGACAO_2026-09-09.md)
    e [registro do piloto](FISCAL_INTNFE_PILOTO_HOMOLOGACAO.md).
 
