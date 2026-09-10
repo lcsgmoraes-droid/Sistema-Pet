@@ -85,7 +85,10 @@ própria HTTP 200. Após Lucas fornecer o PFX, o A1 foi enviado e reconhecido:
 HTTP 200, válido até 02/04/2027. Houve recuperação controlada da credencial do
 emitente recém-criado após perda da resposta de cadastro. A primeira nota
 direta de API, 1/001 em homologação, foi aceita com HTTP 202 e depois rejeitada
-com `SCHEMA` em ICMS-ST e PIS/COFINS. Ainda sem chave/protocolo/XML/DANFE.
+com `SCHEMA` em ICMS-ST e PIS/COFINS. O reteste com dados idênticos gerou a
+nota 2/001 e retornou 539 (duplicidade), sem repetir os erros de XML. Falta
+reconciliar a numeração; chave gerada sem autorização, protocolo ou XML/DANFE
+autorizados.
 Detalhes no [registro](../FISCAL_INTNFE_PILOTO_HOMOLOGACAO.md) e no
 [diagnóstico](../DIAGNOSTICO_INTNFE_NFE_HOMOLOGACAO_2026-09-09.md).
 Esta ficha registra a validação técnica parcial; homologação operacional com
@@ -134,7 +137,8 @@ Marco de comunicação aos clientes: liberação futura da funcionalidade.
 - [x] RLS/concorrência e migration validadas em PostgreSQL.
 - [ ] E2E autenticado do fluxo completo com conta DEV autorizada e emissor real.
 - [x] Emissor real e certificado reconhecidos no piloto direto da API IntNFe.
-- [ ] Resolver rejeição de schema em ICMS-ST e PIS/COFINS na IntNFe.
+- [x] Retestar os mesmos dados: erros anteriores de schema não se repetiram.
+- [ ] Resolver duplicidade 539 e reconciliar a numeração de homologação.
 - [ ] Primeira nota de produto autorizada em homologação.
 
 Decisão: preparada para revisão, com pendências de homologação. Não liberada

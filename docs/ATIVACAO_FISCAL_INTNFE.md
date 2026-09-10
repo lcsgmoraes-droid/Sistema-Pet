@@ -111,9 +111,11 @@ Validação desta entrega e limites estão na
    válido até 02/04/2027. Conferir esse estado também no fluxo integrado DEV.
 4. A primeira NF-e direta, com um item e total de R$ 71,23, recebeu HTTP 202 e
    tornou-se a nota 1/001 em homologação. O resultado foi rejeição `SCHEMA` nos
-   grupos ICMS-ST e PIS/COFINS. Corrigir o XML na IntNFe e repetir o teste de
-   forma controlada antes de considerar autorização, chave, XML e DANFE
-   concluídos. [Diagnóstico](DIAGNOSTICO_INTNFE_NFE_HOMOLOGACAO_2026-09-09.md)
+   grupos ICMS-ST e PIS/COFINS. No reteste com o mesmo JSON, a nota 2/001
+   retornou 539 (duplicidade), sem repetir os erros de XML. Reconciliar a
+   numeração de homologação antes de novo envio. Autorização, XML e DANFE
+   seguem pendentes; a chave gerada na rejeição não comprova autorização.
+   [Diagnóstico](DIAGNOSTICO_INTNFE_NFE_HOMOLOGACAO_2026-09-09.md)
    e [registro do piloto](FISCAL_INTNFE_PILOTO_HOMOLOGACAO.md).
 
 Upload de A1 dentro do CorePet, emissão pelo PDV, cadastro/sincronização de
