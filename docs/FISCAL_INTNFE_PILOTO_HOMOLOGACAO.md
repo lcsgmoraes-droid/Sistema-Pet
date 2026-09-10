@@ -331,3 +331,16 @@ a série 001. Lucas sugeriu uma série diferente no teste seguinte.
 nova emissão para esse ajuste. Manter a conciliação da série 001 como pendência
 antes de voltar a usá-la. Para produção, levantar a sequência do Bling por
 CNPJ/série/ambiente: a numeração real é independente da homologação.
+
+### Nova consulta do DANFE sem emissão
+
+- **23:13:26 de Brasília:** confirmado HTTP 200 em
+  `GET /nfe/3a6cea68-0a2d-4b1d-b7db-aff339a30497/danfe`, com token do emitente.
+- Nota consultada antes/depois e XML lido novamente: autorização, protocolo,
+  chave, horário e XML preservados. Não foi feito POST de emissão.
+- O HTML ainda mostra total 7.123,00 e tem o mesmo hash da primeira obtenção.
+  Após a correção, repetir somente o GET do DANFE. A documentação não esclarece
+  geração a cada chamada versus cache; verificar isso no provedor se o HTML
+  continuar antigo depois da alteração.
+- Reconsulta e evidências privadas detalhadas no
+  [diagnóstico](DIAGNOSTICO_INTNFE_NFE_HOMOLOGACAO_2026-09-09.md).

@@ -50,6 +50,32 @@ verificação na IntNFe. Conferir conversão dos decimais do XML e formatação
 em português do Brasil, incluindo quantidades, valores, descontos e totais.
 O HTML original foi preservado sem correção local.
 
+### Endpoint confirmado para consultar novamente o DANFE
+
+Em **09/09/2026 às 23:13:26 de Brasília**, a pedido de Lucas, foi testado:
+
+```http
+GET https://api.intnfe.com.br/nfe/3a6cea68-0a2d-4b1d-b7db-aff339a30497/danfe
+Authorization: Bearer <token do emitente>
+```
+
+Retorno **HTTP 200**, HTML do DANFE da nota 1/003. Foram feitas consultas da
+nota antes e depois e nova leitura do XML: estado, chave, protocolo, horário
+de autorização e XML permaneceram idênticos. **Não houve POST de emissão**.
+O DANFE ainda mostrou total 7.123,00 e teve o mesmo hash do arquivo anterior.
+
+O endpoint permite obter novamente a representação da nota autorizada, sem
+repetir autorização. A documentação não especifica se há renderização a cada
+requisição ou cache; a resposta idêntica antes do ajuste não distingue esses
+comportamentos. Depois da correção, repetir somente esse GET e comparar o HTML
+com o XML. Se ainda vier antigo, verificar cache/geração do DANFE no provedor.
+
+Evidências em `reteste-03-serie3/` dentro da pasta privada do piloto:
+`DANFE-1-003-reconsulta-20260910T021325Z.html` e
+`danfe-reconsulta-20260910T021325Z.json`. Script local
+`baixar-danfe-autorizada.ps1` consulta apenas a nota existente, XML e DANFE;
+o único POST nele é para obter o token de autenticação.
+
 **Próxima ação da equipe IntNFe:** corrigir o DANFE e regenerá-lo para esta
 mesma nota autorizada. Não é necessário emitir outra NF-e para validar a
 representação, pois XML, chave e protocolo já existem. Depois comparar de
