@@ -1,10 +1,19 @@
 # IntNFe — diagnóstico e reteste da NF-e de homologação
 
-**Atualização em 09/09/2026 às 23:19 de Brasília:** a correção dos valores e
-da quantidade do DANFE foi confirmada por nova consulta da nota **1/003**,
-já autorizada em homologação. Total agora **R$ 71,23**, com XML e autorização
-intactos. A conferência adicional identificou divergência no **frete**:
-XML com modalidade 9; DANFE exibe 0 (emitente).
+**Atualização em 10/09/2026 às 00:02 de Brasília:** a impressão refeita foi
+consultada na mesma nota **1/003**, sem nova emissão. XML, autorização, chave e
+protocolo permaneceram intactos. Produtos **199,00**, desconto **127,77**, total
+**71,23**, quantidade **1**, valor unitário **199,0000** e frete **9 - Sem frete**
+agora correspondem ao XML. A inspeção visual não encontrou cortes, sobreposições
+ou tabelas quebradas no conteúdo.
+
+A impressão em A4 gera uma folha, mas o conteúdo encosta nas bordas porque o CSS
+de impressão zera margem e preenchimento. Isso pode cortar traços/texto em
+impressoras sem suporte a impressão até a borda. Sem tamanho de papel declarado,
+o teste com padrão Carta gerou duas páginas: a primeira completa e a segunda
+totalmente em branco, enquanto o documento informa `Folha 1/1`. Recomenda-se
+declarar A4 no CSS de impressão e manter uma margem interna segura, conferindo
+que o resultado continue em uma única folha.
 
 Consulta posterior da nova rota de numeração do integrador: HTTP 200, com série
 001 de homologação em `ultimoNumero=1000000` (próximo 1.000.001) e série 003 em
@@ -14,7 +23,7 @@ conciliar com a IntNFe a origem do avanço da série 001. O CorePet recebeu tela
 para configurar a sequência por série/ambiente, ainda em desenvolvimento:
 [contrato, testes e limites](ATIVACAO_FISCAL_INTNFE.md#numeração-por-série-e-ambiente).
 
-## DANFE após a correção — valores corrigidos, frete pendente
+## DANFE após a correção — conteúdo fiscal conferido
 
 Lucas informou a publicação da correção. Às **23:19:40 de Brasília**, foi
 repetido somente `GET /nfe/3a6cea68-0a2d-4b1d-b7db-aff339a30497/danfe`, após
@@ -29,7 +38,7 @@ sem nova emissão ou autorização. Estado, chave, protocolo e XML mantidos.
 | Total | 7.123,00 | 71,23 | Igual ao XML |
 | Quantidade | 100.000 | 1,000 | Corresponde a uma unidade |
 
-### Pendências restantes do DANFE
+### Pendências identificadas às 23:19 — resolvidas às 00:02
 
 1. **Modalidade do frete divergente:** JSON enviado `frete.modalidade: "9"`;
    XML autorizado `<modFrete>9</modFrete>`; HTML no campo `FRETE POR CONTA`
@@ -42,14 +51,16 @@ sem nova emissão ou autorização. Estado, chave, protocolo e XML mantidos.
    mas a apresentação ainda mistura ponto com a vírgula dos totais; usar
    formatação brasileira consistente, preservando a precisão de cada campo.
 
-Para validar esses ajustes, consultar de novo o DANFE da **mesma nota 1/003**.
-O XML autorizado permanece correto; não é necessário emitir outra nota.
+Os dois itens acima foram corrigidos na versão consultada às 00:02: modalidade
+`9 - Sem frete`, valor unitário `199,0000` e total do item `199,00`. O XML
+autorizado permaneceu correto e nenhuma nova nota foi emitida. As pendências
+atuais são somente as de impressão descritas no início deste diagnóstico.
+
 Evidências privadas em `reteste-03-serie3/` na pasta local do piloto:
-`DANFE-1-003-reconsulta-20260910T021940Z.html`,
-`danfe-reconsulta-20260910T021940Z.json` e
-`validacao-danfe-20260910T021940Z.json`. O HTML original e as versões anteriores
-foram preservados, sem edição local. O histórico abaixo registra os problemas
-anteriores e sua investigação.
+`DANFE-1-003-reconsulta-20260910T030257Z.html` e
+`danfe-reconsulta-20260910T030257Z.json`, além dos PDFs/PNGs de conferência A4 e
+Carta. O HTML original e as versões anteriores foram preservados, sem edição
+local. O histórico abaixo registra os problemas anteriores e sua investigação.
 
 ## Teste com série 3 — autorizado, DANFE divergente
 
