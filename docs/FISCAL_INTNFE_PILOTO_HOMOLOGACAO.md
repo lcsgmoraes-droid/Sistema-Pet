@@ -133,4 +133,35 @@ Nenhum dos assuntos futuros será usado para exigir a integração completa ante
 
 O próximo passo é a equipe da IntNFe localizar o registro/validação que ainda reserva o CNPJ `33590794000140`. Pode haver outro vínculo ou um registro excluído ainda considerado na duplicidade; são hipóteses, não causas comprovadas pelo teste. Depois da verificação, disponibilizar o emitente à PetSys ou corrigir o cadastro para permitir sua criação, conforme o estado real da base. Não substituir o CNPJ da empresa por um fictício para contornar o conflito.
 
-Depois de resolver o acesso, conferir certificado, dados fiscais e série de homologação antes de preparar a emissão. Não houve alteração de aplicação, banco, estoque, caixa ou implantação em produção.
+Depois de resolver o acesso, conferir certificado, dados fiscais e série de homologação antes de preparar a emissão. As tentativas remotas descritas acima não alteraram aplicação, banco, estoque, caixa ou produção.
+
+### Preparação do vínculo no CorePet
+
+Por solicitação do Lucas, foi implementada a ativação opcional em **Configurações
+→ Integrações → IntNFe**, independente do cadastro inicial da conta. O CorePet
+consulta/cria o emitente, protege as credenciais por empresa e mostra a situação
+do certificado. Conflito de CNPJ e resposta perdida têm recuperação controlada.
+
+O código e a nova migration estão preparados para revisão. As validações locais
+usaram dados fictícios/respostas simuladas; não alteram o resultado do piloto
+real acima e não significam que o 409 foi resolvido. Não houve emissão ou
+habilitação/deploy em produção.
+
+Configuração, contrato e pendências: [guia da ativação](ATIVACAO_FISCAL_INTNFE.md)
+e [ficha de entrega](entregas/2026-09-09-ativacao-fiscal-intnfe.md).
+
+### Tentativa após a atualização de "Minha conta"
+
+- Lucas informou que o painel passou a permitir edição dos dados do integrador
+  e pediu nova tentativa do vínculo como emitente.
+- Na sessão PetSys, `/conta` mostra nome, contato e acesso do integrador; o CNPJ
+  dessa conta continua separado do CNPJ da empresa emitente. Não foram alterados
+  dados cadastrais, senha ou secret do integrador.
+- Nova autenticação do integrador: HTTP 200. Consulta dos emitentes: HTTP 200,
+  lista vazia. Novo POST com o CNPJ da LJ: **HTTP 409**.
+- Horário: 09/09/2026 às **21:00:21 em Brasília** (10/09/2026 00:00:21 UTC).
+- Protocolo `X-Correlation-Id`: `02d1de67c4eb434eb1d7c9f4e64b7bf9`.
+- Evidência: `runtime/analises/fiscal/2026-09-09/cadastro-20260910T000021Z.json`.
+- Nenhum emitente ou segredo de emitente foi retornado. A alteração do painel
+  foi conferida; o conflito na criação pela API ainda depende de verificação
+  da equipe IntNFe. Não repetir automaticamente nem usar CNPJ fictício.

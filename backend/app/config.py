@@ -1,6 +1,7 @@
 import os
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import SecretStr
 from typing import List
 
 
@@ -17,6 +18,11 @@ class Settings(BaseSettings):
     JWT_SECRET_KEY: str = "CHANGE_ME_IN_ENV"
 
     # Integracoes externas
+    # Ativacao opcional do emitente. Nao habilita emissao fiscal em producao.
+    INTNFE_ACTIVATION_ENABLED: bool = False
+    INTNFE_INTEGRADOR_ID: str = ""
+    INTNFE_INTEGRADOR_SECRET: SecretStr = SecretStr("")
+
     GOOGLE_MAPS_API_KEY: str = ""
     ASAAS_ENVIRONMENT: str = "sandbox"
     ASAAS_API_KEY: str = ""

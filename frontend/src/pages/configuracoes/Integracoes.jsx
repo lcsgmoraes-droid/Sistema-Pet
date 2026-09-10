@@ -5,6 +5,7 @@ import {
   FiCheck,
   FiCpu,
   FiGrid,
+  FiFileText,
   FiPackage,
   FiShoppingBag,
 } from "react-icons/fi";
@@ -12,8 +13,25 @@ import BlingIntegracao from "./BlingIntegracao";
 import EcommerceAIIntegracaoCard from "./EcommerceAIIntegracaoCard";
 import IfoodIntegracaoCard from "./IfoodIntegracaoCard";
 import OpenAIIntegracaoCard from "./OpenAIIntegracaoCard";
+import IntNFeIntegracao from "./IntNFeIntegracao";
 
 const INTEGRACOES = [
+  {
+    id: "intnfe",
+    nome: "IntNFe",
+    categoria: "Notas fiscais",
+    descricao: "Ative o vínculo da empresa para os testes de emissão de NF-e de produtos.",
+    recursos: [
+      "Cadastro do emitente",
+      "Acompanhamento das pendências",
+      "Conferência do certificado A1",
+    ],
+    icon: FiFileText,
+    cardClass:
+      "border-blue-200 bg-blue-50/70 hover:border-blue-300 hover:bg-blue-50 dark:border-blue-800 dark:bg-blue-950/20",
+    iconClass: "bg-blue-600 text-white",
+    linkClass: "text-blue-700 dark:text-blue-300",
+  },
   {
     id: "bling",
     nome: "Bling v3",
@@ -81,6 +99,7 @@ const INTEGRACOES = [
 ];
 
 const PAINEIS = {
+  intnfe: IntNFeIntegracao,
   bling: BlingIntegracao,
   ifood: IfoodIntegracaoCard,
   ecommerceai: EcommerceAIIntegracaoCard,
