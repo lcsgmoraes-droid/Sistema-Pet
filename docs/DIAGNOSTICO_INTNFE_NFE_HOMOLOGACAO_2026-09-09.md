@@ -6,6 +6,14 @@ já autorizada em homologação. Total agora **R$ 71,23**, com XML e autorizaç�
 intactos. A conferência adicional identificou divergência no **frete**:
 XML com modalidade 9; DANFE exibe 0 (emitente).
 
+Consulta posterior da nova rota de numeração do integrador: HTTP 200, com série
+001 de homologação em `ultimoNumero=1000000` (próximo 1.000.001) e série 003 em
+`ultimoNumero=1` (próximo 2). Isso é a sequência configurada no emissor, não um
+histórico de notas autorizadas. Nenhum PUT foi realizado nessa verificação;
+conciliar com a IntNFe a origem do avanço da série 001. O CorePet recebeu tela
+para configurar a sequência por série/ambiente, ainda em desenvolvimento:
+[contrato, testes e limites](ATIVACAO_FISCAL_INTNFE.md#numeração-por-série-e-ambiente).
+
 ## DANFE após a correção — valores corrigidos, frete pendente
 
 Lucas informou a publicação da correção. Às **23:19:40 de Brasília**, foi

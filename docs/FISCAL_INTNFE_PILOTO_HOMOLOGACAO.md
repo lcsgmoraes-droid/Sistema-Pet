@@ -359,3 +359,16 @@ CNPJ/série/ambiente: a numeração real é independente da homologação.
 - Arquivos em `runtime/analises/fiscal/2026-09-09/reteste-03-serie3/`, com
   sufixo `20260910T021940Z`. A próxima validação pode novamente buscar o
   DANFE dessa nota, sem emissão adicional.
+
+### Nova rota de numeração e configuração no CorePet
+
+- `GET /integrador/emitentes/{tenantId}/numeracao` confirmado com HTTP 200.
+  Homologação: série 001 configurada até 1.000.000 (próxima 1.000.001), série 003
+  até 1 (próxima 2). Nenhuma linha de produção retornada; nenhum PUT realizado.
+- A numeração consultada não prova autorização de notas nesses números. A série
+  001 continua exigindo conciliação com a IntNFe; não tentar retrocedê-la.
+- Configuração implementada no CorePet para NF-e, por série e ambiente explícito,
+  com revisão, avanço somente, auditoria e confirmação por nova leitura. Lucas
+  escolheu permitir homologação e produção nessa configuração.
+- Testes locais de escrita são simulados. Falta validar o PUT pela conta DEV com
+  uma sequência escolhida para o piloto. [Guia](ATIVACAO_FISCAL_INTNFE.md#numeração-por-série-e-ambiente).

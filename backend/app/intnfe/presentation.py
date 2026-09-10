@@ -145,6 +145,16 @@ def public_status(tenant, connection, integrador_id):
         and state
         in {"nao_vinculado", "cnpj_em_uso", "falha", "acesso_integrador_invalido"},
         "pode_consultar": not blocked and not busy and bool(connection),
+        "pode_configurar_numeracao": not blocked
+        and not busy
+        and linked
+        and state
+        in {
+            "vinculado",
+            "certificado_pendente",
+            "certificado_invalido",
+            "certificado_validado",
+        },
         "pode_vincular": not blocked
         and not busy
         and state in {"credenciais_pendentes", "credenciais_invalidas"},
