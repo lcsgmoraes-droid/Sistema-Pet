@@ -1,6 +1,10 @@
 # IntNFe — primeiro teste de NF-e de produto
 
-Registro: 09/09/2026. Situação atual às 23:19 de Brasília: **NF-e 1/003 autorizada em homologação**, total **R$ 71,23**, XML e protocolo conferidos. A nova consulta do DANFE confirmou a correção dos valores e da quantidade, sem nova emissão. Restam ajustar a modalidade do frete exibida (XML 9, HTML 0) e padronizar decimais da linha do item. [Diagnóstico atualizado](DIAGNOSTICO_INTNFE_NFE_HOMOLOGACAO_2026-09-09.md).
+Registro iniciado em 09/09/2026. Situação atual em 10/09 às 00:02 de Brasília:
+**NF-e 1/003 autorizada em homologação**, total **R$ 71,23**, XML e protocolo
+conferidos. A nova impressão corrigiu valores, quantidade, frete e decimais da
+linha do item, sem nova emissão. Restam definir A4/margem segura e eliminar uma
+folha em branco no padrão Carta. [Diagnóstico atualizado](DIAGNOSTICO_INTNFE_NFE_HOMOLOGACAO_2026-09-09.md).
 
 ## Decisão registrada
 
@@ -345,20 +349,21 @@ CNPJ/série/ambiente: a numeração real é independente da homologação.
 - Reconsulta e evidências privadas detalhadas no
   [diagnóstico](DIAGNOSTICO_INTNFE_NFE_HOMOLOGACAO_2026-09-09.md).
 
-### Correção do DANFE conferida às 23:19
+### Correção intermediária do DANFE conferida às 23:19
 
 - Após Lucas informar a publicação da correção, nova consulta do DANFE retornou
   HTTP 200 para a mesma nota 1/003. Chave, protocolo, horário de autorização,
   estado da nota e XML permaneceram iguais. Nenhum novo POST de emissão.
 - Produtos 199,00, desconto 127,77, total 71,23 e quantidade 1,000 agora
   correspondem ao XML. A versão nova do HTML foi preservada separadamente.
-- Conferência adicional: o XML tem `modFrete=9` e o DANFE exibe 0, emitente.
+- Naquela versão, o XML tinha `modFrete=9` e o DANFE exibia 0, emitente.
   Corrigir código/legenda da modalidade de transporte. A linha do item ainda
   apresenta 199.00/0.00, precisando padronizar o separador decimal sem mudar
   os valores. [Evidências e detalhes](DIAGNOSTICO_INTNFE_NFE_HOMOLOGACAO_2026-09-09.md).
 - Arquivos em `runtime/analises/fiscal/2026-09-09/reteste-03-serie3/`, com
   sufixo `20260910T021940Z`. A próxima validação pode novamente buscar o
-  DANFE dessa nota, sem emissão adicional.
+  DANFE dessa nota, sem emissão adicional. Os dois pontos foram corrigidos na
+  consulta posterior das 00:02, registrada abaixo.
 
 ### Nova rota de numeração e configuração no CorePet
 
@@ -372,3 +377,17 @@ CNPJ/série/ambiente: a numeração real é independente da homologação.
   escolheu permitir homologação e produção nessa configuração.
 - Testes locais de escrita são simulados. Falta validar o PUT pela conta DEV com
   uma sequência escolhida para o piloto. [Guia](ATIVACAO_FISCAL_INTNFE.md#numeração-por-série-e-ambiente).
+
+### Impressão refeita — validação de dados e visual em 10/09
+
+- Nova chamada apenas a `GET /nfe/{correlationId}/danfe`, às 00:02 de Brasília.
+  Mesma autorização, chave, protocolo e XML; nenhum POST de emissão.
+- Dados corrigidos e coerentes com o XML: produtos 199,00, desconto 127,77,
+  total 71,23, quantidade 1, unitário 199,0000 e modalidade 9 - Sem frete.
+- No navegador e no PDF A4, o conteúdo está legível, alinhado e em uma folha,
+  sem cortes internos, sobreposições ou quebra de tabelas.
+- Pendência visual: o modo impressão elimina todas as margens, levando a borda
+  da folha ao limite físico. Impressoras comuns podem cortar esse contorno.
+- Pendência de paginação: como o HTML não declara A4, o padrão Carta gerou uma
+  segunda página totalmente em branco. Declarar o tamanho A4 e uma margem segura,
+  preservando uma única página. Depois, validar novamente sem emitir outra nota.

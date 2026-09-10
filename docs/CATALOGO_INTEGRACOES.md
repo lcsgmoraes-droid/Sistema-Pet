@@ -546,9 +546,10 @@ Toda integração nova ou alterada deve registrar, antes da homologação:
   falha de auditoria antes do PUT impede o ajuste.
 - **Responsável:** Lucas pelo piloto; equipe IntNFe pelo conflito/contrato
   externo; Codex pela implementação e testes.
-- **Lacuna prioritária:** homologar o fluxo integrado DEV e corrigir modalidade
-  do frete no DANFE (XML 9, HTML 0), além de padronizar os decimais do item.
-  Totais e quantidade corrigidos na reconsulta da nota 1/003 às 23:19.
+- **Lacuna prioritária:** homologar o fluxo integrado DEV. Dados, frete e formato
+  numérico do DANFE foram corrigidos e conferidos na nota 1/003 em 10/09 às 00:02.
+  Na impressão, declarar A4, manter margem segura e impedir a página em branco
+  observada quando o navegador usa papel Carta.
   Cadastro, autenticação, A1 e primeira autorização confirmados em 09/09/2026.
   Conciliar a duplicidade 539 da série
   001 antes de reutilizá-la; não impediu a autorização na série 003.

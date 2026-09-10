@@ -88,7 +88,8 @@ apagar vínculos para contornar conflitos ou repetir uma criação incerta.
   Escrita no provedor e E2E autenticado de configuração continuam pendentes.
 - Não foi realizado teste de carga. O piloto direto de API obteve autorização
   em homologação na nota 1/003, com XML conferido; isso não valida emissão
-  pelo CorePet. O DANFE apresentou divergência de formatação numérica.
+  pelo CorePet. A nova impressão corrigiu valores, quantidade e frete. A revisão
+  visual encontrou falta de margem segura e uma página em branco no papel Carta.
 
 ## 6. Ambientes e homologação
 
@@ -108,9 +109,11 @@ com `SCHEMA` em ICMS-ST e PIS/COFINS. O reteste com dados idênticos gerou a
 nota 2/001 e retornou 539 (duplicidade), sem repetir os erros de XML. Por
 sugestão de Lucas, somente a série foi alterada para 3 e a nota 1/003 foi
 autorizada. XML conferido, com protocolo, cStat 100 e tpAmb 2. O DANFE teve
-produtos/desconto/total/quantidade corrigidos, confirmados por nova consulta
-às 23:19, sem emissão. Restam modalidade do frete (XML 9, HTML 0) e formatação
-decimal do item. A série 001 segue pendente de conciliação antes de reutilizá-la.
+produtos, desconto, total, quantidade, valor unitário e frete corrigidos,
+confirmados por nova consulta em 10/09 às 00:02, sem emissão. A inspeção visual
+em A4 passou em uma folha, sem sobreposição; restam margem de impressão segura,
+tamanho A4 declarado e remoção da folha em branco gerada no padrão Carta. A série
+001 segue pendente de conciliação antes de reutilizá-la.
 Detalhes no [registro](../FISCAL_INTNFE_PILOTO_HOMOLOGACAO.md) e no
 [diagnóstico](../DIAGNOSTICO_INTNFE_NFE_HOMOLOGACAO_2026-09-09.md).
 Esta ficha registra a validação técnica parcial; homologação operacional com
@@ -167,7 +170,9 @@ Marco de comunicação aos clientes: liberação futura da funcionalidade.
 - [ ] Conciliar duplicidade 539 antes de reutilizar a série 001 em homologação.
 - [x] Primeira nota de produto autorizada em homologação: 1/003, XML conferido.
 - [x] Corrigir produtos, desconto, total e quantidade no DANFE; nova consulta confirmada.
-- [ ] Corrigir modalidade do frete no DANFE e padronizar decimais da linha do item.
+- [x] Corrigir modalidade do frete e decimais da linha do item no DANFE.
+- [x] Validar visualmente a impressão A4 da mesma nota, sem nova emissão.
+- [ ] Declarar papel A4, manter margem segura e impedir página em branco no padrão Carta.
 
 Decisão: preparada para revisão, com pendências de homologação. Não liberada
 para produção. Responsáveis: equipe IntNFe pelo contrato; Lucas e Codex
