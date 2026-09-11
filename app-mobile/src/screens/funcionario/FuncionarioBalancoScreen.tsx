@@ -453,7 +453,12 @@ export default function FuncionarioBalancoScreen() {
             onClose={() => setEditandoCadastro(false)}
             onSaved={(atualizado) => {
               setProduto((atual) => atual?.id === atualizado.id
-                ? { ...atual, nome: atualizado.nome, codigo_barras: atualizado.codigo_barras }
+                ? {
+                  ...atual,
+                  nome: atualizado.nome,
+                  codigo_barras: atualizado.codigo_barras,
+                  preco_venda: Number(atualizado.preco_venda ?? atual.preco_venda ?? 0),
+                }
                 : atual);
               setEditandoCadastro(false);
               Alert.alert("Cadastro atualizado", "As alterações foram salvas no ERP. Você pode continuar o balanço.");

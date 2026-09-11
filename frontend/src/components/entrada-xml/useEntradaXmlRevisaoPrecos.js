@@ -16,7 +16,7 @@ import {
 const ACOES_PROCESSAMENTO_PADRAO = {
   lancar_estoque: true,
   atualizar_custo: true,
-  atualizar_preco_venda: false,
+  atualizar_preco_venda: true,
   gerar_contas_pagar: true,
 };
 
@@ -192,6 +192,14 @@ export default function useEntradaXmlRevisaoPrecos({
           });
         }
       });
+      if (
+        precosParaAtualizar.some(
+          ({ preco_venda: precoVenda }) => !Number.isFinite(precoVenda) || precoVenda <= 0,
+        )
+      ) {
+        toast.error("Confira os preços revisados. O preço de venda deve ser maior que zero.");
+        return;
+      }
 
       const overridesNaoDefault = Object.fromEntries(
         Object.entries(multiplicadoresPack).flatMap(([itemId, valor]) => {
@@ -239,9 +247,18 @@ export default function useEntradaXmlRevisaoPrecos({
         ...(Object.keys(custosOverride).length > 0 ? { custos_override: custosOverride } : {}),
       });
 
-      toast.success(response.data.message || "Movimentos da NF processados com sucesso", {
-        duration: 5000,
-      });
+      const precosAtualizados = Number(response.data.precos_venda_atualizados || 0);
+      const resultadoPrecos = acaoPendenteSelecionada("atualizar_preco_venda")
+        ? precosParaAtualizar.length > 0
+          ? `${precosAtualizados} de ${precosParaAtualizar.length} preço(s) de venda atualizado(s).`
+          : "Nenhum preço de venda mudou, pois os valores revisados ficaram iguais aos atuais."
+        : "A atualização de preços de venda ficou desmarcada.";
+      toast.success(
+        `${response.data.message || "Movimentos da NF processados com sucesso"}. ${resultadoPrecos}`,
+        {
+          duration: 5000,
+        },
+      );
 
       setMostrarDetalhes(false);
       setNotaSelecionada(null);
@@ -276,6 +293,7 @@ export default function useEntradaXmlRevisaoPrecos({
         margem: formatBRL(novaMargem),
       },
     }));
+    setAcaoProcessamento("atualizar_preco_venda", true);
   };
 
   const atualizarMargem = (produtoId, novaMargemEntrada, custoNovo) => {
@@ -295,6 +313,7 @@ export default function useEntradaXmlRevisaoPrecos({
         margem: String(novaMargemEntrada ?? ""),
       },
     }));
+    setAcaoProcessamento("atualizar_preco_venda", true);
   };
 
   const normalizarCamposRevisaoPrecos = (produtoId) => {

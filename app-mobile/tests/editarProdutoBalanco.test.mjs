@@ -43,7 +43,15 @@ function tela(arquivo, deps, props = {}) {
     if (id in comuns) return comuns[id];
     if (id.endsWith("/theme")) return { CORES: {}, ESPACO: {}, FONTE: {}, RAIO: {}, SOMBRA: {} };
     if (id.endsWith("KeyboardSafeScrollView")) return "Scroll";
-    if (id.endsWith("/utils/produtoRapido")) return { erroCadastroProduto: (e, fallback) => e?.response?.data?.detail || fallback };
+    if (id.endsWith("/utils/produtoRapido")) return {
+      erroCadastroProduto: (e, fallback) => e?.response?.data?.detail || fallback,
+      valorMonetarioProduto: (texto) => Number(String(texto).replace(/\D/g, "") || "0") / 100,
+      formatarCampoMonetarioProduto: (texto) => {
+        if (!String(texto).replace(/\D/g, "")) return "";
+        const valor = Number(String(texto).replace(/\D/g, "") || "0") / 100;
+        return new Intl.NumberFormat("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(valor);
+      },
+    };
     throw new Error(`Dependencia ausente: ${id}`);
   }, () => 1, () => {});
   function render() {
@@ -70,7 +78,7 @@ function tela(arquivo, deps, props = {}) {
   };
 }
 
-const original = { id: 42, nome: "Ração", codigo: "SKU42", codigo_barras: "7891234567890", descricao_curta: "Descrição existente" };
+const original = { id: 42, nome: "Ração", codigo: "SKU42", codigo_barras: "7891234567890", descricao_curta: "Descrição existente", preco_venda: 179.9 };
 const esperar = () => new Promise((resolve) => setImmediate(resolve));
 
 async function editor({ granted = true, carregar, salvar } = {}) {
@@ -104,6 +112,16 @@ test("camera preenche somente o EAN, ignora leitura repetida e salva apenas ao c
   await e.button("Salvar cadastro").onPress();
   assert.deepEqual(e.chamadas, [[42, { codigo_barras: "0012345678905" }]]);
   assert.equal(e.salvos[0].id, 42);
+});
+
+test("edita preco em formato brasileiro e envia o valor numerico ao ERP", async () => {
+  const e = await editor();
+  assert.equal(e.label("Preço de venda").value, "179,90");
+  e.label("Preço de venda").onChangeText("18990");
+  assert.equal(e.label("Preço de venda").value, "189,90");
+  await e.button("Salvar cadastro").onPress();
+  assert.deepEqual(e.chamadas, [[42, { preco_venda: 189.9 }]]);
+  assert.equal(e.salvos[0].preco_venda, 189.9);
 });
 
 test("cancelar camera preserva campos e cancelar edicao nao chama API", async () => {
@@ -179,11 +197,11 @@ test("falha ao carregar exige nova leitura antes de permitir edicao", async () =
   assert.equal(e.label("Descrição complementar").value, original.descricao_curta);
 });
 
-test("voltar da edicao atualiza identificacao e preserva saldo, lote, validade e observacao", async () => {
+test("voltar da edicao atualiza identificacao e preco sem perder dados do balanco", async () => {
   const b = tela("FuncionarioBalancoScreen.tsx", {
     "expo-camera": { CameraView: "Camera", useCameraPermissions: () => [{ granted: true }, async () => ({ granted: true })] },
     "../../services/funcionarioEstoque.service": { buscarProdutosFuncionario: async () => [{ ...original, unidade: "UN", permite_balanco: true }] },
-    "../../utils/format": { formatarMoeda: () => "R$ 10,00" },
+    "../../utils/format": { formatarMoeda: (valor) => `R$ ${valor}` },
     "./produto/EditarProdutoBalanco": "Editor",
   });
   b.find((n) => n.props?.placeholder === "Buscar produto por nome, codigo ou barras").onChangeText("Ração");
@@ -194,7 +212,9 @@ test("voltar da edicao atualiza identificacao e preserva saldo, lote, validade e
   b.find((n) => n.props?.placeholder === "DD/MM/AAAA ou AAAA-MM-DD").onChangeText("10/12/2026");
   b.find((n) => n.type === "TextInput" && n.props.multiline).onChangeText("Conferido");
   b.button("Editar cadastro").onPress();
-  b.find((n) => n.type === "Editor").onSaved({ ...original, nome: "Nome corrigido", codigo_barras: "12345678" });
+  b.find((n) => n.type === "Editor").onSaved({
+    ...original, nome: "Nome corrigido", codigo_barras: "12345678", preco_venda: 189.9,
+  });
   assert.equal(b.has("Editor"), false);
   assert.equal(b.find((n) => n.props?.placeholder === "Ex: 12").value, "12,5");
   assert.equal(b.find((n) => n.props?.autoCapitalize === "characters").value, "LOTE-A");
@@ -202,4 +222,5 @@ test("voltar da edicao atualiza identificacao e preserva saldo, lote, validade e
   assert.equal(b.find((n) => n.type === "TextInput" && n.props.multiline).value, "Conferido");
   assert.match(JSON.stringify(b.render()), /Nome corrigido/);
   assert.match(JSON.stringify(b.render()), /12345678/);
+  assert.match(JSON.stringify(b.render()), /R\$ 189\.9/);
 });

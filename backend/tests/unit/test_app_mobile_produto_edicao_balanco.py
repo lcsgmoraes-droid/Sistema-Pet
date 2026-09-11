@@ -10,7 +10,7 @@ from sqlalchemy import func, select
 
 from app.db import get_session
 from app.produto_identity_models import ProdutoSkuAlias
-from app.produtos_models import EstoqueMovimentacao, Produto
+from app.produtos_models import EstoqueMovimentacao, Produto, ProdutoHistoricoPreco
 from app.routes import app_mobile_funcionario_estoque_routes as estoque
 from app.routes import app_mobile_funcionario_produtos_routes as cadastro
 from app.routes.app_mobile_funcionario_pdv import auth
@@ -137,6 +137,33 @@ def test_edita_cadastro_real_e_novo_ean_localiza_mesmo_produto_sem_movimentar(am
     assert [p["id"] for p in busca.json()] == [1]
 
 
+def test_edita_preco_registra_historico_e_consultas_do_app_recebem_valor_novo(ambiente):
+    client, db, _ = ambiente
+
+    consulta = client.get("/app/funcionario/produtos/1/cadastro")
+    assert consulta.status_code == 200
+    assert consulta.json()["preco_venda"] == 179.9
+
+    resposta = editar(client, preco_venda=189.9)
+
+    assert resposta.status_code == 200, resposta.text
+    assert resposta.json()["preco_venda"] == 189.9
+    assert registro(db)["preco_venda"] == 189.9
+    historico = db.scalar(
+        select(ProdutoHistoricoPreco).where(
+            ProdutoHistoricoPreco.produto_id == 1,
+            ProdutoHistoricoPreco.motivo == "edicao_app_funcionario",
+        )
+    )
+    assert historico is not None
+    assert historico.preco_venda_anterior == 179.9
+    assert historico.preco_venda_novo == 189.9
+
+    encontrado = client.get("/app/funcionario/estoque/produtos/barcode/7891234567890")
+    assert encontrado.status_code == 200, encontrado.text
+    assert encontrado.json()["preco_venda"] == 189.9
+
+
 def test_patch_preserva_campos_omitidos_e_permite_adicionar_ou_limpar_ean(ambiente):
     client, db, _ = ambiente
     assert editar(client, nome="Apenas nome").status_code == 200
@@ -221,8 +248,9 @@ def test_respeita_empresa_perfil_e_produto_arquivado(ambiente):
         {"descricao_curta": "a" * 1001},
         {"codigo_barras": "1" * 21},
         {"codigo_barras": "https://site@produto"},
+        {"preco_venda": 0},
+        {"preco_venda": 100000000},
         {"estoque_atual": 100},
-        {"preco_venda": 1},
         {"codigo": "NOVO-SKU"},
         {"tenant_id": str(TENANT_B)},
     ],

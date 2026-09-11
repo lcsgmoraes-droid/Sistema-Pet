@@ -13,7 +13,11 @@ import {
   ProdutoCadastro, ProdutoCadastroPayload,
 } from "../../../services/funcionarioProdutos.service";
 import { CORES, ESPACO, FONTE, RAIO } from "../../../theme";
-import { erroCadastroProduto } from "../../../utils/produtoRapido";
+import {
+  erroCadastroProduto,
+  formatarCampoMonetarioProduto,
+  valorMonetarioProduto,
+} from "../../../utils/produtoRapido";
 
 type Props = {
   produtoId: number;
@@ -28,6 +32,7 @@ export default function EditarProdutoBalanco({ produtoId, onClose, onSaved }: Pr
   const [nome, setNome] = useState("");
   const [descricao, setDescricao] = useState("");
   const [ean, setEan] = useState("");
+  const [preco, setPreco] = useState("");
   const [carregando, setCarregando] = useState(true);
   const [tentativa, setTentativa] = useState(0);
   const [erro, setErro] = useState<string | null>(null);
@@ -52,6 +57,8 @@ export default function EditarProdutoBalanco({ produtoId, onClose, onSaved }: Pr
       setNome(dados.nome);
       setDescricao(dados.descricao_curta ?? "");
       setEan(dados.codigo_barras ?? "");
+      const precoEmCentavos = Math.round(Number(dados.preco_venda ?? 0) * 100);
+      setPreco(formatarCampoMonetarioProduto(String(precoEmCentavos)));
     }).catch((error) => {
       if (ativo) setErro(erroCadastroProduto(error, "Não foi possível carregar o cadastro."));
     }).finally(() => { if (ativo) setCarregando(false); });
@@ -119,10 +126,22 @@ export default function EditarProdutoBalanco({ produtoId, onClose, onSaved }: Pr
       setErro("Informe um código de barras válido, com até 20 caracteres.");
       return;
     }
+    const precoVenda = valorMonetarioProduto(preco);
+    const precoOriginal = Number(original.preco_venda ?? 0);
+    const precoFoiAlterado = Math.abs(precoVenda - precoOriginal) > 0.0001;
+    if (precoFoiAlterado && precoVenda <= 0) {
+      setErro("Informe um preço de venda maior que zero.");
+      return;
+    }
+    if (precoFoiAlterado && precoVenda > 99999999.99) {
+      setErro("O preço de venda máximo é R$ 99.999.999,99.");
+      return;
+    }
     const payload: ProdutoCadastroPayload = {};
     if (nome.trim() !== original.nome) payload.nome = nome.trim();
     if ((descricao.trim() || null) !== original.descricao_curta) payload.descricao_curta = descricao.trim() || null;
     if ((ean.trim() || null) !== original.codigo_barras) payload.codigo_barras = ean.trim() || null;
+    if (precoFoiAlterado) payload.preco_venda = precoVenda;
     if (!Object.keys(payload).length) { onClose(); return; }
     salvamentoAtivo.current = true;
     setSalvando(true);
@@ -183,6 +202,12 @@ export default function EditarProdutoBalanco({ produtoId, onClose, onSaved }: Pr
                   </TouchableOpacity>
                 </View>
                 <Text style={styles.ajuda}>Digite o código ou toque na câmera para ler a embalagem.</Text>
+                <Text style={styles.label}>Preço de venda (R$)</Text>
+                <TextInput accessibilityLabel="Preço de venda" value={preco}
+                  onChangeText={(valor) => setPreco(formatarCampoMonetarioProduto(valor))}
+                  keyboardType="number-pad" maxLength={15} editable={!salvando} selectTextOnFocus
+                  style={styles.input} placeholder="0,00" />
+                <Text style={styles.ajuda}>O novo preço será salvo no ERP e usado nas próximas consultas do app.</Text>
                 <Text style={styles.label}>Descrição complementar</Text>
                 <TextInput accessibilityLabel="Descrição complementar" value={descricao} onChangeText={setDescricao}
                   maxLength={1000} editable={!salvando} multiline placeholder="Opcional"

@@ -49,7 +49,7 @@ class RateioItemRequest(BaseModel):
 
 class AtualizarPrecoRequest(BaseModel):
     produto_id: int
-    preco_venda: float
+    preco_venda: float = Field(gt=0, le=99999999.99)
 
 
 class ProcessarConfig(BaseModel):

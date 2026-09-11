@@ -118,6 +118,15 @@ def processar_entrada_estoque(
         raise HTTPException(status_code=404, detail="Nota nao encontrada")
 
     acoes_processamento = _acoes_processamento_dict(config)
+    logger.info(
+        "Acoes da entrada NF %s: estoque=%s custo=%s preco_venda=%s financeiro=%s overrides_preco=%s",
+        nota.numero_nota,
+        acoes_processamento["lancar_estoque"],
+        acoes_processamento["atualizar_custo"],
+        acoes_processamento["atualizar_preco_venda"],
+        acoes_processamento["gerar_contas_pagar"],
+        len(config.precos_venda_override),
+    )
     acoes_realizadas_antes = detectar_acoes_realizadas_processamento(
         db, nota, tenant_id
     )
