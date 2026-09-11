@@ -8,7 +8,7 @@ primeira emissão em produção.
 ## O que será configurado
 
 - dados fiscais da empresa;
-- vínculo do CNPJ com a IntNFe;
+- vínculo automático do CNPJ com a IntNFe;
 - certificado digital A1;
 - CSC da NFC-e em homologação e em produção;
 - série e sequência de NF-e (modelo 55) e NFC-e (modelo 65);
@@ -110,22 +110,27 @@ No CorePet:
 O código secreto é enviado diretamente à IntNFe e não volta nas consultas. O
 CorePet mostra somente se existe um CSC e qual é o seu ID.
 
-## 5. Ative ou vincule o emitente no CorePet
+## 5. Integre o emitente pelo CorePet
 
 1. Abra **Configurações → Fiscal** e confira os dados da empresa.
 2. Abra **Configurações → Integrações → IntNFe**.
-3. Clique em **Ativar emissão em teste** para criar o vínculo, ou use
-   **Vincular cadastro existente** se a IntNFe já forneceu `clientId` e
-   `clientSecret` para o CNPJ.
-4. Clique em **Consultar vínculo e certificado**.
-5. Só prossiga quando aparecerem o vínculo concluído e o certificado A1 válido.
+3. Leia o resumo do aceite e clique em **Integrar automaticamente**.
+4. O CorePet cria o emissor na conta da IntNFe, recebe os códigos técnicos e os
+   guarda cifrados. O cliente não precisa pedir, copiar nem preencher
+   `clientId` ou `clientSecret`.
+5. Clique em **Consultar vínculo e certificado**.
+6. Só prossiga quando aparecerem o vínculo concluído e o certificado A1 válido.
 
 Durante o piloto, essa tela é liberada somente para as empresas selecionadas
 pela equipe do CorePet.
 
-Os códigos do integrador pertencem ao CorePet e não devem ser digitados na tela
-do cliente. O formulário de vínculo aceita apenas os códigos do emitente daquela
-empresa.
+Se a IntNFe informar que o CNPJ já possuía um emissor antes da integração, o
+CorePet não troca o segredo automaticamente. A tela orienta procurar o suporte e
+mantém a recuperação por códigos recolhida como exceção. Ela só deve ser usada
+quando a IntNFe já tiver fornecido os códigos daquele emissor.
+
+Os códigos do integrador pertencem ao CorePet, ficam somente no servidor seguro
+e nunca devem ser digitados na tela do cliente.
 
 ## 6. Configure série e numeração sem duplicar notas
 
