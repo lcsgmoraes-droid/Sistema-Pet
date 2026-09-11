@@ -3,12 +3,14 @@ import { api } from "../../services/api";
 import { useAuth } from "../../contexts/AuthContext";
 import IntNFeAtivacaoView from "./IntNFeAtivacaoView";
 import IntNFeNumeracao from "./IntNFeNumeracao.jsx";
+import IntNFeCsc from "./IntNFeCsc.jsx";
 
 function ActivationPanel() {
   const [data, setData] = useState(null);
   const [busy, setBusy] = useState(true);
   const [error, setError] = useState("");
   const [numberingBusy, setNumberingBusy] = useState(false);
+  const [cscBusy, setCscBusy] = useState(false);
   const [credentials, setCredentials] = useState({ client_id: "", client_secret: "" });
   const inFlight = useRef(false);
   const mounted = useRef(false);
@@ -62,7 +64,7 @@ function ActivationPanel() {
     <div className="space-y-6">
       <IntNFeAtivacaoView
         data={data}
-        busy={busy || numberingBusy}
+        busy={busy || numberingBusy || cscBusy}
         error={error}
         credentials={credentials}
         onCredentials={(event) =>
@@ -74,7 +76,10 @@ function ActivationPanel() {
         onReload={() => execute()}
       />
       {data?.pode_configurar_numeracao && (
-        <IntNFeNumeracao apiClient={api} disabled={busy} onBusy={setNumberingBusy} />
+        <>
+          <IntNFeCsc apiClient={api} disabled={busy || numberingBusy} onBusy={setCscBusy} />
+          <IntNFeNumeracao apiClient={api} disabled={busy || cscBusy} onBusy={setNumberingBusy} />
+        </>
       )}
     </div>
   );

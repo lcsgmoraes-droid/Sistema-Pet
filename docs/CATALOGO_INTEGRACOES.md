@@ -522,12 +522,13 @@ Toda integração nova ou alterada deve registrar, antes da homologação:
 
 ## Ativação fiscal opcional
 
-### INT-018 — IntNFe: ativação fiscal e numeração
+### INT-018 — IntNFe: ativação fiscal, CSC e numeração
 
 - **Finalidade e direção:** enviar CNPJ, razão social e nome fantasia para criar
   emitente quando o usuário optar pela integração; consultar vínculo e A1.
   Consultar/avançar a numeração de NF-e com GET/PUT de integrador, por série e
-  ambiente (homologação/produção explicitamente escolhidos), sem emitir notas.
+  ambiente (homologação/produção explicitamente escolhidos), e configurar o CSC
+  de homologação da NFC-e, sem emitir notas.
 - **Autenticação e segredos:** token do integrador com variáveis exclusivas do
   backend; token do emitente com `clientSecret` cifrado por empresa. Respostas
   públicas sem segredos. Permissão `configuracoes.editar` e módulo `integracoes`.
@@ -547,7 +548,8 @@ Toda integração nova ou alterada deve registrar, antes da homologação:
 - **Observabilidade:** auditoria de ação, estado, código e correlação, sem corpos
   externos ou credenciais. Exclusão/inativação externa pede revisão de suporte.
   `intnfe_numeracao` registra série/modelo/ambiente e números consultado/solicitado;
-  falha de auditoria antes do PUT impede o ajuste.
+  `intnfe_csc` registra ambiente, ID e resultado, nunca o segredo. Falha de
+  auditoria antes de qualquer PUT impede o ajuste.
 - **Responsável:** Lucas pelo piloto; equipe IntNFe pelo conflito/contrato
   externo; Codex pela implementação e testes.
 - **Lacuna prioritária:** homologar o fluxo integrado DEV. Dados, frete e formato
@@ -560,9 +562,12 @@ Toda integração nova ou alterada deve registrar, antes da homologação:
   Em 11/09, quatro NF-e de marketplace foram autorizadas, mas perderam o grupo
   `infIntermed`. Após a correção, nova NF-e foi autorizada com `indIntermed=1` e
   `infIntermed` completo. O contrato também passou a aceitar CSOSN 900 e crédito
-  do Simples; a prova no modelo 65 aguarda o CSC de homologação. Uma nota com
+  do Simples; após o cadastro do CSC de homologação, uma NFC-e modelo 65 foi
+  autorizada e o XML confirmou `ICMSSN900`, `pCredSN` e `vCredICMSSN`. Uma nota com
   frete segue rejeitada com cStat 535 porque o contrato não permite compor o frete
-  nos itens.
+  nos itens. O contrato do CSC ainda não recebe `ambienteCodigo`; por isso, a
+  configuração criada no CorePet fica restrita à homologação até a IntNFe
+  separar ou esclarecer o armazenamento de produção.
   Emissão pelo CorePet não implementada nesta etapa. Flag desligada por padrão.
 - **Evidência:** `backend/app/intnfe/`, `backend/tests/unit/test_intnfe_*.py`,
   `backend/tests/integration/test_intnfe_postgres.py`,

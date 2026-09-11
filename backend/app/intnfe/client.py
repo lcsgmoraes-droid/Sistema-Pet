@@ -8,7 +8,6 @@ import requests
 
 from app.config import settings
 
-
 BASE_URL = "https://api.intnfe.com.br"
 
 
@@ -44,7 +43,16 @@ class IntNFeClient:
     def close(self):
         self.session.close()
 
-    def _request(self, method, path, *, token=None, body=None, creating=False):
+    def _request(
+        self,
+        method,
+        path,
+        *,
+        token=None,
+        body=None,
+        creating=False,
+        expect_empty=False,
+    ):
         headers = {"Accept": "application/json"}
         if token:
             headers["Authorization"] = f"Bearer {token}"
@@ -91,6 +99,12 @@ class IntNFeClient:
                     or 300 <= response.status_code < 400
                 ),
             )
+        if expect_empty:
+            if response.status_code != 204:
+                raise IntNFeError(
+                    "RespostaInvalida", correlation=correlation, uncertain=creating
+                )
+            return None
         try:
             data = response.json()
         except (ValueError, requests.exceptions.JSONDecodeError):
@@ -178,12 +192,16 @@ class IntNFeClient:
         return result
 
     @staticmethod
-    def _numbering_path(emitter_id):
+    def _emitter_path(emitter_id, resource):
         if not isinstance(emitter_id, str) or not re.fullmatch(
             r"[A-Za-z0-9-]{1,128}", emitter_id
         ):
             raise IntNFeError("RespostaInvalida")
-        return f"/integrador/emitentes/{emitter_id}/numeracao"
+        return f"/integrador/emitentes/{emitter_id}/{resource}"
+
+    @classmethod
+    def _numbering_path(cls, emitter_id):
+        return cls._emitter_path(emitter_id, "numeracao")
 
     def numbering(self, token, emitter_id):
         result = self._request("GET", self._numbering_path(emitter_id), token=token)
@@ -199,4 +217,23 @@ class IntNFeClient:
             token=token,
             body=body,
             creating=True,
+        )
+
+    def csc(self, token, emitter_id):
+        result = self._request(
+            "GET", self._emitter_path(emitter_id, "csc"), token=token
+        )
+        if not isinstance(result, dict):
+            raise IntNFeError("RespostaInvalida")
+        return result
+
+    def set_csc(self, token, emitter_id, body):
+        # O segredo nunca volta pela API. Um timeout pode ocorrer depois da gravacao.
+        return self._request(
+            "PUT",
+            self._emitter_path(emitter_id, "csc"),
+            token=token,
+            body=body,
+            creating=True,
+            expect_empty=True,
         )

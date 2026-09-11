@@ -15,6 +15,14 @@ from app.auth.dependencies import get_current_user_and_tenant
 from app.config import settings
 from app.db import get_session
 from app.intnfe.client import IntNFeClient, IntNFeError
+from app.intnfe.csc import (
+    CscError,
+    CscInput,
+    CscUpdateView,
+    CscView,
+    read_csc,
+    save_csc,
+)
 from app.intnfe.presentation import public_status
 from app.intnfe.numbering import (
     NumberingError,
@@ -247,12 +255,16 @@ def advance_numbering_route(
         except SQLAlchemyError:
             db.rollback()
             raise NumberingError(
-                "AuditoriaIndisponivel"
-                if result == "solicitado"
-                else "ResultadoNaoConfirmado",
-                "Não foi possível registrar o ajuste; nenhuma alteração foi enviada."
-                if result == "solicitado"
-                else "O ajuste pode ter sido aplicado. Consulte a numeração antes de tentar novamente.",
+                (
+                    "AuditoriaIndisponivel"
+                    if result == "solicitado"
+                    else "ResultadoNaoConfirmado"
+                ),
+                (
+                    "Não foi possível registrar o ajuste; nenhuma alteração foi enviada."
+                    if result == "solicitado"
+                    else "O ajuste pode ter sido aplicado. Consulte a numeração antes de tentar novamente."
+                ),
                 status=503,
             ) from None
 
@@ -260,5 +272,86 @@ def advance_numbering_route(
         return advance_numbering(db, tenant_id, api, body, audit)
     except NumberingError as exc:
         raise _numbering_failure(exc) from None
+    except ActivationError as exc:
+        raise HTTPException(exc.status, str(exc)) from None
+
+
+def _csc_failure(exc):
+    return HTTPException(
+        exc.status,
+        {
+            "codigo": exc.code,
+            "mensagem": str(exc),
+            "protocolo_suporte": exc.correlation,
+            "exige_consulta": exc.refresh,
+        },
+    )
+
+
+@router.get("/csc", response_model=CscView)
+def csc_route(
+    db: Session = Depends(get_session),
+    user_and_tenant=Depends(get_current_user_and_tenant),
+    api=Depends(get_client),
+):
+    _user, tenant_id = user_and_tenant
+    set_current_tenant(tenant_id)
+    try:
+        return read_csc(db, tenant_id, api)
+    except CscError as exc:
+        raise _csc_failure(exc) from None
+    except ActivationError as exc:
+        raise HTTPException(exc.status, str(exc)) from None
+
+
+@router.put("/csc", response_model=CscUpdateView)
+def save_csc_route(
+    body: CscInput,
+    db: Session = Depends(get_session),
+    user_and_tenant=Depends(get_current_user_and_tenant),
+    api=Depends(get_client),
+):
+    user, tenant_id = user_and_tenant
+    set_current_tenant(tenant_id)
+
+    def audit(connection_id, result, previous_id, change, error=None):
+        try:
+            log_action(
+                db,
+                user_id=user.id,
+                tenant_id=tenant_id,
+                action="intnfe_csc",
+                entity_type="intnfe_connection",
+                entity_id=connection_id,
+                old_value={"cscId": previous_id, "ambienteCodigo": 2},
+                new_value={
+                    **change,
+                    "resultado": result,
+                    "codigo": error.code if error else None,
+                    "correlation_id": error.correlation if error else None,
+                },
+                commit=False,
+            )
+            db.commit()
+        except SQLAlchemyError:
+            db.rollback()
+            raise CscError(
+                (
+                    "AuditoriaIndisponivel"
+                    if result == "solicitado"
+                    else "ResultadoNaoConfirmado"
+                ),
+                (
+                    "Não foi possível registrar a alteração; nenhum CSC foi enviado."
+                    if result == "solicitado"
+                    else "O CSC pode ter sido gravado. Consulte a situação antes de tentar novamente."
+                ),
+                status=503,
+            ) from None
+
+    try:
+        return save_csc(db, tenant_id, api, body, audit)
+    except CscError as exc:
+        raise _csc_failure(exc) from None
     except ActivationError as exc:
         raise HTTPException(exc.status, str(exc)) from None

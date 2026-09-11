@@ -10,7 +10,6 @@ from app.intnfe.presentation import public_status
 from app.intnfe.repository import ActivationError, get_connection, get_tenant
 from app.intnfe.service import _find
 
-
 Number = Annotated[int, Field(strict=True, ge=0, le=999_999_999)]
 NextNumber = Annotated[int, Field(strict=True, ge=1, le=999_999_999)]
 
@@ -90,13 +89,13 @@ def _rows(raw):
         raise IntNFeError("RespostaInvalida") from None
 
 
-def _access(db, tenant_id, api):
+def emitter_access(db, tenant_id, api):
     tenant = get_tenant(db, tenant_id)
     connection = get_connection(db, tenant_id)
     view = public_status(tenant, connection, api.integrador_id)
     if not view["pode_configurar_numeracao"]:
         raise ActivationError(
-            "Conclua ou consulte o vínculo desta empresa antes de ajustar a numeração."
+            "Conclua ou consulte o vínculo desta empresa antes de configurar a IntNFe."
         )
     token = api.integrator_token()
     existing = _find(api, token, connection.cnpj)
@@ -144,7 +143,7 @@ def _provider_error(exc):
 
 def read_numbering(db, tenant_id, api):
     try:
-        connection, token = _access(db, tenant_id, api)
+        connection, token = emitter_access(db, tenant_id, api)
         return NumberingView(series=_rows(api.numbering(token, connection.emitente_id)))
     except IntNFeError as exc:
         raise _provider_error(exc) from None
@@ -154,7 +153,7 @@ def advance_numbering(db, tenant_id, api, request, audit):
     attempted = False
     accepted = False
     try:
-        connection, token = _access(db, tenant_id, api)
+        connection, token = emitter_access(db, tenant_id, api)
         rows = _rows(api.numbering(token, connection.emitente_id))
         current = next(
             (
