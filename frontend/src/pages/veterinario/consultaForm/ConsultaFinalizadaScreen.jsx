@@ -1,8 +1,9 @@
 import { CheckCircle } from "lucide-react";
+import NfseManualPanel from "./NfseManualPanel";
 
-export default function ConsultaFinalizadaScreen({ onVerConsultas, onNovaConsulta }) {
+export default function ConsultaFinalizadaScreen({ consultaId, onVerConsultas, onNovaConsulta }) {
   return (
-    <div className="p-6 max-w-lg mx-auto text-center space-y-4">
+    <div className="p-6 max-w-3xl mx-auto text-center space-y-4">
       <div className="p-4 bg-green-50 rounded-xl border border-green-200">
         <CheckCircle size={40} className="mx-auto text-green-500 mb-2" />
         <h2 className="text-lg font-bold text-green-700">Consulta finalizada!</h2>
@@ -10,6 +11,7 @@ export default function ConsultaFinalizadaScreen({ onVerConsultas, onNovaConsult
           O prontuário foi assinado digitalmente e não pode mais ser alterado.
         </p>
       </div>
+      <NfseManualPanel consultaId={consultaId} />
       <div className="flex gap-3 justify-center">
         <button
           onClick={onVerConsultas}

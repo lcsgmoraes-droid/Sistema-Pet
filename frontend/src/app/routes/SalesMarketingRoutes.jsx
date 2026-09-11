@@ -14,6 +14,7 @@ import {
   MeusCaixas,
   AlertasGestor,
   NFEntrada,
+  NfseManual,
   PDV,
 } from "../lazyPages";
 import { ModuleGate } from "./RouteGates";
@@ -60,6 +61,22 @@ export function createSalesMarketingRoutes() {
         element={
           <ModuleGate modulo="compras">
             <NFEntrada />
+          </ModuleGate>
+        }
+      />
+      <Route
+        path="notas-fiscais/servicos"
+        element={
+          <ModuleGate modulo="fiscal">
+            <ProtectedRoute
+              anyOfPermissions={[
+                "vendas.visualizar",
+                "configuracoes.empresa",
+                "configuracoes.editar",
+              ]}
+            >
+              <NfseManual />
+            </ProtectedRoute>
           </ModuleGate>
         }
       />

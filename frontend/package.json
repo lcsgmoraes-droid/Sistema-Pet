@@ -36,6 +36,7 @@
     "test:pdv-online-order-actions": "node scripts/test-pdv-online-order-actions.mjs",
     "test:mercado-pago-payment-return": "node scripts/test-mercado-pago-payment-return.mjs",
     "test:nfe-fiscal-assistida": "node scripts/test-nfe-fiscal-assistida.mjs",
+    "test:nfse-manual-assistida": "node scripts/test-nfse-manual-assistida.mjs",
     "test:mercado-pago-oauth": "node scripts/test-mercado-pago-oauth-return.mjs",
     "test:openai-config-security": "node scripts/test-openai-config-security.mjs",
     "test:oferta-publica-navigation": "node src/pages/ofertas/ofertaPublicaNavigation.test.mjs",

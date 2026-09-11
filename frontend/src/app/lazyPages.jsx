@@ -56,6 +56,7 @@ export const MeusCaixas = lazy(() => import("../pages/MeusCaixas"));
 export const AlertasGestor = lazy(() => import("../pages/AlertasGestor"));
 export const NFEntrada = lazy(() => import("../pages/NFEntrada"));
 export const CentralNFSaida = lazy(() => import("../pages/CentralNFSaida"));
+export const NfseManual = lazy(() => import("../pages/NfseManual"));
 
 export const ClienteTimelinePage = lazy(() => import("../pages/ClienteTimelinePage"));
 
