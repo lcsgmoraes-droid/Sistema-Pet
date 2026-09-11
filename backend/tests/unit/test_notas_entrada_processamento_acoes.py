@@ -17,13 +17,13 @@ def test_sugere_todas_acoes_para_nota_comum():
     assert sugestao["acoes"] == {
         "lancar_estoque": True,
         "atualizar_custo": True,
-        "atualizar_preco_venda": False,
+        "atualizar_preco_venda": True,
         "gerar_contas_pagar": True,
     }
     assert sugestao["contexto"] == "nota_comum"
 
 
-def test_sugere_apenas_estoque_para_bonificacao():
+def test_sugere_estoque_e_preco_revisado_para_bonificacao():
     dados_xml = {
         "natureza_operacao": "Bonificacao sem cobranca",
         "valor_total": 0,
@@ -36,7 +36,7 @@ def test_sugere_apenas_estoque_para_bonificacao():
     assert sugestao["acoes"] == {
         "lancar_estoque": True,
         "atualizar_custo": False,
-        "atualizar_preco_venda": False,
+        "atualizar_preco_venda": True,
         "gerar_contas_pagar": False,
     }
     assert sugestao["contexto"] == "bonificacao"
@@ -57,7 +57,7 @@ def test_bonificacao_com_valor_fiscal_sem_duplicata_nao_gera_custo_financeiro():
     assert sugestao["acoes"] == {
         "lancar_estoque": True,
         "atualizar_custo": False,
-        "atualizar_preco_venda": False,
+        "atualizar_preco_venda": True,
         "gerar_contas_pagar": False,
     }
 

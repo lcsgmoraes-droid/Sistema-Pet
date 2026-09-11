@@ -55,7 +55,7 @@ function EntradaXmlRevisaoPrecosModal({
   const acoes = {
     lancar_estoque: true,
     atualizar_custo: true,
-    atualizar_preco_venda: false,
+    atualizar_preco_venda: true,
     gerar_contas_pagar: true,
     ...(acoesProcessamento || {}),
   };

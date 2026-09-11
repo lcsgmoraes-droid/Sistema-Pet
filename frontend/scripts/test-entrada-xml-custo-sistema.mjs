@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 
 import {
   calcularMargemPorPrecoVenda,
@@ -21,5 +22,13 @@ assert.equal(baseSemCustoManual.fallback, true);
 const baseInvalida = obterBaseMargemEntrada({ custoNF: 8.75, custoSistema: "invalido" });
 assert.equal(baseInvalida.valor, 8.75);
 assert.equal(baseInvalida.fallback, true);
+
+const revisaoSource = readFileSync(
+  new URL("../src/components/entrada-xml/useEntradaXmlRevisaoPrecos.js", import.meta.url),
+  "utf8",
+);
+assert.match(revisaoSource, /atualizar_preco_venda:\s*true/);
+assert.match(revisaoSource, /setAcaoProcessamento\("atualizar_preco_venda", true\)/);
+assert.match(revisaoSource, /precos_venda_atualizados/);
 
 console.log("Entrada XML custo do sistema: OK");

@@ -14,7 +14,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from app.db import get_session
 from app.models import User
 from app.produtos.search import _valores_codigo_produto
-from app.produtos_models import Produto
+from app.produtos_models import Produto, ProdutoHistoricoPreco
 from app.routes.app_mobile_funcionario_pdv.auth import (
     _get_funcionario_operacional_or_403,
 )
@@ -137,6 +137,9 @@ class ProdutoCadastroUpdate(BaseModel):
         default=None, min_length=1, max_length=20, pattern=r"^[A-Za-z0-9 ._/-]+$"
     )
     descricao_curta: str | None = Field(default=None, max_length=1000)
+    preco_venda: Decimal | None = Field(
+        default=None, gt=0, max_digits=10, decimal_places=2
+    )
 
     @field_validator("nome")
     @classmethod
@@ -159,6 +162,49 @@ class ProdutoCadastroResponse(BaseModel):
     codigo: str | None = None
     codigo_barras: str | None = None
     descricao_curta: str | None = None
+    preco_venda: float | None = None
+
+
+def _registrar_historico_preco_mobile(
+    *,
+    db: Session,
+    produto: Produto,
+    preco_anterior: float,
+    user_id: int,
+    tenant_id: UUID,
+) -> None:
+    preco_novo = float(produto.preco_venda or 0)
+    custo = float(produto.preco_custo or 0)
+    if abs(preco_novo - preco_anterior) < 0.0001:
+        return
+
+    margem_anterior = (
+        ((preco_anterior - custo) / preco_anterior) * 100 if preco_anterior > 0 else 0
+    )
+    margem_nova = ((preco_novo - custo) / preco_novo) * 100 if preco_novo > 0 else 0
+    variacao = (
+        ((preco_novo - preco_anterior) / preco_anterior) * 100
+        if preco_anterior > 0
+        else 0
+    )
+    db.add(
+        ProdutoHistoricoPreco(
+            produto_id=produto.id,
+            preco_custo_anterior=custo,
+            preco_custo_novo=custo,
+            preco_venda_anterior=preco_anterior,
+            preco_venda_novo=preco_novo,
+            margem_anterior=margem_anterior,
+            margem_nova=margem_nova,
+            variacao_custo_percentual=0,
+            variacao_venda_percentual=variacao,
+            motivo="edicao_app_funcionario",
+            referencia="App do funcionario - edicao de cadastro",
+            observacoes="Preco de venda atualizado pelo app do funcionario.",
+            user_id=user_id,
+            tenant_id=tenant_id,
+        )
+    )
 
 
 def _obter_produto_cadastro(db, tenant_id, produto_id, *, bloquear=False):
@@ -208,6 +254,13 @@ def atualizar_cadastro_produto_funcionario(
     _lock_cadastro_mobile(db, tenant_id)
     _lock_alias_namespace(db, tenant_uuid)
     produto = _obter_produto_cadastro(db, tenant_uuid, produto_id, bloquear=True)
+    if "preco_venda" in dados:
+        if bool(getattr(produto, "is_parent", False)):
+            raise HTTPException(
+                status_code=400,
+                detail="Produto pai nao pode ter preco de venda. Edite a variacao correspondente.",
+            )
+        dados["preco_venda"] = float(dados["preco_venda"])
     codigo = dados.get("codigo_barras")
     if codigo and codigo != produto.codigo_barras:
         existente = _buscar_produto_existente(
@@ -228,10 +281,18 @@ def atualizar_cadastro_produto_funcionario(
                 detail="Este codigo ja identifica outro produto no ERP.",
             ) from exc
 
-    # Somente os campos de identificacao enviados; nao movimenta estoque nem
-    # altera precos, composicoes, SKU, EAN fiscal ou codigos alternativos.
+    # Somente os campos enviados; nao movimenta estoque nem altera composicoes,
+    # SKU, EAN fiscal, codigos alternativos ou preco de custo.
+    preco_anterior = float(produto.preco_venda or 0)
     for campo, valor in dados.items():
         setattr(produto, campo, valor)
+    _registrar_historico_preco_mobile(
+        db=db,
+        produto=produto,
+        preco_anterior=preco_anterior,
+        user_id=current_user.id,
+        tenant_id=tenant_uuid,
+    )
     try:
         db.commit()
         db.refresh(produto)

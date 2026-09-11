@@ -69,23 +69,27 @@ def sugerir_acoes_processamento(dados_xml: dict) -> dict:
             "contexto": "bonificacao",
             "mensagem": (
                 "Bonificacao detectada: estoque e validade serao lancados usando "
-                "o custo atual do sistema; custo, preco e financeiro ficaram desmarcados."
+                "o custo atual do sistema; custo e financeiro ficaram desmarcados. "
+                "Precos de venda revisados serao atualizados."
             ),
             "acoes": {
                 "lancar_estoque": True,
                 "atualizar_custo": False,
-                "atualizar_preco_venda": False,
+                "atualizar_preco_venda": True,
                 "gerar_contas_pagar": False,
             },
         }
 
     return {
         "contexto": "nota_comum",
-        "mensagem": "Nota comum detectada: estoque, custo e contas a pagar serao processados.",
+        "mensagem": (
+            "Nota comum detectada: estoque, custo, precos de venda revisados e "
+            "contas a pagar serao processados."
+        ),
         "acoes": {
             "lancar_estoque": True,
             "atualizar_custo": True,
-            "atualizar_preco_venda": False,
+            "atualizar_preco_venda": True,
             "gerar_contas_pagar": True,
         },
     }

@@ -6,9 +6,10 @@ export type ProdutoCadastro = {
   codigo: string | null;
   codigo_barras: string | null;
   descricao_curta: string | null;
+  preco_venda: number | null;
 };
 
-export type ProdutoCadastroPayload = Partial<Pick<ProdutoCadastro, "nome" | "codigo_barras" | "descricao_curta">>;
+export type ProdutoCadastroPayload = Partial<Pick<ProdutoCadastro, "nome" | "codigo_barras" | "descricao_curta" | "preco_venda">>;
 
 export async function obterCadastroProdutoFuncionario(produtoId: number): Promise<ProdutoCadastro> {
   const { data } = await api.get<ProdutoCadastro>(`/app/funcionario/produtos/${produtoId}/cadastro`);
