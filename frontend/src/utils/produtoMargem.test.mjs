@@ -16,6 +16,7 @@ test("calcula o preco de venda pela margem sobre a venda", () => {
 test("deriva a margem do custo e do preco sem alterar o preco existente", () => {
   assert.equal(calcularMargemSobreVenda(10, 20), 50);
   assert.equal(calcularMargemSobreVenda(10, 14.2857142857).toFixed(2), "30.00");
+  assert.equal(calcularMargemSobreVenda(24.99, 45).toFixed(2), "44.47");
 });
 
 test("recusa valores que nao permitem calcular um preco valido", () => {
