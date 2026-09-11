@@ -217,8 +217,6 @@ Ja existem no cockpit:
 
 Evolucoes planejadas para o mesmo cockpit:
 
-- copia externa do backup e sua idade (automacao S3 compativel preparada; manter
-  o alerta visivel ate criar o bucket e ativar as credenciais em producao);
 - resultado de monitoramento externo;
 
 ## Ordem de execucao
@@ -234,14 +232,23 @@ Evolucoes planejadas para o mesmo cockpit:
 
 ## Progresso das oito etapas
 
-Situacao em 2026-07-13: **6 de 8 concluidas (75%)**.
+Situacao em 2026-07-13: **7 de 8 concluidas (87,5%)**.
 
-- etapas 1, 2, 3, 4, 6 e 7 concluidas;
-- etapa 5 parcial: backup e restore locais validados; automacao externa preparada,
-  faltando criar o bucket privado e ativar suas credenciais em producao;
+- etapas 1, 2, 3, 4, 5, 6 e 7 concluidas;
 - etapa 8 em execucao: Maiara e o primeiro piloto veterinario acompanhado; o
   cockpit registra indicadores automaticamente, mas ainda falta um piloto real
   aderente ao Plano Basico.
+
+Evidencias da etapa 5:
+
+- backup e restore locais recorrentes continuam ativos e visiveis no `/ops`;
+- bucket privado `corepet-backups-prod` ativo no Cloudflare R2, com acesso publico
+  desativado e retencao automatica de 90 dias para `corepet/database/`;
+- token de producao limitado a leitura e gravacao de objetos nesse bucket e ao IP
+  do servidor, sem credenciais no Git;
+- primeira copia externa validada em 2026-07-13 no commit `e2134e939`, com arquivo
+  de `28973026` bytes e SHA-256 conferido local e remotamente;
+- cron diario das 03:45 ativo e evento `external_copy:ok` publicado para o cockpit.
 
 Evidencias da etapa 7:
 
