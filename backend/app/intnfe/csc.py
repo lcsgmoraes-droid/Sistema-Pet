@@ -1,4 +1,4 @@
-"""CSC da NFC-e em homologacao, sem persistir nem devolver o segredo."""
+"""CSC da NFC-e por ambiente, sem persistir nem devolver o segredo."""
 
 from typing import Annotated, Literal
 
@@ -19,7 +19,7 @@ CscId = Annotated[str, Field(min_length=1, max_length=32, pattern=r"^[A-Za-z0-9_
 
 class CscInput(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    ambiente_codigo: Literal[2]
+    ambiente_codigo: Literal[1, 2]
     csc_id: CscId
     csc: SecretStr = Field(min_length=1, max_length=4096)
     csc_id_consultado: CscId | None = None
@@ -40,11 +40,15 @@ class CscInput(BaseModel):
         return value
 
 
-class CscView(BaseModel):
-    ambiente_codigo: Literal[2] = 2
-    ambiente: Literal["homologacao"] = "homologacao"
+class CscEnvironmentView(BaseModel):
+    ambiente_codigo: Literal[1, 2]
+    ambiente: Literal["producao", "homologacao"]
     tem_csc: bool
     csc_id: str | None
+
+
+class CscView(BaseModel):
+    ambientes: list[CscEnvironmentView]
 
 
 class CscUpdateView(CscView):
@@ -53,10 +57,12 @@ class CscUpdateView(CscView):
 
 class RemoteCsc(BaseModel):
     model_config = ConfigDict(extra="ignore")
-    temCsc: bool
-    cscId: CscId | None = None
+    temCscHomologacao: bool
+    cscIdHomologacao: CscId | None = None
+    temCscProducao: bool
+    cscIdProducao: CscId | None = None
 
-    @field_validator("temCsc", mode="before")
+    @field_validator("temCscHomologacao", "temCscProducao", mode="before")
     @classmethod
     def strict_presence(cls, value):
         if type(value) is not bool:
@@ -76,15 +82,35 @@ class CscError(Exception):
 def _state(raw):
     try:
         state = RemoteCsc.model_validate(raw)
-        if state.temCsc != bool(state.cscId):
+        if state.temCscHomologacao != bool(state.cscIdHomologacao) or (
+            state.temCscProducao != bool(state.cscIdProducao)
+        ):
             raise ValueError
         return state
     except (ValidationError, ValueError, TypeError):
         raise IntNFeError("RespostaInvalida") from None
 
 
+def _environment(state, ambiente_codigo):
+    if ambiente_codigo == 1:
+        return CscEnvironmentView(
+            ambiente_codigo=1,
+            ambiente="producao",
+            tem_csc=state.temCscProducao,
+            csc_id=state.cscIdProducao,
+        )
+    return CscEnvironmentView(
+        ambiente_codigo=2,
+        ambiente="homologacao",
+        tem_csc=state.temCscHomologacao,
+        csc_id=state.cscIdHomologacao,
+    )
+
+
 def _view(state, *, message=None):
-    values = CscView(tem_csc=state.temCsc, csc_id=state.cscId).model_dump()
+    values = CscView(
+        ambientes=[_environment(state, 2), _environment(state, 1)]
+    ).model_dump()
     if message is not None:
         return CscUpdateView(**values, mensagem=message)
     return CscView(**values)
@@ -133,12 +159,16 @@ def save_csc(db, tenant_id, api, request, audit):
     try:
         connection, token = emitter_access(db, tenant_id, api)
         current = _state(api.csc(token, connection.emitente_id))
-        if current.cscId != request.csc_id_consultado:
+        current_environment = _environment(current, request.ambiente_codigo)
+        other_environment = _environment(
+            current, 1 if request.ambiente_codigo == 2 else 2
+        )
+        if current_environment.csc_id != request.csc_id_consultado:
             raise CscError(
                 "CscAlterado",
                 "O CSC mudou desde a consulta. Atualize a situação e revise antes de salvar.",
             )
-        if current.temCsc and not request.confirmar_substituicao:
+        if current_environment.tem_csc and not request.confirmar_substituicao:
             raise CscError(
                 "SubstituicaoNaoConfirmada",
                 "Confirme a substituição do CSC já cadastrado.",
@@ -146,24 +176,37 @@ def save_csc(db, tenant_id, api, request, audit):
                 refresh=False,
             )
         public_change = {
-            "ambienteCodigo": 2,
+            "ambienteCodigo": request.ambiente_codigo,
             "cscId": request.csc_id,
-            "substituiu": current.temCsc,
+            "substituiu": current_environment.tem_csc,
         }
-        audit(connection.id, "solicitado", current.cscId, public_change)
+        audit(connection.id, "solicitado", current_environment.csc_id, public_change)
         attempted = True
         api.set_csc(
             token,
             connection.emitente_id,
-            {"cscId": request.csc_id, "csc": request.csc.get_secret_value()},
+            {
+                "cscId": request.csc_id,
+                "csc": request.csc.get_secret_value(),
+                "ambienteCodigo": request.ambiente_codigo,
+            },
         )
         confirmed = _state(api.csc(token, connection.emitente_id))
-        if not confirmed.temCsc or confirmed.cscId != request.csc_id:
+        confirmed_environment = _environment(confirmed, request.ambiente_codigo)
+        confirmed_other = _environment(
+            confirmed, 1 if request.ambiente_codigo == 2 else 2
+        )
+        if (
+            not confirmed_environment.tem_csc
+            or confirmed_environment.csc_id != request.csc_id
+            or confirmed_other != other_environment
+        ):
             raise IntNFeError("RespostaInvalida", uncertain=True)
-        audit(connection.id, "confirmado", current.cscId, public_change)
+        audit(connection.id, "confirmado", current_environment.csc_id, public_change)
+        environment_name = "produção" if request.ambiente_codigo == 1 else "homologação"
         return _view(
             confirmed,
-            message="CSC de homologação salvo. A IntNFe confirmou o ID cadastrado.",
+            message=f"CSC de {environment_name} salvo. A IntNFe confirmou o ID cadastrado.",
         )
     except CscError:
         raise
@@ -174,7 +217,7 @@ def save_csc(db, tenant_id, api, request, audit):
             audit(
                 connection.id,
                 "nao_confirmado" if exc.uncertain else "recusado",
-                current.cscId,
+                current_environment.csc_id,
                 public_change,
                 exc,
             )

@@ -88,15 +88,21 @@ def store(pilot):
     return result
 
 
-@pytest.mark.parametrize("environment,last", [(1, 20), (2, 1)])
+@pytest.mark.parametrize(
+    "environment,last,model", [(1, 20, 55), (2, 1, 55), (2, 7, 65)]
+)
 def test_save_converts_next_and_preserves_other_sequences(
-    store, http_pilot, environment, last
+    store, http_pilot, environment, last, model
 ):
     client, access, _app = http_pilot
     before = deepcopy(store.rows)
     response = client.put(
         "/intnfe/numeracao",
-        json=body(ambiente_codigo=environment, ultimo_numero_consultado=last),
+        json=body(
+            ambiente_codigo=environment,
+            modelo=model,
+            ultimo_numero_consultado=last,
+        ),
     )
     assert response.status_code == 200, response.text
     assert store.writes == [
@@ -104,12 +110,12 @@ def test_save_converts_next_and_preserves_other_sequences(
             "serie": "3",
             "ultimoNumero": 4500,
             "ambienteCodigo": environment,
-            "modelo": 55,
+            "modelo": model,
         }
     ]
     assert store.reads == ["emitente-teste", "emitente-teste"]
     for previous in before:
-        if previous["ambienteCodigo"] != environment or previous["modelo"] != 55:
+        if previous["ambienteCodigo"] != environment or previous["modelo"] != model:
             assert previous in store.rows
     assert [item["new_value"]["resultado"] for item in access["audits"]] == [
         "solicitado",
@@ -166,7 +172,7 @@ def test_new_series_zero_can_start_above_one(store, http_pilot):
         {"serie": "3.0"},
         {"ambiente_codigo": 3},
         {"ambiente_codigo": True},
-        {"modelo": 65},
+        {"modelo": 54},
         {"modelo": 55.0},
         {"proximo_numero": 0},
         {"proximo_numero": "4501"},

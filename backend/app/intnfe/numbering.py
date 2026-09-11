@@ -18,7 +18,7 @@ class NumberingInput(BaseModel):
     model_config = ConfigDict(extra="forbid")
     serie: str = Field(pattern=r"^[0-9]{1,3}$")
     ambiente_codigo: Literal[1, 2]
-    modelo: Literal[55] = 55
+    modelo: Literal[55, 65] = 55
     proximo_numero: NextNumber
     ultimo_numero_consultado: Number
 

@@ -272,9 +272,9 @@ Migração proposta: manter as tabelas e contratos atuais em funcionamento, intr
 | Validar CNPJ piloto, localidade, regime e operações | Empresa piloto e contador | Define a tributação que será implementada e testada |
 | Obter matriz de capacidades e proposta comercial da IntNFe | Irmão/fornecedor | Confirma cobertura, limitações, suporte e custo por empresa/volume |
 | Validar reenvio seguro e recuperação documentados na IntNFe | Fornecedor e implementação | `Idempotency-Key` e `GET /nfe` estão descritos; falta comprovação em homologação |
-| Confirmar cancelamento, CC-e e inutilização na IntNFe | Fornecedor e implementação | A interface só pode liberar eventos que tenham contrato e retorno conciliável comprovados |
+| Implementar cancelamento, CC-e e inutilização no CorePet | CorePet | As rotas de NF-e foram comprovadas diretamente; o cancelamento da NFC-e ainda precisa de correção/consulta no provedor |
 | Definir as naturezas do piloto | Empresa e contador | Substitui CFOP/tributação genéricos por regras explícitas para PDV, marketplace, destino e condição do cliente |
-| Ampliar a numeração para NFC-e | CorePet | A tela atual protege apenas o modelo 55, embora NF-e e NFC-e tenham sequências independentes |
+| Validar a numeração de NFC-e com a IntNFe | Fornecedor e CorePet | A tela já separa modelos 55/65, mas o GET externo passou a devolver `modelo: null` e é bloqueado como ambíguo |
 | Concluir e revisar as mudanças atuais em documentos/listagem | Trabalho de desenvolvimento em andamento | Mantém uma implementação coerente antes do novo núcleo |
 | Definir permissões, exportação e tratamento de credenciais | CorePet | Prepara operação multiempresa e atendimento ao contador |
 

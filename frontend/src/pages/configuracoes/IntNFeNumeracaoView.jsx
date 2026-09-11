@@ -1,6 +1,7 @@
 import { FiHash, FiRefreshCw } from "react-icons/fi";
 import {
   currentSequence,
+  documentName,
   environmentName,
   formatSequence,
   prepareNumbering,
@@ -24,11 +25,15 @@ export default function IntNFeNumeracaoView({
   onCancel,
   onSave,
 }) {
-  const current = rows && currentSequence(rows, form.serie, form.ambiente_codigo);
+  const current = rows && currentSequence(rows, form.serie, form.ambiente_codigo, form.modelo);
+  const document = documentName(form.modelo);
   const prepared = prepareNumbering(rows, form);
   const visible =
     rows
-      ?.filter((row) => row.modelo === 55 && row.ambienteCodigo === Number(form.ambiente_codigo))
+      ?.filter(
+        (row) =>
+          row.modelo === Number(form.modelo) && row.ambienteCodigo === Number(form.ambiente_codigo),
+      )
       .sort((a, b) => Number(a.serie) - Number(b.serie)) ?? [];
   return (
     <section
@@ -39,7 +44,7 @@ export default function IntNFeNumeracaoView({
         <div className="flex items-start gap-3">
           <FiHash className="mt-1 h-7 w-7 text-blue-600" aria-hidden="true" />
           <div>
-            <h2 className="text-xl font-bold text-slate-950 dark:text-white">Numeração da NF-e</h2>
+            <h2 className="text-xl font-bold text-slate-950 dark:text-white">Numeração fiscal</h2>
             <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
               Defina de qual número sua empresa vai continuar em cada série e ambiente.
             </p>
@@ -72,7 +77,19 @@ export default function IntNFeNumeracaoView({
         </p>
       )}
       <form onSubmit={onReview} className="space-y-5">
-        <div className="grid gap-4 sm:grid-cols-3">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <label className="text-sm font-semibold">
+            Documento
+            <select
+              value={form.modelo}
+              disabled={busy || Boolean(review)}
+              onChange={(e) => onChange({ modelo: e.target.value, proximo_numero: "" })}
+              className={fieldClass}
+            >
+              <option value="55">NF-e (modelo 55)</option>
+              <option value="65">NFC-e (modelo 65)</option>
+            </select>
+          </label>
           <label className="text-sm font-semibold">
             Ambiente
             <select
@@ -98,7 +115,7 @@ export default function IntNFeNumeracaoView({
             />
           </label>
           <label className="text-sm font-semibold">
-            Próximo número da NF-e
+            Próximo número da {document}
             <input
               value={form.proximo_numero}
               inputMode="numeric"
@@ -112,13 +129,13 @@ export default function IntNFeNumeracaoView({
           </label>
         </div>
         <p id="intnfe-series-help" className="text-sm text-slate-600 dark:text-slate-300">
-          NF-e de produtos (modelo 55). Séries de 0 a 889. Homologação e produção têm sequências
-          independentes.
+          {document} (modelo {form.modelo}). Séries de 0 a 889. Cada modelo e ambiente mantém sua
+          própria sequência.
         </p>
         {Number(form.ambiente_codigo) === 1 && (
           <p className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950">
-            Você está configurando a numeração de produção. Confira a última NF-e desta mesma série
-            no sistema que sua empresa já utiliza.
+            Você está configurando a numeração de produção. Confira a última {document} desta mesma
+            série no sistema que sua empresa já utiliza.
           </p>
         )}
         {current && (
@@ -131,7 +148,7 @@ export default function IntNFeNumeracaoView({
                 Último número no emissor: <strong>{formatSequence(current.ultimoNumero)}</strong>
               </p>
               <p>
-                Próxima NF-e: <strong>{formatSequence(current.proximoNumero)}</strong>
+                Próxima {document}: <strong>{formatSequence(current.proximoNumero)}</strong>
               </p>
             </div>
             {current.nova && (
@@ -170,7 +187,8 @@ export default function IntNFeNumeracaoView({
               Confirme o ajuste em {environmentName(review.payload.ambiente_codigo)}
             </p>
             <p className="text-sm">
-              NF-e · Série {review.payload.serie.padStart(3, "0")} · Próximo número:{" "}
+              {documentName(review.payload.modelo)} · Série {review.payload.serie.padStart(3, "0")}{" "}
+              · Próximo número:{" "}
               <strong>
                 {formatSequence(review.current.proximoNumero)} →{" "}
                 {formatSequence(review.payload.proximo_numero)}
@@ -205,7 +223,9 @@ export default function IntNFeNumeracaoView({
       </form>
       {rows && (
         <div className="border-t border-slate-200 pt-4 dark:border-slate-700">
-          <h3 className="font-semibold">Séries em {environmentName(form.ambiente_codigo)}</h3>
+          <h3 className="font-semibold">
+            Séries de {document} em {environmentName(form.ambiente_codigo)}
+          </h3>
           {visible.length ? (
             <ul className="mt-2 grid gap-2 sm:grid-cols-2">
               {visible.map((row) => (
@@ -226,7 +246,7 @@ export default function IntNFeNumeracaoView({
             </ul>
           ) : (
             <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
-              Nenhuma série de NF-e registrada neste ambiente.
+              Nenhuma série de {document} registrada neste ambiente.
             </p>
           )}
         </div>

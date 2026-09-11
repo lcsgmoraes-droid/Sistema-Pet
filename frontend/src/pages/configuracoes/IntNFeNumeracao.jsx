@@ -4,7 +4,12 @@ import { numberingRows, prepareNumbering } from "./intnfeNumeracao.mjs";
 
 export default function IntNFeNumeracao({ apiClient, disabled = false, onBusy }) {
   const [rows, setRows] = useState(null);
-  const [form, setForm] = useState({ serie: "1", ambiente_codigo: "2", proximo_numero: "" });
+  const [form, setForm] = useState({
+    modelo: "55",
+    serie: "1",
+    ambiente_codigo: "2",
+    proximo_numero: "",
+  });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");

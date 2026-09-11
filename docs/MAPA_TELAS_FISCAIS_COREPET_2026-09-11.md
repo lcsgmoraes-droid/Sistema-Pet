@@ -21,16 +21,16 @@ configuração, natureza, certificado ou nota foi alterada.
 | Área observada | Função encontrada | Situação atual do CorePet | Decisão para o CorePet |
 |---|---|---|---|
 | Emissão de NF-e | Layout, ambiente de produção/homologação e teste de comunicação com a SEFAZ | A ativação IntNFe mostra o vínculo e o certificado, mas o fluxo ainda está apresentado como homologação | Criar um painel de prontidão por modelo e ambiente, com estado do provedor, certificado, série e pendências |
-| Emissão de NFC-e | Ambiente, CSC, numeração, preenchimento e automatismos | O CSC de homologação já pode ser consultado e gravado; a numeração visível/editável ainda está limitada à NF-e modelo 55 | Incluir uma configuração própria da NFC-e modelo 65, com CSC e sequência separados por ambiente |
+| Emissão de NFC-e | Ambiente, CSC, numeração, preenchimento e automatismos | A ativação IntNFe já mostra e grava CSC por ambiente e permite escolher a sequência do modelo 65 | Completar o painel de prontidão e bloquear emissão quando CSC, série ou cadastro fiscal do ambiente estiverem pendentes |
 | Certificado digital | Tipo de certificado, validade, atualização e remoção | O vínculo IntNFe recebe A1 e informa a validade quando o provedor a devolve | Manter A1 no servidor como primeiro recorte, mostrar validade e permitir rotação segura; outros tipos só entram se o emissor escolhido os suportar |
-| Controle de numeração | Série e próximo número por CNPJ/modelo | A tela IntNFe já consulta e só permite avançar a NF-e por série e ambiente | Reutilizar o componente para NF-e e NFC-e, sempre distinguindo modelo, ambiente e autoridade da sequência |
+| Controle de numeração | Série e próximo número por CNPJ/modelo | A tela IntNFe permite escolher NF-e/NFC-e e ambiente, revisa e só avança a sequência | Aguardar a IntNFe corrigir a listagem que passou a devolver `modelo: null`; o CorePet bloqueia essa resposta ambígua |
 | Preenchimento padrão | Frete, volumes, rastreio, descontos, retenções, grupos especiais, destinatários autorizados do XML e informações complementares | Parte desses dados já aparece no detalhe da Central, mas não existe uma configuração de emissão equivalente | Guardar padrões realmente usados pelo CorePet e preenchê-los a partir da venda/pedido; evitar uma coleção de chaves que só reproduza o Bling |
 | Naturezas de operação | Lista de naturezas, padrão por tipo, série, entrada/saída, CRT, presença, consumidor final, devolução e regras por imposto | A configuração atual da empresa guarda regime, CNAE e alguns campos fiscais, sem cadastro versionado de naturezas | Criar uma tela própria de naturezas e regras, com vigência, revisão e critérios por cenário |
 | Regras por imposto | Abas de ICMS, IPI, PIS, COFINS, ISSQN, outros e retenções; critérios por destino e produto; CFOP e situação tributária | Produtos guardam parte da classificação, mas não há uma matriz completa por operação | A natureza decide a regra e o produto fornece sua classificação; a combinação final deve ser validada antes da emissão |
 | Preferências operacionais | Lançar/estornar estoque e contas, emissão em lote, consulta de protocolo, travas de edição e guias | O CorePet já é a origem de estoque, caixa e financeiro para vendas próprias | A nota não deve repetir efeitos já aplicados pela venda; efeitos fiscais e comerciais ficam registrados separadamente e são reconciliados por origem |
 | DANFE e distribuição | Preferências de impressão, DANFE simplificado, assunto/remetente/modelo de e-mail e cópia para transportadora | A Central baixa DANFE/XML e permite compartilhar nota; a IntNFe gera o documento novamente quando solicitado | Manter download/compartilhamento no detalhe da nota; preferências de e-mail e impressão entram depois do núcleo fiscal |
 | Inutilizações | Consulta por período e histórico das faixas inutilizadas | Não há tela nem operação própria no CorePet | Criar evento fiscal de inutilização com modelo, série, faixa, justificativa, protocolo, ambiente e situação |
-| Cartas de correção | Lista por série/número, texto, data e atualização de protocolo | Existe uma rota legada de CC-e para Bling, sem jornada integrada na Central atual e sem histórico próprio do CorePet | Colocar CC-e dentro do detalhe da nota e também em uma consulta de eventos; habilitar somente quando a IntNFe confirmar o contrato |
+| Cartas de correção | Lista por série/número, texto, data e atualização de protocolo | Existe uma rota legada de CC-e para Bling; a nova rota IntNFe e sua consulta de eventos foram comprovadas em homologação, ainda sem jornada própria no CorePet | Colocar CC-e dentro do detalhe da nota e também em uma consulta de eventos |
 
 ## Estrutura de navegação proposta
 
@@ -112,7 +112,7 @@ primeiro recorte do CorePet para pet shops.
 | Prioridade | Entrega | Critério prático |
 |---|---|---|
 | P0 | Painel de prontidão fiscal para NF-e/NFC-e | O usuário entende o que está pronto e o que bloqueia cada modelo em homologação ou produção |
-| P0 | Numeração também para NFC-e | Série e próximo número do modelo 65 podem ser consultados e avançados com as mesmas proteções do modelo 55 |
+| P0 | Numeração também para NFC-e | **Preparada no CorePet**; falta o GET da IntNFe voltar a identificar as linhas com modelo 55/65 para a validação integrada |
 | P0 | Naturezas de operação versionadas | PDV, venda interna e venda interestadual usam regras explícitas aprovadas para o piloto |
 | P0 | Documento fiscal próprio e adaptador IntNFe | A Central não depende do cache do Bling para registrar a emissão, o retorno e os arquivos |
 | P0 | Cancelamento e reconsulta | O resultado é conciliado por protocolo sem repetir estoque, caixa ou emissão |
@@ -123,10 +123,13 @@ primeiro recorte do CorePet para pet shops.
 
 ## Pendências externas que continuam abertas
 
-- confirmar com a IntNFe a separação do CSC entre homologação e produção;
-- corrigir ou expor o rateio do frete nos itens para eliminar a rejeição 535;
-- confirmar os endpoints e contratos de cancelamento, CC-e, inutilização e XML
-  dos eventos;
+- corrigir o pagamento 17/PIX, que no reteste foi interpretado como cartão e
+  rejeitado com cStat 391;
+- devolver o modelo 55/65 em cada linha de numeração, atualmente `null`;
+- concluir e expor o resultado do cancelamento da NFC-e aceito com HTTP 202;
+- confirmar a migração dos CSCs cadastrados antes da separação por ambiente;
+- o rateio de frete, a descrição automática da NFC-e, a CC-e, o cancelamento de
+  NF-e e a inutilização já foram confirmados em homologação;
 - definir com a contabilidade as naturezas e regras dos cenários reais, incluindo
   vendas internas, interestaduais, consumidor final e substituição tributária;
 - concluir o contrato de entrada de pedidos do EcommerceAI com canal,
