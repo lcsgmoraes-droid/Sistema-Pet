@@ -129,63 +129,71 @@ export default function IntNFeAtivacaoView({
           </div>
 
           {data.pode_vincular && (
-            <form
-              onSubmit={onBind}
-              className="space-y-4 rounded-xl border border-slate-200 p-4 dark:border-slate-700"
-            >
-              <div>
-                <h3 className="font-semibold text-slate-900 dark:text-white">
-                  Vincular cadastro existente
-                </h3>
-                <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
-                  Informe os códigos fornecidos pela IntNFe para esta empresa. Os códigos do
-                  integrador não devem ser usados aqui.
-                </p>
-              </div>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <label className="text-sm font-medium text-slate-700 dark:text-slate-200">
-                  Código do emitente (clientId)
-                  <input
-                    name="client_id"
-                    value={credentials.client_id}
-                    onChange={onCredentials}
-                    autoComplete="off"
-                    maxLength={128}
-                    required
+            <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-amber-950">
+              <h3 className="font-semibold">Encontramos um cadastro anterior</h3>
+              <p className="mt-1 text-sm">
+                A integração automática não altera o acesso de um emissor que já existia. Peça ao
+                suporte para recuperar o vínculo com segurança.
+              </p>
+              <details className="mt-3 text-sm">
+                <summary className="cursor-pointer font-semibold underline">
+                  Já recebi os códigos desse emissor
+                </summary>
+                <form onSubmit={onBind} className="mt-4 space-y-4">
+                  <p className="text-slate-600 dark:text-slate-300">
+                    Use somente os códigos do emissor desta empresa fornecidos pela IntNFe. Esta é
+                    uma recuperação excepcional; os códigos do integrador não servem aqui.
+                  </p>
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <label className="text-sm font-medium text-slate-700 dark:text-slate-200">
+                      Código do emissor
+                      <input
+                        name="client_id"
+                        value={credentials.client_id}
+                        onChange={onCredentials}
+                        autoComplete="off"
+                        maxLength={128}
+                        required
+                        disabled={busy}
+                        className="mt-1 block w-full rounded-lg border border-slate-300 bg-white p-2.5 text-slate-900"
+                      />
+                    </label>
+                    <label className="text-sm font-medium text-slate-700 dark:text-slate-200">
+                      Segredo do emissor
+                      <input
+                        name="client_secret"
+                        type="password"
+                        value={credentials.client_secret}
+                        onChange={onCredentials}
+                        autoComplete="new-password"
+                        maxLength={4096}
+                        required
+                        disabled={busy}
+                        className="mt-1 block w-full rounded-lg border border-slate-300 bg-white p-2.5 text-slate-900"
+                      />
+                    </label>
+                  </div>
+                  <button
+                    type="submit"
                     disabled={busy}
-                    className="mt-1 block w-full rounded-lg border border-slate-300 bg-white p-2.5 text-slate-900"
-                  />
-                </label>
-                <label className="text-sm font-medium text-slate-700 dark:text-slate-200">
-                  Segredo do emitente (clientSecret)
-                  <input
-                    name="client_secret"
-                    type="password"
-                    value={credentials.client_secret}
-                    onChange={onCredentials}
-                    autoComplete="new-password"
-                    maxLength={4096}
-                    required
-                    disabled={busy}
-                    className="mt-1 block w-full rounded-lg border border-slate-300 bg-white p-2.5 text-slate-900"
-                  />
-                </label>
-              </div>
-              <button
-                type="submit"
-                disabled={busy}
-                className={`${buttonClass} bg-blue-600 text-white hover:bg-blue-700`}
-              >
-                Verificar e vincular
-              </button>
-            </form>
+                    className={`${buttonClass} bg-blue-600 text-white hover:bg-blue-700`}
+                  >
+                    Recuperar vínculo
+                  </button>
+                </form>
+              </details>
+            </div>
           )}
 
           {data.pode_ativar && (
-            <p className="text-sm text-slate-600 dark:text-slate-300">
-              Ao ativar, o CorePet envia o CNPJ, a razão social e o nome fantasia à IntNFe para
-              preparar o cadastro fiscal da empresa.
-            </p>
+            <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-950">
+              <p className="font-semibold">Integração automática</p>
+              <p className="mt-1">
+                Ao continuar, você autoriza o CorePet a criar e administrar o emissor desta empresa
+                na IntNFe. O CorePet envia os dados cadastrais, recebe os códigos técnicos e os
+                guarda de forma protegida. Você não precisa copiar nem informar códigos.
+              </p>
+            </div>
           )}
           <div className="flex flex-wrap gap-3">
             {data.pode_ativar && (
@@ -195,7 +203,7 @@ export default function IntNFeAtivacaoView({
                 disabled={busy}
                 className={`${buttonClass} bg-blue-600 text-white hover:bg-blue-700`}
               >
-                {busy ? "Verificando…" : "Ativar emissão em teste"}
+                {busy ? "Integrando…" : "Integrar automaticamente"}
               </button>
             )}
             {data.pode_consultar && (
