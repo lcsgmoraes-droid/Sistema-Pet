@@ -46,7 +46,7 @@ export default function IntNFeNumeracaoView({
           <div>
             <h2 className="text-xl font-bold text-slate-950 dark:text-white">Numeração fiscal</h2>
             <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
-              Defina de qual número sua empresa vai continuar em cada série e ambiente.
+              Informe manualmente de qual número sua empresa vai continuar em cada série e ambiente.
             </p>
           </div>
         </div>
@@ -163,6 +163,10 @@ export default function IntNFeNumeracaoView({
           className="space-y-1 text-sm text-slate-600 dark:text-slate-300"
         >
           <p>Exemplo: se a última nota foi 4.500, informe 4501 como próximo número.</p>
+          <p>
+            Consulte a última nota no sistema que sua empresa usava antes. O CorePet não tenta
+            adivinhar essa sequência.
+          </p>
           <p>
             A numeração só avança. Depois de salvar, os números anteriores não poderão ser
             reutilizados neste emissor.

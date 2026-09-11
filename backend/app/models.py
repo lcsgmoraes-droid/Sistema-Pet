@@ -591,6 +591,7 @@ class Tenant(Base):
     complemento = Column(String(100), nullable=True)
     bairro = Column(String(100), nullable=True)
     cidade = Column(String(100), nullable=True)
+    codigo_municipio = Column(String(7), nullable=True)
     uf = Column(String(2), nullable=True)
     cep = Column(String(10), nullable=True)
     telefone = Column(String(20), nullable=True)

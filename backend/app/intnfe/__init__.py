@@ -1,1 +1,1 @@
-"""Ativacao opcional da IntNFe por empresa; sem emissao automatica de notas."""
+"""Configuração da IntNFe e preparação fiscal; sem emissão automática de notas."""

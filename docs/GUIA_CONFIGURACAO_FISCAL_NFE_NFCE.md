@@ -46,8 +46,8 @@ Antes de abrir a configuração, tenha em mãos:
 
 O certificado digital ICP-Brasil identifica a empresa e permite assinar os
 documentos fiscais. O A1 é um certificado armazenado como arquivo e costuma ter
-validade de um ano. O A3 usa cartão, token ou nuvem e não é o formato aceito no
-piloto atual do CorePet/IntNFe.
+validade de um ano. O A3 usa cartão, token ou nuvem e não é o formato aceito na
+integração atual do CorePet/IntNFe.
 
 Para obter um A1:
 
@@ -64,9 +64,12 @@ O arquivo e a senha dão poder de assinatura em nome da empresa: não os envie p
 WhatsApp, e-mail comum ou chamados. Use apenas a tela ou o procedimento seguro
 indicado pelo CorePet/IntNFe.
 
-No piloto atual, o A1 é cadastrado no portal seguro da IntNFe. O CorePet consulta
-se o certificado pertence ao CNPJ, está válido e quando vence. A tela de vínculo
-não devolve o arquivo nem a senha.
+No CorePet, abra **Configurações → Integrações → IntNFe → Certificado digital
+A1**, selecione o arquivo e informe a senha. O CorePet envia o certificado pelo
+canal autenticado da integração, confere se pertence ao CNPJ e mostra a validade.
+O formulário é limpo depois do envio e não devolve o arquivo nem a senha. Quando
+faltarem 30 dias ou menos para o vencimento, o sistema mostra um alerta diário
+para quem pode administrar as configurações da empresa.
 
 ## 3. Confirme o credenciamento na SEFAZ
 
@@ -112,17 +115,24 @@ CorePet mostra somente se existe um CSC e qual é o seu ID.
 
 ## 5. Integre o emitente pelo CorePet
 
-1. Abra **Configurações → Fiscal** e confira os dados da empresa.
+1. Abra **Configurações → Fiscal**, pesquise o CNPJ e confira os dados da empresa.
+   A busca também preenche o código IBGE do município quando ele estiver
+   disponível.
 2. Abra **Configurações → Integrações → IntNFe**.
 3. Leia o resumo do aceite e clique em **Integrar automaticamente**.
 4. O CorePet cria o emissor na conta da IntNFe, recebe os códigos técnicos e os
    guarda cifrados. O cliente não precisa pedir, copiar nem preencher
    `clientId` ou `clientSecret`.
-5. Clique em **Consultar vínculo e certificado**.
-6. Só prossiga quando aparecerem o vínculo concluído e o certificado A1 válido.
+5. O CorePet sincroniza automaticamente razão social, inscrição estadual,
+   regime tributário, endereço e contato. Se algum campo obrigatório estiver
+   ausente, o checklist informa qual deve ser preenchido.
+6. Envie o certificado A1 na própria tela do CorePet.
+7. Acompanhe o **Checklist de preparação fiscal** até a base da NF-e aparecer
+   como pronta. Para NFC-e, cadastre também o CSC do ambiente escolhido.
 
-Durante o piloto, essa tela é liberada somente para as empresas selecionadas
-pela equipe do CorePet.
+O fluxo pode ser usado por qualquer empresa do CorePet quando a integração
+IntNFe estiver habilitada no ambiente e o usuário tiver permissão para editar
+as configurações.
 
 Se a IntNFe informar que o CNPJ já possuía um emissor antes da integração, o
 CorePet não troca o segredo automaticamente. A tela orienta procurar o suporte e
@@ -141,10 +151,15 @@ A sequência é independente para cada combinação de:
 - série;
 - ambiente de homologação ou produção.
 
-Antes de configurar produção, abra a última nota **autorizada** no Bling ou no
-emissor anterior e anote modelo, série e número. Se a última NF-e modelo 55 da
+Antes de configurar produção, abra a última nota **autorizada** no sistema ou
+emissor usado anteriormente e anote modelo, série e número. Se a última NF-e modelo 55 da
 série 2 foi a 17.697, informe `17698` como próximo número para essa mesma
 combinação. Repita a conferência para a NFC-e.
+
+Esse preenchimento é propositalmente manual. Cada empresa pode vir de um sistema
+diferente, e o CorePet não tenta adivinhar uma sequência que poderia causar
+duplicidade. Se a série for realmente nova, ela começa no número 1 e não exige
+avanço.
 
 No CorePet:
 
@@ -201,7 +216,8 @@ Antes da primeira nota real:
 - o A1 está válido e pertence ao CNPJ correto;
 - NF-e/NFC-e estão credenciadas na SEFAZ para produção;
 - o CSC de produção da NFC-e está confirmado;
-- a série e o próximo número de produção foram conciliados com o Bling;
+- a série e o próximo número de produção foram conciliados com o sistema
+  utilizado anteriormente;
 - a contabilidade aprovou as regras do cenário escolhido;
 - a mesma venda não será emitida também no sistema anterior;
 - os testes de autorização, impressão, reconsulta e cancelamento foram

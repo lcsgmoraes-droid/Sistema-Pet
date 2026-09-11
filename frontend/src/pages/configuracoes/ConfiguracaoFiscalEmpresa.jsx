@@ -48,6 +48,7 @@ export default function ConfiguracaoFiscalEmpresa() {
     complemento: "",
     bairro: "",
     cidade: "",
+    codigo_municipio: "",
     uf: "",
     cupom_cabecalho: "",
     cupom_mensagem_final: "",
@@ -118,6 +119,7 @@ export default function ConfiguracaoFiscalEmpresa() {
               complemento: resDados.data.complemento || "",
               bairro: resDados.data.bairro || "",
               cidade: resDados.data.cidade || "",
+              codigo_municipio: resDados.data.codigo_municipio || "",
               uf: resDados.data.uf || "",
               cupom_cabecalho: resDados.data.cupom_cabecalho || "",
               cupom_mensagem_final: resDados.data.cupom_mensagem_final || "",
@@ -159,12 +161,14 @@ export default function ConfiguracaoFiscalEmpresa() {
       "razao_social",
       "nome_fantasia",
       "email",
+      "email_resposta",
       "telefone",
       "cep",
       "endereco",
       "numero",
       "bairro",
       "cidade",
+      "codigo_municipio",
       "uf",
     ]),
     "empresa-cupom": new Set(["cupom_cabecalho", "cupom_mensagem_final"]),
@@ -252,6 +256,10 @@ export default function ConfiguracaoFiscalEmpresa() {
       if (dados.complemento) novosDados.complemento = dados.complemento;
       if (dados.bairro) novosDados.bairro = dados.bairro;
       if (dados.municipio) novosDados.cidade = dados.municipio;
+      const codigoMunicipio = dados.codigo_municipio_ibge || dados.codigo_municipio;
+      if (codigoMunicipio) {
+        novosDados.codigo_municipio = String(codigoMunicipio).replace(/[^0-9]/g, "");
+      }
       if (dados.uf) novosDados.uf = dados.uf;
 
       setDadosEmpresa(novosDados);
@@ -319,7 +327,39 @@ export default function ConfiguracaoFiscalEmpresa() {
         }
       }
 
-      toast.success("Configurações salvas com sucesso!");
+      let intnfeSincronizada = false;
+      let intnfeVinculada = false;
+      try {
+        const statusIntNFe = await api.get("/intnfe/status");
+        intnfeVinculada = Boolean(statusIntNFe.data?.vinculado);
+      } catch {
+        // A integração pode estar desabilitada para esta empresa ou ambiente.
+      }
+
+      if (intnfeVinculada) {
+        try {
+          const sincronizacao = await api.post("/intnfe/cadastro-fiscal/sincronizar");
+          intnfeSincronizada = Boolean(sincronizacao.data?.sincronizado);
+        } catch (syncError) {
+          const detail = syncError?.response?.data?.detail;
+          if (syncError?.response?.status === 422) {
+            toast.error(
+              detail?.mensagem ||
+                "Os dados foram salvos. Complete os campos fiscais indicados para sincronizar a IntNFe.",
+            );
+          } else {
+            toast.error(
+              "Os dados foram salvos, mas a sincronização com a IntNFe precisa ser refeita.",
+            );
+          }
+        }
+      }
+
+      toast.success(
+        intnfeSincronizada
+          ? "Configurações salvas e sincronizadas com a IntNFe!"
+          : "Configurações salvas com sucesso!",
+      );
     } catch (e) {
       console.error("Erro ao salvar:", e);
       toast.error(e.response?.data?.detail || "Erro ao salvar configurações");

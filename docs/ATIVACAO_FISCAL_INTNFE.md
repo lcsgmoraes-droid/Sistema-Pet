@@ -1,6 +1,6 @@
 # Ativação fiscal, CSC e numeração com a IntNFe
 
-Data: 2026-09-09. Situação: implementação para desenvolvimento; homologação do fluxo CorePet pendente.
+Data: 2026-09-11. Situação: fluxo de configuração implementado; homologação integrada do CorePet pendente.
 
 ## Fluxo para o usuário
 
@@ -10,9 +10,13 @@ em teste**. O cadastro inicial da conta não depende da disponibilidade do emiss
 
 1. O CorePet confere CNPJ, razão social e nome fantasia nos dados da empresa.
 2. Consulta os emitentes da conta do integrador e cria o cadastro quando cabível.
-3. Salva as credenciais do emitente com criptografia e verifica o certificado A1.
-4. Mostra a situação e as pendências. Com vínculo válido, disponibiliza CSC e
-   numeração separados por modelo, série e ambiente. Não emite uma nota nesta etapa.
+3. Salva as credenciais do emitente com criptografia e sincroniza o cadastro
+   fiscal já preenchido no CorePet.
+4. Recebe e valida o certificado A1 pelo próprio CorePet, sem persistir a senha
+   ou o conteúdo do arquivo.
+5. Mostra checklist, validade do A1 e pendências. Com vínculo válido,
+   disponibiliza CSC e numeração separados por modelo, série e ambiente. Não
+   emite uma nota nesta etapa.
 
 Para um CNPJ ainda não cadastrado na IntNFe, o cliente apenas autoriza a
 integração na tela. O backend cria o emissor com a conta de integrador do
@@ -27,12 +31,13 @@ excepcional e não faz parte do fluxo normal. Não há rotação automática de 
 
 ## Habilitar em desenvolvimento
 
-- Aplicar a migration `zzn20260909a1`, posterior a `zzm20260909a1`, antes de iniciar
-  a versão do backend que disponibiliza a tela. Ela acrescenta somente
-  `intnfe_connections`; não altera vendas, estoque ou financeiro.
+- Aplicar as migrations até `zzo20260911a1`. Além da tabela
+  `intnfe_connections`, a última migration acrescenta o código IBGE do município
+  ao cadastro da empresa; não altera vendas, estoque ou financeiro.
 - Configurar no ambiente seguro do **backend**, nunca em variável `VITE_*`:
-  `INTNFE_ACTIVATION_ENABLED=true`, `INTNFE_ACTIVATION_TENANT_IDS` com os UUIDs
-  liberados no piloto (separados por vírgula), `INTNFE_INTEGRADOR_ID` e
+  `INTNFE_ACTIVATION_ENABLED=true`, `INTNFE_ACTIVATION_TENANT_IDS` vazio ou `*`
+  para todas as empresas, ou com UUIDs separados por vírgula para uma liberação
+  controlada, `INTNFE_INTEGRADOR_ID` e
   `INTNFE_INTEGRADOR_SECRET`.
 - Manter `PAYMENT_CONFIG_ENCRYPTION_KEY` estável e protegida. A integração usa o
   mecanismo existente de criptografia das configurações por empresa. Produção
@@ -55,6 +60,10 @@ fluxo de publicação do repositório, além da homologação abaixo.
 | `POST /intnfe/ativar` | Consulta o vínculo e, se seguro, cria o emitente. |
 | `POST /intnfe/consultar` | Consulta o emissor/certificado; nunca cria emitente remoto. |
 | `POST /intnfe/vincular` | Recebe `client_id` e `client_secret` para comprovar acesso a um cadastro existente. |
+| `GET /intnfe/cadastro-fiscal` | Compara os dados fiscais do CorePet com o cadastro permanente da IntNFe e lista pendências. |
+| `POST /intnfe/cadastro-fiscal/sincronizar` | Envia apenas os dados fiscais da empresa autenticada e confirma o resultado. |
+| `GET /intnfe/certificado` | Consulta presença, situação e validade do A1 sem devolver arquivo, senha ou impressão digital. |
+| `POST /intnfe/certificado` | Recebe `.pfx`/`.p12` e senha em multipart, valida limites e envia ao emitente vinculado. |
 | `GET /intnfe/numeracao` | Consulta as sequências do emitente da empresa autenticada. |
 | `PUT /intnfe/numeracao` | Avança uma sequência de NF-e ou NFC-e após nova consulta, auditoria e confirmação por leitura. |
 | `GET /intnfe/csc` | Consulta separadamente homologação e produção, informando presença e ID; o segredo nunca retorna. |
@@ -86,7 +95,8 @@ Exemplo: para continuar com a NF-e 4.501, o formulário recebe `4501` e o backen
 envia `ultimoNumero: 4500`. Se uma série ainda não existe e começará no 1, não há
 ajuste a enviar. A operação configura a sequência no emissor; não escolhe a série
 padrão de futuras vendas e não representa consulta ao histórico completo da SEFAZ
-ou sincronização automática com o Bling.
+ou sincronização automática com qualquer ERP anterior. A conferência da última
+numeração é manual e independente da origem.
 
 Contrato interno de escrita, sem tenant/CNPJ/credenciais no corpo:
 
@@ -161,9 +171,10 @@ A equipe IntNFe precisa confirmar se os cadastros anteriores serão migrados.
 | Resultado da criação nunca confirmado | Suporte deve reconciliar com a IntNFe. Não apagar a reserva local nem zerar indicadores para forçar uma repetição. |
 | `emitente_inativo` / `vinculo_inconsistente` | Revisão de suporte; não criar substituto automaticamente. |
 | Falha após salvar credenciais | Consultar novamente. O segredo retornado uma única vez permanece armazenado. |
-| `certificado_pendente` / `certificado_invalido` | Cadastrar/corrigir o A1 no emissor e consultar novamente. |
+| `certificado_pendente` / `certificado_invalido` | Enviar ou substituir o A1 na tela da IntNFe dentro do CorePet. |
 
-As chamadas têm timeout de 3 segundos para conexão e 15 segundos para leitura,
+As chamadas têm timeout de 3 segundos para conexão e 15 segundos para leitura;
+o upload do A1 permite até 30 segundos de leitura,
 sem retry automático e sem seguir redirecionamentos. A URL externa é fixa:
 `https://api.intnfe.com.br`. A criação remota não tem idempotência documentada;
 não reutilizamos a garantia de idempotência das rotas de notas para esse cadastro.
@@ -181,10 +192,28 @@ repetição; a expiração permite consultar/reconciliar.
   já previstos na infraestrutura.
 - Segredos cifrados; tokens apenas durante a requisição. Auditoria registra
   usuário, empresa, ação, estado, código e protocolo, sem payload sensível.
-- O cadastro envia somente CNPJ, razão social e nome fantasia à IntNFe. Não há
-  envio de dados de clientes, itens, certificado ou senha do certificado nesta etapa.
+- O cadastro inicial envia CNPJ, razão social e nome fantasia. Depois do vínculo,
+  a sincronização envia somente o cadastro fiscal permanente da empresa.
+- O A1 e sua senha são transmitidos à rota autenticada da IntNFe e não são
+  gravados em banco ou auditoria pelo CorePet. A auditoria registra apenas
+  formato, tamanho e resultado.
 - Testes de API/serviço usam dados fictícios e respostas simuladas, sem acesso
   às credenciais ou à conta real.
+
+## Preparação dos pedidos de marketplace
+
+O CorePet já mantém uma representação interna independente do conector para os
+fatos fiscais do pedido: canal, referência externa, UF de destino, intermediador,
+frete, transportadora e formas de pagamento. Mercado Livre, Amazon, Shopee,
+TikTok Shop e PDV passam pelo mesmo contrato. CNPJ e identificador do
+intermediador precisam chegar juntos, assim como nome e documento da
+transportadora. Dados parciais viram pendências antes da montagem da nota.
+
+Essa preparação não emite notas. O futuro adaptador de emissão ainda deverá
+combinar esses fatos comerciais com destinatário, itens e regras tributárias da
+empresa e dos produtos, e então mapear o resultado para o contrato da IntNFe.
+Não há CNPJ de marketplace fixo no código: a integração de origem deve fornecer
+os identificadores válidos para cada conta e pedido.
 
 Validação desta entrega e limites estão na
 [ficha de entrega](entregas/2026-09-09-ativacao-fiscal-intnfe.md).
@@ -213,9 +242,9 @@ Validação desta entrega e limites estão na
    [Diagnóstico](DIAGNOSTICO_INTNFE_NFE_HOMOLOGACAO_2026-09-09.md)
    e [registro do piloto](FISCAL_INTNFE_PILOTO_HOMOLOGACAO.md).
 
-Upload de A1 dentro do CorePet, emissão pelo PDV, cadastro/sincronização de
-destinatários, eventos, webhooks, XML/DANFE e passagem para produção são etapas
-posteriores. O presente vínculo não depende da implementação completa dessas etapas.
+Emissão pelo PDV, cadastro/sincronização de destinatários, eventos, webhooks,
+XML/DANFE e passagem para produção são etapas posteriores. O cadastro fiscal e o
+upload de A1 dentro do CorePet já fazem parte desta entrega, sem liberar emissão.
 
 O cadastro de origem do CorePet ainda trabalha com CNPJ numérico. A documentação
 atual da IntNFe também aceita CNPJ alfanumérico; ampliar o cadastro e a validação

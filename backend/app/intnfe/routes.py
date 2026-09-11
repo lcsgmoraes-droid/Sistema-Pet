@@ -3,7 +3,7 @@
 from datetime import datetime
 from typing import Literal
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from fastapi.exceptions import RequestValidationError
 from fastapi.routing import APIRoute
 from pydantic import BaseModel, ConfigDict, SecretStr
@@ -15,6 +15,13 @@ from app.auth.dependencies import get_current_user_and_tenant
 from app.config import settings
 from app.db import get_session
 from app.intnfe.client import IntNFeClient, IntNFeError
+from app.intnfe.certificate import (
+    MAX_CERTIFICATE_BYTES,
+    CertificateError,
+    CertificateView,
+    read_certificate,
+    upload_certificate,
+)
 from app.intnfe.csc import (
     CscError,
     CscInput,
@@ -24,6 +31,12 @@ from app.intnfe.csc import (
     save_csc,
 )
 from app.intnfe.presentation import public_status
+from app.intnfe.fiscal_profile import (
+    FiscalProfileError,
+    FiscalProfileView,
+    read_fiscal_profile,
+    sync_fiscal_profile,
+)
 from app.intnfe.numbering import (
     NumberingError,
     NumberingInput,
@@ -88,6 +101,8 @@ class ActivationView(BaseModel):
     pode_vincular: bool
     pode_configurar_numeracao: bool
     certificado_valido_ate: datetime | None
+    certificado_dias_restantes: int | None
+    certificado_alerta: str | None
     codigo: str | None
     protocolo_suporte: str | None
 
@@ -119,7 +134,7 @@ def _require_pilot_tenant(tenant_id):
         for value in settings.INTNFE_ACTIVATION_TENANT_IDS.split(",")
         if value.strip()
     }
-    if "*" not in allowed and str(tenant_id).strip().lower() not in allowed:
+    if allowed and "*" not in allowed and str(tenant_id).strip().lower() not in allowed:
         raise HTTPException(
             403, "A configuração fiscal ainda não foi liberada para esta empresa."
         )
@@ -374,5 +389,186 @@ def save_csc_route(
         return save_csc(db, tenant_id, api, body, audit)
     except CscError as exc:
         raise _csc_failure(exc) from None
+    except ActivationError as exc:
+        raise HTTPException(exc.status, str(exc)) from None
+
+
+def _certificate_failure(exc):
+    return HTTPException(
+        exc.status,
+        {
+            "codigo": exc.code,
+            "mensagem": str(exc),
+            "protocolo_suporte": exc.correlation,
+            "exige_consulta": exc.refresh,
+        },
+    )
+
+
+@router.get("/certificado", response_model=CertificateView)
+def certificate_route(
+    db: Session = Depends(get_session),
+    user_and_tenant=Depends(get_current_user_and_tenant),
+    api=Depends(get_client),
+):
+    _user, tenant_id = user_and_tenant
+    set_current_tenant(tenant_id)
+    _require_pilot_tenant(tenant_id)
+    try:
+        return read_certificate(db, tenant_id, api)
+    except CertificateError as exc:
+        raise _certificate_failure(exc) from None
+    except ActivationError as exc:
+        raise HTTPException(exc.status, str(exc)) from None
+
+
+@router.post("/certificado", response_model=CertificateView)
+async def upload_certificate_route(
+    arquivo: UploadFile = File(...),
+    senha: str = Form(...),
+    db: Session = Depends(get_session),
+    user_and_tenant=Depends(get_current_user_and_tenant),
+    api=Depends(get_client),
+):
+    user, tenant_id = user_and_tenant
+    set_current_tenant(tenant_id)
+    _require_pilot_tenant(tenant_id)
+    if arquivo.size is not None and arquivo.size > MAX_CERTIFICATE_BYTES:
+        raise _certificate_failure(
+            CertificateError(
+                "ArquivoInvalido", "O certificado deve ter no máximo 512 KB."
+            )
+        )
+    content = await arquivo.read(MAX_CERTIFICATE_BYTES + 1)
+    await arquivo.close()
+
+    def audit(connection_id, result, change, error=None):
+        try:
+            log_action(
+                db,
+                user_id=user.id,
+                tenant_id=tenant_id,
+                action="intnfe_certificado",
+                entity_type="intnfe_connection",
+                entity_id=connection_id,
+                new_value={
+                    **change,
+                    "resultado": result,
+                    "codigo": error.code if error else None,
+                    "correlation_id": error.correlation if error else None,
+                },
+                commit=False,
+            )
+            db.commit()
+        except SQLAlchemyError:
+            db.rollback()
+            raise CertificateError(
+                (
+                    "AuditoriaIndisponivel"
+                    if result == "solicitado"
+                    else "ResultadoNaoConfirmado"
+                ),
+                (
+                    "Não foi possível registrar o envio; nenhum certificado foi transmitido."
+                    if result == "solicitado"
+                    else "O certificado foi recebido, mas a confirmação local falhou. Consulte a situação."
+                ),
+                status=503,
+                refresh=result != "solicitado",
+            ) from None
+
+    try:
+        return upload_certificate(
+            db,
+            tenant_id,
+            api,
+            filename=arquivo.filename,
+            content=content,
+            password=senha,
+            audit=audit,
+        )
+    except CertificateError as exc:
+        raise _certificate_failure(exc) from None
+    except ActivationError as exc:
+        raise HTTPException(exc.status, str(exc)) from None
+
+
+def _fiscal_profile_failure(exc):
+    return HTTPException(
+        exc.status,
+        {
+            "codigo": exc.code,
+            "mensagem": str(exc),
+            "protocolo_suporte": exc.correlation,
+            "exige_consulta": exc.refresh,
+        },
+    )
+
+
+@router.get("/cadastro-fiscal", response_model=FiscalProfileView)
+def fiscal_profile_route(
+    db: Session = Depends(get_session),
+    user_and_tenant=Depends(get_current_user_and_tenant),
+    api=Depends(get_client),
+):
+    _user, tenant_id = user_and_tenant
+    set_current_tenant(tenant_id)
+    _require_pilot_tenant(tenant_id)
+    try:
+        return read_fiscal_profile(db, tenant_id, api)
+    except FiscalProfileError as exc:
+        raise _fiscal_profile_failure(exc) from None
+    except ActivationError as exc:
+        raise HTTPException(exc.status, str(exc)) from None
+
+
+@router.post("/cadastro-fiscal/sincronizar", response_model=FiscalProfileView)
+def sync_fiscal_profile_route(
+    db: Session = Depends(get_session),
+    user_and_tenant=Depends(get_current_user_and_tenant),
+    api=Depends(get_client),
+):
+    user, tenant_id = user_and_tenant
+    set_current_tenant(tenant_id)
+    _require_pilot_tenant(tenant_id)
+
+    def audit(connection_id, result, change, error=None):
+        try:
+            log_action(
+                db,
+                user_id=user.id,
+                tenant_id=tenant_id,
+                action="intnfe_cadastro_fiscal",
+                entity_type="intnfe_connection",
+                entity_id=connection_id,
+                new_value={
+                    **change,
+                    "resultado": result,
+                    "codigo": error.code if error else None,
+                    "correlation_id": error.correlation if error else None,
+                },
+                commit=False,
+            )
+            db.commit()
+        except SQLAlchemyError:
+            db.rollback()
+            raise FiscalProfileError(
+                (
+                    "AuditoriaIndisponivel"
+                    if result == "solicitado"
+                    else "ResultadoNaoConfirmado"
+                ),
+                (
+                    "Não foi possível registrar a sincronização; nenhum dado foi enviado."
+                    if result == "solicitado"
+                    else "Os dados foram enviados, mas a confirmação local falhou. Consulte a situação."
+                ),
+                status=503,
+            ) from None
+
+    try:
+        return sync_fiscal_profile(db, tenant_id, api, audit)
+    except FiscalProfileError as exc:
+        raise _fiscal_profile_failure(exc) from None
     except ActivationError as exc:
         raise HTTPException(exc.status, str(exc)) from None

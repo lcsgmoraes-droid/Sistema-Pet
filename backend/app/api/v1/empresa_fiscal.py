@@ -32,6 +32,7 @@ class EmpresaDadosBasicosUpdate(BaseModel):
     complemento: Optional[str] = None
     bairro: Optional[str] = None
     cidade: Optional[str] = None
+    codigo_municipio: Optional[str] = None
     uf: Optional[str] = None
     cep: Optional[str] = None
     telefone: Optional[str] = None
@@ -100,6 +101,7 @@ def obter_dados_basicos_empresa(
         "complemento": tenant.complemento,
         "bairro": tenant.bairro,
         "cidade": tenant.cidade,
+        "codigo_municipio": tenant.codigo_municipio,
         "uf": tenant.uf,
         "cep": tenant.cep,
         "telefone": tenant.telefone,

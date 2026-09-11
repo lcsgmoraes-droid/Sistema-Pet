@@ -121,6 +121,11 @@ export default function IntNFeAtivacaoView({
                 {new Date(data.certificado_valido_ate).toLocaleDateString("pt-BR")}
               </p>
             )}
+            {data.certificado_alerta && (
+              <p className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-amber-950">
+                {data.certificado_alerta}
+              </p>
+            )}
             {data.protocolo_suporte && (
               <p className="break-all text-xs">
                 Protocolo para o suporte: {data.protocolo_suporte}
