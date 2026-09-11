@@ -13,11 +13,12 @@ import {
 import { formatarMoeda } from "../../../utils/format";
 
 import { detalheEntregaStyles as styles } from "./DetalheEntregaStyles";
-import type {
-  FormaRecebimento,
-  Parada,
-  Rota,
-  VendaDetalhes,
+import {
+  montarInstrucoesPagamentoEntrega,
+  type FormaRecebimento,
+  type Parada,
+  type Rota,
+  type VendaDetalhes,
 } from "./DetalheEntregaUtils";
 
 export type DetalheEntregaModalsProps = {
@@ -95,6 +96,8 @@ export function DetalheEntregaModals({
   loadingVenda,
   vendaDetalhes,
 }: DetalheEntregaModalsProps) {
+  const instrucoesPagamento = montarInstrucoesPagamentoEntrega(vendaDetalhes || {});
+
   return (
     <>
       <Modal
@@ -378,10 +381,22 @@ export function DetalheEntregaModals({
                     ? new Date(vendaDetalhes.data_venda).toLocaleString("pt-BR")
                     : "N/A"}
                 </Text>
-                <Text style={styles.detalheLinha}>
-                  <Text style={styles.detalheLabel}>Pagamento: </Text>
-                  {vendaDetalhes?.forma_pagamento || "N/A"}
-                </Text>
+                <View style={styles.pagamentoEntregaBox}>
+                  <Text style={styles.pagamentoEntregaTitulo}>FORMA DE PAGAMENTO</Text>
+                  {instrucoesPagamento.map((instrucao) => (
+                    <View key={instrucao.chave} style={styles.pagamentoEntregaItem}>
+                      <Text style={styles.pagamentoEntregaResumo}>{instrucao.resumo}</Text>
+                      {instrucao.alerta ? (
+                        <Text style={styles.pagamentoEntregaAlerta}>⚠️ {instrucao.alerta}</Text>
+                      ) : null}
+                      {instrucao.complemento ? (
+                        <Text style={styles.pagamentoEntregaComplemento}>
+                          {instrucao.complemento}
+                        </Text>
+                      ) : null}
+                    </View>
+                  ))}
+                </View>
                 <Text style={styles.detalheLinha}>
                   <Text style={styles.detalheLabel}>Status pagamento: </Text>
                   {vendaDetalhes?.status_pagamento || "N/A"}

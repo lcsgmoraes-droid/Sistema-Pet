@@ -78,6 +78,66 @@ test("configuracoes opcionais vazias usam fallback sensato", () => {
   assert.match(recibo, /Volte sempre!/);
 });
 
+test("recibo em dinheiro imprime valor recebido e troco com clareza", () => {
+  const recibo = montarCupomVenda(
+    {
+      ...vendaBase,
+      tem_entrega: true,
+      pagamentos: [
+        {
+          forma_pagamento: "Dinheiro",
+          forma_pagamento_tipo: "dinheiro",
+          valor: 390,
+          valor_recebido: 400,
+          troco: 10,
+        },
+      ],
+    },
+    empresa,
+  );
+
+  assert.match(recibo, /Dinheiro\s+R\$ 400,00/);
+  assert.match(recibo, /TROCO:\s+R\$ 10,00/);
+});
+
+test("recibo de entrega paga no cartao avisa para levar maquininha", () => {
+  const recibo = montarCupomVenda(
+    {
+      ...vendaBase,
+      tem_entrega: true,
+      pagamentos: [
+        {
+          forma_pagamento: "Cartão de crédito",
+          modalidade_cartao: "credito",
+          valor: 390,
+        },
+      ],
+    },
+    empresa,
+  );
+
+  assert.match(recibo, /ATENCAO: LEVAR MAQUININHA DE CARTAO/);
+});
+
+test("recibo sem entrega nao inclui aviso operacional de maquininha", () => {
+  const recibo = montarCupomVenda(
+    {
+      ...vendaBase,
+      tem_entrega: false,
+      pagamentos: [
+        {
+          forma_pagamento: "Cartão de débito",
+          modalidade_cartao: "debito",
+          valor: 390,
+        },
+      ],
+    },
+    empresa,
+  );
+
+  assert.doesNotMatch(recibo, /LEVAR MAQUININHA/);
+});
+
 test("crediario imprime cupom e duas vias da nota promissoria em folhas separadas", () => {
   const vendaCrediario = {
     ...vendaBase,

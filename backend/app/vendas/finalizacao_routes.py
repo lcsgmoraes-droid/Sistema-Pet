@@ -20,6 +20,26 @@ router = APIRouter()
 logger = logging.getLogger(__name__)
 
 
+def _converter_pagamentos_request(pagamentos):
+    return [
+        {
+            "forma_pagamento": pagamento.forma_pagamento,
+            "forma_pagamento_id": pagamento.forma_pagamento_id,
+            "valor": pagamento.valor,
+            "numero_parcelas": pagamento.numero_parcelas,
+            "bandeira": pagamento.bandeira,
+            "nsu_cartao": pagamento.nsu_cartao,
+            "operadora_id": pagamento.operadora_id,
+            "modalidade_cartao": pagamento.modalidade_cartao,
+            "valor_recebido": pagamento.valor_recebido,
+            "troco": pagamento.troco,
+            "data_recebimento_prevista": pagamento.data_recebimento_prevista,
+            "intervalo_crediario": pagamento.intervalo_crediario,
+        }
+        for pagamento in pagamentos
+    ]
+
+
 @router.post("/{venda_id}/finalizar")
 @idempotent()  # 🔒 IDEMPOTÊNCIA: evita finalização duplicada
 async def finalizar_venda(
@@ -63,27 +83,7 @@ async def finalizar_venda(
     from app.vendas import VendaService
 
     # Converter pagamentos do request para formato do service
-    pagamentos_list = (
-        [
-            {
-                "forma_pagamento": p.forma_pagamento,
-                "forma_pagamento_id": p.forma_pagamento_id,
-                "valor": p.valor,
-                "numero_parcelas": p.numero_parcelas,
-                "bandeira": getattr(p, "bandeira", None),
-                "nsu_cartao": getattr(p, "nsu_cartao", None),
-                "operadora_id": getattr(
-                    p, "operadora_id", None
-                ),  # 🆕 Capturar operadora
-                "modalidade_cartao": p.modalidade_cartao,
-                "data_recebimento_prevista": p.data_recebimento_prevista,
-                "intervalo_crediario": p.intervalo_crediario,
-            }
-            for p in dados.pagamentos
-        ]
-        if dados.pagamentos
-        else []
-    )
+    pagamentos_list = _converter_pagamentos_request(dados.pagamentos)
 
     # Executar finalização com transação atômica única
     resultado = VendaService.finalizar_venda(

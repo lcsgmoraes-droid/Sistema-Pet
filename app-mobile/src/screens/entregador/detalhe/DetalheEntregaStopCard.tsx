@@ -6,6 +6,7 @@ import {
   STATUS_BADGE,
   abrirMapa,
   ligar,
+  montarInstrucoesPagamentoEntrega,
   rotaPermiteReordenacao,
   type Parada,
 } from "./DetalheEntregaUtils";
@@ -42,6 +43,7 @@ export function DetalheEntregaStopCard({
   };
   const emProcessamento = processando === parada.id;
   const podeReordenar = rotaPermiteReordenacao(rotaStatus);
+  const instrucoesPagamento = montarInstrucoesPagamentoEntrega(parada);
 
   return (
     <View
@@ -93,6 +95,21 @@ export function DetalheEntregaStopCard({
             {badge.label}
           </Text>
         </View>
+      </View>
+
+      <View style={styles.pagamentoEntregaBox}>
+        <Text style={styles.pagamentoEntregaTitulo}>FORMA DE PAGAMENTO</Text>
+        {instrucoesPagamento.map((instrucao) => (
+          <View key={instrucao.chave} style={styles.pagamentoEntregaItem}>
+            <Text style={styles.pagamentoEntregaResumo}>{instrucao.resumo}</Text>
+            {instrucao.alerta ? (
+              <Text style={styles.pagamentoEntregaAlerta}>⚠️ {instrucao.alerta}</Text>
+            ) : null}
+            {instrucao.complemento ? (
+              <Text style={styles.pagamentoEntregaComplemento}>{instrucao.complemento}</Text>
+            ) : null}
+          </View>
+        ))}
       </View>
 
       {!!parada.observacoes && (

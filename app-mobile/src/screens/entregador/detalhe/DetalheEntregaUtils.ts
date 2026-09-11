@@ -1,7 +1,19 @@
 import * as Location from "expo-location";
 import { Alert, Linking } from "react-native";
 
+import { formatarMoeda } from "@/utils/format";
 import { limparEnderecoParaMaps } from "@/utils/mapsAddress";
+
+export interface PagamentoEntrega {
+  forma_pagamento?: string;
+  valor?: number | null;
+  valor_recebido?: number | null;
+  troco?: number | null;
+  numero_parcelas?: number | null;
+  bandeira?: string | null;
+  modalidade_cartao?: string | null;
+  status?: string | null;
+}
 
 export interface Parada {
   id: number;
@@ -14,6 +26,9 @@ export interface Parada {
   cliente_celular?: string;
   observacoes?: string;
   data_entrega?: string;
+  forma_pagamento?: string;
+  valor_venda?: number | null;
+  pagamentos?: PagamentoEntrega[];
 }
 
 export interface Rota {
@@ -37,6 +52,7 @@ export interface VendaDetalhes {
   observacoes_entrega?: string;
   total?: number;
   valor_total?: number;
+  pagamentos?: PagamentoEntrega[];
   itens?: Array<{
     produto_nome?: string;
     servico_descricao?: string;
@@ -47,6 +63,107 @@ export interface VendaDetalhes {
 }
 
 export type FormaRecebimento = "pix" | "cartao_debito" | "cartao_credito";
+
+type FontePagamentoEntrega = {
+  forma_pagamento?: string;
+  valor_venda?: number | null;
+  valor_total?: number | null;
+  total?: number | null;
+  pagamentos?: PagamentoEntrega[];
+};
+
+export interface InstrucaoPagamentoEntrega {
+  chave: string;
+  resumo: string;
+  alerta?: string;
+  complemento?: string;
+}
+
+function normalizarPagamento(valor?: string | null) {
+  return String(valor || "")
+    .normalize("NFD")
+    .replaceAll(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
+}
+
+function detalhesFormaPagamento(pagamento: PagamentoEntrega) {
+  const modalidade = normalizarPagamento(pagamento.modalidade_cartao);
+  const identificacao = normalizarPagamento(pagamento.forma_pagamento);
+  const nome = String(pagamento.forma_pagamento || "").trim();
+  const ehDinheiro = identificacao.includes("dinheiro");
+  const ehCredito =
+    modalidade === "credito" ||
+    (identificacao.includes("cartao") && identificacao.includes("credito"));
+  const ehDebito =
+    modalidade === "debito" ||
+    (identificacao.includes("cartao") && identificacao.includes("debito"));
+  const ehCartao = identificacao.includes("cartao") || ehCredito || ehDebito;
+  const ehPix = identificacao.includes("pix");
+
+  return {
+    ehDinheiro,
+    ehCartao,
+    rotulo: ehCredito
+      ? "CARTÃO DE CRÉDITO"
+      : ehDebito
+        ? "CARTÃO DE DÉBITO"
+        : nome
+          ? nome.toLocaleUpperCase("pt-BR")
+          : "NÃO INFORMADA",
+    icone: ehDinheiro ? "💵" : ehCartao ? "💳" : ehPix ? "📱" : "💰",
+  };
+}
+
+export function montarInstrucoesPagamentoEntrega(
+  fonte: FontePagamentoEntrega = {},
+): InstrucaoPagamentoEntrega[] {
+  const totalVenda = Number(fonte.valor_venda ?? fonte.valor_total ?? fonte.total ?? 0);
+  const pagamentos = fonte.pagamentos?.length
+    ? fonte.pagamentos
+    : fonte.forma_pagamento
+      ? [{ forma_pagamento: fonte.forma_pagamento, valor: totalVenda }]
+      : [];
+
+  if (!pagamentos.length) {
+    return [
+      {
+        chave: "nao-informada",
+        resumo: "⚠️ FORMA NÃO INFORMADA",
+        alerta: "CONFIRME O PAGAMENTO COM A LOJA",
+      },
+    ];
+  }
+
+  return pagamentos.map((pagamento, index) => {
+    const { ehDinheiro, ehCartao, icone, rotulo } = detalhesFormaPagamento(pagamento);
+    const valor = Number(pagamento.valor ?? 0);
+    const troco = Number(pagamento.troco ?? 0);
+    const valorRecebido = Number(pagamento.valor_recebido ?? 0);
+    const parcelas = Number(pagamento.numero_parcelas ?? 1);
+    const sufixoParcelas = ehCartao && parcelas > 1 ? ` (${parcelas}x)` : "";
+    const resumoValor = valor > 0 ? ` — ${formatarMoeda(valor)}` : "";
+
+    if (ehDinheiro && troco > 0.005) {
+      const recebido = valorRecebido > 0 ? valorRecebido : valor + troco;
+      return {
+        chave: `${rotulo}-${index}`,
+        resumo: `${icone} ${rotulo}${resumoValor}`,
+        alerta: `LEVAR TROCO: ${formatarMoeda(troco)}`,
+        complemento:
+          recebido > 0 ? `Cliente paga com ${formatarMoeda(recebido)}` : undefined,
+      };
+    }
+
+    return {
+      chave: `${rotulo}-${index}`,
+      resumo: `${icone} ${rotulo}${sufixoParcelas}${resumoValor}`,
+      alerta: ehCartao ? "LEVAR MÁQUINA DE CARTÃO" : undefined,
+      complemento:
+        ehDinheiro && valorRecebido > 0 ? "Cliente informou valor exato (sem troco)" : undefined,
+    };
+  });
+}
 
 export function reordenarParadasPorPosicao(
   paradas: Parada[],

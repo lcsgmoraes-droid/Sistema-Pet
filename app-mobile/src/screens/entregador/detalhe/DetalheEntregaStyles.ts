@@ -146,6 +146,31 @@ export const detalheEntregaStyles = StyleSheet.create({
   },
   statusBadgeText: { fontSize: 11, fontWeight: "600" },
 
+  pagamentoEntregaBox: {
+    backgroundColor: "#fffbeb",
+    borderColor: "#f59e0b",
+    borderWidth: 1.5,
+    borderRadius: 10,
+    padding: 10,
+    marginBottom: 10,
+  },
+  pagamentoEntregaTitulo: {
+    color: "#92400e",
+    fontSize: 11,
+    fontWeight: "800",
+    letterSpacing: 0.5,
+    marginBottom: 5,
+  },
+  pagamentoEntregaItem: { marginTop: 2 },
+  pagamentoEntregaResumo: { color: "#111827", fontSize: 14, fontWeight: "800" },
+  pagamentoEntregaAlerta: {
+    color: "#b45309",
+    fontSize: 14,
+    fontWeight: "900",
+    marginTop: 3,
+  },
+  pagamentoEntregaComplemento: { color: "#78350f", fontSize: 12, marginTop: 2 },
+
   observacoes: {
     fontSize: 13,
     color: "#374151",
