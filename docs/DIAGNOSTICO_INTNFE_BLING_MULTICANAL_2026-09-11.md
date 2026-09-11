@@ -4,6 +4,14 @@ Data: 11/09/2026. Escopo: emissão de documentos de produto em homologação
 (`ambienteCodigo: 2`), usando notas recentes do Bling apenas como referência.
 Nenhum documento foi enviado à produção e nenhum destinatário recebeu e-mail.
 
+## Objetivo do produto
+
+O fluxo pretendido é **marketplace → EcommerceAI → CorePet → IntNFe**. O
+EcommerceAI recebe os pedidos dos canais; o CorePet passa a ser a fonte operacional
+do pedido, estoque e histórico fiscal; a IntNFe transmite e acompanha o documento.
+O Bling serve como referência de comparação durante a transição e deixa de ser
+necessário quando o novo fluxo provar equivalência funcional e fiscal.
+
 ## Resultado executivo
 
 Foram reproduzidos quatro cenários reais de NF-e modelo 55, um de cada origem:
@@ -40,6 +48,53 @@ Nos quatro XMLs, o meio de pagamento ficou como dinheiro porque essa também era
 a informação encontrada nas notas consultadas no Bling. Esse dado provavelmente
 não representa a liquidação real dos marketplaces e precisa ser validado com a
 contabilidade antes de virar regra do CorePet.
+
+### Teste adicional de frete e Pix
+
+Uma quinta NF-e reproduziu uma venda recente do TikTok com um item, desconto de
+R$ 6,00, frete de R$ 5,59, total de R$ 38,49 e pagamento Pix. A IntNFe aceitou a
+requisição para processamento, mas a SEFAZ rejeitou a nota com código 535:
+**“Total do Frete difere do somatório dos itens”**.
+
+O corpo documentado pela IntNFe permite informar apenas `frete.valor` no nível da
+nota. O objeto `Produto` não oferece um campo para ratear o frete entre os itens.
+Assim, o total recebeu R$ 5,59, mas os itens não conseguiram compor o mesmo valor.
+A equipe IntNFe precisa distribuir o frete internamente ou expor e documentar o
+valor de frete por item. A tentativa foi rejeitada, sem XML autorizado.
+
+## Estados e tributação
+
+Além do cenário já emitido para o Pará, foram examinadas notas recentes com destino
+a Goiás, Ceará e Mato Grosso do Sul. Elas confirmam que a UF altera CFOP, alíquotas
+interestaduais, eventual DIFAL/FCP e algumas validações estaduais. Portanto,
+operações para outros estados precisam de homologação.
+
+Emitir várias notas com o mesmo CFOP 6404 e CSOSN 500 tem ganho limitado. A próxima
+amostra interestadual deve acrescentar uma diferença fiscal real: produto sem ST
+com CFOP 6102/CSOSN 102, comprador contribuinte com IE, operação com DIFAL/FCP ou
+outro benefício/regra validado pela contabilidade.
+
+## Logística de marketplace e transportadora fiscal
+
+Nas notas examinadas, o Bling separa a integração logística dos campos fiscais da
+transportadora. Amazon DBA, Mercado Envios e a logística do TikTok aparecem como
+serviço operacional, com objeto de postagem, rastreio e volume. Mesmo assim, razão
+social, CNPJ, IE e endereço da transportadora podem permanecer vazios, e a NF-e
+pode usar modalidade 9.
+
+A IntNFe aceita modalidade, valor do frete e uma transportadora opcional. O contrato
+atual não oferece objetos de postagem, rastreio, quantidade/espécie dos volumes ou
+pesos. Portanto, transporte ainda não está homologado de ponta a ponta. O CorePet
+precisa guardar separadamente:
+
+- **informação fiscal:** modalidade, valor e transportadora quando ela realmente
+  deve constar no XML;
+- **informação operacional:** operador logístico, serviço, etiqueta, código de
+  rastreio, volumes, pesos e endereço de entrega.
+
+Não se deve inventar uma transportadora no XML a partir apenas do nome “Mercado
+Envios”, “Amazon DBA” ou “Logística TikTok”. O mapeamento depende dos dados que o
+marketplace/EcommerceAI efetivamente entregar e da regra fiscal aplicável.
 
 ## DANFE: validação visual
 
@@ -89,6 +144,7 @@ cupons reais ou informar formalmente a conversão fiscal válida.
 | CSC da NFC-e em homologação | Obter na SEFAZ e cadastrar ID do token e segredo no emitente por canal protegido | Empresa/contador e equipe IntNFe |
 | CSOSN 900 na NFC-e | Aceitar `ICMSSN900`, inclusive `pCredSN` e `vCredICMSSN` quando aplicáveis, e documentar o corpo | Equipe IntNFe |
 | Intermediador de marketplace | Aceitar `indIntermed`, CNPJ do intermediador e `idCadIntTran`; gerar `indIntermed=1` e `infIntermed` no XML | Equipe IntNFe |
+| Rateio do frete por item | Corrigir a rejeição 535: distribuir `frete.valor` nos itens ou expor o campo correspondente no objeto `Produto` | Equipe IntNFe |
 | Regra fiscal por operação | Confirmar com a contabilidade CFOP, CSOSN/CST, benefícios, DIFAL/FCP e natureza por estado/canal | Empresa/contador |
 | Separação de ambientes | Manter CSC, série, numeração e credenciais explicitamente separados entre homologação e produção | CorePet/IntNFe |
 
@@ -138,6 +194,33 @@ provedores. Para atender os cenários observados, o modelo precisa guardar:
 9. vínculo imutável entre venda/pedido e documento, evitando duplicar estoque,
    financeiro ou emissão ao sincronizar mais de um provedor.
 
+## Situação atual do EcommerceAI no CorePet
+
+A integração existente ainda não recebe pedidos de marketplace. Ela oferece o
+catálogo do CorePet para leitura pelo EcommerceAI e aceita eventos com idempotência,
+mas somente `integration.test` e `company.overview.snapshot` são processados. Um
+evento de pedido seria armazenado com estado `unsupported`.
+
+Para substituir o Bling, precisamos acrescentar um contrato versionado com pelo
+menos estes eventos:
+
+| Evento | Finalidade |
+|---|---|
+| `marketplace.order.upsert` | Criar ou atualizar o pedido pela identidade do canal e sua versão |
+| `marketplace.order.cancelled` | Cancelar de modo idempotente e acionar as regras de estoque/fiscal |
+| `marketplace.order.shipping.updated` | Atualizar etiqueta, serviço, rastreio e volumes sem reemitir a nota |
+
+O pedido recebido precisa conter canal, conta do vendedor, ID e versão externos,
+datas, comprador, endereço de entrega/cobrança, itens/SKUs/GTIN, valores e descontos,
+pagamentos, intermediador, logística, frete e referências do marketplace. O CorePet
+deve deduplicar o evento, resolver o produto, reservar estoque, criar o pedido,
+montar uma fotografia fiscal, emitir pela IntNFe e devolver ao EcommerceAI o estado,
+número, chave e motivo de rejeição quando aplicável.
+
+Os dados tributários finais não devem ser aceitos cegamente do canal. O pedido traz
+os fatos comerciais; o CorePet aplica a configuração fiscal revisada da empresa e
+do produto antes de formar o corpo da IntNFe.
+
 Segredos, certificados, CSC, dados pessoais e XMLs completos devem permanecer em
 armazenamento protegido; não entram em logs comuns, documentos versionados ou
 mensagens de diagnóstico.
@@ -149,8 +232,10 @@ mensagens de diagnóstico.
 3. Emitir uma NFC-e anônima equivalente a um cupom recente do PDV.
 4. Emitir uma NFC-e com CPF para validar a Nota Fiscal Paulista.
 5. Validar XML, QR Code e DANFE de 80 mm, depois cancelamento e reconsulta.
-6. Corrigir o grupo de intermediador e repetir uma NF-e de cada marketplace.
-7. Repetir os cenários com pagamento e logística fiéis à operação real.
+6. Corrigir o grupo de intermediador e o rateio do frete; repetir as amostras que
+   hoje saem incompletas ou rejeitadas.
+7. Definir e homologar o contrato de entrada de pedidos do EcommerceAI.
+8. Repetir os cenários com pagamento e logística fiéis à operação real.
 
 ## Fontes
 
@@ -159,4 +244,3 @@ mensagens de diagnóstico.
 - [Sobre a NFC-e em São Paulo](https://portal.fazenda.sp.gov.br/servicos/nfce/Paginas/Sobre.aspx)
 - [Como participar da Nota Fiscal Paulista](https://portal.fazenda.sp.gov.br/servicos/nfp/Paginas/Como-participar.aspx)
 - [Nota Técnica NF-e 2020.006 — intermediador da operação](https://www.nfe.fazenda.gov.br/Portal/exibirArquivo.aspx?conteudo=A6qvFRVbPSA%3D)
-
