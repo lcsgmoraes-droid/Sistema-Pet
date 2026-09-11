@@ -17,7 +17,6 @@ from app.intnfe.repository import ActivationError, get_connection, reserve, save
 from app.intnfe.service import activate, bind_existing
 from app.models import Tenant
 
-
 CNPJ = "11222333000181"
 OTHER_CNPJ = "11444777000161"
 
@@ -405,6 +404,15 @@ def test_routes_are_restricted_to_configured_pilot_tenants(
     assert client.get("/intnfe/numeracao?modelo=55&ambienteCodigo=2").status_code == 403
     assert client.get("/intnfe/csc?ambienteCodigo=2").status_code == 403
     assert pilot.api.creates == 0
+
+
+@pytest.mark.parametrize("allowlist", ["", "*"])
+def test_empty_or_wildcard_allowlist_enables_all_tenants(
+    pilot, http_pilot, monkeypatch, allowlist
+):
+    client, _access, _app = http_pilot
+    monkeypatch.setattr(settings, "INTNFE_ACTIVATION_TENANT_IDS", allowlist)
+    assert client.get("/intnfe/status").status_code == 200
 
 
 def test_route_schema_errors_never_echo_secret(http_pilot):

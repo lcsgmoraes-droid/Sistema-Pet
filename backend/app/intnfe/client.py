@@ -50,20 +50,29 @@ class IntNFeClient:
         *,
         token=None,
         body=None,
+        data=None,
+        files=None,
         creating=False,
         expect_empty=False,
     ):
         headers = {"Accept": "application/json"}
         if token:
             headers["Authorization"] = f"Bearer {token}"
+        request_args = {
+            "headers": headers,
+            "timeout": (3, 30) if files else (3, 15),
+            "allow_redirects": False,
+        }
+        if files:
+            request_args["data"] = data
+            request_args["files"] = files
+        else:
+            request_args["json"] = body
         try:
             response = self.session.request(
                 method,
                 BASE_URL + path,
-                json=body,
-                headers=headers,
-                timeout=(3, 15),
-                allow_redirects=False,
+                **request_args,
             )
         except requests.RequestException:
             raise IntNFeError("EmissorIndisponivel", uncertain=creating) from None
@@ -88,6 +97,19 @@ class IntNFeClient:
                     and error.get("erro") == "NumeracaoRetrocede"
                 ):
                     code = "NumeracaoRetrocede"
+            if response.status_code == 422 and path.endswith("/certificado"):
+                try:
+                    error = response.json()
+                except ValueError:
+                    error = None
+                remote_code = error.get("erro") if isinstance(error, dict) else None
+                if remote_code in {
+                    "DadosInvalidos",
+                    "CertificadoExpirado",
+                    "CertificadoAindaNaoValido",
+                    "CnpjDivergente",
+                }:
+                    code = remote_code
             raise IntNFeError(
                 code,
                 status=response.status_code,
@@ -191,6 +213,36 @@ class IntNFeClient:
             raise IntNFeError("RespostaInvalida")
         return result
 
+    def emitter_certificate(self, token, emitter_id):
+        try:
+            result = self._request(
+                "GET",
+                self._emitter_path(emitter_id, "certificado"),
+                token=token,
+            )
+        except IntNFeError as exc:
+            if exc.status == 404:
+                return None
+            raise
+        if not isinstance(result, dict):
+            raise IntNFeError("RespostaInvalida")
+        return result
+
+    def upload_emitter_certificate(
+        self, token, emitter_id, *, filename, content, password
+    ):
+        result = self._request(
+            "POST",
+            self._emitter_path(emitter_id, "certificado"),
+            token=token,
+            data={"Senha": password},
+            files={"Arquivo": (filename, content, "application/x-pkcs12")},
+            creating=True,
+        )
+        if not isinstance(result, dict):
+            raise IntNFeError("RespostaInvalida", uncertain=True)
+        return result
+
     @staticmethod
     def _emitter_path(emitter_id, resource):
         if not isinstance(emitter_id, str) or not re.fullmatch(
@@ -237,3 +289,28 @@ class IntNFeClient:
             creating=True,
             expect_empty=True,
         )
+
+    def fiscal_registration(self, token, emitter_id):
+        try:
+            result = self._request(
+                "GET", self._emitter_path(emitter_id, "cadastro"), token=token
+            )
+        except IntNFeError as exc:
+            if exc.status == 404:
+                return None
+            raise
+        if not isinstance(result, dict):
+            raise IntNFeError("RespostaInvalida")
+        return result
+
+    def set_fiscal_registration(self, token, emitter_id, body):
+        result = self._request(
+            "PATCH",
+            self._emitter_path(emitter_id, "cadastro"),
+            token=token,
+            body=body,
+            creating=True,
+        )
+        if not isinstance(result, dict):
+            raise IntNFeError("RespostaInvalida", uncertain=True)
+        return result

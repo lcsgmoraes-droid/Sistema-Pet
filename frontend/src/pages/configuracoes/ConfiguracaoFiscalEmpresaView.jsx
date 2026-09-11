@@ -206,7 +206,7 @@ export default function ConfiguracaoFiscalEmpresaView({
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                E-mail para receber respostas
+                E-mail para respostas e comunicações fiscais
               </label>
               <input
                 type="email"
@@ -217,8 +217,8 @@ export default function ConfiguracaoFiscalEmpresaView({
                 className={classeCampo("email_resposta")}
               />
               <p className="mt-1 text-xs text-gray-500">
-                As respostas de fornecedores aos e-mails automáticos irão para este endereço. Se
-                ficar vazio, será usado o e-mail da empresa.
+                As respostas automáticas e as comunicações do emissor fiscal irão para este
+                endereço. Se ficar vazio, será usado o e-mail da empresa.
               </p>
             </div>
 
@@ -308,17 +308,38 @@ export default function ConfiguracaoFiscalEmpresaView({
               </div>
             </div>
 
-            {/* Linha 7: Cidade */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Cidade</label>
-              <input
-                type="text"
-                name="cidade"
-                value={dadosEmpresa.cidade}
-                onChange={handleDadosChange}
-                placeholder="Nome da cidade"
-                className={classeCampo("cidade")}
-              />
+            {/* Linha 7: Cidade e código fiscal do município */}
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-gray-700 mb-2">Cidade</label>
+                <input
+                  type="text"
+                  name="cidade"
+                  value={dadosEmpresa.cidade}
+                  onChange={handleDadosChange}
+                  placeholder="Nome da cidade"
+                  className={classeCampo("cidade")}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Código IBGE do município
+                </label>
+                <input
+                  type="text"
+                  name="codigo_municipio"
+                  value={dadosEmpresa.codigo_municipio}
+                  onChange={handleDadosChange}
+                  inputMode="numeric"
+                  maxLength="7"
+                  pattern="[0-9]{7}"
+                  placeholder="Ex.: 3550308"
+                  className={classeCampo("codigo_municipio")}
+                />
+                <p className="mt-1 text-xs text-gray-500">
+                  A busca pelo CNPJ preenche este código quando ele estiver disponível.
+                </p>
+              </div>
             </div>
           </div>
         </div>

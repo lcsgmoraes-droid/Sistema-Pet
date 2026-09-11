@@ -10,6 +10,10 @@ import { isAdminRole } from "../auth/userRole";
 import { useEscapeFallbackForVisibleModals } from "../utils/modalEscape";
 import { isVeterinarioProfile } from "../utils/veterinarioPerfil";
 import {
+  markIntNFeCertificateAlert,
+  shouldNotifyIntNFeCertificate,
+} from "../utils/intnfeCertificateAlert.mjs";
+import {
   FLOATING_CALCULATOR_ENABLED_KEY,
   FLOATING_CALCULATOR_PREF_EVENT,
   isFloatingCalculatorEnabled,
@@ -100,6 +104,36 @@ const Layout = () => {
     if (!Array.isArray(permissions) || permissions.length === 0) return false;
     return permissions.some((permission) => hasPermission(permission));
   };
+
+  const podeConfigurarEmpresa =
+    Boolean(user) &&
+    (hasPermission("configuracoes.empresa") || hasPermission("configuracoes.editar"));
+
+  useEffect(() => {
+    if (!podeConfigurarEmpresa) return undefined;
+    const tenantId = user?.tenant?.id || user?.tenant_id;
+    if (!tenantId) return undefined;
+    let active = true;
+
+    api
+      .get("/intnfe/status")
+      .then((response) => {
+        if (active && shouldNotifyIntNFeCertificate(response.data, tenantId, window.localStorage)) {
+          markIntNFeCertificateAlert(tenantId, window.localStorage);
+          toast.error(
+            `${response.data.certificado_alerta} Confira em Configurações > Integrações > IntNFe.`,
+            { duration: 12000 },
+          );
+        }
+      })
+      .catch(() => {
+        // Uma consulta fiscal indisponível não pode bloquear o uso do sistema.
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [podeConfigurarEmpresa, user?.tenant?.id, user?.tenant_id]);
 
   // Estado da sidebar com persistência e fechada por padrão no PDV
   const [sidebarOpen, setSidebarOpen] = useState(() => {

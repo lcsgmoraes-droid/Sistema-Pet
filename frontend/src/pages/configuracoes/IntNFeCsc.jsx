@@ -6,7 +6,7 @@ const buttonClass =
 const fieldClass =
   "mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-950 disabled:opacity-60 dark:border-slate-600 dark:bg-slate-800 dark:text-white";
 
-export default function IntNFeCsc({ apiClient, disabled = false, onBusy }) {
+export default function IntNFeCsc({ apiClient, disabled = false, onBusy, onData }) {
   const [state, setState] = useState(null);
   const [form, setForm] = useState({ ambiente_codigo: "2", csc_id: "", csc: "" });
   const [review, setReview] = useState(false);
@@ -34,6 +34,7 @@ export default function IntNFeCsc({ apiClient, disabled = false, onBusy }) {
           : await apiClient.get("/intnfe/csc", { signal: controller.signal });
         if (isCurrent()) {
           setState(response.data);
+          onData?.(response.data);
           setReview(false);
           if (payload) {
             setForm((previous) => ({ ...previous, csc_id: "", csc: "" }));
@@ -45,6 +46,7 @@ export default function IntNFeCsc({ apiClient, disabled = false, onBusy }) {
           const detail = failure?.response?.data?.detail;
           const text = typeof detail === "string" ? detail : detail?.mensagem;
           setState(null);
+          onData?.(null);
           setReview(false);
           setForm((previous) => ({ ...previous, csc_id: "", csc: "" }));
           setError(
@@ -63,7 +65,7 @@ export default function IntNFeCsc({ apiClient, disabled = false, onBusy }) {
         }
       }
     },
-    [apiClient, onBusy],
+    [apiClient, onBusy, onData],
   );
 
   useEffect(() => {

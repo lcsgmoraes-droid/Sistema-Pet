@@ -187,3 +187,75 @@ def test_csc_invalid_path_is_rejected_before_network(api):
     with pytest.raises(IntNFeError):
         api.csc("token", "../outro-emissor")
     assert api.session.request.call_count == 0
+
+
+def test_certificate_upload_uses_integrator_multipart_without_json(api):
+    api.session.request.return_value = response(
+        body={
+            "cnpj": "11222333000181",
+            "validoDe": "2026-01-01T00:00:00Z",
+            "validoAte": "2027-01-01T00:00:00Z",
+            "expirado": False,
+        }
+    )
+
+    api.upload_emitter_certificate(
+        "token",
+        "emitente-teste",
+        filename="empresa.pfx",
+        content=b"certificado-ficticio",
+        password="senha-ficticia",
+    )
+
+    call = api.session.request.call_args
+    assert call.args == (
+        "POST",
+        BASE_URL + "/integrador/emitentes/emitente-teste/certificado",
+    )
+    assert "json" not in call.kwargs
+    assert call.kwargs["data"] == {"Senha": "senha-ficticia"}
+    assert call.kwargs["files"]["Arquivo"] == (
+        "empresa.pfx",
+        b"certificado-ficticio",
+        "application/x-pkcs12",
+    )
+    assert call.kwargs["allow_redirects"] is False
+
+
+def test_certificate_error_only_exposes_allowlisted_code(api):
+    api.session.request.return_value = response(
+        422, {"erro": "CnpjDivergente", "mensagem": "senha-nao-deve-vazar"}
+    )
+    with pytest.raises(IntNFeError) as error:
+        api.upload_emitter_certificate(
+            "token",
+            "emitente-teste",
+            filename="empresa.pfx",
+            content=b"certificado-ficticio",
+            password="senha-ficticia",
+        )
+    assert error.value.code == "CnpjDivergente"
+    assert "senha" not in str(error.value)
+
+
+def test_fiscal_profile_uses_integrator_get_and_patch(api):
+    remote = {
+        "razaoSocial": "Loja Teste Ltda",
+        "inscricaoEstadual": "123",
+        "crt": "1",
+        "endereco": {"codigoMunicipio": "3550308"},
+    }
+    api.session.request.return_value = response(body=remote)
+    assert api.fiscal_registration("token", "emitente-teste") == remote
+    assert api.session.request.call_args.args == (
+        "GET",
+        BASE_URL + "/integrador/emitentes/emitente-teste/cadastro",
+    )
+
+    api.session.request.return_value = response(body=remote)
+    assert api.set_fiscal_registration("token", "emitente-teste", remote) == remote
+    assert api.session.request.call_args.args == (
+        "PATCH",
+        BASE_URL + "/integrador/emitentes/emitente-teste/cadastro",
+    )
+    assert api.session.request.call_args.kwargs["json"] == remote

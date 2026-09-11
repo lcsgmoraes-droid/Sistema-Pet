@@ -20,11 +20,11 @@ const INTEGRACOES = [
     id: "intnfe",
     nome: "IntNFe",
     categoria: "Notas fiscais",
-    descricao: "Ative o vínculo da empresa para os testes de emissão de NF-e de produtos.",
+    descricao: "Configure a empresa para emissão de NF-e e NFC-e com o mínimo de preenchimento.",
     recursos: [
-      "Cadastro do emitente",
-      "Acompanhamento das pendências",
-      "Conferência do certificado A1",
+      "Cadastro e vínculo automáticos do emitente",
+      "Envio protegido do certificado A1",
+      "Sincronização fiscal, checklist e alertas",
     ],
     icon: FiFileText,
     cardClass:

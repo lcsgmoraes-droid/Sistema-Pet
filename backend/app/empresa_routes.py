@@ -45,6 +45,7 @@ class DadosCadastraisResponse(BaseModel):
     complemento: Optional[str] = None
     bairro: Optional[str] = None
     cidade: Optional[str] = None
+    codigo_municipio: Optional[str] = None
     uf: Optional[str] = None
     cupom_cabecalho: Optional[str] = None
     cupom_mensagem_final: Optional[str] = None
@@ -68,6 +69,7 @@ class DadosCadastraisUpdate(BaseModel):
     complemento: Optional[str] = None
     bairro: Optional[str] = None
     cidade: Optional[str] = None
+    codigo_municipio: Optional[str] = Field(default=None, pattern=r"^\d{7}$")
     uf: Optional[str] = None
     cupom_cabecalho: Optional[str] = Field(default=None, max_length=240)
     cupom_mensagem_final: Optional[str] = Field(default=None, max_length=500)
@@ -78,6 +80,13 @@ class DadosCadastraisUpdate(BaseModel):
         if value is None or not str(value).strip():
             return None
         return str(value).strip()
+
+    @field_validator("codigo_municipio", mode="before")
+    @classmethod
+    def empty_municipality_code_as_none(cls, value):
+        if value is None or not str(value).strip():
+            return None
+        return "".join(character for character in str(value) if character.isdigit())
 
 
 class DadosCupomResponse(DadosCadastraisResponse):
@@ -250,6 +259,7 @@ def _serializar_dados_cadastrais(tenant: Tenant) -> DadosCadastraisResponse:
         complemento=getattr(tenant, "complemento", None),
         bairro=getattr(tenant, "bairro", None),
         cidade=getattr(tenant, "cidade", None),
+        codigo_municipio=getattr(tenant, "codigo_municipio", None),
         uf=getattr(tenant, "uf", None),
         cupom_cabecalho=getattr(tenant, "cupom_cabecalho", None),
         cupom_mensagem_final=getattr(tenant, "cupom_mensagem_final", None),

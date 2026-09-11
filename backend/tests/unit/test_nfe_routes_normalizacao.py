@@ -358,6 +358,13 @@ def test_normalizar_detalhe_nota_bling_expoe_campos_ricos():
             "transporte": {
                 "tipo": "Nao havera transporte",
                 "fretePorConta": "9 - Sem Ocorrencia de Transporte",
+                "transportador": {
+                    "nome": "Transportadora Teste",
+                    "cnpj": "11.222.333/0001-81",
+                    "inscricaoEstadual": "123456789",
+                    "municipio": "São Paulo",
+                    "uf": "SP",
+                },
             },
             "enderecoEntrega": {
                 "nome": "Adna Alves Da Silva Santos",
@@ -406,6 +413,8 @@ def test_normalizar_detalhe_nota_bling_expoe_campos_ricos():
     assert detalhe["itens"][0]["codigo"] == "018631.1"
     assert detalhe["totais"]["valor_total"] == pytest.approx(68.93)
     assert detalhe["pagamento"]["parcelas"][0]["forma"] == "Dinheiro"
+    assert detalhe["transporte"]["transportadora"]["nome"] == "Transportadora Teste"
+    assert detalhe["transporte"]["transportadora"]["cpf_cnpj"] == "11.222.333/0001-81"
     assert detalhe["intermediador"]["cnpj"] == "35.635.824/0001-12"
     assert detalhe["informacoes_adicionais"]["numero_pedido_loja"] == "260329CDGSH41N"
     assert detalhe["canal_label"] == "Shopee"
@@ -450,8 +459,7 @@ def test_normalizar_detalhe_nota_bling_formata_objetos_aninhados_sem_exibir_dict
 
 
 def test_extrair_campos_fiscais_do_xml_preenche_horas_e_rotulos():
-    campos = _extrair_campos_fiscais_do_xml(
-        """<?xml version="1.0" encoding="UTF-8"?>
+    campos = _extrair_campos_fiscais_do_xml("""<?xml version="1.0" encoding="UTF-8"?>
         <nfeProc xmlns="http://www.portalfiscal.inf.br/nfe">
           <NFe>
             <infNFe>
@@ -467,8 +475,7 @@ def test_extrair_campos_fiscais_do_xml_preenche_horas_e_rotulos():
               </emit>
             </infNFe>
           </NFe>
-        </nfeProc>"""
-    )
+        </nfeProc>""")
 
     assert campos["data_emissao"] == "2026-03-28"
     assert campos["hora_emissao"] == "22:03:22"

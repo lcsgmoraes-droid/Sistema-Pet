@@ -4,6 +4,9 @@ import { useAuth } from "../../contexts/AuthContext";
 import IntNFeAtivacaoView from "./IntNFeAtivacaoView";
 import IntNFeNumeracao from "./IntNFeNumeracao.jsx";
 import IntNFeCsc from "./IntNFeCsc.jsx";
+import IntNFeCadastroFiscal from "./IntNFeCadastroFiscal.jsx";
+import IntNFeCertificado from "./IntNFeCertificado.jsx";
+import IntNFeChecklist from "./IntNFeChecklist.jsx";
 
 function ActivationPanel() {
   const [data, setData] = useState(null);
@@ -11,9 +14,17 @@ function ActivationPanel() {
   const [error, setError] = useState("");
   const [numberingBusy, setNumberingBusy] = useState(false);
   const [cscBusy, setCscBusy] = useState(false);
+  const [certificateBusy, setCertificateBusy] = useState(false);
+  const [fiscalBusy, setFiscalBusy] = useState(false);
+  const [certificateData, setCertificateData] = useState(null);
+  const [fiscalData, setFiscalData] = useState(null);
+  const [cscData, setCscData] = useState(null);
+  const [numberingData, setNumberingData] = useState(null);
+  const [fiscalRefreshKey, setFiscalRefreshKey] = useState(0);
   const [credentials, setCredentials] = useState({ client_id: "", client_secret: "" });
   const inFlight = useRef(false);
   const mounted = useRef(false);
+  const automaticSyncAttempted = useRef(false);
 
   const execute = useCallback(async (action = "status", body = {}) => {
     if (inFlight.current) return;
@@ -49,6 +60,28 @@ function ActivationPanel() {
     };
   }, [execute]);
 
+  useEffect(() => {
+    if (!data?.vinculado || automaticSyncAttempted.current) return undefined;
+    automaticSyncAttempted.current = true;
+    let active = true;
+
+    api
+      .post("/intnfe/cadastro-fiscal/sincronizar")
+      .then((response) => {
+        if (active && mounted.current) setFiscalData(response.data);
+      })
+      .catch(() => {
+        // A tela de cadastro fiscal mostra os campos que ainda impedem a sincronização.
+      })
+      .finally(() => {
+        if (active && mounted.current) setFiscalRefreshKey((current) => current + 1);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [data?.vinculado]);
+
   async function bind(event) {
     event.preventDefault();
     if (inFlight.current) return;
@@ -64,7 +97,7 @@ function ActivationPanel() {
     <div className="space-y-6">
       <IntNFeAtivacaoView
         data={data}
-        busy={busy || numberingBusy || cscBusy}
+        busy={busy || numberingBusy || cscBusy || certificateBusy || fiscalBusy}
         error={error}
         credentials={credentials}
         onCredentials={(event) =>
@@ -77,8 +110,39 @@ function ActivationPanel() {
       />
       {data?.pode_configurar_numeracao && (
         <>
-          <IntNFeCsc apiClient={api} disabled={busy || numberingBusy} onBusy={setCscBusy} />
-          <IntNFeNumeracao apiClient={api} disabled={busy || cscBusy} onBusy={setNumberingBusy} />
+          <IntNFeChecklist
+            activation={data}
+            fiscal={fiscalData}
+            certificate={certificateData}
+            csc={cscData}
+            numbering={numberingData}
+          />
+          <IntNFeCadastroFiscal
+            apiClient={api}
+            disabled={busy || certificateBusy || cscBusy || numberingBusy}
+            onBusy={setFiscalBusy}
+            onData={setFiscalData}
+            refreshKey={fiscalRefreshKey}
+          />
+          <IntNFeCertificado
+            apiClient={api}
+            disabled={busy || fiscalBusy || cscBusy || numberingBusy}
+            onBusy={setCertificateBusy}
+            onData={setCertificateData}
+            onChanged={() => execute()}
+          />
+          <IntNFeCsc
+            apiClient={api}
+            disabled={busy || fiscalBusy || certificateBusy || numberingBusy}
+            onBusy={setCscBusy}
+            onData={setCscData}
+          />
+          <IntNFeNumeracao
+            apiClient={api}
+            disabled={busy || fiscalBusy || certificateBusy || cscBusy}
+            onBusy={setNumberingBusy}
+            onData={setNumberingData}
+          />
         </>
       )}
     </div>

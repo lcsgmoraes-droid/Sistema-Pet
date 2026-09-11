@@ -1,10 +1,10 @@
 """Validacao do cadastro de origem e respostas publicas sem credenciais."""
 
 import re
+from math import ceil
 from datetime import datetime, timezone
 
 from app.intnfe.client import IntNFeError, available
-
 
 MESSAGES = {
     "nao_vinculado": "Ative para preparar o vínculo fiscal desta empresa.",
@@ -127,6 +127,17 @@ def public_status(tenant, connection, integrador_id):
         ).total_seconds()
         < 120
     )
+    expires = utc(connection.certificado_valido_ate) if connection else None
+    certificate_days = (
+        ceil((expires - datetime.now(timezone.utc)).total_seconds() / 86400)
+        if expires
+        else None
+    )
+    certificate_alert = None
+    if certificate_days is not None and certificate_days < 0:
+        certificate_alert = "O certificado A1 está vencido. Envie o arquivo renovado."
+    elif certificate_days is not None and certificate_days <= 30:
+        certificate_alert = f"O certificado A1 vence em {max(certificate_days, 0)} dia(s). Prepare a renovação."
     return {
         "status": state,
         "mensagem": MESSAGES.get(state, MESSAGES["falha"]),
@@ -158,9 +169,11 @@ def public_status(tenant, connection, integrador_id):
         "pode_vincular": not blocked
         and not busy
         and state in {"credenciais_pendentes", "credenciais_invalidas"},
-        "certificado_valido_ate": connection.certificado_valido_ate
-        if connection
-        else None,
+        "certificado_valido_ate": (
+            connection.certificado_valido_ate if connection else None
+        ),
+        "certificado_dias_restantes": certificate_days,
+        "certificado_alerta": certificate_alert,
         "codigo": connection.ultimo_codigo if connection else None,
         "protocolo_suporte": connection.correlation_id if connection else None,
     }

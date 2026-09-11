@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import IntNFeNumeracaoView from "./IntNFeNumeracaoView";
 import { numberingRows, prepareNumbering } from "./intnfeNumeracao.mjs";
 
-export default function IntNFeNumeracao({ apiClient, disabled = false, onBusy }) {
+export default function IntNFeNumeracao({ apiClient, disabled = false, onBusy, onData }) {
   const [rows, setRows] = useState(null);
   const [form, setForm] = useState({
     modelo: "55",
@@ -37,6 +37,7 @@ export default function IntNFeNumeracao({ apiClient, disabled = false, onBusy })
         const updated = numberingRows(response.data);
         if (isCurrent()) {
           setRows(updated);
+          onData?.(response.data);
           if (payload) {
             setMessage(
               response.data.mensagem || "Ajuste confirmado. Confira a sequência atual abaixo.",
@@ -48,6 +49,7 @@ export default function IntNFeNumeracao({ apiClient, disabled = false, onBusy })
         if (isCurrent()) {
           // Falha de escrita pode ocorrer depois da aplicacao. Exigir nova consulta, sem repetir PUT.
           setRows(null);
+          onData?.(null);
           const detail = failure?.response?.data?.detail;
           const text = typeof detail === "string" ? detail : detail?.mensagem;
           setError(
@@ -66,7 +68,7 @@ export default function IntNFeNumeracao({ apiClient, disabled = false, onBusy })
         }
       }
     },
-    [apiClient, onBusy],
+    [apiClient, onBusy, onData],
   );
 
   useEffect(() => {

@@ -221,6 +221,13 @@ def _normalizar_detalhe_nota_bling(
     transporte = _dict(
         _primeiro_preenchido(item.get("transporte"), item.get("transportador"))
     )
+    transportadora = _dict(
+        _primeiro_preenchido(
+            transporte.get("transportador"),
+            transporte.get("contato"),
+            item.get("transportador"),
+        )
+    )
     pagamento = _dict(item.get("pagamento"))
     info_adicionais = _dict(item.get("informacoesAdicionais"))
     intermediador = _dict(item.get("intermediador"))
@@ -302,9 +309,9 @@ def _normalizar_detalhe_nota_bling(
             cpf_cnpj=cpf_cnpj,
         ),
         "cpf_cnpj": cpf_cnpj,
-        "consumidor_final": bool(consumidor_final)
-        if consumidor_final is not None
-        else None,
+        "consumidor_final": (
+            bool(consumidor_final) if consumidor_final is not None else None
+        ),
         "cep": _texto(
             _primeiro_preenchido(contato.get("cep"), contato_endereco.get("cep"))
         ),
@@ -457,6 +464,46 @@ def _normalizar_detalhe_nota_bling(
                     _texto_relacionado(item.get("fretePorConta")),
                 )
             ),
+            "transportadora": {
+                "nome": _texto(
+                    _primeiro_preenchido(
+                        transportadora.get("nome"),
+                        transportadora.get("razaoSocial"),
+                        transportadora.get("descricao"),
+                    )
+                ),
+                "cpf_cnpj": _texto(
+                    _primeiro_preenchido(
+                        transportadora.get("cpfCnpj"),
+                        transportadora.get("cnpj"),
+                        transportadora.get("cpf"),
+                        transportadora.get("numeroDocumento"),
+                    )
+                ),
+                "inscricao_estadual": _texto(
+                    _primeiro_preenchido(
+                        transportadora.get("inscricaoEstadual"),
+                        transportadora.get("ie"),
+                    )
+                ),
+                "endereco": _formatar_endereco(
+                    _primeiro_preenchido(
+                        transportadora.get("endereco"),
+                        transportadora.get("logradouro"),
+                    )
+                ),
+                "municipio": _texto(
+                    _primeiro_preenchido(
+                        transportadora.get("municipio"),
+                        transportadora.get("cidade"),
+                    )
+                ),
+                "uf": _texto(
+                    _primeiro_preenchido(
+                        transportadora.get("uf"), transportadora.get("estado")
+                    )
+                ),
+            },
         },
         "endereco_entrega": {
             "nome": _texto(
@@ -596,16 +643,16 @@ def _normalizar_nota_venda_local(venda: Venda) -> dict:
         "modelo": _coerce_int(venda.nfe_modelo, 65 if _venda_usa_nfce(venda) else 55),
         "chave": venda.nfe_chave,
         "status": venda.nfe_status or "Pendente",
-        "data_emissao": venda.nfe_data_emissao.isoformat()
-        if venda.nfe_data_emissao
-        else None,
+        "data_emissao": (
+            venda.nfe_data_emissao.isoformat() if venda.nfe_data_emissao else None
+        ),
         "valor": float(venda.total or 0),
         "cliente": {
             "id": venda.cliente.id if venda.cliente else None,
             "nome": venda.cliente.nome if venda.cliente else None,
-            "cpf_cnpj": (venda.cliente.cpf or venda.cliente.cnpj)
-            if venda.cliente
-            else None,
+            "cpf_cnpj": (
+                (venda.cliente.cpf or venda.cliente.cnpj) if venda.cliente else None
+            ),
         },
         "canal": _texto(venda.canal),
         "canal_label": _canal_label(canal_slug, venda.canal),
