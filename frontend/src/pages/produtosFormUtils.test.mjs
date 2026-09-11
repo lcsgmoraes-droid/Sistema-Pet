@@ -58,8 +58,9 @@ test("formata valores monetarios e percentuais do produto", () => {
 });
 
 test("calcula margem percentual mantendo nulo quando custo nao permite recalculo", () => {
-  assert.equal(calcularMargemPercentual("50", "75"), "50.00");
-  assert.equal(calcularMargemPercentual("50", "0"), "-100.00");
+  assert.equal(calcularMargemPercentual("50", "100"), "50.00");
+  assert.equal(calcularMargemPercentual("10", "14.2857142857"), "30.00");
+  assert.equal(calcularMargemPercentual("50", "0"), null);
   assert.equal(calcularMargemPercentual("0", "75"), null);
   assert.equal(calcularMargemPercentual("", "75"), null);
 });
@@ -85,7 +86,7 @@ test("atualiza campo do produto e recalcula margem quando preco muda", () => {
       nome: "Racao",
       preco_custo: "50",
       preco_venda: "100",
-      margem_lucro: "100.00",
+      margem_lucro: "50.00",
       anunciar_app: false,
     },
   );
@@ -95,7 +96,7 @@ test("atualiza campo do produto e recalcula margem quando preco muda", () => {
       {
         preco_custo: "50",
         preco_venda: "100",
-        margem_lucro: "100.00",
+        margem_lucro: "50.00",
         anunciar_app: false,
       },
       {
@@ -108,7 +109,7 @@ test("atualiza campo do produto e recalcula margem quando preco muda", () => {
     {
       preco_custo: "50",
       preco_venda: "100",
-      margem_lucro: "100.00",
+      margem_lucro: "50.00",
       anunciar_app: true,
     },
   );

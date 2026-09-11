@@ -1,3 +1,8 @@
+import {
+  calcularMargemSobreVenda,
+  calcularPrecoVendaPorMargem as calcularPrecoVendaPorMargemProduto,
+} from "../../utils/produtoMargem.js";
+
 export function montarNomeXml(dados) {
   const numero = String(dados?.numero_nf || "0").replaceAll(/\D/g, "");
   const serie = String(dados?.serie || "1").replaceAll(/\D/g, "");
@@ -256,17 +261,11 @@ export function obterBaseMargemEntrada({ custoNF = 0, custoSistema = 0 } = {}) {
 }
 
 export function calcularPrecoVendaPorMargem(custo, margemDesejada) {
-  const custoNormalizado = Number(custo || 0);
-  const margemNormalizada = Number(margemDesejada || 0);
-  if (margemNormalizada >= 100) return custoNormalizado * 2;
-  return custoNormalizado / (1 - margemNormalizada / 100);
+  return calcularPrecoVendaPorMargemProduto(custo, margemDesejada);
 }
 
 export function calcularMargemPorPrecoVenda(precoVenda, custo) {
-  const precoNormalizado = Number(precoVenda || 0);
-  const custoNormalizado = Number(custo || 0);
-  if (precoNormalizado <= 0) return 0;
-  return ((precoNormalizado - custoNormalizado) / precoNormalizado) * 100;
+  return calcularMargemSobreVenda(custo, precoVenda) ?? 0;
 }
 
 export const ACAO_CONFERENCIA_OPCOES = [

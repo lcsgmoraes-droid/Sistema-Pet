@@ -1,6 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import { confirmarCorePet } from "../../services/corepetDialog";
 import { aplicarMultiplicadorPackAoItem, obterCustoAquisicaoItem } from "./entradaXmlUtils";
+import {
+  calcularMargemLucroProduto,
+  calcularPrecoVendaInicialProduto,
+  MARGEM_PADRAO_CRIACAO_PRODUTO,
+} from "./entradaXmlProdutosPricing";
 
 const FORM_PRODUTO_INICIAL = {
   sku: "",
@@ -185,8 +190,8 @@ export default function useEntradaXmlProdutos({
         nome: itemAjustado.descricao || itemAjustado.descricao_produto || "Produto sem nome",
         descricao: itemAjustado.descricao || itemAjustado.descricao_produto || "",
         preco_custo: custoBase.toString(),
-        preco_venda: (custoBase * 1.5).toFixed(2),
-        margem_lucro: "50",
+        preco_venda: calcularPrecoVendaInicialProduto(custoBase),
+        margem_lucro: String(MARGEM_PADRAO_CRIACAO_PRODUTO),
         estoque_minimo: 10,
         estoque_maximo: 100,
       });
@@ -206,8 +211,8 @@ export default function useEntradaXmlProdutos({
         nome: itemAjustado.descricao || "Produto sem nome",
         descricao: itemAjustado.descricao || "",
         preco_custo: custoBase.toString(),
-        preco_venda: (custoBase * 1.5).toFixed(2),
-        margem_lucro: "50",
+        preco_venda: calcularPrecoVendaInicialProduto(custoBase),
+        margem_lucro: String(MARGEM_PADRAO_CRIACAO_PRODUTO),
         estoque_minimo: 10,
         estoque_maximo: 100,
       });
@@ -301,8 +306,8 @@ export default function useEntradaXmlProdutos({
             nome: item.descricao || "Produto sem nome",
             descricao: item.descricao || "",
             preco_custo: custoBase,
-            preco_venda: Number.parseFloat((custoBase * 1.5).toFixed(2)),
-            margem_lucro: 50,
+            preco_venda: Number.parseFloat(calcularPrecoVendaInicialProduto(custoBase)) || 0,
+            margem_lucro: MARGEM_PADRAO_CRIACAO_PRODUTO,
             estoque_minimo: 10,
             estoque_maximo: 100,
           };
@@ -341,10 +346,7 @@ export default function useEntradaXmlProdutos({
     }
   };
 
-  const calcularMargemLucro = (custo, venda) => {
-    if (custo === 0) return 0;
-    return (((venda - custo) / custo) * 100).toFixed(2);
-  };
+  const calcularMargemLucro = calcularMargemLucroProduto;
 
   return {
     abrirModalCriarProduto,

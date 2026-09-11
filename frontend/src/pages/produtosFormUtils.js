@@ -1,4 +1,5 @@
 import { normalizarProtocolosRecorrencia } from "../utils/produtoRecorrencia.js";
+import { calcularMargemSobreVenda } from "../utils/produtoMargem.js";
 
 export function organizarCategoriasHierarquicas(categorias) {
   if (!categorias || categorias.length === 0) return [];
@@ -43,14 +44,12 @@ export function formatarPorcentagemProduto(valor) {
 }
 
 export function calcularMargemPercentual(custo, venda) {
-  const custoNumerico = parseFloat(custo) || 0;
-  const vendaNumerica = parseFloat(venda) || 0;
+  const margem = calcularMargemSobreVenda(custo, venda);
 
-  if (custoNumerico <= 0) {
+  if (margem === null) {
     return null;
   }
 
-  const margem = ((vendaNumerica - custoNumerico) / custoNumerico) * 100;
   return margem.toFixed(2);
 }
 
