@@ -14,10 +14,16 @@ em teste**. O cadastro inicial da conta não depende da disponibilidade do emiss
 4. Mostra a situação e as pendências. Com vínculo válido, disponibiliza CSC e
    numeração separados por modelo, série e ambiente. Não emite uma nota nesta etapa.
 
+Para um CNPJ ainda não cadastrado na IntNFe, o cliente apenas autoriza a
+integração na tela. O backend cria o emissor com a conta de integrador do
+CorePet, recebe `clientId` e `clientSecret` uma única vez e guarda o segredo
+cifrado. Essas credenciais técnicas não são exibidas nem pedidas ao cliente.
+
 Um cadastro encontrado pelo CNPJ exige comprovação de acesso com `clientId` e
 `clientSecret` **do emitente**. A tela não recebe os códigos do integrador. O
 CorePet confere o cadastro na conta do integrador e autentica essas credenciais
-antes de associá-las à empresa. Não há rotação automática de segredo.
+antes de associá-las à empresa. A opção manual fica recolhida como recuperação
+excepcional e não faz parte do fluxo normal. Não há rotação automática de segredo.
 
 ## Habilitar em desenvolvimento
 
@@ -25,14 +31,15 @@ antes de associá-las à empresa. Não há rotação automática de segredo.
   a versão do backend que disponibiliza a tela. Ela acrescenta somente
   `intnfe_connections`; não altera vendas, estoque ou financeiro.
 - Configurar no ambiente seguro do **backend**, nunca em variável `VITE_*`:
-  `INTNFE_ACTIVATION_ENABLED=true`, `INTNFE_INTEGRADOR_ID` e
+  `INTNFE_ACTIVATION_ENABLED=true`, `INTNFE_ACTIVATION_TENANT_IDS` com os UUIDs
+  liberados no piloto (separados por vírgula), `INTNFE_INTEGRADOR_ID` e
   `INTNFE_INTEGRADOR_SECRET`.
 - Manter `PAYMENT_CONFIG_ENCRYPTION_KEY` estável e protegida. A integração usa o
   mecanismo existente de criptografia das configurações por empresa. Produção
   exige uma chave configurada; a perda/troca sem migração torna os segredos antigos
   ilegíveis. Não substituir uma chave já utilizada por outras integrações.
 - O Compose local lê o `.env.local`; o Compose de produção declara explicitamente as
-  três novas variáveis, desligadas/vazias por padrão. A chave de criptografia já
+  quatro variáveis, desligadas/vazias por padrão. A chave de criptografia já
   era declarada. Nenhum valor real foi versionado ou habilitado nesta entrega.
 - Utilizar o fluxo local `FLUXO_UNICO.bat dev-up` e uma empresa autorizada para o
   piloto. O módulo `integracoes` e a permissão `configuracoes.editar` são exigidos.

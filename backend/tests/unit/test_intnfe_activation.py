@@ -94,6 +94,7 @@ def pilot(intnfe_db, tenant_context, monkeypatch):
         settings, "INTNFE_INTEGRADOR_SECRET", SecretStr("segredo-integrador-ficticio")
     )
     tenant_id = uuid4()
+    monkeypatch.setattr(settings, "INTNFE_ACTIVATION_TENANT_IDS", str(tenant_id))
     tenant_context(tenant_id)
     tenant = Tenant(
         id=str(tenant_id),
@@ -391,6 +392,18 @@ def test_routes_require_configuration_permission(pilot, http_pilot):
         ).status_code
         == 403
     )
+    assert pilot.api.creates == 0
+
+
+def test_routes_are_restricted_to_configured_pilot_tenants(
+    pilot, http_pilot, monkeypatch
+):
+    client, _access, _app = http_pilot
+    monkeypatch.setattr(settings, "INTNFE_ACTIVATION_TENANT_IDS", str(uuid4()))
+    assert client.get("/intnfe/status").status_code == 403
+    assert client.post("/intnfe/ativar").status_code == 403
+    assert client.get("/intnfe/numeracao?modelo=55&ambienteCodigo=2").status_code == 403
+    assert client.get("/intnfe/csc?ambienteCodigo=2").status_code == 403
     assert pilot.api.creates == 0
 
 
