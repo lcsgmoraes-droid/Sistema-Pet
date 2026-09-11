@@ -19,11 +19,11 @@ Amazon, Shopee, Mercado Livre e TikTok Shop. As quatro notas foram autorizadas
 pela SEFAZ em homologação, com XML e DANFE disponíveis. Quantidade de itens,
 CFOP, tributação principal, descontos e totais foram conferidos nos XMLs.
 
-O teste de cupom fiscal eletrônico, a NFC-e modelo 65, ficou bloqueado antes do
-envio à SEFAZ porque o emitente ainda não possui CSC de homologação cadastrado
-na IntNFe. Os três cupons recentes analisados no Bling também revelaram um
-segundo bloqueio inicial: usam CSOSN 900 com crédito do Simples Nacional, que não
-aparecia na primeira versão consultada do contrato da IntNFe.
+O CSC ativo de homologação foi localizado na SEFAZ-SP e cadastrado na IntNFe.
+Depois disso, uma NFC-e modelo 65 baseada em cupom recente do PDV foi autorizada
+com cStat 100. O XML confirmou CSOSN 900, `pCredSN=1,3600`,
+`vCredICMSSN=2,72`, QR Code, série 023 e total de R$ 199,90. O DANFE NFC-e também
+foi baixado e conferido visualmente.
 
 Para operações de marketplace existia um problema fiscal bloqueador. As quatro
 notas de origem no Bling identificavam a operação com intermediador, mas os XMLs
@@ -36,13 +36,12 @@ feito depois da correção está registrado abaixo.
 | Correção informada | Resultado prático | Situação |
 |---|---|---|
 | Intermediador de marketplace | Nova NF-e Amazon autorizada com cStat 100; XML contém `indIntermed=1`, `infIntermed`, CNPJ e `idCadIntTran` corretos | **Comprovada** |
-| CSOSN 900 e crédito do Simples | Novo contrato aceita `icms.cst=900`; uma NF-e modelo 55 chegou à SEFAZ e recebeu cStat 600 por incompatibilidade do CSOSN com destinatário não contribuinte | **Construtor aceito; NFC-e ainda precisa do CSC** |
+| CSOSN 900 e crédito do Simples | NFC-e modelo 65 autorizada com cStat 100; XML contém `ICMSSN900`, `pCredSN=1,3600` e `vCredICMSSN=2,72` | **Comprovada** |
+| CSC da NFC-e | CSC ativo de homologação localizado na SEFAZ-SP, `PUT` da IntNFe respondeu 204 e o `GET` posterior confirmou o cadastro | **Comprovado em homologação** |
 
-A tentativa com CSOSN 900 não reproduz o documento de origem porque o cupom do
-Bling é modelo 65 e o teste possível sem CSC foi modelo 55. A rejeição 600 é uma
-regra fiscal desse segundo cenário; não demonstra defeito no XML do cupom. A prova
-correta será emitir a NFC-e com os mesmos `pCredSN` e `vCredICMSSN` do Bling após
-cadastrar o CSC de homologação.
+A tentativa anterior no modelo 55 recebeu cStat 600 porque não reproduzia o
+documento de origem: o cupom do Bling é modelo 65. O novo teste no modelo correto
+encerrou essa dúvida. O segredo do CSC não foi incluído neste documento nem no Git.
 
 ## Testes executados
 
@@ -119,6 +118,11 @@ Ainda há conteúdo e linhas muito próximos das bordas da página. Impressoras 
 não trabalham até a borda podem cortar parte da moldura. A geração deve reservar
 uma margem física segura para A4 e ser validada em impressão real.
 
+O DANFE NFC-e autorizado foi renderizado no formato de cupom e conferido
+visualmente. Cabeçalho de homologação, emitente, item, total, forma de pagamento,
+consumidor não identificado, chave, QR Code e protocolo estão presentes e
+legíveis, sem sobreposição. Ainda falta uma impressão física em bobina de 80 mm.
+
 ## Cupom fiscal, NFC-e e Nota Fiscal Paulista
 
 Em São Paulo, o fluxo de varejo a validar no CorePet é a NFC-e modelo 65. A partir
@@ -138,17 +142,21 @@ Foram examinadas três NFC-e recentes do PDV no Bling: uma com vários itens e d
 com um item. Todas eram para consumidor não identificado, série 3, CFOP 5102,
 CSOSN 900 e PIS/COFINS 49. Os pagamentos estavam registrados como dinheiro.
 
-Duas tentativas controladas foram feitas sem consumir numeração:
+Quatro tentativas controladas documentaram a evolução do bloqueio até a
+autorização:
 
 | Tentativa | Resultado | Diagnóstico |
 |---|---|---|
 | NFC-e com `crt` numérico | HTTP 400 | O contrato exige `emitente.crt` como texto; o serializador do CorePet deve enviar `"1"`, e não `1` |
 | NFC-e com `crt` em texto | HTTP 422 `OperacaoInvalida` | Emitente sem CSC de NFC-e; a requisição parou antes de validar os impostos |
+| NFC-e após o CSC | cStat 373 | A SEFAZ exige a frase padrão de homologação na descrição do primeiro item; a IntNFe não a substituiu automaticamente |
+| NFC-e com descrição padrão | **Autorizada, cStat 100** | XML modelo 65 confirmou CSC, QR Code, `ICMSSN900`, crédito do Simples e total |
 
 Não é correto trocar o CSOSN 900 por outro código apenas para fazer o teste passar.
-O contrato atualizado passou a aceitar `icms.cst=900` e mapeia `icms.aliquota` e
-`icms.valor` para `pCredSN` e `vCredICMSSN`. Depois do cadastro do CSC, falta
-comprovar esse resultado no XML autorizado da NFC-e.
+O contrato atualizado aceita `icms.cst=900` e mapeia `icms.aliquota` e
+`icms.valor` para `pCredSN` e `vCredICMSSN`; o XML autorizado comprovou o
+mapeamento. Para homologação, o CorePet deve aplicar a descrição exigida pela
+SEFAZ antes do envio ou a IntNFe deve fazê-lo no construtor.
 
 ## Pendências priorizadas
 
@@ -156,11 +164,11 @@ comprovar esse resultado no XML autorizado da NFC-e.
 
 | Pendência | O que falta | Responsável sugerido |
 |---|---|---|
-| CSC da NFC-e em homologação | Obter na SEFAZ e cadastrar ID do token e segredo no emitente pela nova rota do integrador | Empresa/contador e CorePet |
-| CSOSN 900 na NFC-e | Contrato e construtor atualizados; falta comprovar `ICMSSN900`, `pCredSN` e `vCredICMSSN` no XML modelo 65 após o CSC | CorePet/IntNFe |
 | Rateio do frete por item | Corrigir a rejeição 535: distribuir `frete.valor` nos itens ou expor o campo correspondente no objeto `Produto` | Equipe IntNFe |
 | Regra fiscal por operação | Confirmar com a contabilidade CFOP, CSOSN/CST, benefícios, DIFAL/FCP e natureza por estado/canal | Empresa/contador |
 | Separação de ambientes | Manter CSC, série, numeração e credenciais explicitamente separados entre homologação e produção | CorePet/IntNFe |
+| Contrato do CSC por ambiente | A documentação diz que os CSCs de homologação e produção são diferentes, mas o `PUT`/`GET .../csc` não recebe `ambienteCodigo`; a IntNFe deve separar ou esclarecer o armazenamento antes de habilitarmos produção | Equipe IntNFe |
+| Descrição do item em homologação | Automatizar a frase padrão exigida pela SEFAZ no primeiro item do modelo 65; sem isso, a NFC-e recebe cStat 373 | CorePet/IntNFe |
 
 ### P1 — necessários para equivalência com as notas reais
 
@@ -172,7 +180,7 @@ comprovar esse resultado no XML autorizado da NFC-e.
 | Transporte e volumes | Faltam quantidade/espécie/marca/numeração dos volumes, pesos, rastreio e dados logísticos completos |
 | Entrega ao consumidor | O contrato de presença documentado não lista o código 4, necessário para entrega em domicílio quando aplicável |
 | DANFE A4 | Reservar margem de impressão e conferir em impressora física comum |
-| DANFE NFC-e | Conferir versão de 80 mm, QR Code, chave, protocolo, descontos, múltiplos itens e identificação do consumidor |
+| DANFE NFC-e | Versão simples conferida em tela; faltam impressão física em 80 mm, descontos, múltiplos itens e identificação do consumidor |
 
 ### P2 — completar antes de ampliar a operação
 
@@ -241,16 +249,15 @@ mensagens de diagnóstico.
 
 ## Próxima rodada de testes
 
-1. Cadastrar o CSC de **homologação** sem expor o segredo em conversa ou commit.
-2. Emitir uma NFC-e anônima com CSOSN 900 equivalente a um cupom recente do PDV.
-3. Emitir uma NFC-e com CPF para validar a Nota Fiscal Paulista.
-4. Validar XML, crédito do Simples, QR Code e DANFE de 80 mm, depois cancelamento
-   e reconsulta.
-5. Corrigir o rateio do frete e repetir a amostra rejeitada com cStat 535.
-6. Repetir o intermediador nos demais marketplaces como regressão, sem prioridade
+1. Emitir uma NFC-e com CPF para validar a Nota Fiscal Paulista.
+2. Validar impressão física do DANFE em bobina de 80 mm, depois cancelamento e
+   reconsulta.
+3. Corrigir o rateio do frete e repetir a amostra rejeitada com cStat 535.
+4. Automatizar a descrição padrão do primeiro item da NFC-e em homologação.
+5. Repetir o intermediador nos demais marketplaces como regressão, sem prioridade
    sobre os bloqueios ainda abertos.
-7. Definir e homologar o contrato de entrada de pedidos do EcommerceAI.
-8. Repetir os cenários com pagamento e logística fiéis à operação real.
+6. Definir e homologar o contrato de entrada de pedidos do EcommerceAI.
+7. Repetir os cenários com pagamento e logística fiéis à operação real.
 
 ## Fontes
 

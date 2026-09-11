@@ -5,7 +5,8 @@ Data da análise: 09/09/2026. Status: proposta para implementação, sem altera�
 **Atualização de 11/09/2026:** a conta privada do Bling foi consultada com
 autorização do Lucas. Quatro NF-e recentes de marketplace foram reproduzidas e
 autorizadas pela IntNFe em homologação. A análise de NFC-e do PDV identificou
-bloqueios de CSC e CSOSN 900; os XMLs de marketplace perderam o grupo obrigatório
+bloqueios iniciais de CSC e CSOSN 900, ambos superados em uma NFC-e autorizada;
+os XMLs iniciais de marketplace perderam o grupo obrigatório
 do intermediador. Ver o
 [diagnóstico multicanal](DIAGNOSTICO_INTNFE_BLING_MULTICANAL_2026-09-11.md).
 
@@ -202,7 +203,7 @@ O catálogo de capacidades deve distinguir **documentado**, **testado em homolog
 
 Para o Bling, emissão/consulta das três famílias aparecem no contrato. Cancelamento de NFS-e está documentado; cancelamento/CC-e de NF-e requerem confirmação de contrato antes de prometer execução integrada. Recursos de tela e API não são necessariamente equivalentes. [API oficial](https://developer.bling.com.br/referencia)
 
-Para a IntNFe, as releituras ao longo de 09/09/2026 mostram evolução da documentação: `Idempotency-Key`, listagem para reconciliação, XML dos eventos, desconto, frete e mais situações de ICMS/ICMS-ST. Após Lucas entrar no portal, a documentação também passou a descrever NFC-e e IBS/CBS com valores calculados pelo integrador, além de IPI/DIFAL/FCP. Esses pontos passam de ausência documental para validação prática pendente; NFS-e continua não confirmada. O piloto segue restrito à primeira NF-e simples. Ver a atualização detalhada no [roteiro do piloto](FISCAL_INTNFE_PILOTO_HOMOLOGACAO.md). [IntNFe](https://intnfe.com.br/api/doc)
+Para a IntNFe, as releituras ao longo de 09/09/2026 mostram evolução da documentação: `Idempotency-Key`, listagem para reconciliação, XML dos eventos, desconto, frete e mais situações de ICMS/ICMS-ST. Após Lucas entrar no portal, a documentação também passou a descrever NFC-e e IBS/CBS com valores calculados pelo integrador, além de IPI/DIFAL/FCP. Em 11/09, o CSC de homologação foi cadastrado e uma NFC-e simples foi autorizada com CSOSN 900; as demais capacidades ainda dependem de validação prática, e NFS-e continua não confirmada. Ver a atualização detalhada no [roteiro do piloto](FISCAL_INTNFE_PILOTO_HOMOLOGACAO.md). [IntNFe](https://intnfe.com.br/api/doc)
 
 Arquivar documentos exige conferir empresa, identificação, modelo e ambiente; limitar tamanho e validar a origem dos downloads. Credenciais, certificados e dados pessoais desnecessários não entram em logs. A política de retenção, acesso do contador e exportação ao encerrar contrato deve ser definida antes da liberação comercial, sem transformar um prazo genérico em regra universal.
 

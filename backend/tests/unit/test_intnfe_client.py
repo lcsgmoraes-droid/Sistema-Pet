@@ -136,3 +136,43 @@ def test_numbering_invalid_path_is_rejected_before_network(api):
     with pytest.raises(IntNFeError):
         api.numbering("token", "../outra-rota?tenant=outro")
     assert api.session.request.call_count == 0
+
+
+def test_csc_uses_integrator_get_and_put_without_expecting_secret_back(api):
+    api.session.request.return_value = response(
+        body={"temCsc": True, "cscId": "000001"}
+    )
+    assert api.csc("token", "emitente-teste") == {
+        "temCsc": True,
+        "cscId": "000001",
+    }
+    assert api.session.request.call_args.args == (
+        "GET",
+        BASE_URL + "/integrador/emitentes/emitente-teste/csc",
+    )
+
+    payload = {"cscId": "000001", "csc": "codigo-ficticio"}
+    api.session.request.return_value = response(status=204)
+    assert api.set_csc("token", "emitente-teste", payload) is None
+    assert api.session.request.call_args.args == (
+        "PUT",
+        BASE_URL + "/integrador/emitentes/emitente-teste/csc",
+    )
+    assert api.session.request.call_args.kwargs["json"] == payload
+
+
+def test_csc_write_requires_documented_empty_response(api):
+    api.session.request.return_value = response(
+        status=200, body={"csc": "codigo-nao-deve-voltar"}
+    )
+    with pytest.raises(IntNFeError) as error:
+        api.set_csc("token", "emitente-teste", {})
+    assert error.value.code == "RespostaInvalida"
+    assert error.value.uncertain
+    assert "codigo-nao-deve-voltar" not in str(error.value)
+
+
+def test_csc_invalid_path_is_rejected_before_network(api):
+    with pytest.raises(IntNFeError):
+        api.csc("token", "../outro-emissor")
+    assert api.session.request.call_count == 0

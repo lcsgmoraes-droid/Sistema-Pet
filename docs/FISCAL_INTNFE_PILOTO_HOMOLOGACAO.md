@@ -3,8 +3,9 @@
 **Atualização de 11/09/2026:** quatro cenários recentes de marketplace foram
 reproduzidos e autorizados em homologação, e a tentativa de NFC-e revelou os
 bloqueios iniciais de CSC e CSOSN 900. Depois da atualização, o intermediador foi
-comprovado em novo XML autorizado e o contrato passou a aceitar CSOSN 900; a prova
-no modelo 65 ainda depende do CSC. O resultado, incluindo cupom, Nota Fiscal
+comprovado em novo XML autorizado. Em 11/09, o CSC de homologação foi cadastrado
+e uma NFC-e modelo 65 foi autorizada com CSOSN 900 e crédito do Simples no XML.
+O resultado, incluindo cupom, Nota Fiscal
 Paulista, intermediador, frete e pendências do CorePet, está no
 [diagnóstico multicanal](DIAGNOSTICO_INTNFE_BLING_MULTICANAL_2026-09-11.md).
 
@@ -77,12 +78,13 @@ Solicitar credenciais por meio protegido ou entrada direta no portal; não coloc
 2. **Cadastrar ou localizar a empresa.** Com acesso de integrador, autenticar em `POST /integrador/auth/token`, consultar `GET /integrador/emitentes` e criar apenas se necessário em `POST /integrador/emitentes`, informando CNPJ e nomes. Webhook fica omitido neste primeiro teste. Guardar `tenantId` e as credenciais que a criação retorna uma única vez em local protegido.
 3. **Autenticar o emitente.** `POST /auth/token` recebe `clientId` e `clientSecret`. As chamadas de NF-e usam o token desse emitente. Não imprimir token/segredo no relatório.
 4. **Verificar o certificado.** `GET /certificados`; cadastrar se necessário em `POST /certificados` com os campos multipart `Arquivo` e `Senha`. A documentação exige A1 e-CNPJ válido, do mesmo CNPJ, até 512 KB. Não há certificado fictício universal documentado; a homologação também depende da assinatura válida.
-5. **Conferir a numeração.** `GET /painel/numeracao`; usar a série combinada. A IntNFe atribui o número automaticamente por emitente/série/ambiente. Não zerar nem alterar uma sequência existente por tentativa.
-6. **Preparar destinatário e produto.** Preencher o [modelo do corpo](templates/INTNFE_NOTA_SIMPLES_HOMOLOGACAO.json) com os dados definidos. Há um item de uma unidade a R$ 1,00, pagamento em dinheiro de R$ 1,00 e ausência de frete/desconto apenas como cenário proposto. Confirmar esse cenário antes do envio. O exemplo contém marcadores e não está pronto para transmissão. Os campos de impostos devem ser adaptados ao caso; não copiar uma tributação arbitrária de exemplo como regra da empresa.
-7. **Revisar e registrar a tentativa.** Conferir emitente, destinatário, produto, regime, série, ambiente e totais. Omitir `destinatario.email` para evitar o envio automático de XML/DANFE a terceiros. Gerar um identificador único de teste e salvar localmente o corpo exato e a `Idempotency-Key` antes de transmitir; resultados e dados privados ficam em `runtime/analises/fiscal/`, fora do Git.
-8. **Enviar uma vez.** `POST https://api.intnfe.com.br/nfe`, com token do emitente e `Idempotency-Key`. HTTP 202 e `correlationId` significam aceite para processamento, ainda não autorização fiscal.
-9. **Consultar o resultado.** `GET /nfe/{correlationId}`, com intervalo de 2–5 segundos e limite de acompanhamento; respeitar `Retry-After` quando recebido. Se ainda estiver em fila, registrar como pendente. Não disparar outra nota para tentar acelerar.
-10. **Guardar a evidência.** Quando autorizada, baixar `GET /nfe/{correlationId}/xml` e `/danfe`. Conferir no XML modelo 55, `tpAmb=2`, empresa, chave/protocolo, item e valor. Registrar situação, número, série, chave, protocolo e caminhos locais protegidos dos arquivos.
+5. **Cadastrar o CSC da NFC-e.** Obter o par de homologação na SEFAZ e gravar em `PUT /integrador/emitentes/{tenantId}/csc`; confirmar por `GET` sem expor o segredo. Esta etapa foi concluída para a LJ em 11/09/2026.
+6. **Conferir a numeração.** `GET /painel/numeracao`; usar a série combinada. A IntNFe atribui o número automaticamente por emitente/série/ambiente. Não zerar nem alterar uma sequência existente por tentativa.
+7. **Preparar destinatário e produto.** Preencher o [modelo do corpo](templates/INTNFE_NOTA_SIMPLES_HOMOLOGACAO.json) com os dados definidos. Há um item de uma unidade a R$ 1,00, pagamento em dinheiro de R$ 1,00 e ausência de frete/desconto apenas como cenário proposto. Confirmar esse cenário antes do envio. O exemplo contém marcadores e não está pronto para transmissão. Os campos de impostos devem ser adaptados ao caso; não copiar uma tributação arbitrária de exemplo como regra da empresa.
+8. **Revisar e registrar a tentativa.** Conferir emitente, destinatário, produto, regime, série, ambiente e totais. Omitir `destinatario.email` para evitar o envio automático de XML/DANFE a terceiros. Gerar um identificador único de teste e salvar localmente o corpo exato e a `Idempotency-Key` antes de transmitir; resultados e dados privados ficam em `runtime/analises/fiscal/`, fora do Git.
+9. **Enviar uma vez.** `POST https://api.intnfe.com.br/nfe`, com token do emitente e `Idempotency-Key`. HTTP 202 e `correlationId` significam aceite para processamento, ainda não autorização fiscal.
+10. **Consultar o resultado.** `GET /nfe/{correlationId}`, com intervalo de 2–5 segundos e limite de acompanhamento; respeitar `Retry-After` quando recebido. Se ainda estiver em fila, registrar como pendente. Não disparar outra nota para tentar acelerar.
+11. **Guardar a evidência.** Quando autorizada, baixar o XML e o DANFE na rota da família emitida. Conferir modelo 55 ou 65, `tpAmb=2`, empresa, chave/protocolo, item e valor. Registrar situação, número, série, chave, protocolo e caminhos locais protegidos dos arquivos.
 
 ### Se a resposta se perder
 
@@ -113,7 +115,7 @@ Releitura da [documentação da IntNFe](https://intnfe.com.br/api/doc) em 09/09/
 | Referências a notas | `documentosReferenciados` descrito | Referenciar uma chave não comprova fluxo completo de devolução/finalidade e impostos |
 | Webhook e recuperação | HMAC, até cinco tentativas, reenvio e reconciliação descritos | Primeiro teste pode usar consulta; validar eventos e recuperação depois |
 | Retenção e arquivos | Prazos e download descritos; DANFE em HTML | Validar arquivo local; há aparente divergência entre XML “só autorizada” e menção posterior a canceladas/denegadas, a esclarecer antes de depender desse acesso |
-| NFC-e e reforma tributária | Na releitura após o login, surgiram `POST /nfce` e IBS/CBS com valores calculados pelo integrador. NFC-e pede CSC e descreve DANFE provisório | Novidades documentais, ainda não testadas. O primeiro envio continua NF-e modelo 55 |
+| NFC-e e reforma tributária | `POST /nfce` foi testado após o CSC; NFC-e simples autorizada com QR Code, CSOSN 900 e crédito do Simples. IBS/CBS continuam apenas documentados | Ampliar os cenários de NFC-e e validar a reforma tributária separadamente |
 | NFS-e | Não confirmada na documentação consultada | Cobertura futura a verificar |
 | Preço, suporte e operação | Não validados por este teste | Definir antes de contratar/ativar clientes em produção |
 
@@ -131,9 +133,11 @@ Nenhum dos assuntos futuros será usado para exigir a integração completa ante
 | Empresa | LJ criada e ativa; `tenantId` 4ef8812e-51da-4dd7-85dc-8b47df8c5148 |
 | Autenticação do emitente | HTTP 200, credencial própria armazenada com DPAPI |
 | Certificado | Upload e consulta HTTP 200; CNPJ correto, válido até 02/04/2027 |
+| CSC de homologação | Localizado na SEFAZ-SP, cadastrado na IntNFe com HTTP 204 e confirmado por GET |
 | Destinatário | Enviado no corpo da NF-e; não foi comprovado cadastro separado de comprador |
 | Nota enviada/autorizada | 1/001 rejeitada SCHEMA; 2/001 rejeitada 539; 1/003 autorizada. Todos em homologação |
 | Chave/XML/DANFE de teste | Chave/protocolo/XML da 1/003 conferidos. Valores e quantidade do DANFE corrigidos; frete e padronização decimal do item pendentes |
+| NFC-e de PDV | 1/023 autorizada, cStat 100; XML confirmou QR Code, ICMSSN900 e crédito do Simples; DANFE conferido em tela |
 
 ### Evidência do impedimento no cadastro
 

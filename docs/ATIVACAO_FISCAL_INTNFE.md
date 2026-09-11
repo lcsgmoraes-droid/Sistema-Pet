@@ -50,6 +50,8 @@ fluxo de publicação do repositório, além da homologação abaixo.
 | `POST /intnfe/vincular` | Recebe `client_id` e `client_secret` para comprovar acesso a um cadastro existente. |
 | `GET /intnfe/numeracao` | Consulta as sequências do emitente da empresa autenticada. |
 | `PUT /intnfe/numeracao` | Avança uma sequência de NF-e após nova consulta, auditoria e confirmação por leitura. |
+| `GET /intnfe/csc` | Consulta se o CSC de homologação está cadastrado e qual é o ID; o segredo nunca retorna. |
+| `PUT /intnfe/csc` | Grava o CSC de homologação após consulta, revisão explícita e auditoria sem o segredo. |
 
 As rotas usam exclusivamente a empresa da sessão autenticada. Não aceitam um
 tenant ou CNPJ arbitrário como destino. A resposta contém mensagem, etapas,
@@ -123,6 +125,23 @@ Nenhuma série de produção apareceu nessa consulta. Isso descreve a configura�
 do emissor, não comprova emissão desses números. Nenhum PUT real foi realizado
 para testar esta tela; as escritas foram simuladas. A origem do avanço da série
 001 permanece para conciliação com a IntNFe, sem tentar retroceder.
+
+## CSC da NFC-e
+
+O CSC é obtido pelo contribuinte na SEFAZ da UF. Em São Paulo, o acesso oficial
+fica em **NFC-e → Serviços → Gerenciar Código de Segurança (ambiente de testes)**
+e exige o certificado digital da empresa. O CorePet consulta e grava o CSC pela
+IntNFe sem persistir o segredo localmente nem incluí-lo em auditoria.
+
+O contrato da IntNFe consultado em 11/09/2026 afirma que homologação e produção
+usam CSCs diferentes, mas `GET`/`PUT /integrador/emitentes/{tenantId}/csc` ainda
+não recebem `ambienteCodigo`. Por isso, a tela atual aceita apenas homologação.
+Produção deve permanecer bloqueada até o fornecedor separar os ambientes no
+contrato ou documentar de forma inequívoca como os dois valores coexistem.
+
+No piloto da LJ, o `PUT` externo respondeu 204 e o `GET` posterior confirmou o
+ID cadastrado. Uma NFC-e de homologação foi autorizada em seguida, comprovando o
+uso do CSC sem registrar seu valor neste repositório.
 
 ## Falhas e recuperação
 
