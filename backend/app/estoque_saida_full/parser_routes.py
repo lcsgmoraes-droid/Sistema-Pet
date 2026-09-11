@@ -47,17 +47,31 @@ async def parse_saida_full_pdf(
 
     try:
         texto_paginas = []
+        tabelas_paginas = []
         with pdfplumber.open(io.BytesIO(pdf_bytes)) as pdf:
-            for page in pdf.pages:
+            paginas = list(pdf.pages)
+            for page in paginas:
                 texto_paginas.append(page.extract_text() or "")
 
-        texto = "\n".join(texto_paginas).strip()
-        if not texto:
-            raise HTTPException(
-                status_code=400, detail="Nao foi possivel ler texto do PDF"
-            )
+            texto = "\n".join(texto_paginas).strip()
+            if not texto:
+                raise HTTPException(
+                    status_code=400, detail="Nao foi possivel ler texto do PDF"
+                )
 
-        dados = _parse_saida_full_pdf(texto)
+            if "DANFE" in texto.upper():
+                for numero_pagina, page in enumerate(paginas, start=1):
+                    try:
+                        tabelas_paginas.append(page.extract_tables() or [])
+                    except Exception as exc:
+                        logger.warning(
+                            "Falha ao extrair tabelas da pagina %s do PDF: %s",
+                            numero_pagina,
+                            exc,
+                        )
+                        tabelas_paginas.append([])
+
+        dados = _parse_saida_full_pdf(texto, tabelas_paginas=tabelas_paginas)
         if not dados["itens"]:
             raise HTTPException(
                 status_code=400,
