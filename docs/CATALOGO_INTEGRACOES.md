@@ -282,8 +282,12 @@ Toda integração nova ou alterada deve registrar, antes da homologação:
   rastreável.
 - **Responsável:** negócio da parceria pelo responsável do Sistema Pet; execução
   técnica pela IA; homologação conjunta com operador autorizado.
-- **Lacuna prioritária:** adicionar fila de callback, retry controlado, alerta e
-  exercício de replay.
+- **Lacuna prioritária:** a integração ainda não recebe/processa pedidos de
+  marketplace. Apenas eventos de teste e resumo empresarial são processados;
+  eventos de pedido ficam como `unsupported`. Definir eventos versionados de
+  criação/atualização, cancelamento e logística antes de usar o EcommerceAI como
+  origem do fluxo fiscal. Adicionar também fila de callback, retry controlado,
+  alerta e exercício de replay.
 - **Evidência no código:** `backend/app/routes/ecommerceai_integration_routes.py`
   e `backend/app/ecommerceai_integration_models.py`.
 
@@ -553,6 +557,10 @@ Toda integração nova ou alterada deve registrar, antes da homologação:
   Cadastro, autenticação, A1 e primeira autorização confirmados em 09/09/2026.
   Conciliar a duplicidade 539 da série
   001 antes de reutilizá-la; não impediu a autorização na série 003.
+  Em 11/09, quatro NF-e de marketplace foram autorizadas, mas perderam o grupo
+  `infIntermed`; uma quinta nota com frete foi rejeitada com cStat 535 porque o
+  contrato não permite compor o frete nos itens. NFC-e segue bloqueada por CSC e
+  pela ausência do CSOSN 900 no contrato.
   Emissão pelo CorePet não implementada nesta etapa. Flag desligada por padrão.
 - **Evidência:** `backend/app/intnfe/`, `backend/tests/unit/test_intnfe_*.py`,
   `backend/tests/integration/test_intnfe_postgres.py`,
