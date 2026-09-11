@@ -182,6 +182,7 @@ def _hidratar_paradas_rotas(
                 parada.forma_pagamento = (
                     pagamentos[0].forma_pagamento if pagamentos else None
                 )
+                parada.pagamentos = pagamentos
                 parada.valor_pago = valor_pago
                 parada.status_pagamento = (
                     "pago"

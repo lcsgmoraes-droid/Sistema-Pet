@@ -62,6 +62,21 @@ class RotaEntregaUpdate(BaseModel):
     km_final: Optional[Decimal] = None
 
 
+class PagamentoEntregaResponse(BaseModel):
+    """Dados operacionais de pagamento que o entregador precisa consultar."""
+
+    forma_pagamento: str
+    valor: Decimal
+    valor_recebido: Optional[Decimal] = None
+    troco: Optional[Decimal] = None
+    numero_parcelas: Optional[int] = 1
+    bandeira: Optional[str] = None
+    modalidade_cartao: Optional[str] = None
+    status: Optional[str] = None
+
+    model_config = {"from_attributes": True}
+
+
 class RotaEntregaParadaResponse(BaseModel):
     """ETAPA 9.3 - Schema de resposta para parada da rota"""
 
@@ -98,6 +113,7 @@ class RotaEntregaParadaResponse(BaseModel):
     forma_pagamento: Optional[str] = None
     status_pagamento: Optional[str] = None
     valor_pago: Optional[Decimal] = None
+    pagamentos: List[PagamentoEntregaResponse] = Field(default_factory=list)
     observacoes_entrega: Optional[str] = None
     canal_venda: Optional[str] = None
     avaliacao_entrega_nota: Optional[int] = None

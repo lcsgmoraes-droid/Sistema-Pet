@@ -45,6 +45,8 @@ def _montar_campos_venda_pagamento(
         "bandeira": bandeira or None,
         "nsu_cartao": pag_data.get("nsu_cartao"),
         "operadora_id": operadora_id,
+        "valor_recebido": pag_data.get("valor_recebido"),
+        "troco": pag_data.get("troco"),
         "prazo_recebimento_dias": pag_data.get("prazo_recebimento_dias"),
         "data_recebimento_prevista": pag_data.get("data_recebimento_prevista"),
         "intervalo_crediario": pag_data.get("intervalo_crediario"),

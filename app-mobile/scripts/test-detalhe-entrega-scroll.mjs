@@ -19,6 +19,9 @@ const nativeMocks = {
   `,
   "react-native-draggable-flatlist": "export default 'DraggableFlatList';",
   "expo-location": "export {};",
+  "@/utils/format": `
+    export const formatarMoeda = value => 'R$ ' + Number(value || 0).toFixed(2).replace('.', ',');
+  `,
   "@/utils/mapsAddress": "export const limparEnderecoParaMaps = value => value;",
   "./DetalheEntregaModals": "export const DetalheEntregaModals = 'Modals';",
 };
@@ -57,9 +60,11 @@ const hooks = registerHooks({
 });
 let DetalheEntregaContent;
 let DetalheEntregaStopCard;
+let montarInstrucoesPagamentoEntrega;
 try {
   ({DetalheEntregaContent} = await import(screenFiles.get("./DetalheEntregaContent")));
   ({DetalheEntregaStopCard} = await import(screenFiles.get("./DetalheEntregaStopCard")));
+  ({montarInstrucoesPagamentoEntrega} = await import(screenFiles.get("./DetalheEntregaUtils")));
 } finally {
   hooks.deregister();
 }
@@ -154,4 +159,54 @@ test("somente segurar o icone inicia arrasto; numero abre a ordem manual", () =>
   assert.equal(dragged, 1);
   nodes.find((node) => node.type === "TouchableOpacity" && texts(node).includes("25")).props.onPress();
   assert.equal(selected.id, 25);
+});
+
+test("pagamento em dinheiro destaca troco e valor levado pelo cliente", () => {
+  const instrucoes = montarInstrucoesPagamentoEntrega({
+    valor_venda: 45,
+    pagamentos: [
+      {
+        forma_pagamento: "Dinheiro",
+        valor: 45,
+        valor_recebido: 50,
+        troco: 5,
+      },
+    ],
+  });
+
+  assert.equal(instrucoes[0].resumo, "💵 DINHEIRO — R$ 45,00");
+  assert.equal(instrucoes[0].alerta, "LEVAR TROCO: R$ 5,00");
+  assert.equal(instrucoes[0].complemento, "Cliente paga com R$ 50,00");
+
+  const card = DetalheEntregaStopCard({
+    parada: { ...paradas[24], pagamentos: [{ forma_pagamento: "Dinheiro", valor: 45, valor_recebido: 50, troco: 5 }] },
+    rotaStatus: "em_rota",
+    processando: null,
+  });
+  const conteudo = texts(card).join(" ");
+  assert.match(conteudo, /FORMA DE PAGAMENTO/);
+  assert.match(conteudo, /LEVAR TROCO: R\$ 5,00/);
+});
+
+test("pagamento em cartao avisa o entregador para levar a maquina", () => {
+  const [instrucao] = montarInstrucoesPagamentoEntrega({
+    pagamentos: [
+      {
+        forma_pagamento: "Cartão de crédito",
+        modalidade_cartao: "credito",
+        numero_parcelas: 3,
+        valor: 390,
+      },
+    ],
+  });
+
+  assert.equal(instrucao.resumo, "💳 CARTÃO DE CRÉDITO (3x) — R$ 390,00");
+  assert.equal(instrucao.alerta, "LEVAR MÁQUINA DE CARTÃO");
+});
+
+test("pagamento ausente gera alerta para confirmar com a loja", () => {
+  const [instrucao] = montarInstrucoesPagamentoEntrega({ valor_venda: 45 });
+
+  assert.equal(instrucao.resumo, "⚠️ FORMA NÃO INFORMADA");
+  assert.equal(instrucao.alerta, "CONFIRME O PAGAMENTO COM A LOJA");
 });

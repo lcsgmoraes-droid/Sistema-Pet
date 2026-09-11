@@ -198,6 +198,23 @@ function pagamentoEhCrediario(pagamento = {}) {
   return tipo === "crediario" || nome.includes("crediario");
 }
 
+function pagamentoEhDinheiro(pagamento = {}) {
+  const tipo = toAscii(
+    pagamento.forma_pagamento_tipo || pagamento.tipo || pagamento.forma_pagamento,
+  ).toLowerCase();
+  return tipo === "dinheiro" || tipo.includes("dinheiro");
+}
+
+function pagamentoEhCartao(pagamento = {}) {
+  const identificacao = toAscii(
+    pagamento.modalidade_cartao ||
+      pagamento.forma_pagamento_tipo ||
+      pagamento.tipo ||
+      pagamento.forma_pagamento,
+  ).toLowerCase();
+  return identificacao.includes("cartao") || ["credito", "debito"].includes(identificacao);
+}
+
 export function ehVendaCrediario(venda = {}) {
   return Boolean(venda.eh_crediario) || (venda.pagamentos || []).some(pagamentoEhCrediario);
 }
@@ -322,12 +339,24 @@ export function montarCupomVenda(venda = {}, empresa = {}) {
   if (Array.isArray(venda.pagamentos) && venda.pagamentos.length > 0) {
     linhas.push("PAGAMENTOS");
     for (const pagamento of venda.pagamentos) {
+      const valorRecebido = Number(pagamento?.valor_recebido || 0);
+      const valorPagamento =
+        pagamentoEhDinheiro(pagamento) && valorRecebido > 0
+          ? valorRecebido
+          : Number(pagamento?.valor || 0);
       linhas.push(
         linePair(
           pagamento?.forma_pagamento || pagamento?.nome || "Pagamento",
-          formatMoneyBRL(Number(pagamento?.valor || 0)),
+          formatMoneyBRL(valorPagamento),
         ),
       );
+      const troco = Number(pagamento?.troco || 0);
+      if (pagamentoEhDinheiro(pagamento) && troco > 0.005) {
+        linhas.push(linePair("TROCO:", formatMoneyBRL(troco)));
+      }
+    }
+    if (venda.tem_entrega && venda.pagamentos.some(pagamentoEhCartao)) {
+      linhas.push(...wrap("ATENCAO: LEVAR MAQUININHA DE CARTAO"));
     }
     linhas.push("-".repeat(RECEIPT_WIDTH));
   }

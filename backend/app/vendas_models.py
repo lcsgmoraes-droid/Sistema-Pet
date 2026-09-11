@@ -670,6 +670,8 @@ class VendaPagamento(BaseTenantModel):
             else None,
             "intervalo_crediario": self.intervalo_crediario,
             "nsu_cartao": self.nsu_cartao,
+            "valor_recebido": safe_decimal_to_float(self.valor_recebido),
+            "troco": safe_decimal_to_float(self.troco),
             "status": self.status,
             "data_pagamento": safe_datetime_to_iso(self.data_pagamento),
             "gateway_provider": self.gateway_provider,
