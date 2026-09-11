@@ -1,6 +1,6 @@
 # Catálogo de integrações do Sistema Pet
 
-Atualizado em: 2026-08-26
+Atualizado em: 2026-09-09
 
 Status: fonte oficial para conhecer as integrações externas implementadas no
 código, seus controles e os modos de falha que precisam ser considerados na
@@ -72,6 +72,7 @@ formam a trilha de conhecimento.
 | INT-015 | Operadoras e bancos por arquivo | Arquivo | Alta | Conciliação por CSV/OFX. |
 | INT-016 | XML/CSV e SimplesVet | Arquivo | Média | Entrada fiscal, produtos e migração controlada. |
 | INT-017 | Pagar.me | Compatibilidade | Alta | Webhook de pagamento legado/condicional. |
+| INT-018 | IntNFe | Condicional | Média | Ativação do emitente, consulta do A1 e ajuste da sequência de NF-e por série/ambiente. |
 
 ## Contrato mínimo por integração
 
@@ -281,8 +282,12 @@ Toda integração nova ou alterada deve registrar, antes da homologação:
   rastreável.
 - **Responsável:** negócio da parceria pelo responsável do Sistema Pet; execução
   técnica pela IA; homologação conjunta com operador autorizado.
-- **Lacuna prioritária:** adicionar fila de callback, retry controlado, alerta e
-  exercício de replay.
+- **Lacuna prioritária:** a integração ainda não recebe/processa pedidos de
+  marketplace. Apenas eventos de teste e resumo empresarial são processados;
+  eventos de pedido ficam como `unsupported`. Definir eventos versionados de
+  criação/atualização, cancelamento e logística antes de usar o EcommerceAI como
+  origem do fluxo fiscal. Adicionar também fila de callback, retry controlado,
+  alerta e exercício de replay.
 - **Evidência no código:** `backend/app/routes/ecommerceai_integration_routes.py`
   e `backend/app/ecommerceai_integration_models.py`.
 
@@ -514,6 +519,62 @@ Toda integração nova ou alterada deve registrar, antes da homologação:
 - **Lacuna prioritária:** decidir entre aposentar o código ou formalizar cliente,
   consulta ao provedor, reconciliação, alertas e testes completos antes do uso.
 - **Evidência no código:** `backend/app/routes/ecommerce_webhooks.py`.
+
+## Ativação fiscal opcional
+
+### INT-018 — IntNFe: ativação fiscal, CSC e numeração
+
+- **Finalidade e direção:** enviar CNPJ, razão social e nome fantasia para criar
+  emitente quando o usuário optar pela integração; consultar vínculo e A1.
+  Consultar/avançar a numeração de NF-e e NFC-e com GET/PUT de integrador, por
+  modelo, série e ambiente explicitamente escolhidos, e configurar o CSC da
+  NFC-e separadamente em homologação e produção, sem emitir notas.
+- **Autenticação e segredos:** token do integrador com variáveis exclusivas do
+  backend; token do emitente com `clientSecret` cifrado por empresa. Respostas
+  públicas sem segredos. Permissão `configuracoes.editar` e módulo `integracoes`.
+- **Timeout:** 3s conexão/15s leitura; origem fixa e redirecionamentos bloqueados.
+- **Retry:** sem repetição automática. Recusa confirmada permite nova tentativa
+  manual após correção; resposta perdida exige consulta/reconciliação.
+- **Idempotência:** não documentada no cadastro remoto. Reserva durável local,
+  unicidade de tenant/CNPJ/emitente e proteção por operação; resultado incerto
+  nunca libera outro POST automaticamente.
+- **Numeração:** fonte remota, conversão de próximo número para `ultimoNumero`,
+  bloqueio de repetição/retrocesso e conferência antes/depois do PUT. A garantia
+  monotônica vem da IntNFe; não há reserva do número para venda ou compare-and-set
+  documentado. Resposta perdida exige GET e revisão, sem retry automático.
+- **Fallback:** manter operação comercial e mostrar pendência fiscal.
+- **Reconciliação:** consultar emitentes antes de criar e após falhas. Cadastro
+  existente exige autenticar credenciais próprias; não há rotação automática.
+- **Observabilidade:** auditoria de ação, estado, código e correlação, sem corpos
+  externos ou credenciais. Exclusão/inativação externa pede revisão de suporte.
+  `intnfe_numeracao` registra série/modelo/ambiente e números consultado/solicitado;
+  `intnfe_csc` registra ambiente, ID e resultado, nunca o segredo. Falha de
+  auditoria antes de qualquer PUT impede o ajuste.
+- **Responsável:** Lucas pelo piloto; equipe IntNFe pelo conflito/contrato
+  externo; Codex pela implementação e testes.
+- **Lacuna prioritária:** homologar o fluxo integrado DEV. Dados, frete e formato
+  numérico do DANFE foram corrigidos e conferidos na nota 1/003 em 10/09 às 00:02.
+  Na impressão, declarar A4, manter margem segura e impedir a página em branco
+  observada quando o navegador usa papel Carta.
+  Cadastro, autenticação, A1 e primeira autorização confirmados em 09/09/2026.
+  Conciliar a duplicidade 539 da série
+  001 antes de reutilizá-la; não impediu a autorização na série 003.
+  Em 11/09, quatro NF-e de marketplace foram autorizadas, mas perderam o grupo
+  `infIntermed`. Após a correção, nova NF-e foi autorizada com `indIntermed=1` e
+  `infIntermed` completo. O contrato também passou a aceitar CSOSN 900 e crédito
+  do Simples; após o cadastro do CSC de homologação, uma NFC-e modelo 65 foi
+  autorizada e o XML confirmou `ICMSSN900`, `pCredSN` e `vCredICMSSN`. Em novo
+  reteste, rateio automático do frete, descrição de homologação, CC-e,
+  cancelamento de NF-e e inutilização foram confirmados. Permanecem externos:
+  pagamento 17 documentado como PIX foi serializado como cartão e rejeitado com
+  cStat 391; cancelamento da NFC-e foi aceito com 202, mas continuou autorizado;
+  e a listagem de numeração passou a devolver `modelo: null`. O contrato do CSC
+  agora separa ambientes e o CorePet foi ajustado; o CSC legado precisou ser
+  recadastrado em homologação, pendente confirmar a migração no provedor.
+  Emissão pelo CorePet não implementada nesta etapa. Flag desligada por padrão.
+- **Evidência:** `backend/app/intnfe/`, `backend/tests/unit/test_intnfe_*.py`,
+  `backend/tests/integration/test_intnfe_postgres.py`,
+  `docs/ATIVACAO_FISCAL_INTNFE.md` e ficha de entrega de 2026-09-09.
 
 ## Itens não classificados como integração ativa
 

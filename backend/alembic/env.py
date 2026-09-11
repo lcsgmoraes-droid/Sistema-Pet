@@ -65,6 +65,7 @@ import app.template_models
 import app.veterinario_models
 import app.ecommerce_payment_models
 import app.billing_models
+import app.intnfe.models
 import app.catalogo_mestre_models
 
 # Stone (pagamentos)

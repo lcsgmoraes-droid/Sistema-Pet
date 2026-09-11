@@ -1,6 +1,19 @@
 # IntNFe — primeiro teste de NF-e de produto
 
-Registro: 09/09/2026. Situação: roteiro preparado; acesso autenticado e envio ainda não realizados.
+**Atualização de 11/09/2026:** quatro cenários recentes de marketplace e NFC-e de
+PDV foram reproduzidos em homologação. Intermediador, CSOSN 900, crédito do
+Simples, rateio de frete, descrição automática da NFC-e, CC-e, cancelamento de
+NF-e e inutilização foram comprovados. Restaram falhas no pagamento PIX,
+cancelamento da NFC-e e identificação do modelo na listagem de numeração. O
+resultado, incluindo cupom, Nota Fiscal Paulista, logística e pendências do
+CorePet, está no
+[diagnóstico multicanal](DIAGNOSTICO_INTNFE_BLING_MULTICANAL_2026-09-11.md).
+
+Registro iniciado em 09/09/2026. Situação atual em 10/09 às 00:02 de Brasília:
+**NF-e 1/003 autorizada em homologação**, total **R$ 71,23**, XML e protocolo
+conferidos. A nova impressão corrigiu valores, quantidade, frete e decimais da
+linha do item, sem nova emissão. Restam definir A4/margem segura e eliminar uma
+folha em branco no padrão Carta. [Diagnóstico atualizado](DIAGNOSTICO_INTNFE_NFE_HOMOLOGACAO_2026-09-09.md).
 
 ## Decisão registrada
 
@@ -12,9 +25,21 @@ O [estudo do Bling e da estrutura fiscal do CorePet](ESTUDO_BLING_E_ESTRUTURA_FI
 
 - [Documentação oficial](https://intnfe.com.br/api/doc): NF-e modelo 55, emissão assíncrona, consulta, XML autorizado e DANFE em HTML.
 - [Portal do cliente](https://app.intnfe.com.br/login): página acessível. Pede usuário e senha fornecidos pela equipe; a tela examinada não oferece cadastro público e se identifica como ambiente de homologação.
-- Ainda não há uma sessão autenticada da IntNFe disponível para este teste. Não foram fornecidos CNPJ/certificado nem credenciais específicos do piloto.
-- Os arquivos de ambiente conhecidos do projeto e as variáveis da sessão não indicaram credenciais `INTNFE_*`. Nenhum segredo foi copiado para esta documentação.
-- Nenhuma empresa/destinatário foi cadastrado e nenhuma NF-e foi transmitida nesta preparação.
+- Lucas entrou no portal. A sessão autenticada identifica a conta **PetSys (smoke test)**. Inicialmente o menu oferecia apenas acompanhamento; depois o portal passou a exibir o ID do integrador e a geração de segredo. Lucas disponibilizou as credenciais para execução do teste.
+- Na sessão do Bling já aberta pelo Lucas, foram conferidos os dados da **LJ Comercio de Rações e Pet Shop LTDA**, empresa indicada para o teste. O corpo mínimo de cadastro foi preparado localmente em `runtime/analises/fiscal/2026-09-09/cadastro_emitente_pet.json`, fora do Git.
+- A autenticação própria da API em `POST /integrador/auth/token` retornou HTTP 200 e validade de 43.200 segundos. Não foi necessário extrair o token do navegador.
+- Credenciais e token foram guardados localmente com proteção DPAPI do Windows, em arquivos ignorados pelo Git. Nenhum segredo foi copiado para esta documentação.
+- Na primeira execução, `GET /integrador/emitentes` retornou HTTP 200 e apenas **Ze Pet**. O cadastro da LJ retornou HTTP 409 `EmitenteDuplicado`; a consulta posterior continuou sem a LJ. Após Lucas informar a exclusão do Ze Pet, a lista passou a vazia, mas uma nova tentativa continuou retornando o mesmo conflito. A API considera o CNPJ existente, mas não informa aqui a conta à qual ele pertence nem a situação desse registro.
+- Após a equipe informar a remoção de todos os emitentes, o cadastro da LJ foi
+  concluído e confirmado por consulta. A autenticação própria do emitente
+  retornou HTTP 200. O histórico de recusas abaixo está superado para este CNPJ.
+- Lucas autorizou usar os cadastros do Bling apenas em homologação. Um destinatário
+  e um produto foram enviados dentro do corpo da primeira nota. Isso não confirma
+  um cadastro separado de compradores na IntNFe. O envio recebeu HTTP 202 e depois
+  rejeição `SCHEMA`, sem chave ou protocolo de autorização. O reteste posterior
+  com dados idênticos recebeu rejeição `539`; a chave gerada nesse retorno
+  não representa autorização. Após Lucas sugerir outra série, o mesmo cenário
+  na série 3 foi autorizado; XML conferido e erro de formatação encontrado no DANFE.
 
 ## Acesso, empresa e cliente são coisas diferentes
 
@@ -24,8 +49,8 @@ O [estudo do Bling e da estrutura fiscal do CorePet](ESTUDO_BLING_E_ESTRUTURA_FI
 | Credencial de integrador | `integradorId` e `integradorSecret`; permitem gerenciar as empresas vinculadas ao integrador. |
 | Empresa emitente | O CNPJ que assina e emite a NF-e, com IE, regime tributário, endereço e certificado A1. A API chama essa empresa de emitente/tenant. |
 | Credencial do emitente | `clientId` e `clientSecret`; servem para obter o token de emissão da empresa. |
-| Destinatário da nota | O comprador/cliente informado no grupo `destinatario`. A documentação consultada não descreve um endpoint separado de cadastro de compradores. O portal autenticado ainda precisa ser examinado. |
-| Chave de acesso da NF-e | Os 44 dígitos que identificam a nota; no fluxo documentado são retornados com a autorização. Não substituem a credencial de acesso à API. |
+| Destinatário da nota | O comprador/cliente informado no grupo `destinatario`. A documentação consultada não descreve um endpoint separado de cadastro de compradores; o portal autenticado examinado não mostrou essa função. |
+| Chave de acesso da NF-e | Os 44 dígitos que identificam a nota. No reteste a API também retornou chave para uma nota rejeitada; conferir status e protocolo, pois a chave isolada não comprova autorização. Não substitui a credencial da API. |
 
 Se já houver empresa cadastrada, consultar e reutilizar seu cadastro. Não rotacionar segredos nem recriar a empresa para simplesmente testar. Caso o irmão forneça somente acesso de emitente, o cadastro dessa empresa precisa ter sido preparado por ele; o cadastro de empresas pela API exige acesso de integrador.
 
@@ -33,12 +58,17 @@ Se já houver empresa cadastrada, consultar e reutilizar seu cadastro. Não rota
 
 | Pendência | Informação/ação necessária | Responsável sugerido |
 |---|---|---|
-| Acesso à IntNFe | Login do portal ou credenciais próprias da API, fornecidas pela equipe | Irmão/IntNFe e Lucas |
-| Definir a empresa piloto | CNPJ, razão social, nome fantasia, IE, regime e endereço com código IBGE | Lucas/empresa piloto |
-| Certificado | A1 válido do mesmo CNPJ, já instalado na IntNFe ou arquivo `.pfx`/`.p12` e senha para cadastro protegido | Lucas/empresa piloto |
-| Habilitação e série | Confirmar que o emitente pode emitir em homologação na sua UF e qual série de teste utilizar | Irmão/empresa piloto |
-| Destinatário | Dados aprovados para o teste: CPF/CNPJ, endereço, indicador de IE e IE quando aplicável | Lucas/irmão |
-| Um produto simples | SKU, descrição, NCM, CFOP e tributação compatíveis com o regime escolhido | Irmão; revisão fiscal da empresa quando usar cenário real |
+| Acesso à API IntNFe | Concluído: autenticação e consulta de emitentes funcionando | Lucas/IntNFe |
+| Acesso ao emitente LJ | Concluído: emitente criado e ativo sob CorePet — Lucas Guerra; credencial própria protegida e autenticação HTTP 200 | Codex/IntNFe |
+| Dados da empresa piloto | Concluído: CNPJ, IE, CRT, endereço e IBGE conferidos. Bairro usado: Vila Industrial, confirmado por consultas de CNPJ e CEP | Codex |
+| Certificado | Concluído: A1 do mesmo CNPJ enviado e reconhecido, HTTP 200, não expirado, válido até 02/04/2027 | Lucas/Codex/IntNFe |
+| Habilitação e série | Concluído para o piloto: nota 1/003 autorizada em homologação, após Lucas sugerir outra série | IntNFe/Codex |
+| Destinatário | Concluído para o envio: cadastro do Bling autorizado por Lucas, CPF válido e endereço/IBGE conferidos, indicador IE 9, sem e-mail | Codex |
+| Um produto simples | Concluído para o envio: um item da NF-e 017697 do Bling, com NCM, CFOP, CEST, origem e tributação da referência | Codex |
+| XML dos impostos | Concluído para o cenário: XML autorizado contém ICMSSN500, PISOutr e COFINSOutr, preservando CSOSN 500/CST 49 | Equipe IntNFe/Codex |
+| Numeração em homologação | Série 3 permitiu emitir. Conciliar o histórico da duplicidade 539 da série 1 antes de reutilizá-la | Equipe IntNFe |
+| Nota autorizada e XML | Concluído: nota 1/003, cStat 100, tpAmb 2, chave/protocolo/destinatário/item/totais conferidos | Codex |
+| DANFE | Valores, quantidade, frete e decimais corrigidos na reconsulta. Em 11/09, quatro DANFEs de marketplace também foram conferidos; resta reservar margem física segura no A4 | Equipe IntNFe/Codex |
 
 Solicitar credenciais por meio protegido ou entrada direta no portal; não colocar segredos/certificados em documentos, commits ou mensagens de diagnóstico. Os exemplos públicos da API não são credenciais de teste liberadas para uso.
 
@@ -48,12 +78,13 @@ Solicitar credenciais por meio protegido ou entrada direta no portal; não coloc
 2. **Cadastrar ou localizar a empresa.** Com acesso de integrador, autenticar em `POST /integrador/auth/token`, consultar `GET /integrador/emitentes` e criar apenas se necessário em `POST /integrador/emitentes`, informando CNPJ e nomes. Webhook fica omitido neste primeiro teste. Guardar `tenantId` e as credenciais que a criação retorna uma única vez em local protegido.
 3. **Autenticar o emitente.** `POST /auth/token` recebe `clientId` e `clientSecret`. As chamadas de NF-e usam o token desse emitente. Não imprimir token/segredo no relatório.
 4. **Verificar o certificado.** `GET /certificados`; cadastrar se necessário em `POST /certificados` com os campos multipart `Arquivo` e `Senha`. A documentação exige A1 e-CNPJ válido, do mesmo CNPJ, até 512 KB. Não há certificado fictício universal documentado; a homologação também depende da assinatura válida.
-5. **Conferir a numeração.** `GET /painel/numeracao`; usar a série combinada. A IntNFe atribui o número automaticamente por emitente/série/ambiente. Não zerar nem alterar uma sequência existente por tentativa.
-6. **Preparar destinatário e produto.** Preencher o [modelo do corpo](templates/INTNFE_NOTA_SIMPLES_HOMOLOGACAO.json) com os dados definidos. Há um item de uma unidade a R$ 1,00, pagamento em dinheiro de R$ 1,00 e ausência de frete/desconto apenas como cenário proposto. Confirmar esse cenário antes do envio. O exemplo contém marcadores e não está pronto para transmissão. Os campos de impostos devem ser adaptados ao caso; não copiar uma tributação arbitrária de exemplo como regra da empresa.
-7. **Revisar e registrar a tentativa.** Conferir emitente, destinatário, produto, regime, série, ambiente e totais. Omitir `destinatario.email` para evitar o envio automático de XML/DANFE a terceiros. Gerar um identificador único de teste e salvar localmente o corpo exato e a `Idempotency-Key` antes de transmitir; resultados e dados privados ficam em `runtime/analises/fiscal/`, fora do Git.
-8. **Enviar uma vez.** `POST https://api.intnfe.com.br/nfe`, com token do emitente e `Idempotency-Key`. HTTP 202 e `correlationId` significam aceite para processamento, ainda não autorização fiscal.
-9. **Consultar o resultado.** `GET /nfe/{correlationId}`, com intervalo de 2–5 segundos e limite de acompanhamento; respeitar `Retry-After` quando recebido. Se ainda estiver em fila, registrar como pendente. Não disparar outra nota para tentar acelerar.
-10. **Guardar a evidência.** Quando autorizada, baixar `GET /nfe/{correlationId}/xml` e `/danfe`. Conferir no XML modelo 55, `tpAmb=2`, empresa, chave/protocolo, item e valor. Registrar situação, número, série, chave, protocolo e caminhos locais protegidos dos arquivos.
+5. **Cadastrar o CSC da NFC-e.** Obter o par de homologação na SEFAZ e gravar em `PUT /integrador/emitentes/{tenantId}/csc`; confirmar por `GET` sem expor o segredo. Esta etapa foi concluída para a LJ em 11/09/2026.
+6. **Conferir a numeração.** `GET /painel/numeracao`; usar a série combinada. A IntNFe atribui o número automaticamente por emitente/série/ambiente. Não zerar nem alterar uma sequência existente por tentativa.
+7. **Preparar destinatário e produto.** Preencher o [modelo do corpo](templates/INTNFE_NOTA_SIMPLES_HOMOLOGACAO.json) com os dados definidos. Há um item de uma unidade a R$ 1,00, pagamento em dinheiro de R$ 1,00 e ausência de frete/desconto apenas como cenário proposto. Confirmar esse cenário antes do envio. O exemplo contém marcadores e não está pronto para transmissão. Os campos de impostos devem ser adaptados ao caso; não copiar uma tributação arbitrária de exemplo como regra da empresa.
+8. **Revisar e registrar a tentativa.** Conferir emitente, destinatário, produto, regime, série, ambiente e totais. Omitir `destinatario.email` para evitar o envio automático de XML/DANFE a terceiros. Gerar um identificador único de teste e salvar localmente o corpo exato e a `Idempotency-Key` antes de transmitir; resultados e dados privados ficam em `runtime/analises/fiscal/`, fora do Git.
+9. **Enviar uma vez.** `POST https://api.intnfe.com.br/nfe`, com token do emitente e `Idempotency-Key`. HTTP 202 e `correlationId` significam aceite para processamento, ainda não autorização fiscal.
+10. **Consultar o resultado.** `GET /nfe/{correlationId}`, com intervalo de 2–5 segundos e limite de acompanhamento; respeitar `Retry-After` quando recebido. Se ainda estiver em fila, registrar como pendente. Não disparar outra nota para tentar acelerar.
+11. **Guardar a evidência.** Quando autorizada, baixar o XML e o DANFE na rota da família emitida. Conferir modelo 55 ou 65, `tpAmb=2`, empresa, chave/protocolo, item e valor. Registrar situação, número, série, chave, protocolo e caminhos locais protegidos dos arquivos.
 
 ### Se a resposta se perder
 
@@ -78,13 +109,14 @@ Releitura da [documentação da IntNFe](https://intnfe.com.br/api/doc) em 09/09/
 |---|---|---|
 | Reenvio seguro | Header `Idempotency-Key`, cache de 24 h e conflitos descritos | Usar desde o primeiro envio; validar repetição controlada depois da emissão inicial |
 | Reconciliação | `GET /nfe` com período, situação e paginação | Recuperação documentada; comprovar correspondência de uma tentativa incerta |
-| Eventos e comprovantes | `GET /nfe/{correlationId}/eventos`, XML e protocolo | Testar cancelamento/CC-e em etapa seguinte |
-| ICMS e ICMS-ST | Mais CST/CSOSN, origem e CEST descritos | Testar por cenário; a própria documentação ainda exclui CST 20/51/90 e IBS/CBS |
-| Descontos e frete | Desconto por item e grupo de frete/transportadora descritos | Testar totais e arredondamentos em etapa seguinte |
+| Eventos e comprovantes | `GET /nfe/{correlationId}/eventos`, XML e protocolo | CC-e, cancelamento de NF-e e inutilização comprovados; cancelamento da NFC-e ainda não concluiu |
+| ICMS e ICMS-ST | Na releitura após o login, a documentação passou a incluir CST 20/51/90, FCP, redução/diferimento, IPI e DIFAL | Passam a documentados; validar campos, cálculos e XML por cenário |
+| Descontos e frete | Desconto por item e rateio automático do frete descritos | Rateio comprovado no XML autorizado; PIX do mesmo cenário foi interpretado como cartão e rejeitado |
 | Referências a notas | `documentosReferenciados` descrito | Referenciar uma chave não comprova fluxo completo de devolução/finalidade e impostos |
 | Webhook e recuperação | HMAC, até cinco tentativas, reenvio e reconciliação descritos | Primeiro teste pode usar consulta; validar eventos e recuperação depois |
 | Retenção e arquivos | Prazos e download descritos; DANFE em HTML | Validar arquivo local; há aparente divergência entre XML “só autorizada” e menção posterior a canceladas/denegadas, a esclarecer antes de depender desse acesso |
-| NFC-e, NFS-e e reforma tributária | Não comprovadas para este piloto; IBS/CBS explicitamente não suportados no texto | Desenvolvimento/cobertura futuros, sem promessa de prontidão comercial |
+| NFC-e e reforma tributária | `POST /nfce` foi testado após o CSC; NFC-e simples autorizada com QR Code, CSOSN 900 e crédito do Simples. IBS/CBS continuam apenas documentados | Ampliar os cenários de NFC-e e validar a reforma tributária separadamente |
+| NFS-e | Não confirmada na documentação consultada | Cobertura futura a verificar |
 | Preço, suporte e operação | Não validados por este teste | Definir antes de contratar/ativar clientes em produção |
 
 Nenhum dos assuntos futuros será usado para exigir a integração completa antes da primeira nota simples. Continuam obrigatórios os dados, o certificado e a compatibilidade do cenário que será efetivamente enviado.
@@ -96,10 +128,280 @@ Nenhum dos assuntos futuros será usado para exigir a integração completa ante
 | Estudo e decisão preservados no projeto | Registrados |
 | Documentação pública e portal | Consultados |
 | Corpo mínimo | Modelo com marcadores preparado e JSON validado localmente |
-| Acesso de teste | Aguardando dados fornecidos pelo irmão/Lucas |
-| Empresa e certificado | Não consultados em sessão autenticada |
-| Destinatário | Não cadastrado nem transmitido |
-| Nota enviada/autorizada | Não executado |
-| Chave/XML/DANFE de teste | Ainda não obtidos |
+| Acesso ao portal | Confirmado; integrador renomeado de PetSys (smoke test) para CorePet — Lucas Guerra |
+| Acesso à API do integrador | Autenticação HTTP 200 e consulta HTTP 200 confirmadas |
+| Empresa | LJ criada e ativa; `tenantId` 4ef8812e-51da-4dd7-85dc-8b47df8c5148 |
+| Autenticação do emitente | HTTP 200, credencial própria armazenada com DPAPI |
+| Certificado | Upload e consulta HTTP 200; CNPJ correto, válido até 02/04/2027 |
+| CSC de homologação | Localizado na SEFAZ-SP, cadastrado na IntNFe com HTTP 204 e confirmado por GET |
+| Destinatário | Enviado no corpo da NF-e; não foi comprovado cadastro separado de comprador |
+| Nota enviada/autorizada | 1/001 rejeitada SCHEMA; 2/001 rejeitada 539; 1/003 autorizada. Todos em homologação |
+| Chave/XML/DANFE de teste | Chave/protocolo/XML da 1/003 conferidos. Valores e quantidade do DANFE corrigidos; frete e padronização decimal do item pendentes |
+| NFC-e de PDV | 1/023 autorizada, cStat 100; XML confirmou QR Code, ICMSSN900 e crédito do Simples; DANFE conferido em tela |
+| Eventos de NF-e | CC-e e cancelamento autorizados com código 135; inutilização homologada com código 102 |
+| Pendências do reteste | Pagamento 17/PIX virou cartão; NFC-e não mudou após cancelamento 202; numeração retornou `modelo: null` |
 
-O próximo passo operacional é receber/abrir o acesso liberado pelo irmão e identificar a empresa de teste. Não houve alteração de aplicação, banco, estoque, caixa ou implantação em produção.
+### Evidência do impedimento no cadastro
+
+- Rota: `POST /integrador/emitentes`.
+- CNPJ preparado para o teste: `33590794000140`.
+- Resultado: HTTP 409, código `EmitenteDuplicado`.
+- Mensagem retornada: “Já existe um emitente com o CNPJ 33590794000140.”
+- Identificador de diagnóstico `X-Correlation-Id`: `e88892115c064c68b697401fe1e7b79d`.
+- Horário do retorno registrado: 09/09/2026 às 22:48:47 UTC (19:48:47 em Brasília).
+- Duas solicitações de cadastro receberam 409; a segunda capturou a mensagem e o identificador para diagnóstico. Não houve resposta de criação nem credenciais de emitente retornadas.
+- Arquivos locais de evidência: `runtime/analises/fiscal/2026-09-09/cadastro_emitente_resultado.json` e `cadastro_emitente_erro.json`. Não contêm o segredo de acesso.
+
+### Nova tentativa após a exclusão informada pelo Lucas
+
+- Lucas informou que Ze Pet era seu cadastro e que ele foi excluído, autorizando nova tentativa.
+- A consulta autenticada confirmou **zero emitentes** visíveis na PetSys, com HTTP 200.
+- Uma nova chamada de cadastro com o mesmo CNPJ da LJ retornou HTTP 409 `EmitenteDuplicado` e a mesma mensagem de CNPJ existente.
+- Identificador de diagnóstico desta tentativa: `37c1b0a98cc14bd691857bb51c9a2077`.
+- Início registrado: 09/09/2026 às 23:20:58 UTC (20:20:58 em Brasília).
+- Evidência local: `runtime/analises/fiscal/2026-09-09/cadastro-20260909T232058Z.json`. O arquivo `cadastro_emitente_resultado.json` também aponta para esse resultado mais recente.
+- Não foram criados emitente, credenciais de emissão ou nota nessa tentativa.
+
+Naquele momento, o próximo passo era a equipe da IntNFe localizar o registro/validação que reservava o CNPJ `33590794000140`. Outro vínculo ou registro excluído eram hipóteses, não causas comprovadas. O bloqueio foi superado no cadastro confirmado às 21:19, registrado ao final. O CNPJ da empresa não foi substituído por um fictício.
+
+Na sequência, foram conferidos certificado, dados fiscais e série de homologação, conforme o registro final. As tentativas remotas descritas acima não alteraram aplicação, banco, estoque, caixa ou produção.
+
+### Preparação do vínculo no CorePet
+
+Por solicitação do Lucas, foi implementada a ativação opcional em **Configurações
+→ Integrações → IntNFe**, independente do cadastro inicial da conta. O CorePet
+consulta/cria o emitente, protege as credenciais por empresa e mostra a situação
+do certificado. Conflito de CNPJ e resposta perdida têm recuperação controlada.
+
+O código e a nova migration estão preparados para revisão. As validações locais
+usaram dados fictícios/respostas simuladas. O piloto remoto posterior resolveu
+o cadastro, validou o A1 e chegou à rejeição de schema detalhada abaixo.
+Não houve emissão, habilitação ou deploy em produção.
+
+Configuração, contrato e pendências: [guia da ativação](ATIVACAO_FISCAL_INTNFE.md)
+e [ficha de entrega](entregas/2026-09-09-ativacao-fiscal-intnfe.md).
+
+### Tentativa após a atualização de "Minha conta"
+
+- Lucas informou que o painel passou a permitir edição dos dados do integrador
+  e pediu nova tentativa do vínculo como emitente.
+- Na sessão PetSys, `/conta` mostra nome, contato e acesso do integrador; o CNPJ
+  dessa conta continua separado do CNPJ da empresa emitente. Não foram alterados
+  dados cadastrais, senha ou secret do integrador.
+- Nova autenticação do integrador: HTTP 200. Consulta dos emitentes: HTTP 200,
+  lista vazia. Novo POST com o CNPJ da LJ: **HTTP 409**.
+- Horário: 09/09/2026 às **21:00:21 em Brasília** (10/09/2026 00:00:21 UTC).
+- Protocolo `X-Correlation-Id`: `02d1de67c4eb434eb1d7c9f4e64b7bf9`.
+- Evidência: `runtime/analises/fiscal/2026-09-09/cadastro-20260910T000021Z.json`.
+- Nenhum emitente ou segredo de emitente foi retornado. A alteração do painel
+  foi conferida; o conflito na criação pela API ainda depende de verificação
+  da equipe IntNFe. Não repetir automaticamente nem usar CNPJ fictício.
+
+### Nova versão: login pelo CNPJ
+
+- A atualização seguinte foi confirmada no painel: o login da conta de
+  integrador PetSys é `11.444.777/0001-61`; a tela agora permite trocar somente
+  a senha, sem editar o login. A sessão existente permaneceu válida. Não foi
+  realizado um novo login por senha nem alterada a senha.
+- O CNPJ da empresa que se pretende cadastrar como emitente continua sendo
+  `33.590.794/0001-40`, da LJ. Os dois papéis não foram confundidos no POST.
+- Após a atualização, autenticação e consulta da API retornaram HTTP 200,
+  novamente sem emitentes visíveis. Uma nova tentativa manual de criação
+  retornou **HTTP 409, `EmitenteDuplicado`**.
+- Horário: 09/09/2026 às **21:09:30 em Brasília** (10/09/2026 00:09:30 UTC).
+- Protocolo: `fa91fa6b79e541d082ae9b6e5436f47f`.
+- Evidência: `runtime/analises/fiscal/2026-09-09/cadastro-20260910T000930Z.json`.
+- A alteração de login foi observada; o vínculo do emitente continua pendente
+  de correção/verificação pela IntNFe. Nenhum documento fiscal foi enviado.
+
+### Cadastro concluído após remoção dos emitentes
+
+- Às 21:18, Lucas informou que seu irmão removeu todos os emitentes e pediu
+  identificar melhor a conta de integrador.
+- No site, o nome foi alterado de **PetSys (smoke test)** para
+  **CorePet — Lucas Guerra**. A tela confirmou “Dados de cadastro salvos”.
+  CNPJ, login e senha do integrador não foram alterados.
+- Às **21:19:43 de Brasília** (10/09/2026 00:19:43 UTC), foi iniciada uma única
+  criação da LJ após autenticação HTTP 200 e lista vazia. O cliente HTTP usado
+  no teste recusou seguir um redirecionamento inseguro no retorno; o status/corpo
+  original não foi capturado. Não foi seguida conexão HTTP sem TLS.
+- Foi feita **consulta, sem repetir o POST de criação**. Ela confirmou a LJ
+  ativa, e o painel mostrou **1 emitente e zero notas**. Identificador:
+  `4ef8812e-51da-4dd7-85dc-8b47df8c5148`, CNPJ `33590794000140`.
+- Como o segredo retornado uma única vez não foi recebido, foi recuperado o
+  acesso **somente ao emitente recém-criado neste teste**: rotação controlada de
+  seu `clientSecret`, HTTP 200, seguida de armazenamento local DPAPI. Essa
+  recuperação pontual não muda a regra de não rotacionar contas existentes
+  automaticamente, nem a implementação do CorePet. O segredo do integrador não
+  foi rotacionado.
+- Às **21:22:29**, a autenticação própria da LJ em `/auth/token` retornou HTTP
+  200. `GET /certificados` retornou **404 `SemCertificado`**.
+- `GET /painel/numeracao` retornou HTTP 200, sem registros de numeração
+  identificados. Nenhuma série/numeração foi alterada.
+- Evidências locais: `cadastro-20260910T001943Z.json` registra o envio iniciado;
+  `emissor-lj-vinculado.json` registra a confirmação e consultas. Ambos em
+  `runtime/analises/fiscal/2026-09-09/`. A credencial fica somente em
+  `intnfe-emitente.dpapi`, protegida e ignorada pelo Git.
+- Naquele momento, faltavam o A1 e a preparação da nota. As etapas seguintes
+  foram executadas conforme o registro abaixo.
+
+### Certificado aceito e primeira NF-e processada
+
+- Lucas forneceu o arquivo PFX da LJ e sua senha e autorizou usar um cliente e
+  um produto já cadastrados no Bling **apenas em homologação**.
+- O PFX foi aberto localmente com chave efêmera, sem instalar certificado no
+  Windows. CNPJ correto, chave privada presente e validade conferida. A senha
+  foi protegida com DPAPI; arquivo e senha não entram no Git.
+- Às **21:27:24 de Brasília**, `POST /certificados` e a consulta posterior
+  retornaram HTTP 200. Validade de 02/04/2026 a **02/04/2027**, `expirado: false`.
+- Cadastro fiscal: CRT Simples Nacional (`"1"`), IE `562465456112`, Avenida
+  Brasil 2550, CEP 19013-002, Presidente Prudente/SP, IBGE `3541406`. O bairro
+  **Vila Industrial** foi confirmado na [consulta do CNPJ](https://brasilapi.com.br/api/cnpj/v1/33590794000140)
+  e na [consulta do CEP](https://viacep.com.br/ws/19013002/json/). O Bling mostrava
+  `SP` no bairro; seu cadastro foi apenas consultado, sem edição.
+- Referência somente para leitura: NF-e **017697, série 2**, já autorizada no
+  Bling. Um item, SKU `022860.1/1`, MGZ EXT COELHOS ORNAMENTAIS 1,2 KG, quantidade
+  1, valor R$ 199,00, desconto R$ 127,77, total R$ 71,23. NCM `23099010`, CFOP
+  `5405`, CEST `2200100`, origem 0, CSOSN 500, PIS/COFINS CST 49 com valores
+  zerados, sem IPI. Foram mantidos os códigos fiscais da referência.
+- Destinatário da referência: CPF com dígitos verificadores válidos, endereço
+  em Mauá/SP conferido por CEP, IBGE `3529401`, indicador IE 9. Dados pessoais
+  completos ficam somente no payload local ignorado. Nome de homologação
+  explícito e e-mail omitido. Não houve emissão, salvamento ou outra alteração
+  na nota original do Bling.
+- O primeiro pedido HTTP foi recusado com **400**, pois o teste enviou `crt`
+  como número. Corrigido para string `"1"`, conforme o exemplo oficial. Uma
+  consulta confirmou lista vazia antes do novo envio. Payload, chave e resposta
+  da tentativa recusada foram preservados; ela não criou uma nota.
+- Às **21:37:43**, a solicitação corrigida recebeu **HTTP 202**. Identificador
+  `d8026b27-c1e9-441f-b8a0-8f667a901376`; ambiente enviado `2`; numeração atribuída
+  **1/001**. O payload e a chave de idempotência foram gravados antes do POST.
+- Às **21:37:45**, o processamento terminou com **status 4 — Rejeitada**,
+  código `SCHEMA`. O XML de `ICMSSN500` apresenta `vICMSSTRet` onde o schema
+  espera `pST`; os grupos gerados para PIS/COFINS também rejeitam o CST `49`.
+  [Retorno e parâmetros para diagnóstico](DIAGNOSTICO_INTNFE_NFE_HOMOLOGACAO_2026-09-09.md).
+- O portal confirmou **1 nota e 1 rejeição** para a LJ. Chave, protocolo e
+  autorização permanecem ausentes; XML autorizado e DANFE não foram obtidos.
+  A nota rejeitada não foi reenviada nem teve a tributação trocada para passar.
+- Evidências privadas em `runtime/analises/fiscal/2026-09-09/`:
+  `certificado-lj-validado.json`, `nota-lj-piloto-payload.json`,
+  `nota-lj-piloto-controle.json`, `nota-lj-piloto-resposta.json` e
+  `nota-lj-piloto-status.json`. O script de envio bloqueia nova transmissão
+  depois de iniciado o pedido; uma retomada exige consultar e revisar o estado.
+
+Naquele momento, a próxima ação era corrigir/validar a montagem dos impostos.
+O vínculo real pelo fluxo autenticado do CorePet DEV continua separado deste
+piloto direto de API e ainda precisa de validação ponta a ponta.
+
+### Reteste solicitado por Lucas — retorno mudou para duplicidade
+
+- Às **22:38:58 de Brasília**, novo POST com o mesmo JSON recebeu HTTP 202.
+  Antes dele, a nota anterior foi consultada e seguia rejeitada. Hash SHA-256
+  confirmou payload idêntico; nova chave de idempotência e evidência própria
+  foram gravadas sem sobrescrever a tentativa anterior.
+- Correlação: `9b91430f-836f-4e50-9b87-18d3c621ae00`. A API atribuiu **2/001**,
+  ambiente homologação. Não houve alteração de cliente, item, impostos,
+  total, série ou ambiente no corpo enviado.
+- Às **22:39:03**, status 4, código **539**, mensagem de duplicidade de NF-e
+  com diferença na chave de acesso. Os erros de XML anteriores não apareceram.
+  [Comparação, chaves e recibo](DIAGNOSTICO_INTNFE_NFE_HOMOLOGACAO_2026-09-09.md).
+- A consulta da chave preexistente retornou 404 no emitente atual. Sua lista
+  contém somente as notas 1 e 2 rejeitadas. A numeração local aponta último 2,
+  próximo 3; isso não confirma que o próximo esteja livre na SEFAZ.
+- Nenhuma sequência foi alterada e não houve nova emissão após a rejeição.
+  O histórico anterior à remoção dos emitentes precisa ser conciliado pela
+  equipe IntNFe. A existência de uso antigo dessa série é hipótese a verificar.
+- Evidências em `runtime/analises/fiscal/2026-09-09/reteste-02/`, ignorado pelo
+  Git. Ainda sem protocolo, autorização, XML autorizado ou DANFE.
+
+Naquele momento, a próxima ação era reconciliar a numeração antes de reutilizar
+a série 001. Lucas sugeriu uma série diferente no teste seguinte.
+
+### Série 3 — primeira autorização e validação dos arquivos
+
+- Lucas sugeriu testar outra série, como 3 ou 4. Somente `serie` foi alterada
+  de `"1"` para `"3"`; comparação do JSON confirmou os demais campos mantidos.
+  Consulta prévia: última tentativa rejeitada, A1 válido, sem série 3 na
+  numeração da API. Nenhuma sequência foi editada.
+- **23:04:08 de Brasília:** POST com nova chave de idempotência, HTTP 202,
+  correlação `3a6cea68-0a2d-4b1d-b7db-aff339a30497`.
+- **23:04:11:** status 3, **Autorizada**, nota **1/003**, modelo 55, homologação.
+  Protocolo `135260008437173`, chave
+  `35260933590794000140550030000000011158859473`.
+- XML e DANFE baixados via API. No `nfeProc`, confirmados `cStat=100`, `tpAmb=2`
+  na NF-e e no protocolo, CNPJ correto, chave e protocolo iguais à consulta,
+  destinatário, um item, códigos fiscais, quantidade, valores e total R$ 71,23.
+  Grupos gerados: ICMSSN500, PISOutr e COFINSOutr, com CSOSN 500 e CST 49.
+- **Nova pendência do DANFE:** o HTML contém chave correta e aviso sem valor
+  fiscal, mas total `7.123,00` no lugar de `71,23`, produtos `19.900,00` no lugar
+  de `199,00`, desconto `12.777,00` no lugar de `127,77` e quantidade `100.000`
+  no lugar de 1. O XML autorizado tem os valores corretos. Hipótese: conversão
+  de separadores decimais; a causa interna cabe à IntNFe confirmar.
+- Evidências originais em `runtime/analises/fiscal/2026-09-09/reteste-03-serie3/`:
+  `NF-e-LJ-HOMOLOGACAO-1-003.xml`, `NF-e-LJ-HOMOLOGACAO-1-003.html`,
+  `validacao-arquivos.json`, payload, controle, preflight e respostas. Dados
+  pessoais e arquivos fiscais não foram incluídos no Git.
+- O teste comprova primeira autorização direta pela API, sem emissão pelo
+  CorePet/PDV e sem produção. A emissão autorizada está concluída; o DANFE
+  ainda não passou na conferência de correspondência com o XML.
+
+**Próxima ação:** corrigir e regenerar o DANFE da mesma nota autorizada, sem
+nova emissão para esse ajuste. Manter a conciliação da série 001 como pendência
+antes de voltar a usá-la. Para produção, levantar a sequência do Bling por
+CNPJ/série/ambiente: a numeração real é independente da homologação.
+
+### Nova consulta do DANFE sem emissão
+
+- **23:13:26 de Brasília:** confirmado HTTP 200 em
+  `GET /nfe/3a6cea68-0a2d-4b1d-b7db-aff339a30497/danfe`, com token do emitente.
+- Nota consultada antes/depois e XML lido novamente: autorização, protocolo,
+  chave, horário e XML preservados. Não foi feito POST de emissão.
+- O HTML ainda mostra total 7.123,00 e tem o mesmo hash da primeira obtenção.
+  Após a correção, repetir somente o GET do DANFE. A documentação não esclarece
+  geração a cada chamada versus cache; verificar isso no provedor se o HTML
+  continuar antigo depois da alteração.
+- Reconsulta e evidências privadas detalhadas no
+  [diagnóstico](DIAGNOSTICO_INTNFE_NFE_HOMOLOGACAO_2026-09-09.md).
+
+### Correção intermediária do DANFE conferida às 23:19
+
+- Após Lucas informar a publicação da correção, nova consulta do DANFE retornou
+  HTTP 200 para a mesma nota 1/003. Chave, protocolo, horário de autorização,
+  estado da nota e XML permaneceram iguais. Nenhum novo POST de emissão.
+- Produtos 199,00, desconto 127,77, total 71,23 e quantidade 1,000 agora
+  correspondem ao XML. A versão nova do HTML foi preservada separadamente.
+- Naquela versão, o XML tinha `modFrete=9` e o DANFE exibia 0, emitente.
+  Corrigir código/legenda da modalidade de transporte. A linha do item ainda
+  apresenta 199.00/0.00, precisando padronizar o separador decimal sem mudar
+  os valores. [Evidências e detalhes](DIAGNOSTICO_INTNFE_NFE_HOMOLOGACAO_2026-09-09.md).
+- Arquivos em `runtime/analises/fiscal/2026-09-09/reteste-03-serie3/`, com
+  sufixo `20260910T021940Z`. A próxima validação pode novamente buscar o
+  DANFE dessa nota, sem emissão adicional. Os dois pontos foram corrigidos na
+  consulta posterior das 00:02, registrada abaixo.
+
+### Nova rota de numeração e configuração no CorePet
+
+- `GET /integrador/emitentes/{tenantId}/numeracao` confirmado com HTTP 200.
+  Homologação: série 001 configurada até 1.000.000 (próxima 1.000.001), série 003
+  até 1 (próxima 2). Nenhuma linha de produção retornada; nenhum PUT realizado.
+- A numeração consultada não prova autorização de notas nesses números. A série
+  001 continua exigindo conciliação com a IntNFe; não tentar retrocedê-la.
+- Configuração implementada no CorePet para NF-e, por série e ambiente explícito,
+  com revisão, avanço somente, auditoria e confirmação por nova leitura. Lucas
+  escolheu permitir homologação e produção nessa configuração.
+- Testes locais de escrita são simulados. Falta validar o PUT pela conta DEV com
+  uma sequência escolhida para o piloto. [Guia](ATIVACAO_FISCAL_INTNFE.md#numeração-por-modelo-série-e-ambiente).
+
+### Impressão refeita — validação de dados e visual em 10/09
+
+- Nova chamada apenas a `GET /nfe/{correlationId}/danfe`, às 00:02 de Brasília.
+  Mesma autorização, chave, protocolo e XML; nenhum POST de emissão.
+- Dados corrigidos e coerentes com o XML: produtos 199,00, desconto 127,77,
+  total 71,23, quantidade 1, unitário 199,0000 e modalidade 9 - Sem frete.
+- No navegador e no PDF A4, o conteúdo está legível, alinhado e em uma folha,
+  sem cortes internos, sobreposições ou quebra de tabelas.
+- Pendência visual: o modo impressão elimina todas as margens, levando a borda
+  da folha ao limite físico. Impressoras comuns podem cortar esse contorno.
+- Pendência de paginação: como o HTML não declara A4, o padrão Carta gerou uma
+  segunda página totalmente em branco. Declarar o tamanho A4 e uma margem segura,
+  preservando uma única página. Depois, validar novamente sem emitir outra nota.
