@@ -11,7 +11,7 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from app.intnfe.client import IntNFeError
 from app.intnfe.numbering import emitter_access
-from app.intnfe.presentation import certificate_state, normalize_cnpj
+from app.intnfe.presentation import certificate_state
 
 MAX_CERTIFICATE_BYTES = 512 * 1024
 MAX_PASSWORD_LENGTH = 1024
