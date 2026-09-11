@@ -1,6 +1,6 @@
 # Indice operacional do Sistema Pet
 
-Atualizado em: 2026-09-09
+Atualizado em: 2026-09-11
 
 Este e o ponto de entrada oficial da documentacao. Se houver conflito entre este
 indice e um documento historico, use este indice e o guia mestre de maturidade.
@@ -24,6 +24,7 @@ Guia mestre:
 | Consultar integracoes externas | `docs/CATALOGO_INTEGRACOES.md` | Controles, modos de falha, responsaveis e lacunas |
 | Ativar vinculo fiscal IntNFe | `docs/ATIVACAO_FISCAL_INTNFE.md` | Configuracao, estados, recuperacao e ficha de entrega |
 | Testar NF-e de produto na IntNFe | `docs/FISCAL_INTNFE_PILOTO_HOMOLOGACAO.md` | Acesso, empresa/certificado e evidencias do teste em homologacao |
+| Validar NF-e de marketplace, NFC-e e Nota Fiscal Paulista | `docs/DIAGNOSTICO_INTNFE_BLING_MULTICANAL_2026-09-11.md` | Testes multicanal, bloqueios e proxima matriz de homologacao |
 | Planejar o modulo fiscal do CorePet | `docs/ESTUDO_BLING_E_ESTRUTURA_FISCAL_COREPET.md` | Estudo do Bling, capacidades do emissor e resultados do piloto |
 | Preparar entrega relevante | `docs/templates/FICHA_ENTREGA.md` | Criterios de aceite, risco, testes e rollback |
 | Registrar homologacao | `docs/templates/REGISTRO_HOMOLOGACAO.md` | Evidencias conforme `docs/PADRAO_EVIDENCIA.md` |

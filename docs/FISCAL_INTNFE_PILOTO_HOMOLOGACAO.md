@@ -1,5 +1,11 @@
 # IntNFe — primeiro teste de NF-e de produto
 
+**Atualização de 11/09/2026:** quatro cenários recentes de marketplace foram
+reproduzidos e autorizados em homologação, e a tentativa de NFC-e revelou os
+bloqueios de CSC e CSOSN 900. O resultado, incluindo cupom, Nota Fiscal Paulista,
+intermediador e pendências do CorePet, está no
+[diagnóstico multicanal](DIAGNOSTICO_INTNFE_BLING_MULTICANAL_2026-09-11.md).
+
 Registro iniciado em 09/09/2026. Situação atual em 10/09 às 00:02 de Brasília:
 **NF-e 1/003 autorizada em homologação**, total **R$ 71,23**, XML e protocolo
 conferidos. A nova impressão corrigiu valores, quantidade, frete e decimais da
@@ -59,7 +65,7 @@ Se já houver empresa cadastrada, consultar e reutilizar seu cadastro. Não rota
 | XML dos impostos | Concluído para o cenário: XML autorizado contém ICMSSN500, PISOutr e COFINSOutr, preservando CSOSN 500/CST 49 | Equipe IntNFe/Codex |
 | Numeração em homologação | Série 3 permitiu emitir. Conciliar o histórico da duplicidade 539 da série 1 antes de reutilizá-la | Equipe IntNFe |
 | Nota autorizada e XML | Concluído: nota 1/003, cStat 100, tpAmb 2, chave/protocolo/destinatário/item/totais conferidos | Codex |
-| DANFE | Valores e quantidade corrigidos, confirmados às 23:19. Corrigir modalidade do frete (XML 9, DANFE 0) e uniformizar decimais dos itens. Validar na mesma nota | Equipe IntNFe |
+| DANFE | Valores, quantidade, frete e decimais corrigidos na reconsulta. Em 11/09, quatro DANFEs de marketplace também foram conferidos; resta reservar margem física segura no A4 | Equipe IntNFe/Codex |
 
 Solicitar credenciais por meio protegido ou entrada direta no portal; não colocar segredos/certificados em documentos, commits ou mensagens de diagnóstico. Os exemplos públicos da API não são credenciais de teste liberadas para uso.
 

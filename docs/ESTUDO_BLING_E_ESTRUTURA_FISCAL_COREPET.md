@@ -2,6 +2,13 @@
 
 Data da análise: 09/09/2026. Status: proposta para implementação, sem alteração de código ou banco.
 
+**Atualização de 11/09/2026:** a conta privada do Bling foi consultada com
+autorização do Lucas. Quatro NF-e recentes de marketplace foram reproduzidas e
+autorizadas pela IntNFe em homologação. A análise de NFC-e do PDV identificou
+bloqueios de CSC e CSOSN 900; os XMLs de marketplace perderam o grupo obrigatório
+do intermediador. Ver o
+[diagnóstico multicanal](DIAGNOSTICO_INTNFE_BLING_MULTICANAL_2026-09-11.md).
+
 **Atualização após o retorno do Lucas e do irmão, em 09/09/2026:** o próximo passo é obter acesso à IntNFe, cadastrar/vincular a empresa de teste e emitir uma NF-e simples de produto em homologação. As demais dúvidas orientam desenvolvimento futuro após os testes preliminares. O [roteiro do piloto](FISCAL_INTNFE_PILOTO_HOMOLOGACAO.md) registra a decisão, as pendências imediatas e a releitura mais recente da documentação. As etapas de construção do módulo abaixo não são pré-requisitos para esse primeiro teste externo.
 
 **Recomendação: criar um módulo fiscal próprio do CorePet, com notas e histórico independentes da venda, e conectar cada emissor por um adaptador.** O Bling serve de referência funcional; a IntNFe é uma candidata a executar a emissão. A escolha do fornecedor não deve determinar o formato dos dados internos do CorePet.
@@ -10,7 +17,11 @@ O primeiro recorte pode ser uma empresa, uma operação de venda de mercadorias 
 
 ## Alcance e evidências
 
-Foram consultados a documentação oficial da API v3, artigos de operação e configuração do Bling, a revisão da IntNFe feita nesta tarefa e o código local do CorePet. Não houve acesso à conta privada do Bling, emissão, cancelamento, mudança de configuração ou teste autenticado da API.
+Na análise inicial foram consultados a documentação oficial da API v3, artigos
+de operação e configuração do Bling, a revisão da IntNFe e o código local do
+CorePet. Em 11/09/2026, com autorização do Lucas, a conta privada do Bling também
+foi consultada e foram executadas emissões autenticadas somente na homologação da
+IntNFe. Não houve cancelamento nem mudança de configuração no Bling.
 
 Referência do código versionado: commit `6a5eaa13ad62269432939067cbb39684e4785069`. Havia alterações de outras atividades em arquivos de notas durante a análise. As observações sobre o legado precisam ser reconferidas depois que essas alterações forem concluídas. Em particular, já apareceu um novo módulo local de documentos; não se deve abrir uma segunda implementação concorrente.
 
