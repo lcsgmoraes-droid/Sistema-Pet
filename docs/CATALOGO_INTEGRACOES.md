@@ -558,9 +558,11 @@ Toda integração nova ou alterada deve registrar, antes da homologação:
   Conciliar a duplicidade 539 da série
   001 antes de reutilizá-la; não impediu a autorização na série 003.
   Em 11/09, quatro NF-e de marketplace foram autorizadas, mas perderam o grupo
-  `infIntermed`; uma quinta nota com frete foi rejeitada com cStat 535 porque o
-  contrato não permite compor o frete nos itens. NFC-e segue bloqueada por CSC e
-  pela ausência do CSOSN 900 no contrato.
+  `infIntermed`. Após a correção, nova NF-e foi autorizada com `indIntermed=1` e
+  `infIntermed` completo. O contrato também passou a aceitar CSOSN 900 e crédito
+  do Simples; a prova no modelo 65 aguarda o CSC de homologação. Uma nota com
+  frete segue rejeitada com cStat 535 porque o contrato não permite compor o frete
+  nos itens.
   Emissão pelo CorePet não implementada nesta etapa. Flag desligada por padrão.
 - **Evidência:** `backend/app/intnfe/`, `backend/tests/unit/test_intnfe_*.py`,
   `backend/tests/integration/test_intnfe_postgres.py`,

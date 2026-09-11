@@ -2,8 +2,10 @@
 
 **Atualização de 11/09/2026:** quatro cenários recentes de marketplace foram
 reproduzidos e autorizados em homologação, e a tentativa de NFC-e revelou os
-bloqueios de CSC e CSOSN 900. O resultado, incluindo cupom, Nota Fiscal Paulista,
-intermediador e pendências do CorePet, está no
+bloqueios iniciais de CSC e CSOSN 900. Depois da atualização, o intermediador foi
+comprovado em novo XML autorizado e o contrato passou a aceitar CSOSN 900; a prova
+no modelo 65 ainda depende do CSC. O resultado, incluindo cupom, Nota Fiscal
+Paulista, intermediador, frete e pendências do CorePet, está no
 [diagnóstico multicanal](DIAGNOSTICO_INTNFE_BLING_MULTICANAL_2026-09-11.md).
 
 Registro iniciado em 09/09/2026. Situação atual em 10/09 às 00:02 de Brasília:
