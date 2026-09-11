@@ -7,7 +7,7 @@ from sqlalchemy.dialects import postgresql
 from app.tenant_rls_migration import iter_tenant_rls_statements
 
 revision = "zzn20260909a1"
-down_revision = "zzm20260909a1"
+down_revision = "zzl20260909a1"
 branch_labels = None
 depends_on = None
 

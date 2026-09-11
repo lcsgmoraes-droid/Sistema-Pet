@@ -226,8 +226,9 @@ def test_invalid_context_blocks_read_and_write(
             permissions_decorator, "check_permission", lambda *_a, **_kw: None
         )
     pilot.db.commit()
-    assert client.get("/intnfe/numeracao").status_code in {404, 409}
-    assert client.put("/intnfe/numeracao", json=body()).status_code in {404, 409}
+    expected = {403} if mode == "other_tenant" else {404, 409}
+    assert client.get("/intnfe/numeracao").status_code in expected
+    assert client.put("/intnfe/numeracao", json=body()).status_code in expected
     assert store.writes == [] and store.reads == []
 
 

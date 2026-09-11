@@ -20,6 +20,8 @@ class Settings(BaseSettings):
     # Integracoes externas
     # Ativacao opcional do emitente. Nao habilita emissao fiscal em producao.
     INTNFE_ACTIVATION_ENABLED: bool = False
+    # UUIDs separados por virgula. Vazio bloqueia todos os tenants; "*" libera todos.
+    INTNFE_ACTIVATION_TENANT_IDS: str = ""
     INTNFE_INTEGRADOR_ID: str = ""
     INTNFE_INTEGRADOR_SECRET: SecretStr = SecretStr("")
 

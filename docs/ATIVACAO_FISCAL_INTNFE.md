@@ -25,7 +25,8 @@ antes de associá-las à empresa. Não há rotação automática de segredo.
   a versão do backend que disponibiliza a tela. Ela acrescenta somente
   `intnfe_connections`; não altera vendas, estoque ou financeiro.
 - Configurar no ambiente seguro do **backend**, nunca em variável `VITE_*`:
-  `INTNFE_ACTIVATION_ENABLED=true`, `INTNFE_INTEGRADOR_ID` e
+  `INTNFE_ACTIVATION_ENABLED=true`, `INTNFE_ACTIVATION_TENANT_IDS` com os UUIDs
+  liberados no piloto (separados por vírgula), `INTNFE_INTEGRADOR_ID` e
   `INTNFE_INTEGRADOR_SECRET`.
 - Manter `PAYMENT_CONFIG_ENCRYPTION_KEY` estável e protegida. A integração usa o
   mecanismo existente de criptografia das configurações por empresa. Produção

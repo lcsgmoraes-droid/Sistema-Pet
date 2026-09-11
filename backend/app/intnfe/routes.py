@@ -113,6 +113,18 @@ def _view(db, tenant_id):
     )
 
 
+def _require_pilot_tenant(tenant_id):
+    allowed = {
+        value.strip().lower()
+        for value in settings.INTNFE_ACTIVATION_TENANT_IDS.split(",")
+        if value.strip()
+    }
+    if "*" not in allowed and str(tenant_id).strip().lower() not in allowed:
+        raise HTTPException(
+            403, "A configuração fiscal ainda não foi liberada para esta empresa."
+        )
+
+
 @router.get("/status", response_model=ActivationView)
 def status(
     db: Session = Depends(get_session),
@@ -120,6 +132,7 @@ def status(
 ):
     _user, tenant_id = user_and_tenant
     set_current_tenant(tenant_id)
+    _require_pilot_tenant(tenant_id)
     try:
         return _view(db, tenant_id)
     except ActivationError as exc:
@@ -129,6 +142,7 @@ def status(
 def _run(db, user_and_tenant, operation, action):
     user, tenant_id = user_and_tenant
     set_current_tenant(tenant_id)
+    _require_pilot_tenant(tenant_id)
     try:
         connection = action(tenant_id)
         log_action(
@@ -215,6 +229,7 @@ def numbering_route(
 ):
     _user, tenant_id = user_and_tenant
     set_current_tenant(tenant_id)
+    _require_pilot_tenant(tenant_id)
     try:
         return read_numbering(db, tenant_id, api)
     except NumberingError as exc:
@@ -232,6 +247,7 @@ def advance_numbering_route(
 ):
     user, tenant_id = user_and_tenant
     set_current_tenant(tenant_id)
+    _require_pilot_tenant(tenant_id)
 
     def audit(connection_id, result, last, change, error=None):
         try:
@@ -296,6 +312,7 @@ def csc_route(
 ):
     _user, tenant_id = user_and_tenant
     set_current_tenant(tenant_id)
+    _require_pilot_tenant(tenant_id)
     try:
         return read_csc(db, tenant_id, api)
     except CscError as exc:
@@ -313,6 +330,7 @@ def save_csc_route(
 ):
     user, tenant_id = user_and_tenant
     set_current_tenant(tenant_id)
+    _require_pilot_tenant(tenant_id)
 
     def audit(connection_id, result, previous_id, change, error=None):
         try:
