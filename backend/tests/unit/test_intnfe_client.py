@@ -140,18 +140,29 @@ def test_numbering_invalid_path_is_rejected_before_network(api):
 
 def test_csc_uses_integrator_get_and_put_without_expecting_secret_back(api):
     api.session.request.return_value = response(
-        body={"temCsc": True, "cscId": "000001"}
+        body={
+            "temCscHomologacao": True,
+            "cscIdHomologacao": "000001",
+            "temCscProducao": False,
+            "cscIdProducao": None,
+        }
     )
     assert api.csc("token", "emitente-teste") == {
-        "temCsc": True,
-        "cscId": "000001",
+        "temCscHomologacao": True,
+        "cscIdHomologacao": "000001",
+        "temCscProducao": False,
+        "cscIdProducao": None,
     }
     assert api.session.request.call_args.args == (
         "GET",
         BASE_URL + "/integrador/emitentes/emitente-teste/csc",
     )
 
-    payload = {"cscId": "000001", "csc": "codigo-ficticio"}
+    payload = {
+        "cscId": "000001",
+        "csc": "codigo-ficticio",
+        "ambienteCodigo": 2,
+    }
     api.session.request.return_value = response(status=204)
     assert api.set_csc("token", "emitente-teste", payload) is None
     assert api.session.request.call_args.args == (

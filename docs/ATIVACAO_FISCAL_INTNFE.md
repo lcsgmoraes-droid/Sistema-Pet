@@ -1,4 +1,4 @@
-# Ativação fiscal e numeração da NF-e com a IntNFe
+# Ativação fiscal, CSC e numeração com a IntNFe
 
 Data: 2026-09-09. Situação: implementação para desenvolvimento; homologação do fluxo CorePet pendente.
 
@@ -11,8 +11,8 @@ em teste**. O cadastro inicial da conta não depende da disponibilidade do emiss
 1. O CorePet confere CNPJ, razão social e nome fantasia nos dados da empresa.
 2. Consulta os emitentes da conta do integrador e cria o cadastro quando cabível.
 3. Salva as credenciais do emitente com criptografia e verifica o certificado A1.
-4. Mostra a situação e as pendências. Com vínculo válido, disponibiliza o cartão
-   **Numeração da NF-e**, separado por série e ambiente. Não emite uma nota nesta etapa.
+4. Mostra a situação e as pendências. Com vínculo válido, disponibiliza CSC e
+   numeração separados por modelo, série e ambiente. Não emite uma nota nesta etapa.
 
 Um cadastro encontrado pelo CNPJ exige comprovação de acesso com `clientId` e
 `clientSecret` **do emitente**. A tela não recebe os códigos do integrador. O
@@ -49,9 +49,9 @@ fluxo de publicação do repositório, além da homologação abaixo.
 | `POST /intnfe/consultar` | Consulta o emissor/certificado; nunca cria emitente remoto. |
 | `POST /intnfe/vincular` | Recebe `client_id` e `client_secret` para comprovar acesso a um cadastro existente. |
 | `GET /intnfe/numeracao` | Consulta as sequências do emitente da empresa autenticada. |
-| `PUT /intnfe/numeracao` | Avança uma sequência de NF-e após nova consulta, auditoria e confirmação por leitura. |
-| `GET /intnfe/csc` | Consulta se o CSC de homologação está cadastrado e qual é o ID; o segredo nunca retorna. |
-| `PUT /intnfe/csc` | Grava o CSC de homologação após consulta, revisão explícita e auditoria sem o segredo. |
+| `PUT /intnfe/numeracao` | Avança uma sequência de NF-e ou NFC-e após nova consulta, auditoria e confirmação por leitura. |
+| `GET /intnfe/csc` | Consulta separadamente homologação e produção, informando presença e ID; o segredo nunca retorna. |
+| `PUT /intnfe/csc` | Grava o CSC do ambiente escolhido após consulta, revisão explícita e auditoria sem o segredo. |
 
 As rotas usam exclusivamente a empresa da sessão autenticada. Não aceitam um
 tenant ou CNPJ arbitrário como destino. A resposta contém mensagem, etapas,
@@ -66,13 +66,14 @@ CNPJ ou da conta do integrador exige revisão de suporte; não reaproveita segre
 de outra empresa. Nomes corrigidos são considerados numa nova tentativa após uma
 recusa confirmada, antes de existir vínculo.
 
-## Numeração por série e ambiente
+## Numeração por modelo, série e ambiente
 
-Em **Configurações → Integrações → IntNFe → Numeração da NF-e**, o usuário consulta
-o último número alcançado e o próximo número de cada série. Escolhe homologação
-(padrão) ou produção, informa a série e o **próximo número desejado**, revisa os
-valores anterior/novo e confirma. Produção tem indicação própria na revisão.
-Lucas autorizou os dois ambientes para esta configuração; isso não libera emissão.
+Em **Configurações → Integrações → IntNFe → Numeração fiscal**, o usuário consulta
+o último número alcançado e o próximo número de cada série. Escolhe NF-e (55) ou
+NFC-e (65), homologação (padrão) ou produção, informa a série e o **próximo número
+desejado**, revisa os valores anterior/novo e confirma. Produção tem indicação
+própria na revisão. Lucas autorizou os dois ambientes para esta configuração;
+isso não libera emissão.
 
 Exemplo: para continuar com a NF-e 4.501, o formulário recebe `4501` e o backend
 envia `ultimoNumero: 4500`. Se uma série ainda não existe e começará no 1, não há
@@ -95,9 +96,9 @@ Contrato interno de escrita, sem tenant/CNPJ/credenciais no corpo:
 O backend utiliza **GET e PUT `/integrador/emitentes/{tenantId}/numeracao`** com
 token do integrador, após verificar o vínculo remoto pelo CNPJ e pelos IDs
 armazenados para a empresa autenticada. Envia `serie`, `ultimoNumero`,
-`ambienteCodigo` e `modelo` explicitamente. A tela está limitada à **NF-e (55)**;
-o leitor tolera séries de NFC-e (65) retornadas junto, sem oferecê-las para ajuste.
-Não há nova tabela/migration; a IntNFe é a fonte da sequência.
+`ambienteCodigo` e `modelo` explicitamente. NF-e e NFC-e aparecem no mesmo cartão,
+mas cada combinação mantém a sua própria sequência. Não há nova tabela/migration;
+a IntNFe é a fonte da sequência.
 
 - Série de 0 a 889, normalizada (`003` e `3` identificam a mesma série).
 - Próximo número inteiro de 1 a 999.999.999. Bloqueia repetição e retrocesso.
@@ -119,12 +120,11 @@ Não há nova tabela/migration; a IntNFe é a fonte da sequência.
   envio. Se a gravação do resultado falhar, é necessário consultar para conciliar.
 - A troca de empresa desmonta o formulário e descarta a revisão anterior.
 
-Validação real **somente GET**, com HTTP 200: a série 001 de homologação retornou
-`ultimoNumero: 1000000` / `proximoNumero: 1000001`; a série 003 retornou `1` / `2`.
-Nenhuma série de produção apareceu nessa consulta. Isso descreve a configuração
-do emissor, não comprova emissão desses números. Nenhum PUT real foi realizado
-para testar esta tela; as escritas foram simuladas. A origem do avanço da série
-001 permanece para conciliação com a IntNFe, sem tentar retroceder.
+No reteste de 11/09, o GET externo passou a devolver `modelo: null` em todas as
+linhas, contrariando o exemplo e a separação por modelo descritos na documentação.
+O CorePet recusa essa resposta em vez de exibir uma série ambígua como NF-e ou
+NFC-e. Nenhum PUT real foi feito por esta tela; as escritas continuam validadas
+por testes simulados até a IntNFe voltar a identificar cada linha com 55 ou 65.
 
 ## CSC da NFC-e
 
@@ -133,15 +133,15 @@ fica em **NFC-e → Serviços → Gerenciar Código de Segurança (ambiente de t
 e exige o certificado digital da empresa. O CorePet consulta e grava o CSC pela
 IntNFe sem persistir o segredo localmente nem incluí-lo em auditoria.
 
-O contrato da IntNFe consultado em 11/09/2026 afirma que homologação e produção
-usam CSCs diferentes, mas `GET`/`PUT /integrador/emitentes/{tenantId}/csc` ainda
-não recebem `ambienteCodigo`. Por isso, a tela atual aceita apenas homologação.
-Produção deve permanecer bloqueada até o fornecedor separar os ambientes no
-contrato ou documentar de forma inequívoca como os dois valores coexistem.
+O contrato atualizado da IntNFe separa os CSCs. O PUT recebe
+`ambienteCodigo: 1|2`; o GET devolve presença e ID de homologação e produção em
+campos distintos. O CorePet mostra os dois estados, exige a escolha explícita do
+ambiente e confirma por nova leitura que o ambiente oposto permaneceu inalterado.
 
-No piloto da LJ, o `PUT` externo respondeu 204 e o `GET` posterior confirmou o
-ID cadastrado. Uma NFC-e de homologação foi autorizada em seguida, comprovando o
-uso do CSC sem registrar seu valor neste repositório.
+No piloto da LJ, o CSC de homologação legado apareceu como ausente após a mudança
+do contrato. O mesmo valor protegido foi recadastrado com `ambienteCodigo: 2`;
+o PUT respondeu 204, o GET confirmou apenas homologação e uma NFC-e foi autorizada.
+A equipe IntNFe precisa confirmar se os cadastros anteriores serão migrados.
 
 ## Falhas e recuperação
 

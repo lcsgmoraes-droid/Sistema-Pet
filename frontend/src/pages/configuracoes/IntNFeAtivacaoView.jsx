@@ -34,12 +34,12 @@ export default function IntNFeAtivacaoView({
               Emissão de notas com a IntNFe
             </h2>
             <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
-              Prepare sua empresa para os testes de NF-e de produtos.
+              Prepare sua empresa para os testes de NF-e e NFC-e de produtos.
             </p>
           </div>
         </div>
         <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-900">
-          Homologação · sem valor fiscal
+          Ativação em teste · sem valor fiscal
         </span>
       </header>
 

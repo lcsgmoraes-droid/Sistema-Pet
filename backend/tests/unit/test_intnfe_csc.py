@@ -25,7 +25,12 @@ def body(**changes):
 
 class Store:
     def __init__(self):
-        self.state = {"temCsc": False, "cscId": None}
+        self.state = {
+            "temCscHomologacao": False,
+            "cscIdHomologacao": None,
+            "temCscProducao": False,
+            "cscIdProducao": None,
+        }
         self.reads = []
         self.writes = []
         self.error = None
@@ -44,7 +49,9 @@ class Store:
         self.writes.append(deepcopy(payload))
         if self.error:
             raise self.error
-        self.state = {"temCsc": True, "cscId": payload["cscId"]}
+        suffix = "Producao" if payload["ambienteCodigo"] == 1 else "Homologacao"
+        self.state[f"temCsc{suffix}"] = True
+        self.state[f"cscId{suffix}"] = payload["cscId"]
 
 
 @pytest.fixture
@@ -61,18 +68,34 @@ def test_reads_and_saves_homologation_csc_without_exposing_secret(store, http_pi
     response = client.get("/intnfe/csc")
     assert response.status_code == 200
     assert response.json() == {
-        "ambiente_codigo": 2,
-        "ambiente": "homologacao",
-        "tem_csc": False,
-        "csc_id": None,
+        "ambientes": [
+            {
+                "ambiente_codigo": 2,
+                "ambiente": "homologacao",
+                "tem_csc": False,
+                "csc_id": None,
+            },
+            {
+                "ambiente_codigo": 1,
+                "ambiente": "producao",
+                "tem_csc": False,
+                "csc_id": None,
+            },
+        ]
     }
 
     response = client.put("/intnfe/csc", json=body())
     assert response.status_code == 200, response.text
-    assert response.json()["tem_csc"] is True
-    assert response.json()["csc_id"] == "000001"
+    assert response.json()["ambientes"][0]["tem_csc"] is True
+    assert response.json()["ambientes"][0]["csc_id"] == "000001"
     assert "codigo-csc-ficticio" not in response.text
-    assert store.writes == [{"cscId": "000001", "csc": "codigo-csc-ficticio"}]
+    assert store.writes == [
+        {
+            "cscId": "000001",
+            "csc": "codigo-csc-ficticio",
+            "ambienteCodigo": 2,
+        }
+    ]
     assert [item["new_value"]["resultado"] for item in access["audits"]] == [
         "solicitado",
         "confirmado",
@@ -82,7 +105,7 @@ def test_reads_and_saves_homologation_csc_without_exposing_secret(store, http_pi
 
 def test_existing_csc_requires_explicit_replacement(store, http_pilot):
     client, _access, _app = http_pilot
-    store.state = {"temCsc": True, "cscId": "000001"}
+    store.state.update({"temCscHomologacao": True, "cscIdHomologacao": "000001"})
     request = body(csc_id_consultado="000001")
     response = client.put("/intnfe/csc", json=request)
     assert response.status_code == 422
@@ -96,7 +119,7 @@ def test_existing_csc_requires_explicit_replacement(store, http_pilot):
 
 def test_stale_csc_screen_requires_refresh(store, http_pilot):
     client, _access, _app = http_pilot
-    store.state = {"temCsc": True, "cscId": "000002"}
+    store.state.update({"temCscHomologacao": True, "cscIdHomologacao": "000002"})
     response = client.put(
         "/intnfe/csc",
         json=body(csc_id_consultado="000001", confirmar_substituicao=True),
@@ -109,7 +132,8 @@ def test_stale_csc_screen_requires_refresh(store, http_pilot):
 @pytest.mark.parametrize(
     "changes",
     [
-        {"ambiente_codigo": 1},
+        {"ambiente_codigo": 3},
+        {"ambiente_codigo": True},
         {"ambiente_codigo": "2"},
         {"csc_id": ""},
         {"csc_id": "../outro"},
@@ -118,15 +142,98 @@ def test_stale_csc_screen_requires_refresh(store, http_pilot):
         {"tenant_id": "outra-empresa"},
     ],
 )
-def test_invalid_or_production_payload_never_reaches_provider(
-    store, http_pilot, changes
-):
+def test_invalid_payload_never_reaches_provider(store, http_pilot, changes):
     client, _access, _app = http_pilot
     secret = "codigo-csc-ficticio"
     response = client.put("/intnfe/csc", json=body(**changes))
     assert response.status_code == 422
     assert secret not in response.text
     assert store.reads == [] and store.writes == []
+
+
+def test_production_csc_is_saved_without_changing_homologation(store, http_pilot):
+    client, access, _app = http_pilot
+    store.state.update({"temCscHomologacao": True, "cscIdHomologacao": "homologacao-1"})
+
+    response = client.put(
+        "/intnfe/csc",
+        json=body(ambiente_codigo=1, csc_id="producao-1"),
+    )
+
+    assert response.status_code == 200, response.text
+    assert store.writes == [
+        {
+            "cscId": "producao-1",
+            "csc": "codigo-csc-ficticio",
+            "ambienteCodigo": 1,
+        }
+    ]
+    assert response.json()["ambientes"] == [
+        {
+            "ambiente_codigo": 2,
+            "ambiente": "homologacao",
+            "tem_csc": True,
+            "csc_id": "homologacao-1",
+        },
+        {
+            "ambiente_codigo": 1,
+            "ambiente": "producao",
+            "tem_csc": True,
+            "csc_id": "producao-1",
+        },
+    ]
+    assert access["audits"][0]["old_value"] == {
+        "cscId": None,
+        "ambienteCodigo": 1,
+    }
+
+
+def test_write_that_changes_other_environment_is_not_confirmed(
+    pilot, store, http_pilot
+):
+    client, _access, _app = http_pilot
+    store.state.update({"temCscProducao": True, "cscIdProducao": "producao-existente"})
+    original_write = store.write
+
+    def overwrite_both(token, emitter, payload):
+        original_write(token, emitter, payload)
+        store.state.update({"temCscProducao": False, "cscIdProducao": None})
+
+    pilot.api.set_csc = overwrite_both
+    response = client.put("/intnfe/csc", json=body())
+
+    assert response.status_code == 503
+    assert response.json()["detail"]["codigo"] == "ResultadoNaoConfirmado"
+    assert len(store.writes) == 1
+
+
+@pytest.mark.parametrize(
+    "remote_state",
+    [
+        {"temCsc": True, "cscId": "formato-legado"},
+        {
+            "temCscHomologacao": True,
+            "cscIdHomologacao": None,
+            "temCscProducao": False,
+            "cscIdProducao": None,
+        },
+        {
+            "temCscHomologacao": "true",
+            "cscIdHomologacao": "000001",
+            "temCscProducao": False,
+            "cscIdProducao": None,
+        },
+    ],
+)
+def test_invalid_remote_state_is_blocked(store, http_pilot, remote_state):
+    client, _access, _app = http_pilot
+    store.state = remote_state
+
+    response = client.get("/intnfe/csc")
+
+    assert response.status_code == 503
+    assert response.json()["detail"]["codigo"] == "RespostaInvalida"
+    assert store.writes == []
 
 
 def test_permission_and_auth_are_required(store, http_pilot):

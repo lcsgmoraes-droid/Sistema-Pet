@@ -1,12 +1,12 @@
 # IntNFe — primeiro teste de NF-e de produto
 
-**Atualização de 11/09/2026:** quatro cenários recentes de marketplace foram
-reproduzidos e autorizados em homologação, e a tentativa de NFC-e revelou os
-bloqueios iniciais de CSC e CSOSN 900. Depois da atualização, o intermediador foi
-comprovado em novo XML autorizado. Em 11/09, o CSC de homologação foi cadastrado
-e uma NFC-e modelo 65 foi autorizada com CSOSN 900 e crédito do Simples no XML.
-O resultado, incluindo cupom, Nota Fiscal
-Paulista, intermediador, frete e pendências do CorePet, está no
+**Atualização de 11/09/2026:** quatro cenários recentes de marketplace e NFC-e de
+PDV foram reproduzidos em homologação. Intermediador, CSOSN 900, crédito do
+Simples, rateio de frete, descrição automática da NFC-e, CC-e, cancelamento de
+NF-e e inutilização foram comprovados. Restaram falhas no pagamento PIX,
+cancelamento da NFC-e e identificação do modelo na listagem de numeração. O
+resultado, incluindo cupom, Nota Fiscal Paulista, logística e pendências do
+CorePet, está no
 [diagnóstico multicanal](DIAGNOSTICO_INTNFE_BLING_MULTICANAL_2026-09-11.md).
 
 Registro iniciado em 09/09/2026. Situação atual em 10/09 às 00:02 de Brasília:
@@ -109,9 +109,9 @@ Releitura da [documentação da IntNFe](https://intnfe.com.br/api/doc) em 09/09/
 |---|---|---|
 | Reenvio seguro | Header `Idempotency-Key`, cache de 24 h e conflitos descritos | Usar desde o primeiro envio; validar repetição controlada depois da emissão inicial |
 | Reconciliação | `GET /nfe` com período, situação e paginação | Recuperação documentada; comprovar correspondência de uma tentativa incerta |
-| Eventos e comprovantes | `GET /nfe/{correlationId}/eventos`, XML e protocolo | Testar cancelamento/CC-e em etapa seguinte |
+| Eventos e comprovantes | `GET /nfe/{correlationId}/eventos`, XML e protocolo | CC-e, cancelamento de NF-e e inutilização comprovados; cancelamento da NFC-e ainda não concluiu |
 | ICMS e ICMS-ST | Na releitura após o login, a documentação passou a incluir CST 20/51/90, FCP, redução/diferimento, IPI e DIFAL | Passam a documentados; validar campos, cálculos e XML por cenário |
-| Descontos e frete | Desconto por item e grupo de frete/transportadora descritos | Testar totais e arredondamentos em etapa seguinte |
+| Descontos e frete | Desconto por item e rateio automático do frete descritos | Rateio comprovado no XML autorizado; PIX do mesmo cenário foi interpretado como cartão e rejeitado |
 | Referências a notas | `documentosReferenciados` descrito | Referenciar uma chave não comprova fluxo completo de devolução/finalidade e impostos |
 | Webhook e recuperação | HMAC, até cinco tentativas, reenvio e reconciliação descritos | Primeiro teste pode usar consulta; validar eventos e recuperação depois |
 | Retenção e arquivos | Prazos e download descritos; DANFE em HTML | Validar arquivo local; há aparente divergência entre XML “só autorizada” e menção posterior a canceladas/denegadas, a esclarecer antes de depender desse acesso |
@@ -138,6 +138,8 @@ Nenhum dos assuntos futuros será usado para exigir a integração completa ante
 | Nota enviada/autorizada | 1/001 rejeitada SCHEMA; 2/001 rejeitada 539; 1/003 autorizada. Todos em homologação |
 | Chave/XML/DANFE de teste | Chave/protocolo/XML da 1/003 conferidos. Valores e quantidade do DANFE corrigidos; frete e padronização decimal do item pendentes |
 | NFC-e de PDV | 1/023 autorizada, cStat 100; XML confirmou QR Code, ICMSSN900 e crédito do Simples; DANFE conferido em tela |
+| Eventos de NF-e | CC-e e cancelamento autorizados com código 135; inutilização homologada com código 102 |
+| Pendências do reteste | Pagamento 17/PIX virou cartão; NFC-e não mudou após cancelamento 202; numeração retornou `modelo: null` |
 
 ### Evidência do impedimento no cadastro
 
@@ -388,7 +390,7 @@ CNPJ/série/ambiente: a numeração real é independente da homologação.
   com revisão, avanço somente, auditoria e confirmação por nova leitura. Lucas
   escolheu permitir homologação e produção nessa configuração.
 - Testes locais de escrita são simulados. Falta validar o PUT pela conta DEV com
-  uma sequência escolhida para o piloto. [Guia](ATIVACAO_FISCAL_INTNFE.md#numeração-por-série-e-ambiente).
+  uma sequência escolhida para o piloto. [Guia](ATIVACAO_FISCAL_INTNFE.md#numeração-por-modelo-série-e-ambiente).
 
 ### Impressão refeita — validação de dados e visual em 10/09
 

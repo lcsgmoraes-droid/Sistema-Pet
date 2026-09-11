@@ -323,7 +323,10 @@ def save_csc_route(
                 action="intnfe_csc",
                 entity_type="intnfe_connection",
                 entity_id=connection_id,
-                old_value={"cscId": previous_id, "ambienteCodigo": 2},
+                old_value={
+                    "cscId": previous_id,
+                    "ambienteCodigo": change["ambienteCodigo"],
+                },
                 new_value={
                     **change,
                     "resultado": result,

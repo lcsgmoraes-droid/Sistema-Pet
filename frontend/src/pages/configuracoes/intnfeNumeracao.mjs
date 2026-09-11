@@ -1,19 +1,21 @@
 const formatInteger = new Intl.NumberFormat("pt-BR");
 export const formatSequence = (value) => formatInteger.format(value);
 export const environmentName = (code) => (Number(code) === 1 ? "Produção" : "Homologação");
+export const documentName = (model) => (Number(model) === 65 ? "NFC-e" : "NF-e");
 
-export function currentSequence(rows, serie, environment) {
+export function currentSequence(rows, serie, environment, model) {
   if (!/^[0-9]{1,3}$/.test(serie) || Number(serie) > 889) return null;
+  if (![55, 65].includes(Number(model))) return null;
   return (
     rows.find(
       (row) =>
         Number(row.serie) === Number(serie) &&
         row.ambienteCodigo === Number(environment) &&
-        row.modelo === 55,
+        row.modelo === Number(model),
     ) ?? {
       serie: String(Number(serie)),
       ambienteCodigo: Number(environment),
-      modelo: 55,
+      modelo: Number(model),
       ultimoNumero: 0,
       proximoNumero: 1,
       nova: true,
@@ -24,7 +26,8 @@ export function currentSequence(rows, serie, environment) {
 export function prepareNumbering(rows, form) {
   if (!Array.isArray(rows)) return { error: "Consulte a numeração antes de ajustar." };
   if (!["1", "2"].includes(String(form.ambiente_codigo))) return { error: "Escolha o ambiente." };
-  const current = currentSequence(rows, form.serie, form.ambiente_codigo);
+  if (!["55", "65"].includes(String(form.modelo))) return { error: "Escolha o documento fiscal." };
+  const current = currentSequence(rows, form.serie, form.ambiente_codigo, form.modelo);
   if (!current) return { error: "Informe uma série de 0 a 889." };
   if (current.proximoNumero > 999999999)
     return { error: "Esta série atingiu o limite de numeração. Escolha outra série." };
@@ -41,7 +44,7 @@ export function prepareNumbering(rows, form) {
     payload: {
       serie: current.serie,
       ambiente_codigo: Number(form.ambiente_codigo),
-      modelo: 55,
+      modelo: Number(form.modelo),
       proximo_numero: next,
       ultimo_numero_consultado: current.ultimoNumero,
     },

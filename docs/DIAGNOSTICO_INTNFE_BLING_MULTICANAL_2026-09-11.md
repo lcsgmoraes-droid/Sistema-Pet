@@ -38,6 +38,11 @@ feito depois da correção está registrado abaixo.
 | Intermediador de marketplace | Nova NF-e Amazon autorizada com cStat 100; XML contém `indIntermed=1`, `infIntermed`, CNPJ e `idCadIntTran` corretos | **Comprovada** |
 | CSOSN 900 e crédito do Simples | NFC-e modelo 65 autorizada com cStat 100; XML contém `ICMSSN900`, `pCredSN=1,3600` e `vCredICMSSN=2,72` | **Comprovada** |
 | CSC da NFC-e | CSC ativo de homologação localizado na SEFAZ-SP, `PUT` da IntNFe respondeu 204 e o `GET` posterior confirmou o cadastro | **Comprovado em homologação** |
+| Frete automático nos itens | A mesma venda com R$ 5,59 de frete autorizou com dinheiro; XML contém `vFrete=5.59` no item e no total | **Comprovada** |
+| Descrição da NFC-e em homologação | NFC-e enviada com a descrição natural do produto autorizou; o XML trouxe automaticamente a frase exigida pela SEFAZ | **Comprovada** |
+| Eventos da NF-e | CC-e e cancelamento autorizados com código 135; consulta de eventos trouxe protocolos e a nota passou para Cancelada | **Comprovada** |
+| Inutilização | Faixa de teste homologada com código 102, protocolo e presença na listagem | **Comprovada** |
+| Cancelamento da NFC-e | POST respondeu 202, mas a NFC-e continuou Autorizada nas consultas; a rota equivalente de eventos retornou 404 | **Não confirmado** |
 
 A tentativa anterior no modelo 55 recebeu cStat 600 porque não reproduzia o
 documento de origem: o cupom do Bling é modelo 65. O novo teste no modelo correto
@@ -60,18 +65,21 @@ a informação encontrada nas notas consultadas no Bling. Esse dado provavelment
 não representa a liquidação real dos marketplaces e precisa ser validado com a
 contabilidade antes de virar regra do CorePet.
 
-### Teste adicional de frete e Pix
+### Reteste de frete e Pix
 
 Uma quinta NF-e reproduziu uma venda recente do TikTok com um item, desconto de
-R$ 6,00, frete de R$ 5,59, total de R$ 38,49 e pagamento Pix. A IntNFe aceitou a
-requisição para processamento, mas a SEFAZ rejeitou a nota com código 535:
-**“Total do Frete difere do somatório dos itens”**.
+R$ 6,00, frete de R$ 5,59, total de R$ 38,49 e pagamento Pix. Antes da correção,
+a SEFAZ a rejeitou com código 535 porque o frete do total não aparecia nos itens.
 
-O corpo documentado pela IntNFe permite informar apenas `frete.valor` no nível da
-nota. O objeto `Produto` não oferece um campo para ratear o frete entre os itens.
-Assim, o total recebeu R$ 5,59, mas os itens não conseguiram compor o mesmo valor.
-A equipe IntNFe precisa distribuir o frete internamente ou expor e documentar o
-valor de frete por item. A tentativa foi rejeitada, sem XML autorizado.
+No reteste, a IntNFe passou a ratear automaticamente `frete.valor`. Com pagamento
+em dinheiro, a nota foi autorizada com cStat 100; o XML confirmou `vFrete=5.59`
+no item e no total, além de `vNF=38.49`. Portanto, o problema do frete está
+resolvido.
+
+Com `formaPagamento: "17"`, que a documentação identifica como PIX, a mesma nota
+foi rejeitada com cStat 391: a SEFAZ entendeu a forma como cartão e exigiu dados
+da operação. Alterar somente a forma para dinheiro fez o cenário autorizar. O
+mapeamento ou a serialização do código 17 precisa ser corrigido pela IntNFe.
 
 ## Estados e tributação
 
@@ -132,6 +140,11 @@ de homologação deve ser obtido na SEFAZ. Com o ID e o token em mãos, o integr
 pode cadastrá-los em `PUT /integrador/emitentes/{tenantId}/csc`; o `GET` da mesma
 rota informa apenas se existe CSC e qual é seu ID, sem devolver o segredo.
 
+O contrato atualizado recebe `ambienteCodigo` no PUT e devolve estados separados
+para homologação e produção no GET. O CSC antigo apareceu ausente após a mudança;
+foi necessário recadastrar o valor protegido em homologação. Isso liberou o novo
+teste, mas a política de migração dos cadastros anteriores deve ser confirmada.
+
 A Nota Fiscal Paulista não é outro modelo de nota nem exige uma segunda emissão.
 Quando o consumidor pede CPF ou CNPJ, o documento eletrônico deve identificar o
 comprador; a transmissão à SEFAZ alimenta o programa. Portanto, depois de liberar
@@ -151,12 +164,13 @@ autorização:
 | NFC-e com `crt` em texto | HTTP 422 `OperacaoInvalida` | Emitente sem CSC de NFC-e; a requisição parou antes de validar os impostos |
 | NFC-e após o CSC | cStat 373 | A SEFAZ exige a frase padrão de homologação na descrição do primeiro item; a IntNFe não a substituiu automaticamente |
 | NFC-e com descrição padrão | **Autorizada, cStat 100** | XML modelo 65 confirmou CSC, QR Code, `ICMSSN900`, crédito do Simples e total |
+| Reteste com descrição natural | **Autorizada, cStat 100** | A IntNFe substituiu automaticamente a descrição do primeiro item pela frase obrigatória de homologação |
 
 Não é correto trocar o CSOSN 900 por outro código apenas para fazer o teste passar.
 O contrato atualizado aceita `icms.cst=900` e mapeia `icms.aliquota` e
 `icms.valor` para `pCredSN` e `vCredICMSSN`; o XML autorizado comprovou o
-mapeamento. Para homologação, o CorePet deve aplicar a descrição exigida pela
-SEFAZ antes do envio ou a IntNFe deve fazê-lo no construtor.
+mapeamento. A substituição automática da descrição no construtor da IntNFe foi
+confirmada no reteste.
 
 ## Pendências priorizadas
 
@@ -164,11 +178,12 @@ SEFAZ antes do envio ou a IntNFe deve fazê-lo no construtor.
 
 | Pendência | O que falta | Responsável sugerido |
 |---|---|---|
-| Rateio do frete por item | Corrigir a rejeição 535: distribuir `frete.valor` nos itens ou expor o campo correspondente no objeto `Produto` | Equipe IntNFe |
+| Pagamento PIX | Corrigir o mapeamento de `formaPagamento: "17"`, documentado como PIX, mas enviado à SEFAZ como cartão e rejeitado com cStat 391 | Equipe IntNFe |
 | Regra fiscal por operação | Confirmar com a contabilidade CFOP, CSOSN/CST, benefícios, DIFAL/FCP e natureza por estado/canal | Empresa/contador |
 | Separação de ambientes | Manter CSC, série, numeração e credenciais explicitamente separados entre homologação e produção | CorePet/IntNFe |
-| Contrato do CSC por ambiente | A documentação diz que os CSCs de homologação e produção são diferentes, mas o `PUT`/`GET .../csc` não recebe `ambienteCodigo`; a IntNFe deve separar ou esclarecer o armazenamento antes de habilitarmos produção | Equipe IntNFe |
-| Descrição do item em homologação | Automatizar a frase padrão exigida pela SEFAZ no primeiro item do modelo 65; sem isso, a NFC-e recebe cStat 373 | CorePet/IntNFe |
+| Identificação da numeração | Corrigir `GET /painel/numeracao`, que devolveu `modelo: null` em todas as séries; sem 55/65 o CorePet não pode identificar a sequência | Equipe IntNFe |
+| Cancelamento da NFC-e | Processar ou expor o resultado do cancelamento aceito com HTTP 202; a nota permaneceu Autorizada e não há consulta de eventos NFC-e documentada | Equipe IntNFe |
+| Migração do CSC | Confirmar se CSCs cadastrados antes da separação por ambiente serão migrados; homologação apareceu ausente e exigiu recadastro | Equipe IntNFe |
 
 ### P1 — necessários para equivalência com as notas reais
 
@@ -184,7 +199,7 @@ SEFAZ antes do envio ou a IntNFe deve fazê-lo no construtor.
 
 ### P2 — completar antes de ampliar a operação
 
-- Cancelamento, Carta de Correção, inutilização e consulta de eventos.
+- Tela e persistência de cancelamento, CC-e, inutilização e consulta de eventos no CorePet; os eventos de NF-e já foram comprovados diretamente na IntNFe.
 - Recuperação após timeout, repetição com idempotência e reconciliação por chave.
 - Contingência da NFC-e e comportamento do caixa quando a SEFAZ estiver indisponível.
 - Devolução, nota complementar, nota de ajuste e referência ao documento original.
@@ -252,8 +267,8 @@ mensagens de diagnóstico.
 1. Emitir uma NFC-e com CPF para validar a Nota Fiscal Paulista.
 2. Validar impressão física do DANFE em bobina de 80 mm, depois cancelamento e
    reconsulta.
-3. Corrigir o rateio do frete e repetir a amostra rejeitada com cStat 535.
-4. Automatizar a descrição padrão do primeiro item da NFC-e em homologação.
+3. Corrigir o pagamento PIX e repetir a amostra rejeitada com cStat 391.
+4. Confirmar o cancelamento da NFC-e e a forma de consultar seu evento.
 5. Repetir o intermediador nos demais marketplaces como regressão, sem prioridade
    sobre os bloqueios ainda abertos.
 6. Definir e homologar o contrato de entrada de pedidos do EcommerceAI.

@@ -526,9 +526,9 @@ Toda integração nova ou alterada deve registrar, antes da homologação:
 
 - **Finalidade e direção:** enviar CNPJ, razão social e nome fantasia para criar
   emitente quando o usuário optar pela integração; consultar vínculo e A1.
-  Consultar/avançar a numeração de NF-e com GET/PUT de integrador, por série e
-  ambiente (homologação/produção explicitamente escolhidos), e configurar o CSC
-  de homologação da NFC-e, sem emitir notas.
+  Consultar/avançar a numeração de NF-e e NFC-e com GET/PUT de integrador, por
+  modelo, série e ambiente explicitamente escolhidos, e configurar o CSC da
+  NFC-e separadamente em homologação e produção, sem emitir notas.
 - **Autenticação e segredos:** token do integrador com variáveis exclusivas do
   backend; token do emitente com `clientSecret` cifrado por empresa. Respostas
   públicas sem segredos. Permissão `configuracoes.editar` e módulo `integracoes`.
@@ -563,11 +563,14 @@ Toda integração nova ou alterada deve registrar, antes da homologação:
   `infIntermed`. Após a correção, nova NF-e foi autorizada com `indIntermed=1` e
   `infIntermed` completo. O contrato também passou a aceitar CSOSN 900 e crédito
   do Simples; após o cadastro do CSC de homologação, uma NFC-e modelo 65 foi
-  autorizada e o XML confirmou `ICMSSN900`, `pCredSN` e `vCredICMSSN`. Uma nota com
-  frete segue rejeitada com cStat 535 porque o contrato não permite compor o frete
-  nos itens. O contrato do CSC ainda não recebe `ambienteCodigo`; por isso, a
-  configuração criada no CorePet fica restrita à homologação até a IntNFe
-  separar ou esclarecer o armazenamento de produção.
+  autorizada e o XML confirmou `ICMSSN900`, `pCredSN` e `vCredICMSSN`. Em novo
+  reteste, rateio automático do frete, descrição de homologação, CC-e,
+  cancelamento de NF-e e inutilização foram confirmados. Permanecem externos:
+  pagamento 17 documentado como PIX foi serializado como cartão e rejeitado com
+  cStat 391; cancelamento da NFC-e foi aceito com 202, mas continuou autorizado;
+  e a listagem de numeração passou a devolver `modelo: null`. O contrato do CSC
+  agora separa ambientes e o CorePet foi ajustado; o CSC legado precisou ser
+  recadastrado em homologação, pendente confirmar a migração no provedor.
   Emissão pelo CorePet não implementada nesta etapa. Flag desligada por padrão.
 - **Evidência:** `backend/app/intnfe/`, `backend/tests/unit/test_intnfe_*.py`,
   `backend/tests/integration/test_intnfe_postgres.py`,
