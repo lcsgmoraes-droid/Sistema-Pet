@@ -24,6 +24,12 @@ CorePet. Em 11/09/2026, com autorização do Lucas, a conta privada do Bling tam
 foi consultada e foram executadas emissões autenticadas somente na homologação da
 IntNFe. Não houve cancelamento nem mudança de configuração no Bling.
 
+Na mesma data foi feita uma varredura somente de leitura nas preferências
+privadas do Bling: emissão, preenchimento, numeração e impressão de NF-e/NFC-e,
+certificado digital, naturezas de operação, inutilizações e cartas de correção.
+O inventário e o encaixe de cada responsabilidade no produto estão no
+[mapa das telas fiscais do CorePet](MAPA_TELAS_FISCAIS_COREPET_2026-09-11.md).
+
 Referência do código versionado: commit `6a5eaa13ad62269432939067cbb39684e4785069`. Havia alterações de outras atividades em arquivos de notas durante a análise. As observações sobre o legado precisam ser reconferidas depois que essas alterações forem concluídas. Em particular, já apareceu um novo módulo local de documentos; não se deve abrir uma segunda implementação concorrente.
 
 O OpenAPI atual foi localizado pelo JavaScript carregado pela [referência oficial](https://developer.bling.com.br/referencia), e não por uma cópia antiga encontrada em busca. Arquivo consultado: [openapi-DKXp8d1e.json](https://developer.bling.com.br/build/assets/openapi-DKXp8d1e.json). O nome desse arquivo pode mudar; a página de referência é o ponto de entrada duradouro.
@@ -46,11 +52,27 @@ Os webhooks do Bling têm assinatura, identificador do evento e empresa. Podem c
 
 **Conclusão de desenho:** precisamos controlar o documento, a comunicação com o fornecedor e os efeitos comerciais como responsabilidades distintas.
 
+### Varredura das telas fiscais do Bling
+
+A tela de configuração da NF-e separa ambiente/comunicação, preferências gerais,
+preenchimento, numeração, impressão e e-mail. A NFC-e tem ambiente, CSC,
+numeração e preenchimento próprios. O cadastro de natureza liga dados gerais da
+operação a regras de ICMS, IPI, PIS, COFINS, ISSQN, outros tributos e retenções,
+com critérios por destino e produto. Inutilizações e cartas de correção aparecem
+como históricos próprios, com pesquisa, período e protocolo.
+
+Isso confirma que a configuração cadastral atual do CorePet não substitui a
+configuração de emissão. Precisamos acrescentar a camada operacional e as
+naturezas versionadas. Os automatismos do Bling para estoque e contas não devem
+ser copiados: no CorePet, a venda/pedido continua sendo a origem desses efeitos,
+e a emissão apenas registra e reconcilia o resultado fiscal.
+
 ## 2. Base que já existe no CorePet
 
 | Área | Evidência local | Como aproveitar |
 |---|---|---|
 | Fiscal da empresa | [EmpresaConfigFiscal](C:/Users/lcs_g/Sistema-Pet/backend/app/empresa_config_fiscal_models.py) | Usar o cadastro existente como origem; acrescentar configuração de emissão e regras versionadas. |
+| Ativação IntNFe | [IntNFeIntegracao](C:/Users/lcs_g/Sistema-Pet/frontend/src/pages/configuracoes/IntNFeIntegracao.jsx) | Já cobre vínculo, certificado A1, CSC de homologação e numeração protegida da NF-e; ampliar o painel por modelo/ambiente e incluir a sequência da NFC-e. |
 | Fiscal dos produtos | [ProdutoConfigFiscal](C:/Users/lcs_g/Sistema-Pet/backend/app/produto_config_fiscal_models.py), configurações de kits e variações | Reaproveitar NCM, CEST, origem, CFOP e códigos tributários; validar completude e exceções. |
 | Vendas e recebimentos | [Venda e itens](C:/Users/lcs_g/Sistema-Pet/backend/app/vendas_models.py) | Continuam sendo a origem comercial. Os campos `nfe_*` atuais são uma ponte de compatibilidade. |
 | Consulta de notas externas | [BlingNotaFiscalCache](C:/Users/lcs_g/Sistema-Pet/backend/app/nfe_cache_models.py) | Reaproveitar listagem e importação; o cache não deve ser o único registro fiscal definitivo. |
@@ -170,11 +192,13 @@ Exemplo de cenário de teste, não regra tributária: uma venda de R$ 150,00 con
 | Tela/jornada | Conteúdo necessário | Prioridade |
 |---|---|---|
 | Configuração fiscal da empresa | Dados cadastrais, emissor, cobertura, ambiente, certificados/CSC conforme modelo, séries e homologação | Primeiro recorte |
+| Naturezas de operação | Finalidade, direção, modelo, série, presença e regras por destino/produto, com versão, vigência e revisão | Primeiro recorte |
 | Pendências fiscais | Produtos/clientes/serviços incompletos, certificado vencendo, natureza não configurada; motivo e atalho para correção | Primeiro recorte |
 | Emissão a partir da venda | Destinatário, itens selecionados, valores e totais, natureza/finalidade, revisão e envio | Primeiro recorte |
 | Central fiscal | Filtros por período, família, emitente, situação, origem; fila, busca por chave/número e ações permitidas | Evoluir CentralNFSaida |
 | Detalhe da nota | Dados preservados, situação, histórico, vínculo comercial, XML/PDF, protocolo, rejeição e consulta | Primeiro recorte |
 | Eventos | Cancelamento com justificativa, CC-e onde disponível, devolução e documentos referenciados | Cancelamento no piloto; demais por capacidade |
+| Inutilizações | Modelo, ambiente, série, faixa, justificativa, protocolo e XML do evento | Depois de confirmar o contrato da IntNFe |
 | Serviços | Tomador, local/competência, código de serviço, ISS/retenções, regras vigentes e vínculo com atendimento | Após cobertura municipal validada |
 | Contador e arquivo | Exportação por período/CNPJ/modelo, XMLs e eventos, registro de exportação | Antes de expansão comercial |
 
@@ -248,7 +272,9 @@ Migração proposta: manter as tabelas e contratos atuais em funcionamento, intr
 | Validar CNPJ piloto, localidade, regime e operações | Empresa piloto e contador | Define a tributação que será implementada e testada |
 | Obter matriz de capacidades e proposta comercial da IntNFe | Irmão/fornecedor | Confirma cobertura, limitações, suporte e custo por empresa/volume |
 | Validar reenvio seguro e recuperação documentados na IntNFe | Fornecedor e implementação | `Idempotency-Key` e `GET /nfe` estão descritos; falta comprovação em homologação |
-| Confirmar cancelamento/CC-e por API e configuração fiscal no Bling | Suporte Bling e implementação | Evita reaproveitar chamadas não comprovadas |
+| Confirmar cancelamento, CC-e e inutilização na IntNFe | Fornecedor e implementação | A interface só pode liberar eventos que tenham contrato e retorno conciliável comprovados |
+| Definir as naturezas do piloto | Empresa e contador | Substitui CFOP/tributação genéricos por regras explícitas para PDV, marketplace, destino e condição do cliente |
+| Ampliar a numeração para NFC-e | CorePet | A tela atual protege apenas o modelo 55, embora NF-e e NFC-e tenham sequências independentes |
 | Concluir e revisar as mudanças atuais em documentos/listagem | Trabalho de desenvolvimento em andamento | Mantém uma implementação coerente antes do novo núcleo |
 | Definir permissões, exportação e tratamento de credenciais | CorePet | Prepara operação multiempresa e atendimento ao contador |
 
