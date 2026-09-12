@@ -63,7 +63,10 @@ export default function V2FieldsSection() {
         </div>
       </StyleGuideExample>
 
-      <StyleGuideExample label="InputData / InputDataHora — máscara dd/mm/aaaa, valor exposto em ISO">
+      <StyleGuideExample
+        label="InputData / InputDataHora — máscara dd/mm/aaaa, valor exposto em ISO"
+        note="Abre um calendário ao focar o campo ou clicar no ícone — digitar continua funcionando normalmente."
+      >
         <div className="w-40">
           <InputData id="v2-data" label="Data de nascimento" value={data} onChange={setData} />
         </div>
@@ -77,7 +80,10 @@ export default function V2FieldsSection() {
         </div>
       </StyleGuideExample>
 
-      <StyleGuideExample label="InputPeriodo — compõe dois InputData (De/Até)">
+      <StyleGuideExample
+        label="InputPeriodo — compõe dois InputData (De/Até)"
+        note="Cada lado abre seu próprio calendário (herdado do InputData). Um seletor único com sombreado do intervalo é uma evolução futura, não implementada ainda."
+      >
         <div className="w-full max-w-sm">
           <InputPeriodo label="Período do relatório" value={periodo} onChange={setPeriodo} />
         </div>
@@ -117,7 +123,10 @@ export default function V2FieldsSection() {
         </div>
       </StyleGuideExample>
 
-      <StyleGuideExample label="InputTelefone / InputCpfCnpj — máscara progressiva, detecção automática">
+      <StyleGuideExample
+        label="InputTelefone / InputCpfCnpj — máscara progressiva, detecção automática"
+        note="InputCpfCnpj já aceita o CNPJ alfanumérico (Receita Federal, 2026) — letras nas 12 primeiras posições, os 2 dígitos verificadores finais continuam numéricos."
+      >
         <div className="w-48">
           <InputTelefone
             id="v2-telefone"
@@ -131,7 +140,10 @@ export default function V2FieldsSection() {
         </div>
       </StyleGuideExample>
 
-      <StyleGuideExample label="InputCombobox — busca, teclado, limpar seleção">
+      <StyleGuideExample
+        label="InputCombobox — busca, teclado, limpar seleção"
+        note='Ghost selection: digite um prefixo (ex.: "cach") e o restante da melhor opção aparece esmaecido — Tab confirma direto, sem precisar abrir a lista.'
+      >
         <div className="w-64">
           <InputCombobox label="Espécie" opcoes={ESPECIES} value={especie} onChange={setEspecie} />
         </div>

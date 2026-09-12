@@ -1,5 +1,5 @@
 import InputTexto from "../InputTexto/InputTexto";
-import { apenasDigitos, formatarCpfCnpjDigitos } from "../utils/mascaras";
+import { formatarDocumento } from "../utils/mascaras";
 
 export default function InputCpfCnpj({
   disabled = false,
@@ -12,21 +12,15 @@ export default function InputCpfCnpj({
   required = false,
   value = "",
 }) {
-  const aoDigitar = (novoTexto) => {
-    const digitos = apenasDigitos(novoTexto).slice(0, 14);
-    onChange?.(formatarCpfCnpjDigitos(digitos));
-  };
-
   return (
     <InputTexto
       disabled={disabled}
       error={error}
       help={help}
       id={id}
-      inputMode="numeric"
       label={label}
       name={name}
-      onChange={aoDigitar}
+      onChange={(novoTexto) => onChange?.(formatarDocumento(novoTexto))}
       placeholder="000.000.000-00"
       required={required}
       value={value}

@@ -20,13 +20,20 @@ export const styleGuideCatalog = [
         nome: "InputData / InputDataHora",
         status: "pronto",
         arquivo: "components/v2/InputData/",
-        descricao: "Máscara dd/mm/aaaa, valor em ISO",
+        descricao: "Máscara dd/mm/aaaa + seletor visual (CalendarioPainel), valor em ISO",
       },
       {
         nome: "InputPeriodo",
         status: "pronto",
         arquivo: "components/v2/InputPeriodo/InputPeriodo.jsx",
-        descricao: "Compõe dois InputData",
+        descricao: "Compõe dois InputData (cada lado com seu próprio calendário)",
+      },
+      {
+        nome: "CalendarioPainel",
+        status: "pronto",
+        arquivo: "components/v2/CalendarioPainel/CalendarioPainel.jsx",
+        descricao:
+          "Grade de mês reaproveitada por InputData/InputDataHora — não usar direto numa tela",
       },
       {
         nome: "InputCheck / InputRadio",
@@ -42,6 +49,7 @@ export const styleGuideCatalog = [
         nome: "InputTelefone / InputCpfCnpj",
         status: "pronto",
         arquivo: "components/v2/InputTelefone/, .../InputCpfCnpj/",
+        descricao: "CNPJ já aceita o formato alfanumérico da Receita Federal (2026)",
       },
       {
         nome: "InputCombobox",

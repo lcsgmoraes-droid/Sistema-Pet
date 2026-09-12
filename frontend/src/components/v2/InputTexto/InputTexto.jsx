@@ -14,6 +14,7 @@ const InputTexto = forwardRef(function InputTexto(
     name,
     onBlur,
     onChange,
+    onFocus,
     onKeyDown,
     placeholder,
     readOnly = false,
@@ -47,6 +48,7 @@ const InputTexto = forwardRef(function InputTexto(
           readOnly={readOnly}
           onChange={(event) => onChange?.(event.target.value)}
           onBlur={onBlur}
+          onFocus={onFocus}
           onKeyDown={onKeyDown}
           aria-invalid={Boolean(error)}
           aria-describedby={error || help ? `${id}-descricao` : undefined}

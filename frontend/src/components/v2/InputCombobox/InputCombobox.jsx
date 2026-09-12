@@ -43,6 +43,25 @@ export default function InputCombobox({
     return opcoes.filter((opcao) => normalizar(opcao.label).includes(alvo));
   }, [opcoes, termo]);
 
+  const sugestaoFantasma = useMemo(() => {
+    if (!termo || !aberto) return null;
+    const alvo = normalizar(termo);
+    return (
+      opcoes.find(
+        (opcao) => normalizar(opcao.label).startsWith(alvo) && opcao.label.length > termo.length,
+      ) || null
+    );
+  }, [opcoes, termo, aberto]);
+
+  useEffect(() => {
+    if (!sugestaoFantasma) {
+      setIndiceAtivo(0);
+      return;
+    }
+    const indice = filtradas.findIndex((opcao) => opcao.value === sugestaoFantasma.value);
+    if (indice >= 0) setIndiceAtivo(indice);
+  }, [sugestaoFantasma, filtradas]);
+
   useRevealFloatingPanel({ enabled: aberto, panelRef, refreshKey: filtradas.length });
 
   useEffect(() => {
@@ -67,6 +86,8 @@ export default function InputCombobox({
     } else if (evento.key === "ArrowUp") {
       evento.preventDefault();
       setIndiceAtivo((atual) => Math.max(atual - 1, 0));
+    } else if (evento.key === "Tab") {
+      if (sugestaoFantasma) escolher(sugestaoFantasma);
     } else if (evento.key === "Enter") {
       evento.preventDefault();
       if (aberto && filtradas[indiceAtivo]) escolher(filtradas[indiceAtivo]);
@@ -83,7 +104,27 @@ export default function InputCombobox({
           {required ? <span className="ml-0.5 text-red-500">*</span> : null}
         </span>
       ) : null}
-      <div className="relative mt-1">
+      <div
+        className={[
+          "relative mt-1 h-9 w-full rounded-lg border border-slate-300 transition-colors",
+          "focus-within:border-transparent focus-within:ring-2 focus-within:ring-blue-500",
+          "dark:border-slate-700 dark:focus-within:ring-cyan-400",
+          disabled
+            ? "cursor-not-allowed bg-slate-50 dark:bg-slate-800"
+            : "bg-white dark:bg-slate-900",
+        ].join(" ")}
+      >
+        {sugestaoFantasma ? (
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-0 flex items-center whitespace-pre px-3 pr-16 text-sm"
+          >
+            <span className="invisible">{termo}</span>
+            <span className="text-slate-400 dark:text-slate-500">
+              {sugestaoFantasma.label.slice(termo.length)}
+            </span>
+          </div>
+        ) : null}
         <input
           id={id}
           disabled={disabled}
@@ -93,12 +134,11 @@ export default function InputCombobox({
           onChange={(evento) => {
             setTermo(evento.target.value);
             setAberto(true);
-            setIndiceAtivo(0);
           }}
           onKeyDown={aoPressionarTecla}
-          className="h-9 w-full rounded-lg border border-slate-300 bg-white px-3 pr-16 text-sm text-slate-900 outline-none transition-colors focus:border-transparent focus:ring-2 focus:ring-blue-500 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:ring-cyan-400 dark:disabled:bg-slate-800 dark:disabled:text-slate-500"
+          className="absolute inset-0 z-10 h-9 w-full rounded-lg border-0 bg-transparent px-3 pr-16 text-sm text-slate-900 outline-none disabled:cursor-not-allowed disabled:text-slate-400 dark:text-slate-100 dark:placeholder:text-slate-500 dark:disabled:text-slate-500"
         />
-        <div className="absolute inset-y-0 right-1 flex items-center gap-0.5">
+        <div className="absolute inset-y-0 right-1 z-20 flex items-center gap-0.5">
           {permitirLimpar && selecionada ? (
             <button
               type="button"

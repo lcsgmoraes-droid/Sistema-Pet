@@ -75,22 +75,54 @@ export function formatarTelefoneDigitos(digitos) {
   return `(${numero.slice(0, 2)}) ${numero.slice(2, 7)}-${numero.slice(7)}`;
 }
 
-export function formatarCpfCnpjDigitos(digitos) {
-  const numero = digitos.slice(0, 14);
-  if (numero.length <= 11) {
-    return numero
-      .replace(/(\d{3})(\d)/, "$1.$2")
-      .replace(/(\d{3})(\d)/, "$1.$2")
-      .replace(/(\d{3})(\d{1,2})$/, "$1-$2");
-  }
-  return numero
-    .replace(/(\d{2})(\d)/, "$1.$2")
-    .replace(/(\d{3})(\d)/, "$1.$2")
-    .replace(/(\d{3})(\d)/, "$1/$2")
-    .replace(/(\d{4})(\d{1,2})$/, "$1-$2");
+function formatarCpfDigitos(digitos) {
+  const a = digitos.slice(0, 3);
+  const b = digitos.slice(3, 6);
+  const c = digitos.slice(6, 9);
+  const d = digitos.slice(9, 11);
+  let saida = a;
+  if (b) saida += `.${b}`;
+  if (c) saida += `.${c}`;
+  if (d) saida += `-${d}`;
+  return saida;
 }
 
-export function tipoDocumento(digitos) {
-  if (digitos.length > 11) return "cnpj";
-  return "cpf";
+function formatarCnpjAlfanumerico(caracteres) {
+  const a = caracteres.slice(0, 2);
+  const b = caracteres.slice(2, 5);
+  const c = caracteres.slice(5, 8);
+  const d = caracteres.slice(8, 12);
+  const e = caracteres.slice(12, 14);
+  let saida = a;
+  if (b) saida += `.${b}`;
+  if (c) saida += `.${c}`;
+  if (d) saida += `/${d}`;
+  if (e) saida += `-${e}`;
+  return saida;
+}
+
+// CNPJ, a partir de 2026 (Nota Tecnica COTEC/RFB), aceita letras nas 12
+// primeiras posicoes (base + ordem) - só os 2 digitos verificadores finais
+// continuam sendo sempre numericos. CPF permanece 100% numerico.
+export function extrairDocumento(bruto) {
+  const limpo = String(bruto || "")
+    .toUpperCase()
+    .replace(/[^0-9A-Z]/g, "");
+  const contemLetra = /[A-Z]/.test(limpo);
+
+  if (!contemLetra && limpo.length <= 11) {
+    return { tipo: "cpf", valor: limpo };
+  }
+
+  const base = limpo.slice(0, 12);
+  const digitosVerificadores = limpo
+    .slice(12)
+    .replace(/[^0-9]/g, "")
+    .slice(0, 2);
+  return { tipo: "cnpj", valor: `${base}${digitosVerificadores}`.slice(0, 14) };
+}
+
+export function formatarDocumento(bruto) {
+  const { tipo, valor } = extrairDocumento(bruto);
+  return tipo === "cpf" ? formatarCpfDigitos(valor) : formatarCnpjAlfanumerico(valor);
 }
