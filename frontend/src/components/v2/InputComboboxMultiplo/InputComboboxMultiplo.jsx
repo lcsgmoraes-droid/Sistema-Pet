@@ -186,7 +186,7 @@ export default function InputComboboxMultiplo({
             aria-autocomplete="list"
             aria-labelledby={labelId}
             aria-label={label ? undefined : placeholder}
-            className="relative z-10 h-6 w-full border-0 bg-transparent text-sm text-slate-900 outline-none dark:text-slate-100"
+            className="relative z-10 h-6 w-full border-0 bg-transparent text-sm text-slate-900 outline-none dark:!bg-transparent dark:!text-slate-100"
           />
         </div>
         <ChevronDown className="ml-auto h-4 w-4 shrink-0 text-slate-400" aria-hidden="true" />

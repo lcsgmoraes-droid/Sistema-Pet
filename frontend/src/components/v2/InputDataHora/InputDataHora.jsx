@@ -11,7 +11,7 @@ import {
 } from "../utils/mascaras";
 
 const campoHoraClasse =
-  "h-8 w-14 rounded-md border border-slate-300 bg-white px-2 text-center text-sm text-slate-900 outline-none focus:border-transparent focus:ring-2 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100";
+  "h-8 w-14 rounded-md border border-slate-300 bg-white px-2 text-center text-sm text-slate-900 outline-none focus:border-transparent focus:ring-2 focus:ring-blue-500 dark:!border-slate-700 dark:!bg-slate-950 dark:!text-slate-100";
 
 export default function InputDataHora({
   disabled = false,

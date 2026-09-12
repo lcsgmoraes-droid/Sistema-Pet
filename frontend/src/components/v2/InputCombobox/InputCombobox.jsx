@@ -146,7 +146,7 @@ export default function InputCombobox({
           aria-autocomplete="list"
           aria-labelledby={labelId}
           aria-label={label ? undefined : placeholder}
-          className="absolute inset-0 z-10 h-9 w-full rounded-lg border-0 bg-transparent px-3 pr-16 text-sm text-slate-900 outline-none disabled:cursor-not-allowed disabled:text-slate-400 dark:text-slate-100 dark:placeholder:text-slate-500 dark:disabled:text-slate-500"
+          className="absolute inset-0 z-10 h-9 w-full rounded-lg border-0 bg-transparent px-3 pr-16 text-sm text-slate-900 outline-none disabled:cursor-not-allowed disabled:text-slate-400 dark:!bg-transparent dark:!text-slate-100 dark:placeholder:!text-slate-500 dark:disabled:!text-slate-500"
         />
         <div className="absolute inset-y-0 right-1 z-20 flex items-center gap-0.5">
           {permitirLimpar && selecionada ? (

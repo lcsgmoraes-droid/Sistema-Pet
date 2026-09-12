@@ -62,11 +62,14 @@ const InputTexto = forwardRef(function InputTexto(
             "h-9 w-full rounded-lg border bg-white px-3 text-sm text-slate-900 outline-none transition-colors",
             "focus:border-transparent focus:ring-2",
             "disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400",
-            "dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-500",
-            "dark:disabled:bg-slate-800 dark:disabled:text-slate-500",
+            // dark:! (important) é necessário aqui: index.css tem uma regra legada
+            // (".dark input:not([type=checkbox]):not([type=radio])") com especificidade
+            // maior que as classes dark: do Tailwind, que sobrescreve bg/border/color.
+            "dark:!bg-slate-900 dark:!text-slate-100 dark:placeholder:!text-slate-500",
+            "dark:disabled:!bg-slate-800 dark:disabled:!text-slate-500",
             error
-              ? "border-red-500 focus:ring-red-500 dark:border-red-500 dark:focus:ring-red-400"
-              : "border-slate-300 focus:ring-blue-500 dark:border-slate-700 dark:focus:ring-cyan-400",
+              ? "border-red-500 focus:ring-red-500 dark:!border-red-500 dark:focus:ring-red-400"
+              : "border-slate-300 focus:ring-blue-500 dark:!border-slate-700 dark:focus:ring-cyan-400",
             right ? "pr-9" : "",
             alinhamentoTexto === "direita" ? "text-right" : "",
           ].join(" ")}

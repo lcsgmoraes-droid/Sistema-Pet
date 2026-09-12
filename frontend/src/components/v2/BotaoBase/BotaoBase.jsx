@@ -13,7 +13,7 @@ const VARIANTES = {
   informativo:
     "border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100 dark:border-blue-400/30 dark:bg-blue-500/10 dark:text-blue-200 dark:hover:bg-blue-500/20",
   atencao:
-    "border-amber-300 bg-amber-50 text-amber-800 hover:bg-amber-100 dark:border-amber-400/30 dark:bg-amber-500/10 dark:text-amber-200 dark:hover:bg-amber-500/20",
+    "border-amber-700 bg-amber-700 text-white hover:bg-amber-800 dark:border-amber-700 dark:bg-amber-700 dark:hover:bg-amber-800",
 };
 
 // Casca interna dos botões v2 — telas usam BotaoSalva/BotaoCancelar/BotaoExcluir/BotaoAjuda/BotaoInteracao, não este diretamente.
@@ -45,7 +45,7 @@ const BotaoBase = forwardRef(function BotaoBase(
       ].join(" ")}
     >
       {loading ? (
-        <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+        <Loader2 className="h-4 w-4 motion-safe:animate-spin" aria-hidden="true" />
       ) : Icone ? (
         <Icone className="h-4 w-4" aria-hidden="true" />
       ) : null}
