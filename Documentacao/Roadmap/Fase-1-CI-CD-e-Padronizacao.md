@@ -365,6 +365,11 @@ Uso esperado numa tela — repare que quem chama só decide texto/tamanho, nunca
 
 Ter os componentes (1.6 e 1.7) não resolve sozinho — sem um lugar único que diga **quando** usar cada um, a inconsistência volta pela porta dos fundos: cor errada por `intent` mal escolhido, campo usado fora do contexto certo, modal remontado do zero por quem não sabia que a casca já existia. É o mesmo risco que [[Matriz-de-Riscos]] já registra em R09 sobre o padrão de pasta por domínio: **documentar sozinho não basta se não for fácil de achar e difícil de deixar desatualizado.**
 
+> ✅ **Duas regras de processo definidas na prática, em 2026-09-12, a partir de um bug visual real** (label renderizando com cor errada nos campos legados do próprio style guide):
+>
+> 1. **Nenhum componente novo é considerado "Pronto" isolado.** Ele precisa aparecer funcionando dentro da seção "Formulário de exemplo" do `/ops/styleguide` (`FormularioExemploSection.jsx`) — vários campos reais lado a lado, do jeito que uma tela de verdade usaria. Um componente só "parece certo" sozinho em uma vitrine; problemas de espaçamento, contraste e alinhamento em conjunto só aparecem quando ele divide espaço com os outros.
+> 2. **`mcp__rams__quick_review` é obrigatório em todo componente de `components/v2/` antes de considerá-lo pronto** — rodar nos arquivos alterados, corrigir o que ele apontar, rodar de novo até não sobrar achado sério. Já pegou, na prática desta sessão, contraste insuficiente em estado `dark:` de botões selecionados, `aria-describedby` quebrado quando `id` não é passado, e asterisco de campo obrigatório sem texto para leitor de tela — nenhum desses seria detectado só olhando a tela renderizada.
+
 ### Onde mora
 
 - [ ] Criar `docs/GUIA_ESTILO_FRONTEND.md` — nome no mesmo padrão já usado em `docs/` (paralelo a `docs/BLUEPRINT_BACKEND.md`, que já cumpre esse papel para o backend). Referenciar a partir de `Documentacao/README.md` e `Documentacao/Arquitetura.md` como qualquer outro documento oficial do projeto, não como anotação solta.

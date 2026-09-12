@@ -48,6 +48,7 @@ export default function FieldsSection() {
         note="Máscara da direita para a esquerda, padrão brasileiro (1.234,56). Ainda sem label/erro padronizados."
       >
         <CurrencyInput
+          aria-label="Valor de exemplo"
           value={valorMonetario}
           onChange={setValorMonetario}
           className="w-40 rounded-lg border border-slate-300 px-3 py-2 text-right text-sm dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
@@ -58,11 +59,16 @@ export default function FieldsSection() {
         label="QuantidadeInput — futuro QuantityField (legado, ver progresso)"
         note="Aceita vírgula ou ponto, permite digitar valores decimais livremente (ex.: 0,587)."
       >
-        <QuantidadeInput
-          value={quantidade}
-          onChange={setQuantidade}
-          className="w-28 rounded-lg border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
-        />
+        <label className="block">
+          <span className="text-xs font-medium text-slate-600 dark:text-slate-300">
+            Quantidade de exemplo
+          </span>
+          <QuantidadeInput
+            value={quantidade}
+            onChange={setQuantidade}
+            className="mt-1 block w-28 rounded-lg border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+          />
+        </label>
       </StyleGuideExample>
 
       <StyleGuideExample

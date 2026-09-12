@@ -9,38 +9,63 @@ export default function InputRadio({
   required = false,
   value,
 }) {
+  const descricaoId = name && (error || help) ? `${name}-descricao` : undefined;
+
   return (
     <div className="w-full">
       {label ? (
         <span className="text-xs font-medium text-slate-600 dark:text-slate-300">
           {label}
-          {required ? <span className="ml-0.5 text-red-500">*</span> : null}
+          {required ? (
+            <span className="ml-0.5 text-red-500">
+              *<span className="sr-only"> (obrigatório)</span>
+            </span>
+          ) : null}
         </span>
       ) : null}
-      <div className="mt-1 flex flex-wrap gap-x-4 gap-y-2">
-        {opcoes.map((opcao) => (
-          <label
-            key={opcao.value}
-            className={[
-              "inline-flex items-center gap-2 text-sm font-medium text-slate-700 dark:text-slate-200",
-              disabled || opcao.disabled ? "cursor-not-allowed opacity-60" : "cursor-pointer",
-            ].join(" ")}
-          >
-            <input
-              type="radio"
-              name={name}
-              value={opcao.value}
-              checked={value === opcao.value}
-              disabled={disabled || opcao.disabled}
-              onChange={() => onChange?.(opcao.value)}
-              className="h-4 w-4 border-slate-300 text-blue-600 accent-blue-600 dark:border-slate-600"
-            />
-            {opcao.label}
-          </label>
-        ))}
+      <div
+        role="radiogroup"
+        aria-label={label}
+        aria-describedby={descricaoId}
+        className="mt-1 flex flex-wrap gap-2"
+      >
+        {opcoes.map((opcao) => {
+          const idOpcao = `${name}-${opcao.value}`;
+          const desabilitada = disabled || opcao.disabled;
+
+          return (
+            <div key={opcao.value} className="flex-1">
+              <input
+                id={idOpcao}
+                name={name}
+                type="radio"
+                value={opcao.value}
+                checked={value === opcao.value}
+                disabled={desabilitada}
+                onChange={() => onChange?.(opcao.value)}
+                className="peer sr-only"
+              />
+              <label
+                htmlFor={idOpcao}
+                className={[
+                  "flex h-9 w-full items-center justify-center rounded-lg border px-3.5 text-center text-sm font-medium transition-colors",
+                  "border-slate-300 bg-white text-slate-700 hover:bg-slate-50",
+                  "peer-checked:border-blue-600 peer-checked:bg-blue-600 peer-checked:text-white peer-checked:hover:bg-blue-700",
+                  "peer-focus-visible:ring-2 peer-focus-visible:ring-blue-500 peer-focus-visible:ring-offset-2",
+                  "dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800",
+                  "dark:peer-checked:border-blue-500 dark:peer-checked:bg-blue-500 dark:peer-checked:text-white dark:peer-checked:hover:bg-blue-600",
+                  desabilitada ? "cursor-not-allowed opacity-60" : "cursor-pointer",
+                ].join(" ")}
+              >
+                {opcao.label}
+              </label>
+            </div>
+          );
+        })}
       </div>
       {error || help ? (
         <span
+          id={descricaoId}
           className={[
             "mt-1 block text-xs",
             error ? "text-red-600 dark:text-red-400" : "text-slate-500 dark:text-slate-400",

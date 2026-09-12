@@ -73,7 +73,9 @@ export default function MesGrade({
                 !noMesAtual
                   ? "text-slate-300 dark:text-slate-600"
                   : "text-slate-700 dark:text-slate-200",
-                noIntervalo && !selecionado ? "bg-blue-50 dark:bg-slate-800" : "",
+                noIntervalo && !selecionado
+                  ? "bg-blue-100 font-semibold text-blue-900 dark:bg-blue-500/25 dark:text-blue-100"
+                  : "",
                 selecionado
                   ? "bg-blue-600 text-white hover:bg-blue-700"
                   : "hover:bg-slate-100 dark:hover:bg-slate-800",

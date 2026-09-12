@@ -30,7 +30,11 @@ const InputTexto = forwardRef(function InputTexto(
       {label ? (
         <span className="text-xs font-medium text-slate-600 dark:text-slate-300">
           {label}
-          {required ? <span className="ml-0.5 text-red-500">*</span> : null}
+          {required ? (
+            <span className="ml-0.5 text-red-500">
+              *<span className="sr-only"> (obrigatório)</span>
+            </span>
+          ) : null}
         </span>
       ) : null}
       <span className="relative mt-1 block">
@@ -46,12 +50,14 @@ const InputTexto = forwardRef(function InputTexto(
           placeholder={placeholder}
           disabled={disabled}
           readOnly={readOnly}
+          required={required}
+          aria-required={required}
           onChange={(event) => onChange?.(event.target.value)}
           onBlur={onBlur}
           onFocus={onFocus}
           onKeyDown={onKeyDown}
           aria-invalid={Boolean(error)}
-          aria-describedby={error || help ? `${id}-descricao` : undefined}
+          aria-describedby={id && (error || help) ? `${id}-descricao` : undefined}
           className={[
             "h-9 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-900 outline-none transition-colors",
             "focus:border-transparent focus:ring-2 focus:ring-blue-500",
@@ -68,10 +74,10 @@ const InputTexto = forwardRef(function InputTexto(
       </span>
       {error || help ? (
         <span
-          id={`${id}-descricao`}
+          id={id ? `${id}-descricao` : undefined}
           className={[
             "mt-1 block text-xs",
-            error ? "text-red-600 dark:text-red-400" : "text-slate-500 dark:text-slate-400",
+            error ? "text-red-700 dark:text-red-400" : "text-slate-500 dark:text-slate-400",
           ].join(" ")}
         >
           {error || help}
