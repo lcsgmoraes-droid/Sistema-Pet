@@ -1,7 +1,8 @@
+import { PawPrint } from "lucide-react";
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { FiAlertCircle, FiBriefcase } from "react-icons/fi";
-import BotaoSalva from "../../components/v2/BotaoSalva/BotaoSalva";
+import BotaoInteracao from "../../components/v2/BotaoInteracao/BotaoInteracao";
 import InputSenha from "../../components/v2/InputSenha/InputSenha";
 import InputTexto from "../../components/v2/InputTexto/InputTexto";
 import { getDefaultAuthenticatedRoute } from "../../auth/userRole";
@@ -174,9 +175,16 @@ const Login = () => {
               required
             />
 
-            <BotaoSalva disabled={loading} loading={loading} type="submit">
+            <BotaoInteracao
+              icon={PawPrint}
+              disabled={loading}
+              loading={loading}
+              tamanho="grande"
+              larguraTotal
+              type="submit"
+            >
               {loading ? "Entrando..." : "Entrar"}
-            </BotaoSalva>
+            </BotaoInteracao>
           </form>
         )}
 

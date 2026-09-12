@@ -9,6 +9,8 @@ const BotaoExcluir = forwardRef(function BotaoExcluir(
     disabled,
     mensagemConfirmacao = "Excluir este registro? Essa ação não pode ser desfeita.",
     onClick,
+    tamanho = "normal",
+    ...rest
   },
   ref,
 ) {
@@ -26,12 +28,14 @@ const BotaoExcluir = forwardRef(function BotaoExcluir(
 
   return (
     <BotaoBase
+      {...rest}
       ref={ref}
       variante="perigo"
       icon={Trash2}
       disabled={disabled}
       loading={confirmando}
       onClick={aoClicar}
+      tamanho={tamanho}
     >
       {children}
     </BotaoBase>

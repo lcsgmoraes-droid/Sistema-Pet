@@ -38,7 +38,9 @@ Para cada uma, usar exatamente o formato de [[Template-Skill-Funcionalidade]] (o
 
 As 10 já criadas ([[PDV-Vendas]], [[Produtos-Estoque]], [[Financeiro]], [[Comissoes]], [[Compras]], [[Banho-e-Tosa]], [[Veterinario]], [[Campanhas]], [[E-commerce]], [[Entregas]]) foram documentadas a partir de reconhecimento estrutural — nenhuma tem a coluna "API" completa em [[Matriz-de-Cobertura]]. Ação: para cada uma, extrair contrato real de request/response dos 3-5 endpoints mais usados (via `/docs` OpenAPI do próprio backend, que é a fonte mais confiável), e listar explicitamente os componentes React reais usados na tela (não apenas o arquivo de rota).
 
-## 2.3 — Formalizar como Skills de IA (ação nova, ainda não feita)
+## 2.3 — Formalizar como Skills de IA
+
+> ✅ **Piloto criado em 2026-09-12: `.claude/skills/login/SKILL.md`**, para a tela de Login (a primeira migrada em [[RefatoracaoV2]]). Confirma que o mecanismo funciona (skill carrega pelo `description`) e prova o formato na prática — ainda não decidido se generaliza para as outras ~24 telas ou só para as de maior tráfego de mudança (ver itens abaixo, ainda em aberto).
 
 Proposta concreta: transformar cada documento de [[Funcionalidades]] em uma **Claude Code Skill** real (`.claude/skills/<nome-da-funcionalidade>/SKILL.md`), não apenas um Markdown de referência. Diferença prática: uma Skill é carregada sob demanda quando alguém (humano ou IA) está trabalhando naquela área, em vez de exigir que a IA leia toda a `/Documentacao` toda vez.
 

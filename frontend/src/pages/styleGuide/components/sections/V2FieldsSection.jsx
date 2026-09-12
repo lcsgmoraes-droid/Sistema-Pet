@@ -69,7 +69,7 @@ export default function V2FieldsSection() {
     <>
       {/* ---------- Botões ---------- */}
       <Grupo
-        label="Botões — um componente por ação, sem prop de cor/tamanho para a página escolher"
+        label="Botões — um componente por ação, sem prop de cor para a página escolher (só tamanho, num enum fechado)"
         note="Ícone-only exige título/aria-label obrigatório para acessibilidade: BotaoAjuda já resolve isso sozinho (prop texto sempre tem um valor); se usar BotaoInteracao só com ícone (sem texto), passe aria-label manualmente."
       >
         <Estado titulo="Ativo">
@@ -94,6 +94,39 @@ export default function V2FieldsSection() {
         </Estado>
         <Estado titulo="Carregando (BotaoSalva)">
           <BotaoSalva loading>Salvando...</BotaoSalva>
+        </Estado>
+      </Grupo>
+
+      <Grupo
+        label='Botões — 3 tamanhos (todo Botao* e BotaoAjuda aceitam tamanho="pequeno"|"normal"|"grande")'
+        note='Enum fechado, não é escala livre. "pequeno" fica abaixo do alvo de toque de 44px recomendado — uso pensado para densidade em desktop (barra de ferramentas), não para telas majoritariamente touch.'
+      >
+        <Estado titulo="Pequeno">
+          <div className="flex flex-wrap items-center gap-2">
+            <BotaoSalva tamanho="pequeno" onClick={() => {}}>
+              Salvar
+            </BotaoSalva>
+            <BotaoAjuda tamanho="pequeno" texto="Ajuda" />
+          </div>
+        </Estado>
+        <Estado titulo="Normal (padrão)">
+          <div className="flex flex-wrap items-center gap-2">
+            <BotaoSalva onClick={() => {}}>Salvar</BotaoSalva>
+            <BotaoAjuda texto="Ajuda" />
+          </div>
+        </Estado>
+        <Estado titulo="Grande">
+          <div className="flex flex-wrap items-center gap-2">
+            <BotaoSalva tamanho="grande" onClick={() => {}}>
+              Salvar
+            </BotaoSalva>
+            <BotaoAjuda tamanho="grande" texto="Ajuda" />
+          </div>
+        </Estado>
+        <Estado titulo='Largura total (prop "larguraTotal", usado no botão "Entrar" do Login)'>
+          <BotaoInteracao icon={Eye} tamanho="grande" larguraTotal onClick={() => {}}>
+            Ocupa toda a largura disponível
+          </BotaoInteracao>
         </Estado>
       </Grupo>
 

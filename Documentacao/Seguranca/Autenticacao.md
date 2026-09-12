@@ -5,7 +5,7 @@ atualizado: 2026-09-12
 
 # Autenticação
 
-Parte do eixo [[Seguranca]]. Ver também [[Autorizacao]], [[Vulnerabilidades]].
+Parte do eixo [[Seguranca]]. Ver também [[Autorizacao]], [[Vulnerabilidades]]. A tela de login do frontend (`/login`) tem sua própria skill (`.claude/skills/login/SKILL.md`), piloto da ideia de [[Fase-2-Funcionalidades-e-Skills]] item 2.3 — fonte de verdade sobre a tela em si (o que cada botão faz, fluxo, dependências), enquanto este documento cobre a segurança do fluxo de auth como um todo.
 
 ## Fluxo ativo (confirmado)
 

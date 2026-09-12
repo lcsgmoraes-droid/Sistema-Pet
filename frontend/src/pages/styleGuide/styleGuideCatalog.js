@@ -73,7 +73,8 @@ export const styleGuideCatalog = [
         nome: "BotaoBase",
         status: "pronto",
         arquivo: "components/v2/BotaoBase/BotaoBase.jsx",
-        descricao: "Casca interna — não usar direto numa tela",
+        descricao:
+          "Casca interna (não usar direto numa tela) — define os 3 tamanhos (pequeno/normal/grande) e a prop larguraTotal, herdados por todo Botao*",
       },
       { nome: "BotaoSalva", status: "pronto", arquivo: "components/v2/BotaoSalva/BotaoSalva.jsx" },
       {
@@ -98,7 +99,8 @@ export const styleGuideCatalog = [
         nome: "BotaoInteracao",
         status: "pronto",
         arquivo: "components/v2/BotaoInteracao/BotaoInteracao.jsx",
-        descricao: "Ação secundária genérica (avançar/voltar/ver detalhes), ícone opcional",
+        descricao:
+          'Ação genérica com ícone livre — usado também para ações primárias fora do padrão salvar/cancelar/excluir (ex.: "Entrar" no login)',
       },
     ],
   },
