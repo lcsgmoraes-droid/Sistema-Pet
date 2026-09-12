@@ -166,6 +166,195 @@ export function MoneyField({ value, onChange, maxValue, allowNegative, ...fieldP
 - [ ] Label associado via `id`/`htmlFor` e erro associado via `aria-describedby` (acessibilidade — ver também [[Fase-2-Funcionalidades-e-Skills]] 2.6, que cobre acessibilidade nas telas de uso diário).
 - [ ] Tem pelo menos um teste `.mjs` cobrindo a lógica de máscara/validação.
 
+## 1.7 — Biblioteca de componentes de tela: tipografia, botões e modais (proposta nova, fora da auditoria original)
+
+Mesma lógica do item 1.6, agora para o resto da tela: **título, subtítulo, texto de destaque, texto simples, texto de ajuda, botão e modal também devem ter uma única fonte cada um**, em vez de cada tela (ou cada componente de `components/ui/`) redefinir sua própria escala tipográfica e seu próprio botão/modal com classes Tailwind soltas.
+
+### Estado atual confirmado no código — tipografia, botões e modais (2026-09-12)
+
+Levantamento quantitativo feito nesta rodada, replicável com `grep`:
+
+| Recurso | O que existe | Evidência de duplicação |
+|---|---|---|
+| **Tipografia** (título/subtítulo/texto) | Nenhum componente — nem `Title`, nem `Text`, nem `HelpText` foi encontrado em nenhum lugar do projeto | `<h1>`–`<h4>` nativos aparecem direto em **530 arquivos**. Pior: os próprios componentes de `components/ui/` já reimplementam a mesma ideia cada um do seu jeito — `PageHeader.jsx` tem seu próprio `<h1 className="text-xl font-bold...">`, `Panel.jsx` tem seu próprio `<h2 className="text-base font-semibold...">`, `EmptyState.jsx` tem seu próprio `<div className="text-sm font-semibold...">` para título — três escalas de "título" ligeiramente diferentes, nenhuma reaproveitando a outra |
+| **Botões** | Já existe uma base boa: `ActionButton`/`IconActionButton` (`components/ui/ActionButton.jsx`, `IconActionButton.jsx`) apoiados num sistema de tokens já maduro em `components/ui/actionStyles.js` (`intent` × `tone` × `size`, com regra documentada de quando usar cada cor — `ACTION_COLOR_RULES`) | O problema aqui não é falta de componente-base, é **adoção** (`<button` nativo em **585 arquivos** contra **135** com `ActionButton`) **e falta de um catálogo por ação**: nada garante hoje que todo botão de "salvar" tenha o mesmo ícone+cor+comportamento — cada tela escolhe `intent`/`icon`/texto na mão. Exemplo concreto já reimplementado localmente: `PageHeader.jsx` monta seu próprio botão de ajuda com `IconActionButton` + `HelpCircle` só para o botão de tour — é exatamente o tipo de botão que deveria ser um `HelpButton` reaproveitável, não algo remontado dentro de `PageHeader` |
+| **Modais** | `CorePetDialogHost.jsx` é um bom exemplo de **casca única para confirmação/prompt** (substitui `window.confirm`/`window.prompt`, já com `role="dialog"`, `aria-modal`, foco automático, `Escape` para fechar) — mas só serve para confirmar/perguntar, não para conteúdo arbitrário (formulário, wizard, lista) | **151 arquivos** têm seu próprio bloco `fixed inset-0` (a casca de modal reimplementada do zero a cada vez), mas só **18** usam `role="dialog"` — ou seja, boa parte desses ~151 modais não tem semântica de acessibilidade correta, e não há como saber sem abrir cada um |
+
+### Arquitetura proposta — tipografia, botões e modais
+
+**Tipografia** — componentes pequenos, sem lógica, só a escala visual nomeada (extraídos do que já está implícito em `PageHeader`/`Panel`/`EmptyState`, não inventados do zero):
+
+```text
+components/ui/typography/
+  Title.jsx       — título de página/seção (o que hoje é o <h1> solto em PageHeader.jsx)
+  Subtitle.jsx     — linha de apoio abaixo do título (o que hoje é o <p> solto em PageHeader.jsx)
+  SectionTitle.jsx — título de bloco/card, menor que Title (o que hoje é o <h2> solto em Panel.jsx)
+  Text.jsx         — parágrafo padrão, com variação de tom (default | muted | destaque)
+  HelpText.jsx     — texto de ajuda/legenda pequena (o que hoje o FormField.jsx já faz só para campos de formulário)
+```
+
+**Botões** — dois níveis, não recriar a base, adicionar uma camada em cima dela:
+
+1. **Base (já existe, só formalizar):** `ActionButton` (ícone + texto) e `IconActionButton` (só ícone), os dois sempre construídos em cima de `actionButtonClasses`/`iconActionButtonClasses` de `actionStyles.js`. Nenhum botão novo nasce com `className` de Tailwind solta reinventando cor/tamanho.
+2. **Catálogo por ação (novo — é a peça que falta):** um componente por *intenção* de botão — salvar, cancelar, excluir, ajuda, alternar submenu etc. — que já fixa ícone, `intent`/cor e comportamento, e decide sozinho entre os dois formatos que você descreveu:
+   - **Grande** (`size="lg"`, padrão): renderiza via `ActionButton` — ícone + texto.
+   - **Pequeno** (`size="sm"`): renderiza via `IconActionButton` — só ícone, e o texto vira `title`/`aria-label` automaticamente (hoje `IconActionButton` aceita `title` como qualquer prop HTML, mas nada obriga a informar — se o chamador esquecer, o botão fica sem nome acessível para leitor de tela; o catálogo por ação resolve isso preenchendo sempre, porque o texto do rótulo é a própria fonte do `title`).
+
+   O texto pode variar por tela ("Salvar", "Salvar cliente", "Gravar alteração") — só o ícone, a cor e o comportamento base ficam fixos, que é exatamente a regra pedida: todo botão que grava algo tem a mesma cara, independente do texto.
+
+**Modais** — uma casca única de uso geral, inspirada na acessibilidade já resolvida em `CorePetDialogHost.jsx` (mesmo `role="dialog"`, `aria-modal`, captura de `Escape`, foco automático ao abrir), mas aberta para receber qualquer conteúdo, não só confirmação/prompt:
+
+```text
+components/ui/Modal.jsx
+  Modal            — casca (backdrop + painel + role="dialog" + Escape + foco)
+  Modal.Header      — título do modal (usa Title/SectionTitle por dentro) + botão fechar
+  Modal.Body        — área de conteúdo com scroll próprio quando necessário
+  Modal.Footer      — ações (usa ActionButton por dentro — nunca botão cru)
+```
+
+### Exemplo de código (não é código final, é o padrão a seguir)
+
+```jsx
+// components/ui/typography/Title.jsx
+const SIZES = {
+  page: "text-xl font-bold text-slate-950 dark:text-slate-100",       // PageHeader hoje
+  section: "text-base font-semibold text-slate-900 dark:text-slate-100", // Panel hoje
+};
+
+export function Title({ as: Tag = "h1", size = "page", className = "", children }) {
+  return <Tag className={cx(SIZES[size], className)}>{children}</Tag>;
+}
+
+// components/ui/actions/SaveButton.jsx — um arquivo por ação; ícone/cor fixos, texto e formato variam
+export function SaveButton({ label = "Salvar", size = "lg", ...props }) {
+  if (size === "sm") {
+    return <IconActionButton icon={Save} intent="create" title={label} aria-label={label} {...props} />;
+  }
+  return (
+    <ActionButton icon={Save} intent="create" {...props}>
+      {label}
+    </ActionButton>
+  );
+}
+
+// components/ui/actions/CancelButton.jsx
+export function CancelButton({ label = "Cancelar", size = "lg", ...props }) {
+  if (size === "sm") {
+    return <IconActionButton icon={X} intent="neutral" tone="ghost" title={label} aria-label={label} {...props} />;
+  }
+  return (
+    <ActionButton icon={X} intent="neutral" tone="ghost" {...props}>
+      {label}
+    </ActionButton>
+  );
+}
+
+// components/ui/actions/DeleteButton.jsx
+export function DeleteButton({ label = "Excluir", size = "lg", ...props }) {
+  if (size === "sm") {
+    return <IconActionButton icon={Trash2} intent="delete" title={label} aria-label={label} {...props} />;
+  }
+  return (
+    <ActionButton icon={Trash2} intent="delete" {...props}>
+      {label}
+    </ActionButton>
+  );
+}
+
+// components/ui/actions/HelpButton.jsx — ajuda é quase sempre só ícone; "lg" existe mas raramente usado
+export function HelpButton({ label = "Ajuda", size = "sm", ...props }) {
+  if (size === "lg") {
+    return (
+      <ActionButton icon={HelpCircle} intent="neutral" tone="ghost" {...props}>
+        {label}
+      </ActionButton>
+    );
+  }
+  return <IconActionButton icon={HelpCircle} intent="neutral" title={label} aria-label={label} {...props} />;
+}
+
+// components/ui/actions/SubmenuToggleButton.jsx — abre/fecha um submenu; usa o "active" que IconActionButton já suporta
+export function SubmenuToggleButton({ label = "Mais opções", active = false, size = "sm", ...props }) {
+  const Icon = active ? ChevronUp : ChevronDown;
+  if (size === "lg") {
+    return (
+      <ActionButton icon={Icon} intent="neutral" tone="ghost" {...props}>
+        {label}
+      </ActionButton>
+    );
+  }
+  return (
+    <IconActionButton icon={Icon} intent="neutral" active={active} title={label} aria-label={label} {...props} />
+  );
+}
+
+// components/ui/Modal.jsx — casca única; conteúdo arbitrário, acessibilidade resolvida uma vez só
+export function Modal({ open, onClose, labelledBy, size = "md", children }) {
+  useEffect(() => {
+    if (!open) return undefined;
+    const onKeyDown = (event) => event.key === "Escape" && onClose?.();
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [open, onClose]);
+
+  if (!open) return null;
+
+  return (
+    <div
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/45 p-4 backdrop-blur-[2px]"
+      onClick={onClose}
+    >
+      <section
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={labelledBy}
+        className={cx(
+          "w-full overflow-hidden rounded-2xl bg-white shadow-2xl dark:bg-slate-900",
+          MODAL_SIZES[size],
+        )}
+        onClick={(event) => event.stopPropagation()}
+      >
+        {children}
+      </section>
+    </div>
+  );
+}
+Modal.Header = ModalHeader;
+Modal.Body = ModalBody;
+Modal.Footer = ModalFooter;
+```
+
+Uso esperado numa tela — repare que quem chama só decide texto/tamanho, nunca ícone ou cor:
+
+```jsx
+<Modal open={aberto} onClose={fechar} labelledBy="titulo-modal-x">
+  <Modal.Header titleId="titulo-modal-x">Novo fornecedor</Modal.Header>
+  <Modal.Body>{/* formulário usando os campos do item 1.6 */}</Modal.Body>
+  <Modal.Footer>
+    <CancelButton onClick={fechar} />
+    <SaveButton label="Salvar fornecedor" onClick={salvar} />
+  </Modal.Footer>
+</Modal>
+
+{/* numa barra de ferramentas compacta, o mesmo SaveButton vira ícone com tooltip: */}
+<SaveButton size="sm" onClick={salvar} />
+```
+
+### Passos concretos para tipografia, botões e modais, em ordem
+
+- [ ] **Tipografia — extrair, não inventar.** Criar `components/ui/typography/` com `Title`, `Subtitle`, `SectionTitle`, `Text`, `HelpText`, copiando exatamente as classes que já existem em `PageHeader.jsx`/`Panel.jsx`/`EmptyState.jsx` hoje (visual não muda). Depois, fazer esses três arquivos passarem a usar os novos componentes por dentro — primeira prova de que a extração não quebrou nada.
+- [ ] **Botões — base é adoção, catálogo por ação é criação.** `ActionButton`/`IconActionButton` já são a base certa, não recriar. Criar `components/ui/actions/` com um arquivo por intenção de botão — mínimo inicial: `SaveButton`, `CancelButton`, `DeleteButton`, `HelpButton`, `SubmenuToggleButton` — cada um já fixando ícone/`intent`/comportamento e decidindo entre `size="lg"` (ícone+texto) e `size="sm"` (só ícone, com `title`/`aria-label` preenchidos automaticamente pelo próprio rótulo). Primeiro uso real: substituir o botão de ajuda remontado à mão em `PageHeader.jsx` (`onTour`) por um `HelpButton` — prova de conceito de baixo risco antes de espalhar o padrão. Levantar com o responsável quais outras ações se repetem o bastante para merecer entrada no catálogo (candidatos prováveis pela quantidade de modais: "Confirmar", "Voltar", "Exportar" — `ExportActionButton.jsx` já existente é outro candidato a entrar nesse catálogo em vez de ficar solto). Qualquer botão novo usa um item do catálogo quando a ação já tem um, ou `ActionButton`/`IconActionButton` direto quando é uma ação única da tela; migração dos 585 arquivos com `<button>` nativo acontece oportunisticamente (mesma regra do item 1.6 — quando a tela for tocada por outro motivo).
+- [ ] **Modais — criar a casca, depois migrar.** Criar `components/ui/Modal.jsx` (`Modal`/`Modal.Header`/`Modal.Body`/`Modal.Footer`) usando `CorePetDialogHost.jsx` como referência de acessibilidade. Escolher 2-3 modais simples já existentes como piloto de migração (bom critério: modais pequenos e sem lógica de wizard, para validar a casca antes de migrar os mais complexos).
+- [ ] **Auditoria pontual de acessibilidade nos 151 modais existentes** — não precisa esperar a migração para o novo `Modal.jsx`; confirmar ao menos que `Escape` fecha e que o foco vai para dentro do modal ao abrir é uma correção rápida mesmo nos modais que ainda não foram migrados.
+- [ ] **Lint bloqueante para botão** — proibir `<button>` nativo fora de `ActionButton.jsx`/`IconActionButton.jsx` (mesmo mecanismo do item 1.6 para `<input>`). Para modais, o reforço automático é mais difícil (não há uma tag `<modal>` para banir); tratar como item de checklist de revisão de PR (`.github/pull_request_template.md` já tem uma seção de checklist — candidato a um item novo ali) em vez de lint.
+- [ ] **Atualizar `docs/BLUEPRINT_BACKEND.md`-equivalente para frontend** (ou criar `docs/BLUEPRINT_FRONTEND.md`, se não existir) documentando que tipografia, botão, modal e os campos do item 1.6 são de uso obrigatório — hoje essa regra só vai existir aqui no roadmap; sem um documento de referência permanente, tende a se perder conforme o roadmap avança de fase.
+
+### Definição de pronto — tipografia, botão e modal
+
+- **Tipografia:** aceita `as`/`size`/`className`, nunca tamanho de fonte/peso definido fora do componente.
+- **Botão:** toda ação que se repete em mais de uma tela (salvar, cancelar, excluir, ajuda, alternar submenu...) tem um componente próprio em `components/ui/actions/`, com ícone e `intent` fixos (ver `ACTION_COLOR_RULES` em `actionStyles.js`) e suporte aos dois formatos (`size="lg"` ícone+texto, `size="sm"` só ícone com `title`/`aria-label` automáticos); só texto e `onClick` variam por tela. Ação sem componente próprio (caso único de uma tela) usa `ActionButton`/`IconActionButton` direto — nunca `className` solta reinventando cor/tamanho.
+- **Modal:** usa `role="dialog"` + `aria-modal` + `aria-labelledby`, fecha com `Escape`, foco vai para dentro ao abrir, cabeçalho/rodapé usam os componentes de tipografia/botão acima — nunca `<h2>`/`<button>` soltos dentro de um modal novo.
+
 ## Critério de avanço para a Fase 2
 
 - CI/CD com CODEOWNERS e Environments configurados.
@@ -173,6 +362,8 @@ export function MoneyField({ value, onChange, maxValue, allowNegative, ...fieldP
 - Lista inicial de duplicações confirmadas (mesmo que pequena) registrada em [[Pendencias]] ou nova seção deste roadmap.
 - Error tracking em produção ativo (item 1.5) — recomendado, não bloqueante.
 - `components/ui/fields/` criado com `BaseTextField`/`BaseSelectField`/`BaseChoiceField` e os campos já existentes (`MoneyField`, `QuantityField`, `ComboboxField`, `DateField`) consolidados nele (item 1.6) — recomendado antes da Fase 2 usar esses mesmos campos ao mapear tela por tela.
+- `components/ui/typography/` e `components/ui/Modal.jsx` criados, com `PageHeader`/`Panel`/`EmptyState` já migrados para usar a tipografia nova (item 1.7) — mesmo motivo: a Fase 2 vai montar/revisar tela por tela, e deve já encontrar essas peças prontas.
+- `components/ui/actions/` criado com pelo menos `SaveButton`, `CancelButton`, `DeleteButton`, `HelpButton` (item 1.7) — recomendado, não bloqueante.
 
 ## Não identificado
 
