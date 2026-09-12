@@ -83,8 +83,8 @@ export default function V2FieldsSection() {
       </StyleGuideExample>
 
       <StyleGuideExample
-        label="InputPeriodo — compõe dois InputData (De/Até)"
-        note="Cada lado abre seu próprio calendário (herdado do InputData). Um seletor único com sombreado do intervalo é uma evolução futura, não implementada ainda."
+        label="InputPeriodo — um único campo, calendário duplo (mês atual + próximo) para escolher início e fim numa tacada só"
+        note="Campo é somente leitura (a digitação livre de um período não é confiável) — clique/foque para abrir; primeiro clique define o início, segundo define o fim, com o intervalo sombreado nos dois meses."
       >
         <div className="w-full max-w-sm">
           <InputPeriodo label="Período do relatório" value={periodo} onChange={setPeriodo} />

@@ -8,10 +8,12 @@ import LayoutSection from "./components/sections/LayoutSection";
 import ModalsSection from "./components/sections/ModalsSection";
 import StatesSection from "./components/sections/StatesSection";
 import TypographySection from "./components/sections/TypographySection";
+import FormularioExemploSection from "./components/sections/FormularioExemploSection";
 import V2FieldsSection from "./components/sections/V2FieldsSection";
 
 const NAV = [
   { id: "progresso", label: "Progresso" },
+  { id: "formulario-exemplo", label: "Formulário de exemplo" },
   { id: "v2", label: "Componentes v2" },
   { id: "tipografia", label: "Tipografia" },
   { id: "botoes", label: "Botões (legado)" },
@@ -55,6 +57,14 @@ export default function StyleGuide() {
             <StyleGuideProgress />
           </div>
         </section>
+
+        <StyleGuideSection
+          id="formulario-exemplo"
+          title="Formulário de exemplo"
+          description="Vários campos v2 lado a lado, como numa tela real de cadastro — para auditar espaçamento, alinhamento e consistência em conjunto, não só isolados. Regra de bloqueio: nenhum componente novo é considerado pronto sem aparecer aqui funcionando ao lado dos outros."
+        >
+          <FormularioExemploSection />
+        </StyleGuideSection>
 
         <StyleGuideSection
           id="v2"

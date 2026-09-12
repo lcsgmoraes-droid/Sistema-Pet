@@ -26,14 +26,14 @@ export const styleGuideCatalog = [
         nome: "InputPeriodo",
         status: "pronto",
         arquivo: "components/v2/InputPeriodo/InputPeriodo.jsx",
-        descricao: "Compõe dois InputData (cada lado com seu próprio calendário)",
+        descricao: "Um único campo (somente leitura) + calendário duplo para início/fim",
       },
       {
-        nome: "CalendarioPainel",
+        nome: "CalendarioPainel / CalendarioIntervaloPainel",
         status: "pronto",
-        arquivo: "components/v2/CalendarioPainel/CalendarioPainel.jsx",
+        arquivo: "components/v2/CalendarioPainel/, components/v2/CalendarioIntervaloPainel/",
         descricao:
-          "Grade de mês reaproveitada por InputData/InputDataHora — não usar direto numa tela",
+          "Grade de mês (e par de meses) reaproveitada por InputData/InputDataHora/InputPeriodo — não usar direto numa tela",
       },
       {
         nome: "InputCheck / InputRadio",
