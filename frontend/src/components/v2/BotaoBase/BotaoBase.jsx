@@ -1,17 +1,16 @@
 import { Loader2 } from "lucide-react";
 import { forwardRef } from "react";
 
+// Todas as variantes são "chapadas" (cor sólida + texto branco) — nunca bg suave/translúcido (bg-*-50, bg-*/10 etc.).
 const VARIANTES = {
   neutro:
     "border-slate-900 bg-slate-900 text-white hover:bg-slate-700 dark:border-slate-600 dark:bg-slate-700 dark:hover:bg-slate-600",
-  neutroSuave:
-    "border-slate-300 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800",
   sucesso:
     "border-emerald-700 bg-emerald-700 text-white hover:bg-emerald-800 dark:border-emerald-700 dark:bg-emerald-700 dark:hover:bg-emerald-800",
   perigo:
     "border-red-600 bg-red-600 text-white hover:bg-red-700 dark:border-red-700 dark:bg-red-700 dark:hover:bg-red-800",
   informativo:
-    "border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100 dark:border-blue-400/30 dark:bg-blue-500/10 dark:text-blue-200 dark:hover:bg-blue-500/20",
+    "border-blue-700 bg-blue-700 text-white hover:bg-blue-800 dark:border-blue-700 dark:bg-blue-700 dark:hover:bg-blue-800",
   atencao:
     "border-amber-700 bg-amber-700 text-white hover:bg-amber-800 dark:border-amber-700 dark:bg-amber-700 dark:hover:bg-amber-800",
 };
