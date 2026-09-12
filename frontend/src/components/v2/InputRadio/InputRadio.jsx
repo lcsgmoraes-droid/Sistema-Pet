@@ -49,11 +49,14 @@ export default function InputRadio({
                 htmlFor={idOpcao}
                 className={[
                   "flex h-9 w-full items-center justify-center rounded-lg border px-3.5 text-center text-sm font-medium transition-colors",
-                  "border-slate-300 bg-white text-slate-700 hover:bg-slate-50",
+                  error
+                    ? "border-red-500 dark:border-red-500"
+                    : "border-slate-300 dark:border-slate-700",
+                  "bg-white text-slate-700 hover:bg-slate-50",
                   "peer-checked:border-blue-600 peer-checked:bg-blue-600 peer-checked:text-white peer-checked:hover:bg-blue-700",
                   "peer-focus-visible:ring-2 peer-focus-visible:ring-blue-500 peer-focus-visible:ring-offset-2",
-                  "dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800",
-                  "dark:peer-checked:border-blue-500 dark:peer-checked:bg-blue-500 dark:peer-checked:text-white dark:peer-checked:hover:bg-blue-600",
+                  "dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800",
+                  "dark:peer-checked:border-blue-500 dark:peer-checked:bg-blue-600 dark:peer-checked:text-white dark:peer-checked:hover:bg-blue-700",
                   desabilitada ? "cursor-not-allowed opacity-60" : "cursor-pointer",
                 ].join(" ")}
               >

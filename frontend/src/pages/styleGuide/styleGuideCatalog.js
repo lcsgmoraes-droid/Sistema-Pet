@@ -1,13 +1,12 @@
 export const STYLEGUIDE_STATUS = {
   pronto: { label: "Pronto", intent: "success" },
-  legado: { label: "Existe (legado)", intent: "warning" },
   planejado: { label: "Planejado", intent: "neutral" },
 };
 
 export const styleGuideCatalog = [
   {
-    categoria: "Componentes v2 (fonte única, em components/v2/)",
-    origem: "itens 1.6/1.7 do roadmap — sem prop de cor/tamanho, base + especialização",
+    categoria: "Campos de formulário",
+    origem: "item 1.6 do roadmap",
     itens: [
       {
         nome: "InputTexto",
@@ -32,13 +31,13 @@ export const styleGuideCatalog = [
         nome: "CalendarioPainel / CalendarioIntervaloPainel",
         status: "pronto",
         arquivo: "components/v2/CalendarioPainel/, components/v2/CalendarioIntervaloPainel/",
-        descricao:
-          "Grade de mês (e par de meses) reaproveitada por InputData/InputDataHora/InputPeriodo — não usar direto numa tela",
+        descricao: "Grade de mês reaproveitada pelos campos de data — não usar direto numa tela",
       },
       {
         nome: "InputCheck / InputRadio",
         status: "pronto",
         arquivo: "components/v2/InputCheck/, components/v2/InputRadio/",
+        descricao: "Aparência de botão, label centralizada",
       },
       {
         nome: "InputMoeda / InputQuantidade / InputPercentual",
@@ -61,59 +60,8 @@ export const styleGuideCatalog = [
         nome: "InputComboboxMultiplo",
         status: "pronto",
         arquivo: "components/v2/InputComboboxMultiplo/InputComboboxMultiplo.jsx",
-        descricao: "Mesma busca, seleção em chips removíveis",
-      },
-      {
-        nome: "BotaoBase",
-        status: "pronto",
-        arquivo: "components/v2/BotaoBase/BotaoBase.jsx",
-        descricao: "Casca interna — não usar direto numa tela",
-      },
-      {
-        nome: "BotaoSalva / BotaoCancelar / BotaoExcluir",
-        status: "pronto",
-        arquivo: "components/v2/BotaoSalva/, .../BotaoCancelar/, .../BotaoExcluir/",
-        descricao: "BotaoExcluir já confirma via corepetDialog antes de agir",
-      },
-      {
-        nome: "BotaoAjuda",
-        status: "pronto",
-        arquivo: "components/v2/BotaoAjuda/BotaoAjuda.jsx",
-        descricao: "Sempre só ícone",
-      },
-      {
-        nome: "BotaoInteracao",
-        status: "pronto",
-        arquivo: "components/v2/BotaoInteracao/BotaoInteracao.jsx",
-        descricao: "Ação secundária genérica (avançar/voltar/ver detalhes)",
-      },
-    ],
-  },
-  {
-    categoria: "Tipografia",
-    origem: "item 1.7 do roadmap",
-    itens: [
-      {
-        nome: "Title",
-        status: "planejado",
-        descricao: "Título de página (o que hoje é o <h1> solto em PageHeader.jsx)",
-      },
-      {
-        nome: "SectionTitle",
-        status: "planejado",
-        descricao: "Título de bloco/card (o que hoje é o <h2> solto em Panel.jsx)",
-      },
-      {
-        nome: "Subtitle",
-        status: "planejado",
-        descricao: "Linha de apoio abaixo do título (o <p> solto em PageHeader.jsx)",
-      },
-      { nome: "Text", status: "planejado", descricao: "Parágrafo padrão, com variação de tom" },
-      {
-        nome: "HelpText",
-        status: "legado",
-        arquivo: "components/ui/FormField.jsx",
-        descricao: "Hoje só existe embutido no FormField, só para campos",
+        descricao:
+          "Mesma busca, seleção em chips removíveis, ghost selection com Tab mantendo foco",
       },
     ],
   },
@@ -122,87 +70,53 @@ export const styleGuideCatalog = [
     origem: "item 1.7 do roadmap",
     itens: [
       {
-        nome: "ActionButton",
+        nome: "BotaoBase",
         status: "pronto",
-        arquivo: "components/ui/ActionButton.jsx",
-        descricao: "Base: ícone + texto",
+        arquivo: "components/v2/BotaoBase/BotaoBase.jsx",
+        descricao: "Casca interna — não usar direto numa tela",
       },
+      { nome: "BotaoSalva", status: "pronto", arquivo: "components/v2/BotaoSalva/BotaoSalva.jsx" },
       {
-        nome: "IconActionButton",
+        nome: "BotaoCancelar",
         status: "pronto",
-        arquivo: "components/ui/IconActionButton.jsx",
-        descricao: "Base: só ícone",
-      },
-      { nome: "SaveButton", status: "planejado", descricao: "Catálogo por ação — salvar/gravar" },
-      { nome: "CancelButton", status: "planejado", descricao: "Catálogo por ação — cancelar" },
-      { nome: "DeleteButton", status: "planejado", descricao: "Catálogo por ação — excluir" },
-      {
-        nome: "HelpButton",
-        status: "planejado",
-        descricao: "Catálogo por ação — ajuda (hoje remontado à mão em PageHeader.jsx)",
+        arquivo: "components/v2/BotaoCancelar/BotaoCancelar.jsx",
       },
       {
-        nome: "SubmenuToggleButton",
-        status: "planejado",
-        descricao: "Catálogo por ação — abrir/fechar submenu",
+        nome: "BotaoExcluir",
+        status: "pronto",
+        arquivo: "components/v2/BotaoExcluir/BotaoExcluir.jsx",
+        descricao: "Já confirma via corepetDialog antes de agir",
+      },
+      {
+        nome: "BotaoAjuda",
+        status: "pronto",
+        arquivo: "components/v2/BotaoAjuda/BotaoAjuda.jsx",
+        descricao:
+          "Sempre só ícone — texto/aria-label obrigatório por design (prop com valor padrão, nunca fica sem)",
+      },
+      {
+        nome: "BotaoInteracao",
+        status: "pronto",
+        arquivo: "components/v2/BotaoInteracao/BotaoInteracao.jsx",
+        descricao: "Ação secundária genérica (avançar/voltar/ver detalhes), ícone opcional",
       },
     ],
   },
   {
-    categoria: "Campos de formulário",
-    origem: "item 1.6 do roadmap",
+    categoria: "Tipografia",
+    origem: "item 1.7 do roadmap — ainda planejado",
     itens: [
-      {
-        nome: "TextField / SelectField / CheckboxField",
-        status: "legado",
-        arquivo: "components/ui/FormField.jsx",
-        descricao: "Já tem label/erro/help, ainda não é base de nada mais específico",
-      },
-      {
-        nome: "MoneyField",
-        status: "legado",
-        arquivo: "components/CurrencyInput.jsx",
-        descricao: "Existe como CurrencyInput, isolado, sem label/erro padronizado",
-      },
-      {
-        nome: "QuantityField",
-        status: "legado",
-        arquivo: "components/QuantidadeInput.jsx",
-        descricao: "Existe como QuantidadeInput, mesma limitação",
-      },
-      {
-        nome: "ComboboxField",
-        status: "legado",
-        arquivo: "components/ui/AutocompleteSelect.jsx",
-        descricao: "O mais completo dos existentes, fora da família FormField",
-      },
-      {
-        nome: "DateField",
-        status: "legado",
-        arquivo: "pages/veterinario/agenda/AgendaDateInputField.jsx",
-        descricao: "Só funciona local, na agenda do veterinário",
-      },
-      {
-        nome: "PercentField",
-        status: "planejado",
-        descricao: "Percentual — telas de margem/comissão",
-      },
-      { nome: "CpfCnpjField", status: "planejado", descricao: "Detecta CPF vs CNPJ pelo tamanho" },
-      { nome: "PhoneField", status: "planejado" },
-      { nome: "RadioGroupField", status: "planejado" },
-      { nome: "PasswordField", status: "planejado", descricao: "Com alternância mostrar/ocultar" },
+      { nome: "Title", status: "planejado", descricao: "Título de página" },
+      { nome: "SectionTitle", status: "planejado", descricao: "Título de bloco/card" },
+      { nome: "Subtitle", status: "planejado", descricao: "Linha de apoio abaixo de um título" },
+      { nome: "Text", status: "planejado", descricao: "Parágrafo padrão" },
+      { nome: "HelpText", status: "planejado", descricao: "Texto de ajuda pequeno" },
     ],
   },
   {
-    categoria: "Modais",
-    origem: "item 1.7 do roadmap",
+    categoria: "Modal",
+    origem: "item 1.7 do roadmap — ainda planejado",
     itens: [
-      {
-        nome: "CorePetDialogHost (confirmar / perguntar)",
-        status: "pronto",
-        arquivo: "components/ui/CorePetDialogHost.jsx",
-        descricao: "Substitui window.confirm/window.prompt, já com role=dialog e Escape",
-      },
       {
         nome: "Modal / Modal.Header / Modal.Body / Modal.Footer",
         status: "planejado",
@@ -210,35 +124,10 @@ export const styleGuideCatalog = [
       },
     ],
   },
-  {
-    categoria: "Estados de tela",
-    origem: "já existiam, sem regra escrita até o item 1.8",
-    itens: [
-      { nome: "EmptyState", status: "pronto", arquivo: "components/ui/EmptyState.jsx" },
-      { nome: "LoadingState", status: "pronto", arquivo: "components/ui/LoadingState.jsx" },
-      { nome: "ErrorState", status: "pronto", arquivo: "components/ui/ErrorState.jsx" },
-      { nome: "TextSkeleton e afins", status: "pronto", arquivo: "components/Skeletons.jsx" },
-    ],
-  },
-  {
-    categoria: "Blocos de layout",
-    origem: "já existiam, sem regra escrita até o item 1.8",
-    itens: [
-      { nome: "Panel", status: "pronto", arquivo: "components/ui/Panel.jsx" },
-      { nome: "PageHeader", status: "pronto", arquivo: "components/ui/PageHeader.jsx" },
-      {
-        nome: "MetricCard / MetricGrid",
-        status: "pronto",
-        arquivo: "components/ui/MetricCard.jsx",
-      },
-      { nome: "StatusBadge", status: "pronto", arquivo: "components/ui/StatusBadge.jsx" },
-      { nome: "SegmentedControl", status: "pronto", arquivo: "components/ui/SegmentedControl.jsx" },
-    ],
-  },
 ];
 
 export function contarPorStatus() {
-  const contagem = { pronto: 0, legado: 0, planejado: 0 };
+  const contagem = { pronto: 0, planejado: 0 };
   styleGuideCatalog.forEach((grupo) => {
     grupo.itens.forEach((item) => {
       contagem[item.status] = (contagem[item.status] || 0) + 1;

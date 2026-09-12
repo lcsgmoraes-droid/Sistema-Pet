@@ -72,6 +72,13 @@ export default function InputCombobox({
     setAberto(false);
   };
 
+  const labelId = id ? `${id}-label` : undefined;
+  const listboxId = id ? `${id}-listbox` : undefined;
+  const opcaoAtivaId =
+    aberto && filtradas[indiceAtivo] && id
+      ? `${id}-option-${filtradas[indiceAtivo].value}`
+      : undefined;
+
   const aoPressionarTecla = (evento) => {
     if (evento.key === "ArrowDown") {
       evento.preventDefault();
@@ -93,16 +100,18 @@ export default function InputCombobox({
   return (
     <div ref={containerRef} className="relative w-full">
       {label ? (
-        <span className="text-xs font-medium text-slate-600 dark:text-slate-300">
+        <span id={labelId} className="text-xs font-medium text-slate-600 dark:text-slate-300">
           {label}
           {required ? <span className="ml-0.5 text-red-500">*</span> : null}
         </span>
       ) : null}
       <div
         className={[
-          "relative mt-1 h-9 w-full rounded-lg border border-slate-300 transition-colors",
-          "focus-within:border-transparent focus-within:ring-2 focus-within:ring-blue-500",
-          "dark:border-slate-700 dark:focus-within:ring-cyan-400",
+          "relative mt-1 h-9 w-full rounded-lg border transition-colors",
+          "focus-within:border-transparent focus-within:ring-2",
+          error
+            ? "border-red-500 focus-within:ring-red-500 dark:border-red-500 dark:focus-within:ring-red-400"
+            : "border-slate-300 focus-within:ring-blue-500 dark:border-slate-700 dark:focus-within:ring-cyan-400",
           disabled
             ? "cursor-not-allowed bg-slate-50 dark:bg-slate-800"
             : "bg-white dark:bg-slate-900",
@@ -130,6 +139,13 @@ export default function InputCombobox({
             setAberto(true);
           }}
           onKeyDown={aoPressionarTecla}
+          role="combobox"
+          aria-expanded={aberto}
+          aria-controls={listboxId}
+          aria-activedescendant={opcaoAtivaId}
+          aria-autocomplete="list"
+          aria-labelledby={labelId}
+          aria-label={label ? undefined : placeholder}
           className="absolute inset-0 z-10 h-9 w-full rounded-lg border-0 bg-transparent px-3 pr-16 text-sm text-slate-900 outline-none disabled:cursor-not-allowed disabled:text-slate-400 dark:text-slate-100 dark:placeholder:text-slate-500 dark:disabled:text-slate-500"
         />
         <div className="absolute inset-y-0 right-1 z-20 flex items-center gap-0.5">
@@ -153,8 +169,9 @@ export default function InputCombobox({
         {aberto ? (
           <div
             ref={panelRef}
+            id={listboxId}
             role="listbox"
-            className="absolute z-20 mt-1 max-h-56 w-full overflow-auto rounded-lg border border-slate-200 bg-white py-1 text-sm shadow-lg dark:border-slate-700 dark:bg-slate-900"
+            className="absolute left-0 top-full z-20 mt-1 max-h-56 w-full overflow-auto rounded-lg border border-slate-200 bg-white py-1 text-sm shadow-lg dark:border-slate-700 dark:bg-slate-900"
           >
             {filtradas.length === 0 ? (
               <div className="px-3 py-2 text-slate-400 dark:text-slate-500">
@@ -164,6 +181,7 @@ export default function InputCombobox({
               filtradas.map((opcao, indice) => (
                 <button
                   key={opcao.value}
+                  id={id ? `${id}-option-${opcao.value}` : undefined}
                   type="button"
                   role="option"
                   aria-selected={String(opcao.value) === String(value)}

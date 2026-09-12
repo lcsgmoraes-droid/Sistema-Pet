@@ -44,7 +44,24 @@ export default function InputComboboxMultiplo({
     return disponiveis.filter((opcao) => normalizar(opcao.label).includes(alvo));
   }, [disponiveis, termo]);
 
-  useEffect(() => setIndiceAtivo(0), [termo, aberto]);
+  const sugestaoFantasma = useMemo(() => {
+    if (!termo || !aberto) return null;
+    const alvo = normalizar(termo);
+    return (
+      disponiveis.find(
+        (opcao) => normalizar(opcao.label).startsWith(alvo) && opcao.label.length > termo.length,
+      ) || null
+    );
+  }, [disponiveis, termo, aberto]);
+
+  useEffect(() => {
+    if (!sugestaoFantasma) {
+      setIndiceAtivo(0);
+      return;
+    }
+    const indice = filtradas.findIndex((opcao) => opcao.value === sugestaoFantasma.value);
+    if (indice >= 0) setIndiceAtivo(indice);
+  }, [sugestaoFantasma, filtradas]);
 
   useRevealFloatingPanel({ enabled: aberto, panelRef, refreshKey: filtradas.length });
 
@@ -67,6 +84,13 @@ export default function InputComboboxMultiplo({
     onChange?.(value.filter((valorItem) => String(valorItem) !== String(valorRemovido)));
   };
 
+  const labelId = id ? `${id}-label` : undefined;
+  const listboxId = id ? `${id}-listbox` : undefined;
+  const opcaoAtivaId =
+    aberto && filtradas[indiceAtivo] && id
+      ? `${id}-option-${filtradas[indiceAtivo].value}`
+      : undefined;
+
   const aoPressionarTecla = (evento) => {
     if (evento.key === "ArrowDown") {
       evento.preventDefault();
@@ -75,6 +99,11 @@ export default function InputComboboxMultiplo({
     } else if (evento.key === "ArrowUp") {
       evento.preventDefault();
       setIndiceAtivo((atual) => Math.max(atual - 1, 0));
+    } else if (evento.key === "Tab") {
+      if (sugestaoFantasma) {
+        evento.preventDefault();
+        adicionar(sugestaoFantasma);
+      }
     } else if (evento.key === "Enter") {
       evento.preventDefault();
       if (aberto && filtradas[indiceAtivo]) adicionar(filtradas[indiceAtivo]);
@@ -88,17 +117,18 @@ export default function InputComboboxMultiplo({
   return (
     <div ref={containerRef} className="relative w-full">
       {label ? (
-        <span className="text-xs font-medium text-slate-600 dark:text-slate-300">
+        <span id={labelId} className="text-xs font-medium text-slate-600 dark:text-slate-300">
           {label}
           {required ? <span className="ml-0.5 text-red-500">*</span> : null}
         </span>
       ) : null}
       <div
-        onClick={() => inputRef.current?.focus()}
         className={[
-          "mt-1 flex min-h-9 w-full flex-wrap items-center gap-1 rounded-lg border border-slate-300 px-2 py-1 transition-colors",
-          "focus-within:border-transparent focus-within:ring-2 focus-within:ring-blue-500",
-          "dark:border-slate-700 dark:focus-within:ring-cyan-400",
+          "mt-1 flex min-h-9 w-full flex-wrap items-center gap-1 rounded-lg border px-2 py-1 transition-colors",
+          "focus-within:border-transparent focus-within:ring-2",
+          error
+            ? "border-red-500 focus-within:ring-red-500 dark:border-red-500 dark:focus-within:ring-red-400"
+            : "border-slate-300 focus-within:ring-blue-500 dark:border-slate-700 dark:focus-within:ring-cyan-400",
           disabled
             ? "cursor-not-allowed bg-slate-50 dark:bg-slate-800"
             : "cursor-text bg-white dark:bg-slate-900",
@@ -125,28 +155,49 @@ export default function InputComboboxMultiplo({
             )}
           </span>
         ))}
-        <input
-          ref={inputRef}
-          id={id}
-          disabled={disabled}
-          value={termo}
-          placeholder={selecionadas.length === 0 ? placeholder : ""}
-          onFocus={() => setAberto(true)}
-          onChange={(evento) => {
-            setTermo(evento.target.value);
-            setAberto(true);
-          }}
-          onKeyDown={aoPressionarTecla}
-          className="h-6 min-w-[60px] flex-1 border-0 bg-transparent text-sm text-slate-900 outline-none dark:text-slate-100"
-        />
+        <div className="relative h-6 min-w-[60px] flex-1">
+          {sugestaoFantasma ? (
+            <div
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-0 flex items-center whitespace-pre text-sm"
+            >
+              <span className="invisible">{termo}</span>
+              <span className="text-slate-400 dark:text-slate-500">
+                {sugestaoFantasma.label.slice(termo.length)}
+              </span>
+            </div>
+          ) : null}
+          <input
+            ref={inputRef}
+            id={id}
+            disabled={disabled}
+            value={termo}
+            placeholder={selecionadas.length === 0 ? placeholder : ""}
+            onFocus={() => setAberto(true)}
+            onChange={(evento) => {
+              setTermo(evento.target.value);
+              setAberto(true);
+            }}
+            onKeyDown={aoPressionarTecla}
+            role="combobox"
+            aria-expanded={aberto}
+            aria-controls={listboxId}
+            aria-activedescendant={opcaoAtivaId}
+            aria-autocomplete="list"
+            aria-labelledby={labelId}
+            aria-label={label ? undefined : placeholder}
+            className="relative z-10 h-6 w-full border-0 bg-transparent text-sm text-slate-900 outline-none dark:text-slate-100"
+          />
+        </div>
         <ChevronDown className="ml-auto h-4 w-4 shrink-0 text-slate-400" aria-hidden="true" />
       </div>
 
       {aberto ? (
         <div
           ref={panelRef}
+          id={listboxId}
           role="listbox"
-          className="absolute z-20 mt-1 max-h-56 w-full overflow-auto rounded-lg border border-slate-200 bg-white py-1 text-sm shadow-lg dark:border-slate-700 dark:bg-slate-900"
+          className="absolute left-0 top-full z-20 mt-1 max-h-56 w-full overflow-auto rounded-lg border border-slate-200 bg-white py-1 text-sm shadow-lg dark:border-slate-700 dark:bg-slate-900"
         >
           {filtradas.length === 0 ? (
             <div className="px-3 py-2 text-slate-400 dark:text-slate-500">
@@ -158,8 +209,10 @@ export default function InputComboboxMultiplo({
             filtradas.map((opcao, indice) => (
               <button
                 key={opcao.value}
+                id={id ? `${id}-option-${opcao.value}` : undefined}
                 type="button"
                 role="option"
+                aria-selected={indice === indiceAtivo}
                 onMouseDown={(evento) => evento.preventDefault()}
                 onClick={() => adicionar(opcao)}
                 className={[

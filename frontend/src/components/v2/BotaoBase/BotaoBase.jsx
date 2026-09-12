@@ -12,6 +12,8 @@ const VARIANTES = {
     "border-red-600 bg-red-600 text-white hover:bg-red-700 dark:border-red-700 dark:bg-red-700 dark:hover:bg-red-800",
   informativo:
     "border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100 dark:border-blue-400/30 dark:bg-blue-500/10 dark:text-blue-200 dark:hover:bg-blue-500/20",
+  atencao:
+    "border-amber-300 bg-amber-50 text-amber-800 hover:bg-amber-100 dark:border-amber-400/30 dark:bg-amber-500/10 dark:text-amber-200 dark:hover:bg-amber-500/20",
 };
 
 // Casca interna dos botões v2 — telas usam BotaoSalva/BotaoCancelar/BotaoExcluir/BotaoAjuda/BotaoInteracao, não este diretamente.

@@ -1,5 +1,10 @@
 import { Eye } from "lucide-react";
 import { useState } from "react";
+import BotaoAjuda from "../../../../components/v2/BotaoAjuda/BotaoAjuda";
+import BotaoCancelar from "../../../../components/v2/BotaoCancelar/BotaoCancelar";
+import BotaoExcluir from "../../../../components/v2/BotaoExcluir/BotaoExcluir";
+import BotaoInteracao from "../../../../components/v2/BotaoInteracao/BotaoInteracao";
+import BotaoSalva from "../../../../components/v2/BotaoSalva/BotaoSalva";
 import InputCheck from "../../../../components/v2/InputCheck/InputCheck";
 import InputCombobox from "../../../../components/v2/InputCombobox/InputCombobox";
 import InputComboboxMultiplo from "../../../../components/v2/InputComboboxMultiplo/InputComboboxMultiplo";
@@ -14,11 +19,6 @@ import InputRadio from "../../../../components/v2/InputRadio/InputRadio";
 import InputSenha from "../../../../components/v2/InputSenha/InputSenha";
 import InputTelefone from "../../../../components/v2/InputTelefone/InputTelefone";
 import InputTexto from "../../../../components/v2/InputTexto/InputTexto";
-import BotaoAjuda from "../../../../components/v2/BotaoAjuda/BotaoAjuda";
-import BotaoCancelar from "../../../../components/v2/BotaoCancelar/BotaoCancelar";
-import BotaoExcluir from "../../../../components/v2/BotaoExcluir/BotaoExcluir";
-import BotaoInteracao from "../../../../components/v2/BotaoInteracao/BotaoInteracao";
-import BotaoSalva from "../../../../components/v2/BotaoSalva/BotaoSalva";
 import StyleGuideExample from "../StyleGuideExample";
 
 const ESPECIES = [
@@ -27,6 +27,27 @@ const ESPECIES = [
   { value: "ave", label: "Ave" },
   { value: "roedor", label: "Roedor" },
 ];
+
+const MENSAGEM_ERRO = "Este campo é obrigatório.";
+
+function Grupo({ label, note, children }) {
+  return (
+    <StyleGuideExample label={label} note={note}>
+      <div className="grid w-full grid-cols-1 gap-4 sm:grid-cols-3">{children}</div>
+    </StyleGuideExample>
+  );
+}
+
+function Estado({ titulo, children }) {
+  return (
+    <div>
+      <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">
+        {titulo}
+      </div>
+      {children}
+    </div>
+  );
+}
 
 export default function V2FieldsSection() {
   const [nome, setNome] = useState("");
@@ -46,54 +67,167 @@ export default function V2FieldsSection() {
 
   return (
     <>
-      <StyleGuideExample label="InputTexto — base de todos os campos de texto (v2)">
-        <div className="w-64">
+      {/* ---------- Botões ---------- */}
+      <Grupo
+        label="Botões — um componente por ação, sem prop de cor/tamanho para a página escolher"
+        note="Ícone-only exige título/aria-label obrigatório para acessibilidade: BotaoAjuda já resolve isso sozinho (prop texto sempre tem um valor); se usar BotaoInteracao só com ícone (sem texto), passe aria-label manualmente."
+      >
+        <Estado titulo="Ativo">
+          <div className="flex flex-wrap items-center gap-2">
+            <BotaoSalva onClick={() => {}}>Salvar</BotaoSalva>
+            <BotaoCancelar onClick={() => {}} />
+            <BotaoExcluir onClick={() => {}} />
+            <BotaoInteracao icon={Eye} onClick={() => {}}>
+              Ver detalhes
+            </BotaoInteracao>
+            <BotaoAjuda texto="Ajuda sobre este formulário" />
+          </div>
+        </Estado>
+        <Estado titulo="Desabilitado">
+          <div className="flex flex-wrap items-center gap-2">
+            <BotaoSalva disabled>Salvar</BotaoSalva>
+            <BotaoCancelar disabled />
+            <BotaoInteracao icon={Eye} disabled>
+              Ver detalhes
+            </BotaoInteracao>
+          </div>
+        </Estado>
+        <Estado titulo="Carregando (BotaoSalva)">
+          <BotaoSalva loading>Salvando...</BotaoSalva>
+        </Estado>
+      </Grupo>
+
+      {/* ---------- InputTexto ---------- */}
+      <Grupo label="InputTexto — base de todos os campos de texto">
+        <Estado titulo="Ativo">
           <InputTexto
             id="v2-nome"
             label="Nome do cliente"
             placeholder="Ex.: Maria Silva"
             value={nome}
             onChange={setNome}
-            required
           />
-        </div>
-      </StyleGuideExample>
+        </Estado>
+        <Estado titulo="Com erro">
+          <InputTexto
+            id="v2-nome-erro"
+            label="Nome do cliente"
+            value=""
+            onChange={() => {}}
+            error={MENSAGEM_ERRO}
+          />
+        </Estado>
+        <Estado titulo="Desabilitado">
+          <InputTexto
+            id="v2-nome-disabled"
+            label="Nome do cliente"
+            value="Maria Silva"
+            onChange={() => {}}
+            disabled
+          />
+        </Estado>
+      </Grupo>
 
-      <StyleGuideExample label="InputSenha — reaproveita o InputTexto, adiciona mostrar/ocultar">
-        <div className="w-64">
+      {/* ---------- InputSenha ---------- */}
+      <Grupo label="InputSenha — reaproveita o InputTexto, adiciona mostrar/ocultar">
+        <Estado titulo="Ativo">
           <InputSenha id="v2-senha" value={senha} onChange={setSenha} />
-        </div>
-      </StyleGuideExample>
+        </Estado>
+        <Estado titulo="Com erro">
+          <InputSenha
+            id="v2-senha-erro"
+            value="123"
+            onChange={() => {}}
+            error="Senha muito curta."
+          />
+        </Estado>
+        <Estado titulo="Desabilitado">
+          <InputSenha id="v2-senha-disabled" value="••••••••" onChange={() => {}} disabled />
+        </Estado>
+      </Grupo>
 
-      <StyleGuideExample
+      {/* ---------- InputData / InputDataHora ---------- */}
+      <Grupo
         label="InputData / InputDataHora — máscara dd/mm/aaaa, valor exposto em ISO"
         note="Abre um calendário ao focar o campo ou clicar no ícone — digitar continua funcionando normalmente."
       >
-        <div className="w-40">
+        <Estado titulo="Ativo">
           <InputData id="v2-data" label="Data de nascimento" value={data} onChange={setData} />
-        </div>
-        <div className="w-56">
-          <InputDataHora
-            id="v2-data-hora"
-            label="Agendamento"
-            value={dataHora}
-            onChange={setDataHora}
+        </Estado>
+        <Estado titulo="Com erro">
+          <InputData
+            id="v2-data-erro"
+            label="Data de nascimento"
+            value=""
+            onChange={() => {}}
+            error={MENSAGEM_ERRO}
           />
-        </div>
-      </StyleGuideExample>
+        </Estado>
+        <Estado titulo="Desabilitado">
+          <InputDataHora
+            id="v2-data-disabled"
+            label="Agendamento"
+            value={dataHora || "2026-09-12T09:00"}
+            onChange={setDataHora}
+            disabled
+          />
+        </Estado>
+      </Grupo>
 
-      <StyleGuideExample
-        label="InputPeriodo — um único campo, calendário duplo (mês atual + próximo) para escolher início e fim numa tacada só"
-        note="Campo é somente leitura (a digitação livre de um período não é confiável) — clique/foque para abrir; primeiro clique define o início, segundo define o fim, com o intervalo sombreado nos dois meses."
+      {/* ---------- InputPeriodo ---------- */}
+      <Grupo
+        label="InputPeriodo — um único campo, calendário duplo para escolher início e fim numa tacada só"
+        note="Campo somente leitura — clique/foque para abrir; primeiro clique define o início, segundo define o fim, com o intervalo sombreado nos dois meses."
       >
-        <div className="w-full max-w-sm">
+        <Estado titulo="Ativo">
           <InputPeriodo label="Período do relatório" value={periodo} onChange={setPeriodo} />
-        </div>
-      </StyleGuideExample>
+        </Estado>
+        <Estado titulo="Com erro">
+          <InputPeriodo
+            label="Período do relatório"
+            value={{ inicio: "", fim: "" }}
+            onChange={() => {}}
+            error={MENSAGEM_ERRO}
+          />
+        </Estado>
+        <Estado titulo="Desabilitado">
+          <InputPeriodo
+            label="Período do relatório"
+            value={{ inicio: "2026-09-01", fim: "2026-09-10" }}
+            onChange={() => {}}
+            disabled
+          />
+        </Estado>
+      </Grupo>
 
-      <StyleGuideExample label="InputCheck / InputRadio">
-        <InputCheck id="v2-ativo" label="Cliente ativo" checked={ativo} onChange={setAtivo} />
-        <div className="w-full max-w-xs">
+      {/* ---------- InputCheck ---------- */}
+      <Grupo label="InputCheck — aparência de botão, label centralizada, mesma altura dos demais campos (h-9)">
+        <Estado titulo="Ativo">
+          <InputCheck id="v2-ativo" label="Cliente ativo" checked={ativo} onChange={setAtivo} />
+        </Estado>
+        <Estado titulo="Com erro">
+          <InputCheck
+            id="v2-ativo-erro"
+            label="Cliente ativo"
+            checked={false}
+            onChange={() => {}}
+            error={MENSAGEM_ERRO}
+          />
+        </Estado>
+        <Estado titulo="Desabilitado">
+          <InputCheck
+            id="v2-ativo-disabled"
+            label="Cliente ativo"
+            checked
+            disabled
+            onChange={() => {}}
+          />
+        </Estado>
+      </Grupo>
+
+      {/* ---------- InputRadio ---------- */}
+      <Grupo label="InputRadio — aparência de botão, label centralizada, mesma altura dos demais campos (h-9)">
+        <Estado titulo="Ativo">
           <InputRadio
             label="Porte"
             name="v2-porte"
@@ -105,78 +239,159 @@ export default function V2FieldsSection() {
               { value: "grande", label: "Grande" },
             ]}
           />
-        </div>
-      </StyleGuideExample>
-
-      <StyleGuideExample label="InputMoeda / InputQuantidade / InputPercentual">
-        <div className="w-36">
-          <InputMoeda id="v2-preco" label="Preço" value={preco} onChange={setPreco} />
-        </div>
-        <div className="w-28">
-          <InputQuantidade
-            id="v2-qtd"
-            label="Quantidade"
-            value={quantidade}
-            onChange={setQuantidade}
+        </Estado>
+        <Estado titulo="Com erro">
+          <InputRadio
+            label="Porte"
+            name="v2-porte-erro"
+            value=""
+            onChange={() => {}}
+            error={MENSAGEM_ERRO}
+            opcoes={[
+              { value: "pequeno", label: "Pequeno" },
+              { value: "medio", label: "Médio" },
+            ]}
           />
-        </div>
-        <div className="w-32">
-          <InputPercentual id="v2-margem" label="Margem" value={margem} onChange={setMargem} />
-        </div>
-      </StyleGuideExample>
+        </Estado>
+        <Estado titulo="Desabilitado">
+          <InputRadio
+            label="Porte"
+            name="v2-porte-disabled"
+            value="medio"
+            onChange={() => {}}
+            disabled
+            opcoes={[
+              { value: "pequeno", label: "Pequeno" },
+              { value: "medio", label: "Médio" },
+            ]}
+          />
+        </Estado>
+      </Grupo>
 
-      <StyleGuideExample
+      {/* ---------- InputMoeda / InputQuantidade / InputPercentual ---------- */}
+      <Grupo label="InputMoeda / InputQuantidade / InputPercentual — texto alinhado à direita">
+        <Estado titulo="Ativo">
+          <div className="flex flex-wrap gap-3">
+            <InputMoeda id="v2-preco" label="Preço" value={preco} onChange={setPreco} />
+            <InputQuantidade
+              id="v2-qtd"
+              label="Quantidade"
+              value={quantidade}
+              onChange={setQuantidade}
+            />
+            <InputPercentual id="v2-margem" label="Margem" value={margem} onChange={setMargem} />
+          </div>
+        </Estado>
+        <Estado titulo="Com erro">
+          <InputMoeda
+            id="v2-preco-erro"
+            label="Preço"
+            value={0}
+            onChange={() => {}}
+            error={MENSAGEM_ERRO}
+          />
+        </Estado>
+        <Estado titulo="Desabilitado">
+          <InputMoeda
+            id="v2-preco-disabled"
+            label="Preço"
+            value={129.9}
+            onChange={() => {}}
+            disabled
+          />
+        </Estado>
+      </Grupo>
+
+      {/* ---------- InputTelefone / InputCpfCnpj ---------- */}
+      <Grupo
         label="InputTelefone / InputCpfCnpj — máscara progressiva, detecção automática"
         note="InputCpfCnpj já aceita o CNPJ alfanumérico (Receita Federal, 2026) — letras nas 12 primeiras posições, os 2 dígitos verificadores finais continuam numéricos."
       >
-        <div className="w-48">
+        <Estado titulo="Ativo">
+          <div className="flex flex-wrap gap-3">
+            <InputTelefone
+              id="v2-telefone"
+              label="Telefone"
+              value={telefone}
+              onChange={setTelefone}
+            />
+            <InputCpfCnpj id="v2-doc" value={documento} onChange={setDocumento} />
+          </div>
+        </Estado>
+        <Estado titulo="Com erro">
+          <InputCpfCnpj id="v2-doc-erro" value="" onChange={() => {}} error={MENSAGEM_ERRO} />
+        </Estado>
+        <Estado titulo="Desabilitado">
           <InputTelefone
-            id="v2-telefone"
+            id="v2-telefone-disabled"
             label="Telefone"
-            value={telefone}
-            onChange={setTelefone}
+            value="(11) 98888-7777"
+            onChange={() => {}}
+            disabled
           />
-        </div>
-        <div className="w-56">
-          <InputCpfCnpj id="v2-doc" value={documento} onChange={setDocumento} />
-        </div>
-      </StyleGuideExample>
+        </Estado>
+      </Grupo>
 
-      <StyleGuideExample
+      {/* ---------- InputCombobox ---------- */}
+      <Grupo
         label="InputCombobox — busca, teclado, limpar seleção"
         note='Ghost selection: digite um prefixo (ex.: "cach") e o restante da melhor opção aparece esmaecido — Tab confirma direto, sem precisar abrir a lista.'
       >
-        <div className="w-64">
+        <Estado titulo="Ativo">
           <InputCombobox label="Espécie" opcoes={ESPECIES} value={especie} onChange={setEspecie} />
-        </div>
-      </StyleGuideExample>
+        </Estado>
+        <Estado titulo="Com erro">
+          <InputCombobox
+            label="Espécie"
+            opcoes={ESPECIES}
+            value=""
+            onChange={() => {}}
+            error={MENSAGEM_ERRO}
+          />
+        </Estado>
+        <Estado titulo="Desabilitado">
+          <InputCombobox
+            label="Espécie"
+            opcoes={ESPECIES}
+            value="cachorro"
+            onChange={() => {}}
+            disabled
+          />
+        </Estado>
+      </Grupo>
 
-      <StyleGuideExample
+      {/* ---------- InputComboboxMultiplo ---------- */}
+      <Grupo
         label="InputComboboxMultiplo — mesma busca, várias seleções em chips"
-        note="Backspace com o campo de busca vazio remove o último chip. Sem ghost selection aqui (a fila de chips quebrando linha dificulta alinhar o texto fantasma com precisão)."
+        note="Ghost selection igual ao InputCombobox — mas aqui Tab adiciona o item como chip e mantém o foco no campo, pronto pro próximo. Backspace com a busca vazia remove o último chip."
       >
-        <div className="w-72">
+        <Estado titulo="Ativo">
           <InputComboboxMultiplo
             label="Espécies atendidas"
             opcoes={ESPECIES}
             value={especiesAtendidas}
             onChange={setEspeciesAtendidas}
           />
-        </div>
-      </StyleGuideExample>
-
-      <StyleGuideExample
-        label="Botões v2 — um componente por ação, sem prop de cor/tamanho para a página escolher"
-        note="BotaoExcluir já pede confirmação (via corepetDialog) antes de chamar onClick — nenhuma tela precisa implementar isso de novo."
-      >
-        <BotaoSalva onClick={() => {}}>Salvar cliente</BotaoSalva>
-        <BotaoCancelar onClick={() => {}} />
-        <BotaoExcluir onClick={() => {}} />
-        <BotaoInteracao icon={Eye} onClick={() => {}}>
-          Ver detalhes
-        </BotaoInteracao>
-        <BotaoAjuda texto="Ajuda sobre este formulário" />
-      </StyleGuideExample>
+        </Estado>
+        <Estado titulo="Com erro">
+          <InputComboboxMultiplo
+            label="Espécies atendidas"
+            opcoes={ESPECIES}
+            value={[]}
+            onChange={() => {}}
+            error={MENSAGEM_ERRO}
+          />
+        </Estado>
+        <Estado titulo="Desabilitado">
+          <InputComboboxMultiplo
+            label="Espécies atendidas"
+            opcoes={ESPECIES}
+            value={["cachorro", "gato"]}
+            onChange={() => {}}
+            disabled
+          />
+        </Estado>
+      </Grupo>
     </>
   );
 }

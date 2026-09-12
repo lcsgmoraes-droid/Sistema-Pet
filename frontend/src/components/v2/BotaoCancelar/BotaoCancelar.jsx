@@ -9,7 +9,7 @@ const BotaoCancelar = forwardRef(function BotaoCancelar(
   return (
     <BotaoBase
       ref={ref}
-      variante="neutroSuave"
+      variante="atencao"
       icon={X}
       disabled={disabled}
       onClick={onClick}
