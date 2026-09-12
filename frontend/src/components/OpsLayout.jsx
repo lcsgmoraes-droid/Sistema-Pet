@@ -6,6 +6,7 @@ import {
   FiBarChart2,
   FiDatabase,
   FiHome,
+  FiLayout,
   FiLogOut,
   FiServer,
   FiShield,
@@ -40,6 +41,12 @@ const navItems = [
     label: "Observabilidade",
     description: "Erros, lentidao e tenants",
     icon: FiActivity,
+  },
+  {
+    to: "/ops/styleguide",
+    label: "Style Guide",
+    description: "Componentes e regras visuais",
+    icon: FiLayout,
   },
 ];
 

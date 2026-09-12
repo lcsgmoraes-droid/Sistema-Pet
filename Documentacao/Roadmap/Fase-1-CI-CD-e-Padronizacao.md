@@ -70,6 +70,8 @@ A auditoria de 2026-09-12 cobriu segurança, arquitetura e funcionalidades, mas 
 
 ## 1.6 — Biblioteca de campos de formulário (proposta nova, fora da auditoria original)
 
+> ✅ **Implementação real iniciada em `frontend/src/components/v2/`.** O responsável decidiu nomenclatura em português (`InputTexto`, `InputSenha`, `InputData`, `InputDataHora`, `InputPeriodo`, `InputCheck`, `InputRadio`, `InputMoeda`, `InputQuantidade`, `InputPercentual`, `InputTelefone`, `InputCpfCnpj`, `InputCombobox`) em vez dos nomes em inglês propostos abaixo (`MoneyField`, `DateField` etc.) — os nomes em inglês nesta seção ficam como registro do raciocínio original, não como padrão a seguir. Regra adicional definida na prática: os componentes evitam ao máximo receber prop que influencie aparência (cor/tamanho) — quando uma variação real de formato é necessária, vira um componente novo, não um parâmetro. Ver exemplo vivo de cada um em `/ops/styleguide`.
+
 Diretriz trazida pelo responsável, validada contra o código: **nenhuma tela deve usar `<input>`, `<select>`, `<textarea>` nativos diretamente.** Cada tipo de campo (texto, monetário, data, combobox, rádio, checkbox, CPF/CNPJ, telefone, percentual...) deve ser um componente próprio, que reaproveita uma base comum e adiciona por cima máscara, rótulo, validação e comportamento — em vez de cada tela reimplementar isso na hora.
 
 ### Estado atual confirmado no código (2026-09-12)
@@ -170,6 +172,8 @@ export function MoneyField({ value, onChange, maxValue, allowNegative, ...fieldP
 ## 1.7 — Biblioteca de componentes de tela: tipografia, botões e modais (proposta nova, fora da auditoria original)
 
 Mesma lógica do item 1.6, agora para o resto da tela: **título, subtítulo, texto de destaque, texto simples, texto de ajuda, botão e modal também devem ter uma única fonte cada um**, em vez de cada tela (ou cada componente de `components/ui/`) redefinir sua própria escala tipográfica e seu próprio botão/modal com classes Tailwind soltas.
+
+> ✅ **Botões implementados em `frontend/src/components/v2/`** com nomenclatura em português: `BotaoBase` (casca interna, não usar direto numa tela), `BotaoSalva`, `BotaoCancelar`, `BotaoExcluir` (já pede confirmação via `corepetDialog` antes de agir — decisão nova, não estava prevista abaixo), `BotaoAjuda` (sempre só ícone) e `BotaoInteracao` (ação secundária genérica — avançar/voltar/ver detalhes, não abertura de menu). Tipografia e Modal genérico continuam planejados. Ver exemplo vivo em `/ops/styleguide`.
 
 ### Estado atual confirmado no código — tipografia, botões e modais (2026-09-12)
 
