@@ -1,6 +1,6 @@
 import { lazy } from "react";
 
-export const Login = lazy(() => import("../pages/Login"));
+export const Login = lazy(() => import("../pages/v2/Login"));
 export const ForgotPassword = lazy(() => import("../pages/ForgotPassword"));
 export const PlatformLogin = lazy(() => import("../pages/PlatformLogin"));
 export const PlatformForgotPassword = lazy(() => import("../pages/PlatformForgotPassword"));

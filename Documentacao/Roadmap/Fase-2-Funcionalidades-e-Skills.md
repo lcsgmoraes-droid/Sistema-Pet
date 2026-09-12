@@ -15,6 +15,8 @@ Terminar de documentar toda tela do sistema no formato padrão, e transformar es
 
 [[Matriz-de-Cobertura]] já mostra o que falta. Ordem sugerida (por criticidade de negócio e por já estarem referenciadas por outras áreas já documentadas):
 
+> Em paralelo a este mapeamento, começou em 2026-09-12 uma frente de execução visual tela por tela usando os componentes de `components/v2/` (itens 1.6-1.9) — registro vivo em [[RefatoracaoV2]], não é o mesmo trabalho deste item 2.1 (que é mapear/documentar), mas os dois cobrem as mesmas telas e devem se referenciar.
+
 **Prioridade alta (referenciadas por múltiplas integrações/funcionalidades já mapeadas):**
 1. Configurações (fiscal, parâmetros gerais, grupos de empresas) — toca [[Fiscal-IntNFe-SEFAZ]], [[Bling]], multiempresa
 2. Cadastros auxiliares (bancos, formas de pagamento, categorias) — usado por [[Financeiro]], [[PDV-Vendas]]

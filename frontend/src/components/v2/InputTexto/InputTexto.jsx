@@ -3,6 +3,7 @@ import { forwardRef } from "react";
 const InputTexto = forwardRef(function InputTexto(
   {
     alinhamentoTexto = "left",
+    autoComplete,
     autoFocus,
     disabled = false,
     error = "",
@@ -43,6 +44,7 @@ const InputTexto = forwardRef(function InputTexto(
           id={id}
           name={name || id}
           type={type}
+          autoComplete={autoComplete}
           autoFocus={autoFocus}
           inputMode={inputMode}
           maxLength={maxLength}

@@ -74,6 +74,8 @@ Ver [[Matriz-de-Riscos]] (tabela completa, 13 itens) e [[Vulnerabilidades]] (det
 
 Um roadmap de trabalho foi construído em cima desta análise: [[Roadmap]] — 5 fases: 4 em ordem de dependência lógica ([[Fase-1-CI-CD-e-Padronizacao]] → [[Fase-2-Funcionalidades-e-Skills]] → [[Fase-3-Integracoes]] → [[Fase-4-Seguranca]]) mais uma fase contínua de produto/negócio que roda em paralelo ([[Fase-5-Produto-e-Negocio]]). É o documento a seguir para transformar os achados abaixo em trabalho executado.
 
+A execução tela por tela da padronização visual (itens 1.6-1.9) é registrada em [[RefatoracaoV2]] — uma linha por tela, com data e resumo do que mudou.
+
 ## 11. Próximas ações
 
 ### Crítico

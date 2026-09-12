@@ -3,6 +3,7 @@ import { useState } from "react";
 import InputTexto from "../InputTexto/InputTexto";
 
 export default function InputSenha({
+  autoComplete,
   autoFocus,
   disabled = false,
   error = "",
@@ -20,6 +21,7 @@ export default function InputSenha({
 
   return (
     <InputTexto
+      autoComplete={autoComplete}
       autoFocus={autoFocus}
       disabled={disabled}
       error={error}
