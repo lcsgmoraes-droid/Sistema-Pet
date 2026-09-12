@@ -165,6 +165,7 @@ export function MoneyField({ value, onChange, maxValue, allowNegative, ...fieldP
 - [ ] `onChange` entrega o valor já convertido (número, string formatada, boolean), nunca o evento cru.
 - [ ] Label associado via `id`/`htmlFor` e erro associado via `aria-describedby` (acessibilidade — ver também [[Fase-2-Funcionalidades-e-Skills]] 2.6, que cobre acessibilidade nas telas de uso diário).
 - [ ] Tem pelo menos um teste `.mjs` cobrindo a lógica de máscara/validação.
+- [ ] Tem entrada no styleguide (ver item 1.8) criada no mesmo PR — um campo não está "pronto" enquanto não estiver documentado lá.
 
 ## 1.7 — Biblioteca de componentes de tela: tipografia, botões e modais (proposta nova, fora da auditoria original)
 
@@ -354,6 +355,31 @@ Uso esperado numa tela — repare que quem chama só decide texto/tamanho, nunca
 - **Tipografia:** aceita `as`/`size`/`className`, nunca tamanho de fonte/peso definido fora do componente.
 - **Botão:** toda ação que se repete em mais de uma tela (salvar, cancelar, excluir, ajuda, alternar submenu...) tem um componente próprio em `components/ui/actions/`, com ícone e `intent` fixos (ver `ACTION_COLOR_RULES` em `actionStyles.js`) e suporte aos dois formatos (`size="lg"` ícone+texto, `size="sm"` só ícone com `title`/`aria-label` automáticos); só texto e `onClick` variam por tela. Ação sem componente próprio (caso único de uma tela) usa `ActionButton`/`IconActionButton` direto — nunca `className` solta reinventando cor/tamanho.
 - **Modal:** usa `role="dialog"` + `aria-modal` + `aria-labelledby`, fecha com `Escape`, foco vai para dentro ao abrir, cabeçalho/rodapé usam os componentes de tipografia/botão acima — nunca `<h2>`/`<button>` soltos dentro de um modal novo.
+- **Todos os três:** têm entrada no styleguide (ver item 1.8) criada no mesmo PR.
+
+## 1.8 — Styleguide: fonte única das regras de uso (proposta nova, fora da auditoria original)
+
+Ter os componentes (1.6 e 1.7) não resolve sozinho — sem um lugar único que diga **quando** usar cada um, a inconsistência volta pela porta dos fundos: cor errada por `intent` mal escolhido, campo usado fora do contexto certo, modal remontado do zero por quem não sabia que a casca já existia. É o mesmo risco que [[Matriz-de-Riscos]] já registra em R09 sobre o padrão de pasta por domínio: **documentar sozinho não basta se não for fácil de achar e difícil de deixar desatualizado.**
+
+### Onde mora
+
+- [ ] Criar `docs/GUIA_ESTILO_FRONTEND.md` — nome no mesmo padrão já usado em `docs/` (paralelo a `docs/BLUEPRINT_BACKEND.md`, que já cumpre esse papel para o backend). Referenciar a partir de `Documentacao/README.md` e `Documentacao/Arquitetura.md` como qualquer outro documento oficial do projeto, não como anotação solta.
+- [ ] Storybook (ou equivalente) como complemento visual navegável é uma opção válida **mais adiante**, se o time crescer o suficiente para justificar mais uma ferramenta no projeto — não é pré-requisito. A versão em Markdown já resolve o problema central ("onde eu confiro a regra") sem exigir dependência nova.
+
+### O que precisa conter (esqueleto mínimo do documento)
+
+1. **Princípios gerais** — as poucas regras que valem para o sistema inteiro: nenhum `<input>`/`<select>`/`<textarea>`/`<button>`/`<h1>`–`<h4>` nativo fora dos componentes-base de 1.6/1.7; Tailwind é a implementação por dentro dos componentes, nunca a interface que quem monta a tela escreve na mão; todo componente novo nasce com classes `dark:` — hoje é convenção seguida em 100% do que existe em `components/ui/`, vale formalizar antes que alguém quebre isso sem perceber.
+2. **Catálogo de componentes**, uma entrada por componente sempre no mesmo formato — **Quando usar** / **Quando não usar** / **Props principais** / **Exemplo mínimo** / **Anti-exemplo** (o erro comum a evitar). Cobre não só os componentes novos de 1.6/1.7, mas os que **já existem em produção sem nenhuma regra escrita hoje**: `LoadingState.jsx`, `ErrorState.jsx`, `EmptyState.jsx`, `Skeletons.jsx`, `Panel.jsx`, `PageHeader.jsx`, `StatusBadge.jsx`, `MetricCard.jsx` (todos em `components/ui/`) — é trabalho represado, não só documentação do que ainda vai nascer.
+3. **Regras de layout** — grid para layout 2D / flex para 1D, estrutura padrão de página (`PageHeader` no topo + conteúdo), a escala de espaçamento que `Panel.jsx` já usa (`sm`/`md`/`lg` → `p-3`/`p-4`/`p-4`, hoje só documentada implicitamente no próprio arquivo) formalizada como a escala oficial do projeto. Para responsividade mobile, referenciar `docs/GUIA_RESPONSIVIDADE_MOBILE.md` (já existe e é bom) em vez de duplicar o conteúdo.
+4. **Regras de cor/estado** — `ACTION_COLOR_RULES` (`components/ui/actionStyles.js`) já é a fonte certa de "que cor uma ação deve ter"; o styleguide aponta para lá, não reescreve. Idem para estados de tela: quando usar `Skeletons` vs `LoadingState`, quando um erro é `ErrorState` de página inteira vs erro de campo (`FormField` já resolve nos campos, ver 1.6).
+5. **Iconografia** — `lucide-react` é a única biblioteca de ícone do projeto (confirmado no `package.json`); os tamanhos já usados em `ICON_SIZES`/`ICON_ACTION_SIZES` (`ActionButton.jsx`/`IconActionButton.jsx`/`actionStyles.js`) viram a referência oficial de tamanho por contexto, não um valor escolhido na hora.
+6. **Acessibilidade mínima obrigatória** — centraliza aqui o checklist que hoje está espalhado em três lugares do roadmap (label associado e `aria-describedby` em 1.6, `role="dialog"`/foco/`Escape` em 1.7, contraste e alvo de toque ≥44px em [[Fase-2-Funcionalidades-e-Skills]] 2.6) — um único ponto de referência, os outros passam a linkar para cá em vez de repetir a regra.
+
+### Como não deixar este documento morrer (o risco real do item)
+
+- [ ] **Nasce junto com o primeiro componente, não depois de todos prontos.** Criar o esqueleto (as 6 seções acima, vazias) no mesmo PR que criar `components/ui/fields/` (1.6) — cada campo/componente novo a partir daí entra no styleguide no mesmo PR que o cria, nunca como tarefa separada para "depois".
+- [ ] **Checklist de PR.** Adicionar ao `.github/pull_request_template.md` um item conferindo se o PR criou/alterou um componente de `components/ui/` e, se sim, se o styleguide foi atualizado junto — mesmo mecanismo de reforço já usado no restante deste roadmap (CI bloqueante, gate de release) para não depender só de boa vontade.
+- [ ] **Dono do documento.** Se/quando existir CODEOWNERS (ver 1.1), `docs/GUIA_ESTILO_FRONTEND.md` entra no mapeamento de dono de frontend — evita o styleguide ficar sem revisor claro quando mudar.
 
 ## Critério de avanço para a Fase 2
 
@@ -364,6 +390,7 @@ Uso esperado numa tela — repare que quem chama só decide texto/tamanho, nunca
 - `components/ui/fields/` criado com `BaseTextField`/`BaseSelectField`/`BaseChoiceField` e os campos já existentes (`MoneyField`, `QuantityField`, `ComboboxField`, `DateField`) consolidados nele (item 1.6) — recomendado antes da Fase 2 usar esses mesmos campos ao mapear tela por tela.
 - `components/ui/typography/` e `components/ui/Modal.jsx` criados, com `PageHeader`/`Panel`/`EmptyState` já migrados para usar a tipografia nova (item 1.7) — mesmo motivo: a Fase 2 vai montar/revisar tela por tela, e deve já encontrar essas peças prontas.
 - `components/ui/actions/` criado com pelo menos `SaveButton`, `CancelButton`, `DeleteButton`, `HelpButton` (item 1.7) — recomendado, não bloqueante.
+- `docs/GUIA_ESTILO_FRONTEND.md` existe com o esqueleto das 6 seções e pelo menos os componentes de 1.6/1.7 já documentados neles (item 1.8) — a Fase 2 vai mapear tela por tela e deve poder linkar cada tela ao styleguide, não escrever a regra de novo a cada funcionalidade.
 
 ## Não identificado
 
