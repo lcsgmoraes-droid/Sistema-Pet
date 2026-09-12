@@ -55,7 +55,13 @@ export const styleGuideCatalog = [
         nome: "InputCombobox",
         status: "pronto",
         arquivo: "components/v2/InputCombobox/InputCombobox.jsx",
-        descricao: "Busca, teclado, limpar seleção",
+        descricao: "Busca, teclado, limpar seleção, ghost selection (Tab confirma)",
+      },
+      {
+        nome: "InputComboboxMultiplo",
+        status: "pronto",
+        arquivo: "components/v2/InputComboboxMultiplo/InputComboboxMultiplo.jsx",
+        descricao: "Mesma busca, seleção em chips removíveis",
       },
       {
         nome: "BotaoBase",

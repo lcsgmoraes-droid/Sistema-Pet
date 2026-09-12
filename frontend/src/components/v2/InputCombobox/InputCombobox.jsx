@@ -1,13 +1,7 @@
 import { ChevronDown, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import useRevealFloatingPanel from "../../../hooks/useRevealFloatingPanel";
-
-function normalizar(texto) {
-  return String(texto ?? "")
-    .toLocaleLowerCase("pt-BR")
-    .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "");
-}
+import { normalizar } from "../utils/texto";
 
 export default function InputCombobox({
   disabled = false,

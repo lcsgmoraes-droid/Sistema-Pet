@@ -2,6 +2,7 @@ import { Eye } from "lucide-react";
 import { useState } from "react";
 import InputCheck from "../../../../components/v2/InputCheck/InputCheck";
 import InputCombobox from "../../../../components/v2/InputCombobox/InputCombobox";
+import InputComboboxMultiplo from "../../../../components/v2/InputComboboxMultiplo/InputComboboxMultiplo";
 import InputCpfCnpj from "../../../../components/v2/InputCpfCnpj/InputCpfCnpj";
 import InputData from "../../../../components/v2/InputData/InputData";
 import InputDataHora from "../../../../components/v2/InputDataHora/InputDataHora";
@@ -41,6 +42,7 @@ export default function V2FieldsSection() {
   const [telefone, setTelefone] = useState("");
   const [documento, setDocumento] = useState("");
   const [especie, setEspecie] = useState("");
+  const [especiesAtendidas, setEspeciesAtendidas] = useState(["cachorro"]);
 
   return (
     <>
@@ -146,6 +148,20 @@ export default function V2FieldsSection() {
       >
         <div className="w-64">
           <InputCombobox label="Espécie" opcoes={ESPECIES} value={especie} onChange={setEspecie} />
+        </div>
+      </StyleGuideExample>
+
+      <StyleGuideExample
+        label="InputComboboxMultiplo — mesma busca, várias seleções em chips"
+        note="Backspace com o campo de busca vazio remove o último chip. Sem ghost selection aqui (a fila de chips quebrando linha dificulta alinhar o texto fantasma com precisão)."
+      >
+        <div className="w-72">
+          <InputComboboxMultiplo
+            label="Espécies atendidas"
+            opcoes={ESPECIES}
+            value={especiesAtendidas}
+            onChange={setEspeciesAtendidas}
+          />
         </div>
       </StyleGuideExample>
 
