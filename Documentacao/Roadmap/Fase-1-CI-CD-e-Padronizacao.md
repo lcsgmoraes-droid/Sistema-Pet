@@ -381,6 +381,34 @@ Ter os componentes (1.6 e 1.7) não resolve sozinho — sem um lugar único que 
 - [ ] **Checklist de PR.** Adicionar ao `.github/pull_request_template.md` um item conferindo se o PR criou/alterou um componente de `components/ui/` e, se sim, se o styleguide foi atualizado junto — mesmo mecanismo de reforço já usado no restante deste roadmap (CI bloqueante, gate de release) para não depender só de boa vontade.
 - [ ] **Dono do documento.** Se/quando existir CODEOWNERS (ver 1.1), `docs/GUIA_ESTILO_FRONTEND.md` entra no mapeamento de dono de frontend — evita o styleguide ficar sem revisor claro quando mudar.
 
+## 1.9 — `components/` só para peças reaproveitáveis; peça de uso único mora junto da tela (proposta nova, fora da auditoria original)
+
+Observação levantada pelo responsável ao comparar com a convenção do Vue 3 (onde "view"/tela e "componente" reaproveitável são coisas claramente separadas), confirmada no código desta rodada: no frontend deste projeto, `components/` virou uma gaveta para tudo que não é o arquivo principal da página, em vez de ser reservado só para peças genuinamente reaproveitáveis em mais de uma tela.
+
+### Evidência confirmada no código (2026-09-12)
+
+- `frontend/src/components/` tem **529 arquivos**; `frontend/src/pages/` tem **832**.
+- Caso concreto de peça de uso único estacionada no lugar errado: `components/campanhas/` tem **66 arquivos** (modais, abas, seções de configuração e de dashboard) — todos consumidos exclusivamente por um único arquivo, `pages/Campanhas.jsx`. Não é um componente reaproveitável, é a própria tela fatiada em arquivos, só que guardada numa pasta com nome de "componente". O mesmo padrão se repete em outras pastas por feature dentro de `components/`: `pdv/`, `produto/`, `veterinario/`, `estoque/`, `financeiro/`, `pessoas/`, `clientes/`, `compras/`, entre outras.
+- **O projeto já tem o padrão certo em áreas mais recentes/refatoradas**, prova de que isso não exige inventar nada novo: `pages/banhoTosa/components/`, `pages/veterinario/agenda/`, `pages/produtos/form/`, `pages/veterinario/consultaForm/` já colocam a peça específica de uma tela ao lado da própria tela, em vez de num diretório global.
+- `components/ui/` (~34 arquivos: `ActionButton`, `Panel`, `EmptyState`, `FormField` etc., já cobertos nos itens 1.6-1.8) é o único lugar de `components/` que já segue corretamente o conceito de "peça reaproveitável em qualquer tela do sistema" — é o equivalente direto ao que o Vue chama de componente.
+
+### Regra proposta
+
+- **`frontend/src/components/` (raiz e `components/ui/`)** — só peça usada em **mais de uma tela/feature**, sem lógica de negócio de um domínio específico. Se um componente só existe para servir uma tela, ele não pertence aqui, não importa quão grande ou complexo seja.
+- **`frontend/src/pages/<feature>/`** — tudo que é específico daquela tela: subcomponentes, modais, abas, seções, hooks locais. Um domínio grande pode (e deve) ter sua própria subpasta `components/` **dentro** de `pages/<feature>/` (exatamente como `pages/banhoTosa/components/` já faz) — a diferença para o `components/` global é o escopo: um vive só dentro daquela feature, o outro é importado de qualquer lugar do sistema.
+- Critério prático para decidir na hora de criar um arquivo novo: **"este pedaço seria útil em uma tela completamente diferente, sem nenhuma adaptação de domínio?"** Se sim, `components/ui/`. Se não, `pages/<feature>/components/`.
+
+### Passos concretos para reorganizar `components/` vs `pages/`, em ordem
+
+- [ ] **Não migrar os 529 arquivos de uma vez.** Mesma regra já usada nos itens anteriores: migração oportunista — quando uma tela for tocada por outro motivo (bug, nova funcionalidade, mapeamento da Fase 2), as peças de uso único dela em `components/<feature>/` migram para `pages/<feature>/components/` no mesmo PR.
+- [ ] **Escolher 1 feature grande como piloto** — `components/campanhas/` (66 arquivos, todos de uso único confirmado) é o candidato mais claro: mover tudo para `pages/campanhas/components/` prova o processo num caso real antes de generalizar.
+- [ ] **Registrar a regra no styleguide (item 1.8)**, na seção de "Princípios gerais" — é exatamente o tipo de regra que esse documento existe para guardar, para não depender de review manual repetindo a mesma explicação a cada PR.
+- [ ] **Ao mapear cada tela na Fase 2** (ver [[Fase-2-Funcionalidades-e-Skills]] 2.1), registrar no respectivo documento de [[Funcionalidades]] se os arquivos de apoio daquela tela já estão no lugar certo — vira um efeito colateral útil do mapeamento, não uma auditoria separada.
+
+### Não identificado nesta rodada (item 1.9)
+
+- ❓ Se algum dos arquivos hoje em `components/<feature>/` é, na verdade, usado por mais de uma tela (o levantamento desta rodada confirmou uso único só para `components/campanhas/`; as demais pastas por feature não foram auditadas arquivo a arquivo) — checar antes de mover, para não quebrar um reaproveitamento real que exista sem estar óbvio.
+
 ## Critério de avanço para a Fase 2
 
 - CI/CD com CODEOWNERS e Environments configurados.
@@ -391,6 +419,7 @@ Ter os componentes (1.6 e 1.7) não resolve sozinho — sem um lugar único que 
 - `components/ui/typography/` e `components/ui/Modal.jsx` criados, com `PageHeader`/`Panel`/`EmptyState` já migrados para usar a tipografia nova (item 1.7) — mesmo motivo: a Fase 2 vai montar/revisar tela por tela, e deve já encontrar essas peças prontas.
 - `components/ui/actions/` criado com pelo menos `SaveButton`, `CancelButton`, `DeleteButton`, `HelpButton` (item 1.7) — recomendado, não bloqueante.
 - `docs/GUIA_ESTILO_FRONTEND.md` existe com o esqueleto das 6 seções e pelo menos os componentes de 1.6/1.7 já documentados neles (item 1.8) — a Fase 2 vai mapear tela por tela e deve poder linkar cada tela ao styleguide, não escrever a regra de novo a cada funcionalidade.
+- Piloto de reorganização `components/campanhas/` → `pages/campanhas/components/` concluído e regra registrada no styleguide (item 1.9) — recomendado antes da Fase 2 mapear tela por tela, para já registrar a localização correta de cada peça de apoio.
 
 ## Não identificado
 
