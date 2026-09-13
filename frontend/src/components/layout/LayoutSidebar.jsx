@@ -194,13 +194,9 @@ export default function LayoutSidebar({
           <BotaoAlternarMenu aberto onClick={() => setSidebarOpen(false)} title="Recolher menu" />
         </div>
       ) : (
-        <div className="relative flex items-center justify-center border-b border-[#d8eee9] bg-white/70 py-4 dark:border-slate-800 dark:bg-slate-950/80">
-          <img src={COREPET_ICON} alt="CorePet" className="h-8 w-8 rounded-lg object-contain" />
-          <BotaoAlternarMenu
-            onClick={() => setSidebarOpen(true)}
-            title="Expandir menu"
-            className="absolute -right-4 top-1/2 -translate-y-1/2"
-          />
+        <div className="flex flex-col items-center gap-2 border-b border-[#d8eee9] bg-white/70 py-4 dark:border-slate-800 dark:bg-slate-950/80">
+          <img src={COREPET_ICON} alt="CorePet" className="h-7 w-7 rounded-lg object-contain" />
+          <BotaoAlternarMenu onClick={() => setSidebarOpen(true)} title="Expandir menu" />
         </div>
       )}
 
