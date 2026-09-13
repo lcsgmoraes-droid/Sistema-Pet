@@ -56,25 +56,17 @@ function useSidebarHoverHint(sidebarOpen) {
   return { show, hide, portal };
 }
 
-function ModuloMenuIndicator({ modulo, moduloAtivo, iconClassName }) {
-  if (!modulo || moduloAtivo(modulo)) return null;
-
-  return (
-    <TooltipPremium modulo={modulo} placement="right">
-      <FiLock className={`${iconClassName} text-amber-400`} aria-label="Módulo premium" />
-    </TooltipPremium>
-  );
-}
-
-// Caixa única para todo acessório à direita de um item de menu (estrela de favorito, seta de
-// submenu, cadeado de módulo bloqueado) — estrela e seta usavam classes soltas e ligeiramente
-// diferentes, reservando uma largura diferente cada uma e truncando o label em pontos diferentes.
-// Encapsular as duas no mesmo componente garante que qualquer ajuste futuro (padding, tamanho,
-// cantos) valha pras duas ao mesmo tempo, em vez de duas strings de classe mantidas à mão.
+// Caixa única para QUALQUER ícone de acessório à direita de um item de menu — estrela, seta de
+// submenu ou cadeado de módulo bloqueado. Regra de ouro desta linha: nenhum desses três ícones
+// pode aparecer "cru" (sem passar por aqui), porque foi exatamente isso que causou o
+// desalinhamento entre estrela e seta antes — a estrela tinha padding próprio (p-1) e a seta
+// era renderizada sem nenhum, então mesmo dentro de colunas de largura igual o ÍCONE em si
+// ficava em posições x diferentes. Todo ícone de acessório tem exatamente o mesmo padding, sem
+// exceção — é isso que garante o alinhamento, não a coluna por fora.
 function MenuAcessorio({ as: Tag = "span", className = "", children, ...rest }) {
   return (
     <Tag
-      className={`flex shrink-0 items-center justify-center rounded p-1 transition-colors ${className}`}
+      className={`flex h-6 w-6 shrink-0 items-center justify-center rounded p-1 transition-colors ${className}`}
       {...rest}
     >
       {children}
@@ -82,21 +74,42 @@ function MenuAcessorio({ as: Tag = "span", className = "", children, ...rest }) 
   );
 }
 
-// Coluna de largura fixa nas duas pontas da linha: ícone de liderança à esquerda, acessório
-// (estrela/seta/cadeado) à direita. O miolo (label) fica flex-1 entre as duas e empurra cada
-// ponta pro seu canto — com largura fixa nas duas pontas (em vez de só "shrink-0", que encolhe
-// pro tamanho do conteúdo e deixa cada ícone num x diferente), elas alinham entre si mesmo
-// quando o conteúdo muda (estrela vs seta, ou seta + cadeado juntos do lado direito).
+// Ponta (esquerda ou direita) da linha do menu: ícone de liderança de um lado, grupo de
+// acessórios (MenuAcessorio, um ou mais) do outro. O label no meio é flex-1 e consome todo
+// espaço sobrando, então a ponta da direita já cai exatamente na borda direita da linha sozinha
+// — não precisa de largura fixa pra isso (uma largura fixa, na verdade, quebra o caso de dois
+// acessórios juntos — cadeado + estrela não cabem os dois no mesmo tamanho que só a estrela).
+// O alinhamento de verdade vem do MenuAcessorio ter o mesmo padding em todo lugar (ver lá).
 function MenuColuna({ children, alinhar = "center", className = "" }) {
   const justify =
     alinhar === "end" ? "justify-end" : alinhar === "start" ? "justify-start" : "justify-center";
+  return <span className={`flex shrink-0 items-center ${justify} ${className}`}>{children}</span>;
+}
+
+// Cadeado de módulo bloqueado — sempre dentro de MenuAcessorio, nunca cru (ver comentário lá).
+function ModuloAcessorio({ modulo, moduloAtivo }) {
+  if (!modulo || moduloAtivo(modulo)) return null;
+
   return (
-    <span className={`flex w-9 shrink-0 items-center gap-0.5 ${justify} ${className}`}>
-      {children}
-    </span>
+    <MenuAcessorio>
+      <TooltipPremium modulo={modulo} placement="right">
+        <FiLock className="h-3.5 w-3.5 flex-shrink-0 text-amber-400" aria-label="Módulo premium" />
+      </TooltipPremium>
+    </MenuAcessorio>
   );
 }
 
+// Seta de expandir/recolher submenu — sempre dentro de MenuAcessorio, nunca cru.
+function SubmenuAcessorio({ aberto }) {
+  const Icone = aberto ? FiChevronDown : FiChevronRight;
+  return (
+    <MenuAcessorio>
+      <Icone className="h-3.5 w-3.5 text-gray-400 dark:text-slate-500" />
+    </MenuAcessorio>
+  );
+}
+
+// Estrela de favorito — sempre dentro de MenuAcessorio (como botão, já que é clicável).
 function FavoriteToggle({ item, active, onToggleFavorite, className = "" }) {
   if (!onToggleFavorite || !item?.path) return null;
 
@@ -133,6 +146,53 @@ function favoriteItem(item, fallback) {
     iconKey: item.iconKey ?? fallback?.iconKey,
     icon: item.icon ?? fallback?.icon,
   };
+}
+
+// Ícone de liderança (esquerda) do item — mesmo tamanho condicional (menor quando recolhido)
+// usado em todo lugar que renderiza um ícone principal de item de menu.
+function IconeItem({ icon: Icone, sidebarOpen }) {
+  return (
+    <Icone
+      className={sidebarOpen ? "h-4 w-4 md:h-5 md:w-5 flex-shrink-0" : "h-4 w-4 flex-shrink-0"}
+    />
+  );
+}
+
+// Grupo de acessórios à direita de um item COM submenu: cadeado (se bloqueado) OU seta — nunca
+// os dois juntos, o cadeado substitui a seta.
+function AcessoriosSubmenu({ item, submenusOpen, moduloAtivo }) {
+  const bloqueado = item.modulo && !moduloAtivo(item.modulo);
+  return (
+    <MenuColuna alinhar="end">
+      {bloqueado ? (
+        <ModuloAcessorio modulo={item.modulo} moduloAtivo={moduloAtivo} />
+      ) : (
+        <SubmenuAcessorio aberto={Boolean(submenusOpen[item.path])} />
+      )}
+    </MenuColuna>
+  );
+}
+
+// Grupo de acessórios à direita de um item SEM submenu (folha): cadeado/badge (se aplicável) e
+// sempre a estrela de favorito, lado a lado.
+function AcessoriosItem({ item, moduloAtivo, favoritePaths, onToggleFavorite }) {
+  return (
+    <MenuColuna alinhar="end" className="gap-0.5">
+      <ModuloAcessorio modulo={item.modulo} moduloAtivo={moduloAtivo} />
+      {!item.modulo && item.badge ? (
+        <span
+          className="h-2 w-2 shrink-0 rounded-full bg-orange-400 motion-safe:animate-pulse"
+          title={item.badgeLabel || "Há itens pendentes"}
+          aria-label={item.badgeLabel || "Há itens pendentes"}
+        />
+      ) : null}
+      <FavoriteToggle
+        item={favoriteItem(item)}
+        active={favoritePaths?.has(item.path)}
+        onToggleFavorite={onToggleFavorite}
+      />
+    </MenuColuna>
+  );
 }
 
 // Com a sidebar recolhida não há espaço pra expandir o submenu inline (é só um rail de ícones) —
@@ -243,13 +303,7 @@ export default function SidebarMenu({
                     }`}
                   >
                     <MenuColuna alinhar={sidebarOpen ? "start" : "center"}>
-                      <item.icon
-                        className={
-                          sidebarOpen
-                            ? "h-4 w-4 md:h-5 md:w-5 flex-shrink-0"
-                            : "h-4 w-4 flex-shrink-0"
-                        }
-                      />
+                      <IconeItem icon={item.icon} sidebarOpen={sidebarOpen} />
                     </MenuColuna>
                     {sidebarOpen && (
                       <span
@@ -260,19 +314,11 @@ export default function SidebarMenu({
                       </span>
                     )}
                     {sidebarOpen && (
-                      <MenuColuna alinhar="end">
-                        {item.modulo && !moduloAtivo(item.modulo) ? (
-                          <ModuloMenuIndicator
-                            modulo={item.modulo}
-                            moduloAtivo={moduloAtivo}
-                            iconClassName="h-3.5 w-3.5 flex-shrink-0"
-                          />
-                        ) : submenusOpen[item.path] ? (
-                          <FiChevronDown className="h-3.5 w-3.5 text-gray-400 dark:text-slate-500" />
-                        ) : (
-                          <FiChevronRight className="h-3.5 w-3.5 text-gray-400 dark:text-slate-500" />
-                        )}
-                      </MenuColuna>
+                      <AcessoriosSubmenu
+                        item={item}
+                        submenusOpen={submenusOpen}
+                        moduloAtivo={moduloAtivo}
+                      />
                     )}
                   </button>
                   {submenusOpen[item.path] && sidebarOpen && (
@@ -302,26 +348,25 @@ export default function SidebarMenu({
                               )}
                               {!sidebarOpen && <span className="sr-only">{subitem.label}</span>}
                             </Link>
-                            {subitem.modulo && sidebarOpen && (
-                              <ModuloMenuIndicator
-                                modulo={subitem.modulo}
-                                moduloAtivo={moduloAtivo}
-                                iconClassName="w-3 h-3 flex-shrink-0"
-                              />
-                            )}
                             {sidebarOpen && subitem.badge ? (
                               <span
-                                className="h-2 w-2 shrink-0 animate-pulse rounded-full bg-orange-400"
+                                className="h-2 w-2 shrink-0 rounded-full bg-orange-400 motion-safe:animate-pulse"
                                 title={subitem.badgeLabel || "Há itens pendentes"}
                                 aria-label={subitem.badgeLabel || "Há itens pendentes"}
                               />
                             ) : null}
                             {sidebarOpen && (
-                              <FavoriteToggle
-                                item={favoriteItem(subitem, item)}
-                                active={favoritePaths?.has(subitem.path)}
-                                onToggleFavorite={onToggleFavorite}
-                              />
+                              <MenuColuna alinhar="end" className="gap-0.5">
+                                <ModuloAcessorio
+                                  modulo={subitem.modulo}
+                                  moduloAtivo={moduloAtivo}
+                                />
+                                <FavoriteToggle
+                                  item={favoriteItem(subitem, item)}
+                                  active={favoritePaths?.has(subitem.path)}
+                                  onToggleFavorite={onToggleFavorite}
+                                />
+                              </MenuColuna>
                             )}
                           </div>
                         ))}
@@ -351,13 +396,7 @@ export default function SidebarMenu({
                     title={item.label}
                   >
                     <MenuColuna alinhar={sidebarOpen ? "start" : "center"}>
-                      <item.icon
-                        className={
-                          sidebarOpen
-                            ? "h-4 w-4 md:h-5 md:w-5 flex-shrink-0"
-                            : "h-4 w-4 flex-shrink-0"
-                        }
-                      />
+                      <IconeItem icon={item.icon} sidebarOpen={sidebarOpen} />
                     </MenuColuna>
                     {sidebarOpen && (
                       <span
@@ -369,22 +408,12 @@ export default function SidebarMenu({
                     )}
                   </Link>
                   {sidebarOpen && (
-                    <MenuColuna alinhar="end">
-                      {item.modulo ? (
-                        <ModuloMenuIndicator
-                          modulo={item.modulo}
-                          moduloAtivo={moduloAtivo}
-                          iconClassName="h-3.5 w-3.5 flex-shrink-0"
-                        />
-                      ) : item.badge ? (
-                        <span className="w-2 h-2 bg-orange-400 rounded-full animate-pulse"></span>
-                      ) : null}
-                      <FavoriteToggle
-                        item={favoriteItem(item)}
-                        active={favoritePaths?.has(item.path)}
-                        onToggleFavorite={onToggleFavorite}
-                      />
-                    </MenuColuna>
+                    <AcessoriosItem
+                      item={item}
+                      moduloAtivo={moduloAtivo}
+                      favoritePaths={favoritePaths}
+                      onToggleFavorite={onToggleFavorite}
+                    />
                   )}
                 </div>
               )}
@@ -424,25 +453,21 @@ export default function SidebarMenu({
                   >
                     <span className="v2-menu-item">{subitem.label}</span>
                   </Link>
-                  {subitem.modulo && (
-                    <ModuloMenuIndicator
-                      modulo={subitem.modulo}
-                      moduloAtivo={moduloAtivo}
-                      iconClassName="w-3 h-3 flex-shrink-0"
-                    />
-                  )}
                   {subitem.badge ? (
                     <span
-                      className="h-2 w-2 shrink-0 animate-pulse rounded-full bg-orange-400"
+                      className="h-2 w-2 shrink-0 rounded-full bg-orange-400 motion-safe:animate-pulse"
                       title={subitem.badgeLabel || "Há itens pendentes"}
                       aria-label={subitem.badgeLabel || "Há itens pendentes"}
                     />
                   ) : null}
-                  <FavoriteToggle
-                    item={favoriteItem(subitem, flyoutMenu.flyout.item)}
-                    active={favoritePaths?.has(subitem.path)}
-                    onToggleFavorite={onToggleFavorite}
-                  />
+                  <MenuColuna alinhar="end" className="gap-0.5">
+                    <ModuloAcessorio modulo={subitem.modulo} moduloAtivo={moduloAtivo} />
+                    <FavoriteToggle
+                      item={favoriteItem(subitem, flyoutMenu.flyout.item)}
+                      active={favoritePaths?.has(subitem.path)}
+                      onToggleFavorite={onToggleFavorite}
+                    />
+                  </MenuColuna>
                 </div>
               ))}
           </div>,
