@@ -3,6 +3,10 @@ import { readFileSync } from "node:fs";
 
 const app = readFileSync(new URL("../src/App.jsx", import.meta.url), "utf8");
 const layout = readFileSync(new URL("../src/components/Layout.jsx", import.meta.url), "utf8");
+const layoutSidebar = readFileSync(
+  new URL("../src/components/layout/LayoutSidebar.jsx", import.meta.url),
+  "utf8",
+);
 const opsLayout = readFileSync(new URL("../src/components/OpsLayout.jsx", import.meta.url), "utf8");
 const indexHtml = readFileSync(new URL("../index.html", import.meta.url), "utf8");
 const themeContext = readFileSync(
@@ -15,7 +19,8 @@ const toggle = readFileSync(
 );
 
 assert.ok(app.includes("ThemeProvider"), "App must wrap routes in ThemeProvider");
-assert.ok(layout.includes("ThemeToggle"), "Main layout must expose ThemeToggle");
+assert.ok(layout.includes("LayoutSidebar"), "Main layout must render LayoutSidebar");
+assert.ok(layoutSidebar.includes("toggleTheme"), "Sidebar user menu must expose the theme toggle");
 assert.ok(opsLayout.includes("ThemeToggle"), "Ops layout must expose ThemeToggle");
 assert.ok(
   indexHtml.includes("corepet_theme"),

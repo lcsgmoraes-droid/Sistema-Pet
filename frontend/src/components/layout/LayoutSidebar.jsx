@@ -1,8 +1,20 @@
-import { FiBell, FiCreditCard, FiHelpCircle, FiLogOut, FiMenu, FiX } from "react-icons/fi";
+import {
+  FiBell,
+  FiChevronDown,
+  FiChevronUp,
+  FiCreditCard,
+  FiHelpCircle,
+  FiLogOut,
+  FiMenu,
+  FiMoon,
+  FiSun,
+  FiX,
+} from "react-icons/fi";
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 
 import useNovidadesNaoVistas from "../../hooks/useNovidadesNaoVistas";
+import { useTheme } from "../../theme/ThemeContext";
 import SidebarMenu from "./SidebarMenu";
 
 const COREPET_LOGO = "/brand/corepet/corepet-horizontal.png";
@@ -23,11 +35,47 @@ export default function LayoutSidebar({
   favoritePaths,
   handleToggleFavorite,
   moduloAtivo,
+  user,
   logout,
 }) {
   const resizeRef = useRef(null);
   const [redimensionando, setRedimensionando] = useState(false);
+  const [menuUsuarioAberto, setMenuUsuarioAberto] = useState(false);
+  const userMenuRef = useRef(null);
   const novidadesNaoVistas = useNovidadesNaoVistas();
+  const { isDark, toggleTheme } = useTheme();
+
+  const nomeUsuario = user?.nome || user?.username || user?.email;
+  const identificadorUsuario = user?.username || user?.email;
+  const inicialUsuario = (
+    user?.nome?.[0] ||
+    user?.username?.[0] ||
+    user?.email?.[0] ||
+    ""
+  ).toUpperCase();
+
+  useEffect(() => {
+    if (!menuUsuarioAberto) return undefined;
+
+    const aoClicarFora = (evento) => {
+      if (!userMenuRef.current?.contains(evento.target)) setMenuUsuarioAberto(false);
+    };
+    const aoPressionarTecla = (evento) => {
+      if (evento.key === "Escape") setMenuUsuarioAberto(false);
+    };
+
+    document.addEventListener("mousedown", aoClicarFora);
+    document.addEventListener("keydown", aoPressionarTecla);
+    return () => {
+      document.removeEventListener("mousedown", aoClicarFora);
+      document.removeEventListener("keydown", aoPressionarTecla);
+    };
+  }, [menuUsuarioAberto]);
+
+  const fecharMenuUsuarioEClicar = () => {
+    setMenuUsuarioAberto(false);
+    handleMenuClick();
+  };
 
   useEffect(
     () => () => {
@@ -140,51 +188,113 @@ export default function LayoutSidebar({
         moduloAtivo={moduloAtivo}
       />
 
-      <div className="border-t border-[#d8eee9] bg-white/40 dark:border-slate-800 dark:bg-slate-950/80">
-        <Link
-          to="/meu-plano"
-          onClick={handleMenuClick}
-          className="w-full flex items-center gap-3 px-4 py-2.5 mx-2 mt-2 rounded-lg text-emerald-700 hover:bg-emerald-50 transition-all dark:text-emerald-300 dark:hover:bg-emerald-500/10"
-          title={!sidebarOpen ? "Meu Plano" : ""}
-        >
-          <FiCreditCard className="text-lg flex-shrink-0" />
-          {sidebarOpen && <span className="font-medium text-sm">Meu Plano</span>}
-        </Link>
-        <Link
-          to="/novidades"
-          onClick={handleMenuClick}
-          className="relative mx-2 mt-1 flex w-full items-center gap-3 rounded-lg px-4 py-2.5 text-[#9a6b05] transition-all hover:bg-[#fff1c9] dark:text-amber-300 dark:hover:bg-amber-500/10"
-          title={!sidebarOpen ? "Novidades" : ""}
-        >
-          <FiBell className="flex-shrink-0 text-lg" />
-          {sidebarOpen && <span className="font-medium text-sm">Novidades</span>}
-          {novidadesNaoVistas > 0 ? (
-            <span
-              className={`${
-                sidebarOpen ? "ml-auto" : "absolute right-1 top-1"
-              } inline-flex min-w-5 items-center justify-center rounded-full bg-red-600 px-1.5 py-0.5 text-[10px] font-bold text-white`}
-              aria-label={`${novidadesNaoVistas} novidade(s) não vista(s)`}
+      <div
+        ref={userMenuRef}
+        className="relative border-t border-[#d8eee9] bg-white/40 dark:border-slate-800 dark:bg-slate-950/80"
+      >
+        {menuUsuarioAberto && (
+          <div
+            role="menu"
+            aria-label="Menu do usuário"
+            className="absolute bottom-full left-2 mb-2 w-64 overflow-hidden rounded-xl border border-[#d8eee9] bg-white py-1 shadow-lg dark:border-slate-800 dark:bg-slate-900"
+          >
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => {
+                toggleTheme();
+                setMenuUsuarioAberto(false);
+              }}
+              className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-gray-700 transition-all hover:bg-gray-50 dark:text-slate-300 dark:hover:bg-slate-800"
             >
-              {novidadesNaoVistas > 9 ? "9+" : novidadesNaoVistas}
-            </span>
-          ) : null}
-        </Link>
-        <Link
-          to="/ajuda"
-          onClick={handleMenuClick}
-          className="w-full flex items-center gap-3 px-4 py-2.5 mx-2 mt-1 rounded-lg text-[#0f5f63] hover:bg-[#d8eee9] transition-all dark:text-cyan-200 dark:hover:bg-slate-800"
-          title={!sidebarOpen ? "Ajuda & Planos" : ""}
-        >
-          <FiHelpCircle className="text-lg flex-shrink-0" />
-          {sidebarOpen && <span className="font-medium text-sm">Ajuda & Planos</span>}
-        </Link>
+              {isDark ? (
+                <FiSun className="flex-shrink-0 text-lg" />
+              ) : (
+                <FiMoon className="flex-shrink-0 text-lg" />
+              )}
+              <span className="text-sm font-medium">
+                {isDark ? "Usar tela clara" : "Usar tela escura"}
+              </span>
+            </button>
+            <Link
+              to="/meu-plano"
+              role="menuitem"
+              onClick={fecharMenuUsuarioEClicar}
+              className="flex w-full items-center gap-3 px-4 py-2.5 text-emerald-700 transition-all hover:bg-emerald-50 dark:text-emerald-300 dark:hover:bg-emerald-500/10"
+            >
+              <FiCreditCard className="flex-shrink-0 text-lg" />
+              <span className="text-sm font-medium">Meu Plano</span>
+            </Link>
+            <Link
+              to="/novidades"
+              role="menuitem"
+              onClick={fecharMenuUsuarioEClicar}
+              className="flex w-full items-center gap-3 px-4 py-2.5 text-[#9a6b05] transition-all hover:bg-[#fff1c9] dark:text-amber-300 dark:hover:bg-amber-500/10"
+            >
+              <FiBell className="flex-shrink-0 text-lg" />
+              <span className="text-sm font-medium">Novidades</span>
+              {novidadesNaoVistas > 0 ? (
+                <span
+                  className="ml-auto inline-flex min-w-5 items-center justify-center rounded-full bg-red-600 px-1.5 py-0.5 text-[10px] font-bold text-white"
+                  aria-label={`${novidadesNaoVistas} novidade(s) não vista(s)`}
+                >
+                  {novidadesNaoVistas > 9 ? "9+" : novidadesNaoVistas}
+                </span>
+              ) : null}
+            </Link>
+            <Link
+              to="/ajuda"
+              role="menuitem"
+              onClick={fecharMenuUsuarioEClicar}
+              className="flex w-full items-center gap-3 px-4 py-2.5 text-[#0f5f63] transition-all hover:bg-[#d8eee9] dark:text-cyan-200 dark:hover:bg-slate-800"
+            >
+              <FiHelpCircle className="flex-shrink-0 text-lg" />
+              <span className="text-sm font-medium">Ajuda & Planos</span>
+            </Link>
+            <div className="my-1 border-t border-[#d8eee9] dark:border-slate-800" />
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => {
+                setMenuUsuarioAberto(false);
+                logout();
+              }}
+              className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-gray-700 transition-all hover:bg-red-50 hover:text-red-600 dark:text-slate-300 dark:hover:bg-red-500/10 dark:hover:text-red-200"
+            >
+              <FiLogOut className="flex-shrink-0 text-lg" />
+              <span className="text-sm font-medium">Sair</span>
+            </button>
+          </div>
+        )}
+
         <button
-          onClick={logout}
-          className="w-full flex items-center gap-3 px-4 py-3 mx-2 my-2 rounded-lg text-gray-700 hover:bg-red-50 hover:text-red-600 transition-all text-left dark:text-slate-300 dark:hover:bg-red-500/10 dark:hover:text-red-200"
-          title={!sidebarOpen ? "Sair" : ""}
+          type="button"
+          onClick={() => setMenuUsuarioAberto((aberto) => !aberto)}
+          aria-haspopup="menu"
+          aria-expanded={menuUsuarioAberto}
+          className="flex w-full items-center gap-2.5 px-3 py-3 text-left transition-all hover:bg-white/70 dark:hover:bg-slate-900/60"
+          title={!sidebarOpen ? nomeUsuario : ""}
         >
-          <FiLogOut className="text-lg" />
-          {sidebarOpen && <span className="font-medium text-sm">Sair</span>}
+          <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-[#0f5f63] text-sm font-bold text-white">
+            {inicialUsuario}
+          </span>
+          {sidebarOpen && (
+            <>
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-sm font-medium text-gray-900 dark:text-slate-100">
+                  {nomeUsuario}
+                </span>
+                <span className="block truncate text-xs text-gray-500 dark:text-slate-400">
+                  {identificadorUsuario}
+                </span>
+              </span>
+              {menuUsuarioAberto ? (
+                <FiChevronUp className="flex-shrink-0 text-gray-400 dark:text-slate-500" />
+              ) : (
+                <FiChevronDown className="flex-shrink-0 text-gray-400 dark:text-slate-500" />
+              )}
+            </>
+          )}
         </button>
       </div>
 

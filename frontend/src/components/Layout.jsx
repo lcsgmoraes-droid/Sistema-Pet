@@ -36,7 +36,6 @@ import LayoutFavoritesBar from "./layout/LayoutFavoritesBar";
 import LayoutSidebar from "./layout/LayoutSidebar";
 import { createLayoutMenuItems } from "./layout/menuConfig";
 import ModalCalculadoraUniversal from "./ModalCalculadoraUniversal";
-import ThemeToggle from "./theme/ThemeToggle";
 
 const COREPET_ICON = "/brand/corepet/corepet-icon-64.png";
 
@@ -703,6 +702,7 @@ const Layout = () => {
           favoritePaths={favoritePaths}
           handleToggleFavorite={handleToggleFavorite}
           moduloAtivo={moduloAtivo}
+          user={user}
           logout={logout}
         />
       )}
@@ -718,50 +718,32 @@ const Layout = () => {
 
       {/* Main Content */}
       <div className="erp-main-column flex min-w-0 flex-1 flex-col overflow-hidden">
-        {/* Header */}
-        <header className="erp-topbar flex shrink-0 items-center justify-between gap-2 border-b border-gray-200 bg-white px-3 py-3 md:px-6 md:py-4 dark:border-slate-800 dark:bg-slate-950">
-          {/* Menu Hamburguer (Mobile) */}
-          {isMobile && effectiveSidebarVisible && (
-            <button
-              type="button"
-              onClick={toggleSidebarMobile}
-              className="touch-manipulation rounded-lg p-2 hover:bg-gray-100 transition-colors md:hidden"
-              aria-label="Toggle menu"
-              aria-expanded={sidebarOpen}
-            >
-              <FiMenu className="w-6 h-6 text-gray-700" />
-            </button>
-          )}
+        {/* Header (só existe no mobile: hamburguer/mostrar menu; no desktop não há mais nada aqui) */}
+        {isMobile && (
+          <header className="erp-topbar flex shrink-0 items-center gap-2 border-b border-gray-200 bg-white px-3 py-3 dark:border-slate-800 dark:bg-slate-950">
+            {effectiveSidebarVisible && (
+              <button
+                type="button"
+                onClick={toggleSidebarMobile}
+                className="touch-manipulation rounded-lg p-2 hover:bg-gray-100 transition-colors"
+                aria-label="Toggle menu"
+                aria-expanded={sidebarOpen}
+              >
+                <FiMenu className="w-6 h-6 text-gray-700" />
+              </button>
+            )}
 
-          {/* Botao CorePet Mobile - Mostrar menu quando escondido */}
-          {isMobile && !effectiveSidebarVisible && !isBradescoOrganizerRoute && (
-            <button
-              onClick={() => setSidebarVisible(true)}
-              className="p-2 rounded-lg hover:bg-[#d8eee9] transition-colors md:hidden"
-              aria-label="Mostrar menu"
-            >
-              <img src={COREPET_ICON} alt="" className="h-6 w-6 rounded" />
-            </button>
-          )}
-
-          {/* User Info */}
-          <div className="flex items-center gap-2 md:gap-3 ml-auto">
-            <ThemeToggle />
-            <div className="text-right hidden sm:block">
-              <p className="text-sm font-medium text-gray-900 dark:text-slate-100">
-                {user?.nome || user?.username || user?.email}
-              </p>
-              <p className="text-xs text-gray-500 dark:text-slate-400">
-                {user?.username || user?.email}
-              </p>
-            </div>
-            <div className="w-9 h-9 md:w-10 md:h-10 rounded-full bg-[#0f5f63] flex items-center justify-center text-white font-bold text-sm md:text-base">
-              {user?.nome?.[0]?.toUpperCase() ||
-                user?.username?.[0]?.toUpperCase() ||
-                user?.email?.[0]?.toUpperCase()}
-            </div>
-          </div>
-        </header>
+            {!effectiveSidebarVisible && !isBradescoOrganizerRoute && (
+              <button
+                onClick={() => setSidebarVisible(true)}
+                className="p-2 rounded-lg hover:bg-[#d8eee9] transition-colors"
+                aria-label="Mostrar menu"
+              >
+                <img src={COREPET_ICON} alt="" className="h-6 w-6 rounded" />
+              </button>
+            )}
+          </header>
+        )}
 
         {!isBradescoOrganizerRoute && (
           <LayoutFavoritesBar
