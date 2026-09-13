@@ -211,25 +211,38 @@ export default function SidebarMenu({
                     }`}
                   >
                     <div className="flex items-center gap-2 md:gap-3">
-                      <item.icon className="h-4 w-4 md:h-5 md:w-5 flex-shrink-0" />
+                      <item.icon
+                        className={
+                          sidebarOpen
+                            ? "h-4 w-4 md:h-5 md:w-5 flex-shrink-0"
+                            : "h-4 w-4 flex-shrink-0"
+                        }
+                      />
                       {sidebarOpen && (
                         <span data-sidebar-label className="v2-menu-item min-w-0 font-medium">
                           {item.label}
                         </span>
                       )}
                     </div>
-                    {sidebarOpen &&
-                      (item.modulo && !moduloAtivo(item.modulo) ? (
-                        <ModuloMenuIndicator
-                          modulo={item.modulo}
-                          moduloAtivo={moduloAtivo}
-                          iconClassName="text-xs md:text-sm flex-shrink-0"
-                        />
-                      ) : submenusOpen[item.path] ? (
-                        <FiChevronDown className="text-xs md:text-sm text-gray-400 dark:text-slate-500" />
-                      ) : (
-                        <FiChevronRight className="text-xs md:text-sm text-gray-400 dark:text-slate-500" />
-                      ))}
+                    {sidebarOpen && (
+                      // Mesma caixa (rounded p-1 ao redor de um ícone h-3.5 w-3.5) do botão de
+                      // favorito dos itens sem submenu — sem isso, a área reservada à direita
+                      // ficava menor aqui (só um chevron) do que nos itens com estrela, e o
+                      // texto do label truncava em pontos diferentes entre os dois tipos de linha.
+                      <div className="flex shrink-0 items-center justify-center rounded p-1">
+                        {item.modulo && !moduloAtivo(item.modulo) ? (
+                          <ModuloMenuIndicator
+                            modulo={item.modulo}
+                            moduloAtivo={moduloAtivo}
+                            iconClassName="h-3.5 w-3.5 flex-shrink-0"
+                          />
+                        ) : submenusOpen[item.path] ? (
+                          <FiChevronDown className="h-3.5 w-3.5 text-gray-400 dark:text-slate-500" />
+                        ) : (
+                          <FiChevronRight className="h-3.5 w-3.5 text-gray-400 dark:text-slate-500" />
+                        )}
+                      </div>
+                    )}
                   </button>
                   {submenusOpen[item.path] && sidebarOpen && (
                     <div className="mt-1 mb-2 space-y-0.5 md:space-y-1">
