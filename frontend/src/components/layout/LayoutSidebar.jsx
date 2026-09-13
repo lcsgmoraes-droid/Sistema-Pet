@@ -26,11 +26,12 @@ const LARGURA_RECOLHIDA = "4rem";
 // Hambúrguer que vira X (e volta) com uma animação simples de 3 barras — substitui os dois
 // botões separados (recolher / esconder) por um único controle: o estado dele É o estado da
 // sidebar (aberta = X, recolhida = hambúrguer), não uma ação de "fechar/esconder o menu".
-// Aparência propositalmente discreta (sem preenchimento/gradiente) — é um ícone de cabeçalho,
-// igual ao "Fechar menu" do mobile, não um botão de ação chamativo.
+// Aparência discreta (sem gradiente/sombra pesada), mas com fundo+borda próprios — no recolhido
+// ele flutua meio pra fora da borda da sidebar, por cima do conteúdo da página, e precisa de uma
+// base visual para não "desaparecer" contra o que estiver atrás.
 function BotaoAlternarMenu({ aberto, onClick, title, className = "" }) {
   const barra =
-    "absolute left-1/2 top-1/2 h-0.5 w-4 -translate-x-1/2 rounded-full bg-[#0f5f63] transition-all duration-300 dark:bg-cyan-200";
+    "absolute left-1/2 top-1/2 h-0.5 w-3.5 -translate-x-1/2 rounded-full bg-[#0f5f63] transition-all duration-300 dark:bg-cyan-200";
 
   return (
     <button
@@ -38,15 +39,15 @@ function BotaoAlternarMenu({ aberto, onClick, title, className = "" }) {
       onClick={onClick}
       title={title}
       aria-expanded={aberto}
-      className={`flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg transition-colors hover:bg-[#d8eee9] dark:hover:bg-slate-800 ${className}`}
+      className={`flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg border border-[#d8eee9] bg-white shadow-sm transition-colors hover:bg-[#d8eee9] dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800 ${className}`}
     >
-      <span className="relative block h-4 w-4">
+      <span className="relative block h-3.5 w-3.5">
         <span
-          className={`${barra} ${aberto ? "translate-y-0 rotate-45" : "-translate-y-1.5 rotate-0"}`}
+          className={`${barra} ${aberto ? "translate-y-0 rotate-45" : "-translate-y-1 rotate-0"}`}
         />
         <span className={`${barra} ${aberto ? "opacity-0" : "opacity-100"}`} />
         <span
-          className={`${barra} ${aberto ? "translate-y-0 -rotate-45" : "translate-y-1.5 rotate-0"}`}
+          className={`${barra} ${aberto ? "translate-y-0 -rotate-45" : "translate-y-1 rotate-0"}`}
         />
       </span>
       <span className="sr-only">{title}</span>
@@ -158,14 +159,16 @@ export default function LayoutSidebar({
           ? `erp-mobile-sidebar fixed inset-y-0 left-0 z-50 w-64 max-w-[calc(100vw-24px)] transform overflow-hidden transition-transform duration-300 ${
               sidebarOpen ? "translate-x-0" : "-translate-x-full"
             }`
-          : `${redimensionando ? "" : "transition-[width] duration-200"} relative`
+          : `${redimensionando ? "" : "transition-[width] duration-300 ease-in-out"} relative`
       } erp-sidebar shrink-0 bg-gradient-to-b from-[#f4fbfa] to-[#fff8ea] border-r border-[#d8eee9] flex flex-col shadow-lg dark:border-slate-800 dark:from-slate-950 dark:to-slate-900`}
       style={
         isMobile
           ? undefined
           : {
+              // Só "width" aqui de propósito: "shrink-0" já impede o flex pai de espremer a
+              // sidebar, então um "minWidth" redundante (que não estava na lista de transição)
+              // pulava pro valor novo instantaneamente e travava a animação no meio do caminho.
               width: sidebarOpen ? `${sidebarWidth}px` : LARGURA_RECOLHIDA,
-              minWidth: sidebarOpen ? `${sidebarWidth}px` : LARGURA_RECOLHIDA,
             }
       }
     >
@@ -196,9 +199,13 @@ export default function LayoutSidebar({
           <BotaoAlternarMenu aberto onClick={() => setSidebarOpen(false)} title="Recolher menu" />
         </div>
       ) : (
-        <div className="flex items-center justify-center gap-1 border-b border-[#d8eee9] bg-white/70 py-4 dark:border-slate-800 dark:bg-slate-950/80">
-          <img src={COREPET_ICON} alt="CorePet" className="h-6 w-6 rounded-md object-contain" />
-          <BotaoAlternarMenu onClick={() => setSidebarOpen(true)} title="Expandir menu" />
+        <div className="relative flex items-center justify-center border-b border-[#d8eee9] bg-white/70 py-4 dark:border-slate-800 dark:bg-slate-950/80">
+          <img src={COREPET_ICON} alt="CorePet" className="h-7 w-7 rounded-lg object-contain" />
+          <BotaoAlternarMenu
+            onClick={() => setSidebarOpen(true)}
+            title="Expandir menu"
+            className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-1/2"
+          />
         </div>
       )}
 

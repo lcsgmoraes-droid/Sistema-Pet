@@ -103,6 +103,55 @@ function favoriteItem(item, fallback) {
   };
 }
 
+// Com a sidebar recolhida não há espaço pra expandir o submenu inline (é só um rail de ícones) —
+// clicar num item com submenu abre esse popup flutuante ao lado, com a mesma lista de subitens.
+function useSidebarFlyout(sidebarOpen) {
+  const [flyout, setFlyout] = useState(null);
+  const flyoutRef = useRef(null);
+
+  useEffect(() => {
+    if (sidebarOpen) setFlyout(null);
+  }, [sidebarOpen]);
+
+  useEffect(() => {
+    if (!flyout) return undefined;
+
+    const aoClicarFora = (evento) => {
+      if (flyoutRef.current?.contains(evento.target)) return;
+      if (evento.target.closest?.("[data-submenu-trigger]")) return;
+      setFlyout(null);
+    };
+    const aoPressionarTecla = (evento) => {
+      if (evento.key === "Escape") setFlyout(null);
+    };
+
+    document.addEventListener("mousedown", aoClicarFora);
+    document.addEventListener("keydown", aoPressionarTecla);
+    return () => {
+      document.removeEventListener("mousedown", aoClicarFora);
+      document.removeEventListener("keydown", aoPressionarTecla);
+    };
+  }, [flyout]);
+
+  useEffect(() => {
+    if (!flyout) return;
+    flyoutRef.current?.querySelector("a,button")?.focus();
+  }, [flyout]);
+
+  const toggle = (event, item) => {
+    const rect = event.currentTarget.getBoundingClientRect();
+    setFlyout((atual) =>
+      atual?.item.path === item.path
+        ? null
+        : { item, left: Math.round(rect.right + 10), top: Math.round(rect.top) },
+    );
+  };
+
+  const close = () => setFlyout(null);
+
+  return { flyout, flyoutRef, toggle, close };
+}
+
 export default function SidebarMenu({
   menuItems,
   sidebarOpen,
@@ -116,6 +165,7 @@ export default function SidebarMenu({
   moduloAtivo,
 }) {
   const hoverHint = useSidebarHoverHint(sidebarOpen);
+  const flyoutMenu = useSidebarFlyout(sidebarOpen);
 
   return (
     <>
@@ -128,7 +178,7 @@ export default function SidebarMenu({
                   className={
                     sidebarOpen
                       ? "px-4 pb-1 pt-4"
-                      : "mx-4 my-3 border-t border-[#d8eee9] dark:border-slate-800"
+                      : "mx-2 my-3 border-t border-[#d8eee9] dark:border-slate-800"
                   }
                   aria-label={sidebarOpen ? item.section : undefined}
                 >
@@ -138,12 +188,18 @@ export default function SidebarMenu({
               {item.submenu ? (
                 <>
                   <button
-                    onClick={() => onToggleSubmenu(item.path)}
+                    data-submenu-trigger
+                    onClick={(event) =>
+                      sidebarOpen ? onToggleSubmenu(item.path) : flyoutMenu.toggle(event, item)
+                    }
                     onMouseEnter={(event) => hoverHint.show(event, item.label)}
                     onMouseLeave={hoverHint.hide}
                     onFocus={(event) => hoverHint.show(event, item.label)}
                     onBlur={hoverHint.hide}
                     title={item.label}
+                    aria-label={sidebarOpen ? undefined : item.label}
+                    aria-haspopup={sidebarOpen ? undefined : "menu"}
+                    aria-expanded={sidebarOpen ? submenusOpen[item.path] : undefined}
                     className={`w-full flex items-center rounded-lg transition-all ${
                       sidebarOpen
                         ? "justify-between gap-2 md:gap-3 px-3 md:px-4 py-2.5 md:py-3 mx-1 md:mx-2 text-sm md:text-base"
@@ -155,7 +211,7 @@ export default function SidebarMenu({
                     }`}
                   >
                     <div className="flex items-center gap-2 md:gap-3">
-                      <item.icon className="text-base md:text-lg flex-shrink-0" />
+                      <item.icon className="h-4 w-4 md:h-5 md:w-5 flex-shrink-0" />
                       {sidebarOpen && (
                         <span data-sidebar-label className="v2-menu-item min-w-0 font-medium">
                           {item.label}
@@ -250,7 +306,7 @@ export default function SidebarMenu({
                     }`}
                     title={item.label}
                   >
-                    <item.icon className="text-base md:text-lg flex-shrink-0" />
+                    <item.icon className="h-4 w-4 md:h-5 md:w-5 flex-shrink-0" />
                     {sidebarOpen && (
                       <span data-sidebar-label className="v2-menu-item font-medium">
                         {item.label}
@@ -281,6 +337,62 @@ export default function SidebarMenu({
           ))}
       </nav>
       {hoverHint.portal}
+      {flyoutMenu.flyout &&
+        typeof document !== "undefined" &&
+        createPortal(
+          <div
+            ref={flyoutMenu.flyoutRef}
+            role="menu"
+            aria-label={flyoutMenu.flyout.item.label}
+            style={{ left: flyoutMenu.flyout.left, top: flyoutMenu.flyout.top }}
+            className="fixed z-[130] max-h-[70vh] w-56 overflow-y-auto rounded-xl border border-[#d8eee9] bg-white py-1 shadow-lg dark:border-slate-800 dark:bg-slate-900"
+          >
+            <p className="v2-menu-secao px-3 pb-1 pt-2">{flyoutMenu.flyout.item.label}</p>
+            {Array.isArray(flyoutMenu.flyout.item.submenu) &&
+              flyoutMenu.flyout.item.submenu.map((subitem) => (
+                <div
+                  key={subitem.path}
+                  className={`mx-1 flex items-center gap-2 rounded-lg px-2 py-1.5 transition-all ${
+                    isActive(subitem.path)
+                      ? "bg-indigo-50 font-medium text-indigo-600 dark:bg-slate-800 dark:text-cyan-200"
+                      : "text-gray-600 hover:bg-gray-50 dark:text-slate-400 dark:hover:bg-slate-800"
+                  }`}
+                >
+                  <Link
+                    to={subitem.path}
+                    role="menuitem"
+                    onClick={() => {
+                      flyoutMenu.close();
+                      onMenuClick();
+                    }}
+                    className="flex min-w-0 flex-1 items-center"
+                  >
+                    <span className="v2-menu-item">{subitem.label}</span>
+                  </Link>
+                  {subitem.modulo && (
+                    <ModuloMenuIndicator
+                      modulo={subitem.modulo}
+                      moduloAtivo={moduloAtivo}
+                      iconClassName="w-3 h-3 flex-shrink-0"
+                    />
+                  )}
+                  {subitem.badge ? (
+                    <span
+                      className="h-2 w-2 shrink-0 animate-pulse rounded-full bg-orange-400"
+                      title={subitem.badgeLabel || "Há itens pendentes"}
+                      aria-label={subitem.badgeLabel || "Há itens pendentes"}
+                    />
+                  ) : null}
+                  <FavoriteToggle
+                    item={favoriteItem(subitem, flyoutMenu.flyout.item)}
+                    active={favoritePaths?.has(subitem.path)}
+                    onToggleFavorite={onToggleFavorite}
+                  />
+                </div>
+              ))}
+          </div>,
+          document.body,
+        )}
     </>
   );
 }
