@@ -82,6 +82,21 @@ function MenuAcessorio({ as: Tag = "span", className = "", children, ...rest }) 
   );
 }
 
+// Coluna de largura fixa nas duas pontas da linha: ícone de liderança à esquerda, acessório
+// (estrela/seta/cadeado) à direita. O miolo (label) fica flex-1 entre as duas e empurra cada
+// ponta pro seu canto — com largura fixa nas duas pontas (em vez de só "shrink-0", que encolhe
+// pro tamanho do conteúdo e deixa cada ícone num x diferente), elas alinham entre si mesmo
+// quando o conteúdo muda (estrela vs seta, ou seta + cadeado juntos do lado direito).
+function MenuColuna({ children, alinhar = "center", className = "" }) {
+  const justify =
+    alinhar === "end" ? "justify-end" : alinhar === "start" ? "justify-start" : "justify-center";
+  return (
+    <span className={`flex w-9 shrink-0 items-center gap-0.5 ${justify} ${className}`}>
+      {children}
+    </span>
+  );
+}
+
 function FavoriteToggle({ item, active, onToggleFavorite, className = "" }) {
   if (!onToggleFavorite || !item?.path) return null;
 
@@ -227,9 +242,7 @@ export default function SidebarMenu({
                         : "text-gray-700 hover:bg-white/60 dark:text-slate-300 dark:hover:bg-slate-800"
                     }`}
                   >
-                    <div
-                      className={`flex items-center gap-2 md:gap-3 ${sidebarOpen ? "min-w-0 flex-1" : ""}`}
-                    >
+                    <MenuColuna alinhar={sidebarOpen ? "start" : "center"}>
                       <item.icon
                         className={
                           sidebarOpen
@@ -237,14 +250,17 @@ export default function SidebarMenu({
                             : "h-4 w-4 flex-shrink-0"
                         }
                       />
-                      {sidebarOpen && (
-                        <span data-sidebar-label className="v2-menu-item min-w-0 font-medium">
-                          {item.label}
-                        </span>
-                      )}
-                    </div>
+                    </MenuColuna>
                     {sidebarOpen && (
-                      <MenuAcessorio>
+                      <span
+                        data-sidebar-label
+                        className="v2-menu-item min-w-0 flex-1 text-left font-medium"
+                      >
+                        {item.label}
+                      </span>
+                    )}
+                    {sidebarOpen && (
+                      <MenuColuna alinhar="end">
                         {item.modulo && !moduloAtivo(item.modulo) ? (
                           <ModuloMenuIndicator
                             modulo={item.modulo}
@@ -256,7 +272,7 @@ export default function SidebarMenu({
                         ) : (
                           <FiChevronRight className="h-3.5 w-3.5 text-gray-400 dark:text-slate-500" />
                         )}
-                      </MenuAcessorio>
+                      </MenuColuna>
                     )}
                   </button>
                   {submenusOpen[item.path] && sidebarOpen && (
@@ -334,26 +350,31 @@ export default function SidebarMenu({
                     }`}
                     title={item.label}
                   >
-                    <item.icon
-                      className={
-                        sidebarOpen
-                          ? "h-4 w-4 md:h-5 md:w-5 flex-shrink-0"
-                          : "h-4 w-4 flex-shrink-0"
-                      }
-                    />
+                    <MenuColuna alinhar={sidebarOpen ? "start" : "center"}>
+                      <item.icon
+                        className={
+                          sidebarOpen
+                            ? "h-4 w-4 md:h-5 md:w-5 flex-shrink-0"
+                            : "h-4 w-4 flex-shrink-0"
+                        }
+                      />
+                    </MenuColuna>
                     {sidebarOpen && (
-                      <span data-sidebar-label className="v2-menu-item font-medium">
+                      <span
+                        data-sidebar-label
+                        className="v2-menu-item min-w-0 flex-1 text-left font-medium"
+                      >
                         {item.label}
                       </span>
                     )}
                   </Link>
                   {sidebarOpen && (
-                    <div className="flex shrink-0 items-center gap-1">
+                    <MenuColuna alinhar="end">
                       {item.modulo ? (
                         <ModuloMenuIndicator
                           modulo={item.modulo}
                           moduloAtivo={moduloAtivo}
-                          iconClassName="w-3 h-3 flex-shrink-0"
+                          iconClassName="h-3.5 w-3.5 flex-shrink-0"
                         />
                       ) : item.badge ? (
                         <span className="w-2 h-2 bg-orange-400 rounded-full animate-pulse"></span>
@@ -363,7 +384,7 @@ export default function SidebarMenu({
                         active={favoritePaths?.has(item.path)}
                         onToggleFavorite={onToggleFavorite}
                       />
-                    </div>
+                    </MenuColuna>
                   )}
                 </div>
               )}
