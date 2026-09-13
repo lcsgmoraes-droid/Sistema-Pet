@@ -26,17 +26,18 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import api from "../api";
-import { useTour } from "../hooks/useTour";
-import { tourDashboard } from "../tours/tourDefinitions";
-import { formatMoneyBRL } from "../utils/formatters";
-import { formatarDataLocal } from "../components/financeiro/vendasFinanceiro/vendasFinanceiroDatas";
-import {
-  CompactMetricCard,
-  DashboardLoading,
-  MetricCard,
-  PriorityCard,
-} from "./dashboard/DashboardCards";
+import api from "../../api";
+import BotaoInteracao from "../../components/v2/BotaoInteracao/BotaoInteracao";
+import BotaoLink from "../../components/v2/BotaoLink/BotaoLink";
+import CartaoIndicador from "../../components/v2/CartaoIndicador/CartaoIndicador";
+import EstadoVazio from "../../components/v2/EstadoVazio/EstadoVazio";
+import SeletorOpcoes from "../../components/v2/SeletorOpcoes/SeletorOpcoes";
+import { TONS_BADGE } from "../../components/v2/utils/tons";
+import { useTour } from "../../hooks/useTour";
+import { useTheme } from "../../theme/ThemeContext";
+import { tourDashboard } from "../../tours/tourDefinitions";
+import { formatMoneyBRL } from "../../utils/formatters";
+import { formatarDataLocal } from "../../components/financeiro/vendasFinanceiro/vendasFinanceiroDatas";
 import {
   calculateDashboardIndicators,
   createEmptyDashboardSummary,
@@ -44,27 +45,16 @@ import {
   getDashboardDetailPath,
   getExecutiveStatus,
   getPeriodLabel,
-} from "./dashboard/dashboardOverview";
+} from "../dashboard/dashboardOverview";
 
 const PERIOD_OPTIONS = [
-  { value: 1, label: "Hoje" },
-  { value: 7, label: "7 dias" },
-  { value: 15, label: "15 dias" },
-  { value: 30, label: "30 dias" },
-  { value: 60, label: "60 dias" },
-  { value: 90, label: "90 dias" },
+  { valor: 1, rotulo: "Hoje" },
+  { valor: 7, rotulo: "7 dias" },
+  { valor: 15, rotulo: "15 dias" },
+  { valor: 30, rotulo: "30 dias" },
+  { valor: 60, rotulo: "60 dias" },
+  { valor: 90, rotulo: "90 dias" },
 ];
-
-const STATUS_STYLES = {
-  neutral:
-    "border-slate-200 bg-slate-100 text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200",
-  positive:
-    "border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-200",
-  warning:
-    "border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200",
-  critical:
-    "border-rose-200 bg-rose-50 text-rose-800 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-200",
-};
 
 function formatDate(dateValue) {
   if (!dateValue) return "-";
@@ -75,8 +65,25 @@ function formatQuantity(value) {
   return Number(value || 0).toLocaleString("pt-BR", { maximumFractionDigits: 3 });
 }
 
+function DashboardLoading() {
+  return (
+    <div role="status" aria-live="polite" className="flex min-h-[65vh] items-center justify-center">
+      <div className="text-center">
+        <RefreshCw
+          className="mx-auto h-8 w-8 motion-safe:animate-spin text-cyan-600 dark:text-cyan-400"
+          aria-hidden="true"
+        />
+        <p className="mt-3 text-sm font-medium text-slate-600 dark:text-slate-300">
+          Organizando os principais números...
+        </p>
+      </div>
+    </div>
+  );
+}
+
 export default function DashboardFinanceiro() {
   const navigate = useNavigate();
+  const { isDark } = useTheme();
   const { iniciarTour } = useTour("dashboard", tourDashboard, { delay: 2000 });
   const requestIdRef = useRef(0);
   const hasLoadedRef = useRef(false);
@@ -152,7 +159,7 @@ export default function DashboardFinanceiro() {
 
   const indicators = useMemo(() => calculateDashboardIndicators(summary), [summary]);
   const executiveStatus = useMemo(() => getExecutiveStatus(summary), [summary]);
-  const statusIcon = executiveStatus.tone === "positive" ? CheckCircle2 : AlertCircle;
+  const statusIcon = executiveStatus.tone === "sucesso" ? CheckCircle2 : AlertCircle;
   const StatusIcon = statusIcon;
   const periodLabel = getPeriodLabel(periodDays);
   const grossSales = Number(summary?.vendas_periodo?.faturamento_bruto || 0);
@@ -166,6 +173,8 @@ export default function DashboardFinanceiro() {
   const hasChartMovement = cashFlow.some(
     (item) => Number(item?.entradas || 0) !== 0 || Number(item?.saidas || 0) !== 0,
   );
+  const chartGridColor = isDark ? "#334155" : "#e2e8f0";
+  const chartTickColor = isDark ? "#94a3b8" : "#64748b";
 
   const openManagementAssistant = () => {
     navigate("/ia/chat", {
@@ -184,10 +193,10 @@ export default function DashboardFinanceiro() {
           <div className="flex flex-wrap items-center gap-2">
             <h1 className="mr-1 text-xl font-bold text-slate-950 dark:text-white">Dashboard</h1>
             <span
-              className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-semibold ${STATUS_STYLES[executiveStatus.tone]}`}
+              className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-semibold ${TONS_BADGE[executiveStatus.tone] || TONS_BADGE.neutro}`}
               title={executiveStatus.description}
             >
-              <StatusIcon className="h-3.5 w-3.5" />
+              <StatusIcon className="h-3.5 w-3.5" aria-hidden="true" />
               {executiveStatus.title}
             </span>
             {lastUpdate && (
@@ -199,56 +208,39 @@ export default function DashboardFinanceiro() {
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            <span className="mr-1 text-xs font-semibold uppercase tracking-wide text-slate-400">
-              Período
-            </span>
-            {PERIOD_OPTIONS.map((option) => (
-              <button
-                key={option.value}
-                type="button"
-                onClick={() => setPeriodDays(option.value)}
-                className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
-                  periodDays === option.value
-                    ? "bg-[#0f8b8d] text-white shadow-sm"
-                    : "bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
-                }`}
-              >
-                {option.label}
-              </button>
-            ))}
-            <button
-              type="button"
+            <SeletorOpcoes
+              rotulo="Período"
+              opcoes={PERIOD_OPTIONS}
+              valorSelecionado={periodDays}
+              aoSelecionar={setPeriodDays}
+            />
+            <BotaoInteracao
+              icon={HelpCircle}
+              tamanho="pequeno"
               onClick={iniciarTour}
-              className="ml-1 inline-flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
               title="Conhecer o dashboard"
+              aria-label="Conhecer o dashboard"
             >
-              <HelpCircle className="h-4 w-4" />
               <span className="hidden sm:inline">Entender painel</span>
-            </button>
-            <button
-              type="button"
-              onClick={openManagementAssistant}
-              className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-3 py-2 text-sm font-semibold text-white transition hover:bg-slate-800 dark:bg-cyan-500 dark:text-slate-950 dark:hover:bg-cyan-400"
-            >
-              <MessageCircle className="h-4 w-4" />
+            </BotaoInteracao>
+            <BotaoInteracao icon={MessageCircle} tamanho="normal" onClick={openManagementAssistant}>
               Analisar com IA
-            </button>
-            <button
-              type="button"
+            </BotaoInteracao>
+            <BotaoInteracao
+              icon={RefreshCw}
+              tamanho="pequeno"
+              loading={refreshing}
               onClick={loadDashboard}
-              disabled={refreshing}
-              className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-50 disabled:opacity-60 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
             >
-              <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
               Atualizar
-            </button>
+            </BotaoInteracao>
           </div>
         </div>
       </section>
 
       {failedBlocks.length > 0 && (
         <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200">
-          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
           <p>
             Parte do painel não pôde ser atualizada ({failedBlocks.join(", ")}). Os demais números
             continuam disponíveis.
@@ -266,32 +258,41 @@ export default function DashboardFinanceiro() {
           </div>
         </div>
         <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-          <MetricCard
-            icon={TrendingUp}
-            label={porRecebimento ? "Recebimentos de vendas" : "Faturamento"}
-            value={formatMoneyBRL(commercialValue)}
-            detail={periodLabel}
-            tone="violet"
-            onClick={() => navigate(getDashboardDetailPath("sales", periodDays))}
-          />
-          <MetricCard
-            icon={ShoppingBag}
-            label="Pedidos / unidades"
-            value={`${formatQuantity(salesCount)} / ${formatQuantity(unitsSold)}`}
-            detail={
+          <CartaoIndicador
+            icone={TrendingUp}
+            tom="informativo"
+            titulo={porRecebimento ? "Recebimentos de vendas" : "Faturamento"}
+            detalhe={periodLabel}
+            aoClicar={() => navigate(getDashboardDetailPath("sales", periodDays))}
+          >
+            <p className="text-2xl font-bold leading-tight text-slate-950 dark:text-white">
+              {formatMoneyBRL(commercialValue)}
+            </p>
+          </CartaoIndicador>
+          <CartaoIndicador
+            icone={ShoppingBag}
+            tom="neutro"
+            titulo="Pedidos / unidades"
+            detalhe={
               porRecebimento ? "Vendas e itens pela data da venda" : "Vendas e itens movimentados"
             }
-            tone="cyan"
-            onClick={() => navigate(getDashboardDetailPath("sales", periodDays))}
-          />
-          <MetricCard
-            icon={BarChart3}
-            label="Lucro das vendas"
-            value={formatMoneyBRL(salesProfit)}
-            detail="Após custos e deduções de cada venda"
-            tone={salesProfit >= 0 ? "emerald" : "rose"}
-            onClick={() => navigate("/financeiro/dre")}
-          />
+            aoClicar={() => navigate(getDashboardDetailPath("sales", periodDays))}
+          >
+            <p className="text-2xl font-bold leading-tight text-slate-950 dark:text-white">
+              {formatQuantity(salesCount)} / {formatQuantity(unitsSold)}
+            </p>
+          </CartaoIndicador>
+          <CartaoIndicador
+            icone={BarChart3}
+            tom={salesProfit >= 0 ? "sucesso" : "perigo"}
+            titulo="Lucro das vendas"
+            detalhe="Após custos e deduções de cada venda"
+            aoClicar={() => navigate("/financeiro/dre")}
+          >
+            <p className="text-2xl font-bold leading-tight text-slate-950 dark:text-white">
+              {formatMoneyBRL(salesProfit)}
+            </p>
+          </CartaoIndicador>
         </div>
       </section>
 
@@ -304,46 +305,61 @@ export default function DashboardFinanceiro() {
             </p>
           </div>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
-            <CompactMetricCard
-              icon={Building2}
-              label={bankBalance === null ? "Saldo estimado" : "Saldo em bancos"}
-              value={formatMoneyBRL(displayedBalance)}
-              detail="Disponibilidade atual"
-              tone="blue"
-              onClick={() => navigate("/financeiro/bancos")}
-            />
-            <CompactMetricCard
-              icon={cashResult >= 0 ? TrendingUp : TrendingDown}
-              label="Resultado de caixa"
-              value={formatMoneyBRL(cashResult)}
-              detail={`${formatMoneyBRL(indicators.inflows)} entrou · ${formatMoneyBRL(indicators.outflows)} saiu`}
-              tone={cashResult >= 0 ? "emerald" : "rose"}
-              onClick={() => navigate(getDashboardDetailPath("cashFlow", periodDays))}
-            />
-            <CompactMetricCard
-              icon={BarChart3}
-              label="Ticket médio"
-              value={formatMoneyBRL(summary?.vendas_periodo?.ticket_medio || 0)}
-              detail={periodLabel}
-              tone="cyan"
-              onClick={() => navigate(getDashboardDetailPath("sales", periodDays))}
-            />
-            <CompactMetricCard
-              icon={TrendingUp}
-              label="Total a receber"
-              value={formatMoneyBRL(summary?.contas_receber?.total || 0)}
-              detail="Valores ainda em aberto"
-              tone="emerald"
-              onClick={() => navigate(getDashboardDetailPath("receivableOpen", periodDays))}
-            />
-            <CompactMetricCard
-              icon={TrendingDown}
-              label="Total a pagar"
-              value={formatMoneyBRL(summary?.contas_pagar?.total || 0)}
-              detail="Compromissos ainda em aberto"
-              tone="rose"
-              onClick={() => navigate(getDashboardDetailPath("payableOpen", periodDays))}
-            />
+            <CartaoIndicador
+              icone={Building2}
+              tom="informativo"
+              titulo={bankBalance === null ? "Saldo estimado" : "Saldo em bancos"}
+              detalhe="Disponibilidade atual"
+              aoClicar={() => navigate("/financeiro/bancos")}
+            >
+              <p className="text-lg font-bold leading-tight text-slate-950 dark:text-white">
+                {formatMoneyBRL(displayedBalance)}
+              </p>
+            </CartaoIndicador>
+            <CartaoIndicador
+              icone={cashResult >= 0 ? TrendingUp : TrendingDown}
+              tom={cashResult >= 0 ? "sucesso" : "perigo"}
+              titulo="Resultado de caixa"
+              detalhe={`${formatMoneyBRL(indicators.inflows)} entrou · ${formatMoneyBRL(indicators.outflows)} saiu`}
+              aoClicar={() => navigate(getDashboardDetailPath("cashFlow", periodDays))}
+            >
+              <p className="text-lg font-bold leading-tight text-slate-950 dark:text-white">
+                {formatMoneyBRL(cashResult)}
+              </p>
+            </CartaoIndicador>
+            <CartaoIndicador
+              icone={BarChart3}
+              tom="neutro"
+              titulo="Ticket médio"
+              detalhe={periodLabel}
+              aoClicar={() => navigate(getDashboardDetailPath("sales", periodDays))}
+            >
+              <p className="text-lg font-bold leading-tight text-slate-950 dark:text-white">
+                {formatMoneyBRL(summary?.vendas_periodo?.ticket_medio || 0)}
+              </p>
+            </CartaoIndicador>
+            <CartaoIndicador
+              icone={TrendingUp}
+              tom="sucesso"
+              titulo="Total a receber"
+              detalhe="Valores ainda em aberto"
+              aoClicar={() => navigate(getDashboardDetailPath("receivableOpen", periodDays))}
+            >
+              <p className="text-lg font-bold leading-tight text-slate-950 dark:text-white">
+                {formatMoneyBRL(summary?.contas_receber?.total || 0)}
+              </p>
+            </CartaoIndicador>
+            <CartaoIndicador
+              icone={TrendingDown}
+              tom="perigo"
+              titulo="Total a pagar"
+              detalhe="Compromissos ainda em aberto"
+              aoClicar={() => navigate(getDashboardDetailPath("payableOpen", periodDays))}
+            >
+              <p className="text-lg font-bold leading-tight text-slate-950 dark:text-white">
+                {formatMoneyBRL(summary?.contas_pagar?.total || 0)}
+              </p>
+            </CartaoIndicador>
           </div>
         </div>
 
@@ -355,66 +371,83 @@ export default function DashboardFinanceiro() {
             </p>
           </div>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
-            <PriorityCard
-              icon={WalletCards}
-              label="Recebimentos vencidos"
-              value={formatMoneyBRL(indicators.overdueReceivable)}
-              detail={
+            <CartaoIndicador
+              icone={WalletCards}
+              tom={indicators.overdueReceivable > 0 ? "atencao" : "sucesso"}
+              titulo="Recebimentos vencidos"
+              detalhe={
                 indicators.overdueReceivable > 0
                   ? "Priorize as cobranças mais antigas"
                   : "Nenhum valor vencido"
               }
-              hasIssue={indicators.overdueReceivable > 0}
-              onClick={() => navigate(getDashboardDetailPath("receivableOverdue", periodDays))}
-            />
-            <PriorityCard
-              icon={Clock3}
-              label="Pagamentos vencidos"
-              value={formatMoneyBRL(indicators.overduePayable)}
-              detail={
+              aoClicar={() => navigate(getDashboardDetailPath("receivableOverdue", periodDays))}
+            >
+              <p className="text-xl font-bold text-slate-900 dark:text-white">
+                {formatMoneyBRL(indicators.overdueReceivable)}
+              </p>
+            </CartaoIndicador>
+            <CartaoIndicador
+              icone={Clock3}
+              tom={indicators.overduePayable > 0 ? "atencao" : "sucesso"}
+              titulo="Pagamentos vencidos"
+              detalhe={
                 indicators.overduePayable > 0
                   ? "Revise juros e fornecedores prioritários"
                   : "Nenhum valor vencido"
               }
-              hasIssue={indicators.overduePayable > 0}
-              onClick={() => navigate(getDashboardDetailPath("payableOverdue", periodDays))}
-            />
-            <PriorityCard
-              icon={Clock3}
-              label="Pagamentos que vencem hoje"
-              value={formatMoneyBRL(indicators.dueTodayPayable)}
-              detail={
+              aoClicar={() => navigate(getDashboardDetailPath("payableOverdue", periodDays))}
+            >
+              <p className="text-xl font-bold text-slate-900 dark:text-white">
+                {formatMoneyBRL(indicators.overduePayable)}
+              </p>
+            </CartaoIndicador>
+            <CartaoIndicador
+              icone={Clock3}
+              tom={indicators.dueTodayPayable > 0 ? "atencao" : "sucesso"}
+              titulo="Pagamentos que vencem hoje"
+              detalhe={
                 indicators.dueTodayReceivable > 0
                   ? `${formatMoneyBRL(indicators.dueTodayReceivable)} a receber hoje`
                   : "Compromissos do dia, sem marcar como atraso"
               }
-              hasIssue={indicators.dueTodayPayable > 0}
-              onClick={() => navigate(getDashboardDetailPath("payableDueToday", periodDays))}
-            />
-            <PriorityCard
-              icon={Users}
-              label="VIPs em risco"
-              value={String(management?.vips_inativos?.quantidade || 0)}
-              detail={
+              aoClicar={() => navigate(getDashboardDetailPath("payableDueToday", periodDays))}
+            >
+              <p className="text-xl font-bold text-slate-900 dark:text-white">
+                {formatMoneyBRL(indicators.dueTodayPayable)}
+              </p>
+            </CartaoIndicador>
+            <CartaoIndicador
+              icone={Users}
+              tom={Number(management?.vips_inativos?.quantidade || 0) > 0 ? "atencao" : "sucesso"}
+              titulo="VIPs em risco"
+              detalhe={
                 management?.vips_inativos?.quantidade > 0
                   ? `${management.vips_inativos.impacto} em impacto estimado`
                   : "Nenhum VIP inativo há mais de 20 dias"
               }
-              hasIssue={Number(management?.vips_inativos?.quantidade || 0) > 0}
-              onClick={() => navigate(getDashboardDetailPath("vipAtRisk", periodDays))}
-            />
-            <PriorityCard
-              icon={Users}
-              label="Clientes inativos"
-              value={String(management?.clientes_inativos?.quantidade || 0)}
-              detail={
+              aoClicar={() => navigate(getDashboardDetailPath("vipAtRisk", periodDays))}
+            >
+              <p className="text-xl font-bold text-slate-900 dark:text-white">
+                {String(management?.vips_inativos?.quantidade || 0)}
+              </p>
+            </CartaoIndicador>
+            <CartaoIndicador
+              icone={Users}
+              tom={
+                Number(management?.clientes_inativos?.quantidade || 0) > 0 ? "atencao" : "sucesso"
+              }
+              titulo="Clientes inativos"
+              detalhe={
                 management?.clientes_inativos?.quantidade > 0
                   ? "Sem compra há mais de 90 dias"
                   : "Nenhum cliente nessa condição"
               }
-              hasIssue={Number(management?.clientes_inativos?.quantidade || 0) > 0}
-              onClick={() => navigate(getDashboardDetailPath("inactiveCustomers", periodDays))}
-            />
+              aoClicar={() => navigate(getDashboardDetailPath("inactiveCustomers", periodDays))}
+            >
+              <p className="text-xl font-bold text-slate-900 dark:text-white">
+                {String(management?.clientes_inativos?.quantidade || 0)}
+              </p>
+            </CartaoIndicador>
           </div>
         </div>
       </section>
@@ -444,18 +477,18 @@ export default function DashboardFinanceiro() {
                     <stop offset="95%" stopColor="#e11d48" stopOpacity={0} />
                   </linearGradient>
                 </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                <CartesianGrid strokeDasharray="3 3" stroke={chartGridColor} />
                 <XAxis
                   dataKey="data"
                   tickFormatter={formatDate}
-                  tick={{ fill: "#64748b", fontSize: 11 }}
+                  tick={{ fill: chartTickColor, fontSize: 11 }}
                 />
                 <YAxis
                   width={54}
                   tickFormatter={(value) =>
                     Number(value).toLocaleString("pt-BR", { notation: "compact" })
                   }
-                  tick={{ fill: "#64748b", fontSize: 11 }}
+                  tick={{ fill: chartTickColor, fontSize: 11 }}
                 />
                 <Tooltip formatter={(value) => formatMoneyBRL(value)} labelFormatter={formatDate} />
                 <Legend wrapperStyle={{ fontSize: "12px" }} />
@@ -478,16 +511,12 @@ export default function DashboardFinanceiro() {
               </AreaChart>
             </ResponsiveContainer>
           ) : (
-            <div className="flex h-[260px] items-center justify-center rounded-xl border border-dashed border-slate-200 bg-slate-50 text-center dark:border-slate-700 dark:bg-slate-950/40">
-              <div>
-                <BarChart3 className="mx-auto h-7 w-7 text-slate-300 dark:text-slate-600" />
-                <p className="mt-2 text-sm font-medium text-slate-600 dark:text-slate-300">
-                  Sem movimento neste período
-                </p>
-                <p className="mt-1 text-xs text-slate-400">
-                  Escolha outro período ou registre novas movimentações.
-                </p>
-              </div>
+            <div className="h-[260px]">
+              <EstadoVazio
+                icone={BarChart3}
+                titulo="Sem movimento neste período"
+                descricao="Escolha outro período ou registre novas movimentações."
+              />
             </div>
           )}
         </div>
@@ -502,13 +531,7 @@ export default function DashboardFinanceiro() {
                 Ranking por quantidade no período
               </p>
             </div>
-            <button
-              type="button"
-              onClick={() => navigate("/produtos")}
-              className="text-xs font-semibold text-[#0f8b8d] hover:underline dark:text-cyan-300"
-            >
-              Ver produtos
-            </button>
+            <BotaoLink onClick={() => navigate("/produtos")}>Ver produtos</BotaoLink>
           </div>
           {topProducts.length > 0 ? (
             <ol className="space-y-2">
@@ -517,7 +540,7 @@ export default function DashboardFinanceiro() {
                   key={`${product.nome}-${index}`}
                   className="flex items-center gap-3 rounded-xl border border-slate-100 p-3 dark:border-slate-800"
                 >
-                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#d8eee9] text-sm font-bold text-[#0f5f63] dark:bg-cyan-500/10 dark:text-cyan-300">
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-cyan-50 text-sm font-bold text-cyan-800 dark:bg-cyan-500/10 dark:text-cyan-300">
                     {index + 1}
                   </span>
                   <div className="min-w-0 flex-1">
@@ -535,13 +558,8 @@ export default function DashboardFinanceiro() {
               ))}
             </ol>
           ) : (
-            <div className="flex min-h-56 items-center justify-center rounded-xl border border-dashed border-slate-200 bg-slate-50 text-center dark:border-slate-700 dark:bg-slate-950/40">
-              <div>
-                <ShoppingBag className="mx-auto h-7 w-7 text-slate-300 dark:text-slate-600" />
-                <p className="mt-2 text-sm font-medium text-slate-600 dark:text-slate-300">
-                  Sem produtos vendidos no período
-                </p>
-              </div>
+            <div className="min-h-56">
+              <EstadoVazio icone={ShoppingBag} titulo="Sem produtos vendidos no período" />
             </div>
           )}
         </div>
@@ -623,7 +641,7 @@ export default function DashboardFinanceiro() {
                     className={`mb-2 flex w-full items-center justify-between text-xs font-bold uppercase tracking-wide ${group.tone}`}
                   >
                     {group.label}
-                    <ArrowRight className="h-3.5 w-3.5" />
+                    <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
                   </button>
                   <div className="space-y-2">
                     {(overdueAccounts[group.key] || []).slice(0, 3).map((account) => (
@@ -656,7 +674,7 @@ export default function DashboardFinanceiro() {
           ) : (
             <div className="flex min-h-36 items-center justify-center rounded-xl border border-dashed border-emerald-200 bg-emerald-50/60 text-center dark:border-emerald-500/30 dark:bg-emerald-500/10">
               <div>
-                <CheckCircle2 className="mx-auto h-7 w-7 text-emerald-600" />
+                <CheckCircle2 className="mx-auto h-7 w-7 text-emerald-600" aria-hidden="true" />
                 <p className="mt-2 text-sm font-semibold text-emerald-800 dark:text-emerald-200">
                   Nenhuma conta vencida
                 </p>

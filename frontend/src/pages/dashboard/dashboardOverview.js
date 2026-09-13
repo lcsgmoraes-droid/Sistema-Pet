@@ -125,7 +125,7 @@ export function getExecutiveStatus(summary = createEmptyDashboardSummary()) {
 
   if (!indicators.hasMovement) {
     return {
-      tone: "neutral",
+      tone: "neutro",
       title: "Aguardando movimentação",
       description: "Registre vendas e lançamentos para acompanhar a evolução do negócio.",
     };
@@ -133,7 +133,7 @@ export function getExecutiveStatus(summary = createEmptyDashboardSummary()) {
 
   if (indicators.cashResult < 0 && hasOverdue) {
     return {
-      tone: "critical",
+      tone: "perigo",
       title: "Ação necessária",
       description: "O caixa do período está negativo e existem contas vencidas.",
     };
@@ -141,7 +141,7 @@ export function getExecutiveStatus(summary = createEmptyDashboardSummary()) {
 
   if (indicators.cashResult < 0) {
     return {
-      tone: "critical",
+      tone: "perigo",
       title: "Caixa pressionado",
       description: "As saídas registradas superaram as entradas no período.",
     };
@@ -149,14 +149,14 @@ export function getExecutiveStatus(summary = createEmptyDashboardSummary()) {
 
   if (hasOverdue) {
     return {
-      tone: "warning",
+      tone: "atencao",
       title: "Operação com pendências",
       description: "O caixa está positivo, mas há recebimentos ou pagamentos vencidos.",
     };
   }
 
   return {
-    tone: "positive",
+    tone: "sucesso",
     title: "Operação em dia",
     description: "O caixa do período está positivo e não há valores vencidos.",
   };

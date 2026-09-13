@@ -3,11 +3,13 @@ import StyleGuideProgress from "./components/StyleGuideProgress";
 import StyleGuideSection from "./components/StyleGuideSection";
 import FormularioExemploSection from "./components/sections/FormularioExemploSection";
 import TypographySection from "./components/sections/TypographySection";
+import V2CardsSection from "./components/sections/V2CardsSection";
 import V2FieldsSection from "./components/sections/V2FieldsSection";
 
 const NAV = [
   { id: "progresso", label: "Progresso" },
   { id: "v2", label: "Componentes v2" },
+  { id: "v2-cartoes", label: "Cartões e navegação" },
   { id: "tipografia", label: "Tipografia (planejado)" },
   { id: "formulario-exemplo", label: "Formulário de exemplo" },
 ];
@@ -67,6 +69,14 @@ export default function StyleGuide() {
           description="Cada tipo de campo e cada ação de botão é um componente próprio, sem prop de cor/tamanho — reaproveita uma base (InputTexto, BotaoBase) e se especializa. Todo grupo mostra os estados ativo, com erro e desabilitado lado a lado."
         >
           <V2FieldsSection />
+        </StyleGuideSection>
+
+        <StyleGuideSection
+          id="v2-cartoes"
+          title="Cartões e navegação (components/v2/)"
+          description="Cartão indicador clicável (dashboards), placeholder de painel sem dado, filtro de opções em pill e link de navegação secundário — nasceram da limpeza da tela /dashboard e reaparecem em qualquer painel com números e navegação."
+        >
+          <V2CardsSection />
         </StyleGuideSection>
 
         <StyleGuideSection

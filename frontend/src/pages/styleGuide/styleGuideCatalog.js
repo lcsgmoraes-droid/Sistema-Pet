@@ -102,6 +102,38 @@ export const styleGuideCatalog = [
         descricao:
           'Ação genérica com ícone livre — usado também para ações primárias fora do padrão salvar/cancelar/excluir (ex.: "Entrar" no login)',
       },
+      {
+        nome: "BotaoLink",
+        status: "pronto",
+        arquivo: "components/v2/BotaoLink/BotaoLink.jsx",
+        descricao: 'Link de navegação secundário dentro de um painel (ex.: "Ver produtos")',
+      },
+    ],
+  },
+  {
+    categoria: "Cartões e navegação",
+    origem: "limpeza da tela /dashboard (RefatoracaoV2)",
+    itens: [
+      {
+        nome: "CartaoIndicador",
+        status: "pronto",
+        arquivo: "components/v2/CartaoIndicador/CartaoIndicador.jsx",
+        descricao:
+          'Substitui MetricCard/CompactMetricCard/PriorityCard do dashboard financeiro — tom (mesmo vocabulário de BotaoBase.variante) colore o ícone, "aoClicar" decide se vira botão ou div estática',
+      },
+      {
+        nome: "EstadoVazio",
+        status: "pronto",
+        arquivo: "components/v2/EstadoVazio/EstadoVazio.jsx",
+        descricao: "Placeholder para painéis sem dado no período (gráfico vazio, lista vazia etc.)",
+      },
+      {
+        nome: "SeletorOpcoes",
+        status: "pronto",
+        arquivo: "components/v2/SeletorOpcoes/SeletorOpcoes.jsx",
+        descricao:
+          "Grupo de opções únicas em formato de pill para barra de ferramentas (filtro de período, alternância de visão) — não é campo de formulário",
+      },
     ],
   },
   {

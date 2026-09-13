@@ -40,7 +40,7 @@ As 10 já criadas ([[PDV-Vendas]], [[Produtos-Estoque]], [[Financeiro]], [[Comis
 
 ## 2.3 — Formalizar como Skills de IA
 
-> ✅ **Piloto criado em 2026-09-12: `.claude/skills/login/SKILL.md`**, para a tela de Login (a primeira migrada em [[RefatoracaoV2]]). Confirma que o mecanismo funciona (skill carrega pelo `description`) e prova o formato na prática — ainda não decidido se generaliza para as outras ~24 telas ou só para as de maior tráfego de mudança (ver itens abaixo, ainda em aberto).
+> ✅ **Piloto criado em 2026-09-12: `.claude/skills/login/SKILL.md`**, para a tela de Login (a primeira migrada em [[RefatoracaoV2]]). Confirma que o mecanismo funciona (skill carrega pelo `description`) e prova o formato na prática. **Segunda skill criada no mesmo dia: `.claude/skills/dashboard/SKILL.md`**, para a tela de Dashboard financeiro — confirma que o formato se repete bem tela a tela; ainda não decidido se generaliza para as outras ~23 telas ou só para as de maior tráfego de mudança (ver itens abaixo, ainda em aberto).
 
 Proposta concreta: transformar cada documento de [[Funcionalidades]] em uma **Claude Code Skill** real (`.claude/skills/<nome-da-funcionalidade>/SKILL.md`), não apenas um Markdown de referência. Diferença prática: uma Skill é carregada sob demanda quando alguém (humano ou IA) está trabalhando naquela área, em vez de exigir que a IA leia toda a `/Documentacao` toda vez.
 
