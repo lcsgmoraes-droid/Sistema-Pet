@@ -177,6 +177,19 @@ export const styleGuideCatalog = [
         descricao:
           "Rótulo pequeno em caixa alta — não estava no plano original, apareceu duplicado em CartaoIndicador/SeletorOpcoes e virou classe por isso",
       },
+      {
+        nome: "v2-menu-secao",
+        status: "pronto",
+        arquivo: "styles/v2-tipografia.css",
+        descricao: "Divisor de seção do menu lateral (SidebarMenu)",
+      },
+      {
+        nome: "v2-menu-item",
+        status: "pronto",
+        arquivo: "styles/v2-tipografia.css",
+        descricao:
+          "Label de item do menu lateral (SidebarMenu, menu do usuário) — sem cor própria, o container decide a cor conforme ativo/inativo",
+      },
     ],
   },
   {

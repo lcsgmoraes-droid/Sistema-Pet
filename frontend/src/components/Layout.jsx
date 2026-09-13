@@ -37,8 +37,6 @@ import LayoutSidebar from "./layout/LayoutSidebar";
 import { createLayoutMenuItems } from "./layout/menuConfig";
 import ModalCalculadoraUniversal from "./ModalCalculadoraUniversal";
 
-const COREPET_ICON = "/brand/corepet/corepet-icon-64.png";
-
 const Layout = () => {
   useEscapeFallbackForVisibleModals();
 
@@ -133,12 +131,9 @@ const Layout = () => {
 
   const [submenusOpen, setSubmenusOpen] = useState({});
 
-  // Estado para esconder completamente a sidebar
-  const [sidebarVisible, setSidebarVisible] = useState(() => {
-    const saved = localStorage.getItem("sidebar_visible");
-    return saved !== null ? JSON.parse(saved) : true;
-  });
-  const effectiveSidebarVisible = !isBradescoOrganizerRoute && sidebarVisible;
+  // A sidebar só recolhe (vira rail de ícones) ou expande — nunca "desaparece" por completo,
+  // exceto na rota dedicada do organizador Bradesco (ferramenta em tela cheia, sem menu).
+  const mostrarSidebar = !isBradescoOrganizerRoute;
 
   // Estado da calculadora universal
   const [calculadoraAberta, setCalculadoraAberta] = useState(false);
@@ -301,7 +296,6 @@ const Layout = () => {
   };
 
   const toggleSidebarMobile = () => {
-    setSidebarVisible(true);
     setSidebarOpen((open) => !open);
   };
 
@@ -317,12 +311,6 @@ const Layout = () => {
       localStorage.setItem("sidebar_width", String(sidebarWidth));
     }
   }, [sidebarWidth, isMobile]);
-
-  useEffect(() => {
-    if (!isMobile) {
-      localStorage.setItem("sidebar_visible", JSON.stringify(sidebarVisible));
-    }
-  }, [sidebarVisible, isMobile]);
 
   // Fechar menu mobile ao mudar de rota
   useEffect(() => {
@@ -677,7 +665,7 @@ const Layout = () => {
   return (
     <div className="erp-shell flex h-screen min-w-0 bg-gray-50 dark:bg-slate-950">
       {/* Backdrop para mobile */}
-      {isMobile && sidebarOpen && effectiveSidebarVisible && (
+      {isMobile && sidebarOpen && mostrarSidebar && (
         <div
           className="erp-mobile-sidebar-backdrop fixed inset-0 bg-transparent z-40 md:hidden"
           onClick={() => setSidebarOpen(false)}
@@ -685,14 +673,13 @@ const Layout = () => {
       )}
 
       {/* Sidebar */}
-      {effectiveSidebarVisible && (
+      {mostrarSidebar && (
         <LayoutSidebar
           isMobile={isMobile}
           sidebarOpen={sidebarOpen}
           sidebarWidth={sidebarWidth}
           setSidebarWidth={setSidebarWidth}
           setSidebarOpen={setSidebarOpen}
-          setSidebarVisible={setSidebarVisible}
           menuItems={menuItems}
           submenusOpen={submenusOpen}
           currentPath={location.pathname}
@@ -706,42 +693,21 @@ const Layout = () => {
           logout={logout}
         />
       )}
-      {!effectiveSidebarVisible && !isMobile && !isBradescoOrganizerRoute && (
-        <button
-          onClick={() => setSidebarVisible(true)}
-          className="fixed left-0 top-4 z-50 p-3 bg-gradient-to-br from-[#0f5f63] to-[#0f8b8d] hover:from-[#0d4f52] hover:to-[#0d7375] text-white rounded-r-xl shadow-lg transition-all"
-          title="Mostrar menu"
-        >
-          <img src={COREPET_ICON} alt="" className="h-6 w-6 rounded bg-white" />
-        </button>
-      )}
 
       {/* Main Content */}
       <div className="erp-main-column flex min-w-0 flex-1 flex-col overflow-hidden">
-        {/* Header (só existe no mobile: hamburguer/mostrar menu; no desktop não há mais nada aqui) */}
-        {isMobile && (
+        {/* Header (só existe no mobile, com o hambúrguer; no desktop o controle mora na própria sidebar) */}
+        {isMobile && mostrarSidebar && (
           <header className="erp-topbar flex shrink-0 items-center gap-2 border-b border-gray-200 bg-white px-3 py-3 dark:border-slate-800 dark:bg-slate-950">
-            {effectiveSidebarVisible && (
-              <button
-                type="button"
-                onClick={toggleSidebarMobile}
-                className="touch-manipulation rounded-lg p-2 hover:bg-gray-100 transition-colors"
-                aria-label="Toggle menu"
-                aria-expanded={sidebarOpen}
-              >
-                <FiMenu className="w-6 h-6 text-gray-700" />
-              </button>
-            )}
-
-            {!effectiveSidebarVisible && !isBradescoOrganizerRoute && (
-              <button
-                onClick={() => setSidebarVisible(true)}
-                className="p-2 rounded-lg hover:bg-[#d8eee9] transition-colors"
-                aria-label="Mostrar menu"
-              >
-                <img src={COREPET_ICON} alt="" className="h-6 w-6 rounded" />
-              </button>
-            )}
+            <button
+              type="button"
+              onClick={toggleSidebarMobile}
+              className="touch-manipulation rounded-lg p-2 hover:bg-gray-100 transition-colors"
+              aria-label="Toggle menu"
+              aria-expanded={sidebarOpen}
+            >
+              <FiMenu className="w-6 h-6 text-gray-700" />
+            </button>
           </header>
         )}
 

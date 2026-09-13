@@ -132,11 +132,7 @@ export default function SidebarMenu({
                   }
                   aria-label={sidebarOpen ? item.section : undefined}
                 >
-                  {sidebarOpen && (
-                    <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#4b7f7b] dark:text-slate-500">
-                      {item.section}
-                    </p>
-                  )}
+                  {sidebarOpen && <p className="v2-menu-secao">{item.section}</p>}
                 </div>
               )}
               {item.submenu ? (
@@ -148,7 +144,11 @@ export default function SidebarMenu({
                     onFocus={(event) => hoverHint.show(event, item.label)}
                     onBlur={hoverHint.hide}
                     title={item.label}
-                    className={`w-full flex items-center justify-between gap-2 md:gap-3 px-3 md:px-4 py-2.5 md:py-3 mx-1 md:mx-2 rounded-lg transition-all text-sm md:text-base ${
+                    className={`w-full flex items-center rounded-lg transition-all ${
+                      sidebarOpen
+                        ? "justify-between gap-2 md:gap-3 px-3 md:px-4 py-2.5 md:py-3 mx-1 md:mx-2 text-sm md:text-base"
+                        : "justify-center px-2 py-2.5 mx-2 text-sm"
+                    } ${
                       currentPath.startsWith(item.path)
                         ? "bg-gradient-to-r from-indigo-100 to-purple-100 text-indigo-700 shadow-sm dark:from-cyan-500/15 dark:to-blue-500/15 dark:text-cyan-200"
                         : "text-gray-700 hover:bg-white/60 dark:text-slate-300 dark:hover:bg-slate-800"
@@ -157,10 +157,7 @@ export default function SidebarMenu({
                     <div className="flex items-center gap-2 md:gap-3">
                       <item.icon className="text-base md:text-lg flex-shrink-0" />
                       {sidebarOpen && (
-                        <span
-                          data-sidebar-label
-                          className="min-w-0 truncate font-medium text-xs md:text-sm"
-                        >
+                        <span data-sidebar-label className="v2-menu-item min-w-0 font-medium">
                           {item.label}
                         </span>
                       )}
@@ -199,7 +196,7 @@ export default function SidebarMenu({
                               title={subitem.label}
                             >
                               {sidebarOpen && (
-                                <span data-sidebar-label className="truncate">
+                                <span data-sidebar-label className="v2-menu-item">
                                   {subitem.label}
                                 </span>
                               )}
@@ -235,7 +232,11 @@ export default function SidebarMenu({
                 <div
                   onMouseEnter={(event) => hoverHint.show(event, item.label)}
                   onMouseLeave={hoverHint.hide}
-                  className={`flex items-center gap-2 md:gap-3 px-3 md:px-4 py-2.5 md:py-3 mx-1 md:mx-2 my-0.5 md:my-1 rounded-lg transition-all text-sm md:text-base ${
+                  className={`flex items-center rounded-lg transition-all my-0.5 md:my-1 ${
+                    sidebarOpen
+                      ? "gap-2 md:gap-3 px-3 md:px-4 py-2.5 md:py-3 mx-1 md:mx-2 text-sm md:text-base"
+                      : "justify-center px-2 py-2.5 mx-2 text-sm"
+                  } ${
                     isActive(item.path)
                       ? "bg-gradient-to-r from-indigo-100 to-purple-100 text-indigo-700 shadow-sm dark:from-cyan-500/15 dark:to-blue-500/15 dark:text-cyan-200"
                       : "text-gray-700 hover:bg-white/60 dark:text-slate-300 dark:hover:bg-slate-800"
@@ -244,12 +245,14 @@ export default function SidebarMenu({
                   <Link
                     to={item.path}
                     onClick={onMenuClick}
-                    className="flex min-w-0 flex-1 items-center gap-2 md:gap-3"
+                    className={`flex items-center ${
+                      sidebarOpen ? "min-w-0 flex-1 gap-2 md:gap-3" : "justify-center"
+                    }`}
                     title={item.label}
                   >
                     <item.icon className="text-base md:text-lg flex-shrink-0" />
                     {sidebarOpen && (
-                      <span data-sidebar-label className="truncate font-medium text-xs md:text-sm">
+                      <span data-sidebar-label className="v2-menu-item font-medium">
                         {item.label}
                       </span>
                     )}

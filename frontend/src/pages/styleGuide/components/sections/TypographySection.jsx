@@ -15,6 +15,12 @@ export default function TypographySection() {
           Texto de ajuda pequeno, abaixo de um campo ou seção (.v2-texto-ajuda)
         </div>
         <div className="v2-rotulo">Rótulo pequeno em caixa alta (.v2-rotulo)</div>
+        <div className="v2-menu-secao">Divisor de seção do menu lateral (.v2-menu-secao)</div>
+        <div className="text-gray-700 dark:text-slate-300">
+          <span className="v2-menu-item font-medium">
+            Item do menu lateral (.v2-menu-item — sem cor própria, herda do container)
+          </span>
+        </div>
       </div>
     </StyleGuideExample>
   );
