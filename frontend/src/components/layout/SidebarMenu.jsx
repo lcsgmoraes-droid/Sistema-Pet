@@ -284,7 +284,7 @@ export default function SidebarMenu({
                       não desconta a própria margem, então a margem mx-1/mx-2 mora aqui fora, e o
                       botão é 100% desta div já "encolhida" — era essa combinação (w-full + margem
                       no mesmo elemento) que empurrava a seta ~16px além da borda da sidebar. */}
-                  <div className={sidebarOpen ? "mx-1 md:mx-2" : "mx-2"}>
+                  <div className={sidebarOpen ? "ml-1 md:ml-2 mr-1" : "mx-2"}>
                     <button
                       data-submenu-trigger
                       onClick={(event) =>
@@ -300,7 +300,7 @@ export default function SidebarMenu({
                       aria-expanded={sidebarOpen ? submenusOpen[item.path] : undefined}
                       className={`w-full flex items-center rounded-lg transition-all ${
                         sidebarOpen
-                          ? "gap-2 md:gap-3 px-3 md:px-4 py-2.5 md:py-3 text-sm md:text-base"
+                          ? "gap-2 md:gap-3 pl-3 md:pl-4 pr-2 py-2.5 md:py-3 text-sm md:text-base"
                           : "justify-center px-2 py-2.5 text-sm"
                       } ${
                         currentPath.startsWith(item.path)
@@ -386,7 +386,7 @@ export default function SidebarMenu({
                   onMouseLeave={hoverHint.hide}
                   className={`flex items-center rounded-lg transition-all my-0.5 md:my-1 ${
                     sidebarOpen
-                      ? "gap-2 md:gap-3 px-3 md:px-4 py-2.5 md:py-3 mx-1 md:mx-2 text-sm md:text-base"
+                      ? "gap-2 md:gap-3 pl-3 md:pl-4 pr-2 py-2.5 md:py-3 ml-1 md:ml-2 mr-1 text-sm md:text-base"
                       : "justify-center px-2 py-2.5 mx-2 text-sm"
                   } ${
                     isActive(item.path)
