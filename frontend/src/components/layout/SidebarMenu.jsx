@@ -279,48 +279,55 @@ export default function SidebarMenu({
               )}
               {item.submenu ? (
                 <>
-                  <button
-                    data-submenu-trigger
-                    onClick={(event) =>
-                      sidebarOpen ? onToggleSubmenu(item.path) : flyoutMenu.toggle(event, item)
-                    }
-                    onMouseEnter={(event) => hoverHint.show(event, item.label)}
-                    onMouseLeave={hoverHint.hide}
-                    onFocus={(event) => hoverHint.show(event, item.label)}
-                    onBlur={hoverHint.hide}
-                    title={item.label}
-                    aria-label={sidebarOpen ? undefined : item.label}
-                    aria-haspopup={sidebarOpen ? undefined : "menu"}
-                    aria-expanded={sidebarOpen ? submenusOpen[item.path] : undefined}
-                    className={`w-full flex items-center rounded-lg transition-all ${
-                      sidebarOpen
-                        ? "gap-2 md:gap-3 px-3 md:px-4 py-2.5 md:py-3 mx-1 md:mx-2 text-sm md:text-base"
-                        : "justify-center px-2 py-2.5 mx-2 text-sm"
-                    } ${
-                      currentPath.startsWith(item.path)
-                        ? "bg-gradient-to-r from-indigo-100 to-purple-100 text-indigo-700 shadow-sm dark:from-cyan-500/15 dark:to-blue-500/15 dark:text-cyan-200"
-                        : "text-gray-700 hover:bg-white/60 dark:text-slate-300 dark:hover:bg-slate-800"
-                    }`}
-                  >
-                    <MenuColuna alinhar={sidebarOpen ? "start" : "center"}>
-                      <IconeItem icon={item.icon} sidebarOpen={sidebarOpen} />
-                    </MenuColuna>
-                    {sidebarOpen && (
-                      <span
-                        data-sidebar-label
-                        className="v2-menu-item min-w-0 flex-1 text-left font-medium"
-                      >
-                        {item.label}
-                      </span>
-                    )}
-                    {sidebarOpen && (
-                      <AcessoriosSubmenu
-                        item={item}
-                        submenusOpen={submenusOpen}
-                        moduloAtivo={moduloAtivo}
-                      />
-                    )}
-                  </button>
+                  {/* O <button>, mesmo com display:flex, não encolhe/preenche como um <div> faria —
+                      precisa de "w-full" pra ocupar a largura disponível. Mas w-full (100% do pai)
+                      não desconta a própria margem, então a margem mx-1/mx-2 mora aqui fora, e o
+                      botão é 100% desta div já "encolhida" — era essa combinação (w-full + margem
+                      no mesmo elemento) que empurrava a seta ~16px além da borda da sidebar. */}
+                  <div className={sidebarOpen ? "mx-1 md:mx-2" : "mx-2"}>
+                    <button
+                      data-submenu-trigger
+                      onClick={(event) =>
+                        sidebarOpen ? onToggleSubmenu(item.path) : flyoutMenu.toggle(event, item)
+                      }
+                      onMouseEnter={(event) => hoverHint.show(event, item.label)}
+                      onMouseLeave={hoverHint.hide}
+                      onFocus={(event) => hoverHint.show(event, item.label)}
+                      onBlur={hoverHint.hide}
+                      title={item.label}
+                      aria-label={sidebarOpen ? undefined : item.label}
+                      aria-haspopup={sidebarOpen ? undefined : "menu"}
+                      aria-expanded={sidebarOpen ? submenusOpen[item.path] : undefined}
+                      className={`w-full flex items-center rounded-lg transition-all ${
+                        sidebarOpen
+                          ? "gap-2 md:gap-3 px-3 md:px-4 py-2.5 md:py-3 text-sm md:text-base"
+                          : "justify-center px-2 py-2.5 text-sm"
+                      } ${
+                        currentPath.startsWith(item.path)
+                          ? "bg-gradient-to-r from-indigo-100 to-purple-100 text-indigo-700 shadow-sm dark:from-cyan-500/15 dark:to-blue-500/15 dark:text-cyan-200"
+                          : "text-gray-700 hover:bg-white/60 dark:text-slate-300 dark:hover:bg-slate-800"
+                      }`}
+                    >
+                      <MenuColuna alinhar={sidebarOpen ? "start" : "center"}>
+                        <IconeItem icon={item.icon} sidebarOpen={sidebarOpen} />
+                      </MenuColuna>
+                      {sidebarOpen && (
+                        <span
+                          data-sidebar-label
+                          className="v2-menu-item min-w-0 flex-1 text-left font-medium"
+                        >
+                          {item.label}
+                        </span>
+                      )}
+                      {sidebarOpen && (
+                        <AcessoriosSubmenu
+                          item={item}
+                          submenusOpen={submenusOpen}
+                          moduloAtivo={moduloAtivo}
+                        />
+                      )}
+                    </button>
+                  </div>
                   {submenusOpen[item.path] && sidebarOpen && (
                     <div className="mt-1 mb-2 space-y-0.5 md:space-y-1">
                       {Array.isArray(item.submenu) &&
