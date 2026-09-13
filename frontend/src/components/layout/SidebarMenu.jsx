@@ -219,7 +219,7 @@ export default function SidebarMenu({
                     aria-expanded={sidebarOpen ? submenusOpen[item.path] : undefined}
                     className={`w-full flex items-center rounded-lg transition-all ${
                       sidebarOpen
-                        ? "justify-between gap-2 md:gap-3 px-3 md:px-4 py-2.5 md:py-3 mx-1 md:mx-2 text-sm md:text-base"
+                        ? "gap-2 md:gap-3 px-3 md:px-4 py-2.5 md:py-3 mx-1 md:mx-2 text-sm md:text-base"
                         : "justify-center px-2 py-2.5 mx-2 text-sm"
                     } ${
                       currentPath.startsWith(item.path)
@@ -227,7 +227,9 @@ export default function SidebarMenu({
                         : "text-gray-700 hover:bg-white/60 dark:text-slate-300 dark:hover:bg-slate-800"
                     }`}
                   >
-                    <div className="flex items-center gap-2 md:gap-3">
+                    <div
+                      className={`flex items-center gap-2 md:gap-3 ${sidebarOpen ? "min-w-0 flex-1" : ""}`}
+                    >
                       <item.icon
                         className={
                           sidebarOpen
@@ -332,7 +334,13 @@ export default function SidebarMenu({
                     }`}
                     title={item.label}
                   >
-                    <item.icon className="h-4 w-4 md:h-5 md:w-5 flex-shrink-0" />
+                    <item.icon
+                      className={
+                        sidebarOpen
+                          ? "h-4 w-4 md:h-5 md:w-5 flex-shrink-0"
+                          : "h-4 w-4 flex-shrink-0"
+                      }
+                    />
                     {sidebarOpen && (
                       <span data-sidebar-label className="v2-menu-item font-medium">
                         {item.label}
