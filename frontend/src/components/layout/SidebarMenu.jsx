@@ -4,6 +4,28 @@ import { createPortal } from "react-dom";
 import { Link } from "react-router-dom";
 import TooltipPremium from "../TooltipPremium";
 
+// Label/estrela/seta apareciam ou somiam no instante exato do clique, enquanto a largura da
+// sidebar (aside) ainda levava 300ms pra terminar de animar — o conteúdo "pipocava" dentro de
+// um contêiner que ainda estava no meio do caminho, esse era o "tranco" do menu (a parte de
+// fora do botão hambúrguer). Ao abrir, só mostra o conteúdo depois que a largura já deu tempo
+// de crescer o suficiente (senão o texto nasce espremido/cortado numa rail ainda estreita). Ao
+// fechar, esconde na hora — não faz sentido o texto ficar visível enquanto a rail encolhe ao
+// redor dele.
+function useConteudoComAtraso(aberto, atrasoMs = 250) {
+  const [mostrar, setMostrar] = useState(aberto);
+
+  useEffect(() => {
+    if (!aberto) {
+      setMostrar(false);
+      return undefined;
+    }
+    const temporizador = window.setTimeout(() => setMostrar(true), atrasoMs);
+    return () => window.clearTimeout(temporizador);
+  }, [aberto, atrasoMs]);
+
+  return mostrar;
+}
+
 function useSidebarHoverHint(sidebarOpen) {
   const [hint, setHint] = useState(null);
   const timerRef = useRef(null);
@@ -258,6 +280,9 @@ export default function SidebarMenu({
 }) {
   const hoverHint = useSidebarHoverHint(sidebarOpen);
   const flyoutMenu = useSidebarFlyout(sidebarOpen);
+  // Só o CONTEÚDO (label, estrela/seta, ícone de seção) usa o valor atrasado — interação
+  // (onClick, aria-*) continua no sidebarOpen de verdade, pra nunca ficar "atrás" do clique real.
+  const conteudo = useConteudoComAtraso(sidebarOpen);
 
   return (
     <>
@@ -268,13 +293,13 @@ export default function SidebarMenu({
               {item.section !== menuItems[index - 1]?.section && (
                 <div
                   className={
-                    sidebarOpen
+                    conteudo
                       ? "px-4 pb-1 pt-4"
                       : "mx-2 my-3 border-t border-[#d8eee9] dark:border-slate-800"
                   }
                   aria-label={sidebarOpen ? item.section : undefined}
                 >
-                  {sidebarOpen && <p className="v2-menu-secao">{item.section}</p>}
+                  {conteudo && <p className="v2-menu-secao">{item.section}</p>}
                 </div>
               )}
               {item.submenu ? (
@@ -299,7 +324,7 @@ export default function SidebarMenu({
                       aria-haspopup={sidebarOpen ? undefined : "menu"}
                       aria-expanded={sidebarOpen ? submenusOpen[item.path] : undefined}
                       className={`w-full flex items-center rounded-lg transition-all ${
-                        sidebarOpen
+                        conteudo
                           ? "gap-2 md:gap-3 pl-3 md:pl-4 pr-2 py-2.5 md:py-3 text-sm md:text-base"
                           : "justify-center px-2 py-2.5 text-sm"
                       } ${
@@ -308,10 +333,10 @@ export default function SidebarMenu({
                           : "text-gray-700 hover:bg-white/60 dark:text-slate-300 dark:hover:bg-slate-800"
                       }`}
                     >
-                      <MenuColuna alinhar={sidebarOpen ? "start" : "center"}>
-                        <IconeItem icon={item.icon} sidebarOpen={sidebarOpen} />
+                      <MenuColuna alinhar={conteudo ? "start" : "center"}>
+                        <IconeItem icon={item.icon} sidebarOpen={conteudo} />
                       </MenuColuna>
-                      {sidebarOpen && (
+                      {conteudo && (
                         <span
                           data-sidebar-label
                           className="v2-menu-item min-w-0 flex-1 text-left font-medium"
@@ -319,7 +344,7 @@ export default function SidebarMenu({
                           {item.label}
                         </span>
                       )}
-                      {sidebarOpen && (
+                      {conteudo && (
                         <AcessoriosSubmenu
                           item={item}
                           submenusOpen={submenusOpen}
@@ -328,7 +353,7 @@ export default function SidebarMenu({
                       )}
                     </button>
                   </div>
-                  {submenusOpen[item.path] && sidebarOpen && (
+                  {submenusOpen[item.path] && conteudo && (
                     <div className="mt-1 mb-2 space-y-0.5 md:space-y-1">
                       {Array.isArray(item.submenu) &&
                         item.submenu.map((subitem) => (
@@ -385,7 +410,7 @@ export default function SidebarMenu({
                   onMouseEnter={(event) => hoverHint.show(event, item.label)}
                   onMouseLeave={hoverHint.hide}
                   className={`flex items-center rounded-lg transition-all my-0.5 md:my-1 ${
-                    sidebarOpen
+                    conteudo
                       ? "gap-2 md:gap-3 pl-3 md:pl-4 pr-2 py-2.5 md:py-3 ml-1 md:ml-2 mr-1 text-sm md:text-base"
                       : "justify-center px-2 py-2.5 mx-2 text-sm"
                   } ${
@@ -398,14 +423,14 @@ export default function SidebarMenu({
                     to={item.path}
                     onClick={onMenuClick}
                     className={`flex items-center ${
-                      sidebarOpen ? "min-w-0 flex-1 gap-2 md:gap-3" : "justify-center"
+                      conteudo ? "min-w-0 flex-1 gap-2 md:gap-3" : "justify-center"
                     }`}
                     title={item.label}
                   >
-                    <MenuColuna alinhar={sidebarOpen ? "start" : "center"}>
-                      <IconeItem icon={item.icon} sidebarOpen={sidebarOpen} />
+                    <MenuColuna alinhar={conteudo ? "start" : "center"}>
+                      <IconeItem icon={item.icon} sidebarOpen={conteudo} />
                     </MenuColuna>
-                    {sidebarOpen && (
+                    {conteudo && (
                       <span
                         data-sidebar-label
                         className="v2-menu-item min-w-0 flex-1 text-left font-medium"
@@ -414,7 +439,7 @@ export default function SidebarMenu({
                       </span>
                     )}
                   </Link>
-                  {sidebarOpen && (
+                  {conteudo && (
                     <AcessoriosItem
                       item={item}
                       moduloAtivo={moduloAtivo}

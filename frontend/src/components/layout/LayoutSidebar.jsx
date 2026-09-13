@@ -189,22 +189,31 @@ export default function LayoutSidebar({
             <FiX className="h-6 w-6 text-[#0f5f63] dark:text-cyan-200" />
           </button>
         </div>
-      ) : sidebarOpen ? (
-        <div className="flex items-center justify-between gap-3 border-b border-[#d8eee9] bg-white/70 p-4 dark:border-slate-800 dark:bg-slate-950/80">
-          <img
-            src={COREPET_LOGO}
-            alt="CorePet"
-            className="h-9 w-auto max-w-[148px] object-contain"
-          />
-          <BotaoAlternarMenu aberto onClick={() => setSidebarOpen(false)} title="Recolher menu" />
-        </div>
       ) : (
-        <div className="relative flex items-center justify-center border-b border-[#d8eee9] bg-white/70 py-4 dark:border-slate-800 dark:bg-slate-950/80">
-          <img src={COREPET_ICON} alt="CorePet" className="h-7 w-7 rounded-lg object-contain" />
+        // Desktop: um único header persistente pros dois estados (nunca desmonta o botão nem a
+        // logo entre recolher/expandir) — antes eram dois blocos JSX diferentes, um por estado,
+        // então o React destruía e recriava o botão a cada clique. Um elemento novo não tem "de
+        // onde vir" pra CSS transition animar, então o morph hambúrguer↔X nunca chegava a
+        // rodar, só trocava de forma instantaneamente junto com o "tranco" da largura.
+        <div
+          className={`relative flex items-center border-b border-[#d8eee9] bg-white/70 transition-all duration-300 dark:border-slate-800 dark:bg-slate-950/80 ${
+            sidebarOpen ? "justify-between gap-3 p-4" : "justify-center py-4"
+          }`}
+        >
+          <img
+            src={sidebarOpen ? COREPET_LOGO : COREPET_ICON}
+            alt="CorePet"
+            className={`object-contain transition-all duration-300 ${
+              sidebarOpen ? "h-9 w-auto max-w-[148px]" : "h-7 w-7 rounded-lg"
+            }`}
+          />
           <BotaoAlternarMenu
-            onClick={() => setSidebarOpen(true)}
-            title="Expandir menu"
-            className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-1/2"
+            aberto={sidebarOpen}
+            onClick={() => setSidebarOpen(!sidebarOpen)}
+            title={sidebarOpen ? "Recolher menu" : "Expandir menu"}
+            className={
+              sidebarOpen ? "" : "absolute right-0 top-1/2 -translate-y-1/2 translate-x-1/2"
+            }
           />
         </div>
       )}
