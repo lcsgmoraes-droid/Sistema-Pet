@@ -14,10 +14,6 @@ export default function LayoutSidebar({
   setSidebarWidth,
   setSidebarOpen,
   setSidebarVisible,
-  devControlesAtivos,
-  devModoModulos,
-  definirModoDevModulos,
-  getModoDevLabel,
   menuItems,
   submenusOpen,
   currentPath,
@@ -27,7 +23,6 @@ export default function LayoutSidebar({
   favoritePaths,
   handleToggleFavorite,
   moduloAtivo,
-  onToggleModuloDev,
   logout,
 }) {
   const resizeRef = useRef(null);
@@ -113,45 +108,6 @@ export default function LayoutSidebar({
                 className="h-9 w-auto max-w-[148px] object-contain"
               />
               <p className="mt-1 text-xs text-gray-500 dark:text-slate-400">Central de Gestao</p>
-              {devControlesAtivos && sidebarOpen && (
-                <div className="mt-2 space-y-1.5">
-                  <p className="text-[10px] font-semibold uppercase tracking-wide text-[#0f8b8d] dark:text-cyan-300">
-                    DEV modulos: {getModoDevLabel()}
-                  </p>
-                  <div className="flex gap-1.5">
-                    <button
-                      onClick={() => definirModoDevModulos("normal")}
-                      className={`px-2 py-1 rounded text-[10px] border ${
-                        devModoModulos === "normal"
-                          ? "bg-[#d8eee9] border-[#b9ddd8] text-[#0f5f63] dark:border-cyan-400/40 dark:bg-cyan-500/15 dark:text-cyan-200"
-                          : "bg-white/70 border-gray-200 text-gray-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400"
-                      }`}
-                    >
-                      Normal
-                    </button>
-                    <button
-                      onClick={() => definirModoDevModulos("all_unlocked")}
-                      className={`px-2 py-1 rounded text-[10px] border ${
-                        devModoModulos === "all_unlocked"
-                          ? "bg-green-100 border-green-200 text-green-700 dark:border-green-400/40 dark:bg-green-500/15 dark:text-green-200"
-                          : "bg-white/70 border-gray-200 text-gray-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400"
-                      }`}
-                    >
-                      Liberar tudo
-                    </button>
-                    <button
-                      onClick={() => definirModoDevModulos("all_locked")}
-                      className={`px-2 py-1 rounded text-[10px] border ${
-                        devModoModulos === "all_locked"
-                          ? "bg-amber-100 border-amber-200 text-amber-700 dark:border-amber-400/40 dark:bg-amber-500/15 dark:text-amber-200"
-                          : "bg-white/70 border-gray-200 text-gray-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400"
-                      }`}
-                    >
-                      Bloquear premium
-                    </button>
-                  </div>
-                </div>
-              )}
             </div>
           )}
         </div>
@@ -181,9 +137,7 @@ export default function LayoutSidebar({
         onMenuClick={handleMenuClick}
         favoritePaths={favoritePaths}
         onToggleFavorite={handleToggleFavorite}
-        devControlesAtivos={devControlesAtivos}
         moduloAtivo={moduloAtivo}
-        onToggleModuloDev={onToggleModuloDev}
       />
 
       <div className="border-t border-[#d8eee9] bg-white/40 dark:border-slate-800 dark:bg-slate-950/80">

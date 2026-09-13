@@ -46,27 +46,7 @@ const Layout = () => {
   const location = useLocation();
   const isBradescoOrganizerRoute = location.pathname === "/organizador-bradesco";
   const { user, logout } = useAuth();
-  const {
-    modulosAtivos,
-    moduloAtivo,
-    devControlesAtivos,
-    devModoModulos,
-    definirModoDevModulos,
-    alternarModuloDev,
-  } = useModulos();
-
-  const getModoDevLabel = () => {
-    if (devModoModulos === "all_unlocked") return "Todos liberados";
-    if (devModoModulos === "all_locked") return "Premium bloqueado";
-    if (devModoModulos === "custom") return "Personalizado";
-    return "Modo normal";
-  };
-
-  const onToggleModuloDev = (event, modulo) => {
-    event.preventDefault();
-    event.stopPropagation();
-    alternarModuloDev(modulo);
-  };
+  const { modulosAtivos, moduloAtivo } = useModulos();
 
   // Estado para detectar mobile
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
@@ -714,10 +694,6 @@ const Layout = () => {
           setSidebarWidth={setSidebarWidth}
           setSidebarOpen={setSidebarOpen}
           setSidebarVisible={setSidebarVisible}
-          devControlesAtivos={devControlesAtivos}
-          devModoModulos={devModoModulos}
-          definirModoDevModulos={definirModoDevModulos}
-          getModoDevLabel={getModoDevLabel}
           menuItems={menuItems}
           submenusOpen={submenusOpen}
           currentPath={location.pathname}
@@ -727,7 +703,6 @@ const Layout = () => {
           favoritePaths={favoritePaths}
           handleToggleFavorite={handleToggleFavorite}
           moduloAtivo={moduloAtivo}
-          onToggleModuloDev={onToggleModuloDev}
           logout={logout}
         />
       )}

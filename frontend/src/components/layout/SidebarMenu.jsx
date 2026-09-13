@@ -1,4 +1,4 @@
-import { FiChevronDown, FiChevronRight, FiLock, FiStar, FiUnlock } from "react-icons/fi";
+import { FiChevronDown, FiChevronRight, FiLock, FiStar } from "react-icons/fi";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Link } from "react-router-dom";
@@ -56,50 +56,14 @@ function useSidebarHoverHint(sidebarOpen) {
   return { show, hide, portal };
 }
 
-function ModuloMenuIndicator({
-  modulo,
-  devControlesAtivos,
-  moduloAtivo,
-  onToggleModuloDev,
-  wrapperClassName,
-  iconClassName,
-  unlockedTitle,
-  lockedTitle,
-}) {
-  if (!modulo) return null;
+function ModuloMenuIndicator({ modulo, moduloAtivo, iconClassName }) {
+  if (!modulo || moduloAtivo(modulo)) return null;
 
-  if (devControlesAtivos) {
-    return (
-      <span
-        role="button"
-        tabIndex={0}
-        onClick={(event) => onToggleModuloDev(event, modulo)}
-        onKeyDown={(event) => {
-          if (event.key === "Enter" || event.key === " ") {
-            onToggleModuloDev(event, modulo);
-          }
-        }}
-        className={wrapperClassName}
-        title="DEV: clicar para travar/destravar modulo"
-      >
-        {moduloAtivo(modulo) ? (
-          <FiUnlock className={`${iconClassName} text-green-500`} title={unlockedTitle} />
-        ) : (
-          <FiLock className={`${iconClassName} text-amber-400`} title={lockedTitle} />
-        )}
-      </span>
-    );
-  }
-
-  if (!moduloAtivo(modulo)) {
-    return (
-      <TooltipPremium modulo={modulo} placement="right">
-        <FiLock className={`${iconClassName} text-amber-400`} aria-label="Módulo premium" />
-      </TooltipPremium>
-    );
-  }
-
-  return null;
+  return (
+    <TooltipPremium modulo={modulo} placement="right">
+      <FiLock className={`${iconClassName} text-amber-400`} aria-label="Módulo premium" />
+    </TooltipPremium>
+  );
 }
 
 function FavoriteToggle({ item, active, onToggleFavorite, className = "" }) {
@@ -149,9 +113,7 @@ export default function SidebarMenu({
   onMenuClick,
   favoritePaths,
   onToggleFavorite,
-  devControlesAtivos,
   moduloAtivo,
-  onToggleModuloDev,
 }) {
   const hoverHint = useSidebarHoverHint(sidebarOpen);
 
@@ -204,22 +166,10 @@ export default function SidebarMenu({
                       )}
                     </div>
                     {sidebarOpen &&
-                      (item.modulo && devControlesAtivos ? (
+                      (item.modulo && !moduloAtivo(item.modulo) ? (
                         <ModuloMenuIndicator
                           modulo={item.modulo}
-                          devControlesAtivos={devControlesAtivos}
                           moduloAtivo={moduloAtivo}
-                          onToggleModuloDev={onToggleModuloDev}
-                          wrapperClassName="p-1 rounded hover:bg-white/70 dark:hover:bg-slate-800 cursor-pointer"
-                          iconClassName="text-xs md:text-sm flex-shrink-0"
-                        />
-                      ) : item.modulo && !moduloAtivo(item.modulo) ? (
-                        <ModuloMenuIndicator
-                          modulo={item.modulo}
-                          devControlesAtivos={devControlesAtivos}
-                          moduloAtivo={moduloAtivo}
-                          onToggleModuloDev={onToggleModuloDev}
-                          wrapperClassName="p-1 rounded hover:bg-white/70 dark:hover:bg-slate-800 cursor-pointer"
                           iconClassName="text-xs md:text-sm flex-shrink-0"
                         />
                       ) : submenusOpen[item.path] ? (
@@ -258,10 +208,7 @@ export default function SidebarMenu({
                             {subitem.modulo && sidebarOpen && (
                               <ModuloMenuIndicator
                                 modulo={subitem.modulo}
-                                devControlesAtivos={devControlesAtivos}
                                 moduloAtivo={moduloAtivo}
-                                onToggleModuloDev={onToggleModuloDev}
-                                wrapperClassName="p-1 rounded hover:bg-white/80 dark:hover:bg-slate-700 ml-auto cursor-pointer"
                                 iconClassName="w-3 h-3 flex-shrink-0"
                               />
                             )}
@@ -312,13 +259,8 @@ export default function SidebarMenu({
                       {item.modulo ? (
                         <ModuloMenuIndicator
                           modulo={item.modulo}
-                          devControlesAtivos={devControlesAtivos}
                           moduloAtivo={moduloAtivo}
-                          onToggleModuloDev={onToggleModuloDev}
-                          wrapperClassName="p-1 rounded hover:bg-white/80 dark:hover:bg-slate-700 cursor-pointer"
                           iconClassName="w-3 h-3 flex-shrink-0"
-                          unlockedTitle="Modulo liberado em DEV"
-                          lockedTitle="Modulo bloqueado"
                         />
                       ) : item.badge ? (
                         <span className="w-2 h-2 bg-orange-400 rounded-full animate-pulse"></span>
