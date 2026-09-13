@@ -66,6 +66,22 @@ function ModuloMenuIndicator({ modulo, moduloAtivo, iconClassName }) {
   );
 }
 
+// Caixa única para todo acessório à direita de um item de menu (estrela de favorito, seta de
+// submenu, cadeado de módulo bloqueado) — estrela e seta usavam classes soltas e ligeiramente
+// diferentes, reservando uma largura diferente cada uma e truncando o label em pontos diferentes.
+// Encapsular as duas no mesmo componente garante que qualquer ajuste futuro (padding, tamanho,
+// cantos) valha pras duas ao mesmo tempo, em vez de duas strings de classe mantidas à mão.
+function MenuAcessorio({ as: Tag = "span", className = "", children, ...rest }) {
+  return (
+    <Tag
+      className={`flex shrink-0 items-center justify-center rounded p-1 transition-colors ${className}`}
+      {...rest}
+    >
+      {children}
+    </Tag>
+  );
+}
+
 function FavoriteToggle({ item, active, onToggleFavorite, className = "" }) {
   if (!onToggleFavorite || !item?.path) return null;
 
@@ -74,24 +90,25 @@ function FavoriteToggle({ item, active, onToggleFavorite, className = "" }) {
     : `Adicionar ${item.label} aos favoritos`;
 
   return (
-    <button
+    <MenuAcessorio
+      as="button"
       type="button"
       onClick={(event) => {
         event.preventDefault();
         event.stopPropagation();
         onToggleFavorite(item);
       }}
-      className={`rounded p-1 transition-colors ${
+      title={label}
+      aria-label={label}
+      aria-pressed={active}
+      className={`${
         active
           ? "text-amber-500 hover:bg-amber-50 dark:text-amber-300 dark:hover:bg-amber-500/10"
           : "text-gray-300 hover:bg-white/70 hover:text-amber-500 dark:text-slate-600 dark:hover:bg-slate-800 dark:hover:text-amber-300"
       } ${className}`}
-      title={label}
-      aria-label={label}
-      aria-pressed={active}
     >
       <FiStar className={`h-3.5 w-3.5 ${active ? "fill-current" : ""}`} />
-    </button>
+    </MenuAcessorio>
   );
 }
 
@@ -225,11 +242,7 @@ export default function SidebarMenu({
                       )}
                     </div>
                     {sidebarOpen && (
-                      // Mesma caixa (rounded p-1 ao redor de um ícone h-3.5 w-3.5) do botão de
-                      // favorito dos itens sem submenu — sem isso, a área reservada à direita
-                      // ficava menor aqui (só um chevron) do que nos itens com estrela, e o
-                      // texto do label truncava em pontos diferentes entre os dois tipos de linha.
-                      <div className="flex shrink-0 items-center justify-center rounded p-1">
+                      <MenuAcessorio>
                         {item.modulo && !moduloAtivo(item.modulo) ? (
                           <ModuloMenuIndicator
                             modulo={item.modulo}
@@ -241,7 +254,7 @@ export default function SidebarMenu({
                         ) : (
                           <FiChevronRight className="h-3.5 w-3.5 text-gray-400 dark:text-slate-500" />
                         )}
-                      </div>
+                      </MenuAcessorio>
                     )}
                   </button>
                   {submenusOpen[item.path] && sidebarOpen && (
