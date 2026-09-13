@@ -32,20 +32,14 @@ const CartaoIndicador = forwardRef(function CartaoIndicador(
         </span>
         {aoClicar ? (
           <ArrowRight
-            className="h-4 w-4 text-slate-300 transition group-hover:translate-x-0.5 group-hover:text-slate-500 dark:text-slate-600"
+            className="h-4 w-4 text-slate-400 transition group-hover:translate-x-0.5 group-hover:text-slate-500 dark:text-slate-500"
             aria-hidden="true"
           />
         ) : null}
       </div>
-      <p className="mt-3 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-        {titulo}
-      </p>
+      <p className="v2-rotulo mt-3">{titulo}</p>
       <div className="mt-1">{children}</div>
-      {detalhe ? (
-        <p className="mt-auto pt-2 text-xs leading-snug text-slate-500 dark:text-slate-400">
-          {detalhe}
-        </p>
-      ) : null}
+      {detalhe ? <p className="v2-texto-ajuda mt-auto pt-2 leading-snug">{detalhe}</p> : null}
     </Wrapper>
   );
 });

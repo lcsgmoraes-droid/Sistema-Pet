@@ -1,0 +1,29 @@
+/* Fonte única de tamanho/peso/cor para texto de página em components/v2/ e pages/v2/.
+   Muda o tamanho de um papel (ex.: título de seção) aqui, ajusta em toda tela que usar a classe —
+   não precisa caçar "text-lg font-bold ..." repetido em cada arquivo. Ver Documentacao/Roadmap
+   (item 1.7) e o StyleGuide (seção Tipografia) para o preview de cada classe. */
+.v2-titulo-pagina {
+  @apply text-xl font-bold text-slate-950 dark:text-white;
+}
+
+.v2-titulo-secao {
+  @apply text-lg font-bold text-slate-900 dark:text-white;
+}
+
+.v2-subtitulo {
+  @apply text-sm text-slate-500 dark:text-slate-400;
+}
+
+.v2-texto {
+  @apply text-sm text-slate-700 dark:text-slate-300;
+}
+
+.v2-texto-ajuda {
+  @apply text-xs text-slate-500 dark:text-slate-400;
+}
+
+/* Rótulo pequeno em caixa alta (não fazia parte do plano original de 5 papéis — apareceu
+   duplicado em CartaoIndicador e SeletorOpcoes e virou classe por isso). */
+.v2-rotulo {
+  @apply text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400;
+}

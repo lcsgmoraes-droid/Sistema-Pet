@@ -138,13 +138,45 @@ export const styleGuideCatalog = [
   },
   {
     categoria: "Tipografia",
-    origem: "item 1.7 do roadmap — ainda planejado",
+    origem: "item 1.7 do roadmap",
     itens: [
-      { nome: "Title", status: "planejado", descricao: "Título de página" },
-      { nome: "SectionTitle", status: "planejado", descricao: "Título de bloco/card" },
-      { nome: "Subtitle", status: "planejado", descricao: "Linha de apoio abaixo de um título" },
-      { nome: "Text", status: "planejado", descricao: "Parágrafo padrão" },
-      { nome: "HelpText", status: "planejado", descricao: "Texto de ajuda pequeno" },
+      {
+        nome: "v2-titulo-pagina",
+        status: "pronto",
+        arquivo: "styles/v2-tipografia.css",
+        descricao: "Título de página (era planejado como componente Title — virou classe)",
+      },
+      {
+        nome: "v2-titulo-secao",
+        status: "pronto",
+        arquivo: "styles/v2-tipografia.css",
+        descricao: "Título de bloco/seção (era planejado como componente SectionTitle)",
+      },
+      {
+        nome: "v2-subtitulo",
+        status: "pronto",
+        arquivo: "styles/v2-tipografia.css",
+        descricao: "Linha de apoio abaixo de um título (era planejado como componente Subtitle)",
+      },
+      {
+        nome: "v2-texto",
+        status: "pronto",
+        arquivo: "styles/v2-tipografia.css",
+        descricao: "Parágrafo padrão (era planejado como componente Text)",
+      },
+      {
+        nome: "v2-texto-ajuda",
+        status: "pronto",
+        arquivo: "styles/v2-tipografia.css",
+        descricao: "Texto de ajuda pequeno (era planejado como componente HelpText)",
+      },
+      {
+        nome: "v2-rotulo",
+        status: "pronto",
+        arquivo: "styles/v2-tipografia.css",
+        descricao:
+          "Rótulo pequeno em caixa alta — não estava no plano original, apareceu duplicado em CartaoIndicador/SeletorOpcoes e virou classe por isso",
+      },
     ],
   },
   {

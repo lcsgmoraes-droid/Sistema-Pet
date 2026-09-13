@@ -19,6 +19,19 @@ Registro vivo de cada tela em que aplicamos os componentes de `frontend/src/comp
 - **Tela só fecha "finalizada".** Nenhum ❓ fica pendente pra depois — se surgir uma pergunta sobre a tela durante o trabalho (payload de API, regra de negócio, existência de alguma proteção), o levantamento é feito ali mesmo, na hora, antes de passar para a próxima tela.
 - **Skill por tela.** Toda tela concluída ganha uma skill em `.claude/skills/<nome>/SKILL.md` (piloto: [[Fase-2-Funcionalidades-e-Skills]] item 2.3) — fonte de verdade sobre a tela (fluxo, o que cada botão faz, dependências, o que ela não faz), carregada automaticamente quando alguém mexe naquela área.
 
+## Tipografia (item 1.7 do roadmap) — resolvida como classe Tailwind, não componente
+
+Motivada pela limpeza do Dashboard: `CartaoIndicador`, `SeletorOpcoes` e o próprio `DashboardFinanceiro.jsx` duplicavam a mesma string de classe (`text-lg font-bold text-slate-900 dark:text-white` etc.) em vários pontos — exatamente o problema que o roadmap já previa resolver com componentes `Title`/`SectionTitle`/`Subtitle`/`Text`/`HelpText`.
+
+Decisão (2026-09-12, a pedido do responsável): em vez de componente React, os 5 papéis viraram **classes Tailwind** em `frontend/src/styles/v2-tipografia.css` (importado uma vez em `main.jsx`), usando `@apply`:
+
+- `.v2-titulo-pagina`, `.v2-titulo-secao`, `.v2-subtitulo`, `.v2-texto`, `.v2-texto-ajuda` — os 5 papéis originalmente planejados.
+- `.v2-rotulo` — 6º papel, não estava no plano original; apareceu duplicado (`CartaoIndicador.titulo` e o rótulo do `SeletorOpcoes`) durante a limpeza do Dashboard e virou classe pela mesma razão dos outros 5.
+
+Por que classe e não componente: título/subtítulo não têm comportamento (sem estado, sem teclado, sem ARIA condicional) — só precisam de um único ponto de ajuste de tamanho/cor. Um componente around isso seria só uma casca ao redor de uma `className` fixa, sem ganho sobre a classe direta. A tag HTML (`h1`, `h2`, `p`, `span`) continua escolhida por quem usa a classe — a classe não define semântica, só aparência.
+
+Retrofit aplicado nos arquivos já existentes: `CartaoIndicador` (`titulo`→`.v2-rotulo`, `detalhe`→`.v2-texto-ajuda`), `SeletorOpcoes` (`rotulo`→`.v2-rotulo`), `DashboardFinanceiro.jsx` (h1→`.v2-titulo-pagina`, os 7 `<h2>` de seção→`.v2-titulo-secao`, os 7 `<p>` de subtítulo→`.v2-subtitulo`). `EstadoVazio.titulo` ficou de fora de propósito — é usado só dentro do próprio componente (já é fonte única por natureza), sem duplicação a resolver. Catálogo do StyleGuide atualizado (seção "Tipografia" saiu de "planejado" para "pronto").
+
 ## Telas
 
 | Tela | Rota | Status | Data | Resumo dos ajustes |
@@ -50,6 +63,7 @@ Registro vivo de cada tela em que aplicamos os componentes de `frontend/src/comp
 - **Cor arbitrária em hex (`bg-[#0f8b8d]`, `text-[#0f5f63]`, `bg-[#d8eee9]`) → paleta padrão do Tailwind.** Trocada por `cyan`/`slate`/`blue` conforme o contexto (ver itens acima). O gradiente do gráfico (Recharts) manteve os hex `#0f8b8d`/`#e11d48` — ali é obrigatório (é uma prop de cor de SVG, não uma classe Tailwind), não é o mesmo tipo de problema.
 - **Gráfico (Recharts) sem adaptação ao dark mode → corrigido com `useTheme()`.** Cor do grid e dos eixos agora troca conforme o tema (`isDark` de `theme/ThemeContext.jsx`); a biblioteca não lê classes `dark:`, então a única forma de resolver é calculando a cor em JS.
 - **Acessibilidade:** `animate-spin` do spinner de carregamento trocado para `motion-safe:animate-spin`; loading de tela inteira ganhou `role="status" aria-live="polite"`; filtro de período ganhou `aria-pressed` por opção (antes só cor indicava a seleção); `CartaoIndicador` ganhou `aria-label={titulo}` quando clicável (sem isso, o nome acessível do botão seria a concatenação de título+valor+detalhe, verboso demais).
+- **Título/subtítulo/rótulo duplicados entre `CartaoIndicador`, `SeletorOpcoes` e os `<h2>`/`<p>` desta própria tela → seção "Tipografia" (ver acima).** Motivou a criação de `frontend/src/styles/v2-tipografia.css`, aplicado retroativamente nos três lugares.
 - ⚠️ Não testado visualmente num navegador autenticado — a tela exige login multiempresa contra o backend e não há credenciais de desenvolvimento documentadas neste ambiente. Validado por build de produção, ESLint, Prettier e revisão `rams` (sem achados reais pendentes); falta a confirmação visual/funcional em execução real.
 
 ## Não identificado

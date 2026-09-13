@@ -10,7 +10,7 @@ const NAV = [
   { id: "progresso", label: "Progresso" },
   { id: "v2", label: "Componentes v2" },
   { id: "v2-cartoes", label: "Cartões e navegação" },
-  { id: "tipografia", label: "Tipografia (planejado)" },
+  { id: "tipografia", label: "Tipografia" },
   { id: "formulario-exemplo", label: "Formulário de exemplo" },
 ];
 
@@ -81,8 +81,8 @@ export default function StyleGuide() {
 
         <StyleGuideSection
           id="tipografia"
-          title="Tipografia (planejado)"
-          description="Título, subtítulo, texto de destaque, texto simples e texto de ajuda — uma única fonte para cada um (item 1.7). Ainda não existe como componente v2; esta é a prévia visual do que Title/SectionTitle/Subtitle/Text/HelpText vão gerar."
+          title="Tipografia (src/styles/v2-tipografia.css)"
+          description='Título, subtítulo, texto de destaque, texto simples, texto de ajuda e rótulo (item 1.7) — resolvido como classe Tailwind, não como componente React: texto não tem comportamento, só precisa de um único ponto de ajuste de tamanho/cor. Mudou o tamanho de ".v2-titulo-secao"? Muda uma vez no CSS, toda tela que usa a classe atualiza.'
         >
           <TypographySection />
         </StyleGuideSection>

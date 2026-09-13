@@ -9,11 +9,7 @@ const SeletorOpcoes = forwardRef(function SeletorOpcoes(
 ) {
   return (
     <div ref={ref} className="flex flex-wrap items-center gap-2">
-      {rotulo ? (
-        <span className="mr-1 text-xs font-semibold uppercase tracking-wide text-slate-400">
-          {rotulo}
-        </span>
-      ) : null}
+      {rotulo ? <span className="v2-rotulo mr-1">{rotulo}</span> : null}
       <div
         role="group"
         aria-label={rotulo || undefined}

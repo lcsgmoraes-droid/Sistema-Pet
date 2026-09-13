@@ -6,9 +6,7 @@ export default function EstadoVazio({ descricao, icone: Icone, titulo }) {
       <div>
         <Icone className="mx-auto h-7 w-7 text-slate-300 dark:text-slate-600" aria-hidden="true" />
         <p className="mt-2 text-sm font-medium text-slate-600 dark:text-slate-300">{titulo}</p>
-        {descricao ? (
-          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{descricao}</p>
-        ) : null}
+        {descricao ? <p className="v2-texto-ajuda mt-1">{descricao}</p> : null}
       </div>
     </div>
   );

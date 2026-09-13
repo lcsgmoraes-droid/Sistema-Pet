@@ -3,25 +3,18 @@ import StyleGuideExample from "../StyleGuideExample";
 export default function TypographySection() {
   return (
     <StyleGuideExample
-      label="Prévia da escala-alvo (Title, SectionTitle, Subtitle, Text, HelpText ainda não existem como componente — ver progresso acima)"
-      note="Classes extraídas do que já existe hoje em PageHeader.jsx e Panel.jsx. Quando os componentes forem criados (item 1.7), devem gerar exatamente esta saída."
+      label="Classes Tailwind (src/styles/v2-tipografia.css) — não são componentes React"
+      note="Mudar o tamanho de um papel em toda a tela: edita a classe uma vez (ex.: .v2-titulo-secao) e todo lugar que usa essa classe muda junto. Escolha deliberada em vez de componente: título/subtítulo não têm comportamento, só estilo — não precisam de composição, só precisam de um único ponto de ajuste. A tag (h1, h2, p, span) continua sendo escolhida por quem usa a classe."
     >
       <div className="w-full space-y-2">
-        <div className="text-xl font-bold text-slate-950 dark:text-slate-100">
-          Título de página (Title)
+        <div className="v2-titulo-pagina">Título de página (.v2-titulo-pagina)</div>
+        <div className="v2-titulo-secao">Título de bloco/seção (.v2-titulo-secao)</div>
+        <div className="v2-subtitulo">Linha de apoio abaixo de um título (.v2-subtitulo)</div>
+        <p className="v2-texto">Parágrafo padrão de conteúdo (.v2-texto)</p>
+        <div className="v2-texto-ajuda">
+          Texto de ajuda pequeno, abaixo de um campo ou seção (.v2-texto-ajuda)
         </div>
-        <div className="text-base font-semibold text-slate-900 dark:text-slate-100">
-          Título de bloco/card (SectionTitle)
-        </div>
-        <div className="text-xs text-slate-500 dark:text-slate-400">
-          Linha de apoio abaixo de um título (Subtitle)
-        </div>
-        <p className="text-sm text-slate-700 dark:text-slate-300">
-          Parágrafo padrão de conteúdo (Text)
-        </p>
-        <div className="text-xs text-slate-500 dark:text-slate-400">
-          Texto de ajuda pequeno, abaixo de um campo ou seção (HelpText)
-        </div>
+        <div className="v2-rotulo">Rótulo pequeno em caixa alta (.v2-rotulo)</div>
       </div>
     </StyleGuideExample>
   );

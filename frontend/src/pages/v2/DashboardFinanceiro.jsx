@@ -191,7 +191,7 @@ export default function DashboardFinanceiro() {
       <section className="rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm dark:border-slate-800 dark:bg-slate-900">
         <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
           <div className="flex flex-wrap items-center gap-2">
-            <h1 className="mr-1 text-xl font-bold text-slate-950 dark:text-white">Dashboard</h1>
+            <h1 className="v2-titulo-pagina mr-1">Dashboard</h1>
             <span
               className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-semibold ${TONS_BADGE[executiveStatus.tone] || TONS_BADGE.neutro}`}
               title={executiveStatus.description}
@@ -251,10 +251,8 @@ export default function DashboardFinanceiro() {
       <section id="tour-stats">
         <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
           <div>
-            <h2 className="text-lg font-bold text-slate-900 dark:text-white">
-              Resultado do período
-            </h2>
-            <p className="text-sm text-slate-500 dark:text-slate-400">{periodLabel}</p>
+            <h2 className="v2-titulo-secao">Resultado do período</h2>
+            <p className="v2-subtitulo">{periodLabel}</p>
           </div>
         </div>
         <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
@@ -299,8 +297,8 @@ export default function DashboardFinanceiro() {
       <section id="tour-financeiro" className="space-y-4">
         <div>
           <div className="mb-3">
-            <h2 className="text-lg font-bold text-slate-900 dark:text-white">Posição financeira</h2>
-            <p className="text-sm text-slate-500 dark:text-slate-400">
+            <h2 className="v2-titulo-secao">Posição financeira</h2>
+            <p className="v2-subtitulo">
               Os números essenciais para saber onde a empresa está agora
             </p>
           </div>
@@ -365,10 +363,8 @@ export default function DashboardFinanceiro() {
 
         <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
           <div className="mb-4">
-            <h2 className="text-lg font-bold text-slate-900 dark:text-white">Atenção agora</h2>
-            <p className="text-sm text-slate-500 dark:text-slate-400">
-              O que está atrasado, vence hoje ou merece acompanhamento
-            </p>
+            <h2 className="v2-titulo-secao">Atenção agora</h2>
+            <p className="v2-subtitulo">O que está atrasado, vence hoje ou merece acompanhamento</p>
           </div>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
             <CartaoIndicador
@@ -456,12 +452,8 @@ export default function DashboardFinanceiro() {
         <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900 xl:col-span-3">
           <div className="mb-3 flex items-center justify-between gap-3">
             <div>
-              <h2 className="text-lg font-bold text-slate-900 dark:text-white">
-                Entradas e saídas
-              </h2>
-              <p className="text-sm text-slate-500 dark:text-slate-400">
-                Movimento diário · {periodLabel.toLowerCase()}
-              </p>
+              <h2 className="v2-titulo-secao">Entradas e saídas</h2>
+              <p className="v2-subtitulo">Movimento diário · {periodLabel.toLowerCase()}</p>
             </div>
           </div>
           {hasChartMovement ? (
@@ -524,12 +516,8 @@ export default function DashboardFinanceiro() {
         <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900 xl:col-span-2">
           <div className="mb-4 flex items-center justify-between gap-3">
             <div>
-              <h2 className="text-lg font-bold text-slate-900 dark:text-white">
-                Produtos que puxam as vendas
-              </h2>
-              <p className="text-sm text-slate-500 dark:text-slate-400">
-                Ranking por quantidade no período
-              </p>
+              <h2 className="v2-titulo-secao">Produtos que puxam as vendas</h2>
+              <p className="v2-subtitulo">Ranking por quantidade no período</p>
             </div>
             <BotaoLink onClick={() => navigate("/produtos")}>Ver produtos</BotaoLink>
           </div>
@@ -567,10 +555,8 @@ export default function DashboardFinanceiro() {
 
       <section id="tour-acoes-rapidas" className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-          <h2 className="text-lg font-bold text-slate-900 dark:text-white">Base de clientes</h2>
-          <p className="text-sm text-slate-500 dark:text-slate-400">
-            Qualidade e oportunidade de relacionamento
-          </p>
+          <h2 className="v2-titulo-secao">Base de clientes</h2>
+          <p className="v2-subtitulo">Qualidade e oportunidade de relacionamento</p>
           <div className="mt-4 divide-y divide-slate-100 dark:divide-slate-800">
             {[
               {
@@ -605,10 +591,8 @@ export default function DashboardFinanceiro() {
         <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900 lg:col-span-2">
           <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
             <div>
-              <h2 className="text-lg font-bold text-slate-900 dark:text-white">
-                Contas vencidas mais antigas
-              </h2>
-              <p className="text-sm text-slate-500 dark:text-slate-400">
+              <h2 className="v2-titulo-secao">Contas vencidas mais antigas</h2>
+              <p className="v2-subtitulo">
                 Detalhes para começar a agir sem procurar em outra tela
               </p>
             </div>
