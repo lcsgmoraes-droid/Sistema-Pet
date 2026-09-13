@@ -26,9 +26,11 @@ const LARGURA_RECOLHIDA = "4rem";
 // Hambúrguer que vira X (e volta) com uma animação simples de 3 barras — substitui os dois
 // botões separados (recolher / esconder) por um único controle: o estado dele É o estado da
 // sidebar (aberta = X, recolhida = hambúrguer), não uma ação de "fechar/esconder o menu".
+// Aparência propositalmente discreta (sem preenchimento/gradiente) — é um ícone de cabeçalho,
+// igual ao "Fechar menu" do mobile, não um botão de ação chamativo.
 function BotaoAlternarMenu({ aberto, onClick, title, className = "" }) {
   const barra =
-    "absolute left-1/2 top-1/2 h-0.5 w-4 -translate-x-1/2 rounded-full bg-white transition-all duration-300";
+    "absolute left-1/2 top-1/2 h-0.5 w-4 -translate-x-1/2 rounded-full bg-[#0f5f63] transition-all duration-300 dark:bg-cyan-200";
 
   return (
     <button
@@ -36,7 +38,7 @@ function BotaoAlternarMenu({ aberto, onClick, title, className = "" }) {
       onClick={onClick}
       title={title}
       aria-expanded={aberto}
-      className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-[#0f5f63] to-[#0f8b8d] shadow-md transition-all hover:from-[#0d4f52] hover:to-[#0d7375] ${className}`}
+      className={`flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg transition-colors hover:bg-[#d8eee9] dark:hover:bg-slate-800 ${className}`}
     >
       <span className="relative block h-4 w-4">
         <span
@@ -194,8 +196,8 @@ export default function LayoutSidebar({
           <BotaoAlternarMenu aberto onClick={() => setSidebarOpen(false)} title="Recolher menu" />
         </div>
       ) : (
-        <div className="flex flex-col items-center gap-2 border-b border-[#d8eee9] bg-white/70 py-4 dark:border-slate-800 dark:bg-slate-950/80">
-          <img src={COREPET_ICON} alt="CorePet" className="h-7 w-7 rounded-lg object-contain" />
+        <div className="flex items-center justify-center gap-1 border-b border-[#d8eee9] bg-white/70 py-4 dark:border-slate-800 dark:bg-slate-950/80">
+          <img src={COREPET_ICON} alt="CorePet" className="h-6 w-6 rounded-md object-contain" />
           <BotaoAlternarMenu onClick={() => setSidebarOpen(true)} title="Expandir menu" />
         </div>
       )}
