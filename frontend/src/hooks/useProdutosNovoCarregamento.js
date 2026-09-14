@@ -137,11 +137,13 @@ export default function useProdutosNovoCarregamento({
             origem_mercadoria: data.origem_mercadoria ?? "0",
             ncm: data.ncm ?? "",
             cest: data.cest ?? "",
-            cfop: data.cfop ?? "",
+            cfop: data.cfop ?? data.cfop_venda ?? "",
             cst_icms: data.cst_icms ?? "",
             icms_aliquota: data.icms_aliquota ?? "",
             icms_st: data.icms_st ?? false,
+            pis_cst: data.pis_cst ?? "",
             pis_aliquota: data.pis_aliquota ?? "",
+            cofins_cst: data.cofins_cst ?? "",
             cofins_aliquota: data.cofins_aliquota ?? "",
           },
         }));
@@ -394,7 +396,9 @@ export default function useProdutosNovoCarregamento({
       cst_icms: formData.tributacao.cst_icms,
       icms_aliquota: formData.tributacao.icms_aliquota,
       icms_st: formData.tributacao.icms_st,
+      pis_cst: formData.tributacao.pis_cst,
       pis_aliquota: formData.tributacao.pis_aliquota,
+      cofins_cst: formData.tributacao.cofins_cst,
       cofins_aliquota: formData.tributacao.cofins_aliquota,
     };
 
