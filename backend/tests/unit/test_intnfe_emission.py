@@ -40,6 +40,7 @@ def _objects(channel="loja_fisica"):
         quantidade=2,
         preco_unitario="10.00",
         desconto_item="2.00",
+        subtotal="18.00",
     )
     payment = SimpleNamespace(forma_pagamento="pix", valor="23.00")
     sale = SimpleNamespace(
@@ -140,4 +141,33 @@ def test_payment_total_must_match_sale_total():
     tenant, connection, sale = _objects()
     sale.pagamentos[0].valor = "22.99"
     with pytest.raises(emission.DirectEmissionError, match="formas de pagamento"):
+        emission.build_payload(None, tenant, connection, sale, "nfe")
+
+
+def test_fractional_quantity_uses_saved_subtotal_for_one_cent_rounding():
+    tenant, connection, sale = _objects()
+    item = sale.itens[0]
+    item.quantidade = "0.941"
+    item.preco_unitario = "169.90"
+    item.desconto_item = "0"
+    item.subtotal = "159.89"
+    sale.desconto_valor = "0"
+    sale.taxa_entrega = "0"
+    sale.tem_entrega = False
+    sale.total = "159.89"
+    sale.pagamentos[0].valor = "159.89"
+
+    product = emission.build_payload(None, tenant, connection, sale, "nfe")["produtos"][
+        0
+    ]
+
+    assert product["valorTotal"] == 159.89
+    assert round(product["quantidade"] * product["valorUnitario"], 2) == 159.89
+
+
+def test_saved_subtotal_with_more_than_one_cent_difference_is_blocked():
+    tenant, connection, sale = _objects()
+    sale.itens[0].subtotal = "18.02"
+
+    with pytest.raises(emission.DirectEmissionError, match="subtotal salvo"):
         emission.build_payload(None, tenant, connection, sale, "nfe")

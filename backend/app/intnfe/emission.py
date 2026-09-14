@@ -282,11 +282,28 @@ def build_payload(db, tenant, connection, venda, document_type):
             )
         quantity = Decimal(str(item.quantidade or 0))
         unit_price = Decimal(str(item.preco_unitario or 0))
-        gross = (quantity * unit_price).quantize(CENT, rounding=ROUND_HALF_UP)
         discount = _money(item.desconto_item)
+        calculated_gross = (quantity * unit_price).quantize(
+            CENT, rounding=ROUND_HALF_UP
+        )
+        stored_subtotal = getattr(item, "subtotal", None)
+        gross = (
+            _money(stored_subtotal) + discount
+            if stored_subtotal is not None
+            else calculated_gross
+        )
         if quantity <= 0 or unit_price < 0 or discount < 0 or discount > gross:
             raise DirectEmissionError(
                 f"Produto {item.produto.nome}: confira quantidade, preço e desconto."
+            )
+        if abs(gross - calculated_gross) > CENT:
+            raise DirectEmissionError(
+                f"Produto {item.produto.nome}: o subtotal salvo difere da quantidade e do preço."
+            )
+        fiscal_unit_price = unit_price
+        if gross != calculated_gross:
+            fiscal_unit_price = (gross / quantity).quantize(
+                Decimal("0.0000000001"), rounding=ROUND_HALF_UP
             )
         taxable = gross - discount
         product = {
@@ -298,7 +315,7 @@ def build_payload(db, tenant, connection, venda, document_type):
             "cfop": cfop,
             "unidade": _text(item.produto.unidade) or "UN",
             "quantidade": _number(quantity),
-            "valorUnitario": float(unit_price),
+            "valorUnitario": float(fiscal_unit_price),
             "valorTotal": float(gross),
             "impostos": {
                 "icms": _tax(
