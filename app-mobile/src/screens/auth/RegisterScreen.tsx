@@ -54,7 +54,10 @@ export default function RegisterScreen({ navigation }: any) {
       return;
     }
     if (!aceitouTermos || !aceitouPrivacidade) {
-      Alert.alert('Aceite necessario', 'Aceite os Termos de Uso e a Politica de Privacidade para criar a conta.');
+      Alert.alert(
+        'Confirmacao necessaria',
+        'Aceite os Termos de Uso e confirme a leitura da Politica de Privacidade para criar a conta.',
+      );
       return;
     }
     setCarregando(true);
@@ -236,7 +239,7 @@ export default function RegisterScreen({ navigation }: any) {
               color={CORES.primario}
             />
             <Text style={styles.checkboxTexto}>
-              Li e aceito a{' '}
+              Li e confirmo que estou ciente da{' '}
               <Text
                 style={styles.linkDestaque}
                 onPress={() => Linking.openURL('https://corepet.com.br/privacidade')}

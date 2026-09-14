@@ -19,17 +19,17 @@ CONTRACT_VERSION = "2026-08-14-01"
 CONTRACT_DOCUMENT_SHA256 = (
     "827819d29b30bf7b6a14a6c5f659cf5b0da475311dba6845c846570fb15e70a8"
 )
-TERMS_VERSION = "termos-2026-08-14"
-PRIVACY_VERSION = "privacidade-2026-08-14"
+TERMS_VERSION = "termos-2026-09-14"
+PRIVACY_VERSION = "privacidade-2026-09-14"
 CONTRACT_URL = "/contrato-assinatura"
 TERMS_URL = "/termos"
 PRIVACY_URL = "/privacidade"
 ACCEPTANCE_TEXT = (
-    "Li e aceito o Resumo da Contratação, o Contrato de Assinatura CorePet, "
-    "os Termos de Uso e a Política de Privacidade. Confirmo o plano, o valor, "
-    "o ciclo e o primeiro vencimento exibidos e autorizo a cobrança "
-    "correspondente. Declaro que tenho poderes para representar a empresa "
-    "cadastrada."
+    "Li e aceito o Resumo da Contratação, o Contrato de Assinatura CorePet e "
+    "os Termos de Uso. Declaro que tive acesso e estou ciente da Política de "
+    "Privacidade. Confirmo o plano, o valor, o ciclo e o primeiro vencimento "
+    "exibidos e autorizo a cobrança correspondente. Declaro que tenho poderes "
+    "para representar a empresa cadastrada."
 )
 
 

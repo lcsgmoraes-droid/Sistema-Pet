@@ -3,7 +3,7 @@ export const BILLING_CONTRACT_DOCUMENT_SHA256 =
   "827819d29b30bf7b6a14a6c5f659cf5b0da475311dba6845c846570fb15e70a8";
 
 export const BILLING_ACCEPTANCE_TEXT =
-  "Li e aceito o Resumo da Contratação, o Contrato de Assinatura CorePet, os Termos de Uso e a Política de Privacidade. Confirmo o plano, o valor, o ciclo e o primeiro vencimento exibidos e autorizo a cobrança correspondente. Declaro que tenho poderes para representar a empresa cadastrada.";
+  "Li e aceito o Resumo da Contratação, o Contrato de Assinatura CorePet e os Termos de Uso. Declaro que tive acesso e estou ciente da Política de Privacidade. Confirmo o plano, o valor, o ciclo e o primeiro vencimento exibidos e autorizo a cobrança correspondente. Declaro que tenho poderes para representar a empresa cadastrada.";
 
 export const billingContract = {
   title: "Contrato de Assinatura CorePet",

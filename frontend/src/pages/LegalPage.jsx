@@ -3,20 +3,22 @@ import { ShieldCheck } from "lucide-react";
 import { billingContract } from "../data/billingContract";
 
 const privacyContact = "lcsgmoraes@gmail.com";
+const privacyController =
+  "WCO COMERCIO E IMPORTACAO LTDA, CNPJ 51.510.640/0001-82, com sede na Rua Alcides Tenorio de Brito Guerra, 51, Parque Sao Matheus, Presidente Prudente/SP, CEP 19025-420";
 
 const legalContent = {
   contrato: billingContract,
   termos: {
     title: "Termos de Uso",
     eyebrow: "Contrato de uso da plataforma",
-    version: "Versao 2026-08-14",
-    updatedAt: "14/08/2026",
+    version: "Versao 2026-09-14",
+    updatedAt: "14/09/2026",
     intro:
       "Estes Termos regulam o acesso e o uso do CorePet, plataforma de gestao, vendas, estoque, financeiro, entregas, atendimento, loja online, aplicativo e integracoes para operacoes de pet shop, clinica, banho e tosa e negocios relacionados.",
     sections: [
       {
         title: "1. Aceite dos Termos",
-        body: "Ao criar conta, acessar a plataforma, convidar usuarios, usar a loja online, usar o aplicativo ou continuar navegando apos atualizacoes relevantes, o usuario declara que leu, compreendeu e aceitou estes Termos e a Politica de Privacidade.",
+        body: "Ao criar conta, acessar a plataforma, convidar usuarios, usar a loja online, usar o aplicativo ou continuar navegando apos atualizacoes relevantes, o usuario declara que leu e aceitou estes Termos e que teve acesso e tomou ciencia da Politica de Privacidade.",
         bullets: [
           "O aceite pode ser registrado por checkbox, login, confirmacao de e-mail, uso continuado ou outro mecanismo equivalente.",
           "A versao aceita, data, IP, user-agent e identificadores tecnicos podem ser registrados para fins de auditoria.",
@@ -189,10 +191,10 @@ const legalContent = {
   privacidade: {
     title: "Politica de Privacidade",
     eyebrow: "Protecao de dados pessoais",
-    version: "Versao 2026-08-27",
-    updatedAt: "27/08/2026",
+    version: "Versao 2026-09-14",
+    updatedAt: "14/09/2026",
     intro:
-      "Esta Politica explica como dados pessoais podem ser coletados, usados, armazenados, compartilhados e protegidos no CorePet, incluindo ERP, loja online, aplicativo, atendimento, entregas, campanhas, integracoes e suporte.",
+      "Esta Politica explica quais dados pessoais podem ser tratados no CorePet, para quais finalidades, com quais justificativas legais, com quem podem ser compartilhados, por quanto tempo podem ser mantidos e como o titular pode exercer seus direitos.",
     sections: [
       {
         title: "1. Abrangencia",
@@ -205,10 +207,11 @@ const legalContent = {
       },
       {
         title: "2. Controlador, operador e responsabilidades",
-        body: "Conforme o contexto, a empresa que usa a plataforma pode ser controladora dos dados de seus clientes, pets, colaboradores, vendas e operacao. O CorePet pode atuar como operador desses dados para executar a plataforma e, em alguns casos, como controlador de dados de conta, seguranca, faturamento, suporte e melhoria do servico.",
+        body: `${privacyController}, e a fornecedora da plataforma CorePet. O papel de controlador ou operador e definido em cada operacao de tratamento, de acordo com quem toma as decisoes sobre a finalidade e os meios essenciais do uso dos dados.`,
         bullets: [
-          "A loja ou empresa cadastrada define as finalidades principais do tratamento dos dados que insere sobre seus clientes, pets, pedidos, entregas e operacao.",
-          "O CorePet trata dados para hospedar, processar, proteger, auditar, dar suporte e disponibilizar as funcionalidades contratadas.",
+          "Em regra, a loja ou empresa cadastrada e controladora dos dados que insere sobre clientes, tutores, pets, colaboradores, pedidos, entregas e sua operacao.",
+          "Nessas operacoes, o CorePet atua como operador para hospedar, processar, proteger, auditar, dar suporte e disponibilizar as funcionalidades contratadas, seguindo as instrucoes da empresa controladora.",
+          "O CorePet atua como controlador dos dados necessarios a cadastro e administracao da conta SaaS, cobranca da assinatura, seguranca da plataforma, prevencao a fraude, suporte, auditoria e defesa de direitos.",
           "Clientes finais podem exercer direitos tanto perante a loja responsavel pelo atendimento quanto pelo canal de privacidade informado nesta Politica, conforme o caso.",
         ],
       },
@@ -263,59 +266,74 @@ const legalContent = {
         ],
       },
       {
-        title: "8. Finalidades do tratamento",
-        body: "Os dados sao tratados para executar a plataforma, prestar suporte, proteger contas, cumprir obrigacoes e permitir a operacao da empresa e seus canais.",
+        title: "8. Dados, finalidades e bases legais",
+        body: "A justificativa legal depende da pessoa, do recurso utilizado e de quem atua como controlador. As relacoes abaixo mostram as combinacoes normalmente aplicaveis, sem transformar o aceite desta Politica em autorizacao generica para qualquer uso.",
         bullets: [
-          "Criar conta, autenticar usuario, confirmar e-mail, recuperar senha e controlar permissoes.",
-          "Processar vendas, pedidos, compras, estoque, entregas, agendamentos, documentos, pagamentos e atendimento.",
-          "Gerar relatorios, indicadores, auditoria, logs, alertas, conciliacoes, sugestoes e historicos operacionais.",
-          "Enviar comunicacoes transacionais, avisos de seguranca, suporte, campanhas e notificacoes configuradas.",
-          "Prevenir fraude, abuso, acesso indevido, incidentes de seguranca, vazamento e uso em desconformidade.",
-          "Cumprir obrigacoes legais, regulatorias, fiscais, contabeis, contratuais e ordens de autoridades competentes.",
-          "Melhorar estabilidade, desempenho, usabilidade, recursos e qualidade da plataforma.",
+          "Conta e autenticacao — nome, e-mail, telefone, empresa, perfil, permissoes, senha protegida, IP e dados do dispositivo sao usados para criar e administrar a conta, autenticar, recuperar acesso e proteger a sessao. Bases normalmente aplicaveis: procedimentos preliminares e execucao de contrato; legitimo interesse e prevencao a fraude para seguranca, conforme avaliacao do caso.",
+          "Assinatura e cobranca do CorePet — dados da empresa, representante, contato de cobranca, plano, faturas e status de pagamento sao usados para contratar, cobrar, prestar suporte financeiro e comprovar a relacao. Bases normalmente aplicaveis: execucao de contrato, obrigacao legal ou regulatoria e exercicio regular de direitos.",
+          "Clientes, tutores, pets e operacao da loja — cadastros, pedidos, vendas, agendamentos, atendimentos, entregas e historicos sao usados pela empresa cadastrada para prestar seus servicos. A empresa define a base legal aplicavel; o CorePet realiza o processamento necessario para executar o contrato SaaS e as instrucoes da controladora.",
+          "Dados fiscais, financeiros e de credito — documentos, pagamentos, parcelas, debitos, conciliacoes e registros transacionais sao usados para executar operacoes, cumprir deveres fiscais e contabeis, cobrar e defender direitos. Bases normalmente aplicaveis: contrato, obrigacao legal ou regulatoria, protecao do credito e exercicio regular de direitos.",
+          "Comunicacoes — e-mail, telefone, WhatsApp, SMS e push podem ser usados para confirmacao de conta, pedido, entrega, cobranca, seguranca e suporte com base no contrato, obrigacao aplicavel ou interesse legitimo avaliado. Comunicacoes promocionais dependem de consentimento ou de outra base previamente documentada pela controladora e sempre devem oferecer oposicao ou descadastro quando aplicavel.",
+          "Localizacao de entrega — a posicao do entregador, data, hora e deslocamento sao usados somente durante a rota ativa para executar, acompanhar e comprovar a entrega. A empresa responsavel pela rota deve informar seus colaboradores e definir a base adequada; o CorePet nao usa essa localizacao para publicidade.",
+          "Logs, cookies e seguranca — IP, user-agent, sessao, rota acessada e eventos tecnicos sao usados para funcionamento, auditoria, suporte, prevencao a fraude e seguranca. Cookies necessarios acompanham a prestacao do servico; analytics ou marketing nao essenciais dependem da escolha e da base legal aplicavel.",
+          "IA e integracoes opcionais — recebem apenas o contexto necessario ao recurso solicitado e seguem a mesma finalidade e base legal do processo de origem. Habilitar uma integracao nao autoriza reutilizacao dos dados para finalidade incompativel.",
+          "Solicitacoes de titulares — identificacao, contato, pedido e evidencia da resposta sao usados para verificar identidade, atender direitos e comprovar o atendimento. Bases normalmente aplicaveis: obrigacao legal ou regulatoria e exercicio regular de direitos.",
         ],
       },
       {
-        title: "9. Bases e justificativas de tratamento",
-        body: "O tratamento pode ocorrer com base em contrato, consentimento, cumprimento de obrigacao legal, exercicio regular de direitos, protecao do credito, legitimo interesse, prevencao a fraude e outras hipoteses admitidas pela legislacao aplicavel.",
+        title: "9. Como aplicamos as bases legais",
+        body: "A base legal e registrada e avaliada conforme a finalidade concreta. Nem todo tratamento depende de consentimento, e a simples ciencia desta Politica nao substitui o consentimento especifico quando ele for exigido.",
         bullets: [
-          "O consentimento pode ser usado para aceite de Termos/Privacidade, comunicacoes especificas, cookies nao necessarios ou funcionalidades opcionais.",
-          "O contrato pode justificar dados necessarios para entregar a plataforma e operar pedidos, contas, suporte e funcionalidades.",
-          "Obrigacoes legais podem justificar retencao fiscal, contabil, registros de seguranca, auditoria e documentos.",
-          "Legitimo interesse pode ser usado para seguranca, prevencao a fraude, melhoria do servico e comunicacoes operacionais, quando aplicavel.",
+          "Consentimento e usado somente quando for livre, informado, destacado, vinculado a finalidade determinada e passivel de revogacao por meio facilitado.",
+          "Execucao de contrato ou procedimentos preliminares cobre apenas os dados necessarios para contratar, entregar a plataforma ou realizar a operacao solicitada.",
+          "Obrigacao legal ou regulatoria pode exigir a coleta ou conservacao de documentos fiscais, contabeis, trabalhistas, de seguranca ou de atendimento, conforme o caso.",
+          "Legitimo interesse exige avaliacao de finalidade, necessidade, expectativas do titular, impacto e salvaguardas; nao e uma autorizacao generica para melhorar o servico ou enviar publicidade.",
+          "Protecao do credito, prevencao a fraude e exercicio regular de direitos sao usados somente quando a operacao e os requisitos legais correspondentes estiverem presentes.",
+          "O registro de aceite desta Politica comprova que o documento foi apresentado ao usuario; ele nao autoriza usos incompativeis com as finalidades informadas.",
         ],
       },
       {
-        title: "10. Compartilhamento de dados",
-        body: "Dados podem ser compartilhados com terceiros estritamente necessarios a operacao, suporte, seguranca, integracoes e cumprimento de obrigacoes.",
+        title: "10. Fornecedores, destinatarios e integracoes",
+        body: "Cada fornecedor recebe somente os dados necessarios ao recurso utilizado. Integracoes escolhidas pela empresa cadastrada somente recebem dados quando habilitadas e podem atuar como operadoras, suboperadoras ou controladoras independentes, conforme o servico e o contrato aplicavel.",
         bullets: [
-          "Hospedagem, banco de dados, armazenamento, backup, monitoramento, logs e infraestrutura.",
-          "E-mail, SMS, WhatsApp, notificacoes, atendimento e suporte.",
-          "Meios de pagamento, bancos, conciliacao, gateways, antifraude e cobranca.",
-          "Emissores fiscais, SEFAZ, contabilidade, documentos, marketplaces, ERPs e plataformas de e-commerce.",
-          "Mapas, rotas, entrega, transportadores e parceiros logisticos.",
+          "Infraestrutura — DigitalOcean pode hospedar a aplicacao e o banco de dados; armazenamento ou backup S3 compativel, inclusive Cloudflare R2 quando configurado, pode receber arquivos e copias protegidas.",
+          "Cobranca da assinatura CorePet — Asaas pode receber identificacao da empresa, contato de cobranca, valor, vencimento, identificadores e status da cobranca.",
+          "Pagamentos do e-commerce — Mercado Pago e, em fluxos legados ou condicionais, Pagar.me podem receber dados do pedido, pagador, valor, meio e resultado da transacao quando a loja habilitar o recurso.",
+          "Operacao, marketplace e fiscal — Bling, iFood, SEFAZ, IntNFe e EcommerceAI podem receber ou devolver produtos, estoque, pedidos, documentos e identificadores fiscais quando a empresa conectar cada integracao.",
+          "Comunicacoes — WhatsApp e o ecossistema Meta, 360dialog, WAHA e o provedor SMTP configurado, como Google/Gmail, podem processar contatos, conteudo e metadados das mensagens necessarias ao canal habilitado.",
+          "Notificacoes do app — Expo Push e os servicos de entrega da Apple e do Google podem processar token do dispositivo, plataforma e conteudo minimo da notificacao.",
+          "Mapas e rotas — Google Maps pode receber enderecos, coordenadas e parametros de rota necessarios a geocodificacao, distancia e acompanhamento da entrega.",
+          "Inteligencia artificial — OpenAI pode receber o contexto minimo enviado a recursos opcionais de IA. Usuarios nao devem inserir senhas, segredos, documentos completos ou dados pessoais desnecessarios nos prompts.",
           "A posicao da rota ativa pode ser exibida a usuarios autorizados da loja e ao cliente que possui o acesso de rastreio daquela entrega. A localizacao do entregador nao e usada para publicidade.",
           "Fornecedores, clientes, usuarios autorizados, autoridades publicas ou terceiros quando houver obrigacao, autorizacao ou necessidade legitima.",
+          "A lista efetivamente aplicavel varia conforme os recursos contratados e habilitados. Alteracoes materiais serao refletidas nesta Politica, e o titular pode pedir pelo canal de privacidade a relacao de destinatarios aplicavel ao seu caso.",
         ],
       },
       {
         title: "11. Transferencias internacionais",
-        body: "Alguns provedores de infraestrutura, e-mail, comunicacao, analytics, IA, pagamento ou suporte podem armazenar ou processar dados fora do Brasil.",
+        body: "Alguns provedores de infraestrutura, e-mail, comunicacao, notificacao, analytics, IA, pagamento ou suporte podem armazenar ou processar dados fora do Brasil.",
         bullets: [
-          "Quando isso ocorrer, buscamos usar provedores com medidas contratuais, tecnicas e organizacionais compativeis com protecao de dados.",
-          "A transferencia pode ocorrer para executar servicos contratados, suporte, seguranca, armazenamento, comunicacao ou integracoes.",
-          "A lista de provedores pode mudar conforme a evolucao da plataforma e necessidades operacionais.",
+          "A transferencia deve estar vinculada a finalidade informada, limitar-se ao minimo necessario e possuir base legal para o tratamento.",
+          "Quando aplicavel, a transferencia sera apoiada por mecanismo valido previsto na LGPD e na regulamentacao da ANPD, como decisao de adequacao, clausulas-padrao contratuais, clausulas especificas aprovadas ou outra hipotese legal cabivel.",
+          "O CorePet avalia medidas contratuais, tecnicas e organizacionais do fornecedor conforme o risco e as informacoes disponiveis.",
+          "Integracoes contratadas diretamente pela empresa cadastrada podem possuir regras proprias de transferencia internacional, que tambem devem ser avaliadas pela respectiva controladora.",
+          "O titular pode solicitar informacoes sobre os paises e mecanismos aplicaveis ao seu tratamento pelo canal de privacidade.",
         ],
       },
       {
-        title: "12. Retencao e descarte",
-        body: "Os dados sao mantidos pelo tempo necessario para cumprir as finalidades descritas, obrigacoes legais, auditoria, seguranca, contrato, suporte, defesa de direitos e continuidade operacional.",
+        title: "12. Retencao, encerramento e descarte",
+        body: "O cancelamento da assinatura, a desativacao de uma integracao e um pedido de exclusao nao produzem o mesmo efeito para todos os registros. Aplicamos o criterio correspondente a cada categoria e preservamos somente o que possuir finalidade e justificativa de conservacao.",
         bullets: [
-          "Dados de conta podem ser mantidos enquanto houver conta ativa e por periodo posterior necessario para auditoria e defesa de direitos.",
-          "Dados fiscais, financeiros, contabeis e transacionais podem ser mantidos conforme prazos legais e regulatorios aplicaveis.",
-          "Logs de seguranca e acesso podem ser mantidos para investigacao, estabilidade, antifraude e auditoria.",
-          "No rastreamento de entregas, o sistema mantem a posicao mais recente e metricas de distancia vinculadas a rota; a finalidade e acompanhar e comprovar a operacao da entrega.",
-          "Dados podem ser anonimizados, bloqueados ou eliminados quando aplicavel, respeitadas obrigacoes de conservacao.",
+          "Conta e assinatura — os dados operacionais permanecem disponiveis enquanto a conta estiver ativa. Apos cancelamento ou encerramento, o acesso pode ser limitado e a empresa deve solicitar a exportacao pelo suporte; identificadores minimos podem permanecer para cobranca, auditoria, seguranca e defesa de direitos.",
+          "Clientes, pets e historicos — quando nao houver obrigacao de conservar a identificacao, os dados podem ser corrigidos, bloqueados, eliminados ou anonimizados. Vendas, documentos e trilhas que precisem permanecer podem conservar o fato da operacao com os campos pessoais reduzidos ou anonimizados.",
+          "Fiscal, financeiro, contabil, trabalhista e veterinario — os registros seguem os prazos legais, regulatorios, profissionais ou de defesa aplicaveis a cada documento e relacao; um pedido de exclusao nao elimina registro cuja conservacao seja obrigatoria.",
+          "Marketing e preferencias — o uso promocional termina com o descadastro, oposicao ou revogacao aplicavel. Pode ser preservada evidencia minima da escolha para impedir novo envio indevido e comprovar o atendimento.",
+          "Entregas — a coleta de localizacao precisa termina quando a rota e finalizada ou cancelada. Depois disso, apenas a ultima posicao e metricas vinculadas a rota podem permanecer pelo periodo necessario a comprovacao da entrega e defesa de direitos.",
+          "Logs e auditoria — como referencia operacional, logs brutos de aplicacao, HTTP e containers sao mantidos normalmente por 30 dias e podem chegar a 90 dias em incidente; eventos detalhados de jornada, por 90 dias; trilhas de auditoria, por ate 24 meses em consulta ativa e, quando justificadas, por ate 7 anos em arquivo protegido ou forma anonimizada.",
+          "Backups — o backup local do banco utiliza ciclo padrao de 14 dias. Copias externas, quando configuradas, seguem o ciclo de vida protegido definido para o armazenamento. Dados eliminados ou anonimizados deixam de reaparecer na base ativa e saem das copias conforme a renovacao do ciclo, salvo preservacao obrigatoria ou bloqueio por investigacao.",
+          "Exportacoes e arquivos temporarios — sao disponibilizados somente pelo tempo necessario a entrega, importacao, verificacao ou suporte e devem ser eliminados ou ter o acesso revogado depois da finalidade.",
+          "Legal hold — prazos podem ser suspensos para incidente, fraude, disputa, auditoria, ordem de autoridade ou exercicio regular de direitos. Encerrado o motivo, o registro volta ao ciclo normal de descarte.",
+          "O titular pode solicitar pelo canal de privacidade o criterio e o periodo aplicavel a uma categoria especifica de seus dados.",
         ],
       },
       {
@@ -339,7 +357,7 @@ const legalContent = {
         body: "Solicitacoes podem ser feitas pelo canal de suporte, pelo canal da loja responsavel ou pelo contato de privacidade abaixo.",
         bullets: [
           `Canal de privacidade: ${privacyContact}.`,
-          "A solicitacao deve informar nome, e-mail, telefone, empresa/loja relacionada, tipo de solicitacao e dados suficientes para verificar identidade e localizar registros.",
+          "Informe apenas os dados suficientes para localizar o cadastro e verificar a identidade, como nome, um contato ja cadastrado, empresa/loja relacionada e tipo de solicitacao. Nao envie senha, codigo de acesso, documento completo ou dado de cartao por e-mail.",
           "Podemos solicitar informacoes adicionais para confirmar identidade, evitar fraude e proteger dados de terceiros.",
           "Quando a loja for controladora dos dados, a solicitacao pode ser direcionada ou compartilhada com a loja responsavel pelo atendimento.",
         ],
@@ -396,17 +414,17 @@ const legalContent = {
         title: "20. Atualizacoes desta Politica",
         body: "Esta Politica pode ser atualizada para refletir novas funcionalidades, integracoes, requisitos legais, medidas de seguranca ou mudancas operacionais.",
         bullets: [
-          "Mudancas relevantes podem ser comunicadas por e-mail, aviso no sistema, novo aceite ou outro meio adequado.",
+          "Mudancas relevantes de finalidade, base legal, compartilhamento ou impacto ao titular podem ser comunicadas por e-mail, aviso no sistema, nova ciencia ou novo consentimento quando este for a base aplicavel.",
           "A versao vigente fica disponivel nesta pagina.",
-          "O uso continuado apos atualizacao pode indicar ciencia da nova versao, quando aplicavel.",
+          "O uso continuado pode registrar ciencia da nova versao, mas nao substitui consentimento especifico quando ele for legalmente necessario.",
         ],
       },
       {
         title: "21. Contato de privacidade",
-        body: "Para duvidas, solicitacoes de titulares, incidentes, preferencias ou assuntos de privacidade, use o canal abaixo.",
+        body: `O canal de privacidade de ${privacyController} recebe duvidas, solicitacoes de titulares, incidentes, preferencias e comunicacoes relacionadas a protecao de dados.`,
         bullets: [
           `E-mail: ${privacyContact}.`,
-          "Informe o maximo de contexto possivel: loja, e-mail cadastrado, telefone, numero de pedido, venda, pet ou outro identificador relacionado.",
+          "Informe somente o contexto necessario, como loja relacionada, contato ja cadastrado e, quando indispensavel, numero do pedido ou outro identificador da operacao.",
           "Clientes finais tambem podem procurar diretamente a loja responsavel pelo pedido, entrega, atendimento, cadastro ou relacionamento comercial.",
         ],
       },

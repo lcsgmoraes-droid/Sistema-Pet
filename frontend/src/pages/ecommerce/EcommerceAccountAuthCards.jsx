@@ -117,7 +117,7 @@ export function RegisterCard({
             style={checkboxInputStyle(registerFieldError, "accepted_privacy")}
           />
           <span>
-            Li e aceito a{" "}
+            Li e confirmo que estou ciente da{" "}
             <a
               href="/privacidade"
               target="_blank"

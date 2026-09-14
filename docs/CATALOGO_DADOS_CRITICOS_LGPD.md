@@ -468,6 +468,14 @@ aprovar objetivos somente após teste mensurável da infraestrutura real.
 
 ## Lacunas priorizadas
 
+Em 14/09/2026, a Politica de Privacidade publica passou a identificar a pessoa
+juridica responsavel, relacionar categorias de dados com finalidades e bases
+normalmente aplicaveis, nomear fornecedores e integracoes suportados e explicar
+criterios de retencao, encerramento e descarte. Essa melhoria de transparencia
+nao substitui as aprovacoes de negocio, juridico, contador e responsavel tecnico
+registradas abaixo, nem comprova que todo fornecedor opcional esteja ativo em
+producao.
+
 ### P0 — decisão e risco
 
 1. Aprovar, por tratamento, finalidade, hipótese legal e papéis de

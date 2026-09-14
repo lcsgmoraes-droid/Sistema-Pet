@@ -184,7 +184,7 @@ function getRegisterValidation(registerForm, tenantContext) {
   if (!registerForm.accepted_privacy) {
     return {
       field: "accepted_privacy",
-      message: "Aceite a Politica de Privacidade para criar a conta.",
+      message: "Confirme a leitura da Politica de Privacidade para criar a conta.",
       normalizedEmail,
     };
   }
