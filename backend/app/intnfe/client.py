@@ -386,6 +386,7 @@ class IntNFeClient:
             token=token,
             body={"ambienteCodigo": environment},
             creating=True,
+            expect_empty=True,
         )
 
     @staticmethod
