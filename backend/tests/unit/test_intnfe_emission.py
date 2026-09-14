@@ -6,7 +6,9 @@ from app.intnfe import emission
 
 
 def _objects(channel="loja_fisica"):
-    tenant = SimpleNamespace(id="11111111-1111-1111-1111-111111111111")
+    tenant = SimpleNamespace(
+        id="11111111-1111-1111-1111-111111111111", cnpj="33590794000140"
+    )
     connection = SimpleNamespace(
         emission_environment=2,
         nfe_series="3",
@@ -114,6 +116,15 @@ def test_payload_preserves_totals_and_hides_real_recipient_in_homologation():
         "cst": "102",
         "origem": "0",
     }
+    assert payload["produtos"][0]["impostos"]["pis"] == {
+        "cst": "49",
+        "aliquota": 0.0,
+    }
+    assert payload["produtos"][0]["impostos"]["cofins"] == {
+        "cst": "49",
+        "aliquota": 0.0,
+    }
+    assert payload["emitente"]["cnpj"] == "33590794000140"
     assert payload["frete"] == {"modalidade": "9", "valor": 5.0}
     assert payload["pagamentos"] == [{"formaPagamento": "17", "valor": 23.0}]
 
@@ -129,6 +140,34 @@ def test_interstate_sale_uses_interstate_cfop():
         ]
         == "6102"
     )
+
+
+def test_cst_49_without_saved_rate_is_sent_with_explicit_zero(monkeypatch):
+    tenant, connection, sale = _objects()
+    monkeypatch.setattr(
+        emission,
+        "_resolver_fiscal_item_nfe",
+        lambda *_args: {
+            "ncm": "23091000",
+            "cest": None,
+            "origem_mercadoria": "0",
+            "cfop_interno": "5102",
+            "cfop_interestadual": "6102",
+            "cst_icms": "102",
+            "icms_aliquota": None,
+            "pis_cst": "49",
+            "pis_aliquota": None,
+            "cofins_cst": "49",
+            "cofins_aliquota": None,
+        },
+    )
+
+    taxes = emission.build_payload(None, tenant, connection, sale, "nfe")["produtos"][
+        0
+    ]["impostos"]
+
+    assert taxes["pis"] == {"cst": "49", "aliquota": 0.0}
+    assert taxes["cofins"] == {"cst": "49", "aliquota": 0.0}
 
 
 def test_marketplace_without_intermediary_snapshot_is_blocked():

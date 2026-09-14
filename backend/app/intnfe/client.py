@@ -82,6 +82,7 @@ class IntNFeClient:
         if not 200 <= response.status_code < 300:
             # Nunca repassar mensagens/corpos externos que possam conter segredos.
             code = {
+                400: "DadosInvalidos",
                 401: "CredenciaisInvalidas",
                 403: "AcessoNegado",
                 404: "NaoEncontrado",

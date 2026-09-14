@@ -221,7 +221,12 @@ def _tax(cst, origin, rate, taxable_amount):
 
 
 def _contribution(cst, rate, taxable_amount):
-    result = {"cst": str(cst)}
+    normalized_cst = str(cst)
+    result = {"cst": normalized_cst}
+    if rate is None and normalized_cst.isdigit() and 49 <= int(normalized_cst) <= 99:
+        # A IntNFe espera a aliquota explicita inclusive nos grupos de saida
+        # sem destaque, como o CST 49 usado pelo Simples Nacional.
+        rate = 0
     if rate is not None:
         normalized_rate = Decimal(str(rate))
         result["aliquota"] = float(normalized_rate)
@@ -237,6 +242,11 @@ def _contribution(cst, rate, taxable_amount):
 
 def build_payload(db, tenant, connection, venda, document_type):
     emitter, emitter_pending = local_profile(db, tenant.id)
+    emitter_cnpj = _digits(getattr(tenant, "cnpj", None))
+    if len(emitter_cnpj) == 14:
+        emitter["cnpj"] = emitter_cnpj
+    elif len(_digits(emitter.get("cnpj"))) != 14:
+        emitter_pending.append("Informe um CNPJ válido nos dados da empresa.")
     if emitter_pending:
         raise DirectEmissionError(" ".join(emitter_pending))
     environment = 1 if connection.emission_environment == 1 else 2
@@ -490,6 +500,8 @@ def issue(db, tenant, venda, document_type, api):
     except IntNFeError as exc:
         venda.nfe_status = "inconclusiva" if exc.uncertain else "rejeitada"
         venda.nfe_codigo_erro = exc.code[:20] if exc.code else None
+        if not exc.uncertain and exc.status:
+            venda.nfe_motivo_rejeicao = f"IntNFe HTTP {exc.status}"
         if not exc.uncertain:
             venda.nfe_idempotency_key = None
             venda.nfe_payload_hash = None
@@ -499,7 +511,11 @@ def issue(db, tenant, venda, document_type, api):
             "O envio ficou sem confirmação; não crie outra nota para esta venda."
             if exc.uncertain
             else "A IntNFe recusou o envio antes do processamento.",
-            status=503 if exc.uncertain else (422 if exc.status == 422 else 503),
+            status=(
+                503
+                if exc.uncertain
+                else (422 if exc.status and 400 <= exc.status < 500 else 503)
+            ),
             code=exc.code,
             correlation=exc.correlation,
         ) from None
