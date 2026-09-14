@@ -224,13 +224,10 @@ export function usePDVVendaFinalizacao({
   const emitirNotaVendaFinalizada = async () => {
     if (!vendaAtual.id) return;
 
-    let tipoNota = "nfce";
-    if (vendaAtual.cliente?.cnpj) {
-      const emitirNfe = await confirmarCorePet(
-        "Cliente tem CNPJ.\n\nClique OK para emitir NF-e (Empresa)\nClique Cancelar para emitir NFC-e (Cupom).",
-      );
-      tipoNota = emitirNfe ? "nfe" : "nfce";
-    }
+    const emitirNfe = await confirmarCorePet(
+      "Escolha o modelo da nota.\n\nClique OK para emitir NF-e (modelo 55)\nClique Cancelar para emitir NFC-e (modelo 65).",
+    );
+    const tipoNota = emitirNfe ? "nfe" : "nfce";
 
     const confirmar = await confirmarCorePet(
       `Confirma emitir ${tipoNota === "nfe" ? "NF-e" : "NFC-e"} para esta venda finalizada?`,
