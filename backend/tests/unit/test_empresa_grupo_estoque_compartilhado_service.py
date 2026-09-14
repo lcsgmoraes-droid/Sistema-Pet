@@ -329,7 +329,19 @@ def test_tela_compartilhada_le_lotes_fornecedores_e_fiscal_da_origem(db):
     with tenant_context(CONSUMIDORA):
         put_fiscal_produto(
             produto.id,
-            {"ncm": "23099020", "origem_mercadoria": "0"},
+            {
+                "ncm": "23099020",
+                "origem_mercadoria": "0",
+                "cst_icms": "900",
+                "pis_cst": "49",
+                "cofins_cst": "49",
+            },
+            db=session,
+            tenant_id=UUID(CONSUMIDORA),
+        )
+    with tenant_context(CONSUMIDORA):
+        fiscal_atualizado = get_fiscal_produto(
+            produto.id,
             db=session,
             tenant_id=UUID(CONSUMIDORA),
         )
@@ -365,6 +377,9 @@ def test_tela_compartilhada_le_lotes_fornecedores_e_fiscal_da_origem(db):
     assert fiscal["ncm"] == "23099010"
     assert str(fiscal_origem.tenant_id) == ORIGEM
     assert fiscal_origem.ncm == "23099020"
+    assert fiscal_atualizado["cst_icms"] == "900"
+    assert fiscal_atualizado["pis_cst"] == "49"
+    assert fiscal_atualizado["cofins_cst"] == "49"
 
 
 def test_remover_compartilhamento_bloqueia_nova_venda_sem_apagar_historico(db):

@@ -111,7 +111,9 @@ export default function ProdutosNovo() {
       cst_icms: "",
       icms_aliquota: "",
       icms_st: false,
+      pis_cst: "",
       pis_aliquota: "",
+      cofins_cst: "",
       cofins_aliquota: "",
     },
     // Campos legados (mantidos para fallback)

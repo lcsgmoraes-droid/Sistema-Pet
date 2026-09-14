@@ -50,9 +50,11 @@ def get_fiscal_produto(
                 if fiscal_v2.icms_aliquota is not None
                 else None,
                 "icms_st": fiscal_v2.icms_st or False,
+                "pis_cst": fiscal_v2.pis_cst,
                 "pis_aliquota": float(fiscal_v2.pis_aliquota)
                 if fiscal_v2.pis_aliquota is not None
                 else None,
+                "cofins_cst": fiscal_v2.cofins_cst,
                 "cofins_aliquota": float(fiscal_v2.cofins_aliquota)
                 if fiscal_v2.cofins_aliquota is not None
                 else None,
@@ -75,7 +77,9 @@ def get_fiscal_produto(
                 "cst_icms": None,
                 "icms_aliquota": None,
                 "icms_st": False,
+                "pis_cst": None,
                 "pis_aliquota": None,
+                "cofins_cst": None,
                 "cofins_aliquota": None,
             }
 
@@ -91,9 +95,11 @@ def get_fiscal_produto(
             if getattr(produto, "aliquota_icms", None) is not None
             else None,
             "icms_st": False,
+            "pis_cst": None,
             "pis_aliquota": float(getattr(produto, "aliquota_pis", 0) or 0)
             if getattr(produto, "aliquota_pis", None) is not None
             else None,
+            "cofins_cst": None,
             "cofins_aliquota": float(getattr(produto, "aliquota_cofins", 0) or 0)
             if getattr(produto, "aliquota_cofins", None) is not None
             else None,
@@ -116,7 +122,9 @@ def get_fiscal_produto(
             "cst_icms": None,
             "icms_aliquota": None,
             "icms_st": False,
+            "pis_cst": None,
             "pis_aliquota": None,
+            "cofins_cst": None,
             "cofins_aliquota": None,
         }
 
@@ -172,9 +180,11 @@ def get_fiscal_kit(
                 if kit_fiscal_v2.icms_aliquota is not None
                 else None,
                 "icms_st": kit_fiscal_v2.icms_st or False,
+                "pis_cst": kit_fiscal_v2.pis_cst,
                 "pis_aliquota": float(kit_fiscal_v2.pis_aliquota)
                 if kit_fiscal_v2.pis_aliquota is not None
                 else None,
+                "cofins_cst": kit_fiscal_v2.cofins_cst,
                 "cofins_aliquota": float(kit_fiscal_v2.cofins_aliquota)
                 if kit_fiscal_v2.cofins_aliquota is not None
                 else None,
@@ -201,7 +211,9 @@ def get_fiscal_kit(
             "cst_icms": None,
             "icms_aliquota": None,
             "icms_st": False,
+            "pis_cst": None,
             "pis_aliquota": None,
+            "cofins_cst": None,
             "cofins_aliquota": None,
         }
 
@@ -251,11 +263,13 @@ def put_fiscal_produto(
     fiscal.icms_st = payload.get("icms_st")
 
     # Converter strings vazias para None em campos numéricos
+    fiscal.pis_cst = payload.get("pis_cst") or None
     pis_aliq = payload.get("pis_aliquota")
     fiscal.pis_aliquota = (
         float(pis_aliq) if pis_aliq and str(pis_aliq).strip() else None
     )
 
+    fiscal.cofins_cst = payload.get("cofins_cst") or None
     cofins_aliq = payload.get("cofins_aliquota")
     fiscal.cofins_aliquota = (
         float(cofins_aliq) if cofins_aliq and str(cofins_aliq).strip() else None
@@ -325,7 +339,9 @@ def put_fiscal_kit(
     fiscal.icms_aliquota = payload.get("icms_aliquota")
     fiscal.icms_st = payload.get("icms_st")
 
+    fiscal.pis_cst = payload.get("pis_cst") or None
     fiscal.pis_aliquota = payload.get("pis_aliquota")
+    fiscal.cofins_cst = payload.get("cofins_cst") or None
     fiscal.cofins_aliquota = payload.get("cofins_aliquota")
 
     fiscal.herdado_da_empresa = False
