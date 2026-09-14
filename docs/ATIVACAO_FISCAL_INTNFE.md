@@ -1,6 +1,6 @@
 # Ativação fiscal, CSC e numeração com a IntNFe
 
-Data: 2026-09-11. Situação: fluxo de configuração implementado; homologação integrada do CorePet pendente.
+Atualizado em 2026-09-14. Situação: configuração e emissão direta implementadas; primeira emissão integrada em produção ainda depende da revisão da venda pelo usuário.
 
 ## Fluxo para o usuário
 
@@ -15,8 +15,12 @@ em teste**. O cadastro inicial da conta não depende da disponibilidade do emiss
 4. Recebe e valida o certificado A1 pelo próprio CorePet, sem persistir a senha
    ou o conteúdo do arquivo.
 5. Mostra checklist, validade do A1 e pendências. Com vínculo válido,
-   disponibiliza CSC e numeração separados por modelo, série e ambiente. Não
-   emite uma nota nesta etapa.
+   disponibiliza CSC e numeração separados por modelo, série e ambiente.
+6. O usuário escolhe explicitamente homologação ou produção e as séries ativas.
+   A credencial de produção nasce e é armazenada cifrada nessa etapa, sem campos
+   técnicos para copiar.
+7. Ao emitir, o CorePet mostra ambiente, série, destinatário, itens e total,
+   solicita confirmação e envia diretamente à IntNFe.
 
 Para um CNPJ ainda não cadastrado na IntNFe, o cliente apenas autoriza a
 integração na tela. O backend cria o emissor com a conta de integrador do
@@ -31,9 +35,9 @@ excepcional e não faz parte do fluxo normal. Não há rotação automática de 
 
 ## Habilitar em desenvolvimento
 
-- Aplicar as migrations até `zzo20260911a1`. Além da tabela
-  `intnfe_connections`, a última migration acrescenta o código IBGE do município
-  ao cadastro da empresa; não altera vendas, estoque ou financeiro.
+- Aplicar as migrations até `zzp20260914a1`. A última migration acrescenta o
+  ambiente e as credenciais protegidas de produção, o código IBGE do cliente e
+  os identificadores necessários para acompanhar a nota na venda.
 - Configurar no ambiente seguro do **backend**, nunca em variável `VITE_*`:
   `INTNFE_ACTIVATION_ENABLED=true`, `INTNFE_ACTIVATION_TENANT_IDS` vazio ou `*`
   para todas as empresas, ou com UUIDs separados por vírgula para uma liberação
@@ -68,13 +72,21 @@ fluxo de publicação do repositório, além da homologação abaixo.
 | `PUT /intnfe/numeracao` | Avança uma sequência de NF-e ou NFC-e após nova consulta, auditoria e confirmação por leitura. |
 | `GET /intnfe/csc` | Consulta separadamente homologação e produção, informando presença e ID; o segredo nunca retorna. |
 | `PUT /intnfe/csc` | Grava o CSC do ambiente escolhido após consulta, revisão explícita e auditoria sem o segredo. |
+| `GET /intnfe/ambiente-emissao` | Mostra ambiente, séries e presença das credenciais sem devolver segredos. |
+| `PUT /intnfe/ambiente-emissao` | Ativa homologação ou produção e prepara automaticamente a credencial de produção quando necessário. |
+| `DELETE /intnfe/ambiente-emissao` | Impede novas emissões diretas sem remover o vínculo ou os documentos existentes. |
+| `POST /nfe/emitir` | Usa IntNFe quando a empresa ativou a emissão direta; mantém o fluxo Bling nas empresas ainda não migradas. |
+| `GET /nfe/vendas/{vendaId}/status` | Reconcilia o processamento sem reenviar o documento. |
+| `GET /nfe/vendas/{vendaId}/xml` | Baixa e arquiva novamente o XML autorizado. |
+| `GET /nfe/vendas/{vendaId}/danfe` | Gera o DANFE novamente a partir da nota existente. |
+| `POST /nfe/vendas/{vendaId}/cancelar` | Solicita o cancelamento da nota autorizada com justificativa. |
 
 As rotas usam exclusivamente a empresa da sessão autenticada. Não aceitam um
 tenant ou CNPJ arbitrário como destino. A resposta contém mensagem, etapas,
-pendências e ações possíveis; nunca credenciais/tokens. `emissao_disponivel` é
-sempre `false` e `ambiente` na resposta de ativação é `homologacao`. A numeração tem
-seleção explícita de ambiente independente dessa resposta. Mesmo `certificado_validado` não libera
-emissão. Erros de validação do formulário não reproduzem o corpo com o segredo.
+pendências e ações possíveis; nunca credenciais/tokens. `emissao_disponivel`
+somente fica verdadeiro depois da seleção explícita do ambiente. A numeração
+continua independente dessa escolha. Erros de validação não reproduzem corpos
+que possam conter segredos.
 
 A identidade vem de `Tenant`: `cnpj`, `razao_social` e `name`. O vínculo guarda
 uma fotografia desses dados e os identificadores da IntNFe. A troca posterior do
@@ -242,9 +254,12 @@ Validação desta entrega e limites estão na
    [Diagnóstico](DIAGNOSTICO_INTNFE_NFE_HOMOLOGACAO_2026-09-09.md)
    e [registro do piloto](FISCAL_INTNFE_PILOTO_HOMOLOGACAO.md).
 
-Emissão pelo PDV, cadastro/sincronização de destinatários, eventos, webhooks,
-XML/DANFE e passagem para produção são etapas posteriores. O cadastro fiscal e o
-upload de A1 dentro do CorePet já fazem parte desta entrega, sem liberar emissão.
+Emissão de vendas do PDV, acompanhamento, XML, DANFE e cancelamento agora passam
+diretamente pela IntNFe quando a empresa ativa essa opção. O envio usa chave de
+idempotência persistida antes da chamada externa; uma resposta inconclusiva não
+autoriza criar outra nota. Pedidos de marketplace permanecem bloqueados até que
+o snapshot importado traga referência externa e dados do intermediador, evitando
+uma emissão incompleta.
 
 O cadastro de origem do CorePet ainda trabalha com CNPJ numérico. A documentação
 atual da IntNFe também aceita CNPJ alfanumérico; ampliar o cadastro e a validação

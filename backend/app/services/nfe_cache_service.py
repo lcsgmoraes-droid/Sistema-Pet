@@ -148,7 +148,7 @@ def serializar_nota_cache(registro: BlingNotaFiscalCache) -> dict:
 
     return {
         "id": registro.bling_id or "",
-        "venda_id": None,
+        "venda_id": registro.venda_id,
         "numero": registro.numero,
         "serie": registro.serie,
         "tipo": registro.tipo or ("nfce" if registro.modelo == 65 else "nfe"),
@@ -170,7 +170,10 @@ def serializar_nota_cache(registro: BlingNotaFiscalCache) -> dict:
         "origem_canal_venda": registro.origem_canal_venda,
         "numero_pedido_loja": registro.numero_pedido_loja,
         "pedido_bling_id_ref": registro.pedido_bling_id_ref,
-        "origem": registro.source or "cache_local",
+        "origem": "intnfe"
+        if registro.provider == "intnfe"
+        else registro.source or "cache_local",
+        "provedor": registro.provider or "bling",
     }
 
 
@@ -345,6 +348,8 @@ def upsert_nota_cache(
         # tenant sem Bling proprio, descarte todo o conteudo remoto antes do merge.
         for campo in (
             "numero",
+            "venda_id",
+            "provider",
             "serie",
             "status",
             "chave",
@@ -370,6 +375,10 @@ def upsert_nota_cache(
     registro.tipo = (
         _texto(nota.get("tipo")) or registro.tipo or ("nfce" if modelo == 65 else "nfe")
     )
+    venda_id = nota.get("venda_id")
+    if venda_id is not None:
+        registro.venda_id = _coerce_int(venda_id) or registro.venda_id
+    registro.provider = _texto(nota.get("provedor")) or registro.provider
     registro.numero = _texto(nota.get("numero")) or registro.numero
     registro.serie = _texto(nota.get("serie")) or registro.serie
     registro.status = _mesclar_status(

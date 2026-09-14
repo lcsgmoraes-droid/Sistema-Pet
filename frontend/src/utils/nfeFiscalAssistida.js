@@ -76,6 +76,37 @@ function erroComValidacaoFiscal(validacao) {
   return error;
 }
 
+function resumoIntNFe(resumo) {
+  const linhas = [
+    `${resumo.modelo === 55 ? "NF-e" : "NFC-e"} em ${resumo.ambiente}, série ${resumo.serie}`,
+    `Total: R$ ${Number(resumo.total || 0)
+      .toFixed(2)
+      .replace(".", ",")}`,
+    `Itens: ${resumo.itens?.length || 0}`,
+  ];
+  const destinatario = resumo.destinatario?.razaoSocial;
+  if (destinatario) linhas.push(`Destinatário: ${destinatario}`);
+  if (resumo.ambiente_codigo === 1) {
+    linhas.unshift("ATENÇÃO: esta confirmação transmitirá uma nota fiscal real.", "");
+  }
+  linhas.push("", "Confirmar a transmissão destes dados?");
+  return linhas.join("\n");
+}
+
+function aguardar(ms) {
+  return new Promise((resolve) => globalThis.setTimeout(resolve, ms));
+}
+
+async function acompanharIntNFe(vendaId, initial) {
+  let current = initial;
+  for (let attempt = 0; current?.processando && attempt < 8; attempt += 1) {
+    await aguardar(2500);
+    const response = await api.get(`/nfe/vendas/${vendaId}/status`);
+    current = response.data;
+  }
+  return current;
+}
+
 export async function emitirNotaFiscalAssistida({
   vendaId,
   tipoNota = "nfce",
@@ -107,12 +138,26 @@ export async function emitirNotaFiscalAssistida({
     }
   }
 
-  const { data } = await api.post("/nfe/emitir", {
+  if (validacao?.provedor === "intnfe" && validacao?.resumo_emissao) {
+    const confirmed = await confirmar(resumoIntNFe(validacao.resumo_emissao));
+    if (!confirmed) return { cancelado: true, validacao };
+  }
+
+  const { data: initialData } = await api.post("/nfe/emitir", {
     venda_id: vendaId,
     tipo_nota: tipoNota,
     transmitir: true,
     autorizar_correcoes_fiscais: autorizarCorrecoes,
   });
+  const data =
+    initialData?.provedor === "intnfe" ? await acompanharIntNFe(vendaId, initialData) : initialData;
+  if (data?.provedor === "intnfe" && !data.success && !data.processando) {
+    throw new Error(
+      data.motivo_rejeicao ||
+        data.codigo_erro ||
+        `A nota terminou com a situação: ${data.situacao || "não autorizada"}.`,
+    );
+  }
 
   return { data, validacao, correcoesAutorizadas: autorizarCorrecoes };
 }

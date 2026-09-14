@@ -7,6 +7,7 @@ import IntNFeCsc from "./IntNFeCsc.jsx";
 import IntNFeCadastroFiscal from "./IntNFeCadastroFiscal.jsx";
 import IntNFeCertificado from "./IntNFeCertificado.jsx";
 import IntNFeChecklist from "./IntNFeChecklist.jsx";
+import IntNFeAmbienteEmissao from "./IntNFeAmbienteEmissao.jsx";
 
 function ActivationPanel() {
   const [data, setData] = useState(null);
@@ -16,10 +17,12 @@ function ActivationPanel() {
   const [cscBusy, setCscBusy] = useState(false);
   const [certificateBusy, setCertificateBusy] = useState(false);
   const [fiscalBusy, setFiscalBusy] = useState(false);
+  const [environmentBusy, setEnvironmentBusy] = useState(false);
   const [certificateData, setCertificateData] = useState(null);
   const [fiscalData, setFiscalData] = useState(null);
   const [cscData, setCscData] = useState(null);
   const [numberingData, setNumberingData] = useState(null);
+  const [environmentData, setEnvironmentData] = useState(null);
   const [fiscalRefreshKey, setFiscalRefreshKey] = useState(0);
   const [credentials, setCredentials] = useState({ client_id: "", client_secret: "" });
   const inFlight = useRef(false);
@@ -97,7 +100,7 @@ function ActivationPanel() {
     <div className="space-y-6">
       <IntNFeAtivacaoView
         data={data}
-        busy={busy || numberingBusy || cscBusy || certificateBusy || fiscalBusy}
+        busy={busy || numberingBusy || cscBusy || certificateBusy || fiscalBusy || environmentBusy}
         error={error}
         credentials={credentials}
         onCredentials={(event) =>
@@ -116,32 +119,39 @@ function ActivationPanel() {
             certificate={certificateData}
             csc={cscData}
             numbering={numberingData}
+            environment={environmentData}
           />
           <IntNFeCadastroFiscal
             apiClient={api}
-            disabled={busy || certificateBusy || cscBusy || numberingBusy}
+            disabled={busy || certificateBusy || cscBusy || numberingBusy || environmentBusy}
             onBusy={setFiscalBusy}
             onData={setFiscalData}
             refreshKey={fiscalRefreshKey}
           />
           <IntNFeCertificado
             apiClient={api}
-            disabled={busy || fiscalBusy || cscBusy || numberingBusy}
+            disabled={busy || fiscalBusy || cscBusy || numberingBusy || environmentBusy}
             onBusy={setCertificateBusy}
             onData={setCertificateData}
             onChanged={() => execute()}
           />
           <IntNFeCsc
             apiClient={api}
-            disabled={busy || fiscalBusy || certificateBusy || numberingBusy}
+            disabled={busy || fiscalBusy || certificateBusy || numberingBusy || environmentBusy}
             onBusy={setCscBusy}
             onData={setCscData}
           />
           <IntNFeNumeracao
             apiClient={api}
-            disabled={busy || fiscalBusy || certificateBusy || cscBusy}
+            disabled={busy || fiscalBusy || certificateBusy || cscBusy || environmentBusy}
             onBusy={setNumberingBusy}
             onData={setNumberingData}
+          />
+          <IntNFeAmbienteEmissao
+            apiClient={api}
+            disabled={busy || fiscalBusy || certificateBusy || cscBusy || numberingBusy}
+            onBusy={setEnvironmentBusy}
+            onData={setEnvironmentData}
           />
         </>
       )}

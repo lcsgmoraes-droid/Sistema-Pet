@@ -294,14 +294,16 @@ export function useModalPagamentoActions({
       if (resultado?.cancelado) return;
 
       const transmissao = resultado?.data?.transmissao;
-      if (transmissao?.success === false) {
+      if (resultado?.data?.processando) {
         globalThis.alert(
-          `${tipoNota === "nfe" ? "NF-e" : "NFC-e"} criada no Bling, mas a transmissao nao foi concluida automaticamente.\n\n${transmissao.erro || ""}`.trim(),
+          `${tipoNota === "nfe" ? "NF-e" : "NFC-e"} recebida pelo emissor e ainda em processamento. Consulte novamente em Notas Fiscais.`,
+        );
+      } else if (transmissao?.success === false) {
+        globalThis.alert(
+          `${tipoNota === "nfe" ? "NF-e" : "NFC-e"} criada, mas a transmissão não foi concluída automaticamente.\n\n${transmissao.erro || ""}`.trim(),
         );
       } else {
-        globalThis.alert(
-          `${tipoNota === "nfe" ? "NF-e" : "NFC-e"} enviada para emissao/transmissao com sucesso!`,
-        );
+        globalThis.alert(`${tipoNota === "nfe" ? "NF-e" : "NFC-e"} autorizada com sucesso!`);
       }
       onConfirmar();
     } catch (error) {

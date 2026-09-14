@@ -8,6 +8,7 @@ from typing import Dict, Optional
 from sqlalchemy.orm import Session
 
 from app.kit_config_fiscal_models import KitConfigFiscal
+from app.empresa_config_fiscal_models import EmpresaConfigFiscal
 from app.produto_config_fiscal_models import ProdutoConfigFiscal
 from app.produtos_models import Produto
 
@@ -51,6 +52,7 @@ def _resolver_fiscal_item_nfe(
     tenant_id = getattr(venda, "tenant_id", None) or getattr(produto, "tenant_id", None)
     kit_fiscal = None
     produto_fiscal = None
+    empresa_fiscal = None
 
     if db is not None and tenant_id is not None:
         if getattr(produto, "tipo_produto", None) == "KIT":
@@ -69,6 +71,11 @@ def _resolver_fiscal_item_nfe(
                 ProdutoConfigFiscal.tenant_id == tenant_id,
                 ProdutoConfigFiscal.produto_id == produto.id,
             )
+            .first()
+        )
+        empresa_fiscal = (
+            db.query(EmpresaConfigFiscal)
+            .filter(EmpresaConfigFiscal.tenant_id == tenant_id)
             .first()
         )
 
@@ -92,12 +99,66 @@ def _resolver_fiscal_item_nfe(
             getattr(kit_fiscal, "cfop_venda", None),
             getattr(produto_fiscal, "cfop_venda", None),
             getattr(produto, "cfop", None),
-            "5102",
+            getattr(empresa_fiscal, "cfop_venda_interna", None),
+        ),
+        "cfop_interno": _primeiro_texto_fiscal(
+            getattr(kit_fiscal, "cfop_venda", None),
+            getattr(produto_fiscal, "cfop_venda", None),
+            getattr(produto, "cfop", None),
+            getattr(empresa_fiscal, "cfop_venda_interna", None),
+        ),
+        "cfop_interestadual": _primeiro_texto_fiscal(
+            getattr(empresa_fiscal, "cfop_venda_interestadual", None),
         ),
         "cst_icms": _primeiro_texto_fiscal(
             getattr(kit_fiscal, "cst_icms", None),
             getattr(produto_fiscal, "cst_icms", None),
-            "102",
+        ),
+        "icms_aliquota": next(
+            (
+                value
+                for value in (
+                    getattr(kit_fiscal, "icms_aliquota", None),
+                    getattr(produto_fiscal, "icms_aliquota", None),
+                    getattr(empresa_fiscal, "icms_aliquota_interna", None),
+                )
+                if value is not None
+            ),
+            None,
+        ),
+        "pis_cst": _primeiro_texto_fiscal(
+            getattr(kit_fiscal, "pis_cst", None),
+            getattr(produto_fiscal, "pis_cst", None),
+            getattr(empresa_fiscal, "pis_cst_padrao", None),
+        ),
+        "pis_aliquota": next(
+            (
+                value
+                for value in (
+                    getattr(kit_fiscal, "pis_aliquota", None),
+                    getattr(produto_fiscal, "pis_aliquota", None),
+                    getattr(empresa_fiscal, "pis_aliquota", None),
+                )
+                if value is not None
+            ),
+            None,
+        ),
+        "cofins_cst": _primeiro_texto_fiscal(
+            getattr(kit_fiscal, "cofins_cst", None),
+            getattr(produto_fiscal, "cofins_cst", None),
+            getattr(empresa_fiscal, "cofins_cst_padrao", None),
+        ),
+        "cofins_aliquota": next(
+            (
+                value
+                for value in (
+                    getattr(kit_fiscal, "cofins_aliquota", None),
+                    getattr(produto_fiscal, "cofins_aliquota", None),
+                    getattr(empresa_fiscal, "cofins_aliquota", None),
+                )
+                if value is not None
+            ),
+            None,
         ),
     }
 

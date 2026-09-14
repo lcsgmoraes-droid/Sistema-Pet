@@ -5,13 +5,14 @@ Rotas para gerenciamento de Notas Fiscais Eletrônicas
 from copy import deepcopy
 from time import monotonic
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from sqlalchemy.orm import Session
 from typing import Optional
 from pydantic import BaseModel
 from datetime import datetime
 
 from app.db import get_session
+from app.audit_log import log_action
 from app.auth.dependencies import get_current_user_and_tenant
 from app.services.nfe_cache_service import (
     FONTES_NFE_LOCAIS,
@@ -24,6 +25,17 @@ from app.services.nfe_pending_reconciliation_service import (
     reconciliar_nfes_pendentes_recentes,
 )
 from app.vendas_models import Venda
+from app.intnfe.client import IntNFeClient
+from app.intnfe.emission import (
+    DirectEmissionError,
+    cancel as cancel_intnfe,
+    direct_emission_enabled,
+    download_document as download_intnfe_document,
+    issue as issue_intnfe,
+    preview as preview_intnfe,
+    reconcile as reconcile_intnfe,
+)
+from app.intnfe.repository import get_connection, get_tenant
 from app.bling_integration import (
     BlingAPI,
     aplicar_correcoes_fiscais_venda,
@@ -126,6 +138,10 @@ class PrevalidarNFeRequest(BaseModel):
     tipo_nota: str = "nfce"  # 'nfe' ou 'nfce'
 
 
+class CancelarIntNFeRequest(BaseModel):
+    justificativa: str
+
+
 def _normalizar_tipo_nota(tipo_nota: str | None) -> str:
     tipo = str(tipo_nota or "nfce").strip().lower()
     return "nfe" if tipo == "nfe" else "nfce"
@@ -147,6 +163,24 @@ def _exigir_bling_configurado_para_tenant(tenant_id) -> None:
         )
 
 
+def _direct_failure(exc):
+    return HTTPException(
+        exc.status,
+        {
+            "erro": exc.code or "intnfe_emissao",
+            "mensagem": str(exc),
+            "protocolo_suporte": exc.correlation,
+        },
+    )
+
+
+def _intnfe_client():
+    try:
+        return IntNFeClient()
+    except Exception as exc:
+        raise HTTPException(503, "A integração IntNFe não está disponível.") from exc
+
+
 @router.post("/prevalidar")
 async def prevalidar_nfe(
     request: PrevalidarNFeRequest,
@@ -160,7 +194,35 @@ async def prevalidar_nfe(
     if not venda:
         raise HTTPException(status_code=404, detail="Venda nao encontrada")
 
-    validacao = prevalidar_fiscal_venda(venda, tipo_nota, db)
+    if direct_emission_enabled(db, tenant_id):
+        try:
+            if venda.nfe_bling_id or venda.nfe_correlation_id:
+                raise DirectEmissionError(
+                    "Esta venda já possui uma tentativa de nota fiscal. Consulte a situação existente.",
+                    status=409,
+                )
+            resumo = preview_intnfe(db, get_tenant(db, tenant_id), venda, tipo_nota)
+            validacao = {
+                "success": True,
+                "pode_emitir": True,
+                "requer_autorizacao": False,
+                "correcoes": [],
+                "bloqueios": [],
+                "resumo_emissao": resumo,
+                "provedor": "intnfe",
+            }
+        except DirectEmissionError as exc:
+            validacao = {
+                "success": True,
+                "pode_emitir": False,
+                "requer_autorizacao": False,
+                "correcoes": [],
+                "bloqueios": [{"campo": "intnfe", "mensagem": str(exc)}],
+                "provedor": "intnfe",
+            }
+    else:
+        validacao = prevalidar_fiscal_venda(venda, tipo_nota, db)
+        validacao["provedor"] = "bling"
     validacao["tipo_nota"] = tipo_nota
     validacao["venda_id"] = venda.id
     validacao["tenant_id"] = str(tenant_id)
@@ -179,11 +241,48 @@ async def emitir_nfe(
 
     try:
         current_user, tenant_id = user_and_tenant
-        _exigir_bling_configurado_para_tenant(tenant_id)
         tipo_nota = _normalizar_tipo_nota(request.tipo_nota)
         venda = _buscar_venda_para_nfe(db, request.venda_id, tenant_id)
         if not venda:
             raise HTTPException(status_code=404, detail="Venda não encontrada")
+
+        if direct_emission_enabled(db, tenant_id):
+            if venda.nfe_bling_id and not venda.nfe_correlation_id:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Esta venda já possui nota fiscal no Bling (NF #{venda.nfe_numero}).",
+                )
+            if not request.transmitir:
+                raise HTTPException(
+                    status_code=422,
+                    detail="A emissão direta pela IntNFe sempre transmite para o ambiente escolhido.",
+                )
+            api = _intnfe_client()
+            try:
+                connection = get_connection(db, tenant_id)
+                log_action(
+                    db,
+                    user_id=current_user.id,
+                    tenant_id=tenant_id,
+                    action="intnfe_emitir_documento",
+                    entity_type="venda",
+                    entity_id=venda.id,
+                    new_value={
+                        "tipo": tipo_nota,
+                        "ambiente": "producao"
+                        if connection and connection.emission_environment == 1
+                        else "homologacao",
+                    },
+                )
+                return issue_intnfe(
+                    db, get_tenant(db, tenant_id), venda, tipo_nota, api
+                )
+            except DirectEmissionError as exc:
+                raise _direct_failure(exc) from None
+            finally:
+                api.close()
+
+        _exigir_bling_configurado_para_tenant(tenant_id)
 
         # Verificar se venda já tem NF emitida
         if venda.nfe_bling_id:
@@ -339,6 +438,95 @@ async def emitir_nfe(
         logger.error("emitir_nfe_error", "Traceback completo:")
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Erro ao emitir NF-e: {str(e)}")
+
+
+@router.get("/vendas/{venda_id}/status")
+def status_intnfe_venda(
+    venda_id: int,
+    db: Session = Depends(get_session),
+    user_and_tenant=Depends(get_current_user_and_tenant),
+):
+    _user, tenant_id = user_and_tenant
+    venda = _buscar_venda_para_nfe(db, venda_id, tenant_id)
+    if not venda:
+        raise HTTPException(404, "Venda não encontrada")
+    api = _intnfe_client()
+    try:
+        return reconcile_intnfe(db, venda, api)
+    except DirectEmissionError as exc:
+        raise _direct_failure(exc) from None
+    finally:
+        api.close()
+
+
+@router.get("/vendas/{venda_id}/xml")
+def xml_intnfe_venda(
+    venda_id: int,
+    db: Session = Depends(get_session),
+    user_and_tenant=Depends(get_current_user_and_tenant),
+):
+    _user, tenant_id = user_and_tenant
+    venda = _buscar_venda_para_nfe(db, venda_id, tenant_id)
+    if not venda:
+        raise HTTPException(404, "Venda não encontrada")
+    api = _intnfe_client()
+    try:
+        content = download_intnfe_document(db, venda, api, "xml")
+        return Response(
+            content=content,
+            media_type="application/xml",
+            headers={
+                "Content-Disposition": f'attachment; filename="nota-{venda_id}.xml"'
+            },
+        )
+    except DirectEmissionError as exc:
+        raise _direct_failure(exc) from None
+    finally:
+        api.close()
+
+
+@router.get("/vendas/{venda_id}/danfe")
+def danfe_intnfe_venda(
+    venda_id: int,
+    db: Session = Depends(get_session),
+    user_and_tenant=Depends(get_current_user_and_tenant),
+):
+    _user, tenant_id = user_and_tenant
+    venda = _buscar_venda_para_nfe(db, venda_id, tenant_id)
+    if not venda:
+        raise HTTPException(404, "Venda não encontrada")
+    api = _intnfe_client()
+    try:
+        content = download_intnfe_document(db, venda, api, "danfe")
+        return Response(
+            content=content,
+            media_type="application/pdf",
+            headers={"Content-Disposition": f'inline; filename="danfe-{venda_id}.pdf"'},
+        )
+    except DirectEmissionError as exc:
+        raise _direct_failure(exc) from None
+    finally:
+        api.close()
+
+
+@router.post("/vendas/{venda_id}/cancelar")
+def cancel_intnfe_venda(
+    venda_id: int,
+    body: CancelarIntNFeRequest,
+    db: Session = Depends(get_session),
+    user_and_tenant=Depends(get_current_user_and_tenant),
+):
+    _user, tenant_id = user_and_tenant
+    venda = _buscar_venda_para_nfe(db, venda_id, tenant_id)
+    if not venda:
+        raise HTTPException(404, "Venda não encontrada")
+    api = _intnfe_client()
+    try:
+        return cancel_intnfe(db, venda, api, body.justificativa)
+    except DirectEmissionError as exc:
+        raise _direct_failure(exc) from None
+    finally:
+        api.close()
 
 
 @router.get("/")

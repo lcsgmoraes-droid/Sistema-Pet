@@ -633,8 +633,9 @@ def _normalizar_nota_bling(item: dict, modelo: int) -> dict:
 
 def _normalizar_nota_venda_local(venda: Venda) -> dict:
     canal_slug = _canal_slug(venda.canal)
+    provider = _texto(getattr(venda, "nfe_provider", None)) or "bling"
     return {
-        "id": str(venda.nfe_bling_id),
+        "id": str(venda.nfe_correlation_id or venda.nfe_bling_id),
         "venda_id": venda.id,
         "numero": venda.nfe_numero,
         "serie": venda.nfe_serie,
@@ -668,5 +669,6 @@ def _normalizar_nota_venda_local(venda: Venda) -> dict:
         "origem_loja_virtual": None,
         "origem_canal_venda": _texto(venda.canal),
         "numero_pedido_loja": _texto(venda.numero_venda),
-        "origem": "local",
+        "origem": "intnfe" if provider == "intnfe" else "local",
+        "provedor": provider,
     }
