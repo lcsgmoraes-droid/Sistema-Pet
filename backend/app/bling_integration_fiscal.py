@@ -105,9 +105,7 @@ def _resolver_fiscal_item_nfe(
 
     cfop_especifico = _primeiro_texto_fiscal(
         getattr(kit_fiscal, "cfop_venda", None),
-        _valor_fiscal_produto(
-            produto_fiscal, produto, "cfop_venda", "cfop"
-        ),
+        _valor_fiscal_produto(produto_fiscal, produto, "cfop_venda", "cfop"),
     )
     cfop_interno, cfop_interestadual = _cfops_venda_por_destino(
         cfop_especifico, empresa_fiscal
