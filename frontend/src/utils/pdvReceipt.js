@@ -215,6 +215,46 @@ function pagamentoEhCartao(pagamento = {}) {
   return identificacao.includes("cartao") || ["credito", "debito"].includes(identificacao);
 }
 
+function valorEmCentavos(valor) {
+  const numero = Number(valor);
+  return Number.isFinite(numero) ? Math.round(numero * 100) : 0;
+}
+
+function temValorMonetario(valor) {
+  return valor !== null && valor !== undefined && valor !== "" && Number.isFinite(Number(valor));
+}
+
+function obterValorPagoCentavos(venda = {}, pagamentos = []) {
+  const totalVendaCentavos = Math.max(0, valorEmCentavos(venda.total));
+  const valorPagoInformado = temValorMonetario(venda.valor_pago)
+    ? venda.valor_pago
+    : temValorMonetario(venda.total_pago)
+      ? venda.total_pago
+      : null;
+
+  if (valorPagoInformado !== null) {
+    return Math.min(totalVendaCentavos, Math.max(0, valorEmCentavos(valorPagoInformado)));
+  }
+
+  if (temValorMonetario(venda.valor_restante)) {
+    const valorRestanteCentavos = Math.max(0, valorEmCentavos(venda.valor_restante));
+    return Math.max(0, totalVendaCentavos - valorRestanteCentavos);
+  }
+
+  const totalPagamentosCentavos = pagamentos.reduce((total, pagamento) => {
+    if (pagamentoEhCrediario(pagamento)) return total;
+    if (temValorMonetario(pagamento?.valor)) {
+      return total + Math.max(0, valorEmCentavos(pagamento.valor));
+    }
+
+    const recebidoCentavos = Math.max(0, valorEmCentavos(pagamento?.valor_recebido));
+    const trocoCentavos = Math.max(0, valorEmCentavos(pagamento?.troco));
+    return total + Math.max(0, recebidoCentavos - trocoCentavos);
+  }, 0);
+
+  return Math.min(totalVendaCentavos, totalPagamentosCentavos);
+}
+
 export function ehVendaCrediario(venda = {}) {
   return Boolean(venda.eh_crediario) || (venda.pagamentos || []).some(pagamentoEhCrediario);
 }
@@ -337,6 +377,17 @@ export function montarCupomVenda(venda = {}, empresa = {}) {
   linhas.push(...montarResumoVenda(venda));
 
   if (Array.isArray(venda.pagamentos) && venda.pagamentos.length > 0) {
+    const totalVendaCentavos = Math.max(0, valorEmCentavos(venda.total));
+    const valorPagoCentavos = obterValorPagoCentavos(venda, venda.pagamentos);
+    const valorAReceberCentavos = Math.max(0, totalVendaCentavos - valorPagoCentavos);
+    const trocoCentavos = venda.pagamentos.reduce(
+      (total, pagamento) =>
+        pagamentoEhDinheiro(pagamento)
+          ? total + Math.max(0, valorEmCentavos(pagamento?.troco))
+          : total,
+      0,
+    );
+
     linhas.push("PAGAMENTOS");
     for (const pagamento of venda.pagamentos) {
       const valorRecebido = Number(pagamento?.valor_recebido || 0);
@@ -350,10 +401,15 @@ export function montarCupomVenda(venda = {}, empresa = {}) {
           formatMoneyBRL(valorPagamento),
         ),
       );
-      const troco = Number(pagamento?.troco || 0);
-      if (pagamentoEhDinheiro(pagamento) && troco > 0.005) {
-        linhas.push(linePair("TROCO:", formatMoneyBRL(troco)));
-      }
+    }
+    linhas.push("-".repeat(RECEIPT_WIDTH));
+    linhas.push(linePair("VALOR PAGO:", formatMoneyBRL(valorPagoCentavos / 100)));
+    if (valorAReceberCentavos > 0) {
+      linhas.push(linePair("VALOR A RECEBER:", formatMoneyBRL(valorAReceberCentavos / 100)));
+    } else if (trocoCentavos > 0) {
+      linhas.push(linePair("TROCO:", formatMoneyBRL(trocoCentavos / 100)));
+    } else {
+      linhas.push(linePair("SALDO A PAGAR:", formatMoneyBRL(0)));
     }
     if (venda.tem_entrega && venda.pagamentos.some(pagamentoEhCartao)) {
       linhas.push(...wrap("ATENCAO: LEVAR MAQUININHA DE CARTAO"));
