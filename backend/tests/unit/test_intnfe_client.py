@@ -261,6 +261,20 @@ def test_fiscal_profile_uses_integrator_get_and_patch(api):
     assert api.session.request.call_args.kwargs["json"] == remote
 
 
+def test_environment_activation_accepts_documented_empty_response(api):
+    api.session.request.return_value = response(status=204)
+
+    assert api.activate_emitter_environment("token", "emitente-teste", 1) is None
+
+    call = api.session.request.call_args
+    assert call.args == (
+        "POST",
+        BASE_URL + "/integrador/emitentes/emitente-teste/ambiente/ativar",
+    )
+    assert call.kwargs["json"] == {"ambienteCodigo": 1}
+    assert call.kwargs["allow_redirects"] is False
+
+
 def test_direct_issue_uses_emitter_token_and_idempotency_header(api):
     api.session.request.return_value = response(
         status=202, body={"correlationId": "correlacao-teste"}

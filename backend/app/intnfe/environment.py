@@ -178,6 +178,29 @@ def configure_environment(db, tenant_id, api, request, audit):
             correlation=exc.correlation,
         ) from None
 
+    try:
+        api.activate_emitter_environment(
+            integrator_token, connection.emitente_id, environment
+        )
+    except IntNFeError as exc:
+        # A ativação é um POST e pode ter sido aplicada antes de uma resposta se
+        # perder. Consulte o estado remoto antes de declarar falha ou repetir.
+        remote_environment = None
+        if exc.uncertain:
+            try:
+                remote_environment = api.emitter_environment(
+                    integrator_token, connection.emitente_id
+                ).get("ambienteAtivo")
+            except (AttributeError, IntNFeError):
+                remote_environment = None
+        if remote_environment != environment:
+            raise EnvironmentError(
+                "Não foi possível ativar o ambiente escolhido na IntNFe.",
+                status=503 if exc.uncertain else (422 if exc.status == 422 else 503),
+                code=exc.code,
+                correlation=exc.correlation,
+            ) from None
+
     connection.emission_environment = environment
     connection.nfe_series = request.serie_nfe
     connection.nfce_series = request.serie_nfce

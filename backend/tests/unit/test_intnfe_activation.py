@@ -32,6 +32,7 @@ class FakeAPI:
         self.cert_error = None
         self.auth_error = None
         self.sent_companies = []
+        self.environment_activations = []
 
     def record(self, cnpj=CNPJ):
         return {
@@ -67,6 +68,9 @@ class FakeAPI:
         if self.cert_error:
             raise self.cert_error
         return self.certificate_value
+
+    def activate_emitter_environment(self, _token, emitter_id, environment):
+        self.environment_activations.append((emitter_id, environment))
 
 
 @pytest.fixture
