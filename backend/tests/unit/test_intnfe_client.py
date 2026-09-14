@@ -259,3 +259,43 @@ def test_fiscal_profile_uses_integrator_get_and_patch(api):
         BASE_URL + "/integrador/emitentes/emitente-teste/cadastro",
     )
     assert api.session.request.call_args.kwargs["json"] == remote
+
+
+def test_direct_issue_uses_emitter_token_and_idempotency_header(api):
+    api.session.request.return_value = response(
+        status=202, body={"correlationId": "correlacao-teste"}
+    )
+    payload = {"serie": "3", "ambienteCodigo": 2}
+    result = api.issue_document("token-emitente", "nfe", payload, "chave-teste-123")
+    assert result["correlationId"] == "correlacao-teste"
+    call = api.session.request.call_args
+    assert call.args == ("POST", BASE_URL + "/nfe")
+    assert call.kwargs["headers"] == {
+        "Accept": "application/json",
+        "Authorization": "Bearer token-emitente",
+        "Idempotency-Key": "chave-teste-123",
+    }
+    assert call.kwargs["json"] == payload
+
+
+def test_document_path_rejects_untrusted_correlation_before_network(api):
+    with pytest.raises(IntNFeError, match="RespostaInvalida"):
+        api.document_status("token", "nfe", "../outro-tenant")
+    assert api.session.request.call_count == 0
+
+
+def test_production_credentials_are_created_once_without_exposing_response(api):
+    api.session.request.return_value = response(
+        body={"clientId": "cliente-producao", "clientSecret": "segredo-producao"}
+    )
+    result = api.create_production_credentials("token", "emitente-teste")
+    assert result == {
+        "clientId": "cliente-producao",
+        "clientSecret": "segredo-producao",
+    }
+    call = api.session.request.call_args
+    assert call.args == (
+        "POST",
+        BASE_URL + "/integrador/emitentes/emitente-teste/credencial-producao",
+    )
+    assert call.kwargs["json"] == {}

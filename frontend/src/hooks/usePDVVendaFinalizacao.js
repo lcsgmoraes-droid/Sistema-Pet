@@ -246,12 +246,16 @@ export function usePDVVendaFinalizacao({
       if (resultado?.cancelado) return;
 
       await carregarVendaEspecifica(vendaAtual.id);
-      if (resultado?.data?.transmissao?.success === false) {
+      if (resultado?.data?.processando) {
+        toast.info(
+          `${tipoNota === "nfe" ? "NF-e" : "NFC-e"} recebida pelo emissor e ainda em processamento.`,
+        );
+      } else if (resultado?.data?.transmissao?.success === false) {
         toast.error(
           `${tipoNota === "nfe" ? "NF-e" : "NFC-e"} criada, mas a transmissao ficou pendente.`,
         );
       } else {
-        toast.success(`${tipoNota === "nfe" ? "NF-e" : "NFC-e"} enviada para emissao/transmissao!`);
+        toast.success(`${tipoNota === "nfe" ? "NF-e" : "NFC-e"} autorizada com sucesso!`);
       }
     } catch (error) {
       console.error("Erro ao emitir nota da venda finalizada:", error);

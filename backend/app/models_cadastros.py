@@ -188,6 +188,7 @@ class Cliente(BaseTenantModel):
     bairro = Column(String(100), nullable=True)
     cidade = Column(String(100), nullable=True)
     estado = Column(String(2), nullable=True)
+    codigo_municipio = Column(String(7), nullable=True)
 
     # Endereços de entrega (alternativos ao endereço principal)
     endereco_entrega = Column(Text, nullable=True)  # Endereço de entrega principal

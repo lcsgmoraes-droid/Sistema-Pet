@@ -1,4 +1,4 @@
-"""Cliente de provisionamento. Nao possui rotas de emissao ou rotacao de segredo."""
+"""Cliente HTTP da IntNFe para provisionamento e emissão fiscal."""
 
 from __future__ import annotations
 
@@ -54,10 +54,12 @@ class IntNFeClient:
         files=None,
         creating=False,
         expect_empty=False,
+        extra_headers=None,
     ):
         headers = {"Accept": "application/json"}
         if token:
             headers["Authorization"] = f"Bearer {token}"
+        headers.update(extra_headers or {})
         request_args = {
             "headers": headers,
             "timeout": (3, 30) if files else (3, 15),
@@ -110,6 +112,16 @@ class IntNFeClient:
                     "CnpjDivergente",
                 }:
                     code = remote_code
+            if path.startswith(("/nfe", "/nfce")):
+                try:
+                    error = response.json()
+                except ValueError:
+                    error = None
+                remote_code = error.get("erro") if isinstance(error, dict) else None
+                if isinstance(remote_code, str) and re.fullmatch(
+                    r"[A-Za-z][A-Za-z0-9_-]{1,79}", remote_code
+                ):
+                    code = remote_code
             raise IntNFeError(
                 code,
                 status=response.status_code,
@@ -138,6 +150,35 @@ class IntNFeClient:
                 "RespostaInvalida", correlation=correlation, uncertain=creating
             )
         return data
+
+    def _binary_request(self, method, path, *, token, accept):
+        headers = {"Accept": accept, "Authorization": f"Bearer {token}"}
+        try:
+            response = self.session.request(
+                method,
+                BASE_URL + path,
+                headers=headers,
+                timeout=(3, 30),
+                allow_redirects=False,
+            )
+        except requests.RequestException:
+            raise IntNFeError("EmissorIndisponivel") from None
+        correlation = response.headers.get("X-Correlation-Id")
+        if not 200 <= response.status_code < 300:
+            code = {
+                401: "CredenciaisInvalidas",
+                403: "AcessoNegado",
+                404: "NaoEncontrado",
+                409: "DocumentoAindaNaoDisponivel",
+                422: "DadosRecusados",
+                429: "LimiteDeRequisicoes",
+            }.get(response.status_code, "EmissorIndisponivel")
+            raise IntNFeError(
+                code, status=response.status_code, correlation=correlation
+            )
+        if not response.content:
+            raise IntNFeError("RespostaInvalida", correlation=correlation)
+        return response.content
 
     def integrator_token(self):
         try:
@@ -309,6 +350,110 @@ class IntNFeClient:
             self._emitter_path(emitter_id, "cadastro"),
             token=token,
             body=body,
+            creating=True,
+        )
+        if not isinstance(result, dict):
+            raise IntNFeError("RespostaInvalida", uncertain=True)
+        return result
+
+    def emitter_environment(self, token, emitter_id):
+        result = self._request(
+            "GET", self._emitter_path(emitter_id, "ambiente"), token=token
+        )
+        if not isinstance(result, dict):
+            raise IntNFeError("RespostaInvalida")
+        return result
+
+    def create_production_credentials(self, token, emitter_id):
+        result = self._request(
+            "POST",
+            self._emitter_path(emitter_id, "credencial-producao"),
+            token=token,
+            body={},
+            creating=True,
+        )
+        if not isinstance(result, dict) or not all(
+            isinstance(result.get(field), str) and result[field].strip()
+            for field in ("clientId", "clientSecret")
+        ):
+            raise IntNFeError("RespostaInvalida", uncertain=True)
+        return result
+
+    def activate_emitter_environment(self, token, emitter_id, environment):
+        return self._request(
+            "POST",
+            self._emitter_path(emitter_id, "ambiente/ativar"),
+            token=token,
+            body={"ambienteCodigo": environment},
+            creating=True,
+        )
+
+    @staticmethod
+    def _document_path(document_type, correlation_id=None, resource=None):
+        if document_type not in {"nfe", "nfce"}:
+            raise IntNFeError("RespostaInvalida")
+        path = f"/{document_type}"
+        if correlation_id is not None:
+            if not isinstance(correlation_id, str) or not re.fullmatch(
+                r"[A-Za-z0-9_-]{1,128}", correlation_id
+            ):
+                raise IntNFeError("RespostaInvalida")
+            path += f"/{correlation_id}"
+        if resource:
+            path += f"/{resource}"
+        return path
+
+    def issue_document(self, token, document_type, body, idempotency_key):
+        try:
+            result = self._request(
+                "POST",
+                self._document_path(document_type),
+                token=token,
+                body=body,
+                creating=True,
+                extra_headers={"Idempotency-Key": idempotency_key},
+            )
+        except IntNFeError as exc:
+            if exc.status == 409:
+                exc.uncertain = True
+            raise
+        if not isinstance(result, dict) or not isinstance(
+            result.get("correlationId"), str
+        ):
+            raise IntNFeError("RespostaInvalida", uncertain=True)
+        return result
+
+    def document_status(self, token, document_type, correlation_id):
+        result = self._request(
+            "GET", self._document_path(document_type, correlation_id), token=token
+        )
+        if not isinstance(result, dict):
+            raise IntNFeError("RespostaInvalida")
+        return result
+
+    def document_xml(self, token, document_type, correlation_id):
+        return self._binary_request(
+            "GET",
+            self._document_path(document_type, correlation_id, "xml"),
+            token=token,
+            accept="application/xml, text/xml",
+        )
+
+    def document_danfe(self, token, document_type, correlation_id):
+        return self._binary_request(
+            "GET",
+            self._document_path(document_type, correlation_id, "danfe")
+            + "?formato=pdf",
+            token=token,
+            accept="application/pdf",
+        )
+
+    def cancel_document(self, token, document_type, correlation_id, justification):
+        result = self._request(
+            "POST",
+            self._document_path(document_type, correlation_id, "cancelar"),
+            token=token,
+            body={"justificativa": justification},
             creating=True,
         )
         if not isinstance(result, dict):

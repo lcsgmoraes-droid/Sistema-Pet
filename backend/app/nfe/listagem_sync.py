@@ -53,7 +53,7 @@ def _sincronizar_vendas_em_cache(
 ) -> None:
     query = db.query(Venda).filter(
         Venda.tenant_id == tenant_id,
-        Venda.nfe_bling_id.isnot(None),
+        or_(Venda.nfe_bling_id.isnot(None), Venda.nfe_correlation_id.isnot(None)),
     )
     if desde:
         query = query.filter(
@@ -66,11 +66,13 @@ def _sincronizar_vendas_em_cache(
     for venda in query.order_by(
         Venda.updated_at.desc(), Venda.nfe_data_emissao.desc()
     ).all():
+        resumo = _normalizar_nota_venda_local(venda)
         upsert_nota_cache(
             db,
             tenant_id,
-            _normalizar_nota_venda_local(venda),
+            resumo,
             source="local_venda",
+            resumo_payload=resumo,
             substituir_origem_remota=not tenant_pode_usar_bling_global(tenant_id),
         )
 

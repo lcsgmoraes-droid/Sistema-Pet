@@ -129,6 +129,9 @@ CorePet mostra somente se existe um CSC e qual é o seu ID.
 6. Envie o certificado A1 na própria tela do CorePet.
 7. Acompanhe o **Checklist de preparação fiscal** até a base da NF-e aparecer
    como pronta. Para NFC-e, cadastre também o CSC do ambiente escolhido.
+8. Em **Ambiente de emissão**, escolha homologação ou produção e informe as
+   séries que serão usadas. O CorePet prepara os códigos técnicos de produção
+   automaticamente; o usuário não copia credenciais.
 
 O fluxo pode ser usado por qualquer empresa do CorePet quando a integração
 IntNFe estiver habilitada no ambiente e o usuário tiver permissão para editar
@@ -168,6 +171,9 @@ No CorePet:
 3. informe a série usada no sistema anterior;
 4. informe o próximo número;
 5. revise o resumo e confirme.
+
+Depois de conferir a sequência, repita a série no cartão **Ambiente de emissão**.
+Essa é a série usada nas próximas notas; o número é atribuído pelo emissor.
 
 O ajuste só avança. Não escolha uma série aleatória para produção e não tente
 voltar a sequência. Notas rejeitadas, denegadas, canceladas ou faixas
@@ -227,6 +233,11 @@ Antes da primeira nota real:
 
 Comece por uma única venda real, de baixo risco e com dados conferidos. Aguarde a
 autorização, valide XML e DANFE e só então amplie o volume.
+
+Na venda, o CorePet exibe uma última revisão com ambiente, série, destinatário,
+quantidade de itens e total. Em produção, a tela destaca que a confirmação gera
+documento fiscal real. Depois do aceite, o CorePet acompanha o processamento e
+permite baixar XML e DANFE na tela **NF de Vendas**.
 
 ## Problemas mais comuns
 

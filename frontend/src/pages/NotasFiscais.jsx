@@ -61,16 +61,18 @@ export default function NotasFiscais() {
     }
   };
 
-  const baixarDanfe = async (nfeId, numero) => {
+  const baixarDanfe = async (nota) => {
     try {
-      const response = await api.get(`/nfe/${nfeId}/danfe`, {
+      const endpoint =
+        nota.provedor === "intnfe" ? `/nfe/vendas/${nota.venda_id}/danfe` : `/nfe/${nota.id}/danfe`;
+      const response = await api.get(endpoint, {
         responseType: "blob",
       });
 
       const url = window.URL.createObjectURL(new Blob([response.data]));
       const link = document.createElement("a");
       link.href = url;
-      link.setAttribute("download", `danfe_${numero}.pdf`);
+      link.setAttribute("download", `danfe_${nota.numero}.pdf`);
       document.body.appendChild(link);
       link.click();
       link.remove();
@@ -80,15 +82,18 @@ export default function NotasFiscais() {
     }
   };
 
-  const baixarXml = async (nfeId, numero) => {
+  const baixarXml = async (nota) => {
     try {
-      const response = await api.get(`/nfe/${nfeId}/xml`);
-
-      const blob = new Blob([response.data.xml], { type: "application/xml" });
+      const direct = nota.provedor === "intnfe";
+      const endpoint = direct ? `/nfe/vendas/${nota.venda_id}/xml` : `/nfe/${nota.id}/xml`;
+      const response = await api.get(endpoint, direct ? { responseType: "blob" } : undefined);
+      const blob = new Blob([direct ? response.data : response.data.xml], {
+        type: "application/xml",
+      });
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
-      link.setAttribute("download", `nfe_${numero}.xml`);
+      link.setAttribute("download", `nfe_${nota.numero}.xml`);
       document.body.appendChild(link);
       link.click();
       link.remove();
@@ -106,11 +111,19 @@ export default function NotasFiscais() {
 
     try {
       setCancelando(true);
-      await api.post(`/nfe/${modalCancelar.id}/cancelar`, {
+      const endpoint =
+        modalCancelar.provedor === "intnfe"
+          ? `/nfe/vendas/${modalCancelar.venda_id}/cancelar`
+          : `/nfe/${modalCancelar.id}/cancelar`;
+      const response = await api.post(endpoint, {
         justificativa,
       });
 
-      alert("Nota fiscal cancelada com sucesso!");
+      alert(
+        response.data?.cancelamento_solicitado
+          ? "Cancelamento enviado. Atualize a lista para acompanhar a confirmação."
+          : "Nota fiscal cancelada com sucesso!",
+      );
       setModalCancelar(null);
       setJustificativa("");
       carregarNotas();
@@ -125,7 +138,7 @@ export default function NotasFiscais() {
   const excluirNota = async (venda_id, numero) => {
     if (
       !(await confirmarCorePet(
-        `Deseja realmente excluir a nota ${numero}?\n\nIsso apenas remove os dados da nota do sistema, não cancela no Bling/SEFAZ.`,
+        `Deseja realmente excluir a nota ${numero}?\n\nIsso apenas remove os dados da nota do sistema e não cancela no emissor ou na SEFAZ.`,
       ))
     ) {
       return;
@@ -343,23 +356,25 @@ export default function NotasFiscais() {
                       )}
 
                       {/* Botão Excluir */}
-                      <button
-                        onClick={() => excluirNota(nota.venda_id, nota.numero)}
-                        className="text-gray-600 hover:text-gray-900 p-1 hover:bg-gray-50 rounded"
-                        title="Excluir nota do sistema"
-                      >
-                        <Trash2 className="w-5 h-5" />
-                      </button>
+                      {nota.provedor !== "intnfe" && (
+                        <button
+                          onClick={() => excluirNota(nota.venda_id, nota.numero)}
+                          className="text-gray-600 hover:text-gray-900 p-1 hover:bg-gray-50 rounded"
+                          title="Excluir nota do sistema"
+                        >
+                          <Trash2 className="w-5 h-5" />
+                        </button>
+                      )}
 
                       <button
-                        onClick={() => baixarDanfe(nota.id, nota.numero)}
+                        onClick={() => baixarDanfe(nota)}
                         className="text-blue-600 hover:text-blue-900 p-1 hover:bg-blue-50 rounded"
                         title="Baixar DANFE"
                       >
                         <Printer className="w-5 h-5" />
                       </button>
                       <button
-                        onClick={() => baixarXml(nota.id, nota.numero)}
+                        onClick={() => baixarXml(nota)}
                         className="text-green-600 hover:text-green-900 p-1 hover:bg-green-50 rounded"
                         title="Baixar XML"
                       >
@@ -466,14 +481,14 @@ export default function NotasFiscais() {
 
               <div className="flex gap-2 pt-4">
                 <button
-                  onClick={() => baixarDanfe(notaSelecionada.id, notaSelecionada.numero)}
+                  onClick={() => baixarDanfe(notaSelecionada)}
                   className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
                 >
                   <Printer className="w-5 h-5" />
                   Baixar DANFE
                 </button>
                 <button
-                  onClick={() => baixarXml(notaSelecionada.id, notaSelecionada.numero)}
+                  onClick={() => baixarXml(notaSelecionada)}
                   className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors"
                 >
                   <Download className="w-5 h-5" />

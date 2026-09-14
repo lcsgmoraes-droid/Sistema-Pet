@@ -63,6 +63,7 @@ function buildNovoClienteFormData(tipoCadastro, tipoPessoa) {
     bairro: "",
     cidade: "",
     estado: "",
+    codigo_municipio: "",
     endereco_entrega: "",
     endereco_entrega_2: "",
     is_entregador: false,
@@ -120,6 +121,7 @@ function buildClienteFormData(cliente) {
     bairro: cliente.bairro || "",
     cidade: cliente.cidade || "",
     estado: cliente.estado || "",
+    codigo_municipio: cliente.codigo_municipio || "",
     endereco_entrega: cliente.endereco_entrega || "",
     endereco_entrega_2: cliente.endereco_entrega_2 || "",
     is_entregador: cliente.is_entregador || false,
@@ -227,6 +229,7 @@ export function useClientesNovoCadastro({
         bairro: data.bairro || "",
         cidade: data.localidade || "",
         estado: data.uf || "",
+        codigo_municipio: data.ibge || "",
         cep,
       }));
     } catch (err) {

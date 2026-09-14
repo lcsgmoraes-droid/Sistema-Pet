@@ -20,7 +20,14 @@ function Step({ label, description, done, action = false }) {
   );
 }
 
-export default function IntNFeChecklist({ activation, fiscal, certificate, csc, numbering }) {
+export default function IntNFeChecklist({
+  activation,
+  fiscal,
+  certificate,
+  csc,
+  numbering,
+  environment,
+}) {
   const linked = Boolean(activation?.vinculado);
   const companyReady = Boolean(activation && activation.pendencias?.length === 0);
   const fiscalReady = Boolean(fiscal?.sincronizado);
@@ -31,6 +38,7 @@ export default function IntNFeChecklist({ activation, fiscal, certificate, csc, 
   const nfeReady = linked && fiscalReady && certificateReady;
   const nfceReady = nfeReady && cscHomologation;
   const knownSequences = numbering?.series?.length || 0;
+  const emissionReady = Boolean(environment?.habilitada);
 
   return (
     <section className="space-y-4 rounded-2xl border border-slate-200 bg-slate-50 p-5 sm:p-7 dark:border-slate-700 dark:bg-slate-950/40">
@@ -104,6 +112,15 @@ export default function IntNFeChecklist({ activation, fiscal, certificate, csc, 
           description={`Confira manualmente no sistema anterior. ${knownSequences ? `${knownSequences} sequência(s) registrada(s).` : "Se a série for nova, ela começa no número 1."}`}
           done={false}
           action
+        />
+        <Step
+          label="Ambiente de emissão"
+          description={
+            emissionReady
+              ? `Emissão direta ativa em ${environment.ambiente}.`
+              : "Escolha homologação ou produção para liberar a transmissão pelo CorePet."
+          }
+          done={emissionReady}
         />
       </ol>
     </section>

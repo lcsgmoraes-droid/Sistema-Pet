@@ -168,6 +168,13 @@ class Venda(BaseTenantModel):
     nfe_bling_id = Column(
         BigInteger, nullable=True
     )  # ID no Bling (pode exceder INTEGER)
+    nfe_provider = Column(String(20), nullable=True)
+    nfe_correlation_id = Column(String(128), nullable=True, index=True)
+    nfe_protocolo = Column(String(64), nullable=True)
+    nfe_ambiente = Column(Integer, nullable=True)
+    nfe_codigo_erro = Column(String(20), nullable=True)
+    nfe_idempotency_key = Column(String(128), nullable=True)
+    nfe_payload_hash = Column(String(64), nullable=True)
 
     # Multi-tenant
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
@@ -330,6 +337,21 @@ class Venda(BaseTenantModel):
             "observacoes": self.observacoes,
             "observacoes_entrega": self.observacoes_entrega,
             "endereco_entrega": self.endereco_entrega,
+            "nfe_tipo": self.nfe_tipo,
+            "nfe_modelo": self.nfe_modelo,
+            "nfe_numero": self.nfe_numero,
+            "nfe_serie": self.nfe_serie,
+            "nfe_chave": self.nfe_chave,
+            "nfe_status": self.nfe_status,
+            "nfe_provider": self.nfe_provider,
+            "nfe_correlation_id": self.nfe_correlation_id,
+            "nfe_protocolo": self.nfe_protocolo,
+            "nfe_ambiente": self.nfe_ambiente,
+            "nfe_codigo_erro": self.nfe_codigo_erro,
+            "nfe_data_emissao": safe_datetime_to_iso(self.nfe_data_emissao),
+            "nfe_data_autorizacao": safe_datetime_to_iso(self.nfe_data_autorizacao),
+            "nfe_motivo_rejeicao": self.nfe_motivo_rejeicao,
+            "nfe_bling_id": str(self.nfe_bling_id) if self.nfe_bling_id else None,
             "itens": [item.to_dict() for item in self.itens]
             if hasattr(self, "itens")
             else [],

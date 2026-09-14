@@ -148,8 +148,14 @@ def public_status(tenant, connection, integrador_id):
         },
         "pendencias": pending,
         "vinculado": linked,
-        "ambiente": "homologacao",
-        "emissao_disponivel": False,
+        "ambiente": (
+            "producao"
+            if connection
+            and connection.emission_enabled
+            and connection.emission_environment == 1
+            else "homologacao"
+        ),
+        "emissao_disponivel": bool(connection and connection.emission_enabled),
         "pode_ativar": not blocked
         and not busy
         and not linked
