@@ -97,7 +97,48 @@ test("recibo em dinheiro imprime valor recebido e troco com clareza", () => {
   );
 
   assert.match(recibo, /Dinheiro\s+R\$ 400,00/);
+  assert.match(recibo, /VALOR PAGO:\s+R\$ 390,00/);
   assert.match(recibo, /TROCO:\s+R\$ 10,00/);
+});
+
+test("recibo de venda parcial mostra o cashback e o valor que falta receber", () => {
+  const recibo = montarCupomVenda(
+    {
+      ...vendaBase,
+      subtotal: 140,
+      total: 140,
+      valor_pago: 2.8,
+      valor_restante: 137.2,
+      pagamentos: [{ forma_pagamento: "Cashback", valor: 2.8 }],
+    },
+    empresa,
+  );
+
+  assert.match(recibo, /Cashback\s+R\$ 2,80/);
+  assert.match(recibo, /VALOR PAGO:\s+R\$ 2,80/);
+  assert.match(recibo, /VALOR A RECEBER:\s+R\$ 137,20/);
+  assert.doesNotMatch(recibo, /SALDO A PAGAR:\s+R\$ 0,00/);
+});
+
+test("recibo quitado com mais de uma forma de pagamento mostra saldo zero", () => {
+  const recibo = montarCupomVenda(
+    {
+      ...vendaBase,
+      subtotal: 140,
+      total: 140,
+      pagamentos: [
+        { forma_pagamento: "Cashback", valor: 2.8 },
+        { forma_pagamento: "Pix", valor: 137.2 },
+      ],
+    },
+    empresa,
+  );
+
+  assert.match(recibo, /Cashback\s+R\$ 2,80/);
+  assert.match(recibo, /Pix\s+R\$ 137,20/);
+  assert.match(recibo, /VALOR PAGO:\s+R\$ 140,00/);
+  assert.match(recibo, /SALDO A PAGAR:\s+R\$ 0,00/);
+  assert.doesNotMatch(recibo, /VALOR A RECEBER:/);
 });
 
 test("recibo de entrega paga no cartao avisa para levar maquininha", () => {
