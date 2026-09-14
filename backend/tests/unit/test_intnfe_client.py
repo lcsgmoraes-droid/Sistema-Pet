@@ -65,6 +65,17 @@ def test_creation_failure_classification_is_safe(api, status, uncertain):
     assert api.session.request.call_count == 1
 
 
+def test_bad_request_is_reported_as_invalid_data(api):
+    api.session.request.return_value = response(400, {"mensagem": "nao-expor"})
+
+    with pytest.raises(IntNFeError) as error:
+        api.issue_document("token", "nfe", {}, "chave-teste")
+
+    assert error.value.code == "DadosInvalidos"
+    assert error.value.status == 400
+    assert not error.value.uncertain
+
+
 def test_timeout_or_invalid_success_response_is_uncertain_for_creation(api):
     api.session.request.side_effect = requests.Timeout("mensagem-privada")
     with pytest.raises(IntNFeError) as error:

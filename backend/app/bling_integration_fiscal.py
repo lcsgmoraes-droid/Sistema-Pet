@@ -36,6 +36,30 @@ def _sku_produto(produto) -> str:
     )
 
 
+def _cfops_venda_por_destino(cfop_especifico, empresa_fiscal):
+    """Separa o CFOP especifico por destino sem reaproveitar 6xxx em venda interna."""
+
+    specific = _limpar_texto_fiscal(cfop_especifico)
+    internal = specific if specific and specific.startswith("5") else None
+    interstate = specific if specific and specific.startswith("6") else None
+    return (
+        _primeiro_texto_fiscal(
+            internal, getattr(empresa_fiscal, "cfop_venda_interna", None)
+        ),
+        _primeiro_texto_fiscal(
+            interstate, getattr(empresa_fiscal, "cfop_venda_interestadual", None)
+        ),
+    )
+
+
+def _valor_fiscal_produto(produto_fiscal, produto, campo_v2, campo_legado):
+    """Usa o cadastro fiscal atual como fonte autoritativa, inclusive se vazio."""
+
+    if produto_fiscal is not None:
+        return getattr(produto_fiscal, campo_v2, None)
+    return getattr(produto, campo_legado, None)
+
+
 def _resolver_fiscal_item_nfe(
     db: Session, venda, item_venda
 ) -> Dict[str, Optional[str]]:
@@ -79,37 +103,38 @@ def _resolver_fiscal_item_nfe(
             .first()
         )
 
+    cfop_especifico = _primeiro_texto_fiscal(
+        getattr(kit_fiscal, "cfop_venda", None),
+        _valor_fiscal_produto(
+            produto_fiscal, produto, "cfop_venda", "cfop"
+        ),
+    )
+    cfop_interno, cfop_interestadual = _cfops_venda_por_destino(
+        cfop_especifico, empresa_fiscal
+    )
+
     return {
         "ncm": _primeiro_texto_fiscal(
             getattr(kit_fiscal, "ncm", None),
-            getattr(produto_fiscal, "ncm", None),
-            getattr(produto, "ncm", None),
+            _valor_fiscal_produto(produto_fiscal, produto, "ncm", "ncm"),
         ),
         "cest": _primeiro_texto_fiscal(
             getattr(kit_fiscal, "cest", None),
-            getattr(produto_fiscal, "cest", None),
-            getattr(produto, "cest", None),
+            _valor_fiscal_produto(produto_fiscal, produto, "cest", "cest"),
         ),
         "origem_mercadoria": _primeiro_texto_fiscal(
             getattr(kit_fiscal, "origem_mercadoria", None),
-            getattr(produto_fiscal, "origem_mercadoria", None),
-            getattr(produto, "origem", None),
+            _valor_fiscal_produto(
+                produto_fiscal, produto, "origem_mercadoria", "origem"
+            ),
         ),
         "cfop": _primeiro_texto_fiscal(
-            getattr(kit_fiscal, "cfop_venda", None),
-            getattr(produto_fiscal, "cfop_venda", None),
-            getattr(produto, "cfop", None),
-            getattr(empresa_fiscal, "cfop_venda_interna", None),
+            cfop_especifico,
+            cfop_interno,
+            cfop_interestadual,
         ),
-        "cfop_interno": _primeiro_texto_fiscal(
-            getattr(kit_fiscal, "cfop_venda", None),
-            getattr(produto_fiscal, "cfop_venda", None),
-            getattr(produto, "cfop", None),
-            getattr(empresa_fiscal, "cfop_venda_interna", None),
-        ),
-        "cfop_interestadual": _primeiro_texto_fiscal(
-            getattr(empresa_fiscal, "cfop_venda_interestadual", None),
-        ),
+        "cfop_interno": cfop_interno,
+        "cfop_interestadual": cfop_interestadual,
         "cst_icms": _primeiro_texto_fiscal(
             getattr(kit_fiscal, "cst_icms", None),
             getattr(produto_fiscal, "cst_icms", None),
