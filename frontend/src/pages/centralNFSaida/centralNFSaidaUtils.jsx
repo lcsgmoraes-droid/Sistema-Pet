@@ -99,6 +99,30 @@ export function valorBooleanoLabel(valor) {
   return "-";
 }
 
+export function identificadorDocumentoFiscal(nota) {
+  return nota.provedor === "intnfe" ? nota.venda_id : nota.id;
+}
+
+export function rotaDocumentoFiscal(nota, tipo) {
+  return nota.provedor === "intnfe"
+    ? `/nfe/vendas/${nota.venda_id}/${tipo}`
+    : `/nfe/${nota.id}/${tipo}`;
+}
+
+export function mesclarStatusIntNFe(nota, status) {
+  return {
+    ...nota,
+    status: status.situacao || nota.status,
+    numero: status.numero || nota.numero,
+    serie: status.serie ?? nota.serie,
+    chave: status.chave_acesso || nota.chave,
+    protocolo: status.protocolo || nota.protocolo,
+    codigo_erro: status.codigo_erro || nota.codigo_erro,
+    motivo_rejeicao: status.motivo_rejeicao || nota.motivo_rejeicao,
+    ambiente_codigo: status.ambiente_codigo ?? nota.ambiente_codigo,
+  };
+}
+
 export function montarDetalheFallback(nota) {
   return {
     id: nota.id,
@@ -109,6 +133,12 @@ export function montarDetalheFallback(nota) {
     tipo_label: nota.tipo === "nfce" ? "NFC-e" : "NF-e",
     chave: nota.chave,
     status: nota.status,
+    provedor: nota.provedor,
+    correlation_id: nota.correlation_id,
+    codigo_erro: nota.codigo_erro,
+    motivo_rejeicao: nota.motivo_rejeicao,
+    protocolo: nota.protocolo,
+    ambiente_codigo: nota.ambiente_codigo,
     data_emissao: nota.data_emissao,
     cliente: {
       nome: nota.cliente?.nome,

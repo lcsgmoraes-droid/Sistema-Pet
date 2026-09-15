@@ -644,6 +644,11 @@ def _normalizar_nota_venda_local(venda: Venda) -> dict:
         "modelo": _coerce_int(venda.nfe_modelo, 65 if _venda_usa_nfce(venda) else 55),
         "chave": venda.nfe_chave,
         "status": venda.nfe_status or "Pendente",
+        "correlation_id": venda.nfe_correlation_id,
+        "codigo_erro": venda.nfe_codigo_erro,
+        "motivo_rejeicao": venda.nfe_motivo_rejeicao,
+        "protocolo": venda.nfe_protocolo,
+        "ambiente_codigo": venda.nfe_ambiente,
         "data_emissao": (
             venda.nfe_data_emissao.isoformat() if venda.nfe_data_emissao else None
         ),

@@ -1,8 +1,13 @@
 import { useEffect, useRef, useState } from "react";
-
 import api from "../api";
 import CentralNFSaidaView from "./centralNFSaida/CentralNFSaidaView";
-import { montarDetalheFallback, soDigitos } from "./centralNFSaida/centralNFSaidaUtils";
+import {
+  identificadorDocumentoFiscal,
+  mesclarStatusIntNFe,
+  montarDetalheFallback,
+  rotaDocumentoFiscal,
+  soDigitos,
+} from "./centralNFSaida/centralNFSaidaUtils";
 import { confirmarCorePet } from "../services/corepetDialog";
 import NFSaidaCompartilharModal from "./centralNFSaida/NFSaidaCompartilharModal";
 
@@ -157,11 +162,16 @@ export default function CentralNFSaida() {
     }
   }
 
-  async function baixarDanfe(nfeId, numero) {
-    setDocumentoEmCurso(String(nfeId));
+  async function baixarDanfe(nota) {
+    const documentoId = identificadorDocumentoFiscal(nota);
+    const endpoint = rotaDocumentoFiscal(nota, "danfe");
+    setDocumentoEmCurso(String(documentoId));
     try {
-      const response = await api.get(`/nfe/${nfeId}/danfe`, { responseType: "blob" });
-      salvarArquivo(new Blob([response.data], { type: "application/pdf" }), `danfe_${numero}.pdf`);
+      const response = await api.get(endpoint, { responseType: "blob" });
+      salvarArquivo(
+        new Blob([response.data], { type: "application/pdf" }),
+        `danfe_${nota.numero}.pdf`,
+      );
     } catch (error) {
       alert(await mensagemDocumento(error, "Erro ao baixar DANFE"));
     } finally {
@@ -169,12 +179,17 @@ export default function CentralNFSaida() {
     }
   }
 
-  async function baixarXml(nfeId, numero) {
-    setDocumentoEmCurso(String(nfeId));
+  async function baixarXml(nota) {
+    const documentoId = identificadorDocumentoFiscal(nota);
+    const endpoint = rotaDocumentoFiscal(nota, "xml");
+    setDocumentoEmCurso(String(documentoId));
     try {
-      const response = await api.get(`/nfe/${nfeId}/xml`);
-      const blob = new Blob([response.data.xml], { type: "application/xml" });
-      salvarArquivo(blob, `nfe_${numero}.xml`);
+      const response = await api.get(endpoint, {
+        responseType: nota.provedor === "intnfe" ? "blob" : "json",
+      });
+      const conteudo = nota.provedor === "intnfe" ? response.data : response.data.xml;
+      const blob = new Blob([conteudo], { type: "application/xml" });
+      salvarArquivo(blob, `nfe_${nota.numero}.xml`);
     } catch (error) {
       alert(await mensagemDocumento(error, "Erro ao baixar XML"));
     } finally {
@@ -191,9 +206,20 @@ export default function CentralNFSaida() {
 
     try {
       setReconciliandoNotaId(notaId);
-      const response = await api.post(`/nfe/${notaId}/reconciliar-fluxo`);
-      const numero = response.data?.nf_numero || nota.numero || notaId;
-      alert(`Fluxo da NF ${numero} reconciliado com sucesso.`);
+      const response =
+        nota.provedor === "intnfe"
+          ? await api.get(`/nfe/vendas/${nota.venda_id}/status`)
+          : await api.post(`/nfe/${notaId}/reconciliar-fluxo`);
+      const numero = response.data?.numero || response.data?.nf_numero || nota.numero || notaId;
+      const situacao = response.data?.situacao;
+      const rejeicao = [response.data?.codigo_erro, response.data?.motivo_rejeicao]
+        .filter(Boolean)
+        .join(" — ");
+      alert(
+        nota.provedor === "intnfe"
+          ? `Status da NF ${numero}: ${situacao || "atualizado"}${rejeicao ? ` — ${rejeicao}` : ""}.`
+          : `Fluxo da NF ${numero} reconciliado com sucesso.`,
+      );
       await carregarNotas(true);
     } catch (error) {
       const detail =
@@ -210,6 +236,22 @@ export default function CentralNFSaida() {
     setNotaSelecionada(nota);
     setDetalheNota(montarDetalheFallback(nota));
     setErroDetalhe("");
+    if (nota.provedor === "intnfe") {
+      try {
+        setCarregandoDetalhe(true);
+        const { data } = await api.get(`/nfe/vendas/${nota.venda_id}/status`);
+        const notaAtualizada = mesclarStatusIntNFe(nota, data);
+        setNotaSelecionada(notaAtualizada);
+        setDetalheNota(montarDetalheFallback(notaAtualizada));
+      } catch (error) {
+        setErroDetalhe(
+          error.response?.data?.detail || "Não foi possível atualizar o status na IntNFe.",
+        );
+      } finally {
+        setCarregandoDetalhe(false);
+      }
+      return;
+    }
     try {
       setCarregandoDetalhe(true);
       const cacheKey = `${nota.id}:${nota.modelo || ""}`;
@@ -246,7 +288,11 @@ export default function CentralNFSaida() {
     }
     try {
       setCancelando(true);
-      await api.post(`/nfe/${modalCancelar.id}/cancelar`, { justificativa });
+      const endpoint =
+        modalCancelar.provedor === "intnfe"
+          ? `/nfe/vendas/${modalCancelar.venda_id}/cancelar`
+          : `/nfe/${modalCancelar.id}/cancelar`;
+      await api.post(endpoint, { justificativa });
       alert("Nota fiscal cancelada com sucesso!");
       setModalCancelar(null);
       setJustificativa("");
