@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { CheckCircle, FileText, Printer } from "lucide-react";
 import { useDadosCupomEmpresa } from "../hooks/useDadosCupomEmpresa";
 import { usePersistentBooleanState } from "../hooks/usePersistentBooleanState";
@@ -21,7 +22,9 @@ export default function ModalPerguntaNFe({
     crediario ? IMPRESSAO_CREDIARIO_STORAGE_KEY : IMPRESSAO_CUPOM_STORAGE_KEY,
     crediario,
   );
+  const [tipoNota, setTipoNota] = useState("nfce");
   const { carregandoEmpresa, dadosEmpresa } = useDadosCupomEmpresa();
+  const clienteIdentificado = Boolean(cliente?.cpf || cliente?.cnpj);
 
   const handleConcluirSemNota = () => {
     concluirVendaComCupom({
@@ -53,35 +56,62 @@ export default function ModalPerguntaNFe({
           )}
 
           <div className="space-y-3">
-            {cliente?.cnpj ? (
-              <>
+            <fieldset>
+              <legend className="mb-2 text-sm font-semibold text-gray-800">Documento fiscal</legend>
+              <div className="grid grid-cols-2 gap-2">
                 <button
-                  onClick={() => onEmitir("nfe")}
+                  type="button"
+                  aria-pressed={tipoNota === "nfce"}
+                  onClick={() => setTipoNota("nfce")}
                   disabled={loading}
-                  className="w-full flex items-center justify-center space-x-2 px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50"
+                  className={`rounded-lg border px-3 py-3 text-left transition-colors disabled:opacity-50 ${
+                    tipoNota === "nfce"
+                      ? "border-green-600 bg-green-50 text-green-900"
+                      : "border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
+                  }`}
                 >
-                  <FileText className="w-5 h-5" />
-                  <span>Emitir NF-e (Empresa)</span>
+                  <span className="block text-sm font-bold">NFC-e · modelo 65</span>
+                  <span className="mt-1 block text-xs">Padrão para venda no PDV</span>
                 </button>
                 <button
-                  onClick={() => onEmitir("nfce")}
-                  disabled={loading}
-                  className="w-full flex items-center justify-center space-x-2 px-4 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50"
+                  type="button"
+                  aria-pressed={tipoNota === "nfe"}
+                  onClick={() => setTipoNota("nfe")}
+                  disabled={loading || !clienteIdentificado}
+                  className={`rounded-lg border px-3 py-3 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
+                    tipoNota === "nfe"
+                      ? "border-blue-600 bg-blue-50 text-blue-900"
+                      : "border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
+                  }`}
                 >
-                  <FileText className="w-5 h-5" />
-                  <span>Emitir NFC-e (Cupom)</span>
+                  <span className="block text-sm font-bold">NF-e · modelo 55</span>
+                  <span className="mt-1 block text-xs">Escolha quando a venda exigir NF-e</span>
                 </button>
-              </>
-            ) : (
-              <button
-                onClick={() => onEmitir("nfce")}
-                disabled={loading}
-                className="w-full flex items-center justify-center space-x-2 px-4 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50"
-              >
-                <FileText className="w-5 h-5" />
-                <span>Emitir NFC-e</span>
-              </button>
-            )}
+              </div>
+            </fieldset>
+
+            <p className="rounded-lg bg-gray-50 px-3 py-2 text-xs text-gray-600">
+              {tipoNota === "nfce"
+                ? "Use para a venda presencial comum ao consumidor final."
+                : "Use para vendas com entrega ou transporte, interestaduais, ou quando o cliente solicitar NF-e."}
+              {!clienteIdentificado
+                ? " Para emitir NF-e, selecione um cliente com CPF ou CNPJ."
+                : ""}
+            </p>
+
+            <button
+              type="button"
+              onClick={() => onEmitir(tipoNota)}
+              disabled={loading || (tipoNota === "nfe" && !clienteIdentificado)}
+              className={`flex w-full items-center justify-center space-x-2 rounded-lg px-4 py-3 font-medium text-white transition-colors disabled:opacity-50 ${
+                tipoNota === "nfce"
+                  ? "bg-green-600 hover:bg-green-700"
+                  : "bg-blue-600 hover:bg-blue-700"
+              }`}
+            >
+              <FileText className="h-5 w-5" />
+              <span>Emitir {tipoNota === "nfce" ? "NFC-e" : "NF-e"}</span>
+            </button>
 
             <button
               onClick={handleConcluirSemNota}
