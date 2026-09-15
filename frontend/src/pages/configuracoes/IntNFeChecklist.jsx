@@ -108,8 +108,8 @@ export default function IntNFeChecklist({
           done={cscHomologation}
         />
         <Step
-          label="Série e última numeração"
-          description={`Confira manualmente no sistema anterior. ${knownSequences ? `${knownSequences} sequência(s) registrada(s).` : "Se a série for nova, ela começa no número 1."}`}
+          label="Sequências por modelo e ambiente"
+          description={`Use as abas de homologação e produção. NF-e e NFC-e possuem numerações próprias. ${knownSequences ? `${knownSequences} sequência(s) registrada(s).` : "Se a série for nova, ela começa no número 1."}`}
           done={false}
           action
         />

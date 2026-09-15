@@ -2,12 +2,10 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "../../services/api";
 import { useAuth } from "../../contexts/AuthContext";
 import IntNFeAtivacaoView from "./IntNFeAtivacaoView";
-import IntNFeNumeracao from "./IntNFeNumeracao.jsx";
-import IntNFeCsc from "./IntNFeCsc.jsx";
 import IntNFeCadastroFiscal from "./IntNFeCadastroFiscal.jsx";
 import IntNFeCertificado from "./IntNFeCertificado.jsx";
 import IntNFeChecklist from "./IntNFeChecklist.jsx";
-import IntNFeAmbienteEmissao from "./IntNFeAmbienteEmissao.jsx";
+import IntNFeConfiguracaoAmbiente from "./IntNFeConfiguracaoAmbiente.jsx";
 
 function ActivationPanel() {
   const [data, setData] = useState(null);
@@ -135,23 +133,17 @@ function ActivationPanel() {
             onData={setCertificateData}
             onChanged={() => execute()}
           />
-          <IntNFeCsc
+          <IntNFeConfiguracaoAmbiente
             apiClient={api}
-            disabled={busy || fiscalBusy || certificateBusy || numberingBusy || environmentBusy}
-            onBusy={setCscBusy}
-            onData={setCscData}
-          />
-          <IntNFeNumeracao
-            apiClient={api}
-            disabled={busy || fiscalBusy || certificateBusy || cscBusy || environmentBusy}
-            onBusy={setNumberingBusy}
-            onData={setNumberingData}
-          />
-          <IntNFeAmbienteEmissao
-            apiClient={api}
-            disabled={busy || fiscalBusy || certificateBusy || cscBusy || numberingBusy}
-            onBusy={setEnvironmentBusy}
-            onData={setEnvironmentData}
+            disabled={
+              busy || fiscalBusy || certificateBusy || cscBusy || numberingBusy || environmentBusy
+            }
+            onNumberingBusy={setNumberingBusy}
+            onCscBusy={setCscBusy}
+            onEnvironmentBusy={setEnvironmentBusy}
+            onNumberingData={setNumberingData}
+            onCscData={setCscData}
+            onEnvironmentData={setEnvironmentData}
           />
         </>
       )}
