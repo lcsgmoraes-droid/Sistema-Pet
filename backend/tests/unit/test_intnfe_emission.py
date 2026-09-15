@@ -94,6 +94,7 @@ def fiscal_data(monkeypatch):
             "origem_mercadoria": "0",
             "cfop_interno": "5102",
             "cfop_interestadual": "6102",
+            "cfop_interestadual_nao_contribuinte": "6102",
             "cst_icms": "102",
             "icms_aliquota": 18,
             "pis_cst": "49",
@@ -140,6 +141,64 @@ def test_interstate_sale_uses_interstate_cfop():
         ]
         == "6102"
     )
+
+
+def test_interstate_st_sale_to_non_contributor_uses_6108(monkeypatch):
+    tenant, connection, sale = _objects()
+    sale.cliente.estado = "RJ"
+    sale.cliente.cidade = "Rio de Janeiro"
+    sale.cliente.codigo_municipio = "3304557"
+    monkeypatch.setattr(
+        emission,
+        "_resolver_fiscal_item_nfe",
+        lambda *_args: {
+            "ncm": "23099010",
+            "cest": "2200100",
+            "origem_mercadoria": "0",
+            "cfop_interno": "5405",
+            "cfop_interestadual": "6102",
+            "cfop_interestadual_nao_contribuinte": "6108",
+            "cst_icms": "500",
+            "icms_st": True,
+            "icms_aliquota": None,
+            "pis_cst": "49",
+            "pis_aliquota": 0,
+            "cofins_cst": "49",
+            "cofins_aliquota": 0,
+        },
+    )
+
+    product = emission.build_payload(None, tenant, connection, sale, "nfe")["produtos"][
+        0
+    ]
+
+    assert product["cfop"] == "6108"
+    assert product["impostos"]["icms"] == {"cst": "500", "origem": "0"}
+
+
+def test_non_contributor_with_incompatible_csosn_is_blocked(monkeypatch):
+    tenant, connection, sale = _objects()
+    monkeypatch.setattr(
+        emission,
+        "_resolver_fiscal_item_nfe",
+        lambda *_args: {
+            "ncm": "23091000",
+            "cest": None,
+            "origem_mercadoria": "0",
+            "cfop_interno": "5102",
+            "cfop_interestadual": "6102",
+            "cfop_interestadual_nao_contribuinte": "6102",
+            "cst_icms": "900",
+            "icms_aliquota": 18,
+            "pis_cst": "49",
+            "pis_aliquota": 0,
+            "cofins_cst": "49",
+            "cofins_aliquota": 0,
+        },
+    )
+
+    with pytest.raises(emission.DirectEmissionError, match="CSOSN 900"):
+        emission.build_payload(None, tenant, connection, sale, "nfe")
 
 
 def test_local_document_details_keeps_sale_items_visible_after_rejection():

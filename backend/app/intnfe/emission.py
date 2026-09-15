@@ -269,11 +269,17 @@ def build_payload(db, tenant, connection, venda, document_type):
         fiscal = _resolver_fiscal_item_nfe(db, venda, item)
         ncm = _digits(fiscal.get("ncm"))
         origin = _text(fiscal.get("origem_mercadoria"))
-        cfop = _text(
-            fiscal.get("cfop_interestadual")
-            if interstate
-            else fiscal.get("cfop_interno")
+        destinatario_nao_contribuinte = bool(
+            recipient and recipient.get("indicadorIe") == "9"
         )
+        if interstate and destinatario_nao_contribuinte:
+            cfop = _text(fiscal.get("cfop_interestadual_nao_contribuinte"))
+        else:
+            cfop = _text(
+                fiscal.get("cfop_interestadual")
+                if interstate
+                else fiscal.get("cfop_interno")
+            )
         missing = [
             label
             for label, value in (
@@ -289,6 +295,16 @@ def build_payload(db, tenant, connection, venda, document_type):
         if missing:
             raise DirectEmissionError(
                 f"Produto {item.produto.nome}: complete {', '.join(missing)} na aba Tributação."
+            )
+        cst_icms = str(fiscal.get("cst_icms") or "")
+        if (
+            emitter.get("crt") == "1"
+            and destinatario_nao_contribuinte
+            and cst_icms not in {"102", "103", "300", "400", "500"}
+        ):
+            raise DirectEmissionError(
+                f"Produto {item.produto.nome}: o CSOSN {cst_icms} não é aceito "
+                "para consumidor não contribuinte. Revise a tributação antes de transmitir."
             )
         quantity = Decimal(str(item.quantidade or 0))
         unit_price = Decimal(str(item.preco_unitario or 0))
