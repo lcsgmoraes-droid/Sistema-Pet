@@ -158,13 +158,15 @@ export default function NFSaidaList({
                           <XCircle className="w-5 h-5" />
                         </button>
                       )}
-                      <button
-                        onClick={() => excluirNota(nota.venda_id, nota.numero)}
-                        className="text-gray-600 hover:text-gray-900 p-1 hover:bg-gray-50 rounded"
-                        title="Excluir nota do sistema"
-                      >
-                        <Trash2 className="w-5 h-5" />
-                      </button>
+                      {nota.provedor !== "intnfe" && (
+                        <button
+                          onClick={() => excluirNota(nota.venda_id, nota.numero)}
+                          className="text-gray-600 hover:text-gray-900 p-1 hover:bg-gray-50 rounded"
+                          title="Excluir nota do sistema"
+                        >
+                          <Trash2 className="w-5 h-5" />
+                        </button>
+                      )}
                       <button
                         onClick={() => reconciliarFluxoNota(nota)}
                         disabled={reconciliandoNotaId === String(nota.id)}
@@ -174,16 +176,24 @@ export default function NFSaidaList({
                         <Zap className="w-5 h-5" />
                       </button>
                       <button
-                        onClick={() => baixarDanfe(nota.id, nota.numero)}
-                        disabled={documentoEmCurso === String(nota.id)}
+                        onClick={() => baixarDanfe(nota)}
+                        disabled={
+                          documentoEmCurso === String(nota.venda_id || nota.id) ||
+                          (nota.provedor === "intnfe" &&
+                            nota.status?.toLowerCase() !== "autorizada")
+                        }
                         className="text-blue-600 hover:text-blue-900 p-1 hover:bg-blue-50 rounded"
                         title="Baixar DANFE"
                       >
                         <Printer className="w-5 h-5" />
                       </button>
                       <button
-                        onClick={() => baixarXml(nota.id, nota.numero)}
-                        disabled={documentoEmCurso === String(nota.id)}
+                        onClick={() => baixarXml(nota)}
+                        disabled={
+                          documentoEmCurso === String(nota.venda_id || nota.id) ||
+                          (nota.provedor === "intnfe" &&
+                            nota.status?.toLowerCase() !== "autorizada")
+                        }
                         className="text-green-600 hover:text-green-900 p-1 hover:bg-green-50 rounded"
                         title="Baixar XML"
                       >

@@ -17,7 +17,7 @@ def test_central_nf_saida_controller_fica_abaixo_do_limite_critico():
     source = _source("CentralNFSaida.jsx")
 
     assert "CentralNFSaidaView" in source
-    assert "api.get(`/nfe/?${params.toString()}`)" in source
+    assert "api.get(`/nfe/lista?${params.toString()}`)" in source
     assert 'api.get("/sefaz/config")' in source
     assert 'api.post("/sefaz/consultar"' in source
     assert "reconciliar-fluxo" in source
