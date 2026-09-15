@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { FiKey, FiRefreshCw } from "react-icons/fi";
+import { FiExternalLink, FiHelpCircle, FiKey, FiRefreshCw } from "react-icons/fi";
 
 const buttonClass =
   "inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-blue-500";
@@ -154,9 +154,50 @@ export default function IntNFeCsc({
           className={`${buttonClass} border border-slate-300 bg-white dark:bg-slate-900`}
         >
           <FiRefreshCw aria-hidden="true" />
-          {busy ? "Aguarde…" : "Consultar CSC"}
+          {busy ? "Aguarde…" : "Verificar cadastro na IntNFe"}
         </button>
       </div>
+      <p className="text-sm text-slate-600 dark:text-slate-300">
+        Esta verificação apenas atualiza a situação e o ID cadastrados. Ela não altera o CSC e, por
+        segurança, nunca recupera o código secreto.
+      </p>
+
+      <details className="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-950">
+        <summary className="flex cursor-pointer list-none items-center gap-2 font-bold">
+          <FiHelpCircle aria-hidden="true" /> Como obter o CSC?
+        </summary>
+        <div className="mt-3 space-y-3">
+          <p>
+            O CSC é gerado pela Secretaria da Fazenda do estado da empresa. Ele é necessário apenas
+            para emitir NFC-e (modelo 65).
+          </p>
+          <ol className="list-decimal space-y-1 pl-5">
+            <li>Confirme que o estabelecimento está credenciado para emitir NFC-e.</li>
+            <li>Acesse o portal da NFC-e da SEFAZ usando o certificado digital da empresa.</li>
+            <li>Selecione o estabelecimento e o ambiente correto.</li>
+            <li>
+              Abra <strong>Gerenciar Cód Segurança</strong> e gere ou consulte o CSC.
+            </li>
+            <li>Copie o ID do CSC e o código secreto para os campos abaixo.</li>
+          </ol>
+          <p>
+            Homologação e produção usam CSCs diferentes. Gere e informe o código correspondente à
+            aba em que você está.
+          </p>
+          <a
+            href="https://portal.fazenda.sp.gov.br/servicos/nfce/"
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center gap-2 font-semibold text-blue-700 underline decoration-blue-300 underline-offset-2"
+          >
+            <FiExternalLink aria-hidden="true" /> Abrir orientações oficiais da SEFAZ-SP
+          </a>
+          <p className="text-xs text-blue-800">
+            Empresa de outro estado: use o portal de NFC-e da Secretaria da Fazenda da sua UF, pois
+            cada estado administra o próprio CSC.
+          </p>
+        </div>
+      </details>
 
       {state && selected && !review && (
         <form
