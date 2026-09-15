@@ -195,11 +195,11 @@ def test_single_recorded_fifo_lot_is_recovered_for_older_sale():
     def query(target):
         if target is emission.ProdutoLote:
             return Query(first=expected_lot)
-        return Query(
-            rows=[SimpleNamespace(lotes_consumidos='[{"lote_id": 2057}]')]
-        )
+        return Query(rows=[SimpleNamespace(lotes_consumidos='[{"lote_id": 2057}]')])
 
-    recovered = emission._lot_from_recorded_fifo(SimpleNamespace(query=query), sale, item)
+    recovered = emission._lot_from_recorded_fifo(
+        SimpleNamespace(query=query), sale, item
+    )
 
     assert recovered is expected_lot
 
