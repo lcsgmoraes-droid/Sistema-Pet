@@ -1,5 +1,6 @@
 import api from "../api";
 import { confirmarCorePet } from "../services/corepetDialog";
+import { solicitarCorrecaoFiscal } from "../services/fiscalCorrectionDialog";
 
 function linhaProduto(item) {
   const partes = [];
@@ -136,30 +137,23 @@ export async function emitirNotaFiscalAssistida({
   tipoNota = "nfce",
   confirmar = confirmarCorePet,
 } = {}) {
-  const { data: validacao } = await api.post("/nfe/prevalidar", {
-    venda_id: vendaId,
-    tipo_nota: tipoNota,
-  });
+  let validacao;
+  for (let tentativa = 0; tentativa < 5; tentativa += 1) {
+    const response = await api.post("/nfe/prevalidar", {
+      venda_id: vendaId,
+      tipo_nota: tipoNota,
+    });
+    validacao = response.data;
+    const temPendencias =
+      (validacao?.bloqueios || []).length > 0 || (validacao?.correcoes || []).length > 0;
+    if (!temPendencias) break;
 
-  const bloqueios = validacao?.bloqueios || [];
-  const correcoes = validacao?.correcoes || [];
-  if (bloqueios.length) {
-    throw erroComValidacaoFiscal(validacao);
+    const corrigido = await solicitarCorrecaoFiscal({ validacao, vendaId, tipoNota });
+    if (!corrigido) return { cancelado: true, validacao };
   }
 
-  let autorizarCorrecoes = false;
-  if (correcoes.length) {
-    const mensagem = [
-      "O sistema encontrou dados fiscais que pode corrigir automaticamente.",
-      "",
-      formatarPendenciasFiscais(validacao),
-      "",
-      "Autorizar correcao fiscal e emitir a nota agora?",
-    ].join("\n");
-    autorizarCorrecoes = await confirmar(mensagem);
-    if (!autorizarCorrecoes) {
-      return { cancelado: true, validacao };
-    }
+  if ((validacao?.bloqueios || []).length || (validacao?.correcoes || []).length) {
+    throw erroComValidacaoFiscal(validacao);
   }
 
   if (validacao?.provedor === "intnfe" && validacao?.resumo_emissao) {
@@ -171,7 +165,7 @@ export async function emitirNotaFiscalAssistida({
     venda_id: vendaId,
     tipo_nota: tipoNota,
     transmitir: true,
-    autorizar_correcoes_fiscais: autorizarCorrecoes,
+    autorizar_correcoes_fiscais: false,
   });
   const data =
     initialData?.provedor === "intnfe" ? await acompanharIntNFe(vendaId, initialData) : initialData;
@@ -179,5 +173,5 @@ export async function emitirNotaFiscalAssistida({
     throw erroRejeicaoIntNFe(vendaId, data);
   }
 
-  return { data, validacao, correcoesAutorizadas: autorizarCorrecoes };
+  return { data, validacao, correcoesAutorizadas: false };
 }

@@ -45,6 +45,7 @@ from app.bling_integration import (
     aplicar_correcoes_fiscais_venda,
     prevalidar_fiscal_venda,
 )
+from app.bling_integration_fiscal import prevalidar_produtos_fiscais_venda
 from app.nfe.operacional_routes import (
     CancelarNFeRequest as CancelarNFeRequest,
     CartaCorrecaoRequest as CartaCorrecaoRequest,
@@ -169,13 +170,16 @@ def _exigir_bling_configurado_para_tenant(tenant_id) -> None:
 
 
 def _direct_failure(exc):
+    detail = {
+        "erro": exc.code or "intnfe_emissao",
+        "mensagem": str(exc),
+        "protocolo_suporte": exc.correlation,
+    }
+    if exc.validation:
+        detail["validacao"] = exc.validation
     return HTTPException(
         exc.status,
-        {
-            "erro": exc.code or "intnfe_emissao",
-            "mensagem": str(exc),
-            "protocolo_suporte": exc.correlation,
-        },
+        detail,
     )
 
 
@@ -206,25 +210,23 @@ async def prevalidar_nfe(
                     "Esta venda já possui uma tentativa de nota fiscal. Consulte a situação existente.",
                     status=409,
                 )
-            resumo = preview_intnfe(db, get_tenant(db, tenant_id), venda, tipo_nota)
-            validacao = {
-                "success": True,
-                "pode_emitir": True,
-                "requer_autorizacao": False,
-                "correcoes": [],
-                "bloqueios": [],
-                "resumo_emissao": resumo,
-                "provedor": "intnfe",
-            }
+            validacao = prevalidar_produtos_fiscais_venda(
+                venda, db, exigir_documento_completo=True
+            )
+            if validacao["pode_emitir"]:
+                validacao["resumo_emissao"] = preview_intnfe(
+                    db, get_tenant(db, tenant_id), venda, tipo_nota
+                )
+            validacao["provedor"] = "intnfe"
         except DirectEmissionError as exc:
-            validacao = {
+            validacao = exc.validation or {
                 "success": True,
                 "pode_emitir": False,
                 "requer_autorizacao": False,
                 "correcoes": [],
                 "bloqueios": [{"campo": "intnfe", "mensagem": str(exc)}],
-                "provedor": "intnfe",
             }
+            validacao["provedor"] = "intnfe"
     else:
         validacao = prevalidar_fiscal_venda(venda, tipo_nota, db)
         validacao["provedor"] = "bling"
@@ -274,9 +276,11 @@ async def emitir_nfe(
                     entity_id=venda.id,
                     new_value={
                         "tipo": tipo_nota,
-                        "ambiente": "producao"
-                        if connection and connection.emission_environment == 1
-                        else "homologacao",
+                        "ambiente": (
+                            "producao"
+                            if connection and connection.emission_environment == 1
+                            else "homologacao"
+                        ),
                     },
                 )
                 return issue_intnfe(

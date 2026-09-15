@@ -6,6 +6,7 @@ import pytest
 import requests
 
 from app.bling_integration import BlingAPI, _montar_url_bling, prevalidar_fiscal_venda
+from app import bling_integration_fiscal
 
 
 class _FakeResponse:
@@ -96,6 +97,45 @@ def test_prevalidacao_sugere_ncm_para_racao_caes_gatos_com_ncm_zerado():
     assert validacao["correcoes"][0]["valor_atual"] == "00000000"
     assert validacao["correcoes"][0]["valor_sugerido"] == "23091000"
     assert validacao["pode_emitir"] is False
+
+
+def test_prevalidacao_direta_identifica_campos_editaveis_e_sugestoes(monkeypatch):
+    venda = _make_venda_nfce()
+    monkeypatch.setattr(
+        bling_integration_fiscal,
+        "_resolver_fiscal_item_nfe",
+        lambda *_args: {
+            "ncm": "39269090",
+            "origem_mercadoria": "0",
+            "cfop": "5102",
+            "cst_icms": None,
+            "pis_cst": None,
+            "cofins_cst": None,
+        },
+    )
+    monkeypatch.setattr(
+        bling_integration_fiscal,
+        "_melhor_sugestao_catalogo",
+        lambda *_args: {
+            "categoria_fiscal": "Acessorios",
+            "cst_icms": "102",
+            "pis_cst": "49",
+            "cofins_cst": "49",
+            "observacao": "Sugestao baseada no catalogo fiscal.",
+        },
+    )
+
+    validacao = bling_integration_fiscal.prevalidar_produtos_fiscais_venda(
+        venda, exigir_documento_completo=True
+    )
+
+    assert validacao["bloqueios"] == []
+    assert {item["campo"] for item in validacao["correcoes"]} == {
+        "cst_icms",
+        "pis_cst",
+        "cofins_cst",
+    }
+    assert all(item["produto_id"] == 10 for item in validacao["correcoes"])
 
 
 def test_emitir_nfce_bloqueia_ncm_zerado_antes_de_criar_nota_no_bling(monkeypatch):

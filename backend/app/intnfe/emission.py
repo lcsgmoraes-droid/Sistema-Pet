@@ -42,11 +42,14 @@ MARKETPLACE_CHANNELS = {
 
 
 class DirectEmissionError(Exception):
-    def __init__(self, message, *, status=422, code=None, correlation=None):
+    def __init__(
+        self, message, *, status=422, code=None, correlation=None, validation=None
+    ):
         super().__init__(message)
         self.status = status
         self.code = code
         self.correlation = correlation
+        self.validation = validation
 
 
 def _digits(value):
@@ -188,9 +191,9 @@ def _recipient(
             if environment == 2
             else _text(getattr(cliente, "razao_social", None)) or _text(cliente.nome)
         ),
-        "indicadorIe": "1"
-        if _text(getattr(cliente, "inscricao_estadual", None))
-        else "9",
+        "indicadorIe": (
+            "1" if _text(getattr(cliente, "inscricao_estadual", None)) else "9"
+        ),
     }
     if not missing:
         recipient["endereco"] = address
@@ -336,6 +339,7 @@ def build_payload(db, tenant, connection, venda, document_type):
     interstate = destination_uf != emitter["endereco"]["uf"]
 
     products = []
+    fiscal_pending = []
     product_total = Decimal("0")
     item_discount_total = Decimal("0")
     for item in venda.itens or []:
@@ -374,9 +378,28 @@ def build_payload(db, tenant, connection, venda, document_type):
             if not value
         ]
         if missing:
-            raise DirectEmissionError(
-                f"Produto {item.produto.nome}: complete {', '.join(missing)} na aba Tributação."
+            fiscal_pending.extend(
+                {
+                    "produto_id": item.produto.id,
+                    "produto_nome": item.produto.nome,
+                    "produto_tipo": getattr(item.produto, "tipo_produto", None),
+                    "sku": _text(item.produto.codigo)
+                    or _text(item.produto.codigo_barras)
+                    or str(item.produto.id),
+                    "campo": campo,
+                    "mensagem": f"{label} nao informado. Preencha para continuar.",
+                }
+                for campo, label, value in (
+                    ("ncm", "NCM", ncm if len(ncm) == 8 else None),
+                    ("origem_mercadoria", "Origem", origin),
+                    ("cfop", "CFOP", cfop if cfop and len(cfop) == 4 else None),
+                    ("cst_icms", "CSOSN/CST de ICMS", fiscal.get("cst_icms")),
+                    ("pis_cst", "CST de PIS", fiscal.get("pis_cst")),
+                    ("cofins_cst", "CST de COFINS", fiscal.get("cofins_cst")),
+                )
+                if not value
             )
+            continue
         cst_icms = str(fiscal.get("cst_icms") or "")
         if (
             emitter.get("crt") == "1"
@@ -385,7 +408,30 @@ def build_payload(db, tenant, connection, venda, document_type):
         ):
             raise DirectEmissionError(
                 f"Produto {item.produto.nome}: o CSOSN {cst_icms} não é aceito "
-                "para consumidor não contribuinte. Revise a tributação antes de transmitir."
+                "para consumidor não contribuinte. Revise a tributação antes de transmitir.",
+                validation={
+                    "success": True,
+                    "pode_emitir": False,
+                    "requer_autorizacao": False,
+                    "correcoes": [],
+                    "bloqueios": [
+                        {
+                            "produto_id": item.produto.id,
+                            "produto_nome": item.produto.nome,
+                            "produto_tipo": getattr(item.produto, "tipo_produto", None),
+                            "sku": _text(getattr(item.produto, "codigo", None))
+                            or _text(getattr(item.produto, "codigo_barras", None))
+                            or str(item.produto.id),
+                            "campo": "cst_icms",
+                            "valor_atual": cst_icms,
+                            "valor_invalido": True,
+                            "mensagem": (
+                                f"O CSOSN {cst_icms} nao e aceito para consumidor nao contribuinte. "
+                                "Escolha a classificacao correta para esta operacao."
+                            ),
+                        }
+                    ],
+                },
             )
         quantity = Decimal(str(item.quantidade or 0))
         unit_price = Decimal(str(item.preco_unitario or 0))
@@ -445,6 +491,18 @@ def build_payload(db, tenant, connection, venda, document_type):
         product_total += gross
         item_discount_total += discount
 
+    if fiscal_pending:
+        raise DirectEmissionError(
+            "Existem dados fiscais de produtos para completar antes da emissao.",
+            validation={
+                "success": True,
+                "pode_emitir": False,
+                "requer_autorizacao": False,
+                "correcoes": [],
+                "bloqueios": fiscal_pending,
+            },
+        )
+
     if not products:
         raise DirectEmissionError("A venda não possui produtos para emitir a nota.")
 
@@ -486,9 +544,9 @@ def build_payload(db, tenant, connection, venda, document_type):
         )
 
     payload = {
-        "serie": connection.nfe_series
-        if document_type == "nfe"
-        else connection.nfce_series,
+        "serie": (
+            connection.nfe_series if document_type == "nfe" else connection.nfce_series
+        ),
         "ambienteCodigo": environment,
         "naturezaOperacao": "Venda de mercadoria",
         "emitente": emitter,
@@ -648,30 +706,33 @@ def local_document_details(db, tenant, venda):
         "indicador_presenca": (
             "1 - Operação presencial" if channel == "loja_fisica" else "9 - Outros"
         ),
-        "cliente": {
-            "id": getattr(cliente, "id", None),
-            "codigo": getattr(cliente, "codigo", None),
-            "nome": getattr(cliente, "nome", None),
-            "tipo_pessoa": getattr(cliente, "tipo_pessoa", None),
-            "cpf_cnpj": customer_document,
-            "vendedor": getattr(getattr(venda, "vendedor", None), "nome", None),
-            "consumidor_final": True,
-            "telefone": (
-                getattr(cliente, "celular", None) or getattr(cliente, "telefone", None)
-                if cliente
-                else None
-            ),
-            "email": getattr(cliente, "email", None),
-            "cep": getattr(cliente, "cep", None),
-            "uf": getattr(cliente, "estado", None),
-            "municipio": getattr(cliente, "cidade", None),
-            "bairro": getattr(cliente, "bairro", None),
-            "endereco": getattr(cliente, "endereco", None),
-            "numero": getattr(cliente, "numero", None),
-            "complemento": getattr(cliente, "complemento", None),
-        }
-        if cliente
-        else {},
+        "cliente": (
+            {
+                "id": getattr(cliente, "id", None),
+                "codigo": getattr(cliente, "codigo", None),
+                "nome": getattr(cliente, "nome", None),
+                "tipo_pessoa": getattr(cliente, "tipo_pessoa", None),
+                "cpf_cnpj": customer_document,
+                "vendedor": getattr(getattr(venda, "vendedor", None), "nome", None),
+                "consumidor_final": True,
+                "telefone": (
+                    getattr(cliente, "celular", None)
+                    or getattr(cliente, "telefone", None)
+                    if cliente
+                    else None
+                ),
+                "email": getattr(cliente, "email", None),
+                "cep": getattr(cliente, "cep", None),
+                "uf": getattr(cliente, "estado", None),
+                "municipio": getattr(cliente, "cidade", None),
+                "bairro": getattr(cliente, "bairro", None),
+                "endereco": getattr(cliente, "endereco", None),
+                "numero": getattr(cliente, "numero", None),
+                "complemento": getattr(cliente, "complemento", None),
+            }
+            if cliente
+            else {}
+        ),
         "canal": venda.canal,
         "canal_label": {
             "loja_fisica": "PDV / Loja física",
@@ -800,9 +861,11 @@ def issue(db, tenant, venda, document_type, api):
             venda.nfe_data_emissao = None
         db.commit()
         raise DirectEmissionError(
-            "O envio ficou sem confirmação; não crie outra nota para esta venda."
-            if exc.uncertain
-            else "A IntNFe recusou o envio antes do processamento.",
+            (
+                "O envio ficou sem confirmação; não crie outra nota para esta venda."
+                if exc.uncertain
+                else "A IntNFe recusou o envio antes do processamento."
+            ),
             status=(
                 503
                 if exc.uncertain

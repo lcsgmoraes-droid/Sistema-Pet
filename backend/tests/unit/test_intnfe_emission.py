@@ -354,8 +354,42 @@ def test_non_contributor_with_incompatible_csosn_is_blocked(monkeypatch):
         },
     )
 
-    with pytest.raises(emission.DirectEmissionError, match="CSOSN 900"):
+    with pytest.raises(emission.DirectEmissionError, match="CSOSN 900") as exc_info:
         emission.build_payload(None, tenant, connection, sale, "nfe")
+
+    bloqueio = exc_info.value.validation["bloqueios"][0]
+    assert bloqueio["produto_id"] == 9
+    assert bloqueio["campo"] == "cst_icms"
+    assert bloqueio["valor_atual"] == "900"
+
+
+def test_missing_product_taxes_return_editable_fiscal_fields(monkeypatch):
+    tenant, connection, sale = _objects()
+    monkeypatch.setattr(
+        emission,
+        "_resolver_fiscal_item_nfe",
+        lambda *_args: {
+            "ncm": "23091000",
+            "origem_mercadoria": "0",
+            "cfop_interno": "5102",
+            "cfop_interestadual": "6102",
+            "cfop_interestadual_nao_contribuinte": "6102",
+            "cst_icms": None,
+            "pis_cst": None,
+            "cofins_cst": None,
+        },
+    )
+
+    with pytest.raises(emission.DirectEmissionError) as exc_info:
+        emission.build_payload(None, tenant, connection, sale, "nfce")
+
+    bloqueios = exc_info.value.validation["bloqueios"]
+    assert {item["campo"] for item in bloqueios} == {
+        "cst_icms",
+        "pis_cst",
+        "cofins_cst",
+    }
+    assert all(item["produto_id"] == 9 for item in bloqueios)
 
 
 def test_local_document_details_keeps_sale_items_visible_after_rejection():
