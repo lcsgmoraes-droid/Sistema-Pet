@@ -195,11 +195,7 @@ export default function FiscalCorrectionDialogHost() {
       produto.pendencias.forEach((item) => {
         const valor = String(fiscal[item.campo] ?? "").trim();
         if (!valor) faltantes.push(`${produto.nome}: ${CAMPOS[item.campo].rotulo}`);
-        if (
-          item.campo === "ncm" &&
-          valor &&
-          (!/^\d{8}$/.test(valor) || valor === "00000000")
-        ) {
+        if (item.campo === "ncm" && valor && (!/^\d{8}$/.test(valor) || valor === "00000000")) {
           faltantes.push(`${produto.nome}: informe um NCM válido com 8 dígitos`);
         }
         if (item.campo === "cfop" && valor && !/^\d{4}$/.test(valor)) {
