@@ -247,12 +247,13 @@ async def excluir_nota(
         if not venda:
             raise HTTPException(status_code=404, detail="Venda não encontrada")
 
-        if not venda.nfe_bling_id:
+        if not venda.nfe_bling_id and not venda.nfe_correlation_id:
             raise HTTPException(status_code=400, detail="Venda não possui nota fiscal")
 
         # Validar status - só permite excluir notas que não foram autorizadas
-        status_permitidos = ["Pendente", "Erro", "Rejeitada", None]
-        if venda.nfe_status not in status_permitidos:
+        status_normalizado = str(venda.nfe_status or "").strip().casefold()
+        status_permitidos = {"", "pendente", "erro", "rejeitada"}
+        if status_normalizado not in status_permitidos:
             raise HTTPException(
                 status_code=400,
                 detail=f"Não é possível excluir nota com status '{venda.nfe_status}'. Apenas notas Pendentes, com Erro ou Rejeitadas podem ser excluídas.",
@@ -266,7 +267,16 @@ async def excluir_nota(
         venda.nfe_chave = None
         venda.nfe_status = None
         venda.nfe_bling_id = None
+        venda.nfe_provider = None
+        venda.nfe_correlation_id = None
+        venda.nfe_protocolo = None
+        venda.nfe_ambiente = None
+        venda.nfe_codigo_erro = None
+        venda.nfe_idempotency_key = None
+        venda.nfe_payload_hash = None
+        venda.nfe_xml = None
         venda.nfe_data_emissao = None
+        venda.nfe_data_autorizacao = None
         venda.nfe_motivo_rejeicao = None
 
         # Voltar status para finalizada

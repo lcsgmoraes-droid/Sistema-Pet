@@ -107,6 +107,18 @@ def _resolver_fiscal_item_nfe(
         getattr(kit_fiscal, "cfop_venda", None),
         _valor_fiscal_produto(produto_fiscal, produto, "cfop_venda", "cfop"),
     )
+    lote = getattr(item_venda, "lote", None)
+    lote_icms_st = getattr(lote, "fiscal_icms_st", None)
+    produto_icms_st = getattr(produto_fiscal, "icms_st", None)
+    icms_st = lote_icms_st if lote_icms_st is not None else produto_icms_st
+    regime = str(getattr(empresa_fiscal, "regime_tributario", "") or "").casefold()
+    empresa_simples = bool(
+        empresa_fiscal
+        and (getattr(empresa_fiscal, "simples_ativo", False) or "simples" in regime)
+    )
+    substituido_simples = bool(icms_st and empresa_simples)
+    if substituido_simples:
+        cfop_especifico = "5405"
     cfop_interno, cfop_interestadual = _cfops_venda_por_destino(
         cfop_especifico, empresa_fiscal
     )
@@ -114,14 +126,17 @@ def _resolver_fiscal_item_nfe(
     return {
         "ncm": _primeiro_texto_fiscal(
             getattr(kit_fiscal, "ncm", None),
+            getattr(lote, "fiscal_ncm", None),
             _valor_fiscal_produto(produto_fiscal, produto, "ncm", "ncm"),
         ),
         "cest": _primeiro_texto_fiscal(
             getattr(kit_fiscal, "cest", None),
+            getattr(lote, "fiscal_cest", None),
             _valor_fiscal_produto(produto_fiscal, produto, "cest", "cest"),
         ),
         "origem_mercadoria": _primeiro_texto_fiscal(
             getattr(kit_fiscal, "origem_mercadoria", None),
+            getattr(lote, "fiscal_origem_mercadoria", None),
             _valor_fiscal_produto(
                 produto_fiscal, produto, "origem_mercadoria", "origem"
             ),
@@ -133,10 +148,15 @@ def _resolver_fiscal_item_nfe(
         ),
         "cfop_interno": cfop_interno,
         "cfop_interestadual": cfop_interestadual,
+        "cfop_interestadual_nao_contribuinte": (
+            "6108" if substituido_simples else cfop_interestadual
+        ),
         "cst_icms": _primeiro_texto_fiscal(
             getattr(kit_fiscal, "cst_icms", None),
+            "500" if substituido_simples else None,
             getattr(produto_fiscal, "cst_icms", None),
         ),
+        "icms_st": bool(icms_st),
         "icms_aliquota": next(
             (
                 value
@@ -148,7 +168,9 @@ def _resolver_fiscal_item_nfe(
                 if value is not None
             ),
             None,
-        ),
+        )
+        if not substituido_simples
+        else None,
         "pis_cst": _primeiro_texto_fiscal(
             getattr(kit_fiscal, "pis_cst", None),
             getattr(produto_fiscal, "pis_cst", None),

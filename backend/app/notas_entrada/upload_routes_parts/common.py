@@ -314,6 +314,10 @@ def _montar_item_nota(
         cest=item_data.get("cest"),
         cfop=_valor_item(item_data, "cfop", campos_xml_obrigatorios),
         origem=item_data.get("origem", "0" if campos_xml_obrigatorios else None),
+        cst_icms=item_data.get("cst_icms"),
+        icms_st=item_data.get("icms_st") if campos_xml_obrigatorios else None,
+        icms_base_st=item_data.get("icms_base_st"),
+        icms_valor_st=item_data.get("icms_valor_st"),
         aliquota_icms=item_data.get(
             "aliquota_icms", 0 if campos_xml_obrigatorios else None
         ),

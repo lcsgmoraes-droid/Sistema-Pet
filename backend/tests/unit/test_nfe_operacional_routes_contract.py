@@ -1,3 +1,7 @@
+from types import SimpleNamespace
+
+import pytest
+
 from app import nfe_routes
 from app.nfe import listagem
 from app.nfe import operacional_routes
@@ -56,3 +60,56 @@ def test_nfe_routes_mantem_aliases_de_listagem_para_imports_legados():
         nfe_routes._sincronizar_cache_nfes_com_bling
         is listagem._sincronizar_cache_nfes_com_bling
     )
+
+
+@pytest.mark.asyncio
+async def test_exclusao_limpa_rejeicao_intnfe_para_permitir_nova_tentativa():
+    venda = SimpleNamespace(
+        id=1116549,
+        tenant_id="tenant",
+        nfe_bling_id=None,
+        nfe_correlation_id="corr-rejeitada",
+        nfe_status="rejeitada",
+        nfe_tipo="nfe",
+        nfe_modelo="55",
+        nfe_numero=17842,
+        nfe_serie=2,
+        nfe_chave="3" * 44,
+        nfe_provider="intnfe",
+        nfe_protocolo=None,
+        nfe_ambiente=1,
+        nfe_codigo_erro="600",
+        nfe_idempotency_key="tentativa",
+        nfe_payload_hash="hash",
+        nfe_xml=None,
+        nfe_data_emissao=None,
+        nfe_data_autorizacao=None,
+        nfe_motivo_rejeicao="CSOSN incompatível",
+        status="pago_nf",
+    )
+
+    class Query:
+        def filter(self, *_args):
+            return self
+
+        def first(self):
+            return venda
+
+    class Db:
+        def query(self, _model):
+            return Query()
+
+        def commit(self):
+            return None
+
+    resposta = await operacional_routes.excluir_nota(
+        venda.id,
+        db=Db(),
+        user_and_tenant=(SimpleNamespace(id=1), "tenant"),
+    )
+
+    assert resposta["success"] is True
+    assert venda.nfe_correlation_id is None
+    assert venda.nfe_idempotency_key is None
+    assert venda.nfe_status is None
+    assert venda.status == "finalizada"
