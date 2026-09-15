@@ -477,7 +477,11 @@ def local_document_details(db, tenant, venda):
                 # tiver sido alterado ou estiver incompleto depois da emissão.
                 fiscal = {}
 
-        cfop = fiscal.get("cfop_interestadual") if interstate else fiscal.get("cfop_interno")
+        cfop = (
+            fiscal.get("cfop_interestadual")
+            if interstate
+            else fiscal.get("cfop_interno")
+        )
         items.append(
             {
                 "produto_id": getattr(sale_item, "produto_id", None),
