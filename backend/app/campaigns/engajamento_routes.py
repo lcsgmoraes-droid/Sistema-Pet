@@ -99,7 +99,7 @@ def criar_retencao(
         tenant_id=tenant_id,
         name=body.name.strip(),
         campaign_type=CampaignTypeEnum.inactivity,
-        status=CampaignStatusEnum.active,
+        status=CampaignStatusEnum.paused,
         priority=max(0, min(999, body.priority)),
         params={
             "inactivity_days": body.inactivity_days,
