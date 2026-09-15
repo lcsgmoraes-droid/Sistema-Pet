@@ -143,6 +143,67 @@ def test_interstate_sale_uses_interstate_cfop():
     )
 
 
+def test_multiple_recorded_fifo_lots_block_direct_emission():
+    tenant, connection, sale = _objects()
+    sale.id = 20
+    sale.tenant_id = tenant.id
+    sale.itens[0].produto_id = sale.itens[0].produto.id
+    sale.itens[0].lote_id = None
+    sale.itens[0].estoque_origem_tenant_id = None
+
+    class RowsQuery:
+        def filter(self, *_args):
+            return self
+
+        def all(self):
+            return [
+                SimpleNamespace(
+                    lotes_consumidos='[{"lote_id": 2057}, {"lote_id": 2088}]'
+                )
+            ]
+
+    db = SimpleNamespace(query=lambda *_args: RowsQuery())
+
+    with pytest.raises(emission.DirectEmissionError, match="mais de um lote"):
+        emission.build_payload(db, tenant, connection, sale, "nfe")
+
+
+def test_single_recorded_fifo_lot_is_recovered_for_older_sale():
+    _tenant, _connection, sale = _objects()
+    sale.id = 20
+    sale.tenant_id = "11111111-1111-1111-1111-111111111111"
+    item = sale.itens[0]
+    item.produto_id = item.produto.id
+    item.lote_id = None
+    item.estoque_origem_tenant_id = None
+    expected_lot = SimpleNamespace(id=2057, fiscal_ncm="23099010")
+
+    class Query:
+        def __init__(self, rows=None, first=None):
+            self.rows = rows
+            self.first_value = first
+
+        def filter(self, *_args):
+            return self
+
+        def all(self):
+            return self.rows
+
+        def first(self):
+            return self.first_value
+
+    def query(target):
+        if target is emission.ProdutoLote:
+            return Query(first=expected_lot)
+        return Query(rows=[SimpleNamespace(lotes_consumidos='[{"lote_id": 2057}]')])
+
+    recovered = emission._lot_from_recorded_fifo(
+        SimpleNamespace(query=query), sale, item
+    )
+
+    assert recovered is expected_lot
+
+
 def test_interstate_st_sale_to_non_contributor_uses_6108(monkeypatch):
     tenant, connection, sale = _objects()
     sale.cliente.estado = "RJ"

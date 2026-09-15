@@ -107,6 +107,30 @@ async function acompanharIntNFe(vendaId, initial) {
   return current;
 }
 
+function erroRejeicaoIntNFe(vendaId, data) {
+  const error = new Error(
+    data?.motivo_rejeicao ||
+      data?.codigo_erro ||
+      `A nota terminou com a situação: ${data?.situacao || "não autorizada"}.`,
+  );
+  error.recuperacaoNFe = {
+    vendaId,
+    codigoErro: data?.codigo_erro,
+    motivo: data?.motivo_rejeicao,
+    ambienteCodigo: data?.ambiente_codigo,
+  };
+  return error;
+}
+
+export async function corrigirEReemitirNota(vendaId) {
+  const { data: initial } = await api.post(`/nfe/vendas/${vendaId}/corrigir-reemitir`);
+  const data = initial?.provedor === "intnfe" ? await acompanharIntNFe(vendaId, initial) : initial;
+  if (data?.provedor === "intnfe" && !data.success && !data.processando) {
+    throw erroRejeicaoIntNFe(vendaId, data);
+  }
+  return data;
+}
+
 export async function emitirNotaFiscalAssistida({
   vendaId,
   tipoNota = "nfce",
@@ -152,11 +176,7 @@ export async function emitirNotaFiscalAssistida({
   const data =
     initialData?.provedor === "intnfe" ? await acompanharIntNFe(vendaId, initialData) : initialData;
   if (data?.provedor === "intnfe" && !data.success && !data.processando) {
-    throw new Error(
-      data.motivo_rejeicao ||
-        data.codigo_erro ||
-        `A nota terminou com a situação: ${data.situacao || "não autorizada"}.`,
-    );
+    throw erroRejeicaoIntNFe(vendaId, data);
   }
 
   return { data, validacao, correcoesAutorizadas: autorizarCorrecoes };
