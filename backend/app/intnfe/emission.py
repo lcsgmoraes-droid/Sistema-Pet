@@ -14,7 +14,7 @@ from types import SimpleNamespace
 from app.bling_integration_fiscal import _resolver_fiscal_item_nfe
 from app.intnfe.client import IntNFeError
 from app.intnfe.fiscal_profile import local_profile
-from app.intnfe.models import IntNFeConnection
+from app.intnfe.models import IntNFeConnection, IntNFeEmissionSequence
 from app.produtos_estoque_models import EstoqueMovimentacao, ProdutoLote
 
 CENT = Decimal("0.01")
@@ -826,6 +826,7 @@ def reconcile(db, venda, api, *, connection=None, token=None):
     venda.nfe_motivo_rejeicao = _text(result.get("motivoRejeicao"))
     if status_code == AUTHORIZED_STATUS:
         venda.nfe_data_autorizacao = datetime.now()
+        _remember_sequence_start(db, venda)
         if not venda.nfe_xml:
             try:
                 venda.nfe_xml = api.document_xml(
@@ -850,6 +851,40 @@ def reconcile(db, venda, api, *, connection=None, token=None):
         "motivo_rejeicao": venda.nfe_motivo_rejeicao,
         "ambiente_codigo": venda.nfe_ambiente,
     }
+
+
+def _remember_sequence_start(db, venda):
+    """Guarda a primeira numeração realmente emitida pelo CorePet."""
+    if not all(
+        (
+            venda.nfe_numero,
+            venda.nfe_serie is not None,
+            venda.nfe_ambiente in {1, 2},
+            str(venda.nfe_modelo) in {"55", "65"},
+        )
+    ):
+        return
+    model = int(venda.nfe_modelo)
+    series = str(int(venda.nfe_serie))
+    saved = (
+        db.query(IntNFeEmissionSequence)
+        .filter(
+            IntNFeEmissionSequence.tenant_id == venda.tenant_id,
+            IntNFeEmissionSequence.ambiente_codigo == venda.nfe_ambiente,
+            IntNFeEmissionSequence.modelo == model,
+        )
+        .one_or_none()
+    )
+    if saved is None:
+        db.add(
+            IntNFeEmissionSequence(
+                tenant_id=venda.tenant_id,
+                ambiente_codigo=venda.nfe_ambiente,
+                modelo=model,
+                serie=series,
+                numero_inicial=venda.nfe_numero,
+            )
+        )
 
 
 def download_document(db, venda, api, kind):
