@@ -131,6 +131,22 @@ async def consultar_nfe(
         nfe_routes._enriquecer_notas_com_pedidos_integrados(
             db, tenant_id, [detalhe_normalizado]
         )
+        try:
+            nfe_routes.upsert_nota_cache(
+                db,
+                tenant_id,
+                detalhe_normalizado,
+                source="bling_detail",
+                resumo_payload=detalhe_normalizado,
+                detalhe_payload=detalhe,
+            )
+            db.commit()
+        except Exception as exc:
+            db.rollback()
+            logger.warning(
+                "consultar_nfe",
+                f"Falha ao atualizar cache da NF {nfe_id}: {exc}",
+            )
         return detalhe_normalizado
     except HTTPException:
         raise

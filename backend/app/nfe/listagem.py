@@ -4,6 +4,7 @@
 
 from app.nfe.listagem_base import (
     _FINALIDADE_MAP,
+    _INTERMEDIADOR_CNPJ_CANAL_MAP,
     _INDICADOR_PRESENCA_MAP,
     _LOJA_ID_CANAL_MAP,
     _NFE_SYNC_CACHE_TTL_SECONDS,
@@ -27,6 +28,7 @@ from app.nfe.listagem_base import (
     _formatar_data_param_bling,
     _formatar_endereco,
     _inferir_canal_por_loja_id,
+    _inferir_canal_por_intermediador,
     _inferir_canal_por_numero,
     _label_codigo,
     _list,
@@ -79,6 +81,7 @@ from app.nfe.listagem_normalizacao import (
     _normalizar_nota_venda_local,
     _normalizar_parcela,
     _normalizar_resumo_canal,
+    _normalizar_totais_nota,
 )
 from app.nfe.listagem_pedidos import (
     _adicionar_notas_de_pedidos_integrados,

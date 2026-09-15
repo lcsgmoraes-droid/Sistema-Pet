@@ -381,9 +381,13 @@ def test_cst_49_without_saved_rate_is_sent_with_explicit_zero(monkeypatch):
     assert taxes["cofins"] == {"cst": "49", "aliquota": 0.0}
 
 
-def test_marketplace_without_intermediary_snapshot_is_blocked():
-    tenant, connection, sale = _objects(channel="amazon")
-    with pytest.raises(emission.DirectEmissionError, match="intermediador"):
+@pytest.mark.parametrize(
+    "channel",
+    ["amazon", "mercado_livre", "Mercado Livre", "ml", "shopee", "tiktok", "TikTok Shop"],
+)
+def test_direct_emission_is_blocked_for_every_marketplace_channel(channel):
+    tenant, connection, sale = _objects(channel=channel)
+    with pytest.raises(emission.DirectEmissionError, match="apenas para vendas do PDV"):
         emission.build_payload(None, tenant, connection, sale, "nfe")
 
 

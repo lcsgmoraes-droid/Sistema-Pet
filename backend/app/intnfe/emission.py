@@ -462,7 +462,8 @@ def build_payload(db, tenant, connection, venda, document_type):
     channel = re.sub(r"[^a-z0-9]+", "_", _ascii(venda.canal)).strip("_")
     if channel in MARKETPLACE_CHANNELS:
         raise DirectEmissionError(
-            "Este pedido de marketplace ainda não contém no CorePet os dados do intermediador e da referência externa. Complete a importação antes de emitir."
+            "A emissão direta está disponível apenas para vendas do PDV do ERP. "
+            "Pedidos de marketplace não podem ser emitidos por este fluxo."
         )
 
     payload = {
