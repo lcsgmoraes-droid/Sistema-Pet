@@ -87,7 +87,12 @@ def _advance_after_duplicate(db, tenant_id, api, venda, numbering_audit):
     series = str(venda.nfe_serie or "")
     model = int(venda.nfe_modelo or 0)
     environment = int(venda.nfe_ambiente or 0)
-    if not failed_number or not series or model not in {55, 65} or environment not in {1, 2}:
+    if (
+        not failed_number
+        or not series
+        or model not in {55, 65}
+        or environment not in {1, 2}
+    ):
         raise DirectEmissionError(
             "A rejeição por duplicidade não trouxe número, série, modelo e ambiente suficientes para corrigir a sequência.",
             status=409,
@@ -147,7 +152,10 @@ def repair_and_retry(
                     correlation=venda.nfe_correlation_id,
                 )
             if current["success"]:
-                return {**current, "correcoes_aplicadas": ["Status atualizado no emissor."]}
+                return {
+                    **current,
+                    "correcoes_aplicadas": ["Status atualizado no emissor."],
+                }
             status = _normalized(venda.nfe_status)
         else:
             raise DirectEmissionError(
@@ -168,7 +176,9 @@ def repair_and_retry(
             code="RejeicaoNaoEncontrada",
         )
 
-    document_type = "nfe" if (venda.nfe_tipo == "nfe" or venda.nfe_modelo == "55") else "nfce"
+    document_type = (
+        "nfe" if (venda.nfe_tipo == "nfe" or venda.nfe_modelo == "55") else "nfce"
+    )
     applied = []
 
     for duplicate_attempt in range(max_duplicate_retries + 1):
@@ -201,10 +211,14 @@ def repair_and_retry(
                 correlation=venda.nfe_correlation_id,
             )
         if not duplicate_number:
-            applied.append("Dados da venda ou do lote fiscal foram corrigidos desde a rejeição.")
+            applied.append(
+                "Dados da venda ou do lote fiscal foram corrigidos desde a rejeição."
+            )
 
         if duplicate_number:
-            changed = _advance_after_duplicate(db, tenant.id, api, venda, numbering_audit)
+            changed = _advance_after_duplicate(
+                db, tenant.id, api, venda, numbering_audit
+            )
             if changed is not None:
                 applied.append(
                     f"Sequência fiscal avançada após a rejeição do número {venda.nfe_numero}."
@@ -238,7 +252,11 @@ def repair_and_retry(
 
         result = issue(db, tenant, venda, document_type, api)
         result = {**result, "correcoes_aplicadas": list(dict.fromkeys(applied))}
-        if result["success"] or result["processando"] or str(result.get("codigo_erro") or "") != "539":
+        if (
+            result["success"]
+            or result["processando"]
+            or str(result.get("codigo_erro") or "") != "539"
+        ):
             return result
         if duplicate_attempt >= max_duplicate_retries:
             raise DirectEmissionError(
@@ -248,4 +266,6 @@ def repair_and_retry(
                 correlation=result.get("correlation_id"),
             )
 
-    raise DirectEmissionError("Não foi possível concluir a correção automática.", status=409)
+    raise DirectEmissionError(
+        "Não foi possível concluir a correção automática.", status=409
+    )

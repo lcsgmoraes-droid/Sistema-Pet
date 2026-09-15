@@ -91,7 +91,9 @@ def test_invalid_current_payload_keeps_rejected_attempt_untouched(monkeypatch):
         raise DirectEmissionError("Produto sem NCM")
 
     monkeypatch.setattr(recovery, "emission_fingerprint", block)
-    monkeypatch.setattr(recovery, "issue", lambda *_args: pytest.fail("não deve emitir"))
+    monkeypatch.setattr(
+        recovery, "issue", lambda *_args: pytest.fail("não deve emitir")
+    )
 
     with pytest.raises(DirectEmissionError, match="sem NCM"):
         recovery.repair_and_retry(
@@ -115,7 +117,9 @@ def test_unknown_rejection_is_not_retried_when_payload_did_not_change(monkeypatc
         "emission_fingerprint",
         lambda *_args: sale.nfe_payload_hash,
     )
-    monkeypatch.setattr(recovery, "issue", lambda *_args: pytest.fail("não deve emitir"))
+    monkeypatch.setattr(
+        recovery, "issue", lambda *_args: pytest.fail("não deve emitir")
+    )
 
     with pytest.raises(DirectEmissionError) as raised:
         recovery.repair_and_retry(
@@ -139,10 +143,13 @@ def test_pending_result_is_reconciled_without_creating_another_note(monkeypatch)
     monkeypatch.setattr(
         recovery,
         "reconcile",
-        lambda *_args: calls.append("reconcile")
-        or {"success": False, "processando": True},
+        lambda *_args: (
+            calls.append("reconcile") or {"success": False, "processando": True}
+        ),
     )
-    monkeypatch.setattr(recovery, "issue", lambda *_args: pytest.fail("não deve emitir"))
+    monkeypatch.setattr(
+        recovery, "issue", lambda *_args: pytest.fail("não deve emitir")
+    )
 
     with pytest.raises(DirectEmissionError) as raised:
         recovery.repair_and_retry(
@@ -226,8 +233,9 @@ def test_duplicate_advances_remote_sequence_only_to_failed_number(monkeypatch):
     monkeypatch.setattr(
         recovery,
         "advance_numbering",
-        lambda _db, _tenant, _api, request, _audit: captured.append(request)
-        or object(),
+        lambda _db, _tenant, _api, request, _audit: (
+            captured.append(request) or object()
+        ),
     )
 
     recovery._advance_after_duplicate(
@@ -266,10 +274,10 @@ def test_changed_attempt_is_never_cleared_after_numbering_query(monkeypatch):
     monkeypatch.setattr(
         recovery, "emission_fingerprint", lambda *_args: "payload-igual"
     )
+    monkeypatch.setattr(recovery, "_advance_after_duplicate", lambda *_args: object())
     monkeypatch.setattr(
-        recovery, "_advance_after_duplicate", lambda *_args: object()
+        recovery, "issue", lambda *_args: pytest.fail("não deve emitir")
     )
-    monkeypatch.setattr(recovery, "issue", lambda *_args: pytest.fail("não deve emitir"))
 
     with pytest.raises(DirectEmissionError) as raised:
         recovery.repair_and_retry(
