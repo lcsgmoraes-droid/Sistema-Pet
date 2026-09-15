@@ -735,6 +735,17 @@ export const BASE_CONHECIMENTO = [
     cor: "gray",
     artigos: [
       {
+        titulo: "Qual é a diferença entre NF-e modelo 55 e NFC-e modelo 65?",
+        tags: ["modelo 55", "modelo 65", "nfe", "nfce", "série", "numeração"],
+        conteudo: [
+          "A **NF-e, modelo 55**, é usada nas vendas de mercadorias que exigem NF-e, como operações com entrega, e-commerce e muitas vendas entre empresas. Confirme a regra da operação com a contabilidade.",
+          "A **NFC-e, modelo 65**, é usada no varejo para consumidor final, normalmente no atendimento presencial. Para emiti-la, a empresa também precisa do CSC do ambiente correspondente.",
+          "Os modelos não compartilham numeração. NF-e modelo 55, série 1, e NFC-e modelo 65, série 1, possuem sequências independentes.",
+          "Homologação e produção também mantêm sequências separadas. Configure sempre o ambiente correto antes de informar a série e o próximo número.",
+          "Em **Configurações → Integrações → IntNFe**, use a ajuda **Qual modelo escolher?** e marque **Continuar com esta série no CorePet** quando quiser manter a série do sistema anterior.",
+        ],
+      },
+      {
         titulo: "Como emitir uma nota fiscal",
         tags: ["nota fiscal", "nfe", "nfce", "emitir", "imposto"],
         conteudo: [

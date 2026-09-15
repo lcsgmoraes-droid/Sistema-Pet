@@ -1,15 +1,30 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import IntNFeNumeracaoView from "./IntNFeNumeracaoView";
-import { numberingRows, prepareNumbering } from "./intnfeNumeracao.mjs";
+import { currentSequence, numberingRows, prepareNumbering } from "./intnfeNumeracao.mjs";
 
-export default function IntNFeNumeracao({ apiClient, disabled = false, onBusy, onData }) {
+const emptyForms = () => ({
+  1: {
+    55: { serie: "1", proximo_numero: "", usar_no_corepet: false },
+    65: { serie: "1", proximo_numero: "", usar_no_corepet: false },
+  },
+  2: {
+    55: { serie: "1", proximo_numero: "", usar_no_corepet: false },
+    65: { serie: "1", proximo_numero: "", usar_no_corepet: false },
+  },
+});
+
+export default function IntNFeNumeracao({
+  apiClient,
+  disabled = false,
+  environment = 2,
+  onBusy,
+  onData,
+  onUseSequence,
+  onClearSequence,
+}) {
   const [rows, setRows] = useState(null);
-  const [form, setForm] = useState({
-    modelo: "55",
-    serie: "1",
-    ambiente_codigo: "2",
-    proximo_numero: "",
-  });
+  const [forms, setForms] = useState(emptyForms);
+  const [models, setModels] = useState({ 1: [55], 2: [55] });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
@@ -19,7 +34,7 @@ export default function IntNFeNumeracao({ apiClient, disabled = false, onBusy, o
   const requestController = useRef(null);
 
   const execute = useCallback(
-    async (payload = null) => {
+    async (payload = null, useForCorePet = false) => {
       if (inFlight.current) return;
       inFlight.current = true;
       const controller = new AbortController();
@@ -39,15 +54,35 @@ export default function IntNFeNumeracao({ apiClient, disabled = false, onBusy, o
           setRows(updated);
           onData?.(response.data);
           if (payload) {
-            setMessage(
-              response.data.mensagem || "Ajuste confirmado. Confira a sequência atual abaixo.",
+            setMessage(response.data.mensagem || "Sequência fiscal salva.");
+            const confirmed = updated.find(
+              (row) =>
+                row.modelo === payload.modelo &&
+                row.ambienteCodigo === payload.ambiente_codigo &&
+                Number(row.serie) === Number(payload.serie),
             );
-            setForm((previous) => ({ ...previous, proximo_numero: "" }));
+            if (useForCorePet && confirmed) {
+              onUseSequence?.({
+                modelo: payload.modelo,
+                serie: String(Number(payload.serie)),
+                proximoNumero: confirmed.proximoNumero,
+                pendente: false,
+              });
+            }
+            setForms((previous) => ({
+              ...previous,
+              [payload.ambiente_codigo]: {
+                ...previous[payload.ambiente_codigo],
+                [payload.modelo]: {
+                  ...previous[payload.ambiente_codigo][payload.modelo],
+                  proximo_numero: "",
+                },
+              },
+            }));
           }
         }
       } catch (failure) {
         if (isCurrent()) {
-          // Falha de escrita pode ocorrer depois da aplicacao. Exigir nova consulta, sem repetir PUT.
           setRows(null);
           onData?.(null);
           const detail = failure?.response?.data?.detail;
@@ -55,8 +90,8 @@ export default function IntNFeNumeracao({ apiClient, disabled = false, onBusy, o
           setError(
             text ||
               (payload
-                ? "Não foi possível confirmar o ajuste. Ele pode ter sido aplicado. Consulte a numeração antes de tentar novamente."
-                : "Não foi possível consultar a numeração. Tente consultar novamente."),
+                ? "Não foi possível confirmar o ajuste. Ele pode ter sido aplicado. Consulte as sequências antes de tentar novamente."
+                : "Não foi possível consultar as sequências. Tente novamente."),
           );
         }
       } finally {
@@ -68,7 +103,7 @@ export default function IntNFeNumeracao({ apiClient, disabled = false, onBusy, o
         }
       }
     },
-    [apiClient, onBusy, onData],
+    [apiClient, onBusy, onData, onUseSequence],
   );
 
   useEffect(() => {
@@ -76,7 +111,6 @@ export default function IntNFeNumeracao({ apiClient, disabled = false, onBusy, o
     execute();
     return () => {
       mounted.current = false;
-      // Descarta a requisicao anterior, inclusive eventual renovacao de sessao.
       requestController.current?.abort();
       requestController.current = null;
       inFlight.current = false;
@@ -84,32 +118,81 @@ export default function IntNFeNumeracao({ apiClient, disabled = false, onBusy, o
     };
   }, [execute, onBusy]);
 
-  const change = (values) => {
+  useEffect(() => {
+    setReview(null);
+    setError("");
+    setMessage("");
+  }, [environment]);
+
+  const change = (model, values) => {
     if (inFlight.current || disabled) return;
-    setForm((previous) => ({ ...previous, ...values }));
+    const nextForm = { ...forms[environment][model], ...values };
+    setForms((previous) => ({
+      ...previous,
+      [environment]: { ...previous[environment], [model]: nextForm },
+    }));
+    if (nextForm.usar_no_corepet && /^[0-9]{1,3}$/.test(nextForm.serie)) {
+      const current = currentSequence(rows || [], nextForm.serie, environment, model);
+      const hasNumber = nextForm.proximo_numero !== "";
+      const validNumber =
+        /^\d{1,9}$/.test(nextForm.proximo_numero) && Number(nextForm.proximo_numero) > 0;
+      onUseSequence?.({
+        modelo: model,
+        serie: String(Number(nextForm.serie)),
+        proximoNumero: validNumber
+          ? Number(nextForm.proximo_numero)
+          : (current?.proximoNumero ?? 1),
+        pendente: Boolean(
+          hasNumber &&
+          (!validNumber || !current || Number(nextForm.proximo_numero) !== current.proximoNumero),
+        ),
+      });
+    }
     setReview(null);
     setMessage("");
+  };
+
+  const toggleUse = (model, checked) => {
+    change(model, { usar_no_corepet: checked });
+    if (!checked) {
+      onClearSequence?.({ modelo: model });
+    }
   };
 
   return (
     <IntNFeNumeracaoView
       rows={rows}
-      form={form}
+      forms={forms[environment]}
+      models={models[environment]}
+      environment={environment}
       busy={busy || disabled}
       error={error}
       message={message}
       review={review}
       onChange={change}
+      onToggleUse={toggleUse}
       onReload={() => execute()}
-      onReview={(event) => {
-        event.preventDefault();
+      onAddNfce={() => setModels((current) => ({ ...current, [environment]: [55, 65] }))}
+      onRemoveNfce={() => {
+        setModels((current) => ({ ...current, [environment]: [55] }));
+        change(65, { usar_no_corepet: false });
+        onClearSequence?.({ modelo: 65 });
+      }}
+      onReview={(model) => {
         if (inFlight.current || disabled) return;
+        const form = {
+          ...forms[environment][model],
+          modelo: String(model),
+          ambiente_codigo: String(environment),
+        };
         const prepared = prepareNumbering(rows, form);
-        if (!prepared.error) setReview(prepared);
+        if (!prepared.error) setReview({ model, ...prepared });
       }}
       onCancel={() => setReview(null)}
       onSave={() => {
-        if (review && !disabled) execute(review.payload);
+        if (review && !disabled) {
+          execute(review.payload, forms[environment][review.model].usar_no_corepet);
+        }
       }}
     />
   );

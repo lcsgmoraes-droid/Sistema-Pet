@@ -6,7 +6,13 @@ const buttonClass =
 const fieldClass =
   "mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-950 disabled:opacity-60 dark:border-slate-600 dark:bg-slate-800 dark:text-white";
 
-export default function IntNFeCsc({ apiClient, disabled = false, onBusy, onData }) {
+export default function IntNFeCsc({
+  apiClient,
+  disabled = false,
+  environment = 2,
+  onBusy,
+  onData,
+}) {
   const [state, setState] = useState(null);
   const [form, setForm] = useState({ ambiente_codigo: "2", csc_id: "", csc: "" });
   const [review, setReview] = useState(false);
@@ -80,11 +86,17 @@ export default function IntNFeCsc({ apiClient, disabled = false, onBusy, onData 
     };
   }, [execute, onBusy]);
 
+  useEffect(() => {
+    setForm({ ambiente_codigo: String(environment), csc_id: "", csc: "" });
+    setReview(false);
+    setMessage("");
+  }, [environment]);
+
   const locked = busy || disabled;
   const selected = state?.ambientes?.find(
     (item) => item.ambiente_codigo === Number(form.ambiente_codigo),
   );
-  const environmentName = Number(form.ambiente_codigo) === 1 ? "produção" : "homologação";
+  const environmentName = environment === 1 ? "produção" : "homologação";
 
   return (
     <section
@@ -97,7 +109,8 @@ export default function IntNFeCsc({ apiClient, disabled = false, onBusy, onData 
           <div>
             <h2 className="text-xl font-bold text-slate-950 dark:text-white">CSC da NFC-e</h2>
             <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
-              Cadastre separadamente os códigos obtidos na SEFAZ para homologação e produção.
+              Código da NFC-e para o ambiente de {environmentName}. Necessário somente para o modelo
+              65.
             </p>
           </div>
         </div>
@@ -123,26 +136,17 @@ export default function IntNFeCsc({ apiClient, disabled = false, onBusy, onData 
         </p>
       )}
 
-      <div className="space-y-3 rounded-xl bg-slate-50 p-4 text-sm dark:bg-slate-800">
-        <div className="grid gap-2 sm:grid-cols-2">
-          {[2, 1].map((environment) => {
-            const item = state?.ambientes?.find(
-              (candidate) => candidate.ambiente_codigo === environment,
-            );
-            return (
-              <p key={environment}>
-                {environment === 2 ? "Homologação" : "Produção"}:{" "}
-                <strong>
-                  {item?.tem_csc
-                    ? `cadastrado · ID ${item.csc_id}`
-                    : state
-                      ? "não cadastrado"
-                      : "não consultado"}
-                </strong>
-              </p>
-            );
-          })}
-        </div>
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-slate-50 p-4 text-sm dark:bg-slate-800">
+        <p>
+          CSC de {environmentName}:{" "}
+          <strong>
+            {selected?.tem_csc
+              ? `cadastrado · ID ${selected.csc_id}`
+              : state
+                ? "não cadastrado"
+                : "não consultado"}
+          </strong>
+        </p>
         <button
           type="button"
           disabled={locked}
@@ -162,26 +166,7 @@ export default function IntNFeCsc({ apiClient, disabled = false, onBusy, onData 
             if (!locked && form.csc_id.trim() && form.csc.trim()) setReview(true);
           }}
         >
-          <div className="grid gap-4 sm:grid-cols-3">
-            <label className="text-sm font-semibold">
-              Ambiente
-              <select
-                className={fieldClass}
-                value={form.ambiente_codigo}
-                disabled={locked}
-                onChange={(event) => {
-                  setForm({
-                    ambiente_codigo: event.target.value,
-                    csc_id: "",
-                    csc: "",
-                  });
-                  setMessage("");
-                }}
-              >
-                <option value="2">Homologação (testes)</option>
-                <option value="1">Produção</option>
-              </select>
-            </label>
+          <div className="grid gap-4 sm:grid-cols-2">
             <label className="text-sm font-semibold">
               ID do CSC
               <input
@@ -271,8 +256,8 @@ export default function IntNFeCsc({ apiClient, disabled = false, onBusy, onData 
       )}
 
       <p className="border-t border-slate-100 pt-4 text-sm text-slate-500 dark:border-slate-800 dark:text-slate-400">
-        Os CSCs de homologação e produção são diferentes. Configurar a produção não emite notas;
-        cada emissão continuará exigindo a seleção explícita do ambiente.
+        Homologação e produção usam CSCs diferentes. O código digitado aqui será associado somente
+        ao ambiente de {environmentName}.
       </p>
     </section>
   );
