@@ -334,9 +334,13 @@ def _melhor_sugestao_catalogo(db: Session, produto) -> Optional[Dict]:
     if db is None or produto is None:
         return None
     try:
-        sugestoes = sugerir_fiscal_por_descricao(
-            db, getattr(produto, "nome", None) or ""
-        )
+        # O catalogo e uma fonte opcional. Execute a consulta em um savepoint para
+        # que uma instalacao sem essa tabela (ou com o catalogo indisponivel) nao
+        # aborte a transacao principal da pre-validacao fiscal.
+        with db.begin_nested():
+            sugestoes = sugerir_fiscal_por_descricao(
+                db, getattr(produto, "nome", None) or ""
+            )
         return sugestoes[0] if sugestoes else None
     except Exception:
         # O catalogo auxilia o preenchimento, mas nunca pode impedir a validacao.

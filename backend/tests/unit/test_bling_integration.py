@@ -138,6 +138,40 @@ def test_prevalidacao_direta_identifica_campos_editaveis_e_sugestoes(monkeypatch
     assert all(item["produto_id"] == 10 for item in validacao["correcoes"])
 
 
+def test_catalogo_opcional_falha_dentro_de_savepoint_sem_interromper_validacao(
+    monkeypatch,
+):
+    eventos = []
+
+    class Savepoint:
+        def __enter__(self):
+            eventos.append("abriu")
+
+        def __exit__(self, exc_type, _exc, _traceback):
+            eventos.append(("fechou", exc_type))
+            return False
+
+    class Db:
+        def begin_nested(self):
+            return Savepoint()
+
+    def catalogo_indisponivel(*_args):
+        raise RuntimeError("tabela de catalogo indisponivel")
+
+    monkeypatch.setattr(
+        bling_integration_fiscal,
+        "sugerir_fiscal_por_descricao",
+        catalogo_indisponivel,
+    )
+
+    sugestao = bling_integration_fiscal._melhor_sugestao_catalogo(
+        Db(), SimpleNamespace(nome="Portao pet")
+    )
+
+    assert sugestao is None
+    assert eventos == ["abriu", ("fechou", RuntimeError)]
+
+
 def test_emitir_nfce_bloqueia_ncm_zerado_antes_de_criar_nota_no_bling(monkeypatch):
     api = _make_api()
     venda = _make_venda_nfce()
