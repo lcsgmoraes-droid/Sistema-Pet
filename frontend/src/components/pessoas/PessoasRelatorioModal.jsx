@@ -30,6 +30,7 @@ export default function PessoasRelatorioModal({
   const [ordenacao, setOrdenacao] = useState("nome_asc");
   const [colunas, setColunas] = useState(COLUNAS_PADRAO_RELATORIO_PESSOAS);
   const [pessoas, setPessoas] = useState([]);
+  const [empresa, setEmpresa] = useState({});
   const [loading, setLoading] = useState(true);
   const [erro, setErro] = useState("");
   const [atualizacao, setAtualizacao] = useState(0);
@@ -50,7 +51,10 @@ export default function PessoasRelatorioModal({
           tipo_cadastro: tipo === "todos" ? undefined : tipo,
           search: busca.trim() || undefined,
         });
-        if (requisicao === requisicaoAtual.current) setPessoas(resultado);
+        if (requisicao === requisicaoAtual.current) {
+          setPessoas(resultado.pessoas);
+          setEmpresa(resultado.empresa);
+        }
       } catch (error) {
         if (requisicao !== requisicaoAtual.current) return;
         console.error("Erro ao carregar relatorio de pessoas:", error);
@@ -114,7 +118,7 @@ export default function PessoasRelatorioModal({
 
     setExportando(formato);
     try {
-      const opcoes = { pessoas: pessoasOrdenadas, colunas, tipo, busca: busca.trim() };
+      const opcoes = { pessoas: pessoasOrdenadas, colunas, tipo, busca: busca.trim(), empresa };
       if (formato === "excel") await exportarPessoasExcel(opcoes);
       else await exportarPessoasPdf(opcoes);
       toast.success(`Relatorio em ${formato === "excel" ? "Excel" : "PDF"} gerado.`);
