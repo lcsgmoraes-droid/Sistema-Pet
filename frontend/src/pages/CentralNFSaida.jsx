@@ -2,8 +2,8 @@ import { useEffect, useRef, useState } from "react";
 import api from "../api";
 import CentralNFSaidaView from "./centralNFSaida/CentralNFSaidaView";
 import {
+  carregarDetalheIntNFe,
   identificadorDocumentoFiscal,
-  mesclarStatusIntNFe,
   montarDetalheFallback,
   rotaDocumentoFiscal,
   soDigitos,
@@ -239,14 +239,10 @@ export default function CentralNFSaida() {
     if (nota.provedor === "intnfe") {
       try {
         setCarregandoDetalhe(true);
-        const { data } = await api.get(`/nfe/vendas/${nota.venda_id}/status`);
-        const notaAtualizada = mesclarStatusIntNFe(nota, data);
-        setNotaSelecionada(notaAtualizada);
-        setDetalheNota(montarDetalheFallback(notaAtualizada));
-      } catch (error) {
-        setErroDetalhe(
-          error.response?.data?.detail || "Não foi possível atualizar o status na IntNFe.",
-        );
+        const resultado = await carregarDetalheIntNFe(api, nota);
+        setNotaSelecionada(resultado.nota);
+        setDetalheNota(resultado.detalhe);
+        setErroDetalhe(resultado.aviso);
       } finally {
         setCarregandoDetalhe(false);
       }

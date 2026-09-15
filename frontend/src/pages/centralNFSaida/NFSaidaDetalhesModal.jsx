@@ -66,7 +66,7 @@ export default function NFSaidaDetalhesModal({
             <div className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800 flex items-center gap-2">
               <RefreshCw className="w-4 h-4 animate-spin" />
               {notaIntNFe
-                ? "Atualizando o status da nota na IntNFe..."
+                ? "Carregando a venda e atualizando o status na IntNFe..."
                 : "Carregando detalhes completos da nota no Bling..."}
             </div>
           )}
@@ -216,6 +216,12 @@ export default function NFSaidaDetalhesModal({
           </SecaoDetalhe>
 
           <SecaoDetalhe titulo="Itens da nota">
+            {notaIntNFe && detalheNota?.itens?.length ? (
+              <p className="text-xs text-gray-500">
+                Produto e valores vêm da venda salva. NCM, CEST, CFOP e CST refletem o cadastro
+                fiscal atual do CorePet.
+              </p>
+            ) : null}
             {detalheNota?.itens?.length ? (
               <div className="overflow-x-auto">
                 <table className="min-w-full divide-y divide-gray-200 text-sm">
@@ -230,6 +236,11 @@ export default function NFSaidaDetalhesModal({
                         Preço total
                       </th>
                       <th className="px-3 py-2 text-left font-semibold text-gray-500">NCM</th>
+                      <th className="px-3 py-2 text-left font-semibold text-gray-500">CEST</th>
+                      <th className="px-3 py-2 text-left font-semibold text-gray-500">CFOP</th>
+                      <th className="px-3 py-2 text-left font-semibold text-gray-500">ICMS</th>
+                      <th className="px-3 py-2 text-left font-semibold text-gray-500">PIS</th>
+                      <th className="px-3 py-2 text-left font-semibold text-gray-500">COFINS</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100 bg-white">
@@ -248,6 +259,11 @@ export default function NFSaidaDetalhesModal({
                           {formatMoneyBRL(item.valor_total || 0)}
                         </td>
                         <td className="px-3 py-2 text-gray-600">{item.ncm || "-"}</td>
+                        <td className="px-3 py-2 text-gray-600">{item.cest || "-"}</td>
+                        <td className="px-3 py-2 text-gray-600">{item.cfop || "-"}</td>
+                        <td className="px-3 py-2 text-gray-600">{item.icms || "-"}</td>
+                        <td className="px-3 py-2 text-gray-600">{item.pis || "-"}</td>
+                        <td className="px-3 py-2 text-gray-600">{item.cofins || "-"}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -362,7 +378,9 @@ export default function NFSaidaDetalhesModal({
                 </div>
               ) : (
                 <p className="text-sm text-gray-500">
-                  Sem parcelas detalhadas na resposta do Bling.
+                  {notaIntNFe
+                    ? "Nenhum pagamento vinculado à venda foi encontrado."
+                    : "Sem parcelas detalhadas na resposta do Bling."}
                 </p>
               )}
             </SecaoDetalhe>

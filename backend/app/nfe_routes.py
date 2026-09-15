@@ -32,6 +32,7 @@ from app.intnfe.emission import (
     direct_emission_enabled,
     download_document as download_intnfe_document,
     issue as issue_intnfe,
+    local_document_details as local_intnfe_details,
     preview as preview_intnfe,
     reconcile as reconcile_intnfe,
 )
@@ -457,6 +458,22 @@ def status_intnfe_venda(
         raise _direct_failure(exc) from None
     finally:
         api.close()
+
+
+@router.get("/vendas/{venda_id}/detalhes")
+def detalhes_intnfe_venda(
+    venda_id: int,
+    db: Session = Depends(get_session),
+    user_and_tenant=Depends(get_current_user_and_tenant),
+):
+    """Retorna o documento fiscal usando a venda persistida no CorePet."""
+    _user, tenant_id = user_and_tenant
+    venda = _buscar_venda_para_nfe(db, venda_id, tenant_id)
+    if not venda:
+        raise HTTPException(404, "Venda não encontrada")
+    if venda.nfe_provider != "intnfe" and not venda.nfe_correlation_id:
+        raise HTTPException(404, "Esta venda não possui uma nota da IntNFe")
+    return local_intnfe_details(db, get_tenant(db, tenant_id), venda)
 
 
 @router.get("/vendas/{venda_id}/xml")

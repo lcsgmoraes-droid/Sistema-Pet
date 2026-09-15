@@ -439,6 +439,192 @@ def preview(db, tenant, venda, document_type):
     }
 
 
+def local_document_details(db, tenant, venda):
+    """Monta os detalhes da nota a partir da venda salva no CorePet.
+
+    A consulta não depende de XML/DANFE nem de uma nova chamada à IntNFe. Isso
+    permite explicar uma rejeição usando os mesmos produtos e dados fiscais que
+    permanecem vinculados à venda.
+    """
+    cliente = venda.cliente
+    emitter_uf = (_text(getattr(tenant, "uf", None)) or "").upper()
+    destination_uf = (
+        (_text(getattr(cliente, "estado", None)) or emitter_uf).upper()
+        if cliente
+        else emitter_uf
+    )
+    interstate = bool(emitter_uf and destination_uf and emitter_uf != destination_uf)
+
+    items = []
+    product_total = Decimal("0")
+    item_discount_total = Decimal("0")
+    for sale_item in venda.itens or []:
+        product = getattr(sale_item, "produto", None)
+        quantity = Decimal(str(getattr(sale_item, "quantidade", 0) or 0))
+        unit_price = Decimal(str(getattr(sale_item, "preco_unitario", 0) or 0))
+        discount = _money(getattr(sale_item, "desconto_item", 0))
+        subtotal = _money(getattr(sale_item, "subtotal", 0))
+        gross = subtotal + discount
+        if gross == 0 and quantity:
+            gross = (quantity * unit_price).quantize(CENT, rounding=ROUND_HALF_UP)
+
+        fiscal = {}
+        if product and _ascii(getattr(sale_item, "tipo", None)) == "produto":
+            try:
+                fiscal = _resolver_fiscal_item_nfe(db, venda, sale_item) or {}
+            except Exception:
+                # O item precisa continuar visível mesmo se seu cadastro fiscal
+                # tiver sido alterado ou estiver incompleto depois da emissão.
+                fiscal = {}
+
+        cfop = (
+            fiscal.get("cfop_interestadual")
+            if interstate
+            else fiscal.get("cfop_interno")
+        )
+        items.append(
+            {
+                "produto_id": getattr(sale_item, "produto_id", None),
+                "codigo": (
+                    _text(getattr(product, "codigo", None))
+                    or _text(getattr(product, "codigo_barras", None))
+                    or (str(getattr(product, "id", "")) if product else None)
+                ),
+                "descricao": (
+                    _text(getattr(product, "nome", None))
+                    or _text(getattr(sale_item, "servico_descricao", None))
+                ),
+                "unidade": _text(getattr(product, "unidade", None)) or "UN",
+                "quantidade": _number(quantity),
+                "valor_unitario": float(unit_price),
+                "valor_total": float(gross),
+                "desconto": float(discount),
+                "ncm": _digits(fiscal.get("ncm")) or None,
+                "cest": _digits(fiscal.get("cest")) or None,
+                "cfop": _text(cfop),
+                "icms": _text(fiscal.get("cst_icms")),
+                "pis": _text(fiscal.get("pis_cst")),
+                "cofins": _text(fiscal.get("cofins_cst")),
+            }
+        )
+        product_total += gross
+        item_discount_total += discount
+
+    sale_discount = _money(getattr(venda, "desconto_valor", 0))
+    total_discount = item_discount_total if item_discount_total else sale_discount
+    freight = _money(venda.taxa_entrega if venda.tem_entrega else 0)
+    issue_at = getattr(venda, "nfe_data_emissao", None)
+    channel = re.sub(r"[^a-z0-9]+", "_", _ascii(venda.canal)).strip("_")
+
+    customer_document = None
+    if cliente:
+        customer_document = _digits(
+            getattr(cliente, "cnpj", None) or getattr(cliente, "cpf", None)
+        )
+
+    return {
+        "id": venda.id,
+        "numero": venda.nfe_numero,
+        "serie": venda.nfe_serie,
+        "modelo": int(venda.nfe_modelo or (55 if venda.nfe_tipo == "nfe" else 65)),
+        "tipo": venda.nfe_tipo or "nfe",
+        "chave": venda.nfe_chave,
+        "status": venda.nfe_status,
+        "provedor": "intnfe",
+        "codigo_erro": venda.nfe_codigo_erro,
+        "motivo_rejeicao": venda.nfe_motivo_rejeicao,
+        "protocolo": venda.nfe_protocolo,
+        "ambiente_codigo": venda.nfe_ambiente,
+        "data_emissao": issue_at.isoformat() if issue_at else None,
+        "hora_emissao": issue_at.strftime("%H:%M:%S") if issue_at else None,
+        "natureza_operacao": "Venda de mercadoria",
+        "finalidade": "1 - NF-e normal",
+        "indicador_presenca": (
+            "1 - Operação presencial" if channel == "loja_fisica" else "9 - Outros"
+        ),
+        "cliente": {
+            "id": getattr(cliente, "id", None),
+            "codigo": getattr(cliente, "codigo", None),
+            "nome": getattr(cliente, "nome", None),
+            "tipo_pessoa": getattr(cliente, "tipo_pessoa", None),
+            "cpf_cnpj": customer_document,
+            "vendedor": getattr(getattr(venda, "vendedor", None), "nome", None),
+            "consumidor_final": True,
+            "telefone": (
+                getattr(cliente, "celular", None) or getattr(cliente, "telefone", None)
+                if cliente
+                else None
+            ),
+            "email": getattr(cliente, "email", None),
+            "cep": getattr(cliente, "cep", None),
+            "uf": getattr(cliente, "estado", None),
+            "municipio": getattr(cliente, "cidade", None),
+            "bairro": getattr(cliente, "bairro", None),
+            "endereco": getattr(cliente, "endereco", None),
+            "numero": getattr(cliente, "numero", None),
+            "complemento": getattr(cliente, "complemento", None),
+        }
+        if cliente
+        else {},
+        "canal": venda.canal,
+        "canal_label": {
+            "loja_fisica": "PDV / Loja física",
+            "mercado_livre": "Mercado Livre",
+            "shopee": "Shopee",
+            "amazon": "Amazon",
+            "tiktok_shop": "TikTok Shop",
+        }.get(channel, venda.canal),
+        "itens": items,
+        "totais": {
+            "valor_produtos": float(product_total),
+            "valor_frete": float(freight),
+            "valor_seguro": 0,
+            "outras_despesas": 0,
+            "valor_desconto": float(total_discount),
+            "valor_total": float(_money(venda.total)),
+        },
+        "transporte": {
+            "tipo": "Entrega local" if venda.tem_entrega else "Sem transporte",
+            "frete_por_conta": "9 - Sem ocorrência de transporte",
+        },
+        "endereco_entrega": {
+            "nome": getattr(cliente, "nome", None) if venda.tem_entrega else None,
+            "endereco": venda.endereco_entrega if venda.tem_entrega else None,
+        },
+        "pagamento": {
+            "condicao": ", ".join(
+                dict.fromkeys(
+                    str(payment.forma_pagamento)
+                    for payment in (venda.pagamentos or [])
+                    if getattr(payment, "forma_pagamento", None)
+                )
+            )
+            or None,
+            "parcelas": [
+                {
+                    "dias": getattr(payment, "prazo_recebimento_dias", None),
+                    "data": (
+                        payment.data_recebimento_prevista.isoformat()
+                        if getattr(payment, "data_recebimento_prevista", None)
+                        else None
+                    ),
+                    "valor": float(_money(payment.valor)),
+                    "forma": payment.forma_pagamento,
+                    "observacao": getattr(payment, "numero_transacao", None),
+                }
+                for payment in (venda.pagamentos or [])
+            ],
+        },
+        "intermediador": {},
+        "informacoes_adicionais": {
+            "numero_pedido_loja": venda.numero_venda,
+            "origem_canal_venda": venda.canal,
+            "informacoes_complementares": venda.observacoes,
+        },
+        "pessoas_autorizadas_xml": [],
+    }
+
+
 def _access_token(api, connection, environment=None):
     client_id, secret = _emitter_credentials(connection, environment)
     try:

@@ -164,3 +164,35 @@ export function montarDetalheFallback(nota) {
     intermediador: {},
   };
 }
+
+export async function carregarDetalheIntNFe(api, nota) {
+  const [statusResult, detalheResult] = await Promise.allSettled([
+    api.get(`/nfe/vendas/${nota.venda_id}/status`),
+    api.get(`/nfe/vendas/${nota.venda_id}/detalhes`),
+  ]);
+  const status = statusResult.status === "fulfilled" ? statusResult.value.data : {};
+  const notaAtualizada = mesclarStatusIntNFe(nota, status);
+  const detalheLocal =
+    detalheResult.status === "fulfilled"
+      ? detalheResult.value.data
+      : montarDetalheFallback(notaAtualizada);
+
+  let aviso = "";
+  if (statusResult.status === "rejected" && detalheResult.status === "rejected") {
+    aviso = "Não foi possível carregar os detalhes desta nota.";
+  } else if (statusResult.status === "rejected") {
+    aviso = "Os dados da venda foram carregados, mas o status da IntNFe não atualizou.";
+  } else if (detalheResult.status === "rejected") {
+    aviso = "O status foi atualizado, mas os dados completos da venda não carregaram.";
+  }
+
+  return {
+    nota: notaAtualizada,
+    detalhe: {
+      ...detalheLocal,
+      codigo_erro: status.codigo_erro || detalheLocal.codigo_erro,
+      motivo_rejeicao: status.motivo_rejeicao || detalheLocal.motivo_rejeicao,
+    },
+    aviso,
+  };
+}
