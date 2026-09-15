@@ -11,6 +11,13 @@ MIGRATION = (
     / "versions"
     / "zxd20260826a1_seed_permission_catalog.py"
 )
+MODULE_ACCESS_MIGRATION = (
+    ROOT
+    / "backend"
+    / "alembic"
+    / "versions"
+    / "zxm20260828a1_module_access_permissions.py"
+)
 APP_ROOT = ROOT / "backend" / "app"
 DEFAULT_ROLES = APP_ROOT / "services" / "default_roles_service.py"
 PERMISSION_PATTERN = re.compile(
@@ -19,17 +26,23 @@ PERMISSION_PATTERN = re.compile(
 
 
 def _catalog() -> dict[str, str]:
-    tree = ast.parse(MIGRATION.read_text(encoding="utf-8"))
-    assignment = next(
-        node
-        for node in tree.body
-        if isinstance(node, ast.Assign)
-        and any(
-            isinstance(target, ast.Name) and target.id == "PERMISSION_CATALOG"
-            for target in node.targets
+    catalog = {}
+    for migration, variable_name in (
+        (MIGRATION, "PERMISSION_CATALOG"),
+        (MODULE_ACCESS_MIGRATION, "MODULE_PERMISSIONS"),
+    ):
+        tree = ast.parse(migration.read_text(encoding="utf-8"))
+        assignment = next(
+            node
+            for node in tree.body
+            if isinstance(node, ast.Assign)
+            and any(
+                isinstance(target, ast.Name) and target.id == variable_name
+                for target in node.targets
+            )
         )
-    )
-    return dict(ast.literal_eval(assignment.value))
+        catalog.update(dict(ast.literal_eval(assignment.value)))
+    return catalog
 
 
 def _permission_literals(source: str) -> set[str]:
@@ -82,7 +95,21 @@ def test_permission_catalog_has_unique_codes_and_meaningful_descriptions():
         )
     )
 
-    assert len(catalog) == len(catalog_literal)
+    module_catalog_literal = ast.literal_eval(
+        next(
+            node.value
+            for node in ast.parse(
+                MODULE_ACCESS_MIGRATION.read_text(encoding="utf-8")
+            ).body
+            if isinstance(node, ast.Assign)
+            and any(
+                isinstance(target, ast.Name) and target.id == "MODULE_PERMISSIONS"
+                for target in node.targets
+            )
+        )
+    )
+
+    assert len(catalog) == len(catalog_literal) + len(module_catalog_literal)
     assert all("." in code for code in catalog)
     assert all(len(description.strip()) >= 8 for description in catalog.values())
 
