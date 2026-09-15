@@ -61,12 +61,87 @@ function SequenceProgress({ document, model, series, sequence, initialNumber }) 
   );
 }
 
+function SequenceRadar({ rows, environment, savedConfigurations }) {
+  const visible = rows
+    .filter((row) => row.ambienteCodigo === environment)
+    .sort((a, b) => a.modelo - b.modelo || Number(a.serie) - Number(b.serie));
+
+  if (!visible.length) return null;
+
+  return (
+    <div className="space-y-3">
+      <div>
+        <h3 className="font-bold text-slate-950 dark:text-white">Radar das sequências fiscais</h3>
+        <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
+          Consulte o último número registrado e o próximo número disponível em cada modelo e série.
+        </p>
+      </div>
+      <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-700">
+        <table className="min-w-full divide-y divide-slate-200 text-left text-sm dark:divide-slate-700">
+          <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500 dark:bg-slate-950/50">
+            <tr>
+              <th className="px-4 py-3">Documento</th>
+              <th className="px-4 py-3">Série</th>
+              <th className="px-4 py-3">Início no CorePet</th>
+              <th className="px-4 py-3">Último no emissor</th>
+              <th className="px-4 py-3">Próximo número</th>
+              <th className="px-4 py-3">Uso no CorePet</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100 bg-white dark:divide-slate-800 dark:bg-slate-900">
+            {visible.map((row) => {
+              const saved = savedConfigurations.find(
+                (item) =>
+                  item.ambiente_codigo === environment &&
+                  item.modelo === row.modelo &&
+                  Number(item.serie) === Number(row.serie),
+              );
+              return (
+                <tr key={`${row.modelo}:${row.serie}`}>
+                  <td className="whitespace-nowrap px-4 py-3 font-semibold">
+                    {row.modelo === 65 ? "NFC-e" : "NF-e"} · modelo {row.modelo}
+                  </td>
+                  <td className="whitespace-nowrap px-4 py-3">{row.serie.padStart(3, "0")}</td>
+                  <td className="whitespace-nowrap px-4 py-3">
+                    {saved ? formatSequence(saved.numero_inicial) : "—"}
+                  </td>
+                  <td className="whitespace-nowrap px-4 py-3 font-semibold">
+                    {formatSequence(row.ultimoNumero)}
+                  </td>
+                  <td className="whitespace-nowrap px-4 py-3 font-semibold">
+                    {formatSequence(row.proximoNumero)}
+                  </td>
+                  <td className="whitespace-nowrap px-4 py-3">
+                    {saved ? (
+                      <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-bold text-emerald-900">
+                        Escolhida no CorePet
+                      </span>
+                    ) : (
+                      <span className="text-slate-500">Disponível</span>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+      <p className="text-xs text-slate-500">
+        O número é controlado separadamente por ambiente, modelo e série. A sequência só pode
+        avançar. Este é o número fiscal da NF-e ou NFC-e; não é o NSU da SEFAZ nem o NSU de uma
+        transação de cartão.
+      </p>
+    </div>
+  );
+}
+
 export default function IntNFeAmbienteEmissao({
   apiClient,
   disabled,
   environment = 2,
   choices = {},
   numberingData,
+  configurationData,
   onBusy,
   onData,
 }) {
@@ -113,6 +188,18 @@ export default function IntNFeAmbienteEmissao({
   }, [apiClient, onBusy, onData]);
 
   useEffect(() => {
+    if (!configurationData) return;
+    setData(configurationData);
+    setSelections((current) => {
+      const next = { 1: { ...current[1] }, 2: { ...current[2] } };
+      for (const configuration of configurationData.configuracoes || []) {
+        next[configuration.ambiente_codigo][configuration.modelo] = configuration.serie;
+      }
+      return next;
+    });
+  }, [configurationData]);
+
+  useEffect(() => {
     setSelections((current) => ({
       ...current,
       [environment]: {
@@ -136,7 +223,7 @@ export default function IntNFeAmbienteEmissao({
   );
   const nfeSequence = selected[55] ? currentSequence(rows, selected[55], environment, 55) : null;
   const nfceSequence = selected[65] ? currentSequence(rows, selected[65], environment, 65) : null;
-  const savedConfigurations = data?.configuracoes || [];
+  const savedConfigurations = configurationData?.configuracoes || data?.configuracoes || [];
   const savedNfe = savedConfigurations.find(
     (item) => item.ambiente_codigo === environment && item.modelo === 55,
   );
@@ -310,6 +397,12 @@ export default function IntNFeAmbienteEmissao({
           />
         </div>
       </div>
+
+      <SequenceRadar
+        rows={rows}
+        environment={environment}
+        savedConfigurations={savedConfigurations}
+      />
 
       {pendingSequence ? (
         <p className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm font-semibold text-amber-950">

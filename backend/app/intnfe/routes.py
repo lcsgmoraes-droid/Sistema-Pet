@@ -38,12 +38,14 @@ from app.intnfe.fiscal_profile import (
     sync_fiscal_profile,
 )
 from app.intnfe.environment import (
+    DefaultSeriesInput,
     EnvironmentError,
     EnvironmentInput,
     EnvironmentView,
     configure_environment,
     disable_environment,
     read_environment,
+    save_default_series,
 )
 from app.intnfe.numbering import (
     NumberingError,
@@ -305,6 +307,26 @@ def configure_emission_environment_route(
     _require_pilot_tenant(tenant_id)
     try:
         return configure_environment(
+            db, tenant_id, api, body, _environment_audit(db, user, tenant_id)
+        )
+    except EnvironmentError as exc:
+        raise _environment_failure(exc) from None
+    except ActivationError as exc:
+        raise HTTPException(exc.status, str(exc)) from None
+
+
+@router.put("/ambiente-emissao/serie-padrao", response_model=EnvironmentView)
+def save_default_series_route(
+    body: DefaultSeriesInput,
+    db: Session = Depends(get_session),
+    user_and_tenant=Depends(get_current_user_and_tenant),
+    api=Depends(get_client),
+):
+    user, tenant_id = user_and_tenant
+    set_current_tenant(tenant_id)
+    _require_pilot_tenant(tenant_id)
+    try:
+        return save_default_series(
             db, tenant_id, api, body, _environment_audit(db, user, tenant_id)
         )
     except EnvironmentError as exc:

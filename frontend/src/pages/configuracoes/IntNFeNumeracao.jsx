@@ -21,6 +21,8 @@ export default function IntNFeNumeracao({
   onData,
   onUseSequence,
   onClearSequence,
+  savedConfigurations = [],
+  onEnvironmentData,
 }) {
   const [rows, setRows] = useState(null);
   const [forms, setForms] = useState(emptyForms);
@@ -33,9 +35,34 @@ export default function IntNFeNumeracao({
   const inFlight = useRef(false);
   const requestController = useRef(null);
 
+  const saveChoice = useCallback(
+    async (model, targetEnvironment, serie) => {
+      const response = await apiClient.put("/intnfe/ambiente-emissao/serie-padrao", {
+        ambiente_codigo: targetEnvironment,
+        modelo: model,
+        serie: String(Number(serie)),
+      });
+      onEnvironmentData?.(response.data);
+      const saved = response.data.configuracoes?.find(
+        (item) => item.ambiente_codigo === targetEnvironment && item.modelo === model,
+      );
+      if (saved) {
+        onUseSequence?.({
+          modelo: model,
+          serie: saved.serie,
+          proximoNumero: saved.numero_inicial,
+          pendente: false,
+        });
+      }
+      return response.data;
+    },
+    [apiClient, onEnvironmentData, onUseSequence],
+  );
+
   const execute = useCallback(
     async (payload = null, useForCorePet = false) => {
       if (inFlight.current) return;
+      let numberingConfirmed = false;
       inFlight.current = true;
       const controller = new AbortController();
       requestController.current = controller;
@@ -54,6 +81,7 @@ export default function IntNFeNumeracao({
           setRows(updated);
           onData?.(response.data);
           if (payload) {
+            numberingConfirmed = true;
             setMessage(response.data.mensagem || "Sequência fiscal salva.");
             const confirmed = updated.find(
               (row) =>
@@ -62,12 +90,12 @@ export default function IntNFeNumeracao({
                 Number(row.serie) === Number(payload.serie),
             );
             if (useForCorePet && confirmed) {
-              onUseSequence?.({
-                modelo: payload.modelo,
-                serie: String(Number(payload.serie)),
-                proximoNumero: confirmed.proximoNumero,
-                pendente: false,
-              });
+              const saved = await saveChoice(
+                payload.modelo,
+                payload.ambiente_codigo,
+                confirmed.serie,
+              );
+              setMessage(saved.mensagem || "Sequência e série padrão salvas no CorePet.");
             }
             setForms((previous) => ({
               ...previous,
@@ -83,15 +111,19 @@ export default function IntNFeNumeracao({
         }
       } catch (failure) {
         if (isCurrent()) {
-          setRows(null);
-          onData?.(null);
+          if (!numberingConfirmed) {
+            setRows(null);
+            onData?.(null);
+          }
           const detail = failure?.response?.data?.detail;
           const text = typeof detail === "string" ? detail : detail?.mensagem;
           setError(
             text ||
-              (payload
-                ? "Não foi possível confirmar o ajuste. Ele pode ter sido aplicado. Consulte as sequências antes de tentar novamente."
-                : "Não foi possível consultar as sequências. Tente novamente."),
+              (numberingConfirmed
+                ? "A sequência foi atualizada, mas a escolha da série no CorePet não foi salva. Confira a lista e tente salvar a escolha novamente."
+                : payload
+                  ? "Não foi possível confirmar o ajuste. Ele pode ter sido aplicado. Consulte as sequências antes de tentar novamente."
+                  : "Não foi possível consultar as sequências. Tente novamente."),
           );
         }
       } finally {
@@ -103,7 +135,7 @@ export default function IntNFeNumeracao({
         }
       }
     },
-    [apiClient, onBusy, onData, onUseSequence],
+    [apiClient, onBusy, onData, saveChoice],
   );
 
   useEffect(() => {
@@ -123,6 +155,33 @@ export default function IntNFeNumeracao({
     setError("");
     setMessage("");
   }, [environment]);
+
+  useEffect(() => {
+    if (!savedConfigurations.length) return;
+    setForms((previous) => {
+      const next = {
+        1: { 55: { ...previous[1][55] }, 65: { ...previous[1][65] } },
+        2: { 55: { ...previous[2][55] }, 65: { ...previous[2][65] } },
+      };
+      for (const saved of savedConfigurations) {
+        next[saved.ambiente_codigo][saved.modelo] = {
+          ...next[saved.ambiente_codigo][saved.modelo],
+          serie: saved.serie,
+          usar_no_corepet: true,
+        };
+      }
+      return next;
+    });
+    setModels((previous) => {
+      const next = { 1: [...previous[1]], 2: [...previous[2]] };
+      for (const saved of savedConfigurations) {
+        if (saved.modelo === 65 && !next[saved.ambiente_codigo].includes(65)) {
+          next[saved.ambiente_codigo].push(65);
+        }
+      }
+      return next;
+    });
+  }, [savedConfigurations]);
 
   const change = (model, values) => {
     if (inFlight.current || disabled) return;
@@ -169,6 +228,7 @@ export default function IntNFeNumeracao({
       error={error}
       message={message}
       review={review}
+      savedConfigurations={savedConfigurations}
       onChange={change}
       onToggleUse={toggleUse}
       onReload={() => execute()}
@@ -186,12 +246,44 @@ export default function IntNFeNumeracao({
           ambiente_codigo: String(environment),
         };
         const prepared = prepareNumbering(rows, form);
-        if (!prepared.error) setReview({ model, ...prepared });
+        const current = currentSequence(rows || [], form.serie, environment, model);
+        const sameNext =
+          current &&
+          (form.proximo_numero === "" || Number(form.proximo_numero) === current.proximoNumero);
+        if (form.usar_no_corepet && current && sameNext) {
+          setReview({ model, current, payload: null, selectionOnly: true });
+        } else if (!prepared.error) {
+          setReview({ model, ...prepared });
+        }
       }}
       onCancel={() => setReview(null)}
       onSave={() => {
         if (review && !disabled) {
-          execute(review.payload, forms[environment][review.model].usar_no_corepet);
+          const form = forms[environment][review.model];
+          if (review.selectionOnly) {
+            if (inFlight.current) return;
+            inFlight.current = true;
+            setBusy(true);
+            onBusy?.(true);
+            setError("");
+            setMessage("");
+            saveChoice(review.model, environment, form.serie)
+              .then((saved) => {
+                setMessage(saved.mensagem || "Série padrão salva no CorePet.");
+                setReview(null);
+              })
+              .catch((failure) => {
+                const detail = failure?.response?.data?.detail;
+                setError(detail?.mensagem || detail || "Não foi possível salvar a série padrão.");
+              })
+              .finally(() => {
+                inFlight.current = false;
+                setBusy(false);
+                onBusy?.(false);
+              });
+          } else {
+            execute(review.payload, form.usar_no_corepet);
+          }
         }
       }}
     />

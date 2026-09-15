@@ -134,6 +134,36 @@ def test_read_normalizes_series_and_status_enables_numbering(store, http_pilot):
     assert store.writes == []
 
 
+def test_existing_sequence_can_be_saved_as_corepet_default_without_remote_advance(
+    store, http_pilot, pilot
+):
+    client, access, _app = http_pilot
+
+    response = client.put(
+        "/intnfe/ambiente-emissao/serie-padrao",
+        json={"ambiente_codigo": 2, "modelo": 55, "serie": "003"},
+    )
+
+    assert response.status_code == 200, response.text
+    assert response.json()["configuracoes"] == [
+        {
+            "ambiente_codigo": 2,
+            "modelo": 55,
+            "serie": "3",
+            "numero_inicial": 2,
+        }
+    ]
+    assert pilot.api.environment_activations == []
+    assert store.writes == []
+    assert access["audits"][-1]["new_value"] == {
+        "ambiente": 2,
+        "modelo": 55,
+        "serie": "3",
+        "numero_inicial": 2,
+        "resultado": "serie_padrao_salva",
+    }
+
+
 @pytest.mark.parametrize("next_number", [1, 2])
 def test_equal_or_backward_sequence_never_sends_put(store, http_pilot, next_number):
     client, _access, _app = http_pilot

@@ -4,9 +4,11 @@ import pytest
 
 from app.intnfe.client import IntNFeError
 from app.intnfe.environment import (
+    DefaultSeriesInput,
     EnvironmentError,
     EnvironmentInput,
     configure_environment,
+    save_default_series,
 )
 from app.intnfe.service import activate
 from tests.unit import test_intnfe_activation as activation_fixtures
@@ -149,6 +151,84 @@ def test_same_series_preserves_start_and_new_series_replaces_it(pilot):
     )
     saved = next(item for item in changed.configuracoes if item.modelo == 55)
     assert (saved.serie, saved.numero_inicial) == ("4", 1)
+
+
+def test_default_series_is_saved_without_activating_environment(pilot):
+    connection = _prepare(pilot)
+    pilot.api.numbering = lambda *_args: [
+        {
+            "serie": "003",
+            "modelo": 55,
+            "ambienteCodigo": 1,
+            "ultimoNumero": 1629,
+            "proximoNumero": 1630,
+        }
+    ]
+    audits = []
+
+    result = save_default_series(
+        pilot.db,
+        pilot.id,
+        pilot.api,
+        DefaultSeriesInput(ambiente_codigo=1, modelo=55, serie="003"),
+        lambda connection_id, event, values: audits.append(
+            (connection_id, event, values)
+        ),
+    )
+
+    assert connection.emission_enabled is False
+    assert pilot.api.environment_activations == []
+    assert connection.nfe_series == "1"
+    saved = next(item for item in result.configuracoes if item.modelo == 55)
+    assert (saved.ambiente_codigo, saved.serie, saved.numero_inicial) == (1, "3", 1630)
+    assert audits[-1][1] == "serie_padrao_salva"
+
+
+def test_default_series_updates_operational_series_only_for_current_environment(pilot):
+    connection = _prepare(pilot)
+    connection.emission_environment = 1
+    pilot.db.commit()
+    pilot.api.numbering = lambda *_args: [
+        {
+            "serie": "003",
+            "modelo": 55,
+            "ambienteCodigo": 1,
+            "ultimoNumero": 1629,
+            "proximoNumero": 1630,
+        }
+    ]
+
+    save_default_series(
+        pilot.db,
+        pilot.id,
+        pilot.api,
+        DefaultSeriesInput(ambiente_codigo=1, modelo=55, serie="3"),
+        lambda *_args: None,
+    )
+
+    assert connection.nfe_series == "3"
+
+
+def test_default_series_must_exist_in_selected_model_and_environment(pilot):
+    _prepare(pilot)
+    pilot.api.numbering = lambda *_args: [
+        {
+            "serie": "1",
+            "modelo": 65,
+            "ambienteCodigo": 1,
+            "ultimoNumero": 528,
+            "proximoNumero": 529,
+        }
+    ]
+
+    with pytest.raises(EnvironmentError, match="ainda não existe"):
+        save_default_series(
+            pilot.db,
+            pilot.id,
+            pilot.api,
+            DefaultSeriesInput(ambiente_codigo=1, modelo=55, serie="1"),
+            lambda *_args: None,
+        )
 
 
 def test_uncertain_activation_is_reconciled_with_remote_environment(pilot):

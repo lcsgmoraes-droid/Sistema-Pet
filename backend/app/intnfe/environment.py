@@ -9,7 +9,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.intnfe.client import IntNFeError
 from app.intnfe.models import IntNFeConnection, IntNFeEmissionSequence
-from app.intnfe.numbering import emitter_access
+from app.intnfe.numbering import emitter_access, read_numbering
 
 SequenceNumber = Annotated[int, Field(strict=True, ge=1, le=999_999_999)]
 
@@ -31,6 +31,28 @@ class EnvironmentInput(BaseModel):
         return value
 
     @field_validator("serie_nfe", "serie_nfce")
+    @classmethod
+    def normalize_series(cls, value):
+        if int(value) > 889:
+            raise ValueError("Série fora da faixa permitida.")
+        return str(int(value))
+
+
+class DefaultSeriesInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    ambiente_codigo: Literal[1, 2]
+    modelo: Literal[55, 65]
+    serie: str = Field(pattern=r"^[0-9]{1,3}$")
+
+    @field_validator("ambiente_codigo", "modelo", mode="before")
+    @classmethod
+    def strict_codes(cls, value):
+        if type(value) is not int:
+            raise ValueError("Código deve ser inteiro.")
+        return value
+
+    @field_validator("serie")
     @classmethod
     def normalize_series(cls, value):
         if int(value) > 889:
@@ -115,6 +137,72 @@ def _view(db, connection, message=None):
 def read_environment(db, tenant_id, api):
     connection, _token = emitter_access(db, tenant_id, api)
     return _view(db, connection)
+
+
+def save_default_series(db, tenant_id, api, request, audit):
+    """Guarda a série padrão sem ativar ou trocar o ambiente de emissão."""
+
+    connection, _token = emitter_access(db, tenant_id, api)
+    numbering = read_numbering(db, tenant_id, api)
+    current = next(
+        (
+            row
+            for row in numbering.series
+            if row.ambienteCodigo == request.ambiente_codigo
+            and row.modelo == request.modelo
+            and row.serie == request.serie
+        ),
+        None,
+    )
+    if current is None:
+        raise EnvironmentError(
+            "A série escolhida ainda não existe no emissor. Salve a sequência antes de usá-la no CorePet.",
+            status=422,
+        )
+    if current.proximoNumero > 999_999_999:
+        raise EnvironmentError(
+            "Essa série atingiu o limite de numeração. Escolha outra série.",
+            status=422,
+        )
+
+    connection = (
+        db.query(IntNFeConnection)
+        .filter(IntNFeConnection.id == connection.id)
+        .with_for_update()
+        .populate_existing()
+        .one()
+    )
+    # Preparar o outro ambiente não pode mudar a série das emissões atuais.
+    if connection.emission_environment == request.ambiente_codigo:
+        if request.modelo == 55:
+            connection.nfe_series = request.serie
+        else:
+            connection.nfce_series = request.serie
+    _save_sequence_start(
+        db,
+        connection,
+        request.ambiente_codigo,
+        request.modelo,
+        request.serie,
+        current.proximoNumero,
+    )
+    db.commit()
+    audit(
+        connection.id,
+        "serie_padrao_salva",
+        {
+            "ambiente": request.ambiente_codigo,
+            "modelo": request.modelo,
+            "serie": request.serie,
+            "numero_inicial": current.proximoNumero,
+        },
+    )
+    document = "NFC-e" if request.modelo == 65 else "NF-e"
+    return _view(
+        db,
+        connection,
+        f"Série {request.serie.zfill(3)} salva como padrão da {document} no CorePet.",
+    )
 
 
 def _save_sequence_start(db, connection, environment, model, series, initial_number):
