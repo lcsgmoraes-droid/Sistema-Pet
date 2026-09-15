@@ -5,6 +5,7 @@ import { usePersistentBooleanState } from "../hooks/usePersistentBooleanState";
 import { concluirVendaComCupom } from "../utils/pdvCupomFinalizacao";
 import { ehVendaCrediario } from "../utils/pdvReceipt";
 import { CupomImpressao } from "./ImprimirCupom";
+import SeletorModeloDocumentoFiscal from "./SeletorModeloDocumentoFiscal";
 
 const IMPRESSAO_CUPOM_STORAGE_KEY = "pdv_imprimir_cupom_ao_finalizar";
 const IMPRESSAO_CREDIARIO_STORAGE_KEY = "pdv_imprimir_crediario_ao_finalizar";
@@ -56,39 +57,12 @@ export default function ModalPerguntaNFe({
           )}
 
           <div className="space-y-3">
-            <fieldset>
-              <legend className="mb-2 text-sm font-semibold text-gray-800">Documento fiscal</legend>
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  aria-pressed={tipoNota === "nfce"}
-                  onClick={() => setTipoNota("nfce")}
-                  disabled={loading}
-                  className={`rounded-lg border px-3 py-3 text-left transition-colors disabled:opacity-50 ${
-                    tipoNota === "nfce"
-                      ? "border-green-600 bg-green-50 text-green-900"
-                      : "border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
-                  }`}
-                >
-                  <span className="block text-sm font-bold">NFC-e · modelo 65</span>
-                  <span className="mt-1 block text-xs">Padrão para venda no PDV</span>
-                </button>
-                <button
-                  type="button"
-                  aria-pressed={tipoNota === "nfe"}
-                  onClick={() => setTipoNota("nfe")}
-                  disabled={loading || !clienteIdentificado}
-                  className={`rounded-lg border px-3 py-3 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
-                    tipoNota === "nfe"
-                      ? "border-blue-600 bg-blue-50 text-blue-900"
-                      : "border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
-                  }`}
-                >
-                  <span className="block text-sm font-bold">NF-e · modelo 55</span>
-                  <span className="mt-1 block text-xs">Escolha quando a venda exigir NF-e</span>
-                </button>
-              </div>
-            </fieldset>
+            <SeletorModeloDocumentoFiscal
+              clienteIdentificado={clienteIdentificado}
+              disabled={loading}
+              onChange={setTipoNota}
+              value={tipoNota}
+            />
 
             <p className="rounded-lg bg-gray-50 px-3 py-2 text-xs text-gray-600">
               {tipoNota === "nfce"

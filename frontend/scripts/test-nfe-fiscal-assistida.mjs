@@ -13,6 +13,14 @@ const notesList = readFileSync(
   resolve(__dirname, "../src/pages/centralNFSaida/NFSaidaList.jsx"),
   "utf8",
 );
+const fiscalModelSelector = readFileSync(
+  resolve(__dirname, "../src/components/SeletorModeloDocumentoFiscal.jsx"),
+  "utf8",
+);
+const finalizedSaleFlow = readFileSync(
+  resolve(__dirname, "../src/hooks/usePDVVendaFinalizacao.js"),
+  "utf8",
+);
 
 assert.match(
   source,
@@ -42,6 +50,22 @@ assert.match(
   source,
   /Autorizar correcao fiscal e emitir a nota agora\?/,
   "assistente fiscal deve pedir autorizacao clara antes de aplicar sugestoes fiscais",
+);
+
+assert.match(
+  fiscalModelSelector,
+  /Modelos disponíveis/,
+  "PDV deve apresentar os modelos fiscais como escolhas visiveis",
+);
+assert.match(
+  fiscalModelSelector,
+  /Padrão do caixa/,
+  "PDV deve identificar a NFC-e como modelo padrao do caixa",
+);
+assert.doesNotMatch(
+  finalizedSaleFlow,
+  /Clique OK para emitir NF-e/,
+  "venda finalizada nao deve esconder a escolha do modelo em OK ou Cancelar",
 );
 
 console.log("NFe fiscal assistant checks passed.");
