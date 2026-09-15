@@ -48,8 +48,23 @@ assert.match(
 
 assert.match(
   source,
-  /Autorizar correcao fiscal e emitir a nota agora\?/,
-  "assistente fiscal deve pedir autorizacao clara antes de aplicar sugestoes fiscais",
+  /solicitarCorrecaoFiscal/,
+  "assistente fiscal deve abrir a correcao guiada antes de emitir",
+);
+
+const correctionDialog = readFileSync(
+  resolve(__dirname, "../src/components/ui/FiscalCorrectionDialogHost.jsx"),
+  "utf8",
+);
+assert.match(
+  correctionDialog,
+  /Preencher sugestões/,
+  "correcao guiada deve permitir aplicar sugestoes encontradas",
+);
+assert.match(
+  correctionDialog,
+  /Salvar e tentar emitir novamente/,
+  "correcao guiada deve salvar e retomar a emissao",
 );
 
 assert.match(

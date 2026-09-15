@@ -11,6 +11,7 @@ from app.kit_config_fiscal_models import KitConfigFiscal
 from app.empresa_config_fiscal_models import EmpresaConfigFiscal
 from app.produto_config_fiscal_models import ProdutoConfigFiscal
 from app.produtos_models import Produto
+from app.services.fiscal_sugestao_service import sugerir_fiscal_por_descricao
 
 
 def _limpar_texto_fiscal(value) -> Optional[str]:
@@ -157,20 +158,22 @@ def _resolver_fiscal_item_nfe(
             getattr(produto_fiscal, "cst_icms", None),
         ),
         "icms_st": bool(icms_st),
-        "icms_aliquota": next(
-            (
-                value
-                for value in (
-                    getattr(kit_fiscal, "icms_aliquota", None),
-                    getattr(produto_fiscal, "icms_aliquota", None),
-                    getattr(empresa_fiscal, "icms_aliquota_interna", None),
-                )
-                if value is not None
-            ),
-            None,
-        )
-        if not substituido_simples
-        else None,
+        "icms_aliquota": (
+            next(
+                (
+                    value
+                    for value in (
+                        getattr(kit_fiscal, "icms_aliquota", None),
+                        getattr(produto_fiscal, "icms_aliquota", None),
+                        getattr(empresa_fiscal, "icms_aliquota_interna", None),
+                    )
+                    if value is not None
+                ),
+                None,
+            )
+            if not substituido_simples
+            else None
+        ),
         "pis_cst": _primeiro_texto_fiscal(
             getattr(kit_fiscal, "pis_cst", None),
             getattr(produto_fiscal, "pis_cst", None),
@@ -327,7 +330,22 @@ def _sugerir_ncm(
     return None
 
 
-def prevalidar_fiscal_venda(venda, tipo_nota: str = "nfce", db: Session = None) -> Dict:
+def _melhor_sugestao_catalogo(db: Session, produto) -> Optional[Dict]:
+    if db is None or produto is None:
+        return None
+    try:
+        sugestoes = sugerir_fiscal_por_descricao(
+            db, getattr(produto, "nome", None) or ""
+        )
+        return sugestoes[0] if sugestoes else None
+    except Exception:
+        # O catalogo auxilia o preenchimento, mas nunca pode impedir a validacao.
+        return None
+
+
+def prevalidar_produtos_fiscais_venda(
+    venda, db: Session = None, *, exigir_documento_completo: bool = False
+) -> Dict:
     tenant_id = getattr(venda, "tenant_id", None)
     correcoes = []
     bloqueios = []
@@ -339,19 +357,6 @@ def prevalidar_fiscal_venda(venda, tipo_nota: str = "nfce", db: Session = None) 
                 "mensagem": "Venda nao possui itens para emitir nota fiscal.",
             }
         )
-
-    if tipo_nota == "nfe":
-        cliente = getattr(venda, "cliente", None)
-        cpf_cnpj = _somente_digitos(
-            getattr(cliente, "cnpj", None) or getattr(cliente, "cpf", None)
-        )
-        if len(cpf_cnpj) != 14:
-            bloqueios.append(
-                {
-                    "campo": "cliente.cnpj",
-                    "mensagem": "NF-e requer cliente empresa com CNPJ cadastrado. Para pessoa fisica use NFC-e.",
-                }
-            )
 
     for item in getattr(venda, "itens", []) or []:
         produto = getattr(item, "produto", None)
@@ -366,17 +371,22 @@ def prevalidar_fiscal_venda(venda, tipo_nota: str = "nfce", db: Session = None) 
 
         fiscal_item = _resolver_fiscal_item_nfe(db, venda, item)
         sku = _sku_produto(produto)
+        dados_produto = {
+            "produto_id": produto.id,
+            "produto_nome": produto.nome,
+            "produto_tipo": getattr(produto, "tipo_produto", None),
+            "sku": sku,
+        }
         ncm_atual = _ncm_normalizado(fiscal_item.get("ncm"))
         origem_atual = _limpar_texto_fiscal(fiscal_item.get("origem_mercadoria"))
+        sugestao_catalogo = _melhor_sugestao_catalogo(db, produto)
 
         if not _ncm_basico_aceitavel(ncm_atual):
             sugestao_ncm = _sugerir_ncm(produto, fiscal_item, db, tenant_id)
             if sugestao_ncm:
                 correcoes.append(
                     {
-                        "produto_id": produto.id,
-                        "produto_nome": produto.nome,
-                        "sku": sku,
+                        **dados_produto,
                         "campo": "ncm",
                         "valor_atual": ncm_atual or "",
                         "valor_sugerido": sugestao_ncm["valor"],
@@ -386,9 +396,7 @@ def prevalidar_fiscal_venda(venda, tipo_nota: str = "nfce", db: Session = None) 
             else:
                 bloqueios.append(
                     {
-                        "produto_id": produto.id,
-                        "produto_nome": produto.nome,
-                        "sku": sku,
+                        **dados_produto,
                         "campo": "ncm",
                         "mensagem": "NCM ausente ou invalido e o sistema ainda nao tem sugestao segura.",
                     }
@@ -397,9 +405,7 @@ def prevalidar_fiscal_venda(venda, tipo_nota: str = "nfce", db: Session = None) 
         if origem_atual is None:
             correcoes.append(
                 {
-                    "produto_id": produto.id,
-                    "produto_nome": produto.nome,
-                    "sku": sku,
+                    **dados_produto,
                     "campo": "origem_mercadoria",
                     "valor_atual": "",
                     "valor_sugerido": "0",
@@ -407,11 +413,77 @@ def prevalidar_fiscal_venda(venda, tipo_nota: str = "nfce", db: Session = None) 
                 }
             )
 
+        campos_obrigatorios = (
+            (
+                ("cfop", "CFOP", None),
+                ("cst_icms", "CSOSN/CST de ICMS", "cst_icms"),
+                ("pis_cst", "CST de PIS", "pis_cst"),
+                ("cofins_cst", "CST de COFINS", "cofins_cst"),
+            )
+            if exigir_documento_completo
+            else ()
+        )
+        for campo, rotulo, campo_catalogo in campos_obrigatorios:
+            valor_atual = _limpar_texto_fiscal(fiscal_item.get(campo))
+            if valor_atual:
+                continue
+            valor_sugerido = (
+                _limpar_texto_fiscal(sugestao_catalogo.get(campo_catalogo))
+                if sugestao_catalogo and campo_catalogo
+                else None
+            )
+            if valor_sugerido:
+                correcoes.append(
+                    {
+                        **dados_produto,
+                        "campo": campo,
+                        "valor_atual": "",
+                        "valor_sugerido": valor_sugerido,
+                        "motivo": (
+                            sugestao_catalogo.get("observacao")
+                            or f"Sugestao do catalogo fiscal para {sugestao_catalogo.get('categoria_fiscal') or 'este tipo de produto'}."
+                        ),
+                        "fonte_sugestao": "catalogo_fiscal",
+                    }
+                )
+            else:
+                bloqueios.append(
+                    {
+                        **dados_produto,
+                        "campo": campo,
+                        "mensagem": f"{rotulo} nao informado. Preencha para continuar.",
+                    }
+                )
+
     return {
         "success": True,
         "pode_emitir": not bloqueios and not correcoes,
         "requer_autorizacao": bool(correcoes),
         "correcoes": correcoes,
+        "bloqueios": bloqueios,
+    }
+
+
+def prevalidar_fiscal_venda(venda, tipo_nota: str = "nfce", db: Session = None) -> Dict:
+    validacao = prevalidar_produtos_fiscais_venda(venda, db)
+    bloqueios = list(validacao["bloqueios"])
+
+    if tipo_nota == "nfe":
+        cliente = getattr(venda, "cliente", None)
+        cpf_cnpj = _somente_digitos(
+            getattr(cliente, "cnpj", None) or getattr(cliente, "cpf", None)
+        )
+        if len(cpf_cnpj) != 14:
+            bloqueios.append(
+                {
+                    "campo": "cliente.cnpj",
+                    "mensagem": "NF-e requer cliente empresa com CNPJ cadastrado. Para pessoa fisica use NFC-e.",
+                }
+            )
+
+    return {
+        **validacao,
+        "pode_emitir": not bloqueios and not validacao["correcoes"],
         "bloqueios": bloqueios,
     }
 
@@ -454,6 +526,14 @@ def aplicar_correcoes_fiscais_venda(
                 config.ncm = valor
             elif campo == "origem_mercadoria":
                 config.origem_mercadoria = valor
+            elif campo == "cfop":
+                config.cfop_venda = valor
+            elif campo == "cst_icms":
+                config.cst_icms = valor
+            elif campo == "pis_cst":
+                config.pis_cst = valor
+            elif campo == "cofins_cst":
+                config.cofins_cst = valor
 
         config.observacao_fiscal = (
             f"Correcao fiscal autorizada no PDV em {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}"
