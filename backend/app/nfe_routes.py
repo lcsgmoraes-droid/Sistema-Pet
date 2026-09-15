@@ -6,6 +6,7 @@ from copy import deepcopy
 from time import monotonic
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 from typing import Optional
 from pydantic import BaseModel
@@ -37,6 +38,8 @@ from app.intnfe.emission import (
     reconcile as reconcile_intnfe,
 )
 from app.intnfe.repository import get_connection, get_tenant
+from app.intnfe.numbering import NumberingError
+from app.intnfe.recovery import repair_and_retry as repair_and_retry_intnfe
 from app.bling_integration import (
     BlingAPI,
     aplicar_correcoes_fiscais_venda,
@@ -456,6 +459,83 @@ def status_intnfe_venda(
         return reconcile_intnfe(db, venda, api)
     except DirectEmissionError as exc:
         raise _direct_failure(exc) from None
+    finally:
+        api.close()
+
+
+@router.post("/vendas/{venda_id}/corrigir-reemitir")
+def corrigir_reemitir_intnfe_venda(
+    venda_id: int,
+    db: Session = Depends(get_session),
+    user_and_tenant=Depends(get_current_user_and_tenant),
+):
+    """Aplica apenas correções comprováveis e refaz uma tentativa rejeitada."""
+    current_user, tenant_id = user_and_tenant
+    venda = _buscar_venda_para_nfe(db, venda_id, tenant_id)
+    if not venda:
+        raise HTTPException(404, "Venda não encontrada")
+
+    def reset_audit(old_value, new_value):
+        log_action(
+            db,
+            user_id=current_user.id,
+            tenant_id=tenant_id,
+            action="intnfe_corrigir_reemitir",
+            entity_type="venda",
+            entity_id=venda.id,
+            old_value=old_value,
+            new_value=new_value,
+            commit=False,
+        )
+
+    def numbering_audit(connection_id, result, last, change, error=None):
+        try:
+            log_action(
+                db,
+                user_id=current_user.id,
+                tenant_id=tenant_id,
+                action="intnfe_numeracao_automatica",
+                entity_type="intnfe_connection",
+                entity_id=connection_id,
+                old_value={"ultimoNumero": last},
+                new_value={
+                    **change,
+                    "resultado": result,
+                    "codigo": error.code if error else None,
+                    "correlation_id": error.correlation if error else None,
+                },
+                commit=False,
+            )
+            db.commit()
+        except SQLAlchemyError:
+            db.rollback()
+            raise NumberingError(
+                "AuditoriaIndisponivel",
+                "Não foi possível auditar o ajuste automático da numeração.",
+                status=503,
+            ) from None
+
+    api = _intnfe_client()
+    try:
+        return repair_and_retry_intnfe(
+            db,
+            get_tenant(db, tenant_id),
+            venda,
+            api,
+            reset_audit=reset_audit,
+            numbering_audit=numbering_audit,
+        )
+    except DirectEmissionError as exc:
+        raise _direct_failure(exc) from None
+    except NumberingError as exc:
+        raise HTTPException(
+            exc.status,
+            {
+                "erro": exc.code,
+                "mensagem": str(exc),
+                "protocolo_suporte": exc.correlation,
+            },
+        ) from None
     finally:
         api.close()
 

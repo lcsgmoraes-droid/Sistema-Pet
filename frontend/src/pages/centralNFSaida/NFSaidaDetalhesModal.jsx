@@ -1,4 +1,4 @@
-import { Download, Printer, RefreshCw, X } from "lucide-react";
+import { Download, Printer, RefreshCw, RotateCcw, X } from "lucide-react";
 
 import CustomerIdentity from "../../components/ui/CustomerIdentity";
 import { formatMoneyBRL } from "../../utils/formatters";
@@ -42,6 +42,8 @@ export default function NFSaidaDetalhesModal({
   fecharDetalhes,
   baixarDanfe,
   baixarXml,
+  corrigirEReemitir,
+  corrigindoNotaId,
 }) {
   if (!notaSelecionada) return null;
 
@@ -80,6 +82,21 @@ export default function NFSaidaDetalhesModal({
               <p className="font-semibold">A autorização da nota foi rejeitada.</p>
               {codigoErro && <p className="mt-1">Código: {codigoErro}</p>}
               {motivoRejeicao && <p className="mt-1">Motivo: {motivoRejeicao}</p>}
+              {notaIntNFe && notaSelecionada.status?.toLowerCase() === "rejeitada" && (
+                <button
+                  type="button"
+                  onClick={() => corrigirEReemitir(notaSelecionada)}
+                  disabled={corrigindoNotaId === String(notaSelecionada.venda_id)}
+                  className="mt-3 inline-flex items-center gap-2 rounded-lg bg-purple-700 px-4 py-2 font-semibold text-white hover:bg-purple-800 disabled:opacity-50"
+                >
+                  <RotateCcw
+                    className={`h-4 w-4 ${
+                      corrigindoNotaId === String(notaSelecionada.venda_id) ? "animate-spin" : ""
+                    }`}
+                  />
+                  Corrigir e tentar novamente
+                </button>
+              )}
             </div>
           )}
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">

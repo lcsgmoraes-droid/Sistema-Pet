@@ -516,6 +516,15 @@ def preview(db, tenant, venda, document_type):
     }
 
 
+def emission_fingerprint(db, tenant, venda, document_type):
+    """Identifica os dados que seriam transmitidos sem criar um documento."""
+    connection = _connection(db, tenant.id)
+    payload = build_payload(db, tenant, connection, venda, document_type)
+    return hashlib.sha256(
+        json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    ).hexdigest()
+
+
 def local_document_details(db, tenant, venda):
     """Monta os detalhes da nota a partir da venda salva no CorePet.
 

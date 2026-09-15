@@ -9,6 +9,7 @@ import {
   soDigitos,
 } from "./centralNFSaida/centralNFSaidaUtils";
 import { confirmarCorePet } from "../services/corepetDialog";
+import { corrigirEReemitirNota, extrairMensagemNFe } from "../utils/nfeFiscalAssistida";
 import NFSaidaCompartilharModal from "./centralNFSaida/NFSaidaCompartilharModal";
 
 function salvarArquivo(blob, nome) {
@@ -62,6 +63,7 @@ export default function CentralNFSaida() {
   const [justificativa, setJustificativa] = useState("");
   const [cancelando, setCancelando] = useState(false);
   const [reconciliandoNotaId, setReconciliandoNotaId] = useState("");
+  const [corrigindoNotaId, setCorrigindoNotaId] = useState("");
   const detalhesNotasCacheRef = useRef(new Map());
 
   const [painelSefazAberto, setPainelSefazAberto] = useState(false);
@@ -229,6 +231,40 @@ export default function CentralNFSaida() {
       alert(detail);
     } finally {
       setReconciliandoNotaId("");
+    }
+  }
+
+  async function corrigirEReemitir(nota) {
+    const vendaId = nota?.venda_id;
+    if (!vendaId) {
+      alert("Não foi possível identificar a venda desta nota.");
+      return;
+    }
+    const ambienteProducao = Number(nota?.ambiente_codigo || nota?.ambiente) === 1;
+    const aviso = ambienteProducao
+      ? "\n\nATENÇÃO: a nova tentativa será transmitida em produção."
+      : "";
+    const confirmed = await confirmarCorePet(
+      `O CorePet vai conferir novamente cadastro, lote, valores, pagamento e tributação. Se tudo estiver consistente, removerá apenas a tentativa rejeitada e transmitirá outra nota.${aviso}\n\nCorrigir e tentar novamente?`,
+    );
+    if (!confirmed) return;
+
+    try {
+      setCorrigindoNotaId(String(vendaId));
+      const resultado = await corrigirEReemitirNota(vendaId);
+      if (resultado?.processando) {
+        alert("A correção foi aplicada e a nota ainda está em processamento.");
+      } else {
+        const numero = resultado?.numero ? ` NF ${resultado.numero}` : "";
+        alert(`${numero || "A nota"} foi corrigida e autorizada com sucesso.`);
+      }
+      fecharDetalhes();
+      await carregarNotas(true);
+    } catch (error) {
+      alert(extrairMensagemNFe(error));
+      await carregarNotas(true);
+    } finally {
+      setCorrigindoNotaId("");
     }
   }
 
@@ -468,6 +504,8 @@ export default function CentralNFSaida() {
         excluirNota={excluirNota}
         reconciliarFluxoNota={reconciliarFluxoNota}
         reconciliandoNotaId={reconciliandoNotaId}
+        corrigirEReemitir={corrigirEReemitir}
+        corrigindoNotaId={corrigindoNotaId}
         baixarDanfe={baixarDanfe}
         baixarXml={baixarXml}
         abrirDetalhes={abrirDetalhes}
