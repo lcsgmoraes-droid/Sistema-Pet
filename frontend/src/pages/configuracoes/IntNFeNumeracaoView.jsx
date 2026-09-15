@@ -25,6 +25,7 @@ function SequenceCard({
   onCancel,
   onSave,
   onRemove,
+  savedConfiguration,
 }) {
   const document = documentName(model);
   const current = rows && currentSequence(rows, form.serie, environment, model);
@@ -38,6 +39,14 @@ function SequenceCard({
       ?.filter((row) => row.modelo === model && row.ambienteCodigo === environment)
       .sort((a, b) => Number(a.serie) - Number(b.serie)) ?? [];
   const reviewing = review?.model === model;
+  const choicePersisted = Boolean(
+    savedConfiguration && Number(savedConfiguration.serie) === Number(form.serie),
+  );
+  const sameNext =
+    current &&
+    (form.proximo_numero === "" || Number(form.proximo_numero) === current.proximoNumero);
+  const canSaveChoice = Boolean(form.usar_no_corepet && current && sameNext);
+  const canReview = canSaveChoice || !prepared.error;
 
   return (
     <article className="space-y-4 rounded-2xl border border-slate-200 bg-slate-50 p-4 sm:p-5 dark:border-slate-700 dark:bg-slate-950/40">
@@ -84,6 +93,7 @@ function SequenceCard({
           <input
             value={form.proximo_numero}
             inputMode="numeric"
+            min={current?.proximoNumero || 1}
             maxLength={9}
             disabled={busy || !rows || reviewing}
             onChange={(event) =>
@@ -101,7 +111,8 @@ function SequenceCard({
         <div className="rounded-xl bg-white p-3 text-sm dark:bg-slate-900">
           {current.nova ? (
             <p>
-              Esta é uma série nova. A primeira {document} será a de número <strong>1</strong>.
+              Esta série ainda não possui numeração. O menor próximo número permitido é{" "}
+              <strong>1</strong>.
             </p>
           ) : (
             <p>
@@ -109,21 +120,32 @@ function SequenceCard({
               próximo <strong>{formatSequence(current.proximoNumero)}</strong>.
             </p>
           )}
+          <p className="mt-1 text-xs text-slate-500">
+            Esta sequência só pode continuar do próximo número mostrado ou avançar.
+          </p>
         </div>
       ) : null}
 
-      <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-950">
+      <label
+        className={`flex items-start gap-3 rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-950 ${choicePersisted ? "cursor-default" : "cursor-pointer"}`}
+      >
         <input
           type="checkbox"
           checked={form.usar_no_corepet}
-          disabled={busy || reviewing || !current}
+          disabled={busy || reviewing || !current || choicePersisted}
           onChange={(event) => onToggleUse(model, event.target.checked)}
           className="mt-0.5 h-4 w-4"
         />
         <span>
-          <strong>Continuar com esta série no CorePet</strong>
+          <strong>
+            {choicePersisted
+              ? "Esta é a série em uso no CorePet"
+              : "Continuar com esta série no CorePet"}
+          </strong>
           <span className="mt-1 block">
-            Ao marcar, esta série será preenchida na escolha das próximas emissões.
+            {choicePersisted
+              ? "A escolha está salva. Para trocar, selecione outra série e salve a nova escolha."
+              : "Ao marcar e salvar, esta série será usada nas próximas emissões."}
           </span>
         </span>
       </label>
@@ -155,27 +177,43 @@ function SequenceCard({
         <div className="flex flex-wrap items-center gap-3">
           <button
             type="button"
-            disabled={busy || Boolean(prepared.error)}
+            disabled={busy || !canReview || (choicePersisted && sameNext)}
             onClick={() => onReview(model)}
             className={`${buttonClass} bg-blue-600 text-white`}
           >
-            Salvar sequência
+            {choicePersisted && sameNext
+              ? "Série em uso"
+              : canSaveChoice
+                ? "Salvar escolha"
+                : "Salvar sequência"}
           </button>
-          {prepared.error ? (
+          {prepared.error && !canSaveChoice && !(choicePersisted && sameNext) ? (
             <p className="text-sm text-slate-600 dark:text-slate-300">{prepared.error}</p>
           ) : null}
         </div>
       ) : (
         <div className="space-y-3 rounded-xl border border-amber-300 bg-amber-50 p-4 text-amber-950">
-          <p className="font-bold">Confirmar sequência de {document}</p>
-          <p className="text-sm">
-            Série {review.payload.serie.padStart(3, "0")} · próxima numeração:{" "}
-            <strong>
-              {formatSequence(review.current.proximoNumero)} →{" "}
-              {formatSequence(review.payload.proximo_numero)}
-            </strong>
-            . Esse avanço não poderá ser desfeito.
+          <p className="font-bold">
+            {review.selectionOnly
+              ? `Confirmar escolha da ${document}`
+              : `Confirmar sequência de ${document}`}
           </p>
+          {review.selectionOnly ? (
+            <p className="text-sm">
+              A série <strong>{form.serie.padStart(3, "0")}</strong>, próxima numeração{" "}
+              <strong>{formatSequence(review.current.proximoNumero)}</strong>, será salva como
+              padrão da {document} no CorePet.
+            </p>
+          ) : (
+            <p className="text-sm">
+              Série {review.payload.serie.padStart(3, "0")} · próxima numeração:{" "}
+              <strong>
+                {formatSequence(review.current.proximoNumero)} →{" "}
+                {formatSequence(review.payload.proximo_numero)}
+              </strong>
+              . Esse avanço não poderá ser desfeito.
+            </p>
+          )}
           <div className="flex flex-wrap gap-3">
             <button
               type="button"
@@ -183,7 +221,7 @@ function SequenceCard({
               onClick={onSave}
               className={`${buttonClass} bg-blue-600 text-white`}
             >
-              Confirmar e salvar
+              {review.selectionOnly ? "Confirmar escolha" : "Confirmar e salvar"}
             </button>
             <button
               type="button"
@@ -209,6 +247,7 @@ export default function IntNFeNumeracaoView({
   error,
   message,
   review,
+  savedConfigurations = [],
   onChange,
   onToggleUse,
   onReload,
@@ -307,6 +346,9 @@ export default function IntNFeNumeracaoView({
             onCancel={onCancel}
             onSave={onSave}
             onRemove={model === 65 ? onRemoveNfce : null}
+            savedConfiguration={savedConfigurations.find(
+              (item) => item.ambiente_codigo === environment && item.modelo === model,
+            )}
           />
         ))}
       </div>

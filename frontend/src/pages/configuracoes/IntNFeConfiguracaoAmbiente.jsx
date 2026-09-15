@@ -22,6 +22,7 @@ export default function IntNFeConfiguracaoAmbiente({
   const [environment, setEnvironment] = useState(2);
   const [choices, setChoices] = useState(initialChoices);
   const [numberingData, setNumberingData] = useState(null);
+  const [environmentData, setEnvironmentData] = useState(null);
 
   const chooseSequence = useCallback(
     ({ modelo, serie, proximoNumero, pendente = false }) => {
@@ -62,6 +63,14 @@ export default function IntNFeConfiguracaoAmbiente({
       onNumberingData?.(data);
     },
     [onNumberingData],
+  );
+
+  const updateEnvironmentData = useCallback(
+    (data) => {
+      setEnvironmentData(data);
+      onEnvironmentData?.(data);
+    },
+    [onEnvironmentData],
   );
 
   return (
@@ -132,6 +141,8 @@ export default function IntNFeConfiguracaoAmbiente({
         onData={updateNumberingData}
         onUseSequence={chooseSequence}
         onClearSequence={clearSequence}
+        savedConfigurations={environmentData?.configuracoes || []}
+        onEnvironmentData={updateEnvironmentData}
       />
 
       <IntNFeCsc
@@ -148,8 +159,9 @@ export default function IntNFeConfiguracaoAmbiente({
         environment={environment}
         choices={choices[environment]}
         numberingData={numberingData}
+        configurationData={environmentData}
         onBusy={onEnvironmentBusy}
-        onData={onEnvironmentData}
+        onData={updateEnvironmentData}
       />
     </section>
   );
