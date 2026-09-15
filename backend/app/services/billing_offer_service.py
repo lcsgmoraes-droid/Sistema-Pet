@@ -153,68 +153,57 @@ def build_offer_commercial_terms(
     }
 
 
+def _has_text_fields(value: Any, fields: tuple[str, ...]) -> bool:
+    return isinstance(value, dict) and all(
+        isinstance(value.get(field), str) and bool(value[field].strip())
+        for field in fields
+    )
+
+
+def _valid_support_terms(value: Any) -> bool:
+    if not _has_text_fields(value, ("channel", "hours")):
+        return False
+    targets = value.get("first_response_targets")
+    return (
+        value.get("contractual_sla_included") is False
+        and value.get("first_response_is_target") is True
+        and _has_text_fields(targets, ("p0", "p1", "p2", "p3", "improvement"))
+    )
+
+
+def _valid_custom_work_terms(value: Any) -> bool:
+    return _has_text_fields(value, ("summary",)) and (
+        value.get("ip_rule") == "corepet_reusable_unless_signed_assignment"
+    )
+
+
+def _valid_termination_terms(value: Any) -> bool:
+    return isinstance(value, dict) and value == {
+        "minimum_term_months": 0,
+        "cancellation_effect": "final_do_ciclo_pago",
+        "export_request_window_days": STANDARD_EXPORT_REQUEST_WINDOW_DAYS,
+    }
+
+
+def _valid_commercial_terms(value: Any) -> bool:
+    return (
+        _has_text_fields(
+            value,
+            ("scope_summary", "implementation_summary", "exclusions_summary"),
+        )
+        and value.get("version") == COMMERCIAL_TERMS_VERSION
+        and _valid_support_terms(value.get("support"))
+        and _valid_custom_work_terms(value.get("custom_work"))
+        and _valid_termination_terms(value.get("termination"))
+    )
+
+
 def _commercial_terms(offer: BillingOffer) -> dict[str, Any] | None:
     try:
         parsed = json.loads(getattr(offer, "commercial_terms_json", "{}") or "{}")
     except (json.JSONDecodeError, TypeError):
         return None
-    if (
-        not isinstance(parsed, dict)
-        or parsed.get("version") != COMMERCIAL_TERMS_VERSION
-    ):
-        return None
-
-    required_text_fields = (
-        "scope_summary",
-        "implementation_summary",
-        "exclusions_summary",
-    )
-    if any(
-        not isinstance(parsed.get(field), str) or not parsed[field].strip()
-        for field in required_text_fields
-    ):
-        return None
-
-    support = parsed.get("support")
-    custom_work = parsed.get("custom_work")
-    termination = parsed.get("termination")
-    if not isinstance(support, dict) or not isinstance(custom_work, dict):
-        return None
-    if not isinstance(termination, dict):
-        return None
-    if not isinstance(support.get("channel"), str) or not support["channel"].strip():
-        return None
-    if not isinstance(support.get("hours"), str) or not support["hours"].strip():
-        return None
-    if support.get("contractual_sla_included") is not False:
-        return None
-    if support.get("first_response_is_target") is not True:
-        return None
-
-    targets = support.get("first_response_targets")
-    required_targets = ("p0", "p1", "p2", "p3", "improvement")
-    if not isinstance(targets, dict) or any(
-        not isinstance(targets.get(target), str) or not targets[target].strip()
-        for target in required_targets
-    ):
-        return None
-    if (
-        not isinstance(custom_work.get("summary"), str)
-        or not custom_work["summary"].strip()
-    ):
-        return None
-    if custom_work.get("ip_rule") != "corepet_reusable_unless_signed_assignment":
-        return None
-    if termination.get("minimum_term_months") != 0:
-        return None
-    if termination.get("cancellation_effect") != "final_do_ciclo_pago":
-        return None
-    if (
-        termination.get("export_request_window_days")
-        != STANDARD_EXPORT_REQUEST_WINDOW_DAYS
-    ):
-        return None
-    return parsed
+    return parsed if _valid_commercial_terms(parsed) else None
 
 
 def _included_modules(offer: BillingOffer) -> list[str]:
