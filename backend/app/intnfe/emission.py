@@ -9,11 +9,13 @@ import json
 from datetime import datetime, timedelta
 from decimal import Decimal, ROUND_HALF_UP
 from uuid import UUID, uuid4
+from types import SimpleNamespace
 
 from app.bling_integration_fiscal import _resolver_fiscal_item_nfe
 from app.intnfe.client import IntNFeError
 from app.intnfe.fiscal_profile import local_profile
 from app.intnfe.models import IntNFeConnection
+from app.produtos_estoque_models import EstoqueMovimentacao, ProdutoLote
 
 CENT = Decimal("0.01")
 AUTHORIZED_STATUS = 3
@@ -240,6 +242,61 @@ def _contribution(cst, rate, taxable_amount):
     return result
 
 
+def _lot_from_recorded_fifo(db, venda, item):
+    """Recupera o lote fiscal de vendas antigas que não salvaram ``lote_id``.
+
+    O vínculo só é inferido quando a movimentação FIFO aponta para exatamente
+    um lote. Mais de um lote exige revisão porque os snapshots fiscais podem
+    divergir e uma única linha da NF não deve escolher um deles arbitrariamente.
+    """
+    if (
+        db is None
+        or getattr(item, "lote_id", None)
+        or getattr(item, "estoque_origem_tenant_id", None)
+    ):
+        return None
+
+    rows = (
+        db.query(EstoqueMovimentacao.lotes_consumidos)
+        .filter(
+            EstoqueMovimentacao.tenant_id == venda.tenant_id,
+            EstoqueMovimentacao.produto_id == item.produto_id,
+            EstoqueMovimentacao.referencia_id == venda.id,
+            EstoqueMovimentacao.referencia_tipo == "venda",
+            EstoqueMovimentacao.status != "cancelado",
+            EstoqueMovimentacao.lotes_consumidos.isnot(None),
+        )
+        .all()
+    )
+    lot_ids = set()
+    for row in rows:
+        raw = row[0] if isinstance(row, tuple) else row.lotes_consumidos
+        try:
+            consumed = json.loads(raw) if isinstance(raw, str) else raw
+        except (TypeError, ValueError):
+            continue
+        for lot in consumed or []:
+            lot_id = lot.get("lote_id") if isinstance(lot, dict) else None
+            if lot_id is not None:
+                lot_ids.add(int(lot_id))
+
+    if len(lot_ids) > 1:
+        raise DirectEmissionError(
+            f"Produto {item.produto.nome}: a venda consumiu mais de um lote. "
+            "Revise os dados fiscais dos lotes antes de transmitir a nota."
+        )
+    if not lot_ids:
+        return None
+    return (
+        db.query(ProdutoLote)
+        .filter(
+            ProdutoLote.id == next(iter(lot_ids)),
+            ProdutoLote.tenant_id == venda.tenant_id,
+        )
+        .first()
+    )
+
+
 def build_payload(db, tenant, connection, venda, document_type):
     emitter, emitter_pending = local_profile(db, tenant.id)
     emitter_cnpj = _digits(getattr(tenant, "cnpj", None))
@@ -266,7 +323,11 @@ def build_payload(db, tenant, connection, venda, document_type):
             raise DirectEmissionError(
                 "A emissão direta atual aceita somente itens de produto vinculados ao cadastro."
             )
-        fiscal = _resolver_fiscal_item_nfe(db, venda, item)
+        fiscal_item = item
+        inferred_lot = _lot_from_recorded_fifo(db, venda, item)
+        if inferred_lot is not None:
+            fiscal_item = SimpleNamespace(produto=item.produto, lote=inferred_lot)
+        fiscal = _resolver_fiscal_item_nfe(db, venda, fiscal_item)
         ncm = _digits(fiscal.get("ncm"))
         origin = _text(fiscal.get("origem_mercadoria"))
         destinatario_nao_contribuinte = bool(
