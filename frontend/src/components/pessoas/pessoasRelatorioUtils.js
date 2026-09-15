@@ -1,3 +1,5 @@
+import { resolveMediaUrl } from "../../utils/mediaUrl.js";
+
 export const TIPOS_RELATORIO_PESSOAS = [
   { value: "todos", label: "Todos os cadastros", singular: "Pessoas" },
   { value: "cliente", label: "Somente clientes", singular: "Clientes" },
@@ -150,6 +152,10 @@ export const ORDENACOES_RELATORIO_PESSOAS = [
 
 const collator = new Intl.Collator("pt-BR", { numeric: true, sensitivity: "base" });
 
+export function obterNomeEmpresaRelatorio(empresa = {}) {
+  return String(empresa.nome || empresa.nome_fantasia || empresa.slug || "Empresa").trim();
+}
+
 export function ordenarPessoasRelatorio(pessoas, ordenacao = "nome_asc") {
   const [campo, direcao] = ordenacao.includes("cadastro_")
     ? ["created_at", ordenacao.endsWith("_desc") ? "desc" : "asc"]
@@ -188,10 +194,18 @@ function nomeBaseArquivo(tipo) {
   return `relatorio_${escopo}_${new Date().toLocaleDateString("sv-SE")}`;
 }
 
-export async function exportarPessoasExcel({ pessoas, colunas, tipo }) {
+const criarLinhaMescladaExcel = (valor, totalColunas, estilo = {}) => [
+  { value: valor, columnSpan: totalColunas, ...estilo },
+  ...Array.from({ length: Math.max(totalColunas - 1, 0) }, () => null),
+];
+
+export async function exportarPessoasExcel({ pessoas, colunas, tipo, busca = "", empresa = {} }) {
   const linhas = montarLinhasRelatorioPessoas(pessoas, colunas);
   const colunasAtivas = obterColunasRelatorio(colunas);
-  const dados = linhas.map((linha, indiceLinha) =>
+  const totalColunas = Math.max(colunasAtivas.length, 1);
+  const nomeEmpresa = obterNomeEmpresaRelatorio(empresa);
+  const tipoLabel = TIPOS_RELATORIO_PESSOAS.find((item) => item.value === tipo)?.label || "Pessoas";
+  const dadosTabela = linhas.map((linha, indiceLinha) =>
     linha.map((valor) => ({
       value: valor,
       ...(indiceLinha === 0
@@ -199,23 +213,105 @@ export async function exportarPessoasExcel({ pessoas, colunas, tipo }) {
         : {}),
     })),
   );
+  const dados = [
+    criarLinhaMescladaExcel(nomeEmpresa, totalColunas, {
+      fontSize: 14,
+      fontWeight: "bold",
+      color: "#0F172A",
+    }),
+    criarLinhaMescladaExcel("Relatorio de Pessoas", totalColunas, {
+      fontSize: 12,
+      fontWeight: "bold",
+      color: "#0F172A",
+    }),
+    criarLinhaMescladaExcel(`${tipoLabel} | ${pessoas.length} registro(s)`, totalColunas, {
+      color: "#475569",
+    }),
+    criarLinhaMescladaExcel(
+      `${busca ? `Busca: ${busca} | ` : ""}Gerado em ${new Date().toLocaleString("pt-BR")}`,
+      totalColunas,
+      { color: "#64748B" },
+    ),
+    ...dadosTabela,
+  ];
   const { default: writeExcelFile } = await import("write-excel-file/browser");
 
   await writeExcelFile(dados, {
     sheet: "Pessoas",
-    stickyRowsCount: 1,
+    stickyRowsCount: 5,
     columns: colunasAtivas.map((coluna) => ({ width: coluna.width })),
   }).toFile(`${nomeBaseArquivo(tipo)}.xlsx`);
 }
 
-export async function exportarPessoasPdf({ pessoas, colunas, tipo, busca = "" }) {
+async function carregarLogoEmpresaPdf(logoUrl) {
+  const url = resolveMediaUrl(logoUrl);
+  if (!url) return null;
+
+  try {
+    const response = await fetch(url, { credentials: "include" });
+    if (!response.ok) return null;
+
+    const blob = await response.blob();
+    const objectUrl = URL.createObjectURL(blob);
+    try {
+      const imagem = await new Promise((resolve, reject) => {
+        const elemento = new Image();
+        elemento.onload = () => resolve(elemento);
+        elemento.onerror = reject;
+        elemento.src = objectUrl;
+      });
+      const maiorLado = Math.max(imagem.naturalWidth, imagem.naturalHeight);
+      const escala = maiorLado > 1000 ? 1000 / maiorLado : 1;
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.max(Math.round(imagem.naturalWidth * escala), 1);
+      canvas.height = Math.max(Math.round(imagem.naturalHeight * escala), 1);
+      canvas.getContext("2d").drawImage(imagem, 0, 0, canvas.width, canvas.height);
+      return {
+        dataUrl: canvas.toDataURL("image/png"),
+        width: canvas.width,
+        height: canvas.height,
+      };
+    } finally {
+      URL.revokeObjectURL(objectUrl);
+    }
+  } catch (error) {
+    console.warn("Nao foi possivel incluir o logo da empresa no relatorio:", error);
+    return null;
+  }
+}
+
+export function desenharCabecalhoTabelaPdf(
+  doc,
+  { colunasAtivas, larguras, margem, y, altura = 7, tamanhoFonte },
+) {
+  const larguraTotal = larguras.reduce((total, largura) => total + largura, 0);
+  doc.setFillColor(5, 150, 105);
+  doc.rect(margem, y, larguraTotal, altura, "F");
+  doc.setDrawColor(4, 120, 87);
+  doc.setTextColor(255, 255, 255);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(tamanhoFonte);
+
+  let x = margem;
+  colunasAtivas.forEach((coluna, indice) => {
+    doc.rect(x, y, larguras[indice], altura, "S");
+    const texto = doc.splitTextToSize(coluna.label, Math.max(larguras[indice] - 2, 2))[0];
+    doc.text(texto || coluna.label, x + 1, y + 4.5);
+    x += larguras[indice];
+  });
+}
+
+export async function exportarPessoasPdf({ pessoas, colunas, tipo, busca = "", empresa = {} }) {
   const colunasAtivas = obterColunasRelatorio(colunas);
   const linhas = montarLinhasRelatorioPessoas(pessoas, colunas).slice(1);
   const orientation = colunasAtivas.length > 4 ? "landscape" : "portrait";
   const { jsPDF } = await import("jspdf");
   const doc = new jsPDF({ orientation, unit: "mm", format: "a4" });
+  const logo = await carregarLogoEmpresaPdf(empresa.logo_url);
+  const nomeEmpresa = obterNomeEmpresaRelatorio(empresa);
   const margem = 10;
-  const topoTabela = 31;
+  const topoCabecalhoTabela = 34;
+  const alturaCabecalhoTabela = 7;
   const rodape = 10;
   const larguraPagina = doc.internal.pageSize.getWidth();
   const alturaPagina = doc.internal.pageSize.getHeight();
@@ -225,34 +321,43 @@ export async function exportarPessoasPdf({ pessoas, colunas, tipo, busca = "" })
   const tamanhoFonte = colunasAtivas.length > 7 ? 6.2 : colunasAtivas.length > 4 ? 7 : 8;
   const alturaLinhaTexto = tamanhoFonte * 0.42;
   const tipoLabel = TIPOS_RELATORIO_PESSOAS.find((item) => item.value === tipo)?.label || "Pessoas";
-  let y = topoTabela;
+  let y = topoCabecalhoTabela + alturaCabecalhoTabela;
 
   const desenharCabecalhoPagina = () => {
+    let textoX = margem;
+    if (logo) {
+      const escalaLogo = Math.min(30 / logo.width, 17 / logo.height);
+      const larguraLogo = logo.width * escalaLogo;
+      const alturaLogo = logo.height * escalaLogo;
+      doc.addImage(logo.dataUrl, "PNG", margem, 7, larguraLogo, alturaLogo);
+      textoX += larguraLogo + 4;
+    }
+
+    const larguraTexto = Math.max(larguraPagina - margem - textoX, 30);
     doc.setTextColor(15, 23, 42);
     doc.setFont("helvetica", "bold");
+    doc.setFontSize(10);
+    doc.text(doc.splitTextToSize(nomeEmpresa, larguraTexto)[0] || nomeEmpresa, textoX, 10);
     doc.setFontSize(15);
-    doc.text("CorePet - Relatorio de Pessoas", margem, 13);
+    doc.text("Relatorio de Pessoas", textoX, 16.5);
     doc.setFont("helvetica", "normal");
     doc.setFontSize(8);
-    doc.text(`${tipoLabel} | ${pessoas.length} registro(s)`, margem, 19);
+    doc.text(`${tipoLabel} | ${pessoas.length} registro(s)`, textoX, 22);
     doc.text(
-      busca ? `Busca: ${busca}` : `Gerado em ${new Date().toLocaleString("pt-BR")}`,
-      margem,
-      24,
+      `${busca ? `Busca: ${busca} | ` : ""}Gerado em ${new Date().toLocaleString("pt-BR")}`,
+      textoX,
+      27,
     );
 
-    let x = margem;
-    doc.setFillColor(5, 150, 105);
-    doc.setTextColor(255, 255, 255);
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(tamanhoFonte);
-    colunasAtivas.forEach((coluna, indice) => {
-      doc.rect(x, 27, larguras[indice], 7, "F");
-      const texto = doc.splitTextToSize(coluna.label, Math.max(larguras[indice] - 2, 2))[0] || "";
-      doc.text(texto, x + 1, 31.5);
-      x += larguras[indice];
+    desenharCabecalhoTabelaPdf(doc, {
+      colunasAtivas,
+      larguras,
+      margem,
+      y: topoCabecalhoTabela,
+      altura: alturaCabecalhoTabela,
+      tamanhoFonte,
     });
-    y = 34;
+    y = topoCabecalhoTabela + alturaCabecalhoTabela;
   };
 
   desenharCabecalhoPagina();

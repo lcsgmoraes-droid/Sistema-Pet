@@ -10,7 +10,7 @@ from app.auth.dependencies import get_current_user_and_tenant
 from app.clientes.common import _validar_tenant_e_obter_usuario
 from app.clientes.crud_routes import _aplicar_filtro_ativo, _aplicar_filtro_busca
 from app.db import get_session
-from app.models import Cliente
+from app.models import Cliente, Tenant
 from app.partner_utils import get_all_accessible_tenant_ids
 from app.security.permissions_decorator import require_permission
 
@@ -54,6 +54,16 @@ COLUNAS_RELATORIO_PESSOAS = (
 )
 
 
+def _serializar_identidade_empresa(tenant: Tenant | None) -> dict:
+    if tenant is None:
+        return {"nome": None, "slug": None, "logo_url": None}
+    return {
+        "nome": tenant.name,
+        "slug": tenant.ecommerce_slug,
+        "logo_url": tenant.logo_url,
+    }
+
+
 def _validar_tipos_relatorio(tipos: Optional[List[str]]) -> list[str]:
     tipos_normalizados = list(
         dict.fromkeys(tipo.strip().lower() for tipo in tipos or [])
@@ -83,6 +93,7 @@ def listar_pessoas_para_relatorio(
     _current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
     tipos = _validar_tipos_relatorio(tipo_cadastro)
     access_ids = get_all_accessible_tenant_ids(db, tenant_id)
+    tenant_atual = db.query(Tenant).filter(Tenant.id == str(tenant_id)).first()
 
     query = db.query(Cliente).filter(Cliente.tenant_id.in_(access_ids))
     if tipos:
@@ -101,6 +112,7 @@ def listar_pessoas_para_relatorio(
 
     return {
         "items": [dict(linha._mapping) for linha in linhas],
+        "empresa": _serializar_identidade_empresa(tenant_atual),
         "total": total,
         "skip": skip,
         "limit": limit,

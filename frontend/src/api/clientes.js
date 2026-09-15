@@ -21,6 +21,7 @@ export const buscarClientes = async (params = {}) => {
 export const buscarPessoasParaRelatorio = async (params = {}) => {
   const limit = 1000;
   const pessoas = [];
+  let empresa = {};
   let skip = 0;
   let total;
 
@@ -29,6 +30,7 @@ export const buscarPessoasParaRelatorio = async (params = {}) => {
       params: { ...params, skip, limit },
     });
     const pagina = response.data?.items || [];
+    empresa = response.data?.empresa || empresa;
     total = Number(response.data?.total || 0);
     pessoas.push(...pagina);
     skip += pagina.length;
@@ -36,7 +38,7 @@ export const buscarPessoasParaRelatorio = async (params = {}) => {
     if (pagina.length === 0) break;
   } while (pessoas.length < total);
 
-  return pessoas;
+  return { pessoas, empresa };
 };
 
 /**

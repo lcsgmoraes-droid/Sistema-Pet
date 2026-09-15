@@ -3,7 +3,10 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import {
   COLUNAS_PADRAO_RELATORIO_PESSOAS,
+  desenharCabecalhoTabelaPdf,
   montarLinhasRelatorioPessoas,
+  obterColunasRelatorio,
+  obterNomeEmpresaRelatorio,
   ordenarPessoasRelatorio,
 } from "../src/components/pessoas/pessoasRelatorioUtils.js";
 
@@ -50,6 +53,35 @@ assert.deepEqual(
     ["Ana", "2299999-9999", "22222-222", "Rua A", "Jardim"],
   ],
 );
+assert.equal(obterNomeEmpresaRelatorio({ nome: "Pet Feliz", slug: "pet-feliz" }), "Pet Feliz");
+assert.equal(obterNomeEmpresaRelatorio({ slug: "pet-feliz" }), "pet-feliz");
+
+const chamadasPdf = [];
+const docPdf = {
+  setFillColor: (...args) => chamadasPdf.push(["setFillColor", ...args]),
+  setDrawColor: (...args) => chamadasPdf.push(["setDrawColor", ...args]),
+  setTextColor: (...args) => chamadasPdf.push(["setTextColor", ...args]),
+  setFont: (...args) => chamadasPdf.push(["setFont", ...args]),
+  setFontSize: (...args) => chamadasPdf.push(["setFontSize", ...args]),
+  rect: (...args) => chamadasPdf.push(["rect", ...args]),
+  splitTextToSize: (texto) => [texto],
+  text: (...args) => chamadasPdf.push(["text", ...args]),
+};
+desenharCabecalhoTabelaPdf(docPdf, {
+  colunasAtivas: obterColunasRelatorio(["nome", "telefone"]),
+  larguras: [120, 70],
+  margem: 10,
+  y: 34,
+  tamanhoFonte: 8,
+});
+assert.deepEqual(
+  chamadasPdf.find((chamada) => chamada[0] === "rect" && chamada.at(-1) === "F"),
+  ["rect", 10, 34, 190, 7, "F"],
+);
+assert.deepEqual(
+  chamadasPdf.filter((chamada) => chamada[0] === "text").map((chamada) => chamada[1]),
+  ["Nome", "Telefone"],
+);
 
 const raiz = resolve(import.meta.dirname, "..");
 const pagina = readFileSync(resolve(raiz, "src/pages/ClientesNovo.jsx"), "utf8");
@@ -69,5 +101,6 @@ assert.match(modal, /Nome \+ telefone/);
 assert.match(modal, /Contato \+ endereco/);
 assert.match(modal, /Baixar Excel/);
 assert.match(modal, /Baixar PDF/);
+assert.match(modal, /empresa/);
 
 console.log("Contrato do relatorio personalizado de pessoas validado.");
