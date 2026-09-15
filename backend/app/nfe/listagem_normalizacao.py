@@ -11,6 +11,7 @@ from app.nfe.listagem_base import (
     _extrair_valor_nota,
     _formatar_data_iso,
     _formatar_endereco,
+    _inferir_canal_por_intermediador,
     _inferir_canal_por_loja_id,
     _inferir_canal_por_numero,
     _label_codigo,
@@ -67,6 +68,7 @@ def _normalizar_resumo_canal(item: dict, venda: Venda | None = None) -> dict:
         )
     )
     canal_inferido = _primeiro_preenchido(
+        _inferir_canal_por_intermediador(intermediador.get("cnpj")),
         _inferir_canal_por_numero(numero_loja_virtual),
         _inferir_canal_por_loja_id(loja.get("id")),
     )
@@ -131,6 +133,7 @@ def _normalizar_resumo_canal(item: dict, venda: Venda | None = None) -> dict:
                 _primeiro_preenchido(
                     intermediador.get("identificacao"),
                     intermediador.get("identificacaoIntermediador"),
+                    intermediador.get("nomeUsuario"),
                     item.get("identificacaoIntermediador"),
                 )
             ),
@@ -165,6 +168,21 @@ def _normalizar_parcela(item: dict) -> dict:
 
 def _normalizar_item_nota(item: dict) -> dict:
     produto = _dict(item.get("produto"))
+    quantidade = _coerce_float(item.get("quantidade"), 0.0)
+    valor_unitario = _coerce_float(
+        _primeiro_preenchido(
+            item.get("valor"),
+            item.get("valorUnitario"),
+            item.get("preco"),
+            item.get("precoUnitario"),
+        ),
+        0.0,
+    )
+    valor_total = _coerce_float(
+        _primeiro_preenchido(item.get("total"), item.get("valorTotal")), None
+    )
+    if valor_total is None:
+        valor_total = round(quantidade * valor_unitario, 2)
     return {
         "descricao": _texto(
             _primeiro_preenchido(
@@ -184,24 +202,69 @@ def _normalizar_item_nota(item: dict) -> dict:
                 item.get("unidade"), item.get("un"), item.get("siglaUnidade")
             )
         ),
-        "quantidade": _coerce_float(item.get("quantidade"), 0.0),
-        "valor_unitario": _coerce_float(
-            _primeiro_preenchido(
-                item.get("valor"),
-                item.get("valorUnitario"),
-                item.get("preco"),
-                item.get("precoUnitario"),
-            ),
-            0.0,
-        ),
-        "valor_total": _coerce_float(
-            _primeiro_preenchido(item.get("total"), item.get("valorTotal")), 0.0
-        ),
+        "quantidade": quantidade,
+        "valor_unitario": valor_unitario,
+        "valor_total": valor_total,
         "ncm": _texto(
             _primeiro_preenchido(
                 item.get("ncm"), item.get("classificacaoFiscal"), produto.get("ncm")
             )
         ),
+    }
+
+
+def _normalizar_totais_nota(item: dict, itens: list[dict]) -> dict:
+    totais = _dict(item.get("totais"))
+    valor_produtos = _coerce_float(
+        _primeiro_preenchido(totais.get("valorProdutos"), item.get("valorProdutos")),
+        None,
+    )
+    if valor_produtos is None:
+        valor_produtos = round(
+            sum(
+                _coerce_float(produto.get("valor_total"), 0.0) or 0.0
+                for produto in itens
+            ),
+            2,
+        )
+
+    valor_frete = _coerce_float(
+        _primeiro_preenchido(totais.get("valorFrete"), item.get("valorFrete")),
+        0.0,
+    )
+    valor_seguro = _coerce_float(
+        _primeiro_preenchido(totais.get("valorSeguro"), item.get("valorSeguro")),
+        0.0,
+    )
+    outras_despesas = _coerce_float(
+        _primeiro_preenchido(totais.get("outrasDespesas"), item.get("outrasDespesas")),
+        0.0,
+    )
+    valor_total = _extrair_valor_nota(item)
+    valor_desconto = _coerce_float(
+        _primeiro_preenchido(totais.get("valorDesconto"), item.get("valorDesconto")),
+        None,
+    )
+    if valor_desconto is None:
+        valor_desconto = max(
+            round(
+                valor_produtos
+                + (valor_frete or 0.0)
+                + (valor_seguro or 0.0)
+                + (outras_despesas or 0.0)
+                - valor_total,
+                2,
+            ),
+            0.0,
+        )
+
+    return {
+        "valor_produtos": valor_produtos,
+        "valor_frete": valor_frete,
+        "valor_seguro": valor_seguro,
+        "outras_despesas": outras_despesas,
+        "valor_desconto": valor_desconto,
+        "valor_total": valor_total,
     }
 
 
@@ -217,7 +280,6 @@ def _normalizar_detalhe_nota_bling(
     endereco_entrega = _dict(
         _primeiro_preenchido(item.get("enderecoEntrega"), item.get("entrega"))
     )
-    totais = _dict(item.get("totais"))
     transporte = _dict(
         _primeiro_preenchido(item.get("transporte"), item.get("transportador"))
     )
@@ -420,37 +482,7 @@ def _normalizar_detalhe_nota_bling(
         ),
         "cliente": cliente,
         "itens": itens,
-        "totais": {
-            "valor_produtos": _coerce_float(
-                _primeiro_preenchido(
-                    totais.get("valorProdutos"), item.get("valorProdutos")
-                ),
-                0.0,
-            ),
-            "valor_frete": _coerce_float(
-                _primeiro_preenchido(totais.get("valorFrete"), item.get("valorFrete")),
-                0.0,
-            ),
-            "valor_seguro": _coerce_float(
-                _primeiro_preenchido(
-                    totais.get("valorSeguro"), item.get("valorSeguro")
-                ),
-                0.0,
-            ),
-            "outras_despesas": _coerce_float(
-                _primeiro_preenchido(
-                    totais.get("outrasDespesas"), item.get("outrasDespesas")
-                ),
-                0.0,
-            ),
-            "valor_desconto": _coerce_float(
-                _primeiro_preenchido(
-                    totais.get("valorDesconto"), item.get("valorDesconto")
-                ),
-                0.0,
-            ),
-            "valor_total": _extrair_valor_nota(item),
-        },
+        "totais": _normalizar_totais_nota(item, itens),
         "transporte": {
             "tipo": _texto(
                 _primeiro_preenchido(
@@ -564,6 +596,7 @@ def _normalizar_detalhe_nota_bling(
                 _primeiro_preenchido(
                     intermediador.get("identificacao"),
                     intermediador.get("identificacaoIntermediador"),
+                    intermediador.get("nomeUsuario"),
                     resumo_canal.get("intermediador", {}).get("identificacao"),
                 )
             ),

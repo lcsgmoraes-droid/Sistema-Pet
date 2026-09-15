@@ -124,6 +124,7 @@ from app.nfe.listagem import (
     _tipo_nota_label as _tipo_nota_label,
     _tipo_pessoa_label as _tipo_pessoa_label,
     _venda_usa_nfce as _venda_usa_nfce,
+    upsert_nota_cache as upsert_nota_cache,
 )
 from app.utils.logger import logger
 

@@ -25,6 +25,13 @@ _LOJA_ID_CANAL_MAP = {
 }
 
 
+_INTERMEDIADOR_CNPJ_CANAL_MAP = {
+    "15436940000103": "amazon",
+    "27415911000136": "tiktok",
+    "35635824000112": "shopee",
+}
+
+
 _REGIME_TRIBUTARIO_MAP = {
     "1": "Simples Nacional",
     "2": "Simples Nacional - excesso de sublimite",
@@ -164,6 +171,8 @@ def _canal_slug(value) -> str:
         return "shopee"
     if "amazon" in texto:
         return "amazon"
+    if "tiktok" in texto or "tik tok" in texto:
+        return "tiktok"
     if any(
         chave in texto for chave in ("loja virtual", "ecommerce", "e-commerce", "site")
     ):
@@ -182,6 +191,7 @@ def _canal_label(slug: str, fallback: str | None = None) -> str | None:
         "mercado_livre": "Mercado Livre",
         "shopee": "Shopee",
         "amazon": "Amazon",
+        "tiktok": "TikTok",
         "site": "Site",
         "app": "App",
         "whatsapp": "WhatsApp",
@@ -212,6 +222,8 @@ def _inferir_canal_por_numero(numero) -> str | None:
         return None
     if re.fullmatch(r"\d{3}-\d{7}-\d{7}", texto):
         return "amazon"
+    if texto.isdigit() and len(texto) >= 18:
+        return "tiktok"
     if texto.isdigit() and len(texto) >= 14:
         return "mercado_livre"
     if re.search(r"[A-Za-z]", texto) and re.search(r"\d", texto):
@@ -221,6 +233,10 @@ def _inferir_canal_por_numero(numero) -> str | None:
 
 def _inferir_canal_por_loja_id(loja_id) -> str | None:
     return _LOJA_ID_CANAL_MAP.get(_texto(loja_id) or "")
+
+
+def _inferir_canal_por_intermediador(cnpj) -> str | None:
+    return _INTERMEDIADOR_CNPJ_CANAL_MAP.get(_digitos(cnpj))
 
 
 def _formatar_endereco(value) -> str | None:

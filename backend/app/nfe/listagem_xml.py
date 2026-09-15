@@ -7,6 +7,9 @@ from app.nfe.listagem_base import (
     _INDICADOR_PRESENCA_MAP,
     _REGIME_TRIBUTARIO_MAP,
     _XML_NS,
+    _coerce_float,
+    _inferir_canal_por_intermediador,
+    _canal_label,
     _primeiro_preenchido,
     _separar_data_hora,
     _texto,
@@ -21,6 +24,8 @@ def _extrair_campos_fiscais_do_xml(xml_texto: str | None) -> dict:
     root = ET.fromstring(xml_texto)
     ide = root.find(".//nfe:ide", _XML_NS)
     emit = root.find(".//nfe:emit", _XML_NS)
+    totais = root.find(".//nfe:ICMSTot", _XML_NS)
+    intermediador = root.find(".//nfe:infIntermed", _XML_NS)
 
     if ide is None:
         return {}
@@ -32,7 +37,13 @@ def _extrair_campos_fiscais_do_xml(xml_texto: str | None) -> dict:
         ide.findtext("nfe:dhSaiEnt", default="", namespaces=_XML_NS)
     )
 
-    return {
+    cnpj_intermediador = (
+        intermediador.findtext("nfe:CNPJ", default="", namespaces=_XML_NS)
+        if intermediador is not None
+        else ""
+    )
+    canal = _inferir_canal_por_intermediador(cnpj_intermediador)
+    resultado = {
         "data_emissao": data_emissao,
         "hora_emissao": hora_emissao,
         "data_saida": data_saida,
@@ -49,7 +60,31 @@ def _extrair_campos_fiscais_do_xml(xml_texto: str | None) -> dict:
         "indicador_presenca": _INDICADOR_PRESENCA_MAP.get(
             _texto(ide.findtext("nfe:indPres", default="", namespaces=_XML_NS)) or "",
         ),
+        "canal": canal,
+        "canal_label": _canal_label(canal),
     }
+    if totais is not None:
+        resultado["totais"] = {
+            "valor_produtos": _coerce_float(
+                totais.findtext("nfe:vProd", default="0", namespaces=_XML_NS), 0.0
+            ),
+            "valor_frete": _coerce_float(
+                totais.findtext("nfe:vFrete", default="0", namespaces=_XML_NS), 0.0
+            ),
+            "valor_seguro": _coerce_float(
+                totais.findtext("nfe:vSeg", default="0", namespaces=_XML_NS), 0.0
+            ),
+            "outras_despesas": _coerce_float(
+                totais.findtext("nfe:vOutro", default="0", namespaces=_XML_NS), 0.0
+            ),
+            "valor_desconto": _coerce_float(
+                totais.findtext("nfe:vDesc", default="0", namespaces=_XML_NS), 0.0
+            ),
+            "valor_total": _coerce_float(
+                totais.findtext("nfe:vNF", default="0", namespaces=_XML_NS), 0.0
+            ),
+        }
+    return resultado
 
 
 def _consultar_campos_fiscais_no_xml(xml_url: str | None) -> dict:
@@ -86,3 +121,13 @@ def _enriquecer_detalhe_com_xml_link(item: dict, detalhe: dict) -> None:
     for campo in ("codigo_regime_tributario", "finalidade", "indicador_presenca"):
         if campos_xml.get(campo) and not detalhe.get(campo):
             detalhe[campo] = campos_xml[campo]
+
+    if campos_xml.get("totais"):
+        detalhe["totais"] = campos_xml["totais"]
+
+    if campos_xml.get("canal"):
+        detalhe["canal"] = campos_xml["canal"]
+        detalhe["canal_label"] = campos_xml["canal_label"]
+        informacoes = detalhe.setdefault("informacoes_adicionais", {})
+        informacoes["origem_loja_virtual"] = campos_xml["canal_label"]
+        informacoes["origem_canal_venda"] = campos_xml["canal_label"]
