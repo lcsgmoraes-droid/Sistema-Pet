@@ -4,6 +4,7 @@ from sqlalchemy import (
     Boolean,
     Column,
     DateTime,
+    Integer,
     SmallInteger,
     String,
     Text,
@@ -62,3 +63,22 @@ class IntNFeConnection(BaseTenantModel):
     @production_client_secret.setter
     def production_client_secret(self, value: str) -> None:
         self.production_client_secret_encrypted = encrypt_secret(value)
+
+
+class IntNFeEmissionSequence(BaseTenantModel):
+    """Série escolhida e ponto inicial do CorePet por ambiente e documento."""
+
+    __tablename__ = "intnfe_emission_sequences"
+    __table_args__ = (
+        UniqueConstraint(
+            "tenant_id",
+            "ambiente_codigo",
+            "modelo",
+            name="uq_intnfe_emission_sequence_tenant_environment_model",
+        ),
+    )
+
+    ambiente_codigo = Column(SmallInteger, nullable=False)
+    modelo = Column(SmallInteger, nullable=False)
+    serie = Column(String(3), nullable=False)
+    numero_inicial = Column(Integer, nullable=False)

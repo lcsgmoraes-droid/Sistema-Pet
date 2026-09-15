@@ -11,7 +11,7 @@ from sqlalchemy.pool import StaticPool
 from app.config import settings
 from app.db import Base
 from app.intnfe.client import IntNFeError
-from app.intnfe.models import IntNFeConnection
+from app.intnfe.models import IntNFeConnection, IntNFeEmissionSequence
 from app.intnfe.presentation import certificate_state, public_status, valid_cnpj
 from app.intnfe.repository import ActivationError, get_connection, reserve, save
 from app.intnfe.service import activate, bind_existing
@@ -80,7 +80,12 @@ def intnfe_db():
         "sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool
     )
     Base.metadata.create_all(
-        engine, tables=[Tenant.__table__, IntNFeConnection.__table__]
+        engine,
+        tables=[
+            Tenant.__table__,
+            IntNFeConnection.__table__,
+            IntNFeEmissionSequence.__table__,
+        ],
     )
     with Session(engine) as session:
         yield session

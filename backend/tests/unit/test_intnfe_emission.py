@@ -130,6 +130,33 @@ def test_payload_preserves_totals_and_hides_real_recipient_in_homologation():
     assert payload["pagamentos"] == [{"formaPagamento": "17", "valor": 23.0}]
 
 
+def test_first_corepet_number_is_recorded_for_sequence():
+    saved = []
+
+    class Query:
+        def filter(self, *_args):
+            return self
+
+        def one_or_none(self):
+            return None
+
+    db = SimpleNamespace(query=lambda *_args: Query(), add=saved.append)
+    sale = SimpleNamespace(
+        tenant_id="11111111-1111-1111-1111-111111111111",
+        nfe_numero=529,
+        nfe_serie=1,
+        nfe_ambiente=1,
+        nfe_modelo="65",
+    )
+
+    emission._remember_sequence_start(db, sale)
+
+    assert len(saved) == 1
+    assert saved[0].modelo == 65
+    assert saved[0].serie == "1"
+    assert saved[0].numero_inicial == 529
+
+
 def test_interstate_sale_uses_interstate_cfop():
     tenant, connection, sale = _objects()
     sale.cliente.estado = "RJ"

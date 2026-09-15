@@ -17,6 +17,50 @@ function uniqueSeries(rows, environment, model, extra = []) {
   return [...values].sort((a, b) => Number(a) - Number(b));
 }
 
+function SequenceProgress({ document, model, series, sequence, initialNumber }) {
+  if (!series || !sequence) {
+    return (
+      <article className="rounded-xl border border-dashed border-slate-300 p-4 dark:border-slate-600">
+        <p className="font-bold text-slate-900 dark:text-white">
+          {document} <span className="font-normal text-slate-500">· modelo {model}</span>
+        </p>
+        <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
+          Nenhuma série foi escolhida para este documento.
+        </p>
+      </article>
+    );
+  }
+
+  return (
+    <article className="rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-950/40">
+      <p className="font-bold text-slate-900 dark:text-white">
+        {document} <span className="font-normal text-slate-500">· modelo {model}</span>
+      </p>
+      <p className="mt-1 text-sm font-semibold text-blue-800">Série {series.padStart(3, "0")}</p>
+      <dl className="mt-3 grid gap-3 text-sm sm:grid-cols-3">
+        <div>
+          <dt className="text-slate-500">Início no CorePet</dt>
+          <dd className="font-bold text-slate-900 dark:text-white">
+            {formatSequence(initialNumber)}
+          </dd>
+        </div>
+        <div>
+          <dt className="text-slate-500">Último no emissor</dt>
+          <dd className="font-bold text-slate-900 dark:text-white">
+            {formatSequence(sequence.ultimoNumero)}
+          </dd>
+        </div>
+        <div>
+          <dt className="text-slate-500">Próxima emissão</dt>
+          <dd className="font-bold text-slate-900 dark:text-white">
+            {formatSequence(sequence.proximoNumero)}
+          </dd>
+        </div>
+      </dl>
+    </article>
+  );
+}
+
 export default function IntNFeAmbienteEmissao({
   apiClient,
   disabled,
@@ -41,13 +85,19 @@ export default function IntNFeAmbienteEmissao({
       .then((response) => {
         if (!active) return;
         setData(response.data);
-        setSelections((current) => ({
-          ...current,
-          [response.data.ambiente_codigo]: {
-            55: response.data.serie_nfe,
-            65: response.data.serie_nfce,
-          },
-        }));
+        setSelections((current) => {
+          const next = {
+            1: { ...current[1] },
+            2: { ...current[2] },
+          };
+          for (const configuration of response.data.configuracoes || []) {
+            next[configuration.ambiente_codigo][configuration.modelo] = configuration.serie;
+          }
+          const activeEnvironment = response.data.ambiente_codigo;
+          if (!next[activeEnvironment][55]) next[activeEnvironment][55] = response.data.serie_nfe;
+          if (!next[activeEnvironment][65]) next[activeEnvironment][65] = response.data.serie_nfce;
+          return next;
+        });
         onData?.(response.data);
       })
       .catch((error) => active && setMessage({ type: "error", text: messageFrom(error) }))
@@ -86,6 +136,23 @@ export default function IntNFeAmbienteEmissao({
   );
   const nfeSequence = selected[55] ? currentSequence(rows, selected[55], environment, 55) : null;
   const nfceSequence = selected[65] ? currentSequence(rows, selected[65], environment, 65) : null;
+  const savedConfigurations = data?.configuracoes || [];
+  const savedNfe = savedConfigurations.find(
+    (item) => item.ambiente_codigo === environment && item.modelo === 55,
+  );
+  const savedNfce = savedConfigurations.find(
+    (item) => item.ambiente_codigo === environment && item.modelo === 65,
+  );
+  const nfeInitial =
+    savedNfe?.serie === selected[55]
+      ? savedNfe.numero_inicial
+      : ((choices[55]?.serie === selected[55] ? choices[55].proximoNumero : null) ??
+        nfeSequence?.proximoNumero);
+  const nfceInitial =
+    savedNfce?.serie === selected[65]
+      ? savedNfce.numero_inicial
+      : ((choices[65]?.serie === selected[65] ? choices[65].proximoNumero : null) ??
+        nfceSequence?.proximoNumero);
 
   const updateSelection = (model, serie) => {
     setSelections((current) => ({
@@ -105,6 +172,8 @@ export default function IntNFeAmbienteEmissao({
         ambiente_codigo: environment,
         serie_nfe: selected[55],
         serie_nfce: selected[65] || "1",
+        numero_inicial_nfe: nfeInitial,
+        numero_inicial_nfce: nfceSequence ? nfceInitial : null,
       });
       setData(response.data);
       onData?.(response.data);
@@ -215,6 +284,31 @@ export default function IntNFeAmbienteEmissao({
               : "Adicione o modelo 65 acima somente se sua empresa emitir NFC-e."}
           </span>
         </label>
+      </div>
+
+      <div className="space-y-3">
+        <div>
+          <h3 className="font-bold text-slate-950 dark:text-white">Resumo das séries escolhidas</h3>
+          <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
+            Acompanhe o ponto de partida e o avanço de cada documento no emissor.
+          </p>
+        </div>
+        <div className="grid gap-4 lg:grid-cols-2">
+          <SequenceProgress
+            document="NF-e"
+            model={55}
+            series={selected[55]}
+            sequence={nfeSequence}
+            initialNumber={nfeInitial}
+          />
+          <SequenceProgress
+            document="NFC-e"
+            model={65}
+            series={selected[65]}
+            sequence={nfceSequence}
+            initialNumber={nfceInitial}
+          />
+        </div>
       </div>
 
       {pendingSequence ? (
