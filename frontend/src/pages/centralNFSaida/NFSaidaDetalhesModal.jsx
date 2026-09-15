@@ -46,11 +46,9 @@ export default function NFSaidaDetalhesModal({
   if (!notaSelecionada) return null;
 
   const codigoErro = detalheNota?.codigo_erro || notaSelecionada.codigo_erro;
-  const motivoRejeicao =
-    detalheNota?.motivo_rejeicao || notaSelecionada.motivo_rejeicao;
+  const motivoRejeicao = detalheNota?.motivo_rejeicao || notaSelecionada.motivo_rejeicao;
   const notaIntNFe = notaSelecionada.provedor === "intnfe";
-  const documentoDisponivel =
-    !notaIntNFe || notaSelecionada.status?.toLowerCase() === "autorizada";
+  const documentoDisponivel = !notaIntNFe || notaSelecionada.status?.toLowerCase() === "autorizada";
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
