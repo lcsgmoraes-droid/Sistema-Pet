@@ -221,18 +221,9 @@ export function usePDVVendaFinalizacao({
     }
   };
 
-  const emitirNotaVendaFinalizada = async () => {
-    if (!vendaAtual.id) return;
-
-    const emitirNfe = await confirmarCorePet(
-      "Escolha o modelo da nota.\n\nClique OK para emitir NF-e (modelo 55)\nClique Cancelar para emitir NFC-e (modelo 65).",
-    );
-    const tipoNota = emitirNfe ? "nfe" : "nfce";
-
-    const confirmar = await confirmarCorePet(
-      `Confirma emitir ${tipoNota === "nfe" ? "NF-e" : "NFC-e"} para esta venda finalizada?`,
-    );
-    if (!confirmar) return;
+  const emitirNotaVendaFinalizada = async (tipoNota = "nfce") => {
+    if (!vendaAtual.id) return false;
+    if (tipoNota !== "nfe" && tipoNota !== "nfce") return false;
 
     try {
       setLoading(true);
@@ -240,7 +231,7 @@ export function usePDVVendaFinalizacao({
         vendaId: vendaAtual.id,
         tipoNota,
       });
-      if (resultado?.cancelado) return;
+      if (resultado?.cancelado) return false;
 
       await carregarVendaEspecifica(vendaAtual.id);
       if (resultado?.data?.processando) {
@@ -254,6 +245,7 @@ export function usePDVVendaFinalizacao({
       } else {
         toast.success(`${tipoNota === "nfe" ? "NF-e" : "NFC-e"} autorizada com sucesso!`);
       }
+      return true;
     } catch (error) {
       console.error("Erro ao emitir nota da venda finalizada:", error);
       const mensagem = extrairMensagemNFe(error);
@@ -266,6 +258,7 @@ export function usePDVVendaFinalizacao({
       } else {
         alert(mensagem);
       }
+      return false;
     } finally {
       setLoading(false);
     }
