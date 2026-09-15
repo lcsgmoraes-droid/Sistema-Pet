@@ -108,7 +108,7 @@ No CorePet:
 2. abra a aba **Homologação** ou **Produção**;
 3. na seção **CSC da NFC-e**, informe o ID e o código CSC daquele ambiente;
 4. revise a substituição quando já existir um CSC;
-5. salve e clique em **Consultar CSC** para confirmar o ID registrado.
+5. salve e clique em **Verificar cadastro na IntNFe** para confirmar o ID registrado.
 
 O código secreto é enviado diretamente à IntNFe e não volta nas consultas. O
 CorePet mostra somente se existe um CSC e qual é o seu ID.

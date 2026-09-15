@@ -746,6 +746,19 @@ export const BASE_CONHECIMENTO = [
         ],
       },
       {
+        titulo: "Como obter e cadastrar o CSC da NFC-e?",
+        tags: ["csc", "nfce", "modelo 65", "sefaz", "código de segurança", "token"],
+        conteudo: [
+          "O **CSC (Código de Segurança do Contribuinte)** é usado para gerar o QR Code da NFC-e, modelo 65. Ele não é necessário para a NF-e modelo 55.",
+          "O CSC é fornecido pela Secretaria da Fazenda do estado da empresa. Primeiro, confirme que o estabelecimento está credenciado para emitir NFC-e.",
+          "Acesse o portal da NFC-e da sua SEFAZ com o certificado digital da empresa, selecione o estabelecimento e procure **Gerenciar Cód Segurança** ou opção equivalente.",
+          "A SEFAZ fornece o **ID do CSC**, que é curto, e o **código CSC**, que é secreto. Copie os dois para **Configurações → Integrações → IntNFe → CSC da NFC-e**.",
+          "Homologação e produção usam CSCs diferentes. Antes de copiar, confira em qual ambiente o código foi gerado.",
+          "Para empresas de São Paulo, consulte as [orientações oficiais da SEFAZ-SP](https://portal.fazenda.sp.gov.br/servicos/nfce/).",
+          "O botão **Verificar cadastro na IntNFe** confirma se existe um CSC e mostra seu ID. Por segurança, ele nunca recupera nem exibe o código secreto.",
+        ],
+      },
+      {
         titulo: "Como emitir uma nota fiscal",
         tags: ["nota fiscal", "nfe", "nfce", "emitir", "imposto"],
         conteudo: [
