@@ -328,7 +328,7 @@ def criar_campanha(
         tenant_id=tenant_id,
         name=body.name.strip(),
         campaign_type=tipo,
-        status=CampaignStatusEnum.active,
+        status=CampaignStatusEnum.paused,
         priority=max(0, min(999, body.priority or 50)),
         params=body.params or {},
     )
