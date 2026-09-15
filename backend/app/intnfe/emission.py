@@ -139,39 +139,48 @@ def _payment_code(value):
     return "99"
 
 
-def _recipient(cliente, environment, document_type):
+def _recipient(
+    cliente,
+    environment,
+    document_type,
+    *,
+    require_identity=False,
+    require_address=False,
+):
     if cliente is None:
         if document_type == "nfe":
             raise DirectEmissionError("A NF-e exige um cliente cadastrado.")
+        if require_identity:
+            raise DirectEmissionError(
+                "Esta NFC-e exige um consumidor identificado com CPF ou CNPJ."
+            )
         return None
     document = _digits(getattr(cliente, "cnpj", None) or getattr(cliente, "cpf", None))
     if len(document) not in {11, 14}:
-        if document_type == "nfce":
+        if document_type == "nfce" and not require_identity:
             return None
         raise DirectEmissionError(
             "Informe um CPF ou CNPJ válido no cadastro do cliente."
         )
 
-    required = {
+    address = {
         "logradouro": _text(cliente.endereco),
         "numero": _text(cliente.numero),
         "bairro": _text(cliente.bairro),
         "municipio": _text(cliente.cidade),
         "codigoMunicipio": _digits(getattr(cliente, "codigo_municipio", None)),
         "uf": (_text(cliente.estado) or "").upper(),
-        "cep": _digits(cliente.cep),
     }
-    missing = [name for name, value in required.items() if not value]
-    if missing and document_type == "nfe":
+    missing = [name for name, value in address.items() if not value]
+    if missing and (document_type == "nfe" or require_address):
         raise DirectEmissionError(
-            "Complete endereço, número, bairro, cidade, UF, CEP e código IBGE do cliente."
+            "Complete endereço, número, bairro, cidade, UF e código IBGE do cliente."
         )
-    if not missing and (
-        len(required["codigoMunicipio"]) != 7 or len(required["cep"]) != 8
-    ):
-        raise DirectEmissionError(
-            "Confira o CEP e o código IBGE do município do cliente."
-        )
+    if not missing and len(address["codigoMunicipio"]) != 7:
+        raise DirectEmissionError("Confira o código IBGE do município do cliente.")
+    cep = _digits(getattr(cliente, "cep", None))
+    if len(cep) == 8:
+        address["cep"] = cep
 
     recipient = {
         "razaoSocial": (
@@ -184,7 +193,7 @@ def _recipient(cliente, environment, document_type):
         else "9",
     }
     if not missing:
-        recipient["endereco"] = required
+        recipient["endereco"] = address
     if len(document) == 14:
         recipient["cnpj"] = document
     else:
@@ -307,7 +316,18 @@ def build_payload(db, tenant, connection, venda, document_type):
     if emitter_pending:
         raise DirectEmissionError(" ".join(emitter_pending))
     environment = 1 if connection.emission_environment == 1 else 2
-    recipient = _recipient(venda.cliente, environment, document_type)
+    sale_total = _money(venda.total)
+    nfce_requires_recipient = document_type == "nfce" and (
+        bool(getattr(venda, "tem_entrega", False)) or sale_total >= Decimal("10000")
+    )
+    recipient = _recipient(
+        venda.cliente,
+        environment,
+        document_type,
+        require_identity=nfce_requires_recipient,
+        require_address=bool(getattr(venda, "tem_entrega", False))
+        or nfce_requires_recipient,
+    )
     destination_uf = (
         recipient.get("endereco", {}).get("uf")
         if recipient
@@ -436,7 +456,6 @@ def build_payload(db, tenant, connection, venda, document_type):
         )
     freight = _money(venda.taxa_entrega if venda.tem_entrega else 0)
     calculated_total = product_total - total_discount + freight
-    sale_total = _money(venda.total)
     if calculated_total != sale_total:
         raise DirectEmissionError(
             f"O total fiscal calculado (R$ {calculated_total}) difere do total da venda (R$ {sale_total})."

@@ -130,6 +130,75 @@ def test_payload_preserves_totals_and_hides_real_recipient_in_homologation():
     assert payload["pagamentos"] == [{"formaPagamento": "17", "valor": 23.0}]
 
 
+def test_nfe_accepts_complete_recipient_address_without_cep():
+    tenant, connection, sale = _objects()
+    sale.cliente.cep = None
+
+    recipient = emission.build_payload(None, tenant, connection, sale, "nfe")[
+        "destinatario"
+    ]
+
+    assert recipient["endereco"]["codigoMunicipio"] == "3541406"
+    assert "cep" not in recipient["endereco"]
+
+
+def test_nfe_still_requires_mandatory_recipient_address_fields():
+    tenant, connection, sale = _objects()
+    sale.cliente.codigo_municipio = None
+
+    with pytest.raises(emission.DirectEmissionError, match="código IBGE"):
+        emission.build_payload(None, tenant, connection, sale, "nfe")
+
+
+def test_counter_nfce_does_not_require_recipient_address():
+    tenant, connection, sale = _objects()
+    sale.tem_entrega = False
+    sale.taxa_entrega = "0.00"
+    sale.total = "18.00"
+    sale.pagamentos[0].valor = "18.00"
+    sale.cliente.endereco = None
+    sale.cliente.numero = None
+    sale.cliente.bairro = None
+    sale.cliente.cidade = None
+    sale.cliente.codigo_municipio = None
+    sale.cliente.estado = None
+    sale.cliente.cep = None
+
+    consumer = emission.build_payload(None, tenant, connection, sale, "nfce")[
+        "consumidor"
+    ]
+
+    assert consumer["cpf"] == "52998224725"
+    assert "endereco" not in consumer
+
+
+def test_delivery_nfce_requires_recipient_address():
+    tenant, connection, sale = _objects()
+    sale.cliente.endereco = None
+
+    with pytest.raises(emission.DirectEmissionError, match="Complete endereço"):
+        emission.build_payload(None, tenant, connection, sale, "nfce")
+
+
+def test_delivery_nfce_requires_identified_recipient():
+    tenant, connection, sale = _objects()
+    sale.cliente = None
+
+    with pytest.raises(emission.DirectEmissionError, match="consumidor identificado"):
+        emission.build_payload(None, tenant, connection, sale, "nfce")
+
+
+def test_high_value_nfce_requires_identified_recipient():
+    with pytest.raises(emission.DirectEmissionError, match="consumidor identificado"):
+        emission._recipient(
+            None,
+            1,
+            "nfce",
+            require_identity=True,
+            require_address=True,
+        )
+
+
 def test_first_corepet_number_is_recorded_for_sequence():
     saved = []
 
