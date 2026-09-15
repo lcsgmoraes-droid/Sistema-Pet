@@ -221,7 +221,10 @@ def _normalizar_totais_nota(item: dict, itens: list[dict]) -> dict:
     )
     if valor_produtos is None:
         valor_produtos = round(
-            sum(_coerce_float(produto.get("valor_total"), 0.0) or 0.0 for produto in itens),
+            sum(
+                _coerce_float(produto.get("valor_total"), 0.0) or 0.0
+                for produto in itens
+            ),
             2,
         )
 
@@ -234,16 +237,12 @@ def _normalizar_totais_nota(item: dict, itens: list[dict]) -> dict:
         0.0,
     )
     outras_despesas = _coerce_float(
-        _primeiro_preenchido(
-            totais.get("outrasDespesas"), item.get("outrasDespesas")
-        ),
+        _primeiro_preenchido(totais.get("outrasDespesas"), item.get("outrasDespesas")),
         0.0,
     )
     valor_total = _extrair_valor_nota(item)
     valor_desconto = _coerce_float(
-        _primeiro_preenchido(
-            totais.get("valorDesconto"), item.get("valorDesconto")
-        ),
+        _primeiro_preenchido(totais.get("valorDesconto"), item.get("valorDesconto")),
         None,
     )
     if valor_desconto is None:

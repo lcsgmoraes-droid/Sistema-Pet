@@ -383,7 +383,15 @@ def test_cst_49_without_saved_rate_is_sent_with_explicit_zero(monkeypatch):
 
 @pytest.mark.parametrize(
     "channel",
-    ["amazon", "mercado_livre", "Mercado Livre", "ml", "shopee", "tiktok", "TikTok Shop"],
+    [
+        "amazon",
+        "mercado_livre",
+        "Mercado Livre",
+        "ml",
+        "shopee",
+        "tiktok",
+        "TikTok Shop",
+    ],
 )
 def test_direct_emission_is_blocked_for_every_marketplace_channel(channel):
     tenant, connection, sale = _objects(channel=channel)
