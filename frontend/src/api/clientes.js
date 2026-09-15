@@ -15,6 +15,31 @@ export const buscarClientes = async (params = {}) => {
 };
 
 /**
+ * Buscar todos os cadastros ativos para o relatorio personalizado.
+ * A consulta e paginada para continuar segura em bases grandes.
+ */
+export const buscarPessoasParaRelatorio = async (params = {}) => {
+  const limit = 1000;
+  const pessoas = [];
+  let skip = 0;
+  let total;
+
+  do {
+    const response = await api.get("/clientes/relatorio/pessoas", {
+      params: { ...params, skip, limit },
+    });
+    const pagina = response.data?.items || [];
+    total = Number(response.data?.total || 0);
+    pessoas.push(...pagina);
+    skip += pagina.length;
+
+    if (pagina.length === 0) break;
+  } while (pessoas.length < total);
+
+  return pessoas;
+};
+
+/**
  * Buscar cliente por ID
  */
 export const buscarClientePorId = async (clienteId) => {
