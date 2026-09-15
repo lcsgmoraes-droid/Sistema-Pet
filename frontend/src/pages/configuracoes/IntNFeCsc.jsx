@@ -247,7 +247,7 @@ export default function IntNFeCsc({
             disabled={locked}
             className={`${buttonClass} bg-blue-600 text-white`}
           >
-            Revisar cadastro
+            Salvar CSC
           </button>
         </form>
       )}
