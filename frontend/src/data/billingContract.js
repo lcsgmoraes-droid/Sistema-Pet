@@ -1,15 +1,15 @@
-export const BILLING_CONTRACT_VERSION = "2026-08-14-01";
+export const BILLING_CONTRACT_VERSION = "2026-09-14-02";
 export const BILLING_CONTRACT_DOCUMENT_SHA256 =
-  "827819d29b30bf7b6a14a6c5f659cf5b0da475311dba6845c846570fb15e70a8";
+  "591557963e446eca1a55e46dba0337ddf95373aa2f0660c6d88cb2142e5aa44e";
 
 export const BILLING_ACCEPTANCE_TEXT =
-  "Li e aceito o Resumo da Contratação, o Contrato de Assinatura CorePet e os Termos de Uso. Declaro que tive acesso e estou ciente da Política de Privacidade. Confirmo o plano, o valor, o ciclo e o primeiro vencimento exibidos e autorizo a cobrança correspondente. Declaro que tenho poderes para representar a empresa cadastrada.";
+  "Li e aceito o Resumo da Contratação, o Contrato de Assinatura CorePet e os Termos de Uso. Declaro que tive acesso e estou ciente da Política de Privacidade. Confirmo o plano, o valor, o ciclo e o primeiro vencimento exibidos. Quando houver proposta específica, confirmo também seu escopo, exclusões, implantação, suporte e a informação sobre ausência ou existência de SLA. Autorizo a cobrança correspondente e declaro que tenho poderes para representar a empresa cadastrada.";
 
 export const billingContract = {
   title: "Contrato de Assinatura CorePet",
   eyebrow: "Licença de uso de software e serviços SaaS",
   version: `Versão ${BILLING_CONTRACT_VERSION}`,
-  updatedAt: "14/08/2026",
+  updatedAt: "14/09/2026",
   intro:
     "Este Contrato regula a assinatura paga da plataforma CorePet. Ele deve ser lido em conjunto com o resumo comercial exibido antes da contratação, os Termos de Uso e a Política de Privacidade.",
   sections: [
@@ -18,8 +18,9 @@ export const billingContract = {
       body: "A contratada é WCO COMERCIO E IMPORTACAO LTDA, CNPJ 51.510.640/0001-82, com sede na Rua Alcides Tenorio de Brito Guerra, 51, Parque São Matheus, Presidente Prudente/SP, CEP 19025-420, fornecedora da plataforma CorePet. A contratante é a empresa identificada no resumo da contratação e representada pelo administrador que realiza o aceite eletrônico.",
       bullets: [
         "O resumo da contratação define plano, preço, ciclo, primeiro vencimento, limites e adicionais escolhidos.",
+        "As condições específicas da proposta definem escopo, implantação, migração, exclusões, suporte, personalizações e regras de encerramento aplicáveis à contratação.",
         "Este Contrato define as regras gerais da assinatura; os Termos de Uso regulam o uso da plataforma; e a Política de Privacidade descreve o tratamento de dados pessoais.",
-        "Em caso de divergência comercial, prevalece o resumo específico que foi exibido e aceito pelo administrador.",
+        "Em caso de divergência sobre condição específica, prevalecem a proposta aceita e os anexos assinados; depois, este Contrato e os Termos de Uso, cada qual em seu tema.",
       ],
     },
     {
@@ -84,59 +85,87 @@ export const billingContract = {
       bullets: [
         "Fornecer dados corretos e atualizados, pagar os valores contratados e manter os dados de cobrança válidos.",
         "Administrar usuários e permissões, remover acessos indevidos e impedir o compartilhamento de senhas e tokens.",
+        "Proteger dispositivos, redes, e-mails, credenciais e integrações sob seu controle, seguir recomendações de segurança comunicadas e avisar imediatamente qualquer suspeita de comprometimento.",
         "Revisar preços, estoque, impostos, documentos fiscais, pagamentos, relatórios, prontuários, prescrições e demais dados antes de decisões relevantes.",
         "Manter profissionais habilitados para decisões veterinárias, fiscais, contábeis, trabalhistas, financeiras e jurídicas.",
       ],
     },
     {
-      title: "9. Integrações, disponibilidade e suporte",
-      body: "A plataforma pode depender de provedores de pagamento, bancos, emissores fiscais, marketplaces, ERPs, WhatsApp, e-mail, mapas, inteligência artificial e outros serviços de terceiros.",
+      title: "9. Suporte, disponibilidade, manutenção e terceiros",
+      body: "A CorePet busca manter a plataforma disponível e corrigir falhas sob seu controle, mas a assinatura padrão não contém garantia numérica de disponibilidade nem prazo garantido de resolução, salvo quando houver SLA específico aceito pelas partes.",
       bullets: [
-        "A CorePet não controla indisponibilidades ou alterações de terceiros, mas prestará suporte razoável para diagnosticar ocorrências na integração.",
-        "Poderão ocorrer manutenções programadas, correções emergenciais e interrupções decorrentes de infraestrutura ou terceiros.",
-        "SLA, créditos por indisponibilidade ou suporte prioritário somente existem quando descritos no plano ou em anexo específico.",
+        "O canal, o horário e as metas de primeira resposta constam das condições específicas da proposta; primeira resposta não significa resolução garantida.",
+        "Um SLA somente existe em anexo específico que defina indicador, janela de medição, meta, exclusões, manutenção, forma de apuração e eventual crédito.",
+        "Sem esse anexo, não há percentual contratual de disponibilidade, crédito automático ou suporte prioritário presumido.",
+        "Manutenções programadas serão comunicadas com antecedência razoável quando causarem impacto relevante; correções urgentes de segurança ou estabilidade podem ocorrer sem aviso prévio.",
+        "A plataforma pode depender de pagamentos, bancos, emissores fiscais, marketplaces, ERPs, WhatsApp, e-mail, mapas, inteligência artificial e outros terceiros. A CorePet não controla esses serviços, mas responde por suas próprias escolhas, integrações e medidas razoáveis de prevenção e mitigação.",
         "Backups de continuidade não substituem os arquivos e exportações que a contratante deva conservar.",
       ],
     },
     {
-      title: "10. Dados, privacidade e confidencialidade",
-      body: "A contratante mantém seus direitos sobre os dados operacionais inseridos na plataforma. A CorePet poderá tratá-los na medida necessária para executar, proteger e dar suporte ao serviço.",
+      title: "10. Dados, segurança, incidentes e confidencialidade",
+      body: "A contratante mantém seus direitos sobre os dados e conteúdos inseridos na plataforma. A CorePet poderá tratá-los na medida necessária para executar, proteger e dar suporte ao serviço, respeitando os papéis definidos na legislação e na Política de Privacidade.",
       bullets: [
         "Em regra, a contratante atua como controladora dos dados de seus clientes, colaboradores e parceiros, e a CorePet atua como operadora para prestar o serviço.",
         "A CorePet poderá atuar como controladora dos dados necessários a cadastro, cobrança, segurança, suporte, prevenção a fraude e defesa de direitos.",
-        "As partes protegerão informações confidenciais e observarão a Política de Privacidade e a legislação aplicável.",
+        "Cada parte deve proteger os ambientes, credenciais e acessos sob seu controle, limitar permissões ao necessário e preservar evidências sem divulgar dados ou segredos indevidamente.",
+        "Ao confirmar incidente que afete dados pessoais da contratante, a CorePet a avisará sem atraso indevido e, sempre que razoavelmente possível, em até 1 dia útil, com as informações disponíveis e atualizações relevantes.",
+        "A contratante decide e realiza comunicações à ANPD e aos titulares quando atuar como controladora; a CorePet prestará cooperação razoável. Quando a CorePet for controladora, cumprirá diretamente suas obrigações legais.",
+        "A distribuição de custos e responsabilidades por incidente observará a participação comprovada de cada parte, suas obrigações próprias e a legislação; o uso de terceiros não elimina responsabilidade que a lei atribua à parte.",
+        "As obrigações de confidencialidade continuam após o encerramento enquanto a informação permanecer confidencial ou protegida por lei.",
       ],
     },
     {
-      title: "11. Propriedade intelectual e decisões profissionais",
+      title: "11. Propriedade intelectual, personalizações e sugestões",
       body: "O software, a marca, o código, as interfaces, os modelos e a documentação pertencem à CorePet ou aos respectivos licenciantes. O contrato concede apenas o direito de uso durante a assinatura.",
       bullets: [
         "É proibido copiar, revender, sublicenciar, desmontar, realizar engenharia reversa ou contornar controles sem autorização legal ou contratual.",
+        "Dados, marcas, imagens, textos e documentos fornecidos pela contratante continuam pertencendo aos respectivos titulares; a contratante autoriza seu uso apenas para executar o serviço.",
+        "Desenvolvimento sob medida somente integra a contratação quando descrito nas condições específicas ou em Ordem de Serviço com escopo, preço, prazo, aceite, manutenção e entregáveis.",
+        "Salvo cessão expressa em documento assinado, o código, componentes reutilizáveis, arquitetura, métodos, melhorias e funcionalidades desenvolvidos permanecem da CorePet e podem ser reutilizados sem expor informações confidenciais da contratante.",
+        "Exclusividade, cessão de direitos ou entrega de código-fonte exigem previsão expressa, preço próprio e definição dos componentes preexistentes, de terceiros e de código aberto que ficam excluídos da cessão.",
+        "Sugestões e feedback podem ser usados para melhorar o produto sem exclusividade ou pagamento, desde que não revelem informação confidencial ou dado pessoal fora da finalidade.",
         "Alertas, automações, cálculos, relatórios e recursos de inteligência artificial são apoio operacional e devem ser revisados por pessoa autorizada.",
         "A CorePet não garante resultado econômico, clínico, tributário, logístico ou comercial específico.",
       ],
     },
     {
-      title: "12. Suspensão, cancelamento e encerramento",
+      title: "12. Escopo, implantação e controle de mudanças",
+      body: "A CorePet deve entregar o escopo registrado na proposta aceita. Necessidades não descritas, mudanças posteriores e novas integrações não entram automaticamente na mensalidade ou no prazo original.",
+      bullets: [
+        "Correção é a adequação de comportamento que contrarie o escopo aceito; melhoria ou personalização é capacidade nova, ampliação ou preferência não prevista.",
+        "Pedidos em reunião, suporte, mensagem ou WhatsApp iniciam uma avaliação, mas só alteram a contratação após proposta ou Ordem de Serviço aceita.",
+        "A mudança deve registrar responsável, descrição, dependências, preço, prazo, critérios de aceite, propriedade intelectual e impacto na manutenção.",
+        "Atraso da contratante no envio de dados, acessos, validações ou decisões pode deslocar o cronograma na medida do impacto comprovado.",
+        "Migrações, importações e integrações dependem da qualidade, formato, autorização e disponibilidade dos dados e sistemas de origem.",
+      ],
+    },
+    {
+      title: "13. Suspensão, cancelamento, exportação e encerramento",
       body: "A CorePet poderá suspender o acesso em caso de inadimplência, risco de segurança, fraude, ordem legal, violação grave ou ameaça à estabilidade, com aviso e oportunidade razoável de regularização sempre que a urgência permitir.",
       bullets: [
         "Nos planos mensais sem fidelidade expressa, o cancelamento pode ser solicitado a qualquer momento e produz efeito ao final do ciclo já pago.",
         "Fidelidade, multa ou prazo mínimo somente valerão se destacados no resumo da contratação e aceitos pelo administrador.",
         "Valores do ciclo em andamento não serão devolvidos proporcionalmente, salvo condição comercial mais favorável ou direito legal aplicável.",
-        "Após o encerramento, aplicam-se os prazos de exportação, retenção e eliminação informados nos documentos vigentes.",
+        "Salvo prazo diferente destacado na proposta, a contratante pode solicitar exportação assistida disponível por até 30 dias após o encerramento; recomenda-se exportar os dados essenciais antes do término do acesso.",
+        "Exportação extraordinária, transformação de formato, migração assistida ou trabalho técnico fora do recurso padrão pode depender de orçamento prévio.",
+        "Após o encerramento, aplicam-se os prazos de retenção e eliminação da Política de Privacidade, obrigações legais e eventual preservação necessária para auditoria, cobrança ou defesa de direitos.",
       ],
     },
     {
-      title: "13. Responsabilidades e força maior",
+      title: "14. Responsabilidades, limite e força maior",
       body: "Cada parte responde pelos danos diretos que causar por descumprimento de suas obrigações, conforme prova, nexo causal e legislação aplicável. Nenhuma disposição afasta responsabilidade que não possa ser limitada por lei.",
       bullets: [
+        "Em relação estritamente empresarial e na extensão permitida por lei, a responsabilidade total da CorePet ligada à assinatura fica limitada ao valor pago ou devido pela contratante nos 12 meses anteriores ao fato que originou a reclamação, salvo limite diferente em anexo assinado.",
+        "O limite não se aplica a dolo, fraude, violação deliberada de confidencialidade ou propriedade intelectual, valores devidos pela contratante nem a obrigação que a lei não permita limitar, inclusive perante titulares de dados e consumidores quando aplicável.",
+        "Na extensão permitida por lei, nenhuma parte responde por dano indireto, perda de oportunidade, economia esperada ou lucro meramente estimado sem relação direta e comprovada com o descumprimento.",
         "A CorePet não responde por dano causado exclusivamente por dado incorreto, uso indevido, permissão concedida pela contratante ou ambiente local inseguro.",
         "Falha de terceiro não exclui a responsabilidade própria da parte que tiver contribuído para o dano ou deixado de adotar medida razoável de prevenção.",
         "Não haverá inadimplemento por evento inevitável e fora do controle razoável da parte afetada enquanto perdurarem seus efeitos, desde que haja comunicação e mitigação.",
       ],
     },
     {
-      title: "14. Alterações, comunicações e solução de conflitos",
+      title: "15. Alterações, comunicações e solução de conflitos",
       body: "Alterações materiais serão comunicadas com antecedência razoável. Mudança extraordinária de preço, inclusão de fidelidade, redução relevante de direitos ou ampliação material de responsabilidade exigirá novo aceite ou proposta específica.",
       bullets: [
         "Avisos poderão ser enviados pelo sistema, e-mail, aplicativo, WhatsApp ou outro canal cadastrado; a contratante deve manter os contatos atualizados.",

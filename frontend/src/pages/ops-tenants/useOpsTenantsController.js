@@ -30,6 +30,11 @@ function initialBillingOfferForm() {
     first_due_date: tomorrowIsoDate(),
     billing_type: "UNDEFINED",
     extra_modules: [],
+    scope_summary: "Uso do CorePet com o plano e os módulos indicados nesta proposta.",
+    implementation_summary: "Implantação acompanhada. Migração ampla exige proposta separada.",
+    exclusions_summary: "Não inclui equipamentos, internet ou desenvolvimento não descrito.",
+    support_channel: "E-mail e WhatsApp informados no contrato",
+    custom_work_summary: "Nenhum desenvolvimento sob medida integra esta proposta.",
   };
 }
 
@@ -317,7 +322,16 @@ export default function useOpsTenantsController() {
       setBillingOfferError("Informe o valor mensal combinado com o cliente.");
       return;
     }
-
+    const invalidCommercialTerms = [
+      ["scope_summary", 10],
+      ["implementation_summary", 10],
+      ["exclusions_summary", 10],
+      ["support_channel", 3],
+    ].some(([key, min]) => billingOfferForm[key].trim().length < min);
+    if (invalidCommercialTerms) {
+      setBillingOfferError("Revise as condições específicas antes de continuar.");
+      return;
+    }
     setBillingOfferCreating(true);
     setBillingOfferError("");
     setBillingOfferSuccess("");
@@ -330,6 +344,11 @@ export default function useOpsTenantsController() {
         first_due_date: billingOfferForm.first_due_date,
         billing_type: billingOfferForm.billing_type,
         extra_modules: billingOfferForm.extra_modules,
+        scope_summary: billingOfferForm.scope_summary.trim(),
+        implementation_summary: billingOfferForm.implementation_summary.trim(),
+        exclusions_summary: billingOfferForm.exclusions_summary.trim(),
+        support_channel: billingOfferForm.support_channel.trim(),
+        custom_work_summary: billingOfferForm.custom_work_summary.trim() || null,
       });
       const publicUrl = new URL(response.data.public_path, globalThis.location.origin).toString();
       setBillingOfferPublicUrl(publicUrl);

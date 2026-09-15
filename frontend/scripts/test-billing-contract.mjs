@@ -15,12 +15,18 @@ const calculatedHash = createHash("sha256")
 
 assert.equal(calculatedHash, BILLING_CONTRACT_DOCUMENT_SHA256);
 assert.equal(billingContract.version, `Versão ${BILLING_CONTRACT_VERSION}`);
-assert.match(BILLING_ACCEPTANCE_TEXT, /autorizo a cobrança correspondente/);
+assert.match(BILLING_ACCEPTANCE_TEXT, /autorizo a cobrança correspondente/i);
 assert.ok(
   billingContract.sections.some((section) =>
     section.title.toLocaleLowerCase("pt-BR").includes("reajuste anual"),
   ),
 );
+const contractText = JSON.stringify(billingContract);
+assert.match(contractText, /não há percentual contratual de disponibilidade/);
+assert.match(contractText, /em até 1 dia útil/);
+assert.match(contractText, /Desenvolvimento sob medida/);
+assert.match(contractText, /12 meses anteriores/);
+assert.match(contractText, /30 dias após o encerramento/);
 
 const meuPlano = await readFile(new URL("../src/pages/MeuPlano.jsx", import.meta.url), "utf8");
 const publicRoutes = await readFile(
