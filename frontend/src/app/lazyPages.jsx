@@ -23,6 +23,7 @@ export const ProdutosNovo = lazy(() => import("../pages/ProdutosNovo"));
 export const ProdutosRelatorio = lazy(() => import("../pages/ProdutosRelatorio"));
 export const ProdutosValorizacaoEstoque = lazy(() => import("../pages/ProdutosValorizacaoEstoque"));
 export const ProdutosBalanco = lazy(() => import("../pages/ProdutosBalanco"));
+export const DemandaNaoAtendida = lazy(() => import("../pages/DemandaNaoAtendida"));
 export const AlertasEstoque = lazy(() => import("../pages/AlertasEstoque"));
 export const EstoqueFullNF = lazy(() => import("../pages/EstoqueFullNF"));
 export const EstoqueTransferenciaParceiro = lazy(
