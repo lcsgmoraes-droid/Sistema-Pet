@@ -54,6 +54,12 @@ export default function ModalSelecaoDocumentoFiscal({ cliente, onClose, onEmitir
             onChange={setTipoNota}
             value={tipoNota}
           />
+          {emitindo && (
+            <p className="mt-4 text-center text-xs text-gray-500" role="status">
+              Normalmente leva alguns segundos. Mantenha esta janela aberta enquanto o CorePet
+              acompanha o retorno da SEFAZ.
+            </p>
+          )}
         </div>
 
         <div className="flex flex-col-reverse gap-2 border-t border-gray-100 px-6 py-4 sm:flex-row sm:justify-end">
@@ -77,7 +83,7 @@ export default function ModalSelecaoDocumentoFiscal({ cliente, onClose, onEmitir
           >
             <FileText className="h-5 w-5" />
             {emitindo
-              ? "Emitindo..."
+              ? "Aguardando autorização da SEFAZ..."
               : `Emitir ${tipoNota === "nfce" ? "NFC-e (65)" : "NF-e (55)"}`}
           </button>
         </div>

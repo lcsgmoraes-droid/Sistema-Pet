@@ -84,8 +84,19 @@ export default function ModalPerguntaNFe({
               }`}
             >
               <FileText className="h-5 w-5" />
-              <span>Emitir {tipoNota === "nfce" ? "NFC-e" : "NF-e"}</span>
+              <span>
+                {loading
+                  ? "Aguardando autorização da SEFAZ..."
+                  : `Emitir ${tipoNota === "nfce" ? "NFC-e" : "NF-e"}`}
+              </span>
             </button>
+
+            {loading && (
+              <p className="text-center text-xs text-gray-500" role="status">
+                Normalmente leva alguns segundos. Mantenha esta janela aberta enquanto o CorePet
+                acompanha o retorno da SEFAZ.
+              </p>
+            )}
 
             <button
               onClick={handleConcluirSemNota}

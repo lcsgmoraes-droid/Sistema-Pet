@@ -5,6 +5,7 @@ from datetime import datetime
 import pytest
 
 from app.nfe_routes import (
+    _danfe_response_metadata,
     _normalizar_nota_pedido_integrado,
     _enriquecer_notas_com_pedidos_integrados,
     _enriquecer_notas_com_detalhes_bling,
@@ -19,6 +20,18 @@ from app.nfe_routes import (
     _situacao_num,
     _status_nota_bling,
 )
+
+
+def test_danfe_nfce_is_returned_as_thermal_html():
+    assert _danfe_response_metadata(
+        SimpleNamespace(nfe_tipo="nfce", nfe_modelo="65")
+    ) == ("text/html", "html")
+
+
+def test_danfe_nfe_is_returned_as_pdf():
+    assert _danfe_response_metadata(
+        SimpleNamespace(nfe_tipo="nfe", nfe_modelo="55")
+    ) == ("application/pdf", "pdf")
 
 
 def test_situacao_num_prioriza_valor_quando_bling_retorna_objeto():
