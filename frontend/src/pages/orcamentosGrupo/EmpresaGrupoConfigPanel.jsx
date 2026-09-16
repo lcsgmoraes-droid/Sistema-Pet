@@ -1,8 +1,11 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import toast from "react-hot-toast";
-import { Building2, Plus, Save, Search, Trash2 } from "lucide-react";
+import { Building2, Plus, Save, Trash2 } from "lucide-react";
 
 import { orcamentosGrupoApi } from "../../api/orcamentosGrupo";
+import PessoaSelector from "../../components/clientes/PessoaSelector";
+import ModalCadastroCliente from "../../components/pdv/ModalCadastroCliente";
+import ActionButton from "../../components/ui/ActionButton";
 
 const inputClass =
   "w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100";
@@ -16,8 +19,43 @@ export default function EmpresaGrupoConfigPanel({ configuracao, empresas, onAtua
   const [busca, setBusca] = useState("");
   const [resultados, setResultados] = useState([]);
   const [carregando, setCarregando] = useState(false);
+  const [buscandoPessoas, setBuscandoPessoas] = useState(false);
+  const [mostrarCadastroPessoa, setMostrarCadastroPessoa] = useState(false);
+  const buscaAtualRef = useRef(0);
 
   useEffect(() => setForm(configuracao), [configuracao]);
+
+  useEffect(() => {
+    const termo = busca.trim();
+    const buscaId = ++buscaAtualRef.current;
+
+    if (termo.length < 2) {
+      setResultados([]);
+      setBuscandoPessoas(false);
+      return undefined;
+    }
+
+    setBuscandoPessoas(true);
+    const timeoutId = window.setTimeout(async () => {
+      try {
+        const response = await orcamentosGrupoApi.buscarPessoas(termo);
+        if (buscaAtualRef.current !== buscaId) return;
+
+        const empresasJaAdicionadas = new Set(empresas.map((empresa) => empresa.cliente_id));
+        setResultados(
+          (response.data || []).filter((pessoa) => !empresasJaAdicionadas.has(pessoa.id)),
+        );
+      } catch (error) {
+        if (buscaAtualRef.current !== buscaId) return;
+        setResultados([]);
+        toast.error(erro(error, "Não foi possível buscar as pessoas."));
+      } finally {
+        if (buscaAtualRef.current === buscaId) setBuscandoPessoas(false);
+      }
+    }, 300);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [busca, empresas]);
 
   async function salvarConfiguracao(event) {
     event.preventDefault();
@@ -39,35 +77,24 @@ export default function EmpresaGrupoConfigPanel({ configuracao, empresas, onAtua
     }
   }
 
-  async function buscarPessoas(event) {
-    event.preventDefault();
-    if (busca.trim().length < 2) {
-      toast.error("Digite pelo menos dois caracteres para buscar.");
-      return;
-    }
-    setCarregando(true);
-    try {
-      const response = await orcamentosGrupoApi.buscarPessoas(busca.trim());
-      setResultados(response.data || []);
-    } catch (error) {
-      toast.error(erro(error, "Não foi possível buscar as pessoas."));
-    } finally {
-      setCarregando(false);
-    }
-  }
-
   async function adicionar(pessoa) {
     setCarregando(true);
     try {
       await orcamentosGrupoApi.adicionarEmpresa({ cliente_id: pessoa.id });
       toast.success(`${pessoa.nome} adicionada às empresas do grupo.`);
-      setResultados((atual) => atual.filter((item) => item.id !== pessoa.id));
+      setBusca("");
+      setResultados([]);
       await onAtualizar();
     } catch (error) {
       toast.error(erro(error, "Não foi possível adicionar a empresa."));
     } finally {
       setCarregando(false);
     }
+  }
+
+  async function adicionarPessoaCriada(pessoa) {
+    setMostrarCadastroPessoa(false);
+    await adicionar(pessoa);
   }
 
   async function alternarFixada(empresa) {
@@ -195,46 +222,60 @@ export default function EmpresaGrupoConfigPanel({ configuracao, empresas, onAtua
           </div>
         </div>
 
-        <form onSubmit={buscarPessoas} className="mt-4 flex gap-2">
-          <input
-            className={inputClass}
+        <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-start">
+          <PessoaSelector
+            className="min-w-0 flex-1"
+            disabled={carregando}
+            minChars={2}
             value={busca}
-            onChange={(event) => setBusca(event.target.value)}
-            placeholder="Nome, razão social ou CNPJ"
-          />
-          <button
-            type="submit"
-            className="inline-flex items-center gap-2 rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200"
-          >
-            <Search size={16} /> Buscar
-          </button>
-        </form>
-
-        {resultados.length > 0 ? (
-          <div className="mt-3 space-y-2 rounded-xl border border-blue-100 bg-blue-50/50 p-3 dark:border-blue-900 dark:bg-blue-950/20">
-            {resultados.map((pessoa) => (
-              <div
+            onChange={setBusca}
+            onSelect={adicionar}
+            placeholder="Digite nome, CPF/CNPJ ou telefone..."
+            showSuggestions={resultados.length > 0}
+            suggestions={resultados}
+            inputClassName="h-10 border-slate-300 bg-white text-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+            renderSuggestion={(pessoa) => (
+              <button
                 key={pessoa.id}
-                className="flex items-center justify-between gap-3 rounded-lg bg-white p-3 dark:bg-slate-900"
+                type="button"
+                onClick={() => adicionar(pessoa)}
+                className="flex w-full items-center justify-between gap-3 border-b px-4 py-3 text-left last:border-b-0 hover:bg-blue-50 dark:border-slate-800 dark:hover:bg-slate-800"
               >
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-semibold text-slate-900 dark:text-slate-100">
+                <span className="min-w-0">
+                  <span className="block truncate text-sm font-semibold text-slate-900 dark:text-slate-100">
                     {pessoa.nome}
-                  </p>
-                  <p className="text-xs text-slate-500">
-                    {pessoa.cnpj || pessoa.razao_social || "Cadastro sem CNPJ"}
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => adicionar(pessoa)}
-                  className="inline-flex items-center gap-1 rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white hover:bg-blue-700"
-                >
+                  </span>
+                  <span className="block text-xs text-slate-500">
+                    {pessoa.cnpj ||
+                      pessoa.razao_social ||
+                      pessoa.telefone ||
+                      "Cadastro sem documento"}
+                  </span>
+                </span>
+                <span className="inline-flex flex-shrink-0 items-center gap-1 text-xs font-semibold text-blue-700 dark:text-blue-300">
                   <Plus size={14} /> Adicionar
-                </button>
-              </div>
-            ))}
-          </div>
+                </span>
+              </button>
+            )}
+          />
+          <ActionButton
+            type="button"
+            onClick={() => setMostrarCadastroPessoa(true)}
+            disabled={carregando}
+            icon={Plus}
+            intent="create"
+            size="md"
+            className="h-10 w-full whitespace-nowrap sm:w-auto"
+          >
+            Novo
+          </ActionButton>
+        </div>
+
+        {buscandoPessoas && busca.trim().length >= 2 ? (
+          <p className="mt-2 text-center text-sm text-slate-500">Buscando pessoas...</p>
+        ) : null}
+        {!buscandoPessoas && busca.trim().length >= 2 && resultados.length === 0 ? (
+          <p className="mt-2 text-center text-sm text-slate-500">Nenhuma pessoa encontrada</p>
         ) : null}
 
         <div className="mt-4 space-y-2">
@@ -280,6 +321,14 @@ export default function EmpresaGrupoConfigPanel({ configuracao, empresas, onAtua
           )}
         </div>
       </section>
+
+      {mostrarCadastroPessoa ? (
+        <ModalCadastroCliente
+          onClose={() => setMostrarCadastroPessoa(false)}
+          onClienteCriado={adicionarPessoaCriada}
+          valorBuscaInicial={busca}
+        />
+      ) : null}
     </div>
   );
 }
