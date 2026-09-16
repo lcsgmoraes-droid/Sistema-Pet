@@ -68,6 +68,11 @@ class BillingOfferCreateRequest(BaseModel):
     first_due_date: date
     billing_type: Literal["UNDEFINED", "PIX", "BOLETO", "CREDIT_CARD"] = "UNDEFINED"
     extra_modules: list[str] = Field(default_factory=list, max_length=20)
+    scope_summary: str = Field(min_length=10, max_length=2000)
+    implementation_summary: str = Field(min_length=10, max_length=2000)
+    exclusions_summary: str = Field(min_length=10, max_length=2000)
+    support_channel: str = Field(min_length=3, max_length=200)
+    custom_work_summary: str | None = Field(default=None, max_length=2000)
 
 
 @router.get("")
@@ -207,6 +212,11 @@ def criar_proposta_cobranca(
             first_due_date=payload.first_due_date,
             billing_type=payload.billing_type,
             extra_modules=payload.extra_modules,
+            scope_summary=payload.scope_summary,
+            implementation_summary=payload.implementation_summary,
+            exclusions_summary=payload.exclusions_summary,
+            support_channel=payload.support_channel,
+            custom_work_summary=payload.custom_work_summary,
         )
         db.commit()
         result = offer_to_admin(

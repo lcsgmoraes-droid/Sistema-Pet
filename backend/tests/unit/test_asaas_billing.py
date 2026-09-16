@@ -273,8 +273,9 @@ class _AsaasSubscriptionClient:
     environment = "sandbox"
 
     def request(self, method, path, *, payload=None, params=None):
+        expected_due_date = max(date.today(), date(2026, 9, 13)).isoformat()
         if method == "POST" and path == "/subscriptions":
-            assert payload["nextDueDate"] == "2026-09-13"
+            assert payload["nextDueDate"] == expected_due_date
             return {"id": "sub_test"}
         if method == "GET" and path == "/subscriptions/sub_test/payments":
             return {
@@ -283,7 +284,7 @@ class _AsaasSubscriptionClient:
                         "id": "pay_test",
                         "status": "PENDING",
                         "billingType": "UNDEFINED",
-                        "dueDate": "2026-09-13",
+                        "dueDate": expected_due_date,
                         "invoiceUrl": "https://sandbox.asaas.com/i/test",
                     }
                 ]

@@ -24,6 +24,7 @@
     "test:text-encoding": "node scripts/test-text-encoding.mjs",
     "test:public-plans": "node scripts/test-public-plans.mjs",
     "test:billing-contract": "node scripts/test-billing-contract.mjs",
+    "test:privacy-policy": "node scripts/test-privacy-policy.mjs",
     "test:custom-billing-offer": "node scripts/test-custom-billing-offer.mjs",
     "test:platform-admin-auth": "node scripts/test-platform-admin-auth.mjs",
     "test:ecommerce-account-validation": "node scripts/test-ecommerce-account-validation.mjs",

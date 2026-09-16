@@ -167,6 +167,83 @@ export default function OpsTenantBillingOfferPanel({
           </div>
         </fieldset>
 
+        <fieldset className="space-y-3 rounded-lg border border-slate-200 bg-slate-50 p-3">
+          <legend className="px-1 text-xs font-bold uppercase tracking-wide text-slate-500">
+            Condições específicas da proposta
+          </legend>
+          <p className="text-xs leading-5 text-slate-500">
+            Registre aqui o que foi prometido. Conversas fora da proposta não alteram o contrato.
+          </p>
+
+          <label className="block">
+            <span className="text-xs font-bold text-slate-700">Escopo contratado</span>
+            <textarea
+              required
+              value={form.scope_summary}
+              onChange={(event) => onChange("scope_summary", event.target.value)}
+              minLength={10}
+              maxLength={2000}
+              rows={3}
+              className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
+            />
+          </label>
+
+          <label className="block">
+            <span className="text-xs font-bold text-slate-700">Implantação e migração</span>
+            <textarea
+              required
+              value={form.implementation_summary}
+              onChange={(event) => onChange("implementation_summary", event.target.value)}
+              minLength={10}
+              maxLength={2000}
+              rows={3}
+              className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
+            />
+          </label>
+
+          <label className="block">
+            <span className="text-xs font-bold text-slate-700">Fora do escopo e dependências</span>
+            <textarea
+              required
+              value={form.exclusions_summary}
+              onChange={(event) => onChange("exclusions_summary", event.target.value)}
+              minLength={10}
+              maxLength={2000}
+              rows={3}
+              className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
+            />
+          </label>
+
+          <label className="block">
+            <span className="text-xs font-bold text-slate-700">Canal oficial de suporte</span>
+            <input
+              required
+              value={form.support_channel}
+              onChange={(event) => onChange("support_channel", event.target.value)}
+              minLength={3}
+              maxLength={200}
+              className="mt-1 h-10 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm"
+            />
+          </label>
+
+          <label className="block">
+            <span className="text-xs font-bold text-slate-700">Desenvolvimento sob medida</span>
+            <textarea
+              value={form.custom_work_summary}
+              onChange={(event) => onChange("custom_work_summary", event.target.value)}
+              maxLength={2000}
+              rows={2}
+              className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
+            />
+          </label>
+
+          <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-900">
+            Padrão seguro: sem SLA contratual, sem fidelidade, suporte em dias úteis das 9h às 18h,
+            exportação assistida solicitável por 30 dias e código reutilizável do CorePet. Exceções
+            exigem anexo específico.
+          </div>
+        </fieldset>
+
         {error ? (
           <div className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
             {error}
@@ -180,7 +257,16 @@ export default function OpsTenantBillingOfferPanel({
 
         <button
           type="submit"
-          disabled={creating || !form.title.trim() || form.price <= 0 || !form.first_due_date}
+          disabled={
+            creating ||
+            !form.title.trim() ||
+            form.price <= 0 ||
+            !form.first_due_date ||
+            !form.scope_summary.trim() ||
+            !form.implementation_summary.trim() ||
+            !form.exclusions_summary.trim() ||
+            !form.support_channel.trim()
+          }
           className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-lg bg-emerald-600 px-4 text-sm font-bold text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
         >
           <FiPlusCircle className="h-4 w-4" />
@@ -245,6 +331,11 @@ export default function OpsTenantBillingOfferPanel({
                 <p className="mt-2 text-[11px] leading-4 text-slate-500">
                   Extras:{" "}
                   {offer.extra_modules.map((item) => MODULOS_INFO[item]?.nome || item).join(", ")}
+                </p>
+              ) : null}
+              {offer.commercial_terms ? (
+                <p className="mt-2 text-[11px] leading-4 text-slate-500">
+                  Suporte: {offer.commercial_terms.support.channel} · sem SLA contratual
                 </p>
               ) : null}
             </article>

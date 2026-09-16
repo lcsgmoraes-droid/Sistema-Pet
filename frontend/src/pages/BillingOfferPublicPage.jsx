@@ -106,6 +106,10 @@ export default function BillingOfferPublicPage() {
 
   async function handleAccept(event) {
     event.preventDefault();
+    if (!offer?.commercial_terms) {
+      setError("Esta proposta precisa ser reemitida com as condições comerciais atuais.");
+      return;
+    }
     if (!accepted) {
       setError("Confirme o aceite dos documentos para continuar.");
       return;
@@ -158,6 +162,7 @@ export default function BillingOfferPublicPage() {
 
   const alreadyAccepted = offer.status !== "ready";
   const paymentUrl = trustedAsaasUrl(offer.checkout_url) ? offer.checkout_url : "";
+  const commercialTerms = offer.commercial_terms;
   const status = statusContent(offer.status);
   const StatusIcon = status.Icon;
 
@@ -226,6 +231,79 @@ export default function BillingOfferPublicPage() {
               continua enquanto a assinatura permanecer ativa.
             </p>
           </div>
+
+          {commercialTerms ? (
+            <div className="mt-7 border-t border-slate-200 pt-7">
+              <h2 className="text-sm font-black uppercase tracking-wide text-slate-700">
+                Condições específicas
+              </h2>
+              <p className="mt-2 text-sm leading-6 text-slate-600">
+                Estas condições integram a proposta e ficam preservadas no comprovante do aceite.
+              </p>
+
+              <div className="mt-4 space-y-3">
+                {[
+                  ["Escopo contratado", commercialTerms.scope_summary],
+                  ["Implantação e migração", commercialTerms.implementation_summary],
+                  ["Fora do escopo e dependências", commercialTerms.exclusions_summary],
+                  ["Desenvolvimento sob medida", commercialTerms.custom_work.summary],
+                ].map(([label, value]) => (
+                  <div key={label} className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                    <p className="text-xs font-black uppercase tracking-wide text-slate-500">
+                      {label}
+                    </p>
+                    <p className="mt-2 whitespace-pre-line text-sm leading-6 text-slate-700">
+                      {value}
+                    </p>
+                  </div>
+                ))}
+              </div>
+
+              <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-950">
+                <p className="font-black">Suporte e disponibilidade</p>
+                <p className="mt-1">
+                  Canal: {commercialTerms.support.channel}. Atendimento padrão em{" "}
+                  {commercialTerms.support.hours.toLowerCase()}.
+                </p>
+                <p className="mt-2">
+                  Metas de primeira resposta: P0 crítico{" "}
+                  {commercialTerms.support.first_response_targets.p0}; P1 alto{" "}
+                  {commercialTerms.support.first_response_targets.p1}; P2 normal{" "}
+                  {commercialTerms.support.first_response_targets.p2}; P3 baixo{" "}
+                  {commercialTerms.support.first_response_targets.p3}.
+                </p>
+                <p className="mt-2">
+                  Melhorias: {commercialTerms.support.first_response_targets.improvement}.
+                </p>
+                <p className="mt-2 font-semibold">
+                  Esta proposta não inclui SLA contratual de disponibilidade nem prazo garantido de
+                  resolução. Metas de primeira resposta são operacionais e não geram crédito
+                  automático.
+                </p>
+              </div>
+
+              <div className="mt-3 rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm leading-6 text-blue-950">
+                <p className="font-black">Regras padrão de proteção</p>
+                <ul className="mt-2 space-y-1">
+                  <li>Sem fidelidade: cancelamento ao final do ciclo já pago.</li>
+                  <li>
+                    Exportação assistida pode ser solicitada por até{" "}
+                    {commercialTerms.termination.export_request_window_days} dias após o
+                    encerramento.
+                  </li>
+                  <li>
+                    Código e componentes reutilizáveis permanecem do CorePet; exclusividade ou
+                    cessão exige anexo assinado.
+                  </li>
+                </ul>
+              </div>
+            </div>
+          ) : (
+            <div className="mt-7 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
+              Esta proposta foi criada antes do registro estruturado das condições específicas.
+              Solicite ao CorePet a confirmação escrita do escopo antes de aceitar.
+            </div>
+          )}
         </section>
 
         <aside className="self-start rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
@@ -322,6 +400,7 @@ export default function BillingOfferPublicPage() {
               <label className="mt-4 flex cursor-pointer items-start gap-3 text-sm leading-6 text-slate-700">
                 <input
                   type="checkbox"
+                  disabled={!commercialTerms}
                   checked={accepted}
                   onChange={(event) => {
                     setAccepted(event.target.checked);
@@ -340,7 +419,7 @@ export default function BillingOfferPublicPage() {
 
               <button
                 type="submit"
-                disabled={submitting || !accepted}
+                disabled={submitting || !accepted || !commercialTerms}
                 className="mt-5 inline-flex h-12 w-full items-center justify-center rounded-xl bg-emerald-600 px-4 text-sm font-black text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {submitting ? "Preparando assinatura..." : "Aceitar e continuar para pagamento"}

@@ -53,6 +53,11 @@ Preencher antes do aceite, sem deixar combinados apenas em conversa:
 Como a cobranca automatica da assinatura esta em standby, o meio manual acordado
 deve ser registrado nesta tabela e conferido pelo responsavel comercial.
 
+Quando a proposta personalizada do sistema for usada, ela tambem deve registrar
+escopo, implantacao/migracao, exclusoes, canal de suporte e desenvolvimento sob
+medida. As regras completas ficam em
+`docs/comercial/GOVERNANCA_CONTRATO_SAAS.md`.
+
 ## 4. Implantacao e aceite
 
 A implantacao segue `docs/implantacao/CHECKLIST_PLANO_BASICO_PILOTO.md` e termina

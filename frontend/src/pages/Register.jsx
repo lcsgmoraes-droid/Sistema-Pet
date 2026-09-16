@@ -60,7 +60,9 @@ const Register = () => {
     }
 
     if (!acceptedTerms || !acceptedPrivacy) {
-      setError("Aceite os Termos de Uso e a Politica de Privacidade para continuar");
+      setError(
+        "Aceite os Termos de Uso e confirme a leitura da Politica de Privacidade para continuar",
+      );
       return;
     }
 
@@ -306,7 +308,7 @@ const Register = () => {
                 className="mt-1"
               />
               <span>
-                Li e aceito a{" "}
+                Li e confirmo que estou ciente da{" "}
                 <Link to="/privacidade" className="text-purple-700 font-semibold">
                   Politica de Privacidade
                 </Link>
