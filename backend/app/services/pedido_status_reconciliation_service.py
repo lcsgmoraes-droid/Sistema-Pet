@@ -109,7 +109,7 @@ def _buscar_pedidos_recentes_reconciliaveis(
             *filtros_base,
             _filtro_pedido_regular_requer_reconciliacao(),
         )
-        .order_by(PedidoIntegrado.criado_em.desc(), PedidoIntegrado.id.desc())
+        .order_by(PedidoIntegrado.criado_em.asc(), PedidoIntegrado.id.asc())
         .limit(max(int(limite_pedidos or 0), 1))
         .all()
     )
@@ -119,7 +119,7 @@ def _buscar_pedidos_recentes_reconciliaveis(
             *filtros_base,
             PedidoIntegrado.status == "cancelado",
         )
-        .order_by(PedidoIntegrado.criado_em.desc(), PedidoIntegrado.id.desc())
+        .order_by(PedidoIntegrado.criado_em.asc(), PedidoIntegrado.id.asc())
         .all()
     )
     cancelados_pendentes = [
@@ -133,7 +133,7 @@ def _buscar_pedidos_recentes_reconciliaveis(
             getattr(pedido, "criado_em", None) or datetime.min,
             int(getattr(pedido, "id", 0) or 0),
         ),
-        reverse=True,
+        reverse=False,
     )
     return pedidos[: max(int(limite_pedidos or 0), 1)]
 
@@ -368,15 +368,21 @@ def reconciliar_status_pedido_local(
         }
 
     if situacao_id and situacao_id in _SITUACOES_PEDIDO_ATENDIDO:
-        if pedido.status not in {"confirmado", "cancelado"}:
+        possui_item_sem_baixa = any(not item.vendido_em for item in itens)
+        if pedido.status != "cancelado" and (
+            pedido.status != "confirmado" or possui_item_sem_baixa
+        ):
             erros = _confirmar_pedido(
                 db=db,
                 pedido=pedido,
                 itens=itens,
                 motivo="pedido_status_reconciliation",
-                observacao="Pedido atendido no Bling; venda aguardando NF",
+                observacao=(
+                    "Pedido atendido no Bling; venda consolidada pela "
+                    "reconciliacao de status"
+                ),
                 processed_at=processed_at,
-                aplicar_baixa_estoque=False,
+                aplicar_baixa_estoque=True,
             )
             return {
                 "success": True,

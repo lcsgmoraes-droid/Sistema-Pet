@@ -378,12 +378,12 @@ def processar_pedido_bling_payload(body: dict, db: Session):
                     pedido=pedido,
                     itens=itens,
                     motivo="venda_bling_webhook",
-                    observacao="Pedido atendido no Bling; venda aguardando NF",
+                    observacao="Pedido atendido no Bling; venda consolidada pelo status",
                     processed_at=event_date,
-                    aplicar_baixa_estoque=False,
+                    aplicar_baixa_estoque=True,
                 )
                 logger.info(
-                    f"[BLING WEBHOOK] Pedido {pedido_bling_id} confirmado sem baixa de estoque; aguardando NF (situacao_id={situacao_id})"
+                    f"[BLING WEBHOOK] Pedido {pedido_bling_id} atendido com baixa idempotente de estoque (situacao_id={situacao_id})"
                 )
 
             return {"status": "ok", "acao": "confirmado_por_situacao"}
@@ -515,18 +515,15 @@ def processar_pedido_bling_payload(body: dict, db: Session):
                     "pedido_id": pedido_consolidado.id,
                     "acao": acao_nf,
                 }
-            if (
-                status_inicial == "confirmado"
-                and pedido_consolidado.status != "confirmado"
-            ):
+            if status_inicial == "confirmado":
                 _confirmar_pedido(
                     db=db,
                     pedido=pedido_consolidado,
                     itens=itens_salvos,
                     motivo="venda_bling_webhook_duplicado",
-                    observacao="Pedido duplicado no Bling consolidado no pedido canonico; venda aguardando NF",
+                    observacao="Pedido duplicado atendido no Bling; venda consolidada no pedido canonico",
                     processed_at=event_date,
-                    aplicar_baixa_estoque=False,
+                    aplicar_baixa_estoque=True,
                 )
         return {
             "status": "ok",
@@ -670,12 +667,12 @@ def processar_pedido_bling_payload(body: dict, db: Session):
             pedido=pedido,
             itens=itens_salvos,
             motivo="venda_bling_webhook",
-            observacao="Pedido criado ja atendido no Bling; venda aguardando NF",
+            observacao="Pedido criado ja atendido no Bling; venda consolidada pelo status",
             processed_at=event_date,
-            aplicar_baixa_estoque=False,
+            aplicar_baixa_estoque=True,
         )
         logger.info(
-            f"[BLING WEBHOOK] Pedido {pedido_bling_id} (order.created ja Atendido) confirmado sem baixa; aguardando NF"
+            f"[BLING WEBHOOK] Pedido {pedido_bling_id} (order.created ja Atendido) consolidado com baixa idempotente de estoque"
         )
 
     return {"status": "ok", "pedido_id": pedido.id}
