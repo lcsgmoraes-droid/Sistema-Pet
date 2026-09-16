@@ -24,6 +24,7 @@ from app.models import (
     Role,
     RolePermission,
     Tenant,
+    TenantLoginName,
     User,
     UserSession,
     UserTenant,
@@ -108,6 +109,7 @@ def auth_db_session():
     )
     for table in (
         Tenant.__table__,
+        TenantLoginName.__table__,
         User.__table__,
         UserSession.__table__,
         AuditLog.__table__,
