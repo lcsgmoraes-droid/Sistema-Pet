@@ -25,8 +25,7 @@ import requests
 logger = logging.getLogger(__name__)
 
 NCM_OFICIAL_JSON_URL = (
-    "https://portalunico.siscomex.gov.br/"
-    "classif/api/publico/nomenclatura/download/json"
+    "https://portalunico.siscomex.gov.br/classif/api/publico/nomenclatura/download/json"
 )
 NCM_CACHE_TTL_SECONDS = 24 * 60 * 60
 NCM_RETRY_SECONDS = 15 * 60
