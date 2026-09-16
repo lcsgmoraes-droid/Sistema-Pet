@@ -7,6 +7,7 @@ import requests
 
 from app.bling_integration import BlingAPI, _montar_url_bling, prevalidar_fiscal_venda
 from app import bling_integration_fiscal
+from app.bling_integration_parts import core as bling_core
 
 
 class _FakeResponse:
@@ -62,6 +63,15 @@ def _make_venda_nfce():
         tem_entrega=False,
         data_venda=None,
     )
+
+
+def test_configuracao_jwt_nao_pode_ser_desativada_por_variavel(monkeypatch):
+    monkeypatch.setattr(bling_core, "ENV_PATHS", [])
+    monkeypatch.setenv("BLING_ENABLE_JWT", "0")
+
+    runtime_config = bling_core._load_bling_runtime_config()
+
+    assert runtime_config["enable_jwt"] == "1"
 
 
 def test_prevalidacao_sugere_ncm_para_racao_caes_gatos_com_ncm_zerado():
@@ -423,6 +433,7 @@ def test_baixar_danfe_usa_timeout(monkeypatch):
 
 def test_renovar_access_token_usa_timeout(monkeypatch):
     api = _make_api()
+    api.enable_jwt = "0"
     api.client_id = "client-id"
     api.client_secret = "client-secret"
     api.refresh_token = "refresh-token"
@@ -457,6 +468,7 @@ def test_renovar_access_token_usa_timeout(monkeypatch):
         "grant_type": "refresh_token",
         "refresh_token": "refresh-token",
     }
+    assert chamadas[0]["headers"]["enable-jwt"] == "1"
     assert chamadas[0]["timeout"] == 30
 
 
