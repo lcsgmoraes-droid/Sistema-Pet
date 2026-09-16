@@ -1,4 +1,4 @@
-import { FiCheckCircle, FiCircle, FiInfo } from "react-icons/fi";
+import { FiCheckCircle, FiChevronDown, FiCircle, FiInfo } from "react-icons/fi";
 
 function Step({ label, description, done, action = false }) {
   const Icon = done ? FiCheckCircle : action ? FiInfo : FiCircle;
@@ -35,37 +35,25 @@ export default function IntNFeChecklist({
   const cscHomologation = Boolean(
     csc?.ambientes?.find((item) => item.ambiente_codigo === 2)?.tem_csc,
   );
-  const nfeReady = linked && fiscalReady && certificateReady;
-  const nfceReady = nfeReady && cscHomologation;
   const knownSequences = numbering?.series?.length || 0;
   const emissionReady = Boolean(environment?.habilitada);
 
   return (
-    <section className="space-y-4 rounded-2xl border border-slate-200 bg-slate-50 p-5 sm:p-7 dark:border-slate-700 dark:bg-slate-950/40">
-      <header className="flex flex-wrap items-center justify-between gap-3">
+    <details className="group rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-3 p-5 sm:px-7">
         <div>
-          <h2 className="text-lg font-bold text-slate-950 dark:text-white">
-            Checklist de preparação fiscal
-          </h2>
+          <h2 className="font-bold text-slate-950 dark:text-white">Checklist completo</h2>
           <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
-            O CorePet atualiza este quadro conforme cada configuração é concluída.
+            Consulte as etapas concluídas e pendentes quando precisar.
           </p>
         </div>
-        <div className="flex flex-wrap gap-2 text-xs font-semibold">
-          <span
-            className={`rounded-full px-3 py-1 ${nfeReady ? "bg-emerald-100 text-emerald-900" : "bg-slate-200 text-slate-700"}`}
-          >
-            NF-e homologação: {nfeReady ? "base pronta" : "pendente"}
-          </span>
-          <span
-            className={`rounded-full px-3 py-1 ${nfceReady ? "bg-emerald-100 text-emerald-900" : "bg-slate-200 text-slate-700"}`}
-          >
-            NFC-e homologação: {nfceReady ? "base pronta" : "pendente"}
-          </span>
-        </div>
-      </header>
+        <FiChevronDown
+          className="shrink-0 text-slate-500 transition-transform group-open:rotate-180"
+          aria-hidden="true"
+        />
+      </summary>
 
-      <ol className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+      <ol className="grid gap-3 border-t border-slate-100 p-5 md:grid-cols-2 lg:grid-cols-3 sm:p-7 dark:border-slate-800">
         <Step
           label="Dados da empresa"
           description={
@@ -94,7 +82,7 @@ export default function IntNFeChecklist({
         <Step
           label="Certificado A1"
           description={
-            certificateReady ? certificate.mensagem : "Envie o A1 e a senha pelo CorePet."
+            certificateReady ? "Certificado validado." : "Envie o A1 e a senha pelo CorePet."
           }
           done={certificateReady}
         />
@@ -123,6 +111,6 @@ export default function IntNFeChecklist({
           done={emissionReady}
         />
       </ol>
-    </section>
+    </details>
   );
 }

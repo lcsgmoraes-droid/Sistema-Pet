@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { FiDatabase, FiRefreshCw } from "react-icons/fi";
+import { FiCheckCircle, FiChevronDown, FiDatabase, FiRefreshCw } from "react-icons/fi";
 import { Link } from "react-router-dom";
 
 const buttonClass =
@@ -70,6 +70,50 @@ export default function IntNFeCadastroFiscal({
   }, [execute, onBusy, refreshKey]);
 
   const locked = busy || disabled;
+
+  if (state?.sincronizado && !error) {
+    return (
+      <details className="group rounded-2xl border border-emerald-200 bg-white shadow-sm dark:border-emerald-900 dark:bg-slate-900">
+        <summary className="flex cursor-pointer list-none items-center justify-between gap-3 p-5 sm:px-7">
+          <div className="flex items-center gap-3">
+            <FiCheckCircle className="shrink-0 text-emerald-600" aria-hidden="true" />
+            <div>
+              <h2 className="font-bold text-slate-950 dark:text-white">
+                Cadastro fiscal sincronizado
+              </h2>
+              <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
+                Nenhuma ação necessária.
+              </p>
+            </div>
+          </div>
+          <FiChevronDown
+            className="shrink-0 text-slate-500 transition-transform group-open:rotate-180"
+            aria-hidden="true"
+          />
+        </summary>
+        <div className="space-y-4 border-t border-slate-100 p-5 sm:px-7 dark:border-slate-800">
+          <p className="text-sm text-slate-600 dark:text-slate-300">{state.mensagem}</p>
+          <div className="flex flex-wrap gap-3">
+            <button
+              type="button"
+              disabled={locked || !state.pronto_para_sincronizar}
+              onClick={() => execute(true)}
+              className={`${buttonClass} border border-slate-300`}
+            >
+              <FiRefreshCw aria-hidden="true" />
+              Sincronizar novamente
+            </button>
+            <Link
+              to="/configuracoes/fiscal"
+              className={`${buttonClass} border border-slate-300 text-slate-700 dark:text-slate-200`}
+            >
+              Conferir dados da empresa
+            </Link>
+          </div>
+        </div>
+      </details>
+    );
+  }
 
   return (
     <section

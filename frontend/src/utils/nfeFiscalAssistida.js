@@ -34,6 +34,16 @@ export function formatarPendenciasFiscais(validacao) {
   return linhas.join("\n");
 }
 
+export function temPendenciasFiscais(validacao) {
+  return Boolean(
+    (validacao?.bloqueios || []).length > 0 || (validacao?.correcoes || []).length > 0,
+  );
+}
+
+export function listarPendenciasFiscais(validacao) {
+  return [...(validacao?.bloqueios || []), ...(validacao?.correcoes || [])];
+}
+
 export function extrairMensagemNFe(error) {
   const detail = error?.response?.data?.detail;
   if (detail && typeof detail === "object") {
@@ -81,9 +91,7 @@ function validacaoFiscalDoErro(error) {
   const detail = error?.response?.data?.detail;
   const validacao = detail?.validacao;
   if (!validacao || typeof validacao !== "object") return null;
-  const temPendencias =
-    (validacao.bloqueios || []).length > 0 || (validacao.correcoes || []).length > 0;
-  return temPendencias ? validacao : null;
+  return temPendenciasFiscais(validacao) ? validacao : null;
 }
 
 function resumoIntNFe(resumo) {
@@ -141,6 +149,18 @@ export async function corrigirEReemitirNota(vendaId) {
   return data;
 }
 
+export async function prevalidarNotaFiscal({ vendaId, tipoNota = "nfce" } = {}) {
+  const response = await api.post("/nfe/prevalidar", {
+    venda_id: vendaId,
+    tipo_nota: tipoNota,
+  });
+  return response.data;
+}
+
+export function resolverPendenciasNotaFiscal({ validacao, vendaId, tipoNota } = {}) {
+  return solicitarCorrecaoFiscal({ validacao, vendaId, tipoNota, apenasCorrigir: true });
+}
+
 export async function emitirNotaFiscalAssistida({
   vendaId,
   tipoNota = "nfce",
@@ -148,20 +168,14 @@ export async function emitirNotaFiscalAssistida({
 } = {}) {
   let validacao;
   for (let tentativa = 0; tentativa < 5; tentativa += 1) {
-    const response = await api.post("/nfe/prevalidar", {
-      venda_id: vendaId,
-      tipo_nota: tipoNota,
-    });
-    validacao = response.data;
-    const temPendencias =
-      (validacao?.bloqueios || []).length > 0 || (validacao?.correcoes || []).length > 0;
-    if (!temPendencias) break;
+    validacao = await prevalidarNotaFiscal({ vendaId, tipoNota });
+    if (!temPendenciasFiscais(validacao)) break;
 
     const corrigido = await solicitarCorrecaoFiscal({ validacao, vendaId, tipoNota });
     if (!corrigido) return { cancelado: true, validacao };
   }
 
-  if ((validacao?.bloqueios || []).length || (validacao?.correcoes || []).length) {
+  if (temPendenciasFiscais(validacao)) {
     throw erroComValidacaoFiscal(validacao);
   }
 

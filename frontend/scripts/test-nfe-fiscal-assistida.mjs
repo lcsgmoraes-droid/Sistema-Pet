@@ -17,6 +17,18 @@ const fiscalModelSelector = readFileSync(
   resolve(__dirname, "../src/components/SeletorModeloDocumentoFiscal.jsx"),
   "utf8",
 );
+const finalizedSaleQuestion = readFileSync(
+  resolve(__dirname, "../src/components/ModalPerguntaNFe.jsx"),
+  "utf8",
+);
+const fiscalAvailability = readFileSync(
+  resolve(__dirname, "../src/hooks/useFiscalDocumentAvailability.js"),
+  "utf8",
+);
+const nfceCpfPrompt = readFileSync(
+  resolve(__dirname, "../src/components/pdv/NfceCpfPrompt.jsx"),
+  "utf8",
+);
 const finalizedSaleFlow = readFileSync(
   resolve(__dirname, "../src/hooks/usePDVVendaFinalizacao.js"),
   "utf8",
@@ -131,6 +143,36 @@ assert.match(
   fiscalModelSelector,
   /Padrão do caixa/,
   "PDV deve identificar a NFC-e como modelo padrao do caixa",
+);
+assert.match(
+  fiscalModelSelector,
+  /Resolver pendências/,
+  "card fiscal deve permitir abrir a correcao antes da tentativa de emissao",
+);
+assert.match(
+  fiscalAvailability,
+  /prevalidarNotaFiscal/,
+  "modal deve prevalidar NF-e e NFC-e antes de oferecer a emissao",
+);
+assert.match(
+  finalizedSaleQuestion,
+  /<span>Finalizar<\/span>/,
+  "saida sem emissao fiscal deve usar um rotulo neutro",
+);
+assert.doesNotMatch(
+  finalizedSaleQuestion,
+  /Concluir sem nota fiscal/,
+  "modal nao deve destacar que a finalizacao ocorreu sem nota",
+);
+assert.match(
+  nfceCpfPrompt,
+  /Quer colocar CPF na nota\?/,
+  "NFC-e deve perguntar se o cliente quer incluir CPF",
+);
+assert.match(
+  nfceCpfPrompt,
+  /atualizarCliente/,
+  "CPF informado no caixa deve ser salvo no cadastro do cliente",
 );
 assert.doesNotMatch(
   finalizedSaleFlow,

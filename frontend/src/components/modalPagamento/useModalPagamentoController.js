@@ -687,6 +687,7 @@ export default function useModalPagamentoController({
       onConfirmar,
       onEmitir: emitirNFe,
       venda: vendaFinalizadaParaCupom || venda,
+      vendaId: vendaFinalizadaId,
     },
     viewProps: {
       venda,
