@@ -333,6 +333,36 @@ def test_document_path_rejects_untrusted_correlation_before_network(api):
     assert api.session.request.call_count == 0
 
 
+def test_nfe_danfe_requests_the_documented_pdf_format(api):
+    result = response()
+    result.content = b"%PDF-exemplo"
+    api.session.request.return_value = result
+
+    assert api.document_danfe("token", "nfe", "correlacao-teste") == b"%PDF-exemplo"
+    api.session.request.assert_called_once_with(
+        "GET",
+        BASE_URL + "/nfe/correlacao-teste/danfe?formato=pdf",
+        headers={"Accept": "application/pdf", "Authorization": "Bearer token"},
+        timeout=(3, 30),
+        allow_redirects=False,
+    )
+
+
+def test_nfce_danfe_requests_the_documented_thermal_html(api):
+    result = response()
+    result.content = b"<!doctype html><html></html>"
+    api.session.request.return_value = result
+
+    assert api.document_danfe("token", "nfce", "correlacao-teste") == result.content
+    api.session.request.assert_called_once_with(
+        "GET",
+        BASE_URL + "/nfce/correlacao-teste/danfe",
+        headers={"Accept": "text/html", "Authorization": "Bearer token"},
+        timeout=(3, 30),
+        allow_redirects=False,
+    )
+
+
 def test_production_credentials_are_created_once_without_exposing_response(api):
     api.session.request.return_value = response(
         body={"clientId": "cliente-producao", "clientSecret": "segredo-producao"}
