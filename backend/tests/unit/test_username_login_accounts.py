@@ -7,20 +7,25 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 from starlette.requests import Request
 
-from app import produtos_models  # noqa: F401 - registra relacionamentos do ORM
+from app import financeiro_models, produtos_models  # noqa: F401 - registra relacionamentos do ORM
 from app.auth import verify_password
 from app.auth.auth_multitenant_account_routes import (
+    _resolve_tenant_reference,
     _tenant_reference_filters,
     login_multitenant,
 )
 from app.auth.auth_multitenant_schemas import LoginRequest
-from app.models import Role, Tenant, User, UserTenant
+from app.models import Role, Tenant, TenantLoginName, User, UserTenant
 from app.routes.ecommerce_auth_public import login_cliente
 from app.routes.ecommerce_auth_schemas import EcommerceLoginRequest
 from app.services.user_account_service import (
     UserAccountError,
     create_tenant_user_account,
     normalize_username,
+)
+from app.services.tenant_login_name_service import (
+    TenantLoginNameError,
+    set_primary_tenant_login_name,
 )
 from app.tenancy.context import set_tenant_context
 from app.usuarios_routes import UserCredentialsUpdate, atualizar_credenciais_usuario
@@ -34,20 +39,29 @@ def _session() -> Session:
     Tenant.__table__.create(engine)
     Role.__table__.create(engine)
     User.__table__.create(engine)
+    TenantLoginName.__table__.create(engine)
     UserTenant.__table__.create(engine)
     return Session(engine)
 
 
-def _tenant(db: Session, *, name: str = "Loja Teste") -> Tenant:
+def _tenant(
+    db: Session,
+    *,
+    name: str = "Loja Teste",
+    login_name: str | None = None,
+    slug: str | None = None,
+) -> Tenant:
     tenant = Tenant(
         id=str(uuid4()),
         name=name,
         name_normalized=name.lower(),
-        ecommerce_slug=name.lower().replace(" ", "-"),
+        ecommerce_slug=slug or name.lower().replace(" ", "-"),
         status="active",
         plan="pet-start",
     )
     db.add(tenant)
+    db.flush()
+    set_primary_tenant_login_name(db, tenant.id, login_name or f"Acesso {name}")
     db.commit()
     set_tenant_context(UUID(str(tenant.id)))
     return tenant
@@ -151,7 +165,7 @@ def test_login_schemas_keep_email_compatibility_and_accept_username():
     assert mobile.identifier == "joao.silva"
 
 
-def test_tenant_name_lookup_does_not_compare_name_with_uuid_id():
+def test_tenant_reference_filters_only_compare_slug_and_valid_uuid_id():
     name_filters = _tenant_reference_filters("Pet Feliz Demo")
     uuid_filters = _tenant_reference_filters("00000000-0000-0000-0000-000000000001")
 
@@ -160,11 +174,12 @@ def test_tenant_name_lookup_does_not_compare_name_with_uuid_id():
 
     assert "tenants.id =" not in name_sql
     assert "tenants.id =" in uuid_sql
+    assert "name_normalized" not in name_sql
 
 
 def test_web_login_resolves_username_inside_informed_store(monkeypatch):
     db = _session()
-    tenant = _tenant(db)
+    tenant = _tenant(db, login_name="Equipe Loja Teste")
     user, _role = _account(db, tenant)
     db.commit()
 
@@ -187,7 +202,7 @@ def test_web_login_resolves_username_inside_informed_store(monkeypatch):
         request=request,
         credentials=LoginRequest(
             identifier="joao.silva",
-            tenant="loja-teste",
+            tenant="equipe loja teste",
             password="SenhaForte123",
         ),
         db=db,
@@ -197,6 +212,54 @@ def test_web_login_resolves_username_inside_informed_store(monkeypatch):
     assert response.user["username"] == "joao.silva"
     assert response.user["email"] is None
     assert response.tenants[0]["id"] == str(tenant.id)
+    assert response.tenants[0]["login_name"] == "Equipe Loja Teste"
+
+
+def test_login_name_change_keeps_previous_name_as_alias():
+    db = _session()
+    tenant = _tenant(db, name="Casa de Racao Vira Lata", login_name="Vira Lata")
+
+    change = set_primary_tenant_login_name(db, tenant.id, "Vira Latas")
+    db.commit()
+
+    assert change.old_name == "Vira Lata"
+    assert change.new_name == "Vira Latas"
+    assert _resolve_tenant_reference(db, "vira lata").id == tenant.id
+    assert _resolve_tenant_reference(db, "VIRA LATAS").id == tenant.id
+    assert (
+        db.query(TenantLoginName)
+        .filter(TenantLoginName.tenant_id == str(tenant.id))
+        .count()
+        == 2
+    )
+
+
+def test_login_name_is_unique_globally_but_fantasy_name_is_not():
+    db = _session()
+    first = _tenant(
+        db,
+        name="Mesmo Nome Fantasia",
+        login_name="Acesso Matriz",
+        slug="mesmo-nome-matriz",
+    )
+    second = _tenant(
+        db,
+        name="Mesmo Nome Fantasia",
+        login_name="Acesso Filial",
+        slug="mesmo-nome-filial",
+    )
+
+    try:
+        set_primary_tenant_login_name(db, second.id, "Ácesso   Matriz")
+    except TenantLoginNameError as exc:
+        assert exc.status_code == 409
+    else:
+        raise AssertionError("Nome de acesso duplicado deveria ser rejeitado")
+
+    first.name = "Novo Nome Fantasia"
+    db.commit()
+
+    assert _resolve_tenant_reference(db, "acesso matriz").id == first.id
 
 
 def test_mobile_login_accepts_username_without_email(monkeypatch):

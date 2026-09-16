@@ -28,6 +28,9 @@ from app.models import Permission, Role, RolePermission, Tenant, User, UserTenan
 from app.security.jwt_compat import JWTError, jwt
 from app.services.auth_security import register_logout
 from app.services.plan_limits import enforce_simultaneous_session_limit
+from app.services.tenant_login_name_service import (
+    get_primary_tenant_login_name_value,
+)
 from app.session_manager import (
     get_session_by_jti,
     revoke_session,
@@ -203,6 +206,9 @@ def select_tenant(
         tenant={
             "id": str(tenant.id),
             "name": tenant.name,
+            "login_name": get_primary_tenant_login_name_value(
+                db, tenant.id, fallback=tenant.name
+            ),
             "role_id": user_tenant.role_id,
         },
     )
@@ -269,7 +275,17 @@ def get_me_multitenant(
         "email_verified": current_user.email_verified,
         "consent_version": current_user.consent_version,
         "privacy_version": current_user.privacy_version,
-        "tenant": {"id": str(tenant.id), "name": tenant.name} if tenant else None,
+        "tenant": (
+            {
+                "id": str(tenant.id),
+                "name": tenant.name,
+                "login_name": get_primary_tenant_login_name_value(
+                    db, tenant.id, fallback=tenant.name
+                ),
+            }
+            if tenant
+            else None
+        ),
         "role": {"id": role.id, "name": role.name} if role else None,
         "permissions": permissions,
     }

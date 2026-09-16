@@ -65,6 +65,9 @@ os.environ.setdefault(
 INTENTIONALLY_GLOBAL_TENANT_TABLES = frozenset(
     {
         "user_sessions",  # sessões não são tenant-scoped (já na whitelist do filtro)
+        # Diretorio minimo de login consultado antes de estabelecer o tenant. Guarda
+        # somente nome de acesso/alias e tenant_id; senhas continuam em users.
+        "tenant_login_names",
         # Observabilidade/operação: cross-tenant POR DESIGN, tenant_id é etiqueta
         # nullable. Lidas só pelo cockpit admin (/admin/observabilidade, protegido por
         # require_admin, com visão cross-tenant) e escritas pelo middleware de captura

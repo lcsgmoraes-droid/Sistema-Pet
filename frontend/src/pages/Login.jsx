@@ -166,7 +166,9 @@ const Login = () => {
 
           {loginComUsuario && (
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Loja</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Nome de acesso da loja
+              </label>
               <div className="relative">
                 <FiBriefcase className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                 <input
@@ -174,7 +176,7 @@ const Login = () => {
                   value={tenant}
                   onChange={(event) => setTenant(event.target.value)}
                   className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#0f8b8d] focus:border-transparent outline-none transition"
-                  placeholder="Nome ou codigo da loja"
+                  placeholder="Ex: Vira Latas"
                   required
                 />
               </div>

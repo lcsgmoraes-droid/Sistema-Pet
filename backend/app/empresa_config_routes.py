@@ -3,6 +3,7 @@ Rotas para Configuração Geral da Empresa
 """
 
 from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, Field, model_validator
 from typing import Optional
@@ -11,7 +12,13 @@ from app.db import get_session
 from app.auth.dependencies import get_current_user_and_tenant
 from app.caixa_models import Caixa
 from app.empresa_config_geral_models import EmpresaConfigGeral
+from app.models import Tenant
 from app.security.permissions_decorator import require_permission
+from app.services.tenant_login_name_service import (
+    TenantLoginNameError,
+    get_primary_tenant_login_name_value,
+    set_primary_tenant_login_name,
+)
 from app.utils.logger import logger
 from app.financeiro.visao_comercial import VisaoComercial, obter_visao_comercial
 from app.audit_log import log_action
@@ -24,6 +31,7 @@ router = APIRouter(prefix="/empresa/config", tags=["Configuração da Empresa"])
 
 class EmpresaConfigGeralCreate(BaseModel):
     visao_comercial: VisaoComercial = "venda"
+    nome_acesso: Optional[str] = Field(default=None, min_length=3, max_length=120)
     razao_social: Optional[str] = None
     nome_fantasia: Optional[str] = None
     cnpj: Optional[str] = None
@@ -59,6 +67,7 @@ class EmpresaConfigGeralCreate(BaseModel):
 
 class EmpresaConfigGeralUpdate(BaseModel):
     visao_comercial: VisaoComercial = "venda"
+    nome_acesso: Optional[str] = Field(default=None, min_length=3, max_length=120)
     razao_social: Optional[str] = None
     nome_fantasia: Optional[str] = None
     cnpj: Optional[str] = None
@@ -97,6 +106,7 @@ class EmpresaConfigGeralUpdate(BaseModel):
 class EmpresaConfigGeralResponse(BaseModel):
     visao_comercial: VisaoComercial = "venda"
     id: int
+    nome_acesso: Optional[str] = None
     razao_social: Optional[str]
     nome_fantasia: Optional[str]
     cnpj: Optional[str]
@@ -121,11 +131,14 @@ class EmpresaConfigGeralResponse(BaseModel):
         from_attributes = True
 
 
-def _serializar_config(config: EmpresaConfigGeral) -> EmpresaConfigGeralResponse:
+def _serializar_config(
+    config: EmpresaConfigGeral, *, nome_acesso: str | None = None
+) -> EmpresaConfigGeralResponse:
     """Mantem a API compativel com configuracoes antigas que possuem campos nulos."""
     return EmpresaConfigGeralResponse(
         visao_comercial=getattr(config, "visao_comercial", None) or "venda",
         id=config.id,
+        nome_acesso=nome_acesso,
         razao_social=config.razao_social,
         nome_fantasia=config.nome_fantasia,
         cnpj=config.cnpj,
@@ -173,6 +186,53 @@ def _serializar_config(config: EmpresaConfigGeral) -> EmpresaConfigGeralResponse
             config.dias_produto_parado if config.dias_produto_parado is not None else 90
         ),
     )
+
+
+def _obter_nome_acesso(db: Session, tenant_id) -> str | None:
+    tenant = db.query(Tenant).filter(Tenant.id == str(tenant_id)).first()
+    return get_primary_tenant_login_name_value(
+        db,
+        tenant_id,
+        fallback=tenant.name if tenant else None,
+    )
+
+
+def _atualizar_nome_acesso(
+    db: Session,
+    tenant_id,
+    nome_acesso: str,
+    *,
+    current_user_id: int,
+) -> str:
+    try:
+        change = set_primary_tenant_login_name(
+            db,
+            tenant_id,
+            nome_acesso,
+        )
+    except TenantLoginNameError as exc:
+        db.rollback()
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+    except IntegrityError as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=409,
+            detail="Este nome de acesso ja esta em uso por outra empresa.",
+        ) from exc
+
+    if change.changed:
+        log_action(
+            db,
+            current_user_id,
+            action="business.tenant.login_name_changed",
+            entity_type="tenant_login_name",
+            entity_id=change.row.id,
+            old_value={"nome_acesso": change.old_name},
+            new_value={"nome_acesso": change.new_name},
+            tenant_id=tenant_id,
+            commit=False,
+        )
+    return change.new_name
 
 
 class EmpresaConfigMargensPrecoUpdate(BaseModel):
@@ -299,11 +359,13 @@ def get_config_empresa(
         .filter(EmpresaConfigGeral.tenant_id == tenant_id)
         .first()
     )
+    nome_acesso = _obter_nome_acesso(db, tenant_id)
 
     if not config:
         # Retorna configuração padrão
         return EmpresaConfigGeralResponse(
             id=0,
+            nome_acesso=nome_acesso,
             razao_social=None,
             nome_fantasia=None,
             cnpj=None,
@@ -325,7 +387,7 @@ def get_config_empresa(
             dias_produto_parado=90,
         )
 
-    return _serializar_config(config)
+    return _serializar_config(config, nome_acesso=nome_acesso)
 
 
 @router.post("/", response_model=EmpresaConfigGeralResponse)
@@ -353,8 +415,21 @@ def create_config_empresa(
     if config_data.caixa_compartilhado:
         _validar_ativacao_caixa_compartilhado(db, tenant_id)
 
+    create_data = config_data.model_dump()
+    nome_acesso_solicitado = create_data.pop("nome_acesso", None)
+    nome_acesso = (
+        _atualizar_nome_acesso(
+            db,
+            tenant_id,
+            nome_acesso_solicitado,
+            current_user_id=current_user.id,
+        )
+        if nome_acesso_solicitado is not None
+        else _obter_nome_acesso(db, tenant_id)
+    )
+
     # Cria nova configuração
-    config = EmpresaConfigGeral(tenant_id=tenant_id, **config_data.model_dump())
+    config = EmpresaConfigGeral(tenant_id=tenant_id, **create_data)
 
     db.add(config)
     db.commit()
@@ -362,7 +437,7 @@ def create_config_empresa(
 
     logger.info(f"Configuração da empresa criada para tenant {tenant_id}")
 
-    return _serializar_config(config)
+    return _serializar_config(config, nome_acesso=nome_acesso)
 
 
 @router.put("/", response_model=EmpresaConfigGeralResponse)
@@ -389,6 +464,18 @@ def update_config_empresa(
 
     # Atualiza apenas campos fornecidos
     update_data = config_data.model_dump(exclude_unset=True)
+    nome_acesso_foi_informado = "nome_acesso" in update_data
+    nome_acesso_solicitado = update_data.pop("nome_acesso", None)
+    nome_acesso = (
+        _atualizar_nome_acesso(
+            db,
+            tenant_id,
+            nome_acesso_solicitado,
+            current_user_id=current_user.id,
+        )
+        if nome_acesso_foi_informado and nome_acesso_solicitado is not None
+        else _obter_nome_acesso(db, tenant_id)
+    )
     visao_anterior = getattr(config, "visao_comercial", None) or "venda"
     if update_data.get("caixa_compartilhado") and not bool(
         getattr(config, "caixa_compartilhado", False)
@@ -415,7 +502,7 @@ def update_config_empresa(
 
     logger.info(f"Configuração da empresa atualizada para tenant {tenant_id}")
 
-    return _serializar_config(config)
+    return _serializar_config(config, nome_acesso=nome_acesso)
 
 
 @router.delete("/")

@@ -26,6 +26,7 @@ class RegisterRequest(BaseModel):
     password: str
     nome: Optional[str] = None
     nome_loja: Optional[str] = None
+    nome_acesso: Optional[str] = None
     plan: Optional[str] = "pet-start"
     organization_type: Optional[str] = None
     accepted_terms: bool = False

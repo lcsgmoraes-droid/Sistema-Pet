@@ -10,6 +10,7 @@ os.environ["DEBUG"] = "false"
 
 from app.empresa_config_routes import (
     EmpresaConfigMargensPrecoUpdate,
+    _atualizar_nome_acesso,
     _serializar_config,
     _serializar_margens_preco,
     get_config_empresa,
@@ -49,6 +50,7 @@ def test_get_config_empresa_usa_tenant_da_dependencia_multitenant(monkeypatch):
     assert response.margem_preco_sugestao_1 == 30.0
     assert response.margem_preco_sugestao_2 == 34.0
     assert response.caixa_compartilhado is False
+    assert response.nome_acesso is None
 
 
 class _FakeTenantQuery:
@@ -156,7 +158,7 @@ def test_serializar_config_antiga_aplica_defaults_sem_apagar_crediario():
         dias_produto_parado=None,
     )
 
-    resposta = _serializar_config(config)
+    resposta = _serializar_config(config, nome_acesso="Loja Teste")
 
     assert resposta.mensagem_venda_saudavel
     assert resposta.mensagem_venda_alerta
@@ -167,6 +169,7 @@ def test_serializar_config_antiga_aplica_defaults_sem_apagar_crediario():
     assert resposta.crediario_juros_mensal_percentual == 1
     assert resposta.margem_preco_sugestao_1 == 30
     assert resposta.margem_preco_sugestao_2 == 34
+    assert resposta.nome_acesso == "Loja Teste"
 
 
 def test_atualizar_margens_preco_nao_toca_em_preco_de_produto(monkeypatch):
@@ -202,6 +205,40 @@ def test_serializar_margens_preco_usa_defaults_para_empresa_sem_configuracao():
 
     assert resposta.margem_preco_sugestao_1 == 30
     assert resposta.margem_preco_sugestao_2 == 34
+
+
+def test_alteracao_do_nome_acesso_e_auditada(monkeypatch):
+    tenant_id = uuid4()
+    row = SimpleNamespace(id=77)
+    change = SimpleNamespace(
+        row=row,
+        old_name="Vira Lata",
+        new_name="Vira Latas",
+        changed=True,
+    )
+    audit_calls = []
+
+    monkeypatch.setattr(
+        "app.empresa_config_routes.set_primary_tenant_login_name",
+        lambda *_args, **_kwargs: change,
+    )
+    monkeypatch.setattr(
+        "app.empresa_config_routes.log_action",
+        lambda *args, **kwargs: audit_calls.append((args, kwargs)),
+    )
+
+    result = _atualizar_nome_acesso(
+        SimpleNamespace(),
+        tenant_id,
+        "Vira Latas",
+        current_user_id=42,
+    )
+
+    assert result == "Vira Latas"
+    assert audit_calls[0][1]["action"] == "business.tenant.login_name_changed"
+    assert audit_calls[0][1]["old_value"] == {"nome_acesso": "Vira Lata"}
+    assert audit_calls[0][1]["new_value"] == {"nome_acesso": "Vira Latas"}
+    assert audit_calls[0][1]["tenant_id"] == tenant_id
 
 
 def test_margens_preco_exige_duas_sugestoes_diferentes():

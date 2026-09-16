@@ -20,6 +20,7 @@ INTENTIONALLY_GLOBAL_NO_RLS_TABLES = frozenset(
         "ops_tenant_onboarding_notes",
         "oferta_publicacao_tokens",
         "rotas_entrega_rastreio_tokens",
+        "tenant_login_names",
         "user_sessions",
     }
 )

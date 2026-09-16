@@ -33,6 +33,9 @@ TENANT_WHITELIST_TABLES = {
     "users",  # Necessário para login (antes de selecionar tenant)
     "tenants",  # Necessário para listar tenants disponíveis
     "user_sessions",  # Sessões não são tenant-specific
+    # Diretorio minimo de autenticacao: nome de acesso/alias -> tenant. Precisa ser
+    # consultado antes de existir contexto; nao guarda senha nem dado operacional.
+    "tenant_login_names",
     "user_tenants",  # Necessário para /auth/select-tenant
     "permissions",  # Permissões globais do sistema
     "audit_logs",  # Pode precisar registrar eventos sem tenant
