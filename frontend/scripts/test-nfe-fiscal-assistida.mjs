@@ -56,6 +56,10 @@ const correctionDialog = readFileSync(
   resolve(__dirname, "../src/components/ui/FiscalCorrectionDialogHost.jsx"),
   "utf8",
 );
+const fiscalReferenceSearch = readFileSync(
+  resolve(__dirname, "../src/components/ui/FiscalReferenceSearch.jsx"),
+  "utf8",
+);
 assert.match(
   correctionDialog,
   /Preencher sugestões confiáveis/,
@@ -81,6 +85,26 @@ assert.match(
   correctionDialog,
   /Salvar e tentar emitir novamente/,
   "correcao guiada deve salvar e retomar a emissao",
+);
+assert.match(
+  fiscalReferenceSearch,
+  /Base de consulta fiscal/,
+  "correcao guiada deve oferecer pesquisa fiscal sem sair do fluxo",
+);
+assert.match(
+  fiscalReferenceSearch,
+  /fonte e confiança/,
+  "pesquisa fiscal deve explicar a qualidade das referencias",
+);
+assert.match(
+  fiscalReferenceSearch,
+  /portalunico\.siscomex\.gov\.br\/classif/,
+  "pesquisa fiscal deve apontar para a classificacao oficial",
+);
+assert.match(
+  fiscalReferenceSearch,
+  /A empresa está no Simples Nacional/,
+  "pesquisa fiscal deve usar o regime tributario no texto de apoio",
 );
 
 assert.match(
