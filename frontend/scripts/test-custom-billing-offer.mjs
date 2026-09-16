@@ -15,7 +15,7 @@ const api = read("src/api.js");
 const backendModel = read("../backend/app/billing_models.py");
 const backendOfferService = read("../backend/app/services/billing_offer_service.py");
 const migration = read(
-  "../backend/alembic/versions/zzq20260914a1_billing_offer_commercial_terms.py",
+  "../backend/alembic/versions/zzs20260915a1_billing_offer_commercial_terms.py",
 );
 
 assert.match(publicRoutes, /path="\/contratar\/:token"/);
@@ -37,7 +37,7 @@ assert.match(opsController, /scope_summary: billingOfferForm\.scope_summary/);
 assert.match(backendModel, /commercial_terms_json/);
 assert.match(backendOfferService, /contractual_sla_included/);
 assert.match(backendOfferService, /Esta proposta foi criada sem as condições comerciais atuais/);
-assert.match(migration, /zzp20260914a1/);
+assert.match(migration, /zzr20260915a1/);
 assert.match(api, /"\/contratar"/);
 
 console.log("Custom billing offer checks passed.");

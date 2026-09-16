@@ -1,15 +1,15 @@
 """Registra as condicoes comerciais especificas da proposta.
 
-Revision ID: zzq20260914a1
-Revises: zzp20260914a1
-Create Date: 2026-09-14
+Revision ID: zzs20260915a1
+Revises: zzr20260915a1
+Create Date: 2026-09-15
 """
 
 from alembic import op
 import sqlalchemy as sa
 
-revision = "zzq20260914a1"
-down_revision = "zzp20260914a1"
+revision = "zzs20260915a1"
+down_revision = "zzr20260915a1"
 branch_labels = None
 depends_on = None
 
