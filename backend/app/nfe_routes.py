@@ -651,7 +651,9 @@ def preparar_compartilhamento_intnfe(
         try:
             xml = download_intnfe_document(db, venda, api, "xml").decode("utf-8-sig")
         except UnicodeDecodeError:
-            raise HTTPException(502, "O XML retornado pelo emissor é inválido.") from None
+            raise HTTPException(
+                502, "O XML retornado pelo emissor é inválido."
+            ) from None
         except DirectEmissionError as exc:
             raise _direct_failure(exc) from None
         finally:
@@ -664,14 +666,10 @@ def preparar_compartilhamento_intnfe(
 
     cliente = venda.cliente
     telefone = (
-        getattr(cliente, "celular", None)
-        or getattr(cliente, "telefone", None)
-        or ""
+        getattr(cliente, "celular", None) or getattr(cliente, "telefone", None) or ""
     )
     nome_cliente = (
-        getattr(cliente, "nome", None)
-        or getattr(cliente, "razao_social", None)
-        or ""
+        getattr(cliente, "nome", None) or getattr(cliente, "razao_social", None) or ""
     )
     return {
         "link": link,
