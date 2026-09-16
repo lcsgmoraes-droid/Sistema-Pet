@@ -11,6 +11,10 @@ from fastapi import HTTPException, status
 from sqlalchemy.orm import Session, joinedload
 
 from app.models import Cliente, Tenant
+from app.orcamentos_grupo_documentos import (
+    preparar_snapshot_documento,
+    sortear_modelos_documento,
+)
 from app.orcamentos_grupo_models import (
     OrcamentoGrupo,
     OrcamentoGrupoConfiguracao,
@@ -303,7 +307,11 @@ def criar_orcamento(
     orcamento.total_base = moeda(total_base)
     db.flush()
 
+    modelos_documento = sortear_modelos_documento(len(payload.empresas) + 1)
     itens_principal, total_principal = montar_itens_snapshot(itens, Decimal("0"))
+    empresa_principal, itens_principal = preparar_snapshot_documento(
+        snapshot_tenant(tenant), itens_principal, modelos_documento[0]
+    )
     db.add(
         OrcamentoGrupoCotacao(
             tenant_id=tenant_id,
@@ -312,7 +320,7 @@ def criar_orcamento(
             emissor_principal=True,
             fixada=True,
             percentual_acrescimo=0,
-            empresa_snapshot=snapshot_tenant(tenant),
+            empresa_snapshot=empresa_principal,
             itens_snapshot=itens_principal,
             total=total_principal,
         )
@@ -322,6 +330,11 @@ def criar_orcamento(
         empresa = empresas_por_id[selecao.empresa_id]
         percentual = sortear_percentual(minimo, maximo)
         itens_snapshot, total = montar_itens_snapshot(itens, percentual)
+        empresa_snapshot, itens_snapshot = preparar_snapshot_documento(
+            snapshot_cliente(empresa.cliente),
+            itens_snapshot,
+            modelos_documento[ordem - 1],
+        )
         db.add(
             OrcamentoGrupoCotacao(
                 tenant_id=tenant_id,
@@ -331,7 +344,7 @@ def criar_orcamento(
                 emissor_principal=False,
                 fixada=selecao.fixada,
                 percentual_acrescimo=percentual,
-                empresa_snapshot=snapshot_cliente(empresa.cliente),
+                empresa_snapshot=empresa_snapshot,
                 itens_snapshot=itens_snapshot,
                 total=total,
             )

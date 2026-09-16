@@ -5,6 +5,11 @@ from types import SimpleNamespace
 import pytest
 
 from app.orcamentos_grupo_pdf import gerar_pdf_orcamentos
+from app.orcamentos_grupo_documentos import (
+    ordenar_itens_documento,
+    preparar_snapshot_documento,
+    sortear_modelos_documento,
+)
 from app.orcamentos_grupo_schemas import OrcamentoGrupoConfiguracaoUpdate
 from app.orcamentos_grupo_service import montar_itens_snapshot, sortear_percentual
 from tests.route_contract_helpers import method_routes
@@ -52,6 +57,34 @@ def test_configuracao_rejeita_faixa_invertida():
             quantidade_empresas=2,
             validade_dias=15,
         )
+
+
+def test_modelos_documento_sao_distintos_e_ficam_persistidos_no_snapshot():
+    modelos = sortear_modelos_documento(5, randbelow=lambda _limite: 0)
+
+    assert len(modelos) == len(set(modelos)) == 5
+    empresa, itens = preparar_snapshot_documento(
+        {"nome": "Empresa teste"},
+        [
+            {"ordem": 1, "descricao": "Item B"},
+            {"ordem": 2, "descricao": "Item A"},
+        ],
+        "editorial_rubi",
+    )
+    assert empresa["modelo_documento"] == "editorial_rubi"
+    assert [item["descricao"] for item in itens] == ["Item A", "Item B"]
+
+
+def test_ordenacao_visual_nao_altera_o_conteudo_dos_itens():
+    itens = [
+        {"ordem": 1, "descricao": "Produto A", "preco_total": "10.00"},
+        {"ordem": 2, "descricao": "Produto B", "preco_total": "20.00"},
+    ]
+
+    ordenados = ordenar_itens_documento(itens, "classico_azul")
+
+    assert [item["descricao"] for item in ordenados] == ["Produto B", "Produto A"]
+    assert sum(Decimal(item["preco_total"]) for item in ordenados) == Decimal("30")
 
 
 def test_pdf_gera_documentos_separados_por_empresa():
