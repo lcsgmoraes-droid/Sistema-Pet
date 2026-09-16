@@ -271,9 +271,7 @@ async def emitir_nfe(
                     ),
                 },
             )
-            return issue_intnfe(
-                db, get_tenant(db, tenant_id), venda, tipo_nota, api
-            )
+            return issue_intnfe(db, get_tenant(db, tenant_id), venda, tipo_nota, api)
         except DirectEmissionError as exc:
             raise _direct_failure(exc) from None
         finally:
