@@ -4,8 +4,6 @@ import pytest
 
 from app.estoque import service as estoque_service
 from app.estoque.service import EstoqueService
-from app import vendas_models  # noqa: F401
-from app import financeiro_models  # noqa: F401
 
 
 TENANT_ID = UUID("11111111-1111-4111-8111-111111111111")

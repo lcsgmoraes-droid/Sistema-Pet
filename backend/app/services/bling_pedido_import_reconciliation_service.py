@@ -166,9 +166,8 @@ def reconciliar_importacao_pedidos_bling_recentes(
                 except Exception as exc:
                     db.rollback()
                     logger.warning(
-                        "[BLING PEDIDO IMPORT] Falha ao reconciliar pedido %s: %s",
-                        pedido_bling_id,
-                        exc,
+                        f"[BLING PEDIDO IMPORT] Falha ao reconciliar pedido "
+                        f"{pedido_bling_id}: {exc}"
                     )
                     erros.append(
                         {
