@@ -99,6 +99,30 @@ export function valorBooleanoLabel(valor) {
   return "-";
 }
 
+export function identificadorDocumentoFiscal(nota) {
+  return nota.provedor === "intnfe" ? nota.venda_id : nota.id;
+}
+
+export function rotaDocumentoFiscal(nota, tipo) {
+  return nota.provedor === "intnfe"
+    ? `/nfe/vendas/${nota.venda_id}/${tipo}`
+    : `/nfe/${nota.id}/${tipo}`;
+}
+
+export function mesclarStatusIntNFe(nota, status) {
+  return {
+    ...nota,
+    status: status.situacao || nota.status,
+    numero: status.numero || nota.numero,
+    serie: status.serie ?? nota.serie,
+    chave: status.chave_acesso || nota.chave,
+    protocolo: status.protocolo || nota.protocolo,
+    codigo_erro: status.codigo_erro || nota.codigo_erro,
+    motivo_rejeicao: status.motivo_rejeicao || nota.motivo_rejeicao,
+    ambiente_codigo: status.ambiente_codigo ?? nota.ambiente_codigo,
+  };
+}
+
 export function montarDetalheFallback(nota) {
   return {
     id: nota.id,
@@ -109,6 +133,12 @@ export function montarDetalheFallback(nota) {
     tipo_label: nota.tipo === "nfce" ? "NFC-e" : "NF-e",
     chave: nota.chave,
     status: nota.status,
+    provedor: nota.provedor,
+    correlation_id: nota.correlation_id,
+    codigo_erro: nota.codigo_erro,
+    motivo_rejeicao: nota.motivo_rejeicao,
+    protocolo: nota.protocolo,
+    ambiente_codigo: nota.ambiente_codigo,
     data_emissao: nota.data_emissao,
     cliente: {
       nome: nota.cliente?.nome,
@@ -132,5 +162,37 @@ export function montarDetalheFallback(nota) {
     transporte: {},
     endereco_entrega: {},
     intermediador: {},
+  };
+}
+
+export async function carregarDetalheIntNFe(api, nota) {
+  const [statusResult, detalheResult] = await Promise.allSettled([
+    api.get(`/nfe/vendas/${nota.venda_id}/status`),
+    api.get(`/nfe/vendas/${nota.venda_id}/detalhes`),
+  ]);
+  const status = statusResult.status === "fulfilled" ? statusResult.value.data : {};
+  const notaAtualizada = mesclarStatusIntNFe(nota, status);
+  const detalheLocal =
+    detalheResult.status === "fulfilled"
+      ? detalheResult.value.data
+      : montarDetalheFallback(notaAtualizada);
+
+  let aviso = "";
+  if (statusResult.status === "rejected" && detalheResult.status === "rejected") {
+    aviso = "Não foi possível carregar os detalhes desta nota.";
+  } else if (statusResult.status === "rejected") {
+    aviso = "Os dados da venda foram carregados, mas o status da IntNFe não atualizou.";
+  } else if (detalheResult.status === "rejected") {
+    aviso = "O status foi atualizado, mas os dados completos da venda não carregaram.";
+  }
+
+  return {
+    nota: notaAtualizada,
+    detalhe: {
+      ...detalheLocal,
+      codigo_erro: status.codigo_erro || detalheLocal.codigo_erro,
+      motivo_rejeicao: status.motivo_rejeicao || detalheLocal.motivo_rejeicao,
+    },
+    aviso,
   };
 }

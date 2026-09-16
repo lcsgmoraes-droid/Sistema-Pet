@@ -25,6 +25,7 @@ def processar_baixa_estoque_item(
     product_variation_id: int = None,
     venda_codigo: str = None,
     observacao: str = None,
+    venda_item=None,
 ) -> List[Dict[str, Any]]:
     """
     Processa a baixa de estoque de um item de venda.
@@ -94,6 +95,20 @@ def processar_baixa_estoque_item(
             observacao=observacao,
         )
 
+        # Guarda no item da venda o lote que o FIFO realmente consumiu. Esse
+        # vínculo permite que a emissão fiscal use o snapshot tributário da NF
+        # de entrada daquele lote, mesmo que o cadastro geral do produto mude.
+        # Um item que atravessa mais de um lote permanece sem lote único; a
+        # pré-validação fiscal bloqueia essa ambiguidade em vez de adivinhar.
+        lotes_consumidos = resultado_estoque.get("lotes_consumidos") or []
+        lote_ids = {
+            lote.get("lote_id")
+            for lote in lotes_consumidos
+            if lote.get("lote_id") is not None
+        }
+        if venda_item is not None and lote_ids:
+            venda_item.lote_id = next(iter(lote_ids)) if len(lote_ids) == 1 else None
+
         resultados.append(
             {
                 "produto": resultado_estoque["produto_nome"],
@@ -137,6 +152,17 @@ def processar_baixa_estoque_item(
                 documento=venda_codigo,
                 observacao="KIT FÍSICO - Estoque próprio (componentes já foram baixados na montagem)",
             )
+
+            lotes_consumidos = resultado_estoque.get("lotes_consumidos") or []
+            lote_ids = {
+                lote.get("lote_id")
+                for lote in lotes_consumidos
+                if lote.get("lote_id") is not None
+            }
+            if venda_item is not None and lote_ids:
+                venda_item.lote_id = (
+                    next(iter(lote_ids)) if len(lote_ids) == 1 else None
+                )
 
             resultados.append(
                 {

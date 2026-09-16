@@ -1,9 +1,11 @@
+import { useState } from "react";
 import { CheckCircle, FileText, Printer } from "lucide-react";
 import { useDadosCupomEmpresa } from "../hooks/useDadosCupomEmpresa";
 import { usePersistentBooleanState } from "../hooks/usePersistentBooleanState";
 import { concluirVendaComCupom } from "../utils/pdvCupomFinalizacao";
 import { ehVendaCrediario } from "../utils/pdvReceipt";
 import { CupomImpressao } from "./ImprimirCupom";
+import SeletorModeloDocumentoFiscal from "./SeletorModeloDocumentoFiscal";
 
 const IMPRESSAO_CUPOM_STORAGE_KEY = "pdv_imprimir_cupom_ao_finalizar";
 const IMPRESSAO_CREDIARIO_STORAGE_KEY = "pdv_imprimir_crediario_ao_finalizar";
@@ -21,7 +23,9 @@ export default function ModalPerguntaNFe({
     crediario ? IMPRESSAO_CREDIARIO_STORAGE_KEY : IMPRESSAO_CUPOM_STORAGE_KEY,
     crediario,
   );
+  const [tipoNota, setTipoNota] = useState("nfce");
   const { carregandoEmpresa, dadosEmpresa } = useDadosCupomEmpresa();
+  const clienteIdentificado = Boolean(cliente?.cpf || cliente?.cnpj);
 
   const handleConcluirSemNota = () => {
     concluirVendaComCupom({
@@ -53,35 +57,35 @@ export default function ModalPerguntaNFe({
           )}
 
           <div className="space-y-3">
-            {cliente?.cnpj ? (
-              <>
-                <button
-                  onClick={() => onEmitir("nfe")}
-                  disabled={loading}
-                  className="w-full flex items-center justify-center space-x-2 px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50"
-                >
-                  <FileText className="w-5 h-5" />
-                  <span>Emitir NF-e (Empresa)</span>
-                </button>
-                <button
-                  onClick={() => onEmitir("nfce")}
-                  disabled={loading}
-                  className="w-full flex items-center justify-center space-x-2 px-4 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50"
-                >
-                  <FileText className="w-5 h-5" />
-                  <span>Emitir NFC-e (Cupom)</span>
-                </button>
-              </>
-            ) : (
-              <button
-                onClick={() => onEmitir("nfce")}
-                disabled={loading}
-                className="w-full flex items-center justify-center space-x-2 px-4 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50"
-              >
-                <FileText className="w-5 h-5" />
-                <span>Emitir NFC-e</span>
-              </button>
-            )}
+            <SeletorModeloDocumentoFiscal
+              clienteIdentificado={clienteIdentificado}
+              disabled={loading}
+              onChange={setTipoNota}
+              value={tipoNota}
+            />
+
+            <p className="rounded-lg bg-gray-50 px-3 py-2 text-xs text-gray-600">
+              {tipoNota === "nfce"
+                ? "Use para a venda presencial comum ao consumidor final."
+                : "Use para vendas com entrega ou transporte, interestaduais, ou quando o cliente solicitar NF-e."}
+              {!clienteIdentificado
+                ? " Para emitir NF-e, selecione um cliente com CPF ou CNPJ."
+                : ""}
+            </p>
+
+            <button
+              type="button"
+              onClick={() => onEmitir(tipoNota)}
+              disabled={loading || (tipoNota === "nfe" && !clienteIdentificado)}
+              className={`flex w-full items-center justify-center space-x-2 rounded-lg px-4 py-3 font-medium text-white transition-colors disabled:opacity-50 ${
+                tipoNota === "nfce"
+                  ? "bg-green-600 hover:bg-green-700"
+                  : "bg-blue-600 hover:bg-blue-700"
+              }`}
+            >
+              <FileText className="h-5 w-5" />
+              <span>Emitir {tipoNota === "nfce" ? "NFC-e" : "NF-e"}</span>
+            </button>
 
             <button
               onClick={handleConcluirSemNota}

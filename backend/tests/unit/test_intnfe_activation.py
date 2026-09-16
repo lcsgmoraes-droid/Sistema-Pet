@@ -11,7 +11,7 @@ from sqlalchemy.pool import StaticPool
 from app.config import settings
 from app.db import Base
 from app.intnfe.client import IntNFeError
-from app.intnfe.models import IntNFeConnection
+from app.intnfe.models import IntNFeConnection, IntNFeEmissionSequence
 from app.intnfe.presentation import certificate_state, public_status, valid_cnpj
 from app.intnfe.repository import ActivationError, get_connection, reserve, save
 from app.intnfe.service import activate, bind_existing
@@ -32,6 +32,7 @@ class FakeAPI:
         self.cert_error = None
         self.auth_error = None
         self.sent_companies = []
+        self.environment_activations = []
 
     def record(self, cnpj=CNPJ):
         return {
@@ -68,6 +69,9 @@ class FakeAPI:
             raise self.cert_error
         return self.certificate_value
 
+    def activate_emitter_environment(self, _token, emitter_id, environment):
+        self.environment_activations.append((emitter_id, environment))
+
 
 @pytest.fixture
 def intnfe_db():
@@ -76,7 +80,12 @@ def intnfe_db():
         "sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool
     )
     Base.metadata.create_all(
-        engine, tables=[Tenant.__table__, IntNFeConnection.__table__]
+        engine,
+        tables=[
+            Tenant.__table__,
+            IntNFeConnection.__table__,
+            IntNFeEmissionSequence.__table__,
+        ],
     )
     with Session(engine) as session:
         yield session

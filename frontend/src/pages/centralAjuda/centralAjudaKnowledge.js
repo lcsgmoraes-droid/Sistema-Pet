@@ -735,6 +735,30 @@ export const BASE_CONHECIMENTO = [
     cor: "gray",
     artigos: [
       {
+        titulo: "Qual é a diferença entre NF-e modelo 55 e NFC-e modelo 65?",
+        tags: ["modelo 55", "modelo 65", "nfe", "nfce", "série", "numeração"],
+        conteudo: [
+          "A **NF-e, modelo 55**, é usada nas vendas de mercadorias que exigem NF-e, como operações com entrega, e-commerce e muitas vendas entre empresas. Confirme a regra da operação com a contabilidade.",
+          "A **NFC-e, modelo 65**, é usada no varejo para consumidor final, normalmente no atendimento presencial. Para emiti-la, a empresa também precisa do CSC do ambiente correspondente.",
+          "Os modelos não compartilham numeração. NF-e modelo 55, série 1, e NFC-e modelo 65, série 1, possuem sequências independentes.",
+          "Homologação e produção também mantêm sequências separadas. Configure sempre o ambiente correto antes de informar a série e o próximo número.",
+          "Em **Configurações → Integrações → IntNFe**, use a ajuda **Qual modelo escolher?** e marque **Continuar com esta série no CorePet** quando quiser manter a série do sistema anterior.",
+        ],
+      },
+      {
+        titulo: "Como obter e cadastrar o CSC da NFC-e?",
+        tags: ["csc", "nfce", "modelo 65", "sefaz", "código de segurança", "token"],
+        conteudo: [
+          "O **CSC (Código de Segurança do Contribuinte)** é usado para gerar o QR Code da NFC-e, modelo 65. Ele não é necessário para a NF-e modelo 55.",
+          "O CSC é fornecido pela Secretaria da Fazenda do estado da empresa. Primeiro, confirme que o estabelecimento está credenciado para emitir NFC-e.",
+          "Acesse o portal da NFC-e da sua SEFAZ com o certificado digital da empresa, selecione o estabelecimento e procure **Gerenciar Cód Segurança** ou opção equivalente.",
+          "A SEFAZ fornece o **ID do CSC**, que é curto, e o **código CSC**, que é secreto. Copie os dois para **Configurações → Integrações → IntNFe → CSC da NFC-e**.",
+          "Homologação e produção usam CSCs diferentes. Antes de copiar, confira em qual ambiente o código foi gerado.",
+          "Para empresas de São Paulo, consulte as [orientações oficiais da SEFAZ-SP](https://portal.fazenda.sp.gov.br/servicos/nfce/).",
+          "O botão **Verificar cadastro na IntNFe** confirma se existe um CSC e mostra seu ID. Por segurança, ele nunca recupera nem exibe o código secreto.",
+        ],
+      },
+      {
         titulo: "Como emitir uma nota fiscal",
         tags: ["nota fiscal", "nfe", "nfce", "emitir", "imposto"],
         conteudo: [

@@ -64,6 +64,10 @@ from app.clientes.racas_routes import (
     list_racas_teste,
     router as racas_router,
 )
+from app.clientes.relatorio_routes import (
+    listar_pessoas_para_relatorio,
+    router as relatorio_router,
+)
 from app.clientes.schemas import (
     AjustarCreditoRequest,
     ClienteCreate,
@@ -92,6 +96,7 @@ router.include_router(duplicidades_router)
 router.include_router(pets_router)
 router.include_router(credito_router)
 router.include_router(parceiros_router)
+router.include_router(relatorio_router)
 router.include_router(clientes_base_router)
 router.include_router(racas_router)
 router.include_router(clientes_detail_router)
@@ -137,6 +142,7 @@ __all__ = [
     "list_pets_by_cliente",
     "list_racas",
     "list_racas_teste",
+    "listar_pessoas_para_relatorio",
     "listar_sugestoes_duplicidade_pessoas_route",
     "listar_todos_pets",
     "obter_custo_operacional_entregador",

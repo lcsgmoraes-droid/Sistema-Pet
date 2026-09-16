@@ -9,11 +9,13 @@ import json
 from datetime import datetime, timedelta
 from decimal import Decimal, ROUND_HALF_UP
 from uuid import UUID, uuid4
+from types import SimpleNamespace
 
 from app.bling_integration_fiscal import _resolver_fiscal_item_nfe
 from app.intnfe.client import IntNFeError
 from app.intnfe.fiscal_profile import local_profile
-from app.intnfe.models import IntNFeConnection
+from app.intnfe.models import IntNFeConnection, IntNFeEmissionSequence
+from app.produtos_estoque_models import EstoqueMovimentacao, ProdutoLote
 
 CENT = Decimal("0.01")
 AUTHORIZED_STATUS = 3
@@ -40,11 +42,14 @@ MARKETPLACE_CHANNELS = {
 
 
 class DirectEmissionError(Exception):
-    def __init__(self, message, *, status=422, code=None, correlation=None):
+    def __init__(
+        self, message, *, status=422, code=None, correlation=None, validation=None
+    ):
         super().__init__(message)
         self.status = status
         self.code = code
         self.correlation = correlation
+        self.validation = validation
 
 
 def _digits(value):
@@ -137,39 +142,48 @@ def _payment_code(value):
     return "99"
 
 
-def _recipient(cliente, environment, document_type):
+def _recipient(
+    cliente,
+    environment,
+    document_type,
+    *,
+    require_identity=False,
+    require_address=False,
+):
     if cliente is None:
         if document_type == "nfe":
             raise DirectEmissionError("A NF-e exige um cliente cadastrado.")
+        if require_identity:
+            raise DirectEmissionError(
+                "Esta NFC-e exige um consumidor identificado com CPF ou CNPJ."
+            )
         return None
     document = _digits(getattr(cliente, "cnpj", None) or getattr(cliente, "cpf", None))
     if len(document) not in {11, 14}:
-        if document_type == "nfce":
+        if document_type == "nfce" and not require_identity:
             return None
         raise DirectEmissionError(
             "Informe um CPF ou CNPJ válido no cadastro do cliente."
         )
 
-    required = {
+    address = {
         "logradouro": _text(cliente.endereco),
         "numero": _text(cliente.numero),
         "bairro": _text(cliente.bairro),
         "municipio": _text(cliente.cidade),
         "codigoMunicipio": _digits(getattr(cliente, "codigo_municipio", None)),
         "uf": (_text(cliente.estado) or "").upper(),
-        "cep": _digits(cliente.cep),
     }
-    missing = [name for name, value in required.items() if not value]
-    if missing and document_type == "nfe":
+    missing = [name for name, value in address.items() if not value]
+    if missing and (document_type == "nfe" or require_address):
         raise DirectEmissionError(
-            "Complete endereço, número, bairro, cidade, UF, CEP e código IBGE do cliente."
+            "Complete endereço, número, bairro, cidade, UF e código IBGE do cliente."
         )
-    if not missing and (
-        len(required["codigoMunicipio"]) != 7 or len(required["cep"]) != 8
-    ):
-        raise DirectEmissionError(
-            "Confira o CEP e o código IBGE do município do cliente."
-        )
+    if not missing and len(address["codigoMunicipio"]) != 7:
+        raise DirectEmissionError("Confira o código IBGE do município do cliente.")
+    cep = _digits(getattr(cliente, "cep", None))
+    if len(cep) == 8:
+        address["cep"] = cep
 
     recipient = {
         "razaoSocial": (
@@ -177,12 +191,12 @@ def _recipient(cliente, environment, document_type):
             if environment == 2
             else _text(getattr(cliente, "razao_social", None)) or _text(cliente.nome)
         ),
-        "indicadorIe": "1"
-        if _text(getattr(cliente, "inscricao_estadual", None))
-        else "9",
+        "indicadorIe": (
+            "1" if _text(getattr(cliente, "inscricao_estadual", None)) else "9"
+        ),
     }
     if not missing:
-        recipient["endereco"] = required
+        recipient["endereco"] = address
     if len(document) == 14:
         recipient["cnpj"] = document
     else:
@@ -221,7 +235,12 @@ def _tax(cst, origin, rate, taxable_amount):
 
 
 def _contribution(cst, rate, taxable_amount):
-    result = {"cst": str(cst)}
+    normalized_cst = str(cst)
+    result = {"cst": normalized_cst}
+    if rate is None and normalized_cst.isdigit() and 49 <= int(normalized_cst) <= 99:
+        # A IntNFe espera a aliquota explicita inclusive nos grupos de saida
+        # sem destaque, como o CST 49 usado pelo Simples Nacional.
+        rate = 0
     if rate is not None:
         normalized_rate = Decimal(str(rate))
         result["aliquota"] = float(normalized_rate)
@@ -235,12 +254,83 @@ def _contribution(cst, rate, taxable_amount):
     return result
 
 
+def _lot_from_recorded_fifo(db, venda, item):
+    """Recupera o lote fiscal de vendas antigas que não salvaram ``lote_id``.
+
+    O vínculo só é inferido quando a movimentação FIFO aponta para exatamente
+    um lote. Mais de um lote exige revisão porque os snapshots fiscais podem
+    divergir e uma única linha da NF não deve escolher um deles arbitrariamente.
+    """
+    if (
+        db is None
+        or getattr(item, "lote_id", None)
+        or getattr(item, "estoque_origem_tenant_id", None)
+    ):
+        return None
+
+    rows = (
+        db.query(EstoqueMovimentacao.lotes_consumidos)
+        .filter(
+            EstoqueMovimentacao.tenant_id == venda.tenant_id,
+            EstoqueMovimentacao.produto_id == item.produto_id,
+            EstoqueMovimentacao.referencia_id == venda.id,
+            EstoqueMovimentacao.referencia_tipo == "venda",
+            EstoqueMovimentacao.status != "cancelado",
+            EstoqueMovimentacao.lotes_consumidos.isnot(None),
+        )
+        .all()
+    )
+    lot_ids = set()
+    for row in rows:
+        raw = row[0] if isinstance(row, tuple) else row.lotes_consumidos
+        try:
+            consumed = json.loads(raw) if isinstance(raw, str) else raw
+        except (TypeError, ValueError):
+            continue
+        for lot in consumed or []:
+            lot_id = lot.get("lote_id") if isinstance(lot, dict) else None
+            if lot_id is not None:
+                lot_ids.add(int(lot_id))
+
+    if len(lot_ids) > 1:
+        raise DirectEmissionError(
+            f"Produto {item.produto.nome}: a venda consumiu mais de um lote. "
+            "Revise os dados fiscais dos lotes antes de transmitir a nota."
+        )
+    if not lot_ids:
+        return None
+    return (
+        db.query(ProdutoLote)
+        .filter(
+            ProdutoLote.id == next(iter(lot_ids)),
+            ProdutoLote.tenant_id == venda.tenant_id,
+        )
+        .first()
+    )
+
+
 def build_payload(db, tenant, connection, venda, document_type):
     emitter, emitter_pending = local_profile(db, tenant.id)
+    emitter_cnpj = _digits(getattr(tenant, "cnpj", None))
+    if len(emitter_cnpj) == 14:
+        emitter["cnpj"] = emitter_cnpj
+    elif len(_digits(emitter.get("cnpj"))) != 14:
+        emitter_pending.append("Informe um CNPJ válido nos dados da empresa.")
     if emitter_pending:
         raise DirectEmissionError(" ".join(emitter_pending))
     environment = 1 if connection.emission_environment == 1 else 2
-    recipient = _recipient(venda.cliente, environment, document_type)
+    sale_total = _money(venda.total)
+    nfce_requires_recipient = document_type == "nfce" and (
+        bool(getattr(venda, "tem_entrega", False)) or sale_total >= Decimal("10000")
+    )
+    recipient = _recipient(
+        venda.cliente,
+        environment,
+        document_type,
+        require_identity=nfce_requires_recipient,
+        require_address=bool(getattr(venda, "tem_entrega", False))
+        or nfce_requires_recipient,
+    )
     destination_uf = (
         recipient.get("endereco", {}).get("uf")
         if recipient
@@ -249,6 +339,7 @@ def build_payload(db, tenant, connection, venda, document_type):
     interstate = destination_uf != emitter["endereco"]["uf"]
 
     products = []
+    fiscal_pending = []
     product_total = Decimal("0")
     item_discount_total = Decimal("0")
     for item in venda.itens or []:
@@ -256,14 +347,24 @@ def build_payload(db, tenant, connection, venda, document_type):
             raise DirectEmissionError(
                 "A emissão direta atual aceita somente itens de produto vinculados ao cadastro."
             )
-        fiscal = _resolver_fiscal_item_nfe(db, venda, item)
+        fiscal_item = item
+        inferred_lot = _lot_from_recorded_fifo(db, venda, item)
+        if inferred_lot is not None:
+            fiscal_item = SimpleNamespace(produto=item.produto, lote=inferred_lot)
+        fiscal = _resolver_fiscal_item_nfe(db, venda, fiscal_item)
         ncm = _digits(fiscal.get("ncm"))
         origin = _text(fiscal.get("origem_mercadoria"))
-        cfop = _text(
-            fiscal.get("cfop_interestadual")
-            if interstate
-            else fiscal.get("cfop_interno")
+        destinatario_nao_contribuinte = bool(
+            recipient and recipient.get("indicadorIe") == "9"
         )
+        if interstate and destinatario_nao_contribuinte:
+            cfop = _text(fiscal.get("cfop_interestadual_nao_contribuinte"))
+        else:
+            cfop = _text(
+                fiscal.get("cfop_interestadual")
+                if interstate
+                else fiscal.get("cfop_interno")
+            )
         missing = [
             label
             for label, value in (
@@ -277,8 +378,60 @@ def build_payload(db, tenant, connection, venda, document_type):
             if not value
         ]
         if missing:
+            fiscal_pending.extend(
+                {
+                    "produto_id": item.produto.id,
+                    "produto_nome": item.produto.nome,
+                    "produto_tipo": getattr(item.produto, "tipo_produto", None),
+                    "sku": _text(item.produto.codigo)
+                    or _text(item.produto.codigo_barras)
+                    or str(item.produto.id),
+                    "campo": campo,
+                    "mensagem": f"{label} nao informado. Preencha para continuar.",
+                }
+                for campo, label, value in (
+                    ("ncm", "NCM", ncm if len(ncm) == 8 else None),
+                    ("origem_mercadoria", "Origem", origin),
+                    ("cfop", "CFOP", cfop if cfop and len(cfop) == 4 else None),
+                    ("cst_icms", "CSOSN/CST de ICMS", fiscal.get("cst_icms")),
+                    ("pis_cst", "CST de PIS", fiscal.get("pis_cst")),
+                    ("cofins_cst", "CST de COFINS", fiscal.get("cofins_cst")),
+                )
+                if not value
+            )
+            continue
+        cst_icms = str(fiscal.get("cst_icms") or "")
+        if (
+            emitter.get("crt") == "1"
+            and destinatario_nao_contribuinte
+            and cst_icms not in {"102", "103", "300", "400", "500"}
+        ):
             raise DirectEmissionError(
-                f"Produto {item.produto.nome}: complete {', '.join(missing)} na aba Tributação."
+                f"Produto {item.produto.nome}: o CSOSN {cst_icms} não é aceito "
+                "para consumidor não contribuinte. Revise a tributação antes de transmitir.",
+                validation={
+                    "success": True,
+                    "pode_emitir": False,
+                    "requer_autorizacao": False,
+                    "correcoes": [],
+                    "bloqueios": [
+                        {
+                            "produto_id": item.produto.id,
+                            "produto_nome": item.produto.nome,
+                            "produto_tipo": getattr(item.produto, "tipo_produto", None),
+                            "sku": _text(getattr(item.produto, "codigo", None))
+                            or _text(getattr(item.produto, "codigo_barras", None))
+                            or str(item.produto.id),
+                            "campo": "cst_icms",
+                            "valor_atual": cst_icms,
+                            "valor_invalido": True,
+                            "mensagem": (
+                                f"O CSOSN {cst_icms} nao e aceito para consumidor nao contribuinte. "
+                                "Escolha a classificacao correta para esta operacao."
+                            ),
+                        }
+                    ],
+                },
             )
         quantity = Decimal(str(item.quantidade or 0))
         unit_price = Decimal(str(item.preco_unitario or 0))
@@ -338,6 +491,18 @@ def build_payload(db, tenant, connection, venda, document_type):
         product_total += gross
         item_discount_total += discount
 
+    if fiscal_pending:
+        raise DirectEmissionError(
+            "Existem dados fiscais de produtos para completar antes da emissao.",
+            validation={
+                "success": True,
+                "pode_emitir": False,
+                "requer_autorizacao": False,
+                "correcoes": [],
+                "bloqueios": fiscal_pending,
+            },
+        )
+
     if not products:
         raise DirectEmissionError("A venda não possui produtos para emitir a nota.")
 
@@ -349,7 +514,6 @@ def build_payload(db, tenant, connection, venda, document_type):
         )
     freight = _money(venda.taxa_entrega if venda.tem_entrega else 0)
     calculated_total = product_total - total_discount + freight
-    sale_total = _money(venda.total)
     if calculated_total != sale_total:
         raise DirectEmissionError(
             f"O total fiscal calculado (R$ {calculated_total}) difere do total da venda (R$ {sale_total})."
@@ -375,13 +539,14 @@ def build_payload(db, tenant, connection, venda, document_type):
     channel = re.sub(r"[^a-z0-9]+", "_", _ascii(venda.canal)).strip("_")
     if channel in MARKETPLACE_CHANNELS:
         raise DirectEmissionError(
-            "Este pedido de marketplace ainda não contém no CorePet os dados do intermediador e da referência externa. Complete a importação antes de emitir."
+            "A emissão direta está disponível apenas para vendas do PDV do ERP. "
+            "Pedidos de marketplace não podem ser emitidos por este fluxo."
         )
 
     payload = {
-        "serie": connection.nfe_series
-        if document_type == "nfe"
-        else connection.nfce_series,
+        "serie": (
+            connection.nfe_series if document_type == "nfe" else connection.nfce_series
+        ),
         "ambienteCodigo": environment,
         "naturezaOperacao": "Venda de mercadoria",
         "emitente": emitter,
@@ -426,6 +591,204 @@ def preview(db, tenant, venda, document_type):
         "pagamentos": payload["pagamentos"],
         "frete": payload["frete"]["valor"],
         "total": float(_money(venda.total)),
+    }
+
+
+def emission_fingerprint(db, tenant, venda, document_type):
+    """Identifica os dados que seriam transmitidos sem criar um documento."""
+    connection = _connection(db, tenant.id)
+    payload = build_payload(db, tenant, connection, venda, document_type)
+    return hashlib.sha256(
+        json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    ).hexdigest()
+
+
+def local_document_details(db, tenant, venda):
+    """Monta os detalhes da nota a partir da venda salva no CorePet.
+
+    A consulta não depende de XML/DANFE nem de uma nova chamada à IntNFe. Isso
+    permite explicar uma rejeição usando os mesmos produtos e dados fiscais que
+    permanecem vinculados à venda.
+    """
+    cliente = venda.cliente
+    emitter_uf = (_text(getattr(tenant, "uf", None)) or "").upper()
+    destination_uf = (
+        (_text(getattr(cliente, "estado", None)) or emitter_uf).upper()
+        if cliente
+        else emitter_uf
+    )
+    interstate = bool(emitter_uf and destination_uf and emitter_uf != destination_uf)
+
+    items = []
+    product_total = Decimal("0")
+    item_discount_total = Decimal("0")
+    for sale_item in venda.itens or []:
+        product = getattr(sale_item, "produto", None)
+        quantity = Decimal(str(getattr(sale_item, "quantidade", 0) or 0))
+        unit_price = Decimal(str(getattr(sale_item, "preco_unitario", 0) or 0))
+        discount = _money(getattr(sale_item, "desconto_item", 0))
+        subtotal = _money(getattr(sale_item, "subtotal", 0))
+        gross = subtotal + discount
+        if gross == 0 and quantity:
+            gross = (quantity * unit_price).quantize(CENT, rounding=ROUND_HALF_UP)
+
+        fiscal = {}
+        if product and _ascii(getattr(sale_item, "tipo", None)) == "produto":
+            try:
+                fiscal = _resolver_fiscal_item_nfe(db, venda, sale_item) or {}
+            except Exception:
+                # O item precisa continuar visível mesmo se seu cadastro fiscal
+                # tiver sido alterado ou estiver incompleto depois da emissão.
+                fiscal = {}
+
+        cfop = (
+            fiscal.get("cfop_interestadual")
+            if interstate
+            else fiscal.get("cfop_interno")
+        )
+        items.append(
+            {
+                "produto_id": getattr(sale_item, "produto_id", None),
+                "codigo": (
+                    _text(getattr(product, "codigo", None))
+                    or _text(getattr(product, "codigo_barras", None))
+                    or (str(getattr(product, "id", "")) if product else None)
+                ),
+                "descricao": (
+                    _text(getattr(product, "nome", None))
+                    or _text(getattr(sale_item, "servico_descricao", None))
+                ),
+                "unidade": _text(getattr(product, "unidade", None)) or "UN",
+                "quantidade": _number(quantity),
+                "valor_unitario": float(unit_price),
+                "valor_total": float(gross),
+                "desconto": float(discount),
+                "ncm": _digits(fiscal.get("ncm")) or None,
+                "cest": _digits(fiscal.get("cest")) or None,
+                "cfop": _text(cfop),
+                "icms": _text(fiscal.get("cst_icms")),
+                "pis": _text(fiscal.get("pis_cst")),
+                "cofins": _text(fiscal.get("cofins_cst")),
+            }
+        )
+        product_total += gross
+        item_discount_total += discount
+
+    sale_discount = _money(getattr(venda, "desconto_valor", 0))
+    total_discount = item_discount_total if item_discount_total else sale_discount
+    freight = _money(venda.taxa_entrega if venda.tem_entrega else 0)
+    issue_at = getattr(venda, "nfe_data_emissao", None)
+    channel = re.sub(r"[^a-z0-9]+", "_", _ascii(venda.canal)).strip("_")
+
+    customer_document = None
+    if cliente:
+        customer_document = _digits(
+            getattr(cliente, "cnpj", None) or getattr(cliente, "cpf", None)
+        )
+
+    return {
+        "id": venda.id,
+        "numero": venda.nfe_numero,
+        "serie": venda.nfe_serie,
+        "modelo": int(venda.nfe_modelo or (55 if venda.nfe_tipo == "nfe" else 65)),
+        "tipo": venda.nfe_tipo or "nfe",
+        "chave": venda.nfe_chave,
+        "status": venda.nfe_status,
+        "provedor": "intnfe",
+        "codigo_erro": venda.nfe_codigo_erro,
+        "motivo_rejeicao": venda.nfe_motivo_rejeicao,
+        "protocolo": venda.nfe_protocolo,
+        "ambiente_codigo": venda.nfe_ambiente,
+        "data_emissao": issue_at.isoformat() if issue_at else None,
+        "hora_emissao": issue_at.strftime("%H:%M:%S") if issue_at else None,
+        "natureza_operacao": "Venda de mercadoria",
+        "finalidade": "1 - NF-e normal",
+        "indicador_presenca": (
+            "1 - Operação presencial" if channel == "loja_fisica" else "9 - Outros"
+        ),
+        "cliente": (
+            {
+                "id": getattr(cliente, "id", None),
+                "codigo": getattr(cliente, "codigo", None),
+                "nome": getattr(cliente, "nome", None),
+                "tipo_pessoa": getattr(cliente, "tipo_pessoa", None),
+                "cpf_cnpj": customer_document,
+                "vendedor": getattr(getattr(venda, "vendedor", None), "nome", None),
+                "consumidor_final": True,
+                "telefone": (
+                    getattr(cliente, "celular", None)
+                    or getattr(cliente, "telefone", None)
+                    if cliente
+                    else None
+                ),
+                "email": getattr(cliente, "email", None),
+                "cep": getattr(cliente, "cep", None),
+                "uf": getattr(cliente, "estado", None),
+                "municipio": getattr(cliente, "cidade", None),
+                "bairro": getattr(cliente, "bairro", None),
+                "endereco": getattr(cliente, "endereco", None),
+                "numero": getattr(cliente, "numero", None),
+                "complemento": getattr(cliente, "complemento", None),
+            }
+            if cliente
+            else {}
+        ),
+        "canal": venda.canal,
+        "canal_label": {
+            "loja_fisica": "PDV / Loja física",
+            "mercado_livre": "Mercado Livre",
+            "shopee": "Shopee",
+            "amazon": "Amazon",
+            "tiktok_shop": "TikTok Shop",
+        }.get(channel, venda.canal),
+        "itens": items,
+        "totais": {
+            "valor_produtos": float(product_total),
+            "valor_frete": float(freight),
+            "valor_seguro": 0,
+            "outras_despesas": 0,
+            "valor_desconto": float(total_discount),
+            "valor_total": float(_money(venda.total)),
+        },
+        "transporte": {
+            "tipo": "Entrega local" if venda.tem_entrega else "Sem transporte",
+            "frete_por_conta": "9 - Sem ocorrência de transporte",
+        },
+        "endereco_entrega": {
+            "nome": getattr(cliente, "nome", None) if venda.tem_entrega else None,
+            "endereco": venda.endereco_entrega if venda.tem_entrega else None,
+        },
+        "pagamento": {
+            "condicao": ", ".join(
+                dict.fromkeys(
+                    str(payment.forma_pagamento)
+                    for payment in (venda.pagamentos or [])
+                    if getattr(payment, "forma_pagamento", None)
+                )
+            )
+            or None,
+            "parcelas": [
+                {
+                    "dias": getattr(payment, "prazo_recebimento_dias", None),
+                    "data": (
+                        payment.data_recebimento_prevista.isoformat()
+                        if getattr(payment, "data_recebimento_prevista", None)
+                        else None
+                    ),
+                    "valor": float(_money(payment.valor)),
+                    "forma": payment.forma_pagamento,
+                    "observacao": getattr(payment, "numero_transacao", None),
+                }
+                for payment in (venda.pagamentos or [])
+            ],
+        },
+        "intermediador": {},
+        "informacoes_adicionais": {
+            "numero_pedido_loja": venda.numero_venda,
+            "origem_canal_venda": venda.canal,
+            "informacoes_complementares": venda.observacoes,
+        },
+        "pessoas_autorizadas_xml": [],
     }
 
 
@@ -490,16 +853,24 @@ def issue(db, tenant, venda, document_type, api):
     except IntNFeError as exc:
         venda.nfe_status = "inconclusiva" if exc.uncertain else "rejeitada"
         venda.nfe_codigo_erro = exc.code[:20] if exc.code else None
+        if not exc.uncertain and exc.status:
+            venda.nfe_motivo_rejeicao = f"IntNFe HTTP {exc.status}"
         if not exc.uncertain:
             venda.nfe_idempotency_key = None
             venda.nfe_payload_hash = None
             venda.nfe_data_emissao = None
         db.commit()
         raise DirectEmissionError(
-            "O envio ficou sem confirmação; não crie outra nota para esta venda."
-            if exc.uncertain
-            else "A IntNFe recusou o envio antes do processamento.",
-            status=503 if exc.uncertain else (422 if exc.status == 422 else 503),
+            (
+                "O envio ficou sem confirmação; não crie outra nota para esta venda."
+                if exc.uncertain
+                else "A IntNFe recusou o envio antes do processamento."
+            ),
+            status=(
+                503
+                if exc.uncertain
+                else (422 if exc.status and 400 <= exc.status < 500 else 503)
+            ),
             code=exc.code,
             correlation=exc.correlation,
         ) from None
@@ -538,6 +909,7 @@ def reconcile(db, venda, api, *, connection=None, token=None):
     venda.nfe_motivo_rejeicao = _text(result.get("motivoRejeicao"))
     if status_code == AUTHORIZED_STATUS:
         venda.nfe_data_autorizacao = datetime.now()
+        _remember_sequence_start(db, venda)
         if not venda.nfe_xml:
             try:
                 venda.nfe_xml = api.document_xml(
@@ -562,6 +934,40 @@ def reconcile(db, venda, api, *, connection=None, token=None):
         "motivo_rejeicao": venda.nfe_motivo_rejeicao,
         "ambiente_codigo": venda.nfe_ambiente,
     }
+
+
+def _remember_sequence_start(db, venda):
+    """Guarda a primeira numeração realmente emitida pelo CorePet."""
+    if not all(
+        (
+            venda.nfe_numero,
+            venda.nfe_serie is not None,
+            venda.nfe_ambiente in {1, 2},
+            str(venda.nfe_modelo) in {"55", "65"},
+        )
+    ):
+        return
+    model = int(venda.nfe_modelo)
+    series = str(int(venda.nfe_serie))
+    saved = (
+        db.query(IntNFeEmissionSequence)
+        .filter(
+            IntNFeEmissionSequence.tenant_id == venda.tenant_id,
+            IntNFeEmissionSequence.ambiente_codigo == venda.nfe_ambiente,
+            IntNFeEmissionSequence.modelo == model,
+        )
+        .one_or_none()
+    )
+    if saved is None:
+        db.add(
+            IntNFeEmissionSequence(
+                tenant_id=venda.tenant_id,
+                ambiente_codigo=venda.nfe_ambiente,
+                modelo=model,
+                serie=series,
+                numero_inicial=venda.nfe_numero,
+            )
+        )
 
 
 def download_document(db, venda, api, kind):

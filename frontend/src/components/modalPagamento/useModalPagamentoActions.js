@@ -5,6 +5,7 @@ import api from "../../api";
 import { verificarEstoqueNegativo } from "../../api/alertasEstoque";
 import { atualizarVenda, criarVenda, finalizarVenda } from "../../api/vendas";
 import {
+  corrigirEReemitirNota,
   emitirNotaFiscalAssistida,
   extrairAcaoCorrecaoFiscal,
   extrairMensagemNFe,
@@ -309,6 +310,36 @@ export function useModalPagamentoActions({
     } catch (error) {
       console.error("Erro ao emitir nota:", error);
       const mensagem = extrairMensagemNFe(error);
+      const recuperacao = error?.recuperacaoNFe;
+      if (recuperacao) {
+        const avisoProducao =
+          recuperacao.ambienteCodigo === 1
+            ? "\n\nATENÇÃO: a nova tentativa será transmitida em produção."
+            : "";
+        const deveCorrigir = await confirmarCorePet(
+          `${mensagem}${avisoProducao}\n\nO CorePet pode validar os dados atuais, aplicar apenas correções seguras e tentar novamente. Corrigir e tentar novamente?`,
+        );
+        if (deveCorrigir) {
+          try {
+            const reemissao = await corrigirEReemitirNota(recuperacao.vendaId);
+            if (reemissao?.processando) {
+              globalThis.alert(
+                "A correção foi aplicada e a nova tentativa ainda está em processamento. Consulte a Central de NF de Saída.",
+              );
+            } else {
+              globalThis.alert(
+                `${tipoNota === "nfe" ? "NF-e" : "NFC-e"} corrigida e autorizada com sucesso!`,
+              );
+            }
+            onConfirmar();
+          } catch (recoveryError) {
+            const recoveryMessage = extrairMensagemNFe(recoveryError);
+            setErro(recoveryMessage);
+            globalThis.alert(recoveryMessage);
+          }
+          return;
+        }
+      }
       const acaoFiscal = extrairAcaoCorrecaoFiscal(error);
       setErro(mensagem);
       if (

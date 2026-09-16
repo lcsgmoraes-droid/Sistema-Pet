@@ -1,9 +1,15 @@
 import { useEffect, useRef, useState } from "react";
-
 import api from "../api";
 import CentralNFSaidaView from "./centralNFSaida/CentralNFSaidaView";
-import { montarDetalheFallback, soDigitos } from "./centralNFSaida/centralNFSaidaUtils";
+import {
+  carregarDetalheIntNFe,
+  identificadorDocumentoFiscal,
+  montarDetalheFallback,
+  rotaDocumentoFiscal,
+  soDigitos,
+} from "./centralNFSaida/centralNFSaidaUtils";
 import { confirmarCorePet } from "../services/corepetDialog";
+import { corrigirEReemitirNota, extrairMensagemNFe } from "../utils/nfeFiscalAssistida";
 import NFSaidaCompartilharModal from "./centralNFSaida/NFSaidaCompartilharModal";
 
 function salvarArquivo(blob, nome) {
@@ -57,6 +63,7 @@ export default function CentralNFSaida() {
   const [justificativa, setJustificativa] = useState("");
   const [cancelando, setCancelando] = useState(false);
   const [reconciliandoNotaId, setReconciliandoNotaId] = useState("");
+  const [corrigindoNotaId, setCorrigindoNotaId] = useState("");
   const detalhesNotasCacheRef = useRef(new Map());
 
   const [painelSefazAberto, setPainelSefazAberto] = useState(false);
@@ -157,11 +164,16 @@ export default function CentralNFSaida() {
     }
   }
 
-  async function baixarDanfe(nfeId, numero) {
-    setDocumentoEmCurso(String(nfeId));
+  async function baixarDanfe(nota) {
+    const documentoId = identificadorDocumentoFiscal(nota);
+    const endpoint = rotaDocumentoFiscal(nota, "danfe");
+    setDocumentoEmCurso(String(documentoId));
     try {
-      const response = await api.get(`/nfe/${nfeId}/danfe`, { responseType: "blob" });
-      salvarArquivo(new Blob([response.data], { type: "application/pdf" }), `danfe_${numero}.pdf`);
+      const response = await api.get(endpoint, { responseType: "blob" });
+      salvarArquivo(
+        new Blob([response.data], { type: "application/pdf" }),
+        `danfe_${nota.numero}.pdf`,
+      );
     } catch (error) {
       alert(await mensagemDocumento(error, "Erro ao baixar DANFE"));
     } finally {
@@ -169,12 +181,17 @@ export default function CentralNFSaida() {
     }
   }
 
-  async function baixarXml(nfeId, numero) {
-    setDocumentoEmCurso(String(nfeId));
+  async function baixarXml(nota) {
+    const documentoId = identificadorDocumentoFiscal(nota);
+    const endpoint = rotaDocumentoFiscal(nota, "xml");
+    setDocumentoEmCurso(String(documentoId));
     try {
-      const response = await api.get(`/nfe/${nfeId}/xml`);
-      const blob = new Blob([response.data.xml], { type: "application/xml" });
-      salvarArquivo(blob, `nfe_${numero}.xml`);
+      const response = await api.get(endpoint, {
+        responseType: nota.provedor === "intnfe" ? "blob" : "json",
+      });
+      const conteudo = nota.provedor === "intnfe" ? response.data : response.data.xml;
+      const blob = new Blob([conteudo], { type: "application/xml" });
+      salvarArquivo(blob, `nfe_${nota.numero}.xml`);
     } catch (error) {
       alert(await mensagemDocumento(error, "Erro ao baixar XML"));
     } finally {
@@ -191,9 +208,20 @@ export default function CentralNFSaida() {
 
     try {
       setReconciliandoNotaId(notaId);
-      const response = await api.post(`/nfe/${notaId}/reconciliar-fluxo`);
-      const numero = response.data?.nf_numero || nota.numero || notaId;
-      alert(`Fluxo da NF ${numero} reconciliado com sucesso.`);
+      const response =
+        nota.provedor === "intnfe"
+          ? await api.get(`/nfe/vendas/${nota.venda_id}/status`)
+          : await api.post(`/nfe/${notaId}/reconciliar-fluxo`);
+      const numero = response.data?.numero || response.data?.nf_numero || nota.numero || notaId;
+      const situacao = response.data?.situacao;
+      const rejeicao = [response.data?.codigo_erro, response.data?.motivo_rejeicao]
+        .filter(Boolean)
+        .join(" — ");
+      alert(
+        nota.provedor === "intnfe"
+          ? `Status da NF ${numero}: ${situacao || "atualizado"}${rejeicao ? ` — ${rejeicao}` : ""}.`
+          : `Fluxo da NF ${numero} reconciliado com sucesso.`,
+      );
       await carregarNotas(true);
     } catch (error) {
       const detail =
@@ -206,10 +234,56 @@ export default function CentralNFSaida() {
     }
   }
 
+  async function corrigirEReemitir(nota) {
+    const vendaId = nota?.venda_id;
+    if (!vendaId) {
+      alert("Não foi possível identificar a venda desta nota.");
+      return;
+    }
+    const ambienteProducao = Number(nota?.ambiente_codigo || nota?.ambiente) === 1;
+    const aviso = ambienteProducao
+      ? "\n\nATENÇÃO: a nova tentativa será transmitida em produção."
+      : "";
+    const confirmed = await confirmarCorePet(
+      `O CorePet vai conferir novamente cadastro, lote, valores, pagamento e tributação. Se tudo estiver consistente, removerá apenas a tentativa rejeitada e transmitirá outra nota.${aviso}\n\nCorrigir e tentar novamente?`,
+    );
+    if (!confirmed) return;
+
+    try {
+      setCorrigindoNotaId(String(vendaId));
+      const resultado = await corrigirEReemitirNota(vendaId);
+      if (resultado?.processando) {
+        alert("A correção foi aplicada e a nota ainda está em processamento.");
+      } else {
+        const numero = resultado?.numero ? ` NF ${resultado.numero}` : "";
+        alert(`${numero || "A nota"} foi corrigida e autorizada com sucesso.`);
+      }
+      fecharDetalhes();
+      await carregarNotas(true);
+    } catch (error) {
+      alert(extrairMensagemNFe(error));
+      await carregarNotas(true);
+    } finally {
+      setCorrigindoNotaId("");
+    }
+  }
+
   async function abrirDetalhes(nota) {
     setNotaSelecionada(nota);
     setDetalheNota(montarDetalheFallback(nota));
     setErroDetalhe("");
+    if (nota.provedor === "intnfe") {
+      try {
+        setCarregandoDetalhe(true);
+        const resultado = await carregarDetalheIntNFe(api, nota);
+        setNotaSelecionada(resultado.nota);
+        setDetalheNota(resultado.detalhe);
+        setErroDetalhe(resultado.aviso);
+      } finally {
+        setCarregandoDetalhe(false);
+      }
+      return;
+    }
     try {
       setCarregandoDetalhe(true);
       const cacheKey = `${nota.id}:${nota.modelo || ""}`;
@@ -246,7 +320,11 @@ export default function CentralNFSaida() {
     }
     try {
       setCancelando(true);
-      await api.post(`/nfe/${modalCancelar.id}/cancelar`, { justificativa });
+      const endpoint =
+        modalCancelar.provedor === "intnfe"
+          ? `/nfe/vendas/${modalCancelar.venda_id}/cancelar`
+          : `/nfe/${modalCancelar.id}/cancelar`;
+      await api.post(endpoint, { justificativa });
       alert("Nota fiscal cancelada com sucesso!");
       setModalCancelar(null);
       setJustificativa("");
@@ -426,6 +504,8 @@ export default function CentralNFSaida() {
         excluirNota={excluirNota}
         reconciliarFluxoNota={reconciliarFluxoNota}
         reconciliandoNotaId={reconciliandoNotaId}
+        corrigirEReemitir={corrigirEReemitir}
+        corrigindoNotaId={corrigindoNotaId}
         baixarDanfe={baixarDanfe}
         baixarXml={baixarXml}
         abrirDetalhes={abrirDetalhes}

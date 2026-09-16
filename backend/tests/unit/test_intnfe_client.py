@@ -65,6 +65,17 @@ def test_creation_failure_classification_is_safe(api, status, uncertain):
     assert api.session.request.call_count == 1
 
 
+def test_bad_request_is_reported_as_invalid_data(api):
+    api.session.request.return_value = response(400, {"mensagem": "nao-expor"})
+
+    with pytest.raises(IntNFeError) as error:
+        api.issue_document("token", "nfe", {}, "chave-teste")
+
+    assert error.value.code == "DadosInvalidos"
+    assert error.value.status == 400
+    assert not error.value.uncertain
+
+
 def test_timeout_or_invalid_success_response_is_uncertain_for_creation(api):
     api.session.request.side_effect = requests.Timeout("mensagem-privada")
     with pytest.raises(IntNFeError) as error:
@@ -259,6 +270,20 @@ def test_fiscal_profile_uses_integrator_get_and_patch(api):
         BASE_URL + "/integrador/emitentes/emitente-teste/cadastro",
     )
     assert api.session.request.call_args.kwargs["json"] == remote
+
+
+def test_environment_activation_accepts_documented_empty_response(api):
+    api.session.request.return_value = response(status=204)
+
+    assert api.activate_emitter_environment("token", "emitente-teste", 1) is None
+
+    call = api.session.request.call_args
+    assert call.args == (
+        "POST",
+        BASE_URL + "/integrador/emitentes/emitente-teste/ambiente/ativar",
+    )
+    assert call.kwargs["json"] == {"ambienteCodigo": 1}
+    assert call.kwargs["allow_redirects"] is False
 
 
 def test_direct_issue_uses_emitter_token_and_idempotency_header(api):

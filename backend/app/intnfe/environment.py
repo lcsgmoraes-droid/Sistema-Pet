@@ -3,13 +3,15 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from typing import Literal
+from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.intnfe.client import IntNFeError
-from app.intnfe.models import IntNFeConnection
-from app.intnfe.numbering import emitter_access
+from app.intnfe.models import IntNFeConnection, IntNFeEmissionSequence
+from app.intnfe.numbering import emitter_access, read_numbering
+
+SequenceNumber = Annotated[int, Field(strict=True, ge=1, le=999_999_999)]
 
 
 class EnvironmentInput(BaseModel):
@@ -18,6 +20,8 @@ class EnvironmentInput(BaseModel):
     ambiente_codigo: Literal[1, 2]
     serie_nfe: str = Field(default="1", pattern=r"^[0-9]{1,3}$")
     serie_nfce: str = Field(default="1", pattern=r"^[0-9]{1,3}$")
+    numero_inicial_nfe: SequenceNumber | None = None
+    numero_inicial_nfce: SequenceNumber | None = None
 
     @field_validator("ambiente_codigo", mode="before")
     @classmethod
@@ -34,6 +38,35 @@ class EnvironmentInput(BaseModel):
         return str(int(value))
 
 
+class DefaultSeriesInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    ambiente_codigo: Literal[1, 2]
+    modelo: Literal[55, 65]
+    serie: str = Field(pattern=r"^[0-9]{1,3}$")
+
+    @field_validator("ambiente_codigo", "modelo", mode="before")
+    @classmethod
+    def strict_codes(cls, value):
+        if type(value) is not int:
+            raise ValueError("Código deve ser inteiro.")
+        return value
+
+    @field_validator("serie")
+    @classmethod
+    def normalize_series(cls, value):
+        if int(value) > 889:
+            raise ValueError("Série fora da faixa permitida.")
+        return str(int(value))
+
+
+class EnvironmentSequenceView(BaseModel):
+    ambiente_codigo: Literal[1, 2]
+    modelo: Literal[55, 65]
+    serie: str
+    numero_inicial: int
+
+
 class EnvironmentView(BaseModel):
     habilitada: bool
     ambiente_codigo: Literal[1, 2]
@@ -42,6 +75,7 @@ class EnvironmentView(BaseModel):
     serie_nfce: str
     credencial_homologacao: bool
     credencial_producao: bool
+    configuracoes: list[EnvironmentSequenceView]
     mensagem: str
 
 
@@ -53,7 +87,19 @@ class EnvironmentError(Exception):
         self.correlation = correlation
 
 
-def _view(connection, message=None):
+def _saved_sequences(db, tenant_id):
+    return (
+        db.query(IntNFeEmissionSequence)
+        .filter(IntNFeEmissionSequence.tenant_id == tenant_id)
+        .order_by(
+            IntNFeEmissionSequence.ambiente_codigo,
+            IntNFeEmissionSequence.modelo,
+        )
+        .all()
+    )
+
+
+def _view(db, connection, message=None):
     environment = 1 if connection.emission_environment == 1 else 2
     enabled = bool(connection.emission_enabled)
     if message is None:
@@ -75,13 +121,115 @@ def _view(connection, message=None):
             connection.production_client_id
             and connection.production_client_secret_encrypted
         ),
+        configuracoes=[
+            EnvironmentSequenceView(
+                ambiente_codigo=item.ambiente_codigo,
+                modelo=item.modelo,
+                serie=item.serie,
+                numero_inicial=item.numero_inicial,
+            )
+            for item in _saved_sequences(db, connection.tenant_id)
+        ],
         mensagem=message,
     )
 
 
 def read_environment(db, tenant_id, api):
     connection, _token = emitter_access(db, tenant_id, api)
-    return _view(connection)
+    return _view(db, connection)
+
+
+def save_default_series(db, tenant_id, api, request, audit):
+    """Guarda a série padrão sem ativar ou trocar o ambiente de emissão."""
+
+    connection, _token = emitter_access(db, tenant_id, api)
+    numbering = read_numbering(db, tenant_id, api)
+    current = next(
+        (
+            row
+            for row in numbering.series
+            if row.ambienteCodigo == request.ambiente_codigo
+            and row.modelo == request.modelo
+            and row.serie == request.serie
+        ),
+        None,
+    )
+    if current is None:
+        raise EnvironmentError(
+            "A série escolhida ainda não existe no emissor. Salve a sequência antes de usá-la no CorePet.",
+            status=422,
+        )
+    if current.proximoNumero > 999_999_999:
+        raise EnvironmentError(
+            "Essa série atingiu o limite de numeração. Escolha outra série.",
+            status=422,
+        )
+
+    connection = (
+        db.query(IntNFeConnection)
+        .filter(IntNFeConnection.id == connection.id)
+        .with_for_update()
+        .populate_existing()
+        .one()
+    )
+    # Preparar o outro ambiente não pode mudar a série das emissões atuais.
+    if connection.emission_environment == request.ambiente_codigo:
+        if request.modelo == 55:
+            connection.nfe_series = request.serie
+        else:
+            connection.nfce_series = request.serie
+    _save_sequence_start(
+        db,
+        connection,
+        request.ambiente_codigo,
+        request.modelo,
+        request.serie,
+        current.proximoNumero,
+    )
+    db.commit()
+    audit(
+        connection.id,
+        "serie_padrao_salva",
+        {
+            "ambiente": request.ambiente_codigo,
+            "modelo": request.modelo,
+            "serie": request.serie,
+            "numero_inicial": current.proximoNumero,
+        },
+    )
+    document = "NFC-e" if request.modelo == 65 else "NF-e"
+    return _view(
+        db,
+        connection,
+        f"Série {request.serie.zfill(3)} salva como padrão da {document} no CorePet.",
+    )
+
+
+def _save_sequence_start(db, connection, environment, model, series, initial_number):
+    if initial_number is None:
+        return
+    saved = (
+        db.query(IntNFeEmissionSequence)
+        .filter(
+            IntNFeEmissionSequence.tenant_id == connection.tenant_id,
+            IntNFeEmissionSequence.ambiente_codigo == environment,
+            IntNFeEmissionSequence.modelo == model,
+        )
+        .one_or_none()
+    )
+    if saved is None:
+        db.add(
+            IntNFeEmissionSequence(
+                tenant_id=connection.tenant_id,
+                ambiente_codigo=environment,
+                modelo=model,
+                serie=series,
+                numero_inicial=initial_number,
+            )
+        )
+    elif saved.serie != series:
+        saved.serie = series
+        saved.numero_inicial = initial_number
 
 
 def configure_environment(db, tenant_id, api, request, audit):
@@ -178,10 +326,49 @@ def configure_environment(db, tenant_id, api, request, audit):
             correlation=exc.correlation,
         ) from None
 
+    try:
+        api.activate_emitter_environment(
+            integrator_token, connection.emitente_id, environment
+        )
+    except IntNFeError as exc:
+        # A ativação é um POST e pode ter sido aplicada antes de uma resposta se
+        # perder. Consulte o estado remoto antes de declarar falha ou repetir.
+        remote_environment = None
+        if exc.uncertain:
+            try:
+                remote_environment = api.emitter_environment(
+                    integrator_token, connection.emitente_id
+                ).get("ambienteAtivo")
+            except (AttributeError, IntNFeError):
+                remote_environment = None
+        if remote_environment != environment:
+            raise EnvironmentError(
+                "Não foi possível ativar o ambiente escolhido na IntNFe.",
+                status=503 if exc.uncertain else (422 if exc.status == 422 else 503),
+                code=exc.code,
+                correlation=exc.correlation,
+            ) from None
+
     connection.emission_environment = environment
     connection.nfe_series = request.serie_nfe
     connection.nfce_series = request.serie_nfce
     connection.emission_enabled = True
+    _save_sequence_start(
+        db,
+        connection,
+        environment,
+        55,
+        request.serie_nfe,
+        request.numero_inicial_nfe,
+    )
+    _save_sequence_start(
+        db,
+        connection,
+        environment,
+        65,
+        request.serie_nfce,
+        request.numero_inicial_nfce,
+    )
     db.commit()
     audit(
         connection.id,
@@ -190,9 +377,12 @@ def configure_environment(db, tenant_id, api, request, audit):
             "ambiente": environment,
             "serie_nfe": request.serie_nfe,
             "serie_nfce": request.serie_nfce,
+            "numero_inicial_nfe": request.numero_inicial_nfe,
+            "numero_inicial_nfce": request.numero_inicial_nfce,
         },
     )
     return _view(
+        db,
         connection,
         f"Emissão direta ativada em {'produção' if environment == 1 else 'homologação'}.",
     )
@@ -203,4 +393,4 @@ def disable_environment(db, tenant_id, api, audit):
     connection.emission_enabled = False
     db.commit()
     audit(connection.id, "emissao_direta_desativada", {})
-    return _view(connection, "Emissão direta desativada para esta empresa.")
+    return _view(db, connection, "Emissão direta desativada para esta empresa.")

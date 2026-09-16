@@ -472,6 +472,7 @@ def criar_venda(
                                 if compartilhado
                                 else None
                             ),
+                            venda_item=item if not compartilhado else None,
                         )
 
                     estoque_baixado.extend(resultados)

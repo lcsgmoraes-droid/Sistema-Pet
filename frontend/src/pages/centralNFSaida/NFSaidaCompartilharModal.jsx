@@ -104,8 +104,8 @@ export default function NFSaidaCompartilharModal({ nota, fechar, baixarDanfe, do
               {copiado ? "Link copiado" : "Copiar link"}
             </button>
             <button
-              disabled={documentoEmCurso === String(nota.id)}
-              onClick={() => baixarDanfe(nota.id, nota.numero)}
+              disabled={documentoEmCurso === String(nota.venda_id || nota.id)}
+              onClick={() => baixarDanfe(nota)}
               className="flex items-center gap-2 border rounded-lg p-3 disabled:opacity-50"
             >
               <Download size={18} />

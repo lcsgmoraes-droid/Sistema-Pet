@@ -6,6 +6,7 @@ from copy import deepcopy
 from time import monotonic
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 from typing import Optional
 from pydantic import BaseModel
@@ -32,15 +33,19 @@ from app.intnfe.emission import (
     direct_emission_enabled,
     download_document as download_intnfe_document,
     issue as issue_intnfe,
+    local_document_details as local_intnfe_details,
     preview as preview_intnfe,
     reconcile as reconcile_intnfe,
 )
 from app.intnfe.repository import get_connection, get_tenant
+from app.intnfe.numbering import NumberingError
+from app.intnfe.recovery import repair_and_retry as repair_and_retry_intnfe
 from app.bling_integration import (
     BlingAPI,
     aplicar_correcoes_fiscais_venda,
     prevalidar_fiscal_venda,
 )
+from app.bling_integration_fiscal import prevalidar_produtos_fiscais_venda
 from app.nfe.operacional_routes import (
     CancelarNFeRequest as CancelarNFeRequest,
     CartaCorrecaoRequest as CartaCorrecaoRequest,
@@ -120,6 +125,7 @@ from app.nfe.listagem import (
     _tipo_nota_label as _tipo_nota_label,
     _tipo_pessoa_label as _tipo_pessoa_label,
     _venda_usa_nfce as _venda_usa_nfce,
+    upsert_nota_cache as upsert_nota_cache,
 )
 from app.utils.logger import logger
 
@@ -164,13 +170,16 @@ def _exigir_bling_configurado_para_tenant(tenant_id) -> None:
 
 
 def _direct_failure(exc):
+    detail = {
+        "erro": exc.code or "intnfe_emissao",
+        "mensagem": str(exc),
+        "protocolo_suporte": exc.correlation,
+    }
+    if exc.validation:
+        detail["validacao"] = exc.validation
     return HTTPException(
         exc.status,
-        {
-            "erro": exc.code or "intnfe_emissao",
-            "mensagem": str(exc),
-            "protocolo_suporte": exc.correlation,
-        },
+        detail,
     )
 
 
@@ -201,25 +210,23 @@ async def prevalidar_nfe(
                     "Esta venda já possui uma tentativa de nota fiscal. Consulte a situação existente.",
                     status=409,
                 )
-            resumo = preview_intnfe(db, get_tenant(db, tenant_id), venda, tipo_nota)
-            validacao = {
-                "success": True,
-                "pode_emitir": True,
-                "requer_autorizacao": False,
-                "correcoes": [],
-                "bloqueios": [],
-                "resumo_emissao": resumo,
-                "provedor": "intnfe",
-            }
+            validacao = prevalidar_produtos_fiscais_venda(
+                venda, db, exigir_documento_completo=True
+            )
+            if validacao["pode_emitir"]:
+                validacao["resumo_emissao"] = preview_intnfe(
+                    db, get_tenant(db, tenant_id), venda, tipo_nota
+                )
+            validacao["provedor"] = "intnfe"
         except DirectEmissionError as exc:
-            validacao = {
+            validacao = exc.validation or {
                 "success": True,
                 "pode_emitir": False,
                 "requer_autorizacao": False,
                 "correcoes": [],
                 "bloqueios": [{"campo": "intnfe", "mensagem": str(exc)}],
-                "provedor": "intnfe",
             }
+            validacao["provedor"] = "intnfe"
     else:
         validacao = prevalidar_fiscal_venda(venda, tipo_nota, db)
         validacao["provedor"] = "bling"
@@ -269,9 +276,11 @@ async def emitir_nfe(
                     entity_id=venda.id,
                     new_value={
                         "tipo": tipo_nota,
-                        "ambiente": "producao"
-                        if connection and connection.emission_environment == 1
-                        else "homologacao",
+                        "ambiente": (
+                            "producao"
+                            if connection and connection.emission_environment == 1
+                            else "homologacao"
+                        ),
                     },
                 )
                 return issue_intnfe(
@@ -457,6 +466,99 @@ def status_intnfe_venda(
         raise _direct_failure(exc) from None
     finally:
         api.close()
+
+
+@router.post("/vendas/{venda_id}/corrigir-reemitir")
+def corrigir_reemitir_intnfe_venda(
+    venda_id: int,
+    db: Session = Depends(get_session),
+    user_and_tenant=Depends(get_current_user_and_tenant),
+):
+    """Aplica apenas correções comprováveis e refaz uma tentativa rejeitada."""
+    current_user, tenant_id = user_and_tenant
+    venda = _buscar_venda_para_nfe(db, venda_id, tenant_id)
+    if not venda:
+        raise HTTPException(404, "Venda não encontrada")
+
+    def reset_audit(old_value, new_value):
+        log_action(
+            db,
+            user_id=current_user.id,
+            tenant_id=tenant_id,
+            action="intnfe_corrigir_reemitir",
+            entity_type="venda",
+            entity_id=venda.id,
+            old_value=old_value,
+            new_value=new_value,
+            commit=False,
+        )
+
+    def numbering_audit(connection_id, result, last, change, error=None):
+        try:
+            log_action(
+                db,
+                user_id=current_user.id,
+                tenant_id=tenant_id,
+                action="intnfe_numeracao_automatica",
+                entity_type="intnfe_connection",
+                entity_id=connection_id,
+                old_value={"ultimoNumero": last},
+                new_value={
+                    **change,
+                    "resultado": result,
+                    "codigo": error.code if error else None,
+                    "correlation_id": error.correlation if error else None,
+                },
+                commit=False,
+            )
+            db.commit()
+        except SQLAlchemyError:
+            db.rollback()
+            raise NumberingError(
+                "AuditoriaIndisponivel",
+                "Não foi possível auditar o ajuste automático da numeração.",
+                status=503,
+            ) from None
+
+    api = _intnfe_client()
+    try:
+        return repair_and_retry_intnfe(
+            db,
+            get_tenant(db, tenant_id),
+            venda,
+            api,
+            reset_audit=reset_audit,
+            numbering_audit=numbering_audit,
+        )
+    except DirectEmissionError as exc:
+        raise _direct_failure(exc) from None
+    except NumberingError as exc:
+        raise HTTPException(
+            exc.status,
+            {
+                "erro": exc.code,
+                "mensagem": str(exc),
+                "protocolo_suporte": exc.correlation,
+            },
+        ) from None
+    finally:
+        api.close()
+
+
+@router.get("/vendas/{venda_id}/detalhes")
+def detalhes_intnfe_venda(
+    venda_id: int,
+    db: Session = Depends(get_session),
+    user_and_tenant=Depends(get_current_user_and_tenant),
+):
+    """Retorna o documento fiscal usando a venda persistida no CorePet."""
+    _user, tenant_id = user_and_tenant
+    venda = _buscar_venda_para_nfe(db, venda_id, tenant_id)
+    if not venda:
+        raise HTTPException(404, "Venda não encontrada")
+    if venda.nfe_provider != "intnfe" and not venda.nfe_correlation_id:
+        raise HTTPException(404, "Esta venda não possui uma nota da IntNFe")
+    return local_intnfe_details(db, get_tenant(db, tenant_id), venda)
 
 
 @router.get("/vendas/{venda_id}/xml")
