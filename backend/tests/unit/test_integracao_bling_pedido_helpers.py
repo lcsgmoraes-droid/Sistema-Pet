@@ -862,6 +862,75 @@ def test_order_updated_com_nf_autorizada_consolida_venda(
     assert chamadas["processou_nf"]["nf_id"] == "26005873647"
 
 
+def test_order_updated_atendido_sem_nf_consolida_venda_pelo_status(monkeypatch):
+    class FakeQuery:
+        def filter(self, *args, **kwargs):
+            return self
+
+        def all(self):
+            return [item]
+
+    class FakeDB:
+        def query(self, model):
+            return FakeQuery()
+
+    class FakeBling:
+        def consultar_pedido(self, pedido_bling_id):
+            assert pedido_bling_id == "BL-11865"
+            return {
+                "id": pedido_bling_id,
+                "numero": "11865",
+                "situacao": {"id": 9},
+            }
+
+    pedido = SimpleNamespace(
+        id=1355,
+        tenant_id="tenant-1",
+        pedido_bling_id="BL-11865",
+        pedido_bling_numero="11865",
+        status="confirmado",
+        payload={"pedido": {"numeroPedidoLoja": "260328BV6H1XN6"}},
+    )
+    item = SimpleNamespace(sku="018631.1", quantidade=1, vendido_em=None)
+    chamadas = {}
+
+    monkeypatch.setattr(
+        "app.integracao_bling_pedido_routes._set_bling_request_tenant",
+        lambda *args, **kwargs: "tenant-1",
+    )
+    monkeypatch.setattr("app.bling_integration.BlingAPI", lambda: FakeBling())
+    monkeypatch.setattr(
+        "app.integracao_bling_pedido_routes.localizar_pedido_por_bling_id",
+        lambda *args, **kwargs: pedido,
+    )
+    monkeypatch.setattr(
+        "app.integracao_bling_pedido_routes._sincronizar_nf_do_pedido",
+        lambda **kwargs: {},
+    )
+    monkeypatch.setattr(
+        "app.integracao_bling_pedido_routes._processar_nf_autorizada_vinculada_ao_pedido",
+        lambda **kwargs: None,
+    )
+    monkeypatch.setattr(
+        "app.integracao_bling_pedido_routes._confirmar_pedido",
+        lambda **kwargs: chamadas.setdefault("confirmacao", kwargs) or [],
+    )
+
+    resposta = processar_pedido_bling_payload(
+        {
+            "event": "order.updated",
+            "date": "2026-09-16T12:00:00Z",
+            "data": {"id": "BL-11865", "situacao": {"id": 9}},
+        },
+        FakeDB(),
+    )
+
+    assert resposta["acao"] == "confirmado_por_situacao"
+    assert chamadas["confirmacao"]["pedido"] is pedido
+    assert chamadas["confirmacao"]["itens"] == [item]
+    assert chamadas["confirmacao"]["aplicar_baixa_estoque"] is True
+
+
 @pytest.mark.parametrize("situacao_id", [9, 24])
 def test_order_created_com_nf_autorizada_consolida_venda(
     monkeypatch,

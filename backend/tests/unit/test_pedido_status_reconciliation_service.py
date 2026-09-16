@@ -170,6 +170,74 @@ def test_reconciliar_status_com_nf_autorizada_consolida_venda(
     assert chamadas["processou_nf"]["nf_id"] == "26005873647"
 
 
+def test_reconciliar_atendido_ja_confirmado_com_item_pendente_aplica_baixa(
+    monkeypatch,
+):
+    class FakeQuery:
+        def filter(self, *args, **kwargs):
+            return self
+
+        def all(self):
+            return [item]
+
+    class FakeDB:
+        def __init__(self):
+            self.commit_calls = 0
+
+        def query(self, model):
+            return FakeQuery()
+
+        def add(self, obj):
+            return None
+
+        def commit(self):
+            self.commit_calls += 1
+
+    pedido = SimpleNamespace(
+        id=1355,
+        tenant_id="tenant-1",
+        pedido_bling_id="25466770617",
+        pedido_bling_numero="11865",
+        status="confirmado",
+        payload={"pedido": {"numeroPedidoLoja": "260328BV6H1XN6"}},
+    )
+    item = SimpleNamespace(sku="018631.1", quantidade=1, vendido_em=None)
+    chamadas = {}
+
+    monkeypatch.setattr(
+        service,
+        "_consultar_pedido_bling",
+        lambda pedido_bling_id: {
+            "id": pedido_bling_id,
+            "numero": "11865",
+            "situacao": {"id": 9},
+        },
+    )
+    monkeypatch.setattr(
+        "app.integracao_bling_pedido_routes._montar_payload_pedido",
+        lambda **kwargs: pedido.payload,
+    )
+    monkeypatch.setattr(
+        "app.integracao_bling_pedido_routes._sincronizar_nf_do_pedido",
+        lambda **kwargs: {},
+    )
+    monkeypatch.setattr(
+        "app.integracao_bling_pedido_routes._processar_nf_autorizada_vinculada_ao_pedido",
+        lambda **kwargs: None,
+    )
+    monkeypatch.setattr(
+        "app.integracao_bling_pedido_routes._confirmar_pedido",
+        lambda **kwargs: chamadas.setdefault("confirmacao", kwargs) or [],
+    )
+
+    resultado = service.reconciliar_status_pedido_local(FakeDB(), pedido)
+
+    assert resultado["acao"] == "confirmado"
+    assert chamadas["confirmacao"]["pedido"] is pedido
+    assert chamadas["confirmacao"]["itens"] == [item]
+    assert chamadas["confirmacao"]["aplicar_baixa_estoque"] is True
+
+
 def test_reconciliar_pedido_cancelado_continua_acompanhando_nf(monkeypatch):
     class FakeQuery:
         def filter(self, *args, **kwargs):
