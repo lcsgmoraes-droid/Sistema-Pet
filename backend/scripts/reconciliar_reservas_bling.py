@@ -88,8 +88,7 @@ def parse_args() -> argparse.Namespace:
         default=[],
         metavar="SKU",
         help=(
-            "Restringe a reconciliacao aos itens do SKU informado. "
-            "Pode ser repetido."
+            "Restringe a reconciliacao aos itens do SKU informado. Pode ser repetido."
         ),
     )
     parser.add_argument(
@@ -150,7 +149,9 @@ def _parse_preservar_saldos(valores: list[str]) -> dict[str, float]:
 
 
 def _normalizar_skus(valores: list[str]) -> list[str]:
-    return sorted({str(valor or "").strip() for valor in valores if str(valor or "").strip()})
+    return sorted(
+        {str(valor or "").strip() for valor in valores if str(valor or "").strip()}
+    )
 
 
 def _validar_recuperacao_atendidos_sem_nf(
