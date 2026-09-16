@@ -2,17 +2,15 @@ from __future__ import annotations
 
 from datetime import datetime
 from decimal import Decimal, ROUND_HALF_UP
-from typing import Dict, Optional
+from typing import Dict
 
 import requests
 from sqlalchemy.orm import Session
 
 from app.bling_integration_fiscal import (
     _limpar_texto_fiscal,
-    _ncm_basico_aceitavel,
     _ncm_normalizado,
     _resolver_fiscal_item_nfe,
-    _sku_produto,
 )
 from app.bling_integration_parts.core import (
     BLING_NFCE_SERIE_PADRAO,
@@ -30,137 +28,12 @@ class BlingNotasMixin:
         venda,
         tipo_nota: str = "nfce",
         db: Session = None,
-        transmitir: Optional[bool] = None,
+        transmitir: bool | None = None,
     ) -> Dict:
-        """
-        Emite nota fiscal (NF-e ou NFC-e) para uma venda
-
-        Args:
-            venda: Objeto Venda do banco
-            tipo_nota: 'nfe' (modelo 55) ou 'nfce' (modelo 65)
-            db: Sessão do banco
-            transmitir: quando True, envia a nota para SEFAZ logo apos criar no Bling
-
-        Returns:
-            Dados da nota emitida
-        """
-        # Validações básicas
-        if not venda.itens or len(venda.itens) == 0:
-            raise ValueError("Venda não possui itens")
-
-        # Validar dados fiscais dos produtos
-        logger.info("\n=== VALIDANDO DADOS FISCAIS ===")
-        erros_produtos = []
-        for item in venda.itens:
-            produto = item.produto
-            if not produto:
-                erros_produtos.append(f"Item {item.id or ''}: produto nao vinculado")
-                continue
-
-            fiscal_item = _resolver_fiscal_item_nfe(db, venda, item)
-            sku = _sku_produto(produto)
-            logger.info(f"Produto: {produto.nome} (SKU {sku})")
-            logger.info(f"  - NCM: {fiscal_item.get('ncm') or 'NAO CADASTRADO'}")
-            logger.info(f"  - CEST: {fiscal_item.get('cest') or 'NAO CADASTRADO'}")
-            logger.info(
-                f"  - Origem: {fiscal_item.get('origem_mercadoria') or 'NAO CADASTRADO'}"
-            )
-
-            if not _ncm_basico_aceitavel(fiscal_item.get("ncm")):
-                erros_produtos.append(
-                    f"{produto.nome} (SKU {sku}): NCM nao cadastrado ou invalido"
-                )
-            if not fiscal_item.get("origem_mercadoria"):
-                erros_produtos.append(
-                    f"{produto.nome} (SKU {sku}): Origem da mercadoria nao cadastrada"
-                )
-
-        if erros_produtos:
-            raise ValueError(
-                "Produtos sem dados fiscais obrigatórios:\n"
-                + "\n".join(erros_produtos)
-                + "\n\nCadastre NCM e Origem nas informações fiscais do produto antes de emitir NF-e."
-            )
-
-        # Validações por tipo
-        if tipo_nota == "nfe":
-            if not venda.cliente or not (venda.cliente.cpf or venda.cliente.cnpj):
-                raise ValueError("NF-e requer cliente com CPF/CNPJ")
-
-            cpf_cnpj = venda.cliente.cnpj or venda.cliente.cpf
-            cpf_cnpj = "".join(filter(str.isdigit, cpf_cnpj))
-            if len(cpf_cnpj) == 11:
-                raise ValueError(
-                    "NF-e requer CNPJ (empresa). Para pessoa física use NFC-e"
-                )
-
-        # Montar payload
-        payload = self._montar_payload(venda, tipo_nota, db)
-
-        # DEBUG: Mostrar payload completo
-        logger.info("\n=== PAYLOAD ENVIADO PARA BLING ===")
-        import json
-
-        logger.debug(json.dumps(payload, indent=2, ensure_ascii=False))
-        logger.info("=" * 50)
-
-        # Definir endpoint correto conforme tipo de nota
-        # NF-e: /nfe | NFC-e: /nfce
-        endpoint = "/nfce" if tipo_nota == "nfce" else "/nfe"
-        logger.info(f"📡 Endpoint: {endpoint}")
-
-        # Enviar para Bling
-        response = self._request("POST", endpoint, data=payload)
-
-        deve_transmitir = (
-            transmitir
-            if transmitir is not None
-            else self.ambiente in ["homologacao", "producao"]
+        del venda, tipo_nota, db, transmitir
+        raise RuntimeError(
+            "A emissão fiscal pelo Bling foi desativada. Use a emissão direta pela IntNFe."
         )
-
-        # Quando solicitado, enviar para SEFAZ logo apos criar a nota no Bling.
-        if deve_transmitir:
-            nota_id = response.get("data", {}).get("id")
-            if nota_id:
-                logger.info(
-                    f"\n{'⚠️' if self.ambiente == 'homologacao' else '🚨'} Enviando nota #{nota_id} para SEFAZ..."
-                )
-                try:
-                    # O Bling pode arredondar quantidades conforme a conta.
-                    # Preservar o ID criado e bloquear apenas a transmissao.
-                    consulta = self._request("GET", f"{endpoint}/{nota_id}")
-                    nota = consulta.get("data", consulta)
-                    total_bling = nota.get("valorNota")
-                    if total_bling is None or Decimal(str(total_bling)).quantize(
-                        Decimal("0.01"), rounding=ROUND_HALF_UP
-                    ) != Decimal(str(payload["totais"]["valorTotal"])):
-                        raise ValueError(
-                            "O valor da nota no Bling difere do total da venda. "
-                            "Confira a nota e as casas decimais da quantidade "
-                            "nas configuracoes do Bling antes de transmitir."
-                        )
-                    # Endpoint para enviar nota para SEFAZ (mesmo endpoint base)
-                    envio_response = self._request(
-                        "POST", f"{endpoint}/{nota_id}/enviar"
-                    )
-                    logger.info("✅ Nota enviada para SEFAZ!")
-                    logger.info(f"Resposta: {envio_response}")
-                    response["transmissao"] = {
-                        "success": True,
-                        "data": envio_response.get("data", envio_response),
-                    }
-
-                    # Atualizar response com dados do envio
-                    if envio_response.get("data"):
-                        response["data"].update(envio_response.get("data", {}))
-                except Exception as e:
-                    logger.info(f"❌ Erro ao enviar nota para SEFAZ: {e}")
-                    response["transmissao"] = {
-                        "success": False,
-                        "erro": str(e),
-                    }
-
-        return response
 
     def _montar_payload(self, venda, tipo_nota: str, db: Session = None) -> Dict:
         """Monta payload para emissão de nota"""

@@ -269,10 +269,9 @@ def test_catalogo_opcional_falha_dentro_de_savepoint_sem_interromper_validacao(
     assert eventos == ["abriu", ("fechou", RuntimeError)]
 
 
-def test_emitir_nfce_bloqueia_ncm_zerado_antes_de_criar_nota_no_bling(monkeypatch):
+def test_emissao_fiscal_pelo_bling_permanece_bloqueada(monkeypatch):
     api = _make_api()
     venda = _make_venda_nfce()
-    venda.itens[0].produto.ncm = "00000000"
 
     chamadas_bling = []
 
@@ -282,7 +281,7 @@ def test_emitir_nfce_bloqueia_ncm_zerado_antes_de_criar_nota_no_bling(monkeypatc
 
     monkeypatch.setattr(api, "_request", fake_request)
 
-    with pytest.raises(ValueError, match="NCM"):
+    with pytest.raises(RuntimeError, match="IntNFe"):
         api.emitir_nota_fiscal(venda, "nfce")
 
     assert chamadas_bling == []
@@ -628,19 +627,6 @@ def test_payload_arredonda_cada_item_vendido_por_peso():
     assert payload["totais"]["valorTotal"] == 300.0
 
 
-def test_emissao_bloqueia_total_divergente_antes_de_criar_nota(monkeypatch):
-    venda = _make_venda_nfce()
-    venda.total = Decimal("90.00")
-    api = _make_api()
-    chamadas = []
-    monkeypatch.setattr(api, "_request", lambda *a, **kw: chamadas.append((a, kw)))
-
-    with pytest.raises(ValueError, match="difere do total da venda"):
-        api.emitir_nota_fiscal(venda, "nfce")
-
-    assert chamadas == []
-
-
 def test_payload_envia_campos_fiscais_e_endereco_no_formato_bling():
     venda = _make_venda_nfce()
     venda.itens[0].produto.cest = "2200100"
@@ -668,46 +654,3 @@ def test_payload_envia_campos_fiscais_e_endereco_no_formato_bling():
     assert "ncm" not in item
     assert payload["contato"]["endereco"]["endereco"] == "Rua Teste"
     assert "logradouro" not in payload["contato"]["endereco"]
-
-
-@pytest.mark.parametrize("valor_bling", [100.03, None])
-def test_emissao_preserva_id_sem_transmitir_total_bling_divergente(
-    monkeypatch, valor_bling
-):
-    api = _make_api()
-    chamadas = []
-
-    def fake_request(method, endpoint, **kwargs):
-        chamadas.append((method, endpoint))
-        if method == "GET":
-            return {"data": {"valorNota": valor_bling}}
-        return {"data": {"id": 123, "numero": "000043"}}
-
-    monkeypatch.setattr(api, "_request", fake_request)
-    resposta = api.emitir_nota_fiscal(_make_venda_nfce(), "nfce", transmitir=True)
-
-    assert resposta["data"]["id"] == 123
-    assert resposta["transmissao"]["success"] is False
-    assert "difere do total da venda" in resposta["transmissao"]["erro"]
-    assert chamadas == [("POST", "/nfce"), ("GET", "/nfce/123")]
-
-
-def test_emissao_transmite_quando_total_bling_confere(monkeypatch):
-    api = _make_api()
-    chamadas = []
-
-    def fake_request(method, endpoint, **kwargs):
-        chamadas.append((method, endpoint))
-        if method == "GET":
-            return {"data": {"valorNota": 100.0}}
-        return {"data": {"id": 123}}
-
-    monkeypatch.setattr(api, "_request", fake_request)
-    resposta = api.emitir_nota_fiscal(_make_venda_nfce(), "nfce", transmitir=True)
-
-    assert resposta["transmissao"]["success"] is True
-    assert chamadas == [
-        ("POST", "/nfce"),
-        ("GET", "/nfce/123"),
-        ("POST", "/nfce/123/enviar"),
-    ]
