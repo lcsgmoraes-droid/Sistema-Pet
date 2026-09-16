@@ -476,12 +476,16 @@ class IntNFeClient:
         )
 
     def document_danfe(self, token, document_type, correlation_id):
+        path = self._document_path(document_type, correlation_id, "danfe")
+        # A IntNFe oferece PDF somente para NF-e (modelo 55). Para NFC-e,
+        # o documento oficial deste endpoint e o cupom termico em HTML.
+        if document_type == "nfe":
+            path += "?formato=pdf"
         return self._binary_request(
             "GET",
-            self._document_path(document_type, correlation_id, "danfe")
-            + "?formato=pdf",
+            path,
             token=token,
-            accept="application/pdf",
+            accept="application/pdf" if document_type == "nfe" else "text/html",
         )
 
     def cancel_document(self, token, document_type, correlation_id, justification):

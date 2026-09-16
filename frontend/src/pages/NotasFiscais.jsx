@@ -15,6 +15,7 @@ import {
 import api from "../api";
 import CustomerIdentity from "../components/ui/CustomerIdentity";
 import { confirmarCorePet } from "../services/corepetDialog";
+import { metadadosDownloadDanfe } from "../utils/documentoFiscalDownload.mjs";
 
 export default function NotasFiscais() {
   const [notas, setNotas] = useState([]);
@@ -69,10 +70,11 @@ export default function NotasFiscais() {
         responseType: "blob",
       });
 
-      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const download = metadadosDownloadDanfe(response, nota.numero);
+      const url = window.URL.createObjectURL(new Blob([response.data], { type: download.tipo }));
       const link = document.createElement("a");
       link.href = url;
-      link.setAttribute("download", `danfe_${nota.numero}.pdf`);
+      link.setAttribute("download", download.nome);
       document.body.appendChild(link);
       link.click();
       link.remove();

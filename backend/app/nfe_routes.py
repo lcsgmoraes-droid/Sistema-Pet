@@ -587,6 +587,13 @@ def xml_intnfe_venda(
         api.close()
 
 
+def _danfe_response_metadata(venda):
+    is_nfce = venda.nfe_tipo == "nfce" or str(venda.nfe_modelo or "") == "65"
+    if is_nfce:
+        return "text/html", "html"
+    return "application/pdf", "pdf"
+
+
 @router.get("/vendas/{venda_id}/danfe")
 def danfe_intnfe_venda(
     venda_id: int,
@@ -600,10 +607,13 @@ def danfe_intnfe_venda(
     api = _intnfe_client()
     try:
         content = download_intnfe_document(db, venda, api, "danfe")
+        media_type, extension = _danfe_response_metadata(venda)
         return Response(
             content=content,
-            media_type="application/pdf",
-            headers={"Content-Disposition": f'inline; filename="danfe-{venda_id}.pdf"'},
+            media_type=media_type,
+            headers={
+                "Content-Disposition": f'attachment; filename="danfe-{venda_id}.{extension}"'
+            },
         )
     except DirectEmissionError as exc:
         raise _direct_failure(exc) from None

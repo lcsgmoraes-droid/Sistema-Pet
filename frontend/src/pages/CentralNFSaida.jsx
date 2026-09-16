@@ -10,6 +10,7 @@ import {
 } from "./centralNFSaida/centralNFSaidaUtils";
 import { confirmarCorePet } from "../services/corepetDialog";
 import { corrigirEReemitirNota, extrairMensagemNFe } from "../utils/nfeFiscalAssistida";
+import { metadadosDownloadDanfe } from "../utils/documentoFiscalDownload.mjs";
 import NFSaidaCompartilharModal from "./centralNFSaida/NFSaidaCompartilharModal";
 
 function salvarArquivo(blob, nome) {
@@ -170,10 +171,8 @@ export default function CentralNFSaida() {
     setDocumentoEmCurso(String(documentoId));
     try {
       const response = await api.get(endpoint, { responseType: "blob" });
-      salvarArquivo(
-        new Blob([response.data], { type: "application/pdf" }),
-        `danfe_${nota.numero}.pdf`,
-      );
+      const download = metadadosDownloadDanfe(response, nota.numero);
+      salvarArquivo(new Blob([response.data], { type: download.tipo }), download.nome);
     } catch (error) {
       alert(await mensagemDocumento(error, "Erro ao baixar DANFE"));
     } finally {
