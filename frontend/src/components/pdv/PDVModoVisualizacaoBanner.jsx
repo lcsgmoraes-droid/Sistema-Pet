@@ -113,6 +113,7 @@ export default function PDVModoVisualizacaoBanner({
           cliente={vendaAtual.cliente}
           onClose={() => setMostrarSelecaoDocumento(false)}
           onEmitir={emitirNotaVendaFinalizada}
+          vendaId={vendaAtual.id}
         />
       )}
     </>

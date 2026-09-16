@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { FiAlertTriangle, FiCheckCircle, FiPower } from "react-icons/fi";
+import { FiAlertTriangle, FiCheckCircle, FiChevronDown, FiPower } from "react-icons/fi";
 import { currentSequence, formatSequence } from "./intnfeNumeracao.mjs";
 
 function messageFrom(error) {
@@ -69,69 +69,77 @@ function SequenceRadar({ rows, environment, savedConfigurations }) {
   if (!visible.length) return null;
 
   return (
-    <div className="space-y-3">
-      <div>
-        <h3 className="font-bold text-slate-950 dark:text-white">Radar das sequências fiscais</h3>
-        <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
-          Consulte o último número registrado e o próximo número disponível em cada modelo e série.
+    <details className="group rounded-xl border border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-950/40">
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-3 p-4">
+        <div>
+          <h3 className="font-bold text-slate-950 dark:text-white">Radar das sequências fiscais</h3>
+          <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
+            Consulte as {visible.length} séries encontradas no emissor.
+          </p>
+        </div>
+        <FiChevronDown
+          className="shrink-0 text-slate-500 transition-transform group-open:rotate-180"
+          aria-hidden="true"
+        />
+      </summary>
+      <div className="space-y-3 border-t border-slate-200 p-4 dark:border-slate-700">
+        <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-700">
+          <table className="min-w-full divide-y divide-slate-200 text-left text-sm dark:divide-slate-700">
+            <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500 dark:bg-slate-950/50">
+              <tr>
+                <th className="px-4 py-3">Documento</th>
+                <th className="px-4 py-3">Série</th>
+                <th className="px-4 py-3">Início no CorePet</th>
+                <th className="px-4 py-3">Último no emissor</th>
+                <th className="px-4 py-3">Próximo número</th>
+                <th className="px-4 py-3">Uso no CorePet</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100 bg-white dark:divide-slate-800 dark:bg-slate-900">
+              {visible.map((row) => {
+                const saved = savedConfigurations.find(
+                  (item) =>
+                    item.ambiente_codigo === environment &&
+                    item.modelo === row.modelo &&
+                    Number(item.serie) === Number(row.serie),
+                );
+                return (
+                  <tr key={`${row.modelo}:${row.serie}`}>
+                    <td className="whitespace-nowrap px-4 py-3 font-semibold">
+                      {row.modelo === 65 ? "NFC-e" : "NF-e"} · modelo {row.modelo}
+                    </td>
+                    <td className="whitespace-nowrap px-4 py-3">{row.serie.padStart(3, "0")}</td>
+                    <td className="whitespace-nowrap px-4 py-3">
+                      {saved ? formatSequence(saved.numero_inicial) : "—"}
+                    </td>
+                    <td className="whitespace-nowrap px-4 py-3 font-semibold">
+                      {formatSequence(row.ultimoNumero)}
+                    </td>
+                    <td className="whitespace-nowrap px-4 py-3 font-semibold">
+                      {formatSequence(row.proximoNumero)}
+                    </td>
+                    <td className="whitespace-nowrap px-4 py-3">
+                      {saved ? (
+                        <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-bold text-emerald-900">
+                          Escolhida no CorePet
+                        </span>
+                      ) : (
+                        <span className="text-slate-500">Disponível</span>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+        <p className="text-xs text-slate-500">
+          O número é controlado separadamente por ambiente, modelo e série. A sequência só pode
+          avançar. Este é o número fiscal da NF-e ou NFC-e; não é o NSU da SEFAZ nem o NSU de uma
+          transação de cartão.
         </p>
       </div>
-      <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-700">
-        <table className="min-w-full divide-y divide-slate-200 text-left text-sm dark:divide-slate-700">
-          <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500 dark:bg-slate-950/50">
-            <tr>
-              <th className="px-4 py-3">Documento</th>
-              <th className="px-4 py-3">Série</th>
-              <th className="px-4 py-3">Início no CorePet</th>
-              <th className="px-4 py-3">Último no emissor</th>
-              <th className="px-4 py-3">Próximo número</th>
-              <th className="px-4 py-3">Uso no CorePet</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100 bg-white dark:divide-slate-800 dark:bg-slate-900">
-            {visible.map((row) => {
-              const saved = savedConfigurations.find(
-                (item) =>
-                  item.ambiente_codigo === environment &&
-                  item.modelo === row.modelo &&
-                  Number(item.serie) === Number(row.serie),
-              );
-              return (
-                <tr key={`${row.modelo}:${row.serie}`}>
-                  <td className="whitespace-nowrap px-4 py-3 font-semibold">
-                    {row.modelo === 65 ? "NFC-e" : "NF-e"} · modelo {row.modelo}
-                  </td>
-                  <td className="whitespace-nowrap px-4 py-3">{row.serie.padStart(3, "0")}</td>
-                  <td className="whitespace-nowrap px-4 py-3">
-                    {saved ? formatSequence(saved.numero_inicial) : "—"}
-                  </td>
-                  <td className="whitespace-nowrap px-4 py-3 font-semibold">
-                    {formatSequence(row.ultimoNumero)}
-                  </td>
-                  <td className="whitespace-nowrap px-4 py-3 font-semibold">
-                    {formatSequence(row.proximoNumero)}
-                  </td>
-                  <td className="whitespace-nowrap px-4 py-3">
-                    {saved ? (
-                      <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-bold text-emerald-900">
-                        Escolhida no CorePet
-                      </span>
-                    ) : (
-                      <span className="text-slate-500">Disponível</span>
-                    )}
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-      <p className="text-xs text-slate-500">
-        O número é controlado separadamente por ambiente, modelo e série. A sequência só pode
-        avançar. Este é o número fiscal da NF-e ou NFC-e; não é o NSU da SEFAZ nem o NSU de uma
-        transação de cartão.
-      </p>
-    </div>
+    </details>
   );
 }
 

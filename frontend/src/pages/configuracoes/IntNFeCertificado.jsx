@@ -109,13 +109,50 @@ export default function IntNFeCertificado({
 
   const locked = busy || disabled;
   const valid = ["valido", "expirando"].includes(state?.situacao);
+  const certificateForm = (
+    <form ref={formRef} onSubmit={upload} className="space-y-4">
+      <div className="grid gap-4 sm:grid-cols-2">
+        <label className="text-sm font-semibold">
+          Arquivo do certificado
+          <input
+            type="file"
+            accept=".pfx,.p12,application/x-pkcs12"
+            required
+            disabled={locked}
+            className={fieldClass}
+            onChange={(event) => setFile(event.target.files?.[0] || null)}
+          />
+        </label>
+        <label className="text-sm font-semibold">
+          Senha do certificado
+          <input
+            type="password"
+            value={password}
+            required
+            maxLength={1024}
+            autoComplete="new-password"
+            disabled={locked}
+            className={fieldClass}
+            onChange={(event) => setPassword(event.target.value)}
+          />
+        </label>
+      </div>
+      <button type="submit" disabled={locked} className={`${buttonClass} bg-blue-600 text-white`}>
+        <FiUploadCloud aria-hidden="true" />
+        {busy ? "Enviando…" : state?.tem_certificado ? "Substituir A1" : "Enviar A1"}
+      </button>
+      <p className="text-sm text-slate-500 dark:text-slate-400">
+        O A1 deve pertencer ao mesmo CNPJ da empresa. A senha é usada somente durante o envio.
+      </p>
+    </form>
+  );
 
   return (
     <section
       aria-busy={locked}
       className="space-y-5 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7 dark:border-slate-700 dark:bg-slate-900"
     >
-      <header className="flex flex-wrap items-start justify-between gap-3">
+      <header>
         <div className="flex items-start gap-3">
           <FiShield className="mt-1 h-7 w-7 text-blue-600" aria-hidden="true" />
           <div>
@@ -123,17 +160,12 @@ export default function IntNFeCertificado({
               Certificado digital A1
             </h2>
             <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
-              Envie o arquivo .pfx ou .p12 aqui. A senha é usada somente durante o envio.
+              {valid
+                ? "Este é o certificado usado na emissão de notas."
+                : "Envie o arquivo .pfx ou .p12 para liberar a emissão."}
             </p>
           </div>
         </div>
-        <span
-          className={`rounded-full px-3 py-1 text-xs font-semibold ${
-            valid ? "bg-emerald-100 text-emerald-900" : "bg-amber-100 text-amber-900"
-          }`}
-        >
-          {valid ? "A1 válido" : "A1 pendente"}
-        </span>
       </header>
 
       {error && (
@@ -155,76 +187,47 @@ export default function IntNFeCertificado({
 
       {state && (
         <div
-          className={`rounded-xl border p-4 text-sm ${
+          className={`flex flex-wrap items-center justify-between gap-3 rounded-xl border p-4 text-sm ${
             state.alerta_vencimento
               ? "border-amber-300 bg-amber-50 text-amber-950"
               : "border-emerald-200 bg-emerald-50 text-emerald-950"
           }`}
         >
-          <p className="font-semibold">{state.mensagem}</p>
-          {state.valido_ate && (
-            <p className="mt-1">
-              Validade: {new Date(state.valido_ate).toLocaleDateString("pt-BR")}
-              {Number.isInteger(state.dias_para_expirar)
-                ? ` · ${Math.max(state.dias_para_expirar, 0)} dia(s)`
-                : ""}
-            </p>
-          )}
-        </div>
-      )}
-
-      <form ref={formRef} onSubmit={upload} className="space-y-4">
-        <div className="grid gap-4 sm:grid-cols-2">
-          <label className="text-sm font-semibold">
-            Arquivo do certificado
-            <input
-              type="file"
-              accept=".pfx,.p12,application/x-pkcs12"
-              required
-              disabled={locked}
-              className={fieldClass}
-              onChange={(event) => setFile(event.target.files?.[0] || null)}
-            />
-          </label>
-          <label className="text-sm font-semibold">
-            Senha do certificado
-            <input
-              type="password"
-              value={password}
-              required
-              maxLength={1024}
-              autoComplete="new-password"
-              disabled={locked}
-              className={fieldClass}
-              onChange={(event) => setPassword(event.target.value)}
-            />
-          </label>
-        </div>
-        <div className="flex flex-wrap gap-3">
-          <button
-            type="submit"
-            disabled={locked}
-            className={`${buttonClass} bg-blue-600 text-white`}
-          >
-            <FiUploadCloud aria-hidden="true" />
-            {busy ? "Enviando…" : state?.tem_certificado ? "Substituir A1" : "Enviar A1"}
-          </button>
+          <div>
+            <p className="font-semibold">{state.mensagem}</p>
+            {state.valido_ate && (
+              <p className="mt-1">
+                Validade: {new Date(state.valido_ate).toLocaleDateString("pt-BR")}
+                {Number.isInteger(state.dias_para_expirar)
+                  ? ` · ${Math.max(state.dias_para_expirar, 0)} dia(s)`
+                  : ""}
+              </p>
+            )}
+          </div>
           <button
             type="button"
             disabled={locked}
             onClick={load}
-            className={`${buttonClass} border border-slate-300`}
+            className={`${buttonClass} border border-current bg-white/70`}
           >
             <FiRefreshCw aria-hidden="true" />
-            Consultar situação
+            Atualizar
           </button>
         </div>
-      </form>
+      )}
 
-      <p className="border-t border-slate-100 pt-4 text-sm text-slate-500 dark:border-slate-800 dark:text-slate-400">
-        O A1 deve pertencer ao mesmo CNPJ da empresa. O CorePet não exibe nem guarda a senha no
-        formulário depois do envio.
-      </p>
+      {valid ? (
+        <details className="rounded-xl border border-slate-200 p-4 dark:border-slate-700">
+          <summary className="cursor-pointer font-semibold text-slate-700 dark:text-slate-200">
+            Substituir certificado
+          </summary>
+          <div className="mt-4 border-t border-slate-100 pt-4 dark:border-slate-800">
+            {certificateForm}
+          </div>
+        </details>
+      ) : (
+        certificateForm
+      )}
     </section>
   );
 }

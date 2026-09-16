@@ -34,10 +34,6 @@ function SequenceCard({
     modelo: String(model),
     ambiente_codigo: String(environment),
   });
-  const visible =
-    rows
-      ?.filter((row) => row.modelo === model && row.ambienteCodigo === environment)
-      .sort((a, b) => Number(a.serie) - Number(b.serie)) ?? [];
   const reviewing = review?.model === model;
   const choicePersisted = Boolean(
     savedConfiguration && Number(savedConfiguration.serie) === Number(form.serie),
@@ -149,29 +145,6 @@ function SequenceCard({
           </span>
         </span>
       </label>
-
-      {visible.length ? (
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-            Séries já registradas neste ambiente
-          </p>
-          <div className="mt-2 flex flex-wrap gap-2">
-            {visible.map((row) => (
-              <button
-                key={row.serie}
-                type="button"
-                disabled={busy || reviewing}
-                onClick={() =>
-                  onChange(model, { serie: String(Number(row.serie)), proximo_numero: "" })
-                }
-                className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm hover:border-blue-300 dark:border-slate-700 dark:bg-slate-900"
-              >
-                Série {row.serie.padStart(3, "0")} · próxima {formatSequence(row.proximoNumero)}
-              </button>
-            ))}
-          </div>
-        </div>
-      ) : null}
 
       {!reviewing ? (
         <div className="flex flex-wrap items-center gap-3">
