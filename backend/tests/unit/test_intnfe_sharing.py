@@ -8,12 +8,13 @@ from app.intnfe.sharing import extrair_link_publico_nfce
 
 
 LINK_SEFAZ = "https://www.nfce.fazenda.sp.gov.br/qrcode?p=chave|2|1|token"
+CHAVE_NFE_TESTE = "3" * 44
 
 
 def _xml_nfce(link=LINK_SEFAZ):
     return f"""<?xml version="1.0" encoding="UTF-8"?>
     <nfeProc xmlns="http://www.portalfiscal.inf.br/nfe">
-      <NFe><infNFe Id="NFe{'3' * 44}"><ide><mod>65</mod></ide></infNFe>
+      <NFe><infNFe Id="NFe{CHAVE_NFE_TESTE}"><ide><mod>65</mod></ide></infNFe>
         <infNFeSupl><qrCode><![CDATA[{link}]]></qrCode></infNFeSupl>
       </NFe>
     </nfeProc>"""
