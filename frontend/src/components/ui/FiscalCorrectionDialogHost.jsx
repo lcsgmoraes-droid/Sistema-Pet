@@ -116,6 +116,7 @@ function agruparPendencias(validacao) {
       id: item.produto_id,
       nome: item.produto_nome || `Produto ${item.produto_id}`,
       sku: item.sku,
+      codigo_barras: item.codigo_barras,
       tipo: item.produto_tipo,
       pendencias: [],
     };

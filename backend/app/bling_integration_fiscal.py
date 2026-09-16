@@ -523,6 +523,7 @@ def prevalidar_produtos_fiscais_venda(
             "produto_nome": produto.nome,
             "produto_tipo": getattr(produto, "tipo_produto", None),
             "sku": sku,
+            "codigo_barras": getattr(produto, "codigo_barras", None),
         }
         ncm_atual = _ncm_normalizado(fiscal_item.get("ncm"))
         origem_atual = _limpar_texto_fiscal(fiscal_item.get("origem_mercadoria"))
