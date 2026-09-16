@@ -3,13 +3,15 @@ import json
 from datetime import date, datetime, timezone
 from types import SimpleNamespace
 
+import pytest
+
+import app.financeiro_models  # noqa: F401 - completa o registry ORM
 import app.produtos_models  # noqa: F401 - completa o registry ORM antes dos construtores
 from app.billing_models import BillingContractAcceptance, BillingOffer
 from app.models import AssinaturaModulo, Tenant
 from app.services import billing_offer_service as service
 from app.services.asaas_billing_service import apply_payment_event
 from app.services.billing_contract_service import ContractAcceptanceContext
-
 
 TENANT_ID = "4c48c5c9-bf40-49a8-b323-7b8fb8b3dc8f"
 
@@ -104,6 +106,13 @@ class _Session:
 
 
 def _offer(**overrides):
+    commercial_terms = service.build_offer_commercial_terms(
+        scope_summary="Plano e módulos exibidos na proposta.",
+        implementation_summary="Implantação acompanhada, sem migração ampla de dados.",
+        exclusions_summary="Não inclui equipamentos nem desenvolvimento exclusivo.",
+        support_channel="E-mail contratual",
+        custom_work_summary=None,
+    )
     values = {
         "offer_id": "aa48c5c9-bf40-49a8-b323-7b8fb8b3dc90",
         "tenant_reference": TENANT_ID,
@@ -116,6 +125,7 @@ def _offer(**overrides):
         "billing_type": "UNDEFINED",
         "first_due_date": date(2026, 8, 17),
         "extra_modules_json": '["veterinario"]',
+        "commercial_terms_json": json.dumps(commercial_terms, ensure_ascii=False),
         "status": "ready",
         "payment_status": None,
         "expires_at": datetime(2026, 9, 15, tzinfo=timezone.utc),
@@ -150,6 +160,11 @@ def test_cria_proposta_de_300_reais_para_pet_venda_ativa():
         first_due_date=date.today(),
         billing_type="UNDEFINED",
         extra_modules=[],
+        scope_summary="Plano Pet Venda Ativa com os módulos exibidos.",
+        implementation_summary="Implantação acompanhada, sem migração ampla de dados.",
+        exclusions_summary="Não inclui equipamentos nem desenvolvimento exclusivo.",
+        support_channel="E-mail contratual",
+        custom_work_summary=None,
     )
 
     assert offer.plan_code == "pet-venda-ativa"
@@ -157,6 +172,10 @@ def test_cria_proposta_de_300_reais_para_pet_venda_ativa():
     assert offer.created_by_platform_admin_id == 9
     assert offer.created_by_user_id is None
     assert json.loads(offer.extra_modules_json) == []
+    assert (
+        json.loads(offer.commercial_terms_json)["support"]["contractual_sla_included"]
+        is False
+    )
     assert offer.token_sha256 == hashlib.sha256(token.encode()).hexdigest()
     assert len(token) >= 32
     assert db.added == [offer]
@@ -205,10 +224,59 @@ def test_aceite_publico_preserva_preco_personalizado_e_modulo_extra(monkeypatch)
     assert acceptance.price_cents == 49_700
     assert acceptance.billing_offer_id == offer.offer_id
     assert snapshot["offer"]["extra_modules"] == ["veterinario"]
+    assert snapshot["offer"]["commercial_terms"]["scope_summary"]
+    assert (
+        snapshot["offer"]["commercial_terms"]["support"]["contractual_sla_included"]
+        is False
+    )
     assert snapshot["representative"]["role"] == "Proprietaria"
     assert tenant.plan == "pet-start"
     assert result["checkout_url"] == "https://sandbox.asaas.com/i/test"
     assert db.commits == 1
+
+
+def test_proposta_antiga_sem_condicoes_comerciais_exige_novo_link():
+    tenant = _tenant()
+    offer = _offer(commercial_terms_json="{}")
+
+    with pytest.raises(
+        service.BillingOfferError,
+        match="criada sem as condições comerciais atuais",
+    ):
+        service.accept_billing_offer(
+            _Session(tenant=tenant, offers=[offer]),
+            offer=offer,
+            tenant=tenant,
+            representative_name="Maria Cliente",
+            representative_email="maria@cliente.test",
+            representative_role="Proprietaria",
+            context=ContractAcceptanceContext(channel="public_offer"),
+        )
+
+
+def test_proposta_com_condicoes_incompletas_exige_novo_link():
+    tenant = _tenant()
+    offer = _offer(
+        commercial_terms_json=json.dumps(
+            {"version": service.COMMERCIAL_TERMS_VERSION},
+        )
+    )
+
+    assert service.offer_to_public(offer, tenant)["commercial_terms"] is None
+
+    with pytest.raises(
+        service.BillingOfferError,
+        match="criada sem as condições comerciais atuais",
+    ):
+        service.accept_billing_offer(
+            _Session(tenant=tenant, offers=[offer]),
+            offer=offer,
+            tenant=tenant,
+            representative_name="Maria Cliente",
+            representative_email="maria@cliente.test",
+            representative_role="Proprietaria",
+            context=ContractAcceptanceContext(channel="public_offer"),
+        )
 
 
 def test_pagamento_confirmado_ativa_plano_e_extra(monkeypatch):

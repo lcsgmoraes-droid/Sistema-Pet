@@ -6,6 +6,7 @@ import hashlib
 import json
 from dataclasses import dataclass
 from datetime import date, datetime, timezone
+from typing import Any
 from uuid import UUID, uuid4
 
 from sqlalchemy.orm import Session
@@ -14,22 +15,24 @@ from app.billing_models import BillingContractAcceptance
 from app.models import Tenant, User
 from app.services.plan_catalog import PlanDefinition
 
-
-CONTRACT_VERSION = "2026-08-14-01"
+CONTRACT_VERSION = "2026-09-14-02"
 CONTRACT_DOCUMENT_SHA256 = (
-    "827819d29b30bf7b6a14a6c5f659cf5b0da475311dba6845c846570fb15e70a8"
+    "591557963e446eca1a55e46dba0337ddf95373aa2f0660c6d88cb2142e5aa44e"
 )
-TERMS_VERSION = "termos-2026-08-14"
-PRIVACY_VERSION = "privacidade-2026-08-14"
+TERMS_VERSION = "termos-2026-09-14"
+PRIVACY_VERSION = "privacidade-2026-09-14"
 CONTRACT_URL = "/contrato-assinatura"
 TERMS_URL = "/termos"
 PRIVACY_URL = "/privacidade"
 ACCEPTANCE_TEXT = (
-    "Li e aceito o Resumo da Contratação, o Contrato de Assinatura CorePet, "
-    "os Termos de Uso e a Política de Privacidade. Confirmo o plano, o valor, "
-    "o ciclo e o primeiro vencimento exibidos e autorizo a cobrança "
-    "correspondente. Declaro que tenho poderes para representar a empresa "
-    "cadastrada."
+    "Li e aceito o Resumo da Contratação, o Contrato de Assinatura CorePet e os "
+    "Termos de Uso. Declaro que tive "
+    "acesso e estou ciente da Política de Privacidade. Confirmo o plano, o "
+    "valor, o ciclo e o primeiro vencimento exibidos. Quando houver proposta "
+    "específica, confirmo também seu escopo, exclusões, implantação, suporte e "
+    "a informação sobre ausência ou existência de SLA. Autorizo a cobrança "
+    "correspondente e declaro que tenho "
+    "poderes para representar a empresa cadastrada."
 )
 
 
@@ -81,6 +84,7 @@ def build_contract_acceptance(
     plan_name: str | None = None,
     billing_offer_id: str | None = None,
     extra_modules: list[str] | tuple[str, ...] = (),
+    commercial_terms: dict[str, Any] | None = None,
     representative_role: str = "Administrador",
 ) -> BillingContractAcceptance:
     accepted_at = datetime.now(timezone.utc)
@@ -120,6 +124,7 @@ def build_contract_acceptance(
             "price_cents": price_cents if price_cents is not None else plan.price_cents,
             "billing_offer_id": billing_offer_id,
             "extra_modules": sorted(set(extra_modules)),
+            "commercial_terms": commercial_terms or {},
             "provider": "asaas",
             "provider_environment": provider_environment,
             "provider_subscription_id": provider_subscription_id,
