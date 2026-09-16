@@ -52,6 +52,7 @@ export const BanhoTosaPage = lazy(() => import("../pages/banhoTosa/BanhoTosaPage
 
 export const preloadPDV = () => import("../pages/PDV");
 export const PDV = lazy(preloadPDV);
+export const OrcamentosGrupo = lazy(() => import("../pages/orcamentosGrupo/OrcamentosGrupoPage"));
 export const MeusCaixas = lazy(() => import("../pages/MeusCaixas"));
 export const AlertasGestor = lazy(() => import("../pages/AlertasGestor"));
 export const NFEntrada = lazy(() => import("../pages/NFEntrada"));

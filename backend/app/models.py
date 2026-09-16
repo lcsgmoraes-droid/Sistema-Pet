@@ -37,6 +37,13 @@ import sqlalchemy as sa
 
 
 from app.models_operacionais import ConfiguracaoEntrega, CreditoLog, FeatureFlag
+from app.orcamentos_grupo_models import (
+    OrcamentoGrupo,
+    OrcamentoGrupoConfiguracao,
+    OrcamentoGrupoCotacao,
+    OrcamentoGrupoEmpresa,
+    OrcamentoGrupoItem,
+)
 from app.models_authz import (
     AppAccessProfile,
     PessoaMergeLog,
