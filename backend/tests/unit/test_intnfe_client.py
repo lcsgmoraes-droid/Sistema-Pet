@@ -76,6 +76,30 @@ def test_bad_request_is_reported_as_invalid_data(api):
     assert not error.value.uncertain
 
 
+def test_nfce_validation_errors_are_available_without_exposing_personal_data(api):
+    api.session.request.return_value = response(
+        422,
+        {
+            "erros": [
+                "CFOP 6102 não é permitido para NFC-e do CPF 52998224725.",
+                "Revise cliente@example.com antes de transmitir.",
+                "CSC: segredo-super-secreto e chave 12345678901234567890123456789012345678901234.",
+            ]
+        },
+    )
+
+    with pytest.raises(IntNFeError) as error:
+        api.issue_document("token", "nfce", {}, "chave-teste")
+
+    assert error.value.validation_errors == [
+        "CFOP 6102 não é permitido para NFC-e do CPF [dado oculto].",
+        "Revise [e-mail oculto] antes de transmitir.",
+        "CSC: [dado oculto] e chave [dado oculto].",
+    ]
+    assert "52998224725" not in str(error.value)
+    assert "cliente@example.com" not in str(error.value)
+
+
 def test_timeout_or_invalid_success_response_is_uncertain_for_creation(api):
     api.session.request.side_effect = requests.Timeout("mensagem-privada")
     with pytest.raises(IntNFeError) as error:

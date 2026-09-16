@@ -51,6 +51,16 @@ assert.match(
   /solicitarCorrecaoFiscal/,
   "assistente fiscal deve abrir a correcao guiada antes de emitir",
 );
+assert.match(
+  source,
+  /validacaoFiscalDoErro/,
+  "assistente fiscal deve aproveitar pendencias detalhadas devolvidas pelo emissor",
+);
+assert.match(
+  source,
+  /tentativaEnvio < 3/,
+  "assistente fiscal deve retentar com limite depois da correcao no caixa",
+);
 
 const correctionDialog = readFileSync(
   resolve(__dirname, "../src/components/ui/FiscalCorrectionDialogHost.jsx"),

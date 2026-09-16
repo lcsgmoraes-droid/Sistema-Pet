@@ -77,6 +77,15 @@ function erroComValidacaoFiscal(validacao) {
   return error;
 }
 
+function validacaoFiscalDoErro(error) {
+  const detail = error?.response?.data?.detail;
+  const validacao = detail?.validacao;
+  if (!validacao || typeof validacao !== "object") return null;
+  const temPendencias =
+    (validacao.bloqueios || []).length > 0 || (validacao.correcoes || []).length > 0;
+  return temPendencias ? validacao : null;
+}
+
 function resumoIntNFe(resumo) {
   const linhas = [
     `${resumo.modelo === 55 ? "NF-e" : "NFC-e"} em ${resumo.ambiente}, série ${resumo.serie}`,
@@ -85,7 +94,7 @@ function resumoIntNFe(resumo) {
       .replace(".", ",")}`,
     `Itens: ${resumo.itens?.length || 0}`,
   ];
-  const destinatario = resumo.destinatario?.razaoSocial;
+  const destinatario = resumo.destinatario?.razaoSocial || resumo.destinatario?.nome;
   if (destinatario) linhas.push(`Destinatário: ${destinatario}`);
   if (resumo.ambiente_codigo === 1) {
     linhas.unshift("ATENÇÃO: esta confirmação transmitirá uma nota fiscal real.", "");
@@ -161,17 +170,35 @@ export async function emitirNotaFiscalAssistida({
     if (!confirmed) return { cancelado: true, validacao };
   }
 
-  const { data: initialData } = await api.post("/nfe/emitir", {
-    venda_id: vendaId,
-    tipo_nota: tipoNota,
-    transmitir: true,
-    autorizar_correcoes_fiscais: false,
-  });
-  const data =
-    initialData?.provedor === "intnfe" ? await acompanharIntNFe(vendaId, initialData) : initialData;
-  if (data?.provedor === "intnfe" && !data.success && !data.processando) {
-    throw erroRejeicaoIntNFe(vendaId, data);
+  for (let tentativaEnvio = 0; tentativaEnvio < 3; tentativaEnvio += 1) {
+    try {
+      const { data: initialData } = await api.post("/nfe/emitir", {
+        venda_id: vendaId,
+        tipo_nota: tipoNota,
+        transmitir: true,
+        autorizar_correcoes_fiscais: false,
+      });
+      const data =
+        initialData?.provedor === "intnfe"
+          ? await acompanharIntNFe(vendaId, initialData)
+          : initialData;
+      if (data?.provedor === "intnfe" && !data.success && !data.processando) {
+        throw erroRejeicaoIntNFe(vendaId, data);
+      }
+      return { data, validacao, correcoesAutorizadas: false };
+    } catch (error) {
+      const validacaoProvedor = validacaoFiscalDoErro(error);
+      if (!validacaoProvedor) throw error;
+
+      const corrigido = await solicitarCorrecaoFiscal({
+        validacao: validacaoProvedor,
+        vendaId,
+        tipoNota,
+      });
+      if (!corrigido) return { cancelado: true, validacao: validacaoProvedor };
+      validacao = validacaoProvedor;
+    }
   }
 
-  return { data, validacao, correcoesAutorizadas: false };
+  throw erroComValidacaoFiscal(validacao);
 }

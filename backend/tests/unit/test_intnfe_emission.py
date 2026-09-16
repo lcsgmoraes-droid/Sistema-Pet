@@ -164,20 +164,42 @@ def test_counter_nfce_does_not_require_recipient_address():
     sale.cliente.estado = None
     sale.cliente.cep = None
 
-    consumer = emission.build_payload(None, tenant, connection, sale, "nfce")[
-        "consumidor"
-    ]
+    payload = emission.build_payload(None, tenant, connection, sale, "nfce")
+    consumer = payload["consumidor"]
 
     assert consumer["cpf"] == "52998224725"
+    assert consumer["nome"].startswith("NF-E EMITIDA")
     assert "endereco" not in consumer
+    assert "razaoSocial" not in consumer
+    assert "indicadorIe" not in consumer
+    assert payload["produtos"][0]["cfop"] == "5102"
+    assert "frete" not in payload
+    assert "documentosReferenciados" not in payload
 
 
-def test_delivery_nfce_requires_recipient_address():
+def test_nfce_with_delivery_fee_requires_nfe():
     tenant, connection, sale = _objects()
-    sale.cliente.endereco = None
 
-    with pytest.raises(emission.DirectEmissionError, match="Complete endereço"):
+    with pytest.raises(emission.DirectEmissionError, match="não aceita frete"):
         emission.build_payload(None, tenant, connection, sale, "nfce")
+
+
+def test_delivery_nfce_without_fee_requires_identity_but_not_address():
+    tenant, connection, sale = _objects()
+    sale.taxa_entrega = "0.00"
+    sale.total = "18.00"
+    sale.pagamentos[0].valor = "18.00"
+    sale.cliente.endereco = None
+    sale.cliente.numero = None
+    sale.cliente.bairro = None
+    sale.cliente.cidade = None
+    sale.cliente.codigo_municipio = None
+    sale.cliente.estado = None
+
+    payload = emission.build_payload(None, tenant, connection, sale, "nfce")
+
+    assert payload["consumidor"]["cpf"] == "52998224725"
+    assert payload["produtos"][0]["cfop"] == "5102"
 
 
 def test_delivery_nfce_requires_identified_recipient():
@@ -237,6 +259,34 @@ def test_interstate_sale_uses_interstate_cfop():
         ]
         == "6102"
     )
+
+
+def test_nfce_for_customer_from_another_state_stays_internal():
+    tenant, connection, sale = _objects()
+    sale.tem_entrega = False
+    sale.taxa_entrega = "0.00"
+    sale.total = "18.00"
+    sale.pagamentos[0].valor = "18.00"
+    sale.cliente.estado = "RJ"
+    sale.cliente.cidade = "Rio de Janeiro"
+    sale.cliente.codigo_municipio = "3304557"
+
+    payload = emission.build_payload(None, tenant, connection, sale, "nfce")
+
+    assert payload["produtos"][0]["cfop"] == "5102"
+    assert "endereco" not in payload["consumidor"]
+
+
+def test_provider_validation_maps_single_product_tax_fields():
+    _tenant, _connection, sale = _objects()
+
+    validation = emission._provider_validation(
+        sale,
+        ["CFOP do produto é inválido.", "CST do PIS é obrigatório."],
+    )
+
+    assert [item["campo"] for item in validation["bloqueios"]] == ["cfop", "pis_cst"]
+    assert all(item["produto_id"] == 9 for item in validation["bloqueios"])
 
 
 def test_multiple_recorded_fifo_lots_block_direct_emission():

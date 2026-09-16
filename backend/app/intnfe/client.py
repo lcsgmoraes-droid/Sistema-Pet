@@ -12,7 +12,15 @@ BASE_URL = "https://api.intnfe.com.br"
 
 
 class IntNFeError(Exception):
-    def __init__(self, code, *, status=None, correlation=None, uncertain=False):
+    def __init__(
+        self,
+        code,
+        *,
+        status=None,
+        correlation=None,
+        uncertain=False,
+        validation_errors=None,
+    ):
         super().__init__(code)
         self.code = code
         self.status = status
@@ -22,6 +30,35 @@ class IntNFeError(Exception):
             else None
         )
         self.uncertain = uncertain
+        self.validation_errors = list(validation_errors or [])
+
+
+def _safe_validation_errors(payload):
+    """Extrai somente mensagens curtas de validação e oculta dados identificáveis."""
+    if not isinstance(payload, dict) or not isinstance(payload.get("erros"), list):
+        return []
+
+    safe = []
+    for raw in payload["erros"][:12]:
+        if not isinstance(raw, str):
+            continue
+        message = re.sub(r"[\x00-\x1f\x7f]+", " ", raw).strip()
+        if not message:
+            continue
+        message = re.sub(r"(?<!\d)\d{11,}(?!\d)", "[dado oculto]", message)
+        message = re.sub(
+            r"[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}",
+            "[e-mail oculto]",
+            message,
+            flags=re.IGNORECASE,
+        )
+        message = re.sub(
+            r"(?i)\b(token|secret|segredo|senha|csc)\b\s*[:=]\s*\S+",
+            r"\1: [dado oculto]",
+            message,
+        )
+        safe.append(message[:320])
+    return safe
 
 
 def available() -> bool:
@@ -81,6 +118,10 @@ class IntNFeClient:
         correlation = response.headers.get("X-Correlation-Id")
         if not 200 <= response.status_code < 300:
             # Nunca repassar mensagens/corpos externos que possam conter segredos.
+            try:
+                error = response.json()
+            except ValueError:
+                error = None
             code = {
                 400: "DadosInvalidos",
                 401: "CredenciaisInvalidas",
@@ -91,20 +132,12 @@ class IntNFeClient:
                 429: "LimiteDeRequisicoes",
             }.get(response.status_code, "EmissorIndisponivel")
             if response.status_code == 422 and path.endswith("/numeracao"):
-                try:
-                    error = response.json()
-                except ValueError:
-                    error = None
                 if (
                     isinstance(error, dict)
                     and error.get("erro") == "NumeracaoRetrocede"
                 ):
                     code = "NumeracaoRetrocede"
             if response.status_code == 422 and path.endswith("/certificado"):
-                try:
-                    error = response.json()
-                except ValueError:
-                    error = None
                 remote_code = error.get("erro") if isinstance(error, dict) else None
                 if remote_code in {
                     "DadosInvalidos",
@@ -114,10 +147,6 @@ class IntNFeClient:
                 }:
                     code = remote_code
             if path.startswith(("/nfe", "/nfce")):
-                try:
-                    error = response.json()
-                except ValueError:
-                    error = None
                 remote_code = error.get("erro") if isinstance(error, dict) else None
                 if isinstance(remote_code, str) and re.fullmatch(
                     r"[A-Za-z][A-Za-z0-9_-]{1,79}", remote_code
@@ -132,6 +161,11 @@ class IntNFeClient:
                     response.status_code >= 500
                     or response.status_code == 408
                     or 300 <= response.status_code < 400
+                ),
+                validation_errors=(
+                    _safe_validation_errors(error)
+                    if path.startswith(("/nfe", "/nfce"))
+                    else None
                 ),
             )
         if expect_empty:
