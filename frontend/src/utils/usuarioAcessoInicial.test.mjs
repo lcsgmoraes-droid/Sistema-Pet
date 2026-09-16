@@ -6,12 +6,17 @@ import {
 } from "./usuarioAcessoInicial.js";
 
 assert.equal(
-  resolveTenantLoginReference({ tenant: { name: " Pet Feliz Demo " } }),
-  "Pet Feliz Demo",
+  resolveTenantLoginReference({
+    tenant: { name: "Pet Feliz Demo", login_name: " Acesso Pet Feliz " },
+  }),
+  "Acesso Pet Feliz",
 );
 assert.equal(
-  resolveTenantLoginReference(null, JSON.stringify({ name: "Loja do Bairro" })),
-  "Loja do Bairro",
+  resolveTenantLoginReference(
+    null,
+    JSON.stringify({ name: "Loja do Bairro", login_name: "Equipe Bairro" }),
+  ),
+  "Equipe Bairro",
 );
 assert.equal(resolveTenantLoginReference(null, { nome: "Pet Center" }), "Pet Center");
 assert.equal(resolveTenantLoginReference(null, "nao-e-json"), "");

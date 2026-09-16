@@ -41,7 +41,12 @@ from app.services.auth_security import (
 from app.services.default_roles_service import create_default_roles_for_new_tenant
 from app.services.tenant_onboarding_service import onboard_tenant_defaults
 from app.services.plan_catalog import resolve_signup_selection
-from app.tenant_identity import normalize_tenant_name
+from app.services.tenant_login_name_service import (
+    TenantLoginNameError,
+    get_primary_tenant_login_name_value,
+    resolve_tenant_id_by_login_name,
+    set_primary_tenant_login_name,
+)
 from app.session_manager import create_session
 from app.tenancy.context import clear_tenant_context, set_tenant_context
 from app.tenancy.rls import (
@@ -56,12 +61,9 @@ router = APIRouter()
 
 
 def _tenant_reference_filters(tenant_reference: str):
-    """Build a safe tenant lookup for both names/slugs and UUID identifiers."""
+    """Build a safe tenant lookup for slugs and UUID identifiers."""
     reference = str(tenant_reference or "").strip()
-    filters = [
-        func.lower(Tenant.ecommerce_slug) == reference.lower(),
-        Tenant.name_normalized == normalize_tenant_name(reference),
-    ]
+    filters = [func.lower(Tenant.ecommerce_slug) == reference.lower()]
 
     try:
         uuid.UUID(reference)
@@ -70,6 +72,29 @@ def _tenant_reference_filters(tenant_reference: str):
 
     filters.append(Tenant.id == reference)
     return filters
+
+
+def _resolve_tenant_reference(db: Session, tenant_reference: str) -> Tenant | None:
+    tenant_id = resolve_tenant_id_by_login_name(db, tenant_reference)
+    if tenant_id:
+        return db.query(Tenant).filter(Tenant.id == str(tenant_id)).first()
+
+    return (
+        db.query(Tenant)
+        .filter(or_(*_tenant_reference_filters(tenant_reference)))
+        .first()
+    )
+
+
+def _tenant_payload(db: Session, tenant: Tenant, role_id: int) -> dict:
+    return {
+        "id": str(tenant.id),
+        "name": tenant.name,
+        "login_name": get_primary_tenant_login_name_value(
+            db, tenant.id, fallback=tenant.name
+        ),
+        "role_id": role_id,
+    }
 
 
 @router.post("/register", response_model=LoginResponse)
@@ -82,7 +107,8 @@ def register(
     - **email**: Email unico
     - **password**: Senha (min 8 caracteres)
     - **nome**: Nome do usuario (opcional)
-    - **nome_loja**: Nome da loja/empresa (opcional)
+    - **nome_loja**: Nome fantasia da loja/empresa (opcional)
+    - **nome_acesso**: Nome unico usado no login dos colaboradores (opcional para clientes antigos)
     """
     email = payload.email.strip().lower()
 
@@ -119,16 +145,7 @@ def register(
 
     tenant_name = payload.nome_loja or f"Loja de {payload.nome or email}"
     tenant_name = tenant_name.strip()
-    tenant_name_normalized = normalize_tenant_name(tenant_name)
-    if (
-        db.query(Tenant)
-        .filter(Tenant.name_normalized == tenant_name_normalized)
-        .first()
-    ):
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Ja existe uma loja com este nome. Escolha um nome diferente.",
-        )
+    tenant_login_name = payload.nome_acesso or tenant_name
 
     tenant_id = uuid.uuid4()
     trial_started_at = _now_utc()
@@ -146,11 +163,19 @@ def register(
     db.add(tenant)
     try:
         db.flush()
+        login_name_change = set_primary_tenant_login_name(
+            db,
+            tenant_id,
+            tenant_login_name,
+        )
+    except TenantLoginNameError as exc:
+        db.rollback()
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
     except IntegrityError as exc:
         db.rollback()
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="Ja existe uma loja com este nome. Escolha um nome diferente.",
+            detail="Este nome de acesso ja esta em uso por outra empresa.",
         ) from exc
 
     set_tenant_context(tenant_id)
@@ -247,7 +272,12 @@ def register(
     clear_tenant_context()
 
     tenants_payload = [
-        {"id": str(tenant_id), "name": tenant.name, "role_id": admin_role.id}
+        {
+            "id": str(tenant_id),
+            "name": tenant.name,
+            "login_name": login_name_change.new_name,
+            "role_id": admin_role.id,
+        }
     ]
 
     if email_verification_required:
@@ -314,11 +344,7 @@ def login_multitenant(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Para entrar com nome de usuario, informe a loja.",
             )
-        tenant = (
-            db.query(Tenant)
-            .filter(or_(*_tenant_reference_filters(tenant_reference)))
-            .first()
-        )
+        tenant = _resolve_tenant_reference(db, tenant_reference)
         if not tenant:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
@@ -398,9 +424,7 @@ def login_multitenant(
     for ut in user_tenants:
         tenant = db.query(Tenant).filter(Tenant.id == str(ut.tenant_id)).first()
         if tenant:
-            tenants_list.append(
-                {"id": str(tenant.id), "name": tenant.name, "role_id": ut.role_id}
-            )
+            tenants_list.append(_tenant_payload(db, tenant, ut.role_id))
 
     return LoginResponse(
         **_auth_payload(access_token, refresh_token),

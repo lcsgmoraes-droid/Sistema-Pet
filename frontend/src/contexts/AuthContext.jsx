@@ -53,6 +53,39 @@ export const AuthProvider = ({ children }) => {
     initAuth();
   }, []);
 
+  useEffect(() => {
+    const handleTenantLoginNameUpdated = (event) => {
+      const loginName = String(event?.detail?.loginName || "").trim();
+      if (!loginName) return;
+
+      setUser((currentUser) => {
+        if (!currentUser?.tenant) return currentUser;
+        const updatedUser = {
+          ...currentUser,
+          tenant: { ...currentUser.tenant, login_name: loginName },
+        };
+        localStorage.setItem("user", JSON.stringify(updatedUser));
+        return updatedUser;
+      });
+
+      try {
+        const selectedTenant = JSON.parse(localStorage.getItem("selectedTenant") || "null");
+        if (selectedTenant?.id) {
+          localStorage.setItem(
+            "selectedTenant",
+            JSON.stringify({ ...selectedTenant, login_name: loginName }),
+          );
+        }
+      } catch {
+        localStorage.removeItem("selectedTenant");
+      }
+    };
+
+    globalThis.addEventListener("tenant-login-name-updated", handleTenantLoginNameUpdated);
+    return () =>
+      globalThis.removeEventListener("tenant-login-name-updated", handleTenantLoginNameUpdated);
+  }, []);
+
   const fetchUser = async () => {
     try {
       const response = await api.get("/auth/me-multitenant");
@@ -207,6 +240,7 @@ export const AuthProvider = ({ children }) => {
     password,
     nome,
     nome_loja,
+    nome_acesso,
     plan = "basico",
     organization_type = "petshop",
     accepted_terms,
@@ -218,6 +252,7 @@ export const AuthProvider = ({ children }) => {
         password,
         nome,
         nome_loja,
+        nome_acesso,
         plan,
         organization_type,
         accepted_terms,

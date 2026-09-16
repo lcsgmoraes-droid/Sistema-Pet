@@ -1,12 +1,21 @@
 export function resolveTenantLoginReference(user, selectedTenantRaw = null) {
-  const sessionTenant = String(user?.tenant?.name || "").trim();
+  const sessionTenant = String(
+    user?.tenant?.login_name || user?.tenant?.nome_acesso || user?.tenant?.name || "",
+  ).trim();
   if (sessionTenant) return sessionTenant;
 
   try {
     const selectedTenant =
       typeof selectedTenantRaw === "string" ? JSON.parse(selectedTenantRaw) : selectedTenantRaw;
 
-    return String(selectedTenant?.name || selectedTenant?.nome || selectedTenant?.id || "").trim();
+    return String(
+      selectedTenant?.login_name ||
+        selectedTenant?.nome_acesso ||
+        selectedTenant?.name ||
+        selectedTenant?.nome ||
+        selectedTenant?.id ||
+        "",
+    ).trim();
   } catch {
     return "";
   }

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import toast from "react-hot-toast";
-import { FiChevronLeft, FiCreditCard, FiSave, FiSliders, FiUsers } from "react-icons/fi";
+import { FiChevronLeft, FiCreditCard, FiKey, FiSave, FiSliders, FiUsers } from "react-icons/fi";
 import api from "../../api";
 import {
   getGuiaAtiva,
@@ -11,6 +11,7 @@ import {
 } from "../../utils/guiaHighlight";
 
 const DEFAULT_FORM = {
+  nome_acesso: "",
   visao_comercial: "venda",
   margem_saudavel_minima: 30,
   margem_alerta_minima: 15,
@@ -105,6 +106,12 @@ export default function ConfiguracaoGeralNegocio() {
   };
 
   const salvar = async () => {
+    const nomeAcesso = String(form.nome_acesso || "").trim();
+    if (nomeAcesso.length < 3) {
+      toast.error("O nome de acesso deve ter pelo menos 3 caracteres");
+      return;
+    }
+
     if (form.margem_alerta_minima < 0 || form.margem_saudavel_minima < 0) {
       toast.error("Margens nao podem ser negativas");
       return;
@@ -127,7 +134,8 @@ export default function ConfiguracaoGeralNegocio() {
 
     setSalvando(true);
     try {
-      await api.put("/empresa/config/", {
+      const response = await api.put("/empresa/config/", {
+        nome_acesso: nomeAcesso,
         visao_comercial: form.visao_comercial,
         margem_saudavel_minima: Number(form.margem_saudavel_minima),
         margem_alerta_minima: Number(form.margem_alerta_minima),
@@ -144,6 +152,13 @@ export default function ConfiguracaoGeralNegocio() {
         alerta_estoque_percentual: Number(form.alerta_estoque_percentual),
         dias_produto_parado: Number(form.dias_produto_parado),
       });
+      const nomeAcessoSalvo = String(response.data?.nome_acesso || nomeAcesso).trim();
+      setForm((current) => ({ ...current, nome_acesso: nomeAcessoSalvo }));
+      globalThis.dispatchEvent(
+        new CustomEvent("tenant-login-name-updated", {
+          detail: { loginName: nomeAcessoSalvo },
+        }),
+      );
       toast.success("Configuracoes gerais salvas com sucesso");
       globalThis.dispatchEvent(new Event("visao-comercial-atualizada"));
     } catch (error) {
@@ -193,6 +208,38 @@ export default function ConfiguracaoGeralNegocio() {
           Etapa da introducao guiada ativa. Os campos importantes desta etapa estao destacados.
         </div>
       )}
+
+      <div className="rounded-lg bg-white p-6 shadow-md">
+        <h2 className="flex items-center gap-2 text-xl font-semibold text-gray-800">
+          <FiKey /> Nome de acesso da loja
+        </h2>
+        <p className="mt-2 text-sm leading-relaxed text-gray-600">
+          Este e o nome que os colaboradores informam junto com o nome de usuario para entrar no
+          sistema. Ele e independente do nome fantasia e deve ser unico em todo o CorePet.
+        </p>
+        <div className="mt-4 max-w-xl">
+          <label
+            htmlFor="nome-acesso-loja"
+            className="mb-1 block text-sm font-medium text-gray-700"
+          >
+            Nome de acesso
+          </label>
+          <input
+            id="nome-acesso-loja"
+            type="text"
+            minLength={3}
+            maxLength={120}
+            value={form.nome_acesso}
+            onChange={(event) => onChange("nome_acesso", event.target.value)}
+            className={campoClass("nome_acesso")}
+            placeholder="Ex: Vira Latas"
+          />
+          <p className="mt-2 text-xs leading-relaxed text-gray-500">
+            Ao alterar, o nome anterior continua funcionando como alias para nao interromper o
+            acesso de quem ainda usa as credenciais antigas.
+          </p>
+        </div>
+      </div>
 
       <fieldset className="rounded-lg bg-white p-6 shadow-md">
         <legend className="sr-only">Visão padrão dos indicadores comerciais</legend>
