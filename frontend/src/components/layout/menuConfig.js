@@ -21,7 +21,11 @@ import {
 } from "react-icons/fi";
 import { applyLayoutMenuStructure } from "./menuStructure.js";
 
-export function createLayoutMenuItems({ lembretesCount = 0, convitesGruposCount = 0 } = {}) {
+export function createLayoutMenuItems({
+  lembretesCount = 0,
+  convitesGruposCount = 0,
+  orcamentosGrupoAtivo = false,
+} = {}) {
   const items = [
     {
       path: "/alertas-gestor",
@@ -251,6 +255,17 @@ export function createLayoutMenuItems({ lembretesCount = 0, convitesGruposCount 
       label: "PDV (Vendas)",
       permission: "vendas.criar",
     },
+    ...(orcamentosGrupoAtivo
+      ? [
+          {
+            path: "/orcamentos-grupo",
+            icon: FiFileText,
+            iconKey: "file-text",
+            label: "Orçamentos",
+            permission: "vendas.criar",
+          },
+        ]
+      : []),
     {
       path: "/campanhas",
       icon: FiGift,
