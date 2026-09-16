@@ -83,6 +83,16 @@ def parse_args() -> argparse.Namespace:
         help="Limita a quantidade de pedidos analisados.",
     )
     parser.add_argument(
+        "--sku",
+        action="append",
+        default=[],
+        metavar="SKU",
+        help=(
+            "Restringe a reconciliacao aos itens do SKU informado. "
+            "Pode ser repetido."
+        ),
+    )
+    parser.add_argument(
         "--preservar-saldo",
         action="append",
         default=[],
@@ -98,6 +108,14 @@ def parse_args() -> argparse.Namespace:
         help=(
             "Consulta no Bling os pedidos pendentes sem NF autorizada local "
             "antes de planejar a conciliacao."
+        ),
+    )
+    parser.add_argument(
+        "--incluir-atendidos-sem-nf",
+        action="store_true",
+        help=(
+            "Inclui pedidos Atendidos no Bling sem NF vinculada. Exige "
+            "--atualizar-do-bling, --sku e saldo preservado para cada SKU."
         ),
     )
     parser.add_argument(
@@ -131,6 +149,37 @@ def _parse_preservar_saldos(valores: list[str]) -> dict[str, float]:
     return saldos
 
 
+def _normalizar_skus(valores: list[str]) -> list[str]:
+    return sorted({str(valor or "").strip() for valor in valores if str(valor or "").strip()})
+
+
+def _validar_recuperacao_atendidos_sem_nf(
+    *,
+    incluir_atendidos_sem_nf: bool,
+    atualizar_do_bling: bool,
+    skus: list[str],
+    saldos_esperados: dict[str, float],
+) -> None:
+    if not incluir_atendidos_sem_nf:
+        return
+    if not atualizar_do_bling:
+        raise ValueError(
+            "--incluir-atendidos-sem-nf exige --atualizar-do-bling para validar "
+            "o status remoto imediatamente antes da reconciliacao."
+        )
+    if not skus:
+        raise ValueError(
+            "--incluir-atendidos-sem-nf exige ao menos um --sku para impedir "
+            "uma reconciliacao ampla acidental."
+        )
+    sem_saldo_preservado = [sku for sku in skus if sku not in saldos_esperados]
+    if sem_saldo_preservado:
+        raise ValueError(
+            "--incluir-atendidos-sem-nf exige --preservar-saldo para cada SKU: "
+            + ", ".join(sem_saldo_preservado)
+        )
+
+
 def _carregar_produtos_preservados(
     db,
     tenant_id,
@@ -159,8 +208,9 @@ def _carregar_referencias_pendentes_sem_nf_autorizada(
     db,
     tenant_id,
     limite: int | None,
+    skus: list[str] | None = None,
 ) -> list[dict[str, Any]]:
-    pedidos = (
+    query = (
         db.query(PedidoIntegrado)
         .join(
             PedidoIntegradoItem,
@@ -174,7 +224,11 @@ def _carregar_referencias_pendentes_sem_nf_autorizada(
             PedidoIntegrado.pedido_bling_id.isnot(None),
             PedidoIntegrado.status.in_(("aberto", "confirmado", "expirado")),
         )
-        .distinct()
+    )
+    if skus:
+        query = query.filter(PedidoIntegradoItem.sku.in_(skus))
+    pedidos = (
+        query.distinct()
         .order_by(PedidoIntegrado.criado_em.asc(), PedidoIntegrado.id.asc())
         .all()
     )
@@ -320,12 +374,14 @@ def _atualizar_pendencias_do_bling(
     *,
     tenant_id,
     limite: int | None,
+    skus: list[str] | None,
     aplicar: bool,
 ) -> dict[str, Any]:
     referencias = _carregar_referencias_pendentes_sem_nf_autorizada(
         db,
         tenant_id,
         limite,
+        skus,
     )
     snapshots = _consultar_referencias_no_bling(referencias)
     contagem_classificacao = Counter(
@@ -373,7 +429,23 @@ def _atualizar_pendencias_do_bling(
     }
 
 
-def _carregar_pedidos_e_itens_ativos(db, tenant_id, limite: int | None):
+def _pedido_atendido_no_payload(pedido: PedidoIntegrado) -> bool:
+    payload = pedido.payload if isinstance(pedido.payload, dict) else {}
+    pedido_payload = (
+        payload.get("pedido") if isinstance(payload.get("pedido"), dict) else payload
+    )
+    situacao = _situacao_codigo_bling(pedido_payload.get("situacao"))
+    return bool(situacao and situacao in _SITUACOES_PEDIDO_ATENDIDO)
+
+
+def _carregar_pedidos_e_itens_ativos(
+    db,
+    tenant_id,
+    limite: int | None,
+    *,
+    skus: list[str] | None = None,
+    incluir_atendidos_sem_nf: bool = False,
+):
     query = (
         db.query(PedidoIntegrado, PedidoIntegradoItem)
         .join(
@@ -388,11 +460,19 @@ def _carregar_pedidos_e_itens_ativos(db, tenant_id, limite: int | None):
         )
         .order_by(PedidoIntegrado.criado_em.asc(), PedidoIntegrado.id.asc())
     )
+    if skus:
+        query = query.filter(PedidoIntegradoItem.sku.in_(skus))
     linhas = query.all()
 
     agrupados: dict[int, dict[str, Any]] = {}
     for pedido, item in linhas:
-        if not _nf_contexto_autorizado(_ultima_nf(pedido.payload)):
+        possui_nf_autorizada = _nf_contexto_autorizado(_ultima_nf(pedido.payload))
+        pedido_atendido_sem_nf = (
+            incluir_atendidos_sem_nf
+            and not possui_nf_autorizada
+            and _pedido_atendido_no_payload(pedido)
+        )
+        if not possui_nf_autorizada and not pedido_atendido_sem_nf:
             continue
         bucket = agrupados.setdefault(
             int(pedido.id),
@@ -654,7 +734,13 @@ def _documentar_saida_ja_absorvida_por_balanco(
     ultimo_balanco: datetime | None,
 ) -> EstoqueMovimentacao:
     saldo_atual = float(produto.estoque_atual or 0)
-    documento = nf_numero or nf_bling_id
+    documento = (
+        nf_numero
+        or nf_bling_id
+        or _texto(pedido.pedido_bling_numero)
+        or _texto(pedido.pedido_bling_id)
+    )
+    origem = f"NF {documento}" if (nf_numero or nf_bling_id) else f"pedido {documento}"
     movimento = EstoqueMovimentacao(
         tenant_id=pedido.tenant_id,
         produto_id=produto.id,
@@ -670,7 +756,7 @@ def _documentar_saida_ja_absorvida_por_balanco(
         referencia_tipo="pedido_integrado",
         status="confirmado",
         observacao=(
-            f"Venda da NF {documento or 'sem numero'} documentada sem nova baixa: "
+            f"Venda do {origem} documentada sem nova baixa: "
             "o saldo fisico ja foi consolidado por balanco posterior"
             + (
                 f" em {ultimo_balanco.isoformat()}"
@@ -800,6 +886,7 @@ def _aplicar_planos(
             )
             continue
         try:
+            possui_nf = bool(plano["nf_numero"] or plano["nf_bling_id"])
             for acao in plano["acoes"]:
                 nome_acao = acao["acao"]
                 if nome_acao == "existente_legado":
@@ -841,13 +928,20 @@ def _aplicar_planos(
             registrar_evento(
                 tenant_id=tenant_id,
                 source="manutencao",
-                event_type="reservas.reconciliadas",
+                event_type=(
+                    "reservas.reconciliadas"
+                    if possui_nf
+                    else "reservas.reconciliadas_status_atendido"
+                ),
                 entity_type="pedido",
                 status="ok",
                 severity="info",
                 message=(
                     "Reserva reconciliada com NF autorizada e protecao de "
                     "balancos fisicos posteriores."
+                    if possui_nf
+                    else "Reserva legada reconciliada para pedido Atendido no "
+                    "Bling, preservando o saldo fisico consolidado."
                 ),
                 pedido_integrado_id=pedido.id,
                 pedido_bling_id=pedido.pedido_bling_id,
@@ -869,6 +963,9 @@ def _aplicar_planos(
                 resolution_note=(
                     "Reserva e estoque reconciliados considerando balancos "
                     "fisicos posteriores."
+                    if possui_nf
+                    else "Reserva legada liberada para pedido Atendido no Bling; "
+                    "saldo fisico preservado."
                 ),
             )
             for preservado in produtos_preservados.values():
@@ -903,6 +1000,13 @@ def executar(args: argparse.Namespace) -> dict[str, Any]:
         )
     tenant_id = UUID(str(args.tenant_id))
     saldos_esperados = _parse_preservar_saldos(args.preservar_saldo)
+    skus = _normalizar_skus(args.sku)
+    _validar_recuperacao_atendidos_sem_nf(
+        incluir_atendidos_sem_nf=args.incluir_atendidos_sem_nf,
+        atualizar_do_bling=args.atualizar_do_bling,
+        skus=skus,
+        saldos_esperados=saldos_esperados,
+    )
     if args.apply and args.confirmar != CONFIRMACAO_APLICACAO:
         raise ValueError(f"Para aplicar, informe --confirmar {CONFIRMACAO_APLICACAO}.")
 
@@ -920,12 +1024,15 @@ def executar(args: argparse.Namespace) -> dict[str, Any]:
                     db,
                     tenant_id=tenant_id,
                     limite=args.limite,
+                    skus=skus,
                     aplicar=args.apply,
                 )
             pedidos = _carregar_pedidos_e_itens_ativos(
                 db,
                 tenant_id,
                 args.limite,
+                skus=skus,
+                incluir_atendidos_sem_nf=args.incluir_atendidos_sem_nf,
             )
             ultimos_balancos = _ultimos_balancos_por_produto(db, tenant_id)
             cache_componentes: dict[int, list[ProdutoKitComponente]] = {}
@@ -945,6 +1052,8 @@ def executar(args: argparse.Namespace) -> dict[str, Any]:
             resultado = {
                 "modo": "apply" if args.apply else "dry_run",
                 "tenant_id": str(tenant_id),
+                "skus_filtrados": skus,
+                "incluiu_atendidos_sem_nf": args.incluir_atendidos_sem_nf,
                 "saldos_preservados": {
                     item["sku"]: item["saldo_esperado"]
                     for item in produtos_preservados.values()
