@@ -24,8 +24,10 @@ def extrair_link_publico_nfce(xml: str | bytes) -> str:
 
     url = urlsplit(link)
     host = (url.hostname or "").lower().rstrip(".")
-    if url.scheme != "https" or not host or not (
-        host == "gov.br" or host.endswith(".gov.br")
+    if (
+        url.scheme != "https"
+        or not host
+        or not (host == "gov.br" or host.endswith(".gov.br"))
     ):
         raise ValueError("O link de consulta da NFC-e não pertence à SEFAZ.")
 
