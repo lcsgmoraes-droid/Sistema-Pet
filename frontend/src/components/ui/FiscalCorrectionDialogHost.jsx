@@ -69,6 +69,37 @@ const OPCOES_PIS_COFINS = [
   ["99", "99 - Outras operações"],
 ];
 
+const CONFIANCA = {
+  alta: {
+    rotulo: "Alta confiança",
+    classe: "bg-emerald-100 text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-200",
+  },
+  media: {
+    rotulo: "Média confiança",
+    classe: "bg-amber-100 text-amber-800 dark:bg-amber-500/15 dark:text-amber-200",
+  },
+  baixa: {
+    rotulo: "Baixa confiança",
+    classe: "bg-rose-100 text-rose-800 dark:bg-rose-500/15 dark:text-rose-200",
+  },
+};
+
+const FONTES_SUGESTAO = {
+  catalogo_fiscal: "catálogo fiscal do CorePet",
+  configuracao_fiscal_da_empresa: "configuração fiscal da empresa",
+  xml_ou_cadastro_do_produto_e_regime_da_empresa: "XML/cadastro do produto e regime da empresa",
+  regime_da_empresa_sem_historico_do_produto: "regime da empresa; sem histórico deste produto",
+  regime_da_empresa_sem_padrao_configurado: "regime da empresa; sem padrão fiscal configurado",
+  historico_de_produtos_semelhantes: "produtos semelhantes já cadastrados",
+  palavras_da_descricao: "descrição do produto",
+  correcao_de_codigo_incompleto: "correção de código fiscal incompleto",
+  padrao_operacional_sem_origem_informada: "padrão operacional; origem não comprovada",
+};
+
+function fonteLegivel(fonte) {
+  return FONTES_SUGESTAO[fonte] || String(fonte || "fonte não identificada").replaceAll("_", " ");
+}
+
 function agruparPendencias(validacao) {
   const itens = [...(validacao?.bloqueios || []), ...(validacao?.correcoes || [])];
   const produtos = new Map();
@@ -132,6 +163,12 @@ export default function FiscalCorrectionDialogHost() {
   const temSugestoes = agrupado.produtos.some((produto) =>
     produto.pendencias.some((item) => item.valor_sugerido),
   );
+  const temSugestoesAutomaticas = agrupado.produtos.some((produto) =>
+    produto.pendencias.some(
+      (item) => item.valor_sugerido && item.preenchimento_automatico === true,
+    ),
+  );
+  const contextoFiscal = dialogo?.validacao?.contexto_fiscal || {};
 
   useEffect(() => {
     if (!dialogo) return undefined;
@@ -180,7 +217,9 @@ export default function FiscalCorrectionDialogHost() {
         const chave = String(produto.id);
         const fiscal = { ...(proximos[chave] || {}) };
         produto.pendencias.forEach((item) => {
-          if (item.valor_sugerido) fiscal[item.campo] = item.valor_sugerido;
+          if (item.valor_sugerido && item.preenchimento_automatico === true) {
+            fiscal[item.campo] = item.valor_sugerido;
+          }
         });
         proximos[chave] = fiscal;
       });
@@ -272,23 +311,40 @@ export default function FiscalCorrectionDialogHost() {
             </div>
           )}
 
+          {!carregando && (contextoFiscal.regime_tributario || contextoFiscal.uf) && (
+            <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-200">
+              <p className="font-semibold">
+                Contexto identificado: {contextoFiscal.regime_tributario || "regime não informado"}
+                {contextoFiscal.uf ? ` · ${contextoFiscal.uf}` : ""}
+              </p>
+              <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-slate-400">
+                O CorePet já usa o regime e o estado nas sugestões. A confirmação ainda é necessária
+                quando o cadastro e o histórico do produto não mostram se há ST, isenção ou outro
+                tratamento específico.
+              </p>
+            </div>
+          )}
+
           {!carregando && temSugestoes && (
             <div className="flex flex-col gap-3 rounded-xl border border-cyan-200 bg-cyan-50 p-4 sm:flex-row sm:items-center sm:justify-between dark:border-cyan-800 dark:bg-cyan-950/30">
               <div>
                 <p className="font-semibold text-cyan-900 dark:text-cyan-100">
-                  O CorePet encontrou sugestões para alguns campos
+                  O CorePet encontrou possíveis respostas para alguns campos
                 </p>
                 <p className="mt-1 text-sm text-cyan-800 dark:text-cyan-200">
-                  Revise os valores sugeridos antes de salvar.
+                  Cada sugestão mostra a fonte e a confiança. Valores de baixa confiança só são
+                  usados quando você escolher explicitamente.
                 </p>
               </div>
-              <button
-                type="button"
-                onClick={preencherSugestoes}
-                className="inline-flex items-center justify-center gap-2 rounded-xl bg-cyan-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-cyan-800"
-              >
-                <Sparkles className="h-4 w-4" /> Preencher sugestões
-              </button>
+              {temSugestoesAutomaticas && (
+                <button
+                  type="button"
+                  onClick={preencherSugestoes}
+                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-cyan-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-cyan-800"
+                >
+                  <Sparkles className="h-4 w-4" /> Preencher sugestões confiáveis
+                </button>
+              )}
             </div>
           )}
 
@@ -312,18 +368,29 @@ export default function FiscalCorrectionDialogHost() {
                     {produto.pendencias.map((item) => {
                       const campo = CAMPOS[item.campo];
                       const opcoes = campo.tipo === "pis-cofins" ? OPCOES_PIS_COFINS : campo.opcoes;
+                      const confianca = CONFIANCA[item.confianca];
+                      const campoId = `fiscal-${produto.id}-${item.campo}`;
                       return (
-                        <label key={item.campo} className="block">
-                          <span className="mb-1.5 flex items-center gap-2 text-sm font-medium text-slate-700 dark:text-slate-200">
+                        <div key={item.campo} className="block">
+                          <label
+                            htmlFor={campoId}
+                            className="mb-1.5 flex flex-wrap items-center gap-2 text-sm font-medium text-slate-700 dark:text-slate-200"
+                          >
                             {campo.rotulo}
-                            {item.valor_sugerido && (
-                              <span className="rounded-full bg-cyan-100 px-2 py-0.5 text-[11px] font-semibold text-cyan-800">
-                                sugestão disponível
+                            {confianca && (
+                              <span
+                                className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${confianca.classe}`}
+                              >
+                                {confianca.rotulo}
+                                {item.confianca_percentual
+                                  ? ` · ${item.confianca_percentual}%`
+                                  : ""}
                               </span>
                             )}
-                          </span>
+                          </label>
                           {campo.tipo === "select" || campo.tipo === "pis-cofins" ? (
                             <select
+                              id={campoId}
                               value={fiscal[item.campo] || ""}
                               onChange={(event) =>
                                 atualizarCampo(String(produto.id), item.campo, event.target.value)
@@ -339,6 +406,7 @@ export default function FiscalCorrectionDialogHost() {
                             </select>
                           ) : (
                             <input
+                              id={campoId}
                               value={fiscal[item.campo] || ""}
                               inputMode="numeric"
                               maxLength={campo.tamanho}
@@ -353,10 +421,37 @@ export default function FiscalCorrectionDialogHost() {
                               className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-cyan-600 focus:ring-2 focus:ring-cyan-600/20 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
                             />
                           )}
-                          <span className="mt-1.5 block text-xs leading-5 text-slate-500">
-                            {item.valor_sugerido ? item.motivo : item.mensagem}
-                          </span>
-                        </label>
+                          {item.valor_sugerido ? (
+                            <div className="mt-2 rounded-lg border border-slate-200 bg-slate-50 p-2.5 text-xs leading-5 text-slate-600 dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-300">
+                              <div className="flex flex-wrap items-center justify-between gap-2">
+                                <p>
+                                  Sugestão: <strong>{item.valor_sugerido}</strong>
+                                </p>
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    atualizarCampo(
+                                      String(produto.id),
+                                      item.campo,
+                                      item.valor_sugerido,
+                                    )
+                                  }
+                                  className="rounded-lg border border-cyan-300 bg-white px-2.5 py-1 font-semibold text-cyan-800 hover:bg-cyan-50 dark:border-cyan-700 dark:bg-slate-900 dark:text-cyan-200"
+                                >
+                                  Usar esta sugestão
+                                </button>
+                              </div>
+                              <p className="mt-1">{item.motivo}</p>
+                              <p className="mt-1 font-medium text-slate-500 dark:text-slate-400">
+                                Fonte: {fonteLegivel(item.fonte_sugestao)}.
+                              </p>
+                            </div>
+                          ) : (
+                            <span className="mt-1.5 block text-xs leading-5 text-slate-500">
+                              {item.mensagem}
+                            </span>
+                          )}
+                        </div>
                       );
                     })}
                   </div>

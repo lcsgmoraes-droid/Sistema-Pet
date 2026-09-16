@@ -215,6 +215,10 @@ _NCM_SUBSTITUICOES_SEGURAS = {
     "42010000": {
         "valor": "42010090",
         "motivo": "4201.00.00 e um codigo de familia; para guias, coleiras e enforcadores de outros materiais o subitem usual e 4201.00.90.",
+        "fonte_sugestao": "correcao_de_codigo_incompleto",
+        "confianca": "alta",
+        "confianca_percentual": 95,
+        "preenchimento_automatico": True,
     },
 }
 
@@ -271,7 +275,7 @@ def _texto_busca_produto(value) -> str:
 
 def _sugerir_ncm_por_historico(
     db: Session, tenant_id, produto
-) -> Optional[Dict[str, str]]:
+) -> Optional[Dict[str, object]]:
     if db is None or tenant_id is None or produto is None:
         return None
 
@@ -305,15 +309,39 @@ def _sugerir_ncm_por_historico(
         return None
 
     ncm, ocorrencias = Counter(ncms).most_common(1)[0]
+    total = len(ncms)
+    consenso = ocorrencias / total
+    nome_escopo = _texto_busca_produto(
+        getattr(getattr(produto, "categoria", None), "nome", "")
+        or getattr(getattr(produto, "departamento", None), "nome", "")
+    )
+    escopo_generico = any(
+        termo in nome_escopo for termo in ("diversos", "outros", "geral")
+    )
+
+    if ocorrencias >= 5 and consenso >= 0.8 and not escopo_generico:
+        confianca, percentual = "alta", 90
+    elif ocorrencias >= 3 and consenso >= 0.7 and not escopo_generico:
+        confianca, percentual = "media", 72
+    else:
+        confianca, percentual = "baixa", min(55, 30 + ocorrencias * 8)
+
     return {
         "valor": ncm,
-        "motivo": f"NCM mais usado em produtos parecidos cadastrados ({ocorrencias} ocorrencia(s)).",
+        "motivo": (
+            f"Encontrado em {ocorrencias} de {total} produto(s) do mesmo grupo. "
+            "A classificacao deve ser conferida pela descricao e composicao do item."
+        ),
+        "fonte_sugestao": "historico_de_produtos_semelhantes",
+        "confianca": confianca,
+        "confianca_percentual": percentual,
+        "preenchimento_automatico": confianca == "alta",
     }
 
 
 def _sugerir_ncm(
     produto, fiscal_item: Dict[str, Optional[str]], db: Session, tenant_id
-) -> Optional[Dict[str, str]]:
+) -> Optional[Dict[str, object]]:
     ncm_atual = _ncm_normalizado(fiscal_item.get("ncm"))
     if ncm_atual in _NCM_SUBSTITUICOES_SEGURAS:
         return _NCM_SUBSTITUICOES_SEGURAS[ncm_atual]
@@ -325,7 +353,14 @@ def _sugerir_ncm(
     nome = _texto_busca_produto(getattr(produto, "nome", ""))
     for termos, ncm, motivo in _NCM_POR_TERMO_PRODUTO:
         if any(_texto_busca_produto(termo) in nome for termo in termos):
-            return {"valor": ncm, "motivo": motivo}
+            return {
+                "valor": ncm,
+                "motivo": motivo,
+                "fonte_sugestao": "palavras_da_descricao",
+                "confianca": "baixa",
+                "confianca_percentual": 45,
+                "preenchimento_automatico": False,
+            }
 
     return None
 
@@ -347,10 +382,118 @@ def _melhor_sugestao_catalogo(db: Session, produto) -> Optional[Dict]:
         return None
 
 
+def _config_fiscal_empresa(db: Session, tenant_id):
+    if db is None or tenant_id is None:
+        return None
+    return (
+        db.query(EmpresaConfigFiscal)
+        .filter(EmpresaConfigFiscal.tenant_id == tenant_id)
+        .first()
+    )
+
+
+def _empresa_no_simples(empresa_fiscal) -> bool:
+    regime = str(getattr(empresa_fiscal, "regime_tributario", "") or "").casefold()
+    return bool(
+        empresa_fiscal
+        and (getattr(empresa_fiscal, "simples_ativo", False) or "simples" in regime)
+    )
+
+
+def _sugerir_tributo_ausente(
+    campo: str,
+    fiscal_item: Dict[str, Optional[str]],
+    empresa_fiscal,
+    sugestao_catalogo: Optional[Dict],
+) -> Optional[Dict[str, object]]:
+    campo_catalogo = {
+        "cst_icms": "cst_icms",
+        "pis_cst": "pis_cst",
+        "cofins_cst": "cofins_cst",
+    }.get(campo)
+    valor_catalogo = (
+        _limpar_texto_fiscal(sugestao_catalogo.get(campo_catalogo))
+        if sugestao_catalogo and campo_catalogo
+        else None
+    )
+    if valor_catalogo:
+        score = int(sugestao_catalogo.get("score") or 0)
+        confianca = "alta" if score >= 2 else "media"
+        return {
+            "valor": valor_catalogo,
+            "motivo": (
+                sugestao_catalogo.get("observacao")
+                or f"Catalogo fiscal associado a {sugestao_catalogo.get('categoria_fiscal') or 'este tipo de produto'}."
+            ),
+            "fonte_sugestao": "catalogo_fiscal",
+            "confianca": confianca,
+            "confianca_percentual": 88 if confianca == "alta" else 68,
+            "preenchimento_automatico": confianca == "alta",
+        }
+
+    if campo in {"pis_cst", "cofins_cst"}:
+        atributo = "pis_cst_padrao" if campo == "pis_cst" else "cofins_cst_padrao"
+        valor_empresa = _limpar_texto_fiscal(getattr(empresa_fiscal, atributo, None))
+        if valor_empresa:
+            return {
+                "valor": valor_empresa,
+                "motivo": "Valor padrao definido na configuracao fiscal desta empresa.",
+                "fonte_sugestao": "configuracao_fiscal_da_empresa",
+                "confianca": "alta",
+                "confianca_percentual": 95,
+                "preenchimento_automatico": True,
+            }
+
+    if not _empresa_no_simples(empresa_fiscal):
+        return None
+
+    if campo == "cst_icms" and fiscal_item.get("icms_st"):
+        return {
+            "valor": "500",
+            "motivo": (
+                "O produto esta marcado como ICMS-ST e a empresa esta no Simples Nacional; "
+                "o CSOSN 500 indica imposto cobrado anteriormente por substituicao tributaria."
+            ),
+            "fonte_sugestao": "xml_ou_cadastro_do_produto_e_regime_da_empresa",
+            "confianca": "alta",
+            "confianca_percentual": 94,
+            "preenchimento_automatico": True,
+        }
+
+    if campo == "cst_icms":
+        return {
+            "valor": "102",
+            "motivo": (
+                "Possivel CSOSN para venda pelo Simples Nacional sem permissao de credito. "
+                "Nao foi encontrada evidencia suficiente sobre ICMS-ST ou beneficio fiscal deste produto."
+            ),
+            "fonte_sugestao": "regime_da_empresa_sem_historico_do_produto",
+            "confianca": "baixa",
+            "confianca_percentual": 42,
+            "preenchimento_automatico": False,
+        }
+
+    if campo in {"pis_cst", "cofins_cst"}:
+        return {
+            "valor": "49",
+            "motivo": (
+                "Possivel enquadramento como outras operacoes de saida para empresa do Simples. "
+                "A empresa ainda nao definiu um CST padrao e nao ha historico fiscal confiavel para este produto."
+            ),
+            "fonte_sugestao": "regime_da_empresa_sem_padrao_configurado",
+            "confianca": "baixa",
+            "confianca_percentual": 40,
+            "preenchimento_automatico": False,
+        }
+
+    return None
+
+
 def prevalidar_produtos_fiscais_venda(
     venda, db: Session = None, *, exigir_documento_completo: bool = False
 ) -> Dict:
     tenant_id = getattr(venda, "tenant_id", None)
+    empresa_fiscal = _config_fiscal_empresa(db, tenant_id)
     correcoes = []
     bloqueios = []
 
@@ -395,6 +538,14 @@ def prevalidar_produtos_fiscais_venda(
                         "valor_atual": ncm_atual or "",
                         "valor_sugerido": sugestao_ncm["valor"],
                         "motivo": sugestao_ncm["motivo"],
+                        "fonte_sugestao": sugestao_ncm.get("fonte_sugestao"),
+                        "confianca": sugestao_ncm.get("confianca"),
+                        "confianca_percentual": sugestao_ncm.get(
+                            "confianca_percentual"
+                        ),
+                        "preenchimento_automatico": sugestao_ncm.get(
+                            "preenchimento_automatico", False
+                        ),
                     }
                 )
             else:
@@ -414,6 +565,10 @@ def prevalidar_produtos_fiscais_venda(
                     "valor_atual": "",
                     "valor_sugerido": "0",
                     "motivo": "Padrao para mercadoria nacional quando a origem nao foi informada.",
+                    "fonte_sugestao": "padrao_operacional_sem_origem_informada",
+                    "confianca": "baixa",
+                    "confianca_percentual": 45,
+                    "preenchimento_automatico": False,
                 }
             )
 
@@ -427,27 +582,30 @@ def prevalidar_produtos_fiscais_venda(
             if exigir_documento_completo
             else ()
         )
-        for campo, rotulo, campo_catalogo in campos_obrigatorios:
+        for campo, rotulo, _campo_catalogo in campos_obrigatorios:
             valor_atual = _limpar_texto_fiscal(fiscal_item.get(campo))
             if valor_atual:
                 continue
-            valor_sugerido = (
-                _limpar_texto_fiscal(sugestao_catalogo.get(campo_catalogo))
-                if sugestao_catalogo and campo_catalogo
-                else None
+            sugestao = _sugerir_tributo_ausente(
+                campo,
+                fiscal_item,
+                empresa_fiscal,
+                sugestao_catalogo,
             )
-            if valor_sugerido:
+            if sugestao:
                 correcoes.append(
                     {
                         **dados_produto,
                         "campo": campo,
                         "valor_atual": "",
-                        "valor_sugerido": valor_sugerido,
-                        "motivo": (
-                            sugestao_catalogo.get("observacao")
-                            or f"Sugestao do catalogo fiscal para {sugestao_catalogo.get('categoria_fiscal') or 'este tipo de produto'}."
-                        ),
-                        "fonte_sugestao": "catalogo_fiscal",
+                        "valor_sugerido": sugestao["valor"],
+                        "motivo": sugestao["motivo"],
+                        "fonte_sugestao": sugestao["fonte_sugestao"],
+                        "confianca": sugestao["confianca"],
+                        "confianca_percentual": sugestao["confianca_percentual"],
+                        "preenchimento_automatico": sugestao[
+                            "preenchimento_automatico"
+                        ],
                     }
                 )
             else:
@@ -465,6 +623,11 @@ def prevalidar_produtos_fiscais_venda(
         "requer_autorizacao": bool(correcoes),
         "correcoes": correcoes,
         "bloqueios": bloqueios,
+        "contexto_fiscal": {
+            "regime_tributario": getattr(empresa_fiscal, "regime_tributario", None),
+            "uf": getattr(empresa_fiscal, "uf", None),
+            "simples_nacional": _empresa_no_simples(empresa_fiscal),
+        },
     }
 
 

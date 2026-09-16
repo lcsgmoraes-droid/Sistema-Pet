@@ -58,8 +58,24 @@ const correctionDialog = readFileSync(
 );
 assert.match(
   correctionDialog,
-  /Preencher sugestões/,
-  "correcao guiada deve permitir aplicar sugestoes encontradas",
+  /Preencher sugestões confiáveis/,
+  "correcao guiada deve aplicar em lote apenas sugestoes confiaveis",
+);
+assert.match(
+  correctionDialog,
+  /Usar esta sugestão/,
+  "correcao guiada deve permitir aceitar explicitamente uma sugestao incerta",
+);
+assert.match(
+  correctionDialog,
+  /Alta confiança/,
+  "correcao guiada deve identificar o nivel de confianca da sugestao",
+);
+assert.match(correctionDialog, /Fonte:/, "correcao guiada deve informar de onde veio a sugestao");
+assert.match(
+  correctionDialog,
+  /Contexto identificado:/,
+  "correcao guiada deve mostrar o regime e a UF considerados",
 );
 assert.match(
   correctionDialog,

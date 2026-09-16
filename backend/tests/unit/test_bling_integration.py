@@ -96,7 +96,45 @@ def test_prevalidacao_sugere_ncm_para_racao_caes_gatos_com_ncm_zerado():
     assert validacao["correcoes"][0]["campo"] == "ncm"
     assert validacao["correcoes"][0]["valor_atual"] == "00000000"
     assert validacao["correcoes"][0]["valor_sugerido"] == "23091000"
+    assert validacao["correcoes"][0]["confianca"] == "baixa"
+    assert validacao["correcoes"][0]["preenchimento_automatico"] is False
     assert validacao["pode_emitir"] is False
+
+
+def test_ncm_com_um_unico_exemplo_em_categoria_generica_tem_baixa_confianca():
+    class Query:
+        def join(self, *_args):
+            return self
+
+        def filter(self, *_args):
+            return self
+
+        def limit(self, *_args):
+            return self
+
+        def all(self):
+            return [("23091000",)]
+
+    class Db:
+        def query(self, *_args):
+            return Query()
+
+    produto = SimpleNamespace(
+        id=28128,
+        categoria_id=298,
+        departamento_id=None,
+        categoria=SimpleNamespace(nome="GRUPO DIVERSOS"),
+        departamento=None,
+    )
+
+    sugestao = bling_integration_fiscal._sugerir_ncm_por_historico(
+        Db(), "tenant-1", produto
+    )
+
+    assert sugestao["valor"] == "23091000"
+    assert sugestao["confianca"] == "baixa"
+    assert sugestao["preenchimento_automatico"] is False
+    assert "1 de 1" in sugestao["motivo"]
 
 
 def test_prevalidacao_direta_identifica_campos_editaveis_e_sugestoes(monkeypatch):
@@ -136,6 +174,52 @@ def test_prevalidacao_direta_identifica_campos_editaveis_e_sugestoes(monkeypatch
         "cofins_cst",
     }
     assert all(item["produto_id"] == 10 for item in validacao["correcoes"])
+
+
+def test_prevalidacao_oferece_opcoes_do_simples_com_baixa_confianca(monkeypatch):
+    venda = _make_venda_nfce()
+    monkeypatch.setattr(
+        bling_integration_fiscal,
+        "_resolver_fiscal_item_nfe",
+        lambda *_args: {
+            "ncm": "39269090",
+            "origem_mercadoria": "0",
+            "cfop": "5102",
+            "cst_icms": None,
+            "pis_cst": None,
+            "cofins_cst": None,
+            "icms_st": False,
+        },
+    )
+    monkeypatch.setattr(
+        bling_integration_fiscal,
+        "_config_fiscal_empresa",
+        lambda *_args: SimpleNamespace(
+            regime_tributario="Simples Nacional",
+            simples_ativo=True,
+            pis_cst_padrao=None,
+            cofins_cst_padrao=None,
+        ),
+    )
+    monkeypatch.setattr(
+        bling_integration_fiscal, "_melhor_sugestao_catalogo", lambda *_args: None
+    )
+
+    validacao = bling_integration_fiscal.prevalidar_produtos_fiscais_venda(
+        venda, object(), exigir_documento_completo=True
+    )
+
+    sugestoes = {item["campo"]: item for item in validacao["correcoes"]}
+    assert sugestoes["cst_icms"]["valor_sugerido"] == "102"
+    assert sugestoes["pis_cst"]["valor_sugerido"] == "49"
+    assert sugestoes["cofins_cst"]["valor_sugerido"] == "49"
+    assert all(item["confianca"] == "baixa" for item in sugestoes.values())
+    assert all(item["preenchimento_automatico"] is False for item in sugestoes.values())
+    assert validacao["contexto_fiscal"] == {
+        "regime_tributario": "Simples Nacional",
+        "uf": None,
+        "simples_nacional": True,
+    }
 
 
 def test_catalogo_opcional_falha_dentro_de_savepoint_sem_interromper_validacao(
