@@ -37,6 +37,7 @@ from app.intnfe.emission import (
     preview as preview_intnfe,
     reconcile as reconcile_intnfe,
 )
+from app.intnfe.sharing import extrair_link_publico_nfce
 from app.intnfe.repository import get_connection, get_tenant
 from app.intnfe.numbering import NumberingError
 from app.intnfe.recovery import repair_and_retry as repair_and_retry_intnfe
@@ -619,6 +620,66 @@ def danfe_intnfe_venda(
         raise _direct_failure(exc) from None
     finally:
         api.close()
+
+
+@router.get("/vendas/{venda_id}/compartilhar")
+def preparar_compartilhamento_intnfe(
+    venda_id: int,
+    db: Session = Depends(get_session),
+    user_and_tenant=Depends(get_current_user_and_tenant),
+):
+    """Prepara o link publico oficial da SEFAZ para uma NFC-e da IntNFe."""
+    _user, tenant_id = user_and_tenant
+    venda = _buscar_venda_para_nfe(db, venda_id, tenant_id)
+    if not venda:
+        raise HTTPException(404, "Venda não encontrada")
+    if venda.nfe_provider != "intnfe" or not venda.nfe_correlation_id:
+        raise HTTPException(404, "Esta venda não possui uma nota da IntNFe")
+    if str(venda.nfe_status or "").strip().lower() != "autorizada":
+        raise HTTPException(409, "Compartilhe a nota após a autorização.")
+
+    is_nfce = venda.nfe_tipo == "nfce" or str(venda.nfe_modelo or "") == "65"
+    if not is_nfce:
+        raise HTTPException(
+            409,
+            "O compartilhamento por link está disponível para NFC-e. Para NF-e, baixe o PDF.",
+        )
+
+    xml = venda.nfe_xml
+    if not xml:
+        api = _intnfe_client()
+        try:
+            xml = download_intnfe_document(db, venda, api, "xml").decode("utf-8-sig")
+        except UnicodeDecodeError:
+            raise HTTPException(502, "O XML retornado pelo emissor é inválido.") from None
+        except DirectEmissionError as exc:
+            raise _direct_failure(exc) from None
+        finally:
+            api.close()
+
+    try:
+        link = extrair_link_publico_nfce(xml)
+    except ValueError as exc:
+        raise HTTPException(502, str(exc)) from None
+
+    cliente = venda.cliente
+    telefone = (
+        getattr(cliente, "celular", None)
+        or getattr(cliente, "telefone", None)
+        or ""
+    )
+    nome_cliente = (
+        getattr(cliente, "nome", None)
+        or getattr(cliente, "razao_social", None)
+        or ""
+    )
+    return {
+        "link": link,
+        "telefone": telefone,
+        "cliente": nome_cliente,
+        "numero": venda.nfe_numero,
+        "modelo": venda.nfe_modelo or 65,
+    }
 
 
 @router.post("/vendas/{venda_id}/cancelar")
