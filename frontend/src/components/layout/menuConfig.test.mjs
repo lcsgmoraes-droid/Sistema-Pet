@@ -72,3 +72,12 @@ test("createLayoutMenuItems sinaliza convites pendentes de grupos de empresas", 
   assert.equal(grupos?.badge, true);
   assert.equal(grupos?.badgeLabel, "3 convite(s) pendente(s)");
 });
+
+test("orçamentos do grupo só aparecem quando o tenant está habilitado", () => {
+  const desligado = createLayoutMenuItems();
+  const ligado = createLayoutMenuItems({ orcamentosGrupoAtivo: true });
+
+  assert.equal(findMenuItem(desligado, "/orcamentos-grupo"), undefined);
+  assert.equal(findMenuItem(ligado, "/orcamentos-grupo")?.permission, "vendas.criar");
+  assert.equal(findMenuItem(ligado, "/orcamentos-grupo")?.section, "Vendas e relacionamento");
+});

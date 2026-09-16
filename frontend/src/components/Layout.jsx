@@ -171,6 +171,7 @@ const Layout = () => {
   // Contagem de lembretes pendentes para badge dinâmico
   const [lembretesCount, setLembretesCount] = useState(0);
   const [convitesGruposCount, setConvitesGruposCount] = useState(0);
+  const [orcamentosGrupoAtivo, setOrcamentosGrupoAtivo] = useState(false);
   const [menuFavorites, setMenuFavorites] = useState([]);
   const lembretesPollingRef = useRef(false);
   const [telaBloqueadaSuspeita, setTelaBloqueadaSuspeita] = useState(false);
@@ -189,6 +190,25 @@ const Layout = () => {
     { path: "/veterinario/vacinas", label: "Vacinas", icon: Syringe },
     { path: "/veterinario/exames", label: "Exames", icon: FlaskConical },
   ];
+
+  useEffect(() => {
+    if (!user?.id) {
+      setOrcamentosGrupoAtivo(false);
+      return undefined;
+    }
+    let ativo = true;
+    api
+      .get("/orcamentos-grupo/status")
+      .then((response) => {
+        if (ativo) setOrcamentosGrupoAtivo(Boolean(response.data?.enabled));
+      })
+      .catch(() => {
+        if (ativo) setOrcamentosGrupoAtivo(false);
+      });
+    return () => {
+      ativo = false;
+    };
+  }, [user?.id, user?.tenant?.id, user?.tenant_id]);
 
   useEffect(() => {
     const atualizarCalculadoraFlutuante = (event) => {
@@ -531,7 +551,11 @@ const Layout = () => {
     };
   }, [user?.id, user?.tenant?.id, user?.tenant_id]);
 
-  const allMenuItems = createLayoutMenuItems({ lembretesCount, convitesGruposCount });
+  const allMenuItems = createLayoutMenuItems({
+    lembretesCount,
+    convitesGruposCount,
+    orcamentosGrupoAtivo,
+  });
 
   const itemLiberadoPorModulo = (item) => !item.modulo || moduloAtivo(item.modulo);
   const itemLiberadoPorPermissao = (item) => {

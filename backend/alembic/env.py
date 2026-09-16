@@ -67,6 +67,7 @@ import app.ecommerce_payment_models
 import app.billing_models
 import app.intnfe.models
 import app.catalogo_mestre_models
+import app.orcamentos_grupo_models
 
 # Stone (pagamentos)
 import app.stone_models  # noqa: F401

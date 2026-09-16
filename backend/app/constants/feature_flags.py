@@ -43,12 +43,22 @@ Documentação: docs/roadmaps/ia_oportunidades_pdv_checklist.md
 """
 
 
+ORCAMENTOS_GRUPO = "ORCAMENTOS_GRUPO"
+"""
+Feature: emissão de orçamentos por empresas vinculadas ao mesmo grupo.
+
+Status padrão: DESLIGADA. A primeira ativação é exclusiva do tenant demo
+associado a corepeterp@gmail.com.
+"""
+
+
 # ====================
 # LISTA DE TODAS AS FEATURES
 # ====================
 
 ALL_FEATURE_FLAGS = [
     PDV_IA_OPORTUNIDADES,
+    ORCAMENTOS_GRUPO,
 ]
 """
 Lista completa de todas as feature flags do sistema.
@@ -62,6 +72,7 @@ Lista completa de todas as feature flags do sistema.
 
 DEFAULT_FEATURE_FLAGS = {
     PDV_IA_OPORTUNIDADES: False,
+    ORCAMENTOS_GRUPO: False,
 }
 """
 Valores padrão para todas as features quando não existem no banco.
