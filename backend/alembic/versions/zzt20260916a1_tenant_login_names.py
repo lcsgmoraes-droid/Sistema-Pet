@@ -1,7 +1,7 @@
 """Separa o nome de acesso do nome fantasia da empresa.
 
 Revision ID: zzt20260916a1
-Revises: zzs20260915a1
+Revises: zzt20260915a1
 Create Date: 2026-09-16
 """
 
@@ -10,7 +10,7 @@ import sqlalchemy as sa
 
 
 revision = "zzt20260916a1"
-down_revision = "zzs20260915a1"
+down_revision = "zzt20260915a1"
 branch_labels = None
 depends_on = None
 
