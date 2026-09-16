@@ -1,7 +1,12 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { calcularTotalBase, nomeArquivoPdf, sortearEmpresas } from "./orcamentosGrupoUtils.js";
+import {
+  calcularTotalBase,
+  nomeArquivoPdf,
+  preencherItemComProduto,
+  sortearEmpresas,
+} from "./orcamentosGrupoUtils.js";
 
 test("calcula o total do orçamento principal", () => {
   assert.equal(
@@ -11,6 +16,27 @@ test("calcula o total do orçamento principal", () => {
     ]),
     50,
   );
+});
+
+test("produto do estoque preenche descrição, unidade e preço de venda do PDV", () => {
+  const item = preencherItemComProduto(
+    { quantidade: 2, unidade: "un", preco_unitario_base: 0 },
+    {
+      id: 42,
+      nome: "Ração Teste",
+      unidade: "KG",
+      preco_venda: 100,
+      preco_venda_pdv: 89.9,
+    },
+  );
+
+  assert.deepEqual(item, {
+    produto_id: 42,
+    descricao: "Ração Teste",
+    quantidade: 2,
+    unidade: "KG",
+    preco_unitario_base: 89.9,
+  });
 });
 
 test("sorteio preserva empresas fixadas e não repete seleção", () => {

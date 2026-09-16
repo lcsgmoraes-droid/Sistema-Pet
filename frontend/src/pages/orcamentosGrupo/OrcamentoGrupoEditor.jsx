@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
-import { Building2, Download, FilePlus2, Lock, Plus, RefreshCw, Trash2 } from "lucide-react";
+import { Building2, Download, FilePlus2, Lock, Plus, RefreshCw } from "lucide-react";
 
 import { baixarBlob, orcamentosGrupoApi } from "../../api/orcamentosGrupo";
-import CurrencyInput from "../../components/CurrencyInput";
 import { formatMoneyBRL } from "../../utils/formatters";
+import OrcamentoGrupoItemRow from "./OrcamentoGrupoItemRow";
 import {
   calcularTotalBase,
   criarItemOrcamento,
@@ -51,9 +51,9 @@ export default function OrcamentoGrupoEditor({ configuracao, empresas, onEmitido
     );
   }, [empresas, quantidadeEmpresas]);
 
-  function atualizarItem(index, campo, valor) {
+  function atualizarItem(index, alteracoes) {
     setItens((atuais) =>
-      atuais.map((item, itemIndex) => (itemIndex === index ? { ...item, [campo]: valor } : item)),
+      atuais.map((item, itemIndex) => (itemIndex === index ? { ...item, ...alteracoes } : item)),
     );
   }
 
@@ -213,57 +213,13 @@ export default function OrcamentoGrupoEditor({ configuracao, empresas, onEmitido
 
           <div className="mt-4 space-y-3">
             {itens.map((item, index) => (
-              <div
+              <OrcamentoGrupoItemRow
                 key={index}
-                className="grid gap-3 rounded-xl border border-slate-200 p-3 md:grid-cols-[1fr_110px_100px_150px_42px] dark:border-slate-800"
-              >
-                <label className="text-xs text-slate-500">
-                  Descrição
-                  <input
-                    className={`${inputClass} mt-1`}
-                    value={item.descricao}
-                    onChange={(event) => atualizarItem(index, "descricao", event.target.value)}
-                    required
-                  />
-                </label>
-                <label className="text-xs text-slate-500">
-                  Quantidade
-                  <input
-                    className={`${inputClass} mt-1`}
-                    type="number"
-                    min="0.001"
-                    step="0.001"
-                    value={item.quantidade}
-                    onChange={(event) => atualizarItem(index, "quantidade", event.target.value)}
-                    required
-                  />
-                </label>
-                <label className="text-xs text-slate-500">
-                  Unidade
-                  <input
-                    className={`${inputClass} mt-1`}
-                    value={item.unidade}
-                    onChange={(event) => atualizarItem(index, "unidade", event.target.value)}
-                  />
-                </label>
-                <label className="text-xs text-slate-500">
-                  Preço unitário
-                  <CurrencyInput
-                    className={`${inputClass} mt-1`}
-                    value={item.preco_unitario_base}
-                    onChange={(value) => atualizarItem(index, "preco_unitario_base", value)}
-                  />
-                </label>
-                <button
-                  type="button"
-                  onClick={() => removerItem(index)}
-                  disabled={itens.length === 1}
-                  className="mt-5 flex h-10 w-10 items-center justify-center rounded-lg text-slate-400 hover:bg-red-50 hover:text-red-600 disabled:opacity-30"
-                  aria-label="Remover item"
-                >
-                  <Trash2 size={17} />
-                </button>
-              </div>
+                item={item}
+                podeRemover={itens.length > 1}
+                onAtualizar={(alteracoes) => atualizarItem(index, alteracoes)}
+                onRemover={() => removerItem(index)}
+              />
             ))}
           </div>
           <button

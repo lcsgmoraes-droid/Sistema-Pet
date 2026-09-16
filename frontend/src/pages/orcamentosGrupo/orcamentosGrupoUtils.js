@@ -1,9 +1,24 @@
 export function criarItemOrcamento() {
   return {
+    produto_id: null,
     descricao: "",
     quantidade: 1,
     unidade: "un",
     preco_unitario_base: 0,
+  };
+}
+
+export function preencherItemComProduto(item, produto) {
+  const preco =
+    produto?.preco_venda_pdv ?? produto?.preco_venda_efetivo ?? produto?.preco_venda ?? 0;
+  const precoNumerico = Number(preco);
+
+  return {
+    ...item,
+    produto_id: produto?.id ?? null,
+    descricao: produto?.nome || item?.descricao || "",
+    unidade: produto?.unidade || item?.unidade || "un",
+    preco_unitario_base: Number.isFinite(precoNumerico) ? precoNumerico : 0,
   };
 }
 
