@@ -5,6 +5,7 @@ import {
   assinarCorrecaoFiscal,
   resolverCorrecaoFiscal,
 } from "../../services/fiscalCorrectionDialog";
+import FiscalReferenceSearch from "./FiscalReferenceSearch";
 
 const CAMPOS = {
   ncm: { rotulo: "NCM", tipo: "texto", placeholder: "8 dígitos", tamanho: 8 },
@@ -364,6 +365,11 @@ export default function FiscalCorrectionDialogHost() {
                       <p className="mt-1 text-xs text-slate-500">SKU {produto.sku}</p>
                     )}
                   </div>
+                  <FiscalReferenceSearch
+                    produto={produto}
+                    contextoFiscal={contextoFiscal}
+                    onAplicar={(campo, valor) => atualizarCampo(String(produto.id), campo, valor)}
+                  />
                   <div className="grid gap-4 md:grid-cols-2">
                     {produto.pendencias.map((item) => {
                       const campo = CAMPOS[item.campo];
