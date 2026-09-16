@@ -93,8 +93,13 @@ assert.match(
 );
 assert.match(
   fiscalReferenceSearch,
-  /fonte e confiança/,
-  "pesquisa fiscal deve explicar a qualidade das referencias",
+  /consulta automaticamente o histórico/,
+  "pesquisa fiscal deve consultar as referencias sem exigir busca manual",
+);
+assert.match(
+  fiscalReferenceSearch,
+  /ncm_oficial/,
+  "pesquisa fiscal deve informar a versao da tabela oficial carregada",
 );
 assert.match(
   fiscalReferenceSearch,

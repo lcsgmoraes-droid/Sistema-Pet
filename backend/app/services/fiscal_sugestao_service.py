@@ -18,6 +18,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.fiscal_catalogo_produtos_models import FiscalCatalogoProdutos
+from app.services.ncm_oficial_service import pesquisar_ncm_oficial
 
 FONTE_NCM_OFICIAL = {
     "rotulo": "Classificação fiscal oficial (Receita Federal)",
@@ -217,6 +218,33 @@ def _buscar_catalogo_mestre(
     return results
 
 
+def _buscar_ncm_oficial(
+    consulta: str, limite: int
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    pesquisa = pesquisar_ncm_oficial(consulta, limite=max(12, limite * 2))
+    results = []
+    for item in pesquisa["resultados"]:
+        results.append(
+            {
+                "ncm": item["ncm"],
+                "cest": None,
+                "descricao": item["descricao_hierarquica"],
+                "fonte": "tabela_ncm_receita_federal",
+                "fonte_rotulo": "tabela NCM vigente da Receita Federal",
+                "score": item["score"],
+                # A fonte comprova que o codigo existe e esta vigente, mas uma
+                # coincidencia de texto nao comprova o enquadramento do produto.
+                "qualidade": min(70, item["score"]),
+            }
+        )
+    return results, {
+        "disponivel": pesquisa["disponivel"],
+        "atualizado_em": pesquisa["atualizado_em"],
+        "ato": pesquisa["ato"],
+        "url": FONTE_NCM_OFICIAL["url"],
+    }
+
+
 def _consolidar_resultados(
     rows: list[dict[str, Any]], limite: int
 ) -> list[dict[str, Any]]:
@@ -287,11 +315,21 @@ def pesquisar_base_fiscal(
         except SQLAlchemyError:
             continue
 
+    ncm_oficial = {
+        "disponivel": False,
+        "atualizado_em": None,
+        "ato": None,
+        "url": FONTE_NCM_OFICIAL["url"],
+    }
+    oficiais, ncm_oficial = _buscar_ncm_oficial(consulta, limite)
+    rows.extend(oficiais)
+
     return {
         "consulta": consulta,
         "resultados": _consolidar_resultados(rows, limite),
         "referencias": _referencias_codigo(),
         "fontes": [FONTE_NCM_OFICIAL, FONTE_SPED, FONTE_NFE],
+        "ncm_oficial": ncm_oficial,
     }
 
 

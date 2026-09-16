@@ -1,5 +1,5 @@
 import { BookOpen, ExternalLink, Loader2, Search, Sparkles } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import api from "../../api";
 
 const CONFIANCA = {
@@ -20,8 +20,10 @@ function mensagemErro(error) {
 }
 
 export default function FiscalReferenceSearch({ produto, contextoFiscal, onAplicar }) {
-  const [aberto, setAberto] = useState(false);
-  const [consulta, setConsulta] = useState(produto.nome || "");
+  const [aberto, setAberto] = useState(true);
+  const [consulta, setConsulta] = useState(
+    produto.codigo_barras || produto.nome || produto.sku || "",
+  );
   const [dados, setDados] = useState(null);
   const [carregando, setCarregando] = useState(false);
   const [erro, setErro] = useState("");
@@ -50,6 +52,29 @@ export default function FiscalReferenceSearch({ produto, contextoFiscal, onAplic
     }
   };
 
+  useEffect(() => {
+    let ativo = true;
+    const termo = String(produto.codigo_barras || produto.nome || produto.sku || "").trim();
+    if (termo.length < 2) return undefined;
+    setConsulta(termo);
+    setCarregando(true);
+    setErro("");
+    api
+      .get("/fiscal/sugestao/pesquisar", { params: { q: termo, limite: 8 } })
+      .then(({ data }) => {
+        if (ativo) setDados(data);
+      })
+      .catch((error) => {
+        if (ativo) setErro(mensagemErro(error));
+      })
+      .finally(() => {
+        if (ativo) setCarregando(false);
+      });
+    return () => {
+      ativo = false;
+    };
+  }, [produto.codigo_barras, produto.id, produto.nome, produto.sku]);
+
   const abrir = () => {
     setAberto(true);
     if (!dados) pesquisar();
@@ -63,7 +88,8 @@ export default function FiscalReferenceSearch({ produto, contextoFiscal, onAplic
             <BookOpen className="h-4 w-4" /> Base de consulta fiscal
           </p>
           <p className="mt-1 text-xs leading-5 text-indigo-800 dark:text-indigo-200">
-            Pesquise pelo nome, código de barras ou NCM e veja opções com fonte e confiança.
+            O CorePet consulta automaticamente o histórico, o catálogo aprendido e a tabela NCM
+            vigente da Receita.
           </p>
         </div>
         <button
@@ -71,7 +97,7 @@ export default function FiscalReferenceSearch({ produto, contextoFiscal, onAplic
           onClick={aberto ? () => setAberto(false) : abrir}
           className="rounded-lg border border-indigo-300 bg-white px-3 py-2 text-xs font-semibold text-indigo-800 hover:bg-indigo-100 dark:border-indigo-700 dark:bg-slate-900 dark:text-indigo-200"
         >
-          {aberto ? "Fechar consulta" : "Pesquisar na base"}
+          {aberto ? "Ocultar consulta" : "Ver sugestões encontradas"}
         </button>
       </div>
 
@@ -126,6 +152,13 @@ export default function FiscalReferenceSearch({ produto, contextoFiscal, onAplic
                     Consultar classificação oficial <ExternalLink className="h-3.5 w-3.5" />
                   </a>
                 </div>
+                {dados.ncm_oficial?.disponivel && (
+                  <p className="mb-2 text-[11px] leading-4 text-slate-500 dark:text-slate-400">
+                    Tabela oficial {dados.ncm_oficial.atualizado_em || "vigente"}
+                    {dados.ncm_oficial.ato ? ` · ${dados.ncm_oficial.ato}` : ""}. O CorePet mantém
+                    essa fonte em cache e atualiza automaticamente.
+                  </p>
+                )}
                 {dados.resultados?.length ? (
                   <div className="space-y-2">
                     {dados.resultados.map((resultado) => (

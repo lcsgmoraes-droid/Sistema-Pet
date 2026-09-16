@@ -174,6 +174,9 @@ def test_prevalidacao_direta_identifica_campos_editaveis_e_sugestoes(monkeypatch
         "cofins_cst",
     }
     assert all(item["produto_id"] == 10 for item in validacao["correcoes"])
+    assert all(
+        item["codigo_barras"] == "7890000000000" for item in validacao["correcoes"]
+    )
 
 
 def test_prevalidacao_oferece_opcoes_do_simples_com_baixa_confianca(monkeypatch):
