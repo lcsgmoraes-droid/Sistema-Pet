@@ -166,6 +166,24 @@ def _recipient(
             "Informe um CPF ou CNPJ válido no cadastro do cliente."
         )
 
+    email = _text(getattr(cliente, "email", None))
+    if document_type == "nfce":
+        consumer = {
+            "nome": (
+                "NF-E EMITIDA EM AMBIENTE DE HOMOLOGACAO - SEM VALOR FISCAL"
+                if environment == 2
+                else _text(getattr(cliente, "razao_social", None))
+                or _text(cliente.nome)
+            )
+        }
+        if len(document) == 14:
+            consumer["cnpj"] = document
+        else:
+            consumer["cpf"] = document
+        if email:
+            consumer["email"] = email
+        return consumer
+
     address = {
         "logradouro": _text(cliente.endereco),
         "numero": _text(cliente.numero),
@@ -204,7 +222,6 @@ def _recipient(
     ie = _text(getattr(cliente, "inscricao_estadual", None))
     if ie:
         recipient["inscricaoEstadual"] = ie
-    email = _text(getattr(cliente, "email", None))
     if email:
         recipient["email"] = email
     return recipient
@@ -328,15 +345,17 @@ def build_payload(db, tenant, connection, venda, document_type):
         environment,
         document_type,
         require_identity=nfce_requires_recipient,
-        require_address=bool(getattr(venda, "tem_entrega", False))
-        or nfce_requires_recipient,
+        require_address=document_type == "nfe",
     )
     destination_uf = (
-        recipient.get("endereco", {}).get("uf")
-        if recipient
+        recipient.get("endereco", {}).get("uf") or emitter["endereco"]["uf"]
+        if recipient and document_type == "nfe"
         else emitter["endereco"]["uf"]
     )
-    interstate = destination_uf != emitter["endereco"]["uf"]
+    # NFC-e representa operação interna, mesmo quando o consumidor foi identificado.
+    interstate = document_type == "nfe" and (
+        destination_uf != emitter["endereco"]["uf"]
+    )
 
     products = []
     fiscal_pending = []
@@ -513,6 +532,10 @@ def build_payload(db, tenant, connection, venda, document_type):
             "O desconto da venda difere da soma dos descontos dos itens."
         )
     freight = _money(venda.taxa_entrega if venda.tem_entrega else 0)
+    if document_type == "nfce" and freight:
+        raise DirectEmissionError(
+            "A NFC-e não aceita frete. Para uma venda com taxa de entrega, escolha NF-e (modelo 55)."
+        )
     calculated_total = product_total - total_discount + freight
     if calculated_total != sale_total:
         raise DirectEmissionError(
@@ -554,9 +577,10 @@ def build_payload(db, tenant, connection, venda, document_type):
         "pagamentos": payments,
         "informacoesAdicionais": f"Venda {venda.numero_venda} - CorePet",
         "indicadorPresenca": "1" if channel == "loja_fisica" else "9",
-        "frete": {"modalidade": "9", "valor": float(freight)},
-        "documentosReferenciados": [],
     }
+    if document_type == "nfe":
+        payload["frete"] = {"modalidade": "9", "valor": float(freight)}
+        payload["documentosReferenciados"] = []
     if recipient:
         key = "destinatario" if document_type == "nfe" else "consumidor"
         payload[key] = recipient
@@ -589,7 +613,7 @@ def preview(db, tenant, venda, document_type):
             for item in payload["produtos"]
         ],
         "pagamentos": payload["pagamentos"],
-        "frete": payload["frete"]["valor"],
+        "frete": payload.get("frete", {}).get("valor", 0),
         "total": float(_money(venda.total)),
     }
 
@@ -805,6 +829,62 @@ def _access_token(api, connection, environment=None):
         ) from None
 
 
+def _provider_validation(venda, messages):
+    if not messages:
+        return None
+
+    products = [
+        item.produto
+        for item in (venda.itens or [])
+        if _ascii(getattr(item, "tipo", None)) == "produto"
+        and getattr(item, "produto", None)
+    ]
+    single_product = products[0] if len(products) == 1 else None
+    field_patterns = (
+        ("ncm", ("ncm",)),
+        ("cfop", ("cfop",)),
+        ("origem_mercadoria", ("origem", "mercadoria")),
+        ("cst_icms", ("csosn",)),
+        ("cst_icms", ("cst", "icms")),
+        ("pis_cst", ("pis",)),
+        ("cofins_cst", ("cofins",)),
+    )
+    blocks = []
+    for message in messages:
+        normalized = _ascii(message)
+        field = next(
+            (
+                candidate
+                for candidate, terms in field_patterns
+                if all(term in normalized for term in terms)
+            ),
+            None,
+        )
+        block = {
+            "campo": field or "intnfe",
+            "mensagem": message,
+        }
+        if field and single_product:
+            block.update(
+                {
+                    "produto_id": single_product.id,
+                    "produto_nome": single_product.nome,
+                    "produto_tipo": getattr(single_product, "tipo_produto", None),
+                    "sku": _text(getattr(single_product, "codigo", None))
+                    or _text(getattr(single_product, "codigo_barras", None))
+                    or str(single_product.id),
+                }
+            )
+        blocks.append(block)
+    return {
+        "success": True,
+        "pode_emitir": False,
+        "requer_autorizacao": False,
+        "correcoes": [],
+        "bloqueios": blocks,
+    }
+
+
 def issue(db, tenant, venda, document_type, api):
     connection = _connection(db, tenant.id)
     db.refresh(venda, with_for_update=True)
@@ -851,10 +931,15 @@ def issue(db, tenant, venda, document_type, api):
     try:
         result = api.issue_document(token, document_type, payload, key)
     except IntNFeError as exc:
+        validation = _provider_validation(venda, exc.validation_errors)
         venda.nfe_status = "inconclusiva" if exc.uncertain else "rejeitada"
         venda.nfe_codigo_erro = exc.code[:20] if exc.code else None
         if not exc.uncertain and exc.status:
-            venda.nfe_motivo_rejeicao = f"IntNFe HTTP {exc.status}"
+            venda.nfe_motivo_rejeicao = (
+                " | ".join(exc.validation_errors)
+                if exc.validation_errors
+                else f"IntNFe HTTP {exc.status}"
+            )
         if not exc.uncertain:
             venda.nfe_idempotency_key = None
             venda.nfe_payload_hash = None
@@ -873,6 +958,7 @@ def issue(db, tenant, venda, document_type, api):
             ),
             code=exc.code,
             correlation=exc.correlation,
+            validation=validation,
         ) from None
     venda.nfe_correlation_id = result["correlationId"]
     venda.nfe_status = "processando"

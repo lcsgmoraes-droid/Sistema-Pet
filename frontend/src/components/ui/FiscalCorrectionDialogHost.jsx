@@ -171,6 +171,7 @@ export default function FiscalCorrectionDialogHost() {
     ),
   );
   const contextoFiscal = dialogo?.validacao?.contexto_fiscal || {};
+  const temCamposDeProduto = agrupado.produtos.length > 0;
 
   useEffect(() => {
     if (!dialogo) return undefined;
@@ -289,11 +290,14 @@ export default function FiscalCorrectionDialogHost() {
               id="fiscal-correction-title"
               className="text-lg font-semibold text-slate-900 dark:text-slate-100"
             >
-              Complete os dados fiscais para emitir
+              {temCamposDeProduto
+                ? "Complete os dados fiscais para emitir"
+                : "Revise a pendência fiscal para emitir"}
             </h2>
             <p className="mt-1 text-sm leading-6 text-slate-600 dark:text-slate-300">
-              A nota ainda não foi criada. Corrija os campos abaixo e o CorePet fará uma nova
-              validação automaticamente.
+              {temCamposDeProduto
+                ? "A nota ainda não foi criada. Corrija os campos abaixo e o CorePet fará uma nova validação automaticamente."
+                : "A nota ainda não foi criada. Confira abaixo o motivo informado pelo emissor."}
             </p>
           </div>
           <button
@@ -488,8 +492,10 @@ export default function FiscalCorrectionDialogHost() {
 
         <footer className="flex flex-col-reverse gap-2 border-t border-slate-200 bg-slate-50 px-5 py-4 sm:flex-row sm:items-center sm:justify-between dark:border-slate-700 dark:bg-slate-950/40">
           <p className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
-            <CheckCircle2 className="h-4 w-4 text-emerald-600" /> Os dados ficam salvos no cadastro
-            do produto para as próximas vendas.
+            <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+            {temCamposDeProduto
+              ? "Os dados ficam salvos no cadastro do produto para as próximas vendas."
+              : "Nenhum documento fiscal foi criado nesta tentativa."}
           </p>
           <div className="flex flex-col-reverse gap-2 sm:flex-row">
             <button
