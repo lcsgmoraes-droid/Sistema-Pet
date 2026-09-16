@@ -12,3 +12,9 @@ export function linkWhatsAppNota(dados, telefone) {
   const numero = telefoneWhatsApp(telefone);
   return numero ? `https://wa.me/${numero}?text=${encodeURIComponent(mensagemNota(dados))}` : "";
 }
+
+export function rotaCompartilhamentoNota(nota) {
+  return nota.provedor === "intnfe"
+    ? `/nfe/vendas/${nota.venda_id}/compartilhar`
+    : `/nfe/${nota.id}/compartilhar`;
+}

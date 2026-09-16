@@ -2,6 +2,7 @@
 🔐 Script para configurar OAuth2 do Bling
 """
 
+import base64
 import os
 import sys
 from pathlib import Path
@@ -32,7 +33,7 @@ def main():
 
     print("✅ Credenciais encontradas:")
     print(f"   Client ID: {CLIENT_ID}")
-    print(f"   Client Secret: {CLIENT_SECRET[:10]}...")
+    print("   Client Secret: configurado (oculto por seguranca)")
     print()
 
     # Passo 1: URL de autorização
@@ -72,16 +73,25 @@ def main():
     print("-" * 60)
 
     token_url = "https://api.bling.com.br/Api/v3/oauth/token"
+    credentials = base64.b64encode(f"{CLIENT_ID}:{CLIENT_SECRET}".encode()).decode()
+    headers = {
+        "Authorization": f"Basic {credentials}",
+        "Content-Type": "application/x-www-form-urlencoded",
+        "enable-jwt": "1",
+    }
     payload = {
         "grant_type": "authorization_code",
         "code": code,
-        "client_id": CLIENT_ID,
-        "client_secret": CLIENT_SECRET,
         "redirect_uri": REDIRECT_URI,
     }
 
     try:
-        response = requests.post(token_url, json=payload)
+        response = requests.post(
+            token_url,
+            headers=headers,
+            data=payload,
+            timeout=30,
+        )
         response.raise_for_status()
         data = response.json()
 
@@ -100,8 +110,8 @@ def main():
         set_key(env_path, "BLING_REFRESH_TOKEN", refresh_token)
 
         print("✅ TOKENS OBTIDOS COM SUCESSO!")
-        print(f"   Access Token: {access_token[:50]}...")
-        print(f"   Refresh Token: {refresh_token[:50]}...")
+        print("   Access Token: gerado (oculto por seguranca)")
+        print("   Refresh Token: gerado (oculto por seguranca)")
         print(f"   Expira em: {expires_in} segundos (~{expires_in // 3600} horas)")
         print()
         print("✅ Tokens salvos no arquivo .env")

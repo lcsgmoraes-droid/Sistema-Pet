@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { X, Copy, Download, MessageCircle } from "lucide-react";
 import api from "../../api";
-import { linkWhatsAppNota } from "./compartilharNota";
+import { linkWhatsAppNota, rotaCompartilhamentoNota } from "./compartilharNota";
 
 export default function NFSaidaCompartilharModal({ nota, fechar, baixarDanfe, documentoEmCurso }) {
   const [dados, setDados] = useState(null);
@@ -17,7 +17,7 @@ export default function NFSaidaCompartilharModal({ nota, fechar, baixarDanfe, do
   useEffect(() => {
     let ativo = true;
     api
-      .get(`/nfe/${nota.id}/compartilhar`)
+      .get(rotaCompartilhamentoNota(nota))
       .then(({ data }) => {
         if (ativo) {
           setDados(data);
@@ -31,7 +31,7 @@ export default function NFSaidaCompartilharModal({ nota, fechar, baixarDanfe, do
     return () => {
       ativo = false;
     };
-  }, [nota.id]);
+  }, [nota.id, nota.provedor, nota.venda_id]);
   const whatsapp = dados ? linkWhatsAppNota(dados, telefone) : "";
   async function copiar() {
     try {

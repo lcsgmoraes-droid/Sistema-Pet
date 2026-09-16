@@ -19,6 +19,7 @@ from app.tenancy.context import get_current_tenant, tenant_context
 
 BLING_API_BASE_URL = "https://api.bling.com.br/Api/v3"
 BLING_OAUTH_TOKEN_URL = f"{BLING_API_BASE_URL}/oauth/token"
+BLING_ENABLE_JWT_HEADER = "1"
 BLING_NFE_SERIE_PADRAO = 1
 BLING_NFCE_SERIE_PADRAO = 3
 TOKEN_CONTROL_FILE = Path("bling_token_control.json")
@@ -137,7 +138,9 @@ def _load_bling_runtime_config(*, lock_held: bool = False) -> dict[str, Any]:
             (tenant_app_credentials or {}).get("client_secret")
             or (pick("BLING_CLIENT_SECRET") if legacy_allowed else "")
         ).strip(),
-        "enable_jwt": pick("BLING_ENABLE_JWT", "1"),
+        # O Bling descontinuara tokens opacos em 15/10/2026. Este valor nao
+        # pode ser desativado por configuracao de ambiente.
+        "enable_jwt": BLING_ENABLE_JWT_HEADER,
         "ambiente": pick("BLING_NFE_AMBIENTE", "rascunho"),
         "source": str(
             (tenant_credentials or {}).get("source")
@@ -325,7 +328,7 @@ class BlingAPIBase:
             "Authorization": f"Bearer {self.access_token}",
             "Content-Type": "application/json",
             "Accept": "application/json",
-            "enable-jwt": self.enable_jwt,
+            "enable-jwt": BLING_ENABLE_JWT_HEADER,
         }
 
     def _recarregar_tokens_compartilhados(self) -> bool:
@@ -504,7 +507,7 @@ class BlingAPIBase:
             headers = {
                 "Authorization": f"Basic {encoded}",
                 "Content-Type": "application/x-www-form-urlencoded",
-                "enable-jwt": self.enable_jwt,
+                "enable-jwt": BLING_ENABLE_JWT_HEADER,
             }
             data = {"grant_type": "refresh_token", "refresh_token": refresh}
 

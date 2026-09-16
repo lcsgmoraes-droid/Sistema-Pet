@@ -4,6 +4,9 @@ import base64
 import json
 from uuid import uuid4
 
+from sqlalchemy import Text
+
+from app.bling_connection_models import BlingConnection
 from app.services.bling_connection_service import (
     extract_bling_company_id,
     get_bling_connection,
@@ -40,6 +43,16 @@ def test_extract_bling_company_id_from_nested_jwt_claim():
     )
 
     assert extract_bling_company_id(token) == "987654"
+
+
+def test_token_columns_accept_long_jwt_values():
+    access_column = BlingConnection.__table__.c.access_token_encrypted
+    refresh_column = BlingConnection.__table__.c.refresh_token_encrypted
+
+    assert isinstance(access_column.type, Text)
+    assert isinstance(refresh_column.type, Text)
+    assert access_column.type.length is None
+    assert refresh_column.type.length is None
 
 
 def test_tokens_are_encrypted_and_resolved_by_company(

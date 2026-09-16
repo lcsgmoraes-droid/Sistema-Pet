@@ -8,8 +8,8 @@ export default function CentralNFSaidaHeader() {
         NF de Saída
       </h1>
       <p className="text-gray-600 mt-1">
-        Notas fiscais emitidas pelo PDV/Bling. Use o painel SEFAZ abaixo para consultar ou
-        configurar sincronização.
+        Notas fiscais emitidas pelo CorePet/IntNFe e histórico importado do Bling. Use o painel
+        SEFAZ abaixo para consultar ou configurar sincronização.
       </p>
     </div>
   );
