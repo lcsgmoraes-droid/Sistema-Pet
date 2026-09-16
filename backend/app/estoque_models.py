@@ -50,9 +50,7 @@ class AlertaEstoqueNegativo(BaseTenantModel):
 
     # Relationships
     produto = relationship("Produto", foreign_keys=[produto_id])
-    # O worker do Bling nao carrega todo o grafo ORM de vendas/financeiro.
-    # O vinculo usado pelo alerta e preservado em venda_id sem forcar a
-    # inicializacao do mapper Venda neste processo dedicado.
+    venda = relationship("Venda", foreign_keys=[venda_id])
     usuario_resolucao = relationship("User", foreign_keys=[usuario_resolucao_id])
 
     def __repr__(self):
