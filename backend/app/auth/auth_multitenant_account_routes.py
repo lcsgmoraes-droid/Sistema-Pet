@@ -41,6 +41,11 @@ from app.services.auth_security import (
 from app.services.default_roles_service import create_default_roles_for_new_tenant
 from app.services.tenant_onboarding_service import onboard_tenant_defaults
 from app.services.plan_catalog import resolve_signup_selection
+from app.services.user_account_service import (
+    UserAccountError,
+    looks_like_login_phone,
+    normalize_login_phone,
+)
 from app.services.tenant_login_name_service import (
     TenantLoginNameError,
     get_primary_tenant_login_name_value,
@@ -51,6 +56,7 @@ from app.session_manager import create_session
 from app.tenancy.context import clear_tenant_context, set_tenant_context
 from app.tenancy.rls import (
     sync_rls_auth_email,
+    sync_rls_auth_phone,
     sync_rls_auth_user,
     sync_rls_tenant,
 )
@@ -334,9 +340,21 @@ def login_multitenant(
     """
     identifier = str(credentials.identifier or "").strip().lower()
     login_por_email = "@" in identifier
+    login_por_telefone = looks_like_login_phone(identifier)
     if login_por_email:
         sync_rls_auth_email(db, identifier)
         user = db.query(User).filter(func.lower(User.email) == identifier).first()
+    elif login_por_telefone:
+        try:
+            login_phone = normalize_login_phone(identifier)
+        except UserAccountError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Celular ou senha incorretos",
+                headers={"WWW-Authenticate": "Bearer"},
+            ) from exc
+        sync_rls_auth_phone(db, login_phone)
+        user = db.query(User).filter(User.login_phone == login_phone).first()
     else:
         tenant_reference = str(credentials.tenant or "").strip()
         if not tenant_reference:
@@ -378,7 +396,7 @@ def login_multitenant(
             db.commit()
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="E-mail, usuario ou senha incorretos",
+            detail="E-mail, celular, usuario ou senha incorretos",
             headers={"WWW-Authenticate": "Bearer"},
         )
 
@@ -397,7 +415,14 @@ def login_multitenant(
     register_successful_login(db, user, request)
     sync_rls_auth_user(db, user.id)
 
-    user_tenants = db.query(UserTenant).filter(UserTenant.user_id == user.id).all()
+    user_tenants = (
+        db.query(UserTenant)
+        .filter(
+            UserTenant.user_id == user.id,
+            UserTenant.is_active.is_(True),
+        )
+        .all()
+    )
 
     if not user_tenants:
         raise HTTPException(
@@ -433,6 +458,7 @@ def login_multitenant(
             "name": user.nome,
             "email": user.email,
             "username": user.username,
+            "login_phone": user.login_phone,
             "is_active": user.is_active,
             "email_verified": user.email_verified,
         },

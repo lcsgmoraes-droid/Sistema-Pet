@@ -31,12 +31,37 @@ const credentials = buildInitialAccessCredentials({
 assert.deepEqual(credentials, {
   tenant: "Pet Feliz Demo",
   username: "maria.silva",
+  loginPhone: "",
   password: "Senha Inicial 123",
   personName: "Maria Silva",
 });
 assert.equal(
   buildInitialAccessCredentials({ tenant: "", username: "maria", password: "senha" }),
   null,
+);
+
+const phoneCredentials = buildInitialAccessCredentials({
+  tenant: "Vira Latas",
+  loginPhone: "(18) 99740-1641",
+  password: "Senha Inicial 123",
+  personName: "Maria Silva",
+});
+
+assert.deepEqual(phoneCredentials, {
+  tenant: "Vira Latas",
+  username: "",
+  loginPhone: "18997401641",
+  password: "Senha Inicial 123",
+  personName: "Maria Silva",
+});
+assert.equal(
+  formatInitialAccessCredentials(phoneCredentials),
+  [
+    "Acesso ao CorePet",
+    "Celular: 18997401641",
+    "Senha inicial: Senha Inicial 123",
+    "Login: https://corepet.com.br/login",
+  ].join("\n"),
 );
 assert.equal(
   formatInitialAccessCredentials(credentials),

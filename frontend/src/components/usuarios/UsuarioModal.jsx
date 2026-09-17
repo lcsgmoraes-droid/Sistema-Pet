@@ -70,24 +70,28 @@ export default function UsuarioModal({
 
           <div>
             <label
-              htmlFor="novo-usuario-username"
+              htmlFor="novo-usuario-login-phone"
               className="mb-1 block text-sm font-medium text-slate-700"
             >
-              Nome de usuario
+              Celular de acesso
             </label>
             <input
-              id="novo-usuario-username"
-              type="text"
+              id="novo-usuario-login-phone"
+              type="tel"
               required
-              minLength={3}
-              maxLength={40}
-              value={novoUsuario.username}
-              onChange={(event) => setNovoUsuario({ ...novoUsuario, username: event.target.value })}
+              maxLength={25}
+              value={novoUsuario.login_phone}
+              onChange={(event) =>
+                setNovoUsuario({ ...novoUsuario, login_phone: event.target.value })
+              }
               className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-              placeholder="maria.silva"
-              autoComplete="username"
+              placeholder="(18) 99740-1641"
+              autoComplete="tel"
+              inputMode="tel"
             />
-            <p className="mt-1 text-xs text-slate-500">Usado para entrar nesta loja.</p>
+            <p className="mt-1 text-xs text-slate-500">
+              A pessoa usara este celular e a senha para entrar no CorePet.
+            </p>
           </div>
 
           <div>

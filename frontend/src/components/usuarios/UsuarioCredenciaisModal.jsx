@@ -28,7 +28,7 @@ export default function UsuarioCredenciaisModal({
     await navigator.clipboard.writeText(
       formatInitialAccessCredentials({
         tenant: tenantReference,
-        username: credenciais.username,
+        loginPhone: credenciais.login_phone,
         password: generatedPassword,
       }),
     );
@@ -41,7 +41,7 @@ export default function UsuarioCredenciaisModal({
           <div>
             <h2 className="text-lg font-semibold text-slate-950">Gerenciar acesso</h2>
             <p className="mt-1 text-sm text-slate-500">
-              {usuario.nome || usuario.username || usuario.email}
+              {usuario.nome || usuario.login_phone || usuario.username || usuario.email}
             </p>
           </div>
 
@@ -82,19 +82,21 @@ export default function UsuarioCredenciaisModal({
           <div>
             <label
               className="mb-1 block text-sm font-medium text-slate-700"
-              htmlFor="cred-username"
+              htmlFor="cred-login-phone"
             >
-              Nome de usuario
+              Celular de acesso
             </label>
             <input
-              id="cred-username"
-              value={credenciais.username}
-              onChange={(event) => onChange({ ...credenciais, username: event.target.value })}
+              id="cred-login-phone"
+              type="tel"
+              value={credenciais.login_phone}
+              onChange={(event) => onChange({ ...credenciais, login_phone: event.target.value })}
               className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
-              minLength={3}
-              maxLength={40}
+              maxLength={25}
               required
-              autoComplete="username"
+              autoComplete="tel"
+              inputMode="tel"
+              placeholder="(18) 99740-1641"
             />
           </div>
 
@@ -141,7 +143,7 @@ export default function UsuarioCredenciaisModal({
                   className="mt-3 inline-flex items-center gap-2 text-xs font-semibold text-emerald-800 underline-offset-2 hover:underline"
                 >
                   <Clipboard className="h-3.5 w-3.5" aria-hidden="true" />
-                  Copiar loja, usuario e nova senha
+                  Copiar celular e nova senha
                 </button>
               ) : null}
             </div>

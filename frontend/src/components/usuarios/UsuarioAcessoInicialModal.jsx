@@ -71,18 +71,29 @@ export default function UsuarioAcessoInicialModal({ credentials, onClose }) {
             fechada.
           </p>
 
-          <CredentialRow
-            label="Loja"
-            value={credentials.tenant}
-            copied={copiado === "tenant"}
-            onCopy={() => copiar(credentials.tenant, "tenant")}
-          />
-          <CredentialRow
-            label="Nome de usuario"
-            value={credentials.username}
-            copied={copiado === "username"}
-            onCopy={() => copiar(credentials.username, "username")}
-          />
+          {credentials.loginPhone ? (
+            <CredentialRow
+              label="Celular"
+              value={credentials.loginPhone}
+              copied={copiado === "loginPhone"}
+              onCopy={() => copiar(credentials.loginPhone, "loginPhone")}
+            />
+          ) : (
+            <>
+              <CredentialRow
+                label="Loja"
+                value={credentials.tenant}
+                copied={copiado === "tenant"}
+                onCopy={() => copiar(credentials.tenant, "tenant")}
+              />
+              <CredentialRow
+                label="Nome de usuario"
+                value={credentials.username}
+                copied={copiado === "username"}
+                onCopy={() => copiar(credentials.username, "username")}
+              />
+            </>
+          )}
           <CredentialRow
             label="Senha inicial"
             value={credentials.password}

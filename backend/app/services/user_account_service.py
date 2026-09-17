@@ -12,11 +12,12 @@ from sqlalchemy.orm import Session
 
 from app.auth.core import hash_password
 from app.models import Role, User, UserTenant
-from app.tenancy.rls import sync_rls_auth_email
+from app.tenancy.rls import sync_rls_auth_email, sync_rls_auth_phone
 
 
 USERNAME_MIN_LENGTH = 3
 USERNAME_MAX_LENGTH = 40
+BRAZIL_MOBILE_DIGITS = 11
 RESERVED_USERNAMES = {
     "admin",
     "administrador",
@@ -39,6 +40,23 @@ class UserAccountError(Exception):
 def normalize_email(value: Any) -> str | None:
     normalized = str(value or "").strip().lower()
     return normalized or None
+
+
+def normalize_login_phone(value: Any) -> str:
+    digits = re.sub(r"\D", "", str(value or ""))
+    if len(digits) == BRAZIL_MOBILE_DIGITS + 2 and digits.startswith("55"):
+        digits = digits[2:]
+
+    if len(digits) != BRAZIL_MOBILE_DIGITS or digits[2] != "9":
+        raise UserAccountError(
+            "Informe um celular valido com DDD, por exemplo 18997401641."
+        )
+    return digits
+
+
+def looks_like_login_phone(value: Any) -> bool:
+    raw = str(value or "").strip()
+    return bool(raw) and bool(re.fullmatch(r"[\d\s()+.\-]+", raw))
 
 
 def normalize_username(value: Any) -> str:
@@ -79,6 +97,30 @@ def email_exists_globally(db: Session, email: str | None) -> bool:
     return row is not None
 
 
+def login_phone_exists_globally(
+    db: Session, login_phone: str | None, *, exclude_user_id: int | None = None
+) -> bool:
+    if not login_phone:
+        return False
+    sync_rls_auth_phone(db, login_phone)
+    row = db.execute(
+        text(
+            """
+            SELECT id
+              FROM users
+             WHERE login_phone = :login_phone
+               AND (:exclude_user_id IS NULL OR id <> :exclude_user_id)
+             LIMIT 1
+            """
+        ),
+        {
+            "login_phone": login_phone,
+            "exclude_user_id": exclude_user_id,
+        },
+    ).first()
+    return row is not None
+
+
 def username_exists_in_tenant(
     db: Session,
     *,
@@ -111,6 +153,13 @@ def is_unique_username_violation(exc: IntegrityError) -> bool:
     )
 
 
+def is_unique_login_phone_violation(exc: IntegrityError) -> bool:
+    error_text = str(getattr(exc, "orig", exc)).lower()
+    return "uq_users_login_phone" in error_text or (
+        "unique" in error_text and "login_phone" in error_text
+    )
+
+
 def get_tenant_role(db: Session, *, tenant_id: Any, role_id: int) -> Role:
     role = (
         db.query(Role).filter(Role.id == role_id, Role.tenant_id == tenant_id).first()
@@ -128,17 +177,21 @@ def create_tenant_user_account(
     tenant_id: Any,
     username: Any,
     email: Any,
+    login_phone: Any = None,
     password: Any,
     role_id: int,
     nome: str | None = None,
 ) -> tuple[User, Role]:
     normalized_username = normalize_username(username) if username else None
     normalized_email = normalize_email(email)
+    normalized_login_phone = (
+        normalize_login_phone(login_phone) if login_phone else None
+    )
     normalized_password = validate_password(password)
     role = get_tenant_role(db, tenant_id=tenant_id, role_id=role_id)
 
-    if not normalized_username and not normalized_email:
-        raise UserAccountError("Informe um nome de usuario ou um e-mail.")
+    if not normalized_username and not normalized_email and not normalized_login_phone:
+        raise UserAccountError("Informe um celular, nome de usuario ou e-mail.")
     if normalized_username and username_exists_in_tenant(
         db,
         tenant_id=tenant_id,
@@ -153,11 +206,17 @@ def create_tenant_user_account(
             "Este e-mail ja esta cadastrado. Use outro e-mail ou deixe o campo vazio.",
             status_code=409,
         )
+    if login_phone_exists_globally(db, normalized_login_phone):
+        raise UserAccountError(
+            "Este celular ja esta vinculado a outro usuario.",
+            status_code=409,
+        )
 
     now = datetime.now(timezone.utc)
     user = User(
         email=normalized_email,
         username=normalized_username,
+        login_phone=normalized_login_phone,
         hashed_password=hash_password(normalized_password),
         nome=(str(nome or "").strip() or None),
         is_active=True,

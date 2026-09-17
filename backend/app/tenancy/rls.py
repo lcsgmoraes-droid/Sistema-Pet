@@ -14,6 +14,7 @@ from app.tenancy.context import get_current_tenant
 RLS_TENANT_SETTING = "app.tenant_id"
 RLS_AUTH_USER_SETTING = "app.auth_user_id"
 RLS_AUTH_EMAIL_SETTING = "app.auth_email"
+RLS_AUTH_PHONE_SETTING = "app.auth_phone"
 _SET_CONFIG_SQL = text("SELECT set_config(:setting_name, :setting_value, true)")
 _UNSET = object()
 
@@ -72,6 +73,11 @@ def sync_rls_auth_user(db: ORMSession, user_id: Any) -> bool:
 def sync_rls_auth_email(db: ORMSession, email: Any) -> bool:
     setting_value = str(email or "").strip().lower()
     return _set_transaction_setting(db, RLS_AUTH_EMAIL_SETTING, setting_value)
+
+
+def sync_rls_auth_phone(db: ORMSession, phone: Any) -> bool:
+    setting_value = str(phone or "").strip()
+    return _set_transaction_setting(db, RLS_AUTH_PHONE_SETTING, setting_value)
 
 
 def _sync_rls_before_flush(session, flush_context, instances) -> None:
