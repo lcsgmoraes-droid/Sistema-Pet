@@ -2,9 +2,9 @@
 
 from datetime import date, datetime, time, timedelta
 from math import ceil
-from typing import Literal, Optional
+from typing import Optional
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
@@ -17,6 +17,16 @@ from app.utils.timezone import now_brasilia
 from app.vendas_models import Venda
 
 router = APIRouter()
+PRAZOS_INATIVIDADE = (30, 60, 90)
+
+
+def _validar_dias_sem_compra(valor: int) -> int:
+    if valor not in PRAZOS_INATIVIDADE:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="dias_sem_compra deve ser 30, 60 ou 90",
+        )
+    return valor
 
 
 def _mensagem_sugerida(nome: str) -> str:
@@ -101,7 +111,7 @@ def _montar_resultado_inativos(
 @router.get("/inativos")
 @require_permission("clientes.visualizar")
 def listar_clientes_inativos(
-    dias_sem_compra: Literal[30, 60, 90] = 30,
+    dias_sem_compra: int = Query(30),
     busca: Optional[str] = Query(None, max_length=120),
     pagina: int = Query(1, ge=1),
     por_pagina: int = Query(25, ge=10, le=100),
@@ -109,6 +119,7 @@ def listar_clientes_inativos(
     user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     """Retorna clientes cuja ultima venda finalizada ultrapassou o prazo escolhido."""
+    dias_sem_compra = _validar_dias_sem_compra(dias_sem_compra)
     _current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
     hoje = now_brasilia().date()
     corte = datetime.combine(
