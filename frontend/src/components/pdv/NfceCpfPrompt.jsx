@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
-import { CheckCircle2 } from "lucide-react";
+import { CheckCircle2, HelpCircle } from "lucide-react";
 
 import { atualizarCliente } from "../../api/clientes";
-import { formatCpf, normalizeCpf, validarCpf } from "../../utils/cpf";
+import { documentoCpfCnpjCliente, formatCpf, normalizeCpf, validarCpf } from "../../utils/cpf";
 
 function errorMessage(error) {
   const detail = error?.response?.data?.detail;
@@ -18,21 +18,25 @@ function errorMessage(error) {
 export default function NfceCpfPrompt({
   cliente,
   disabled = false,
+  onContinueWithoutCpf,
   onResolvedChange,
   onSaved,
   visible = true,
 }) {
-  const existingDocument = cliente?.cpf || cliente?.cnpj || cliente?.cpf_cnpj || "";
-  const [choice, setChoice] = useState(existingDocument ? "registered" : "");
+  const existingDocument = documentoCpfCnpjCliente(cliente);
+  const [saved, setSaved] = useState(false);
   const [cpf, setCpf] = useState("");
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
-  const resolved = Boolean(existingDocument || choice === "skip" || choice === "saved");
+  const [continuing, setContinuing] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
+  const resolved = Boolean(existingDocument || saved);
 
   useEffect(() => {
-    setChoice(existingDocument ? "registered" : "");
+    setSaved(false);
     setCpf("");
     setError("");
+    setHelpOpen(false);
   }, [cliente?.id, existingDocument]);
 
   useEffect(() => {
@@ -57,7 +61,7 @@ export default function NfceCpfPrompt({
     setError("");
     try {
       const updatedCustomer = await atualizarCliente(cliente.id, { cpf: normalized });
-      setChoice("saved");
+      setSaved(true);
       onSaved?.(updatedCustomer || { ...cliente, cpf: normalized });
     } catch (failure) {
       setError(errorMessage(failure));
@@ -66,97 +70,85 @@ export default function NfceCpfPrompt({
     }
   }
 
+  async function continueWithoutCpf() {
+    setContinuing(true);
+    setError("");
+    try {
+      await onContinueWithoutCpf?.();
+    } finally {
+      setContinuing(false);
+    }
+  }
+
   return (
-    <div className="rounded-xl border border-sky-200 bg-sky-50 p-4 text-sm text-sky-950">
-      {choice === "saved" ? (
+    <div className="rounded-xl border border-sky-200 bg-sky-50 p-3 text-sm text-sky-950 dark:border-sky-800 dark:bg-sky-950/40 dark:text-sky-100">
+      {saved ? (
         <p className="flex items-center gap-2 font-semibold">
           <CheckCircle2 className="h-4 w-4" /> CPF salvo no cadastro e incluído na NFC-e.
         </p>
-      ) : choice === "skip" ? (
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <p className="font-medium">A NFC-e será emitida sem CPF.</p>
-          {cliente?.id && (
+      ) : (
+        <form onSubmit={saveCpf} className="space-y-2.5">
+          <div className="flex items-center gap-1.5">
+            <p className="font-semibold">Quer colocar CPF na nota?</p>
             <button
               type="button"
-              onClick={() => setChoice("form")}
-              disabled={disabled}
-              className="font-semibold text-sky-800 underline disabled:opacity-50"
+              onClick={() => setHelpOpen((open) => !open)}
+              aria-label="Explicação sobre CPF na nota"
+              aria-expanded={helpOpen}
+              aria-controls="ajuda-cpf-na-nota"
+              className="rounded-full p-1 text-sky-700 hover:bg-sky-100 dark:text-sky-200 dark:hover:bg-sky-900"
             >
-              Adicionar CPF
+              <HelpCircle className="h-4 w-4" />
             </button>
-          )}
-        </div>
-      ) : choice === "form" ? (
-        <form onSubmit={saveCpf} className="space-y-3">
-          <div>
-            <label htmlFor="nfce-cpf" className="font-semibold">
-              CPF para incluir na NFC-e
-            </label>
-            <input
-              id="nfce-cpf"
-              value={cpf}
-              onChange={(event) => {
-                setCpf(formatCpf(event.target.value));
-                setError("");
-              }}
-              inputMode="numeric"
-              autoComplete="off"
-              placeholder="000.000.000-00"
-              disabled={disabled || saving}
-              className="mt-2 w-full rounded-lg border border-sky-300 bg-white px-3 py-2 text-slate-900 outline-none focus:border-sky-600 focus:ring-2 focus:ring-sky-600/20"
-            />
           </div>
+          {helpOpen && (
+            <p id="ajuda-cpf-na-nota" className="text-xs text-sky-800 dark:text-sky-200">
+              {cliente?.id
+                ? "O CPF ficará salvo no cadastro deste cliente para as próximas compras."
+                : "Para salvar um CPF, selecione o cliente no PDV antes de finalizar a venda."}
+            </p>
+          )}
+          {cliente?.id && (
+            <div>
+              <label htmlFor="nfce-cpf" className="sr-only">
+                CPF para incluir na NFC-e
+              </label>
+              <input
+                id="nfce-cpf"
+                value={cpf}
+                onChange={(event) => {
+                  setCpf(formatCpf(event.target.value));
+                  setError("");
+                }}
+                inputMode="numeric"
+                autoComplete="off"
+                placeholder="000.000.000-00"
+                disabled={disabled || saving || continuing}
+                className="w-full rounded-lg border border-sky-300 bg-white px-3 py-2 text-slate-900 outline-none focus:border-sky-600 focus:ring-2 focus:ring-sky-600/20 dark:border-sky-700 dark:bg-slate-950 dark:text-slate-100"
+              />
+            </div>
+          )}
           {error && <p className="text-xs font-medium text-red-700">{error}</p>}
           <div className="flex flex-wrap gap-2">
-            <button
-              type="submit"
-              disabled={disabled || saving}
-              className="rounded-lg bg-sky-700 px-3 py-2 font-semibold text-white hover:bg-sky-800 disabled:opacity-50"
-            >
-              {saving ? "Salvando…" : "Salvar CPF"}
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setChoice("skip");
-                setError("");
-              }}
-              disabled={disabled || saving}
-              className="rounded-lg border border-sky-300 px-3 py-2 font-semibold disabled:opacity-50"
-            >
-              Continuar sem CPF
-            </button>
-          </div>
-        </form>
-      ) : (
-        <div>
-          <p className="font-semibold">Quer colocar CPF na nota?</p>
-          <p className="mt-1 text-xs text-sky-800">
-            {cliente?.id
-              ? "O CPF ficará salvo no cadastro deste cliente para as próximas compras."
-              : "Para salvar um CPF, selecione o cliente no PDV antes de finalizar a venda."}
-          </p>
-          <div className="mt-3 flex flex-wrap gap-2">
             {cliente?.id && (
               <button
-                type="button"
-                onClick={() => setChoice("form")}
-                disabled={disabled}
+                type="submit"
+                disabled={disabled || saving || continuing}
                 className="rounded-lg bg-sky-700 px-3 py-2 font-semibold text-white hover:bg-sky-800 disabled:opacity-50"
               >
-                Sim, adicionar CPF
+                {saving ? "Salvando…" : "Salvar CPF"}
               </button>
             )}
             <button
               type="button"
-              onClick={() => setChoice("skip")}
-              disabled={disabled}
-              className="rounded-lg border border-sky-300 px-3 py-2 font-semibold disabled:opacity-50"
+              onClick={continueWithoutCpf}
+              disabled={disabled || saving || continuing}
+              className="rounded-lg border border-sky-300 px-3 py-2 font-semibold hover:bg-sky-100 disabled:opacity-50 dark:border-sky-700 dark:hover:bg-sky-900"
             >
-              Não, continuar sem CPF
+              {continuing ? "Emitindo NFC-e…" : "Não, continuar sem CPF"}
             </button>
           </div>
-        </div>
+        </form>
       )}
     </div>
   );

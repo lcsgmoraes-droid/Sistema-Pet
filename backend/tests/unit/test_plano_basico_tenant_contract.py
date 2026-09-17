@@ -257,6 +257,7 @@ def test_premium_routers_remain_gated_in_router_bootstrap():
         "banho_tosa_router": "banho_tosa",
         "bling_sync_router": "bling",
         "nfe_router": "fiscal",
+        "intnfe_router": "fiscal",
         "simples_router": "financeiro_erp",
         "auditoria_provisoes_router": "financeiro_erp",
         "contas_receber_router": "financeiro_erp",

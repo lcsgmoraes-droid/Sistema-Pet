@@ -32,6 +32,7 @@ export function useModalPagamentoActions({
   formaPagamentoSelecionada,
   justificativaTexto,
   margemCriticaAtual,
+  moduloFiscalAtivo,
   nsuCartao,
   numeroParcelas,
   onConfirmar,
@@ -269,7 +270,7 @@ export function useModalPagamentoActions({
         eh_crediario: ehVendaCrediario(vendaParaCupom),
       });
 
-      if (devePerguntarNotaFiscal(resultado)) {
+      if (!moduloFiscalAtivo || devePerguntarNotaFiscal(resultado)) {
         setMostrarPerguntaNFe(true);
       } else {
         onConfirmar();

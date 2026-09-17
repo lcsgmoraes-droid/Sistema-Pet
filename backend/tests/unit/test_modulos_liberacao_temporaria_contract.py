@@ -3,6 +3,7 @@ from types import SimpleNamespace
 
 from app.routes.modulos_routes import (
     MODULOS_BETA_PUBLICOS,
+    MODULOS_CONTRATACAO_SEPARADA,
     MODULOS_FORA_DA_OFERTA_PUBLICA,
     MODULOS_PREMIUM,
     MODULOS_TRIAL_COMPLETO,
@@ -14,7 +15,7 @@ from app.routes.modulos_routes import (
 )
 
 
-def test_plano_legado_free_continua_liberado_para_nao_quebrar_tenants_existentes():
+def test_plano_legado_free_preserva_modulos_exceto_contratacoes_separadas():
     ativos = _resolver_modulos_ativos(
         raw_modulos=None,
         assinaturas_ativas=[],
@@ -22,7 +23,8 @@ def test_plano_legado_free_continua_liberado_para_nao_quebrar_tenants_existentes
         plano="free",
     )
 
-    assert set(ativos) >= set(MODULOS_PREMIUM)
+    assert set(ativos) >= set(MODULOS_PREMIUM - MODULOS_CONTRATACAO_SEPARADA)
+    assert "fiscal" not in ativos
 
 
 def test_plano_basico_nao_libera_extras_sem_assinatura_ou_modulo_expresso():
@@ -47,12 +49,16 @@ def test_trial_ativo_libera_todos_modulos_corepet_sem_integracao_externa():
 
     assert set(ativos) == set(MODULOS_TRIAL_COMPLETO)
     assert "bling" not in ativos
+    assert "fiscal" not in ativos
 
 
-def test_bling_nao_entra_na_vitrine_beta_publica():
+def test_modulos_de_contratacao_separada_nao_entram_na_vitrine_beta_publica():
     assert "bling" in MODULOS_PREMIUM
     assert "bling" in MODULOS_FORA_DA_OFERTA_PUBLICA
     assert "bling" not in MODULOS_BETA_PUBLICOS
+    assert "fiscal" in MODULOS_PREMIUM
+    assert "fiscal" in MODULOS_FORA_DA_OFERTA_PUBLICA
+    assert "fiscal" not in MODULOS_BETA_PUBLICOS
 
 
 def test_plano_basico_preserva_assinaturas_ativas_e_ignora_expiradas():
@@ -74,7 +80,7 @@ def test_plano_basico_preserva_assinaturas_ativas_e_ignora_expiradas():
     assert "expirado" not in ativos
 
 
-def test_plano_completo_libera_todos_modulos_controlados():
+def test_plano_completo_nao_libera_modulo_fiscal_sem_contratacao():
     ativos = _resolver_modulos_ativos(
         raw_modulos=None,
         assinaturas_ativas=[],
@@ -82,7 +88,19 @@ def test_plano_completo_libera_todos_modulos_controlados():
         plano="enterprise",
     )
 
-    assert set(ativos) == set(MODULOS_PREMIUM)
+    assert set(ativos) == set(MODULOS_PREMIUM - MODULOS_CONTRATACAO_SEPARADA)
+    assert "fiscal" not in ativos
+
+
+def test_modulo_fiscal_expresso_e_preservado_em_qualquer_plano():
+    ativos = _resolver_modulos_ativos(
+        raw_modulos='["fiscal"]',
+        assinaturas_ativas=[],
+        agora=datetime(2026, 9, 17, tzinfo=timezone.utc),
+        plano="pet-start",
+    )
+
+    assert "fiscal" in ativos
 
 
 def test_modulos_ativos_json_vazio_e_valido():
