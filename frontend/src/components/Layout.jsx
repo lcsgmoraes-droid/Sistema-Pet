@@ -35,6 +35,7 @@ import {
 import LayoutFavoritesBar from "./layout/LayoutFavoritesBar";
 import LayoutSidebar from "./layout/LayoutSidebar";
 import { createLayoutMenuItems } from "./layout/menuConfig";
+import { resolveLayoutSessionIdentity } from "./layout/layoutSessionIdentity";
 import ModalCalculadoraUniversal from "./ModalCalculadoraUniversal";
 import ThemeToggle from "./theme/ThemeToggle";
 
@@ -46,6 +47,7 @@ const Layout = () => {
   const location = useLocation();
   const isBradescoOrganizerRoute = location.pathname === "/organizador-bradesco";
   const { user, logout } = useAuth();
+  const sessionIdentity = resolveLayoutSessionIdentity(user);
   const {
     modulosAtivos,
     moduloAtivo,
@@ -796,18 +798,22 @@ const Layout = () => {
           {/* User Info */}
           <div className="flex items-center gap-2 md:gap-3 ml-auto">
             <ThemeToggle />
-            <div className="text-right hidden sm:block">
-              <p className="text-sm font-medium text-gray-900 dark:text-slate-100">
-                {user?.nome || user?.username || user?.email}
+            <div className="hidden max-w-[260px] text-right sm:block">
+              <p
+                className="truncate text-sm font-medium text-gray-900 dark:text-slate-100"
+                title={`Loja ativa: ${sessionIdentity.tenantLabel}`}
+              >
+                Loja: {sessionIdentity.tenantLabel}
               </p>
-              <p className="text-xs text-gray-500 dark:text-slate-400">
-                {user?.username || user?.email}
+              <p
+                className="truncate text-xs text-gray-500 dark:text-slate-400"
+                title={`Usuário logado: ${sessionIdentity.userLabel}`}
+              >
+                Usuário: {sessionIdentity.userLabel}
               </p>
             </div>
             <div className="w-9 h-9 md:w-10 md:h-10 rounded-full bg-[#0f5f63] flex items-center justify-center text-white font-bold text-sm md:text-base">
-              {user?.nome?.[0]?.toUpperCase() ||
-                user?.username?.[0]?.toUpperCase() ||
-                user?.email?.[0]?.toUpperCase()}
+              {sessionIdentity.avatarInitial}
             </div>
           </div>
         </header>
