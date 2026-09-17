@@ -64,6 +64,10 @@ from app.clientes.racas_routes import (
     list_racas_teste,
     router as racas_router,
 )
+from app.clientes.ranking_routes import (
+    listar_ranking_clientes,
+    router as ranking_router,
+)
 from app.clientes.relatorio_routes import (
     listar_pessoas_para_relatorio,
     router as relatorio_router,
@@ -96,6 +100,7 @@ router.include_router(duplicidades_router)
 router.include_router(pets_router)
 router.include_router(credito_router)
 router.include_router(parceiros_router)
+router.include_router(ranking_router)
 router.include_router(relatorio_router)
 router.include_router(clientes_base_router)
 router.include_router(racas_router)
@@ -112,6 +117,7 @@ __all__ = [
     "PetCreate",
     "PetResponse",
     "PetUpdate",
+    "listar_ranking_clientes",
     "TimelineEvento",
     "ToggleParceiroRequest",
     "_anexar_metadados_criacao_cliente",

@@ -5,7 +5,14 @@ export const LAYOUT_MENU_GROUPS = [
   },
   {
     label: "Atendimento",
-    paths: ["/clientes", "/pets", "/veterinario", "/banho-tosa", "/calculadora-racao"],
+    paths: [
+      "/clientes",
+      "/ranking-clientes",
+      "/pets",
+      "/veterinario",
+      "/banho-tosa",
+      "/calculadora-racao",
+    ],
   },
   {
     label: "Vendas e relacionamento",

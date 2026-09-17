@@ -49,6 +49,13 @@ export function createLayoutMenuItems({
       permission: "clientes.visualizar",
     },
     {
+      path: "/ranking-clientes",
+      icon: FiTrendingUp,
+      iconKey: "trending-up",
+      label: "Ranking de clientes",
+      permission: "clientes.visualizar",
+    },
+    {
       path: "/pets",
       icon: PawPrint,
       iconKey: "paw-print",
