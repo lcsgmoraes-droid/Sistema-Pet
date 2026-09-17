@@ -184,9 +184,7 @@ def create_tenant_user_account(
 ) -> tuple[User, Role]:
     normalized_username = normalize_username(username) if username else None
     normalized_email = normalize_email(email)
-    normalized_login_phone = (
-        normalize_login_phone(login_phone) if login_phone else None
-    )
+    normalized_login_phone = normalize_login_phone(login_phone) if login_phone else None
     normalized_password = validate_password(password)
     role = get_tenant_role(db, tenant_id=tenant_id, role_id=role_id)
 
