@@ -9,7 +9,6 @@ import {
   Pessoas,
   PetDetalhes,
   PetForm,
-  RankingClientes,
 } from "../lazyPages";
 import { DefaultProtectedHomeRedirect } from "./RouteGates";
 
@@ -28,18 +27,14 @@ export function createCoreProtectedRoutes() {
       />
       <Route path="dashboard-gerencial" element={<Navigate to="/dashboard" replace />} />
       <Route
+        path="ranking-clientes"
+        element={<Navigate to="/campanhas/ranking-clientes" replace />}
+      />
+      <Route
         path="clientes"
         element={
           <ProtectedRoute permission="clientes.visualizar">
             <Pessoas />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="ranking-clientes"
-        element={
-          <ProtectedRoute permission="clientes.visualizar">
-            <RankingClientes />
           </ProtectedRoute>
         }
       />

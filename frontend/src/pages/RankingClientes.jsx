@@ -33,7 +33,7 @@ const quantidade = (valor) =>
     maximumFractionDigits: 3,
   });
 
-export default function RankingClientes() {
+export default function RankingClientes({ embedded = false }) {
   const periodoInicial = obterPeriodoRanking("mes_atual");
   const [periodoDigitado, setPeriodoDigitado] = useState(periodoInicial);
   const [filtros, setFiltros] = useState({
@@ -110,23 +110,47 @@ export default function RankingClientes() {
   const resumo = dados?.resumo || {};
 
   return (
-    <div className="mx-auto max-w-[1500px] space-y-6 p-4 md:p-6">
-      <PageHeader
-        icon={Trophy}
-        title="Ranking de clientes"
-        subtitle="Veja rapidamente quem mais compra, mais gasta e leva mais itens em cada período."
-        actions={
+    <div className={embedded ? "space-y-6" : "mx-auto max-w-[1500px] space-y-6 p-4 md:p-6"}>
+      {!embedded && (
+        <PageHeader
+          icon={Trophy}
+          title="Ranking de clientes"
+          subtitle="Veja rapidamente quem mais compra, mais gasta e leva mais itens em cada período."
+          actions={
+            <button
+              type="button"
+              onClick={() => setAtualizacao((valor) => valor + 1)}
+              disabled={carregando}
+              className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm disabled:opacity-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+            >
+              <RefreshCw className={`h-4 w-4 ${carregando ? "animate-spin" : ""}`} />
+              Atualizar
+            </button>
+          }
+        />
+      )}
+
+      {embedded && (
+        <div className="flex flex-col gap-3 rounded-xl border border-blue-100 bg-blue-50 p-4 sm:flex-row sm:items-center sm:justify-between dark:border-blue-900/60 dark:bg-blue-950/30">
+          <div>
+            <h2 className="font-semibold text-slate-900 dark:text-slate-100">
+              Ranking de compras por periodo
+            </h2>
+            <p className="text-sm text-slate-600 dark:text-slate-300">
+              Compare quem mais gastou, mais comprou e levou mais itens.
+            </p>
+          </div>
           <button
             type="button"
             onClick={() => setAtualizacao((valor) => valor + 1)}
             disabled={carregando}
-            className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm disabled:opacity-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+            className="inline-flex items-center justify-center gap-2 rounded-lg border border-blue-200 bg-white px-4 py-2 text-sm font-semibold text-blue-700 shadow-sm disabled:opacity-50 dark:border-blue-800 dark:bg-slate-900 dark:text-blue-300"
           >
             <RefreshCw className={`h-4 w-4 ${carregando ? "animate-spin" : ""}`} />
             Atualizar
           </button>
-        }
-      />
+        </div>
+      )}
 
       <section className="space-y-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
         <div className="flex flex-wrap gap-2">
