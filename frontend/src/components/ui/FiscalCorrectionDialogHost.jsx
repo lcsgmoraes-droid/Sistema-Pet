@@ -374,6 +374,7 @@ export default function FiscalCorrectionDialogHost() {
                     produto={produto}
                     contextoFiscal={contextoFiscal}
                     onAplicar={(campo, valor) => atualizarCampo(String(produto.id), campo, valor)}
+                    valoresAtuais={fiscal}
                   />
                   <div className="grid gap-4 md:grid-cols-2">
                     {produto.pendencias.map((item) => {

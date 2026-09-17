@@ -4,6 +4,14 @@ export function normalizeCpf(value) {
     .slice(0, 11);
 }
 
+export function documentoCpfCnpjCliente(cliente) {
+  return (
+    [cliente?.cpf, cliente?.cnpj, cliente?.cpf_cnpj]
+      .map((value) => String(value ?? "").trim())
+      .find(Boolean) || ""
+  );
+}
+
 export function formatCpf(value) {
   const digits = normalizeCpf(value);
   return digits

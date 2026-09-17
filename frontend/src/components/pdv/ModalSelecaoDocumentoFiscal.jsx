@@ -1,20 +1,19 @@
 import { useState } from "react";
-import { FileText, X } from "lucide-react";
+import { FileText, HelpCircle, X } from "lucide-react";
 import { useFiscalDocumentAvailability } from "../../hooks/useFiscalDocumentAvailability";
+import { documentoCpfCnpjCliente } from "../../utils/cpf";
 import { temPendenciasFiscais } from "../../utils/nfeFiscalAssistida";
 import NfceCpfPrompt from "./NfceCpfPrompt";
 import SeletorModeloDocumentoFiscal from "../SeletorModeloDocumentoFiscal";
 
 export default function ModalSelecaoDocumentoFiscal({ cliente, onClose, onEmitir, vendaId }) {
+  const documentoCliente = documentoCpfCnpjCliente(cliente);
   const [tipoNota, setTipoNota] = useState("nfce");
   const [emitindo, setEmitindo] = useState(false);
-  const [nfceCpfResolved, setNfceCpfResolved] = useState(
-    Boolean(cliente?.cpf || cliente?.cnpj || cliente?.cpf_cnpj),
-  );
+  const [nfceCpfResolved, setNfceCpfResolved] = useState(Boolean(documentoCliente));
   const [savedCustomerDocument, setSavedCustomerDocument] = useState("");
-  const clienteIdentificado = Boolean(
-    cliente?.cpf || cliente?.cnpj || cliente?.cpf_cnpj || savedCustomerDocument,
-  );
+  const [headerHelpOpen, setHeaderHelpOpen] = useState(false);
+  const clienteIdentificado = Boolean(documentoCliente || savedCustomerDocument);
   const {
     reload: reloadFiscalStatus,
     resolvePending,
@@ -50,13 +49,27 @@ export default function ModalSelecaoDocumentoFiscal({ cliente, onClose, onEmitir
         className="w-full max-w-lg rounded-2xl bg-white shadow-2xl"
       >
         <div className="flex items-start justify-between border-b border-gray-100 px-6 py-5">
-          <div>
-            <h2 id="titulo-modelo-documento-fiscal" className="text-lg font-bold text-gray-900">
-              Escolha o documento fiscal
-            </h2>
-            <p className="mt-1 text-sm text-gray-500">
-              A NFC-e já vem selecionada por ser a opção mais comum no caixa.
-            </p>
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-1.5">
+              <h2 id="titulo-modelo-documento-fiscal" className="text-lg font-bold text-gray-900">
+                Escolha o documento fiscal
+              </h2>
+              <button
+                type="button"
+                onClick={() => setHeaderHelpOpen((open) => !open)}
+                aria-label="Explicação sobre os documentos fiscais"
+                aria-expanded={headerHelpOpen}
+                aria-controls="ajuda-modelos-fiscais"
+                className="rounded-full p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-700"
+              >
+                <HelpCircle className="h-4 w-4" />
+              </button>
+            </div>
+            {headerHelpOpen && (
+              <p id="ajuda-modelos-fiscais" className="mt-1 text-sm text-gray-500">
+                A NFC-e já vem selecionada por ser a opção mais comum no caixa.
+              </p>
+            )}
           </div>
           <button
             type="button"
@@ -83,6 +96,7 @@ export default function ModalSelecaoDocumentoFiscal({ cliente, onClose, onEmitir
             <NfceCpfPrompt
               cliente={cliente}
               disabled={emitindo}
+              onContinueWithoutCpf={handleEmitir}
               onResolvedChange={setNfceCpfResolved}
               onSaved={(updatedCustomer) => {
                 setSavedCustomerDocument(updatedCustomer?.cpf || "cpf-salvo");

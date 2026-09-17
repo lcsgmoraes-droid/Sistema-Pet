@@ -476,7 +476,7 @@ def register_routers(app: FastAPI) -> None:
         dependencies=_module_dependencies("bling"),
     )
     app.include_router(bling_oauth_public_router, tags=["Bling OAuth"])
-    app.include_router(intnfe_router, dependencies=_module_dependencies("integracoes"))
+    app.include_router(intnfe_router, dependencies=_module_dependencies("fiscal"))
     app.include_router(
         bling_pedido_router,
         tags=["Integração Bling - Pedido"],

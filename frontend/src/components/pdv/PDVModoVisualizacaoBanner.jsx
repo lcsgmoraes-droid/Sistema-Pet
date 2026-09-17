@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { AlertCircle, FileText, RotateCcw, X } from "lucide-react";
+import { useModulos } from "../../contexts/ModulosContext";
 import ImprimirCupom from "../ImprimirCupom";
 import ActionButton from "../ui/ActionButton";
 import { podeAbrirDevolucaoVenda } from "../../utils/pdvReturnEligibility";
@@ -15,6 +16,8 @@ export default function PDVModoVisualizacaoBanner({
   mudarStatusParaAberta,
   habilitarEdicao,
 }) {
+  const { moduloAtivo } = useModulos();
+  const moduloFiscalAtivo = moduloAtivo("fiscal");
   const [mostrarSelecaoDocumento, setMostrarSelecaoDocumento] = useState(false);
 
   if (!ativo) {
@@ -70,17 +73,18 @@ export default function PDVModoVisualizacaoBanner({
               Voltar
             </ActionButton>
 
-            {(vendaAtual.status === "finalizada" || vendaAtual.status === "baixa_parcial") && (
-              <ActionButton
-                onClick={() => setMostrarSelecaoDocumento(true)}
-                icon={FileText}
-                intent="create"
-                size="md"
-                className="min-w-[116px]"
-              >
-                Emitir NF
-              </ActionButton>
-            )}
+            {moduloFiscalAtivo &&
+              (vendaAtual.status === "finalizada" || vendaAtual.status === "baixa_parcial") && (
+                <ActionButton
+                  onClick={() => setMostrarSelecaoDocumento(true)}
+                  icon={FileText}
+                  intent="create"
+                  size="md"
+                  className="min-w-[116px]"
+                >
+                  Emitir NF
+                </ActionButton>
+              )}
 
             {(vendaAtual.status === "finalizada" || vendaAtual.status === "baixa_parcial") && (
               <ActionButton
@@ -108,7 +112,7 @@ export default function PDVModoVisualizacaoBanner({
         </div>
       </div>
 
-      {mostrarSelecaoDocumento && (
+      {moduloFiscalAtivo && mostrarSelecaoDocumento && (
         <ModalSelecaoDocumentoFiscal
           cliente={vendaAtual.cliente}
           onClose={() => setMostrarSelecaoDocumento(false)}

@@ -1,4 +1,4 @@
-import { BookOpen, ExternalLink, Loader2, Search, Sparkles } from "lucide-react";
+import { BookOpen, CheckCircle2, ExternalLink, Loader2, Search, Sparkles } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import api from "../../api";
 
@@ -19,7 +19,12 @@ function mensagemErro(error) {
   return typeof detail === "string" ? detail : "Não foi possível consultar a base fiscal agora.";
 }
 
-export default function FiscalReferenceSearch({ produto, contextoFiscal, onAplicar }) {
+export default function FiscalReferenceSearch({
+  produto,
+  contextoFiscal,
+  onAplicar,
+  valoresAtuais,
+}) {
   const [aberto, setAberto] = useState(true);
   const [consulta, setConsulta] = useState(
     produto.codigo_barras || produto.nome || produto.sku || "",
@@ -27,6 +32,11 @@ export default function FiscalReferenceSearch({ produto, contextoFiscal, onAplic
   const [dados, setDados] = useState(null);
   const [carregando, setCarregando] = useState(false);
   const [erro, setErro] = useState("");
+  const ncmAtual = String(valoresAtuais?.ncm || "");
+  const cestAtual = String(valoresAtuais?.cest || "");
+  const resumoPreenchido = [ncmAtual && `NCM ${ncmAtual}`, cestAtual && `CEST ${cestAtual}`]
+    .filter(Boolean)
+    .join(" · ");
   const pendentes = useMemo(
     () => new Set((produto.pendencias || []).map((item) => item.campo)),
     [produto.pendencias],
@@ -78,6 +88,10 @@ export default function FiscalReferenceSearch({ produto, contextoFiscal, onAplic
   const abrir = () => {
     setAberto(true);
     if (!dados) pesquisar();
+  };
+
+  const aplicar = (campo, valor) => {
+    onAplicar(campo, valor);
   };
 
   return (
@@ -136,6 +150,17 @@ export default function FiscalReferenceSearch({ produto, contextoFiscal, onAplic
 
           {erro && <p className="text-sm font-medium text-red-700 dark:text-red-300">{erro}</p>}
 
+          {resumoPreenchido && (
+            <p
+              role="status"
+              className="flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-200"
+            >
+              <CheckCircle2 className="h-4 w-4 shrink-0" />
+              {resumoPreenchido} {ncmAtual && cestAtual ? "preenchidos" : "preenchido"} no
+              formulário. Revise os campos abaixo antes de salvar.
+            </p>
+          )}
+
           {dados && (
             <>
               <div>
@@ -184,18 +209,38 @@ export default function FiscalReferenceSearch({ produto, contextoFiscal, onAplic
                           <div className="flex shrink-0 flex-wrap gap-2">
                             <button
                               type="button"
-                              onClick={() => onAplicar("ncm", resultado.ncm)}
-                              className="rounded-lg bg-indigo-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-800"
+                              onClick={() => aplicar("ncm", resultado.ncm)}
+                              className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold text-white ${
+                                ncmAtual === String(resultado.ncm)
+                                  ? "bg-emerald-600 hover:bg-emerald-700"
+                                  : "bg-indigo-700 hover:bg-indigo-800"
+                              }`}
                             >
-                              Usar NCM
+                              {ncmAtual === String(resultado.ncm) ? (
+                                <>
+                                  <CheckCircle2 className="h-3.5 w-3.5" /> NCM aplicado
+                                </>
+                              ) : (
+                                "Usar NCM"
+                              )}
                             </button>
                             {resultado.cest && (
                               <button
                                 type="button"
-                                onClick={() => onAplicar("cest", resultado.cest)}
-                                className="rounded-lg border border-indigo-300 bg-white px-3 py-1.5 text-xs font-semibold text-indigo-800 hover:bg-indigo-50 dark:border-indigo-700 dark:bg-slate-950 dark:text-indigo-200"
+                                onClick={() => aplicar("cest", resultado.cest)}
+                                className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-semibold ${
+                                  cestAtual === String(resultado.cest)
+                                    ? "border-emerald-600 bg-emerald-50 text-emerald-800 hover:bg-emerald-100 dark:bg-emerald-950/30 dark:text-emerald-200"
+                                    : "border-indigo-300 bg-white text-indigo-800 hover:bg-indigo-50 dark:border-indigo-700 dark:bg-slate-950 dark:text-indigo-200"
+                                }`}
                               >
-                                Usar CEST
+                                {cestAtual === String(resultado.cest) ? (
+                                  <>
+                                    <CheckCircle2 className="h-3.5 w-3.5" /> CEST aplicado
+                                  </>
+                                ) : (
+                                  "Usar CEST"
+                                )}
                               </button>
                             )}
                           </div>
@@ -233,7 +278,7 @@ export default function FiscalReferenceSearch({ produto, contextoFiscal, onAplic
                       <select
                         defaultValue=""
                         onChange={(event) => {
-                          if (event.target.value) onAplicar(campo, event.target.value);
+                          if (event.target.value) aplicar(campo, event.target.value);
                         }}
                         className="mt-1.5 w-full rounded-lg border border-slate-300 bg-white px-2 py-2 text-xs text-slate-900 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
                       >

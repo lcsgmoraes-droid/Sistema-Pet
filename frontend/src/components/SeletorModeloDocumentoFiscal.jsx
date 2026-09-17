@@ -1,4 +1,14 @@
-import { AlertTriangle, CheckCircle2, FileText, Loader2, Receipt, RefreshCw } from "lucide-react";
+import { useState } from "react";
+import {
+  AlertTriangle,
+  CheckCircle2,
+  ChevronRight,
+  FileText,
+  HelpCircle,
+  Loader2,
+  Receipt,
+  RefreshCw,
+} from "lucide-react";
 import { listarPendenciasFiscais } from "../utils/nfeFiscalAssistida";
 
 const MODELOS = [
@@ -33,6 +43,8 @@ export default function SeletorModeloDocumentoFiscal({
   onRetryValidation,
   value = "nfce",
 }) {
+  const [ajudaAberta, setAjudaAberta] = useState(null);
+
   return (
     <fieldset>
       <legend className="mb-2 text-sm font-semibold text-gray-800">Modelos disponíveis</legend>
@@ -63,75 +75,86 @@ export default function SeletorModeloDocumentoFiscal({
               key={opcao.tipo}
               className={`overflow-hidden rounded-xl border-2 transition-colors ${cardClasses}`}
             >
-              <button
-                type="button"
-                aria-pressed={selecionado}
-                onClick={() => onChange(opcao.tipo)}
-                disabled={bloqueado}
-                className="flex w-full items-start gap-3 px-4 py-3 text-left disabled:cursor-not-allowed"
-              >
-                <span className="mt-0.5 rounded-lg bg-white p-2 shadow-sm">
-                  <Icone className="h-5 w-5" />
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className="flex flex-wrap items-center gap-2">
-                    <span className="font-bold">{opcao.titulo}</span>
-                    <span className="text-sm text-gray-500">{opcao.modelo}</span>
-                    <span
-                      className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${opcao.badgeClasses}`}
-                    >
-                      {opcao.destaque}
-                    </span>
-                  </span>
-                  <span className="mt-1 block text-xs leading-5 text-gray-600">
-                    {opcao.descricao}
-                  </span>
-                  {clientePendente && (
-                    <span className="mt-1 block text-xs font-medium text-amber-700">
-                      Selecione um cliente com CPF ou CNPJ para liberar este modelo.
-                    </span>
-                  )}
-                  {fiscalStatus.loading && (
-                    <span className="mt-2 flex items-center gap-1.5 text-xs font-medium text-gray-500">
-                      <Loader2 className="h-3.5 w-3.5 animate-spin" /> Verificando pendências…
-                    </span>
-                  )}
-                </span>
-                <span
-                  className={`mt-1 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border ${
-                    selecionado && !bloqueado ? "border-current bg-white" : "border-gray-300"
-                  }`}
+              <div className="flex items-start">
+                <button
+                  type="button"
+                  aria-pressed={selecionado}
+                  onClick={() => onChange(opcao.tipo)}
+                  disabled={bloqueado}
+                  className="flex min-w-0 flex-1 items-start gap-3 px-4 py-2.5 text-left disabled:cursor-not-allowed"
                 >
-                  {selecionado && !bloqueado && <CheckCircle2 className="h-4 w-4" />}
-                </span>
-              </button>
+                  <span className="rounded-lg bg-white p-2 shadow-sm">
+                    <Icone className="h-5 w-5" />
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="flex flex-wrap items-center gap-2">
+                      <span className="font-bold">{opcao.titulo}</span>
+                      <span className="text-sm text-gray-500">{opcao.modelo}</span>
+                      <span
+                        className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${opcao.badgeClasses}`}
+                      >
+                        {opcao.destaque}
+                      </span>
+                    </span>
+                    {clientePendente && (
+                      <span className="mt-1 block text-xs font-semibold text-amber-700">
+                        CPF/CNPJ necessário
+                      </span>
+                    )}
+                    {fiscalStatus.loading && (
+                      <span className="mt-1 flex items-center gap-1.5 text-xs font-medium text-gray-500">
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" /> Verificando pendências…
+                      </span>
+                    )}
+                  </span>
+                  <span
+                    className={`mt-1 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border ${
+                      selecionado && !bloqueado ? "border-current bg-white" : "border-gray-300"
+                    }`}
+                  >
+                    {selecionado && !bloqueado && <CheckCircle2 className="h-4 w-4" />}
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setAjudaAberta((atual) => (atual === opcao.tipo ? null : opcao.tipo))
+                  }
+                  aria-label={`Explicação sobre ${opcao.titulo}`}
+                  aria-expanded={ajudaAberta === opcao.tipo}
+                  aria-controls={`ajuda-modelo-${opcao.tipo}`}
+                  className="mr-3 mt-2.5 rounded-full p-1.5 text-gray-500 transition-colors hover:bg-black/5 hover:text-gray-800"
+                >
+                  <HelpCircle className="h-4 w-4" />
+                </button>
+              </div>
+
+              {ajudaAberta === opcao.tipo && (
+                <div
+                  id={`ajuda-modelo-${opcao.tipo}`}
+                  className="border-t border-current/10 px-4 py-2 text-xs leading-5 text-gray-600"
+                >
+                  <p>{opcao.descricao}</p>
+                  {clientePendente && (
+                    <p className="mt-1 font-medium text-amber-700">
+                      Selecione um cliente com CPF ou CNPJ para liberar este modelo.
+                    </p>
+                  )}
+                </div>
+              )}
 
               {temPendencias && (
-                <div className="border-t border-amber-200 px-4 py-3 text-xs">
-                  <p className="flex items-center gap-2 font-semibold text-amber-900">
-                    <AlertTriangle className="h-4 w-4 shrink-0" />
-                    {pendencias.length === 1
-                      ? "1 pendência impede a emissão"
-                      : `${pendencias.length} pendências impedem a emissão`}
-                  </p>
-                  <ul className="mt-2 space-y-1 text-amber-900">
-                    {pendencias.slice(0, 2).map((item, index) => (
-                      <li key={`${item.campo || "pendencia"}-${index}`}>
-                        • {item.produto_nome ? `${item.produto_nome}: ` : ""}
-                        {item.mensagem || item.campo}
-                      </li>
-                    ))}
-                    {pendencias.length > 2 && <li>• Mais {pendencias.length - 2} pendência(s)</li>}
-                  </ul>
-                  <button
-                    type="button"
-                    onClick={() => onResolvePending?.(opcao.tipo)}
-                    disabled={disabled}
-                    className="mt-3 inline-flex items-center gap-2 rounded-lg bg-amber-700 px-3 py-2 font-semibold text-white hover:bg-amber-800 disabled:opacity-50"
-                  >
-                    Resolver pendências
-                  </button>
-                </div>
+                <button
+                  type="button"
+                  onClick={() => onResolvePending?.(opcao.tipo)}
+                  disabled={disabled}
+                  aria-label={`Com pendências na ${opcao.titulo}. Clique para corrigir.`}
+                  className="flex w-full items-center gap-2 border-t border-amber-200 px-4 py-2.5 text-left text-xs font-semibold text-amber-900 transition-colors hover:bg-amber-100 disabled:opacity-50"
+                >
+                  <AlertTriangle className="h-4 w-4 shrink-0" />
+                  <span className="flex-1">Com pendências</span>
+                  <ChevronRight className="h-4 w-4 shrink-0" />
+                </button>
               )}
 
               {fiscalStatus.error && (
