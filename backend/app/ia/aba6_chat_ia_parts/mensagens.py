@@ -16,6 +16,7 @@ class ChatIAMensagensMixin:
         modelo_usado: str = None,
         contexto_usado: Dict = None,
         tenant_id: Optional[str] = None,
+        commit: bool = True,
     ) -> MensagemChat:
         """Adiciona mensagem à conversa"""
         conversa_query = self.db.query(Conversa).filter(Conversa.id == conversa_id)
@@ -53,8 +54,11 @@ class ChatIAMensagensMixin:
             if not conversa.titulo and tipo == "usuario":
                 conversa.titulo = conteudo[:50] + ("..." if len(conteudo) > 50 else "")
 
-        self.db.commit()
-        self.db.refresh(mensagem)
+        if commit:
+            self.db.commit()
+            self.db.refresh(mensagem)
+        else:
+            self.db.flush()
         return mensagem
 
     def obter_historico(

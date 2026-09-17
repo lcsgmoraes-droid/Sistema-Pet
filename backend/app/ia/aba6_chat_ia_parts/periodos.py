@@ -11,6 +11,36 @@ class ChatIAPeriodosMixin:
         agora = datetime.now()
         hoje = date.today()
 
+        match_intervalo = re.search(
+            r"\b(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})\s*"
+            r"(?:ate|a|ao|-|–|—)\s*"
+            r"(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})\b",
+            texto,
+        )
+        if match_intervalo:
+            dia_inicio, mes_inicio, ano_inicio, dia_fim, mes_fim, ano_fim = (
+                int(valor) for valor in match_intervalo.groups()
+            )
+            ano_inicio = ano_inicio + 2000 if ano_inicio < 100 else ano_inicio
+            ano_fim = ano_fim + 2000 if ano_fim < 100 else ano_fim
+            try:
+                inicio = datetime(ano_inicio, mes_inicio, dia_inicio)
+                fim = datetime.combine(
+                    date(ano_fim, mes_fim, dia_fim), datetime.max.time()
+                )
+            except ValueError:
+                pass
+            else:
+                if inicio <= fim:
+                    return {
+                        "inicio": inicio,
+                        "fim": fim,
+                        "label": (
+                            f"{dia_inicio:02d}/{mes_inicio:02d}/{ano_inicio} a "
+                            f"{dia_fim:02d}/{mes_fim:02d}/{ano_fim}"
+                        ),
+                    }
+
         meses = {
             "janeiro": 1,
             "fevereiro": 2,
@@ -38,6 +68,12 @@ class ChatIAPeriodosMixin:
         if "hoje" in texto or "dia de hoje" in texto:
             inicio, fim = self._date_bounds_for_today()
             return {"inicio": inicio, "fim": fim, "label": "hoje"}
+
+        if "ontem" in texto:
+            ontem = hoje - timedelta(days=1)
+            inicio = datetime.combine(ontem, datetime.min.time())
+            fim = datetime.combine(ontem, datetime.max.time())
+            return {"inicio": inicio, "fim": fim, "label": "ontem"}
 
         for nome_mes, numero_mes in meses.items():
             if nome_mes in texto:
