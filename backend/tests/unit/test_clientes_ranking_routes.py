@@ -73,13 +73,18 @@ def test_ranking_rejeita_periodo_invertido():
 
 def test_clientes_router_expoe_ranking_antes_da_rota_de_detalhe():
     from app import clientes_routes
+    from app.clientes.crud_routes import detail_router
     from app.clientes.ranking_routes import router as ranking_router
 
-    paths_clientes = [route.path for route in clientes_routes.router.routes]
+    routers_incluidos = [
+        route.original_router
+        for route in clientes_routes.router.routes
+        if hasattr(route, "original_router")
+    ]
 
     assert "/ranking-vendas" in {route.path for route in ranking_router.routes}
-    assert paths_clientes.index("/clientes/ranking-vendas") < paths_clientes.index(
-        "/clientes/{cliente_id}"
+    assert routers_incluidos.index(ranking_router) < routers_incluidos.index(
+        detail_router
     )
 
 
