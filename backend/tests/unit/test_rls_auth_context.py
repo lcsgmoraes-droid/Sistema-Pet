@@ -82,7 +82,11 @@ def test_rls_auth_sync_clears_empty_values():
 
 
 def test_rls_auth_sync_is_noop_outside_postgresql():
-    from app.tenancy.rls import sync_rls_auth_email, sync_rls_auth_phone, sync_rls_auth_user
+    from app.tenancy.rls import (
+        sync_rls_auth_email,
+        sync_rls_auth_phone,
+        sync_rls_auth_user,
+    )
 
     session = FakeSession("sqlite")
 

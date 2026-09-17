@@ -506,7 +506,9 @@ def test_admin_can_add_phone_login_to_existing_user(monkeypatch):
     db.commit()
 
     monkeypatch.setattr("app.usuarios_routes.revoke_all_sessions", lambda **_kwargs: 1)
-    monkeypatch.setattr("app.usuarios_routes.log_business_event", lambda **_kwargs: None)
+    monkeypatch.setattr(
+        "app.usuarios_routes.log_business_event", lambda **_kwargs: None
+    )
 
     result = atualizar_credenciais_usuario.__wrapped__(
         user_id=target_user.id,
@@ -568,9 +570,9 @@ def test_migration_makes_email_optional_and_username_unique_per_tenant():
 
 
 def test_phone_login_migration_adds_unique_identifier_and_rls_guard():
-    source = (REPO_ROOT / "alembic/versions/zzu20260917a1_user_phone_login.py").read_text(
-        encoding="utf-8"
-    )
+    source = (
+        REPO_ROOT / "alembic/versions/zzu20260917a1_user_phone_login.py"
+    ).read_text(encoding="utf-8")
 
     assert 'down_revision = "zzt20260916a1"' in source
     assert 'sa.Column("login_phone", sa.String(length=16), nullable=True)' in source
