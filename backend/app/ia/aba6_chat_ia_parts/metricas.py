@@ -221,11 +221,18 @@ class ChatIAMetricasMixin:
         from app.vendas_models import Venda, VendaItem
 
         if not tenant_id:
-            return {"top_categorias_margem": [], "top_canais": []}
+            return {
+                "top_categorias_margem": [],
+                "top_canais": [],
+                "top_clientes": [],
+            }
 
         vendas = (
             self.db.query(Venda)
-            .options(selectinload(Venda.itens).selectinload(VendaItem.produto))
+            .options(
+                selectinload(Venda.itens).selectinload(VendaItem.produto),
+                selectinload(Venda.cliente),
+            )
             .filter(
                 Venda.tenant_id == tenant_id,
                 Venda.data_venda >= data_inicio,
@@ -237,12 +244,34 @@ class ChatIAMetricasMixin:
 
         categorias: Dict[str, Dict[str, float]] = {}
         canais: Dict[str, Dict[str, float]] = {}
+        clientes: Dict[int, Dict[str, Any]] = {}
 
         for venda in vendas:
             canal = (venda.canal or "loja_fisica").replace("_", " ")
             canais.setdefault(canal, {"receita": 0.0, "quantidade": 0.0})
             canais[canal]["receita"] += float(venda.total or 0)
             canais[canal]["quantidade"] += 1
+
+            cliente = getattr(venda, "cliente", None)
+            cliente_id = getattr(venda, "cliente_id", None)
+            if cliente is not None and cliente_id is not None:
+                nome_cliente = (
+                    getattr(cliente, "nome_fantasia", None)
+                    or getattr(cliente, "razao_social", None)
+                    or getattr(cliente, "nome", None)
+                    or f"Cliente #{cliente_id}"
+                )
+                clientes.setdefault(
+                    cliente_id,
+                    {
+                        "cliente_id": cliente_id,
+                        "cliente": nome_cliente,
+                        "valor_total": 0.0,
+                        "quantidade_compras": 0,
+                    },
+                )
+                clientes[cliente_id]["valor_total"] += float(venda.total or 0)
+                clientes[cliente_id]["quantidade_compras"] += 1
 
             for item in venda.itens:
                 if not item.produto:
@@ -286,19 +315,31 @@ class ChatIAMetricasMixin:
             }
             for nome, dados in canais.items()
         ]
+        top_clientes = [
+            {
+                **dados,
+                "valor_total": round(float(dados["valor_total"]), 2),
+            }
+            for dados in clientes.values()
+        ]
 
         top_categorias_margem.sort(
             key=lambda item: item["margem_percentual"], reverse=True
         )
         top_canais.sort(key=lambda item: item["receita"], reverse=True)
+        top_clientes.sort(key=lambda item: item["valor_total"], reverse=True)
 
         return {
             "top_categorias_margem": top_categorias_margem[:limite],
             "top_canais": top_canais[:limite],
+            "top_clientes": top_clientes[:limite],
         }
 
     def _montar_resumo_executivo_periodo(
-        self, tenant_id: Optional[str], periodo: Dict[str, Any]
+        self,
+        tenant_id: Optional[str],
+        periodo: Dict[str, Any],
+        limite_rankings: int = 5,
     ) -> Dict[str, Any]:
         inicio = periodo["inicio"]
         fim = periodo["fim"]
@@ -308,5 +349,7 @@ class ChatIAMetricasMixin:
             "resumo_vendas": self._obter_resumo_vendas_periodo(tenant_id, inicio, fim),
             "produtos": self._obter_produtos_periodo(tenant_id, inicio, fim, limite=5),
             "dre": self._obter_dre_simplificada_mes(tenant_id, inicio, fim),
-            "rankings": self._obter_rankings_periodo(tenant_id, inicio, fim, limite=5),
+            "rankings": self._obter_rankings_periodo(
+                tenant_id, inicio, fim, limite=limite_rankings
+            ),
         }

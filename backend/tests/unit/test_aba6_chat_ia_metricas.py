@@ -1,8 +1,22 @@
 from datetime import datetime
 from types import SimpleNamespace
 
+import pytest
+
 from app.financeiro_models import ContaPagar
 from app.ia.aba6_chat_ia_parts.metricas import ChatIAMetricasMixin
+
+
+class _FakeLoad:
+    def selectinload(self, *_args, **_kwargs):
+        return self
+
+
+@pytest.fixture(autouse=True)
+def _ignorar_loader_options_no_banco_falso(monkeypatch):
+    monkeypatch.setattr(
+        "sqlalchemy.orm.selectinload", lambda *_args, **_kwargs: _FakeLoad()
+    )
 
 
 class _FakeQuery:
@@ -83,3 +97,54 @@ def test_dre_simplificada_ignora_compra_de_estoque_das_notas():
     assert dre["cmv_estimado"] == 400
     assert dre["despesas_operacionais"] == 100
     assert dre["lucro_liquido_estimado"] == 500
+
+
+def test_ranking_clientes_soma_compras_e_ordena_por_valor():
+    cliente_a = SimpleNamespace(nome="Cliente A", nome_fantasia=None, razao_social=None)
+    cliente_b = SimpleNamespace(nome="Cliente B", nome_fantasia=None, razao_social=None)
+    vendas = [
+        SimpleNamespace(
+            canal="loja_fisica",
+            total=100,
+            cliente_id=1,
+            cliente=cliente_a,
+            itens=[],
+        ),
+        SimpleNamespace(
+            canal="loja_fisica",
+            total=250,
+            cliente_id=2,
+            cliente=cliente_b,
+            itens=[],
+        ),
+        SimpleNamespace(
+            canal="site",
+            total=200,
+            cliente_id=1,
+            cliente=cliente_a,
+            itens=[],
+        ),
+    ]
+    service = _Metricas(_FakeDb(vendas, []))
+
+    ranking = service._obter_rankings_periodo(
+        "tenant-1",
+        datetime(2026, 8, 1),
+        datetime(2026, 8, 31, 23, 59, 59),
+        limite=10,
+    )
+
+    assert ranking["top_clientes"] == [
+        {
+            "cliente_id": 1,
+            "cliente": "Cliente A",
+            "valor_total": 300.0,
+            "quantidade_compras": 2,
+        },
+        {
+            "cliente_id": 2,
+            "cliente": "Cliente B",
+            "valor_total": 250.0,
+            "quantidade_compras": 1,
+        },
+    ]
