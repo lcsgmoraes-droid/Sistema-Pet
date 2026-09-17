@@ -27,6 +27,10 @@ export function createCoreProtectedRoutes() {
       />
       <Route path="dashboard-gerencial" element={<Navigate to="/dashboard" replace />} />
       <Route
+        path="ranking-clientes"
+        element={<Navigate to="/campanhas/ranking-clientes" replace />}
+      />
+      <Route
         path="clientes"
         element={
           <ProtectedRoute permission="clientes.visualizar">

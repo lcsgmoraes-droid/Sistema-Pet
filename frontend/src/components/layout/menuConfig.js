@@ -284,6 +284,11 @@ export function createLayoutMenuItems({
           label: "Estúdio de Ofertas",
           permission: "vendas.criar",
         },
+        {
+          path: "/campanhas/ranking-clientes",
+          label: "Ranking de clientes",
+          permission: "clientes.visualizar",
+        },
       ],
     },
     {

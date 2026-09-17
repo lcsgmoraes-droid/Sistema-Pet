@@ -81,6 +81,16 @@ export function createSalesMarketingRoutes() {
         }
       />
       <Route
+        path="campanhas/ranking-clientes"
+        element={
+          <ModuleGate modulo="campanhas">
+            <ProtectedRoute permission="clientes.visualizar">
+              <Campanhas />
+            </ProtectedRoute>
+          </ModuleGate>
+        }
+      />
+      <Route
         path="campanhas/canais"
         element={
           <ModuleGate modulo="campanhas">

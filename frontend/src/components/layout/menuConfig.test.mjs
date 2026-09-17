@@ -10,6 +10,13 @@ test("createLayoutMenuItems preserva itens principais do menu", () => {
   assert.equal(findMenuItem(items, "/dashboard")?.permission, "relatorios.gerencial");
   assert.equal(findMenuItem(items, "/dashboard-gerencial"), undefined);
   assert.equal(findMenuItem(items, "/pdv")?.permission, "vendas.criar");
+  assert.equal(findMenuItem(items, "/ranking-clientes"), undefined);
+  assert.equal(
+    findMenuItem(items, "/campanhas")?.submenu?.find(
+      (item) => item.path === "/campanhas/ranking-clientes",
+    )?.permission,
+    "clientes.visualizar",
+  );
   assert.equal(
     findMenuItem(items, "/financeiro")?.submenu?.some((item) => item.path === "/financeiro/vendas"),
     true,
