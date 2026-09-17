@@ -1,8 +1,9 @@
 import { useState } from "react";
-import { CheckCircle, FileText } from "lucide-react";
+import { CheckCircle, FileText, HelpCircle } from "lucide-react";
 import { useDadosCupomEmpresa } from "../hooks/useDadosCupomEmpresa";
 import { useFiscalDocumentAvailability } from "../hooks/useFiscalDocumentAvailability";
 import { usePersistentBooleanState } from "../hooks/usePersistentBooleanState";
+import { documentoCpfCnpjCliente } from "../utils/cpf";
 import { concluirVendaComCupom } from "../utils/pdvCupomFinalizacao";
 import { ehVendaCrediario } from "../utils/pdvReceipt";
 import { temPendenciasFiscais } from "../utils/nfeFiscalAssistida";
@@ -17,30 +18,29 @@ export default function ModalPerguntaNFe({
   cliente,
   erro = "",
   loading = false,
+  moduloFiscalAtivo = true,
   onConfirmar,
   onEmitir,
   venda,
   vendaId,
 }) {
   const crediario = ehVendaCrediario(venda);
+  const documentoCliente = documentoCpfCnpjCliente(cliente);
   const [imprimirCupom, setImprimirCupom] = usePersistentBooleanState(
     crediario ? IMPRESSAO_CREDIARIO_STORAGE_KEY : IMPRESSAO_CUPOM_STORAGE_KEY,
     crediario,
   );
   const [tipoNota, setTipoNota] = useState("nfce");
-  const [nfceCpfResolved, setNfceCpfResolved] = useState(
-    Boolean(cliente?.cpf || cliente?.cnpj || cliente?.cpf_cnpj),
-  );
+  const [nfceCpfResolved, setNfceCpfResolved] = useState(Boolean(documentoCliente));
   const [savedCustomerDocument, setSavedCustomerDocument] = useState("");
+  const [headerHelpOpen, setHeaderHelpOpen] = useState(false);
   const { carregandoEmpresa, dadosEmpresa } = useDadosCupomEmpresa();
   const {
     reload: reloadFiscalStatus,
     resolvePending,
     statuses: fiscalStatuses,
-  } = useFiscalDocumentAvailability(vendaId);
-  const clienteIdentificado = Boolean(
-    cliente?.cpf || cliente?.cnpj || cliente?.cpf_cnpj || savedCustomerDocument,
-  );
+  } = useFiscalDocumentAvailability(moduloFiscalAtivo ? vendaId : null);
+  const clienteIdentificado = Boolean(documentoCliente || savedCustomerDocument);
   const selectedFiscalStatus = fiscalStatuses[tipoNota] || {};
   const selectedModelBlocked = Boolean(
     selectedFiscalStatus.loading ||
@@ -65,11 +65,27 @@ export default function ModalPerguntaNFe({
             <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
               <CheckCircle className="w-6 h-6 text-green-600" />
             </div>
-            <div>
-              <h3 className="text-lg font-bold text-gray-900">Venda Finalizada!</h3>
-              <p className="text-sm text-gray-500">
-                Escolha se deseja emitir um documento fiscal antes de finalizar.
-              </p>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-1.5">
+                <h3 className="text-lg font-bold text-gray-900">Venda Finalizada!</h3>
+                {moduloFiscalAtivo && (
+                  <button
+                    type="button"
+                    onClick={() => setHeaderHelpOpen((open) => !open)}
+                    aria-label="Explicação sobre a emissão fiscal"
+                    aria-expanded={headerHelpOpen}
+                    aria-controls="ajuda-venda-finalizada-fiscal"
+                    className="rounded-full p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-700"
+                  >
+                    <HelpCircle className="h-4 w-4" />
+                  </button>
+                )}
+              </div>
+              {moduloFiscalAtivo && headerHelpOpen && (
+                <p id="ajuda-venda-finalizada-fiscal" className="mt-1 text-sm text-gray-500">
+                  Escolha se deseja emitir um documento fiscal antes de finalizar.
+                </p>
+              )}
             </div>
           </div>
 
@@ -80,52 +96,57 @@ export default function ModalPerguntaNFe({
           )}
 
           <div className="space-y-3">
-            <SeletorModeloDocumentoFiscal
-              clienteIdentificado={clienteIdentificado}
-              disabled={loading}
-              fiscalStatuses={fiscalStatuses}
-              onChange={setTipoNota}
-              onResolvePending={resolvePending}
-              onRetryValidation={reloadFiscalStatus}
-              value={tipoNota}
-            />
+            {moduloFiscalAtivo && (
+              <>
+                <SeletorModeloDocumentoFiscal
+                  clienteIdentificado={clienteIdentificado}
+                  disabled={loading}
+                  fiscalStatuses={fiscalStatuses}
+                  onChange={setTipoNota}
+                  onResolvePending={resolvePending}
+                  onRetryValidation={reloadFiscalStatus}
+                  value={tipoNota}
+                />
 
-            <NfceCpfPrompt
-              cliente={cliente}
-              disabled={loading}
-              onResolvedChange={setNfceCpfResolved}
-              onSaved={(updatedCustomer) => {
-                setSavedCustomerDocument(updatedCustomer?.cpf || "cpf-salvo");
-                reloadFiscalStatus();
-              }}
-              visible={tipoNota === "nfce"}
-            />
+                <NfceCpfPrompt
+                  cliente={cliente}
+                  disabled={loading}
+                  onContinueWithoutCpf={() => onEmitir("nfce")}
+                  onResolvedChange={setNfceCpfResolved}
+                  onSaved={(updatedCustomer) => {
+                    setSavedCustomerDocument(updatedCustomer?.cpf || "cpf-salvo");
+                    reloadFiscalStatus();
+                  }}
+                  visible={tipoNota === "nfce"}
+                />
 
-            {(loading || !selectedModelBlocked) && (
-              <button
-                type="button"
-                onClick={() => onEmitir(tipoNota)}
-                disabled={loading}
-                className={`flex w-full items-center justify-center space-x-2 rounded-lg px-4 py-3 font-medium text-white transition-colors disabled:opacity-50 ${
-                  tipoNota === "nfce"
-                    ? "bg-green-600 hover:bg-green-700"
-                    : "bg-blue-600 hover:bg-blue-700"
-                }`}
-              >
-                <FileText className="h-5 w-5" />
-                <span>
-                  {loading
-                    ? "Aguardando autorização da SEFAZ..."
-                    : `Emitir ${tipoNota === "nfce" ? "NFC-e" : "NF-e"}`}
-                </span>
-              </button>
-            )}
+                {(loading || !selectedModelBlocked) && (
+                  <button
+                    type="button"
+                    onClick={() => onEmitir(tipoNota)}
+                    disabled={loading}
+                    className={`flex w-full items-center justify-center space-x-2 rounded-lg px-4 py-3 font-medium text-white transition-colors disabled:opacity-50 ${
+                      tipoNota === "nfce"
+                        ? "bg-green-600 hover:bg-green-700"
+                        : "bg-blue-600 hover:bg-blue-700"
+                    }`}
+                  >
+                    <FileText className="h-5 w-5" />
+                    <span>
+                      {loading
+                        ? "Aguardando autorização da SEFAZ..."
+                        : `Emitir ${tipoNota === "nfce" ? "NFC-e" : "NF-e"}`}
+                    </span>
+                  </button>
+                )}
 
-            {loading && (
-              <p className="text-center text-xs text-gray-500" role="status">
-                Normalmente leva alguns segundos. Mantenha esta janela aberta enquanto o CorePet
-                acompanha o retorno da SEFAZ.
-              </p>
+                {loading && (
+                  <p className="text-center text-xs text-gray-500" role="status">
+                    Normalmente leva alguns segundos. Mantenha esta janela aberta enquanto o CorePet
+                    acompanha o retorno da SEFAZ.
+                  </p>
+                )}
+              </>
             )}
 
             <button

@@ -33,6 +33,18 @@ const finalizedSaleFlow = readFileSync(
   resolve(__dirname, "../src/hooks/usePDVVendaFinalizacao.js"),
   "utf8",
 );
+const paymentController = readFileSync(
+  resolve(__dirname, "../src/components/modalPagamento/useModalPagamentoController.js"),
+  "utf8",
+);
+const finalizedSaleBanner = readFileSync(
+  resolve(__dirname, "../src/components/pdv/PDVModoVisualizacaoBanner.jsx"),
+  "utf8",
+);
+const modulesContext = readFileSync(
+  resolve(__dirname, "../src/contexts/ModulosContext.jsx"),
+  "utf8",
+);
 
 assert.match(
   source,
@@ -120,6 +132,21 @@ assert.match(
 );
 assert.match(
   fiscalReferenceSearch,
+  /NCM aplicado/,
+  "pesquisa fiscal deve confirmar visualmente quando o NCM for preenchido",
+);
+assert.match(
+  fiscalReferenceSearch,
+  /preenchido.*no\s*[\r\n]*\s*formulário/,
+  "pesquisa fiscal deve orientar o usuario a revisar o campo preenchido",
+);
+assert.match(
+  correctionDialog,
+  /valoresAtuais=\{fiscal\}/,
+  "confirmacao da pesquisa fiscal deve refletir o valor atual do formulario",
+);
+assert.match(
+  fiscalReferenceSearch,
   /ncm_oficial/,
   "pesquisa fiscal deve informar a versao da tabela oficial carregada",
 );
@@ -146,8 +173,28 @@ assert.match(
 );
 assert.match(
   fiscalModelSelector,
-  /Resolver pendências/,
-  "card fiscal deve permitir abrir a correcao antes da tentativa de emissao",
+  /Com pendências/,
+  "card fiscal deve resumir as pendencias sem expandir os detalhes",
+);
+assert.match(
+  fiscalModelSelector,
+  /onResolvePending\?\.\(opcao\.tipo\)/,
+  "resumo das pendencias deve abrir a correcao guiada",
+);
+assert.doesNotMatch(
+  fiscalModelSelector,
+  /pendencias\.slice/,
+  "card fiscal nao deve listar as pendencias dentro do seletor",
+);
+assert.match(
+  fiscalModelSelector,
+  /aria-label=\{`Explicação sobre \$\{opcao\.titulo\}`\}/,
+  "explicacoes dos modelos fiscais devem ficar recolhidas em um botao de ajuda",
+);
+assert.match(
+  fiscalModelSelector,
+  /ajudaAberta === opcao\.tipo/,
+  "explicacao do modelo deve aparecer somente quando solicitada",
 );
 assert.match(
   fiscalAvailability,
@@ -171,13 +218,68 @@ assert.match(
 );
 assert.match(
   nfceCpfPrompt,
+  /aria-label="Explicação sobre CPF na nota"/,
+  "explicacao do CPF deve ficar recolhida em um botao de ajuda",
+);
+assert.match(
+  nfceCpfPrompt,
   /atualizarCliente/,
   "CPF informado no caixa deve ser salvo no cadastro do cliente",
+);
+assert.match(
+  nfceCpfPrompt,
+  /placeholder="000\.000\.000-00"/,
+  "campo de CPF deve aparecer diretamente na pergunta",
+);
+assert.match(
+  nfceCpfPrompt,
+  /await onContinueWithoutCpf\?\.\(\)/,
+  "continuar sem CPF deve iniciar a emissao da NFC-e no mesmo clique",
+);
+assert.match(
+  nfceCpfPrompt,
+  /documentoCpfCnpjCliente\(cliente\)/,
+  "campo de CPF deve continuar visivel quando o cadastro tiver apenas espacos",
+);
+assert.doesNotMatch(
+  nfceCpfPrompt,
+  /Sim, adicionar CPF/,
+  "CPF nao deve exigir um clique extra antes de mostrar o campo",
 );
 assert.doesNotMatch(
   finalizedSaleFlow,
   /Clique OK para emitir NF-e/,
   "venda finalizada nao deve esconder a escolha do modelo em OK ou Cancelar",
+);
+assert.match(
+  paymentController,
+  /moduloAtivo\("fiscal"\)/,
+  "fluxo de pagamento deve consultar a contratacao do modulo fiscal",
+);
+assert.match(
+  paymentActions,
+  /!moduloFiscalAtivo \|\| devePerguntarNotaFiscal\(resultado\)/,
+  "venda sem modulo fiscal deve abrir a conclusao para permitir imprimir o recibo",
+);
+assert.match(
+  finalizedSaleQuestion,
+  /\{moduloFiscalAtivo && \([\s\S]*<SeletorModeloDocumentoFiscal/,
+  "modal de conclusao deve esconder apenas as opcoes fiscais quando o modulo nao estiver ativo",
+);
+assert.match(
+  finalizedSaleQuestion,
+  /useFiscalDocumentAvailability\(moduloFiscalAtivo \? vendaId : null\)/,
+  "cliente sem modulo fiscal nao deve consultar a prevalidacao de notas",
+);
+assert.match(
+  finalizedSaleBanner,
+  /moduloFiscalAtivo &&[\s\S]*Emitir NF/,
+  "venda ja finalizada nao deve exibir emissao sem modulo fiscal",
+);
+assert.match(
+  modulesContext,
+  /MODULOS_FORA_DA_OFERTA_PUBLICA = \["bling", "fiscal"\]/,
+  "modulo fiscal deve ser tratado como contratacao separada",
 );
 
 console.log("NFe fiscal assistant checks passed.");

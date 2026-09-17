@@ -115,7 +115,7 @@ export const publicPlans = {
         "Tudo do Pet Gestão",
         "App e e-commerce integrados",
         "Campanhas, recorrência e recompra",
-        "Entregas, rotas e emissão fiscal integrada",
+        "Entregas, rotas e operação multicanal",
       ],
     },
   ],
@@ -291,7 +291,7 @@ export const publicPlanComparisons = {
     { label: "Financeiro, DRE e ponto de equilíbrio", values: [false, false, true, true] },
     { label: "App e e-commerce integrados", values: [false, false, false, true] },
     { label: "Campanhas, recorrência e recompra", values: [false, false, false, true] },
-    { label: "Entregas, rotas e emissão fiscal integrada", values: [false, false, false, true] },
+    { label: "Entregas, rotas e operação multicanal", values: [false, false, false, true] },
   ],
   vet: [
     { label: "Agenda, tutores, pets, serviços e preços", values: [true, true, true] },

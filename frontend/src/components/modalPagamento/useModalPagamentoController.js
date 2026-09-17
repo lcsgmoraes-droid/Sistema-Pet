@@ -43,6 +43,7 @@ export default function useModalPagamentoController({
 }) {
   const { moduloAtivo } = useModulos();
   const moduloCampanhasAtivo = moduloAtivo("campanhas");
+  const moduloFiscalAtivo = moduloAtivo("fiscal");
   const [pagamentos, setPagamentos] = useState([]);
   const [pagamentosExistentes, setPagamentosExistentes] = useState([]);
   const [formasPagamento, setFormasPagamento] = useState([]);
@@ -641,6 +642,7 @@ export default function useModalPagamentoController({
     formaPagamentoSelecionada,
     justificativaTexto,
     margemCriticaAtual,
+    moduloFiscalAtivo,
     nsuCartao,
     numeroParcelas,
     onConfirmar,
@@ -684,6 +686,7 @@ export default function useModalPagamentoController({
       cliente: venda.cliente,
       erro,
       loading,
+      moduloFiscalAtivo,
       onConfirmar,
       onEmitir: emitirNFe,
       venda: vendaFinalizadaParaCupom || venda,
@@ -720,6 +723,7 @@ export default function useModalPagamentoController({
       valorTotal,
       valorPago,
       moduloCampanhasAtivo,
+      moduloFiscalAtivo,
       loadingBeneficiosCampanha,
       carimbosPrevistos,
       cashbackPrevisto,
