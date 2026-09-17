@@ -3,20 +3,27 @@ import { Link, useNavigate } from "react-router-dom";
 import { FiAlertCircle, FiBriefcase, FiEye, FiEyeOff, FiLock, FiUser } from "react-icons/fi";
 import { getDefaultAuthenticatedRoute } from "../auth/userRole";
 import { useAuth } from "../contexts/AuthContext";
+import { isBrazilianMobileLogin, looksLikePhoneLoginInput } from "../utils/loginPhone";
 
 const COREPET_LOGO = "/brand/corepet/corepet-horizontal.png";
+const REMEMBERED_LOGIN_KEY = "corepet-remembered-login";
 
 const Login = () => {
-  const [identifier, setIdentifier] = useState("");
+  const rememberedLogin = localStorage.getItem(REMEMBERED_LOGIN_KEY) || "";
+  const [identifier, setIdentifier] = useState(rememberedLogin);
   const [tenant, setTenant] = useState("");
   const [password, setPassword] = useState("");
   const [availableTenants, setAvailableTenants] = useState([]);
   const [error, setError] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [rememberLogin, setRememberLogin] = useState(Boolean(rememberedLogin));
   const { cancelTenantSelection, login, selectTenant } = useAuth();
   const navigate = useNavigate();
-  const loginComUsuario = Boolean(identifier.trim() && !identifier.includes("@"));
+  const digitandoTelefone = looksLikePhoneLoginInput(identifier);
+  const loginComUsuario = Boolean(
+    identifier.trim() && !identifier.includes("@") && !digitandoTelefone,
+  );
 
   const redirectAfterLogin = () => {
     const savedUser = localStorage.getItem("user");
@@ -31,10 +38,21 @@ const Login = () => {
   const handleSubmit = async (event) => {
     event.preventDefault();
     setError("");
+    if (digitandoTelefone && !isBrazilianMobileLogin(identifier)) {
+      setError("Informe um celular valido com DDD, por exemplo 18997401641.");
+      return;
+    }
     setLoading(true);
 
     try {
       const result = await login(identifier.trim().toLowerCase(), password, tenant.trim() || null);
+      if (result.success) {
+        if (rememberLogin) {
+          localStorage.setItem(REMEMBERED_LOGIN_KEY, identifier.trim());
+        } else {
+          localStorage.removeItem(REMEMBERED_LOGIN_KEY);
+        }
+      }
       if (result.success && result.requiresTenantSelection) {
         setAvailableTenants(result.tenants);
       } else if (result.success) {
@@ -148,7 +166,7 @@ const Login = () => {
         >
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              E-mail ou nome de usuario
+              Celular, e-mail ou nome de usuario
             </label>
             <div className="relative">
               <FiUser className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
@@ -158,7 +176,7 @@ const Login = () => {
                 autoComplete="username"
                 onChange={(event) => setIdentifier(event.target.value)}
                 className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#0f8b8d] focus:border-transparent outline-none transition"
-                placeholder="seu@email.com ou maria.silva"
+                placeholder="(18) 99740-1641"
                 required
               />
             </div>
@@ -208,6 +226,23 @@ const Login = () => {
                 {showPassword ? <FiEyeOff /> : <FiEye />}
               </button>
             </div>
+          </div>
+
+          <div>
+            <label className="flex cursor-pointer items-start gap-2 text-sm text-gray-700">
+              <input
+                type="checkbox"
+                checked={rememberLogin}
+                onChange={(event) => setRememberLogin(event.target.checked)}
+                className="mt-0.5 h-4 w-4 rounded border-gray-300 text-[#0f8b8d] focus:ring-[#0f8b8d]"
+              />
+              <span>
+                Lembrar meu celular ou e-mail
+                <span className="block text-xs text-gray-500">
+                  A senha pode ser salva pelo gerenciador seguro do navegador.
+                </span>
+              </span>
+            </label>
           </div>
 
           <button

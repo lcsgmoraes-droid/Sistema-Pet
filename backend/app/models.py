@@ -80,8 +80,12 @@ class User(BaseTenantModel):
             "username",
             name="uq_users_tenant_username",
         ),
+        UniqueConstraint(
+            "login_phone",
+            name="uq_users_login_phone",
+        ),
         sa.CheckConstraint(
-            "email IS NOT NULL OR username IS NOT NULL",
+            "email IS NOT NULL OR username IS NOT NULL OR login_phone IS NOT NULL",
             name="ck_users_login_identifier",
         ),
     )
@@ -89,6 +93,7 @@ class User(BaseTenantModel):
     id = Column(Integer, primary_key=True, index=True)
     email = Column(String(255), unique=True, index=True, nullable=True)
     username = Column(String(50), nullable=True)
+    login_phone = Column(String(16), nullable=True)
     hashed_password = Column(String(255), nullable=True)  # Nullable para OAuth
     is_active = Column(Boolean, default=True)
     is_admin = Column(Boolean, default=False)  # Superusuário

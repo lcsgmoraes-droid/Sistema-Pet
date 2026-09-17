@@ -21,18 +21,31 @@ export function resolveTenantLoginReference(user, selectedTenantRaw = null) {
   }
 }
 
-export function buildInitialAccessCredentials({ tenant, username, password, personName = "" }) {
+export function buildInitialAccessCredentials({
+  tenant,
+  username,
+  loginPhone,
+  password,
+  personName = "",
+}) {
   const normalizedTenant = String(tenant || "").trim();
   const normalizedUsername = String(username || "")
     .trim()
     .toLowerCase();
+  const normalizedLoginPhone = String(loginPhone || "").replace(/\D/g, "");
   const normalizedPassword = String(password || "");
 
-  if (!normalizedTenant || !normalizedUsername || !normalizedPassword) return null;
+  if (
+    (!normalizedLoginPhone && (!normalizedTenant || !normalizedUsername)) ||
+    !normalizedPassword
+  ) {
+    return null;
+  }
 
   return {
     tenant: normalizedTenant,
     username: normalizedUsername,
+    loginPhone: normalizedLoginPhone,
     password: normalizedPassword,
     personName: String(personName || "").trim(),
   };
@@ -41,11 +54,14 @@ export function buildInitialAccessCredentials({ tenant, username, password, pers
 export function formatInitialAccessCredentials(credentials) {
   if (!credentials) return "";
 
-  return [
-    "Acesso ao CorePet",
-    `Loja: ${credentials.tenant}`,
-    `Nome de usuario: ${credentials.username}`,
-    `Senha inicial: ${credentials.password}`,
-    "Login: https://corepet.com.br/login",
-  ].join("\n");
+  const lines = ["Acesso ao CorePet"];
+  if (credentials.loginPhone) {
+    lines.push(`Celular: ${credentials.loginPhone}`);
+  } else {
+    lines.push(`Loja: ${credentials.tenant}`);
+    lines.push(`Nome de usuario: ${credentials.username}`);
+  }
+  lines.push(`Senha inicial: ${credentials.password}`);
+  lines.push("Login: https://corepet.com.br/login");
+  return lines.join("\n");
 }

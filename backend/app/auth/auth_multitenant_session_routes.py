@@ -271,6 +271,7 @@ def get_me_multitenant(
         "name": current_user.nome,
         "email": current_user.email,
         "username": getattr(current_user, "username", None),
+        "login_phone": getattr(current_user, "login_phone", None),
         "is_active": current_user.is_active,
         "email_verified": current_user.email_verified,
         "consent_version": current_user.consent_version,
