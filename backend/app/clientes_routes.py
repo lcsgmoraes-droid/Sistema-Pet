@@ -43,6 +43,10 @@ from app.clientes.financeiro_routes import (
     get_vendas_em_aberto,
     router as financeiro_router,
 )
+from app.clientes.inativos_routes import (
+    listar_clientes_inativos,
+    router as inativos_router,
+)
 from app.clientes.parceiros_routes import (
     atualizar_controla_dre,
     obter_custo_operacional_entregador,
@@ -101,6 +105,7 @@ router.include_router(pets_router)
 router.include_router(credito_router)
 router.include_router(parceiros_router)
 router.include_router(ranking_router)
+router.include_router(inativos_router)
 router.include_router(relatorio_router)
 router.include_router(clientes_base_router)
 router.include_router(racas_router)
@@ -118,6 +123,7 @@ __all__ = [
     "PetResponse",
     "PetUpdate",
     "listar_ranking_clientes",
+    "listar_clientes_inativos",
     "TimelineEvento",
     "ToggleParceiroRequest",
     "_anexar_metadados_criacao_cliente",

@@ -1,6 +1,7 @@
 import "../../styles/Lembretes.css";
 import LembreteContatoModal from "./LembreteContatoModal";
 import LembretesCampanhasAlertas from "./LembretesCampanhasAlertas";
+import LembretesClientesInativos from "./LembretesClientesInativos";
 import LembretesHeader from "./LembretesHeader";
 import LembretesList from "./LembretesList";
 import LembretesRelatorios from "./LembretesRelatorios";
@@ -55,6 +56,7 @@ export default function LembretesPage() {
             {!controller.alertasCampanhas && (
               <EmptyPanel text="Nenhum alerta de campanha disponível neste momento." />
             )}
+            <LembretesClientesInativos />
           </>
         )}
 
