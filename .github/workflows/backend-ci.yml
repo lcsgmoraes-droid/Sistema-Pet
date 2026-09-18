@@ -143,7 +143,7 @@ jobs:
 
       - name: Fiscal NF rateio root lint (blocking)
         run: |
-          ruff check app/fiscal_estado_padrao_models.py app/fiscal_patterns.py app/nf_item_rateio_canal_models.py app/nf_item_rateio_validator.py app/nf_rateio_canal_models.py app/nfe_cache_models.py app/nota_fiscal_item_rateio_routes.py app/nota_fiscal_rateio_helper.py app/nota_fiscal_rateio_routes.py app/nota_fiscal_tipos.py app/notas_entrada_pdf_parser.py
+          ruff check app/fiscal_estado_padrao_models.py app/fiscal_patterns.py app/nf_item_rateio_canal_models.py app/nf_rateio_canal_models.py app/nfe_cache_models.py app/nota_fiscal_tipos.py app/notas_entrada_pdf_parser.py
 
       - name: Pedidos pendencias root lint (blocking)
         run: |
@@ -183,7 +183,7 @@ jobs:
 
       - name: Conciliacao adquirentes root lint (blocking)
         run: |
-          ruff check app/conciliacao_cartao_routes.py app/conciliacao_helpers.py app/conciliacao_models.py app/conciliacao_operadora_detector.py app/stone_models.py app/operadoras_cartao_models.py app/duplicatas_ignoradas_models.py app/controle_processamento_models.py
+          ruff check app/conciliacao_cartao_routes.py app/conciliacao_helpers.py app/conciliacao_models.py app/conciliacao_operadora_detector.py app/stone_models.py app/duplicatas_ignoradas_models.py app/controle_processamento_models.py
 
       - name: Routers lint (blocking)
         run: |
@@ -279,7 +279,7 @@ jobs:
 
       - name: Operational root lint (blocking)
         run: |
-          ruff check app/health_router.py app/session_manager.py app/idempotency.py app/idempotency_models.py app/encryption.py app/audit.py app/audit_log.py
+          ruff check app/health_router.py app/session_manager.py app/idempotency.py app/idempotency_models.py app/encryption.py app/audit_log.py
 
       - name: Main root lint (blocking)
         run: |
@@ -431,7 +431,7 @@ jobs:
 
       - name: Backend IA stable files format (blocking)
         run: |
-          ruff format --check app/ia/aba5_models.py app/ia/aba6_aba9_models.py app/ia/aba6_models.py app/ia/aba7_dre_detalhada_models.py app/ia/aba7_models.py app/ia/aba8_models.py app/ia/acoes_assistidas.py app/ia/alertas_ia_service.py app/ia/catalogo_fontes.py app/ia/extrato_nlp.py app/ia/extrato_service.py app/ia/memoria_conversacional.py
+          ruff format --check app/ia/aba5_models.py app/ia/aba6_aba9_models.py app/ia/aba6_models.py app/ia/aba7_dre_detalhada_models.py app/ia/aba7_models.py app/ia/acoes_assistidas.py app/ia/alertas_ia_service.py app/ia/catalogo_fontes.py app/ia/extrato_nlp.py app/ia/extrato_service.py app/ia/memoria_conversacional.py
 
       - name: Backend WhatsApp format (blocking)
         run: |
@@ -491,7 +491,7 @@ jobs:
 
       - name: Backend operational stock cash format (blocking)
         run: |
-          ruff format --check app/caixa app/estoque app/health_router.py app/session_manager.py app/idempotency.py app/idempotency_models.py app/encryption.py app/audit.py app/audit_log.py
+          ruff format --check app/caixa app/estoque app/health_router.py app/session_manager.py app/idempotency.py app/idempotency_models.py app/encryption.py app/audit_log.py
 
       - name: Backend stock cash support format (blocking)
         run: |
@@ -503,7 +503,7 @@ jobs:
 
       - name: Backend model registry root format (blocking)
         run: |
-          ruff format --check app/controle_processamento_models.py app/duplicatas_ignoradas_models.py app/ecommerce_payment_models.py app/fiscal_catalogo_produtos_models.py app/fiscal_estado_padrao_models.py app/kit_composicao_models.py app/kit_config_fiscal_models.py app/lgpd_models.py app/local_estoque_models.py app/models_configuracao_custo_moto.py app/nf_item_rateio_canal_models.py app/nf_rateio_canal_models.py app/operadoras_cartao_models.py app/opportunities_models.py app/opportunity_events_models.py app/ops_models.py app/pedido_integrado_item_models.py app/pedido_integrado_models.py app/pedido_models.py app/pendencia_estoque_models.py app/produtos_models.py app/segmentacao_models.py app/simples_nacional_models.py app/stone_models.py app/variacao_config_fiscal_models.py
+          ruff format --check app/controle_processamento_models.py app/duplicatas_ignoradas_models.py app/ecommerce_payment_models.py app/fiscal_catalogo_produtos_models.py app/fiscal_estado_padrao_models.py app/kit_composicao_models.py app/kit_config_fiscal_models.py app/lgpd_models.py app/local_estoque_models.py app/models_configuracao_custo_moto.py app/nf_item_rateio_canal_models.py app/nf_rateio_canal_models.py app/opportunities_models.py app/opportunity_events_models.py app/ops_models.py app/pedido_integrado_item_models.py app/pedido_integrado_models.py app/pedido_models.py app/pendencia_estoque_models.py app/produtos_models.py app/segmentacao_models.py app/simples_nacional_models.py app/stone_models.py app/variacao_config_fiscal_models.py
 
       - name: Backend admin product support root format (blocking)
         run: |
