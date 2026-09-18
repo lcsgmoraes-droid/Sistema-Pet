@@ -54,11 +54,15 @@ export default function Campanhas() {
   } = campanhasConsultas;
 
   useEffect(() => {
+    if (location.pathname.endsWith("/ranking-clientes")) {
+      setAba("ranking-clientes");
+      return;
+    }
     const abaDaUrl = new URLSearchParams(location.search).get("aba");
     if (abaDaUrl) {
       setAba(abaDaUrl);
     }
-  }, [location.search, setAba]);
+  }, [location.pathname, location.search, setAba]);
 
   const campanhasGestor = useCampanhasGestor();
   const campanhasGestao = useCampanhasGestao({

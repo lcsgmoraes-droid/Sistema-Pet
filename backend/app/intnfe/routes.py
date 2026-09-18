@@ -37,6 +37,16 @@ from app.intnfe.fiscal_profile import (
     read_fiscal_profile,
     sync_fiscal_profile,
 )
+from app.intnfe.environment import (
+    DefaultSeriesInput,
+    EnvironmentError,
+    EnvironmentInput,
+    EnvironmentView,
+    configure_environment,
+    disable_environment,
+    read_environment,
+    save_default_series,
+)
 from app.intnfe.numbering import (
     NumberingError,
     NumberingInput,
@@ -94,8 +104,8 @@ class ActivationView(BaseModel):
     empresa: CompanyView
     pendencias: list[str]
     vinculado: bool
-    ambiente: Literal["homologacao"]
-    emissao_disponivel: Literal[False]
+    ambiente: Literal["homologacao", "producao"]
+    emissao_disponivel: bool
     pode_ativar: bool
     pode_consultar: bool
     pode_vincular: bool
@@ -234,6 +244,114 @@ def _numbering_failure(exc):
             "exige_consulta": exc.refresh,
         },
     )
+
+
+def _environment_failure(exc):
+    return HTTPException(
+        exc.status,
+        {
+            "codigo": exc.code,
+            "mensagem": str(exc),
+            "protocolo_suporte": exc.correlation,
+        },
+    )
+
+
+def _environment_audit(db, user, tenant_id):
+    def audit(connection_id, result, change):
+        try:
+            log_action(
+                db,
+                user_id=user.id,
+                tenant_id=tenant_id,
+                action="intnfe_ambiente_emissao",
+                entity_type="intnfe_connection",
+                entity_id=connection_id,
+                new_value={**change, "resultado": result},
+                commit=False,
+            )
+            db.commit()
+        except SQLAlchemyError:
+            db.rollback()
+            raise EnvironmentError(
+                "Não foi possível registrar a alteração do ambiente.", status=503
+            ) from None
+
+    return audit
+
+
+@router.get("/ambiente-emissao", response_model=EnvironmentView)
+def emission_environment_route(
+    db: Session = Depends(get_session),
+    user_and_tenant=Depends(get_current_user_and_tenant),
+    api=Depends(get_client),
+):
+    _user, tenant_id = user_and_tenant
+    set_current_tenant(tenant_id)
+    _require_pilot_tenant(tenant_id)
+    try:
+        return read_environment(db, tenant_id, api)
+    except ActivationError as exc:
+        raise HTTPException(exc.status, str(exc)) from None
+
+
+@router.put("/ambiente-emissao", response_model=EnvironmentView)
+def configure_emission_environment_route(
+    body: EnvironmentInput,
+    db: Session = Depends(get_session),
+    user_and_tenant=Depends(get_current_user_and_tenant),
+    api=Depends(get_client),
+):
+    user, tenant_id = user_and_tenant
+    set_current_tenant(tenant_id)
+    _require_pilot_tenant(tenant_id)
+    try:
+        return configure_environment(
+            db, tenant_id, api, body, _environment_audit(db, user, tenant_id)
+        )
+    except EnvironmentError as exc:
+        raise _environment_failure(exc) from None
+    except ActivationError as exc:
+        raise HTTPException(exc.status, str(exc)) from None
+
+
+@router.put("/ambiente-emissao/serie-padrao", response_model=EnvironmentView)
+def save_default_series_route(
+    body: DefaultSeriesInput,
+    db: Session = Depends(get_session),
+    user_and_tenant=Depends(get_current_user_and_tenant),
+    api=Depends(get_client),
+):
+    user, tenant_id = user_and_tenant
+    set_current_tenant(tenant_id)
+    _require_pilot_tenant(tenant_id)
+    try:
+        return save_default_series(
+            db, tenant_id, api, body, _environment_audit(db, user, tenant_id)
+        )
+    except EnvironmentError as exc:
+        raise _environment_failure(exc) from None
+    except ActivationError as exc:
+        raise HTTPException(exc.status, str(exc)) from None
+
+
+@router.delete("/ambiente-emissao", response_model=EnvironmentView)
+def disable_emission_environment_route(
+    db: Session = Depends(get_session),
+    user_and_tenant=Depends(get_current_user_and_tenant),
+    api=Depends(get_client),
+):
+    user, tenant_id = user_and_tenant
+    set_current_tenant(tenant_id)
+    _require_pilot_tenant(tenant_id)
+    try:
+        return disable_environment(
+            db, tenant_id, api, _environment_audit(db, user, tenant_id)
+        )
+    except EnvironmentError as exc:
+        raise _environment_failure(exc) from None
+    except ActivationError as exc:
+        raise HTTPException(exc.status, str(exc)) from None
 
 
 @router.get("/numeracao", response_model=NumberingView)

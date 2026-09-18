@@ -52,6 +52,7 @@ export const BanhoTosaPage = lazy(() => import("../pages/banhoTosa/BanhoTosaPage
 
 export const preloadPDV = () => import("../pages/PDV");
 export const PDV = lazy(preloadPDV);
+export const OrcamentosGrupo = lazy(() => import("../pages/orcamentosGrupo/OrcamentosGrupoPage"));
 export const MeusCaixas = lazy(() => import("../pages/MeusCaixas"));
 export const AlertasGestor = lazy(() => import("../pages/AlertasGestor"));
 export const NFEntrada = lazy(() => import("../pages/NFEntrada"));
@@ -118,6 +119,7 @@ export const TipoDespesa = lazy(() => import("../pages/Cadastros/TipoDespesa"));
 export const CategoriasFinanceiras = lazy(() => import("../pages/CategoriasFinanceiras"));
 export const EspeciesRacas = lazy(() => import("../pages/EspeciesRacas"));
 export const ClienteFinanceiro = lazy(() => import("../pages/ClienteFinanceiro"));
+export const RankingClientes = lazy(() => import("../pages/RankingClientes"));
 export const UsuariosPage = lazy(() => import("../pages/UsuariosPage.jsx"));
 export const RolesPage = lazy(() => import("../pages/RolesPage.jsx"));
 export const LGPDOperacional = lazy(() => import("../pages/LGPDOperacional.jsx"));

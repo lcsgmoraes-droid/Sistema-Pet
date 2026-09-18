@@ -281,7 +281,7 @@ def test_apply_fiscal_data_fills_missing_product_fields_from_xml_item():
 
     assert atualizou is True
     assert produto.ncm == "23091000"
-    assert produto.cfop == "5405"
+    assert produto.cfop is None
     assert produto.cest == "1234567"
     assert produto.origem == "0"
-    assert produto.aliquota_icms == pytest.approx(18.0)
+    assert produto.aliquota_icms is None

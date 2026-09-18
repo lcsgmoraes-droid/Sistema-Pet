@@ -63,6 +63,41 @@ def test_parse_preservar_saldos_rejeita_valor_sem_sku():
         script._parse_preservar_saldos(["24"])
 
 
+def test_recuperacao_atendido_sem_nf_exige_escopo_e_saldo_preservado():
+    with pytest.raises(ValueError, match="--atualizar-do-bling"):
+        script._validar_recuperacao_atendidos_sem_nf(
+            incluir_atendidos_sem_nf=True,
+            atualizar_do_bling=False,
+            skus=["018631.1"],
+            saldos_esperados={"018631.1": 19},
+        )
+
+    with pytest.raises(ValueError, match="ao menos um --sku"):
+        script._validar_recuperacao_atendidos_sem_nf(
+            incluir_atendidos_sem_nf=True,
+            atualizar_do_bling=True,
+            skus=[],
+            saldos_esperados={},
+        )
+
+    with pytest.raises(ValueError, match="018631.1"):
+        script._validar_recuperacao_atendidos_sem_nf(
+            incluir_atendidos_sem_nf=True,
+            atualizar_do_bling=True,
+            skus=["018631.1"],
+            saldos_esperados={},
+        )
+
+
+def test_pedido_atendido_sem_nf_e_identificado_pelo_payload():
+    assert script._pedido_atendido_no_payload(
+        SimpleNamespace(payload={"pedido": {"situacao": {"id": 9}}})
+    )
+    assert not script._pedido_atendido_no_payload(
+        SimpleNamespace(payload={"pedido": {"situacao": {"id": 6}}})
+    )
+
+
 def test_consulta_bling_classifica_nf_independente_da_situacao(monkeypatch):
     respostas = {
         "BL-1": {
@@ -233,6 +268,35 @@ def test_planejamento_preserva_saldo_explicito_e_balanco_posterior(monkeypatch):
     ]
     assert plano["acoes"][0]["preservacao_explicita"] is True
     assert plano["acoes"][1]["preservacao_explicita"] is False
+
+
+def test_documentacao_sem_nf_usa_numero_do_pedido_e_nao_altera_saldo():
+    db = _FakeDB()
+    db.flush = lambda: None
+    pedido = SimpleNamespace(
+        id=10,
+        tenant_id=TENANT_ID,
+        pedido_bling_numero="11865",
+        pedido_bling_id="BL-10",
+    )
+    produto = SimpleNamespace(id=1, estoque_atual=19, preco_custo=43.01)
+
+    movimento = script._documentar_saida_ja_absorvida_por_balanco(
+        db,
+        pedido=pedido,
+        produto=produto,
+        quantidade=1,
+        user_id=7,
+        nf_numero=None,
+        nf_bling_id=None,
+        ultimo_balanco=datetime.utcnow(),
+    )
+
+    assert movimento.documento == "11865"
+    assert "Venda do pedido 11865" in movimento.observacao
+    assert movimento.quantidade_anterior == 19
+    assert movimento.quantidade_nova == 19
+    assert produto.estoque_atual == 19
 
 
 def test_aplicacao_faz_um_commit_atomico_por_pedido(monkeypatch):

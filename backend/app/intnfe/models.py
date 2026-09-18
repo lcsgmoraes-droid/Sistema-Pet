@@ -1,6 +1,15 @@
 """Vinculo fiscal independente do cadastro comercial da empresa."""
 
-from sqlalchemy import Boolean, Column, DateTime, String, Text, UniqueConstraint
+from sqlalchemy import (
+    Boolean,
+    Column,
+    DateTime,
+    Integer,
+    SmallInteger,
+    String,
+    Text,
+    UniqueConstraint,
+)
 
 from app.base_models import BaseTenantModel
 from app.security.tenant_config_crypto import decrypt_secret_strict, encrypt_secret
@@ -21,6 +30,14 @@ class IntNFeConnection(BaseTenantModel):
     emitente_id = Column(String(128), nullable=True)
     client_id = Column(String(128), nullable=True)
     client_secret_encrypted = Column(Text, nullable=True)
+    production_client_id = Column(String(128), nullable=True)
+    production_client_secret_encrypted = Column(Text, nullable=True)
+    production_credentials_created_at = Column(DateTime(timezone=True), nullable=True)
+    production_credentials_pending = Column(Boolean, nullable=False, default=False)
+    emission_enabled = Column(Boolean, nullable=False, default=False)
+    emission_environment = Column(SmallInteger, nullable=False, default=2)
+    nfe_series = Column(String(3), nullable=False, default="1")
+    nfce_series = Column(String(3), nullable=False, default="1")
     status = Column(String(40), nullable=False, default="nao_vinculado")
     # Gravado ANTES do POST externo. Resposta perdida nao autoriza nova criacao.
     criacao_iniciada = Column(Boolean, nullable=False, default=False)
@@ -38,3 +55,30 @@ class IntNFeConnection(BaseTenantModel):
     @client_secret.setter
     def client_secret(self, value: str) -> None:
         self.client_secret_encrypted = encrypt_secret(value)
+
+    @property
+    def production_client_secret(self) -> str:
+        return decrypt_secret_strict(self.production_client_secret_encrypted)
+
+    @production_client_secret.setter
+    def production_client_secret(self, value: str) -> None:
+        self.production_client_secret_encrypted = encrypt_secret(value)
+
+
+class IntNFeEmissionSequence(BaseTenantModel):
+    """Série escolhida e ponto inicial do CorePet por ambiente e documento."""
+
+    __tablename__ = "intnfe_emission_sequences"
+    __table_args__ = (
+        UniqueConstraint(
+            "tenant_id",
+            "ambiente_codigo",
+            "modelo",
+            name="uq_intnfe_emission_sequence_tenant_environment_model",
+        ),
+    )
+
+    ambiente_codigo = Column(SmallInteger, nullable=False)
+    modelo = Column(SmallInteger, nullable=False)
+    serie = Column(String(3), nullable=False)
+    numero_inicial = Column(Integer, nullable=False)

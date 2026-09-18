@@ -37,6 +37,13 @@ import sqlalchemy as sa
 
 
 from app.models_operacionais import ConfiguracaoEntrega, CreditoLog, FeatureFlag
+from app.orcamentos_grupo_models import (
+    OrcamentoGrupo,
+    OrcamentoGrupoConfiguracao,
+    OrcamentoGrupoCotacao,
+    OrcamentoGrupoEmpresa,
+    OrcamentoGrupoItem,
+)
 from app.models_authz import (
     AppAccessProfile,
     PessoaMergeLog,
@@ -73,8 +80,12 @@ class User(BaseTenantModel):
             "username",
             name="uq_users_tenant_username",
         ),
+        UniqueConstraint(
+            "login_phone",
+            name="uq_users_login_phone",
+        ),
         sa.CheckConstraint(
-            "email IS NOT NULL OR username IS NOT NULL",
+            "email IS NOT NULL OR username IS NOT NULL OR login_phone IS NOT NULL",
             name="ck_users_login_identifier",
         ),
     )
@@ -82,6 +93,7 @@ class User(BaseTenantModel):
     id = Column(Integer, primary_key=True, index=True)
     email = Column(String(255), unique=True, index=True, nullable=True)
     username = Column(String(50), nullable=True)
+    login_phone = Column(String(16), nullable=True)
     hashed_password = Column(String(255), nullable=True)  # Nullable para OAuth
     is_active = Column(Boolean, default=True)
     is_admin = Column(Boolean, default=False)  # Superusuário
@@ -571,7 +583,7 @@ class Tenant(Base):
 
     __tablename__ = "tenants"
     __table_args__ = (
-        Index("ux_tenants_name_normalized", "name_normalized", unique=True),
+        Index("ix_tenants_name_normalized", "name_normalized"),
         sa.CheckConstraint(
             "onboarding_satisfaction IN "
             "('not_collected', 'satisfied', 'neutral', 'dissatisfied')",
@@ -698,6 +710,52 @@ class Tenant(Base):
         clean_name = str(value or "").strip()
         if not clean_name:
             raise ValueError("O nome da loja e obrigatorio.")
+        self.name_normalized = normalize_tenant_name(clean_name)
+        return clean_name
+
+
+class TenantLoginName(Base):
+    """Nome global usado no login e aliases historicos de uma empresa."""
+
+    __tablename__ = "tenant_login_names"
+    __table_args__ = (
+        Index(
+            "ux_tenant_login_names_name_normalized",
+            "name_normalized",
+            unique=True,
+        ),
+        Index("ix_tenant_login_names_tenant_id", "tenant_id"),
+        Index(
+            "ux_tenant_login_names_primary_tenant",
+            "tenant_id",
+            unique=True,
+            postgresql_where=sa.text("is_primary = true"),
+            sqlite_where=sa.text("is_primary = 1"),
+        ),
+    )
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    tenant_id = Column(
+        String(36),
+        ForeignKey("tenants.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    name = Column(String(255), nullable=False)
+    name_normalized = Column(String(255), nullable=False)
+    is_primary = Column(Boolean, nullable=False, default=False, server_default="false")
+    created_at = Column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at = Column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+    @validates("name")
+    def validate_name(self, _key, value):
+        clean_name = " ".join(str(value or "").strip().split())
         self.name_normalized = normalize_tenant_name(clean_name)
         return clean_name
 

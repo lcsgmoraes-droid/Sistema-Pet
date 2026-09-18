@@ -21,7 +21,10 @@ from app.services.user_account_service import (
     create_tenant_user_account,
     email_exists_globally,
     is_unique_email_violation,
+    is_unique_login_phone_violation,
     is_unique_username_violation,
+    login_phone_exists_globally,
+    normalize_login_phone,
     normalize_username,
     username_exists_in_tenant,
     validate_password,
@@ -36,14 +39,15 @@ MAX_MENU_FAVORITOS = 8
 class UserCreate(BaseModel):
     username: str | None = Field(default=None, min_length=3, max_length=50)
     email: EmailStr | None = None
+    login_phone: str | None = Field(default=None, max_length=25)
     nome: str | None = Field(default=None, max_length=255)
     password: str = Field(min_length=8, max_length=72)
     role_id: int  # Role a ser vinculada ao usuário
 
     @model_validator(mode="after")
     def validate_identifier(self):
-        if not self.username and not self.email:
-            raise ValueError("Informe o nome de usuario ou o e-mail")
+        if not self.username and not self.email and not self.login_phone:
+            raise ValueError("Informe o celular, nome de usuario ou e-mail")
         return self
 
 
@@ -51,6 +55,7 @@ class UsuarioListResponse(BaseModel):
     user_id: int
     username: str | None = None
     email: str | None = None
+    login_phone: str | None = None
     nome: str | None = None
     role_id: int
     role: str
@@ -64,6 +69,7 @@ class UserResponse(BaseModel):
     id: int
     username: str | None = None
     email: str | None = None
+    login_phone: str | None = None
     is_active: bool
 
     class Config:
@@ -82,6 +88,7 @@ class MenuFavoritosPayload(BaseModel):
 
 class UserCredentialsUpdate(BaseModel):
     username: str | None = Field(default=None, min_length=3, max_length=50)
+    login_phone: str | None = Field(default=None, max_length=25)
     new_password: str | None = Field(default=None, min_length=8, max_length=72)
     generate_password: bool = False
     role_id: int | None = None
@@ -90,11 +97,14 @@ class UserCredentialsUpdate(BaseModel):
     def validate_change(self):
         if (
             self.username is None
+            and self.login_phone is None
             and self.new_password is None
             and not self.generate_password
             and self.role_id is None
         ):
-            raise ValueError("Informe o nome de usuario, uma nova senha ou um perfil")
+            raise ValueError(
+                "Informe o celular, nome de usuario, uma nova senha ou um perfil"
+            )
         if self.new_password is not None and self.generate_password:
             raise ValueError("Escolha uma senha ou gere uma senha, nao as duas opcoes")
         return self
@@ -213,6 +223,7 @@ def listar_usuarios(
             User.id.label("user_id"),
             User.username,
             User.email,
+            User.login_phone,
             User.nome,
             Role.id.label("role_id"),
             Role.name.label("role"),
@@ -242,6 +253,7 @@ def criar_usuario(
             tenant_id=tenant_id,
             username=payload.username,
             email=payload.email,
+            login_phone=payload.login_phone,
             password=payload.password,
             role_id=payload.role_id,
             nome=payload.nome,
@@ -260,7 +272,7 @@ def criar_usuario(
                 role=role,
                 extra={"is_active": True},
             ),
-            details=f"Usuario {user.username or user.email} criado no tenant",
+            details=f"Usuario #{user.id} criado no tenant",
             commit=False,
         )
         db.commit()
@@ -279,6 +291,11 @@ def criar_usuario(
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
                 detail="Este nome de usuario ja esta em uso nesta loja.",
+            ) from exc
+        if is_unique_login_phone_violation(exc):
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Este celular ja esta vinculado a outro usuario.",
             ) from exc
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -312,6 +329,7 @@ def atualizar_credenciais_usuario(
 
     target_user, vinculo = row
     username_changed = False
+    login_phone_changed = False
     password_changed = False
     role_changed = False
     selected_role: Role | None = None
@@ -332,6 +350,20 @@ def atualizar_credenciais_usuario(
                 )
             username_changed = target_user.username != normalized_username
             target_user.username = normalized_username
+
+        if payload.login_phone is not None:
+            normalized_login_phone = normalize_login_phone(payload.login_phone)
+            if login_phone_exists_globally(
+                db,
+                normalized_login_phone,
+                exclude_user_id=target_user.id,
+            ):
+                raise UserAccountError(
+                    "Este celular ja esta vinculado a outro usuario.",
+                    status_code=409,
+                )
+            login_phone_changed = target_user.login_phone != normalized_login_phone
+            target_user.login_phone = normalized_login_phone
 
         new_password = payload.new_password
         if payload.generate_password:
@@ -357,7 +389,7 @@ def atualizar_credenciais_usuario(
             role_changed = vinculo.role_id != selected_role.id
             vinculo.role_id = selected_role.id
 
-        if password_changed or role_changed:
+        if password_changed or role_changed or login_phone_changed:
             sessions_revoked = revoke_all_sessions(
                 db=db,
                 user_id=target_user.id,
@@ -380,6 +412,7 @@ def atualizar_credenciais_usuario(
                 role=selected_role,
                 extra={
                     "username_changed": username_changed,
+                    "login_phone_changed": login_phone_changed,
                     "password_changed": password_changed,
                     "role_changed": role_changed,
                     "sessions_revoked": sessions_revoked,
@@ -398,11 +431,17 @@ def atualizar_credenciais_usuario(
                 status_code=status.HTTP_409_CONFLICT,
                 detail="Este nome de usuario ja esta em uso nesta loja.",
             ) from exc
+        if is_unique_login_phone_violation(exc):
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Este celular ja esta vinculado a outro usuario.",
+            ) from exc
         raise
 
     return {
         "status": "ok",
         "username": target_user.username,
+        "login_phone": target_user.login_phone,
         "password_changed": password_changed,
         "role_changed": role_changed,
         "role_id": vinculo.role_id,

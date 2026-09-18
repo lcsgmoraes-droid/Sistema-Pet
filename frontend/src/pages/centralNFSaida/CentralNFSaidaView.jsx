@@ -52,6 +52,8 @@ export default function CentralNFSaidaView({
   excluirNota,
   reconciliarFluxoNota,
   reconciliandoNotaId,
+  corrigirEReemitir,
+  corrigindoNotaId,
   baixarDanfe,
   baixarXml,
   abrirDetalhes,
@@ -131,6 +133,8 @@ export default function CentralNFSaidaView({
         excluirNota={excluirNota}
         reconciliarFluxoNota={reconciliarFluxoNota}
         reconciliandoNotaId={reconciliandoNotaId}
+        corrigirEReemitir={corrigirEReemitir}
+        corrigindoNotaId={corrigindoNotaId}
         baixarDanfe={baixarDanfe}
         baixarXml={baixarXml}
         abrirDetalhes={abrirDetalhes}
@@ -144,6 +148,8 @@ export default function CentralNFSaidaView({
         fecharDetalhes={fecharDetalhes}
         baixarDanfe={baixarDanfe}
         baixarXml={baixarXml}
+        corrigirEReemitir={corrigirEReemitir}
+        corrigindoNotaId={corrigindoNotaId}
       />
 
       <NFSaidaCancelamentoModal

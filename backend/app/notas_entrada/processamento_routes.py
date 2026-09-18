@@ -43,7 +43,7 @@ from app.notas_entrada.processamento_precos import (
 )
 from app.notas_entrada.produtos import (
     _aplicar_codigos_barras_item_no_produto,
-    _aplicar_dados_fiscais_item_no_produto,
+    _sincronizar_config_fiscal_produto_por_entrada,
 )
 from app.notas_entrada.schemas import ProcessarConfig
 from app.notas_entrada.xml_parser import parse_nfe_xml
@@ -283,12 +283,14 @@ def processar_entrada_estoque(
             produto.ativo = True
             logger.info(f"  ♻️  Produto reativado: {produto.codigo} - {produto.nome}")
 
-        # Atualizar dados fiscais do produto com informacoes do XML quando vierem preenchidas.
-        # Entradas PDF preservam o cadastro atual, pois o arquivo nao contem dados fiscais reais.
-        _aplicar_dados_fiscais_item_no_produto(
-            produto,
-            item,
-            sobrescrever=nota.serie != "PDF",
+        # Sincronizar a configuração usada na emissão e preservar o tratamento
+        # fiscal da entrada no lote que será criado.
+        _sincronizar_config_fiscal_produto_por_entrada(
+            db=db,
+            tenant_id=tenant_id,
+            produto=produto,
+            item=item,
+            nota=nota,
         )
 
         _aplicar_codigos_barras_item_no_produto(produto, item)
@@ -365,6 +367,12 @@ def processar_entrada_estoque(
                 quantidade_inicial=quantidade_lote,
                 quantidade_disponivel=quantidade_lote,
                 custo_unitario=float(custo_unitario_entrada),
+                fiscal_ncm=item.ncm,
+                fiscal_cest=item.cest,
+                fiscal_origem_mercadoria=item.origem,
+                fiscal_cfop_entrada=item.cfop,
+                fiscal_cst_icms_entrada=item.cst_icms,
+                fiscal_icms_st=item.icms_st,
                 data_fabricacao=lote_entrada.get("data_fabricacao"),
                 data_validade=lote_entrada.get("data_validade"),
                 ordem_entrada=ordem_base + lote_index,

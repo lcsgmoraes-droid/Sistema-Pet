@@ -11,6 +11,8 @@ from typing import Any, Dict, List, Optional
 from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
+from app.empresa_config_fiscal_models import EmpresaConfigFiscal
+from app.produto_config_fiscal_models import ProdutoConfigFiscal
 from app.produtos_models import NotaEntrada, NotaEntradaItem, Produto, ProdutoFornecedor
 
 from .fiscal import calcular_composicao_custos_nota
@@ -30,7 +32,11 @@ def _valor_preenchido(valor) -> bool:
 def _aplicar_dados_fiscais_item_no_produto(
     produto, item, sobrescrever: bool = False
 ) -> bool:
-    """Atualiza dados fiscais somente quando o item realmente trouxe o campo."""
+    """Atualiza identificadores fiscais estáveis trazidos pela NF de entrada.
+
+    CFOP e alíquotas do fornecedor descrevem a operação de entrada e não podem
+    ser reutilizados diretamente como tributação de saída do lojista.
+    """
     atualizou = False
 
     def aplicar_texto(campo: str) -> None:
@@ -43,23 +49,95 @@ def _aplicar_dados_fiscais_item_no_produto(
             setattr(produto, campo, valor_item)
             atualizou = True
 
-    def aplicar_aliquota(campo: str) -> None:
-        nonlocal atualizou
-        valor_item = getattr(item, campo, None)
-        if valor_item is None:
-            return
-        if not sobrescrever and float(valor_item or 0) == 0:
-            return
-        valor_produto = getattr(produto, campo, None)
-        if sobrescrever or valor_produto is None:
-            setattr(produto, campo, valor_item)
-            atualizou = True
-
-    for campo_texto in ("ncm", "cfop", "cest", "origem"):
+    for campo_texto in ("ncm", "cest", "origem"):
         aplicar_texto(campo_texto)
 
-    for campo_aliquota in ("aliquota_icms", "aliquota_pis", "aliquota_cofins"):
-        aplicar_aliquota(campo_aliquota)
+    return atualizou
+
+
+def _empresa_simples_nacional(db: Session, tenant_id) -> EmpresaConfigFiscal | None:
+    config = (
+        db.query(EmpresaConfigFiscal)
+        .filter(EmpresaConfigFiscal.tenant_id == tenant_id)
+        .first()
+    )
+    if not config:
+        return None
+    regime = str(getattr(config, "regime_tributario", "") or "").casefold()
+    return config if bool(config.simples_ativo) or "simples" in regime else None
+
+
+def _sincronizar_config_fiscal_produto_por_entrada(
+    db: Session,
+    tenant_id,
+    produto: Produto,
+    item: NotaEntradaItem,
+    nota: NotaEntrada,
+) -> bool:
+    """Sincroniza o fiscal V2 usando somente sinais seguros da NF-e de entrada.
+
+    Identificação fiscal é atualizada pelo XML. Quando a entrada comprova
+    ICMS-ST e o destinatário é optante do Simples, a configuração de saída é
+    registrada como contribuinte substituído. Entradas sem ST não apagam uma
+    configuração ST enquanto ainda puder existir estoque de lotes anteriores.
+    """
+    if getattr(nota, "serie", None) == "PDF":
+        return False
+
+    atualizou = _aplicar_dados_fiscais_item_no_produto(produto, item, sobrescrever=True)
+    fiscal = (
+        db.query(ProdutoConfigFiscal)
+        .filter(
+            ProdutoConfigFiscal.tenant_id == tenant_id,
+            ProdutoConfigFiscal.produto_id == produto.id,
+        )
+        .first()
+    )
+    if not fiscal:
+        fiscal = ProdutoConfigFiscal(
+            tenant_id=tenant_id,
+            produto_id=produto.id,
+            herdado_da_empresa=False,
+        )
+        db.add(fiscal)
+        atualizou = True
+
+    for destino, origem in (
+        ("ncm", "ncm"),
+        ("cest", "cest"),
+        ("origem_mercadoria", "origem"),
+    ):
+        valor = getattr(item, origem, None)
+        if _valor_preenchido(valor) and getattr(fiscal, destino, None) != valor:
+            setattr(fiscal, destino, valor)
+            atualizou = True
+
+    empresa = _empresa_simples_nacional(db, tenant_id)
+    entrada_com_st = bool(getattr(item, "icms_st", False))
+    if empresa and entrada_com_st:
+        cfop_fornecedor = str(getattr(item, "cfop", "") or "")
+        cfop_compra = "2403" if cfop_fornecedor.startswith("6") else "1403"
+        valores_saida = {
+            "herdado_da_empresa": False,
+            "cst_icms": "500",
+            "icms_st": True,
+            "icms_aliquota": None,
+            "cfop_venda": "5405",
+            "cfop_compra": cfop_compra,
+            "pis_cst": fiscal.pis_cst or empresa.pis_cst_padrao or "49",
+            "cofins_cst": fiscal.cofins_cst or empresa.cofins_cst_padrao or "49",
+        }
+        for campo, valor in valores_saida.items():
+            if getattr(fiscal, campo, None) != valor:
+                setattr(fiscal, campo, valor)
+                atualizou = True
+        produto.cfop = "5405"
+        produto.aliquota_icms = None
+        fiscal.observacao_fiscal = (
+            f"Atualizado pela NF-e de entrada {nota.numero_nota}, "
+            f"item {item.numero_item}: ICMS-ST identificado no XML "
+            f"(CST/CSOSN do fornecedor {item.cst_icms or 'não informado'})."
+        )
 
     return atualizou
 

@@ -37,6 +37,23 @@ def test_rls_auth_email_sync_sets_normalized_email_on_postgresql():
     ]
 
 
+def test_rls_auth_phone_sync_sets_normalized_phone_on_postgresql():
+    from app.tenancy.rls import RLS_AUTH_PHONE_SETTING, sync_rls_auth_phone
+
+    session = FakeSession("postgresql")
+
+    assert sync_rls_auth_phone(session, "18997401641") is True
+    assert session.connection_obj.calls == [
+        (
+            "SELECT set_config(:setting_name, :setting_value, true)",
+            {
+                "setting_name": RLS_AUTH_PHONE_SETTING,
+                "setting_value": "18997401641",
+            },
+        )
+    ]
+
+
 def test_rls_auth_sync_clears_empty_values():
     from app.tenancy.rls import RLS_AUTH_EMAIL_SETTING, RLS_AUTH_USER_SETTING
     from app.tenancy.rls import sync_rls_auth_email, sync_rls_auth_user
@@ -65,10 +82,15 @@ def test_rls_auth_sync_clears_empty_values():
 
 
 def test_rls_auth_sync_is_noop_outside_postgresql():
-    from app.tenancy.rls import sync_rls_auth_email, sync_rls_auth_user
+    from app.tenancy.rls import (
+        sync_rls_auth_email,
+        sync_rls_auth_phone,
+        sync_rls_auth_user,
+    )
 
     session = FakeSession("sqlite")
 
     assert sync_rls_auth_user(session, 123) is False
     assert sync_rls_auth_email(session, "user@example.com") is False
+    assert sync_rls_auth_phone(session, "18997401641") is False
     assert session.connection_obj.calls == []

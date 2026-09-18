@@ -256,6 +256,10 @@ class NotaEntradaItem(BaseTenantModel):
     cest = Column(String(7))  # Código CEST do produto
     cfop = Column(String(4))
     origem = Column(String(1))  # Origem da mercadoria (0-8)
+    cst_icms = Column(String(3))  # CST/CSOSN informado pelo fornecedor
+    icms_st = Column(Boolean, nullable=True)  # XML informa ICMS-ST no item
+    icms_base_st = Column(Float, nullable=True)
+    icms_valor_st = Column(Float, nullable=True)
     aliquota_icms = Column(Float, default=0)  # Alíquota ICMS (%)
     aliquota_pis = Column(Float, default=0)  # Alíquota PIS (%)
     aliquota_cofins = Column(Float, default=0)  # Alíquota COFINS (%)

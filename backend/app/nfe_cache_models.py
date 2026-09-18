@@ -41,6 +41,8 @@ class BlingNotaFiscalCache(BaseTenantModel):
     )
 
     bling_id = Column(String(50), nullable=False)
+    venda_id = Column(Integer, nullable=True, index=True)
+    provider = Column(String(20), nullable=True)
     modelo = Column(Integer, nullable=False, default=55)
     tipo = Column(String(10), nullable=False, default="nfe")
     numero = Column(String(50), nullable=True)

@@ -1,4 +1,4 @@
-import { GitMerge, Plus, Search, UploadCloud, X } from "lucide-react";
+import { FileText, GitMerge, Plus, Search, UploadCloud, X } from "lucide-react";
 import ActionButton from "../ui/ActionButton";
 import IconActionButton from "../ui/IconActionButton";
 import Panel from "../ui/Panel";
@@ -12,6 +12,7 @@ const ClientesNovoActionsBar = ({
   tipoFiltro,
   pessoasSelecionadasFusao = [],
   onAbrirFusao,
+  onAbrirRelatorio,
   onLimparSelecaoFusao,
 }) => {
   const labelNovo =
@@ -76,6 +77,15 @@ const ClientesNovoActionsBar = ({
               />
             </div>
           )}
+          <ActionButton
+            icon={FileText}
+            intent="info"
+            onClick={onAbrirRelatorio}
+            size="lg"
+            tone="soft"
+          >
+            Relatorios
+          </ActionButton>
           <ActionButton
             icon={UploadCloud}
             intent="neutral"

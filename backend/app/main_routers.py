@@ -151,6 +151,7 @@ from app.pendencia_estoque_routes import (
     router as pendencia_estoque_router,
 )  # Sistema de Lista de Espera
 from app.nao_venda_routes import router as nao_venda_router
+from app.orcamentos_grupo_routes import router as orcamentos_grupo_router
 
 # ============================================================================
 # WHATSAPP + IA - SPRINT 2 & 4 & 6 & 7
@@ -265,6 +266,7 @@ def register_routers(app: FastAPI) -> None:
     app.include_router(roles_router, tags=["Roles & RBAC"])
     app.include_router(permissions_router, tags=["Permissions & RBAC"])
     app.include_router(clientes_router, tags=["Clientes & Pets"])
+    app.include_router(orcamentos_grupo_router)
     app.include_router(pets_router, tags=["Gestão de Pets"])  # Módulo dedicado separado
     app.include_router(
         veterinario_router,
@@ -474,7 +476,7 @@ def register_routers(app: FastAPI) -> None:
         dependencies=_module_dependencies("bling"),
     )
     app.include_router(bling_oauth_public_router, tags=["Bling OAuth"])
-    app.include_router(intnfe_router, dependencies=_module_dependencies("integracoes"))
+    app.include_router(intnfe_router, dependencies=_module_dependencies("fiscal"))
     app.include_router(
         bling_pedido_router,
         tags=["Integração Bling - Pedido"],

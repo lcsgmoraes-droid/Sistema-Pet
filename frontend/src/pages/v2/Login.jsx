@@ -3,23 +3,31 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { FiAlertCircle, FiBriefcase } from "react-icons/fi";
 import BotaoInteracao from "../../components/v2/BotaoInteracao/BotaoInteracao";
+import InputCheck from "../../components/v2/InputCheck/InputCheck";
 import InputSenha from "../../components/v2/InputSenha/InputSenha";
 import InputTexto from "../../components/v2/InputTexto/InputTexto";
 import { getDefaultAuthenticatedRoute } from "../../auth/userRole";
 import { useAuth } from "../../contexts/AuthContext";
+import { isBrazilianMobileLogin, looksLikePhoneLoginInput } from "../../utils/loginPhone";
 
 const COREPET_LOGO = "/brand/corepet/corepet-horizontal.png";
+const REMEMBERED_LOGIN_KEY = "corepet-remembered-login";
 
 const Login = () => {
-  const [identifier, setIdentifier] = useState("");
+  const rememberedLogin = localStorage.getItem(REMEMBERED_LOGIN_KEY) || "";
+  const [identifier, setIdentifier] = useState(rememberedLogin);
   const [tenant, setTenant] = useState("");
   const [password, setPassword] = useState("");
   const [availableTenants, setAvailableTenants] = useState([]);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [rememberLogin, setRememberLogin] = useState(Boolean(rememberedLogin));
   const { cancelTenantSelection, login, selectTenant } = useAuth();
   const navigate = useNavigate();
-  const loginComUsuario = Boolean(identifier.trim() && !identifier.includes("@"));
+  const digitandoTelefone = looksLikePhoneLoginInput(identifier);
+  const loginComUsuario = Boolean(
+    identifier.trim() && !identifier.includes("@") && !digitandoTelefone,
+  );
 
   const redirectAfterLogin = () => {
     const savedUser = localStorage.getItem("user");
@@ -34,10 +42,23 @@ const Login = () => {
   const handleSubmit = async (event) => {
     event.preventDefault();
     setError("");
+
+    if (digitandoTelefone && !isBrazilianMobileLogin(identifier)) {
+      setError("Informe um celular válido com DDD, por exemplo 18997401641.");
+      return;
+    }
+
     setLoading(true);
 
     try {
       const result = await login(identifier.trim().toLowerCase(), password, tenant.trim() || null);
+      if (result.success) {
+        if (rememberLogin) {
+          localStorage.setItem(REMEMBERED_LOGIN_KEY, identifier.trim());
+        } else {
+          localStorage.removeItem(REMEMBERED_LOGIN_KEY);
+        }
+      }
       if (result.success && result.requiresTenantSelection) {
         setAvailableTenants(result.tenants);
       } else if (result.success) {
@@ -147,8 +168,8 @@ const Login = () => {
           <form onSubmit={handleSubmit} className="space-y-4">
             <InputTexto
               id="login-identificador"
-              label="E-mail ou nome de usuário"
-              placeholder="seu@email.com ou maria.silva"
+              label="Celular, e-mail ou nome de usuário"
+              placeholder="(18) 99740-1641"
               value={identifier}
               onChange={setIdentifier}
               autoComplete="username"
@@ -158,8 +179,8 @@ const Login = () => {
             {loginComUsuario ? (
               <InputTexto
                 id="login-loja"
-                label="Loja"
-                placeholder="Nome ou código da loja"
+                label="Nome de acesso da loja"
+                placeholder="Ex: Vira Latas"
                 value={tenant}
                 onChange={setTenant}
                 help="O administrador da loja informa este nome junto com seu usuário."
@@ -173,6 +194,14 @@ const Login = () => {
               onChange={setPassword}
               autoComplete="current-password"
               required
+            />
+
+            <InputCheck
+              id="login-lembrar"
+              label="Lembrar meu celular ou e-mail"
+              help="A senha pode ser salva pelo gerenciador seguro do navegador."
+              checked={rememberLogin}
+              onChange={setRememberLogin}
             />
 
             <BotaoInteracao

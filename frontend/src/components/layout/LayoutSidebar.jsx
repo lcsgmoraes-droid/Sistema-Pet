@@ -15,6 +15,7 @@ import { Link } from "react-router-dom";
 import useNovidadesNaoVistas from "../../hooks/useNovidadesNaoVistas";
 import { useTheme } from "../../theme/ThemeContext";
 import SidebarMenu from "./SidebarMenu";
+import { resolveLayoutSessionIdentity } from "./layoutSessionIdentity";
 
 const COREPET_LOGO = "/brand/corepet/corepet-horizontal.png";
 const COREPET_ICON = "/brand/corepet/corepet-icon-64.png";
@@ -88,6 +89,7 @@ export default function LayoutSidebar({
     user?.email?.[0] ||
     ""
   ).toUpperCase();
+  const { tenantLabel } = resolveLayoutSessionIdentity(user);
 
   useEffect(() => {
     if (!menuUsuarioAberto) return undefined;
@@ -316,7 +318,7 @@ export default function LayoutSidebar({
           aria-haspopup="menu"
           aria-expanded={menuUsuarioAberto}
           className="flex w-full items-center gap-2.5 px-3 py-3 text-left transition-all hover:bg-white/70 dark:hover:bg-slate-900/60"
-          title={!sidebarOpen ? nomeUsuario : ""}
+          title={!sidebarOpen ? `${nomeUsuario} · Loja: ${tenantLabel}` : ""}
         >
           <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-[#0f5f63] text-sm font-bold text-white">
             {inicialUsuario}
@@ -324,6 +326,12 @@ export default function LayoutSidebar({
           {sidebarOpen && (
             <>
               <span className="min-w-0 flex-1">
+                <span
+                  className="v2-texto-ajuda block truncate font-semibold text-[#0f5f63] dark:text-cyan-200"
+                  title={`Loja ativa: ${tenantLabel}`}
+                >
+                  {tenantLabel}
+                </span>
                 <span className="block truncate text-sm font-medium text-gray-900 dark:text-slate-100">
                   {nomeUsuario}
                 </span>

@@ -1,5 +1,6 @@
 import api from "../api";
 import { confirmarCorePet } from "../services/corepetDialog";
+import { solicitarCorrecaoFiscal } from "../services/fiscalCorrectionDialog";
 
 function linhaProduto(item) {
   const partes = [];
@@ -31,6 +32,16 @@ export function formatarPendenciasFiscais(validacao) {
   }
 
   return linhas.join("\n");
+}
+
+export function temPendenciasFiscais(validacao) {
+  return Boolean(
+    (validacao?.bloqueios || []).length > 0 || (validacao?.correcoes || []).length > 0,
+  );
+}
+
+export function listarPendenciasFiscais(validacao) {
+  return [...(validacao?.bloqueios || []), ...(validacao?.correcoes || [])];
 }
 
 export function extrairMensagemNFe(error) {
@@ -76,43 +87,132 @@ function erroComValidacaoFiscal(validacao) {
   return error;
 }
 
+function validacaoFiscalDoErro(error) {
+  const detail = error?.response?.data?.detail;
+  const validacao = detail?.validacao;
+  if (!validacao || typeof validacao !== "object") return null;
+  return temPendenciasFiscais(validacao) ? validacao : null;
+}
+
+function resumoIntNFe(resumo) {
+  const linhas = [
+    `${resumo.modelo === 55 ? "NF-e" : "NFC-e"} em ${resumo.ambiente}, série ${resumo.serie}`,
+    `Total: R$ ${Number(resumo.total || 0)
+      .toFixed(2)
+      .replace(".", ",")}`,
+    `Itens: ${resumo.itens?.length || 0}`,
+  ];
+  const destinatario = resumo.destinatario?.razaoSocial || resumo.destinatario?.nome;
+  if (destinatario) linhas.push(`Destinatário: ${destinatario}`);
+  if (resumo.ambiente_codigo === 1) {
+    linhas.unshift("ATENÇÃO: esta confirmação transmitirá uma nota fiscal real.", "");
+  }
+  linhas.push("", "Confirmar a transmissão destes dados?");
+  return linhas.join("\n");
+}
+
+function aguardar(ms) {
+  return new Promise((resolve) => globalThis.setTimeout(resolve, ms));
+}
+
+async function acompanharIntNFe(vendaId, initial) {
+  let current = initial;
+  for (let attempt = 0; current?.processando && attempt < 8; attempt += 1) {
+    await aguardar(2500);
+    const response = await api.get(`/nfe/vendas/${vendaId}/status`);
+    current = response.data;
+  }
+  return current;
+}
+
+function erroRejeicaoIntNFe(vendaId, data) {
+  const error = new Error(
+    data?.motivo_rejeicao ||
+      data?.codigo_erro ||
+      `A nota terminou com a situação: ${data?.situacao || "não autorizada"}.`,
+  );
+  error.recuperacaoNFe = {
+    vendaId,
+    codigoErro: data?.codigo_erro,
+    motivo: data?.motivo_rejeicao,
+    ambienteCodigo: data?.ambiente_codigo,
+  };
+  return error;
+}
+
+export async function corrigirEReemitirNota(vendaId) {
+  const { data: initial } = await api.post(`/nfe/vendas/${vendaId}/corrigir-reemitir`);
+  const data = initial?.provedor === "intnfe" ? await acompanharIntNFe(vendaId, initial) : initial;
+  if (data?.provedor === "intnfe" && !data.success && !data.processando) {
+    throw erroRejeicaoIntNFe(vendaId, data);
+  }
+  return data;
+}
+
+export async function prevalidarNotaFiscal({ vendaId, tipoNota = "nfce" } = {}) {
+  const response = await api.post("/nfe/prevalidar", {
+    venda_id: vendaId,
+    tipo_nota: tipoNota,
+  });
+  return response.data;
+}
+
+export function resolverPendenciasNotaFiscal({ validacao, vendaId, tipoNota } = {}) {
+  return solicitarCorrecaoFiscal({ validacao, vendaId, tipoNota, apenasCorrigir: true });
+}
+
 export async function emitirNotaFiscalAssistida({
   vendaId,
   tipoNota = "nfce",
   confirmar = confirmarCorePet,
 } = {}) {
-  const { data: validacao } = await api.post("/nfe/prevalidar", {
-    venda_id: vendaId,
-    tipo_nota: tipoNota,
-  });
+  let validacao;
+  for (let tentativa = 0; tentativa < 5; tentativa += 1) {
+    validacao = await prevalidarNotaFiscal({ vendaId, tipoNota });
+    if (!temPendenciasFiscais(validacao)) break;
 
-  const bloqueios = validacao?.bloqueios || [];
-  const correcoes = validacao?.correcoes || [];
-  if (bloqueios.length) {
+    const corrigido = await solicitarCorrecaoFiscal({ validacao, vendaId, tipoNota });
+    if (!corrigido) return { cancelado: true, validacao };
+  }
+
+  if (temPendenciasFiscais(validacao)) {
     throw erroComValidacaoFiscal(validacao);
   }
 
-  let autorizarCorrecoes = false;
-  if (correcoes.length) {
-    const mensagem = [
-      "O sistema encontrou dados fiscais que pode corrigir automaticamente.",
-      "",
-      formatarPendenciasFiscais(validacao),
-      "",
-      "Autorizar correcao fiscal e emitir a nota agora?",
-    ].join("\n");
-    autorizarCorrecoes = await confirmar(mensagem);
-    if (!autorizarCorrecoes) {
-      return { cancelado: true, validacao };
+  if (validacao?.provedor === "intnfe" && validacao?.resumo_emissao) {
+    const confirmed = await confirmar(resumoIntNFe(validacao.resumo_emissao));
+    if (!confirmed) return { cancelado: true, validacao };
+  }
+
+  for (let tentativaEnvio = 0; tentativaEnvio < 3; tentativaEnvio += 1) {
+    try {
+      const { data: initialData } = await api.post("/nfe/emitir", {
+        venda_id: vendaId,
+        tipo_nota: tipoNota,
+        transmitir: true,
+        autorizar_correcoes_fiscais: false,
+      });
+      const data =
+        initialData?.provedor === "intnfe"
+          ? await acompanharIntNFe(vendaId, initialData)
+          : initialData;
+      if (data?.provedor === "intnfe" && !data.success && !data.processando) {
+        throw erroRejeicaoIntNFe(vendaId, data);
+      }
+      return { data, validacao, correcoesAutorizadas: false };
+    } catch (error) {
+      const validacaoProvedor = validacaoFiscalDoErro(error);
+      if (!validacaoProvedor) throw error;
+
+      const corrigido = await solicitarCorrecaoFiscal({
+        validacao: validacaoProvedor,
+        vendaId,
+        tipoNota,
+      });
+      if (!corrigido) return { cancelado: true, validacao: validacaoProvedor };
+      validacao = validacaoProvedor;
     }
   }
 
-  const { data } = await api.post("/nfe/emitir", {
-    venda_id: vendaId,
-    tipo_nota: tipoNota,
-    transmitir: true,
-    autorizar_correcoes_fiscais: autorizarCorrecoes,
-  });
-
-  return { data, validacao, correcoesAutorizadas: autorizarCorrecoes };
+  throw erroComValidacaoFiscal(validacao);
 }

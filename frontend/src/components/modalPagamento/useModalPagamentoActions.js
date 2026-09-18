@@ -5,6 +5,7 @@ import api from "../../api";
 import { verificarEstoqueNegativo } from "../../api/alertasEstoque";
 import { atualizarVenda, criarVenda, finalizarVenda } from "../../api/vendas";
 import {
+  corrigirEReemitirNota,
   emitirNotaFiscalAssistida,
   extrairAcaoCorrecaoFiscal,
   extrairMensagemNFe,
@@ -31,6 +32,7 @@ export function useModalPagamentoActions({
   formaPagamentoSelecionada,
   justificativaTexto,
   margemCriticaAtual,
+  moduloFiscalAtivo,
   nsuCartao,
   numeroParcelas,
   onConfirmar,
@@ -268,7 +270,7 @@ export function useModalPagamentoActions({
         eh_crediario: ehVendaCrediario(vendaParaCupom),
       });
 
-      if (devePerguntarNotaFiscal(resultado)) {
+      if (!moduloFiscalAtivo || devePerguntarNotaFiscal(resultado)) {
         setMostrarPerguntaNFe(true);
       } else {
         onConfirmar();
@@ -294,19 +296,51 @@ export function useModalPagamentoActions({
       if (resultado?.cancelado) return;
 
       const transmissao = resultado?.data?.transmissao;
-      if (transmissao?.success === false) {
+      if (resultado?.data?.processando) {
         globalThis.alert(
-          `${tipoNota === "nfe" ? "NF-e" : "NFC-e"} criada no Bling, mas a transmissao nao foi concluida automaticamente.\n\n${transmissao.erro || ""}`.trim(),
+          `${tipoNota === "nfe" ? "NF-e" : "NFC-e"} recebida pelo emissor e ainda em processamento. Consulte novamente em Notas Fiscais.`,
+        );
+      } else if (transmissao?.success === false) {
+        globalThis.alert(
+          `${tipoNota === "nfe" ? "NF-e" : "NFC-e"} criada, mas a transmissão não foi concluída automaticamente.\n\n${transmissao.erro || ""}`.trim(),
         );
       } else {
-        globalThis.alert(
-          `${tipoNota === "nfe" ? "NF-e" : "NFC-e"} enviada para emissao/transmissao com sucesso!`,
-        );
+        globalThis.alert(`${tipoNota === "nfe" ? "NF-e" : "NFC-e"} autorizada com sucesso!`);
       }
       onConfirmar();
     } catch (error) {
       console.error("Erro ao emitir nota:", error);
       const mensagem = extrairMensagemNFe(error);
+      const recuperacao = error?.recuperacaoNFe;
+      if (recuperacao) {
+        const avisoProducao =
+          recuperacao.ambienteCodigo === 1
+            ? "\n\nATENÇÃO: a nova tentativa será transmitida em produção."
+            : "";
+        const deveCorrigir = await confirmarCorePet(
+          `${mensagem}${avisoProducao}\n\nO CorePet pode validar os dados atuais, aplicar apenas correções seguras e tentar novamente. Corrigir e tentar novamente?`,
+        );
+        if (deveCorrigir) {
+          try {
+            const reemissao = await corrigirEReemitirNota(recuperacao.vendaId);
+            if (reemissao?.processando) {
+              globalThis.alert(
+                "A correção foi aplicada e a nova tentativa ainda está em processamento. Consulte a Central de NF de Saída.",
+              );
+            } else {
+              globalThis.alert(
+                `${tipoNota === "nfe" ? "NF-e" : "NFC-e"} corrigida e autorizada com sucesso!`,
+              );
+            }
+            onConfirmar();
+          } catch (recoveryError) {
+            const recoveryMessage = extrairMensagemNFe(recoveryError);
+            setErro(recoveryMessage);
+            globalThis.alert(recoveryMessage);
+          }
+          return;
+        }
+      }
       const acaoFiscal = extrairAcaoCorrecaoFiscal(error);
       setErro(mensagem);
       if (

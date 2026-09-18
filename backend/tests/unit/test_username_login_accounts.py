@@ -7,22 +7,28 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 from starlette.requests import Request
 
-from app import produtos_models  # noqa: F401 - registra relacionamentos do ORM
+from app import financeiro_models, produtos_models  # noqa: F401 - registra relacionamentos do ORM
 from app.auth import verify_password
 from app.auth.auth_multitenant_account_routes import (
+    _resolve_tenant_reference,
     _tenant_reference_filters,
     login_multitenant,
 )
 from app.auth.auth_multitenant_schemas import LoginRequest
-from app.models import Role, Tenant, User, UserTenant
+from app.models import Role, Tenant, TenantLoginName, User, UserTenant
 from app.routes.ecommerce_auth_public import login_cliente
 from app.routes.ecommerce_auth_schemas import EcommerceLoginRequest
 from app.services.user_account_service import (
     UserAccountError,
     create_tenant_user_account,
+    normalize_login_phone,
     normalize_username,
 )
-from app.tenancy.context import set_tenant_context
+from app.services.tenant_login_name_service import (
+    TenantLoginNameError,
+    set_primary_tenant_login_name,
+)
+from app.tenancy.context import clear_tenant_context, set_tenant_context
 from app.usuarios_routes import UserCredentialsUpdate, atualizar_credenciais_usuario
 
 
@@ -34,20 +40,29 @@ def _session() -> Session:
     Tenant.__table__.create(engine)
     Role.__table__.create(engine)
     User.__table__.create(engine)
+    TenantLoginName.__table__.create(engine)
     UserTenant.__table__.create(engine)
     return Session(engine)
 
 
-def _tenant(db: Session, *, name: str = "Loja Teste") -> Tenant:
+def _tenant(
+    db: Session,
+    *,
+    name: str = "Loja Teste",
+    login_name: str | None = None,
+    slug: str | None = None,
+) -> Tenant:
     tenant = Tenant(
         id=str(uuid4()),
         name=name,
         name_normalized=name.lower(),
-        ecommerce_slug=name.lower().replace(" ", "-"),
+        ecommerce_slug=slug or name.lower().replace(" ", "-"),
         status="active",
         plan="pet-start",
     )
     db.add(tenant)
+    db.flush()
+    set_primary_tenant_login_name(db, tenant.id, login_name or f"Acesso {name}")
     db.commit()
     set_tenant_context(UUID(str(tenant.id)))
     return tenant
@@ -76,6 +91,81 @@ def test_normalize_username_is_store_friendly_and_rejects_reserved_names():
         assert exc.status_code == 409
     else:
         raise AssertionError("Nome reservado deveria ser rejeitado")
+
+
+def test_normalize_login_phone_accepts_brazilian_mobile_formats():
+    assert normalize_login_phone("(18) 99740-1641") == "18997401641"
+    assert normalize_login_phone("+55 18 99740-1641") == "18997401641"
+
+    try:
+        normalize_login_phone("18 3224-1234")
+    except UserAccountError as exc:
+        assert "celular valido" in exc.detail
+    else:
+        raise AssertionError("Telefone fixo nao deveria ser aceito como login")
+
+
+def test_admin_can_create_phone_only_account():
+    db = _session()
+    tenant = _tenant(db)
+    role = Role(tenant_id=tenant.id, name="Caixa")
+    db.add(role)
+    db.commit()
+
+    user, _role = create_tenant_user_account(
+        db,
+        tenant_id=UUID(str(tenant.id)),
+        username=None,
+        email=None,
+        login_phone="(18) 99740-1641",
+        password="SenhaForte123",
+        role_id=role.id,
+        nome="Maria da Silva",
+    )
+    db.commit()
+
+    assert user.login_phone == "18997401641"
+    assert user.username is None
+    assert user.email is None
+
+
+def test_same_login_phone_cannot_be_created_in_different_stores():
+    db = _session()
+    first_tenant = _tenant(db, name="Loja Um")
+    first_role = Role(tenant_id=first_tenant.id, name="Caixa")
+    db.add(first_role)
+    db.commit()
+    create_tenant_user_account(
+        db,
+        tenant_id=UUID(str(first_tenant.id)),
+        username=None,
+        email=None,
+        login_phone="18997401641",
+        password="SenhaForte123",
+        role_id=first_role.id,
+    )
+    db.commit()
+
+    second_tenant = _tenant(db, name="Loja Dois")
+    second_role = Role(tenant_id=second_tenant.id, name="Caixa")
+    db.add(second_role)
+    db.commit()
+
+    try:
+        create_tenant_user_account(
+            db,
+            tenant_id=UUID(str(second_tenant.id)),
+            username=None,
+            email=None,
+            login_phone="(18) 99740-1641",
+            password="OutraSenha123",
+            role_id=second_role.id,
+        )
+    except UserAccountError as exc:
+        assert exc.status_code == 409
+        assert "celular" in exc.detail.lower()
+    else:
+        raise AssertionError("Celular global duplicado deveria ser rejeitado")
 
 
 def test_admin_can_create_username_only_account_per_tenant():
@@ -151,7 +241,7 @@ def test_login_schemas_keep_email_compatibility_and_accept_username():
     assert mobile.identifier == "joao.silva"
 
 
-def test_tenant_name_lookup_does_not_compare_name_with_uuid_id():
+def test_tenant_reference_filters_only_compare_slug_and_valid_uuid_id():
     name_filters = _tenant_reference_filters("Pet Feliz Demo")
     uuid_filters = _tenant_reference_filters("00000000-0000-0000-0000-000000000001")
 
@@ -160,11 +250,12 @@ def test_tenant_name_lookup_does_not_compare_name_with_uuid_id():
 
     assert "tenants.id =" not in name_sql
     assert "tenants.id =" in uuid_sql
+    assert "name_normalized" not in name_sql
 
 
 def test_web_login_resolves_username_inside_informed_store(monkeypatch):
     db = _session()
-    tenant = _tenant(db)
+    tenant = _tenant(db, login_name="Equipe Loja Teste")
     user, _role = _account(db, tenant)
     db.commit()
 
@@ -187,7 +278,7 @@ def test_web_login_resolves_username_inside_informed_store(monkeypatch):
         request=request,
         credentials=LoginRequest(
             identifier="joao.silva",
-            tenant="loja-teste",
+            tenant="equipe loja teste",
             password="SenhaForte123",
         ),
         db=db,
@@ -197,6 +288,115 @@ def test_web_login_resolves_username_inside_informed_store(monkeypatch):
     assert response.user["username"] == "joao.silva"
     assert response.user["email"] is None
     assert response.tenants[0]["id"] == str(tenant.id)
+    assert response.tenants[0]["login_name"] == "Equipe Loja Teste"
+
+
+def test_web_login_resolves_phone_without_store_and_returns_user_tenants(monkeypatch):
+    db = _session()
+    first_tenant = _tenant(db, name="Loja Um")
+    role = Role(tenant_id=first_tenant.id, name="Caixa")
+    db.add(role)
+    db.commit()
+    user, _role = create_tenant_user_account(
+        db,
+        tenant_id=UUID(str(first_tenant.id)),
+        username=None,
+        email=None,
+        login_phone="18997401641",
+        password="SenhaForte123",
+        role_id=role.id,
+        nome="Maria",
+    )
+    db.commit()
+
+    second_tenant = _tenant(db, name="Loja Dois")
+    second_role = Role(tenant_id=second_tenant.id, name="Gerente")
+    db.add(second_role)
+    db.flush()
+    db.add(
+        UserTenant(
+            user_id=user.id,
+            tenant_id=second_tenant.id,
+            role_id=second_role.id,
+            is_active=True,
+        )
+    )
+    db.commit()
+    clear_tenant_context()
+
+    expires_at = datetime.now(timezone.utc) + timedelta(hours=1)
+    monkeypatch.setattr(
+        "app.auth.auth_multitenant_account_routes.create_session",
+        lambda **_kwargs: SimpleNamespace(token_jti="test-jti", expires_at=expires_at),
+    )
+    monkeypatch.setattr(
+        "app.auth.auth_multitenant_account_routes._create_token_pair",
+        lambda *_args: ("access-token", "refresh-token"),
+    )
+    monkeypatch.setattr(
+        "app.auth.auth_multitenant_account_routes.register_successful_login",
+        lambda *_args: None,
+    )
+
+    response = login_multitenant(
+        request=Request({"type": "http", "headers": []}),
+        credentials=LoginRequest(
+            identifier="(18) 99740-1641",
+            password="SenhaForte123",
+        ),
+        db=db,
+    )
+
+    assert response.user["id"] == user.id
+    assert response.user["login_phone"] == "18997401641"
+    assert {tenant["name"] for tenant in response.tenants} == {"Loja Um", "Loja Dois"}
+
+
+def test_login_name_change_keeps_previous_name_as_alias():
+    db = _session()
+    tenant = _tenant(db, name="Casa de Racao Vira Lata", login_name="Vira Lata")
+
+    change = set_primary_tenant_login_name(db, tenant.id, "Vira Latas")
+    db.commit()
+
+    assert change.old_name == "Vira Lata"
+    assert change.new_name == "Vira Latas"
+    assert _resolve_tenant_reference(db, "vira lata").id == tenant.id
+    assert _resolve_tenant_reference(db, "VIRA LATAS").id == tenant.id
+    assert (
+        db.query(TenantLoginName)
+        .filter(TenantLoginName.tenant_id == str(tenant.id))
+        .count()
+        == 2
+    )
+
+
+def test_login_name_is_unique_globally_but_fantasy_name_is_not():
+    db = _session()
+    first = _tenant(
+        db,
+        name="Mesmo Nome Fantasia",
+        login_name="Acesso Matriz",
+        slug="mesmo-nome-matriz",
+    )
+    second = _tenant(
+        db,
+        name="Mesmo Nome Fantasia",
+        login_name="Acesso Filial",
+        slug="mesmo-nome-filial",
+    )
+
+    try:
+        set_primary_tenant_login_name(db, second.id, "Ácesso   Matriz")
+    except TenantLoginNameError as exc:
+        assert exc.status_code == 409
+    else:
+        raise AssertionError("Nome de acesso duplicado deveria ser rejeitado")
+
+    first.name = "Novo Nome Fantasia"
+    db.commit()
+
+    assert _resolve_tenant_reference(db, "acesso matriz").id == first.id
 
 
 def test_mobile_login_accepts_username_without_email(monkeypatch):
@@ -290,6 +490,38 @@ def test_admin_generated_password_updates_hash_and_returns_plaintext_once(monkey
     assert verify_password(result["generated_password"], target_user.hashed_password)
 
 
+def test_admin_can_add_phone_login_to_existing_user(monkeypatch):
+    db = _session()
+    tenant = _tenant(db)
+    target_user, _role = _account(db, tenant)
+    actor = User(
+        tenant_id=tenant.id,
+        email="admin@loja.com",
+        hashed_password="irrelevante",
+        nome="Admin",
+        is_active=True,
+        email_verified=True,
+    )
+    db.add(actor)
+    db.commit()
+
+    monkeypatch.setattr("app.usuarios_routes.revoke_all_sessions", lambda **_kwargs: 1)
+    monkeypatch.setattr(
+        "app.usuarios_routes.log_business_event", lambda **_kwargs: None
+    )
+
+    result = atualizar_credenciais_usuario.__wrapped__(
+        user_id=target_user.id,
+        payload=UserCredentialsUpdate(login_phone="(18) 99740-1641"),
+        db=db,
+        user_and_tenant=(actor, UUID(str(tenant.id))),
+    )
+
+    assert result["login_phone"] == "18997401641"
+    assert result["sessions_revoked"] == 1
+    assert target_user.username == "joao.silva"
+
+
 def test_admin_can_change_user_role_and_revoke_open_sessions(monkeypatch):
     db = _session()
     tenant = _tenant(db)
@@ -335,3 +567,14 @@ def test_migration_makes_email_optional_and_username_unique_per_tenant():
     assert '"email",' in source and "nullable=True" in source
     assert "uq_users_tenant_username" in source
     assert "email IS NOT NULL OR username IS NOT NULL" in source
+
+
+def test_phone_login_migration_adds_unique_identifier_and_rls_guard():
+    source = (
+        REPO_ROOT / "alembic/versions/zzu20260917a1_user_phone_login.py"
+    ).read_text(encoding="utf-8")
+
+    assert 'down_revision = "zzt20260916a1"' in source
+    assert 'sa.Column("login_phone", sa.String(length=16), nullable=True)' in source
+    assert "uq_users_login_phone" in source
+    assert "app.auth_phone" in source

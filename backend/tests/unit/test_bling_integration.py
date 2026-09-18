@@ -6,6 +6,8 @@ import pytest
 import requests
 
 from app.bling_integration import BlingAPI, _montar_url_bling, prevalidar_fiscal_venda
+from app import bling_integration_fiscal
+from app.bling_integration_parts import core as bling_core
 
 
 class _FakeResponse:
@@ -63,6 +65,15 @@ def _make_venda_nfce():
     )
 
 
+def test_configuracao_jwt_nao_pode_ser_desativada_por_variavel(monkeypatch):
+    monkeypatch.setattr(bling_core, "ENV_PATHS", [])
+    monkeypatch.setenv("BLING_ENABLE_JWT", "0")
+
+    runtime_config = bling_core._load_bling_runtime_config()
+
+    assert runtime_config["enable_jwt"] == "1"
+
+
 def test_prevalidacao_sugere_ncm_para_racao_caes_gatos_com_ncm_zerado():
     produto = SimpleNamespace(
         id=10,
@@ -95,13 +106,172 @@ def test_prevalidacao_sugere_ncm_para_racao_caes_gatos_com_ncm_zerado():
     assert validacao["correcoes"][0]["campo"] == "ncm"
     assert validacao["correcoes"][0]["valor_atual"] == "00000000"
     assert validacao["correcoes"][0]["valor_sugerido"] == "23091000"
+    assert validacao["correcoes"][0]["confianca"] == "baixa"
+    assert validacao["correcoes"][0]["preenchimento_automatico"] is False
     assert validacao["pode_emitir"] is False
 
 
-def test_emitir_nfce_bloqueia_ncm_zerado_antes_de_criar_nota_no_bling(monkeypatch):
+def test_ncm_com_um_unico_exemplo_em_categoria_generica_tem_baixa_confianca():
+    class Query:
+        def join(self, *_args):
+            return self
+
+        def filter(self, *_args):
+            return self
+
+        def limit(self, *_args):
+            return self
+
+        def all(self):
+            return [("23091000",)]
+
+    class Db:
+        def query(self, *_args):
+            return Query()
+
+    produto = SimpleNamespace(
+        id=28128,
+        categoria_id=298,
+        departamento_id=None,
+        categoria=SimpleNamespace(nome="GRUPO DIVERSOS"),
+        departamento=None,
+    )
+
+    sugestao = bling_integration_fiscal._sugerir_ncm_por_historico(
+        Db(), "tenant-1", produto
+    )
+
+    assert sugestao["valor"] == "23091000"
+    assert sugestao["confianca"] == "baixa"
+    assert sugestao["preenchimento_automatico"] is False
+    assert "1 de 1" in sugestao["motivo"]
+
+
+def test_prevalidacao_direta_identifica_campos_editaveis_e_sugestoes(monkeypatch):
+    venda = _make_venda_nfce()
+    monkeypatch.setattr(
+        bling_integration_fiscal,
+        "_resolver_fiscal_item_nfe",
+        lambda *_args: {
+            "ncm": "39269090",
+            "origem_mercadoria": "0",
+            "cfop": "5102",
+            "cst_icms": None,
+            "pis_cst": None,
+            "cofins_cst": None,
+        },
+    )
+    monkeypatch.setattr(
+        bling_integration_fiscal,
+        "_melhor_sugestao_catalogo",
+        lambda *_args: {
+            "categoria_fiscal": "Acessorios",
+            "cst_icms": "102",
+            "pis_cst": "49",
+            "cofins_cst": "49",
+            "observacao": "Sugestao baseada no catalogo fiscal.",
+        },
+    )
+
+    validacao = bling_integration_fiscal.prevalidar_produtos_fiscais_venda(
+        venda, exigir_documento_completo=True
+    )
+
+    assert validacao["bloqueios"] == []
+    assert {item["campo"] for item in validacao["correcoes"]} == {
+        "cst_icms",
+        "pis_cst",
+        "cofins_cst",
+    }
+    assert all(item["produto_id"] == 10 for item in validacao["correcoes"])
+    assert all(
+        item["codigo_barras"] == "7890000000000" for item in validacao["correcoes"]
+    )
+
+
+def test_prevalidacao_oferece_opcoes_do_simples_com_baixa_confianca(monkeypatch):
+    venda = _make_venda_nfce()
+    monkeypatch.setattr(
+        bling_integration_fiscal,
+        "_resolver_fiscal_item_nfe",
+        lambda *_args: {
+            "ncm": "39269090",
+            "origem_mercadoria": "0",
+            "cfop": "5102",
+            "cst_icms": None,
+            "pis_cst": None,
+            "cofins_cst": None,
+            "icms_st": False,
+        },
+    )
+    monkeypatch.setattr(
+        bling_integration_fiscal,
+        "_config_fiscal_empresa",
+        lambda *_args: SimpleNamespace(
+            regime_tributario="Simples Nacional",
+            simples_ativo=True,
+            pis_cst_padrao=None,
+            cofins_cst_padrao=None,
+        ),
+    )
+    monkeypatch.setattr(
+        bling_integration_fiscal, "_melhor_sugestao_catalogo", lambda *_args: None
+    )
+
+    validacao = bling_integration_fiscal.prevalidar_produtos_fiscais_venda(
+        venda, object(), exigir_documento_completo=True
+    )
+
+    sugestoes = {item["campo"]: item for item in validacao["correcoes"]}
+    assert sugestoes["cst_icms"]["valor_sugerido"] == "102"
+    assert sugestoes["pis_cst"]["valor_sugerido"] == "49"
+    assert sugestoes["cofins_cst"]["valor_sugerido"] == "49"
+    assert all(item["confianca"] == "baixa" for item in sugestoes.values())
+    assert all(item["preenchimento_automatico"] is False for item in sugestoes.values())
+    assert validacao["contexto_fiscal"] == {
+        "regime_tributario": "Simples Nacional",
+        "uf": None,
+        "simples_nacional": True,
+    }
+
+
+def test_catalogo_opcional_falha_dentro_de_savepoint_sem_interromper_validacao(
+    monkeypatch,
+):
+    eventos = []
+
+    class Savepoint:
+        def __enter__(self):
+            eventos.append("abriu")
+
+        def __exit__(self, exc_type, _exc, _traceback):
+            eventos.append(("fechou", exc_type))
+            return False
+
+    class Db:
+        def begin_nested(self):
+            return Savepoint()
+
+    def catalogo_indisponivel(*_args):
+        raise RuntimeError("tabela de catalogo indisponivel")
+
+    monkeypatch.setattr(
+        bling_integration_fiscal,
+        "sugerir_fiscal_por_descricao",
+        catalogo_indisponivel,
+    )
+
+    sugestao = bling_integration_fiscal._melhor_sugestao_catalogo(
+        Db(), SimpleNamespace(nome="Portao pet")
+    )
+
+    assert sugestao is None
+    assert eventos == ["abriu", ("fechou", RuntimeError)]
+
+
+def test_emissao_fiscal_pelo_bling_permanece_bloqueada(monkeypatch):
     api = _make_api()
     venda = _make_venda_nfce()
-    venda.itens[0].produto.ncm = "00000000"
 
     chamadas_bling = []
 
@@ -111,7 +281,7 @@ def test_emitir_nfce_bloqueia_ncm_zerado_antes_de_criar_nota_no_bling(monkeypatc
 
     monkeypatch.setattr(api, "_request", fake_request)
 
-    with pytest.raises(ValueError, match="NCM"):
+    with pytest.raises(RuntimeError, match="IntNFe"):
         api.emitir_nota_fiscal(venda, "nfce")
 
     assert chamadas_bling == []
@@ -262,6 +432,7 @@ def test_baixar_danfe_usa_timeout(monkeypatch):
 
 def test_renovar_access_token_usa_timeout(monkeypatch):
     api = _make_api()
+    api.enable_jwt = "0"
     api.client_id = "client-id"
     api.client_secret = "client-secret"
     api.refresh_token = "refresh-token"
@@ -296,6 +467,7 @@ def test_renovar_access_token_usa_timeout(monkeypatch):
         "grant_type": "refresh_token",
         "refresh_token": "refresh-token",
     }
+    assert chamadas[0]["headers"]["enable-jwt"] == "1"
     assert chamadas[0]["timeout"] == 30
 
 
@@ -455,19 +627,6 @@ def test_payload_arredonda_cada_item_vendido_por_peso():
     assert payload["totais"]["valorTotal"] == 300.0
 
 
-def test_emissao_bloqueia_total_divergente_antes_de_criar_nota(monkeypatch):
-    venda = _make_venda_nfce()
-    venda.total = Decimal("90.00")
-    api = _make_api()
-    chamadas = []
-    monkeypatch.setattr(api, "_request", lambda *a, **kw: chamadas.append((a, kw)))
-
-    with pytest.raises(ValueError, match="difere do total da venda"):
-        api.emitir_nota_fiscal(venda, "nfce")
-
-    assert chamadas == []
-
-
 def test_payload_envia_campos_fiscais_e_endereco_no_formato_bling():
     venda = _make_venda_nfce()
     venda.itens[0].produto.cest = "2200100"
@@ -495,46 +654,3 @@ def test_payload_envia_campos_fiscais_e_endereco_no_formato_bling():
     assert "ncm" not in item
     assert payload["contato"]["endereco"]["endereco"] == "Rua Teste"
     assert "logradouro" not in payload["contato"]["endereco"]
-
-
-@pytest.mark.parametrize("valor_bling", [100.03, None])
-def test_emissao_preserva_id_sem_transmitir_total_bling_divergente(
-    monkeypatch, valor_bling
-):
-    api = _make_api()
-    chamadas = []
-
-    def fake_request(method, endpoint, **kwargs):
-        chamadas.append((method, endpoint))
-        if method == "GET":
-            return {"data": {"valorNota": valor_bling}}
-        return {"data": {"id": 123, "numero": "000043"}}
-
-    monkeypatch.setattr(api, "_request", fake_request)
-    resposta = api.emitir_nota_fiscal(_make_venda_nfce(), "nfce", transmitir=True)
-
-    assert resposta["data"]["id"] == 123
-    assert resposta["transmissao"]["success"] is False
-    assert "difere do total da venda" in resposta["transmissao"]["erro"]
-    assert chamadas == [("POST", "/nfce"), ("GET", "/nfce/123")]
-
-
-def test_emissao_transmite_quando_total_bling_confere(monkeypatch):
-    api = _make_api()
-    chamadas = []
-
-    def fake_request(method, endpoint, **kwargs):
-        chamadas.append((method, endpoint))
-        if method == "GET":
-            return {"data": {"valorNota": 100.0}}
-        return {"data": {"id": 123}}
-
-    monkeypatch.setattr(api, "_request", fake_request)
-    resposta = api.emitir_nota_fiscal(_make_venda_nfce(), "nfce", transmitir=True)
-
-    assert resposta["transmissao"]["success"] is True
-    assert chamadas == [
-        ("POST", "/nfce"),
-        ("GET", "/nfce/123"),
-        ("POST", "/nfce/123/enviar"),
-    ]

@@ -214,6 +214,16 @@ class ProdutoLote(BaseTenantModel):
     ordem_entrada = Column(Integer, nullable=False)  # Timestamp Unix para FIFO
     custo_unitario = Column(Float, nullable=True)
 
+    # Snapshot fiscal da entrada que originou o lote. A emissão usa estes
+    # campos antes do cadastro geral do produto para preservar diferenças
+    # fiscais entre lotes do mesmo SKU.
+    fiscal_ncm = Column(String(8), nullable=True)
+    fiscal_cest = Column(String(7), nullable=True)
+    fiscal_origem_mercadoria = Column(String(1), nullable=True)
+    fiscal_cfop_entrada = Column(String(4), nullable=True)
+    fiscal_cst_icms_entrada = Column(String(3), nullable=True)
+    fiscal_icms_st = Column(Boolean, nullable=True)
+
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 

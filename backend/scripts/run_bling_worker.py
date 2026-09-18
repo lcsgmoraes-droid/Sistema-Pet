@@ -15,6 +15,9 @@ ROOT_DIR = Path(__file__).resolve().parents[1]
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
+# Carrega o registro ORM completo antes de iniciar jobs que podem criar
+# registros com FKs para modulos que o worker nao importa diretamente.
+import app.db.base  # noqa: F401
 from app.schedulers.bling_sync_scheduler import BlingSyncScheduler
 from app.utils.logger import configure_logging
 

@@ -34,7 +34,7 @@ export const MODULOS_PREMIUM = [
   "marketplaces",
 ];
 
-export const MODULOS_FORA_DA_OFERTA_PUBLICA = ["bling"];
+export const MODULOS_FORA_DA_OFERTA_PUBLICA = ["bling", "fiscal"];
 export const MODULOS_BETA_PUBLICOS = MODULOS_PREMIUM.filter(
   (modulo) => !MODULOS_FORA_DA_OFERTA_PUBLICA.includes(modulo),
 );

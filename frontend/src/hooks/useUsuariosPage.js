@@ -7,16 +7,17 @@ import {
   buildInitialAccessCredentials,
   resolveTenantLoginReference,
 } from "../utils/usuarioAcessoInicial";
+import { isBrazilianMobileLogin, normalizeBrazilianLoginPhone } from "../utils/loginPhone";
 
 const USUARIO_INICIAL = {
   nome: "",
-  username: "",
+  login_phone: "",
   email: "",
   password: "",
   role_id: null,
 };
 
-const CREDENCIAIS_INICIAIS = { username: "", new_password: "", role_id: "" };
+const CREDENCIAIS_INICIAIS = { login_phone: "", new_password: "", role_id: "" };
 
 function detalhesValidacaoParaMensagem(details) {
   const validationDetails = Array.isArray(details) ? details : [];
@@ -161,10 +162,10 @@ export default function useUsuariosPage() {
     event.preventDefault();
     setUsuarioFormError("");
 
-    const username = (novoUsuario.username || "").trim().toLowerCase();
+    const loginPhone = normalizeBrazilianLoginPhone(novoUsuario.login_phone);
     const email = (novoUsuario.email || "").trim().toLowerCase();
-    if (username.length < 3) {
-      setUsuarioFormError("Informe um nome de usuario com pelo menos 3 caracteres.");
+    if (!isBrazilianMobileLogin(novoUsuario.login_phone)) {
+      setUsuarioFormError("Informe um celular valido com DDD, por exemplo 18997401641.");
       return;
     }
     if (email && !emailPareceValido(email)) {
@@ -187,13 +188,13 @@ export default function useUsuariosPage() {
     try {
       await api.post("/usuarios", {
         ...novoUsuario,
-        username,
+        login_phone: loginPhone,
         email: email || null,
       });
       setInitialAccessCredentials(
         buildInitialAccessCredentials({
           tenant: tenantLoginReference,
-          username,
+          loginPhone,
           password: novoUsuario.password,
           personName: novoUsuario.nome,
         }),
@@ -212,7 +213,7 @@ export default function useUsuariosPage() {
   function abrirCredenciais(usuario) {
     setUsuarioCredenciais(usuario);
     setCredenciais({
-      username: usuario.username || "",
+      login_phone: usuario.login_phone || "",
       new_password: "",
       role_id: usuario.role_id || "",
     });
@@ -238,9 +239,9 @@ export default function useUsuariosPage() {
 
   async function atualizarCredenciais(generatePassword) {
     if (!usuarioCredenciais) return;
-    const username = (credenciais.username || "").trim().toLowerCase();
-    if (username.length < 3) {
-      setCredenciaisError("Informe um nome de usuario com pelo menos 3 caracteres.");
+    const loginPhone = normalizeBrazilianLoginPhone(credenciais.login_phone);
+    if (!isBrazilianMobileLogin(credenciais.login_phone)) {
+      setCredenciaisError("Informe um celular valido com DDD, por exemplo 18997401641.");
       return;
     }
     if (!generatePassword && credenciais.new_password && credenciais.new_password.length < 8) {
@@ -257,12 +258,12 @@ export default function useUsuariosPage() {
     setGeneratedPassword("");
     try {
       const response = await api.patch(`/usuarios/${usuarioCredenciais.user_id}/credenciais`, {
-        username,
+        login_phone: loginPhone,
         new_password: generatePassword ? null : credenciais.new_password || null,
         generate_password: generatePassword,
         role_id: Number(credenciais.role_id),
       });
-      setCredenciais((current) => ({ ...current, username, new_password: "" }));
+      setCredenciais((current) => ({ ...current, login_phone: loginPhone, new_password: "" }));
       await carregarUsuarios();
       if (response.data?.generated_password) {
         setGeneratedPassword(response.data.generated_password);

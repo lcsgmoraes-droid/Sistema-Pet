@@ -1,9 +1,14 @@
+import importlib.util
 from pathlib import Path
 from uuid import uuid4
 
+import sqlalchemy as sa
+from alembic.migration import MigrationContext
+from alembic.operations import Operations
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
+from app import financeiro_models, produtos_models  # noqa: F401 - completa o registry ORM
 from app.models import Tenant
 from app.tenant_identity import normalize_tenant_name
 from app.routes.ecommerce_public import (
@@ -126,22 +131,89 @@ def test_store_search_contract_keeps_name_global_and_gps_limited_to_eight():
     assert '"distancia_km"' in source
 
 
-def test_tenant_database_migration_enforces_unique_normalized_names():
+def test_tenant_login_name_migration_separates_login_from_fantasy_name():
     source = (
-        REPO_ROOT
-        / "backend/alembic/versions/zwo20260729a1_tenant_discovery_identity.py"
+        REPO_ROOT / "backend/alembic/versions/zzt20260916a1_tenant_login_names.py"
     ).read_text(encoding="utf-8")
 
-    assert '"ux_tenants_name_normalized"' in source
+    assert '"tenant_login_names"' in source
+    assert '"ux_tenant_login_names_name_normalized"' in source
+    assert '"ux_tenant_login_names_primary_tenant"' in source
+    assert '"ix_tenants_name_normalized"' in source
     assert "unique=True" in source
-    assert "Existem lojas com nomes duplicados" in source
+    assert "SELECT id, name, name_normalized" in source
 
 
-def test_tenant_registration_rejects_an_existing_store_name():
+def test_tenant_login_name_migration_backfills_and_keeps_aliases_on_sqlite():
+    migration_path = (
+        REPO_ROOT / "backend/alembic/versions/zzt20260916a1_tenant_login_names.py"
+    )
+    spec = importlib.util.spec_from_file_location(
+        "tenant_login_name_migration", migration_path
+    )
+    assert spec and spec.loader
+    login_name_migration = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(login_name_migration)
+
+    engine = create_engine("sqlite:///:memory:")
+    metadata = sa.MetaData()
+    tenants = sa.Table(
+        "tenants",
+        metadata,
+        sa.Column("id", sa.String(36), primary_key=True),
+        sa.Column("name", sa.String(255), nullable=False),
+        sa.Column("name_normalized", sa.String(255), nullable=False),
+    )
+    sa.Index("ux_tenants_name_normalized", tenants.c.name_normalized, unique=True)
+    sa.Table("users", metadata, sa.Column("id", sa.Integer, primary_key=True))
+    metadata.create_all(engine)
+
+    tenant_id = str(uuid4())
+    with engine.begin() as connection:
+        connection.execute(
+            tenants.insert().values(
+                id=tenant_id,
+                name="Casa de Racao Vira Lata",
+                name_normalized="casa de racao vira lata",
+            )
+        )
+        original_op = login_name_migration.op
+        login_name_migration.op = Operations(MigrationContext.configure(connection))
+        try:
+            login_name_migration.upgrade()
+        finally:
+            login_name_migration.op = original_op
+
+        row = (
+            connection.execute(
+                sa.text(
+                    "SELECT tenant_id, name, name_normalized, is_primary "
+                    "FROM tenant_login_names"
+                )
+            )
+            .mappings()
+            .one()
+        )
+        primary_index_sql = connection.execute(
+            sa.text(
+                "SELECT sql FROM sqlite_master "
+                "WHERE name = 'ux_tenant_login_names_primary_tenant'"
+            )
+        ).scalar_one()
+
+    assert row["tenant_id"] == tenant_id
+    assert row["name"] == "Casa de Racao Vira Lata"
+    assert row["name_normalized"] == "casa de racao vira lata"
+    assert bool(row["is_primary"]) is True
+    assert "WHERE is_primary = 1" in primary_index_sql
+
+
+def test_tenant_registration_uses_the_unique_login_name_service():
     source = (
         REPO_ROOT / "backend/app/auth/auth_multitenant_account_routes.py"
     ).read_text(encoding="utf-8")
 
-    assert "Tenant.name_normalized == tenant_name_normalized" in source
-    assert "Ja existe uma loja com este nome" in source
-    assert "HTTP_409_CONFLICT" in source
+    assert "set_primary_tenant_login_name" in source
+    assert "payload.nome_acesso or tenant_name" in source
+    assert "Tenant.name_normalized ==" not in source
+    assert "Este nome de acesso ja esta em uso" in source

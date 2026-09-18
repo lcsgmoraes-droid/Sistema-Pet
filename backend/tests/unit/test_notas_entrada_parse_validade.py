@@ -120,6 +120,32 @@ def test_parse_nfe_xml_extrai_ean_comercial_e_ean_tributario():
     assert item["ean_tributario"] == "7898242030076"
 
 
+def test_parse_nfe_xml_identifica_icms_st_do_fornecedor():
+    xml = """
+    <nfeProc xmlns="http://www.portalfiscal.inf.br/nfe">
+      <NFe><infNFe Id="NFe123"><ide><nNF>46270</nNF><serie>1</serie>
+        <dhEmi>2026-08-01T10:00:00-03:00</dhEmi></ide>
+        <emit><CNPJ>12345678000199</CNPJ><xNome>Fornecedor</xNome><IE>123</IE></emit>
+        <det nItem="1"><prod><cProd>690</cProd><xProd>Racao</xProd>
+          <NCM>23099010</NCM><CEST>2200100</CEST><CFOP>6401</CFOP>
+          <uCom>UN</uCom><qCom>17</qCom><vUnCom>100</vUnCom><vProd>1700</vProd>
+        </prod><imposto><ICMS><ICMS10><orig>0</orig><CST>10</CST>
+          <vBCST>1280.36</vBCST><vICMSST>140.04</vICMSST><pICMS>12</pICMS>
+        </ICMS10></ICMS></imposto></det>
+        <total><ICMSTot><vProd>1700</vProd><vFrete>0</vFrete><vDesc>0</vDesc>
+          <vNF>1700</vNF></ICMSTot></total>
+      </infNFe></NFe>
+    </nfeProc>
+    """
+
+    item = routes.parse_nfe_xml(xml)["itens"][0]
+
+    assert item["cst_icms"] == "10"
+    assert item["icms_st"] is True
+    assert item["icms_base_st"] == 1280.36
+    assert item["icms_valor_st"] == 140.04
+
+
 def test_migration_ean_tributario_aumenta_coluna_antes_do_backfill():
     source = MIGRATION_EAN_TRIBUTARIO.read_text(encoding="utf-8")
     upgrade_source = source[

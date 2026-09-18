@@ -1,6 +1,6 @@
 # Guia CorePet — configuração fiscal para NF-e e NFC-e
 
-Atualizado em 11/09/2026. Este guia explica como preparar uma empresa para a
+Atualizado em 15/09/2026. Este guia explica como preparar uma empresa para a
 emissão de notas de produto pelo CorePet e pela IntNFe. As regras tributárias da
 empresa e dos produtos devem ser confirmadas com a contabilidade antes da
 primeira emissão em produção.
@@ -17,10 +17,10 @@ primeira emissão em produção.
 
 ## NF-e e NFC-e: qual usar
 
-| Documento | Uso mais comum | Identificação do comprador |
-|---|---|---|
-| NF-e, modelo 55 | Venda de mercadoria, inclusive pedidos enviados e vendas para outro estado | Destinatário completo, conforme a operação |
-| NFC-e, modelo 65 | Venda presencial ao consumidor no caixa | Pode sair sem consumidor identificado; informe CPF/CNPJ quando solicitado |
+| Documento        | Uso mais comum                                                             | Identificação do comprador                                                |
+| ---------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
+| NF-e, modelo 55  | Venda de mercadoria, inclusive pedidos enviados e vendas para outro estado | Destinatário completo, conforme a operação                                |
+| NFC-e, modelo 65 | Venda presencial ao consumidor no caixa                                    | Pode sair sem consumidor identificado; informe CPF/CNPJ quando solicitado |
 
 Em São Paulo, a NFC-e passou a ser obrigatória para o varejo paulista em
 01/01/2026, conforme a [página oficial da NFC-e da SEFAZ-SP](https://portal.fazenda.sp.gov.br/servicos/nfce/).
@@ -105,10 +105,10 @@ produção; cadastrar o CSC de testes não prepara automaticamente a produção.
 No CorePet:
 
 1. entre em **Configurações → Integrações → IntNFe**;
-2. na seção **CSC da NFC-e**, escolha **Homologação (testes)** ou **Produção**;
-3. informe o ID e o código CSC daquele ambiente;
+2. abra a aba **Homologação** ou **Produção**;
+3. na seção **CSC da NFC-e**, informe o ID e o código CSC daquele ambiente;
 4. revise a substituição quando já existir um CSC;
-5. salve e clique em **Consultar CSC** para confirmar o ID registrado.
+5. salve e clique em **Verificar cadastro na IntNFe** para confirmar o ID registrado.
 
 O código secreto é enviado diretamente à IntNFe e não volta nas consultas. O
 CorePet mostra somente se existe um CSC e qual é o seu ID.
@@ -129,6 +129,9 @@ CorePet mostra somente se existe um CSC e qual é o seu ID.
 6. Envie o certificado A1 na própria tela do CorePet.
 7. Acompanhe o **Checklist de preparação fiscal** até a base da NF-e aparecer
    como pronta. Para NFC-e, cadastre também o CSC do ambiente escolhido.
+8. Em **Ambiente de emissão**, escolha homologação ou produção e informe as
+   séries que serão usadas. O CorePet prepara os códigos técnicos de produção
+   automaticamente; o usuário não copia credenciais.
 
 O fluxo pode ser usado por qualquer empresa do CorePet quando a integração
 IntNFe estiver habilitada no ambiente e o usuário tiver permissão para editar
@@ -163,11 +166,22 @@ avanço.
 
 No CorePet:
 
-1. na seção **Numeração fiscal**, escolha NF-e ou NFC-e;
-2. escolha explicitamente homologação ou produção;
-3. informe a série usada no sistema anterior;
-4. informe o próximo número;
-5. revise o resumo e confirme.
+1. abra a aba **Homologação** ou **Produção**; tudo que aparece abaixo pertence
+   ao ambiente selecionado;
+2. em **Sequências usadas anteriormente**, informe a série e o próximo número
+   da NF-e modelo 55;
+3. se a empresa também emitir NFC-e, clique em **Adicionar NFC-e (modelo 65)**
+   e informe a sequência própria do modelo;
+4. marque **Continuar com esta série no CorePet** quando quiser manter a série
+   utilizada no sistema anterior;
+5. em **Séries que o CorePet usará**, confira as séries preenchidas e as próximas
+   numerações. Também é possível escolher outra série já cadastrada;
+6. salve cada avanço de sequência. Na produção, revise o resumo final antes de
+   ativar a emissão real.
+
+A NF-e modelo 55 e a NFC-e modelo 65 não compartilham sequência, mesmo quando
+ambas usam a série 1. A tela mostra separadamente a próxima numeração de cada
+modelo e impede que uma escolha pareça substituir a outra.
 
 O ajuste só avança. Não escolha uma série aleatória para produção e não tente
 voltar a sequência. Notas rejeitadas, denegadas, canceladas ou faixas
@@ -177,15 +191,15 @@ inutilizadas exigem conferência do histórico antes da decisão.
 
 O vínculo técnico não substitui os cadastros fiscais. Antes de emitir, confirme:
 
-| Área | Campos principais |
-|---|---|
-| Cliente | CPF/CNPJ, indicador de IE, inscrição estadual quando exigida e endereço completo |
-| Produto | descrição, SKU, NCM, CEST quando aplicável, origem e unidade |
-| Operação | CFOP, consumidor final, presença, finalidade e natureza da operação |
-| Tributos | CSOSN/CST de ICMS, PIS, COFINS, IPI quando aplicável, ST, DIFAL, FCP e crédito do Simples |
-| Valores | quantidade, preço, desconto, frete, outras despesas, total e forma de pagamento |
-| Marketplace | canal, CNPJ do intermediador, identificador no intermediador e referência do pedido |
-| Transporte | modalidade do frete, transportadora quando houver, volumes, pesos e rastreio |
+| Área        | Campos principais                                                                         |
+| ----------- | ----------------------------------------------------------------------------------------- |
+| Cliente     | CPF/CNPJ, indicador de IE, inscrição estadual quando exigida e endereço completo          |
+| Produto     | descrição, SKU, NCM, CEST quando aplicável, origem e unidade                              |
+| Operação    | CFOP, consumidor final, presença, finalidade e natureza da operação                       |
+| Tributos    | CSOSN/CST de ICMS, PIS, COFINS, IPI quando aplicável, ST, DIFAL, FCP e crédito do Simples |
+| Valores     | quantidade, preço, desconto, frete, outras despesas, total e forma de pagamento           |
+| Marketplace | canal, CNPJ do intermediador, identificador no intermediador e referência do pedido       |
+| Transporte  | modalidade do frete, transportadora quando houver, volumes, pesos e rastreio              |
 
 O pedido do marketplace traz os fatos comerciais. O CorePet deve aplicar as
 regras fiscais aprovadas da empresa e do produto antes de montar a nota.
@@ -228,17 +242,22 @@ Antes da primeira nota real:
 Comece por uma única venda real, de baixo risco e com dados conferidos. Aguarde a
 autorização, valide XML e DANFE e só então amplie o volume.
 
+Na venda, o CorePet exibe uma última revisão com ambiente, série, destinatário,
+quantidade de itens e total. Em produção, a tela destaca que a confirmação gera
+documento fiscal real. Depois do aceite, o CorePet acompanha o processamento e
+permite baixar XML e DANFE na tela **NF de Vendas**.
+
 ## Problemas mais comuns
 
-| Mensagem ou situação | O que conferir |
-|---|---|
-| Certificado pendente/inválido | CNPJ do A1, senha, arquivo, validade e cadastro na IntNFe |
-| Sem CSC | Ambiente escolhido, ID e código obtidos na SEFAZ |
-| Duplicidade de número | Modelo, série, ambiente e última nota autorizada no sistema anterior |
-| Rejeição de destinatário | CPF/CNPJ, IE, indicador de IE, endereço e UF |
-| Rejeição tributária | CFOP, NCM/CEST, origem, CSOSN/CST e regras da operação |
-| Resposta ainda processando | Consultar pelo identificador; não repetir a emissão em sequência |
-| DANFE diferente do esperado | Reconsultar a nota autorizada e gerar novamente o DANFE antes de alterar a nota |
+| Mensagem ou situação          | O que conferir                                                                  |
+| ----------------------------- | ------------------------------------------------------------------------------- |
+| Certificado pendente/inválido | CNPJ do A1, senha, arquivo, validade e cadastro na IntNFe                       |
+| Sem CSC                       | Ambiente escolhido, ID e código obtidos na SEFAZ                                |
+| Duplicidade de número         | Modelo, série, ambiente e última nota autorizada no sistema anterior            |
+| Rejeição de destinatário      | CPF/CNPJ, IE, indicador de IE, endereço e UF                                    |
+| Rejeição tributária           | CFOP, NCM/CEST, origem, CSOSN/CST e regras da operação                          |
+| Resposta ainda processando    | Consultar pelo identificador; não repetir a emissão em sequência                |
+| DANFE diferente do esperado   | Reconsultar a nota autorizada e gerar novamente o DANFE antes de alterar a nota |
 
 Ao pedir suporte, informe CNPJ, ambiente, modelo, série, número, horário,
 situação, código da rejeição e protocolo/correlationId. Não inclua senhas,

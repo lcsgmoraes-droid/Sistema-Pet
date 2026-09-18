@@ -54,6 +54,7 @@ encoded = base64.b64encode(credentials.encode()).decode()
 headers = {
     "Authorization": f"Basic {encoded}",
     "Content-Type": "application/x-www-form-urlencoded",
+    "enable-jwt": "1",
 }
 
 data = {
@@ -64,7 +65,10 @@ data = {
 
 try:
     response = requests.post(
-        "https://api.bling.com.br/Api/v3/oauth/token", headers=headers, data=data
+        "https://api.bling.com.br/Api/v3/oauth/token",
+        headers=headers,
+        data=data,
+        timeout=30,
     )
 
     if response.status_code == 200:

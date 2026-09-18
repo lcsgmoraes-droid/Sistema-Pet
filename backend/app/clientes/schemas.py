@@ -187,6 +187,7 @@ class ClienteCreate(BaseModel):
     bairro: Optional[str] = None
     cidade: Optional[str] = None
     estado: Optional[str] = None
+    codigo_municipio: Optional[str] = None
 
     # Endereços de entrega
     endereco_entrega: Optional[str] = None
@@ -247,6 +248,7 @@ class ClienteCreate(BaseModel):
         "bairro",
         "cidade",
         "estado",
+        "codigo_municipio",
         "observacoes",
         "cnpj",
         "inscricao_estadual",
@@ -318,6 +320,7 @@ class ClienteUpdate(BaseModel):
     bairro: Optional[str] = None
     cidade: Optional[str] = None
     estado: Optional[str] = None
+    codigo_municipio: Optional[str] = None
 
     # Endereços de entrega
     endereco_entrega: Optional[str] = None
@@ -382,6 +385,7 @@ class ClienteUpdate(BaseModel):
         "bairro",
         "cidade",
         "estado",
+        "codigo_municipio",
         "observacoes",
         "cnpj",
         "inscricao_estadual",
@@ -444,6 +448,7 @@ class ClienteResponse(BaseModel):
     bairro: Optional[str] = None
     cidade: Optional[str] = None
     estado: Optional[str] = None
+    codigo_municipio: Optional[str] = None
 
     # Endereços adicionais
     endereco_entrega: Optional[str] = None

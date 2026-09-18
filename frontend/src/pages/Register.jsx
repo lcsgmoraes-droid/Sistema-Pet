@@ -6,6 +6,7 @@ import {
   FiBriefcase,
   FiEye,
   FiEyeOff,
+  FiKey,
   FiLock,
   FiMail,
   FiUser,
@@ -16,6 +17,7 @@ import { findPublicPlan, planOrganizationTypes } from "../data/publicPlans";
 const Register = () => {
   const [nome, setNome] = useState("");
   const [nomeLoja, setNomeLoja] = useState("");
+  const [nomeAcesso, setNomeAcesso] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -59,8 +61,15 @@ const Register = () => {
       return;
     }
 
+    if (nomeAcesso.trim().length < 3) {
+      setError("O nome de acesso da loja deve ter pelo menos 3 caracteres");
+      return;
+    }
+
     if (!acceptedTerms || !acceptedPrivacy) {
-      setError("Aceite os Termos de Uso e a Politica de Privacidade para continuar");
+      setError(
+        "Aceite os Termos de Uso e confirme a leitura da Politica de Privacidade para continuar",
+      );
       return;
     }
 
@@ -70,6 +79,7 @@ const Register = () => {
       password,
       nome,
       nome_loja: nomeLoja,
+      nome_acesso: nomeAcesso.trim(),
       plan: selectedPlan,
       organization_type: organizationType,
       accepted_terms: acceptedTerms,
@@ -166,6 +176,33 @@ const Register = () => {
                 required
               />
             </div>
+          </div>
+
+          <div>
+            <label
+              htmlFor="register-nome-acesso"
+              className="block text-sm font-medium text-gray-700 mb-2"
+            >
+              Nome de acesso da loja
+            </label>
+            <div className="relative">
+              <FiKey className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+              <input
+                id="register-nome-acesso"
+                name="nome_acesso"
+                type="text"
+                minLength={3}
+                maxLength={120}
+                value={nomeAcesso}
+                onChange={(event) => setNomeAcesso(event.target.value)}
+                className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none transition"
+                placeholder="Ex: Vira Latas"
+                required
+              />
+            </div>
+            <p className="mt-1 text-xs text-gray-500">
+              Deve ser unico no CorePet. Seus colaboradores usarao este nome para entrar.
+            </p>
           </div>
 
           <div>
@@ -306,7 +343,7 @@ const Register = () => {
                 className="mt-1"
               />
               <span>
-                Li e aceito a{" "}
+                Li e confirmo que estou ciente da{" "}
                 <Link to="/privacidade" className="text-purple-700 font-semibold">
                   Politica de Privacidade
                 </Link>

@@ -128,6 +128,7 @@ class BillingOffer(Base):
     billing_type = Column(String(30), nullable=False, server_default="UNDEFINED")
     first_due_date = Column(Date, nullable=False)
     extra_modules_json = Column(Text, nullable=False, server_default="[]")
+    commercial_terms_json = Column(Text, nullable=False, server_default="{}")
 
     status = Column(String(20), nullable=False, server_default="ready", index=True)
     payment_status = Column(String(40), nullable=True)

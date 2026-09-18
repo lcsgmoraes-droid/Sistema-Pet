@@ -1,6 +1,6 @@
-from sqlalchemy import Column, Integer, Numeric, DateTime, UniqueConstraint
+from sqlalchemy import Column, Integer, Numeric, ForeignKey, DateTime, UniqueConstraint
 from sqlalchemy.sql import func
-from app.db.base_class import Base
+from .db import Base
 
 
 class KitComposicao(Base):
@@ -11,14 +11,11 @@ class KitComposicao(Base):
     tenant_id = Column(Integer, nullable=False, index=True)
 
     # O kit pode ser um produto ou uma variação
-    # TEMPORÁRIO: FKs desabilitadas - tabelas não existem ainda
-    produto_kit_id = Column(Integer, nullable=False)  # ForeignKey("produto.id")
+    produto_kit_id = Column(Integer, ForeignKey("produtos.id"), nullable=False)
 
     # Item que compõe o kit (produto ou variação)
-    produto_item_id = Column(Integer, nullable=False)  # ForeignKey("produto.id")
-    variacao_item_id = Column(
-        Integer, nullable=True
-    )  # ForeignKey("produto_variacao.id")
+    produto_item_id = Column(Integer, ForeignKey("produtos.id"), nullable=False)
+    variacao_item_id = Column(Integer, ForeignKey("produtos.id"), nullable=True)
 
     quantidade = Column(Numeric(10, 3), nullable=False, default=1)
 

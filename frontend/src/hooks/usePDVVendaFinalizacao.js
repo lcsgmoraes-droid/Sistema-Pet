@@ -221,21 +221,9 @@ export function usePDVVendaFinalizacao({
     }
   };
 
-  const emitirNotaVendaFinalizada = async () => {
-    if (!vendaAtual.id) return;
-
-    let tipoNota = "nfce";
-    if (vendaAtual.cliente?.cnpj) {
-      const emitirNfe = await confirmarCorePet(
-        "Cliente tem CNPJ.\n\nClique OK para emitir NF-e (Empresa)\nClique Cancelar para emitir NFC-e (Cupom).",
-      );
-      tipoNota = emitirNfe ? "nfe" : "nfce";
-    }
-
-    const confirmar = await confirmarCorePet(
-      `Confirma emitir ${tipoNota === "nfe" ? "NF-e" : "NFC-e"} para esta venda finalizada?`,
-    );
-    if (!confirmar) return;
+  const emitirNotaVendaFinalizada = async (tipoNota = "nfce") => {
+    if (!vendaAtual.id) return false;
+    if (tipoNota !== "nfe" && tipoNota !== "nfce") return false;
 
     try {
       setLoading(true);
@@ -243,16 +231,21 @@ export function usePDVVendaFinalizacao({
         vendaId: vendaAtual.id,
         tipoNota,
       });
-      if (resultado?.cancelado) return;
+      if (resultado?.cancelado) return false;
 
       await carregarVendaEspecifica(vendaAtual.id);
-      if (resultado?.data?.transmissao?.success === false) {
+      if (resultado?.data?.processando) {
+        toast.info(
+          `${tipoNota === "nfe" ? "NF-e" : "NFC-e"} recebida pelo emissor e ainda em processamento.`,
+        );
+      } else if (resultado?.data?.transmissao?.success === false) {
         toast.error(
           `${tipoNota === "nfe" ? "NF-e" : "NFC-e"} criada, mas a transmissao ficou pendente.`,
         );
       } else {
-        toast.success(`${tipoNota === "nfe" ? "NF-e" : "NFC-e"} enviada para emissao/transmissao!`);
+        toast.success(`${tipoNota === "nfe" ? "NF-e" : "NFC-e"} autorizada com sucesso!`);
       }
+      return true;
     } catch (error) {
       console.error("Erro ao emitir nota da venda finalizada:", error);
       const mensagem = extrairMensagemNFe(error);
@@ -265,6 +258,7 @@ export function usePDVVendaFinalizacao({
       } else {
         alert(mensagem);
       }
+      return false;
     } finally {
       setLoading(false);
     }

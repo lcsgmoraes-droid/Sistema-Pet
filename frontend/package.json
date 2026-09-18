@@ -24,6 +24,7 @@
     "test:text-encoding": "node scripts/test-text-encoding.mjs",
     "test:public-plans": "node scripts/test-public-plans.mjs",
     "test:billing-contract": "node scripts/test-billing-contract.mjs",
+    "test:privacy-policy": "node scripts/test-privacy-policy.mjs",
     "test:custom-billing-offer": "node scripts/test-custom-billing-offer.mjs",
     "test:platform-admin-auth": "node scripts/test-platform-admin-auth.mjs",
     "test:ecommerce-account-validation": "node scripts/test-ecommerce-account-validation.mjs",
@@ -77,6 +78,7 @@
     "test:onboarding-inicial": "node scripts/test-onboarding-inicial-contract.mjs",
     "test:banho-tosa-fluxo": "node scripts/test-banho-tosa-fluxo.mjs",
     "test:pessoas-duplicidade-central": "node scripts/test-pessoas-duplicidade-central.mjs",
+    "test:pessoas-relatorio": "node scripts/test-pessoas-relatorio.mjs",
     "test:pessoa-app-login": "node src/utils/pessoaAppLogin.test.mjs",
     "test:usuario-acesso-inicial": "node src/utils/usuarioAcessoInicial.test.mjs",
     "preview": "vite preview"

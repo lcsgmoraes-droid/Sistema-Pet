@@ -1,15 +1,32 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import IntNFeNumeracaoView from "./IntNFeNumeracaoView";
-import { numberingRows, prepareNumbering } from "./intnfeNumeracao.mjs";
+import { currentSequence, numberingRows, prepareNumbering } from "./intnfeNumeracao.mjs";
 
-export default function IntNFeNumeracao({ apiClient, disabled = false, onBusy, onData }) {
+const emptyForms = () => ({
+  1: {
+    55: { serie: "1", proximo_numero: "", usar_no_corepet: false },
+    65: { serie: "1", proximo_numero: "", usar_no_corepet: false },
+  },
+  2: {
+    55: { serie: "1", proximo_numero: "", usar_no_corepet: false },
+    65: { serie: "1", proximo_numero: "", usar_no_corepet: false },
+  },
+});
+
+export default function IntNFeNumeracao({
+  apiClient,
+  disabled = false,
+  environment = 2,
+  onBusy,
+  onData,
+  onUseSequence,
+  onClearSequence,
+  savedConfigurations = [],
+  onEnvironmentData,
+}) {
   const [rows, setRows] = useState(null);
-  const [form, setForm] = useState({
-    modelo: "55",
-    serie: "1",
-    ambiente_codigo: "2",
-    proximo_numero: "",
-  });
+  const [forms, setForms] = useState(emptyForms);
+  const [models, setModels] = useState({ 1: [55], 2: [55] });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
@@ -18,9 +35,34 @@ export default function IntNFeNumeracao({ apiClient, disabled = false, onBusy, o
   const inFlight = useRef(false);
   const requestController = useRef(null);
 
+  const saveChoice = useCallback(
+    async (model, targetEnvironment, serie) => {
+      const response = await apiClient.put("/intnfe/ambiente-emissao/serie-padrao", {
+        ambiente_codigo: targetEnvironment,
+        modelo: model,
+        serie: String(Number(serie)),
+      });
+      onEnvironmentData?.(response.data);
+      const saved = response.data.configuracoes?.find(
+        (item) => item.ambiente_codigo === targetEnvironment && item.modelo === model,
+      );
+      if (saved) {
+        onUseSequence?.({
+          modelo: model,
+          serie: saved.serie,
+          proximoNumero: saved.numero_inicial,
+          pendente: false,
+        });
+      }
+      return response.data;
+    },
+    [apiClient, onEnvironmentData, onUseSequence],
+  );
+
   const execute = useCallback(
-    async (payload = null) => {
+    async (payload = null, useForCorePet = false) => {
       if (inFlight.current) return;
+      let numberingConfirmed = false;
       inFlight.current = true;
       const controller = new AbortController();
       requestController.current = controller;
@@ -39,24 +81,49 @@ export default function IntNFeNumeracao({ apiClient, disabled = false, onBusy, o
           setRows(updated);
           onData?.(response.data);
           if (payload) {
-            setMessage(
-              response.data.mensagem || "Ajuste confirmado. Confira a sequência atual abaixo.",
+            numberingConfirmed = true;
+            setMessage(response.data.mensagem || "Sequência fiscal salva.");
+            const confirmed = updated.find(
+              (row) =>
+                row.modelo === payload.modelo &&
+                row.ambienteCodigo === payload.ambiente_codigo &&
+                Number(row.serie) === Number(payload.serie),
             );
-            setForm((previous) => ({ ...previous, proximo_numero: "" }));
+            if (useForCorePet && confirmed) {
+              const saved = await saveChoice(
+                payload.modelo,
+                payload.ambiente_codigo,
+                confirmed.serie,
+              );
+              setMessage(saved.mensagem || "Sequência e série padrão salvas no CorePet.");
+            }
+            setForms((previous) => ({
+              ...previous,
+              [payload.ambiente_codigo]: {
+                ...previous[payload.ambiente_codigo],
+                [payload.modelo]: {
+                  ...previous[payload.ambiente_codigo][payload.modelo],
+                  proximo_numero: "",
+                },
+              },
+            }));
           }
         }
       } catch (failure) {
         if (isCurrent()) {
-          // Falha de escrita pode ocorrer depois da aplicacao. Exigir nova consulta, sem repetir PUT.
-          setRows(null);
-          onData?.(null);
+          if (!numberingConfirmed) {
+            setRows(null);
+            onData?.(null);
+          }
           const detail = failure?.response?.data?.detail;
           const text = typeof detail === "string" ? detail : detail?.mensagem;
           setError(
             text ||
-              (payload
-                ? "Não foi possível confirmar o ajuste. Ele pode ter sido aplicado. Consulte a numeração antes de tentar novamente."
-                : "Não foi possível consultar a numeração. Tente consultar novamente."),
+              (numberingConfirmed
+                ? "A sequência foi atualizada, mas a escolha da série no CorePet não foi salva. Confira a lista e tente salvar a escolha novamente."
+                : payload
+                  ? "Não foi possível confirmar o ajuste. Ele pode ter sido aplicado. Consulte as sequências antes de tentar novamente."
+                  : "Não foi possível consultar as sequências. Tente novamente."),
           );
         }
       } finally {
@@ -68,7 +135,7 @@ export default function IntNFeNumeracao({ apiClient, disabled = false, onBusy, o
         }
       }
     },
-    [apiClient, onBusy, onData],
+    [apiClient, onBusy, onData, saveChoice],
   );
 
   useEffect(() => {
@@ -76,7 +143,6 @@ export default function IntNFeNumeracao({ apiClient, disabled = false, onBusy, o
     execute();
     return () => {
       mounted.current = false;
-      // Descarta a requisicao anterior, inclusive eventual renovacao de sessao.
       requestController.current?.abort();
       requestController.current = null;
       inFlight.current = false;
@@ -84,32 +150,141 @@ export default function IntNFeNumeracao({ apiClient, disabled = false, onBusy, o
     };
   }, [execute, onBusy]);
 
-  const change = (values) => {
+  useEffect(() => {
+    setReview(null);
+    setError("");
+    setMessage("");
+  }, [environment]);
+
+  useEffect(() => {
+    if (!savedConfigurations.length) return;
+    setForms((previous) => {
+      const next = {
+        1: { 55: { ...previous[1][55] }, 65: { ...previous[1][65] } },
+        2: { 55: { ...previous[2][55] }, 65: { ...previous[2][65] } },
+      };
+      for (const saved of savedConfigurations) {
+        next[saved.ambiente_codigo][saved.modelo] = {
+          ...next[saved.ambiente_codigo][saved.modelo],
+          serie: saved.serie,
+          usar_no_corepet: true,
+        };
+      }
+      return next;
+    });
+    setModels((previous) => {
+      const next = { 1: [...previous[1]], 2: [...previous[2]] };
+      for (const saved of savedConfigurations) {
+        if (saved.modelo === 65 && !next[saved.ambiente_codigo].includes(65)) {
+          next[saved.ambiente_codigo].push(65);
+        }
+      }
+      return next;
+    });
+  }, [savedConfigurations]);
+
+  const change = (model, values) => {
     if (inFlight.current || disabled) return;
-    setForm((previous) => ({ ...previous, ...values }));
+    const nextForm = { ...forms[environment][model], ...values };
+    setForms((previous) => ({
+      ...previous,
+      [environment]: { ...previous[environment], [model]: nextForm },
+    }));
+    if (nextForm.usar_no_corepet && /^[0-9]{1,3}$/.test(nextForm.serie)) {
+      const current = currentSequence(rows || [], nextForm.serie, environment, model);
+      const hasNumber = nextForm.proximo_numero !== "";
+      const validNumber =
+        /^\d{1,9}$/.test(nextForm.proximo_numero) && Number(nextForm.proximo_numero) > 0;
+      onUseSequence?.({
+        modelo: model,
+        serie: String(Number(nextForm.serie)),
+        proximoNumero: validNumber
+          ? Number(nextForm.proximo_numero)
+          : (current?.proximoNumero ?? 1),
+        pendente: Boolean(
+          hasNumber &&
+          (!validNumber || !current || Number(nextForm.proximo_numero) !== current.proximoNumero),
+        ),
+      });
+    }
     setReview(null);
     setMessage("");
+  };
+
+  const toggleUse = (model, checked) => {
+    change(model, { usar_no_corepet: checked });
+    if (!checked) {
+      onClearSequence?.({ modelo: model });
+    }
   };
 
   return (
     <IntNFeNumeracaoView
       rows={rows}
-      form={form}
+      forms={forms[environment]}
+      models={models[environment]}
+      environment={environment}
       busy={busy || disabled}
       error={error}
       message={message}
       review={review}
+      savedConfigurations={savedConfigurations}
       onChange={change}
+      onToggleUse={toggleUse}
       onReload={() => execute()}
-      onReview={(event) => {
-        event.preventDefault();
+      onAddNfce={() => setModels((current) => ({ ...current, [environment]: [55, 65] }))}
+      onRemoveNfce={() => {
+        setModels((current) => ({ ...current, [environment]: [55] }));
+        change(65, { usar_no_corepet: false });
+        onClearSequence?.({ modelo: 65 });
+      }}
+      onReview={(model) => {
         if (inFlight.current || disabled) return;
+        const form = {
+          ...forms[environment][model],
+          modelo: String(model),
+          ambiente_codigo: String(environment),
+        };
         const prepared = prepareNumbering(rows, form);
-        if (!prepared.error) setReview(prepared);
+        const current = currentSequence(rows || [], form.serie, environment, model);
+        const sameNext =
+          current &&
+          (form.proximo_numero === "" || Number(form.proximo_numero) === current.proximoNumero);
+        if (form.usar_no_corepet && current && sameNext) {
+          setReview({ model, current, payload: null, selectionOnly: true });
+        } else if (!prepared.error) {
+          setReview({ model, ...prepared });
+        }
       }}
       onCancel={() => setReview(null)}
       onSave={() => {
-        if (review && !disabled) execute(review.payload);
+        if (review && !disabled) {
+          const form = forms[environment][review.model];
+          if (review.selectionOnly) {
+            if (inFlight.current) return;
+            inFlight.current = true;
+            setBusy(true);
+            onBusy?.(true);
+            setError("");
+            setMessage("");
+            saveChoice(review.model, environment, form.serie)
+              .then((saved) => {
+                setMessage(saved.mensagem || "Série padrão salva no CorePet.");
+                setReview(null);
+              })
+              .catch((failure) => {
+                const detail = failure?.response?.data?.detail;
+                setError(detail?.mensagem || detail || "Não foi possível salvar a série padrão.");
+              })
+              .finally(() => {
+                inFlight.current = false;
+                setBusy(false);
+                onBusy?.(false);
+              });
+          } else {
+            execute(review.payload, form.usar_no_corepet);
+          }
+        }
       }}
     />
   );

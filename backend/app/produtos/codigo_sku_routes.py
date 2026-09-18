@@ -1,7 +1,8 @@
 """Rotas de codigo de barras e SKU de produtos."""
 
+from collections.abc import Iterable
+
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.auth.dependencies import get_current_user_and_tenant
@@ -16,6 +17,30 @@ from app.produtos.validators import _validar_tenant_e_obter_usuario
 from app.produtos_models import Produto
 
 router = APIRouter()
+
+
+def _proximo_sku_disponivel(prefixo: str, codigos_existentes: Iterable[str]):
+    """Continua a sequencia recente e pula todos os SKUs ja ocupados."""
+    marcador = f"{prefixo}-"
+    numeros_ocupados = set()
+    ultimo_numero = None
+    for codigo in codigos_existentes:
+        codigo_normalizado = str(codigo or "").strip().upper()
+        if not codigo_normalizado.startswith(marcador):
+            continue
+
+        sufixo = codigo_normalizado[len(marcador) :]
+        if sufixo.isdigit():
+            numero = int(sufixo)
+            numeros_ocupados.add(numero)
+            if ultimo_numero is None:
+                ultimo_numero = numero
+
+    proximo_numero = (ultimo_numero or 0) + 1
+    while proximo_numero in numeros_ocupados:
+        proximo_numero += 1
+
+    return f"{prefixo}-{proximo_numero:05d}", proximo_numero
 
 
 @router.post("/gerar-codigo-barras", response_model=GerarCodigoBarrasResponse)
@@ -116,38 +141,18 @@ def gerar_sku(
     _, tenant_id = user_and_tenant
     prefixo = _normalizar_sku_produto(prefixo).upper()
 
-    # Buscar maior numero ja usado com esse prefixo dentro do tenant atual.
-    ultimo_produto = (
-        db.query(Produto)
+    # Os codigos chegam do mais recente para o mais antigo. A sequencia continua
+    # do ultimo sufixo numerico e pula quantos codigos ocupados forem necessarios.
+    registros = (
+        db.query(Produto.codigo)
         .filter(Produto.tenant_id == tenant_id, Produto.codigo.ilike(f"{prefixo}-%"))
         .order_by(Produto.id.desc())
-        .first()
+        .all()
     )
-
-    if ultimo_produto:
-        # Extrair número do último SKU
-        try:
-            ultimo_numero = int(ultimo_produto.codigo.split("-")[-1])
-            proximo_numero = ultimo_numero + 1
-        except ValueError:
-            proximo_numero = 1
-    else:
-        proximo_numero = 1
-
-    # Gerar novo SKU
-    novo_sku = f"{prefixo}-{proximo_numero:05d}"
-
-    existe = (
-        db.query(Produto)
-        .filter(
-            Produto.tenant_id == tenant_id,
-            func.lower(Produto.codigo) == novo_sku.lower(),
-        )
-        .first()
+    novo_sku, proximo_numero = _proximo_sku_disponivel(
+        prefixo,
+        [registro[0] for registro in registros],
     )
-
-    if existe:
-        novo_sku = f"{prefixo}-{proximo_numero + 1:05d}"
 
     return {
         "sku": novo_sku,

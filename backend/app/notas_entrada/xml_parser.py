@@ -230,6 +230,10 @@ def parse_nfe_xml(xml_content: str) -> dict:
             aliquota_icms = 0.0
             aliquota_pis = 0.0
             aliquota_cofins = 0.0
+            cst_icms = ""
+            icms_st = False
+            icms_base_st = 0.0
+            icms_valor_st = 0.0
 
             # Buscar impostos do item
             imposto = det.find("nfe:imposto", ns)
@@ -257,6 +261,34 @@ def parse_nfe_xml(xml_content: str) -> dict:
                     ]:
                         icms_elem = icms_group.find(f"nfe:{icms_tag}", ns)
                         if icms_elem is not None:
+                            cst_elem = icms_elem.find("nfe:CST", ns)
+                            if cst_elem is None:
+                                cst_elem = icms_elem.find("nfe:CSOSN", ns)
+                            if cst_elem is not None and cst_elem.text:
+                                cst_icms = cst_elem.text.strip()
+
+                            base_st_elem = icms_elem.find("nfe:vBCST", ns)
+                            valor_st_elem = icms_elem.find("nfe:vICMSST", ns)
+                            try:
+                                icms_base_st = float(
+                                    base_st_elem.text if base_st_elem is not None else 0
+                                )
+                            except (TypeError, ValueError):
+                                icms_base_st = 0.0
+                            try:
+                                icms_valor_st = float(
+                                    valor_st_elem.text
+                                    if valor_st_elem is not None
+                                    else 0
+                                )
+                            except (TypeError, ValueError):
+                                icms_valor_st = 0.0
+                            icms_st = bool(
+                                icms_base_st > 0
+                                or icms_valor_st > 0
+                                or cst_icms
+                                in {"10", "30", "60", "70", "201", "202", "203", "500"}
+                            )
                             picms = icms_elem.find("nfe:pICMS", ns)
                             if picms is not None:
                                 try:
@@ -320,6 +352,10 @@ def parse_nfe_xml(xml_content: str) -> dict:
                     "cest": cest,
                     "cfop": cfop,
                     "origem": origem,
+                    "cst_icms": cst_icms,
+                    "icms_st": icms_st,
+                    "icms_base_st": icms_base_st,
+                    "icms_valor_st": icms_valor_st,
                     "aliquota_icms": aliquota_icms,
                     "aliquota_pis": aliquota_pis,
                     "aliquota_cofins": aliquota_cofins,

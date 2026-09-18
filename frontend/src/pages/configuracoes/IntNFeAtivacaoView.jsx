@@ -1,8 +1,43 @@
-import { FiCheckCircle, FiCircle, FiFileText, FiRefreshCw } from "react-icons/fi";
+import { FiCheckCircle, FiFileText, FiRefreshCw } from "react-icons/fi";
 import { Link } from "react-router-dom";
 
 const buttonClass =
   "inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-blue-500";
+
+function nextAction(data) {
+  const pendingCompanyData = data?.pendencias || [];
+
+  if (pendingCompanyData.length) {
+    return {
+      title: "Complete os dados da empresa",
+      description: "Corrija os itens abaixo para continuar a ativação.",
+      items: pendingCompanyData,
+    };
+  }
+  if (data?.pode_vincular) {
+    return {
+      title: "Recupere o vínculo existente",
+      description: "Use os códigos fornecidos pelo suporte da IntNFe para continuar.",
+    };
+  }
+  if (data?.pode_ativar || !data?.vinculado) {
+    return {
+      title: "Conecte a empresa à IntNFe",
+      description: "A integração é automática e não exige copiar códigos técnicos.",
+    };
+  }
+  if (data?.status !== "certificado_validado") {
+    return {
+      title: "Valide o certificado A1",
+      description: "Envie ou confira o certificado na seção logo abaixo.",
+    };
+  }
+  return {
+    title: "Continue pelas configurações pendentes",
+    description: "O vínculo inicial está pronto. Configure somente os itens indicados abaixo.",
+    done: true,
+  };
+}
 
 export default function IntNFeAtivacaoView({
   data,
@@ -15,11 +50,7 @@ export default function IntNFeAtivacaoView({
   onBind,
   onReload,
 }) {
-  const steps = [
-    { label: "Dados da empresa", done: data && data.pendencias.length === 0 },
-    { label: "Vínculo com o emissor", done: data?.vinculado },
-    { label: "Certificado A1", done: data?.status === "certificado_validado" },
-  ];
+  const action = data ? nextAction(data) : null;
 
   return (
     <section
@@ -70,66 +101,50 @@ export default function IntNFeAtivacaoView({
         </div>
       ) : (
         <>
-          <div className="rounded-xl bg-slate-50 p-4 dark:bg-slate-800">
-            <p className="font-semibold text-slate-900 dark:text-white">
-              {data.empresa.razao_social || data.empresa.nome_fantasia}
-            </p>
-            <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
-              CNPJ: {data.empresa.cnpj || "Não informado"}
-            </p>
-            <Link
-              to="/configuracoes/fiscal"
-              className="mt-3 inline-block text-sm font-semibold text-blue-700 underline dark:text-blue-300"
-            >
-              Conferir dados da empresa
-            </Link>
-          </div>
-
-          <ol className="grid gap-3 sm:grid-cols-3" aria-label="Etapas da ativação">
-            {steps.map(({ label, done }, index) => (
-              <li
-                key={label}
-                className={`rounded-xl border p-4 text-sm ${done ? "border-emerald-200 bg-emerald-50 text-emerald-900" : "border-slate-200 text-slate-700 dark:border-slate-700 dark:text-slate-200"}`}
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-slate-50 px-4 py-3 dark:bg-slate-800">
+            <div>
+              <p className="font-semibold text-slate-900 dark:text-white">
+                {data.empresa.razao_social || data.empresa.nome_fantasia}
+              </p>
+              <p className="mt-0.5 text-sm text-slate-600 dark:text-slate-300">
+                CNPJ: {data.empresa.cnpj || "Não informado"}
+              </p>
+            </div>
+            {data.pendencias.length > 0 && (
+              <Link
+                to="/configuracoes/fiscal"
+                className="text-sm font-semibold text-blue-700 underline dark:text-blue-300"
               >
-                <div className="mb-2 flex items-center gap-2">
-                  {done ? <FiCheckCircle aria-hidden="true" /> : <FiCircle aria-hidden="true" />}
-                  <span className="text-xs">{done ? "Concluído" : "Pendente"}</span>
-                </div>
-                <strong>
-                  {index + 1}. {label}
-                </strong>
-              </li>
-            ))}
-          </ol>
+                Corrigir dados da empresa
+              </Link>
+            )}
+          </div>
 
           <div
             role="status"
             aria-live="polite"
-            className="space-y-2 rounded-xl border border-blue-100 bg-blue-50 p-4 text-sm text-blue-950"
+            className={`rounded-xl border p-4 text-sm ${
+              action.done
+                ? "border-emerald-200 bg-emerald-50 text-emerald-950"
+                : "border-blue-200 bg-blue-50 text-blue-950"
+            }`}
           >
-            <p className="font-medium">{data.mensagem}</p>
-            {data.pendencias.length > 0 && (
-              <ul className="list-disc space-y-1 pl-5">
-                {data.pendencias.map((item) => (
+            <div className="flex items-start gap-3">
+              {action.done && <FiCheckCircle className="mt-0.5 shrink-0" aria-hidden="true" />}
+              <div>
+                <p className="text-xs font-bold uppercase tracking-wide opacity-70">
+                  {action.done ? "Etapa inicial concluída" : "Próximo passo"}
+                </p>
+                <p className="mt-1 font-semibold">{action.title}</p>
+                <p className="mt-1">{action.description}</p>
+              </div>
+            </div>
+            {action.items?.length > 0 && (
+              <ul className="mt-3 list-disc space-y-1 pl-8">
+                {action.items.map((item) => (
                   <li key={item}>{item}</li>
                 ))}
               </ul>
-            )}
-            {data.certificado_valido_ate && (
-              <p>
-                Validade do certificado:{" "}
-                {new Date(data.certificado_valido_ate).toLocaleDateString("pt-BR")}
-              </p>
-            )}
-            {data.certificado_alerta && (
-              <p className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-amber-950">
-                {data.certificado_alerta}
-              </p>
-            )}
-            {data.protocolo_suporte && (
-              <p className="break-all text-xs">
-                Protocolo para o suporte: {data.protocolo_suporte}
-              </p>
             )}
           </div>
 
@@ -140,6 +155,11 @@ export default function IntNFeAtivacaoView({
                 A integração automática não altera o acesso de um emissor que já existia. Peça ao
                 suporte para recuperar o vínculo com segurança.
               </p>
+              {data.protocolo_suporte && (
+                <p className="mt-2 break-all text-xs">
+                  Protocolo para o suporte: {data.protocolo_suporte}
+                </p>
+              )}
               <details className="mt-3 text-sm">
                 <summary className="cursor-pointer font-semibold underline">
                   Já recebi os códigos desse emissor
@@ -190,16 +210,6 @@ export default function IntNFeAtivacaoView({
             </div>
           )}
 
-          {data.pode_ativar && (
-            <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-950">
-              <p className="font-semibold">Integração automática</p>
-              <p className="mt-1">
-                Ao continuar, você autoriza o CorePet a criar e administrar o emissor desta empresa
-                na IntNFe. O CorePet envia os dados cadastrais, recebe os códigos técnicos e os
-                guarda de forma protegida. Você não precisa copiar nem informar códigos.
-              </p>
-            </div>
-          )}
           <div className="flex flex-wrap gap-3">
             {data.pode_ativar && (
               <button
@@ -219,7 +229,7 @@ export default function IntNFeAtivacaoView({
                 className={`${buttonClass} border border-slate-300 text-slate-700 dark:text-slate-200`}
               >
                 <FiRefreshCw aria-hidden="true" />
-                Consultar vínculo e certificado
+                Atualizar situação
               </button>
             )}
             {data.status === "processando" && (
@@ -233,10 +243,6 @@ export default function IntNFeAtivacaoView({
               </button>
             )}
           </div>
-          <p className="border-t border-slate-100 pt-4 text-sm text-slate-500 dark:border-slate-800 dark:text-slate-400">
-            Esta etapa prepara o vínculo. A emissão de notas pelo PDV será liberada após os testes
-            de homologação.
-          </p>
         </>
       )}
     </section>

@@ -20,31 +20,43 @@ class ChatIARespostasMixin:
         if not conversa:
             raise ValueError("Conversa nao encontrada")
 
-        msg_usuario = self.adicionar_mensagem(
-            conversa_id=conversa_id,
-            tipo="usuario",
-            conteudo=mensagem_usuario,
-            tenant_id=tenant_id,
-        )
+        try:
+            # 1. Calcular contexto e resposta antes de gravar a pergunta. Algumas
+            # rotinas financeiras legadas controlam a propria transacao; deixar a
+            # mensagem pendente antes delas poderia consolidar uma pergunta orfa.
+            contexto = self.obter_contexto_financeiro(usuario_id, tenant_id)
+            resposta_texto = self._gerar_resposta_simples(
+                mensagem_usuario, contexto, tenant_id=tenant_id
+            )
 
-        # 2. Obter contexto financeiro
-        contexto = self.obter_contexto_financeiro(usuario_id, tenant_id)
+            # 2. Persistir pergunta e resposta juntas.
+            msg_usuario = self.adicionar_mensagem(
+                conversa_id=conversa_id,
+                tipo="usuario",
+                conteudo=mensagem_usuario,
+                tenant_id=tenant_id,
+                commit=False,
+            )
 
-        # 3. Gerar resposta com regras locais
-        resposta_texto = self._gerar_resposta_simples(
-            mensagem_usuario, contexto, tenant_id=tenant_id
-        )
+            msg_ia = self.adicionar_mensagem(
+                conversa_id=conversa_id,
+                tipo="assistente",
+                conteudo=resposta_texto,
+                tokens_usados=0,
+                modelo_usado="regras_simples",
+                contexto_usado=contexto,
+                tenant_id=tenant_id,
+                commit=False,
+            )
 
-        # 4. Adicionar resposta da IA
-        msg_ia = self.adicionar_mensagem(
-            conversa_id=conversa_id,
-            tipo="assistente",
-            conteudo=resposta_texto,
-            tokens_usados=0,
-            modelo_usado="regras_simples",
-            contexto_usado=contexto,
-            tenant_id=tenant_id,
-        )
+            # A pergunta e a resposta formam uma unidade: ou ambas persistem,
+            # ou nenhuma fica no historico em caso de erro.
+            self.db.commit()
+            self.db.refresh(msg_usuario)
+            self.db.refresh(msg_ia)
+        except Exception:
+            self.db.rollback()
+            raise
 
         return {
             "conversa_id": conversa_id,

@@ -14,6 +14,7 @@ import {
   MeusCaixas,
   AlertasGestor,
   NFEntrada,
+  OrcamentosGrupo,
   PDV,
 } from "../lazyPages";
 import { ModuleGate } from "./RouteGates";
@@ -34,6 +35,14 @@ export function createSalesMarketingRoutes() {
         element={
           <ProtectedRoute permission="vendas.criar">
             <PDV />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="orcamentos-grupo"
+        element={
+          <ProtectedRoute permission="vendas.criar">
+            <OrcamentosGrupo />
           </ProtectedRoute>
         }
       />
@@ -68,6 +77,16 @@ export function createSalesMarketingRoutes() {
         element={
           <ModuleGate modulo="campanhas">
             <Campanhas />
+          </ModuleGate>
+        }
+      />
+      <Route
+        path="campanhas/ranking-clientes"
+        element={
+          <ModuleGate modulo="campanhas">
+            <ProtectedRoute permission="clientes.visualizar">
+              <Campanhas />
+            </ProtectedRoute>
           </ModuleGate>
         }
       />

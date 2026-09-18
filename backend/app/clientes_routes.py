@@ -43,6 +43,10 @@ from app.clientes.financeiro_routes import (
     get_vendas_em_aberto,
     router as financeiro_router,
 )
+from app.clientes.inativos_routes import (
+    listar_clientes_inativos,
+    router as inativos_router,
+)
 from app.clientes.parceiros_routes import (
     atualizar_controla_dre,
     obter_custo_operacional_entregador,
@@ -63,6 +67,14 @@ from app.clientes.racas_routes import (
     list_racas,
     list_racas_teste,
     router as racas_router,
+)
+from app.clientes.ranking_routes import (
+    listar_ranking_clientes,
+    router as ranking_router,
+)
+from app.clientes.relatorio_routes import (
+    listar_pessoas_para_relatorio,
+    router as relatorio_router,
 )
 from app.clientes.schemas import (
     AjustarCreditoRequest,
@@ -92,6 +104,9 @@ router.include_router(duplicidades_router)
 router.include_router(pets_router)
 router.include_router(credito_router)
 router.include_router(parceiros_router)
+router.include_router(ranking_router)
+router.include_router(inativos_router)
+router.include_router(relatorio_router)
 router.include_router(clientes_base_router)
 router.include_router(racas_router)
 router.include_router(clientes_detail_router)
@@ -107,6 +122,8 @@ __all__ = [
     "PetCreate",
     "PetResponse",
     "PetUpdate",
+    "listar_ranking_clientes",
+    "listar_clientes_inativos",
     "TimelineEvento",
     "ToggleParceiroRequest",
     "_anexar_metadados_criacao_cliente",
@@ -137,6 +154,7 @@ __all__ = [
     "list_pets_by_cliente",
     "list_racas",
     "list_racas_teste",
+    "listar_pessoas_para_relatorio",
     "listar_sugestoes_duplicidade_pessoas_route",
     "listar_todos_pets",
     "obter_custo_operacional_entregador",

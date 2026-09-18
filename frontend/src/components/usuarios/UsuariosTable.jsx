@@ -3,6 +3,7 @@ import DataTable from "../ui/DataTable";
 import IconActionButton from "../ui/IconActionButton";
 import Panel from "../ui/Panel";
 import StatusBadge from "../ui/StatusBadge";
+import { formatBrazilianLoginPhone } from "../../utils/loginPhone";
 
 export default function UsuariosTable({
   loading,
@@ -13,12 +14,14 @@ export default function UsuariosTable({
 }) {
   const columns = [
     {
-      key: "username",
+      key: "login_phone",
       header: "Usuario",
       render: (usuario) => (
         <div className="min-w-0">
           <p className="truncate text-sm font-semibold text-slate-900">
-            {usuario.username || usuario.email}
+            {usuario.login_phone
+              ? formatBrazilianLoginPhone(usuario.login_phone)
+              : usuario.username || usuario.email}
           </p>
           <p className="truncate text-xs text-slate-500">
             {usuario.nome || usuario.email || `ID ${usuario.user_id}`}

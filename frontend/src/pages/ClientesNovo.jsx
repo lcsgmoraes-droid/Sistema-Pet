@@ -12,6 +12,7 @@ import ClientesNovoTabsBar from "../components/clientes/ClientesNovoTabsBar";
 import PessoasDuplicidadeBanner from "../components/pessoas/PessoasDuplicidadeBanner";
 import PessoasDuplicidadeCentralModal from "../components/pessoas/PessoasDuplicidadeCentralModal";
 import PessoasFusaoModal from "../components/pessoas/PessoasFusaoModal";
+import PessoasRelatorioModal from "../components/pessoas/PessoasRelatorioModal";
 import LoadingState from "../components/ui/LoadingState";
 import PageHeader from "../components/ui/PageHeader";
 import {
@@ -41,6 +42,7 @@ const Pessoas = () => {
   const [pessoasSelecionadasFusao, setPessoasSelecionadasFusao] = useState([]);
   const [pessoasSugestaoFusao, setPessoasSugestaoFusao] = useState(null);
   const [modalFusaoAberto, setModalFusaoAberto] = useState(false);
+  const [modalRelatorioAberto, setModalRelatorioAberto] = useState(false);
   const [filaRevisaoFusao, setFilaRevisaoFusao] = useState([]);
   const [reabrirCentralAposFusao, setReabrirCentralAposFusao] = useState(false);
   const [centralDuplicidades, setCentralDuplicidades] = useState({
@@ -513,7 +515,7 @@ const Pessoas = () => {
         className="mb-6"
         icon={UsersRound}
         iconClassName="bg-emerald-50 text-emerald-600"
-        title="Cadastros"
+        title="Pessoas"
         subtitle="Gerenciamento de clientes, fornecedores, veterinarios, funcionarios e pets"
       />
 
@@ -548,6 +550,7 @@ const Pessoas = () => {
         tipoFiltro={tipoFiltro}
         pessoasSelecionadasFusao={pessoasSelecionadasFusao}
         onAbrirFusao={abrirModalFusao}
+        onAbrirRelatorio={() => setModalRelatorioAberto(true)}
         onLimparSelecaoFusao={limparSelecaoFusao}
       />
       <ClientesNovoCadastroRecenteBanner
@@ -624,6 +627,14 @@ const Pessoas = () => {
         onSuccess={concluirFusaoPessoa}
         pessoasSelecionadas={pessoasParaFusao}
       />
+      {modalRelatorioAberto ? (
+        <PessoasRelatorioModal
+          buscaInicial={searchTerm}
+          isOpen
+          onClose={() => setModalRelatorioAberto(false)}
+          tipoInicial={tipoFiltro}
+        />
+      ) : null}
 
       {/* Estilos para animação do badge de parceiro */}
       <style>{`

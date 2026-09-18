@@ -1,5 +1,6 @@
 """Resposta simples baseada em regras para o chat IA da aba 6."""
 
+import re
 from typing import Dict, Optional
 
 
@@ -21,9 +22,22 @@ def gerar_resposta_simples(
     dias_caixa = indices.get("dias_de_caixa", 0)
     status = indices.get("status", "").lower()
 
+    eh_ranking_clientes = "cliente" in msg_normalizada and any(
+        chave in msg_normalizada
+        for chave in ["ranking", "mais compr", "maiores clientes", "top clientes"]
+    )
+    match_limite = re.search(
+        r"\b(?:top|ranking\s+(?:dos?\s+)?)\s*(\d{1,2})\b", msg_normalizada
+    )
+    limite_rankings = 5
+    if eh_ranking_clientes:
+        limite_rankings = 10
+        if match_limite:
+            limite_rankings = min(max(int(match_limite.group(1)), 1), 20)
+
     periodo_detectado = service._detectar_periodo(mensagem)
     resumo_periodo = service._montar_resumo_executivo_periodo(
-        tenant_id, periodo_detectado
+        tenant_id, periodo_detectado, limite_rankings=limite_rankings
     )
     resumo_vendas_periodo = resumo_periodo["resumo_vendas"]
     produtos_periodo = resumo_periodo["produtos"]
@@ -141,28 +155,42 @@ def gerar_resposta_simples(
             linhas.append(f"- Alertas ativos: **{len(alertas)}**")
         return "\n".join(linhas)
 
+    if eh_ranking_clientes:
+        top_clientes = rankings_periodo.get("top_clientes", [])
+        if not top_clientes:
+            return f"Ainda não encontrei compras de clientes em {label_periodo} para montar o ranking."
+
+        linhas = [f"👥 **Clientes que Mais Compraram ({label_periodo})**\n"]
+        for idx, item in enumerate(top_clientes, 1):
+            linhas.append(
+                f"{idx}. {item['cliente']} — {moeda(float(item['valor_total']))} "
+                f"em {int(item['quantidade_compras'])} compra(s)"
+            )
+        return "\n".join(linhas)
+
+    periodo_de_vendas_mencionado = any(
+        chave in msg_normalizada
+        for chave in [
+            "ultimo",
+            "ultimos",
+            "ontem",
+            "marco",
+            "abril",
+            "maio",
+            "junho",
+            "julho",
+            "agosto",
+            "setembro",
+            "outubro",
+            "novembro",
+            "dezembro",
+            "janeiro",
+            "fevereiro",
+            "mes",
+        ]
+    ) or bool(re.search(r"\d{1,2}[/-]\d{1,2}[/-]\d{2,4}", msg_normalizada))
     if any(palavra in msg_lower for palavra in ["vendas do mês", "vendas do mes"]) or (
-        "vendas" in msg_normalizada
-        and any(
-            chave in msg_normalizada
-            for chave in [
-                "ultimo",
-                "ultimos",
-                "marco",
-                "abril",
-                "maio",
-                "junho",
-                "julho",
-                "agosto",
-                "setembro",
-                "outubro",
-                "novembro",
-                "dezembro",
-                "janeiro",
-                "fevereiro",
-                "mes",
-            ]
-        )
+        "vendas" in msg_normalizada and periodo_de_vendas_mencionado
     ):
         return (
             f"📅 **Vendas de {label_periodo}**\n\n"

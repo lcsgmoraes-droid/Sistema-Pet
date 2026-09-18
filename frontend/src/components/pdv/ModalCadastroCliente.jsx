@@ -1,26 +1,8 @@
 import { CheckCircle, X } from "lucide-react";
 import { useState } from "react";
 import { criarCliente } from "../../api/clientes";
+import { validarCpf } from "../../utils/cpf";
 import ClienteOrigemSelect from "../clientes/ClienteOrigemSelect";
-
-function validarCpf(cpf) {
-  const digits = String(cpf || "").replace(/\D/g, "");
-  if (digits.length !== 11 || /^(\d)\1{10}$/.test(digits)) return false;
-
-  const calcularDigito = (base, factor) => {
-    let total = 0;
-    for (const char of base) {
-      total += Number(char) * factor;
-      factor -= 1;
-    }
-    const rest = (total * 10) % 11;
-    return rest === 10 ? 0 : rest;
-  };
-
-  const dig1 = calcularDigito(digits.slice(0, 9), 10);
-  const dig2 = calcularDigito(digits.slice(0, 10), 11);
-  return dig1 === Number(digits[9]) && dig2 === Number(digits[10]);
-}
 
 function inferirDadosIniciais(valorBuscaInicial) {
   const base = {

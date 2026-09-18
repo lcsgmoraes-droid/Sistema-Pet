@@ -65,6 +65,41 @@ def test_creation_failure_classification_is_safe(api, status, uncertain):
     assert api.session.request.call_count == 1
 
 
+def test_bad_request_is_reported_as_invalid_data(api):
+    api.session.request.return_value = response(400, {"mensagem": "nao-expor"})
+
+    with pytest.raises(IntNFeError) as error:
+        api.issue_document("token", "nfe", {}, "chave-teste")
+
+    assert error.value.code == "DadosInvalidos"
+    assert error.value.status == 400
+    assert not error.value.uncertain
+
+
+def test_nfce_validation_errors_are_available_without_exposing_personal_data(api):
+    api.session.request.return_value = response(
+        422,
+        {
+            "erros": [
+                "CFOP 6102 não é permitido para NFC-e do CPF 52998224725.",
+                "Revise cliente@example.com antes de transmitir.",
+                "CSC: segredo-super-secreto e chave 12345678901234567890123456789012345678901234.",
+            ]
+        },
+    )
+
+    with pytest.raises(IntNFeError) as error:
+        api.issue_document("token", "nfce", {}, "chave-teste")
+
+    assert error.value.validation_errors == [
+        "CFOP 6102 não é permitido para NFC-e do CPF [dado oculto].",
+        "Revise [e-mail oculto] antes de transmitir.",
+        "CSC: [dado oculto] e chave [dado oculto].",
+    ]
+    assert "52998224725" not in str(error.value)
+    assert "cliente@example.com" not in str(error.value)
+
+
 def test_timeout_or_invalid_success_response_is_uncertain_for_creation(api):
     api.session.request.side_effect = requests.Timeout("mensagem-privada")
     with pytest.raises(IntNFeError) as error:
@@ -259,3 +294,87 @@ def test_fiscal_profile_uses_integrator_get_and_patch(api):
         BASE_URL + "/integrador/emitentes/emitente-teste/cadastro",
     )
     assert api.session.request.call_args.kwargs["json"] == remote
+
+
+def test_environment_activation_accepts_documented_empty_response(api):
+    api.session.request.return_value = response(status=204)
+
+    assert api.activate_emitter_environment("token", "emitente-teste", 1) is None
+
+    call = api.session.request.call_args
+    assert call.args == (
+        "POST",
+        BASE_URL + "/integrador/emitentes/emitente-teste/ambiente/ativar",
+    )
+    assert call.kwargs["json"] == {"ambienteCodigo": 1}
+    assert call.kwargs["allow_redirects"] is False
+
+
+def test_direct_issue_uses_emitter_token_and_idempotency_header(api):
+    api.session.request.return_value = response(
+        status=202, body={"correlationId": "correlacao-teste"}
+    )
+    payload = {"serie": "3", "ambienteCodigo": 2}
+    result = api.issue_document("token-emitente", "nfe", payload, "chave-teste-123")
+    assert result["correlationId"] == "correlacao-teste"
+    call = api.session.request.call_args
+    assert call.args == ("POST", BASE_URL + "/nfe")
+    assert call.kwargs["headers"] == {
+        "Accept": "application/json",
+        "Authorization": "Bearer token-emitente",
+        "Idempotency-Key": "chave-teste-123",
+    }
+    assert call.kwargs["json"] == payload
+
+
+def test_document_path_rejects_untrusted_correlation_before_network(api):
+    with pytest.raises(IntNFeError, match="RespostaInvalida"):
+        api.document_status("token", "nfe", "../outro-tenant")
+    assert api.session.request.call_count == 0
+
+
+def test_nfe_danfe_requests_the_documented_pdf_format(api):
+    result = response()
+    result.content = b"%PDF-exemplo"
+    api.session.request.return_value = result
+
+    assert api.document_danfe("token", "nfe", "correlacao-teste") == b"%PDF-exemplo"
+    api.session.request.assert_called_once_with(
+        "GET",
+        BASE_URL + "/nfe/correlacao-teste/danfe?formato=pdf",
+        headers={"Accept": "application/pdf", "Authorization": "Bearer token"},
+        timeout=(3, 30),
+        allow_redirects=False,
+    )
+
+
+def test_nfce_danfe_requests_the_documented_thermal_html(api):
+    result = response()
+    result.content = b"<!doctype html><html></html>"
+    api.session.request.return_value = result
+
+    assert api.document_danfe("token", "nfce", "correlacao-teste") == result.content
+    api.session.request.assert_called_once_with(
+        "GET",
+        BASE_URL + "/nfce/correlacao-teste/danfe",
+        headers={"Accept": "text/html", "Authorization": "Bearer token"},
+        timeout=(3, 30),
+        allow_redirects=False,
+    )
+
+
+def test_production_credentials_are_created_once_without_exposing_response(api):
+    api.session.request.return_value = response(
+        body={"clientId": "cliente-producao", "clientSecret": "segredo-producao"}
+    )
+    result = api.create_production_credentials("token", "emitente-teste")
+    assert result == {
+        "clientId": "cliente-producao",
+        "clientSecret": "segredo-producao",
+    }
+    call = api.session.request.call_args
+    assert call.args == (
+        "POST",
+        BASE_URL + "/integrador/emitentes/emitente-teste/credencial-producao",
+    )
+    assert call.kwargs["json"] == {}

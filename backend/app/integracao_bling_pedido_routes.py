@@ -671,7 +671,7 @@ _SITUACOES_PEDIDO_CANCELADO = {
 }
 
 _SITUACOES_PEDIDO_ATENDIDO = {
-    9,  # Atendido (concluído/nota fiscal emitida)
+    9,  # Atendido (venda concluída no Bling)
 }
 
 

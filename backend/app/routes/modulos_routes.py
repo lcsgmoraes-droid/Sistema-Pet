@@ -52,9 +52,10 @@ MODULOS_PREMIUM = frozenset(
     ]
 )
 
-# Bling/webhooks seguem disponiveis apenas para tenants explicitamente
-# configurados. Nao entram na vitrine publica nem no piloto Beta.
-MODULOS_FORA_DA_OFERTA_PUBLICA = frozenset(["bling"])
+# Bling/webhooks e emissao fiscal seguem disponiveis apenas para tenants
+# explicitamente configurados. Nao entram na vitrine publica nem no piloto Beta.
+MODULOS_FORA_DA_OFERTA_PUBLICA = frozenset(["bling", "fiscal"])
+MODULOS_CONTRATACAO_SEPARADA = frozenset(["fiscal"])
 MODULOS_BETA_PUBLICOS = frozenset(MODULOS_PREMIUM - MODULOS_FORA_DA_OFERTA_PUBLICA)
 MODULOS_TRIAL_COMPLETO = frozenset(MODULOS_PREMIUM - MODULOS_FORA_DA_OFERTA_PUBLICA)
 
@@ -216,7 +217,7 @@ def _resolver_modulos_ativos(
         plano_normalizado in PLANOS_LEGADO_LIBERADOS
         or plano_normalizado in PLANOS_TODOS_MODULOS
     ):
-        modulos_do_tenant.update(MODULOS_PREMIUM)
+        modulos_do_tenant.update(MODULOS_PREMIUM - MODULOS_CONTRATACAO_SEPARADA)
 
     plano_catalogo = get_plan(plano)
     if liberar_modulos_do_plano and plano_catalogo:

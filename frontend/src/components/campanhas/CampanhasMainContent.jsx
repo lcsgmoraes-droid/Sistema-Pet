@@ -12,6 +12,7 @@ import CampanhasUnificacaoTab from "./CampanhasUnificacaoTab";
 import CampanhasGestorTab from "./CampanhasGestorTab";
 import CampanhasConfigTab from "./CampanhasConfigTab";
 import CampanhasValidadeTab from "./CampanhasValidadeTab";
+import RankingClientes from "../../pages/RankingClientes";
 import {
   TIPO_LABELS,
   USER_CREATABLE_TYPES,
@@ -182,6 +183,8 @@ export default function CampanhasMainContent({
           rankLabels={RANK_LABELS}
         />
       )}
+
+      {aba === "ranking-clientes" && <RankingClientes embedded />}
 
       {aba === "ranking" && (
         <CampanhasRankingTab

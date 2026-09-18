@@ -10,6 +10,13 @@ test("createLayoutMenuItems preserva itens principais do menu", () => {
   assert.equal(findMenuItem(items, "/dashboard")?.permission, "relatorios.gerencial");
   assert.equal(findMenuItem(items, "/dashboard-gerencial"), undefined);
   assert.equal(findMenuItem(items, "/pdv")?.permission, "vendas.criar");
+  assert.equal(findMenuItem(items, "/ranking-clientes"), undefined);
+  assert.equal(
+    findMenuItem(items, "/campanhas")?.submenu?.find(
+      (item) => item.path === "/campanhas/ranking-clientes",
+    )?.permission,
+    "clientes.visualizar",
+  );
   assert.equal(
     findMenuItem(items, "/financeiro")?.submenu?.some((item) => item.path === "/financeiro/vendas"),
     true,
@@ -71,4 +78,13 @@ test("createLayoutMenuItems sinaliza convites pendentes de grupos de empresas", 
 
   assert.equal(grupos?.badge, true);
   assert.equal(grupos?.badgeLabel, "3 convite(s) pendente(s)");
+});
+
+test("orçamentos do grupo só aparecem quando o tenant está habilitado", () => {
+  const desligado = createLayoutMenuItems();
+  const ligado = createLayoutMenuItems({ orcamentosGrupoAtivo: true });
+
+  assert.equal(findMenuItem(desligado, "/orcamentos-grupo"), undefined);
+  assert.equal(findMenuItem(ligado, "/orcamentos-grupo")?.permission, "vendas.criar");
+  assert.equal(findMenuItem(ligado, "/orcamentos-grupo")?.section, "Vendas e relacionamento");
 });

@@ -5,9 +5,11 @@ from datetime import datetime
 import pytest
 
 from app.nfe_routes import (
+    _danfe_response_metadata,
     _normalizar_nota_pedido_integrado,
     _enriquecer_notas_com_pedidos_integrados,
     _enriquecer_notas_com_detalhes_bling,
+    _enriquecer_detalhe_com_xml_link,
     _extrair_campos_fiscais_do_xml,
     _extrair_valor_nota,
     _normalizar_detalhe_nota_bling,
@@ -18,6 +20,18 @@ from app.nfe_routes import (
     _situacao_num,
     _status_nota_bling,
 )
+
+
+def test_danfe_nfce_is_returned_as_thermal_html():
+    assert _danfe_response_metadata(
+        SimpleNamespace(nfe_tipo="nfce", nfe_modelo="65")
+    ) == ("text/html", "html")
+
+
+def test_danfe_nfe_is_returned_as_pdf():
+    assert _danfe_response_metadata(
+        SimpleNamespace(nfe_tipo="nfe", nfe_modelo="55")
+    ) == ("application/pdf", "pdf")
 
 
 def test_situacao_num_prioriza_valor_quando_bling_retorna_objeto():
@@ -149,6 +163,59 @@ def test_normalizar_resumo_canal_mapeia_loja_id_conhecida_para_mercado_livre():
     assert resumo["canal"] == "mercado_livre"
     assert resumo["canal_label"] == "Mercado Livre"
     assert resumo["origem_loja_virtual"] == "Mercado Livre"
+
+
+def test_normalizar_resumo_canal_prioriza_tiktok_antes_do_numero_longo():
+    resumo = _normalizar_resumo_canal(
+        {
+            "numeroLojaVirtual": "7494832466292606945",
+            "origemCanalVenda": "Outros",
+            "intermediador": {
+                "cnpj": "27.415.911/0001-36",
+                "nomeUsuario": "7494832466292606945",
+            },
+        }
+    )
+
+    assert resumo["canal"] == "tiktok"
+    assert resumo["canal_label"] == "TikTok"
+    assert resumo["origem_loja_virtual"] == "TikTok"
+    assert resumo["origem_canal_venda"] == "TikTok"
+    assert resumo["intermediador"]["identificacao"] == "7494832466292606945"
+
+
+def test_normalizar_detalhe_calcula_totais_do_formato_atual_do_bling():
+    detalhe = _normalizar_detalhe_nota_bling(
+        {
+            "id": 123,
+            "numero": "017890",
+            "situacao": 5,
+            "valorNota": 34.20,
+            "valorFrete": 0,
+            "numeroPedidoLoja": "7494832466292606945",
+            "intermediador": {
+                "cnpj": "27415911000136",
+                "nomeUsuario": "7494832466292606945",
+            },
+            "itens": [
+                {
+                    "codigo": "STO0074",
+                    "descricao": "Produto TikTok",
+                    "unidade": "UN",
+                    "quantidade": 2,
+                    "valor": 19.20,
+                    "valorTotal": 38.40,
+                }
+            ],
+        },
+        55,
+    )
+
+    assert detalhe["itens"][0]["valor_total"] == pytest.approx(38.40)
+    assert detalhe["totais"]["valor_produtos"] == pytest.approx(38.40)
+    assert detalhe["totais"]["valor_desconto"] == pytest.approx(4.20)
+    assert detalhe["totais"]["valor_total"] == pytest.approx(34.20)
+    assert detalhe["canal_label"] == "TikTok"
 
 
 def test_normalizar_nota_pedido_integrado_usa_ultima_nf_salva_no_payload():
@@ -485,6 +552,66 @@ def test_extrair_campos_fiscais_do_xml_preenche_horas_e_rotulos():
     assert campos["codigo_regime_tributario"] == "Simples Nacional"
     assert campos["finalidade"] == "NF-e normal"
     assert campos["indicador_presenca"] == "9 - Operacao nao presencial, outros"
+
+
+def test_extrair_campos_fiscais_do_xml_preenche_totais_e_tiktok():
+    campos = _extrair_campos_fiscais_do_xml("""<?xml version="1.0" encoding="UTF-8"?>
+        <nfeProc xmlns="http://www.portalfiscal.inf.br/nfe">
+          <NFe>
+            <infNFe>
+              <ide><natOp>Venda</natOp><indPres>9</indPres></ide>
+              <emit><CRT>1</CRT></emit>
+              <total><ICMSTot>
+                <vProd>38.40</vProd><vFrete>0.00</vFrete><vSeg>0.00</vSeg>
+                <vDesc>4.20</vDesc><vOutro>0.00</vOutro><vNF>34.20</vNF>
+              </ICMSTot></total>
+              <infIntermed><CNPJ>27415911000136</CNPJ></infIntermed>
+            </infNFe>
+          </NFe>
+        </nfeProc>""")
+
+    assert campos["totais"] == {
+        "valor_produtos": pytest.approx(38.40),
+        "valor_frete": pytest.approx(0),
+        "valor_seguro": pytest.approx(0),
+        "outras_despesas": pytest.approx(0),
+        "valor_desconto": pytest.approx(4.20),
+        "valor_total": pytest.approx(34.20),
+    }
+    assert campos["canal"] == "tiktok"
+    assert campos["canal_label"] == "TikTok"
+
+
+def test_enriquecer_detalhe_com_xml_corrige_totais_e_canal(monkeypatch):
+    monkeypatch.setattr(
+        "app.nfe.listagem_xml._consultar_campos_fiscais_no_xml",
+        lambda _: {
+            "totais": {
+                "valor_produtos": 38.40,
+                "valor_frete": 0,
+                "valor_seguro": 0,
+                "outras_despesas": 0,
+                "valor_desconto": 4.20,
+                "valor_total": 34.20,
+            },
+            "canal": "tiktok",
+            "canal_label": "TikTok",
+        },
+    )
+    detalhe = {
+        "totais": {"valor_produtos": 0, "valor_desconto": 0},
+        "canal": "mercado_livre",
+        "canal_label": "Mercado Livre",
+        "informacoes_adicionais": {},
+    }
+
+    _enriquecer_detalhe_com_xml_link({"xml": "https://bling.test/nfe.xml"}, detalhe)
+
+    assert detalhe["totais"]["valor_produtos"] == pytest.approx(38.40)
+    assert detalhe["totais"]["valor_desconto"] == pytest.approx(4.20)
+    assert detalhe["canal"] == "tiktok"
+    assert detalhe["canal_label"] == "TikTok"
+    assert detalhe["informacoes_adicionais"]["origem_loja_virtual"] == "TikTok"
 
 
 def test_normalizar_detalhe_nota_bling_extrai_hora_de_timestamp_compacto():

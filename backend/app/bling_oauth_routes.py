@@ -24,6 +24,7 @@ from sqlalchemy.orm import Session
 
 from app.auth.dependencies import get_current_user_and_tenant
 from app.bling_integration_parts.core import (
+    BLING_ENABLE_JWT_HEADER,
     BLING_OAUTH_TOKEN_URL,
     _bling_token_lock,
     _load_bling_runtime_config,
@@ -233,7 +234,7 @@ def _trocar_code_por_tokens(
         headers={
             "Authorization": f"Basic {creds}",
             "Content-Type": "application/x-www-form-urlencoded",
-            "enable-jwt": "1",
+            "enable-jwt": BLING_ENABLE_JWT_HEADER,
         },
         data={
             "grant_type": "authorization_code",
@@ -470,7 +471,7 @@ def status_token(user_and_tenant=Depends(get_current_user_and_tenant)):
             headers={
                 "Authorization": f"Bearer {token}",
                 "Accept": "application/json",
-                "enable-jwt": "1",
+                "enable-jwt": BLING_ENABLE_JWT_HEADER,
             },
             timeout=10,
         )

@@ -7,6 +7,7 @@ const read = (name) => readFileSync(new URL(`./${name}`, import.meta.url), "utf8
 const cardSource = read("LembreteCard.jsx");
 const listSource = read("LembretesList.jsx");
 const pageSource = read("LembretesPage.jsx");
+const inactiveSource = read("LembretesClientesInativos.jsx");
 const modalSource = read("LembreteContatoModal.jsx");
 const tabsSource = read("LembretesTabs.jsx");
 const styleSource = read("../../styles/Lembretes.css");
@@ -45,6 +46,16 @@ test("compositor deixa sugestão editável e distingue abertura do WhatsApp", ()
   assert.match(modalSource, /Enviar push/);
   assert.match(modalSource, /Conversa aberta/);
   assert.match(modalSource, /Histórico deste ciclo/);
+});
+
+test("relacionamento lista clientes inativos com ações manuais de mensagem", () => {
+  assert.match(pageSource, /LembretesClientesInativos/);
+  assert.match(inactiveSource, /Clientes inativos/);
+  assert.match(inactiveSource, /PRAZOS_INATIVIDADE = \[30, 60, 90\]/);
+  assert.match(inactiveSource, /\{prazo\}\+ dias/);
+  assert.match(inactiveSource, /WhatsApp/);
+  assert.match(inactiveSource, /Copiar/);
+  assert.match(inactiveSource, /Nenhuma mensagem é\s+enviada automaticamente/);
 });
 
 test("folha da página continua sem estilos legados de cartão", () => {

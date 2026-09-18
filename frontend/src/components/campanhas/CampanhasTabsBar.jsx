@@ -11,6 +11,7 @@ import {
   Sparkles,
   Tags,
   BadgePercent,
+  Medal,
   Trophy,
   Wrench,
 } from "lucide-react";
@@ -29,7 +30,12 @@ export const CAMPANHAS_TABS = [
       { id: "retencao", label: "Retencao", labelText: "Retencao", icon: Repeat2 },
       { id: "destaque", label: "Cliente destaque", labelText: "Cliente Destaque", icon: Sparkles },
       { id: "sorteios", label: "Sorteios", labelText: "Sorteios", icon: Dice5 },
-      { id: "ranking", label: "Ranking", labelText: "Ranking", icon: Trophy },
+      {
+        id: "ranking-clientes",
+        label: "Ranking de clientes",
+        labelText: "Ranking de clientes",
+        icon: Trophy,
+      },
       { id: "cupons", label: "Cupons", labelText: "Cupons e Brindes", icon: BadgePercent },
     ],
   },
@@ -44,6 +50,7 @@ export const CAMPANHAS_TABS = [
   {
     group: "Configuracao",
     items: [
+      { id: "ranking", label: "Niveis VIP", labelText: "Niveis VIP", icon: Medal },
       { id: "config", label: "Configuracoes", labelText: "Configuracoes", icon: Settings },
       { id: "canais", label: "Canais", labelText: "Descontos por Canal", icon: Tags },
     ],

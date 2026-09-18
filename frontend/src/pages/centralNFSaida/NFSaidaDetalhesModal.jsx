@@ -1,4 +1,4 @@
-import { Download, Printer, RefreshCw, X } from "lucide-react";
+import { Download, Printer, RefreshCw, RotateCcw, X } from "lucide-react";
 
 import CustomerIdentity from "../../components/ui/CustomerIdentity";
 import { formatMoneyBRL } from "../../utils/formatters";
@@ -42,8 +42,15 @@ export default function NFSaidaDetalhesModal({
   fecharDetalhes,
   baixarDanfe,
   baixarXml,
+  corrigirEReemitir,
+  corrigindoNotaId,
 }) {
   if (!notaSelecionada) return null;
+
+  const codigoErro = detalheNota?.codigo_erro || notaSelecionada.codigo_erro;
+  const motivoRejeicao = detalheNota?.motivo_rejeicao || notaSelecionada.motivo_rejeicao;
+  const notaIntNFe = notaSelecionada.provedor === "intnfe";
+  const documentoDisponivel = !notaIntNFe || notaSelecionada.status?.toLowerCase() === "autorizada";
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -60,12 +67,36 @@ export default function NFSaidaDetalhesModal({
           {carregandoDetalhe && (
             <div className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800 flex items-center gap-2">
               <RefreshCw className="w-4 h-4 animate-spin" />
-              Carregando detalhes completos da nota no Bling...
+              {notaIntNFe
+                ? "Carregando a venda e atualizando o status na IntNFe..."
+                : "Carregando detalhes completos da nota no Bling..."}
             </div>
           )}
           {erroDetalhe && (
             <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
               {erroDetalhe}
+            </div>
+          )}
+          {(codigoErro || motivoRejeicao) && (
+            <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900">
+              <p className="font-semibold">A autorização da nota foi rejeitada.</p>
+              {codigoErro && <p className="mt-1">Código: {codigoErro}</p>}
+              {motivoRejeicao && <p className="mt-1">Motivo: {motivoRejeicao}</p>}
+              {notaIntNFe && notaSelecionada.status?.toLowerCase() === "rejeitada" && (
+                <button
+                  type="button"
+                  onClick={() => corrigirEReemitir(notaSelecionada)}
+                  disabled={corrigindoNotaId === String(notaSelecionada.venda_id)}
+                  className="mt-3 inline-flex items-center gap-2 rounded-lg bg-purple-700 px-4 py-2 font-semibold text-white hover:bg-purple-800 disabled:opacity-50"
+                >
+                  <RotateCcw
+                    className={`h-4 w-4 ${
+                      corrigindoNotaId === String(notaSelecionada.venda_id) ? "animate-spin" : ""
+                    }`}
+                  />
+                  Corrigir e tentar novamente
+                </button>
+              )}
             </div>
           )}
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
@@ -202,6 +233,12 @@ export default function NFSaidaDetalhesModal({
           </SecaoDetalhe>
 
           <SecaoDetalhe titulo="Itens da nota">
+            {notaIntNFe && detalheNota?.itens?.length ? (
+              <p className="text-xs text-gray-500">
+                Produto e valores vêm da venda salva. NCM, CEST, CFOP e CST refletem o cadastro
+                fiscal atual do CorePet.
+              </p>
+            ) : null}
             {detalheNota?.itens?.length ? (
               <div className="overflow-x-auto">
                 <table className="min-w-full divide-y divide-gray-200 text-sm">
@@ -216,6 +253,11 @@ export default function NFSaidaDetalhesModal({
                         Preço total
                       </th>
                       <th className="px-3 py-2 text-left font-semibold text-gray-500">NCM</th>
+                      <th className="px-3 py-2 text-left font-semibold text-gray-500">CEST</th>
+                      <th className="px-3 py-2 text-left font-semibold text-gray-500">CFOP</th>
+                      <th className="px-3 py-2 text-left font-semibold text-gray-500">ICMS</th>
+                      <th className="px-3 py-2 text-left font-semibold text-gray-500">PIS</th>
+                      <th className="px-3 py-2 text-left font-semibold text-gray-500">COFINS</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100 bg-white">
@@ -234,6 +276,11 @@ export default function NFSaidaDetalhesModal({
                           {formatMoneyBRL(item.valor_total || 0)}
                         </td>
                         <td className="px-3 py-2 text-gray-600">{item.ncm || "-"}</td>
+                        <td className="px-3 py-2 text-gray-600">{item.cest || "-"}</td>
+                        <td className="px-3 py-2 text-gray-600">{item.cfop || "-"}</td>
+                        <td className="px-3 py-2 text-gray-600">{item.icms || "-"}</td>
+                        <td className="px-3 py-2 text-gray-600">{item.pis || "-"}</td>
+                        <td className="px-3 py-2 text-gray-600">{item.cofins || "-"}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -348,7 +395,9 @@ export default function NFSaidaDetalhesModal({
                 </div>
               ) : (
                 <p className="text-sm text-gray-500">
-                  Sem parcelas detalhadas na resposta do Bling.
+                  {notaIntNFe
+                    ? "Nenhum pagamento vinculado à venda foi encontrado."
+                    : "Sem parcelas detalhadas na resposta do Bling."}
                 </p>
               )}
             </SecaoDetalhe>
@@ -411,14 +460,16 @@ export default function NFSaidaDetalhesModal({
 
           <div className="flex gap-2 pt-4">
             <button
-              onClick={() => baixarDanfe(notaSelecionada.id, notaSelecionada.numero)}
-              className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg"
+              onClick={() => baixarDanfe(notaSelecionada)}
+              disabled={!documentoDisponivel}
+              className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white rounded-lg"
             >
               <Printer className="w-5 h-5" /> Baixar DANFE
             </button>
             <button
-              onClick={() => baixarXml(notaSelecionada.id, notaSelecionada.numero)}
-              className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg"
+              onClick={() => baixarXml(notaSelecionada)}
+              disabled={!documentoDisponivel}
+              className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white rounded-lg"
             >
               <Download className="w-5 h-5" /> Baixar XML
             </button>

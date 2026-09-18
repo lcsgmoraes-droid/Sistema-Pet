@@ -36,10 +36,13 @@ from app.services.billing_contract_service import (
 from app.services.plan_catalog import PlanDefinition, get_plan
 from app.tenancy.context import tenant_context
 
-
 ALLOWED_BILLING_TYPES = frozenset({"UNDEFINED", "PIX", "BOLETO", "CREDIT_CARD"})
 OFFER_REFERENCE_PREFIX = "billing_offer:"
 PUBLIC_LINK_TTL_DAYS = 30
+COMMERCIAL_TERMS_VERSION = "2026-09-14-01"
+STANDARD_SUPPORT_HOURS = "Dias úteis, das 9h às 18h, horário de Brasília"
+STANDARD_CUSTOM_WORK = "Nenhum desenvolvimento sob medida integra esta proposta."
+STANDARD_EXPORT_REQUEST_WINDOW_DAYS = 30
 
 
 class BillingOfferError(RuntimeError):
@@ -76,6 +79,133 @@ def _extra_modules(offer: BillingOffer) -> list[str]:
     return sorted({str(item) for item in parsed if isinstance(item, str)})
 
 
+def _required_commercial_text(
+    value: str | None,
+    *,
+    label: str,
+    min_length: int = 10,
+    max_length: int = 2000,
+) -> str:
+    clean = str(value or "").strip()
+    if len(clean) < min_length:
+        raise BillingOfferError(f"Detalhe melhor o campo: {label}")
+    if len(clean) > max_length:
+        raise BillingOfferError(
+            f"O campo {label} deve ter no máximo {max_length} caracteres"
+        )
+    return clean
+
+
+def build_offer_commercial_terms(
+    *,
+    scope_summary: str,
+    implementation_summary: str,
+    exclusions_summary: str,
+    support_channel: str,
+    custom_work_summary: str | None,
+) -> dict[str, Any]:
+    custom_work = str(custom_work_summary or "").strip() or STANDARD_CUSTOM_WORK
+    if len(custom_work) > 2000:
+        raise BillingOfferError(
+            "O campo desenvolvimento sob medida deve ter no máximo 2000 caracteres"
+        )
+    return {
+        "version": COMMERCIAL_TERMS_VERSION,
+        "scope_summary": _required_commercial_text(
+            scope_summary,
+            label="escopo contratado",
+        ),
+        "implementation_summary": _required_commercial_text(
+            implementation_summary,
+            label="implantação e migração",
+        ),
+        "exclusions_summary": _required_commercial_text(
+            exclusions_summary,
+            label="itens fora do escopo e dependências",
+        ),
+        "support": {
+            "channel": _required_commercial_text(
+                support_channel,
+                label="canal de suporte",
+                min_length=3,
+                max_length=200,
+            ),
+            "hours": STANDARD_SUPPORT_HOURS,
+            "first_response_is_target": True,
+            "first_response_targets": {
+                "p0": "até 2 horas úteis",
+                "p1": "até 4 horas úteis",
+                "p2": "até 1 dia útil",
+                "p3": "até 2 dias úteis",
+                "improvement": "registro para priorização, sem prazo de entrega",
+            },
+            "contractual_sla_included": False,
+        },
+        "custom_work": {
+            "summary": custom_work,
+            "ip_rule": "corepet_reusable_unless_signed_assignment",
+        },
+        "termination": {
+            "minimum_term_months": 0,
+            "cancellation_effect": "final_do_ciclo_pago",
+            "export_request_window_days": STANDARD_EXPORT_REQUEST_WINDOW_DAYS,
+        },
+    }
+
+
+def _has_text_fields(value: Any, fields: tuple[str, ...]) -> bool:
+    return isinstance(value, dict) and all(
+        isinstance(value.get(field), str) and bool(value[field].strip())
+        for field in fields
+    )
+
+
+def _valid_support_terms(value: Any) -> bool:
+    if not _has_text_fields(value, ("channel", "hours")):
+        return False
+    targets = value.get("first_response_targets")
+    return (
+        value.get("contractual_sla_included") is False
+        and value.get("first_response_is_target") is True
+        and _has_text_fields(targets, ("p0", "p1", "p2", "p3", "improvement"))
+    )
+
+
+def _valid_custom_work_terms(value: Any) -> bool:
+    return _has_text_fields(value, ("summary",)) and (
+        value.get("ip_rule") == "corepet_reusable_unless_signed_assignment"
+    )
+
+
+def _valid_termination_terms(value: Any) -> bool:
+    return isinstance(value, dict) and value == {
+        "minimum_term_months": 0,
+        "cancellation_effect": "final_do_ciclo_pago",
+        "export_request_window_days": STANDARD_EXPORT_REQUEST_WINDOW_DAYS,
+    }
+
+
+def _valid_commercial_terms(value: Any) -> bool:
+    return (
+        _has_text_fields(
+            value,
+            ("scope_summary", "implementation_summary", "exclusions_summary"),
+        )
+        and value.get("version") == COMMERCIAL_TERMS_VERSION
+        and _valid_support_terms(value.get("support"))
+        and _valid_custom_work_terms(value.get("custom_work"))
+        and _valid_termination_terms(value.get("termination"))
+    )
+
+
+def _commercial_terms(offer: BillingOffer) -> dict[str, Any] | None:
+    try:
+        parsed = json.loads(getattr(offer, "commercial_terms_json", "{}") or "{}")
+    except (json.JSONDecodeError, TypeError):
+        return None
+    return parsed if _valid_commercial_terms(parsed) else None
+
+
 def _included_modules(offer: BillingOffer) -> list[str]:
     plan = get_plan(offer.plan_code)
     return sorted(set(plan.modules if plan else ()) | set(_extra_modules(offer)))
@@ -107,6 +237,7 @@ def offer_to_public(
         },
         "extra_modules": _extra_modules(offer),
         "included_modules": _included_modules(offer),
+        "commercial_terms": _commercial_terms(offer),
         "price_cents": offer.price_cents,
         "currency": offer.currency,
         "billing_cycle": offer.billing_cycle,
@@ -116,13 +247,15 @@ def offer_to_public(
         "payment_status": offer.payment_status,
         "expires_at": _iso(offer.expires_at),
         "accepted_at": _iso(offer.accepted_at),
-        "representative": {
-            "name": offer.representative_name,
-            "email": offer.representative_email,
-            "role": offer.representative_role,
-        }
-        if offer.accepted_at
-        else None,
+        "representative": (
+            {
+                "name": offer.representative_name,
+                "email": offer.representative_email,
+                "role": offer.representative_role,
+            }
+            if offer.accepted_at
+            else None
+        ),
         "checkout_url": offer.checkout_url if include_checkout else None,
         "contract": contract_manifest(),
     }
@@ -171,6 +304,11 @@ def create_billing_offer(
     first_due_date: date,
     billing_type: str,
     extra_modules: list[str],
+    scope_summary: str,
+    implementation_summary: str,
+    exclusions_summary: str,
+    support_channel: str,
+    custom_work_summary: str | None,
 ) -> tuple[BillingOffer, str]:
     tenant = _tenant(db, tenant_reference)
     if len(_digits(tenant.cnpj)) not in {11, 14}:
@@ -192,6 +330,13 @@ def create_billing_offer(
     if normalized_type not in ALLOWED_BILLING_TYPES:
         raise BillingOfferError("Forma de pagamento indisponivel")
     normalized_modules = _validate_modules(plan, extra_modules)
+    commercial_terms = build_offer_commercial_terms(
+        scope_summary=scope_summary,
+        implementation_summary=implementation_summary,
+        exclusions_summary=exclusions_summary,
+        support_channel=support_channel,
+        custom_work_summary=custom_work_summary,
+    )
     normalized_title = str(title or "").strip() or f"CorePet - {plan.name}"
     if len(normalized_title) > 160:
         raise BillingOfferError("O nome da proposta deve ter no maximo 160 caracteres")
@@ -220,6 +365,12 @@ def create_billing_offer(
         billing_type=normalized_type,
         first_due_date=first_due_date,
         extra_modules_json=json.dumps(normalized_modules, separators=(",", ":")),
+        commercial_terms_json=json.dumps(
+            commercial_terms,
+            ensure_ascii=False,
+            separators=(",", ":"),
+            sort_keys=True,
+        ),
         status="ready",
         expires_at=now + timedelta(days=PUBLIC_LINK_TTL_DAYS),
     )
@@ -343,6 +494,12 @@ def accept_billing_offer(
         raise BillingOfferError(
             "Esta proposta não está mais disponível", status_code=409
         )
+    commercial_terms = _commercial_terms(offer)
+    if commercial_terms is None:
+        raise BillingOfferError(
+            "Esta proposta foi criada sem as condições comerciais atuais. Solicite um novo link.",
+            status_code=409,
+        )
 
     plan = get_plan(offer.plan_code)
     if plan is None:
@@ -408,6 +565,7 @@ def accept_billing_offer(
         plan_name=offer.title,
         billing_offer_id=offer.offer_id,
         extra_modules=_extra_modules(offer),
+        commercial_terms=commercial_terms,
         representative_role=clean_role,
     )
     with tenant_context(tenant.id):
