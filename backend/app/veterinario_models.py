@@ -861,7 +861,12 @@ class FotoClinica(BaseTenantModel):
 
 
 class PerfilComportamental(BaseTenantModel):
-    """Perfil comportamental do pet — alimenta módulo de Banho e Tosa."""
+    """Perfil comportamental do pet (temperamento, reações, tolerância a procedimentos).
+
+    Hoje não há nenhuma integração real com o módulo de Banho e Tosa — o snapshot
+    comportamental usado lá vem só de atributos físicos do Pet (porte/peso/pelagem),
+    não desta tabela. Se o vínculo for implementado de fato, atualizar esta docstring.
+    """
 
     __tablename__ = "vet_perfil_comportamental"
 

@@ -31,8 +31,8 @@ class ConversaWhatsApp(BaseTenantModel):
     __tablename__ = "conversas_whatsapp"
 
     id = Column(Integer, primary_key=True)
-    usuario_id = Column(Integer, ForeignKey("usuarios.id"), nullable=False)
-    cliente_id = Column(Integer, ForeignKey("cliente.id"), nullable=True)
+    usuario_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    cliente_id = Column(Integer, ForeignKey("clientes.id"), nullable=True)
 
     # Informações do contato
     numero_whatsapp = Column(String(20), nullable=False)
@@ -121,8 +121,8 @@ class AnaliseClienteInteligente(BaseTenantModel):
     __tablename__ = "analise_cliente_inteligente"
 
     id = Column(Integer, primary_key=True)
-    usuario_id = Column(Integer, ForeignKey("usuarios.id"), nullable=False)
-    cliente_id = Column(Integer, ForeignKey("cliente.id"), nullable=False)
+    usuario_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    cliente_id = Column(Integer, ForeignKey("clientes.id"), nullable=False)
 
     # Perfil de compra
     total_compras = Column(Integer, default=0)
@@ -164,8 +164,8 @@ class AnaliseClienteInteligente(BaseTenantModel):
 SQL_CREATE_CONVERSA_WHATSAPP = """
 CREATE TABLE IF NOT EXISTS conversas_whatsapp (
     id INTEGER PRIMARY KEY,
-    usuario_id INTEGER NOT NULL REFERENCES usuarios(id),
-    cliente_id INTEGER REFERENCES cliente(id),
+    usuario_id INTEGER NOT NULL REFERENCES users(id),
+    cliente_id INTEGER REFERENCES clientes(id),
     numero_whatsapp VARCHAR(20) NOT NULL,
     nome_cliente VARCHAR(200),
     estado_atual VARCHAR,
@@ -209,8 +209,8 @@ CREATE INDEX idx_mensagem_conversa ON mensagens_whatsapp(conversa_id);
 SQL_CREATE_ANALISE_CLIENTE = """
 CREATE TABLE IF NOT EXISTS analise_cliente_inteligente (
     id INTEGER PRIMARY KEY,
-    usuario_id INTEGER NOT NULL REFERENCES usuarios(id),
-    cliente_id INTEGER NOT NULL REFERENCES cliente(id),
+    usuario_id INTEGER NOT NULL REFERENCES users(id),
+    cliente_id INTEGER NOT NULL REFERENCES clientes(id),
     total_compras INTEGER DEFAULT 0,
     valor_total_gasto FLOAT DEFAULT 0,
     ticket_medio FLOAT,
