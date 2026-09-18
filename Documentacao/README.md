@@ -46,6 +46,7 @@ atualizado: 2026-09-12
 ## 7. Entidades e domínio
 
 - [[Dominio]] — [[Tenant]] · [[Usuario]] · [[Role-Permission]] · [[Cliente]] · [[Pet]] · [[Produto]] · [[Venda]] · [[ContaPagar]] · [[ContaReceber]]
+- Licenciamento por loja (dentro de [[Dominio]]) — [[Plano]] · [[Modulo]] · [[EmpresaGrupo]] · [[UserTenant]]
 
 ## 8. Tecnologias
 
