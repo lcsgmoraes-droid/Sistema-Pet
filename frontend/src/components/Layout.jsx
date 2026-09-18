@@ -35,11 +35,7 @@ import {
 import LayoutFavoritesBar from "./layout/LayoutFavoritesBar";
 import LayoutSidebar from "./layout/LayoutSidebar";
 import { createLayoutMenuItems } from "./layout/menuConfig";
-import { resolveLayoutSessionIdentity } from "./layout/layoutSessionIdentity";
 import ModalCalculadoraUniversal from "./ModalCalculadoraUniversal";
-import ThemeToggle from "./theme/ThemeToggle";
-
-const COREPET_ICON = "/brand/corepet/corepet-icon-64.png";
 
 const Layout = () => {
   useEscapeFallbackForVisibleModals();
@@ -47,28 +43,7 @@ const Layout = () => {
   const location = useLocation();
   const isBradescoOrganizerRoute = location.pathname === "/organizador-bradesco";
   const { user, logout } = useAuth();
-  const sessionIdentity = resolveLayoutSessionIdentity(user);
-  const {
-    modulosAtivos,
-    moduloAtivo,
-    devControlesAtivos,
-    devModoModulos,
-    definirModoDevModulos,
-    alternarModuloDev,
-  } = useModulos();
-
-  const getModoDevLabel = () => {
-    if (devModoModulos === "all_unlocked") return "Todos liberados";
-    if (devModoModulos === "all_locked") return "Premium bloqueado";
-    if (devModoModulos === "custom") return "Personalizado";
-    return "Modo normal";
-  };
-
-  const onToggleModuloDev = (event, modulo) => {
-    event.preventDefault();
-    event.stopPropagation();
-    alternarModuloDev(modulo);
-  };
+  const { modulosAtivos, moduloAtivo } = useModulos();
 
   // Estado para detectar mobile
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
@@ -156,12 +131,9 @@ const Layout = () => {
 
   const [submenusOpen, setSubmenusOpen] = useState({});
 
-  // Estado para esconder completamente a sidebar
-  const [sidebarVisible, setSidebarVisible] = useState(() => {
-    const saved = localStorage.getItem("sidebar_visible");
-    return saved !== null ? JSON.parse(saved) : true;
-  });
-  const effectiveSidebarVisible = !isBradescoOrganizerRoute && sidebarVisible;
+  // A sidebar só recolhe (vira rail de ícones) ou expande — nunca "desaparece" por completo,
+  // exceto na rota dedicada do organizador Bradesco (ferramenta em tela cheia, sem menu).
+  const mostrarSidebar = !isBradescoOrganizerRoute;
 
   // Estado da calculadora universal
   const [calculadoraAberta, setCalculadoraAberta] = useState(false);
@@ -344,7 +316,6 @@ const Layout = () => {
   };
 
   const toggleSidebarMobile = () => {
-    setSidebarVisible(true);
     setSidebarOpen((open) => !open);
   };
 
@@ -360,12 +331,6 @@ const Layout = () => {
       localStorage.setItem("sidebar_width", String(sidebarWidth));
     }
   }, [sidebarWidth, isMobile]);
-
-  useEffect(() => {
-    if (!isMobile) {
-      localStorage.setItem("sidebar_visible", JSON.stringify(sidebarVisible));
-    }
-  }, [sidebarVisible, isMobile]);
 
   // Fechar menu mobile ao mudar de rota
   useEffect(() => {
@@ -724,7 +689,7 @@ const Layout = () => {
   return (
     <div className="erp-shell flex h-screen min-w-0 bg-gray-50 dark:bg-slate-950">
       {/* Backdrop para mobile */}
-      {isMobile && sidebarOpen && effectiveSidebarVisible && (
+      {isMobile && sidebarOpen && mostrarSidebar && (
         <div
           className="erp-mobile-sidebar-backdrop fixed inset-0 bg-transparent z-40 md:hidden"
           onClick={() => setSidebarOpen(false)}
@@ -732,18 +697,13 @@ const Layout = () => {
       )}
 
       {/* Sidebar */}
-      {effectiveSidebarVisible && (
+      {mostrarSidebar && (
         <LayoutSidebar
           isMobile={isMobile}
           sidebarOpen={sidebarOpen}
           sidebarWidth={sidebarWidth}
           setSidebarWidth={setSidebarWidth}
           setSidebarOpen={setSidebarOpen}
-          setSidebarVisible={setSidebarVisible}
-          devControlesAtivos={devControlesAtivos}
-          devModoModulos={devModoModulos}
-          definirModoDevModulos={definirModoDevModulos}
-          getModoDevLabel={getModoDevLabel}
           menuItems={menuItems}
           submenusOpen={submenusOpen}
           currentPath={location.pathname}
@@ -753,70 +713,27 @@ const Layout = () => {
           favoritePaths={favoritePaths}
           handleToggleFavorite={handleToggleFavorite}
           moduloAtivo={moduloAtivo}
-          onToggleModuloDev={onToggleModuloDev}
+          user={user}
           logout={logout}
         />
-      )}
-      {!effectiveSidebarVisible && !isMobile && !isBradescoOrganizerRoute && (
-        <button
-          onClick={() => setSidebarVisible(true)}
-          className="fixed left-0 top-4 z-50 p-3 bg-gradient-to-br from-[#0f5f63] to-[#0f8b8d] hover:from-[#0d4f52] hover:to-[#0d7375] text-white rounded-r-xl shadow-lg transition-all"
-          title="Mostrar menu"
-        >
-          <img src={COREPET_ICON} alt="" className="h-6 w-6 rounded bg-white" />
-        </button>
       )}
 
       {/* Main Content */}
       <div className="erp-main-column flex min-w-0 flex-1 flex-col overflow-hidden">
-        {/* Header */}
-        <header className="erp-topbar flex shrink-0 items-center justify-between gap-2 border-b border-gray-200 bg-white px-3 py-3 md:px-6 md:py-4 dark:border-slate-800 dark:bg-slate-950">
-          {/* Menu Hamburguer (Mobile) */}
-          {isMobile && effectiveSidebarVisible && (
+        {/* Header (só existe no mobile, com o hambúrguer; no desktop o controle mora na própria sidebar) */}
+        {isMobile && mostrarSidebar && (
+          <header className="erp-topbar flex shrink-0 items-center gap-2 border-b border-gray-200 bg-white px-3 py-3 dark:border-slate-800 dark:bg-slate-950">
             <button
               type="button"
               onClick={toggleSidebarMobile}
-              className="touch-manipulation rounded-lg p-2 hover:bg-gray-100 transition-colors md:hidden"
+              className="touch-manipulation rounded-lg p-2 hover:bg-gray-100 transition-colors"
               aria-label="Toggle menu"
               aria-expanded={sidebarOpen}
             >
               <FiMenu className="w-6 h-6 text-gray-700" />
             </button>
-          )}
-
-          {/* Botao CorePet Mobile - Mostrar menu quando escondido */}
-          {isMobile && !effectiveSidebarVisible && !isBradescoOrganizerRoute && (
-            <button
-              onClick={() => setSidebarVisible(true)}
-              className="p-2 rounded-lg hover:bg-[#d8eee9] transition-colors md:hidden"
-              aria-label="Mostrar menu"
-            >
-              <img src={COREPET_ICON} alt="" className="h-6 w-6 rounded" />
-            </button>
-          )}
-
-          {/* User Info */}
-          <div className="flex items-center gap-2 md:gap-3 ml-auto">
-            <ThemeToggle />
-            <div className="hidden max-w-[260px] text-right sm:block">
-              <p
-                className="truncate text-sm font-medium text-gray-900 dark:text-slate-100"
-                title={`Loja ativa: ${sessionIdentity.tenantLabel}`}
-              >
-                Loja: {sessionIdentity.tenantLabel}
-              </p>
-              <p
-                className="truncate text-xs text-gray-500 dark:text-slate-400"
-                title={`Usuário logado: ${sessionIdentity.userLabel}`}
-              >
-                Usuário: {sessionIdentity.userLabel}
-              </p>
-            </div>
-            <div className="w-9 h-9 md:w-10 md:h-10 rounded-full bg-[#0f5f63] flex items-center justify-center text-white font-bold text-sm md:text-base">
-              {sessionIdentity.avatarInitial}
-            </div>
-          </div>
-        </header>
+          </header>
+        )}
 
         {!isBradescoOrganizerRoute && (
           <LayoutFavoritesBar

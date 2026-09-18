@@ -12,11 +12,8 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 import { api } from "../services/api";
 import { getAccessToken } from "../auth/tokenStorage";
 import { useAuth } from "./AuthContext";
-import { shouldShowDevModuleControls } from "./modulosDevControls";
 
 const ModulosContext = createContext();
-const DEV_MODULOS_STORAGE_KEY = "dev_modulos_config";
-const DEV_MODULOS_MODOS_VALIDOS = ["normal", "custom", "all_unlocked", "all_locked"];
 
 export const MODULOS_PREMIUM = [
   "compras",
@@ -227,28 +224,6 @@ export const ModulosProvider = ({ children }) => {
   const [planoAtual, setPlanoAtual] = useState(null);
   const [assinaturaAtual, setAssinaturaAtual] = useState(null);
   const [trialPadrao, setTrialPadrao] = useState(null);
-  const devControlesAtivos = shouldShowDevModuleControls(import.meta.env);
-  const [devModulosConfig, setDevModulosConfig] = useState(() => {
-    if (!devControlesAtivos) {
-      return { modo: "normal", overrides: {} };
-    }
-
-    try {
-      const raw = localStorage.getItem(DEV_MODULOS_STORAGE_KEY);
-      if (!raw) return { modo: "normal", overrides: {} };
-      const parsed = JSON.parse(raw);
-      const modo = DEV_MODULOS_MODOS_VALIDOS.includes(parsed?.modo) ? parsed.modo : "normal";
-      const overrides =
-        parsed?.overrides && typeof parsed.overrides === "object" ? parsed.overrides : {};
-
-      return {
-        modo,
-        overrides: modo === "custom" ? overrides : {},
-      };
-    } catch {
-      return { modo: "normal", overrides: {} };
-    }
-  });
 
   const carregarModulos = useCallback(async () => {
     if (!user) {
@@ -305,46 +280,13 @@ export const ModulosProvider = ({ children }) => {
     carregarModulos();
   }, [carregarModulos]);
 
-  useEffect(() => {
-    if (!devControlesAtivos) return;
-    if (devModulosConfig.modo !== "normal") return;
-    if (Object.keys(devModulosConfig.overrides || {}).length === 0) return;
-    setDevModulosConfig({ modo: "normal", overrides: {} });
-  }, [devControlesAtivos, devModulosConfig]);
-
-  useEffect(() => {
-    if (!devControlesAtivos) return;
-    localStorage.setItem(DEV_MODULOS_STORAGE_KEY, JSON.stringify(devModulosConfig));
-  }, [devModulosConfig, devControlesAtivos]);
-
-  const moduloAtivoBase = useCallback(
+  const moduloAtivo = useCallback(
     (modulo) => {
       if (modulosAtivos === null) return !user;
       if (!MODULOS_PREMIUM.includes(modulo)) return true;
       return modulosAtivos.includes(modulo);
     },
     [modulosAtivos, user],
-  );
-
-  const moduloAtivo = useCallback(
-    (modulo) => {
-      if (!MODULOS_PREMIUM.includes(modulo)) return true;
-
-      if (devControlesAtivos) {
-        if (devModulosConfig.modo === "all_unlocked") return true;
-        if (devModulosConfig.modo === "all_locked") return false;
-
-        if (
-          devModulosConfig.modo === "custom" &&
-          Object.prototype.hasOwnProperty.call(devModulosConfig.overrides, modulo)
-        ) {
-          return Boolean(devModulosConfig.overrides[modulo]);
-        }
-      }
-
-      return moduloAtivoBase(modulo);
-    },
-    [devControlesAtivos, devModulosConfig, moduloAtivoBase],
   );
 
   const moduloBetaPublico = useCallback(
@@ -355,43 +297,6 @@ export const ModulosProvider = ({ children }) => {
   const moduloForaOfertaPublica = useCallback(
     (modulo) => modulosForaOfertaPublica.includes(modulo),
     [modulosForaOfertaPublica],
-  );
-
-  const definirModoDevModulos = useCallback(
-    (modo) => {
-      if (!devControlesAtivos) return;
-      if (!["normal", "all_unlocked", "all_locked"].includes(modo)) return;
-      setDevModulosConfig({ modo, overrides: {} });
-    },
-    [devControlesAtivos],
-  );
-
-  const alternarModuloDev = useCallback(
-    (modulo) => {
-      if (!devControlesAtivos || !MODULOS_PREMIUM.includes(modulo)) return;
-
-      setDevModulosConfig((prev) => {
-        const baseAtivo = moduloAtivoBase(modulo);
-        const overrides = { ...prev.overrides };
-
-        const atualModoNormal = Object.prototype.hasOwnProperty.call(overrides, modulo)
-          ? Boolean(overrides[modulo])
-          : baseAtivo;
-        const proximo = !atualModoNormal;
-
-        if (proximo === baseAtivo) {
-          delete overrides[modulo];
-        } else {
-          overrides[modulo] = proximo;
-        }
-
-        return {
-          modo: Object.keys(overrides).length > 0 ? "custom" : "normal",
-          overrides,
-        };
-      });
-    },
-    [devControlesAtivos, moduloAtivoBase],
   );
 
   const value = useMemo(
@@ -406,10 +311,6 @@ export const ModulosProvider = ({ children }) => {
       moduloBetaPublico,
       moduloForaOfertaPublica,
       carregarModulos,
-      devControlesAtivos,
-      devModoModulos: devModulosConfig.modo,
-      definirModoDevModulos,
-      alternarModuloDev,
     }),
     [
       modulosAtivos,
@@ -422,10 +323,6 @@ export const ModulosProvider = ({ children }) => {
       moduloBetaPublico,
       moduloForaOfertaPublica,
       carregarModulos,
-      devControlesAtivos,
-      devModulosConfig.modo,
-      definirModoDevModulos,
-      alternarModuloDev,
     ],
   );
 

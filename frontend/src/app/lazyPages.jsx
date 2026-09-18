@@ -1,6 +1,6 @@
 import { lazy } from "react";
 
-export const Login = lazy(() => import("../pages/Login"));
+export const Login = lazy(() => import("../pages/v2/Login"));
 export const ForgotPassword = lazy(() => import("../pages/ForgotPassword"));
 export const PlatformLogin = lazy(() => import("../pages/PlatformLogin"));
 export const PlatformForgotPassword = lazy(() => import("../pages/PlatformForgotPassword"));
@@ -68,7 +68,7 @@ export const PedidosCompra = lazy(() => import("../components/PedidosCompra"));
 export const EntradaXML = lazy(() => import("../components/EntradaXML"));
 export const ComprasPendencias = lazy(() => import("../components/ComprasPendencias"));
 
-export const preloadDashboardFinanceiro = () => import("../pages/DashboardFinanceiro");
+export const preloadDashboardFinanceiro = () => import("../pages/v2/DashboardFinanceiro");
 export const DashboardFinanceiro = lazy(preloadDashboardFinanceiro);
 export const BancosFinanceiro = lazy(() => import("../pages/BancosFinanceiro"));
 export const Imobilizado = lazy(() => import("../pages/Imobilizado"));
@@ -127,6 +127,7 @@ export const OpsDashboard = lazy(() => import("../pages/OpsDashboard.jsx"));
 export const OpsIncidentes = lazy(() => import("../pages/OpsIncidentes.jsx"));
 export const OpsTenants = lazy(() => import("../pages/OpsTenants.jsx"));
 export const Observabilidade = lazy(() => import("../pages/Observabilidade.jsx"));
+export const StyleGuide = lazy(() => import("../pages/styleGuide/StyleGuide.jsx"));
 export const Configuracoes = lazy(() => import("../pages/Configuracoes"));
 export const ConfiguracaoFiscalEmpresa = lazy(
   () => import("../pages/configuracoes/ConfiguracaoFiscalEmpresa"),

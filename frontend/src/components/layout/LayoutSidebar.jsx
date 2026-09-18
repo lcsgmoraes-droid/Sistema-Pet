@@ -1,11 +1,60 @@
-import { FiBell, FiCreditCard, FiHelpCircle, FiLogOut, FiMenu, FiX } from "react-icons/fi";
+import {
+  FiBell,
+  FiChevronDown,
+  FiChevronUp,
+  FiCreditCard,
+  FiHelpCircle,
+  FiLogOut,
+  FiMoon,
+  FiSun,
+  FiX,
+} from "react-icons/fi";
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 
 import useNovidadesNaoVistas from "../../hooks/useNovidadesNaoVistas";
+import { useTheme } from "../../theme/ThemeContext";
 import SidebarMenu from "./SidebarMenu";
+import { resolveLayoutSessionIdentity } from "./layoutSessionIdentity";
 
 const COREPET_LOGO = "/brand/corepet/corepet-horizontal.png";
+const COREPET_ICON = "/brand/corepet/corepet-icon-64.png";
+// Rail de menu recolhido: 4rem/64px é o padrão usado por VS Code, GitHub etc. para sidebars
+// só-ícone — mais estreito que o antigo 5rem/80px (Material Design Navigation Rail, pensado
+// para touch, mais largo do que este app precisa no desktop).
+const LARGURA_RECOLHIDA = "4rem";
+
+// Hambúrguer que vira X (e volta) com uma animação simples de 3 barras — substitui os dois
+// botões separados (recolher / esconder) por um único controle: o estado dele É o estado da
+// sidebar (aberta = X, recolhida = hambúrguer), não uma ação de "fechar/esconder o menu".
+// Aparência discreta (sem gradiente/sombra pesada), mas com fundo+borda próprios — no recolhido
+// ele flutua meio pra fora da borda da sidebar, por cima do conteúdo da página, e precisa de uma
+// base visual para não "desaparecer" contra o que estiver atrás.
+function BotaoAlternarMenu({ aberto, onClick, title, className = "" }) {
+  const barra =
+    "absolute left-1/2 top-1/2 h-0.5 w-3.5 -translate-x-1/2 rounded-full bg-[#0f5f63] transition-all duration-300 dark:bg-cyan-200";
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title={title}
+      aria-expanded={aberto}
+      className={`flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg border border-[#d8eee9] bg-white shadow-sm transition-colors hover:bg-[#d8eee9] dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800 ${className}`}
+    >
+      <span className="relative block h-3.5 w-3.5">
+        <span
+          className={`${barra} ${aberto ? "translate-y-0 rotate-45" : "-translate-y-1 rotate-0"}`}
+        />
+        <span className={`${barra} ${aberto ? "opacity-0" : "opacity-100"}`} />
+        <span
+          className={`${barra} ${aberto ? "translate-y-0 -rotate-45" : "translate-y-1 rotate-0"}`}
+        />
+      </span>
+      <span className="sr-only">{title}</span>
+    </button>
+  );
+}
 
 export default function LayoutSidebar({
   isMobile,
@@ -13,11 +62,6 @@ export default function LayoutSidebar({
   sidebarWidth,
   setSidebarWidth,
   setSidebarOpen,
-  setSidebarVisible,
-  devControlesAtivos,
-  devModoModulos,
-  definirModoDevModulos,
-  getModoDevLabel,
   menuItems,
   submenusOpen,
   currentPath,
@@ -27,12 +71,48 @@ export default function LayoutSidebar({
   favoritePaths,
   handleToggleFavorite,
   moduloAtivo,
-  onToggleModuloDev,
+  user,
   logout,
 }) {
   const resizeRef = useRef(null);
   const [redimensionando, setRedimensionando] = useState(false);
+  const [menuUsuarioAberto, setMenuUsuarioAberto] = useState(false);
+  const userMenuRef = useRef(null);
   const novidadesNaoVistas = useNovidadesNaoVistas();
+  const { isDark, toggleTheme } = useTheme();
+
+  const nomeUsuario = user?.nome || user?.username || user?.email;
+  const identificadorUsuario = user?.username || user?.email;
+  const inicialUsuario = (
+    user?.nome?.[0] ||
+    user?.username?.[0] ||
+    user?.email?.[0] ||
+    ""
+  ).toUpperCase();
+  const { tenantLabel } = resolveLayoutSessionIdentity(user);
+
+  useEffect(() => {
+    if (!menuUsuarioAberto) return undefined;
+
+    const aoClicarFora = (evento) => {
+      if (!userMenuRef.current?.contains(evento.target)) setMenuUsuarioAberto(false);
+    };
+    const aoPressionarTecla = (evento) => {
+      if (evento.key === "Escape") setMenuUsuarioAberto(false);
+    };
+
+    document.addEventListener("mousedown", aoClicarFora);
+    document.addEventListener("keydown", aoPressionarTecla);
+    return () => {
+      document.removeEventListener("mousedown", aoClicarFora);
+      document.removeEventListener("keydown", aoPressionarTecla);
+    };
+  }, [menuUsuarioAberto]);
+
+  const fecharMenuUsuarioEClicar = () => {
+    setMenuUsuarioAberto(false);
+    handleMenuClick();
+  };
 
   useEffect(
     () => () => {
@@ -81,95 +161,64 @@ export default function LayoutSidebar({
           ? `erp-mobile-sidebar fixed inset-y-0 left-0 z-50 w-64 max-w-[calc(100vw-24px)] transform overflow-hidden transition-transform duration-300 ${
               sidebarOpen ? "translate-x-0" : "-translate-x-full"
             }`
-          : `${redimensionando ? "" : "transition-[width] duration-200"} relative`
+          : `${redimensionando ? "" : "transition-[width] duration-300 ease-in-out"} relative`
       } erp-sidebar shrink-0 bg-gradient-to-b from-[#f4fbfa] to-[#fff8ea] border-r border-[#d8eee9] flex flex-col shadow-lg dark:border-slate-800 dark:from-slate-950 dark:to-slate-900`}
       style={
         isMobile
           ? undefined
           : {
-              width: sidebarOpen ? `${sidebarWidth}px` : "5rem",
-              minWidth: sidebarOpen ? `${sidebarWidth}px` : "5rem",
+              // Só "width" aqui de propósito: "shrink-0" já impede o flex pai de espremer a
+              // sidebar, então um "minWidth" redundante (que não estava na lista de transição)
+              // pulava pro valor novo instantaneamente e travava a animação no meio do caminho.
+              width: sidebarOpen ? `${sidebarWidth}px` : LARGURA_RECOLHIDA,
             }
       }
     >
-      <div
-        className={`p-4 flex items-center border-b border-[#d8eee9] bg-white/70 dark:border-slate-800 dark:bg-slate-950/80 ${!isMobile && !sidebarOpen ? "justify-center" : "justify-between"}`}
-      >
-        <div className="flex items-center gap-3">
-          {!isMobile && (
-            <button
-              onClick={() => setSidebarOpen(!sidebarOpen)}
-              className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#0f5f63] to-[#0f8b8d] hover:from-[#0d4f52] hover:to-[#0d7375] flex items-center justify-center shadow-md transition-all cursor-pointer"
-              title={sidebarOpen ? "Recolher menu" : "Expandir menu"}
-            >
-              <FiMenu className="text-white w-6 h-6" />
-            </button>
-          )}
-          {(isMobile || sidebarOpen) && (
-            <div className="min-w-0">
-              <img
-                src={COREPET_LOGO}
-                alt="CorePet"
-                className="h-9 w-auto max-w-[148px] object-contain"
-              />
-              <p className="mt-1 text-xs text-gray-500 dark:text-slate-400">Central de Gestao</p>
-              {devControlesAtivos && sidebarOpen && (
-                <div className="mt-2 space-y-1.5">
-                  <p className="text-[10px] font-semibold uppercase tracking-wide text-[#0f8b8d] dark:text-cyan-300">
-                    DEV modulos: {getModoDevLabel()}
-                  </p>
-                  <div className="flex gap-1.5">
-                    <button
-                      onClick={() => definirModoDevModulos("normal")}
-                      className={`px-2 py-1 rounded text-[10px] border ${
-                        devModoModulos === "normal"
-                          ? "bg-[#d8eee9] border-[#b9ddd8] text-[#0f5f63] dark:border-cyan-400/40 dark:bg-cyan-500/15 dark:text-cyan-200"
-                          : "bg-white/70 border-gray-200 text-gray-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400"
-                      }`}
-                    >
-                      Normal
-                    </button>
-                    <button
-                      onClick={() => definirModoDevModulos("all_unlocked")}
-                      className={`px-2 py-1 rounded text-[10px] border ${
-                        devModoModulos === "all_unlocked"
-                          ? "bg-green-100 border-green-200 text-green-700 dark:border-green-400/40 dark:bg-green-500/15 dark:text-green-200"
-                          : "bg-white/70 border-gray-200 text-gray-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400"
-                      }`}
-                    >
-                      Liberar tudo
-                    </button>
-                    <button
-                      onClick={() => definirModoDevModulos("all_locked")}
-                      className={`px-2 py-1 rounded text-[10px] border ${
-                        devModoModulos === "all_locked"
-                          ? "bg-amber-100 border-amber-200 text-amber-700 dark:border-amber-400/40 dark:bg-amber-500/15 dark:text-amber-200"
-                          : "bg-white/70 border-gray-200 text-gray-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400"
-                      }`}
-                    >
-                      Bloquear premium
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-
-        {(isMobile || sidebarOpen) && (
+      {isMobile ? (
+        <div className="flex items-center justify-between gap-3 border-b border-[#d8eee9] bg-white/70 p-4 dark:border-slate-800 dark:bg-slate-950/80">
+          <img
+            src={COREPET_LOGO}
+            alt="CorePet"
+            className="h-9 w-auto max-w-[148px] object-contain"
+          />
           <button
-            onClick={() => (isMobile ? setSidebarOpen(false) : setSidebarVisible(false))}
-            className="p-2 hover:bg-[#d8eee9] rounded-lg transition-colors dark:hover:bg-slate-800"
-            title={isMobile ? "Fechar menu" : "Esconder menu completamente"}
+            type="button"
+            onClick={() => setSidebarOpen(false)}
+            className="rounded-lg p-2 transition-colors hover:bg-[#d8eee9] dark:hover:bg-slate-800"
+            title="Fechar menu"
+            aria-label="Fechar menu"
           >
-            {isMobile ? (
-              <FiX className="w-6 h-6 text-[#0f5f63] dark:text-cyan-200" />
-            ) : (
-              <FiX className="w-5 h-5 text-[#0f5f63] dark:text-cyan-200" />
-            )}
+            <FiX className="h-6 w-6 text-[#0f5f63] dark:text-cyan-200" />
           </button>
-        )}
-      </div>
+        </div>
+      ) : (
+        // Desktop: um único header persistente pros dois estados (nunca desmonta o botão nem a
+        // logo entre recolher/expandir) — antes eram dois blocos JSX diferentes, um por estado,
+        // então o React destruía e recriava o botão a cada clique. Um elemento novo não tem "de
+        // onde vir" pra CSS transition animar, então o morph hambúrguer↔X nunca chegava a
+        // rodar, só trocava de forma instantaneamente junto com o "tranco" da largura.
+        <div
+          className={`relative flex items-center border-b border-[#d8eee9] bg-white/70 transition-all duration-300 dark:border-slate-800 dark:bg-slate-950/80 ${
+            sidebarOpen ? "justify-between gap-3 p-4" : "justify-center py-4"
+          }`}
+        >
+          <img
+            src={sidebarOpen ? COREPET_LOGO : COREPET_ICON}
+            alt="CorePet"
+            className={`object-contain transition-all duration-300 ${
+              sidebarOpen ? "h-9 w-auto max-w-[148px]" : "h-7 w-7 rounded-lg"
+            }`}
+          />
+          <BotaoAlternarMenu
+            aberto={sidebarOpen}
+            onClick={() => setSidebarOpen(!sidebarOpen)}
+            title={sidebarOpen ? "Recolher menu" : "Expandir menu"}
+            className={
+              sidebarOpen ? "" : "absolute right-0 top-1/2 -translate-y-1/2 translate-x-1/2"
+            }
+          />
+        </div>
+      )}
 
       <SidebarMenu
         menuItems={menuItems}
@@ -181,56 +230,120 @@ export default function LayoutSidebar({
         onMenuClick={handleMenuClick}
         favoritePaths={favoritePaths}
         onToggleFavorite={handleToggleFavorite}
-        devControlesAtivos={devControlesAtivos}
         moduloAtivo={moduloAtivo}
-        onToggleModuloDev={onToggleModuloDev}
       />
 
-      <div className="border-t border-[#d8eee9] bg-white/40 dark:border-slate-800 dark:bg-slate-950/80">
-        <Link
-          to="/meu-plano"
-          onClick={handleMenuClick}
-          className="w-full flex items-center gap-3 px-4 py-2.5 mx-2 mt-2 rounded-lg text-emerald-700 hover:bg-emerald-50 transition-all dark:text-emerald-300 dark:hover:bg-emerald-500/10"
-          title={!sidebarOpen ? "Meu Plano" : ""}
-        >
-          <FiCreditCard className="text-lg flex-shrink-0" />
-          {sidebarOpen && <span className="font-medium text-sm">Meu Plano</span>}
-        </Link>
-        <Link
-          to="/novidades"
-          onClick={handleMenuClick}
-          className="relative mx-2 mt-1 flex w-full items-center gap-3 rounded-lg px-4 py-2.5 text-[#9a6b05] transition-all hover:bg-[#fff1c9] dark:text-amber-300 dark:hover:bg-amber-500/10"
-          title={!sidebarOpen ? "Novidades" : ""}
-        >
-          <FiBell className="flex-shrink-0 text-lg" />
-          {sidebarOpen && <span className="font-medium text-sm">Novidades</span>}
-          {novidadesNaoVistas > 0 ? (
-            <span
-              className={`${
-                sidebarOpen ? "ml-auto" : "absolute right-1 top-1"
-              } inline-flex min-w-5 items-center justify-center rounded-full bg-red-600 px-1.5 py-0.5 text-[10px] font-bold text-white`}
-              aria-label={`${novidadesNaoVistas} novidade(s) não vista(s)`}
+      <div
+        ref={userMenuRef}
+        className="relative border-t border-[#d8eee9] bg-white/40 dark:border-slate-800 dark:bg-slate-950/80"
+      >
+        {menuUsuarioAberto && (
+          <div
+            role="menu"
+            aria-label="Menu do usuário"
+            className="absolute bottom-full left-2 mb-2 w-64 overflow-hidden rounded-xl border border-[#d8eee9] bg-white py-1 shadow-lg dark:border-slate-800 dark:bg-slate-900"
+          >
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => {
+                toggleTheme();
+                setMenuUsuarioAberto(false);
+              }}
+              className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-gray-700 transition-all hover:bg-gray-50 dark:text-slate-300 dark:hover:bg-slate-800"
             >
-              {novidadesNaoVistas > 9 ? "9+" : novidadesNaoVistas}
-            </span>
-          ) : null}
-        </Link>
-        <Link
-          to="/ajuda"
-          onClick={handleMenuClick}
-          className="w-full flex items-center gap-3 px-4 py-2.5 mx-2 mt-1 rounded-lg text-[#0f5f63] hover:bg-[#d8eee9] transition-all dark:text-cyan-200 dark:hover:bg-slate-800"
-          title={!sidebarOpen ? "Ajuda & Planos" : ""}
-        >
-          <FiHelpCircle className="text-lg flex-shrink-0" />
-          {sidebarOpen && <span className="font-medium text-sm">Ajuda & Planos</span>}
-        </Link>
+              {isDark ? (
+                <FiSun className="flex-shrink-0 text-lg" />
+              ) : (
+                <FiMoon className="flex-shrink-0 text-lg" />
+              )}
+              <span className="v2-menu-item font-medium">
+                {isDark ? "Usar tela clara" : "Usar tela escura"}
+              </span>
+            </button>
+            <Link
+              to="/meu-plano"
+              role="menuitem"
+              onClick={fecharMenuUsuarioEClicar}
+              className="flex w-full items-center gap-3 px-4 py-2.5 text-emerald-700 transition-all hover:bg-emerald-50 dark:text-emerald-300 dark:hover:bg-emerald-500/10"
+            >
+              <FiCreditCard className="flex-shrink-0 text-lg" />
+              <span className="v2-menu-item font-medium">Meu Plano</span>
+            </Link>
+            <Link
+              to="/novidades"
+              role="menuitem"
+              onClick={fecharMenuUsuarioEClicar}
+              className="flex w-full items-center gap-3 px-4 py-2.5 text-[#9a6b05] transition-all hover:bg-[#fff1c9] dark:text-amber-300 dark:hover:bg-amber-500/10"
+            >
+              <FiBell className="flex-shrink-0 text-lg" />
+              <span className="v2-menu-item font-medium">Novidades</span>
+              {novidadesNaoVistas > 0 ? (
+                <span
+                  className="ml-auto inline-flex min-w-5 items-center justify-center rounded-full bg-red-600 px-1.5 py-0.5 text-[10px] font-bold text-white"
+                  aria-label={`${novidadesNaoVistas} novidade(s) não vista(s)`}
+                >
+                  {novidadesNaoVistas > 9 ? "9+" : novidadesNaoVistas}
+                </span>
+              ) : null}
+            </Link>
+            <Link
+              to="/ajuda"
+              role="menuitem"
+              onClick={fecharMenuUsuarioEClicar}
+              className="flex w-full items-center gap-3 px-4 py-2.5 text-[#0f5f63] transition-all hover:bg-[#d8eee9] dark:text-cyan-200 dark:hover:bg-slate-800"
+            >
+              <FiHelpCircle className="flex-shrink-0 text-lg" />
+              <span className="v2-menu-item font-medium">Ajuda & Planos</span>
+            </Link>
+            <div className="my-1 border-t border-[#d8eee9] dark:border-slate-800" />
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => {
+                setMenuUsuarioAberto(false);
+                logout();
+              }}
+              className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-gray-700 transition-all hover:bg-red-50 hover:text-red-600 dark:text-slate-300 dark:hover:bg-red-500/10 dark:hover:text-red-200"
+            >
+              <FiLogOut className="flex-shrink-0 text-lg" />
+              <span className="v2-menu-item font-medium">Sair</span>
+            </button>
+          </div>
+        )}
+
         <button
-          onClick={logout}
-          className="w-full flex items-center gap-3 px-4 py-3 mx-2 my-2 rounded-lg text-gray-700 hover:bg-red-50 hover:text-red-600 transition-all text-left dark:text-slate-300 dark:hover:bg-red-500/10 dark:hover:text-red-200"
-          title={!sidebarOpen ? "Sair" : ""}
+          type="button"
+          onClick={() => setMenuUsuarioAberto((aberto) => !aberto)}
+          aria-haspopup="menu"
+          aria-expanded={menuUsuarioAberto}
+          className="flex w-full items-center gap-2.5 px-3 py-3 text-left transition-all hover:bg-white/70 dark:hover:bg-slate-900/60"
+          title={!sidebarOpen ? `${nomeUsuario} · Loja: ${tenantLabel}` : ""}
         >
-          <FiLogOut className="text-lg" />
-          {sidebarOpen && <span className="font-medium text-sm">Sair</span>}
+          <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-[#0f5f63] text-sm font-bold text-white">
+            {inicialUsuario}
+          </span>
+          {sidebarOpen && (
+            <>
+              <span className="min-w-0 flex-1">
+                <span
+                  className="v2-texto-ajuda block truncate font-semibold text-[#0f5f63] dark:text-cyan-200"
+                  title={`Loja ativa: ${tenantLabel}`}
+                >
+                  {tenantLabel}
+                </span>
+                <span className="block truncate text-sm font-medium text-gray-900 dark:text-slate-100">
+                  {nomeUsuario}
+                </span>
+                <span className="v2-texto-ajuda block truncate">{identificadorUsuario}</span>
+              </span>
+              {menuUsuarioAberto ? (
+                <FiChevronUp className="flex-shrink-0 text-gray-400 dark:text-slate-500" />
+              ) : (
+                <FiChevronDown className="flex-shrink-0 text-gray-400 dark:text-slate-500" />
+              )}
+            </>
+          )}
         </button>
       </div>
 

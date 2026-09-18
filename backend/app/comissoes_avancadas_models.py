@@ -76,8 +76,9 @@ class FecharComissaoComPagamento(BaseModel):
 # ======================== MODELS DE RESPONSE ========================
 
 
-class ComissaoItem(BaseModel):
-    """Item individual de comissão"""
+class ComissaoItemSchema(BaseModel):
+    """Item individual de comissão (schema de resposta da API — não confundir com o
+    modelo ORM ComissaoItem de comissoes_models.py, que mapeia a tabela comissoes_itens)"""
 
     id: int
     venda_id: int
@@ -133,7 +134,7 @@ class ConferenciaComFiltrosResponse(BaseModel):
     funcionario: Dict[str, Any]
     periodo_selecionado: PeriodoSelecionado
     resumo: ResumoComFiltros
-    comissoes: List[ComissaoItem]
+    comissoes: List[ComissaoItemSchema]
 
     class Config:
         json_schema_extra = {
@@ -214,8 +215,9 @@ class FecharComPagamentoResponse(BaseModel):
         }
 
 
-class FormaPagamento(BaseModel):
-    """Opção de forma de pagamento"""
+class FormaPagamentoSchema(BaseModel):
+    """Opção de forma de pagamento (schema de resposta da API — não confundir com o
+    modelo ORM FormaPagamento de financeiro/models_catalogos.py)"""
 
     id: int
     nome: str
@@ -227,4 +229,4 @@ class ListaFormasPagamento(BaseModel):
     """Lista de formas de pagamento disponíveis"""
 
     success: bool
-    formas: List[FormaPagamento]
+    formas: List[FormaPagamentoSchema]

@@ -8,7 +8,7 @@ const read = (path) => readFileSync(join(root, path), "utf8");
 const readRepo = (path) => readFileSync(join(root, "..", path), "utf8");
 
 const indexHtml = read("index.html");
-const login = read("src/pages/Login.jsx");
+const login = read("src/pages/v2/Login.jsx");
 const layout = read("src/components/Layout.jsx");
 const layoutSidebar = read("src/components/layout/LayoutSidebar.jsx");
 const legalPage = read("src/pages/LegalPage.jsx");

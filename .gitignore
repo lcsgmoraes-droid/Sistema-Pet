@@ -93,7 +93,8 @@ runtime/
 
 # IDEs
 .idea/
-.claude/
+.claude/*
+!.claude/skills/
 .gemini/
 *.iml
 *.iws

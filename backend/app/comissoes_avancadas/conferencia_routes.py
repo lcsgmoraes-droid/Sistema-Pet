@@ -9,7 +9,7 @@ from sqlalchemy import bindparam, text
 from app.auth.dependencies import get_current_user_and_tenant
 from app.comissoes_avancadas.common import logger, struct_logger
 from app.comissoes_avancadas_models import (
-    ComissaoItem,
+    ComissaoItemSchema,
     ConferenciaComFiltrosResponse,
     PeriodoSelecionado,
     ResumoComFiltros,
@@ -213,7 +213,7 @@ def conferencia_com_filtros_avancados(
                     else valor_comissao - valor_pago
                 )
 
-                comissao_dict = ComissaoItem(
+                comissao_dict = ComissaoItemSchema(
                     id=row.id,
                     venda_id=row.venda_id,
                     data_venda=row.data_venda.isoformat() if row.data_venda else None,
