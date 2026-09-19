@@ -241,9 +241,7 @@ class AniversarioContato(BaseTenantModel):
     cliente_id = Column(
         Integer, ForeignKey("clientes.id", ondelete="CASCADE"), nullable=False
     )
-    pet_id = Column(
-        Integer, ForeignKey("pets.id", ondelete="SET NULL"), nullable=True
-    )
+    pet_id = Column(Integer, ForeignKey("pets.id", ondelete="SET NULL"), nullable=True)
     aniversario_em = Column(Date, nullable=False)
     usuario_id = Column(
         Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
