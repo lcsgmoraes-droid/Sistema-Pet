@@ -6,10 +6,12 @@ from datetime import datetime, timezone
 from uuid import UUID
 
 from fastapi import HTTPException, status
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from app.models import Tenant, UserSession
 from app.services.plan_catalog import PLAN_CATALOG, get_plan
+from app.session_manager import SESSION_SCOPE_ECOMMERCE
 from app.utils.timezone import now_brasilia
 from app.vendas_models import Venda
 
@@ -58,7 +60,7 @@ def enforce_monthly_sales_limit(
     tenant = (
         db.query(Tenant).filter(Tenant.id == str(tenant_id)).with_for_update().first()
     )
-    if tenant is None or _trial_is_active(tenant):
+    if tenant is None or _trial_is_active(tenant, now):
         return
 
     raw_plan = str(getattr(tenant, "plan", "") or "").strip().lower()
@@ -112,6 +114,10 @@ def active_session_usage(db: Session, tenant_id: str | UUID) -> int:
         db.query(UserSession)
         .filter(
             UserSession.tenant_id == session_tenant_id,
+            or_(
+                UserSession.session_scope.is_(None),
+                UserSession.session_scope != SESSION_SCOPE_ECOMMERCE,
+            ),
             UserSession.revoked.is_(False),
             UserSession.expires_at > datetime.now(timezone.utc),
         )
@@ -146,6 +152,10 @@ def enforce_simultaneous_session_limit(
         .filter(
             UserSession.tenant_id == session_tenant_id,
             UserSession.token_jti != current_session.token_jti,
+            or_(
+                UserSession.session_scope.is_(None),
+                UserSession.session_scope != SESSION_SCOPE_ECOMMERCE,
+            ),
             UserSession.revoked.is_(False),
             UserSession.expires_at > now,
         )

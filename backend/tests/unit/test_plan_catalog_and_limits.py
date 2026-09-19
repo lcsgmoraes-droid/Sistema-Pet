@@ -1,12 +1,16 @@
 from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 from unittest.mock import MagicMock
+from uuid import uuid4
 
 import pytest
 from fastapi import HTTPException
+from sqlalchemy import Boolean, Column, DateTime, Integer, String, create_engine
+from sqlalchemy.orm import declarative_base, sessionmaker
 
 from app.routes.modulos_routes import _resolver_modulos_ativos
 from app.security.module_access import _load_active_entitlements
+from app.services import plan_limits
 from app.services.plan_catalog import (
     ALL_PUBLIC_ENTITLEMENTS,
     PLAN_CATALOG,
@@ -17,6 +21,7 @@ from app.services.plan_limits import (
     enforce_monthly_sales_limit,
     enforce_simultaneous_session_limit,
 )
+from app.session_manager import SESSION_SCOPE_ECOMMERCE, SESSION_SCOPE_ERP
 
 
 def _tenant(plan: str, **overrides):
@@ -125,7 +130,7 @@ def test_trial_does_not_apply_the_selected_plan_limit():
     db = MagicMock()
     db.query.return_value = tenant_query
 
-    enforce_monthly_sales_limit(db, "tenant-1")
+    enforce_monthly_sales_limit(db, "tenant-1", now)
 
     assert db.query.call_count == 1
 
@@ -194,3 +199,71 @@ def test_new_start_login_revokes_previous_tenant_sessions():
         session.revoke_reason == "plan_simultaneous_session_limit"
         for session in old_sessions
     )
+
+
+def test_erp_login_does_not_revoke_or_count_ecommerce_session(
+    monkeypatch, tenant_context
+):
+    base = declarative_base()
+
+    class SessionRow(base):
+        __tablename__ = "test_user_sessions"
+
+        id = Column(Integer, primary_key=True)
+        user_id = Column(Integer, nullable=False)
+        tenant_id = Column(String(36), nullable=False)
+        token_jti = Column(String(36), nullable=False, unique=True)
+        session_scope = Column(String(32), nullable=False)
+        created_at = Column(DateTime(timezone=True), nullable=False)
+        last_activity_at = Column(DateTime(timezone=True), nullable=False)
+        expires_at = Column(DateTime(timezone=True), nullable=False)
+        revoked = Column(Boolean, nullable=False, default=False)
+        revoked_at = Column(DateTime(timezone=True), nullable=True)
+        revoke_reason = Column(String(255), nullable=True)
+
+    engine = create_engine("sqlite:///:memory:")
+    base.metadata.create_all(engine)
+    db_session = sessionmaker(bind=engine)()
+    monkeypatch.setattr(plan_limits, "UserSession", SessionRow)
+    tenant_context(uuid4())
+
+    now = datetime.now(timezone.utc)
+    tenant_id = "tenant-session-scope"
+    ecommerce_session = SessionRow(
+        user_id=901,
+        tenant_id=tenant_id,
+        token_jti="ecommerce-session",
+        session_scope=SESSION_SCOPE_ECOMMERCE,
+        created_at=now - timedelta(hours=2),
+        last_activity_at=now - timedelta(hours=2),
+        expires_at=now + timedelta(days=30),
+        revoked=False,
+    )
+    erp_session = SessionRow(
+        user_id=902,
+        tenant_id=tenant_id,
+        token_jti="erp-session",
+        session_scope=SESSION_SCOPE_ERP,
+        created_at=now - timedelta(hours=1),
+        last_activity_at=now - timedelta(hours=1),
+        expires_at=now + timedelta(days=7),
+        revoked=False,
+    )
+    db_session.add_all([ecommerce_session, erp_session])
+    db_session.flush()
+
+    assert plan_limits.active_session_usage(db_session, tenant_id) == 1
+
+    revoked = plan_limits.enforce_simultaneous_session_limit(
+        db=db_session,
+        tenant=_tenant("pet-start", id=tenant_id),
+        current_session=SimpleNamespace(token_jti="new-erp-session"),
+        now_utc=now,
+    )
+
+    assert revoked == 1
+    assert ecommerce_session.revoked is False
+    assert erp_session.revoked is True
+    assert erp_session.revoke_reason == "plan_simultaneous_session_limit"
+    db_session.close()
+    engine.dispose()
