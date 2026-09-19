@@ -5,6 +5,7 @@ import test from "node:test";
 const read = (name) => readFileSync(new URL(`./${name}`, import.meta.url), "utf8");
 
 const cardSource = read("LembreteCard.jsx");
+const birthdaySource = read("LembretesAniversariantes.jsx");
 const listSource = read("LembretesList.jsx");
 const pageSource = read("LembretesPage.jsx");
 const inactiveSource = read("LembretesClientesInativos.jsx");
@@ -56,6 +57,15 @@ test("relacionamento lista clientes inativos com ações manuais de mensagem", (
   assert.match(inactiveSource, /WhatsApp/);
   assert.match(inactiveSource, /Copiar/);
   assert.match(inactiveSource, /Nenhuma mensagem é\s+enviada automaticamente/);
+});
+
+test("relacionamento oferece aniversários de tutor e pet com mensagem, push e WhatsApp", () => {
+  assert.match(pageSource, /LembretesAniversariantes/);
+  assert.match(birthdaySource, /Aniversariantes — tutor e pet/);
+  assert.match(birthdaySource, /> Criar mensagem/);
+  assert.match(birthdaySource, /Enviar novamente uma notificação no app/);
+  assert.match(modalSource, /Abrir WhatsApp/);
+  assert.match(modalSource, /reminder\.historico_titulo/);
 });
 
 test("folha da página continua sem estilos legados de cartão", () => {
