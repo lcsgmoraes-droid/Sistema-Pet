@@ -18,6 +18,7 @@ from app.routes.ecommerce_auth_common import (
     _refresh_ecommerce_session,
 )
 from app.security.jwt_compat import jwt
+from app.session_manager import SESSION_SCOPE_ECOMMERCE
 
 
 def test_ecommerce_token_pair_separa_acesso_e_renovacao():
@@ -43,6 +44,37 @@ def test_ecommerce_token_pair_separa_acesso_e_renovacao():
     assert access_payload["jti"] == refresh_payload["jti"] == token_jti
     assert access_payload["tenant_id"] == refresh_payload["tenant_id"] == tenant_id
     assert access_payload["exp"] < refresh_payload["exp"]
+
+
+def test_nova_sessao_ecommerce_e_criada_fora_do_limite_do_erp(monkeypatch):
+    tenant_id = str(uuid4())
+    token_jti = str(uuid4())
+    session_expiry = datetime.now(timezone.utc) + timedelta(days=30)
+    user = SimpleNamespace(id=42, email="cliente@corepet.com.br")
+    captured = {}
+
+    def create_session_stub(**kwargs):
+        captured.update(kwargs)
+        return SimpleNamespace(token_jti=token_jti, expires_at=session_expiry)
+
+    monkeypatch.setattr(ecommerce_auth_common, "create_session", create_session_stub)
+    monkeypatch.setattr(
+        ecommerce_auth_common, "get_request_ip", lambda _request: "127.0.0.1"
+    )
+
+    response = ecommerce_auth_common._create_ecommerce_session_tokens(
+        db=object(),
+        user=user,
+        tenant_id=tenant_id,
+        request=SimpleNamespace(
+            headers={"X-Client-Channel": "app", "user-agent": "CorePet App"}
+        ),
+    )
+
+    assert captured["session_scope"] == SESSION_SCOPE_ECOMMERCE
+    assert captured["expires_in_days"] == MOBILE_SESSION_EXPIRE_DAYS
+    assert response["access_token"]
+    assert response["refresh_token"]
 
 
 def test_access_token_nao_pode_ser_usado_para_renovar_sessao():
@@ -73,6 +105,7 @@ def test_refresh_valido_renova_acesso_da_mesma_sessao_e_loja(monkeypatch):
         tenant_id=tenant_id,
         token_jti=token_jti,
         expires_at=session_expiry,
+        session_scope="erp",
     )
 
     class QueryStub:
@@ -86,6 +119,9 @@ def test_refresh_valido_renova_acesso_da_mesma_sessao_e_loja(monkeypatch):
             return self.result
 
     class DbStub:
+        def __init__(self):
+            self.commits = 0
+
         def query(self, model):
             return QueryStub(
                 {
@@ -94,6 +130,11 @@ def test_refresh_valido_renova_acesso_da_mesma_sessao_e_loja(monkeypatch):
                     Tenant: tenant,
                 }[model]
             )
+
+        def commit(self):
+            self.commits += 1
+
+    db = DbStub()
 
     _, refresh_token = _create_ecommerce_token_pair(
         user,
@@ -117,7 +158,7 @@ def test_refresh_valido_renova_acesso_da_mesma_sessao_e_loja(monkeypatch):
         lambda _db, _jti: db_session,
     )
 
-    response = _refresh_ecommerce_session(refresh_token, DbStub())
+    response = _refresh_ecommerce_session(refresh_token, db)
     renewed_access = jwt.decode(
         response["access_token"], JWT_SECRET_KEY, algorithms=[ALGORITHM]
     )
@@ -127,6 +168,8 @@ def test_refresh_valido_renova_acesso_da_mesma_sessao_e_loja(monkeypatch):
     assert renewed_access["jti"] == token_jti
     assert renewed_access["tenant_id"] == str(tenant_id)
     assert response["refresh_token"]
+    assert db_session.session_scope == SESSION_SCOPE_ECOMMERCE
+    assert db.commits == 1
 
 
 def test_selecao_de_perfil_preserva_sessao_e_refresh_token(monkeypatch):
