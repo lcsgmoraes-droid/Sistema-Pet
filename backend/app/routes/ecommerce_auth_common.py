@@ -19,7 +19,12 @@ from app.db import get_session
 from app.models import Role, Tenant, User, UserTenant
 from app.services.app_access_profile_service import normalize_profile_type
 from app.services.auth_security import get_request_ip
-from app.session_manager import create_session, get_session_by_jti, validate_session
+from app.session_manager import (
+    SESSION_SCOPE_ECOMMERCE,
+    create_session,
+    get_session_by_jti,
+    validate_session,
+)
 from app.tenancy.context import set_current_tenant
 from app.tenancy.rls import sync_rls_auth_user
 
@@ -106,6 +111,7 @@ def _create_ecommerce_session_tokens(
         ip_address=get_request_ip(request),
         user_agent=request.headers.get("user-agent"),
         expires_in_days=_session_lifetime_days(request),
+        session_scope=SESSION_SCOPE_ECOMMERCE,
     )
     access_token, refresh_token = _create_ecommerce_token_pair(
         user,
@@ -120,7 +126,15 @@ def _create_ecommerce_session_tokens(
 def _extend_mobile_session(
     db: Session, db_session, request: Request | None
 ) -> datetime:
+    scope_changed = (
+        getattr(db_session, "session_scope", None) != SESSION_SCOPE_ECOMMERCE
+    )
+    if scope_changed:
+        db_session.session_scope = SESSION_SCOPE_ECOMMERCE
+
     if not _is_app_client(request):
+        if scope_changed:
+            db.commit()
         return _session_expiry_utc(db_session)
 
     now = datetime.now(timezone.utc)
@@ -353,6 +367,9 @@ def _get_current_ecommerce_user(
             or str(db_session.tenant_id or "") != str(tenant_id)
         ):
             raise credentials_exception
+        if getattr(db_session, "session_scope", None) != SESSION_SCOPE_ECOMMERCE:
+            db_session.session_scope = SESSION_SCOPE_ECOMMERCE
+            db.commit()
 
     user = (
         db.query(User).filter(User.id == user_id, User.tenant_id == tenant_id).first()

@@ -11,6 +11,18 @@ import uuid
 import json
 
 
+SESSION_SCOPE_ERP = "erp"
+SESSION_SCOPE_ECOMMERCE = "ecommerce"
+_VALID_SESSION_SCOPES = {SESSION_SCOPE_ERP, SESSION_SCOPE_ECOMMERCE}
+
+
+def normalize_session_scope(value: str | None) -> str:
+    normalized = str(value or "").strip().lower()
+    if normalized in _VALID_SESSION_SCOPES:
+        return normalized
+    return SESSION_SCOPE_ERP
+
+
 def create_session(
     db: DBSession,
     user_id: int,
@@ -19,6 +31,7 @@ def create_session(
     device_info: Optional[Dict[str, Any]] = None,
     expires_in_days: int = 30,
     tenant_id: Optional[str] = None,
+    session_scope: str = SESSION_SCOPE_ERP,
 ) -> UserSession:
     """
     Cria uma nova sessão para o usuário.
@@ -41,6 +54,7 @@ def create_session(
         user_id=user_id,
         tenant_id=tenant_id,
         token_jti=token_jti,
+        session_scope=normalize_session_scope(session_scope),
         ip_address=ip_address,
         user_agent=user_agent,
         device_info=json.dumps(device_info) if device_info else None,
