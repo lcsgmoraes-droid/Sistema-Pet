@@ -70,6 +70,7 @@ from .relatorios_validade_routes import relatorio_validade_proxima
 from .relatorios_valorizacao_routes import router as valorizacao_router
 from .relatorios_valorizacao_routes import relatorio_valorizacao_estoque
 from .relatorios_limites_routes import router as limites_router
+from .relatorios_analise_routes import router as analise_router
 
 router = APIRouter()
 PRODUTO_SKU_COLUMN = getattr(Produto, "sku", None)
@@ -492,3 +493,4 @@ def relatorio_vendas_produto(
 router.include_router(validade_router)
 router.include_router(valorizacao_router)
 router.include_router(limites_router)
+router.include_router(analise_router)

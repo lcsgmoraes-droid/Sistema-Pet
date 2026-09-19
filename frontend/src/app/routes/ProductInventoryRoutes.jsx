@@ -1,6 +1,7 @@
 import { Navigate, Route } from "react-router-dom";
 import ProtectedRoute from "../../components/ProtectedRoute";
 import {
+  AnaliseProdutos,
   AlertasEstoque,
   CalculadoraRacao,
   EstoqueFullNF,
@@ -46,6 +47,14 @@ export function createProductInventoryRoutes() {
         element={
           <ProtectedRoute permission="produtos.visualizar">
             <MovimentacoesProduto />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="produtos/analise"
+        element={
+          <ProtectedRoute permission="produtos.visualizar">
+            <AnaliseProdutos />
           </ProtectedRoute>
         }
       />

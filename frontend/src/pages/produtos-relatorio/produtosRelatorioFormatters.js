@@ -6,6 +6,10 @@ export const formatarQuantidade = (valor) =>
 
 export const formatarData = (valor) => {
   if (!valor) return "-";
+  if (/^\d{4}-\d{2}-\d{2}$/.test(valor)) {
+    const [ano, mes, dia] = valor.split("-");
+    return `${dia}/${mes}/${ano}`;
+  }
   return new Date(valor).toLocaleDateString("pt-BR");
 };
 
@@ -14,11 +18,16 @@ export const formatarDataHora = (valor) => {
   return new Date(valor).toLocaleString("pt-BR");
 };
 
-export const formatarDiaCurto = (valor) =>
-  new Date(valor).toLocaleDateString("pt-BR", {
+export const formatarDiaCurto = (valor) => {
+  if (/^\d{4}-\d{2}-\d{2}$/.test(valor || "")) {
+    const [, mes, dia] = valor.split("-");
+    return `${dia}/${mes}`;
+  }
+  return new Date(valor).toLocaleDateString("pt-BR", {
     day: "2-digit",
     month: "2-digit",
   });
+};
 
 export function hojeIso() {
   return new Date().toISOString().split("T")[0];
