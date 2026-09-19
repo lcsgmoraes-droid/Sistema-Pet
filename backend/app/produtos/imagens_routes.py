@@ -23,8 +23,8 @@ from app.services.product_image_storage import (
     prepare_product_image_variants,
     save_product_image_variants,
 )
-from app.empresa_grupo_estoque_compartilhado_service import (
-    EmpresaGrupoEstoqueCompartilhadoService,
+from app.grupo_comercial_estoque_compartilhado_service import (
+    GrupoComercialEstoqueCompartilhadoService,
 )
 from app.tenancy.context import set_current_tenant
 
@@ -56,7 +56,7 @@ async def upload_imagem_produto(
     try:
         current_user, tenant_solicitante_id = user_and_tenant
         acesso_catalogo = (
-            EmpresaGrupoEstoqueCompartilhadoService.resolver_produto_catalogo(
+            GrupoComercialEstoqueCompartilhadoService.resolver_produto_catalogo(
                 db, tenant_solicitante_id, produto_id
             )
         )
@@ -193,7 +193,7 @@ def listar_imagens_produto(
     current_user, tenant_solicitante_id = _validar_tenant_e_obter_usuario(
         user_and_tenant
     )
-    acesso_catalogo = EmpresaGrupoEstoqueCompartilhadoService.resolver_produto_catalogo(
+    acesso_catalogo = GrupoComercialEstoqueCompartilhadoService.resolver_produto_catalogo(
         db, tenant_solicitante_id, produto_id
     )
     tenant_id = UUID(str(acesso_catalogo.tenant_origem_id))
@@ -235,7 +235,7 @@ def atualizar_imagem(
     """
     user, tenant_solicitante_id = user_and_tenant
     tenant_id = UUID(
-        EmpresaGrupoEstoqueCompartilhadoService.resolver_tenant_imagem_catalogo(
+        GrupoComercialEstoqueCompartilhadoService.resolver_tenant_imagem_catalogo(
             db, tenant_solicitante_id, imagem_id
         )
     )
@@ -314,7 +314,7 @@ def deletar_imagem(
     """
     current_user, tenant_solicitante_id = user_and_tenant
     tenant_id = UUID(
-        EmpresaGrupoEstoqueCompartilhadoService.resolver_tenant_imagem_catalogo(
+        GrupoComercialEstoqueCompartilhadoService.resolver_tenant_imagem_catalogo(
             db, tenant_solicitante_id, imagem_id
         )
     )

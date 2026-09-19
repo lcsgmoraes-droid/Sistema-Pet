@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 
 from .auth.dependencies import get_current_user_and_tenant
 from .db import get_session
-from .empresa_grupo_models import EmpresaGrupoTransferencia
+from .grupo_comercial_models import GrupoComercialTransferencia
 from .estoque.transferencia_parceiro_devolucao_service import buscar_resumos_devolucao
 from .estoque.transferencia_parceiro_documents import (
     _gerar_pdf_transferencia_parceiro_bytes,
@@ -148,10 +148,10 @@ def listar_transferencias_para_parceiro(
         ordem_desc=True,
     )
     transferencias_integradas = (
-        db.query(EmpresaGrupoTransferencia)
+        db.query(GrupoComercialTransferencia)
         .filter(
-            EmpresaGrupoTransferencia.empresa_origem_id == str(tenant_id),
-            EmpresaGrupoTransferencia.conta_receber_origem_id.in_(
+            GrupoComercialTransferencia.empresa_origem_id == str(tenant_id),
+            GrupoComercialTransferencia.conta_receber_origem_id.in_(
                 [conta.id for conta in contas]
             ),
         )

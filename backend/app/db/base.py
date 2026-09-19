@@ -22,6 +22,24 @@ from app.fiscal_models import (  # noqa
 # direto para registrar a tabela no metadata do Alembic.
 from app.variacao_config_fiscal_models import VariacaoConfigFiscal  # noqa
 
+# Espécie/Raça mestre (camada geral do grupo comercial, Checkpoint 1) —
+# módulo próprio, não reexportado por app.models.
+from app.especie_raca_mestre_models import EspecieMestre, RacaMestre  # noqa
+
+# Produto mestre + categoria/marca/departamento mestre (Checkpoint 2)
+from app.produto_mestre_models import (  # noqa
+    CategoriaMestre,
+    DepartamentoMestre,
+    MarcaMestre,
+    ProdutoMestre,
+)
+
+# Pet mestre (Checkpoint 3)
+from app.pet_mestre_models import PetMestre  # noqa
+
+# Pessoa mestre (Checkpoint 4)
+from app.pessoa_mestre_models import PessoaMestre  # noqa
+
 # Importando produtos
 from app.produtos_models import Produto, Marca, Categoria  # noqa
 from app.produto_identity_models import ProdutoSkuAlias, ProdutoFusaoLog  # noqa

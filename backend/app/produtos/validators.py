@@ -11,8 +11,8 @@ from sqlalchemy.orm import Session
 
 from app.produtos.core import _normalizar_sku_produto
 from app.produtos_models import Categoria, Marca, Produto
-from app.empresa_grupo_estoque_compartilhado_service import (
-    EmpresaGrupoEstoqueCompartilhadoService,
+from app.grupo_comercial_estoque_compartilhado_service import (
+    GrupoComercialEstoqueCompartilhadoService,
 )
 from app.tenancy.context import set_current_tenant
 
@@ -27,7 +27,7 @@ def _resolver_tenant_produto_catalogo(
     db: Session, tenant_solicitante_id, produto_id: int
 ):
     """Valida o acesso ao catalogo e entra no tenant que possui o produto."""
-    acesso_catalogo = EmpresaGrupoEstoqueCompartilhadoService.resolver_produto_catalogo(
+    acesso_catalogo = GrupoComercialEstoqueCompartilhadoService.resolver_produto_catalogo(
         db, tenant_solicitante_id, produto_id
     )
     tenant_origem_id = UUID(str(acesso_catalogo.tenant_origem_id))

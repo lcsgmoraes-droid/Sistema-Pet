@@ -98,6 +98,14 @@ class Cliente(BaseTenantModel):
     codigo = Column(
         String(20), nullable=True, index=True
     )  # Código único do cliente por tenant (ex: 9923)
+    # Vínculo opcional com a pessoa-mestre do grupo comercial (ver
+    # app/pessoa_mestre_models.py). Sem vínculo, cadastro 100% local igual
+    # hoje. Histórico de compra, segmentação, DRE e consentimento continuam
+    # sempre locais, com ou sem vínculo — só identidade é compartilhada, e
+    # só por confirmação explícita (nunca fusão automática por CPF/CNPJ).
+    pessoa_mestre_id = Column(
+        Integer, ForeignKey("pessoa_mestre.id", ondelete="SET NULL"), nullable=True
+    )
 
     # Tipo de cadastro e pessoa
     # Sem default global: importacoes e registros antigos nao comprovam origem.
@@ -283,6 +291,13 @@ class Especie(BaseTenantModel):
         String(100), nullable=False, index=True
     )  # Cão, Gato, Ave, Réptil, etc
     ativo = Column(Boolean, default=True)
+    # Vínculo opcional com a espécie-mestre do grupo comercial do tenant — ver
+    # app/especie_raca_mestre_models.py. Sem vínculo, funciona exatamente como
+    # hoje; com vínculo, a UI pode oferecer os dados do mestre em vez de pedir
+    # recadastro numa loja adicional do mesmo grupo.
+    especie_mestre_id = Column(
+        Integer, ForeignKey("especie_mestre.id", ondelete="SET NULL"), nullable=True
+    )
 
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(
@@ -307,6 +322,11 @@ class Raca(BaseTenantModel):
     )  # compatibilidade com schema legado
     especie_id = Column(Integer, ForeignKey("especies.id"), nullable=False, index=True)
     ativo = Column(Boolean, default=True)
+    # Vínculo opcional com a raça-mestre do grupo comercial do tenant — mesmo
+    # padrão da espécie acima.
+    raca_mestre_id = Column(
+        Integer, ForeignKey("raca_mestre.id", ondelete="SET NULL"), nullable=True
+    )
 
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(
@@ -362,6 +382,13 @@ class Pet(BaseTenantModel):
     observacoes = Column(Text, nullable=True)
     foto_url = Column(String(500), nullable=True)  # URL da foto do pet
     ativo = Column(Boolean, default=True)
+    # Vínculo opcional com o pet-mestre do grupo comercial do tutor (ver
+    # app/pet_mestre_models.py) — sem vínculo, cadastro 100% local igual
+    # hoje. Prontuário/consulta/vacina continuam sempre por loja, com ou
+    # sem vínculo.
+    pet_mestre_id = Column(
+        Integer, ForeignKey("pet_mestre.id", ondelete="SET NULL"), nullable=True
+    )
 
     # Timestamps
     created_at = Column(DateTime(timezone=True), server_default=func.now())

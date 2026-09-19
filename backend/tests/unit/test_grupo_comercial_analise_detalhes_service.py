@@ -13,19 +13,19 @@ from app import (  # noqa: F401
     ecommerceai_integration_models,
 )
 from app.db import Base
-from app.empresa_grupo_analise_detalhes_service import (
-    EmpresaGrupoAnaliseDetalhesService,
+from app.grupo_comercial_analise_detalhes_service import (
+    GrupoComercialAnaliseDetalhesService,
 )
-from app.empresa_grupo_models import (
-    EmpresaGrupo,
-    EmpresaGrupoMembro,
-    EmpresaGrupoProdutoVinculo,
+from app.grupo_comercial_models import (
+    GrupoComercial,
+    GrupoComercialMembro,
+    GrupoComercialProdutoVinculo,
 )
-from app.empresa_grupo_planejamento_service import (
-    EmpresaGrupoPlanejamentoService,
+from app.grupo_comercial_planejamento_service import (
+    GrupoComercialPlanejamentoService,
 )
-from app.empresa_grupo_produto_vinculo_service import (
-    EmpresaGrupoProdutoVinculoService,
+from app.grupo_comercial_produto_vinculo_service import (
+    GrupoComercialProdutoVinculoService,
 )
 from app.financeiro_models import ContaPagar, ContaReceber
 from app.models import Tenant
@@ -44,7 +44,7 @@ AGORA = datetime(2026, 8, 22, 12, 0)
 def db_local(monkeypatch):
     clear_current_tenant()
     monkeypatch.setattr(
-        "app.empresa_grupo_produto_vinculo_service.log_business_event",
+        "app.grupo_comercial_produto_vinculo_service.log_business_event",
         lambda **_kwargs: None,
     )
     engine = create_engine(
@@ -56,9 +56,9 @@ def db_local(monkeypatch):
         engine,
         tables=[
             Tenant.__table__,
-            EmpresaGrupo.__table__,
-            EmpresaGrupoMembro.__table__,
-            EmpresaGrupoProdutoVinculo.__table__,
+            GrupoComercial.__table__,
+            GrupoComercialMembro.__table__,
+            GrupoComercialProdutoVinculo.__table__,
             Cliente.__table__,
             Produto.__table__,
             Venda.__table__,
@@ -148,7 +148,7 @@ def _preparar(db: Session):
         ]
     )
     db.flush()
-    grupo = EmpresaGrupo(
+    grupo = GrupoComercial(
         nome="Grupo Centro",
         criado_por_empresa_id=EMPRESA_A,
         criado_por_usuario_id=1,
@@ -158,13 +158,13 @@ def _preparar(db: Session):
     db.flush()
     db.add_all(
         [
-            EmpresaGrupoMembro(
+            GrupoComercialMembro(
                 grupo_id=grupo.id,
                 empresa_id=EMPRESA_A,
                 papel="responsavel",
                 status="ativo",
             ),
-            EmpresaGrupoMembro(
+            GrupoComercialMembro(
                 grupo_id=grupo.id,
                 empresa_id=EMPRESA_B,
                 papel="membro",
@@ -269,7 +269,7 @@ def _preparar(db: Session):
 
 def test_lista_pedidos_e_contas_pagar_das_duas_empresas(db_local):
     grupo, _referencias = _preparar(db_local)
-    service = EmpresaGrupoAnaliseDetalhesService(db_local, agora=AGORA)
+    service = GrupoComercialAnaliseDetalhesService(db_local, agora=AGORA)
 
     pedidos = service.listar_pedidos(grupo.id, EMPRESA_A, periodo_dias=30)
     pedidos_compra = service.listar_pedidos_compra(grupo.id, EMPRESA_A, periodo_dias=30)
@@ -305,7 +305,7 @@ def test_lista_pedidos_e_contas_pagar_das_duas_empresas(db_local):
 
 def test_consolida_produtos_automaticamente_por_ean_e_pesquisa_por_sku(db_local):
     grupo, referencias = _preparar(db_local)
-    service = EmpresaGrupoAnaliseDetalhesService(db_local, agora=AGORA)
+    service = GrupoComercialAnaliseDetalhesService(db_local, agora=AGORA)
 
     resultado = service.listar_produtos_vendidos(
         grupo.id, EMPRESA_A, periodo_dias=30, busca="RACAO-B"
@@ -345,7 +345,7 @@ def test_consolida_estoque_por_ean_quando_equivalente_nao_teve_venda(db_local):
         db_local.delete(item_vendido)
     db_local.commit()
 
-    service = EmpresaGrupoAnaliseDetalhesService(db_local, agora=AGORA)
+    service = GrupoComercialAnaliseDetalhesService(db_local, agora=AGORA)
     resultado = service.listar_produtos_vendidos(
         grupo.id, EMPRESA_A, periodo_dias=30, busca="RACAO-B"
     )
@@ -370,8 +370,8 @@ def test_consolida_estoque_por_ean_quando_equivalente_nao_teve_venda(db_local):
 
 def test_vinculo_manual_agrupa_skus_diferentes_e_pode_ser_removido(db_local):
     grupo, referencias = _preparar(db_local)
-    service = EmpresaGrupoAnaliseDetalhesService(db_local, agora=AGORA)
-    vinculos_service = EmpresaGrupoProdutoVinculoService(db_local, agora=AGORA)
+    service = GrupoComercialAnaliseDetalhesService(db_local, agora=AGORA)
+    vinculos_service = GrupoComercialProdutoVinculoService(db_local, agora=AGORA)
     referencia_a = SimpleNamespace(
         empresa_id=EMPRESA_A,
         produto_id=referencias[EMPRESA_A]["produto_manual"].id,
@@ -407,7 +407,7 @@ def test_vinculo_manual_agrupa_skus_diferentes_e_pode_ser_removido(db_local):
 
 def test_vinculo_manual_inclui_estoque_do_equivalente_sem_venda(db_local):
     grupo, referencias = _preparar(db_local)
-    vinculos_service = EmpresaGrupoProdutoVinculoService(db_local, agora=AGORA)
+    vinculos_service = GrupoComercialProdutoVinculoService(db_local, agora=AGORA)
     produto_a = referencias[EMPRESA_A]["produto_manual"]
     produto_b = referencias[EMPRESA_B]["produto_manual"]
     vinculos_service.vincular_produtos(
@@ -424,7 +424,7 @@ def test_vinculo_manual_inclui_estoque_do_equivalente_sem_venda(db_local):
         db_local.delete(item_vendido)
     db_local.commit()
 
-    service = EmpresaGrupoAnaliseDetalhesService(db_local, agora=AGORA)
+    service = GrupoComercialAnaliseDetalhesService(db_local, agora=AGORA)
     resultado = service.listar_produtos_vendidos(
         grupo.id, EMPRESA_A, periodo_dias=30, busca="PET-B"
     )
@@ -443,7 +443,7 @@ def test_vinculo_manual_inclui_estoque_do_equivalente_sem_venda(db_local):
 
 def test_empresa_fora_do_grupo_nao_acessa_detalhes(db_local):
     grupo, _referencias = _preparar(db_local)
-    service = EmpresaGrupoAnaliseDetalhesService(db_local, agora=AGORA)
+    service = GrupoComercialAnaliseDetalhesService(db_local, agora=AGORA)
 
     with pytest.raises(HTTPException) as erro:
         service.listar_pedidos(grupo.id, EMPRESA_FORA)
@@ -457,7 +457,7 @@ def test_reposicao_inteligente_prioriza_transferencia_antes_da_compra(db_local):
     referencias[EMPRESA_B]["produto_ean"].estoque_atual = 10
     db_local.commit()
 
-    service = EmpresaGrupoPlanejamentoService(db_local, agora=AGORA)
+    service = GrupoComercialPlanejamentoService(db_local, agora=AGORA)
     resultado = service.listar_reposicao_inteligente(
         grupo.id,
         EMPRESA_A,
@@ -519,7 +519,7 @@ def test_reposicao_inteligente_sugere_compra_para_deficit_do_grupo(db_local):
     referencias[EMPRESA_B]["produto_ean"].estoque_atual = 0
     db_local.commit()
 
-    service = EmpresaGrupoPlanejamentoService(db_local, agora=AGORA)
+    service = GrupoComercialPlanejamentoService(db_local, agora=AGORA)
     resultado = service.listar_reposicao_inteligente(
         grupo.id,
         EMPRESA_A,
@@ -570,7 +570,7 @@ def test_reposicao_inteligente_conta_apenas_produtos_com_acao_ao_mostrar_todos(
     referencias[EMPRESA_B]["produto_ean"].estoque_atual = 10
     db_local.commit()
 
-    service = EmpresaGrupoPlanejamentoService(db_local, agora=AGORA)
+    service = GrupoComercialPlanejamentoService(db_local, agora=AGORA)
     resultado = service.listar_reposicao_inteligente(
         grupo.id,
         EMPRESA_A,
@@ -590,7 +590,7 @@ def test_reposicao_inteligente_conta_apenas_produtos_com_acao_ao_mostrar_todos(
 
 def test_analise_financeira_cruza_entradas_saidas_e_vencimentos(db_local):
     grupo, _referencias = _preparar(db_local)
-    service = EmpresaGrupoPlanejamentoService(db_local, agora=AGORA)
+    service = GrupoComercialPlanejamentoService(db_local, agora=AGORA)
 
     resultado = service.analisar_financeiro(grupo.id, EMPRESA_A)
 

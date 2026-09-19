@@ -1,4 +1,5 @@
-import { FiRefreshCw, FiUsers } from "react-icons/fi";
+import { FiPlusCircle, FiRefreshCw, FiUsers } from "react-icons/fi";
+import { Link } from "react-router-dom";
 
 export default function OpsTenantsHeader({ loading, onRefresh }) {
   return (
@@ -14,15 +15,24 @@ export default function OpsTenantsHeader({ loading, onRefresh }) {
           Lucas.
         </p>
       </div>
-      <button
-        type="button"
-        onClick={onRefresh}
-        disabled={loading}
-        className="inline-flex h-10 items-center gap-2 rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
-      >
-        <FiRefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
-        Atualizar
-      </button>
+      <div className="flex flex-wrap items-center gap-2">
+        <Link
+          to="/ops/grupos-comerciais/onboarding"
+          className="inline-flex h-10 items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-4 text-sm font-semibold text-blue-700 hover:bg-blue-100"
+        >
+          <FiPlusCircle className="h-4 w-4" />
+          Novo grupo comercial (onboarding assistido)
+        </Link>
+        <button
+          type="button"
+          onClick={onRefresh}
+          disabled={loading}
+          className="inline-flex h-10 items-center gap-2 rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          <FiRefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+          Atualizar
+        </button>
+      </div>
     </div>
   );
 }

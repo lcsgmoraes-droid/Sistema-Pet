@@ -28,7 +28,7 @@ def test_migration_adiciona_e_remove_acesso_catalogo_completo(tmp_path):
     engine = sa.create_engine(f"sqlite:///{tmp_path / 'catalogo-compartilhado.db'}")
     metadata = sa.MetaData()
     sa.Table(
-        "empresa_grupo_estoques_compartilhados",
+        "grupo_comercial_estoques_compartilhados",
         metadata,
         sa.Column("id", sa.Integer, primary_key=True),
         sa.Column("status", sa.String(20), nullable=False),
@@ -42,7 +42,7 @@ def test_migration_adiciona_e_remove_acesso_catalogo_completo(tmp_path):
         colunas = {
             item["name"]
             for item in sa.inspect(connection).get_columns(
-                "empresa_grupo_estoques_compartilhados"
+                "grupo_comercial_estoques_compartilhados"
             )
         }
         assert "acesso_catalogo_completo" in colunas
@@ -51,7 +51,7 @@ def test_migration_adiciona_e_remove_acesso_catalogo_completo(tmp_path):
         colunas = {
             item["name"]
             for item in sa.inspect(connection).get_columns(
-                "empresa_grupo_estoques_compartilhados"
+                "grupo_comercial_estoques_compartilhados"
             )
         }
         assert "acesso_catalogo_completo" not in colunas

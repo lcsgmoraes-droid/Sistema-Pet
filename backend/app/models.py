@@ -52,13 +52,13 @@ from app.models_authz import (
     RolePermission,
     UserTenant,
 )
-from app.empresa_grupo_models import (
-    EmpresaGrupo,
-    EmpresaGrupoCodigo,
-    EmpresaGrupoConvite,
-    EmpresaGrupoEstoqueCompartilhado,
-    EmpresaGrupoMembro,
-    EmpresaGrupoTransferencia,
+from app.grupo_comercial_models import (
+    GrupoComercial,
+    GrupoComercialCodigo,
+    GrupoComercialConvite,
+    GrupoComercialEstoqueCompartilhado,
+    GrupoComercialMembro,
+    GrupoComercialTransferencia,
 )
 from app.bling_connection_models import BlingCompanyTenantLink, BlingConnection
 from app.models_cadastros import (

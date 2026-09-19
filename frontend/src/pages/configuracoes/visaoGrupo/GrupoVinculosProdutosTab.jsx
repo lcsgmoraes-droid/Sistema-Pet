@@ -12,7 +12,7 @@ import {
   obterVinculosProdutosGrupo,
   removerVinculoProdutosGrupo,
   vincularProdutosGrupo,
-} from "../../../services/gruposEmpresas";
+} from "../../../services/gruposComerciais";
 import { campoClasses } from "./GrupoAnaliseFiltros";
 
 function ProdutoResultado({ produto, selecionado, onSelect }) {

@@ -11,7 +11,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, aliased, joinedload, noload, selectinload
 
 from app.models import Cliente, FornecedorGrupo
-from app.empresa_grupo_sql import empresa_id_igual, empresa_id_sql
+from app.grupo_comercial_sql import empresa_id_igual, empresa_id_sql
 from app.partner_utils import is_partner_owned
 from app.produtos_models import (
     Produto,
@@ -69,44 +69,44 @@ def _montar_query_produtos_vendaveis(
     termo_busca: Optional[str],
     contar_total: bool,
 ) -> Any:
-    from app.empresa_grupo_models import (
-        EmpresaGrupo,
-        EmpresaGrupoEstoqueCompartilhado,
-        EmpresaGrupoMembro,
+    from app.grupo_comercial_models import (
+        GrupoComercial,
+        GrupoComercialEstoqueCompartilhado,
+        GrupoComercialMembro,
     )
 
-    membro_origem = aliased(EmpresaGrupoMembro)
-    membro_consumidora = aliased(EmpresaGrupoMembro)
+    membro_origem = aliased(GrupoComercialMembro)
+    membro_consumidora = aliased(GrupoComercialMembro)
     produtos_compartilhados = (
-        select(EmpresaGrupoEstoqueCompartilhado.produto_origem_id)
+        select(GrupoComercialEstoqueCompartilhado.produto_origem_id)
         .join(
-            EmpresaGrupo,
-            EmpresaGrupo.id == EmpresaGrupoEstoqueCompartilhado.grupo_id,
+            GrupoComercial,
+            GrupoComercial.id == GrupoComercialEstoqueCompartilhado.grupo_id,
         )
         .join(
             membro_origem,
-            (membro_origem.grupo_id == EmpresaGrupoEstoqueCompartilhado.grupo_id)
+            (membro_origem.grupo_id == GrupoComercialEstoqueCompartilhado.grupo_id)
             & (
                 empresa_id_sql(membro_origem.empresa_id)
-                == empresa_id_sql(EmpresaGrupoEstoqueCompartilhado.empresa_origem_id)
+                == empresa_id_sql(GrupoComercialEstoqueCompartilhado.empresa_origem_id)
             ),
         )
         .join(
             membro_consumidora,
-            (membro_consumidora.grupo_id == EmpresaGrupoEstoqueCompartilhado.grupo_id)
+            (membro_consumidora.grupo_id == GrupoComercialEstoqueCompartilhado.grupo_id)
             & (
                 empresa_id_sql(membro_consumidora.empresa_id)
                 == empresa_id_sql(
-                    EmpresaGrupoEstoqueCompartilhado.empresa_consumidora_id
+                    GrupoComercialEstoqueCompartilhado.empresa_consumidora_id
                 )
             ),
         )
         .where(
             empresa_id_igual(
-                EmpresaGrupoEstoqueCompartilhado.empresa_consumidora_id, tenant_id
+                GrupoComercialEstoqueCompartilhado.empresa_consumidora_id, tenant_id
             ),
-            EmpresaGrupoEstoqueCompartilhado.status == "ativo",
-            EmpresaGrupo.status == "ativo",
+            GrupoComercialEstoqueCompartilhado.status == "ativo",
+            GrupoComercial.status == "ativo",
             membro_origem.status == "ativo",
             membro_consumidora.status == "ativo",
         )

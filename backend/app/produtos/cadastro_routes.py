@@ -47,8 +47,8 @@ from app.services.produto_ai_enrichment import (
     gerar_rascunho_produto_por_ean,
 )
 from app.produtos.tipos import aplicar_regras_servico_dados
-from app.empresa_grupo_estoque_compartilhado_service import (
-    EmpresaGrupoEstoqueCompartilhadoService,
+from app.grupo_comercial_estoque_compartilhado_service import (
+    GrupoComercialEstoqueCompartilhadoService,
 )
 from app.tenancy.context import set_current_tenant
 
@@ -280,7 +280,7 @@ def obter_produto(
     current_user, tenant_solicitante_id = _validar_tenant_e_obter_usuario(
         user_and_tenant
     )
-    acesso_catalogo = EmpresaGrupoEstoqueCompartilhadoService.resolver_produto_catalogo(
+    acesso_catalogo = GrupoComercialEstoqueCompartilhadoService.resolver_produto_catalogo(
         db, tenant_solicitante_id, produto_id
     )
     tenant_id = UUID(str(acesso_catalogo.tenant_origem_id))
@@ -405,7 +405,7 @@ def preview_precos_venda_produtos_compostos(
     """Mostra os precos de venda sugeridos sem alterar nenhum produto."""
 
     _, tenant_solicitante_id = _validar_tenant_e_obter_usuario(user_and_tenant)
-    acesso_catalogo = EmpresaGrupoEstoqueCompartilhadoService.resolver_produto_catalogo(
+    acesso_catalogo = GrupoComercialEstoqueCompartilhadoService.resolver_produto_catalogo(
         db, tenant_solicitante_id, produto_id
     )
     tenant_id = UUID(str(acesso_catalogo.tenant_origem_id))
@@ -450,7 +450,7 @@ def atualizar_produto(
     current_user, tenant_solicitante_id = _validar_tenant_e_obter_usuario(
         user_and_tenant
     )
-    acesso_catalogo = EmpresaGrupoEstoqueCompartilhadoService.resolver_produto_catalogo(
+    acesso_catalogo = GrupoComercialEstoqueCompartilhadoService.resolver_produto_catalogo(
         db, tenant_solicitante_id, produto_id
     )
     tenant_id = UUID(str(acesso_catalogo.tenant_origem_id))

@@ -8,12 +8,12 @@ from uuid import UUID
 
 from sqlalchemy.orm import Session
 
-from app.empresa_grupo_analise_detalhes_service import (
-    EmpresaGrupoAnaliseDetalhesService,
+from app.grupo_comercial_analise_detalhes_service import (
+    GrupoComercialAnaliseDetalhesService,
 )
-from app.empresa_grupo_analise_service import (
+from app.grupo_comercial_analise_service import (
     STATUS_CONTAS_ABERTAS,
-    EmpresaGrupoAnaliseService,
+    GrupoComercialAnaliseService,
     _moeda,
     _numero,
     _quantidade,
@@ -34,14 +34,14 @@ FAIXAS_FINANCEIRAS = (
 )
 
 
-class EmpresaGrupoPlanejamentoService:
+class GrupoComercialPlanejamentoService:
     """Calcula acoes sugeridas sem alterar estoque ou financeiro."""
 
     def __init__(self, db: Session, *, agora: datetime | None = None):
         self.db = db
         self.agora = agora or now_brasilia()
-        self.resumo = EmpresaGrupoAnaliseService(db, agora=self.agora)
-        self.detalhes = EmpresaGrupoAnaliseDetalhesService(db, agora=self.agora)
+        self.resumo = GrupoComercialAnaliseService(db, agora=self.agora)
+        self.detalhes = GrupoComercialAnaliseDetalhesService(db, agora=self.agora)
 
     @staticmethod
     def _prioridade(*, cobertura: float | None, compra: float, transferencias: list):

@@ -7,7 +7,7 @@ import MetricCard from "../../../components/ui/MetricCard";
 import MetricGrid from "../../../components/ui/MetricGrid";
 import Panel from "../../../components/ui/Panel";
 import StatusBadge from "../../../components/ui/StatusBadge";
-import { obterContasPagarGrupo } from "../../../services/gruposEmpresas";
+import { obterContasPagarGrupo } from "../../../services/gruposComerciais";
 import { formatMoneyBRL } from "../../../utils/formatters";
 import GrupoAnaliseFiltros from "./GrupoAnaliseFiltros";
 

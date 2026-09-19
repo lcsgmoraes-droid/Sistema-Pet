@@ -10,14 +10,14 @@ from fastapi import HTTPException, status
 from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
-from app.empresa_grupo_analise_service import (
+from app.grupo_comercial_analise_service import (
     STATUS_CONTAS_ABERTAS,
-    EmpresaGrupoAnaliseService,
+    GrupoComercialAnaliseService,
     _moeda,
     _numero,
     _quantidade,
 )
-from app.empresa_grupo_models import EmpresaGrupoProdutoVinculo
+from app.grupo_comercial_models import GrupoComercialProdutoVinculo
 from app.financeiro_models import ContaPagar
 from app.models_cadastros import Cliente
 from app.produtos_models import PedidoCompra, PedidoCompraItem, Produto
@@ -63,13 +63,13 @@ class _ConjuntosProdutos:
             self.pais[raiz_b] = raiz_a
 
 
-class EmpresaGrupoAnaliseDetalhesService:
+class GrupoComercialAnaliseDetalhesService:
     """Expõe detalhes somente depois de validar o vínculo ativo do grupo."""
 
     def __init__(self, db: Session, *, agora: datetime | None = None):
         self.db = db
         self.agora = agora or now_brasilia()
-        self.resumo = EmpresaGrupoAnaliseService(db, agora=self.agora)
+        self.resumo = GrupoComercialAnaliseService(db, agora=self.agora)
 
     def _contexto(self, grupo_id: int, empresa_atual_id) -> tuple[object, list, dict]:
         grupo, membros = self.resumo._grupo_e_membros(grupo_id, empresa_atual_id)
@@ -650,10 +650,10 @@ class EmpresaGrupoAnaliseDetalhesService:
         linhas = self._linhas_produtos_vendidos(membros, inicio, fim)
 
         vinculos = (
-            self.db.query(EmpresaGrupoProdutoVinculo)
+            self.db.query(GrupoComercialProdutoVinculo)
             .filter(
-                EmpresaGrupoProdutoVinculo.grupo_id == grupo.id,
-                EmpresaGrupoProdutoVinculo.status == "ativo",
+                GrupoComercialProdutoVinculo.grupo_id == grupo.id,
+                GrupoComercialProdutoVinculo.status == "ativo",
             )
             .all()
         )

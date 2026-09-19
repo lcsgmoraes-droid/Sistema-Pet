@@ -196,13 +196,13 @@ async def criar_venda(
     # ========================================
     # 🔒 TRAVA 1 — VALIDAÇÃO: PRODUTO PAI NÃO PODE SER VENDIDO
     # ========================================
-    from app.empresa_grupo_estoque_compartilhado_service import (
-        EmpresaGrupoEstoqueCompartilhadoService,
+    from app.grupo_comercial_estoque_compartilhado_service import (
+        GrupoComercialEstoqueCompartilhadoService,
     )
 
     for item in dados.itens:
         if item.produto_id:
-            produto = EmpresaGrupoEstoqueCompartilhadoService.resolver_produto_venda(
+            produto = GrupoComercialEstoqueCompartilhadoService.resolver_produto_venda(
                 db, tenant_id, item.produto_id
             )
             produto = produto.produto

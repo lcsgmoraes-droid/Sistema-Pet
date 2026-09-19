@@ -31,8 +31,8 @@ from app.produtos.validade import _mapa_validade_proxima_produtos
 from app.produtos.validators import _validar_tenant_e_obter_usuario
 from app.security.permissions_decorator import require_permission
 from app.services.ecommerce_catalog_health import catalog_health_filter_expression
-from app.empresa_grupo_estoque_compartilhado_service import (
-    EmpresaGrupoEstoqueCompartilhadoService,
+from app.grupo_comercial_estoque_compartilhado_service import (
+    GrupoComercialEstoqueCompartilhadoService,
 )
 
 router = APIRouter()
@@ -137,7 +137,7 @@ def listar_produtos_vendaveis(
         busca_rapida=not contar_total,
     )
     compartilhamentos = (
-        EmpresaGrupoEstoqueCompartilhadoService.mapa_ativos_para_consumidora(
+        GrupoComercialEstoqueCompartilhadoService.mapa_ativos_para_consumidora(
             db, tenant_id, [produto.id for produto in produtos]
         )
     )
@@ -222,7 +222,7 @@ def listar_produtos(
     # Incluir produtos de tenants parceiros (ex.: pet shop parceiro da clínica)
     access_ids = get_all_accessible_tenant_ids(db, tenant_id)
     compartilhamentos_catalogo = (
-        EmpresaGrupoEstoqueCompartilhadoService.mapa_catalogo_completo_para_consumidora(
+        GrupoComercialEstoqueCompartilhadoService.mapa_catalogo_completo_para_consumidora(
             db, tenant_id
         )
     )

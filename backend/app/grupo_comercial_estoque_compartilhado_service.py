@@ -12,12 +12,12 @@ from fastapi import HTTPException, status
 from sqlalchemy import MetaData, Table, func, or_
 from sqlalchemy.orm import Session, aliased
 
-from app.empresa_grupo_models import (
-    EmpresaGrupo,
-    EmpresaGrupoEstoqueCompartilhado,
-    EmpresaGrupoMembro,
+from app.grupo_comercial_models import (
+    GrupoComercial,
+    GrupoComercialEstoqueCompartilhado,
+    GrupoComercialMembro,
 )
-from app.empresa_grupo_sql import empresa_id_igual, empresa_id_sql
+from app.grupo_comercial_sql import empresa_id_igual, empresa_id_sql
 from app.evolucao_corepet import registrar_uso_funcionalidade
 from app.models import Tenant
 from app.produtos_models import Produto
@@ -57,7 +57,7 @@ def resolver_tenant_estoque_item(item, tenant_venda_id) -> tuple[str, bool]:
     return origem_id, origem_id != str(tenant_venda_id)
 
 
-class EmpresaGrupoEstoqueCompartilhadoService:
+class GrupoComercialEstoqueCompartilhadoService:
     TIPOS_COMPARTILHAVEIS = ("SIMPLES", "VARIACAO")
 
     def __init__(self, db: Session):
@@ -100,7 +100,7 @@ class EmpresaGrupoEstoqueCompartilhadoService:
         if not produto_ids:
             return
         tabela = Table(
-            EmpresaGrupoEstoqueCompartilhado.__tablename__,
+            GrupoComercialEstoqueCompartilhado.__tablename__,
             MetaData(),
             autoload_with=self.db.get_bind(),
             resolve_fks=False,
@@ -127,25 +127,25 @@ class EmpresaGrupoEstoqueCompartilhadoService:
             ],
         )
 
-    def _grupo_ativo(self, grupo_id: int) -> EmpresaGrupo:
+    def _grupo_ativo(self, grupo_id: int) -> GrupoComercial:
         grupo = (
-            self.db.query(EmpresaGrupo)
-            .filter(EmpresaGrupo.id == grupo_id, EmpresaGrupo.status == "ativo")
+            self.db.query(GrupoComercial)
+            .filter(GrupoComercial.id == grupo_id, GrupoComercial.status == "ativo")
             .first()
         )
         if grupo is None:
             raise HTTPException(
-                status_code=404, detail="Grupo de empresas não encontrado."
+                status_code=404, detail="Grupo Comercial não encontrado."
             )
         return grupo
 
-    def _membro_ativo(self, grupo_id: int, empresa_id: str) -> EmpresaGrupoMembro:
+    def _membro_ativo(self, grupo_id: int, empresa_id: str) -> GrupoComercialMembro:
         membro = (
-            self.db.query(EmpresaGrupoMembro)
+            self.db.query(GrupoComercialMembro)
             .filter(
-                EmpresaGrupoMembro.grupo_id == grupo_id,
-                EmpresaGrupoMembro.empresa_id == str(empresa_id),
-                EmpresaGrupoMembro.status == "ativo",
+                GrupoComercialMembro.grupo_id == grupo_id,
+                GrupoComercialMembro.empresa_id == str(empresa_id),
+                GrupoComercialMembro.status == "ativo",
             )
             .first()
         )
@@ -201,20 +201,20 @@ class EmpresaGrupoEstoqueCompartilhadoService:
         produtos = query.order_by(Produto.nome.asc()).limit(limite).all()
 
         compartilhamentos = (
-            self.db.query(EmpresaGrupoEstoqueCompartilhado)
+            self.db.query(GrupoComercialEstoqueCompartilhado)
             .filter(
-                EmpresaGrupoEstoqueCompartilhado.grupo_id == grupo_id,
+                GrupoComercialEstoqueCompartilhado.grupo_id == grupo_id,
                 empresa_id_igual(
-                    EmpresaGrupoEstoqueCompartilhado.empresa_origem_id, origem
+                    GrupoComercialEstoqueCompartilhado.empresa_origem_id, origem
                 ),
                 empresa_id_igual(
-                    EmpresaGrupoEstoqueCompartilhado.empresa_consumidora_id,
+                    GrupoComercialEstoqueCompartilhado.empresa_consumidora_id,
                     consumidora,
                 ),
-                EmpresaGrupoEstoqueCompartilhado.produto_origem_id.in_(
+                GrupoComercialEstoqueCompartilhado.produto_origem_id.in_(
                     [produto.id for produto in produtos] or [-1]
                 ),
-                EmpresaGrupoEstoqueCompartilhado.status == "ativo",
+                GrupoComercialEstoqueCompartilhado.status == "ativo",
             )
             .all()
         )
@@ -248,37 +248,37 @@ class EmpresaGrupoEstoqueCompartilhadoService:
         consumidora_tenant = aliased(Tenant)
         linhas = (
             self.db.query(
-                EmpresaGrupoEstoqueCompartilhado,
+                GrupoComercialEstoqueCompartilhado,
                 origem_tenant.name,
                 consumidora_tenant.name,
             )
             .join(
                 origem_tenant,
                 empresa_id_sql(origem_tenant.id)
-                == empresa_id_sql(EmpresaGrupoEstoqueCompartilhado.empresa_origem_id),
+                == empresa_id_sql(GrupoComercialEstoqueCompartilhado.empresa_origem_id),
             )
             .join(
                 consumidora_tenant,
                 empresa_id_sql(consumidora_tenant.id)
                 == empresa_id_sql(
-                    EmpresaGrupoEstoqueCompartilhado.empresa_consumidora_id
+                    GrupoComercialEstoqueCompartilhado.empresa_consumidora_id
                 ),
             )
             .filter(
-                EmpresaGrupoEstoqueCompartilhado.grupo_id == grupo_id,
-                EmpresaGrupoEstoqueCompartilhado.status == "ativo",
+                GrupoComercialEstoqueCompartilhado.grupo_id == grupo_id,
+                GrupoComercialEstoqueCompartilhado.status == "ativo",
                 or_(
                     empresa_id_igual(
-                        EmpresaGrupoEstoqueCompartilhado.empresa_origem_id,
+                        GrupoComercialEstoqueCompartilhado.empresa_origem_id,
                         empresa_atual,
                     ),
                     empresa_id_igual(
-                        EmpresaGrupoEstoqueCompartilhado.empresa_consumidora_id,
+                        GrupoComercialEstoqueCompartilhado.empresa_consumidora_id,
                         empresa_atual,
                     ),
                 ),
             )
-            .order_by(EmpresaGrupoEstoqueCompartilhado.criado_em.desc())
+            .order_by(GrupoComercialEstoqueCompartilhado.criado_em.desc())
             .all()
         )
 
@@ -364,15 +364,15 @@ class EmpresaGrupoEstoqueCompartilhadoService:
         novos: list[int] = []
         for produto_id in ids:
             item = (
-                self.db.query(EmpresaGrupoEstoqueCompartilhado)
+                self.db.query(GrupoComercialEstoqueCompartilhado)
                 .filter(
-                    EmpresaGrupoEstoqueCompartilhado.grupo_id == grupo_id,
+                    GrupoComercialEstoqueCompartilhado.grupo_id == grupo_id,
                     empresa_id_igual(
-                        EmpresaGrupoEstoqueCompartilhado.empresa_origem_id, origem
+                        GrupoComercialEstoqueCompartilhado.empresa_origem_id, origem
                     ),
-                    EmpresaGrupoEstoqueCompartilhado.produto_origem_id == produto_id,
+                    GrupoComercialEstoqueCompartilhado.produto_origem_id == produto_id,
                     empresa_id_igual(
-                        EmpresaGrupoEstoqueCompartilhado.empresa_consumidora_id,
+                        GrupoComercialEstoqueCompartilhado.empresa_consumidora_id,
                         consumidora,
                     ),
                 )
@@ -405,14 +405,14 @@ class EmpresaGrupoEstoqueCompartilhadoService:
             db=self.db,
             tenant_id=origem,
             user_id=usuario_id,
-            event="empresa_grupo_estoque_compartilhado_ativado",
-            entity_type="empresa_grupo",
+            event="grupo_comercial_estoque_compartilhado_ativado",
+            entity_type="grupo_comercial",
             entity_id=grupo_id,
             metadata={"empresa_consumidora_id": consumidora, "produto_ids": ids},
             commit=False,
         )
         self.db.commit()
-        registrar_uso_funcionalidade(self.db, "grupos-empresas-estoque-compartilhado")
+        registrar_uso_funcionalidade(self.db, "grupos-comerciais-estoque-compartilhado")
         return {"ativados": ativados, "selecionados": len(ids)}
 
     def atualizar_acesso_catalogo(
@@ -428,14 +428,14 @@ class EmpresaGrupoEstoqueCompartilhadoService:
         self._grupo_ativo(grupo_id)
         self._membro_ativo(grupo_id, origem)
         item = (
-            self.db.query(EmpresaGrupoEstoqueCompartilhado)
+            self.db.query(GrupoComercialEstoqueCompartilhado)
             .filter(
-                EmpresaGrupoEstoqueCompartilhado.id == compartilhamento_id,
-                EmpresaGrupoEstoqueCompartilhado.grupo_id == grupo_id,
+                GrupoComercialEstoqueCompartilhado.id == compartilhamento_id,
+                GrupoComercialEstoqueCompartilhado.grupo_id == grupo_id,
                 empresa_id_igual(
-                    EmpresaGrupoEstoqueCompartilhado.empresa_origem_id, origem
+                    GrupoComercialEstoqueCompartilhado.empresa_origem_id, origem
                 ),
-                EmpresaGrupoEstoqueCompartilhado.status == "ativo",
+                GrupoComercialEstoqueCompartilhado.status == "ativo",
             )
             .first()
         )
@@ -449,8 +449,8 @@ class EmpresaGrupoEstoqueCompartilhadoService:
             db=self.db,
             tenant_id=origem,
             user_id=usuario_id,
-            event="empresa_grupo_catalogo_compartilhado_atualizado",
-            entity_type="empresa_grupo_estoque_compartilhado",
+            event="grupo_comercial_catalogo_compartilhado_atualizado",
+            entity_type="grupo_comercial_estoque_compartilhado",
             entity_id=item.id,
             metadata={
                 "produto_id": item.produto_origem_id,
@@ -475,14 +475,14 @@ class EmpresaGrupoEstoqueCompartilhadoService:
         self._grupo_ativo(grupo_id)
         self._membro_ativo(grupo_id, origem)
         item = (
-            self.db.query(EmpresaGrupoEstoqueCompartilhado)
+            self.db.query(GrupoComercialEstoqueCompartilhado)
             .filter(
-                EmpresaGrupoEstoqueCompartilhado.id == compartilhamento_id,
-                EmpresaGrupoEstoqueCompartilhado.grupo_id == grupo_id,
+                GrupoComercialEstoqueCompartilhado.id == compartilhamento_id,
+                GrupoComercialEstoqueCompartilhado.grupo_id == grupo_id,
                 empresa_id_igual(
-                    EmpresaGrupoEstoqueCompartilhado.empresa_origem_id, origem
+                    GrupoComercialEstoqueCompartilhado.empresa_origem_id, origem
                 ),
-                EmpresaGrupoEstoqueCompartilhado.status == "ativo",
+                GrupoComercialEstoqueCompartilhado.status == "ativo",
             )
             .first()
         )
@@ -496,8 +496,8 @@ class EmpresaGrupoEstoqueCompartilhadoService:
             db=self.db,
             tenant_id=origem,
             user_id=usuario_id,
-            event="empresa_grupo_estoque_compartilhado_removido",
-            entity_type="empresa_grupo_estoque_compartilhado",
+            event="grupo_comercial_estoque_compartilhado_removido",
+            entity_type="grupo_comercial_estoque_compartilhado",
             entity_id=item.id,
             metadata={"produto_id": item.produto_origem_id},
             commit=False,
@@ -514,21 +514,21 @@ class EmpresaGrupoEstoqueCompartilhadoService:
         *,
         exigir_catalogo_completo: bool = False,
     ):
-        membro_origem = aliased(EmpresaGrupoMembro)
-        membro_consumidora = aliased(EmpresaGrupoMembro)
+        membro_origem = aliased(GrupoComercialMembro)
+        membro_consumidora = aliased(GrupoComercialMembro)
         query = (
-            db.query(EmpresaGrupoEstoqueCompartilhado, Tenant.name)
+            db.query(GrupoComercialEstoqueCompartilhado, Tenant.name)
             .join(
-                EmpresaGrupo,
-                EmpresaGrupo.id == EmpresaGrupoEstoqueCompartilhado.grupo_id,
+                GrupoComercial,
+                GrupoComercial.id == GrupoComercialEstoqueCompartilhado.grupo_id,
             )
             .join(
                 membro_origem,
-                (membro_origem.grupo_id == EmpresaGrupoEstoqueCompartilhado.grupo_id)
+                (membro_origem.grupo_id == GrupoComercialEstoqueCompartilhado.grupo_id)
                 & (
                     empresa_id_sql(membro_origem.empresa_id)
                     == empresa_id_sql(
-                        EmpresaGrupoEstoqueCompartilhado.empresa_origem_id
+                        GrupoComercialEstoqueCompartilhado.empresa_origem_id
                     )
                 ),
             )
@@ -536,38 +536,38 @@ class EmpresaGrupoEstoqueCompartilhadoService:
                 membro_consumidora,
                 (
                     membro_consumidora.grupo_id
-                    == EmpresaGrupoEstoqueCompartilhado.grupo_id
+                    == GrupoComercialEstoqueCompartilhado.grupo_id
                 )
                 & (
                     empresa_id_sql(membro_consumidora.empresa_id)
                     == empresa_id_sql(
-                        EmpresaGrupoEstoqueCompartilhado.empresa_consumidora_id
+                        GrupoComercialEstoqueCompartilhado.empresa_consumidora_id
                     )
                 ),
             )
             .join(
                 Tenant,
                 empresa_id_sql(Tenant.id)
-                == empresa_id_sql(EmpresaGrupoEstoqueCompartilhado.empresa_origem_id),
+                == empresa_id_sql(GrupoComercialEstoqueCompartilhado.empresa_origem_id),
             )
             .filter(
                 empresa_id_igual(
-                    EmpresaGrupoEstoqueCompartilhado.empresa_consumidora_id,
+                    GrupoComercialEstoqueCompartilhado.empresa_consumidora_id,
                     empresa_consumidora_id,
                 ),
-                EmpresaGrupoEstoqueCompartilhado.status == "ativo",
-                EmpresaGrupo.status == "ativo",
+                GrupoComercialEstoqueCompartilhado.status == "ativo",
+                GrupoComercial.status == "ativo",
                 membro_origem.status == "ativo",
                 membro_consumidora.status == "ativo",
             )
         )
         if produto_id is not None:
             query = query.filter(
-                EmpresaGrupoEstoqueCompartilhado.produto_origem_id == produto_id
+                GrupoComercialEstoqueCompartilhado.produto_origem_id == produto_id
             )
         if exigir_catalogo_completo:
             query = query.filter(
-                EmpresaGrupoEstoqueCompartilhado.acesso_catalogo_completo.is_(True)
+                GrupoComercialEstoqueCompartilhado.acesso_catalogo_completo.is_(True)
             )
         return query
 
@@ -765,7 +765,7 @@ class EmpresaGrupoEstoqueCompartilhadoService:
         if not ids:
             return {}
         query = cls._consulta_compartilhamento_ativo(db, empresa_consumidora_id).filter(
-            EmpresaGrupoEstoqueCompartilhado.produto_origem_id.in_(ids)
+            GrupoComercialEstoqueCompartilhado.produto_origem_id.in_(ids)
         )
         resultados: dict[int, dict] = {}
         for compartilhamento, origem_nome in query.all():

@@ -21,8 +21,8 @@ from sqlalchemy.sql import func
 from app.db import Base
 
 
-class EmpresaGrupo(Base):
-    __tablename__ = "empresa_grupos"
+class GrupoComercial(Base):
+    __tablename__ = "grupos_comerciais"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     nome = Column(String(150), nullable=False)
@@ -43,14 +43,14 @@ class EmpresaGrupo(Base):
     )
 
 
-class EmpresaGrupoMembro(Base):
-    __tablename__ = "empresa_grupo_membros"
+class GrupoComercialMembro(Base):
+    __tablename__ = "grupo_comercial_membros"
     __table_args__ = (
         UniqueConstraint(
-            "grupo_id", "empresa_id", name="uq_empresa_grupo_membro_empresa"
+            "grupo_id", "empresa_id", name="uq_grupo_comercial_membro_empresa"
         ),
         Index(
-            "ix_empresa_grupo_membros_empresa_status",
+            "ix_grupo_comercial_membros_empresa_status",
             "empresa_id",
             "status",
         ),
@@ -59,7 +59,7 @@ class EmpresaGrupoMembro(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     grupo_id = Column(
         Integer,
-        ForeignKey("empresa_grupos.id", ondelete="CASCADE"),
+        ForeignKey("grupos_comerciais.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
     )
@@ -77,14 +77,14 @@ class EmpresaGrupoMembro(Base):
     removido_em = Column(DateTime(timezone=True), nullable=True)
 
 
-class EmpresaGrupoCodigo(Base):
-    __tablename__ = "empresa_grupo_codigos"
+class GrupoComercialCodigo(Base):
+    __tablename__ = "grupo_comercial_codigos"
     __table_args__ = (
         UniqueConstraint(
-            "empresa_id", "competencia", name="uq_empresa_grupo_codigo_competencia"
+            "empresa_id", "competencia", name="uq_grupo_comercial_codigo_competencia"
         ),
         Index(
-            "ix_empresa_grupo_codigos_empresa_validade",
+            "ix_grupo_comercial_codigos_empresa_validade",
             "empresa_id",
             "expira_em",
         ),
@@ -103,16 +103,16 @@ class EmpresaGrupoCodigo(Base):
     expira_em = Column(DateTime(timezone=True), nullable=False)
 
 
-class EmpresaGrupoConvite(Base):
-    __tablename__ = "empresa_grupo_convites"
+class GrupoComercialConvite(Base):
+    __tablename__ = "grupo_comercial_convites"
     __table_args__ = (
         UniqueConstraint(
             "grupo_id",
             "empresa_convidada_id",
-            name="uq_empresa_grupo_convite_empresa",
+            name="uq_grupo_comercial_convite_empresa",
         ),
         Index(
-            "ix_empresa_grupo_convites_destino_status",
+            "ix_grupo_comercial_convites_destino_status",
             "empresa_convidada_id",
             "status",
             "expira_em",
@@ -122,7 +122,7 @@ class EmpresaGrupoConvite(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     grupo_id = Column(
         Integer,
-        ForeignKey("empresa_grupos.id", ondelete="CASCADE"),
+        ForeignKey("grupos_comerciais.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
     )
@@ -144,21 +144,21 @@ class EmpresaGrupoConvite(Base):
     respondido_em = Column(DateTime(timezone=True), nullable=True)
 
 
-class EmpresaGrupoTransferencia(Base):
-    __tablename__ = "empresa_grupo_transferencias"
+class GrupoComercialTransferencia(Base):
+    __tablename__ = "grupo_comercial_transferencias"
     __table_args__ = (
         UniqueConstraint(
             "empresa_origem_id",
             "chave_idempotencia",
-            name="uq_empresa_grupo_transferencia_idempotencia",
+            name="uq_grupo_comercial_transferencia_idempotencia",
         ),
         Index(
-            "ix_empresa_grupo_transferencias_grupo_criado",
+            "ix_grupo_comercial_transferencias_grupo_criado",
             "grupo_id",
             "criado_em",
         ),
         Index(
-            "ix_empresa_grupo_transferencias_destino_criado",
+            "ix_grupo_comercial_transferencias_destino_criado",
             "empresa_destino_id",
             "criado_em",
         ),
@@ -167,7 +167,7 @@ class EmpresaGrupoTransferencia(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     grupo_id = Column(
         Integer,
-        ForeignKey("empresa_grupos.id", ondelete="RESTRICT"),
+        ForeignKey("grupos_comerciais.id", ondelete="RESTRICT"),
         nullable=False,
     )
     empresa_origem_id = Column(
@@ -193,7 +193,7 @@ class EmpresaGrupoTransferencia(Base):
     concluido_em = Column(DateTime(timezone=True), nullable=True)
 
 
-class EmpresaGrupoProdutoVinculo(Base):
+class GrupoComercialProdutoVinculo(Base):
     """Equivalencia manual entre produtos de empresas do mesmo grupo.
 
     Os IDs de produto nao recebem chave estrangeira porque pertencem a tenants
@@ -201,7 +201,7 @@ class EmpresaGrupoProdutoVinculo(Base):
     participacao ativa antes de criar ou consultar o vinculo.
     """
 
-    __tablename__ = "empresa_grupo_produto_vinculos"
+    __tablename__ = "grupo_comercial_produto_vinculos"
     __table_args__ = (
         UniqueConstraint(
             "grupo_id",
@@ -209,10 +209,10 @@ class EmpresaGrupoProdutoVinculo(Base):
             "produto_a_id",
             "empresa_b_id",
             "produto_b_id",
-            name="uq_empresa_grupo_produto_vinculo_par",
+            name="uq_grupo_comercial_produto_vinculo_par",
         ),
         Index(
-            "ix_empresa_grupo_produto_vinculos_grupo_status",
+            "ix_grupo_comercial_produto_vinculos_grupo_status",
             "grupo_id",
             "status",
         ),
@@ -221,7 +221,7 @@ class EmpresaGrupoProdutoVinculo(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     grupo_id = Column(
         Integer,
-        ForeignKey("empresa_grupos.id", ondelete="CASCADE"),
+        ForeignKey("grupos_comerciais.id", ondelete="CASCADE"),
         nullable=False,
     )
     empresa_a_id = Column(
@@ -249,7 +249,7 @@ class EmpresaGrupoProdutoVinculo(Base):
     removido_em = Column(DateTime(timezone=True), nullable=True)
 
 
-class EmpresaGrupoEstoqueCompartilhado(Base):
+class GrupoComercialEstoqueCompartilhado(Base):
     """Autoriza uma empresa do grupo a vender o saldo de outra empresa.
 
     O produto e o estoque continuam pertencendo exclusivamente ao tenant de
@@ -257,22 +257,22 @@ class EmpresaGrupoEstoqueCompartilhado(Base):
     consumidora; ele nunca transfere saldo entre empresas.
     """
 
-    __tablename__ = "empresa_grupo_estoques_compartilhados"
+    __tablename__ = "grupo_comercial_estoques_compartilhados"
     __table_args__ = (
         UniqueConstraint(
             "grupo_id",
             "empresa_origem_id",
             "produto_origem_id",
             "empresa_consumidora_id",
-            name="uq_empresa_grupo_estoque_compartilhado",
+            name="uq_grupo_comercial_estoque_compartilhado",
         ),
         Index(
-            "ix_empresa_grupo_estoque_compartilhado_consumidora_status",
+            "ix_grupo_comercial_estoque_compartilhado_consumidora_status",
             "empresa_consumidora_id",
             "status",
         ),
         Index(
-            "ix_empresa_grupo_estoque_compartilhado_origem_status",
+            "ix_grupo_comercial_estoque_compartilhado_origem_status",
             "empresa_origem_id",
             "status",
         ),
@@ -281,7 +281,7 @@ class EmpresaGrupoEstoqueCompartilhado(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     grupo_id = Column(
         Integer,
-        ForeignKey("empresa_grupos.id", ondelete="CASCADE"),
+        ForeignKey("grupos_comerciais.id", ondelete="CASCADE"),
         nullable=False,
     )
     empresa_origem_id = Column(

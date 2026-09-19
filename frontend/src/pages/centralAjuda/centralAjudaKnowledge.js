@@ -61,21 +61,21 @@ export const BASE_CONHECIMENTO = [
         ],
       },
       {
-        slug: "grupos-empresas-convites",
-        titulo: "Como criar um grupo de empresas e enviar convites",
+        slug: "grupos-comerciais-convites",
+        titulo: "Como adicionar lojas ao seu grupo comercial e enviar convites",
         tags: ["grupo", "empresas", "convite", "codigo mensal", "consolidado"],
         conteudo: [
-          "Acesse **Configurações → Grupos de Empresas** no ERP.",
+          "Acesse **Configurações → Grupos Comerciais** no ERP. Toda loja já nasce dentro do próprio grupo comercial — não é preciso criar um grupo antes de usar os recursos abaixo.",
           "Na parte **Código mensal da sua empresa**, copie o código e envie somente para a empresa que deverá convidá-la. O código muda automaticamente no início de cada mês.",
-          "Para administrar um grupo, informe um nome em **Criar um grupo**. A empresa que cria o grupo fica como responsável pelos convites e membros.",
-          "Para convidar outra empresa, peça o código mensal dela, abra o grupo criado, preencha **Convidar empresa** e confirme.",
+          "Para abrir mais uma loja sua dentro do mesmo grupo, preencha **Adicionar nova loja ao grupo** com o nome da loja — ela é criada e já entra no grupo, sem precisar de convite.",
+          "Para unir uma empresa que já existia separadamente, peça o código mensal dela, preencha **Convidar empresa já existente** e confirme.",
           "A empresa convidada verá o aviso em **Convites recebidos** e poderá **Aceitar** ou **Recusar**. O vínculo só é criado depois do aceite.",
           "O código não permite acessar dados e não adiciona a empresa automaticamente. Ele serve apenas para localizar com segurança o destino do convite.",
           "A empresa responsável pode remover membros. Os dados continuam separados por empresa, e a transferência integrada só acontece depois da escolha e confirmação do usuário.",
         ],
       },
       {
-        slug: "visao-consolidada-grupo-empresas",
+        slug: "visao-consolidada-grupo-comercial",
         titulo: "Como analisar pedidos, produtos e financeiro de um grupo",
         tags: [
           "grupo",
@@ -92,7 +92,7 @@ export const BASE_CONHECIMENTO = [
         ],
         conteudo: [
           "Antes de começar, as empresas precisam ser membros ativos do mesmo grupo e o usuário precisa ter permissão de relatório gerencial ou financeiro.",
-          "Acesse **Configurações → Grupos de Empresas** e clique em **Ver visão consolidada** no grupo desejado.",
+          "Acesse **Configurações → Grupos Comerciais** e clique em **Ver visão consolidada** no grupo desejado.",
           "Escolha o período das vendas: 7, 30, 90, 180 ou 365 dias. O valor vendido e o ticket médio são atualizados pelo período selecionado.",
           "Na aba **Pedidos / vendas**, consulte as vendas de todas as empresas em ordem de data. Use a busca por número, cliente ou canal e filtre uma empresa quando necessário.",
           "Na aba **Produtos vendidos**, pesquise nome, SKU ou código de barras. O CorePet soma automaticamente produtos com o mesmo EAN e mostra quantidade, receita, estoque atual e estimativa de cobertura.",
@@ -118,7 +118,7 @@ export const BASE_CONHECIMENTO = [
         titulo: "Como transferir produtos entre empresas do grupo",
         tags: ["grupo", "empresas", "transferencia", "estoque", "codigo de barras"],
         conteudo: [
-          "Antes de começar, as duas empresas precisam estar como membros ativos do mesmo grupo em **Configurações → Grupos de Empresas**.",
+          "Antes de começar, as duas empresas precisam estar como membros ativos do mesmo grupo em **Configurações → Grupos Comerciais**.",
           "Acesse **Produtos / Estoque → Transferência Parceiro** e escolha **Entre empresas do grupo** no tipo de lançamento.",
           "Selecione a empresa de destino, adicione os produtos, informe quantidades e valores e clique em **Transferir e dar entrada**.",
           "O sistema confere cada produto primeiro pelos **Vínculos de produtos** do grupo e, quando não houver vínculo, pelo mesmo código de barras ou GTIN nas duas empresas. Correspondência ausente, duplicada ou inativa no destino bloqueia a operação e aparece na conferência.",

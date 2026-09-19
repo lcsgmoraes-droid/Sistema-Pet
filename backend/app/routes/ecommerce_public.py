@@ -27,8 +27,8 @@ from app.services.ecommerce_catalog_health import (
 )
 from app.tenant_identity import normalize_tenant_name
 from app.tenancy.context import set_current_tenant
-from app.empresa_grupo_estoque_compartilhado_service import (
-    EmpresaGrupoEstoqueCompartilhadoService,
+from app.grupo_comercial_estoque_compartilhado_service import (
+    GrupoComercialEstoqueCompartilhadoService,
 )
 
 
@@ -60,7 +60,7 @@ _ANALYTICS_EVENT_NAMES = {
 
 def _escopo_catalogo_publico(db: Session, tenant_id):
     compartilhados = (
-        EmpresaGrupoEstoqueCompartilhadoService.mapa_catalogo_completo_para_consumidora(
+        GrupoComercialEstoqueCompartilhadoService.mapa_catalogo_completo_para_consumidora(
             db, tenant_id
         )
     )

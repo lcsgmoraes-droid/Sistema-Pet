@@ -9,7 +9,7 @@ from sqlalchemy import desc, or_
 from sqlalchemy.orm import Session, joinedload
 
 from app.bling_estoque_sync import sincronizar_bling_background
-from app.empresa_grupo_models import EmpresaGrupoTransferencia
+from app.grupo_comercial_models import GrupoComercialTransferencia
 from app.financeiro_models import ContaPagar
 from app.models import Cliente
 from app.produtos_models import EstoqueMovimentacao, Produto
@@ -439,10 +439,10 @@ def listar_entradas_parceiro(
     contas = query.order_by(desc(ContaPagar.data_emissao), desc(ContaPagar.id)).all()
     registros = [serializar_entrada_parceiro(conta) for conta in contas]
     integradas = (
-        db.query(EmpresaGrupoTransferencia)
+        db.query(GrupoComercialTransferencia)
         .filter(
-            EmpresaGrupoTransferencia.empresa_destino_id == str(tenant_id),
-            EmpresaGrupoTransferencia.conta_pagar_destino_id.in_(
+            GrupoComercialTransferencia.empresa_destino_id == str(tenant_id),
+            GrupoComercialTransferencia.conta_pagar_destino_id.in_(
                 [conta.id for conta in contas]
             ),
         )

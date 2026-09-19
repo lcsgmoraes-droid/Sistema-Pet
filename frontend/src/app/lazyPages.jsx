@@ -126,15 +126,21 @@ export const LGPDOperacional = lazy(() => import("../pages/LGPDOperacional.jsx")
 export const OpsDashboard = lazy(() => import("../pages/OpsDashboard.jsx"));
 export const OpsIncidentes = lazy(() => import("../pages/OpsIncidentes.jsx"));
 export const OpsTenants = lazy(() => import("../pages/OpsTenants.jsx"));
+export const OpsGrupoComercialOnboarding = lazy(() =>
+  import("../pages/ops-tenants/OpsGrupoComercialOnboardingPage.jsx"),
+);
 export const Observabilidade = lazy(() => import("../pages/Observabilidade.jsx"));
 export const StyleGuide = lazy(() => import("../pages/styleGuide/StyleGuide.jsx"));
 export const Configuracoes = lazy(() => import("../pages/Configuracoes"));
 export const ConfiguracaoFiscalEmpresa = lazy(
   () => import("../pages/configuracoes/ConfiguracaoFiscalEmpresa"),
 );
-export const GruposEmpresas = lazy(() => import("../pages/configuracoes/GruposEmpresas"));
+export const GruposComerciais = lazy(() => import("../pages/configuracoes/GruposComerciais"));
 export const VisaoConsolidadaGrupo = lazy(
   () => import("../pages/configuracoes/VisaoConsolidadaGrupo"),
+);
+export const GrupoComercialMestres = lazy(
+  () => import("../pages/configuracoes/GrupoComercialMestres"),
 );
 export const EntregasConfig = lazy(() => import("../pages/configuracoes/EntregasConfig"));
 export const CustosMoto = lazy(() => import("../pages/configuracoes/CustosMoto"));

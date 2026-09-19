@@ -38,6 +38,11 @@ class Categoria(BaseTenantModel):
     icone = Column(String(50), nullable=True)
     cor = Column(String(7), nullable=True)  # Hex color
     ordem = Column(Integer, default=0)
+    # Vínculo opcional com a categoria-mestre do grupo comercial (ver
+    # app/produto_mestre_models.py) — sem vínculo, funciona como hoje.
+    categoria_mestre_id = Column(
+        Integer, ForeignKey("categoria_mestre.id", ondelete="SET NULL"), nullable=True
+    )
 
     # Auditoria
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
@@ -63,6 +68,9 @@ class Marca(BaseTenantModel):
     descricao = Column(Text, nullable=True)
     logo = Column(String(255), nullable=True)
     site = Column(String(255), nullable=True)
+    marca_mestre_id = Column(
+        Integer, ForeignKey("marca_mestre.id", ondelete="SET NULL"), nullable=True
+    )
 
     # Auditoria
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
@@ -84,6 +92,11 @@ class Departamento(BaseTenantModel):
     id = Column(Integer, primary_key=True)
     nome = Column(String(100), nullable=False)
     descricao = Column(Text, nullable=True)
+    departamento_mestre_id = Column(
+        Integer,
+        ForeignKey("departamento_mestre.id", ondelete="SET NULL"),
+        nullable=True,
+    )
 
     # Auditoria
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
@@ -109,6 +122,13 @@ class Produto(BaseTenantModel):
     nome = Column(String(200), nullable=False)
     tipo = Column(String(20), default="produto")  # produto, servico, produto_servico
     situacao = Column(Boolean, default=True)  # ativo/inativo
+    # Vínculo opcional com o produto-mestre do grupo comercial (ver
+    # app/produto_mestre_models.py). Sem vínculo, cadastro 100% independente
+    # igual hoje; preço/estoque/fornecedor continuam sempre locais, com ou
+    # sem vínculo.
+    produto_mestre_id = Column(
+        Integer, ForeignKey("produto_mestre.id", ondelete="SET NULL"), nullable=True
+    )
 
     @property
     def controlar_estoque(self) -> bool:

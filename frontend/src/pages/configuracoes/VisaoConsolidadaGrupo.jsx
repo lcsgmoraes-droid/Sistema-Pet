@@ -19,7 +19,7 @@ import ModuleTabs from "../../components/ui/ModuleTabs";
 import PageHeader from "../../components/ui/PageHeader";
 import Panel from "../../components/ui/Panel";
 import StatusBadge from "../../components/ui/StatusBadge";
-import { obterVisaoConsolidadaGrupo } from "../../services/gruposEmpresas";
+import { obterVisaoConsolidadaGrupo } from "../../services/gruposComerciais";
 import { formatMoneyBRL } from "../../utils/formatters";
 import GrupoContasPagarTab from "./visaoGrupo/GrupoContasPagarTab";
 import GrupoAnaliseFinanceiraTab from "./visaoGrupo/GrupoAnaliseFinanceiraTab";
@@ -92,11 +92,11 @@ export default function VisaoConsolidadaGrupo() {
   return (
     <div className="mx-auto max-w-7xl space-y-6 p-6">
       <Link
-        to="/configuracoes/grupos-empresas"
+        to="/configuracoes/grupos-comerciais"
         className="inline-flex items-center gap-1 text-sm font-medium text-blue-600 hover:text-blue-700"
       >
         <FiChevronLeft aria-hidden="true" />
-        Voltar para Grupos de empresas
+        Voltar para Grupos Comerciais
       </Link>
 
       <PageHeader

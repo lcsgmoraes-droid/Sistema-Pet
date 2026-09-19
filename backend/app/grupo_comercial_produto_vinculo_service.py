@@ -7,19 +7,19 @@ from uuid import UUID
 from fastapi import HTTPException, status
 from sqlalchemy import or_
 
-from app.empresa_grupo_analise_detalhes_service import (
-    EmpresaGrupoAnaliseDetalhesService,
+from app.grupo_comercial_analise_detalhes_service import (
+    GrupoComercialAnaliseDetalhesService,
     _iso_data_hora,
     _texto,
 )
-from app.empresa_grupo_analise_service import _moeda, _quantidade
-from app.empresa_grupo_models import EmpresaGrupoProdutoVinculo
+from app.grupo_comercial_analise_service import _moeda, _quantidade
+from app.grupo_comercial_models import GrupoComercialProdutoVinculo
 from app.produtos_models import Produto
 from app.services.business_audit_service import log_business_event
 from app.tenancy.context import tenant_context
 
 
-class EmpresaGrupoProdutoVinculoService(EmpresaGrupoAnaliseDetalhesService):
+class GrupoComercialProdutoVinculoService(GrupoComercialAnaliseDetalhesService):
     def buscar_produtos(
         self,
         grupo_id: int,
@@ -144,12 +144,12 @@ class EmpresaGrupoProdutoVinculoService(EmpresaGrupoAnaliseDetalhesService):
     def listar_vinculos(self, grupo_id: int, empresa_atual_id) -> dict:
         grupo, _membros, membros_por_id = self._contexto(grupo_id, empresa_atual_id)
         vinculos = (
-            self.db.query(EmpresaGrupoProdutoVinculo)
+            self.db.query(GrupoComercialProdutoVinculo)
             .filter(
-                EmpresaGrupoProdutoVinculo.grupo_id == grupo.id,
-                EmpresaGrupoProdutoVinculo.status == "ativo",
+                GrupoComercialProdutoVinculo.grupo_id == grupo.id,
+                GrupoComercialProdutoVinculo.status == "ativo",
             )
-            .order_by(EmpresaGrupoProdutoVinculo.criado_em.desc())
+            .order_by(GrupoComercialProdutoVinculo.criado_em.desc())
             .all()
         )
         return {
@@ -184,10 +184,10 @@ class EmpresaGrupoProdutoVinculoService(EmpresaGrupoAnaliseDetalhesService):
         self._produto(produto_b.empresa_id, produto_b.produto_id)
 
         conflitos = (
-            self.db.query(EmpresaGrupoProdutoVinculo)
+            self.db.query(GrupoComercialProdutoVinculo)
             .filter(
-                EmpresaGrupoProdutoVinculo.grupo_id == grupo.id,
-                EmpresaGrupoProdutoVinculo.status == "ativo",
+                GrupoComercialProdutoVinculo.grupo_id == grupo.id,
+                GrupoComercialProdutoVinculo.status == "ativo",
             )
             .all()
         )
@@ -214,18 +214,18 @@ class EmpresaGrupoProdutoVinculoService(EmpresaGrupoAnaliseDetalhesService):
                 )
 
         vinculo = (
-            self.db.query(EmpresaGrupoProdutoVinculo)
+            self.db.query(GrupoComercialProdutoVinculo)
             .filter(
-                EmpresaGrupoProdutoVinculo.grupo_id == grupo.id,
-                EmpresaGrupoProdutoVinculo.empresa_a_id == produto_a.empresa_id,
-                EmpresaGrupoProdutoVinculo.produto_a_id == produto_a.produto_id,
-                EmpresaGrupoProdutoVinculo.empresa_b_id == produto_b.empresa_id,
-                EmpresaGrupoProdutoVinculo.produto_b_id == produto_b.produto_id,
+                GrupoComercialProdutoVinculo.grupo_id == grupo.id,
+                GrupoComercialProdutoVinculo.empresa_a_id == produto_a.empresa_id,
+                GrupoComercialProdutoVinculo.produto_a_id == produto_a.produto_id,
+                GrupoComercialProdutoVinculo.empresa_b_id == produto_b.empresa_id,
+                GrupoComercialProdutoVinculo.produto_b_id == produto_b.produto_id,
             )
             .first()
         )
         if vinculo is None:
-            vinculo = EmpresaGrupoProdutoVinculo(
+            vinculo = GrupoComercialProdutoVinculo(
                 grupo_id=grupo.id,
                 empresa_a_id=produto_a.empresa_id,
                 produto_a_id=produto_a.produto_id,
@@ -245,8 +245,8 @@ class EmpresaGrupoProdutoVinculoService(EmpresaGrupoAnaliseDetalhesService):
             db=self.db,
             tenant_id=str(empresa_atual_id),
             user_id=usuario_id,
-            event="empresa_grupo_produtos_vinculados",
-            entity_type="empresa_grupo_produto_vinculo",
+            event="grupo_comercial_produtos_vinculados",
+            entity_type="grupo_comercial_produto_vinculo",
             entity_id=vinculo.id,
             metadata={"grupo_id": grupo.id, "produto_a": chave_a, "produto_b": chave_b},
             commit=False,
@@ -263,11 +263,11 @@ class EmpresaGrupoProdutoVinculoService(EmpresaGrupoAnaliseDetalhesService):
     ) -> dict:
         grupo, _membros_por_id = self._exigir_responsavel(grupo_id, empresa_atual_id)
         vinculo = (
-            self.db.query(EmpresaGrupoProdutoVinculo)
+            self.db.query(GrupoComercialProdutoVinculo)
             .filter(
-                EmpresaGrupoProdutoVinculo.id == vinculo_id,
-                EmpresaGrupoProdutoVinculo.grupo_id == grupo.id,
-                EmpresaGrupoProdutoVinculo.status == "ativo",
+                GrupoComercialProdutoVinculo.id == vinculo_id,
+                GrupoComercialProdutoVinculo.grupo_id == grupo.id,
+                GrupoComercialProdutoVinculo.status == "ativo",
             )
             .with_for_update()
             .first()
@@ -283,8 +283,8 @@ class EmpresaGrupoProdutoVinculoService(EmpresaGrupoAnaliseDetalhesService):
             db=self.db,
             tenant_id=str(empresa_atual_id),
             user_id=usuario_id,
-            event="empresa_grupo_produtos_desvinculados",
-            entity_type="empresa_grupo_produto_vinculo",
+            event="grupo_comercial_produtos_desvinculados",
+            entity_type="grupo_comercial_produto_vinculo",
             entity_id=vinculo.id,
             metadata={"grupo_id": grupo.id},
             commit=False,

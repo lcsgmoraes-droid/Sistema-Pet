@@ -73,7 +73,7 @@ test("createLayoutMenuItems sinaliza convites pendentes de grupos de empresas", 
   const items = createLayoutMenuItems({ convitesGruposCount: 3 });
   const configuracoes = findMenuItem(items, "/configuracoes");
   const grupos = configuracoes?.submenu?.find(
-    (item) => item.path === "/configuracoes/grupos-empresas",
+    (item) => item.path === "/configuracoes/grupos-comerciais",
   );
 
   assert.equal(grupos?.badge, true);

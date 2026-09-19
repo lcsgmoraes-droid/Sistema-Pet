@@ -8,13 +8,13 @@ from sqlalchemy.orm import Session
 from sqlalchemy.pool import StaticPool
 
 from app.db import Base
-from app.empresa_grupo_estoque_compartilhado_service import (
-    EmpresaGrupoEstoqueCompartilhadoService,
+from app.grupo_comercial_estoque_compartilhado_service import (
+    GrupoComercialEstoqueCompartilhadoService,
 )
-from app.empresa_grupo_models import (
-    EmpresaGrupo,
-    EmpresaGrupoEstoqueCompartilhado,
-    EmpresaGrupoMembro,
+from app.grupo_comercial_models import (
+    GrupoComercial,
+    GrupoComercialEstoqueCompartilhado,
+    GrupoComercialMembro,
 )
 from app.estoque.service import EstoqueService
 from app.models import Tenant, User
@@ -34,7 +34,7 @@ CONSUMIDORA = "72222222-2222-2222-2222-222222222222"
 
 
 def test_id_de_empresa_se_adapta_ao_tipo_fisico_do_banco():
-    service = EmpresaGrupoEstoqueCompartilhadoService(None)
+    service = GrupoComercialEstoqueCompartilhadoService(None)
 
     assert service._valor_empresa_para_coluna(ORIGEM, Column(String(36))) == ORIGEM
     assert service._valor_empresa_para_coluna(
@@ -60,22 +60,22 @@ def db(monkeypatch):
             ProdutoFornecedor.__table__,
             ProdutoConfigFiscal.__table__,
             EstoqueMovimentacao.__table__,
-            EmpresaGrupo.__table__,
-            EmpresaGrupoMembro.__table__,
-            EmpresaGrupoEstoqueCompartilhado.__table__,
+            GrupoComercial.__table__,
+            GrupoComercialMembro.__table__,
+            GrupoComercialEstoqueCompartilhado.__table__,
         ],
     )
     session = Session(engine, expire_on_commit=False)
     monkeypatch.setattr(
-        "app.empresa_grupo_estoque_compartilhado_service.log_business_event",
+        "app.grupo_comercial_estoque_compartilhado_service.log_business_event",
         lambda **_kwargs: None,
     )
     monkeypatch.setattr(
-        "app.empresa_grupo_service.log_business_event",
+        "app.grupo_comercial_service.log_business_event",
         lambda **_kwargs: None,
     )
     monkeypatch.setattr(
-        "app.empresa_grupo_estoque_compartilhado_service.registrar_uso_funcionalidade",
+        "app.grupo_comercial_estoque_compartilhado_service.registrar_uso_funcionalidade",
         lambda *_args, **_kwargs: True,
     )
     syncs = []
@@ -124,7 +124,7 @@ def _preparar_cenario(db: Session):
         db.add(produto)
         db.flush()
 
-    grupo = EmpresaGrupo(
+    grupo = GrupoComercial(
         nome="Consolidado Atacadão",
         criado_por_empresa_id=CONSUMIDORA,
         criado_por_usuario_id=1,
@@ -133,13 +133,13 @@ def _preparar_cenario(db: Session):
     db.flush()
     db.add_all(
         [
-            EmpresaGrupoMembro(
+            GrupoComercialMembro(
                 grupo_id=grupo.id,
                 empresa_id=CONSUMIDORA,
                 papel="responsavel",
                 status="ativo",
             ),
-            EmpresaGrupoMembro(
+            GrupoComercialMembro(
                 grupo_id=grupo.id,
                 empresa_id=ORIGEM,
                 papel="membro",
@@ -154,7 +154,7 @@ def _preparar_cenario(db: Session):
 def test_somente_produto_autorizado_pode_ser_resolvido_no_pdv(db):
     session, _syncs = db
     grupo, produto, _usuario = _preparar_cenario(session)
-    service = EmpresaGrupoEstoqueCompartilhadoService(session)
+    service = GrupoComercialEstoqueCompartilhadoService(session)
 
     with tenant_context(CONSUMIDORA):
         with pytest.raises(HTTPException) as sem_autorizacao:
@@ -175,7 +175,7 @@ def test_somente_produto_autorizado_pode_ser_resolvido_no_pdv(db):
 def test_baixa_e_estorno_ocorrem_no_tenant_de_origem_e_disparam_sync(db):
     session, syncs = db
     grupo, produto, _usuario = _preparar_cenario(session)
-    service = EmpresaGrupoEstoqueCompartilhadoService(session)
+    service = GrupoComercialEstoqueCompartilhadoService(session)
     with tenant_context(ORIGEM):
         service.compartilhar(grupo.id, ORIGEM, 1, CONSUMIDORA, [produto.id])
 
@@ -232,7 +232,7 @@ def test_baixa_e_estorno_ocorrem_no_tenant_de_origem_e_disparam_sync(db):
 def test_acesso_completo_ao_catalogo_e_independente_do_uso_do_saldo(db):
     session, _syncs = db
     grupo, produto, _usuario = _preparar_cenario(session)
-    service = EmpresaGrupoEstoqueCompartilhadoService(session)
+    service = GrupoComercialEstoqueCompartilhadoService(session)
 
     with tenant_context(ORIGEM):
         service.compartilhar(grupo.id, ORIGEM, 1, CONSUMIDORA, [produto.id])
@@ -284,7 +284,7 @@ def test_tela_compartilhada_le_lotes_fornecedores_e_fiscal_da_origem(db):
 
     session, _syncs = db
     grupo, produto, usuario = _preparar_cenario(session)
-    service = EmpresaGrupoEstoqueCompartilhadoService(session)
+    service = GrupoComercialEstoqueCompartilhadoService(session)
 
     with tenant_context(ORIGEM):
         service.compartilhar(
@@ -385,7 +385,7 @@ def test_tela_compartilhada_le_lotes_fornecedores_e_fiscal_da_origem(db):
 def test_remover_compartilhamento_bloqueia_nova_venda_sem_apagar_historico(db):
     session, _syncs = db
     grupo, produto, _usuario = _preparar_cenario(session)
-    service = EmpresaGrupoEstoqueCompartilhadoService(session)
+    service = GrupoComercialEstoqueCompartilhadoService(session)
     with tenant_context(ORIGEM):
         service.compartilhar(grupo.id, ORIGEM, 1, CONSUMIDORA, [produto.id])
         item = service.listar(grupo.id, ORIGEM)[0]
@@ -407,24 +407,24 @@ def test_remover_compartilhamento_bloqueia_nova_venda_sem_apagar_historico(db):
 
 
 def test_remover_empresa_do_grupo_revoga_compartilhamentos_anteriores(db):
-    from app.empresa_grupo_service import EmpresaGrupoService
+    from app.grupo_comercial_service import GrupoComercialService
 
     session, _syncs = db
     grupo, produto, _usuario = _preparar_cenario(session)
-    compartilhamento_service = EmpresaGrupoEstoqueCompartilhadoService(session)
+    compartilhamento_service = GrupoComercialEstoqueCompartilhadoService(session)
     with tenant_context(ORIGEM):
         compartilhamento_service.compartilhar(
             grupo.id, ORIGEM, 1, CONSUMIDORA, [produto.id]
         )
 
     with tenant_context(CONSUMIDORA):
-        EmpresaGrupoService(session).remover_membro(
+        GrupoComercialService(session).remover_membro(
             CONSUMIDORA,
             1,
             grupo.id,
             ORIGEM,
         )
 
-    compartilhamento = session.query(EmpresaGrupoEstoqueCompartilhado).one()
+    compartilhamento = session.query(GrupoComercialEstoqueCompartilhado).one()
     assert compartilhamento.status == "removido"
     assert compartilhamento.removido_em is not None

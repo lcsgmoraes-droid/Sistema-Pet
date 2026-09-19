@@ -2,34 +2,31 @@
 
 import logging
 import uuid
-from datetime import timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy import func, or_
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.auth import hash_password, verify_password
+from app.auth import verify_password
 from app.auth.auth_multitenant_schemas import (
     LoginRequest,
     LoginResponse,
     RegisterRequest,
 )
 from app.auth.auth_multitenant_support import (
-    DEFAULT_TRIAL_DAYS,
     _auth_payload,
     _create_token_pair,
     _email_verification_block,
     _email_verification_required_for_request,
     _mark_user_consent,
-    _now_utc,
     _send_email_verification,
     _session_expiry_utc,
-    grant_all_permissions_to_role,
 )
 from app.auth.core import ACCESS_TOKEN_EXPIRE_DAYS
 from app.db import get_session
-from app.models import Role, Tenant, User, UserTenant
+from app.grupo_comercial_service import GrupoComercialService
+from app.models import Tenant, User, UserTenant
 from app.services.auth_security import (
     get_request_ip,
     is_user_locked,
@@ -38,9 +35,11 @@ from app.services.auth_security import (
     register_successful_login,
     remaining_lock_seconds,
 )
-from app.services.default_roles_service import create_default_roles_for_new_tenant
-from app.services.tenant_onboarding_service import onboard_tenant_defaults
 from app.services.plan_catalog import resolve_signup_selection
+from app.services.tenant_provisioning_service import (
+    TenantOnboardingError,
+    provision_tenant,
+)
 from app.services.user_account_service import (
     UserAccountError,
     looks_like_login_phone,
@@ -50,7 +49,6 @@ from app.services.tenant_login_name_service import (
     TenantLoginNameError,
     get_primary_tenant_login_name_value,
     resolve_tenant_id_by_login_name,
-    set_primary_tenant_login_name,
 )
 from app.session_manager import create_session
 from app.tenancy.context import clear_tenant_context, set_tenant_context
@@ -153,26 +151,17 @@ def register(
     tenant_name = tenant_name.strip()
     tenant_login_name = payload.nome_acesso or tenant_name
 
-    tenant_id = uuid.uuid4()
-    trial_started_at = _now_utc()
-    tenant = Tenant(
-        id=str(tenant_id),
-        name=tenant_name,
-        status="active",
-        plan=selected_plan.code,
-        billing_status="trial",
-        trial_started_at=trial_started_at,
-        trial_ends_at=trial_started_at + timedelta(days=DEFAULT_TRIAL_DAYS),
-        subscription_source="manual",
-        organization_type=organization_type,
-    )
-    db.add(tenant)
     try:
-        db.flush()
-        login_name_change = set_primary_tenant_login_name(
+        provisioning = provision_tenant(
             db,
-            tenant_id,
-            tenant_login_name,
+            tenant_name=tenant_name,
+            login_name=tenant_login_name,
+            plan_code=selected_plan.code,
+            organization_type=organization_type,
+            new_user_email=email,
+            new_user_password=payload.password,
+            new_user_nome=payload.nome,
+            new_user_email_verified=not email_verification_required,
         )
     except TenantLoginNameError as exc:
         db.rollback()
@@ -183,84 +172,30 @@ def register(
             status_code=status.HTTP_409_CONFLICT,
             detail="Este nome de acesso ja esta em uso por outra empresa.",
         ) from exc
-
-    set_tenant_context(tenant_id)
-
-    user = User(
-        email=email,
-        hashed_password=hash_password(payload.password),
-        nome=payload.nome,
-        nome_loja=payload.nome_loja,
-        is_active=True,
-        is_admin=False,
-        email_verified=not email_verification_required,
-        email_verified_at=_now_utc() if not email_verification_required else None,
-        tenant_id=tenant_id,
-    )
-    _mark_user_consent(user, request, payload.terms_version, payload.privacy_version)
-    db.add(user)
-    db.flush()
-
-    admin_role = Role(
-        name="Administrador",
-        tenant_id=tenant_id,
-    )
-    db.add(admin_role)
-    db.flush()
-
-    permissions_granted = grant_all_permissions_to_role(
-        role_id=admin_role.id, tenant_id=tenant_id, db=db
-    )
-    db.flush()
-
-    logger.info(
-        "Role 'Administrador' criada para tenant %s: %s permissoes vinculadas",
-        tenant_id,
-        permissions_granted,
-    )
-
-    try:
-        default_roles_result = create_default_roles_for_new_tenant(db, tenant_id)
-        db.flush()
-        logger.info(
-            "Perfis operacionais padrao criados para tenant %s: %s",
-            tenant_id,
-            default_roles_result,
-        )
-
-        onboarding_result = onboard_tenant_defaults(
-            db=db,
-            tenant_id=tenant_id,
-            user_id=user.id,
-            dry_run=False,
-            strict_required=True,
-        )
-        db.flush()
-        logger.info(
-            "Onboarding inicial do tenant %s concluido: %s",
-            tenant_id,
-            onboarding_result,
-        )
-    except Exception:
+    except TenantOnboardingError:
         logger.warning(
-            "Nao foi possivel criar os dados padrao de onboarding para o tenant %s",
-            tenant_id,
+            "Nao foi possivel criar os dados padrao de onboarding para o novo tenant",
             exc_info=True,
         )
-        clear_tenant_context()
         db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Nao foi possivel criar os dados padrao da empresa. Tente novamente em instantes.",
         )
 
-    user_tenant = UserTenant(
-        user_id=user.id,
-        tenant_id=tenant_id,
-        role_id=admin_role.id,
-        is_active=True,
+    tenant_id = provisioning.tenant_id
+    tenant = provisioning.tenant
+    user = provisioning.user
+    admin_role = provisioning.admin_role
+
+    _mark_user_consent(user, request, payload.terms_version, payload.privacy_version)
+
+    # Todo tenant novo nasce dentro de um grupo comercial — grupo-de-1 quando
+    # e autocadastro, ver GrupoComercialService.criar_grupo (commit=False:
+    # esta rota e quem decide quando commitar a transacao inteira).
+    GrupoComercialService(db).criar_grupo(
+        empresa_id=str(tenant_id), usuario_id=user.id, nome=tenant_name, commit=False
     )
-    db.add(user_tenant)
 
     email_verification_sent = False
     if email_verification_required:
@@ -281,7 +216,7 @@ def register(
         {
             "id": str(tenant_id),
             "name": tenant.name,
-            "login_name": login_name_change.new_name,
+            "login_name": provisioning.login_name,
             "role_id": admin_role.id,
         }
     ]

@@ -699,8 +699,8 @@ export function createLayoutMenuItems({
           permission: "configuracoes.editar",
         },
         {
-          path: "/configuracoes/grupos-empresas",
-          label: "Grupos de Empresas",
+          path: "/configuracoes/grupos-comerciais",
+          label: "Grupos Comerciais",
           permission: "configuracoes.empresa",
           anyOfPermissions: ["configuracoes.empresa", "configuracoes.editar"],
           badge: convitesGruposCount > 0,

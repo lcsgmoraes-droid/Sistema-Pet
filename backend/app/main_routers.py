@@ -132,7 +132,7 @@ from app.funcionarios_routes import router as funcionarios_router
 from app.empresa_config_routes import router as empresa_config_router
 from app.pdv_indicadores_routes import router as pdv_indicadores_router
 from app.empresa_routes import router as empresa_router
-from app.empresa_grupo_routes import router as empresa_grupo_router
+from app.grupo_comercial_routes import router as grupo_comercial_router
 from app.api.endpoints.configuracoes_entrega import (
     router as configuracoes_entrega_router,
 )
@@ -182,6 +182,18 @@ from app.routes.error_events_routes import (
 from app.routes.ops_tenants_routes import (
     router as ops_tenants_router,
 )  # Gestao operacional de tenants
+from app.routes.ops_grupo_comercial_routes import (
+    router as ops_grupo_comercial_router,
+)  # Onboarding assistido de grupo comercial (1 -> N)
+from app.produto_mestre_routes import (
+    router as produto_mestre_router,
+)  # Camada geral do grupo comercial, Checkpoint 2
+from app.pet_mestre_routes import (
+    router as pet_mestre_router,
+)  # Camada geral do grupo comercial, Checkpoint 3
+from app.pessoa_mestre_routes import (
+    router as pessoa_mestre_router,
+)  # Camada geral do grupo comercial, Checkpoint 4
 from app.platform_auth import router as platform_auth_router
 from app.routes.evolucao_routes import router as evolucao_router
 from app.lgpd_routes import router as lgpd_router  # LGPD operacional
@@ -257,6 +269,10 @@ def register_routers(app: FastAPI) -> None:
     app.include_router(platform_auth_router)
     app.include_router(error_events_router)
     app.include_router(ops_tenants_router)
+    app.include_router(ops_grupo_comercial_router)
+    app.include_router(produto_mestre_router)
+    app.include_router(pet_mestre_router)
+    app.include_router(pessoa_mestre_router)
     app.include_router(evolucao_router)
     app.include_router(product_images_public_router)
     app.include_router(ofertas_estudio_public_router)
@@ -575,7 +591,7 @@ def register_routers(app: FastAPI) -> None:
     app.include_router(empresa_config_router, tags=["Empresa - Configuração Geral"])
     app.include_router(pdv_indicadores_router, tags=["PDV - Indicadores e Margens"])
     app.include_router(empresa_router, tags=["Empresa - Configurações"])
-    app.include_router(empresa_grupo_router)
+    app.include_router(grupo_comercial_router)
     app.include_router(
         configuracoes_entrega_router,
         tags=["Configurações - Entregas"],

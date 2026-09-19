@@ -20,8 +20,8 @@ from app.produtos.validators import (
 from app.produtos_models import Produto
 from app.security.permissions_decorator import require_permission
 from app.services.kit_custo_service import KitCustoService
-from app.empresa_grupo_estoque_compartilhado_service import (
-    EmpresaGrupoEstoqueCompartilhadoService,
+from app.grupo_comercial_estoque_compartilhado_service import (
+    GrupoComercialEstoqueCompartilhadoService,
 )
 from app.tenancy.context import set_current_tenant
 
@@ -41,7 +41,7 @@ def atualizar_preco_produto(
     """Atualiza apenas o preço de um produto (edição rápida)"""
 
     current_user, tenant_solicitante_id = user_and_tenant
-    acesso_catalogo = EmpresaGrupoEstoqueCompartilhadoService.resolver_produto_catalogo(
+    acesso_catalogo = GrupoComercialEstoqueCompartilhadoService.resolver_produto_catalogo(
         db, tenant_solicitante_id, produto_id
     )
     tenant_id = UUID(str(acesso_catalogo.tenant_origem_id))
@@ -92,7 +92,7 @@ def deletar_produto(
     current_user, tenant_solicitante_id = _validar_tenant_e_obter_usuario(
         user_and_tenant
     )
-    acesso_catalogo = EmpresaGrupoEstoqueCompartilhadoService.resolver_produto_catalogo(
+    acesso_catalogo = GrupoComercialEstoqueCompartilhadoService.resolver_produto_catalogo(
         db, tenant_solicitante_id, produto_id
     )
     tenant_id = UUID(str(acesso_catalogo.tenant_origem_id))
@@ -128,7 +128,7 @@ def atualizar_status_ativo_produto(
     """Ativa ou desativa produto sem removê-lo do sistema."""
 
     _, tenant_solicitante_id = _validar_tenant_e_obter_usuario(user_and_tenant)
-    acesso_catalogo = EmpresaGrupoEstoqueCompartilhadoService.resolver_produto_catalogo(
+    acesso_catalogo = GrupoComercialEstoqueCompartilhadoService.resolver_produto_catalogo(
         db, tenant_solicitante_id, produto_id
     )
     tenant_id = UUID(str(acesso_catalogo.tenant_origem_id))

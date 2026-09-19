@@ -38,7 +38,7 @@ def test_migration_cria_e_remove_estrutura_em_sqlite(tmp_path):
         sa.Column("id", sa.Integer, primary_key=True),
     )
     sa.Table(
-        "empresa_grupos",
+        "grupos_comerciais",
         metadata,
         sa.Column("id", sa.Integer, primary_key=True),
     )
@@ -55,7 +55,7 @@ def test_migration_cria_e_remove_estrutura_em_sqlite(tmp_path):
         migration.upgrade()
 
         inspector = sa.inspect(connection)
-        assert "empresa_grupo_estoques_compartilhados" in inspector.get_table_names()
+        assert "grupo_comercial_estoques_compartilhados" in inspector.get_table_names()
         colunas = {item["name"] for item in inspector.get_columns("venda_itens")}
         assert {
             "estoque_origem_tenant_id",
@@ -66,7 +66,7 @@ def test_migration_cria_e_remove_estrutura_em_sqlite(tmp_path):
         migration.downgrade()
         inspector = sa.inspect(connection)
         assert (
-            "empresa_grupo_estoques_compartilhados" not in inspector.get_table_names()
+            "grupo_comercial_estoques_compartilhados" not in inspector.get_table_names()
         )
         colunas = {item["name"] for item in inspector.get_columns("venda_itens")}
         assert "estoque_origem_tenant_id" not in colunas

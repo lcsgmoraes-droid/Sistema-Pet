@@ -18,7 +18,7 @@ from app.ecommerceai_integration_models import (
     EcommerceAIConnection,
     EcommerceAIConnectionRequest,
 )
-from app.empresa_grupo_models import EmpresaGrupoEstoqueCompartilhado
+from app.grupo_comercial_models import GrupoComercialEstoqueCompartilhado
 from app.estoque_reserva_service import EstoqueReservaService
 from app.models import Tenant
 from app.pedido_integrado_item_models import PedidoIntegradoItem
@@ -48,7 +48,7 @@ def db_session():
         ProdutoKitComponente,
         ProdutoSkuAlias,
         PedidoIntegradoItem,
-        EmpresaGrupoEstoqueCompartilhado,
+        GrupoComercialEstoqueCompartilhado,
         EcommerceAIConnectionRequest,
         EcommerceAIConnection,
     ):
@@ -262,7 +262,7 @@ def test_shared_stock_query_and_tenant_channel_setting(catalog, db_session):
         == "channel_stock_unsupported"
     )
     tenant.ecommerce_usar_estoque_canal = False
-    shared = EmpresaGrupoEstoqueCompartilhado(
+    shared = GrupoComercialEstoqueCompartilhado(
         grupo_id=1,
         empresa_origem_id=str(product.tenant_id),
         produto_origem_id=product.id,

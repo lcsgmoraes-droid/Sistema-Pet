@@ -14,6 +14,15 @@ from app.db import get_session
 from app.models import Especie, Raca
 from app.auth.dependencies import get_current_user_and_tenant
 from app.audit_log import log_create, log_update, log_delete
+from app.especie_raca_mestre_service import (
+    desvincular_especie_mestre,
+    desvincular_raca_mestre,
+    sugerir_especie_mestre,
+    sugerir_raca_mestre,
+    vincular_especie_mestre,
+    vincular_raca_mestre,
+)
+from app.grupo_comercial_contexto import obter_grupo_id_ativo
 
 logger = logging.getLogger(__name__)
 
@@ -125,10 +134,23 @@ class EspecieResponse(BaseModel):
     id: int
     nome: str
     ativo: bool
+    especie_mestre_id: Optional[int] = None
     created_at: datetime
     updated_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+class MestreSugestaoResponse(BaseModel):
+    id: int
+    nome: str
+
+
+class VincularMestreRequest(BaseModel):
+    mestre_id: Optional[int] = None
+    """Vincula a este mestre existente do grupo. Se omitido, promove o
+    próprio registro local a um mestre novo — única forma de um mestre
+    nascer, sempre por ação explícita."""
 
 
 class RacaCreate(BaseModel):
@@ -149,6 +171,7 @@ class RacaResponse(BaseModel):
     especie_id: int
     especie_nome: Optional[str] = None
     ativo: bool
+    raca_mestre_id: Optional[int] = None
     created_at: datetime
     updated_at: datetime
 
@@ -644,4 +667,159 @@ def deletar_raca(
         data={"nome": raca.nome},
     )
 
+    return None
+
+
+# ========== ESPÉCIE/RAÇA MESTRE (grupo comercial) ==========
+# Ver Documentacao/Dominio/Plano-Camada-Geral.md, Checkpoint 1. Nunca funde
+# automaticamente — só sugere (GET) e vincula quando pedido explicitamente
+# (POST). Sem grupo comercial ativo, os dois endpoints de sugestão retornam
+# null (não deveria acontecer para tenants criados após a fundação
+# automática de grupo, ver GrupoComercialService.criar_grupo).
+
+
+@router.get(
+    "/especies/mestre/sugestao", response_model=Optional[MestreSugestaoResponse]
+)
+def sugerir_mestre_especie(
+    nome: str,
+    db: Session = Depends(get_session),
+    user_and_tenant=Depends(get_current_user_and_tenant),
+):
+    """Existe uma espécie-mestre com este nome em outra loja do mesmo grupo?"""
+    _current_user, tenant_id = user_and_tenant
+    grupo_id = obter_grupo_id_ativo(db, tenant_id)
+    if grupo_id is None:
+        return None
+    return sugerir_especie_mestre(db, grupo_id, nome)
+
+
+@router.post("/especies/{especie_id}/vincular-mestre", response_model=EspecieResponse)
+def vincular_mestre_especie(
+    especie_id: int,
+    payload: VincularMestreRequest,
+    db: Session = Depends(get_session),
+    user_and_tenant=Depends(get_current_user_and_tenant),
+):
+    current_user, tenant_id = user_and_tenant
+    especie = (
+        db.query(Especie)
+        .filter(Especie.id == especie_id, Especie.tenant_id == tenant_id)
+        .first()
+    )
+    if not especie:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Espécie não encontrada"
+        )
+    grupo_id = obter_grupo_id_ativo(db, tenant_id)
+    if grupo_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Esta loja não tem grupo comercial ativo.",
+        )
+    vincular_especie_mestre(
+        db,
+        especie=especie,
+        grupo_id=grupo_id,
+        usuario_id=current_user.id,
+        especie_mestre_id=payload.mestre_id,
+    )
+    db.refresh(especie)
+    return especie
+
+
+@router.get("/racas/mestre/sugestao", response_model=Optional[MestreSugestaoResponse])
+def sugerir_mestre_raca(
+    nome: str,
+    especie_mestre_id: int,
+    db: Session = Depends(get_session),
+    user_and_tenant=Depends(get_current_user_and_tenant),
+):
+    """Existe uma raça-mestre com este nome (dentro da mesma espécie-mestre)
+    em outra loja do mesmo grupo?"""
+    _current_user, tenant_id = user_and_tenant
+    grupo_id = obter_grupo_id_ativo(db, tenant_id)
+    if grupo_id is None:
+        return None
+    return sugerir_raca_mestre(db, grupo_id, especie_mestre_id, nome)
+
+
+@router.post("/racas/{raca_id}/vincular-mestre", response_model=RacaResponse)
+def vincular_mestre_raca(
+    raca_id: int,
+    payload: VincularMestreRequest,
+    db: Session = Depends(get_session),
+    user_and_tenant=Depends(get_current_user_and_tenant),
+):
+    current_user, tenant_id = user_and_tenant
+    raca = (
+        db.query(Raca).filter(Raca.id == raca_id, Raca.tenant_id == tenant_id).first()
+    )
+    if not raca:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Raça não encontrada"
+        )
+    especie = (
+        db.query(Especie)
+        .filter(Especie.id == raca.especie_id, Especie.tenant_id == tenant_id)
+        .first()
+    )
+    if not especie or not especie.especie_mestre_id:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Vincule a espécie desta raça a um mestre antes de vincular a raça.",
+        )
+    grupo_id = obter_grupo_id_ativo(db, tenant_id)
+    if grupo_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Esta loja não tem grupo comercial ativo.",
+        )
+    vincular_raca_mestre(
+        db,
+        raca=raca,
+        grupo_id=grupo_id,
+        especie_mestre_id=especie.especie_mestre_id,
+        usuario_id=current_user.id,
+        raca_mestre_id=payload.mestre_id,
+    )
+    db.refresh(raca)
+    return raca
+
+
+@router.delete("/especies/{especie_id}/vincular-mestre", status_code=status.HTTP_204_NO_CONTENT)
+def remover_vinculo_mestre_especie(
+    especie_id: int,
+    db: Session = Depends(get_session),
+    user_and_tenant=Depends(get_current_user_and_tenant),
+):
+    _current_user, tenant_id = user_and_tenant
+    especie = (
+        db.query(Especie)
+        .filter(Especie.id == especie_id, Especie.tenant_id == tenant_id)
+        .first()
+    )
+    if not especie:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Espécie não encontrada"
+        )
+    desvincular_especie_mestre(db, especie=especie)
+    return None
+
+
+@router.delete("/racas/{raca_id}/vincular-mestre", status_code=status.HTTP_204_NO_CONTENT)
+def remover_vinculo_mestre_raca(
+    raca_id: int,
+    db: Session = Depends(get_session),
+    user_and_tenant=Depends(get_current_user_and_tenant),
+):
+    _current_user, tenant_id = user_and_tenant
+    raca = (
+        db.query(Raca).filter(Raca.id == raca_id, Raca.tenant_id == tenant_id).first()
+    )
+    if not raca:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Raça não encontrada"
+        )
+    desvincular_raca_mestre(db, raca=raca)
     return None

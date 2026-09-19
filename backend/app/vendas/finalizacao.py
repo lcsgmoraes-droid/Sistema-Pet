@@ -346,7 +346,7 @@ def finalizar_venda(
         for item in venda.itens:
             if item.tipo == "produto":
                 from app.produtos_models import Produto
-                from app.empresa_grupo_estoque_compartilhado_service import (
+                from app.grupo_comercial_estoque_compartilhado_service import (
                     contexto_tenant_estoque,
                     resolver_tenant_estoque_item,
                 )

@@ -137,7 +137,7 @@ export default function LancamentoTransferenciaParceiro({
               {!loadingDestinosGrupo && (destinosGrupo || []).length === 0 ? (
                 <p className="mt-2 text-sm text-amber-700">
                   Nenhuma outra empresa ativa do grupo esta disponivel. Confira os convites em
-                  Configuracoes &gt; Grupos de empresas.
+                  Configuracoes &gt; Grupos Comerciais.
                 </p>
               ) : null}
               {destinoGrupoSelecionado ? (

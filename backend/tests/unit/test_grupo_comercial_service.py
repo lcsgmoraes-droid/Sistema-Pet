@@ -6,14 +6,14 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
 from app.db import Base
-from app.empresa_grupo_models import (
-    EmpresaGrupo,
-    EmpresaGrupoCodigo,
-    EmpresaGrupoConvite,
-    EmpresaGrupoEstoqueCompartilhado,
-    EmpresaGrupoMembro,
+from app.grupo_comercial_models import (
+    GrupoComercial,
+    GrupoComercialCodigo,
+    GrupoComercialConvite,
+    GrupoComercialEstoqueCompartilhado,
+    GrupoComercialMembro,
 )
-from app.empresa_grupo_service import EmpresaGrupoService
+from app.grupo_comercial_service import GrupoComercialService
 from app.models import Tenant
 
 
@@ -30,11 +30,11 @@ def db(monkeypatch):
         engine,
         tables=[
             Tenant.__table__,
-            EmpresaGrupo.__table__,
-            EmpresaGrupoMembro.__table__,
-            EmpresaGrupoCodigo.__table__,
-            EmpresaGrupoConvite.__table__,
-            EmpresaGrupoEstoqueCompartilhado.__table__,
+            GrupoComercial.__table__,
+            GrupoComercialMembro.__table__,
+            GrupoComercialCodigo.__table__,
+            GrupoComercialConvite.__table__,
+            GrupoComercialEstoqueCompartilhado.__table__,
         ],
     )
     session = Session(engine)
@@ -47,10 +47,10 @@ def db(monkeypatch):
     )
     session.commit()
     monkeypatch.setattr(
-        "app.empresa_grupo_service.log_business_event", lambda **_kwargs: None
+        "app.grupo_comercial_service.log_business_event", lambda **_kwargs: None
     )
     monkeypatch.setattr(
-        "app.empresa_grupo_service.registrar_uso_funcionalidade",
+        "app.grupo_comercial_service.registrar_uso_funcionalidade",
         lambda *_args, **_kwargs: True,
     )
     try:
@@ -60,11 +60,11 @@ def db(monkeypatch):
 
 
 def test_codigo_permanece_no_mes_e_troca_na_competencia_seguinte(db):
-    agosto = EmpresaGrupoService(db, agora=AGORA)
+    agosto = GrupoComercialService(db, agora=AGORA)
     primeiro = agosto.obter_codigo(EMPRESA_A, 10)
     repetido = agosto.obter_codigo(EMPRESA_A, 10)
 
-    setembro = EmpresaGrupoService(
+    setembro = GrupoComercialService(
         db, agora=datetime(2026, 9, 1, 4, 0, tzinfo=timezone.utc)
     ).obter_codigo(EMPRESA_A, 10)
 
@@ -75,7 +75,7 @@ def test_codigo_permanece_no_mes_e_troca_na_competencia_seguinte(db):
 
 
 def test_convite_exige_aceite_e_adiciona_empresa_ao_grupo(db):
-    service = EmpresaGrupoService(db, agora=AGORA)
+    service = GrupoComercialService(db, agora=AGORA)
     grupo = service.criar_grupo(EMPRESA_A, 10, "Grupo Centro")
     codigo_b = service.obter_codigo(EMPRESA_B, 20)["codigo"]
 
@@ -96,7 +96,7 @@ def test_convite_exige_aceite_e_adiciona_empresa_ao_grupo(db):
 
 
 def test_somente_responsavel_pode_convidar_e_destino_pode_responder(db):
-    service = EmpresaGrupoService(db, agora=AGORA)
+    service = GrupoComercialService(db, agora=AGORA)
     grupo = service.criar_grupo(EMPRESA_A, 10, "Grupo Seguro")
     codigo_b = service.obter_codigo(EMPRESA_B, 20)["codigo"]
     convite = service.convidar(EMPRESA_A, 10, grupo["id"], codigo_b)
@@ -114,7 +114,7 @@ def test_somente_responsavel_pode_convidar_e_destino_pode_responder(db):
 
 
 def test_responsavel_remove_membro_sem_poder_remover_a_si_mesmo(db):
-    service = EmpresaGrupoService(db, agora=AGORA)
+    service = GrupoComercialService(db, agora=AGORA)
     grupo = service.criar_grupo(EMPRESA_A, 10, "Grupo Operação")
     codigo_b = service.obter_codigo(EMPRESA_B, 20)["codigo"]
     convite = service.convidar(EMPRESA_A, 10, grupo["id"], codigo_b)

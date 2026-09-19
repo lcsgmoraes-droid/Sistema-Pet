@@ -14,11 +14,11 @@ from app import (  # noqa: F401
     vendas_models,
 )
 from app.db import Base
-from app.empresa_grupo_models import (
-    EmpresaGrupo,
-    EmpresaGrupoMembro,
-    EmpresaGrupoProdutoVinculo,
-    EmpresaGrupoTransferencia,
+from app.grupo_comercial_models import (
+    GrupoComercial,
+    GrupoComercialMembro,
+    GrupoComercialProdutoVinculo,
+    GrupoComercialTransferencia,
 )
 from app.estoque.transferencia_grupo_schemas import (
     TransferenciaGrupoExecutarRequest,
@@ -127,7 +127,7 @@ def _preparar_cenario(db_session):
         db_session.add(produto_b)
         db_session.flush()
 
-    grupo = EmpresaGrupo(
+    grupo = GrupoComercial(
         nome="Grupo Teste",
         criado_por_empresa_id=EMPRESA_A,
         criado_por_usuario_id=usuario_a.id,
@@ -137,14 +137,14 @@ def _preparar_cenario(db_session):
     db_session.flush()
     db_session.add_all(
         [
-            EmpresaGrupoMembro(
+            GrupoComercialMembro(
                 grupo_id=grupo.id,
                 empresa_id=EMPRESA_A,
                 papel="responsavel",
                 status="ativo",
                 usuario_referencia_id=usuario_a.id,
             ),
-            EmpresaGrupoMembro(
+            GrupoComercialMembro(
                 grupo_id=grupo.id,
                 empresa_id=EMPRESA_B,
                 papel="membro",
@@ -197,7 +197,7 @@ def test_previa_aceita_vinculo_manual_quando_codigos_sao_diferentes(db_local):
     produto_a.codigo_barras = "1111111111111"
     produto_b.codigo_barras = "2222222222222"
     db_local.add(
-        EmpresaGrupoProdutoVinculo(
+        GrupoComercialProdutoVinculo(
             grupo_id=grupo.id,
             empresa_a_id=EMPRESA_A,
             produto_a_id=produto_a.id,
@@ -275,7 +275,7 @@ def test_transferencia_integrada_movimenta_estoque_e_financeiro_dos_dois_lados(
     with tenant_context(EMPRESA_B):
         assert db_session.get(Produto, produto_b.id).estoque_atual == pytest.approx(3)
         assert db_session.query(ContaPagar).count() == 1
-    transferencia = db_session.query(EmpresaGrupoTransferencia).one()
+    transferencia = db_session.query(GrupoComercialTransferencia).one()
     assert transferencia.status == "concluida"
     assert transferencia.conta_receber_origem_id == resultado["conta_receber_origem_id"]
     assert transferencia.conta_pagar_destino_id == resultado["conta_pagar_destino_id"]
@@ -315,7 +315,7 @@ def test_falha_na_entrada_reverte_toda_a_saida_da_origem(db_local, monkeypatch):
     with tenant_context(EMPRESA_B):
         assert db_session.query(ContaPagar).count() == 0
     with tenant_context(EMPRESA_A):
-        assert db_session.query(EmpresaGrupoTransferencia).count() == 0
+        assert db_session.query(GrupoComercialTransferencia).count() == 0
 
 
 def test_cancelamento_integrado_reverte_estoque_e_financeiro_dos_dois_lados(
@@ -380,7 +380,7 @@ def test_cancelamento_integrado_reverte_estoque_e_financeiro_dos_dois_lados(
             == 1
         )
     transferencia = db_session.get(
-        EmpresaGrupoTransferencia, resultado["transferencia_grupo_id"]
+        GrupoComercialTransferencia, resultado["transferencia_grupo_id"]
     )
     assert transferencia.status == "cancelada"
     assert (
@@ -434,6 +434,6 @@ def test_cancelamento_integrado_bloqueia_se_estoque_destino_ja_foi_consumido(
         conta_pagar = db_session.get(ContaPagar, resultado["conta_pagar_destino_id"])
         assert conta_pagar.status == "pendente"
     transferencia = db_session.get(
-        EmpresaGrupoTransferencia, resultado["transferencia_grupo_id"]
+        GrupoComercialTransferencia, resultado["transferencia_grupo_id"]
     )
     assert transferencia.status == "concluida"

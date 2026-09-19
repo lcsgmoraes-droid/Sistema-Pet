@@ -13,8 +13,8 @@ from app import (  # noqa: F401
     ecommerceai_integration_models,
 )
 from app.db import Base
-from app.empresa_grupo_analise_service import EmpresaGrupoAnaliseService
-from app.empresa_grupo_models import EmpresaGrupo, EmpresaGrupoMembro
+from app.grupo_comercial_analise_service import GrupoComercialAnaliseService
+from app.grupo_comercial_models import GrupoComercial, GrupoComercialMembro
 from app.financeiro_models import ContaPagar, ContaReceber
 from app.models import Tenant
 from app.produtos_models import Produto
@@ -39,8 +39,8 @@ def db_local():
         engine,
         tables=[
             Tenant.__table__,
-            EmpresaGrupo.__table__,
-            EmpresaGrupoMembro.__table__,
+            GrupoComercial.__table__,
+            GrupoComercialMembro.__table__,
             Venda.__table__,
             Produto.__table__,
             ContaPagar.__table__,
@@ -123,7 +123,7 @@ def _preparar_cenario(db: Session):
         ]
     )
     db.flush()
-    grupo = EmpresaGrupo(
+    grupo = GrupoComercial(
         nome="Grupo Centro",
         criado_por_empresa_id=EMPRESA_A,
         criado_por_usuario_id=1,
@@ -133,13 +133,13 @@ def _preparar_cenario(db: Session):
     db.flush()
     db.add_all(
         [
-            EmpresaGrupoMembro(
+            GrupoComercialMembro(
                 grupo_id=grupo.id,
                 empresa_id=EMPRESA_A,
                 papel="responsavel",
                 status="ativo",
             ),
-            EmpresaGrupoMembro(
+            GrupoComercialMembro(
                 grupo_id=grupo.id,
                 empresa_id=EMPRESA_B,
                 papel="membro",
@@ -184,7 +184,7 @@ def test_consolida_apenas_membros_ativos_sem_misturar_contextos(db_local):
     grupo = _preparar_cenario(db_local)
 
     with tenant_context(EMPRESA_A):
-        resultado = EmpresaGrupoAnaliseService(db_local, agora=AGORA).obter(
+        resultado = GrupoComercialAnaliseService(db_local, agora=AGORA).obter(
             grupo.id,
             EMPRESA_A,
             periodo_dias=30,
@@ -224,7 +224,7 @@ def test_empresa_fora_do_grupo_nao_acessa_a_visao(db_local):
 
     with tenant_context(EMPRESA_FORA):
         with pytest.raises(HTTPException) as erro:
-            EmpresaGrupoAnaliseService(db_local, agora=AGORA).obter(
+            GrupoComercialAnaliseService(db_local, agora=AGORA).obter(
                 grupo.id,
                 EMPRESA_FORA,
                 periodo_dias=30,

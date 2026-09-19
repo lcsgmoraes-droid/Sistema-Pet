@@ -23,7 +23,7 @@ Conceitos de negócio centrais, confirmados nos modelos SQLAlchemy (`backend/app
 
 - [[Plano]] — plano contratado, assinatura e mecânica do trial de 30 dias
 - [[Modulo]] — liberação de áreas premium (financeiro avançado, WhatsApp, e-commerce, etc.) por tenant
-- [[EmpresaGrupo]] — agrupamento de tenants com estoque seletivamente compartilhado, sem afetar plano/billing individual
+- [[EmpresaGrupo]] — agrupamento de tenants com estoque seletivamente compartilhado, sem afetar plano/billing individual. ⚠️ **Doc desatualizada**: no código isso virou `GrupoComercial` (rename completo — tabelas, rotas, serviço), passou a ser criado automaticamente pra todo tenant novo (grupo-de-1), e ganhou "adicionar loja ao grupo" self-service + onboarding assistido de ops. Ver [[Plano-Camada-Geral]] para o que vem a seguir (camada de Pessoas/Produtos/Pet mestre em cima dessa fundação).
 - [[UserTenant]] — vínculo pessoa↔loja↔perfil; base do modelo "uma pessoa, múltiplas lojas"
 
 ## Relação estrutural (visão simplificada)

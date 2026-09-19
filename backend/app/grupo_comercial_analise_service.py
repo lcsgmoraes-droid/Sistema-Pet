@@ -9,7 +9,7 @@ from fastapi import HTTPException, status
 from sqlalchemy import case, func, or_
 from sqlalchemy.orm import Session
 
-from app.empresa_grupo_models import EmpresaGrupo, EmpresaGrupoMembro
+from app.grupo_comercial_models import GrupoComercial, GrupoComercialMembro
 from app.financeiro_models import ContaPagar, ContaReceber
 from app.models import Tenant
 from app.produtos_models import Produto
@@ -35,7 +35,7 @@ def _quantidade(valor) -> float:
     return round(_numero(valor), 3)
 
 
-class EmpresaGrupoAnaliseService:
+class GrupoComercialAnaliseService:
     """Agrega indicadores sem expor cadastros ou lancamentos individuais."""
 
     def __init__(self, db: Session, *, agora: datetime | None = None):
@@ -45,25 +45,25 @@ class EmpresaGrupoAnaliseService:
     def _grupo_e_membros(self, grupo_id: int, empresa_atual_id) -> tuple:
         empresa_atual_id = str(empresa_atual_id)
         grupo = (
-            self.db.query(EmpresaGrupo)
+            self.db.query(GrupoComercial)
             .filter(
-                EmpresaGrupo.id == grupo_id,
-                EmpresaGrupo.status == "ativo",
+                GrupoComercial.id == grupo_id,
+                GrupoComercial.status == "ativo",
             )
             .first()
         )
         if grupo is None:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="Grupo de empresas não encontrado.",
+                detail="Grupo Comercial não encontrado.",
             )
 
         participacao = (
-            self.db.query(EmpresaGrupoMembro)
+            self.db.query(GrupoComercialMembro)
             .filter(
-                EmpresaGrupoMembro.grupo_id == grupo.id,
-                EmpresaGrupoMembro.empresa_id == empresa_atual_id,
-                EmpresaGrupoMembro.status == "ativo",
+                GrupoComercialMembro.grupo_id == grupo.id,
+                GrupoComercialMembro.empresa_id == empresa_atual_id,
+                GrupoComercialMembro.status == "ativo",
             )
             .first()
         )
@@ -74,14 +74,14 @@ class EmpresaGrupoAnaliseService:
             )
 
         membros = (
-            self.db.query(EmpresaGrupoMembro, Tenant)
-            .join(Tenant, Tenant.id == EmpresaGrupoMembro.empresa_id)
+            self.db.query(GrupoComercialMembro, Tenant)
+            .join(Tenant, Tenant.id == GrupoComercialMembro.empresa_id)
             .filter(
-                EmpresaGrupoMembro.grupo_id == grupo.id,
-                EmpresaGrupoMembro.status == "ativo",
+                GrupoComercialMembro.grupo_id == grupo.id,
+                GrupoComercialMembro.status == "ativo",
                 Tenant.status == "active",
             )
-            .order_by(EmpresaGrupoMembro.papel.desc(), Tenant.name.asc())
+            .order_by(GrupoComercialMembro.papel.desc(), Tenant.name.asc())
             .all()
         )
         return grupo, membros

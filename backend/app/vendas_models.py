@@ -382,7 +382,7 @@ class VendaItem(BaseTenantModel):
     )
     estoque_compartilhado_id = Column(
         Integer,
-        ForeignKey("empresa_grupo_estoques_compartilhados.id", ondelete="SET NULL"),
+        ForeignKey("grupo_comercial_estoques_compartilhados.id", ondelete="SET NULL"),
         nullable=True,
     )
     estoque_origem_nome = Column(String(150), nullable=True)

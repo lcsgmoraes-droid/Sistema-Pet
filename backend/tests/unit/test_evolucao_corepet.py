@@ -61,8 +61,8 @@ def test_catalogo_filtra_projetos_por_canal_sem_expor_item_interno():
     ids_erp = {item["id"] for item in erp["itens"]}
     ids_cliente = {item["id"] for item in cliente["itens"]}
 
-    assert "grupos-empresas-transferencia-integrada" in ids_erp
-    assert "grupos-empresas-transferencia-integrada" not in ids_cliente
+    assert "grupos-comerciais-transferencia-integrada" in ids_erp
+    assert "grupos-comerciais-transferencia-integrada" not in ids_cliente
     assert "avaliacao-entrega-app" in ids_cliente
     assert erp["total_disponivel"] >= 1
 
@@ -330,7 +330,7 @@ def test_novidade_some_depois_do_periodo_sem_remover_outros_projetos():
     ids = {item["id"] for item in resultado["itens"]}
 
     assert "avaliacao-entrega-app" not in ids
-    assert "grupos-empresas-transferencia-integrada" in ids
+    assert "grupos-comerciais-transferencia-integrada" in ids
 
 
 def test_metrica_de_uso_e_global_e_nao_guarda_empresa_cliente_ou_usuario():

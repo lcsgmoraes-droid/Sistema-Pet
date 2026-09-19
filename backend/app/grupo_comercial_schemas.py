@@ -1,7 +1,7 @@
 from pydantic import BaseModel, Field, field_validator
 
 
-class EmpresaGrupoCriar(BaseModel):
+class GrupoComercialCriar(BaseModel):
     nome: str = Field(min_length=2, max_length=150)
 
     @field_validator("nome")
@@ -13,33 +13,52 @@ class EmpresaGrupoCriar(BaseModel):
         return nome
 
 
-class EmpresaGrupoConvidar(BaseModel):
+class GrupoComercialConvidar(BaseModel):
     codigo_empresa: str = Field(min_length=12, max_length=20)
 
 
-class EmpresaGrupoProdutoReferencia(BaseModel):
+class GrupoComercialLojaAdicionar(BaseModel):
+    """Provisiona uma loja nova e a anexa direto neste grupo, como membro —
+    sem convite/código, porque é o mesmo dono legal adicionando outra loja
+    própria (ver GrupoComercialService.adicionar_loja)."""
+
+    nome_loja: str = Field(min_length=2, max_length=150)
+    nome_acesso: str | None = Field(default=None, max_length=150)
+    plan: str | None = None
+    organization_type: str | None = None
+
+    @field_validator("nome_loja")
+    @classmethod
+    def limpar_nome_loja(cls, value: str) -> str:
+        nome = " ".join(value.split())
+        if len(nome) < 2:
+            raise ValueError("Informe um nome para a loja.")
+        return nome
+
+
+class GrupoComercialProdutoReferencia(BaseModel):
     empresa_id: str = Field(min_length=36, max_length=36)
     produto_id: int = Field(gt=0)
 
 
-class EmpresaGrupoProdutoVincular(BaseModel):
-    produto_a: EmpresaGrupoProdutoReferencia
-    produto_b: EmpresaGrupoProdutoReferencia
+class GrupoComercialProdutoVincular(BaseModel):
+    produto_a: GrupoComercialProdutoReferencia
+    produto_b: GrupoComercialProdutoReferencia
 
     @field_validator("produto_b")
     @classmethod
     def validar_empresas_distintas(
         cls,
-        value: EmpresaGrupoProdutoReferencia,
+        value: GrupoComercialProdutoReferencia,
         info,
-    ) -> EmpresaGrupoProdutoReferencia:
+    ) -> GrupoComercialProdutoReferencia:
         produto_a = info.data.get("produto_a")
         if produto_a and produto_a.empresa_id == value.empresa_id:
             raise ValueError("Escolha produtos de empresas diferentes.")
         return value
 
 
-class EmpresaGrupoEstoqueCompartilhar(BaseModel):
+class GrupoComercialEstoqueCompartilhar(BaseModel):
     empresa_consumidora_id: str = Field(min_length=36, max_length=36)
     produto_ids: list[int] = Field(min_length=1, max_length=200)
     acesso_catalogo_completo: bool = False
@@ -53,5 +72,5 @@ class EmpresaGrupoEstoqueCompartilhar(BaseModel):
         return ids
 
 
-class EmpresaGrupoEstoqueAcessoCatalogoAtualizar(BaseModel):
+class GrupoComercialEstoqueAcessoCatalogoAtualizar(BaseModel):
     acesso_catalogo_completo: bool

@@ -11,17 +11,19 @@ from fastapi import HTTPException, status
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.empresa_grupo_models import (
-    EmpresaGrupo,
-    EmpresaGrupoCodigo,
-    EmpresaGrupoConvite,
-    EmpresaGrupoEstoqueCompartilhado,
-    EmpresaGrupoMembro,
+from app.grupo_comercial_models import (
+    GrupoComercial,
+    GrupoComercialCodigo,
+    GrupoComercialConvite,
+    GrupoComercialEstoqueCompartilhado,
+    GrupoComercialMembro,
 )
-from app.empresa_grupo_sql import empresa_id_igual
-from app.models import Tenant
+from app.grupo_comercial_sql import empresa_id_igual
+from app.models import Tenant, User
 from app.evolucao_corepet import registrar_uso_funcionalidade
 from app.services.business_audit_service import log_business_event
+from app.services.plan_catalog import resolve_signup_selection
+from app.services.tenant_provisioning_service import provision_tenant
 
 
 CODIGO_ALFABETO = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
@@ -69,7 +71,7 @@ def _formatar_codigo(codigo: str) -> str:
     return "-".join(codigo[indice : indice + 4] for indice in range(0, 12, 4))
 
 
-class EmpresaGrupoService:
+class GrupoComercialService:
     def __init__(self, db: Session, *, agora: datetime | None = None):
         self.db = db
         self.agora = _agora_utc(agora)
@@ -91,10 +93,10 @@ class EmpresaGrupoService:
             )
         return empresa
 
-    def _grupo_ativo(self, grupo_id: int, *, travar: bool = False) -> EmpresaGrupo:
-        query = self.db.query(EmpresaGrupo).filter(
-            EmpresaGrupo.id == grupo_id,
-            EmpresaGrupo.status == "ativo",
+    def _grupo_ativo(self, grupo_id: int, *, travar: bool = False) -> GrupoComercial:
+        query = self.db.query(GrupoComercial).filter(
+            GrupoComercial.id == grupo_id,
+            GrupoComercial.status == "ativo",
         )
         if travar:
             query = query.with_for_update()
@@ -102,19 +104,19 @@ class EmpresaGrupoService:
         if grupo is None:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="Grupo de empresas não encontrado.",
+                detail="Grupo Comercial não encontrado.",
             )
         return grupo
 
     def _membro_ativo(
         self, grupo_id: int, empresa_id: str, *, exigir_responsavel: bool = False
-    ) -> EmpresaGrupoMembro:
+    ) -> GrupoComercialMembro:
         membro = (
-            self.db.query(EmpresaGrupoMembro)
+            self.db.query(GrupoComercialMembro)
             .filter(
-                EmpresaGrupoMembro.grupo_id == grupo_id,
-                EmpresaGrupoMembro.empresa_id == str(empresa_id),
-                EmpresaGrupoMembro.status == "ativo",
+                GrupoComercialMembro.grupo_id == grupo_id,
+                GrupoComercialMembro.empresa_id == str(empresa_id),
+                GrupoComercialMembro.status == "ativo",
             )
             .first()
         )
@@ -144,7 +146,7 @@ class EmpresaGrupoService:
             tenant_id=empresa_id,
             user_id=usuario_id,
             event=evento,
-            entity_type="empresa_grupo",
+            entity_type="grupo_comercial",
             entity_id=grupo_id,
             metadata=metadados or {},
             commit=False,
@@ -156,8 +158,8 @@ class EmpresaGrupoService:
                 secrets.choice(CODIGO_ALFABETO) for _ in range(CODIGO_TAMANHO)
             )
             existente = (
-                self.db.query(EmpresaGrupoCodigo.id)
-                .filter(EmpresaGrupoCodigo.codigo == codigo)
+                self.db.query(GrupoComercialCodigo.id)
+                .filter(GrupoComercialCodigo.codigo == codigo)
                 .first()
             )
             if existente is None:
@@ -172,15 +174,15 @@ class EmpresaGrupoService:
         self._empresa_ativa(empresa_id)
         competencia, expira_em = _competencia_e_expiracao(self.agora)
         codigo = (
-            self.db.query(EmpresaGrupoCodigo)
+            self.db.query(GrupoComercialCodigo)
             .filter(
-                EmpresaGrupoCodigo.empresa_id == empresa_id,
-                EmpresaGrupoCodigo.competencia == competencia,
+                GrupoComercialCodigo.empresa_id == empresa_id,
+                GrupoComercialCodigo.competencia == competencia,
             )
             .first()
         )
         if codigo is None:
-            codigo = EmpresaGrupoCodigo(
+            codigo = GrupoComercialCodigo(
                 empresa_id=empresa_id,
                 competencia=competencia,
                 codigo=self._novo_codigo(),
@@ -193,10 +195,10 @@ class EmpresaGrupoService:
             except IntegrityError as exc:
                 self.db.rollback()
                 codigo = (
-                    self.db.query(EmpresaGrupoCodigo)
+                    self.db.query(GrupoComercialCodigo)
                     .filter(
-                        EmpresaGrupoCodigo.empresa_id == empresa_id,
-                        EmpresaGrupoCodigo.competencia == competencia,
+                        GrupoComercialCodigo.empresa_id == empresa_id,
+                        GrupoComercialCodigo.competencia == competencia,
                     )
                     .first()
                 )
@@ -213,18 +215,20 @@ class EmpresaGrupoService:
             "expira_em": codigo.expira_em,
         }
 
-    def criar_grupo(self, empresa_id, usuario_id: int, nome: str) -> dict:
+    def criar_grupo(
+        self, empresa_id, usuario_id: int, nome: str, *, commit: bool = True
+    ) -> dict:
         empresa_id = self._empresa_id(empresa_id)
         self._empresa_ativa(empresa_id)
         nome_limpo = " ".join(nome.split())
-        grupo = EmpresaGrupo(
+        grupo = GrupoComercial(
             nome=nome_limpo,
             criado_por_empresa_id=empresa_id,
             criado_por_usuario_id=usuario_id,
         )
         self.db.add(grupo)
         self.db.flush()
-        membro = EmpresaGrupoMembro(
+        membro = GrupoComercialMembro(
             grupo_id=grupo.id,
             empresa_id=empresa_id,
             papel="responsavel",
@@ -235,11 +239,12 @@ class EmpresaGrupoService:
         self._auditar(
             empresa_id=empresa_id,
             usuario_id=usuario_id,
-            evento="empresa_grupo_criado",
+            evento="grupo_comercial_criado",
             grupo_id=grupo.id,
         )
-        self.db.commit()
-        registrar_uso_funcionalidade(self.db, "grupos-empresas-convites")
+        if commit:
+            self.db.commit()
+            registrar_uso_funcionalidade(self.db, "grupos-comerciais-convites")
         return self._serializar_grupo(grupo, membro)
 
     def convidar(
@@ -254,10 +259,10 @@ class EmpresaGrupoService:
         self._membro_ativo(grupo.id, empresa_id, exigir_responsavel=True)
         codigo_normalizado = _normalizar_codigo(codigo_empresa)
         codigo = (
-            self.db.query(EmpresaGrupoCodigo)
+            self.db.query(GrupoComercialCodigo)
             .filter(
-                EmpresaGrupoCodigo.codigo == codigo_normalizado,
-                EmpresaGrupoCodigo.expira_em > self.agora,
+                GrupoComercialCodigo.codigo == codigo_normalizado,
+                GrupoComercialCodigo.expira_em > self.agora,
             )
             .first()
         )
@@ -274,11 +279,11 @@ class EmpresaGrupoService:
                 detail="A empresa responsável já faz parte do grupo.",
             )
         membro = (
-            self.db.query(EmpresaGrupoMembro)
+            self.db.query(GrupoComercialMembro)
             .filter(
-                EmpresaGrupoMembro.grupo_id == grupo.id,
-                EmpresaGrupoMembro.empresa_id == empresa_convidada_id,
-                EmpresaGrupoMembro.status == "ativo",
+                GrupoComercialMembro.grupo_id == grupo.id,
+                GrupoComercialMembro.empresa_id == empresa_convidada_id,
+                GrupoComercialMembro.status == "ativo",
             )
             .first()
         )
@@ -289,10 +294,10 @@ class EmpresaGrupoService:
             )
 
         convite = (
-            self.db.query(EmpresaGrupoConvite)
+            self.db.query(GrupoComercialConvite)
             .filter(
-                EmpresaGrupoConvite.grupo_id == grupo.id,
-                EmpresaGrupoConvite.empresa_convidada_id == empresa_convidada_id,
+                GrupoComercialConvite.grupo_id == grupo.id,
+                GrupoComercialConvite.empresa_convidada_id == empresa_convidada_id,
             )
             .with_for_update()
             .first()
@@ -307,7 +312,7 @@ class EmpresaGrupoService:
                 detail="Já existe um convite pendente para esta empresa.",
             )
         if convite is None:
-            convite = EmpresaGrupoConvite(
+            convite = GrupoComercialConvite(
                 grupo_id=grupo.id,
                 empresa_convidada_id=empresa_convidada_id,
                 convidado_por_empresa_id=empresa_id,
@@ -327,13 +332,56 @@ class EmpresaGrupoService:
         self._auditar(
             empresa_id=empresa_id,
             usuario_id=usuario_id,
-            evento="empresa_grupo_convite_enviado",
+            evento="grupo_comercial_convite_enviado",
             grupo_id=grupo.id,
             metadados={"empresa_convidada_id": empresa_convidada_id},
         )
         self.db.commit()
         self.db.refresh(convite)
         return self._serializar_convite_enviado(convite, empresa_convidada)
+
+    def _fechar_grupo_solo_se_necessario(self, empresa_id: str, usuario_id: int) -> None:
+        """Fecha o grupo-de-1 antigo de uma empresa que está entrando em outro
+        grupo agora — só age se a empresa participa hoje de exatamente 1
+        grupo, sozinha, como responsável (um "grupo-de-1" puro); nunca mexe
+        num grupo com outros membros ativos.
+        """
+        membros_ativos = (
+            self.db.query(GrupoComercialMembro)
+            .filter(
+                GrupoComercialMembro.empresa_id == empresa_id,
+                GrupoComercialMembro.status == "ativo",
+            )
+            .with_for_update()
+            .all()
+        )
+        if len(membros_ativos) != 1:
+            return
+        membro_solo = membros_ativos[0]
+        if membro_solo.papel != "responsavel":
+            return
+        outro_membro_no_grupo = (
+            self.db.query(GrupoComercialMembro.id)
+            .filter(
+                GrupoComercialMembro.grupo_id == membro_solo.grupo_id,
+                GrupoComercialMembro.status == "ativo",
+                GrupoComercialMembro.id != membro_solo.id,
+            )
+            .first()
+        )
+        if outro_membro_no_grupo is not None:
+            return
+
+        grupo_solo = self._grupo_ativo(membro_solo.grupo_id, travar=True)
+        membro_solo.status = "removido"
+        membro_solo.removido_em = self.agora
+        grupo_solo.status = "encerrado"
+        self._auditar(
+            empresa_id=empresa_id,
+            usuario_id=usuario_id,
+            evento="grupo_comercial_solo_encerrado",
+            grupo_id=grupo_solo.id,
+        )
 
     def responder_convite(
         self,
@@ -345,10 +393,10 @@ class EmpresaGrupoService:
     ) -> dict:
         empresa_id = self._empresa_id(empresa_id)
         convite = (
-            self.db.query(EmpresaGrupoConvite)
+            self.db.query(GrupoComercialConvite)
             .filter(
-                EmpresaGrupoConvite.id == convite_id,
-                EmpresaGrupoConvite.empresa_convidada_id == empresa_id,
+                GrupoComercialConvite.id == convite_id,
+                GrupoComercialConvite.empresa_convidada_id == empresa_id,
             )
             .with_for_update()
             .first()
@@ -374,17 +422,18 @@ class EmpresaGrupoService:
         convite.respondido_por_usuario_id = usuario_id
         convite.respondido_em = self.agora
         if aceitar:
+            self._fechar_grupo_solo_se_necessario(empresa_id, usuario_id)
             membro = (
-                self.db.query(EmpresaGrupoMembro)
+                self.db.query(GrupoComercialMembro)
                 .filter(
-                    EmpresaGrupoMembro.grupo_id == grupo.id,
-                    EmpresaGrupoMembro.empresa_id == empresa_id,
+                    GrupoComercialMembro.grupo_id == grupo.id,
+                    GrupoComercialMembro.empresa_id == empresa_id,
                 )
                 .with_for_update()
                 .first()
             )
             if membro is None:
-                membro = EmpresaGrupoMembro(
+                membro = GrupoComercialMembro(
                     grupo_id=grupo.id,
                     empresa_id=empresa_id,
                     papel="membro",
@@ -400,11 +449,11 @@ class EmpresaGrupoService:
                 membro.usuario_referencia_id = usuario_id
             convite.status = "aceito"
             grupo.versao_membros = int(grupo.versao_membros or 1) + 1
-            evento = "empresa_grupo_convite_aceito"
+            evento = "grupo_comercial_convite_aceito"
             mensagem = "Convite aceito. Sua empresa agora faz parte do grupo."
         else:
             convite.status = "recusado"
-            evento = "empresa_grupo_convite_recusado"
+            evento = "grupo_comercial_convite_recusado"
             mensagem = "Convite recusado."
         self._auditar(
             empresa_id=empresa_id,
@@ -414,7 +463,7 @@ class EmpresaGrupoService:
         )
         self.db.commit()
         if aceitar:
-            registrar_uso_funcionalidade(self.db, "grupos-empresas-convites")
+            registrar_uso_funcionalidade(self.db, "grupos-comerciais-convites")
         return {"mensagem": mensagem, "grupo_id": grupo.id, "status": convite.status}
 
     def remover_membro(
@@ -428,11 +477,11 @@ class EmpresaGrupoService:
         grupo = self._grupo_ativo(grupo_id, travar=True)
         self._membro_ativo(grupo.id, empresa_id, exigir_responsavel=True)
         membro = (
-            self.db.query(EmpresaGrupoMembro)
+            self.db.query(GrupoComercialMembro)
             .filter(
-                EmpresaGrupoMembro.grupo_id == grupo.id,
-                EmpresaGrupoMembro.empresa_id == str(membro_empresa_id),
-                EmpresaGrupoMembro.status == "ativo",
+                GrupoComercialMembro.grupo_id == grupo.id,
+                GrupoComercialMembro.empresa_id == str(membro_empresa_id),
+                GrupoComercialMembro.status == "ativo",
             )
             .with_for_update()
             .first()
@@ -450,16 +499,16 @@ class EmpresaGrupoService:
         membro.status = "removido"
         membro.removido_em = self.agora
         compartilhamentos = (
-            self.db.query(EmpresaGrupoEstoqueCompartilhado)
+            self.db.query(GrupoComercialEstoqueCompartilhado)
             .filter(
-                EmpresaGrupoEstoqueCompartilhado.grupo_id == grupo.id,
-                EmpresaGrupoEstoqueCompartilhado.status == "ativo",
+                GrupoComercialEstoqueCompartilhado.grupo_id == grupo.id,
+                GrupoComercialEstoqueCompartilhado.status == "ativo",
                 empresa_id_igual(
-                    EmpresaGrupoEstoqueCompartilhado.empresa_origem_id,
+                    GrupoComercialEstoqueCompartilhado.empresa_origem_id,
                     membro_empresa_id,
                 )
                 | empresa_id_igual(
-                    EmpresaGrupoEstoqueCompartilhado.empresa_consumidora_id,
+                    GrupoComercialEstoqueCompartilhado.empresa_consumidora_id,
                     membro_empresa_id,
                 ),
             )
@@ -473,40 +522,114 @@ class EmpresaGrupoService:
         self._auditar(
             empresa_id=empresa_id,
             usuario_id=usuario_id,
-            evento="empresa_grupo_membro_removido",
+            evento="grupo_comercial_membro_removido",
             grupo_id=grupo.id,
             metadados={"empresa_removida_id": str(membro_empresa_id)},
         )
         self.db.commit()
         return {"mensagem": "Empresa removida do grupo."}
 
+    def adicionar_loja(
+        self,
+        *,
+        grupo_id: int,
+        usuario: User,
+        nome_loja: str,
+        nome_acesso: str | None = None,
+        plan: str | None = None,
+        organization_type: str | None = None,
+        restore_tenant_id=None,
+        empresa_acionadora_id: str | None = None,
+        commit: bool = True,
+    ) -> dict:
+        """Provisiona uma loja nova e a anexa direto neste grupo, como
+        `membro` — sem passar pelo fluxo de convite/código, porque é o
+        mesmo dono legal adicionando mais uma loja própria, não duas
+        empresas independentes se juntando depois. Usado tanto pela rota
+        self-service (responsável do grupo autenticado) quanto pelo
+        onboarding assistido de ops.
+
+        `empresa_acionadora_id`: quando informado, exige que essa empresa
+        seja a responsável pelo grupo (chamada self-service, via rota
+        autenticada por tenant). Quando `None`, pula essa checagem — uso do
+        onboarding assistido de ops, que já se autoriza via admin de
+        plataforma, não via sessão de tenant.
+        """
+        grupo = self._grupo_ativo(grupo_id, travar=True)
+        if empresa_acionadora_id is not None:
+            self._membro_ativo(grupo.id, empresa_acionadora_id, exigir_responsavel=True)
+        nome_limpo = " ".join(nome_loja.split())
+        try:
+            selected_plan, resolved_organization_type = resolve_signup_selection(
+                plan, organization_type
+            )
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)
+            ) from exc
+
+        resultado = provision_tenant(
+            self.db,
+            tenant_name=nome_limpo,
+            login_name=nome_acesso or nome_limpo,
+            plan_code=selected_plan.code,
+            organization_type=resolved_organization_type,
+            user=usuario,
+            restore_tenant_id=restore_tenant_id,
+        )
+        membro = GrupoComercialMembro(
+            grupo_id=grupo.id,
+            empresa_id=str(resultado.tenant_id),
+            papel="membro",
+            status="ativo",
+            usuario_referencia_id=usuario.id,
+        )
+        self.db.add(membro)
+        grupo.versao_membros = int(grupo.versao_membros or 1) + 1
+        self._auditar(
+            empresa_id=str(resultado.tenant_id),
+            usuario_id=usuario.id,
+            evento="grupo_comercial_loja_adicionada",
+            grupo_id=grupo.id,
+            metadados={"adicionada_via_grupo_id": grupo.id},
+        )
+        if commit:
+            self.db.commit()
+            registrar_uso_funcionalidade(self.db, "grupos-comerciais-nova-loja")
+        return {
+            "tenant_id": str(resultado.tenant_id),
+            "nome": resultado.tenant.name,
+            "login_name": resultado.login_name,
+            "grupo_id": grupo.id,
+        }
+
     def listar_resumo(self, empresa_id, usuario_id: int) -> dict:
         empresa_id = self._empresa_id(empresa_id)
         codigo = self.obter_codigo(empresa_id, usuario_id)
         participacoes = (
-            self.db.query(EmpresaGrupo, EmpresaGrupoMembro)
+            self.db.query(GrupoComercial, GrupoComercialMembro)
             .join(
-                EmpresaGrupoMembro,
-                EmpresaGrupoMembro.grupo_id == EmpresaGrupo.id,
+                GrupoComercialMembro,
+                GrupoComercialMembro.grupo_id == GrupoComercial.id,
             )
             .filter(
-                EmpresaGrupoMembro.empresa_id == empresa_id,
-                EmpresaGrupoMembro.status == "ativo",
-                EmpresaGrupo.status == "ativo",
+                GrupoComercialMembro.empresa_id == empresa_id,
+                GrupoComercialMembro.status == "ativo",
+                GrupoComercial.status == "ativo",
             )
-            .order_by(EmpresaGrupo.nome.asc())
+            .order_by(GrupoComercial.nome.asc())
             .all()
         )
         convites = (
-            self.db.query(EmpresaGrupoConvite, EmpresaGrupo)
-            .join(EmpresaGrupo, EmpresaGrupo.id == EmpresaGrupoConvite.grupo_id)
+            self.db.query(GrupoComercialConvite, GrupoComercial)
+            .join(GrupoComercial, GrupoComercial.id == GrupoComercialConvite.grupo_id)
             .filter(
-                EmpresaGrupoConvite.empresa_convidada_id == empresa_id,
-                EmpresaGrupoConvite.status == "pendente",
-                EmpresaGrupoConvite.expira_em > self.agora,
-                EmpresaGrupo.status == "ativo",
+                GrupoComercialConvite.empresa_convidada_id == empresa_id,
+                GrupoComercialConvite.status == "pendente",
+                GrupoComercialConvite.expira_em > self.agora,
+                GrupoComercial.status == "ativo",
             )
-            .order_by(EmpresaGrupoConvite.criado_em.desc())
+            .order_by(GrupoComercialConvite.criado_em.desc())
             .all()
         )
         return {
@@ -523,13 +646,13 @@ class EmpresaGrupoService:
 
     def _serializar_membros(self, grupo_id: int) -> list[dict]:
         linhas = (
-            self.db.query(EmpresaGrupoMembro, Tenant)
-            .join(Tenant, Tenant.id == EmpresaGrupoMembro.empresa_id)
+            self.db.query(GrupoComercialMembro, Tenant)
+            .join(Tenant, Tenant.id == GrupoComercialMembro.empresa_id)
             .filter(
-                EmpresaGrupoMembro.grupo_id == grupo_id,
-                EmpresaGrupoMembro.status == "ativo",
+                GrupoComercialMembro.grupo_id == grupo_id,
+                GrupoComercialMembro.status == "ativo",
             )
-            .order_by(EmpresaGrupoMembro.papel.desc(), Tenant.name.asc())
+            .order_by(GrupoComercialMembro.papel.desc(), Tenant.name.asc())
             .all()
         )
         return [
@@ -543,7 +666,7 @@ class EmpresaGrupoService:
         ]
 
     def _serializar_convite_enviado(
-        self, convite: EmpresaGrupoConvite, empresa: Tenant
+        self, convite: GrupoComercialConvite, empresa: Tenant
     ) -> dict:
         return {
             "id": convite.id,
@@ -556,14 +679,14 @@ class EmpresaGrupoService:
 
     def _convites_enviados(self, grupo_id: int) -> list[dict]:
         linhas = (
-            self.db.query(EmpresaGrupoConvite, Tenant)
-            .join(Tenant, Tenant.id == EmpresaGrupoConvite.empresa_convidada_id)
+            self.db.query(GrupoComercialConvite, Tenant)
+            .join(Tenant, Tenant.id == GrupoComercialConvite.empresa_convidada_id)
             .filter(
-                EmpresaGrupoConvite.grupo_id == grupo_id,
-                EmpresaGrupoConvite.status == "pendente",
-                EmpresaGrupoConvite.expira_em > self.agora,
+                GrupoComercialConvite.grupo_id == grupo_id,
+                GrupoComercialConvite.status == "pendente",
+                GrupoComercialConvite.expira_em > self.agora,
             )
-            .order_by(EmpresaGrupoConvite.criado_em.desc())
+            .order_by(GrupoComercialConvite.criado_em.desc())
             .all()
         )
         return [
@@ -572,7 +695,7 @@ class EmpresaGrupoService:
         ]
 
     def _serializar_grupo(
-        self, grupo: EmpresaGrupo, participacao: EmpresaGrupoMembro
+        self, grupo: GrupoComercial, participacao: GrupoComercialMembro
     ) -> dict:
         return {
             "id": grupo.id,
@@ -590,7 +713,7 @@ class EmpresaGrupoService:
         }
 
     def _serializar_convite_recebido(
-        self, convite: EmpresaGrupoConvite, grupo: EmpresaGrupo
+        self, convite: GrupoComercialConvite, grupo: GrupoComercial
     ) -> dict:
         empresa_origem = (
             self.db.query(Tenant)

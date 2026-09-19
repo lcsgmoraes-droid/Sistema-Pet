@@ -1,35 +1,89 @@
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from app.auth.dependencies import get_current_user_and_tenant
 from app.db import get_session
-from app.empresa_grupo_analise_service import EmpresaGrupoAnaliseService
-from app.empresa_grupo_analise_detalhes_service import (
-    EmpresaGrupoAnaliseDetalhesService,
+from app.grupo_comercial_analise_service import GrupoComercialAnaliseService
+from app.grupo_comercial_analise_detalhes_service import (
+    GrupoComercialAnaliseDetalhesService,
 )
-from app.empresa_grupo_planejamento_service import (
-    EmpresaGrupoPlanejamentoService,
+from app.grupo_comercial_planejamento_service import (
+    GrupoComercialPlanejamentoService,
 )
-from app.empresa_grupo_produto_vinculo_service import (
-    EmpresaGrupoProdutoVinculoService,
+from app.grupo_comercial_produto_vinculo_service import (
+    GrupoComercialProdutoVinculoService,
 )
-from app.empresa_grupo_estoque_compartilhado_service import (
-    EmpresaGrupoEstoqueCompartilhadoService,
+from app.grupo_comercial_estoque_compartilhado_service import (
+    GrupoComercialEstoqueCompartilhadoService,
 )
-from app.empresa_grupo_schemas import (
-    EmpresaGrupoEstoqueAcessoCatalogoAtualizar,
-    EmpresaGrupoConvidar,
-    EmpresaGrupoCriar,
-    EmpresaGrupoEstoqueCompartilhar,
-    EmpresaGrupoProdutoVincular,
+from app.grupo_comercial_schemas import (
+    GrupoComercialEstoqueAcessoCatalogoAtualizar,
+    GrupoComercialConvidar,
+    GrupoComercialCriar,
+    GrupoComercialEstoqueCompartilhar,
+    GrupoComercialLojaAdicionar,
+    GrupoComercialProdutoVincular,
 )
-from app.empresa_grupo_service import EmpresaGrupoService
+from app.grupo_comercial_service import GrupoComercialService
+from app.grupo_comercial_models import GrupoComercialMembro
 from app.evolucao_corepet import registrar_uso_funcionalidade
 from app.security.permissions_decorator import require_any_permission
+from app.especie_raca_mestre_models import EspecieMestre, RacaMestre
+from app.produto_mestre_models import ProdutoMestre
+from app.pet_mestre_models import PetMestre
+from app.pessoa_mestre_models import PessoaMestre
 
-router = APIRouter(prefix="/grupos-empresas", tags=["Grupos de empresas"])
+router = APIRouter(prefix="/grupos-comerciais", tags=["Grupos Comerciais"])
 PERMISSOES_CONFIG_EMPRESA = ("configuracoes.empresa", "configuracoes.editar")
 PERMISSOES_ANALISE_GRUPO = ("relatorios.gerencial", "relatorios.financeiro")
+
+
+@router.get("/{grupo_id}/mestres")
+@require_any_permission(PERMISSOES_CONFIG_EMPRESA)
+def listar_mestres_grupo(
+    grupo_id: int,
+    db: Session = Depends(get_session),
+    user_and_tenant=Depends(get_current_user_and_tenant),
+):
+    """Checkpoint 5 da camada geral (ver Documentacao/Dominio/
+    Plano-Camada-Geral.md): visão única dos dados mestre do grupo — quem
+    já tem, sem precisar entrar em cada domínio separadamente. Qualquer
+    membro ativo pode ver; vincular/desvincular continua na rota de cada
+    domínio (cada loja só mexe nos próprios registros locais)."""
+    _usuario, empresa_id = user_and_tenant
+    membro = (
+        db.query(GrupoComercialMembro)
+        .filter(
+            GrupoComercialMembro.grupo_id == grupo_id,
+            GrupoComercialMembro.empresa_id == str(empresa_id),
+            GrupoComercialMembro.status == "ativo",
+        )
+        .first()
+    )
+    if membro is None:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Sua empresa não participa deste grupo.",
+        )
+
+    def _linhas(modelo):
+        return [
+            {"id": linha.id, "nome": linha.nome}
+            for linha in (
+                db.query(modelo)
+                .filter(modelo.grupo_id == grupo_id, modelo.ativo.is_(True))
+                .order_by(modelo.nome)
+                .all()
+            )
+        ]
+
+    return {
+        "produtos": _linhas(ProdutoMestre),
+        "pets": _linhas(PetMestre),
+        "pessoas": _linhas(PessoaMestre),
+        "especies": _linhas(EspecieMestre),
+        "racas": _linhas(RacaMestre),
+    }
 
 
 @router.get("/{grupo_id}/estoque-compartilhado")
@@ -40,7 +94,7 @@ def listar_estoque_compartilhado_grupo(
     user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     _usuario, empresa_id = user_and_tenant
-    return EmpresaGrupoEstoqueCompartilhadoService(db).listar(grupo_id, empresa_id)
+    return GrupoComercialEstoqueCompartilhadoService(db).listar(grupo_id, empresa_id)
 
 
 @router.get("/{grupo_id}/estoque-compartilhado/produtos")
@@ -54,7 +108,7 @@ def buscar_produtos_para_estoque_compartilhado(
     user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     _usuario, empresa_id = user_and_tenant
-    return EmpresaGrupoEstoqueCompartilhadoService(db).buscar_produtos_compartilhaveis(
+    return GrupoComercialEstoqueCompartilhadoService(db).buscar_produtos_compartilhaveis(
         grupo_id,
         empresa_id,
         empresa_consumidora_id,
@@ -67,12 +121,12 @@ def buscar_produtos_para_estoque_compartilhado(
 @require_any_permission(PERMISSOES_CONFIG_EMPRESA)
 def compartilhar_estoque_grupo(
     grupo_id: int,
-    payload: EmpresaGrupoEstoqueCompartilhar,
+    payload: GrupoComercialEstoqueCompartilhar,
     db: Session = Depends(get_session),
     user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     usuario, empresa_id = user_and_tenant
-    return EmpresaGrupoEstoqueCompartilhadoService(db).compartilhar(
+    return GrupoComercialEstoqueCompartilhadoService(db).compartilhar(
         grupo_id,
         empresa_id,
         usuario.id,
@@ -87,12 +141,12 @@ def compartilhar_estoque_grupo(
 def atualizar_acesso_catalogo_estoque_compartilhado(
     grupo_id: int,
     compartilhamento_id: int,
-    payload: EmpresaGrupoEstoqueAcessoCatalogoAtualizar,
+    payload: GrupoComercialEstoqueAcessoCatalogoAtualizar,
     db: Session = Depends(get_session),
     user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     usuario, empresa_id = user_and_tenant
-    return EmpresaGrupoEstoqueCompartilhadoService(db).atualizar_acesso_catalogo(
+    return GrupoComercialEstoqueCompartilhadoService(db).atualizar_acesso_catalogo(
         grupo_id,
         compartilhamento_id,
         empresa_id,
@@ -110,7 +164,7 @@ def remover_estoque_compartilhado_grupo(
     user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     usuario, empresa_id = user_and_tenant
-    return EmpresaGrupoEstoqueCompartilhadoService(db).remover(
+    return GrupoComercialEstoqueCompartilhadoService(db).remover(
         grupo_id, compartilhamento_id, empresa_id, usuario.id
     )
 
@@ -122,7 +176,7 @@ def listar_resumo_grupos(
     user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     usuario, empresa_id = user_and_tenant
-    return EmpresaGrupoService(db).listar_resumo(empresa_id, usuario.id)
+    return GrupoComercialService(db).listar_resumo(empresa_id, usuario.id)
 
 
 @router.get("/{grupo_id}/visao-consolidada")
@@ -134,12 +188,12 @@ def obter_visao_consolidada_grupo(
     user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     _usuario, empresa_id = user_and_tenant
-    resultado = EmpresaGrupoAnaliseService(db).obter(
+    resultado = GrupoComercialAnaliseService(db).obter(
         grupo_id,
         empresa_id,
         periodo_dias,
     )
-    registrar_uso_funcionalidade(db, "grupos-empresas-visao-consolidada")
+    registrar_uso_funcionalidade(db, "grupos-comerciais-visao-consolidada")
     return resultado
 
 
@@ -155,7 +209,7 @@ def listar_pedidos_grupo(
     user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     _usuario, empresa_atual_id = user_and_tenant
-    resultado = EmpresaGrupoAnaliseDetalhesService(db).listar_pedidos(
+    resultado = GrupoComercialAnaliseDetalhesService(db).listar_pedidos(
         grupo_id,
         empresa_atual_id,
         periodo_dias=periodo_dias,
@@ -163,7 +217,7 @@ def listar_pedidos_grupo(
         empresa_id=empresa_id,
         limite=limite,
     )
-    registrar_uso_funcionalidade(db, "grupos-empresas-analises-detalhadas")
+    registrar_uso_funcionalidade(db, "grupos-comerciais-analises-detalhadas")
     return resultado
 
 
@@ -178,14 +232,14 @@ def listar_produtos_vendidos_grupo(
     user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     _usuario, empresa_atual_id = user_and_tenant
-    resultado = EmpresaGrupoAnaliseDetalhesService(db).listar_produtos_vendidos(
+    resultado = GrupoComercialAnaliseDetalhesService(db).listar_produtos_vendidos(
         grupo_id,
         empresa_atual_id,
         periodo_dias=periodo_dias,
         busca=busca,
         limite=limite,
     )
-    registrar_uso_funcionalidade(db, "grupos-empresas-analises-detalhadas")
+    registrar_uso_funcionalidade(db, "grupos-comerciais-analises-detalhadas")
     return resultado
 
 
@@ -201,7 +255,7 @@ def listar_pedidos_compra_grupo(
     user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     _usuario, empresa_atual_id = user_and_tenant
-    resultado = EmpresaGrupoAnaliseDetalhesService(db).listar_pedidos_compra(
+    resultado = GrupoComercialAnaliseDetalhesService(db).listar_pedidos_compra(
         grupo_id,
         empresa_atual_id,
         periodo_dias=periodo_dias,
@@ -209,7 +263,7 @@ def listar_pedidos_compra_grupo(
         empresa_id=empresa_id,
         limite=limite,
     )
-    registrar_uso_funcionalidade(db, "grupos-empresas-analises-detalhadas")
+    registrar_uso_funcionalidade(db, "grupos-comerciais-analises-detalhadas")
     return resultado
 
 
@@ -226,7 +280,7 @@ def listar_contas_pagar_grupo(
     user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     _usuario, empresa_atual_id = user_and_tenant
-    resultado = EmpresaGrupoAnaliseDetalhesService(db).listar_contas_pagar(
+    resultado = GrupoComercialAnaliseDetalhesService(db).listar_contas_pagar(
         grupo_id,
         empresa_atual_id,
         periodo_dias=periodo_dias,
@@ -235,7 +289,7 @@ def listar_contas_pagar_grupo(
         empresa_id=empresa_id,
         limite=limite,
     )
-    registrar_uso_funcionalidade(db, "grupos-empresas-analises-detalhadas")
+    registrar_uso_funcionalidade(db, "grupos-comerciais-analises-detalhadas")
     return resultado
 
 
@@ -252,7 +306,7 @@ def listar_reposicao_inteligente_grupo(
     user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     _usuario, empresa_atual_id = user_and_tenant
-    resultado = EmpresaGrupoPlanejamentoService(db).listar_reposicao_inteligente(
+    resultado = GrupoComercialPlanejamentoService(db).listar_reposicao_inteligente(
         grupo_id,
         empresa_atual_id,
         periodo_dias=periodo_dias,
@@ -261,7 +315,7 @@ def listar_reposicao_inteligente_grupo(
         somente_acao=somente_acao,
         limite=limite,
     )
-    registrar_uso_funcionalidade(db, "grupos-empresas-planejamento-inteligente")
+    registrar_uso_funcionalidade(db, "grupos-comerciais-planejamento-inteligente")
     return resultado
 
 
@@ -273,10 +327,10 @@ def obter_analise_financeira_grupo(
     user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     _usuario, empresa_atual_id = user_and_tenant
-    resultado = EmpresaGrupoPlanejamentoService(db).analisar_financeiro(
+    resultado = GrupoComercialPlanejamentoService(db).analisar_financeiro(
         grupo_id, empresa_atual_id
     )
-    registrar_uso_funcionalidade(db, "grupos-empresas-planejamento-inteligente")
+    registrar_uso_funcionalidade(db, "grupos-comerciais-planejamento-inteligente")
     return resultado
 
 
@@ -291,7 +345,7 @@ def buscar_produtos_grupo(
     user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     _usuario, empresa_atual_id = user_and_tenant
-    return EmpresaGrupoProdutoVinculoService(db).buscar_produtos(
+    return GrupoComercialProdutoVinculoService(db).buscar_produtos(
         grupo_id,
         empresa_atual_id,
         busca=busca,
@@ -308,7 +362,7 @@ def listar_vinculos_produtos_grupo(
     user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     _usuario, empresa_atual_id = user_and_tenant
-    return EmpresaGrupoProdutoVinculoService(db).listar_vinculos(
+    return GrupoComercialProdutoVinculoService(db).listar_vinculos(
         grupo_id, empresa_atual_id
     )
 
@@ -317,19 +371,19 @@ def listar_vinculos_produtos_grupo(
 @require_any_permission(PERMISSOES_CONFIG_EMPRESA)
 def vincular_produtos_grupo(
     grupo_id: int,
-    payload: EmpresaGrupoProdutoVincular,
+    payload: GrupoComercialProdutoVincular,
     db: Session = Depends(get_session),
     user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     usuario, empresa_atual_id = user_and_tenant
-    resultado = EmpresaGrupoProdutoVinculoService(db).vincular_produtos(
+    resultado = GrupoComercialProdutoVinculoService(db).vincular_produtos(
         grupo_id,
         empresa_atual_id,
         usuario.id,
         payload.produto_a,
         payload.produto_b,
     )
-    registrar_uso_funcionalidade(db, "grupos-empresas-analises-detalhadas")
+    registrar_uso_funcionalidade(db, "grupos-comerciais-analises-detalhadas")
     return resultado
 
 
@@ -342,7 +396,7 @@ def remover_vinculo_produtos_grupo(
     user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     usuario, empresa_atual_id = user_and_tenant
-    return EmpresaGrupoProdutoVinculoService(db).remover_vinculo(
+    return GrupoComercialProdutoVinculoService(db).remover_vinculo(
         grupo_id,
         vinculo_id,
         empresa_atual_id,
@@ -353,24 +407,48 @@ def remover_vinculo_produtos_grupo(
 @router.post("", status_code=status.HTTP_201_CREATED)
 @require_any_permission(PERMISSOES_CONFIG_EMPRESA)
 def criar_grupo_empresa(
-    payload: EmpresaGrupoCriar,
+    payload: GrupoComercialCriar,
     db: Session = Depends(get_session),
     user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     usuario, empresa_id = user_and_tenant
-    return EmpresaGrupoService(db).criar_grupo(empresa_id, usuario.id, payload.nome)
+    return GrupoComercialService(db).criar_grupo(empresa_id, usuario.id, payload.nome)
+
+
+@router.post("/{grupo_id}/lojas", status_code=status.HTTP_201_CREATED)
+@require_any_permission(PERMISSOES_CONFIG_EMPRESA)
+def adicionar_loja_ao_grupo(
+    grupo_id: int,
+    payload: GrupoComercialLojaAdicionar,
+    db: Session = Depends(get_session),
+    user_and_tenant=Depends(get_current_user_and_tenant),
+):
+    """Cria uma loja nova (mesmo usuário logado) e já anexa ao grupo — a
+    forma self-service de "crescer" um grupo, sem passar por convite/código.
+    Só a empresa responsável do grupo pode chamar."""
+    usuario, empresa_id = user_and_tenant
+    return GrupoComercialService(db).adicionar_loja(
+        grupo_id=grupo_id,
+        usuario=usuario,
+        nome_loja=payload.nome_loja,
+        nome_acesso=payload.nome_acesso,
+        plan=payload.plan,
+        organization_type=payload.organization_type,
+        restore_tenant_id=empresa_id,
+        empresa_acionadora_id=empresa_id,
+    )
 
 
 @router.post("/{grupo_id}/convites", status_code=status.HTTP_201_CREATED)
 @require_any_permission(PERMISSOES_CONFIG_EMPRESA)
 def convidar_empresa_para_grupo(
     grupo_id: int,
-    payload: EmpresaGrupoConvidar,
+    payload: GrupoComercialConvidar,
     db: Session = Depends(get_session),
     user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     usuario, empresa_id = user_and_tenant
-    return EmpresaGrupoService(db).convidar(
+    return GrupoComercialService(db).convidar(
         empresa_id,
         usuario.id,
         grupo_id,
@@ -386,7 +464,7 @@ def aceitar_convite_grupo(
     user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     usuario, empresa_id = user_and_tenant
-    return EmpresaGrupoService(db).responder_convite(
+    return GrupoComercialService(db).responder_convite(
         empresa_id, usuario.id, convite_id, aceitar=True
     )
 
@@ -399,7 +477,7 @@ def recusar_convite_grupo(
     user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     usuario, empresa_id = user_and_tenant
-    return EmpresaGrupoService(db).responder_convite(
+    return GrupoComercialService(db).responder_convite(
         empresa_id, usuario.id, convite_id, aceitar=False
     )
 
@@ -413,7 +491,7 @@ def remover_empresa_do_grupo(
     user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     usuario, empresa_id = user_and_tenant
-    return EmpresaGrupoService(db).remover_membro(
+    return GrupoComercialService(db).remover_membro(
         empresa_id,
         usuario.id,
         grupo_id,

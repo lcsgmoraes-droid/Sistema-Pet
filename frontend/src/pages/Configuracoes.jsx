@@ -48,10 +48,10 @@ const cards = [
     permission: "configuracoes.editar",
   },
   {
-    title: "Grupos de Empresas",
-    description: "Convites, empresas vinculadas e recursos consolidados",
+    title: "Grupos Comerciais",
+    description: "Novas lojas, convites e recursos consolidados",
     icon: FiLink,
-    link: "/configuracoes/grupos-empresas",
+    link: "/configuracoes/grupos-comerciais",
     color: "purple",
     anyOfPermissions: ["configuracoes.empresa", "configuracoes.editar"],
   },

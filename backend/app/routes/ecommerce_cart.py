@@ -29,8 +29,8 @@ from app.services.ecommerce_catalog_health import (
 )
 from app.tenancy.context import set_current_tenant
 from app.tenancy.context import tenant_context
-from app.empresa_grupo_estoque_compartilhado_service import (
-    EmpresaGrupoEstoqueCompartilhadoService,
+from app.grupo_comercial_estoque_compartilhado_service import (
+    GrupoComercialEstoqueCompartilhadoService,
 )
 
 
@@ -205,7 +205,7 @@ def _serialize_carrinho(db: Session, carrinho: Pedido) -> dict:
     for produto_id in produto_ids - set(produtos_por_id):
         try:
             resolvido = (
-                EmpresaGrupoEstoqueCompartilhadoService.resolver_produto_catalogo(
+                GrupoComercialEstoqueCompartilhadoService.resolver_produto_catalogo(
                     db, carrinho.tenant_id, produto_id
                 )
             )
@@ -306,7 +306,7 @@ def adicionar_item_carrinho(
     _expirar_reservas_automaticamente(db, tenant_id)
     tenant_config = db.query(Tenant).filter(Tenant.id == tenant_id).first()
 
-    acesso_catalogo = EmpresaGrupoEstoqueCompartilhadoService.resolver_produto_catalogo(
+    acesso_catalogo = GrupoComercialEstoqueCompartilhadoService.resolver_produto_catalogo(
         db, tenant_id, payload.produto_id
     )
     with tenant_context(acesso_catalogo.tenant_origem_id) as tenant_origem:
@@ -454,7 +454,7 @@ def atualizar_item_carrinho(
             detail="Item do carrinho não encontrado",
         )
 
-    acesso_catalogo = EmpresaGrupoEstoqueCompartilhadoService.resolver_produto_catalogo(
+    acesso_catalogo = GrupoComercialEstoqueCompartilhadoService.resolver_produto_catalogo(
         db, tenant_id, item.produto_id
     )
     with tenant_context(acesso_catalogo.tenant_origem_id) as tenant_origem:

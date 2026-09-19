@@ -7,8 +7,8 @@ from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
 from app.audit_log import log_action
-from app.empresa_grupo_estoque_compartilhado_service import (
-    EmpresaGrupoEstoqueCompartilhadoService,
+from app.grupo_comercial_estoque_compartilhado_service import (
+    GrupoComercialEstoqueCompartilhadoService,
     ProdutoVendaResolvido,
     contexto_tenant_estoque,
     resolver_tenant_estoque_item,
@@ -107,7 +107,7 @@ def ajustar_estoque_edicao_venda(
             continue
         produto_id = int(item.produto_id)
         try:
-            resolucao = EmpresaGrupoEstoqueCompartilhadoService.resolver_produto_venda(
+            resolucao = GrupoComercialEstoqueCompartilhadoService.resolver_produto_venda(
                 db, tenant_venda, produto_id
             )
         except HTTPException as error:
@@ -118,7 +118,7 @@ def ajustar_estoque_edicao_venda(
             if not origem_antiga:
                 raise
             resolucao = (
-                EmpresaGrupoEstoqueCompartilhadoService.carregar_produto_historico(
+                GrupoComercialEstoqueCompartilhadoService.carregar_produto_historico(
                     db,
                     produto_id=produto_id,
                     tenant_origem_id=origem_antiga,
@@ -155,7 +155,7 @@ def ajustar_estoque_edicao_venda(
         if resolucao is None or resolucao.tenant_origem_id != tenant_estoque:
             antigo = antigos_por_produto.get(produto_id)
             resolucao = (
-                EmpresaGrupoEstoqueCompartilhadoService.carregar_produto_historico(
+                GrupoComercialEstoqueCompartilhadoService.carregar_produto_historico(
                     db,
                     produto_id=produto_id,
                     tenant_origem_id=tenant_estoque,

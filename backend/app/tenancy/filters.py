@@ -17,7 +17,7 @@ import logging
 from sqlalchemy import String, cast, event, func, or_, select
 from sqlalchemy.orm import Session, aliased, with_loader_criteria
 
-from app.empresa_grupo_sql import empresa_id_sql
+from app.grupo_comercial_sql import empresa_id_sql
 from app.tenancy.context import get_current_tenant
 from app.tenancy.rls import sync_rls_tenant
 
@@ -106,27 +106,27 @@ def _tenant_read_filter(cls, tenant_id):
     )
     criterios = [cls.tenant_id == tenant_id, cls.tenant_id.in_(partner_tenant_ids)]
     if table_name in {"produtos", "produto_imagens"}:
-        from app.empresa_grupo_models import (
-            EmpresaGrupo,
-            EmpresaGrupoEstoqueCompartilhado,
-            EmpresaGrupoMembro,
+        from app.grupo_comercial_models import (
+            GrupoComercial,
+            GrupoComercialEstoqueCompartilhado,
+            GrupoComercialMembro,
         )
 
-        membro_origem = aliased(EmpresaGrupoMembro)
-        membro_consumidora = aliased(EmpresaGrupoMembro)
+        membro_origem = aliased(GrupoComercialMembro)
+        membro_consumidora = aliased(GrupoComercialMembro)
         compartilhamento_ativo = (
-            select(EmpresaGrupoEstoqueCompartilhado.id)
+            select(GrupoComercialEstoqueCompartilhado.id)
             .join(
-                EmpresaGrupo,
-                EmpresaGrupo.id == EmpresaGrupoEstoqueCompartilhado.grupo_id,
+                GrupoComercial,
+                GrupoComercial.id == GrupoComercialEstoqueCompartilhado.grupo_id,
             )
             .join(
                 membro_origem,
-                (membro_origem.grupo_id == EmpresaGrupoEstoqueCompartilhado.grupo_id)
+                (membro_origem.grupo_id == GrupoComercialEstoqueCompartilhado.grupo_id)
                 & (
                     empresa_id_sql(membro_origem.empresa_id)
                     == empresa_id_sql(
-                        EmpresaGrupoEstoqueCompartilhado.empresa_origem_id
+                        GrupoComercialEstoqueCompartilhado.empresa_origem_id
                     )
                 ),
             )
@@ -134,24 +134,24 @@ def _tenant_read_filter(cls, tenant_id):
                 membro_consumidora,
                 (
                     membro_consumidora.grupo_id
-                    == EmpresaGrupoEstoqueCompartilhado.grupo_id
+                    == GrupoComercialEstoqueCompartilhado.grupo_id
                 )
                 & (
                     empresa_id_sql(membro_consumidora.empresa_id)
                     == empresa_id_sql(
-                        EmpresaGrupoEstoqueCompartilhado.empresa_consumidora_id
+                        GrupoComercialEstoqueCompartilhado.empresa_consumidora_id
                     )
                 ),
             )
             .where(
-                EmpresaGrupoEstoqueCompartilhado.produto_origem_id
+                GrupoComercialEstoqueCompartilhado.produto_origem_id
                 == (cls.id if table_name == "produtos" else cls.produto_id),
-                empresa_id_sql(EmpresaGrupoEstoqueCompartilhado.empresa_origem_id)
+                empresa_id_sql(GrupoComercialEstoqueCompartilhado.empresa_origem_id)
                 == empresa_id_sql(cls.tenant_id),
-                empresa_id_sql(EmpresaGrupoEstoqueCompartilhado.empresa_consumidora_id)
+                empresa_id_sql(GrupoComercialEstoqueCompartilhado.empresa_consumidora_id)
                 == func.replace(cast(tenant_id, String), "-", ""),
-                EmpresaGrupoEstoqueCompartilhado.status == "ativo",
-                EmpresaGrupo.status == "ativo",
+                GrupoComercialEstoqueCompartilhado.status == "ativo",
+                GrupoComercial.status == "ativo",
                 membro_origem.status == "ativo",
                 membro_consumidora.status == "ativo",
             )

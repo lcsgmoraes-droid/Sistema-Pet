@@ -12,11 +12,11 @@ from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
 from app.bling_estoque_sync import sincronizar_bling_background
-from app.empresa_grupo_models import (
-    EmpresaGrupo,
-    EmpresaGrupoMembro,
-    EmpresaGrupoProdutoVinculo,
-    EmpresaGrupoTransferencia,
+from app.grupo_comercial_models import (
+    GrupoComercial,
+    GrupoComercialMembro,
+    GrupoComercialProdutoVinculo,
+    GrupoComercialTransferencia,
 )
 from app.estoque.transferencia_grupo_cancelamento_service import (
     cancelar_transferencia_integrada_por_conta as _cancelar_transferencia_integrada_por_conta,
@@ -94,28 +94,28 @@ def _empresa_ativa(db: Session, empresa_id: str) -> Tenant:
 
 def _validar_vinculo(
     db: Session, *, grupo_id: int, empresa_origem_id: str, empresa_destino_id: str
-) -> tuple[EmpresaGrupo, EmpresaGrupoMembro, EmpresaGrupoMembro]:
+) -> tuple[GrupoComercial, GrupoComercialMembro, GrupoComercialMembro]:
     if empresa_origem_id == empresa_destino_id:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="A empresa de destino deve ser diferente da empresa atual.",
         )
     grupo = (
-        db.query(EmpresaGrupo)
-        .filter(EmpresaGrupo.id == grupo_id, EmpresaGrupo.status == "ativo")
+        db.query(GrupoComercial)
+        .filter(GrupoComercial.id == grupo_id, GrupoComercial.status == "ativo")
         .first()
     )
     if grupo is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Grupo de empresas não encontrado.",
+            detail="Grupo Comercial não encontrado.",
         )
     membros = (
-        db.query(EmpresaGrupoMembro)
+        db.query(GrupoComercialMembro)
         .filter(
-            EmpresaGrupoMembro.grupo_id == grupo.id,
-            EmpresaGrupoMembro.empresa_id.in_([empresa_origem_id, empresa_destino_id]),
-            EmpresaGrupoMembro.status == "ativo",
+            GrupoComercialMembro.grupo_id == grupo.id,
+            GrupoComercialMembro.empresa_id.in_([empresa_origem_id, empresa_destino_id]),
+            GrupoComercialMembro.status == "ativo",
         )
         .all()
     )
@@ -138,27 +138,27 @@ def _validar_vinculo(
 def listar_destinos_transferencia(db: Session, *, empresa_origem_id) -> list[dict]:
     empresa_origem_id = str(empresa_origem_id)
     grupos_origem = (
-        db.query(EmpresaGrupo, EmpresaGrupoMembro)
+        db.query(GrupoComercial, GrupoComercialMembro)
         .join(
-            EmpresaGrupoMembro,
-            EmpresaGrupoMembro.grupo_id == EmpresaGrupo.id,
+            GrupoComercialMembro,
+            GrupoComercialMembro.grupo_id == GrupoComercial.id,
         )
         .filter(
-            EmpresaGrupo.status == "ativo",
-            EmpresaGrupoMembro.empresa_id == empresa_origem_id,
-            EmpresaGrupoMembro.status == "ativo",
+            GrupoComercial.status == "ativo",
+            GrupoComercialMembro.empresa_id == empresa_origem_id,
+            GrupoComercialMembro.status == "ativo",
         )
         .all()
     )
     destinos: list[dict] = []
     for grupo, _membro_origem in grupos_origem:
         membros = (
-            db.query(EmpresaGrupoMembro, Tenant)
-            .join(Tenant, Tenant.id == EmpresaGrupoMembro.empresa_id)
+            db.query(GrupoComercialMembro, Tenant)
+            .join(Tenant, Tenant.id == GrupoComercialMembro.empresa_id)
             .filter(
-                EmpresaGrupoMembro.grupo_id == grupo.id,
-                EmpresaGrupoMembro.empresa_id != empresa_origem_id,
-                EmpresaGrupoMembro.status == "ativo",
+                GrupoComercialMembro.grupo_id == grupo.id,
+                GrupoComercialMembro.empresa_id != empresa_origem_id,
+                GrupoComercialMembro.status == "ativo",
                 Tenant.status == "active",
             )
             .order_by(Tenant.name.asc())
@@ -195,20 +195,20 @@ def _produtos_destino_vinculados(
     empresa_destino_id: str,
 ) -> list[Produto]:
     vinculos = (
-        db.query(EmpresaGrupoProdutoVinculo)
+        db.query(GrupoComercialProdutoVinculo)
         .filter(
-            EmpresaGrupoProdutoVinculo.grupo_id == grupo_id,
-            EmpresaGrupoProdutoVinculo.status == "ativo",
+            GrupoComercialProdutoVinculo.grupo_id == grupo_id,
+            GrupoComercialProdutoVinculo.status == "ativo",
             or_(
                 (
-                    (EmpresaGrupoProdutoVinculo.empresa_a_id == empresa_origem_id)
-                    & (EmpresaGrupoProdutoVinculo.produto_a_id == produto_origem_id)
-                    & (EmpresaGrupoProdutoVinculo.empresa_b_id == empresa_destino_id)
+                    (GrupoComercialProdutoVinculo.empresa_a_id == empresa_origem_id)
+                    & (GrupoComercialProdutoVinculo.produto_a_id == produto_origem_id)
+                    & (GrupoComercialProdutoVinculo.empresa_b_id == empresa_destino_id)
                 ),
                 (
-                    (EmpresaGrupoProdutoVinculo.empresa_b_id == empresa_origem_id)
-                    & (EmpresaGrupoProdutoVinculo.produto_b_id == produto_origem_id)
-                    & (EmpresaGrupoProdutoVinculo.empresa_a_id == empresa_destino_id)
+                    (GrupoComercialProdutoVinculo.empresa_b_id == empresa_origem_id)
+                    & (GrupoComercialProdutoVinculo.produto_b_id == produto_origem_id)
+                    & (GrupoComercialProdutoVinculo.empresa_a_id == empresa_destino_id)
                 ),
             ),
         )
@@ -392,7 +392,7 @@ def preparar_previa_transferencia(
 
 
 def _resolver_usuario_destino(
-    db: Session, *, empresa_destino_id: str, membro_destino: EmpresaGrupoMembro
+    db: Session, *, empresa_destino_id: str, membro_destino: GrupoComercialMembro
 ) -> int:
     empresa_destino_uuid = UUID(empresa_destino_id)
     usuario_referencia = membro_destino.usuario_referencia_id
@@ -499,10 +499,10 @@ def executar_transferencia_integrada(
     empresa_destino_uuid = UUID(empresa_destino_id)
     chave_idempotencia = str(payload.chave_idempotencia)
     existente = (
-        db.query(EmpresaGrupoTransferencia)
+        db.query(GrupoComercialTransferencia)
         .filter(
-            EmpresaGrupoTransferencia.empresa_origem_id == empresa_origem_id,
-            EmpresaGrupoTransferencia.chave_idempotencia == chave_idempotencia,
+            GrupoComercialTransferencia.empresa_origem_id == empresa_origem_id,
+            GrupoComercialTransferencia.chave_idempotencia == chave_idempotencia,
         )
         .first()
     )
@@ -536,7 +536,7 @@ def executar_transferencia_integrada(
     empresa_origem = _empresa_ativa(db, empresa_origem_id)
     empresa_destino = _empresa_ativa(db, empresa_destino_id)
     documento = _documento_integrado(payload.documento)
-    transferencia = EmpresaGrupoTransferencia(
+    transferencia = GrupoComercialTransferencia(
         grupo_id=grupo.id,
         empresa_origem_id=empresa_origem_id,
         empresa_destino_id=empresa_destino_id,
@@ -591,7 +591,7 @@ def executar_transferencia_integrada(
         tenant_id=empresa_origem_id,
         user_id=usuario_origem_id,
         event="transferencia_grupo_saida_integrada",
-        entity_type="empresa_grupo_transferencia",
+        entity_type="grupo_comercial_transferencia",
         entity_id=transferencia.id,
         metadata={
             "grupo_id": grupo.id,
@@ -651,7 +651,7 @@ def executar_transferencia_integrada(
             tenant_id=empresa_destino_id,
             user_id=usuario_destino_id,
             event="transferencia_grupo_entrada_integrada",
-            entity_type="empresa_grupo_transferencia",
+            entity_type="grupo_comercial_transferencia",
             entity_id=transferencia.id,
             metadata={
                 "grupo_id": grupo.id,
@@ -726,7 +726,7 @@ def executar_transferencia_integrada(
                 "Nao foi possivel agendar o Bling da entrada integrada",
                 exc_info=True,
             )
-    registrar_uso_funcionalidade(db, "grupos-empresas-transferencia-integrada")
+    registrar_uso_funcionalidade(db, "grupos-comerciais-transferencia-integrada")
     return resultado
 
 

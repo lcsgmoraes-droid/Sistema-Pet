@@ -437,7 +437,7 @@ const Layout = () => {
     let ativo = true;
     const carregarConvites = async () => {
       try {
-        const response = await api.get("/grupos-empresas/resumo");
+        const response = await api.get("/grupos-comerciais/resumo");
         if (ativo) {
           setConvitesGruposCount(
             Array.isArray(response.data?.convites_pendentes)
