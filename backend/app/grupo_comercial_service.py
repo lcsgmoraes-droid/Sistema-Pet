@@ -24,6 +24,7 @@ from app.evolucao_corepet import registrar_uso_funcionalidade
 from app.services.business_audit_service import log_business_event
 from app.services.plan_catalog import resolve_signup_selection
 from app.services.tenant_provisioning_service import provision_tenant
+from app.tenancy.context import clear_tenant_context, set_tenant_context
 
 
 CODIGO_ALFABETO = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
@@ -577,25 +578,36 @@ class GrupoComercialService:
             user=usuario,
             restore_tenant_id=restore_tenant_id,
         )
-        membro = GrupoComercialMembro(
-            grupo_id=grupo.id,
-            empresa_id=str(resultado.tenant_id),
-            papel="membro",
-            status="ativo",
-            usuario_referencia_id=usuario.id,
-        )
-        self.db.add(membro)
-        grupo.versao_membros = int(grupo.versao_membros or 1) + 1
-        self._auditar(
-            empresa_id=str(resultado.tenant_id),
-            usuario_id=usuario.id,
-            evento="grupo_comercial_loja_adicionada",
-            grupo_id=grupo.id,
-            metadados={"adicionada_via_grupo_id": grupo.id},
-        )
-        if commit:
-            self.db.commit()
-            registrar_uso_funcionalidade(self.db, "grupos-comerciais-nova-loja")
+        # provision_tenant ja restaurou o contexto pro tenant chamador (ou
+        # limpou, se nao houver) — mas o insert do membro e a auditoria
+        # abaixo se referem ao tenant NOVO, entao o contexto precisa
+        # apontar pra ele por um instante antes de voltar ao que era.
+        set_tenant_context(resultado.tenant_id)
+        try:
+            membro = GrupoComercialMembro(
+                grupo_id=grupo.id,
+                empresa_id=str(resultado.tenant_id),
+                papel="membro",
+                status="ativo",
+                usuario_referencia_id=usuario.id,
+            )
+            self.db.add(membro)
+            grupo.versao_membros = int(grupo.versao_membros or 1) + 1
+            self._auditar(
+                empresa_id=str(resultado.tenant_id),
+                usuario_id=usuario.id,
+                evento="grupo_comercial_loja_adicionada",
+                grupo_id=grupo.id,
+                metadados={"adicionada_via_grupo_id": grupo.id},
+            )
+            if commit:
+                self.db.commit()
+                registrar_uso_funcionalidade(self.db, "grupos-comerciais-nova-loja")
+        finally:
+            if restore_tenant_id is not None:
+                set_tenant_context(restore_tenant_id)
+            else:
+                clear_tenant_context()
         return {
             "tenant_id": str(resultado.tenant_id),
             "nome": resultado.tenant.name,

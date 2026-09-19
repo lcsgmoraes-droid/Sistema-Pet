@@ -36,6 +36,7 @@ from app.services.tenant_provisioning_service import (
     TenantOnboardingError,
     provision_tenant,
 )
+from app.tenancy.context import clear_tenant_context, set_tenant_context
 
 
 class OpsGrupoComercialOnboardingError(Exception):
@@ -111,12 +112,17 @@ def onboard_grupo_comercial(
 
     usuario = provisionamento.user
     grupo_nome = f"Grupo comercial de {titular_nome or email}"
+    # provision_tenant() limpou o contexto (restore_tenant_id=None, nao ha
+    # "tenant chamador" no onboarding de ops) — mas criar_grupo audita em
+    # nome do tenant novo, entao o contexto precisa apontar pra ele aqui.
+    set_tenant_context(provisionamento.tenant_id)
     grupo = GrupoComercialService(db).criar_grupo(
         empresa_id=str(provisionamento.tenant_id),
         usuario_id=usuario.id,
         nome=grupo_nome,
         commit=False,
     )
+    clear_tenant_context()
 
     lojas_criadas = [
         {

@@ -188,6 +188,13 @@ def register(
     user = provisioning.user
     admin_role = provisioning.admin_role
 
+    # provision_tenant() ja limpou o tenant context no proprio finally (nao
+    # tem "tenant chamador" pra restaurar aqui, e' cadastro publico) — mas o
+    # resto desta rota (auditoria do grupo, log de conta criada) ainda
+    # precisa do contexto do tenant novo ativo. Fica ativo ate o
+    # clear_tenant_context() explicito mais abaixo.
+    set_tenant_context(tenant_id)
+
     _mark_user_consent(user, request, payload.terms_version, payload.privacy_version)
 
     # Todo tenant novo nasce dentro de um grupo comercial — grupo-de-1 quando
