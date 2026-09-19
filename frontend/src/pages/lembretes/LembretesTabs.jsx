@@ -1,9 +1,10 @@
-import { FiBarChart2, FiCalendar, FiRepeat, FiUsers } from "react-icons/fi";
+import { FiBarChart2, FiCalendar, FiGift, FiRepeat, FiUsers } from "react-icons/fi";
 
 const tabs = [
   { id: "recompras", label: "Recompras", icon: FiRepeat, count: "lembretes" },
   { id: "validade", label: "Validade", icon: FiCalendar, count: "validadePendencias" },
-  { id: "relacionamento", label: "Relacionamento", icon: FiUsers, count: "aniversariantes" },
+  { id: "aniversarios", label: "Aniversários", icon: FiGift, count: "aniversariantes" },
+  { id: "relacionamento", label: "Relacionamento", icon: FiUsers },
   { id: "relatorios", label: "Histórico e relatórios", icon: FiBarChart2 },
 ];
 

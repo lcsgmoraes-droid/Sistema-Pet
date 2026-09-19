@@ -6,6 +6,7 @@ export default function LembretesCampanhasAlertas({ alertasCampanhas }) {
   if (!alertasCampanhas) return null;
 
   const cards = montarCardsCampanha(alertasCampanhas);
+  if (cards.length === 0) return null;
 
   return (
     <section className="mb-5 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
@@ -36,25 +37,6 @@ function montarCardsCampanha(alertas) {
   const proximos = alertas.proximos_eventos || {};
   const alertasInternos = alertas.alertas || {};
 
-  if (proximos.total_aniversarios_amanha > 0) {
-    cards.push({
-      id: "aniversarios-amanha",
-      count: proximos.total_aniversarios_amanha,
-      title: "Aniversario(s) amanha",
-      items: (proximos.aniversarios_amanha || []).slice(0, 3).map((a) => a.nome),
-      more: proximos.total_aniversarios_amanha > 3 ? proximos.total_aniversarios_amanha - 3 : 0,
-      tone: "pink",
-    });
-  }
-  if (alertas.total_aniversarios > 0) {
-    cards.push({
-      id: "aniversarios-hoje",
-      count: alertas.total_aniversarios,
-      title: "Aniversario(s) hoje",
-      items: (alertas.aniversarios_hoje || []).slice(0, 3).map((a) => a.nome),
-      tone: "amber",
-    });
-  }
   if (alertasInternos.inativos_30d > 0) {
     cards.push({
       id: "inativos-30d",
