@@ -74,6 +74,7 @@ from app.tributacao_routes import router as tributacao_router
 from app.importacao_produtos import router as importacao_router
 from app.importacao_pessoas import router as importacao_pessoas_router
 from app.lembretes import router as lembretes_router
+from app.lembretes_aniversarios_routes import router as lembretes_aniversarios_router
 from app.lembretes_relacionamento_routes import (
     router as lembretes_relacionamento_router,
 )
@@ -303,6 +304,10 @@ def register_routers(app: FastAPI) -> None:
     app.include_router(variacoes_router, tags=["Produtos - Variações"])  # Sprint 2
     app.include_router(calculadora_racao_router, tags=["Calculadora de Ração"])
     app.include_router(lembretes_router, tags=["Lembretes de Recorrência"])
+    app.include_router(
+        lembretes_aniversarios_router,
+        tags=["Lembretes de Aniversários"],
+    )
     app.include_router(
         lembretes_relacionamento_router,
         tags=["Lembretes de Recorrência"],

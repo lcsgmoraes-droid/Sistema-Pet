@@ -7,6 +7,7 @@ from sqlalchemy import (
     BigInteger,
     Boolean,
     Column,
+    Date,
     DateTime,
     Float,
     ForeignKey,
@@ -224,6 +225,59 @@ class LembreteContato(BaseTenantModel):
         ),
         Index(
             "ix_lembretes_contatos_tenant_canal_created",
+            "tenant_id",
+            "canal",
+            "created_at",
+        ),
+    )
+
+
+class AniversarioContato(BaseTenantModel):
+    """Contato manual ligado ao aniversário de um tutor ou pet."""
+
+    __tablename__ = "aniversarios_contatos"
+
+    tipo = Column(String(20), nullable=False)
+    cliente_id = Column(
+        Integer, ForeignKey("clientes.id", ondelete="CASCADE"), nullable=False
+    )
+    pet_id = Column(Integer, ForeignKey("pets.id", ondelete="SET NULL"), nullable=True)
+    aniversario_em = Column(Date, nullable=False)
+    usuario_id = Column(
+        Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    notification_queue_id = Column(
+        BigInteger,
+        ForeignKey("notification_queue.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    canal = Column(String(20), nullable=False)
+    acao = Column(String(40), nullable=False)
+    status = Column(String(30), nullable=False, default="registrado")
+    mensagem = Column(Text, nullable=False)
+    resultado = Column(String(120), nullable=True)
+    idempotency_key = Column(String(300), nullable=True)
+
+    cliente = relationship("Cliente")
+    pet = relationship("Pet")
+    operador = relationship("User")
+
+    __table_args__ = (
+        UniqueConstraint(
+            "tenant_id",
+            "idempotency_key",
+            name="uq_aniversarios_contatos_tenant_idempotency",
+        ),
+        Index(
+            "ix_aniversarios_contatos_tenant_evento",
+            "tenant_id",
+            "tipo",
+            "aniversario_em",
+            "cliente_id",
+            "pet_id",
+        ),
+        Index(
+            "ix_aniversarios_contatos_tenant_canal_created",
             "tenant_id",
             "canal",
             "created_at",

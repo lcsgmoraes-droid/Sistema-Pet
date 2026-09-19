@@ -1,6 +1,7 @@
 import "../../styles/Lembretes.css";
 import LembreteContatoModal from "./LembreteContatoModal";
 import LembretesCampanhasAlertas from "./LembretesCampanhasAlertas";
+import LembretesAniversariantes from "./LembretesAniversariantes";
 import LembretesClientesInativos from "./LembretesClientesInativos";
 import LembretesHeader from "./LembretesHeader";
 import LembretesList from "./LembretesList";
@@ -52,6 +53,7 @@ export default function LembretesPage() {
               description="Aniversários, inatividade, brindes e outras oportunidades de campanha sem misturar com recompra."
               title="Alertas de relacionamento"
             />
+            <LembretesAniversariantes controller={controller} />
             <LembretesCampanhasAlertas alertasCampanhas={controller.alertasCampanhas} />
             {!controller.alertasCampanhas && (
               <EmptyPanel text="Nenhum alerta de campanha disponível neste momento." />

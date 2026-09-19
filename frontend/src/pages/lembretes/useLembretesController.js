@@ -12,6 +12,17 @@ function errorDetail(error, fallback) {
   return error?.response?.data?.detail || fallback;
 }
 
+function contactKey(item) {
+  return item?.contato_chave || item?.id;
+}
+
+function contactBasePath(item) {
+  if (item?.contato_tipo === "aniversario") {
+    return `/lembretes/aniversarios/${item.tipo_aniversario}/${item.referencia_id}`;
+  }
+  return `/lembretes/${item?.id}`;
+}
+
 export default function useLembretesController() {
   const { moduloAtivo } = useModulos();
   const navigate = useNavigate();
@@ -19,6 +30,8 @@ export default function useLembretesController() {
   const [lembretes, setLembretes] = useState([]);
   const [loading, setLoading] = useState(false);
   const [alertasCampanhas, setAlertasCampanhas] = useState(null);
+  const [aniversariantes, setAniversariantes] = useState([]);
+  const [loadingAniversariantes, setLoadingAniversariantes] = useState(false);
   const [validadePendencias, setValidadePendencias] = useState([]);
   const [validadeConfig, setValidadeConfig] = useState(initialValidityConfig);
   const [processandoValidade, setProcessandoValidade] = useState(false);
@@ -53,6 +66,19 @@ export default function useLembretesController() {
       setAlertasCampanhas(response.data);
     } catch {
       setAlertasCampanhas(null);
+    }
+  }, []);
+
+  const carregarAniversariantes = useCallback(async () => {
+    setLoadingAniversariantes(true);
+    try {
+      const response = await api.get("/lembretes/aniversarios", { params: { dias: 30 } });
+      setAniversariantes(response.data?.aniversariantes || []);
+    } catch (error) {
+      console.error("Erro ao carregar aniversariantes:", error);
+      setAniversariantes([]);
+    } finally {
+      setLoadingAniversariantes(false);
     }
   }, []);
 
@@ -116,12 +142,14 @@ export default function useLembretesController() {
 
   useEffect(() => {
     void carregarLembretes();
+    void carregarAniversariantes();
     void carregarRelatorio();
     if (campanhasAtivo) void carregarAlertasCampanhas();
     else setAlertasCampanhas(null);
     void carregarValidadePendencias({ processar: true });
     const interval = setInterval(() => {
       void carregarLembretes();
+      void carregarAniversariantes();
       void carregarRelatorio();
       void carregarValidadePendencias();
     }, 60000);
@@ -129,6 +157,7 @@ export default function useLembretesController() {
   }, [
     campanhasAtivo,
     carregarAlertasCampanhas,
+    carregarAniversariantes,
     carregarLembretes,
     carregarRelatorio,
     carregarValidadePendencias,
@@ -201,10 +230,10 @@ export default function useLembretesController() {
     [carregarValidadePendencias],
   );
 
-  const carregarContatos = useCallback(async (id) => {
+  const carregarContatos = useCallback(async (item) => {
     setCarregandoContatos(true);
     try {
-      const response = await api.get(`/lembretes/${id}/contatos`);
+      const response = await api.get(`${contactBasePath(item)}/contatos`);
       setContatos(response.data?.contatos || []);
     } catch {
       setContatos([]);
@@ -218,28 +247,31 @@ export default function useLembretesController() {
       setContatoAberto(lembrete);
       setMensagemContato(lembrete.mensagem_sugerida || "");
       setContatos([]);
-      void carregarContatos(lembrete.id);
+      void carregarContatos(lembrete);
     },
     [carregarContatos],
   );
 
   const atualizarAposContato = useCallback(
-    async (id) => {
-      await Promise.all([carregarContatos(id), carregarLembretes(), carregarRelatorio()]);
+    async (item) => {
+      const refreshes = [carregarContatos(item), carregarRelatorio()];
+      if (item.contato_tipo === "aniversario") refreshes.push(carregarAniversariantes());
+      else refreshes.push(carregarLembretes());
+      await Promise.all(refreshes);
     },
-    [carregarContatos, carregarLembretes, carregarRelatorio],
+    [carregarAniversariantes, carregarContatos, carregarLembretes, carregarRelatorio],
   );
 
   const enviarPush = useCallback(
     async (lembrete, mensagem = lembrete.mensagem_sugerida) => {
-      setAcaoContato(`push-${lembrete.id}`);
+      setAcaoContato(`push-${contactKey(lembrete)}`);
       try {
-        await api.post(`/lembretes/${lembrete.id}/notificar-app`, {
+        await api.post(`${contactBasePath(lembrete)}/notificar-app`, {
           mensagem,
           chave_cliente: crypto.randomUUID(),
         });
         toast.success("Notificação adicionada à fila de envio");
-        await atualizarAposContato(lembrete.id);
+        await atualizarAposContato(lembrete);
       } catch (error) {
         toast.error(errorDetail(error, "Não foi possível enviar a notificação"));
       } finally {
@@ -264,13 +296,13 @@ export default function useLembretesController() {
     popup.opener = null;
     setAcaoContato("whatsapp");
     try {
-      await api.post(`/lembretes/${contatoAberto.id}/contatos/whatsapp`, {
+      await api.post(`${contactBasePath(contatoAberto)}/contatos/whatsapp`, {
         mensagem: mensagemContato,
         chave_cliente: crypto.randomUUID(),
       });
       popup.location.replace(url);
       toast.success("Conversa aberta e registrada no histórico");
-      await atualizarAposContato(contatoAberto.id);
+      await atualizarAposContato(contatoAberto);
     } catch (error) {
       popup.close();
       toast.error(errorDetail(error, "Não foi possível abrir o WhatsApp"));
@@ -303,11 +335,13 @@ export default function useLembretesController() {
     abaAtiva,
     acaoContato,
     alertasCampanhas,
+    aniversariantes,
     abrirContato,
     abrirWhatsApp,
     busca,
     cancelarLembrete,
     carregandoContatos,
+    carregarAniversariantes,
     carregarValidadePendencias,
     completarLembrete,
     contatoAberto,
@@ -322,6 +356,7 @@ export default function useLembretesController() {
     lembretes,
     lembretesFiltrados,
     loading,
+    loadingAniversariantes,
     mensagemContato,
     processandoValidade,
     proximosEmBreve,

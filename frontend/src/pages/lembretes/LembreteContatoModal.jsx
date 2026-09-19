@@ -34,7 +34,8 @@ export default function LembreteContatoModal({ controller }) {
               className="mt-1 text-xl font-semibold text-slate-900 dark:text-slate-100"
               id="lembrete-contato-title"
             >
-              {reminder.cliente_nome || "Cliente"} · {reminder.produto_nome}
+              {reminder.cliente_nome || "Cliente"} ·{" "}
+              {reminder.contexto_nome || reminder.produto_nome || "Contato"}
             </h2>
             <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
               Revise o texto antes de escolher o canal.
@@ -109,7 +110,7 @@ export default function LembreteContatoModal({ controller }) {
           <aside className="border-t border-slate-200 bg-slate-50/70 p-5 dark:border-slate-700 dark:bg-slate-950/40 sm:p-6 lg:border-l lg:border-t-0">
             <div className="flex items-center justify-between gap-3">
               <h3 className="m-0 text-sm font-semibold text-slate-900 dark:text-slate-100">
-                Histórico deste ciclo
+                {reminder.historico_titulo || "Histórico deste ciclo"}
               </h3>
               <span className="rounded-full bg-white px-2 py-0.5 text-xs font-bold text-slate-600 ring-1 ring-slate-200 dark:bg-slate-900 dark:text-slate-300 dark:ring-slate-700">
                 {controller.contatos.length}
