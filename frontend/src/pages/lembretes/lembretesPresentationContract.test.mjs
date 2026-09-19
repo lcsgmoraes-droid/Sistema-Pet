@@ -13,10 +13,18 @@ const modalSource = read("LembreteContatoModal.jsx");
 const tabsSource = read("LembretesTabs.jsx");
 const styleSource = read("../../styles/Lembretes.css");
 
-test("central separa recompra, validade, relacionamento e relatórios", () => {
-  for (const literal of ["Recompras", "Validade", "Relacionamento", "Histórico e relatórios"]) {
+test("central separa recompra, validade, aniversários, relacionamento e relatórios", () => {
+  for (const literal of [
+    "Recompras",
+    "Validade",
+    "Aniversários",
+    "Relacionamento",
+    "Histórico e relatórios",
+  ]) {
     assert.match(tabsSource, new RegExp(literal));
   }
+  assert.match(tabsSource, /id: "aniversarios"[^}]+count: "aniversariantes"/);
+  assert.doesNotMatch(tabsSource, /id: "relacionamento"[^}]+count: "aniversariantes"/);
   assert.match(pageSource, /Central de lembretes/);
   assert.doesNotMatch(pageSource, /LembretesBlingAutocadastros/);
   assert.doesNotMatch(pageSource, /LembretesDrePendentes/);
@@ -59,7 +67,8 @@ test("relacionamento lista clientes inativos com ações manuais de mensagem", (
   assert.match(inactiveSource, /Nenhuma mensagem é\s+enviada automaticamente/);
 });
 
-test("relacionamento oferece aniversários de tutor e pet com mensagem, push e WhatsApp", () => {
+test("aba própria oferece aniversários de tutor e pet com mensagem, push e WhatsApp", () => {
+  assert.match(pageSource, /abaAtiva === "aniversarios"/);
   assert.match(pageSource, /LembretesAniversariantes/);
   assert.match(birthdaySource, /Aniversariantes — tutor e pet/);
   assert.match(birthdaySource, /> Criar mensagem/);

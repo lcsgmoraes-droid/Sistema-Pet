@@ -47,13 +47,16 @@ export default function LembretesPage() {
           </>
         )}
 
+        {controller.abaAtiva === "aniversarios" && (
+          <LembretesAniversariantes controller={controller} />
+        )}
+
         {controller.abaAtiva === "relacionamento" && (
           <>
             <PanelIntro
-              description="Aniversários, inatividade, brindes e outras oportunidades de campanha sem misturar com recompra."
+              description="Clientes inativos, brindes e outras oportunidades de campanha sem misturar com recompra."
               title="Alertas de relacionamento"
             />
-            <LembretesAniversariantes controller={controller} />
             <LembretesCampanhasAlertas alertasCampanhas={controller.alertasCampanhas} />
             {!controller.alertasCampanhas && (
               <EmptyPanel text="Nenhum alerta de campanha disponível neste momento." />
