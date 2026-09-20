@@ -54,9 +54,8 @@ from app.models_authz import (
 )
 from app.grupo_comercial_models import (
     GrupoComercial,
-    GrupoComercialCodigo,
-    GrupoComercialConvite,
     GrupoComercialEstoqueCompartilhado,
+    GrupoComercialGestor,
     GrupoComercialMembro,
     GrupoComercialTransferencia,
 )
@@ -97,6 +96,15 @@ class User(BaseTenantModel):
     hashed_password = Column(String(255), nullable=True)  # Nullable para OAuth
     is_active = Column(Boolean, default=True)
     is_admin = Column(Boolean, default=False)  # Superusuário
+
+    # Usuario master do grupo comercial: acesso total e permanente a todas
+    # as lojas do PROPRIO grupo (nunca de outro grupo/cliente). So preenchido
+    # automaticamente na criacao do grupo (GrupoComercialService.criar_grupo)
+    # e nunca aceito em nenhum payload de criacao/edicao de usuario -
+    # protecao por construcao, nao por checagem espalhada pelo codigo.
+    master_grupo_id = Column(
+        Integer, ForeignKey("grupos_comerciais.id"), nullable=True, index=True
+    )
 
     # Perfil
     nome = Column(String(255), nullable=True)

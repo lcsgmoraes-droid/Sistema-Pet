@@ -11,8 +11,7 @@ from app.db import base as _base  # noqa: F401 - registra todo o metadata (evita
 # mesmo criando so um subconjunto de tabelas abaixo).
 from app.grupo_comercial_models import (
     GrupoComercial,
-    GrupoComercialCodigo,
-    GrupoComercialConvite,
+    GrupoComercialGestor,
     GrupoComercialMembro,
 )
 from app.models import (
@@ -75,8 +74,7 @@ def db(monkeypatch):
             AuditLog.__table__,
             GrupoComercial.__table__,
             GrupoComercialMembro.__table__,
-            GrupoComercialCodigo.__table__,
-            GrupoComercialConvite.__table__,
+            GrupoComercialGestor.__table__,
         ],
     )
     session = Session(engine)

@@ -410,7 +410,8 @@ def test_remover_empresa_do_grupo_revoga_compartilhamentos_anteriores(db):
     from app.grupo_comercial_service import GrupoComercialService
 
     session, _syncs = db
-    grupo, produto, _usuario = _preparar_cenario(session)
+    grupo, produto, usuario = _preparar_cenario(session)
+    usuario.master_grupo_id = grupo.id  # so o master pode remover empresa do grupo
     compartilhamento_service = GrupoComercialEstoqueCompartilhadoService(session)
     with tenant_context(ORIGEM):
         compartilhamento_service.compartilhar(
@@ -420,7 +421,7 @@ def test_remover_empresa_do_grupo_revoga_compartilhamentos_anteriores(db):
     with tenant_context(CONSUMIDORA):
         GrupoComercialService(session).remover_membro(
             CONSUMIDORA,
-            1,
+            usuario,
             grupo.id,
             ORIGEM,
         )

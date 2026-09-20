@@ -7,6 +7,7 @@ from app.grupo_comercial_analise_service import GrupoComercialAnaliseService
 from app.grupo_comercial_analise_detalhes_service import (
     GrupoComercialAnaliseDetalhesService,
 )
+from app.grupo_comercial_billing_service import GrupoComercialBillingService
 from app.grupo_comercial_planejamento_service import (
     GrupoComercialPlanejamentoService,
 )
@@ -18,9 +19,9 @@ from app.grupo_comercial_estoque_compartilhado_service import (
 )
 from app.grupo_comercial_schemas import (
     GrupoComercialEstoqueAcessoCatalogoAtualizar,
-    GrupoComercialConvidar,
     GrupoComercialCriar,
     GrupoComercialEstoqueCompartilhar,
+    GrupoComercialGestorConceder,
     GrupoComercialLojaAdicionar,
     GrupoComercialProdutoVincular,
 )
@@ -176,7 +177,7 @@ def listar_resumo_grupos(
     user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     usuario, empresa_id = user_and_tenant
-    return GrupoComercialService(db).listar_resumo(empresa_id, usuario.id)
+    return GrupoComercialService(db).listar_resumo(empresa_id, usuario)
 
 
 @router.get("/{grupo_id}/visao-consolidada")
@@ -439,49 +440,6 @@ def adicionar_loja_ao_grupo(
     )
 
 
-@router.post("/{grupo_id}/convites", status_code=status.HTTP_201_CREATED)
-@require_any_permission(PERMISSOES_CONFIG_EMPRESA)
-def convidar_empresa_para_grupo(
-    grupo_id: int,
-    payload: GrupoComercialConvidar,
-    db: Session = Depends(get_session),
-    user_and_tenant=Depends(get_current_user_and_tenant),
-):
-    usuario, empresa_id = user_and_tenant
-    return GrupoComercialService(db).convidar(
-        empresa_id,
-        usuario.id,
-        grupo_id,
-        payload.codigo_empresa,
-    )
-
-
-@router.post("/convites/{convite_id}/aceitar")
-@require_any_permission(PERMISSOES_CONFIG_EMPRESA)
-def aceitar_convite_grupo(
-    convite_id: int,
-    db: Session = Depends(get_session),
-    user_and_tenant=Depends(get_current_user_and_tenant),
-):
-    usuario, empresa_id = user_and_tenant
-    return GrupoComercialService(db).responder_convite(
-        empresa_id, usuario.id, convite_id, aceitar=True
-    )
-
-
-@router.post("/convites/{convite_id}/recusar")
-@require_any_permission(PERMISSOES_CONFIG_EMPRESA)
-def recusar_convite_grupo(
-    convite_id: int,
-    db: Session = Depends(get_session),
-    user_and_tenant=Depends(get_current_user_and_tenant),
-):
-    usuario, empresa_id = user_and_tenant
-    return GrupoComercialService(db).responder_convite(
-        empresa_id, usuario.id, convite_id, aceitar=False
-    )
-
-
 @router.delete("/{grupo_id}/membros/{membro_empresa_id}")
 @require_any_permission(PERMISSOES_CONFIG_EMPRESA)
 def remover_empresa_do_grupo(
@@ -493,7 +451,74 @@ def remover_empresa_do_grupo(
     usuario, empresa_id = user_and_tenant
     return GrupoComercialService(db).remover_membro(
         empresa_id,
-        usuario.id,
+        usuario,
         grupo_id,
         membro_empresa_id,
+    )
+
+
+@router.get("/{grupo_id}/gestores")
+@require_any_permission(PERMISSOES_CONFIG_EMPRESA)
+def listar_gestores_grupo(
+    grupo_id: int,
+    db: Session = Depends(get_session),
+    user_and_tenant=Depends(get_current_user_and_tenant),
+):
+    usuario, _empresa_id = user_and_tenant
+    return {"gestores": GrupoComercialService(db).listar_gestores(grupo_id, usuario)}
+
+
+@router.post("/{grupo_id}/gestores", status_code=status.HTTP_201_CREATED)
+@require_any_permission(PERMISSOES_CONFIG_EMPRESA)
+def conceder_gestor_grupo(
+    grupo_id: int,
+    payload: GrupoComercialGestorConceder,
+    db: Session = Depends(get_session),
+    user_and_tenant=Depends(get_current_user_and_tenant),
+):
+    """So o usuario master do grupo pode chamar - checagem dentro do
+    servico, nao depende de permissao de tenant (ver
+    GrupoComercialService.conceder_gestor)."""
+    usuario, empresa_id = user_and_tenant
+    return GrupoComercialService(db).conceder_gestor(
+        grupo_id, empresa_id, usuario, payload.user_id
+    )
+
+
+@router.delete("/{grupo_id}/gestores/{user_id}")
+@require_any_permission(PERMISSOES_CONFIG_EMPRESA)
+def revogar_gestor_grupo(
+    grupo_id: int,
+    user_id: int,
+    db: Session = Depends(get_session),
+    user_and_tenant=Depends(get_current_user_and_tenant),
+):
+    usuario, empresa_id = user_and_tenant
+    return GrupoComercialService(db).revogar_gestor(
+        grupo_id, empresa_id, usuario, user_id
+    )
+
+
+@router.get("/{grupo_id}/billing")
+@require_any_permission(PERMISSOES_CONFIG_EMPRESA)
+def listar_billing_grupo(
+    grupo_id: int,
+    db: Session = Depends(get_session),
+    user_and_tenant=Depends(get_current_user_and_tenant),
+):
+    usuario, _empresa_id = user_and_tenant
+    return GrupoComercialBillingService(db).listar(grupo_id, usuario)
+
+
+@router.post("/{grupo_id}/lojas/{tenant_id}/billing/sincronizar")
+@require_any_permission(PERMISSOES_CONFIG_EMPRESA)
+def sincronizar_billing_loja_grupo(
+    grupo_id: int,
+    tenant_id: str,
+    db: Session = Depends(get_session),
+    user_and_tenant=Depends(get_current_user_and_tenant),
+):
+    usuario, _empresa_id = user_and_tenant
+    return GrupoComercialBillingService(db).sincronizar_loja(
+        grupo_id, tenant_id, usuario
     )

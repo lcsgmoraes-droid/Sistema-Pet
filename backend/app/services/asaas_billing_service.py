@@ -230,6 +230,28 @@ def _apply_payment_snapshot(tenant: Tenant, payment: dict[str, Any] | None) -> N
     )
 
 
+def refresh_subscription_payment(db: Session, *, tenant: Tenant) -> dict[str, Any]:
+    """Rebusca no Asaas o pagamento atual da assinatura vigente da loja e
+    atualiza o snapshot local (status, tipo, proxima data, link do boleto/
+    fatura). Nao cria nenhuma cobranca nova - so atualiza o que ja existe,
+    util quando o link salvo expirou ou o status mudou fora do webhook."""
+    if not tenant.billing_provider_subscription_id:
+        raise AsaasBillingError(
+            "Esta loja ainda nao tem assinatura ativa no Asaas.", status_code=422
+        )
+    client = AsaasClient()
+    payment = _subscription_payment(client, tenant.billing_provider_subscription_id)
+    if payment is None:
+        raise AsaasBillingError(
+            "Nenhuma cobranca encontrada para a assinatura desta loja.",
+            status_code=404,
+        )
+    _apply_payment_snapshot(tenant, payment)
+    db.commit()
+    db.refresh(tenant)
+    return subscription_status(tenant)
+
+
 def _trial_active(tenant: Tenant) -> bool:
     ends_at = tenant.trial_ends_at
     if ends_at is None:

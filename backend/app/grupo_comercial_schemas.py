@@ -13,8 +13,8 @@ class GrupoComercialCriar(BaseModel):
         return nome
 
 
-class GrupoComercialConvidar(BaseModel):
-    codigo_empresa: str = Field(min_length=12, max_length=20)
+class GrupoComercialGestorConceder(BaseModel):
+    user_id: int = Field(gt=0)
 
 
 class GrupoComercialLojaAdicionar(BaseModel):

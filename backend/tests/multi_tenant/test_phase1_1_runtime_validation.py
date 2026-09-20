@@ -21,8 +21,6 @@ from app.auth.core import ALGORITHM
 from app.auth.dependencies import get_current_user_and_tenant
 from app.grupo_comercial_models import (
     GrupoComercial,
-    GrupoComercialCodigo,
-    GrupoComercialConvite,
     GrupoComercialMembro,
 )
 from app.models import (
@@ -126,8 +124,6 @@ def auth_db_session():
         RolePermission.__table__,
         GrupoComercial.__table__,
         GrupoComercialMembro.__table__,
-        GrupoComercialCodigo.__table__,
-        GrupoComercialConvite.__table__,
     ):
         table.create(engine, checkfirst=True)
 

@@ -2,34 +2,32 @@
 
 from __future__ import annotations
 
-import re
-import secrets
 from datetime import datetime, timezone
-from zoneinfo import ZoneInfo
 
 from fastapi import HTTPException, status
-from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.grupo_comercial_models import (
     GrupoComercial,
-    GrupoComercialCodigo,
-    GrupoComercialConvite,
     GrupoComercialEstoqueCompartilhado,
+    GrupoComercialGestor,
     GrupoComercialMembro,
 )
 from app.grupo_comercial_sql import empresa_id_igual
-from app.models import Tenant, User
+from app.auth.auth_multitenant_support import grant_all_permissions_to_role
+from app.models import Role, Tenant, User, UserTenant
 from app.evolucao_corepet import registrar_uso_funcionalidade
 from app.services.business_audit_service import log_business_event
 from app.services.plan_catalog import resolve_signup_selection
 from app.services.tenant_provisioning_service import provision_tenant
-from app.tenancy.context import clear_tenant_context, set_tenant_context
+from app.tenancy.context import (
+    clear_tenant_context,
+    get_current_tenant,
+    set_tenant_context,
+)
 
 
-CODIGO_ALFABETO = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
-CODIGO_TAMANHO = 12
-FUSO_NEGOCIO = ZoneInfo("America/Sao_Paulo")
+NOME_ROLE_MASTER = "Administrador (Grupo)"
 
 
 def _agora_utc(agora: datetime | None = None) -> datetime:
@@ -37,39 +35,6 @@ def _agora_utc(agora: datetime | None = None) -> datetime:
     if valor.tzinfo is None:
         return valor.replace(tzinfo=timezone.utc)
     return valor.astimezone(timezone.utc)
-
-
-def _em_utc(valor: datetime) -> datetime:
-    if valor.tzinfo is None:
-        return valor.replace(tzinfo=timezone.utc)
-    return valor.astimezone(timezone.utc)
-
-
-def _competencia_e_expiracao(agora: datetime) -> tuple[str, datetime]:
-    local = agora.astimezone(FUSO_NEGOCIO)
-    competencia = f"{local.year:04d}-{local.month:02d}"
-    if local.month == 12:
-        proximo_ano, proximo_mes = local.year + 1, 1
-    else:
-        proximo_ano, proximo_mes = local.year, local.month + 1
-    expiracao_local = datetime(proximo_ano, proximo_mes, 1, tzinfo=FUSO_NEGOCIO)
-    return competencia, expiracao_local.astimezone(timezone.utc)
-
-
-def _normalizar_codigo(valor: str) -> str:
-    codigo = re.sub(r"[\s-]+", "", str(valor or "")).upper()
-    if len(codigo) != CODIGO_TAMANHO or any(
-        caractere not in CODIGO_ALFABETO for caractere in codigo
-    ):
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Código da empresa inválido ou expirado.",
-        )
-    return codigo
-
-
-def _formatar_codigo(codigo: str) -> str:
-    return "-".join(codigo[indice : indice + 4] for indice in range(0, 12, 4))
 
 
 class GrupoComercialService:
@@ -153,69 +118,6 @@ class GrupoComercialService:
             commit=False,
         )
 
-    def _novo_codigo(self) -> str:
-        for _tentativa in range(20):
-            codigo = "".join(
-                secrets.choice(CODIGO_ALFABETO) for _ in range(CODIGO_TAMANHO)
-            )
-            existente = (
-                self.db.query(GrupoComercialCodigo.id)
-                .filter(GrupoComercialCodigo.codigo == codigo)
-                .first()
-            )
-            if existente is None:
-                return codigo
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Não foi possível gerar o código agora. Tente novamente.",
-        )
-
-    def obter_codigo(self, empresa_id, usuario_id: int) -> dict:
-        empresa_id = self._empresa_id(empresa_id)
-        self._empresa_ativa(empresa_id)
-        competencia, expira_em = _competencia_e_expiracao(self.agora)
-        codigo = (
-            self.db.query(GrupoComercialCodigo)
-            .filter(
-                GrupoComercialCodigo.empresa_id == empresa_id,
-                GrupoComercialCodigo.competencia == competencia,
-            )
-            .first()
-        )
-        if codigo is None:
-            codigo = GrupoComercialCodigo(
-                empresa_id=empresa_id,
-                competencia=competencia,
-                codigo=self._novo_codigo(),
-                criado_por_usuario_id=usuario_id,
-                expira_em=expira_em,
-            )
-            self.db.add(codigo)
-            try:
-                self.db.commit()
-            except IntegrityError as exc:
-                self.db.rollback()
-                codigo = (
-                    self.db.query(GrupoComercialCodigo)
-                    .filter(
-                        GrupoComercialCodigo.empresa_id == empresa_id,
-                        GrupoComercialCodigo.competencia == competencia,
-                    )
-                    .first()
-                )
-                if codigo is None:
-                    raise HTTPException(
-                        status_code=status.HTTP_409_CONFLICT,
-                        detail="O código foi criado em outra sessão. Recarregue a página.",
-                    ) from exc
-            else:
-                self.db.refresh(codigo)
-        return {
-            "codigo": _formatar_codigo(codigo.codigo),
-            "competencia": codigo.competencia,
-            "expira_em": codigo.expira_em,
-        }
-
     def criar_grupo(
         self, empresa_id, usuario_id: int, nome: str, *, commit: bool = True
     ) -> dict:
@@ -237,6 +139,14 @@ class GrupoComercialService:
             usuario_referencia_id=usuario_id,
         )
         self.db.add(membro)
+        # O usuario que cria o grupo vira o master permanente dele - acesso
+        # total a todas as lojas do proprio grupo, nunca alterado por tela.
+        # So marca se ainda nao for master de nenhum outro grupo (nao deveria
+        # rodar duas vezes pro mesmo fundador, mas fica idempotente por
+        # seguranca).
+        usuario = self.db.query(User).filter(User.id == usuario_id).first()
+        if usuario is not None and usuario.master_grupo_id is None:
+            usuario.master_grupo_id = grupo.id
         self._auditar(
             empresa_id=empresa_id,
             usuario_id=usuario_id,
@@ -245,238 +155,20 @@ class GrupoComercialService:
         )
         if commit:
             self.db.commit()
-            registrar_uso_funcionalidade(self.db, "grupos-comerciais-convites")
-        return self._serializar_grupo(grupo, membro)
-
-    def convidar(
-        self,
-        empresa_id,
-        usuario_id: int,
-        grupo_id: int,
-        codigo_empresa: str,
-    ) -> dict:
-        empresa_id = self._empresa_id(empresa_id)
-        grupo = self._grupo_ativo(grupo_id, travar=True)
-        self._membro_ativo(grupo.id, empresa_id, exigir_responsavel=True)
-        codigo_normalizado = _normalizar_codigo(codigo_empresa)
-        codigo = (
-            self.db.query(GrupoComercialCodigo)
-            .filter(
-                GrupoComercialCodigo.codigo == codigo_normalizado,
-                GrupoComercialCodigo.expira_em > self.agora,
-            )
-            .first()
-        )
-        if codigo is None:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Código da empresa inválido ou expirado.",
-            )
-        empresa_convidada_id = str(codigo.empresa_id)
-        empresa_convidada = self._empresa_ativa(empresa_convidada_id)
-        if empresa_convidada_id == empresa_id:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="A empresa responsável já faz parte do grupo.",
-            )
-        membro = (
-            self.db.query(GrupoComercialMembro)
-            .filter(
-                GrupoComercialMembro.grupo_id == grupo.id,
-                GrupoComercialMembro.empresa_id == empresa_convidada_id,
-                GrupoComercialMembro.status == "ativo",
-            )
-            .first()
-        )
-        if membro is not None:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail="Esta empresa já participa do grupo.",
-            )
-
-        convite = (
-            self.db.query(GrupoComercialConvite)
-            .filter(
-                GrupoComercialConvite.grupo_id == grupo.id,
-                GrupoComercialConvite.empresa_convidada_id == empresa_convidada_id,
-            )
-            .with_for_update()
-            .first()
-        )
-        if (
-            convite is not None
-            and convite.status == "pendente"
-            and _em_utc(convite.expira_em) > self.agora
-        ):
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail="Já existe um convite pendente para esta empresa.",
-            )
-        if convite is None:
-            convite = GrupoComercialConvite(
-                grupo_id=grupo.id,
-                empresa_convidada_id=empresa_convidada_id,
-                convidado_por_empresa_id=empresa_id,
-                convidado_por_usuario_id=usuario_id,
-                status="pendente",
-                expira_em=codigo.expira_em,
-            )
-            self.db.add(convite)
-        else:
-            convite.convidado_por_empresa_id = empresa_id
-            convite.convidado_por_usuario_id = usuario_id
-            convite.respondido_por_usuario_id = None
-            convite.status = "pendente"
-            convite.criado_em = self.agora
-            convite.expira_em = codigo.expira_em
-            convite.respondido_em = None
-        self._auditar(
-            empresa_id=empresa_id,
-            usuario_id=usuario_id,
-            evento="grupo_comercial_convite_enviado",
-            grupo_id=grupo.id,
-            metadados={"empresa_convidada_id": empresa_convidada_id},
-        )
-        self.db.commit()
-        self.db.refresh(convite)
-        return self._serializar_convite_enviado(convite, empresa_convidada)
-
-    def _fechar_grupo_solo_se_necessario(self, empresa_id: str, usuario_id: int) -> None:
-        """Fecha o grupo-de-1 antigo de uma empresa que está entrando em outro
-        grupo agora — só age se a empresa participa hoje de exatamente 1
-        grupo, sozinha, como responsável (um "grupo-de-1" puro); nunca mexe
-        num grupo com outros membros ativos.
-        """
-        membros_ativos = (
-            self.db.query(GrupoComercialMembro)
-            .filter(
-                GrupoComercialMembro.empresa_id == empresa_id,
-                GrupoComercialMembro.status == "ativo",
-            )
-            .with_for_update()
-            .all()
-        )
-        if len(membros_ativos) != 1:
-            return
-        membro_solo = membros_ativos[0]
-        if membro_solo.papel != "responsavel":
-            return
-        outro_membro_no_grupo = (
-            self.db.query(GrupoComercialMembro.id)
-            .filter(
-                GrupoComercialMembro.grupo_id == membro_solo.grupo_id,
-                GrupoComercialMembro.status == "ativo",
-                GrupoComercialMembro.id != membro_solo.id,
-            )
-            .first()
-        )
-        if outro_membro_no_grupo is not None:
-            return
-
-        grupo_solo = self._grupo_ativo(membro_solo.grupo_id, travar=True)
-        membro_solo.status = "removido"
-        membro_solo.removido_em = self.agora
-        grupo_solo.status = "encerrado"
-        self._auditar(
-            empresa_id=empresa_id,
-            usuario_id=usuario_id,
-            evento="grupo_comercial_solo_encerrado",
-            grupo_id=grupo_solo.id,
-        )
-
-    def responder_convite(
-        self,
-        empresa_id,
-        usuario_id: int,
-        convite_id: int,
-        *,
-        aceitar: bool,
-    ) -> dict:
-        empresa_id = self._empresa_id(empresa_id)
-        convite = (
-            self.db.query(GrupoComercialConvite)
-            .filter(
-                GrupoComercialConvite.id == convite_id,
-                GrupoComercialConvite.empresa_convidada_id == empresa_id,
-            )
-            .with_for_update()
-            .first()
-        )
-        if convite is None:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Convite não encontrado para esta empresa.",
-            )
-        if convite.status != "pendente":
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail="Este convite já foi respondido.",
-            )
-        if _em_utc(convite.expira_em) <= self.agora:
-            convite.status = "expirado"
-            self.db.commit()
-            raise HTTPException(
-                status_code=status.HTTP_410_GONE,
-                detail="Este convite expirou. Solicite um novo convite.",
-            )
-        grupo = self._grupo_ativo(convite.grupo_id, travar=True)
-        convite.respondido_por_usuario_id = usuario_id
-        convite.respondido_em = self.agora
-        if aceitar:
-            self._fechar_grupo_solo_se_necessario(empresa_id, usuario_id)
-            membro = (
-                self.db.query(GrupoComercialMembro)
-                .filter(
-                    GrupoComercialMembro.grupo_id == grupo.id,
-                    GrupoComercialMembro.empresa_id == empresa_id,
-                )
-                .with_for_update()
-                .first()
-            )
-            if membro is None:
-                membro = GrupoComercialMembro(
-                    grupo_id=grupo.id,
-                    empresa_id=empresa_id,
-                    papel="membro",
-                    status="ativo",
-                    usuario_referencia_id=usuario_id,
-                )
-                self.db.add(membro)
-            else:
-                membro.papel = "membro"
-                membro.status = "ativo"
-                membro.entrou_em = self.agora
-                membro.removido_em = None
-                membro.usuario_referencia_id = usuario_id
-            convite.status = "aceito"
-            grupo.versao_membros = int(grupo.versao_membros or 1) + 1
-            evento = "grupo_comercial_convite_aceito"
-            mensagem = "Convite aceito. Sua empresa agora faz parte do grupo."
-        else:
-            convite.status = "recusado"
-            evento = "grupo_comercial_convite_recusado"
-            mensagem = "Convite recusado."
-        self._auditar(
-            empresa_id=empresa_id,
-            usuario_id=usuario_id,
-            evento=evento,
-            grupo_id=grupo.id,
-        )
-        self.db.commit()
-        if aceitar:
-            registrar_uso_funcionalidade(self.db, "grupos-comerciais-convites")
-        return {"mensagem": mensagem, "grupo_id": grupo.id, "status": convite.status}
+            registrar_uso_funcionalidade(self.db, "grupos-comerciais-nova-loja")
+        return self._serializar_grupo(grupo, membro, usuario)
 
     def remover_membro(
         self,
         empresa_id,
-        usuario_id: int,
+        usuario: User,
         grupo_id: int,
         membro_empresa_id: str,
     ) -> dict:
         empresa_id = self._empresa_id(empresa_id)
         grupo = self._grupo_ativo(grupo_id, travar=True)
         self._membro_ativo(grupo.id, empresa_id, exigir_responsavel=True)
+        self.exigir_acesso_gestao(grupo.id, usuario)
         membro = (
             self.db.query(GrupoComercialMembro)
             .filter(
@@ -522,13 +214,206 @@ class GrupoComercialService:
         grupo.versao_membros = int(grupo.versao_membros or 1) + 1
         self._auditar(
             empresa_id=empresa_id,
-            usuario_id=usuario_id,
+            usuario_id=usuario.id,
             evento="grupo_comercial_membro_removido",
             grupo_id=grupo.id,
             metadados={"empresa_removida_id": str(membro_empresa_id)},
         )
         self.db.commit()
         return {"mensagem": "Empresa removida do grupo."}
+
+    def _garantir_acesso_master(self, *, grupo_id: int, tenant_id) -> None:
+        """Garante que o usuario master do grupo (se existir) tenha acesso
+        administrativo completo na loja que acabou de entrar no grupo - sem
+        isso ele precisaria ser adicionado manualmente toda vez que uma loja
+        nova nascer dentro do grupo, mesmo quando quem adicionou a loja nao
+        foi o proprio master.
+
+        A busca pelo master roda com o contexto de tenant temporariamente
+        limpo: o filtro automatico de tenant (app/tenancy/filters.py) so
+        enxerga um User de outra loja quando ja existe um UserTenant ativo
+        dele la - exatamente o vinculo que este metodo ainda vai criar, entao
+        com o contexto da loja nova ele nunca apareceria na busca.
+        """
+        contexto_anterior = get_current_tenant()
+        clear_tenant_context()
+        try:
+            master = (
+                self.db.query(User).filter(User.master_grupo_id == grupo_id).first()
+            )
+        finally:
+            if contexto_anterior is not None:
+                set_tenant_context(contexto_anterior)
+
+        if master is None:
+            return
+
+        ja_tem_acesso = (
+            self.db.query(UserTenant)
+            .filter(
+                UserTenant.user_id == master.id,
+                UserTenant.tenant_id == tenant_id,
+                UserTenant.is_active.is_(True),
+            )
+            .first()
+        )
+        if ja_tem_acesso is not None:
+            return
+
+        role = (
+            self.db.query(Role)
+            .filter(Role.tenant_id == tenant_id, Role.name == NOME_ROLE_MASTER)
+            .first()
+        )
+        if role is None:
+            role = Role(name=NOME_ROLE_MASTER, tenant_id=tenant_id)
+            self.db.add(role)
+            self.db.flush()
+            grant_all_permissions_to_role(
+                role_id=role.id, tenant_id=tenant_id, db=self.db
+            )
+
+        self.db.add(
+            UserTenant(
+                user_id=master.id,
+                tenant_id=tenant_id,
+                role_id=role.id,
+                is_active=True,
+            )
+        )
+
+    def _e_master(self, grupo_id: int, usuario: User) -> bool:
+        return usuario.master_grupo_id == grupo_id
+
+    def _e_gestor(self, grupo_id: int, user_id: int) -> bool:
+        return (
+            self.db.query(GrupoComercialGestor.id)
+            .filter(
+                GrupoComercialGestor.grupo_id == grupo_id,
+                GrupoComercialGestor.user_id == user_id,
+                GrupoComercialGestor.status == "ativo",
+            )
+            .first()
+            is not None
+        )
+
+    def tem_acesso_gestao(self, grupo_id: int, usuario: User) -> bool:
+        return self._e_master(grupo_id, usuario) or self._e_gestor(
+            grupo_id, usuario.id
+        )
+
+    def exigir_acesso_gestao(self, grupo_id: int, usuario: User) -> None:
+        if not self.tem_acesso_gestao(grupo_id, usuario):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=(
+                    "Você não tem acesso à gestão deste grupo comercial. "
+                    "Peça para o responsável do grupo liberar seu acesso."
+                ),
+            )
+
+    def listar_gestores(self, grupo_id: int, usuario: User) -> list[dict]:
+        self.exigir_acesso_gestao(grupo_id, usuario)
+        linhas = (
+            self.db.query(GrupoComercialGestor, User)
+            .join(User, User.id == GrupoComercialGestor.user_id)
+            .filter(
+                GrupoComercialGestor.grupo_id == grupo_id,
+                GrupoComercialGestor.status == "ativo",
+            )
+            .order_by(User.nome.asc())
+            .all()
+        )
+        return [
+            {
+                "user_id": gestor.user_id,
+                "nome": alvo.nome or alvo.email or alvo.username,
+                "email": alvo.email,
+                "concedido_em": gestor.concedido_em,
+            }
+            for gestor, alvo in linhas
+        ]
+
+    def conceder_gestor(
+        self, grupo_id: int, empresa_id, master: User, user_id: int
+    ) -> dict:
+        empresa_id = self._empresa_id(empresa_id)
+        if not self._e_master(grupo_id, master):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Somente o usuário master do grupo pode conceder este acesso.",
+            )
+        self._grupo_ativo(grupo_id)
+        alvo = self.db.query(User).filter(User.id == user_id).first()
+        if alvo is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Usuário não encontrado."
+            )
+        gestor = (
+            self.db.query(GrupoComercialGestor)
+            .filter(
+                GrupoComercialGestor.grupo_id == grupo_id,
+                GrupoComercialGestor.user_id == user_id,
+            )
+            .first()
+        )
+        if gestor is None:
+            gestor = GrupoComercialGestor(
+                grupo_id=grupo_id,
+                user_id=user_id,
+                concedido_por_user_id=master.id,
+                status="ativo",
+            )
+            self.db.add(gestor)
+        else:
+            gestor.status = "ativo"
+            gestor.concedido_por_user_id = master.id
+            gestor.concedido_em = self.agora
+            gestor.revogado_em = None
+        self._auditar(
+            empresa_id=empresa_id,
+            usuario_id=master.id,
+            evento="grupo_comercial_gestor_concedido",
+            grupo_id=grupo_id,
+            metadados={"user_id": user_id},
+        )
+        self.db.commit()
+        return {"mensagem": "Acesso de gestão concedido.", "user_id": user_id}
+
+    def revogar_gestor(
+        self, grupo_id: int, empresa_id, master: User, user_id: int
+    ) -> dict:
+        empresa_id = self._empresa_id(empresa_id)
+        if not self._e_master(grupo_id, master):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Somente o usuário master do grupo pode revogar este acesso.",
+            )
+        gestor = (
+            self.db.query(GrupoComercialGestor)
+            .filter(
+                GrupoComercialGestor.grupo_id == grupo_id,
+                GrupoComercialGestor.user_id == user_id,
+                GrupoComercialGestor.status == "ativo",
+            )
+            .first()
+        )
+        if gestor is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Este usuário não tem acesso de gestão neste grupo.",
+            )
+        gestor.status = "revogado"
+        gestor.revogado_em = self.agora
+        self._auditar(
+            empresa_id=empresa_id,
+            usuario_id=master.id,
+            evento="grupo_comercial_gestor_revogado",
+            grupo_id=grupo_id,
+            metadados={"user_id": user_id},
+        )
+        self.db.commit()
+        return {"mensagem": "Acesso de gestão revogado.", "user_id": user_id}
 
     def adicionar_loja(
         self,
@@ -559,6 +444,7 @@ class GrupoComercialService:
         grupo = self._grupo_ativo(grupo_id, travar=True)
         if empresa_acionadora_id is not None:
             self._membro_ativo(grupo.id, empresa_acionadora_id, exigir_responsavel=True)
+            self.exigir_acesso_gestao(grupo.id, usuario)
         nome_limpo = " ".join(nome_loja.split())
         try:
             selected_plan, resolved_organization_type = resolve_signup_selection(
@@ -593,6 +479,9 @@ class GrupoComercialService:
             )
             self.db.add(membro)
             grupo.versao_membros = int(grupo.versao_membros or 1) + 1
+            self._garantir_acesso_master(
+                grupo_id=grupo.id, tenant_id=resultado.tenant_id
+            )
             self._auditar(
                 empresa_id=str(resultado.tenant_id),
                 usuario_id=usuario.id,
@@ -615,9 +504,8 @@ class GrupoComercialService:
             "grupo_id": grupo.id,
         }
 
-    def listar_resumo(self, empresa_id, usuario_id: int) -> dict:
+    def listar_resumo(self, empresa_id, usuario: User) -> dict:
         empresa_id = self._empresa_id(empresa_id)
-        codigo = self.obter_codigo(empresa_id, usuario_id)
         participacoes = (
             self.db.query(GrupoComercial, GrupoComercialMembro)
             .join(
@@ -632,28 +520,17 @@ class GrupoComercialService:
             .order_by(GrupoComercial.nome.asc())
             .all()
         )
-        convites = (
-            self.db.query(GrupoComercialConvite, GrupoComercial)
-            .join(GrupoComercial, GrupoComercial.id == GrupoComercialConvite.grupo_id)
-            .filter(
-                GrupoComercialConvite.empresa_convidada_id == empresa_id,
-                GrupoComercialConvite.status == "pendente",
-                GrupoComercialConvite.expira_em > self.agora,
-                GrupoComercial.status == "ativo",
-            )
-            .order_by(GrupoComercialConvite.criado_em.desc())
-            .all()
-        )
+        grupos_visiveis = []
+        tem_grupo_sem_acesso = False
+        for grupo, membro in participacoes:
+            if self.tem_acesso_gestao(grupo.id, usuario):
+                grupos_visiveis.append(self._serializar_grupo(grupo, membro, usuario))
+            else:
+                tem_grupo_sem_acesso = True
         return {
             "empresa_atual_id": empresa_id,
-            "codigo_empresa": codigo,
-            "convites_pendentes": [
-                self._serializar_convite_recebido(convite, grupo)
-                for convite, grupo in convites
-            ],
-            "grupos": [
-                self._serializar_grupo(grupo, membro) for grupo, membro in participacoes
-            ],
+            "grupos": grupos_visiveis,
+            "tem_grupo_sem_acesso": tem_grupo_sem_acesso,
         }
 
     def _serializar_membros(self, grupo_id: int) -> list[dict]:
@@ -677,37 +554,11 @@ class GrupoComercialService:
             for membro, empresa in linhas
         ]
 
-    def _serializar_convite_enviado(
-        self, convite: GrupoComercialConvite, empresa: Tenant
-    ) -> dict:
-        return {
-            "id": convite.id,
-            "empresa_id": str(convite.empresa_convidada_id),
-            "empresa_nome": empresa.name,
-            "status": convite.status,
-            "criado_em": convite.criado_em,
-            "expira_em": convite.expira_em,
-        }
-
-    def _convites_enviados(self, grupo_id: int) -> list[dict]:
-        linhas = (
-            self.db.query(GrupoComercialConvite, Tenant)
-            .join(Tenant, Tenant.id == GrupoComercialConvite.empresa_convidada_id)
-            .filter(
-                GrupoComercialConvite.grupo_id == grupo_id,
-                GrupoComercialConvite.status == "pendente",
-                GrupoComercialConvite.expira_em > self.agora,
-            )
-            .order_by(GrupoComercialConvite.criado_em.desc())
-            .all()
-        )
-        return [
-            self._serializar_convite_enviado(convite, empresa)
-            for convite, empresa in linhas
-        ]
-
     def _serializar_grupo(
-        self, grupo: GrupoComercial, participacao: GrupoComercialMembro
+        self,
+        grupo: GrupoComercial,
+        participacao: GrupoComercialMembro,
+        usuario: User,
     ) -> dict:
         return {
             "id": grupo.id,
@@ -716,27 +567,7 @@ class GrupoComercialService:
             "status": grupo.status,
             "versao_membros": grupo.versao_membros,
             "criado_em": grupo.criado_em,
+            "sou_master": self._e_master(grupo.id, usuario),
+            "sou_gestor": self.tem_acesso_gestao(grupo.id, usuario),
             "membros": self._serializar_membros(grupo.id),
-            "convites_enviados": (
-                self._convites_enviados(grupo.id)
-                if participacao.papel == "responsavel"
-                else []
-            ),
-        }
-
-    def _serializar_convite_recebido(
-        self, convite: GrupoComercialConvite, grupo: GrupoComercial
-    ) -> dict:
-        empresa_origem = (
-            self.db.query(Tenant)
-            .filter(Tenant.id == convite.convidado_por_empresa_id)
-            .first()
-        )
-        return {
-            "id": convite.id,
-            "grupo_id": grupo.id,
-            "grupo_nome": grupo.nome,
-            "empresa_origem_nome": empresa_origem.name if empresa_origem else "Empresa",
-            "criado_em": convite.criado_em,
-            "expira_em": convite.expira_em,
         }
