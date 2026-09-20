@@ -1,6 +1,7 @@
 import "../../styles/Lembretes.css";
 import LembreteContatoModal from "./LembreteContatoModal";
 import LembretesCampanhasAlertas from "./LembretesCampanhasAlertas";
+import LembretesAniversariantes from "./LembretesAniversariantes";
 import LembretesClientesInativos from "./LembretesClientesInativos";
 import LembretesHeader from "./LembretesHeader";
 import LembretesList from "./LembretesList";
@@ -46,10 +47,14 @@ export default function LembretesPage() {
           </>
         )}
 
+        {controller.abaAtiva === "aniversarios" && (
+          <LembretesAniversariantes controller={controller} />
+        )}
+
         {controller.abaAtiva === "relacionamento" && (
           <>
             <PanelIntro
-              description="Aniversários, inatividade, brindes e outras oportunidades de campanha sem misturar com recompra."
+              description="Clientes inativos, brindes e outras oportunidades de campanha sem misturar com recompra."
               title="Alertas de relacionamento"
             />
             <LembretesCampanhasAlertas alertasCampanhas={controller.alertasCampanhas} />

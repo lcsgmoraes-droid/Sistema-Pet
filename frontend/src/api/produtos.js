@@ -457,6 +457,13 @@ export const getRelatorioProdutoVendas = (params = {}) => {
   return api.get("/produtos/relatorio/produto-vendas", { params });
 };
 
+export const getAnaliseProdutos = (params = {}) => {
+  const paramsPreenchidos = Object.fromEntries(
+    Object.entries(params).filter(([, valor]) => valor !== "" && valor != null),
+  );
+  return api.get("/produtos/relatorio/analise-vendas", { params: paramsPreenchidos });
+};
+
 export const getRelatorioValorizacaoEstoque = (params = {}) => {
   return api.get("/produtos/relatorio/valorizacao-estoque", { params });
 };
@@ -592,6 +599,7 @@ export default {
   // Relatórios
   getRelatorioMovimentacoes,
   getRelatorioProdutoVendas,
+  getAnaliseProdutos,
   getRelatorioValorizacaoEstoque,
   getRelatorioEstoqueBaixo,
   getRelatorioMaisVendidos,

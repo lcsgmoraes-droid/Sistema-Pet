@@ -196,6 +196,11 @@ export function createLayoutMenuItems({
           permission: "produtos.visualizar",
         },
         {
+          path: "/produtos/analise",
+          label: "Análise de Produtos",
+          permission: "produtos.visualizar",
+        },
+        {
           path: "/produtos/relatorio",
           label: "Relatório de Movimentações",
           permission: "produtos.visualizar",

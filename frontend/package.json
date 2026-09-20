@@ -73,6 +73,7 @@
     "test:pdv-produto-busca": "node scripts/test-pdv-produto-busca.mjs",
     "test:entrada-xml-custo-sistema": "node scripts/test-entrada-xml-custo-sistema.mjs",
     "test:pdv-card-fee-visibility": "node scripts/test-pdv-card-fee-visibility.mjs",
+    "test:pdv-endereco": "node --test src/hooks/pdvEndereco.test.mjs",
     "test:balanco": "node scripts/test-produtos-balanco-utils.mjs",
     "test:vendas-reprocessamento-feedback": "node scripts/test-vendas-reprocessamento-feedback.mjs",
     "test:onboarding-inicial": "node scripts/test-onboarding-inicial-contract.mjs",

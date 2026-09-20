@@ -21,6 +21,7 @@ export const preloadProdutos = () => import("../pages/Produtos");
 export const Produtos = lazy(preloadProdutos);
 export const ProdutosNovo = lazy(() => import("../pages/ProdutosNovo"));
 export const ProdutosRelatorio = lazy(() => import("../pages/ProdutosRelatorio"));
+export const AnaliseProdutos = lazy(() => import("../pages/AnaliseProdutos"));
 export const ProdutosValorizacaoEstoque = lazy(() => import("../pages/ProdutosValorizacaoEstoque"));
 export const ProdutosBalanco = lazy(() => import("../pages/ProdutosBalanco"));
 export const AlertasEstoque = lazy(() => import("../pages/AlertasEstoque"));

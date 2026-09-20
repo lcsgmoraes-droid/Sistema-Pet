@@ -197,6 +197,9 @@ class UserSession(Base):  # Não usar BaseTenantModel - sessões não são tenan
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
     tenant_id = Column(UUID(as_uuid=True), nullable=True, index=True)
     token_jti = Column(String(36), unique=True, index=True, nullable=False)  # UUID
+    session_scope = Column(
+        String(32), nullable=False, default="erp", server_default="erp"
+    )
 
     # Informações do dispositivo
     ip_address = Column(String(50), nullable=True)

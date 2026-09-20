@@ -26,14 +26,16 @@ export default function ProdutosRelatorioCurvaVendas30Dias({ pontos }) {
           const destacar = index >= pontos.length - 7;
 
           return (
-            <div key={ponto.data} className="group flex flex-1 flex-col items-center justify-end">
-              <div
-                className={`w-full rounded-t-md transition-all ${
-                  destacar ? "bg-blue-500" : "bg-slate-300"
-                }`}
-                style={{ height: `${altura}%` }}
-                title={`${formatarDiaCurto(ponto.data)} - ${formatarQuantidade(quantidade)} un`}
-              />
+            <div key={ponto.data} className="group flex h-full flex-1 flex-col items-center">
+              <div className="flex w-full flex-1 items-end">
+                <div
+                  className={`w-full rounded-t-md transition-all ${
+                    destacar ? "bg-blue-500" : "bg-slate-300"
+                  }`}
+                  style={{ height: `${altura}%` }}
+                  title={`${formatarDiaCurto(ponto.data)} - ${formatarQuantidade(quantidade)} un`}
+                />
+              </div>
               <span className="mt-2 text-[10px] text-gray-500 group-hover:text-gray-700">
                 {index % 5 === 0 || index === pontos.length - 1 ? formatarDiaCurto(ponto.data) : ""}
               </span>

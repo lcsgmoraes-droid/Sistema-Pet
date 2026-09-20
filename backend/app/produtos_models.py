@@ -35,6 +35,7 @@ from .estoque_fracionamento_models import (
     EstoqueFracionamentoVinculo,
 )
 from .produtos_lembretes_variacoes_models import (
+    AniversarioContato,
     Lembrete,
     LembreteContato,
     ProdutoAtributo,
@@ -45,6 +46,7 @@ from .produtos_lembretes_variacoes_models import (
 )
 
 __all__ = [
+    "AniversarioContato",
     "CampanhaValidadeAutomatica",
     "CampanhaValidadeExclusao",
     "Categoria",
