@@ -1,6 +1,7 @@
 import { useState } from "react";
 import api from "../api";
 import { buscarClientePorId } from "../api/clientes";
+import { criarPayloadEnderecoAdicional } from "./pdvEndereco";
 
 const criarEnderecoVazio = () => ({
   tipo: "entrega",
@@ -70,13 +71,9 @@ export function usePDVEndereco({ vendaAtual, setVendaAtual }) {
 
     try {
       const clienteAtual = await buscarClientePorId(vendaAtual.cliente.id);
-      const enderecosAdicionais = clienteAtual.enderecos_adicionais || [];
-      enderecosAdicionais.push({ ...enderecoAtual });
+      const payload = criarPayloadEnderecoAdicional(clienteAtual, enderecoAtual);
 
-      await api.put(`/clientes/${vendaAtual.cliente.id}`, {
-        ...clienteAtual,
-        enderecos_adicionais: enderecosAdicionais,
-      });
+      await api.put(`/clientes/${vendaAtual.cliente.id}`, payload);
 
       const clienteAtualizado = await buscarClientePorId(vendaAtual.cliente.id);
       setVendaAtual((prev) => ({
