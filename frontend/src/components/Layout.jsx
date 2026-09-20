@@ -144,7 +144,6 @@ const Layout = () => {
 
   // Contagem de lembretes pendentes para badge dinâmico
   const [lembretesCount, setLembretesCount] = useState(0);
-  const [convitesGruposCount, setConvitesGruposCount] = useState(0);
   const [orcamentosGrupoAtivo, setOrcamentosGrupoAtivo] = useState(false);
   const [menuFavorites, setMenuFavorites] = useState([]);
   const lembretesPollingRef = useRef(false);
@@ -426,39 +425,6 @@ const Layout = () => {
   }, [moduloAtivo, modulosAtivos]);
 
   useEffect(() => {
-    const podeConfigurarEmpresa =
-      Boolean(user) &&
-      (hasPermission("configuracoes.empresa") || hasPermission("configuracoes.editar"));
-    if (!podeConfigurarEmpresa) {
-      setConvitesGruposCount(0);
-      return undefined;
-    }
-
-    let ativo = true;
-    const carregarConvites = async () => {
-      try {
-        const response = await api.get("/grupos-comerciais/resumo");
-        if (ativo) {
-          setConvitesGruposCount(
-            Array.isArray(response.data?.convites_pendentes)
-              ? response.data.convites_pendentes.length
-              : 0,
-          );
-        }
-      } catch {
-        // Silencioso: o aviso não pode bloquear o restante do ERP.
-      }
-    };
-
-    carregarConvites();
-    const interval = window.setInterval(carregarConvites, 300000);
-    return () => {
-      ativo = false;
-      window.clearInterval(interval);
-    };
-  }, [user]);
-
-  useEffect(() => {
     if (!user) {
       setMenuFavorites([]);
       return undefined;
@@ -520,7 +486,6 @@ const Layout = () => {
 
   const allMenuItems = createLayoutMenuItems({
     lembretesCount,
-    convitesGruposCount,
     orcamentosGrupoAtivo,
   });
 

@@ -23,7 +23,6 @@ import { applyLayoutMenuStructure } from "./menuStructure.js";
 
 export function createLayoutMenuItems({
   lembretesCount = 0,
-  convitesGruposCount = 0,
   orcamentosGrupoAtivo = false,
 } = {}) {
   const items = [
@@ -708,8 +707,6 @@ export function createLayoutMenuItems({
           label: "Grupos Comerciais",
           permission: "configuracoes.empresa",
           anyOfPermissions: ["configuracoes.empresa", "configuracoes.editar"],
-          badge: convitesGruposCount > 0,
-          badgeLabel: `${convitesGruposCount} convite(s) pendente(s)`,
         },
         {
           path: "/configuracoes/entregas",

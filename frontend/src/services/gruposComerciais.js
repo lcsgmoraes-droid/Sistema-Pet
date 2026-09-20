@@ -70,11 +70,9 @@ export async function removerVinculoProdutosGrupo(grupoId, vinculoId) {
 }
 
 /**
- * Provisiona uma loja nova e ja anexa ao grupo, como membro — forma
- * self-service de "crescer" um grupo, sem passar por convite/codigo (essa
- * lista continua existindo, via convidarEmpresa, so pra unir negocios que
- * ja eram independentes). Reaproveita o usuario logado, sem pedir e-mail
- * novo.
+ * Provisiona uma loja nova e ja anexa ao grupo, como membro — unica forma
+ * de um grupo crescer hoje (nao existe mais convite entre empresas ja
+ * independentes). Reaproveita o usuario logado, sem pedir e-mail novo.
  */
 export async function adicionarLojaGrupo(grupoId, { nomeLoja, nomeAcesso, plan, organizationType } = {}) {
   const { data } = await api.post(`/grupos-comerciais/${grupoId}/lojas`, {
@@ -83,19 +81,6 @@ export async function adicionarLojaGrupo(grupoId, { nomeLoja, nomeAcesso, plan, 
     plan: plan || undefined,
     organization_type: organizationType || undefined,
   });
-  return data;
-}
-
-export async function convidarEmpresa(grupoId, codigoEmpresa) {
-  const { data } = await api.post(`/grupos-comerciais/${grupoId}/convites`, {
-    codigo_empresa: codigoEmpresa,
-  });
-  return data;
-}
-
-export async function responderConviteGrupo(conviteId, aceitar) {
-  const acao = aceitar ? "aceitar" : "recusar";
-  const { data } = await api.post(`/grupos-comerciais/convites/${conviteId}/${acao}`);
   return data;
 }
 
@@ -158,5 +143,47 @@ export async function removerEstoqueCompartilhadoGrupo(grupoId, compartilhamento
  */
 export async function obterMestresGrupo(grupoId) {
   const { data } = await api.get(`/grupos-comerciais/${grupoId}/mestres`);
+  return data;
+}
+
+/**
+ * Situação de cobrança (Asaas) de cada loja do grupo — cada loja continua
+ * sendo cobrada de forma independente, isso só consolida a visão. Só quem
+ * tem acesso de gestão do grupo (master ou gestor concedido) enxerga.
+ */
+export async function listarBillingGrupo(grupoId) {
+  const { data } = await api.get(`/grupos-comerciais/${grupoId}/billing`);
+  return data;
+}
+
+/**
+ * Rebusca no Asaas a cobrança em aberto de UMA loja do grupo (ex.: link do
+ * boleto expirado). Não gera uma cobrança nova, só atualiza a existente.
+ */
+export async function sincronizarBillingLojaGrupo(grupoId, tenantId) {
+  const { data } = await api.post(
+    `/grupos-comerciais/${grupoId}/lojas/${encodeURIComponent(tenantId)}/billing/sincronizar`,
+  );
+  return data;
+}
+
+export async function listarGestoresGrupo(grupoId) {
+  const { data } = await api.get(`/grupos-comerciais/${grupoId}/gestores`);
+  return data.gestores;
+}
+
+/**
+ * Concede acesso à gestão do grupo (ver/gerenciar lojas, ver cobrança) a
+ * outro usuário — só o usuário master do grupo pode chamar isso.
+ */
+export async function concederGestorGrupo(grupoId, userId) {
+  const { data } = await api.post(`/grupos-comerciais/${grupoId}/gestores`, {
+    user_id: userId,
+  });
+  return data;
+}
+
+export async function revogarGestorGrupo(grupoId, userId) {
+  const { data } = await api.delete(`/grupos-comerciais/${grupoId}/gestores/${userId}`);
   return data;
 }
