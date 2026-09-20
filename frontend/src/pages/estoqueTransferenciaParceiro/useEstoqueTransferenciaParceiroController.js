@@ -92,6 +92,8 @@ export default function useEstoqueTransferenciaParceiroController() {
       aplicarPeriodoRapido: historico.aplicarPeriodoRapidoHistorico,
       limparFiltros: historico.limparFiltrosHistorico,
       onAbrirBaixaLoteTransferencia: historico.abrirBaixaLoteTransferencia,
+      focoExtrato: historico.focoExtrato,
+      onAbrirExtrato: historico.abrirExtrato,
       onSubmit: historico.aplicarFiltrosHistorico,
     },
     historicoResultsProps: {
@@ -99,6 +101,12 @@ export default function useEstoqueTransferenciaParceiroController() {
       loadingEntradasParceiro: historico.loadingEntradasParceiro,
       historico: historico.historico,
       entradasParceiro: historico.entradasParceiro,
+      extrato: historico.extrato,
+      loadingExtrato: historico.loadingExtrato,
+      erroExtrato: historico.erroExtrato,
+      focoExtrato: historico.focoExtrato,
+      extratoRef: historico.extratoRef,
+      pessoaFiltroAplicada: historico.pessoaFiltroAplicada,
       pessoaBaixaLoteNome: historico.pessoaBaixaLoteNome,
       selecionadosHistorico: historico.selecionadosHistorico,
       todosPaginaSelecionados: historico.todosPaginaSelecionados,
@@ -153,6 +161,7 @@ export default function useEstoqueTransferenciaParceiroController() {
       onRegistrarBaixaLoteTransferencia: historico.registrarBaixaLoteTransferencia,
       onSetPaginaHistorico: historico.setPaginaHistorico,
       onSetPaginaEntradasParceiro: historico.setPaginaEntradasParceiro,
+      onChangeFocoExtrato: historico.setFocoExtrato,
     },
   };
 }

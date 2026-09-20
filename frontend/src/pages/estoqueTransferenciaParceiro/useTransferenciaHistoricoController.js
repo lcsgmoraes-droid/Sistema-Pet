@@ -25,6 +25,7 @@ import useTransferenciaBaixaLoteController from "./useTransferenciaBaixaLoteCont
 import { confirmarCorePet } from "../../services/corepetDialog";
 import useShiftRangeSelection from "../../hooks/useShiftRangeSelection";
 import { calcularDevolucaoParceiro } from "./devolucaoParceiroUtils";
+import useTransferenciaExtratoController from "./useTransferenciaExtratoController";
 export default function useTransferenciaHistoricoController({
   parceiroSelecionado,
   transferenciaEditando,
@@ -72,6 +73,10 @@ export default function useTransferenciaHistoricoController({
   );
   const historicoRequestId = useRef(0);
   const entradasRequestId = useRef(0);
+  const extratoController = useTransferenciaExtratoController({
+    filtrosAplicados: filtrosHistoricoAplicados,
+    pessoaSelecionada: pessoaHistoricoSelecionada,
+  });
   async function carregarFormasPagamento() {
     try {
       setLoadingFormasPagamento(true);
@@ -239,6 +244,12 @@ export default function useTransferenciaHistoricoController({
   const rotuloPessoaHistorico = (pessoa) =>
     pessoa?.nome || pessoa?.razao_social || pessoa?.nome_fantasia || `Pessoa #${pessoa?.id || ""}`;
 
+  const carregarHistoricoEExtrato = (filtros, pagina) =>
+    Promise.all([
+      carregarHistoricoTransferencias(filtros, pagina),
+      extratoController.recarregarExtrato(filtros),
+    ]);
+
   const baixaLote = useTransferenciaBaixaLoteController({
     historico,
     filtrosHistoricoAplicados,
@@ -246,7 +257,7 @@ export default function useTransferenciaHistoricoController({
     contasPagarCompensacao,
     setContasPagarCompensacao,
     carregarContasPagarCompensacao,
-    carregarHistoricoTransferencias,
+    carregarHistoricoTransferencias: carregarHistoricoEExtrato,
     paginaHistorico,
     rotuloPessoa: rotuloPessoaHistorico,
   });
@@ -591,6 +602,7 @@ export default function useTransferenciaHistoricoController({
       void Promise.all([
         carregarHistoricoTransferencias(filtrosHistoricoAplicados, paginaHistorico),
         carregarEntradasParceiro(filtrosHistoricoAplicados, paginaEntradasParceiro),
+        extratoController.recarregarExtrato(),
       ]);
       setAbaAtiva?.("historico");
     } catch (error) {
@@ -630,6 +642,7 @@ export default function useTransferenciaHistoricoController({
       void Promise.all([
         carregarHistoricoTransferencias(filtrosHistoricoAplicados, paginaHistorico),
         carregarEntradasParceiro(filtrosHistoricoAplicados, paginaEntradasParceiro),
+        extratoController.recarregarExtrato(),
       ]);
     } catch (error) {
       console.error("Erro ao excluir transferencia:", error);
@@ -646,6 +659,7 @@ export default function useTransferenciaHistoricoController({
     await Promise.all([
       carregarHistoricoTransferencias(filtrosHistoricoAplicados, 1),
       carregarEntradasParceiro(filtrosHistoricoAplicados, 1),
+      extratoController.recarregarExtrato(),
     ]);
   };
 
@@ -653,6 +667,7 @@ export default function useTransferenciaHistoricoController({
     Promise.all([
       carregarHistoricoTransferencias(filtrosHistoricoAplicados, paginaHistorico),
       carregarEntradasParceiro(filtrosHistoricoAplicados, paginaEntradasParceiro),
+      extratoController.recarregarExtrato(),
     ]);
 
   return {
@@ -691,18 +706,22 @@ export default function useTransferenciaHistoricoController({
     setPaginaEntradasParceiro,
     loadingHistorico,
     loadingEntradasParceiro,
+    loadingExtrato: extratoController.loadingExtrato,
+    erroExtrato: extratoController.erroExtrato,
+    focoExtrato: extratoController.focoExtrato,
+    setFocoExtrato: extratoController.setFocoExtrato,
+    extratoRef: extratoController.extratoRef,
+    abrirExtrato: extratoController.abrirExtrato,
     filtrosHistoricoForm,
     filtrosHistoricoAplicados,
-    pessoaFiltroAplicada: Boolean(
-      pessoaHistoricoSelecionada?.id &&
-      String(pessoaHistoricoSelecionada.id) === String(filtrosHistoricoAplicados.parceiro_id || ""),
-    ),
+    pessoaFiltroAplicada: extratoController.pessoaFiltroAplicada,
     pessoaHistoricoSelecionada,
     pessoaBaixaLoteNome: baixaLote.pessoaBaixaLoteNome,
     sugestoesPessoasHistorico,
     loadingPessoasHistorico,
     historico,
     entradasParceiro,
+    extrato: extratoController.extrato,
     totalCompensadoBaixa,
     todosPaginaSelecionados,
     totalPaginasHistorico,
