@@ -3,6 +3,21 @@ tipo: dominio
 atualizado: 2026-09-16
 ---
 
+> **Desatualizado (2026-09-20):** este doc ainda usa o nome antigo
+> (`EmpresaGrupo` → renomeado pra `GrupoComercial`, ver
+> [[Plano-Camada-Geral]]) **e** descreve um fluxo que não existe mais: o
+> convite/código mensal entre empresas independentes (seção "Ciclo de
+> vida — criação, convite, entrada e saída") foi **removido** — um grupo
+> hoje só cresce por "adicionar loja" (self-service, cria loja nova direto
+> no grupo). Em troca, todo grupo agora tem um usuário **master**
+> permanente (quem criou o grupo, ou o responsável de cada grupo já
+> existente via backfill) com acesso total a todas as lojas do próprio
+> grupo, e uma permissão de "gestão do grupo" (ver/gerenciar lojas, ver
+> cobrança consolidada) que só o master concede/revoga pra outros
+> usuários — antes disso não existia nenhuma permissão dedicada, bastava
+> `configuracoes.empresa`/`configuracoes.editar` na empresa responsável.
+> Reescrita completa deste doc (rename + fluxo novo) ainda pendente.
+
 # Entidade — EmpresaGrupo (grupo de empresas)
 
 Ver [[Tenant]], [[Produto]], [[Cliente]], [[ContaPagar]], [[ContaReceber]], [[Plano]], [[Venda]].
