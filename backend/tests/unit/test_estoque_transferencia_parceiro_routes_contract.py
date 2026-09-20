@@ -26,6 +26,7 @@ def test_transferencia_parceiro_routes_ficam_em_router_dedicado():
     assert ("/estoque/transferencia-parceiro", "POST") in routes
     assert ("/estoque/transferencia-parceiro/{conta_receber_id}", "PUT") in routes
     assert ("/estoque/transferencia-parceiro/historico", "GET") in routes
+    assert ("/estoque/transferencia-parceiro/extrato", "GET") in routes
     assert ("/estoque/transferencia-parceiro/{conta_receber_id}/pdf", "GET") in routes
     assert ("/estoque/transferencia-parceiro/pdf-consolidado", "POST") in routes
     assert (

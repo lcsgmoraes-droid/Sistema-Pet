@@ -18,6 +18,8 @@ export default function HistoricoTransferenciaFilters({
   aplicarPeriodoRapido,
   limparFiltros,
   onAbrirBaixaLoteTransferencia,
+  focoExtrato,
+  onAbrirExtrato,
   onSubmit,
 }) {
   const baixaPorValorDisponivel = Boolean(pessoaFiltroAplicada);
@@ -78,6 +80,8 @@ export default function HistoricoTransferenciaFilters({
               : "Documentos localizados no historico atual."
           }
           destaque="slate"
+          onClick={() => onAbrirExtrato("dividas")}
+          selecionado={focoExtrato === "dividas"}
         />
         <ResumoTransferenciaCard
           titulo={pessoaFiltroAplicada ? "Divida lancada" : "Valor transferido"}
@@ -88,18 +92,24 @@ export default function HistoricoTransferenciaFilters({
               : "Total em custo enviado para pessoas com ressarcimento."
           }
           destaque="blue"
+          onClick={() => onAbrirExtrato("dividas")}
+          selecionado={focoExtrato === "dividas"}
         />
         <ResumoTransferenciaCard
           titulo={pessoaFiltroAplicada ? "Pago" : "Valor recebido"}
           valor={formatarMoeda(totais.valor_recebido || 0)}
           descricao={`${totais.recebidas || 0} transferencia(s) ja recebida(s).`}
           destaque="emerald"
+          onClick={() => onAbrirExtrato("creditos")}
+          selecionado={focoExtrato === "creditos"}
         />
         <ResumoTransferenciaCard
           titulo="Saldo em aberto"
           valor={formatarMoeda(totais.saldo_aberto || 0)}
           descricao={`${totais.pendentes || 0} pendente(s) e ${totais.vencidas || 0} vencida(s).`}
           destaque="amber"
+          onClick={() => onAbrirExtrato("em_aberto")}
+          selecionado={focoExtrato === "em_aberto"}
         />
       </div>
 

@@ -2,12 +2,19 @@ import BaixaLoteTransferenciaPanel from "./BaixaLoteTransferenciaPanel";
 import HistoricoEntradaParceiroPanel from "./HistoricoEntradaParceiroPanel";
 import HistoricoTransferenciaBulkActions from "./HistoricoTransferenciaBulkActions";
 import HistoricoTransferenciaLista from "./HistoricoTransferenciaLista";
+import ExtratoTransferenciaParceiro from "./ExtratoTransferenciaParceiro";
 
 export default function HistoricoTransferenciaResults({
   loadingHistorico,
   loadingEntradasParceiro,
   historico,
   entradasParceiro,
+  extrato,
+  loadingExtrato,
+  erroExtrato,
+  focoExtrato,
+  extratoRef,
+  pessoaFiltroAplicada,
   pessoaBaixaLoteNome,
   selecionadosHistorico,
   todosPaginaSelecionados,
@@ -62,6 +69,7 @@ export default function HistoricoTransferenciaResults({
   onRegistrarBaixaLoteTransferencia,
   onSetPaginaHistorico,
   onSetPaginaEntradasParceiro,
+  onChangeFocoExtrato,
 }) {
   if (loadingHistorico) {
     return (
@@ -103,6 +111,16 @@ export default function HistoricoTransferenciaResults({
     return (
       <div className="space-y-4 px-6 py-5">
         {baixaLotePanel}
+        <ExtratoTransferenciaParceiro
+          sectionRef={extratoRef}
+          pessoaFiltroAplicada={pessoaFiltroAplicada}
+          pessoaNome={pessoaBaixaLoteNome}
+          extrato={extrato}
+          loading={loadingExtrato}
+          erro={erroExtrato}
+          foco={focoExtrato}
+          onChangeFoco={onChangeFocoExtrato}
+        />
         <HistoricoEntradaParceiroPanel
           entradasParceiro={entradasParceiro}
           loading={loadingEntradasParceiro}
@@ -122,6 +140,16 @@ export default function HistoricoTransferenciaResults({
   return (
     <div className="space-y-4 px-6 py-5">
       {baixaLotePanel}
+      <ExtratoTransferenciaParceiro
+        sectionRef={extratoRef}
+        pessoaFiltroAplicada={pessoaFiltroAplicada}
+        pessoaNome={pessoaBaixaLoteNome}
+        extrato={extrato}
+        loading={loadingExtrato}
+        erro={erroExtrato}
+        foco={focoExtrato}
+        onChangeFoco={onChangeFocoExtrato}
+      />
       <HistoricoEntradaParceiroPanel
         entradasParceiro={entradasParceiro}
         loading={loadingEntradasParceiro}
