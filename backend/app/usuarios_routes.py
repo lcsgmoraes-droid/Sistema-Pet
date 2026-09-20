@@ -335,6 +335,15 @@ def atualizar_credenciais_usuario(
     selected_role: Role | None = None
     generated_password: str | None = None
 
+    if payload.role_id is not None and target_user.master_grupo_id is not None:
+        raise HTTPException(
+            status_code=403,
+            detail=(
+                "Este usuário é o master do grupo comercial — o acesso dele "
+                "não pode ser alterado por aqui."
+            ),
+        )
+
     try:
         if payload.username is not None:
             normalized_username = normalize_username(payload.username)
@@ -551,6 +560,17 @@ def atualizar_status_usuario(
         raise HTTPException(
             status_code=404, detail="Usuário não vinculado a este tenant"
         )
+
+    if not payload.is_active:
+        alvo = db.query(User).filter(User.id == user_id).first()
+        if alvo is not None and alvo.master_grupo_id is not None:
+            raise HTTPException(
+                status_code=403,
+                detail=(
+                    "Este usuário é o master do grupo comercial — não pode "
+                    "ser desativado."
+                ),
+            )
 
     previous_status = bool(vinculo.is_active)
     vinculo.is_active = payload.is_active
