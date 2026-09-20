@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from collections import defaultdict
 from datetime import date, datetime
 import re
 from typing import Any, Iterable
