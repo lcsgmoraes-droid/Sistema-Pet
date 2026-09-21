@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "react-hot-toast";
 import api from "../../api";
+import { criarItemCatalogoPedido } from "./pedidoCompraPorProdutosUtils";
 
 function extrairProdutos(response) {
   const produtos = Array.isArray(response?.data)
@@ -14,13 +15,14 @@ export default function usePedidoCompraPorProdutos({
   formData,
   mostrarForm,
   produtoTexto,
+  setFormData,
   setItemForm,
   itemFormInicial,
   setMostrarSugestoesProduto,
   setProdutoTexto,
   setProdutos,
 }) {
-  const [modoMontagem, setModoMontagem] = useState("fornecedor");
+  const [modoMontagem, setModoMontagem] = useState("produtos");
   const [filtroProdutosPedido, setFiltroProdutosPedido] = useState("estoque_baixo");
   const [loadingProdutosPedido, setLoadingProdutosPedido] = useState(false);
   const [produtosVinculoSelecionados, setProdutosVinculoSelecionados] = useState([]);
@@ -92,6 +94,42 @@ export default function usePedidoCompraPorProdutos({
     }
   };
 
+  const adicionarProdutoCatalogo = (produto, quantidade, custoUnitario) => {
+    if (Number(quantidade) <= 0) {
+      toast.error("Informe uma quantidade maior que zero");
+      return;
+    }
+
+    const produtoJaAdicionado = formData.itens.some(
+      (item) => Number(item.produto_id) === Number(produto.id),
+    );
+
+    setFormData((atual) => {
+      const itemIndex = atual.itens.findIndex(
+        (item) => Number(item.produto_id) === Number(produto.id),
+      );
+      const itemAtual = itemIndex >= 0 ? atual.itens[itemIndex] : null;
+      const proximoItem = criarItemCatalogoPedido({
+        produto,
+        quantidade,
+        custoUnitario,
+        itemAtual,
+      });
+
+      if (!proximoItem) return atual;
+
+      const itens = [...atual.itens];
+      if (itemIndex >= 0) itens[itemIndex] = proximoItem;
+      else itens.push(proximoItem);
+
+      return { ...atual, itens };
+    });
+
+    toast.success(
+      produtoJaAdicionado ? "Produto atualizado no pedido" : "Produto adicionado ao pedido",
+    );
+  };
+
   const resetarModoMontagem = () => {
     setModoMontagem("fornecedor");
     setFiltroProdutosPedido("estoque_baixo");
@@ -143,6 +181,7 @@ export default function usePedidoCompraPorProdutos({
   };
 
   return {
+    adicionarProdutoCatalogo,
     alterarModoMontagem,
     alternarProdutoVinculo,
     alternarTodosProdutosVinculo,
