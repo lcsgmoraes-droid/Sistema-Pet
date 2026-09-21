@@ -8,6 +8,7 @@ import { useClientesNovoEnderecos } from "./useClientesNovoEnderecos";
 import { normalizeClienteAlertasPdv } from "../utils/clienteAlertasPdv";
 import { canManageAppAccessProfiles } from "../utils/appAccessProfiles";
 import { normalizePessoaAppLogin } from "../utils/pessoaAppLogin";
+import { resolveCepMunicipio } from "../utils/cepMunicipio";
 import {
   buildInitialAccessCredentials,
   resolveTenantLoginReference,
@@ -215,25 +216,20 @@ export function useClientesNovoCadastro({
     setError("");
 
     try {
-      const response = await fetch(`https://viacep.com.br/ws/${cepLimpo}/json/`);
-      const data = await response.json();
-
-      if (data.erro) {
-        setCepError("CEP nao encontrado");
-        return;
-      }
+      const data = await resolveCepMunicipio(cepLimpo);
 
       setFormData((prev) => ({
         ...prev,
-        endereco: data.logradouro || "",
+        endereco: data.endereco,
         bairro: data.bairro || "",
-        cidade: data.localidade || "",
-        estado: data.uf || "",
-        codigo_municipio: data.ibge || "",
+        cidade: data.cidade,
+        estado: data.estado,
+        codigo_municipio: data.codigo_municipio,
         cep,
       }));
     } catch (err) {
       console.error("Erro ao buscar CEP:", err);
+      setCepError(err.message || "Nao foi possivel consultar o CEP");
     } finally {
       setLoadingCep(false);
     }
@@ -442,7 +438,8 @@ export function useClientesNovoCadastro({
 
     try {
       const isEdicao = Boolean(editingCliente);
-      const appLoginInicial = !isEdicao ? formData.app_login : null;
+      let formDataParaSalvar = formData;
+      const appLoginInicial = !isEdicao ? formDataParaSalvar.app_login : null;
       const errosValidacao = [];
 
       if (!formData.nome || formData.nome.trim() === "") {
@@ -511,7 +508,44 @@ export function useClientesNovoCadastro({
         }
       }
 
-      const { celular_whatsapp: _celular_whatsapp, tags: _tags, ...clienteData } = formData;
+      const enderecoPrincipalCompleto = [
+        formData.cep,
+        formData.endereco,
+        formData.numero,
+        formData.bairro,
+        formData.cidade,
+        formData.estado,
+      ].every((value) => String(value || "").trim());
+      const codigoMunicipioValido = /^\d{7}$/.test(
+        String(formData.codigo_municipio || "").replace(/\D/g, ""),
+      );
+
+      if (enderecoPrincipalCompleto && !codigoMunicipioValido) {
+        setLoadingCadastro(true);
+        try {
+          const municipio = await resolveCepMunicipio(formData.cep, {
+            cidade: formData.cidade,
+            estado: formData.estado,
+          });
+          formDataParaSalvar = {
+            ...formData,
+            codigo_municipio: municipio.codigo_municipio,
+          };
+          setFormData(formDataParaSalvar);
+        } catch (cepLookupError) {
+          const mensagemCep =
+            cepLookupError.message || "Nao foi possivel validar o municipio pelo CEP.";
+          setCepError(mensagemCep);
+          cepLookupError.userMessage = mensagemCep;
+          throw cepLookupError;
+        }
+      }
+
+      const {
+        celular_whatsapp: _celular_whatsapp,
+        tags: _tags,
+        ...clienteData
+      } = formDataParaSalvar;
       clienteData.alertas_pdv = normalizeClienteAlertasPdv(clienteData.alertas_pdv);
       clienteData.app_login = normalizePessoaAppLogin(clienteData.app_login);
 
@@ -595,7 +629,7 @@ export function useClientesNovoCadastro({
         tenant: tenantLoginReference,
         username: appLoginInicial?.username,
         password: appLoginInicial?.password,
-        personName: clienteSalvo?.nome || formData.nome,
+        personName: clienteSalvo?.nome || formDataParaSalvar.nome,
       });
       if (createdCredentials) {
         setInitialAccessCredentials(createdCredentials);
@@ -667,6 +701,7 @@ export function useClientesNovoCadastro({
 
       const errorMessage =
         mensagemErro ||
+        err.userMessage ||
         err.response?.data?.detail ||
         err.response?.data?.message ||
         "Erro ao salvar o cadastro";

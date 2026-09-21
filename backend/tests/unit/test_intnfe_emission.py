@@ -1,3 +1,4 @@
+from datetime import date
 from types import SimpleNamespace
 
 import pytest
@@ -133,10 +134,45 @@ def test_payload_preserves_totals_and_hides_real_recipient_in_homologation():
 def test_crediario_uses_credito_loja_instead_of_outros():
     tenant, connection, sale = _objects()
     sale.pagamentos[0].forma_pagamento = "Crediário"
+    sale.pagamentos[0].numero_parcelas = 1
+    sale.pagamentos[0].data_recebimento_prevista = date(2026, 10, 5)
+    sale.pagamentos[0].intervalo_crediario = None
 
     payload = emission.build_payload(None, tenant, connection, sale, "nfe")
 
     assert payload["pagamentos"] == [{"formaPagamento": "05", "valor": 23.0}]
+    assert (
+        "Crediario: 1/1 vence em 05/10/2026 - R$ 23,00"
+        in payload["informacoesAdicionais"]
+    )
+
+
+def test_crediario_uses_saved_receivable_due_date_and_sale_observation():
+    tenant, connection, sale = _objects()
+    sale.observacoes = "Entregar no posto"
+    sale.pagamentos[0].forma_pagamento = "Crediário"
+    sale.pagamentos[0].numero_parcelas = 1
+    sale.pagamentos[0].data_recebimento_prevista = date(2026, 10, 20)
+    sale.pagamentos[0].intervalo_crediario = None
+    sale.contas_receber = [
+        SimpleNamespace(
+            id=42,
+            descricao="Venda VEN-TESTE - Crediário",
+            status="pendente",
+            data_vencimento=date(2026, 10, 5),
+            numero_parcela=1,
+            total_parcelas=1,
+            valor_original="23.00",
+            valor_final="23.00",
+            forma_pagamento=SimpleNamespace(tipo="crediario"),
+        )
+    ]
+
+    payload = emission.build_payload(None, tenant, connection, sale, "nfe")
+
+    assert "Observacoes da venda: Entregar no posto" in payload["informacoesAdicionais"]
+    assert "05/10/2026" in payload["informacoesAdicionais"]
+    assert "20/10/2026" not in payload["informacoesAdicionais"]
 
 
 def test_nfe_accepts_complete_recipient_address_without_cep():
