@@ -64,13 +64,16 @@ export default function PedidoCompraFormulario({
   );
   const {
     adicionarProdutoCatalogo,
+    alterarFiltroProdutosPedido,
+    alterarTermoProdutosPedido,
     alternarProdutoVinculo,
     alternarTodosProdutosVinculo,
     filtroProdutosPedido,
     loadingProdutosPedido,
     modoMontagem,
+    paginacaoProdutosPedido,
     produtosVinculoSelecionados,
-    setFiltroProdutosPedido,
+    setPaginaProdutosPedido,
     setVinculoComoPrincipal,
     vincularProdutosFornecedorPedido,
     vinculandoProdutos,
@@ -239,8 +242,10 @@ export default function PedidoCompraFormulario({
             itensPedido={formData.itens}
             loading={loadingProdutosPedido}
             onAdicionar={adicionarProdutoCatalogo}
-            onChangeFiltro={setFiltroProdutosPedido}
-            onChangeTermo={setProdutoTexto}
+            onChangeFiltro={alterarFiltroProdutosPedido}
+            onChangePagina={setPaginaProdutosPedido}
+            onChangeTermo={alterarTermoProdutosPedido}
+            paginacao={paginacaoProdutosPedido}
             produtos={produtos}
             termo={produtoTexto}
           />

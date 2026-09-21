@@ -2,6 +2,10 @@
 
 from fastapi import APIRouter
 
+from .pedidos_compra.catalogo_routes import (
+    listar_catalogo_produtos_pedido,
+    router as catalogo_router,
+)
 from .pedidos_compra.confronto_routes import (
     _realizar_confronto as _realizar_confronto,
     router as confronto_router,
@@ -46,6 +50,7 @@ from .pedidos_compra.sugestao_routes import (
 )
 
 router = APIRouter(prefix="/pedidos-compra", tags=["Pedidos de Compra"])
+router.include_router(catalogo_router)
 router.include_router(confronto_router)
 router.include_router(core_router)
 router.include_router(envio_router)
@@ -71,6 +76,7 @@ __all__ = [
     "enviar_pedido",
     "exportar_excel",
     "exportar_pdf",
+    "listar_catalogo_produtos_pedido",
     "listar_pedidos",
     "receber_pedido",
     "reverter_status",
