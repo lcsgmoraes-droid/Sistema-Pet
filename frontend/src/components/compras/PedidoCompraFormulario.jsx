@@ -2,6 +2,7 @@ import FornecedorSelector from "../fornecedores/FornecedorSelector";
 import ProductIdentity from "../ui/ProductIdentity";
 import { Check, Lightbulb, Plus, Save, X } from "lucide-react";
 import { formatMoneyBRL } from "../../utils/formatters";
+import { PedidoCompraModoMontagem, PedidoCompraVinculoLote } from "./PedidoCompraModoMontagem";
 import {
   formatarQuantidadeCompraPedido,
   montarTooltipQuantidadeCompraPedido,
@@ -21,6 +22,7 @@ export default function PedidoCompraFormulario({
   setFornecedorTexto,
   fornecedores,
   gruposFornecedores,
+  registrarFornecedorCriado,
   selecionarFornecedor,
   selecionarGrupoFornecedor,
   setFormData,
@@ -50,6 +52,7 @@ export default function PedidoCompraFormulario({
   removerItem,
   calcularTotal,
   loading,
+  porProdutos,
 }) {
   if (!mostrarForm) {
     return null;
@@ -58,6 +61,26 @@ export default function PedidoCompraFormulario({
   const fornecedorSelecionado = fornecedores.find(
     (fornecedor) => Number(fornecedor.id) === Number(formData.fornecedor_id),
   );
+  const {
+    alterarModoMontagem,
+    alternarProdutoVinculo,
+    alternarTodosProdutosVinculo,
+    filtroProdutosPedido,
+    loadingProdutosPedido,
+    modoMontagem,
+    produtosVinculoSelecionados,
+    setFiltroProdutosPedido,
+    setVinculoComoPrincipal,
+    vincularProdutosFornecedorPedido,
+    vinculandoProdutos,
+    vinculoComoPrincipal,
+  } = porProdutos;
+  const modoPorProdutos = modoMontagem === "produtos";
+  const idsProdutosPedido = [
+    ...new Set(formData.itens.map((item) => Number(item.produto_id)).filter(Boolean)),
+  ];
+  const todosProdutosSelecionados =
+    idsProdutosPedido.length > 0 && produtosVinculoSelecionados.length === idsProdutosPedido.length;
   const unidadeCompraAtual = normalizarUnidadeCompraPedido(itemForm.unidade_compra);
   const itemUsaEmbalagem = unidadeCompraAtual !== "UN";
   const produtoSelecionadoItem = produtos.find(
@@ -75,8 +98,12 @@ export default function PedidoCompraFormulario({
   const tooltipQuantidadeItem = montarTooltipQuantidadeCompraPedido(itemPreview);
 
   const limparFornecedorSelecionado = () => {
-    setFormData((prev) => ({ ...prev, fornecedor_id: "", itens: [] }));
-    setProdutos([]);
+    setFormData((prev) => ({
+      ...prev,
+      fornecedor_id: "",
+      itens: modoPorProdutos ? prev.itens : [],
+    }));
+    if (!modoPorProdutos) setProdutos([]);
     setIncluirGrupoFornecedor(false);
     setProdutoTexto("");
     setMostrarSugestoesProduto(false);
@@ -100,16 +127,25 @@ export default function PedidoCompraFormulario({
         </button>
       </div>
       <form onSubmit={modoEdicao ? editarPedido : handleSubmit} className="space-y-6 p-6">
+        <PedidoCompraModoMontagem
+          filtroProdutosPedido={filtroProdutosPedido}
+          loadingProdutosPedido={loadingProdutosPedido}
+          modoMontagem={modoMontagem}
+          onChangeFiltro={setFiltroProdutosPedido}
+          onChangeModo={alterarModoMontagem}
+        />
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Fornecedor *</label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Fornecedor {modoPorProdutos ? "(opcional)" : "*"}
+            </label>
             <FornecedorSelector
               fornecedores={fornecedores}
               gruposFornecedores={gruposFornecedores}
               fornecedorId={formData.fornecedor_id}
               fornecedorSelecionado={fornecedorSelecionado}
               showLabel={false}
-              required
+              required={!modoPorProdutos}
               value={fornecedorTexto}
               placeholder="Digite ou selecione o fornecedor"
               onInputChange={(valor) => {
@@ -120,6 +156,7 @@ export default function PedidoCompraFormulario({
               }}
               onSelect={selecionarFornecedor}
               onSelectGrupo={selecionarGrupoFornecedor}
+              onFornecedorCriado={registrarFornecedorCriado}
               onClear={() => {
                 setFornecedorTexto("");
                 limparFornecedorSelecionado();
@@ -127,7 +164,9 @@ export default function PedidoCompraFormulario({
             />
             <div className="mt-2 flex flex-wrap items-center gap-2">
               <p className="text-xs text-gray-500">
-                Digite ou selecione um fornecedor para carregar seus produtos
+                {modoPorProdutos
+                  ? "Selecione ou cadastre um fornecedor para corrigir os vínculos em lote"
+                  : "Digite ou selecione um fornecedor para carregar seus produtos"}
               </p>
               <button
                 type="button"
@@ -137,7 +176,7 @@ export default function PedidoCompraFormulario({
                 Grupos de fornecedor
               </button>
             </div>
-            {formData.fornecedor_id && grupoFornecedorAtual && (
+            {!modoPorProdutos && formData.fornecedor_id && grupoFornecedorAtual && (
               <label className="mt-2 flex cursor-pointer items-start gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-900">
                 <input
                   type="checkbox"
@@ -156,13 +195,13 @@ export default function PedidoCompraFormulario({
                 </span>
               </label>
             )}
-            {formData.fornecedor_id && !grupoFornecedorAtual && (
+            {!modoPorProdutos && formData.fornecedor_id && !grupoFornecedorAtual && (
               <div className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
                 Este fornecedor ainda nao esta em um grupo. Use "Grupos de fornecedor" para unificar
                 CNPJs.
               </div>
             )}
-            {formData.fornecedor_id && (
+            {!modoPorProdutos && formData.fornecedor_id && (
               <button
                 type="button"
                 onClick={abrirFluxoSugestaoInteligente}
@@ -224,7 +263,7 @@ export default function PedidoCompraFormulario({
                   }
                 }}
                 onFocus={() => {
-                  if (formData.fornecedor_id) {
+                  if (modoPorProdutos || formData.fornecedor_id) {
                     setMostrarSugestoesProduto(true);
                   }
                 }}
@@ -232,16 +271,16 @@ export default function PedidoCompraFormulario({
                   setTimeout(() => setMostrarSugestoesProduto(false), 120);
                 }}
                 placeholder={
-                  !formData.fornecedor_id
+                  !modoPorProdutos && !formData.fornecedor_id
                     ? "Selecione um fornecedor primeiro"
-                    : "Digite ou selecione o produto"
+                    : "Pesquise por nome, SKU ou código de barras"
                 }
-                disabled={!formData.fornecedor_id}
+                disabled={!modoPorProdutos && !formData.fornecedor_id}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg disabled:bg-gray-100 focus:ring-2 focus:ring-blue-500"
               />
               {mostrarSugestoesProduto &&
                 produtosFiltrados.length > 0 &&
-                formData.fornecedor_id && (
+                (modoPorProdutos || formData.fornecedor_id) && (
                   <div className="absolute z-20 mt-1 w-full max-h-60 overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg">
                     {produtosFiltrados.map((p) => (
                       <button
@@ -369,6 +408,17 @@ export default function PedidoCompraFormulario({
               <table className="w-full">
                 <thead className="bg-gray-50">
                   <tr>
+                    {modoPorProdutos ? (
+                      <th className="w-10 px-3 py-2 text-left">
+                        <input
+                          type="checkbox"
+                          checked={todosProdutosSelecionados}
+                          onChange={alternarTodosProdutosVinculo}
+                          aria-label="Selecionar todos os produtos para vincular"
+                          className="h-4 w-4 rounded"
+                        />
+                      </th>
+                    ) : null}
                     <th className="w-12 px-4 py-2 text-left text-sm font-semibold">#</th>
                     <th className="px-4 py-2 text-left text-sm font-semibold">Produto</th>
                     <th className="px-4 py-2 text-right text-sm font-semibold">Qtd. pedida</th>
@@ -380,6 +430,17 @@ export default function PedidoCompraFormulario({
                 <tbody>
                   {formData.itens.map((item, index) => (
                     <tr key={index} className="border-t">
+                      {modoPorProdutos ? (
+                        <td className="px-3 py-2">
+                          <input
+                            type="checkbox"
+                            checked={produtosVinculoSelecionados.includes(Number(item.produto_id))}
+                            onChange={() => alternarProdutoVinculo(item.produto_id)}
+                            aria-label={`Selecionar ${item.produto_nome} para vincular`}
+                            className="h-4 w-4 rounded"
+                          />
+                        </td>
+                      ) : null}
                       <td className="px-4 py-2 text-sm font-semibold text-slate-500">
                         {index + 1}
                       </td>
@@ -429,6 +490,16 @@ export default function PedidoCompraFormulario({
               </table>
             </div>
           )}
+          {modoPorProdutos && formData.itens.length > 0 ? (
+            <PedidoCompraVinculoLote
+              fornecedorSelecionado={fornecedorSelecionado}
+              onVincular={vincularProdutosFornecedorPedido}
+              selecionados={produtosVinculoSelecionados.length}
+              setVinculoComoPrincipal={setVinculoComoPrincipal}
+              vinculando={vinculandoProdutos}
+              vinculoComoPrincipal={vinculoComoPrincipal}
+            />
+          ) : null}
         </div>
 
         <div className="grid grid-cols-3 gap-4">

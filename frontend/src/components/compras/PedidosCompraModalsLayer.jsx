@@ -20,6 +20,7 @@ export default function PedidosCompraModalsLayer({
   carregarDados,
   mostrarModalEnvio,
   pedidoParaEnviar,
+  pedidoSemFornecedor,
   setMostrarModalEnvio,
   confirmarEnvioPedido,
   marcarComoEnviadoManualmente,
@@ -170,6 +171,7 @@ export default function PedidosCompraModalsLayer({
       {mostrarModalEnvio && (
         <ModalEnvioPedido
           pedidoId={pedidoParaEnviar}
+          pedidoSemFornecedor={pedidoSemFornecedor}
           onClose={() => setMostrarModalEnvio(false)}
           onEnviar={confirmarEnvioPedido}
           onEnvioManual={marcarComoEnviadoManualmente}

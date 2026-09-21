@@ -33,11 +33,23 @@ PEDIDO_EXPORT_COLUNAS_FINANCEIRAS = {"preco_unitario", "desconto", "total"}
 def _buscar_fornecedor_pedido(
     db: Session, tenant_id: int, pedido: PedidoCompra
 ) -> Optional[Cliente]:
+    if pedido.fornecedor_id is None:
+        return None
     return (
         db.query(Cliente)
         .filter(Cliente.id == pedido.fornecedor_id, Cliente.tenant_id == tenant_id)
         .first()
     )
+
+
+def _nome_fornecedor_documento(
+    fornecedor: Optional[Cliente], pedido: PedidoCompra
+) -> str:
+    if fornecedor:
+        return fornecedor.nome
+    if pedido.fornecedor_id is None:
+        return "Não informado"
+    return f"Fornecedor {pedido.fornecedor_id}"
 
 
 def _formatar_token_nome(texto: str) -> str:
@@ -118,7 +130,11 @@ def _montar_nome_arquivo_pedido(
     numero_pedido = _normalizar_texto_nome_arquivo(
         pedido.numero_pedido or pedido.id
     ) or str(pedido.id)
-    fornecedor_curto = _extrair_nome_curto_fornecedor(fornecedor_nome)
+    fornecedor_curto = (
+        "Sem Fornecedor"
+        if pedido.fornecedor_id is None
+        else _extrair_nome_curto_fornecedor(fornecedor_nome)
+    )
     marca_nome = _buscar_nome_marca_pedido(db, tenant_id, pedido)
 
     partes = ["Pedido", numero_pedido, fornecedor_curto]

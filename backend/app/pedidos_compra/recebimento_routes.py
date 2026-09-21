@@ -17,6 +17,7 @@ from ..produtos_models import (
 )
 from .quantidades import calcular_quantidade_total_unidades
 from .schemas import RecebimentoPedidoRequest
+from .validacoes import garantir_fornecedor_operacional
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -49,6 +50,8 @@ def receber_pedido(
 
     if not pedido:
         raise HTTPException(status_code=404, detail="Pedido não encontrado")
+
+    garantir_fornecedor_operacional(pedido)
 
     if pedido.status not in ["confirmado", "recebido_parcial"]:
         raise HTTPException(

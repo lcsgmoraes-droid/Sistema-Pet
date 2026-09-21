@@ -124,6 +124,7 @@ export default function PedidosCompraView({ controller }) {
     produtoTexto,
     produtos,
     produtosFiltrados,
+    porProdutos,
     produtosSelecionados,
     receberPedido,
     registrarFornecedorCriado,
@@ -176,7 +177,9 @@ export default function PedidosCompraView({ controller }) {
       <div className="mb-6 flex justify-between items-center">
         <div>
           <h1 className="text-2xl font-bold text-gray-800">Pedidos de Compra</h1>
-          <p className="text-gray-600">Gerencie seus pedidos aos fornecedores</p>
+          <p className="text-gray-600">
+            Monte pedidos por fornecedor ou diretamente pelos produtos
+          </p>
         </div>
         <button
           onClick={() => {
@@ -213,6 +216,7 @@ export default function PedidosCompraView({ controller }) {
         setFornecedorTexto={setFornecedorTexto}
         fornecedores={fornecedores}
         gruposFornecedores={gruposFornecedores}
+        registrarFornecedorCriado={registrarFornecedorCriado}
         selecionarFornecedor={selecionarFornecedor}
         selecionarGrupoFornecedor={selecionarGrupoFornecedor}
         setFormData={setFormData}
@@ -243,6 +247,7 @@ export default function PedidosCompraView({ controller }) {
         removerItem={removerItem}
         calcularTotal={calcularTotal}
         loading={loading}
+        porProdutos={porProdutos}
       />
 
       <PedidosCompraFiltros
@@ -292,6 +297,10 @@ export default function PedidosCompraView({ controller }) {
         carregarDados={carregarDados}
         mostrarModalEnvio={mostrarModalEnvio}
         pedidoParaEnviar={pedidoParaEnviar}
+        pedidoSemFornecedor={Boolean(
+          pedidoParaEnviar &&
+          !pedidos.find((pedido) => Number(pedido.id) === Number(pedidoParaEnviar))?.fornecedor_id,
+        )}
         setMostrarModalEnvio={setMostrarModalEnvio}
         confirmarEnvioPedido={confirmarEnvioPedido}
         marcarComoEnviadoManualmente={marcarComoEnviadoManualmente}
