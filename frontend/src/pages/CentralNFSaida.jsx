@@ -9,7 +9,11 @@ import {
   soDigitos,
 } from "./centralNFSaida/centralNFSaidaUtils";
 import { confirmarCorePet } from "../services/corepetDialog";
-import { corrigirEReemitirNota, extrairMensagemNFe } from "../utils/nfeFiscalAssistida";
+import {
+  corrigirEReemitirNota,
+  descartarTentativaRejeitada,
+  extrairMensagemNFe,
+} from "../utils/nfeFiscalAssistida";
 import { metadadosDownloadDanfe } from "../utils/documentoFiscalDownload.mjs";
 import NFSaidaCompartilharModal from "./centralNFSaida/NFSaidaCompartilharModal";
 
@@ -65,6 +69,7 @@ export default function CentralNFSaida() {
   const [cancelando, setCancelando] = useState(false);
   const [reconciliandoNotaId, setReconciliandoNotaId] = useState("");
   const [corrigindoNotaId, setCorrigindoNotaId] = useState("");
+  const [liberandoVendaId, setLiberandoVendaId] = useState("");
   const detalhesNotasCacheRef = useRef(new Map());
 
   const [painelSefazAberto, setPainelSefazAberto] = useState(false);
@@ -264,6 +269,32 @@ export default function CentralNFSaida() {
       await carregarNotas(true);
     } finally {
       setCorrigindoNotaId("");
+    }
+  }
+
+  async function liberarVendaComRejeicao(nota) {
+    const vendaId = nota?.venda_id;
+    if (!vendaId) {
+      alert("Não foi possível identificar a venda desta tentativa rejeitada.");
+      return;
+    }
+    const tipo = nota?.tipo === "nfe" || Number(nota?.modelo) === 55 ? "NF-e" : "NFC-e";
+    const confirmed = await confirmarCorePet(
+      `A tentativa de ${tipo} foi rejeitada e não gerou uma nota autorizada. O CorePet removerá somente essa tentativa e liberará a venda para você escolher o modelo correto.\n\nLiberar a venda agora?`,
+    );
+    if (!confirmed) return;
+
+    try {
+      setLiberandoVendaId(String(vendaId));
+      const resultado = await descartarTentativaRejeitada(vendaId);
+      alert(resultado?.message || "A tentativa rejeitada foi removida e a venda está liberada.");
+      fecharDetalhes();
+      await carregarNotas(true);
+    } catch (error) {
+      alert(extrairMensagemNFe(error));
+      await carregarNotas(true);
+    } finally {
+      setLiberandoVendaId("");
     }
   }
 
@@ -509,6 +540,8 @@ export default function CentralNFSaida() {
         reconciliandoNotaId={reconciliandoNotaId}
         corrigirEReemitir={corrigirEReemitir}
         corrigindoNotaId={corrigindoNotaId}
+        liberarVendaComRejeicao={liberarVendaComRejeicao}
+        liberandoVendaId={liberandoVendaId}
         baixarDanfe={baixarDanfe}
         baixarXml={baixarXml}
         abrirDetalhes={abrirDetalhes}

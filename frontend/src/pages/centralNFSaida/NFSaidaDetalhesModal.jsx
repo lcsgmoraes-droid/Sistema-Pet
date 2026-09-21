@@ -1,4 +1,4 @@
-import { Download, Printer, RefreshCw, RotateCcw, X } from "lucide-react";
+import { Download, Printer, RefreshCw, RotateCcw, Unlock, X } from "lucide-react";
 
 import CustomerIdentity from "../../components/ui/CustomerIdentity";
 import { formatMoneyBRL } from "../../utils/formatters";
@@ -44,6 +44,8 @@ export default function NFSaidaDetalhesModal({
   baixarXml,
   corrigirEReemitir,
   corrigindoNotaId,
+  liberarVendaComRejeicao,
+  liberandoVendaId,
 }) {
   if (!notaSelecionada) return null;
 
@@ -83,19 +85,30 @@ export default function NFSaidaDetalhesModal({
               {codigoErro && <p className="mt-1">Código: {codigoErro}</p>}
               {motivoRejeicao && <p className="mt-1">Motivo: {motivoRejeicao}</p>}
               {notaIntNFe && notaSelecionada.status?.toLowerCase() === "rejeitada" && (
-                <button
-                  type="button"
-                  onClick={() => corrigirEReemitir(notaSelecionada)}
-                  disabled={corrigindoNotaId === String(notaSelecionada.venda_id)}
-                  className="mt-3 inline-flex items-center gap-2 rounded-lg bg-purple-700 px-4 py-2 font-semibold text-white hover:bg-purple-800 disabled:opacity-50"
-                >
-                  <RotateCcw
-                    className={`h-4 w-4 ${
-                      corrigindoNotaId === String(notaSelecionada.venda_id) ? "animate-spin" : ""
-                    }`}
-                  />
-                  Corrigir e tentar novamente
-                </button>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => liberarVendaComRejeicao(notaSelecionada)}
+                    disabled={liberandoVendaId === String(notaSelecionada.venda_id)}
+                    className="inline-flex items-center gap-2 rounded-lg bg-teal-700 px-4 py-2 font-semibold text-white hover:bg-teal-800 disabled:opacity-50"
+                  >
+                    <Unlock className="h-4 w-4" />
+                    Liberar venda e escolher outro modelo
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => corrigirEReemitir(notaSelecionada)}
+                    disabled={corrigindoNotaId === String(notaSelecionada.venda_id)}
+                    className="inline-flex items-center gap-2 rounded-lg bg-purple-700 px-4 py-2 font-semibold text-white hover:bg-purple-800 disabled:opacity-50"
+                  >
+                    <RotateCcw
+                      className={`h-4 w-4 ${
+                        corrigindoNotaId === String(notaSelecionada.venda_id) ? "animate-spin" : ""
+                      }`}
+                    />
+                    Tentar novamente como {Number(notaSelecionada.modelo) === 55 ? "NF-e" : "NFC-e"}
+                  </button>
+                </div>
               )}
             </div>
           )}
