@@ -115,8 +115,7 @@ def test_frontend_abre_pedido_por_fornecedor_como_padrao():
 
     assert 'const [abaAtiva, setAbaAtiva] = useState("fornecedor");' in controller
     assert (
-        'const [modoMontagem, setModoMontagem] = useState("fornecedor");'
-        in modo_pedido
+        'const [modoMontagem, setModoMontagem] = useState("fornecedor");' in modo_pedido
     )
 
 
