@@ -111,8 +111,11 @@ referencia do CorePet.
 
 5. Em producao, acrescentar `--allow-production-apply` e executar pelo wrapper de
    auditoria, somente com autorizacao explicita.
-6. Conferir a auditoria do bundle `catalogo-base-loja-lucas`.
-7. Confirmar que estoque, custo, margem, preco de venda, preco de aplicativo e
+6. Reservar uma janela sem deploy ou reinicio dos containers. A importacao e
+   atomica no banco, mas um restart interrompe o processo longo e obriga uma
+   nova execucao completa.
+7. Conferir a auditoria do bundle `catalogo-base-loja-lucas`.
+8. Confirmar que estoque, custo, margem, preco de venda, preco de aplicativo e
    preco de e-commerce ficaram zerados.
 
 A carga copia somente cadastros reutilizaveis, como departamentos, categorias,
