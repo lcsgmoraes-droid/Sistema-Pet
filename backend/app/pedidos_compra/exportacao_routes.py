@@ -16,6 +16,7 @@ from .exportacao import (
     _gerar_pdf_pedido_bytes,
     _montar_content_disposition_attachment,
     _montar_nome_arquivo_pedido,
+    _nome_fornecedor_documento,
     _normalizar_colunas_exportacao_pedido,
 )
 
@@ -49,9 +50,7 @@ def exportar_excel(
         raise HTTPException(status_code=404, detail="Pedido não encontrado")
 
     fornecedor = _buscar_fornecedor_pedido(db, tenant_id, pedido)
-    fornecedor_nome = (
-        fornecedor.nome if fornecedor else f"Fornecedor {pedido.fornecedor_id}"
-    )
+    fornecedor_nome = _nome_fornecedor_documento(fornecedor, pedido)
     colunas_exportacao = _normalizar_colunas_exportacao_pedido(colunas)
     output = BytesIO(
         _gerar_excel_pedido_bytes(
@@ -93,9 +92,7 @@ def exportar_pdf(
         raise HTTPException(status_code=404, detail="Pedido não encontrado")
 
     fornecedor = _buscar_fornecedor_pedido(db, tenant_id, pedido)
-    fornecedor_nome = (
-        fornecedor.nome if fornecedor else f"Fornecedor {pedido.fornecedor_id}"
-    )
+    fornecedor_nome = _nome_fornecedor_documento(fornecedor, pedido)
     colunas_exportacao = _normalizar_colunas_exportacao_pedido(colunas)
     buffer = BytesIO(
         _gerar_pdf_pedido_bytes(

@@ -79,6 +79,7 @@ export default function PedidosCompraTabela({
       );
     }
     if (pedido.status === "enviado") {
+      if (!pedido.fornecedor_id) return null;
       return (
         <ActionButton
           icon={Check}
@@ -93,6 +94,7 @@ export default function PedidosCompraTabela({
       );
     }
     if (pedido.status === "confirmado") {
+      if (!pedido.fornecedor_id) return null;
       return (
         <ActionButton
           icon={Search}
@@ -107,6 +109,7 @@ export default function PedidosCompraTabela({
       );
     }
     if (pedido.status === "recebido_parcial") {
+      if (!pedido.fornecedor_id) return null;
       return (
         <ActionButton
           icon={Package}
@@ -183,7 +186,14 @@ export default function PedidosCompraTabela({
                       </div>
                     </td>
                     <td className="px-4 py-3">
-                      {obterFornecedorPorId(pedido.fornecedor_id)?.nome || pedido.fornecedor_id}
+                      {obterFornecedorPorId(pedido.fornecedor_id)?.nome ||
+                        (pedido.fornecedor_id ? (
+                          `Fornecedor ${pedido.fornecedor_id}`
+                        ) : (
+                          <span className="rounded-full bg-amber-100 px-2 py-1 text-xs font-semibold text-amber-800">
+                            Sem fornecedor
+                          </span>
+                        ))}
                     </td>
                     <td className="px-4 py-3">{formatarDataPedido(pedido.data_pedido)}</td>
                     <td className="px-4 py-3 text-right font-semibold">
@@ -254,7 +264,7 @@ export default function PedidosCompraTabela({
                               Excel
                             </ExportActionButton>
 
-                            {pedido.status === "confirmado" ? (
+                            {pedido.status === "confirmado" && pedido.fornecedor_id ? (
                               <ActionButton
                                 icon={Package}
                                 intent="neutral"
@@ -265,7 +275,7 @@ export default function PedidosCompraTabela({
                                 Receber sem confronto
                               </ActionButton>
                             ) : null}
-                            {pedido.status === "recebido_parcial" ? (
+                            {pedido.status === "recebido_parcial" && pedido.fornecedor_id ? (
                               <ActionButton
                                 icon={Search}
                                 intent="info"

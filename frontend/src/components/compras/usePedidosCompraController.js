@@ -7,6 +7,7 @@ import { createPedidosCompraDataController } from "./pedidosCompraDataController
 import { createPedidosCompraFormularioController } from "./pedidosCompraFormularioController";
 import { createPedidosCompraItemController } from "./pedidosCompraItemController";
 import { createPedidosCompraOperacoesController } from "./pedidosCompraOperacoesController";
+import usePedidoCompraPorProdutos from "./usePedidoCompraPorProdutos";
 import { COLUNAS_DOCUMENTO_COMPLETO } from "./pedidoDocumentoColunas";
 import {
   montarRascunhoPedidoReposicaoGrupo,
@@ -169,14 +170,22 @@ export default function usePedidosCompraController() {
 
   const selecionarFornecedor = (fornecedor) => {
     const grupo = obterGrupoDoFornecedor(fornecedor.id);
+    const preservarItens = porProdutos.modoMontagem === "produtos";
+    registrarFornecedorCriado(fornecedor);
     setFornecedorTexto(fornecedor.nome || "");
-    setFormData((prev) => ({ ...prev, fornecedor_id: fornecedor.id.toString(), itens: [] }));
+    setFormData((prev) => ({
+      ...prev,
+      fornecedor_id: fornecedor.id.toString(),
+      itens: preservarItens ? prev.itens : [],
+    }));
     setIncluirGrupoFornecedor(Boolean(grupo));
     setItemForm(ITEM_FORM_INICIAL);
     setProdutoTexto("");
     // Limpar sugestões do fornecedor anterior
     limparEstadosSugestao();
-    carregarProdutosFornecedor(fornecedor.id, { fornecedorGrupoId: grupo?.id });
+    if (!preservarItens) {
+      carregarProdutosFornecedor(fornecedor.id, { fornecedorGrupoId: grupo?.id });
+    }
   };
 
   const obterFornecedorPorId = (fornecedorId) =>
@@ -212,16 +221,19 @@ export default function usePedidosCompraController() {
       registrarFornecedorCriado(fornecedorBase);
     }
     setFornecedorTexto(grupo.nome || fornecedorBase.nome || "");
+    const preservarItens = porProdutos.modoMontagem === "produtos";
     setFormData((prev) => ({
       ...prev,
       fornecedor_id: fornecedorBase.id.toString(),
-      itens: [],
+      itens: preservarItens ? prev.itens : [],
     }));
     setIncluirGrupoFornecedor(true);
     setItemForm(ITEM_FORM_INICIAL);
     setProdutoTexto("");
     limparEstadosSugestao();
-    carregarProdutosFornecedor(fornecedorBase.id, { fornecedorGrupoId: grupo.id });
+    if (!preservarItens) {
+      carregarProdutosFornecedor(fornecedorBase.id, { fornecedorGrupoId: grupo.id });
+    }
   };
 
   const obterGrupoDoFornecedor = (fornecedorId) => {
@@ -383,6 +395,18 @@ export default function usePedidosCompraController() {
     setProdutoTexto,
   });
 
+  const porProdutos = usePedidoCompraPorProdutos({
+    carregarProdutosFornecedor,
+    formData,
+    mostrarForm,
+    produtoTexto,
+    setItemForm,
+    itemFormInicial: ITEM_FORM_INICIAL,
+    setMostrarSugestoesProduto,
+    setProdutoTexto,
+    setProdutos,
+  });
+
   const {
     fecharFormularioPedido,
     abrirNovoFormulario,
@@ -417,6 +441,8 @@ export default function usePedidosCompraController() {
     setPedidoEditando,
     setProdutos,
     setProdutoTexto,
+    resetarModoMontagem: porProdutos.resetarModoMontagem,
+    setModoMontagem: porProdutos.setModoMontagem,
   });
 
   useEffect(() => {
@@ -622,6 +648,7 @@ export default function usePedidosCompraController() {
     produtoTexto,
     produtos,
     produtosFiltrados,
+    porProdutos,
     produtosSelecionados,
     receberPedido,
     registrarFornecedorCriado,
