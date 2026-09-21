@@ -55,10 +55,10 @@ export default function usePedidoCompraPorProdutos({
         try {
           const params = {
             page: 1,
-          page_size: 80,
-          include_variations: true,
-          busca_completa: true,
-          estoque_baixo: !produtoTexto.trim() && filtroProdutosPedido === "estoque_baixo",
+            page_size: 80,
+            include_variations: true,
+            busca_completa: true,
+            estoque_baixo: !produtoTexto.trim() && filtroProdutosPedido === "estoque_baixo",
           };
           if (produtoTexto.trim()) params.busca = produtoTexto.trim();
           const response = await api.get("/produtos/", { params });
