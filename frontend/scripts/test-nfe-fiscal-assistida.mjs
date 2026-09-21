@@ -66,8 +66,20 @@ assert.match(
 
 assert.match(
   notesList,
-  /title="Corrigir e tentar novamente"/,
+  /title={`Tentar novamente como \$\{Number\(nota\.modelo\) === 55 \? "NF-e" : "NFC-e"\}`}/,
   "Central de NF deve disponibilizar a recuperação para notas rejeitadas",
+);
+
+assert.match(
+  source,
+  /\/nfe\/vendas\/\$\{vendaId\}\/descartar-rejeicao/,
+  "assistente fiscal deve permitir descartar apenas uma tentativa rejeitada",
+);
+
+assert.match(
+  notesList,
+  /Liberar venda para escolher outro modelo de nota/,
+  "Central de NF deve permitir liberar a venda sem retransmitir o modelo errado",
 );
 
 assert.match(

@@ -25,6 +25,24 @@ export default function PDVModoVisualizacaoBanner({
   }
 
   const podeAbrirDevolucao = podeAbrirDevolucaoVenda(vendaAtual);
+  const notaRejeitada =
+    vendaAtual.status === "pago_nf" &&
+    String(vendaAtual.nfe_status || "").toLowerCase() === "rejeitada";
+  const situacaoVenda =
+    vendaAtual.status === "finalizada"
+      ? "Finalizada"
+      : vendaAtual.status === "baixa_parcial"
+        ? "com Baixa Parcial"
+        : notaRejeitada
+          ? "com NF rejeitada"
+          : vendaAtual.status === "pago_nf"
+            ? "com NF emitida"
+            : "Aberta";
+  const orientacao = notaRejeitada
+    ? "Libere a tentativa rejeitada na Central NF para escolher outro modelo."
+    : vendaAtual.status === "aberta"
+      ? "Clique em Editar para modificar."
+      : "Reabra a venda para modificar.";
 
   return (
     <>
@@ -32,15 +50,8 @@ export default function PDVModoVisualizacaoBanner({
         <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-2.5">
           <div className="flex items-center space-x-2 text-sm text-yellow-800">
             <AlertCircle className="h-4 w-4" />
-            <span className="font-semibold">
-              Modo Visualização - Venda{" "}
-              {vendaAtual.status === "finalizada"
-                ? "Finalizada"
-                : vendaAtual.status === "baixa_parcial"
-                  ? "com Baixa Parcial"
-                  : "Aberta"}
-            </span>
-            <span className="text-xs">(Clique em Editar para modificar)</span>
+            <span className="font-semibold">Modo Visualização - Venda {situacaoVenda}</span>
+            <span className="text-xs">({orientacao})</span>
           </div>
           <div className="flex flex-wrap items-center justify-end gap-2">
             <ImprimirCupom venda={vendaAtual} size="md" className="min-w-[132px]" />

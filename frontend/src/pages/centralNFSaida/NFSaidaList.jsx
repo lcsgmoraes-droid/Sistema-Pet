@@ -6,6 +6,7 @@ import {
   Printer,
   RotateCcw,
   Trash2,
+  Unlock,
   XCircle,
   Zap,
   Share2,
@@ -29,6 +30,8 @@ export default function NFSaidaList({
   reconciliandoNotaId,
   corrigirEReemitir,
   corrigindoNotaId,
+  liberarVendaComRejeicao,
+  liberandoVendaId,
   baixarDanfe,
   baixarXml,
   abrirDetalhes,
@@ -171,18 +174,32 @@ export default function NFSaidaList({
                         </button>
                       )}
                       {nota.provedor === "intnfe" && nota.status?.toLowerCase() === "rejeitada" && (
-                        <button
-                          onClick={() => corrigirEReemitir(nota)}
-                          disabled={corrigindoNotaId === String(nota.venda_id)}
-                          className="text-purple-600 hover:text-purple-900 p-1 hover:bg-purple-50 rounded disabled:opacity-50"
-                          title="Corrigir e tentar novamente"
-                        >
-                          <RotateCcw
-                            className={`w-5 h-5 ${
-                              corrigindoNotaId === String(nota.venda_id) ? "animate-spin" : ""
-                            }`}
-                          />
-                        </button>
+                        <>
+                          <button
+                            onClick={() => liberarVendaComRejeicao(nota)}
+                            disabled={liberandoVendaId === String(nota.venda_id)}
+                            className="text-teal-600 hover:text-teal-900 p-1 hover:bg-teal-50 rounded disabled:opacity-50"
+                            title="Liberar venda para escolher outro modelo de nota"
+                          >
+                            <Unlock
+                              className={`w-5 h-5 ${
+                                liberandoVendaId === String(nota.venda_id) ? "animate-pulse" : ""
+                              }`}
+                            />
+                          </button>
+                          <button
+                            onClick={() => corrigirEReemitir(nota)}
+                            disabled={corrigindoNotaId === String(nota.venda_id)}
+                            className="text-purple-600 hover:text-purple-900 p-1 hover:bg-purple-50 rounded disabled:opacity-50"
+                            title={`Tentar novamente como ${Number(nota.modelo) === 55 ? "NF-e" : "NFC-e"}`}
+                          >
+                            <RotateCcw
+                              className={`w-5 h-5 ${
+                                corrigindoNotaId === String(nota.venda_id) ? "animate-spin" : ""
+                              }`}
+                            />
+                          </button>
+                        </>
                       )}
                       <button
                         onClick={() => reconciliarFluxoNota(nota)}

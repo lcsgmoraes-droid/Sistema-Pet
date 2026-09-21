@@ -10,7 +10,6 @@ from app.intnfe.emission import (
 )
 from app.intnfe.numbering import NumberingInput, advance_numbering, read_numbering
 
-
 REJECTED_STATUSES = {"rejeitada"}
 PENDING_STATUSES = {"aguardando", "enviando", "processando", "inconclusiva"}
 AUTHORIZED_STATUSES = {"autorizada", "cancelada", "inutilizada", "denegada"}
@@ -80,6 +79,28 @@ def _clear_rejected_attempt(venda):
     venda.nfe_motivo_rejeicao = None
     if venda.status == "pago_nf":
         venda.status = "finalizada"
+
+
+def discard_rejected_attempt(db, venda, *, reset_audit):
+    """Descarta uma tentativa IntNFe rejeitada sem transmitir outro documento."""
+    _lock_sale(db, venda)
+    if venda.nfe_provider != "intnfe":
+        raise DirectEmissionError(
+            "Não existe uma tentativa rejeitada pela IntNFe para liberar nesta venda.",
+            status=409,
+            code="RejeicaoNaoEncontrada",
+        )
+
+    old_value = _snapshot(venda)
+    _clear_rejected_attempt(venda)
+    reset_audit(old_value, {"resultado": "tentativa_rejeitada_descartada"})
+    db.commit()
+    return {
+        "success": True,
+        "message": "Tentativa rejeitada descartada. A venda foi liberada para escolher o documento fiscal correto.",
+        "venda_id": venda.id,
+        "status_venda": venda.status,
+    }
 
 
 def _advance_after_duplicate(db, tenant_id, api, venda, numbering_audit):
