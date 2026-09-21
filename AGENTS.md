@@ -66,6 +66,30 @@ feita nos momentos certos, sem virar repeticao a cada micro-etapa.
   Nao substituir os binarios/revisoes atuais sem autorizacao especifica para
   uma nova versao nativa.
 
+## Frontend — sempre usar os componentes V2 do styleguide
+
+- Em qualquer tela nova ou alterada, nunca usar elemento de formulario nativo
+  direto (`<input>`, `<select>`, `<textarea>`, `<button>` cru etc.). Usar
+  sempre um componente pronto de `frontend/src/components/v2/` (ex.:
+  `InputTexto`, `InputSenha`, `InputData`, `InputCombobox`, `BotaoSalva`,
+  `BotaoCancelar`, `BotaoInteracao`). O catalogo completo do que ja existe,
+  com status ("pronto"/"planejado") e caminho do arquivo, fica em
+  `frontend/src/pages/styleGuide/styleGuideCatalog.js` (visivel tambem na
+  tela `/style-guide` do proprio sistema) — consultar esse catalogo antes de
+  montar qualquer campo ou botao novo.
+- Se o styleguide V2 ainda nao tiver um componente pronto para o que a tela
+  precisa, nao resolver com HTML cru direto na tela. Primeiro avaliar se
+  aquele elemento e reutilizavel (mais de uma tela provavelmente vai
+  precisar dele): se for, criar um componente novo dentro de
+  `frontend/src/components/v2/` seguindo o mesmo padrao dos componentes
+  existentes (props controladas, `label`/`error`/`help`, suporte a modo
+  escuro) e **adicionar a entrada correspondente em
+  `styleGuideCatalog.js`** (categoria certa, `status: "pronto"`, caminho do
+  arquivo) — sem isso o catalogo fica desatualizado e o proximo assistente
+  não vai saber que aquele componente existe.
+- Objetivo: manter o codigo do frontend organizado e com manutencao facil,
+  sem duplicar a mesma peca de UI de jeitos diferentes em telas diferentes.
+
 ## Padrao de trabalho
 
 - Fazer mudancas pequenas e focadas.
