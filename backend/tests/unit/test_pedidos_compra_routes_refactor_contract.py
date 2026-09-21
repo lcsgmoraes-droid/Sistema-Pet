@@ -13,6 +13,7 @@ BACKEND_ROOT = Path(__file__).resolve().parents[2]
 
 EXPECTED_PUBLIC_PATHS = {
     "/pedidos-compra/",
+    "/pedidos-compra/catalogo-produtos",
     "/pedidos-compra/envio/status",
     "/pedidos-compra/rascunho/fornecedor/{fornecedor_id}",
     "/pedidos-compra/{pedido_id}",
@@ -27,8 +28,18 @@ EXPECTED_PUBLIC_PATHS = {
 }
 
 
-def _route_paths(router):
-    return {getattr(route, "path", None) for route in router.routes}
+def _route_paths(router, prefix=""):
+    paths = set()
+    for route in router.routes:
+        path = getattr(route, "path", None)
+        if path:
+            paths.add(f"{prefix}{path}")
+        nested_router = getattr(route, "original_router", None)
+        if nested_router is not None:
+            include_context = getattr(route, "include_context", None)
+            nested_prefix = f"{prefix}{getattr(include_context, 'prefix', '')}"
+            paths.update(_route_paths(nested_router, nested_prefix))
+    return paths
 
 
 def _line_count(relative_path: str) -> int:
@@ -50,6 +61,7 @@ def test_pedidos_compra_routes_mantem_reexports_compativeis():
         is schemas.RecebimentoPedidoRequest
     )
     assert pedidos_compra_routes.listar_pedidos is core_routes.listar_pedidos
+    assert callable(pedidos_compra_routes.listar_catalogo_produtos_pedido)
     assert pedidos_compra_routes.criar_pedido is core_routes.criar_pedido
     assert pedidos_compra_routes.enviar_pedido is envio_routes.enviar_pedido
     assert pedidos_compra_routes.receber_pedido is recebimento_routes.receber_pedido

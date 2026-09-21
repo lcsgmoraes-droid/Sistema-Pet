@@ -1,12 +1,28 @@
 import { useEffect, useState } from "react";
-import { AlertTriangle, Check, Loader2, PackageSearch, Plus, Search } from "lucide-react";
+import {
+  AlertTriangle,
+  Check,
+  HelpCircle,
+  Loader2,
+  PackageSearch,
+  Plus,
+  Search,
+} from "lucide-react";
 import ProductIdentity from "../ui/ProductIdentity";
 import CurrencyInput from "../CurrencyInput";
+import Pagination from "../Pagination/Pagination";
 import { formatMoneyBRL } from "../../utils/formatters";
-import { calcularQuantidadeReposicaoProduto } from "./pedidoCompraPorProdutosUtils";
+import {
+  calcularQuantidadeReposicaoProduto,
+  montarTooltipGiroCatalogo,
+} from "./pedidoCompraPorProdutosUtils";
 
 function formatarQuantidade(valor) {
   return Number(valor || 0).toLocaleString("pt-BR", { maximumFractionDigits: 2 });
+}
+
+function formatarMediaDiaria(valor) {
+  return Number(valor || 0).toLocaleString("pt-BR", { maximumFractionDigits: 3 });
 }
 
 function ProdutoCatalogoLinha({ itemPedido, onAdicionar, produto }) {
@@ -19,6 +35,27 @@ function ProdutoCatalogoLinha({ itemPedido, onAdicionar, produto }) {
   const estoqueAtual = Number(produto.estoque_atual || 0);
   const estoqueMinimo = Number(produto.estoque_minimo || 0);
   const semEstoque = estoqueAtual <= 0;
+  const statusEstoque =
+    produto.status_estoque || (estoqueAtual <= estoqueMinimo ? "baixo" : "normal");
+  const statusConfigs = {
+    baixo: {
+      label: semEstoque ? "Sem estoque" : "Abaixo do mínimo",
+      numero: "text-red-700",
+      texto: "text-red-600",
+    },
+    risco: {
+      label: "Risco pelo giro",
+      numero: "text-amber-700",
+      texto: "text-amber-600",
+    },
+    normal: {
+      label: "Estoque normal",
+      numero: "text-emerald-700",
+      texto: "text-emerald-600",
+    },
+  };
+  const statusConfig = statusConfigs[statusEstoque] || statusConfigs.normal;
+  const tooltipGiro = montarTooltipGiroCatalogo(produto);
 
   useEffect(() => {
     if (!itemPedido) return;
@@ -41,17 +78,20 @@ function ProdutoCatalogoLinha({ itemPedido, onAdicionar, produto }) {
         ) : null}
       </td>
       <td className="px-4 py-3 text-right">
-        <div className={`font-bold ${semEstoque ? "text-red-700" : "text-amber-700"}`}>
-          {formatarQuantidade(estoqueAtual)}
-        </div>
-        <span
-          className={`text-[11px] font-semibold ${semEstoque ? "text-red-600" : "text-amber-600"}`}
-        >
-          {semEstoque ? "Sem estoque" : "Estoque baixo"}
+        <div className={`font-bold ${statusConfig.numero}`}>{formatarQuantidade(estoqueAtual)}</div>
+        <span className={`text-[11px] font-semibold ${statusConfig.texto}`}>
+          {statusConfig.label}
         </span>
       </td>
       <td className="px-4 py-3 text-right font-medium text-slate-600">
         {formatarQuantidade(estoqueMinimo)}
+      </td>
+      <td className="px-4 py-3 text-right" title={tooltipGiro}>
+        <div className="inline-flex cursor-help items-center justify-end gap-1 font-semibold text-slate-700">
+          {formatarMediaDiaria(produto.media_diaria_30)}
+          <HelpCircle className="h-3.5 w-3.5 text-blue-500" />
+        </div>
+        <div className="text-[11px] text-slate-500">últimos 30 dias</div>
       </td>
       <td className="px-4 py-3 text-right text-sm font-semibold text-blue-700">
         {formatarQuantidade(calcularQuantidadeReposicaoProduto(produto))}
@@ -98,7 +138,9 @@ export default function PedidoCompraCatalogoProdutos({
   loading,
   onAdicionar,
   onChangeFiltro,
+  onChangePagina,
   onChangeTermo,
+  paginacao,
   produtos,
   termo,
 }) {
@@ -108,10 +150,12 @@ export default function PedidoCompraCatalogoProdutos({
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <h3 className="flex items-center gap-2 font-bold text-slate-900">
-              <PackageSearch className="h-5 w-5 text-blue-600" /> Produtos sugeridos
+              <PackageSearch className="h-5 w-5 text-blue-600" /> Catálogo para pedido
             </h3>
             <p className="mt-1 text-sm text-slate-600">
-              A lista abaixo já mostra o estoque baixo. Digite uma quantidade e adicione ao pedido.
+              {filtro === "estoque_baixo"
+                ? "Produtos abaixo do mínimo ou com risco de atingir o mínimo em até 7 dias pelo giro."
+                : "Todos os produtos do catálogo. Pesquise, informe a quantidade e adicione ao pedido."}
             </p>
           </div>
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
@@ -156,12 +200,13 @@ export default function PedidoCompraCatalogoProdutos({
       ) : produtos.length ? (
         <>
           <div className="max-h-[34rem] overflow-auto">
-            <table className="w-full min-w-[1050px]">
+            <table className="w-full min-w-[1180px]">
               <thead className="sticky top-0 z-10 bg-slate-50 text-xs font-bold uppercase tracking-wide text-slate-500 shadow-sm">
                 <tr>
                   <th className="px-4 py-3 text-left">Produto</th>
                   <th className="px-4 py-3 text-right">Estoque atual</th>
                   <th className="px-4 py-3 text-right">Mínimo</th>
+                  <th className="px-4 py-3 text-right">Média/dia</th>
                   <th className="px-4 py-3 text-right">Sugestão</th>
                   <th className="px-3 py-3 text-right">Qtd. a pedir</th>
                   <th className="px-3 py-3 text-right">Custo unitário</th>
@@ -182,10 +227,23 @@ export default function PedidoCompraCatalogoProdutos({
               </tbody>
             </table>
           </div>
-          <div className="border-t border-slate-100 bg-slate-50 px-4 py-2 text-xs text-slate-500">
-            {produtos.length} produto{produtos.length === 1 ? "" : "s"} exibido
-            {produtos.length === 1 ? "" : "s"}
-            {termo.trim() ? " para esta pesquisa" : " nesta sugestão"}.
+          <div className="border-t border-slate-100 bg-slate-50 px-4 py-3">
+            <Pagination
+              page={paginacao.page}
+              pages={paginacao.pages}
+              total={paginacao.total}
+              pageSize={paginacao.page_size}
+              onPageChange={onChangePagina}
+              onNextPage={() => onChangePagina(Math.min(paginacao.page + 1, paginacao.pages))}
+              onPreviousPage={() => onChangePagina(Math.max(paginacao.page - 1, 1))}
+            />
+            {paginacao.pages <= 1 ? (
+              <p className="text-xs text-slate-500">
+                {paginacao.total} produto{paginacao.total === 1 ? "" : "s"} encontrado
+                {paginacao.total === 1 ? "" : "s"}
+                {termo.trim() ? " em toda a base para esta pesquisa" : ""}.
+              </p>
+            ) : null}
           </div>
         </>
       ) : (
@@ -194,12 +252,16 @@ export default function PedidoCompraCatalogoProdutos({
           <p className="font-bold text-slate-800">
             {termo.trim()
               ? "Nenhum produto encontrado para esta pesquisa"
-              : "Nenhum produto com estoque baixo encontrado"}
+              : filtro === "estoque_baixo"
+                ? "Nenhum produto com estoque baixo ou em risco"
+                : "Nenhum produto encontrado"}
           </p>
           <p className="mt-1 text-sm text-slate-500">
             {termo.trim()
               ? "Tente outro nome, SKU ou código de barras."
-              : "Use a opção Todos para consultar o catálogo completo."}
+              : filtro === "estoque_baixo"
+                ? "Use a opção Todos para consultar o catálogo completo."
+                : "Cadastre produtos para começar a montar o pedido."}
           </p>
         </div>
       )}
