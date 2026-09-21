@@ -1,5 +1,6 @@
-import { Percent, Tag, X } from "lucide-react";
+import { CreditCard, Percent, Tag, X } from "lucide-react";
 import { formatMoneyBRL } from "../../utils/formatters";
+import { descricaoFormaPagamento } from "../../utils/pdvPaymentDisplay";
 import Panel from "../ui/Panel";
 
 export default function PDVResumoFinanceiroCard({
@@ -20,6 +21,9 @@ export default function PDVResumoFinanceiroCard({
 }) {
   const totalBruto = vendaAtual.subtotal + vendaAtual.desconto_valor;
   const saldoRestante = Math.max(0, vendaAtual.total - (vendaAtual.total_pago || 0));
+  const pagamentosExibicao = Array.isArray(vendaAtual.pagamentos)
+    ? vendaAtual.pagamentos.filter((pagamento) => pagamento && Number(pagamento.valor || 0) > 0)
+    : [];
   const cupomExibicao =
     cupomAplicado ||
     (vendaAtual.cupom_code
@@ -237,6 +241,28 @@ export default function PDVResumoFinanceiroCard({
                 </span>
               </div>
             </>
+          )}
+
+          {modoVisualizacao && pagamentosExibicao.length > 0 && (
+            <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3">
+              <div className="mb-2 flex items-center gap-1.5 text-sm font-semibold text-emerald-800">
+                <CreditCard className="h-4 w-4" />
+                <span>
+                  {pagamentosExibicao.length === 1 ? "Forma de pagamento" : "Formas de pagamento"}
+                </span>
+              </div>
+              <div className="space-y-1.5">
+                {pagamentosExibicao.map((pagamento, index) => (
+                  <div
+                    key={pagamento.id || `${pagamento.forma_pagamento || "pagamento"}-${index}`}
+                    className="flex items-center justify-between gap-3 text-sm text-emerald-950"
+                  >
+                    <span>{descricaoFormaPagamento(pagamento)}</span>
+                    <span className="font-semibold">{formatMoneyBRL(pagamento.valor)}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
           )}
 
           {!vendaAtual.total_pago && (
