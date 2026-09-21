@@ -20,6 +20,7 @@ export function createPedidosCompraFormularioController({
   obterGrupoDoFornecedor,
   obterParametrosGrupoFornecedor,
   pedidoEditando,
+  resetarModoMontagem,
   setContextoRascunhoSugestao,
   setEstrategiaMesclaItens,
   setFornecedorTexto,
@@ -28,6 +29,7 @@ export function createPedidosCompraFormularioController({
   setItemForm,
   setLoadingPrepararSugestao,
   setModoEdicao,
+  setModoMontagem,
   setMostrarForm,
   setMostrarModalRascunhoSugestao,
   setMostrarSugestoesProduto,
@@ -36,6 +38,7 @@ export function createPedidosCompraFormularioController({
   setProdutoTexto,
 }) {
   const limparFormularioPedido = () => {
+    resetarModoMontagem();
     setFormData(formDataInicial);
     setItemForm(itemFormInicial);
     setEstrategiaMesclaItens("somar");
@@ -95,7 +98,9 @@ export function createPedidosCompraFormularioController({
     const fornecedorSelecionado = obterFornecedorPorId(fornecedorId);
     const proximoFormData = formDataOverride || converterPedidoParaFormData(pedidoCompleto);
 
+    resetarModoMontagem();
     setModoEdicao(true);
+    setModoMontagem(fornecedorId ? "fornecedor" : "produtos");
     setPedidoEditando(pedidoCompleto);
     setFormData(proximoFormData);
     setFornecedorTexto(fornecedorSelecionado?.nome || "");
@@ -125,6 +130,7 @@ export function createPedidosCompraFormularioController({
     };
 
     setModoEdicao(false);
+    setModoMontagem("fornecedor");
     setPedidoEditando(null);
     setFormData(proximoFormData);
     setFornecedorTexto(fornecedorSelecionado?.nome || "");

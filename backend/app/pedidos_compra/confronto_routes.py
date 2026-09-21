@@ -35,6 +35,7 @@ from .confronto_vinculos import (
     _obter_notas_vinculadas,
     _salvar_confronto_pedido,
 )
+from .validacoes import garantir_fornecedor_operacional
 
 router = APIRouter()
 
@@ -56,6 +57,8 @@ def listar_notas_candidatas(
     )
     if not pedido:
         raise HTTPException(status_code=404, detail="Pedido não encontrado")
+
+    garantir_fornecedor_operacional(pedido)
 
     fornecedor = (
         db.query(Cliente)
@@ -126,6 +129,8 @@ def vincular_nota_e_confrontar(
     )
     if not pedido:
         raise HTTPException(status_code=404, detail="Pedido não encontrado")
+
+    garantir_fornecedor_operacional(pedido)
 
     nota = (
         db.query(NotaEntrada)

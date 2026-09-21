@@ -41,6 +41,11 @@ function serializarQuantidadePorEmbalagem(item) {
   return Number.isFinite(quantidade) && quantidade > 0 ? quantidade : null;
 }
 
+function serializarFornecedorId(valor) {
+  const fornecedorId = Number(valor);
+  return Number.isFinite(fornecedorId) && fornecedorId > 0 ? fornecedorId : null;
+}
+
 export function createPedidosCompraOperacoesController({
   aplicarPedidoNoFormulario,
   carregarDados,
@@ -80,7 +85,7 @@ export function createPedidosCompraOperacoesController({
     try {
       const dadosEnvio = {
         ...formData,
-        fornecedor_id: parseInt(formData.fornecedor_id),
+        fornecedor_id: serializarFornecedorId(formData.fornecedor_id),
         valor_frete: parseFloat(formData.valor_frete),
         valor_desconto: parseFloat(formData.valor_desconto),
         data_prevista_entrega: formData.data_prevista_entrega
@@ -382,7 +387,7 @@ export function createPedidosCompraOperacoesController({
 
       const dadosEnvio = {
         ...formData,
-        fornecedor_id: parseInt(formData.fornecedor_id),
+        fornecedor_id: serializarFornecedorId(formData.fornecedor_id),
         valor_frete: parseFloat(formData.valor_frete),
         valor_desconto: parseFloat(formData.valor_desconto),
         data_prevista_entrega: formData.data_prevista_entrega

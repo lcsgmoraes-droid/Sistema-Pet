@@ -33,7 +33,8 @@ class PedidoCompra(BaseTenantModel):
 
     id = Column(Integer, primary_key=True, index=True)
     numero_pedido = Column(String(50), unique=True, nullable=False, index=True)
-    fornecedor_id = Column(Integer, nullable=False, index=True)  # FK para clientes
+    # FK para clientes; opcional no pedido generico montado por produtos.
+    fornecedor_id = Column(Integer, nullable=True, index=True)
 
     # Status: rascunho, enviado, confirmado, recebido_parcial, recebido_total, cancelado
     status = Column(String(20), nullable=False, default="rascunho", index=True)
