@@ -9,7 +9,7 @@ from app.grupo_comercial_models import GrupoComercialMembro
 from app.models import UserTenant, RolePermission, Permission, User
 
 
-def _tenant_pertence_ao_grupo(db: Session, tenant_id: UUID, grupo_id: int) -> bool:
+def tenant_pertence_ao_grupo(db: Session, tenant_id: UUID, grupo_id: int) -> bool:
     return (
         db.query(GrupoComercialMembro.id)
         .filter(
@@ -67,8 +67,9 @@ def check_permission(
     # Usuario master do grupo comercial: acesso total e sempre atualizado
     # (inclusive a permissoes novas criadas depois do Role dele existir),
     # mas so dentro das lojas do PROPRIO grupo - nunca um bypass global.
-    if current_user is not None and current_user.master_grupo_id is not None:
-        if _tenant_pertence_ao_grupo(db, tenant_id, current_user.master_grupo_id):
+    master_grupo_id = getattr(current_user, "master_grupo_id", None)
+    if master_grupo_id is not None:
+        if tenant_pertence_ao_grupo(db, tenant_id, master_grupo_id):
             return
 
     perms = set(expand_permissions(list(get_user_permissions(db, user_id, tenant_id))))

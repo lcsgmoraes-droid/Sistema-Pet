@@ -209,13 +209,26 @@ def _ensure_customer(client: AsaasClient, tenant: Tenant, current_user: User) ->
 def _subscription_payment(
     client: AsaasClient, subscription_id: str
 ) -> dict[str, Any] | None:
-    response = client.request(
-        "GET", f"/subscriptions/{subscription_id}/payments", params={"limit": 10}
-    )
-    items = response.get("data")
-    if not isinstance(items, list) or not items:
-        return None
-    return items[0] if isinstance(items[0], dict) else None
+    """Busca a cobranca em aberto (pendente ou vencida) da assinatura.
+
+    A API do Asaas nao documenta nenhuma ordem garantida para
+    `GET /subscriptions/{id}/payments` sem filtro - pegar `items[0]` sem
+    mais nada arriscava devolver um pagamento antigo qualquer (ja pago,
+    estornado etc.) em vez da cobranca atual. Filtra explicitamente por
+    `status` (PENDING primeiro, OVERDUE como fallback) em vez de confiar em
+    ordem implicita - esses dois sao os unicos status onde ainda existe algo
+    "em aberto" pra reemitir/sincronizar.
+    """
+    for status_filtro in ("PENDING", "OVERDUE"):
+        response = client.request(
+            "GET",
+            f"/subscriptions/{subscription_id}/payments",
+            params={"limit": 1, "status": status_filtro},
+        )
+        items = response.get("data")
+        if isinstance(items, list) and items and isinstance(items[0], dict):
+            return items[0]
+    return None
 
 
 def _apply_payment_snapshot(tenant: Tenant, payment: dict[str, Any] | None) -> None:
@@ -243,7 +256,7 @@ def refresh_subscription_payment(db: Session, *, tenant: Tenant) -> dict[str, An
     payment = _subscription_payment(client, tenant.billing_provider_subscription_id)
     if payment is None:
         raise AsaasBillingError(
-            "Nenhuma cobranca encontrada para a assinatura desta loja.",
+            "Nao ha cobranca pendente ou vencida nesta assinatura no momento.",
             status_code=404,
         )
     _apply_payment_snapshot(tenant, payment)
