@@ -95,6 +95,31 @@ def test_frontend_oferece_montagem_por_produtos_e_vinculo_em_lote():
     )
 
 
+def test_frontend_abre_pedido_por_fornecedor_como_padrao():
+    controller = (
+        ROOT
+        / "frontend"
+        / "src"
+        / "components"
+        / "compras"
+        / "usePedidosCompraController.js"
+    ).read_text(encoding="utf-8")
+    modo_pedido = (
+        ROOT
+        / "frontend"
+        / "src"
+        / "components"
+        / "compras"
+        / "usePedidoCompraPorProdutos.js"
+    ).read_text(encoding="utf-8")
+
+    assert 'const [abaAtiva, setAbaAtiva] = useState("fornecedor");' in controller
+    assert (
+        'const [modoMontagem, setModoMontagem] = useState("fornecedor");'
+        in modo_pedido
+    )
+
+
 def test_migracao_torna_fornecedor_do_pedido_opcional():
     migration = (
         ROOT

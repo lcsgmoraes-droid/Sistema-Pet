@@ -61,7 +61,7 @@ export default function usePedidosCompraController() {
   const [gruposFornecedores, setGruposFornecedores] = useState([]);
   const [produtos, setProdutos] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [abaAtiva, setAbaAtiva] = useState("produtos");
+  const [abaAtiva, setAbaAtiva] = useState("fornecedor");
   const [mostrarForm, setMostrarForm] = useState(true);
   const [modoEdicao, setModoEdicao] = useState(false);
   const [pedidoEditando, setPedidoEditando] = useState(null);

@@ -30,7 +30,7 @@ export default function usePedidoCompraPorProdutos({
   setProdutoTexto,
   setProdutos,
 }) {
-  const [modoMontagem, setModoMontagem] = useState("produtos");
+  const [modoMontagem, setModoMontagem] = useState("fornecedor");
   const [filtroProdutosPedido, setFiltroProdutosPedido] = useState("estoque_baixo");
   const [loadingProdutosPedido, setLoadingProdutosPedido] = useState(false);
   const [paginaProdutosPedido, setPaginaProdutosPedido] = useState(1);
