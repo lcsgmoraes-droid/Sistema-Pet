@@ -130,6 +130,15 @@ def test_payload_preserves_totals_and_hides_real_recipient_in_homologation():
     assert payload["pagamentos"] == [{"formaPagamento": "17", "valor": 23.0}]
 
 
+def test_crediario_uses_credito_loja_instead_of_outros():
+    tenant, connection, sale = _objects()
+    sale.pagamentos[0].forma_pagamento = "Crediário"
+
+    payload = emission.build_payload(None, tenant, connection, sale, "nfe")
+
+    assert payload["pagamentos"] == [{"formaPagamento": "05", "valor": 23.0}]
+
+
 def test_nfe_accepts_complete_recipient_address_without_cep():
     tenant, connection, sale = _objects()
     sale.cliente.cep = None

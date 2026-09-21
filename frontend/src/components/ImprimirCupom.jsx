@@ -138,6 +138,10 @@ const vendaPropType = PropTypes.shape({
   endereco_entrega: PropTypes.string,
   observacoes_entrega: PropTypes.string,
   cliente: PropTypes.shape({
+    cnpj: PropTypes.string,
+    cpf: PropTypes.string,
+    cpf_cnpj: PropTypes.string,
+    documento: PropTypes.string,
     nome: PropTypes.string,
     telefone: PropTypes.string,
     celular: PropTypes.string,

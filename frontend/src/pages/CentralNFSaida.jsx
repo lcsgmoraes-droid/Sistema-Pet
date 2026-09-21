@@ -323,8 +323,12 @@ export default function CentralNFSaida() {
         modalCancelar.provedor === "intnfe"
           ? `/nfe/vendas/${modalCancelar.venda_id}/cancelar`
           : `/nfe/${modalCancelar.id}/cancelar`;
-      await api.post(endpoint, { justificativa });
-      alert("Nota fiscal cancelada com sucesso!");
+      const response = await api.post(endpoint, { justificativa });
+      alert(
+        response.data?.cancelamento_solicitado
+          ? "Solicitação de cancelamento enviada. A nota só estará cancelada quando a situação mudar para Cancelada; atualize a lista para acompanhar a confirmação da SEFAZ."
+          : "Nota fiscal cancelada com sucesso!",
+      );
       setModalCancelar(null);
       setJustificativa("");
       carregarNotas(true);

@@ -192,6 +192,18 @@ function formatarDataHoraVenda(valor) {
   return Number.isNaN(data.getTime()) ? String(valor || "-") : data.toLocaleString("pt-BR");
 }
 
+function formatarDocumentoCliente(valor) {
+  const original = texto(valor);
+  const digitos = original.replaceAll(/\D/g, "");
+  if (digitos.length === 11) {
+    return digitos.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, "$1.$2.$3-$4");
+  }
+  if (digitos.length === 14) {
+    return digitos.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, "$1.$2.$3/$4-$5");
+  }
+  return original;
+}
+
 function pagamentoEhCrediario(pagamento = {}) {
   const tipo = toAscii(pagamento.forma_pagamento_tipo || pagamento.tipo).toLowerCase();
   const nome = toAscii(pagamento.forma_pagamento || pagamento.nome).toLowerCase();
@@ -370,6 +382,9 @@ export function montarCupomVenda(venda = {}, empresa = {}) {
   ];
 
   if (cliente.nome) linhas.push(...wrap(`Cliente: ${cliente.nome}`));
+  if (cliente.documento) {
+    linhas.push(...wrap(`CPF/CNPJ: ${formatarDocumentoCliente(cliente.documento)}`));
+  }
   if (cliente.telefone) linhas.push(...wrap(`Telefone: ${cliente.telefone}`));
   if (cliente.endereco) linhas.push(...wrap(`Endereco: ${cliente.endereco}`));
   if (venda?.pet?.nome) linhas.push(...wrap(`Pet: ${venda.pet.nome}`));

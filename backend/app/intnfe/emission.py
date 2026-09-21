@@ -127,6 +127,8 @@ def _payment_code(value):
         return "17"
     if "boleto" in name:
         return "15"
+    if "crediario" in name or "credito_loja" in name:
+        return "05"
     if "deposit" in name or "transfer" in name:
         return "16"
     if "debito" in name:
