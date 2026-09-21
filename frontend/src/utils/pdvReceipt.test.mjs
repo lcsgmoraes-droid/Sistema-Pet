@@ -78,6 +78,26 @@ test("configuracoes opcionais vazias usam fallback sensato", () => {
   assert.match(recibo, /Volte sempre!/);
 });
 
+test("recibo imprime o CPF ou CNPJ informado no cadastro do cliente", () => {
+  const reciboCpf = montarCupomVenda(
+    {
+      ...vendaBase,
+      cliente: { ...vendaBase.cliente, cpf: "12345678901" },
+    },
+    empresa,
+  );
+  const reciboCnpj = montarCupomVenda(
+    {
+      ...vendaBase,
+      cliente: { ...vendaBase.cliente, cnpj: "23226250000140" },
+    },
+    empresa,
+  );
+
+  assert.match(reciboCpf, /CPF\/CNPJ: 123\.456\.789-01/);
+  assert.match(reciboCnpj, /CPF\/CNPJ: 23\.226\.250\/0001-40/);
+});
+
 test("recibo em dinheiro imprime valor recebido e troco com clareza", () => {
   const recibo = montarCupomVenda(
     {
