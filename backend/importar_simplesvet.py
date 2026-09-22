@@ -31,7 +31,7 @@ from sqlalchemy.orm import Session
 from app.models import Cliente, Pet, Especie, Raca
 from app.produtos_models import Produto, Marca
 from app.vendas_models import Venda, VendaItem
-from app.financeiro_models import ContaReceber  # registra o relacionamento Venda.contas_receber
+from app.financeiro_models import ContaReceber  # noqa: F401 - registra Venda.contas_receber
 from importar_simplesvet_state import ID_MAP, NAO_IMPORTADOS, RUNTIME, STATS
 from importar_simplesvet_summary import exibir_resumo as _exibir_resumo
 from importar_simplesvet_cadastros import dados_cliente, importar_categorias_produtos
