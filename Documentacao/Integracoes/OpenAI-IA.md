@@ -18,7 +18,7 @@ Parte de [[Integracoes]]. Ver [[Veterinario]], [[Campanhas]] (calculadora de ra�
 REST via SDK oficial `openai` (Python), versão 2.43.0.
 
 ## Autenticação
-`OPENAI_API_KEY`. Providers alternativos configuráveis: `GROQ_API_KEY`, `GOOGLE_AI_API_KEY` — ❓ não confirmado se há implementação ativa (`groq_provider.py`/`google_ai_provider.py`) para esses dois além da variável de ambiente existir.
+`OPENAI_API_KEY`. Providers alternativos: `GROQ_API_KEY` (Groq, modelo `llama-3.3-70b-versatile`) e `GEMINI_API_KEY` (Google Gemini, modelo `gemini-1.5-flash`) — **confirmado em 2026-09-21 que ambos têm implementação ativa**, não são só variáveis reservadas. Ordem de fallback (Groq → OpenAI → Gemini, primeiro que tiver chave configurada) em dois pontos: `backend/app/cliente_info_pdv_chat.py:327-375` (assistente do caixa/PDV) e `backend/app/veterinario_ia.py:642-706` (copiloto clínico veterinário). O dado enviado a qualquer um dos três nesses dois fluxos inclui CPF/CNPJ e telefone do cliente e, no fluxo veterinário, alergias, doenças crônicas, medicamentos em uso e histórico clínico do pet — ver detalhe e status na Política de Privacidade em [[Terceiros-Dados-LGPD]].
 
 ## Webhook
 Não há — uso é apenas de saída (CorePet chama a OpenAI).
@@ -41,4 +41,4 @@ Mensagem do cliente → whatsapp/ai_service.py → ai/engine.py
 Atendimento WhatsApp (ver [[WhatsApp-WAHA]]), [[Veterinario]] (assistente IA vet, calculadora de doses), catálogo mestre de produtos (enriquecimento automático).
 
 ## Não identificado
-- ❓ Confirmar implementação real dos providers Groq/Google AI como alternativos, ou se são apenas variáveis reservadas para uso futuro.
+- ❓ Decisão de negócio pendente: manter Groq e Gemini como fallback de IA (e documentá-los formalmente na Política de Privacidade) ou remover esses dois providers — ver [[Terceiros-Dados-LGPD]].

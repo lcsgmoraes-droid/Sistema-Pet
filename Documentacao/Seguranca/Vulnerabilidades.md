@@ -31,6 +31,22 @@ Parte do eixo [[Seguranca]]. Lista consolidada, mais severo primeiro. Ver també
 - **Recomendação:** ❓ confirmar com o responsável se esse campo está em uso; se sim, auditar o caminho real de cifragem antes de considerar seguro.
 - **Prioridade:** Alta até confirmação. Detalhe: [[Secrets]].
 
+### 9. Groq e Gemini recebem CPF/CNPJ e dado de saúde do pet — decisão de negócio pendente
+- **Onde:** `backend/app/cliente_info_pdv_chat.py:327-375` (chat do PDV) e `backend/app/veterinario_ia.py:642-706` (copiloto clínico veterinário).
+- **Evidência:** quando `GROQ_API_KEY` ou `GEMINI_API_KEY` estão configuradas, o fallback de IA envia nome, CPF/CNPJ, telefone e histórico de compras do cliente (PDV) e, no fluxo veterinário, alergias, doenças crônicas, medicamentos em uso e histórico clínico do pet.
+- **Status em 21/09/2026:** ✅ **disclosure resolvido** — os dois provedores já são nomeados na Política de Privacidade (`frontend/src/pages/LegalPage.jsx`, seção 10, versão 21/09/2026), junto com o tipo de dado enviado. **Resta só a decisão de negócio**: manter os dois no fallback de IA (já documentados) ou removê-los.
+- **Impacto potencial:** enquanto a decisão não for tomada, compartilhamento de dado sensível (saúde) e identificador (CPF/CNPJ) com dois subprocessadores adicionais segue ativo — agora divulgado, mas ainda não decidido se é o desenho definitivo.
+- **Recomendação:** decisão de negócio do Lucas — manter e formalizar, ou remover do fallback. Detalhe: [[Terceiros-Dados-LGPD]].
+- **Prioridade:** Alta.
+
+### 10. Google Analytics 4 ativo sem consentimento prévio; `.env.production` versionado no git
+- **Onde:** `frontend/index.html:52-70`, ID real em `frontend/.env.production` (`G-WPC2ZCFNWW`, arquivo versionado no git apesar de constar no `.gitignore` — adicionado depois do arquivo já estar rastreado).
+- **Evidência:** o script carrega incondicionalmente ao renderizar a loja online, sem banner de consentimento prévio; envia IP, user-agent, cookies e eventos de navegação/compra (incluindo `pedido_id`) ao Google.
+- **Status em 21/09/2026:** ✅ **disclosure resolvido** — o Google Analytics já é nomeado na seção 10 da Política de Privacidade (versão 21/09/2026). **Restam duas pendências técnicas**, não de texto: (a) o script continua carregando sem consentimento prévio; (b) `frontend/.env.production` com o ID real continua versionado no git.
+- **Impacto potencial:** coleta de dado pessoal (IP, identificador de cookie) por terceiro sem mecanismo de consentimento demonstrável, mesmo já divulgado na política.
+- **Recomendação:** `git rm --cached frontend/.env.production`; decidir se o GA4 continua ativo e, se sim, implementar banner de consentimento antes do carregamento do script.
+- **Prioridade:** Alta.
+
 ## 🟡 Médio
 
 ### 4. Upload de XML de NF-e sem limite de tamanho
@@ -54,6 +70,12 @@ Parte do eixo [[Seguranca]]. Lista consolidada, mais severo primeiro. Ver també
 - **Prioridade:** Média.
 
 ## 🔵 Baixo / dívida técnica
+
+### 11. Outros pontos de contato com terceiros — disclosure já resolvido em 21/09/2026
+- **Onde:** ver tabela completa em [[Terceiros-Dados-LGPD]].
+- **Evidência:** chamadas diretas do navegador a ViaCEP e BrasilAPI, carregamento de Google Fonts em toda tela, tiles do OpenStreetMap numa página pública de rastreio, localização na seleção de loja e na confirmação pontual de entrega do app mobile, e verificação de atualização via EAS Update.
+- **Status em 21/09/2026:** ✅ todos os itens acima já estão nomeados na Política de Privacidade (`LegalPage.jsx`, seção 10, versão 21/09/2026) — item mantido só como registro histórico do achado original.
+- **Prioridade:** Baixa (já resolvido).
 
 ### 7. Rota de webhook Bling sem assinatura — código morto, não exposto
 - **Onde:** `backend/app/integracao_bling_webhook_routes.py` (`POST /integracoes/bling/webhook`).

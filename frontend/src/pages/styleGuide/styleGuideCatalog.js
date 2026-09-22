@@ -14,6 +14,12 @@ export const styleGuideCatalog = [
         arquivo: "components/v2/InputTexto/InputTexto.jsx",
         descricao: "Base de todos os campos de texto",
       },
+      {
+        nome: "InputTextoLongo",
+        status: "pronto",
+        arquivo: "components/v2/InputTextoLongo/InputTextoLongo.jsx",
+        descricao: "Textarea — mesma aparência do InputTexto, com `linhas` controlando a altura",
+      },
       { nome: "InputSenha", status: "pronto", arquivo: "components/v2/InputSenha/InputSenha.jsx" },
       {
         nome: "InputData / InputDataHora",
@@ -40,6 +46,13 @@ export const styleGuideCatalog = [
         descricao: "Aparência de botão, label centralizada",
       },
       {
+        nome: "InputCheckTexto",
+        status: "pronto",
+        arquivo: "components/v2/InputCheckTexto/InputCheckTexto.jsx",
+        descricao:
+          "Checkbox tradicional (não é pill) com rótulo rico — aceita texto com link no meio, ex.: aceite de termos",
+      },
+      {
         nome: "InputMoeda / InputQuantidade / InputPercentual",
         status: "pronto",
         arquivo: "components/v2/InputMoeda/, .../InputQuantidade/, .../InputPercentual/",
@@ -48,7 +61,8 @@ export const styleGuideCatalog = [
         nome: "InputTelefone / InputCpfCnpj",
         status: "pronto",
         arquivo: "components/v2/InputTelefone/, .../InputCpfCnpj/",
-        descricao: "CNPJ já aceita o formato alfanumérico da Receita Federal (2026)",
+        descricao:
+          "InputTelefone serve celular e fixo via prop tipo (celular/fixo/ambos) e já traz o toggle de WhatsApp embutido; CNPJ já aceita o formato alfanumérico da Receita Federal (2026)",
       },
       {
         nome: "InputCombobox",
@@ -108,6 +122,13 @@ export const styleGuideCatalog = [
         arquivo: "components/v2/BotaoLink/BotaoLink.jsx",
         descricao: 'Link de navegação secundário dentro de um painel (ex.: "Ver produtos")',
       },
+      {
+        nome: "LinkPadrao",
+        status: "pronto",
+        arquivo: "components/v2/LinkPadrao/LinkPadrao.jsx",
+        descricao:
+          "Link de navegação real (rota interna via `to` ou URL via `href`) — cor, peso e ícone padronizados; só o tamanho da fonte é livre. `novaJanela` abre em outra aba com ícone de link externo",
+      },
     ],
   },
   {
@@ -133,6 +154,13 @@ export const styleGuideCatalog = [
         arquivo: "components/v2/SeletorOpcoes/SeletorOpcoes.jsx",
         descricao:
           "Grupo de opções únicas em formato de pill para barra de ferramentas (filtro de período, alternância de visão) — não é campo de formulário",
+      },
+      {
+        nome: "AbasNavegacao",
+        status: "pronto",
+        arquivo: "components/v2/AbasNavegacao/AbasNavegacao.jsx",
+        descricao:
+          "Abas horizontais com ícone (estilo GitHub) — cada aba aceita `descricao` (vira dica ao passar o mouse) e `invalida` (mostra ícone de alerta ao lado do rótulo, para sinalizar campo obrigatório pendente naquela aba)",
       },
     ],
   },
@@ -194,12 +222,14 @@ export const styleGuideCatalog = [
   },
   {
     categoria: "Modal",
-    origem: "item 1.7 do roadmap — ainda planejado",
+    origem: "item 1.7 do roadmap",
     itens: [
       {
-        nome: "Modal / Modal.Header / Modal.Body / Modal.Footer",
-        status: "planejado",
-        descricao: "Casca genérica para conteúdo arbitrário (formulário, wizard)",
+        nome: "ModalPadrao",
+        status: "pronto",
+        arquivo: "components/v2/ModalPadrao/ModalPadrao.jsx",
+        descricao:
+          "Casca padrão de modal — título, corpo (children) e rodapé de ações (prop rodape); fechar sempre pelo X no mesmo lugar, nunca clicando fora.",
       },
     ],
   },

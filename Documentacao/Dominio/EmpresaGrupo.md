@@ -1,6 +1,6 @@
 ---
 tipo: dominio
-atualizado: 2026-09-20
+atualizado: 2026-09-21
 ---
 
 # Entidade — GrupoComercial (grupo de empresas)
@@ -15,18 +15,18 @@ Ver [[Tenant]], [[Produto]], [[Cliente]], [[ContaPagar]], [[ContaReceber]], [[Pl
 
 ## Definição
 
-Agrupa vários [[Tenant]] (lojas) sob um mesmo grupo econômico, permitindo que operem de forma coordenada em três frentes — **estoque seletivamente compartilhado**, **transferência integrada de mercadoria com lançamento financeiro automático** e **análise consolidada de indicadores** — sem nunca unir o cadastro, o licenciamento ou o isolamento de dados de cada loja. É puramente uma camada operacional que **atravessa** tenants por natureza; por isso os modelos não herdam `BaseTenantModel`, e todo acesso passa obrigatoriamente por um service que valida manualmente o tenant do ator em cada operação.
+Agrupa vários [[Tenant]] (lojas) sob um mesmo grupo comercial, permitindo que operem de forma coordenada em três frentes — **estoque seletivamente compartilhado**, **transferência integrada de mercadoria com lançamento financeiro automático** e **análise consolidada de indicadores** — sem nunca unir o cadastro, o licenciamento ou o isolamento de dados de cada loja. É puramente uma camada operacional que **atravessa** tenants por natureza; por isso os modelos não herdam `BaseTenantModel`, e todo acesso passa obrigatoriamente por um service que valida manualmente o tenant do ator em cada operação.
 
 Desde 18/09/2026, **todo tenant novo já nasce dentro de um grupo comercial automaticamente** — um "grupo-de-1", só ele mesmo como membro `responsavel`. Grupo comercial deixou de ser um recurso opcional que a empresa "adere"; é infraestrutura obrigatória do cadastro. Uma mesma empresa (tenant) **pode participar de mais de um grupo ao mesmo tempo** — não há nenhuma constraint ou validação que impeça isso; `GrupoComercialMembro` só garante `UniqueConstraint(grupo_id, empresa_id)`, ou seja, só impede entrar duas vezes *no mesmo* grupo.
 
 ## Duas camadas de controle de acesso
 
-Desde 20/09/2026 existem **duas camadas independentes** decidindo quem pode fazer o quê num grupo — importante não confundir uma com a outra:
+Existem **duas camadas independentes** decidindo quem pode fazer o quê num grupo — importante não confundir uma com a outra:
 
 1. **Papel da empresa dentro do grupo** (`GrupoComercialMembro.papel`) — decide qual **loja/tenant** pode disparar ações de composição do grupo (adicionar loja, remover membro). Não mudou desde a criação do recurso.
-2. **Acesso de gestão do grupo, por usuário** (`User.master_grupo_id` + `GrupoComercialGestor`) — decide qual **pessoa/login**, dentro daquela loja, pode efetivamente ver e mexer na tela de gestão do grupo (lojas, cobrança consolidada). Novo, adicionado em 20/09/2026.
+2. **Acesso de gestão do grupo, por usuário** (`User.master_grupo_id`) — decide qual **pessoa/login** pode efetivamente ver e mexer na tela de gestão do grupo (lojas, cobrança consolidada). Adicionada em 20/09/2026; **desde 21/09/2026 só o usuário MASTER tem esse acesso** — o acesso "gestor" concedível a outros usuários (que existiu entre 20/09 e 21/09/2026) foi eliminado por decisão de negócio (ver seção própria abaixo).
 
-Uma ação de composição do grupo (ex.: adicionar loja) **exige as duas** ao mesmo tempo: a empresa logada precisa ser a `responsavel` do grupo **e** o usuário logado precisa ter acesso de gestão (ser master ou gestor concedido). Antes de 20/09/2026 só existia a camada 1 — qualquer usuário com a permissão genérica `configuracoes.empresa`/`configuracoes.editar` na loja responsável conseguia mexer no grupo inteiro, mesmo sem nenhuma relação direta com a administração dele. Essa era a lacuna que motivou a camada 2.
+Uma ação de composição do grupo (ex.: adicionar loja) **exige as duas** ao mesmo tempo: a empresa logada precisa ser a `responsavel` do grupo **e** o usuário logado precisa ser o master. Antes de 20/09/2026 só existia a camada 1 — qualquer usuário com a permissão genérica `configuracoes.empresa`/`configuracoes.editar` na loja responsável conseguia mexer no grupo inteiro, mesmo sem nenhuma relação direta com a administração dele. Essa era a lacuna que motivou a camada 2.
 
 ### Camada 1 — papel da empresa (`GrupoComercialMembro.papel`)
 
@@ -43,10 +43,10 @@ Uma ação de composição do grupo (ex.: adicionar loja) **exige as duas** ao m
   - Não pode ser reduzido nem removido por nenhuma tela — `usuarios_routes.py` recusa (`403`) mudar o `role_id` ou desativar o vínculo de um usuário que é master de algum grupo, em qualquer loja.
   - Faz bypass de permissão dentro do próprio grupo (`check_permission` em `permissions_service.py`) — sempre com acesso total, inclusive a permissões criadas depois que o `Role` dele já existia. **Nunca** um bypass fora do grupo dele.
   - Grupos que já existiam antes de 20/09/2026 ganharam um master via migration de backfill, a partir do usuário já registrado como `responsavel` de cada um (ou, na ausência de referência direta, o usuário mais antigo com vínculo ativo naquela empresa) — nenhum grupo ficou sem master.
-- **Gestor do grupo** (`GrupoComercialGestor`): um usuário qualquer (de qualquer loja do grupo) ao qual o **master** concedeu acesso à tela de gestão. Só o master concede ou revoga (`conceder_gestor`/`revogar_gestor` — `403` se quem chama não for master); quem recebe **não** vira master e **não** pode repassar o acesso a outra pessoa.
-- O que a camada 2 protege, na prática (`exigir_acesso_gestao`, chamado a partir do service): `listar_resumo` (filtra quais grupos aparecem — ver abaixo), `adicionar_loja`, `remover_membro`, conceder/revogar/listar gestor, billing consolidado (ver seção própria). **Não** protege: estoque compartilhado, vínculos de produto, visão consolidada/análises, mestres do grupo — essas rotas continuam só na permissão genérica de tenant (`configuracoes.empresa`/`configuracoes.editar` ou `relatorios.gerencial`/`relatorios.financeiro`, conforme o caso).
+- **Gestor do grupo (removido em 21/09/2026)**: entre 20/09 e 21/09/2026 existiu um acesso "gestor" (`GrupoComercialGestor`) que o master podia conceder a qualquer usuário do grupo, dando a ele a mesma visão da tela de gestão sem virar master. Decisão de negócio: **só o master tem controle sobre o grupo**, ponto — não existe mais forma de delegar isso. `conceder_gestor`/`revogar_gestor`/`listar_gestores` (service) e as rotas `GET/POST /{grupo_id}/gestores`, `DELETE /{grupo_id}/gestores/{user_id}` foram apagados; `exigir_acesso_gestao`/`tem_acesso_gestao` agora checam só `_e_master`. A tabela `grupo_comercial_gestores` **continua existindo no banco** (nenhuma migration foi feita pra dropá-la — decisão deliberada de não mexer em schema por uma limpeza que não precisa disso), mas está órfã: nada no código escreve ou lê nela.
+- O que a camada 2 protege, na prática (`exigir_acesso_gestao`, chamado a partir do service): `listar_resumo` (filtra quais grupos aparecem — ver abaixo), `adicionar_loja`, `remover_membro`, billing consolidado (ver seção própria). **Não** protege: estoque compartilhado, vínculos de produto, visão consolidada/análises, mestres do grupo — essas rotas continuam só na permissão genérica de tenant (`configuracoes.empresa`/`configuracoes.editar` ou `relatorios.gerencial`/`relatorios.financeiro`, conforme o caso).
 
-`GET /grupos-comerciais/resumo` retorna só os grupos em que o usuário logado tem acesso de gestão (master ou gestor); se a empresa participa de um grupo mas o usuário não tem esse acesso, o grupo some da lista e a resposta sinaliza `tem_grupo_sem_acesso=true` — a tela mostra uma mensagem pedindo pra falar com o responsável, em vez de simplesmente não achar nada.
+`GET /grupos-comerciais/resumo` retorna só os grupos em que o usuário logado é o master; se a empresa participa de um grupo mas o usuário não é o master, o grupo some da lista e a resposta sinaliza `tem_grupo_sem_acesso=true` — a tela mostra uma mensagem pedindo pra falar com o master do grupo ou com a equipe CorePet, em vez de simplesmente não achar nada.
 
 ## Como um grupo cresce hoje — só "adicionar loja"
 
@@ -60,8 +60,10 @@ Uma ação de composição do grupo (ex.: adicionar loja) **exige as duas** ao m
 ### 1. Criação do grupo
 `GrupoComercialService.criar_grupo` — hoje só é alcançado indiretamente: pelo cadastro público (todo tenant novo cria seu próprio grupo-de-1) ou pelo onboarding assistido de ops (contrato inicial com N lojas). Não existe mais um botão "criar grupo novo" isolado para quem já está logado no sistema. Quem cria vira automaticamente `responsavel` **e** master do grupo.
 
-### 2. Adicionar loja (única forma de crescer)
-`POST /grupos-comerciais/{grupo_id}/lojas` → `adicionar_loja`. Exige, ao mesmo tempo: (a) a empresa logada ser a `responsavel` do grupo e (b) o usuário logado ter acesso de gestão (master ou gestor). Provisiona uma loja nova do zero (mesmo fluxo de `provision_tenant` usado no cadastro público), reaproveitando o **mesmo usuário logado** — sem pedir e-mail/senha novos — e já anexa a loja nova ao grupo com `papel="membro"` (nunca `"responsavel"`, mesmo sendo o mesmo dono). Ao final, o master do grupo (se for uma pessoa diferente de quem chamou) ganha acesso automático à loja nova (ver camada 2 acima).
+### 2. Adicionar loja
+`POST /grupos-comerciais/{grupo_id}/lojas` → `adicionar_loja`. Exige, ao mesmo tempo: (a) a empresa logada ser a `responsavel` do grupo e (b) o usuário logado ser o master. Provisiona uma loja nova do zero (mesmo fluxo de `provision_tenant` usado no cadastro público), reaproveitando o **mesmo usuário logado** — sem pedir e-mail/senha novos — e já anexa a loja nova ao grupo com `papel="membro"` (nunca `"responsavel"`, mesmo sendo o mesmo dono). Ao final, o master do grupo ganha acesso automático à loja nova (ver camada 2 acima). Chamada com `grant_trial=False` nessa rota — ver seção "Relação com licenciamento" abaixo.
+
+⚠️ **Mudou em 21/09/2026**: a tela `/configuracoes/grupos-comerciais` **não oferece mais esse fluxo como self-service** — decisão de negócio de eliminar a criação de loja direto pelo usuário. O bloco "Adicionar nova loja ao grupo" na tela hoje só abre uma conversa de WhatsApp com a equipe CorePet (`buildSalesContactUrl`); quem cria a loja, na prática, é a equipe (via onboarding assistido de ops, que chama o mesmo `adicionar_loja` mas com `grant_trial=True` — ver abaixo). A rota `POST /{grupo_id}/lojas` em si **continua existindo e funcional** no backend (não foi removida, só ficou sem nenhum caminho de UI apontando pra ela) — pendente decisão de negócio sobre desativá-la também.
 
 ### 3. Saída/remoção de um membro
 ⚠️ **Não existe rota de "sair do grupo" self-service.** A única forma de uma loja deixar de participar é remoção pela `responsavel`, com acesso de gestão: `DELETE /grupos-comerciais/{grupo_id}/membros/{empresa_id}` → `remover_membro`. Ao remover:
@@ -116,7 +118,11 @@ Três serviços de leitura, todos operando com o mesmo padrão seguro: **iterar 
 
 ## Relação com licenciamento — cobrança continua 100% por loja
 
-✅ Confirmado, sem ambiguidade, e **não mudou em 20/09/2026**: **não existe billing/plano de grupo**. Nenhum modelo em `grupo_comercial_models.py` tem coluna `plan`/`billing_status`/`modulos_ativos`. Cada [[Tenant]] do grupo mantém seu próprio [[Plano]], trial e módulos contratados de forma totalmente independente — entrar ou sair de um grupo não muda em nada o que aquela loja paga ou pode acessar. Quando uma loja nova nasce via `adicionar_loja`, ela recebe seu próprio trial do zero, sem herdar nada da loja que a criou.
+✅ Confirmado, sem ambiguidade, e **não mudou em 20/09/2026**: **não existe billing/plano de grupo**. Nenhum modelo em `grupo_comercial_models.py` tem coluna `plan`/`billing_status`/`modulos_ativos`. Cada [[Tenant]] do grupo mantém seu próprio [[Plano]], trial e módulos contratados de forma totalmente independente — entrar ou sair de um grupo não muda em nada o que aquela loja paga ou pode acessar.
+
+⚠️ **Trial da loja nova — mudou em 21/09/2026**: `provision_tenant` ganhou o parâmetro `grant_trial` (`backend/app/services/tenant_provisioning_service.py`). Antes, toda loja nova via `adicionar_loja` recebia 30 dias de acesso completo do zero, igual a um cadastro público. Decisão de negócio: quem já é cliente pagante adicionando mais uma loja ao próprio grupo **não** deve ganhar o trial gratuito de cliente novo. Por isso:
+- Rota self-service `POST /{grupo_id}/lojas` chama `adicionar_loja(..., grant_trial=False)` — a loja nasce com `billing_status="pending"` e sem `trial_started_at`/`trial_ends_at`, o que zera `acesso_completo_durante_trial` e os entitlements do plano ficam bloqueados até uma assinatura real ser ativada (mesmo estado de um trial expirado — caminho já coberto pelo restante do sistema, não é um estado novo).
+- Onboarding assistido de ops continua com `grant_trial=True` (padrão) — são clientes novos, todas as lojas do contrato inicial ganham o trial completo, igual antes.
 
 O que existe, desde 20/09/2026, é uma **visão consolidada de leitura** da cobrança (Asaas) de cada loja, para quem tem acesso de gestão do grupo (camada 2 acima):
 - `GET /grupos-comerciais/{grupo_id}/billing` (`GrupoComercialBillingService.listar`) — para cada loja ativa do grupo, devolve o mesmo status já calculado por `asaas_billing_service.subscription_status` (o endpoint self-service `/billing/asaas/status` usa a mesma função): `billing_status`, `payment_status`, `billing_type`, `next_due_date`, `checkout_url`, e um booleano `adimplente` (`billing_status == "active"`).
@@ -126,7 +132,7 @@ O que existe, desde 20/09/2026, é uma **visão consolidada de leitura** da cobr
 
 - **`empresa_id_igual`/`empresa_id_sql`** (`grupo_comercial_sql.py`): todas as comparações de ID de empresa passam por essas duas funções, que normalizam removendo hífens antes de comparar — existe explicitamente para tolerar bancos/ambientes onde a coluna de `tenant_id` é `UUID` nativo num lugar e `VARCHAR` legado noutro. Indício de uma migração de tipo de coluna que já aconteceu no passado.
 - `GrupoComercial.criado_por_empresa_id`, `GrupoComercialMembro.empresa_id`, `GrupoComercialTransferencia.empresa_origem_id`/`empresa_destino_id`, `GrupoComercialProdutoVinculo.empresa_a_id`/`empresa_b_id`/`criado_por_empresa_id` e `GrupoComercialEstoqueCompartilhado.empresa_origem_id`/`empresa_consumidora_id` são **todas FKs reais** para `tenants.id`, a maioria com `ondelete="RESTRICT"` — ou seja, o banco **impede fisicamente apagar um Tenant** enquanto ele aparecer em qualquer registro de grupo (criador, membro, transferência, vínculo, compartilhamento). Isso é mais rígido do que a regra de negócio "responsável não pode ser removido do grupo" — é uma segunda camada de proteção, a nível de schema.
-- `User.master_grupo_id` é FK para `grupos_comerciais.id` (nullable) — não-nulo identifica o usuário master daquele grupo. `GrupoComercialGestor` tem FK para `grupos_comerciais.id` e duas para `users.id` (`user_id` e `concedido_por_user_id`).
+- `User.master_grupo_id` é FK para `grupos_comerciais.id` (nullable) — não-nulo identifica o usuário master daquele grupo. `GrupoComercialGestor`/`grupo_comercial_gestores` ainda existe no schema mas está órfã desde 21/09/2026 (ver camada 2 acima) — nenhum código lê ou escreve nela.
 - `GrupoComercialCodigo`/`GrupoComercialConvite` (as tabelas do antigo fluxo de convite, ver seção acima) foram **dropadas** por migration em 20/09/2026 — não existem mais no schema.
 - Toda mutação relevante gera um evento de auditoria via `log_business_event` (`grupo_comercial_criado`, `_membro_removido`, `_loja_adicionada`, `_gestor_concedido`/`_revogado`, `_estoque_compartilhado_ativado`/`_removido`, `_produtos_vinculados`/`_desvinculados`, `transferencia_grupo_saida_integrada`/`_entrada_integrada`) e um contador de uso de funcionalidade via `registrar_uso_funcionalidade` (ver [[evolucao_funcionalidade_usos]]).
 
@@ -136,7 +142,7 @@ O que existe, desde 20/09/2026, é uma **visão consolidada de leitura** da cobr
 - Reposição inteligente e análise financeira entre lojas do mesmo grupo (`GrupoComercialPlanejamentoService`).
 - Dashboard de visão consolidada e análises detalhadas (vendas, produtos vendidos, compras, contas a pagar) entre lojas do mesmo grupo.
 - Sincronização Bling em background, disparada após transferências integradas.
-- Tela `/configuracoes/grupos-comerciais` (frontend) — abas "Lojas do grupo", "Cobrança" e "Acessos do grupo" (a última só visível ao master).
+- Tela `/configuracoes/grupos-comerciais` (frontend) — desde 21/09/2026, uma visão única sem abas: lojas participantes, bloco "Adicionar nova loja" (link de contato com a equipe, não mais self-service), cobrança das lojas e estoque compartilhado, tudo na mesma tela. Só o master vê o grupo aqui (`tem_grupo_sem_acesso` esconde de quem não é). Botão "Dados compartilhados" continua (vai pra `GrupoComercialMestres`); o botão "Ver visão consolidada" foi tirado dessa tela (a página `VisaoConsolidadaGrupo` e a rota continuam existindo, só não tem mais link daqui).
 
 ## Não identificado
 - 🔴 **Achado de robustez, já detalhado acima**: remoção de membro não limpa `GrupoComercialProdutoVinculo`, causando risco real de `KeyError`/erro 500 em `listar_vinculos` se o vínculo remanescente for consultado depois da remoção.
@@ -144,4 +150,8 @@ O que existe, desde 20/09/2026, é uma **visão consolidada de leitura** da cobr
 - ❓ `transferencia_grupo_cancelamento_service.py` (cancelamento de transferência integrada) não foi lido em detalhe.
 - ❓ Não confirmado se há limite de número de membros por grupo ligado ao plano de alguma empresa — nada encontrado nos modelos/services lidos.
 - ❓ Não existe rota para o responsável transferir seu papel a outro membro, nem para excluir/encerrar um grupo inteiro — não confirmado se isso é lacuna real de produto ou decisão deliberada (grupos são pensados para não serem desfeitos).
-- ❓ `/me-multitenant` (permissões exibidas no frontend) não reflete o bypass de permissão do master — se uma permissão nova for criada no catálogo depois do `Role` do master já existir, o backend libera (bypass em `check_permission`) mas a lista de permissões devolvida ao frontend pode não mostrar a opção correspondente na UI. Não chegou a ser corrigido nesta rodada.
+- ✅ **Corrigido em 21/09/2026**: `/me-multitenant` agora reflete o bypass do master — quando `User.master_grupo_id` aponta para o grupo da loja ativa, a rota devolve a lista completa de permissões do catálogo (`app/auth/auth_multitenant_session_routes.py::get_me_multitenant`), em vez de só as permissões explicitamente atribuídas ao `Role` dele.
+
+## Privacidade e LGPD
+
+Com a existência do Grupo Comercial, dados de clientes/tutores/pets/pedidos passam a poder ser vistos, de forma consolidada, por usuários com acesso de gestão do grupo (camada 2 acima) em todas as lojas do mesmo Grupo Comercial — não só pela loja onde o cadastro foi originalmente feito. A Política de Privacidade (`frontend/src/pages/LegalPage.jsx`) foi atualizada em 21/09/2026 para deixar esse compartilhamento explícito e para registrar que o consentimento vale desde a criação da conta, já que toda empresa nasce vinculada a um Grupo Comercial (nunca é uma etapa opcional posterior de "integrar" um grupo). Ver [[Terceiros-Dados-LGPD]] para o levantamento completo de para onde os dados do sistema podem ir (não só entre lojas do grupo, mas a terceiros).

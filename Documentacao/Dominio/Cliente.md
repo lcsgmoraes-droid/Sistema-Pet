@@ -11,7 +11,7 @@ Ver [[Pet]], [[Funcionalidades]] (Pessoas/Clientes), [[Venda]], [[Tenant]], [[Em
 
 **1 [[Tenant]] = 1 loja.** Não existe, em lugar nenhum do sistema, um modelo "Loja"/"Filial"/"Unidade" separado dentro de um Tenant (confirmado por busca no código — não há nenhuma classe assim). Cada `Tenant` já **é** uma loja/empresa individual: tem seu próprio isolamento de dados via Row Level Security no Postgres, e seu próprio ciclo de contratação (`plan`/`billing_status`/módulos — ver [[Plano]]).
 
-**Cliente do CorePet com 7 lojas físicas → 7 Tenants, não 1 Tenant com 7 "lojas" dentro dele.** Cada loja vira um `Tenant` próprio, com assinatura, trial e faturamento **totalmente independentes** — confirmado: o modelo que junta lojas do mesmo grupo econômico ([[EmpresaGrupo]]) não tem nenhuma coluna de plano ou billing. As 7 lojas podem, opcionalmente, ser ligadas por um `EmpresaGrupo`, que:
+**Cliente do CorePet com 7 lojas físicas → 7 Tenants, não 1 Tenant com 7 "lojas" dentro dele.** Cada loja vira um `Tenant` próprio, com assinatura, trial e faturamento **totalmente independentes** — confirmado: o modelo que junta lojas do mesmo grupo comercial ([[EmpresaGrupo]]) não tem nenhuma coluna de plano ou billing. As 7 lojas podem, opcionalmente, ser ligadas por um `EmpresaGrupo`, que:
 - permite compartilhar **estoque de produto** seletivamente entre lojas (ver [[Produto]] para o mecanismo exato — nunca mexe em Cliente);
 - permite transferências de itens entre lojas do grupo (gera lançamento financeiro real nos dois tenants — não é "grátis");
 - **não** une nem afeta o licenciamento — as 7 lojas continuam pagando e contratando módulos cada uma por si.

@@ -21,7 +21,6 @@ from app.grupo_comercial_schemas import (
     GrupoComercialEstoqueAcessoCatalogoAtualizar,
     GrupoComercialCriar,
     GrupoComercialEstoqueCompartilhar,
-    GrupoComercialGestorConceder,
     GrupoComercialLojaAdicionar,
     GrupoComercialProdutoVincular,
 )
@@ -426,7 +425,14 @@ def adicionar_loja_ao_grupo(
 ):
     """Cria uma loja nova (mesmo usuário logado) e já anexa ao grupo — a
     forma self-service de "crescer" um grupo, sem passar por convite/código.
-    Só a empresa responsável do grupo pode chamar."""
+    Só a empresa responsável do grupo pode chamar.
+
+    `grant_trial=False`: quem chama essa rota já é cliente pagante do
+    grupo adicionando mais uma loja própria — não é aquisição de cliente
+    novo, então não ganha os 30 dias de acesso completo gratuito (decisão
+    de negócio de 21/09/2026). O onboarding assistido de ops continua
+    dando trial em todas as lojas do contrato inicial (chama o mesmo
+    `adicionar_loja` sem esse parâmetro, então mantém o padrão `True`)."""
     usuario, empresa_id = user_and_tenant
     return GrupoComercialService(db).adicionar_loja(
         grupo_id=grupo_id,
@@ -437,6 +443,7 @@ def adicionar_loja_ao_grupo(
         organization_type=payload.organization_type,
         restore_tenant_id=empresa_id,
         empresa_acionadora_id=empresa_id,
+        grant_trial=False,
     )
 
 
@@ -454,48 +461,6 @@ def remover_empresa_do_grupo(
         usuario,
         grupo_id,
         membro_empresa_id,
-    )
-
-
-@router.get("/{grupo_id}/gestores")
-@require_any_permission(PERMISSOES_CONFIG_EMPRESA)
-def listar_gestores_grupo(
-    grupo_id: int,
-    db: Session = Depends(get_session),
-    user_and_tenant=Depends(get_current_user_and_tenant),
-):
-    usuario, _empresa_id = user_and_tenant
-    return {"gestores": GrupoComercialService(db).listar_gestores(grupo_id, usuario)}
-
-
-@router.post("/{grupo_id}/gestores", status_code=status.HTTP_201_CREATED)
-@require_any_permission(PERMISSOES_CONFIG_EMPRESA)
-def conceder_gestor_grupo(
-    grupo_id: int,
-    payload: GrupoComercialGestorConceder,
-    db: Session = Depends(get_session),
-    user_and_tenant=Depends(get_current_user_and_tenant),
-):
-    """So o usuario master do grupo pode chamar - checagem dentro do
-    servico, nao depende de permissao de tenant (ver
-    GrupoComercialService.conceder_gestor)."""
-    usuario, empresa_id = user_and_tenant
-    return GrupoComercialService(db).conceder_gestor(
-        grupo_id, empresa_id, usuario, payload.user_id
-    )
-
-
-@router.delete("/{grupo_id}/gestores/{user_id}")
-@require_any_permission(PERMISSOES_CONFIG_EMPRESA)
-def revogar_gestor_grupo(
-    grupo_id: int,
-    user_id: int,
-    db: Session = Depends(get_session),
-    user_and_tenant=Depends(get_current_user_and_tenant),
-):
-    usuario, empresa_id = user_and_tenant
-    return GrupoComercialService(db).revogar_gestor(
-        grupo_id, empresa_id, usuario, user_id
     )
 
 

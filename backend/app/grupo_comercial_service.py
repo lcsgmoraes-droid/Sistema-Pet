@@ -10,7 +10,6 @@ from sqlalchemy.orm import Session
 from app.grupo_comercial_models import (
     GrupoComercial,
     GrupoComercialEstoqueCompartilhado,
-    GrupoComercialGestor,
     GrupoComercialMembro,
 )
 from app.grupo_comercial_sql import empresa_id_igual
@@ -285,135 +284,21 @@ class GrupoComercialService:
     def _e_master(self, grupo_id: int, usuario: User) -> bool:
         return usuario.master_grupo_id == grupo_id
 
-    def _e_gestor(self, grupo_id: int, user_id: int) -> bool:
-        return (
-            self.db.query(GrupoComercialGestor.id)
-            .filter(
-                GrupoComercialGestor.grupo_id == grupo_id,
-                GrupoComercialGestor.user_id == user_id,
-                GrupoComercialGestor.status == "ativo",
-            )
-            .first()
-            is not None
-        )
-
     def tem_acesso_gestao(self, grupo_id: int, usuario: User) -> bool:
-        return self._e_master(grupo_id, usuario) or self._e_gestor(
-            grupo_id, usuario.id
-        )
+        # Único papel com controle sobre o grupo é o usuário master (decisão de
+        # negócio de 21/09/2026 — o antigo acesso de "gestor" concedível a
+        # outros usuários foi eliminado; GrupoComercialGestor fica sem uso).
+        return self._e_master(grupo_id, usuario)
 
     def exigir_acesso_gestao(self, grupo_id: int, usuario: User) -> None:
         if not self.tem_acesso_gestao(grupo_id, usuario):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail=(
-                    "Você não tem acesso à gestão deste grupo comercial. "
-                    "Peça para o responsável do grupo liberar seu acesso."
+                    "Somente o usuário master deste grupo comercial pode fazer isso. "
+                    "Fale com a equipe CorePet se precisar de ajuda."
                 ),
             )
-
-    def listar_gestores(self, grupo_id: int, usuario: User) -> list[dict]:
-        self.exigir_acesso_gestao(grupo_id, usuario)
-        linhas = (
-            self.db.query(GrupoComercialGestor, User)
-            .join(User, User.id == GrupoComercialGestor.user_id)
-            .filter(
-                GrupoComercialGestor.grupo_id == grupo_id,
-                GrupoComercialGestor.status == "ativo",
-            )
-            .order_by(User.nome.asc())
-            .all()
-        )
-        return [
-            {
-                "user_id": gestor.user_id,
-                "nome": alvo.nome or alvo.email or alvo.username,
-                "email": alvo.email,
-                "concedido_em": gestor.concedido_em,
-            }
-            for gestor, alvo in linhas
-        ]
-
-    def conceder_gestor(
-        self, grupo_id: int, empresa_id, master: User, user_id: int
-    ) -> dict:
-        empresa_id = self._empresa_id(empresa_id)
-        if not self._e_master(grupo_id, master):
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Somente o usuário master do grupo pode conceder este acesso.",
-            )
-        self._grupo_ativo(grupo_id)
-        alvo = self.db.query(User).filter(User.id == user_id).first()
-        if alvo is None:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, detail="Usuário não encontrado."
-            )
-        gestor = (
-            self.db.query(GrupoComercialGestor)
-            .filter(
-                GrupoComercialGestor.grupo_id == grupo_id,
-                GrupoComercialGestor.user_id == user_id,
-            )
-            .first()
-        )
-        if gestor is None:
-            gestor = GrupoComercialGestor(
-                grupo_id=grupo_id,
-                user_id=user_id,
-                concedido_por_user_id=master.id,
-                status="ativo",
-            )
-            self.db.add(gestor)
-        else:
-            gestor.status = "ativo"
-            gestor.concedido_por_user_id = master.id
-            gestor.concedido_em = self.agora
-            gestor.revogado_em = None
-        self._auditar(
-            empresa_id=empresa_id,
-            usuario_id=master.id,
-            evento="grupo_comercial_gestor_concedido",
-            grupo_id=grupo_id,
-            metadados={"user_id": user_id},
-        )
-        self.db.commit()
-        return {"mensagem": "Acesso de gestão concedido.", "user_id": user_id}
-
-    def revogar_gestor(
-        self, grupo_id: int, empresa_id, master: User, user_id: int
-    ) -> dict:
-        empresa_id = self._empresa_id(empresa_id)
-        if not self._e_master(grupo_id, master):
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Somente o usuário master do grupo pode revogar este acesso.",
-            )
-        gestor = (
-            self.db.query(GrupoComercialGestor)
-            .filter(
-                GrupoComercialGestor.grupo_id == grupo_id,
-                GrupoComercialGestor.user_id == user_id,
-                GrupoComercialGestor.status == "ativo",
-            )
-            .first()
-        )
-        if gestor is None:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Este usuário não tem acesso de gestão neste grupo.",
-            )
-        gestor.status = "revogado"
-        gestor.revogado_em = self.agora
-        self._auditar(
-            empresa_id=empresa_id,
-            usuario_id=master.id,
-            evento="grupo_comercial_gestor_revogado",
-            grupo_id=grupo_id,
-            metadados={"user_id": user_id},
-        )
-        self.db.commit()
-        return {"mensagem": "Acesso de gestão revogado.", "user_id": user_id}
 
     def adicionar_loja(
         self,
@@ -427,6 +312,7 @@ class GrupoComercialService:
         restore_tenant_id=None,
         empresa_acionadora_id: str | None = None,
         commit: bool = True,
+        grant_trial: bool = True,
     ) -> dict:
         """Provisiona uma loja nova e a anexa direto neste grupo, como
         `membro` — sem passar pelo fluxo de convite/código, porque é o
@@ -440,6 +326,14 @@ class GrupoComercialService:
         autenticada por tenant). Quando `None`, pula essa checagem — uso do
         onboarding assistido de ops, que já se autoriza via admin de
         plataforma, não via sessão de tenant.
+
+        `grant_trial`: repassado direto pra `provision_tenant`. O
+        onboarding assistido de ops mantém o padrão `True` (são clientes
+        novos, todas as lojas do contrato inicial ganham o teste completo).
+        A rota self-service (`POST /{grupo_id}/lojas`) passa `False`
+        explicitamente — quem já é cliente pagante adicionando mais uma
+        loja ao próprio grupo não deve ganhar os 30 dias de acesso completo
+        gratuito de um cliente novo (decisão de negócio de 21/09/2026).
         """
         grupo = self._grupo_ativo(grupo_id, travar=True)
         if empresa_acionadora_id is not None:
@@ -463,6 +357,7 @@ class GrupoComercialService:
             organization_type=resolved_organization_type,
             user=usuario,
             restore_tenant_id=restore_tenant_id,
+            grant_trial=grant_trial,
         )
         # provision_tenant ja restaurou o contexto pro tenant chamador (ou
         # limpou, se nao houver) — mas o insert do membro e a auditoria
@@ -568,6 +463,5 @@ class GrupoComercialService:
             "versao_membros": grupo.versao_membros,
             "criado_em": grupo.criado_em,
             "sou_master": self._e_master(grupo.id, usuario),
-            "sou_gestor": self.tem_acesso_gestao(grupo.id, usuario),
             "membros": self._serializar_membros(grupo.id),
         }

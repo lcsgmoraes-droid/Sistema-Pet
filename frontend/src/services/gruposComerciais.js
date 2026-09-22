@@ -167,23 +167,3 @@ export async function sincronizarBillingLojaGrupo(grupoId, tenantId) {
   return data;
 }
 
-export async function listarGestoresGrupo(grupoId) {
-  const { data } = await api.get(`/grupos-comerciais/${grupoId}/gestores`);
-  return data.gestores;
-}
-
-/**
- * Concede acesso à gestão do grupo (ver/gerenciar lojas, ver cobrança) a
- * outro usuário — só o usuário master do grupo pode chamar isso.
- */
-export async function concederGestorGrupo(grupoId, userId) {
-  const { data } = await api.post(`/grupos-comerciais/${grupoId}/gestores`, {
-    user_id: userId,
-  });
-  return data;
-}
-
-export async function revogarGestorGrupo(grupoId, userId) {
-  const { data } = await api.delete(`/grupos-comerciais/${grupoId}/gestores/${userId}`);
-  return data;
-}

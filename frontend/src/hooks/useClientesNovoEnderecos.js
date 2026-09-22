@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { confirmarCorePet } from "../services/corepetDialog";
 
 const createEnderecoVazio = () => ({
   tipo: "entrega",
@@ -80,10 +79,8 @@ export function useClientesNovoEnderecos() {
     fecharModalEndereco();
   };
 
-  const removerEndereco = async (index) => {
-    if (await confirmarCorePet("Deseja realmente remover este endereco?")) {
-      setEnderecosAdicionais((prev) => prev.filter((_, i) => i !== index));
-    }
+  const removerEndereco = (index) => {
+    setEnderecosAdicionais((prev) => prev.filter((_, i) => i !== index));
   };
 
   return {

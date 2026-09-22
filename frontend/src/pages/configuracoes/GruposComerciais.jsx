@@ -1,29 +1,32 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
+import { MessageCircle } from "lucide-react";
 import {
-  FiBarChart2,
+  FiAlertTriangle,
+  FiCheckCircle,
   FiChevronLeft,
   FiGrid,
   FiLink,
-  FiPlusCircle,
   FiTrash2,
   FiUsers,
 } from "react-icons/fi";
 import ActionButton from "../../components/ui/ActionButton";
 import EmptyState from "../../components/ui/EmptyState";
-import { TextField } from "../../components/ui/FormField";
 import LoadingState from "../../components/ui/LoadingState";
-import ModuleTabs from "../../components/ui/ModuleTabs";
 import PageHeader from "../../components/ui/PageHeader";
 import Panel from "../../components/ui/Panel";
 import StatusBadge from "../../components/ui/StatusBadge";
-import { adicionarLojaGrupo, obterResumoGruposComerciais, removerEmpresaGrupo } from "../../services/gruposComerciais";
+import LinkPadrao from "../../components/v2/LinkPadrao/LinkPadrao";
+import {
+  listarBillingGrupo,
+  obterResumoGruposComerciais,
+  removerEmpresaGrupo,
+  sincronizarBillingLojaGrupo,
+} from "../../services/gruposComerciais";
 import { confirmarCorePet } from "../../services/corepetDialog";
-import { useAuth } from "../../contexts/AuthContext";
+import { buildSalesContactUrl } from "../../data/publicPlans";
 import EstoqueCompartilhadoGrupo from "./EstoqueCompartilhadoGrupo";
-import GrupoComercialAcessos from "./GrupoComercialAcessos";
-import GrupoComercialCobranca from "./GrupoComercialCobranca";
 
 const resumoVazio = {
   empresa_atual_id: null,
@@ -31,92 +34,175 @@ const resumoVazio = {
   tem_grupo_sem_acesso: false,
 };
 
+const STATUS_COBRANCA = {
+  active: { label: "Adimplente", intent: "success" },
+  trial: { label: "Em teste", intent: "info" },
+  pending: { label: "Pendente", intent: "warning" },
+  past_due: { label: "Inadimplente", intent: "danger" },
+  blocked: { label: "Bloqueada", intent: "danger" },
+  refunded: { label: "Estornada", intent: "neutral" },
+  canceled: { label: "Cancelada", intent: "neutral" },
+};
+
+const TIPO_COBRANCA = {
+  BOLETO: "Boleto",
+  PIX: "Pix",
+  UNDEFINED: "Não definido",
+};
+
+// Só faz sentido oferecer "verificar pendência" quando existe, de fato, algo em
+// aberto pra checar — nos demais status (em dia, em teste, encerrada) não há
+// boleto pendente algum pra rebuscar no Asaas.
+const STATUS_COM_PENDENCIA = new Set(["pending", "past_due", "blocked"]);
+
 function mensagemErro(error, padrao) {
   return error?.response?.data?.detail || padrao;
 }
 
-function GrupoComercialPainel({
-  acao,
-  empresaAtualId,
-  executar,
-  grupo,
-  navigate,
-  onRemover,
-  podeAnalisarGrupo,
-}) {
-  const [aba, setAba] = useState("membros");
-  const [nomeNovaLoja, setNomeNovaLoja] = useState("");
+function formatarData(value) {
+  if (!value) return "-";
+  return new Intl.DateTimeFormat("pt-BR").format(new Date(`${value}T00:00:00`));
+}
 
-  const abas = [
-    { id: "membros", label: "Lojas do grupo" },
-    { id: "cobranca", label: "Cobrança" },
-    ...(grupo.sou_master ? [{ id: "acessos", label: "Acessos do grupo" }] : []),
-  ];
+function GrupoComercialPainel({ acao, empresaAtualId, grupo, navigate, onRemover }) {
+  const [billingPorEmpresa, setBillingPorEmpresa] = useState({});
+  const [carregandoBilling, setCarregandoBilling] = useState(true);
+  const [sincronizando, setSincronizando] = useState("");
 
-  function handleAdicionarLoja(event) {
-    event.preventDefault();
-    const nome = nomeNovaLoja.trim();
-    if (nome.length < 2) {
-      toast.error("Informe o nome da nova loja.");
-      return;
+  useEffect(() => {
+    let ativo = true;
+    setCarregandoBilling(true);
+    listarBillingGrupo(grupo.id)
+      .then((data) => {
+        if (!ativo) return;
+        const mapa = {};
+        (data.lojas || []).forEach((loja) => {
+          mapa[loja.tenant_id] = loja;
+        });
+        setBillingPorEmpresa(mapa);
+      })
+      .catch((error) => {
+        toast.error(mensagemErro(error, "Não foi possível carregar a cobrança das lojas."));
+      })
+      .finally(() => {
+        if (ativo) setCarregandoBilling(false);
+      });
+    return () => {
+      ativo = false;
+    };
+  }, [grupo.id]);
+
+  async function sincronizar(tenantId) {
+    setSincronizando(tenantId);
+    try {
+      const atualizada = await sincronizarBillingLojaGrupo(grupo.id, tenantId);
+      setBillingPorEmpresa((atual) => ({ ...atual, [tenantId]: atualizada }));
+      toast.success("Cobrança atualizada.");
+    } catch (error) {
+      toast.error(mensagemErro(error, "Não foi possível atualizar a cobrança desta loja."));
+    } finally {
+      setSincronizando("");
     }
-    executar(
-      `adicionar-loja-${grupo.id}`,
-      async () => {
-        await adicionarLojaGrupo(grupo.id, { nomeLoja: nome });
-        setNomeNovaLoja("");
-      },
-      "Loja criada e adicionada ao grupo.",
-    );
   }
 
   return (
     <Panel
       title={grupo.nome}
       actions={
-        <div className="flex flex-wrap items-center gap-2">
-          <StatusBadge intent={grupo.sou_master ? "purple" : "info"}>
-            {grupo.sou_master ? "Master" : "Gestor"}
-          </StatusBadge>
-          <ActionButton
-            icon={FiGrid}
-            intent="success"
-            tone="outline"
-            onClick={() => navigate(`/configuracoes/grupos-comerciais/${grupo.id}/mestres`)}
-          >
-            Dados compartilhados
-          </ActionButton>
-          {podeAnalisarGrupo ? (
-            <ActionButton
-              icon={FiBarChart2}
-              intent="info"
-              tone="outline"
-              onClick={() => navigate(`/configuracoes/grupos-comerciais/${grupo.id}/visao-consolidada`)}
-            >
-              Ver visão consolidada
-            </ActionButton>
-          ) : null}
-        </div>
+        <ActionButton
+          icon={FiGrid}
+          intent="success"
+          tone="outline"
+          onClick={() => navigate(`/configuracoes/grupos-comerciais/${grupo.id}/mestres`)}
+        >
+          Dados compartilhados
+        </ActionButton>
       }
     >
-      <ModuleTabs active={aba} onChange={setAba} tabs={abas} className="mb-4" />
+      <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-5">
+        <div className="flex items-center gap-3">
+          <div className="flex-none rounded-md bg-emerald-100 p-2 text-emerald-700">
+            <MessageCircle className="h-5 w-5" aria-hidden="true" />
+          </div>
+          <h3 className="text-sm font-bold text-emerald-900">Adicionar nova loja ao grupo</h3>
+        </div>
+        <p className="mt-3 max-w-2xl text-sm leading-6 text-emerald-900">
+          Nossa equipe cuida da configuração da loja nova com você — funcionalidades, ajustes da
+          operação e integração com as demais lojas do grupo, tudo já pronto pra usar desde o
+          primeiro dia.
+        </p>
+        <div className="mt-4">
+          <LinkPadrao
+            href={buildSalesContactUrl(
+              `Olá! Quero adicionar uma nova loja ao grupo "${grupo.nome}" no CorePet.`,
+            )}
+            novaJanela
+            tamanho="text-sm font-bold"
+          >
+            Falar com a equipe sobre uma nova loja
+          </LinkPadrao>
+        </div>
+      </div>
 
-      {aba === "membros" ? (
-        <div className="grid gap-5 lg:grid-cols-[1fr_0.9fr]">
-          <div>
-            <h3 className="text-sm font-semibold text-slate-800">Lojas participantes</h3>
-            <div className="mt-2 divide-y divide-slate-100 rounded-lg border border-slate-200">
-              {grupo.membros.map((membro) => (
-                <div
-                  key={membro.empresa_id}
-                  className="flex items-center justify-between gap-3 px-3 py-2.5"
-                >
-                  <div>
-                    <div className="text-sm font-medium text-slate-900">{membro.empresa_nome}</div>
-                    <div className="text-xs text-slate-500">
+      <div className="mt-5">
+        <h3 className="text-sm font-semibold text-slate-800">Lojas participantes</h3>
+        <div className="mt-2 divide-y divide-slate-100 rounded-lg border border-slate-200">
+          {grupo.membros.map((membro) => {
+            const billing = billingPorEmpresa[membro.empresa_id];
+            const status = billing
+              ? STATUS_COBRANCA[billing.billing_status] || {
+                  label: billing.billing_status || "Sem informação",
+                  intent: "neutral",
+                }
+              : null;
+
+            return (
+              <div
+                key={membro.empresa_id}
+                className="flex flex-col gap-3 px-3 py-3 sm:flex-row sm:items-center sm:justify-between"
+              >
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-sm font-medium text-slate-900">
+                      {membro.empresa_nome}
+                    </span>
+                    <span className="text-xs text-slate-500">
                       {membro.papel === "responsavel" ? "Loja responsável" : "Loja do grupo"}
-                    </div>
+                    </span>
+                    {status ? <StatusBadge intent={status.intent}>{status.label}</StatusBadge> : null}
                   </div>
+                  <div className="mt-0.5 text-xs text-slate-500">
+                    {carregandoBilling
+                      ? "Carregando cobrança..."
+                      : billing
+                        ? `${TIPO_COBRANCA[billing.billing_type] || "Não definido"} · Próxima cobrança: ${formatarData(billing.next_due_date)}`
+                        : "Cobrança não disponível"}
+                  </div>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  {billing?.checkout_url ? (
+                    <LinkPadrao href={billing.checkout_url} novaJanela tamanho="text-sm">
+                      Ver boleto/fatura
+                    </LinkPadrao>
+                  ) : null}
+                  {billing && STATUS_COM_PENDENCIA.has(billing.billing_status) ? (
+                    <ActionButton
+                      icon={FiAlertTriangle}
+                      intent="warning"
+                      tone="outline"
+                      size="sm"
+                      title="Busca o boleto/fatura mais recente desta loja direto no Asaas"
+                      loading={sincronizando === membro.empresa_id}
+                      onClick={() => sincronizar(membro.empresa_id)}
+                    >
+                      Verificar pendência financeira
+                    </ActionButton>
+                  ) : billing?.billing_status === "active" ? (
+                    <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-700">
+                      <FiCheckCircle aria-hidden="true" />
+                      Pagamento em dia
+                    </span>
+                  ) : null}
                   {membro.papel !== "responsavel" ? (
                     <ActionButton
                       icon={FiTrash2}
@@ -130,39 +216,11 @@ function GrupoComercialPainel({
                     </ActionButton>
                   ) : null}
                 </div>
-              ))}
-            </div>
-          </div>
-
-          <div>
-            <h3 className="text-sm font-semibold text-slate-800">Adicionar nova loja ao grupo</h3>
-            <p className="mt-1 text-xs text-slate-500">
-              Cria uma loja nova, com seu próprio login, já dentro deste grupo.
-            </p>
-            <form className="mt-2 flex flex-col gap-2 sm:flex-row sm:items-end" onSubmit={handleAdicionarLoja}>
-              <TextField
-                className="min-w-0 flex-1"
-                value={nomeNovaLoja}
-                onChange={setNomeNovaLoja}
-                placeholder="Nome da nova loja"
-                maxLength={150}
-              />
-              <ActionButton
-                type="submit"
-                icon={FiPlusCircle}
-                intent="success"
-                loading={acao === `adicionar-loja-${grupo.id}`}
-              >
-                Adicionar loja
-              </ActionButton>
-            </form>
-          </div>
+              </div>
+            );
+          })}
         </div>
-      ) : null}
-
-      {aba === "cobranca" ? <GrupoComercialCobranca grupoId={grupo.id} /> : null}
-
-      {aba === "acessos" && grupo.sou_master ? <GrupoComercialAcessos grupoId={grupo.id} /> : null}
+      </div>
 
       <EstoqueCompartilhadoGrupo empresaAtualId={empresaAtualId} grupo={grupo} />
     </Panel>
@@ -171,16 +229,9 @@ function GrupoComercialPainel({
 
 export default function GruposComerciais() {
   const navigate = useNavigate();
-  const { user } = useAuth();
   const [resumo, setResumo] = useState(resumoVazio);
   const [carregando, setCarregando] = useState(true);
   const [acao, setAcao] = useState("");
-  const permissoes = user?.permissions || [];
-  const podeAnalisarGrupo =
-    user?.role?.name?.toLowerCase() === "admin" ||
-    ["relatorios.gerencial", "relatorios.financeiro"].some((permissao) =>
-      permissoes.includes(permissao),
-    );
 
   const carregar = useCallback(async () => {
     try {
@@ -237,7 +288,7 @@ export default function GruposComerciais() {
       <PageHeader
         icon={FiUsers}
         title="Grupos Comerciais"
-        subtitle="Toda loja já nasce dentro de um grupo comercial. Adicione novas lojas suas direto aqui."
+        subtitle="Veja as lojas do seu grupo, os dados compartilhados entre elas e a situação de cobrança de cada uma."
       />
 
       <div className="space-y-4">
@@ -246,12 +297,12 @@ export default function GruposComerciais() {
             icon={FiLink}
             title={
               resumo.tem_grupo_sem_acesso
-                ? "Você não tem acesso à gestão deste grupo"
+                ? "Só o usuário master deste grupo vê esta tela"
                 : "Nenhum grupo encontrado"
             }
             description={
               resumo.tem_grupo_sem_acesso
-                ? "Peça para o responsável do seu grupo comercial liberar seu acesso nesta tela."
+                ? "Fale com o usuário master do seu grupo comercial, ou com a equipe CorePet, se precisar de algo aqui."
                 : "Fale com o suporte se você acredita que sua loja deveria ter um grupo comercial."
             }
           />
@@ -261,11 +312,9 @@ export default function GruposComerciais() {
               key={grupo.id}
               acao={acao}
               empresaAtualId={resumo.empresa_atual_id}
-              executar={executar}
               grupo={grupo}
               navigate={navigate}
               onRemover={handleRemover}
-              podeAnalisarGrupo={podeAnalisarGrupo}
             />
           ))
         )}

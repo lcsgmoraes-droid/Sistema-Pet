@@ -13,10 +13,6 @@ class GrupoComercialCriar(BaseModel):
         return nome
 
 
-class GrupoComercialGestorConceder(BaseModel):
-    user_id: int = Field(gt=0)
-
-
 class GrupoComercialLojaAdicionar(BaseModel):
     """Provisiona uma loja nova e a anexa direto neste grupo, como membro —
     sem convite/código, porque é o mesmo dono legal adicionando outra loja

@@ -7,7 +7,10 @@ e no onboarding assistido feito por ops (`POST /admin/grupos-comerciais/onboardi
 
 Os campos de billing/plano/trial (`plan`, `billing_status`, `trial_started_at`,
 `trial_ends_at`, `subscription_source`) sao definidos exatamente como no
-cadastro publico de hoje — este modulo nao muda esse comportamento.
+cadastro publico de hoje, EXCETO quando `grant_trial=False` — usado pela loja
+adicionada a um grupo comercial ja existente (`GrupoComercialService.adicionar_loja`),
+que nao deve ganhar os 30 dias de acesso completo gratuito de um cliente novo
+(decisao de negocio de 21/09/2026).
 
 Controle de transacao (`commit`/`rollback`) e responsabilidade de quem chama,
 nao desta funcao — isso permite que o onboarding assistido crie N tenants
@@ -62,6 +65,7 @@ def provision_tenant(
     new_user_nome: str | None = None,
     new_user_email_verified: bool = True,
     restore_tenant_id: uuid.UUID | None = None,
+    grant_trial: bool = True,
 ) -> TenantProvisioningResult:
     """Cria um Tenant novo com toda a estrutura inicial (papel admin, perfis
     operacionais padrao, dados de onboarding) e o vincula a um usuario.
@@ -77,6 +81,14 @@ def provision_tenant(
     ja autenticada num tenant existente (adicionar loja ao proprio grupo).
     Se ``None``, o contexto e limpo no final (comportamento do cadastro
     publico, que nao tem "tenant chamador" para restaurar).
+
+    ``grant_trial``: quando ``False``, o tenant nasce com ``billing_status``
+    ``"pending"`` e sem ``trial_started_at``/``trial_ends_at`` — sem os 30
+    dias de acesso completo gratuito. Usado quando quem esta criando a loja
+    ja e cliente pagante adicionando mais uma loja ao proprio grupo, nao um
+    cliente novo sendo adquirido. Os modulos/recursos premium do plano
+    escolhido so liberam depois que a assinatura for de fato ativada (mesmo
+    caminho ja usado hoje por um tenant com trial expirado).
     """
     if user is None and not (new_user_email and new_user_password):
         raise ValueError(
@@ -85,15 +97,17 @@ def provision_tenant(
         )
 
     tenant_id = uuid.uuid4()
-    trial_started_at = _now_utc()
+    trial_started_at = _now_utc() if grant_trial else None
     tenant = Tenant(
         id=str(tenant_id),
         name=tenant_name,
         status="active",
         plan=plan_code,
-        billing_status="trial",
+        billing_status="trial" if grant_trial else "pending",
         trial_started_at=trial_started_at,
-        trial_ends_at=trial_started_at + timedelta(days=DEFAULT_TRIAL_DAYS),
+        trial_ends_at=(
+            trial_started_at + timedelta(days=DEFAULT_TRIAL_DAYS) if grant_trial else None
+        ),
         subscription_source="manual",
         organization_type=organization_type,
     )

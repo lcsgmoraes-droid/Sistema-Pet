@@ -2,6 +2,7 @@ import { Navigate, Route } from "react-router-dom";
 import ProtectedRoute from "../../components/ProtectedRoute";
 import {
   ClienteFinanceiro,
+  ClientePessoaEditar,
   ClienteTimelinePage,
   DashboardFinanceiro,
   GerenciamentoPets,
@@ -35,6 +36,14 @@ export function createCoreProtectedRoutes() {
         element={
           <ProtectedRoute permission="clientes.visualizar">
             <Pessoas />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="clientes/:clienteId/editar"
+        element={
+          <ProtectedRoute permission="clientes.visualizar">
+            <ClientePessoaEditar />
           </ProtectedRoute>
         }
       />

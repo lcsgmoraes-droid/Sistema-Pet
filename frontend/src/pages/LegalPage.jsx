@@ -11,8 +11,8 @@ const legalContent = {
   termos: {
     title: "Termos de Uso",
     eyebrow: "Contrato de uso da plataforma",
-    version: "Versao 2026-09-14",
-    updatedAt: "14/09/2026",
+    version: "Versao 2026-09-21",
+    updatedAt: "21/09/2026",
     intro:
       "Estes Termos regulam o acesso e o uso do CorePet, plataforma de gestao, vendas, estoque, financeiro, entregas, atendimento, loja online, aplicativo e integracoes para operacoes de pet shop, clinica, banho e tosa e negocios relacionados.",
     sections: [
@@ -42,6 +42,7 @@ const legalContent = {
           "O administrador deve remover ou bloquear usuarios que nao devem mais acessar a plataforma.",
           "A empresa e responsavel pelos dados inseridos por seus usuarios, colaboradores, clientes, canais e integracoes.",
           "O compartilhamento de senhas, tokens ou acessos pessoais e proibido.",
+          "Toda empresa cadastrada ja nasce vinculada a um Grupo Comercial, mesmo quando e a unica loja dele. Participar de um Grupo Comercial nao e uma etapa posterior e opcional de adesao: e parte da propria criacao da conta, com as consequencias de compartilhamento de dados descritas na Politica de Privacidade.",
         ],
       },
       {
@@ -191,8 +192,8 @@ const legalContent = {
   privacidade: {
     title: "Politica de Privacidade",
     eyebrow: "Protecao de dados pessoais",
-    version: "Versao 2026-09-14",
-    updatedAt: "14/09/2026",
+    version: "Versao 2026-09-21",
+    updatedAt: "21/09/2026",
     intro:
       "Esta Politica explica quais dados pessoais podem ser tratados no CorePet, para quais finalidades, com quais justificativas legais, com quem podem ser compartilhados, por quanto tempo podem ser mantidos e como o titular pode exercer seus direitos.",
     sections: [
@@ -213,6 +214,7 @@ const legalContent = {
           "Nessas operacoes, o CorePet atua como operador para hospedar, processar, proteger, auditar, dar suporte e disponibilizar as funcionalidades contratadas, seguindo as instrucoes da empresa controladora.",
           "O CorePet atua como controlador dos dados necessarios a cadastro e administracao da conta SaaS, cobranca da assinatura, seguranca da plataforma, prevencao a fraude, suporte, auditoria e defesa de direitos.",
           "Clientes finais podem exercer direitos tanto perante a loja responsavel pelo atendimento quanto pelo canal de privacidade informado nesta Politica, conforme o caso.",
+          "Toda empresa cadastrada ja nasce vinculada a um Grupo Comercial (um conjunto de lojas sob a mesma administracao, ainda que seja apenas a propria loja). Por isso, desde a criacao da conta, o cadastro ja inclui o consentimento para que os dados tratados por uma loja sejam tambem usados pelas demais lojas do mesmo Grupo Comercial, para as finalidades desta Politica — isso vale para dados de identificacao e tambem para dados operacionais e indicadores agregados (como pedidos, vendas e situacao financeira), visiveis a usuarios com acesso de gestao do grupo. Esse compartilhamento nao depende de uma etapa posterior de 'integrar' ou 'aderir' a um grupo, porque nenhuma loja existe fora de um Grupo Comercial.",
         ],
       },
       {
@@ -234,6 +236,9 @@ const legalContent = {
           "Informacoes veterinarias ou de saude podem exigir cuidado adicional e devem ser usadas somente por usuarios autorizados e para finalidades compativeis.",
           "Dados de entrega, como endereco, referencia, rota, status, entregador, comprovantes e ocorrencias.",
           "Durante uma rota ativa, o app do entregador pode coletar localizacao precisa, data e hora e deslocamento para permitir o acompanhamento pela loja e pelo cliente vinculado. A coleta comeca quando o entregador confirma Iniciar Rota, pode continuar com o app minimizado ou a tela bloqueada e para quando a rota e finalizada ou cancelada.",
+          "Alem dessa coleta continua, o app do entregador tambem pode capturar a localizacao do dispositivo em dois momentos pontuais e opcionais — ao confirmar o inicio da rota e ao marcar cada parada como entregue — para registrar onde a rota comecou e onde cada entrega foi concluida. Se a permissao de localizacao nao for concedida ou a captura nao responder a tempo, a acao segue normalmente sem essas coordenadas.",
+          "O aplicativo tambem pode solicitar localizacao aproximada do dispositivo, de forma pontual e mediante autorizacao do usuario, para sugerir a loja mais proxima na tela de selecao de loja — uso diferente e independente da localizacao continua do entregador durante uma rota, descrita acima.",
+          "Quando a loja participa de um Grupo Comercial, dados de clientes, tutores, pets, pedidos e indicadores operacionais podem ser vistos de forma consolidada por usuarios com acesso de gestao do grupo, nas demais lojas do mesmo Grupo Comercial, alem da loja onde o cadastro foi originalmente feito (ver secao 2).",
         ],
       },
       {
@@ -271,12 +276,12 @@ const legalContent = {
         bullets: [
           "Conta e autenticacao — nome, e-mail, telefone, empresa, perfil, permissoes, senha protegida, IP e dados do dispositivo sao usados para criar e administrar a conta, autenticar, recuperar acesso e proteger a sessao. Bases normalmente aplicaveis: procedimentos preliminares e execucao de contrato; legitimo interesse e prevencao a fraude para seguranca, conforme avaliacao do caso.",
           "Assinatura e cobranca do CorePet — dados da empresa, representante, contato de cobranca, plano, faturas e status de pagamento sao usados para contratar, cobrar, prestar suporte financeiro e comprovar a relacao. Bases normalmente aplicaveis: execucao de contrato, obrigacao legal ou regulatoria e exercicio regular de direitos.",
-          "Clientes, tutores, pets e operacao da loja — cadastros, pedidos, vendas, agendamentos, atendimentos, entregas e historicos sao usados pela empresa cadastrada para prestar seus servicos. A empresa define a base legal aplicavel; o CorePet realiza o processamento necessario para executar o contrato SaaS e as instrucoes da controladora.",
+          "Clientes, tutores, pets e operacao da loja — cadastros, pedidos, vendas, agendamentos, atendimentos, entregas e historicos sao usados pela empresa cadastrada para prestar seus servicos. A empresa define a base legal aplicavel; o CorePet realiza o processamento necessario para executar o contrato SaaS e as instrucoes da controladora. Quando a empresa integra um Grupo Comercial, essa mesma base cobre o uso consolidado desses dados pelas demais lojas do grupo, conforme detalhado na secao 2.",
           "Dados fiscais, financeiros e de credito — documentos, pagamentos, parcelas, debitos, conciliacoes e registros transacionais sao usados para executar operacoes, cumprir deveres fiscais e contabeis, cobrar e defender direitos. Bases normalmente aplicaveis: contrato, obrigacao legal ou regulatoria, protecao do credito e exercicio regular de direitos.",
           "Comunicacoes — e-mail, telefone, WhatsApp, SMS e push podem ser usados para confirmacao de conta, pedido, entrega, cobranca, seguranca e suporte com base no contrato, obrigacao aplicavel ou interesse legitimo avaliado. Comunicacoes promocionais dependem de consentimento ou de outra base previamente documentada pela controladora e sempre devem oferecer oposicao ou descadastro quando aplicavel.",
           "Localizacao de entrega — a posicao do entregador, data, hora e deslocamento sao usados somente durante a rota ativa para executar, acompanhar e comprovar a entrega. A empresa responsavel pela rota deve informar seus colaboradores e definir a base adequada; o CorePet nao usa essa localizacao para publicidade.",
           "Logs, cookies e seguranca — IP, user-agent, sessao, rota acessada e eventos tecnicos sao usados para funcionamento, auditoria, suporte, prevencao a fraude e seguranca. Cookies necessarios acompanham a prestacao do servico; analytics ou marketing nao essenciais dependem da escolha e da base legal aplicavel.",
-          "IA e integracoes opcionais — recebem apenas o contexto necessario ao recurso solicitado e seguem a mesma finalidade e base legal do processo de origem. Habilitar uma integracao nao autoriza reutilizacao dos dados para finalidade incompativel.",
+          "IA e integracoes opcionais — recebem apenas o contexto necessario ao recurso solicitado, seguem a mesma finalidade e base legal do processo de origem, e sao limitadas ao estritamente necessario para o funcionamento da ferramenta contratada (por exemplo, dados de pagamento enviados a Asaas ou Mercado Pago apenas para processar a cobranca ou o pedido). Habilitar uma integracao nao autoriza reutilizacao dos dados para finalidade incompativel.",
           "Solicitacoes de titulares — identificacao, contato, pedido e evidencia da resposta sao usados para verificar identidade, atender direitos e comprovar o atendimento. Bases normalmente aplicaveis: obrigacao legal ou regulatoria e exercicio regular de direitos.",
         ],
       },
@@ -298,12 +303,15 @@ const legalContent = {
         bullets: [
           "Infraestrutura — DigitalOcean pode hospedar a aplicacao e o banco de dados; armazenamento ou backup S3 compativel, inclusive Cloudflare R2 quando configurado, pode receber arquivos e copias protegidas.",
           "Cobranca da assinatura CorePet — Asaas pode receber identificacao da empresa, contato de cobranca, valor, vencimento, identificadores e status da cobranca.",
-          "Pagamentos do e-commerce — Mercado Pago e, em fluxos legados ou condicionais, Pagar.me podem receber dados do pedido, pagador, valor, meio e resultado da transacao quando a loja habilitar o recurso.",
+          "Pagamentos do e-commerce — Mercado Pago e, em fluxos legados ou condicionais, Pagar.me podem receber dados do pedido (incluindo endereco de entrega quando houver), pagador, valor, meio e resultado da transacao quando a loja habilitar o recurso.",
           "Operacao, marketplace e fiscal — Bling, iFood, SEFAZ, IntNFe e EcommerceAI podem receber ou devolver produtos, estoque, pedidos, documentos e identificadores fiscais quando a empresa conectar cada integracao.",
           "Comunicacoes — WhatsApp e o ecossistema Meta, 360dialog, WAHA e o provedor SMTP configurado, como Google/Gmail, podem processar contatos, conteudo e metadados das mensagens necessarias ao canal habilitado.",
           "Notificacoes do app — Expo Push e os servicos de entrega da Apple e do Google podem processar token do dispositivo, plataforma e conteudo minimo da notificacao.",
           "Mapas e rotas — Google Maps pode receber enderecos, coordenadas e parametros de rota necessarios a geocodificacao, distancia e acompanhamento da entrega.",
-          "Inteligencia artificial — OpenAI pode receber o contexto minimo enviado a recursos opcionais de IA. Usuarios nao devem inserir senhas, segredos, documentos completos ou dados pessoais desnecessarios nos prompts.",
+          "Inteligencia artificial — conforme a chave configurada pelo CorePet, recursos opcionais de IA (assistente do caixa/PDV, copiloto clinico veterinario, leitura de exame por imagem, atendimento por WhatsApp) podem enviar o contexto necessario a resposta solicitada a um dos provedores OpenAI, Groq ou Google (Gemini). Esse contexto pode incluir CPF/CNPJ e telefone do cliente e, no assistente clinico veterinario, tambem alergias, doencas cronicas, medicamentos em uso e historico clinico do pet. Usuarios nao devem inserir senhas, segredos, documentos completos ou dados pessoais desnecessarios nos prompts.",
+          "Medicao de uso da loja online — quando ativado, o Google Analytics pode receber IP, identificador de navegador/cookie, paginas visitadas, termo de busca e eventos de navegacao e compra da loja online, incluindo o identificador do pedido; nao e usado no ambiente administrativo (ERP).",
+          "Recursos carregados direto do navegador — fontes (Google Fonts), consulta de CEP (ViaCEP), consulta de CNPJ (BrasilAPI) e mapas de rastreio publico de entrega (OpenStreetMap) podem ser buscados pelo proprio navegador do usuario diretamente do site do fornecedor, sem passar pelo servidor do CorePet; nesses casos o fornecedor pode registrar o IP e o navegador de quem acessa.",
+          "Atualizacoes do aplicativo — o aplicativo movel verifica e recebe atualizacoes diretamente dos servidores da Expo (EAS Update), o que pode incluir identificador do dispositivo e versao instalada.",
           "A posicao da rota ativa pode ser exibida a usuarios autorizados da loja e ao cliente que possui o acesso de rastreio daquela entrega. A localizacao do entregador nao e usada para publicidade.",
           "Fornecedores, clientes, usuarios autorizados, autoridades publicas ou terceiros quando houver obrigacao, autorizacao ou necessidade legitima.",
           "A lista efetivamente aplicavel varia conforme os recursos contratados e habilitados. Alteracoes materiais serao refletidas nesta Politica, e o titular pode pedir pelo canal de privacidade a relacao de destinatarios aplicavel ao seu caso.",

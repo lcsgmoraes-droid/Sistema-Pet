@@ -1,5 +1,7 @@
 import { useEffect, useId, useState } from "react";
 import api from "../../api";
+import InputCombobox from "../v2/InputCombobox/InputCombobox";
+import InputTexto from "../v2/InputTexto/InputTexto";
 import { nomeOrigemCliente, ORIGENS_CLIENTE } from "../../utils/clienteOrigem";
 
 export default function ClienteOrigemSelect({ value, onChange, filtro = false, disabled = false }) {
@@ -27,42 +29,40 @@ export default function ClienteOrigemSelect({ value, onChange, filtro = false, d
       ? [{ value, label: nomeOrigemCliente(value) }]
       : [];
 
+  const opcoesCombobox = [
+    ...(filtro ? [{ value: "", label: "Todas as origens" }] : []),
+    ...opcoes,
+    ...extras,
+    { value: "nao_identificada", label: "Não identificada" },
+    ...(!filtro ? [{ value: "__nova__", label: "+ Nova origem" }] : []),
+  ];
+
   return (
     <div>
-      <label htmlFor={id} className="mb-1 block text-sm font-medium text-gray-700">
-        Origem do cliente
-      </label>
-      <select
+      <InputCombobox
         id={id}
+        label="Origem do cliente"
+        opcoes={opcoesCombobox}
         value={nova ? "__nova__" : selecionado}
         disabled={disabled}
-        onChange={(event) => {
-          const next = event.target.value;
+        permitirLimpar={false}
+        onChange={(next) => {
           setNova(next === "__nova__");
           onChange(next === "__nova__" ? "" : next === "nao_identificada" && !filtro ? null : next);
         }}
-        className="h-10 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-900"
-      >
-        {filtro && <option value="">Todas as origens</option>}
-        {[...opcoes, ...extras].map((item) => (
-          <option key={item.value} value={item.value}>
-            {item.label}
-          </option>
-        ))}
-        <option value="nao_identificada">Não identificada</option>
-        {!filtro && <option value="__nova__">+ Nova origem</option>}
-      </select>
+      />
       {nova && (
-        <input
-          aria-label="Nome da nova origem"
-          value={value || ""}
-          required
-          maxLength={50}
-          onChange={(event) => onChange(event.target.value)}
-          disabled={disabled}
-          placeholder="Ex.: Feira de adoção"
-          className="mt-2 h-10 w-full rounded-lg border border-slate-300 px-3 text-sm"
-        />
+        <div className="mt-2">
+          <InputTexto
+            id={`${id}-nova`}
+            value={value || ""}
+            required
+            maxLength={50}
+            onChange={onChange}
+            disabled={disabled}
+            placeholder="Ex.: Feira de adoção"
+          />
+        </div>
       )}
       {erro && (
         <p className="mt-1 text-xs text-amber-700">

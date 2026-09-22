@@ -1,4 +1,5 @@
 import { Fragment } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   ArrowRight,
   DollarSign,
@@ -28,18 +29,19 @@ function PessoaMobileCard({
   handleDelete,
   handleDeletePet,
   highlightedPetId,
-  openModal,
+  listaUrl,
   setExpandedPets,
   setHighlightedPetId,
   togglePessoaFusao,
 }) {
+  const navigate = useNavigate();
   const pets = Array.isArray(cliente.pets) ? cliente.pets : [];
   const petsAberto = Boolean(expandedPets[cliente.id]);
 
   return (
     <article
       id={`cliente-${cliente.id}`}
-      onClick={() => openModal(cliente)}
+      onClick={() => navigate(`/clientes/${cliente.id}/editar`, { state: { from: listaUrl } })}
       className={`rounded-lg border bg-white p-3 shadow-sm transition-colors ${
         clienteSelecionadoFusao
           ? "border-amber-200 bg-amber-50"
@@ -176,7 +178,7 @@ function PessoaMobileCard({
             />
           ) : null}
           <IconActionButton
-            onClick={() => openModal(cliente)}
+            onClick={() => navigate(`/clientes/${cliente.id}/editar`, { state: { from: listaUrl } })}
             icon={Edit2}
             intent="edit"
             tone="ghost"
@@ -225,7 +227,9 @@ function PessoaMobileCard({
                   <IconActionButton
                     onClick={() => {
                       setHighlightedPetId(pet.id);
-                      openModal(cliente, null, pet.id);
+                      navigate(`/clientes/${cliente.id}/editar`, {
+                        state: { abaInicial: "animais", from: listaUrl },
+                      });
                     }}
                     icon={Edit2}
                     intent="edit"
@@ -262,16 +266,17 @@ const ClientesNovoTabelaSection = ({
   setPaginaAtual,
   filteredClientes,
   highlightedClienteId,
+  listaUrl,
   expandedPets,
   setExpandedPets,
   highlightedPetId,
   setHighlightedPetId,
-  openModal,
   handleDelete,
   handleDeletePet,
   pessoasSelecionadasFusao = [],
   togglePessoaFusao,
 }) => {
+  const navigate = useNavigate();
   return (
     <>
       <PaginationControls
@@ -302,7 +307,7 @@ const ClientesNovoTabelaSection = ({
                   handleDelete={handleDelete}
                   handleDeletePet={handleDeletePet}
                   highlightedPetId={highlightedPetId}
-                  openModal={openModal}
+                  listaUrl={listaUrl}
                   setExpandedPets={setExpandedPets}
                   setHighlightedPetId={setHighlightedPetId}
                   togglePessoaFusao={togglePessoaFusao}
@@ -349,7 +354,7 @@ const ClientesNovoTabelaSection = ({
                       <Fragment key={cliente.id}>
                         <tr
                           id={`cliente-${cliente.id}`}
-                          onClick={() => openModal(cliente)}
+                          onClick={() => navigate(`/clientes/${cliente.id}/editar`, { state: { from: listaUrl } })}
                           className={`cursor-pointer transition-colors ${
                             clienteSelecionadoFusao
                               ? "bg-amber-50 hover:bg-amber-100"
@@ -476,7 +481,11 @@ const ClientesNovoTabelaSection = ({
                                 />
                               )}
                               <IconActionButton
-                                onClick={() => openModal(cliente)}
+                                onClick={() =>
+                                  navigate(`/clientes/${cliente.id}/editar`, {
+                                    state: { from: listaUrl },
+                                  })
+                                }
                                 icon={Edit2}
                                 intent="edit"
                                 tone="ghost"
@@ -545,7 +554,9 @@ const ClientesNovoTabelaSection = ({
                                       <IconActionButton
                                         onClick={() => {
                                           setHighlightedPetId(pet.id);
-                                          openModal(cliente, null, pet.id);
+                                          navigate(`/clientes/${cliente.id}/editar`, {
+                                            state: { abaInicial: "animais", from: listaUrl },
+                                          });
                                         }}
                                         icon={Edit2}
                                         intent="edit"

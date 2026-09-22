@@ -79,7 +79,7 @@ Toda entidade "mestre" segue a mesma forma:
 - **Vínculo é sempre sugestão + confirmação manual, nunca automático** — mesmo padrão CDP já decidido na proposta: ao cadastrar um CPF/telefone que já existe em outra loja do grupo, sugerir "já existe cadastro em [loja], vincular histórico?".
 - Continua 100% local: histórico de compra, segmentação, campos financeiros/DRE, consentimento — cada loja é dona do que coletou.
 
-**Pré-requisito de negócio, não técnico:** confirmar com o usuário se os termos de uso já foram atualizados pra cobrir "consentimento vale pro grupo econômico" (mencionado por ele numa rodada anterior — não é bloqueio técnico, mas vale checar antes de ativar isso em produção).
+**Pré-requisito de negócio, não técnico:** confirmar com o usuário se os termos de uso já foram atualizados pra cobrir "consentimento vale pro grupo comercial" (mencionado por ele numa rodada anterior — não é bloqueio técnico, mas vale checar antes de ativar isso em produção).
 
 **Critério de pronto:** cadastro de cliente já existente noutra loja do grupo sugere vínculo (nunca funde sozinho); teste cobrindo a sugestão e a recusa; confirmação de que o time validou o texto de consentimento antes de ligar isso pra clientes reais.
 

@@ -1,15 +1,22 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import api from "../api";
 
-export function useClientesNovoListagem({ tipoFiltro, visaoDashboard = "", setError }) {
+export function useClientesNovoListagem({
+  tipoFiltro,
+  visaoDashboard = "",
+  setError,
+  initialSearchTerm = "",
+  initialPaginaAtual = 1,
+  initialRegistrosPorPagina = 20,
+}) {
   const [clientes, setClientes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [carregamentoInicialConcluido, setCarregamentoInicialConcluido] = useState(false);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [paginaAtual, setPaginaAtual] = useState(1);
+  const [searchTerm, setSearchTerm] = useState(initialSearchTerm);
+  const [paginaAtual, setPaginaAtual] = useState(initialPaginaAtual);
   const [totalRegistros, setTotalRegistros] = useState(0);
-  const [registrosPorPagina, setRegistrosPorPagina] = useState(20);
-  const [searchTermAplicado, setSearchTermAplicado] = useState("");
+  const [registrosPorPagina, setRegistrosPorPagina] = useState(initialRegistrosPorPagina);
+  const [searchTermAplicado, setSearchTermAplicado] = useState(initialSearchTerm.trim());
   const [filtrosOrigem, setFiltrosOrigem] = useState({ origem: "", inicio: "", fim: "" });
   const [resumoOrigens, setResumoOrigens] = useState([]);
   const requisicaoAtual = useRef(0);
