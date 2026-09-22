@@ -43,7 +43,7 @@ def upgrade() -> None:
                 ELSE config.icms_aliquota_interna
             END
         FROM tenants AS tenant
-        WHERE config.tenant_id::text = tenant.id
+        WHERE config.tenant_id::text = tenant.id::text
           AND tenant.uf IS NOT NULL
           AND LENGTH(TRIM(tenant.uf)) >= 2
         """)
