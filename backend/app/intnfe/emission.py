@@ -252,7 +252,7 @@ def _format_brl(value):
 
 
 def _additional_information(venda, installments):
-    parts = [f"Venda {venda.numero_venda} - CorePet"]
+    parts = [f"Venda {venda.numero_venda}"]
     observation = _text(getattr(venda, "observacoes", None))
     if observation:
         parts.append(f"Observacoes da venda: {' '.join(observation.split())}")

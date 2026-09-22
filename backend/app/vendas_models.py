@@ -240,6 +240,8 @@ class Venda(BaseTenantModel):
                 "id": self.cliente.id,
                 "codigo": self.cliente.codigo,
                 "nome": self.cliente.nome,
+                "cpf": self.cliente.cpf,
+                "cnpj": self.cliente.cnpj,
                 "telefone": self.cliente.telefone,
                 "celular": self.cliente.celular,
                 "email": self.cliente.email,

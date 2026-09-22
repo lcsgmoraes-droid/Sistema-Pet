@@ -103,7 +103,7 @@ export default function ImprimirCupom({ className = "", size = "md", venda }) {
         className={["print:hidden", className].filter(Boolean).join(" ")}
         title={carregandoEmpresa ? "Carregando dados da empresa para o recibo" : undefined}
       >
-        <span>{crediario ? "Imprimir cupom + 2 vias" : "Imprimir Recibo"}</span>
+        <span>{crediario ? "Recibo + 2 vias" : "Recibo do PDV"}</span>
       </ActionButton>
 
       <CupomImpressao empresa={dadosEmpresa} venda={venda} />
