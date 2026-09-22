@@ -25,6 +25,10 @@ import useEntradaXmlRevisaoPrecos from "./entrada-xml/useEntradaXmlRevisaoPrecos
 import useEntradaXmlSefaz from "./entrada-xml/useEntradaXmlSefaz";
 import useEntradaXmlUpload from "./entrada-xml/useEntradaXmlUpload";
 import {
+  mensagemErroDocumentoEntrada,
+  salvarDocumentoEntrada,
+} from "./entrada-xml/entradaXmlDocumentos.mjs";
+import {
   ACAO_CONFERENCIA_OPCOES,
   CONFERENCIA_STATUS_META,
   aplicarMultiplicadorPackAoItem,
@@ -46,6 +50,7 @@ const EntradaXML = () => {
   const [mostrarDetalhes, setMostrarDetalhes] = useState(false);
   const [mostrarUploadPdf, setMostrarUploadPdf] = useState(false);
   const [mostrarVisualizacao, setMostrarVisualizacao] = useState(false);
+  const [documentoBaixando, setDocumentoBaixando] = useState("");
 
   // Filtro de status da tabela
   const [filtroStatus, setFiltroStatus] = useState("todos");
@@ -337,6 +342,29 @@ const EntradaXML = () => {
       toast.error("Erro ao carregar nota");
     }
   };
+
+  const baixarDocumentoNota = async (formato) => {
+    if (!notaSelecionada?.id || documentoBaixando) return;
+
+    setDocumentoBaixando(formato);
+    try {
+      const endpoint = formato === "pdf" ? "danfe" : "xml";
+      const response = await api.get(`/notas-entrada/${notaSelecionada.id}/${endpoint}`, {
+        responseType: "blob",
+      });
+      salvarDocumentoEntrada(response, notaSelecionada, formato);
+      toast.success(formato === "pdf" ? "DANFE baixado em PDF." : "XML da NF-e baixado.");
+    } catch (error) {
+      toast.error(
+        await mensagemErroDocumentoEntrada(
+          error,
+          formato === "pdf" ? "Nao foi possivel baixar o DANFE." : "Nao foi possivel baixar o XML.",
+        ),
+      );
+    } finally {
+      setDocumentoBaixando("");
+    }
+  };
   const excluirNota = async (notaId, numeroNota) => {
     const confirmou = await confirmarCorePet({
       titulo: "Excluir nota fiscal?",
@@ -565,6 +593,8 @@ const EntradaXML = () => {
       />
       <EntradaXmlVisualizacaoNotaModal
         aberto={mostrarVisualizacao}
+        baixarDocumentoNota={baixarDocumentoNota}
+        documentoBaixando={documentoBaixando}
         notaSelecionada={notaSelecionada}
         resumoConferenciaAtual={resumoConferenciaAtual}
         metaConferenciaAtual={metaConferenciaAtual}
