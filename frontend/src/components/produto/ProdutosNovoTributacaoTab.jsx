@@ -248,6 +248,44 @@ export default function ProdutosNovoTributacaoTab({
           />
         </div>
       </div>
+
+      <div className="rounded-lg border border-blue-200 bg-blue-50 p-4">
+        <h3 className="text-sm font-semibold text-blue-900">Campos estaduais de ICMS</h3>
+        <p className="mt-1 text-xs text-blue-800">
+          Preencha somente quando a contabilidade indicar. No RJ, o FCP não deve ser aplicado
+          automaticamente a todos os produtos; no PR e no RJ, informe cBenef quando houver benefício
+          fiscal. A integração atual transmite cBenef somente com CST 51 ou 90.
+        </p>
+        <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
+          <div>
+            <label className="mb-1 block text-sm font-medium text-gray-700">cBenef</label>
+            <input
+              type="text"
+              maxLength={10}
+              value={formData.tributacao?.codigo_beneficio_fiscal || ""}
+              onChange={(e) =>
+                handleChangeTributacao("codigo_beneficio_fiscal", e.target.value.toUpperCase())
+              }
+              disabled={formData.tributacao?.herdado_da_empresa === true}
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 disabled:bg-gray-100"
+              placeholder="Código do benefício"
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-gray-700">FCP (%)</label>
+            <input
+              type="number"
+              min="0"
+              step="0.01"
+              value={formData.tributacao?.fcp_aliquota || ""}
+              onChange={(e) => handleChangeTributacao("fcp_aliquota", e.target.value)}
+              disabled={formData.tributacao?.herdado_da_empresa === true}
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 disabled:bg-gray-100"
+              placeholder="0,00"
+            />
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

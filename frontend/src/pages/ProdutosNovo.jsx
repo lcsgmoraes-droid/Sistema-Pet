@@ -111,6 +111,8 @@ export default function ProdutosNovo() {
       cst_icms: "",
       icms_aliquota: "",
       icms_st: false,
+      codigo_beneficio_fiscal: "",
+      fcp_aliquota: "",
       pis_cst: "",
       pis_aliquota: "",
       cofins_cst: "",

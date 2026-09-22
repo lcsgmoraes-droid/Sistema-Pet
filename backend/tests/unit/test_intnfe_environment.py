@@ -11,6 +11,7 @@ from app.intnfe.environment import (
     save_default_series,
 )
 from app.intnfe.service import activate
+from app.empresa_config_fiscal_models import EmpresaConfigFiscal
 from tests.unit import test_intnfe_activation as activation_fixtures
 
 intnfe_db = activation_fixtures.intnfe_db
@@ -22,6 +23,28 @@ def _prepare(pilot):
     connection.certificado_valido_ate = datetime.now(timezone.utc) + timedelta(days=90)
     pilot.db.commit()
     return connection
+
+
+def _confirm_fiscal_configuration(pilot):
+    pilot.tenant.uf = "PR"
+    pilot.tenant.inscricao_estadual = "1234567890"
+    pilot.db.add(
+        EmpresaConfigFiscal(
+            tenant_id=pilot.id,
+            uf="PR",
+            regime_tributario="Simples Nacional",
+            contribuinte_icms=True,
+            icms_aliquota_interna=19.5,
+            icms_aliquota_interestadual=12,
+            aplica_difal=True,
+            cfop_venda_interna="5102",
+            cfop_venda_interestadual="6102",
+            cfop_compra="1102",
+            herdado_do_estado=False,
+            configuracao_confirmada=True,
+        )
+    )
+    pilot.db.commit()
 
 
 def test_homologation_activation_reuses_existing_credentials(pilot):
@@ -73,6 +96,7 @@ def test_sequence_start_requires_strict_valid_number(value):
 
 def test_production_credentials_are_encrypted_and_not_regenerated(pilot):
     connection = _prepare(pilot)
+    _confirm_fiscal_configuration(pilot)
     calls = []
 
     def create(_token, emitter_id):
@@ -103,6 +127,26 @@ def test_production_credentials_are_encrypted_and_not_regenerated(pilot):
         ("emitente-teste", 1),
         ("emitente-teste", 1),
     ]
+
+
+def test_production_is_blocked_until_company_tax_is_confirmed(pilot):
+    connection = _prepare(pilot)
+    _confirm_fiscal_configuration(pilot)
+    config = pilot.db.query(EmpresaConfigFiscal).one()
+    config.configuracao_confirmada = False
+    pilot.db.commit()
+
+    with pytest.raises(EnvironmentError, match="contabilidade"):
+        configure_environment(
+            pilot.db,
+            pilot.id,
+            pilot.api,
+            EnvironmentInput(ambiente_codigo=1),
+            lambda *_args: None,
+        )
+
+    assert connection.production_client_id is None
+    assert pilot.api.environment_activations == []
 
 
 def test_same_series_preserves_start_and_new_series_replaces_it(pilot):

@@ -12,7 +12,9 @@ from uuid import UUID, uuid4
 from types import SimpleNamespace
 
 from app.bling_integration_fiscal import _resolver_fiscal_item_nfe
+from app.empresa_config_fiscal_models import EmpresaConfigFiscal
 from app.financeiro.crediario_parcelamento import montar_plano_crediario
+from app.fiscal_state_rules import production_fiscal_pending
 from app.intnfe.client import IntNFeError
 from app.intnfe.fiscal_profile import local_profile
 from app.intnfe.models import IntNFeConnection, IntNFeEmissionSequence
@@ -354,7 +356,15 @@ def _recipient(
     return recipient
 
 
-def _tax(cst, origin, rate, taxable_amount):
+def _tax(
+    cst,
+    origin,
+    rate,
+    taxable_amount,
+    *,
+    codigo_beneficio_fiscal=None,
+    fcp_aliquota=None,
+):
     normalized_cst = str(cst)
     result = {"cst": normalized_cst, "origem": str(origin)}
     # CSOSN 102/500, entre outros, não recebem alíquota no grupo XML.
@@ -375,6 +385,28 @@ def _tax(cst, origin, rate, taxable_amount):
                     CENT, rounding=ROUND_HALF_UP
                 )
             )
+    benefit_code = _text(codigo_beneficio_fiscal)
+    if benefit_code:
+        if normalized_cst not in {"51", "90"}:
+            raise DirectEmissionError(
+                "A IntNFe aceita cBenef somente com CST 51 ou 90. Revise a operação fiscal antes de transmitir."
+            )
+        result["codigoBeneficioFiscal"] = benefit_code
+
+    if fcp_aliquota is not None:
+        fcp_rate = Decimal(str(fcp_aliquota))
+        if fcp_rate < 0:
+            raise DirectEmissionError("A alíquota de FCP não pode ser negativa.")
+        if fcp_rate > 0:
+            fcp_value = (taxable_amount * fcp_rate / Decimal("100")).quantize(
+                CENT, rounding=ROUND_HALF_UP
+            )
+            result["fcp"] = {
+                "baseCalculo": float(taxable_amount),
+                "aliquota": float(fcp_rate),
+                "valor": float(fcp_value),
+            }
+
     return result
 
 
@@ -454,6 +486,21 @@ def _lot_from_recorded_fifo(db, venda, item):
 
 
 def build_payload(db, tenant, connection, venda, document_type):
+    environment = 1 if connection.emission_environment == 1 else 2
+    if environment == 1:
+        if db is None:
+            raise DirectEmissionError(
+                "Não foi possível validar a configuração fiscal para produção."
+            )
+        config = (
+            db.query(EmpresaConfigFiscal)
+            .filter(EmpresaConfigFiscal.tenant_id == tenant.id)
+            .first()
+        )
+        pending = production_fiscal_pending(tenant, config)
+        if pending:
+            raise DirectEmissionError("Produção fiscal bloqueada: " + " ".join(pending))
+
     emitter, emitter_pending = local_profile(db, tenant.id)
     emitter_cnpj = _digits(getattr(tenant, "cnpj", None))
     if len(emitter_cnpj) == 14:
@@ -462,7 +509,6 @@ def build_payload(db, tenant, connection, venda, document_type):
         emitter_pending.append("Informe um CNPJ válido nos dados da empresa.")
     if emitter_pending:
         raise DirectEmissionError(" ".join(emitter_pending))
-    environment = 1 if connection.emission_environment == 1 else 2
     sale_total = _money(venda.total)
     nfce_requires_recipient = document_type == "nfce" and (
         bool(getattr(venda, "tem_entrega", False)) or sale_total >= Decimal("10000")
@@ -618,7 +664,12 @@ def build_payload(db, tenant, connection, venda, document_type):
             "valorTotal": float(gross),
             "impostos": {
                 "icms": _tax(
-                    fiscal["cst_icms"], origin, fiscal.get("icms_aliquota"), taxable
+                    fiscal["cst_icms"],
+                    origin,
+                    fiscal.get("icms_aliquota"),
+                    taxable,
+                    codigo_beneficio_fiscal=fiscal.get("codigo_beneficio_fiscal"),
+                    fcp_aliquota=fiscal.get("fcp_aliquota"),
                 ),
                 "pis": _contribution(
                     fiscal["pis_cst"], fiscal.get("pis_aliquota"), taxable

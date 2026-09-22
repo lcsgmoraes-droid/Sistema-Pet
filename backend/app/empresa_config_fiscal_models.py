@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Numeric, Boolean, Text
+from sqlalchemy import Column, Integer, String, Numeric, Boolean, Text, DateTime
 from sqlalchemy.dialects.postgresql import JSONB
 from .base_models import BaseTenantModel
 
@@ -45,6 +45,8 @@ class EmpresaConfigFiscal(BaseTenantModel):
     iss_retido = Column(Boolean, default=False)
 
     herdado_do_estado = Column(Boolean, nullable=False, default=True)
+    configuracao_confirmada = Column(Boolean, nullable=False, default=False)
+    configuracao_confirmada_em = Column(DateTime(timezone=True))
 
     # ============================
     # SIMPLES NACIONAL

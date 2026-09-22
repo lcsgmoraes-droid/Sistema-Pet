@@ -2,6 +2,7 @@ from sqlalchemy.orm import Session
 from app.fiscal_estado_padrao_models import FiscalEstadoPadrao
 from app.empresa_config_fiscal_models import EmpresaConfigFiscal
 from app.models import Tenant
+from app.fiscal_state_rules import default_company_fiscal_values, normalize_uf
 
 
 def obter_ou_criar_config_fiscal_empresa_padrao(
@@ -13,33 +14,32 @@ def obter_ou_criar_config_fiscal_empresa_padrao(
     Retorna a configuracao fiscal da empresa ou cria um padrao minimo.
     Evita que tenants novos quebrem o PDV antes de passarem pela tela fiscal.
     """
+    tenant = db.query(Tenant).filter(Tenant.id == str(tenant_id)).first()
+    uf = normalize_uf(getattr(tenant, "uf", None))
     existente = (
         db.query(EmpresaConfigFiscal)
         .filter(EmpresaConfigFiscal.tenant_id == tenant_id)
         .first()
     )
     if existente:
+        if uf and normalize_uf(existente.uf) != uf:
+            existente.uf = uf
+            existente.configuracao_confirmada = False
+            existente.configuracao_confirmada_em = None
+            if existente.herdado_do_estado:
+                referencia = default_company_fiscal_values(uf)
+                existente.icms_aliquota_interna = referencia["icms_aliquota_interna"]
+            if "simples" in str(existente.regime_tributario or "").casefold():
+                existente.aplica_difal = False
+            db.flush()
+            if commit:
+                db.commit()
+                db.refresh(existente)
         return existente
-
-    tenant = db.query(Tenant).filter(Tenant.id == str(tenant_id)).first()
-    uf = (getattr(tenant, "uf", None) or "SP").strip().upper()[:2] or "SP"
 
     config = EmpresaConfigFiscal(
         tenant_id=tenant_id,
-        uf=uf,
-        regime_tributario="Simples Nacional",
-        contribuinte_icms=True,
-        icms_aliquota_interna=18.0,
-        icms_aliquota_interestadual=12.0,
-        aplica_difal=True,
-        cfop_venda_interna="5102",
-        cfop_venda_interestadual="6102",
-        cfop_compra="1102",
-        pis_cst_padrao=None,
-        pis_aliquota=0,
-        cofins_cst_padrao=None,
-        cofins_aliquota=0,
-        herdado_do_estado=True,
+        **default_company_fiscal_values(uf),
     )
     db.add(config)
     db.flush()
@@ -84,7 +84,11 @@ def criar_config_fiscal_empresa(
         contribuinte_icms=True,
         icms_aliquota_interna=estado.icms_aliquota_interna,
         icms_aliquota_interestadual=estado.icms_aliquota_interestadual,
-        aplica_difal=estado.aplica_difal,
+        aplica_difal=(
+            False
+            if "simples" in str(regime_tributario or "").casefold()
+            else estado.aplica_difal
+        ),
         cfop_venda_interna=estado.cfop_venda_interna,
         cfop_venda_interestadual=estado.cfop_venda_interestadual,
         cfop_compra=estado.cfop_compra,

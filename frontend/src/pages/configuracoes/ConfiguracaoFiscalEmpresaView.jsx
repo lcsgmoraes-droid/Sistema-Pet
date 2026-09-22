@@ -13,6 +13,8 @@ export default function ConfiguracaoFiscalEmpresaView({
   handleChange,
   cnaePrincipalDescricao,
   salvar,
+  perfilEstado,
+  pendenciasProducao,
 }) {
   if (loading) {
     return (
@@ -407,6 +409,40 @@ export default function ConfiguracaoFiscalEmpresaView({
             </h2>
           </div>
           <div className="p-6 space-y-4">
+            {perfilEstado && (
+              <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4">
+                <h3 className="font-semibold text-emerald-900">
+                  Perfil fiscal: {perfilEstado.nome} ({perfilEstado.uf})
+                </h3>
+                <p className="mt-1 text-sm text-emerald-800">
+                  Referência geral: ICMS interno{" "}
+                  {perfilEstado.icms_interno_referencia ?? "a validar"}%
+                  {perfilEstado.fcp_referencia > 0
+                    ? ` e FCP de até ${perfilEstado.fcp_referencia}% quando aplicável`
+                    : ""}
+                  . A tributação final continua sendo definida por produto e operação.
+                </p>
+                <ul className="mt-3 list-disc space-y-1 pl-5 text-sm text-emerald-900">
+                  {(perfilEstado.requisitos_producao || []).map((item) => (
+                    <li key={item}>{item}</li>
+                  ))}
+                  {(perfilEstado.alertas || []).map((item) => (
+                    <li key={item}>{item}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {pendenciasProducao.length > 0 && (
+              <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+                <p className="font-semibold">Pendências antes de ativar produção:</p>
+                <ul className="mt-2 list-disc space-y-1 pl-5">
+                  {pendenciasProducao.map((item) => (
+                    <li key={item}>{item}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
             {/* CNAE */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">CNAE Principal</label>
@@ -464,6 +500,98 @@ export default function ConfiguracaoFiscalEmpresaView({
                 <option value="Lucro Presumido">Lucro Presumido</option>
                 <option value="Lucro Real">Lucro Real</option>
               </select>
+            </div>
+
+            <div className="grid grid-cols-1 gap-4 rounded-lg border border-gray-200 p-4 md:grid-cols-3">
+              <div>
+                <label className="mb-2 block text-sm font-medium text-gray-700">
+                  ICMS interno de referência (%)
+                </label>
+                <input
+                  type="number"
+                  name="icms_aliquota_interna"
+                  min="0"
+                  max="100"
+                  step="0.01"
+                  value={form.icms_aliquota_interna}
+                  onChange={handleChange}
+                  className={classeCampo("icms_aliquota_interna")}
+                />
+              </div>
+              <div>
+                <label className="mb-2 block text-sm font-medium text-gray-700">
+                  ICMS interestadual de referência (%)
+                </label>
+                <input
+                  type="number"
+                  name="icms_aliquota_interestadual"
+                  min="0"
+                  max="100"
+                  step="0.01"
+                  value={form.icms_aliquota_interestadual}
+                  onChange={handleChange}
+                  className={classeCampo("icms_aliquota_interestadual")}
+                />
+              </div>
+              <label className="flex items-center gap-3 rounded-md border border-gray-200 px-3 py-2">
+                <input
+                  type="checkbox"
+                  name="aplica_difal"
+                  checked={Boolean(form.aplica_difal)}
+                  disabled={simplesAtivo}
+                  onChange={handleChange}
+                  className="h-4 w-4"
+                />
+                <span className="text-sm text-gray-700">
+                  Aplicar DIFAL nas vendas
+                  {simplesAtivo && (
+                    <span className="block text-xs text-gray-500">
+                      Desativado para saída de optante do Simples Nacional.
+                    </span>
+                  )}
+                </span>
+              </label>
+              <div>
+                <label className="mb-2 block text-sm font-medium text-gray-700">
+                  CFOP venda interna
+                </label>
+                <input
+                  type="text"
+                  name="cfop_venda_interna"
+                  maxLength={4}
+                  value={form.cfop_venda_interna}
+                  onChange={handleChange}
+                  className={classeCampo("cfop_venda_interna")}
+                />
+              </div>
+              <div>
+                <label className="mb-2 block text-sm font-medium text-gray-700">
+                  CFOP venda interestadual
+                </label>
+                <input
+                  type="text"
+                  name="cfop_venda_interestadual"
+                  maxLength={4}
+                  value={form.cfop_venda_interestadual}
+                  onChange={handleChange}
+                  className={classeCampo("cfop_venda_interestadual")}
+                />
+              </div>
+              <div>
+                <label className="mb-2 block text-sm font-medium text-gray-700">CFOP compra</label>
+                <input
+                  type="text"
+                  name="cfop_compra"
+                  maxLength={4}
+                  value={form.cfop_compra}
+                  onChange={handleChange}
+                  className={classeCampo("cfop_compra")}
+                />
+              </div>
+              <p className="text-xs text-gray-500 md:col-span-3">
+                Estes valores são referências da empresa. NCM, CEST, origem, ICMS-ST, FCP e
+                benefício continuam sendo validados por produto e operação.
+              </p>
             </div>
 
             {/* Bloco Simples Nacional - Exibido apenas se regime = Simples */}
@@ -533,6 +661,25 @@ export default function ConfiguracaoFiscalEmpresaView({
                 </div>
               </div>
             )}
+
+            <label className="flex items-start gap-3 rounded-lg border border-gray-200 p-4">
+              <input
+                type="checkbox"
+                name="configuracao_confirmada"
+                checked={Boolean(form.configuracao_confirmada)}
+                onChange={handleChange}
+                className="mt-1 h-4 w-4"
+              />
+              <span>
+                <span className="block text-sm font-semibold text-gray-900">
+                  Configuração fiscal conferida
+                </span>
+                <span className="block text-xs text-gray-600">
+                  Marque somente após validar regime, CFOP, NCM/CEST, ICMS-ST, FCP e benefícios com
+                  a contabilidade. Essa confirmação é obrigatória para ativar produção.
+                </span>
+              </span>
+            </label>
           </div>
         </div>
 

@@ -11,6 +11,8 @@ export default function ConfiguracaoFiscalEmpresa() {
   const [salvando, setSalvando] = useState(false);
   const [buscandoCNPJ, setBuscandoCNPJ] = useState(false);
   const [guiaAtiva, setGuiaAtiva] = useState("");
+  const [perfilEstado, setPerfilEstado] = useState(null);
+  const [pendenciasProducao, setPendenciasProducao] = useState([]);
 
   const normalizeCnaesSecundarios = (value) => {
     console.log("🔧 normalizeCnaesSecundarios chamado com:", value, "tipo:", typeof value);
@@ -64,6 +66,13 @@ export default function ConfiguracaoFiscalEmpresa() {
     cnae_descricao: "",
     cnaes_secundarios: [],
     uf: "",
+    icms_aliquota_interna: "",
+    icms_aliquota_interestadual: "",
+    aplica_difal: false,
+    cfop_venda_interna: "5102",
+    cfop_venda_interestadual: "6102",
+    cfop_compra: "1102",
+    configuracao_confirmada: false,
   });
 
   useEffect(() => {
@@ -90,7 +99,16 @@ export default function ConfiguracaoFiscalEmpresa() {
           cnae_descricao: resFiscal.data.cnae_descricao || "",
           cnaes_secundarios: cnaesSecundarios,
           uf: resFiscal.data.uf || "",
+          icms_aliquota_interna: resFiscal.data.icms_aliquota_interna ?? "",
+          icms_aliquota_interestadual: resFiscal.data.icms_aliquota_interestadual ?? "",
+          aplica_difal: Boolean(resFiscal.data.aplica_difal),
+          cfop_venda_interna: resFiscal.data.cfop_venda_interna || "5102",
+          cfop_venda_interestadual: resFiscal.data.cfop_venda_interestadual || "6102",
+          cfop_compra: resFiscal.data.cfop_compra || "1102",
+          configuracao_confirmada: Boolean(resFiscal.data.configuracao_confirmada),
         });
+        setPerfilEstado(resFiscal.data.perfil_estado || null);
+        setPendenciasProducao(resFiscal.data.pendencias_producao || []);
 
         // Atualizar estados locais para exibição
         if (resFiscal.data.cnae_descricao) {
@@ -184,15 +202,20 @@ export default function ConfiguracaoFiscalEmpresa() {
   };
 
   function handleChange(e) {
-    const { name, value } = e.target;
+    const { name, value, type, checked } = e.target;
+    const nextValue = type === "checkbox" ? checked : value;
     setForm((prev) => {
       const updated = {
         ...prev,
-        [name]: value,
+        [name]: nextValue,
       };
+      if (name !== "configuracao_confirmada") {
+        updated.configuracao_confirmada = false;
+      }
 
       // Se mudou o regime para Simples Nacional, garantir valores padrão
-      if (name === "regime_tributario" && value === "Simples Nacional") {
+      if (name === "regime_tributario" && nextValue === "Simples Nacional") {
+        updated.aplica_difal = false;
         if (!updated.simples_anexo || updated.simples_anexo === "") {
           updated.simples_anexo = "I";
         }
@@ -314,6 +337,14 @@ export default function ConfiguracaoFiscalEmpresa() {
       // Salvar dados fiscais
       const response = await api.put("/empresa/fiscal", payload);
       console.log("✅ Resposta do servidor (fiscal):", response.data);
+      if (response.data?.config) {
+        setPerfilEstado(response.data.config.perfil_estado || null);
+        setPendenciasProducao(response.data.config.pendencias_producao || []);
+        setForm((prev) => ({
+          ...prev,
+          configuracao_confirmada: Boolean(response.data.config.configuracao_confirmada),
+        }));
+      }
 
       // Salvar dados cadastrais (se endpoint existir)
       try {
@@ -384,6 +415,8 @@ export default function ConfiguracaoFiscalEmpresa() {
       handleChange={handleChange}
       cnaePrincipalDescricao={cnaePrincipalDescricao}
       salvar={salvar}
+      perfilEstado={perfilEstado}
+      pendenciasProducao={pendenciasProducao}
     />
   );
 }
