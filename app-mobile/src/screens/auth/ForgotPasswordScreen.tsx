@@ -13,6 +13,7 @@ import KeyboardSafeScrollView from '../../components/KeyboardSafeScrollView';
 import SelectedStoreBanner from '../../components/SelectedStoreBanner';
 import * as AuthService from '../../services/auth.service';
 import { CORES, ESPACO, FONTE, RAIO } from '../../theme';
+import { passwordResetEmailWasSent } from '../../utils/passwordRecovery';
 
 type Step = 'request' | 'reset';
 
@@ -36,13 +37,26 @@ export default function ForgotPasswordScreen({ navigation }: any) {
     setCarregando(true);
     try {
       const data = await AuthService.requestPasswordReset(emailNormalizado);
+      if (!passwordResetEmailWasSent(data)) {
+        Alert.alert(
+          'Conta não cadastrada',
+          'Não encontramos uma conta com este e-mail nesta loja. Você pode criar uma conta agora.',
+          [
+            { text: 'Agora não', style: 'cancel' },
+            {
+              text: 'Criar conta',
+              onPress: () => navigation.navigate('Register'),
+            },
+          ],
+        );
+        return;
+      }
+
       setEmail(emailNormalizado);
       setStep('reset');
       Alert.alert(
         'Confira seu e-mail',
-        data?.expires_in_minutes
-          ? `Enviamos um codigo de recuperacao. Ele expira em ${data.expires_in_minutes} minutos.`
-          : 'Enviamos um codigo de recuperacao para o seu e-mail.',
+        `Enviamos um codigo de recuperacao. Ele expira em ${data.expires_in_minutes} minutos.`,
       );
     } catch (err: any) {
       const msg =
