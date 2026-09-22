@@ -82,6 +82,7 @@
     "test:pessoas-relatorio": "node scripts/test-pessoas-relatorio.mjs",
     "test:pessoa-app-login": "node src/utils/pessoaAppLogin.test.mjs",
     "test:usuario-acesso-inicial": "node src/utils/usuarioAcessoInicial.test.mjs",
+    "test:usuarios-pessoa-vinculo": "node scripts/test-usuarios-pessoa-vinculo.mjs",
     "preview": "vite preview"
   },
   "dependencies": {
