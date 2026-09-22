@@ -19,6 +19,7 @@ class ImportRuntime:
     source_dir: Path | None = None
     report_dir: Path | None = None
     dry_run: bool = True
+    quiet_rows: bool = False
 
     def configure(
         self,
@@ -28,12 +29,14 @@ class ImportRuntime:
         source_dir: Path,
         report_dir: Path,
         dry_run: bool,
+        quiet_rows: bool = False,
     ) -> None:
         self.tenant_id = tenant_id
         self.user_id = user_id
         self.source_dir = source_dir.resolve()
         self.report_dir = report_dir.resolve()
         self.dry_run = dry_run
+        self.quiet_rows = quiet_rows
 
     def require_configured(self) -> "ImportRuntime":
         if (
@@ -55,6 +58,7 @@ class ImportRuntime:
         self.source_dir = None
         self.report_dir = None
         self.dry_run = True
+        self.quiet_rows = False
 
 
 RUNTIME = ImportRuntime()
@@ -68,6 +72,9 @@ ID_MAP = {
     "especies": {},
     "racas": {},
     "marcas": {},
+    "categorias": {},
+    "fornecedores": {},
+    "compras": {},
 }
 
 STATS = {
@@ -75,10 +82,17 @@ STATS = {
     "racas": {"total": 0, "sucesso": 0, "erro": 0, "duplicado": 0},
     "clientes": {"total": 0, "sucesso": 0, "erro": 0, "duplicado": 0},
     "marcas": {"total": 0, "sucesso": 0, "erro": 0, "duplicado": 0},
+    "categorias": {"total": 0, "sucesso": 0, "erro": 0, "duplicado": 0},
     "produtos": {"total": 0, "sucesso": 0, "erro": 0, "duplicado": 0, "sem_sku": 0},
     "pets": {"total": 0, "sucesso": 0, "erro": 0, "duplicado": 0},
     "vendas": {"total": 0, "sucesso": 0, "erro": 0, "duplicado": 0},
     "itens_venda": {"total": 0, "sucesso": 0, "erro": 0, "duplicado": 0},
+    "pagamentos_venda": {"total": 0, "sucesso": 0, "erro": 0, "duplicado": 0, "divergencia": 0},
+    "baixas_venda": {"total": 0, "sucesso": 0, "erro": 0, "duplicado": 0},
+    "contas_receber": {"total": 0, "sucesso": 0, "erro": 0, "duplicado": 0, "sem_cliente": 0, "clientes_devedores": 0, "saldo_centavos": 0},
+    "fornecedores": {"total": 0, "sucesso": 0, "erro": 0, "duplicado": 0},
+    "compras": {"total": 0, "sucesso": 0, "erro": 0, "duplicado": 0},
+    "itens_compra": {"total": 0, "sucesso": 0, "erro": 0, "duplicado": 0},
 }
 
 NAO_IMPORTADOS = {

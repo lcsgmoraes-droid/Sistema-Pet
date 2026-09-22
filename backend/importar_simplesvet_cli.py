@@ -208,6 +208,7 @@ def _run_import(
         source_dir=source_dir,
         report_dir=report_dir,
         dry_run=dry_run,
+        quiet_rows=scope == "operational",
     )
     try:
         _ensure_atomic_transaction(db)

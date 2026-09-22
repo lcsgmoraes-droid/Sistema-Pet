@@ -7,7 +7,7 @@ param(
     [string]$TenantId,
     [int]$UserId,
     [string]$DiretorioDados,
-    [ValidateSet('all', 'base', 'catalog', 'pets', 'sales')]
+    [ValidateSet('all', 'base', 'catalog', 'pets', 'sales', 'operational')]
     [string]$Escopo = 'all',
     [int]$Limite,
     [string]$DiretorioRelatorios,

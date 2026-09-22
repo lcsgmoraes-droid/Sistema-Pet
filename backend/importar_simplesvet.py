@@ -31,12 +31,16 @@ from sqlalchemy.orm import Session
 from app.models import Cliente, Pet, Especie, Raca
 from app.produtos_models import Produto, Marca
 from app.vendas_models import Venda, VendaItem
+from app.financeiro_models import ContaReceber  # registra o relacionamento Venda.contas_receber
 from importar_simplesvet_state import ID_MAP, NAO_IMPORTADOS, RUNTIME, STATS
 from importar_simplesvet_summary import exibir_resumo as _exibir_resumo
+from importar_simplesvet_cadastros import dados_cliente, importar_categorias_produtos
 from importar_simplesvet_utils import (
     carregar_contatos,
     ler_csv,
     limpar_cpf,
+    normalizar_unidade,
+    gtin_valido,
     log,
     parse_bool,
     parse_date,
@@ -191,6 +195,7 @@ def importar_clientes(db: Session, limite: Optional[int] = None):
         row_failed = False
         try:
             cpf = limpar_cpf(row.get("pes_var_cpf"))
+            pessoa_juridica = row.get("pes_var_tipo") == "Pessoa jurídica"
             codigo = row.get("pes_var_chave")
             contato = contatos.get(row.get("pes_int_codigo"), {})
 
@@ -221,9 +226,10 @@ def importar_clientes(db: Session, limite: Optional[int] = None):
                         )
                     continue
 
-            # Verificar duplicata por CPF
+            # Verificar documento dentro do mesmo tipo de pessoa.
             if cpf:
-                existe = db.query(Cliente).filter(Cliente.cpf == cpf).first()
+                campo_documento = Cliente.cnpj if pessoa_juridica else Cliente.cpf
+                existe = db.query(Cliente).filter(campo_documento == cpf).first()
                 if existe:
                     ID_MAP["pessoas"][row["pes_int_codigo"]] = existe.id
                     STATS["clientes"]["duplicado"] += 1
@@ -251,45 +257,7 @@ def importar_clientes(db: Session, limite: Optional[int] = None):
                 log(f"Cliente sem nome pulado (código: {codigo})", "AVISO")
                 continue
 
-            cliente = Cliente(
-                user_id=RUNTIME.user_id,
-                tenant_id=RUNTIME.tenant_id,
-                codigo=codigo,
-                nome=nome,
-                cpf=cpf,
-                telefone=contato.get("telefone"),
-                celular=contato.get("celular"),
-                email=row.get("pes_var_email")
-                if row.get("pes_var_email") and row["pes_var_email"] != "NULL"
-                else None,
-                cep=row.get("end_var_cep")
-                if row.get("end_var_cep") and row["end_var_cep"] != "NULL"
-                else None,
-                endereco=row.get("end_var_endereco")
-                if row.get("end_var_endereco") and row["end_var_endereco"] != "NULL"
-                else None,
-                numero=row.get("end_var_numero")
-                if row.get("end_var_numero") and row["end_var_numero"] != "NULL"
-                else None,
-                complemento=row.get("end_var_complemento")
-                if row.get("end_var_complemento")
-                and row["end_var_complemento"] != "NULL"
-                else None,
-                bairro=row.get("end_var_bairro")
-                if row.get("end_var_bairro") and row["end_var_bairro"] != "NULL"
-                else None,
-                cidade=row.get("end_var_municipio")
-                if row.get("end_var_municipio") and row["end_var_municipio"] != "NULL"
-                else None,
-                estado=row.get("end_var_uf")
-                if row.get("end_var_uf") and row["end_var_uf"] != "NULL"
-                else None,
-                observacoes=row.get("pes_txt_observacao")
-                if row.get("pes_txt_observacao") and row["pes_txt_observacao"] != "NULL"
-                else None,
-                ativo=True,
-                created_at=parse_date(row.get("pes_dti_inclusao")),
-            )
+            cliente = Cliente(**dados_cliente(row, contato, cpf))
 
             db.add(cliente)
             db.flush()
@@ -319,6 +287,7 @@ def importar_produtos(db: Session, limite: Optional[int] = None):
 
     importar_marcas(db)
     registros = ler_csv("eco_produto.csv", limite)
+    importar_categorias_produtos(db, registros)
     STATS["produtos"]["total"] = len(registros)
 
     linha = 0  # Contador de linha para relatório
@@ -402,11 +371,22 @@ def importar_produtos(db: Session, limite: Optional[int] = None):
                 tipo=tipo,
                 situacao=situacao,
                 marca_id=marca_id,
+                categoria_id=ID_MAP["categorias"].get(row.get("tpr_int_codigo")),
                 preco_custo=parse_decimal(row.get("pro_dec_custo", "0")),
                 preco_venda=parse_decimal(row.get("pro_dec_preco", "0")),
                 codigo_barras=row.get("pro_var_codigobarra")
                 if row.get("pro_var_codigobarra")
                 and row["pro_var_codigobarra"] != "NULL"
+                else None,
+                unidade=normalizar_unidade(row.get("pro_var_unidade")),
+                gtin_ean=row.get("pro_var_codigobarra")
+                if gtin_valido(row.get("pro_var_codigobarra"))
+                else None,
+                ncm=(row.get("pro_var_codigoncm") or "").strip()
+                if row.get("pro_var_codigoncm") not in (None, "", "NULL")
+                else None,
+                cest=(row.get("pro_var_cest") or "").replace(".", "").strip()
+                if row.get("pro_var_cest") not in (None, "", "NULL")
                 else None,
                 estoque_atual=parse_decimal(row.get("pro_dec_estoque", "0")),
                 estoque_minimo=parse_decimal(row.get("pro_dec_minimo", "0")),
@@ -577,9 +557,7 @@ def importar_pets(db: Session, limite: Optional[int] = None):
                 else None
             )
             if not especie_nome:
-                log(f"Pet {row['ani_var_nome']} sem espécie, pulando...", "AVISO")
-                STATS["pets"]["erro"] += 1
-                continue
+                especie_nome = "Não informada"
 
             pet = Pet(
                 cliente_id=cliente_id,
@@ -600,6 +578,9 @@ def importar_pets(db: Session, limite: Optional[int] = None):
                 else None,
                 microchip=row.get("ani_var_chip")
                 if row.get("ani_var_chip") and row["ani_var_chip"] != "NULL"
+                else None,
+                pedigree_registro=row.get("ani_var_numeropedigree")
+                if row.get("ani_var_numeropedigree") not in (None, "", "NULL")
                 else None,
                 ativo=row.get("ani_var_morto", "Não") != "Sim",
                 created_at=parse_date(row.get("ani_dti_inclusao")),
@@ -796,7 +777,28 @@ def executar_escopo(db: Session, *, scope: str, limite: Optional[int] = None) ->
     log(f"INICIANDO IMPORTACAO SIMPLESVET ({scope})")
     log(f"Limite por arquivo: {limite if limite is not None else 'sem limite'}")
 
-    if scope == "all":
+    if scope == "operational":
+        if limite is not None:
+            raise ValueError("Escopo operational exige todos os registros para conciliar saldos")
+        from importar_simplesvet_operational import (
+            importar_fornecedores_e_compras,
+            importar_itens_venda_em_lote,
+            importar_pagamentos_venda,
+            importar_saldos_clientes,
+            importar_vendas_em_lote,
+        )
+
+        importar_especies(db)
+        importar_racas(db)
+        importar_clientes(db)
+        importar_produtos(db)
+        importar_pets(db)
+        importar_vendas_em_lote(db)
+        importar_itens_venda_em_lote(db)
+        importar_pagamentos_venda(db)
+        importar_saldos_clientes(db)
+        importar_fornecedores_e_compras(db)
+    elif scope == "all":
         importar_especies(db, limite)
         importar_racas(db, limite)
         importar_clientes(db, limite)
