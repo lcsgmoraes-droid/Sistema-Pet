@@ -1,6 +1,15 @@
-import { AlertCircle } from "lucide-react";
+import { AlertCircle, FileText } from "lucide-react";
 import SaleReference from "../ui/SaleReference";
+import { obterSituacaoFiscalVenda } from "../../utils/pdvFiscalStatus";
 import { buildValidadePdvMessage } from "./pdvValidadeAlertUtils";
+
+const ESTILOS_FISCAIS = {
+  success: "border-emerald-200 bg-emerald-50 text-emerald-800",
+  info: "border-blue-200 bg-blue-50 text-blue-800",
+  warning: "border-amber-200 bg-amber-50 text-amber-900",
+  danger: "border-red-200 bg-red-50 text-red-800",
+  neutral: "border-slate-200 bg-slate-50 text-slate-800",
+};
 
 function formatarDataVenda(dataVenda) {
   if (!dataVenda) {
@@ -23,6 +32,7 @@ export default function PDVInfoBanners({
   validadeAlertas = [],
 }) {
   const mensagemValidade = buildValidadePdvMessage(validadeAlertas);
+  const situacaoFiscal = modoVisualizacao ? obterSituacaoFiscalVenda(vendaAtual) : null;
 
   return (
     <>
@@ -70,6 +80,22 @@ export default function PDVInfoBanners({
                 {formatarDataVenda(vendaAtual.data_venda)}
               </span>
             )}
+          </div>
+        </div>
+      )}
+
+      {situacaoFiscal && (
+        <div
+          className={`border-b px-4 py-2 ${ESTILOS_FISCAIS[situacaoFiscal.intent] || ESTILOS_FISCAIS.info}`}
+        >
+          <div className="mx-auto flex max-w-5xl items-start gap-2">
+            <FileText className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+            <div className="min-w-0">
+              <div className="text-sm font-semibold">{situacaoFiscal.titulo}</div>
+              {situacaoFiscal.detalhe && (
+                <div className="mt-0.5 text-xs">{situacaoFiscal.detalhe}</div>
+              )}
+            </div>
           </div>
         </div>
       )}

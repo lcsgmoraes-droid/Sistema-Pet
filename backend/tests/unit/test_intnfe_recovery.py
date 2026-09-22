@@ -135,6 +135,45 @@ def test_unknown_rejection_is_not_retried_when_payload_did_not_change(monkeypatc
     assert sale.nfe_status == "rejeitada"
 
 
+def test_provider_rejection_963_can_retry_after_emitter_fix_without_payload_change(
+    monkeypatch,
+):
+    db = FakeDb()
+    sale = rejected_sale("963")
+    issued = []
+    monkeypatch.setattr(
+        recovery,
+        "emission_fingerprint",
+        lambda *_args: sale.nfe_payload_hash,
+    )
+    monkeypatch.setattr(
+        recovery,
+        "issue",
+        lambda *_args: issued.append(True)
+        or {
+            "success": True,
+            "processando": False,
+            "provedor": "intnfe",
+            "numero": 17843,
+        },
+    )
+
+    result = recovery.repair_and_retry(
+        db,
+        SimpleNamespace(id=sale.tenant_id),
+        sale,
+        object(),
+        reset_audit=lambda *_args: None,
+        numbering_audit=lambda *_args: None,
+    )
+
+    assert result["success"] is True
+    assert issued == [True]
+    assert any("rejeição 963" in item for item in result["correcoes_aplicadas"])
+    assert sale.nfe_status is None
+    assert db.commits == 1
+
+
 def test_pending_result_is_reconciled_without_creating_another_note(monkeypatch):
     db = FakeDb()
     sale = rejected_sale()

@@ -1,0 +1,55 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+
+import {
+  extrairCamposFiscaisVenda,
+  obterSituacaoFiscalVenda,
+  temDocumentoFiscalVenda,
+} from "./pdvFiscalStatus.js";
+
+test("não exibe situação fiscal quando a venda nunca teve nota", () => {
+  assert.equal(temDocumentoFiscalVenda({ id: 10, status: "finalizada" }), false);
+  assert.equal(obterSituacaoFiscalVenda({ id: 10 }), null);
+});
+
+test("resume uma NF-e rejeitada com código e motivo", () => {
+  const situacao = obterSituacaoFiscalVenda({
+    nfe_tipo: "nfe",
+    nfe_modelo: "55",
+    nfe_numero: 1630,
+    nfe_status: "rejeitada",
+    nfe_codigo_erro: "963",
+    nfe_motivo_rejeicao: "Tipo de pagamento não aceita o grupo de cartões ou boletos",
+  });
+
+  assert.equal(situacao.label, "NF-e 1630: Rejeitada");
+  assert.equal(situacao.intent, "danger");
+  assert.match(situacao.detalhe, /Código 963/);
+  assert.match(situacao.detalhe, /Tipo de pagamento/);
+});
+
+test("distingue NFC-e autorizada e cancelada", () => {
+  assert.equal(
+    obterSituacaoFiscalVenda({ nfe_modelo: 65, nfe_numero: 530, nfe_status: "autorizada" }).label,
+    "NFC-e 530: Autorizada",
+  );
+  assert.equal(
+    obterSituacaoFiscalVenda({ nfe_tipo: "nfce", nfe_status: "cancelada" }).intent,
+    "danger",
+  );
+});
+
+test("preserva todos os campos fiscais ao abrir a venda no PDV", () => {
+  const campos = extrairCamposFiscaisVenda({
+    nfe_status: "rejeitada",
+    nfe_numero: 1630,
+    nfe_chave: "123",
+    outro_campo: "ignorado",
+  });
+
+  assert.equal(campos.nfe_status, "rejeitada");
+  assert.equal(campos.nfe_numero, 1630);
+  assert.equal(campos.nfe_chave, "123");
+  assert.equal(campos.nfe_tipo, null);
+  assert.equal("outro_campo" in campos, false);
+});

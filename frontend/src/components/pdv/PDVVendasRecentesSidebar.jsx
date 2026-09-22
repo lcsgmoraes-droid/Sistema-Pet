@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { formatMoneyBRL } from "../../utils/formatters";
+import { obterSituacaoFiscalVenda } from "../../utils/pdvFiscalStatus";
 import { getSalesChannelInfo, isOnlineSalesChannel } from "../../utils/salesChannel";
 import CopyableCode from "../ui/CopyableCode";
 import CustomerIdentity, { getCustomerIdentityCode } from "../ui/CustomerIdentity";
@@ -312,6 +313,7 @@ export default function PDVVendasRecentesSidebar({
             ) : (
               vendasRecentesVisiveis.map((venda) => {
                 const statusPagamento = venda.status_pagamento || venda.status;
+                const situacaoFiscal = obterSituacaoFiscalVenda(venda);
                 const canalInfo = getCanalInfo(venda.canal);
                 const CanalIcon = canalInfo.Icon;
                 const entregaStatus = getEntregaStatusInfo(venda);
@@ -459,6 +461,17 @@ export default function PDVVendasRecentesSidebar({
                             title={entregaStatus.title}
                           >
                             {entregaStatus.label}
+                          </StatusBadge>
+                        )}
+                        {situacaoFiscal && (
+                          <StatusBadge
+                            intent={situacaoFiscal.intent}
+                            size="xs"
+                            title={[situacaoFiscal.titulo, situacaoFiscal.detalhe]
+                              .filter(Boolean)
+                              .join(" — ")}
+                          >
+                            {situacaoFiscal.label}
                           </StatusBadge>
                         )}
                       </div>
