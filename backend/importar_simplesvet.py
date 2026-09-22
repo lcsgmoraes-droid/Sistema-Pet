@@ -34,7 +34,11 @@ from app.vendas_models import Venda, VendaItem
 from app.financeiro_models import ContaReceber  # noqa: F401 - registra Venda.contas_receber
 from importar_simplesvet_state import ID_MAP, NAO_IMPORTADOS, RUNTIME, STATS
 from importar_simplesvet_summary import exibir_resumo as _exibir_resumo
-from importar_simplesvet_cadastros import dados_cliente, importar_categorias_produtos
+from importar_simplesvet_cadastros import (
+    dados_cliente,
+    importar_categorias_produtos,
+    produtos_existentes_por_sku,
+)
 from importar_simplesvet_utils import (
     carregar_contatos,
     ler_csv,
@@ -285,6 +289,7 @@ def importar_produtos(db: Session, limite: Optional[int] = None):
     registros = ler_csv("eco_produto.csv", limite)
     importar_categorias_produtos(db, registros)
     STATS["produtos"]["total"] = len(registros)
+    produtos_por_codigo = produtos_existentes_por_sku(db)
 
     linha = 0  # Contador de linha para relatório
     for row in registros:
@@ -329,7 +334,7 @@ def importar_produtos(db: Session, limite: Optional[int] = None):
                     marca_id = marca.id
 
             # Verificar duplicata
-            existe = db.query(Produto).filter(Produto.codigo == codigo).first()
+            existe = produtos_por_codigo.get(codigo)
             if existe:
                 ID_MAP["produtos"][row["pro_int_codigo"]] = existe.id
                 STATS["produtos"]["duplicado"] += 1
@@ -393,6 +398,7 @@ def importar_produtos(db: Session, limite: Optional[int] = None):
             db.add(produto)
             db.flush()
 
+            produtos_por_codigo[codigo] = produto
             ID_MAP["produtos"][row["pro_int_codigo"]] = produto.id
             STATS["produtos"]["sucesso"] += 1
             log(f"Produto: {produto.nome} (SKU: {produto.codigo})", "SUCESSO")

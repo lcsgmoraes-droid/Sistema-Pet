@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from app.produtos_models import Categoria
+from app.produtos_models import Categoria, Produto
 from importar_simplesvet_state import ID_MAP, RUNTIME, STATS
 from importar_simplesvet_utils import parse_date
 
@@ -67,3 +67,14 @@ def importar_categorias_produtos(db, registros: list[dict]) -> None:
         if row.get("tpr_int_codigo"):
             ID_MAP["categorias"][row["tpr_int_codigo"]] = categorias_por_nome[chave]
     STATS["categorias"]["total"] = len(categorias_por_nome)
+
+
+def produtos_existentes_por_sku(db) -> dict[str, Produto]:
+    """Consulta os SKUs do destino uma vez para evitar milhares de leituras."""
+
+    return {
+        produto.codigo: produto
+        for produto in db.query(Produto)
+        .filter(Produto.tenant_id == RUNTIME.tenant_id)
+        .all()
+    }
