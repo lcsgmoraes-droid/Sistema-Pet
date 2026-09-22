@@ -815,6 +815,10 @@ def _fail(message: str, *, mode: str) -> int:
 def main(argv: list[str] | None = None) -> int:
     args = _build_parser().parse_args(argv)
     try:
+        # O CLI nao passa pelo bootstrap da API. Carregar o registro completo antes
+        # de abrir a sessao garante que relacionamentos por nome (User, Cliente,
+        # EstoqueMovimentacao etc.) estejam disponiveis ao configurar os mappers.
+        from app.db import base as _orm_registry  # noqa: F401
         from app.db import DATABASE_URL, SessionLocal
 
         database = database_identity(DATABASE_URL)
