@@ -145,6 +145,8 @@ def test_crediario_uses_credito_loja_instead_of_outros():
         "Crediario: 1/1 vence em 05/10/2026 - R$ 23,00"
         in payload["informacoesAdicionais"]
     )
+    assert payload["informacoesAdicionais"].startswith("Venda VEN-TESTE | Crediario:")
+    assert "CorePet" not in payload["informacoesAdicionais"]
 
 
 def test_crediario_uses_saved_receivable_due_date_and_sale_observation():
