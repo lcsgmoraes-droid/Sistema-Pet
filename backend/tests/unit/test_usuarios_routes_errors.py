@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 
 from sqlalchemy.exc import IntegrityError
 
@@ -6,6 +7,9 @@ os.environ.setdefault("DATABASE_URL", "sqlite:///./test.db")
 os.environ["DEBUG"] = "false"
 
 from app import usuarios_routes
+
+
+REPO_ROOT = Path(__file__).resolve().parents[3]
 
 
 class _FakeExecuteResult:
@@ -62,3 +66,24 @@ def test_is_unique_email_violation_reconhece_constraint_de_email():
     )
 
     assert usuarios_routes._is_unique_email_violation(exc) is True
+
+
+def test_criacao_direta_de_usuario_recusa_perfil_cliente():
+    role = type("Role", (), {"name": " Cliente "})()
+
+    try:
+        usuarios_routes._ensure_role_is_not_cliente(role)
+    except usuarios_routes.UserAccountError as exc:
+        assert exc.status_code == 400
+        assert "reservado" in exc.detail
+    else:
+        raise AssertionError("Perfil Cliente deveria ser recusado no cadastro direto")
+
+
+def test_usuarios_routes_contract_vincula_pessoa_operacional():
+    source = (REPO_ROOT / "backend/app/usuarios_routes.py").read_text(encoding="utf-8")
+
+    assert "pessoa_id: int | None = None" in source
+    assert "Cliente.auth_user_id == User.id" in source
+    assert 'tipo_cadastro="funcionario"' in source
+    assert 'origem_cliente="cadastro_usuario"' in source

@@ -24,6 +24,7 @@ export default function UsuariosPage() {
     onAbrirCredenciais,
     onCloseModalUsuario,
     roles,
+    rolesUsuariosDiretos,
     setNovoUsuario,
     setCredenciais,
     setShowPassword,
@@ -66,7 +67,7 @@ export default function UsuariosPage() {
         novoUsuario={novoUsuario}
         onClose={onCloseModalUsuario}
         onSubmit={criarUsuario}
-        roles={roles}
+        roles={rolesUsuariosDiretos}
         setNovoUsuario={setNovoUsuario}
         setShowPassword={setShowPassword}
         showModal={showModal}
@@ -83,7 +84,7 @@ export default function UsuariosPage() {
         onClose={fecharCredenciais}
         onGenerate={gerarNovaSenha}
         onSubmit={salvarCredenciais}
-        roles={roles}
+        roles={rolesUsuariosDiretos}
         tenantReference={tenantLoginReference}
         usuario={usuarioCredenciais}
       />

@@ -5,6 +5,12 @@ import Panel from "../ui/Panel";
 import StatusBadge from "../ui/StatusBadge";
 import { formatBrazilianLoginPhone } from "../../utils/loginPhone";
 
+function formatPessoaTipo(tipoCadastro) {
+  const value = (tipoCadastro || "").trim();
+  if (!value) return "";
+  return value.charAt(0).toUpperCase() + value.slice(1).replaceAll("_", " ");
+}
+
 export default function UsuariosTable({
   loading,
   onForcarLogout,
@@ -28,6 +34,30 @@ export default function UsuariosTable({
           </p>
         </div>
       ),
+    },
+    {
+      key: "pessoa",
+      header: "Pessoa vinculada",
+      render: (usuario) =>
+        usuario.pessoa_id ? (
+          <div className="min-w-0">
+            <p className="truncate text-sm font-semibold text-slate-900">
+              {usuario.pessoa_nome || `Pessoa ${usuario.pessoa_id}`}
+            </p>
+            <p className="truncate text-xs text-slate-500">
+              {[
+                usuario.pessoa_codigo ? `Codigo ${usuario.pessoa_codigo}` : null,
+                formatPessoaTipo(usuario.pessoa_tipo_cadastro),
+              ]
+                .filter(Boolean)
+                .join(" - ")}
+            </p>
+          </div>
+        ) : (
+          <StatusBadge intent="warning" size="sm">
+            Sem pessoa
+          </StatusBadge>
+        ),
     },
     {
       key: "role",
@@ -87,7 +117,7 @@ export default function UsuariosTable({
         getRowKey={(usuario) => usuario.user_id}
         loading={loading}
         loadingMessage="Carregando usuarios..."
-        tableClassName="min-w-[720px]"
+        tableClassName="min-w-[860px]"
       />
     </Panel>
   );
