@@ -60,9 +60,7 @@ def _finish_row_savepoint(savepoint, failed: bool) -> None:
         return
 
 
-# =====================================================================
 # FASE 1: CADASTROS BASE
-# =====================================================================
 
 
 def importar_especies(db: Session, limite: Optional[int] = None):
@@ -177,9 +175,7 @@ def importar_racas(db: Session, limite: Optional[int] = None):
     log(f"✓ Raças: {STATS['racas']['sucesso']}/{STATS['racas']['total']}")
 
 
-# =====================================================================
 # FASE 2: CLIENTES E PRODUTOS
-# =====================================================================
 
 
 def importar_clientes(db: Session, limite: Optional[int] = None):
@@ -516,9 +512,7 @@ def importar_marcas(db: Session):
     log(f"✓ Marcas: {STATS['marcas']['sucesso']}/{STATS['marcas']['total']}")
 
 
-# =====================================================================
 # FASE 3: PETS
-# =====================================================================
 
 
 def importar_pets(db: Session, limite: Optional[int] = None):
@@ -605,9 +599,7 @@ def importar_pets(db: Session, limite: Optional[int] = None):
     log(f"✓ Pets: {STATS['pets']['sucesso']}/{STATS['pets']['total']}")
 
 
-# =====================================================================
 # FASE 4: VENDAS
-# =====================================================================
 
 
 def importar_vendas(db: Session, limite: Optional[int] = None, data_hoje: bool = False):
@@ -760,9 +752,7 @@ def importar_itens_venda(db: Session, vendas_ids: List[str]):
     log(f"✓ Itens: {STATS['itens_venda']['sucesso']}/{STATS['itens_venda']['total']}")
 
 
-# =====================================================================
 # MAIN
-# =====================================================================
 
 
 def exibir_resumo():
@@ -779,7 +769,9 @@ def executar_escopo(db: Session, *, scope: str, limite: Optional[int] = None) ->
 
     if scope == "operational":
         if limite is not None:
-            raise ValueError("Escopo operational exige todos os registros para conciliar saldos")
+            raise ValueError(
+                "Escopo operational exige todos os registros para conciliar saldos"
+            )
         from importar_simplesvet_operational import (
             importar_fornecedores_e_compras,
             importar_itens_venda_em_lote,

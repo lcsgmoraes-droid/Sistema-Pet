@@ -22,7 +22,8 @@ def dados_cliente(row: dict, contato: dict, cpf: str | None) -> dict:
         "cpf": None if juridica else cpf,
         "cnpj": cpf if juridica else None,
         "inscricao_estadual": _preenchido(row.get("pes_var_inscricaoestadual"))
-        if juridica else None,
+        if juridica
+        else None,
         "telefone": contato.get("telefone"),
         "celular": contato.get("celular"),
         "email": contato.get("email"),
@@ -47,7 +48,9 @@ def importar_categorias_produtos(db, registros: list[dict]) -> None:
             continue
         chave = nome_categoria.casefold()
         if chave not in categorias_por_nome:
-            existente = db.query(Categoria).filter(Categoria.nome == nome_categoria).first()
+            existente = (
+                db.query(Categoria).filter(Categoria.nome == nome_categoria).first()
+            )
             if existente is None:
                 existente = Categoria(
                     tenant_id=RUNTIME.tenant_id,

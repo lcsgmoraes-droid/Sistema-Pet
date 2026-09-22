@@ -40,8 +40,17 @@ from app.tenancy.rls import sync_rls_auth_email, sync_rls_tenant
 def _args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     for key in (
-        "name", "login-name", "legal-name", "cnpj", "email", "owner",
-        "address", "number", "city", "uf", "plan",
+        "name",
+        "login-name",
+        "legal-name",
+        "cnpj",
+        "email",
+        "owner",
+        "address",
+        "number",
+        "city",
+        "uf",
+        "plan",
     ):
         parser.add_argument(f"--{key}", required=True)
     parser.add_argument("--cep")
@@ -52,7 +61,11 @@ def _args() -> argparse.Namespace:
 
 
 def _senha() -> str:
-    password = sys.stdin.readline().rstrip("\r\n") if not sys.stdin.isatty() else getpass.getpass("Senha do administrador: ")
+    password = (
+        sys.stdin.readline().rstrip("\r\n")
+        if not sys.stdin.isatty()
+        else getpass.getpass("Senha do administrador: ")
+    )
     if len(password) < 8:
         raise ValueError("Senha deve ter no minimo 8 caracteres")
     return password
@@ -76,15 +89,25 @@ def provisionar(db, args: argparse.Namespace, password: str) -> dict:
     tenant_id = uuid.uuid4()
     trial_started = datetime.now(timezone.utc)
     tenant = Tenant(
-        id=str(tenant_id), name=args.name.strip(), razao_social=args.legal_name.strip(),
-        cnpj=cnpj, email=email, endereco=args.address.strip(), numero=args.number.strip(),
-        bairro=(args.bairro or "").strip() or None, cidade=args.city.strip(),
-        uf=args.uf.strip().upper(), cep=(args.cep or "").strip() or None,
+        id=str(tenant_id),
+        name=args.name.strip(),
+        razao_social=args.legal_name.strip(),
+        cnpj=cnpj,
+        email=email,
+        endereco=args.address.strip(),
+        numero=args.number.strip(),
+        bairro=(args.bairro or "").strip() or None,
+        cidade=args.city.strip(),
+        uf=args.uf.strip().upper(),
+        cep=(args.cep or "").strip() or None,
         telefone=(args.phone or "").strip() or None,
-        status="active", plan=selected_plan.code, billing_status="trial",
+        status="active",
+        plan=selected_plan.code,
+        billing_status="trial",
         trial_started_at=trial_started,
         trial_ends_at=trial_started + timedelta(days=DEFAULT_TRIAL_DAYS),
-        subscription_source="manual", organization_type=organization_type,
+        subscription_source="manual",
+        organization_type=organization_type,
     )
     db.add(tenant)
     db.flush()
@@ -93,9 +116,15 @@ def provisionar(db, args: argparse.Namespace, password: str) -> dict:
     with tenant_context(str(tenant_id)):
         sync_rls_tenant(db, tenant_id)
         user = User(
-            tenant_id=tenant_id, email=email, hashed_password=hash_password(password),
-            nome=args.owner.strip(), nome_loja=tenant.name, is_active=True,
-            is_admin=False, email_verified=True, email_verified_at=trial_started,
+            tenant_id=tenant_id,
+            email=email,
+            hashed_password=hash_password(password),
+            nome=args.owner.strip(),
+            nome_loja=tenant.name,
+            is_active=True,
+            is_admin=False,
+            email_verified=True,
+            email_verified_at=trial_started,
         )
         db.add(user)
         db.flush()
@@ -105,12 +134,21 @@ def provisionar(db, args: argparse.Namespace, password: str) -> dict:
         permissions = grant_all_permissions_to_role(admin_role.id, tenant_id, db)
         create_default_roles_for_new_tenant(db, tenant_id)
         onboard_tenant_defaults(
-            db=db, tenant_id=tenant_id, user_id=user.id,
-            dry_run=False, strict_required=True,
+            db=db,
+            tenant_id=tenant_id,
+            user_id=user.id,
+            dry_run=False,
+            strict_required=True,
         )
-        config = db.execute(
-            select(EmpresaConfigGeral).where(EmpresaConfigGeral.tenant_id == tenant_id)
-        ).scalars().first()
+        config = (
+            db.execute(
+                select(EmpresaConfigGeral).where(
+                    EmpresaConfigGeral.tenant_id == tenant_id
+                )
+            )
+            .scalars()
+            .first()
+        )
         if config is None:
             config = EmpresaConfigGeral(tenant_id=tenant_id)
             db.add(config)
@@ -125,15 +163,22 @@ def provisionar(db, args: argparse.Namespace, password: str) -> dict:
         config.cep = tenant.cep
         config.telefone = tenant.telefone
         config.email = tenant.email
-        db.add(UserTenant(
-            user_id=user.id, tenant_id=tenant_id,
-            role_id=admin_role.id, is_active=True,
-        ))
+        db.add(
+            UserTenant(
+                user_id=user.id,
+                tenant_id=tenant_id,
+                role_id=admin_role.id,
+                is_active=True,
+            )
+        )
         db.flush()
         return {
-            "tenant_id": str(tenant_id), "user_id": user.id,
-            "plan": selected_plan.code, "permissions": permissions,
-            "name": tenant.name, "login_name": args.login_name.strip(),
+            "tenant_id": str(tenant_id),
+            "user_id": user.id,
+            "plan": selected_plan.code,
+            "permissions": permissions,
+            "name": tenant.name,
+            "login_name": args.login_name.strip(),
             "cnpj": cnpj,
         }
 

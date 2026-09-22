@@ -55,13 +55,19 @@ FILE_COLUMNS: dict[str, set[str]] = {
     },
     "eco_vendabaixa.csv": {"vba_int_codigo", "ven_int_codigo", "vba_dec_pago"},
     "eco_vendabaixa_formapagamento.csv": {
-        "vba_int_codigo", "ven_int_codigo", "fpa_var_nome", "vfp_dec_valor"
+        "vba_int_codigo",
+        "ven_int_codigo",
+        "fpa_var_nome",
+        "vfp_dec_valor",
     },
     "glo_pessoadebito.csv": {"pes_int_codigo", "pes_dec_saldoaberto"},
     "eco_fornecedor.csv": {"for_int_codigo", "for_var_nome"},
     "eco_compra.csv": {"com_int_codigo", "for_int_codigo", "com_dec_liquido"},
     "eco_compra_produto.csv": {
-        "com_int_codigo", "pro_int_codigo", "cpr_dec_quantidade", "cpr_dec_preco"
+        "com_int_codigo",
+        "pro_int_codigo",
+        "cpr_dec_quantidade",
+        "cpr_dec_preco",
     },
 }
 
@@ -83,8 +89,14 @@ SCOPE_FILES: dict[str, tuple[str, ...]] = {
         "eco_venda_produto.csv",
     ),
     "all": (
-        "vet_especie.csv", "vet_raca.csv", "glo_pessoa.csv", "glo_contato.csv",
-        "eco_marca.csv", "eco_produto.csv", "vet_animal.csv", "eco_venda.csv",
+        "vet_especie.csv",
+        "vet_raca.csv",
+        "glo_pessoa.csv",
+        "glo_contato.csv",
+        "eco_marca.csv",
+        "eco_produto.csv",
+        "vet_animal.csv",
+        "eco_venda.csv",
         "eco_venda_produto.csv",
     ),
     "operational": tuple(FILE_COLUMNS),
@@ -158,7 +170,8 @@ def _inspect_csv(path: Path, required_columns: set[str]) -> tuple[list[str], int
                     f"{path.name}: colunas obrigatorias ausentes: {', '.join(missing)}"
                 )
             rows = sum(
-                1 for row in reader
+                1
+                for row in reader
                 if row and any(value not in (None, "") for value in row.values())
             )
     except UnicodeDecodeError as exc:

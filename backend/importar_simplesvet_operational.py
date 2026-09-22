@@ -99,7 +99,10 @@ def importar_vendas_em_lote(db: Session) -> None:
     for linha in _linhas("eco_venda.csv"):
         STATS["vendas"]["total"] += 1
         cliente_antigo = linha.get("pes_int_codigo")
-        if cliente_antigo not in (None, "", "NULL") and cliente_antigo not in ID_MAP["pessoas"]:
+        if (
+            cliente_antigo not in (None, "", "NULL")
+            and cliente_antigo not in ID_MAP["pessoas"]
+        ):
             raise ValueError("Venda referencia cliente que nao foi importado")
         data_venda = _data(linha["ven_dat_data"])
         status = {
@@ -122,7 +125,9 @@ def importar_vendas_em_lote(db: Session) -> None:
                     "cliente_id": ID_MAP["pessoas"].get(cliente_antigo),
                     "subtotal": _valor(linha.get("ven_dec_bruto")),
                     "desconto_valor": _valor(linha.get("ven_dec_descontovalor")),
-                    "desconto_percentual": _valor(linha.get("ven_dec_descontopercentual")),
+                    "desconto_percentual": _valor(
+                        linha.get("ven_dec_descontopercentual")
+                    ),
                     "total": _valor(linha.get("ven_dec_liquido")),
                     "observacoes": linha.get("ven_txt_observacao")
                     if linha.get("ven_txt_observacao") not in (None, "", "NULL")
@@ -130,8 +135,10 @@ def importar_vendas_em_lote(db: Session) -> None:
                     "status": status,
                     "data_venda": data_venda,
                     "data_finalizacao": parse_date(linha.get("ven_dat_pagamento"))
-                    if status == "finalizada" else None,
-                    "created_at": parse_date(linha.get("ven_dti_inclusao")) or data_venda,
+                    if status == "finalizada"
+                    else None,
+                    "created_at": parse_date(linha.get("ven_dti_inclusao"))
+                    or data_venda,
                 },
             )
         )
@@ -272,13 +279,17 @@ def importar_saldos_clientes(db: Session) -> None:
     }
     soma_por_cliente: dict[str, Decimal] = defaultdict(Decimal)
     contas: list[dict] = []
-    categoria = db.execute(
-        select(CategoriaFinanceira).where(
-            CategoriaFinanceira.tenant_id == RUNTIME.tenant_id,
-            CategoriaFinanceira.nome == "Receitas de Vendas",
-            CategoriaFinanceira.tipo == "receita",
+    categoria = (
+        db.execute(
+            select(CategoriaFinanceira).where(
+                CategoriaFinanceira.tenant_id == RUNTIME.tenant_id,
+                CategoriaFinanceira.nome == "Receitas de Vendas",
+                CategoriaFinanceira.tipo == "receita",
+            )
         )
-    ).scalars().first()
+        .scalars()
+        .first()
+    )
     if categoria is None or categoria.dre_subcategoria_id is None:
         raise ValueError("Categoria Receitas de Vendas sem vinculo DRE no tenant")
     subcategoria = db.execute(
@@ -333,19 +344,23 @@ def importar_saldos_clientes(db: Session) -> None:
         sum(saldos_fonte.values(), Decimal("0.00")) * 100
     )
     for inicio in range(0, len(contas), LOTE):
-        db.execute(insert(ContaReceber), contas[inicio:inicio + LOTE])
-        STATS["contas_receber"]["sucesso"] += len(contas[inicio:inicio + LOTE])
+        db.execute(insert(ContaReceber), contas[inicio : inicio + LOTE])
+        STATS["contas_receber"]["sucesso"] += len(contas[inicio : inicio + LOTE])
 
 
 def importar_fornecedores_e_compras(db: Session) -> None:
     for linha in _linhas("eco_fornecedor.csv"):
         STATS["fornecedores"]["total"] += 1
         codigo = f"FOR-{linha['for_int_codigo']}"
-        fornecedor = db.execute(
-            select(Cliente).where(
-                Cliente.tenant_id == RUNTIME.tenant_id, Cliente.codigo == codigo
+        fornecedor = (
+            db.execute(
+                select(Cliente).where(
+                    Cliente.tenant_id == RUNTIME.tenant_id, Cliente.codigo == codigo
+                )
             )
-        ).scalars().first()
+            .scalars()
+            .first()
+        )
         if fornecedor is None:
             juridica = bool(linha.get("for_var_cnpj") not in (None, "", "NULL"))
             fornecedor = Cliente(
@@ -356,14 +371,30 @@ def importar_fornecedores_e_compras(db: Session) -> None:
                 tipo_cadastro="fornecedor",
                 tipo_pessoa="PJ" if juridica else "PF",
                 cnpj=linha.get("for_var_cnpj") if juridica else None,
-                cpf=linha.get("for_var_cpf") if not juridica and linha.get("for_var_cpf") not in (None, "", "NULL") else None,
-                inscricao_estadual=linha.get("for_var_inscricaoestadual") if linha.get("for_var_inscricaoestadual") not in (None, "", "NULL") else None,
-                cep=linha.get("end_var_cep") if linha.get("end_var_cep") not in (None, "", "NULL") else None,
-                endereco=linha.get("end_var_endereco") if linha.get("end_var_endereco") not in (None, "", "NULL") else None,
-                numero=linha.get("end_var_numero") if linha.get("end_var_numero") not in (None, "", "NULL") else None,
-                bairro=linha.get("end_var_bairro") if linha.get("end_var_bairro") not in (None, "", "NULL") else None,
-                cidade=linha.get("end_var_municipio") if linha.get("end_var_municipio") not in (None, "", "NULL") else None,
-                estado=linha.get("end_var_uf") if linha.get("end_var_uf") not in (None, "", "NULL") else None,
+                cpf=linha.get("for_var_cpf")
+                if not juridica and linha.get("for_var_cpf") not in (None, "", "NULL")
+                else None,
+                inscricao_estadual=linha.get("for_var_inscricaoestadual")
+                if linha.get("for_var_inscricaoestadual") not in (None, "", "NULL")
+                else None,
+                cep=linha.get("end_var_cep")
+                if linha.get("end_var_cep") not in (None, "", "NULL")
+                else None,
+                endereco=linha.get("end_var_endereco")
+                if linha.get("end_var_endereco") not in (None, "", "NULL")
+                else None,
+                numero=linha.get("end_var_numero")
+                if linha.get("end_var_numero") not in (None, "", "NULL")
+                else None,
+                bairro=linha.get("end_var_bairro")
+                if linha.get("end_var_bairro") not in (None, "", "NULL")
+                else None,
+                cidade=linha.get("end_var_municipio")
+                if linha.get("end_var_municipio") not in (None, "", "NULL")
+                else None,
+                estado=linha.get("end_var_uf")
+                if linha.get("end_var_uf") not in (None, "", "NULL")
+                else None,
             )
             db.add(fornecedor)
             db.flush()
@@ -375,12 +406,16 @@ def importar_fornecedores_e_compras(db: Session) -> None:
     for linha in _linhas("eco_compra.csv"):
         STATS["compras"]["total"] += 1
         numero = f"SV-{RUNTIME.tenant_id}-{linha['com_int_codigo']}"
-        compra = db.execute(
-            select(PedidoCompra).where(
-                PedidoCompra.tenant_id == RUNTIME.tenant_id,
-                PedidoCompra.numero_pedido == numero,
+        compra = (
+            db.execute(
+                select(PedidoCompra).where(
+                    PedidoCompra.tenant_id == RUNTIME.tenant_id,
+                    PedidoCompra.numero_pedido == numero,
+                )
             )
-        ).scalars().first()
+            .scalars()
+            .first()
+        )
         if compra is None:
             fornecedor_id = ID_MAP["fornecedores"].get(linha["for_int_codigo"])
             if not fornecedor_id:
@@ -397,7 +432,9 @@ def importar_fornecedores_e_compras(db: Session) -> None:
                 valor_final=float(_valor(linha.get("com_dec_liquido"))),
                 data_pedido=data_compra,
                 data_recebimento=data_compra,
-                observacoes=linha.get("com_txt_observacao") if linha.get("com_txt_observacao") not in (None, "", "NULL") else None,
+                observacoes=linha.get("com_txt_observacao")
+                if linha.get("com_txt_observacao") not in (None, "", "NULL")
+                else None,
             )
             db.add(compra)
             db.flush()
