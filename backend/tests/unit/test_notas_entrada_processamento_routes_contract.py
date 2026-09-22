@@ -1,6 +1,8 @@
 import os
 from pathlib import Path
 
+from fastapi import FastAPI
+
 os.environ.setdefault("DATABASE_URL", "sqlite:///./test.db")
 os.environ.setdefault("DEBUG", "false")
 
@@ -11,9 +13,11 @@ from app.notas_entrada import reversao_routes  # noqa: E402
 
 
 def test_notas_entrada_routes_inclui_subrouter_de_processamento():
+    app = FastAPI()
+    app.include_router(routes.router)
     rotas = {
-        (getattr(route, "path", ""), tuple(sorted(getattr(route, "methods", []) or [])))
-        for route in routes.router.routes
+        (path, tuple(sorted(method.upper() for method in operacoes)))
+        for path, operacoes in app.openapi()["paths"].items()
     }
 
     assert ("/notas-entrada/{nota_id}/preview-processamento", ("GET",)) in rotas

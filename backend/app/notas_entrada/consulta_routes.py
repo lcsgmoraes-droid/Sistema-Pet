@@ -12,6 +12,7 @@ Funcionalidades:
 """
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query, Form
+from fastapi.responses import Response
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import desc
 from typing import List, Optional
@@ -55,6 +56,7 @@ from app.notas_entrada.financeiro import (
     criar_contas_pagar_da_nota,
 )
 from app.notas_entrada.exclusao import limpar_vinculos_nota_entrada
+from app.notas_entrada.documentos import gerar_danfe_entrada, validar_xml_nfe_entrada
 from app.notas_entrada.fornecedores import (
     criar_fornecedor_automatico,
 )
@@ -106,6 +108,29 @@ from app.notas_entrada.processamento_routes import (
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+
+def _buscar_nota_para_documento(db: Session, nota_id: int, tenant_id) -> NotaEntrada:
+    nota = (
+        db.query(NotaEntrada)
+        .filter(NotaEntrada.id == nota_id, NotaEntrada.tenant_id == tenant_id)
+        .first()
+    )
+    if not nota:
+        raise HTTPException(status_code=404, detail="Nota nao encontrada")
+    if str(nota.serie or "").upper() == "PDF":
+        raise HTTPException(
+            status_code=409,
+            detail="Esta entrada veio de um PDF e nao possui XML fiscal autorizado.",
+        )
+    return nota
+
+
+def _nome_documento(nota: NotaEntrada, extensao: str) -> str:
+    numero = "".join(ch for ch in str(nota.numero_nota or "") if ch.isdigit()) or "nota"
+    serie = "".join(ch for ch in str(nota.serie or "") if ch.isdigit()) or "1"
+    prefixo = "danfe" if extensao == "pdf" else "nfe"
+    return f"{prefixo}_{numero}_serie_{serie}.{extensao}"
 
 
 @router.get("/", response_model=List[NotaEntradaResponse])
@@ -164,6 +189,54 @@ def listar_notas(
         )
 
     return respostas
+
+
+@router.get("/{nota_id}/xml")
+def baixar_xml_nota_entrada(
+    nota_id: int,
+    db: Session = Depends(get_session),
+    user_and_tenant=Depends(get_current_user_and_tenant),
+):
+    """Baixa o XML fiscal autorizado originalmente armazenado na entrada."""
+    _, tenant_id = user_and_tenant
+    nota = _buscar_nota_para_documento(db, nota_id, tenant_id)
+    try:
+        xml_content = validar_xml_nfe_entrada(nota.xml_content, nota.chave_acesso)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    return Response(
+        content=xml_content.encode("utf-8"),
+        media_type="application/xml",
+        headers={
+            "Content-Disposition": f'attachment; filename="{_nome_documento(nota, "xml")}"'
+        },
+    )
+
+
+@router.get("/{nota_id}/danfe")
+def baixar_danfe_nota_entrada(
+    nota_id: int,
+    db: Session = Depends(get_session),
+    user_and_tenant=Depends(get_current_user_and_tenant),
+):
+    """Gera e baixa o DANFE em PDF a partir do XML autorizado da entrada."""
+    _, tenant_id = user_and_tenant
+    nota = _buscar_nota_para_documento(db, nota_id, tenant_id)
+    try:
+        pdf = gerar_danfe_entrada(nota.xml_content, nota.chave_acesso)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except RuntimeError as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+    return Response(
+        content=pdf,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f'attachment; filename="{_nome_documento(nota, "pdf")}"'
+        },
+    )
 
 
 # ============================================================================
