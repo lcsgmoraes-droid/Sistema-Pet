@@ -43,6 +43,7 @@ from app.intnfe.recovery import (
     repair_and_retry as repair_and_retry_intnfe,
 )
 from app.bling_integration_fiscal import prevalidar_produtos_fiscais_venda
+from app.nfe.danfe_nfce import gerar_danfe_nfce
 from app.nfe.operacional_routes import (
     CancelarNFeRequest as CancelarNFeRequest,
     CartaCorrecaoRequest as CartaCorrecaoRequest,
@@ -467,10 +468,26 @@ def xml_intnfe_venda(
 
 
 def _danfe_response_metadata(venda):
-    is_nfce = venda.nfe_tipo == "nfce" or str(venda.nfe_modelo or "") == "65"
-    if is_nfce:
-        return "text/html", "html"
     return "application/pdf", "pdf"
+
+
+def _conteudo_danfe_intnfe_venda(db, venda, api):
+    is_nfce = venda.nfe_tipo == "nfce" or str(venda.nfe_modelo or "") == "65"
+    if not is_nfce:
+        return download_intnfe_document(db, venda, api, "danfe")
+
+    xml = venda.nfe_xml
+    if not xml:
+        xml = download_intnfe_document(db, venda, api, "xml")
+    elif isinstance(xml, str):
+        xml = xml.encode("utf-8")
+    try:
+        return gerar_danfe_nfce(xml, str(venda.nfe_chave or ""))
+    except ValueError as exc:
+        raise DirectEmissionError(
+            "Não foi possível gerar o DANFE da NFC-e a partir do XML autorizado.",
+            status=502,
+        ) from exc
 
 
 @router.get("/vendas/{venda_id}/danfe")
@@ -485,7 +502,7 @@ def danfe_intnfe_venda(
         raise HTTPException(404, "Venda não encontrada")
     api = _intnfe_client()
     try:
-        content = download_intnfe_document(db, venda, api, "danfe")
+        content = _conteudo_danfe_intnfe_venda(db, venda, api)
         media_type, extension = _danfe_response_metadata(venda)
         return Response(
             content=content,
