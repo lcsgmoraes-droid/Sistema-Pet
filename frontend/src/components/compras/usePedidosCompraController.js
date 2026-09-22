@@ -7,6 +7,7 @@ import { createPedidosCompraDataController } from "./pedidosCompraDataController
 import { createPedidosCompraFormularioController } from "./pedidosCompraFormularioController";
 import { createPedidosCompraItemController } from "./pedidosCompraItemController";
 import { createPedidosCompraOperacoesController } from "./pedidosCompraOperacoesController";
+import usePedidoCompraPorProdutos from "./usePedidoCompraPorProdutos";
 import { COLUNAS_DOCUMENTO_COMPLETO } from "./pedidoDocumentoColunas";
 import {
   montarRascunhoPedidoReposicaoGrupo,
@@ -60,7 +61,8 @@ export default function usePedidosCompraController() {
   const [gruposFornecedores, setGruposFornecedores] = useState([]);
   const [produtos, setProdutos] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [mostrarForm, setMostrarForm] = useState(false);
+  const [abaAtiva, setAbaAtiva] = useState("fornecedor");
+  const [mostrarForm, setMostrarForm] = useState(true);
   const [modoEdicao, setModoEdicao] = useState(false);
   const [pedidoEditando, setPedidoEditando] = useState(null);
   const [pedidoSelecionado, setPedidoSelecionado] = useState(null);
@@ -169,14 +171,22 @@ export default function usePedidosCompraController() {
 
   const selecionarFornecedor = (fornecedor) => {
     const grupo = obterGrupoDoFornecedor(fornecedor.id);
+    const preservarItens = porProdutos.modoMontagem === "produtos";
+    registrarFornecedorCriado(fornecedor);
     setFornecedorTexto(fornecedor.nome || "");
-    setFormData((prev) => ({ ...prev, fornecedor_id: fornecedor.id.toString(), itens: [] }));
+    setFormData((prev) => ({
+      ...prev,
+      fornecedor_id: fornecedor.id.toString(),
+      itens: preservarItens ? prev.itens : [],
+    }));
     setIncluirGrupoFornecedor(Boolean(grupo));
     setItemForm(ITEM_FORM_INICIAL);
     setProdutoTexto("");
     // Limpar sugestões do fornecedor anterior
     limparEstadosSugestao();
-    carregarProdutosFornecedor(fornecedor.id, { fornecedorGrupoId: grupo?.id });
+    if (!preservarItens) {
+      carregarProdutosFornecedor(fornecedor.id, { fornecedorGrupoId: grupo?.id });
+    }
   };
 
   const obterFornecedorPorId = (fornecedorId) =>
@@ -212,16 +222,19 @@ export default function usePedidosCompraController() {
       registrarFornecedorCriado(fornecedorBase);
     }
     setFornecedorTexto(grupo.nome || fornecedorBase.nome || "");
+    const preservarItens = porProdutos.modoMontagem === "produtos";
     setFormData((prev) => ({
       ...prev,
       fornecedor_id: fornecedorBase.id.toString(),
-      itens: [],
+      itens: preservarItens ? prev.itens : [],
     }));
     setIncluirGrupoFornecedor(true);
     setItemForm(ITEM_FORM_INICIAL);
     setProdutoTexto("");
     limparEstadosSugestao();
-    carregarProdutosFornecedor(fornecedorBase.id, { fornecedorGrupoId: grupo.id });
+    if (!preservarItens) {
+      carregarProdutosFornecedor(fornecedorBase.id, { fornecedorGrupoId: grupo.id });
+    }
   };
 
   const obterGrupoDoFornecedor = (fornecedorId) => {
@@ -383,6 +396,19 @@ export default function usePedidosCompraController() {
     setProdutoTexto,
   });
 
+  const porProdutos = usePedidoCompraPorProdutos({
+    carregarProdutosFornecedor,
+    formData,
+    mostrarForm,
+    produtoTexto,
+    setFormData,
+    setItemForm,
+    itemFormInicial: ITEM_FORM_INICIAL,
+    setMostrarSugestoesProduto,
+    setProdutoTexto,
+    setProdutos,
+  });
+
   const {
     fecharFormularioPedido,
     abrirNovoFormulario,
@@ -417,7 +443,24 @@ export default function usePedidosCompraController() {
     setPedidoEditando,
     setProdutos,
     setProdutoTexto,
+    resetarModoMontagem: porProdutos.resetarModoMontagem,
+    setModoMontagem: porProdutos.setModoMontagem,
   });
+
+  const selecionarAbaCompra = (aba) => {
+    if (!["fornecedor", "produtos", "pedidos"].includes(aba)) return;
+
+    setAbaAtiva(aba);
+    if (aba === "pedidos") return;
+
+    if (!mostrarForm) abrirNovoFormulario();
+    porProdutos.alterarModoMontagem(aba);
+  };
+
+  const fecharFormularioEListar = () => {
+    fecharFormularioPedido();
+    setAbaAtiva("pedidos");
+  };
 
   useEffect(() => {
     const plano = location.state?.reposicaoGrupoPedido;
@@ -432,6 +475,7 @@ export default function usePedidosCompraController() {
         "Não foi possível preparar o pedido. Confira o fornecedor do produto e recalcule o plano.",
       );
     } else {
+      setAbaAtiva("fornecedor");
       abrirNovoFormulario();
       setFornecedorTexto(fornecedor.nome || plano.fornecedor_nome || "");
       setFormData(rascunho);
@@ -484,6 +528,9 @@ export default function usePedidosCompraController() {
     fecharFormularioPedido,
     formData,
     obterFornecedorPorId,
+    onPedidoEdicaoAberta: (pedido) =>
+      setAbaAtiva(pedido?.fornecedor_id ? "fornecedor" : "produtos"),
+    onPedidoSalvo: () => setAbaAtiva("pedidos"),
     pedidoEditando,
     pedidoParaEnviar,
     pedidoParaExportar,
@@ -505,6 +552,7 @@ export default function usePedidosCompraController() {
 
   return {
     ITEM_FORM_INICIAL,
+    abaAtiva,
     adicionarItem,
     adicionarSugestoesAoPedido,
     alterarPaginaPedidos,
@@ -555,6 +603,7 @@ export default function usePedidosCompraController() {
     exportarExcel,
     exportarPDF,
     fecharFormularioPedido,
+    fecharFormularioEListar,
     fecharModalExportacao,
     fecharModalGruposFornecedores,
     fecharModalRascunho,
@@ -622,6 +671,7 @@ export default function usePedidosCompraController() {
     produtoTexto,
     produtos,
     produtosFiltrados,
+    porProdutos,
     produtosSelecionados,
     receberPedido,
     registrarFornecedorCriado,
@@ -632,6 +682,7 @@ export default function usePedidosCompraController() {
     salvarGrupoFornecedor,
     salvandoGrupoFornecedor,
     selecionarVisaoPedidos,
+    selecionarAbaCompra,
     selecionarFornecedor,
     selecionarGrupoFornecedor,
     selecionarPreenchidosVisiveis,

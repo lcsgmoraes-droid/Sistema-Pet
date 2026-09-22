@@ -2,11 +2,12 @@ import PedidoCompraFormulario from "./PedidoCompraFormulario";
 import PedidosCompraFiltros from "./PedidosCompraFiltros";
 import PedidosCompraModalsLayer from "./PedidosCompraModalsLayer";
 import PedidosCompraTabela from "./PedidosCompraTabela";
-import { Plus, X } from "lucide-react";
+import PedidosCompraTabs from "./PedidosCompraTabs";
 
 export default function PedidosCompraView({ controller }) {
   const {
     ITEM_FORM_INICIAL,
+    abaAtiva,
     adicionarItem,
     adicionarSugestoesAoPedido,
     alterarPaginaPedidos,
@@ -18,7 +19,6 @@ export default function PedidosCompraView({ controller }) {
     abrirConfronto,
     abrirEdicao,
     abrirFluxoSugestaoInteligente,
-    abrirNovoFormulario,
     abrirNovoGrupoFornecedor,
     abrirRecebimento,
     atualizarColunasDocumento,
@@ -56,7 +56,7 @@ export default function PedidosCompraView({ controller }) {
     exportandoArquivo,
     exportarExcel,
     exportarPDF,
-    fecharFormularioPedido,
+    fecharFormularioEListar,
     fecharModalExportacao,
     fecharModalGruposFornecedores,
     fecharModalRascunho,
@@ -124,6 +124,7 @@ export default function PedidosCompraView({ controller }) {
     produtoTexto,
     produtos,
     produtosFiltrados,
+    porProdutos,
     produtosSelecionados,
     receberPedido,
     registrarFornecedorCriado,
@@ -134,6 +135,7 @@ export default function PedidosCompraView({ controller }) {
     salvarGrupoFornecedor,
     salvandoGrupoFornecedor,
     selecionarVisaoPedidos,
+    selecionarAbaCompra,
     selecionarFornecedor,
     selecionarGrupoFornecedor,
     selecionarPreenchidosVisiveis,
@@ -173,112 +175,105 @@ export default function PedidosCompraView({ controller }) {
 
   return (
     <div className="p-6">
-      <div className="mb-6 flex justify-between items-center">
+      <div className="mb-6">
         <div>
           <h1 className="text-2xl font-bold text-gray-800">Pedidos de Compra</h1>
-          <p className="text-gray-600">Gerencie seus pedidos aos fornecedores</p>
+          <p className="text-gray-600">
+            Monte novos pedidos e acompanhe os pedidos realizados em áreas separadas
+          </p>
         </div>
-        <button
-          onClick={() => {
-            if (mostrarForm) {
-              fecharFormularioPedido();
-              return;
-            }
-
-            abrirNovoFormulario();
-          }}
-          className="inline-flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-5 py-2.5 font-semibold text-blue-700 transition-colors hover:bg-blue-100"
-        >
-          {mostrarForm ? (
-            <>
-              <X className="h-4 w-4" />
-              Cancelar
-            </>
-          ) : (
-            <>
-              <Plus className="h-4 w-4" />
-              Novo Pedido
-            </>
-          )}
-        </button>
       </div>
 
-      <PedidoCompraFormulario
-        mostrarForm={mostrarForm}
-        modoEdicao={modoEdicao}
-        fecharFormularioPedido={fecharFormularioPedido}
-        editarPedido={editarPedido}
-        handleSubmit={handleSubmit}
-        fornecedorTexto={fornecedorTexto}
-        setFornecedorTexto={setFornecedorTexto}
-        fornecedores={fornecedores}
-        gruposFornecedores={gruposFornecedores}
-        selecionarFornecedor={selecionarFornecedor}
-        selecionarGrupoFornecedor={selecionarGrupoFornecedor}
-        setFormData={setFormData}
-        setProdutos={setProdutos}
-        setIncluirGrupoFornecedor={setIncluirGrupoFornecedor}
-        setProdutoTexto={setProdutoTexto}
-        setMostrarSugestoesProduto={setMostrarSugestoesProduto}
-        setItemForm={setItemForm}
-        itemFormInicial={ITEM_FORM_INICIAL}
-        limparEstadosSugestao={limparEstadosSugestao}
-        obterGrupoDoFornecedor={obterGrupoDoFornecedor}
-        abrirNovoGrupoFornecedor={abrirNovoGrupoFornecedor}
-        formData={formData}
-        grupoFornecedorAtual={grupoFornecedorAtual}
-        incluirGrupoFornecedor={incluirGrupoFornecedor}
-        abrirFluxoSugestaoInteligente={abrirFluxoSugestaoInteligente}
-        loadingPrepararSugestao={loadingPrepararSugestao}
-        produtoTexto={produtoTexto}
-        produtos={produtos}
-        selecionarProduto={selecionarProduto}
-        produtosFiltrados={produtosFiltrados}
-        mostrarSugestoesProduto={mostrarSugestoesProduto}
-        itemForm={itemForm}
-        adicionarItem={adicionarItem}
-        obterSkuItemPedido={obterSkuItemPedido}
-        atualizarItemPedido={atualizarItemPedido}
-        numeroSeguro={numeroSeguro}
-        removerItem={removerItem}
-        calcularTotal={calcularTotal}
-        loading={loading}
-      />
-
-      <PedidosCompraFiltros
-        filtrosPedidos={filtrosPedidos}
-        filtrosPedidosAtivos={filtrosPedidosAtivos}
-        fornecedoresOrdenados={fornecedoresOrdenados}
-        loadingListaPedidos={loadingListaPedidos}
-        onAplicar={aplicarFiltrosPedidos}
-        onAtualizarFiltro={atualizarFiltroPedidos}
-        onLimpar={limparFiltrosPedidos}
-        onSelecionarVisao={selecionarVisaoPedidos}
-        pedidosCount={paginacaoPedidos.total}
-      />
-
-      {/* Lista de Pedidos */}
-      <PedidosCompraTabela
-        abrirConfronto={abrirConfronto}
-        abrirEdicao={abrirEdicao}
-        abrirRecebimento={abrirRecebimento}
-        cancelarPedido={cancelarPedido}
-        confirmarPedido={confirmarPedido}
-        enviarPedido={enviarPedido}
-        exportarExcel={exportarExcel}
-        exportarPDF={exportarPDF}
-        loading={loadingListaPedidos}
-        obterFornecedorPorId={obterFornecedorPorId}
-        onItemsPerPageChange={alterarPedidosPorPagina}
-        onPageChange={alterarPaginaPedidos}
-        paginaAtual={paginaPedidos}
-        paginasTotal={paginacaoPedidos.pages}
-        pedidos={pedidos}
-        pedidosPorPagina={pedidosPorPagina}
-        reverterStatus={reverterStatus}
+      <PedidosCompraTabs
+        abaAtiva={abaAtiva}
+        itensNoPedido={formData.itens.length}
+        onChange={selecionarAbaCompra}
         totalPedidos={paginacaoPedidos.total}
-        verDetalhes={verDetalhes}
       />
+
+      {abaAtiva !== "pedidos" ? (
+        <PedidoCompraFormulario
+          mostrarForm={mostrarForm}
+          modoEdicao={modoEdicao}
+          fecharFormularioPedido={fecharFormularioEListar}
+          editarPedido={editarPedido}
+          handleSubmit={handleSubmit}
+          fornecedorTexto={fornecedorTexto}
+          setFornecedorTexto={setFornecedorTexto}
+          fornecedores={fornecedores}
+          gruposFornecedores={gruposFornecedores}
+          registrarFornecedorCriado={registrarFornecedorCriado}
+          selecionarFornecedor={selecionarFornecedor}
+          selecionarGrupoFornecedor={selecionarGrupoFornecedor}
+          setFormData={setFormData}
+          setProdutos={setProdutos}
+          setIncluirGrupoFornecedor={setIncluirGrupoFornecedor}
+          setProdutoTexto={setProdutoTexto}
+          setMostrarSugestoesProduto={setMostrarSugestoesProduto}
+          setItemForm={setItemForm}
+          itemFormInicial={ITEM_FORM_INICIAL}
+          limparEstadosSugestao={limparEstadosSugestao}
+          obterGrupoDoFornecedor={obterGrupoDoFornecedor}
+          abrirNovoGrupoFornecedor={abrirNovoGrupoFornecedor}
+          formData={formData}
+          grupoFornecedorAtual={grupoFornecedorAtual}
+          incluirGrupoFornecedor={incluirGrupoFornecedor}
+          abrirFluxoSugestaoInteligente={abrirFluxoSugestaoInteligente}
+          loadingPrepararSugestao={loadingPrepararSugestao}
+          produtoTexto={produtoTexto}
+          produtos={produtos}
+          selecionarProduto={selecionarProduto}
+          produtosFiltrados={produtosFiltrados}
+          mostrarSugestoesProduto={mostrarSugestoesProduto}
+          itemForm={itemForm}
+          adicionarItem={adicionarItem}
+          obterSkuItemPedido={obterSkuItemPedido}
+          atualizarItemPedido={atualizarItemPedido}
+          numeroSeguro={numeroSeguro}
+          removerItem={removerItem}
+          calcularTotal={calcularTotal}
+          loading={loading}
+          porProdutos={porProdutos}
+        />
+      ) : null}
+
+      {abaAtiva === "pedidos" ? (
+        <>
+          <PedidosCompraFiltros
+            filtrosPedidos={filtrosPedidos}
+            filtrosPedidosAtivos={filtrosPedidosAtivos}
+            fornecedoresOrdenados={fornecedoresOrdenados}
+            loadingListaPedidos={loadingListaPedidos}
+            onAplicar={aplicarFiltrosPedidos}
+            onAtualizarFiltro={atualizarFiltroPedidos}
+            onLimpar={limparFiltrosPedidos}
+            onSelecionarVisao={selecionarVisaoPedidos}
+            pedidosCount={paginacaoPedidos.total}
+          />
+
+          <PedidosCompraTabela
+            abrirConfronto={abrirConfronto}
+            abrirEdicao={abrirEdicao}
+            abrirRecebimento={abrirRecebimento}
+            cancelarPedido={cancelarPedido}
+            confirmarPedido={confirmarPedido}
+            enviarPedido={enviarPedido}
+            exportarExcel={exportarExcel}
+            exportarPDF={exportarPDF}
+            loading={loadingListaPedidos}
+            obterFornecedorPorId={obterFornecedorPorId}
+            onItemsPerPageChange={alterarPedidosPorPagina}
+            onPageChange={alterarPaginaPedidos}
+            paginaAtual={paginaPedidos}
+            paginasTotal={paginacaoPedidos.pages}
+            pedidos={pedidos}
+            pedidosPorPagina={pedidosPorPagina}
+            reverterStatus={reverterStatus}
+            totalPedidos={paginacaoPedidos.total}
+            verDetalhes={verDetalhes}
+          />
+        </>
+      ) : null}
       <PedidosCompraModalsLayer
         mostrarRecebimento={mostrarRecebimento}
         pedidoSelecionado={pedidoSelecionado}
@@ -292,6 +287,10 @@ export default function PedidosCompraView({ controller }) {
         carregarDados={carregarDados}
         mostrarModalEnvio={mostrarModalEnvio}
         pedidoParaEnviar={pedidoParaEnviar}
+        pedidoSemFornecedor={Boolean(
+          pedidoParaEnviar &&
+          !pedidos.find((pedido) => Number(pedido.id) === Number(pedidoParaEnviar))?.fornecedor_id,
+        )}
         setMostrarModalEnvio={setMostrarModalEnvio}
         confirmarEnvioPedido={confirmarEnvioPedido}
         marcarComoEnviadoManualmente={marcarComoEnviadoManualmente}

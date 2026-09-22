@@ -54,6 +54,8 @@ export default function CentralNFSaidaView({
   reconciliandoNotaId,
   corrigirEReemitir,
   corrigindoNotaId,
+  liberarVendaComRejeicao,
+  liberandoVendaId,
   baixarDanfe,
   baixarXml,
   abrirDetalhes,
@@ -135,6 +137,8 @@ export default function CentralNFSaidaView({
         reconciliandoNotaId={reconciliandoNotaId}
         corrigirEReemitir={corrigirEReemitir}
         corrigindoNotaId={corrigindoNotaId}
+        liberarVendaComRejeicao={liberarVendaComRejeicao}
+        liberandoVendaId={liberandoVendaId}
         baixarDanfe={baixarDanfe}
         baixarXml={baixarXml}
         abrirDetalhes={abrirDetalhes}
@@ -150,6 +154,8 @@ export default function CentralNFSaidaView({
         baixarXml={baixarXml}
         corrigirEReemitir={corrigirEReemitir}
         corrigindoNotaId={corrigindoNotaId}
+        liberarVendaComRejeicao={liberarVendaComRejeicao}
+        liberandoVendaId={liberandoVendaId}
       />
 
       <NFSaidaCancelamentoModal

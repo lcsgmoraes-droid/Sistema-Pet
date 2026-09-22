@@ -27,7 +27,7 @@ class PedidoCompraItemRequest(BaseModel):
 class PedidoCompraRequest(BaseModel):
     """Schema para criar/editar pedido"""
 
-    fornecedor_id: int
+    fornecedor_id: Optional[int] = None
     data_prevista_entrega: Optional[datetime] = None
     valor_frete: float = Field(default=0, ge=0)
     valor_desconto: float = Field(default=0, ge=0)
@@ -59,7 +59,7 @@ class PedidoCompraResponse(BaseModel):
 
     id: int
     numero_pedido: str
-    fornecedor_id: int
+    fornecedor_id: Optional[int] = None
     status: str
     valor_total: float
     valor_frete: float

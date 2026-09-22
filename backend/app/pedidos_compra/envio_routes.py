@@ -19,9 +19,11 @@ from .exportacao import (
     _gerar_pdf_pedido_bytes,
     _montar_email_pedido,
     _montar_nome_arquivo_pedido,
+    _nome_fornecedor_documento,
     _normalizar_colunas_exportacao_pedido,
 )
 from .schemas import PedidoCompraEnviarRequest, PedidoCompraEnvioFormatos
+from .validacoes import garantir_fornecedor_operacional
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -89,9 +91,7 @@ def enviar_pedido(
         )
 
     fornecedor = _buscar_fornecedor_pedido(db, tenant_id, pedido)
-    fornecedor_nome = (
-        fornecedor.nome if fornecedor else f"Fornecedor {pedido.fornecedor_id}"
-    )
+    fornecedor_nome = _nome_fornecedor_documento(fornecedor, pedido)
 
     if request.envio_manual:
         pedido.status = "enviado"
@@ -107,6 +107,8 @@ def enviar_pedido(
             "status": pedido.status,
             "tipo_envio": "manual",
         }
+
+    garantir_fornecedor_operacional(pedido)
 
     emails_destino = _normalizar_emails_destino(request.email or "")
     if not emails_destino:
@@ -220,6 +222,8 @@ def confirmar_pedido(
             status_code=400,
             detail=f"Pedido não pode ser confirmado no status '{pedido.status}'",
         )
+
+    garantir_fornecedor_operacional(pedido)
 
     pedido.status = "confirmado"
     pedido.data_confirmacao = datetime.utcnow()

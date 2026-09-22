@@ -6,12 +6,13 @@ import re
 import unicodedata
 import hashlib
 import json
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from decimal import Decimal, ROUND_HALF_UP
 from uuid import UUID, uuid4
 from types import SimpleNamespace
 
 from app.bling_integration_fiscal import _resolver_fiscal_item_nfe
+from app.financeiro.crediario_parcelamento import montar_plano_crediario
 from app.intnfe.client import IntNFeError
 from app.intnfe.fiscal_profile import local_profile
 from app.intnfe.models import IntNFeConnection, IntNFeEmissionSequence
@@ -127,6 +128,8 @@ def _payment_code(value):
         return "17"
     if "boleto" in name:
         return "15"
+    if "crediario" in name or "credito_loja" in name:
+        return "05"
     if "deposit" in name or "transfer" in name:
         return "16"
     if "debito" in name:
@@ -140,6 +143,130 @@ def _payment_code(value):
     if "sem_pagamento" in name:
         return "90"
     return "99"
+
+
+def _date(value):
+    if isinstance(value, datetime):
+        return value.date()
+    if isinstance(value, date):
+        return value
+    text = str(value or "").strip()
+    if not text:
+        return None
+    try:
+        return date.fromisoformat(text[:10])
+    except ValueError:
+        return None
+
+
+def _crediario_accounts(venda):
+    accounts = []
+    for account in getattr(venda, "contas_receber", None) or []:
+        due_date = _date(getattr(account, "data_vencimento", None))
+        if due_date is None or _ascii(getattr(account, "status", None)) in {
+            "cancelado",
+            "cancelada",
+        }:
+            continue
+        payment_type = _ascii(
+            getattr(getattr(account, "forma_pagamento", None), "tipo", None)
+        )
+        description = _ascii(getattr(account, "descricao", None))
+        if payment_type == "crediario" or "crediario" in description:
+            accounts.append(account)
+
+    if not accounts:
+        credit_payments = [
+            payment
+            for payment in (getattr(venda, "pagamentos", None) or [])
+            if _payment_code(getattr(payment, "forma_pagamento", None)) == "05"
+        ]
+        other_payments = [
+            payment
+            for payment in (getattr(venda, "pagamentos", None) or [])
+            if _payment_code(getattr(payment, "forma_pagamento", None)) != "05"
+        ]
+        if credit_payments and not other_payments:
+            accounts = [
+                account
+                for account in (getattr(venda, "contas_receber", None) or [])
+                if _date(getattr(account, "data_vencimento", None)) is not None
+                and _ascii(getattr(account, "status", None))
+                not in {"cancelado", "cancelada"}
+            ]
+
+    return sorted(
+        accounts,
+        key=lambda account: (
+            _date(getattr(account, "data_vencimento", None)),
+            int(getattr(account, "numero_parcela", None) or 0),
+            int(getattr(account, "id", None) or 0),
+        ),
+    )
+
+
+def _crediario_installments(venda):
+    """Retorna os vencimentos reais; usa o plano somente se ainda não houver contas."""
+    accounts = _crediario_accounts(venda)
+    if accounts:
+        total_accounts = len(accounts)
+        return [
+            {
+                "numero": int(getattr(account, "numero_parcela", None) or index),
+                "total_parcelas": int(
+                    getattr(account, "total_parcelas", None) or total_accounts
+                ),
+                "data_vencimento": _date(account.data_vencimento),
+                "valor": _money(
+                    getattr(account, "valor_original", None)
+                    or getattr(account, "valor_final", None)
+                ),
+            }
+            for index, account in enumerate(accounts, start=1)
+        ]
+
+    installments = []
+    for payment in getattr(venda, "pagamentos", None) or []:
+        if _payment_code(getattr(payment, "forma_pagamento", None)) != "05":
+            continue
+        first_due_date = _date(getattr(payment, "data_recebimento_prevista", None))
+        if first_due_date is None:
+            continue
+        try:
+            count = max(1, int(getattr(payment, "numero_parcelas", None) or 1))
+            plan = montar_plano_crediario(
+                valor_total=_money(getattr(payment, "valor", None)),
+                numero_parcelas=count,
+                primeira_data=first_due_date,
+                intervalo=getattr(payment, "intervalo_crediario", None),
+            )
+        except (TypeError, ValueError):
+            continue
+        installments.extend(plan)
+    return installments
+
+
+def _format_brl(value):
+    formatted = f"{_money(value):,.2f}"
+    return formatted.replace(",", "_").replace(".", ",").replace("_", ".")
+
+
+def _additional_information(venda, installments):
+    parts = [f"Venda {venda.numero_venda} - CorePet"]
+    observation = _text(getattr(venda, "observacoes", None))
+    if observation:
+        parts.append(f"Observacoes da venda: {' '.join(observation.split())}")
+    if installments:
+        schedule = "; ".join(
+            (
+                f"{item['numero']}/{item['total_parcelas']} vence em "
+                f"{item['data_vencimento'].strftime('%d/%m/%Y')} - "
+                f"R$ {_format_brl(item['valor'])}"
+            )
+            for item in installments
+        )
+        parts.append(f"Crediario: {schedule}")
+    return " | ".join(parts)[:5000]
 
 
 def _recipient(
@@ -558,6 +685,7 @@ def build_payload(db, tenant, connection, venda, document_type):
         raise DirectEmissionError(
             "Confira as formas de pagamento: a soma precisa ser igual ao total da venda."
         )
+    credit_installments = _crediario_installments(venda)
 
     channel = re.sub(r"[^a-z0-9]+", "_", _ascii(venda.canal)).strip("_")
     if channel in MARKETPLACE_CHANNELS:
@@ -575,7 +703,7 @@ def build_payload(db, tenant, connection, venda, document_type):
         "emitente": emitter,
         "produtos": products,
         "pagamentos": payments,
-        "informacoesAdicionais": f"Venda {venda.numero_venda} - CorePet",
+        "informacoesAdicionais": _additional_information(venda, credit_installments),
         "indicadorPresenca": "1" if channel == "loja_fisica" else "9",
     }
     if document_type == "nfe":
@@ -613,6 +741,16 @@ def preview(db, tenant, venda, document_type):
             for item in payload["produtos"]
         ],
         "pagamentos": payload["pagamentos"],
+        "vencimentos_crediario": [
+            {
+                "numero": item["numero"],
+                "total_parcelas": item["total_parcelas"],
+                "data_vencimento": item["data_vencimento"].isoformat(),
+                "valor": float(_money(item["valor"])),
+            }
+            for item in _crediario_installments(venda)
+        ],
+        "informacoes_adicionais": payload["informacoesAdicionais"],
         "frete": payload.get("frete", {}).get("valor", 0),
         "total": float(_money(venda.total)),
     }
@@ -710,6 +848,40 @@ def local_document_details(db, tenant, venda):
             getattr(cliente, "cnpj", None) or getattr(cliente, "cpf", None)
         )
 
+    credit_installments = _crediario_installments(venda)
+    payment_rows = []
+    credit_rows_added = False
+    for payment in venda.pagamentos or []:
+        if _payment_code(getattr(payment, "forma_pagamento", None)) == "05":
+            if credit_installments and not credit_rows_added:
+                payment_rows.extend(
+                    {
+                        "dias": None,
+                        "data": item["data_vencimento"].isoformat(),
+                        "valor": float(_money(item["valor"])),
+                        "forma": payment.forma_pagamento,
+                        "observacao": (
+                            f"Parcela {item['numero']}/{item['total_parcelas']}"
+                        ),
+                    }
+                    for item in credit_installments
+                )
+                credit_rows_added = True
+                continue
+        payment_rows.append(
+            {
+                "dias": getattr(payment, "prazo_recebimento_dias", None),
+                "data": (
+                    payment.data_recebimento_prevista.isoformat()
+                    if getattr(payment, "data_recebimento_prevista", None)
+                    else None
+                ),
+                "valor": float(_money(payment.valor)),
+                "forma": payment.forma_pagamento,
+                "observacao": getattr(payment, "numero_transacao", None),
+            }
+        )
+
     return {
         "id": venda.id,
         "numero": venda.nfe_numero,
@@ -791,26 +963,15 @@ def local_document_details(db, tenant, venda):
                 )
             )
             or None,
-            "parcelas": [
-                {
-                    "dias": getattr(payment, "prazo_recebimento_dias", None),
-                    "data": (
-                        payment.data_recebimento_prevista.isoformat()
-                        if getattr(payment, "data_recebimento_prevista", None)
-                        else None
-                    ),
-                    "valor": float(_money(payment.valor)),
-                    "forma": payment.forma_pagamento,
-                    "observacao": getattr(payment, "numero_transacao", None),
-                }
-                for payment in (venda.pagamentos or [])
-            ],
+            "parcelas": payment_rows,
         },
         "intermediador": {},
         "informacoes_adicionais": {
             "numero_pedido_loja": venda.numero_venda,
             "origem_canal_venda": venda.canal,
-            "informacoes_complementares": venda.observacoes,
+            "informacoes_complementares": _additional_information(
+                venda, credit_installments
+            ),
         },
         "pessoas_autorizadas_xml": [],
     }

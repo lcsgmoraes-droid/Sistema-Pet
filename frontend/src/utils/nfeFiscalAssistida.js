@@ -149,6 +149,11 @@ export async function corrigirEReemitirNota(vendaId) {
   return data;
 }
 
+export async function descartarTentativaRejeitada(vendaId) {
+  const { data } = await api.post(`/nfe/vendas/${vendaId}/descartar-rejeicao`);
+  return data;
+}
+
 export async function prevalidarNotaFiscal({ vendaId, tipoNota = "nfce" } = {}) {
   const response = await api.post("/nfe/prevalidar", {
     venda_id: vendaId,

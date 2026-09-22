@@ -41,6 +41,11 @@ function serializarQuantidadePorEmbalagem(item) {
   return Number.isFinite(quantidade) && quantidade > 0 ? quantidade : null;
 }
 
+function serializarFornecedorId(valor) {
+  const fornecedorId = Number(valor);
+  return Number.isFinite(fornecedorId) && fornecedorId > 0 ? fornecedorId : null;
+}
+
 export function createPedidosCompraOperacoesController({
   aplicarPedidoNoFormulario,
   carregarDados,
@@ -51,6 +56,8 @@ export function createPedidosCompraOperacoesController({
   fecharFormularioPedido,
   formData,
   obterFornecedorPorId,
+  onPedidoEdicaoAberta,
+  onPedidoSalvo,
   pedidoEditando,
   pedidoParaEnviar,
   pedidoParaExportar,
@@ -80,7 +87,7 @@ export function createPedidosCompraOperacoesController({
     try {
       const dadosEnvio = {
         ...formData,
-        fornecedor_id: parseInt(formData.fornecedor_id),
+        fornecedor_id: serializarFornecedorId(formData.fornecedor_id),
         valor_frete: parseFloat(formData.valor_frete),
         valor_desconto: parseFloat(formData.valor_desconto),
         data_prevista_entrega: formData.data_prevista_entrega
@@ -100,6 +107,7 @@ export function createPedidosCompraOperacoesController({
       toast.success("✅ Pedido criado com sucesso!");
       fecharFormularioPedido();
       carregarDados();
+      onPedidoSalvo?.();
     } catch (error) {
       console.error("Erro ao criar pedido de compra:", error);
       const detalheServidor =
@@ -363,6 +371,7 @@ export function createPedidosCompraOperacoesController({
         mostrarToast: true,
         mensagemSucesso: "Modo de edição ativado",
       });
+      onPedidoEdicaoAberta?.(pedidoCompleto);
       return;
     } catch {
       toast.error("Erro ao carregar pedido para edição");
@@ -382,7 +391,7 @@ export function createPedidosCompraOperacoesController({
 
       const dadosEnvio = {
         ...formData,
-        fornecedor_id: parseInt(formData.fornecedor_id),
+        fornecedor_id: serializarFornecedorId(formData.fornecedor_id),
         valor_frete: parseFloat(formData.valor_frete),
         valor_desconto: parseFloat(formData.valor_desconto),
         data_prevista_entrega: formData.data_prevista_entrega
@@ -403,6 +412,7 @@ export function createPedidosCompraOperacoesController({
       toast.success("✏️ Pedido atualizado com sucesso!");
       fecharFormularioPedido();
       carregarDados();
+      onPedidoSalvo?.();
     } catch (error) {
       toast.error(error.response?.data?.detail || "Erro ao atualizar pedido");
     } finally {

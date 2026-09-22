@@ -1,4 +1,5 @@
 import PropTypes from "prop-types";
+import { Download, FileText } from "lucide-react";
 import CardFiscal from "../CardFiscal";
 
 function formatarValorFiscal(valor, casas = 4) {
@@ -53,6 +54,8 @@ StatusBadge.defaultProps = {
 
 function EntradaXmlVisualizacaoNotaModal({
   aberto,
+  baixarDocumentoNota,
+  documentoBaixando,
   notaSelecionada,
   resumoConferenciaAtual,
   metaConferenciaAtual,
@@ -89,13 +92,39 @@ function EntradaXmlVisualizacaoNotaModal({
                 <p className="text-blue-100 text-sm mt-1">Serie: {notaSelecionada.serie}</p>
               </div>
             </div>
-            <button
-              onClick={onClose}
-              className="text-white hover:bg-white/20 rounded-full p-2 transition-colors"
-              title="Fechar"
-            >
-              X
-            </button>
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              {notaSelecionada.serie !== "PDF" && (
+                <>
+                  <button
+                    type="button"
+                    disabled={Boolean(documentoBaixando)}
+                    onClick={() => baixarDocumentoNota("pdf")}
+                    className="inline-flex items-center gap-2 rounded-md bg-white px-3 py-1.5 text-sm font-semibold text-blue-700 transition-colors hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    <FileText className="h-4 w-4" aria-hidden="true" />
+                    {documentoBaixando === "pdf" ? "Baixando..." : "Baixar PDF"}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={Boolean(documentoBaixando)}
+                    onClick={() => baixarDocumentoNota("xml")}
+                    className="inline-flex items-center gap-2 rounded-md bg-white/15 px-3 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-white/25 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    <Download className="h-4 w-4" aria-hidden="true" />
+                    {documentoBaixando === "xml" ? "Baixando..." : "Baixar XML"}
+                  </button>
+                </>
+              )}
+              <button
+                type="button"
+                onClick={onClose}
+                className="rounded-full p-2 text-white transition-colors hover:bg-white/20"
+                title="Fechar"
+                aria-label="Fechar visualizacao da nota"
+              >
+                X
+              </button>
+            </div>
           </div>
         </div>
 
@@ -352,6 +381,8 @@ function EntradaXmlVisualizacaoNotaModal({
 
 EntradaXmlVisualizacaoNotaModal.propTypes = {
   aberto: PropTypes.bool.isRequired,
+  baixarDocumentoNota: PropTypes.func.isRequired,
+  documentoBaixando: PropTypes.string.isRequired,
   notaSelecionada: PropTypes.shape({
     id: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
     numero_nota: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),

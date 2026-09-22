@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session, joinedload
 from ..auth.dependencies import get_current_user_and_tenant
 from ..db import get_session
 from ..models import Cliente
-from ..produtos_models import PedidoCompra, PedidoCompraItem, Produto
+from ..produtos_models import PedidoCompra, PedidoCompraItem
 from .exportacao import _montar_resposta_pedido_detalhada
 from .quantidades import (
     calcular_quantidade_total_unidades,
@@ -21,6 +21,7 @@ from .quantidades import (
 )
 from .schemas import PedidoCompraRequest, PedidoCompraResponse
 from .sugestao_queries import _resolver_fornecedores_compra
+from .validacoes import validar_fornecedor_pedido, validar_itens_pedido
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -276,29 +277,8 @@ def criar_pedido(
     current_user, tenant_id = current_user_and_tenant
     logger.info(f"📝 Criando pedido de compra - Fornecedor: {request.fornecedor_id}")
 
-    # Validar fornecedor
-    fornecedor = (
-        db.query(Cliente)
-        .filter(Cliente.id == request.fornecedor_id, Cliente.tenant_id == tenant_id)
-        .first()
-    )
-    if not fornecedor:
-        raise HTTPException(status_code=404, detail="Fornecedor não encontrado")
-
-    # Validar produtos
-    if not request.itens or len(request.itens) == 0:
-        raise HTTPException(status_code=400, detail="Pedido deve ter pelo menos 1 item")
-
-    for item_req in request.itens:
-        produto = (
-            db.query(Produto)
-            .filter(Produto.id == item_req.produto_id, Produto.tenant_id == tenant_id)
-            .first()
-        )
-        if not produto:
-            raise HTTPException(
-                status_code=404, detail=f"Produto {item_req.produto_id} não encontrado"
-            )
+    validar_fornecedor_pedido(db, tenant_id, request.fornecedor_id)
+    validar_itens_pedido(db, tenant_id, request.itens)
 
     # Gerar número do pedido
     # Calcular totais
@@ -412,6 +392,9 @@ def atualizar_pedido(
             status_code=400,
             detail=f"Pedido não pode ser editado no status '{pedido.status}'",
         )
+
+    validar_fornecedor_pedido(db, tenant_id, request.fornecedor_id)
+    validar_itens_pedido(db, tenant_id, request.itens)
 
     # Recalcular totais
     valor_total = sum(
