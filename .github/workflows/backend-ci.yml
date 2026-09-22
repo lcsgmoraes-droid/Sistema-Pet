@@ -38,8 +38,24 @@ jobs:
           pip install pytest pytest-cov pytest-asyncio ruff==0.15.12 mypy pip-audit
 
       - name: Python dependency audit (blocking)
+        shell: bash
         run: |
-          pip-audit -r requirements.lock -s osv --progress-spinner off --timeout 60
+          set +e
+          audit_output="$(pip-audit -r requirements.lock -s osv --progress-spinner off --timeout 60 2>&1)"
+          audit_status=$?
+          set -e
+          printf '%s\n' "$audit_output"
+
+          if [ "$audit_status" -eq 0 ]; then
+            exit 0
+          fi
+
+          if ! printf '%s\n' "$audit_output" | grep -Eq 'ServiceError|ConnectionError|ConnectTimeout|ReadTimeout|(429|5[0-9][0-9]) Server Error'; then
+            exit "$audit_status"
+          fi
+
+          echo 'OSV indisponivel; repetindo a auditoria pela fonte PyPI.'
+          pip-audit -r requirements.lock -s pypi --progress-spinner off --timeout 60
 
       - name: Alembic env lint (blocking)
         run: |
