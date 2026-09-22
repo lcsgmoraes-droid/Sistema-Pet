@@ -107,6 +107,7 @@ def test_build_product_rows_preserves_scan_code_but_only_valid_gtin_for_matching
 def test_production_apply_requires_backup_and_explicit_flags():
     source = Path(importer.__file__).read_text(encoding="utf-8")
 
+    assert "from app.db import base as _orm_registry" in source
     assert "--allow-production-apply" in source
     assert "--confirm-production" in source
     assert "--backup-reference" in source
