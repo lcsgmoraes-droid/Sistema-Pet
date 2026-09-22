@@ -1,7 +1,7 @@
 """Validacao e geracao de documentos das NF-e de entrada."""
 
-from defusedxml import ElementTree as ET
 from brazilfiscalreport.danfe import Danfe
+from defusedxml import ElementTree as ET
 
 
 NS = {"n": "http://www.portalfiscal.inf.br/nfe"}

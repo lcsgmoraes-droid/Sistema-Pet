@@ -1,10 +1,15 @@
+import os
 from types import SimpleNamespace
 
 import pytest
-from fastapi import HTTPException
+from fastapi import FastAPI, HTTPException
 
-from app.notas_entrada import consulta_routes
-from app.notas_entrada.documentos import validar_xml_nfe_entrada
+os.environ.setdefault("DATABASE_URL", "sqlite:///./test.db")
+os.environ.setdefault("DEBUG", "false")
+
+from app import notas_entrada_routes  # noqa: E402
+from app.notas_entrada import consulta_routes  # noqa: E402
+from app.notas_entrada.documentos import validar_xml_nfe_entrada  # noqa: E402
 
 
 CHAVE = "35260912345678000195550010000001231234567890"
@@ -44,6 +49,14 @@ def _criar_nota(*, serie="1"):
         tenant_id="tenant-a",
     )
     return nota, _FakeDB(nota)
+
+
+def test_rotas_de_documentos_estao_publicadas():
+    app = FastAPI()
+    app.include_router(notas_entrada_routes.router)
+
+    assert "/notas-entrada/{nota_id}/xml" in app.openapi()["paths"]
+    assert "/notas-entrada/{nota_id}/danfe" in app.openapi()["paths"]
 
 
 def test_validar_xml_nfe_entrada_exige_nota_autorizada():

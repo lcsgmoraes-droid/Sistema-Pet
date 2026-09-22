@@ -56,6 +56,8 @@ export function createPedidosCompraOperacoesController({
   fecharFormularioPedido,
   formData,
   obterFornecedorPorId,
+  onPedidoEdicaoAberta,
+  onPedidoSalvo,
   pedidoEditando,
   pedidoParaEnviar,
   pedidoParaExportar,
@@ -105,6 +107,7 @@ export function createPedidosCompraOperacoesController({
       toast.success("✅ Pedido criado com sucesso!");
       fecharFormularioPedido();
       carregarDados();
+      onPedidoSalvo?.();
     } catch (error) {
       console.error("Erro ao criar pedido de compra:", error);
       const detalheServidor =
@@ -368,6 +371,7 @@ export function createPedidosCompraOperacoesController({
         mostrarToast: true,
         mensagemSucesso: "Modo de edição ativado",
       });
+      onPedidoEdicaoAberta?.(pedidoCompleto);
       return;
     } catch {
       toast.error("Erro ao carregar pedido para edição");
@@ -408,6 +412,7 @@ export function createPedidosCompraOperacoesController({
       toast.success("✏️ Pedido atualizado com sucesso!");
       fecharFormularioPedido();
       carregarDados();
+      onPedidoSalvo?.();
     } catch (error) {
       toast.error(error.response?.data?.detail || "Erro ao atualizar pedido");
     } finally {

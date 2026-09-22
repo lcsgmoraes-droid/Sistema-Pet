@@ -109,6 +109,11 @@ export function usePDVVendaCarregamento({
           entrega: venda.entrega || criarEntregaVazia(),
           pagamentos,
           total_pago: totalPago,
+          nfe_tipo: venda.nfe_tipo,
+          nfe_modelo: venda.nfe_modelo,
+          nfe_status: venda.nfe_status,
+          nfe_codigo_erro: venda.nfe_codigo_erro,
+          nfe_motivo_rejeicao: venda.nfe_motivo_rejeicao,
         };
 
         setVendaAtual(vendaCarregada);

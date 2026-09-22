@@ -257,6 +257,47 @@ def test_authorization_evidence_blocks_automatic_reset():
     assert sale.nfe_correlation_id == "corr-rejeitada"
 
 
+def test_discard_rejected_attempt_releases_sale_without_reissuing(monkeypatch):
+    db = FakeDb()
+    sale = rejected_sale("441")
+    audit = []
+    monkeypatch.setattr(
+        recovery, "issue", lambda *_args: pytest.fail("não deve emitir")
+    )
+
+    result = recovery.discard_rejected_attempt(
+        db,
+        sale,
+        reset_audit=lambda old, new: audit.append((old, new)),
+    )
+
+    assert result["success"] is True
+    assert result["status_venda"] == "finalizada"
+    assert sale.nfe_status is None
+    assert sale.nfe_correlation_id is None
+    assert sale.nfe_modelo is None
+    assert audit[0][0]["codigo_erro"] == "441"
+    assert audit[0][1]["resultado"] == "tentativa_rejeitada_descartada"
+    assert db.commits == 1
+
+
+def test_discard_rejected_attempt_refuses_other_provider():
+    db = FakeDb()
+    sale = rejected_sale()
+    sale.nfe_provider = "bling"
+
+    with pytest.raises(DirectEmissionError) as raised:
+        recovery.discard_rejected_attempt(
+            db,
+            sale,
+            reset_audit=lambda *_args: pytest.fail("não deve auditar"),
+        )
+
+    assert raised.value.code == "RejeicaoNaoEncontrada"
+    assert sale.nfe_correlation_id == "corr-rejeitada"
+    assert db.commits == 0
+
+
 def test_changed_attempt_is_never_cleared_after_numbering_query(monkeypatch):
     sale = rejected_sale("539")
 

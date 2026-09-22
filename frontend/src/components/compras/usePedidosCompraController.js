@@ -61,7 +61,8 @@ export default function usePedidosCompraController() {
   const [gruposFornecedores, setGruposFornecedores] = useState([]);
   const [produtos, setProdutos] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [mostrarForm, setMostrarForm] = useState(false);
+  const [abaAtiva, setAbaAtiva] = useState("fornecedor");
+  const [mostrarForm, setMostrarForm] = useState(true);
   const [modoEdicao, setModoEdicao] = useState(false);
   const [pedidoEditando, setPedidoEditando] = useState(null);
   const [pedidoSelecionado, setPedidoSelecionado] = useState(null);
@@ -400,6 +401,7 @@ export default function usePedidosCompraController() {
     formData,
     mostrarForm,
     produtoTexto,
+    setFormData,
     setItemForm,
     itemFormInicial: ITEM_FORM_INICIAL,
     setMostrarSugestoesProduto,
@@ -445,6 +447,21 @@ export default function usePedidosCompraController() {
     setModoMontagem: porProdutos.setModoMontagem,
   });
 
+  const selecionarAbaCompra = (aba) => {
+    if (!["fornecedor", "produtos", "pedidos"].includes(aba)) return;
+
+    setAbaAtiva(aba);
+    if (aba === "pedidos") return;
+
+    if (!mostrarForm) abrirNovoFormulario();
+    porProdutos.alterarModoMontagem(aba);
+  };
+
+  const fecharFormularioEListar = () => {
+    fecharFormularioPedido();
+    setAbaAtiva("pedidos");
+  };
+
   useEffect(() => {
     const plano = location.state?.reposicaoGrupoPedido;
     if (!plano || !dadosIniciaisCarregados || planoReposicaoAplicadoRef.current) return;
@@ -458,6 +475,7 @@ export default function usePedidosCompraController() {
         "Não foi possível preparar o pedido. Confira o fornecedor do produto e recalcule o plano.",
       );
     } else {
+      setAbaAtiva("fornecedor");
       abrirNovoFormulario();
       setFornecedorTexto(fornecedor.nome || plano.fornecedor_nome || "");
       setFormData(rascunho);
@@ -510,6 +528,9 @@ export default function usePedidosCompraController() {
     fecharFormularioPedido,
     formData,
     obterFornecedorPorId,
+    onPedidoEdicaoAberta: (pedido) =>
+      setAbaAtiva(pedido?.fornecedor_id ? "fornecedor" : "produtos"),
+    onPedidoSalvo: () => setAbaAtiva("pedidos"),
     pedidoEditando,
     pedidoParaEnviar,
     pedidoParaExportar,
@@ -531,6 +552,7 @@ export default function usePedidosCompraController() {
 
   return {
     ITEM_FORM_INICIAL,
+    abaAtiva,
     adicionarItem,
     adicionarSugestoesAoPedido,
     alterarPaginaPedidos,
@@ -581,6 +603,7 @@ export default function usePedidosCompraController() {
     exportarExcel,
     exportarPDF,
     fecharFormularioPedido,
+    fecharFormularioEListar,
     fecharModalExportacao,
     fecharModalGruposFornecedores,
     fecharModalRascunho,
@@ -659,6 +682,7 @@ export default function usePedidosCompraController() {
     salvarGrupoFornecedor,
     salvandoGrupoFornecedor,
     selecionarVisaoPedidos,
+    selecionarAbaCompra,
     selecionarFornecedor,
     selecionarGrupoFornecedor,
     selecionarPreenchidosVisiveis,

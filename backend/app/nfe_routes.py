@@ -38,7 +38,10 @@ from app.intnfe.emission import (
 from app.intnfe.sharing import extrair_link_publico_nfce
 from app.intnfe.repository import get_connection, get_tenant
 from app.intnfe.numbering import NumberingError
-from app.intnfe.recovery import repair_and_retry as repair_and_retry_intnfe
+from app.intnfe.recovery import (
+    discard_rejected_attempt as discard_rejected_attempt_intnfe,
+    repair_and_retry as repair_and_retry_intnfe,
+)
 from app.bling_integration_fiscal import prevalidar_produtos_fiscais_venda
 from app.nfe.operacional_routes import (
     CancelarNFeRequest as CancelarNFeRequest,
@@ -384,6 +387,41 @@ def corrigir_reemitir_intnfe_venda(
         ) from None
     finally:
         api.close()
+
+
+@router.post("/vendas/{venda_id}/descartar-rejeicao")
+def descartar_rejeicao_intnfe_venda(
+    venda_id: int,
+    db: Session = Depends(get_session),
+    user_and_tenant=Depends(get_current_user_and_tenant),
+):
+    """Libera uma venda cuja tentativa IntNFe foi rejeitada, sem retransmitir."""
+    current_user, tenant_id = user_and_tenant
+    venda = _buscar_venda_para_nfe(db, venda_id, tenant_id)
+    if not venda:
+        raise HTTPException(404, "Venda não encontrada")
+
+    def reset_audit(old_value, new_value):
+        log_action(
+            db,
+            user_id=current_user.id,
+            tenant_id=tenant_id,
+            action="intnfe_descartar_rejeicao",
+            entity_type="venda",
+            entity_id=venda.id,
+            old_value=old_value,
+            new_value=new_value,
+            commit=False,
+        )
+
+    try:
+        return discard_rejected_attempt_intnfe(
+            db,
+            venda,
+            reset_audit=reset_audit,
+        )
+    except DirectEmissionError as exc:
+        raise _direct_failure(exc) from None
 
 
 @router.get("/vendas/{venda_id}/detalhes")

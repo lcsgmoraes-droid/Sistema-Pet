@@ -1,12 +1,21 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "react-hot-toast";
 import api from "../../api";
+import { criarItemCatalogoPedido } from "./pedidoCompraPorProdutosUtils";
 
 function extrairProdutos(response) {
-  const produtos = Array.isArray(response?.data)
-    ? response.data
-    : response?.data?.items || response?.data?.produtos || [];
-  return produtos.filter((produto) => produto.tipo_produto !== "PAI");
+  const payload = response?.data || {};
+  const produtos = Array.isArray(payload) ? payload : payload.items || payload.produtos || [];
+  const items = produtos.filter((produto) => produto.tipo_produto !== "PAI");
+  return {
+    items,
+    paginacao: {
+      total: Number(payload.total ?? items.length),
+      page: Number(payload.page || 1),
+      page_size: Number(payload.page_size || 25),
+      pages: Number(payload.pages || (items.length ? 1 : 0)),
+    },
+  };
 }
 
 export default function usePedidoCompraPorProdutos({
@@ -14,6 +23,7 @@ export default function usePedidoCompraPorProdutos({
   formData,
   mostrarForm,
   produtoTexto,
+  setFormData,
   setItemForm,
   itemFormInicial,
   setMostrarSugestoesProduto,
@@ -23,6 +33,13 @@ export default function usePedidoCompraPorProdutos({
   const [modoMontagem, setModoMontagem] = useState("fornecedor");
   const [filtroProdutosPedido, setFiltroProdutosPedido] = useState("estoque_baixo");
   const [loadingProdutosPedido, setLoadingProdutosPedido] = useState(false);
+  const [paginaProdutosPedido, setPaginaProdutosPedido] = useState(1);
+  const [paginacaoProdutosPedido, setPaginacaoProdutosPedido] = useState({
+    total: 0,
+    page: 1,
+    page_size: 25,
+    pages: 0,
+  });
   const [produtosVinculoSelecionados, setProdutosVinculoSelecionados] = useState([]);
   const [vinculoComoPrincipal, setVinculoComoPrincipal] = useState(true);
   const [vinculandoProdutos, setVinculandoProdutos] = useState(false);
@@ -54,15 +71,20 @@ export default function usePedidoCompraPorProdutos({
         setLoadingProdutosPedido(true);
         try {
           const params = {
-            page: 1,
-          page_size: 80,
-          include_variations: true,
-          busca_completa: true,
-          estoque_baixo: !produtoTexto.trim() && filtroProdutosPedido === "estoque_baixo",
+            page: paginaProdutosPedido,
+            page_size: 25,
+            filtro: filtroProdutosPedido,
           };
           if (produtoTexto.trim()) params.busca = produtoTexto.trim();
-          const response = await api.get("/produtos/", { params });
-          if (!cancelado) setProdutos(extrairProdutos(response));
+          const response = await api.get("/pedidos-compra/catalogo-produtos", { params });
+          if (!cancelado) {
+            const resultado = extrairProdutos(response);
+            setProdutos(resultado.items);
+            setPaginacaoProdutosPedido(resultado.paginacao);
+            if (resultado.paginacao.page !== paginaProdutosPedido) {
+              setPaginaProdutosPedido(resultado.paginacao.page);
+            }
+          }
         } catch (error) {
           if (!cancelado) {
             console.error("Erro ao pesquisar produtos para o pedido:", error);
@@ -79,11 +101,29 @@ export default function usePedidoCompraPorProdutos({
       cancelado = true;
       clearTimeout(timer);
     };
-  }, [filtroProdutosPedido, modoMontagem, mostrarForm, produtoTexto, setProdutos]);
+  }, [
+    filtroProdutosPedido,
+    modoMontagem,
+    mostrarForm,
+    paginaProdutosPedido,
+    produtoTexto,
+    setProdutos,
+  ]);
+
+  const alterarFiltroProdutosPedido = (filtro) => {
+    setFiltroProdutosPedido(filtro);
+    setPaginaProdutosPedido(1);
+  };
+
+  const alterarTermoProdutosPedido = (termo) => {
+    setProdutoTexto(termo);
+    setPaginaProdutosPedido(1);
+  };
 
   const alterarModoMontagem = (modo) => {
     setModoMontagem(modo);
     setProdutoTexto("");
+    setPaginaProdutosPedido(1);
     setItemForm(itemFormInicial);
     setMostrarSugestoesProduto(false);
     if (modo === "fornecedor") {
@@ -92,9 +132,47 @@ export default function usePedidoCompraPorProdutos({
     }
   };
 
+  const adicionarProdutoCatalogo = (produto, quantidade, custoUnitario) => {
+    if (Number(quantidade) <= 0) {
+      toast.error("Informe uma quantidade maior que zero");
+      return;
+    }
+
+    const produtoJaAdicionado = formData.itens.some(
+      (item) => Number(item.produto_id) === Number(produto.id),
+    );
+
+    setFormData((atual) => {
+      const itemIndex = atual.itens.findIndex(
+        (item) => Number(item.produto_id) === Number(produto.id),
+      );
+      const itemAtual = itemIndex >= 0 ? atual.itens[itemIndex] : null;
+      const proximoItem = criarItemCatalogoPedido({
+        produto,
+        quantidade,
+        custoUnitario,
+        itemAtual,
+      });
+
+      if (!proximoItem) return atual;
+
+      const itens = [...atual.itens];
+      if (itemIndex >= 0) itens[itemIndex] = proximoItem;
+      else itens.push(proximoItem);
+
+      return { ...atual, itens };
+    });
+
+    toast.success(
+      produtoJaAdicionado ? "Produto atualizado no pedido" : "Produto adicionado ao pedido",
+    );
+  };
+
   const resetarModoMontagem = () => {
     setModoMontagem("fornecedor");
     setFiltroProdutosPedido("estoque_baixo");
+    setPaginaProdutosPedido(1);
+    setPaginacaoProdutosPedido({ total: 0, page: 1, page_size: 25, pages: 0 });
     setProdutosVinculoSelecionados([]);
     setVinculoComoPrincipal(true);
     idsAnterioresRef.current = new Set();
@@ -143,15 +221,20 @@ export default function usePedidoCompraPorProdutos({
   };
 
   return {
+    adicionarProdutoCatalogo,
+    alterarFiltroProdutosPedido,
     alterarModoMontagem,
+    alterarTermoProdutosPedido,
     alternarProdutoVinculo,
     alternarTodosProdutosVinculo,
     filtroProdutosPedido,
     loadingProdutosPedido,
     modoMontagem,
+    paginaProdutosPedido,
+    paginacaoProdutosPedido,
     produtosVinculoSelecionados,
     resetarModoMontagem,
-    setFiltroProdutosPedido,
+    setPaginaProdutosPedido,
     setModoMontagem,
     setVinculoComoPrincipal,
     vincularProdutosFornecedorPedido,

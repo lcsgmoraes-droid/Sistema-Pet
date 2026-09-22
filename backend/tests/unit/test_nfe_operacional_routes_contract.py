@@ -7,7 +7,6 @@ from app.nfe import listagem
 from app.nfe import operacional_routes
 from fastapi import FastAPI
 
-
 EXPECTED_SUBROUTES = {
     ("/{nfe_id}/reconciliar-fluxo", "POST"),
     ("/{nfe_id}", "GET"),
@@ -25,6 +24,7 @@ EXPECTED_SUBROUTES = {
 EXPECTED_PUBLIC_ROUTES = {
     (f"/nfe{path}", method) for path, method in EXPECTED_SUBROUTES
 }
+EXPECTED_PUBLIC_ROUTES.add(("/nfe/vendas/{venda_id}/descartar-rejeicao", "POST"))
 
 
 def _route_signatures(router):
