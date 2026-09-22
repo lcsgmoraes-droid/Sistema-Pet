@@ -4,7 +4,9 @@ from datetime import datetime
 
 import pytest
 
+from app import nfe_routes
 from app.nfe_routes import (
+    _conteudo_danfe_intnfe_venda,
     _danfe_response_metadata,
     _normalizar_nota_pedido_integrado,
     _enriquecer_notas_com_pedidos_integrados,
@@ -22,16 +24,80 @@ from app.nfe_routes import (
 )
 
 
-def test_danfe_nfce_is_returned_as_thermal_html():
+def test_danfe_nfce_is_returned_as_thermal_pdf():
     assert _danfe_response_metadata(
         SimpleNamespace(nfe_tipo="nfce", nfe_modelo="65")
-    ) == ("text/html", "html")
+    ) == ("application/pdf", "pdf")
 
 
 def test_danfe_nfe_is_returned_as_pdf():
     assert _danfe_response_metadata(
         SimpleNamespace(nfe_tipo="nfe", nfe_modelo="55")
     ) == ("application/pdf", "pdf")
+
+
+def test_danfe_nfce_usa_pdf_local_gerado_do_xml_autorizado(monkeypatch):
+    gerar = Mock(return_value=b"%PDF-local")
+    baixar = Mock()
+    monkeypatch.setattr(nfe_routes, "gerar_danfe_nfce", gerar)
+    monkeypatch.setattr(nfe_routes, "download_intnfe_document", baixar)
+    venda = SimpleNamespace(
+        nfe_tipo="nfce",
+        nfe_modelo="65",
+        nfe_xml="<nfeProc />",
+        nfe_chave="123",
+    )
+
+    assert _conteudo_danfe_intnfe_venda(Mock(), venda, Mock()) == b"%PDF-local"
+    gerar.assert_called_once_with(b"<nfeProc />", "123")
+    baixar.assert_not_called()
+
+
+def test_danfe_nfce_busca_xml_quando_a_venda_ainda_nao_o_armazenou(monkeypatch):
+    gerar = Mock(return_value=b"%PDF-local")
+    baixar = Mock(return_value=b"<nfeProc />")
+    monkeypatch.setattr(nfe_routes, "gerar_danfe_nfce", gerar)
+    monkeypatch.setattr(nfe_routes, "download_intnfe_document", baixar)
+    db, api = Mock(), Mock()
+    venda = SimpleNamespace(
+        nfe_tipo="nfce",
+        nfe_modelo="65",
+        nfe_xml=None,
+        nfe_chave="123",
+    )
+
+    assert _conteudo_danfe_intnfe_venda(db, venda, api) == b"%PDF-local"
+    baixar.assert_called_once_with(db, venda, api, "xml")
+    gerar.assert_called_once_with(b"<nfeProc />", "123")
+
+
+def test_danfe_nfce_retorna_erro_controlado_quando_xml_e_invalido(monkeypatch):
+    monkeypatch.setattr(
+        nfe_routes,
+        "gerar_danfe_nfce",
+        Mock(side_effect=ValueError("xml inválido")),
+    )
+    venda = SimpleNamespace(
+        nfe_tipo="nfce",
+        nfe_modelo="65",
+        nfe_xml="<xml-invalido />",
+        nfe_chave="123",
+    )
+
+    with pytest.raises(nfe_routes.DirectEmissionError, match="XML autorizado") as erro:
+        _conteudo_danfe_intnfe_venda(Mock(), venda, Mock())
+
+    assert erro.value.status == 502
+
+
+def test_danfe_nfe_preserva_pdf_oficial_do_provedor(monkeypatch):
+    baixar = Mock(return_value=b"%PDF-provedor")
+    monkeypatch.setattr(nfe_routes, "download_intnfe_document", baixar)
+    db, api = Mock(), Mock()
+    venda = SimpleNamespace(nfe_tipo="nfe", nfe_modelo="55")
+
+    assert _conteudo_danfe_intnfe_venda(db, venda, api) == b"%PDF-provedor"
+    baixar.assert_called_once_with(db, venda, api, "danfe")
 
 
 def test_situacao_num_prioriza_valor_quando_bling_retorna_objeto():

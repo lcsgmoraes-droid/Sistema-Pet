@@ -136,10 +136,14 @@ def gerar_danfe_nfce(xml: bytes, chave: str) -> bytes:
     if not qr:
         raise ValueError("O XML da NFC-e não contém o QR Code de consulta.")
 
-    largura, margem = 80 * mm, 4 * mm
+    largura, margem = 80 * mm, 3 * mm
     util = largura - 2 * margem
     normal = ParagraphStyle(
-        "normal", fontName="Helvetica", fontSize=8, leading=10, spaceAfter=3
+        "normal",
+        fontName="Helvetica-Bold",
+        fontSize=9,
+        leading=11.2,
+        spaceAfter=3,
     )
     centro = ParagraphStyle("centro", parent=normal, alignment=1)
     linhas = []
