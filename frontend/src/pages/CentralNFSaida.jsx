@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import api from "../api";
 import CentralNFSaidaView from "./centralNFSaida/CentralNFSaidaView";
 import {
@@ -41,13 +42,17 @@ async function mensagemDocumento(error, padrao) {
 }
 
 export default function CentralNFSaida() {
+  const [searchParams] = useSearchParams();
+  const buscaInicial = searchParams.get("busca") || "";
+  const vendaIdInicial = searchParams.get("venda_id") || "";
+  const abrirNotaInicial = searchParams.get("abrir") === "1";
   const [notas, setNotas] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filtroSituacao, setFiltroSituacao] = useState("");
   const [dataInicial, setDataInicial] = useState("");
   const [dataFinal, setDataFinal] = useState("");
-  const [busca, setBusca] = useState("");
-  const [buscaAplicada, setBuscaAplicada] = useState("");
+  const [busca, setBusca] = useState(buscaInicial);
+  const [buscaAplicada, setBuscaAplicada] = useState(buscaInicial);
   const [filtroCanal, setFiltroCanal] = useState("");
   const [canais, setCanais] = useState([]);
   const [pagina, setPagina] = useState(1);
@@ -71,6 +76,7 @@ export default function CentralNFSaida() {
   const [corrigindoNotaId, setCorrigindoNotaId] = useState("");
   const [liberandoVendaId, setLiberandoVendaId] = useState("");
   const detalhesNotasCacheRef = useRef(new Map());
+  const notaDiretaAbertaRef = useRef(false);
 
   const [painelSefazAberto, setPainelSefazAberto] = useState(false);
   const [chave, setChave] = useState("");
@@ -139,9 +145,21 @@ export default function CentralNFSaida() {
       if (buscaAplicada) params.set("busca", buscaAplicada);
       const response = await api.get(`/nfe/lista?${params.toString()}`);
       if (requisicao !== requisicaoListaRef.current) return;
-      setNotas(response.data.notas || []);
+      const notasRecebidas = response.data.notas || [];
+      setNotas(notasRecebidas);
       setTotalNotas(response.data.total || 0);
       setCanais(response.data.canais || []);
+      if (abrirNotaInicial && !notaDiretaAbertaRef.current) {
+        const notaDireta = notasRecebidas.find(
+          (nota) =>
+            (vendaIdInicial && String(nota.venda_id || "") === vendaIdInicial) ||
+            (buscaInicial && String(nota.numero || "") === buscaInicial),
+        );
+        if (notaDireta) {
+          notaDiretaAbertaRef.current = true;
+          await abrirDetalhes(notaDireta);
+        }
+      }
     } catch {
       if (requisicao === requisicaoListaRef.current) setErro("Erro ao carregar notas fiscais");
     } finally {
