@@ -4,6 +4,7 @@ import test from "node:test";
 import {
   extrairCamposFiscaisVenda,
   obterSituacaoFiscalVenda,
+  rotaNotaFiscalVenda,
   temDocumentoFiscalVenda,
 } from "./pdvFiscalStatus.js";
 
@@ -52,4 +53,12 @@ test("preserva todos os campos fiscais ao abrir a venda no PDV", () => {
   assert.equal(campos.nfe_chave, "123");
   assert.equal(campos.nfe_tipo, null);
   assert.equal("outro_campo" in campos, false);
+});
+
+test("monta acesso direto da venda para a nota fiscal", () => {
+  assert.equal(
+    rotaNotaFiscalVenda({ id: 26, nfe_modelo: 55, nfe_numero: 1631 }),
+    "/notas-fiscais/saida?abrir=1&busca=1631&venda_id=26",
+  );
+  assert.equal(rotaNotaFiscalVenda({ id: 26 }), null);
 });

@@ -92,3 +92,13 @@ export function obterSituacaoFiscalVenda(venda = {}) {
     detalhe: detalhes.join(" — "),
   };
 }
+
+export function rotaNotaFiscalVenda(venda = {}) {
+  if (!temDocumentoFiscalVenda(venda)) return null;
+
+  const parametros = new URLSearchParams({ abrir: "1" });
+  if (venda.nfe_numero) parametros.set("busca", String(venda.nfe_numero));
+  if (venda.id) parametros.set("venda_id", String(venda.id));
+
+  return `/notas-fiscais/saida?${parametros.toString()}`;
+}

@@ -1,6 +1,6 @@
-import { AlertCircle, FileText } from "lucide-react";
+import { AlertCircle, ExternalLink, FileText } from "lucide-react";
 import SaleReference from "../ui/SaleReference";
-import { obterSituacaoFiscalVenda } from "../../utils/pdvFiscalStatus";
+import { obterSituacaoFiscalVenda, rotaNotaFiscalVenda } from "../../utils/pdvFiscalStatus";
 import { buildValidadePdvMessage } from "./pdvValidadeAlertUtils";
 
 const ESTILOS_FISCAIS = {
@@ -33,6 +33,7 @@ export default function PDVInfoBanners({
 }) {
   const mensagemValidade = buildValidadePdvMessage(validadeAlertas);
   const situacaoFiscal = modoVisualizacao ? obterSituacaoFiscalVenda(vendaAtual) : null;
+  const rotaNotaFiscal = situacaoFiscal ? rotaNotaFiscalVenda(vendaAtual) : null;
 
   return (
     <>
@@ -88,14 +89,28 @@ export default function PDVInfoBanners({
         <div
           className={`border-b px-4 py-2 ${ESTILOS_FISCAIS[situacaoFiscal.intent] || ESTILOS_FISCAIS.info}`}
         >
-          <div className="mx-auto flex max-w-5xl items-start gap-2">
-            <FileText className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
-            <div className="min-w-0">
-              <div className="text-sm font-semibold">{situacaoFiscal.titulo}</div>
-              {situacaoFiscal.detalhe && (
-                <div className="mt-0.5 text-xs">{situacaoFiscal.detalhe}</div>
-              )}
+          <div className="mx-auto flex max-w-5xl flex-wrap items-start justify-between gap-2">
+            <div className="flex min-w-0 items-start gap-2">
+              <FileText className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+              <div className="min-w-0">
+                <div className="text-sm font-semibold">{situacaoFiscal.titulo}</div>
+                {situacaoFiscal.detalhe && (
+                  <div className="mt-0.5 text-xs">{situacaoFiscal.detalhe}</div>
+                )}
+              </div>
             </div>
+            {rotaNotaFiscal && (
+              <a
+                className="inline-flex items-center gap-1 rounded-md border border-current bg-white/70 px-2 py-1 text-xs font-semibold transition-colors hover:bg-white"
+                href={rotaNotaFiscal}
+                rel="noopener noreferrer"
+                target="_blank"
+                title="Abrir esta nota fiscal em uma nova aba"
+              >
+                <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
+                Abrir NF
+              </a>
+            )}
           </div>
         </div>
       )}
