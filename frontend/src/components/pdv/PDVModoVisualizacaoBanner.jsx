@@ -4,6 +4,7 @@ import { useModulos } from "../../contexts/ModulosContext";
 import ImprimirCupom from "../ImprimirCupom";
 import ActionButton from "../ui/ActionButton";
 import { podeAbrirDevolucaoVenda } from "../../utils/pdvReturnEligibility";
+import ImprimirDocumentoFiscalButton from "./ImprimirDocumentoFiscalButton";
 import ModalSelecaoDocumentoFiscal from "./ModalSelecaoDocumentoFiscal";
 
 export default function PDVModoVisualizacaoBanner({
@@ -55,6 +56,7 @@ export default function PDVModoVisualizacaoBanner({
           </div>
           <div className="flex flex-wrap items-center justify-end gap-2">
             <ImprimirCupom venda={vendaAtual} size="md" className="min-w-[132px]" />
+            <ImprimirDocumentoFiscalButton venda={vendaAtual} size="md" className="min-w-[132px]" />
 
             {podeAbrirDevolucao && (
               <ActionButton

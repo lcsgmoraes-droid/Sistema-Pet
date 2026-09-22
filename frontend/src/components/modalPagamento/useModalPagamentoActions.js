@@ -300,14 +300,21 @@ export function useModalPagamentoActions({
         globalThis.alert(
           `${tipoNota === "nfe" ? "NF-e" : "NFC-e"} recebida pelo emissor e ainda em processamento. Consulte novamente em Notas Fiscais.`,
         );
+        onConfirmar();
+        return { autorizada: false, processando: true, data: resultado.data };
       } else if (transmissao?.success === false) {
         globalThis.alert(
           `${tipoNota === "nfe" ? "NF-e" : "NFC-e"} criada, mas a transmissão não foi concluída automaticamente.\n\n${transmissao.erro || ""}`.trim(),
         );
-      } else {
-        globalThis.alert(`${tipoNota === "nfe" ? "NF-e" : "NFC-e"} autorizada com sucesso!`);
+        onConfirmar();
+        return { autorizada: false, processando: true, data: resultado.data };
       }
-      onConfirmar();
+      return {
+        autorizada: true,
+        data: resultado?.data,
+        tipoNota,
+        vendaId: vendaFinalizadaId,
+      };
     } catch (error) {
       console.error("Erro ao emitir nota:", error);
       const mensagem = extrairMensagemNFe(error);
@@ -327,12 +334,16 @@ export function useModalPagamentoActions({
               globalThis.alert(
                 "A correção foi aplicada e a nova tentativa ainda está em processamento. Consulte a Central de NF de Saída.",
               );
+              onConfirmar();
+              return { autorizada: false, processando: true, data: reemissao };
             } else {
-              globalThis.alert(
-                `${tipoNota === "nfe" ? "NF-e" : "NFC-e"} corrigida e autorizada com sucesso!`,
-              );
+              return {
+                autorizada: true,
+                data: reemissao,
+                tipoNota,
+                vendaId: vendaFinalizadaId,
+              };
             }
-            onConfirmar();
           } catch (recoveryError) {
             const recoveryMessage = extrairMensagemNFe(recoveryError);
             setErro(recoveryMessage);

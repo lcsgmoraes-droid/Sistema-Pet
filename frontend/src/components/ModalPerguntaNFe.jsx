@@ -8,6 +8,7 @@ import { concluirVendaComCupom } from "../utils/pdvCupomFinalizacao";
 import { ehVendaCrediario } from "../utils/pdvReceipt";
 import { temPendenciasFiscais } from "../utils/nfeFiscalAssistida";
 import { CupomImpressao } from "./ImprimirCupom";
+import ImprimirDocumentoFiscalButton from "./pdv/ImprimirDocumentoFiscalButton";
 import NfceCpfPrompt from "./pdv/NfceCpfPrompt";
 import SeletorModeloDocumentoFiscal from "./SeletorModeloDocumentoFiscal";
 
@@ -33,6 +34,7 @@ export default function ModalPerguntaNFe({
   const [tipoNota, setTipoNota] = useState("nfce");
   const [nfceCpfResolved, setNfceCpfResolved] = useState(Boolean(documentoCliente));
   const [savedCustomerDocument, setSavedCustomerDocument] = useState("");
+  const [documentoEmitido, setDocumentoEmitido] = useState(null);
   const [headerHelpOpen, setHeaderHelpOpen] = useState(false);
   const { carregandoEmpresa, dadosEmpresa } = useDadosCupomEmpresa();
   const {
@@ -55,6 +57,23 @@ export default function ModalPerguntaNFe({
       imprimirCupom,
       onConcluir: onConfirmar,
     });
+  };
+
+  const handleEmitir = async (modelo = tipoNota) => {
+    const resultado = await onEmitir(modelo);
+    if (resultado?.autorizada) {
+      setDocumentoEmitido({
+        ...venda,
+        id: vendaId,
+        nfe_tipo: modelo,
+        nfe_modelo: modelo === "nfce" ? 65 : 55,
+        nfe_numero: resultado.data?.numero || null,
+        nfe_status: "autorizada",
+        nfe_provider: resultado.data?.provedor || "intnfe",
+        nfe_correlation_id: resultado.data?.correlation_id || null,
+      });
+    }
+    return resultado;
   };
 
   return (
@@ -96,7 +115,7 @@ export default function ModalPerguntaNFe({
           )}
 
           <div className="space-y-3">
-            {moduloFiscalAtivo && (
+            {moduloFiscalAtivo && !documentoEmitido && (
               <>
                 <SeletorModeloDocumentoFiscal
                   clienteIdentificado={clienteIdentificado}
@@ -111,7 +130,7 @@ export default function ModalPerguntaNFe({
                 <NfceCpfPrompt
                   cliente={cliente}
                   disabled={loading}
-                  onContinueWithoutCpf={() => onEmitir("nfce")}
+                  onContinueWithoutCpf={() => handleEmitir("nfce")}
                   onResolvedChange={setNfceCpfResolved}
                   onSaved={(updatedCustomer) => {
                     setSavedCustomerDocument(updatedCustomer?.cpf || "cpf-salvo");
@@ -123,7 +142,7 @@ export default function ModalPerguntaNFe({
                 {(loading || !selectedModelBlocked) && (
                   <button
                     type="button"
-                    onClick={() => onEmitir(tipoNota)}
+                    onClick={() => handleEmitir(tipoNota)}
                     disabled={loading}
                     className={`flex w-full items-center justify-center space-x-2 rounded-lg px-4 py-3 font-medium text-white transition-colors disabled:opacity-50 ${
                       tipoNota === "nfce"
@@ -149,6 +168,20 @@ export default function ModalPerguntaNFe({
               </>
             )}
 
+            {documentoEmitido && (
+              <div className="rounded-md border border-emerald-200 bg-emerald-50 p-3">
+                <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-emerald-800">
+                  <CheckCircle className="h-4 w-4" aria-hidden="true" />
+                  {documentoEmitido.nfe_tipo === "nfce" ? "NFC-e" : "NF-e"} autorizada
+                </div>
+                <ImprimirDocumentoFiscalButton
+                  venda={documentoEmitido}
+                  className="w-full justify-center"
+                  size="md"
+                />
+              </div>
+            )}
+
             <button
               type="button"
               onClick={handleFinalizar}
@@ -156,7 +189,7 @@ export default function ModalPerguntaNFe({
               className="flex w-full items-center justify-center space-x-2 rounded-lg bg-gray-100 px-4 py-3 font-medium text-gray-700 transition-colors hover:bg-gray-200 disabled:opacity-50"
             >
               <CheckCircle className="h-5 w-5" />
-              <span>Finalizar</span>
+              <span>{documentoEmitido ? "Concluir venda" : "Finalizar"}</span>
             </button>
 
             <label

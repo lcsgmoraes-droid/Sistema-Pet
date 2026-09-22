@@ -4,6 +4,8 @@ import test from "node:test";
 import {
   extrairCamposFiscaisVenda,
   obterSituacaoFiscalVenda,
+  podeImprimirDocumentoFiscalVenda,
+  rotaDanfeFiscalVenda,
   rotaNotaFiscalVenda,
   temDocumentoFiscalVenda,
 } from "./pdvFiscalStatus.js";
@@ -61,4 +63,38 @@ test("monta acesso direto da venda para a nota fiscal", () => {
     "/notas-fiscais/saida?abrir=1&busca=1631&venda_id=26",
   );
   assert.equal(rotaNotaFiscalVenda({ id: 26 }), null);
+});
+
+test("monta a rota do DANFE conforme o provedor fiscal", () => {
+  assert.equal(
+    rotaDanfeFiscalVenda({
+      id: 26,
+      nfe_modelo: 65,
+      nfe_provider: "intnfe",
+      nfe_correlation_id: "corr-26",
+    }),
+    "/nfe/vendas/26/danfe",
+  );
+  assert.equal(
+    rotaDanfeFiscalVenda({
+      id: 27,
+      nfe_modelo: 55,
+      nfe_provider: "bling",
+      nfe_bling_id: 910,
+    }),
+    "/nfe/910/danfe",
+  );
+});
+
+test("só permite imprimir documento fiscal autorizado", () => {
+  const venda = {
+    id: 26,
+    nfe_modelo: 65,
+    nfe_provider: "intnfe",
+    nfe_correlation_id: "corr-26",
+  };
+
+  assert.equal(podeImprimirDocumentoFiscalVenda({ ...venda, nfe_status: "autorizada" }), true);
+  assert.equal(podeImprimirDocumentoFiscalVenda({ ...venda, nfe_status: "processando" }), false);
+  assert.equal(podeImprimirDocumentoFiscalVenda({ ...venda, nfe_status: "rejeitada" }), false);
 });

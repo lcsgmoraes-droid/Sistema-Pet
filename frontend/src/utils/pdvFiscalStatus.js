@@ -102,3 +102,23 @@ export function rotaNotaFiscalVenda(venda = {}) {
 
   return `/notas-fiscais/saida?${parametros.toString()}`;
 }
+
+export function rotaDanfeFiscalVenda(venda = {}) {
+  if (!venda.id || !temDocumentoFiscalVenda(venda)) return null;
+
+  const provedor = normalizar(venda.nfe_provider);
+  if (provedor === "intnfe" || venda.nfe_correlation_id) {
+    return `/nfe/vendas/${venda.id}/danfe`;
+  }
+  if (venda.nfe_bling_id) {
+    return `/nfe/${venda.nfe_bling_id}/danfe`;
+  }
+  return null;
+}
+
+export function podeImprimirDocumentoFiscalVenda(venda = {}) {
+  const status = normalizar(venda.nfe_status);
+  return Boolean(
+    rotaDanfeFiscalVenda(venda) && (status === "autorizada" || status === "emitida_danfe"),
+  );
+}
