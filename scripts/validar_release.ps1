@@ -103,8 +103,14 @@ function Invoke-BackendDependencyAudit {
 
     Push-Location $WorkingDirectory
     try {
-        $osvOutput = & $Python @commonArguments -s osv 2>&1
-        $osvExitCode = $LASTEXITCODE
+        $previousErrorActionPreference = $ErrorActionPreference
+        try {
+            $ErrorActionPreference = 'Continue'
+            $osvOutput = & $Python @commonArguments -s osv 2>&1
+            $osvExitCode = $LASTEXITCODE
+        } finally {
+            $ErrorActionPreference = $previousErrorActionPreference
+        }
         $osvOutput | ForEach-Object { Write-Host $_ }
 
         if ($osvExitCode -eq 0) {
