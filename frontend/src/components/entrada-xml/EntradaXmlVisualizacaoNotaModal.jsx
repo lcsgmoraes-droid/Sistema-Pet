@@ -1,6 +1,8 @@
 import PropTypes from "prop-types";
-import { Download, FileText } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Download, FileText, X } from "lucide-react";
 import CardFiscal from "../CardFiscal";
+import { formatMoneyBRL } from "../../utils/formatters";
+import ActionButton from "../ui/ActionButton";
 
 function formatarValorFiscal(valor, casas = 4) {
   return Number(valor || 0).toLocaleString("pt-BR", {
@@ -37,7 +39,7 @@ function StatusBadge({ status }) {
 
   return (
     <span
-      className={`px-3 py-1 rounded-full text-sm font-semibold ${styles[status] || "bg-gray-200"}`}
+      className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${styles[status] || "bg-gray-200"}`}
     >
       {labels[status] || String(status || "").toUpperCase()}
     </span>
@@ -76,302 +78,328 @@ function EntradaXmlVisualizacaoNotaModal({
       : "Revisar acoes e processar";
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/50">
-      <div className="bg-white w-full h-full overflow-hidden flex flex-col">
-        <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-4">
-          <div className="flex items-start justify-between gap-3">
-            <div className="flex items-center gap-3">
-              <button
-                onClick={onClose}
-                className="px-3 py-1.5 rounded-md bg-white/15 hover:bg-white/25 text-sm font-semibold transition-colors"
-              >
-                Voltar
-              </button>
-              <div>
-                <h2 className="text-xl font-bold">NF-e {notaSelecionada.numero_nota}</h2>
-                <p className="text-blue-100 text-sm mt-1">Serie: {notaSelecionada.serie}</p>
+    <div className="fixed inset-0 z-50 bg-slate-950/50">
+      <div className="flex h-full w-full flex-col overflow-hidden bg-slate-50">
+        <div className="shrink-0 border-b border-slate-200 bg-white">
+          <div className="mx-auto flex w-full max-w-[1600px] items-center gap-3 px-4 py-2.5">
+            <button
+              type="button"
+              onClick={onClose}
+              className="inline-flex h-9 items-center gap-2 rounded-lg px-2.5 text-sm font-semibold text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900"
+            >
+              <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+              <span className="hidden sm:inline">Voltar</span>
+            </button>
+
+            <div className="min-w-0 flex-1 border-l border-slate-200 pl-3">
+              <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+                <h2 className="truncate text-lg font-bold text-slate-900">
+                  NF-e {notaSelecionada.numero_nota}
+                </h2>
+                <span className="text-xs text-slate-400">Serie {notaSelecionada.serie}</span>
+                <StatusBadge status={notaSelecionada.status} />
               </div>
+              <p className="truncate text-xs text-slate-500">{notaSelecionada.fornecedor_nome}</p>
             </div>
-            <div className="flex flex-wrap items-center justify-end gap-2">
-              {notaSelecionada.serie !== "PDF" && (
-                <>
+
+            {notaSelecionada.serie !== "PDF" && (
+              <div className="flex shrink-0 items-center gap-2">
+                <ActionButton
+                  disabled={Boolean(documentoBaixando)}
+                  icon={FileText}
+                  intent="pdf"
+                  loading={documentoBaixando === "pdf"}
+                  onClick={() => baixarDocumentoNota("pdf")}
+                  size="sm"
+                >
+                  <span className="hidden md:inline">Baixar PDF</span>
+                  <span className="md:hidden">PDF</span>
+                </ActionButton>
+                <ActionButton
+                  disabled={Boolean(documentoBaixando)}
+                  icon={Download}
+                  intent="neutral"
+                  loading={documentoBaixando === "xml"}
+                  onClick={() => baixarDocumentoNota("xml")}
+                  size="sm"
+                  tone="soft"
+                >
+                  <span className="hidden md:inline">Baixar XML</span>
+                  <span className="md:hidden">XML</span>
+                </ActionButton>
+              </div>
+            )}
+
+            <button
+              type="button"
+              onClick={onClose}
+              className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900"
+              title="Fechar"
+              aria-label="Fechar visualizacao da nota"
+            >
+              <X className="h-5 w-5" aria-hidden="true" />
+            </button>
+          </div>
+        </div>
+
+        <div className="flex-1 overflow-y-auto">
+          <div className="mx-auto w-full max-w-[1600px] space-y-3 p-3 md:p-4">
+            <section className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
+              <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_auto] xl:items-center">
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm">
+                    <div className="min-w-0">
+                      <div className="text-[11px] font-medium uppercase tracking-wide text-slate-400">
+                        Fornecedor
+                      </div>
+                      <div className="truncate font-semibold text-slate-800">
+                        {notaSelecionada.fornecedor_nome}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-[11px] font-medium uppercase tracking-wide text-slate-400">
+                        Emissao
+                      </div>
+                      <div className="font-semibold text-slate-700">
+                        {new Date(notaSelecionada.data_emissao).toLocaleDateString("pt-BR")}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-[11px] font-medium uppercase tracking-wide text-slate-400">
+                        CNPJ
+                      </div>
+                      <div className="font-mono text-xs font-medium text-slate-600">
+                        {notaSelecionada.fornecedor_cnpj}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="mt-2 flex min-w-0 items-center gap-2 border-t border-slate-100 pt-2 text-xs text-slate-500">
+                    <span className="shrink-0 font-medium">Chave</span>
+                    <span className="truncate font-mono" title={notaSelecionada.chave_acesso}>
+                      {notaSelecionada.chave_acesso}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap gap-2 xl:justify-end">
+                  <div className="min-w-[112px] rounded-lg bg-emerald-50 px-3 py-2">
+                    <div className="text-[11px] font-medium text-emerald-700">Valor total</div>
+                    <div className="font-bold text-emerald-700">
+                      {formatMoneyBRL(notaSelecionada.valor_total || 0)}
+                    </div>
+                  </div>
+                  <div className="min-w-[82px] rounded-lg bg-slate-100 px-3 py-2">
+                    <div className="text-[11px] text-slate-500">Itens</div>
+                    <div className="font-bold text-slate-800">{itens.length}</div>
+                  </div>
+                  <div className="min-w-[82px] rounded-lg bg-emerald-50 px-3 py-2">
+                    <div className="text-[11px] text-emerald-700">Vinculados</div>
+                    <div className="font-bold text-emerald-700">
+                      {notaSelecionada.produtos_vinculados}
+                    </div>
+                  </div>
+                  <div className="min-w-[82px] rounded-lg bg-amber-50 px-3 py-2">
+                    <div className="text-[11px] text-amber-700">Pendentes</div>
+                    <div className="font-bold text-amber-700">
+                      {notaSelecionada.produtos_nao_vinculados}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            {resumoConferenciaAtual && (
+              <section className="rounded-xl border border-emerald-200 bg-emerald-50/60 px-3 py-2.5">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1.5">
+                    <div
+                      className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold ${metaConferenciaAtual?.cls || "bg-gray-100 text-gray-700 border-gray-200"}`}
+                    >
+                      {metaConferenciaAtual?.label || "Nao conferida"}
+                    </div>
+                    <p className="text-sm text-slate-600">
+                      Entrada prevista:{" "}
+                      <strong className="text-slate-800">
+                        {formatarValorFiscal(resumoConferenciaAtual.quantidade_total_conferida, 2)}
+                      </strong>
+                      {resumoConferenciaAtual.itens_com_divergencia > 0 && (
+                        <>
+                          <span className="mx-2 text-slate-300">|</span>
+                          Divergencias:{" "}
+                          <strong className="text-orange-700">
+                            {resumoConferenciaAtual.itens_com_divergencia}
+                          </strong>
+                        </>
+                      )}
+                    </p>
+                  </div>
                   <button
                     type="button"
-                    disabled={Boolean(documentoBaixando)}
-                    onClick={() => baixarDocumentoNota("pdf")}
-                    className="inline-flex items-center gap-2 rounded-md bg-white px-3 py-1.5 text-sm font-semibold text-blue-700 transition-colors hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-60"
+                    onClick={() => onAbrirConferencia(notaSelecionada.id)}
+                    className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-emerald-600 px-3 text-xs font-semibold text-white transition-colors hover:bg-emerald-700"
                   >
-                    <FileText className="h-4 w-4" aria-hidden="true" />
-                    {documentoBaixando === "pdf" ? "Baixando..." : "Baixar PDF"}
+                    <CheckCircle2 className="h-4 w-4" aria-hidden="true" />
+                    Conferencia
                   </button>
-                  <button
-                    type="button"
-                    disabled={Boolean(documentoBaixando)}
-                    onClick={() => baixarDocumentoNota("xml")}
-                    className="inline-flex items-center gap-2 rounded-md bg-white/15 px-3 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-white/25 disabled:cursor-not-allowed disabled:opacity-60"
+                </div>
+              </section>
+            )}
+
+            <section>
+              <div className="mb-2 flex items-center justify-between">
+                <h3 className="text-sm font-bold text-slate-800">Itens da Nota</h3>
+                <span className="text-xs text-slate-500">{itens.length} produto(s)</span>
+              </div>
+              <div className="space-y-2">
+                {itens.map((item) => (
+                  <article
+                    key={item.id}
+                    className="rounded-xl border border-slate-200 bg-white p-3"
                   >
-                    <Download className="h-4 w-4" aria-hidden="true" />
-                    {documentoBaixando === "xml" ? "Baixando..." : "Baixar XML"}
+                    <div className="mb-1.5 flex items-start justify-between gap-3">
+                      <div className="flex-1">
+                        <div className="text-sm font-semibold text-slate-800">{item.descricao}</div>
+                        <div className="mt-0.5 text-[11px] text-slate-500">
+                          Codigo: {item.codigo_produto} | NCM: {item.ncm}
+                        </div>
+                      </div>
+                      {item.vinculado ? (
+                        <span className="rounded-full bg-green-100 px-2 py-1 text-[11px] font-semibold text-green-800">
+                          Vinculado
+                        </span>
+                      ) : (
+                        <span className="rounded-full bg-orange-100 px-2 py-1 text-[11px] font-semibold text-orange-800">
+                          Nao Vinculado
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="mt-2 grid grid-cols-2 gap-x-4 gap-y-2 border-t border-slate-100 pt-2 text-xs md:grid-cols-5">
+                      <div>
+                        <span className="text-gray-600">Qtd:</span>
+                        <div className="font-semibold">{item.quantidade}</div>
+                      </div>
+                      <div>
+                        <span className="text-gray-600">Unit:</span>
+                        <div className="font-semibold text-rose-700">
+                          {formatMoneyBRL(item.valor_unitario || 0)}
+                        </div>
+                      </div>
+                      <div>
+                        <span className="text-gray-600">Custo Aq.:</span>
+                        <div className="font-semibold text-amber-700">
+                          R$ {formatarValorFiscal(obterCustoAquisicaoItem(item), 4)}
+                        </div>
+                      </div>
+                      <div>
+                        <span className="text-gray-600">Total fiscal:</span>
+                        <div className="font-semibold text-rose-700">
+                          {formatMoneyBRL(item.valor_total || 0)}
+                        </div>
+                      </div>
+                      <div>
+                        <span className="text-gray-600">CFOP:</span>
+                        <div className="font-semibold">{item.cfop}</div>
+                      </div>
+                    </div>
+
+                    <CardFiscal
+                      nota={notaSelecionada}
+                      item={item}
+                      composicao={item.composicao_custo}
+                    />
+
+                    {(item.lote || item.data_validade) && (
+                      <div className="mt-2 flex flex-wrap gap-x-5 gap-y-1 rounded-lg bg-slate-50 px-3 py-2 text-xs">
+                        {item.lote && (
+                          <div>
+                            <span className="text-slate-500">Lote: </span>
+                            <span className="font-semibold text-slate-800">{item.lote}</span>
+                          </div>
+                        )}
+                        {item.data_validade && (
+                          <div>
+                            <span className="text-slate-500">Validade: </span>
+                            <span className="font-semibold text-slate-800">
+                              {new Date(item.data_validade).toLocaleDateString("pt-BR")}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {item.vinculado && item.produto_nome && (
+                      <div className="mt-2 border-t border-slate-100 pt-2">
+                        <span className="text-xs text-gray-600">Produto vinculado: </span>
+                        <span className="text-xs font-semibold text-blue-600">
+                          {item.produto_nome}
+                        </span>
+                      </div>
+                    )}
+
+                    {item.tem_divergencia && (
+                      <div className="mt-3 rounded-lg border border-orange-200 bg-orange-50 p-3 text-xs text-orange-900">
+                        <div className="font-semibold mb-1">Divergencia registrada</div>
+                        <div>
+                          Estoque: {formatarValorFiscal(item.quantidade_conferida, 2)} | Avaria:{" "}
+                          {formatarValorFiscal(item.quantidade_avariada, 2)} | Faltante:{" "}
+                          {formatarValorFiscal(item.quantidade_faltante, 2)}
+                        </div>
+                        {item.observacao_conferencia && (
+                          <div className="mt-1">Obs.: {item.observacao_conferencia}</div>
+                        )}
+                      </div>
+                    )}
+                  </article>
+                ))}
+              </div>
+            </section>
+          </div>
+        </div>
+
+        <div className="shrink-0 border-t border-slate-200 bg-white px-4 py-3">
+          <div className="mx-auto flex w-full max-w-[1600px] flex-wrap items-center justify-between gap-3">
+            <div className="text-xs text-slate-600">
+              {notaSelecionada.entrada_estoque_realizada ? (
+                <span className="text-green-600 font-semibold">Entrada realizada no estoque</span>
+              ) : (
+                <span className="text-orange-600 font-semibold">Entrada ainda nao processada</span>
+              )}
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {podeAbrirProcessamento && (
+                <>
+                  {notaSelecionada.status === "pendente" && (
+                    <button
+                      onClick={() => onAbrirConferencia(notaSelecionada.id)}
+                      className="h-9 rounded-lg bg-emerald-600 px-3.5 text-sm font-semibold text-white hover:bg-emerald-700"
+                    >
+                      Conferencia
+                    </button>
+                  )}
+                  <button
+                    onClick={() => onAjustarCustos(notaSelecionada.id)}
+                    className="h-9 rounded-lg bg-violet-600 px-3.5 text-sm font-semibold text-white hover:bg-violet-700"
+                  >
+                    {textoBotaoProcessamento}
                   </button>
                 </>
               )}
+              {notaSelecionada.status === "pendente" && (
+                <button
+                  onClick={() => onAbrirDetalhes(notaSelecionada.id)}
+                  className="h-9 rounded-lg bg-blue-600 px-3.5 text-sm font-semibold text-white hover:bg-blue-700"
+                >
+                  Vincular Produtos
+                </button>
+              )}
               <button
-                type="button"
                 onClick={onClose}
-                className="rounded-full p-2 text-white transition-colors hover:bg-white/20"
-                title="Fechar"
-                aria-label="Fechar visualizacao da nota"
+                className="h-9 rounded-lg border border-slate-300 px-3.5 text-sm font-semibold text-slate-700 hover:bg-slate-50"
               >
-                X
+                Voltar
               </button>
             </div>
-          </div>
-        </div>
-
-        <div className="flex-1 overflow-y-auto p-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-            <div>
-              <h3 className="font-semibold text-gray-700 mb-2">Dados da Nota</h3>
-              <div className="space-y-1.5 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Data Emissao:</span>
-                  <span className="font-semibold">
-                    {new Date(notaSelecionada.data_emissao).toLocaleDateString("pt-BR")}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Status:</span>
-                  <span>
-                    <StatusBadge status={notaSelecionada.status} />
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Valor Total:</span>
-                  <span className="font-bold text-green-600">
-                    R$ {Number(notaSelecionada.valor_total || 0).toFixed(2)}
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            <div>
-              <h3 className="font-semibold text-gray-700 mb-2">Fornecedor</h3>
-              <div className="space-y-1.5 text-sm">
-                <div>
-                  <span className="text-gray-600">Nome:</span>
-                  <div className="font-semibold">{notaSelecionada.fornecedor_nome}</div>
-                </div>
-                <div>
-                  <span className="text-gray-600">CNPJ:</span>
-                  <div className="font-mono text-xs">{notaSelecionada.fornecedor_cnpj}</div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="mb-4 p-3 bg-gray-50 rounded">
-            <div className="text-xs text-gray-600 mb-1">Chave de Acesso</div>
-            <div className="font-mono text-xs break-all">{notaSelecionada.chave_acesso}</div>
-          </div>
-
-          <div className="grid grid-cols-3 gap-3 mb-4">
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-center">
-              <div className="text-xl font-bold text-blue-600">{itens.length}</div>
-              <div className="text-xs text-gray-600">Total Itens</div>
-            </div>
-            <div className="bg-green-50 border border-green-200 rounded-lg p-3 text-center">
-              <div className="text-xl font-bold text-green-600">
-                {notaSelecionada.produtos_vinculados}
-              </div>
-              <div className="text-xs text-gray-600">Vinculados</div>
-            </div>
-            <div className="bg-orange-50 border border-orange-200 rounded-lg p-3 text-center">
-              <div className="text-xl font-bold text-orange-600">
-                {notaSelecionada.produtos_nao_vinculados}
-              </div>
-              <div className="text-xs text-gray-600">Nao Vinculados</div>
-            </div>
-          </div>
-
-          {resumoConferenciaAtual && (
-            <div className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50/70 p-4">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div>
-                  <div
-                    className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold ${metaConferenciaAtual?.cls || "bg-gray-100 text-gray-700 border-gray-200"}`}
-                  >
-                    {metaConferenciaAtual?.label || "Nao conferida"}
-                  </div>
-                  <p className="text-sm text-gray-700 mt-2">
-                    Entrada prevista em estoque:{" "}
-                    <strong>
-                      {formatarValorFiscal(resumoConferenciaAtual.quantidade_total_conferida, 2)}
-                    </strong>
-                    {resumoConferenciaAtual.itens_com_divergencia > 0 && (
-                      <>
-                        {" "}
-                        | Divergencias:{" "}
-                        <strong>{resumoConferenciaAtual.itens_com_divergencia}</strong>
-                      </>
-                    )}
-                  </p>
-                </div>
-                <button
-                  onClick={() => onAbrirConferencia(notaSelecionada.id)}
-                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-semibold"
-                >
-                  Conferencia
-                </button>
-              </div>
-            </div>
-          )}
-
-          <div>
-            <h3 className="font-semibold text-gray-700 mb-2">Itens da Nota</h3>
-            <div className="space-y-2">
-              {itens.map((item) => (
-                <div key={item.id} className="border border-gray-200 rounded-lg p-3">
-                  <div className="flex justify-between items-start mb-1.5">
-                    <div className="flex-1">
-                      <div className="font-semibold text-gray-800 text-sm">{item.descricao}</div>
-                      <div className="text-xs text-gray-500 mt-1">
-                        Codigo: {item.codigo_produto} | NCM: {item.ncm}
-                      </div>
-                    </div>
-                    {item.vinculado ? (
-                      <span className="px-2 py-1 bg-green-100 text-green-800 text-xs font-semibold rounded">
-                        Vinculado
-                      </span>
-                    ) : (
-                      <span className="px-2 py-1 bg-orange-100 text-orange-800 text-xs font-semibold rounded">
-                        Nao Vinculado
-                      </span>
-                    )}
-                  </div>
-
-                  <div className="grid grid-cols-2 md:grid-cols-5 gap-2 text-xs mt-2">
-                    <div>
-                      <span className="text-gray-600">Qtd:</span>
-                      <div className="font-semibold">{item.quantidade}</div>
-                    </div>
-                    <div>
-                      <span className="text-gray-600">Unit:</span>
-                      <div className="font-semibold">
-                        R$ {Number(item.valor_unitario || 0).toFixed(2)}
-                      </div>
-                    </div>
-                    <div>
-                      <span className="text-gray-600">Custo Aq.:</span>
-                      <div className="font-semibold text-amber-700">
-                        R$ {formatarValorFiscal(obterCustoAquisicaoItem(item), 4)}
-                      </div>
-                    </div>
-                    <div>
-                      <span className="text-gray-600">Total:</span>
-                      <div className="font-semibold text-green-600">
-                        R$ {Number(item.valor_total || 0).toFixed(2)}
-                      </div>
-                    </div>
-                    <div>
-                      <span className="text-gray-600">CFOP:</span>
-                      <div className="font-semibold">{item.cfop}</div>
-                    </div>
-                  </div>
-
-                  <CardFiscal
-                    nota={notaSelecionada}
-                    item={item}
-                    composicao={item.composicao_custo}
-                  />
-
-                  {(item.lote || item.data_validade) && (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-2 text-xs">
-                      {item.lote && (
-                        <div className="bg-purple-50 border border-purple-200 rounded p-2">
-                          <span className="text-gray-600">Lote:</span>
-                          <div className="font-semibold text-purple-800">{item.lote}</div>
-                        </div>
-                      )}
-                      {item.data_validade && (
-                        <div className="bg-orange-50 border border-orange-200 rounded p-2">
-                          <span className="text-gray-600">Validade:</span>
-                          <div className="font-semibold text-orange-800">
-                            {new Date(item.data_validade).toLocaleDateString("pt-BR")}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {item.vinculado && item.produto_nome && (
-                    <div className="mt-2 pt-2 border-t border-gray-200">
-                      <span className="text-xs text-gray-600">Produto vinculado: </span>
-                      <span className="text-sm font-semibold text-blue-600">
-                        {item.produto_nome}
-                      </span>
-                    </div>
-                  )}
-
-                  {item.tem_divergencia && (
-                    <div className="mt-3 rounded-lg border border-orange-200 bg-orange-50 p-3 text-xs text-orange-900">
-                      <div className="font-semibold mb-1">Divergencia registrada</div>
-                      <div>
-                        Estoque: {formatarValorFiscal(item.quantidade_conferida, 2)} | Avaria:{" "}
-                        {formatarValorFiscal(item.quantidade_avariada, 2)} | Faltante:{" "}
-                        {formatarValorFiscal(item.quantidade_faltante, 2)}
-                      </div>
-                      {item.observacao_conferencia && (
-                        <div className="mt-1">Obs.: {item.observacao_conferencia}</div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        <div className="border-t p-4 md:p-6 bg-gray-50 flex flex-wrap justify-between items-center gap-3">
-          <div className="text-sm text-gray-600">
-            {notaSelecionada.entrada_estoque_realizada ? (
-              <span className="text-green-600 font-semibold">Entrada realizada no estoque</span>
-            ) : (
-              <span className="text-orange-600 font-semibold">Entrada ainda nao processada</span>
-            )}
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {podeAbrirProcessamento && (
-              <>
-                {notaSelecionada.status === "pendente" && (
-                  <button
-                    onClick={() => onAbrirConferencia(notaSelecionada.id)}
-                    className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-semibold"
-                  >
-                    Conferencia
-                  </button>
-                )}
-                <button
-                  onClick={() => onAjustarCustos(notaSelecionada.id)}
-                  className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-semibold"
-                >
-                  {textoBotaoProcessamento}
-                </button>
-              </>
-            )}
-            {notaSelecionada.status === "pendente" && (
-              <button
-                onClick={() => onAbrirDetalhes(notaSelecionada.id)}
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold"
-              >
-                Vincular Produtos
-              </button>
-            )}
-            <button
-              onClick={onClose}
-              className="px-4 py-2 border border-gray-300 rounded-lg font-semibold hover:bg-gray-50"
-            >
-              Voltar
-            </button>
           </div>
         </div>
       </div>

@@ -45,19 +45,23 @@ function EntradaXmlDetalhesItemCard({
   const podeEditarQuantidadesItem = notaSelecionada.status === "pendente";
 
   return (
-    <div className="border-2 border-gray-400 rounded-lg overflow-hidden bg-white shadow-sm">
+    <div className="overflow-hidden rounded-xl border-2 border-slate-300 bg-white shadow-sm">
       {/* Grade de 2 Colunas: NF-e (esquerda) | Conexão | Produto Sistema (direita) */}
-      <div className="grid grid-cols-[1fr_auto_1fr] gap-0">
+      <div className="grid grid-cols-1 gap-0 lg:grid-cols-[1fr_auto_1fr]">
         {/* COLUNA ESQUERDA: Dados da NF-e */}
-        <div className="bg-blue-50 border-r-2 border-gray-300 p-4">
-          <div className="flex items-center gap-2 mb-3">
-            <div className="bg-blue-600 text-white px-2 py-1 rounded text-xs font-bold">NF-e</div>
+        <div className="border-b border-slate-300 bg-white p-3 lg:border-b-0 lg:border-r">
+          <div className="mb-2 flex items-center gap-2">
+            <div className="rounded border border-blue-200 bg-blue-50 px-2 py-0.5 text-[11px] font-bold text-blue-700">
+              NF-e
+            </div>
             {getConfiancaBadge(item.confianca_vinculo)}
           </div>
 
-          <div className="font-semibold text-base mb-2 text-blue-900">{item.descricao}</div>
+          <div className="mb-2 text-sm font-semibold leading-tight text-slate-900">
+            {item.descricao}
+          </div>
 
-          <div className="space-y-1.5 text-sm">
+          <div className="grid grid-cols-2 gap-x-5 gap-y-1 text-xs 2xl:grid-cols-3">
             <div className="flex justify-between">
               <span className="text-gray-600">Codigo:</span>
               <span className="font-mono font-semibold">{item.codigo_produto}</span>
@@ -80,13 +84,15 @@ function EntradaXmlDetalhesItemCard({
               <span className="text-gray-600">NCM:</span>
               <span className="font-mono font-semibold">{item.ncm}</span>
             </div>
-            <div className="flex justify-between border-t pt-1.5 mt-1.5">
+            <div className="flex justify-between">
               <span className="text-gray-600">Qtd:</span>
               <span className="font-semibold">{item.quantidade}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-gray-600">Valor Unit.:</span>
-              <span className="font-semibold">R$ {item.valor_unitario.toFixed(2)}</span>
+              <span className="font-semibold text-rose-700">
+                R$ {formatarValorFiscal(item.valor_unitario, 2)}
+              </span>
             </div>
             <div className="flex justify-between">
               <span className="text-gray-600">Custo Aquisição:</span>
@@ -95,105 +101,107 @@ function EntradaXmlDetalhesItemCard({
               </span>
             </div>
             <div className="flex justify-between">
-              <span className="text-gray-600">Total:</span>
-              <span className="font-semibold text-green-600">R$ {item.valor_total.toFixed(2)}</span>
+              <span className="text-gray-600">Total fiscal:</span>
+              <span className="font-semibold text-rose-700">
+                R$ {formatarValorFiscal(item.valor_total, 2)}
+              </span>
             </div>
             <div className="flex justify-between">
               <span className="text-gray-600">CFOP:</span>
               <span className="font-semibold">{item.cfop}</span>
             </div>
-
-            {/* Pack / Caixa: multiplicador manual ou auto-detectado */}
-            {notaSelecionada.status === "pendente" && (
-              <div className="mt-2 pt-2 border-t border-blue-200">
-                <div className="flex items-center justify-between gap-2 mb-1 flex-wrap">
-                  <span className="text-gray-600 text-xs font-semibold">Pack (unid./caixa):</span>
-                  <div className="flex items-center gap-1.5 flex-wrap justify-end">
-                    {packConfig.packDetectadoAutomatico && (
-                      <span className="text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded font-semibold">
-                        📦 auto
-                      </span>
-                    )}
-                    {packConfig.sugestaoAutomaticaDiferenteDoPadrao && (
-                      <span className="text-xs bg-amber-100 text-amber-800 px-2 py-0.5 rounded font-semibold">
-                        Conferir sugestão x{packConfig.multiplicadorDetectado}
-                      </span>
-                    )}
-                    {packConfig.overrideManual && (
-                      <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded font-semibold">
-                        Usando x{packConfig.multiplicador} digitado
-                      </span>
-                    )}
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="number"
-                    min="1"
-                    max="200"
-                    value={packConfig.multiplicador}
-                    onChange={(e) => {
-                      const v = Math.max(1, Math.min(200, Number.parseInt(e.target.value) || 1));
-                      setMultiplicadoresPack((prev) => ({ ...prev, [item.id]: v }));
-                    }}
-                    className={`w-20 px-2 py-1 border-2 rounded text-sm text-right font-semibold focus:ring-2 ${
-                      packConfig.overrideManual
-                        ? "border-blue-400 bg-blue-50 text-blue-900 focus:ring-blue-500"
-                        : packConfig.sugestaoAutomaticaDiferenteDoPadrao
-                          ? "border-amber-400 bg-amber-50 text-amber-900 focus:ring-amber-500"
-                          : "border-blue-300 focus:ring-blue-500"
-                    }`}
-                  />
-                  <span className="text-xs text-gray-500">unid. por caixa</span>
-                </div>
-                {(packConfig.sugestaoAutomaticaDiferenteDoPadrao || packConfig.overrideManual) && (
-                  <div
-                    className={`mt-1.5 rounded p-2 text-xs space-y-0.5 border ${
-                      packConfig.overrideManual
-                        ? "bg-blue-50 border-blue-200 text-blue-800"
-                        : "bg-amber-50 border-amber-200 text-amber-800"
-                    }`}
-                  >
-                    <div>
-                      {packConfig.overrideManual
-                        ? "✏️ Valor digitado considerado nos cálculos."
-                        : "🤖 Sugestão automática aplicada nos cálculos."}
-                    </div>
-                    <div>
-                      🔢 Qtd efetiva: <strong>{itemAjustado.quantidade_efetiva}</strong> unid. (
-                      {item.quantidade} cx × {packConfig.multiplicador})
-                    </div>
-                    <div>
-                      💰 Custo unit.:{" "}
-                      <strong>R$ {obterCustoAquisicaoItem(itemAjustado).toFixed(4)}</strong>
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-
-            <CardFiscal
-              nota={notaSelecionada}
-              item={itemAjustado}
-              composicao={itemAjustado.composicao_custo}
-            />
           </div>
+
+          {/* Pack / Caixa: multiplicador manual ou auto-detectado */}
+          {notaSelecionada.status === "pendente" && (
+            <div className="mt-2 border-t border-slate-200 pt-2">
+              <div className="flex items-center justify-between gap-2 mb-1 flex-wrap">
+                <span className="text-gray-600 text-xs font-semibold">Pack (unid./caixa):</span>
+                <div className="flex items-center gap-1.5 flex-wrap justify-end">
+                  {packConfig.packDetectadoAutomatico && (
+                    <span className="text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded font-semibold">
+                      📦 auto
+                    </span>
+                  )}
+                  {packConfig.sugestaoAutomaticaDiferenteDoPadrao && (
+                    <span className="text-xs bg-amber-100 text-amber-800 px-2 py-0.5 rounded font-semibold">
+                      Conferir sugestão x{packConfig.multiplicadorDetectado}
+                    </span>
+                  )}
+                  {packConfig.overrideManual && (
+                    <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded font-semibold">
+                      Usando x{packConfig.multiplicador} digitado
+                    </span>
+                  )}
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <input
+                  type="number"
+                  min="1"
+                  max="200"
+                  value={packConfig.multiplicador}
+                  onChange={(e) => {
+                    const v = Math.max(1, Math.min(200, Number.parseInt(e.target.value) || 1));
+                    setMultiplicadoresPack((prev) => ({ ...prev, [item.id]: v }));
+                  }}
+                  className={`w-20 px-2 py-1 border-2 rounded text-sm text-right font-semibold focus:ring-2 ${
+                    packConfig.overrideManual
+                      ? "border-blue-400 bg-blue-50 text-blue-900 focus:ring-blue-500"
+                      : packConfig.sugestaoAutomaticaDiferenteDoPadrao
+                        ? "border-amber-400 bg-amber-50 text-amber-900 focus:ring-amber-500"
+                        : "border-blue-300 focus:ring-blue-500"
+                  }`}
+                />
+                <span className="text-xs text-gray-500">unid. por caixa</span>
+              </div>
+              {(packConfig.sugestaoAutomaticaDiferenteDoPadrao || packConfig.overrideManual) && (
+                <div
+                  className={`mt-1.5 rounded p-2 text-xs space-y-0.5 border ${
+                    packConfig.overrideManual
+                      ? "bg-blue-50 border-blue-200 text-blue-800"
+                      : "bg-amber-50 border-amber-200 text-amber-800"
+                  }`}
+                >
+                  <div>
+                    {packConfig.overrideManual
+                      ? "✏️ Valor digitado considerado nos cálculos."
+                      : "🤖 Sugestão automática aplicada nos cálculos."}
+                  </div>
+                  <div>
+                    🔢 Qtd efetiva: <strong>{itemAjustado.quantidade_efetiva}</strong> unid. (
+                    {item.quantidade} cx × {packConfig.multiplicador})
+                  </div>
+                  <div>
+                    💰 Custo unit.:{" "}
+                    <strong>R$ {obterCustoAquisicaoItem(itemAjustado).toFixed(4)}</strong>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          <CardFiscal
+            nota={notaSelecionada}
+            item={itemAjustado}
+            composicao={itemAjustado.composicao_custo}
+          />
 
           {/* Lote e Validade */}
           {(item.lote || item.data_validade) && (
-            <div className="mt-3 pt-3 border-t space-y-2">
+            <div className="mt-2 flex flex-wrap gap-x-5 gap-y-1 border-t pt-2">
               {item.lote && (
                 <div className="text-xs">
                   <span className="text-gray-600">Lote:</span>
-                  <div className="font-semibold text-purple-800">{item.lote}</div>
+                  <span className="ml-1 font-semibold text-purple-800">{item.lote}</span>
                 </div>
               )}
               {item.data_validade && (
                 <div className="text-xs">
                   <span className="text-gray-600">Validade:</span>
-                  <div className="font-semibold text-orange-800">
+                  <span className="ml-1 font-semibold text-orange-800">
                     {new Date(item.data_validade).toLocaleDateString("pt-BR")}
-                  </div>
+                  </span>
                 </div>
               )}
             </div>
@@ -201,12 +209,12 @@ function EntradaXmlDetalhesItemCard({
         </div>
 
         {/* COLUNA CENTRAL: Ícone de Conexão + Alerta de Divergência */}
-        <div className="flex flex-col items-center justify-center bg-gray-100 px-2 py-4">
+        <div className="flex items-center justify-center border-b border-slate-300 bg-slate-50 px-3 py-2 lg:flex-col lg:border-b-0 lg:px-2 lg:py-3">
           {item.produto_id ? (
             <>
               <button
                 onClick={() => desvincularProduto(notaSelecionada.id, item.id)}
-                className="text-3xl text-green-600 hover:text-red-600 transition-colors mb-2"
+                className="rounded-full border border-emerald-200 bg-white px-1.5 text-sm font-bold text-emerald-600 transition-colors hover:border-red-200 hover:text-red-600 lg:mb-2"
                 title="Vinculado - Clique para desvincular"
               >
                 V
@@ -226,81 +234,79 @@ function EntradaXmlDetalhesItemCard({
               )}
             </>
           ) : (
-            <div className="text-3xl text-gray-400" title="❌ Não vinculado">
+            <div className="text-lg font-bold text-gray-400" title="❌ Não vinculado">
               X
             </div>
           )}
         </div>
 
         {/* COLUNA DIREITA: Produto do Sistema */}
-        <div className={`p-4 ${item.produto_id ? "bg-green-50" : "bg-gray-50"}`}>
-          {/* COLUNA DIREITA: Produto do Sistema */}
-          <div className={`p-4 ${item.produto_id ? "bg-green-50" : "bg-gray-50"}`}>
-            {notaSelecionada.status === "pendente" ? (
-              <>
-                {item.produto_id ? (
-                  <>
-                    <div className="flex items-center gap-2 mb-3">
-                      <div className="bg-green-600 text-white px-2 py-1 rounded text-xs font-bold">
-                        PRODUTO SISTEMA
-                      </div>
+        <div className={`p-3 ${item.produto_id ? "bg-white" : "bg-slate-50"}`}>
+          {notaSelecionada.status === "pendente" ? (
+            <>
+              {item.produto_id ? (
+                <>
+                  <div className="mb-2 flex items-center gap-2">
+                    <div className="rounded border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] font-bold text-emerald-700">
+                      PRODUTO SISTEMA
                     </div>
+                  </div>
 
-                    <div className="font-semibold text-base mb-3 text-green-900">
-                      {item.produto_nome}
+                  <div className="mb-2 text-sm font-semibold text-slate-900">
+                    {item.produto_nome}
+                  </div>
+
+                  <div className="mb-2 grid grid-cols-2 gap-x-5 gap-y-1 rounded border border-slate-200 bg-slate-50 p-2 text-xs">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-semibold text-gray-600">SKU:</span>
+                      <span className="font-mono text-gray-900">
+                        {item.produto_codigo || "Nao informado"}
+                      </span>
                     </div>
-
-                    <div className="mb-3 rounded border border-green-200 bg-white/80 p-2 text-xs space-y-1">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-semibold text-gray-600">Cod. barras:</span>
+                      <span className="font-mono text-gray-900">
+                        {item.produto_ean || "Nao informado"}
+                      </span>
+                    </div>
+                    {item.produto_gtin_ean && (
                       <div className="flex items-center justify-between gap-2">
-                        <span className="font-semibold text-gray-600">SKU:</span>
+                        <span className="font-semibold text-gray-600">EAN comercial:</span>
+                        <span className="font-mono text-gray-900">{item.produto_gtin_ean}</span>
+                      </div>
+                    )}
+                    {item.produto_ean_tributario && (
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-semibold text-gray-600">EAN fiscal:</span>
                         <span className="font-mono text-gray-900">
-                          {item.produto_codigo || "Nao informado"}
+                          {item.produto_ean_tributario}
                         </span>
                       </div>
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="font-semibold text-gray-600">Cod. barras:</span>
-                        <span className="font-mono text-gray-900">
-                          {item.produto_ean || "Nao informado"}
-                        </span>
+                    )}
+                    {item.origem_vinculo_automatico && item.referencia_vinculo && (
+                      <div className="col-span-2 mt-1 border-l-2 border-emerald-400 bg-white px-2 py-1 text-slate-600">
+                        Match automatico por{" "}
+                        <strong>
+                          {item.origem_vinculo_automatico === "codigo_barras"
+                            ? "codigo de barras"
+                            : "SKU"}
+                        </strong>
+                        : <strong>{item.referencia_vinculo}</strong>
                       </div>
-                      {item.produto_gtin_ean && (
-                        <div className="flex items-center justify-between gap-2">
-                          <span className="font-semibold text-gray-600">EAN comercial:</span>
-                          <span className="font-mono text-gray-900">{item.produto_gtin_ean}</span>
-                        </div>
-                      )}
-                      {item.produto_ean_tributario && (
-                        <div className="flex items-center justify-between gap-2">
-                          <span className="font-semibold text-gray-600">EAN fiscal:</span>
-                          <span className="font-mono text-gray-900">
-                            {item.produto_ean_tributario}
-                          </span>
-                        </div>
-                      )}
-                      {item.origem_vinculo_automatico && item.referencia_vinculo && (
-                        <div className="mt-2 rounded border border-emerald-200 bg-emerald-50 p-2 text-emerald-800">
-                          Match automatico por{" "}
-                          <strong>
-                            {item.origem_vinculo_automatico === "codigo_barras"
-                              ? "codigo de barras"
-                              : "SKU"}
-                          </strong>
-                          : <strong>{item.referencia_vinculo}</strong>
-                        </div>
-                      )}
-                    </div>
+                    )}
+                  </div>
 
-                    <div className="text-xs text-green-700 mb-3 italic">
-                      Para alterar o vinculo, selecione outro produto ou clique no V para
-                      desvincular
-                    </div>
+                  <div className="mb-1.5 text-[11px] text-slate-500">
+                    Para alterar o vinculo, selecione outro produto ou clique no V para desvincular
+                  </div>
 
+                  <div className="grid gap-2 xl:grid-cols-[minmax(180px,0.8fr)_minmax(260px,1.2fr)]">
                     <input
                       type="text"
-                      placeholder="Pesquisar outro produto para trocar..."
+                      placeholder="Pesquisar outro produto..."
                       value={filtroProduto[item.id] || ""}
                       onChange={(e) => atualizarFiltroProduto(item.id, e.target.value)}
-                      className="w-full px-3 py-2 border-2 border-green-300 rounded focus:ring-2 focus:ring-green-500 text-sm mb-2"
+                      className="w-full rounded border border-slate-300 px-3 py-1.5 text-sm focus:border-emerald-400 focus:ring-2 focus:ring-emerald-500"
                     />
 
                     {/* Select para trocar produto */}
@@ -311,7 +317,7 @@ function EntradaXmlDetalhesItemCard({
                           vincularProduto(notaSelecionada.id, item.id, e.target.value);
                         }
                       }}
-                      className="w-full px-3 py-2 border-2 border-green-400 rounded text-sm focus:ring-2 focus:ring-green-500"
+                      className="w-full rounded border border-slate-300 px-3 py-1.5 text-sm focus:border-emerald-400 focus:ring-2 focus:ring-emerald-500"
                     >
                       <option value={item.produto_id}>
                         {`${item.produto_codigo || "Sem SKU"} | EAN: ${item.produto_ean || "Sem EAN"} | ${item.produto_nome}`}
@@ -324,121 +330,119 @@ function EntradaXmlDetalhesItemCard({
                           </option>
                         ))}
                     </select>
-                  </>
-                ) : (
-                  <>
-                    <div className="flex items-center gap-2 mb-3">
-                      <div className="bg-orange-600 text-white px-2 py-1 rounded text-xs font-bold">
-                        ⚠️ NÃO VINCULADO
-                      </div>
-                    </div>
-
-                    <div className="space-y-3">
-                      {/* Campo de pesquisa */}
-                      <div>
-                        <div className="block text-xs font-semibold text-gray-700 mb-1">
-                          Pesquisar produto existente:
-                        </div>
-                        <input
-                          type="text"
-                          placeholder="Digite nome ou SKU..."
-                          value={filtroProduto[item.id] || ""}
-                          onChange={(e) => atualizarFiltroProduto(item.id, e.target.value)}
-                          className="w-full px-3 py-2 border-2 border-gray-400 rounded focus:ring-2 focus:ring-blue-500 text-sm"
-                        />
-                      </div>
-
-                      {/* Lista de produtos filtrados */}
-                      {filtroProduto[item.id] && filtroProduto[item.id].length >= 2 && (
-                        <div className="border-2 border-gray-300 rounded max-h-48 overflow-y-auto bg-white">
-                          {(() => {
-                            const filtrados = resultadosBuscaProduto[item.id] || [];
-                            if (buscandoProduto[item.id]) {
-                              return (
-                                <div className="px-3 py-4 text-center text-gray-500 text-xs">
-                                  Buscando produtos...
-                                </div>
-                              );
-                            }
-                            if (filtrados.length === 0) {
-                              return (
-                                <div className="px-3 py-4 text-center text-gray-500 text-xs">
-                                  ❌ Nenhum produto encontrado
-                                </div>
-                              );
-                            }
-                            return filtrados.map((p) => (
-                              <button
-                                key={`produto-${item.id}-${p.id}`}
-                                type="button"
-                                onClick={() => {
-                                  vincularProduto(notaSelecionada.id, item.id, p.id);
-                                  setFiltroProduto((prev) => ({ ...prev, [item.id]: "" }));
-                                  setResultadosBuscaProduto((prev) => ({ ...prev, [item.id]: [] }));
-                                }}
-                                className={`w-full text-left px-3 py-2 hover:bg-blue-50 border-b border-gray-200 last:border-b-0 text-xs ${!p.ativo ? "text-red-600 font-bold" : ""}`}
-                              >
-                                {!p.ativo && "[INATIVO] "}
-                                {p.codigo || "Sem SKU"} - {p.nome}
-                                <span className="text-gray-500 ml-1">
-                                  | EAN:{" "}
-                                  {p.codigo_barras ||
-                                    p.gtin_ean ||
-                                    p.gtin_ean_tributario ||
-                                    "Sem EAN"}
-                                </span>
-                                <span className="text-gray-500 ml-1">
-                                  (Est: {p.estoque_atual || 0})
-                                </span>
-                              </button>
-                            ));
-                          })()}
-                        </div>
-                      )}
-
-                      <div className="flex items-center gap-2">
-                        <div className="flex-1 border-t border-gray-300"></div>
-                        <span className="text-xs text-gray-500">ou</span>
-                        <div className="flex-1 border-t border-gray-300"></div>
-                      </div>
-
-                      <ActionButton
-                        className="w-full"
-                        intent="create"
-                        onClick={() => abrirModalCriarProduto(item)}
-                        size="md"
-                      >
-                        ➕ Criar Novo Produto
-                      </ActionButton>
-                    </div>
-                  </>
-                )}
-              </>
-            ) : (
-              // Nota ja processada - apenas visualizacao
-              <div>
-                {item.produto_id ? (
-                  <>
-                    <div className="bg-green-600 text-white px-2 py-1 rounded text-xs font-bold inline-block mb-2">
-                      VINCULADO
-                    </div>
-                    <div className="font-semibold text-base text-green-900">
-                      {item.produto_nome}
-                    </div>
-                  </>
-                ) : (
-                  <div className="bg-gray-600 text-white px-2 py-1 rounded text-xs font-bold inline-block">
-                    ⚠️ NÃO VINCULADO
                   </div>
-                )}
-              </div>
-            )}
-          </div>
+                </>
+              ) : (
+                <>
+                  <div className="flex items-center gap-2 mb-3">
+                    <div className="bg-orange-600 text-white px-2 py-1 rounded text-xs font-bold">
+                      ⚠️ NÃO VINCULADO
+                    </div>
+                  </div>
+
+                  <div className="space-y-3">
+                    {/* Campo de pesquisa */}
+                    <div>
+                      <div className="block text-xs font-semibold text-gray-700 mb-1">
+                        Pesquisar produto existente:
+                      </div>
+                      <input
+                        type="text"
+                        placeholder="Digite nome ou SKU..."
+                        value={filtroProduto[item.id] || ""}
+                        onChange={(e) => atualizarFiltroProduto(item.id, e.target.value)}
+                        className="w-full px-3 py-2 border-2 border-gray-400 rounded focus:ring-2 focus:ring-blue-500 text-sm"
+                      />
+                    </div>
+
+                    {/* Lista de produtos filtrados */}
+                    {filtroProduto[item.id] && filtroProduto[item.id].length >= 2 && (
+                      <div className="border-2 border-gray-300 rounded max-h-48 overflow-y-auto bg-white">
+                        {(() => {
+                          const filtrados = resultadosBuscaProduto[item.id] || [];
+                          if (buscandoProduto[item.id]) {
+                            return (
+                              <div className="px-3 py-4 text-center text-gray-500 text-xs">
+                                Buscando produtos...
+                              </div>
+                            );
+                          }
+                          if (filtrados.length === 0) {
+                            return (
+                              <div className="px-3 py-4 text-center text-gray-500 text-xs">
+                                ❌ Nenhum produto encontrado
+                              </div>
+                            );
+                          }
+                          return filtrados.map((p) => (
+                            <button
+                              key={`produto-${item.id}-${p.id}`}
+                              type="button"
+                              onClick={() => {
+                                vincularProduto(notaSelecionada.id, item.id, p.id);
+                                setFiltroProduto((prev) => ({ ...prev, [item.id]: "" }));
+                                setResultadosBuscaProduto((prev) => ({ ...prev, [item.id]: [] }));
+                              }}
+                              className={`w-full text-left px-3 py-2 hover:bg-blue-50 border-b border-gray-200 last:border-b-0 text-xs ${!p.ativo ? "text-red-600 font-bold" : ""}`}
+                            >
+                              {!p.ativo && "[INATIVO] "}
+                              {p.codigo || "Sem SKU"} - {p.nome}
+                              <span className="text-gray-500 ml-1">
+                                | EAN:{" "}
+                                {p.codigo_barras ||
+                                  p.gtin_ean ||
+                                  p.gtin_ean_tributario ||
+                                  "Sem EAN"}
+                              </span>
+                              <span className="text-gray-500 ml-1">
+                                (Est: {p.estoque_atual || 0})
+                              </span>
+                            </button>
+                          ));
+                        })()}
+                      </div>
+                    )}
+
+                    <div className="flex items-center gap-2">
+                      <div className="flex-1 border-t border-gray-300"></div>
+                      <span className="text-xs text-gray-500">ou</span>
+                      <div className="flex-1 border-t border-gray-300"></div>
+                    </div>
+
+                    <ActionButton
+                      className="w-full"
+                      intent="create"
+                      onClick={() => abrirModalCriarProduto(item)}
+                      size="md"
+                    >
+                      ➕ Criar Novo Produto
+                    </ActionButton>
+                  </div>
+                </>
+              )}
+            </>
+          ) : (
+            // Nota ja processada - apenas visualizacao
+            <div>
+              {item.produto_id ? (
+                <>
+                  <div className="bg-green-600 text-white px-2 py-1 rounded text-xs font-bold inline-block mb-2">
+                    VINCULADO
+                  </div>
+                  <div className="font-semibold text-base text-green-900">{item.produto_nome}</div>
+                </>
+              ) : (
+                <div className="bg-gray-600 text-white px-2 py-1 rounded text-xs font-bold inline-block">
+                  ⚠️ NÃO VINCULADO
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Rateio de Estoque (se modo PARCIAL) - Expande por toda a largura */}
         {notaSelecionada.status === "pendente" && tipoRateio === "parcial" && item.produto_id && (
-          <div className="col-span-3 p-4 border-t-2 border-gray-300 bg-gradient-to-r from-blue-50 via-gray-50 to-green-50">
+          <div className="border-t border-slate-200 bg-slate-50 p-3 lg:col-span-3">
             <h4 className="font-medium text-gray-700 mb-3 flex items-center text-sm">
               Quantidade destinada ao estoque online
             </h4>
@@ -523,11 +527,11 @@ function EntradaXmlDetalhesItemCard({
         )}
 
         {mostrarTratativaItem && (
-          <div className="border-t border-emerald-200 bg-emerald-50/60 p-4">
-            <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
+          <div className="border-t border-slate-300 bg-slate-50 px-3 py-2.5 lg:col-span-3">
+            <div className="mb-2 flex flex-wrap items-center justify-between gap-3">
               <div>
-                <h4 className="font-semibold text-emerald-900">Conferencia fisica</h4>
-                <p className="text-xs text-emerald-800">
+                <h4 className="font-semibold text-slate-800">Conferencia fisica</h4>
+                <p className="text-xs text-slate-500">
                   {podeEditarQuantidadesItem
                     ? "Ajuste apenas o que realmente entrou, o que faltou e o que veio avariado."
                     : "Quantidade ja lancada no estoque. Ajuste aqui a tratativa e a observacao da divergencia."}
@@ -546,14 +550,14 @@ function EntradaXmlDetalhesItemCard({
               </span>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+            <div className="grid grid-cols-2 gap-2.5 md:grid-cols-4 2xl:grid-cols-[repeat(4,minmax(90px,0.65fr))_minmax(180px,1fr)_minmax(260px,1.6fr)]">
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1">Qtd NF</label>
                 <input
                   type="number"
                   value={conferenciaItem.quantidadeNF}
                   disabled
-                  className="w-full rounded border border-gray-300 bg-gray-100 px-3 py-2 text-sm font-semibold"
+                  className="w-full rounded border border-gray-300 bg-gray-100 px-3 py-1.5 text-sm font-semibold"
                 />
               </div>
               <div>
@@ -571,15 +575,13 @@ function EntradaXmlDetalhesItemCard({
                   onChange={(e) =>
                     atualizarCampoConferenciaItem(item, "quantidade_conferida", e.target.value)
                   }
-                  className={`w-full rounded border px-3 py-2 text-sm font-semibold focus:ring-2 focus:ring-emerald-500 ${
+                  className={`w-full rounded border px-3 py-1.5 text-sm font-semibold focus:ring-2 focus:ring-emerald-500 ${
                     podeEditarQuantidadesItem
-                      ? "border-emerald-300"
+                      ? "border-slate-300 bg-white"
                       : "border-gray-300 bg-gray-100 text-gray-600"
                   }`}
                 />
-                <div className="mt-1 text-[11px] text-emerald-700 font-medium">
-                  Entra no estoque
-                </div>
+                <div className="mt-1 text-[11px] font-medium text-slate-500">Entra no estoque</div>
               </div>
               <div>
                 <label className="block text-xs font-medium text-gray-700 mb-1">Qtd avariada</label>
@@ -599,9 +601,9 @@ function EntradaXmlDetalhesItemCard({
                   onChange={(e) =>
                     atualizarCampoConferenciaItem(item, "quantidade_avariada", e.target.value)
                   }
-                  className={`w-full rounded border px-3 py-2 text-sm font-semibold focus:ring-2 focus:ring-orange-500 ${
+                  className={`w-full rounded border px-3 py-1.5 text-sm font-semibold focus:ring-2 focus:ring-orange-500 ${
                     podeEditarQuantidadesItem
-                      ? "border-orange-300"
+                      ? "border-slate-300 bg-white"
                       : "border-gray-300 bg-gray-100 text-gray-600"
                   }`}
                 />
@@ -612,13 +614,10 @@ function EntradaXmlDetalhesItemCard({
                   type="number"
                   value={conferenciaItem.quantidadeFaltante.toFixed(2)}
                   disabled
-                  className="w-full rounded border border-gray-300 bg-gray-100 px-3 py-2 text-sm font-semibold"
+                  className="w-full rounded border border-gray-300 bg-gray-100 px-3 py-1.5 text-sm font-semibold"
                 />
               </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-[220px_1fr] gap-3 mt-3">
-              <div>
+              <div className="col-span-2 md:col-span-2 2xl:col-span-1">
                 <label className="block text-xs font-medium text-gray-700 mb-1">
                   Tratativa sugerida
                 </label>
@@ -627,7 +626,7 @@ function EntradaXmlDetalhesItemCard({
                   onChange={(e) =>
                     atualizarCampoConferenciaItem(item, "acao_sugerida", e.target.value)
                   }
-                  className="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500"
+                  className="w-full rounded border border-gray-300 px-3 py-1.5 text-sm focus:ring-2 focus:ring-emerald-500"
                 >
                   {acaoConferenciaOpcoes.map((opcao) => (
                     <option key={opcao.value} value={opcao.value}>
@@ -636,7 +635,7 @@ function EntradaXmlDetalhesItemCard({
                   ))}
                 </select>
               </div>
-              <div>
+              <div className="col-span-2 md:col-span-2 2xl:col-span-1">
                 <label className="block text-xs font-medium text-gray-700 mb-1">Observacao</label>
                 <input
                   type="text"
@@ -647,7 +646,7 @@ function EntradaXmlDetalhesItemCard({
                   onChange={(e) =>
                     atualizarCampoConferenciaItem(item, "observacao_conferencia", e.target.value)
                   }
-                  className="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500"
+                  className="w-full rounded border border-gray-300 px-3 py-1.5 text-sm focus:ring-2 focus:ring-emerald-500"
                   placeholder="Ex.: faltou 1 unidade, embalagem avariada, solicitar reposicao..."
                 />
               </div>
@@ -657,7 +656,7 @@ function EntradaXmlDetalhesItemCard({
       </div>
 
       {notaSelecionada.status === "processada" && item.produto_id && (
-        <div className="mt-3 pt-3 border-t bg-blue-50 border border-blue-200 rounded-lg p-3">
+        <div className="border-t border-blue-200 bg-blue-50 px-3 py-2 text-sm">
           <span className="text-blue-800 font-semibold">Lancado no estoque:</span>
           <span className="ml-2">{item.produto_nome}</span>
         </div>

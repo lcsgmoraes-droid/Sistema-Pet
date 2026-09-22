@@ -86,6 +86,53 @@ function Invoke-GateStep {
     }
 }
 
+function Invoke-BackendDependencyAudit {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Python,
+
+        [Parameter(Mandatory = $true)]
+        [string]$WorkingDirectory
+    )
+
+    Write-Section 'Backend dependency audit'
+    $commonArguments = @(
+        '-m', 'pip_audit', '-r', 'requirements.lock',
+        '--progress-spinner', 'off', '--timeout', '60', '--no-deps', '--disable-pip'
+    )
+
+    Push-Location $WorkingDirectory
+    try {
+        $previousErrorActionPreference = $ErrorActionPreference
+        try {
+            $ErrorActionPreference = 'Continue'
+            $osvOutput = & $Python @commonArguments -s osv 2>&1
+            $osvExitCode = $LASTEXITCODE
+        } finally {
+            $ErrorActionPreference = $previousErrorActionPreference
+        }
+        $osvOutput | ForEach-Object { Write-Host $_ }
+
+        if ($osvExitCode -eq 0) {
+            return
+        }
+
+        $osvText = $osvOutput -join "`n"
+        $serviceFailurePattern = 'ServiceError|ConnectionError|ConnectTimeout|ReadTimeout|(?:429|5\d\d) Server Error'
+        if ($osvText -notmatch $serviceFailurePattern) {
+            Fail 'Gate falhou em: Backend dependency audit'
+        }
+
+        Write-Warning 'Servico OSV indisponivel. Repetindo a auditoria pela fonte PyPI.'
+        & $Python @commonArguments -s pypi
+        if ($LASTEXITCODE -ne 0) {
+            Fail 'Gate falhou em: Backend dependency audit (fallback PyPI)'
+        }
+    } finally {
+        Pop-Location
+    }
+}
+
 $python = Resolve-BackendPython
 $auditPython = Resolve-PythonWithModule 'pip_audit'
 $ruff = Resolve-RequiredCommand 'ruff'
@@ -137,10 +184,7 @@ Invoke-GateStep 'Multitenant hardening suite' $python @(
 Invoke-GateStep 'Backend import smoke' $python @(
     '-c', "import app.main; print('main import ok')"
 ) $backend
-Invoke-GateStep 'Backend dependency audit' $auditPython @(
-    '-m', 'pip_audit', '-r', 'requirements.lock', '-s', 'osv',
-    '--progress-spinner', 'off', '--timeout', '60', '--no-deps', '--disable-pip'
-) $backend
+Invoke-BackendDependencyAudit $auditPython $backend
 
 Invoke-GateStep 'Mobile dependency audit' $npm @(
     'run', 'audit:dependencies'
