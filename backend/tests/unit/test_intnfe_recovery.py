@@ -149,13 +149,15 @@ def test_provider_rejection_963_can_retry_after_emitter_fix_without_payload_chan
     monkeypatch.setattr(
         recovery,
         "issue",
-        lambda *_args: issued.append(True)
-        or {
-            "success": True,
-            "processando": False,
-            "provedor": "intnfe",
-            "numero": 17843,
-        },
+        lambda *_args: (
+            issued.append(True)
+            or {
+                "success": True,
+                "processando": False,
+                "provedor": "intnfe",
+                "numero": 17843,
+            }
+        ),
     )
 
     result = recovery.repair_and_retry(
