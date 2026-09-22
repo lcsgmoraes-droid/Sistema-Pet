@@ -23,7 +23,6 @@ export default function UsuariosPage() {
     onAbrirModalUsuario,
     onAbrirCredenciais,
     onCloseModalUsuario,
-    roles,
     rolesUsuariosDiretos,
     setNovoUsuario,
     setCredenciais,
