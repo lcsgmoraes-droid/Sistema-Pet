@@ -347,23 +347,34 @@ const ClientesNovoCadastroStep = ({
                 </div>
               )}
 
-              {/* MOTO PRÓPRIA */}
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={formData.moto_propria || false}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      moto_propria: e.target.checked,
-                    })
-                  }
-                  className="w-3.5 h-3.5 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                />
-                <span className="text-xs text-gray-700">
-                  {formData.moto_propria ? "✅ Moto própria" : "🏢 Moto da loja"}
-                </span>
-              </label>
+              {/* PROPRIEDADE DA MOTO */}
+              <fieldset className="space-y-1">
+                <legend className="text-xs font-medium text-gray-700">
+                  De quem é a moto usada nas entregas?
+                </legend>
+                <div className="flex flex-wrap gap-x-4 gap-y-1">
+                  <label className="flex items-center gap-1.5 cursor-pointer text-xs text-gray-700">
+                    <input
+                      type="radio"
+                      name="propriedade_moto_entregador"
+                      checked={formData.moto_propria === true}
+                      onChange={() => setFormData({ ...formData, moto_propria: true })}
+                      className="w-3.5 h-3.5 text-blue-600 border-gray-300 focus:ring-blue-500"
+                    />
+                    Moto do entregador
+                  </label>
+                  <label className="flex items-center gap-1.5 cursor-pointer text-xs text-gray-700">
+                    <input
+                      type="radio"
+                      name="propriedade_moto_entregador"
+                      checked={formData.moto_propria === false}
+                      onChange={() => setFormData({ ...formData, moto_propria: false })}
+                      className="w-3.5 h-3.5 text-blue-600 border-gray-300 focus:ring-blue-500"
+                    />
+                    Moto da loja
+                  </label>
+                </div>
+              </fieldset>
 
               {/* 📆 Acerto Financeiro */}
               <div className="mt-2 pt-2 border-t border-blue-200">
