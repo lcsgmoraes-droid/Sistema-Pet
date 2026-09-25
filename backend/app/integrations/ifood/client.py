@@ -177,9 +177,7 @@ class IfoodClient:
         return self.get_virtual_bag(order_id)
 
     def get_virtual_bag(self, order_id: str) -> dict[str, Any]:
-        response = self._request(
-            "GET", f"/order/v1.0/orders/{order_id}/virtual-bag"
-        )
+        response = self._request("GET", f"/order/v1.0/orders/{order_id}/virtual-bag")
         payload = self._json_response(response, fallback={})
         if not isinstance(payload, dict):
             raise IfoodClientError("O iFood retornou um pedido invalido.")
@@ -201,9 +199,7 @@ class IfoodClient:
         )
         return self._accepted_result(response)
 
-    def remove_picking_item(
-        self, order_id: str, unique_id: str
-    ) -> dict[str, Any]:
+    def remove_picking_item(self, order_id: str, unique_id: str) -> dict[str, Any]:
         response = self._request(
             "DELETE", f"/picking/v1.0/orders/{order_id}/items/{unique_id}"
         )

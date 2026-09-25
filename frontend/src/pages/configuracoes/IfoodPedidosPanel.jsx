@@ -1,11 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import {
-  FiClock,
-  FiEdit3,
-  FiPackage,
-  FiRefreshCw,
-  FiTrash2,
-} from "react-icons/fi";
+import { FiClock, FiEdit3, FiPackage, FiRefreshCw, FiTrash2 } from "react-icons/fi";
 import { api } from "../../services/api";
 import { confirmarCorePet } from "../../services/corepetDialog";
 
@@ -159,7 +153,11 @@ function OrderDetails({ order, onAction, onItemAction, action }) {
                     </p>
                   </div>
                   <div className="text-right text-xs">
-                    <p className={item.unavailable ? "font-semibold text-red-700" : "text-emerald-700"}>
+                    <p
+                      className={
+                        item.unavailable ? "font-semibold text-red-700" : "text-emerald-700"
+                      }
+                    >
                       unavailable: {String(Boolean(item.unavailable))}
                     </p>
                     {item.prices?.grossValue ? (
@@ -374,9 +372,7 @@ export default function IfoodPedidosPanel({ enabled, onMessage }) {
       } else {
         await api.patch(url, body);
       }
-      const response = await api.post(
-        `/integracoes/ifood/pedidos/${selectedId}/atualizar-sacola`,
-      );
+      const response = await api.post(`/integracoes/ifood/pedidos/${selectedId}/atualizar-sacola`);
       setSelected(response.data);
       await loadOrders();
       onMessage(

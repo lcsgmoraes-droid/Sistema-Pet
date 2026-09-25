@@ -424,8 +424,8 @@ export default function IfoodIntegracaoCard() {
                   Diagnóstico do catálogo
                 </p>
                 <p className="text-xs text-slate-500">
-                  Selecione um produto elegível para demonstrar POST, PATCH, PLU, preço, promoção
-                  e estoque na homologação.
+                  Selecione um produto elegível para demonstrar POST, PATCH, PLU, preço, promoção e
+                  estoque na homologação.
                 </p>
               </div>
               {preview.issues?.length ? (
