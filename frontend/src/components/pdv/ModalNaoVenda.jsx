@@ -1,5 +1,6 @@
-import { BarChart3, ClipboardEdit, SearchX, X } from "lucide-react";
+import { BarChart3, ClipboardEdit, ExternalLink, SearchX, X } from "lucide-react";
 import { useState } from "react";
+import { Link } from "react-router-dom";
 
 import NaoVendaRegistroForm from "./NaoVendaRegistroForm";
 import NaoVendaRelatorio from "./NaoVendaRelatorio";
@@ -34,7 +35,7 @@ export default function ModalNaoVenda({ isOpen, onClose, clienteInicial }) {
           </button>
         </div>
 
-        <div className="flex border-b border-slate-200 bg-slate-50 px-5">
+        <div className="flex flex-wrap border-b border-slate-200 bg-slate-50 px-5">
           <button
             type="button"
             onClick={() => setAba("registrar")}
@@ -55,8 +56,15 @@ export default function ModalNaoVenda({ isOpen, onClose, clienteInicial }) {
                 : "border-transparent text-slate-500 hover:text-slate-800"
             }`}
           >
-            <BarChart3 className="h-4 w-4" /> Relatório
+            <BarChart3 className="h-4 w-4" /> Relatório do PDV
           </button>
+          <Link
+            to="/produtos/demanda-nao-atendida"
+            onClick={onClose}
+            className="ml-auto inline-flex items-center gap-1.5 px-3 py-3 text-sm font-semibold text-violet-700 hover:text-violet-900"
+          >
+            Central completa <ExternalLink className="h-4 w-4" />
+          </Link>
         </div>
 
         <div className="flex-1 overflow-y-auto bg-slate-50/50 p-5">
