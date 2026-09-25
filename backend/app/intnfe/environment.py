@@ -10,6 +10,9 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 from app.intnfe.client import IntNFeError
 from app.intnfe.models import IntNFeConnection, IntNFeEmissionSequence
 from app.intnfe.numbering import emitter_access, read_numbering
+from app.empresa_config_fiscal_models import EmpresaConfigFiscal
+from app.fiscal_state_rules import production_fiscal_pending
+from app.models import Tenant
 
 SequenceNumber = Annotated[int, Field(strict=True, ge=1, le=999_999_999)]
 
@@ -233,6 +236,20 @@ def _save_sequence_start(db, connection, environment, model, series, initial_num
 
 
 def configure_environment(db, tenant_id, api, request, audit):
+    environment = request.ambiente_codigo
+    if environment == 1:
+        tenant = db.query(Tenant).filter(Tenant.id == str(tenant_id)).first()
+        config = (
+            db.query(EmpresaConfigFiscal)
+            .filter(EmpresaConfigFiscal.tenant_id == tenant_id)
+            .first()
+        )
+        pending = production_fiscal_pending(tenant, config)
+        if pending:
+            raise EnvironmentError(
+                "Produção fiscal bloqueada: " + " ".join(pending), status=422
+            )
+
     connection, integrator_token = emitter_access(db, tenant_id, api)
     connection = (
         db.query(IntNFeConnection)
@@ -241,7 +258,6 @@ def configure_environment(db, tenant_id, api, request, audit):
         .populate_existing()
         .one()
     )
-    environment = request.ambiente_codigo
     certificate_end = connection.certificado_valido_ate
     if certificate_end is None:
         raise EnvironmentError(
@@ -288,9 +304,11 @@ def configure_environment(db, tenant_id, api, request, audit):
                 db.commit()
             audit(
                 connection.id,
-                "credencial_producao_nao_confirmada"
-                if exc.uncertain
-                else "credencial_producao_recusada",
+                (
+                    "credencial_producao_nao_confirmada"
+                    if exc.uncertain
+                    else "credencial_producao_recusada"
+                ),
                 {"ambiente": 1, "codigo": exc.code},
             )
             if exc.uncertain:

@@ -1,4 +1,5 @@
 from datetime import date
+from decimal import Decimal
 from types import SimpleNamespace
 
 import pytest
@@ -129,6 +130,29 @@ def test_payload_preserves_totals_and_hides_real_recipient_in_homologation():
     assert payload["emitente"]["cnpj"] == "33590794000140"
     assert payload["frete"] == {"modalidade": "9", "valor": 5.0}
     assert payload["pagamentos"] == [{"formaPagamento": "17", "valor": 23.0}]
+
+
+def test_production_payload_is_blocked_without_confirmed_company_tax():
+    tenant, connection, sale = _objects()
+    tenant.uf = "PR"
+    tenant.inscricao_estadual = "1234567890"
+    connection.emission_environment = 1
+
+    class Query:
+        def filter(self, *_args):
+            return self
+
+        def first(self):
+            return SimpleNamespace(uf="PR", configuracao_confirmada=False)
+
+    with pytest.raises(emission.DirectEmissionError, match="contabilidade"):
+        emission.build_payload(
+            SimpleNamespace(query=lambda *_args: Query()),
+            tenant,
+            connection,
+            sale,
+            "nfe",
+        )
 
 
 def test_crediario_uses_credito_loja_instead_of_outros():
@@ -428,6 +452,64 @@ def test_interstate_st_sale_to_non_contributor_uses_6108(monkeypatch):
 
     assert product["cfop"] == "6108"
     assert product["impostos"]["icms"] == {"cst": "500", "origem": "0"}
+
+
+def test_state_icms_fields_are_sent_only_when_configured(monkeypatch):
+    tenant, connection, sale = _objects()
+    monkeypatch.setattr(
+        emission,
+        "_resolver_fiscal_item_nfe",
+        lambda *_args: {
+            "ncm": "23099010",
+            "cest": "2200100",
+            "origem_mercadoria": "0",
+            "cfop_interno": "5405",
+            "cfop_interestadual": "6404",
+            "cfop_interestadual_nao_contribuinte": "6108",
+            "cst_icms": "500",
+            "icms_st": True,
+            "icms_aliquota": None,
+            "codigo_beneficio_fiscal": None,
+            "fcp_aliquota": 2,
+            "pis_cst": "49",
+            "pis_aliquota": 0,
+            "cofins_cst": "49",
+            "cofins_aliquota": 0,
+        },
+    )
+
+    icms = emission.build_payload(None, tenant, connection, sale, "nfe")["produtos"][0][
+        "impostos"
+    ]["icms"]
+
+    assert icms == {
+        "cst": "500",
+        "origem": "0",
+        "fcp": {"baseCalculo": 18.0, "aliquota": 2.0, "valor": 0.36},
+    }
+
+
+def test_cbenef_is_sent_for_provider_supported_cst():
+    icms = emission._tax(
+        "90",
+        "0",
+        20,
+        Decimal("100"),
+        codigo_beneficio_fiscal="RJ123456",
+    )
+
+    assert icms["codigoBeneficioFiscal"] == "RJ123456"
+
+
+def test_cbenef_blocks_unsupported_csosn_instead_of_sending_invalid_payload():
+    with pytest.raises(emission.DirectEmissionError, match="CST 51 ou 90"):
+        emission._tax(
+            "500",
+            "0",
+            None,
+            Decimal("100"),
+            codigo_beneficio_fiscal="RJ123456",
+        )
 
 
 def test_non_contributor_with_incompatible_csosn_is_blocked(monkeypatch):
