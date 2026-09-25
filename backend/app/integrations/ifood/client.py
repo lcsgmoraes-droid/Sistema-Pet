@@ -174,11 +174,42 @@ class IfoodClient:
         return self._accepted_result(response)
 
     def get_order(self, order_id: str) -> dict[str, Any]:
-        response = self._request("GET", f"/order/v1.0/orders/{order_id}")
+        return self.get_virtual_bag(order_id)
+
+    def get_virtual_bag(self, order_id: str) -> dict[str, Any]:
+        response = self._request("GET", f"/order/v1.0/orders/{order_id}/virtual-bag")
         payload = self._json_response(response, fallback={})
         if not isinstance(payload, dict):
             raise IfoodClientError("O iFood retornou um pedido invalido.")
         return payload
+
+    def start_separation(self, order_id: str) -> dict[str, Any]:
+        response = self._request(
+            "POST", f"/picking/v1.0/orders/{order_id}/startSeparation"
+        )
+        return self._accepted_result(response)
+
+    def update_picking_item(
+        self, order_id: str, unique_id: str, quantity: float
+    ) -> dict[str, Any]:
+        response = self._request(
+            "PATCH",
+            f"/picking/v1.0/orders/{order_id}/items/{unique_id}",
+            json={"quantity": quantity},
+        )
+        return self._accepted_result(response)
+
+    def remove_picking_item(self, order_id: str, unique_id: str) -> dict[str, Any]:
+        response = self._request(
+            "DELETE", f"/picking/v1.0/orders/{order_id}/items/{unique_id}"
+        )
+        return self._accepted_result(response)
+
+    def end_separation(self, order_id: str) -> dict[str, Any]:
+        response = self._request(
+            "POST", f"/picking/v1.0/orders/{order_id}/endSeparation"
+        )
+        return self._accepted_result(response)
 
     def confirm_order(self, order_id: str) -> dict[str, Any]:
         response = self._request("POST", f"/order/v1.0/orders/{order_id}/confirm")
@@ -247,10 +278,13 @@ class IfoodClient:
         items: list[dict[str, Any]],
         *,
         method: Literal["POST", "PATCH"],
+        reset_catalog: bool = False,
     ) -> dict[str, Any]:
         if not items:
             raise IfoodClientError("Nenhum item elegivel para enviar ao iFood.")
         path = f"/item/v1.0/ingestion/{merchant_id}"
-        params = {"reset": "false"} if method == "POST" else None
+        if method == "PATCH" and reset_catalog:
+            raise IfoodClientError("Reset de catalogo so pode ser usado com POST.")
+        params = {"reset": str(reset_catalog).lower()} if method == "POST" else None
         response = self._request(method, path, params=params, json=items)
         return self._accepted_result(response)
