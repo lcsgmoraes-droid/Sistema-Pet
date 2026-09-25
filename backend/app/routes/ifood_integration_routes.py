@@ -50,6 +50,8 @@ class IfoodSyncPayload(BaseModel):
     product_ids: list[int] | None = Field(default=None, max_length=500)
     dry_run: bool = True
     confirm_send: bool = False
+    reset_catalog: bool = False
+    confirm_reset: bool = False
 
 
 def _utcnow() -> datetime:
@@ -314,7 +316,26 @@ def sync_ifood_catalog(
     eligible = [item for item in items if item.eligible and item.payload]
     preview = _catalog_response(items, limit=200)
     if body.dry_run:
-        return {"dry_run": True, "operation": body.operation, **preview}
+        return {
+            "dry_run": True,
+            "operation": body.operation,
+            "reset_catalog": body.reset_catalog,
+            **preview,
+        }
+
+    if body.reset_catalog and body.operation != "create":
+        raise HTTPException(
+            status_code=422,
+            detail="Reset de catalogo so pode ser usado na criacao via POST.",
+        )
+    if body.reset_catalog and not body.confirm_reset:
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                "Confirme o reset do catalogo de teste. Produtos omitidos serao "
+                "desativados no iFood."
+            ),
+        )
 
     if not settings.IFOOD_CATALOG_WRITE_ENABLED:
         raise HTTPException(
@@ -365,6 +386,7 @@ def sync_ifood_catalog(
                 config.merchant_id,
                 payloads,
                 method="POST" if body.operation == "create" else "PATCH",
+                reset_catalog=body.reset_catalog,
             )
         config.status = "connected"
         config.last_catalog_sync_at = _utcnow()
@@ -373,6 +395,7 @@ def sync_ifood_catalog(
         return {
             "dry_run": False,
             "operation": body.operation,
+            "reset_catalog": body.reset_catalog,
             "sent": len(payloads),
             "rejected": len(items) - len(eligible),
             **result,

@@ -1,6 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { FiCheck, FiClock, FiPackage, FiRefreshCw, FiTruck, FiX } from "react-icons/fi";
+import {
+  FiClock,
+  FiEdit3,
+  FiPackage,
+  FiRefreshCw,
+  FiTrash2,
+} from "react-icons/fi";
 import { api } from "../../services/api";
+import { confirmarCorePet } from "../../services/corepetDialog";
 
 function errorMessage(error, fallback) {
   const detail = error?.response?.data?.detail;
@@ -33,16 +40,21 @@ function values(value) {
   return Array.isArray(value) ? value : [];
 }
 
+function providerMoney(value) {
+  const raw = typeof value === "object" ? value?.value : value;
+  return money(Number(raw || 0) / 100);
+}
+
 function paymentLines(payload) {
-  const payment = payload?.payments || payload?.payment || {};
+  const payment = payload?.payment || payload?.payments || {};
   return values(payment.methods || payment.paymentMethods).map((method, index) => {
     const card = method.card || {};
     const cash = method.cash || {};
     const description = [
-      method.method || method.type,
+      method.name || method.method || method.type,
       card.brand,
       cash.changeFor ? `troco para ${money(cash.changeFor)}` : null,
-      method.value ? money(method.value) : null,
+      method.amount ? providerMoney(method.amount) : method.value ? money(method.value) : null,
     ]
       .filter(Boolean)
       .join(" · ");
@@ -51,9 +63,14 @@ function paymentLines(payload) {
 }
 
 function benefitLines(payload) {
-  return values(payload?.benefits).map((benefit, index) => {
-    const sponsorship = values(benefit.sponsorshipValues)
-      .map((item) => `${item.name || item.responsible || "Responsável"}: ${money(item.value)}`)
+  return values(payload?.benefit?.benefits || payload?.benefits).map((benefit, index) => {
+    const sponsorship = values(benefit.sponsorships || benefit.sponsorshipValues)
+      .map(
+        (item) =>
+          `${item.liability || item.name || item.responsible || "Responsável"}: ${
+            item.amount ? providerMoney(item.amount) : money(item.value)
+          }`,
+      )
       .join(" · ");
     return {
       id: benefit.id || `${benefit.description || "cupom"}-${index}`,
@@ -64,26 +81,23 @@ function benefitLines(payload) {
   });
 }
 
-function OrderDetails({ order, onAction, action }) {
-  const [reasons, setReasons] = useState([]);
-  const [reason, setReason] = useState("");
-  const [code, setCode] = useState("");
+function OrderDetails({ order, onAction, onItemAction, action }) {
+  const [quantities, setQuantities] = useState({});
   const payload = order.payload || {};
-  const delivery = payload.delivery || {};
-  const address = delivery.deliveryAddress || order.delivery_address || {};
-  const phone = payload.customer?.phone || {};
+  const delivery = payload.delivery || payload.operationMode?.delivery || {};
+  const address = delivery.deliveryAddress || delivery.destination || order.delivery_address || {};
+  const phone = payload.customer?.phone || payload.customer?.localizer || {};
   const payments = paymentLines(payload);
   const benefits = benefitLines(payload);
-  const items = values(payload.items);
+  const items = values(payload.bag?.items || payload.items);
 
-  async function loadReasons() {
-    const response = await api.get(
-      `/integracoes/ifood/pedidos/${order.ifood_order_id}/motivos-cancelamento`,
+  useEffect(() => {
+    setQuantities(
+      Object.fromEntries(
+        items.map((item, index) => [item.uniqueId || item.id || index, item.quantity || 1]),
+      ),
     );
-    const next = values(response.data?.reasons);
-    setReasons(next);
-    setReason(String(next[0]?.code || next[0]?.reason || ""));
-  }
+  }, [order.ifood_order_id, order.last_action_at, items.length]);
 
   return (
     <div className="mt-4 rounded-xl border border-slate-200 p-4 dark:border-slate-800">
@@ -126,15 +140,74 @@ function OrderDetails({ order, onAction, action }) {
           <p className="text-xs font-semibold uppercase text-slate-500">Itens</p>
           {items.length ? (
             items.map((item, index) => (
-              <p key={item.id || `${item.name}-${index}`} className="mt-2 text-sm">
-                {item.quantity || 1}× {item.name || item.externalCode || "Item"}
-                {item.totalPrice || item.unitPrice ? (
-                  <span className="text-slate-500">
-                    {" "}
-                    · {money(item.totalPrice || item.unitPrice)}
-                  </span>
+              <div
+                key={item.uniqueId || item.id || `${item.name}-${index}`}
+                className={`mt-3 rounded-lg border p-3 ${
+                  item.unavailable ? "border-red-200 bg-red-50" : "border-slate-200 bg-white"
+                }`}
+              >
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <div>
+                    <p className="text-sm font-medium">
+                      {item.quantity || 1}× {item.name || item.externalCode || "Item"}
+                    </p>
+                    <p className="mt-1 text-xs text-slate-500">
+                      EAN {item.ean || "não informado"} · PLU {item.product?.plu || "não informado"}
+                    </p>
+                    <p className="font-mono text-[11px] text-slate-400">
+                      uniqueId: {item.uniqueId || "não informado"}
+                    </p>
+                  </div>
+                  <div className="text-right text-xs">
+                    <p className={item.unavailable ? "font-semibold text-red-700" : "text-emerald-700"}>
+                      unavailable: {String(Boolean(item.unavailable))}
+                    </p>
+                    {item.prices?.grossValue ? (
+                      <p className="mt-1 text-slate-500">{providerMoney(item.prices.grossValue)}</p>
+                    ) : null}
+                  </div>
+                </div>
+                {item.uniqueId && !item.unavailable ? (
+                  <div className="mt-3 flex flex-wrap items-end gap-2">
+                    <label className="text-xs font-medium text-slate-600">
+                      Quantidade separada
+                      <input
+                        type="number"
+                        min="0.001"
+                        step="0.001"
+                        value={quantities[item.uniqueId] ?? item.quantity ?? 1}
+                        onChange={(event) =>
+                          setQuantities((current) => ({
+                            ...current,
+                            [item.uniqueId]: event.target.value,
+                          }))
+                        }
+                        className="mt-1 block w-32 rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                      />
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        onItemAction("update", item.uniqueId, {
+                          quantity: Number(quantities[item.uniqueId] ?? item.quantity ?? 1),
+                        })
+                      }
+                      disabled={Boolean(action)}
+                      className="rounded-lg border border-blue-300 px-3 py-2 text-xs font-medium text-blue-800 disabled:opacity-50"
+                    >
+                      <FiEdit3 className="mr-1 inline" /> Atualizar quantidade
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => onItemAction("remove", item.uniqueId)}
+                      disabled={Boolean(action)}
+                      className="rounded-lg border border-red-200 px-3 py-2 text-xs font-medium text-red-700 disabled:opacity-50"
+                    >
+                      <FiTrash2 className="mr-1 inline" /> Marcar indisponível
+                    </button>
+                  </div>
                 ) : null}
-              </p>
+              </div>
             ))
           ) : (
             <p className="mt-2 text-sm text-slate-500">Itens ainda não carregados.</p>
@@ -183,102 +256,27 @@ function OrderDetails({ order, onAction, action }) {
       <div className="mt-4 flex flex-wrap gap-2">
         <button
           type="button"
-          onClick={() => onAction("confirmar")}
+          onClick={() => onAction("atualizar-sacola")}
           disabled={Boolean(action)}
-          className="rounded-lg bg-emerald-600 px-3 py-2 text-xs font-medium text-white disabled:opacity-50"
+          className="rounded-lg border border-slate-300 px-3 py-2 text-xs font-medium disabled:opacity-50"
         >
-          <FiCheck className="mr-1 inline" /> Confirmar
+          <FiRefreshCw className="mr-1 inline" /> Consultar Orders Virtual Bag
         </button>
         <button
           type="button"
-          onClick={() => onAction("iniciar-preparacao")}
+          onClick={() => onAction("iniciar-separacao")}
           disabled={Boolean(action)}
-          className="rounded-lg border border-slate-300 px-3 py-2 text-xs font-medium disabled:opacity-50"
+          className="rounded-lg bg-blue-600 px-3 py-2 text-xs font-medium text-white disabled:opacity-50"
         >
           <FiClock className="mr-1 inline" /> Iniciar separação
         </button>
         <button
           type="button"
-          onClick={() => onAction("pronto")}
+          onClick={() => onAction("finalizar-separacao")}
           disabled={Boolean(action)}
-          className="rounded-lg border border-slate-300 px-3 py-2 text-xs font-medium disabled:opacity-50"
+          className="rounded-lg bg-emerald-600 px-3 py-2 text-xs font-medium text-white disabled:opacity-50"
         >
-          <FiPackage className="mr-1 inline" /> Marcar pronto
-        </button>
-        {order.order_type === "DELIVERY" && order.delivered_by === "MERCHANT" ? (
-          <button
-            type="button"
-            onClick={() => onAction("despachar")}
-            disabled={Boolean(action)}
-            className="rounded-lg border border-slate-300 px-3 py-2 text-xs font-medium disabled:opacity-50"
-          >
-            <FiTruck className="mr-1 inline" /> Despachar
-          </button>
-        ) : null}
-        <button
-          type="button"
-          onClick={loadReasons}
-          disabled={Boolean(action)}
-          className="rounded-lg border border-red-200 px-3 py-2 text-xs font-medium text-red-700 disabled:opacity-50"
-        >
-          <FiX className="mr-1 inline" /> Consultar cancelamento
-        </button>
-      </div>
-
-      {reasons.length ? (
-        <div className="mt-3 flex flex-wrap items-end gap-2 rounded-lg border border-red-100 bg-red-50 p-3">
-          <label className="min-w-64 flex-1 text-xs font-medium text-red-900">
-            Motivo retornado pelo iFood
-            <select
-              value={reason}
-              onChange={(event) => setReason(event.target.value)}
-              className="mt-1 w-full rounded-lg border border-red-200 bg-white px-3 py-2 text-sm"
-            >
-              {reasons.map((item) => {
-                const value = String(item.code || item.reason || "");
-                return (
-                  <option key={value} value={value}>
-                    {value} — {item.description || item.message}
-                  </option>
-                );
-              })}
-            </select>
-          </label>
-          <button
-            type="button"
-            onClick={() => onAction("cancelar", { reason })}
-            disabled={!reason || Boolean(action)}
-            className="rounded-lg bg-red-600 px-3 py-2 text-xs font-medium text-white disabled:opacity-50"
-          >
-            Solicitar cancelamento
-          </button>
-        </div>
-      ) : null}
-
-      <div className="mt-3 flex flex-wrap items-end gap-2 rounded-lg border border-blue-100 bg-blue-50 p-3">
-        <label className="min-w-48 flex-1 text-xs font-medium text-blue-900">
-          Código de coleta/entrega
-          <input
-            value={code}
-            onChange={(event) => setCode(event.target.value)}
-            className="mt-1 w-full rounded-lg border border-blue-200 bg-white px-3 py-2 font-mono text-sm"
-          />
-        </label>
-        <button
-          type="button"
-          onClick={() => onAction("validar-coleta", { code })}
-          disabled={!code || Boolean(action)}
-          className="rounded-lg border border-blue-300 px-3 py-2 text-xs font-medium text-blue-800 disabled:opacity-50"
-        >
-          Validar coleta
-        </button>
-        <button
-          type="button"
-          onClick={() => onAction("validar-entrega", { code })}
-          disabled={!code || Boolean(action)}
-          className="rounded-lg border border-blue-300 px-3 py-2 text-xs font-medium text-blue-800 disabled:opacity-50"
-        >
-          Validar entrega
+          <FiPackage className="mr-1 inline" /> Finalizar separação e consultar sacola
         </button>
       </div>
     </div>
@@ -337,13 +335,58 @@ export default function IfoodPedidosPanel({ enabled, onMessage }) {
     if (!selectedId) return;
     try {
       setAction(name);
-      await api.post(`/integracoes/ifood/pedidos/${selectedId}/${name}`, body || {});
-      onMessage("success", "Ação aceita pelo iFood. O status será atualizado pelo próximo evento.");
+      const actionResponse = await api.post(
+        `/integracoes/ifood/pedidos/${selectedId}/${name}`,
+        body || {},
+      );
+      onMessage("success", "Ação executada no iFood e registrada para a homologação.");
       await loadOrders();
-      const response = await api.get(`/integracoes/ifood/pedidos/${selectedId}`);
-      setSelected(response.data);
+      if (name === "atualizar-sacola") {
+        setSelected(actionResponse.data);
+      } else if (actionResponse.data?.order) {
+        setSelected(actionResponse.data.order);
+      } else {
+        const response = await api.get(`/integracoes/ifood/pedidos/${selectedId}`);
+        setSelected(response.data);
+      }
     } catch (error) {
       onMessage("error", errorMessage(error, "O iFood recusou a ação do pedido."));
+    } finally {
+      setAction(null);
+    }
+  }
+
+  async function runItemAction(name, uniqueId, body) {
+    if (!selectedId) return;
+    if (
+      name === "remove" &&
+      !(await confirmarCorePet(
+        "Confirma que este item está indisponível? O iFood o removerá da separação do pedido de teste.",
+      ))
+    ) {
+      return;
+    }
+    try {
+      setAction(`${name}-${uniqueId}`);
+      const url = `/integracoes/ifood/pedidos/${selectedId}/itens/${uniqueId}`;
+      if (name === "remove") {
+        await api.delete(url);
+      } else {
+        await api.patch(url, body);
+      }
+      const response = await api.post(
+        `/integracoes/ifood/pedidos/${selectedId}/atualizar-sacola`,
+      );
+      setSelected(response.data);
+      await loadOrders();
+      onMessage(
+        "success",
+        name === "remove"
+          ? "Item marcado como indisponível e sacola consultada novamente."
+          : "Quantidade separada atualizada e sacola consultada novamente.",
+      );
+    } catch (error) {
+      onMessage("error", errorMessage(error, "O iFood recusou a alteração do item."));
     } finally {
       setAction(null);
     }
@@ -355,7 +398,8 @@ export default function IfoodPedidosPanel({ enabled, onMessage }) {
         <div>
           <p className="font-medium text-slate-900 dark:text-slate-100">Pedidos para homologação</p>
           <p className="text-xs text-slate-500">
-            Recebimento, confirmação, cancelamento, despacho e validação sem publicar produtos.
+            Orders Virtual Bag e Picking: consulta, início, alteração, indisponibilidade e fim da
+            separação.
           </p>
         </div>
         <button
@@ -406,7 +450,12 @@ export default function IfoodPedidosPanel({ enabled, onMessage }) {
       )}
 
       {selected ? (
-        <OrderDetails order={selected} onAction={runOrderAction} action={action} />
+        <OrderDetails
+          order={selected}
+          onAction={runOrderAction}
+          onItemAction={runItemAction}
+          action={action}
+        />
       ) : null}
       {!selected && selectedSummary ? (
         <p className="mt-3 text-sm text-slate-500">Carregando pedido...</p>

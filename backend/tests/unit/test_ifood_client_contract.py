@@ -7,7 +7,7 @@ import pytest
 from app.integrations.ifood.client import IfoodClient, IfoodClientError
 
 
-def test_authenticates_once_and_never_uses_destructive_reset():
+def test_authenticates_once_and_uses_safe_reset_by_default():
     requests: list[httpx.Request] = []
 
     def handler(request: httpx.Request) -> httpx.Response:
@@ -92,6 +92,40 @@ def test_patch_does_not_add_reset_parameter():
     assert result["status_code"] == 202
 
 
+def test_post_can_explicitly_reset_test_catalog():
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/authentication/v1.0/oauth/token":
+            return httpx.Response(200, json={"accessToken": "token", "expiresIn": 3600})
+        assert request.method == "POST"
+        assert request.url.params["reset"] == "true"
+        return httpx.Response(202)
+
+    with IfoodClient(
+        client_id="client",
+        client_secret="secret",
+        transport=httpx.MockTransport(handler),
+    ) as client:
+        result = client.ingest_items(
+            "merchant-id",
+            [{"barcode": "789", "name": "Produto"}],
+            method="POST",
+            reset_catalog=True,
+        )
+
+    assert result["status_code"] == 202
+
+
+def test_patch_rejects_reset_parameter():
+    with IfoodClient(client_id="client", client_secret="secret") as client:
+        with pytest.raises(IfoodClientError, match="so pode ser usado com POST"):
+            client.ingest_items(
+                "merchant-id",
+                [{"barcode": "789", "prices": {"price": 10}}],
+                method="PATCH",
+                reset_catalog=True,
+            )
+
+
 def test_order_and_event_endpoints_follow_ifood_contracts():
     requests: list[httpx.Request] = []
 
@@ -117,8 +151,10 @@ def test_order_and_event_endpoints_follow_ifood_contracts():
         if path == "/events/v1.0/events/acknowledgment":
             assert json.loads(request.content) == [{"id": "event-id"}]
             return httpx.Response(202)
-        if path == "/order/v1.0/orders/order-id":
+        if path == "/order/v1.0/orders/order-id/virtual-bag":
             return httpx.Response(200, json={"id": "order-id", "status": "PLACED"})
+        if path.startswith("/picking/v1.0/"):
+            return httpx.Response(204)
         if path.endswith("/cancellationReasons"):
             return httpx.Response(
                 200, json={"reasons": [{"code": "503", "description": "Item"}]}
@@ -145,6 +181,10 @@ def test_order_and_event_endpoints_follow_ifood_contracts():
         )
         assert client.validate_pickup_code("order-id", "1234")["valid"] is True
         assert client.verify_delivery_code("order-id", "4321")["valid"] is True
+        assert client.start_separation("order-id")["status_code"] == 204
+        assert client.update_picking_item("order-id", "item-id", 1)["status_code"] == 204
+        assert client.remove_picking_item("order-id", "item-id")["status_code"] == 204
+        assert client.end_separation("order-id")["status_code"] == 204
 
     dispatch = next(
         request for request in requests if request.url.path.endswith("/dispatch")
@@ -156,3 +196,10 @@ def test_order_and_event_endpoints_follow_ifood_contracts():
         if request.url.path.endswith("/requestCancellation")
     )
     assert json.loads(cancellation.content) == {"reason": "503"}
+    picking_update = next(
+        request
+        for request in requests
+        if request.method == "PATCH" and "/picking/v1.0/" in request.url.path
+    )
+    assert picking_update.url.path.endswith("/orders/order-id/items/item-id")
+    assert json.loads(picking_update.content) == {"quantity": 1}

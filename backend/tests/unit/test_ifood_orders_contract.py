@@ -7,9 +7,14 @@ from sqlalchemy.orm import sessionmaker
 from app.db import Base
 import app.produtos_catalogo_models  # noqa: F401 - registra Produto
 import app.produtos_estoque_models  # noqa: F401 - completa relacionamentos do catalogo
+import app.produtos_lembretes_variacoes_models  # noqa: F401 - completa relacionamentos
 from app.ifood_integration_models import IfoodMerchantConfig
 from app.ifood_order_models import IfoodEvent, IfoodOrder
-from app.integrations.ifood.orders import order_detail, process_order_events
+from app.integrations.ifood.orders import (
+    order_detail,
+    process_order_events,
+    upsert_ifood_order,
+)
 from app.tenancy.context import tenant_context
 
 
@@ -114,3 +119,50 @@ def test_events_are_persisted_before_ack_and_placed_is_idempotent():
             2026, 8, 16, 20, 0, tzinfo=timezone.utc
         )
         assert order_detail(stored)["customer_name"] == "Cliente Teste"
+
+
+def test_virtual_bag_fields_are_normalized_for_corepet_panel():
+    db = _session()
+    tenant_id = uuid4()
+    merchant_id = "00000000-0000-0000-0000-000000000001"
+    payload = {
+        "id": "order-virtual-bag",
+        "shortCode": "9013",
+        "createdAt": "2026-09-25T10:00:00Z",
+        "customer": {"name": "Cliente Mercado"},
+        "bag": {
+            "items": [
+                {
+                    "uniqueId": "item-1",
+                    "name": "Racao",
+                    "quantity": 3,
+                    "unavailable": False,
+                }
+            ],
+            "prices": {"grossValue": {"value": 4250}},
+        },
+        "operationMode": {
+            "type": "DELIVERY",
+            "schedulingType": "TIME_SLOT",
+            "delivery": {"provider": "IFOOD"},
+        },
+    }
+
+    with tenant_context(tenant_id):
+        order = upsert_ifood_order(
+            db,
+            tenant_id=tenant_id,
+            merchant_id=merchant_id,
+            order_id=payload["id"],
+            payload=payload,
+            event_status="PLACED",
+        )
+        db.commit()
+
+        details = order_detail(order)
+        assert details["display_id"] == "9013"
+        assert details["order_type"] == "DELIVERY"
+        assert details["order_timing"] == "TIME_SLOT"
+        assert details["delivered_by"] == "IFOOD"
+        assert details["total"] == 42.5
+        assert details["payload"]["bag"]["items"][0]["uniqueId"] == "item-1"
