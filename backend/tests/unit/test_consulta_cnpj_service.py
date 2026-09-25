@@ -21,7 +21,9 @@ def _mock_client(monkeypatch, handler):
     monkeypatch.setattr(
         service.httpx,
         "Client",
-        lambda **kwargs: original_client(transport=httpx.MockTransport(handler), **kwargs),
+        lambda **kwargs: original_client(
+            transport=httpx.MockTransport(handler), **kwargs
+        ),
     )
 
 
@@ -32,24 +34,32 @@ def test_fallback_preenche_campos_quando_primeira_fonte_retorna_429(monkeypatch)
         chamadas.append(request.url.host)
         if request.url.host == "minhareceita.org":
             return httpx.Response(429)
-        return httpx.Response(200, json={
-            "razao_social": "M.A. DE ALMEIDA CLINICA VETERINARIA LTDA",
-            "estabelecimento": {
-                "cnpj": CNPJ,
-                "nome_fantasia": "SAO JOSE CLINICA VETERINARIA",
-                "email": "contato@exemplo.com",
-                "ddd1": "18",
-                "telefone1": "96312465",
-                "cep": "19020120",
-                "logradouro": "JOSE SOARES MARCONDES-CEL",
-                "numero": "379",
-                "bairro": "VILA MACHADINHO",
-                "cidade": {"nome": "PRESIDENTE PRUDENTE", "ibge_id": 3541406},
-                "estado": {"sigla": "SP"},
-                "atividade_principal": {"id": "7500100", "descricao": "Atividades veterinárias"},
-                "atividades_secundarias": [{"id": "4789004", "descricao": "Comércio varejista"}],
+        return httpx.Response(
+            200,
+            json={
+                "razao_social": "M.A. DE ALMEIDA CLINICA VETERINARIA LTDA",
+                "estabelecimento": {
+                    "cnpj": CNPJ,
+                    "nome_fantasia": "SAO JOSE CLINICA VETERINARIA",
+                    "email": "contato@exemplo.com",
+                    "ddd1": "18",
+                    "telefone1": "96312465",
+                    "cep": "19020120",
+                    "logradouro": "JOSE SOARES MARCONDES-CEL",
+                    "numero": "379",
+                    "bairro": "VILA MACHADINHO",
+                    "cidade": {"nome": "PRESIDENTE PRUDENTE", "ibge_id": 3541406},
+                    "estado": {"sigla": "SP"},
+                    "atividade_principal": {
+                        "id": "7500100",
+                        "descricao": "Atividades veterinárias",
+                    },
+                    "atividades_secundarias": [
+                        {"id": "4789004", "descricao": "Comércio varejista"}
+                    ],
+                },
             },
-        })
+        )
 
     _mock_client(monkeypatch, handler)
     dados = service.consultar_cnpj(CNPJ)
@@ -59,7 +69,9 @@ def test_fallback_preenche_campos_quando_primeira_fonte_retorna_429(monkeypatch)
     assert dados["nome_fantasia"] == "SAO JOSE CLINICA VETERINARIA"
     assert dados["codigo_municipio_ibge"] == 3541406
     assert dados["cnae_fiscal"] == "7500100"
-    assert dados["cnaes_secundarios"] == [{"codigo": "4789004", "descricao": "Comércio varejista"}]
+    assert dados["cnaes_secundarios"] == [
+        {"codigo": "4789004", "descricao": "Comércio varejista"}
+    ]
 
     assert service.consultar_cnpj(CNPJ) == dados
     assert len(chamadas) == 2
@@ -70,12 +82,15 @@ def test_primeira_fonte_valida_dispensa_fallback(monkeypatch):
 
     def handler(request):
         chamadas.append(request.url.host)
-        return httpx.Response(200, json={
-            "cnpj": CNPJ,
-            "razao_social": "Empresa Teste",
-            "codigo_municipio_ibge": 3541406,
-            "cnaes_secundarios": [],
-        })
+        return httpx.Response(
+            200,
+            json={
+                "cnpj": CNPJ,
+                "razao_social": "Empresa Teste",
+                "codigo_municipio_ibge": 3541406,
+                "cnaes_secundarios": [],
+            },
+        )
 
     _mock_client(monkeypatch, handler)
     assert service.consultar_cnpj(CNPJ)["razao_social"] == "Empresa Teste"
