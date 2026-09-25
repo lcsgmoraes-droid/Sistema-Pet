@@ -18,10 +18,49 @@ from app.financeiro.contas_pagar_recorrencia import (
     calcular_limite_janela_recorrencia,
 )
 from app.financeiro.contas_pagar_schemas import ContaPagarRecorrenciaBulkDelete
-from app.financeiro_models import ContaPagar
+from app.financeiro_models import ContaPagar, LancamentoManual
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
+
+
+def _tem_pagamento(conta: ContaPagar) -> bool:
+    return bool(
+        conta.status in ("pago", "parcial")
+        or (conta.valor_pago or Decimal("0")) > 0
+        or conta.pagamentos
+    )
+
+
+def _remover_previsoes_conta(db: Session, tenant_id, conta: ContaPagar) -> None:
+    """Remove apenas previsoes automaticas vinculadas a esta conta."""
+    prefixo = f"Gerado automaticamente da conta a pagar #{conta.id}"
+    previsoes = (
+        db.query(LancamentoManual)
+        .filter(
+            LancamentoManual.tenant_id == tenant_id,
+            LancamentoManual.tipo == "saida",
+            LancamentoManual.status == "previsto",
+            LancamentoManual.gerado_automaticamente.is_(True),
+            or_(
+                LancamentoManual.documento == f"CONTA-PAGAR-{conta.id}",
+                LancamentoManual.observacoes == prefixo,
+                LancamentoManual.observacoes.like(f"{prefixo}.%"),
+                LancamentoManual.observacoes.like(f"{prefixo} (%"),
+            ),
+        )
+        .all()
+    )
+    for previsao in previsoes:
+        db.delete(previsao)
+
+
+def _excluir_contas_sem_pagamento(
+    db: Session, tenant_id, contas: list[ContaPagar]
+) -> None:
+    for conta in sorted(contas, key=lambda item: 1 if item.eh_recorrente else 0):
+        _remover_previsoes_conta(db, tenant_id, conta)
+        db.delete(conta)
 
 
 @router.get("/{conta_id}/recorrencia")
@@ -68,17 +107,9 @@ def listar_recorrencia_conta_pagar(
                 "valor_pago": float(item.valor_pago or 0),
                 "status": item.status,
                 "eh_origem": item.id == conta_origem.id,
-                "pode_excluir": not (
-                    item.status == "pago"
-                    or (item.valor_pago or Decimal("0")) > 0
-                    or bool(item.pagamentos)
-                ),
+                "pode_excluir": not _tem_pagamento(item),
                 "motivo_bloqueio": (
-                    "Conta com pagamento registrado"
-                    if item.status == "pago"
-                    or (item.valor_pago or Decimal("0")) > 0
-                    or bool(item.pagamentos)
-                    else None
+                    "Conta com pagamento registrado" if _tem_pagamento(item) else None
                 ),
             }
             for item in itens
@@ -116,11 +147,7 @@ def excluir_recorrencias_contas_pagar(
 
     contas_por_id = {conta.id: conta for conta in contas}
     for conta in contas:
-        if (
-            conta.status == "pago"
-            or (conta.valor_pago or Decimal("0")) > 0
-            or conta.pagamentos
-        ):
+        if _tem_pagamento(conta):
             raise HTTPException(
                 status_code=400,
                 detail=f"Conta #{conta.id} possui pagamento registrado e nao pode ser excluida",
@@ -149,12 +176,9 @@ def excluir_recorrencias_contas_pagar(
                 ),
             )
 
-    contas_para_excluir = sorted(
-        (contas_por_id[conta_id] for conta_id in ids),
-        key=lambda conta: 1 if conta.eh_recorrente else 0,
+    _excluir_contas_sem_pagamento(
+        db, tenant_id, [contas_por_id[conta_id] for conta_id in ids]
     )
-    for conta in contas_para_excluir:
-        db.delete(conta)
 
     db.commit()
 

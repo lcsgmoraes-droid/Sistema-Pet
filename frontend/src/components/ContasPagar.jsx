@@ -298,7 +298,9 @@ const ContasPagar = () => {
         loading: false,
       });
       setRecorrenciasSelecionadasExclusao(
-        itens.filter((item) => item.pode_excluir).map((item) => item.id),
+        itens
+          .filter((item) => item.pode_excluir && (conta.eh_recorrente || item.id === conta.id))
+          .map((item) => item.id),
       );
     } catch (error) {
       console.error("Erro ao carregar recorrencia:", error);
@@ -366,6 +368,7 @@ const ContasPagar = () => {
     contas,
     carregarDados,
     abrirModalEdicao,
+    abrirExclusaoRecorrencia: carregarRecorrenciaExclusao,
   });
 
   const contasParaPagamentoLote = useMemo(

@@ -18,6 +18,10 @@ from app.financeiro.contas_pagar_recorrencia import (
     _garantir_janela_recorrencia_conta,
     calcular_proxima_recorrencia,
 )
+from app.financeiro.contas_pagar_recorrencia_routes import (
+    _excluir_contas_sem_pagamento,
+    _tem_pagamento,
+)
 from app.financeiro.contas_pagar_schemas import (
     ContaPagarOperacaoRequest,
     ContaPagarUpdate,
@@ -355,27 +359,27 @@ def excluir_conta_pagar(
     if not conta:
         raise HTTPException(status_code=404, detail="Conta nao encontrada")
 
-    valor_pago = conta.valor_pago or Decimal("0")
-    if conta.status == "pago" or valor_pago > 0 or conta.pagamentos:
+    if _tem_pagamento(conta):
         raise HTTPException(
             status_code=400,
             detail="Conta com pagamento registrado nao pode ser excluida",
         )
 
     recorrencias_filhas = (
-        db.query(func.count(ContaPagar.id))
+        db.query(ContaPagar)
+        .options(joinedload(ContaPagar.pagamentos))
         .filter(
             ContaPagar.tenant_id == tenant_id,
             ContaPagar.conta_recorrencia_origem_id == conta.id,
         )
-        .scalar()
-        or 0
+        .all()
     )
     if recorrencias_filhas:
-        raise HTTPException(
-            status_code=400,
-            detail="Conta recorrente com lancamentos futuros nao pode ser excluida individualmente",
-        )
+        if any(_tem_pagamento(filha) for filha in recorrencias_filhas):
+            raise HTTPException(
+                status_code=400,
+                detail="Ha lancamentos pagos nesta recorrencia. Estorne os pagamentos antes de excluir toda a serie.",
+            )
 
     parcelas_filhas = (
         db.query(func.count(ContaPagar.id))
@@ -392,13 +396,14 @@ def excluir_conta_pagar(
             detail="Conta parcelada com parcelas futuras nao pode ser excluida individualmente",
         )
 
-    db.delete(conta)
+    _excluir_contas_sem_pagamento(db, tenant_id, [*recorrencias_filhas, conta])
     db.commit()
 
     return {
         "ok": True,
-        "mensagem": "Conta a pagar excluida com sucesso",
+        "mensagem": "Conta a pagar e recorrencias sem pagamento excluidas com sucesso",
         "conta_id": conta_id,
+        "total": len(recorrencias_filhas) + 1,
     }
 
 
