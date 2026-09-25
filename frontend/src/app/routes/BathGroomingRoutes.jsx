@@ -1,11 +1,14 @@
 import { Route } from "react-router-dom";
+import ProtectedRoute from "../../components/ProtectedRoute";
 import { BanhoTosaPage } from "../lazyPages";
 import { ModuleGate } from "./RouteGates";
 
 function banhoTosaView(view) {
   return (
     <ModuleGate modulo="banho_tosa">
-      <BanhoTosaPage view={view} />
+      <ProtectedRoute permission="banho_tosa.acessar">
+        <BanhoTosaPage view={view} />
+      </ProtectedRoute>
     </ModuleGate>
   );
 }
