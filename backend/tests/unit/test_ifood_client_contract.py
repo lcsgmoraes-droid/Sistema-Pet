@@ -182,7 +182,9 @@ def test_order_and_event_endpoints_follow_ifood_contracts():
         assert client.validate_pickup_code("order-id", "1234")["valid"] is True
         assert client.verify_delivery_code("order-id", "4321")["valid"] is True
         assert client.start_separation("order-id")["status_code"] == 204
-        assert client.update_picking_item("order-id", "item-id", 1)["status_code"] == 204
+        assert (
+            client.update_picking_item("order-id", "item-id", 1)["status_code"] == 204
+        )
         assert client.remove_picking_item("order-id", "item-id")["status_code"] == 204
         assert client.end_separation("order-id")["status_code"] == 204
 
