@@ -34,8 +34,13 @@ OBSERVACAO = (
 
 
 def preparar(
-    db, *, aplicar: bool, email: str, nome_tenant: str,
-    cliente_codigo: str, cliente_nome: str,
+    db,
+    *,
+    aplicar: bool,
+    email: str,
+    nome_tenant: str,
+    cliente_codigo: str,
+    cliente_nome: str,
     alvos: dict[str, Decimal],
 ) -> tuple[list[tuple[Venda, ContaReceber | None]], User]:
     usuario = db.query(User).filter(User.email == email).one()
@@ -53,7 +58,9 @@ def preparar(
             query = query.with_for_update()
         vendas = {v.numero_venda: v for v in query.all()}
         if set(vendas) != set(alvos):
-            raise ValueError(f"Vendas encontradas: {sorted(vendas)}; esperado: {sorted(alvos)}")
+            raise ValueError(
+                f"Vendas encontradas: {sorted(vendas)}; esperado: {sorted(alvos)}"
+            )
 
         preparados = []
         clientes = set()
@@ -63,7 +70,10 @@ def preparar(
             if venda.status != "aberta" or Decimal(venda.total) != esperado:
                 raise ValueError(f"{numero}: status ou total divergiu")
             cliente = db.query(Cliente).filter_by(id=venda.cliente_id).one()
-            if str(cliente.codigo) != cliente_codigo or cliente.nome.casefold() != cliente_nome.casefold():
+            if (
+                str(cliente.codigo) != cliente_codigo
+                or cliente.nome.casefold() != cliente_nome.casefold()
+            ):
                 raise ValueError(f"{numero}: cliente divergiu")
             if venda.data_venda.strftime("%Y%m%d") != numero[4:12]:
                 raise ValueError(f"{numero}: data divergiu")
@@ -73,9 +83,11 @@ def preparar(
                 raise ValueError(f"{numero}: ja possui baixa")
             if db.query(MovimentacaoCaixa).filter_by(venda_id=venda.id).count():
                 raise ValueError(f"{numero}: ja possui movimento de caixa")
-            if db.query(MovimentacaoFinanceira).filter_by(
-                origem_tipo="venda", origem_id=venda.id
-            ).count():
+            if (
+                db.query(MovimentacaoFinanceira)
+                .filter_by(origem_tipo="venda", origem_id=venda.id)
+                .count()
+            ):
                 raise ValueError(f"{numero}: ja possui movimento bancario")
 
             contas = db.query(ContaReceber).filter_by(venda_id=venda.id).all()
@@ -107,17 +119,32 @@ def preparar(
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--tenant-email", required=True, help="Email do login da empresa")
-    parser.add_argument("--tenant-name", required=True, help="Nome da empresa no CorePet")
-    parser.add_argument("--client-code", required=True, help="Codigo visivel do cliente")
+    parser.add_argument(
+        "--tenant-email", required=True, help="Email do login da empresa"
+    )
+    parser.add_argument(
+        "--tenant-name", required=True, help="Nome da empresa no CorePet"
+    )
+    parser.add_argument(
+        "--client-code", required=True, help="Codigo visivel do cliente"
+    )
     parser.add_argument("--client-name", required=True, help="Nome visivel do cliente")
     parser.add_argument(
-        "--sale", required=True, action="append", metavar="NUMERO:VALOR",
+        "--sale",
+        required=True,
+        action="append",
+        metavar="NUMERO:VALOR",
         help="Numero importado e valor exato em reais (ponto decimal)",
     )
-    parser.add_argument("--apply", action="store_true", help="Gravar a regularizacao validada")
+    parser.add_argument(
+        "--apply", action="store_true", help="Gravar a regularizacao validada"
+    )
     args = parser.parse_args()
-    if len(args.sale) != 2 or not args.client_code.strip() or not args.client_name.strip():
+    if (
+        len(args.sale) != 2
+        or not args.client_code.strip()
+        or not args.client_name.strip()
+    ):
         parser.error("Informe duas vendas, codigo e nome do cliente")
     alvos = {}
     for entrada in args.sale:
@@ -126,7 +153,11 @@ def main() -> None:
             quantia = Decimal(valor)
         except (ValueError, ArithmeticError) as exc:
             parser.error(f"Venda invalida: {entrada!r} ({exc})")
-        if not numero.startswith("IMP-") or quantia <= 0 or quantia.as_tuple().exponent < -2:
+        if (
+            not numero.startswith("IMP-")
+            or quantia <= 0
+            or quantia.as_tuple().exponent < -2
+        ):
             parser.error(f"Venda invalida: {entrada!r}")
         alvos[numero] = quantia
     if len(alvos) != 2:
@@ -143,7 +174,9 @@ def main() -> None:
             alvos=alvos,
         )
         if not args.apply:
-            print("SIMULACAO: nenhuma alteracao gravada. Use --apply apos revisar os dados.")
+            print(
+                "SIMULACAO: nenhuma alteracao gravada. Use --apply apos revisar os dados."
+            )
             db.rollback()
             return
 
@@ -178,7 +211,9 @@ def main() -> None:
                 venda.status = "finalizada"
                 venda.data_finalizacao = agora
                 if conta is not None:
-                    db.delete(conta)  # Saldo importado indevidamente; sem recebimento vinculado.
+                    db.delete(
+                        conta
+                    )  # Saldo importado indevidamente; sem recebimento vinculado.
                 log_action(
                     db,
                     usuario.id,
@@ -201,7 +236,9 @@ def main() -> None:
                 ):
                     raise ValueError(f"{venda.numero_venda}: validacao final falhou")
             db.commit()
-            print("APLICADO: duas vendas finalizadas como PIX historico; contas em aberto removidas.")
+            print(
+                "APLICADO: duas vendas finalizadas como PIX historico; contas em aberto removidas."
+            )
     except Exception:
         db.rollback()
         raise
