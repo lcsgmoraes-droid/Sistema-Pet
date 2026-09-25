@@ -12,6 +12,12 @@ from app.models import Tenant
 from app.db import get_session
 from app.empresa_config_fiscal_models import EmpresaConfigFiscal
 from app.estoque_validade_service import EstoqueValidadeService
+from app.services.consulta_cnpj_service import (
+    CnpjInvalido,
+    CnpjNaoEncontrado,
+    ConsultaCnpjIndisponivel,
+    consultar_cnpj,
+)
 from app.security.permissions_decorator import (
     require_any_permission,
     require_permission,
@@ -264,6 +270,24 @@ def _serializar_dados_cadastrais(tenant: Tenant) -> DadosCadastraisResponse:
         cupom_cabecalho=getattr(tenant, "cupom_cabecalho", None),
         cupom_mensagem_final=getattr(tenant, "cupom_mensagem_final", None),
     )
+
+
+@router.get("/consulta-cnpj/{cnpj}")
+@require_any_permission(("configuracoes.empresa", "configuracoes.editar"))
+def buscar_dados_por_cnpj(
+    cnpj: str,
+    user_and_tenant=Depends(get_current_user_and_tenant),
+    db: Session = Depends(get_session),
+):
+    """Consulta dados públicos com fallback sem expor as fontes ao navegador."""
+    try:
+        return consultar_cnpj(cnpj)
+    except CnpjInvalido as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except CnpjNaoEncontrado as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ConsultaCnpjIndisponivel as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
 
 
 @router.get("/dados-cadastrais", response_model=DadosCadastraisResponse)
