@@ -50,9 +50,21 @@ function actionText(action, expectedAction, pendingText, idleText) {
   return action === expectedAction ? pendingText : idleText;
 }
 
-function CatalogItem({ item }) {
+function CatalogItem({ item, selected, onSelect }) {
   return (
-    <div className="flex items-start gap-3 px-4 py-3 text-sm">
+    <label
+      className={`flex items-start gap-3 px-4 py-3 text-sm ${
+        item.eligible ? "cursor-pointer" : "cursor-not-allowed opacity-75"
+      } ${selected ? "bg-red-50 dark:bg-red-950/20" : ""}`}
+    >
+      <input
+        type="radio"
+        name="ifood_catalog_product"
+        checked={selected}
+        onChange={() => onSelect(item.product_id)}
+        disabled={!item.eligible}
+        className="mt-0.5 h-4 w-4 shrink-0 border-slate-300 text-red-600"
+      />
       {item.eligible ? (
         <FiCheckCircle className="mt-0.5 shrink-0 text-emerald-600" />
       ) : (
@@ -73,7 +85,7 @@ function CatalogItem({ item }) {
           <p className="mt-1 text-xs text-blue-700">{item.warnings.join(" ")}</p>
         ) : null}
       </div>
-    </div>
+    </label>
   );
 }
 
@@ -84,6 +96,8 @@ export default function IfoodIntegracaoCard() {
   const [loading, setLoading] = useState(true);
   const [action, setAction] = useState(null);
   const [message, setMessage] = useState(null);
+  const [selectedProductId, setSelectedProductId] = useState(null);
+  const [confirmReset, setConfirmReset] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -139,9 +153,11 @@ export default function IfoodIntegracaoCard() {
     try {
       setAction("preview");
       const response = await api.get("/integracoes/ifood/catalogo/preview", {
-        params: { limit: 50, only_issues: true },
+        params: { limit: 50, only_issues: false },
       });
       setPreview(response.data);
+      const eligible = (response.data?.items || []).find((item) => item.eligible);
+      setSelectedProductId((current) => current || eligible?.product_id || null);
       setMessage({
         type: "success",
         text: "Prévia gerada somente para conferência. Nada foi enviado ao iFood.",
@@ -190,6 +206,39 @@ export default function IfoodIntegracaoCard() {
       setMessage({
         type: "error",
         text: errorMessage(error, "Não foi possível simular a sincronização."),
+      });
+    } finally {
+      setAction(null);
+    }
+  }
+
+  async function sendCatalog(operation, resetCatalog = false) {
+    if (!selectedProductId) {
+      setMessage({ type: "error", text: "Selecione um produto elegível para o teste." });
+      return;
+    }
+    try {
+      const actionName = resetCatalog ? "reset" : operation;
+      setAction(actionName);
+      const response = await api.post("/integracoes/ifood/catalogo/sincronizar", {
+        operation,
+        product_ids: [selectedProductId],
+        dry_run: false,
+        confirm_send: true,
+        reset_catalog: resetCatalog,
+        confirm_reset: resetCatalog && confirmReset,
+      });
+      setMessage({
+        type: "success",
+        text: `${response.data?.sent || 1} item enviado ao iFood via ${
+          operation === "create" ? "POST" : "PATCH"
+        }${resetCatalog ? " com reset=true" : ""}.`,
+      });
+      await load();
+    } catch (error) {
+      setMessage({
+        type: "error",
+        text: errorMessage(error, "Não foi possível enviar o item ao iFood."),
       });
     } finally {
       setAction(null);
@@ -375,8 +424,8 @@ export default function IfoodIntegracaoCard() {
                   Diagnóstico do catálogo
                 </p>
                 <p className="text-xs text-slate-500">
-                  A lista mostra até 50 bloqueios reais e informa o que precisa ser corrigido no
-                  ERP.
+                  Selecione um produto elegível para demonstrar POST, PATCH, PLU, preço, promoção e
+                  estoque na homologação.
                 </p>
               </div>
               {preview.issues?.length ? (
@@ -393,8 +442,66 @@ export default function IfoodIntegracaoCard() {
               ) : null}
               <div className="max-h-96 divide-y divide-slate-100 overflow-y-auto dark:divide-slate-800">
                 {(preview.items || []).map((item) => (
-                  <CatalogItem key={item.product_id} item={item} />
+                  <CatalogItem
+                    key={item.product_id}
+                    item={item}
+                    selected={selectedProductId === item.product_id}
+                    onSelect={setSelectedProductId}
+                  />
                 ))}
+              </div>
+
+              <div className="border-t border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-900">
+                <p className="text-sm font-medium text-slate-900 dark:text-slate-100">
+                  Execução controlada do módulo Item
+                </p>
+                <p className="mt-1 text-xs text-slate-500">
+                  Somente o produto selecionado será enviado. As ações ficam bloqueadas no servidor
+                  fora da homologação.
+                </p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => sendCatalog("create", false)}
+                    disabled={Boolean(action) || !data?.catalog_write_enabled || !selectedProductId}
+                    className="rounded-lg border border-blue-200 px-3 py-2 text-xs font-medium text-blue-800 disabled:opacity-50"
+                  >
+                    {action === "create" ? "Enviando..." : "Criar/reativar (POST reset=false)"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => sendCatalog("update", false)}
+                    disabled={Boolean(action) || !data?.catalog_write_enabled || !selectedProductId}
+                    className="rounded-lg border border-emerald-200 px-3 py-2 text-xs font-medium text-emerald-800 disabled:opacity-50"
+                  >
+                    {action === "update" ? "Enviando..." : "Atualizar preço e estoque (PATCH)"}
+                  </button>
+                </div>
+                <label className="mt-4 flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-900">
+                  <input
+                    type="checkbox"
+                    checked={confirmReset}
+                    onChange={(event) => setConfirmReset(event.target.checked)}
+                    className="mt-0.5 h-4 w-4 rounded border-red-300 text-red-600"
+                  />
+                  <span>
+                    Confirmo o reset do catálogo da loja de testes. Itens omitidos na carga serão
+                    desativados pelo iFood.
+                  </span>
+                </label>
+                <button
+                  type="button"
+                  onClick={() => sendCatalog("create", true)}
+                  disabled={
+                    Boolean(action) ||
+                    !data?.catalog_write_enabled ||
+                    !selectedProductId ||
+                    !confirmReset
+                  }
+                  className="mt-2 rounded-lg bg-red-600 px-3 py-2 text-xs font-medium text-white disabled:opacity-50"
+                >
+                  {action === "reset" ? "Enviando..." : "Carga de homologação (POST reset=true)"}
+                </button>
               </div>
             </div>
           ) : null}
