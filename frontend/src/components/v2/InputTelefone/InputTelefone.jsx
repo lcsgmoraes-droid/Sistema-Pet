@@ -28,6 +28,7 @@ export default function InputTelefone({
   id,
   label,
   name,
+  onBlur,
   onChange,
   onChangeWhatsapp,
   required = false,
@@ -61,6 +62,7 @@ export default function InputTelefone({
       inputMode="tel"
       label={label}
       name={name}
+      onBlur={onBlur}
       onChange={aoDigitar}
       placeholder={PLACEHOLDER_POR_TIPO[tipo] || PLACEHOLDER_POR_TIPO.ambos}
       required={required}

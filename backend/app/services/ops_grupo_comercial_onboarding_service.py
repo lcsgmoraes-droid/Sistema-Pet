@@ -36,7 +36,7 @@ from app.services.tenant_provisioning_service import (
     TenantOnboardingError,
     provision_tenant,
 )
-from app.tenancy.context import clear_tenant_context, set_tenant_context
+from app.tenancy.context import clear_tenant_context, get_current_tenant, set_tenant_context
 
 
 class OpsGrupoComercialOnboardingError(Exception):
@@ -78,8 +78,8 @@ def onboard_grupo_comercial(
         raise OpsGrupoComercialOnboardingError(
             409,
             "Ja existe uma conta com este e-mail. Para adicionar uma loja a um "
-            "titular existente, use 'Adicionar loja ao grupo' com o usuario "
-            "dele ja logado, em vez do onboarding assistido.",
+            "cliente que ja tem grupo comercial, use a acao 'Adicionar loja' "
+            "dentro do grupo dele em /ops/tenants, em vez do onboarding assistido.",
         )
 
     primeira_loja = lojas[0]
@@ -183,3 +183,52 @@ def onboard_grupo_comercial(
     return OpsGrupoComercialOnboardingResult(
         grupo_id=grupo["id"], titular_email=usuario.email, lojas=lojas_criadas
     )
+
+
+def adicionar_loja_a_grupo_existente(
+    db: Session,
+    *,
+    grupo_id: int,
+    loja: OpsLojaOnboarding,
+) -> dict:
+    """Provisiona mais uma loja dentro de um grupo comercial que ja existe,
+    acionado pela equipe (nao pelo cliente): o caso do cliente que liga
+    pedindo uma loja nova, negocia o valor por telefone, e a equipe
+    implanta a partir daqui. Reaproveita ``adicionar_loja`` com o mesmo
+    usuario master do grupo (nenhum titular novo e criado, nenhum e-mail e
+    enviado) e ``grant_trial=False`` — cliente ja pagante, loja nova nao
+    ganha os 30 dias de teste gratuito de cadastro novo.
+    """
+    contexto_anterior = get_current_tenant()
+    clear_tenant_context()
+    try:
+        master = db.query(User).filter(User.master_grupo_id == grupo_id).first()
+    finally:
+        if contexto_anterior is not None:
+            set_tenant_context(contexto_anterior)
+
+    if master is None:
+        raise OpsGrupoComercialOnboardingError(
+            409,
+            "Este grupo comercial nao tem um usuario master definido. "
+            "Nao e possivel provisionar uma loja nova sem um titular.",
+        )
+
+    try:
+        return GrupoComercialService(db).adicionar_loja(
+            grupo_id=grupo_id,
+            usuario=master,
+            nome_loja=loja.nome_loja,
+            nome_acesso=loja.nome_acesso,
+            plan=loja.plan,
+            organization_type=loja.organization_type,
+            restore_tenant_id=None,
+            empresa_acionadora_id=None,
+            commit=True,
+            grant_trial=False,
+        )
+    except TenantOnboardingError as exc:
+        db.rollback()
+        raise OpsGrupoComercialOnboardingError(
+            500, f"Nao foi possivel provisionar a loja '{loja.nome_loja}'."
+        ) from exc

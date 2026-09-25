@@ -9,8 +9,10 @@ from app.db import get_session
 from app.auth import get_current_user_and_tenant
 from app.auth.core import hash_password
 from app.security.permissions_decorator import require_permission
-from app.models import User, UserTenant, Role
+from app.models import AppAccessProfile, Cliente, User, UserTenant, Role
 from app.usuario_menu_favoritos_models import UsuarioMenuFavorito
+from app.clientes.common import gerar_codigo_cliente
+from app.services.app_access_profile_service import sync_cliente_app_access_profiles
 from app.services.business_audit_service import (
     build_user_access_metadata,
     log_business_event,
@@ -43,11 +45,29 @@ class UserCreate(BaseModel):
     nome: str | None = Field(default=None, max_length=255)
     password: str = Field(min_length=8, max_length=72)
     role_id: int  # Role a ser vinculada ao usuário
+    # Pessoa (Cliente) já existente para vincular a este login, encontrada via
+    # /clientes/verificar-duplicata/campo. Se None, uma Pessoa nova é criada.
+    pessoa_id: int | None = None
+    # Perfis de app (cliente/funcionario/veterinario/etc.) para a Pessoa
+    # vinculada ou recém-criada — ver app_access_profile_service.
+    app_access_profiles: list[str] = Field(default_factory=list)
+    # PF/PJ — usado só ao criar uma Pessoa nova (pessoa_id=None). Ignorado ao
+    # vincular a uma pessoa já existente, que já tem seu próprio tipo_pessoa.
+    tipo_pessoa: str = "PF"
+    # Este celular também é WhatsApp? Vai para Cliente.celular_whatsapp — só ao
+    # criar Pessoa nova, mesma regra do tipo_pessoa.
+    celular_whatsapp: bool = False
 
     @model_validator(mode="after")
     def validate_identifier(self):
         if not self.username and not self.email and not self.login_phone:
             raise ValueError("Informe o celular, nome de usuario ou e-mail")
+        if not self.nome or not self.nome.strip():
+            raise ValueError("Informe o nome da pessoa")
+        if not self.app_access_profiles:
+            raise ValueError("Selecione ao menos um perfil de acesso")
+        if self.tipo_pessoa not in ("PF", "PJ"):
+            raise ValueError("tipo_pessoa deve ser PF ou PJ")
         return self
 
 
@@ -60,6 +80,9 @@ class UsuarioListResponse(BaseModel):
     role_id: int
     role: str
     is_active: bool
+    pessoa_id: int | None = None
+    pessoa_nome: str | None = None
+    pessoa_codigo: str | None = None
 
     class Config:
         from_attributes = True
@@ -205,6 +228,64 @@ def _email_ja_cadastrado_globalmente(db: Session, email: str) -> bool:
     return email_exists_globally(db, email)
 
 
+def _vincular_ou_criar_pessoa_para_usuario(
+    db: Session,
+    *,
+    actor: User,
+    tenant_id,
+    user: User,
+    pessoa_id: int | None,
+    nome: str | None,
+    login_phone: str | None,
+    email: str | None,
+    tipo_pessoa: str = "PF",
+    celular_whatsapp: bool = False,
+) -> Cliente:
+    """Vincula o novo login a uma Pessoa já existente (encontrada via
+    /clientes/verificar-duplicata/campo) ou cria uma Pessoa nova como
+    funcionário. Ver .claude/skills/pessoas/SKILL.md."""
+    if pessoa_id is not None:
+        pessoa = (
+            db.query(Cliente)
+            .filter(
+                Cliente.id == pessoa_id,
+                Cliente.tenant_id == tenant_id,
+                Cliente.ativo.is_not(False),
+            )
+            .first()
+        )
+        if not pessoa:
+            raise UserAccountError("Pessoa selecionada não encontrada.", status_code=404)
+        if pessoa.auth_user_id is not None and pessoa.auth_user_id != user.id:
+            raise UserAccountError(
+                "Esta pessoa já está vinculada a outro usuário.", status_code=409
+            )
+        pessoa.auth_user_id = user.id
+        return pessoa
+
+    nome_pessoa = (
+        nome or user.nome or user.email or user.username or user.login_phone or f"Usuario {user.id}"
+    )
+    pessoa = Cliente(
+        tenant_id=tenant_id,
+        user_id=actor.id,
+        auth_user_id=user.id,
+        codigo=gerar_codigo_cliente(db, "funcionario", tipo_pessoa, tenant_id),
+        tipo_cadastro="funcionario",
+        tipo_pessoa=tipo_pessoa,
+        is_funcionario=True,
+        nome=nome_pessoa,
+        celular=login_phone,
+        celular_whatsapp=celular_whatsapp,
+        email=email,
+        origem_cliente="cadastro_usuario",
+        ativo=True,
+    )
+    db.add(pessoa)
+    db.flush()
+    return pessoa
+
+
 def _is_unique_email_violation(exc: IntegrityError) -> bool:
     return is_unique_email_violation(exc)
 
@@ -228,9 +309,18 @@ def listar_usuarios(
             Role.id.label("role_id"),
             Role.name.label("role"),
             UserTenant.is_active,
+            Cliente.id.label("pessoa_id"),
+            Cliente.nome.label("pessoa_nome"),
+            Cliente.codigo.label("pessoa_codigo"),
         )
         .join(UserTenant, UserTenant.user_id == User.id)
         .join(Role, Role.id == UserTenant.role_id)
+        .outerjoin(
+            Cliente,
+            (Cliente.auth_user_id == User.id)
+            & (Cliente.tenant_id == tenant_id)
+            & (Cliente.ativo.is_not(False)),
+        )
         .filter(UserTenant.tenant_id == tenant_id)
         .all()
     )
@@ -275,6 +365,29 @@ def criar_usuario(
             details=f"Usuario #{user.id} criado no tenant",
             commit=False,
         )
+
+        pessoa = _vincular_ou_criar_pessoa_para_usuario(
+            db,
+            actor=actor,
+            tenant_id=tenant_id,
+            user=user,
+            pessoa_id=payload.pessoa_id,
+            nome=payload.nome,
+            login_phone=user.login_phone,
+            email=payload.email,
+            tipo_pessoa=payload.tipo_pessoa,
+            celular_whatsapp=payload.celular_whatsapp,
+        )
+        if payload.app_access_profiles:
+            sync_cliente_app_access_profiles(
+                db,
+                tenant_id=tenant_id,
+                cliente=pessoa,
+                profile_types=payload.app_access_profiles,
+                granted_by_user_id=actor.id,
+                linked_user_id=user.id,
+            )
+
         db.commit()
         db.refresh(user)
     except UserAccountError as exc:
@@ -457,6 +570,70 @@ def atualizar_credenciais_usuario(
         "generated_password": generated_password,
         "sessions_revoked": sessions_revoked,
     }
+
+
+class PerfisAppUpdate(BaseModel):
+    profiles: list[str] = Field(default_factory=list)
+
+
+def _obter_pessoa_do_usuario(db: Session, *, user_id: int, tenant_id) -> Cliente:
+    pessoa = (
+        db.query(Cliente)
+        .filter(
+            Cliente.auth_user_id == user_id,
+            Cliente.tenant_id == tenant_id,
+            Cliente.ativo.is_not(False),
+        )
+        .first()
+    )
+    if not pessoa:
+        raise HTTPException(
+            status_code=404,
+            detail="Este usuário não tem uma Pessoa vinculada.",
+        )
+    return pessoa
+
+
+@router.get("/{user_id}/perfis-app")
+@require_permission("usuarios.manage")
+def listar_perfis_app_usuario(
+    user_id: int,
+    db: Session = Depends(get_session),
+    user_and_tenant=Depends(get_current_user_and_tenant),
+):
+    _actor, tenant_id = user_and_tenant
+    pessoa = _obter_pessoa_do_usuario(db, user_id=user_id, tenant_id=tenant_id)
+    perfis = (
+        db.query(AppAccessProfile.profile_type)
+        .filter(
+            AppAccessProfile.tenant_id == tenant_id,
+            AppAccessProfile.cliente_id == pessoa.id,
+        )
+        .all()
+    )
+    return {"pessoa_id": pessoa.id, "profiles": [item[0] for item in perfis]}
+
+
+@router.put("/{user_id}/perfis-app")
+@require_permission("usuarios.manage")
+def atualizar_perfis_app_usuario(
+    user_id: int,
+    payload: PerfisAppUpdate,
+    db: Session = Depends(get_session),
+    user_and_tenant=Depends(get_current_user_and_tenant),
+):
+    actor, tenant_id = user_and_tenant
+    pessoa = _obter_pessoa_do_usuario(db, user_id=user_id, tenant_id=tenant_id)
+    profiles = sync_cliente_app_access_profiles(
+        db,
+        tenant_id=tenant_id,
+        cliente=pessoa,
+        profile_types=payload.profiles,
+        granted_by_user_id=actor.id,
+        linked_user_id=user_id,
+    )
+    db.commit()
+    return {"pessoa_id": pessoa.id, "profiles": profiles}
 
 
 # ==========================================

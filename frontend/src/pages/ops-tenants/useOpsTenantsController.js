@@ -7,9 +7,10 @@ import {
   buildOpsTenantOnboardingForm,
   buildOpsTenantOnboardingPayload,
   buildOpsTenantTabSummaries,
+  groupOpsTenantsByClient,
 } from "../opsTenantsUtils";
 
-import { extractError, sumCounts } from "./opsTenantsFormatters";
+import { extractError } from "./opsTenantsFormatters";
 import { BILLING_OFFER_PLAN_OPTIONS } from "./opsTenantsConstants";
 import useOpsTenantOnboardingNotes from "./useOpsTenantOnboardingNotes";
 
@@ -62,10 +63,15 @@ export default function useOpsTenantsController() {
   const [selectedTenantId, setSelectedTenantId] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [actionError, setActionError] = useState("");
-  const [previewByTenant, setPreviewByTenant] = useState({});
-  const [applyByTenant, setApplyByTenant] = useState({});
-  const [busyKey, setBusyKey] = useState("");
+  const [tenantsPage, setTenantsPage] = useState(1);
+  const [tenantsItems, setTenantsItems] = useState([]);
+  const [tenantsLoading, setTenantsLoading] = useState(true);
+  const [tenantsPagination, setTenantsPagination] = useState({
+    page: 1,
+    pageSize: 10,
+    totalGroups: 0,
+    totalPages: 0,
+  });
 
   const loadTenants = useCallback(async () => {
     setLoading(true);
@@ -93,6 +99,40 @@ export default function useOpsTenantsController() {
   useEffect(() => {
     loadTenants();
   }, [loadTenants]);
+
+  const loadTenantsGrouped = useCallback(async () => {
+    setTenantsLoading(true);
+    try {
+      const response = await api.get("/admin/tenants/grouped", {
+        params: {
+          search: search.trim() || undefined,
+          status: status || undefined,
+          page: tenantsPage,
+          page_size: 10,
+        },
+      });
+      setTenantsItems(response.data?.items || []);
+      setTenantsPagination({
+        page: response.data?.page || 1,
+        pageSize: response.data?.page_size || 10,
+        totalGroups: response.data?.total_groups || 0,
+        totalPages: response.data?.total_pages || 0,
+      });
+    } catch (err) {
+      console.error("Erro ao carregar tenants agrupados:", err);
+      setError(extractError(err, "Nao foi possivel carregar os tenants agora."));
+    } finally {
+      setTenantsLoading(false);
+    }
+  }, [search, status, tenantsPage]);
+
+  useEffect(() => {
+    loadTenantsGrouped();
+  }, [loadTenantsGrouped]);
+
+  useEffect(() => {
+    setTenantsPage(1);
+  }, [search, status]);
 
   const selectedTenant = useMemo(
     () => items.find((item) => item.id === selectedTenantId) || items[0] || null,
@@ -153,58 +193,18 @@ export default function useOpsTenantsController() {
         items.filter((item) =>
           ["active", "ativo"].includes(String(item.status || "").toLowerCase()),
         ).length,
-      withCatalog:
-        summary?.with_base_catalog ?? items.filter((item) => item.base_catalog?.installed).length,
-      products: sumCounts(items, "produtos"),
     }),
     [items, summary],
   );
 
   const tabSummaries = useMemo(() => buildOpsTenantTabSummaries(items, summary), [items, summary]);
-  const showTenantTable = activeTab === "tenants" || activeTab === "catalog";
+  const groupedItems = useMemo(() => groupOpsTenantsByClient(tenantsItems), [tenantsItems]);
+  const showTenantTable = activeTab === "tenants";
 
-  async function handlePreview(tenant) {
-    setBusyKey(`preview:${tenant.id}`);
-    setActionError("");
-    setSelectedTenantId(tenant.id);
-    try {
-      const response = await api.post(`/admin/tenants/${tenant.id}/catalog-import/preview`);
-      setPreviewByTenant((current) => ({ ...current, [tenant.id]: response.data }));
-      setApplyByTenant((current) => {
-        const next = { ...current };
-        delete next[tenant.id];
-        return next;
-      });
-    } catch (err) {
-      setActionError(extractError(err, "Nao foi possivel simular a importacao."));
-    } finally {
-      setBusyKey("");
-    }
-  }
-
-  async function handleApply(tenant) {
-    const preview = previewByTenant[tenant.id];
-    if (!preview?.ok) {
-      setSelectedTenantId(tenant.id);
-      setActionError("Rode uma simulacao valida antes de aplicar a importacao.");
-      return;
-    }
-
-    setBusyKey(`apply:${tenant.id}`);
-    setActionError("");
-    setSelectedTenantId(tenant.id);
-    try {
-      const response = await api.post(`/admin/tenants/${tenant.id}/catalog-import/apply`, {
-        confirm: true,
-      });
-      setApplyByTenant((current) => ({ ...current, [tenant.id]: response.data }));
-      await loadTenants();
-    } catch (err) {
-      setActionError(extractError(err, "Nao foi possivel aplicar a importacao."));
-    } finally {
-      setBusyKey("");
-    }
-  }
+  const refreshAfterLojaAdded = useCallback(async () => {
+    setTenantsPage(1);
+    await Promise.all([loadTenants(), loadTenantsGrouped()]);
+  }, [loadTenants, loadTenantsGrouped]);
 
   function handleCommercialChange(field, value) {
     setCommercialForm((current) => ({ ...current, [field]: value }));
@@ -362,10 +362,7 @@ export default function useOpsTenantsController() {
   }
 
   return {
-    actionError,
     activeTab,
-    applyByTenant,
-    busyKey,
     commercialError,
     commercialForm,
     commercialSaving,
@@ -378,7 +375,6 @@ export default function useOpsTenantsController() {
     billingOffersLoading,
     billingOfferSuccess,
     error,
-    handleApply,
     handleCommercialChange,
     handleCommercialSubmit,
     handleOnboardingChange,
@@ -388,7 +384,7 @@ export default function useOpsTenantsController() {
     handleBillingOfferChange,
     handleBillingOfferSubmit,
     handleBillingOfferToggleModule,
-    handlePreview,
+    groupedItems,
     items,
     loadTenants,
     loading,
@@ -402,16 +398,19 @@ export default function useOpsTenantsController() {
     onboardingNotesLoading,
     onboardingSaving,
     onboardingSuccess,
-    previewByTenant,
+    refreshAfterLojaAdded,
     search,
     selectedTenant,
     setActiveTab,
     setSearch,
     setSelectedTenantId,
     setStatus,
+    setTenantsPage,
     showTenantTable,
     status,
     tabSummaries,
+    tenantsLoading,
+    tenantsPagination,
     totals,
   };
 }

@@ -112,7 +112,7 @@ function PessoaMobileCard({
       </div>
 
       <dl className="mt-3 grid grid-cols-2 gap-2 text-xs">
-        {cliente.tipo_cadastro === "cliente" && (
+        {cliente.is_cliente && (
           <div>
             <dt className="text-slate-500">Origem</dt>
             <dd className="text-slate-700">{nomeOrigemCliente(cliente.origem_cliente)}</dd>
@@ -457,7 +457,7 @@ const ClientesNovoTabelaSection = ({
                           </td>
                           <td className="px-4 py-3 whitespace-nowrap">
                             <span className="text-xs text-gray-600">
-                              {cliente.tipo_cadastro === "cliente"
+                              {cliente.is_cliente
                                 ? nomeOrigemCliente(cliente.origem_cliente)
                                 : "-"}
                             </span>

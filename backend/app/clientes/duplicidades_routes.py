@@ -81,6 +81,9 @@ def _igual_normalizado(campo, valor: str):
             )
             == normalizado
         )
+    if campo_nome == "email":
+        normalizado = str(valor or "").strip().casefold()
+        return func.lower(campo) == normalizado
     return campo == valor
 
 
@@ -91,11 +94,12 @@ def verificar_duplicata(
     telefone: Optional[str] = None,
     celular: Optional[str] = None,
     crmv: Optional[str] = None,
+    email: Optional[str] = None,
     cliente_id: Optional[int] = None,
     db: Session = Depends(get_session),
     user_and_tenant=Depends(get_current_user_and_tenant),
 ):
-    """Verificar se existe cliente com CPF, CNPJ, telefone, celular ou CRMV duplicado"""
+    """Verificar se existe cliente com CPF, CNPJ, telefone, celular, CRMV ou e-mail duplicado"""
     current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
 
     resultado = {"duplicado": False, "cliente": None, "campo": None}
@@ -198,6 +202,33 @@ def verificar_duplicata(
                 "id": cliente.id,
                 "codigo": cliente.codigo,
                 "nome": cliente.nome,
+                "cpf": cliente.cpf,
+                "telefone": cliente.telefone,
+                "celular": cliente.celular,
+                "email": cliente.email,
+            }
+            return resultado
+
+    # Verificar e-mail
+    if email:
+        query = db.query(Cliente).filter(
+            Cliente.tenant_id == tenant_id,
+            _igual_normalizado(Cliente.email, email),
+            Cliente.ativo.is_not(False),
+        )
+        if cliente_id:
+            query = query.filter(Cliente.id != cliente_id)
+
+        cliente = query.first()
+        if cliente:
+            resultado["duplicado"] = True
+            resultado["campo"] = "email"
+            resultado["cliente"] = {
+                "id": cliente.id,
+                "codigo": cliente.codigo,
+                "nome": cliente.nome,
+                "tipo_cadastro": cliente.tipo_cadastro,
+                "tipo_pessoa": cliente.tipo_pessoa,
                 "cpf": cliente.cpf,
                 "telefone": cliente.telefone,
                 "celular": cliente.celular,

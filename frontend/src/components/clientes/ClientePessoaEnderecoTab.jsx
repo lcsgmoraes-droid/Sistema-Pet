@@ -1,4 +1,4 @@
-import { Edit2, Plus, Star } from "lucide-react";
+import { Edit2, MapPin, Plus, Star } from "lucide-react";
 import BotaoExcluir from "../v2/BotaoExcluir/BotaoExcluir";
 import BotaoInteracao from "../v2/BotaoInteracao/BotaoInteracao";
 
@@ -116,13 +116,16 @@ export default function ClientePessoaEnderecoTab({
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h4 className="text-sm font-semibold text-slate-800 dark:text-slate-200">Endereços</h4>
-          <p className="text-xs text-slate-500 dark:text-slate-400">
-            O principal é usado como endereço padrão do cadastro; adicione outros para entrega,
-            cobrança etc.
-          </p>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex items-start gap-2">
+          <MapPin className="mt-0.5 h-4 w-4 flex-none text-blue-600 dark:text-blue-300" aria-hidden="true" />
+          <div>
+            <h4 className="text-sm font-semibold text-slate-800 dark:text-slate-200">Endereço</h4>
+            <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+              O principal é usado como endereço padrão do cadastro; adicione outros para
+              entrega, cobrança etc.
+            </p>
+          </div>
         </div>
         <BotaoInteracao
           icon={Plus}

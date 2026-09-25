@@ -1,6 +1,5 @@
 import assert from "node:assert/strict";
 import {
-  buildInitialAccessCredentials,
   formatInitialAccessCredentials,
   resolveTenantLoginReference,
 } from "./usuarioAcessoInicial.js";
@@ -21,41 +20,12 @@ assert.equal(
 assert.equal(resolveTenantLoginReference(null, { nome: "Pet Center" }), "Pet Center");
 assert.equal(resolveTenantLoginReference(null, "nao-e-json"), "");
 
-const credentials = buildInitialAccessCredentials({
-  tenant: " Pet Feliz Demo ",
-  username: " MARIA.SILVA ",
-  password: "Senha Inicial 123",
-  personName: " Maria Silva ",
-});
-
-assert.deepEqual(credentials, {
-  tenant: "Pet Feliz Demo",
-  username: "maria.silva",
-  loginPhone: "",
-  password: "Senha Inicial 123",
-  personName: "Maria Silva",
-});
 assert.equal(
-  buildInitialAccessCredentials({ tenant: "", username: "maria", password: "senha" }),
-  null,
-);
-
-const phoneCredentials = buildInitialAccessCredentials({
-  tenant: "Vira Latas",
-  loginPhone: "(18) 99740-1641",
-  password: "Senha Inicial 123",
-  personName: "Maria Silva",
-});
-
-assert.deepEqual(phoneCredentials, {
-  tenant: "Vira Latas",
-  username: "",
-  loginPhone: "18997401641",
-  password: "Senha Inicial 123",
-  personName: "Maria Silva",
-});
-assert.equal(
-  formatInitialAccessCredentials(phoneCredentials),
+  formatInitialAccessCredentials({
+    tenant: "Vira Latas",
+    loginPhone: "18997401641",
+    password: "Senha Inicial 123",
+  }),
   [
     "Acesso ao CorePet",
     "Celular: 18997401641",
@@ -64,7 +34,11 @@ assert.equal(
   ].join("\n"),
 );
 assert.equal(
-  formatInitialAccessCredentials(credentials),
+  formatInitialAccessCredentials({
+    tenant: "Pet Feliz Demo",
+    username: "maria.silva",
+    password: "Senha Inicial 123",
+  }),
   [
     "Acesso ao CorePet",
     "Loja: Pet Feliz Demo",
@@ -73,5 +47,6 @@ assert.equal(
     "Login: https://corepet.com.br/login",
   ].join("\n"),
 );
+assert.equal(formatInitialAccessCredentials(null), "");
 
 console.log("usuarioAcessoInicial tests passed");

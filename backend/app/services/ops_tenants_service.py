@@ -1,8 +1,8 @@
 """Fachada das operacoes administrativas de empresas.
 
 As rotas continuam importando este modulo. Consultas, metricas e montagem da
-visao operacional ficam em ``ops_tenants_read_service``; comandos comerciais,
-acompanhamento e importacao de catalogo permanecem aqui.
+visao operacional ficam em ``ops_tenants_read_service``; comandos comerciais
+e acompanhamento permanecem aqui.
 """
 
 from __future__ import annotations
@@ -14,12 +14,6 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.ops_models import OpsTenantOnboardingNote
-from app.services.base_catalog_import_service import (
-    DEFAULT_BASE_CATALOG_BUNDLE_CODE,
-    DEFAULT_BASE_CATALOG_BUNDLE_VERSION,
-    DEFAULT_BASE_CATALOG_SOURCE_EMAIL,
-    import_base_catalog,
-)
 from app.services.ops_tenants_common import (
     BUSINESS_TIMEZONE,
     OpsTenantActionError,
@@ -28,7 +22,6 @@ from app.services.ops_tenants_common import (
     _iso,
     _parse_date,
     _parse_datetime,
-    _table_exists,
 )
 from app.services.ops_tenants_read_service import (
     COUNT_TABLES,
@@ -49,6 +42,7 @@ from app.services.ops_tenants_read_service import (
     _tenant_row_to_item,
     _tenant_usage,
     list_ops_tenants,
+    list_ops_tenants_grouped,
 )
 
 __all__ = [
@@ -56,9 +50,6 @@ __all__ = [
     "COMMERCIAL_STATE_LABELS",
     "COMMERCIAL_STATE_OPTIONS",
     "COUNT_TABLES",
-    "DEFAULT_BASE_CATALOG_BUNDLE_CODE",
-    "DEFAULT_BASE_CATALOG_BUNDLE_VERSION",
-    "DEFAULT_BASE_CATALOG_SOURCE_EMAIL",
     "ONBOARDING_SATISFACTION_OPTIONS",
     "OpsTenantActionError",
     "_base_catalog_status",
@@ -78,16 +69,14 @@ __all__ = [
     "_pilot_errors_7d",
     "_pilot_follow_up",
     "_principal_user",
-    "_table_exists",
     "_tenant_counts",
     "_tenant_pilot_status",
     "_tenant_row_to_item",
     "_tenant_usage",
-    "apply_base_catalog_import",
     "create_ops_tenant_onboarding_note",
     "list_ops_tenant_onboarding_notes",
     "list_ops_tenants",
-    "preview_base_catalog_import",
+    "list_ops_tenants_grouped",
     "update_ops_tenant_commercial_state",
     "update_ops_tenant_onboarding_follow_up",
 ]
@@ -340,35 +329,6 @@ def create_ops_tenant_onboarding_note(
     return _onboarding_note_to_item(row)
 
 
-def _resolve_source_tenant_id(
-    db: Session, source_email: str = DEFAULT_BASE_CATALOG_SOURCE_EMAIL
-) -> str:
-    if not _table_exists(db, "users"):
-        raise OpsTenantActionError("Tabela de usuarios ausente.")
-
-    row = db.execute(
-        text("""
-            SELECT tenant_id
-            FROM users
-            WHERE lower(email) = lower(:email)
-              AND tenant_id IS NOT NULL
-            ORDER BY id ASC
-            LIMIT 1
-            """),
-        {"email": source_email},
-    ).first()
-    if not row:
-        raise OpsTenantActionError(f"Usuario fonte nao encontrado: {source_email}.")
-    return str(row[0])
-
-
-def _resolve_target_user_id(db: Session, tenant_id: str) -> int:
-    principal = _principal_user(db, tenant_id)
-    if not principal:
-        raise OpsTenantActionError(f"Tenant sem usuario principal: {tenant_id}.")
-    return int(principal["id"])
-
-
 def _ensure_target_tenant(db: Session, tenant_id: str) -> None:
     exists = db.execute(
         text("SELECT 1 FROM tenants WHERE CAST(id AS TEXT) = :tenant_id LIMIT 1"),
@@ -376,36 +336,3 @@ def _ensure_target_tenant(db: Session, tenant_id: str) -> None:
     ).scalar()
     if not exists:
         raise OpsTenantActionError(f"Tenant nao encontrado: {tenant_id}.")
-
-
-def preview_base_catalog_import(db: Session, *, tenant_id: str) -> dict[str, Any]:
-    target_tenant_id = str(tenant_id).strip()
-    _ensure_target_tenant(db, target_tenant_id)
-    return import_base_catalog(
-        db=db,
-        source_tenant_id=_resolve_source_tenant_id(db),
-        target_tenant_id=target_tenant_id,
-        user_id=_resolve_target_user_id(db, target_tenant_id),
-        dry_run=True,
-    )
-
-
-def apply_base_catalog_import(
-    db: Session,
-    *,
-    tenant_id: str,
-    confirm: bool,
-) -> dict[str, Any]:
-    if not confirm:
-        raise OpsTenantActionError("Importacao real exige confirmacao explicita.")
-
-    target_tenant_id = str(tenant_id).strip()
-    _ensure_target_tenant(db, target_tenant_id)
-    target_user_id = _resolve_target_user_id(db, target_tenant_id)
-    return import_base_catalog(
-        db=db,
-        source_tenant_id=_resolve_source_tenant_id(db),
-        target_tenant_id=target_tenant_id,
-        user_id=target_user_id,
-        dry_run=False,
-    )

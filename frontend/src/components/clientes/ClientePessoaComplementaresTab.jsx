@@ -1,14 +1,14 @@
-import { AlertTriangle, Plus, Trash2 } from "lucide-react";
-import { FiDollarSign } from "react-icons/fi";
-import { buildEmptyClienteAlertaPdv } from "../../utils/clienteAlertasPdv";
-import ActionButton from "../ui/ActionButton";
-import ClientePessoaAcessoAppCard from "./ClientePessoaAcessoAppCard";
 import InputCheckTexto from "../v2/InputCheckTexto/InputCheckTexto";
 import InputCombobox from "../v2/InputCombobox/InputCombobox";
 import InputMoeda from "../v2/InputMoeda/InputMoeda";
 import InputQuantidade from "../v2/InputQuantidade/InputQuantidade";
-import InputTexto from "../v2/InputTexto/InputTexto";
+import InputRadio from "../v2/InputRadio/InputRadio";
 import InputTextoLongo from "../v2/InputTextoLongo/InputTextoLongo";
+
+const OPCOES_SIM_NAO = [
+  { value: "sim", label: "Sim" },
+  { value: "nao", label: "Não" },
+];
 
 const OPCOES_PERIODICIDADE = [
   { value: "semanal", label: "Semanal" },
@@ -26,42 +26,21 @@ const OPCOES_DIA_SEMANA = [
   { value: "7", label: "Domingo" },
 ];
 
-const OPCOES_PRIORIDADE_ALERTA = [
-  { value: "aviso", label: "Aviso" },
-  { value: "importante", label: "Importante" },
-  { value: "info", label: "Info" },
-];
-
-export default function ClientePessoaComplementaresTab({
-  formData,
-  loadingUsuariosAcessoApp,
-  rolesAcessoApp,
-  setFormData,
-  usuariosAcessoApp,
-}) {
-  const alertasPdv = Array.isArray(formData.alertas_pdv) ? formData.alertas_pdv : [];
-
-  const setAlertasPdv = (alertas) => setFormData((prev) => ({ ...prev, alertas_pdv: alertas }));
-
-  const atualizarAlerta = (index, campo, valor) => {
-    setAlertasPdv(
-      alertasPdv.map((alerta, alertaIndex) =>
-        alertaIndex === index ? { ...alerta, [campo]: valor } : alerta,
-      ),
-    );
-  };
-
-  const mostrarEntrega =
-    formData.tipo_cadastro === "funcionario" || formData.tipo_cadastro === "fornecedor";
+export default function ClientePessoaComplementaresTab({ formData, setFormData }) {
+  const mostrarEntrega = formData.is_funcionario || formData.is_fornecedor;
 
   return (
     <div className="space-y-6">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:items-start">
       {mostrarEntrega ? (
         <section className="rounded-lg border border-blue-200 bg-blue-50 p-4 dark:border-blue-500/30 dark:bg-blue-500/10">
-          <InputCheckTexto
-            id="pessoa-is-entregador"
-            checked={formData.is_entregador || false}
-            onChange={(marcado) => {
+          <InputRadio
+            name="pessoa-is-entregador"
+            label="É entregador?"
+            opcoes={OPCOES_SIM_NAO}
+            value={formData.is_entregador ? "sim" : "nao"}
+            onChange={(valor) => {
+              const marcado = valor === "sim";
               setFormData((prev) => {
                 const perfis = new Set(prev.app_access_profiles || []);
                 if (marcado) perfis.add("entregador");
@@ -69,11 +48,11 @@ export default function ClientePessoaComplementaresTab({
                 return { ...prev, is_entregador: marcado, app_access_profiles: Array.from(perfis) };
               });
             }}
-          >
-            <span className="text-sm font-medium text-slate-800 dark:text-slate-200">
-              É entregador
-            </span>
-          </InputCheckTexto>
+          />
+          <p className="mt-1 text-xs text-slate-500">
+            Ao ativar, esta pessoa poderá ser vinculada a rotas de entrega, com custo e acerto
+            financeiro configuráveis abaixo.
+          </p>
 
           {formData.is_entregador ? (
             <div className="mt-3 space-y-3 border-l-2 border-blue-300 pl-3">
@@ -90,7 +69,7 @@ export default function ClientePessoaComplementaresTab({
                 </span>
               </InputCheckTexto>
 
-              {formData.tipo_cadastro === "funcionario" ? (
+              {formData.is_funcionario ? (
                 <>
                   <InputCheckTexto
                     id="pessoa-controla-rh"
@@ -146,8 +125,8 @@ export default function ClientePessoaComplementaresTab({
                 </>
               ) : null}
 
-              {formData.tipo_cadastro === "fornecedor" ||
-              (formData.tipo_cadastro === "funcionario" && !formData.controla_rh) ? (
+              {formData.is_fornecedor ||
+              (formData.is_funcionario && !formData.controla_rh) ? (
                 <div className="space-y-3">
                   <InputCheckTexto
                     id="pessoa-modelo-taxa-fixa"
@@ -278,33 +257,29 @@ export default function ClientePessoaComplementaresTab({
       ) : null}
 
       <section className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 dark:border-emerald-500/30 dark:bg-emerald-500/10">
-        <div className="flex items-center gap-2">
-          <FiDollarSign className="text-emerald-700 dark:text-emerald-300" size={18} />
-          <InputCheckTexto
-            id="pessoa-parceiro-ativo"
-            checked={formData.parceiro_ativo || false}
-            onChange={(parceiro_ativo) =>
-              setFormData((prev) => ({
-                ...prev,
-                parceiro_ativo,
-                parceiro_desde:
-                  parceiro_ativo && !prev.parceiro_desde
-                    ? new Date().toISOString().split("T")[0]
-                    : prev.parceiro_desde || "",
-              }))
-            }
-          >
-            <span className="text-sm font-medium text-slate-800 dark:text-slate-200">
-              Ativar como parceiro (comissões)
-            </span>
-            <span className="mt-0.5 block text-xs text-slate-500">
-              Ao ativar, esta pessoa poderá receber comissões de vendas, independente do tipo de
-              cadastro.
-            </span>
-          </InputCheckTexto>
-        </div>
+        <InputRadio
+          name="pessoa-parceiro-ativo"
+          label="Ativar como parceiro (comissões)?"
+          opcoes={OPCOES_SIM_NAO}
+          value={formData.parceiro_ativo ? "sim" : "nao"}
+          onChange={(valor) => {
+            const parceiro_ativo = valor === "sim";
+            setFormData((prev) => ({
+              ...prev,
+              parceiro_ativo,
+              parceiro_desde:
+                parceiro_ativo && !prev.parceiro_desde
+                  ? new Date().toISOString().split("T")[0]
+                  : prev.parceiro_desde || "",
+            }));
+          }}
+        />
+        <p className="mt-1 text-xs text-slate-500">
+          Ao ativar, esta pessoa poderá receber comissões de vendas, independente do tipo de
+          cadastro.
+        </p>
         {formData.parceiro_ativo ? (
-          <div className="mt-3 pl-7">
+          <div className="mt-3">
             <InputTextoLongo
               id="pessoa-parceiro-observacoes"
               label="Observações do parceiro (opcional)"
@@ -318,104 +293,7 @@ export default function ClientePessoaComplementaresTab({
           </div>
         ) : null}
       </section>
-
-      <section>
-        <div className="mb-3 flex items-center justify-between gap-3">
-          <h4 className="flex items-center gap-2 text-sm font-semibold text-slate-800 dark:text-slate-200">
-            <AlertTriangle className="h-4 w-4 text-amber-600" aria-hidden="true" />
-            Alertas do PDV
-          </h4>
-          <ActionButton
-            icon={Plus}
-            intent="warning"
-            onClick={() => setAlertasPdv([...alertasPdv, buildEmptyClienteAlertaPdv()])}
-          >
-            Adicionar alerta
-          </ActionButton>
-        </div>
-
-        {alertasPdv.length > 0 ? (
-          <div className="space-y-3">
-            {alertasPdv.map((alerta, index) => (
-              <div
-                key={index}
-                className="rounded-lg border border-amber-200 bg-amber-50 p-3 dark:border-amber-500/30 dark:bg-amber-500/10"
-              >
-                <div className="grid grid-cols-1 gap-3 md:grid-cols-[minmax(0,1fr)_150px_auto] md:items-start">
-                  <InputTexto
-                    id={`pessoa-alerta-titulo-${index}`}
-                    label="Tag"
-                    value={alerta.titulo || ""}
-                    onChange={(titulo) => atualizarAlerta(index, "titulo", titulo)}
-                    placeholder="Preço especial"
-                  />
-                  <InputCombobox
-                    id={`pessoa-alerta-prioridade-${index}`}
-                    label="Prioridade"
-                    opcoes={OPCOES_PRIORIDADE_ALERTA}
-                    permitirLimpar={false}
-                    value={alerta.prioridade || "aviso"}
-                    onChange={(prioridade) => atualizarAlerta(index, "prioridade", prioridade)}
-                  />
-                  <ActionButton
-                    icon={Trash2}
-                    intent="delete"
-                    tone="ghost"
-                    className="md:mt-6"
-                    onClick={() =>
-                      setAlertasPdv(alertasPdv.filter((_, alertaIndex) => alertaIndex !== index))
-                    }
-                  >
-                    Remover
-                  </ActionButton>
-                </div>
-
-                <div className="mt-3">
-                  <InputTextoLongo
-                    id={`pessoa-alerta-mensagem-${index}`}
-                    label="Mensagem"
-                    linhas={2}
-                    value={alerta.mensagem || ""}
-                    onChange={(mensagem) => atualizarAlerta(index, "mensagem", mensagem)}
-                    placeholder="Cliente tem preço especial na ração X: fazer por R$ 120,00"
-                  />
-                </div>
-
-                <div className="mt-2">
-                  <InputCheckTexto
-                    id={`pessoa-alerta-ativo-${index}`}
-                    checked={alerta.ativo !== false}
-                    onChange={(ativo) => atualizarAlerta(index, "ativo", ativo)}
-                  >
-                    <span className="text-sm text-slate-700 dark:text-slate-300">Ativo no PDV</span>
-                  </InputCheckTexto>
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="rounded-lg border border-dashed border-amber-200 bg-amber-50 px-4 py-5 text-center text-sm text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200">
-            Nenhum alerta cadastrado
-          </div>
-        )}
-      </section>
-
-      <InputTextoLongo
-        id="pessoa-observacoes"
-        label="Observações"
-        linhas={4}
-        value={formData.observacoes}
-        onChange={(observacoes) => setFormData((prev) => ({ ...prev, observacoes }))}
-        placeholder="Informações adicionais sobre a pessoa..."
-      />
-
-      <ClientePessoaAcessoAppCard
-        formData={formData}
-        setFormData={setFormData}
-        usuarios={usuariosAcessoApp}
-        roles={rolesAcessoApp}
-        loadingUsuarios={loadingUsuariosAcessoApp}
-      />
+      </div>
     </div>
   );
 }

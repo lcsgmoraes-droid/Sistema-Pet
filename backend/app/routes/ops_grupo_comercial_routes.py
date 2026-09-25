@@ -19,6 +19,7 @@ from app.platform_auth_models import PlatformAdmin
 from app.services.ops_grupo_comercial_onboarding_service import (
     OpsGrupoComercialOnboardingError,
     OpsLojaOnboarding,
+    adicionar_loja_a_grupo_existente,
     onboard_grupo_comercial,
 )
 
@@ -70,3 +71,22 @@ def onboarding_assistido_grupo_comercial(
         "titular_email": resultado.titular_email,
         "lojas": resultado.lojas,
     }
+
+
+@router.post("/{grupo_id}/lojas")
+def adicionar_loja_ops(
+    grupo_id: int,
+    payload: OpsLojaOnboardingRequest,
+    _current_admin: PlatformAdmin = Depends(require_platform_admin),
+    db: Session = Depends(get_session),
+) -> dict[str, Any]:
+    loja = OpsLojaOnboarding(
+        nome_loja=payload.nome_loja,
+        nome_acesso=payload.nome_acesso,
+        plan=payload.plan,
+        organization_type=payload.organization_type,
+    )
+    try:
+        return adicionar_loja_a_grupo_existente(db, grupo_id=grupo_id, loja=loja)
+    except OpsGrupoComercialOnboardingError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc

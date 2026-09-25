@@ -146,8 +146,13 @@ O contrato operacional esta em `docs/IMPORTACAO_SIMPLESVET_SEGURA.md`.
 
 ## Catalogo Base Administrativo
 
-O catalogo base da loja `admin@mlprohub.com.br` pode ser importado por acao administrativa
-para novos tenants que quiserem iniciar com uma lista pronta de produtos.
+O catalogo base da loja do Lucas (`atacadaopetpp@gmail.com`) pode ser importado para novos
+tenants que quiserem iniciar com uma lista pronta de produtos. Desde 23/09/2026 isso nao tem
+mais gatilho na tela `/ops/tenants` (paineis "Catalogo base"/"Guardrails do MVP" e as rotas
+`/{tenant_id}/catalog-import/preview`/`/apply` foram removidos por estarem sem uso real e sem
+a conta-fonte cadastrada em nenhum ambiente) — a importacao continua existindo como motor
+(`base_catalog_import_service.py`) e pode ser rodada via `backend/app/scripts/run_base_catalog_import.py`
+ou reaproveitada pelo seed de demo/QA (`seed_demo_operacional_db.py`).
 
 Regras obrigatorias:
 

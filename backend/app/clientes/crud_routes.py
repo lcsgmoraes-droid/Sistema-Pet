@@ -16,6 +16,8 @@ from app.clientes.common import (
     _anexar_metadados_criacao_cliente,
     _obter_cliente_ou_404,
     _somente_digitos_coluna,
+    _validar_e_normalizar_flags_tipo_criacao,
+    _validar_e_normalizar_flags_tipo_update,
     _validar_telefone_cliente_obrigatorio,
     _validar_tenant_e_obter_usuario,
     gerar_codigo_cliente,
@@ -78,6 +80,7 @@ def create_cliente(
             tenant_id,
             current_user=current_user,
         )
+    _validar_e_normalizar_flags_tipo_criacao(cliente_data)
     _validar_telefone_cliente_obrigatorio(cliente_data)
     _validar_documentos_unicos_criacao(db, cliente_data, tenant_id)
 
@@ -271,6 +274,10 @@ def list_clientes(
     incluir_inativos: bool = False,
     tipo_cadastro: Optional[List[str]] = Query(None),
     is_entregador: Optional[bool] = None,
+    is_cliente: Optional[bool] = None,
+    is_fornecedor: Optional[bool] = None,
+    is_veterinario: Optional[bool] = None,
+    is_funcionario: Optional[bool] = None,
     visao_dashboard: Optional[str] = Query(None),
     origem_cliente: Optional[str] = None,
     cadastro_inicio: Optional[date] = None,
@@ -288,6 +295,10 @@ def list_clientes(
             tenant_id=tenant_id,
             tipo_cadastro=tipo_cadastro,
             is_entregador=is_entregador,
+            is_cliente=is_cliente,
+            is_fornecedor=is_fornecedor,
+            is_veterinario=is_veterinario,
+            is_funcionario=is_funcionario,
             search=search,
             ativo=ativo,
             incluir_inativos=incluir_inativos,
@@ -304,7 +315,7 @@ def list_clientes(
         except ValueError as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
         resumo = (
-            resumir_origens(query.filter(Cliente.tipo_cadastro == "cliente"), Cliente)
+            resumir_origens(query.filter(Cliente.is_cliente.is_(True)), Cliente)
             if resumo_por_origem
             else []
         )
@@ -352,6 +363,7 @@ def update_cliente(
     logger.info("[update_cliente] Dados de configuracao de entrega recebidos")
 
     cliente = _obter_cliente_ou_404(db, cliente_id, tenant_id)
+    _validar_e_normalizar_flags_tipo_update(cliente_data, cliente)
     _validar_telefone_cliente_obrigatorio(cliente_data, cliente)
     _validar_documentos_unicos_update(db, cliente, cliente_data, cliente_id, tenant_id)
 
@@ -610,7 +622,7 @@ def _validar_documentos_unicos_criacao(
             detail=f"Já existe um {cliente_data.tipo_cadastro} cadastrado com este CNPJ",
         )
 
-    if cliente_data.crmv and cliente_data.tipo_cadastro == "veterinario":
+    if cliente_data.crmv and cliente_data.is_veterinario:
         _validar_campo_unico(
             db,
             tenant_id=tenant_id,
@@ -779,6 +791,10 @@ def _montar_query_listagem_clientes(
     search,
     ativo,
     incluir_inativos,
+    is_cliente=None,
+    is_fornecedor=None,
+    is_veterinario=None,
+    is_funcionario=None,
     visao_dashboard=None,
 ):
     access_ids = get_all_accessible_tenant_ids(db, tenant_id)
@@ -790,6 +806,14 @@ def _montar_query_listagem_clientes(
             query = query.filter(Cliente.tipo_cadastro == tipo_cadastro)
     if is_entregador is not None:
         query = query.filter(Cliente.is_entregador == is_entregador)
+    if is_cliente is not None:
+        query = query.filter(Cliente.is_cliente == is_cliente)
+    if is_fornecedor is not None:
+        query = query.filter(Cliente.is_fornecedor == is_fornecedor)
+    if is_veterinario is not None:
+        query = query.filter(Cliente.is_veterinario == is_veterinario)
+    if is_funcionario is not None:
+        query = query.filter(Cliente.is_funcionario == is_funcionario)
 
     query = _aplicar_filtro_busca(query, search)
     if not incluir_inativos:

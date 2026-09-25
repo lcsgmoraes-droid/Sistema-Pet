@@ -1,23 +1,21 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import toast from "react-hot-toast";
-import { DollarSign, MapPin, Phone, Settings, User } from "lucide-react";
+import { AlertTriangle, DollarSign, ExternalLink, MapPin, PawPrint, Phone, User } from "lucide-react";
 import { FiChevronLeft } from "react-icons/fi";
-import { PawPrint } from "lucide-react";
 import api from "../api";
-import { useAuth } from "../contexts/AuthContext";
 import { useModulos } from "../contexts/ModulosContext";
 import EmptyState from "../components/ui/EmptyState";
 import LoadingState from "../components/ui/LoadingState";
 import PageHeader from "../components/ui/PageHeader";
 import Panel from "../components/ui/Panel";
 import AbasNavegacao from "../components/v2/AbasNavegacao/AbasNavegacao";
+import BotaoInteracao from "../components/v2/BotaoInteracao/BotaoInteracao";
 import BotaoSalva from "../components/v2/BotaoSalva/BotaoSalva";
 import LinkPadrao from "../components/v2/LinkPadrao/LinkPadrao";
 import ModalAdicionarCredito from "../components/ModalAdicionarCredito";
 import ModalRemoverCredito from "../components/ModalRemoverCredito";
-import UsuarioAcessoInicialModal from "../components/usuarios/UsuarioAcessoInicialModal";
-import ClientePessoaAnimaisTab from "../components/clientes/ClientePessoaAnimaisTab";
+import ClientePessoaAlertasPdvSection from "../components/clientes/ClientePessoaAlertasPdvSection";
 import ClientePessoaComplementaresTab from "../components/clientes/ClientePessoaComplementaresTab";
 import ClientePessoaContatosTab from "../components/clientes/ClientePessoaContatosTab";
 import ClientePessoaDadosGeraisTab from "../components/clientes/ClientePessoaDadosGeraisTab";
@@ -25,17 +23,15 @@ import ClientePessoaEnderecoModal from "../components/clientes/ClientePessoaEnde
 import ClientePessoaEnderecoTab from "../components/clientes/ClientePessoaEnderecoTab";
 import ClientePessoaFinanceiroTab from "../components/clientes/ClientePessoaFinanceiroTab";
 import { useClientesNovoEnderecos } from "../hooks/useClientesNovoEnderecos";
-import { canManageAppAccessProfiles } from "../utils/appAccessProfiles";
 import { normalizeClienteAlertasPdv } from "../utils/clienteAlertasPdv";
-import { normalizePessoaAppLogin } from "../utils/pessoaAppLogin";
-import {
-  buildInitialAccessCredentials,
-  resolveTenantLoginReference,
-} from "../utils/usuarioAcessoInicial";
 
 function buildFormDataFromCliente(cliente) {
   return {
     tipo_cadastro: cliente.tipo_cadastro || "cliente",
+    is_cliente: cliente.is_cliente || false,
+    is_fornecedor: cliente.is_fornecedor || false,
+    is_veterinario: cliente.is_veterinario || false,
+    is_funcionario: cliente.is_funcionario || false,
     origem_cliente: cliente.origem_cliente ?? null,
     tipo_pessoa: cliente.tipo_pessoa || "PF",
     nome: cliente.nome || "",
@@ -44,10 +40,7 @@ function buildFormDataFromCliente(cliente) {
     email: cliente.email || "",
     telefone: cliente.telefone || "",
     celular: cliente.celular || "",
-    celular_whatsapp: true,
-    auth_user_id: cliente.auth_user_id || null,
-    app_login: null,
-    app_access_profiles: cliente.app_access_profiles || [],
+    celular_whatsapp: cliente.celular_whatsapp || false,
     cnpj: cliente.cnpj || "",
     inscricao_estadual: cliente.inscricao_estadual || "",
     razao_social: cliente.razao_social || "",
@@ -102,13 +95,22 @@ function validarFormData(formData) {
     }
   }
 
-  if (formData.tipo_cadastro === "veterinario" && (!formData.crmv || !formData.crmv.trim())) {
+  if (formData.is_veterinario && (!formData.crmv || !formData.crmv.trim())) {
     erros.crmv = "Informe o CRMV.";
   }
 
-  if (formData.tipo_cadastro === "cliente") {
+  if (formData.is_cliente) {
     const digitos = `${formData.telefone || ""}${formData.celular || ""}`.replace(/\D/g, "");
     if (digitos.length < 10) erros.celular = "Informe telefone ou celular.";
+  }
+
+  if (
+    !formData.is_cliente &&
+    !formData.is_fornecedor &&
+    !formData.is_veterinario &&
+    !formData.is_funcionario
+  ) {
+    erros.tipos_cadastro = "Selecione ao menos um tipo de cadastro.";
   }
 
   return erros;
@@ -129,8 +131,6 @@ export default function ClientePessoaEditar() {
   const { clienteId } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
-  const { user } = useAuth();
-  const canManageAppAccess = canManageAppAccessProfiles(user);
   const { moduloAtivo } = useModulos();
   const moduloCampanhasAtivo = moduloAtivo("campanhas");
 
@@ -138,25 +138,15 @@ export default function ClientePessoaEditar() {
   const [carregando, setCarregando] = useState(true);
   const [naoEncontrado, setNaoEncontrado] = useState(false);
   const [formData, setFormData] = useState(null);
-  const [pets, setPets] = useState([]);
   const [abaAtiva, setAbaAtiva] = useState(location.state?.abaInicial || "dados-gerais");
   const [salvando, setSalvando] = useState(false);
 
-  const [usuariosAcessoApp, setUsuariosAcessoApp] = useState([]);
-  const [rolesAcessoApp, setRolesAcessoApp] = useState([]);
-  const [loadingUsuariosAcessoApp, setLoadingUsuariosAcessoApp] = useState(false);
   const [resumoFinanceiro, setResumoFinanceiro] = useState(null);
   const [loadingResumo, setLoadingResumo] = useState(false);
   const [saldoCampanhas, setSaldoCampanhas] = useState(null);
   const [refreshKeyCredito, setRefreshKeyCredito] = useState(0);
   const [mostrarModalAdicionarCredito, setMostrarModalAdicionarCredito] = useState(false);
   const [mostrarModalRemoverCredito, setMostrarModalRemoverCredito] = useState(false);
-  const [initialAccessCredentials, setInitialAccessCredentials] = useState(null);
-
-  const tenantLoginReference = resolveTenantLoginReference(
-    user,
-    typeof window === "undefined" ? null : window.localStorage.getItem("selectedTenant"),
-  );
 
   const {
     enderecosAdicionais,
@@ -178,7 +168,6 @@ export default function ClientePessoaEditar() {
       const { data } = await api.get(`/clientes/${clienteId}`);
       setCliente(data);
       setFormData(buildFormDataFromCliente(data));
-      setPets(data.pets || []);
       setEnderecosAdicionais(data.enderecos_adicionais || []);
     } catch (error) {
       if (error.response?.status === 404) {
@@ -194,20 +183,6 @@ export default function ClientePessoaEditar() {
   useEffect(() => {
     carregar();
   }, [carregar]);
-
-  useEffect(() => {
-    if (!canManageAppAccess) return;
-    setLoadingUsuariosAcessoApp(true);
-    api
-      .get("/clientes/acessos-app/usuarios", { params: { cliente_id: clienteId } })
-      .then((response) => setUsuariosAcessoApp(response.data || []))
-      .catch(() => setUsuariosAcessoApp([]))
-      .finally(() => setLoadingUsuariosAcessoApp(false));
-    api
-      .get("/roles")
-      .then((response) => setRolesAcessoApp(response.data || []))
-      .catch(() => setRolesAcessoApp([]));
-  }, [canManageAppAccess, clienteId]);
 
   useEffect(() => {
     setLoadingResumo(true);
@@ -257,12 +232,44 @@ export default function ClientePessoaEditar() {
     abrirModalEndereco(alvo);
   };
 
-  const confirmarEndereco = () => {
-    if (enderecoAtual?.index === "principal") {
-      if (!enderecoAtual.cep || !enderecoAtual.endereco || !enderecoAtual.cidade) {
-        toast.error("Preencha pelo menos CEP, Endereço e Cidade.");
-        return;
+  const principalTemDados = formData
+    ? CAMPOS_ENDERECO_PRINCIPAL.some((campo) => formData[campo])
+    : false;
+
+  // Promove `entrada` (novo endereço ou um adicional existente) a principal. Se o principal atual
+  // tiver dados, ele vira uma entrada normal na lista, com o tipo escolhido na confirmação — nunca
+  // fica mais de um endereço marcado como principal ao mesmo tempo.
+  const promoverAPrincipal = (entrada, tipoAntigoPrincipal) => {
+    const principalAntigo = {
+      tipo: tipoAntigoPrincipal,
+      apelido: "",
+      ...Object.fromEntries(CAMPOS_ENDERECO_PRINCIPAL.map((campo) => [campo, formData[campo] || ""])),
+    };
+
+    setFormData((prev) => ({
+      ...prev,
+      ...Object.fromEntries(CAMPOS_ENDERECO_PRINCIPAL.map((campo) => [campo, entrada[campo] || ""])),
+    }));
+
+    setEnderecosAdicionais((prev) => {
+      let proximos = typeof entrada.index === "number" ? prev.filter((_, i) => i !== entrada.index) : [...prev];
+      if (principalTemDados) {
+        proximos = [...proximos, principalAntigo];
       }
+      return proximos;
+    });
+
+    fecharModalEndereco();
+    toast.success("Endereço principal atualizado.");
+  };
+
+  const confirmarEndereco = (tipoAntigoPrincipal) => {
+    if (!enderecoAtual?.cep || !enderecoAtual?.endereco || !enderecoAtual?.cidade) {
+      toast.error("Preencha pelo menos CEP, Endereço e Cidade.");
+      return;
+    }
+
+    if (enderecoAtual.index === "principal") {
       setFormData((prev) => ({
         ...prev,
         ...Object.fromEntries(CAMPOS_ENDERECO_PRINCIPAL.map((campo) => [campo, enderecoAtual[campo]])),
@@ -270,6 +277,12 @@ export default function ClientePessoaEditar() {
       fecharModalEndereco();
       return;
     }
+
+    if (enderecoAtual.tipo === "principal") {
+      promoverAPrincipal(enderecoAtual, tipoAntigoPrincipal);
+      return;
+    }
+
     salvarEndereco();
   };
 
@@ -286,42 +299,42 @@ export default function ClientePessoaEditar() {
 
   const erros = useMemo(() => (formData ? validarFormData(formData) : {}), [formData]);
 
-  const abas = useMemo(() => {
-    const todasAbas = [
+  const alertasPdvAtivosCount = (formData?.alertas_pdv || []).filter(
+    (alerta) => alerta.ativo !== false,
+  ).length;
+
+  const abas = useMemo(
+    () => [
       {
         id: "dados-gerais",
         label: "Dados gerais",
         icon: User,
-        descricao: "Identificação, documento e tipo de cadastro",
-        invalida: Boolean(erros.nome || erros.cnpj || erros.razao_social || erros.crmv),
+        descricao: "Identificação e complementares",
+        invalida: Boolean(
+          erros.nome || erros.cnpj || erros.razao_social || erros.crmv || erros.tipos_cadastro,
+        ),
       },
       {
         id: "contatos",
         label: "Contatos",
         icon: Phone,
-        descricao: "Telefone, celular e e-mail",
+        descricao: "Telefone, e-mail e observações",
         invalida: Boolean(erros.celular),
       },
       {
         id: "endereco",
         label: "Endereço",
         icon: MapPin,
-        descricao: "Endereço principal e endereços adicionais",
+        descricao: "Endereço principal e adicionais",
         invalida: false,
       },
       {
-        id: "complementares",
-        label: "Complementares",
-        icon: Settings,
-        descricao: "Entrega, parceiro, alertas do PDV e acesso ao app",
+        id: "alertas-pdv",
+        label: "Alertas do PDV",
+        icon: AlertTriangle,
+        descricao: "Mensagens automáticas ao atender esta pessoa",
         invalida: false,
-      },
-      {
-        id: "animais",
-        label: "Animais",
-        icon: PawPrint,
-        descricao: "Pets vinculados a esta pessoa",
-        invalida: false,
+        contador: alertasPdvAtivosCount,
       },
       {
         id: "financeiro",
@@ -330,13 +343,9 @@ export default function ClientePessoaEditar() {
         descricao: "Crédito, histórico e indicadores financeiros",
         invalida: false,
       },
-    ];
-
-    if (formData?.tipo_cadastro === "veterinario") {
-      return todasAbas.filter((aba) => ["dados-gerais", "contatos", "endereco", "complementares"].includes(aba.id));
-    }
-    return todasAbas;
-  }, [erros, formData?.tipo_cadastro]);
+    ],
+    [erros, alertasPdvAtivosCount],
+  );
 
   useEffect(() => {
     if (!abas.some((aba) => aba.id === abaAtiva)) {
@@ -356,22 +365,14 @@ export default function ClientePessoaEditar() {
 
     setSalvando(true);
     try {
-      const appLoginNovo = formData.app_login;
-      const { celular_whatsapp: _celularWhatsapp, tags: _tags, ...clienteData } = formData;
+      const { tags: _tags, ...clienteData } = formData;
       clienteData.alertas_pdv = normalizeClienteAlertasPdv(clienteData.alertas_pdv);
-      clienteData.app_login = normalizePessoaAppLogin(clienteData.app_login);
-
-      if (!canManageAppAccess) {
-        delete clienteData.auth_user_id;
-        delete clienteData.app_login;
-        delete clienteData.app_access_profiles;
-      }
 
       if (clienteData.is_entregador) {
-        if (clienteData.tipo_cadastro === "funcionario") {
+        if (clienteData.is_funcionario) {
           clienteData.tipo_vinculo_entrega = "funcionario";
           clienteData.is_terceirizado = false;
-        } else if (clienteData.tipo_cadastro === "fornecedor") {
+        } else if (clienteData.is_fornecedor) {
           clienteData.is_terceirizado = true;
           clienteData.tipo_vinculo_entrega = "terceirizado";
         }
@@ -387,14 +388,6 @@ export default function ClientePessoaEditar() {
       const { data: clienteSalvo } = await api.put(`/clientes/${clienteId}`, clienteData);
       setCliente(clienteSalvo);
       setFormData(buildFormDataFromCliente(clienteSalvo));
-
-      const credenciais = buildInitialAccessCredentials({
-        tenant: tenantLoginReference,
-        username: appLoginNovo?.username,
-        password: appLoginNovo?.password,
-        personName: clienteSalvo?.nome || formData.nome,
-      });
-      if (credenciais) setInitialAccessCredentials(credenciais);
 
       toast.success("Alterações salvas.");
     } catch (error) {
@@ -448,9 +441,22 @@ export default function ClientePessoaEditar() {
           </>
         }
         actions={
-          <BotaoSalva onClick={salvar} loading={salvando} tamanho="grande">
-            Salvar
-          </BotaoSalva>
+          <div className="flex items-center gap-2">
+            <BotaoInteracao
+              icon={PawPrint}
+              tamanho="grande"
+              onClick={() =>
+                window.open(`/pets?cliente_id=${cliente.id}`, "_blank", "noopener,noreferrer")
+              }
+            >
+              Gerenciar pets
+              <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
+              <span className="sr-only"> (abre em nova aba)</span>
+            </BotaoInteracao>
+            <BotaoSalva onClick={salvar} loading={salvando} tamanho="grande">
+              Salvar
+            </BotaoSalva>
+          </div>
         }
       />
 
@@ -458,7 +464,16 @@ export default function ClientePessoaEditar() {
         <AbasNavegacao abas={abas} ativa={abaAtiva} onChange={setAbaAtiva} className="px-4" />
         <div className="p-4">
           {abaAtiva === "dados-gerais" ? (
-            <ClientePessoaDadosGeraisTab erros={erros} formData={formData} setFormData={setFormData} />
+            <div className="space-y-8">
+              <ClientePessoaDadosGeraisTab erros={erros} formData={formData} setFormData={setFormData} />
+
+              <div className="border-t border-slate-200 pt-6 dark:border-slate-700">
+                <h3 className="mb-4 text-base font-semibold text-slate-900 dark:text-slate-100">
+                  Complementares
+                </h3>
+                <ClientePessoaComplementaresTab formData={formData} setFormData={setFormData} />
+              </div>
+            </div>
           ) : null}
 
           {abaAtiva === "contatos" ? (
@@ -474,18 +489,8 @@ export default function ClientePessoaEditar() {
             />
           ) : null}
 
-          {abaAtiva === "complementares" ? (
-            <ClientePessoaComplementaresTab
-              formData={formData}
-              loadingUsuariosAcessoApp={loadingUsuariosAcessoApp}
-              rolesAcessoApp={rolesAcessoApp}
-              setFormData={setFormData}
-              usuariosAcessoApp={usuariosAcessoApp}
-            />
-          ) : null}
-
-          {abaAtiva === "animais" ? (
-            <ClientePessoaAnimaisTab cliente={cliente} navigate={navigate} pets={pets} />
+          {abaAtiva === "alertas-pdv" ? (
+            <ClientePessoaAlertasPdvSection formData={formData} setFormData={setFormData} />
           ) : null}
 
           {abaAtiva === "financeiro" ? (
@@ -503,16 +508,12 @@ export default function ClientePessoaEditar() {
         </div>
       </Panel>
 
-      <UsuarioAcessoInicialModal
-        credentials={initialAccessCredentials}
-        onClose={() => setInitialAccessCredentials(null)}
-      />
-
       {enderecoAtual ? (
         <ClientePessoaEnderecoModal
           enderecoAtual={enderecoAtual}
           fecharModalEndereco={fecharModalEndereco}
           loadingCepEndereco={loadingCepEndereco}
+          principalTemDados={principalTemDados}
           salvarEndereco={confirmarEndereco}
           buscarCepModal={buscarCepModal}
           setEnderecoAtual={setEnderecoAtual}

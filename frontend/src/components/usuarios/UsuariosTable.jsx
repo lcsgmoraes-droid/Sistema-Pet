@@ -10,9 +10,37 @@ export default function UsuariosTable({
   onForcarLogout,
   onManageCredentials,
   onToggleStatus,
+  paginacaoRodape,
   usuarios,
 }) {
   const columns = [
+    {
+      key: "actions",
+      header: "Acoes",
+      align: "left",
+      render: (usuario) => (
+        <div className="flex items-center justify-start gap-2">
+          <IconActionButton
+            icon={KeyRound}
+            intent="edit"
+            onClick={() => onManageCredentials(usuario)}
+            title="Gerenciar usuario e senha"
+          />
+          <IconActionButton
+            icon={LogOut}
+            intent="warning"
+            onClick={() => onForcarLogout(usuario.user_id)}
+            title="Forcar logout"
+          />
+          <IconActionButton
+            icon={usuario.is_active ? UserX : UserCheck}
+            intent={usuario.is_active ? "danger" : "success"}
+            onClick={() => onToggleStatus(usuario.user_id, usuario.is_active)}
+            title={usuario.is_active ? "Desativar acesso" : "Ativar acesso"}
+          />
+        </div>
+      ),
+    },
     {
       key: "login_phone",
       header: "Usuario",
@@ -49,33 +77,6 @@ export default function UsuariosTable({
         />
       ),
     },
-    {
-      key: "actions",
-      header: "Acoes",
-      align: "center",
-      render: (usuario) => (
-        <div className="flex items-center justify-center gap-2">
-          <IconActionButton
-            icon={KeyRound}
-            intent="edit"
-            onClick={() => onManageCredentials(usuario)}
-            title="Gerenciar usuario e senha"
-          />
-          <IconActionButton
-            icon={LogOut}
-            intent="warning"
-            onClick={() => onForcarLogout(usuario.user_id)}
-            title="Forcar logout"
-          />
-          <IconActionButton
-            icon={usuario.is_active ? UserX : UserCheck}
-            intent={usuario.is_active ? "danger" : "success"}
-            onClick={() => onToggleStatus(usuario.user_id, usuario.is_active)}
-            title={usuario.is_active ? "Desativar acesso" : "Ativar acesso"}
-          />
-        </div>
-      ),
-    },
   ];
 
   return (
@@ -89,6 +90,7 @@ export default function UsuariosTable({
         loadingMessage="Carregando usuarios..."
         tableClassName="min-w-[720px]"
       />
+      {paginacaoRodape}
     </Panel>
   );
 }

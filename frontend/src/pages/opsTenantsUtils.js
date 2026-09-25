@@ -1,6 +1,5 @@
 export const OPS_TENANT_TABS = [
   { id: "tenants", label: "Tenants" },
-  { id: "catalog", label: "Importacao" },
   { id: "billing", label: "Planos" },
   { id: "pilot", label: "Pilotos" },
   { id: "usage", label: "Uso" },
@@ -22,6 +21,32 @@ export function isBillingAttention(status) {
   );
 }
 
+export function groupOpsTenantsByClient(items = []) {
+  const groups = new Map();
+  for (const item of items) {
+    const grupo = item?.grupo_comercial;
+    const key = grupo?.id != null ? `grupo:${grupo.id}` : `tenant:${item.id}`;
+    if (!groups.has(key)) {
+      groups.set(key, {
+        key,
+        grupoId: grupo?.id ?? null,
+        nome: grupo?.nome || item.name,
+        lojas: [],
+      });
+    }
+    groups.get(key).lojas.push(item);
+  }
+  return Array.from(groups.values()).map((group) => {
+    const inadimplentes = group.lojas.filter((loja) => isBillingAttention(loja.billing_status));
+    return {
+      ...group,
+      lojaCount: group.lojas.length,
+      inadimplentes,
+      adimplente: inadimplentes.length === 0,
+    };
+  });
+}
+
 export function formatStorageMb(bytes) {
   const value = Number(bytes || 0) / 1024 / 1024;
   return `${value.toLocaleString("pt-BR", {
@@ -36,9 +61,6 @@ export function buildOpsTenantTabSummaries(items = [], summary = {}) {
     summary?.active ??
       items.filter((item) => ["active", "ativo"].includes(String(item?.status || "").toLowerCase()))
         .length,
-  );
-  const installed = Number(
-    summary?.with_base_catalog ?? items.filter((item) => item?.base_catalog?.installed).length,
   );
   const suspended = items.filter((item) =>
     ["suspended", "blocked", "bloqueado"].includes(String(item?.status || "").toLowerCase()),
@@ -83,10 +105,6 @@ export function buildOpsTenantTabSummaries(items = [], summary = {}) {
       total,
       active,
       suspended,
-    },
-    catalog: {
-      installed,
-      pending: Math.max(total - installed, 0),
     },
     billing: {
       attention,

@@ -1,6 +1,6 @@
 ---
 tipo: dominio
-atualizado: 2026-09-12
+atualizado: 2026-09-22
 ---
 
 # Entidade — Cliente
@@ -46,7 +46,11 @@ Todos os campos da tabela `clientes` (além de `id`/`tenant_id`, herdados de `Ba
 | Campo | Tipo | Observação |
 |---|---|---|
 | `origem_cliente` | String(50), nullable | Sem default — registros antigos/importados não comprovam origem |
-| `tipo_cadastro` | String(50), **NOT NULL**, default `"cliente"` | `cliente` \| `fornecedor` \| `veterinario` (também reaproveitado para funcionário/entregador via outras flags) |
+| `tipo_cadastro` | String(50), **NOT NULL**, default `"cliente"` | ⚠️ **OBSOLETO** (desde 2026-09-22, ver [[pessoas]]) — mantido só por compatibilidade com consumidores ainda não migrados (backend/frontend, lista documentada na skill [[pessoas]]). No create, preenchido automaticamente com a primeira flag `true` numa ordem fixa sem significado de negócio (`cliente`→`fornecedor`→`veterinario`→`funcionario`). Não usar para decisão de negócio nova — usar as 4 flags abaixo |
+| `is_cliente` | Boolean, **NOT NULL**, default `false` | Uma pessoa pode acumular vários tipos ao mesmo tempo — substitui `tipo_cadastro` como fonte de verdade |
+| `is_fornecedor` | Boolean, **NOT NULL**, default `false` | Idem |
+| `is_veterinario` | Boolean, **NOT NULL**, default `false` | Idem |
+| `is_funcionario` | Boolean, **NOT NULL**, default `false` | Idem |
 | `tipo_pessoa` | String(2), **NOT NULL**, default `"PF"` | `PF` ou `PJ` |
 | `fornecedor_grupo_id` | Integer, FK `fornecedor_grupos.id` (SET NULL), nullable | Agrupa fornecedores com CNPJs separados sob um mesmo grupo comercial |
 
@@ -163,7 +167,7 @@ Qualquer pessoa (cliente, veterinário, funcionário, fornecedor) pode ser parce
 | `created_at` | DateTime(tz), server default `now()` | |
 | `updated_at` | DateTime(tz), server default `now()`, `onupdate now()` | |
 
-⚠️ Nenhum campo de `Cliente` distingue estruturalmente um dos seus vários papéis (fornecedor, veterinário, entregador, funcionário/parceiro) além de `tipo_cadastro` (string livre) e das flags booleanas específicas — não há `CHECK`/enum garantindo que, por exemplo, um registro com `crmv` preenchido também tenha `tipo_cadastro="veterinario"`.
+⚠️ Nenhum campo de `Cliente` distingue estruturalmente um dos seus vários papéis (fornecedor, veterinário, entregador, funcionário/parceiro) além das flags booleanas `is_cliente`/`is_fornecedor`/`is_veterinario`/`is_funcionario` (mais `is_entregador`/`parceiro_ativo`) — não há `CHECK`/enum garantindo que, por exemplo, um registro com `crmv` preenchido também tenha `is_veterinario=true`. Backend valida no create/update que pelo menos uma das 4 flags seja `true`, mas não impede inconsistência entre `crmv`/`cnpj` e as flags.
 
 ## Utilizado por
 - Cadastro de Pessoas/Clientes no menu (ver [[Funcionalidades]])

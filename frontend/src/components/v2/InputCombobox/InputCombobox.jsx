@@ -130,6 +130,7 @@ export default function InputCombobox({
         ) : null}
         <input
           id={id}
+          autoComplete="off"
           disabled={disabled}
           value={termo}
           placeholder={selecionada?.label || placeholder}
@@ -148,7 +149,7 @@ export default function InputCombobox({
           aria-label={label ? undefined : placeholder}
           className="absolute inset-0 z-10 h-9 w-full rounded-lg border-0 bg-transparent px-3 pr-16 text-sm text-slate-900 outline-none disabled:cursor-not-allowed disabled:text-slate-400 dark:!bg-transparent dark:!text-slate-100 dark:placeholder:!text-slate-500 dark:disabled:!text-slate-500"
         />
-        <div className="absolute inset-y-0 right-1 z-20 flex items-center gap-0.5">
+        <div className="pointer-events-none absolute inset-y-0 right-1 z-20 flex items-center gap-0.5">
           {permitirLimpar && selecionada ? (
             <button
               type="button"
@@ -158,7 +159,7 @@ export default function InputCombobox({
                 onChange?.("", null);
                 setTermo("");
               }}
-              className="rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-300"
+              className="pointer-events-auto rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-300"
             >
               <X className="h-3.5 w-3.5" />
             </button>

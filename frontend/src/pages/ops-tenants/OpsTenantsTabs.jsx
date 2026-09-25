@@ -33,7 +33,6 @@ function TabButton({ tab, active, badge, onClick }) {
 export default function OpsTenantsTabs({ activeTab, summaries, onChange }) {
   const badges = {
     tenants: `${formatNumber(summaries.tenants.active)}/${formatNumber(summaries.tenants.total)}`,
-    catalog: summaries.catalog.pending ? `${formatNumber(summaries.catalog.pending)} pend.` : "ok",
     billing: summaries.billing.attention
       ? `${formatNumber(summaries.billing.attention)} atencao`
       : "ok",

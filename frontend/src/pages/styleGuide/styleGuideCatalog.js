@@ -46,6 +46,13 @@ export const styleGuideCatalog = [
         descricao: "Aparência de botão, label centralizada",
       },
       {
+        nome: "InputCheckGroup",
+        status: "pronto",
+        arquivo: "components/v2/InputCheckGroup/InputCheckGroup.jsx",
+        descricao:
+          "Grupo de pills seleção múltipla (não exclusiva) com label/obrigatório/erro compartilhados — mesmo visual do InputRadio, mas várias opções podem ficar marcadas ao mesmo tempo",
+      },
+      {
         nome: "InputCheckTexto",
         status: "pronto",
         arquivo: "components/v2/InputCheckTexto/InputCheckTexto.jsx",

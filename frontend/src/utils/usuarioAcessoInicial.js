@@ -21,36 +21,6 @@ export function resolveTenantLoginReference(user, selectedTenantRaw = null) {
   }
 }
 
-export function buildInitialAccessCredentials({
-  tenant,
-  username,
-  loginPhone,
-  password,
-  personName = "",
-}) {
-  const normalizedTenant = String(tenant || "").trim();
-  const normalizedUsername = String(username || "")
-    .trim()
-    .toLowerCase();
-  const normalizedLoginPhone = String(loginPhone || "").replace(/\D/g, "");
-  const normalizedPassword = String(password || "");
-
-  if (
-    (!normalizedLoginPhone && (!normalizedTenant || !normalizedUsername)) ||
-    !normalizedPassword
-  ) {
-    return null;
-  }
-
-  return {
-    tenant: normalizedTenant,
-    username: normalizedUsername,
-    loginPhone: normalizedLoginPhone,
-    password: normalizedPassword,
-    personName: String(personName || "").trim(),
-  };
-}
-
 export function formatInitialAccessCredentials(credentials) {
   if (!credentials) return "";
 

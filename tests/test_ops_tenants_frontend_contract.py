@@ -34,8 +34,5 @@ def test_ops_tenants_frontend_route_nav_and_api_contract():
     assert 'to: "/ops/tenants"' in layout_source
     assert "OpsTenantsPage" in page_source
     assert 'api.get("/admin/tenants"' in feature_source
-    assert "catalog-import/preview" in feature_source
-    assert "catalog-import/apply" in feature_source
     assert "onboarding-follow-up" in feature_source
-    assert "Importar catalogo base" in feature_source
     assert "Responsavel pelo acompanhamento" in feature_source

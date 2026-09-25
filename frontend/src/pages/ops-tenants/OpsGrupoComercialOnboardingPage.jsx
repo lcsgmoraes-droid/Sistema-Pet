@@ -96,8 +96,8 @@ export default function OpsGrupoComercialOnboardingPage() {
         <p className="mt-1 text-sm text-slate-500">
           Use esta tela quando o contrato inicial do cliente já inclui mais de uma loja. Cada
           loja listada aqui é criada de uma vez, todas dentro de um único grupo comercial novo.
-          Para adicionar mais uma loja a um grupo que já existe, use "Adicionar loja ao grupo" —
-          o próprio titular já logado faz isso sozinho em Configurações.
+          Para adicionar mais uma loja a um cliente que já tem grupo comercial, use o botão
+          "Adicionar loja" dentro do grupo dele, na tela de Tenants.
         </p>
       </div>
 

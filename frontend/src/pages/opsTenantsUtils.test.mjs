@@ -8,6 +8,7 @@ import {
   buildOpsTenantOnboardingPayload,
   buildOpsTenantTabSummaries,
   formatStorageMb,
+  groupOpsTenantsByClient,
   isBillingAttention,
 } from "./opsTenantsUtils.js";
 
@@ -29,7 +30,6 @@ test("buildOpsTenantTabSummaries resume tenants por aba do MVP Ops", () => {
     {
       status: "active",
       billing_status: "active",
-      base_catalog: { installed: true },
       counts: { produtos: 3 },
       usage: { records_total: 18, image_bytes: 1572864 },
       pilot: { status: "active", needs_follow_up: false },
@@ -37,7 +37,6 @@ test("buildOpsTenantTabSummaries resume tenants por aba do MVP Ops", () => {
     {
       status: "suspended",
       billing_status: "past_due",
-      base_catalog: { installed: false },
       counts: { produtos: 0 },
       usage: { records_total: 2, image_bytes: 0 },
       pilot: { status: "blocked", needs_follow_up: true },
@@ -47,17 +46,12 @@ test("buildOpsTenantTabSummaries resume tenants por aba do MVP Ops", () => {
   const summaries = buildOpsTenantTabSummaries(items, {
     total: 2,
     active: 1,
-    with_base_catalog: 1,
   });
 
   assert.deepEqual(summaries.tenants, {
     total: 2,
     active: 1,
     suspended: 1,
-  });
-  assert.deepEqual(summaries.catalog, {
-    installed: 1,
-    pending: 1,
   });
   assert.deepEqual(summaries.billing, {
     attention: 1,
@@ -73,6 +67,48 @@ test("buildOpsTenantTabSummaries resume tenants por aba do MVP Ops", () => {
     pending: 0,
     needFollowUp: 1,
   });
+});
+
+test("groupOpsTenantsByClient agrupa por grupo comercial e marca inadimplencia", () => {
+  const items = [
+    {
+      id: "t1",
+      name: "Loja A",
+      billing_status: "active",
+      grupo_comercial: { id: 10, nome: "Cliente Grupo" },
+    },
+    {
+      id: "t2",
+      name: "Loja B",
+      billing_status: "past_due",
+      grupo_comercial: { id: 10, nome: "Cliente Grupo" },
+    },
+    {
+      id: "t3",
+      name: "Loja Solo",
+      billing_status: "active",
+      grupo_comercial: null,
+    },
+  ];
+
+  const groups = groupOpsTenantsByClient(items);
+
+  assert.equal(groups.length, 2);
+  const grupo = groups.find((group) => group.grupoId === 10);
+  assert.ok(grupo);
+  assert.equal(grupo.nome, "Cliente Grupo");
+  assert.equal(grupo.lojaCount, 2);
+  assert.equal(grupo.adimplente, false);
+  assert.deepEqual(
+    grupo.inadimplentes.map((loja) => loja.id),
+    ["t2"],
+  );
+
+  const solo = groups.find((group) => group.grupoId === null);
+  assert.ok(solo);
+  assert.equal(solo.nome, "Loja Solo");
+  assert.equal(solo.lojaCount, 1);
+  assert.equal(solo.adimplente, true);
 });
 
 test("buildOpsTenantCommercialForm monta formulario editavel com valores atuais", () => {

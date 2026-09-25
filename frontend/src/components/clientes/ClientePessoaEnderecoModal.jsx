@@ -1,3 +1,5 @@
+import { useState } from "react";
+import { AlertTriangle } from "lucide-react";
 import BotaoCancelar from "../v2/BotaoCancelar/BotaoCancelar";
 import BotaoSalva from "../v2/BotaoSalva/BotaoSalva";
 import InputCombobox from "../v2/InputCombobox/InputCombobox";
@@ -5,6 +7,7 @@ import InputTexto from "../v2/InputTexto/InputTexto";
 import ModalPadrao from "../v2/ModalPadrao/ModalPadrao";
 
 const OPCOES_TIPO_ENDERECO = [
+  { value: "principal", label: "Principal" },
   { value: "entrega", label: "Entrega" },
   { value: "cobranca", label: "Cobrança" },
   { value: "comercial", label: "Comercial" },
@@ -12,22 +15,77 @@ const OPCOES_TIPO_ENDERECO = [
   { value: "trabalho", label: "Trabalho" },
 ];
 
+const OPCOES_TIPO_ENDERECO_ANTIGO_PRINCIPAL = OPCOES_TIPO_ENDERECO.filter(
+  (opcao) => opcao.value !== "principal",
+);
+
 function ClientePessoaEnderecoModal({
   enderecoAtual,
   fecharModalEndereco,
   loadingCepEndereco,
+  principalTemDados,
   salvarEndereco,
   buscarCepModal,
   setEnderecoAtual,
 }) {
+  const [mostrandoConfirmacao, setMostrandoConfirmacao] = useState(false);
+  const [tipoAntigoPrincipal, setTipoAntigoPrincipal] = useState("residencial");
+
   if (!enderecoAtual) return null;
 
-  const ehPrincipal = enderecoAtual.index === "principal";
-  const titulo = ehPrincipal
-    ? "Editar Endereço Principal"
-    : enderecoAtual.index !== undefined
-      ? "Editar Endereço"
-      : "Adicionar Novo Endereço";
+  const ehEndrecoPrincipalAtual = enderecoAtual.index === "principal";
+  const titulo = enderecoAtual.index !== undefined ? "Editar Endereço" : "Adicionar Endereço";
+
+  const aoClicarSalvar = () => {
+    const promovendoAPrincipal = enderecoAtual.tipo === "principal" && !ehEndrecoPrincipalAtual;
+    if (promovendoAPrincipal && principalTemDados) {
+      setMostrandoConfirmacao(true);
+      return;
+    }
+    salvarEndereco();
+  };
+
+  if (mostrandoConfirmacao) {
+    return (
+      <ModalPadrao
+        titulo="Trocar o endereço principal?"
+        onFechar={fecharModalEndereco}
+        rodape={
+          <>
+            <BotaoCancelar onClick={() => setMostrandoConfirmacao(false)}>
+              Cancelar e mudar o tipo
+            </BotaoCancelar>
+            <BotaoSalva onClick={() => salvarEndereco(tipoAntigoPrincipal)}>
+              Confirmar substituição
+            </BotaoSalva>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          <div className="flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 p-3 dark:border-amber-500/30 dark:bg-amber-500/10">
+            <AlertTriangle
+              className="mt-0.5 h-4 w-4 flex-none text-amber-600 dark:text-amber-400"
+              aria-hidden="true"
+            />
+            <p className="text-sm text-amber-900 dark:text-amber-200">
+              Só pode haver um endereço Principal. Este endereço vai virar o novo principal, e o
+              que é principal hoje deixa de ser — escolha abaixo para qual tipo ele passa.
+            </p>
+          </div>
+
+          <InputCombobox
+            id="endereco-tipo-antigo-principal"
+            label="Novo tipo do endereço que deixará de ser principal"
+            required
+            opcoes={OPCOES_TIPO_ENDERECO_ANTIGO_PRINCIPAL}
+            permitirLimpar={false}
+            value={tipoAntigoPrincipal}
+            onChange={setTipoAntigoPrincipal}
+          />
+        </div>
+      </ModalPadrao>
+    );
+  }
 
   return (
     <ModalPadrao
@@ -37,40 +95,35 @@ function ClientePessoaEnderecoModal({
       rodape={
         <>
           <BotaoCancelar onClick={fecharModalEndereco}>Cancelar</BotaoCancelar>
-          <BotaoSalva onClick={salvarEndereco}>Salvar endereço</BotaoSalva>
+          <BotaoSalva onClick={aoClicarSalvar}>Salvar endereço</BotaoSalva>
         </>
       }
     >
       <div className="space-y-4">
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          {ehPrincipal ? (
-            <div>
-              <span className="text-xs font-medium text-slate-600">Tipo de endereço</span>
-              <p className="mt-1 flex h-9 items-center rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm text-slate-500">
-                Principal — endereço padrão do cadastro
-              </p>
-            </div>
-          ) : (
-            <InputCombobox
-              id="endereco-tipo"
-              label="Tipo de endereço"
-              required
-              opcoes={OPCOES_TIPO_ENDERECO}
-              permitirLimpar={false}
-              value={enderecoAtual.tipo}
-              onChange={(tipo) => setEnderecoAtual({ ...enderecoAtual, tipo })}
-            />
-          )}
+          <InputCombobox
+            id="endereco-tipo"
+            label="Tipo de endereço"
+            required
+            disabled={ehEndrecoPrincipalAtual}
+            help={
+              ehEndrecoPrincipalAtual
+                ? "Para trocar quem é o principal, marque outro endereço como Principal."
+                : undefined
+            }
+            opcoes={OPCOES_TIPO_ENDERECO}
+            permitirLimpar={false}
+            value={enderecoAtual.tipo}
+            onChange={(tipo) => setEnderecoAtual({ ...enderecoAtual, tipo })}
+          />
 
-          {ehPrincipal ? null : (
-            <InputTexto
-              id="endereco-apelido"
-              label="Apelido (opcional)"
-              value={enderecoAtual.apelido}
-              onChange={(apelido) => setEnderecoAtual({ ...enderecoAtual, apelido })}
-              placeholder="Ex: Casa da mãe, Escritório, Loja"
-            />
-          )}
+          <InputTexto
+            id="endereco-apelido"
+            label="Apelido (opcional)"
+            value={enderecoAtual.apelido}
+            onChange={(apelido) => setEnderecoAtual({ ...enderecoAtual, apelido })}
+            placeholder="Ex: Casa da mãe, Escritório, Loja"
+          />
         </div>
 
         <div className="grid grid-cols-1 gap-4 md:grid-cols-3">

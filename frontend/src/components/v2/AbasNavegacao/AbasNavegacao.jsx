@@ -6,7 +6,8 @@ import { AlertCircle } from "lucide-react";
 // do sistema. `descricao` vira dica nativa ao passar o mouse, em vez de disputar espaço
 // com o rótulo. `invalida` mostra um ícone de alerta ao lado do rótulo (nunca só cor) —
 // sinaliza que aquela aba tem campo obrigatório pendente, sem precisar abrir a aba pra
-// descobrir.
+// descobrir. `contador` (número > 0) mostra uma bolinha com a contagem ao lado do rótulo —
+// para sinalizar quantos itens relevantes existem dentro da aba sem precisar abrir.
 const AbasNavegacao = forwardRef(function AbasNavegacao(
   { abas = [], ariaLabel = "Abas", ativa, className = "", onChange },
   ref,
@@ -44,6 +45,14 @@ const AbasNavegacao = forwardRef(function AbasNavegacao(
           >
             {Icone ? <Icone className="h-4 w-4" aria-hidden="true" /> : null}
             {aba.label}
+            {typeof aba.contador === "number" && aba.contador > 0 ? (
+              <span
+                className="flex h-5 min-w-[1.25rem] flex-none items-center justify-center rounded-full bg-indigo-600 px-1 text-[11px] font-semibold text-white dark:bg-indigo-500"
+                aria-label={`${aba.contador} nesta aba`}
+              >
+                {aba.contador}
+              </span>
+            ) : null}
             {aba.invalida ? (
               <AlertCircle
                 className="h-3.5 w-3.5 flex-none text-amber-600 dark:text-amber-400"

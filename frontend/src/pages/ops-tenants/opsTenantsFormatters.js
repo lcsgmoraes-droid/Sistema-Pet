@@ -28,14 +28,6 @@ export function extractError(err, fallback) {
   return err?.response?.data?.detail || err?.message || fallback;
 }
 
-export function sumCounts(items, key) {
-  return (items || []).reduce((total, item) => total + Number(item?.counts?.[key] || 0), 0);
-}
-
-export function sumObjectValues(value) {
-  return Object.values(value || {}).reduce((total, current) => total + Number(current || 0), 0);
-}
-
 export function statusBadge(status) {
   const normalized = String(status || "").toLowerCase();
   if (["active", "ativo"].includes(normalized)) {
@@ -61,9 +53,23 @@ export function billingBadge(status) {
   return "border-slate-200 bg-slate-50 text-slate-700";
 }
 
-export function catalogBadge(catalog) {
-  if (catalog?.installed) {
-    return "border-emerald-200 bg-emerald-50 text-emerald-700";
+export const ATTENTION_LABELS = {
+  critical: "Critico",
+  high: "Atencao",
+  normal: "Acompanhar",
+  healthy: "Saudavel",
+};
+
+export function attentionBadge(level) {
+  if (level === "critical") {
+    return "border-rose-200 bg-rose-50 text-rose-700";
   }
-  return "border-slate-200 bg-slate-50 text-slate-600";
+  if (level === "high") {
+    return "border-amber-200 bg-amber-50 text-amber-800";
+  }
+  if (level === "normal") {
+    return "border-blue-200 bg-blue-50 text-blue-700";
+  }
+  return "border-emerald-200 bg-emerald-50 text-emerald-700";
 }
+

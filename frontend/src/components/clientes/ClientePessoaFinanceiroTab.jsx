@@ -1,11 +1,5 @@
-import {
-  FiCreditCard,
-  FiDollarSign,
-  FiMessageCircle,
-  FiTrendingDown,
-  FiTrendingUp,
-} from "react-icons/fi";
-import ActionButton from "../ui/ActionButton";
+import { CreditCard, DollarSign, MessageCircle, TrendingDown, TrendingUp } from "lucide-react";
+import BotaoInteracao from "../v2/BotaoInteracao/BotaoInteracao";
 import ClienteInsights from "../ClienteInsights";
 import { ClienteSegmentos } from "../ClienteSegmentos";
 import ClienteTimeline from "../ClienteTimeline";
@@ -45,20 +39,12 @@ export default function ClientePessoaFinanceiroTab({
             <p className="mt-1 text-xs text-green-700">Disponível para uso em compras</p>
           </div>
           <div className="flex gap-2">
-            <ActionButton
-              icon={FiTrendingUp}
-              intent="create"
-              onClick={() => setMostrarModalAdicionarCredito(true)}
-            >
+            <BotaoInteracao icon={TrendingUp} onClick={() => setMostrarModalAdicionarCredito(true)}>
               Inserir crédito
-            </ActionButton>
-            <ActionButton
-              icon={FiTrendingDown}
-              intent="delete"
-              onClick={() => setMostrarModalRemoverCredito(true)}
-            >
+            </BotaoInteracao>
+            <BotaoInteracao icon={TrendingDown} onClick={() => setMostrarModalRemoverCredito(true)}>
               Remover crédito
-            </ActionButton>
+            </BotaoInteracao>
           </div>
         </div>
       </div>
@@ -92,7 +78,7 @@ export default function ClientePessoaFinanceiroTab({
 
       <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
         <h4 className="text-md mb-4 flex items-center gap-2 font-semibold text-gray-800">
-          <FiCreditCard />
+          <CreditCard className="h-4 w-4" aria-hidden="true" />
           Resumo financeiro (últimos 90 dias)
         </h4>
 
@@ -179,17 +165,14 @@ export default function ClientePessoaFinanceiroTab({
             )}
 
             <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">
-              <ActionButton
-                icon={FiCreditCard}
-                intent="info"
+              <BotaoInteracao
+                icon={CreditCard}
                 onClick={() => navigate(`/clientes/${cliente.id}/financeiro`)}
               >
                 Ver histórico financeiro completo
-              </ActionButton>
-              <ActionButton
-                icon={FiDollarSign}
-                intent="info"
-                tone="outline"
+              </BotaoInteracao>
+              <BotaoInteracao
+                icon={DollarSign}
                 onClick={() =>
                   navigate(
                     `/financeiro/contas-receber?cliente_id=${cliente.id}&filtro=em_aberto&periodo=todos`,
@@ -197,7 +180,7 @@ export default function ClientePessoaFinanceiroTab({
                 }
               >
                 Ver parcelas em aberto
-              </ActionButton>
+              </BotaoInteracao>
             </div>
           </>
         )}
@@ -211,19 +194,18 @@ export default function ClientePessoaFinanceiroTab({
         <div className="rounded-xl border-2 border-green-200 bg-gradient-to-br from-green-50 to-emerald-50 p-6 shadow-sm">
           <div className="mb-4 flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <FiMessageCircle className="text-green-600" size={24} />
+              <MessageCircle className="text-green-600" size={24} />
               <h3 className="text-lg font-semibold text-gray-900">WhatsApp</h3>
             </div>
-            <ActionButton
-              icon={FiMessageCircle}
-              intent="create"
+            <BotaoInteracao
+              icon={MessageCircle}
               onClick={() => {
                 const celular = cliente.celular.replace(/\D/g, "");
                 window.open(`https://wa.me/55${celular}`, "_blank");
               }}
             >
               Abrir conversa
-            </ActionButton>
+            </BotaoInteracao>
           </div>
 
           <WhatsAppHistorico clienteId={cliente.id} />
@@ -231,10 +213,12 @@ export default function ClientePessoaFinanceiroTab({
       ) : null}
 
       <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+        {/* A aba Financeiro aparece pra qualquer tipo; se a pessoa não é cliente mas é
+        fornecedor, mostra o lado fornecedor. Sendo os dois ao mesmo tempo, prioriza cliente. */}
         <ClienteTimeline
-          clienteId={cliente.tipo_cadastro === "cliente" ? cliente.id : null}
-          fornecedorId={cliente.tipo_cadastro === "fornecedor" ? cliente.id : null}
-          tipo={cliente.tipo_cadastro === "fornecedor" ? "fornecedor" : "cliente"}
+          clienteId={cliente.is_cliente ? cliente.id : null}
+          fornecedorId={!cliente.is_cliente && cliente.is_fornecedor ? cliente.id : null}
+          tipo={!cliente.is_cliente && cliente.is_fornecedor ? "fornecedor" : "cliente"}
           limit={5}
           showHeader
           onVerMais={() => navigate(`/clientes/${cliente.id}/timeline`)}

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import toast from "react-hot-toast";
 
 const createEnderecoVazio = () => ({
   tipo: "entrega",
@@ -41,7 +42,7 @@ export function useClientesNovoEnderecos() {
       const data = await response.json();
 
       if (data.erro) {
-        alert("CEP nao encontrado");
+        toast.error("CEP não encontrado.");
         return;
       }
 
@@ -54,7 +55,7 @@ export function useClientesNovoEnderecos() {
       }));
     } catch (error) {
       console.error("Erro ao buscar CEP:", error);
-      alert("Erro ao buscar CEP");
+      toast.error("Erro ao buscar CEP.");
     } finally {
       setLoadingCepEndereco(false);
     }
@@ -62,7 +63,7 @@ export function useClientesNovoEnderecos() {
 
   const salvarEndereco = () => {
     if (!enderecoAtual?.cep || !enderecoAtual?.endereco || !enderecoAtual?.cidade) {
-      alert("Preencha pelo menos CEP, Endereco e Cidade");
+      toast.error("Preencha pelo menos CEP, Endereço e Cidade.");
       return;
     }
 

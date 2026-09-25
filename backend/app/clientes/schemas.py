@@ -148,7 +148,15 @@ class AppLoginCreate(BaseModel):
 class ClienteCreate(BaseModel):
     origem_cliente: OrigemCliente = "loja_fisica"
     # Tipo de cadastro
+    # tipo_cadastro é OBSOLETO (mantido só para compatibilidade com
+    # consumidores ainda não migrados — ver .claude/skills/pessoas/SKILL.md).
+    # Uma pessoa pode ser vários tipos ao mesmo tempo: usar is_cliente/
+    # is_fornecedor/is_veterinario/is_funcionario abaixo.
     tipo_cadastro: str = "cliente"  # cliente, fornecedor, veterinario, funcionario
+    is_cliente: Optional[bool] = False
+    is_fornecedor: Optional[bool] = False
+    is_veterinario: Optional[bool] = False
+    is_funcionario: Optional[bool] = False
     tipo_pessoa: str = "PF"  # PF ou PJ
 
     # Dados comuns
@@ -156,6 +164,7 @@ class ClienteCreate(BaseModel):
     data_nascimento: Optional[date] = None
     telefone: Optional[str] = None
     celular: Optional[str] = None
+    celular_whatsapp: Optional[bool] = False
     email: Optional[str] = None
     auth_user_id: Optional[int] = None
     app_login: Optional[AppLoginCreate] = None
@@ -285,7 +294,11 @@ class ClienteCreate(BaseModel):
 
 class ClienteUpdate(BaseModel):
     origem_cliente: OrigemCliente = None
-    tipo_cadastro: Optional[str] = None
+    tipo_cadastro: Optional[str] = None  # OBSOLETO, ver ClienteCreate
+    is_cliente: Optional[bool] = None
+    is_fornecedor: Optional[bool] = None
+    is_veterinario: Optional[bool] = None
+    is_funcionario: Optional[bool] = None
     tipo_pessoa: Optional[str] = None
     nome: Optional[str] = None
     data_nascimento: Optional[date] = None
@@ -293,6 +306,7 @@ class ClienteUpdate(BaseModel):
     email: Optional[EmailStr] = None
     telefone: Optional[str] = None
     celular: Optional[str] = None
+    celular_whatsapp: Optional[bool] = None
     auth_user_id: Optional[int] = None
     app_login: Optional[AppLoginCreate] = None
     app_access_profiles: Optional[List[str]] = None
@@ -408,7 +422,11 @@ class ClienteResponse(BaseModel):
     origem_cliente: Optional[str] = None
     id: int
     codigo: Optional[str] = None
-    tipo_cadastro: str
+    tipo_cadastro: str  # OBSOLETO, ver ClienteCreate
+    is_cliente: bool = False
+    is_fornecedor: bool = False
+    is_veterinario: bool = False
+    is_funcionario: bool = False
     tipo_pessoa: str
     fornecedor_grupo_id: Optional[int] = None
     fornecedor_grupo_nome: Optional[str] = None
@@ -418,6 +436,7 @@ class ClienteResponse(BaseModel):
     email: Optional[str] = None
     telefone: Optional[str] = None
     celular: Optional[str] = None
+    celular_whatsapp: bool = False
     auth_user_id: Optional[int] = None
     auth_user_nome: Optional[str] = None
     auth_user_email: Optional[str] = None
@@ -503,6 +522,20 @@ class ClienteResponse(BaseModel):
     @validator("parceiro_ativo", pre=True)
     def ensure_parceiro_ativo(cls, v):
         """Garantir que parceiro_ativo seja sempre bool"""
+        if v is None:
+            return False
+        return bool(v)
+
+    @validator(
+        "is_cliente", "is_fornecedor", "is_veterinario", "is_funcionario", pre=True
+    )
+    def ensure_tipo_flags_bool(cls, v):
+        if v is None:
+            return False
+        return bool(v)
+
+    @validator("celular_whatsapp", pre=True)
+    def ensure_celular_whatsapp_bool(cls, v):
         if v is None:
             return False
         return bool(v)

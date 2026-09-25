@@ -1,4 +1,5 @@
 import ClienteOrigemSelect from "./ClienteOrigemSelect";
+import InputCheckGroup from "../v2/InputCheckGroup/InputCheckGroup";
 import InputCpfCnpj from "../v2/InputCpfCnpj/InputCpfCnpj";
 import InputData from "../v2/InputData/InputData";
 import InputRadio from "../v2/InputRadio/InputRadio";
@@ -11,6 +12,13 @@ const OPCOES_TIPO_CADASTRO = [
   { value: "funcionario", label: "Funcionário" },
 ];
 
+const FLAG_POR_TIPO = {
+  cliente: "is_cliente",
+  fornecedor: "is_fornecedor",
+  veterinario: "is_veterinario",
+  funcionario: "is_funcionario",
+};
+
 const OPCOES_TIPO_PESSOA = [
   { value: "PF", label: "Pessoa Física" },
   { value: "PJ", label: "Pessoa Jurídica" },
@@ -22,16 +30,23 @@ export default function ClientePessoaDadosGeraisTab({
   onBlurCampo,
   setFormData,
 }) {
-  const selecionarTipoCadastro = (tipoCadastro) => {
+  const selecionarTiposCadastro = (valoresSelecionados) => {
     setFormData((prev) => {
+      const novosFlags = {
+        is_cliente: valoresSelecionados.includes("cliente"),
+        is_fornecedor: valoresSelecionados.includes("fornecedor"),
+        is_veterinario: valoresSelecionados.includes("veterinario"),
+        is_funcionario: valoresSelecionados.includes("funcionario"),
+      };
       const perfis = new Set(prev.app_access_profiles || []);
-      if (["cliente", "funcionario", "veterinario"].includes(prev.tipo_cadastro)) {
-        perfis.delete(prev.tipo_cadastro);
-      }
-      if (["cliente", "funcionario", "veterinario"].includes(tipoCadastro)) {
-        perfis.add(tipoCadastro);
-      }
-      return { ...prev, tipo_cadastro: tipoCadastro, app_access_profiles: Array.from(perfis) };
+      ["cliente", "funcionario", "veterinario"].forEach((tipo) => {
+        if (novosFlags[FLAG_POR_TIPO[tipo]]) {
+          perfis.add(tipo);
+        } else {
+          perfis.delete(tipo);
+        }
+      });
+      return { ...prev, ...novosFlags, app_access_profiles: Array.from(perfis) };
     });
   };
 
@@ -39,13 +54,16 @@ export default function ClientePessoaDadosGeraisTab({
     <div className="space-y-4">
       <div className="flex flex-col gap-4 sm:flex-row">
         <div className="w-full sm:w-[70%]">
-          <InputRadio
-            name="tipo_cadastro"
+          <InputCheckGroup
+            name="pessoa-tipos-cadastro"
             label="Tipo de cadastro"
             required
+            error={erros.tipos_cadastro}
             opcoes={OPCOES_TIPO_CADASTRO}
-            value={formData.tipo_cadastro}
-            onChange={selecionarTipoCadastro}
+            value={Object.entries(FLAG_POR_TIPO)
+              .filter(([, flag]) => formData[flag])
+              .map(([tipo]) => tipo)}
+            onChange={selecionarTiposCadastro}
           />
         </div>
 
@@ -62,54 +80,57 @@ export default function ClientePessoaDadosGeraisTab({
       </div>
 
       {formData.tipo_pessoa === "PF" ? (
-        <>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-[minmax(220px,1fr)_200px_180px]">
+        <div
+          className={[
+            "grid grid-cols-1 gap-4",
+            formData.is_veterinario
+              ? "sm:grid-cols-[minmax(220px,1fr)_180px_200px_180px]"
+              : "sm:grid-cols-[minmax(220px,1fr)_200px_180px]",
+          ].join(" ")}
+        >
+          <InputTexto
+            id="pessoa-nome"
+            label="Nome completo"
+            required
+            value={formData.nome}
+            error={erros.nome}
+            onChange={(nome) => setFormData((prev) => ({ ...prev, nome }))}
+            onBlur={() => onBlurCampo?.("nome")}
+            placeholder="Digite o nome completo"
+          />
+
+          {formData.is_veterinario ? (
             <InputTexto
-              id="pessoa-nome"
-              label="Nome completo"
+              id="pessoa-crmv"
+              label="CRMV"
               required
-              value={formData.nome}
-              error={erros.nome}
-              onChange={(nome) => setFormData((prev) => ({ ...prev, nome }))}
-              onBlur={() => onBlurCampo?.("nome")}
-              placeholder="Digite o nome completo"
+              value={formData.crmv}
+              error={erros.crmv}
+              onChange={(crmv) => setFormData((prev) => ({ ...prev, crmv }))}
+              onBlur={() => onBlurCampo?.("crmv")}
+              maxLength={20}
+              placeholder="CRMV XX 1234"
+              help="Informe o número com UF."
             />
-
-            <InputCpfCnpj
-              id="pessoa-cpf"
-              label="CPF"
-              value={formData.cpf}
-              onChange={(cpf) => setFormData((prev) => ({ ...prev, cpf }))}
-            />
-
-            <InputData
-              id="pessoa-data-nascimento"
-              label="Data de nascimento"
-              help=""
-              value={formData.data_nascimento || ""}
-              onChange={(data_nascimento) =>
-                setFormData((prev) => ({ ...prev, data_nascimento }))
-              }
-            />
-          </div>
-
-          {formData.tipo_cadastro === "veterinario" ? (
-            <div className="w-full max-w-[220px]">
-              <InputTexto
-                id="pessoa-crmv"
-                label="CRMV"
-                required
-                value={formData.crmv}
-                error={erros.crmv}
-                onChange={(crmv) => setFormData((prev) => ({ ...prev, crmv }))}
-                onBlur={() => onBlurCampo?.("crmv")}
-                maxLength={20}
-                placeholder="CRMV XX 1234"
-                help="Informe o número com UF."
-              />
-            </div>
           ) : null}
-        </>
+
+          <InputCpfCnpj
+            id="pessoa-cpf"
+            label="CPF"
+            value={formData.cpf}
+            onChange={(cpf) => setFormData((prev) => ({ ...prev, cpf }))}
+          />
+
+          <InputData
+            id="pessoa-data-nascimento"
+            label="Data de nascimento"
+            help=""
+            value={formData.data_nascimento || ""}
+            onChange={(data_nascimento) =>
+              setFormData((prev) => ({ ...prev, data_nascimento }))
+            }
+          />
+        </div>
       ) : (
         <>
           <InputTexto
@@ -172,11 +193,13 @@ export default function ClientePessoaDadosGeraisTab({
         </>
       )}
 
-      {formData.tipo_cadastro === "cliente" ? (
-        <ClienteOrigemSelect
-          value={formData.origem_cliente}
-          onChange={(origem_cliente) => setFormData((prev) => ({ ...prev, origem_cliente }))}
-        />
+      {formData.is_cliente ? (
+        <div className="max-w-xs">
+          <ClienteOrigemSelect
+            value={formData.origem_cliente}
+            onChange={(origem_cliente) => setFormData((prev) => ({ ...prev, origem_cliente }))}
+          />
+        </div>
       ) : null}
     </div>
   );

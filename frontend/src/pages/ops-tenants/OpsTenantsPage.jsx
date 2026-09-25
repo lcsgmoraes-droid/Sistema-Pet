@@ -1,10 +1,8 @@
-import { FiBox, FiCheckCircle, FiCreditCard, FiDatabase, FiUsers } from "react-icons/fi";
+import { FiAlertTriangle, FiCheckCircle, FiCreditCard, FiUsers } from "react-icons/fi";
 
 import OpsTenantsBillingTab from "./OpsTenantsBillingTab";
 import OpsTenantsFilters from "./OpsTenantsFilters";
-import OpsTenantsGuardrailsPanel from "./OpsTenantsGuardrailsPanel";
 import OpsTenantsHeader from "./OpsTenantsHeader";
-import OpsTenantsImportPanel from "./OpsTenantsImportPanel";
 import OpsTenantsMetricCard from "./OpsTenantsMetricCard";
 import OpsTenantsPilotTab from "./OpsTenantsPilotTab";
 import OpsTenantsTable from "./OpsTenantsTable";
@@ -15,10 +13,7 @@ import useOpsTenantsController from "./useOpsTenantsController";
 
 export default function OpsTenantsPage() {
   const {
-    actionError,
     activeTab,
-    applyByTenant,
-    busyKey,
     billingOfferCreating,
     billingOfferError,
     billingOfferForm,
@@ -31,7 +26,6 @@ export default function OpsTenantsPage() {
     commercialSaving,
     commercialSuccess,
     error,
-    handleApply,
     handleBillingOfferChange,
     handleBillingOfferSubmit,
     handleBillingOfferToggleModule,
@@ -41,7 +35,7 @@ export default function OpsTenantsPage() {
     handleOnboardingNoteChange,
     handleOnboardingNoteSubmit,
     handleOnboardingSubmit,
-    handlePreview,
+    groupedItems,
     items,
     loadTenants,
     loading,
@@ -55,16 +49,19 @@ export default function OpsTenantsPage() {
     onboardingNotesLoading,
     onboardingSaving,
     onboardingSuccess,
-    previewByTenant,
+    refreshAfterLojaAdded,
     search,
     selectedTenant,
     setActiveTab,
     setSearch,
     setSelectedTenantId,
     setStatus,
+    setTenantsPage,
     showTenantTable,
     status,
     tabSummaries,
+    tenantsLoading,
+    tenantsPagination,
     totals,
   } = useOpsTenantsController();
 
@@ -79,7 +76,7 @@ export default function OpsTenantsPage() {
           </div>
         ) : null}
 
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
           <OpsTenantsMetricCard
             icon={FiUsers}
             label="Tenants"
@@ -95,18 +92,11 @@ export default function OpsTenantsPage() {
             tone="green"
           />
           <OpsTenantsMetricCard
-            icon={FiBox}
-            label="Com catalogo base"
-            value={formatNumber(totals.withCatalog)}
-            detail="Ja receberam o pacote padrao"
-            tone="blue"
-          />
-          <OpsTenantsMetricCard
-            icon={FiDatabase}
-            label="Produtos somados"
-            value={formatNumber(totals.products)}
-            detail="Total visivel nesta lista"
-            tone="amber"
+            icon={FiAlertTriangle}
+            label="Precisam de atencao"
+            value={formatNumber(tabSummaries.pilot.needFollowUp)}
+            detail="Erros, alertas ou acompanhamento pendente"
+            tone={tabSummaries.pilot.needFollowUp ? "amber" : "green"}
           />
           <OpsTenantsMetricCard
             icon={FiCreditCard}
@@ -127,30 +117,15 @@ export default function OpsTenantsPage() {
         />
 
         {showTenantTable ? (
-          <div className="grid gap-4 xl:grid-cols-[1fr_410px]">
-            <OpsTenantsTable
-              activeTab={activeTab}
-              items={items}
-              loading={loading}
-              selectedTenant={selectedTenant}
-              previewByTenant={previewByTenant}
-              busyKey={busyKey}
-              onSelectTenant={setSelectedTenantId}
-              onPreview={handlePreview}
-              onApply={handleApply}
-            />
-
-            <div className="space-y-4">
-              <OpsTenantsImportPanel
-                tenant={selectedTenant}
-                preview={selectedTenant ? previewByTenant[selectedTenant.id] : null}
-                applyResult={selectedTenant ? applyByTenant[selectedTenant.id] : null}
-                actionError={actionError}
-              />
-
-              <OpsTenantsGuardrailsPanel />
-            </div>
-          </div>
+          <OpsTenantsTable
+            groupedItems={groupedItems}
+            pagination={tenantsPagination}
+            onPageChange={setTenantsPage}
+            loading={tenantsLoading}
+            selectedTenant={selectedTenant}
+            onSelectTenant={setSelectedTenantId}
+            onLojaAdded={refreshAfterLojaAdded}
+          />
         ) : null}
 
         {activeTab === "billing" ? (

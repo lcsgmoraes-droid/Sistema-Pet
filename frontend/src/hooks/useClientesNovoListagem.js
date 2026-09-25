@@ -52,7 +52,7 @@ export function useClientesNovoListagem({
         });
 
         if (tipoFiltro !== "todos") {
-          params.append("tipo_cadastro", tipoFiltro);
+          params.append(`is_${tipoFiltro}`, "true");
         }
 
         if (termoBusca) {

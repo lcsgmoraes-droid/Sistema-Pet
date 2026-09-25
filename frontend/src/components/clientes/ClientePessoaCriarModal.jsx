@@ -4,6 +4,7 @@ import toast from "react-hot-toast";
 import api from "../../api";
 import BotaoCancelar from "../v2/BotaoCancelar/BotaoCancelar";
 import BotaoSalva from "../v2/BotaoSalva/BotaoSalva";
+import InputCheckGroup from "../v2/InputCheckGroup/InputCheckGroup";
 import InputCpfCnpj from "../v2/InputCpfCnpj/InputCpfCnpj";
 import InputRadio from "../v2/InputRadio/InputRadio";
 import InputTelefone from "../v2/InputTelefone/InputTelefone";
@@ -16,14 +17,22 @@ const OPCOES_TIPO_CADASTRO = [
   { value: "funcionario", label: "Funcionário" },
 ];
 
+const FLAG_POR_TIPO = {
+  cliente: "is_cliente",
+  fornecedor: "is_fornecedor",
+  veterinario: "is_veterinario",
+  funcionario: "is_funcionario",
+};
+
 const OPCOES_TIPO_PESSOA = [
   { value: "PF", label: "Pessoa Física" },
   { value: "PJ", label: "Pessoa Jurídica" },
 ];
 
-const CAMPOS_EM_ORDEM = ["nome", "razao_social", "cnpj", "crmv", "celular"];
+const CAMPOS_EM_ORDEM = ["tipos_cadastro", "nome", "razao_social", "cnpj", "crmv", "celular"];
 
 const ID_DO_CAMPO = {
+  tipos_cadastro: "pessoa-criar-tipos-cadastro",
   nome: "pessoa-criar-nome",
   razao_social: "pessoa-criar-razao-social",
   cnpj: "pessoa-criar-cnpj",
@@ -32,10 +41,13 @@ const ID_DO_CAMPO = {
 };
 
 function formDataInicial(tipoCadastro) {
-  const tipo_cadastro = tipoCadastro && tipoCadastro !== "todos" ? tipoCadastro : "cliente";
+  const tipoValido = FLAG_POR_TIPO[tipoCadastro] ? tipoCadastro : "cliente";
   return {
-    tipo_cadastro,
-    tipo_pessoa: tipo_cadastro === "fornecedor" ? "PJ" : "PF",
+    is_cliente: tipoValido === "cliente",
+    is_fornecedor: tipoValido === "fornecedor",
+    is_veterinario: tipoValido === "veterinario",
+    is_funcionario: tipoValido === "funcionario",
+    tipo_pessoa: "PF",
     nome: "",
     cpf: "",
     cnpj: "",
@@ -58,13 +70,22 @@ function validar(formData) {
     if (!formData.razao_social.trim()) erros.razao_social = "Informe a razão social.";
   }
 
-  if (formData.tipo_cadastro === "veterinario" && !formData.crmv.trim()) {
+  if (formData.is_veterinario && !formData.crmv.trim()) {
     erros.crmv = "Informe o CRMV.";
   }
 
-  if (formData.tipo_cadastro === "cliente") {
+  if (formData.is_cliente) {
     const digitos = `${formData.telefone}${formData.celular}`.replace(/\D/g, "");
     if (digitos.length < 10) erros.celular = "Informe telefone ou celular.";
+  }
+
+  if (
+    !formData.is_cliente &&
+    !formData.is_fornecedor &&
+    !formData.is_veterinario &&
+    !formData.is_funcionario
+  ) {
+    erros.tipos_cadastro = "Selecione ao menos um tipo de cadastro.";
   }
 
   return erros;
@@ -91,18 +112,20 @@ export default function ClientePessoaCriarModal({ aberto, tipoInicial, onCriado,
   const erroVisivel = (campo) => (tocados[campo] ? erros[campo] : undefined);
   const marcarTocado = (campo) => setTocados((atual) => ({ ...atual, [campo]: true }));
 
-  const selecionarTipoCadastro = (tipo_cadastro) => {
+  const selecionarTiposCadastro = (valoresSelecionados) => {
     setFormData((prev) => ({
       ...prev,
-      tipo_cadastro,
-      tipo_pessoa: tipo_cadastro === "fornecedor" ? "PJ" : prev.tipo_pessoa,
+      is_cliente: valoresSelecionados.includes("cliente"),
+      is_fornecedor: valoresSelecionados.includes("fornecedor"),
+      is_veterinario: valoresSelecionados.includes("veterinario"),
+      is_funcionario: valoresSelecionados.includes("funcionario"),
     }));
   };
 
   const criarCliente = async () => {
     setEnviando(true);
     try {
-      const { celular_whatsapp: _celularWhatsapp, ...payload } = formData;
+      const payload = { ...formData };
       Object.keys(payload).forEach((campo) => {
         if (payload[campo] === "") payload[campo] = null;
       });
@@ -158,7 +181,7 @@ export default function ClientePessoaCriarModal({ aberto, tipoInicial, onCriado,
       id="pessoa-criar-celular"
       label="Celular"
       tipo="celular"
-      required={formData.tipo_cadastro === "cliente"}
+      required={formData.is_cliente}
       value={formData.celular}
       error={erroVisivel("celular")}
       onChange={(celular) => setFormData((prev) => ({ ...prev, celular }))}
@@ -168,7 +191,7 @@ export default function ClientePessoaCriarModal({ aberto, tipoInicial, onCriado,
         setFormData((prev) => ({ ...prev, celular_whatsapp }))
       }
       help={
-        formData.tipo_cadastro === "cliente"
+        formData.is_cliente
           ? "Obrigatório para clientes do app, e-commerce e loja física."
           : "Opcional — pode ser preenchido depois, na tela de edição."
       }
@@ -216,14 +239,22 @@ export default function ClientePessoaCriarModal({ aberto, tipoInicial, onCriado,
             </div>
           ) : null}
 
-          <InputRadio
-            name="tipo_cadastro"
-            label="Tipo de cadastro"
-            required
-            opcoes={OPCOES_TIPO_CADASTRO}
-            value={formData.tipo_cadastro}
-            onChange={selecionarTipoCadastro}
-          />
+          <div id="pessoa-criar-tipos-cadastro">
+            <InputCheckGroup
+              name="pessoa-criar-tipos-cadastro"
+              label="Tipo de cadastro"
+              required
+              error={tocados.tipos_cadastro ? erros.tipos_cadastro : undefined}
+              opcoes={OPCOES_TIPO_CADASTRO}
+              value={Object.entries(FLAG_POR_TIPO)
+                .filter(([, flag]) => formData[flag])
+                .map(([tipo]) => tipo)}
+              onChange={(valores) => {
+                marcarTocado("tipos_cadastro");
+                selecionarTiposCadastro(valores);
+              }}
+            />
+          </div>
 
           <InputRadio
             name="tipo_pessoa"
@@ -258,7 +289,7 @@ export default function ClientePessoaCriarModal({ aberto, tipoInicial, onCriado,
                 {campoCelular}
               </div>
 
-              {formData.tipo_cadastro === "veterinario" ? (
+              {formData.is_veterinario ? (
                 <InputTexto
                   id="pessoa-criar-crmv"
                   label="CRMV"

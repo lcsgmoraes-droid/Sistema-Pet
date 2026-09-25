@@ -112,7 +112,15 @@ class Cliente(BaseTenantModel):
     origem_cliente = Column(String(50), nullable=True)
     tipo_cadastro = Column(
         String(50), nullable=False, default="cliente", index=True
-    )  # cliente, fornecedor, veterinario
+    )  # OBSOLETO: mantido só por compatibilidade com consumidores da Fase 2
+    # (ver Documentacao/Dominio/Cliente.md e .claude/skills/pessoas/SKILL.md).
+    # Decisões de negócio novas devem usar is_cliente/is_fornecedor/
+    # is_veterinario/is_funcionario abaixo — uma pessoa pode ser vários ao
+    # mesmo tempo, o que tipo_cadastro (valor único) não representa mais.
+    is_cliente = Column(Boolean, nullable=False, default=False, server_default="0")
+    is_fornecedor = Column(Boolean, nullable=False, default=False, server_default="0")
+    is_veterinario = Column(Boolean, nullable=False, default=False, server_default="0")
+    is_funcionario = Column(Boolean, nullable=False, default=False, server_default="0")
     tipo_pessoa = Column(
         String(2), nullable=False, default="PF", index=True
     )  # PF ou PJ
@@ -128,6 +136,7 @@ class Cliente(BaseTenantModel):
     cpf = Column(String(14), nullable=True, index=True)
     telefone = Column(String(50), nullable=True)
     celular = Column(String(50), nullable=True)
+    celular_whatsapp = Column(Boolean, nullable=False, default=False, server_default="0")
     email = Column(String(255), nullable=True)
     data_nascimento = Column(
         DateTime, nullable=True

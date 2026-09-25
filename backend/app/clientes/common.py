@@ -41,11 +41,11 @@ def _somente_digitos(valor) -> str:
 
 
 def _validar_telefone_cliente_obrigatorio(cliente_data, cliente_atual=None) -> None:
-    tipo = getattr(cliente_data, "tipo_cadastro", None)
-    if tipo is None and cliente_atual is not None:
-        tipo = getattr(cliente_atual, "tipo_cadastro", None)
+    is_cliente = getattr(cliente_data, "is_cliente", None)
+    if is_cliente is None and cliente_atual is not None:
+        is_cliente = getattr(cliente_atual, "is_cliente", None)
 
-    if tipo and tipo != "cliente":
+    if not is_cliente:
         return
 
     telefone = getattr(cliente_data, "telefone", None)
@@ -60,6 +60,62 @@ def _validar_telefone_cliente_obrigatorio(cliente_data, cliente_atual=None) -> N
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Telefone/celular obrigatorio para cadastro de cliente",
         )
+
+
+ORDEM_TIPOS_CADASTRO_LEGADO = ["cliente", "fornecedor", "veterinario", "funcionario"]
+
+
+def _tipo_cadastro_legado_a_partir_das_flags(
+    is_cliente: bool, is_fornecedor: bool, is_veterinario: bool, is_funcionario: bool
+):
+    """tipo_cadastro é OBSOLETO — mantido só por compatibilidade com
+    consumidores da Fase 2 que ainda leem essa coluna (ver
+    .claude/skills/pessoas/SKILL.md). Sem significado de prioridade de
+    negócio: retorna só o primeiro valor True numa ordem fixa, para
+    satisfazer a coluna NOT NULL legada."""
+    flags = {
+        "cliente": is_cliente,
+        "fornecedor": is_fornecedor,
+        "veterinario": is_veterinario,
+        "funcionario": is_funcionario,
+    }
+    for tipo in ORDEM_TIPOS_CADASTRO_LEGADO:
+        if flags[tipo]:
+            return tipo
+    return None
+
+
+def _validar_e_normalizar_flags_tipo_criacao(cliente_data) -> None:
+    tipo = _tipo_cadastro_legado_a_partir_das_flags(
+        cliente_data.is_cliente,
+        cliente_data.is_fornecedor,
+        cliente_data.is_veterinario,
+        cliente_data.is_funcionario,
+    )
+    if tipo is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Selecione ao menos um tipo de cadastro (cliente, fornecedor, veterinário ou funcionário).",
+        )
+    cliente_data.tipo_cadastro = tipo
+
+
+def _validar_e_normalizar_flags_tipo_update(cliente_data, cliente_atual) -> None:
+    campos_flag = ("is_cliente", "is_fornecedor", "is_veterinario", "is_funcionario")
+    if not any(getattr(cliente_data, campo) is not None for campo in campos_flag):
+        return
+
+    def efetivo(campo):
+        valor = getattr(cliente_data, campo)
+        return valor if valor is not None else getattr(cliente_atual, campo)
+
+    tipo = _tipo_cadastro_legado_a_partir_das_flags(*(efetivo(c) for c in campos_flag))
+    if tipo is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Selecione ao menos um tipo de cadastro (cliente, fornecedor, veterinário ou funcionário).",
+        )
+    cliente_data.tipo_cadastro = tipo
 
 
 def _validar_tenant_e_obter_usuario(user_and_tenant):
