@@ -4,7 +4,7 @@ from uuid import uuid4
 
 import pytest
 from fastapi import HTTPException
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, event
 from sqlalchemy.schema import CreateTable
 from sqlalchemy.orm import Session
 
@@ -19,11 +19,27 @@ from app.financeiro_models import ContaPagar, LancamentoManual, Pagamento
 @pytest.fixture
 def db_session():
     engine = create_engine("sqlite://")
+
+    @event.listens_for(engine, "connect")
+    def _ativar_chaves_estrangeiras(dbapi_connection, _connection_record):
+        dbapi_connection.execute("PRAGMA foreign_keys=ON")
+
     with engine.begin() as connection:
+        externos = {
+            fk.column.table.name
+            for model in (ContaPagar, Pagamento, LancamentoManual)
+            for fk in model.__table__.foreign_keys
+        } - {"contas_pagar", "pagamentos", "lancamentos_manuais"}
+        for nome in externos:
+            connection.exec_driver_sql(
+                f'CREATE TABLE "{nome}" (id INTEGER PRIMARY KEY)'
+            )
+        connection.exec_driver_sql("INSERT INTO users (id) VALUES (1)")
         for model in (ContaPagar, Pagamento, LancamentoManual):
             connection.exec_driver_sql(
                 str(CreateTable(model.__table__).compile(engine))
             )
+        assert connection.exec_driver_sql("PRAGMA foreign_keys").scalar() == 1
     with Session(engine) as session:
         yield session
     engine.dispose()

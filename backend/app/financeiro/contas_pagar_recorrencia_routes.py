@@ -58,7 +58,13 @@ def _remover_previsoes_conta(db: Session, tenant_id, conta: ContaPagar) -> None:
 def _excluir_contas_sem_pagamento(
     db: Session, tenant_id, contas: list[ContaPagar]
 ) -> None:
-    for conta in sorted(contas, key=lambda item: 1 if item.eh_recorrente else 0):
+    filhas = [conta for conta in contas if conta.conta_recorrencia_origem_id]
+    origens = [conta for conta in contas if not conta.conta_recorrencia_origem_id]
+    for conta in filhas:
+        _remover_previsoes_conta(db, tenant_id, conta)
+        db.delete(conta)
+    db.flush()  # O banco exige remover as filhas antes da origem (FK autorreferente).
+    for conta in origens:
         _remover_previsoes_conta(db, tenant_id, conta)
         db.delete(conta)
 
