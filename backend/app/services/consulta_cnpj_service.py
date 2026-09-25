@@ -48,9 +48,21 @@ def _validar_cnpj(cnpj: str) -> str:
 
 def _normalizar_minha_receita(dados: dict) -> dict:
     campos = (
-        "cnpj", "razao_social", "nome_fantasia", "email", "ddd_telefone_1",
-        "cep", "logradouro", "numero", "complemento", "bairro", "municipio",
-        "codigo_municipio_ibge", "uf", "cnae_fiscal", "cnae_fiscal_descricao",
+        "cnpj",
+        "razao_social",
+        "nome_fantasia",
+        "email",
+        "ddd_telefone_1",
+        "cep",
+        "logradouro",
+        "numero",
+        "complemento",
+        "bairro",
+        "municipio",
+        "codigo_municipio_ibge",
+        "uf",
+        "cnae_fiscal",
+        "cnae_fiscal_descricao",
         "cnaes_secundarios",
     )
     return {campo: dados.get(campo) for campo in campos}
@@ -67,9 +79,11 @@ def _normalizar_cnpj_ws(dados: dict) -> dict:
         "razao_social": dados.get("razao_social"),
         "nome_fantasia": estabelecimento.get("nome_fantasia"),
         "email": estabelecimento.get("email"),
-        "ddd_telefone_1": "".join(filter(None, (
-            estabelecimento.get("ddd1"), estabelecimento.get("telefone1")
-        ))),
+        "ddd_telefone_1": "".join(
+            filter(
+                None, (estabelecimento.get("ddd1"), estabelecimento.get("telefone1"))
+            )
+        ),
         "cep": estabelecimento.get("cep"),
         "logradouro": estabelecimento.get("logradouro"),
         "numero": estabelecimento.get("numero"),
@@ -91,7 +105,9 @@ def _normalizar_cnpj_ws(dados: dict) -> dict:
 def _permitir_fallback() -> bool:
     agora = monotonic()
     with _lock:
-        while _fallback_calls and agora - _fallback_calls[0] >= _FALLBACK_WINDOW_SECONDS:
+        while (
+            _fallback_calls and agora - _fallback_calls[0] >= _FALLBACK_WINDOW_SECONDS
+        ):
             _fallback_calls.popleft()
         if len(_fallback_calls) >= _FALLBACK_LIMIT:
             return False
@@ -109,14 +125,20 @@ def consultar_cnpj(cnpj: str) -> dict:
         _cache.pop(numero, None)
 
     fontes = (
-        ("Minha Receita", f"https://minhareceita.org/{numero}", _normalizar_minha_receita),
+        (
+            "Minha Receita",
+            f"https://minhareceita.org/{numero}",
+            _normalizar_minha_receita,
+        ),
         ("CNPJ.ws", f"https://publica.cnpj.ws/cnpj/{numero}", _normalizar_cnpj_ws),
     )
     nao_encontrado = 0
     with httpx.Client(timeout=8.0, headers={"User-Agent": "CorePet/1.0"}) as client:
         for nome, url, normalizar in fontes:
             if nome == "CNPJ.ws" and not _permitir_fallback():
-                logger.warning("Consulta CNPJ: limite preventivo da fonte reserva atingido")
+                logger.warning(
+                    "Consulta CNPJ: limite preventivo da fonte reserva atingido"
+                )
                 continue
             try:
                 resposta = client.get(url)

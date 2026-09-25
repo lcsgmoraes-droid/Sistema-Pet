@@ -288,7 +288,9 @@ export default function ConfiguracaoFiscalEmpresa() {
       toast.success("✅ Dados preenchidos com sucesso!");
     } catch (error) {
       console.error("Erro ao buscar CNPJ:", error);
-      toast.error(error.response?.data?.detail || "Não foi possível consultar o CNPJ. Tente novamente.");
+      toast.error(
+        error.response?.data?.detail || "Não foi possível consultar o CNPJ. Tente novamente.",
+      );
     } finally {
       setBuscandoCNPJ(false);
     }
