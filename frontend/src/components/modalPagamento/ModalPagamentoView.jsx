@@ -18,6 +18,7 @@ export default function ModalPagamentoView({
   setValorRecebido,
   valorRestante,
   saldoCashback,
+  saldoCreditoDisponivel,
   formasPagamento,
   valorRecebido,
   bandeira,
@@ -108,6 +109,7 @@ export default function ModalPagamentoView({
                 setValorRecebido={setValorRecebido}
                 valorRestante={valorRestante}
                 saldoCashback={saldoCashback}
+                saldoCreditoDisponivel={saldoCreditoDisponivel}
                 formasPagamento={formasPagamento}
                 valorRecebido={valorRecebido}
                 troco={troco}

@@ -10,6 +10,7 @@ import {
   calcularFaixasParcelamento,
   calcularCustoTotalItensVenda,
   calcularResumoRecebimento,
+  calcularSaldoBeneficioDisponivel,
   descreverCupomMargem,
   ehFormaPagamentoCartao,
   ehFormaPagamentoPix,
@@ -307,6 +308,16 @@ export default function useModalPagamentoController({
     pagamentos,
     totalPagoExistente,
     valorRecebido,
+  });
+  const saldoCreditoDisponivel = calcularSaldoBeneficioDisponivel({
+    saldo: venda.cliente?.credito,
+    pagamentos,
+    tipo: "credito_cliente",
+  });
+  const saldoCashbackDisponivel = calcularSaldoBeneficioDisponivel({
+    saldo: saldoCashback,
+    pagamentos,
+    tipo: "cashback",
   });
   const cupomParaFinalizar = montarCupomParaFinalizar({ cupomAplicado, venda });
   const descricaoCupomMargem = descreverCupomMargem(cupomParaFinalizar, formatMoneyBRL);
@@ -654,7 +665,8 @@ export default function useModalPagamentoController({
     pagamentos,
     podeConfirmarFinalizacao,
     revelarJustificativaObrigatoria,
-    saldoCashback,
+    saldoCashback: saldoCashbackDisponivel,
+    saldoCreditoDisponivel,
     setBandeira,
     setErro,
     setErroJustificativa,
@@ -704,7 +716,8 @@ export default function useModalPagamentoController({
       setNsuCartao,
       setValorRecebido,
       valorRestante,
-      saldoCashback,
+      saldoCashback: saldoCashbackDisponivel,
+      saldoCreditoDisponivel,
       formasPagamento,
       valorRecebido,
       bandeira,
