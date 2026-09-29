@@ -217,6 +217,8 @@ export const MODULOS_INFO = {
 export const ModulosProvider = ({ children }) => {
   const { user } = useAuth();
   const [modulosAtivos, setModulosAtivos] = useState(null); // null = carregando
+  const [erroCarregamento, setErroCarregamento] = useState(false);
+  const [carregandoModulos, setCarregandoModulos] = useState(false);
   const [modulosBetaPublicos, setModulosBetaPublicos] = useState(MODULOS_BETA_PUBLICOS);
   const [modulosForaOfertaPublica, setModulosForaOfertaPublica] = useState(
     MODULOS_FORA_DA_OFERTA_PUBLICA,
@@ -230,6 +232,7 @@ export const ModulosProvider = ({ children }) => {
       // Sem usuario logado: mantem estado de carregamento para evitar
       // liberar modulos premium durante a hidratacao da sessao.
       setModulosAtivos(null);
+      setErroCarregamento(false);
       setModulosBetaPublicos(MODULOS_BETA_PUBLICOS);
       setModulosForaOfertaPublica(MODULOS_FORA_DA_OFERTA_PUBLICA);
       setPlanoAtual(null);
@@ -241,6 +244,7 @@ export const ModulosProvider = ({ children }) => {
     const selectedTenant = localStorage.getItem("selectedTenant");
     if (!token || !selectedTenant) {
       setModulosAtivos([]);
+      setErroCarregamento(false);
       setModulosBetaPublicos(MODULOS_BETA_PUBLICOS);
       setModulosForaOfertaPublica(MODULOS_FORA_DA_OFERTA_PUBLICA);
       setPlanoAtual(null);
@@ -249,13 +253,18 @@ export const ModulosProvider = ({ children }) => {
       return;
     }
 
+    setCarregandoModulos(true);
     try {
       const response = await api.get("/modulos/status");
       const modulosApi = response.data?.modulos_ativos;
+      if (!Array.isArray(modulosApi)) {
+        throw new Error("Resposta de módulos inválida");
+      }
       const modulosBetaApi = response.data?.modulos_beta;
       const modulosForaOfertaApi = response.data?.modulos_fora_oferta_publica;
 
-      setModulosAtivos(Array.isArray(modulosApi) ? modulosApi : []);
+      setModulosAtivos(modulosApi);
+      setErroCarregamento(false);
       setPlanoAtual(response.data?.plano || "basico");
       setAssinaturaAtual(response.data?.assinatura || null);
       setTrialPadrao(response.data?.trial_padrao || null);
@@ -268,13 +277,27 @@ export const ModulosProvider = ({ children }) => {
     } catch {
       // Fail-closed: se não conseguir confirmar o plano, não libera premium.
       setModulosAtivos([]);
+      setErroCarregamento(true);
       setModulosBetaPublicos(MODULOS_BETA_PUBLICOS);
       setModulosForaOfertaPublica(MODULOS_FORA_DA_OFERTA_PUBLICA);
       setPlanoAtual(null);
       setAssinaturaAtual(null);
       setTrialPadrao(null);
+    } finally {
+      setCarregandoModulos(false);
     }
   }, [user]);
+
+  useEffect(() => {
+    if (!erroCarregamento) return undefined;
+    const tentarNovamente = () => carregarModulos();
+    window.addEventListener("focus", tentarNovamente);
+    window.addEventListener("online", tentarNovamente);
+    return () => {
+      window.removeEventListener("focus", tentarNovamente);
+      window.removeEventListener("online", tentarNovamente);
+    };
+  }, [erroCarregamento, carregarModulos]);
 
   useEffect(() => {
     carregarModulos();
@@ -302,6 +325,8 @@ export const ModulosProvider = ({ children }) => {
   const value = useMemo(
     () => ({
       modulosAtivos,
+      erroCarregamento,
+      carregandoModulos,
       planoAtual,
       assinaturaAtual,
       trialPadrao,
@@ -314,6 +339,8 @@ export const ModulosProvider = ({ children }) => {
     }),
     [
       modulosAtivos,
+      erroCarregamento,
+      carregandoModulos,
       planoAtual,
       assinaturaAtual,
       trialPadrao,
