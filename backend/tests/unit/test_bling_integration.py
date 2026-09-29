@@ -257,7 +257,9 @@ def test_prevalidacao_destaca_cst_00_usado_como_csosn(monkeypatch):
             "icms_st": False,
         },
     )
-    monkeypatch.setattr(bling_integration_fiscal, "_melhor_sugestao_catalogo", lambda *_args: None)
+    monkeypatch.setattr(
+        bling_integration_fiscal, "_melhor_sugestao_catalogo", lambda *_args: None
+    )
 
     validacao = bling_integration_fiscal.prevalidar_produtos_fiscais_venda(
         venda, object(), exigir_documento_completo=True
