@@ -1,8 +1,13 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { toast } from "react-hot-toast";
 
 import api from "../api";
 import ClienteFinanceiroView from "./clienteFinanceiro/ClienteFinanceiroView";
+import {
+  buscarTransacoesParaPdf,
+  gerarPdfComprasCliente,
+} from "./clienteFinanceiro/clienteFinanceiroPdf";
 
 const filtrosIniciais = {
   page: 1,
@@ -27,6 +32,7 @@ const ClienteFinanceiro = () => {
   const [detalhesVendas, setDetalhesVendas] = useState({});
   const [loadingDetalhes, setLoadingDetalhes] = useState({});
   const [filtros, setFiltros] = useState(filtrosIniciais);
+  const [gerandoPdf, setGerandoPdf] = useState(false);
 
   const carregarDados = async () => {
     try {
@@ -110,6 +116,28 @@ const ClienteFinanceiro = () => {
     }
   };
 
+  const exportarPdf = async () => {
+    if (filtros.data_inicio && filtros.data_fim && filtros.data_inicio > filtros.data_fim) {
+      toast.error("A data inicial deve ser anterior à data final.");
+      return;
+    }
+
+    try {
+      setGerandoPdf(true);
+      const transacoes = await buscarTransacoesParaPdf(api, clienteId, filtros);
+      if (!transacoes.length) {
+        toast.error("Não há compras para gerar o PDF com esses filtros.");
+        return;
+      }
+      await gerarPdfComprasCliente({ cliente, filtros, transacoes });
+    } catch (err) {
+      console.error("Erro ao gerar PDF das compras:", err);
+      toast.error("Não foi possível gerar o PDF. Tente novamente.");
+    } finally {
+      setGerandoPdf(false);
+    }
+  };
+
   return (
     <ClienteFinanceiroView
       cliente={cliente}
@@ -117,10 +145,12 @@ const ClienteFinanceiro = () => {
       error={error}
       expandedRows={expandedRows}
       filtros={filtros}
+      gerandoPdf={gerandoPdf}
       historico={historico}
       loading={loading}
       loadingDetalhes={loadingDetalhes}
       onAplicarFiltros={aplicarFiltros}
+      onExportarPdf={exportarPdf}
       onLimparFiltros={limparFiltros}
       onMudarPagina={mudarPagina}
       onNavegarParaVenda={navegarParaVenda}
