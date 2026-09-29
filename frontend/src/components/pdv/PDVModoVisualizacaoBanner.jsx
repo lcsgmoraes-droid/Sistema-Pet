@@ -17,7 +17,7 @@ export default function PDVModoVisualizacaoBanner({
   mudarStatusParaAberta,
   habilitarEdicao,
 }) {
-  const { moduloAtivo } = useModulos();
+  const { moduloAtivo, erroCarregamento, carregandoModulos, carregarModulos } = useModulos();
   const moduloFiscalAtivo = moduloAtivo("fiscal");
   const [mostrarSelecaoDocumento, setMostrarSelecaoDocumento] = useState(false);
 
@@ -124,6 +124,28 @@ export default function PDVModoVisualizacaoBanner({
           </div>
         </div>
       </div>
+
+      {erroCarregamento && !moduloFiscalAtivo && (
+        <div
+          role="alert"
+          className="border-b border-amber-200 bg-amber-50 px-5 py-3 text-sm text-amber-900"
+        >
+          <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-2">
+            <span>
+              Não foi possível confirmar o acesso fiscal desta empresa. A emissão de NF está
+              temporariamente indisponível.
+            </span>
+            <button
+              type="button"
+              onClick={carregarModulos}
+              disabled={carregandoModulos}
+              className="rounded-md border border-amber-500 px-3 py-1 font-semibold hover:bg-amber-100 disabled:opacity-50"
+            >
+              {carregandoModulos ? "Verificando..." : "Tentar novamente"}
+            </button>
+          </div>
+        </div>
+      )}
 
       {moduloFiscalAtivo && mostrarSelecaoDocumento && (
         <ModalSelecaoDocumentoFiscal
