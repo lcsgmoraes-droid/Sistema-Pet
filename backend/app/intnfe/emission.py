@@ -551,7 +551,9 @@ def build_payload(db, tenant, connection, venda, document_type):
             )
             continue
         cst_icms = str(fiscal.get("cst_icms") or "").strip()
-        codigos_validos = CSOSN_VALIDOS if emitter.get("crt") == "1" else CST_ICMS_VALIDOS
+        codigos_validos = (
+            CSOSN_VALIDOS if emitter.get("crt") == "1" else CST_ICMS_VALIDOS
+        )
         if cst_icms not in codigos_validos:
             tipo_codigo = "CSOSN" if emitter.get("crt") == "1" else "CST"
             mensagem = (
@@ -565,16 +567,19 @@ def build_payload(db, tenant, connection, venda, document_type):
                     "pode_emitir": False,
                     "requer_autorizacao": False,
                     "correcoes": [],
-                    "bloqueios": [{
-                        "produto_id": item.produto.id,
-                        "produto_nome": item.produto.nome,
-                        "produto_tipo": getattr(item.produto, "tipo_produto", None),
-                        "sku": _text(getattr(item.produto, "codigo", None)) or str(item.produto.id),
-                        "campo": "cst_icms",
-                        "valor_atual": cst_icms,
-                        "valor_invalido": True,
-                        "mensagem": mensagem,
-                    }],
+                    "bloqueios": [
+                        {
+                            "produto_id": item.produto.id,
+                            "produto_nome": item.produto.nome,
+                            "produto_tipo": getattr(item.produto, "tipo_produto", None),
+                            "sku": _text(getattr(item.produto, "codigo", None))
+                            or str(item.produto.id),
+                            "campo": "cst_icms",
+                            "valor_atual": cst_icms,
+                            "valor_invalido": True,
+                            "mensagem": mensagem,
+                        }
+                    ],
                 },
             )
         if (
