@@ -213,7 +213,7 @@ async def prevalidar_nfe(
                 status=409,
             )
         validacao = prevalidar_produtos_fiscais_venda(
-            venda, db, exigir_documento_completo=True
+            venda, db, exigir_documento_completo=True, tipo_nota=tipo_nota
         )
         if validacao["pode_emitir"]:
             validacao["resumo_emissao"] = preview_intnfe(
@@ -226,6 +226,9 @@ async def prevalidar_nfe(
             }
         validacao["provedor"] = "intnfe"
     except DirectEmissionError as exc:
+        contexto_fiscal = (
+            validacao.get("contexto_fiscal") if "validacao" in locals() else None
+        )
         validacao = exc.validation or {
             "success": True,
             "pode_emitir": False,
@@ -233,6 +236,13 @@ async def prevalidar_nfe(
             "correcoes": [],
             "bloqueios": [{"campo": "intnfe", "mensagem": str(exc)}],
         }
+        if contexto_fiscal:
+            validacao.setdefault("contexto_fiscal", contexto_fiscal)
+        if rejeitada_intnfe:
+            validacao["rejeicao"] = {
+                "codigo": venda.nfe_codigo_erro,
+                "motivo": venda.nfe_motivo_rejeicao,
+            }
         validacao["provedor"] = "intnfe"
     validacao["tipo_nota"] = tipo_nota
     validacao["venda_id"] = venda.id

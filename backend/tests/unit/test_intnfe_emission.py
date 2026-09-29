@@ -224,6 +224,52 @@ def test_counter_nfce_does_not_require_recipient_address():
     assert "documentosReferenciados" not in payload
 
 
+def test_nfce_bloqueia_regra_386_no_item_tres_antes_da_transmissao(monkeypatch):
+    tenant, connection, sale = _objects()
+    sale.tem_entrega = False
+    sale.taxa_entrega = "0.00"
+    sale.total = "18.00"
+    sale.pagamentos[0].valor = "18.00"
+    primeiro = sale.itens[0]
+    sale.itens = [
+        primeiro,
+        SimpleNamespace(
+            **{
+                **vars(primeiro),
+                "produto": SimpleNamespace(**{**vars(primeiro.produto), "id": 10}),
+            }
+        ),
+        SimpleNamespace(
+            **{
+                **vars(primeiro),
+                "produto": SimpleNamespace(**{**vars(primeiro.produto), "id": 11}),
+            }
+        ),
+    ]
+    fiscal_original = emission._resolver_fiscal_item_nfe
+
+    def fiscal_item(db, venda, item):
+        fiscal = fiscal_original(db, venda, item)
+        if item.produto.id == 11:
+            return {
+                **fiscal,
+                "cfop_interno": "5405",
+                "cst_icms": "102",
+                "icms_st": True,
+            }
+        return fiscal
+
+    monkeypatch.setattr(emission, "_resolver_fiscal_item_nfe", fiscal_item)
+
+    with pytest.raises(emission.DirectEmissionError) as rejeicao:
+        emission.build_payload(None, tenant, connection, sale, "nfce")
+
+    bloqueios = rejeicao.value.validation["bloqueios"]
+    assert {item["campo"] for item in bloqueios} == {"cfop", "cst_icms"}
+    assert all(item["item_numero"] == 3 for item in bloqueios)
+    assert all(item["produto_id"] == 11 for item in bloqueios)
+
+
 def test_nfce_with_delivery_fee_requires_nfe():
     tenant, connection, sale = _objects()
 

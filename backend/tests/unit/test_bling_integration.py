@@ -274,6 +274,71 @@ def test_prevalidacao_destaca_cst_00_usado_como_csosn(monkeypatch):
     assert validacao["bloqueios"][0]["preenchimento_automatico"] is False
 
 
+def test_prevalidacao_nfce_aponta_cfop_e_csosn_incompativeis_antes_do_envio(
+    monkeypatch,
+):
+    venda = _make_venda_nfce()
+    monkeypatch.setattr(
+        bling_integration_fiscal,
+        "_config_fiscal_empresa",
+        lambda *_args: SimpleNamespace(
+            regime_tributario="Simples Nacional", simples_ativo=True, uf="SP"
+        ),
+    )
+    monkeypatch.setattr(
+        bling_integration_fiscal,
+        "_resolver_fiscal_item_nfe",
+        lambda *_args: {
+            "ncm": "39269090",
+            "origem_mercadoria": "0",
+            "cfop": "5405",
+            "cfop_interno": "5405",
+            "cst_icms": "102",
+            "pis_cst": "49",
+            "cofins_cst": "49",
+            "icms_st": True,
+        },
+    )
+    monkeypatch.setattr(
+        bling_integration_fiscal, "_melhor_sugestao_catalogo", lambda *_args: None
+    )
+
+    validacao = bling_integration_fiscal.prevalidar_produtos_fiscais_venda(
+        venda, object(), exigir_documento_completo=True, tipo_nota="nfce"
+    )
+
+    assert validacao["pode_emitir"] is False
+    assert {item["campo"] for item in validacao["bloqueios"]} == {"cfop", "cst_icms"}
+    assert all(item["item_numero"] == 1 for item in validacao["bloqueios"])
+    assert validacao["bloqueios"][0]["valor_atual"] == "5405"
+    assert validacao["bloqueios"][1]["valor_sugerido"] == "500"
+    assert validacao["bloqueios"][1]["preenchimento_automatico"] is False
+
+
+@pytest.mark.parametrize(
+    ("csosn", "cfop", "uf", "espera_bloqueio"),
+    [
+        ("102", "5102", "SP", False),
+        ("500", "5405", "SP", False),
+        ("900", "5949", "SP", False),
+        ("102", "5405", "SP", True),
+        ("500", "5102", "SP", True),
+    ],
+)
+def test_regra_386_respeita_cfop_do_csosn(csosn, cfop, uf, espera_bloqueio):
+    pendencias = bling_integration_fiscal.pendencias_cfop_csosn_nfce(
+        {"cst_icms": csosn, "cfop_interno": cfop, "icms_st": False},
+        {"produto_id": 10, "produto_nome": "Produto teste"},
+        uf,
+        3,
+    )
+
+    assert bool(pendencias) is espera_bloqueio
+    if pendencias:
+        assert {item["campo"] for item in pendencias} == {"cfop", "cst_icms"}
+        assert all(item["item_numero"] == 3 for item in pendencias)
+
+
 def test_catalogo_opcional_falha_dentro_de_savepoint_sem_interromper_validacao(
     monkeypatch,
 ):
