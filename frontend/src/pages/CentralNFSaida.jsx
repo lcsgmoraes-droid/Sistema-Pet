@@ -14,7 +14,10 @@ import {
   corrigirEReemitirNota,
   descartarTentativaRejeitada,
   extrairMensagemNFe,
+  prevalidarNotaFiscal,
+  temPendenciasFiscais,
 } from "../utils/nfeFiscalAssistida";
+import { solicitarCorrecaoFiscal } from "../services/fiscalCorrectionDialog";
 import { metadadosDownloadDanfe } from "../utils/documentoFiscalDownload.mjs";
 import NFSaidaCompartilharModal from "./centralNFSaida/NFSaidaCompartilharModal";
 
@@ -46,6 +49,7 @@ export default function CentralNFSaida() {
   const buscaInicial = searchParams.get("busca") || "";
   const vendaIdInicial = searchParams.get("venda_id") || "";
   const abrirNotaInicial = searchParams.get("abrir") === "1";
+  const corrigirNotaInicial = searchParams.get("corrigir") === "1";
   const [notas, setNotas] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filtroSituacao, setFiltroSituacao] = useState("");
@@ -74,6 +78,7 @@ export default function CentralNFSaida() {
   const [cancelando, setCancelando] = useState(false);
   const [reconciliandoNotaId, setReconciliandoNotaId] = useState("");
   const [corrigindoNotaId, setCorrigindoNotaId] = useState("");
+  const [diagnosticandoNotaId, setDiagnosticandoNotaId] = useState("");
   const [liberandoVendaId, setLiberandoVendaId] = useState("");
   const detalhesNotasCacheRef = useRef(new Map());
   const notaDiretaAbertaRef = useRef(false);
@@ -157,7 +162,11 @@ export default function CentralNFSaida() {
         );
         if (notaDireta) {
           notaDiretaAbertaRef.current = true;
-          await abrirDetalhes(notaDireta);
+          if (corrigirNotaInicial && notaDireta.status?.toLowerCase() === "rejeitada") {
+            await abrirCorrecao(notaDireta);
+          } else {
+            await abrirDetalhes(notaDireta);
+          }
         }
       }
     } catch {
@@ -287,6 +296,43 @@ export default function CentralNFSaida() {
       await carregarNotas(true);
     } finally {
       setCorrigindoNotaId("");
+    }
+  }
+
+  async function abrirCorrecao(nota) {
+    const vendaId = nota?.venda_id;
+    if (!vendaId) {
+      alert("Não foi possível identificar a venda desta nota.");
+      return;
+    }
+    const tipoNota = nota?.tipo === "nfe" || Number(nota?.modelo) === 55 ? "nfe" : "nfce";
+    setDiagnosticandoNotaId(String(vendaId));
+    try {
+      for (let tentativa = 0; tentativa < 4; tentativa += 1) {
+        const validacao = await prevalidarNotaFiscal({ vendaId, tipoNota });
+        const corrigido = await solicitarCorrecaoFiscal({
+          validacao,
+          vendaId,
+          tipoNota,
+          apenasCorrigir: true,
+          rejeicao: validacao.rejeicao || {
+            codigo: nota.codigo_erro,
+            motivo: nota.motivo_rejeicao,
+          },
+        });
+        if (!corrigido) return;
+        const revisao = await prevalidarNotaFiscal({ vendaId, tipoNota });
+        if (!temPendenciasFiscais(revisao)) {
+          fecharDetalhes();
+          await corrigirEReemitir(nota);
+          return;
+        }
+      }
+      alert("Ainda há pendências fiscais. Abra a correção novamente para continuar.");
+    } catch (error) {
+      alert(extrairMensagemNFe(error));
+    } finally {
+      setDiagnosticandoNotaId("");
     }
   }
 
@@ -558,6 +604,8 @@ export default function CentralNFSaida() {
         reconciliandoNotaId={reconciliandoNotaId}
         corrigirEReemitir={corrigirEReemitir}
         corrigindoNotaId={corrigindoNotaId}
+        abrirCorrecao={abrirCorrecao}
+        diagnosticandoNotaId={diagnosticandoNotaId}
         liberarVendaComRejeicao={liberarVendaComRejeicao}
         liberandoVendaId={liberandoVendaId}
         baixarDanfe={baixarDanfe}

@@ -5,7 +5,6 @@ import api from "../../api";
 import { verificarEstoqueNegativo } from "../../api/alertasEstoque";
 import { atualizarVenda, criarVenda, finalizarVenda } from "../../api/vendas";
 import {
-  corrigirEReemitirNota,
   emitirNotaFiscalAssistida,
   extrairAcaoCorrecaoFiscal,
   extrairMensagemNFe,
@@ -323,37 +322,17 @@ export function useModalPagamentoActions({
       const mensagem = extrairMensagemNFe(error);
       const recuperacao = error?.recuperacaoNFe;
       if (recuperacao) {
-        const avisoProducao =
-          recuperacao.ambienteCodigo === 1
-            ? "\n\nATENÇÃO: a nova tentativa será transmitida em produção."
-            : "";
-        const deveCorrigir = await confirmarCorePet(
-          `${mensagem}${avisoProducao}\n\nO CorePet pode validar os dados atuais, aplicar apenas correções seguras e tentar novamente. Corrigir e tentar novamente?`,
-        );
-        if (deveCorrigir) {
-          try {
-            const reemissao = await corrigirEReemitirNota(recuperacao.vendaId);
-            if (reemissao?.processando) {
-              globalThis.alert(
-                "A correção foi aplicada e a nova tentativa ainda está em processamento. Consulte a Central de NF de Saída.",
-              );
-              onConfirmar();
-              return { autorizada: false, processando: true, data: reemissao };
-            } else {
-              return {
-                autorizada: true,
-                data: reemissao,
-                tipoNota,
-                vendaId: vendaFinalizadaId,
-              };
-            }
-          } catch (recoveryError) {
-            const recoveryMessage = extrairMensagemNFe(recoveryError);
-            setErro(recoveryMessage);
-            globalThis.alert(recoveryMessage);
-          }
-          return;
+        setErro(mensagem);
+        if (await confirmarCorePet(`${mensagem}\n\nAbrir a tela de correção desta nota agora?`)) {
+          const params = new URLSearchParams({
+            abrir: "1",
+            venda_id: String(recuperacao.vendaId),
+            corrigir: "1",
+          });
+          if (recuperacao.numero) params.set("busca", String(recuperacao.numero));
+          navigate(`/notas-fiscais/saida?${params.toString()}`);
         }
+        return;
       }
       const acaoFiscal = extrairAcaoCorrecaoFiscal(error);
       setErro(mensagem);

@@ -460,6 +460,25 @@ def test_non_contributor_with_incompatible_csosn_is_blocked(monkeypatch):
     assert bloqueio["valor_atual"] == "900"
 
 
+def test_cst_00_nao_e_enviado_como_csosn(monkeypatch):
+    tenant, connection, sale = _objects()
+    fiscal_original = emission._resolver_fiscal_item_nfe
+    monkeypatch.setattr(
+        emission,
+        "_resolver_fiscal_item_nfe",
+        lambda db, venda, item: {
+            **fiscal_original(db, venda, item),
+            "cst_icms": "00",
+        },
+    )
+
+    with pytest.raises(emission.DirectEmissionError, match="CSOSN 00") as exc_info:
+        emission.build_payload(None, tenant, connection, sale, "nfce")
+
+    assert exc_info.value.validation["bloqueios"][0]["campo"] == "cst_icms"
+    assert exc_info.value.validation["bloqueios"][0]["valor_atual"] == "00"
+
+
 def test_missing_product_taxes_return_editable_fiscal_fields(monkeypatch):
     tenant, connection, sale = _objects()
     monkeypatch.setattr(

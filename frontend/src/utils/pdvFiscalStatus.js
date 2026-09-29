@@ -99,6 +99,7 @@ export function rotaNotaFiscalVenda(venda = {}) {
   const parametros = new URLSearchParams({ abrir: "1" });
   if (venda.nfe_numero) parametros.set("busca", String(venda.nfe_numero));
   if (venda.id) parametros.set("venda_id", String(venda.id));
+  if (normalizar(venda.nfe_status) === "rejeitada") parametros.set("corrigir", "1");
 
   return `/notas-fiscais/saida?${parametros.toString()}`;
 }

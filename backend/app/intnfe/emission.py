@@ -11,7 +11,11 @@ from decimal import Decimal, ROUND_HALF_UP
 from uuid import UUID, uuid4
 from types import SimpleNamespace
 
-from app.bling_integration_fiscal import _resolver_fiscal_item_nfe
+from app.bling_integration_fiscal import (
+    CSOSN_VALIDOS,
+    CST_ICMS_VALIDOS,
+    _resolver_fiscal_item_nfe,
+)
 from app.financeiro.crediario_parcelamento import montar_plano_crediario
 from app.intnfe.client import IntNFeError
 from app.intnfe.fiscal_profile import local_profile
@@ -546,7 +550,33 @@ def build_payload(db, tenant, connection, venda, document_type):
                 if not value
             )
             continue
-        cst_icms = str(fiscal.get("cst_icms") or "")
+        cst_icms = str(fiscal.get("cst_icms") or "").strip()
+        codigos_validos = CSOSN_VALIDOS if emitter.get("crt") == "1" else CST_ICMS_VALIDOS
+        if cst_icms not in codigos_validos:
+            tipo_codigo = "CSOSN" if emitter.get("crt") == "1" else "CST"
+            mensagem = (
+                f"Produto {item.produto.nome}: {tipo_codigo} {cst_icms} não é válido "
+                "para o regime da empresa. Confira a classificação fiscal do produto."
+            )
+            raise DirectEmissionError(
+                mensagem,
+                validation={
+                    "success": True,
+                    "pode_emitir": False,
+                    "requer_autorizacao": False,
+                    "correcoes": [],
+                    "bloqueios": [{
+                        "produto_id": item.produto.id,
+                        "produto_nome": item.produto.nome,
+                        "produto_tipo": getattr(item.produto, "tipo_produto", None),
+                        "sku": _text(getattr(item.produto, "codigo", None)) or str(item.produto.id),
+                        "campo": "cst_icms",
+                        "valor_atual": cst_icms,
+                        "valor_invalido": True,
+                        "mensagem": mensagem,
+                    }],
+                },
+            )
         if (
             emitter.get("crt") == "1"
             and destinatario_nao_contribuinte

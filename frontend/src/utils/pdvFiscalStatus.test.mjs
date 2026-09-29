@@ -63,6 +63,10 @@ test("monta acesso direto da venda para a nota fiscal", () => {
     "/notas-fiscais/saida?abrir=1&busca=1631&venda_id=26",
   );
   assert.equal(rotaNotaFiscalVenda({ id: 26 }), null);
+  assert.equal(
+    rotaNotaFiscalVenda({ id: 26, nfe_modelo: 65, nfe_numero: 66, nfe_status: "rejeitada" }),
+    "/notas-fiscais/saida?abrir=1&busca=66&venda_id=26&corrigir=1",
+  );
 });
 
 test("monta a rota do DANFE conforme o provedor fiscal", () => {

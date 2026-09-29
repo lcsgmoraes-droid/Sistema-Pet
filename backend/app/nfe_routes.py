@@ -202,7 +202,12 @@ async def prevalidar_nfe(
         raise HTTPException(status_code=404, detail="Venda nao encontrada")
 
     try:
-        if venda.nfe_bling_id or venda.nfe_correlation_id:
+        rejeitada_intnfe = (
+            venda.nfe_correlation_id
+            and venda.nfe_provider == "intnfe"
+            and str(venda.nfe_status or "").strip().casefold() == "rejeitada"
+        )
+        if (venda.nfe_bling_id or venda.nfe_correlation_id) and not rejeitada_intnfe:
             raise DirectEmissionError(
                 "Esta venda já possui uma tentativa de nota fiscal. Consulte a situação existente.",
                 status=409,
@@ -214,6 +219,11 @@ async def prevalidar_nfe(
             validacao["resumo_emissao"] = preview_intnfe(
                 db, get_tenant(db, tenant_id), venda, tipo_nota
             )
+        if rejeitada_intnfe:
+            validacao["rejeicao"] = {
+                "codigo": venda.nfe_codigo_erro,
+                "motivo": venda.nfe_motivo_rejeicao,
+            }
         validacao["provedor"] = "intnfe"
     except DirectEmissionError as exc:
         validacao = exc.validation or {

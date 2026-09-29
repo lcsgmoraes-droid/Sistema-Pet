@@ -54,6 +54,8 @@ export default function CentralNFSaidaView({
   reconciliandoNotaId,
   corrigirEReemitir,
   corrigindoNotaId,
+  abrirCorrecao,
+  diagnosticandoNotaId,
   liberarVendaComRejeicao,
   liberandoVendaId,
   baixarDanfe,
@@ -137,6 +139,8 @@ export default function CentralNFSaidaView({
         reconciliandoNotaId={reconciliandoNotaId}
         corrigirEReemitir={corrigirEReemitir}
         corrigindoNotaId={corrigindoNotaId}
+        abrirCorrecao={abrirCorrecao}
+        diagnosticandoNotaId={diagnosticandoNotaId}
         liberarVendaComRejeicao={liberarVendaComRejeicao}
         liberandoVendaId={liberandoVendaId}
         baixarDanfe={baixarDanfe}
@@ -154,6 +158,8 @@ export default function CentralNFSaidaView({
         baixarXml={baixarXml}
         corrigirEReemitir={corrigirEReemitir}
         corrigindoNotaId={corrigindoNotaId}
+        abrirCorrecao={abrirCorrecao}
+        diagnosticandoNotaId={diagnosticandoNotaId}
         liberarVendaComRejeicao={liberarVendaComRejeicao}
         liberandoVendaId={liberandoVendaId}
       />

@@ -40,7 +40,7 @@ export default function PDVModoVisualizacaoBanner({
             ? "com NF emitida"
             : "Aberta";
   const orientacao = notaRejeitada
-    ? "Libere a tentativa rejeitada na Central NF para escolher outro modelo."
+    ? "Clique em Corrigir erro no aviso da nota para revisar os dados fiscais."
     : vendaAtual.status === "aberta"
       ? "Clique em Editar para modificar."
       : "Reabra a venda para modificar.";
