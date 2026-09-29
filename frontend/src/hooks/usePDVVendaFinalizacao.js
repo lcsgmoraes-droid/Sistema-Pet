@@ -249,6 +249,18 @@ export function usePDVVendaFinalizacao({
     } catch (error) {
       console.error("Erro ao emitir nota da venda finalizada:", error);
       const mensagem = extrairMensagemNFe(error);
+      if (error?.recuperacaoNFe?.vendaId) {
+        if (await confirmarCorePet(`${mensagem}\n\nAbrir a tela de correção desta nota agora?`)) {
+          const params = new URLSearchParams({
+            abrir: "1",
+            venda_id: String(error.recuperacaoNFe.vendaId),
+            corrigir: "1",
+          });
+          if (error.recuperacaoNFe.numero) params.set("busca", String(error.recuperacaoNFe.numero));
+          navigate(`/notas-fiscais/saida?${params.toString()}`);
+        }
+        return false;
+      }
       const acaoFiscal = extrairAcaoCorrecaoFiscal(error);
       if (
         acaoFiscal &&

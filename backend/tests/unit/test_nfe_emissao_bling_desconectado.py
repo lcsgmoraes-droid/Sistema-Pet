@@ -77,6 +77,40 @@ def test_prevalidacao_sem_intnfe_configurada_nao_faz_fallback_bling(monkeypatch)
     assert "IntNFe" in resposta["bloqueios"][0]["mensagem"]
 
 
+def test_prevalidacao_permite_diagnosticar_tentativa_intnfe_rejeitada(monkeypatch):
+    venda = SimpleNamespace(
+        id=30,
+        nfe_bling_id=None,
+        nfe_correlation_id="tentativa-30",
+        nfe_provider="intnfe",
+        nfe_status="rejeitada",
+        nfe_codigo_erro="MAPEAMENTO",
+        nfe_motivo_rejeicao="CSOSN '00' não suportado",
+    )
+    monkeypatch.setattr(nfe_routes, "_buscar_venda_para_nfe", lambda *a: venda)
+    monkeypatch.setattr(
+        nfe_routes,
+        "prevalidar_produtos_fiscais_venda",
+        lambda *a, **kw: {
+            "pode_emitir": False,
+            "bloqueios": [{"campo": "cst_icms", "produto_id": 9}],
+            "correcoes": [],
+        },
+    )
+
+    resposta = asyncio.run(
+        nfe_routes.prevalidar_nfe(
+            nfe_routes.PrevalidarNFeRequest(venda_id=30),
+            db=SimpleNamespace(),
+            user_and_tenant=(SimpleNamespace(id=2), "tenant-teste"),
+        )
+    )
+
+    assert resposta["bloqueios"][0]["campo"] == "cst_icms"
+    assert resposta["rejeicao"]["codigo"] == "MAPEAMENTO"
+    assert resposta["rejeicao"]["motivo"] == "CSOSN '00' não suportado"
+
+
 def test_rota_de_emissao_nao_contem_chamada_ao_bling():
     fonte = inspect.getsource(nfe_routes.emitir_nfe)
 

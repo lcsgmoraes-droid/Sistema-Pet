@@ -133,6 +133,7 @@ function erroRejeicaoIntNFe(vendaId, data) {
   );
   error.recuperacaoNFe = {
     vendaId,
+    numero: data?.numero,
     codigoErro: data?.codigo_erro,
     motivo: data?.motivo_rejeicao,
     ambienteCodigo: data?.ambiente_codigo,

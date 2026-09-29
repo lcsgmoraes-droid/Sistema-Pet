@@ -30,6 +30,8 @@ export default function NFSaidaList({
   reconciliandoNotaId,
   corrigirEReemitir,
   corrigindoNotaId,
+  abrirCorrecao,
+  diagnosticandoNotaId,
   liberarVendaComRejeicao,
   liberandoVendaId,
   baixarDanfe,
@@ -142,12 +144,23 @@ export default function NFSaidaList({
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <span
-                      className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium ${getSituacaoCor(nota.status)}`}
-                    >
-                      {getSituacaoIcone(nota.status)}
-                      {nota.status || "Pendente"}
-                    </span>
+                    {nota.provedor === "intnfe" && nota.status?.toLowerCase() === "rejeitada" ? (
+                      <button
+                        type="button"
+                        onClick={() => abrirCorrecao(nota)}
+                        disabled={diagnosticandoNotaId === String(nota.venda_id)}
+                        className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium underline disabled:opacity-50 ${getSituacaoCor(nota.status)}`}
+                        title="Abrir a correção desta rejeição"
+                      >
+                        {getSituacaoIcone(nota.status)} {nota.status} · Corrigir erro
+                      </button>
+                    ) : (
+                      <span
+                        className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium ${getSituacaoCor(nota.status)}`}
+                      >
+                        {getSituacaoIcone(nota.status)} {nota.status || "Pendente"}
+                      </span>
+                    )}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                     {formatMoneyBRL(nota.valor)}

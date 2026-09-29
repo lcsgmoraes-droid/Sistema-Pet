@@ -44,6 +44,8 @@ export default function NFSaidaDetalhesModal({
   baixarXml,
   corrigirEReemitir,
   corrigindoNotaId,
+  abrirCorrecao,
+  diagnosticandoNotaId,
   liberarVendaComRejeicao,
   liberandoVendaId,
 }) {
@@ -79,13 +81,29 @@ export default function NFSaidaDetalhesModal({
               {erroDetalhe}
             </div>
           )}
-          {(codigoErro || motivoRejeicao) && (
+          {(codigoErro ||
+            motivoRejeicao ||
+            (notaIntNFe && notaSelecionada.status?.toLowerCase() === "rejeitada")) && (
             <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900">
               <p className="font-semibold">A autorização da nota foi rejeitada.</p>
               {codigoErro && <p className="mt-1">Código: {codigoErro}</p>}
               {motivoRejeicao && <p className="mt-1">Motivo: {motivoRejeicao}</p>}
+              {!codigoErro && !motivoRejeicao && (
+                <p className="mt-1">
+                  O emissor ainda não informou o motivo. Abra a correção para revisar os dados da
+                  venda.
+                </p>
+              )}
               {notaIntNFe && notaSelecionada.status?.toLowerCase() === "rejeitada" && (
                 <div className="mt-3 flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => abrirCorrecao(notaSelecionada)}
+                    disabled={diagnosticandoNotaId === String(notaSelecionada.venda_id)}
+                    className="inline-flex items-center gap-2 rounded-lg bg-red-700 px-4 py-2 font-semibold text-white hover:bg-red-800 disabled:opacity-50"
+                  >
+                    Corrigir erro
+                  </button>
                   <button
                     type="button"
                     onClick={() => liberarVendaComRejeicao(notaSelecionada)}

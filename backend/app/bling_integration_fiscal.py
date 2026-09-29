@@ -400,6 +400,61 @@ def _empresa_no_simples(empresa_fiscal) -> bool:
     )
 
 
+CSOSN_VALIDOS = {"101", "102", "103", "201", "202", "203", "300", "400", "500", "900"}
+CST_ICMS_VALIDOS = {"00", "10", "20", "30", "40", "41", "50", "51", "60", "70", "90"}
+
+
+def _empresa_usa_csosn(empresa_fiscal) -> bool:
+    regime = str(getattr(empresa_fiscal, "regime_tributario", "") or "").casefold()
+    return _empresa_no_simples(empresa_fiscal) and not (
+        "excesso" in regime and "simples" in regime
+    )
+
+
+def _pendencia_codigo_icms(codigo, empresa_fiscal, dados_produto, fiscal_item):
+    """Explica o codigo incompatível sem escolher tributação por conta do usuário."""
+    if empresa_fiscal is None:
+        return None
+    simples = _empresa_usa_csosn(empresa_fiscal)
+    validos = CSOSN_VALIDOS if simples else CST_ICMS_VALIDOS
+    if codigo in validos:
+        return None
+    tipo = "CSOSN" if simples else "CST"
+    mensagem = (
+        f"O código {codigo} não é um {tipo} válido para o regime da empresa. "
+        f"Confira a classificação do ICMS deste produto com a contabilidade."
+    )
+    pendencia = {
+        **dados_produto,
+        "campo": "cst_icms",
+        "valor_atual": codigo,
+        "valor_invalido": True,
+        "mensagem": mensagem,
+    }
+    if simples and fiscal_item.get("icms_st"):
+        pendencia.update(
+            valor_sugerido="500",
+            motivo="O cadastro indica ICMS já cobrado por substituição tributária. Confirme se isso vale para esta venda.",
+            fonte_sugestao="xml_ou_cadastro_do_produto_e_regime_da_empresa",
+            confianca="media",
+            preenchimento_automatico=False,
+        )
+    elif simples:
+        pendencia.update(
+            valor_sugerido="102",
+            motivo=(
+                "Possível código para venda pelo Simples Nacional sem permissão de crédito. "
+                "Confirme com a contabilidade se o produto não tem substituição tributária, "
+                "isenção ou outro tratamento específico."
+            ),
+            fonte_sugestao="regime_da_empresa_sem_historico_do_produto",
+            confianca="baixa",
+            confianca_percentual=42,
+            preenchimento_automatico=False,
+        )
+    return pendencia
+
+
 def _sugerir_tributo_ausente(
     campo: str,
     fiscal_item: Dict[str, Optional[str]],
@@ -618,6 +673,15 @@ def prevalidar_produtos_fiscais_venda(
                     }
                 )
 
+        if exigir_documento_completo:
+            codigo_icms = _limpar_texto_fiscal(fiscal_item.get("cst_icms"))
+            if codigo_icms:
+                pendencia = _pendencia_codigo_icms(
+                    codigo_icms, empresa_fiscal, dados_produto, fiscal_item
+                )
+                if pendencia:
+                    bloqueios.append(pendencia)
+
     return {
         "success": True,
         "pode_emitir": not bloqueios and not correcoes,
@@ -627,7 +691,7 @@ def prevalidar_produtos_fiscais_venda(
         "contexto_fiscal": {
             "regime_tributario": getattr(empresa_fiscal, "regime_tributario", None),
             "uf": getattr(empresa_fiscal, "uf", None),
-            "simples_nacional": _empresa_no_simples(empresa_fiscal),
+            "simples_nacional": _empresa_usa_csosn(empresa_fiscal),
         },
     }
 

@@ -235,6 +235,45 @@ def test_prevalidacao_oferece_opcoes_do_simples_com_baixa_confianca(monkeypatch)
     }
 
 
+def test_prevalidacao_destaca_cst_00_usado_como_csosn(monkeypatch):
+    venda = _make_venda_nfce()
+    monkeypatch.setattr(
+        bling_integration_fiscal,
+        "_config_fiscal_empresa",
+        lambda *_args: SimpleNamespace(
+            regime_tributario="Simples Nacional", simples_ativo=True, uf="SP"
+        ),
+    )
+    monkeypatch.setattr(
+        bling_integration_fiscal,
+        "_resolver_fiscal_item_nfe",
+        lambda *_args: {
+            "ncm": "39269090",
+            "origem_mercadoria": "0",
+            "cfop": "5102",
+            "cst_icms": "00",
+            "pis_cst": "49",
+            "cofins_cst": "49",
+            "icms_st": False,
+        },
+    )
+    monkeypatch.setattr(
+        bling_integration_fiscal, "_melhor_sugestao_catalogo", lambda *_args: None
+    )
+
+    validacao = bling_integration_fiscal.prevalidar_produtos_fiscais_venda(
+        venda, object(), exigir_documento_completo=True
+    )
+
+    assert validacao["pode_emitir"] is False
+    assert validacao["bloqueios"][0]["campo"] == "cst_icms"
+    assert validacao["bloqueios"][0]["valor_atual"] == "00"
+    assert validacao["bloqueios"][0]["valor_invalido"] is True
+    assert validacao["bloqueios"][0]["valor_sugerido"] == "102"
+    assert validacao["bloqueios"][0]["confianca"] == "baixa"
+    assert validacao["bloqueios"][0]["preenchimento_automatico"] is False
+
+
 def test_catalogo_opcional_falha_dentro_de_savepoint_sem_interromper_validacao(
     monkeypatch,
 ):
