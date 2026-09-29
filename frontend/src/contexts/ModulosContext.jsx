@@ -233,6 +233,7 @@ export const ModulosProvider = ({ children }) => {
       // liberar modulos premium durante a hidratacao da sessao.
       setModulosAtivos(null);
       setErroCarregamento(false);
+      setCarregandoModulos(false);
       setModulosBetaPublicos(MODULOS_BETA_PUBLICOS);
       setModulosForaOfertaPublica(MODULOS_FORA_DA_OFERTA_PUBLICA);
       setPlanoAtual(null);
@@ -244,7 +245,8 @@ export const ModulosProvider = ({ children }) => {
     const selectedTenant = localStorage.getItem("selectedTenant");
     if (!token || !selectedTenant) {
       setModulosAtivos([]);
-      setErroCarregamento(false);
+      setErroCarregamento(true);
+      setCarregandoModulos(false);
       setModulosBetaPublicos(MODULOS_BETA_PUBLICOS);
       setModulosForaOfertaPublica(MODULOS_FORA_DA_OFERTA_PUBLICA);
       setPlanoAtual(null);
