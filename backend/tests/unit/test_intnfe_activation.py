@@ -12,6 +12,7 @@ from app.config import settings
 from app.db import Base
 from app.intnfe.client import IntNFeError
 from app.intnfe.models import IntNFeConnection, IntNFeEmissionSequence
+from app.empresa_config_fiscal_models import EmpresaConfigFiscal
 from app.intnfe.presentation import certificate_state, public_status, valid_cnpj
 from app.intnfe.repository import ActivationError, get_connection, reserve, save
 from app.intnfe.service import activate, bind_existing
@@ -85,6 +86,7 @@ def intnfe_db():
             Tenant.__table__,
             IntNFeConnection.__table__,
             IntNFeEmissionSequence.__table__,
+            EmpresaConfigFiscal.__table__,
         ],
     )
     with Session(engine) as session:

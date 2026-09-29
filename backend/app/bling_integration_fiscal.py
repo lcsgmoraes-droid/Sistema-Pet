@@ -174,6 +174,21 @@ def _resolver_fiscal_item_nfe(
             if not substituido_simples
             else None
         ),
+        "codigo_beneficio_fiscal": _primeiro_texto_fiscal(
+            getattr(kit_fiscal, "codigo_beneficio_fiscal", None),
+            getattr(produto_fiscal, "codigo_beneficio_fiscal", None),
+        ),
+        "fcp_aliquota": next(
+            (
+                value
+                for value in (
+                    getattr(kit_fiscal, "fcp_aliquota", None),
+                    getattr(produto_fiscal, "fcp_aliquota", None),
+                )
+                if value is not None
+            ),
+            None,
+        ),
         "pis_cst": _primeiro_texto_fiscal(
             getattr(kit_fiscal, "pis_cst", None),
             getattr(produto_fiscal, "pis_cst", None),

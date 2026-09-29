@@ -3,6 +3,8 @@ API de Configurações Fiscais e Dados da Empresa
 Permite configurar tributação padrão e dados cadastrais da empresa
 """
 
+from datetime import datetime, timezone
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, EmailStr, field_validator
@@ -12,7 +14,11 @@ from uuid import UUID
 from app.db import get_session as get_db
 from app.auth.dependencies import get_current_user_and_tenant
 from app.empresa_config_fiscal_models import EmpresaConfigFiscal
+from app.fiscal_state_rules import production_fiscal_pending, state_profile_payload
 from app.models import Tenant, User
+from app.services.fiscal_config_service import (
+    obter_ou_criar_config_fiscal_empresa_padrao,
+)
 from app.security.permissions_decorator import require_any_permission
 from app.utils.logger import logger
 
@@ -72,6 +78,48 @@ class EmpresaConfigFiscalUpdate(BaseModel):
     # PIS/COFINS
     pis_cst_padrao: Optional[str] = None
     cofins_cst_padrao: Optional[str] = None
+    configuracao_confirmada: Optional[bool] = None
+
+    @field_validator("icms_aliquota_interna", "icms_aliquota_interestadual")
+    @classmethod
+    def validate_icms_rate(cls, value):
+        if value is not None and not 0 <= value <= 100:
+            raise ValueError("Alíquota de ICMS deve ficar entre 0% e 100%")
+        return value
+
+    @field_validator("cfop_venda_interna", "cfop_venda_interestadual", "cfop_compra")
+    @classmethod
+    def validate_cfop(cls, value):
+        if value is not None and (len(value) != 4 or not value.isdigit()):
+            raise ValueError("CFOP deve conter quatro dígitos")
+        return value
+
+
+def _config_fiscal_response(config, tenant):
+    return {
+        "uf": config.uf,
+        "regime_tributario": config.regime_tributario,
+        "cnae_principal": config.cnae_principal,
+        "cnae_descricao": config.cnae_descricao,
+        "cnaes_secundarios": config.cnaes_secundarios,
+        "simples_ativo": config.simples_ativo,
+        "simples_anexo": config.simples_anexo,
+        "aliquota_simples_vigente": float(config.aliquota_simples_vigente or 0),
+        "aliquota_simples_sugerida": float(config.aliquota_simples_sugerida or 0),
+        "icms_aliquota_interna": float(config.icms_aliquota_interna or 0),
+        "icms_aliquota_interestadual": float(config.icms_aliquota_interestadual or 0),
+        "aplica_difal": config.aplica_difal,
+        "cfop_venda_interna": config.cfop_venda_interna,
+        "cfop_venda_interestadual": config.cfop_venda_interestadual,
+        "cfop_compra": config.cfop_compra,
+        "pis_cst_padrao": config.pis_cst_padrao,
+        "cofins_cst_padrao": config.cofins_cst_padrao,
+        "herdado_do_estado": config.herdado_do_estado,
+        "configuracao_confirmada": bool(config.configuracao_confirmada),
+        "configuracao_confirmada_em": config.configuracao_confirmada_em,
+        "perfil_estado": state_profile_payload(config.uf),
+        "pendencias_producao": production_fiscal_pending(tenant, config),
+    }
 
 
 @router.get("/dados-basicos")
@@ -160,51 +208,11 @@ def obter_config_fiscal_empresa(
     """
     _, tenant_id = user_and_tenant
 
-    config = (
-        db.query(EmpresaConfigFiscal)
-        .filter(EmpresaConfigFiscal.tenant_id == tenant_id)
-        .first()
-    )
-
-    if not config:
-        # Criar configuração padrão
-        config = EmpresaConfigFiscal(
-            tenant_id=tenant_id,
-            uf="SP",  # Padrão, deve vir do cadastro da empresa
-            regime_tributario="Simples Nacional",
-            contribuinte_icms=True,
-            icms_aliquota_interna=18.0,
-            icms_aliquota_interestadual=12.0,
-            aplica_difal=True,
-            cfop_venda_interna="5102",
-            cfop_venda_interestadual="6102",
-            cfop_compra="1102",
-            herdado_do_estado=True,
-        )
-        db.add(config)
-        db.commit()
-        db.refresh(config)
-
-    return {
-        "uf": config.uf,
-        "regime_tributario": config.regime_tributario,
-        "cnae_principal": config.cnae_principal,
-        "cnae_descricao": config.cnae_descricao,
-        "cnaes_secundarios": config.cnaes_secundarios,
-        "simples_ativo": config.simples_ativo,
-        "simples_anexo": config.simples_anexo,
-        "aliquota_simples_vigente": float(config.aliquota_simples_vigente or 0),
-        "aliquota_simples_sugerida": float(config.aliquota_simples_sugerida or 0),
-        "icms_aliquota_interna": float(config.icms_aliquota_interna or 0),
-        "icms_aliquota_interestadual": float(config.icms_aliquota_interestadual or 0),
-        "aplica_difal": config.aplica_difal,
-        "cfop_venda_interna": config.cfop_venda_interna,
-        "cfop_venda_interestadual": config.cfop_venda_interestadual,
-        "cfop_compra": config.cfop_compra,
-        "pis_cst_padrao": config.pis_cst_padrao,
-        "cofins_cst_padrao": config.cofins_cst_padrao,
-        "herdado_do_estado": config.herdado_do_estado,
-    }
+    tenant = db.query(Tenant).filter(Tenant.id == str(tenant_id)).first()
+    if not tenant:
+        raise HTTPException(status_code=404, detail="Empresa não encontrada")
+    config = obter_ou_criar_config_fiscal_empresa_padrao(db, tenant_id, commit=True)
+    return _config_fiscal_response(config, tenant)
 
 
 @router.put("/fiscal")
@@ -231,8 +239,13 @@ def atualizar_config_fiscal_empresa(
             detail="Configuração fiscal não encontrada. Execute GET primeiro para criar.",
         )
 
-    # Atualizar campos
-    update_data = data.dict(exclude_unset=True)
+    tenant = db.query(Tenant).filter(Tenant.id == str(tenant_id)).first()
+    if not tenant:
+        raise HTTPException(status_code=404, detail="Empresa não encontrada")
+
+    # Atualizar campos. Qualquer alteração fiscal exige nova confirmação explícita.
+    update_data = data.model_dump(exclude_unset=True)
+    confirmation = update_data.pop("configuracao_confirmada", None)
     logger.info(f"🔍 Dados recebidos para atualização fiscal: {update_data}")
 
     for key, value in update_data.items():
@@ -244,6 +257,14 @@ def atualizar_config_fiscal_empresa(
 
     # Marcar que não é mais herdado do estado (foi personalizado)
     config.herdado_do_estado = False
+    if "simples" in str(config.regime_tributario or "").casefold():
+        config.aplica_difal = False
+    if confirmation is True:
+        config.configuracao_confirmada = True
+        config.configuracao_confirmada_em = datetime.now(timezone.utc)
+    elif confirmation is False or update_data:
+        config.configuracao_confirmada = False
+        config.configuracao_confirmada_em = None
 
     logger.info(f"💾 CNAE Descrição antes do commit: {config.cnae_descricao}")
     logger.info(f"💾 CNAEs Secundários antes do commit: {config.cnaes_secundarios}")
@@ -256,24 +277,5 @@ def atualizar_config_fiscal_empresa(
 
     return {
         "message": "Configurações fiscais atualizadas com sucesso",
-        "config": {
-            "uf": config.uf,
-            "regime_tributario": config.regime_tributario,
-            "cnae_principal": config.cnae_principal,
-            "cnae_descricao": config.cnae_descricao,
-            "cnaes_secundarios": config.cnaes_secundarios,
-            "simples_ativo": config.simples_ativo,
-            "simples_anexo": config.simples_anexo,
-            "aliquota_simples_vigente": float(config.aliquota_simples_vigente or 0),
-            "aliquota_simples_sugerida": float(config.aliquota_simples_sugerida or 0),
-            "icms_aliquota_interna": float(config.icms_aliquota_interna or 0),
-            "icms_aliquota_interestadual": float(
-                config.icms_aliquota_interestadual or 0
-            ),
-            "aplica_difal": config.aplica_difal,
-            "cfop_venda_interna": config.cfop_venda_interna,
-            "cfop_venda_interestadual": config.cfop_venda_interestadual,
-            "cfop_compra": config.cfop_compra,
-            "herdado_do_estado": config.herdado_do_estado,
-        },
+        "config": _config_fiscal_response(config, tenant),
     }

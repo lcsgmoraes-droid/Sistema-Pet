@@ -49,6 +49,8 @@ class KitConfigFiscal(TenantScoped, Base):
     cst_icms = Column(String(3))
     icms_aliquota = Column(Numeric(5, 2))
     icms_st = Column(Boolean)
+    codigo_beneficio_fiscal = Column(String(10))
+    fcp_aliquota = Column(Numeric(5, 2))
 
     # CFOP
     cfop_venda = Column(String(4))
