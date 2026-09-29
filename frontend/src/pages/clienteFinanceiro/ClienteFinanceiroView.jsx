@@ -8,6 +8,7 @@ import {
   FiChevronUp,
   FiCreditCard,
   FiDollarSign,
+  FiDownload,
   FiPackage,
   FiShoppingCart,
 } from "react-icons/fi";
@@ -79,10 +80,12 @@ export default function ClienteFinanceiroView({
   error,
   expandedRows,
   filtros,
+  gerandoPdf,
   historico,
   loading,
   loadingDetalhes,
   onAplicarFiltros,
+  onExportarPdf,
   onLimparFiltros,
   onMudarPagina,
   onNavegarParaVenda,
@@ -186,9 +189,21 @@ export default function ClienteFinanceiroView({
           title="Filtros"
           subtitle="Refine o historico por periodo, tipo, status e quantidade por pagina."
           actions={
-            <ActionButton onClick={onLimparFiltros} intent="neutral" tone="ghost" size="sm">
-              Limpar filtros
-            </ActionButton>
+            <div className="flex flex-wrap items-center gap-2">
+              <ActionButton onClick={onLimparFiltros} intent="neutral" tone="ghost" size="sm">
+                Limpar filtros
+              </ActionButton>
+              <ActionButton
+                onClick={onExportarPdf}
+                disabled={loading || !paginacao?.total_itens}
+                loading={gerandoPdf}
+                icon={FiDownload}
+                intent="edit"
+                size="sm"
+              >
+                {gerandoPdf ? "Gerando PDF..." : "Gerar PDF"}
+              </ActionButton>
+            </div>
           }
         >
           <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
