@@ -118,6 +118,7 @@ function agruparPendencias(validacao) {
       sku: item.sku,
       codigo_barras: item.codigo_barras,
       tipo: item.produto_tipo,
+      itemNumero: item.item_numero,
       pendencias: [],
     };
     if (!atual.pendencias.some((pendencia) => pendencia.campo === item.campo)) {
@@ -403,6 +404,7 @@ export default function FiscalCorrectionDialogHost() {
                 >
                   <div className="mb-4">
                     <h3 className="font-semibold text-slate-900 dark:text-slate-100">
+                      {produto.itemNumero ? `Item ${produto.itemNumero} · ` : ""}
                       {produto.nome}
                     </h3>
                     {produto.sku && (
@@ -434,7 +436,9 @@ export default function FiscalCorrectionDialogHost() {
                       const campoId = `fiscal-${produto.id}-${item.campo}`;
                       const valorAtual = String(fiscal[item.campo] || "");
                       const valorForaDaLista =
-                        valorAtual && !opcoes.some(([valor]) => valor === valorAtual);
+                        valorAtual &&
+                        Array.isArray(opcoes) &&
+                        !opcoes.some(([valor]) => valor === valorAtual);
                       return (
                         <div key={item.campo} className="block">
                           <label
@@ -501,6 +505,12 @@ export default function FiscalCorrectionDialogHost() {
                           >
                             {item.mensagem || item.motivo || "Confira este campo antes de emitir."}
                           </p>
+                          {item.valor_atual && valorAtual !== String(item.valor_atual) && (
+                            <p className="mt-1.5 text-xs font-semibold text-amber-800">
+                              Valor que seria usado na nota: {item.valor_atual}. O cadastro, lote ou
+                              regra de ICMS-ST pode prevalecer sobre o valor mostrado no campo.
+                            </p>
+                          )}
                           {item.valor_sugerido ? (
                             <div className="mt-2 rounded-lg border border-slate-200 bg-slate-50 p-2.5 text-xs leading-5 text-slate-600 dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-300">
                               <div className="flex flex-wrap items-center justify-between gap-2">
@@ -598,6 +608,15 @@ export default function FiscalCorrectionDialogHost() {
                 {dialogo?.apenasCorrigir
                   ? "Salvar e verificar novamente"
                   : "Salvar e tentar emitir novamente"}
+              </button>
+            )}
+            {!temCamposDeProduto && rejeicao && dialogo.apenasCorrigir && (
+              <button
+                type="button"
+                onClick={() => resolverCorrecaoFiscal(true)}
+                className="rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700"
+              >
+                Verificar correção e tentar novamente
               </button>
             )}
           </div>

@@ -15,6 +15,7 @@ from app.bling_integration_fiscal import (
     CSOSN_VALIDOS,
     CST_ICMS_VALIDOS,
     _resolver_fiscal_item_nfe,
+    pendencias_cfop_csosn_nfce,
 )
 from app.financeiro.crediario_parcelamento import montar_plano_crediario
 from app.intnfe.client import IntNFeError
@@ -492,7 +493,7 @@ def build_payload(db, tenant, connection, venda, document_type):
     fiscal_pending = []
     product_total = Decimal("0")
     item_discount_total = Decimal("0")
-    for item in venda.itens or []:
+    for item_numero, item in enumerate(venda.itens or [], start=1):
         if _ascii(item.tipo) != "produto" or not item.produto:
             raise DirectEmissionError(
                 "A emissão direta atual aceita somente itens de produto vinculados ao cadastro."
@@ -582,6 +583,30 @@ def build_payload(db, tenant, connection, venda, document_type):
                     ],
                 },
             )
+        if document_type == "nfce" and emitter.get("crt") == "1":
+            pendencias_cfop_csosn = pendencias_cfop_csosn_nfce(
+                fiscal,
+                {
+                    "produto_id": item.produto.id,
+                    "produto_nome": item.produto.nome,
+                    "produto_tipo": getattr(item.produto, "tipo_produto", None),
+                    "sku": _text(getattr(item.produto, "codigo", None))
+                    or str(item.produto.id),
+                },
+                emitter["endereco"]["uf"],
+                item_numero,
+            )
+            if pendencias_cfop_csosn:
+                raise DirectEmissionError(
+                    f"Item {item_numero}: CFOP não permitido para o CSOSN informado.",
+                    validation={
+                        "success": True,
+                        "pode_emitir": False,
+                        "requer_autorizacao": False,
+                        "correcoes": [],
+                        "bloqueios": pendencias_cfop_csosn,
+                    },
+                )
         if (
             emitter.get("crt") == "1"
             and destinatario_nao_contribuinte
