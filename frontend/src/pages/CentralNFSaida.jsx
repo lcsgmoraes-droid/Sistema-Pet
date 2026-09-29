@@ -134,6 +134,22 @@ export default function CentralNFSaida() {
     listaConsultasRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
   }, [consultasSessao.length]);
 
+  async function abrirNotaDiretaSeSolicitada(notasRecebidas) {
+    if (!abrirNotaInicial || notaDiretaAbertaRef.current) return;
+    const notaDireta = notasRecebidas.find(
+      (nota) =>
+        (vendaIdInicial && String(nota.venda_id || "") === vendaIdInicial) ||
+        (buscaInicial && String(nota.numero || "") === buscaInicial),
+    );
+    if (!notaDireta) return;
+    notaDiretaAbertaRef.current = true;
+    if (corrigirNotaInicial && notaDireta.status?.toLowerCase() === "rejeitada") {
+      await abrirCorrecao(notaDireta);
+    } else {
+      await abrirDetalhes(notaDireta);
+    }
+  }
+
   async function carregarNotas(forceRefresh = false) {
     if (forceRefresh) return atualizarLista(true);
     const requisicao = ++requisicaoListaRef.current;
@@ -154,21 +170,7 @@ export default function CentralNFSaida() {
       setNotas(notasRecebidas);
       setTotalNotas(response.data.total || 0);
       setCanais(response.data.canais || []);
-      if (abrirNotaInicial && !notaDiretaAbertaRef.current) {
-        const notaDireta = notasRecebidas.find(
-          (nota) =>
-            (vendaIdInicial && String(nota.venda_id || "") === vendaIdInicial) ||
-            (buscaInicial && String(nota.numero || "") === buscaInicial),
-        );
-        if (notaDireta) {
-          notaDiretaAbertaRef.current = true;
-          if (corrigirNotaInicial && notaDireta.status?.toLowerCase() === "rejeitada") {
-            await abrirCorrecao(notaDireta);
-          } else {
-            await abrirDetalhes(notaDireta);
-          }
-        }
-      }
+      await abrirNotaDiretaSeSolicitada(notasRecebidas);
     } catch {
       if (requisicao === requisicaoListaRef.current) setErro("Erro ao carregar notas fiscais");
     } finally {
