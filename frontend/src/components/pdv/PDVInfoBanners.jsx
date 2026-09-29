@@ -108,7 +108,9 @@ export default function PDVInfoBanners({
                 title="Abrir esta nota fiscal em uma nova aba"
               >
                 <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
-                {situacaoFiscal.status === "rejeitada" ? "Corrigir erro" : `Abrir ${situacaoFiscal.documento}`}
+                {situacaoFiscal.status === "rejeitada"
+                  ? "Corrigir erro"
+                  : `Abrir ${situacaoFiscal.documento}`}
               </a>
             )}
           </div>

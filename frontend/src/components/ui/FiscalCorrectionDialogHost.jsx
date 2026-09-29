@@ -163,7 +163,11 @@ function destinoPendenciaGeral(dialogo, gerais, rejeicao) {
   if (/empresa|emitente|regime tributário|regime tributario/.test(texto)) {
     return { url: "/configuracoes/fiscal", rotulo: "Abrir configuração fiscal da empresa" };
   }
-  if (/cliente|consumidor|destinatário|destinatario|cpf|cnpj|endereço|endereco|código ibge|codigo ibge/.test(texto)) {
+  if (
+    /cliente|consumidor|destinatário|destinatario|cpf|cnpj|endereço|endereco|código ibge|codigo ibge/.test(
+      texto,
+    )
+  ) {
     return { url: "/clientes", rotulo: "Abrir cadastro de clientes" };
   }
   if (dialogo?.vendaId) {
@@ -337,7 +341,10 @@ export default function FiscalCorrectionDialogHost() {
 
         <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-5">
           {(rejeicao?.motivo || rejeicao?.codigo) && (
-            <div className="rounded-xl border border-red-300 bg-red-50 p-4 text-sm text-red-900" role="alert">
+            <div
+              className="rounded-xl border border-red-300 bg-red-50 p-4 text-sm text-red-900"
+              role="alert"
+            >
               <p className="font-semibold">Erro informado na tentativa anterior</p>
               {rejeicao.codigo && <p className="mt-1">Código: {rejeicao.codigo}</p>}
               {rejeicao.motivo && <p className="mt-1">{rejeicao.motivo}</p>}
@@ -411,16 +418,23 @@ export default function FiscalCorrectionDialogHost() {
                   <div className="grid gap-4 md:grid-cols-2">
                     {produto.pendencias.map((item) => {
                       const campo = CAMPOS[item.campo];
-                      const opcoesBase = campo.tipo === "pis-cofins" ? OPCOES_PIS_COFINS : campo.opcoes;
-                      const opcoes = item.campo === "cst_icms" && contextoFiscal.regime_tributario && typeof contextoFiscal.simples_nacional === "boolean"
-                        ? opcoesBase.filter(([valor]) =>
-                            contextoFiscal.simples_nacional ? valor.length === 3 : valor.length === 2,
-                          )
-                        : opcoesBase;
+                      const opcoesBase =
+                        campo.tipo === "pis-cofins" ? OPCOES_PIS_COFINS : campo.opcoes;
+                      const opcoes =
+                        item.campo === "cst_icms" &&
+                        contextoFiscal.regime_tributario &&
+                        typeof contextoFiscal.simples_nacional === "boolean"
+                          ? opcoesBase.filter(([valor]) =>
+                              contextoFiscal.simples_nacional
+                                ? valor.length === 3
+                                : valor.length === 2,
+                            )
+                          : opcoesBase;
                       const confianca = CONFIANCA[item.confianca];
                       const campoId = `fiscal-${produto.id}-${item.campo}`;
                       const valorAtual = String(fiscal[item.campo] || "");
-                      const valorForaDaLista = valorAtual && !opcoes.some(([valor]) => valor === valorAtual);
+                      const valorForaDaLista =
+                        valorAtual && !opcoes.some(([valor]) => valor === valorAtual);
                       return (
                         <div key={item.campo} className="block">
                           <label
@@ -451,7 +465,11 @@ export default function FiscalCorrectionDialogHost() {
                               className="w-full rounded-xl border-2 border-red-400 bg-red-50 px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-red-600 focus:ring-2 focus:ring-red-600/20 dark:bg-slate-950 dark:text-slate-100"
                             >
                               <option value="">Selecione...</option>
-                              {valorForaDaLista && <option value={valorAtual}>{valorAtual} — valor atual inválido</option>}
+                              {valorForaDaLista && (
+                                <option value={valorAtual}>
+                                  {valorAtual} — valor atual inválido
+                                </option>
+                              )}
                               {opcoes.map(([valor, rotulo]) => (
                                 <option key={valor} value={valor}>
                                   {rotulo}
@@ -477,7 +495,10 @@ export default function FiscalCorrectionDialogHost() {
                               className="w-full rounded-xl border-2 border-red-400 bg-red-50 px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-red-600 focus:ring-2 focus:ring-red-600/20 dark:bg-slate-950 dark:text-slate-100"
                             />
                           )}
-                          <p id={`${campoId}-erro`} className="mt-1.5 text-xs font-medium leading-5 text-red-700">
+                          <p
+                            id={`${campoId}-erro`}
+                            className="mt-1.5 text-xs font-medium leading-5 text-red-700"
+                          >
                             {item.mensagem || item.motivo || "Confira este campo antes de emitir."}
                           </p>
                           {item.valor_sugerido ? (
@@ -533,8 +554,8 @@ export default function FiscalCorrectionDialogHost() {
           )}
           {!carregando && !temCamposDeProduto && agrupado.gerais.length === 0 && (
             <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
-              Os dados atuais passaram na validação, mas a rejeição anterior ainda precisa ser conferida.
-              Revise o motivo acima antes de tentar transmitir novamente.
+              Os dados atuais passaram na validação, mas a rejeição anterior ainda precisa ser
+              conferida. Revise o motivo acima antes de tentar transmitir novamente.
               {destinoGeral && (
                 <a href={destinoGeral.url} className="mt-3 block font-semibold underline">
                   {destinoGeral.rotulo}

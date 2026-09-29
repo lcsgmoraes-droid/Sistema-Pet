@@ -155,7 +155,9 @@ export default function NFSaidaList({
                         {getSituacaoIcone(nota.status)} {nota.status} · Corrigir erro
                       </button>
                     ) : (
-                      <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium ${getSituacaoCor(nota.status)}`}>
+                      <span
+                        className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium ${getSituacaoCor(nota.status)}`}
+                      >
                         {getSituacaoIcone(nota.status)} {nota.status || "Pendente"}
                       </span>
                     )}
