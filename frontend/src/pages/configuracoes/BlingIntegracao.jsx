@@ -150,7 +150,10 @@ export default function BlingIntegracao() {
     setRenovando(true);
     try {
       if (status.rate_limited) {
-        mostrarMensagem("info", "O Bling limitou as tentativas. Aguarde e teste a conexão novamente.");
+        mostrarMensagem(
+          "info",
+          "O Bling limitou as tentativas. Aguarde e teste a conexão novamente.",
+        );
         return;
       }
       if (!status.conectado) {
@@ -195,7 +198,10 @@ export default function BlingIntegracao() {
       setLoading(true);
       const statusAtual = await carregarStatus();
       if (statusAtual.rate_limited) {
-        mostrarMensagem("info", "O Bling limitou as tentativas. Aguarde antes de tentar novamente.");
+        mostrarMensagem(
+          "info",
+          "O Bling limitou as tentativas. Aguarde antes de tentar novamente.",
+        );
       } else if (statusAtual.conectado) {
         mostrarMensagem(
           "sucesso",
@@ -358,7 +364,11 @@ export default function BlingIntegracao() {
         <div className="space-y-3 text-sm">
           <p className="text-gray-700">
             <strong>Status:</strong>{" "}
-            {status.rate_limited ? "⏳ Temporariamente indisponível" : status.conectado ? "✅ Online" : "❌ Offline"}
+            {status.rate_limited
+              ? "⏳ Temporariamente indisponível"
+              : status.conectado
+                ? "✅ Online"
+                : "❌ Offline"}
           </p>
 
           <p className="text-gray-700">
