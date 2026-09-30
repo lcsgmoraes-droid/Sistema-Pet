@@ -34,6 +34,7 @@ from app.intnfe.emission import (
     local_document_details as local_intnfe_details,
     preview as preview_intnfe,
     reconcile as reconcile_intnfe,
+    rejected_technical_responsible_cnpj,
 )
 from app.intnfe.sharing import extrair_link_publico_nfce
 from app.intnfe.repository import get_connection, get_tenant
@@ -327,6 +328,26 @@ def status_intnfe_venda(
     api = _intnfe_client()
     try:
         return reconcile_intnfe(db, venda, api)
+    except DirectEmissionError as exc:
+        raise _direct_failure(exc) from None
+    finally:
+        api.close()
+
+
+@router.get("/vendas/{venda_id}/responsavel-tecnico")
+def responsavel_tecnico_intnfe_venda(
+    venda_id: int,
+    db: Session = Depends(get_session),
+    user_and_tenant=Depends(get_current_user_and_tenant),
+):
+    """Mostra apenas o CNPJ do fornecedor técnico da tentativa rejeitada."""
+    _user, tenant_id = user_and_tenant
+    venda = _buscar_venda_para_nfe(db, venda_id, tenant_id)
+    if not venda:
+        raise HTTPException(404, "Venda não encontrada")
+    api = _intnfe_client()
+    try:
+        return {"cnpj": rejected_technical_responsible_cnpj(db, venda, api)}
     except DirectEmissionError as exc:
         raise _direct_failure(exc) from None
     finally:

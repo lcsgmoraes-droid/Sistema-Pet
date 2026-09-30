@@ -194,6 +194,8 @@ export default function FiscalCorrectionDialogHost() {
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState("");
   const [regularizacaoConfirmada, setRegularizacaoConfirmada] = useState(false);
+  const [cnpjResponsavelTecnico, setCnpjResponsavelTecnico] = useState("");
+  const [erroConsultaCnpjTecnico, setErroConsultaCnpjTecnico] = useState(false);
 
   useEffect(() => assinarCorrecaoFiscal(setDialogo), []);
 
@@ -213,6 +215,24 @@ export default function FiscalCorrectionDialogHost() {
   const destinoGeral = destinoPendenciaGeral(dialogo, agrupado.gerais, rejeicao);
 
   useEffect(() => setRegularizacaoConfirmada(false), [dialogo?.id]);
+
+  useEffect(() => {
+    setCnpjResponsavelTecnico("");
+    setErroConsultaCnpjTecnico(false);
+    if (!dialogo?.vendaId || !erroResponsavelTecnico) return undefined;
+    let ativo = true;
+    api
+      .get(`/nfe/vendas/${dialogo.vendaId}/responsavel-tecnico`)
+      .then(({ data }) => {
+        if (ativo) setCnpjResponsavelTecnico(String(data?.cnpj || ""));
+      })
+      .catch(() => {
+        if (ativo) setErroConsultaCnpjTecnico(true);
+      });
+    return () => {
+      ativo = false;
+    };
+  }, [dialogo?.id, dialogo?.vendaId, erroResponsavelTecnico]);
 
   useEffect(() => {
     if (!dialogo) return undefined;
@@ -371,6 +391,18 @@ export default function FiscalCorrectionDialogHost() {
                 Receita/PR. O fornecedor informado no XML precisa ser autorizado no UPD e reconhecer
                 a empresa como usuária.
               </p>
+              {cnpjResponsavelTecnico && (
+                <p className="mt-2 font-semibold">
+                  CNPJ enviado no XML:{" "}
+                  {cnpjResponsavelTecnico.replace(
+                    /^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/,
+                    "$1.$2.$3/$4-$5",
+                  )}
+                </p>
+              )}
+              {erroConsultaCnpjTecnico && (
+                <p className="mt-2">Não foi possível consultar o CNPJ no XML agora.</p>
+              )}
               <a
                 href={RECEITA_PR_PORTAL_URL}
                 target="_blank"
@@ -380,8 +412,9 @@ export default function FiscalCorrectionDialogHost() {
                 Abrir Receita/PR para corrigir
               </a>
               <p className="mt-2 text-xs leading-5">
-                No portal: UPD → Autorização de Uso → Cadastro de Autorização de Uso. Confirme com o
-                fornecedor da emissão qual CNPJ foi informado como responsável técnico na nota.
+                No portal: UPD → Autorização de Uso → Cadastro de Autorização de Uso. Confira se o
+                fornecedor autorizado para esta empresa tem o CNPJ do responsável técnico informado
+                no XML. Se o número não aparecer acima, confirme-o com o fornecedor da emissão.
               </p>
               <label className="mt-4 flex items-start gap-2 font-medium">
                 <input
