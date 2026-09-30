@@ -650,6 +650,51 @@ def test_renovar_access_token_propaga_falha_ao_persistir(monkeypatch):
         api.renovar_access_token()
 
 
+def test_refresh_revogado_exige_reconexao_sem_novas_chamadas(monkeypatch):
+    api = _make_api()
+    api.tenant_id = "00000000-0000-0000-0000-000000000001"
+    api.client_id = "client-id"
+    api.client_secret = "client-secret"
+    api.refresh_token = "refresh-revogado"
+    state = {"reauthorization_required": False, "requests": 0}
+
+    class FakeResponse:
+        status_code = 400
+
+        def json(self):
+            return {"error": {"type": "invalid_grant"}}
+
+    def fake_post(*_args, **_kwargs):
+        state["requests"] += 1
+        return FakeResponse()
+
+    def fake_mark(**_kwargs):
+        state["reauthorization_required"] = True
+        return True
+
+    monkeypatch.setattr("requests.post", fake_post)
+    monkeypatch.setattr(
+        "app.bling_integration_parts.core._bling_token_lock", nullcontext
+    )
+    monkeypatch.setattr(
+        "app.bling_integration_parts.core._load_bling_runtime_config",
+        lambda **_kwargs: {
+            "refresh_token": "refresh-revogado",
+            "reauthorization_required": state["reauthorization_required"],
+        },
+    )
+    monkeypatch.setattr(
+        "app.services.bling_connection_service.mark_bling_reauthorization_required",
+        fake_mark,
+    )
+
+    with pytest.raises(ValueError, match="invalid_grant"):
+        api.renovar_access_token()
+    with pytest.raises(ValueError, match="reconectado"):
+        api.renovar_access_token()
+    assert state["requests"] == 1
+
+
 def test_payload_nfce_usa_serie_3_e_deixa_numero_para_sequencia_do_bling():
     api = _make_api()
     payload = api._montar_payload(_make_venda_nfce(), "nfce")

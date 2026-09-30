@@ -181,6 +181,7 @@ def _renovar_conexoes_bling() -> dict[str, int]:
     """Renova somente conexoes proximas do vencimento, isoladas por tenant."""
     from app.bling_integration import BlingAPI
     from app.services.bling_connection_service import (
+        BLING_REAUTH_REQUIRED,
         connected_bling_tenant_ids,
         get_bling_connection,
     )
@@ -200,6 +201,12 @@ def _renovar_conexoes_bling() -> dict[str, int]:
         try:
             with tenant_context(tenant_id):
                 connection = get_bling_connection(tenant_id)
+                if (
+                    connection
+                    and getattr(connection, "last_error", None) == BLING_REAUTH_REQUIRED
+                ):
+                    result["adiadas"] += 1
+                    continue
                 expires_at = connection.expires_at if connection else None
                 if expires_at and expires_at.tzinfo is None:
                     expires_at = expires_at.replace(tzinfo=timezone.utc)

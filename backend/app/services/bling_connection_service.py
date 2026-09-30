@@ -16,6 +16,9 @@ from app.db import SessionLocal
 from app.tenancy.context import get_current_tenant, tenant_context
 
 
+BLING_REAUTH_REQUIRED = "reauthorization_required"
+
+
 def _tenant_uuid(value: Any) -> UUID | None:
     try:
         return UUID(str(value)) if value else None
@@ -113,6 +116,7 @@ def load_bling_credentials(
         "expires_at": connection.expires_at,
         "last_refresh_at": connection.last_refresh_at,
         "renewal_count": int(connection.renewal_count or 0),
+        "reauthorization_required": connection.last_error == BLING_REAUTH_REQUIRED,
         "source": "tenant",
     }
 
@@ -321,6 +325,41 @@ def save_bling_tokens(
             session.commit()
             session.refresh(connection)
             return connection
+    except Exception:
+        session.rollback()
+        raise
+    finally:
+        if owns_session:
+            session.close()
+
+
+def mark_bling_reauthorization_required(
+    *, tenant_id: UUID | str, failed_refresh_token: str, db: Session | None = None
+) -> bool:
+    """Interrompe renovacoes de um refresh token revogado, sem apagar a conexao."""
+    resolved_tenant = _tenant_uuid(tenant_id)
+    if not resolved_tenant:
+        return False
+
+    owns_session = db is None
+    session = db or SessionLocal()
+    context = (
+        nullcontext(resolved_tenant)
+        if get_current_tenant() == resolved_tenant
+        else tenant_context(resolved_tenant)
+    )
+    try:
+        with context:
+            connection = (
+                session.query(BlingConnection)
+                .filter(BlingConnection.tenant_id == resolved_tenant)
+                .first()
+            )
+            if not connection or connection.refresh_token != failed_refresh_token:
+                return False
+            connection.last_error = BLING_REAUTH_REQUIRED
+            session.commit()
+            return True
     except Exception:
         session.rollback()
         raise

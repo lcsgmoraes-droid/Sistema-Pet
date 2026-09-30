@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import ast
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -155,3 +156,27 @@ async def test_testar_conexao_isola_tenant_sem_bling(monkeypatch):
     assert response["conectado"] is False
     assert response["status"] == "desconectado"
     assert response["total_produtos_bling"] == 0
+
+
+@pytest.mark.asyncio
+async def test_limite_temporario_nao_aparece_como_conectado(monkeypatch):
+    class FakeBlingAPI:
+        def listar_produtos(self, limite):
+            raise RuntimeError("Bling HTTP 429")
+
+    monkeypatch.setattr(bling_routes, "BlingAPI", FakeBlingAPI)
+    monkeypatch.setattr(
+        bling_routes,
+        "get_bling_connection",
+        lambda *_args, **_kwargs: SimpleNamespace(last_error=None),
+    )
+    monkeypatch.setattr(
+        bling_routes, "tenant_pode_usar_bling_global", lambda _tenant_id: False
+    )
+
+    response = await bling_routes.testar_conexao(
+        db=object(), user_and_tenant=(object(), "00000000-0000-0000-0000-000000000001")
+    )
+
+    assert response["conectado"] is False
+    assert response["rate_limited"] is True

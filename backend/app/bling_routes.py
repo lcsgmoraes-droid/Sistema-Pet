@@ -11,7 +11,10 @@ from sqlalchemy.orm import Session
 from app.db import get_session
 from app.auth.dependencies import get_current_user_and_tenant
 from app.bling_integration import BlingAPI
-from app.services.bling_connection_service import get_bling_connection
+from app.services.bling_connection_service import (
+    BLING_REAUTH_REQUIRED,
+    get_bling_connection,
+)
 from app.services.bling_tenant_guard import tenant_pode_usar_bling_global
 from app.bling_flow_monitor_routes import (
     corrigir_incidente as corrigir_incidente_monitor,
@@ -81,9 +84,16 @@ async def renovar_token(
     """
     try:
         _current_user, tenant_id = user_and_tenant
-        if not get_bling_connection(
-            tenant_id, db=db
-        ) and not tenant_pode_usar_bling_global(tenant_id):
+        connection = get_bling_connection(tenant_id, db=db)
+        if (
+            connection
+            and getattr(connection, "last_error", None) == BLING_REAUTH_REQUIRED
+        ):
+            raise HTTPException(
+                status_code=400,
+                detail="invalid_grant: reconecte o Bling nesta empresa.",
+            )
+        if not connection and not tenant_pode_usar_bling_global(tenant_id):
             raise HTTPException(
                 status_code=409,
                 detail="Bling nao conectado para esta empresa. Inicie a autorizacao OAuth.",
@@ -113,6 +123,13 @@ async def testar_conexao(
     _current_user, tenant_id = user_and_tenant
     connection = get_bling_connection(tenant_id, db=db)
     legacy_allowed = tenant_pode_usar_bling_global(tenant_id)
+    if connection and getattr(connection, "last_error", None) == BLING_REAUTH_REQUIRED:
+        return {
+            "conectado": False,
+            "status": "reautorizacao_necessaria",
+            "message": "A conexao com o Bling precisa de uma nova autorizacao.",
+            "detail": "Use o botao Reconectar Bling.",
+        }
     if not connection and not legacy_allowed:
         return {
             "conectado": False,
@@ -163,10 +180,10 @@ async def testar_conexao(
             or "Limite de requisi" in error_msg
         ):
             return {
-                "conectado": True,
+                "conectado": False,
                 "rate_limited": True,
-                "message": "Conexao com o Bling valida, mas a API pediu uma pausa temporaria.",
-                "detail": "A API do Bling respondeu com limite temporario de requisicoes. Isso nao significa token vencido.",
+                "message": "O Bling limitou temporariamente as requisicoes.",
+                "detail": "Nao foi possivel confirmar a conexao agora. Aguarde e teste novamente.",
             }
         if (
             "401" in error_msg
