@@ -72,6 +72,7 @@ def _erro_autenticacao_bling(valor: Any) -> bool:
         or "unauthorized" in mensagem
         or "401 client error" in mensagem
         or "token expirado" in mensagem
+        or "bling precisa ser reconectado" in mensagem
     )
 
 
