@@ -98,6 +98,7 @@ function ActivationPanel() {
     <div className="space-y-6">
       <IntNFeAtivacaoView
         data={data}
+        environment={environmentData}
         busy={busy || numberingBusy || cscBusy || certificateBusy || fiscalBusy || environmentBusy}
         error={error}
         credentials={credentials}

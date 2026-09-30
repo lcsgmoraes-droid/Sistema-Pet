@@ -1,4 +1,5 @@
 import { FiCheckCircle, FiChevronDown, FiCircle, FiInfo } from "react-icons/fi";
+import { resolveEmissionState } from "./intnfeEmissionState.mjs";
 
 function Step({ label, description, done, action = false }) {
   const Icon = done ? FiCheckCircle : action ? FiInfo : FiCircle;
@@ -32,11 +33,12 @@ export default function IntNFeChecklist({
   const companyReady = Boolean(activation && activation.pendencias?.length === 0);
   const fiscalReady = Boolean(fiscal?.sincronizado);
   const certificateReady = ["valido", "expirando"].includes(certificate?.situacao);
-  const cscHomologation = Boolean(
-    csc?.ambientes?.find((item) => item.ambiente_codigo === 2)?.tem_csc,
+  const emission = resolveEmissionState(activation, environment);
+  const cscReady = Boolean(
+    csc?.ambientes?.find((item) => item.ambiente_codigo === emission.code)?.tem_csc,
   );
   const knownSequences = numbering?.series?.length || 0;
-  const emissionReady = Boolean(environment?.habilitada);
+  const emissionReady = emission.enabled;
 
   return (
     <details className="group rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
@@ -87,13 +89,13 @@ export default function IntNFeChecklist({
           done={certificateReady}
         />
         <Step
-          label="CSC para NFC-e"
+          label={`CSC para NFC-e (${emission.label})`}
           description={
-            cscHomologation
-              ? "CSC de homologação cadastrado."
-              : "Necessário somente para NFC-e; obtenha o código na SEFAZ."
+            cscReady
+              ? `CSC de ${emission.label} cadastrado.`
+              : `Necessário somente para NFC-e em ${emission.label}; obtenha o código na SEFAZ.`
           }
-          done={cscHomologation}
+          done={cscReady}
         />
         <Step
           label="Sequências por modelo e ambiente"
@@ -105,7 +107,7 @@ export default function IntNFeChecklist({
           label="Ambiente de emissão"
           description={
             emissionReady
-              ? `Emissão direta ativa em ${environment.ambiente}.`
+              ? `Emissão direta ativa em ${emission.label}.`
               : "Escolha homologação ou produção para liberar a transmissão pelo CorePet."
           }
           done={emissionReady}

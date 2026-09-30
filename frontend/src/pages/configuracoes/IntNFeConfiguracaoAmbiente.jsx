@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { FiAlertTriangle, FiCheckCircle } from "react-icons/fi";
 import IntNFeAmbienteEmissao from "./IntNFeAmbienteEmissao.jsx";
 import IntNFeCsc from "./IntNFeCsc.jsx";
@@ -23,6 +23,7 @@ export default function IntNFeConfiguracaoAmbiente({
   const [choices, setChoices] = useState(initialChoices);
   const [numberingData, setNumberingData] = useState(null);
   const [environmentData, setEnvironmentData] = useState(null);
+  const initialEnvironmentLoaded = useRef(false);
 
   const chooseSequence = useCallback(
     ({ modelo, serie, proximoNumero, pendente = false }) => {
@@ -67,6 +68,12 @@ export default function IntNFeConfiguracaoAmbiente({
 
   const updateEnvironmentData = useCallback(
     (data) => {
+      if (!initialEnvironmentLoaded.current) {
+        initialEnvironmentLoaded.current = true;
+        if (data?.habilitada && [1, 2].includes(data.ambiente_codigo)) {
+          setEnvironment(data.ambiente_codigo);
+        }
+      }
       setEnvironmentData(data);
       onEnvironmentData?.(data);
     },

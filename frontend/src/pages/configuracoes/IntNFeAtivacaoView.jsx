@@ -1,10 +1,11 @@
 import { FiCheckCircle, FiFileText, FiRefreshCw } from "react-icons/fi";
 import { Link } from "react-router-dom";
+import { resolveEmissionState } from "./intnfeEmissionState.mjs";
 
 const buttonClass =
   "inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-blue-500";
 
-function nextAction(data) {
+function nextAction(data, emission) {
   const pendingCompanyData = data?.pendencias || [];
 
   if (pendingCompanyData.length) {
@@ -32,15 +33,25 @@ function nextAction(data) {
       description: "Envie ou confira o certificado na seção logo abaixo.",
     };
   }
+  if (emission.enabled) {
+    return {
+      title: `Emissão em ${emission.label} habilitada`,
+      description:
+        emission.code === 1
+          ? "O CorePet está configurado para transmitir notas em produção. Cada nota precisa ser autorizada pela SEFAZ para ter validade fiscal."
+          : "O CorePet está configurado para transmitir notas de teste, sem valor fiscal.",
+      done: true,
+    };
+  }
   return {
-    title: "Continue pelas configurações pendentes",
-    description: "O vínculo inicial está pronto. Configure somente os itens indicados abaixo.",
-    done: true,
+    title: "Escolha o ambiente de emissão",
+    description: "O vínculo inicial está pronto. Ative a emissão na seção Configuração por ambiente.",
   };
 }
 
 export default function IntNFeAtivacaoView({
   data,
+  environment,
   busy,
   error,
   credentials,
@@ -50,7 +61,8 @@ export default function IntNFeAtivacaoView({
   onBind,
   onReload,
 }) {
-  const action = data ? nextAction(data) : null;
+  const emission = resolveEmissionState(data, environment);
+  const action = data ? nextAction(data, emission) : null;
 
   return (
     <section
@@ -65,13 +77,25 @@ export default function IntNFeAtivacaoView({
               Emissão de notas com a IntNFe
             </h2>
             <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
-              Prepare sua empresa para os testes de NF-e e NFC-e de produtos.
+              {data
+                ? emission.description
+                : "Consulte a situação da emissão de NF-e e NFC-e desta empresa."}
             </p>
           </div>
         </div>
-        <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-900">
-          Ativação em teste · sem valor fiscal
-        </span>
+        {data && (
+          <span
+            className={`rounded-full px-3 py-1 text-xs font-semibold ${
+              emission.enabled && emission.code === 1
+                ? "bg-emerald-100 text-emerald-900"
+                : emission.enabled
+                  ? "bg-amber-100 text-amber-900"
+                  : "bg-slate-100 text-slate-700"
+            }`}
+          >
+            {emission.badge}
+          </span>
+        )}
       </header>
 
       {error && (
@@ -133,7 +157,7 @@ export default function IntNFeAtivacaoView({
               {action.done && <FiCheckCircle className="mt-0.5 shrink-0" aria-hidden="true" />}
               <div>
                 <p className="text-xs font-bold uppercase tracking-wide opacity-70">
-                  {action.done ? "Etapa inicial concluída" : "Próximo passo"}
+                  {action.done ? "Situação da emissão" : "Próximo passo"}
                 </p>
                 <p className="mt-1 font-semibold">{action.title}</p>
                 <p className="mt-1">{action.description}</p>

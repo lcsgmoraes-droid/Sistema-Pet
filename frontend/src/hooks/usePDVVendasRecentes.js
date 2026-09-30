@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import api from "../api";
 import { listarVendas } from "../api/vendas";
 import { debugLog } from "../utils/debug";
+import { getTipoDevolucaoVenda } from "../utils/pdvReturnEligibility";
 import { useModulos } from "../contexts/ModulosContext";
 
 export function usePDVVendasRecentes() {
@@ -58,10 +59,14 @@ export function usePDVVendasRecentes() {
       const resultado = await listarVendas(params);
       let vendas = resultado.vendas || [];
       if (filtroStatus === "pago") {
-        vendas = vendas.filter((venda) => venda.status_pagamento === "pago");
+        vendas = vendas.filter(
+          (venda) => !getTipoDevolucaoVenda(venda) && venda.status_pagamento === "pago",
+        );
       } else if (filtroStatus === "aberta") {
-        vendas = vendas.filter((venda) =>
-          ["em_aberto", "parcial"].includes(venda.status_pagamento || venda.status),
+        vendas = vendas.filter(
+          (venda) =>
+            !getTipoDevolucaoVenda(venda) &&
+            ["em_aberto", "parcial"].includes(venda.status_pagamento || venda.status),
         );
       }
       setVendasRecentes(vendas);
