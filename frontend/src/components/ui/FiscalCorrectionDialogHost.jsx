@@ -6,6 +6,10 @@ import {
   resolverCorrecaoFiscal,
 } from "../../services/fiscalCorrectionDialog";
 import FiscalReferenceSearch from "./FiscalReferenceSearch";
+import {
+  RECEITA_PR_PORTAL_URL,
+  rejeicaoResponsavelTecnico,
+} from "../../utils/fiscalRejectionGuidance.mjs";
 
 const CAMPOS = {
   ncm: { rotulo: "NCM", tipo: "texto", placeholder: "8 dígitos", tamanho: 8 },
@@ -154,6 +158,9 @@ function mensagemErroApi(error) {
 }
 
 function destinoPendenciaGeral(dialogo, gerais, rejeicao) {
+  if (rejeicaoResponsavelTecnico(rejeicao)) {
+    return { url: RECEITA_PR_PORTAL_URL, rotulo: "Abrir Receita/PR para autorizar o fornecedor" };
+  }
   const texto = [rejeicao?.motivo, ...gerais.map((item) => item.mensagem)]
     .filter(Boolean)
     .join(" ")
@@ -186,6 +193,7 @@ export default function FiscalCorrectionDialogHost() {
   const [carregando, setCarregando] = useState(false);
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState("");
+  const [regularizacaoConfirmada, setRegularizacaoConfirmada] = useState(false);
 
   useEffect(() => assinarCorrecaoFiscal(setDialogo), []);
 
@@ -201,7 +209,10 @@ export default function FiscalCorrectionDialogHost() {
   const contextoFiscal = dialogo?.validacao?.contexto_fiscal || {};
   const temCamposDeProduto = agrupado.produtos.length > 0;
   const rejeicao = dialogo?.rejeicao || dialogo?.validacao?.rejeicao;
+  const erroResponsavelTecnico = rejeicaoResponsavelTecnico(rejeicao);
   const destinoGeral = destinoPendenciaGeral(dialogo, agrupado.gerais, rejeicao);
+
+  useEffect(() => setRegularizacaoConfirmada(false), [dialogo?.id]);
 
   useEffect(() => {
     if (!dialogo) return undefined;
@@ -349,6 +360,38 @@ export default function FiscalCorrectionDialogHost() {
               <p className="font-semibold">Erro informado na tentativa anterior</p>
               {rejeicao.codigo && <p className="mt-1">Código: {rejeicao.codigo}</p>}
               {rejeicao.motivo && <p className="mt-1">{rejeicao.motivo}</p>}
+            </div>
+          )}
+          {erroResponsavelTecnico && (
+            <div className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950">
+              <p className="font-semibold">O CPF da cliente não causou esta rejeição.</p>
+              <p className="mt-2 leading-6">
+                O código 974 indica que o CNPJ do fornecedor responsável pelo sistema emissor
+                informado na nota não corresponde ao fornecedor autorizado para esta empresa na
+                Receita/PR. O fornecedor informado no XML precisa ser autorizado no UPD e reconhecer
+                a empresa como usuária.
+              </p>
+              <a
+                href={RECEITA_PR_PORTAL_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-3 inline-flex rounded-lg bg-amber-900 px-4 py-2.5 font-semibold text-white hover:bg-amber-950"
+              >
+                Abrir Receita/PR para corrigir
+              </a>
+              <p className="mt-2 text-xs leading-5">
+                No portal: UPD → Autorização de Uso → Cadastro de Autorização de Uso. Confirme com o
+                fornecedor da emissão qual CNPJ foi informado como responsável técnico na nota.
+              </p>
+              <label className="mt-4 flex items-start gap-2 font-medium">
+                <input
+                  type="checkbox"
+                  checked={regularizacaoConfirmada}
+                  onChange={(event) => setRegularizacaoConfirmada(event.target.checked)}
+                  className="mt-1"
+                />
+                A autorização do fornecedor foi concluída e reconhecida no Receita/PR.
+              </label>
             </div>
           )}
           {carregando && (
@@ -555,24 +598,27 @@ export default function FiscalCorrectionDialogHost() {
                   <li key={`${item.campo}-${index}`}>• {item.mensagem || item.campo}</li>
                 ))}
               </ul>
-              {destinoGeral && (
+              {destinoGeral && !erroResponsavelTecnico && (
                 <a href={destinoGeral.url} className="mt-3 inline-block font-semibold underline">
                   {destinoGeral.rotulo}
                 </a>
               )}
             </div>
           )}
-          {!carregando && !temCamposDeProduto && agrupado.gerais.length === 0 && (
-            <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
-              Os dados atuais passaram na validação, mas a rejeição anterior ainda precisa ser
-              conferida. Revise o motivo acima antes de tentar transmitir novamente.
-              {destinoGeral && (
-                <a href={destinoGeral.url} className="mt-3 block font-semibold underline">
-                  {destinoGeral.rotulo}
-                </a>
-              )}
-            </div>
-          )}
+          {!carregando &&
+            !temCamposDeProduto &&
+            agrupado.gerais.length === 0 &&
+            !erroResponsavelTecnico && (
+              <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+                Os dados atuais passaram na validação, mas a rejeição anterior ainda precisa ser
+                conferida. Revise o motivo acima antes de tentar transmitir novamente.
+                {destinoGeral && (
+                  <a href={destinoGeral.url} className="mt-3 block font-semibold underline">
+                    {destinoGeral.rotulo}
+                  </a>
+                )}
+              </div>
+            )}
 
           {erro && (
             <div className="whitespace-pre-line rounded-xl border border-red-200 bg-red-50 p-3 text-sm font-medium text-red-700 dark:border-red-800 dark:bg-red-950/30 dark:text-red-200">
@@ -601,7 +647,9 @@ export default function FiscalCorrectionDialogHost() {
               <button
                 type="button"
                 onClick={salvarETentarNovamente}
-                disabled={carregando || salvando}
+                disabled={
+                  carregando || salvando || (erroResponsavelTecnico && !regularizacaoConfirmada)
+                }
                 className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {salvando && <Loader2 className="h-4 w-4 animate-spin" />}
@@ -614,9 +662,12 @@ export default function FiscalCorrectionDialogHost() {
               <button
                 type="button"
                 onClick={() => resolverCorrecaoFiscal(true)}
-                className="rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700"
+                disabled={erroResponsavelTecnico && !regularizacaoConfirmada}
+                className="rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                Verificar correção e tentar novamente
+                {erroResponsavelTecnico
+                  ? "Já regularizei: tentar emitir novamente"
+                  : "Verificar correção e tentar novamente"}
               </button>
             )}
           </div>

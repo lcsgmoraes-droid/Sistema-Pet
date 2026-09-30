@@ -135,11 +135,12 @@ def test_unknown_rejection_is_not_retried_when_payload_did_not_change(monkeypatc
     assert sale.nfe_status == "rejeitada"
 
 
-def test_provider_rejection_963_can_retry_after_emitter_fix_without_payload_change(
-    monkeypatch,
+@pytest.mark.parametrize("rejection_code", ["963", "974"])
+def test_provider_rejection_can_retry_after_external_fix_without_payload_change(
+    monkeypatch, rejection_code
 ):
     db = FakeDb()
-    sale = rejected_sale("963")
+    sale = rejected_sale(rejection_code)
     issued = []
     monkeypatch.setattr(
         recovery,
@@ -171,7 +172,7 @@ def test_provider_rejection_963_can_retry_after_emitter_fix_without_payload_chan
 
     assert result["success"] is True
     assert issued == [True]
-    assert any("rejeição 963" in item for item in result["correcoes_aplicadas"])
+    assert any(f"rejeição {rejection_code}" in item for item in result["correcoes_aplicadas"])
     assert sale.nfe_status is None
     assert db.commits == 1
 

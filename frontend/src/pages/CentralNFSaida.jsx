@@ -19,6 +19,7 @@ import {
 } from "../utils/nfeFiscalAssistida";
 import { solicitarCorrecaoFiscal } from "../services/fiscalCorrectionDialog";
 import { metadadosDownloadDanfe } from "../utils/documentoFiscalDownload.mjs";
+import { rejeicaoResponsavelTecnico } from "../utils/fiscalRejectionGuidance.mjs";
 import NFSaidaCompartilharModal from "./centralNFSaida/NFSaidaCompartilharModal";
 
 function salvarArquivo(blob, nome) {
@@ -267,7 +268,14 @@ export default function CentralNFSaida() {
     }
   }
 
-  async function corrigirEReemitir(nota) {
+  async function corrigirEReemitir(nota, { correcaoConcluida = false } = {}) {
+    if (
+      !correcaoConcluida &&
+      rejeicaoResponsavelTecnico({ codigo: nota?.codigo_erro, motivo: nota?.motivo_rejeicao })
+    ) {
+      await abrirCorrecao(nota);
+      return;
+    }
     const vendaId = nota?.venda_id;
     if (!vendaId) {
       alert("Não foi possível identificar a venda desta nota.");
@@ -326,7 +334,7 @@ export default function CentralNFSaida() {
         const revisao = await prevalidarNotaFiscal({ vendaId, tipoNota });
         if (!temPendenciasFiscais(revisao)) {
           fecharDetalhes();
-          await corrigirEReemitir(nota);
+          await corrigirEReemitir(nota, { correcaoConcluida: true });
           return;
         }
       }
