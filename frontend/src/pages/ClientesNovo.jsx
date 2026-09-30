@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { AlertCircle, UsersRound } from "lucide-react";
 import toast from "react-hot-toast";
@@ -126,6 +126,42 @@ const Pessoas = () => {
     error,
     setError,
   });
+  const edicaoPorUrlEmAndamento = useRef(false);
+  const clienteIdEdicaoPorUrl = searchParams.get("editar_cliente");
+  const etapaEdicaoPorUrl = searchParams.get("etapa");
+
+  useEffect(() => {
+    if (!clienteIdEdicaoPorUrl || edicaoPorUrlEmAndamento.current) return;
+    edicaoPorUrlEmAndamento.current = true;
+    let ativo = true;
+    api
+      .get(`/clientes/${encodeURIComponent(clienteIdEdicaoPorUrl)}`)
+      .then(({ data }) => {
+        if (!ativo) return;
+        cadastro.openModal(data);
+        cadastro.setCurrentStep(etapaEdicaoPorUrl === "3" ? 3 : 1);
+      })
+      .catch(() => {
+        if (ativo) toast.error("Não foi possível abrir o cadastro deste cliente.");
+      })
+      .finally(() => {
+        if (!ativo) return;
+        setSearchParams(
+          (atuais) => {
+            const proximos = new URLSearchParams(atuais);
+            proximos.delete("editar_cliente");
+            proximos.delete("etapa");
+            return proximos;
+          },
+          { replace: true },
+        );
+        edicaoPorUrlEmAndamento.current = false;
+      });
+    return () => {
+      ativo = false;
+      edicaoPorUrlEmAndamento.current = false;
+    };
+  }, [clienteIdEdicaoPorUrl, etapaEdicaoPorUrl, setSearchParams]);
 
   const handleDelete = async (id) => {
     if (!(await confirmarCorePet("Tem certeza que deseja excluir este cliente?"))) return;

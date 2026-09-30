@@ -158,7 +158,7 @@ function mensagemErroApi(error) {
   );
 }
 
-function destinoPendenciaGeral(dialogo, gerais, rejeicao) {
+function destinoPendenciaGeral(dialogo, gerais, rejeicao, clienteId) {
   const texto = [rejeicao?.motivo, ...gerais.map((item) => item.mensagem)]
     .filter(Boolean)
     .join(" ")
@@ -174,6 +174,13 @@ function destinoPendenciaGeral(dialogo, gerais, rejeicao) {
       texto,
     )
   ) {
+    if (clienteId) {
+      const etapa = /endereço|endereco|cep|ibge|município|municipio/.test(texto) ? 3 : 1;
+      return {
+        url: `/clientes?editar_cliente=${encodeURIComponent(clienteId)}&etapa=${etapa}`,
+        rotulo: etapa === 3 ? "Corrigir endereço deste cliente" : "Corrigir cadastro deste cliente",
+      };
+    }
     return { url: "/clientes", rotulo: "Abrir cadastro de clientes" };
   }
   if (dialogo?.vendaId) {
@@ -234,6 +241,7 @@ export default function FiscalCorrectionDialogHost() {
   const [carregando, setCarregando] = useState(false);
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState("");
+  const [clienteDestino, setClienteDestino] = useState(null);
 
   useEffect(() => assinarCorrecaoFiscal(setDialogo), []);
 
@@ -250,7 +258,31 @@ export default function FiscalCorrectionDialogHost() {
   const temCamposDeProduto = agrupado.produtos.length > 0;
   const rejeicao = dialogo?.rejeicao || dialogo?.validacao?.rejeicao;
   const erroResponsavelTecnico = rejeicaoResponsavelTecnico(rejeicao);
-  const destinoGeral = destinoPendenciaGeral(dialogo, agrupado.gerais, rejeicao);
+  const destinoBase = destinoPendenciaGeral(dialogo, agrupado.gerais, rejeicao);
+  const clienteResolvido =
+    Boolean(dialogo?.vendaId) && String(clienteDestino?.vendaId) === String(dialogo.vendaId);
+  const clienteId = clienteResolvido ? clienteDestino?.clienteId : null;
+  const aguardandoCliente =
+    destinoBase?.url === "/clientes" && dialogo?.vendaId && !clienteResolvido;
+  const destinoGeral = destinoPendenciaGeral(dialogo, agrupado.gerais, rejeicao, clienteId);
+
+  useEffect(() => {
+    if (!dialogo?.vendaId || destinoBase?.url !== "/clientes" || erroResponsavelTecnico) {
+      return undefined;
+    }
+    let ativo = true;
+    api
+      .get(`/vendas/${dialogo.vendaId}`)
+      .then(({ data }) => {
+        if (ativo) setClienteDestino({ vendaId: dialogo.vendaId, clienteId: data?.cliente_id });
+      })
+      .catch(() => {
+        if (ativo) setClienteDestino({ vendaId: dialogo.vendaId, clienteId: null });
+      });
+    return () => {
+      ativo = false;
+    };
+  }, [dialogo?.vendaId, destinoBase?.url, erroResponsavelTecnico]);
 
   useEffect(() => {
     if (!dialogo || erroResponsavelTecnico) return undefined;
@@ -605,7 +637,7 @@ export default function FiscalCorrectionDialogHost() {
                   <li key={`${item.campo}-${index}`}>• {item.mensagem || item.campo}</li>
                 ))}
               </ul>
-              {destinoGeral && (
+              {destinoGeral && !aguardandoCliente && (
                 <a href={destinoGeral.url} className="mt-3 inline-block font-semibold underline">
                   {destinoGeral.rotulo}
                 </a>
@@ -616,7 +648,7 @@ export default function FiscalCorrectionDialogHost() {
             <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
               Os dados atuais passaram na validação, mas a rejeição anterior ainda precisa ser
               conferida. Revise o motivo acima antes de tentar transmitir novamente.
-              {destinoGeral && (
+              {destinoGeral && !aguardandoCliente && (
                 <a href={destinoGeral.url} className="mt-3 block font-semibold underline">
                   {destinoGeral.rotulo}
                 </a>
