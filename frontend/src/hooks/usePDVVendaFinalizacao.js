@@ -10,6 +10,7 @@ import {
   extrairAcaoCorrecaoFiscal,
   extrairMensagemNFe,
 } from "../utils/nfeFiscalAssistida";
+import { rejeicaoResponsavelTecnico } from "../utils/fiscalRejectionGuidance.mjs";
 import { confirmarCorePet, perguntarCorePet } from "../services/corepetDialog";
 
 async function carregarPagamentosDaVenda(vendaId) {
@@ -250,7 +251,14 @@ export function usePDVVendaFinalizacao({
       console.error("Erro ao emitir nota da venda finalizada:", error);
       const mensagem = extrairMensagemNFe(error);
       if (error?.recuperacaoNFe?.vendaId) {
-        if (await confirmarCorePet(`${mensagem}\n\nAbrir a tela de correção desta nota agora?`)) {
+        const suporte = rejeicaoResponsavelTecnico({
+          codigo: error.recuperacaoNFe.codigoErro,
+          motivo: error.recuperacaoNFe.motivo,
+        });
+        const pergunta = suporte
+          ? "Abrir a orientação de suporte desta nota agora?"
+          : "Abrir a tela de correção desta nota agora?";
+        if (await confirmarCorePet(`${mensagem}\n\n${pergunta}`)) {
           const params = new URLSearchParams({
             abrir: "1",
             venda_id: String(error.recuperacaoNFe.vendaId),

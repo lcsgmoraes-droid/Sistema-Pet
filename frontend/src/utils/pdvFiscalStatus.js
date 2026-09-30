@@ -1,3 +1,8 @@
+import {
+  MENSAGEM_SUPORTE_RESPONSAVEL_TECNICO,
+  rejeicaoResponsavelTecnico,
+} from "./fiscalRejectionGuidance.mjs";
+
 const CAMPOS_FISCAIS_VENDA = [
   "nfe_tipo",
   "nfe_modelo",
@@ -78,8 +83,17 @@ export function obterSituacaoFiscalVenda(venda = {}) {
   };
   const referencia = `${documento}${numero ? ` nº ${numero}` : ""}`;
   const detalhes = [];
-  if (venda.nfe_codigo_erro) detalhes.push(`Código ${venda.nfe_codigo_erro}`);
-  if (venda.nfe_motivo_rejeicao) detalhes.push(String(venda.nfe_motivo_rejeicao));
+  if (
+    rejeicaoResponsavelTecnico({
+      codigo: venda.nfe_codigo_erro,
+      motivo: venda.nfe_motivo_rejeicao,
+    })
+  ) {
+    detalhes.push(MENSAGEM_SUPORTE_RESPONSAVEL_TECNICO);
+  } else {
+    if (venda.nfe_codigo_erro) detalhes.push(`Código ${venda.nfe_codigo_erro}`);
+    if (venda.nfe_motivo_rejeicao) detalhes.push(String(venda.nfe_motivo_rejeicao));
+  }
 
   return {
     documento,

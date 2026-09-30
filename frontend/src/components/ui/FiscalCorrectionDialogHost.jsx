@@ -6,6 +6,11 @@ import {
   resolverCorrecaoFiscal,
 } from "../../services/fiscalCorrectionDialog";
 import FiscalReferenceSearch from "./FiscalReferenceSearch";
+import {
+  MENSAGEM_SUPORTE_RESPONSAVEL_TECNICO,
+  rejeicaoResponsavelTecnico,
+  SUPORTE_FISCAL_COREPET_URL,
+} from "../../utils/fiscalRejectionGuidance.mjs";
 
 const CAMPOS = {
   ncm: { rotulo: "NCM", tipo: "texto", placeholder: "8 dígitos", tamanho: 8 },
@@ -153,7 +158,7 @@ function mensagemErroApi(error) {
   );
 }
 
-function destinoPendenciaGeral(dialogo, gerais, rejeicao) {
+function destinoPendenciaGeral(dialogo, gerais, rejeicao, clienteId) {
   const texto = [rejeicao?.motivo, ...gerais.map((item) => item.mensagem)]
     .filter(Boolean)
     .join(" ")
@@ -169,6 +174,13 @@ function destinoPendenciaGeral(dialogo, gerais, rejeicao) {
       texto,
     )
   ) {
+    if (clienteId) {
+      const etapa = /endereço|endereco|cep|ibge|município|municipio/.test(texto) ? 3 : 1;
+      return {
+        url: `/clientes?editar_cliente=${encodeURIComponent(clienteId)}&etapa=${etapa}`,
+        rotulo: etapa === 3 ? "Corrigir endereço deste cliente" : "Corrigir cadastro deste cliente",
+      };
+    }
     return { url: "/clientes", rotulo: "Abrir cadastro de clientes" };
   }
   if (dialogo?.vendaId) {
@@ -180,12 +192,56 @@ function destinoPendenciaGeral(dialogo, gerais, rejeicao) {
   return null;
 }
 
+function FiscalSupportDialog({ fechar }) {
+  return (
+    <div className="fixed inset-0 z-[140] flex items-center justify-center bg-slate-950/55 p-3 backdrop-blur-sm">
+      <section
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="fiscal-support-title"
+        className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl dark:bg-slate-900"
+      >
+        <h2
+          id="fiscal-support-title"
+          className="text-lg font-semibold text-slate-900 dark:text-slate-100"
+        >
+          Não foi possível emitir esta nota
+        </h2>
+        <p className="mt-3 text-sm leading-6 text-slate-700 dark:text-slate-200">
+          {MENSAGEM_SUPORTE_RESPONSAVEL_TECNICO}
+        </p>
+        <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
+          O suporte precisa verificar a integração fiscal antes de uma nova tentativa.
+        </p>
+        <div className="mt-6 flex flex-wrap justify-end gap-2">
+          <button
+            type="button"
+            onClick={fechar}
+            className="rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-700 dark:border-slate-700 dark:text-slate-200"
+          >
+            Fechar
+          </button>
+          <a
+            href={SUPORTE_FISCAL_COREPET_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700"
+          >
+            Falar com o suporte
+          </a>
+        </div>
+      </section>
+    </div>
+  );
+}
+
 export default function FiscalCorrectionDialogHost() {
   const [dialogo, setDialogo] = useState(null);
   const [formularios, setFormularios] = useState({});
   const [carregando, setCarregando] = useState(false);
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState("");
+  const [clienteDestino, setClienteDestino] = useState(null);
 
   useEffect(() => assinarCorrecaoFiscal(setDialogo), []);
 
@@ -201,10 +257,35 @@ export default function FiscalCorrectionDialogHost() {
   const contextoFiscal = dialogo?.validacao?.contexto_fiscal || {};
   const temCamposDeProduto = agrupado.produtos.length > 0;
   const rejeicao = dialogo?.rejeicao || dialogo?.validacao?.rejeicao;
-  const destinoGeral = destinoPendenciaGeral(dialogo, agrupado.gerais, rejeicao);
+  const erroResponsavelTecnico = rejeicaoResponsavelTecnico(rejeicao);
+  const destinoBase = destinoPendenciaGeral(dialogo, agrupado.gerais, rejeicao);
+  const clienteResolvido =
+    Boolean(dialogo?.vendaId) && String(clienteDestino?.vendaId) === String(dialogo.vendaId);
+  const clienteId = clienteResolvido ? clienteDestino?.clienteId : null;
+  const aguardandoCliente =
+    destinoBase?.url === "/clientes" && dialogo?.vendaId && !clienteResolvido;
+  const destinoGeral = destinoPendenciaGeral(dialogo, agrupado.gerais, rejeicao, clienteId);
 
   useEffect(() => {
-    if (!dialogo) return undefined;
+    if (!dialogo?.vendaId || destinoBase?.url !== "/clientes" || erroResponsavelTecnico) {
+      return undefined;
+    }
+    let ativo = true;
+    api
+      .get(`/vendas/${dialogo.vendaId}`)
+      .then(({ data }) => {
+        if (ativo) setClienteDestino({ vendaId: dialogo.vendaId, clienteId: data?.cliente_id });
+      })
+      .catch(() => {
+        if (ativo) setClienteDestino({ vendaId: dialogo.vendaId, clienteId: null });
+      });
+    return () => {
+      ativo = false;
+    };
+  }, [dialogo?.vendaId, destinoBase?.url, erroResponsavelTecnico]);
+
+  useEffect(() => {
+    if (!dialogo || erroResponsavelTecnico) return undefined;
     let ativo = true;
     setCarregando(true);
     setErro("");
@@ -230,11 +311,12 @@ export default function FiscalCorrectionDialogHost() {
     return () => {
       ativo = false;
     };
-  }, [dialogo, agrupado.produtos]);
+  }, [dialogo, agrupado.produtos, erroResponsavelTecnico]);
 
   if (!dialogo) return null;
 
   const fechar = () => resolverCorrecaoFiscal(false);
+  if (erroResponsavelTecnico) return <FiscalSupportDialog fechar={fechar} />;
   const atualizarCampo = (produtoId, campo, valor) => {
     setFormularios((atuais) => ({
       ...atuais,
@@ -555,7 +637,7 @@ export default function FiscalCorrectionDialogHost() {
                   <li key={`${item.campo}-${index}`}>• {item.mensagem || item.campo}</li>
                 ))}
               </ul>
-              {destinoGeral && (
+              {destinoGeral && !aguardandoCliente && (
                 <a href={destinoGeral.url} className="mt-3 inline-block font-semibold underline">
                   {destinoGeral.rotulo}
                 </a>
@@ -566,7 +648,7 @@ export default function FiscalCorrectionDialogHost() {
             <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
               Os dados atuais passaram na validação, mas a rejeição anterior ainda precisa ser
               conferida. Revise o motivo acima antes de tentar transmitir novamente.
-              {destinoGeral && (
+              {destinoGeral && !aguardandoCliente && (
                 <a href={destinoGeral.url} className="mt-3 block font-semibold underline">
                   {destinoGeral.rotulo}
                 </a>
@@ -614,7 +696,7 @@ export default function FiscalCorrectionDialogHost() {
               <button
                 type="button"
                 onClick={() => resolverCorrecaoFiscal(true)}
-                className="rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700"
+                className="rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 Verificar correção e tentar novamente
               </button>

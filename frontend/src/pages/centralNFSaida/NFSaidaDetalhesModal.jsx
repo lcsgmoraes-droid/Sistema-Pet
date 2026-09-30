@@ -3,6 +3,11 @@ import { Download, Printer, RefreshCw, RotateCcw, Unlock, X } from "lucide-react
 import CustomerIdentity from "../../components/ui/CustomerIdentity";
 import { formatMoneyBRL } from "../../utils/formatters";
 import {
+  MENSAGEM_SUPORTE_RESPONSAVEL_TECNICO,
+  rejeicaoResponsavelTecnico,
+  SUPORTE_FISCAL_COREPET_URL,
+} from "../../utils/fiscalRejectionGuidance.mjs";
+import {
   formatarDataBR,
   formatarValorDetalhe,
   getSituacaoCor,
@@ -53,6 +58,10 @@ export default function NFSaidaDetalhesModal({
 
   const codigoErro = detalheNota?.codigo_erro || notaSelecionada.codigo_erro;
   const motivoRejeicao = detalheNota?.motivo_rejeicao || notaSelecionada.motivo_rejeicao;
+  const erroResponsavelTecnico = rejeicaoResponsavelTecnico({
+    codigo: codigoErro,
+    motivo: motivoRejeicao,
+  });
   const notaIntNFe = notaSelecionada.provedor === "intnfe";
   const documentoDisponivel = !notaIntNFe || notaSelecionada.status?.toLowerCase() === "autorizada";
 
@@ -86,48 +95,69 @@ export default function NFSaidaDetalhesModal({
             (notaIntNFe && notaSelecionada.status?.toLowerCase() === "rejeitada")) && (
             <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900">
               <p className="font-semibold">A autorização da nota foi rejeitada.</p>
-              {codigoErro && <p className="mt-1">Código: {codigoErro}</p>}
-              {motivoRejeicao && <p className="mt-1">Motivo: {motivoRejeicao}</p>}
-              {!codigoErro && !motivoRejeicao && (
+              {erroResponsavelTecnico ? (
+                <p className="mt-1">{MENSAGEM_SUPORTE_RESPONSAVEL_TECNICO}</p>
+              ) : (
+                <>
+                  {codigoErro && <p className="mt-1">Código: {codigoErro}</p>}
+                  {motivoRejeicao && <p className="mt-1">Motivo: {motivoRejeicao}</p>}
+                </>
+              )}
+              {!codigoErro && !motivoRejeicao && !erroResponsavelTecnico && (
                 <p className="mt-1">
                   O emissor ainda não informou o motivo. Abra a correção para revisar os dados da
                   venda.
                 </p>
               )}
-              {notaIntNFe && notaSelecionada.status?.toLowerCase() === "rejeitada" && (
-                <div className="mt-3 flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    onClick={() => abrirCorrecao(notaSelecionada)}
-                    disabled={diagnosticandoNotaId === String(notaSelecionada.venda_id)}
-                    className="inline-flex items-center gap-2 rounded-lg bg-red-700 px-4 py-2 font-semibold text-white hover:bg-red-800 disabled:opacity-50"
-                  >
-                    Corrigir erro
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => liberarVendaComRejeicao(notaSelecionada)}
-                    disabled={liberandoVendaId === String(notaSelecionada.venda_id)}
-                    className="inline-flex items-center gap-2 rounded-lg bg-teal-700 px-4 py-2 font-semibold text-white hover:bg-teal-800 disabled:opacity-50"
-                  >
-                    <Unlock className="h-4 w-4" />
-                    Liberar venda e escolher outro modelo
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => corrigirEReemitir(notaSelecionada)}
-                    disabled={corrigindoNotaId === String(notaSelecionada.venda_id)}
-                    className="inline-flex items-center gap-2 rounded-lg bg-purple-700 px-4 py-2 font-semibold text-white hover:bg-purple-800 disabled:opacity-50"
-                  >
-                    <RotateCcw
-                      className={`h-4 w-4 ${
-                        corrigindoNotaId === String(notaSelecionada.venda_id) ? "animate-spin" : ""
-                      }`}
-                    />
-                    Tentar novamente como {Number(notaSelecionada.modelo) === 55 ? "NF-e" : "NFC-e"}
-                  </button>
-                </div>
+              {erroResponsavelTecnico && (
+                <a
+                  href={SUPORTE_FISCAL_COREPET_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-3 inline-flex rounded-lg bg-red-700 px-4 py-2 font-semibold text-white hover:bg-red-800"
+                >
+                  Falar com o suporte
+                </a>
               )}
+              {notaIntNFe &&
+                notaSelecionada.status?.toLowerCase() === "rejeitada" &&
+                !erroResponsavelTecnico && (
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => abrirCorrecao(notaSelecionada)}
+                      disabled={diagnosticandoNotaId === String(notaSelecionada.venda_id)}
+                      className="inline-flex items-center gap-2 rounded-lg bg-red-700 px-4 py-2 font-semibold text-white hover:bg-red-800 disabled:opacity-50"
+                    >
+                      Corrigir erro
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => liberarVendaComRejeicao(notaSelecionada)}
+                      disabled={liberandoVendaId === String(notaSelecionada.venda_id)}
+                      className="inline-flex items-center gap-2 rounded-lg bg-teal-700 px-4 py-2 font-semibold text-white hover:bg-teal-800 disabled:opacity-50"
+                    >
+                      <Unlock className="h-4 w-4" />
+                      Liberar venda e escolher outro modelo
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => corrigirEReemitir(notaSelecionada)}
+                      disabled={corrigindoNotaId === String(notaSelecionada.venda_id)}
+                      className="inline-flex items-center gap-2 rounded-lg bg-purple-700 px-4 py-2 font-semibold text-white hover:bg-purple-800 disabled:opacity-50"
+                    >
+                      <RotateCcw
+                        className={`h-4 w-4 ${
+                          corrigindoNotaId === String(notaSelecionada.venda_id)
+                            ? "animate-spin"
+                            : ""
+                        }`}
+                      />
+                      Tentar novamente como{" "}
+                      {Number(notaSelecionada.modelo) === 55 ? "NF-e" : "NFC-e"}
+                    </button>
+                  </div>
+                )}
             </div>
           )}
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">

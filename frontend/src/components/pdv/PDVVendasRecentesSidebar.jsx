@@ -11,6 +11,7 @@ import {
 import { useEffect, useMemo, useState } from "react";
 import { formatMoneyBRL } from "../../utils/formatters";
 import { obterSituacaoFiscalVenda } from "../../utils/pdvFiscalStatus";
+import { getTipoDevolucaoVenda } from "../../utils/pdvReturnEligibility";
 import { getSalesChannelInfo, isOnlineSalesChannel } from "../../utils/salesChannel";
 import CopyableCode from "../ui/CopyableCode";
 import CustomerIdentity, { getCustomerIdentityCode } from "../ui/CustomerIdentity";
@@ -61,6 +62,7 @@ function isRetiradaOnlineSemEntrega(venda) {
 }
 
 function isPedidoOnlineOperacional(venda) {
+  if (getTipoDevolucaoVenda(venda)) return false;
   return (
     !isVendaCancelada(venda) &&
     isCanalOnline(venda?.canal) &&
@@ -73,6 +75,7 @@ function isPedidoOnlinePendente(venda) {
 }
 
 function canConfirmarRetirada(venda) {
+  if (getTipoDevolucaoVenda(venda)) return false;
   return (
     !isVendaCancelada(venda) &&
     venda?.status_entrega !== "entregue" &&
@@ -100,7 +103,7 @@ function formatarDataVenda(dataStr) {
 }
 
 function getEntregaStatusInfo(venda) {
-  if (isVendaCancelada(venda)) {
+  if (isVendaCancelada(venda) || getTipoDevolucaoVenda(venda)) {
     return null;
   }
 
@@ -313,6 +316,16 @@ export default function PDVVendasRecentesSidebar({
             ) : (
               vendasRecentesVisiveis.map((venda) => {
                 const statusPagamento = venda.status_pagamento || venda.status;
+                const tipoDevolucao = getTipoDevolucaoVenda(venda);
+                const corDevolucao =
+                  tipoDevolucao === "total"
+                    ? "border-l-slate-500 border-slate-300 bg-slate-50 hover:border-slate-400"
+                    : "border-l-amber-500 border-amber-300 bg-amber-50 hover:border-amber-400";
+                const corValor = tipoDevolucao
+                  ? tipoDevolucao === "total"
+                    ? "text-slate-700"
+                    : "text-amber-800"
+                  : "text-green-600";
                 const situacaoFiscal = obterSituacaoFiscalVenda(venda);
                 const canalInfo = getCanalInfo(venda.canal);
                 const CanalIcon = canalInfo.Icon;
@@ -337,7 +350,7 @@ export default function PDVVendasRecentesSidebar({
                   <div
                     key={venda.id}
                     onClick={() => reabrirVenda(venda)}
-                    className={`overflow-hidden rounded-lg p-2.5 border border-l-4 ${canalInfo.cor} ${canalInfo.border} cursor-pointer transition-colors ${canalInfo.bg}`}
+                    className={`overflow-hidden rounded-lg p-2.5 border border-l-4 cursor-pointer transition-colors ${tipoDevolucao ? corDevolucao : `${canalInfo.cor} ${canalInfo.border} ${canalInfo.bg}`}`}
                   >
                     <div className="flex items-center justify-between mb-1">
                       <span
@@ -405,7 +418,14 @@ export default function PDVVendasRecentesSidebar({
 
                       <div className="mt-1 flex justify-end">
                         <div className="text-right">
-                          {["parcial", "baixa_parcial"].includes(statusPagamento) ? (
+                          {tipoDevolucao ? (
+                            <>
+                              <div className="text-[10px] text-gray-500">Valor original</div>
+                              <div className={`text-sm font-semibold ${corValor}`}>
+                                {formatMoneyBRL(venda.total || 0)}
+                              </div>
+                            </>
+                          ) : ["parcial", "baixa_parcial"].includes(statusPagamento) ? (
                             <>
                               <div className="text-[10px] text-gray-500">Pago</div>
                               <div className="text-xs font-semibold text-green-600">
@@ -420,7 +440,17 @@ export default function PDVVendasRecentesSidebar({
                               {formatMoneyBRL(venda.total || 0)}
                             </div>
                           )}
-                          <StatusBadge status={statusPagamento} size="xs" className="mt-1" />
+                          {tipoDevolucao ? (
+                            <StatusBadge
+                              intent={tipoDevolucao === "total" ? "neutral" : "warning"}
+                              size="xs"
+                              className="mt-1"
+                            >
+                              {tipoDevolucao === "total" ? "Devolvida" : "Dev. parcial"}
+                            </StatusBadge>
+                          ) : (
+                            <StatusBadge status={statusPagamento} size="xs" className="mt-1" />
+                          )}
                         </div>
                       </div>
                     </div>

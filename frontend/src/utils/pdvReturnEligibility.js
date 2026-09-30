@@ -16,6 +16,17 @@ export function normalizarStatusVenda(status) {
     .toLowerCase();
 }
 
+export function getTipoDevolucaoVenda(venda) {
+  const status = normalizarStatusVenda(venda?.status);
+  if (status === "devolvida_total" || status === "finalizada_devolucao_total") {
+    return "total";
+  }
+  if (status === "finalizada_devolucao" || status === "finalizada_devolucao_parcial") {
+    return "parcial";
+  }
+  return null;
+}
+
 export function podeAbrirDevolucaoVenda(venda) {
   return Boolean(venda?.id && STATUS_DEVOLUCAO_DIRETA.has(normalizarStatusVenda(venda.status)));
 }

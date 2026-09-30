@@ -9,6 +9,7 @@ import {
   extrairAcaoCorrecaoFiscal,
   extrairMensagemNFe,
 } from "../../utils/nfeFiscalAssistida";
+import { rejeicaoResponsavelTecnico } from "../../utils/fiscalRejectionGuidance.mjs";
 import { ehVendaCrediario } from "../../utils/pdvReceipt";
 import { montarPayloadVenda } from "../../utils/pdvVendaPayload";
 import {
@@ -323,7 +324,14 @@ export function useModalPagamentoActions({
       const recuperacao = error?.recuperacaoNFe;
       if (recuperacao) {
         setErro(mensagem);
-        if (await confirmarCorePet(`${mensagem}\n\nAbrir a tela de correção desta nota agora?`)) {
+        const suporte = rejeicaoResponsavelTecnico({
+          codigo: recuperacao.codigoErro,
+          motivo: recuperacao.motivo,
+        });
+        const pergunta = suporte
+          ? "Abrir a orientação de suporte desta nota agora?"
+          : "Abrir a tela de correção desta nota agora?";
+        if (await confirmarCorePet(`${mensagem}\n\n${pergunta}`)) {
           const params = new URLSearchParams({
             abrir: "1",
             venda_id: String(recuperacao.vendaId),

@@ -109,9 +109,10 @@ def test_invalid_current_payload_keeps_rejected_attempt_untouched(monkeypatch):
     assert db.commits == 0
 
 
-def test_unknown_rejection_is_not_retried_when_payload_did_not_change(monkeypatch):
+@pytest.mark.parametrize("rejection_code", ["999", "974"])
+def test_rejection_without_local_fix_is_not_retried(monkeypatch, rejection_code):
     db = FakeDb()
-    sale = rejected_sale("999")
+    sale = rejected_sale(rejection_code)
     monkeypatch.setattr(
         recovery,
         "emission_fingerprint",
