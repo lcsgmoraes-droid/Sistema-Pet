@@ -45,7 +45,8 @@ function nextAction(data, emission) {
   }
   return {
     title: "Escolha o ambiente de emissão",
-    description: "O vínculo inicial está pronto. Ative a emissão na seção Configuração por ambiente.",
+    description:
+      "O vínculo inicial está pronto. Ative a emissão na seção Configuração por ambiente.",
   };
 }
 
