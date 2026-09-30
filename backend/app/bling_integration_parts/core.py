@@ -154,6 +154,9 @@ def _load_bling_runtime_config(*, lock_held: bool = False) -> dict[str, Any]:
         "reauthorization_required": bool(
             (tenant_credentials or {}).get("reauthorization_required")
         ),
+        "oauth_rate_limited_until": (tenant_credentials or {}).get(
+            "oauth_rate_limited_until"
+        ),
     }
 
 
@@ -233,11 +236,14 @@ class BlingAPIBase:
         self.reauthorization_required = bool(
             runtime_config.get("reauthorization_required")
         )
+        self.oauth_rate_limited_until = runtime_config.get("oauth_rate_limited_until")
         # Ambiente: 'rascunho', 'homologacao' ou 'producao'
         self.ambiente = runtime_config["ambiente"]
 
         if self.reauthorization_required:
             raise ValueError("Bling precisa ser reconectado para esta empresa")
+        if self.oauth_rate_limited_until:
+            raise RuntimeError("Bling OAuth temporariamente limitado (HTTP 429)")
         if not self.access_token:
             raise ValueError("Bling nao conectado para esta empresa")
 
@@ -362,8 +368,11 @@ class BlingAPIBase:
         self.reauthorization_required = bool(
             runtime_config.get("reauthorization_required")
         )
+        self.oauth_rate_limited_until = runtime_config.get("oauth_rate_limited_until")
         if self.reauthorization_required:
             raise ValueError("Bling precisa ser reconectado para esta empresa")
+        if self.oauth_rate_limited_until:
+            raise RuntimeError("Bling OAuth temporariamente limitado (HTTP 429)")
 
         return access_changed
 
@@ -500,6 +509,8 @@ class BlingAPIBase:
             runtime_config = _load_bling_runtime_config(lock_held=True)
             if runtime_config.get("reauthorization_required"):
                 raise ValueError("Bling precisa ser reconectado para esta empresa")
+            if runtime_config.get("oauth_rate_limited_until"):
+                raise RuntimeError("Bling OAuth temporariamente limitado (HTTP 429)")
             refresh = (
                 refresh_token
                 or runtime_config.get("refresh_token")
@@ -554,6 +565,15 @@ class BlingAPIBase:
                         )
                     raise ValueError("invalid_grant: reconecte o Bling nesta empresa")
                 if response.status_code == 429:
+                    from app.services.bling_connection_service import (
+                        mark_bling_oauth_rate_limited,
+                    )
+
+                    if getattr(self, "tenant_id", None):
+                        mark_bling_oauth_rate_limited(
+                            tenant_id=self.tenant_id,
+                            failed_refresh_token=refresh,
+                        )
                     raise RuntimeError(
                         "Bling limitou temporariamente as autorizacoes (HTTP 429)"
                     )

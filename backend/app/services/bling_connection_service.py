@@ -17,6 +17,23 @@ from app.tenancy.context import get_current_tenant, tenant_context
 
 
 BLING_REAUTH_REQUIRED = "reauthorization_required"
+BLING_OAUTH_RATE_LIMIT_PREFIX = "oauth_rate_limited_until:"
+
+
+def bling_oauth_rate_limited_until(
+    connection: BlingConnection | None,
+) -> datetime | None:
+    """Retorna o fim da pausa compartilhada para pedidos de token OAuth."""
+    last_error = str(getattr(connection, "last_error", "") or "")
+    if not last_error.startswith(BLING_OAUTH_RATE_LIMIT_PREFIX):
+        return None
+    try:
+        until = datetime.fromisoformat(last_error[len(BLING_OAUTH_RATE_LIMIT_PREFIX) :])
+    except ValueError:
+        return None
+    if until.tzinfo is None or until <= datetime.now(timezone.utc):
+        return None
+    return until
 
 
 def _tenant_uuid(value: Any) -> UUID | None:
@@ -117,6 +134,7 @@ def load_bling_credentials(
         "last_refresh_at": connection.last_refresh_at,
         "renewal_count": int(connection.renewal_count or 0),
         "reauthorization_required": connection.last_error == BLING_REAUTH_REQUIRED,
+        "oauth_rate_limited_until": bling_oauth_rate_limited_until(connection),
         "source": "tenant",
     }
 
@@ -358,6 +376,48 @@ def mark_bling_reauthorization_required(
             if not connection or connection.refresh_token != failed_refresh_token:
                 return False
             connection.last_error = BLING_REAUTH_REQUIRED
+            session.commit()
+            return True
+    except Exception:
+        session.rollback()
+        raise
+    finally:
+        if owns_session:
+            session.close()
+
+
+def mark_bling_oauth_rate_limited(
+    *, tenant_id: UUID | str, failed_refresh_token: str, db: Session | None = None
+) -> bool:
+    """Pausa por uma hora renovacoes do mesmo token apos HTTP 429."""
+    resolved_tenant = _tenant_uuid(tenant_id)
+    if not resolved_tenant:
+        return False
+
+    owns_session = db is None
+    session = db or SessionLocal()
+    context = (
+        nullcontext(resolved_tenant)
+        if get_current_tenant() == resolved_tenant
+        else tenant_context(resolved_tenant)
+    )
+    try:
+        with context:
+            connection = (
+                session.query(BlingConnection)
+                .filter(BlingConnection.tenant_id == resolved_tenant)
+                .first()
+            )
+            if (
+                not connection
+                or connection.refresh_token != failed_refresh_token
+                or connection.last_error == BLING_REAUTH_REQUIRED
+            ):
+                return False
+            until = datetime.now(timezone.utc) + timedelta(hours=1)
+            connection.last_error = (
+                f"{BLING_OAUTH_RATE_LIMIT_PREFIX}{until.isoformat()}"
+            )
             session.commit()
             return True
     except Exception:

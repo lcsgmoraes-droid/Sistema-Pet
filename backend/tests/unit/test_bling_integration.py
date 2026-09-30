@@ -695,6 +695,48 @@ def test_refresh_revogado_exige_reconexao_sem_novas_chamadas(monkeypatch):
     assert state["requests"] == 1
 
 
+def test_rate_limit_oauth_pausa_novas_tentativas_de_refresh(monkeypatch):
+    api = _make_api()
+    api.tenant_id = "00000000-0000-0000-0000-000000000001"
+    api.client_id = "client-id"
+    api.client_secret = "client-secret"
+    api.refresh_token = "refresh-antigo"
+    state = {"oauth_rate_limited_until": None, "requests": 0}
+
+    class FakeResponse:
+        status_code = 429
+
+    def fake_post(*_args, **_kwargs):
+        state["requests"] += 1
+        return FakeResponse()
+
+    def fake_mark(**_kwargs):
+        state["oauth_rate_limited_until"] = "future"
+        return True
+
+    monkeypatch.setattr("requests.post", fake_post)
+    monkeypatch.setattr(
+        "app.bling_integration_parts.core._bling_token_lock", nullcontext
+    )
+    monkeypatch.setattr(
+        "app.bling_integration_parts.core._load_bling_runtime_config",
+        lambda **_kwargs: {
+            "refresh_token": "refresh-antigo",
+            "oauth_rate_limited_until": state["oauth_rate_limited_until"],
+        },
+    )
+    monkeypatch.setattr(
+        "app.services.bling_connection_service.mark_bling_oauth_rate_limited",
+        fake_mark,
+    )
+
+    with pytest.raises(RuntimeError, match="HTTP 429"):
+        api.renovar_access_token()
+    with pytest.raises(RuntimeError, match="HTTP 429"):
+        api.renovar_access_token()
+    assert state["requests"] == 1
+
+
 def test_payload_nfce_usa_serie_3_e_deixa_numero_para_sequencia_do_bling():
     api = _make_api()
     payload = api._montar_payload(_make_venda_nfce(), "nfce")

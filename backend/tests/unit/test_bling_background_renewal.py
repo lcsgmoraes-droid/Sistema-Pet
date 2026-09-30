@@ -103,3 +103,35 @@ def test_renovacao_nao_reutiliza_refresh_token_revogado(monkeypatch):
         "adiadas": 1,
         "falhas": 0,
     }
+
+
+def test_renovacao_respeita_pausa_oauth_compartilhada(monkeypatch):
+    from app.services.bling_connection_service import BLING_OAUTH_RATE_LIMIT_PREFIX
+
+    tenant_id = uuid4()
+    until = datetime.now(timezone.utc) + timedelta(minutes=30)
+    monkeypatch.delenv("BLING_WEBHOOK_TENANT_ID", raising=False)
+    monkeypatch.setattr(
+        main_background_jobs, "_bootstrap_conexao_bling_legada", lambda: False
+    )
+    monkeypatch.setattr(
+        "app.services.bling_connection_service.connected_bling_tenant_ids",
+        lambda: [tenant_id],
+    )
+    monkeypatch.setattr(
+        "app.services.bling_connection_service.get_bling_connection",
+        lambda _tenant_id: SimpleNamespace(
+            expires_at=datetime.now(timezone.utc),
+            last_error=f"{BLING_OAUTH_RATE_LIMIT_PREFIX}{until.isoformat()}",
+        ),
+    )
+    monkeypatch.setattr(
+        "app.bling_integration.BlingAPI",
+        lambda: (_ for _ in ()).throw(AssertionError("Nao deveria consultar o Bling")),
+    )
+
+    assert main_background_jobs._renovar_conexoes_bling() == {
+        "renovadas": 0,
+        "adiadas": 1,
+        "falhas": 0,
+    }

@@ -182,6 +182,7 @@ def _renovar_conexoes_bling() -> dict[str, int]:
     from app.bling_integration import BlingAPI
     from app.services.bling_connection_service import (
         BLING_REAUTH_REQUIRED,
+        bling_oauth_rate_limited_until,
         connected_bling_tenant_ids,
         get_bling_connection,
     )
@@ -205,6 +206,9 @@ def _renovar_conexoes_bling() -> dict[str, int]:
                     connection
                     and getattr(connection, "last_error", None) == BLING_REAUTH_REQUIRED
                 ):
+                    result["adiadas"] += 1
+                    continue
+                if bling_oauth_rate_limited_until(connection):
                     result["adiadas"] += 1
                     continue
                 expires_at = connection.expires_at if connection else None
