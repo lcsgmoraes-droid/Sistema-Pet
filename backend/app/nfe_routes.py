@@ -176,12 +176,18 @@ def salvar_cpf_consumidor_nfce(
     if not venda:
         raise HTTPException(status_code=404, detail="Venda não encontrada")
     if venda.cliente_id:
-        raise HTTPException(status_code=409, detail="Esta venda já possui cliente cadastrado.")
+        raise HTTPException(
+            status_code=409, detail="Esta venda já possui cliente cadastrado."
+        )
     if venda.nfe_correlation_id or venda.nfe_idempotency_key or venda.nfe_bling_id:
-        raise HTTPException(status_code=409, detail="Esta venda já possui uma tentativa de nota fiscal.")
+        raise HTTPException(
+            status_code=409, detail="Esta venda já possui uma tentativa de nota fiscal."
+        )
     cpf = "".join(char for char in request.cpf if char.isdigit())
     if not _cpf_valido(cpf):
-        raise HTTPException(status_code=422, detail="Informe um CPF válido com 11 dígitos.")
+        raise HTTPException(
+            status_code=422, detail="Informe um CPF válido com 11 dígitos."
+        )
     venda.nfe_consumidor_cpf = cpf
     db.commit()
     return {"cpf": cpf}

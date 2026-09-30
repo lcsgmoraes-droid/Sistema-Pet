@@ -478,7 +478,9 @@ def build_payload(db, tenant, connection, venda, document_type):
             raise DirectEmissionError("O CPF informado para esta NFC-e é inválido.")
         recipient = {"cpf": cpf_avulso}
         if environment == 2:
-            recipient["nome"] = "NF-E EMITIDA EM AMBIENTE DE HOMOLOGACAO - SEM VALOR FISCAL"
+            recipient["nome"] = (
+                "NF-E EMITIDA EM AMBIENTE DE HOMOLOGACAO - SEM VALOR FISCAL"
+            )
     else:
         recipient = _recipient(
             venda.cliente,
