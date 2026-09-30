@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { rejeicaoResponsavelTecnico } from "./fiscalRejectionGuidance.mjs";
+import {
+  MENSAGEM_SUPORTE_RESPONSAVEL_TECNICO,
+  rejeicaoResponsavelTecnico,
+  SUPORTE_FISCAL_COREPET_URL,
+} from "./fiscalRejectionGuidance.mjs";
 
 test("rejeição 974 aponta para o fornecedor técnico, não para o CPF da cliente", () => {
   assert.equal(
@@ -25,4 +29,9 @@ test("rejeição 974 aponta para o fornecedor técnico, não para o CPF da clien
     rejeicaoResponsavelTecnico({ codigo: "999", motivo: "CNPJ do destinatário inválido" }),
     false,
   );
+});
+
+test("rejeição do emissor orienta o cliente a procurar o suporte", () => {
+  assert.match(MENSAGEM_SUPORTE_RESPONSAVEL_TECNICO, /suporte do CorePet/);
+  assert.match(SUPORTE_FISCAL_COREPET_URL, /wa\.me\/5518997401641/);
 });

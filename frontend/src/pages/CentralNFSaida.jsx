@@ -19,7 +19,10 @@ import {
 } from "../utils/nfeFiscalAssistida";
 import { solicitarCorrecaoFiscal } from "../services/fiscalCorrectionDialog";
 import { metadadosDownloadDanfe } from "../utils/documentoFiscalDownload.mjs";
-import { rejeicaoResponsavelTecnico } from "../utils/fiscalRejectionGuidance.mjs";
+import {
+  MENSAGEM_SUPORTE_RESPONSAVEL_TECNICO,
+  rejeicaoResponsavelTecnico,
+} from "../utils/fiscalRejectionGuidance.mjs";
 import NFSaidaCompartilharModal from "./centralNFSaida/NFSaidaCompartilharModal";
 
 function salvarArquivo(blob, nome) {
@@ -248,9 +251,12 @@ export default function CentralNFSaida() {
           : await api.post(`/nfe/${notaId}/reconciliar-fluxo`);
       const numero = response.data?.numero || response.data?.nf_numero || nota.numero || notaId;
       const situacao = response.data?.situacao;
-      const rejeicao = [response.data?.codigo_erro, response.data?.motivo_rejeicao]
-        .filter(Boolean)
-        .join(" — ");
+      const rejeicao = rejeicaoResponsavelTecnico({
+        codigo: response.data?.codigo_erro,
+        motivo: response.data?.motivo_rejeicao,
+      })
+        ? MENSAGEM_SUPORTE_RESPONSAVEL_TECNICO
+        : [response.data?.codigo_erro, response.data?.motivo_rejeicao].filter(Boolean).join(" — ");
       alert(
         nota.provedor === "intnfe"
           ? `Status da NF ${numero}: ${situacao || "atualizado"}${rejeicao ? ` — ${rejeicao}` : ""}.`
@@ -316,6 +322,11 @@ export default function CentralNFSaida() {
       return;
     }
     const tipoNota = nota?.tipo === "nfe" || Number(nota?.modelo) === 55 ? "nfe" : "nfce";
+    const rejeicao = { codigo: nota?.codigo_erro, motivo: nota?.motivo_rejeicao };
+    if (rejeicaoResponsavelTecnico(rejeicao)) {
+      await solicitarCorrecaoFiscal({ vendaId, tipoNota, apenasCorrigir: true, rejeicao });
+      return;
+    }
     setDiagnosticandoNotaId(String(vendaId));
     try {
       for (let tentativa = 0; tentativa < 4; tentativa += 1) {
@@ -347,6 +358,10 @@ export default function CentralNFSaida() {
   }
 
   async function liberarVendaComRejeicao(nota) {
+    if (rejeicaoResponsavelTecnico({ codigo: nota?.codigo_erro, motivo: nota?.motivo_rejeicao })) {
+      await abrirCorrecao(nota);
+      return;
+    }
     const vendaId = nota?.venda_id;
     if (!vendaId) {
       alert("Não foi possível identificar a venda desta tentativa rejeitada.");

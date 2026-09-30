@@ -13,9 +13,7 @@ from app.intnfe.numbering import NumberingInput, advance_numbering, read_numberi
 REJECTED_STATUSES = {"rejeitada"}
 PENDING_STATUSES = {"aguardando", "enviando", "processando", "inconclusiva"}
 AUTHORIZED_STATUSES = {"autorizada", "cancelada", "inutilizada", "denegada"}
-# A rejeição 974 depende da autorização do fornecedor no UPD da SEFA/PR.
-# Essa regularização externa não modifica o payload da venda.
-PROVIDER_RETRYABLE_REJECTION_CODES = {"963", "974"}
+PROVIDER_RETRYABLE_REJECTION_CODES = {"963"}
 MAX_DUPLICATE_RETRIES = 10
 
 
@@ -242,7 +240,7 @@ def repair_and_retry(
             )
         if provider_retry:
             applied.append(
-                f"Reenvio da rejeição {rejection_code} liberado após regularização externa confirmada."
+                f"Reenvio da rejeição {rejection_code} liberado após correção confirmada no emissor."
             )
         elif not duplicate_number:
             applied.append(

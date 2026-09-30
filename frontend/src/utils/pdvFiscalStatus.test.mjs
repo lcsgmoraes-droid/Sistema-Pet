@@ -31,6 +31,18 @@ test("resume uma NF-e rejeitada com código e motivo", () => {
   assert.match(situacao.detalhe, /Tipo de pagamento/);
 });
 
+test("resume rejeição técnica como atendimento do suporte, sem instrução fiscal ao cliente", () => {
+  const situacao = obterSituacaoFiscalVenda({
+    nfe_tipo: "nfe",
+    nfe_status: "rejeitada",
+    nfe_codigo_erro: "974",
+    nfe_motivo_rejeicao: "CNPJ do responsável técnico diverge do cadastrado",
+  });
+
+  assert.match(situacao.detalhe, /suporte do CorePet/);
+  assert.doesNotMatch(situacao.detalhe, /CNPJ do responsável técnico/);
+});
+
 test("distingue NFC-e autorizada e cancelada", () => {
   assert.equal(
     obterSituacaoFiscalVenda({ nfe_modelo: 65, nfe_numero: 530, nfe_status: "autorizada" }).label,

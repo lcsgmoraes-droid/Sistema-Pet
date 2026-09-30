@@ -11,8 +11,6 @@ from decimal import Decimal, ROUND_HALF_UP
 from uuid import UUID, uuid4
 from types import SimpleNamespace
 
-from defusedxml import ElementTree
-
 from app.bling_integration_fiscal import (
     CSOSN_VALIDOS,
     CST_ICMS_VALIDOS,
@@ -1304,41 +1302,6 @@ def download_document(db, venda, api, kind):
             code=exc.code,
             correlation=exc.correlation,
         ) from None
-
-
-def rejected_technical_responsible_cnpj(db, venda, api):
-    """Consulta somente o CNPJ técnico no XML de uma rejeição 974, sem salvá-lo."""
-    if (
-        venda.nfe_provider != "intnfe"
-        or venda.nfe_status != "rejeitada"
-        or str(venda.nfe_codigo_erro or "").strip() != "974"
-        or not venda.nfe_correlation_id
-    ):
-        raise DirectEmissionError(
-            "Esta venda não possui uma rejeição 974 da IntNFe.", status=409
-        )
-    connection = _connection(db, venda.tenant_id, require_enabled=False)
-    token = _access_token(api, connection, venda.nfe_ambiente)
-    try:
-        xml = api.document_xml(token, venda.nfe_tipo, venda.nfe_correlation_id)
-    except IntNFeError as exc:
-        raise DirectEmissionError(
-            "Não foi possível consultar o CNPJ técnico no emissor.",
-            status=503,
-            code=exc.code,
-            correlation=exc.correlation,
-        ) from None
-    try:
-        root = ElementTree.fromstring(xml)
-        element = root.find(".//{*}infRespTec/{*}CNPJ")
-        cnpj = _digits(element.text if element is not None else None)
-    except ElementTree.ParseError:
-        cnpj = ""
-    if len(cnpj) != 14:
-        raise DirectEmissionError(
-            "O XML da tentativa não contém um CNPJ técnico válido.", status=422
-        )
-    return cnpj
 
 
 def cancel(db, venda, api, justification):

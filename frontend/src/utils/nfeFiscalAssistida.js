@@ -1,6 +1,10 @@
 import api from "../api";
 import { confirmarCorePet } from "../services/corepetDialog";
 import { solicitarCorrecaoFiscal } from "../services/fiscalCorrectionDialog";
+import {
+  MENSAGEM_SUPORTE_RESPONSAVEL_TECNICO,
+  rejeicaoResponsavelTecnico,
+} from "./fiscalRejectionGuidance.mjs";
 
 function linhaProduto(item) {
   const partes = [];
@@ -45,6 +49,14 @@ export function listarPendenciasFiscais(validacao) {
 }
 
 export function extrairMensagemNFe(error) {
+  if (
+    rejeicaoResponsavelTecnico({
+      codigo: error?.recuperacaoNFe?.codigoErro,
+      motivo: error?.recuperacaoNFe?.motivo,
+    })
+  ) {
+    return MENSAGEM_SUPORTE_RESPONSAVEL_TECNICO;
+  }
   const detail = error?.response?.data?.detail;
   if (detail && typeof detail === "object") {
     const validacao = detail.validacao || detail;
@@ -126,10 +138,16 @@ async function acompanharIntNFe(vendaId, initial) {
 }
 
 function erroRejeicaoIntNFe(vendaId, data) {
+  const erroResponsavelTecnico = rejeicaoResponsavelTecnico({
+    codigo: data?.codigo_erro,
+    motivo: data?.motivo_rejeicao,
+  });
   const error = new Error(
-    data?.motivo_rejeicao ||
-      data?.codigo_erro ||
-      `A nota terminou com a situação: ${data?.situacao || "não autorizada"}.`,
+    erroResponsavelTecnico
+      ? MENSAGEM_SUPORTE_RESPONSAVEL_TECNICO
+      : data?.motivo_rejeicao ||
+          data?.codigo_erro ||
+          `A nota terminou com a situação: ${data?.situacao || "não autorizada"}.`,
   );
   error.recuperacaoNFe = {
     vendaId,
