@@ -472,13 +472,21 @@ def build_payload(db, tenant, connection, venda, document_type):
     nfce_requires_recipient = document_type == "nfce" and (
         bool(getattr(venda, "tem_entrega", False)) or sale_total >= Decimal("10000")
     )
-    recipient = _recipient(
-        venda.cliente,
-        environment,
-        document_type,
-        require_identity=nfce_requires_recipient,
-        require_address=document_type == "nfe",
-    )
+    cpf_avulso = _digits(getattr(venda, "nfe_consumidor_cpf", None))
+    if document_type == "nfce" and not venda.cliente and cpf_avulso:
+        if len(cpf_avulso) != 11:
+            raise DirectEmissionError("O CPF informado para esta NFC-e é inválido.")
+        recipient = {"cpf": cpf_avulso}
+        if environment == 2:
+            recipient["nome"] = "NF-E EMITIDA EM AMBIENTE DE HOMOLOGACAO - SEM VALOR FISCAL"
+    else:
+        recipient = _recipient(
+            venda.cliente,
+            environment,
+            document_type,
+            require_identity=nfce_requires_recipient,
+            require_address=document_type == "nfe",
+        )
     destination_uf = (
         recipient.get("endereco", {}).get("uf") or emitter["endereco"]["uf"]
         if recipient and document_type == "nfe"
@@ -907,6 +915,8 @@ def local_document_details(db, tenant, venda):
         customer_document = _digits(
             getattr(cliente, "cnpj", None) or getattr(cliente, "cpf", None)
         )
+    elif venda.nfe_tipo == "nfce":
+        customer_document = _digits(getattr(venda, "nfe_consumidor_cpf", None)) or None
 
     credit_installments = _crediario_installments(venda)
     payment_rows = []
@@ -987,7 +997,11 @@ def local_document_details(db, tenant, venda):
                 "complemento": getattr(cliente, "complemento", None),
             }
             if cliente
-            else {}
+            else (
+                {"id": None, "nome": None, "cpf_cnpj": customer_document}
+                if customer_document
+                else {}
+            )
         ),
         "canal": venda.canal,
         "canal_label": {

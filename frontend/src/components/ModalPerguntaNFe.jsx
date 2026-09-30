@@ -32,7 +32,9 @@ export default function ModalPerguntaNFe({
     crediario,
   );
   const [tipoNota, setTipoNota] = useState("nfce");
-  const [nfceCpfResolved, setNfceCpfResolved] = useState(Boolean(documentoCliente));
+  const [nfceCpfResolved, setNfceCpfResolved] = useState(
+    Boolean(documentoCliente || venda?.nfe_consumidor_cpf),
+  );
   const [savedCustomerDocument, setSavedCustomerDocument] = useState("");
   const [documentoEmitido, setDocumentoEmitido] = useState(null);
   const [headerHelpOpen, setHeaderHelpOpen] = useState(false);
@@ -129,13 +131,15 @@ export default function ModalPerguntaNFe({
 
                 <NfceCpfPrompt
                   cliente={cliente}
+                  cpfAvulso={venda?.nfe_consumidor_cpf}
                   disabled={loading}
                   onContinueWithoutCpf={() => handleEmitir("nfce")}
                   onResolvedChange={setNfceCpfResolved}
                   onSaved={(updatedCustomer) => {
-                    setSavedCustomerDocument(updatedCustomer?.cpf || "cpf-salvo");
+                    if (cliente?.id) setSavedCustomerDocument(updatedCustomer?.cpf || "cpf-salvo");
                     reloadFiscalStatus();
                   }}
+                  vendaId={vendaId}
                   visible={tipoNota === "nfce"}
                 />
 

@@ -303,6 +303,35 @@ def test_delivery_nfce_requires_identified_recipient():
         emission.build_payload(None, tenant, connection, sale, "nfce")
 
 
+def test_nfce_uses_sale_cpf_without_customer_registration():
+    tenant, connection, sale = _objects()
+    sale.cliente = None
+    sale.nfe_consumidor_cpf = "52998224725"
+    sale.tem_entrega = False
+    sale.taxa_entrega = "0.00"
+    sale.total = "18.00"
+    sale.pagamentos[0].valor = "18.00"
+
+    payload = emission.build_payload(None, tenant, connection, sale, "nfce")
+
+    assert payload["consumidor"]["cpf"] == "52998224725"
+    assert payload["consumidor"]["nome"].startswith("NF-E EMITIDA")
+    assert sale.cliente is None
+
+    connection.emission_environment = 1
+    production_payload = emission.build_payload(None, tenant, connection, sale, "nfce")
+    assert production_payload["consumidor"] == {"cpf": "52998224725"}
+
+
+def test_sale_cpf_does_not_enable_nfe_without_customer():
+    tenant, connection, sale = _objects()
+    sale.cliente = None
+    sale.nfe_consumidor_cpf = "52998224725"
+
+    with pytest.raises(emission.DirectEmissionError, match="cliente cadastrado"):
+        emission.build_payload(None, tenant, connection, sale, "nfe")
+
+
 def test_high_value_nfce_requires_identified_recipient():
     with pytest.raises(emission.DirectEmissionError, match="consumidor identificado"):
         emission._recipient(

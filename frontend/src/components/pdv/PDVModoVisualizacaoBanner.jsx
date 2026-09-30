@@ -150,6 +150,7 @@ export default function PDVModoVisualizacaoBanner({
       {moduloFiscalAtivo && mostrarSelecaoDocumento && (
         <ModalSelecaoDocumentoFiscal
           cliente={vendaAtual.cliente}
+          cpfAvulso={vendaAtual.nfe_consumidor_cpf}
           onClose={() => setMostrarSelecaoDocumento(false)}
           onEmitir={emitirNotaVendaFinalizada}
           vendaId={vendaAtual.id}

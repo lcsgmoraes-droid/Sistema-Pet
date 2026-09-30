@@ -25,6 +25,7 @@ from app.services.nfe_pending_reconciliation_service import (
     reconciliar_nfes_pendentes_recentes,
 )
 from app.vendas_models import Venda
+from app.services.pessoa_duplicate_service import _cpf_valido
 from app.intnfe.client import IntNFeClient
 from app.intnfe.emission import (
     DirectEmissionError,
@@ -142,6 +143,10 @@ class PrevalidarNFeRequest(BaseModel):
     tipo_nota: str = "nfce"  # 'nfe' ou 'nfce'
 
 
+class ConsumidorCpfRequest(BaseModel):
+    cpf: str
+
+
 class CancelarIntNFeRequest(BaseModel):
     justificativa: str
 
@@ -157,6 +162,29 @@ def _buscar_venda_para_nfe(db: Session, venda_id: int, tenant_id):
         .filter(Venda.id == venda_id, Venda.tenant_id == tenant_id)
         .first()
     )
+
+
+@router.put("/vendas/{venda_id}/consumidor-cpf")
+def salvar_cpf_consumidor_nfce(
+    venda_id: int,
+    request: ConsumidorCpfRequest,
+    db: Session = Depends(get_session),
+    user_and_tenant=Depends(get_current_user_and_tenant),
+):
+    _user, tenant_id = user_and_tenant
+    venda = _buscar_venda_para_nfe(db, venda_id, tenant_id)
+    if not venda:
+        raise HTTPException(status_code=404, detail="Venda não encontrada")
+    if venda.cliente_id:
+        raise HTTPException(status_code=409, detail="Esta venda já possui cliente cadastrado.")
+    if venda.nfe_correlation_id or venda.nfe_idempotency_key or venda.nfe_bling_id:
+        raise HTTPException(status_code=409, detail="Esta venda já possui uma tentativa de nota fiscal.")
+    cpf = "".join(char for char in request.cpf if char.isdigit())
+    if not _cpf_valido(cpf):
+        raise HTTPException(status_code=422, detail="Informe um CPF válido com 11 dígitos.")
+    venda.nfe_consumidor_cpf = cpf
+    db.commit()
+    return {"cpf": cpf}
 
 
 def _exigir_bling_configurado_para_tenant(tenant_id) -> None:
