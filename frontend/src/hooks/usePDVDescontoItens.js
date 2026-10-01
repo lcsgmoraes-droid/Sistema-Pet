@@ -24,9 +24,10 @@ export function usePDVDescontoItens({ vendaAtual, setVendaAtual }) {
     }));
   };
 
-  const abrirModalDescontoItem = (item) => {
+  const abrirModalDescontoItem = (item, index) => {
     setItemEditando({
       ...item,
+      indice_carrinho: index,
       preco: item.preco_unitario,
       descontoValor: item.desconto_valor || 0,
       descontoPercentual: item.desconto_percentual || 0,
@@ -36,8 +37,8 @@ export function usePDVDescontoItens({ vendaAtual, setVendaAtual }) {
   };
 
   const salvarDescontoItem = () => {
-    const itensAtualizados = vendaAtual.itens.map((item) => {
-      if (item.produto_id === itemEditando.produto_id) {
+    const itensAtualizados = vendaAtual.itens.map((item, index) => {
+      if (index === itemEditando.indice_carrinho) {
         return recalcularItemComPrecoEDesconto(item, itemEditando);
       }
       return item;
@@ -51,7 +52,7 @@ export function usePDVDescontoItens({ vendaAtual, setVendaAtual }) {
   const removerItemEditando = () => {
     if (!itemEditando) return;
     const novosItens = vendaAtual.itens.filter(
-      (item) => item.produto_id !== itemEditando.produto_id,
+      (_item, index) => index !== itemEditando.indice_carrinho,
     );
     recalcularTotais(novosItens);
     setMostrarModalDescontoItem(false);

@@ -1,5 +1,11 @@
 import { useEffect, useRef, useState } from "react";
+import toast from "react-hot-toast";
 import { getProdutosVendaveis } from "../api/produtos";
+import {
+  calcularItemEtiquetaBalanca,
+  lerEtiquetaBalanca,
+  produtoAceitaEtiquetaBalanca,
+} from "../utils/pdvEtiquetaBalanca";
 import {
   deveAdicionarProdutoAutomaticamente,
   encontrarProdutoPorCodigo,
@@ -33,6 +39,8 @@ export function usePDVProdutoBusca({
   const sequenciaRapidaProdutoRef = useRef(0);
   const leituraScannerDetectadaRef = useRef(false);
   const adicionandoProdutoPorEnterRef = useRef(false);
+  const processandoEtiquetaBalancaRef = useRef(false);
+  const ultimoErroEtiquetaRef = useRef("");
   const buscaProdutoAtualRef = useRef("");
   const focoProdutoTimeoutRef = useRef(null);
   const adicionarProdutoAoCarrinhoRef = useRef(adicionarProdutoAoCarrinho);
@@ -144,7 +152,10 @@ export function usePDVProdutoBusca({
   };
 
   const adicionarProduto = (produto, options) => {
-    const adicionou = adicionarProdutoAoCarrinhoRef.current?.(produto);
+    const adicionou = adicionarProdutoAoCarrinhoRef.current?.(
+      produto,
+      options?.etiquetaBalanca || null,
+    );
 
     if (adicionou === false) {
       return false;
@@ -152,6 +163,72 @@ export function usePDVProdutoBusca({
 
     limparBuscaProduto(options);
     return true;
+  };
+
+  const mostrarErroEtiqueta = (etiqueta, mensagem) => {
+    if (ultimoErroEtiquetaRef.current === etiqueta.codigo) return;
+    ultimoErroEtiquetaRef.current = etiqueta.codigo;
+    toast.error(mensagem);
+  };
+
+  const processarEtiquetaBalanca = async (etiqueta) => {
+    if (processandoEtiquetaBalancaRef.current) return true;
+    if (etiqueta.erro) {
+      mostrarErroEtiqueta(etiqueta, etiqueta.erro);
+      return true;
+    }
+
+    processandoEtiquetaBalancaRef.current = true;
+    try {
+      // Preserva produtos comuns cujo EAN tambem comeca com 2.
+      const produtosCodigoCompleto = await buscarProdutosAtualizados(etiqueta.codigo);
+      const produtoCodigoCompleto = encontrarProdutoPorCodigo(
+        produtosCodigoCompleto,
+        etiqueta.codigo,
+      );
+      if (produtoCodigoCompleto && !produtoAceitaEtiquetaBalanca(produtoCodigoCompleto)) {
+        if (!modoVisualizacao) adicionarProduto(produtoCodigoCompleto, { focarInput: true });
+        return true;
+      }
+
+      const produtos = await buscarProdutosAtualizados(etiqueta.codigoProdutoSemZeros);
+      const candidatos = produtos.filter(
+        (produto) =>
+          encontrarProdutoPorCodigo([produto], etiqueta.codigoProduto) ||
+          encontrarProdutoPorCodigo([produto], etiqueta.codigoProdutoSemZeros),
+      );
+      if (candidatos.length !== 1) {
+        mostrarErroEtiqueta(
+          etiqueta,
+          candidatos.length > 1
+            ? "Mais de um produto usa o codigo desta etiqueta. Corrija o cadastro."
+            : `Produto ${etiqueta.codigoProdutoSemZeros} nao encontrado para esta etiqueta.`,
+        );
+        return true;
+      }
+
+      const produto = candidatos[0];
+      if (!produtoAceitaEtiquetaBalanca(produto)) {
+        mostrarErroEtiqueta(
+          etiqueta,
+          "O produto desta etiqueta precisa estar marcado como granel e com unidade KG.",
+        );
+        return true;
+      }
+
+      const itemEtiqueta = calcularItemEtiquetaBalanca(etiqueta, produto);
+      if (itemEtiqueta.erro) {
+        mostrarErroEtiqueta(etiqueta, itemEtiqueta.erro);
+        return true;
+      }
+
+      if (!modoVisualizacao) {
+        adicionarProduto(produto, { focarInput: true, etiquetaBalanca: itemEtiqueta });
+      }
+      return true;
+    } finally {
+      processandoEtiquetaBalancaRef.current = false;
+    }
   };
 
   useEffect(() => {
@@ -168,6 +245,12 @@ export function usePDVProdutoBusca({
       setMostrarSugestoesProduto(true);
       const timer = setTimeout(async () => {
         try {
+          const etiqueta = lerEtiquetaBalanca(termoAtual);
+          if (etiqueta) {
+            await processarEtiquetaBalanca(etiqueta);
+            return;
+          }
+
           const produtos = await buscarProdutosAtualizados(termoAtual);
 
           if (buscaProdutoAtualRef.current !== termoAtual) {
@@ -259,6 +342,12 @@ export function usePDVProdutoBusca({
 
     adicionandoProdutoPorEnterRef.current = true;
     try {
+      const etiqueta = lerEtiquetaBalanca(termo);
+      if (etiqueta) {
+        await processarEtiquetaBalanca(etiqueta);
+        return;
+      }
+
       const produtos = await buscarProdutosAtualizados(termo);
       const produtoSelecionado = encontrarProdutoPorCodigo(produtos, termo) || produtos[0] || null;
 
@@ -278,6 +367,9 @@ export function usePDVProdutoBusca({
   };
 
   const handleBuscarProdutoChange = (valor) => {
+    if (String(valor || "").trim() !== ultimoErroEtiquetaRef.current) {
+      ultimoErroEtiquetaRef.current = "";
+    }
     setBuscarProduto(valor);
     if (!String(valor || "").trim()) {
       limparSugestoesProduto();
