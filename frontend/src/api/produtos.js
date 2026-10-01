@@ -221,6 +221,10 @@ export const updateProduto = (id, data) => {
   return api.put(`/produtos/${id}`, data);
 };
 
+export const corrigirPrecoEtiquetaBalanca = (id, data) => {
+  return api.patch(`/produtos/${id}/preco-etiqueta-balanca`, data);
+};
+
 /**
  * Simular os precos de venda dos produtos compostos afetados.
  */

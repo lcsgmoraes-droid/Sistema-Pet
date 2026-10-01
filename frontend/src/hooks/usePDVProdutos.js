@@ -44,6 +44,7 @@ export function usePDVProdutos({
   } = usePDVProdutoBusca({
     modoVisualizacao,
     adicionarProdutoAoCarrinho,
+    temCaixaAberto,
     vendaContextKey: vendaAtual?.id || "nova-venda",
   });
 

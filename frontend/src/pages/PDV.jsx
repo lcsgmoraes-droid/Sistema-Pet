@@ -8,6 +8,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { buscarClientePorId } from "../api/clientes";
+import { isAdminRole } from "../auth/userRole";
 import PDVDriveAlertBanner from "../components/pdv/PDVDriveAlertBanner";
 import PDVEtiquetaBalancaModal from "../components/pdv/PDVEtiquetaBalancaModal";
 import PDVMainArea from "../components/pdv/PDVMainArea";
@@ -624,6 +625,12 @@ export default function PDV() {
             pendencia={etiquetaPendente}
             onConfirmar={confirmarEtiquetaBalanca}
             onCancelar={cancelarEtiquetaBalanca}
+            podeEditarPreco={
+              user?.is_admin === true ||
+              isAdminRole(user) ||
+              user?.permissions?.includes("*") ||
+              user?.permissions?.includes("produtos.editar")
+            }
           />
         )}
       </div>

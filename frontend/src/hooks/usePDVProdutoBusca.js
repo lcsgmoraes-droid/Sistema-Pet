@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import toast from "react-hot-toast";
-import { getProdutosVendaveis } from "../api/produtos";
+import { corrigirPrecoEtiquetaBalanca, getProdutosVendaveis } from "../api/produtos";
+import { obterPrecoVendaPDV } from "../utils/pdvCarrinhoItensUtils";
 import { lerEtiquetaBalanca, produtoAceitaEtiquetaBalanca } from "../utils/pdvEtiquetaBalanca";
 import {
   deveAdicionarProdutoAutomaticamente,
@@ -22,6 +23,7 @@ const BUSCA_PRODUTO_CACHE_MAX = 20;
 export function usePDVProdutoBusca({
   modoVisualizacao,
   adicionarProdutoAoCarrinho,
+  temCaixaAberto,
   vendaContextKey,
 }) {
   const [buscarProduto, setBuscarProduto] = useState("");
@@ -421,9 +423,22 @@ export function usePDVProdutoBusca({
     limparBuscaProduto({ focarInput: true });
   };
 
-  const confirmarEtiquetaBalanca = (itemEtiqueta) => {
+  const confirmarEtiquetaBalanca = async (itemEtiqueta, { atualizarCadastro = false } = {}) => {
     if (!etiquetaPendente || itemEtiqueta?.codigo !== etiquetaPendente.etiqueta.codigo) {
       return false;
+    }
+    if (!temCaixaAberto) {
+      throw new Error("Abra um caixa antes de adicionar a etiqueta.");
+    }
+    if (atualizarCadastro) {
+      await corrigirPrecoEtiquetaBalanca(etiquetaPendente.produto.id, {
+        preco_kg_etiqueta: itemEtiqueta.precoUnitario,
+        preco_kg_sistema_esperado: obterPrecoVendaPDV(etiquetaPendente.produto),
+        codigo_etiqueta: itemEtiqueta.codigo,
+      });
+      buscaProdutoCacheRef.current.clear();
+      toast.success("Preço por kg atualizado no cadastro.");
+      if (etiquetaPendenteCodigoRef.current !== itemEtiqueta.codigo) return false;
     }
     const adicionou = adicionarProduto(etiquetaPendente.produto, {
       focarInput: true,

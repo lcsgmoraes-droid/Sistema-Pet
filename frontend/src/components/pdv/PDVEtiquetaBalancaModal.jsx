@@ -6,9 +6,17 @@ import { formatMoneyBRL } from "../../utils/formatters";
 import { useEscapeToClose } from "../../utils/modalEscape";
 import { obterPrecoVendaPDV } from "../../utils/pdvCarrinhoItensUtils";
 
-export default function PDVEtiquetaBalancaModal({ pendencia, onConfirmar, onCancelar }) {
+export default function PDVEtiquetaBalancaModal({
+  pendencia,
+  onConfirmar,
+  onCancelar,
+  podeEditarPreco,
+}) {
   const [precoEtiqueta, setPrecoEtiqueta] = useState(0);
   const [pesoImpresso, setPesoImpresso] = useState("");
+  const [perguntarAtualizacao, setPerguntarAtualizacao] = useState(false);
+  const [salvando, setSalvando] = useState(false);
+  const [erroSalvar, setErroSalvar] = useState("");
   const { etiqueta, produto } = pendencia;
   const precoSistema = obterPrecoVendaPDV(produto);
   const comparacao =
@@ -16,18 +24,53 @@ export default function PDVEtiquetaBalancaModal({ pendencia, onConfirmar, onCanc
       ? compararPrecosEtiquetaBalanca(etiqueta, produto, precoEtiqueta, pesoImpresso)
       : null;
   const pesoValido = comparacao && !comparacao.erro;
+  const precosDiferentes = pesoValido && comparacao.precoKgSistema !== comparacao.precoKgEtiqueta;
   const totalEtiqueta = etiqueta.totalCentavos / 100;
 
-  useEscapeToClose({ onClose: onCancelar });
+  useEscapeToClose({ onClose: onCancelar, disabled: salvando });
 
-  const confirmar = (usarPrecoEtiqueta) => {
-    if (!pesoValido || (!usarPrecoEtiqueta && comparacao.precoKgSistema === null)) return;
-    onConfirmar({
-      codigo: etiqueta.codigo,
-      quantidade: comparacao.quantidade,
-      precoUnitario: usarPrecoEtiqueta ? comparacao.precoKgEtiqueta : comparacao.precoKgSistema,
-      subtotal: usarPrecoEtiqueta ? comparacao.totalEtiqueta : comparacao.totalSistema,
-    });
+  const confirmar = async (usarPrecoEtiqueta, atualizarCadastro = false) => {
+    if (!pesoValido || salvando || (!usarPrecoEtiqueta && comparacao.precoKgSistema === null))
+      return;
+    setSalvando(true);
+    setErroSalvar("");
+    try {
+      const adicionou = await onConfirmar(
+        {
+          codigo: etiqueta.codigo,
+          quantidade: comparacao.quantidade,
+          precoUnitario: usarPrecoEtiqueta ? comparacao.precoKgEtiqueta : comparacao.precoKgSistema,
+          subtotal: usarPrecoEtiqueta ? comparacao.totalEtiqueta : comparacao.totalSistema,
+        },
+        { atualizarCadastro },
+      );
+      if (!adicionou) {
+        setErroSalvar(
+          atualizarCadastro
+            ? "O item não foi adicionado à venda. O cadastro pode já ter sido atualizado; confira antes de tentar novamente."
+            : "Não foi possível adicionar o produto à venda.",
+        );
+      }
+    } catch (error) {
+      const detalhe = error?.response?.data?.detail;
+      setErroSalvar(
+        typeof detalhe === "string"
+          ? `O item não foi adicionado. ${detalhe}`
+          : `O item não foi adicionado. ${error?.message || "Não foi possível atualizar o cadastro. Tente novamente ou use apenas nesta venda."}`,
+      );
+    } finally {
+      setSalvando(false);
+    }
+  };
+
+  const escolherPrecoEtiqueta = () => {
+    if (!pesoValido || salvando) return;
+    if (precosDiferentes) {
+      setPerguntarAtualizacao(true);
+      setErroSalvar("");
+    } else {
+      void confirmar(true);
+    }
   };
 
   return (
@@ -53,6 +96,7 @@ export default function PDVEtiquetaBalancaModal({ pendencia, onConfirmar, onCanc
           <button
             type="button"
             onClick={onCancelar}
+            disabled={salvando}
             aria-label="Cancelar etiqueta"
             className="rounded p-1 text-gray-500 hover:bg-gray-100"
           >
@@ -85,6 +129,7 @@ export default function PDVEtiquetaBalancaModal({ pendencia, onConfirmar, onCanc
                 value={precoEtiqueta}
                 onChange={setPrecoEtiqueta}
                 autoFocus
+                disabled={perguntarAtualizacao || salvando}
                 className="w-full rounded-lg border border-gray-300 px-3 py-2 text-lg focus:border-blue-500 focus:outline-none"
               />
             </div>
@@ -118,6 +163,7 @@ export default function PDVEtiquetaBalancaModal({ pendencia, onConfirmar, onCanc
                 placeholder="Ex.: 0,310"
                 value={pesoImpresso}
                 onChange={(event) => setPesoImpresso(event.target.value)}
+                disabled={perguntarAtualizacao || salvando}
                 className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none"
               />
             </div>
@@ -133,7 +179,7 @@ export default function PDVEtiquetaBalancaModal({ pendencia, onConfirmar, onCanc
                 })}{" "}
                 kg
               </p>
-              {comparacao.precoKgSistema !== comparacao.precoKgEtiqueta && (
+              {precosDiferentes && (
                 <p className="mt-2 text-amber-800">
                   Os preços por kg são diferentes. Escolha qual valor será cobrado.
                 </p>
@@ -163,30 +209,96 @@ export default function PDVEtiquetaBalancaModal({ pendencia, onConfirmar, onCanc
             </div>
           )}
 
+          {perguntarAtualizacao && (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
+              <p className="font-semibold">Corrigir também o preço no cadastro?</p>
+              <p className="mt-1">
+                O preço padrão deste produto passará de {formatMoneyBRL(comparacao.precoKgSistema)}{" "}
+                para {formatMoneyBRL(comparacao.precoKgEtiqueta)}/kg nas próximas vendas. Outros
+                canais que usam o preço padrão também podem ser afetados.
+              </p>
+              {produto.promocao_pdv_ativa && (
+                <p className="mt-2 font-medium">
+                  Há uma promoção ativa. Ajuste o preço promocional no cadastro; esta venda pode
+                  seguir com o preço da etiqueta.
+                </p>
+              )}
+              {!podeEditarPreco && !produto.promocao_pdv_ativa && (
+                <p className="mt-2 font-medium">
+                  Sua conta não tem permissão para editar produtos. Esta venda pode seguir com o
+                  preço da etiqueta.
+                </p>
+              )}
+            </div>
+          )}
+
+          {erroSalvar && (
+            <p role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-red-700">
+              {erroSalvar}
+            </p>
+          )}
+
           <div className="flex flex-wrap justify-end gap-2 border-t border-gray-200 pt-4">
-            <button
-              type="button"
-              onClick={onCancelar}
-              className="rounded-lg border border-gray-300 px-4 py-2 text-gray-700 hover:bg-gray-50"
-            >
-              Cancelar
-            </button>
-            <button
-              type="button"
-              onClick={() => confirmar(false)}
-              disabled={!pesoValido || comparacao.precoKgSistema === null}
-              className="rounded-lg border border-blue-600 px-4 py-2 font-semibold text-blue-700 hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              Usar preço do sistema
-            </button>
-            <button
-              type="button"
-              onClick={() => confirmar(true)}
-              disabled={!pesoValido}
-              className="rounded-lg bg-blue-600 px-4 py-2 font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              Usar preço da etiqueta
-            </button>
+            {perguntarAtualizacao ? (
+              <>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPerguntarAtualizacao(false);
+                    setErroSalvar("");
+                  }}
+                  disabled={salvando}
+                  className="rounded-lg border border-gray-300 px-4 py-2 text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                >
+                  Voltar
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void confirmar(true)}
+                  disabled={salvando}
+                  className="rounded-lg border border-blue-600 px-4 py-2 font-semibold text-blue-700 hover:bg-blue-50 disabled:opacity-50"
+                >
+                  Só nesta venda
+                </button>
+                {!produto.promocao_pdv_ativa && podeEditarPreco && (
+                  <button
+                    type="button"
+                    onClick={() => void confirmar(true, true)}
+                    disabled={salvando}
+                    className="rounded-lg bg-blue-600 px-4 py-2 font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
+                  >
+                    {salvando ? "Atualizando..." : "Atualizar cadastro e adicionar"}
+                  </button>
+                )}
+              </>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  onClick={onCancelar}
+                  disabled={salvando}
+                  className="rounded-lg border border-gray-300 px-4 py-2 text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void confirmar(false)}
+                  disabled={!pesoValido || comparacao.precoKgSistema === null || salvando}
+                  className="rounded-lg border border-blue-600 px-4 py-2 font-semibold text-blue-700 hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Usar preço do sistema
+                </button>
+                <button
+                  type="button"
+                  onClick={escolherPrecoEtiqueta}
+                  disabled={!pesoValido || salvando}
+                  className="rounded-lg bg-blue-600 px-4 py-2 font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Usar preço da etiqueta
+                </button>
+              </>
+            )}
           </div>
         </div>
       </div>
