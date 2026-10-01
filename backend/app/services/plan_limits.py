@@ -77,9 +77,11 @@ def enforce_monthly_sales_limit(
         "canceled",
     }
     tolerancia = overdue_grace_state(tenant, now.date() if now else None)
-    if raw_plan in PLAN_CATALOG and assinatura_inativa and not tolerancia[
-        "access_allowed"
-    ]:
+    if (
+        raw_plan in PLAN_CATALOG
+        and assinatura_inativa
+        and not tolerancia["access_allowed"]
+    ):
         mensagem = (
             "O pagamento esta vencido ha mais de 15 dias. Regularize para registrar novas vendas."
             if billing_status == "past_due"

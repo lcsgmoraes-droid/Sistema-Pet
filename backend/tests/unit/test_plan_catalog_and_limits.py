@@ -221,9 +221,12 @@ def test_atraso_exibe_contagem_e_preserva_recursos_ate_o_limite():
     assert "sales.app_ecommerce" in _load_active_entitlements(
         db, tenant.id, datetime(2026, 7, 16, tzinfo=timezone.utc)
     )
-    assert _load_active_entitlements(
-        db, tenant.id, datetime(2026, 7, 17, 12, tzinfo=timezone.utc)
-    ) == []
+    assert (
+        _load_active_entitlements(
+            db, tenant.id, datetime(2026, 7, 17, 12, tzinfo=timezone.utc)
+        )
+        == []
+    )
 
 
 def test_atraso_sem_data_nao_bloqueia_automaticamente():

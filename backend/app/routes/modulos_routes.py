@@ -132,9 +132,9 @@ def _assinatura_resumo_tenant(tenant: Tenant, agora: datetime) -> dict:
         else agora.date()
     )
     tolerancia = overdue_grace_state(tenant, data_brasilia)
-    acesso_operacional_ativo = status_efetivo in {"active", "trial"} or tolerancia[
-        "access_allowed"
-    ]
+    acesso_operacional_ativo = (
+        status_efetivo in {"active", "trial"} or tolerancia["access_allowed"]
+    )
 
     origem = getattr(tenant, "subscription_source", None) or "manual"
     pagamento_integrado = bool(
