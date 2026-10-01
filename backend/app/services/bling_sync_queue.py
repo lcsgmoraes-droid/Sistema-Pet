@@ -449,7 +449,9 @@ class BlingSyncQueueMixin:
         estoque_atual = float(produto.estoque_atual or 0)
         if estoque_atual < 0:
             fila.status = "falha_final"
-            fila.ultimo_erro = "Saldo negativo no CorePet; confira o estoque antes de enviar ao Bling"
+            fila.ultimo_erro = (
+                "Saldo negativo no CorePet; confira o estoque antes de enviar ao Bling"
+            )
             fila.processado_em = utc_now()
             fila.proxima_tentativa_em = None
             sync.status = "erro"
