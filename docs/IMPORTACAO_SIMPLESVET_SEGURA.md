@@ -31,9 +31,31 @@ a Pull Requests. A pasta `simplesvet/` e ignorada pelo Git para uso local.
 | `pets` | clientes, contatos e pets |
 | `sales` | clientes, produtos, vendas e itens |
 | `all` | todos os grupos acima |
+| `operational` | cadastros, produtos da loja, pets, vendas e pagamentos historicos, saldos em aberto dos clientes, fornecedores e compras. Nao inclui o livro financeiro nem XMLs. |
 
 As dependencias sao executadas automaticamente. Por exemplo, `sales` prepara os
 mapas de clientes e produtos antes de processar vendas.
+
+O escopo `operational` exige a exportacao completa, sem `-Limite`. Antes de
+aplicar, a simulacao reconcilia os saldos dos clientes com as vendas abertas e
+parcialmente pagas. Compras antigas entram como pedidos ja recebidos, sem
+movimentar estoque novamente. Formas de pagamento e baixas entram apenas como
+historico; os lancamentos do livro financeiro nao entram.
+
+O relatorio de `contas_receber` informa `clientes_devedores`, `saldo_centavos`
+e `sem_cliente`. Vendas abertas sem cliente seguem no historico, mas nao viram
+conta a receber atribuida a alguem. Como a exportacao nao traz vencimento
+individual, a data da venda e usada como vencimento e esta ressalva fica na
+observacao da conta.
+
+Para uma loja nova criada diretamente por um operador, use
+`backend/provisionar_tenant_operador.py` com os dados da empresa e `--plan`
+explicito. O comando le a senha de stdin; sem `--apply`, cria tudo dentro de
+uma transacao e desfaz ao final. Com `--apply`, cria tenant, nome de acesso,
+usuario administrador, papeis, permissoes e configuracao geral. O email fica
+verificado sem envio de mensagem, conforme a criacao direta autorizada. O
+aceite dos Termos e da Politica de Privacidade nao e preenchido em nome do
+usuario. Verifique antes se o plano escolhido inclui os modulos que ele usara.
 
 ## Etapa 1: simular
 

@@ -13,6 +13,7 @@ from app.intnfe.numbering import NumberingInput, advance_numbering, read_numberi
 REJECTED_STATUSES = {"rejeitada"}
 PENDING_STATUSES = {"aguardando", "enviando", "processando", "inconclusiva"}
 AUTHORIZED_STATUSES = {"autorizada", "cancelada", "inutilizada", "denegada"}
+PROVIDER_RETRYABLE_REJECTION_CODES = {"963"}
 MAX_DUPLICATE_RETRIES = 10
 
 
@@ -221,9 +222,15 @@ def repair_and_retry(
         # cadastro, lote, totais, pagamento e tributação atuais já são válidos.
         previous_fingerprint = venda.nfe_payload_hash
         current_fingerprint = emission_fingerprint(db, tenant, venda, document_type)
-        duplicate_number = str(venda.nfe_codigo_erro or "").strip() == "539"
-        if not duplicate_number and (
-            not previous_fingerprint or previous_fingerprint == current_fingerprint
+        rejection_code = str(venda.nfe_codigo_erro or "").strip()
+        duplicate_number = rejection_code == "539"
+        provider_retry = rejection_code in PROVIDER_RETRYABLE_REJECTION_CODES
+        if (
+            not duplicate_number
+            and not provider_retry
+            and (
+                not previous_fingerprint or previous_fingerprint == current_fingerprint
+            )
         ):
             raise DirectEmissionError(
                 "O CorePet validou os dados, mas não encontrou uma correção automática segura para esta rejeição. Revise o motivo informado antes de transmitir outra nota.",
@@ -231,7 +238,11 @@ def repair_and_retry(
                 code="CorrecaoAutomaticaIndisponivel",
                 correlation=venda.nfe_correlation_id,
             )
-        if not duplicate_number:
+        if provider_retry:
+            applied.append(
+                f"Reenvio da rejeição {rejection_code} liberado após correção confirmada no emissor."
+            )
+        elif not duplicate_number:
             applied.append(
                 "Dados da venda ou do lote fiscal foram corrigidos desde a rejeição."
             )

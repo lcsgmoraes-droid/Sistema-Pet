@@ -6,6 +6,11 @@ import {
   resolverCorrecaoFiscal,
 } from "../../services/fiscalCorrectionDialog";
 import FiscalReferenceSearch from "./FiscalReferenceSearch";
+import {
+  MENSAGEM_SUPORTE_RESPONSAVEL_TECNICO,
+  rejeicaoResponsavelTecnico,
+  SUPORTE_FISCAL_COREPET_URL,
+} from "../../utils/fiscalRejectionGuidance.mjs";
 
 const CAMPOS = {
   ncm: { rotulo: "NCM", tipo: "texto", placeholder: "8 dígitos", tamanho: 8 },
@@ -118,6 +123,7 @@ function agruparPendencias(validacao) {
       sku: item.sku,
       codigo_barras: item.codigo_barras,
       tipo: item.produto_tipo,
+      itemNumero: item.item_numero,
       pendencias: [],
     };
     if (!atual.pendencias.some((pendencia) => pendencia.campo === item.campo)) {
@@ -152,12 +158,91 @@ function mensagemErroApi(error) {
   );
 }
 
+function destinoPendenciaGeral(dialogo, gerais, rejeicao, clienteId) {
+  const texto = [rejeicao?.motivo, ...gerais.map((item) => item.mensagem)]
+    .filter(Boolean)
+    .join(" ")
+    .toLocaleLowerCase("pt-BR");
+  if (/intnfe|integração|integracao|credencial|certificado|csc/.test(texto)) {
+    return { url: "/configuracoes/integracoes", rotulo: "Abrir integração fiscal" };
+  }
+  if (/empresa|emitente|regime tributário|regime tributario/.test(texto)) {
+    return { url: "/configuracoes/fiscal", rotulo: "Abrir configuração fiscal da empresa" };
+  }
+  if (
+    /cliente|consumidor|destinatário|destinatario|cpf|cnpj|endereço|endereco|código ibge|codigo ibge/.test(
+      texto,
+    )
+  ) {
+    if (clienteId) {
+      const ehEndereco = /endereço|endereco|cep|ibge|município|municipio/.test(texto);
+      const aba = ehEndereco ? "endereco" : "dados-gerais";
+      return {
+        url: `/clientes/${encodeURIComponent(clienteId)}/editar?aba=${aba}`,
+        rotulo: ehEndereco ? "Corrigir endereço deste cliente" : "Corrigir cadastro deste cliente",
+      };
+    }
+    return { url: "/clientes", rotulo: "Abrir cadastro de clientes" };
+  }
+  if (dialogo?.vendaId) {
+    return {
+      url: `/pdv?venda_id=${encodeURIComponent(dialogo.vendaId)}`,
+      rotulo: "Abrir esta venda no PDV",
+    };
+  }
+  return null;
+}
+
+function FiscalSupportDialog({ fechar }) {
+  return (
+    <div className="fixed inset-0 z-[140] flex items-center justify-center bg-slate-950/55 p-3 backdrop-blur-sm">
+      <section
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="fiscal-support-title"
+        className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl dark:bg-slate-900"
+      >
+        <h2
+          id="fiscal-support-title"
+          className="text-lg font-semibold text-slate-900 dark:text-slate-100"
+        >
+          Não foi possível emitir esta nota
+        </h2>
+        <p className="mt-3 text-sm leading-6 text-slate-700 dark:text-slate-200">
+          {MENSAGEM_SUPORTE_RESPONSAVEL_TECNICO}
+        </p>
+        <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
+          O suporte precisa verificar a integração fiscal antes de uma nova tentativa.
+        </p>
+        <div className="mt-6 flex flex-wrap justify-end gap-2">
+          <button
+            type="button"
+            onClick={fechar}
+            className="rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-700 dark:border-slate-700 dark:text-slate-200"
+          >
+            Fechar
+          </button>
+          <a
+            href={SUPORTE_FISCAL_COREPET_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700"
+          >
+            Falar com o suporte
+          </a>
+        </div>
+      </section>
+    </div>
+  );
+}
+
 export default function FiscalCorrectionDialogHost() {
   const [dialogo, setDialogo] = useState(null);
   const [formularios, setFormularios] = useState({});
   const [carregando, setCarregando] = useState(false);
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState("");
+  const [clienteDestino, setClienteDestino] = useState(null);
 
   useEffect(() => assinarCorrecaoFiscal(setDialogo), []);
 
@@ -172,9 +257,36 @@ export default function FiscalCorrectionDialogHost() {
   );
   const contextoFiscal = dialogo?.validacao?.contexto_fiscal || {};
   const temCamposDeProduto = agrupado.produtos.length > 0;
+  const rejeicao = dialogo?.rejeicao || dialogo?.validacao?.rejeicao;
+  const erroResponsavelTecnico = rejeicaoResponsavelTecnico(rejeicao);
+  const destinoBase = destinoPendenciaGeral(dialogo, agrupado.gerais, rejeicao);
+  const clienteResolvido =
+    Boolean(dialogo?.vendaId) && String(clienteDestino?.vendaId) === String(dialogo.vendaId);
+  const clienteId = clienteResolvido ? clienteDestino?.clienteId : null;
+  const aguardandoCliente =
+    destinoBase?.url === "/clientes" && dialogo?.vendaId && !clienteResolvido;
+  const destinoGeral = destinoPendenciaGeral(dialogo, agrupado.gerais, rejeicao, clienteId);
 
   useEffect(() => {
-    if (!dialogo) return undefined;
+    if (!dialogo?.vendaId || destinoBase?.url !== "/clientes" || erroResponsavelTecnico) {
+      return undefined;
+    }
+    let ativo = true;
+    api
+      .get(`/vendas/${dialogo.vendaId}`)
+      .then(({ data }) => {
+        if (ativo) setClienteDestino({ vendaId: dialogo.vendaId, clienteId: data?.cliente_id });
+      })
+      .catch(() => {
+        if (ativo) setClienteDestino({ vendaId: dialogo.vendaId, clienteId: null });
+      });
+    return () => {
+      ativo = false;
+    };
+  }, [dialogo?.vendaId, destinoBase?.url, erroResponsavelTecnico]);
+
+  useEffect(() => {
+    if (!dialogo || erroResponsavelTecnico) return undefined;
     let ativo = true;
     setCarregando(true);
     setErro("");
@@ -200,11 +312,12 @@ export default function FiscalCorrectionDialogHost() {
     return () => {
       ativo = false;
     };
-  }, [dialogo, agrupado.produtos]);
+  }, [dialogo, agrupado.produtos, erroResponsavelTecnico]);
 
   if (!dialogo) return null;
 
   const fechar = () => resolverCorrecaoFiscal(false);
+  if (erroResponsavelTecnico) return <FiscalSupportDialog fechar={fechar} />;
   const atualizarCampo = (produtoId, campo, valor) => {
     setFormularios((atuais) => ({
       ...atuais,
@@ -296,8 +409,8 @@ export default function FiscalCorrectionDialogHost() {
             </h2>
             <p className="mt-1 text-sm leading-6 text-slate-600 dark:text-slate-300">
               {temCamposDeProduto
-                ? "A nota ainda não foi criada. Corrija os campos abaixo e o CorePet fará uma nova validação automaticamente."
-                : "A nota ainda não foi criada. Confira abaixo o motivo informado pelo emissor."}
+                ? "Corrija os campos destacados. Os dados serão validados novamente antes de qualquer nova transmissão."
+                : "Confira o motivo informado pelo emissor e a orientação abaixo."}
             </p>
           </div>
           <button
@@ -311,6 +424,16 @@ export default function FiscalCorrectionDialogHost() {
         </header>
 
         <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-5">
+          {(rejeicao?.motivo || rejeicao?.codigo) && (
+            <div
+              className="rounded-xl border border-red-300 bg-red-50 p-4 text-sm text-red-900"
+              role="alert"
+            >
+              <p className="font-semibold">Erro informado na tentativa anterior</p>
+              {rejeicao.codigo && <p className="mt-1">Código: {rejeicao.codigo}</p>}
+              {rejeicao.motivo && <p className="mt-1">{rejeicao.motivo}</p>}
+            </div>
+          )}
           {carregando && (
             <div className="flex items-center justify-center gap-2 py-12 text-sm text-slate-600 dark:text-slate-300">
               <Loader2 className="h-5 w-5 animate-spin" /> Carregando os cadastros fiscais...
@@ -364,6 +487,7 @@ export default function FiscalCorrectionDialogHost() {
                 >
                   <div className="mb-4">
                     <h3 className="font-semibold text-slate-900 dark:text-slate-100">
+                      {produto.itemNumero ? `Item ${produto.itemNumero} · ` : ""}
                       {produto.nome}
                     </h3>
                     {produto.sku && (
@@ -379,14 +503,30 @@ export default function FiscalCorrectionDialogHost() {
                   <div className="grid gap-4 md:grid-cols-2">
                     {produto.pendencias.map((item) => {
                       const campo = CAMPOS[item.campo];
-                      const opcoes = campo.tipo === "pis-cofins" ? OPCOES_PIS_COFINS : campo.opcoes;
+                      const opcoesBase =
+                        campo.tipo === "pis-cofins" ? OPCOES_PIS_COFINS : campo.opcoes;
+                      const opcoes =
+                        item.campo === "cst_icms" &&
+                        contextoFiscal.regime_tributario &&
+                        typeof contextoFiscal.simples_nacional === "boolean"
+                          ? opcoesBase.filter(([valor]) =>
+                              contextoFiscal.simples_nacional
+                                ? valor.length === 3
+                                : valor.length === 2,
+                            )
+                          : opcoesBase;
                       const confianca = CONFIANCA[item.confianca];
                       const campoId = `fiscal-${produto.id}-${item.campo}`;
+                      const valorAtual = String(fiscal[item.campo] || "");
+                      const valorForaDaLista =
+                        valorAtual &&
+                        Array.isArray(opcoes) &&
+                        !opcoes.some(([valor]) => valor === valorAtual);
                       return (
                         <div key={item.campo} className="block">
                           <label
                             htmlFor={campoId}
-                            className="mb-1.5 flex flex-wrap items-center gap-2 text-sm font-medium text-slate-700 dark:text-slate-200"
+                            className="mb-1.5 flex flex-wrap items-center gap-2 text-sm font-semibold text-red-800 dark:text-red-300"
                           >
                             {campo.rotulo}
                             {confianca && (
@@ -407,9 +547,16 @@ export default function FiscalCorrectionDialogHost() {
                               onChange={(event) =>
                                 atualizarCampo(String(produto.id), item.campo, event.target.value)
                               }
-                              className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-cyan-600 focus:ring-2 focus:ring-cyan-600/20 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+                              aria-invalid="true"
+                              aria-describedby={`${campoId}-erro`}
+                              className="w-full rounded-xl border-2 border-red-400 bg-red-50 px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-red-600 focus:ring-2 focus:ring-red-600/20 dark:bg-slate-950 dark:text-slate-100"
                             >
                               <option value="">Selecione...</option>
+                              {valorForaDaLista && (
+                                <option value={valorAtual}>
+                                  {valorAtual} — valor atual inválido
+                                </option>
+                              )}
                               {opcoes.map(([valor, rotulo]) => (
                                 <option key={valor} value={valor}>
                                   {rotulo}
@@ -430,8 +577,22 @@ export default function FiscalCorrectionDialogHost() {
                                   event.target.value.replace(/\D/g, ""),
                                 )
                               }
-                              className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-cyan-600 focus:ring-2 focus:ring-cyan-600/20 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+                              aria-invalid="true"
+                              aria-describedby={`${campoId}-erro`}
+                              className="w-full rounded-xl border-2 border-red-400 bg-red-50 px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-red-600 focus:ring-2 focus:ring-red-600/20 dark:bg-slate-950 dark:text-slate-100"
                             />
+                          )}
+                          <p
+                            id={`${campoId}-erro`}
+                            className="mt-1.5 text-xs font-medium leading-5 text-red-700"
+                          >
+                            {item.mensagem || item.motivo || "Confira este campo antes de emitir."}
+                          </p>
+                          {item.valor_atual && valorAtual !== String(item.valor_atual) && (
+                            <p className="mt-1.5 text-xs font-semibold text-amber-800">
+                              Valor que seria usado na nota: {item.valor_atual}. O cadastro, lote ou
+                              regra de ICMS-ST pode prevalecer sobre o valor mostrado no campo.
+                            </p>
                           )}
                           {item.valor_sugerido ? (
                             <div className="mt-2 rounded-lg border border-slate-200 bg-slate-50 p-2.5 text-xs leading-5 text-slate-600 dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-300">
@@ -458,11 +619,7 @@ export default function FiscalCorrectionDialogHost() {
                                 Fonte: {fonteLegivel(item.fonte_sugestao)}.
                               </p>
                             </div>
-                          ) : (
-                            <span className="mt-1.5 block text-xs leading-5 text-slate-500">
-                              {item.mensagem}
-                            </span>
-                          )}
+                          ) : null}
                         </div>
                       );
                     })}
@@ -481,6 +638,22 @@ export default function FiscalCorrectionDialogHost() {
                   <li key={`${item.campo}-${index}`}>• {item.mensagem || item.campo}</li>
                 ))}
               </ul>
+              {destinoGeral && !aguardandoCliente && (
+                <a href={destinoGeral.url} className="mt-3 inline-block font-semibold underline">
+                  {destinoGeral.rotulo}
+                </a>
+              )}
+            </div>
+          )}
+          {!carregando && !temCamposDeProduto && agrupado.gerais.length === 0 && (
+            <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+              Os dados atuais passaram na validação, mas a rejeição anterior ainda precisa ser
+              conferida. Revise o motivo acima antes de tentar transmitir novamente.
+              {destinoGeral && !aguardandoCliente && (
+                <a href={destinoGeral.url} className="mt-3 block font-semibold underline">
+                  {destinoGeral.rotulo}
+                </a>
+              )}
             </div>
           )}
 
@@ -496,7 +669,7 @@ export default function FiscalCorrectionDialogHost() {
             <CheckCircle2 className="h-4 w-4 text-emerald-600" />
             {temCamposDeProduto
               ? "Os dados ficam salvos no cadastro do produto para as próximas vendas."
-              : "Nenhum documento fiscal foi criado nesta tentativa."}
+              : "Esta tela não transmite uma nova nota."}
           </p>
           <div className="flex flex-col-reverse gap-2 sm:flex-row">
             <button
@@ -518,6 +691,15 @@ export default function FiscalCorrectionDialogHost() {
                 {dialogo?.apenasCorrigir
                   ? "Salvar e verificar novamente"
                   : "Salvar e tentar emitir novamente"}
+              </button>
+            )}
+            {!temCamposDeProduto && rejeicao && dialogo.apenasCorrigir && (
+              <button
+                type="button"
+                onClick={() => resolverCorrecaoFiscal(true)}
+                className="rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Verificar correção e tentar novamente
               </button>
             )}
           </div>

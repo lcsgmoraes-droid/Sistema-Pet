@@ -6,11 +6,16 @@ from uuid import uuid4
 
 from sqlalchemy import Text
 
+from app.campaigns import models as campaign_models  # noqa: F401 - FK do schema SQLite
 from app.bling_connection_models import BlingConnection
 from app.services.bling_connection_service import (
+    BLING_REAUTH_REQUIRED,
+    bling_oauth_rate_limited_until,
     extract_bling_company_id,
     get_bling_connection,
     load_bling_credentials,
+    mark_bling_reauthorization_required,
+    mark_bling_oauth_rate_limited,
     resolve_bling_webhook_tenant,
     save_bling_stock_deposit_id,
     save_bling_tokens,
@@ -114,6 +119,69 @@ def test_company_cannot_be_linked_to_two_tenants(db_session, monkeypatch):
         assert "outro tenant" in str(exc)
     else:  # pragma: no cover - assertion guard
         raise AssertionError("A mesma empresa Bling foi vinculada a dois tenants")
+
+
+def test_refresh_invalido_pausa_renovacao_ate_nova_autorizacao(db_session, monkeypatch):
+    monkeypatch.setenv("PAYMENT_CONFIG_ENCRYPTION_KEY", "bling-test-master-key")
+    tenant_id = uuid4()
+    save_bling_tokens(
+        tenant_id=tenant_id,
+        access_token=_jwt_with_company("company-reauth"),
+        refresh_token="refresh-antigo",
+        db=db_session,
+    )
+
+    assert not mark_bling_reauthorization_required(
+        tenant_id=tenant_id, failed_refresh_token="outro-token", db=db_session
+    )
+    assert mark_bling_reauthorization_required(
+        tenant_id=tenant_id, failed_refresh_token="refresh-antigo", db=db_session
+    )
+    assert (
+        get_bling_connection(tenant_id, db=db_session).last_error
+        == BLING_REAUTH_REQUIRED
+    )
+
+    save_bling_tokens(
+        tenant_id=tenant_id,
+        access_token=_jwt_with_company("company-reauth"),
+        refresh_token="refresh-novo",
+        db=db_session,
+    )
+    assert get_bling_connection(tenant_id, db=db_session).last_error is None
+
+
+def test_rate_limit_oauth_pausa_por_tenant_e_nao_pausa_token_novo(
+    db_session, monkeypatch
+):
+    monkeypatch.setenv("PAYMENT_CONFIG_ENCRYPTION_KEY", "bling-test-master-key")
+    tenant_id = uuid4()
+    save_bling_tokens(
+        tenant_id=tenant_id,
+        access_token=_jwt_with_company("company-rate-limit"),
+        refresh_token="refresh-antigo",
+        db=db_session,
+    )
+
+    assert not mark_bling_oauth_rate_limited(
+        tenant_id=tenant_id, failed_refresh_token="outro-token", db=db_session
+    )
+    assert mark_bling_oauth_rate_limited(
+        tenant_id=tenant_id, failed_refresh_token="refresh-antigo", db=db_session
+    )
+    connection = get_bling_connection(tenant_id, db=db_session)
+    assert bling_oauth_rate_limited_until(connection) is not None
+
+    save_bling_tokens(
+        tenant_id=tenant_id,
+        access_token=_jwt_with_company("company-rate-limit"),
+        refresh_token="refresh-novo",
+        db=db_session,
+    )
+    assert (
+        bling_oauth_rate_limited_until(get_bling_connection(tenant_id, db=db_session))
+        is None
+    )
 
 
 def test_stock_deposit_is_persisted_per_tenant(db_session, monkeypatch):

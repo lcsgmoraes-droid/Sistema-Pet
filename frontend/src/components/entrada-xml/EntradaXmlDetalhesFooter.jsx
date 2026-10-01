@@ -25,18 +25,12 @@ function EntradaXmlDetalhesFooter({
   const temProdutosVinculados = produtosVinculados > 0;
 
   return (
-    <div className="sticky bottom-0 space-y-3 border-t bg-white px-6 py-4">
-      <div className="rounded border border-gray-200 bg-gray-50 p-3">
-        <div className="mb-2 flex items-center justify-between">
-          <h4 className="text-sm font-medium text-gray-700">
+    <div className="shrink-0 space-y-2 border-t border-slate-200 bg-white px-4 py-2 md:px-5">
+      <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <h4 className="mr-1 text-xs font-medium text-slate-600">
             Distribuicao (informativo para relatorios)
           </h4>
-          <div className="text-xs text-gray-500">
-            Estoque unificado - Classificacao apenas para analises
-          </div>
-        </div>
-
-        <div className="flex flex-wrap gap-2">
           {RATEIO_OPCOES.map((opcao) => {
             const ativo = tipoRateio === opcao.value;
 
@@ -55,7 +49,7 @@ function EntradaXmlDetalhesFooter({
           })}
 
           {(notaSelecionada.percentual_online > 0 || notaSelecionada.tipo_rateio) && (
-            <div className="ml-auto flex gap-3 text-xs text-gray-600">
+            <div className="ml-auto flex gap-3 text-[11px] text-slate-500">
               <span>Online: {(notaSelecionada.percentual_online || 0).toFixed(0)}%</span>
               <span>Loja: {(notaSelecionada.percentual_loja || 100).toFixed(0)}%</span>
             </div>
@@ -63,7 +57,7 @@ function EntradaXmlDetalhesFooter({
         </div>
 
         {tipoRateio === "parcial" && (
-          <div className="mt-2 rounded bg-gray-100 p-2 text-xs text-gray-600">
+          <div className="mt-2 text-[11px] text-slate-500">
             Defina a quantidade destinada ao <strong>estoque online</strong> em cada produto acima.
             O sistema calcula automaticamente a % baseado nos valores.
           </div>
@@ -71,17 +65,17 @@ function EntradaXmlDetalhesFooter({
       </div>
 
       <div className="flex items-center justify-between gap-3">
-        <div className="text-sm text-gray-600">
+        <div className="text-xs text-slate-500">
           {produtosVinculados} de {notaSelecionada.itens.length} produtos vinculados
         </div>
 
-        <div className="flex flex-wrap justify-end gap-3">
+        <div className="flex flex-wrap justify-end gap-2">
           {notaSelecionada.entrada_estoque_realizada ? (
             <ActionButton
               disabled={loading}
               intent="warning"
               onClick={() => reverterNota(notaSelecionada.id, notaSelecionada.numero_nota)}
-              size="md"
+              size="sm"
             >
               {loading ? "Revertendo..." : "Reverter Entrada"}
             </ActionButton>
@@ -91,7 +85,7 @@ function EntradaXmlDetalhesFooter({
                 disabled={loading}
                 intent="delete"
                 onClick={() => excluirNota(notaSelecionada.id, notaSelecionada.numero_nota)}
-                size="md"
+                size="sm"
               >
                 Excluir Nota
               </ActionButton>
@@ -101,7 +95,7 @@ function EntradaXmlDetalhesFooter({
                   disabled={loading}
                   intent="create"
                   onClick={() => carregarPreviewProcessamento(notaSelecionada.id)}
-                  size="md"
+                  size="sm"
                 >
                   {loading ? "Carregando revisao..." : "Revisar acoes e processar"}
                 </ActionButton>
@@ -115,7 +109,7 @@ function EntradaXmlDetalhesFooter({
               setMostrarDetalhes(false);
               setNotaSelecionada(null);
             }}
-            size="md"
+            size="sm"
             tone="soft"
           >
             Fechar

@@ -53,8 +53,7 @@ export default function ConfiguracaoFiscalEmpresaView({
             <h2 className="text-lg font-semibold text-blue-900">📋 Dados Cadastrais</h2>
             <p className="text-sm text-blue-700 mt-2">
               💡 <strong>Dica:</strong> Digite o CNPJ e clique no botão 🔍 para preencher
-              automaticamente os dados da empresa (razão social, endereço, CNAEs, etc.) consultando
-              a Receita Federal.
+              automaticamente os dados públicos da empresa (razão social, endereço, CNAEs, etc.).
             </p>
           </div>
           <div className="p-6 space-y-4">
@@ -78,7 +77,7 @@ export default function ConfiguracaoFiscalEmpresaView({
                     type="button"
                     onClick={buscarDadosPorCNPJ}
                     disabled={buscandoCNPJ || !dadosEmpresa.cnpj}
-                    title="Buscar dados da Receita Federal pelo CNPJ"
+                    title="Buscar dados da empresa pelo CNPJ"
                     className="px-3 py-2 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 disabled:from-gray-300 disabled:to-gray-400 disabled:cursor-not-allowed flex items-center justify-center shadow-md hover:shadow-lg transition-all duration-200"
                   >
                     {buscandoCNPJ ? (

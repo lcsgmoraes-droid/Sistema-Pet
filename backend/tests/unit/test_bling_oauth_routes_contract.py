@@ -5,6 +5,7 @@ from uuid import uuid4
 from starlette.requests import Request
 
 from app.bling_oauth_routes import (
+    BlingOAuthRateLimited,
     _bling_redirect_uri,
     _encode_oauth_state,
     _html_erro,
@@ -109,6 +110,26 @@ def test_bling_oauth_callback_salva_no_tenant_assinado(monkeypatch):
     assert captured["kwargs"]["tenant_id"] == tenant_id
     assert captured["args"] == ("access-gabi", "refresh-gabi")
     assert get_current_tenant() is None
+
+
+def test_callback_exibe_limite_temporario_sem_expor_codigo(monkeypatch):
+    monkeypatch.setattr(
+        "app.bling_oauth_routes._trocar_code_por_tokens",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(
+            BlingOAuthRateLimited("Bling OAuth: HTTP 429")
+        ),
+    )
+
+    response = bling_oauth_callback(
+        request=_request(),
+        code="codigo-secreto",
+        state=_encode_oauth_state(tenant_id=uuid4()),
+        db=object(),
+    )
+
+    assert response.status_code == 429
+    assert "limitou temporariamente" in response.body.decode()
+    assert "codigo-secreto" not in response.body.decode()
 
 
 def test_troca_oauth_usa_client_secret_do_tenant(monkeypatch):

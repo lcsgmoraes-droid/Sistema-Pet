@@ -223,13 +223,8 @@ export default function ConfiguracaoFiscalEmpresa() {
 
     setBuscandoCNPJ(true);
     try {
-      const response = await fetch(`https://brasilapi.com.br/api/cnpj/v1/${cnpjLimpo}`);
-
-      if (!response.ok) {
-        throw new Error("CNPJ não encontrado");
-      }
-
-      const dados = await response.json();
+      const response = await api.get(`/empresa/consulta-cnpj/${cnpjLimpo}`);
+      const dados = response.data;
       console.log("🔍 Dados completos da API:", dados);
       console.log("📋 CNAE Fiscal:", dados.cnae_fiscal);
       console.log("📋 CNAE Descrição:", dados.cnae_fiscal_descricao);
@@ -293,7 +288,9 @@ export default function ConfiguracaoFiscalEmpresa() {
       toast.success("✅ Dados preenchidos com sucesso!");
     } catch (error) {
       console.error("Erro ao buscar CNPJ:", error);
-      toast.error("❌ Erro ao buscar CNPJ. Verifique o número.");
+      toast.error(
+        error.response?.data?.detail || "Não foi possível consultar o CNPJ. Tente novamente.",
+      );
     } finally {
       setBuscandoCNPJ(false);
     }

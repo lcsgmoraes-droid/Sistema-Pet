@@ -2,6 +2,7 @@ import {
   campaignAllowsSaleChannel,
   getCashbackBonusParamKey,
 } from "../utils/campaignChannelScope.js";
+import { formatMoneyBRL } from "../utils/formatters.js";
 
 export const BANDEIRAS_CARTAO = [
   "Visa",
@@ -316,6 +317,15 @@ export function calcularResumoRecebimento({
   };
 }
 
+export function calcularSaldoBeneficioDisponivel({ saldo = 0, pagamentos = [], tipo }) {
+  const saldoCentavos = Math.round(Number(saldo || 0) * 100);
+  const reservadoCentavos = pagamentos.reduce((total, pagamento) => {
+    const corresponde = tipo === "cashback" ? pagamento.is_cashback : pagamento.is_credito_cliente;
+    return total + (corresponde ? Math.round(Number(pagamento.valor || 0) * 100) : 0);
+  }, 0);
+  return Math.max(0, saldoCentavos - reservadoCentavos) / 100;
+}
+
 export function montarCupomParaFinalizar({ cupomAplicado, venda = {} }) {
   if (cupomAplicado) return cupomAplicado;
   if (!venda.cupom_code) return null;
@@ -482,6 +492,8 @@ export function validarPagamentoParaAdicionar({
   formaPagamento,
   valor = 0,
   saldoCashback = 0,
+  saldoCreditoDisponivel,
+  valorRestante,
   bandeira = "",
   operadora = null,
   numeroParcelas = 1,
@@ -496,6 +508,14 @@ export function validarPagamentoParaAdicionar({
 
   if (valorNumerico <= 0) {
     return "Informe o valor recebido";
+  }
+
+  if (
+    ["credito_cliente", "cashback"].includes(formaPagamento.id) &&
+    valorRestante !== undefined &&
+    Math.round(valorNumerico * 100) > Math.round(valorRestante * 100)
+  ) {
+    return `Valor excede o restante da venda (${formatMoneyBRL(valorRestante)})`;
   }
 
   if (formaPagamento.tipo === "crediario" && !cliente?.id) {
@@ -529,19 +549,21 @@ export function validarPagamentoParaAdicionar({
     }
   }
 
+  const creditoDisponivel = Number(
+    saldoCreditoDisponivel ?? formaPagamento.credito_disponivel ?? 0,
+  );
   if (
     formaPagamento.id === "credito_cliente" &&
-    valorNumerico > Number(formaPagamento.credito_disponivel || 0)
+    Math.round(valorNumerico * 100) > Math.round(creditoDisponivel * 100)
   ) {
-    return `Valor excede o crédito disponível (R$ ${Number(
-      formaPagamento.credito_disponivel || 0,
-    ).toFixed(2)})`;
+    return `Valor excede o crédito disponível (${formatMoneyBRL(creditoDisponivel)})`;
   }
 
-  if (formaPagamento.id === "cashback" && valorNumerico > Number(saldoCashback || 0) + 0.01) {
-    return `Valor excede o cashback disponível (R$ ${Number(saldoCashback || 0)
-      .toFixed(2)
-      .replace(".", ",")})`;
+  if (
+    formaPagamento.id === "cashback" &&
+    Math.round(valorNumerico * 100) > Math.round(Number(saldoCashback || 0) * 100)
+  ) {
+    return `Valor excede o cashback disponível (${formatMoneyBRL(saldoCashback)})`;
   }
 
   const isCartao = ["cartao_credito", "cartao_debito"].includes(formaPagamento.tipo);

@@ -3,6 +3,7 @@ import api from "../api";
 import { buscarClientePorId } from "../api/clientes";
 import { buscarVenda, listarVendas } from "../api/vendas";
 import { debugLog } from "../utils/debug";
+import { extrairCamposFiscaisVenda } from "../utils/pdvFiscalStatus";
 import { perguntarCorePet } from "../services/corepetDialog";
 
 function criarEntregaVazia() {
@@ -109,11 +110,7 @@ export function usePDVVendaCarregamento({
           entrega: venda.entrega || criarEntregaVazia(),
           pagamentos,
           total_pago: totalPago,
-          nfe_tipo: venda.nfe_tipo,
-          nfe_modelo: venda.nfe_modelo,
-          nfe_status: venda.nfe_status,
-          nfe_codigo_erro: venda.nfe_codigo_erro,
-          nfe_motivo_rejeicao: venda.nfe_motivo_rejeicao,
+          ...extrairCamposFiscaisVenda(venda),
         };
 
         setVendaAtual(vendaCarregada);
@@ -263,6 +260,7 @@ export function usePDVVendaCarregamento({
         },
         pagamentos,
         total_pago: totalPago,
+        ...extrairCamposFiscaisVenda(vendaCompleta),
       };
 
       setVendaAtual(vendaParaSetar);

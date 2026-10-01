@@ -14,6 +14,7 @@ import {
 
 import CustomerIdentity from "../../components/ui/CustomerIdentity";
 import { formatMoneyBRL } from "../../utils/formatters";
+import { rejeicaoResponsavelTecnico } from "../../utils/fiscalRejectionGuidance.mjs";
 import { formatarDataBR, getSituacaoCor, getSituacaoIcone } from "./centralNFSaidaUtils";
 
 export default function NFSaidaList({
@@ -30,6 +31,8 @@ export default function NFSaidaList({
   reconciliandoNotaId,
   corrigirEReemitir,
   corrigindoNotaId,
+  abrirCorrecao,
+  diagnosticandoNotaId,
   liberarVendaComRejeicao,
   liberandoVendaId,
   baixarDanfe,
@@ -142,12 +145,36 @@ export default function NFSaidaList({
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <span
-                      className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium ${getSituacaoCor(nota.status)}`}
-                    >
-                      {getSituacaoIcone(nota.status)}
-                      {nota.status || "Pendente"}
-                    </span>
+                    {nota.provedor === "intnfe" && nota.status?.toLowerCase() === "rejeitada" ? (
+                      <button
+                        type="button"
+                        onClick={() => abrirCorrecao(nota)}
+                        disabled={diagnosticandoNotaId === String(nota.venda_id)}
+                        className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium underline disabled:opacity-50 ${getSituacaoCor(nota.status)}`}
+                        title={
+                          rejeicaoResponsavelTecnico({
+                            codigo: nota.codigo_erro,
+                            motivo: nota.motivo_rejeicao,
+                          })
+                            ? "Ver orientação de suporte"
+                            : "Abrir a correção desta rejeição"
+                        }
+                      >
+                        {getSituacaoIcone(nota.status)} {nota.status} ·{" "}
+                        {rejeicaoResponsavelTecnico({
+                          codigo: nota.codigo_erro,
+                          motivo: nota.motivo_rejeicao,
+                        })
+                          ? "Falar com suporte"
+                          : "Corrigir erro"}
+                      </button>
+                    ) : (
+                      <span
+                        className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium ${getSituacaoCor(nota.status)}`}
+                      >
+                        {getSituacaoIcone(nota.status)} {nota.status || "Pendente"}
+                      </span>
+                    )}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                     {formatMoneyBRL(nota.valor)}
@@ -173,34 +200,39 @@ export default function NFSaidaList({
                           <Trash2 className="w-5 h-5" />
                         </button>
                       )}
-                      {nota.provedor === "intnfe" && nota.status?.toLowerCase() === "rejeitada" && (
-                        <>
-                          <button
-                            onClick={() => liberarVendaComRejeicao(nota)}
-                            disabled={liberandoVendaId === String(nota.venda_id)}
-                            className="text-teal-600 hover:text-teal-900 p-1 hover:bg-teal-50 rounded disabled:opacity-50"
-                            title="Liberar venda para escolher outro modelo de nota"
-                          >
-                            <Unlock
-                              className={`w-5 h-5 ${
-                                liberandoVendaId === String(nota.venda_id) ? "animate-pulse" : ""
-                              }`}
-                            />
-                          </button>
-                          <button
-                            onClick={() => corrigirEReemitir(nota)}
-                            disabled={corrigindoNotaId === String(nota.venda_id)}
-                            className="text-purple-600 hover:text-purple-900 p-1 hover:bg-purple-50 rounded disabled:opacity-50"
-                            title={`Tentar novamente como ${Number(nota.modelo) === 55 ? "NF-e" : "NFC-e"}`}
-                          >
-                            <RotateCcw
-                              className={`w-5 h-5 ${
-                                corrigindoNotaId === String(nota.venda_id) ? "animate-spin" : ""
-                              }`}
-                            />
-                          </button>
-                        </>
-                      )}
+                      {nota.provedor === "intnfe" &&
+                        nota.status?.toLowerCase() === "rejeitada" &&
+                        !rejeicaoResponsavelTecnico({
+                          codigo: nota.codigo_erro,
+                          motivo: nota.motivo_rejeicao,
+                        }) && (
+                          <>
+                            <button
+                              onClick={() => liberarVendaComRejeicao(nota)}
+                              disabled={liberandoVendaId === String(nota.venda_id)}
+                              className="text-teal-600 hover:text-teal-900 p-1 hover:bg-teal-50 rounded disabled:opacity-50"
+                              title="Liberar venda para escolher outro modelo de nota"
+                            >
+                              <Unlock
+                                className={`w-5 h-5 ${
+                                  liberandoVendaId === String(nota.venda_id) ? "animate-pulse" : ""
+                                }`}
+                              />
+                            </button>
+                            <button
+                              onClick={() => corrigirEReemitir(nota)}
+                              disabled={corrigindoNotaId === String(nota.venda_id)}
+                              className="text-purple-600 hover:text-purple-900 p-1 hover:bg-purple-50 rounded disabled:opacity-50"
+                              title={`Tentar novamente como ${Number(nota.modelo) === 55 ? "NF-e" : "NFC-e"}`}
+                            >
+                              <RotateCcw
+                                className={`w-5 h-5 ${
+                                  corrigindoNotaId === String(nota.venda_id) ? "animate-spin" : ""
+                                }`}
+                              />
+                            </button>
+                          </>
+                        )}
                       <button
                         onClick={() => reconciliarFluxoNota(nota)}
                         disabled={reconciliandoNotaId === String(nota.id)}

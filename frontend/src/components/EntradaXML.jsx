@@ -525,6 +525,7 @@ const EntradaXML = () => {
         atualizarCampoConferenciaItem={atualizarCampoConferenciaItem}
         atualizarFiltroProduto={atualizarFiltroProduto}
         buscandoProduto={buscandoProduto}
+        baixarDocumentoNota={baixarDocumentoNota}
         calcularConferenciaItem={calcularConferenciaItem}
         carregarPreviewProcessamento={carregarPreviewProcessamento}
         conferenciaItens={conferenciaItens}
@@ -535,6 +536,7 @@ const EntradaXML = () => {
         desfazerConferenciaAtual={desfazerConferenciaAtual}
         desvincularProduto={desvincularProduto}
         detectarDivergencias={detectarDivergencias}
+        documentoBaixando={documentoBaixando}
         excluirNota={excluirNota}
         filtroItensNota={filtroItensNota}
         filtroProduto={filtroProduto}

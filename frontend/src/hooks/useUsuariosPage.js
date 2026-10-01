@@ -21,6 +21,10 @@ const USUARIO_INICIAL = {
 
 const CREDENCIAIS_INICIAIS = { login_phone: "", new_password: "", role_id: "" };
 
+function isClienteRole(role) {
+  return (role?.nome || "").trim().toLocaleLowerCase("pt-BR") === "cliente";
+}
+
 function detalhesValidacaoParaMensagem(details) {
   const validationDetails = Array.isArray(details) ? details : [];
 
@@ -373,6 +377,8 @@ export default function useUsuariosPage() {
     carregarRoles();
   }, []);
 
+  const rolesUsuariosDiretos = roles.filter((role) => !isClienteRole(role));
+
   return {
     criarUsuario,
     credenciais,
@@ -394,6 +400,7 @@ export default function useUsuariosPage() {
     perfisApp,
     pessoaVinculadaCredenciais,
     roles,
+    rolesUsuariosDiretos,
     searchTerm,
     setFiltroPerfil,
     setFiltroStatus,

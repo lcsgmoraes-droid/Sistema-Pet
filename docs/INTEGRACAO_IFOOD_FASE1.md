@@ -51,7 +51,9 @@ identificador ou sem preço válido ficam fora do envio e aparecem no diagnósti
 - Cliente OAuth `client_credentials`, consulta das lojas autorizadas e ingestão
   pelo módulo Item.
 - `POST` somente para criação/reativação e `PATCH` para atualização.
-- O parâmetro destrutivo `reset=true` nunca é utilizado.
+- `reset=true` fica disponível apenas na ação explícita de homologação, exige
+  confirmação adicional na tela e somente pode ser usado com `POST`. A ação
+  informa que todos os produtos omitidos serão desativados pelo iFood.
 - Trava global para envio real e limite local de 200 produtos por chamada.
 
 ## Variáveis do servidor
@@ -64,9 +66,9 @@ IFOOD_REQUEST_TIMEOUT_SECONDS=15
 IFOOD_CATALOG_WRITE_ENABLED=false
 ```
 
-`IFOOD_CATALOG_WRITE_ENABLED` deve continuar `false` até o aplicativo concluir a
-homologação. Credenciais reais pertencem ao ambiente do servidor e não devem ser
-commitadas.
+`IFOOD_CATALOG_WRITE_ENABLED` deve ficar `true` somente no ambiente controlado
+em que os testes do módulo Item serão executados. Credenciais reais pertencem ao
+ambiente do servidor e não devem ser commitadas.
 
 ## Passos externos para ativação
 

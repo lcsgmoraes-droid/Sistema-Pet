@@ -6,11 +6,17 @@ import { temPendenciasFiscais } from "../../utils/nfeFiscalAssistida";
 import NfceCpfPrompt from "./NfceCpfPrompt";
 import SeletorModeloDocumentoFiscal from "../SeletorModeloDocumentoFiscal";
 
-export default function ModalSelecaoDocumentoFiscal({ cliente, onClose, onEmitir, vendaId }) {
+export default function ModalSelecaoDocumentoFiscal({
+  cliente,
+  cpfAvulso,
+  onClose,
+  onEmitir,
+  vendaId,
+}) {
   const documentoCliente = documentoCpfCnpjCliente(cliente);
   const [tipoNota, setTipoNota] = useState("nfce");
   const [emitindo, setEmitindo] = useState(false);
-  const [nfceCpfResolved, setNfceCpfResolved] = useState(Boolean(documentoCliente));
+  const [nfceCpfResolved, setNfceCpfResolved] = useState(Boolean(documentoCliente || cpfAvulso));
   const [savedCustomerDocument, setSavedCustomerDocument] = useState("");
   const [headerHelpOpen, setHeaderHelpOpen] = useState(false);
   const clienteIdentificado = Boolean(documentoCliente || savedCustomerDocument);
@@ -95,13 +101,15 @@ export default function ModalSelecaoDocumentoFiscal({ cliente, onClose, onEmitir
           <div className="mt-3">
             <NfceCpfPrompt
               cliente={cliente}
+              cpfAvulso={cpfAvulso}
               disabled={emitindo}
               onContinueWithoutCpf={handleEmitir}
               onResolvedChange={setNfceCpfResolved}
               onSaved={(updatedCustomer) => {
-                setSavedCustomerDocument(updatedCustomer?.cpf || "cpf-salvo");
+                if (cliente?.id) setSavedCustomerDocument(updatedCustomer?.cpf || "cpf-salvo");
                 reloadFiscalStatus();
               }}
+              vendaId={vendaId}
               visible={tipoNota === "nfce"}
             />
           </div>

@@ -6,6 +6,7 @@ import {
   calcularFaixasParcelamento,
   calcularCustoTotalItensVenda,
   calcularResumoRecebimento,
+  calcularSaldoBeneficioDisponivel,
   dataCrediarioParaIso,
   devePerguntarNotaFiscal,
   descreverCupomMargem,
@@ -976,7 +977,7 @@ test("valida pagamento antes de adicionar", () => {
       },
       valor: 25,
     }),
-    "Valor excede o crédito disponível (R$ 20.00)",
+    "Valor excede o crédito disponível (R$ 20,00)",
   );
 
   assert.equal(
@@ -1028,6 +1029,100 @@ test("valida pagamento antes de adicionar", () => {
       valor: 100,
     }),
     "",
+  );
+});
+
+test("reserva crédito e cashback apenas pelos pagamentos pendentes do mesmo benefício", () => {
+  const pagamentos = [
+    { valor: 10.1, is_credito_cliente: true },
+    { valor: 5.15, is_credito_cliente: true },
+    { valor: 7.01, is_cashback: true },
+    { valor: 30, forma_pagamento: "PIX" },
+  ];
+
+  assert.equal(
+    calcularSaldoBeneficioDisponivel({ saldo: 26.39, pagamentos, tipo: "credito_cliente" }),
+    11.14,
+  );
+  assert.equal(
+    calcularSaldoBeneficioDisponivel({ saldo: 26.39, pagamentos, tipo: "cashback" }),
+    19.38,
+  );
+  assert.equal(
+    calcularSaldoBeneficioDisponivel({
+      saldo: 26.39,
+      pagamentos: pagamentos.slice(1),
+      tipo: "credito_cliente",
+    }),
+    21.24,
+  );
+  assert.equal(
+    calcularSaldoBeneficioDisponivel({
+      saldo: 26.39,
+      pagamentos: [{ valor: 26.39, is_cashback: true }],
+      tipo: "cashback",
+    }),
+    0,
+  );
+});
+
+test("impede repetir benefício esgotado e aceita lançamentos parciais até o limite", () => {
+  const credito = { id: "credito_cliente", tipo: "credito_cliente", credito_disponivel: 26.39 };
+  const cashback = { id: "cashback", tipo: "cashback" };
+
+  assert.equal(
+    validarPagamentoParaAdicionar({
+      formaPagamento: credito,
+      valor: 10,
+      saldoCreditoDisponivel: 26.39,
+      valorRestante: 100,
+    }),
+    "",
+  );
+  assert.equal(
+    validarPagamentoParaAdicionar({
+      formaPagamento: credito,
+      valor: 16.39,
+      saldoCreditoDisponivel: 16.39,
+      valorRestante: 90,
+    }),
+    "",
+  );
+  assert.equal(
+    validarPagamentoParaAdicionar({
+      formaPagamento: credito,
+      valor: 0.01,
+      saldoCreditoDisponivel: 0,
+      valorRestante: 73.61,
+    }),
+    "Valor excede o crédito disponível (R$ 0,00)",
+  );
+  assert.equal(
+    validarPagamentoParaAdicionar({
+      formaPagamento: cashback,
+      valor: 0.01,
+      saldoCashback: 0,
+      valorRestante: 73.61,
+    }),
+    "Valor excede o cashback disponível (R$ 0,00)",
+  );
+  assert.equal(
+    validarPagamentoParaAdicionar({
+      formaPagamento: cashback,
+      valor: 10.01,
+      saldoCashback: 10,
+      valorRestante: 100,
+    }),
+    "Valor excede o cashback disponível (R$ 10,00)",
+  );
+  assert.equal(
+    validarPagamentoParaAdicionar({
+      formaPagamento: cashback,
+      valor: 11,
+      saldoCashback: 26.39,
+      valorRestante: 10,
+    }),
+    "Valor excede o restante da venda (R$ 10,00)",
   );
 });
 

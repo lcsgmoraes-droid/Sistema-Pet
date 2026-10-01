@@ -20,18 +20,19 @@ escopo inicial.
 
 1. Polling de eventos com filtro pelo Merchant ID da empresa.
 2. Persistencia idempotente do evento antes do acknowledgment.
-3. Consulta e armazenamento do pedido completo ao receber `PLACED`.
-4. Atualizacao local dos estados `CONFIRMED`, `SEPARATION_STARTED`,
-   `READY_TO_PICKUP`, `DISPATCHED`, `CONCLUDED` e `CANCELLED`.
-5. Confirmacao do pedido.
-6. Inicio da preparacao/separacao.
-7. Aviso de pedido pronto.
-8. Despacho somente para `DELIVERY` com `deliveredBy=MERCHANT`.
-9. Consulta dinamica dos motivos de cancelamento e envio do motivo escolhido.
-10. Validacao de codigo de coleta e de entrega.
+3. Consulta e armazenamento do pedido pela Orders Virtual Bag
+   (`GET /order/v1.0/orders/{id}/virtual-bag`).
+4. Exibicao de `uniqueId`, EAN, PLU, quantidade, preco e `unavailable` de cada
+   item na interface do CorePet.
+5. Inicio da separacao pelo modulo Picking.
+6. Alteracao da quantidade separada de um item.
+7. Remocao de item indisponivel.
+8. Finalizacao da separacao seguida de nova consulta da Virtual Bag para
+   comprovar as alteracoes.
+9. Atualizacao local dos estados e registro da ultima acao executada.
 
-A tela mostra itens, pagamento, bandeira/troco, cupons e seus responsaveis,
-endereco e localizador do telefone para servir como evidencia da homologacao.
+A tela mostra itens, pagamento, cupons e seus responsaveis, endereco, localizador
+do telefone e os controles de Picking para servir como evidencia da homologacao.
 
 ## Travas operacionais
 
@@ -50,7 +51,8 @@ O intervalo minimo e 30 segundos e apenas um worker lider executa o ciclo.
 2. Manter a escrita de catalogo desligada.
 3. Habilitar as operacoes de pedidos somente na janela assistida de teste.
 4. Gerar pedidos pela loja de teste do iFood.
-5. Comprovar recebimento, confirmacao, cancelamento, despacho e validacao.
+5. Comprovar Orders Virtual Bag e o fluxo completo de Picking: iniciar, alterar
+   quantidade, remover item, finalizar e consultar novamente a sacola.
 6. Desligar o polling ao terminar a sessao, se ainda nao houver go-live.
 
 ## Referencias oficiais
@@ -59,3 +61,4 @@ O intervalo minimo e 30 segundos e apenas um worker lider executa o ciclo.
 - Eventos de pedidos: <https://developer.ifood.com.br/pt-BR/docs/guides/modules/events/order-events/>
 - Endpoints de pedidos: <https://developer.ifood.com.br/pt-BR/docs/guides/modules/order/endpoints>
 - Criterios de homologacao: <https://developer.ifood.com.br/pt-BR/docs/guides/modules/order/homologation/>
+- Picking: <https://developer.ifood.com.br/pt-BR/docs/groceries/guides/modules/picking/general>

@@ -25,6 +25,7 @@ from app.services.nfe_pending_reconciliation_service import (
     reconciliar_nfes_pendentes_recentes,
 )
 from app.vendas_models import Venda
+from app.services.pessoa_duplicate_service import _cpf_valido
 from app.intnfe.client import IntNFeClient
 from app.intnfe.emission import (
     DirectEmissionError,
@@ -43,6 +44,7 @@ from app.intnfe.recovery import (
     repair_and_retry as repair_and_retry_intnfe,
 )
 from app.bling_integration_fiscal import prevalidar_produtos_fiscais_venda
+from app.nfe.danfe_nfce import gerar_danfe_nfce
 from app.nfe.operacional_routes import (
     CancelarNFeRequest as CancelarNFeRequest,
     CartaCorrecaoRequest as CartaCorrecaoRequest,
@@ -141,6 +143,10 @@ class PrevalidarNFeRequest(BaseModel):
     tipo_nota: str = "nfce"  # 'nfe' ou 'nfce'
 
 
+class ConsumidorCpfRequest(BaseModel):
+    cpf: str
+
+
 class CancelarIntNFeRequest(BaseModel):
     justificativa: str
 
@@ -156,6 +162,35 @@ def _buscar_venda_para_nfe(db: Session, venda_id: int, tenant_id):
         .filter(Venda.id == venda_id, Venda.tenant_id == tenant_id)
         .first()
     )
+
+
+@router.put("/vendas/{venda_id}/consumidor-cpf")
+def salvar_cpf_consumidor_nfce(
+    venda_id: int,
+    request: ConsumidorCpfRequest,
+    db: Session = Depends(get_session),
+    user_and_tenant=Depends(get_current_user_and_tenant),
+):
+    _user, tenant_id = user_and_tenant
+    venda = _buscar_venda_para_nfe(db, venda_id, tenant_id)
+    if not venda:
+        raise HTTPException(status_code=404, detail="Venda não encontrada")
+    if venda.cliente_id:
+        raise HTTPException(
+            status_code=409, detail="Esta venda já possui cliente cadastrado."
+        )
+    if venda.nfe_correlation_id or venda.nfe_idempotency_key or venda.nfe_bling_id:
+        raise HTTPException(
+            status_code=409, detail="Esta venda já possui uma tentativa de nota fiscal."
+        )
+    cpf = "".join(char for char in request.cpf if char.isdigit())
+    if not _cpf_valido(cpf):
+        raise HTTPException(
+            status_code=422, detail="Informe um CPF válido com 11 dígitos."
+        )
+    venda.nfe_consumidor_cpf = cpf
+    db.commit()
+    return {"cpf": cpf}
 
 
 def _exigir_bling_configurado_para_tenant(tenant_id) -> None:
@@ -201,20 +236,33 @@ async def prevalidar_nfe(
         raise HTTPException(status_code=404, detail="Venda nao encontrada")
 
     try:
-        if venda.nfe_bling_id or venda.nfe_correlation_id:
+        rejeitada_intnfe = (
+            venda.nfe_correlation_id
+            and venda.nfe_provider == "intnfe"
+            and str(venda.nfe_status or "").strip().casefold() == "rejeitada"
+        )
+        if (venda.nfe_bling_id or venda.nfe_correlation_id) and not rejeitada_intnfe:
             raise DirectEmissionError(
                 "Esta venda já possui uma tentativa de nota fiscal. Consulte a situação existente.",
                 status=409,
             )
         validacao = prevalidar_produtos_fiscais_venda(
-            venda, db, exigir_documento_completo=True
+            venda, db, exigir_documento_completo=True, tipo_nota=tipo_nota
         )
         if validacao["pode_emitir"]:
             validacao["resumo_emissao"] = preview_intnfe(
                 db, get_tenant(db, tenant_id), venda, tipo_nota
             )
+        if rejeitada_intnfe:
+            validacao["rejeicao"] = {
+                "codigo": venda.nfe_codigo_erro,
+                "motivo": venda.nfe_motivo_rejeicao,
+            }
         validacao["provedor"] = "intnfe"
     except DirectEmissionError as exc:
+        contexto_fiscal = (
+            validacao.get("contexto_fiscal") if "validacao" in locals() else None
+        )
         validacao = exc.validation or {
             "success": True,
             "pode_emitir": False,
@@ -222,6 +270,13 @@ async def prevalidar_nfe(
             "correcoes": [],
             "bloqueios": [{"campo": "intnfe", "mensagem": str(exc)}],
         }
+        if contexto_fiscal:
+            validacao.setdefault("contexto_fiscal", contexto_fiscal)
+        if rejeitada_intnfe:
+            validacao["rejeicao"] = {
+                "codigo": venda.nfe_codigo_erro,
+                "motivo": venda.nfe_motivo_rejeicao,
+            }
         validacao["provedor"] = "intnfe"
     validacao["tipo_nota"] = tipo_nota
     validacao["venda_id"] = venda.id
@@ -467,10 +522,26 @@ def xml_intnfe_venda(
 
 
 def _danfe_response_metadata(venda):
-    is_nfce = venda.nfe_tipo == "nfce" or str(venda.nfe_modelo or "") == "65"
-    if is_nfce:
-        return "text/html", "html"
     return "application/pdf", "pdf"
+
+
+def _conteudo_danfe_intnfe_venda(db, venda, api):
+    is_nfce = venda.nfe_tipo == "nfce" or str(venda.nfe_modelo or "") == "65"
+    if not is_nfce:
+        return download_intnfe_document(db, venda, api, "danfe")
+
+    xml = venda.nfe_xml
+    if not xml:
+        xml = download_intnfe_document(db, venda, api, "xml")
+    elif isinstance(xml, str):
+        xml = xml.encode("utf-8")
+    try:
+        return gerar_danfe_nfce(xml, str(venda.nfe_chave or ""))
+    except ValueError as exc:
+        raise DirectEmissionError(
+            "Não foi possível gerar o DANFE da NFC-e a partir do XML autorizado.",
+            status=502,
+        ) from exc
 
 
 @router.get("/vendas/{venda_id}/danfe")
@@ -485,7 +556,7 @@ def danfe_intnfe_venda(
         raise HTTPException(404, "Venda não encontrada")
     api = _intnfe_client()
     try:
-        content = download_intnfe_document(db, venda, api, "danfe")
+        content = _conteudo_danfe_intnfe_venda(db, venda, api)
         media_type, extension = _danfe_response_metadata(venda)
         return Response(
             content=content,

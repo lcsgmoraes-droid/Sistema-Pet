@@ -175,6 +175,7 @@ class Venda(BaseTenantModel):
     nfe_codigo_erro = Column(String(20), nullable=True)
     nfe_idempotency_key = Column(String(128), nullable=True)
     nfe_payload_hash = Column(String(64), nullable=True)
+    nfe_consumidor_cpf = Column(String(11), nullable=True)
 
     # Multi-tenant
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
@@ -240,6 +241,8 @@ class Venda(BaseTenantModel):
                 "id": self.cliente.id,
                 "codigo": self.cliente.codigo,
                 "nome": self.cliente.nome,
+                "cpf": self.cliente.cpf,
+                "cnpj": self.cliente.cnpj,
                 "telefone": self.cliente.telefone,
                 "celular": self.cliente.celular,
                 "email": self.cliente.email,
@@ -352,6 +355,7 @@ class Venda(BaseTenantModel):
             "nfe_data_autorizacao": safe_datetime_to_iso(self.nfe_data_autorizacao),
             "nfe_motivo_rejeicao": self.nfe_motivo_rejeicao,
             "nfe_bling_id": str(self.nfe_bling_id) if self.nfe_bling_id else None,
+            "nfe_consumidor_cpf": self.nfe_consumidor_cpf,
             "itens": [item.to_dict() for item in self.itens]
             if hasattr(self, "itens")
             else [],

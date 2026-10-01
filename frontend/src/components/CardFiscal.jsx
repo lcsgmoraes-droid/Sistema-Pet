@@ -82,25 +82,27 @@ function CardFiscal({ composicao }) {
   };
 
   return (
-    <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50 p-3">
-      <div
-        className="flex items-center justify-between cursor-pointer"
+    <div className="mt-2 rounded-lg border border-slate-200 bg-slate-50/70 px-3 py-2">
+      <button
+        type="button"
+        className="flex w-full items-center justify-between text-left"
         onClick={() => setExpandido(!expandido)}
+        aria-expanded={expandido}
       >
         <div className="flex items-center gap-2">
-          <span className="text-base">📊</span>
-          <h4 className="text-sm font-semibold text-slate-800">Composição Fiscal do Item</h4>
+          <span className="text-sm">📊</span>
+          <h4 className="text-xs font-semibold text-slate-700">Composição fiscal</h4>
         </div>
         <span
           className={`text-sm text-slate-600 transition-transform ${expandido ? "rotate-180" : ""}`}
         >
           ▼
         </span>
-      </div>
+      </button>
 
       {expandido && (
         <>
-          <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
+          <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
             {linhas.map((linha) => {
               const colorGradient = colorMap[linha.color] || "from-slate-50 to-slate-100";
               const textColor = textColorMap[linha.color] || "text-slate-700";
@@ -109,9 +111,9 @@ function CardFiscal({ composicao }) {
               return (
                 <div
                   key={linha.label}
-                  className={`bg-gradient-to-br ${colorGradient} border rounded-md p-2 text-center`}
+                  className={`bg-gradient-to-br ${colorGradient} rounded-md border p-1.5 text-center`}
                 >
-                  <div className="text-lg mb-0.5">{linha.icon}</div>
+                  <div className="text-sm">{linha.icon}</div>
                   <div className={`text-[11px] font-medium ${textColor} truncate`}>
                     {linha.label}
                   </div>
@@ -127,7 +129,7 @@ function CardFiscal({ composicao }) {
           </div>
 
           <div className="mt-3 border-t border-slate-300 pt-2">
-            <div className="flex items-center justify-between bg-gradient-to-r from-emerald-50 to-emerald-100 border border-emerald-300 rounded-md p-2">
+            <div className="flex items-center justify-between rounded-md border border-emerald-200 bg-emerald-50 p-2">
               <div>
                 <span className="text-[11px] text-emerald-700 font-medium block">
                   Custo de Aquisição por Unidade
@@ -137,7 +139,7 @@ function CardFiscal({ composicao }) {
                 </span>
               </div>
               <div className="text-right">
-                <div className="text-xl font-bold text-emerald-700">
+                <div className="text-base font-bold text-emerald-700">
                   R$ {formatarValorFiscal(composicao.custo_aquisicao_unitario || 0, 4)}
                 </div>
                 <div className="text-[11px] text-emerald-600 mt-0.5">

@@ -1,6 +1,7 @@
 import secrets
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, EmailStr, Field, model_validator
@@ -93,8 +94,9 @@ class UsuarioListResponse(BaseModel):
     role: str
     is_active: bool
     pessoa_id: int | None = None
-    pessoa_nome: str | None = None
     pessoa_codigo: str | None = None
+    pessoa_nome: str | None = None
+    pessoa_tipo_cadastro: str | None = None
 
     class Config:
         from_attributes = True
@@ -302,6 +304,68 @@ def _is_unique_email_violation(exc: IntegrityError) -> bool:
     return is_unique_email_violation(exc)
 
 
+def _is_cliente_role(role: Role | None) -> bool:
+    return bool(role and (role.name or "").strip().casefold() == "cliente")
+
+
+def _ensure_role_is_not_cliente(role: Role | None) -> None:
+    if _is_cliente_role(role):
+        raise UserAccountError(
+            "O perfil Cliente e reservado para acesso criado pelo cadastro da pessoa/app. "
+            "Para usuario criado direto, selecione um perfil operacional.",
+            status_code=400,
+        )
+
+
+def _nome_pessoa_para_usuario(user: User) -> str:
+    return (
+        (user.nome or "").strip()
+        or (user.email or "").strip()
+        or (user.username or "").strip()
+        or (user.login_phone or "").strip()
+        or f"Usuario {user.id}"
+    )
+
+
+def _criar_pessoa_operacional_para_usuario(
+    db: Session,
+    *,
+    actor: User,
+    tenant_id,
+    user: User,
+) -> Cliente:
+    pessoa = Cliente(
+        tenant_id=tenant_id,
+        user_id=actor.id,
+        auth_user_id=user.id,
+        codigo=gerar_codigo_cliente(db, "funcionario", "PF", tenant_id),
+        tipo_cadastro="funcionario",
+        tipo_pessoa="PF",
+        nome=_nome_pessoa_para_usuario(user),
+        celular=user.login_phone,
+        telefone=user.telefone,
+        email=user.email,
+        origem_cliente="cadastro_usuario",
+        ativo=True,
+    )
+    db.add(pessoa)
+    db.flush()
+    return pessoa
+
+
+def _usuario_tem_pessoa_vinculada(db: Session, *, tenant_id, user_id: int) -> bool:
+    return (
+        db.query(func.count(Cliente.id))
+        .filter(
+            Cliente.tenant_id == tenant_id,
+            Cliente.auth_user_id == user_id,
+            Cliente.ativo.is_not(False),
+        )
+        .scalar()
+        > 0
+    )
+
+
 @router.get("", response_model=list[UsuarioListResponse])
 @require_permission("usuarios.manage")
 def listar_usuarios(
@@ -322,8 +386,9 @@ def listar_usuarios(
             Role.name.label("role"),
             UserTenant.is_active,
             Cliente.id.label("pessoa_id"),
-            Cliente.nome.label("pessoa_nome"),
             Cliente.codigo.label("pessoa_codigo"),
+            Cliente.nome.label("pessoa_nome"),
+            Cliente.tipo_cadastro.label("pessoa_tipo_cadastro"),
         )
         .join(UserTenant, UserTenant.user_id == User.id)
         .join(Role, Role.id == UserTenant.role_id)
@@ -350,6 +415,12 @@ def criar_usuario(
     actor, tenant_id = user_and_tenant
 
     try:
+        selected_role = (
+            db.query(Role)
+            .filter(Role.id == payload.role_id, Role.tenant_id == tenant_id)
+            .first()
+        )
+        _ensure_role_is_not_cliente(selected_role)
         user, role = create_tenant_user_account(
             db,
             tenant_id=tenant_id,
@@ -359,6 +430,12 @@ def criar_usuario(
             password=payload.password,
             role_id=payload.role_id,
             nome=payload.nome,
+        )
+        pessoa = _criar_pessoa_operacional_para_usuario(
+            db,
+            actor=actor,
+            tenant_id=tenant_id,
+            user=user,
         )
         log_business_event(
             db=db,
@@ -372,7 +449,7 @@ def criar_usuario(
                 target_user=user,
                 tenant_id=tenant_id,
                 role=role,
-                extra={"is_active": True},
+                extra={"is_active": True, "pessoa_id": pessoa.id},
             ),
             details=f"Usuario #{user.id} criado no tenant",
             commit=False,
@@ -532,8 +609,21 @@ def atualizar_credenciais_usuario(
                     "Perfil de acesso invalido para esta loja.",
                     status_code=400,
                 )
+            _ensure_role_is_not_cliente(selected_role)
             role_changed = vinculo.role_id != selected_role.id
             vinculo.role_id = selected_role.id
+
+        if not _usuario_tem_pessoa_vinculada(
+            db,
+            tenant_id=tenant_id,
+            user_id=target_user.id,
+        ):
+            _criar_pessoa_operacional_para_usuario(
+                db,
+                actor=actor,
+                tenant_id=tenant_id,
+                user=target_user,
+            )
 
         if password_changed or role_changed or login_phone_changed:
             sessions_revoked = revoke_all_sessions(
@@ -696,6 +786,10 @@ def vincular_usuario(
     )
     if not role:
         raise HTTPException(status_code=400, detail="Role inválido para este tenant")
+    try:
+        _ensure_role_is_not_cliente(role)
+    except UserAccountError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
 
     existing = (
         db.query(UserTenant)

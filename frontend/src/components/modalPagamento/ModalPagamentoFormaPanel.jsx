@@ -2,6 +2,7 @@ import { Wallet, AlertCircle } from "lucide-react";
 
 import CurrencyInput from "../CurrencyInput";
 import PaymentMethodIcon from "../PaymentMethodIcon";
+import { formatMoneyBRL } from "../../utils/formatters";
 import {
   gerarPlanoCrediario,
   mascararDataCrediario,
@@ -20,6 +21,7 @@ export default function ModalPagamentoFormaPanel({
   setValorRecebido,
   valorRestante,
   saldoCashback,
+  saldoCreditoDisponivel,
   formasPagamento,
   valorRecebido,
   troco,
@@ -58,7 +60,7 @@ export default function ModalPagamentoFormaPanel({
 
           <div className="grid grid-cols-2 gap-3">
             {/* Crédito Cliente (exibir primeiro se disponível) */}
-            {venda.cliente && venda.cliente.credito > 0 && (
+            {venda.cliente && saldoCreditoDisponivel > 0 && (
               <button
                 onClick={() => {
                   setFormaPagamentoSelecionada({
@@ -66,13 +68,13 @@ export default function ModalPagamentoFormaPanel({
                     nome: "Crédito Cliente",
                     tipo: "credito_cliente",
                     icone: "🎁",
-                    credito_disponivel: parseFloat(venda.cliente.credito),
+                    credito_disponivel: saldoCreditoDisponivel,
                   });
                   setNumeroParcelas(1);
                   setBandeira("");
                   setNsuCartao(""); // Limpar NSU
                   // Pre-preencher com o menor valor entre crédito e valor restante
-                  setValorRecebido(Math.min(parseFloat(venda.cliente.credito), valorRestante));
+                  setValorRecebido(Math.min(saldoCreditoDisponivel, valorRestante));
                 }}
                 className={`p-4 rounded-lg border-2 transition-all ${
                   formaPagamentoSelecionada?.id === "credito_cliente"
@@ -91,7 +93,7 @@ export default function ModalPagamentoFormaPanel({
                   Crédito Cliente
                 </div>
                 <div className="text-xs text-purple-600 mt-1 font-semibold">
-                  R$ {parseFloat(venda.cliente.credito).toFixed(2).replace(".", ",")}
+                  {formatMoneyBRL(saldoCreditoDisponivel)}
                 </div>
               </button>
             )}
@@ -128,7 +130,7 @@ export default function ModalPagamentoFormaPanel({
                   Cashback
                 </div>
                 <div className="text-xs text-green-600 mt-1 font-semibold">
-                  R$ {saldoCashback.toFixed(2).replace(".", ",")}
+                  {formatMoneyBRL(saldoCashback)}
                 </div>
               </button>
             )}
@@ -188,7 +190,7 @@ export default function ModalPagamentoFormaPanel({
                   <span className="text-sm font-semibold">Crédito Disponível</span>
                 </div>
                 <div className="text-lg font-bold text-purple-600">
-                  R$ {formaPagamentoSelecionada.credito_disponivel.toFixed(2).replace(".", ",")}
+                  {formatMoneyBRL(saldoCreditoDisponivel)}
                 </div>
                 <p className="text-xs text-purple-700 mt-1">💡 Não gera movimentação de caixa</p>
               </div>
@@ -202,7 +204,7 @@ export default function ModalPagamentoFormaPanel({
                   <span className="text-sm font-semibold">Cashback Disponível</span>
                 </div>
                 <div className="text-lg font-bold text-green-600">
-                  R$ {saldoCashback.toFixed(2).replace(".", ",")}
+                  {formatMoneyBRL(saldoCashback)}
                 </div>
                 <p className="text-xs text-green-700 mt-1">
                   💡 Saldo acumulado em campanhas — não gera movimentação de caixa
@@ -224,10 +226,7 @@ export default function ModalPagamentoFormaPanel({
                   value={valorRecebido}
                   onChange={(v) => {
                     if (formaPagamentoSelecionada.id === "credito_cliente") {
-                      const maxCredito = Math.min(
-                        formaPagamentoSelecionada.credito_disponivel,
-                        valorRestante,
-                      );
+                      const maxCredito = Math.min(saldoCreditoDisponivel, valorRestante);
                       setValorRecebido(Math.min(v, maxCredito));
                     } else if (formaPagamentoSelecionada.id === "cashback") {
                       const maxCashback = Math.min(saldoCashback, valorRestante);
@@ -243,13 +242,12 @@ export default function ModalPagamentoFormaPanel({
               </div>
               {formaPagamentoSelecionada.id === "credito_cliente" && (
                 <p className="text-xs text-gray-600 mt-1">
-                  Máximo: R${" "}
-                  {Math.min(formaPagamentoSelecionada.credito_disponivel, valorRestante).toFixed(2)}
+                  Máximo: {formatMoneyBRL(Math.min(saldoCreditoDisponivel, valorRestante))}
                 </p>
               )}
               {formaPagamentoSelecionada.id === "cashback" && (
                 <p className="text-xs text-gray-600 mt-1">
-                  Máximo: R$ {Math.min(saldoCashback, valorRestante).toFixed(2).replace(".", ",")}
+                  Máximo: {formatMoneyBRL(Math.min(saldoCashback, valorRestante))}
                 </p>
               )}
             </div>

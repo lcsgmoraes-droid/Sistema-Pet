@@ -15,6 +15,9 @@ def test_worker_carrega_registro_orm_antes_do_scheduler():
     codigo = """
 import scripts.run_bling_worker
 from app.estoque_models import AlertaEstoqueNegativo
+from sqlalchemy.orm import configure_mappers
+
+configure_mappers()
 
 AlertaEstoqueNegativo(
     tenant_id="11111111-1111-4111-8111-111111111111",
@@ -39,3 +42,26 @@ print("worker-model-registry-ok")
 
     assert resultado.returncode == 0, resultado.stderr
     assert "worker-model-registry-ok" in resultado.stdout
+
+
+def test_worker_configura_mapeamentos_antes_de_iniciar_jobs(monkeypatch):
+    import scripts.run_bling_worker as worker
+
+    chamadas = []
+
+    class FakeScheduler:
+        def start(self):
+            chamadas.append("start")
+
+        def shutdown(self):
+            chamadas.append("shutdown")
+
+    monkeypatch.setattr(worker, "configure_logging", lambda: None)
+    monkeypatch.setattr(worker, "configure_mappers", lambda: chamadas.append("mappers"))
+    monkeypatch.setattr(worker, "BlingSyncScheduler", FakeScheduler)
+    monkeypatch.setattr(worker, "_should_stop", True)
+    monkeypatch.setattr(worker.signal, "signal", lambda *_args: None)
+
+    worker.main()
+
+    assert chamadas == ["mappers", "start", "shutdown"]

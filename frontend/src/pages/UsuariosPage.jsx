@@ -37,6 +37,7 @@ export default function UsuariosPage() {
     perfisApp,
     pessoaVinculadaCredenciais,
     roles,
+    rolesUsuariosDiretos,
     searchTerm,
     setFiltroPerfil,
     setFiltroStatus,
@@ -135,7 +136,7 @@ export default function UsuariosPage() {
         novoUsuario={novoUsuario}
         onClose={onCloseModalUsuario}
         onSubmit={criarUsuario}
-        roles={roles}
+        roles={rolesUsuariosDiretos}
         setNovoUsuario={setNovoUsuario}
         showModal={showModal}
         usuarioServerErrors={usuarioServerErrors}
@@ -154,7 +155,7 @@ export default function UsuariosPage() {
         pessoaVinculada={pessoaVinculadaCredenciais}
         onSalvarPerfisApp={salvarPerfisApp}
         savingPerfisApp={savingPerfisApp}
-        roles={roles}
+        roles={rolesUsuariosDiretos}
         tenantReference={tenantLoginReference}
         usuario={usuarioCredenciais}
       />

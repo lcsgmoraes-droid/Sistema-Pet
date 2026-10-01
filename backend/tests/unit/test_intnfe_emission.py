@@ -145,6 +145,8 @@ def test_crediario_uses_credito_loja_instead_of_outros():
         "Crediario: 1/1 vence em 05/10/2026 - R$ 23,00"
         in payload["informacoesAdicionais"]
     )
+    assert payload["informacoesAdicionais"].startswith("Venda VEN-TESTE | Crediario:")
+    assert "CorePet" not in payload["informacoesAdicionais"]
 
 
 def test_crediario_uses_saved_receivable_due_date_and_sale_observation():
@@ -222,6 +224,52 @@ def test_counter_nfce_does_not_require_recipient_address():
     assert "documentosReferenciados" not in payload
 
 
+def test_nfce_bloqueia_regra_386_no_item_tres_antes_da_transmissao(monkeypatch):
+    tenant, connection, sale = _objects()
+    sale.tem_entrega = False
+    sale.taxa_entrega = "0.00"
+    sale.total = "18.00"
+    sale.pagamentos[0].valor = "18.00"
+    primeiro = sale.itens[0]
+    sale.itens = [
+        primeiro,
+        SimpleNamespace(
+            **{
+                **vars(primeiro),
+                "produto": SimpleNamespace(**{**vars(primeiro.produto), "id": 10}),
+            }
+        ),
+        SimpleNamespace(
+            **{
+                **vars(primeiro),
+                "produto": SimpleNamespace(**{**vars(primeiro.produto), "id": 11}),
+            }
+        ),
+    ]
+    fiscal_original = emission._resolver_fiscal_item_nfe
+
+    def fiscal_item(db, venda, item):
+        fiscal = fiscal_original(db, venda, item)
+        if item.produto.id == 11:
+            return {
+                **fiscal,
+                "cfop_interno": "5405",
+                "cst_icms": "102",
+                "icms_st": True,
+            }
+        return fiscal
+
+    monkeypatch.setattr(emission, "_resolver_fiscal_item_nfe", fiscal_item)
+
+    with pytest.raises(emission.DirectEmissionError) as rejeicao:
+        emission.build_payload(None, tenant, connection, sale, "nfce")
+
+    bloqueios = rejeicao.value.validation["bloqueios"]
+    assert {item["campo"] for item in bloqueios} == {"cfop", "cst_icms"}
+    assert all(item["item_numero"] == 3 for item in bloqueios)
+    assert all(item["produto_id"] == 11 for item in bloqueios)
+
+
 def test_nfce_with_delivery_fee_requires_nfe():
     tenant, connection, sale = _objects()
 
@@ -253,6 +301,35 @@ def test_delivery_nfce_requires_identified_recipient():
 
     with pytest.raises(emission.DirectEmissionError, match="consumidor identificado"):
         emission.build_payload(None, tenant, connection, sale, "nfce")
+
+
+def test_nfce_uses_sale_cpf_without_customer_registration():
+    tenant, connection, sale = _objects()
+    sale.cliente = None
+    sale.nfe_consumidor_cpf = "52998224725"
+    sale.tem_entrega = False
+    sale.taxa_entrega = "0.00"
+    sale.total = "18.00"
+    sale.pagamentos[0].valor = "18.00"
+
+    payload = emission.build_payload(None, tenant, connection, sale, "nfce")
+
+    assert payload["consumidor"]["cpf"] == "52998224725"
+    assert payload["consumidor"]["nome"].startswith("NF-E EMITIDA")
+    assert sale.cliente is None
+
+    connection.emission_environment = 1
+    production_payload = emission.build_payload(None, tenant, connection, sale, "nfce")
+    assert production_payload["consumidor"] == {"cpf": "52998224725"}
+
+
+def test_sale_cpf_does_not_enable_nfe_without_customer():
+    tenant, connection, sale = _objects()
+    sale.cliente = None
+    sale.nfe_consumidor_cpf = "52998224725"
+
+    with pytest.raises(emission.DirectEmissionError, match="cliente cadastrado"):
+        emission.build_payload(None, tenant, connection, sale, "nfe")
 
 
 def test_high_value_nfce_requires_identified_recipient():
@@ -456,6 +533,25 @@ def test_non_contributor_with_incompatible_csosn_is_blocked(monkeypatch):
     assert bloqueio["produto_id"] == 9
     assert bloqueio["campo"] == "cst_icms"
     assert bloqueio["valor_atual"] == "900"
+
+
+def test_cst_00_nao_e_enviado_como_csosn(monkeypatch):
+    tenant, connection, sale = _objects()
+    fiscal_original = emission._resolver_fiscal_item_nfe
+    monkeypatch.setattr(
+        emission,
+        "_resolver_fiscal_item_nfe",
+        lambda db, venda, item: {
+            **fiscal_original(db, venda, item),
+            "cst_icms": "00",
+        },
+    )
+
+    with pytest.raises(emission.DirectEmissionError, match="CSOSN 00") as exc_info:
+        emission.build_payload(None, tenant, connection, sale, "nfce")
+
+    assert exc_info.value.validation["bloqueios"][0]["campo"] == "cst_icms"
+    assert exc_info.value.validation["bloqueios"][0]["valor_atual"] == "00"
 
 
 def test_missing_product_taxes_return_editable_fiscal_fields(monkeypatch):

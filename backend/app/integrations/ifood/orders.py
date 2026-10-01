@@ -67,7 +67,15 @@ def _event_status(event: dict[str, Any]) -> str | None:
 
 def _delivery_details(payload: dict[str, Any]) -> dict[str, Any]:
     delivery = _mapping(payload.get("delivery"))
-    return _mapping(delivery.get("deliveryAddress")) or delivery
+    operation_delivery = _mapping(
+        _mapping(payload.get("operationMode")).get("delivery")
+    )
+    return (
+        _mapping(delivery.get("deliveryAddress"))
+        or _mapping(operation_delivery.get("destination"))
+        or delivery
+        or operation_delivery
+    )
 
 
 def _order_total(payload: dict[str, Any]) -> float | None:
@@ -81,6 +89,10 @@ def _order_total(payload: dict[str, Any]) -> float | None:
         parsed = _number(value)
         if parsed is not None:
             return parsed
+    bag_prices = _mapping(_mapping(payload.get("bag")).get("prices"))
+    bag_total = _number(_mapping(bag_prices.get("grossValue")).get("value"))
+    if bag_total is not None:
+        return bag_total / 100
     return None
 
 
@@ -112,16 +124,31 @@ def upsert_ifood_order(
         db.add(order)
 
     delivery = _mapping(payload.get("delivery"))
+    operation_mode = _mapping(payload.get("operationMode"))
+    operation_delivery = _mapping(operation_mode.get("delivery"))
     schedule = _mapping(payload.get("schedule")) or _mapping(payload.get("scheduling"))
     order.merchant_id = merchant_id
-    order.display_id = _text(payload.get("displayId")) or order.display_id
+    order.display_id = (
+        _text(payload.get("displayId"))
+        or _text(payload.get("shortCode"))
+        or order.display_id
+    )
     order.status = (
         _text(payload.get("status")) or event_status or order.status or "PLACED"
     )
-    order.order_type = _text(payload.get("orderType")) or order.order_type
-    order.order_timing = _text(payload.get("orderTiming")) or order.order_timing
+    order.order_type = (
+        _text(payload.get("orderType"))
+        or _text(operation_mode.get("type"))
+        or order.order_type
+    )
+    order.order_timing = (
+        _text(payload.get("orderTiming"))
+        or _text(operation_mode.get("schedulingType"))
+        or order.order_timing
+    )
     order.delivered_by = (
         _text(delivery.get("deliveredBy"))
+        or _text(operation_delivery.get("provider"))
         or _text(payload.get("deliveredBy"))
         or order.delivered_by
     )

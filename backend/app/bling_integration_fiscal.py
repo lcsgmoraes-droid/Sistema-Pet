@@ -400,6 +400,126 @@ def _empresa_no_simples(empresa_fiscal) -> bool:
     )
 
 
+CSOSN_VALIDOS = {"101", "102", "103", "201", "202", "203", "300", "400", "500", "900"}
+CST_ICMS_VALIDOS = {"00", "10", "20", "30", "40", "41", "50", "51", "60", "70", "90"}
+CFOPS_NFCE_CSOSN_COMUM = {"5101", "5102", "5103", "5104", "5115", "5910"}
+CFOPS_NFCE_CSOSN_500 = {"5405", "5656", "5667", "5910"}
+
+
+def _empresa_usa_csosn(empresa_fiscal) -> bool:
+    regime = str(getattr(empresa_fiscal, "regime_tributario", "") or "").casefold()
+    return _empresa_no_simples(empresa_fiscal) and not (
+        "excesso" in regime and "simples" in regime
+    )
+
+
+def pendencias_cfop_csosn_nfce(fiscal_item, dados_produto, uf, item_numero=None):
+    """Aponta a combinação rejeitada pela regra 386 antes da transmissão.
+
+    NT 2023.003 (N12a-40/44) e NT 2024.001. A escolha tributária continua
+    com o usuário: a lista de CFOPs permitidos não define qual operação ocorreu.
+    """
+    csosn = _limpar_texto_fiscal(fiscal_item.get("cst_icms"))
+    cfop = _limpar_texto_fiscal(fiscal_item.get("cfop_interno"))
+    if csosn in {"102", "103", "300", "400", "900"}:
+        permitidos = set(CFOPS_NFCE_CSOSN_COMUM)
+        if csosn == "900" and str(uf or "").upper() in {"SP", "RS"}:
+            permitidos.add("5949")
+        if csosn == "900" and str(uf or "").upper() == "CE":
+            permitidos.add("5405")
+    elif csosn == "500":
+        permitidos = CFOPS_NFCE_CSOSN_500
+    else:
+        return []
+    if not cfop or cfop in permitidos:
+        return []
+
+    contexto = {
+        **dados_produto,
+        "item_numero": item_numero,
+        "codigo_rejeicao": "386",
+        "grupo_correcao": "cfop_csosn_nfce",
+    }
+    opcoes = ", ".join(sorted(permitidos))
+    pendencias = [
+        {
+            **contexto,
+            "campo": "cfop",
+            "valor_atual": cfop,
+            "mensagem": (
+                f"Na NFC-e, o CFOP {cfop} não é permitido com o CSOSN {csosn}. "
+                f"CFOPs previstos para esse CSOSN: {opcoes}. "
+                "Escolha o código conforme a operação real e confirme a tributação do produto."
+            ),
+        },
+        {
+            **contexto,
+            "campo": "cst_icms",
+            "valor_atual": csosn,
+            "mensagem": (
+                f"O CSOSN {csosn} está combinado com CFOP {cfop}. "
+                "Revise também se o produto tem ICMS-ST, isenção ou outro tratamento específico."
+            ),
+        },
+    ]
+    if fiscal_item.get("icms_st") and csosn != "500":
+        pendencias[1].update(
+            valor_sugerido="500",
+            motivo=(
+                "O cadastro ou lote indica ICMS-ST. Confirme se houve cobrança "
+                "anterior por substituição tributária nesta venda."
+            ),
+            fonte_sugestao="xml_ou_cadastro_do_produto_e_regime_da_empresa",
+            confianca="media",
+            preenchimento_automatico=False,
+        )
+    return pendencias
+
+
+def _pendencia_codigo_icms(codigo, empresa_fiscal, dados_produto, fiscal_item):
+    """Explica o codigo incompatível sem escolher tributação por conta do usuário."""
+    if empresa_fiscal is None:
+        return None
+    simples = _empresa_usa_csosn(empresa_fiscal)
+    validos = CSOSN_VALIDOS if simples else CST_ICMS_VALIDOS
+    if codigo in validos:
+        return None
+    tipo = "CSOSN" if simples else "CST"
+    mensagem = (
+        f"O código {codigo} não é um {tipo} válido para o regime da empresa. "
+        f"Confira a classificação do ICMS deste produto com a contabilidade."
+    )
+    pendencia = {
+        **dados_produto,
+        "campo": "cst_icms",
+        "valor_atual": codigo,
+        "valor_invalido": True,
+        "mensagem": mensagem,
+    }
+    if simples and fiscal_item.get("icms_st"):
+        pendencia.update(
+            valor_sugerido="500",
+            motivo="O cadastro indica ICMS já cobrado por substituição tributária. Confirme se isso vale para esta venda.",
+            fonte_sugestao="xml_ou_cadastro_do_produto_e_regime_da_empresa",
+            confianca="media",
+            preenchimento_automatico=False,
+        )
+    elif simples:
+        pendencia.update(
+            valor_sugerido="102",
+            motivo=(
+                "Possível código para venda pelo Simples Nacional sem permissão de crédito. "
+                "Confirme com a contabilidade se o produto não tem substituição tributária, "
+                "isenção ou outro tratamento específico."
+            ),
+            fonte_sugestao="regime_da_empresa_sem_historico_do_produto",
+            confianca="baixa",
+            confianca_percentual=42,
+            preenchimento_automatico=False,
+        )
+    return pendencia
+
+
 def _sugerir_tributo_ausente(
     campo: str,
     fiscal_item: Dict[str, Optional[str]],
@@ -490,7 +610,11 @@ def _sugerir_tributo_ausente(
 
 
 def prevalidar_produtos_fiscais_venda(
-    venda, db: Session = None, *, exigir_documento_completo: bool = False
+    venda,
+    db: Session = None,
+    *,
+    exigir_documento_completo: bool = False,
+    tipo_nota: Optional[str] = None,
 ) -> Dict:
     tenant_id = getattr(venda, "tenant_id", None)
     empresa_fiscal = _config_fiscal_empresa(db, tenant_id)
@@ -505,7 +629,7 @@ def prevalidar_produtos_fiscais_venda(
             }
         )
 
-    for item in getattr(venda, "itens", []) or []:
+    for item_numero, item in enumerate(getattr(venda, "itens", []) or [], start=1):
         produto = getattr(item, "produto", None)
         if not produto:
             bloqueios.append(
@@ -524,6 +648,7 @@ def prevalidar_produtos_fiscais_venda(
             "produto_tipo": getattr(produto, "tipo_produto", None),
             "sku": sku,
             "codigo_barras": getattr(produto, "codigo_barras", None),
+            "item_numero": item_numero,
         }
         ncm_atual = _ncm_normalizado(fiscal_item.get("ncm"))
         origem_atual = _limpar_texto_fiscal(fiscal_item.get("origem_mercadoria"))
@@ -584,7 +709,10 @@ def prevalidar_produtos_fiscais_venda(
             else ()
         )
         for campo, rotulo, _campo_catalogo in campos_obrigatorios:
-            valor_atual = _limpar_texto_fiscal(fiscal_item.get(campo))
+            chave_fiscal = (
+                "cfop_interno" if campo == "cfop" and tipo_nota == "nfce" else campo
+            )
+            valor_atual = _limpar_texto_fiscal(fiscal_item.get(chave_fiscal))
             if valor_atual:
                 continue
             sugestao = _sugerir_tributo_ausente(
@@ -618,6 +746,24 @@ def prevalidar_produtos_fiscais_venda(
                     }
                 )
 
+        if exigir_documento_completo:
+            codigo_icms = _limpar_texto_fiscal(fiscal_item.get("cst_icms"))
+            if codigo_icms:
+                pendencia = _pendencia_codigo_icms(
+                    codigo_icms, empresa_fiscal, dados_produto, fiscal_item
+                )
+                if pendencia:
+                    bloqueios.append(pendencia)
+            if tipo_nota == "nfce" and _empresa_usa_csosn(empresa_fiscal):
+                bloqueios.extend(
+                    pendencias_cfop_csosn_nfce(
+                        fiscal_item,
+                        dados_produto,
+                        getattr(empresa_fiscal, "uf", None),
+                        item_numero,
+                    )
+                )
+
     return {
         "success": True,
         "pode_emitir": not bloqueios and not correcoes,
@@ -627,7 +773,7 @@ def prevalidar_produtos_fiscais_venda(
         "contexto_fiscal": {
             "regime_tributario": getattr(empresa_fiscal, "regime_tributario", None),
             "uf": getattr(empresa_fiscal, "uf", None),
-            "simples_nacional": _empresa_no_simples(empresa_fiscal),
+            "simples_nacional": _empresa_usa_csosn(empresa_fiscal),
         },
     }
 

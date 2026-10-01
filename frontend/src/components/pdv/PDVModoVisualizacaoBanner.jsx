@@ -4,6 +4,7 @@ import { useModulos } from "../../contexts/ModulosContext";
 import ImprimirCupom from "../ImprimirCupom";
 import ActionButton from "../ui/ActionButton";
 import { podeAbrirDevolucaoVenda } from "../../utils/pdvReturnEligibility";
+import ImprimirDocumentoFiscalButton from "./ImprimirDocumentoFiscalButton";
 import ModalSelecaoDocumentoFiscal from "./ModalSelecaoDocumentoFiscal";
 
 export default function PDVModoVisualizacaoBanner({
@@ -16,7 +17,7 @@ export default function PDVModoVisualizacaoBanner({
   mudarStatusParaAberta,
   habilitarEdicao,
 }) {
-  const { moduloAtivo } = useModulos();
+  const { moduloAtivo, erroCarregamento, carregandoModulos, carregarModulos } = useModulos();
   const moduloFiscalAtivo = moduloAtivo("fiscal");
   const [mostrarSelecaoDocumento, setMostrarSelecaoDocumento] = useState(false);
 
@@ -39,7 +40,7 @@ export default function PDVModoVisualizacaoBanner({
             ? "com NF emitida"
             : "Aberta";
   const orientacao = notaRejeitada
-    ? "Libere a tentativa rejeitada na Central NF para escolher outro modelo."
+    ? "Clique em Corrigir erro no aviso da nota para revisar os dados fiscais."
     : vendaAtual.status === "aberta"
       ? "Clique em Editar para modificar."
       : "Reabra a venda para modificar.";
@@ -55,6 +56,7 @@ export default function PDVModoVisualizacaoBanner({
           </div>
           <div className="flex flex-wrap items-center justify-end gap-2">
             <ImprimirCupom venda={vendaAtual} size="md" className="min-w-[132px]" />
+            <ImprimirDocumentoFiscalButton venda={vendaAtual} size="md" className="min-w-[132px]" />
 
             {podeAbrirDevolucao && (
               <ActionButton
@@ -123,9 +125,32 @@ export default function PDVModoVisualizacaoBanner({
         </div>
       </div>
 
+      {erroCarregamento && !moduloFiscalAtivo && (
+        <div
+          role="alert"
+          className="border-b border-amber-200 bg-amber-50 px-5 py-3 text-sm text-amber-900"
+        >
+          <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-2">
+            <span>
+              Não foi possível confirmar o acesso fiscal desta empresa. A emissão de NF está
+              temporariamente indisponível.
+            </span>
+            <button
+              type="button"
+              onClick={carregarModulos}
+              disabled={carregandoModulos}
+              className="rounded-md border border-amber-500 px-3 py-1 font-semibold hover:bg-amber-100 disabled:opacity-50"
+            >
+              {carregandoModulos ? "Verificando..." : "Tentar novamente"}
+            </button>
+          </div>
+        </div>
+      )}
+
       {moduloFiscalAtivo && mostrarSelecaoDocumento && (
         <ModalSelecaoDocumentoFiscal
           cliente={vendaAtual.cliente}
+          cpfAvulso={vendaAtual.nfe_consumidor_cpf}
           onClose={() => setMostrarSelecaoDocumento(false)}
           onEmitir={emitirNotaVendaFinalizada}
           vendaId={vendaAtual.id}

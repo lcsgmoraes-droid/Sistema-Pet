@@ -11,7 +11,12 @@ from decimal import Decimal, ROUND_HALF_UP
 from uuid import UUID, uuid4
 from types import SimpleNamespace
 
-from app.bling_integration_fiscal import _resolver_fiscal_item_nfe
+from app.bling_integration_fiscal import (
+    CSOSN_VALIDOS,
+    CST_ICMS_VALIDOS,
+    _resolver_fiscal_item_nfe,
+    pendencias_cfop_csosn_nfce,
+)
 from app.financeiro.crediario_parcelamento import montar_plano_crediario
 from app.intnfe.client import IntNFeError
 from app.intnfe.fiscal_profile import local_profile
@@ -252,7 +257,7 @@ def _format_brl(value):
 
 
 def _additional_information(venda, installments):
-    parts = [f"Venda {venda.numero_venda} - CorePet"]
+    parts = [f"Venda {venda.numero_venda}"]
     observation = _text(getattr(venda, "observacoes", None))
     if observation:
         parts.append(f"Observacoes da venda: {' '.join(observation.split())}")
@@ -467,13 +472,23 @@ def build_payload(db, tenant, connection, venda, document_type):
     nfce_requires_recipient = document_type == "nfce" and (
         bool(getattr(venda, "tem_entrega", False)) or sale_total >= Decimal("10000")
     )
-    recipient = _recipient(
-        venda.cliente,
-        environment,
-        document_type,
-        require_identity=nfce_requires_recipient,
-        require_address=document_type == "nfe",
-    )
+    cpf_avulso = _digits(getattr(venda, "nfe_consumidor_cpf", None))
+    if document_type == "nfce" and not venda.cliente and cpf_avulso:
+        if len(cpf_avulso) != 11:
+            raise DirectEmissionError("O CPF informado para esta NFC-e é inválido.")
+        recipient = {"cpf": cpf_avulso}
+        if environment == 2:
+            recipient["nome"] = (
+                "NF-E EMITIDA EM AMBIENTE DE HOMOLOGACAO - SEM VALOR FISCAL"
+            )
+    else:
+        recipient = _recipient(
+            venda.cliente,
+            environment,
+            document_type,
+            require_identity=nfce_requires_recipient,
+            require_address=document_type == "nfe",
+        )
     destination_uf = (
         recipient.get("endereco", {}).get("uf") or emitter["endereco"]["uf"]
         if recipient and document_type == "nfe"
@@ -488,7 +503,7 @@ def build_payload(db, tenant, connection, venda, document_type):
     fiscal_pending = []
     product_total = Decimal("0")
     item_discount_total = Decimal("0")
-    for item in venda.itens or []:
+    for item_numero, item in enumerate(venda.itens or [], start=1):
         if _ascii(item.tipo) != "produto" or not item.produto:
             raise DirectEmissionError(
                 "A emissão direta atual aceita somente itens de produto vinculados ao cadastro."
@@ -546,7 +561,62 @@ def build_payload(db, tenant, connection, venda, document_type):
                 if not value
             )
             continue
-        cst_icms = str(fiscal.get("cst_icms") or "")
+        cst_icms = str(fiscal.get("cst_icms") or "").strip()
+        codigos_validos = (
+            CSOSN_VALIDOS if emitter.get("crt") == "1" else CST_ICMS_VALIDOS
+        )
+        if cst_icms not in codigos_validos:
+            tipo_codigo = "CSOSN" if emitter.get("crt") == "1" else "CST"
+            mensagem = (
+                f"Produto {item.produto.nome}: {tipo_codigo} {cst_icms} não é válido "
+                "para o regime da empresa. Confira a classificação fiscal do produto."
+            )
+            raise DirectEmissionError(
+                mensagem,
+                validation={
+                    "success": True,
+                    "pode_emitir": False,
+                    "requer_autorizacao": False,
+                    "correcoes": [],
+                    "bloqueios": [
+                        {
+                            "produto_id": item.produto.id,
+                            "produto_nome": item.produto.nome,
+                            "produto_tipo": getattr(item.produto, "tipo_produto", None),
+                            "sku": _text(getattr(item.produto, "codigo", None))
+                            or str(item.produto.id),
+                            "campo": "cst_icms",
+                            "valor_atual": cst_icms,
+                            "valor_invalido": True,
+                            "mensagem": mensagem,
+                        }
+                    ],
+                },
+            )
+        if document_type == "nfce" and emitter.get("crt") == "1":
+            pendencias_cfop_csosn = pendencias_cfop_csosn_nfce(
+                fiscal,
+                {
+                    "produto_id": item.produto.id,
+                    "produto_nome": item.produto.nome,
+                    "produto_tipo": getattr(item.produto, "tipo_produto", None),
+                    "sku": _text(getattr(item.produto, "codigo", None))
+                    or str(item.produto.id),
+                },
+                emitter["endereco"]["uf"],
+                item_numero,
+            )
+            if pendencias_cfop_csosn:
+                raise DirectEmissionError(
+                    f"Item {item_numero}: CFOP não permitido para o CSOSN informado.",
+                    validation={
+                        "success": True,
+                        "pode_emitir": False,
+                        "requer_autorizacao": False,
+                        "correcoes": [],
+                        "bloqueios": pendencias_cfop_csosn,
+                    },
+                )
         if (
             emitter.get("crt") == "1"
             and destinatario_nao_contribuinte
@@ -847,6 +917,8 @@ def local_document_details(db, tenant, venda):
         customer_document = _digits(
             getattr(cliente, "cnpj", None) or getattr(cliente, "cpf", None)
         )
+    elif venda.nfe_tipo == "nfce":
+        customer_document = _digits(getattr(venda, "nfe_consumidor_cpf", None)) or None
 
     credit_installments = _crediario_installments(venda)
     payment_rows = []
@@ -927,7 +999,11 @@ def local_document_details(db, tenant, venda):
                 "complemento": getattr(cliente, "complemento", None),
             }
             if cliente
-            else {}
+            else (
+                {"id": None, "nome": None, "cpf_cnpj": customer_document}
+                if customer_document
+                else {}
+            )
         ),
         "canal": venda.canal,
         "canal_label": {

@@ -52,6 +52,10 @@ public_router = APIRouter(prefix="/auth/bling", tags=["Bling OAuth"])
 OAUTH_STATE_TTL_SECONDS = 600
 
 
+class BlingOAuthRateLimited(RuntimeError):
+    pass
+
+
 class BlingOAuthAppConfigUpdate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -245,6 +249,8 @@ def _trocar_code_por_tokens(
     )
 
     if response.status_code != 200:
+        if response.status_code == 429:
+            raise BlingOAuthRateLimited("Bling OAuth: HTTP 429")
         raise RuntimeError(f"Erro Bling OAuth: HTTP {response.status_code}")
 
     return response.json()
@@ -314,6 +320,15 @@ def bling_oauth_callback(
 
         return HTMLResponse(content=_html_sucesso(expira_em))
 
+    except BlingOAuthRateLimited:
+        logger.warning("Bling limitou temporariamente a autorizacao OAuth (HTTP 429)")
+        return HTMLResponse(
+            content=_html_erro(
+                "O Bling limitou temporariamente as tentativas de conexao. "
+                "Aguarde antes de autorizar novamente."
+            ),
+            status_code=429,
+        )
     except Exception:
         logger.exception("Erro no callback OAuth Bling")
         return HTMLResponse(

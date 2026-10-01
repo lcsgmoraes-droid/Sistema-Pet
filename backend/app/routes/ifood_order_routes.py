@@ -18,6 +18,7 @@ from app.integrations.ifood import (
     order_detail,
     order_summary,
     process_order_events,
+    upsert_ifood_order,
 )
 from app.routes.ifood_integration_routes import (
     _client,
@@ -46,6 +47,10 @@ class IfoodCodePayload(BaseModel):
     @classmethod
     def normalize_code(cls, value: str) -> str:
         return value.strip()
+
+
+class IfoodPickingItemPayload(BaseModel):
+    quantity: float = Field(gt=0, le=1000000)
 
 
 def _require_order_operations() -> None:
@@ -95,6 +100,22 @@ def _ensure_ready(db: Session, tenant_id):
     return config
 
 
+def _refresh_virtual_bag(
+    *, db: Session, tenant_id, order: IfoodOrder, client
+) -> dict[str, Any]:
+    payload = client.get_virtual_bag(order.ifood_order_id)
+    upsert_ifood_order(
+        db,
+        tenant_id=tenant_id,
+        merchant_id=order.merchant_id,
+        order_id=order.ifood_order_id,
+        payload=payload,
+    )
+    db.commit()
+    db.refresh(order)
+    return order_detail(order)
+
+
 @router.get("/pedidos")
 def list_ifood_orders(
     order_status: str | None = Query(default=None, alias="status", max_length=64),
@@ -122,6 +143,151 @@ def get_ifood_order(
 ):
     _user, tenant_id = auth
     return order_detail(_order(db, tenant_id, order_id))
+
+
+@router.post("/pedidos/{order_id}/atualizar-sacola")
+def refresh_ifood_virtual_bag(
+    order_id: str,
+    auth=Depends(get_current_user_and_tenant),
+    db: Session = Depends(get_session),
+):
+    current_user, tenant_id = auth
+    _require_admin(current_user)
+    _require_order_operations()
+    config = _ensure_ready(db, tenant_id)
+    order = _order(db, tenant_id, order_id)
+    try:
+        with _client() as client:
+            return _refresh_virtual_bag(
+                db=db, tenant_id=tenant_id, order=order, client=client
+            )
+    except IfoodClientError as exc:
+        raise _provider_failure(db, config, exc) from exc
+
+
+def _run_picking_action(
+    *,
+    db: Session,
+    tenant_id,
+    config,
+    order: IfoodOrder,
+    action: Literal["start_separation", "end_separation"],
+) -> dict[str, Any]:
+    try:
+        with _client() as client:
+            provider = getattr(client, action)(order.ifood_order_id)
+            virtual_bag = None
+            if action == "end_separation":
+                virtual_bag = _refresh_virtual_bag(
+                    db=db, tenant_id=tenant_id, order=order, client=client
+                )
+        mark_order_action(order, action)
+        order.status = (
+            "SEPARATION_STARTED" if action == "start_separation" else "SEPARATION_ENDED"
+        )
+        db.commit()
+        return {
+            "accepted": True,
+            "action": action,
+            "provider": provider,
+            "order": virtual_bag,
+        }
+    except IfoodClientError as exc:
+        raise _provider_failure(db, config, exc) from exc
+
+
+@router.post("/pedidos/{order_id}/iniciar-separacao")
+def start_ifood_separation(
+    order_id: str,
+    auth=Depends(get_current_user_and_tenant),
+    db: Session = Depends(get_session),
+):
+    current_user, tenant_id = auth
+    _require_admin(current_user)
+    _require_order_operations()
+    config = _ensure_ready(db, tenant_id)
+    return _run_picking_action(
+        db=db,
+        tenant_id=tenant_id,
+        config=config,
+        order=_order(db, tenant_id, order_id),
+        action="start_separation",
+    )
+
+
+@router.patch("/pedidos/{order_id}/itens/{unique_id}")
+def update_ifood_picking_item(
+    order_id: str,
+    unique_id: str,
+    body: IfoodPickingItemPayload,
+    auth=Depends(get_current_user_and_tenant),
+    db: Session = Depends(get_session),
+):
+    current_user, tenant_id = auth
+    _require_admin(current_user)
+    _require_order_operations()
+    config = _ensure_ready(db, tenant_id)
+    order = _order(db, tenant_id, order_id)
+    try:
+        with _client() as client:
+            provider = client.update_picking_item(
+                order.ifood_order_id, unique_id, body.quantity
+            )
+        mark_order_action(order, "update_picking_item")
+        db.commit()
+        return {
+            "accepted": True,
+            "action": "update_picking_item",
+            "quantity": body.quantity,
+            "provider": provider,
+        }
+    except IfoodClientError as exc:
+        raise _provider_failure(db, config, exc) from exc
+
+
+@router.delete("/pedidos/{order_id}/itens/{unique_id}")
+def remove_ifood_picking_item(
+    order_id: str,
+    unique_id: str,
+    auth=Depends(get_current_user_and_tenant),
+    db: Session = Depends(get_session),
+):
+    current_user, tenant_id = auth
+    _require_admin(current_user)
+    _require_order_operations()
+    config = _ensure_ready(db, tenant_id)
+    order = _order(db, tenant_id, order_id)
+    try:
+        with _client() as client:
+            provider = client.remove_picking_item(order.ifood_order_id, unique_id)
+        mark_order_action(order, "remove_picking_item")
+        db.commit()
+        return {
+            "accepted": True,
+            "action": "remove_picking_item",
+            "provider": provider,
+        }
+    except IfoodClientError as exc:
+        raise _provider_failure(db, config, exc) from exc
+
+
+@router.post("/pedidos/{order_id}/finalizar-separacao")
+def end_ifood_separation(
+    order_id: str,
+    auth=Depends(get_current_user_and_tenant),
+    db: Session = Depends(get_session),
+):
+    current_user, tenant_id = auth
+    _require_admin(current_user)
+    _require_order_operations()
+    config = _ensure_ready(db, tenant_id)
+    return _run_picking_action(
+        db=db,
+        tenant_id=tenant_id,
+        config=config,
+        order=_order(db, tenant_id, order_id),
+        action="end_separation",
+    )
 
 
 @router.post("/pedidos/processar-eventos")

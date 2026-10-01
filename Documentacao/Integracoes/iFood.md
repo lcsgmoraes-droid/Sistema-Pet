@@ -1,6 +1,6 @@
 ---
 tipo: integracao
-atualizado: 2026-09-12
+atualizado: 2026-09-25
 ---
 
 # Integração — iFood
@@ -16,6 +16,10 @@ Parte de [[Integracoes]]. Fontes pré-existentes validadas: `docs/INTEGRACAO_IFO
 
 ## Comunicação
 REST + OAuth2 `client_credentials` + **polling de pedidos** (não usa webhook do iFood).
+
+Pedidos Groceries são consultados pela **Orders Virtual Bag**. A separação usa o
+módulo **Picking**, com início, alteração de quantidade, remoção de item,
+finalização e consulta final da sacola.
 
 ## Autenticação
 `IFOOD_CLIENT_ID`/`IFOOD_CLIENT_SECRET`, `IFOOD_API_BASE_URL`, `IFOOD_REQUEST_TIMEOUT_SECONDS`; flags `IFOOD_CATALOG_WRITE_ENABLED`, `IFOOD_ORDER_OPERATIONS_ENABLED`, `IFOOD_ORDER_POLLING_ENABLED`.

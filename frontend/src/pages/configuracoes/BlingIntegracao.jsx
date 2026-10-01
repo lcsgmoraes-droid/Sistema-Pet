@@ -38,6 +38,7 @@ export default function BlingIntegracao() {
     ultima_renovacao: null,
     proxima_renovacao: null,
     renovacoes_automaticas: 0,
+    rate_limited: false,
     temp_acesso_horas: 0,
     total_produtos_bling: 0,
   });
@@ -61,6 +62,7 @@ export default function BlingIntegracao() {
       ultima_renovacao: null,
       proxima_renovacao: null,
       renovacoes_automaticas: 0,
+      rate_limited: false,
       temp_acesso_horas: 0,
       total_produtos_bling: 0,
     };
@@ -147,6 +149,13 @@ export default function BlingIntegracao() {
   async function renovarToken() {
     setRenovando(true);
     try {
+      if (status.rate_limited) {
+        mostrarMensagem(
+          "info",
+          "O Bling limitou as tentativas. Aguarde e teste a conexão novamente.",
+        );
+        return;
+      }
       if (!status.conectado) {
         await abrirAutorizacaoBling();
         return;
@@ -188,7 +197,12 @@ export default function BlingIntegracao() {
     try {
       setLoading(true);
       const statusAtual = await carregarStatus();
-      if (statusAtual.conectado) {
+      if (statusAtual.rate_limited) {
+        mostrarMensagem(
+          "info",
+          "O Bling limitou as tentativas. Aguarde antes de tentar novamente.",
+        );
+      } else if (statusAtual.conectado) {
         mostrarMensagem(
           "sucesso",
           `✅ Conectado! ${statusAtual.total_produtos_bling || 0} produtos no Bling.`,
@@ -215,7 +229,11 @@ export default function BlingIntegracao() {
     ? "bg-emerald-50 border-emerald-200"
     : "bg-amber-50 border-amber-200";
 
-  const statusTexto = status.conectado ? "✅ Conectado" : "🔗 Não conectado";
+  const statusTexto = status.rate_limited
+    ? "⏳ Bling temporariamente indisponível"
+    : status.conectado
+      ? "✅ Conectado"
+      : "🔗 Não conectado";
 
   const statusCor = status.conectado ? "text-emerald-700" : "text-amber-700";
 
@@ -295,8 +313,11 @@ export default function BlingIntegracao() {
           )}
           {!status.conectado && (
             <p className="text-gray-700">
-              Conecte a conta do Bling pertencente a esta empresa. As credenciais e a sincronização
-              ficam isoladas das demais empresas do CorePet.
+              {status.rate_limited
+                ? "O Bling limitou as tentativas de conexão. Aguarde e use Testar Conexão antes de tentar novamente."
+                : status.status === "reautorizacao_necessaria"
+                  ? "O Bling invalidou a autorização anterior. Reconecte a conta desta empresa para retomar a sincronização."
+                  : "Conecte a conta do Bling pertencente a esta empresa. As credenciais e a sincronização ficam isoladas das demais empresas do CorePet."}
             </p>
           )}
         </div>
@@ -306,13 +327,19 @@ export default function BlingIntegracao() {
       <div className="grid grid-cols-2 gap-4 mb-6">
         <button
           onClick={renovarToken}
-          disabled={renovando}
+          disabled={renovando || status.rate_limited}
           className="px-4 py-3 rounded-lg font-medium flex items-center justify-center gap-2 transition-all
             bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed
             text-white shadow-sm hover:shadow-md"
         >
           <FiRefreshCw className={renovando ? "animate-spin" : ""} />
-          {renovando ? "Abrindo..." : status.conectado ? "Renovar Token" : "Reconectar Bling"}
+          {renovando
+            ? "Abrindo..."
+            : status.rate_limited
+              ? "Aguardar Bling"
+              : status.conectado
+                ? "Renovar Token"
+                : "Reconectar Bling"}
         </button>
 
         <button
@@ -336,15 +363,20 @@ export default function BlingIntegracao() {
 
         <div className="space-y-3 text-sm">
           <p className="text-gray-700">
-            <strong>Status:</strong> {status.conectado ? "✅ Online" : "❌ Offline"}
+            <strong>Status:</strong>{" "}
+            {status.rate_limited
+              ? "⏳ Temporariamente indisponível"
+              : status.conectado
+                ? "✅ Online"
+                : "❌ Offline"}
           </p>
 
           <p className="text-gray-700">
-            <strong>Renovação automática:</strong> O sistema renova o token automaticamente a cada 5
-            horas. Você não precisa fazer nada.
+            <strong>Renovação automática:</strong> O sistema tenta renovar o token antes de vencer.
+            Se o Bling invalidar a autorização, será necessário reconectar a conta.
           </p>
 
-          {!status.conectado && (
+          {!status.conectado && !status.rate_limited && (
             <div className="bg-amber-50 border border-amber-200 rounded p-3 text-amber-800">
               <p className="font-medium mb-2">Como reconectar:</p>
               <ol className="list-decimal list-inside space-y-1 text-xs">

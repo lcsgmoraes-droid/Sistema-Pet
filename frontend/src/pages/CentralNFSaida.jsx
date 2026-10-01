@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import api from "../api";
 import CentralNFSaidaView from "./centralNFSaida/CentralNFSaidaView";
 import {
@@ -13,8 +14,15 @@ import {
   corrigirEReemitirNota,
   descartarTentativaRejeitada,
   extrairMensagemNFe,
+  prevalidarNotaFiscal,
+  temPendenciasFiscais,
 } from "../utils/nfeFiscalAssistida";
+import { solicitarCorrecaoFiscal } from "../services/fiscalCorrectionDialog";
 import { metadadosDownloadDanfe } from "../utils/documentoFiscalDownload.mjs";
+import {
+  MENSAGEM_SUPORTE_RESPONSAVEL_TECNICO,
+  rejeicaoResponsavelTecnico,
+} from "../utils/fiscalRejectionGuidance.mjs";
 import NFSaidaCompartilharModal from "./centralNFSaida/NFSaidaCompartilharModal";
 
 function salvarArquivo(blob, nome) {
@@ -41,13 +49,18 @@ async function mensagemDocumento(error, padrao) {
 }
 
 export default function CentralNFSaida() {
+  const [searchParams] = useSearchParams();
+  const buscaInicial = searchParams.get("busca") || "";
+  const vendaIdInicial = searchParams.get("venda_id") || "";
+  const abrirNotaInicial = searchParams.get("abrir") === "1";
+  const corrigirNotaInicial = searchParams.get("corrigir") === "1";
   const [notas, setNotas] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filtroSituacao, setFiltroSituacao] = useState("");
   const [dataInicial, setDataInicial] = useState("");
   const [dataFinal, setDataFinal] = useState("");
-  const [busca, setBusca] = useState("");
-  const [buscaAplicada, setBuscaAplicada] = useState("");
+  const [busca, setBusca] = useState(buscaInicial);
+  const [buscaAplicada, setBuscaAplicada] = useState(buscaInicial);
   const [filtroCanal, setFiltroCanal] = useState("");
   const [canais, setCanais] = useState([]);
   const [pagina, setPagina] = useState(1);
@@ -69,8 +82,10 @@ export default function CentralNFSaida() {
   const [cancelando, setCancelando] = useState(false);
   const [reconciliandoNotaId, setReconciliandoNotaId] = useState("");
   const [corrigindoNotaId, setCorrigindoNotaId] = useState("");
+  const [diagnosticandoNotaId, setDiagnosticandoNotaId] = useState("");
   const [liberandoVendaId, setLiberandoVendaId] = useState("");
   const detalhesNotasCacheRef = useRef(new Map());
+  const notaDiretaAbertaRef = useRef(false);
 
   const [painelSefazAberto, setPainelSefazAberto] = useState(false);
   const [chave, setChave] = useState("");
@@ -123,6 +138,22 @@ export default function CentralNFSaida() {
     listaConsultasRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
   }, [consultasSessao.length]);
 
+  async function abrirNotaDiretaSeSolicitada(notasRecebidas) {
+    if (!abrirNotaInicial || notaDiretaAbertaRef.current) return;
+    const notaDireta = notasRecebidas.find(
+      (nota) =>
+        (vendaIdInicial && String(nota.venda_id || "") === vendaIdInicial) ||
+        (buscaInicial && String(nota.numero || "") === buscaInicial),
+    );
+    if (!notaDireta) return;
+    notaDiretaAbertaRef.current = true;
+    if (corrigirNotaInicial && notaDireta.status?.toLowerCase() === "rejeitada") {
+      await abrirCorrecao(notaDireta);
+    } else {
+      await abrirDetalhes(notaDireta);
+    }
+  }
+
   async function carregarNotas(forceRefresh = false) {
     if (forceRefresh) return atualizarLista(true);
     const requisicao = ++requisicaoListaRef.current;
@@ -139,9 +170,11 @@ export default function CentralNFSaida() {
       if (buscaAplicada) params.set("busca", buscaAplicada);
       const response = await api.get(`/nfe/lista?${params.toString()}`);
       if (requisicao !== requisicaoListaRef.current) return;
-      setNotas(response.data.notas || []);
+      const notasRecebidas = response.data.notas || [];
+      setNotas(notasRecebidas);
       setTotalNotas(response.data.total || 0);
       setCanais(response.data.canais || []);
+      await abrirNotaDiretaSeSolicitada(notasRecebidas);
     } catch {
       if (requisicao === requisicaoListaRef.current) setErro("Erro ao carregar notas fiscais");
     } finally {
@@ -218,9 +251,12 @@ export default function CentralNFSaida() {
           : await api.post(`/nfe/${notaId}/reconciliar-fluxo`);
       const numero = response.data?.numero || response.data?.nf_numero || nota.numero || notaId;
       const situacao = response.data?.situacao;
-      const rejeicao = [response.data?.codigo_erro, response.data?.motivo_rejeicao]
-        .filter(Boolean)
-        .join(" — ");
+      const rejeicao = rejeicaoResponsavelTecnico({
+        codigo: response.data?.codigo_erro,
+        motivo: response.data?.motivo_rejeicao,
+      })
+        ? MENSAGEM_SUPORTE_RESPONSAVEL_TECNICO
+        : [response.data?.codigo_erro, response.data?.motivo_rejeicao].filter(Boolean).join(" — ");
       alert(
         nota.provedor === "intnfe"
           ? `Status da NF ${numero}: ${situacao || "atualizado"}${rejeicao ? ` — ${rejeicao}` : ""}.`
@@ -238,7 +274,14 @@ export default function CentralNFSaida() {
     }
   }
 
-  async function corrigirEReemitir(nota) {
+  async function corrigirEReemitir(nota, { correcaoConcluida = false } = {}) {
+    if (
+      !correcaoConcluida &&
+      rejeicaoResponsavelTecnico({ codigo: nota?.codigo_erro, motivo: nota?.motivo_rejeicao })
+    ) {
+      await abrirCorrecao(nota);
+      return;
+    }
     const vendaId = nota?.venda_id;
     if (!vendaId) {
       alert("Não foi possível identificar a venda desta nota.");
@@ -272,7 +315,53 @@ export default function CentralNFSaida() {
     }
   }
 
+  async function abrirCorrecao(nota) {
+    const vendaId = nota?.venda_id;
+    if (!vendaId) {
+      alert("Não foi possível identificar a venda desta nota.");
+      return;
+    }
+    const tipoNota = nota?.tipo === "nfe" || Number(nota?.modelo) === 55 ? "nfe" : "nfce";
+    const rejeicao = { codigo: nota?.codigo_erro, motivo: nota?.motivo_rejeicao };
+    if (rejeicaoResponsavelTecnico(rejeicao)) {
+      await solicitarCorrecaoFiscal({ vendaId, tipoNota, apenasCorrigir: true, rejeicao });
+      return;
+    }
+    setDiagnosticandoNotaId(String(vendaId));
+    try {
+      for (let tentativa = 0; tentativa < 4; tentativa += 1) {
+        const validacao = await prevalidarNotaFiscal({ vendaId, tipoNota });
+        const corrigido = await solicitarCorrecaoFiscal({
+          validacao,
+          vendaId,
+          tipoNota,
+          apenasCorrigir: true,
+          rejeicao: validacao.rejeicao || {
+            codigo: nota.codigo_erro,
+            motivo: nota.motivo_rejeicao,
+          },
+        });
+        if (!corrigido) return;
+        const revisao = await prevalidarNotaFiscal({ vendaId, tipoNota });
+        if (!temPendenciasFiscais(revisao)) {
+          fecharDetalhes();
+          await corrigirEReemitir(nota, { correcaoConcluida: true });
+          return;
+        }
+      }
+      alert("Ainda há pendências fiscais. Abra a correção novamente para continuar.");
+    } catch (error) {
+      alert(extrairMensagemNFe(error));
+    } finally {
+      setDiagnosticandoNotaId("");
+    }
+  }
+
   async function liberarVendaComRejeicao(nota) {
+    if (rejeicaoResponsavelTecnico({ codigo: nota?.codigo_erro, motivo: nota?.motivo_rejeicao })) {
+      await abrirCorrecao(nota);
+      return;
+    }
     const vendaId = nota?.venda_id;
     if (!vendaId) {
       alert("Não foi possível identificar a venda desta tentativa rejeitada.");
@@ -540,6 +629,8 @@ export default function CentralNFSaida() {
         reconciliandoNotaId={reconciliandoNotaId}
         corrigirEReemitir={corrigirEReemitir}
         corrigindoNotaId={corrigindoNotaId}
+        abrirCorrecao={abrirCorrecao}
+        diagnosticandoNotaId={diagnosticandoNotaId}
         liberarVendaComRejeicao={liberarVendaComRejeicao}
         liberandoVendaId={liberandoVendaId}
         baixarDanfe={baixarDanfe}

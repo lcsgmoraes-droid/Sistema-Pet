@@ -98,6 +98,13 @@ test("recibo imprime o CPF ou CNPJ informado no cadastro do cliente", () => {
   assert.match(reciboCnpj, /CPF\/CNPJ: 23\.226\.250\/0001-40/);
 });
 
+test("recibo sem CPF ou CNPJ continua sendo gerado normalmente", () => {
+  const recibo = montarCupomVenda(vendaBase, empresa);
+
+  assert.match(recibo, /RECIBO DO PDV/);
+  assert.doesNotMatch(recibo, /CPF\/CNPJ:/);
+});
+
 test("recibo em dinheiro imprime valor recebido e troco com clareza", () => {
   const recibo = montarCupomVenda(
     {

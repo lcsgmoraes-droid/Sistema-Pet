@@ -235,6 +235,110 @@ def test_prevalidacao_oferece_opcoes_do_simples_com_baixa_confianca(monkeypatch)
     }
 
 
+def test_prevalidacao_destaca_cst_00_usado_como_csosn(monkeypatch):
+    venda = _make_venda_nfce()
+    monkeypatch.setattr(
+        bling_integration_fiscal,
+        "_config_fiscal_empresa",
+        lambda *_args: SimpleNamespace(
+            regime_tributario="Simples Nacional", simples_ativo=True, uf="SP"
+        ),
+    )
+    monkeypatch.setattr(
+        bling_integration_fiscal,
+        "_resolver_fiscal_item_nfe",
+        lambda *_args: {
+            "ncm": "39269090",
+            "origem_mercadoria": "0",
+            "cfop": "5102",
+            "cst_icms": "00",
+            "pis_cst": "49",
+            "cofins_cst": "49",
+            "icms_st": False,
+        },
+    )
+    monkeypatch.setattr(
+        bling_integration_fiscal, "_melhor_sugestao_catalogo", lambda *_args: None
+    )
+
+    validacao = bling_integration_fiscal.prevalidar_produtos_fiscais_venda(
+        venda, object(), exigir_documento_completo=True
+    )
+
+    assert validacao["pode_emitir"] is False
+    assert validacao["bloqueios"][0]["campo"] == "cst_icms"
+    assert validacao["bloqueios"][0]["valor_atual"] == "00"
+    assert validacao["bloqueios"][0]["valor_invalido"] is True
+    assert validacao["bloqueios"][0]["valor_sugerido"] == "102"
+    assert validacao["bloqueios"][0]["confianca"] == "baixa"
+    assert validacao["bloqueios"][0]["preenchimento_automatico"] is False
+
+
+def test_prevalidacao_nfce_aponta_cfop_e_csosn_incompativeis_antes_do_envio(
+    monkeypatch,
+):
+    venda = _make_venda_nfce()
+    monkeypatch.setattr(
+        bling_integration_fiscal,
+        "_config_fiscal_empresa",
+        lambda *_args: SimpleNamespace(
+            regime_tributario="Simples Nacional", simples_ativo=True, uf="SP"
+        ),
+    )
+    monkeypatch.setattr(
+        bling_integration_fiscal,
+        "_resolver_fiscal_item_nfe",
+        lambda *_args: {
+            "ncm": "39269090",
+            "origem_mercadoria": "0",
+            "cfop": "5405",
+            "cfop_interno": "5405",
+            "cst_icms": "102",
+            "pis_cst": "49",
+            "cofins_cst": "49",
+            "icms_st": True,
+        },
+    )
+    monkeypatch.setattr(
+        bling_integration_fiscal, "_melhor_sugestao_catalogo", lambda *_args: None
+    )
+
+    validacao = bling_integration_fiscal.prevalidar_produtos_fiscais_venda(
+        venda, object(), exigir_documento_completo=True, tipo_nota="nfce"
+    )
+
+    assert validacao["pode_emitir"] is False
+    assert {item["campo"] for item in validacao["bloqueios"]} == {"cfop", "cst_icms"}
+    assert all(item["item_numero"] == 1 for item in validacao["bloqueios"])
+    assert validacao["bloqueios"][0]["valor_atual"] == "5405"
+    assert validacao["bloqueios"][1]["valor_sugerido"] == "500"
+    assert validacao["bloqueios"][1]["preenchimento_automatico"] is False
+
+
+@pytest.mark.parametrize(
+    ("csosn", "cfop", "uf", "espera_bloqueio"),
+    [
+        ("102", "5102", "SP", False),
+        ("500", "5405", "SP", False),
+        ("900", "5949", "SP", False),
+        ("102", "5405", "SP", True),
+        ("500", "5102", "SP", True),
+    ],
+)
+def test_regra_386_respeita_cfop_do_csosn(csosn, cfop, uf, espera_bloqueio):
+    pendencias = bling_integration_fiscal.pendencias_cfop_csosn_nfce(
+        {"cst_icms": csosn, "cfop_interno": cfop, "icms_st": False},
+        {"produto_id": 10, "produto_nome": "Produto teste"},
+        uf,
+        3,
+    )
+
+    assert bool(pendencias) is espera_bloqueio
+    if pendencias:
+        assert {item["campo"] for item in pendencias} == {"cfop", "cst_icms"}
+        assert all(item["item_numero"] == 3 for item in pendencias)
+
+
 def test_catalogo_opcional_falha_dentro_de_savepoint_sem_interromper_validacao(
     monkeypatch,
 ):
@@ -544,6 +648,93 @@ def test_renovar_access_token_propaga_falha_ao_persistir(monkeypatch):
 
     with pytest.raises(RuntimeError, match="db indisponivel"):
         api.renovar_access_token()
+
+
+def test_refresh_revogado_exige_reconexao_sem_novas_chamadas(monkeypatch):
+    api = _make_api()
+    api.tenant_id = "00000000-0000-0000-0000-000000000001"
+    api.client_id = "client-id"
+    api.client_secret = "client-secret"
+    api.refresh_token = "refresh-revogado"
+    state = {"reauthorization_required": False, "requests": 0}
+
+    class FakeResponse:
+        status_code = 400
+
+        def json(self):
+            return {"error": {"type": "invalid_grant"}}
+
+    def fake_post(*_args, **_kwargs):
+        state["requests"] += 1
+        return FakeResponse()
+
+    def fake_mark(**_kwargs):
+        state["reauthorization_required"] = True
+        return True
+
+    monkeypatch.setattr("requests.post", fake_post)
+    monkeypatch.setattr(
+        "app.bling_integration_parts.core._bling_token_lock", nullcontext
+    )
+    monkeypatch.setattr(
+        "app.bling_integration_parts.core._load_bling_runtime_config",
+        lambda **_kwargs: {
+            "refresh_token": "refresh-revogado",
+            "reauthorization_required": state["reauthorization_required"],
+        },
+    )
+    monkeypatch.setattr(
+        "app.services.bling_connection_service.mark_bling_reauthorization_required",
+        fake_mark,
+    )
+
+    with pytest.raises(ValueError, match="invalid_grant"):
+        api.renovar_access_token()
+    with pytest.raises(ValueError, match="reconectado"):
+        api.renovar_access_token()
+    assert state["requests"] == 1
+
+
+def test_rate_limit_oauth_pausa_novas_tentativas_de_refresh(monkeypatch):
+    api = _make_api()
+    api.tenant_id = "00000000-0000-0000-0000-000000000001"
+    api.client_id = "client-id"
+    api.client_secret = "client-secret"
+    api.refresh_token = "refresh-antigo"
+    state = {"oauth_rate_limited_until": None, "requests": 0}
+
+    class FakeResponse:
+        status_code = 429
+
+    def fake_post(*_args, **_kwargs):
+        state["requests"] += 1
+        return FakeResponse()
+
+    def fake_mark(**_kwargs):
+        state["oauth_rate_limited_until"] = "future"
+        return True
+
+    monkeypatch.setattr("requests.post", fake_post)
+    monkeypatch.setattr(
+        "app.bling_integration_parts.core._bling_token_lock", nullcontext
+    )
+    monkeypatch.setattr(
+        "app.bling_integration_parts.core._load_bling_runtime_config",
+        lambda **_kwargs: {
+            "refresh_token": "refresh-antigo",
+            "oauth_rate_limited_until": state["oauth_rate_limited_until"],
+        },
+    )
+    monkeypatch.setattr(
+        "app.services.bling_connection_service.mark_bling_oauth_rate_limited",
+        fake_mark,
+    )
+
+    with pytest.raises(RuntimeError, match="HTTP 429"):
+        api.renovar_access_token()
+    with pytest.raises(RuntimeError, match="HTTP 429"):
+        api.renovar_access_token()
+    assert state["requests"] == 1
 
 
 def test_payload_nfce_usa_serie_3_e_deixa_numero_para_sequencia_do_bling():

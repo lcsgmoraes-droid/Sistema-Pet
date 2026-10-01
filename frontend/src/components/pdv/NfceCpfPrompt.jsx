@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { CheckCircle2, HelpCircle } from "lucide-react";
 
 import { atualizarCliente } from "../../api/clientes";
+import api from "../../api";
 import { documentoCpfCnpjCliente, formatCpf, normalizeCpf, validarCpf } from "../../utils/cpf";
 
 function errorMessage(error) {
@@ -12,18 +13,20 @@ function errorMessage(error) {
       .map((item) => item?.msg)
       .filter(Boolean)
       .join("; ");
-  return detail?.mensagem || "Não foi possível salvar o CPF no cadastro do cliente.";
+  return detail?.mensagem || "Não foi possível incluir o CPF na NFC-e.";
 }
 
 export default function NfceCpfPrompt({
   cliente,
+  cpfAvulso = "",
   disabled = false,
   onContinueWithoutCpf,
   onResolvedChange,
   onSaved,
+  vendaId,
   visible = true,
 }) {
-  const existingDocument = documentoCpfCnpjCliente(cliente);
+  const existingDocument = documentoCpfCnpjCliente(cliente) || cpfAvulso;
   const [saved, setSaved] = useState(false);
   const [cpf, setCpf] = useState("");
   const [error, setError] = useState("");
@@ -52,15 +55,17 @@ export default function NfceCpfPrompt({
       setError("Informe um CPF válido com 11 dígitos.");
       return;
     }
-    if (!cliente?.id) {
-      setError("Selecione um cliente no PDV para salvar o CPF no cadastro.");
+    if (!cliente?.id && !vendaId) {
+      setError("Não foi possível identificar a venda para incluir o CPF.");
       return;
     }
 
     setSaving(true);
     setError("");
     try {
-      const updatedCustomer = await atualizarCliente(cliente.id, { cpf: normalized });
+      const updatedCustomer = cliente?.id
+        ? await atualizarCliente(cliente.id, { cpf: normalized })
+        : (await api.put(`/nfe/vendas/${vendaId}/consumidor-cpf`, { cpf: normalized })).data;
       setSaved(true);
       onSaved?.(updatedCustomer || { ...cliente, cpf: normalized });
     } catch (failure) {
@@ -84,7 +89,8 @@ export default function NfceCpfPrompt({
     <div className="rounded-xl border border-sky-200 bg-sky-50 p-3 text-sm text-sky-950 dark:border-sky-800 dark:bg-sky-950/40 dark:text-sky-100">
       {saved ? (
         <p className="flex items-center gap-2 font-semibold">
-          <CheckCircle2 className="h-4 w-4" /> CPF salvo no cadastro e incluído na NFC-e.
+          <CheckCircle2 className="h-4 w-4" />
+          {cliente?.id ? "CPF salvo no cadastro e incluído na NFC-e." : "CPF incluído na NFC-e."}
         </p>
       ) : (
         <form onSubmit={saveCpf} className="space-y-2.5">
@@ -105,40 +111,36 @@ export default function NfceCpfPrompt({
             <p id="ajuda-cpf-na-nota" className="text-xs text-sky-800 dark:text-sky-200">
               {cliente?.id
                 ? "O CPF ficará salvo no cadastro deste cliente para as próximas compras."
-                : "Para salvar um CPF, selecione o cliente no PDV antes de finalizar a venda."}
+                : "O CPF será incluído somente nesta NFC-e, sem cadastrar um cliente."}
             </p>
           )}
-          {cliente?.id && (
-            <div>
-              <label htmlFor="nfce-cpf" className="sr-only">
-                CPF para incluir na NFC-e
-              </label>
-              <input
-                id="nfce-cpf"
-                value={cpf}
-                onChange={(event) => {
-                  setCpf(formatCpf(event.target.value));
-                  setError("");
-                }}
-                inputMode="numeric"
-                autoComplete="off"
-                placeholder="000.000.000-00"
-                disabled={disabled || saving || continuing}
-                className="w-full rounded-lg border border-sky-300 bg-white px-3 py-2 text-slate-900 outline-none focus:border-sky-600 focus:ring-2 focus:ring-sky-600/20 dark:border-sky-700 dark:bg-slate-950 dark:text-slate-100"
-              />
-            </div>
-          )}
+          <div>
+            <label htmlFor="nfce-cpf" className="sr-only">
+              CPF para incluir na NFC-e
+            </label>
+            <input
+              id="nfce-cpf"
+              value={cpf}
+              onChange={(event) => {
+                setCpf(formatCpf(event.target.value));
+                setError("");
+              }}
+              inputMode="numeric"
+              autoComplete="off"
+              placeholder="000.000.000-00"
+              disabled={disabled || saving || continuing}
+              className="w-full rounded-lg border border-sky-300 bg-white px-3 py-2 text-slate-900 outline-none focus:border-sky-600 focus:ring-2 focus:ring-sky-600/20 dark:border-sky-700 dark:bg-slate-950 dark:text-slate-100"
+            />
+          </div>
           {error && <p className="text-xs font-medium text-red-700">{error}</p>}
           <div className="flex flex-wrap gap-2">
-            {cliente?.id && (
-              <button
-                type="submit"
-                disabled={disabled || saving || continuing}
-                className="rounded-lg bg-sky-700 px-3 py-2 font-semibold text-white hover:bg-sky-800 disabled:opacity-50"
-              >
-                {saving ? "Salvando…" : "Salvar CPF"}
-              </button>
-            )}
+            <button
+              type="submit"
+              disabled={disabled || saving || continuing}
+              className="rounded-lg bg-sky-700 px-3 py-2 font-semibold text-white hover:bg-sky-800 disabled:opacity-50"
+            >
+              {saving ? "Salvando…" : cliente?.id ? "Salvar CPF" : "Incluir CPF na NFC-e"}
+            </button>
             <button
               type="button"
               onClick={continueWithoutCpf}

@@ -60,8 +60,14 @@ assert.match(
 
 assert.match(
   paymentActions,
-  /Corrigir e tentar novamente\?/,
-  "PDV deve oferecer correção e nova tentativa logo após a rejeição",
+  /Abrir a tela de correção desta nota agora\?/,
+  "PDV deve abrir a correção guiada logo após a rejeição",
+);
+
+assert.match(
+  notesList,
+  /Corrigir erro/,
+  "Central de NF deve abrir a correção diretamente pela rejeição",
 );
 
 assert.match(
@@ -215,7 +221,7 @@ assert.match(
 );
 assert.match(
   finalizedSaleQuestion,
-  /<span>Finalizar<\/span>/,
+  /documentoEmitido \? "Concluir venda" : "Finalizar"/,
   "saida sem emissao fiscal deve usar um rotulo neutro",
 );
 assert.doesNotMatch(

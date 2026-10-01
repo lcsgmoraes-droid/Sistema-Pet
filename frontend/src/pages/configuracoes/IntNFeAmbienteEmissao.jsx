@@ -302,6 +302,9 @@ export default function IntNFeAmbienteEmissao({
 
   const locked = disabled || loading;
   const production = environment === 1;
+  const selectedEnvironmentActive = Boolean(
+    data?.habilitada && data.ambiente_codigo === environment,
+  );
   const pendingSequence = Boolean(choices[55]?.pendente || choices[65]?.pendente);
   const exhaustedSequence = Boolean(
     (nfeSequence && nfeSequence.proximoNumero > 999999999) ||
@@ -322,9 +325,9 @@ export default function IntNFeAmbienteEmissao({
             Escolha, entre as sequências acima, a série padrão de cada documento.
           </p>
         </div>
-        {data?.habilitada && data.ambiente_codigo === environment ? (
+        {selectedEnvironmentActive ? (
           <span className="inline-flex items-center gap-2 rounded-full bg-emerald-100 px-3 py-1 text-xs font-bold text-emerald-900">
-            <FiCheckCircle /> Ativa em {data.ambiente}
+            <FiCheckCircle /> Ativa em {production ? "produção" : "homologação"}
           </span>
         ) : null}
       </header>
@@ -445,7 +448,11 @@ export default function IntNFeAmbienteEmissao({
 
       {productionReview ? (
         <div className="space-y-3 rounded-xl border border-amber-400 bg-amber-50 p-4 text-amber-950">
-          <p className="font-bold">Confirmar ativação da emissão real</p>
+          <p className="font-bold">
+            {selectedEnvironmentActive
+              ? "Confirmar atualização da emissão em produção"
+              : "Confirmar ativação da emissão real"}
+          </p>
           <p className="text-sm">
             O CorePet usará NF-e série <strong>{selected[55].padStart(3, "0")}</strong>, próxima{" "}
             <strong>{formatSequence(nfeSequence.proximoNumero)}</strong>
@@ -464,7 +471,7 @@ export default function IntNFeAmbienteEmissao({
               onClick={save}
               className="rounded-lg bg-amber-700 px-4 py-2 text-sm font-bold text-white hover:bg-amber-800 disabled:opacity-50"
             >
-              Confirmar e ativar produção
+              {selectedEnvironmentActive ? "Confirmar atualização" : "Confirmar e ativar produção"}
             </button>
             <button
               type="button"
@@ -487,8 +494,12 @@ export default function IntNFeAmbienteEmissao({
             {loading
               ? "Salvando…"
               : production
-                ? "Revisar e ativar produção"
-                : "Ativar emissão de teste"}
+                ? selectedEnvironmentActive
+                  ? "Revisar e atualizar produção"
+                  : "Revisar e ativar produção"
+                : selectedEnvironmentActive
+                  ? "Atualizar emissão de teste"
+                  : "Ativar emissão de teste"}
           </button>
           {data?.habilitada ? (
             <button

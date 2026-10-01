@@ -73,3 +73,19 @@ def test_preflight_de_reprocessamento_usa_escopo_de_catalogo(monkeypatch):
 
     assert chamadas == [("produtos", {"limite": 1})]
     assert resultado["auth_invalid"] is False
+
+
+def test_reprocessamento_pede_reconexao_sem_agendar_fila(monkeypatch):
+    monkeypatch.setattr(bling_sync_reprocess, "SessionLocal", FakeSession)
+    monkeypatch.setattr(
+        bling_sync_reprocess,
+        "BlingAPI",
+        lambda: (_ for _ in ()).throw(
+            ValueError("Bling precisa ser reconectado para esta empresa")
+        ),
+    )
+
+    resultado = ServiceTeste.reprocess_failed_syncs(limit=100)
+
+    assert resultado["auth_invalid"] is True
+    assert resultado["reprocessados"] == 0

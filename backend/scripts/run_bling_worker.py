@@ -18,6 +18,7 @@ if str(ROOT_DIR) not in sys.path:
 # Carrega o registro ORM completo antes de iniciar jobs que podem criar
 # registros com FKs para modulos que o worker nao importa diretamente.
 import app.db.base  # noqa: F401
+from sqlalchemy.orm import configure_mappers
 from app.schedulers.bling_sync_scheduler import BlingSyncScheduler
 from app.utils.logger import configure_logging
 
@@ -43,6 +44,9 @@ def _touch_heartbeat() -> None:
 
 def main() -> None:
     configure_logging()
+    # APScheduler inicia varios jobs em paralelo. Concluir o registro ORM antes
+    # evita que uma consulta configure relacionamentos ainda em importacao.
+    configure_mappers()
     signal.signal(signal.SIGTERM, _handle_signal)
     signal.signal(signal.SIGINT, _handle_signal)
 

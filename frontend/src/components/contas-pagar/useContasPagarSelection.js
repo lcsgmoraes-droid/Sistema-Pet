@@ -7,7 +7,12 @@ import { safeArray } from "../../utils/safeArray";
 import { ehLancamentoFinanceiroCancelado } from "../../utils/financeiroStatus";
 import { confirmarCorePet, perguntarCorePet } from "../../services/corepetDialog";
 
-export default function useContasPagarSelection({ contas, carregarDados, abrirModalEdicao }) {
+export default function useContasPagarSelection({
+  contas,
+  carregarDados,
+  abrirModalEdicao,
+  abrirExclusaoRecorrencia,
+}) {
   const [contasSelecionadas, setContasSelecionadas] = useState([]);
 
   const contasVisiveis = useMemo(() => safeArray(contas), [contas]);
@@ -141,6 +146,18 @@ export default function useContasPagarSelection({ contas, carregarDados, abrirMo
     const contasParaExcluir = contasSelecionadasObjetos.filter(contaPodeExcluir);
     if (contasParaExcluir.length === 0) {
       toast.error("Selecione pelo menos uma conta sem pagamento para excluir");
+      return;
+    }
+
+    const recorrentes = contasParaExcluir.filter(
+      (conta) => conta.eh_recorrente || conta.conta_recorrencia_origem_id,
+    );
+    if (recorrentes.length > 0) {
+      if (contasParaExcluir.length === 1) {
+        await abrirExclusaoRecorrencia(recorrentes[0]);
+      } else {
+        toast.error("Exclua cada recorrência pelo botão Excluir da respectiva linha.");
+      }
       return;
     }
 

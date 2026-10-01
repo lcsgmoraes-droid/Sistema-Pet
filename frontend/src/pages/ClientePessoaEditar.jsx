@@ -120,6 +120,23 @@ function mensagemErro(error, padrao) {
   return error?.response?.data?.detail || padrao;
 }
 
+const ABAS_VALIDAS = ["dados-gerais", "contatos", "endereco", "alertas-pdv", "financeiro"];
+
+// Aba inicial: `location.state.abaInicial` quando a navegação vem de dentro do
+// app (ex.: clique num link da própria SPA); `?aba=` na URL quando vem de um
+// link externo/recarregado (ex.: "Corrigir cadastro" na pendência fiscal, que
+// usa <a href> normal e por isso não carrega state do React Router).
+function resolverAbaInicial(location) {
+  if (ABAS_VALIDAS.includes(location.state?.abaInicial)) {
+    return location.state.abaInicial;
+  }
+  const abaDaUrl = new URLSearchParams(location.search).get("aba");
+  if (ABAS_VALIDAS.includes(abaDaUrl)) {
+    return abaDaUrl;
+  }
+  return "dados-gerais";
+}
+
 function formatarDataHoraCadastro(valor) {
   if (!valor) return "Data não registrada";
   const data = new Date(valor);
@@ -138,7 +155,7 @@ export default function ClientePessoaEditar() {
   const [carregando, setCarregando] = useState(true);
   const [naoEncontrado, setNaoEncontrado] = useState(false);
   const [formData, setFormData] = useState(null);
-  const [abaAtiva, setAbaAtiva] = useState(location.state?.abaInicial || "dados-gerais");
+  const [abaAtiva, setAbaAtiva] = useState(() => resolverAbaInicial(location));
   const [salvando, setSalvando] = useState(false);
 
   const [resumoFinanceiro, setResumoFinanceiro] = useState(null);

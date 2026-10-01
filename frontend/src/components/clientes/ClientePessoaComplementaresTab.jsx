@@ -16,6 +16,11 @@ const OPCOES_PERIODICIDADE = [
   { value: "mensal", label: "Mensal" },
 ];
 
+const OPCOES_PROPRIEDADE_MOTO = [
+  { value: "entregador", label: "Moto do entregador" },
+  { value: "loja", label: "Moto da loja" },
+];
+
 const OPCOES_DIA_SEMANA = [
   { value: "1", label: "Segunda" },
   { value: "2", label: "Terça" },
@@ -182,15 +187,15 @@ export default function ClientePessoaComplementaresTab({ formData, setFormData }
                 </div>
               ) : null}
 
-              <InputCheckTexto
-                id="pessoa-moto-propria"
-                checked={formData.moto_propria || false}
-                onChange={(moto_propria) => setFormData((prev) => ({ ...prev, moto_propria }))}
-              >
-                <span className="text-sm text-slate-700 dark:text-slate-300">
-                  {formData.moto_propria ? "Moto própria" : "Moto da loja"}
-                </span>
-              </InputCheckTexto>
+              <InputRadio
+                name="pessoa-moto-propria"
+                label="De quem é a moto usada nas entregas?"
+                opcoes={OPCOES_PROPRIEDADE_MOTO}
+                value={formData.moto_propria ? "entregador" : "loja"}
+                onChange={(valor) =>
+                  setFormData((prev) => ({ ...prev, moto_propria: valor === "entregador" }))
+                }
+              />
 
               <div className="border-t border-blue-200 pt-3">
                 <h4 className="mb-2 text-xs font-semibold text-slate-700 dark:text-slate-300">

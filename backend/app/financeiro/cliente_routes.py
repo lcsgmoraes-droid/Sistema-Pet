@@ -128,7 +128,9 @@ async def get_historico_financeiro_cliente(
         if filtro_data_inicio:
             query_vendas = query_vendas.filter(Venda.data_venda >= filtro_data_inicio)
         if filtro_data_fim:
-            query_vendas = query_vendas.filter(Venda.data_venda <= filtro_data_fim)
+            query_vendas = query_vendas.filter(
+                Venda.data_venda < filtro_data_fim + timedelta(days=1)
+            )
         if status:
             query_vendas = query_vendas.filter(Venda.status == status)
 
@@ -180,7 +182,7 @@ async def get_historico_financeiro_cliente(
             )
         if filtro_data_fim:
             query_devolucoes = query_devolucoes.filter(
-                Venda.data_venda <= filtro_data_fim
+                Venda.data_venda < filtro_data_fim + timedelta(days=1)
             )
 
         devolucoes = query_devolucoes.all()
