@@ -37,6 +37,23 @@ test("traz para o topo um produto bipado novamente sem duplica-lo", () => {
   ]);
 });
 
+test("mantem etiquetas de pesos distintos quando o mesmo produto e adicionado manualmente", () => {
+  const itens = [
+    { produto_id: 2024, quantidade: 0.538, etiqueta_balanca: "2002024015556" },
+    { produto_id: 2024, quantidade: 0.228, etiqueta_balanca: "2002024006592" },
+    { produto_id: 2024, quantidade: 1, etiqueta_balanca: null },
+  ];
+  const resultado = colocarItemProdutoNoTopo(itens, {
+    produto_id: 2024,
+    quantidade: 2,
+  });
+  assert.equal(resultado.length, 3);
+  assert.deepEqual(
+    resultado.map((item) => item.quantidade),
+    [2, 0.538, 0.228],
+  );
+});
+
 test("recalcula subtotal mantendo quantidade fracionada menor que uma unidade", () => {
   const item = {
     preco_unitario: 20,

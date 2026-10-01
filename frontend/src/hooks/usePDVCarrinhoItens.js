@@ -16,7 +16,7 @@ export function usePDVCarrinhoItens({
   const [copiadoCodigoItem, setCopiadoCodigoItem] = useState("");
   const [itensKitExpandidos, setItensKitExpandidos] = useState({});
 
-  const adicionarProdutoAoCarrinho = (produto) => {
+  const adicionarProdutoAoCarrinho = (produto, etiquetaBalanca = null) => {
     if (!temCaixaAberto) {
       alert(
         "\u274c N\u00e3o \u00e9 poss\u00edvel adicionar produtos sem caixa aberto. Abra um caixa primeiro.",
@@ -32,7 +32,9 @@ export function usePDVCarrinhoItens({
       classificacao_racao: produto.classificacao_racao,
     });
 
-    const itemExistente = vendaAtual.itens.find((item) => item.produto_id === produto.id);
+    const itemExistente = etiquetaBalanca
+      ? null
+      : vendaAtual.itens.find((item) => item.produto_id === produto.id && !item.etiqueta_balanca);
 
     const precoUnitario = obterPrecoVendaPDV(produto);
     const promocaoAtiva = Boolean(produto.promocao_pdv_ativa);
@@ -44,7 +46,7 @@ export function usePDVCarrinhoItens({
         recalcularSubtotalItem(itemExistente, itemExistente.quantidade + 1),
       );
     } else {
-      novosItens = colocarItemProdutoNoTopo(vendaAtual.itens, {
+      const novoItem = {
         tipo:
           produto.controlar_estoque === false || produto.tipo === "servico" ? "servico" : "produto",
         produto_id: produto.id,
@@ -52,14 +54,17 @@ export function usePDVCarrinhoItens({
         produto_codigo: produto.codigo || null,
         produto_imagem_principal: produto.imagem_principal || null,
         produto_imagem_thumbnail: produto.imagem_principal_thumbnail || null,
-        quantidade: 1,
+        quantidade: etiquetaBalanca?.quantidade ?? 1,
         preco_unitario: precoUnitario,
+        unidade: produto.unidade || (produto.e_granel ? "KG" : "UN"),
+        e_granel: Boolean(produto.e_granel),
+        etiqueta_balanca: etiquetaBalanca?.codigo || null,
         preco_venda_original: produto.preco_venda_original ?? produto.preco_venda ?? precoUnitario,
         em_promocao: promocaoAtiva,
         promocao_origem: produto.promocao_origem_pdv || (promocaoAtiva ? "Promocao ERP" : null),
         desconto_promocional_unitario: produto.desconto_promocional_pdv || 0,
         desconto_item: 0,
-        subtotal: precoUnitario,
+        subtotal: etiquetaBalanca?.subtotal ?? precoUnitario,
         pet_id: vendaAtual.pet?.id || null,
         protocolo_recorrencia_id: sugerirProtocoloRecorrencia(
           produto.protocolos_recorrencia || [],
@@ -83,7 +88,10 @@ export function usePDVCarrinhoItens({
         estoque_compartilhado_id: produto.estoque_compartilhado_id || null,
         estoque_origem_empresa_id: produto.estoque_origem_empresa_id || null,
         estoque_origem_nome: produto.estoque_origem_nome || null,
-      });
+      };
+      novosItens = etiquetaBalanca
+        ? [novoItem, ...vendaAtual.itens]
+        : colocarItemProdutoNoTopo(vendaAtual.itens, novoItem);
     }
 
     recalcularTotais(novosItens);

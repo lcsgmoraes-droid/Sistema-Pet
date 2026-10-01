@@ -272,7 +272,7 @@ export default function PDVProdutosCard({
               >
                 <div
                   className="flex cursor-pointer flex-col gap-3 lg:flex-row lg:items-center lg:justify-between"
-                  onClick={() => !modoVisualizacao && onAbrirModalDescontoItem(item)}
+                  onClick={() => !modoVisualizacao && onAbrirModalDescontoItem(item, index)}
                 >
                   <div className="flex min-w-0 flex-1 items-start gap-2">
                     {hasComposicao && (
@@ -411,9 +411,23 @@ export default function PDVProdutosCard({
                       </div>
                       <div className="mt-1 flex min-w-0 flex-wrap items-center gap-x-1 gap-y-0.5 text-sm text-gray-500">
                         <span>
-                          {item.quantidade} Unidade
-                          {item.quantidade !== 1 ? "s" : ""} x {formatMoneyBRL(item.preco_unitario)}
+                          {item.e_granel || String(item.unidade || "").toUpperCase() === "KG"
+                            ? `${new Intl.NumberFormat("pt-BR", {
+                                minimumFractionDigits: 3,
+                                maximumFractionDigits: 3,
+                              }).format(item.quantidade)} kg`
+                            : `${item.quantidade} Unidade${item.quantidade !== 1 ? "s" : ""}`}{" "}
+                          x {formatMoneyBRL(item.preco_unitario)}
+                          {item.etiqueta_balanca ? "/kg" : ""}
                         </span>
+                        {item.etiqueta_balanca && (
+                          <span
+                            className="text-xs font-medium text-amber-700"
+                            title="Peso calculado pelo valor da etiqueta e pelo preco por kg cadastrado. Confira o peso impresso."
+                          >
+                            Peso calculado da etiqueta; confira o impresso
+                          </span>
+                        )}
                         {resumoPrecoKg.disponivel && (
                           <span className="font-medium text-teal-700">
                             ({resumoPrecoKg.pesoFormatado})
@@ -441,7 +455,7 @@ export default function PDVProdutosCard({
                       <button
                         type="button"
                         onClick={() => onAlterarQuantidade(index, -1)}
-                        disabled={modoVisualizacao}
+                        disabled={modoVisualizacao || Boolean(item.etiqueta_balanca)}
                         className="p-2 hover:bg-gray-100 rounded-l-lg disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         <Minus className="w-4 h-4" />
@@ -451,13 +465,13 @@ export default function PDVProdutosCard({
                         onChange={(novaQuantidade) =>
                           onAtualizarQuantidadeItem(index, novaQuantidade)
                         }
-                        disabled={modoVisualizacao}
+                        disabled={modoVisualizacao || Boolean(item.etiqueta_balanca)}
                         className="w-20 px-2 py-1 text-center font-medium border-none focus:ring-0 disabled:bg-gray-50"
                       />
                       <button
                         type="button"
                         onClick={() => onAlterarQuantidade(index, 1)}
-                        disabled={modoVisualizacao}
+                        disabled={modoVisualizacao || Boolean(item.etiqueta_balanca)}
                         className="p-2 hover:bg-gray-100 rounded-r-lg disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         <Plus className="w-4 h-4" />
@@ -468,7 +482,7 @@ export default function PDVProdutosCard({
                       <SubtotalInput
                         subtotal={item.subtotal}
                         precoUnitario={item.preco_unitario}
-                        disabled={modoVisualizacao}
+                        disabled={modoVisualizacao || Boolean(item.etiqueta_balanca)}
                         onQuantidadeChange={(novaQuantidade) =>
                           onAtualizarQuantidadeItem(index, novaQuantidade)
                         }
