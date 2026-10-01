@@ -36,8 +36,10 @@ export function usePDVCarrinhoItens({
       ? null
       : vendaAtual.itens.find((item) => item.produto_id === produto.id && !item.etiqueta_balanca);
 
-    const precoUnitario = obterPrecoVendaPDV(produto);
-    const promocaoAtiva = Boolean(produto.promocao_pdv_ativa);
+    const precoPDV = obterPrecoVendaPDV(produto);
+    const precoUnitario = etiquetaBalanca?.precoUnitario ?? precoPDV;
+    const precoEtiquetaDiferente = Boolean(etiquetaBalanca && precoUnitario !== precoPDV);
+    const promocaoAtiva = Boolean(produto.promocao_pdv_ativa && !precoEtiquetaDiferente);
 
     let novosItens;
     if (itemExistente) {
@@ -59,10 +61,12 @@ export function usePDVCarrinhoItens({
         unidade: produto.unidade || (produto.e_granel ? "KG" : "UN"),
         e_granel: Boolean(produto.e_granel),
         etiqueta_balanca: etiquetaBalanca?.codigo || null,
-        preco_venda_original: produto.preco_venda_original ?? produto.preco_venda ?? precoUnitario,
+        preco_venda_original: precoEtiquetaDiferente
+          ? precoUnitario
+          : (produto.preco_venda_original ?? produto.preco_venda ?? precoUnitario),
         em_promocao: promocaoAtiva,
-        promocao_origem: produto.promocao_origem_pdv || (promocaoAtiva ? "Promocao ERP" : null),
-        desconto_promocional_unitario: produto.desconto_promocional_pdv || 0,
+        promocao_origem: promocaoAtiva ? produto.promocao_origem_pdv || "Promocao ERP" : null,
+        desconto_promocional_unitario: promocaoAtiva ? produto.desconto_promocional_pdv || 0 : 0,
         desconto_item: 0,
         subtotal: etiquetaBalanca?.subtotal ?? precoUnitario,
         pet_id: vendaAtual.pet?.id || null,
