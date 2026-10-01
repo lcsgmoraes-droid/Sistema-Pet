@@ -3,14 +3,22 @@ from __future__ import annotations
 from datetime import date
 from typing import Any, Literal
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from pydantic import BaseModel, Field
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, defer
+from uuid import UUID
 
+from app.billing_models import BillingPaymentProof
 from app.db import get_session
 from app.models import Tenant
 from app.platform_auth import require_platform_admin
 from app.platform_auth_models import PlatformAdmin
+from app.services.billing_payment_proof_service import (
+    PaymentProofError,
+    proof_to_public,
+    review_proof,
+)
+from app.tenancy.context import tenant_context
 from app.services.billing_offer_service import (
     BillingOfferError,
     create_billing_offer,
@@ -73,6 +81,95 @@ class BillingOfferCreateRequest(BaseModel):
     exclusions_summary: str = Field(min_length=10, max_length=2000)
     support_channel: str = Field(min_length=3, max_length=200)
     custom_work_summary: str | None = Field(default=None, max_length=2000)
+
+
+class PaymentProofReviewRequest(BaseModel):
+    decision: Literal["approve", "reject"]
+    note: str | None = Field(default=None, max_length=1000)
+
+
+@router.get("/{tenant_id}/payment-proofs")
+def list_payment_proofs_for_review(
+    tenant_id: UUID,
+    _current_admin: PlatformAdmin = Depends(require_platform_admin),
+    db: Session = Depends(get_session),
+):
+    tenant = db.query(Tenant).filter(Tenant.id == str(tenant_id)).first()
+    if tenant is None:
+        raise HTTPException(status_code=404, detail="Empresa nao encontrada.")
+    with tenant_context(tenant.id):
+        proofs = (
+            db.query(BillingPaymentProof)
+            .options(defer(BillingPaymentProof.content))
+            .filter(BillingPaymentProof.tenant_id == UUID(str(tenant.id)))
+            .order_by(BillingPaymentProof.submitted_at.desc())
+            .limit(30)
+            .all()
+        )
+        return {"items": [proof_to_public(proof) for proof in proofs]}
+
+
+@router.get("/{tenant_id}/payment-proofs/{proof_id}/file")
+def download_payment_proof_for_review(
+    tenant_id: UUID,
+    proof_id: int,
+    _current_admin: PlatformAdmin = Depends(require_platform_admin),
+    db: Session = Depends(get_session),
+):
+    with tenant_context(tenant_id):
+        proof = (
+            db.query(BillingPaymentProof)
+            .filter(
+                BillingPaymentProof.id == proof_id,
+                BillingPaymentProof.tenant_id == tenant_id,
+            )
+            .first()
+        )
+        if proof is None:
+            raise HTTPException(status_code=404, detail="Comprovante nao encontrado.")
+        extension = {"application/pdf": "pdf", "image/jpeg": "jpg", "image/png": "png"}[
+            proof.content_type
+        ]
+        return Response(
+            content=proof.content,
+            media_type=proof.content_type,
+            headers={
+                "Content-Disposition": f'attachment; filename="comprovante-{proof.id}.{extension}"',
+                "Cache-Control": "private, no-store",
+            },
+        )
+
+
+@router.post("/{tenant_id}/payment-proofs/{proof_id}/review")
+def review_payment_proof(
+    tenant_id: UUID,
+    proof_id: int,
+    payload: PaymentProofReviewRequest,
+    current_admin: PlatformAdmin = Depends(require_platform_admin),
+    db: Session = Depends(get_session),
+):
+    if payload.decision == "reject" and not (payload.note or "").strip():
+        raise HTTPException(status_code=422, detail="Informe o motivo da recusa.")
+    tenant = (
+        db.query(Tenant).filter(Tenant.id == str(tenant_id)).with_for_update().first()
+    )
+    if tenant is None:
+        raise HTTPException(status_code=404, detail="Empresa nao encontrada.")
+    try:
+        proof = review_proof(
+            db,
+            tenant=tenant,
+            proof_id=proof_id,
+            admin_id=current_admin.id,
+            approve=payload.decision == "approve",
+            note=payload.note,
+        )
+        result = proof_to_public(proof)
+        db.commit()
+        return result
+    except PaymentProofError as exc:
+        db.rollback()
+        raise HTTPException(status_code=exc.status_code, detail=str(exc)) from exc
 
 
 @router.get("")

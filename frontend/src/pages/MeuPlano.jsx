@@ -19,6 +19,7 @@ import {
 } from "../data/billingContract";
 import { buildSalesContactUrl, publicPlans, serviceInvoiceAddon } from "../data/publicPlans";
 import { api } from "../services/api";
+import BillingPaymentProofPanel from "./BillingPaymentProofPanel";
 import { formatMoneyBRL } from "../utils/formatters";
 
 const WHATSAPP_NUMERO = "5518997401641";
@@ -284,6 +285,8 @@ export default function MeuPlano() {
             Atualizar status
           </button>
         </header>
+
+        <BillingPaymentProofPanel billing={billing} onRefresh={carregarModulos} />
 
         <section className="grid gap-4 lg:grid-cols-[1fr_0.8fr]">
           <article className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">

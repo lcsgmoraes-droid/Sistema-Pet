@@ -308,7 +308,10 @@ export const ModulosProvider = ({ children }) => {
     const atualizarQuandoVisivel = () => {
       if (document.visibilityState === "visible") carregarModulos();
     };
-    const interval = window.setInterval(atualizarQuandoVisivel, 60 * 60 * 1000);
+    const interval = window.setInterval(
+      atualizarQuandoVisivel,
+      assinaturaAtual?.status === "past_due" ? 60 * 1000 : 60 * 60 * 1000,
+    );
     window.addEventListener("focus", atualizarQuandoVisivel);
     document.addEventListener("visibilitychange", atualizarQuandoVisivel);
     return () => {
@@ -316,7 +319,7 @@ export const ModulosProvider = ({ children }) => {
       window.removeEventListener("focus", atualizarQuandoVisivel);
       document.removeEventListener("visibilitychange", atualizarQuandoVisivel);
     };
-  }, [carregarModulos, user]);
+  }, [assinaturaAtual?.status, carregarModulos, user]);
 
   const moduloAtivo = useCallback(
     (modulo) => {

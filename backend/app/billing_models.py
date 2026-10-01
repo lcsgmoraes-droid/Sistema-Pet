@@ -8,6 +8,7 @@ from sqlalchemy import (
     DateTime,
     ForeignKey,
     Integer,
+    LargeBinary,
     String,
     Text,
     UniqueConstraint,
@@ -41,6 +42,28 @@ class BillingWebhookEvent(Base):
     created_at = Column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
+
+
+class BillingPaymentProof(TenantScoped, Base):
+    """Comprovante privado de uma cobranca, sujeito a revisao humana."""
+
+    __tablename__ = "billing_payment_proofs"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    submitted_by_user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    provider_payment_id = Column(String(80), nullable=True, index=True)
+    due_date = Column(Date, nullable=True)
+    filename = Column(String(180), nullable=False)
+    content_type = Column(String(50), nullable=False)
+    content_sha256 = Column(String(64), nullable=False)
+    content = Column(LargeBinary, nullable=False)
+    status = Column(String(20), nullable=False, server_default="pending", index=True)
+    reviewer_admin_id = Column(Integer, ForeignKey("platform_admins.id"), nullable=True)
+    review_note = Column(String(1000), nullable=True)
+    submitted_at = Column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    reviewed_at = Column(DateTime(timezone=True), nullable=True)
 
 
 class BillingContractAcceptance(TenantScoped, Base):
