@@ -21,6 +21,7 @@ export default function ModalPerguntaNFe({
   loading = false,
   moduloFiscalAtivo = true,
   onConfirmar,
+  onVoltar,
   onEmitir,
   venda,
   vendaId,
@@ -194,6 +195,15 @@ export default function ModalPerguntaNFe({
             >
               <CheckCircle className="h-5 w-5" />
               <span>{documentoEmitido ? "Concluir venda" : "Finalizar"}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={onVoltar}
+              disabled={loading}
+              className="w-full rounded-lg border border-gray-300 px-4 py-3 font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+            >
+              Voltar para a venda
             </button>
 
             <label

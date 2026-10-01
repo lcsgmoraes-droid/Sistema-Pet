@@ -46,6 +46,7 @@ export default function PDVMainArea(props) {
     emitirNotaVendaFinalizada,
     mudarStatusParaAberta,
     habilitarEdicao,
+    onRecarregarVenda,
     onAbrirDevolucaoVendaAtual,
     onAbrirCadastroCliente,
     onAbrirHistoricoCliente,
@@ -203,6 +204,7 @@ export default function PDVMainArea(props) {
         emitirNotaVendaFinalizada={emitirNotaVendaFinalizada}
         mudarStatusParaAberta={mudarStatusParaAberta}
         habilitarEdicao={habilitarEdicao}
+        onRecarregarVenda={onRecarregarVenda}
         temCaixaAberto={temCaixaAberto}
         onAbrirDevolucao={onAbrirDevolucaoVendaAtual}
       />

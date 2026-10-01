@@ -1,11 +1,12 @@
 import { useState } from "react";
-import { AlertCircle, FileText, RotateCcw, X } from "lucide-react";
+import { AlertCircle, FileText, Pencil, RotateCcw, X } from "lucide-react";
 import { useModulos } from "../../contexts/ModulosContext";
 import ImprimirCupom from "../ImprimirCupom";
 import ActionButton from "../ui/ActionButton";
 import { podeAbrirDevolucaoVenda } from "../../utils/pdvReturnEligibility";
 import ImprimirDocumentoFiscalButton from "./ImprimirDocumentoFiscalButton";
 import ModalSelecaoDocumentoFiscal from "./ModalSelecaoDocumentoFiscal";
+import ModalDadosVendaFinalizada from "./ModalDadosVendaFinalizada";
 
 export default function PDVModoVisualizacaoBanner({
   ativo,
@@ -16,10 +17,12 @@ export default function PDVModoVisualizacaoBanner({
   emitirNotaVendaFinalizada,
   mudarStatusParaAberta,
   habilitarEdicao,
+  onRecarregarVenda,
 }) {
   const { moduloAtivo, erroCarregamento, carregandoModulos, carregarModulos } = useModulos();
   const moduloFiscalAtivo = moduloAtivo("fiscal");
   const [mostrarSelecaoDocumento, setMostrarSelecaoDocumento] = useState(false);
+  const [mostrarDadosFinalizados, setMostrarDadosFinalizados] = useState(false);
 
   if (!ativo) {
     return null;
@@ -85,6 +88,17 @@ export default function PDVModoVisualizacaoBanner({
             >
               Voltar
             </ActionButton>
+
+            {["finalizada", "baixa_parcial", "pago_nf"].includes(vendaAtual.status) && (
+              <ActionButton
+                onClick={() => setMostrarDadosFinalizados(true)}
+                icon={Pencil}
+                intent="edit"
+                size="md"
+              >
+                NSU e observação
+              </ActionButton>
+            )}
 
             {moduloFiscalAtivo &&
               (vendaAtual.status === "finalizada" || vendaAtual.status === "baixa_parcial") && (
@@ -154,6 +168,13 @@ export default function PDVModoVisualizacaoBanner({
           onClose={() => setMostrarSelecaoDocumento(false)}
           onEmitir={emitirNotaVendaFinalizada}
           vendaId={vendaAtual.id}
+        />
+      )}
+      {mostrarDadosFinalizados && (
+        <ModalDadosVendaFinalizada
+          venda={vendaAtual}
+          onClose={() => setMostrarDadosFinalizados(false)}
+          onUpdated={() => onRecarregarVenda(vendaAtual.id)}
         />
       )}
     </>

@@ -60,6 +60,30 @@ const Layout = () => {
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
+  useEffect(() => {
+    let navegandoComTab = false;
+    const registrarTab = (event) => {
+      navegandoComTab = event.key === "Tab";
+    };
+    const mostrarCampoFocado = (event) => {
+      if (!navegandoComTab) return;
+      navegandoComTab = false;
+      const campo = event.target;
+      if (!campo?.matches?.("input, select, textarea, [contenteditable='true']")) return;
+      requestAnimationFrame(() => {
+        if (document.activeElement === campo) {
+          campo.scrollIntoView({ block: "nearest", inline: "nearest" });
+        }
+      });
+    };
+    document.addEventListener("keydown", registrarTab, true);
+    document.addEventListener("focusin", mostrarCampoFocado, true);
+    return () => {
+      document.removeEventListener("keydown", registrarTab, true);
+      document.removeEventListener("focusin", mostrarCampoFocado, true);
+    };
+  }, []);
+
   // Função para verificar se o usuário tem permissão
   const hasPermission = (permission) => {
     if (!user) return false;

@@ -700,6 +700,10 @@ export default function useModalPagamentoController({
       loading,
       moduloFiscalAtivo,
       onConfirmar,
+      onVoltar: async () => {
+        await onVendaAtualizada(vendaFinalizadaId);
+        onClose();
+      },
       onEmitir: emitirNFe,
       venda: vendaFinalizadaParaCupom || venda,
       vendaId: vendaFinalizadaId,

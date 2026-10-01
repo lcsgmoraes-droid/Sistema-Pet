@@ -50,6 +50,7 @@ from .vendas.pagamentos_routes import (
     listar_pagamentos_venda,
     router as pagamentos_router,
 )
+from .vendas.observacoes_routes import router as observacoes_router
 from .vendas.regras import _resolver_status_entrega_atualizacao, calcular_totais_venda
 from .vendas.relatorios_routes import relatorio_resumo, router as relatorios_router
 from .vendas.routes_common import (
@@ -78,6 +79,7 @@ router = APIRouter(tags=["vendas"])
 router.include_router(pagamentos_router, prefix="/vendas")
 router.include_router(devolucoes_router, prefix="/vendas")
 router.include_router(crud_router, prefix="/vendas")
+router.include_router(observacoes_router, prefix="/vendas")
 router.include_router(entrega_router, prefix="/vendas")
 router.include_router(finalizacao_router, prefix="/vendas")
 router.include_router(cancelamento_router, prefix="/vendas")
