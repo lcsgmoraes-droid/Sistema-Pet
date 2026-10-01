@@ -11,7 +11,6 @@ import {
 } from "../opsTenantsUtils";
 
 import { extractError } from "./opsTenantsFormatters";
-import { BILLING_OFFER_PLAN_OPTIONS } from "./opsTenantsConstants";
 import useOpsTenantOnboardingNotes from "./useOpsTenantOnboardingNotes";
 
 function tomorrowIsoDate() {
@@ -25,8 +24,10 @@ function tomorrowIsoDate() {
 
 function initialBillingOfferForm() {
   return {
-    title: "CorePet - Pet Venda Ativa",
-    plan_code: "pet-venda-ativa",
+    title: "",
+    plan_pet_code: null,
+    plan_vet_code: null,
+    plan_grooming_code: null,
     price: 0,
     first_due_date: tomorrowIsoDate(),
     billing_type: "UNDEFINED",
@@ -54,6 +55,7 @@ export default function useOpsTenantsController() {
   const [onboardingSuccess, setOnboardingSuccess] = useState("");
   const [onboardingSaving, setOnboardingSaving] = useState(false);
   const [billingOfferForm, setBillingOfferForm] = useState(initialBillingOfferForm);
+  const [planosCatalogo, setPlanosCatalogo] = useState([]);
   const [billingOffers, setBillingOffers] = useState([]);
   const [billingOffersLoading, setBillingOffersLoading] = useState(false);
   const [billingOfferCreating, setBillingOfferCreating] = useState(false);
@@ -100,6 +102,13 @@ export default function useOpsTenantsController() {
   useEffect(() => {
     loadTenants();
   }, [loadTenants]);
+
+  useEffect(() => {
+    api
+      .get("/admin/tenants/planos-catalogo")
+      .then((response) => setPlanosCatalogo(response.data?.items || []))
+      .catch((err) => console.error("Erro ao carregar catalogo de planos:", err));
+  }, []);
 
   const loadTenantsGrouped = useCallback(async () => {
     setTenantsLoading(true);
@@ -287,12 +296,27 @@ export default function useOpsTenantsController() {
   }
 
   function handleBillingOfferChange(field, value) {
+    setBillingOfferForm((current) => ({ ...current, [field]: value }));
+    setBillingOfferError("");
+    setBillingOfferSuccess("");
+    setBillingOfferPublicUrl("");
+  }
+
+  function handleBillingOfferSegmentChange(segmento, codigo) {
+    const campo = `plan_${segmento}_code`;
     setBillingOfferForm((current) => {
-      const next = { ...current, [field]: value };
-      if (field === "plan_code") {
-        const plan = BILLING_OFFER_PLAN_OPTIONS.find((item) => item.value === value);
-        next.title = plan ? `CorePet - ${plan.label}` : current.title;
-      }
+      const next = { ...current, [campo]: codigo || null };
+      const planosSelecionados = ["pet", "vet", "grooming"]
+        .map((seg) => planosCatalogo.find((plano) => plano.codigo === next[`plan_${seg}_code`]))
+        .filter(Boolean);
+      const nomeCombinado = planosSelecionados.map((plano) => plano.nome).join(" + ");
+      next.title = nomeCombinado ? `CorePet - ${nomeCombinado}` : "";
+      // Modulo que passou a vir de um plano selecionado sai da lista de
+      // extras (ficaria redundante e escondido das opcoes disponiveis).
+      const modulosDosPlanos = new Set(planosSelecionados.flatMap((plano) => plano.modulos || []));
+      next.extra_modules = current.extra_modules.filter(
+        (modulo) => !modulosDosPlanos.has(modulo),
+      );
       return next;
     });
     setBillingOfferError("");
@@ -323,6 +347,14 @@ export default function useOpsTenantsController() {
       setBillingOfferError("Informe o valor mensal combinado com o cliente.");
       return;
     }
+    if (
+      !billingOfferForm.plan_pet_code &&
+      !billingOfferForm.plan_vet_code &&
+      !billingOfferForm.plan_grooming_code
+    ) {
+      setBillingOfferError("Selecione pelo menos um plano (Pet, Vet ou Banho & Tosa).");
+      return;
+    }
     const invalidCommercialTerms = [
       ["scope_summary", 10],
       ["implementation_summary", 10],
@@ -340,7 +372,9 @@ export default function useOpsTenantsController() {
     try {
       const response = await api.post(`/admin/tenants/${selectedTenant.id}/billing-offers`, {
         title: billingOfferForm.title.trim(),
-        plan_code: billingOfferForm.plan_code,
+        plan_pet_code: billingOfferForm.plan_pet_code,
+        plan_vet_code: billingOfferForm.plan_vet_code,
+        plan_grooming_code: billingOfferForm.plan_grooming_code,
         price_cents: priceCents,
         first_due_date: billingOfferForm.first_due_date,
         billing_type: billingOfferForm.billing_type,
@@ -395,8 +429,10 @@ export default function useOpsTenantsController() {
     handleOnboardingNoteSubmit,
     handleOnboardingSubmit,
     handleBillingOfferChange,
+    handleBillingOfferSegmentChange,
     handleBillingOfferSubmit,
     handleBillingOfferToggleModule,
+    planosCatalogo,
     groupedItems,
     items,
     loadTenants,

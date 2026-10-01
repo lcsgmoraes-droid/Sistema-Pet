@@ -33,7 +33,7 @@ from app.services.billing_contract_service import (
     build_contract_acceptance,
     contract_manifest,
 )
-from app.services.plan_catalog import PlanDefinition, get_plan
+from app.services.plan_catalog import PlanDefinition, get_plan, segment_plan_field
 from app.tenancy.context import tenant_context
 
 ALLOWED_BILLING_TYPES = frozenset({"UNDEFINED", "PIX", "BOLETO", "CREDIT_CARD"})
@@ -206,9 +206,48 @@ def _commercial_terms(offer: BillingOffer) -> dict[str, Any] | None:
     return parsed if _valid_commercial_terms(parsed) else None
 
 
+OFFER_SEGMENT_FIELDS = {
+    "pet": "plan_pet_code",
+    "vet": "plan_vet_code",
+    "grooming": "plan_grooming_code",
+}
+
+
+def _offer_segment_codes(offer: BillingOffer) -> dict[str, str | None]:
+    """Os ate-3 codigos de segmento da oferta. Cai para o `plan_code` legado
+    (1 plano so) quando nenhum dos 3 campos novos esta preenchido — ofertas
+    criadas antes desta migracao."""
+    codigos = {
+        segmento: getattr(offer, campo, None)
+        for segmento, campo in OFFER_SEGMENT_FIELDS.items()
+    }
+    if any(codigos.values()):
+        return codigos
+    plano_legado = get_plan(offer.plan_code)
+    if plano_legado:
+        codigos[plano_legado.segment] = plano_legado.code
+    return codigos
+
+
+def offer_combined_plan_code(offer: BillingOffer) -> str | None:
+    """Mesmo formato gravado em BillingContractAcceptance.plan_code no aceite
+    (ver `accept_billing_offer`) — usado para localizar o comprovante de
+    aceite correspondente a esta oferta."""
+    codigos = [codigo for codigo in _offer_segment_codes(offer).values() if codigo]
+    return "+".join(codigos) if codigos else None
+
+
+def _offer_planos_catalogo(offer: BillingOffer) -> list[PlanDefinition]:
+    return [
+        plano
+        for codigo in _offer_segment_codes(offer).values()
+        if codigo and (plano := get_plan(codigo))
+    ]
+
+
 def _included_modules(offer: BillingOffer) -> list[str]:
-    plan = get_plan(offer.plan_code)
-    return sorted(set(plan.modules if plan else ()) | set(_extra_modules(offer)))
+    modulos = {modulo for plano in _offer_planos_catalogo(offer) for modulo in plano.modules}
+    return sorted(modulos | set(_extra_modules(offer)))
 
 
 def _iso(value: datetime | None) -> str | None:
@@ -225,16 +264,24 @@ def offer_to_public(
     *,
     include_checkout: bool = True,
 ) -> dict[str, Any]:
-    plan = get_plan(offer.plan_code)
+    codigos_segmento = _offer_segment_codes(offer)
+    planos_por_segmento = {
+        segmento: (
+            {
+                "code": plano.code,
+                "name": plano.name,
+                "base_modules": sorted(plano.modules),
+            }
+            if (plano := get_plan(codigo))
+            else None
+        )
+        for segmento, codigo in codigos_segmento.items()
+    }
     return {
         "id": offer.offer_id,
         "tenant": {"name": tenant.razao_social or tenant.name},
         "title": offer.title,
-        "plan": {
-            "code": offer.plan_code,
-            "name": offer.plan_name,
-            "base_modules": sorted(plan.modules) if plan else [],
-        },
+        "plans": planos_por_segmento,
         "extra_modules": _extra_modules(offer),
         "included_modules": _included_modules(offer),
         "commercial_terms": _commercial_terms(offer),
@@ -283,14 +330,43 @@ def _tenant(db: Session, tenant_reference: str) -> Tenant:
     return tenant
 
 
-def _validate_modules(plan: PlanDefinition, values: list[str]) -> list[str]:
+def _validate_modules(modulos_dos_planos: set[str], values: list[str]) -> list[str]:
     from app.routes.modulos_routes import MODULOS_PREMIUM
 
     normalized = sorted({str(value or "").strip().lower() for value in values if value})
     invalid = [value for value in normalized if value not in MODULOS_PREMIUM]
     if invalid:
         raise BillingOfferError(f"Módulo indisponível: {', '.join(invalid)}")
-    return [value for value in normalized if value not in plan.modules]
+    return [value for value in normalized if value not in modulos_dos_planos]
+
+
+def _validate_segment_plans(
+    *,
+    plan_pet_code: str | None,
+    plan_vet_code: str | None,
+    plan_grooming_code: str | None,
+) -> dict[str, PlanDefinition | None]:
+    """Valida os ate-3 codigos (cada um opcional) contra o catalogo, exigindo
+    que cada um realmente pertenca ao segmento informado. Pelo menos 1 precisa
+    estar presente."""
+    informados = {
+        "pet": plan_pet_code,
+        "vet": plan_vet_code,
+        "grooming": plan_grooming_code,
+    }
+    if not any(informados.values()):
+        raise BillingOfferError("Selecione pelo menos um plano (Pet, Vet ou Banho & Tosa)")
+
+    planos: dict[str, PlanDefinition | None] = {}
+    for segmento, codigo in informados.items():
+        if not codigo:
+            planos[segmento] = None
+            continue
+        plano = get_plan(codigo)
+        if plano is None or plano.segment != segmento:
+            raise BillingOfferError(f"Plano informado para {segmento} é inválido")
+        planos[segmento] = plano
+    return planos
 
 
 def create_billing_offer(
@@ -299,7 +375,9 @@ def create_billing_offer(
     tenant_reference: str,
     created_by: PlatformAdmin,
     title: str,
-    plan_code: str,
+    plan_pet_code: str | None,
+    plan_vet_code: str | None,
+    plan_grooming_code: str | None,
     price_cents: int,
     first_due_date: date,
     billing_type: str,
@@ -316,9 +394,15 @@ def create_billing_offer(
             "Cadastre um CPF ou CNPJ válido na empresa antes de gerar o link."
         )
 
-    plan = get_plan(plan_code)
-    if plan is None:
-        raise BillingOfferError("Plano-base informado não existe")
+    planos_por_segmento = _validate_segment_plans(
+        plan_pet_code=plan_pet_code,
+        plan_vet_code=plan_vet_code,
+        plan_grooming_code=plan_grooming_code,
+    )
+    planos_selecionados = [plano for plano in planos_por_segmento.values() if plano]
+    modulos_dos_planos = {
+        modulo for plano in planos_selecionados for modulo in plano.modules
+    }
     if not 100 <= int(price_cents) <= 10_000_000:
         raise BillingOfferError("Informe uma mensalidade entre R$ 1,00 e R$ 100.000,00")
     if first_due_date < date.today():
@@ -329,7 +413,7 @@ def create_billing_offer(
     normalized_type = str(billing_type or "UNDEFINED").strip().upper()
     if normalized_type not in ALLOWED_BILLING_TYPES:
         raise BillingOfferError("Forma de pagamento indisponivel")
-    normalized_modules = _validate_modules(plan, extra_modules)
+    normalized_modules = _validate_modules(modulos_dos_planos, extra_modules)
     commercial_terms = build_offer_commercial_terms(
         scope_summary=scope_summary,
         implementation_summary=implementation_summary,
@@ -337,7 +421,8 @@ def create_billing_offer(
         support_channel=support_channel,
         custom_work_summary=custom_work_summary,
     )
-    normalized_title = str(title or "").strip() or f"CorePet - {plan.name}"
+    nome_combinado = " + ".join(plano.name for plano in planos_selecionados)
+    normalized_title = str(title or "").strip() or f"CorePet - {nome_combinado}"
     if len(normalized_title) > 160:
         raise BillingOfferError("O nome da proposta deve ter no maximo 160 caracteres")
 
@@ -359,8 +444,11 @@ def create_billing_offer(
         token_sha256=_token_hash(token),
         created_by_platform_admin_id=created_by.id,
         title=normalized_title,
-        plan_code=plan.code,
-        plan_name=plan.name,
+        plan_pet_code=planos_por_segmento["pet"].code if planos_por_segmento["pet"] else None,
+        plan_vet_code=planos_por_segmento["vet"].code if planos_por_segmento["vet"] else None,
+        plan_grooming_code=(
+            planos_por_segmento["grooming"].code if planos_por_segmento["grooming"] else None
+        ),
         price_cents=int(price_cents),
         billing_type=normalized_type,
         first_due_date=first_due_date,
@@ -501,11 +589,18 @@ def accept_billing_offer(
             status_code=409,
         )
 
-    plan = get_plan(offer.plan_code)
-    if plan is None:
+    planos_aceitos = _offer_planos_catalogo(offer)
+    if not planos_aceitos:
         raise BillingOfferError(
-            "O plano desta proposta não está mais disponível", status_code=409
+            "O(s) plano(s) desta proposta não estão mais disponíveis", status_code=409
         )
+    # O comprovante de aceite (BillingContractAcceptance) guarda 1 plan_code so
+    # — sintetiza um "plano combinado" (ate 3 segmentos) so pra esse registro,
+    # sem precisar existir no catalogo real.
+    plano_combinado = SimpleNamespace(
+        code="+".join(plano.code for plano in planos_aceitos),
+        name=" + ".join(plano.name for plano in planos_aceitos),
+    )
 
     clean_name = str(representative_name or "").strip()
     clean_email = str(representative_email or "").strip().lower()
@@ -555,7 +650,7 @@ def accept_billing_offer(
     acceptance = build_contract_acceptance(
         tenant=tenant,
         current_user=payer,
-        plan=plan,
+        plan=plano_combinado,
         billing_type=offer.billing_type,
         first_due_date=offer.first_due_date,
         provider_environment=client.environment,
@@ -618,6 +713,22 @@ def _sync_offer_modules(
         db.flush()
 
 
+def _apply_offer_plans_to_tenant(tenant: Tenant, offer: BillingOffer) -> None:
+    """A oferta representa o estado completo final dos 3 segmentos — um
+    segmento ausente na oferta e gravado como None no tenant (fica
+    desligado), nao e incremental. E assim que uma oferta que "desmarca" um
+    segmento (ex. Vet) realmente desativa o acesso aquele segmento."""
+    codigos = _offer_segment_codes(offer)
+    tenant.plan_pet = codigos["pet"]
+    tenant.plan_vet = codigos["vet"]
+    tenant.plan_grooming = codigos["grooming"]
+    # `plan` legado acompanha o primeiro segmento presente, so para telas
+    # ainda nao migradas para os 3 campos continuarem mostrando algo coerente.
+    primeiro_codigo = next((codigo for codigo in codigos.values() if codigo), None)
+    if primeiro_codigo:
+        tenant.plan = primeiro_codigo
+
+
 def apply_offer_payment_event(
     db: Session,
     *,
@@ -637,7 +748,7 @@ def apply_offer_payment_event(
     )
     if normalized_event in PAYMENT_SUCCESS_EVENTS:
         offer.status = "active"
-        tenant.plan = offer.plan_code
+        _apply_offer_plans_to_tenant(tenant, offer)
         if offer.accepted_at is not None:
             (
                 db.query(BillingOffer)

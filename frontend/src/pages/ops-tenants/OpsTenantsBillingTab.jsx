@@ -33,7 +33,9 @@ export default function OpsTenantsBillingTab({
   offerError,
   offerSuccess,
   offerPublicUrl,
+  planosCatalogo,
   onOfferChange,
+  onOfferSegmentChange,
   onOfferToggleModule,
   onOfferSubmit,
 }) {
@@ -166,7 +168,9 @@ export default function OpsTenantsBillingTab({
               error={offerError}
               success={offerSuccess}
               publicUrl={offerPublicUrl}
+              planosCatalogo={planosCatalogo}
               onChange={onOfferChange}
+              onSegmentChange={onOfferSegmentChange}
               onToggleModule={onOfferToggleModule}
               onSubmit={onOfferSubmit}
             />

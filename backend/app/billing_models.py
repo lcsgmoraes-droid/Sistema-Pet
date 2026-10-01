@@ -120,8 +120,19 @@ class BillingOffer(Base):
     )
 
     title = Column(String(160), nullable=False)
-    plan_code = Column(String(50), nullable=False, index=True)
-    plan_name = Column(String(120), nullable=False)
+    # Legado (1 plano so) — mantido para ofertas antigas ja aceitas/ativas.
+    # Ofertas novas gravam nos 3 campos de segmento abaixo e deixam estes
+    # dois nulos; removidos so numa fase futura, depois que nao houver mais
+    # ofertas antigas em uso.
+    plan_code = Column(String(50), nullable=True, index=True)
+    plan_name = Column(String(120), nullable=True)
+    # Plano por segmento — uma oferta pode combinar ate 3 (um por segmento),
+    # cada um opcionalmente vazio. A oferta representa o estado completo
+    # final desejado: um segmento ausente significa "este segmento fica
+    # desligado" quando a oferta for aceita (nao e incremental).
+    plan_pet_code = Column(String(50), nullable=True)
+    plan_vet_code = Column(String(50), nullable=True)
+    plan_grooming_code = Column(String(50), nullable=True)
     price_cents = Column(Integer, nullable=False)
     currency = Column(String(3), nullable=False, server_default="BRL")
     billing_cycle = Column(String(20), nullable=False, server_default="MONTHLY")

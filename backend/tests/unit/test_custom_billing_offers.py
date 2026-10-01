@@ -155,7 +155,9 @@ def test_cria_proposta_de_300_reais_para_pet_venda_ativa():
         tenant_reference=TENANT_ID,
         created_by=SimpleNamespace(id=9),
         title="CorePet completo sem Vet e Banho e Tosa",
-        plan_code="pet-venda-ativa",
+        plan_pet_code="pet-venda-ativa",
+        plan_vet_code=None,
+        plan_grooming_code=None,
         price_cents=30_000,
         first_due_date=date.today(),
         billing_type="UNDEFINED",
@@ -167,7 +169,9 @@ def test_cria_proposta_de_300_reais_para_pet_venda_ativa():
         custom_work_summary=None,
     )
 
-    assert offer.plan_code == "pet-venda-ativa"
+    assert offer.plan_pet_code == "pet-venda-ativa"
+    assert offer.plan_vet_code is None
+    assert offer.plan_grooming_code is None
     assert offer.price_cents == 30_000
     assert offer.created_by_platform_admin_id == 9
     assert offer.created_by_user_id is None
@@ -179,6 +183,50 @@ def test_cria_proposta_de_300_reais_para_pet_venda_ativa():
     assert offer.token_sha256 == hashlib.sha256(token.encode()).hexdigest()
     assert len(token) >= 32
     assert db.added == [offer]
+
+
+def test_cria_proposta_com_2_segmentos_simultaneos_pet_e_vet():
+    tenant = _tenant()
+    db = _Session(tenant=tenant)
+
+    offer, _token = service.create_billing_offer(
+        db,
+        tenant_reference=TENANT_ID,
+        created_by=SimpleNamespace(id=9),
+        title="",
+        plan_pet_code="pet-gestao",
+        plan_vet_code="vet-start",
+        plan_grooming_code=None,
+        price_cents=50_000,
+        first_due_date=date.today(),
+        billing_type="UNDEFINED",
+        # "compras"/"financeiro_erp" ja vem do pet-gestao, "veterinario" do
+        # vet-start — nao devem sobrar como extra_modules.
+        extra_modules=["compras", "veterinario", "fiscal"],
+        scope_summary="Combo Pet Gestão + Vet Start.",
+        implementation_summary="Implantação acompanhada, sem migração ampla de dados.",
+        exclusions_summary="Não inclui equipamentos nem desenvolvimento exclusivo.",
+        support_channel="E-mail contratual",
+        custom_work_summary=None,
+    )
+
+    assert offer.plan_pet_code == "pet-gestao"
+    assert offer.plan_vet_code == "vet-start"
+    assert offer.plan_grooming_code is None
+    assert offer.title == "CorePet - Pet Gestao + Vet Start"
+    assert json.loads(offer.extra_modules_json) == ["fiscal"]
+
+    publico = service.offer_to_public(offer, tenant)
+    assert publico["plans"]["pet"]["code"] == "pet-gestao"
+    assert publico["plans"]["vet"]["code"] == "vet-start"
+    assert publico["plans"]["grooming"] is None
+    assert set(publico["included_modules"]) == {
+        "compras",
+        "financeiro_erp",
+        "app_mobile",
+        "veterinario",
+        "fiscal",
+    }
 
 
 def test_aceite_publico_preserva_preco_personalizado_e_modulo_extra(monkeypatch):

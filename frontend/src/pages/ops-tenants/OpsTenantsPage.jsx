@@ -29,8 +29,10 @@ export default function OpsTenantsPage() {
     commercialSuccess,
     error,
     handleBillingOfferChange,
+    handleBillingOfferSegmentChange,
     handleBillingOfferSubmit,
     handleBillingOfferToggleModule,
+    planosCatalogo,
     handleCommercialChange,
     handleCommercialSubmit,
     handleOnboardingChange,
@@ -163,7 +165,9 @@ export default function OpsTenantsPage() {
             offerError={billingOfferError}
             offerSuccess={billingOfferSuccess}
             offerPublicUrl={billingOfferPublicUrl}
+            planosCatalogo={planosCatalogo}
             onOfferChange={handleBillingOfferChange}
+            onOfferSegmentChange={handleBillingOfferSegmentChange}
             onOfferToggleModule={handleBillingOfferToggleModule}
             onOfferSubmit={handleBillingOfferSubmit}
           />

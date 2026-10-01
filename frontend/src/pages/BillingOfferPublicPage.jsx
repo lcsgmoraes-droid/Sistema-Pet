@@ -201,8 +201,13 @@ export default function BillingOfferPublicPage() {
             </p>
             <div className="mt-5 grid gap-3 border-t border-white/10 pt-5 text-sm sm:grid-cols-2">
               <div>
-                <p className="text-xs text-slate-400">Plano-base</p>
-                <p className="mt-1 font-bold">{offer.plan.name}</p>
+                <p className="text-xs text-slate-400">Planos</p>
+                <p className="mt-1 font-bold">
+                  {Object.values(offer.plans || {})
+                    .filter(Boolean)
+                    .map((plano) => plano.name)
+                    .join(" + ") || "-"}
+                </p>
               </div>
               <div>
                 <p className="text-xs text-slate-400">Primeiro vencimento</p>

@@ -43,7 +43,15 @@ export const styleGuideCatalog = [
         nome: "InputCheck / InputRadio",
         status: "pronto",
         arquivo: "components/v2/InputCheck/, components/v2/InputRadio/",
-        descricao: "Aparência de botão, label centralizada",
+        descricao:
+          "Aparência de botão, label centralizada. InputRadio aceita prop opcional tom (pet/vet/grooming, azul por padrão) para blocos de segmento comercial visualmente distintos — ver proposta comercial em /ops-tenants.",
+      },
+      {
+        nome: "LegendaBolinha",
+        status: "pronto",
+        arquivo: "components/v2/LegendaBolinha/LegendaBolinha.jsx",
+        descricao:
+          "Bolinha colorida pequena + rótulo acessível (sr-only) — indicador de origem (ex.: qual segmento de plano concede um módulo). Mesmo vocabulário de tom do InputRadio (pet/vet/grooming), pra reaproveitar a mesma cor entre o radio e a bolinha do mesmo segmento.",
       },
       {
         nome: "InputCheckGroup",

@@ -164,19 +164,26 @@ export default function MeuPlano() {
     setContractAccepted(false);
   }, [planoAtual]);
 
+  // A oferta pode combinar planos de ate 3 segmentos — esta pagina (autoatendimento
+  // de assinatura) segue mostrando so o primeiro segmento presente; o desenho com
+  // os 3 blocos fica no fluxo de proposta comercial operado pelo time (ops).
+  const customOfferPrimaryPlan = Object.values(billing?.custom_offer?.plans || {}).find(Boolean);
+
   useEffect(() => {
-    if (billing?.custom_offer?.plan?.code) {
-      setSelectedPlan(normalizedPlanCode(billing.custom_offer.plan.code));
+    if (customOfferPrimaryPlan?.code) {
+      setSelectedPlan(normalizedPlanCode(customOfferPrimaryPlan.code));
       setContractAccepted(false);
     }
-  }, [billing?.custom_offer?.plan?.code]);
+  }, [customOfferPrimaryPlan?.code]);
 
   const statusInfo = getStatusInfo(assinaturaAtual);
   const billingConfigured = billing?.configured === true;
   const selectedPlanDetails = PLAN_OPTIONS.find((plan) => plan.id === selectedPlan);
   const customOffer = billing?.custom_offer;
   const hasCustomOffer = Boolean(
-    customOffer && customOffer.plan?.code === selectedPlan && customOffer.status !== "replaced",
+    customOffer &&
+      customOfferPrimaryPlan?.code === selectedPlan &&
+      customOffer.status !== "replaced",
   );
   const billingMatchesSelectedPlan = billing?.plan?.codigo === selectedPlan || hasCustomOffer;
   const currentAcceptance = billing?.contract_acceptance;

@@ -26,8 +26,20 @@ from app.services.ops_tenants_service import (
     update_ops_tenant_commercial_state,
     update_ops_tenant_onboarding_follow_up,
 )
+from app.services.plan_catalog import PLAN_CATALOG
 
 router = APIRouter(prefix="/admin/tenants", tags=["Admin - Tenants"])
+
+
+@router.get("/planos-catalogo")
+def listar_planos_catalogo(
+    _current_admin: PlatformAdmin = Depends(require_platform_admin),
+) -> dict[str, Any]:
+    """Catalogo completo de planos reais (10, 3 segmentos) com os modulos que
+    cada um libera — usado pela tela de proposta comercial pra montar os 3
+    blocos de segmento e as bolinhas de modulo, sem duplicar essa lista no
+    frontend."""
+    return {"items": [plano.to_public_dict() for plano in PLAN_CATALOG.values()]}
 
 
 class CommercialStateRequest(BaseModel):
@@ -58,7 +70,9 @@ class OnboardingNoteCreateRequest(BaseModel):
 
 class BillingOfferCreateRequest(BaseModel):
     title: str = Field(min_length=3, max_length=160)
-    plan_code: str
+    plan_pet_code: str | None = None
+    plan_vet_code: str | None = None
+    plan_grooming_code: str | None = None
     price_cents: int = Field(ge=100, le=10_000_000)
     first_due_date: date
     billing_type: Literal["UNDEFINED", "PIX", "BOLETO", "CREDIT_CARD"] = "UNDEFINED"
@@ -216,7 +230,9 @@ def criar_proposta_cobranca(
             tenant_reference=tenant_id,
             created_by=current_admin,
             title=payload.title,
-            plan_code=payload.plan_code,
+            plan_pet_code=payload.plan_pet_code,
+            plan_vet_code=payload.plan_vet_code,
+            plan_grooming_code=payload.plan_grooming_code,
             price_cents=payload.price_cents,
             first_due_date=payload.first_due_date,
             billing_type=payload.billing_type,

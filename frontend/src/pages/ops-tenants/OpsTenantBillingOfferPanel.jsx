@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { FiCheck, FiCopy, FiExternalLink, FiLink } from "react-icons/fi";
+import { FiArrowRight, FiCheck, FiCopy, FiExternalLink, FiLink } from "react-icons/fi";
 
 import { MODULOS_INFO, MODULOS_PREMIUM } from "../../contexts/ModulosContext";
 import { formatMoneyBRL } from "../../utils/formatters";
@@ -9,15 +9,30 @@ import InputCheckGroup from "../../components/v2/InputCheckGroup/InputCheckGroup
 import InputCombobox from "../../components/v2/InputCombobox/InputCombobox";
 import InputData from "../../components/v2/InputData/InputData";
 import InputMoeda from "../../components/v2/InputMoeda/InputMoeda";
+import InputRadio from "../../components/v2/InputRadio/InputRadio";
 import InputTexto from "../../components/v2/InputTexto/InputTexto";
 import InputTextoLongo from "../../components/v2/InputTextoLongo/InputTextoLongo";
+import LegendaBolinha from "../../components/v2/LegendaBolinha/LegendaBolinha";
 
-import { BILLING_OFFER_PLAN_OPTIONS, BILLING_TYPE_OPTIONS } from "./opsTenantsConstants";
+import { BILLING_TYPE_OPTIONS } from "./opsTenantsConstants";
 
-const MODULO_OPCOES = MODULOS_PREMIUM.map((modulo) => ({
-  value: modulo,
-  label: MODULOS_INFO[modulo]?.nome || modulo,
-}));
+const SEGMENTOS = [
+  { chave: "pet", campo: "plan_pet_code", titulo: "Pet", tom: "pet" },
+  { chave: "vet", campo: "plan_vet_code", titulo: "Vet", tom: "vet" },
+  { chave: "grooming", campo: "plan_grooming_code", titulo: "Banho & Tosa", tom: "grooming" },
+];
+
+const BLOCO_CLASSES = {
+  pet: "border-blue-200 bg-blue-50 dark:border-blue-500/30 dark:bg-blue-500/10",
+  vet: "border-emerald-200 bg-emerald-50 dark:border-emerald-500/30 dark:bg-emerald-500/10",
+  grooming: "border-violet-200 bg-violet-50 dark:border-violet-500/30 dark:bg-violet-500/10",
+};
+
+const TITULO_CLASSES = {
+  pet: "text-blue-800 dark:text-blue-300",
+  vet: "text-emerald-800 dark:text-emerald-300",
+  grooming: "text-violet-800 dark:text-violet-300",
+};
 
 function formatDateOnly(value) {
   if (!value) return "-";
@@ -46,6 +61,9 @@ function statusClasses(status) {
 
 function validar(form) {
   const erros = {};
+  if (!form.plan_pet_code && !form.plan_vet_code && !form.plan_grooming_code) {
+    erros.planos = "Selecione pelo menos um plano (Pet, Vet ou Banho & Tosa).";
+  }
   if (!form.title.trim()) erros.title = "Informe o nome da proposta.";
   if (!(form.price > 0)) erros.price = "Informe uma mensalidade maior que zero.";
   if (!form.first_due_date) erros.first_due_date = "Informe o primeiro vencimento.";
@@ -69,7 +87,9 @@ export default function OpsTenantBillingOfferPanel({
   error,
   success,
   publicUrl,
+  planosCatalogo = [],
   onChange,
+  onSegmentChange,
   onToggleModule,
   onSubmit,
 }) {
@@ -86,6 +106,22 @@ export default function OpsTenantBillingOfferPanel({
   if (!tenant) return null;
 
   const erros = tentouEnviar ? validar(form) : {};
+
+  const planosSelecionados = SEGMENTOS.map(({ campo }) =>
+    planosCatalogo.find((plano) => plano.codigo === form[campo]),
+  ).filter(Boolean);
+  const modulosDosPlanosSelecionados = new Set(
+    planosSelecionados.flatMap((plano) => plano.modulos || []),
+  );
+  const somaCentavos = planosSelecionados.reduce(
+    (total, plano) => total + (plano.preco_centavos || 0),
+    0,
+  );
+  const precoAtualCentavos = Math.round(Number(form.price || 0) * 100);
+  const somaDiferenteDoPreco = somaCentavos > 0 && somaCentavos !== precoAtualCentavos;
+  const modulosExtrasDisponiveis = MODULOS_PREMIUM.filter(
+    (modulo) => !modulosDosPlanosSelecionados.has(modulo),
+  ).map((modulo) => ({ value: modulo, label: MODULOS_INFO[modulo]?.nome || modulo }));
 
   function handleSubmit(event) {
     event.preventDefault();
@@ -112,35 +148,78 @@ export default function OpsTenantBillingOfferPanel({
       </div>
 
       <form onSubmit={handleSubmit} noValidate className="mt-4 space-y-3">
-        <div className="grid gap-3 sm:grid-cols-[2fr_1fr]">
-          <InputTexto
-            id="oferta-titulo"
-            label="Nome da proposta"
-            value={form.title}
-            onChange={(value) => onChange("title", value)}
-            maxLength={160}
-            error={erros.title}
-            required
-          />
-          <InputCombobox
-            id="oferta-plano"
-            label="Plano-base"
-            opcoes={BILLING_OFFER_PLAN_OPTIONS}
-            value={form.plan_code}
-            onChange={(value) => onChange("plan_code", value)}
-            permitirLimpar={false}
-          />
+        <InputTexto
+          id="oferta-titulo"
+          label="Nome da proposta"
+          value={form.title}
+          onChange={(value) => onChange("title", value)}
+          maxLength={160}
+          error={erros.title}
+          required
+        />
+
+        <div>
+          <span className="text-xs font-medium text-slate-600 dark:text-slate-300">
+            Planos (selecione até 1 por segmento)
+          </span>
+          <div className="mt-1 grid gap-2 sm:grid-cols-3">
+            {SEGMENTOS.map(({ chave, campo, titulo, tom }) => {
+              const opcoesSegmento = [
+                { value: "", label: "Nenhum" },
+                ...planosCatalogo
+                  .filter((plano) => plano.segmento === chave)
+                  .map((plano) => ({ value: plano.codigo, label: plano.nome })),
+              ];
+              return (
+                <div
+                  key={chave}
+                  className={`rounded-lg border p-2.5 ${BLOCO_CLASSES[chave]}`}
+                >
+                  <p className={`text-xs font-bold uppercase tracking-wide ${TITULO_CLASSES[chave]}`}>
+                    {titulo}
+                  </p>
+                  <div className="mt-2">
+                    <InputRadio
+                      name={`oferta-plano-${chave}`}
+                      opcoes={opcoesSegmento}
+                      value={form[campo] || ""}
+                      tom={tom}
+                      onChange={(value) => onSegmentChange(chave, value || null)}
+                    />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          {erros.planos ? (
+            <span className="mt-1 block text-xs text-red-600 dark:text-red-400">
+              {erros.planos}
+            </span>
+          ) : null}
         </div>
 
         <div className="grid gap-3 sm:grid-cols-3">
-          <InputMoeda
-            id="oferta-valor"
-            label="Mensalidade"
-            value={form.price}
-            onChange={(value) => onChange("price", value)}
-            error={erros.price}
-            required
-          />
+          <div>
+            <InputMoeda
+              id="oferta-valor"
+              label="Mensalidade"
+              value={form.price}
+              onChange={(value) => onChange("price", value)}
+              error={erros.price}
+              required
+            />
+            {somaDiferenteDoPreco ? (
+              <button
+                type="button"
+                onClick={() => onChange("price", somaCentavos / 100)}
+                className="mt-1 inline-flex items-center gap-1.5 text-xs font-semibold text-blue-700 hover:text-blue-800 dark:text-blue-400"
+              >
+                Soma dos planos: {formatMoneyBRL(somaCentavos / 100)}
+                <FiArrowRight className="h-3 w-3" aria-hidden="true" />
+                usar este valor
+              </button>
+            ) : null}
+          </div>
           <InputData
             id="oferta-vencimento"
             label="Primeiro vencimento"
@@ -159,10 +238,32 @@ export default function OpsTenantBillingOfferPanel({
           />
         </div>
 
+        {planosSelecionados.length > 0 ? (
+          <div>
+            <span className="text-xs font-medium text-slate-600 dark:text-slate-300">
+              Módulos incluídos nos planos selecionados
+            </span>
+            <div className="mt-1 grid gap-1.5 rounded-lg border border-slate-200 bg-white p-2.5 sm:grid-cols-2 dark:border-slate-700 dark:bg-slate-900">
+              {[...modulosDosPlanosSelecionados].sort().map((modulo) => (
+                <div key={modulo} className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200">
+                  {SEGMENTOS.filter(({ chave }) =>
+                    planosCatalogo
+                      .find((plano) => plano.codigo === form[`plan_${chave}_code`])
+                      ?.modulos?.includes(modulo),
+                  ).map(({ chave, tom, titulo }) => (
+                    <LegendaBolinha key={chave} tom={tom} rotulo={titulo} />
+                  ))}
+                  {MODULOS_INFO[modulo]?.nome || modulo}
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : null}
+
         <InputCheckGroup
           name="oferta-modulos-extras"
-          label="Módulos extras ao plano-base"
-          opcoes={MODULO_OPCOES}
+          label="Módulos extras (fora de qualquer plano selecionado)"
+          opcoes={modulosExtrasDisponiveis}
           value={form.extra_modules}
           onChange={(modulos) => {
             const adicionado = modulos.find((modulo) => !form.extra_modules.includes(modulo));
@@ -311,6 +412,18 @@ export default function OpsTenantBillingOfferPanel({
                     {formatMoneyBRL(offer.price_cents / 100)} / mês · vence{" "}
                     {formatDateOnly(offer.first_due_date)}
                   </p>
+                  <div className="mt-1 flex flex-wrap gap-1">
+                    {SEGMENTOS.filter(({ chave }) => offer.plans?.[chave]).map(
+                      ({ chave, titulo }) => (
+                        <span
+                          key={chave}
+                          className={`rounded-full border px-1.5 py-0.5 text-[10px] font-bold ${BLOCO_CLASSES[chave]} ${TITULO_CLASSES[chave]}`}
+                        >
+                          {titulo}: {offer.plans[chave].name}
+                        </span>
+                      ),
+                    )}
+                  </div>
                 </div>
                 <span
                   className={`flex-none rounded-full border px-2 py-1 text-xs font-bold ${statusClasses(offer.status)}`}
