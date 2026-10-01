@@ -18,6 +18,7 @@ export default function InputCombobox({
 }) {
   const containerRef = useRef(null);
   const panelRef = useRef(null);
+  const inputRef = useRef(null);
   const [aberto, setAberto] = useState(false);
   const [termo, setTermo] = useState("");
   const [indiceAtivo, setIndiceAtivo] = useState(0);
@@ -129,6 +130,7 @@ export default function InputCombobox({
           </div>
         ) : null}
         <input
+          ref={inputRef}
           id={id}
           autoComplete="off"
           disabled={disabled}
@@ -164,7 +166,22 @@ export default function InputCombobox({
               <X className="h-3.5 w-3.5" />
             </button>
           ) : null}
-          <ChevronDown className="h-4 w-4 text-slate-400" aria-hidden="true" />
+          <button
+            type="button"
+            tabIndex={-1}
+            aria-label={aberto ? "Fechar lista" : "Abrir lista"}
+            onMouseDown={(evento) => {
+              evento.preventDefault();
+              setAberto((atual) => {
+                const proximo = !atual;
+                if (proximo) inputRef.current?.focus();
+                return proximo;
+              });
+            }}
+            className="pointer-events-auto rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-300"
+          >
+            <ChevronDown className="h-4 w-4" aria-hidden="true" />
+          </button>
         </div>
 
         {aberto ? (
@@ -172,7 +189,7 @@ export default function InputCombobox({
             ref={panelRef}
             id={listboxId}
             role="listbox"
-            className="absolute left-0 top-full z-20 mt-1 max-h-56 w-full overflow-auto rounded-lg border border-slate-200 bg-white py-1 text-sm shadow-lg dark:border-slate-700 dark:bg-slate-900"
+            className="absolute left-0 top-full z-30 mt-1 max-h-56 w-full overflow-auto rounded-lg border border-slate-200 bg-white py-1 text-sm shadow-lg dark:border-slate-700 dark:bg-slate-900"
           >
             {filtradas.length === 0 ? (
               <div className="px-3 py-2 text-slate-400 dark:text-slate-500">

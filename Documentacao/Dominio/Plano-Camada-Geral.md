@@ -1,6 +1,6 @@
 ---
 tipo: plano
-atualizado: 2026-09-19
+atualizado: 2026-09-25
 ---
 
 > **Status (2026-09-19): Checkpoints 1-5 implementados e verificados contra Postgres real** (migrations aplicadas, boot limpo, rotas confirmadas no OpenAPI, lógica de sugestão/vínculo/desvínculo testada ao vivo pra cada domínio). Pendência declarada desde o início: nenhum teste `pytest` formal ainda — só verificação manual/ao vivo, mesmo padrão do Checkpoint 0. Ver "Notas de implementação" no fim do documento pra detalhes de cada checkpoint.
@@ -78,6 +78,8 @@ Toda entidade "mestre" segue a mesma forma:
 - `Cliente.pessoa_mestre_id`, nullable.
 - **Vínculo é sempre sugestão + confirmação manual, nunca automático** — mesmo padrão CDP já decidido na proposta: ao cadastrar um CPF/telefone que já existe em outra loja do grupo, sugerir "já existe cadastro em [loja], vincular histórico?".
 - Continua 100% local: histórico de compra, segmentação, campos financeiros/DRE, consentimento — cada loja é dona do que coletou.
+
+✅ **Mudou em 25/09/2026 — exceção para onboarding/criação de loja**: ao provisionar uma loja nova (cadastro público em `/auth/register`, onboarding assistido de ops e "adicionar loja", todos via `GrupoComercialService.criar_grupo`/`adicionar_loja`), o `Cliente` do titular é criado automaticamente em cada loja nova e **vinculado automaticamente** à mesma `PessoaMestre` do grupo — achada via `Cliente.auth_user_id` do titular em qualquer loja já membro, não por CPF/CNPJ — sem sugestão nem confirmação manual. Isso faz parte de uma reestruturação maior do processo de onboarding/criação de lojas: a regra "sempre sugestão + confirmação manual" acima segue valendo para o fluxo de tela (cadastro manual de um cliente comprador pré-existente), mas deixa de ser a regra padrão para toda vinculação — o vínculo automático em onboarding é a nova direção de produto, e os resquícios do fluxo manual-apenas fora deste caso devem ser eliminados depois (fora do escopo desta rodada). Ver [[EmpresaGrupo]], seções "1. Criação do grupo" e "2. Adicionar loja".
 
 **Pré-requisito de negócio, não técnico:** confirmar com o usuário se os termos de uso já foram atualizados pra cobrir "consentimento vale pro grupo comercial" (mencionado por ele numa rodada anterior — não é bloqueio técnico, mas vale checar antes de ativar isso em produção).
 

@@ -1,12 +1,11 @@
 import { FiAlertTriangle, FiCheckCircle, FiCreditCard, FiUsers } from "react-icons/fi";
 
 import OpsTenantsBillingTab from "./OpsTenantsBillingTab";
-import OpsTenantsFilters from "./OpsTenantsFilters";
 import OpsTenantsHeader from "./OpsTenantsHeader";
 import OpsTenantsMetricCard from "./OpsTenantsMetricCard";
 import OpsTenantsPilotTab from "./OpsTenantsPilotTab";
 import OpsTenantsTable from "./OpsTenantsTable";
-import OpsTenantsTabs from "./OpsTenantsTabs";
+import OpsTenantsToolbar from "./OpsTenantsToolbar";
 import OpsTenantsUsageTab from "./OpsTenantsUsageTab";
 import { formatNumber } from "./opsTenantsFormatters";
 import useOpsTenantsController from "./useOpsTenantsController";
@@ -14,6 +13,9 @@ import useOpsTenantsController from "./useOpsTenantsController";
 export default function OpsTenantsPage() {
   const {
     activeTab,
+    billingModalOpen,
+    openBillingModal,
+    closeBillingModal,
     billingOfferCreating,
     billingOfferError,
     billingOfferForm,
@@ -65,10 +67,20 @@ export default function OpsTenantsPage() {
     totals,
   } = useOpsTenantsController();
 
+  function handleManageTenant(tenantId) {
+    setActiveTab("billing");
+    openBillingModal(tenantId);
+  }
+
   return (
     <div className="p-6">
       <div className="mx-auto max-w-[1600px] space-y-5">
-        <OpsTenantsHeader loading={loading} onRefresh={loadTenants} />
+        <OpsTenantsHeader
+          loading={loading}
+          onRefresh={loadTenants}
+          onGrupoCriado={refreshAfterLojaAdded}
+          onDefinirProposta={handleManageTenant}
+        />
 
         {error ? (
           <div className="rounded-lg border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">
@@ -107,9 +119,10 @@ export default function OpsTenantsPage() {
           />
         </div>
 
-        <OpsTenantsTabs activeTab={activeTab} summaries={tabSummaries} onChange={setActiveTab} />
-
-        <OpsTenantsFilters
+        <OpsTenantsToolbar
+          activeTab={activeTab}
+          summaries={tabSummaries}
+          onChangeTab={setActiveTab}
           search={search}
           status={status}
           onSearchChange={setSearch}
@@ -124,6 +137,7 @@ export default function OpsTenantsPage() {
             loading={tenantsLoading}
             selectedTenant={selectedTenant}
             onSelectTenant={setSelectedTenantId}
+            onManageTenant={handleManageTenant}
             onLojaAdded={refreshAfterLojaAdded}
           />
         ) : null}
@@ -133,11 +147,13 @@ export default function OpsTenantsPage() {
             items={items}
             loading={loading}
             selectedTenant={selectedTenant}
+            modalOpen={billingModalOpen}
             editForm={commercialForm}
             editError={commercialError}
             editSuccess={commercialSuccess}
             saving={commercialSaving}
-            onSelectTenant={setSelectedTenantId}
+            onSelectTenant={openBillingModal}
+            onCloseManage={closeBillingModal}
             onEditChange={handleCommercialChange}
             onEditSubmit={handleCommercialSubmit}
             offerForm={billingOfferForm}

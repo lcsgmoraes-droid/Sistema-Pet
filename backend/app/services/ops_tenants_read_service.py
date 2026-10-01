@@ -319,6 +319,7 @@ def _pilot_follow_up(
     onboarding_owner_name: str | None,
     onboarding_satisfaction: str | None,
     onboarding_next_contact_on: date | str | None,
+    credencial_email_pendente: bool = False,
 ) -> dict[str, Any]:
     reasons: list[dict[str, Any]] = []
     overdue_milestones: list[str] = []
@@ -337,6 +338,12 @@ def _pilot_follow_up(
         if overdue_milestone:
             overdue_milestones.append(overdue_milestone)
 
+    if credencial_email_pendente:
+        add_reason(
+            "credential_email_failed",
+            "e-mail de definicao de senha do titular nao foi enviado",
+            "critical",
+        )
     if critical_alerts_open:
         add_reason(
             "critical_alert",
@@ -425,7 +432,9 @@ def _pilot_follow_up(
     else:
         attention_level = "healthy"
 
-    if critical_alerts_open:
+    if credencial_email_pendente:
+        next_action = "Repassar usuario/senha ao titular por outro canal (telefone, WhatsApp etc.)."
+    elif critical_alerts_open:
         next_action = "Resolver o alerta critico e validar a jornada afetada."
     elif not access_confirmed:
         next_action = "Confirmar o primeiro acesso do responsavel pela empresa."
@@ -533,6 +542,7 @@ def _tenant_pilot_status(
         onboarding_owner_name=row.get("onboarding_owner_name"),
         onboarding_satisfaction=row.get("onboarding_satisfaction"),
         onboarding_next_contact_on=row.get("onboarding_next_contact_on"),
+        credencial_email_pendente=bool(row.get("onboarding_credencial_email_pendente")),
     )
     return {
         "kind": kind,
@@ -568,6 +578,28 @@ def _is_billing_attention(status: str | None) -> bool:
     }
 
 
+def _valor_cobrado_cents(db: Session, tenant_id: str) -> int | None:
+    """Valor mensal de verdade sendo cobrado dessa loja: o `price_cents` da
+    proposta comercial mais recente que já foi aceita (nunca uma proposta
+    ainda so "ready", que e so um link pronto, ainda nao confirmado pelo
+    cliente) — ver `billing_offer_service.accept_billing_offer`."""
+    if not _table_exists(db, "billing_offers"):
+        return None
+    valor = db.execute(
+        text("""
+            SELECT price_cents
+            FROM billing_offers
+            WHERE tenant_reference = :tenant_id
+              AND status IN ('accepted', 'active', 'past_due', 'blocked')
+              AND revoked = false
+            ORDER BY COALESCE(accepted_at, created_at) DESC
+            LIMIT 1
+            """),
+        {"tenant_id": tenant_id},
+    ).scalar()
+    return int(valor) if valor is not None else None
+
+
 def _tenant_row_to_item(db: Session, row: dict[str, Any]) -> dict[str, Any]:
     tenant_id = str(row["id"])
     counts = _tenant_counts(db, tenant_id)
@@ -578,6 +610,7 @@ def _tenant_row_to_item(db: Session, row: dict[str, Any]) -> dict[str, Any]:
         "status": row.get("status") or "active",
         "plan": row.get("plan") or "free",
         "billing_status": row.get("billing_status") or "active",
+        "valor_cobrado_cents": _valor_cobrado_cents(db, tenant_id),
         "subscription_source": row.get("subscription_source") or "manual",
         "subscription_activated_at": row.get("subscription_activated_at"),
         "organization_type": row.get("organization_type") or "petshop",
@@ -612,6 +645,7 @@ def _fetch_tenant_item(db: Session, tenant_id: str) -> dict[str, Any]:
                    subscription_activated_at, organization_type,
                    onboarding_owner_name, onboarding_unblocked_on, onboarding_next_contact_on,
                    onboarding_satisfaction, onboarding_follow_up_updated_at,
+                   onboarding_credencial_email_pendente,
                    created_at, updated_at
             FROM tenants
             WHERE CAST(id AS TEXT) = :tenant_id
@@ -658,6 +692,7 @@ def list_ops_tenants(
                    subscription_activated_at, organization_type,
                    onboarding_owner_name, onboarding_unblocked_on, onboarding_next_contact_on,
                    onboarding_satisfaction, onboarding_follow_up_updated_at,
+                   onboarding_credencial_email_pendente,
                    created_at, updated_at
             FROM tenants
             {where_sql}
@@ -825,6 +860,7 @@ def list_ops_tenants_grouped(
                    subscription_activated_at, organization_type,
                    onboarding_owner_name, onboarding_unblocked_on, onboarding_next_contact_on,
                    onboarding_satisfaction, onboarding_follow_up_updated_at,
+                   onboarding_credencial_email_pendente,
                    created_at, updated_at
             FROM tenants
             WHERE CAST(id AS TEXT) IN :tenant_ids

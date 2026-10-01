@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from uuid import UUID
 
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
@@ -14,8 +15,11 @@ from app.grupo_comercial_models import (
 )
 from app.grupo_comercial_sql import empresa_id_igual
 from app.auth.auth_multitenant_support import grant_all_permissions_to_role
-from app.models import Role, Tenant, User, UserTenant
+from app.clientes.common import gerar_codigo_cliente
+from app.models import Cliente, Role, Tenant, User, UserTenant
 from app.evolucao_corepet import registrar_uso_funcionalidade
+from app.pessoa_mestre_models import PessoaMestre
+from app.pessoa_mestre_service import vincular_pessoa_mestre
 from app.services.business_audit_service import log_business_event
 from app.services.plan_catalog import resolve_signup_selection
 from app.services.tenant_provisioning_service import provision_tenant
@@ -23,6 +27,7 @@ from app.tenancy.context import (
     clear_tenant_context,
     get_current_tenant,
     set_tenant_context,
+    tenant_context,
 )
 
 
@@ -117,9 +122,153 @@ class GrupoComercialService:
             commit=False,
         )
 
+    def _pessoa_mestre_do_titular(
+        self, *, grupo_id: int, usuario_id: int
+    ) -> PessoaMestre | None:
+        """Acha a pessoa-mestre que o titular ja tem em qualquer loja membro
+        ativa deste grupo, olhando o Cliente dele em cada empresa, uma de
+        cada vez, no proprio tenant_context - mesmo padrao ja usado em
+        GrupoComercialProdutoVinculoService.buscar_produtos. GrupoComercialMembro
+        nao herda BaseTenantModel (atravessa tenants por natureza), entao
+        esta consulta nao precisa de nenhum contexto ativo.
+        """
+        membros_ativos = (
+            self.db.query(GrupoComercialMembro)
+            .filter(
+                GrupoComercialMembro.grupo_id == grupo_id,
+                GrupoComercialMembro.status == "ativo",
+            )
+            .all()
+        )
+        mestre_id = None
+        for membro in membros_ativos:
+            with tenant_context(membro.empresa_id):
+                cliente = (
+                    self.db.query(Cliente)
+                    .filter(
+                        Cliente.auth_user_id == usuario_id,
+                        Cliente.pessoa_mestre_id.isnot(None),
+                    )
+                    .first()
+                )
+            if cliente is not None:
+                mestre_id = cliente.pessoa_mestre_id
+                break
+        if mestre_id is None:
+            return None
+        return (
+            self.db.query(PessoaMestre)
+            .filter(PessoaMestre.id == mestre_id)
+            .first()
+        )
+
+    def _criar_cliente_titular(
+        self,
+        *,
+        tenant_id,
+        usuario: User,
+        grupo_id: int,
+        tipo_pessoa: str = "PF",
+        telefone: str | None = None,
+        pessoa_mestre_id: int | None,
+    ) -> Cliente:
+        """Cria a Pessoa (Cliente) do titular na loja recem-provisionada e
+        ja vincula automaticamente a pessoa-mestre do grupo - mesmo molde de
+        usuarios_routes._vincular_ou_criar_pessoa_para_usuario (branch de
+        criacao; a branch de vinculo a Cliente existente nao se aplica aqui,
+        toda loja nova e um tenant vazio). Ver Documentacao/Dominio/
+        EmpresaGrupo.md e Plano-Camada-Geral.md (Checkpoint 4, nota de
+        25/09/2026 sobre vinculo automatico nesta situacao).
+        """
+        # Cliente.tenant_id e UUID(as_uuid=True) - callers passam empresa_id
+        # como string as vezes (ex.: GrupoComercialService normaliza tudo
+        # via _empresa_id/str()), entao precisa converter explicitamente
+        # antes de usar num filtro/insert nesta coluna.
+        tenant_uuid = tenant_id if isinstance(tenant_id, UUID) else UUID(str(tenant_id))
+        cliente_existente = (
+            self.db.query(Cliente)
+            .filter(
+                Cliente.tenant_id == tenant_uuid,
+                Cliente.auth_user_id == usuario.id,
+                Cliente.ativo.is_not(False),
+            )
+            .first()
+        )
+        if cliente_existente is not None:
+            if cliente_existente.pessoa_mestre_id is None:
+                vincular_pessoa_mestre(
+                    self.db,
+                    cliente=cliente_existente,
+                    grupo_id=grupo_id,
+                    usuario_id=usuario.id,
+                    pessoa_mestre_id=pessoa_mestre_id,
+                    commit=False,
+                )
+            return cliente_existente
+
+        nome_pessoa = (
+            usuario.nome
+            or usuario.email
+            or usuario.username
+            or usuario.login_phone
+            or f"Usuario {usuario.id}"
+        )
+        cliente = Cliente(
+            tenant_id=tenant_uuid,
+            user_id=usuario.id,
+            auth_user_id=usuario.id,
+            codigo=gerar_codigo_cliente(self.db, "funcionario", tipo_pessoa, tenant_uuid),
+            tipo_cadastro="funcionario",
+            tipo_pessoa=tipo_pessoa,
+            is_funcionario=True,
+            nome=nome_pessoa,
+            celular=telefone,
+            email=usuario.email,
+            origem_cliente="cadastro_grupo_comercial",
+            ativo=True,
+        )
+        self.db.add(cliente)
+        self.db.flush()
+
+        mestre = vincular_pessoa_mestre(
+            self.db,
+            cliente=cliente,
+            grupo_id=grupo_id,
+            usuario_id=usuario.id,
+            pessoa_mestre_id=pessoa_mestre_id,
+            commit=False,
+        )
+        log_business_event(
+            db=self.db,
+            tenant_id=tenant_id,
+            user_id=usuario.id,
+            event="grupo_comercial_cliente_titular_criado",
+            entity_type="cliente",
+            entity_id=cliente.id,
+            metadata={
+                "grupo_id": grupo_id,
+                "pessoa_mestre_id": mestre.id,
+                "tipo_pessoa": tipo_pessoa,
+            },
+            commit=False,
+        )
+        return cliente
+
     def criar_grupo(
-        self, empresa_id, usuario_id: int, nome: str, *, commit: bool = True
+        self,
+        empresa_id,
+        usuario_id: int,
+        nome: str,
+        *,
+        commit: bool = True,
+        titular_tipo_pessoa: str = "PF",
+        titular_telefone: str | None = None,
     ) -> dict:
+        if titular_tipo_pessoa not in ("PF", "PJ"):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="titular_tipo_pessoa deve ser PF ou PJ",
+            )
         empresa_id = self._empresa_id(empresa_id)
         self._empresa_ativa(empresa_id)
         nome_limpo = " ".join(nome.split())
@@ -146,6 +295,23 @@ class GrupoComercialService:
         usuario = self.db.query(User).filter(User.id == usuario_id).first()
         if usuario is not None and usuario.master_grupo_id is None:
             usuario.master_grupo_id = grupo.id
+        if usuario is not None:
+            # criar_grupo e chamado hoje sempre com o contexto de tenant ja
+            # ativo (cadastro publico, onboarding de ops e a rota
+            # self-service setam antes) - mas _criar_cliente_titular precisa
+            # do contexto pra consultar/gravar em Cliente (tabela
+            # multi-tenant), entao garante isso aqui mesmo, sem depender de
+            # quem chamou ja ter feito - mesmo padrao que adicionar_loja ja
+            # usa pra sua propria janela de contexto.
+            with tenant_context(empresa_id):
+                self._criar_cliente_titular(
+                    tenant_id=empresa_id,
+                    usuario=usuario,
+                    grupo_id=grupo.id,
+                    tipo_pessoa=titular_tipo_pessoa,
+                    telefone=titular_telefone,
+                    pessoa_mestre_id=None,
+                )
         self._auditar(
             empresa_id=empresa_id,
             usuario_id=usuario_id,
@@ -313,6 +479,7 @@ class GrupoComercialService:
         empresa_acionadora_id: str | None = None,
         commit: bool = True,
         grant_trial: bool = True,
+        cnpj: str | None = None,
     ) -> dict:
         """Provisiona uma loja nova e a anexa direto neste grupo, como
         `membro` — sem passar pelo fluxo de convite/código, porque é o
@@ -358,6 +525,7 @@ class GrupoComercialService:
             user=usuario,
             restore_tenant_id=restore_tenant_id,
             grant_trial=grant_trial,
+            cnpj=cnpj,
         )
         # provision_tenant ja restaurou o contexto pro tenant chamador (ou
         # limpou, se nao houver) — mas o insert do membro e a auditoria
@@ -376,6 +544,21 @@ class GrupoComercialService:
             grupo.versao_membros = int(grupo.versao_membros or 1) + 1
             self._garantir_acesso_master(
                 grupo_id=grupo.id, tenant_id=resultado.tenant_id
+            )
+            mestre_existente = self._pessoa_mestre_do_titular(
+                grupo_id=grupo.id, usuario_id=usuario.id
+            )
+            self._criar_cliente_titular(
+                tenant_id=resultado.tenant_id,
+                usuario=usuario,
+                grupo_id=grupo.id,
+                tipo_pessoa=mestre_existente.tipo_pessoa if mestre_existente else "PF",
+                telefone=(
+                    (mestre_existente.celular or mestre_existente.telefone)
+                    if mestre_existente
+                    else None
+                ),
+                pessoa_mestre_id=mestre_existente.id if mestre_existente else None,
             )
             self._auditar(
                 empresa_id=str(resultado.tenant_id),

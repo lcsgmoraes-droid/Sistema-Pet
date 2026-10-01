@@ -2,6 +2,7 @@ import { FiEdit3 } from "react-icons/fi";
 
 import { isBillingAttention } from "../opsTenantsUtils";
 
+import ModalPadrao from "../../components/v2/ModalPadrao/ModalPadrao";
 import OpsTenantsBadge from "./OpsTenantsBadge";
 import OpsTenantsCommercialEditPanel from "./OpsTenantsCommercialEditPanel";
 import OpsTenantBillingOfferPanel from "./OpsTenantBillingOfferPanel";
@@ -11,11 +12,13 @@ export default function OpsTenantsBillingTab({
   items,
   loading,
   selectedTenant,
+  modalOpen,
   editForm,
   editError,
   editSuccess,
   saving,
   onSelectTenant,
+  onCloseManage,
   onEditChange,
   onEditSubmit,
   offerForm,
@@ -30,7 +33,7 @@ export default function OpsTenantsBillingTab({
   onOfferSubmit,
 }) {
   return (
-    <div className="grid gap-4 xl:grid-cols-[1fr_360px]">
+    <>
       <section className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
         <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-4 py-3">
           <div>
@@ -52,14 +55,14 @@ export default function OpsTenantsBillingTab({
 
         <div className="overflow-x-auto">
           <table className="min-w-[1080px] w-full divide-y divide-slate-200 text-left">
-            <thead className="bg-slate-50 text-xs uppercase text-slate-500">
+            <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
               <tr>
+                <th className="px-4 py-3 font-bold">Acao</th>
                 <th className="px-4 py-3 font-bold">Tenant</th>
                 <th className="px-4 py-3 font-bold">Plano</th>
                 <th className="px-4 py-3 font-bold">Pagamento</th>
                 <th className="px-4 py-3 font-bold">Origem</th>
                 <th className="px-4 py-3 font-bold">Usuario principal</th>
-                <th className="px-4 py-3 font-bold">Acao</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -88,13 +91,17 @@ export default function OpsTenantsBillingTab({
                         <button
                           type="button"
                           onClick={() => onSelectTenant(tenant.id)}
-                          className="block text-left"
+                          className="inline-flex h-9 items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700 hover:bg-slate-50"
                         >
-                          <div className="text-sm font-bold text-slate-900">{tenant.name}</div>
-                          <div className="mt-1 font-mono text-[11px] text-slate-500">
-                            {shortId(tenant.id)}
-                          </div>
+                          <FiEdit3 className="h-4 w-4" aria-hidden="true" />
+                          Editar
                         </button>
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="text-sm font-bold text-slate-900">{tenant.name}</div>
+                        <div className="mt-1 font-mono text-xs text-slate-500">
+                          {shortId(tenant.id)}
+                        </div>
                       </td>
                       <td className="px-4 py-3">
                         <OpsTenantsBadge className="border-blue-200 bg-blue-50 text-blue-700">
@@ -126,16 +133,6 @@ export default function OpsTenantsBillingTab({
                           {tenant.principal_user?.email || "sem usuario principal"}
                         </div>
                       </td>
-                      <td className="px-4 py-3">
-                        <button
-                          type="button"
-                          onClick={() => onSelectTenant(tenant.id)}
-                          className="inline-flex h-9 items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700 hover:bg-slate-50"
-                        >
-                          <FiEdit3 className="h-4 w-4" />
-                          Editar
-                        </button>
-                      </td>
                     </tr>
                   );
                 })
@@ -145,30 +142,36 @@ export default function OpsTenantsBillingTab({
         </div>
       </section>
 
-      <div className="space-y-4">
-        <OpsTenantBillingOfferPanel
-          tenant={selectedTenant}
-          form={offerForm}
-          offers={offers}
-          loadingOffers={offersLoading}
-          creating={offerCreating}
-          error={offerError}
-          success={offerSuccess}
-          publicUrl={offerPublicUrl}
-          onChange={onOfferChange}
-          onToggleModule={onOfferToggleModule}
-          onSubmit={onOfferSubmit}
-        />
-        <OpsTenantsCommercialEditPanel
-          tenant={selectedTenant}
-          form={editForm}
-          error={editError}
-          success={editSuccess}
-          saving={saving}
-          onChange={onEditChange}
-          onSubmit={onEditSubmit}
-        />
-      </div>
-    </div>
+      {modalOpen && selectedTenant ? (
+        <ModalPadrao titulo={`Manutencao comercial — ${selectedTenant.name}`} tamanho="grande" onFechar={onCloseManage}>
+          <div className="space-y-4">
+            <OpsTenantBillingOfferPanel
+              tenant={selectedTenant}
+              form={offerForm}
+              offers={offers}
+              loadingOffers={offersLoading}
+              creating={offerCreating}
+              error={offerError}
+              success={offerSuccess}
+              publicUrl={offerPublicUrl}
+              onChange={onOfferChange}
+              onToggleModule={onOfferToggleModule}
+              onSubmit={onOfferSubmit}
+            />
+            <div className="border-t border-slate-200 pt-4 dark:border-slate-700">
+              <OpsTenantsCommercialEditPanel
+                tenant={selectedTenant}
+                form={editForm}
+                error={editError}
+                success={editSuccess}
+                saving={saving}
+                onChange={onEditChange}
+                onSubmit={onEditSubmit}
+              />
+            </div>
+          </div>
+        </ModalPadrao>
+      ) : null}
+    </>
   );
 }

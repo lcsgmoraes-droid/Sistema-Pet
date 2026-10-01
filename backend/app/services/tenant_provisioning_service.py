@@ -66,6 +66,7 @@ def provision_tenant(
     new_user_email_verified: bool = True,
     restore_tenant_id: uuid.UUID | None = None,
     grant_trial: bool = True,
+    cnpj: str | None = None,
 ) -> TenantProvisioningResult:
     """Cria um Tenant novo com toda a estrutura inicial (papel admin, perfis
     operacionais padrao, dados de onboarding) e o vincula a um usuario.
@@ -110,6 +111,7 @@ def provision_tenant(
         ),
         subscription_source="manual",
         organization_type=organization_type,
+        cnpj=cnpj,
     )
     db.add(tenant)
     # Sem context ainda — falhas daqui pra baixo (nome de acesso duplicado)

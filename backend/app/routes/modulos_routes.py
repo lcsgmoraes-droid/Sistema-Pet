@@ -21,6 +21,10 @@ from app.services.business_audit_service import (
     build_plan_activation_metadata,
     log_business_event,
 )
+from app.services.modulo_activation_service import (
+    ModuloActivationError,
+    ativar_modulo_manual,
+)
 from app.services.plan_catalog import PLAN_CATALOG, get_plan
 from app.services.plan_limits import active_session_usage, monthly_sales_usage
 from app.tenancy.context import set_current_tenant
@@ -360,78 +364,24 @@ def ativar_modulo(
             status_code=status.HTTP_403_FORBIDDEN, detail="Acesso negado"
         )
 
-    if modulo not in MODULOS_PREMIUM:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Módulo '{modulo}' não existe. Disponíveis: {sorted(MODULOS_PREMIUM)}",
-        )
-
     tenant = db.query(Tenant).filter(Tenant.id == tenant_id_alvo).first()
     if not tenant:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Tenant não encontrado"
         )
 
-    tenant_id_alvo = _set_tenant_context_for_target(str(tenant.id))
+    _set_tenant_context_for_target(str(tenant.id))
 
-    # Atualiza campo JSON no tenant
-    modulos_atuais: list[str] = []
-    if tenant.modulos_ativos:
-        try:
-            modulos_atuais = json.loads(tenant.modulos_ativos)
-        except (json.JSONDecodeError, TypeError):
-            modulos_atuais = []
-
-    modulos_anteriores = sorted(
-        modulo_atual for modulo_atual in modulos_atuais if isinstance(modulo_atual, str)
-    )
-    if modulo not in modulos_atuais:
-        modulos_atuais.append(modulo)
-        tenant.modulos_ativos = json.dumps(modulos_atuais)
-
-    # Cria registro de assinatura manual
-    existente = (
-        db.query(AssinaturaModulo)
-        .filter(
-            AssinaturaModulo.tenant_id == tenant_id_alvo,
-            AssinaturaModulo.modulo == modulo,
-            AssinaturaModulo.status == "ativo",
-        )
-        .first()
-    )
-    assinatura_criada = False
-    if not existente:
-        assinatura = AssinaturaModulo(
-            tenant_id=tenant_id_alvo,
-            modulo=modulo,
-            status="ativo",
-            gateway="manual",
-            data_inicio=datetime.now(tz=timezone.utc),
-        )
-        db.add(assinatura)
-        assinatura_criada = True
-
-    log_business_event(
-        db=db,
-        tenant_id=tenant_id_alvo,
-        user_id=current_user.id,
-        event="config.module_activated",
-        entity_type="tenant_modules",
-        entity_id=None,
-        old_value={"modules": modulos_anteriores},
-        metadata=build_module_activation_metadata(
+    try:
+        return ativar_modulo_manual(
+            db,
             tenant=tenant,
-            module=modulo,
-            previous_modules=modulos_anteriores,
-            current_modules=modulos_atuais,
-            subscription_created=assinatura_criada,
-        ),
-        details=f"Modulo {modulo} ativado manualmente para tenant {tenant_id_alvo}",
-        commit=False,
-    )
-    db.commit()
-
-    return {"ok": True, "modulo": modulo, "tenant_id": tenant_id_alvo}
+            modulo=modulo,
+            modulos_premium=MODULOS_PREMIUM,
+            ativado_por_user_id=current_user.id,
+        )
+    except ModuloActivationError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
 
 
 @router.post("/admin/plano/ativar")

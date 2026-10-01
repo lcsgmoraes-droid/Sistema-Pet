@@ -128,9 +128,6 @@ export const LGPDOperacional = lazy(() => import("../pages/LGPDOperacional.jsx")
 export const OpsDashboard = lazy(() => import("../pages/OpsDashboard.jsx"));
 export const OpsIncidentes = lazy(() => import("../pages/OpsIncidentes.jsx"));
 export const OpsTenants = lazy(() => import("../pages/OpsTenants.jsx"));
-export const OpsGrupoComercialOnboarding = lazy(() =>
-  import("../pages/ops-tenants/OpsGrupoComercialOnboardingPage.jsx"),
-);
 export const Observabilidade = lazy(() => import("../pages/Observabilidade.jsx"));
 export const StyleGuide = lazy(() => import("../pages/styleGuide/StyleGuide.jsx"));
 export const Configuracoes = lazy(() => import("../pages/Configuracoes"));

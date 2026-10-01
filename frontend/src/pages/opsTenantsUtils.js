@@ -38,11 +38,18 @@ export function groupOpsTenantsByClient(items = []) {
   }
   return Array.from(groups.values()).map((group) => {
     const inadimplentes = group.lojas.filter((loja) => isBillingAttention(loja.billing_status));
+    const totalValorCobradoCents = group.lojas.reduce(
+      (total, loja) => total + (Number(loja.valor_cobrado_cents) || 0),
+      0,
+    );
+    const todasComValor = group.lojas.every((loja) => loja.valor_cobrado_cents != null);
     return {
       ...group,
       lojaCount: group.lojas.length,
       inadimplentes,
       adimplente: inadimplentes.length === 0,
+      totalValorCobradoCents,
+      todasComValor,
     };
   });
 }

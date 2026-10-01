@@ -1,6 +1,6 @@
 ---
 tipo: dominio
-atualizado: 2026-09-22
+atualizado: 2026-09-25
 ---
 
 # Entidade — Cliente
@@ -46,6 +46,7 @@ Todos os campos da tabela `clientes` (além de `id`/`tenant_id`, herdados de `Ba
 | Campo | Tipo | Observação |
 |---|---|---|
 | `origem_cliente` | String(50), nullable | Sem default — registros antigos/importados não comprovam origem |
+| | | ✅ **Novos valores (2026-09)**: `"cadastro_usuario"` (Cliente criado/vinculado automaticamente ao criar um login na tela Usuários) e `"cadastro_grupo_comercial"` (Cliente do titular criado automaticamente ao provisionar uma loja nova — cadastro público, onboarding assistido de ops, "adicionar loja"; ver [[EmpresaGrupo]]). Nenhum dos dois está na lista fixa `ORIGENS_CLIENTE` de `cliente_origem.py` (que cobre só canais de aquisição de cliente comprador) — ambos aparecem no filtro de origem via o fallback de `opcoes_origem_cliente`, que humaniza qualquer valor fora da lista fixa. |
 | `tipo_cadastro` | String(50), **NOT NULL**, default `"cliente"` | ⚠️ **OBSOLETO** (desde 2026-09-22, ver [[pessoas]]) — mantido só por compatibilidade com consumidores ainda não migrados (backend/frontend, lista documentada na skill [[pessoas]]). No create, preenchido automaticamente com a primeira flag `true` numa ordem fixa sem significado de negócio (`cliente`→`fornecedor`→`veterinario`→`funcionario`). Não usar para decisão de negócio nova — usar as 4 flags abaixo |
 | `is_cliente` | Boolean, **NOT NULL**, default `false` | Uma pessoa pode acumular vários tipos ao mesmo tempo — substitui `tipo_cadastro` como fonte de verdade |
 | `is_fornecedor` | Boolean, **NOT NULL**, default `false` | Idem |

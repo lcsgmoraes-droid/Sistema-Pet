@@ -1,6 +1,6 @@
 ---
 tipo: dominio
-atualizado: 2026-09-24
+atualizado: 2026-09-25
 ---
 
 # Entidade — GrupoComercial (grupo de empresas)
@@ -60,6 +60,8 @@ Uma ação de composição do grupo (ex.: adicionar loja) **exige as duas** ao m
 ### 1. Criação do grupo
 `GrupoComercialService.criar_grupo` — hoje só é alcançado indiretamente: pelo cadastro público (todo tenant novo cria seu próprio grupo-de-1) ou pelo onboarding assistido de ops (contrato inicial com N lojas). Não existe mais um botão "criar grupo novo" isolado para quem já está logado no sistema. Quem cria vira automaticamente `responsavel` **e** master do grupo.
 
+✅ **Novidade em 25/09/2026**: `criar_grupo` também cria o `Cliente` do titular na loja recém-criada (`tipo_cadastro="funcionario"`, `origem_cliente="cadastro_grupo_comercial"`, mesmo molde de `usuarios_routes._vincular_ou_criar_pessoa_para_usuario`) e já o vincula automaticamente a uma `PessoaMestre` nova do grupo — sem sugestão manual (ver [[Plano-Camada-Geral]], Checkpoint 4). Vale para os três caminhos que chamam `criar_grupo`: cadastro público (grupo-de-1), onboarding assistido de ops, e a rota self-service `POST /grupos-comerciais` (sem UI hoje). O onboarding assistido de ops ganhou dois campos opcionais no titular — `titular_tipo_pessoa` (PF/PJ, default PF) e `titular_telefone` — usados só para montar esse Cliente; o cadastro público não coleta nenhum dos dois e usa os defaults (`PF`, sem telefone).
+
 ### 2. Adicionar loja
 `POST /grupos-comerciais/{grupo_id}/lojas` → `adicionar_loja`. Exige, ao mesmo tempo: (a) a empresa logada ser a `responsavel` do grupo e (b) o usuário logado ser o master. Provisiona uma loja nova do zero (mesmo fluxo de `provision_tenant` usado no cadastro público), reaproveitando o **mesmo usuário logado** — sem pedir e-mail/senha novos — e já anexa a loja nova ao grupo com `papel="membro"` (nunca `"responsavel"`, mesmo sendo o mesmo dono). Ao final, o master do grupo ganha acesso automático à loja nova (ver camada 2 acima). Chamada com `grant_trial=False` nessa rota — ver seção "Relação com licenciamento" abaixo.
 
@@ -68,6 +70,8 @@ Uma ação de composição do grupo (ex.: adicionar loja) **exige as duas** ao m
 ✅ **Novidade em 24/09/2026 — quem cria a loja na prática, hoje**: a equipe CorePet passou a ter um caminho próprio pra isso, separado do onboarding de grupo novo. `POST /admin/grupos-comerciais/{grupo_id}/lojas` (`adicionar_loja_a_grupo_existente` em `ops_grupo_comercial_onboarding_service.py`, protegida por `require_platform_admin`) provisiona uma loja nova dentro de um grupo **que já existe** — o caso do cliente que liga pedindo mais uma loja, negocia o valor por telefone, e a equipe implanta. Resolve o usuário master do grupo (`User.master_grupo_id == grupo_id`) e chama o mesmo `GrupoComercialService.adicionar_loja` de sempre com `empresa_acionadora_id=None` (pula a checagem de "responsável logado", igual o onboarding de grupo novo) e `grant_trial=False` (cliente já pagante, loja nova não ganha os 30 dias de trial gratuito). Nenhum titular novo é criado, nenhum e-mail é enviado — a loja nasce vinculada ao master que já existe. Acionado pelo botão "Adicionar loja" dentro de cada grupo, na tela `/ops/tenants` (`OpsAdicionarLojaModal.jsx`).
 
 Isso é diferente do onboarding assistido de ops (`POST /admin/grupos-comerciais/onboarding`, ver seção "1. Criação do grupo" acima), que só sabe criar **grupo novo** (cliente que ainda não existe) — antes de 24/09/2026 não havia nenhum caminho de ops pra adicionar loja a um grupo já existente sem passar pela sessão de tenant do próprio cliente.
+
+✅ **Novidade em 25/09/2026**: `adicionar_loja` também cria o `Cliente` do titular (o `usuario` recebido) na loja nova. Em vez de pedir tipo de pessoa/telefone de novo, ele procura a `PessoaMestre` já vinculada ao titular em qualquer loja já membro do grupo (`GrupoComercialService._pessoa_mestre_do_titular`, iterando cada empresa membro no próprio `tenant_context`, mesmo padrão já usado em `GrupoComercialProdutoVinculoService.buscar_produtos`) e copia `tipo_pessoa`/telefone de lá, vinculando o Cliente novo direto a essa mesma `PessoaMestre` — nunca cria uma mestre duplicada para o mesmo titular dentro do mesmo grupo. Se o titular ainda não tiver nenhuma `PessoaMestre` no grupo (ex.: grupo antigo, anterior a esta mudança), cai nos mesmos defaults do cadastro público (`PF`, sem telefone) e minta uma mestre nova ali mesmo. Vale para os três caminhos que chamam `adicionar_loja`: self-service (sem UI hoje), o laço de lojas do onboarding assistido de ops, e `adicionar_loja_a_grupo_existente` (o botão "Adicionar loja" de `/ops/tenants`, descrito acima).
 
 ### 3. Saída/remoção de um membro
 ⚠️ **Não existe rota de "sair do grupo" self-service.** A única forma de uma loja deixar de participar é remoção pela `responsavel`, com acesso de gestão: `DELETE /grupos-comerciais/{grupo_id}/membros/{empresa_id}` → `remover_membro`. Ao remover:

@@ -1,11 +1,23 @@
 import { useState } from "react";
-import { FiCheck, FiCopy, FiExternalLink, FiLink, FiPlusCircle } from "react-icons/fi";
+import { FiCheck, FiCopy, FiExternalLink, FiLink } from "react-icons/fi";
 
-import CurrencyInput from "../../components/CurrencyInput";
 import { MODULOS_INFO, MODULOS_PREMIUM } from "../../contexts/ModulosContext";
 import { formatMoneyBRL } from "../../utils/formatters";
 
+import BotaoSalva from "../../components/v2/BotaoSalva/BotaoSalva";
+import InputCheckGroup from "../../components/v2/InputCheckGroup/InputCheckGroup";
+import InputCombobox from "../../components/v2/InputCombobox/InputCombobox";
+import InputData from "../../components/v2/InputData/InputData";
+import InputMoeda from "../../components/v2/InputMoeda/InputMoeda";
+import InputTexto from "../../components/v2/InputTexto/InputTexto";
+import InputTextoLongo from "../../components/v2/InputTextoLongo/InputTextoLongo";
+
 import { BILLING_OFFER_PLAN_OPTIONS, BILLING_TYPE_OPTIONS } from "./opsTenantsConstants";
+
+const MODULO_OPCOES = MODULOS_PREMIUM.map((modulo) => ({
+  value: modulo,
+  label: MODULOS_INFO[modulo]?.nome || modulo,
+}));
 
 function formatDateOnly(value) {
   if (!value) return "-";
@@ -32,6 +44,22 @@ function statusClasses(status) {
   return "border-slate-200 bg-slate-50 text-slate-700";
 }
 
+function validar(form) {
+  const erros = {};
+  if (!form.title.trim()) erros.title = "Informe o nome da proposta.";
+  if (!(form.price > 0)) erros.price = "Informe uma mensalidade maior que zero.";
+  if (!form.first_due_date) erros.first_due_date = "Informe o primeiro vencimento.";
+  if (!form.scope_summary.trim()) erros.scope_summary = "Descreva o escopo contratado.";
+  if (!form.implementation_summary.trim()) {
+    erros.implementation_summary = "Descreva a implantação e migração.";
+  }
+  if (!form.exclusions_summary.trim()) {
+    erros.exclusions_summary = "Descreva o que fica fora do escopo.";
+  }
+  if (!form.support_channel.trim()) erros.support_channel = "Informe o canal oficial de suporte.";
+  return erros;
+}
+
 export default function OpsTenantBillingOfferPanel({
   tenant,
   form,
@@ -46,6 +74,7 @@ export default function OpsTenantBillingOfferPanel({
   onSubmit,
 }) {
   const [copied, setCopied] = useState(false);
+  const [tentouEnviar, setTentouEnviar] = useState(false);
 
   async function copyPublicUrl() {
     if (!publicUrl) return;
@@ -56,8 +85,20 @@ export default function OpsTenantBillingOfferPanel({
 
   if (!tenant) return null;
 
+  const erros = tentouEnviar ? validar(form) : {};
+
+  function handleSubmit(event) {
+    event.preventDefault();
+    const errosAtuais = validar(form);
+    if (Object.keys(errosAtuais).length > 0) {
+      setTentouEnviar(true);
+      return;
+    }
+    onSubmit(event);
+  }
+
   return (
-    <section className="rounded-lg border border-emerald-200 bg-white p-4 shadow-sm">
+    <div>
       <div className="flex items-start gap-3">
         <div className="rounded-lg bg-emerald-100 p-2 text-emerald-700">
           <FiLink className="h-5 w-5" />
@@ -70,104 +111,67 @@ export default function OpsTenantBillingOfferPanel({
         </div>
       </div>
 
-      <form onSubmit={onSubmit} className="mt-4 space-y-3">
-        <label className="block">
-          <span className="text-xs font-bold uppercase tracking-wide text-slate-500">
-            Nome da proposta
-          </span>
-          <input
+      <form onSubmit={handleSubmit} noValidate className="mt-4 space-y-3">
+        <div className="grid gap-3 sm:grid-cols-[2fr_1fr]">
+          <InputTexto
+            id="oferta-titulo"
+            label="Nome da proposta"
             value={form.title}
-            onChange={(event) => onChange("title", event.target.value)}
+            onChange={(value) => onChange("title", value)}
             maxLength={160}
-            className="mt-1 h-10 w-full rounded-lg border border-slate-300 px-3 text-sm"
+            error={erros.title}
+            required
           />
-        </label>
-
-        <label className="block">
-          <span className="text-xs font-bold uppercase tracking-wide text-slate-500">
-            Plano-base
-          </span>
-          <select
+          <InputCombobox
+            id="oferta-plano"
+            label="Plano-base"
+            opcoes={BILLING_OFFER_PLAN_OPTIONS}
             value={form.plan_code}
-            onChange={(event) => onChange("plan_code", event.target.value)}
-            className="mt-1 h-10 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm font-semibold"
-          >
-            {BILLING_OFFER_PLAN_OPTIONS.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-        </label>
-
-        <label className="block">
-          <span className="text-xs font-bold uppercase tracking-wide text-slate-500">
-            Mensalidade personalizada
-          </span>
-          <div className="mt-1 flex h-10 items-center rounded-lg border border-slate-300 bg-white px-3">
-            <span className="mr-2 text-sm font-bold text-slate-500">R$</span>
-            <CurrencyInput
-              value={form.price}
-              onChange={(value) => onChange("price", value)}
-              maxValue={100000}
-              className="min-w-0 flex-1 bg-transparent text-sm font-bold text-slate-900 outline-none"
-            />
-          </div>
-        </label>
-
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
-          <label className="block">
-            <span className="text-xs font-bold uppercase tracking-wide text-slate-500">
-              Primeiro vencimento
-            </span>
-            <input
-              type="date"
-              value={form.first_due_date}
-              onChange={(event) => onChange("first_due_date", event.target.value)}
-              className="mt-1 h-10 w-full rounded-lg border border-slate-300 px-3 text-sm"
-            />
-          </label>
-          <label className="block">
-            <span className="text-xs font-bold uppercase tracking-wide text-slate-500">
-              Pagamento
-            </span>
-            <select
-              value={form.billing_type}
-              onChange={(event) => onChange("billing_type", event.target.value)}
-              className="mt-1 h-10 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm"
-            >
-              {BILLING_TYPE_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </label>
+            onChange={(value) => onChange("plan_code", value)}
+            permitirLimpar={false}
+          />
         </div>
 
-        <fieldset>
-          <legend className="text-xs font-bold uppercase tracking-wide text-slate-500">
-            Módulos extras ao plano-base
-          </legend>
-          <div className="mt-2 grid max-h-48 gap-2 overflow-y-auto rounded-lg border border-slate-200 p-2">
-            {MODULOS_PREMIUM.map((module) => (
-              <label
-                key={module}
-                className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-xs text-slate-700 hover:bg-slate-50"
-              >
-                <input
-                  type="checkbox"
-                  checked={form.extra_modules.includes(module)}
-                  onChange={() => onToggleModule(module)}
-                  className="h-4 w-4 rounded border-slate-300 text-emerald-600"
-                />
-                <span>{MODULOS_INFO[module]?.nome || module}</span>
-              </label>
-            ))}
-          </div>
-        </fieldset>
+        <div className="grid gap-3 sm:grid-cols-3">
+          <InputMoeda
+            id="oferta-valor"
+            label="Mensalidade"
+            value={form.price}
+            onChange={(value) => onChange("price", value)}
+            error={erros.price}
+            required
+          />
+          <InputData
+            id="oferta-vencimento"
+            label="Primeiro vencimento"
+            value={form.first_due_date}
+            onChange={(value) => onChange("first_due_date", value)}
+            error={erros.first_due_date}
+            required
+          />
+          <InputCombobox
+            id="oferta-pagamento"
+            label="Pagamento"
+            opcoes={BILLING_TYPE_OPTIONS}
+            value={form.billing_type}
+            onChange={(value) => onChange("billing_type", value)}
+            permitirLimpar={false}
+          />
+        </div>
 
-        <fieldset className="space-y-3 rounded-lg border border-slate-200 bg-slate-50 p-3">
+        <InputCheckGroup
+          name="oferta-modulos-extras"
+          label="Módulos extras ao plano-base"
+          opcoes={MODULO_OPCOES}
+          value={form.extra_modules}
+          onChange={(modulos) => {
+            const adicionado = modulos.find((modulo) => !form.extra_modules.includes(modulo));
+            const removido = form.extra_modules.find((modulo) => !modulos.includes(modulo));
+            onToggleModule(adicionado || removido);
+          }}
+        />
+
+        <fieldset className="space-y-3 rounded-lg border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-800">
           <legend className="px-1 text-xs font-bold uppercase tracking-wide text-slate-500">
             Condições específicas da proposta
           </legend>
@@ -175,69 +179,61 @@ export default function OpsTenantBillingOfferPanel({
             Registre aqui o que foi prometido. Conversas fora da proposta não alteram o contrato.
           </p>
 
-          <label className="block">
-            <span className="text-xs font-bold text-slate-700">Escopo contratado</span>
-            <textarea
-              required
-              value={form.scope_summary}
-              onChange={(event) => onChange("scope_summary", event.target.value)}
-              minLength={10}
-              maxLength={2000}
-              rows={3}
-              className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
-            />
-          </label>
+          <InputTextoLongo
+            id="oferta-escopo"
+            label="Escopo contratado"
+            value={form.scope_summary}
+            onChange={(value) => onChange("scope_summary", value)}
+            maxLength={2000}
+            linhas={3}
+            error={erros.scope_summary}
+            required
+          />
 
-          <label className="block">
-            <span className="text-xs font-bold text-slate-700">Implantação e migração</span>
-            <textarea
-              required
-              value={form.implementation_summary}
-              onChange={(event) => onChange("implementation_summary", event.target.value)}
-              minLength={10}
-              maxLength={2000}
-              rows={3}
-              className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
-            />
-          </label>
+          <InputTextoLongo
+            id="oferta-implantacao"
+            label="Implantação e migração"
+            value={form.implementation_summary}
+            onChange={(value) => onChange("implementation_summary", value)}
+            maxLength={2000}
+            linhas={3}
+            error={erros.implementation_summary}
+            required
+          />
 
-          <label className="block">
-            <span className="text-xs font-bold text-slate-700">Fora do escopo e dependências</span>
-            <textarea
-              required
-              value={form.exclusions_summary}
-              onChange={(event) => onChange("exclusions_summary", event.target.value)}
-              minLength={10}
-              maxLength={2000}
-              rows={3}
-              className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
-            />
-          </label>
+          <InputTextoLongo
+            id="oferta-exclusoes"
+            label="Fora do escopo e dependências"
+            value={form.exclusions_summary}
+            onChange={(value) => onChange("exclusions_summary", value)}
+            maxLength={2000}
+            linhas={3}
+            error={erros.exclusions_summary}
+            required
+          />
 
-          <label className="block">
-            <span className="text-xs font-bold text-slate-700">Canal oficial de suporte</span>
-            <input
-              required
+          <div className="sm:max-w-xs">
+            <InputTexto
+              id="oferta-suporte"
+              label="Canal oficial de suporte"
               value={form.support_channel}
-              onChange={(event) => onChange("support_channel", event.target.value)}
-              minLength={3}
+              onChange={(value) => onChange("support_channel", value)}
               maxLength={200}
-              className="mt-1 h-10 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm"
+              error={erros.support_channel}
+              required
             />
-          </label>
+          </div>
 
-          <label className="block">
-            <span className="text-xs font-bold text-slate-700">Desenvolvimento sob medida</span>
-            <textarea
-              value={form.custom_work_summary}
-              onChange={(event) => onChange("custom_work_summary", event.target.value)}
-              maxLength={2000}
-              rows={2}
-              className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
-            />
-          </label>
+          <InputTextoLongo
+            id="oferta-sob-medida"
+            label="Desenvolvimento sob medida (opcional)"
+            value={form.custom_work_summary}
+            onChange={(value) => onChange("custom_work_summary", value)}
+            maxLength={2000}
+            linhas={2}
+          />
 
-          <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-900">
+          <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200">
             Padrão seguro: sem SLA contratual, sem fidelidade, suporte em dias úteis das 9h às 18h,
             exportação assistida solicitável por 30 dias e código reutilizável do CorePet. Exceções
             exigem anexo específico.
@@ -245,39 +241,29 @@ export default function OpsTenantBillingOfferPanel({
         </fieldset>
 
         {error ? (
-          <div className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
+          <div className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700 dark:border-rose-900 dark:bg-rose-950 dark:text-rose-300">
             {error}
           </div>
         ) : null}
         {success ? (
-          <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
+          <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950 dark:text-emerald-300">
             {success}
           </div>
         ) : null}
 
-        <button
-          type="submit"
-          disabled={
-            creating ||
-            !form.title.trim() ||
-            form.price <= 0 ||
-            !form.first_due_date ||
-            !form.scope_summary.trim() ||
-            !form.implementation_summary.trim() ||
-            !form.exclusions_summary.trim() ||
-            !form.support_channel.trim()
-          }
-          className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-lg bg-emerald-600 px-4 text-sm font-bold text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          <FiPlusCircle className="h-4 w-4" />
-          {creating ? "Gerando..." : "Gerar link de contratação"}
-        </button>
+        <BotaoSalva loading={creating} larguraTotal>
+          Gerar link de contratação
+        </BotaoSalva>
       </form>
 
       {publicUrl ? (
-        <div className="mt-4 rounded-lg border border-emerald-200 bg-emerald-50 p-3">
-          <p className="text-xs font-bold uppercase text-emerald-800">Link pronto para enviar</p>
-          <p className="mt-2 break-all text-xs text-emerald-950">{publicUrl}</p>
+        <div className="mt-4 rounded-lg border border-emerald-200 bg-emerald-50 p-3 dark:border-emerald-900 dark:bg-emerald-950">
+          <p className="text-xs font-bold uppercase text-emerald-800 dark:text-emerald-300">
+            Link pronto para enviar
+          </p>
+          <p className="mt-2 break-all text-xs text-emerald-950 dark:text-emerald-100">
+            {publicUrl}
+          </p>
           <div className="mt-3 grid grid-cols-2 gap-2">
             <button
               type="button"
@@ -300,7 +286,7 @@ export default function OpsTenantBillingOfferPanel({
         </div>
       ) : null}
 
-      <div className="mt-5 border-t border-slate-200 pt-4">
+      <div className="mt-5 border-t border-slate-200 pt-4 dark:border-slate-700">
         <div className="flex items-center justify-between">
           <h3 className="text-xs font-bold uppercase tracking-wide text-slate-500">
             Propostas recentes
@@ -312,29 +298,34 @@ export default function OpsTenantBillingOfferPanel({
             <p className="text-xs text-slate-500">Nenhuma proposta gerada para esta empresa.</p>
           ) : null}
           {offers.map((offer) => (
-            <article key={offer.id} className="rounded-lg border border-slate-200 p-3">
+            <article
+              key={offer.id}
+              className="rounded-lg border border-slate-200 p-3 dark:border-slate-700"
+            >
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
-                  <p className="truncate text-xs font-bold text-slate-900">{offer.title}</p>
-                  <p className="mt-1 text-xs text-slate-500">
+                  <p className="truncate text-xs font-bold text-slate-900 dark:text-slate-100">
+                    {offer.title}
+                  </p>
+                  <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
                     {formatMoneyBRL(offer.price_cents / 100)} / mês · vence{" "}
                     {formatDateOnly(offer.first_due_date)}
                   </p>
                 </div>
                 <span
-                  className={`flex-none rounded-full border px-2 py-1 text-[10px] font-bold ${statusClasses(offer.status)}`}
+                  className={`flex-none rounded-full border px-2 py-1 text-xs font-bold ${statusClasses(offer.status)}`}
                 >
                   {statusLabels[offer.status] || offer.status}
                 </span>
               </div>
               {offer.extra_modules?.length ? (
-                <p className="mt-2 text-[11px] leading-4 text-slate-500">
+                <p className="mt-2 text-[11px] leading-4 text-slate-500 dark:text-slate-400">
                   Extras:{" "}
                   {offer.extra_modules.map((item) => MODULOS_INFO[item]?.nome || item).join(", ")}
                 </p>
               ) : null}
               {offer.commercial_terms ? (
-                <p className="mt-2 text-[11px] leading-4 text-slate-500">
+                <p className="mt-2 text-[11px] leading-4 text-slate-500 dark:text-slate-400">
                   Suporte: {offer.commercial_terms.support.channel} · sem SLA contratual
                 </p>
               ) : null}
@@ -342,6 +333,6 @@ export default function OpsTenantBillingOfferPanel({
           ))}
         </div>
       </div>
-    </section>
+    </div>
   );
 }

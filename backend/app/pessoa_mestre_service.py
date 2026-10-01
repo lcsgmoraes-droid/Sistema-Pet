@@ -60,6 +60,7 @@ def vincular_pessoa_mestre(
     grupo_id: int,
     usuario_id: int,
     pessoa_mestre_id: int | None,
+    commit: bool = True,
 ) -> PessoaMestre:
     if pessoa_mestre_id is not None:
         mestre = (
@@ -106,8 +107,11 @@ def vincular_pessoa_mestre(
         db.flush()
 
     cliente.pessoa_mestre_id = mestre.id
-    db.commit()
-    db.refresh(mestre)
+    if commit:
+        db.commit()
+        db.refresh(mestre)
+    else:
+        db.flush()
     return mestre
 
 

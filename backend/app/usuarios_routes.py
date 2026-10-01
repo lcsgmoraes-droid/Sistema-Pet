@@ -31,11 +31,19 @@ from app.services.user_account_service import (
     username_exists_in_tenant,
     validate_password,
 )
+from app.services.user_loja_vinculo_service import (
+    VinculoLojaError,
+    vincular_usuario_a_loja_do_grupo,
+)
 from app.session_manager import revoke_all_sessions
 from app.tenancy.rls import sync_rls_auth_user
 
 router = APIRouter(prefix="/usuarios", tags=["Usuários"])
 MAX_MENU_FAVORITOS = 8
+
+
+class LojaAdicionalVinculo(BaseModel):
+    tenant_id: str
 
 
 class UserCreate(BaseModel):
@@ -57,6 +65,10 @@ class UserCreate(BaseModel):
     # Este celular também é WhatsApp? Vai para Cliente.celular_whatsapp — só ao
     # criar Pessoa nova, mesma regra do tipo_pessoa.
     celular_whatsapp: bool = False
+    # Outras lojas do mesmo grupo comercial que este usuário também deve
+    # acessar (opcional) — ver user_loja_vinculo_service.py. Nunca vincula a
+    # loja de fora do grupo comercial da loja atual.
+    lojas_adicionais: list[LojaAdicionalVinculo] = Field(default_factory=list)
 
     @model_validator(mode="after")
     def validate_identifier(self):
@@ -388,8 +400,20 @@ def criar_usuario(
                 linked_user_id=user.id,
             )
 
+        for loja_adicional in payload.lojas_adicionais:
+            vincular_usuario_a_loja_do_grupo(
+                db,
+                usuario=user,
+                tenant_origem_id=tenant_id,
+                tenant_destino_id=loja_adicional.tenant_id,
+                commit=False,
+            )
+
         db.commit()
         db.refresh(user)
+    except VinculoLojaError as exc:
+        db.rollback()
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
     except UserAccountError as exc:
         db.rollback()
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
@@ -713,6 +737,57 @@ def vincular_usuario(
     db.commit()
 
     return {"status": "ok", "message": "Usuário vinculado com sucesso"}
+
+
+class VinculoLojaCreate(BaseModel):
+    tenant_id: str
+
+
+@router.post("/{user_id}/vincular-loja")
+@require_permission("usuarios.manage")
+def vincular_usuario_outra_loja(
+    user_id: int,
+    payload: VinculoLojaCreate,
+    db: Session = Depends(get_session),
+    user_and_tenant=Depends(get_current_user_and_tenant),
+):
+    """Vincula um usuário já existente a outra loja do mesmo grupo comercial
+    da loja atual (nunca a uma loja de fora do grupo) — ver
+    `user_loja_vinculo_service.py`."""
+    actor, tenant_id = user_and_tenant
+
+    user = (
+        db.query(User).filter(User.id == user_id, User.tenant_id == tenant_id).first()
+    )
+    if not user:
+        raise HTTPException(status_code=404, detail="Usuário não encontrado")
+
+    try:
+        vincular_usuario_a_loja_do_grupo(
+            db,
+            usuario=user,
+            tenant_origem_id=tenant_id,
+            tenant_destino_id=payload.tenant_id,
+            commit=False,
+        )
+    except VinculoLojaError as exc:
+        db.rollback()
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+
+    log_business_event(
+        db=db,
+        tenant_id=tenant_id,
+        user_id=actor.id,
+        event="access.user_linked_other_store",
+        entity_type="users",
+        entity_id=user.id,
+        metadata={"tenant_destino_id": payload.tenant_id},
+        details=f"Usuario {user.username or user.email or user.id} vinculado a outra loja do grupo",
+        commit=False,
+    )
+    db.commit()
+
+    return {"status": "ok", "message": "Usuário vinculado à loja com sucesso"}
 
 
 @router.patch("/{user_id}/status")

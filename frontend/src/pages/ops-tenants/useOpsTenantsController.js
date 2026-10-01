@@ -61,6 +61,7 @@ export default function useOpsTenantsController() {
   const [billingOfferSuccess, setBillingOfferSuccess] = useState("");
   const [billingOfferPublicUrl, setBillingOfferPublicUrl] = useState("");
   const [selectedTenantId, setSelectedTenantId] = useState("");
+  const [billingModalOpen, setBillingModalOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [tenantsPage, setTenantsPage] = useState(1);
@@ -361,8 +362,20 @@ export default function useOpsTenantsController() {
     }
   }
 
+  function openBillingModal(tenantId) {
+    setSelectedTenantId(tenantId);
+    setBillingModalOpen(true);
+  }
+
+  function closeBillingModal() {
+    setBillingModalOpen(false);
+  }
+
   return {
     activeTab,
+    billingModalOpen,
+    openBillingModal,
+    closeBillingModal,
     commercialError,
     commercialForm,
     commercialSaving,

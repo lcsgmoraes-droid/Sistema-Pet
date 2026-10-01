@@ -11,6 +11,7 @@ const InputTexto = forwardRef(function InputTexto(
     id,
     inputMode,
     label,
+    left = null,
     maxLength,
     name,
     onBlur,
@@ -59,6 +60,7 @@ const InputTexto = forwardRef(function InputTexto(
           onFocus={onFocus}
           onKeyDown={onKeyDown}
           aria-invalid={Boolean(error)}
+          aria-label={label ? undefined : placeholder}
           aria-describedby={id && (error || help) ? `${id}-descricao` : undefined}
           className={[
             "h-9 w-full rounded-lg border bg-white px-3 text-sm text-slate-900 outline-none transition-colors",
@@ -73,9 +75,15 @@ const InputTexto = forwardRef(function InputTexto(
               ? "border-red-500 focus:ring-red-500 dark:!border-red-500 dark:focus:ring-red-400"
               : "border-slate-300 focus:ring-blue-500 dark:!border-slate-700 dark:focus:ring-cyan-400",
             right ? "pr-9" : "",
+            left ? "pl-9" : "",
             alinhamentoTexto === "direita" ? "text-right" : "",
           ].join(" ")}
         />
+        {left ? (
+          <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center">
+            {left}
+          </span>
+        ) : null}
         {right ? (
           <span className="absolute inset-y-0 right-1 flex items-center">{right}</span>
         ) : null}

@@ -11,6 +11,7 @@ from app.api import racao_calculadora_routes
 from app.auth.dependencies import get_current_user_and_tenant
 from app.models import AssinaturaModulo, Tenant
 from app.routes import modulos_routes
+from app.services import modulo_activation_service
 
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -225,7 +226,7 @@ def test_modulos_admin_activation_sets_target_tenant_context(monkeypatch):
         lambda: tenant_context_calls.append("cleared"),
         raising=False,
     )
-    monkeypatch.setattr(modulos_routes, "log_business_event", lambda **_kwargs: None)
+    monkeypatch.setattr(modulo_activation_service, "log_business_event", lambda **_kwargs: None)
 
     db = _FakeAdminModuleDb()
     current_user = SimpleNamespace(id=7, is_superadmin=True, is_system_admin=False)
@@ -243,7 +244,11 @@ def test_modulos_admin_activation_sets_target_tenant_context(monkeypatch):
         "tenant_id": TENANT_ALVO_MODULO,
     }
     assert tenant_context_calls == [TENANT_ALVO_MODULO]
-    assert db.added[0].tenant_id == TENANT_ALVO_MODULO
+    # AssinaturaModulo.tenant_id usa UUID(as_uuid=True) - o service grava um
+    # uuid.UUID de verdade (nao mais a string crua), pra funcionar tambem no
+    # SQLite (Postgres aceitava a string por cast implicito, mas isso quebrava
+    # comparacoes ORM fora do Postgres).
+    assert str(db.added[0].tenant_id) == TENANT_ALVO_MODULO
     assert db.committed is True
 
 

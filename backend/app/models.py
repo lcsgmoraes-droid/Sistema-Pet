@@ -651,6 +651,13 @@ class Tenant(Base):
         String(24), nullable=False, server_default="not_collected"
     )
     onboarding_follow_up_updated_at = Column(DateTime(timezone=True), nullable=True)
+    # Marcado quando o onboarding assistido cria a loja normalmente mas nao
+    # consegue enviar o e-mail de definicao de senha do titular (ex.: SMTP
+    # indisponivel) — a loja nao fica mais bloqueada por isso, mas o time
+    # de ops precisa saber que as credenciais nao chegaram por e-mail.
+    onboarding_credencial_email_pendente = Column(
+        Boolean, nullable=False, default=False, server_default="false"
+    )
 
     # Configurações operacionais
     permite_estoque_negativo = Column(Boolean, nullable=False, server_default="false")

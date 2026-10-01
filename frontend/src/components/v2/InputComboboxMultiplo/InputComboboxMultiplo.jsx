@@ -192,16 +192,19 @@ export default function InputComboboxMultiplo({
         <button
           type="button"
           tabIndex={-1}
-          aria-hidden="true"
+          aria-label={aberto ? "Fechar lista" : "Abrir lista"}
           disabled={disabled}
           onMouseDown={(evento) => {
             evento.preventDefault();
-            setAberto(true);
-            inputRef.current?.focus();
+            setAberto((atual) => {
+              const proximo = !atual;
+              if (proximo) inputRef.current?.focus();
+              return proximo;
+            });
           }}
           className="ml-auto shrink-0 rounded p-0.5 text-slate-400 disabled:cursor-not-allowed"
         >
-          <ChevronDown className="h-4 w-4" />
+          <ChevronDown className="h-4 w-4" aria-hidden="true" />
         </button>
       </div>
 

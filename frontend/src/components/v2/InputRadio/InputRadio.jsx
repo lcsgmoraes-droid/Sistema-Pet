@@ -34,7 +34,7 @@ export default function InputRadio({
           const desabilitada = disabled || opcao.disabled;
 
           return (
-            <div key={opcao.value} className="flex-1">
+            <div key={opcao.value}>
               <input
                 id={idOpcao}
                 name={name}
@@ -48,7 +48,7 @@ export default function InputRadio({
               <label
                 htmlFor={idOpcao}
                 className={[
-                  "flex h-9 w-full items-center justify-center rounded-lg border px-3.5 text-center text-sm font-medium transition-colors",
+                  "inline-flex h-9 items-center justify-center whitespace-nowrap rounded-lg border px-3.5 text-center text-sm font-medium transition-colors",
                   error
                     ? "border-red-500 dark:border-red-500"
                     : "border-slate-300 dark:border-slate-700",

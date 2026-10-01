@@ -1,7 +1,11 @@
+import { useState } from "react";
 import { FiPlusCircle, FiRefreshCw, FiUsers } from "react-icons/fi";
-import { Link } from "react-router-dom";
 
-export default function OpsTenantsHeader({ loading, onRefresh }) {
+import OpsGrupoComercialOnboardingModal from "./OpsGrupoComercialOnboardingModal";
+
+export default function OpsTenantsHeader({ loading, onRefresh, onGrupoCriado, onDefinirProposta }) {
+  const [modalAberto, setModalAberto] = useState(false);
+
   return (
     <div className="flex flex-wrap items-start justify-between gap-4">
       <div>
@@ -16,13 +20,14 @@ export default function OpsTenantsHeader({ loading, onRefresh }) {
         </p>
       </div>
       <div className="flex flex-wrap items-center gap-2">
-        <Link
-          to="/ops/grupos-comerciais/onboarding"
+        <button
+          type="button"
+          onClick={() => setModalAberto(true)}
           className="inline-flex h-10 items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-4 text-sm font-semibold text-blue-700 hover:bg-blue-100"
         >
           <FiPlusCircle className="h-4 w-4" />
           Novo grupo comercial (onboarding assistido)
-        </Link>
+        </button>
         <button
           type="button"
           onClick={onRefresh}
@@ -33,6 +38,14 @@ export default function OpsTenantsHeader({ loading, onRefresh }) {
           Atualizar
         </button>
       </div>
+
+      {modalAberto ? (
+        <OpsGrupoComercialOnboardingModal
+          onClose={() => setModalAberto(false)}
+          onCreated={onGrupoCriado}
+          onDefinirProposta={onDefinirProposta}
+        />
+      ) : null}
     </div>
   );
 }

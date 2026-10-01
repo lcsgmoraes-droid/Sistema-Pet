@@ -14,6 +14,7 @@ mesmo fluxo de recuperacao de senha que ja existe (``/auth/forgot-password``).
 Nao inventa nenhum mecanismo novo de credencial.
 """
 
+import re
 import secrets
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
@@ -29,7 +30,7 @@ from app.auth.auth_multitenant_support import (
     _resolve_frontend_base_url,
 )
 from app.grupo_comercial_service import GrupoComercialService
-from app.models import User
+from app.models import Tenant, User
 from app.services.email_service import send_email
 from app.services.plan_catalog import resolve_signup_selection
 from app.services.tenant_provisioning_service import (
@@ -59,6 +60,7 @@ class OpsGrupoComercialOnboardingResult:
     grupo_id: int
     titular_email: str
     lojas: list[dict] = field(default_factory=list)
+    aviso: str | None = None
 
 
 def onboard_grupo_comercial(
@@ -68,9 +70,19 @@ def onboard_grupo_comercial(
     titular_email: str,
     titular_nome: str | None,
     lojas: list[OpsLojaOnboarding],
+    titular_cpf_cnpj: str,
+    titular_tipo_pessoa: str = "PF",
+    titular_telefone: str | None = None,
+    grant_trial: bool = True,
 ) -> OpsGrupoComercialOnboardingResult:
     if not lojas:
         raise OpsGrupoComercialOnboardingError(400, "Informe ao menos uma loja.")
+
+    cpf_cnpj_digitos = re.sub(r"\D", "", titular_cpf_cnpj or "")
+    if len(cpf_cnpj_digitos) not in (11, 14):
+        raise OpsGrupoComercialOnboardingError(
+            400, "Informe um CPF ou CNPJ valido do titular."
+        )
 
     email = titular_email.strip().lower()
     existing = db.query(User).filter(User.email == email).first()
@@ -103,6 +115,8 @@ def onboard_grupo_comercial(
             new_user_nome=titular_nome,
             new_user_email_verified=True,
             restore_tenant_id=None,
+            grant_trial=grant_trial,
+            cnpj=titular_cpf_cnpj,
         )
     except TenantOnboardingError as exc:
         db.rollback()
@@ -120,6 +134,8 @@ def onboard_grupo_comercial(
         empresa_id=str(provisionamento.tenant_id),
         usuario_id=usuario.id,
         nome=grupo_nome,
+        titular_tipo_pessoa=titular_tipo_pessoa,
+        titular_telefone=titular_telefone,
         commit=False,
     )
     clear_tenant_context()
@@ -144,6 +160,8 @@ def onboard_grupo_comercial(
                 restore_tenant_id=None,
                 empresa_acionadora_id=None,
                 commit=False,
+                grant_trial=grant_trial,
+                cnpj=titular_cpf_cnpj,
             )
         except TenantOnboardingError as exc:
             db.rollback()
@@ -171,17 +189,33 @@ def onboard_grupo_comercial(
         text_body=text_body,
         simulate_if_unconfigured=False,
     )
+
+    aviso = None
     if not enviado:
-        db.rollback()
-        raise OpsGrupoComercialOnboardingError(
-            503,
-            "Lojas nao criadas: nao foi possivel enviar o e-mail de definicao "
-            "de senha. Tente novamente em instantes.",
+        # Nao desfaz mais o cadastro so por causa do e-mail (ex.: SMTP
+        # indisponivel) — a(s) loja(s) ja foram criadas de verdade e ficar
+        # sem elas so pra tentar de novo e pior pra operacao. Em vez disso,
+        # marca cada loja do lote como "credencial pendente de envio" — isso
+        # ja aparece automaticamente como atencao "critica" na lista de
+        # tenants (ver ops_tenants_read_service.py), pra o time de ops saber
+        # que precisa repassar usuario/senha por outro canal.
+        aviso = (
+            "Loja(s) criada(s), mas nao foi possivel enviar o e-mail de definicao "
+            "de senha do titular. Repasse as credenciais por outro canal."
         )
+        for loja_criada in lojas_criadas:
+            tenant_afetado = (
+                db.query(Tenant).filter(Tenant.id == loja_criada["tenant_id"]).first()
+            )
+            if tenant_afetado is not None:
+                tenant_afetado.onboarding_credencial_email_pendente = True
 
     db.commit()
     return OpsGrupoComercialOnboardingResult(
-        grupo_id=grupo["id"], titular_email=usuario.email, lojas=lojas_criadas
+        grupo_id=grupo["id"],
+        titular_email=usuario.email,
+        lojas=lojas_criadas,
+        aviso=aviso,
     )
 
 

@@ -16,6 +16,7 @@ const USUARIO_INICIAL = {
   pessoa_id: null,
   app_access_profiles: [],
   tipo_pessoa: "PF",
+  lojas_adicionais: [],
 };
 
 const CREDENCIAIS_INICIAIS = { login_phone: "", new_password: "", role_id: "" };
@@ -224,6 +225,9 @@ export default function useUsuariosPage() {
         ...novoUsuario,
         login_phone: loginPhone,
         email: email || null,
+        lojas_adicionais: (novoUsuario.lojas_adicionais || []).map((tenant_id) => ({
+          tenant_id,
+        })),
       });
       toast.success("Usuario criado com sucesso.");
       resetarModalUsuario();

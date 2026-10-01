@@ -48,7 +48,7 @@ export default function InputCheckGroup({
           const marcado = selecionados.includes(opcao.value);
 
           return (
-            <div key={opcao.value} className={temDescricao ? "" : "flex-1"}>
+            <div key={opcao.value}>
               <input
                 id={idOpcao}
                 name={idOpcao}
@@ -64,7 +64,7 @@ export default function InputCheckGroup({
                 className={[
                   temDescricao
                     ? "flex w-full flex-col items-start gap-0.5 rounded-lg border px-3.5 py-2.5 text-left transition-colors"
-                    : "flex h-9 w-full items-center justify-center rounded-lg border px-3.5 text-center text-sm font-medium transition-colors",
+                    : "inline-flex h-9 items-center justify-center whitespace-nowrap rounded-lg border px-3.5 text-center text-sm font-medium transition-colors",
                   error
                     ? "border-red-500 dark:border-red-500"
                     : "border-slate-300 dark:border-slate-700",

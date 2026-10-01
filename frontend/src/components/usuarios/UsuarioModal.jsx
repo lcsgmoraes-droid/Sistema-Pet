@@ -1,6 +1,7 @@
 import { UserCheck, UserPlus } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import api from "../../api";
+import { useAuth } from "../../contexts/AuthContext";
 import { PERFIS_APP } from "../../utils/appAccessProfiles";
 import { isBrazilianMobileLogin } from "../../utils/loginPhone";
 import BotaoCancelar from "../v2/BotaoCancelar/BotaoCancelar";
@@ -72,6 +73,31 @@ export default function UsuarioModal({
   const [pessoaVinculada, setPessoaVinculada] = useState(null);
   const [tocados, setTocados] = useState({});
   const [tentouEnviar, setTentouEnviar] = useState(false);
+  const [outrasLojasDoGrupo, setOutrasLojasDoGrupo] = useState([]);
+  const { user } = useAuth();
+  const tenantAtualId = user?.tenant?.id;
+
+  // Outras lojas do mesmo grupo comercial, pra oferecer como "lojas adicionais"
+  // — só existe esse campo quando o grupo já tem mais de uma loja.
+  useEffect(() => {
+    if (!showModal) return undefined;
+    let ativo = true;
+    api
+      .get("/grupos-comerciais/resumo")
+      .then(({ data }) => {
+        if (!ativo) return;
+        const membros = (data?.grupos || []).flatMap((grupo) => grupo.membros || []);
+        setOutrasLojasDoGrupo(
+          membros.filter((membro) => membro.empresa_id !== tenantAtualId),
+        );
+      })
+      .catch(() => {
+        if (ativo) setOutrasLojasDoGrupo([]);
+      });
+    return () => {
+      ativo = false;
+    };
+  }, [showModal, tenantAtualId]);
 
   if (!showModal) return null;
 
@@ -287,6 +313,24 @@ export default function UsuarioModal({
             }}
           />
         </div>
+
+        {outrasLojasDoGrupo.length > 0 ? (
+          <div id="novo-usuario-lojas-adicionais">
+            <InputCheckGroup
+              name="novo-usuario-lojas-adicionais"
+              label="Lojas adicionais (opcional)"
+              help="Além desta loja, o usuário também terá acesso às lojas marcadas aqui — todas do mesmo grupo comercial."
+              opcoes={outrasLojasDoGrupo.map((membro) => ({
+                value: membro.empresa_id,
+                label: membro.empresa_nome,
+              }))}
+              value={novoUsuario.lojas_adicionais || []}
+              onChange={(lojas_adicionais) =>
+                setNovoUsuario({ ...novoUsuario, lojas_adicionais })
+              }
+            />
+          </div>
+        ) : null}
       </form>
     </ModalPadrao>
   );

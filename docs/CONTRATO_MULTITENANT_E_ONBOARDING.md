@@ -42,6 +42,14 @@ Ao cadastrar uma nova empresa:
 7. Registrar mapeamento item-a-item em `tenant_template_item_installs`.
 8. Se qualquer etapa obrigatoria falhar, fazer rollback do cadastro.
 
+**Nota (25/09/2026)**: alem do fluxo acima, todo tenant novo criado a partir de
+`GrupoComercialService.criar_grupo`/`adicionar_loja` (cadastro publico, onboarding
+assistido de ops, "adicionar loja") tambem ganha automaticamente um `Cliente` para
+o titular, vinculado a uma `PessoaMestre` do grupo — ver `Documentacao/Dominio/
+EmpresaGrupo.md` e `Documentacao/Dominio/Plano-Camada-Geral.md` (Checkpoint 4).
+Esse passo roda dentro do `GrupoComercialService`, fora do escopo de
+`onboard_tenant_defaults`/copia de template descrito acima.
+
 ## Checks Obrigatorios Antes de Liberar Cadastro Novo
 
 Rodar:

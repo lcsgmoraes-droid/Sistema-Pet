@@ -10,7 +10,7 @@ from __future__ import annotations
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, model_validator
 from sqlalchemy.orm import Session
 
 from app.db import get_session
@@ -36,7 +36,17 @@ class OpsLojaOnboardingRequest(BaseModel):
 class OpsGrupoComercialOnboardingRequest(BaseModel):
     titular_email: EmailStr
     titular_nome: str | None = Field(default=None, max_length=160)
+    titular_tipo_pessoa: str = "PF"
+    titular_telefone: str | None = Field(default=None, max_length=50)
+    titular_cpf_cnpj: str = Field(min_length=11, max_length=18)
+    grant_trial: bool = True
     lojas: list[OpsLojaOnboardingRequest] = Field(min_length=1, max_length=50)
+
+    @model_validator(mode="after")
+    def validar_titular_tipo_pessoa(self):
+        if self.titular_tipo_pessoa not in ("PF", "PJ"):
+            raise ValueError("titular_tipo_pessoa deve ser PF ou PJ")
+        return self
 
 
 @router.post("/onboarding")
@@ -61,6 +71,10 @@ def onboarding_assistido_grupo_comercial(
             request=request,
             titular_email=payload.titular_email,
             titular_nome=payload.titular_nome,
+            titular_tipo_pessoa=payload.titular_tipo_pessoa,
+            titular_telefone=payload.titular_telefone,
+            titular_cpf_cnpj=payload.titular_cpf_cnpj,
+            grant_trial=payload.grant_trial,
             lojas=lojas,
         )
     except OpsGrupoComercialOnboardingError as exc:
@@ -70,6 +84,7 @@ def onboarding_assistido_grupo_comercial(
         "grupo_id": resultado.grupo_id,
         "titular_email": resultado.titular_email,
         "lojas": resultado.lojas,
+        "aviso": resultado.aviso,
     }
 
 

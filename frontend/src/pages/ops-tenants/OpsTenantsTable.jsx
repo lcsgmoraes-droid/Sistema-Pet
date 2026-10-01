@@ -1,6 +1,7 @@
 import { useState } from "react";
-import { FiChevronDown, FiChevronLeft, FiChevronRight, FiPlusCircle } from "react-icons/fi";
+import { FiChevronDown, FiChevronLeft, FiChevronRight, FiEdit3, FiPlusCircle } from "react-icons/fi";
 
+import { formatMoneyBRL } from "../../utils/formatters";
 import OpsAdicionarLojaModal from "./OpsAdicionarLojaModal";
 import OpsTenantsBadge from "./OpsTenantsBadge";
 import {
@@ -12,12 +13,26 @@ import {
   statusBadge,
 } from "./opsTenantsFormatters";
 
-function TenantRow({ tenant, selected, onSelect }) {
+function valorCobradoLabel(cents) {
+  return cents == null ? "Sem proposta aceita" : `${formatMoneyBRL(cents / 100)}/mes`;
+}
+
+function TenantRow({ tenant, selected, onSelect, onManage }) {
   const pilot = tenant.pilot || {};
 
   return (
     <tr className={selected ? "bg-blue-50" : "bg-white hover:bg-slate-50"}>
-      <td className="w-[28%] px-4 py-3 align-top">
+      <td className="px-4 py-3 align-top">
+        <button
+          type="button"
+          onClick={() => onManage(tenant.id)}
+          className="inline-flex h-9 items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+        >
+          <FiEdit3 className="h-4 w-4" />
+          Manutencao
+        </button>
+      </td>
+      <td className="w-[24%] px-4 py-3 align-top">
         <button
           type="button"
           onClick={() => onSelect(tenant.id)}
@@ -43,7 +58,12 @@ function TenantRow({ tenant, selected, onSelect }) {
             {tenant.billing_status || "active"}
           </OpsTenantsBadge>
         </div>
-        <div className="mt-2 text-xs text-slate-500">
+        <div
+          className={`mt-2 text-sm font-semibold ${tenant.valor_cobrado_cents == null ? "text-slate-400" : "text-slate-800"}`}
+        >
+          {valorCobradoLabel(tenant.valor_cobrado_cents)}
+        </div>
+        <div className="mt-1 text-xs text-slate-500">
           Origem {tenant.subscription_source || "manual"} |{" "}
           {formatDate(tenant.subscription_activated_at || tenant.created_at)}
         </div>
@@ -76,7 +96,7 @@ function TenantRow({ tenant, selected, onSelect }) {
 function GroupHeaderRow({ group, collapsed, onToggle, onAddLoja }) {
   return (
     <tr className="bg-slate-50/80">
-      <td colSpan={4} className="px-4 py-2">
+      <td colSpan={5} className="px-4 py-2">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <button
             type="button"
@@ -96,6 +116,16 @@ function GroupHeaderRow({ group, collapsed, onToggle, onAddLoja }) {
             </OpsTenantsBadge>
           </button>
           <div className="flex flex-wrap items-center gap-2">
+            <OpsTenantsBadge
+              className={
+                group.totalValorCobradoCents > 0
+                  ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                  : "border-slate-200 bg-white text-slate-500"
+              }
+            >
+              Total {formatMoneyBRL(group.totalValorCobradoCents / 100)}/mes
+              {group.todasComValor ? "" : " (parcial)"}
+            </OpsTenantsBadge>
             {group.adimplente ? (
               <OpsTenantsBadge className="border-emerald-200 bg-emerald-50 text-emerald-700">
                 Adimplente
@@ -137,6 +167,7 @@ export default function OpsTenantsTable({
   loading,
   selectedTenant,
   onSelectTenant,
+  onManageTenant,
   onLojaAdded,
 }) {
   const [expandedGroups, setExpandedGroups] = useState(() => new Set());
@@ -175,11 +206,12 @@ export default function OpsTenantsTable({
       </div>
 
       <div className="overflow-x-auto">
-        <table className="min-w-[860px] w-full divide-y divide-slate-200 text-left">
+        <table className="min-w-[960px] w-full divide-y divide-slate-200 text-left">
           <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-600">
             <tr>
+              <th className="px-4 py-3 font-bold">Acoes</th>
               <th className="px-4 py-3 font-bold">Tenant</th>
-              <th className="px-4 py-3 font-bold">Plano</th>
+              <th className="px-4 py-3 font-bold">Plano / Valor</th>
               <th className="px-4 py-3 font-bold">Principal</th>
               <th className="px-4 py-3 font-bold">Atencao</th>
             </tr>
@@ -187,7 +219,7 @@ export default function OpsTenantsTable({
           <tbody className="divide-y divide-slate-100">
             {groupedItems.length === 0 && !loading ? (
               <tr>
-                <td colSpan={4} className="px-4 py-10 text-center text-sm text-slate-500">
+                <td colSpan={5} className="px-4 py-10 text-center text-sm text-slate-500">
                   Nenhum tenant encontrado para o filtro atual.
                 </td>
               </tr>
@@ -201,6 +233,7 @@ export default function OpsTenantsTable({
                   onAddLoja={() => setModalGrupo(group)}
                   selectedTenant={selectedTenant}
                   onSelectTenant={onSelectTenant}
+                  onManageTenant={onManageTenant}
                 />
               ))
             )}
@@ -245,7 +278,15 @@ export default function OpsTenantsTable({
   );
 }
 
-function GroupRows({ group, collapsed, onToggle, onAddLoja, selectedTenant, onSelectTenant }) {
+function GroupRows({
+  group,
+  collapsed,
+  onToggle,
+  onAddLoja,
+  selectedTenant,
+  onSelectTenant,
+  onManageTenant,
+}) {
   return (
     <>
       <GroupHeaderRow group={group} collapsed={collapsed} onToggle={onToggle} onAddLoja={onAddLoja} />
@@ -257,6 +298,7 @@ function GroupRows({ group, collapsed, onToggle, onAddLoja, selectedTenant, onSe
               tenant={tenant}
               selected={selectedTenant?.id === tenant.id}
               onSelect={onSelectTenant}
+              onManage={onManageTenant}
             />
           ))}
     </>

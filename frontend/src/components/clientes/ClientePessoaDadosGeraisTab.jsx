@@ -124,7 +124,6 @@ export default function ClientePessoaDadosGeraisTab({
           <InputData
             id="pessoa-data-nascimento"
             label="Data de nascimento"
-            help=""
             value={formData.data_nascimento || ""}
             onChange={(data_nascimento) =>
               setFormData((prev) => ({ ...prev, data_nascimento }))

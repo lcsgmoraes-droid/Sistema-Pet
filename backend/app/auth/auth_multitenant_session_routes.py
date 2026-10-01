@@ -7,6 +7,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 
 from app.auth import get_current_user
+from app.auth.auth_multitenant_account_routes import _tenant_payload
 from app.auth.auth_multitenant_schemas import (
     RefreshTokenRequest,
     RefreshTokenResponse,
@@ -111,6 +112,34 @@ def refresh_access_token(
     )
 
     return RefreshTokenResponse(**_auth_payload(access_token, refresh_token))
+
+
+@router.get("/my-tenants")
+def get_my_tenants(
+    db: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Lista as lojas que o usuario logado tem acesso, a qualquer momento da sessao
+    (nao so na janela de login) - usado pelo seletor de loja no header, que
+    permite trocar de loja sem sair e logar de novo (ver POST /select-tenant).
+    """
+    user_tenants = (
+        db.query(UserTenant)
+        .filter(
+            UserTenant.user_id == current_user.id,
+            UserTenant.is_active.is_(True),
+        )
+        .all()
+    )
+
+    tenants_list = []
+    for ut in user_tenants:
+        tenant = db.query(Tenant).filter(Tenant.id == str(ut.tenant_id)).first()
+        if tenant and str(tenant.status or "").strip().lower() in {"active", "ativo"}:
+            tenants_list.append(_tenant_payload(db, tenant, ut.role_id))
+
+    return {"tenants": tenants_list}
 
 
 @router.post("/select-tenant", response_model=SelectTenantResponse)
