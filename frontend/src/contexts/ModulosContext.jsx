@@ -303,7 +303,23 @@ export const ModulosProvider = ({ children }) => {
 
   useEffect(() => {
     carregarModulos();
-  }, [carregarModulos]);
+    if (!user) return undefined;
+
+    const atualizarQuandoVisivel = () => {
+      if (document.visibilityState === "visible") carregarModulos();
+    };
+    const interval = window.setInterval(
+      atualizarQuandoVisivel,
+      assinaturaAtual?.status === "past_due" ? 60 * 1000 : 60 * 60 * 1000,
+    );
+    window.addEventListener("focus", atualizarQuandoVisivel);
+    document.addEventListener("visibilitychange", atualizarQuandoVisivel);
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener("focus", atualizarQuandoVisivel);
+      document.removeEventListener("visibilitychange", atualizarQuandoVisivel);
+    };
+  }, [assinaturaAtual?.status, carregarModulos, user]);
 
   const moduloAtivo = useCallback(
     (modulo) => {

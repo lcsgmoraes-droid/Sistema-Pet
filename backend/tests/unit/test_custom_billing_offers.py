@@ -1,6 +1,6 @@
 import hashlib
 import json
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from types import SimpleNamespace
 
 import pytest
@@ -12,6 +12,7 @@ from app.models import AssinaturaModulo, Tenant
 from app.services import billing_offer_service as service
 from app.services.asaas_billing_service import apply_payment_event
 from app.services.billing_contract_service import ContractAcceptanceContext
+from app.utils.timezone import now_brasilia
 
 TENANT_ID = "4c48c5c9-bf40-49a8-b323-7b8fb8b3dc8f"
 
@@ -341,8 +342,38 @@ def test_webhook_encontra_proposta_quando_assinatura_existente_mantem_referencia
     assert module_calls == [True]
 
 
-def test_atraso_suspende_apenas_modulos_da_proposta(monkeypatch):
-    tenant = _tenant(plan="pet-venda-ativa", billing_status="past_due")
+def test_atraso_preserva_modulos_da_proposta_durante_tolerancia(monkeypatch):
+    tenant = _tenant(
+        plan="pet-venda-ativa",
+        billing_status="past_due",
+        billing_next_due_date=now_brasilia().date(),
+    )
+    offer = _offer(status="active")
+    calls = []
+    monkeypatch.setattr(
+        service,
+        "_sync_offer_modules",
+        lambda _db, *, offer, tenant, active: calls.append(active),
+    )
+
+    service.apply_offer_payment_event(
+        _Session(tenant=tenant, offers=[offer]),
+        offer=offer,
+        tenant=tenant,
+        event_type="PAYMENT_OVERDUE",
+        payment={"id": "pay_test", "status": "OVERDUE"},
+    )
+
+    assert offer.status == "past_due"
+    assert calls == [True]
+
+
+def test_atraso_suspende_extras_depois_da_tolerancia(monkeypatch):
+    tenant = _tenant(
+        plan="pet-venda-ativa",
+        billing_status="past_due",
+        billing_next_due_date=now_brasilia().date() - timedelta(days=16),
+    )
     offer = _offer(status="active")
     calls = []
     monkeypatch.setattr(

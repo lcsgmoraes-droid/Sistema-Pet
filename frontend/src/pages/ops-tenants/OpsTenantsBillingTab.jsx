@@ -5,6 +5,7 @@ import { isBillingAttention } from "../opsTenantsUtils";
 import OpsTenantsBadge from "./OpsTenantsBadge";
 import OpsTenantsCommercialEditPanel from "./OpsTenantsCommercialEditPanel";
 import OpsTenantBillingOfferPanel from "./OpsTenantBillingOfferPanel";
+import OpsTenantPaymentProofPanel from "./OpsTenantPaymentProofPanel";
 import { billingBadge, formatDate, shortId } from "./opsTenantsFormatters";
 
 export default function OpsTenantsBillingTab({
@@ -28,6 +29,7 @@ export default function OpsTenantsBillingTab({
   onOfferChange,
   onOfferToggleModule,
   onOfferSubmit,
+  onProofUpdated,
 }) {
   return (
     <div className="grid gap-4 xl:grid-cols-[1fr_360px]">
@@ -146,6 +148,7 @@ export default function OpsTenantsBillingTab({
       </section>
 
       <div className="space-y-4">
+        <OpsTenantPaymentProofPanel tenant={selectedTenant} onUpdated={onProofUpdated} />
         <OpsTenantBillingOfferPanel
           tenant={selectedTenant}
           form={offerForm}
