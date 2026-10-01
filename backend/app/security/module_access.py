@@ -65,16 +65,21 @@ def _load_active_modules(
         .all()
     )
 
+    assinatura_resumo = _assinatura_resumo_tenant(tenant, agora)
+    if not assinatura_resumo["acesso_operacional_ativo"]:
+        assinaturas = [
+            assinatura
+            for assinatura in assinaturas
+            if assinatura.gateway != "asaas_offer"
+        ]
+
     return _resolver_modulos_ativos(
         tenant.modulos_ativos,
         assinaturas,
         agora,
         tenant.plan,
         liberar_trial_completo=_trial_completo_ativo(tenant, agora),
-        liberar_modulos_do_plano=_assinatura_resumo_tenant(tenant, agora)[
-            "status_efetivo"
-        ]
-        in {"active", "trial"},
+        liberar_modulos_do_plano=assinatura_resumo["acesso_operacional_ativo"],
     )
 
 
@@ -92,7 +97,7 @@ def _load_active_entitlements(
         return sorted(ALL_PUBLIC_ENTITLEMENTS)
     if plano_normalizado in PLANOS_LEGADO_LIBERADOS | PLANOS_TODOS_MODULOS:
         return sorted(ALL_PUBLIC_ENTITLEMENTS)
-    if assinatura["status_efetivo"] != "active":
+    if not assinatura["acesso_operacional_ativo"]:
         return []
 
     plano = get_plan(tenant.plan)

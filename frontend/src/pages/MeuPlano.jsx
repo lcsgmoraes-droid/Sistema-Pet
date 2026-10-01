@@ -62,6 +62,19 @@ function getStatusInfo(assinatura) {
     };
   }
 
+  if (status === "past_due" && assinatura?.tolerancia_atraso?.em_vigor) {
+    const dias = assinatura.tolerancia_atraso.dias_restantes;
+    return {
+      label: "Pagamento em atraso",
+      tone: "amber",
+      icon: AlertTriangle,
+      text:
+        dias == null
+          ? "O acesso continua liberado enquanto confirmamos a data de vencimento."
+          : `O acesso continua liberado. Faltam ${dias} ${dias === 1 ? "dia" : "dias"} para o bloqueio das funções caso o pagamento não seja regularizado.`,
+    };
+  }
+
   if (status === "expired") {
     return {
       label: "Trial encerrado",

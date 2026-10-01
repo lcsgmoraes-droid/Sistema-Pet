@@ -21,9 +21,11 @@ from app.services.business_audit_service import (
     build_plan_activation_metadata,
     log_business_event,
 )
+from app.services.billing_access import overdue_grace_state
 from app.services.plan_catalog import PLAN_CATALOG, get_plan
 from app.services.plan_limits import active_session_usage, monthly_sales_usage
 from app.tenancy.context import set_current_tenant
+from app.utils.timezone import BRASILIA_TZ
 
 logger = logging.getLogger(__name__)
 
@@ -124,6 +126,16 @@ def _assinatura_resumo_tenant(tenant: Tenant, agora: datetime) -> dict:
     if status_raw == "trial" and trial_ends_at and trial_ends_at < agora:
         status_efetivo = "expired"
 
+    data_brasilia = (
+        agora.astimezone(BRASILIA_TZ).date()
+        if agora.tzinfo is not None
+        else agora.date()
+    )
+    tolerancia = overdue_grace_state(tenant, data_brasilia)
+    acesso_operacional_ativo = status_efetivo in {"active", "trial"} or tolerancia[
+        "access_allowed"
+    ]
+
     origem = getattr(tenant, "subscription_source", None) or "manual"
     pagamento_integrado = bool(
         getattr(tenant, "billing_provider_subscription_id", None)
@@ -133,6 +145,12 @@ def _assinatura_resumo_tenant(tenant: Tenant, agora: datetime) -> dict:
     return {
         "status": status_raw,
         "status_efetivo": status_efetivo,
+        "acesso_operacional_ativo": acesso_operacional_ativo,
+        "tolerancia_atraso": {
+            "em_vigor": tolerancia["in_grace"],
+            "dias_restantes": tolerancia["days_until_block"],
+            "bloqueio_em": tolerancia["block_on"],
+        },
         "origem": origem,
         "trial_inicio": _iso_datetime(getattr(tenant, "trial_started_at", None)),
         "trial_fim": _iso_datetime(trial_ends_at),
@@ -266,22 +284,25 @@ def get_modulos_status(
         .all()
     )
 
+    assinatura_resumo = _assinatura_resumo_tenant(tenant, agora)
+    if not assinatura_resumo["acesso_operacional_ativo"]:
+        assinaturas_ativas = [
+            assinatura
+            for assinatura in assinaturas_ativas
+            if assinatura.gateway != "asaas_offer"
+        ]
+
     modulos_do_tenant = _resolver_modulos_ativos(
         tenant.modulos_ativos,
         assinaturas_ativas,
         agora,
         tenant.plan,
         liberar_trial_completo=_trial_completo_ativo(tenant, agora),
-        liberar_modulos_do_plano=_assinatura_resumo_tenant(tenant, agora)[
-            "status_efetivo"
-        ]
-        in {"active", "trial"},
+        liberar_modulos_do_plano=assinatura_resumo["acesso_operacional_ativo"],
     )
-
-    assinatura_resumo = _assinatura_resumo_tenant(tenant, agora)
     plano_catalogo = get_plan(tenant.plan)
     trial_completo = assinatura_resumo["acesso_completo_durante_trial"]
-    plano_ativo = assinatura_resumo["status_efetivo"] in {"active", "trial"}
+    plano_ativo = assinatura_resumo["acesso_operacional_ativo"]
     recursos_trial = sorted(
         {recurso for plano in PLAN_CATALOG.values() for recurso in plano.entitlements}
     )

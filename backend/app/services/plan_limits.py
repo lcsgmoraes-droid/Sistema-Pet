@@ -10,6 +10,7 @@ from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from app.models import Tenant, UserSession
+from app.services.billing_access import overdue_grace_state
 from app.services.plan_catalog import PLAN_CATALOG, get_plan
 from app.session_manager import SESSION_SCOPE_ECOMMERCE
 from app.utils.timezone import now_brasilia
@@ -65,7 +66,8 @@ def enforce_monthly_sales_limit(
 
     raw_plan = str(getattr(tenant, "plan", "") or "").strip().lower()
     billing_status = str(getattr(tenant, "billing_status", "active") or "active")
-    if raw_plan in PLAN_CATALOG and billing_status.strip().lower() in {
+    billing_status = billing_status.strip().lower()
+    assinatura_inativa = billing_status in {
         "trial",
         "pending",
         "past_due",
@@ -73,14 +75,21 @@ def enforce_monthly_sales_limit(
         "blocked",
         "refunded",
         "canceled",
-    }:
+    }
+    tolerancia = overdue_grace_state(tenant, now.date() if now else None)
+    if raw_plan in PLAN_CATALOG and assinatura_inativa and not tolerancia[
+        "access_allowed"
+    ]:
+        mensagem = (
+            "O pagamento esta vencido ha mais de 15 dias. Regularize para registrar novas vendas."
+            if billing_status == "past_due"
+            else "O periodo gratuito terminou. Ative um plano para registrar novas vendas."
+        )
         raise HTTPException(
             status_code=status.HTTP_402_PAYMENT_REQUIRED,
             detail={
                 "code": "subscription_inactive",
-                "message": (
-                    "O periodo gratuito terminou. Ative um plano para registrar novas vendas."
-                ),
+                "message": mensagem,
             },
         )
 

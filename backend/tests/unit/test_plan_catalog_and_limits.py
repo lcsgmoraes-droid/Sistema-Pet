@@ -8,7 +8,11 @@ from fastapi import HTTPException
 from sqlalchemy import Boolean, Column, DateTime, Integer, String, create_engine
 from sqlalchemy.orm import declarative_base, sessionmaker
 
-from app.routes.modulos_routes import _resolver_modulos_ativos
+from app.routes.modulos_routes import (
+    _assinatura_resumo_tenant,
+    _resolver_modulos_ativos,
+)
+from app.services.billing_access import overdue_grace_state
 from app.security.module_access import _load_active_entitlements
 from app.services import plan_limits
 from app.services.plan_catalog import (
@@ -154,6 +158,79 @@ def test_expired_trial_blocks_new_sales_until_activation():
 
     assert exc.value.status_code == 402
     assert exc.value.detail["code"] == "subscription_inactive"
+
+
+def test_atraso_libera_vendas_ate_o_decimo_quinto_dia():
+    tenant_query = MagicMock()
+    tenant_query.filter.return_value.with_for_update.return_value.first.return_value = (
+        _tenant(
+            "pet-venda-ativa",
+            billing_status="past_due",
+            billing_next_due_date=datetime(2026, 7, 1).date(),
+        )
+    )
+    db = MagicMock()
+    db.query.return_value = tenant_query
+
+    enforce_monthly_sales_limit(db, "tenant-1", datetime(2026, 7, 16, 12, 0))
+
+    assert db.query.call_count == 1
+
+
+def test_atraso_bloqueia_vendas_a_partir_do_decimo_sexto_dia():
+    tenant_query = MagicMock()
+    tenant_query.filter.return_value.with_for_update.return_value.first.return_value = (
+        _tenant(
+            "pet-venda-ativa",
+            billing_status="past_due",
+            billing_next_due_date=datetime(2026, 7, 1).date(),
+        )
+    )
+    db = MagicMock()
+    db.query.return_value = tenant_query
+
+    with pytest.raises(HTTPException) as exc:
+        enforce_monthly_sales_limit(db, "tenant-1", datetime(2026, 7, 17, 12, 0))
+
+    assert exc.value.status_code == 402
+    assert exc.value.detail["code"] == "subscription_inactive"
+
+
+def test_atraso_exibe_contagem_e_preserva_recursos_ate_o_limite():
+    due_date = datetime(2026, 7, 1).date()
+    tenant = _tenant(
+        "pet-venda-ativa",
+        billing_status="past_due",
+        billing_next_due_date=due_date,
+    )
+    db = MagicMock()
+    db.query.return_value.filter.return_value.first.return_value = tenant
+
+    assert overdue_grace_state(tenant, datetime(2026, 7, 2).date()) == {
+        "in_grace": True,
+        "access_allowed": True,
+        "days_until_block": 15,
+        "block_on": "2026-07-17",
+    }
+    resumo = _assinatura_resumo_tenant(
+        tenant, datetime(2026, 7, 2, 12, tzinfo=timezone.utc)
+    )
+    assert resumo["status_efetivo"] == "past_due"
+    assert resumo["acesso_operacional_ativo"] is True
+    assert resumo["tolerancia_atraso"]["dias_restantes"] == 15
+    assert "sales.app_ecommerce" in _load_active_entitlements(
+        db, tenant.id, datetime(2026, 7, 16, tzinfo=timezone.utc)
+    )
+    assert _load_active_entitlements(
+        db, tenant.id, datetime(2026, 7, 17, 12, tzinfo=timezone.utc)
+    ) == []
+
+
+def test_atraso_sem_data_nao_bloqueia_automaticamente():
+    tenant = _tenant("pet-venda-ativa", billing_status="past_due")
+
+    assert overdue_grace_state(tenant)["access_allowed"] is True
+    assert overdue_grace_state(tenant)["days_until_block"] is None
 
 
 def test_legacy_basic_tenant_is_not_blocked_by_the_new_billing_rule():
