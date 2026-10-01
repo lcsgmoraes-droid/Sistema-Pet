@@ -90,6 +90,33 @@ feita nos momentos certos, sem virar repeticao a cada micro-etapa.
 - Objetivo: manter o codigo do frontend organizado e com manutencao facil,
   sem duplicar a mesma peca de UI de jeitos diferentes em telas diferentes.
 
+## Padronizacao de acoes e icones em listagens (regra geral, 2026-09-29)
+
+- Em qualquer coluna "Acoes" de tabela/listagem com 3 ou mais acoes, nunca
+  enfileirar varios `IconActionButton`/icones soltos lado a lado — nao escala
+  (cada acao nova aperta mais a linha) e vira ruido visual. Usar sempre
+  `frontend/src/components/v2/BotaoMenuAcoes/BotaoMenuAcoes.jsx`: um unico
+  botao com icone de "mais opcoes" que revela um menu com a lista completa
+  (icone + texto por item), abrindo sozinho pra cima ou pra baixo conforme o
+  espaco livre na tela. Ver demo com explicacao em `/style-guide` (secao
+  "Cartões e navegação") e entrada no catalogo (`styleGuideCatalog.js`).
+  Com 1 ou 2 acoes apenas, `IconActionButton`/`BotaoInteracao` direto na
+  linha continua aceitavel (o menu existe pra resolver o excesso de icones,
+  nao e obrigatorio pra toda e qualquer listagem).
+- Mesma acao = sempre o mesmo icone, em qualquer tela do sistema. Antes de
+  usar um icone novo para uma acao (editar, excluir, historico, abrir em
+  nova janela, etc.), checar se alguma tela ja existente usa um icone
+  equivalente para essa mesma acao e reaproveitar — nunca escolher um novo
+  so porque e mais conveniente no momento. Padrao ja estabelecido (ver demo
+  de `BotaoMenuAcoes` em `/style-guide`): Editar = `Pencil`, Excluir =
+  `Trash2`, Historico = `History`, Abrir em nova janela = `ExternalLink`
+  (todos de `lucide-react`, mesma biblioteca usada por todo `components/v2/`).
+  Se surgir uma acao sem icone equivalente ainda estabelecido, escolher um
+  novo com bom senso e deixar documentado (nota no componente que o usa, ou
+  no catalogo) para os proximos reaproveitarem.
+- Objetivo: usuario treina o olho uma vez ("esse icone sempre faz aquilo") e
+  nao precisa reaprender a interface tela por tela.
+
 ## Padrao de trabalho
 
 - Fazer mudancas pequenas e focadas.

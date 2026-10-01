@@ -74,7 +74,7 @@ export default function StyleGuide() {
         <StyleGuideSection
           id="v2-cartoes"
           title="Cartões e navegação (components/v2/)"
-          description="Cartão indicador clicável (dashboards), placeholder de painel sem dado, filtro de opções em pill e link de navegação secundário — nasceram da limpeza da tela /dashboard e reaparecem em qualquer painel com números e navegação."
+          description="Cartão indicador clicável (dashboards), placeholder de painel sem dado, filtro de opções em pill, link de navegação secundário e o menu padrão de ações de linha de listagem — nasceram da limpeza da tela /dashboard e reaparecem em qualquer painel com números, navegação ou tabela de ações."
         >
           <V2CardsSection />
         </StyleGuideSection>

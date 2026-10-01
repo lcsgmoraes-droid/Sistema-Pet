@@ -1,6 +1,17 @@
-import { BarChart3, ShoppingBag, TrendingUp, Users, WalletCards } from "lucide-react";
+import {
+  BarChart3,
+  ExternalLink as ExternalLinkIcon,
+  History,
+  Pencil,
+  ShoppingBag,
+  Trash2,
+  TrendingUp,
+  Users,
+  WalletCards,
+} from "lucide-react";
 import { useState } from "react";
 import BotaoLink from "../../../../components/v2/BotaoLink/BotaoLink";
+import BotaoMenuAcoes from "../../../../components/v2/BotaoMenuAcoes/BotaoMenuAcoes";
 import CartaoIndicador from "../../../../components/v2/CartaoIndicador/CartaoIndicador";
 import EstadoVazio from "../../../../components/v2/EstadoVazio/EstadoVazio";
 import SeletorOpcoes from "../../../../components/v2/SeletorOpcoes/SeletorOpcoes";
@@ -106,6 +117,45 @@ export default function V2CardsSection() {
         note="Sempre o mesmo texto simples — sem tamanho nem variante, não usa BotaoBase."
       >
         <BotaoLink onClick={() => {}}>Ver produtos</BotaoLink>
+      </Grupo>
+
+      <Grupo
+        label="BotaoMenuAcoes — botão padrão para a coluna Ações de qualquer listagem com várias ações"
+        note='Regra geral (não só deste componente): a partir de ~3 ações numa linha, pare de enfileirar ícones soltos — vira ruído visual e não escala. Use este botão único, que abre um menu com a lista completa (ícone + texto, mais fácil de reconhecer que ícone sozinho), posicionado sozinho para cima ou para baixo conforme o espaço livre na viewport. A outra metade da regra é de ícone: ação do mesmo tipo = sempre o mesmo ícone em qualquer tela, nunca um novo por preguiça de checar o que já existe. Padrão já adotado nesta tela: Editar = Pencil, Excluir = Trash2, Histórico = History, Abrir em nova janela = ExternalLink. Antes de usar um ícone novo para uma ação, confira se uma dessas quatro (ou outra já em uso alhures) já serve.'
+      >
+        <table className="w-full max-w-sm text-left text-sm">
+          <thead className="text-xs uppercase text-slate-500 dark:text-slate-400">
+            <tr>
+              <th className="pb-2 pr-2 font-semibold">Ações</th>
+              <th className="pb-2 font-semibold">Produto</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+            <tr>
+              <td className="py-2 pr-2">
+                <BotaoMenuAcoes
+                  rotulo="Mais ações para Ração Premium 10kg"
+                  acoes={[
+                    { icon: Pencil, label: "Editar", onClick: () => {} },
+                    {
+                      icon: ExternalLinkIcon,
+                      label: "Abrir em nova janela",
+                      onClick: () => {},
+                    },
+                    { icon: History, label: "Ver histórico", onClick: () => {} },
+                    {
+                      icon: Trash2,
+                      label: "Excluir",
+                      tom: "perigo",
+                      onClick: () => {},
+                    },
+                  ]}
+                />
+              </td>
+              <td className="py-2 text-slate-700 dark:text-slate-200">Ração Premium 10kg</td>
+            </tr>
+          </tbody>
+        </table>
       </Grupo>
     </>
   );

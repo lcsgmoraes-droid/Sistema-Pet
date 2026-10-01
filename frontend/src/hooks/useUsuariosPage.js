@@ -1,9 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
 import api from "../api";
-import { useAuth } from "../contexts/AuthContext";
 import { confirmarCorePet } from "../services/corepetDialog";
-import { resolveTenantLoginReference } from "../utils/usuarioAcessoInicial";
 import { isBrazilianMobileLogin, normalizeBrazilianLoginPhone } from "../utils/loginPhone";
 
 const USUARIO_INICIAL = {
@@ -19,7 +17,7 @@ const USUARIO_INICIAL = {
   lojas_adicionais: [],
 };
 
-const CREDENCIAIS_INICIAIS = { login_phone: "", new_password: "", role_id: "" };
+const CREDENCIAIS_INICIAIS = { login_phone: "", role_id: "" };
 
 function isClienteRole(role) {
   return (role?.nome || "").trim().toLocaleLowerCase("pt-BR") === "cliente";
@@ -98,7 +96,6 @@ function campoDoErroServidor(mensagem) {
 }
 
 export default function useUsuariosPage() {
-  const { user } = useAuth();
   const [usuarios, setUsuarios] = useState([]);
   const [roles, setRoles] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -106,9 +103,9 @@ export default function useUsuariosPage() {
   const [novoUsuario, setNovoUsuario] = useState(USUARIO_INICIAL);
   const [usuarioServerErrors, setUsuarioServerErrors] = useState({});
   const [usuarioCredenciais, setUsuarioCredenciais] = useState(null);
+  const [vincularLojaUsuario, setVincularLojaUsuario] = useState(null);
   const [credenciais, setCredenciais] = useState(CREDENCIAIS_INICIAIS);
   const [credenciaisError, setCredenciaisError] = useState("");
-  const [generatedPassword, setGeneratedPassword] = useState("");
   const [savingCredentials, setSavingCredentials] = useState(false);
   const [perfisApp, setPerfisApp] = useState([]);
   const [pessoaVinculadaCredenciais, setPessoaVinculadaCredenciais] = useState(null);
@@ -118,10 +115,6 @@ export default function useUsuariosPage() {
   const [filtroStatus, setFiltroStatus] = useState([]);
   const [paginaAtual, setPaginaAtual] = useState(1);
   const [itensPorPagina, setItensPorPagina] = useState(20);
-  const tenantLoginReference = resolveTenantLoginReference(
-    user,
-    typeof window === "undefined" ? null : window.localStorage.getItem("selectedTenant"),
-  );
 
   // Busca/filtro/paginação são só de navegador — a lista de usuários de uma loja é pequena
   // (dezenas, não milhares como Pessoas), então não precisa de endpoint com skip/limit/search.
@@ -217,6 +210,35 @@ export default function useUsuariosPage() {
     }
   }
 
+  async function recriarSenha(userId) {
+    if (
+      !(await confirmarCorePet(
+        "Enviar e-mail de recriação de senha para este usuário? Ele vai receber um link/código " +
+          "válido por 30 minutos para definir a nova senha sozinho.",
+      ))
+    ) {
+      return;
+    }
+
+    try {
+      const response = await api.post(`/usuarios/${userId}/recriar-senha`);
+      toast.success(response.data?.message || "E-mail de recriação de senha enviado.");
+    } catch (error) {
+      console.error("Erro ao recriar senha:", error);
+      toast.error(
+        error.response?.data?.detail || "Não foi possível enviar o e-mail de recriação de senha.",
+      );
+    }
+  }
+
+  function abrirVincularLoja(usuario) {
+    setVincularLojaUsuario(usuario);
+  }
+
+  function fecharVincularLoja() {
+    setVincularLojaUsuario(null);
+  }
+
   // Validação síncrona (formato/obrigatoriedade) fica no UsuarioModal, exibida campo a campo.
   // Esta função assume que o formulário já passou por ela e só cuida do envio.
   async function criarUsuario() {
@@ -263,11 +285,9 @@ export default function useUsuariosPage() {
     setUsuarioCredenciais(usuario);
     setCredenciais({
       login_phone: usuario.login_phone || "",
-      new_password: "",
       role_id: usuario.role_id || "",
     });
     setCredenciaisError("");
-    setGeneratedPassword("");
     setPerfisApp([]);
     setPessoaVinculadaCredenciais(
       usuario.pessoa_id ? { id: usuario.pessoa_id, nome: usuario.pessoa_nome } : null,
@@ -284,13 +304,12 @@ export default function useUsuariosPage() {
     setUsuarioCredenciais(null);
     setCredenciais({ ...CREDENCIAIS_INICIAIS });
     setCredenciaisError("");
-    setGeneratedPassword("");
     setPerfisApp([]);
     setPessoaVinculadaCredenciais(null);
   }
 
   async function salvarPerfisApp(profiles) {
-    if (!usuarioCredenciais) return;
+    if (!usuarioCredenciais) return false;
     setSavingPerfisApp(true);
     try {
       const response = await api.put(`/usuarios/${usuarioCredenciais.user_id}/perfis-app`, {
@@ -298,10 +317,12 @@ export default function useUsuariosPage() {
       });
       setPerfisApp(response.data?.profiles || []);
       toast.success("Perfis de acesso ao app atualizados.");
+      return true;
     } catch (error) {
       toast.error(
         error.response?.data?.detail || "Não foi possível atualizar os perfis de acesso.",
       );
+      return false;
     } finally {
       setSavingPerfisApp(false);
     }
@@ -309,22 +330,10 @@ export default function useUsuariosPage() {
 
   async function salvarCredenciais(event) {
     event.preventDefault();
-    await atualizarCredenciais(false);
-  }
-
-  async function gerarNovaSenha() {
-    await atualizarCredenciais(true);
-  }
-
-  async function atualizarCredenciais(generatePassword) {
     if (!usuarioCredenciais) return;
     const loginPhone = normalizeBrazilianLoginPhone(credenciais.login_phone);
     if (!isBrazilianMobileLogin(credenciais.login_phone)) {
       setCredenciaisError("Informe um celular valido com DDD.");
-      return;
-    }
-    if (!generatePassword && credenciais.new_password && credenciais.new_password.length < 8) {
-      setCredenciaisError("A nova senha deve ter no minimo 8 caracteres.");
       return;
     }
     if (!credenciais.role_id) {
@@ -334,23 +343,15 @@ export default function useUsuariosPage() {
 
     setSavingCredentials(true);
     setCredenciaisError("");
-    setGeneratedPassword("");
     try {
-      const response = await api.patch(`/usuarios/${usuarioCredenciais.user_id}/credenciais`, {
+      await api.patch(`/usuarios/${usuarioCredenciais.user_id}/credenciais`, {
         login_phone: loginPhone,
-        new_password: generatePassword ? null : credenciais.new_password || null,
-        generate_password: generatePassword,
         role_id: Number(credenciais.role_id),
       });
-      setCredenciais((current) => ({ ...current, login_phone: loginPhone, new_password: "" }));
+      setCredenciais((current) => ({ ...current, login_phone: loginPhone }));
       await carregarUsuarios();
-      if (response.data?.generated_password) {
-        setGeneratedPassword(response.data.generated_password);
-        toast.success("Nova senha gerada. Copie antes de fechar.");
-      } else {
-        toast.success("Acesso atualizado com sucesso.");
-        fecharCredenciais();
-      }
+      toast.success("Acesso atualizado com sucesso.");
+      fecharCredenciais();
     } catch (error) {
       setCredenciaisError(
         error.response?.data?.detail || "Nao foi possivel atualizar o acesso deste usuario.",
@@ -387,8 +388,6 @@ export default function useUsuariosPage() {
     filtroPerfil,
     filtroStatus,
     forcarLogout,
-    generatedPassword,
-    gerarNovaSenha,
     itensPorPagina,
     limparErroServidor,
     loading,
@@ -396,9 +395,12 @@ export default function useUsuariosPage() {
     onAbrirModalUsuario: abrirModalUsuario,
     onAbrirCredenciais: abrirCredenciais,
     onCloseModalUsuario: resetarModalUsuario,
+    onAbrirVincularLoja: abrirVincularLoja,
+    onFecharVincularLoja: fecharVincularLoja,
     paginaAtual: paginaSegura,
     perfisApp,
     pessoaVinculadaCredenciais,
+    recriarSenha,
     roles,
     rolesUsuariosDiretos,
     searchTerm,
@@ -414,12 +416,13 @@ export default function useUsuariosPage() {
     salvarPerfisApp,
     savingCredentials,
     savingPerfisApp,
-    tenantLoginReference,
     toggleStatus,
     totalPaginas,
     totalUsuariosFiltrados,
     usuarioServerErrors,
     usuarioCredenciais,
     usuarios: usuariosPaginados,
+    vincularLojaUsuario,
+    onUsuarioVinculadoLoja: carregarUsuarios,
   };
 }

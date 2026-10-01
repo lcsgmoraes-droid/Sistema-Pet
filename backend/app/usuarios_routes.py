@@ -1,6 +1,8 @@
 import secrets
+from datetime import datetime, timedelta, timezone
+from urllib.parse import quote
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -9,6 +11,12 @@ from pydantic import BaseModel, EmailStr, Field, model_validator
 from app.db import get_session
 from app.auth import get_current_user_and_tenant
 from app.auth.core import hash_password
+from app.auth.auth_multitenant_support import (
+    RESET_TOKEN_MINUTES,
+    _build_password_reset_email,
+    _issue_password_reset_tokens,
+    _resolve_frontend_base_url,
+)
 from app.security.permissions_decorator import require_permission
 from app.models import AppAccessProfile, Cliente, User, UserTenant, Role
 from app.usuario_menu_favoritos_models import UsuarioMenuFavorito
@@ -18,7 +26,11 @@ from app.services.business_audit_service import (
     build_user_access_metadata,
     log_business_event,
 )
-from app.services.auth_security import register_password_changed
+from app.services.email_service import send_email
+from app.services.auth_security import (
+    register_password_changed,
+    register_password_reset_requested,
+)
 from app.services.user_account_service import (
     UserAccountError,
     create_tenant_user_account,
@@ -34,7 +46,10 @@ from app.services.user_account_service import (
 )
 from app.services.user_loja_vinculo_service import (
     VinculoLojaError,
+    desvincular_usuario_de_loja,
+    listar_lojas_do_grupo_com_vinculo,
     vincular_usuario_a_loja_do_grupo,
+    vincular_usuario_a_qualquer_loja_do_grupo,
 )
 from app.session_manager import revoke_all_sessions
 from app.tenancy.rls import sync_rls_auth_user
@@ -686,6 +701,79 @@ def atualizar_credenciais_usuario(
     }
 
 
+@router.post("/{user_id}/recriar-senha")
+@require_permission("usuarios.manage")
+def recriar_senha_usuario(
+    user_id: int,
+    request: Request,
+    db: Session = Depends(get_session),
+    user_and_tenant=Depends(get_current_user_and_tenant),
+):
+    """Dispara pro usuario o mesmo processo padrao de "esqueci minha senha"
+    (POST /auth/forgot-password) — o admin nunca ve nem define a senha dele,
+    so pede pro sistema mandar o link/codigo de recriacao por e-mail. Exige
+    e-mail cadastrado (o processo padrao nao tem variante por celular)."""
+    actor, tenant_id = user_and_tenant
+
+    user = _usuario_visivel_neste_tenant(db, user_id=user_id, tenant_id=tenant_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="Usuário não encontrado")
+    if not user.email:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Este usuário não tem e-mail cadastrado — não é possível "
+                "enviar o link de recriação de senha."
+            ),
+        )
+
+    reset_code, reset_link_token, stored_reset_token = _issue_password_reset_tokens()
+    user.reset_token = stored_reset_token
+    user.reset_token_expires = datetime.now(timezone.utc) + timedelta(
+        minutes=RESET_TOKEN_MINUTES
+    )
+
+    reset_link = (
+        f"{_resolve_frontend_base_url(request)}/recuperar-senha"
+        f"?email={quote(user.email)}&token={quote(reset_link_token)}"
+    )
+    subject, html_body, text_body = _build_password_reset_email(
+        user, reset_code, reset_link
+    )
+    enviado = send_email(
+        to=user.email,
+        subject=subject,
+        html_body=html_body,
+        text_body=text_body,
+        simulate_if_unconfigured=False,
+    )
+    if not enviado:
+        db.rollback()
+        raise HTTPException(
+            status_code=503,
+            detail="Não foi possível enviar o e-mail agora. Tente novamente em instantes.",
+        )
+
+    register_password_reset_requested(db, user, request)
+    log_business_event(
+        db=db,
+        tenant_id=tenant_id,
+        user_id=actor.id,
+        event="access.user_password_reset_triggered_by_admin",
+        entity_type="users",
+        entity_id=user.id,
+        metadata={"target_user_id": user.id},
+        details=f"Processo de recriacao de senha disparado para {user.email} pelo admin {actor.id}",
+        commit=False,
+    )
+    db.commit()
+
+    return {
+        "message": f"E-mail de recriação de senha enviado para {user.email}.",
+        "expires_in_minutes": RESET_TOKEN_MINUTES,
+    }
+
+
 class PerfisAppUpdate(BaseModel):
     profiles: list[str] = Field(default_factory=list)
 
@@ -880,6 +968,128 @@ def vincular_usuario_outra_loja(
         commit=False,
     )
     db.commit()
+
+
+def _usuario_visivel_neste_tenant(db: Session, *, user_id: int, tenant_id) -> User | None:
+    """Mesmo criterio da listagem (`GET /usuarios`): o usuario aparece aqui
+    se tiver um UserTenant pra este tenant, mesmo que a loja "de origem"
+    dele (`User.tenant_id`) seja outra — acontece justamente com usuario
+    vinculado a mais de uma loja do grupo."""
+    vinculo = (
+        db.query(UserTenant)
+        .filter(UserTenant.user_id == user_id, UserTenant.tenant_id == tenant_id)
+        .first()
+    )
+    if vinculo is None:
+        return None
+    return db.query(User).filter(User.id == user_id).first()
+
+
+@router.get("/{user_id}/lojas-grupo")
+@require_permission("usuarios.manage")
+def listar_lojas_grupo_usuario(
+    user_id: int,
+    db: Session = Depends(get_session),
+    user_and_tenant=Depends(get_current_user_and_tenant),
+):
+    """Lojas do mesmo grupo comercial da loja atual, com status de vinculo
+    deste usuario em cada uma — base da tela de arrastar-e-soltar."""
+    _actor, tenant_id = user_and_tenant
+
+    user = _usuario_visivel_neste_tenant(db, user_id=user_id, tenant_id=tenant_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="Usuário não encontrado")
+
+    lojas = listar_lojas_do_grupo_com_vinculo(
+        db, tenant_origem_id=tenant_id, usuario_id=user_id
+    )
+    return {"lojas": lojas}
+
+
+@router.post("/{user_id}/lojas-grupo/{tenant_destino_id}")
+@require_permission("usuarios.manage")
+def vincular_usuario_loja_grupo(
+    user_id: int,
+    tenant_destino_id: str,
+    db: Session = Depends(get_session),
+    user_and_tenant=Depends(get_current_user_and_tenant),
+):
+    """Vincula o usuario a outra loja do grupo, arrastada pra "associadas" —
+    resolve sozinho qual loja ja vinculada usar como origem do perfil de
+    acesso (nao precisa ser a loja de quem esta operando a tela)."""
+    actor, tenant_id = user_and_tenant
+
+    user = _usuario_visivel_neste_tenant(db, user_id=user_id, tenant_id=tenant_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="Usuário não encontrado")
+
+    try:
+        vincular_usuario_a_qualquer_loja_do_grupo(
+            db,
+            usuario=user,
+            tenant_destino_id=tenant_destino_id,
+            commit=False,
+        )
+    except VinculoLojaError as exc:
+        db.rollback()
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+
+    log_business_event(
+        db=db,
+        tenant_id=tenant_id,
+        user_id=actor.id,
+        event="access.user_linked_other_store",
+        entity_type="users",
+        entity_id=user.id,
+        metadata={"tenant_destino_id": tenant_destino_id},
+        details=f"Usuario {user.username or user.email or user.id} vinculado a outra loja do grupo",
+        commit=False,
+    )
+    db.commit()
+    return {"status": "ok"}
+
+
+@router.delete("/{user_id}/lojas-grupo/{tenant_destino_id}")
+@require_permission("usuarios.manage")
+def desvincular_usuario_loja_grupo(
+    user_id: int,
+    tenant_destino_id: str,
+    db: Session = Depends(get_session),
+    user_and_tenant=Depends(get_current_user_and_tenant),
+):
+    """Remove o acesso do usuario aquela loja, arrastada pra "disponiveis" —
+    nunca deixa o usuario sem nenhuma loja ativa no grupo."""
+    actor, tenant_id = user_and_tenant
+
+    user = _usuario_visivel_neste_tenant(db, user_id=user_id, tenant_id=tenant_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="Usuário não encontrado")
+
+    try:
+        desvincular_usuario_de_loja(
+            db,
+            usuario=user,
+            tenant_origem_id=tenant_id,
+            tenant_destino_id=tenant_destino_id,
+            commit=False,
+        )
+    except VinculoLojaError as exc:
+        db.rollback()
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+
+    log_business_event(
+        db=db,
+        tenant_id=tenant_id,
+        user_id=actor.id,
+        event="access.user_unlinked_store",
+        entity_type="users",
+        entity_id=user.id,
+        metadata={"tenant_destino_id": tenant_destino_id},
+        details=f"Usuario {user.username or user.email or user.id} desvinculado de uma loja do grupo",
+        commit=False,
+    )
+    db.commit()
+    return {"status": "ok"}
 
     return {"status": "ok", "message": "Usuário vinculado à loja com sucesso"}
 

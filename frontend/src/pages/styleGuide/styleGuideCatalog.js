@@ -136,6 +136,13 @@ export const styleGuideCatalog = [
         descricao:
           "Link de navegação real (rota interna via `to` ou URL via `href`) — cor, peso e ícone padronizados; só o tamanho da fonte é livre. `novaJanela` abre em outra aba com ícone de link externo",
       },
+      {
+        nome: "BotaoMenuAcoes",
+        status: "pronto",
+        arquivo: "components/v2/BotaoMenuAcoes/BotaoMenuAcoes.jsx",
+        descricao:
+          'Regra geral (29/09/2026): coluna "Ações" de qualquer listagem com 3+ ações nunca mais enfileira ícones soltos (não escala, vira ruído visual) — um único ícone de "mais opções" revela o menu completo (ícone + texto por item), que abre sozinho pra cima ou pra baixo conforme o espaço na tela. Junto vem a diretriz de ícone por ação: mesma ação = mesmo ícone em toda a aplicação (ex.: Editar = Pencil, Excluir = Trash2, Histórico = History, Abrir em nova janela = ExternalLink — ver demo em "Cartões e navegação"). Antes de introduzir um ícone novo para uma ação, checar se um já existente em outra tela já serve.',
+      },
     ],
   },
   {

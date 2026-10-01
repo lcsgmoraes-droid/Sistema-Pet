@@ -1,6 +1,7 @@
 import { Plus, Users } from "lucide-react";
 import UsuarioModal from "../components/usuarios/UsuarioModal";
 import UsuarioCredenciaisModal from "../components/usuarios/UsuarioCredenciaisModal";
+import UsuarioVincularLojaModal from "../components/usuarios/UsuarioVincularLojaModal";
 import UsuariosTable from "../components/usuarios/UsuariosTable";
 import BotaoInteracao from "../components/v2/BotaoInteracao/BotaoInteracao";
 import InputComboboxMultiplo from "../components/v2/InputComboboxMultiplo/InputComboboxMultiplo";
@@ -24,18 +25,20 @@ export default function UsuariosPage() {
     filtroPerfil,
     filtroStatus,
     forcarLogout,
-    generatedPassword,
-    gerarNovaSenha,
     itensPorPagina,
     limparErroServidor,
     loading,
     novoUsuario,
     onAbrirModalUsuario,
     onAbrirCredenciais,
+    onAbrirVincularLoja,
     onCloseModalUsuario,
+    onFecharVincularLoja,
+    onUsuarioVinculadoLoja,
     paginaAtual,
     perfisApp,
     pessoaVinculadaCredenciais,
+    recriarSenha,
     roles,
     rolesUsuariosDiretos,
     searchTerm,
@@ -51,13 +54,13 @@ export default function UsuariosPage() {
     salvarPerfisApp,
     savingCredentials,
     savingPerfisApp,
-    tenantLoginReference,
     toggleStatus,
     totalPaginas,
     totalUsuariosFiltrados,
     usuarioServerErrors,
     usuarioCredenciais,
     usuarios,
+    vincularLojaUsuario,
   } = useUsuariosPage();
 
   const opcoesPerfil = roles.map((role) => ({
@@ -126,7 +129,9 @@ export default function UsuariosPage() {
         loading={loading}
         onForcarLogout={forcarLogout}
         onManageCredentials={onAbrirCredenciais}
+        onRecriarSenha={recriarSenha}
         onToggleStatus={toggleStatus}
+        onVincularLoja={onAbrirVincularLoja}
         paginacaoRodape={paginacao("bottom")}
         usuarios={usuarios}
       />
@@ -145,20 +150,25 @@ export default function UsuariosPage() {
       <UsuarioCredenciaisModal
         credenciais={credenciais}
         erro={credenciaisError}
-        generatedPassword={generatedPassword}
         loading={savingCredentials}
         onChange={setCredenciais}
         onClose={fecharCredenciais}
-        onGenerate={gerarNovaSenha}
         onSubmit={salvarCredenciais}
         perfisApp={perfisApp}
         pessoaVinculada={pessoaVinculadaCredenciais}
         onSalvarPerfisApp={salvarPerfisApp}
         savingPerfisApp={savingPerfisApp}
         roles={rolesUsuariosDiretos}
-        tenantReference={tenantLoginReference}
         usuario={usuarioCredenciais}
       />
+
+      {vincularLojaUsuario ? (
+        <UsuarioVincularLojaModal
+          usuario={vincularLojaUsuario}
+          onClose={onFecharVincularLoja}
+          onAlterado={onUsuarioVinculadoLoja}
+        />
+      ) : null}
     </div>
   );
 }

@@ -12,7 +12,10 @@ from app.grupo_comercial_models import GrupoComercial, GrupoComercialMembro
 from app.models import Role, Tenant, User, UserTenant
 from app.services.user_loja_vinculo_service import (
     VinculoLojaError,
+    desvincular_usuario_de_loja,
+    listar_lojas_do_grupo_com_vinculo,
     vincular_usuario_a_loja_do_grupo,
+    vincular_usuario_a_qualquer_loja_do_grupo,
 )
 from app.tenancy.context import clear_current_tenant, set_current_tenant
 
@@ -189,3 +192,110 @@ def test_rejeita_usuario_sem_acesso_ativo_na_loja_de_origem(db):
         )
 
     assert excinfo.value.status_code == 400
+
+
+TENANT_A3 = "44444444-4444-4444-4444-444444444444"
+
+
+def _grupo_abc(db, usuario):
+    _criar_tenant(db, TENANT_A1, "Loja A1")
+    _criar_tenant(db, TENANT_A2, "Loja A2")
+    _criar_tenant(db, TENANT_A3, "Loja A3")
+    _grupo(
+        db,
+        grupo_id_hint="A",
+        criado_por_empresa_id=TENANT_A1,
+        criado_por_usuario_id=usuario.id,
+        lojas=[TENANT_A1, TENANT_A2, TENANT_A3],
+    )
+
+
+def test_lista_lojas_do_grupo_marca_vinculado_e_atual_corretamente(db):
+    usuario = _usuario(db, email="titular@grupo-a.com", tenant_id=TENANT_A1)
+    _grupo_abc(db, usuario)
+    _criar_role_e_vinculo(db, tenant_id=TENANT_A1, usuario_id=usuario.id)
+    _criar_role_e_vinculo(db, tenant_id=TENANT_A2, usuario_id=usuario.id)
+    db.commit()
+
+    lojas = listar_lojas_do_grupo_com_vinculo(
+        db, tenant_origem_id=TENANT_A1, usuario_id=usuario.id
+    )
+    por_tenant = {loja["tenant_id"]: loja for loja in lojas}
+
+    assert len(lojas) == 3
+    assert por_tenant[TENANT_A1]["vinculado"] is True
+    assert por_tenant[TENANT_A1]["atual"] is True
+    assert por_tenant[TENANT_A2]["vinculado"] is True
+    assert por_tenant[TENANT_A2]["atual"] is False
+    assert por_tenant[TENANT_A3]["vinculado"] is False
+
+
+def test_desvincula_usuario_de_loja_quando_sobra_pelo_menos_uma(db):
+    usuario = _usuario(db, email="titular@grupo-a.com", tenant_id=TENANT_A1)
+    _grupo_abc(db, usuario)
+    _criar_role_e_vinculo(db, tenant_id=TENANT_A1, usuario_id=usuario.id)
+    _criar_role_e_vinculo(db, tenant_id=TENANT_A2, usuario_id=usuario.id)
+    db.commit()
+
+    desvincular_usuario_de_loja(
+        db, usuario=usuario, tenant_origem_id=TENANT_A1, tenant_destino_id=TENANT_A2
+    )
+
+    lojas = listar_lojas_do_grupo_com_vinculo(
+        db, tenant_origem_id=TENANT_A1, usuario_id=usuario.id
+    )
+    por_tenant = {loja["tenant_id"]: loja for loja in lojas}
+    assert por_tenant[TENANT_A2]["vinculado"] is False
+    assert por_tenant[TENANT_A1]["vinculado"] is True  # a outra loja continua ativa
+
+
+def test_rejeita_desvincular_a_ultima_loja_ativa_do_usuario(db):
+    """O requisito central: usuario nunca pode ficar sem nenhuma loja."""
+    usuario = _usuario(db, email="titular@grupo-a.com", tenant_id=TENANT_A1)
+    _grupo_abc(db, usuario)
+    _criar_role_e_vinculo(db, tenant_id=TENANT_A1, usuario_id=usuario.id)
+    db.commit()
+
+    with pytest.raises(VinculoLojaError) as excinfo:
+        desvincular_usuario_de_loja(
+            db, usuario=usuario, tenant_origem_id=TENANT_A1, tenant_destino_id=TENANT_A1
+        )
+
+    assert excinfo.value.status_code == 400
+    lojas = listar_lojas_do_grupo_com_vinculo(
+        db, tenant_origem_id=TENANT_A1, usuario_id=usuario.id
+    )
+    assert any(loja["vinculado"] for loja in lojas)  # continua com pelo menos 1
+
+
+def test_rejeita_desvincular_acesso_do_master_do_grupo_comercial(db):
+    usuario = _usuario(db, email="master@grupo-a.com", tenant_id=TENANT_A1)
+    usuario.master_grupo_id = 1
+    _grupo_abc(db, usuario)
+    _criar_role_e_vinculo(db, tenant_id=TENANT_A1, usuario_id=usuario.id)
+    _criar_role_e_vinculo(db, tenant_id=TENANT_A2, usuario_id=usuario.id)
+    db.commit()
+
+    with pytest.raises(VinculoLojaError) as excinfo:
+        desvincular_usuario_de_loja(
+            db, usuario=usuario, tenant_origem_id=TENANT_A1, tenant_destino_id=TENANT_A2
+        )
+
+    assert excinfo.value.status_code == 403
+
+
+def test_vincular_a_qualquer_loja_resolve_origem_sozinho(db):
+    """Usuario so tem acesso ativo na A2 (nao na loja de quem esta operando,
+    A1) — mesmo assim precisa dar pra vincular ele na A3, herdando o perfil
+    da A2 automaticamente."""
+    usuario = _usuario(db, email="titular@grupo-a.com", tenant_id=TENANT_A1)
+    _grupo_abc(db, usuario)
+    _criar_role_e_vinculo(db, tenant_id=TENANT_A2, usuario_id=usuario.id, nome_role="Gerente")
+    _criar_role_e_vinculo(db, tenant_id=TENANT_A3, usuario_id=999999, nome_role="Gerente")
+    db.commit()
+
+    vinculo = vincular_usuario_a_qualquer_loja_do_grupo(
+        db, usuario=usuario, tenant_destino_id=TENANT_A3
+    )
+
+    assert str(vinculo.tenant_id) == TENANT_A3

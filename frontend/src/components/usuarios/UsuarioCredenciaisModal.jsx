@@ -1,9 +1,7 @@
-import { Clipboard, KeyRound, RefreshCw, UserCheck } from "lucide-react";
+import { KeyRound, UserCheck } from "lucide-react";
 import { useEffect, useState } from "react";
-import { formatInitialAccessCredentials } from "../../utils/usuarioAcessoInicial";
 import { PERFIS_APP } from "../../utils/appAccessProfiles";
 import BotaoCancelar from "../v2/BotaoCancelar/BotaoCancelar";
-import BotaoInteracao from "../v2/BotaoInteracao/BotaoInteracao";
 import BotaoSalva from "../v2/BotaoSalva/BotaoSalva";
 import InputCheckGroup from "../v2/InputCheckGroup/InputCheckGroup";
 import InputCombobox from "../v2/InputCombobox/InputCombobox";
@@ -13,18 +11,15 @@ import ModalPadrao from "../v2/ModalPadrao/ModalPadrao";
 export default function UsuarioCredenciaisModal({
   credenciais,
   erro,
-  generatedPassword,
   loading,
   onChange,
   onClose,
-  onGenerate,
   onSalvarPerfisApp,
   onSubmit,
   perfisApp,
   pessoaVinculada,
   roles,
   savingPerfisApp,
-  tenantReference,
   usuario,
 }) {
   const [perfisSelecionados, setPerfisSelecionados] = useState([]);
@@ -35,20 +30,11 @@ export default function UsuarioCredenciaisModal({
 
   if (!usuario) return null;
 
-  const copiarSenha = async () => {
-    if (!generatedPassword) return;
-    await navigator.clipboard.writeText(generatedPassword);
-  };
-
-  const copiarDadosDeAcesso = async () => {
-    if (!generatedPassword || !tenantReference) return;
-    await navigator.clipboard.writeText(
-      formatInitialAccessCredentials({
-        tenant: tenantReference,
-        loginPhone: credenciais.login_phone,
-        password: generatedPassword,
-      }),
-    );
+  const alternarPerfisApp = async (novosPerfis) => {
+    const anteriores = perfisSelecionados;
+    setPerfisSelecionados(novosPerfis);
+    const sucesso = await onSalvarPerfisApp(novosPerfis);
+    if (!sucesso) setPerfisSelecionados(anteriores);
   };
 
   return (
@@ -59,9 +45,6 @@ export default function UsuarioCredenciaisModal({
       rodape={
         <>
           <BotaoCancelar onClick={onClose}>Fechar</BotaoCancelar>
-          <BotaoInteracao icon={RefreshCw} onClick={onGenerate} disabled={loading}>
-            Gerar nova senha
-          </BotaoInteracao>
           <BotaoSalva form="credenciais-usuario-form" icon={KeyRound} disabled={loading}>
             Salvar
           </BotaoSalva>
@@ -108,71 +91,18 @@ export default function UsuarioCredenciaisModal({
             onChange={(login_phone) => onChange({ ...credenciais, login_phone })}
             placeholder="(18) 99740-1641"
           />
-
-          <InputTexto
-            id="cred-password"
-            label="Definir nova senha (opcional)"
-            type="password"
-            value={credenciais.new_password}
-            onChange={(new_password) => onChange({ ...credenciais, new_password })}
-            placeholder="Mínimo 8 caracteres"
-            minLength={8}
-            maxLength={72}
-            autoComplete="new-password"
-          />
-
-          {generatedPassword ? (
-            <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 dark:border-emerald-500/30 dark:bg-emerald-500/10">
-              <p className="text-xs font-medium text-emerald-800 dark:text-emerald-200">
-                Copie e entregue esta senha ao usuário. Ela não será mostrada novamente.
-              </p>
-              <div className="mt-2 flex items-center gap-2">
-                <code className="min-w-0 flex-1 break-all rounded bg-white px-2 py-1.5 text-sm dark:bg-slate-900">
-                  {generatedPassword}
-                </code>
-                <BotaoInteracao icon={Clipboard} tamanho="pequeno" onClick={copiarSenha}>
-                  Copiar
-                </BotaoInteracao>
-              </div>
-              {tenantReference ? (
-                <button
-                  type="button"
-                  onClick={copiarDadosDeAcesso}
-                  className="mt-3 inline-flex items-center gap-2 text-xs font-semibold text-emerald-800 underline-offset-2 hover:underline dark:text-emerald-200"
-                >
-                  <Clipboard className="h-3.5 w-3.5" aria-hidden="true" />
-                  Copiar celular e nova senha
-                </button>
-              ) : null}
-            </div>
-          ) : null}
-
-          <p className="text-xs text-slate-500 dark:text-slate-400">
-            Ao trocar a senha, as sessões abertas desta conta serão encerradas.
-          </p>
         </form>
 
         <div className="border-t border-slate-200 pt-4 dark:border-slate-700">
           {pessoaVinculada ? (
-            <>
-              <InputCheckGroup
-                name="cred-perfis"
-                label="Perfis de acesso ao app (Clique para alternar permissão)"
-                opcoes={PERFIS_APP}
-                value={perfisSelecionados}
-                onChange={setPerfisSelecionados}
-              />
-              <div className="mt-3">
-                <BotaoSalva
-                  type="button"
-                  tamanho="pequeno"
-                  loading={savingPerfisApp}
-                  onClick={() => onSalvarPerfisApp(perfisSelecionados)}
-                >
-                  Salvar perfis de acesso
-                </BotaoSalva>
-              </div>
-            </>
+            <InputCheckGroup
+              name="cred-perfis"
+              label="Perfis de acesso ao app (clique para marcar ou desmarcar — salva na hora)"
+              opcoes={PERFIS_APP}
+              value={perfisSelecionados}
+              onChange={alternarPerfisApp}
+              disabled={savingPerfisApp}
+            />
           ) : (
             <>
               <span className="text-xs font-medium text-slate-600 dark:text-slate-300">

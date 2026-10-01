@@ -1,6 +1,6 @@
-import { KeyRound, LogOut, UserCheck, UserX } from "lucide-react";
+import { Building2, KeyRound, LogOut, Mail, UserCheck, UserX } from "lucide-react";
+import BotaoMenuAcoes from "../v2/BotaoMenuAcoes/BotaoMenuAcoes";
 import DataTable from "../ui/DataTable";
-import IconActionButton from "../ui/IconActionButton";
 import Panel from "../ui/Panel";
 import StatusBadge from "../ui/StatusBadge";
 import { formatBrazilianLoginPhone } from "../../utils/loginPhone";
@@ -15,7 +15,9 @@ export default function UsuariosTable({
   loading,
   onForcarLogout,
   onManageCredentials,
+  onRecriarSenha,
   onToggleStatus,
+  onVincularLoja,
   paginacaoRodape,
   usuarios,
 }) {
@@ -25,26 +27,41 @@ export default function UsuariosTable({
       header: "Acoes",
       align: "left",
       render: (usuario) => (
-        <div className="flex items-center justify-start gap-2">
-          <IconActionButton
-            icon={KeyRound}
-            intent="edit"
-            onClick={() => onManageCredentials(usuario)}
-            title="Gerenciar usuario e senha"
-          />
-          <IconActionButton
-            icon={LogOut}
-            intent="warning"
-            onClick={() => onForcarLogout(usuario.user_id)}
-            title="Forcar logout"
-          />
-          <IconActionButton
-            icon={usuario.is_active ? UserX : UserCheck}
-            intent={usuario.is_active ? "danger" : "success"}
-            onClick={() => onToggleStatus(usuario.user_id, usuario.is_active)}
-            title={usuario.is_active ? "Desativar acesso" : "Ativar acesso"}
-          />
-        </div>
+        <BotaoMenuAcoes
+          rotulo={`Mais ações para ${usuario.nome || usuario.login_phone || usuario.email}`}
+          acoes={[
+            {
+              icon: KeyRound,
+              label: "Gerenciar usuário e senha",
+              onClick: () => onManageCredentials(usuario),
+            },
+            {
+              icon: Mail,
+              label: "Recriar senha",
+              disabled: !usuario.email,
+              title: usuario.email
+                ? undefined
+                : "Usuário sem e-mail cadastrado — não é possível enviar recriação de senha",
+              onClick: () => onRecriarSenha(usuario.user_id),
+            },
+            {
+              icon: Building2,
+              label: "Vincular a outra loja do grupo",
+              onClick: () => onVincularLoja(usuario),
+            },
+            {
+              icon: LogOut,
+              label: "Forçar logout",
+              onClick: () => onForcarLogout(usuario.user_id),
+            },
+            {
+              icon: usuario.is_active ? UserX : UserCheck,
+              label: usuario.is_active ? "Desativar acesso" : "Ativar acesso",
+              tom: usuario.is_active ? "perigo" : "neutro",
+              onClick: () => onToggleStatus(usuario.user_id, usuario.is_active),
+            },
+          ]}
+        />
       ),
     },
     {
