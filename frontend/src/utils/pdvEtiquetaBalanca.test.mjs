@@ -1,6 +1,11 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { calcularItemEtiquetaBalanca, lerEtiquetaBalanca } from "./pdvEtiquetaBalanca.js";
+import {
+  calcularItemEtiquetaBalanca,
+  compararPrecosEtiquetaBalanca,
+  lerEtiquetaBalanca,
+} from "./pdvEtiquetaBalanca.js";
+import { montarItensVendaPayload } from "./pdvVendaPayload.js";
 
 const produtoGranel = {
   codigo: "2024",
@@ -31,19 +36,40 @@ test("rejeita erro de leitura, valor zerado e formato comum", () => {
   assert.equal(lerEtiquetaBalanca("7891234567895"), null);
 });
 
+test("compara preco da etiqueta e do sistema com o mesmo peso", () => {
+  const etiqueta = lerEtiquetaBalanca("2002024008961");
+  assert.deepEqual(
+    compararPrecosEtiquetaBalanca(etiqueta, { ...produtoGranel, preco_venda: 24.77 }, 28.9),
+    {
+      codigo: "2002024008961",
+      quantidade: 0.31,
+      precoKgEtiqueta: 28.9,
+      precoKgSistema: 24.77,
+      totalEtiqueta: 8.96,
+      totalSistema: 7.68,
+      pesoInformado: false,
+    },
+  );
+  assert.match(compararPrecosEtiquetaBalanca(etiqueta, produtoGranel, 24.77).erro, /não fecha/);
+  assert.match(
+    compararPrecosEtiquetaBalanca(etiqueta, produtoGranel, 28.9, "0,311").erro,
+    /não fecham/,
+  );
+});
+
 test("nao inventa peso quando preco por kg mudou ou ha mais de um peso possivel", () => {
   const etiqueta = lerEtiquetaBalanca("2002024015556");
   assert.match(
     calcularItemEtiquetaBalanca(etiqueta, { ...produtoGranel, preco_venda: 28.88 }).erro,
-    /peso único/,
+    /não fecha/,
   );
   assert.match(
     calcularItemEtiquetaBalanca(etiqueta, { ...produtoGranel, preco_venda: 5 }).erro,
-    /peso único/,
+    /mais de um peso/,
   );
   assert.match(
     calcularItemEtiquetaBalanca(etiqueta, { ...produtoGranel, preco_venda: 0 }).erro,
-    /Marque/,
+    /preço por kg/,
   );
   assert.match(
     calcularItemEtiquetaBalanca(etiqueta, { ...produtoGranel, unidade: "UN" }).erro,
@@ -53,4 +79,39 @@ test("nao inventa peso quando preco por kg mudou ou ha mais de um peso possivel"
     calcularItemEtiquetaBalanca(etiqueta, { ...produtoGranel, e_granel: false }).erro,
     /granel/,
   );
+});
+
+test("pede peso impresso quando o total aceita mais de um peso", () => {
+  const etiqueta = lerEtiquetaBalanca("2002024015556");
+  const resultado = compararPrecosEtiquetaBalanca(etiqueta, produtoGranel, 5, "3,110");
+  assert.equal(resultado.quantidade, 3.11);
+  assert.equal(resultado.totalEtiqueta, 15.55);
+  assert.equal(resultado.totalSistema, 89.88);
+});
+
+test("a venda preserva o preço por kg escolhido e o total correspondente", () => {
+  const comparacao = compararPrecosEtiquetaBalanca(
+    lerEtiquetaBalanca("2002024008961"),
+    { ...produtoGranel, preco_venda: 24.77 },
+    28.9,
+  );
+  for (const [preco, total] of [
+    [comparacao.precoKgEtiqueta, comparacao.totalEtiqueta],
+    [comparacao.precoKgSistema, comparacao.totalSistema],
+  ]) {
+    const [item] = montarItensVendaPayload({
+      itens: [
+        {
+          tipo: "produto",
+          produto_id: 2024,
+          quantidade: comparacao.quantidade,
+          preco_unitario: preco,
+          subtotal: total,
+        },
+      ],
+    });
+    assert.equal(item.quantidade, 0.31);
+    assert.equal(item.preco_unitario, preco);
+    assert.equal(item.subtotal, total);
+  }
 });

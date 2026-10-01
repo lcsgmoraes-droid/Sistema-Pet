@@ -9,6 +9,7 @@ import { useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { buscarClientePorId } from "../api/clientes";
 import PDVDriveAlertBanner from "../components/pdv/PDVDriveAlertBanner";
+import PDVEtiquetaBalancaModal from "../components/pdv/PDVEtiquetaBalancaModal";
 import PDVMainArea from "../components/pdv/PDVMainArea";
 import PDVOverlays from "../components/pdv/PDVOverlays";
 import { useAuth } from "../contexts/AuthContext";
@@ -352,6 +353,9 @@ export default function PDV() {
     itensKitExpandidos,
     mostrarSugestoesProduto,
     produtosSugeridos,
+    etiquetaPendente,
+    cancelarEtiquetaBalanca,
+    confirmarEtiquetaBalanca,
     alterarQuantidade,
     atualizarPetDoItem,
     atualizarProtocoloDoItem,
@@ -615,6 +619,13 @@ export default function PDV() {
       <div className="flex h-screen bg-gray-50" style={containerStyle}>
         <PDVMainArea {...mainAreaProps} />
         <PDVOverlays {...overlayProps} />
+        {etiquetaPendente && (
+          <PDVEtiquetaBalancaModal
+            pendencia={etiquetaPendente}
+            onConfirmar={confirmarEtiquetaBalanca}
+            onCancelar={cancelarEtiquetaBalanca}
+          />
+        )}
       </div>
     </>
   );

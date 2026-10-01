@@ -423,9 +423,9 @@ export default function PDVProdutosCard({
                         {item.etiqueta_balanca && (
                           <span
                             className="text-xs font-medium text-amber-700"
-                            title="Peso calculado pelo valor da etiqueta e pelo preco por kg cadastrado. Confira o peso impresso."
+                            title="Peso da etiqueta calculado ou informado no caixa. Confira o peso impresso."
                           >
-                            Peso calculado da etiqueta; confira o impresso
+                            Peso da etiqueta; confira o impresso
                           </span>
                         )}
                         {resumoPrecoKg.disponivel && (
