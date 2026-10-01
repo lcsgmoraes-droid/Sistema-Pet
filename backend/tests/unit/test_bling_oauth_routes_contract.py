@@ -9,6 +9,7 @@ from app.bling_oauth_routes import (
     _bling_redirect_uri,
     _encode_oauth_state,
     _html_erro,
+    _salvar_tokens,
     _trocar_code_por_tokens,
     _validate_oauth_state,
     buscar_configuracao_oauth_bling,
@@ -110,6 +111,32 @@ def test_bling_oauth_callback_salva_no_tenant_assinado(monkeypatch):
     assert captured["kwargs"]["tenant_id"] == tenant_id
     assert captured["args"] == ("access-gabi", "refresh-gabi")
     assert get_current_tenant() is None
+
+
+def test_oauth_uses_official_company_id_for_webhook(monkeypatch):
+    official_id = "d4475854366a36c86a37e792f9634a51"
+    captured = {}
+
+    class Response:
+        def raise_for_status(self):
+            pass
+
+        def json(self):
+            return {"data": {"id": official_id}}
+
+    def fake_get(url, *, headers, timeout):
+        assert url.endswith("/empresas/me/dados-basicos")
+        assert headers["Authorization"] == "Bearer access"
+        assert timeout == 5
+        return Response()
+
+    monkeypatch.setattr("app.bling_oauth_routes.requests.get", fake_get)
+    monkeypatch.setattr(
+        "app.bling_oauth_routes.save_bling_tokens",
+        lambda **kwargs: captured.update(kwargs),
+    )
+    _salvar_tokens("access", "refresh", tenant_id=uuid4(), db=object(), lock_held=True)
+    assert captured["webhook_company_id"] == official_id
 
 
 def test_callback_exibe_limite_temporario_sem_expor_codigo(monkeypatch):

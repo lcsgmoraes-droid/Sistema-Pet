@@ -121,6 +121,31 @@ def test_company_cannot_be_linked_to_two_tenants(db_session, monkeypatch):
         raise AssertionError("A mesma empresa Bling foi vinculada a dois tenants")
 
 
+def test_refresh_preserves_official_webhook_company_id(db_session, monkeypatch):
+    monkeypatch.setenv("PAYMENT_CONFIG_ENCRYPTION_KEY", "bling-test-master-key")
+    tenant_id = uuid4()
+    official_id = "d4475854366a36c86a37e792f9634a51"
+    save_bling_tokens(
+        tenant_id=tenant_id,
+        access_token=_jwt_with_company("12345678901"),
+        refresh_token="refresh-one",
+        webhook_company_id=official_id,
+        db=db_session,
+    )
+    renewed = save_bling_tokens(
+        tenant_id=tenant_id,
+        access_token=_jwt_with_company("12345678901"),
+        refresh_token="refresh-two",
+        increment_renewal=True,
+        db=db_session,
+    )
+    assert renewed.company_id == official_id
+    assert (
+        resolve_bling_webhook_tenant({"companyId": official_id}, db=db_session)
+        == tenant_id
+    )
+
+
 def test_refresh_invalido_pausa_renovacao_ate_nova_autorizacao(db_session, monkeypatch):
     monkeypatch.setenv("PAYMENT_CONFIG_ENCRYPTION_KEY", "bling-test-master-key")
     tenant_id = uuid4()

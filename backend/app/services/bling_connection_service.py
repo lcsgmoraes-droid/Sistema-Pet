@@ -268,6 +268,7 @@ def save_bling_tokens(
     refresh_token: str,
     expires_in: int = 21600,
     increment_renewal: bool = False,
+    webhook_company_id: str | None = None,
     db: Session | None = None,
 ) -> BlingConnection:
     resolved_tenant = _tenant_uuid(tenant_id)
@@ -296,7 +297,20 @@ def save_bling_tokens(
                 session.add(connection)
 
             previous_company_id = str(connection.company_id or "").strip() or None
-            company_id = extract_bling_company_id(access_token) or previous_company_id
+            # O ID do JWT pode ser numerico; o webhook usa o ID oficial de
+            # /empresas/me/dados-basicos. Uma renovacao nao deve desfazer o mapa.
+            company_id = (
+                str(webhook_company_id or "").strip()
+                or (
+                    previous_company_id
+                    if increment_renewal
+                    and previous_company_id
+                    and len(previous_company_id) == 32
+                    else None
+                )
+                or extract_bling_company_id(access_token)
+                or previous_company_id
+            )
             connection.access_token = access_token
             connection.refresh_token = refresh_token
             connection.company_id = company_id
