@@ -16,6 +16,7 @@ export default function useProdutosExclusao({
   const [resolvendoConflitoExclusao, setResolvendoConflitoExclusao] = useState(false);
   const [autoSelecionarConflito, setAutoSelecionarConflito] = useState(true);
   const [pularConfirmacaoConflito, setPularConfirmacaoConflito] = useState(false);
+  const [liberarSkuConflito, setLiberarSkuConflito] = useState(false);
 
   const obterNomeProduto = (id) => {
     const produto = produtosBrutos.find((item) => item.id === id);
@@ -139,7 +140,7 @@ export default function useProdutosExclusao({
       );
 
       const resultadosVariacoes = await Promise.allSettled(
-        variacoesSelecionadas.map((variacao) => deleteProduto(variacao.id)),
+        variacoesSelecionadas.map((variacao) => deleteProduto(variacao.id, liberarSkuConflito)),
       );
 
       const falhasVariacao = resultadosVariacoes
@@ -147,7 +148,7 @@ export default function useProdutosExclusao({
         .map((resultado) => extrairErroExclusao(resultado.reason));
 
       try {
-        await deleteProduto(bloqueio.parentId);
+        await deleteProduto(bloqueio.parentId, liberarSkuConflito);
         paisExcluidos.push(bloqueio);
       } catch (error) {
         const erroPai = extrairErroExclusao(error);
@@ -185,10 +186,15 @@ export default function useProdutosExclusao({
   };
 
   const handleExcluir = async (id) => {
-    if (!(await confirmarCorePet("Deseja realmente excluir este produto?"))) return;
+    const escolha = await confirmarCorePet({
+      mensagem: "Deseja realmente excluir este produto?",
+      rotuloOpcao: "Liberar o SKU para uso em outro produto. O cadastro antigo receberá um código interno.",
+    });
+    if (!escolha?.confirmado) return;
+    const liberarSku = escolha.opcaoMarcada;
 
     try {
-      await deleteProduto(id);
+      await deleteProduto(id, liberarSku);
       toast.success("Produto excluido com sucesso!");
       carregarDados();
     } catch (error) {
@@ -196,6 +202,7 @@ export default function useProdutosExclusao({
       const erro = extrairErroExclusao(error);
 
       if (erro.statusCode === 409) {
+        setLiberarSkuConflito(liberarSku);
         const abriuModal = await abrirModalConflitoExclusao([{ id, ...erro }]);
         if (abriuModal) {
           return;
@@ -207,11 +214,14 @@ export default function useProdutosExclusao({
   };
 
   const handleExcluirSelecionados = async (selecionados) => {
-    if (!(await confirmarCorePet(`Deseja realmente excluir ${selecionados.length} produtos?`))) {
-      return;
-    }
+    const escolha = await confirmarCorePet({
+      mensagem: `Deseja realmente excluir ${selecionados.length} produtos?`,
+      rotuloOpcao: "Liberar os SKUs destes produtos para uso em novos cadastros.",
+    });
+    if (!escolha?.confirmado) return;
+    const liberarSku = escolha.opcaoMarcada;
 
-    const resultados = await Promise.allSettled(selecionados.map((id) => deleteProduto(id)));
+    const resultados = await Promise.allSettled(selecionados.map((id) => deleteProduto(id, liberarSku)));
 
     const idsExcluidos = [];
     const falhas = [];
@@ -235,6 +245,7 @@ export default function useProdutosExclusao({
     }
 
     if (falhas.length > 0) {
+      setLiberarSkuConflito(liberarSku);
       const abriuModal = await abrirModalConflitoExclusao(falhas);
       if (abriuModal) {
         setSelecionados(falhas.map((falha) => falha.id));
@@ -258,18 +269,35 @@ export default function useProdutosExclusao({
   const handleToggleAtivo = async (produto) => {
     const proximoAtivo = produto.ativo === false;
     const acao = proximoAtivo ? "ativar" : "desativar";
-
-    if (!(await confirmarCorePet(`Deseja realmente ${acao} o produto "${produto.nome}"?`))) {
-      return;
-    }
+    const escolha = await confirmarCorePet({
+      mensagem: `Deseja realmente ${acao} o produto "${produto.nome}"?`,
+      ...(!proximoAtivo && {
+        rotuloOpcao: "Liberar o SKU para uso em outro produto. O cadastro antigo receberá um código interno.",
+      }),
+    });
+    if (proximoAtivo ? !escolha : !escolha?.confirmado) return;
 
     try {
-      await toggleProdutoAtivo(produto.id, proximoAtivo);
-      toast.success(`Produto ${proximoAtivo ? "ativado" : "desativado"} com sucesso!`);
+      await toggleProdutoAtivo(produto.id, proximoAtivo, escolha?.opcaoMarcada || false);
+      toast.success(escolha?.opcaoMarcada ? "Produto inativado e SKU liberado!" : `Produto ${proximoAtivo ? "ativado" : "desativado"} com sucesso!`);
       carregarDados();
     } catch (error) {
       console.error(`Erro ao ${acao} produto:`, error);
       alert(`Erro ao ${acao} produto`);
+    }
+  };
+
+  const handleLiberarSku = async (produto) => {
+    if (!(await confirmarCorePet({
+      mensagem: `Liberar o SKU "${produto.codigo}" do produto inativo "${produto.nome}"? O cadastro antigo receberá um código interno e manterá seu histórico.`,
+      confirmarTexto: "Liberar SKU",
+    }))) return;
+    try {
+      await toggleProdutoAtivo(produto.id, false, true);
+      toast.success(`SKU ${produto.codigo} liberado para novo cadastro!`);
+      await carregarDados();
+    } catch (error) {
+      alert(corrigirTextoQuebrado(error?.response?.data?.detail) || "Erro ao liberar SKU.");
     }
   };
 
@@ -278,6 +306,7 @@ export default function useProdutosExclusao({
     bloqueiosExclusao,
     handleExcluir,
     handleExcluirSelecionados,
+    handleLiberarSku,
     handleResolverConflitosExclusao,
     handleSelecionarTodasVariacoesDoPai,
     handleSelecionarVariacaoConflito,

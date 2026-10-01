@@ -425,6 +425,7 @@ class ProdutoCompostoPrecoVendaPreviewResponse(BaseModel):
 
 class ProdutoAtivoUpdate(BaseModel):
     ativo: bool
+    liberar_sku: bool = False
 
 
 class ProdutoFusaoPreviewRequest(BaseModel):

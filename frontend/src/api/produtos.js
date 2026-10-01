@@ -233,15 +233,15 @@ export const previewPrecosVendaProdutosCompostos = (id, precoVenda) => {
 /**
  * Excluir produto (soft delete)
  */
-export const deleteProduto = (id) => {
-  return api.delete(`/produtos/${id}`);
+export const deleteProduto = (id, liberarSku = false) => {
+  return api.delete(`/produtos/${id}`, { params: { liberar_sku: liberarSku } });
 };
 
 /**
  * Ativar ou desativar produto
  */
-export const toggleProdutoAtivo = (id, ativo) => {
-  return api.patch(`/produtos/${id}/ativo`, { ativo });
+export const toggleProdutoAtivo = (id, ativo, liberarSku = false) => {
+  return api.patch(`/produtos/${id}/ativo`, { ativo, liberar_sku: liberarSku });
 };
 
 export const previewFusaoProdutos = (data) => {

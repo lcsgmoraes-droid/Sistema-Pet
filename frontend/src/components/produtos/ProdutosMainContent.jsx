@@ -19,6 +19,7 @@ export default function ProdutosMainContent({
   handleCancelarEdicaoPreco,
   handleEditarPreco,
   handleExcluir,
+  handleLiberarSku,
   handleFiltroChange,
   handleSalvarMargem,
   handleSalvarPreco,
@@ -111,6 +112,7 @@ export default function ProdutosMainContent({
         handleCancelarEdicaoPreco={handleCancelarEdicaoPreco}
         handleEditarPreco={handleEditarPreco}
         handleExcluir={handleExcluir}
+        handleLiberarSku={handleLiberarSku}
         handleSalvarMargem={handleSalvarMargem}
         handleSalvarPreco={handleSalvarPreco}
         handleSelecionar={handleSelecionar}
