@@ -29,6 +29,13 @@ body {
   color: var(--color-text-primary);
 }
 
+input,
+select,
+textarea,
+[contenteditable="true"] {
+  scroll-margin-block: 24px;
+}
+
 :root {
   color-scheme: light;
   --color-app-bg: #f8fafc;

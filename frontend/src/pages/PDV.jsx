@@ -457,6 +457,7 @@ export default function PDV() {
     emitirNotaVendaFinalizada,
     mudarStatusParaAberta,
     habilitarEdicao,
+    carregarVendaEspecifica,
     setMostrarModalCliente,
     setMostrarHistoricoCliente,
     setMostrarModalAdicionarCredito,
