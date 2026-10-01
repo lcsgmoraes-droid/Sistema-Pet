@@ -631,6 +631,13 @@ class Tenant(Base):
     banner_3_url = Column(String(500), nullable=True)
     status = Column(String(50), nullable=False, server_default="active")
     plan = Column(String(50), nullable=False, server_default="free")
+    # Plano contratado por segmento — um tenant pode ter mais de um segmento
+    # ativo ao mesmo tempo (ex. pet-start + vet-start simultaneos). NULL =
+    # segmento nao contratado. Substitui `plan` (campo legado, mantido por
+    # enquanto para nao quebrar leitores ainda nao migrados).
+    plan_pet = Column(String(50), nullable=True)
+    plan_vet = Column(String(50), nullable=True)
+    plan_grooming = Column(String(50), nullable=True)
     billing_status = Column(String(20), nullable=False, server_default="active")
     trial_started_at = Column(DateTime(timezone=True), nullable=True)
     trial_ends_at = Column(DateTime(timezone=True), nullable=True)

@@ -11,6 +11,7 @@ import {
   formatDate,
   shortId,
   statusBadge,
+  tenantPlanosSegmento,
 } from "./opsTenantsFormatters";
 
 function valorCobradoLabel(cents) {
@@ -51,9 +52,14 @@ function TenantRow({ tenant, selected, onSelect, onManage }) {
       </td>
       <td className="px-4 py-3 align-top">
         <div className="flex flex-wrap gap-2">
-          <OpsTenantsBadge className="border-blue-200 bg-blue-50 text-blue-700">
-            {tenant.plan || "free"}
-          </OpsTenantsBadge>
+          {tenantPlanosSegmento(tenant).map(({ label, codigo }) => (
+            <OpsTenantsBadge
+              key={label || codigo}
+              className="border-blue-200 bg-blue-50 text-blue-700"
+            >
+              {label ? `${label}: ${codigo}` : codigo}
+            </OpsTenantsBadge>
+          ))}
           <OpsTenantsBadge className={billingBadge(tenant.billing_status)}>
             {tenant.billing_status || "active"}
           </OpsTenantsBadge>

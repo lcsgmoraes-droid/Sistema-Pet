@@ -253,6 +253,18 @@ def get_plan(value: str | None) -> PlanDefinition | None:
     return PLAN_CATALOG.get(normalize_plan_code(value))
 
 
+# Nome do campo em Tenant/BillingOffer que guarda o plano de cada segmento.
+SEGMENT_PLAN_FIELD: Final[dict[str, str]] = {
+    "pet": "plan_pet",
+    "vet": "plan_vet",
+    "grooming": "plan_grooming",
+}
+
+
+def segment_plan_field(plan: PlanDefinition) -> str | None:
+    return SEGMENT_PLAN_FIELD.get(plan.segment)
+
+
 def normalize_organization_type(value: str | None) -> str:
     normalized = (value or "").strip().lower()
     return ORGANIZATION_TYPE_ALIASES.get(normalized, normalized)

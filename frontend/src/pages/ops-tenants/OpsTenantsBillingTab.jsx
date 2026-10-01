@@ -6,7 +6,12 @@ import ModalPadrao from "../../components/v2/ModalPadrao/ModalPadrao";
 import OpsTenantsBadge from "./OpsTenantsBadge";
 import OpsTenantsCommercialEditPanel from "./OpsTenantsCommercialEditPanel";
 import OpsTenantBillingOfferPanel from "./OpsTenantBillingOfferPanel";
-import { billingBadge, formatDate, shortId } from "./opsTenantsFormatters";
+import {
+  billingBadge,
+  formatDate,
+  shortId,
+  tenantPlanosSegmento,
+} from "./opsTenantsFormatters";
 
 export default function OpsTenantsBillingTab({
   items,
@@ -104,9 +109,16 @@ export default function OpsTenantsBillingTab({
                         </div>
                       </td>
                       <td className="px-4 py-3">
-                        <OpsTenantsBadge className="border-blue-200 bg-blue-50 text-blue-700">
-                          {tenant.plan || "free"}
-                        </OpsTenantsBadge>
+                        <div className="flex flex-wrap gap-1">
+                          {tenantPlanosSegmento(tenant).map(({ label, codigo }) => (
+                            <OpsTenantsBadge
+                              key={label || codigo}
+                              className="border-blue-200 bg-blue-50 text-blue-700"
+                            >
+                              {label ? `${label}: ${codigo}` : codigo}
+                            </OpsTenantsBadge>
+                          ))}
+                        </div>
                       </td>
                       <td className="px-4 py-3">
                         <OpsTenantsBadge

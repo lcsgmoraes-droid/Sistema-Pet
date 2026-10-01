@@ -609,6 +609,9 @@ def _tenant_row_to_item(db: Session, row: dict[str, Any]) -> dict[str, Any]:
         "name": row["name"],
         "status": row.get("status") or "active",
         "plan": row.get("plan") or "free",
+        "plan_pet": row.get("plan_pet"),
+        "plan_vet": row.get("plan_vet"),
+        "plan_grooming": row.get("plan_grooming"),
         "billing_status": row.get("billing_status") or "active",
         "valor_cobrado_cents": _valor_cobrado_cents(db, tenant_id),
         "subscription_source": row.get("subscription_source") or "manual",
@@ -641,7 +644,8 @@ def _fetch_tenant_item(db: Session, tenant_id: str) -> dict[str, Any]:
     row = (
         db.execute(
             text("""
-            SELECT id, name, status, plan, billing_status, subscription_source,
+            SELECT id, name, status, plan, plan_pet, plan_vet, plan_grooming,
+                   billing_status, subscription_source,
                    subscription_activated_at, organization_type,
                    onboarding_owner_name, onboarding_unblocked_on, onboarding_next_contact_on,
                    onboarding_satisfaction, onboarding_follow_up_updated_at,
@@ -688,7 +692,8 @@ def list_ops_tenants(
     where_sql = f"WHERE {' AND '.join(clauses)}" if clauses else ""
     rows = db.execute(
         text(f"""
-            SELECT id, name, status, plan, billing_status, subscription_source,
+            SELECT id, name, status, plan, plan_pet, plan_vet, plan_grooming,
+                   billing_status, subscription_source,
                    subscription_activated_at, organization_type,
                    onboarding_owner_name, onboarding_unblocked_on, onboarding_next_contact_on,
                    onboarding_satisfaction, onboarding_follow_up_updated_at,
@@ -856,7 +861,8 @@ def list_ops_tenants_grouped(
 
     rows = db.execute(
         text("""
-            SELECT id, name, status, plan, billing_status, subscription_source,
+            SELECT id, name, status, plan, plan_pet, plan_vet, plan_grooming,
+                   billing_status, subscription_source,
                    subscription_activated_at, organization_type,
                    onboarding_owner_name, onboarding_unblocked_on, onboarding_next_contact_on,
                    onboarding_satisfaction, onboarding_follow_up_updated_at,

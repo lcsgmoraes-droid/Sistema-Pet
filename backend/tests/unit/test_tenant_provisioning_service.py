@@ -65,6 +65,10 @@ def test_provision_tenant_cria_usuario_novo_tenant_e_roles_e_limpa_contexto(db):
     assert resultado.created_new_user is True
     assert resultado.tenant.name == "Loja Nova"
     assert resultado.login_name == "Loja Nova"
+    assert resultado.tenant.plan == "pet-start"
+    assert resultado.tenant.plan_pet == "pet-start"
+    assert resultado.tenant.plan_vet is None
+    assert resultado.tenant.plan_grooming is None
 
     # sem restore_tenant_id -> contexto e limpo no final, nao deixa vazamento
     # pro proximo objeto criado fora dessa chamada.

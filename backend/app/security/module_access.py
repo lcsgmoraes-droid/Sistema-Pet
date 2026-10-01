@@ -15,13 +15,13 @@ from app.db import get_session
 from app.models import AssinaturaModulo, Tenant
 from app.routes.modulos_routes import (
     MODULOS_PREMIUM,
-    PLANOS_LEGADO_LIBERADOS,
-    PLANOS_TODOS_MODULOS,
     _assinatura_resumo_tenant,
+    _planos_catalogo_segmento,
+    _planos_segmento_tenant,
     _resolver_modulos_ativos,
     _trial_completo_ativo,
 )
-from app.services.plan_catalog import ALL_PUBLIC_ENTITLEMENTS, get_plan
+from app.services.plan_catalog import ALL_PUBLIC_ENTITLEMENTS
 
 optional_security = HTTPBearer(auto_error=False)
 
@@ -69,11 +69,9 @@ def _load_active_modules(
         tenant.modulos_ativos,
         assinaturas,
         agora,
-        tenant.plan,
+        _planos_segmento_tenant(tenant),
         liberar_trial_completo=_trial_completo_ativo(tenant, agora),
-        liberar_modulos_do_plano=_assinatura_resumo_tenant(tenant, agora)[
-            "status_efetivo"
-        ]
+        acesso_liberado=_assinatura_resumo_tenant(tenant, agora)["status_efetivo"]
         in {"active", "trial"},
     )
 
@@ -86,17 +84,17 @@ def _load_active_entitlements(
     if not tenant:
         return []
 
-    plano_normalizado = str(tenant.plan or "").strip().lower()
     assinatura = _assinatura_resumo_tenant(tenant, agora)
     if assinatura["acesso_completo_durante_trial"]:
         return sorted(ALL_PUBLIC_ENTITLEMENTS)
-    if plano_normalizado in PLANOS_LEGADO_LIBERADOS | PLANOS_TODOS_MODULOS:
-        return sorted(ALL_PUBLIC_ENTITLEMENTS)
     if assinatura["status_efetivo"] != "active":
+        # Cobranca com problema bloqueia entitlements tambem, sem excecao
+        # para plano legado — esses tenants serao reatribuidos a planos
+        # reais via o fluxo de aditivo comercial.
         return []
 
-    plano = get_plan(tenant.plan)
-    return sorted(plano.entitlements) if plano else []
+    planos = _planos_catalogo_segmento(tenant)
+    return sorted({recurso for plano in planos for recurso in plano.entitlements})
 
 
 def _is_public_bling_webhook(modulo: str, request: Request | None) -> bool:

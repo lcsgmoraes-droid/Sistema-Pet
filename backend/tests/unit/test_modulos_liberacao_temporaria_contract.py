@@ -20,7 +20,7 @@ def test_plano_legado_free_preserva_modulos_exceto_contratacoes_separadas():
         raw_modulos=None,
         assinaturas_ativas=[],
         agora=datetime(2026, 4, 24, tzinfo=timezone.utc),
-        plano="free",
+        planos=("free",),
     )
 
     assert set(ativos) >= set(MODULOS_PREMIUM - MODULOS_CONTRATACAO_SEPARADA)
@@ -32,7 +32,7 @@ def test_plano_basico_nao_libera_extras_sem_assinatura_ou_modulo_expresso():
         raw_modulos=None,
         assinaturas_ativas=[],
         agora=datetime(2026, 5, 13, tzinfo=timezone.utc),
-        plano="basico",
+        planos=("basico",),
     )
 
     assert ativos == []
@@ -43,7 +43,7 @@ def test_trial_ativo_libera_todos_modulos_corepet_sem_integracao_externa():
         raw_modulos=None,
         assinaturas_ativas=[],
         agora=datetime(2026, 7, 18, tzinfo=timezone.utc),
-        plano="pet-start",
+        planos=("pet-start",),
         liberar_trial_completo=True,
     )
 
@@ -72,7 +72,7 @@ def test_plano_basico_preserva_assinaturas_ativas_e_ignora_expiradas():
         raw_modulos='["entregas"]',
         assinaturas_ativas=assinaturas,
         agora=agora,
-        plano="basico",
+        planos=("basico",),
     )
 
     assert "entregas" in ativos
@@ -85,11 +85,59 @@ def test_plano_completo_nao_libera_modulo_fiscal_sem_contratacao():
         raw_modulos=None,
         assinaturas_ativas=[],
         agora=datetime(2026, 5, 13, tzinfo=timezone.utc),
-        plano="enterprise",
+        planos=("enterprise",),
     )
 
     assert set(ativos) == set(MODULOS_PREMIUM - MODULOS_CONTRATACAO_SEPARADA)
     assert "fiscal" not in ativos
+
+
+def test_cobranca_bloqueada_zera_modulo_manual_e_assinatura_nao_so_o_do_plano():
+    """Regressao do bug corrigido: antes, so os modulos do plano eram
+    bloqueados quando a cobranca tinha problema — modulos ativados manualmente
+    (modulos_ativos) e via AssinaturaModulo continuavam liberados mesmo com
+    billing bloqueado. Agora acesso_liberado=False bloqueia as 3 fontes."""
+    assinaturas = [SimpleNamespace(modulo="compras", data_fim=None)]
+
+    ativos = _resolver_modulos_ativos(
+        raw_modulos='["entregas"]',
+        assinaturas_ativas=assinaturas,
+        agora=datetime(2026, 9, 1, tzinfo=timezone.utc),
+        planos=("pet-gestao",),
+        acesso_liberado=False,
+    )
+
+    assert ativos == []
+
+
+def test_cobranca_liberada_mantem_as_3_fontes_unidas():
+    assinaturas = [SimpleNamespace(modulo="compras", data_fim=None)]
+
+    ativos = _resolver_modulos_ativos(
+        raw_modulos='["entregas"]',
+        assinaturas_ativas=assinaturas,
+        agora=datetime(2026, 9, 1, tzinfo=timezone.utc),
+        planos=("pet-gestao",),
+        acesso_liberado=True,
+    )
+
+    assert "entregas" in ativos
+    assert "compras" in ativos
+    assert "financeiro_erp" in ativos  # modulo do plano pet-gestao
+
+
+def test_dois_planos_de_segmento_simultaneos_unem_os_modulos():
+    ativos = _resolver_modulos_ativos(
+        raw_modulos=None,
+        assinaturas_ativas=[],
+        agora=datetime(2026, 9, 1, tzinfo=timezone.utc),
+        planos=("pet-gestao", "vet-start"),
+    )
+
+    assert "compras" in ativos  # exclusivo do pet-gestao
+    assert "financeiro_erp" in ativos  # exclusivo do pet-gestao
+    assert "veterinario" in ativos  # exclusivo do vet-start
+    assert "app_mobile" in ativos  # exclusivo do vet-start
 
 
 def test_modulo_fiscal_expresso_e_preservado_em_qualquer_plano():
@@ -97,7 +145,7 @@ def test_modulo_fiscal_expresso_e_preservado_em_qualquer_plano():
         raw_modulos='["fiscal"]',
         assinaturas_ativas=[],
         agora=datetime(2026, 9, 17, tzinfo=timezone.utc),
-        plano="pet-start",
+        planos=("pet-start",),
     )
 
     assert "fiscal" in ativos

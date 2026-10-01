@@ -26,6 +26,9 @@ def ops_tenants_session():
             name TEXT NOT NULL,
             status TEXT,
             plan TEXT,
+            plan_pet TEXT,
+            plan_vet TEXT,
+            plan_grooming TEXT,
             billing_status TEXT,
             subscription_source TEXT,
             subscription_activated_at TEXT,
@@ -35,6 +38,7 @@ def ops_tenants_session():
             onboarding_next_contact_on TEXT,
             onboarding_satisfaction TEXT NOT NULL DEFAULT 'not_collected',
             onboarding_follow_up_updated_at TEXT,
+            onboarding_credencial_email_pendente BOOLEAN NOT NULL DEFAULT 0,
             created_at TEXT,
             updated_at TEXT
         )
@@ -401,27 +405,27 @@ def test_dissatisfied_pilot_gets_recovery_action(ops_tenants_session):
 def test_update_ops_tenant_commercial_state_changes_safe_fields(ops_tenants_session):
     from app.services.ops_tenants_service import update_ops_tenant_commercial_state
 
+    # Plano e origem da assinatura nao sao mais editaveis por este painel
+    # rapido — qualquer mudanca de plano agora exige um aditivo comercial
+    # (BillingOffer) com aceite do cliente. Só status/billing_status seguem
+    # aqui, para ajuste operacional imediato.
     tenant = update_ops_tenant_commercial_state(
         ops_tenants_session,
         tenant_id=TARGET_TENANT,
         changes={
             "status": "suspended",
-            "plan": "premium",
             "billing_status": "past_due",
-            "subscription_source": "manual",
         },
     )
 
     assert tenant["id"] == TARGET_TENANT
     assert tenant["status"] == "suspended"
-    assert tenant["plan"] == "premium"
     assert tenant["billing_status"] == "past_due"
-    assert tenant["subscription_source"] == "manual"
 
     row = (
         ops_tenants_session.execute(
             text("""
-            SELECT status, plan, billing_status, subscription_source
+            SELECT status, billing_status
             FROM tenants
             WHERE id = :tenant_id
             """),
@@ -432,9 +436,7 @@ def test_update_ops_tenant_commercial_state_changes_safe_fields(ops_tenants_sess
     )
     assert dict(row) == {
         "status": "suspended",
-        "plan": "premium",
         "billing_status": "past_due",
-        "subscription_source": "manual",
     }
 
 
@@ -444,12 +446,34 @@ def test_update_ops_tenant_commercial_state_rejects_invalid_values(ops_tenants_s
         update_ops_tenant_commercial_state,
     )
 
-    with pytest.raises(OpsTenantActionError, match="Plano invalido"):
+    with pytest.raises(OpsTenantActionError, match="Status de cobranca invalido"):
         update_ops_tenant_commercial_state(
             ops_tenants_session,
             tenant_id=TARGET_TENANT,
-            changes={"plan": "plano sem cadastro"},
+            changes={"billing_status": "status sem cadastro"},
         )
+
+
+def test_update_ops_tenant_commercial_state_ignores_plan_and_source_fields(
+    ops_tenants_session,
+):
+    """`plan`/`subscription_source` nao fazem mais parte do painel rapido —
+    se ainda chegarem no payload (ex.: cliente antigo em cache), sao
+    simplesmente ignorados, sem erro e sem alterar o banco."""
+    from app.services.ops_tenants_service import update_ops_tenant_commercial_state
+
+    tenant = update_ops_tenant_commercial_state(
+        ops_tenants_session,
+        tenant_id=TARGET_TENANT,
+        changes={
+            "status": "suspended",
+            "plan": "premium",
+            "subscription_source": "manual",
+        },
+    )
+
+    assert tenant["status"] == "suspended"
+    assert tenant["plan"] == "basico"  # valor original, nao foi tocado
 
 
 def test_update_ops_tenant_onboarding_follow_up_saves_safe_fields(

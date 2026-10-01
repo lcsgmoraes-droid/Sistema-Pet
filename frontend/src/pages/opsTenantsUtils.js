@@ -130,25 +130,23 @@ export function buildOpsTenantTabSummaries(items = [], summary = {}) {
   };
 }
 
+// Plano e origem da assinatura nao sao mais editaveis por este painel rapido
+// — qualquer mudanca de plano agora exige um aditivo comercial (proposta
+// BillingOffer) com aceite do cliente. Esses dois campos ficam so leitura
+// (ver tenant.plan_pet/plan_vet/plan_grooming), nao fazem parte do form.
 export function buildOpsTenantCommercialForm(tenant = {}) {
   return {
     status: String(tenant?.status || "active")
       .trim()
       .toLowerCase(),
-    plan: String(tenant?.plan || "basico")
-      .trim()
-      .toLowerCase(),
     billing_status: String(tenant?.billing_status || "active")
-      .trim()
-      .toLowerCase(),
-    subscription_source: String(tenant?.subscription_source || "manual")
       .trim()
       .toLowerCase(),
   };
 }
 
 export function buildOpsTenantCommercialPayload(current = {}, next = {}) {
-  return ["status", "plan", "billing_status", "subscription_source"].reduce((payload, field) => {
+  return ["status", "billing_status"].reduce((payload, field) => {
     const currentValue = String(current?.[field] || "")
       .trim()
       .toLowerCase();

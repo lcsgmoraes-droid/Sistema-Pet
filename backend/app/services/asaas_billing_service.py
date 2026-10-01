@@ -18,7 +18,7 @@ from app.services.billing_contract_service import (
     acceptance_to_public,
     build_contract_acceptance,
 )
-from app.services.plan_catalog import PlanDefinition, get_plan
+from app.services.plan_catalog import PlanDefinition, get_plan, segment_plan_field
 
 
 ASAAS_BASE_URLS = {
@@ -346,6 +346,9 @@ def create_subscription(
         payment = _subscription_payment(client, subscription_id)
 
     tenant.plan = plan.code
+    campo_segmento = segment_plan_field(plan)
+    if campo_segmento:
+        setattr(tenant, campo_segmento, plan.code)
     tenant.subscription_source = "asaas"
     tenant.billing_provider_environment = client.environment
     tenant.billing_type = normalized_type

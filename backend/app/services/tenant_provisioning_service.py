@@ -29,6 +29,7 @@ from app.auth.auth_multitenant_support import DEFAULT_TRIAL_DAYS, _now_utc
 from app.models import Role, Tenant, User, UserTenant
 from app.auth.auth_multitenant_support import grant_all_permissions_to_role
 from app.services.default_roles_service import create_default_roles_for_new_tenant
+from app.services.plan_catalog import get_plan, segment_plan_field
 from app.services.tenant_onboarding_service import onboard_tenant_defaults
 from app.services.tenant_login_name_service import (
     TenantLoginNameError,
@@ -99,6 +100,12 @@ def provision_tenant(
 
     tenant_id = uuid.uuid4()
     trial_started_at = _now_utc() if grant_trial else None
+    plano_catalogo = get_plan(plan_code)
+    segmento_kwargs = (
+        {segment_plan_field(plano_catalogo): plano_catalogo.code}
+        if plano_catalogo and segment_plan_field(plano_catalogo)
+        else {}
+    )
     tenant = Tenant(
         id=str(tenant_id),
         name=tenant_name,
@@ -112,6 +119,7 @@ def provision_tenant(
         subscription_source="manual",
         organization_type=organization_type,
         cnpj=cnpj,
+        **segmento_kwargs,
     )
     db.add(tenant)
     # Sem context ainda — falhas daqui pra baixo (nome de acesso duplicado)

@@ -25,7 +25,7 @@ from app.services.modulo_activation_service import (
     ModuloActivationError,
     ativar_modulo_manual,
 )
-from app.services.plan_catalog import PLAN_CATALOG, get_plan
+from app.services.plan_catalog import PLAN_CATALOG, get_plan, segment_plan_field
 from app.services.plan_limits import active_session_usage, monthly_sales_usage
 from app.tenancy.context import set_current_tenant
 
@@ -204,33 +204,81 @@ def _resolver_modulos_ativos(
     raw_modulos: str | None,
     assinaturas_ativas: list[AssinaturaModulo],
     agora: datetime,
-    plano: str | None = None,
+    planos: tuple[str | None, ...] = (),
     liberar_trial_completo: bool = False,
-    liberar_modulos_do_plano: bool = True,
+    acesso_liberado: bool = True,
 ) -> list[str]:
-    modulos_do_tenant = set(_normalizar_modulos_ativos(raw_modulos))
-    plano_normalizado = (plano or "").strip().lower()
+    """Une as 3 fontes de modulo liberado (manual, AssinaturaModulo, planos de
+    segmento). Quando `acesso_liberado` e False (cobranca com problema), nenhuma
+    das 3 fontes libera nada — so o trial completo (ortogonal a billing) segue
+    valendo. `planos` e a lista dos ate-3 codigos de segmento do tenant
+    (plan_pet/plan_vet/plan_grooming), filtrando os vazios.
+    """
+    modulos_do_tenant: set[str] = set()
 
-    for assinatura in assinaturas_ativas:
-        # Respeita data_fim se definida
-        if assinatura.data_fim and assinatura.data_fim < agora:
-            continue
-        modulos_do_tenant.add(assinatura.modulo)
+    if acesso_liberado:
+        modulos_do_tenant |= set(_normalizar_modulos_ativos(raw_modulos))
 
-    if (
-        plano_normalizado in PLANOS_LEGADO_LIBERADOS
-        or plano_normalizado in PLANOS_TODOS_MODULOS
-    ):
-        modulos_do_tenant.update(MODULOS_PREMIUM - MODULOS_CONTRATACAO_SEPARADA)
+        for assinatura in assinaturas_ativas:
+            # Respeita data_fim se definida
+            if assinatura.data_fim and assinatura.data_fim < agora:
+                continue
+            modulos_do_tenant.add(assinatura.modulo)
 
-    plano_catalogo = get_plan(plano)
-    if liberar_modulos_do_plano and plano_catalogo:
-        modulos_do_tenant.update(plano_catalogo.modules)
+        for plano in planos:
+            plano_normalizado = (plano or "").strip().lower()
+            if not plano_normalizado:
+                continue
+            if (
+                plano_normalizado in PLANOS_LEGADO_LIBERADOS
+                or plano_normalizado in PLANOS_TODOS_MODULOS
+            ):
+                modulos_do_tenant.update(MODULOS_PREMIUM - MODULOS_CONTRATACAO_SEPARADA)
+
+            plano_catalogo = get_plan(plano)
+            if plano_catalogo:
+                modulos_do_tenant.update(plano_catalogo.modules)
 
     if liberar_trial_completo:
         modulos_do_tenant.update(MODULOS_TRIAL_COMPLETO)
 
     return sorted(modulo for modulo in modulos_do_tenant if modulo in MODULOS_PREMIUM)
+
+
+def _planos_segmento_tenant(tenant: Tenant) -> tuple[str, ...]:
+    """Ate-3 codigos de plano de segmento do tenant (plan_pet/plan_vet/
+    plan_grooming), filtrando os vazios. Fallback para o `plan` legado quando
+    nenhum dos 3 campos novos esta preenchido (tenants ainda nao migrados)."""
+    segmentos = tuple(
+        codigo
+        for codigo in (
+            getattr(tenant, "plan_pet", None),
+            getattr(tenant, "plan_vet", None),
+            getattr(tenant, "plan_grooming", None),
+        )
+        if codigo
+    )
+    if segmentos:
+        return segmentos
+    plano_legado = getattr(tenant, "plan", None)
+    return (plano_legado,) if plano_legado else ()
+
+
+def _planos_catalogo_segmento(tenant: Tenant) -> list:
+    return [
+        plano_catalogo
+        for codigo in _planos_segmento_tenant(tenant)
+        if (plano_catalogo := get_plan(codigo))
+    ]
+
+
+def _atribuir_plano_segmento(tenant: Tenant, plano_catalogo) -> None:
+    """Grava o codigo do plano no campo do segmento correspondente
+    (plan_pet/plan_vet/plan_grooming), alem do `plan` legado (mantido em
+    paralelo nesta fase)."""
+    campo = segment_plan_field(plano_catalogo)
+    if campo:
+        setattr(tenant, campo, plano_catalogo.code)
 
 
 @router.get("/status")
@@ -270,43 +318,55 @@ def get_modulos_status(
         .all()
     )
 
+    assinatura_resumo = _assinatura_resumo_tenant(tenant, agora)
+    acesso_liberado = assinatura_resumo["status_efetivo"] in {"active", "trial"}
+    planos_segmento = _planos_segmento_tenant(tenant)
+
     modulos_do_tenant = _resolver_modulos_ativos(
         tenant.modulos_ativos,
         assinaturas_ativas,
         agora,
-        tenant.plan,
+        planos_segmento,
         liberar_trial_completo=_trial_completo_ativo(tenant, agora),
-        liberar_modulos_do_plano=_assinatura_resumo_tenant(tenant, agora)[
-            "status_efetivo"
-        ]
-        in {"active", "trial"},
+        acesso_liberado=acesso_liberado,
     )
 
-    assinatura_resumo = _assinatura_resumo_tenant(tenant, agora)
-    plano_catalogo = get_plan(tenant.plan)
+    planos_catalogo = _planos_catalogo_segmento(tenant)
+    plano_catalogo = planos_catalogo[0] if planos_catalogo else None
     trial_completo = assinatura_resumo["acesso_completo_durante_trial"]
-    plano_ativo = assinatura_resumo["status_efetivo"] in {"active", "trial"}
+    plano_ativo = acesso_liberado
     recursos_trial = sorted(
         {recurso for plano in PLAN_CATALOG.values() for recurso in plano.entitlements}
     )
     recursos_ativos = (
         recursos_trial
         if trial_completo
-        else sorted(plano_catalogo.entitlements)
-        if plano_catalogo and plano_ativo
+        else sorted({recurso for plano in planos_catalogo for recurso in plano.entitlements})
+        if planos_catalogo and plano_ativo
         else []
     )
 
     # Planos legados nao possuem limites comerciais no catalogo publico.
-    plano_publico_canonico = str(tenant.plan or "").strip().lower() in PLAN_CATALOG
+    plano_publico_canonico = any(
+        codigo.strip().lower() in PLAN_CATALOG for codigo in planos_segmento
+    )
     uso_vendas = monthly_sales_usage(db, tenant_id) if plano_publico_canonico else 0
     uso_sessoes = active_session_usage(db, tenant_id) if plano_publico_canonico else 0
+    # Combinacao "mais generosa" entre os planos de segmento simultaneos: se
+    # algum plano ativo nao define limite (ilimitado), o combinado fica
+    # ilimitado; senao, usa o maior limite numerico entre os planos presentes.
+    limites_vendas = [plano.monthly_sales_limit for plano in planos_catalogo]
+    limites_sessoes = [plano.simultaneous_sessions_limit for plano in planos_catalogo]
     limites_apos_trial = {
         "vendas_mensais": (
-            plano_catalogo.monthly_sales_limit if plano_catalogo else None
+            None
+            if not limites_vendas or any(limite is None for limite in limites_vendas)
+            else max(limites_vendas)
         ),
         "acessos_simultaneos": (
-            plano_catalogo.simultaneous_sessions_limit if plano_catalogo else None
+            None
+            if not limites_sessoes or any(limite is None for limite in limites_sessoes)
+            else max(limites_sessoes)
         ),
     }
     limites_aplicados = (
@@ -318,6 +378,9 @@ def get_modulos_status(
     return {
         "modulos_ativos": modulos_do_tenant,
         "plano": tenant.plan or "basico",
+        "plano_pet": tenant.plan_pet,
+        "plano_vet": tenant.plan_vet,
+        "plano_grooming": tenant.plan_grooming,
         "tenant_id": tenant_id,
         "modulos_controlados": sorted(MODULOS_PREMIUM),
         "modulos_beta": sorted(MODULOS_BETA_PUBLICOS),
@@ -331,6 +394,7 @@ def get_modulos_status(
         },
         "assinatura": assinatura_resumo,
         "plano_catalogo": plano_catalogo.to_public_dict() if plano_catalogo else None,
+        "planos_catalogo": [plano.to_public_dict() for plano in planos_catalogo],
         "recursos_ativos": recursos_ativos,
         "limites": {
             "aplicados": limites_aplicados,
@@ -431,6 +495,7 @@ def ativar_plano_manual(
         else None,
     }
     tenant.plan = plano_catalogo.code
+    _atribuir_plano_segmento(tenant, plano_catalogo)
     tenant.billing_status = "active"
     tenant.subscription_source = "manual"
     tenant.subscription_activated_at = agora

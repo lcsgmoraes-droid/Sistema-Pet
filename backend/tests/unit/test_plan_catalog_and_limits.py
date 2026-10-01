@@ -61,7 +61,7 @@ def test_plan_modules_are_active_after_trial_without_manual_activation():
         raw_modulos=None,
         assinaturas_ativas=[],
         agora=datetime(2026, 7, 18, tzinfo=timezone.utc),
-        plano="pet-gestao",
+        planos=("pet-gestao",),
     )
 
     assert "compras" in active

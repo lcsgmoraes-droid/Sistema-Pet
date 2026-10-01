@@ -5,13 +5,14 @@ import { buildOpsTenantCommercialForm, buildOpsTenantCommercialPayload } from ".
 import BotaoSalva from "../../components/v2/BotaoSalva/BotaoSalva";
 import InputCombobox from "../../components/v2/InputCombobox/InputCombobox";
 import OpsTenantsBadge from "./OpsTenantsBadge";
-import {
-  BILLING_EDIT_OPTIONS,
-  PLAN_EDIT_OPTIONS,
-  SOURCE_EDIT_OPTIONS,
-  TENANT_STATUS_EDIT_OPTIONS,
-} from "./opsTenantsConstants";
+import { BILLING_EDIT_OPTIONS, TENANT_STATUS_EDIT_OPTIONS } from "./opsTenantsConstants";
 import { billingBadge } from "./opsTenantsFormatters";
+
+const ROTULO_PLANO_SEGMENTO = {
+  plan_pet: "Pet",
+  plan_vet: "Vet",
+  plan_grooming: "Banho & Tosa",
+};
 
 export default function OpsTenantsCommercialEditPanel({
   tenant,
@@ -33,6 +34,9 @@ export default function OpsTenantsCommercialEditPanel({
   const original = buildOpsTenantCommercialForm(tenant);
   const payload = buildOpsTenantCommercialPayload(original, form);
   const hasChanges = Object.keys(payload).length > 0;
+  const planosSegmento = Object.entries(ROTULO_PLANO_SEGMENTO).filter(
+    ([campo]) => tenant[campo],
+  );
 
   return (
     <div>
@@ -43,7 +47,7 @@ export default function OpsTenantsCommercialEditPanel({
             Manutencao comercial
           </div>
           <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-            Ajuste status, plano e cobranca sem entrar no tenant do cliente.
+            Ajuste status e cobranca sem entrar no tenant do cliente.
           </p>
         </div>
         <OpsTenantsBadge className={billingBadge(tenant.billing_status)}>
@@ -58,6 +62,24 @@ export default function OpsTenantsCommercialEditPanel({
         <div className="mt-1 truncate text-xs text-slate-500 dark:text-slate-400">
           {tenant.principal_user?.email || tenant.id}
         </div>
+        <div className="mt-2 flex flex-wrap items-center gap-1.5">
+          <span className="text-xs text-slate-500 dark:text-slate-400">Planos:</span>
+          {planosSegmento.length === 0 ? (
+            <span className="text-xs text-slate-400 dark:text-slate-500">
+              Nenhum segmento contratado
+            </span>
+          ) : (
+            planosSegmento.map(([campo, rotuloSegmento]) => (
+              <OpsTenantsBadge key={campo} className="bg-blue-100 text-blue-700 dark:bg-blue-500/10 dark:text-blue-300">
+                {rotuloSegmento}: {tenant[campo]}
+              </OpsTenantsBadge>
+            ))
+          )}
+        </div>
+        <p className="mt-1 text-xs text-slate-400 dark:text-slate-500">
+          Para mudar o plano, use uma proposta comercial (aditivo) — o cliente
+          precisa aceitar antes de valer.
+        </p>
       </div>
 
       <form
@@ -76,27 +98,11 @@ export default function OpsTenantsCommercialEditPanel({
             permitirLimpar={false}
           />
           <InputCombobox
-            id="tenant-comercial-plano"
-            label="Plano"
-            opcoes={PLAN_EDIT_OPTIONS}
-            value={form.plan}
-            onChange={(value) => onChange("plan", value)}
-            permitirLimpar={false}
-          />
-          <InputCombobox
             id="tenant-comercial-cobranca"
             label="Cobranca"
             opcoes={BILLING_EDIT_OPTIONS}
             value={form.billing_status}
             onChange={(value) => onChange("billing_status", value)}
-            permitirLimpar={false}
-          />
-          <InputCombobox
-            id="tenant-comercial-origem"
-            label="Origem"
-            opcoes={SOURCE_EDIT_OPTIONS}
-            value={form.subscription_source}
-            onChange={(value) => onChange("subscription_source", value)}
             permitirLimpar={false}
           />
         </div>

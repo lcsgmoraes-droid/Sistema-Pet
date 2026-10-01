@@ -28,6 +28,23 @@ export function extractError(err, fallback) {
   return err?.response?.data?.detail || err?.message || fallback;
 }
 
+// Ate-3 planos de segmento simultaneos (pet/vet/banho&tosa). Cai para o
+// `plan` legado quando nenhum dos 3 campos novos esta preenchido (tenant
+// ainda nao migrado para o formato por segmento).
+export function tenantPlanosSegmento(tenant = {}) {
+  const segmentos = [
+    { campo: "plan_pet", label: "Pet" },
+    { campo: "plan_vet", label: "Vet" },
+    { campo: "plan_grooming", label: "B&T" },
+  ]
+    .filter(({ campo }) => tenant?.[campo])
+    .map(({ campo, label }) => ({ label, codigo: tenant[campo] }));
+
+  if (segmentos.length > 0) return segmentos;
+  if (tenant?.plan) return [{ label: null, codigo: tenant.plan }];
+  return [{ label: null, codigo: "free" }];
+}
+
 export function statusBadge(status) {
   const normalized = String(status || "").toLowerCase();
   if (["active", "ativo"].includes(normalized)) {
