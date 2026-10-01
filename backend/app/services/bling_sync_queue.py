@@ -188,6 +188,12 @@ class BlingSyncQueueMixin:
             if estoque_novo is None
             else float(estoque_novo)
         )
+        if float(produto.estoque_atual or 0) < 0 or estoque_destino < 0:
+            return {
+                "ok": False,
+                "detail": "Saldo negativo no CorePet; confira o estoque antes de enviar ao Bling",
+                "produto_id": produto_id,
+            }
         now = utc_now()
 
         fila = (
@@ -439,6 +445,27 @@ class BlingSyncQueueMixin:
                 "status": fila.status,
                 "erro": fila.ultimo_erro,
             }
+
+        estoque_atual = float(produto.estoque_atual or 0)
+        if estoque_atual < 0:
+            fila.status = "falha_final"
+            fila.ultimo_erro = "Saldo negativo no CorePet; confira o estoque antes de enviar ao Bling"
+            fila.processado_em = utc_now()
+            fila.proxima_tentativa_em = None
+            sync.status = "erro"
+            sync.erro_mensagem = fila.ultimo_erro
+            sync.proxima_tentativa_sync = None
+            return {
+                "ok": False,
+                "queue_id": fila.id,
+                "produto_id": fila.produto_id,
+                "status": fila.status,
+                "erro": fila.ultimo_erro,
+            }
+
+        # A fila guarda um saldo historico. O saldo atual do CorePet e a fonte
+        # de verdade, inclusive quando novas vendas ocorreram depois do enfileiramento.
+        fila.estoque_novo = estoque_atual
 
         now = utc_now()
         fila.status = "processando"

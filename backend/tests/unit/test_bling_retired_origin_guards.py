@@ -334,6 +334,36 @@ def test_queue_creation_rejects_retired_origin():
     assert db.refreshes == 2
 
 
+def test_queue_creation_rejects_negative_corepet_stock():
+    negative = product()
+    negative.estoque_atual = -2
+    db = Db(negative, sync())
+    result = BlingSyncService.queue_product_sync(db, produto_id=4752)
+    assert result["ok"] is False
+    assert "negativo" in result["detail"]
+    assert not db.added
+
+
+def test_worker_never_publishes_negative_corepet_stock(monkeypatch):
+    negative = product()
+    negative.estoque_atual = -2
+    current = sync()
+    row = SimpleNamespace(
+        id=1,
+        sync_id=100,
+        produto_id=4752,
+        estoque_novo=5,
+        status="pendente",
+        proxima_tentativa_em=datetime.utcnow(),
+    )
+    monkeypatch.setattr(bling_sync_queue, "BlingAPI", forbid_api)
+    result = BlingSyncService.process_queue_item(Db(negative, current), row)
+    assert result["ok"] is False
+    assert row.status == "falha_final"
+    assert current.status == "erro"
+    assert "negativo" in row.ultimo_erro
+
+
 def latest_query_stub():
     return SimpleNamespace(
         c=SimpleNamespace(
