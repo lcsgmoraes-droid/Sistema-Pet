@@ -67,9 +67,15 @@ def _liberar_sku_produto(db: Session, produto: Produto, tenant_id, user_id: int)
     produto.codigo = codigo_interno
     produto.updated_at = datetime.utcnow()
     log_action(
-        db, user_id, "release_product_sku", entity_type="product",
-        entity_id=produto.id, old_value={"codigo": sku_antigo},
-        new_value={"codigo": codigo_interno}, tenant_id=tenant_id, commit=False,
+        db,
+        user_id,
+        "release_product_sku",
+        entity_type="product",
+        entity_id=produto.id,
+        old_value={"codigo": sku_antigo},
+        new_value={"codigo": codigo_interno},
+        tenant_id=tenant_id,
+        commit=False,
     )
     return sku_antigo
 
@@ -146,8 +152,14 @@ def deletar_produto(
     if liberar_sku:
         _lock_alias_namespace(db, tenant_id)
 
-    query = db.query(Produto).filter(Produto.id == produto_id, Produto.tenant_id == tenant_id)
-    produto = query.with_for_update().populate_existing().first() if liberar_sku else query.first()
+    query = db.query(Produto).filter(
+        Produto.id == produto_id, Produto.tenant_id == tenant_id
+    )
+    produto = (
+        query.with_for_update().populate_existing().first()
+        if liberar_sku
+        else query.first()
+    )
 
     if not produto:
         raise HTTPException(status_code=404, detail="Produto não encontrado")
@@ -174,9 +186,13 @@ def atualizar_status_ativo_produto(
 ):
     """Ativa ou desativa produto sem removê-lo do sistema."""
 
-    current_user, tenant_solicitante_id = _validar_tenant_e_obter_usuario(user_and_tenant)
+    current_user, tenant_solicitante_id = _validar_tenant_e_obter_usuario(
+        user_and_tenant
+    )
     if payload.ativo and payload.liberar_sku:
-        raise HTTPException(status_code=400, detail="Para liberar o SKU, inative o produto.")
+        raise HTTPException(
+            status_code=400, detail="Para liberar o SKU, inative o produto."
+        )
     acesso_catalogo = EmpresaGrupoEstoqueCompartilhadoService.resolver_produto_catalogo(
         db, tenant_solicitante_id, produto_id
     )
@@ -187,7 +203,9 @@ def atualizar_status_ativo_produto(
         produto = (
             db.query(Produto)
             .filter(Produto.id == produto_id, Produto.tenant_id == tenant_id)
-            .with_for_update().populate_existing().first()
+            .with_for_update()
+            .populate_existing()
+            .first()
         )
         if not produto:
             raise HTTPException(status_code=404, detail="Produto nao encontrado")

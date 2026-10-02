@@ -87,7 +87,9 @@ def test_credito_devolucao_aceita_cliente_criado_por_outro_funcionario(monkeypat
 
     db = MagicMock()
     db.query.side_effect = lambda modelo: consultas[modelo]
-    monkeypatch.setattr("app.vendas.devolucoes_routes.log_action", lambda **_kwargs: None)
+    monkeypatch.setattr(
+        "app.vendas.devolucoes_routes.log_action", lambda **_kwargs: None
+    )
 
     resultado = registrar_devolucao(
         venda_id=venda.id,
@@ -100,7 +102,9 @@ def test_credito_devolucao_aceita_cliente_criado_por_outro_funcionario(monkeypat
         user_and_tenant=(atendente, tenant_id),
     )
 
-    consultas[Cliente].filter_by.assert_called_once_with(id=cliente.id, tenant_id=tenant_id)
+    consultas[Cliente].filter_by.assert_called_once_with(
+        id=cliente.id, tenant_id=tenant_id
+    )
     assert cliente.credito == Decimal("59.89")
     assert resultado["credito_cliente"] == 59.89
     db.commit.assert_called_once()
