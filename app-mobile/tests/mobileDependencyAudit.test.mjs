@@ -63,3 +63,24 @@ test("continua bloqueando qualquer outro alerta moderado ou superior", () => {
   assert.deepEqual(result.ignored, []);
   assert.equal(result.blocked[0].name, "outra-dependencia");
 });
+
+test("só aceita o alerta de node-forge quando o backport foi verificado", () => {
+  const report = {
+    vulnerabilities: {
+      "node-forge": {
+        severity: "high",
+        via: [{ url: "https://github.com/advisories/GHSA-86w9-cpqp-85rv" }],
+      },
+      expo: { severity: "high", via: ["node-forge"] },
+    },
+  };
+
+  assert.deepEqual(
+    evaluateAudit(report).blocked.map((item) => item.name),
+    ["node-forge", "expo"],
+  );
+  assert.deepEqual(
+    evaluateAudit(report, { nodeForgePatched: true }).blocked,
+    [],
+  );
+});
