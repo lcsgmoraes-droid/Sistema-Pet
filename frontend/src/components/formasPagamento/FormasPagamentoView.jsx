@@ -2,7 +2,7 @@ import { ArrowLeftRight, Banknote, CreditCard, QrCode, Receipt } from "lucide-re
 import CurrencyInput from "../CurrencyInput";
 import { formatMoneyBRL } from "../../utils/formatters";
 
-const ehTipoCartao = (tipo) => ["cartao_credito", "cartao_debito"].includes(tipo);
+const ehTipoCartao = (tipo) => ["cartao_credito", "cartao_debito", "link_pagamento"].includes(tipo);
 
 const getIconeFormaPagamento = (icone, tipo) => {
   const key = (icone || tipo || "").toLowerCase();
@@ -226,7 +226,22 @@ export default function FormasPagamentoView({
                   <select
                     className="w-full border border-gray-300 rounded px-3 py-2"
                     value={formData.tipo}
-                    onChange={(e) => setFormData({ ...formData, tipo: e.target.value })}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        tipo: e.target.value,
+                        tipo_cartao:
+                          e.target.value === "link_pagamento" ? "" : formData.tipo_cartao,
+                        permite_parcelamento:
+                          e.target.value === "link_pagamento"
+                            ? true
+                            : formData.permite_parcelamento,
+                        parcelas_maximas:
+                          e.target.value === "link_pagamento"
+                            ? Math.max(12, formData.parcelas_maximas)
+                            : formData.parcelas_maximas,
+                      })
+                    }
                   >
                     {tiposDisponiveis.map((t) => (
                       <option key={t.value} value={t.value}>
@@ -324,7 +339,7 @@ export default function FormasPagamentoView({
                     <a href="/cadastros/financeiro/operadoras" className="font-semibold underline">
                       Operadoras de Cartao
                     </a>
-                    . Esta forma define apenas se o pagamento e credito ou debito.
+                    . Esta forma define se o pagamento e credito, debito ou link.
                   </div>
                 )}
 

@@ -191,7 +191,7 @@ class ContasReceberService:
             numero_parcelas = numero_parcelas or 1
             eh_pagamento_parcelado = bool(
                 forma_pag
-                and forma_pag.tipo in {"cartao_credito", "crediario"}
+                and forma_pag.tipo in {"cartao_credito", "link_pagamento", "crediario"}
                 and numero_parcelas > 1
             )
 

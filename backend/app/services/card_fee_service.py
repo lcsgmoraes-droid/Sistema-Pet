@@ -49,6 +49,9 @@ MODALITY_ALIASES = {
     "cartao de debito": "debito",
     "cartão de débito": "debito",
     "voucher": "voucher",
+    "link": "link",
+    "link_pagamento": "link",
+    "link de pagamento": "link",
 }
 
 
@@ -66,9 +69,25 @@ def normalize_card_modality(value: Any) -> str:
     return MODALITY_ALIASES.get(normalized, normalized)
 
 
+def _modality_from_candidate(candidate: Any) -> str:
+    text = str(candidate or "").strip().lower()
+    normalized = normalize_card_modality(text)
+    if normalized in {"credito", "debito", "link", "voucher"}:
+        return normalized
+    if "credit" in text or "crédit" in text:
+        return "credito"
+    if "debit" in text or "débit" in text:
+        return "debito"
+    if "voucher" in text:
+        return "voucher"
+    return ""
+
+
 def modality_from_payment_form(
     forma: Optional[FormaPagamento], fallback: Any = None
 ) -> str:
+    if getattr(forma, "tipo", None) == "link_pagamento":
+        return "link"
     candidates = [
         fallback,
         getattr(forma, "tipo_cartao", None),
@@ -83,16 +102,9 @@ def modality_from_payment_form(
     ):
         return ""
     for candidate in candidates:
-        text = str(candidate or "").strip().lower()
-        normalized = normalize_card_modality(text)
-        if normalized in {"credito", "debito", "voucher"}:
-            return normalized
-        if "credit" in text or "crédit" in text:
-            return "credito"
-        if "debit" in text or "débit" in text:
-            return "debito"
-        if "voucher" in text:
-            return "voucher"
+        modality = _modality_from_candidate(candidate)
+        if modality:
+            return modality
     return ""
 
 
@@ -275,6 +287,11 @@ def resolve_card_fee(
                 prazo_recebimento_dias=rule.prazo_recebimento_dias,
                 regra_id=rule.id,
                 fonte="regra_operadora",
+            )
+
+        if modality == "link" and strict:
+            raise CardFeeConfigurationError(
+                f"Taxa de link nao cadastrada para {operadora.nome} / {brand.title()} / {parcelas_int}x."
             )
 
         if rules_query.first() and strict:

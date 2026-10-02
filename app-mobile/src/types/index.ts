@@ -476,6 +476,7 @@ export type FuncionarioPdvFormaPagamento =
   | "pix"
   | "credito"
   | "debito"
+  | "link"
   | "crediario"
   | "boleto"
   | "transferencia";

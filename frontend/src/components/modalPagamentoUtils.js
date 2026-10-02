@@ -45,6 +45,7 @@ export function normalizarBandeiraCartao(bandeira = "") {
 }
 
 export function obterModalidadeCartao(formaPagamento = null) {
+  if (formaPagamento?.tipo === "link_pagamento") return "link";
   const tipo = String(formaPagamento?.tipo_cartao || formaPagamento?.tipo || "").toLowerCase();
   const nome = String(formaPagamento?.nome || "").toLowerCase();
   if (tipo.includes("debito") || tipo.includes("débito") || nome.includes("débito")) {
@@ -448,7 +449,7 @@ export function montarPagamentoRecebido({
   troco = 0,
 }) {
   const tipo = formaPagamento?.tipo;
-  const isCartao = ["cartao_credito", "cartao_debito"].includes(tipo);
+  const isCartao = ["cartao_credito", "cartao_debito", "link_pagamento"].includes(tipo);
   const parcelas =
     tipo === "crediario" || formaPagamento?.permite_parcelamento ? numeroParcelas : 1;
   const formaPagamentoId = normalizarFormaPagamentoId(formaPagamento?.id);
@@ -566,7 +567,9 @@ export function validarPagamentoParaAdicionar({
     return `Valor excede o cashback disponível (${formatMoneyBRL(saldoCashback)})`;
   }
 
-  const isCartao = ["cartao_credito", "cartao_debito"].includes(formaPagamento.tipo);
+  const isCartao = ["cartao_credito", "cartao_debito", "link_pagamento"].includes(
+    formaPagamento.tipo,
+  );
 
   if (isCartao && !bandeira) {
     return "Selecione a bandeira do cartão";
