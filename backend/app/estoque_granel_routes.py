@@ -19,6 +19,10 @@ from .estoque.granel import (
     _validar_produto_origem_granel,
 )
 from .produtos_models import Produto, ProdutoGranelVinculo
+from .produtos.search import (
+    _build_produto_search_order_clause,
+    _produto_search_conditions_fast,
+)
 
 
 router = APIRouter(prefix="/estoque", tags=["Estoque - Granel"])
@@ -91,7 +95,7 @@ def listar_produtos_granel(
 @router.get("/granel/produtos-origem")
 def listar_produtos_origem_granel(
     busca: Optional[str] = None,
-    limite: int = Query(default=30, ge=1, le=100),
+    limite: int = Query(default=12, ge=1, le=100),
     db: Session = Depends(get_session),
     user_and_tenant=Depends(get_current_user_and_tenant),
 ):
@@ -106,20 +110,22 @@ def listar_produtos_origem_granel(
         Produto.peso_embalagem > 0,
     )
     termo = (busca or "").strip()
-    if termo:
-        pattern = f"%{termo}%"
-        query = query.filter(
-            or_(
-                Produto.nome.ilike(pattern),
-                Produto.codigo.ilike(pattern),
-                Produto.codigo_barras.ilike(pattern),
-            )
-        )
-    produtos = query.order_by(Produto.nome.asc()).limit(limite).all()
+    for palavra in termo.split():
+        query = query.filter(_produto_search_conditions_fast(palavra))
+    ordenacao = (
+        _build_produto_search_order_clause(termo)
+        if termo
+        else [Produto.nome.asc()]
+    )
+    produtos = query.order_by(*ordenacao).limit(limite).all()
     return [
         {
             "id": produto.id,
             "codigo": produto.codigo,
+            "codigo_barras": produto.codigo_barras,
+            "gtin_ean": produto.gtin_ean,
+            "gtin_ean_tributario": produto.gtin_ean_tributario,
+            "codigos_barras_alternativos": produto.codigos_barras_alternativos,
             "nome": produto.nome,
             "peso_embalagem": float(produto.peso_embalagem),
         }
