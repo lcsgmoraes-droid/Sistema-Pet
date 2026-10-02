@@ -571,8 +571,10 @@ def obter_resumo_caixa(
         and str(mov.forma_pagamento or "").strip().casefold() == "dinheiro"
     ]
 
-    vendas_do_caixa = (
+    data_da_venda = func.date(Venda.data_venda)
+    pagamentos_por_data = (
         db.query(
+            data_da_venda.label("data_venda"),
             VendaPagamento.forma_pagamento,
             func.count(VendaPagamento.id).label("quantidade"),
             func.sum(VendaPagamento.valor).label("total"),
@@ -585,30 +587,50 @@ def obter_resumo_caixa(
             Venda.status.in_(["finalizada", "baixa_parcial", "pago_nf"]),
             func.lower(func.trim(VendaPagamento.forma_pagamento)) != "dinheiro",
         )
-        .group_by(VendaPagamento.forma_pagamento)
+        .group_by(data_da_venda, VendaPagamento.forma_pagamento)
         .all()
     )
 
     vendas_por_forma = {}
-    if entradas_dinheiro:
-        vendas_por_forma["Dinheiro"] = {
-            "quantidade": len(entradas_dinheiro),
-            "total": float(
-                sum((moeda(mov.valor) for mov in entradas_dinheiro), moeda(0))
-            ),
-            "tipo_contagem": "lançamento",
-        }
-    for forma_id, qtd, total in vendas_do_caixa:
-        vendas_por_forma[forma_id] = {
-            "quantidade": qtd,
-            "total": float(total) if total else 0.0,
-            "tipo_contagem": "pagamento",
-        }
+    recebimentos_por_data_venda = {}
+
+    def somar_recebimento(data_venda, forma, quantidade, valor, tipo_contagem):
+        data_chave = str(data_venda) if data_venda else "sem_venda"
+        por_forma = recebimentos_por_data_venda.setdefault(data_chave, {})
+        for destino in (vendas_por_forma, por_forma):
+            item = destino.setdefault(
+                forma, {"quantidade": 0, "total": 0.0, "tipo_contagem": tipo_contagem}
+            )
+            item["quantidade"] += int(quantidade)
+            item["total"] = float(moeda(item["total"]) + moeda(valor))
+
+    venda_ids_dinheiro = {mov.venda_id for mov in entradas_dinheiro if mov.venda_id}
+    datas_vendas_dinheiro = (
+        dict(
+            db.query(Venda.id, Venda.data_venda)
+            .filter(Venda.id.in_(venda_ids_dinheiro), Venda.tenant_id == tenant_id)
+            .all()
+        )
+        if venda_ids_dinheiro
+        else {}
+    )
+    for mov in entradas_dinheiro:
+        data_venda = datas_vendas_dinheiro.get(mov.venda_id)
+        somar_recebimento(
+            data_venda.date().isoformat() if data_venda else None,
+            "Dinheiro",
+            1,
+            mov.valor,
+            "lançamento",
+        )
+    for data_venda, forma, quantidade, total in pagamentos_por_data:
+        somar_recebimento(data_venda, forma, quantidade, total, "pagamento")
 
     return {
         "caixa": _serializar_caixa(caixa, compartilhado=compartilhado),
         "totais": totais,
         "vendas_por_forma_pagamento": vendas_por_forma,
+        "recebimentos_por_data_venda": recebimentos_por_data_venda,
     }
 
 
@@ -731,6 +753,9 @@ def listar_vendas_caixa(
                 "hora_venda": mov.data_movimento.strftime("%H:%M")
                 if mov.data_movimento
                 else None,
+                "data_venda": mov.venda.data_venda.date().isoformat()
+                if mov.venda and mov.venda.data_venda
+                else None,
             }
             for mov in movimentos
         ]
@@ -782,6 +807,9 @@ def listar_vendas_caixa(
             "valor_nesta_forma": float(pagamento.valor),
             "hora_venda": pagamento.data_pagamento.strftime("%H:%M")
             if pagamento.data_pagamento
+            else None,
+            "data_venda": pagamento.venda.data_venda.date().isoformat()
+            if pagamento.venda.data_venda
             else None,
         }
         for pagamento in pagamentos

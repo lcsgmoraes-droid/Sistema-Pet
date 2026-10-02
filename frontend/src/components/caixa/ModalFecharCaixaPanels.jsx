@@ -246,6 +246,13 @@ export function PaymentBreakdownPanel({
 }) {
   const [imprimindo, setImprimindo] = useState(false);
   const formas = Object.entries(resumo.vendas_por_forma_pagamento || {});
+  const recebimentosPorData = Object.entries(resumo.recebimentos_por_data_venda || {}).sort(
+    ([dataA], [dataB]) => dataB.localeCompare(dataA),
+  );
+  const rotuloData = (data) =>
+    data === "sem_venda" ? "Sem venda vinculada" : data.split("-").reverse().join("/");
+  const totalPorData = (formasDoDia) =>
+    Object.values(formasDoDia).reduce((total, dados) => total + dados.total, 0);
 
   useEffect(() => {
     if (!imprimindo) return undefined;
@@ -337,6 +344,33 @@ export function PaymentBreakdownPanel({
             })}
           </div>
 
+          {recebimentosPorData.length > 0 && (
+            <details className="mt-3 rounded border border-blue-200 bg-white px-3 py-2 text-xs">
+              <summary className="cursor-pointer font-semibold text-blue-800">
+                Conferir por data da venda
+              </summary>
+              <p className="mt-2 text-gray-600">
+                O total do caixa pode incluir pagamentos de vendas feitas em outras datas.
+              </p>
+              <div className="mt-2 space-y-2">
+                {recebimentosPorData.map(([data, formasDoDia]) => (
+                  <div key={data} className="rounded border border-gray-200 p-2">
+                    <div className="flex justify-between font-bold text-gray-800">
+                      <span>{rotuloData(data)}</span>
+                      <span>{formatMoneyBRL(totalPorData(formasDoDia))}</span>
+                    </div>
+                    {Object.entries(formasDoDia).map(([forma, dados]) => (
+                      <div key={forma} className="flex justify-between text-gray-600">
+                        <span>{forma} · {dados.quantidade}</span>
+                        <span>{formatMoneyBRL(dados.total)}</span>
+                      </div>
+                    ))}
+                  </div>
+                ))}
+              </div>
+            </details>
+          )}
+
           {/* Painel de detalhes dos recebimentos por forma */}
           {formaExpandida && (
             <div className="mt-3 border-t border-blue-200 pt-3">
@@ -376,7 +410,10 @@ export function PaymentBreakdownPanel({
                           />
                         </div>
                         <div className="text-right">
-                          <span className="text-gray-400 mr-2">{v.hora_venda}</span>
+                          <span className="text-gray-400 mr-2">
+                            {v.data_venda ? `${rotuloData(v.data_venda)} ` : ""}
+                            {v.hora_venda}
+                          </span>
                           <span className="font-bold text-gray-800">
                             {formatMoneyBRL(v.valor_nesta_forma ?? v.total)}
                           </span>
@@ -436,6 +473,33 @@ export function PaymentBreakdownPanel({
                 ))}
               </tbody>
             </table>
+            {recebimentosPorData.length > 0 && (
+              <>
+                <h2>Conferência por data da venda</h2>
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Data da venda</th>
+                      <th>Forma</th>
+                      <th>Registros</th>
+                      <th>Valor</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {recebimentosPorData.flatMap(([data, formasDoDia]) =>
+                      Object.entries(formasDoDia).map(([forma, dados]) => (
+                        <tr key={`${data}-${forma}`}>
+                          <td>{rotuloData(data)}</td>
+                          <td>{forma}</td>
+                          <td>{dados.quantidade}</td>
+                          <td>{formatMoneyBRL(dados.total)}</td>
+                        </tr>
+                      )),
+                    )}
+                  </tbody>
+                </table>
+              </>
+            )}
             <p>
               Dinheiro corresponde às entradas registradas no extrato deste caixa. As demais formas
               não afetam o saldo físico.
