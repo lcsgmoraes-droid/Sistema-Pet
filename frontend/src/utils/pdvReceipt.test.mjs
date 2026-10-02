@@ -114,7 +114,10 @@ test("justificativa interna de margem critica nao aparece no cupom nem na reimpr
     pagamentos: [{ forma_pagamento_tipo: "crediario", valor: 390 }],
   };
 
-  for (const cupom of [montarCupomVenda(venda, empresa), montarConteudoCupom(vendaCrediario, empresa)]) {
+  for (const cupom of [
+    montarCupomVenda(venda, empresa),
+    montarConteudoCupom(vendaCrediario, empresa),
+  ]) {
     assert.match(cupom, /OBSERVACOES:\nSeparar pedido para retirada/);
     assert.doesNotMatch(cupom, /JUSTIFICATIVA|Desconto autorizado|Motivo interno detalhado/);
   }
