@@ -108,6 +108,19 @@ export function encontrarProdutoPorCodigo(produtos, termo) {
   );
 }
 
+// O codigo do produto na etiqueta EAN-13 tem seis digitos e a balanca
+// completa com zeros a esquerda. O cadastro pode guardar, por exemplo, 0151.
+export function produtoCorrespondeCodigoBalanca(produto, codigoBalanca) {
+  const codigo = String(codigoBalanca ?? "").trim();
+  if (!/^\d{1,6}$/.test(codigo)) return false;
+  const semZeros = codigo.replace(/^0+/, "") || "0";
+
+  return codigosProdutoParaBusca(produto).some((valor) => {
+    const cadastrado = String(valor).trim();
+    return /^\d{1,6}$/.test(cadastrado) && (cadastrado.replace(/^0+/, "") || "0") === semZeros;
+  });
+}
+
 export function deveAdicionarProdutoAutomaticamente({
   matchExato,
   termo,
