@@ -187,6 +187,7 @@ def processar_pagamentos_finalizacao(
     tenant_id: str,
     db: Session,
     caixa_aberto_id: int,
+    data_ocorrencia=None,
 ) -> List[int]:
     from app.caixa.service import CaixaService
     from app.campaigns.models import (
@@ -431,6 +432,8 @@ def processar_pagamentos_finalizacao(
                 taxa_aplicada=taxa_aplicada,
             )
         )
+        if data_ocorrencia is not None:
+            pagamento.data_pagamento = data_ocorrencia
         db.add(pagamento)
         db.flush()
 
@@ -558,6 +561,7 @@ def processar_pagamentos_finalizacao(
                 user_nome=user_nome,
                 tenant_id=tenant_id,
                 db=db,
+                data_movimento=data_ocorrencia,
             )
             movimentacoes_caixa_ids.append(mov_info["movimentacao_id"])
             logger.info(f"💵 Caixa: Movimentação #{mov_info['movimentacao_id']} criada")

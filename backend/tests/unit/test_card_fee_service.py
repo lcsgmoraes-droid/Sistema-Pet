@@ -143,3 +143,57 @@ def test_mantem_compatibilidade_com_json_legado_numerico_ou_detalhado():
     assert resultado.taxa_percentual == Decimal("3.1")
     assert resultado.taxa_fixa == Decimal("0.40")
     assert resultado.valor_taxa == Decimal("6.60")
+
+
+def test_link_parcelado_usa_regra_propria_com_taxa_e_prazo():
+    regra = SimpleNamespace(
+        id=92,
+        taxa_percentual=Decimal("5.2500"),
+        taxa_fixa=Decimal("1.00"),
+        prazo_recebimento_dias=14,
+    )
+    db = _FakeSession(
+        {
+            FormaPagamento: [_forma(tipo="link_pagamento", tipo_cartao="credito")],
+            OperadoraCartao: [_operadora()],
+            OperadoraCartaoTaxa: [regra],
+        }
+    )
+
+    resultado = resolve_card_fee(
+        db,
+        tenant_id="tenant",
+        valor=200,
+        forma_pagamento_id=10,
+        operadora_id=7,
+        bandeira="Visa",
+        modalidade="link",
+        parcelas=3,
+    )
+
+    assert resultado.modalidade == "link"
+    assert resultado.regra_id == 92
+    assert resultado.valor_taxa == Decimal("11.50")
+    assert resultado.prazo_recebimento_dias == 14
+
+
+def test_link_sem_regra_nao_herda_taxa_de_credito():
+    db = _FakeSession(
+        {
+            FormaPagamento: [_forma(tipo="link_pagamento")],
+            OperadoraCartao: [_operadora(taxa_credito_parcelado=Decimal("4.00"))],
+            OperadoraCartaoTaxa: [None, None],
+        }
+    )
+
+    with pytest.raises(CardFeeConfigurationError, match="Taxa de link nao cadastrada"):
+        resolve_card_fee(
+            db,
+            tenant_id="tenant",
+            valor=200,
+            forma_pagamento_id=10,
+            operadora_id=7,
+            bandeira="Visa",
+            modalidade="link",
+            parcelas=3,
+        )

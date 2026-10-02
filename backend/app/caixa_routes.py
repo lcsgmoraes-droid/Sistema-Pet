@@ -790,7 +790,7 @@ def gerar_pdf_caixa(
     for mov in movimentacoes:
         mov_list.append(
             {
-                "created_at": mov.created_at,
+                "created_at": mov.data_movimento or mov.created_at,
                 "tipo": mov.tipo,
                 "descricao": mov.descricao,
                 "forma_pagamento_nome": mov.forma_pagamento,

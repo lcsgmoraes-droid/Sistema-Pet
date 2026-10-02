@@ -128,7 +128,7 @@ class OperadoraCartaoResponse(BaseModel):
 
 class OperadoraCartaoTaxaInput(BaseModel):
     bandeira: str = Field(..., min_length=1, max_length=30)
-    modalidade: str = Field(..., pattern="^(credito|debito|voucher)$")
+    modalidade: str = Field(..., pattern="^(credito|debito|link|voucher)$")
     parcelas: int = Field(..., ge=1, le=24)
     taxa_percentual: float = Field(0, ge=0, le=100)
     taxa_fixa: float = Field(0, ge=0)

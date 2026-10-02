@@ -72,6 +72,8 @@ class VendaService:
         cupom_discount_applied: Optional[float] = None,
         caixa_id: Optional[int] = None,
         permitir_caixa_tenant: bool = False,
+        data_ocorrencia=None,
+        motivo_revisao: Optional[str] = None,
     ) -> Dict[str, Any]:
         return finalizar_venda_impl(
             venda_id=venda_id,
@@ -84,5 +86,7 @@ class VendaService:
             cupom_discount_applied=cupom_discount_applied,
             caixa_id=caixa_id,
             permitir_caixa_tenant=permitir_caixa_tenant,
+            data_ocorrencia=data_ocorrencia,
+            motivo_revisao=motivo_revisao,
             processar_baixa_estoque_item=VendaService._processar_baixa_estoque_item,
         )

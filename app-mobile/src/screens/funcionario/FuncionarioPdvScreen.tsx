@@ -172,7 +172,7 @@ export default function FuncionarioPdvScreen() {
     () => carrinho.reduce((soma, item) => soma + item.quantidade, 0),
     [carrinho],
   );
-  const ehCartao = formaPagamento === "credito" || formaPagamento === "debito";
+  const ehCartao = ["credito", "debito", "link"].includes(formaPagamento);
   const opcoesCartao = useMemo(
     () => formasPagamentoErp.filter((item) => item.key === formaPagamento),
     [formasPagamentoErp, formaPagamento],
@@ -185,7 +185,7 @@ export default function FuncionarioPdvScreen() {
   const parcelasCredito = useMemo(() => {
     const formaParcelamento = formaPagamentoSelecionada;
     const podeParcelar =
-      formaPagamento === "credito" &&
+      (formaPagamento === "credito" || formaPagamento === "link") &&
       Boolean(formaParcelamento?.permite_parcelamento || formaParcelamento?.split_parcelas);
     if (!podeParcelar) return [1];
     return formaParcelamento?.parcelas_disponiveis?.length
@@ -224,7 +224,7 @@ export default function FuncionarioPdvScreen() {
       setFormaPagamentoIdSelecionada(opcoesCartao[0].selection_id);
       return;
     }
-    if (formaPagamento !== "credito") {
+    if (formaPagamento !== "credito" && formaPagamento !== "link") {
       setNumeroParcelas(1);
       return;
     }
@@ -691,7 +691,7 @@ export default function FuncionarioPdvScreen() {
               ? Number(trocoFinal.toFixed(2))
               : null,
           numero_parcelas:
-            formaPagamento === "credito" || formaPagamento === "crediario" ? numeroParcelas : 1,
+            ["credito", "link", "crediario"].includes(formaPagamento) ? numeroParcelas : 1,
           forma_pagamento_id: formaPagamentoSelecionada?.id ?? null,
           bandeira: ehCartao
             ? (formaPagamentoSelecionada?.bandeira ?? formaPagamentoSelecionada?.nome ?? null)

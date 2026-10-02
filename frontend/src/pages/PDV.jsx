@@ -33,11 +33,13 @@ import { usePDVVendaAtual } from "../hooks/usePDVVendaAtual";
 import { useTour } from "../hooks/useTour";
 import { tourPDV } from "../tours/tourDefinitions";
 import { getGuiaClassNames } from "../utils/guiaHighlight";
+import { obterContextoRevisaoCaixa } from "../utils/caixaRevisao";
 
 export default function PDV() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const searchParamsString = searchParams.toString();
+  const contextoRevisao = obterContextoRevisaoCaixa();
   const guiaAtiva = searchParams.get("guia");
   const novoPetIdRetorno = searchParams.get("novo_pet_id");
   const tutorIdRetorno = searchParams.get("tutor_id");
@@ -615,10 +617,36 @@ export default function PDV() {
 
   return (
     <>
+      {contextoRevisao && (
+        <div className="flex items-center justify-between gap-4 bg-amber-100 px-5 py-3 text-amber-950">
+          <div>
+            <strong>Revisão do caixa #{contextoRevisao.caixa_revisao_id}</strong>
+            {" — ocorrência em "}
+            {contextoRevisao.data_ocorrencia.replace("T", " às ")}
+            <p className="text-sm">
+              Cadastre a venda que faltou ou localize uma venda pelo número e registre o pagamento.
+              O caixa de hoje continua aberto.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => navigate("/meus-caixas")}
+            className="rounded bg-white px-3 py-2 font-medium"
+          >
+            Sair da revisão
+          </button>
+        </div>
+      )}
       <PDVDriveAlertBanner {...driveAlertProps} />
-      <div className="flex h-screen bg-gray-50" style={containerStyle}>
+      <div
+        className={`flex bg-gray-50 ${contextoRevisao ? "h-[calc(100vh-76px)]" : "h-screen"}`}
+        style={containerStyle}
+      >
         <PDVMainArea {...mainAreaProps} />
-        <PDVOverlays {...overlayProps} />
+        <PDVOverlays
+          {...overlayProps}
+          mostrarVendasEmAberto={contextoRevisao ? false : overlayProps.mostrarVendasEmAberto}
+        />
         {etiquetaPendente && (
           <PDVEtiquetaBalancaModal
             pendencia={etiquetaPendente}
