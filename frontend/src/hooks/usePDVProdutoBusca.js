@@ -6,6 +6,7 @@ import {
   deveAdicionarProdutoAutomaticamente,
   encontrarProdutoPorCodigo,
   normalizarCodigoProdutoBusca,
+  produtoCorrespondeCodigoBalanca,
 } from "../utils/pdvProdutoBuscaUtils";
 
 function isBuscaCancelada(error) {
@@ -193,16 +194,14 @@ export function usePDVProdutoBusca({
 
       const produtos = await buscarProdutosAtualizados(etiqueta.codigoProdutoSemZeros);
       const candidatos = produtos.filter(
-        (produto) =>
-          encontrarProdutoPorCodigo([produto], etiqueta.codigoProduto) ||
-          encontrarProdutoPorCodigo([produto], etiqueta.codigoProdutoSemZeros),
+        (produto) => produtoCorrespondeCodigoBalanca(produto, etiqueta.codigoProduto),
       );
       if (candidatos.length !== 1) {
         mostrarErroEtiqueta(
           etiqueta,
           candidatos.length > 1
             ? "Mais de um produto usa o codigo desta etiqueta. Corrija o cadastro."
-            : `Produto ${etiqueta.codigoProdutoSemZeros} nao encontrado para esta etiqueta.`,
+            : `Produto ${etiqueta.codigoProdutoSemZeros} nao encontrado para esta etiqueta. Confira o codigo cadastrado na balanca e no produto.`,
         );
         return true;
       }
