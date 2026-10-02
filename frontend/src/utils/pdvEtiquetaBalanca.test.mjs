@@ -4,7 +4,6 @@ import {
   calcularItemEtiquetaBalanca,
   compararPrecosEtiquetaBalanca,
   lerEtiquetaBalanca,
-  obterLeiturasPossiveisEtiquetaBalanca,
 } from "./pdvEtiquetaBalanca.js";
 import { montarItensVendaPayload } from "./pdvVendaPayload.js";
 import { produtoCorrespondeCodigoBalanca } from "./pdvProdutoBuscaUtils.js";
@@ -32,14 +31,20 @@ test("as duas etiquetas identificam o mesmo produto e preservam os totais impres
   assert.equal(calcularItemEtiquetaBalanca(segunda, produtoGranel).subtotal, 6.59);
 });
 
-test("etiqueta da balanca encontra SKU com zeros a esquerda sem confundir 15 e 0150", () => {
-  const etiqueta0151 = lerEtiquetaBalanca("2000151001435");
-  assert.equal(etiqueta0151.codigoProdutoSemZeros, "151");
-  assert.equal(
-    produtoCorrespondeCodigoBalanca({ codigo: "0151" }, etiqueta0151.codigoProduto),
-    true,
-  );
+test("etiquetas corrigidas usam seis digitos de produto e cinco de valor", () => {
+  for (const [codigo, sku, totalCentavos] of [
+    ["2000151001435", "0151", 143],
+    ["2000152001434", "0152", 143],
+    ["2000153001433", "0153", 143],
+    ["2000154000718", "0154", 71],
+  ]) {
+    const etiqueta = lerEtiquetaBalanca(codigo);
+    assert.equal(etiqueta.codigoProdutoSemZeros, sku.slice(1));
+    assert.equal(etiqueta.totalCentavos, totalCentavos);
+    assert.equal(produtoCorrespondeCodigoBalanca({ codigo: sku }, etiqueta.codigoProduto), true);
+  }
 
+  // A etiqueta antiga do 0150 foi gerada com cadastro errado na balanca.
   const etiqueta15 = lerEtiquetaBalanca("2000015001144");
   assert.equal(etiqueta15.codigoProdutoSemZeros, "15");
   assert.equal(produtoCorrespondeCodigoBalanca({ codigo: "15" }, etiqueta15.codigoProduto), true);
@@ -47,34 +52,6 @@ test("etiqueta da balanca encontra SKU com zeros a esquerda sem confundir 15 e 0
     produtoCorrespondeCodigoBalanca({ codigo: "0150" }, etiqueta15.codigoProduto),
     false,
   );
-
-  const leituras0150 = obterLeiturasPossiveisEtiquetaBalanca(etiqueta15);
-  assert.deepEqual(
-    leituras0150.map(({ codigoProdutoSemZeros, totalCentavos }) => [
-      codigoProdutoSemZeros,
-      totalCentavos,
-    ]),
-    [
-      ["15", 114],
-      ["150", 114],
-    ],
-  );
-  assert.equal(
-    produtoCorrespondeCodigoBalanca({ codigo: "0150" }, leituras0150[1].codigoProduto),
-    true,
-  );
-  assert.equal(
-    compararPrecosEtiquetaBalanca(
-      leituras0150[1],
-      { ...produtoGranel, codigo: "0150", preco_venda: 15.9 },
-      15.9,
-    ).quantidade,
-    0.072,
-  );
-
-  const leituras0151 = obterLeiturasPossiveisEtiquetaBalanca(etiqueta0151);
-  assert.equal(leituras0151[0].codigoProdutoSemZeros, "151");
-  assert.equal(leituras0151[1].codigoProdutoSemZeros, "1510");
 });
 
 test("rejeita erro de leitura, valor zerado e formato comum", () => {

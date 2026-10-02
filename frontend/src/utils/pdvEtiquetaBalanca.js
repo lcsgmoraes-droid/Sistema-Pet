@@ -8,8 +8,7 @@ function digitoVerificadorEan13(codigoSemDigito) {
   return (10 - (soma % 10)) % 10;
 }
 
-// Leitura inicial: 2 + produto (6) + preco em centavos (5) + DV.
-// A posicao real dos campos pode variar; veja obterLeiturasPossiveisEtiquetaBalanca.
+// Formato configurado nas etiquetas da balanca: 2 + produto (6) + preco em centavos (5) + DV.
 export function lerEtiquetaBalanca(codigoLido) {
   const codigo = String(codigoLido ?? "").trim();
   if (!/^2\d{12}$/.test(codigo)) return null;
@@ -30,26 +29,6 @@ export function lerEtiquetaBalanca(codigoLido) {
     codigoProdutoSemZeros: codigoProduto.replace(/^0+/, "") || "0",
     totalCentavos,
   };
-}
-
-// O EAN-13 valida a sequencia inteira, mas nao informa onde termina o PLU.
-// Estas duas divisoes sao usadas em etiquetas de preco variavel. Quando ambas
-// identificarem produtos cadastrados, o operador precisa escolher pela etiqueta.
-export function obterLeiturasPossiveisEtiquetaBalanca(etiqueta) {
-  if (!etiqueta || etiqueta.erro) return [];
-  const codigoProduto7 = etiqueta.codigo.slice(1, 8);
-  const totalCentavos4 = Number(etiqueta.codigo.slice(8, 12));
-  const leituras = [{ ...etiqueta, formato: "produto6_valor5" }];
-  if (totalCentavos4 > 0) {
-    leituras.push({
-      ...etiqueta,
-      formato: "produto7_valor4",
-      codigoProduto: codigoProduto7,
-      codigoProdutoSemZeros: codigoProduto7.replace(/^0+/, "") || "0",
-      totalCentavos: totalCentavos4,
-    });
-  }
-  return leituras;
 }
 
 export function produtoAceitaEtiquetaBalanca(produto) {
