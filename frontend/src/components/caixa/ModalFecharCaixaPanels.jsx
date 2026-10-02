@@ -361,7 +361,9 @@ export function PaymentBreakdownPanel({
                     </div>
                     {Object.entries(formasDoDia).map(([forma, dados]) => (
                       <div key={forma} className="flex justify-between text-gray-600">
-                        <span>{forma} · {dados.quantidade}</span>
+                        <span>
+                          {forma} · {dados.quantidade}
+                        </span>
                         <span>{formatMoneyBRL(dados.total)}</span>
                       </div>
                     ))}
