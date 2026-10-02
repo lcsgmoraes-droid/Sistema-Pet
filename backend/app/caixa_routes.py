@@ -565,7 +565,8 @@ def obter_resumo_caixa(
     from sqlalchemy import func
 
     entradas_dinheiro = [
-        mov for mov in movimentacoes
+        mov
+        for mov in movimentacoes
         if mov.tipo == "venda"
         and str(mov.forma_pagamento or "").strip().casefold() == "dinheiro"
     ]
@@ -592,7 +593,9 @@ def obter_resumo_caixa(
     if entradas_dinheiro:
         vendas_por_forma["Dinheiro"] = {
             "quantidade": len(entradas_dinheiro),
-            "total": float(sum((moeda(mov.valor) for mov in entradas_dinheiro), moeda(0))),
+            "total": float(
+                sum((moeda(mov.valor) for mov in entradas_dinheiro), moeda(0))
+            ),
             "tipo_contagem": "lançamento",
         }
     for forma_id, qtd, total in vendas_do_caixa:
@@ -720,10 +723,14 @@ def listar_vendas_caixa(
             {
                 "id": mov.id,
                 "numero_venda": mov.venda.numero_venda if mov.venda else None,
-                "cliente_nome": mov.venda.cliente.nome if mov.venda and mov.venda.cliente else "Consumidor",
+                "cliente_nome": mov.venda.cliente.nome
+                if mov.venda and mov.venda.cliente
+                else "Consumidor",
                 "total": float(mov.valor),
                 "valor_nesta_forma": float(mov.valor),
-                "hora_venda": mov.data_movimento.strftime("%H:%M") if mov.data_movimento else None,
+                "hora_venda": mov.data_movimento.strftime("%H:%M")
+                if mov.data_movimento
+                else None,
             }
             for mov in movimentos
         ]
@@ -742,7 +749,9 @@ def listar_vendas_caixa(
                 "cliente_nome": venda.cliente.nome if venda.cliente else "Consumidor",
                 "total": float(venda.total),
                 "valor_nesta_forma": float(venda.total),
-                "hora_venda": venda.data_venda.strftime("%H:%M") if venda.data_venda else None,
+                "hora_venda": venda.data_venda.strftime("%H:%M")
+                if venda.data_venda
+                else None,
             }
             for venda in vendas
         ]
@@ -766,10 +775,14 @@ def listar_vendas_caixa(
         {
             "id": pagamento.id,
             "numero_venda": pagamento.venda.numero_venda,
-            "cliente_nome": pagamento.venda.cliente.nome if pagamento.venda.cliente else "Consumidor",
+            "cliente_nome": pagamento.venda.cliente.nome
+            if pagamento.venda.cliente
+            else "Consumidor",
             "total": float(pagamento.venda.total),
             "valor_nesta_forma": float(pagamento.valor),
-            "hora_venda": pagamento.data_pagamento.strftime("%H:%M") if pagamento.data_pagamento else None,
+            "hora_venda": pagamento.data_pagamento.strftime("%H:%M")
+            if pagamento.data_pagamento
+            else None,
         }
         for pagamento in pagamentos
     ]

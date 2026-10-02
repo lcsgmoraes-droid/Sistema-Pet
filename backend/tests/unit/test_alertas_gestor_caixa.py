@@ -387,9 +387,15 @@ def test_formas_do_caixa_conciliam_dinheiro_e_incluem_venda_com_nf(dados_caixa):
     for id_, status_venda in ((1, "finalizada"), (2, "pago_nf")):
         db.execute(
             Venda.__table__.insert().values(
-                id=id_, tenant_id=tenant, numero_venda=f"VEN-{id_}",
-                vendedor_id=10, user_id=10, subtotal=100, total=100,
-                caixa_id=caixa.id, status=status_venda,
+                id=id_,
+                tenant_id=tenant,
+                numero_venda=f"VEN-{id_}",
+                vendedor_id=10,
+                user_id=10,
+                subtotal=100,
+                total=100,
+                caixa_id=caixa.id,
+                status=status_venda,
                 data_venda=datetime(2026, 9, 4, 12),
             )
         )
@@ -400,17 +406,26 @@ def test_formas_do_caixa_conciliam_dinheiro_e_incluem_venda_com_nf(dados_caixa):
     ):
         db.execute(
             VendaPagamento.__table__.insert().values(
-                id=id_, tenant_id=tenant, venda_id=venda_id,
-                forma_pagamento=forma, valor=valor,
+                id=id_,
+                tenant_id=tenant,
+                venda_id=venda_id,
+                forma_pagamento=forma,
+                valor=valor,
                 data_pagamento=datetime(2026, 9, 4, 12),
             )
         )
     for id_, venda_id, valor in ((1, 1, 50), (2, 2, 37.90)):
         db.execute(
             MovimentacaoCaixa.__table__.insert().values(
-                id=id_, tenant_id=tenant, caixa_id=caixa.id, venda_id=venda_id,
-                tipo="venda", forma_pagamento="Dinheiro", valor=valor,
-                usuario_id=10, usuario_nome="Operador",
+                id=id_,
+                tenant_id=tenant,
+                caixa_id=caixa.id,
+                venda_id=venda_id,
+                tipo="venda",
+                forma_pagamento="Dinheiro",
+                valor=valor,
+                usuario_id=10,
+                usuario_nome="Operador",
                 data_movimento=datetime(2026, 9, 4, 12),
             )
         )
@@ -419,7 +434,9 @@ def test_formas_do_caixa_conciliam_dinheiro_e_incluem_venda_com_nf(dados_caixa):
 
     assert resumo["totais"]["vendas"] == 87.90
     assert resumo["vendas_por_forma_pagamento"]["Dinheiro"] == {
-        "quantidade": 2, "total": 87.90, "tipo_contagem": "lançamento"
+        "quantidade": 2,
+        "total": 87.90,
+        "tipo_contagem": "lançamento",
     }
     assert resumo["vendas_por_forma_pagamento"]["PIX"]["total"] == 20
     assert len(listar_vendas_caixa(caixa.id, "Dinheiro", db, (user, tenant))) == 2
