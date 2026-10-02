@@ -85,11 +85,13 @@ def criar_venda(
         # ETAPA 2: GERAR NÚMERO DA VENDA
         # ============================================================
 
-        numero_venda = gerar_numero_venda(
-            db,
-            tenant_id=payload.get("tenant_id"),
-            user_id=user_id,
-        )
+        argumentos_numero = {
+            "tenant_id": payload.get("tenant_id"),
+            "user_id": user_id,
+        }
+        if payload.get("data_venda") is not None:
+            argumentos_numero["data_venda"] = payload["data_venda"]
+        numero_venda = gerar_numero_venda(db, **argumentos_numero)
         logger.debug(f"✅ Número gerado: {numero_venda}")
 
         # ============================================================
@@ -184,7 +186,8 @@ def criar_venda(
             status_entrega="pendente" if tem_entrega else None,
             canal=payload.get("canal", "loja_fisica"),  # Canal de venda para DRE
             status="aberta",
-            data_venda=now_brasilia(),
+            caixa_id=payload.get("caixa_id"),
+            data_venda=payload.get("data_venda") or now_brasilia(),
             user_id=user_id,
             tenant_id=payload.get("tenant_id"),
         )
@@ -498,6 +501,25 @@ def criar_venda(
         # ============================================================
         # ETAPA 7: COMMIT
         # ============================================================
+
+        if payload.get("motivo_revisao"):
+            from app.services.business_audit_service import log_business_event
+
+            log_business_event(
+                db=db,
+                tenant_id=payload.get("tenant_id"),
+                user_id=user_id,
+                event="cashier.review_sale_created",
+                entity_type="vendas",
+                entity_id=venda.id,
+                metadata={
+                    "caixa_id": payload.get("caixa_id"),
+                    "data_ocorrencia": venda.data_venda.isoformat(),
+                    "motivo": payload["motivo_revisao"],
+                },
+                details="Venda lançada em caixa fechado durante revisão",
+                commit=False,
+            )
 
         db.commit()
         db.refresh(venda)

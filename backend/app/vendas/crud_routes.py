@@ -193,6 +193,17 @@ async def criar_venda(
 
     current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
 
+    from app.caixa.revisao import validar_revisao_caixa
+
+    caixa_revisao = validar_revisao_caixa(
+        db,
+        caixa_id=dados.caixa_revisao_id,
+        data_ocorrencia=dados.data_ocorrencia,
+        motivo=dados.motivo_revisao,
+        usuario=current_user,
+        tenant_id=tenant_id,
+    )
+
     # ========================================
     # 🔒 TRAVA 1 — VALIDAÇÃO: PRODUTO PAI NÃO PODE SER VENDIDO
     # ========================================
@@ -233,6 +244,9 @@ async def criar_venda(
 
     # Preparar payload para o service
     payload = {
+        "caixa_id": caixa_revisao.id if caixa_revisao else None,
+        "data_venda": dados.data_ocorrencia if caixa_revisao else None,
+        "motivo_revisao": dados.motivo_revisao.strip() if caixa_revisao else None,
         "cliente_id": dados.cliente_id,
         "vendedor_id": dados.vendedor_id,
         "funcionario_id": dados.funcionario_id,
