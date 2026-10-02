@@ -2,9 +2,11 @@ import { readdirSync, readFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
+import { isNodeForgePatched } from "./patch-node-forge.mjs";
 
 const severityOrder = { info: 0, low: 1, moderate: 2, high: 3, critical: 4 };
 const minimumSeverity = severityOrder.moderate;
+const patchedNodeForgeAdvisory = "GHSA-86W9-CPQP-85RV";
 const allowedAdvisories = new Map([
   [
     "GHSA-W3RX-R6R6-PGPR",
@@ -30,7 +32,8 @@ function sourceUsesImageSize(directory) {
     }
     if (!/\.(?:js|jsx|mjs|ts|tsx)$/.test(entry.name)) continue;
     const source = readFileSync(entryPath, "utf8");
-    if (imageSizeImportPatterns.some((pattern) => pattern.test(source))) return true;
+    if (imageSizeImportPatterns.some((pattern) => pattern.test(source)))
+      return true;
   }
   return false;
 }
@@ -41,7 +44,8 @@ function applicationUsesImageSize() {
 
   for (const entryFile of ["App.tsx", "index.js"]) {
     const source = readFileSync(path.resolve(entryFile), "utf8");
-    if (imageSizeImportPatterns.some((pattern) => pattern.test(source))) return true;
+    if (imageSizeImportPatterns.some((pattern) => pattern.test(source)))
+      return true;
   }
   return false;
 }
@@ -95,21 +99,29 @@ function advisoryIdsByVulnerability(vulnerabilities) {
   return idsByName;
 }
 
-export function evaluateAudit(report, { sourceImportsImageSize = false } = {}) {
+export function evaluateAudit(
+  report,
+  { sourceImportsImageSize = false, nodeForgePatched = false } = {},
+) {
   const vulnerabilities = report?.vulnerabilities || {};
   const advisoryIdsByName = advisoryIdsByVulnerability(vulnerabilities);
   const blocked = [];
   const ignored = [];
 
   for (const [name, vulnerability] of Object.entries(vulnerabilities)) {
-    if ((severityOrder[vulnerability.severity] ?? 99) < minimumSeverity) continue;
+    if ((severityOrder[vulnerability.severity] ?? 99) < minimumSeverity)
+      continue;
 
     const advisoryIds = advisoryIdsByName.get(name) || new Set();
-    const onlyAllowed =
+    const mitigated =
       advisoryIds.size > 0 &&
-      [...advisoryIds].every((advisoryId) => allowedAdvisories.has(advisoryId));
+      [...advisoryIds].every(
+        (advisoryId) =>
+          (allowedAdvisories.has(advisoryId) && !sourceImportsImageSize) ||
+          (advisoryId === patchedNodeForgeAdvisory && nodeForgePatched),
+      );
 
-    if (onlyAllowed && !sourceImportsImageSize) {
+    if (mitigated) {
       ignored.push({ name, advisoryIds: [...advisoryIds] });
     } else {
       blocked.push({
@@ -144,15 +156,20 @@ function main() {
 
   const { blocked, ignored } = evaluateAudit(report, {
     sourceImportsImageSize: applicationUsesImageSize(),
+    nodeForgePatched: isNodeForgePatched(),
   });
 
   const ignoredAdvisories = new Set(
     ignored.flatMap((item) => item.advisoryIds),
   );
   for (const advisoryId of ignoredAdvisories) {
-    console.warn(
-      `Excecao documentada: image-size / ${advisoryId}. ${allowedAdvisories.get(advisoryId)}`,
-    );
+    if (advisoryId === patchedNodeForgeAdvisory) {
+      console.warn(`Backport verificado: node-forge / ${advisoryId}.`);
+    } else {
+      console.warn(
+        `Excecao documentada: image-size / ${advisoryId}. ${allowedAdvisories.get(advisoryId)}`,
+      );
+    }
   }
 
   if (blocked.length > 0) {
