@@ -6,6 +6,7 @@ import {
   lerEtiquetaBalanca,
 } from "./pdvEtiquetaBalanca.js";
 import { montarItensVendaPayload } from "./pdvVendaPayload.js";
+import { produtoCorrespondeCodigoBalanca } from "./pdvProdutoBuscaUtils.js";
 
 const produtoGranel = {
   codigo: "2024",
@@ -28,6 +29,29 @@ test("as duas etiquetas identificam o mesmo produto e preservam os totais impres
   });
   assert.equal(calcularItemEtiquetaBalanca(segunda, produtoGranel).quantidade, 0.228);
   assert.equal(calcularItemEtiquetaBalanca(segunda, produtoGranel).subtotal, 6.59);
+});
+
+test("etiquetas corrigidas usam seis digitos de produto e cinco de valor", () => {
+  for (const [codigo, sku, totalCentavos] of [
+    ["2000151001435", "0151", 143],
+    ["2000152001434", "0152", 143],
+    ["2000153001433", "0153", 143],
+    ["2000154000718", "0154", 71],
+  ]) {
+    const etiqueta = lerEtiquetaBalanca(codigo);
+    assert.equal(etiqueta.codigoProdutoSemZeros, sku.slice(1));
+    assert.equal(etiqueta.totalCentavos, totalCentavos);
+    assert.equal(produtoCorrespondeCodigoBalanca({ codigo: sku }, etiqueta.codigoProduto), true);
+  }
+
+  // A etiqueta antiga do 0150 foi gerada com cadastro errado na balanca.
+  const etiqueta15 = lerEtiquetaBalanca("2000015001144");
+  assert.equal(etiqueta15.codigoProdutoSemZeros, "15");
+  assert.equal(produtoCorrespondeCodigoBalanca({ codigo: "15" }, etiqueta15.codigoProduto), true);
+  assert.equal(
+    produtoCorrespondeCodigoBalanca({ codigo: "0150" }, etiqueta15.codigoProduto),
+    false,
+  );
 });
 
 test("rejeita erro de leitura, valor zerado e formato comum", () => {
