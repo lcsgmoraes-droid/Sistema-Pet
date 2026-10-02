@@ -89,7 +89,9 @@ test("resolve bandeiras e parcelas pela matriz de taxas da operadora", () => {
   assert.equal(normalizarBandeiraCartao("Diners Club"), "diners");
   assert.equal(normalizarBandeiraCartao("Union Pay"), "unionpay");
   assert.equal(obterModalidadeCartao({ tipo: "cartao_credito" }), "credito");
+  assert.equal(obterModalidadeCartao({ tipo: "link_pagamento", tipo_cartao: "credito" }), "link");
   assert.equal(ehFormaPagamentoCartao({ tipo: "cartao_debito" }), true);
+  assert.equal(ehFormaPagamentoCartao({ tipo: "link_pagamento" }), true);
   assert.deepEqual(obterBandeirasDisponiveis({ taxas, modalidade: "credito" }), [
     "Visa",
     "Mastercard",
@@ -131,6 +133,39 @@ test("crediario oferece de uma a sessenta parcelas sem herdar o limite cadastral
   assert.equal(parcelas.length, 60);
   assert.deepEqual(parcelas.slice(0, 3), [1, 2, 3]);
   assert.equal(parcelas.at(-1), 60);
+});
+
+test("link de pagamento usa apenas suas parcelas e envia a modalidade correta", () => {
+  const taxas = [
+    { id: 1, bandeira: "visa", modalidade: "credito", parcelas: 3 },
+    { id: 2, bandeira: "visa", modalidade: "link", parcelas: 1, prazo_recebimento_dias: 7 },
+    { id: 3, bandeira: "visa", modalidade: "link", parcelas: 3, prazo_recebimento_dias: 14 },
+  ];
+  assert.deepEqual(
+    obterParcelasDisponiveis({ taxas, modalidade: "link", bandeira: "Visa", maxParcelas: 12 }),
+    [1, 3],
+  );
+  assert.equal(
+    obterTaxaCartaoSelecionada({ taxas, modalidade: "link", bandeira: "Visa", parcelas: 3 })
+      ?.prazo_recebimento_dias,
+    14,
+  );
+  const pagamento = montarPagamentoRecebido({
+    formaPagamento: {
+      id: 9,
+      nome: "Link de pagamento",
+      tipo: "link_pagamento",
+      permite_parcelamento: true,
+    },
+    valor: 100,
+    valorRestante: 100,
+    bandeira: "Visa",
+    operadora: { id: 7 },
+    numeroParcelas: 3,
+  });
+  assert.equal(pagamento.modalidade_cartao, "link");
+  assert.equal(pagamento.operadora_id, 7);
+  assert.equal(pagamento.numero_parcelas, 3);
 });
 
 test("calcula dados auxiliares da venda sem depender do modal", () => {

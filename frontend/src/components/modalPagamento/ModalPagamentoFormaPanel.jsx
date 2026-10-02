@@ -403,7 +403,9 @@ export default function ModalPagamentoFormaPanel({
 
             {/* Bandeira do cartão */}
             {formaPagamentoSelecionada?.tipo &&
-              ["cartao_credito", "cartao_debito"].includes(formaPagamentoSelecionada.tipo) && (
+              ["cartao_credito", "cartao_debito", "link_pagamento"].includes(
+                formaPagamentoSelecionada.tipo,
+              ) && (
                 <>
                   {/* 🆕 OPERADORA DE CARTÃO */}
                   <div>
@@ -460,7 +462,7 @@ export default function ModalPagamentoFormaPanel({
                       </div>
                     )}
 
-                  {/* NSU do Cartão (para conciliação bancária) */}
+                  {/* NSU da transação (para conciliação bancária) */}
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       NSU (Número Sequencial Único)

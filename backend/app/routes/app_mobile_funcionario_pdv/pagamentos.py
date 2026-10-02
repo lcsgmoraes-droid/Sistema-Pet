@@ -35,6 +35,9 @@ def _normalizar_forma_pagamento_pdv(forma_pagamento: str) -> str:
         "debito": "cartao_debito",
         "cartao_debito": "cartao_debito",
         "cartao de debito": "cartao_debito",
+        "link": "link_pagamento",
+        "link_pagamento": "link_pagamento",
+        "link de pagamento": "link_pagamento",
         "cashback": "Cashback",
         "crediario": "Crediário",
         "crediário": "Crediário",
@@ -53,6 +56,8 @@ def _forma_pagamento_key_funcionario_pdv(
     forma_pagamento: FormaPagamento,
 ) -> Optional[str]:
     texto = f"{forma_pagamento.tipo or ''} {forma_pagamento.nome or ''} {forma_pagamento.tipo_cartao or ''}".lower()
+    if forma_pagamento.tipo == "link_pagamento":
+        return "link"
     if "credito" in texto or "crédito" in texto:
         return "credito"
     if "debito" in texto or "débito" in texto:
@@ -117,6 +122,7 @@ def _resolver_forma_pagamento_ativa_funcionario_pdv(
     key_informada = {
         "cartao_credito": "credito",
         "cartao_debito": "debito",
+        "link_pagamento": "link",
         "crediário": "crediario",
         "transferência": "transferencia",
     }.get(key_informada, key_informada)
@@ -134,10 +140,19 @@ def _resolver_forma_pagamento_cartao_funcionario_pdv(
     pagamento: FuncionarioPdvPagamentoRequest,
 ) -> Optional[FormaPagamento]:
     forma_key = (pagamento.forma_pagamento or "").strip().lower()
-    if forma_key not in {"credito", "debito", "cartao_credito", "cartao_debito"}:
+    if forma_key not in {
+        "credito",
+        "debito",
+        "link",
+        "cartao_credito",
+        "cartao_debito",
+        "link_pagamento",
+    }:
         return None
 
-    forma_normalizada = "credito" if "credito" in forma_key else "debito"
+    forma_normalizada = {"link": "link", "link_pagamento": "link"}.get(
+        forma_key, "credito" if "credito" in forma_key else "debito"
+    )
     query = db.query(FormaPagamento).filter(
         FormaPagamento.tenant_id == tenant_id,
         FormaPagamento.ativo.is_(True),
@@ -181,7 +196,7 @@ def _resolver_forma_pagamento_cartao_funcionario_pdv(
             raise HTTPException(status_code=400, detail="Operadora de cartao invalida.")
         max_parcelas = max(1, int(operadora.max_parcelas or 1))
     numero_parcelas = max(1, int(pagamento.numero_parcelas or 1))
-    pode_parcelar = forma_normalizada == "credito" and (
+    pode_parcelar = forma_normalizada in {"credito", "link"} and (
         bool(forma.permite_parcelamento)
         or bool(forma.split_parcelas)
         or bool(pagamento.operadora_id)
@@ -191,14 +206,18 @@ def _resolver_forma_pagamento_cartao_funcionario_pdv(
         raise HTTPException(
             status_code=400, detail="Cartao de debito deve ser registrado em 1 parcela."
         )
-    if forma_normalizada == "credito" and numero_parcelas > 1 and not pode_parcelar:
+    if (
+        forma_normalizada in {"credito", "link"}
+        and numero_parcelas > 1
+        and not pode_parcelar
+    ):
         raise HTTPException(
-            status_code=400, detail="Esta forma de credito nao permite parcelamento."
+            status_code=400, detail="Esta forma de pagamento nao permite parcelamento."
         )
-    if forma_normalizada == "credito" and numero_parcelas > max_parcelas:
+    if forma_normalizada in {"credito", "link"} and numero_parcelas > max_parcelas:
         raise HTTPException(
             status_code=400,
-            detail=f"Esta forma de credito permite no maximo {max_parcelas}x.",
+            detail=f"Esta forma de pagamento permite no maximo {max_parcelas}x.",
         )
 
     if pagamento.operadora_id:
@@ -267,7 +286,7 @@ def listar_formas_pagamento_funcionario_pdv(
         parcelas_maximas = int(forma.parcelas_maximas or forma.max_parcelas or 1)
         max_parcelas = int(forma.max_parcelas or parcelas_maximas or 1)
         numero_parcelas = max(1, parcelas_maximas, max_parcelas)
-        permite_parcelamento = key == "credito" and (
+        permite_parcelamento = key in {"credito", "link"} and (
             bool(forma.permite_parcelamento) or bool(forma.split_parcelas)
         )
         resposta_base = {
@@ -292,7 +311,7 @@ def listar_formas_pagamento_funcionario_pdv(
             else [1],
         }
 
-        if key not in {"credito", "debito"}:
+        if key not in {"credito", "debito", "link"}:
             resposta.append(resposta_base)
             continue
 
@@ -351,7 +370,7 @@ def listar_formas_pagamento_funcionario_pdv(
                         "numero_parcelas": max(parcelas),
                         "max_parcelas": max(parcelas),
                         "parcelas_maximas": max(parcelas),
-                        "permite_parcelamento": key == "credito"
+                        "permite_parcelamento": key in {"credito", "link"}
                         and any(parcela > 1 for parcela in parcelas),
                         "operadora": operadora.nome,
                         "operadora_id": operadora.id,

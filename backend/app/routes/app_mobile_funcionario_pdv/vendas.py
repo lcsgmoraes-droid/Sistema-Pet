@@ -178,7 +178,7 @@ def finalizar_venda_funcionario_pdv(
         forma_pagamento_selecionada = _resolver_forma_pagamento_ativa_funcionario_pdv(
             db, tenant_id, dados.pagamento
         )
-    if forma_pagamento not in {"cartao_credito", "Crediário"}:
+    if forma_pagamento not in {"cartao_credito", "link_pagamento", "Crediário"}:
         numero_parcelas = max(1, min(numero_parcelas, 1))
     criar_payload = _criar_payload_venda_funcionario_pdv(
         dados=dados,
