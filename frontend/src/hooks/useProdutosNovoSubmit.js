@@ -1,4 +1,5 @@
 import { useState } from "react";
+import api from "../api";
 import { createProduto, previewPrecosVendaProdutosCompostos, updateProduto } from "../api/produtos";
 import { normalizarCodigosBarrasAlternativosPayload } from "../pages/produtosFormUtils";
 import { debugLog } from "../utils/debug";
@@ -17,10 +18,23 @@ export default function useProdutosNovoSubmit({
   salvarFiscal,
   salvando,
   setSalvando,
+  produtoOrigemGranel,
+  granelVinculos,
 }) {
   const [dadosPendentes, setDadosPendentes] = useState(null);
   const [previewPrecosCompostos, setPreviewPrecosCompostos] = useState(null);
   const [precosCompostosSelecionados, setPrecosCompostosSelecionados] = useState([]);
+
+  const salvarVinculoGranel = async (produtoId) => {
+    if (!formData.e_granel || !produtoOrigemGranel?.id) return;
+    if (granelVinculos.some((vinculo) => vinculo.produto_origem_id === produtoOrigemGranel.id)) {
+      return;
+    }
+    await api.post("/estoque/granel/vinculos", {
+      produto_origem_id: produtoOrigemGranel.id,
+      produto_granel_id: Number(produtoId),
+    });
+  };
 
   const salvarEdicao = async (dados, produtosCompostosIds) => {
     await salvarFiscal({ id, tipo_produto: formData.tipo_produto });
@@ -32,6 +46,14 @@ export default function useProdutosNovoSubmit({
             produtos_compostos_preco_venda_ids: produtosCompostosIds,
           };
     await updateProduto(id, payload);
+    try {
+      await salvarVinculoGranel(id);
+    } catch (error) {
+      alert(
+        `Produto atualizado, mas o vínculo de granel não foi salvo: ${error.response?.data?.detail || "tente novamente"}`,
+      );
+      return;
+    }
     alert("Produto atualizado com sucesso!");
     navigate("/produtos");
   };
@@ -216,6 +238,15 @@ export default function useProdutosNovoSubmit({
 
       const response = await createProduto(dados);
       const produtoId = response.data.id;
+      try {
+        await salvarVinculoGranel(produtoId);
+      } catch (error) {
+        alert(
+          `Produto cadastrado, mas o vínculo de granel não foi salvo: ${error.response?.data?.detail || "tente novamente"}`,
+        );
+        navigate(`/produtos/${produtoId}/editar?aba=7`);
+        return;
+      }
 
       if (formData.tipo_produto === "PAI") {
         alert("Produto PAI criado com sucesso! Agora cadastre as variações.");

@@ -1,11 +1,15 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Plus, Save, X } from "lucide-react";
+import api from "../../api";
 import { formatarPrecoPorKg } from "../../utils/racaoPrecoKg";
 import TabelaConsumoEditor from "../TabelaConsumoEditor";
 
 export default function ProdutosNovoRacaoTab({
   formData,
   handleChange,
+  produtoOrigemGranel,
+  setProdutoOrigemGranel,
+  granelVinculos = [],
   handleApresentacaoPesoChange,
   handleClassificacaoRacaoChange,
   handleCriarOpcaoRacao,
@@ -23,6 +27,39 @@ export default function ProdutosNovoRacaoTab({
   const [descricaoOpcao, setDescricaoOpcao] = useState("");
   const [erroOpcao, setErroOpcao] = useState("");
   const [salvandoOpcao, setSalvandoOpcao] = useState(false);
+  const [buscaOrigem, setBuscaOrigem] = useState("");
+  const [opcoesOrigem, setOpcoesOrigem] = useState([]);
+  const [buscandoOrigem, setBuscandoOrigem] = useState(false);
+  const [erroBuscaOrigem, setErroBuscaOrigem] = useState(false);
+
+  useEffect(() => {
+    if (!formData.e_granel) return undefined;
+    let ativo = true;
+    const timer = setTimeout(
+      async () => {
+        setBuscandoOrigem(true);
+        setErroBuscaOrigem(false);
+        try {
+          const { data } = await api.get("/estoque/granel/produtos-origem", {
+            params: { busca: buscaOrigem.trim() || undefined },
+          });
+          if (ativo) setOpcoesOrigem(Array.isArray(data) ? data : []);
+        } catch (_error) {
+          if (ativo) {
+            setOpcoesOrigem([]);
+            setErroBuscaOrigem(true);
+          }
+        } finally {
+          if (ativo) setBuscandoOrigem(false);
+        }
+      },
+      buscaOrigem.trim() ? 250 : 0,
+    );
+    return () => {
+      ativo = false;
+      clearTimeout(timer);
+    };
+  }, [formData.e_granel, buscaOrigem]);
 
   const linhaSelecionada = opcoesLinhas.find(
     (linha) => String(linha.id) === String(formData.linha_racao_id || ""),
@@ -143,6 +180,8 @@ export default function ProdutosNovoRacaoTab({
                 if (marcado) {
                   handleChange("eh_racao", true);
                   handleChange("unidade", "KG");
+                } else {
+                  setProdutoOrigemGranel(null);
                 }
               }}
               className="mt-1 h-4 w-4 rounded border-gray-300 text-orange-600 focus:ring-orange-500"
@@ -160,10 +199,90 @@ export default function ProdutosNovoRacaoTab({
       </div>
 
       {formData.e_granel && (
-        <div className="rounded-lg border border-cyan-200 bg-cyan-50 p-4 text-sm text-cyan-800">
-          Para abastecer este granel, abra o produto fechado de origem e use "Lancar granel". O
-          sistema baixa pacote(s) do produto fechado e entra kg aqui usando o peso da embalagem da
-          racao.
+        <div className="space-y-3 rounded-lg border border-cyan-200 bg-cyan-50 p-4 text-sm text-cyan-900">
+          <div>
+            <label htmlFor="busca-origem-granel" className="block font-semibold">
+              Vincular produto fechado de origem
+            </label>
+            <p className="mt-1 text-xs text-cyan-800">
+              Escolha a embalagem unitária que será aberta para abastecer este granel. O vínculo é
+              salvo junto com o produto.
+            </p>
+          </div>
+          {granelVinculos.length > 0 && (
+            <div>
+              <span className="font-medium">Já vinculados:</span>
+              <ul className="mt-1 list-inside list-disc">
+                {granelVinculos.map((vinculo) => (
+                  <li key={vinculo.id}>
+                    {vinculo.produto_origem_nome} ({vinculo.produto_origem_codigo}) ·{" "}
+                    {vinculo.peso_por_unidade_kg} kg
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {produtoOrigemGranel && (
+            <div className="flex items-center justify-between gap-3 rounded-md border border-cyan-300 bg-white px-3 py-2">
+              <span>
+                A vincular: {produtoOrigemGranel.nome} ({produtoOrigemGranel.codigo}) ·{" "}
+                {produtoOrigemGranel.peso_embalagem} kg
+              </span>
+              <button
+                type="button"
+                onClick={() => setProdutoOrigemGranel(null)}
+                className="font-semibold text-cyan-700 hover:underline"
+              >
+                Remover
+              </button>
+            </div>
+          )}
+          <input
+            id="busca-origem-granel"
+            type="search"
+            value={buscaOrigem}
+            onChange={(e) => setBuscaOrigem(e.target.value)}
+            placeholder="Buscar pelo nome, SKU ou código de barras"
+            className="w-full rounded-lg border border-cyan-300 bg-white px-3 py-2 text-slate-900"
+          />
+          {buscandoOrigem && <p>Buscando produtos...</p>}
+          {erroBuscaOrigem && (
+            <p role="alert" className="text-red-700">
+              Não foi possível buscar os produtos fechados.
+            </p>
+          )}
+          {!buscandoOrigem && !erroBuscaOrigem && (
+            <div className="max-h-48 overflow-y-auto rounded-lg border border-cyan-200 bg-white">
+              {opcoesOrigem.filter(
+                (produto) =>
+                  !granelVinculos.some((vinculo) => vinculo.produto_origem_id === produto.id),
+              ).length === 0 ? (
+                <p className="px-3 py-2 text-slate-600">
+                  Nenhum produto fechado com peso cadastrado encontrado.
+                </p>
+              ) : (
+                opcoesOrigem
+                  .filter(
+                    (produto) =>
+                      !granelVinculos.some((vinculo) => vinculo.produto_origem_id === produto.id),
+                  )
+                  .map((produto) => (
+                    <button
+                      key={produto.id}
+                      type="button"
+                      onClick={() => setProdutoOrigemGranel(produto)}
+                      className="block w-full border-b border-slate-100 px-3 py-2 text-left hover:bg-cyan-50"
+                    >
+                      {produto.nome} ({produto.codigo}) · {produto.peso_embalagem} kg
+                    </button>
+                  ))
+              )}
+            </div>
+          )}
+          <p className="text-xs text-cyan-800">
+            Depois de vincular, use "Lançar granel" nas movimentações do produto fechado para
+            transferir o estoque em kg.
+          </p>
         </div>
       )}
 
