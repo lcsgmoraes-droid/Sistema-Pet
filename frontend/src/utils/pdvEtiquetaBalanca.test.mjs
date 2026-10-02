@@ -55,7 +55,6 @@ test("etiquetas corrigidas usam seis digitos de produto e cinco de valor", () =>
   );
 });
 
-
 test("etiquetas de 0,906 kg preservam SKU, valor e peso", () => {
   for (const [codigo, sku, centavos, precoKg] of [
     ["2000151018037", "0151", 1803, 19.9],
@@ -70,7 +69,6 @@ test("etiquetas de 0,906 kg preservam SKU, valor e peso", () => {
   }
 });
 
-
 test("etiqueta escolhe o produto granel quando existe SKU numerico comum", () => {
   for (const [codigo, skuGranel, skuComum] of [
     ["2000151018037", "0151", "151"],
@@ -81,7 +79,9 @@ test("etiqueta escolhe o produto granel quando existe SKU numerico comum", () =>
       { codigo: skuComum, unidade: "UN", e_granel: false },
       { codigo: skuGranel, unidade: "KG", e_granel: true },
     ];
-    assert.deepEqual(encontrarProdutosGranelDaEtiqueta(produtos, etiqueta.codigoProduto), [produtos[1]]);
+    assert.deepEqual(encontrarProdutosGranelDaEtiqueta(produtos, etiqueta.codigoProduto), [
+      produtos[1],
+    ]);
     assert.equal(
       encontrarProdutosGranelDaEtiqueta(
         [...produtos, { codigo: skuComum, unidade: "KG", e_granel: true }],
