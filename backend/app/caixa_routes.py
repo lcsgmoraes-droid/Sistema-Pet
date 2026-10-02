@@ -559,10 +559,16 @@ def obter_resumo_caixa(
 
     totais = totais_dinheiro(caixa.valor_abertura, movimentacoes)
 
-    # 💰 Calcular totais por forma de pagamento de TODAS as vendas DESTE CAIXA
-    # Buscar vendas vinculadas a este caixa específico (não apenas do dia)
+    # Dinheiro deve vir dos mesmos lançamentos que compõem o saldo físico.
+    # Uma venda pode ter mudado para pago_nf depois de receber o pagamento.
     from app.vendas_models import Venda, VendaPagamento
     from sqlalchemy import func
+
+    entradas_dinheiro = [
+        mov for mov in movimentacoes
+        if mov.tipo == "venda"
+        and str(mov.forma_pagamento or "").strip().casefold() == "dinheiro"
+    ]
 
     vendas_do_caixa = (
         db.query(
@@ -570,34 +576,30 @@ def obter_resumo_caixa(
             func.count(VendaPagamento.id).label("quantidade"),
             func.sum(VendaPagamento.valor).label("total"),
         )
-        .join(Venda)
+        .join(Venda, VendaPagamento.venda_id == Venda.id)
         .filter(
             Venda.caixa_id == caixa_id,
             Venda.tenant_id == tenant_id,
-            Venda.status.in_(["finalizada", "baixa_parcial"]),
+            VendaPagamento.tenant_id == tenant_id,
+            Venda.status.in_(["finalizada", "baixa_parcial", "pago_nf"]),
+            func.lower(func.trim(VendaPagamento.forma_pagamento)) != "dinheiro",
         )
         .group_by(VendaPagamento.forma_pagamento)
         .all()
     )
 
     vendas_por_forma = {}
+    if entradas_dinheiro:
+        vendas_por_forma["Dinheiro"] = {
+            "quantidade": len(entradas_dinheiro),
+            "total": float(sum((moeda(mov.valor) for mov in entradas_dinheiro), moeda(0))),
+            "tipo_contagem": "lançamento",
+        }
     for forma_id, qtd, total in vendas_do_caixa:
-        # Buscar nome da forma de pagamento
-        from app.financeiro_models import FormaPagamento
-
-        # forma_id é na verdade o NOME da forma (String), não o ID
-        forma = (
-            db.query(FormaPagamento)
-            .filter(
-                FormaPagamento.nome == forma_id, FormaPagamento.tenant_id == tenant_id
-            )
-            .first()
-        )
-        nome_forma = forma.nome if forma else str(forma_id)
-
-        vendas_por_forma[nome_forma] = {
+        vendas_por_forma[forma_id] = {
             "quantidade": qtd,
             "total": float(total) if total else 0.0,
+            "tipo_contagem": "pagamento",
         }
 
     return {
@@ -702,44 +704,75 @@ def listar_vendas_caixa(
 
     from app.vendas_models import Venda, VendaPagamento
 
+    if forma_pagamento and forma_pagamento.strip().casefold() == "dinheiro":
+        movimentos = (
+            db.query(MovimentacaoCaixa)
+            .filter(
+                MovimentacaoCaixa.caixa_id == caixa_id,
+                MovimentacaoCaixa.tenant_id == tenant_id,
+                MovimentacaoCaixa.tipo == "venda",
+                func.lower(func.trim(MovimentacaoCaixa.forma_pagamento)) == "dinheiro",
+            )
+            .order_by(MovimentacaoCaixa.data_movimento.desc())
+            .all()
+        )
+        return [
+            {
+                "id": mov.id,
+                "numero_venda": mov.venda.numero_venda if mov.venda else None,
+                "cliente_nome": mov.venda.cliente.nome if mov.venda and mov.venda.cliente else "Consumidor",
+                "total": float(mov.valor),
+                "valor_nesta_forma": float(mov.valor),
+                "hora_venda": mov.data_movimento.strftime("%H:%M") if mov.data_movimento else None,
+            }
+            for mov in movimentos
+        ]
+
     query = db.query(Venda).filter(
         Venda.caixa_id == caixa_id,
         Venda.tenant_id == tenant_id,
-        Venda.status.in_(["finalizada", "baixa_parcial"]),
+        Venda.status.in_(["finalizada", "baixa_parcial", "pago_nf"]),
     )
-
-    if forma_pagamento:
-        query = (
-            query.join(VendaPagamento, VendaPagamento.venda_id == Venda.id)
-            .filter(VendaPagamento.forma_pagamento == forma_pagamento)
-            .distinct()
-        )
-
-    vendas = query.order_by(Venda.data_venda.desc()).all()
-
-    resultado = []
-    for v in vendas:
-        if forma_pagamento:
-            valor_nesta_forma = sum(
-                float(p.valor)
-                for p in v.pagamentos
-                if p.forma_pagamento == forma_pagamento
-            )
-        else:
-            valor_nesta_forma = float(v.total)
-
-        resultado.append(
+    if not forma_pagamento:
+        vendas = query.order_by(Venda.data_venda.desc()).all()
+        return [
             {
-                "id": v.id,
-                "numero_venda": v.numero_venda,
-                "cliente_nome": v.cliente.nome if v.cliente else "Consumidor",
-                "total": float(v.total),
-                "valor_nesta_forma": valor_nesta_forma,
-                "hora_venda": v.data_venda.strftime("%H:%M") if v.data_venda else None,
+                "id": venda.id,
+                "numero_venda": venda.numero_venda,
+                "cliente_nome": venda.cliente.nome if venda.cliente else "Consumidor",
+                "total": float(venda.total),
+                "valor_nesta_forma": float(venda.total),
+                "hora_venda": venda.data_venda.strftime("%H:%M") if venda.data_venda else None,
             }
-        )
+            for venda in vendas
+        ]
 
-    return resultado
+    # Consultar pagamentos diretamente evita DISTINCT em Venda, que contém coluna JSON
+    # e causa erro 500 no PostgreSQL ao abrir o detalhe.
+    pagamentos = (
+        db.query(VendaPagamento)
+        .join(Venda, VendaPagamento.venda_id == Venda.id)
+        .filter(
+            Venda.caixa_id == caixa_id,
+            Venda.tenant_id == tenant_id,
+            VendaPagamento.tenant_id == tenant_id,
+            Venda.status.in_(["finalizada", "baixa_parcial", "pago_nf"]),
+            VendaPagamento.forma_pagamento == forma_pagamento,
+        )
+        .order_by(VendaPagamento.data_pagamento.desc())
+        .all()
+    )
+    return [
+        {
+            "id": pagamento.id,
+            "numero_venda": pagamento.venda.numero_venda,
+            "cliente_nome": pagamento.venda.cliente.nome if pagamento.venda.cliente else "Consumidor",
+            "total": float(pagamento.venda.total),
+            "valor_nesta_forma": float(pagamento.valor),
+            "hora_venda": pagamento.data_pagamento.strftime("%H:%M") if pagamento.data_pagamento else None,
+        }
+        for pagamento in pagamentos
+    ]
 
 
 @router.get("/{caixa_id}/pdf")

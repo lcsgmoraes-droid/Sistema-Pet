@@ -1,6 +1,9 @@
-import { Calculator, Receipt, X } from "lucide-react";
+import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
+import { Calculator, Printer, Receipt, X } from "lucide-react";
 import CustomerIdentity from "../ui/CustomerIdentity";
 import SaleReference from "../ui/SaleReference";
+import { formatMoneyBRL } from "../../utils/formatters";
 
 export function CashCountPanel({
   aplicarContagem,
@@ -241,127 +244,204 @@ export function PaymentBreakdownPanel({
   setFormaExpandida,
   vendasDetalhe,
 }) {
+  const [imprimindo, setImprimindo] = useState(false);
+  const formas = Object.entries(resumo.vendas_por_forma_pagamento || {});
+
+  useEffect(() => {
+    if (!imprimindo) return undefined;
+
+    document.body.classList.add("imprimindo-formas-caixa");
+    const finalizar = () => setImprimindo(false);
+    window.addEventListener("afterprint", finalizar);
+    const frame = requestAnimationFrame(() => window.print());
+
+    return () => {
+      cancelAnimationFrame(frame);
+      window.removeEventListener("afterprint", finalizar);
+      document.body.classList.remove("imprimindo-formas-caixa");
+    };
+  }, [imprimindo]);
+
   return (
     <>
-      {resumo.vendas_por_forma_pagamento &&
-        Object.keys(resumo.vendas_por_forma_pagamento).length > 0 && (
-          <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg p-4 border border-blue-200">
-            <h4 className="text-sm font-bold text-gray-700 mb-3 flex items-center">
+      {formas.length > 0 && (
+        <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg p-4 border border-blue-200">
+          <div className="flex items-center justify-between gap-2 mb-3">
+            <h4 className="text-sm font-bold text-gray-700 flex items-center">
               <Receipt className="w-4 h-4 mr-1.5 text-blue-600" />
-              Vendas por Forma de Pagamento (Informativo)
+              Recebimentos por Forma de Pagamento
             </h4>
+            <button
+              type="button"
+              onClick={() => setImprimindo(true)}
+              className="inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold text-blue-700 bg-white border border-blue-300 rounded hover:bg-blue-50"
+              title="Imprimir recebimentos por forma de pagamento"
+            >
+              <Printer className="w-4 h-4" />
+              Imprimir
+            </button>
+          </div>
 
-            <div className="grid grid-cols-2 gap-2">
-              {Object.entries(resumo.vendas_por_forma_pagamento).map(([forma, dados]) => {
-                const ehDinheiro = forma === "Dinheiro";
-                return (
-                  <div
-                    key={forma}
-                    className={`bg-white rounded-lg p-3 border ${
-                      formaExpandida === forma
-                        ? "border-blue-400 bg-blue-50 shadow-md"
-                        : ehDinheiro
-                          ? "border-green-300 bg-green-50"
-                          : "border-gray-200"
-                    } hover:shadow-sm transition-shadow cursor-pointer select-none`}
-                    title="Clique para ver detalhes das vendas"
-                    onClick={() => carregarVendasForma(forma)}
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex-1">
-                        <div className="flex items-center space-x-2">
-                          <div
-                            className={`w-2 h-2 rounded-full ${
-                              forma === "Dinheiro"
-                                ? "bg-green-500"
-                                : forma === "PIX"
-                                  ? "bg-purple-500"
-                                  : forma.includes("Débito")
-                                    ? "bg-blue-500"
-                                    : forma.includes("Crédito")
-                                      ? "bg-orange-500"
-                                      : "bg-gray-400"
-                            }`}
-                          ></div>
-                          <span className="text-xs font-semibold text-gray-700">{forma}</span>
-                          {ehDinheiro && (
-                            <span className="text-xs bg-green-600 text-white px-1.5 py-0.5 rounded">
-                              CAIXA
-                            </span>
-                          )}
-                        </div>
-                        <div className="text-xs text-gray-500 mt-0.5">
-                          {dados.quantidade} venda{dados.quantidade !== 1 ? "s" : ""}
-                        </div>
+          <div className="grid grid-cols-2 gap-2">
+            {formas.map(([forma, dados]) => {
+              const ehDinheiro = forma === "Dinheiro";
+              return (
+                <div
+                  key={forma}
+                  className={`bg-white rounded-lg p-3 border ${
+                    formaExpandida === forma
+                      ? "border-blue-400 bg-blue-50 shadow-md"
+                      : ehDinheiro
+                        ? "border-green-300 bg-green-50"
+                        : "border-gray-200"
+                  } hover:shadow-sm transition-shadow cursor-pointer select-none`}
+                  title="Clique para ver detalhes dos recebimentos"
+                  onClick={() => carregarVendasForma(forma)}
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1">
+                      <div className="flex items-center space-x-2">
+                        <div
+                          className={`w-2 h-2 rounded-full ${
+                            forma === "Dinheiro"
+                              ? "bg-green-500"
+                              : forma === "PIX"
+                                ? "bg-purple-500"
+                                : forma.includes("Débito")
+                                  ? "bg-blue-500"
+                                  : forma.includes("Crédito")
+                                    ? "bg-orange-500"
+                                    : "bg-gray-400"
+                          }`}
+                        ></div>
+                        <span className="text-xs font-semibold text-gray-700">{forma}</span>
+                        {ehDinheiro && (
+                          <span className="text-xs bg-green-600 text-white px-1.5 py-0.5 rounded">
+                            CAIXA
+                          </span>
+                        )}
                       </div>
-                      <div className="text-right">
-                        <div className="text-sm font-bold text-gray-900">
-                          R$ {dados.total.toFixed(2)}
-                        </div>
+                      <div className="text-xs text-gray-500 mt-0.5">
+                        {dados.quantidade} {dados.tipo_contagem || "pagamento"}
+                        {dados.quantidade !== 1 ? "s" : ""}
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-sm font-bold text-gray-900">
+                        {formatMoneyBRL(dados.total)}
                       </div>
                     </div>
                   </div>
-                );
-              })}
-            </div>
-
-            {/* Painel de detalhes das vendas por forma */}
-            {formaExpandida && (
-              <div className="mt-3 border-t border-blue-200 pt-3">
-                <div className="flex items-center justify-between mb-2">
-                  <h5 className="text-xs font-bold text-gray-700">Vendas — {formaExpandida}</h5>
-                  <button
-                    onClick={() => setFormaExpandida(null)}
-                    className="text-xs text-gray-400 hover:text-gray-600"
-                  >
-                    ✕ fechar
-                  </button>
                 </div>
-                {loadingVendas === formaExpandida ? (
-                  <div className="text-xs text-gray-500 py-2">Carregando...</div>
-                ) : (
-                  <div className="space-y-1 max-h-44 overflow-y-auto">
-                    {(vendasDetalhe[formaExpandida] || []).length === 0 ? (
-                      <div className="text-xs text-gray-400">Nenhuma venda encontrada.</div>
-                    ) : (
-                      (vendasDetalhe[formaExpandida] || []).map((v) => (
-                        <div
-                          key={v.id}
-                          className="flex justify-between items-center text-xs py-1.5 px-2 rounded bg-white border border-gray-100"
-                        >
-                          <div>
-                            <SaleReference
-                              sale={v}
-                              showPrefix={false}
-                              valueClassName="font-semibold text-gray-700"
-                            />
-                            <CustomerIdentity
-                              className="ml-1.5"
-                              fallback="Consumidor"
-                              layout="inline"
-                              nameClassName="text-gray-500"
-                              venda={v}
-                            />
-                          </div>
-                          <div className="text-right">
-                            <span className="text-gray-400 mr-2">{v.hora_venda}</span>
-                            <span className="font-bold text-gray-800">
-                              R$ {(v.valor_nesta_forma ?? v.total).toFixed(2)}
-                            </span>
-                          </div>
-                        </div>
-                      ))
-                    )}
-                  </div>
-                )}
-              </div>
-            )}
-
-            <div className="mt-3 pt-3 border-t border-blue-200 text-xs text-gray-600">
-              💡 <strong>Dica:</strong> Apenas <strong>Dinheiro</strong> afeta o saldo físico do
-              caixa. Demais formas vão para banco/financeiro.
-            </div>
+              );
+            })}
           </div>
+
+          {/* Painel de detalhes dos recebimentos por forma */}
+          {formaExpandida && (
+            <div className="mt-3 border-t border-blue-200 pt-3">
+              <div className="flex items-center justify-between mb-2">
+                <h5 className="text-xs font-bold text-gray-700">Recebimentos — {formaExpandida}</h5>
+                <button
+                  onClick={() => setFormaExpandida(null)}
+                  className="text-xs text-gray-400 hover:text-gray-600"
+                >
+                  ✕ fechar
+                </button>
+              </div>
+              {loadingVendas === formaExpandida ? (
+                <div className="text-xs text-gray-500 py-2">Carregando...</div>
+              ) : (
+                <div className="space-y-1 max-h-44 overflow-y-auto">
+                  {(vendasDetalhe[formaExpandida] || []).length === 0 ? (
+                    <div className="text-xs text-gray-400">Nenhuma venda encontrada.</div>
+                  ) : (
+                    (vendasDetalhe[formaExpandida] || []).map((v) => (
+                      <div
+                        key={v.id}
+                        className="flex justify-between items-center text-xs py-1.5 px-2 rounded bg-white border border-gray-100"
+                      >
+                        <div>
+                          <SaleReference
+                            sale={v}
+                            showPrefix={false}
+                            valueClassName="font-semibold text-gray-700"
+                          />
+                          <CustomerIdentity
+                            className="ml-1.5"
+                            fallback="Consumidor"
+                            layout="inline"
+                            nameClassName="text-gray-500"
+                            venda={v}
+                          />
+                        </div>
+                        <div className="text-right">
+                          <span className="text-gray-400 mr-2">{v.hora_venda}</span>
+                          <span className="font-bold text-gray-800">
+                            {formatMoneyBRL(v.valor_nesta_forma ?? v.total)}
+                          </span>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
+          <div className="mt-3 pt-3 border-t border-blue-200 text-xs text-gray-600">
+            💡 <strong>Dica:</strong> Apenas <strong>Dinheiro</strong> afeta o saldo físico do
+            caixa. As demais formas são informativas.
+          </div>
+        </div>
+      )}
+      {imprimindo &&
+        createPortal(
+          <div id="caixa-formas-impressao">
+            <style>{`
+            @media screen { #caixa-formas-impressao { display: none; } }
+            @media print {
+              @page { margin: 15mm; }
+              body.imprimindo-formas-caixa > :not(#caixa-formas-impressao) { display: none !important; }
+              #caixa-formas-impressao { display: block !important; font: 12px Arial, sans-serif; color: #111; }
+              #caixa-formas-impressao h1 { font-size: 18px; margin-bottom: 8px; }
+              #caixa-formas-impressao table { width: 100%; border-collapse: collapse; margin-top: 18px; }
+              #caixa-formas-impressao th, #caixa-formas-impressao td { border-bottom: 1px solid #bbb; padding: 8px; text-align: left; }
+              #caixa-formas-impressao th:last-child, #caixa-formas-impressao td:last-child { text-align: right; }
+            }
+          `}</style>
+            <h1>Recebimentos por forma de pagamento</h1>
+            <div>
+              Caixa #{resumo.caixa.numero_caixa} — {resumo.caixa.usuario_nome}
+            </div>
+            <div>Abertura: {new Date(resumo.caixa.data_abertura).toLocaleString("pt-BR")}</div>
+            <table>
+              <thead>
+                <tr>
+                  <th>Forma</th>
+                  <th>Registros</th>
+                  <th>Valor</th>
+                </tr>
+              </thead>
+              <tbody>
+                {formas.map(([forma, dados]) => (
+                  <tr key={forma}>
+                    <td>{forma}</td>
+                    <td>
+                      {dados.quantidade} {dados.tipo_contagem || "pagamento"}
+                      {dados.quantidade !== 1 ? "s" : ""}
+                    </td>
+                    <td>{formatMoneyBRL(dados.total)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <p>
+              Dinheiro corresponde às entradas registradas no extrato deste caixa. As demais formas
+              não afetam o saldo físico.
+            </p>
+          </div>,
+          document.body,
         )}
     </>
   );
