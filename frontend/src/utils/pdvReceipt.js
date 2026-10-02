@@ -365,12 +365,19 @@ function montarResumoVenda(venda = {}) {
   return linhas;
 }
 
+function observacoesParaCupom(observacoes) {
+  return String(observacoes || "")
+    .replace(/(?:^|\r?\n)JUSTIFICATIVA\s*\(Margem Cr[ií]tica\)\s*:[\s\S]*$/i, "")
+    .trim();
+}
+
 export function montarCupomVenda(venda = {}, empresa = {}) {
   const dataVenda = formatarDataHoraVenda(venda.data_venda);
   const numeroVenda = venda.numero_venda || venda.id || "-";
   const cliente = montarDadosCliente(venda);
   const enderecoEntrega = venda?.entrega?.endereco_completo || venda.endereco_entrega || "";
   const observacoesEntrega = venda?.entrega?.observacoes_entrega || venda.observacoes_entrega || "";
+  const observacoes = observacoesParaCupom(venda.observacoes);
   const linhas = [
     ...montarCabecalhoEmpresa(empresa),
     "-".repeat(RECEIPT_WIDTH),
@@ -439,8 +446,8 @@ export function montarCupomVenda(venda = {}, empresa = {}) {
     linhas.push("-".repeat(RECEIPT_WIDTH));
   }
 
-  if (venda.observacoes) {
-    linhas.push("OBSERVACOES:", ...wrap(venda.observacoes), "-".repeat(RECEIPT_WIDTH));
+  if (observacoes) {
+    linhas.push("OBSERVACOES:", ...wrap(observacoes), "-".repeat(RECEIPT_WIDTH));
   }
 
   linhas.push(...montarRodapeEmpresa(empresa));
