@@ -50,6 +50,8 @@ def finalizar_venda(
     cupom_discount_applied: Optional[float] = None,
     caixa_id: Optional[int] = None,
     permitir_caixa_tenant: bool = False,
+    data_ocorrencia=None,
+    motivo_revisao: Optional[str] = None,
     *,
     processar_baixa_estoque_item: Callable[..., List[Dict[str, Any]]],
 ) -> Dict[str, Any]:
@@ -145,6 +147,7 @@ def finalizar_venda(
             tenant_id=tenant_id,
             caixa_id=caixa_id,
             permitir_caixa_tenant=permitir_caixa_tenant,
+            permitir_fechado=data_ocorrencia is not None,
         )
         caixa_aberto_id = caixa_info["caixa_id"]
         logger.debug(f"✅ Caixa validado: ID={caixa_aberto_id}")
@@ -159,6 +162,20 @@ def finalizar_venda(
         )
         if not venda:
             raise HTTPException(status_code=404, detail="Venda não encontrada")
+
+        if data_ocorrencia is not None and venda.caixa_id not in (None, caixa_aberto_id):
+            raise HTTPException(400, "A venda pertence a outro caixa.")
+
+        caixa_revisao = None
+        if data_ocorrencia is not None:
+            from app.caixa_models import Caixa
+
+            caixa_revisao = db.query(Caixa).filter(
+                Caixa.id == caixa_aberto_id, Caixa.tenant_id == tenant_id,
+                Caixa.status == "fechado",
+            ).with_for_update().first()
+            if caixa_revisao is None:
+                raise HTTPException(409, "O caixa mudou durante a revisão. Atualize a página.")
 
         # Validar status
         if venda.status not in ["aberta", "baixa_parcial"]:
@@ -208,6 +225,7 @@ def finalizar_venda(
             tenant_id=tenant_id,
             db=db,
             caixa_aberto_id=caixa_aberto_id,
+            data_ocorrencia=data_ocorrencia,
         )
         # ============================================================
         # ETAPA 3: ATUALIZAR STATUS DA VENDA
@@ -220,7 +238,7 @@ def finalizar_venda(
         if total_pagamentos >= total_venda - 0.01:
             # Pagamento completo
             venda.status = "finalizada"
-            venda.data_finalizacao = now_brasilia()
+            venda.data_finalizacao = data_ocorrencia or now_brasilia()
             logger.info("✅ Venda FINALIZADA - Pagamento completo")
         elif total_pagamentos > 0:
             # Pagamento parcial
@@ -436,6 +454,7 @@ def finalizar_venda(
                 user_id=user_id,
                 tenant_id=tenant_id,
                 db=db,
+                data_recebimento=data_ocorrencia.date() if data_ocorrencia else None,
             )
 
             contas_baixadas = resultado_baixa["contas_baixadas"]
@@ -457,6 +476,7 @@ def finalizar_venda(
                 user_id=user_id,
                 tenant_id=tenant_id,
                 db=db,
+                data_recebimento=data_ocorrencia.date() if data_ocorrencia else None,
             )
 
             logger.info(
@@ -492,6 +512,24 @@ def finalizar_venda(
                     coupon_consumed=cupom_consumido,
                 ),
                 details=f"Cupom consumido na venda #{venda.numero_venda}",
+                commit=False,
+            )
+
+        if data_ocorrencia is not None:
+            from app.caixa.revisao import recalcular_fechamento_revisado
+
+            db.flush()
+            recalcular_fechamento_revisado(
+                db, caixa=caixa_revisao, tenant_id=tenant_id
+            )
+            log_business_event(
+                db=db, tenant_id=tenant_id, user_id=user_id,
+                event="cashier.review_payment_recorded", entity_type="vendas",
+                entity_id=venda.id,
+                metadata={"caixa_id": caixa_aberto_id,
+                          "data_ocorrencia": data_ocorrencia.isoformat(),
+                          "motivo": motivo_revisao},
+                details="Pagamento lançado em caixa fechado durante revisão",
                 commit=False,
             )
 

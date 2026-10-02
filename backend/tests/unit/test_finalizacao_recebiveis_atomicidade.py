@@ -13,6 +13,7 @@ from sqlalchemy.schema import CreateSchema, CreateTable, DropSchema
 from sqlalchemy.orm import Session
 
 from app import caixa_models, produtos_models  # noqa: F401 - relacionamentos
+from app.caixa_models import Caixa, MovimentacaoCaixa
 from app.caixa.service import CaixaService
 from app.financeiro import ContasReceberService
 from app.financeiro_models import (
@@ -51,6 +52,8 @@ def cenario(monkeypatch, tenant_context):
         Recebimento,
         LancamentoManual,
         AuditLog,
+        Caixa,
+        MovimentacaoCaixa,
     ):
         if pg_url:
             for coluna in model.__table__.columns:
@@ -101,6 +104,24 @@ def cenario(monkeypatch, tenant_context):
                 user_id=1,
             )
         )
+        db.add(
+            FormaPagamento(
+                id=2, tenant_id=tenant, nome="Dinheiro", tipo="dinheiro",
+                prazo_dias=0, ativo=True, user_id=1,
+            )
+        )
+        db.add(Caixa(
+            id=1, tenant_id=tenant, numero_caixa=1, usuario_id=1,
+            usuario_nome="Teste", data_abertura=datetime(2026, 9, 4, 8),
+            data_fechamento=datetime(2026, 9, 4, 20), status="fechado",
+            valor_abertura=100, valor_informado=130, valor_esperado=100,
+            diferenca=30,
+        ))
+        db.add(Caixa(
+            id=2, tenant_id=tenant, numero_caixa=2, usuario_id=1,
+            usuario_nome="Teste", data_abertura=datetime(2026, 9, 5, 8),
+            status="aberto", valor_abertura=130,
+        ))
         venda = Venda(
             id=1,
             tenant_id=tenant,
@@ -191,6 +212,48 @@ def test_duas_baixas_parciais_criam_apenas_recebimentos_novos(cenario):
     assert cenario.db.query(func.sum(Recebimento.valor_recebido)).scalar() == Decimal(
         "135"
     )
+
+
+def test_pagamento_retroativo_corrige_caixa_fechado_sem_mudar_caixa_atual(cenario):
+    momento = datetime(2026, 9, 4, 15, 30)
+    cenario.venda.total = Decimal("30")
+    cenario.venda.subtotal = Decimal("30")
+    cenario.db.query(LancamentoManual).filter_by(id=1).one().valor = Decimal("30")
+    cenario.db.commit()
+
+    finalizacao.finalizar_venda(
+        venda_id=1,
+        pagamentos=[{"forma_pagamento": "Dinheiro", "forma_pagamento_id": 2, "valor": 30}],
+        user_id=1, user_nome="Teste", tenant_id=cenario.tenant, db=cenario.db,
+        caixa_id=1, data_ocorrencia=momento, motivo_revisao="Recebido e esquecido",
+        processar_baixa_estoque_item=lambda **kw: [],
+    )
+
+    pagamento = cenario.db.query(VendaPagamento).one()
+    movimento = cenario.db.query(MovimentacaoCaixa).one()
+    recebimento = cenario.db.query(Recebimento).one()
+    caixa_anterior = cenario.db.get(Caixa, 1)
+    caixa_atual = cenario.db.get(Caixa, 2)
+    assert pagamento.data_pagamento == momento
+    assert movimento.caixa_id == 1
+    assert movimento.data_movimento == momento
+    assert recebimento.data_recebimento == momento.date()
+    assert caixa_anterior.status == "fechado"
+    assert caixa_anterior.valor_esperado == 130
+    assert caixa_anterior.diferenca == 0
+    assert caixa_atual.status == "aberto"
+    assert caixa_atual.valor_abertura == 130
+
+
+def test_pagamento_normal_em_dinheiro_mantem_data_automatica(cenario):
+    finalizacao.finalizar_venda(
+        venda_id=1,
+        pagamentos=[{"forma_pagamento": "Dinheiro", "forma_pagamento_id": 2, "valor": 135}],
+        user_id=1, user_nome="Teste", tenant_id=cenario.tenant, db=cenario.db,
+        processar_baixa_estoque_item=lambda **kw: [],
+    )
+    movimento = cenario.db.query(MovimentacaoCaixa).one()
+    assert movimento.data_movimento is not None
 
 
 def test_erro_ao_criar_recebivel_desfaz_pagamento_e_permite_tentar_de_novo(

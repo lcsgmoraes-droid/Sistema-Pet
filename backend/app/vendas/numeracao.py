@@ -8,7 +8,9 @@ from app.utils.timezone import now_brasilia
 __all__ = ["gerar_numero_venda"]
 
 
-def gerar_numero_venda(db: Session, tenant_id: str, user_id: int | None = None) -> str:
+def gerar_numero_venda(
+    db: Session, tenant_id: str, user_id: int | None = None, data_venda=None
+) -> str:
     """
     Gera um número sequencial para a venda no formato YYYYMMDDNNNN.
 
@@ -21,7 +23,7 @@ def gerar_numero_venda(db: Session, tenant_id: str, user_id: int | None = None) 
     """
     from app.vendas_models import Venda
 
-    hoje = now_brasilia()
+    hoje = data_venda or now_brasilia()
     prefixo = hoje.strftime("%Y%m%d")
 
     # A numeracao pode repetir entre tenants, mas nunca dentro do mesmo tenant.

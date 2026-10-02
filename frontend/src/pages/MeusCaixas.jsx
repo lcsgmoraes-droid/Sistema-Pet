@@ -11,13 +11,20 @@ import {
   Download,
   Users,
 } from "lucide-react";
-import { listarCaixas, reabrirCaixa } from "../api/caixa";
+import { listarCaixas, obterCaixaAberto, reabrirCaixa } from "../api/caixa";
 import { getAccessToken } from "../auth/tokenStorage";
 import { confirmarCorePet } from "../services/corepetDialog";
+import { useAuth } from "../contexts/AuthContext";
+import { formatMoneyBRL } from "../utils/formatters";
 
 export default function MeusCaixas() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [caixas, setCaixas] = useState([]);
+  const [caixaAberto, setCaixaAberto] = useState(null);
+  const [caixaRevisao, setCaixaRevisao] = useState(null);
+  const [dataOcorrencia, setDataOcorrencia] = useState("");
+  const [motivoRevisao, setMotivoRevisao] = useState("");
   const [loading, setLoading] = useState(true);
   const [filtros, setFiltros] = useState({
     data_inicio: "",
@@ -39,7 +46,9 @@ export default function MeusCaixas() {
       if (filtros.status) params.status_filter = filtros.status;
 
       const response = await listarCaixas(params);
+      const aberto = await obterCaixaAberto().catch(() => ({ desconhecido: true }));
       setCaixas(response);
+      setCaixaAberto(aberto);
     } catch (error) {
       console.error("Erro ao carregar caixas:", error);
       alert("Erro ao carregar histórico de caixas");
@@ -59,6 +68,17 @@ export default function MeusCaixas() {
       console.error("Erro ao reabrir caixa:", error);
       alert(error.response?.data?.detail || "Erro ao reabrir caixa");
     }
+  };
+
+  const iniciarRevisao = (event) => {
+    event.preventDefault();
+    if (!caixaRevisao || motivoRevisao.trim().length < 10) return;
+    const params = new URLSearchParams({
+      caixa_revisao_id: String(caixaRevisao.id),
+      data_ocorrencia: dataOcorrencia,
+      motivo_revisao: motivoRevisao.trim(),
+    });
+    navigate(`/pdv?${params.toString()}`);
   };
 
   const handleDownloadPDF = async (caixaId, numeroCaixa) => {
@@ -112,7 +132,7 @@ export default function MeusCaixas() {
       return (
         <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-sm font-medium bg-amber-100 text-amber-800">
           <AlertTriangle className="w-4 h-4" />
-          Diferença {dif > 0 ? "+" : "-"}R$ {Math.abs(dif).toFixed(2)}
+          Diferença {dif > 0 ? "+" : "-"}{formatMoneyBRL(Math.abs(dif))}
         </span>
       );
     }
@@ -269,7 +289,7 @@ export default function MeusCaixas() {
                     <div className="bg-gray-50 rounded-lg p-3">
                       <div className="text-xs text-gray-600 mb-1">Abertura</div>
                       <div className="text-lg font-semibold text-gray-900">
-                        R$ {caixa.valor_abertura.toFixed(2)}
+                        {formatMoneyBRL(caixa.valor_abertura)}
                       </div>
                     </div>
 
@@ -278,14 +298,14 @@ export default function MeusCaixas() {
                         <div className="bg-blue-50 rounded-lg p-3">
                           <div className="text-xs text-gray-600 mb-1">Esperado</div>
                           <div className="text-lg font-semibold text-blue-900">
-                            R$ {caixa.valor_esperado.toFixed(2)}
+                            {formatMoneyBRL(caixa.valor_esperado)}
                           </div>
                         </div>
 
                         <div className="bg-green-50 rounded-lg p-3">
                           <div className="text-xs text-gray-600 mb-1">Informado</div>
                           <div className="text-lg font-semibold text-green-900">
-                            R$ {caixa.valor_informado.toFixed(2)}
+                            {formatMoneyBRL(caixa.valor_informado)}
                           </div>
                         </div>
 
@@ -309,8 +329,8 @@ export default function MeusCaixas() {
                             }`}
                           >
                             {diferenca.tipo === "ok" && "✓ Caixa Batido"}
-                            {diferenca.tipo === "sobra" && `+ R$ ${diferenca.valor.toFixed(2)}`}
-                            {diferenca.tipo === "falta" && `- R$ ${diferenca.valor.toFixed(2)}`}
+                            {diferenca.tipo === "sobra" && `+ ${formatMoneyBRL(diferenca.valor)}`}
+                            {diferenca.tipo === "falta" && `- ${formatMoneyBRL(diferenca.valor)}`}
                           </div>
                         </div>
                       </>
@@ -338,13 +358,28 @@ export default function MeusCaixas() {
                   {/* Ações */}
                   {caixa.status === "fechado" && (
                     <div className="border-t pt-4 flex gap-3">
-                      <button
-                        onClick={() => handleReabrir(caixa.id)}
-                        className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
-                      >
-                        <RefreshCw className="w-4 h-4" />
-                        Reabrir Caixa
-                      </button>
+                      {!caixaAberto && (
+                        <button
+                          onClick={() => handleReabrir(caixa.id)}
+                          className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+                        >
+                          <RefreshCw className="w-4 h-4" />
+                          Reabrir Caixa
+                        </button>
+                      )}
+                      {user?.is_admin && (
+                        <button
+                          onClick={() => {
+                            setCaixaRevisao(caixa);
+                            setDataOcorrencia("");
+                            setMotivoRevisao("");
+                          }}
+                          className="flex items-center gap-2 px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg transition-colors"
+                        >
+                          <RefreshCw className="w-4 h-4" />
+                          Revisar lançamentos
+                        </button>
+                      )}
                       <button
                         onClick={() => handleDownloadPDF(caixa.id, caixa.numero_caixa)}
                         className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors"
@@ -358,6 +393,36 @@ export default function MeusCaixas() {
               </div>
             );
           })}
+        </div>
+      )}
+      {caixaRevisao && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <form onSubmit={iniciarRevisao} className="w-full max-w-lg rounded-xl bg-white p-6 shadow-xl">
+            <h2 className="text-xl font-semibold">Revisar caixa #{caixaRevisao.numero_caixa}</h2>
+            <p className="mt-2 text-sm text-gray-600">
+              Informe quando a venda ou o pagamento aconteceu. O caixa atual continua aberto.
+              A correção ficará registrada com seu nome e justificativa.
+            </p>
+            <label className="mt-5 block text-sm font-medium" htmlFor="data-revisao">Data e hora da ocorrência</label>
+            <input
+              id="data-revisao" type="datetime-local" required value={dataOcorrencia}
+              min={caixaRevisao.data_abertura.slice(0, 16)}
+              max={caixaRevisao.data_fechamento.slice(0, 16)}
+              onChange={(event) => setDataOcorrencia(event.target.value)}
+              className="mt-1 w-full rounded border border-gray-300 px-3 py-2"
+            />
+            <label className="mt-4 block text-sm font-medium" htmlFor="motivo-revisao">Motivo da correção</label>
+            <textarea
+              id="motivo-revisao" required minLength={10} value={motivoRevisao}
+              onChange={(event) => setMotivoRevisao(event.target.value)}
+              className="mt-1 w-full rounded border border-gray-300 px-3 py-2"
+              placeholder="Ex.: pagamento recebido ontem, mas não lançado"
+            />
+            <div className="mt-5 flex justify-end gap-3">
+              <button type="button" onClick={() => setCaixaRevisao(null)} className="rounded px-4 py-2 text-gray-700">Cancelar</button>
+              <button type="submit" className="rounded bg-amber-600 px-4 py-2 font-medium text-white">Ir ao PDV em revisão</button>
+            </div>
+          </form>
         </div>
       )}
     </div>

@@ -280,8 +280,10 @@ class ContasReceberService:
                 return pagamento.get(nome, padrao)
             return getattr(pagamento, nome, padrao)
 
+        data_pagamento = campo("data_pagamento")
+        data_base = data_pagamento.date() if hasattr(data_pagamento, "date") else date.today()
         data_primeira_parcela = campo("data_recebimento_prevista") or (
-            date.today() + timedelta(days=30)
+            data_base + timedelta(days=30)
         )
         intervalo_crediario = campo("intervalo_crediario")
         if getattr(forma_pag, "tipo", None) == "crediario":
@@ -319,7 +321,7 @@ class ContasReceberService:
                 valor_original=valor_parcela,
                 valor_recebido=Decimal("0"),
                 valor_final=valor_parcela,
-                data_emissao=date.today(),
+                data_emissao=data_base,
                 data_vencimento=data_vencimento,
                 data_recebimento=None,
                 venda_id=venda.id,
@@ -402,10 +404,15 @@ class ContasReceberService:
         )
 
         # SEMPRE criar conta a receber (inclusive à vista, para rastreabilidade)
+        data_pagamento = (
+            pagamento.get("data_pagamento") if isinstance(pagamento, dict)
+            else getattr(pagamento, "data_pagamento", None)
+        )
+        data_base = data_pagamento.date() if hasattr(data_pagamento, "date") else date.today()
         data_vencimento = data_aplicada or (
-            date.today()
+            data_base
             if prazo_dias == 0
-            else (date.today() + timedelta(days=prazo_dias))
+            else (data_base + timedelta(days=prazo_dias))
         )
 
         eh_crediario = bool(
@@ -417,7 +424,7 @@ class ContasReceberService:
         if prazo_dias == 0 and not eh_crediario:
             status_conta = "recebido"
             valor_recebido = valor
-            data_recebimento = date.today()
+            data_recebimento = data_base
             logger.debug("✅ Pagamento à vista: criando conta recebida automaticamente")
         else:
             status_conta = "pendente"
@@ -440,7 +447,7 @@ class ContasReceberService:
             valor_original=valor,
             valor_recebido=valor_recebido,
             valor_final=valor,
-            data_emissao=date.today(),
+            data_emissao=data_base,
             data_vencimento=data_vencimento,
             data_recebimento=data_recebimento,
             status=status_conta,
@@ -464,7 +471,7 @@ class ContasReceberService:
             recebimento = Recebimento(
                 conta_receber_id=conta.id,
                 valor_recebido=valor,
-                data_recebimento=date.today(),
+                data_recebimento=data_base,
                 forma_pagamento_id=forma_pag.id if forma_pag else None,
                 observacoes=f"Recebimento automático - Venda à vista #{venda.numero_venda}",
                 user_id=user_id,
@@ -492,6 +499,7 @@ class ContasReceberService:
         user_id: int,
         tenant_id: str,
         db: Session,
+        data_recebimento: Optional[date] = None,
     ) -> Dict[str, Any]:
         """
         Baixa contas a receber pendentes de uma venda (parcial ou total).
@@ -601,7 +609,7 @@ class ContasReceberService:
                 recebimento = Recebimento(
                     conta_receber_id=conta.id,
                     valor_recebido=Decimal(str(valor_a_baixar)),
-                    data_recebimento=date.today(),
+                    data_recebimento=data_recebimento or date.today(),
                     forma_pagamento_id=forma_pag_id,
                     observacoes=f"Recebimento venda #{venda_numero}",
                     user_id=user_id,
@@ -615,7 +623,7 @@ class ContasReceberService:
                 if abs(novo_valor_recebido - float(conta.valor_final)) < 0.01:
                     # Conta totalmente paga
                     conta.status = "recebido"
-                    conta.data_recebimento = date.today()
+                    conta.data_recebimento = data_recebimento or date.today()
                     logger.info(
                         f"✅ Conta #{conta.id} TOTALMENTE baixada - "
                         f"R$ {valor_a_baixar:.2f} (Recebimento #{recebimento.id})"
@@ -667,6 +675,7 @@ class ContasReceberService:
         user_id: int,
         tenant_id: str,
         db: Session,
+        data_recebimento: Optional[date] = None,
     ) -> Dict[str, Any]:
         """
         Atualiza lançamentos manuais previstos após pagamento de venda.
@@ -728,7 +737,7 @@ class ContasReceberService:
             # TOTALMENTE PAGO: Marcar lançamentos como realizados
             for lanc_prev in lancamentos_previstos:
                 lanc_prev.status = "realizado"
-                lanc_prev.data_lancamento = date.today()
+                lanc_prev.data_lancamento = data_recebimento or date.today()
                 db.add(lanc_prev)
                 lancamentos_atualizados.append(lanc_prev.id)
                 logger.info(f"✅ Lançamento #{lanc_prev.id} marcado como REALIZADO")
@@ -747,7 +756,7 @@ class ContasReceberService:
                     tipo="entrada",
                     valor=Decimal(str(total_recebido)),
                     descricao=f"Venda {venda_numero} - Recebido (parcial)",
-                    data_lancamento=date.today(),
+                    data_lancamento=data_recebimento or date.today(),
                     status="realizado",
                     categoria_id=lanc_prev.categoria_id,
                     documento=f"VENDA-{venda_id}-REALIZADO",
