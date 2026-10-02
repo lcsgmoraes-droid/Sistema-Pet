@@ -34,12 +34,18 @@ test("as duas etiquetas identificam o mesmo produto e preservam os totais impres
 test("etiqueta da balanca encontra SKU com zeros a esquerda sem confundir 15 e 0150", () => {
   const etiqueta0151 = lerEtiquetaBalanca("2000151001435");
   assert.equal(etiqueta0151.codigoProdutoSemZeros, "151");
-  assert.equal(produtoCorrespondeCodigoBalanca({ codigo: "0151" }, etiqueta0151.codigoProduto), true);
+  assert.equal(
+    produtoCorrespondeCodigoBalanca({ codigo: "0151" }, etiqueta0151.codigoProduto),
+    true,
+  );
 
   const etiqueta15 = lerEtiquetaBalanca("2000015001144");
   assert.equal(etiqueta15.codigoProdutoSemZeros, "15");
   assert.equal(produtoCorrespondeCodigoBalanca({ codigo: "15" }, etiqueta15.codigoProduto), true);
-  assert.equal(produtoCorrespondeCodigoBalanca({ codigo: "0150" }, etiqueta15.codigoProduto), false);
+  assert.equal(
+    produtoCorrespondeCodigoBalanca({ codigo: "0150" }, etiqueta15.codigoProduto),
+    false,
+  );
 });
 
 test("rejeita erro de leitura, valor zerado e formato comum", () => {

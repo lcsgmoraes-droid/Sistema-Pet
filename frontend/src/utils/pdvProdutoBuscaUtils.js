@@ -117,8 +117,7 @@ export function produtoCorrespondeCodigoBalanca(produto, codigoBalanca) {
 
   return codigosProdutoParaBusca(produto).some((valor) => {
     const cadastrado = String(valor).trim();
-    return /^\d{1,6}$/.test(cadastrado)
-      && (cadastrado.replace(/^0+/, "") || "0") === semZeros;
+    return /^\d{1,6}$/.test(cadastrado) && (cadastrado.replace(/^0+/, "") || "0") === semZeros;
   });
 }
 

@@ -193,8 +193,8 @@ export function usePDVProdutoBusca({
       }
 
       const produtos = await buscarProdutosAtualizados(etiqueta.codigoProdutoSemZeros);
-      const candidatos = produtos.filter(
-        (produto) => produtoCorrespondeCodigoBalanca(produto, etiqueta.codigoProduto),
+      const candidatos = produtos.filter((produto) =>
+        produtoCorrespondeCodigoBalanca(produto, etiqueta.codigoProduto),
       );
       if (candidatos.length !== 1) {
         mostrarErroEtiqueta(
