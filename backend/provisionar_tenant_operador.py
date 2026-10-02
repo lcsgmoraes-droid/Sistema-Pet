@@ -17,7 +17,6 @@ from __future__ import annotations
 
 import argparse
 import getpass
-import json
 import sys
 import uuid
 from datetime import datetime, timedelta, timezone
@@ -398,7 +397,10 @@ def main() -> int:
         else:
             db.rollback()
             result["status"] = "simulation_rolled_back"
-        print(json.dumps(result, ensure_ascii=False))
+        if args.apply:
+            print("Tenant criado. Consulte o cadastro pelo CNPJ para verificar.")
+        else:
+            print("Simulacao validada. Nenhuma alteracao foi gravada.")
         return 0
     except Exception:
         db.rollback()
