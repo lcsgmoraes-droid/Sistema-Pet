@@ -1,11 +1,16 @@
 import { useEffect, useRef, useState } from "react";
 import toast from "react-hot-toast";
 import { getProdutosVendaveis } from "../api/produtos";
-import { lerEtiquetaBalanca, produtoAceitaEtiquetaBalanca } from "../utils/pdvEtiquetaBalanca";
+import {
+  encontrarProdutosGranelDaEtiqueta,
+  lerEtiquetaBalanca,
+  produtoAceitaEtiquetaBalanca,
+} from "../utils/pdvEtiquetaBalanca";
 import {
   deveAdicionarProdutoAutomaticamente,
   encontrarProdutoPorCodigo,
   normalizarCodigoProdutoBusca,
+  produtoCorrespondeCodigoBalanca,
 } from "../utils/pdvProdutoBuscaUtils";
 
 function isBuscaCancelada(error) {
@@ -191,31 +196,31 @@ export function usePDVProdutoBusca({
         return true;
       }
 
-      const produtos = await buscarProdutosAtualizados(etiqueta.codigoProdutoSemZeros);
-      const candidatos = produtos.filter(
-        (produto) =>
-          encontrarProdutoPorCodigo([produto], etiqueta.codigoProduto) ||
-          encontrarProdutoPorCodigo([produto], etiqueta.codigoProdutoSemZeros),
+      // A busca por "150" pode preencher a pagina antes de chegar ao SKU "0150".
+      const response = await getProdutosVendaveis({
+        codigo_balanca: etiqueta.codigoProduto,
+        page_size: 100,
+        contar_total: false,
+        incluir_imagens: false,
+      });
+      const produtos = response.data.items || [];
+      const correspondentes = produtos.filter((produto) =>
+        produtoCorrespondeCodigoBalanca(produto, etiqueta.codigoProduto),
       );
+      const candidatos = encontrarProdutosGranelDaEtiqueta(produtos, etiqueta.codigoProduto);
       if (candidatos.length !== 1) {
         mostrarErroEtiqueta(
           etiqueta,
           candidatos.length > 1
-            ? "Mais de um produto usa o codigo desta etiqueta. Corrija o cadastro."
-            : `Produto ${etiqueta.codigoProdutoSemZeros} nao encontrado para esta etiqueta.`,
+            ? "Mais de um produto granel usa o codigo desta etiqueta. Corrija o cadastro."
+            : correspondentes.length > 0
+              ? "O produto desta etiqueta precisa estar marcado como granel e com unidade KG."
+              : `Produto ${etiqueta.codigoProdutoSemZeros} nao encontrado para esta etiqueta. Confira o codigo cadastrado na balanca e no produto.`,
         );
         return true;
       }
 
       const produto = candidatos[0];
-      if (!produtoAceitaEtiquetaBalanca(produto)) {
-        mostrarErroEtiqueta(
-          etiqueta,
-          "O produto desta etiqueta precisa estar marcado como granel e com unidade KG.",
-        );
-        return true;
-      }
-
       if (!modoVisualizacao) {
         etiquetaPendenteCodigoRef.current = etiqueta.codigo;
         limparSugestoesProduto();

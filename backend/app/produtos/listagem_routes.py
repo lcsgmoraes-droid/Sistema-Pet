@@ -3,7 +3,7 @@
 import logging
 from typing import Literal, Optional
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
@@ -26,6 +26,7 @@ from app.produtos.listagem import (
     _resolver_fornecedor_ids_filtro_produto,
 )
 from app.produtos.schemas import ProdutosPaginadosResponse
+from app.produtos.search import _produto_search_scale_code_conditions
 from app.produtos_models import Produto
 from app.produtos.validade import _mapa_validade_proxima_produtos
 from app.produtos.validators import _validar_tenant_e_obter_usuario
@@ -62,6 +63,7 @@ def listar_produtos_vendaveis(
     page: int = 1,
     page_size: int = 50,
     busca: Optional[str] = None,
+    codigo_balanca: Optional[str] = Query(default=None, pattern=r"^\d{6}$"),
     categoria_id: Optional[int] = None,
     marca_id: Optional[int] = None,
     departamento_id: Optional[int] = None,
@@ -87,7 +89,7 @@ def listar_produtos_vendaveis(
         page_size,
         max_page_size=100,
     )
-    termo_busca = (busca or "").strip()
+    termo_busca = "" if codigo_balanca else (busca or "").strip()
     _desativar_jit_busca_rapida_produtos(
         db,
         termo_busca=termo_busca,
@@ -101,6 +103,8 @@ def listar_produtos_vendaveis(
         termo_busca=termo_busca,
         contar_total=contar_total,
     )
+    if codigo_balanca:
+        query = query.filter(_produto_search_scale_code_conditions(codigo_balanca))
 
     query = _aplicar_filtros_basicos_produtos(
         query,

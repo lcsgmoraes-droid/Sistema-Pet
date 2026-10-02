@@ -1,4 +1,5 @@
 import { arredondarDinheiro, obterPrecoVendaPDV } from "./pdvCarrinhoItensUtils.js";
+import { produtoCorrespondeCodigoBalanca } from "./pdvProdutoBuscaUtils.js";
 
 function digitoVerificadorEan13(codigoSemDigito) {
   const soma = [...codigoSemDigito].reduce(
@@ -33,6 +34,14 @@ export function lerEtiquetaBalanca(codigoLido) {
 
 export function produtoAceitaEtiquetaBalanca(produto) {
   return produto?.e_granel === true && String(produto?.unidade || "").toUpperCase() === "KG";
+}
+
+export function encontrarProdutosGranelDaEtiqueta(produtos, codigoProduto) {
+  return produtos.filter(
+    (produto) =>
+      produtoAceitaEtiquetaBalanca(produto) &&
+      produtoCorrespondeCodigoBalanca(produto, codigoProduto),
+  );
 }
 
 export function calcularPesoEtiquetaBalanca(etiqueta, precoKg) {

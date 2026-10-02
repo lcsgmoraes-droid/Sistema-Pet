@@ -105,6 +105,37 @@ test("recibo sem CPF ou CNPJ continua sendo gerado normalmente", () => {
   assert.doesNotMatch(recibo, /CPF\/CNPJ:/);
 });
 
+test("justificativa interna de margem critica nao aparece no cupom nem na reimpressao", () => {
+  const observacoes =
+    "Separar pedido para retirada\n\nJUSTIFICATIVA (Margem Critica): Desconto autorizado pelo gerente\nMotivo interno detalhado";
+  const venda = { ...vendaBase, observacoes };
+  const vendaCrediario = {
+    ...venda,
+    pagamentos: [{ forma_pagamento_tipo: "crediario", valor: 390 }],
+  };
+
+  for (const cupom of [
+    montarCupomVenda(venda, empresa),
+    montarConteudoCupom(vendaCrediario, empresa),
+  ]) {
+    assert.match(cupom, /OBSERVACOES:\nSeparar pedido para retirada/);
+    assert.doesNotMatch(cupom, /JUSTIFICATIVA|Desconto autorizado|Motivo interno detalhado/);
+  }
+  assert.equal(venda.observacoes, observacoes);
+});
+
+test("cupom omite observacoes quando contem apenas a justificativa interna", () => {
+  const recibo = montarCupomVenda(
+    {
+      ...vendaBase,
+      observacoes: "JUSTIFICATIVA (Margem Crítica): Autorização interna",
+    },
+    empresa,
+  );
+
+  assert.doesNotMatch(recibo, /OBSERVACOES:|JUSTIFICATIVA|Autorizacao interna/);
+});
+
 test("recibo em dinheiro imprime valor recebido e troco com clareza", () => {
   const recibo = montarCupomVenda(
     {
