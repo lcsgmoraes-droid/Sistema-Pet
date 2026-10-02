@@ -582,6 +582,21 @@ export function createProdutosColunas() {
                   </svg>
                 </button>
               )}
+              {produto.ativo === false &&
+                !String(produto.codigo || "").startsWith("__LIBERADO__") &&
+                (!produto.de_parceiro || produto.acesso_catalogo_completo) && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      props.handleLiberarSku(produto);
+                    }}
+                    className={iconButtonClass("warning")}
+                    title="Liberar SKU para outro produto"
+                    aria-label={`Liberar SKU ${produto.codigo}`}
+                  >
+                    <span className="text-xs font-bold">SKU</span>
+                  </button>
+                )}
             </div>
           </td>
         );

@@ -2,6 +2,7 @@ import { AlertCircle, Check, Layers, Package } from "lucide-react";
 import CustomerIdentity from "../ui/CustomerIdentity";
 import ProductIdentity from "../ui/ProductIdentity";
 import SaleReference from "../ui/SaleReference";
+import { formatMoneyBRL } from "../../utils/formatters";
 
 function getVendaStatusDevolucaoInfo(status) {
   if (status === "finalizada") {
@@ -509,7 +510,7 @@ export default function ModalDevolucaoSections({
                 <span
                   className={`text-2xl font-bold ${gerarCredito ? "text-purple-600" : "text-orange-600"}`}
                 >
-                  R$ {calcularTotalDevolucao().toFixed(2)}
+                  {formatMoneyBRL(calcularTotalDevolucao())}
                 </span>
               </div>
             </div>

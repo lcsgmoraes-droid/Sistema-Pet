@@ -20,8 +20,10 @@ from app.empresa_grupo_estoque_compartilhado_service import (
 )
 from app.estoque.service import EstoqueService
 from app.produtos_models import EstoqueMovimentacao
-from app.utils.security_helpers import safe_get_cliente
-from app.vendas.routes_common import _validar_tenant_e_obter_usuario
+from app.vendas.routes_common import (
+    _obter_cliente_ou_404,
+    _validar_tenant_e_obter_usuario,
+)
 from app.vendas_models import Venda, VendaItem
 
 router = APIRouter()
@@ -366,13 +368,15 @@ def registrar_devolucao(
                     detail="Não é possível gerar crédito para venda sem cliente cadastrado",
                 )
 
-            # 🔒 SEGURANÇA: Validar que o cliente pertence ao usuário
-            cliente = safe_get_cliente(db, venda.cliente_id, current_user.id)
+            # O criador do cadastro pode ser outro funcionário da mesma loja.
+            cliente = _obter_cliente_ou_404(db, venda.cliente_id, tenant_id)
 
             # Adicionar crédito ao cliente
             cliente.credito = (cliente.credito or Decimal("0")) + Decimal(
                 str(valor_total_devolucao)
             )
+            credito_cliente_resultado = float(cliente.credito)
+            cliente_nome_resultado = cliente.nome
             logger.info(
                 f"💰 Crédito adicionado ao cliente {cliente.nome}: +R$ {valor_total_devolucao:.2f} (Total: R$ {cliente.credito:.2f})"
             )
@@ -590,10 +594,8 @@ def registrar_devolucao(
         }
 
         if gerar_credito:
-            # 🔒 SEGURANÇA: Validar que o cliente pertence ao usuário
-            cliente = safe_get_cliente(db, venda.cliente_id, current_user.id)
-            resultado["credito_cliente"] = float(cliente.credito)
-            resultado["cliente_nome"] = cliente.nome
+            resultado["credito_cliente"] = credito_cliente_resultado
+            resultado["cliente_nome"] = cliente_nome_resultado
         else:
             resultado["movimentacao_caixa_id"] = movimentacao["movimentacao_id"]
 
