@@ -163,19 +163,30 @@ def finalizar_venda(
         if not venda:
             raise HTTPException(status_code=404, detail="Venda não encontrada")
 
-        if data_ocorrencia is not None and venda.caixa_id not in (None, caixa_aberto_id):
+        if data_ocorrencia is not None and venda.caixa_id not in (
+            None,
+            caixa_aberto_id,
+        ):
             raise HTTPException(400, "A venda pertence a outro caixa.")
 
         caixa_revisao = None
         if data_ocorrencia is not None:
             from app.caixa_models import Caixa
 
-            caixa_revisao = db.query(Caixa).filter(
-                Caixa.id == caixa_aberto_id, Caixa.tenant_id == tenant_id,
-                Caixa.status == "fechado",
-            ).with_for_update().first()
+            caixa_revisao = (
+                db.query(Caixa)
+                .filter(
+                    Caixa.id == caixa_aberto_id,
+                    Caixa.tenant_id == tenant_id,
+                    Caixa.status == "fechado",
+                )
+                .with_for_update()
+                .first()
+            )
             if caixa_revisao is None:
-                raise HTTPException(409, "O caixa mudou durante a revisão. Atualize a página.")
+                raise HTTPException(
+                    409, "O caixa mudou durante a revisão. Atualize a página."
+                )
 
         # Validar status
         if venda.status not in ["aberta", "baixa_parcial"]:
@@ -519,16 +530,19 @@ def finalizar_venda(
             from app.caixa.revisao import recalcular_fechamento_revisado
 
             db.flush()
-            recalcular_fechamento_revisado(
-                db, caixa=caixa_revisao, tenant_id=tenant_id
-            )
+            recalcular_fechamento_revisado(db, caixa=caixa_revisao, tenant_id=tenant_id)
             log_business_event(
-                db=db, tenant_id=tenant_id, user_id=user_id,
-                event="cashier.review_payment_recorded", entity_type="vendas",
+                db=db,
+                tenant_id=tenant_id,
+                user_id=user_id,
+                event="cashier.review_payment_recorded",
+                entity_type="vendas",
                 entity_id=venda.id,
-                metadata={"caixa_id": caixa_aberto_id,
-                          "data_ocorrencia": data_ocorrencia.isoformat(),
-                          "motivo": motivo_revisao},
+                metadata={
+                    "caixa_id": caixa_aberto_id,
+                    "data_ocorrencia": data_ocorrencia.isoformat(),
+                    "motivo": motivo_revisao,
+                },
                 details="Pagamento lançado em caixa fechado durante revisão",
                 commit=False,
             )

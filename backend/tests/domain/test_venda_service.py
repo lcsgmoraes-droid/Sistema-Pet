@@ -45,11 +45,15 @@ class TestCriarVenda:
             patch("app.financeiro_models.CategoriaFinanceira"),
             patch("app.audit_log.log_action"),
             patch("app.vendas.service.enforce_monthly_sales_limit"),
-            patch.object(VendaService, "_gerar_numero_venda", return_value="202610010001"),
+            patch.object(
+                VendaService, "_gerar_numero_venda", return_value="202610010001"
+            ),
             patch("app.services.business_audit_service.log_business_event") as audit,
         ):
             mock_venda.return_value = fake_venda_model
-            mock_db_session.query.return_value.filter.return_value.first.return_value = MagicMock(id=1)
+            mock_db_session.query.return_value.filter.return_value.first.return_value = MagicMock(
+                id=1
+            )
             VendaService.criar_venda(payload=payload, user_id=1, db=mock_db_session)
 
         assert mock_venda.call_args.kwargs["caixa_id"] == 12

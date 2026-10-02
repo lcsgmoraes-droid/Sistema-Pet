@@ -281,7 +281,9 @@ class ContasReceberService:
             return getattr(pagamento, nome, padrao)
 
         data_pagamento = campo("data_pagamento")
-        data_base = data_pagamento.date() if hasattr(data_pagamento, "date") else date.today()
+        data_base = (
+            data_pagamento.date() if hasattr(data_pagamento, "date") else date.today()
+        )
         data_primeira_parcela = campo("data_recebimento_prevista") or (
             data_base + timedelta(days=30)
         )
@@ -405,14 +407,15 @@ class ContasReceberService:
 
         # SEMPRE criar conta a receber (inclusive à vista, para rastreabilidade)
         data_pagamento = (
-            pagamento.get("data_pagamento") if isinstance(pagamento, dict)
+            pagamento.get("data_pagamento")
+            if isinstance(pagamento, dict)
             else getattr(pagamento, "data_pagamento", None)
         )
-        data_base = data_pagamento.date() if hasattr(data_pagamento, "date") else date.today()
+        data_base = (
+            data_pagamento.date() if hasattr(data_pagamento, "date") else date.today()
+        )
         data_vencimento = data_aplicada or (
-            data_base
-            if prazo_dias == 0
-            else (data_base + timedelta(days=prazo_dias))
+            data_base if prazo_dias == 0 else (data_base + timedelta(days=prazo_dias))
         )
 
         eh_crediario = bool(

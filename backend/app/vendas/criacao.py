@@ -506,8 +506,11 @@ def criar_venda(
             from app.services.business_audit_service import log_business_event
 
             log_business_event(
-                db=db, tenant_id=payload.get("tenant_id"), user_id=user_id,
-                event="cashier.review_sale_created", entity_type="vendas",
+                db=db,
+                tenant_id=payload.get("tenant_id"),
+                user_id=user_id,
+                event="cashier.review_sale_created",
+                entity_type="vendas",
                 entity_id=venda.id,
                 metadata={
                     "caixa_id": payload.get("caixa_id"),

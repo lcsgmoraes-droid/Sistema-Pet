@@ -106,22 +106,43 @@ def cenario(monkeypatch, tenant_context):
         )
         db.add(
             FormaPagamento(
-                id=2, tenant_id=tenant, nome="Dinheiro", tipo="dinheiro",
-                prazo_dias=0, ativo=True, user_id=1,
+                id=2,
+                tenant_id=tenant,
+                nome="Dinheiro",
+                tipo="dinheiro",
+                prazo_dias=0,
+                ativo=True,
+                user_id=1,
             )
         )
-        db.add(Caixa(
-            id=1, tenant_id=tenant, numero_caixa=1, usuario_id=1,
-            usuario_nome="Teste", data_abertura=datetime(2026, 9, 4, 8),
-            data_fechamento=datetime(2026, 9, 4, 20), status="fechado",
-            valor_abertura=100, valor_informado=130, valor_esperado=100,
-            diferenca=30,
-        ))
-        db.add(Caixa(
-            id=2, tenant_id=tenant, numero_caixa=2, usuario_id=1,
-            usuario_nome="Teste", data_abertura=datetime(2026, 9, 5, 8),
-            status="aberto", valor_abertura=130,
-        ))
+        db.add(
+            Caixa(
+                id=1,
+                tenant_id=tenant,
+                numero_caixa=1,
+                usuario_id=1,
+                usuario_nome="Teste",
+                data_abertura=datetime(2026, 9, 4, 8),
+                data_fechamento=datetime(2026, 9, 4, 20),
+                status="fechado",
+                valor_abertura=100,
+                valor_informado=130,
+                valor_esperado=100,
+                diferenca=30,
+            )
+        )
+        db.add(
+            Caixa(
+                id=2,
+                tenant_id=tenant,
+                numero_caixa=2,
+                usuario_id=1,
+                usuario_nome="Teste",
+                data_abertura=datetime(2026, 9, 5, 8),
+                status="aberto",
+                valor_abertura=130,
+            )
+        )
         venda = Venda(
             id=1,
             tenant_id=tenant,
@@ -223,9 +244,16 @@ def test_pagamento_retroativo_corrige_caixa_fechado_sem_mudar_caixa_atual(cenari
 
     finalizacao.finalizar_venda(
         venda_id=1,
-        pagamentos=[{"forma_pagamento": "Dinheiro", "forma_pagamento_id": 2, "valor": 30}],
-        user_id=1, user_nome="Teste", tenant_id=cenario.tenant, db=cenario.db,
-        caixa_id=1, data_ocorrencia=momento, motivo_revisao="Recebido e esquecido",
+        pagamentos=[
+            {"forma_pagamento": "Dinheiro", "forma_pagamento_id": 2, "valor": 30}
+        ],
+        user_id=1,
+        user_nome="Teste",
+        tenant_id=cenario.tenant,
+        db=cenario.db,
+        caixa_id=1,
+        data_ocorrencia=momento,
+        motivo_revisao="Recebido e esquecido",
         processar_baixa_estoque_item=lambda **kw: [],
     )
 
@@ -248,8 +276,13 @@ def test_pagamento_retroativo_corrige_caixa_fechado_sem_mudar_caixa_atual(cenari
 def test_pagamento_normal_em_dinheiro_mantem_data_automatica(cenario):
     finalizacao.finalizar_venda(
         venda_id=1,
-        pagamentos=[{"forma_pagamento": "Dinheiro", "forma_pagamento_id": 2, "valor": 135}],
-        user_id=1, user_nome="Teste", tenant_id=cenario.tenant, db=cenario.db,
+        pagamentos=[
+            {"forma_pagamento": "Dinheiro", "forma_pagamento_id": 2, "valor": 135}
+        ],
+        user_id=1,
+        user_nome="Teste",
+        tenant_id=cenario.tenant,
+        db=cenario.db,
         processar_baixa_estoque_item=lambda **kw: [],
     )
     movimento = cenario.db.query(MovimentacaoCaixa).one()

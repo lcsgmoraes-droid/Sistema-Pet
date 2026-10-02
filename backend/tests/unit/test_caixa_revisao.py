@@ -28,22 +28,30 @@ class _Session:
 
 def _caixa():
     return SimpleNamespace(
-        id=12, status="fechado",
+        id=12,
+        status="fechado",
         data_abertura=datetime(2026, 10, 1, 8, 0),
         data_fechamento=datetime(2026, 10, 1, 20, 0),
-        valor_abertura=100.0, valor_informado=170.0,
-        valor_esperado=100.0, diferenca=70.0,
+        valor_abertura=100.0,
+        valor_informado=170.0,
+        valor_esperado=100.0,
+        diferenca=70.0,
     )
 
 
 def test_revisao_valida_caixa_fechado_sem_afetar_caixa_atual(monkeypatch):
     caixa = _caixa()
-    monkeypatch.setattr(revisao, "buscar_caixa_acessivel", lambda *args, **kwargs: (caixa, False))
+    monkeypatch.setattr(
+        revisao, "buscar_caixa_acessivel", lambda *args, **kwargs: (caixa, False)
+    )
     monkeypatch.setattr(revisao, "now_brasilia", lambda: datetime(2026, 10, 2, 12, 0))
 
     resultado = revisao.validar_revisao_caixa(
-        _Session(), caixa_id=12, data_ocorrencia=datetime(2026, 10, 1, 13, 0),
-        motivo="Pagamento esquecido", usuario=SimpleNamespace(id=4, is_admin=True),
+        _Session(),
+        caixa_id=12,
+        data_ocorrencia=datetime(2026, 10, 1, 13, 0),
+        motivo="Pagamento esquecido",
+        usuario=SimpleNamespace(id=4, is_admin=True),
         tenant_id="empresa-a",
     )
 
@@ -54,20 +62,36 @@ def test_revisao_valida_caixa_fechado_sem_afetar_caixa_atual(monkeypatch):
 @pytest.mark.parametrize(
     "usuario,data_ocorrencia,motivo,codigo",
     [
-        (SimpleNamespace(id=4, is_admin=False), datetime(2026, 10, 1, 13), "Pagamento esquecido", 403),
-        (SimpleNamespace(id=4, is_admin=True), datetime(2026, 10, 1, 21), "Pagamento esquecido", 400),
+        (
+            SimpleNamespace(id=4, is_admin=False),
+            datetime(2026, 10, 1, 13),
+            "Pagamento esquecido",
+            403,
+        ),
+        (
+            SimpleNamespace(id=4, is_admin=True),
+            datetime(2026, 10, 1, 21),
+            "Pagamento esquecido",
+            400,
+        ),
         (SimpleNamespace(id=4, is_admin=True), datetime(2026, 10, 1, 13), "curto", 400),
     ],
 )
 def test_revisao_bloqueia_permissao_data_e_motivo(
     monkeypatch, usuario, data_ocorrencia, motivo, codigo
 ):
-    monkeypatch.setattr(revisao, "buscar_caixa_acessivel", lambda *args, **kwargs: (_caixa(), False))
+    monkeypatch.setattr(
+        revisao, "buscar_caixa_acessivel", lambda *args, **kwargs: (_caixa(), False)
+    )
     monkeypatch.setattr(revisao, "now_brasilia", lambda: datetime(2026, 10, 2, 12, 0))
     with pytest.raises(HTTPException) as erro:
         revisao.validar_revisao_caixa(
-            _Session(), caixa_id=12, data_ocorrencia=data_ocorrencia,
-            motivo=motivo, usuario=usuario, tenant_id="empresa-a",
+            _Session(),
+            caixa_id=12,
+            data_ocorrencia=data_ocorrencia,
+            motivo=motivo,
+            usuario=usuario,
+            tenant_id="empresa-a",
         )
     assert erro.value.status_code == codigo
 

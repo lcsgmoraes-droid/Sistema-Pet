@@ -60,9 +60,12 @@ async def finalizar_venda(
     from app.caixa.revisao import validar_revisao_caixa
 
     caixa_revisao = validar_revisao_caixa(
-        db, caixa_id=dados.caixa_revisao_id,
-        data_ocorrencia=dados.data_ocorrencia, motivo=dados.motivo_revisao,
-        usuario=current_user, tenant_id=tenant_id,
+        db,
+        caixa_id=dados.caixa_revisao_id,
+        data_ocorrencia=dados.data_ocorrencia,
+        motivo=dados.motivo_revisao,
+        usuario=current_user,
+        tenant_id=tenant_id,
     )
 
     # 🔒 HARDENING 1: Logs estruturados e validação de estado

@@ -132,7 +132,9 @@ class CaixaService:
             compartilhado = caixa_compartilhado_habilitado(db, tenant_id)
 
         if permitir_fechado and caixa_id is None:
-            raise HTTPException(status_code=400, detail="Informe o caixa fechado da revisão.")
+            raise HTTPException(
+                status_code=400, detail="Informe o caixa fechado da revisão."
+            )
         query = db.query(Caixa).filter(
             Caixa.status == ("fechado" if permitir_fechado else "aberto")
         )
