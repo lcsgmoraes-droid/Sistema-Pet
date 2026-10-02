@@ -1,7 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import toast from "react-hot-toast";
 import { getProdutosVendaveis } from "../api/produtos";
-import { lerEtiquetaBalanca, produtoAceitaEtiquetaBalanca } from "../utils/pdvEtiquetaBalanca";
+import {
+  lerEtiquetaBalanca,
+  obterLeiturasPossiveisEtiquetaBalanca,
+  produtoAceitaEtiquetaBalanca,
+} from "../utils/pdvEtiquetaBalanca";
 import {
   deveAdicionarProdutoAutomaticamente,
   encontrarProdutoPorCodigo,
@@ -192,25 +196,27 @@ export function usePDVProdutoBusca({
         return true;
       }
 
-      const produtos = await buscarProdutosAtualizados(etiqueta.codigoProdutoSemZeros);
-      const candidatos = produtos.filter((produto) =>
-        produtoCorrespondeCodigoBalanca(produto, etiqueta.codigoProduto),
-      );
-      if (candidatos.length !== 1) {
-        mostrarErroEtiqueta(
-          etiqueta,
-          candidatos.length > 1
-            ? "Mais de um produto usa o codigo desta etiqueta. Corrija o cadastro."
-            : `Produto ${etiqueta.codigoProdutoSemZeros} nao encontrado para esta etiqueta. Confira o codigo cadastrado na balanca e no produto.`,
+      const opcoes = [];
+      for (const leitura of obterLeiturasPossiveisEtiquetaBalanca(etiqueta)) {
+        const produtos = await buscarProdutosAtualizados(leitura.codigoProdutoSemZeros);
+        const candidatos = produtos.filter((produto) =>
+          produtoCorrespondeCodigoBalanca(produto, leitura.codigoProduto),
         );
-        return true;
+        if (candidatos.length > 1) {
+          mostrarErroEtiqueta(
+            etiqueta,
+            `Mais de um produto usa o codigo ${leitura.codigoProdutoSemZeros}. Corrija o cadastro.`,
+          );
+          return true;
+        }
+        if (candidatos.length === 1) {
+          opcoes.push({ etiqueta: leitura, produto: candidatos[0] });
+        }
       }
-
-      const produto = candidatos[0];
-      if (!produtoAceitaEtiquetaBalanca(produto)) {
+      if (opcoes.length === 0) {
         mostrarErroEtiqueta(
           etiqueta,
-          "O produto desta etiqueta precisa estar marcado como granel e com unidade KG.",
+          `Nenhum produto encontrado para os codigos ${etiqueta.codigoProdutoSemZeros} ou ${etiqueta.codigo.slice(1, 8).replace(/^0+/, "") || "0"}. Confira o formato da balanca.`,
         );
         return true;
       }
@@ -218,7 +224,7 @@ export function usePDVProdutoBusca({
       if (!modoVisualizacao) {
         etiquetaPendenteCodigoRef.current = etiqueta.codigo;
         limparSugestoesProduto();
-        setEtiquetaPendente({ etiqueta, produto });
+        setEtiquetaPendente({ etiqueta, opcoes });
       }
       return true;
     } finally {
@@ -420,11 +426,13 @@ export function usePDVProdutoBusca({
     limparBuscaProduto({ focarInput: true });
   };
 
-  const confirmarEtiquetaBalanca = (itemEtiqueta) => {
+  const confirmarEtiquetaBalanca = (itemEtiqueta, indiceOpcao) => {
     if (!etiquetaPendente || itemEtiqueta?.codigo !== etiquetaPendente.etiqueta.codigo) {
       return false;
     }
-    const adicionou = adicionarProduto(etiquetaPendente.produto, {
+    const opcao = etiquetaPendente.opcoes[indiceOpcao];
+    if (!opcao || !produtoAceitaEtiquetaBalanca(opcao.produto)) return false;
+    const adicionou = adicionarProduto(opcao.produto, {
       focarInput: true,
       etiquetaBalanca: itemEtiqueta,
     });

@@ -1,7 +1,10 @@
 import { useState } from "react";
 import { X } from "lucide-react";
 import CurrencyInput from "../CurrencyInput";
-import { compararPrecosEtiquetaBalanca } from "../../utils/pdvEtiquetaBalanca";
+import {
+  compararPrecosEtiquetaBalanca,
+  produtoAceitaEtiquetaBalanca,
+} from "../../utils/pdvEtiquetaBalanca";
 import { formatMoneyBRL } from "../../utils/formatters";
 import { useEscapeToClose } from "../../utils/modalEscape";
 import { obterPrecoVendaPDV } from "../../utils/pdvCarrinhoItensUtils";
@@ -9,26 +12,89 @@ import { obterPrecoVendaPDV } from "../../utils/pdvCarrinhoItensUtils";
 export default function PDVEtiquetaBalancaModal({ pendencia, onConfirmar, onCancelar }) {
   const [precoEtiqueta, setPrecoEtiqueta] = useState(0);
   const [pesoImpresso, setPesoImpresso] = useState("");
-  const { etiqueta, produto } = pendencia;
-  const precoSistema = obterPrecoVendaPDV(produto);
+  const { etiqueta: codigoLido, opcoes } = pendencia;
+  const exigirEscolha = opcoes.length > 1 || opcoes[0].etiqueta.formato !== "produto6_valor5";
+  const [indiceOpcao, setIndiceOpcao] = useState(exigirEscolha ? null : 0);
+  const opcao = indiceOpcao === null ? null : opcoes[indiceOpcao];
+  const etiqueta = opcao?.etiqueta;
+  const produto = opcao?.produto;
+  const precoSistema = produto ? obterPrecoVendaPDV(produto) : null;
   const comparacao =
-    precoEtiqueta > 0
+    produto && precoEtiqueta > 0
       ? compararPrecosEtiquetaBalanca(etiqueta, produto, precoEtiqueta, pesoImpresso)
       : null;
   const pesoValido = comparacao && !comparacao.erro;
-  const totalEtiqueta = etiqueta.totalCentavos / 100;
+  const totalEtiqueta = etiqueta ? etiqueta.totalCentavos / 100 : null;
 
   useEscapeToClose({ onClose: onCancelar });
 
   const confirmar = (usarPrecoEtiqueta) => {
     if (!pesoValido || (!usarPrecoEtiqueta && comparacao.precoKgSistema === null)) return;
-    onConfirmar({
-      codigo: etiqueta.codigo,
-      quantidade: comparacao.quantidade,
-      precoUnitario: usarPrecoEtiqueta ? comparacao.precoKgEtiqueta : comparacao.precoKgSistema,
-      subtotal: usarPrecoEtiqueta ? comparacao.totalEtiqueta : comparacao.totalSistema,
-    });
+    onConfirmar(
+      {
+        codigo: etiqueta.codigo,
+        quantidade: comparacao.quantidade,
+        precoUnitario: usarPrecoEtiqueta ? comparacao.precoKgEtiqueta : comparacao.precoKgSistema,
+        subtotal: usarPrecoEtiqueta ? comparacao.totalEtiqueta : comparacao.totalSistema,
+      },
+      indiceOpcao,
+    );
   };
+
+  if (!opcao) {
+    return (
+      <div
+        className="fixed inset-0 z-[70] flex items-center justify-center bg-black/55 p-4"
+        role="presentation"
+      >
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="titulo-etiqueta-balanca"
+          className="max-h-[95vh] w-full max-w-xl overflow-y-auto rounded-xl bg-white p-6 shadow-2xl"
+        >
+          <h2 id="titulo-etiqueta-balanca" className="text-xl font-bold text-gray-900">
+            Conferir produto da etiqueta
+          </h2>
+          <p className="mt-2 text-sm text-gray-700">
+            O código {codigoLido.codigo} admite mais de uma divisão entre produto e valor. Confira o
+            nome impresso na etiqueta antes de escolher.
+          </p>
+          <div className="mt-4 space-y-2">
+            {opcoes.map(({ etiqueta: leitura, produto: candidato }, indice) => (
+              <button
+                key={`${leitura.formato}-${candidato.id}`}
+                type="button"
+                disabled={!produtoAceitaEtiquetaBalanca(candidato)}
+                onClick={() => setIndiceOpcao(indice)}
+                className="w-full rounded-lg border border-gray-300 p-4 text-left hover:border-blue-500 hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <strong className="block text-gray-900">{candidato.nome}</strong>
+                <span className="text-sm text-gray-700">
+                  Código cadastrado: {candidato.codigo} · Total:{" "}
+                  {formatMoneyBRL(leitura.totalCentavos / 100)}
+                </span>
+                {!produtoAceitaEtiquetaBalanca(candidato) && (
+                  <span className="block text-xs text-red-700">
+                    Produto não cadastrado como granel em KG
+                  </span>
+                )}
+              </button>
+            ))}
+          </div>
+          <div className="mt-5 flex justify-end">
+            <button
+              type="button"
+              onClick={onCancelar}
+              className="rounded-lg border border-gray-300 px-4 py-2 text-gray-700 hover:bg-gray-50"
+            >
+              Cancelar
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div
@@ -164,6 +230,19 @@ export default function PDVEtiquetaBalancaModal({ pendencia, onConfirmar, onCanc
           )}
 
           <div className="flex flex-wrap justify-end gap-2 border-t border-gray-200 pt-4">
+            {exigirEscolha && (
+              <button
+                type="button"
+                onClick={() => {
+                  setPrecoEtiqueta(0);
+                  setPesoImpresso("");
+                  setIndiceOpcao(null);
+                }}
+                className="rounded-lg border border-gray-300 px-4 py-2 text-gray-700 hover:bg-gray-50"
+              >
+                Trocar produto
+              </button>
+            )}
             <button
               type="button"
               onClick={onCancelar}

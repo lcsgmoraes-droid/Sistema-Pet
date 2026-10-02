@@ -4,6 +4,7 @@ import {
   calcularItemEtiquetaBalanca,
   compararPrecosEtiquetaBalanca,
   lerEtiquetaBalanca,
+  obterLeiturasPossiveisEtiquetaBalanca,
 } from "./pdvEtiquetaBalanca.js";
 import { montarItensVendaPayload } from "./pdvVendaPayload.js";
 import { produtoCorrespondeCodigoBalanca } from "./pdvProdutoBuscaUtils.js";
@@ -46,6 +47,34 @@ test("etiqueta da balanca encontra SKU com zeros a esquerda sem confundir 15 e 0
     produtoCorrespondeCodigoBalanca({ codigo: "0150" }, etiqueta15.codigoProduto),
     false,
   );
+
+  const leituras0150 = obterLeiturasPossiveisEtiquetaBalanca(etiqueta15);
+  assert.deepEqual(
+    leituras0150.map(({ codigoProdutoSemZeros, totalCentavos }) => [
+      codigoProdutoSemZeros,
+      totalCentavos,
+    ]),
+    [
+      ["15", 114],
+      ["150", 114],
+    ],
+  );
+  assert.equal(
+    produtoCorrespondeCodigoBalanca({ codigo: "0150" }, leituras0150[1].codigoProduto),
+    true,
+  );
+  assert.equal(
+    compararPrecosEtiquetaBalanca(
+      leituras0150[1],
+      { ...produtoGranel, codigo: "0150", preco_venda: 15.9 },
+      15.9,
+    ).quantidade,
+    0.072,
+  );
+
+  const leituras0151 = obterLeiturasPossiveisEtiquetaBalanca(etiqueta0151);
+  assert.equal(leituras0151[0].codigoProdutoSemZeros, "151");
+  assert.equal(leituras0151[1].codigoProdutoSemZeros, "1510");
 });
 
 test("rejeita erro de leitura, valor zerado e formato comum", () => {
