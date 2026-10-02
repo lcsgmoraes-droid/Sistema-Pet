@@ -27,10 +27,12 @@ from app.db import get_session
 from app.caixa_routes import (
     abrir_caixa,
     fechar_caixa,
+    listar_vendas_caixa,
     obter_resumo_caixa,
     FecharCaixaSchema,
 )
 from app.empresa_config_geral_models import EmpresaConfigGeral
+from app.financeiro_models import ContaReceber
 from app import (  # noqa: F401
     produtos_models,
     dre_plano_contas_models,
@@ -54,6 +56,7 @@ def dados_caixa():
         Venda,
         MovimentacaoCaixa,
         VendaPagamento,
+        ContaReceber,
         EmpresaConfigGeral,
     ):
         model.__table__.create(engine)
@@ -376,6 +379,86 @@ def test_resumo_fechamento_e_nova_abertura_preservam_o_mesmo_dinheiro(dados_caix
     assert novo["conferencia_abertura"]["caixa_id"] == 1
     assert novo["conferencia_abertura"]["valor_fechamento"] == 140
     assert novo["conferencia_abertura"]["diferenca"] == 1
+
+
+def test_formas_do_caixa_conciliam_dinheiro_e_incluem_venda_com_nf(dados_caixa):
+    db, tenant, _ = dados_caixa
+    caixa = inserir_caixa(db, tenant, 1, 2, status="aberto", data_fechamento=None)
+    for id_, status_venda, data_venda in (
+        (1, "finalizada", datetime(2026, 9, 4, 12)),
+        (2, "pago_nf", datetime(2026, 9, 4, 12)),
+        (3, "finalizada", datetime(2026, 9, 3, 12)),
+    ):
+        db.execute(
+            Venda.__table__.insert().values(
+                id=id_,
+                tenant_id=tenant,
+                numero_venda=f"VEN-{id_}",
+                vendedor_id=10,
+                user_id=10,
+                subtotal=200 if id_ == 3 else 100,
+                total=200 if id_ == 3 else 100,
+                caixa_id=caixa.id,
+                status=status_venda,
+                data_venda=data_venda,
+            )
+        )
+    for id_, venda_id, forma, valor in (
+        (1, 1, "Dinheiro", 50),
+        (2, 2, "Dinheiro", 37.90),
+        (3, 2, "PIX", 20),
+        (4, 3, "Cartao de debito", 200),
+    ):
+        db.execute(
+            VendaPagamento.__table__.insert().values(
+                id=id_,
+                tenant_id=tenant,
+                venda_id=venda_id,
+                forma_pagamento=forma,
+                valor=valor,
+                data_pagamento=datetime(2026, 9, 4, 12),
+            )
+        )
+    for id_, venda_id, valor in ((1, 1, 50), (2, 2, 37.90)):
+        db.execute(
+            MovimentacaoCaixa.__table__.insert().values(
+                id=id_,
+                tenant_id=tenant,
+                caixa_id=caixa.id,
+                venda_id=venda_id,
+                tipo="venda",
+                forma_pagamento="Dinheiro",
+                valor=valor,
+                usuario_id=10,
+                usuario_nome="Operador",
+                data_movimento=datetime(2026, 9, 4, 12),
+            )
+        )
+    user = SimpleNamespace(id=10, nome="Operador")
+    resumo = obter_resumo_caixa(caixa.id, db=db, current_user_and_tenant=(user, tenant))
+
+    assert resumo["totais"]["vendas"] == 87.90
+    assert resumo["vendas_por_forma_pagamento"]["Dinheiro"] == {
+        "quantidade": 2,
+        "total": 87.90,
+        "tipo_contagem": "lançamento",
+    }
+    assert resumo["vendas_por_forma_pagamento"]["PIX"]["total"] == 20
+    assert resumo["vendas_por_forma_pagamento"]["Cartao de debito"]["total"] == 200
+    assert (
+        resumo["recebimentos_por_data_venda"]["2026-09-04"]["Dinheiro"]["total"]
+        == 87.90
+    )
+    assert resumo["recebimentos_por_data_venda"]["2026-09-04"]["PIX"]["total"] == 20
+    assert (
+        resumo["recebimentos_por_data_venda"]["2026-09-03"]["Cartao de debito"]["total"]
+        == 200
+    )
+    assert len(listar_vendas_caixa(caixa.id, "Dinheiro", db, (user, tenant))) == 2
+    assert (
+        listar_vendas_caixa(caixa.id, "PIX", db, (user, tenant))[0]["data_venda"]
+        == "2026-09-04"
+    )
 
 
 def test_periodo_invalido_e_paginacao_sem_perder_totais(dados_caixa):
