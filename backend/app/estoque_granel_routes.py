@@ -88,6 +88,45 @@ def listar_produtos_granel(
     ]
 
 
+@router.get("/granel/produtos-origem")
+def listar_produtos_origem_granel(
+    busca: Optional[str] = None,
+    limite: int = Query(default=30, ge=1, le=100),
+    db: Session = Depends(get_session),
+    user_and_tenant=Depends(get_current_user_and_tenant),
+):
+    """Busca produtos fechados com peso definido para abastecer granel."""
+    _current_user, tenant_id = user_and_tenant
+    query = db.query(Produto).filter(
+        Produto.tenant_id == tenant_id,
+        or_(Produto.ativo.is_(True), Produto.ativo.is_(None)),
+        or_(Produto.e_granel.is_(False), Produto.e_granel.is_(None)),
+        ~Produto.nome.ilike("%granel%"),
+        Produto.tipo_produto.in_(("SIMPLES", "VARIACAO")),
+        Produto.peso_embalagem > 0,
+    )
+    termo = (busca or "").strip()
+    if termo:
+        pattern = f"%{termo}%"
+        query = query.filter(
+            or_(
+                Produto.nome.ilike(pattern),
+                Produto.codigo.ilike(pattern),
+                Produto.codigo_barras.ilike(pattern),
+            )
+        )
+    produtos = query.order_by(Produto.nome.asc()).limit(limite).all()
+    return [
+        {
+            "id": produto.id,
+            "codigo": produto.codigo,
+            "nome": produto.nome,
+            "peso_embalagem": float(produto.peso_embalagem),
+        }
+        for produto in produtos
+    ]
+
+
 @router.get("/granel/vinculos/origem/{produto_origem_id}")
 def listar_vinculos_granel_origem(
     produto_origem_id: int,
@@ -105,6 +144,31 @@ def listar_vinculos_granel_origem(
         .filter(
             ProdutoGranelVinculo.tenant_id == tenant_id,
             ProdutoGranelVinculo.produto_origem_id == produto_origem_id,
+            ProdutoGranelVinculo.ativo.is_(True),
+        )
+        .order_by(ProdutoGranelVinculo.updated_at.desc())
+        .all()
+    )
+    return [_serializar_vinculo_granel(vinculo) for vinculo in vinculos]
+
+
+@router.get("/granel/vinculos/granel/{produto_granel_id}")
+def listar_vinculos_granel_produto(
+    produto_granel_id: int,
+    db: Session = Depends(get_session),
+    user_and_tenant=Depends(get_current_user_and_tenant),
+):
+    """Lista produtos fechados vinculados ao produto granel."""
+    _current_user, tenant_id = user_and_tenant
+    vinculos = (
+        db.query(ProdutoGranelVinculo)
+        .options(
+            joinedload(ProdutoGranelVinculo.produto_origem),
+            joinedload(ProdutoGranelVinculo.produto_granel),
+        )
+        .filter(
+            ProdutoGranelVinculo.tenant_id == tenant_id,
+            ProdutoGranelVinculo.produto_granel_id == produto_granel_id,
             ProdutoGranelVinculo.ativo.is_(True),
         )
         .order_by(ProdutoGranelVinculo.updated_at.desc())
