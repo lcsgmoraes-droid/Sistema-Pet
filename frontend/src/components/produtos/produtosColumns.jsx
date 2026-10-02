@@ -582,7 +582,8 @@ export function createProdutosColunas() {
                   </svg>
                 </button>
               )}
-              {produto.ativo === false && !String(produto.codigo || "").startsWith("__LIBERADO__") &&
+              {produto.ativo === false &&
+                !String(produto.codigo || "").startsWith("__LIBERADO__") &&
                 (!produto.de_parceiro || produto.acesso_catalogo_completo) && (
                   <button
                     onClick={(e) => {

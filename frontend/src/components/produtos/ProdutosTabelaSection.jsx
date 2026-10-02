@@ -510,20 +510,21 @@ export default function ProdutosTabelaSection({
                       >
                         {produto.ativo === false ? "Ativar" : "Inativar"}
                       </ActionButton>
-                      {produto.ativo === false && !String(produto.codigo || "").startsWith("__LIBERADO__") && (
-                        <ActionButton
-                          type="button"
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            handleLiberarSku(produto);
-                          }}
-                          intent="warning"
-                          tone="soft"
-                          size="sm"
-                        >
-                          Liberar SKU
-                        </ActionButton>
-                      )}
+                      {produto.ativo === false &&
+                        !String(produto.codigo || "").startsWith("__LIBERADO__") && (
+                          <ActionButton
+                            type="button"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              handleLiberarSku(produto);
+                            }}
+                            intent="warning"
+                            tone="soft"
+                            size="sm"
+                          >
+                            Liberar SKU
+                          </ActionButton>
+                        )}
                     </div>
                   </article>
                 );

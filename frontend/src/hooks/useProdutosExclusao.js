@@ -188,7 +188,8 @@ export default function useProdutosExclusao({
   const handleExcluir = async (id) => {
     const escolha = await confirmarCorePet({
       mensagem: "Deseja realmente excluir este produto?",
-      rotuloOpcao: "Liberar o SKU para uso em outro produto. O cadastro antigo receberá um código interno.",
+      rotuloOpcao:
+        "Liberar o SKU para uso em outro produto. O cadastro antigo receberá um código interno.",
     });
     if (!escolha?.confirmado) return;
     const liberarSku = escolha.opcaoMarcada;
@@ -221,7 +222,9 @@ export default function useProdutosExclusao({
     if (!escolha?.confirmado) return;
     const liberarSku = escolha.opcaoMarcada;
 
-    const resultados = await Promise.allSettled(selecionados.map((id) => deleteProduto(id, liberarSku)));
+    const resultados = await Promise.allSettled(
+      selecionados.map((id) => deleteProduto(id, liberarSku)),
+    );
 
     const idsExcluidos = [];
     const falhas = [];
@@ -272,14 +275,19 @@ export default function useProdutosExclusao({
     const escolha = await confirmarCorePet({
       mensagem: `Deseja realmente ${acao} o produto "${produto.nome}"?`,
       ...(!proximoAtivo && {
-        rotuloOpcao: "Liberar o SKU para uso em outro produto. O cadastro antigo receberá um código interno.",
+        rotuloOpcao:
+          "Liberar o SKU para uso em outro produto. O cadastro antigo receberá um código interno.",
       }),
     });
     if (proximoAtivo ? !escolha : !escolha?.confirmado) return;
 
     try {
       await toggleProdutoAtivo(produto.id, proximoAtivo, escolha?.opcaoMarcada || false);
-      toast.success(escolha?.opcaoMarcada ? "Produto inativado e SKU liberado!" : `Produto ${proximoAtivo ? "ativado" : "desativado"} com sucesso!`);
+      toast.success(
+        escolha?.opcaoMarcada
+          ? "Produto inativado e SKU liberado!"
+          : `Produto ${proximoAtivo ? "ativado" : "desativado"} com sucesso!`,
+      );
       carregarDados();
     } catch (error) {
       console.error(`Erro ao ${acao} produto:`, error);
@@ -288,10 +296,13 @@ export default function useProdutosExclusao({
   };
 
   const handleLiberarSku = async (produto) => {
-    if (!(await confirmarCorePet({
-      mensagem: `Liberar o SKU "${produto.codigo}" do produto inativo "${produto.nome}"? O cadastro antigo receberá um código interno e manterá seu histórico.`,
-      confirmarTexto: "Liberar SKU",
-    }))) return;
+    if (
+      !(await confirmarCorePet({
+        mensagem: `Liberar o SKU "${produto.codigo}" do produto inativo "${produto.nome}"? O cadastro antigo receberá um código interno e manterá seu histórico.`,
+        confirmarTexto: "Liberar SKU",
+      }))
+    )
+      return;
     try {
       await toggleProdutoAtivo(produto.id, false, true);
       toast.success(`SKU ${produto.codigo} liberado para novo cadastro!`);

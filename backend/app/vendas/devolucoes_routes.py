@@ -20,7 +20,10 @@ from app.empresa_grupo_estoque_compartilhado_service import (
 )
 from app.estoque.service import EstoqueService
 from app.produtos_models import EstoqueMovimentacao
-from app.vendas.routes_common import _obter_cliente_ou_404, _validar_tenant_e_obter_usuario
+from app.vendas.routes_common import (
+    _obter_cliente_ou_404,
+    _validar_tenant_e_obter_usuario,
+)
 from app.vendas_models import Venda, VendaItem
 
 router = APIRouter()
