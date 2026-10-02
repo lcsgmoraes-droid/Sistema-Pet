@@ -69,6 +69,20 @@ def normalize_card_modality(value: Any) -> str:
     return MODALITY_ALIASES.get(normalized, normalized)
 
 
+def _modality_from_candidate(candidate: Any) -> str:
+    text = str(candidate or "").strip().lower()
+    normalized = normalize_card_modality(text)
+    if normalized in {"credito", "debito", "link", "voucher"}:
+        return normalized
+    if "credit" in text or "crédit" in text:
+        return "credito"
+    if "debit" in text or "débit" in text:
+        return "debito"
+    if "voucher" in text:
+        return "voucher"
+    return ""
+
+
 def modality_from_payment_form(
     forma: Optional[FormaPagamento], fallback: Any = None
 ) -> str:
@@ -88,16 +102,9 @@ def modality_from_payment_form(
     ):
         return ""
     for candidate in candidates:
-        text = str(candidate or "").strip().lower()
-        normalized = normalize_card_modality(text)
-        if normalized in {"credito", "debito", "link", "voucher"}:
-            return normalized
-        if "credit" in text or "crédit" in text:
-            return "credito"
-        if "debit" in text or "débit" in text:
-            return "debito"
-        if "voucher" in text:
-            return "voucher"
+        modality = _modality_from_candidate(candidate)
+        if modality:
+            return modality
     return ""
 
 
