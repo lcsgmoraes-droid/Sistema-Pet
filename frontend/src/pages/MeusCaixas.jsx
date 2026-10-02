@@ -132,7 +132,8 @@ export default function MeusCaixas() {
       return (
         <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-sm font-medium bg-amber-100 text-amber-800">
           <AlertTriangle className="w-4 h-4" />
-          Diferença {dif > 0 ? "+" : "-"}{formatMoneyBRL(Math.abs(dif))}
+          Diferença {dif > 0 ? "+" : "-"}
+          {formatMoneyBRL(Math.abs(dif))}
         </span>
       );
     }
@@ -397,30 +398,54 @@ export default function MeusCaixas() {
       )}
       {caixaRevisao && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <form onSubmit={iniciarRevisao} className="w-full max-w-lg rounded-xl bg-white p-6 shadow-xl">
+          <form
+            onSubmit={iniciarRevisao}
+            className="w-full max-w-lg rounded-xl bg-white p-6 shadow-xl"
+          >
             <h2 className="text-xl font-semibold">Revisar caixa #{caixaRevisao.numero_caixa}</h2>
             <p className="mt-2 text-sm text-gray-600">
-              Informe quando a venda ou o pagamento aconteceu. O caixa atual continua aberto.
-              A correção ficará registrada com seu nome e justificativa.
+              Informe quando a venda ou o pagamento aconteceu. O caixa atual continua aberto. A
+              correção ficará registrada com seu nome e justificativa.
             </p>
-            <label className="mt-5 block text-sm font-medium" htmlFor="data-revisao">Data e hora da ocorrência</label>
+            <label className="mt-5 block text-sm font-medium" htmlFor="data-revisao">
+              Data e hora da ocorrência
+            </label>
             <input
-              id="data-revisao" type="datetime-local" required value={dataOcorrencia}
+              id="data-revisao"
+              type="datetime-local"
+              required
+              value={dataOcorrencia}
               min={caixaRevisao.data_abertura.slice(0, 16)}
               max={caixaRevisao.data_fechamento.slice(0, 16)}
               onChange={(event) => setDataOcorrencia(event.target.value)}
               className="mt-1 w-full rounded border border-gray-300 px-3 py-2"
             />
-            <label className="mt-4 block text-sm font-medium" htmlFor="motivo-revisao">Motivo da correção</label>
+            <label className="mt-4 block text-sm font-medium" htmlFor="motivo-revisao">
+              Motivo da correção
+            </label>
             <textarea
-              id="motivo-revisao" required minLength={10} value={motivoRevisao}
+              id="motivo-revisao"
+              required
+              minLength={10}
+              value={motivoRevisao}
               onChange={(event) => setMotivoRevisao(event.target.value)}
               className="mt-1 w-full rounded border border-gray-300 px-3 py-2"
               placeholder="Ex.: pagamento recebido ontem, mas não lançado"
             />
             <div className="mt-5 flex justify-end gap-3">
-              <button type="button" onClick={() => setCaixaRevisao(null)} className="rounded px-4 py-2 text-gray-700">Cancelar</button>
-              <button type="submit" className="rounded bg-amber-600 px-4 py-2 font-medium text-white">Ir ao PDV em revisão</button>
+              <button
+                type="button"
+                onClick={() => setCaixaRevisao(null)}
+                className="rounded px-4 py-2 text-gray-700"
+              >
+                Cancelar
+              </button>
+              <button
+                type="submit"
+                className="rounded bg-amber-600 px-4 py-2 font-medium text-white"
+              >
+                Ir ao PDV em revisão
+              </button>
             </div>
           </form>
         </div>

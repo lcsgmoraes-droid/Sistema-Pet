@@ -621,14 +621,27 @@ export default function PDV() {
         <div className="flex items-center justify-between gap-4 bg-amber-100 px-5 py-3 text-amber-950">
           <div>
             <strong>Revisão do caixa #{contextoRevisao.caixa_revisao_id}</strong>
-            {" — ocorrência em "}{contextoRevisao.data_ocorrencia.replace("T", " às ")}
-            <p className="text-sm">Cadastre a venda que faltou ou localize uma venda pelo número e registre o pagamento. O caixa de hoje continua aberto.</p>
+            {" — ocorrência em "}
+            {contextoRevisao.data_ocorrencia.replace("T", " às ")}
+            <p className="text-sm">
+              Cadastre a venda que faltou ou localize uma venda pelo número e registre o pagamento.
+              O caixa de hoje continua aberto.
+            </p>
           </div>
-          <button type="button" onClick={() => navigate("/meus-caixas")} className="rounded bg-white px-3 py-2 font-medium">Sair da revisão</button>
+          <button
+            type="button"
+            onClick={() => navigate("/meus-caixas")}
+            className="rounded bg-white px-3 py-2 font-medium"
+          >
+            Sair da revisão
+          </button>
         </div>
       )}
       <PDVDriveAlertBanner {...driveAlertProps} />
-      <div className={`flex bg-gray-50 ${contextoRevisao ? "h-[calc(100vh-76px)]" : "h-screen"}`} style={containerStyle}>
+      <div
+        className={`flex bg-gray-50 ${contextoRevisao ? "h-[calc(100vh-76px)]" : "h-screen"}`}
+        style={containerStyle}
+      >
         <PDVMainArea {...mainAreaProps} />
         <PDVOverlays
           {...overlayProps}

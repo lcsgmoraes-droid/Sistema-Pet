@@ -12,7 +12,8 @@ test("PDV de revisão encaminha caixa, ocorrência e motivo", () => {
   globalThis.window = {
     location: {
       pathname: "/pdv",
-      search: "?caixa_revisao_id=12&data_ocorrencia=2026-10-01T15%3A30&motivo_revisao=Pagamento+esquecido",
+      search:
+        "?caixa_revisao_id=12&data_ocorrencia=2026-10-01T15%3A30&motivo_revisao=Pagamento+esquecido",
     },
   };
   assert.deepEqual(obterContextoRevisaoCaixa(), {
