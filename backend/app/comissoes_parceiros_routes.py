@@ -100,6 +100,7 @@ async def listar_funcionarios_com_comissao(
                 FROM clientes c
                 LEFT JOIN comissoes_configuracao cc ON cc.funcionario_id = c.id AND cc.ativo = true AND cc.tenant_id = c.tenant_id
                 WHERE c.parceiro_ativo = true
+                AND c.ativo = true
                 AND c.{tenant_filter}
                 GROUP BY c.id, c.nome, c.email, c.tipo_cadastro
                 ORDER BY c.nome
