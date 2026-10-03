@@ -229,7 +229,7 @@ class Campaign(TenantScoped, Base):
     status = Column(
         Enum(CampaignStatusEnum, name="campaign_status_enum"),
         nullable=False,
-        default=CampaignStatusEnum.active,
+        default=CampaignStatusEnum.paused,
     )
     params = Column(JSONB, nullable=False, default=dict)
     priority = Column(Integer, nullable=False, default=100)
