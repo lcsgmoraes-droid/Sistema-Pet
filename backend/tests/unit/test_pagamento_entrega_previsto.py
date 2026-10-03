@@ -11,9 +11,10 @@ def test_plano_de_pix_nao_e_pagamento_recebido():
     assert normalizar_pagamento_entrega_previsto(
         {"forma": "pix"}, tem_entrega=True
     ) == {"forma": "pix"}
-    assert normalizar_pagamento_entrega_previsto(
-        {"forma": "pix"}, tem_entrega=False
-    ) is None
+    assert (
+        normalizar_pagamento_entrega_previsto({"forma": "pix"}, tem_entrega=False)
+        is None
+    )
 
 
 def test_valor_de_troco_precisa_cobrir_a_venda():
