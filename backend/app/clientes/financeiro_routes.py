@@ -7,6 +7,8 @@ from sqlalchemy.orm import Session, joinedload, selectinload
 
 from app.auth.dependencies import get_current_user_and_tenant
 from app.clientes.financeiro_baixa_lote_routes import (
+    _money,
+    _saldo_venda,
     baixar_vendas_lote,
     router as financeiro_baixa_lote_router,
 )
@@ -246,15 +248,10 @@ async def get_vendas_em_aberto(
     # Filtrar apenas vendas com saldo devedor maior que zero
     vendas_com_saldo = []
     for v in vendas_aberto:
-        valor_pago = (
-            sum(float(pag.valor or 0) for pag in v.pagamentos)
-            if hasattr(v, "pagamentos") and v.pagamentos
-            else 0
-        )
-        saldo = float(v.total or 0) - valor_pago
+        valor_pago, saldo = _saldo_venda(v)
 
-        if saldo > 0.01:  # Apenas vendas com saldo maior que 1 centavo
-            vendas_com_saldo.append(v)
+        if saldo > 0:
+            vendas_com_saldo.append((v, valor_pago, saldo))
             logger.info(
                 f"  ✅ ID: {v.id} | Status: {v.status} | Total: R$ {v.total} | Pago: R$ {valor_pago} | Saldo: R$ {saldo}"
             )
@@ -264,19 +261,11 @@ async def get_vendas_em_aberto(
             )
 
     # Usar apenas vendas com saldo
-    vendas_aberto = vendas_com_saldo
-
     # Calcular valores
-    total_vendas = len(vendas_aberto)
-    valor_total = sum(float(v.total or 0) for v in vendas_aberto)
-
-    # Calcular valor pago somando os pagamentos
-    valor_pago = 0
-    for v in vendas_aberto:
-        if hasattr(v, "pagamentos") and v.pagamentos:
-            valor_pago += sum(float(pag.valor or 0) for pag in v.pagamentos)
-
-    saldo_pendente = valor_total - valor_pago
+    total_vendas = len(vendas_com_saldo)
+    valor_total = sum((_money(v.total) for v, _, _ in vendas_com_saldo), _money(0))
+    valor_pago = sum((pago for _, pago, _ in vendas_com_saldo), _money(0))
+    saldo_pendente = sum((saldo for _, _, saldo in vendas_com_saldo), _money(0))
 
     contas_crediario = (
         db.query(ContaReceber)
@@ -331,10 +320,10 @@ async def get_vendas_em_aberto(
         "tem_vendas_aberto": total_vendas > 0,
         "resumo": {
             "total_vendas": total_vendas,
-            "valor_total": round(valor_total, 2),
-            "valor_pago": round(valor_pago, 2),
-            "saldo_pendente": round(saldo_pendente, 2),
-            "total_em_aberto": round(saldo_pendente, 2),  # Compatibilidade com frontend
+            "valor_total": float(valor_total),
+            "valor_pago": float(valor_pago),
+            "saldo_pendente": float(saldo_pendente),
+            "total_em_aberto": float(saldo_pendente),  # Compatibilidade com frontend
             "total_parcelas_crediario": len(parcelas_crediario),
             "total_crediario_em_aberto": total_crediario,
             "total_crediario_vencido": total_crediario_vencido,
@@ -355,21 +344,12 @@ async def get_vendas_em_aberto(
                     else str(v.data_venda)
                 ),
                 "total": float(v.total or 0),
-                "total_pago": (
-                    sum(float(pag.valor or 0) for pag in v.pagamentos)
-                    if hasattr(v, "pagamentos") and v.pagamentos
-                    else 0
-                ),
-                "saldo_devedor": float(v.total or 0)
-                - (
-                    sum(float(pag.valor or 0) for pag in v.pagamentos)
-                    if hasattr(v, "pagamentos") and v.pagamentos
-                    else 0
-                ),
+                "total_pago": float(pago),
+                "saldo_devedor": float(saldo),
                 "status": v.status,
                 "canal": v.canal or "loja_fisica",
             }
-            for v in vendas_aberto
+            for v, pago, saldo in vendas_com_saldo
         ],
     }
 
