@@ -1,4 +1,4 @@
-import { KeyRound, LogOut, UserCheck, UserX } from "lucide-react";
+import { KeyRound, LogOut, Trash2, UserCheck, UserX } from "lucide-react";
 import DataTable from "../ui/DataTable";
 import IconActionButton from "../ui/IconActionButton";
 import Panel from "../ui/Panel";
@@ -16,6 +16,7 @@ export default function UsuariosTable({
   onForcarLogout,
   onManageCredentials,
   onToggleStatus,
+  onDelete,
   usuarios,
 }) {
   const columns = [
@@ -102,6 +103,12 @@ export default function UsuariosTable({
             intent={usuario.is_active ? "danger" : "success"}
             onClick={() => onToggleStatus(usuario.user_id, usuario.is_active)}
             title={usuario.is_active ? "Desativar acesso" : "Ativar acesso"}
+          />
+          <IconActionButton
+            icon={Trash2}
+            intent="danger"
+            onClick={() => onDelete(usuario)}
+            title="Excluir acesso definitivamente"
           />
         </div>
       ),
