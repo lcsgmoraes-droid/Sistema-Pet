@@ -57,6 +57,32 @@ export function filtrarRotasEmAndamento(rotas = []) {
   return rotas.filter((rota) => rota.status === "em_rota" || rota.status === "em_andamento");
 }
 
+export function statusApiRotas(filtroStatus) {
+  return filtroStatus === "ativas" || filtroStatus === "em_execucao" ? "" : filtroStatus;
+}
+
+export function filtrarRotasPorStatus(rotas, filtroStatus) {
+  if (filtroStatus === "em_execucao") return filtrarRotasEmAndamento(rotas);
+  return Array.isArray(rotas) ? rotas : [];
+}
+
+export function ordenarRotasRecentes(rotas = []) {
+  const lista = Array.isArray(rotas) ? rotas : [];
+  return [...lista].sort((a, b) => {
+    const dataA = Date.parse(a.created_at || "") || 0;
+    const dataB = Date.parse(b.created_at || "") || 0;
+    return dataB - dataA || Number(b.id || 0) - Number(a.id || 0);
+  });
+}
+
+export function separarRotasAtivas(rotas = []) {
+  const maisRecentes = ordenarRotasRecentes(rotas);
+  return {
+    emAndamento: maisRecentes.filter((rota) => ["em_rota", "em_andamento"].includes(rota.status)),
+    pendentes: maisRecentes.filter((rota) => rota.status === "pendente"),
+  };
+}
+
 export function agruparRotasPorEntregador(rotas = []) {
   return (rotas || []).reduce((acc, rota) => {
     const chave = rota?.entregador?.id || `sem-id-${rota.id}`;

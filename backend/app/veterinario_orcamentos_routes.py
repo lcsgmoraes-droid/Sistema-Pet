@@ -3,11 +3,13 @@
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session, joinedload
 
 from .auth.dependencies import get_current_user_and_tenant
 from .db import get_session
-from .models import Cliente, Pet
+from .models import Cliente, Pet, Tenant
+from .pdf_orcamento_vet import gerar_pdf_orcamento_vet
 from .produtos_models import Produto
 from .veterinario_core import _get_tenant
 from .veterinario_internacao import _garantir_internacao_ativa
@@ -367,6 +369,31 @@ def obter_orcamento(
 ):
     _, tenant_id = _get_tenant(current)
     return serializar_orcamento(_orcamento_or_404(db, tenant_id, orcamento_id))
+
+
+@router.get("/orcamentos/{orcamento_id}/pdf")
+def baixar_orcamento_pdf(
+    orcamento_id: int,
+    db: Session = Depends(get_session),
+    current=Depends(get_current_user_and_tenant),
+):
+    _, tenant_id = _get_tenant(current)
+    orcamento = _orcamento_or_404(db, tenant_id, orcamento_id)
+    if not orcamento.itens:
+        raise HTTPException(
+            status_code=400, detail="Adicione itens antes de gerar o PDF"
+        )
+    clinica = db.query(Tenant).filter(Tenant.id == str(tenant_id)).first()
+    if not clinica:
+        raise HTTPException(status_code=404, detail="Clínica não encontrada")
+    pdf = gerar_pdf_orcamento_vet(orcamento, clinica)
+    return StreamingResponse(
+        pdf,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f"attachment; filename=orcamento_veterinario_{orcamento_id}.pdf"
+        },
+    )
 
 
 @router.patch("/orcamentos/{orcamento_id}", response_model=OrcamentoResponse)

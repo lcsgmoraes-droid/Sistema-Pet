@@ -13,6 +13,7 @@ function RotaCard({
   onIniciarRota,
   onExcluirRota,
   onReverterInicio,
+  onAbrirRastreio,
   getStatusColor,
   getStatusLabel,
   calcularTempoEstimado,
@@ -341,14 +342,7 @@ function RotaCard({
   };
 
   return (
-    <div
-      style={{
-        border: "1px solid #ddd",
-        borderRadius: 8,
-        padding: 15,
-        backgroundColor: "#fff",
-      }}
-    >
+    <div className="rota-card">
       <RotaCardHeader
         rota={rota}
         expandida={expandida}
@@ -362,6 +356,7 @@ function RotaCard({
         paradasOrdenadas={paradasOrdenadas}
         onIniciarRota={onIniciarRota}
         onReverterInicio={onReverterInicio}
+        onAbrirRastreio={onAbrirRastreio}
         onExcluirRota={onExcluirRota}
         getStatusColor={getStatusColor}
         getStatusLabel={getStatusLabel}

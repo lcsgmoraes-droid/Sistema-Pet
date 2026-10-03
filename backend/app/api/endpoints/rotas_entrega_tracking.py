@@ -453,6 +453,7 @@ def _montar_rastreio_publico_tenant(
     total = len(paradas)
 
     return {
+        "rota_id": rota_id,
         "rota_numero": rota_numero,
         "status": rota_status,
         "entregador_nome": entregador.nome if entregador else "Entregador",

@@ -5,12 +5,16 @@ import {
   calcularTempoEstimado,
   agruparRotasPorEntregador,
   filtrarRotasEmAndamento,
+  filtrarRotasPorStatus,
   formatarTempo,
   formatarHorarioLocalizacao,
   getStatusColor,
   getStatusLabel,
   getUltimaParadaPendente,
   montarDestinoMapaRota,
+  ordenarRotasRecentes,
+  statusApiRotas,
+  separarRotasAtivas,
 } from "./rotasEntregaUtils.js";
 
 test("calcula e formata tempo estimado da ultima parada", () => {
@@ -24,6 +28,47 @@ test("calcula e formata tempo estimado da ultima parada", () => {
   assert.equal(formatarTempo(3900), "1h5min");
   assert.equal(formatarTempo(900), "15min");
   assert.equal(formatarTempo(null), "N/A");
+});
+
+test("mostra rotas ativas por etapa e da mais recente para a mais antiga", () => {
+  const rotas = [
+    { id: 1, status: "pendente", created_at: "2026-10-01T09:00:00" },
+    { id: 4, status: "em_rota", created_at: "2026-10-02T11:00:00" },
+    { id: 2, status: "pendente", created_at: "2026-10-02T10:00:00" },
+    { id: 3, status: "em_andamento", created_at: "2026-10-01T11:00:00" },
+    { id: 5, status: "concluida", created_at: "2026-10-02T12:00:00" },
+  ];
+  assert.deepEqual(
+    ordenarRotasRecentes(rotas).map((rota) => rota.id),
+    [5, 4, 2, 3, 1],
+  );
+  const grupos = separarRotasAtivas(rotas);
+  assert.deepEqual(
+    grupos.emAndamento.map((rota) => rota.id),
+    [4, 3],
+  );
+  assert.deepEqual(
+    grupos.pendentes.map((rota) => rota.id),
+    [2, 1],
+  );
+  assert.deepEqual(
+    rotas.map((rota) => rota.id),
+    [1, 4, 2, 3, 5],
+  );
+});
+
+test("o filtro em andamento usa a mesma lista ativa da contagem", () => {
+  const rotas = [
+    { id: 1, status: "pendente" },
+    { id: 2, status: "em_rota" },
+    { id: 3, status: "em_andamento" },
+  ];
+  assert.equal(statusApiRotas("em_execucao"), "");
+  assert.equal(statusApiRotas("concluida"), "concluida");
+  assert.deepEqual(
+    filtrarRotasPorStatus(rotas, "em_execucao").map((rota) => rota.id),
+    [2, 3],
+  );
 });
 
 test("retorna cores e labels dos status conhecidos", () => {
