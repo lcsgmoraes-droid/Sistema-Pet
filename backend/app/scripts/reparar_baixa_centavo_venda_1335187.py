@@ -55,8 +55,7 @@ def reparar(db, *, aplicar=False):
             return {"ja_aplicado": True, "audit_id": audit, "venda_id": VENDA_ID}
 
         vendas = linhas(
-            "SELECT id, total, status FROM vendas "
-            "WHERE tenant_id=:tenant AND id=:venda"
+            "SELECT id, total, status FROM vendas WHERE tenant_id=:tenant AND id=:venda"
         )
         pagamentos = linhas(
             "SELECT id, valor, status FROM venda_pagamentos "
@@ -78,7 +77,11 @@ def reparar(db, *, aplicar=False):
             "AND origem_id IN (:original, :duplicada) ORDER BY id"
         )
 
-        if len(vendas) != 1 or vendas[0]["status"] != "finalizada" or _dinheiro(vendas[0]["total"]) != Decimal("334.46"):
+        if (
+            len(vendas) != 1
+            or vendas[0]["status"] != "finalizada"
+            or _dinheiro(vendas[0]["total"]) != Decimal("334.46")
+        ):
             raise ValueError("Venda diferente do caso conferido")
         if [(p["id"], _dinheiro(p["valor"]), p["status"]) for p in pagamentos] != [
             (234595, Decimal("168.00"), "aprovado"),
@@ -95,7 +98,9 @@ def reparar(db, *, aplicar=False):
             or duplicada["status"] != "pago"
             or _dinheiro(duplicada["valor_final"]) != Decimal("334.46")
             or _dinheiro(duplicada["valor_recebido"]) != Decimal("334.45")
-            or not (duplicada["observacoes"] or "").startswith("Criada automaticamente pela baixa em lote")
+            or not (duplicada["observacoes"] or "").startswith(
+                "Criada automaticamente pela baixa em lote"
+            )
         ):
             raise ValueError("Saldos ou status das contas mudaram")
         if (
@@ -129,7 +134,9 @@ def reparar(db, *, aplicar=False):
             return plano
 
         db.execute(
-            text("UPDATE vendas SET status='baixa_parcial' WHERE tenant_id=:tenant AND id=:venda"),
+            text(
+                "UPDATE vendas SET status='baixa_parcial' WHERE tenant_id=:tenant AND id=:venda"
+            ),
             params,
         )
         db.execute(
@@ -174,7 +181,16 @@ def reparar(db, *, aplicar=False):
             {
                 **params,
                 "action": ACTION,
-                "old": json.dumps({"venda": vendas[0], "pagamentos": pagamentos, "contas": contas, "recebimentos": recebimentos, "fluxos": fluxos}, default=str),
+                "old": json.dumps(
+                    {
+                        "venda": vendas[0],
+                        "pagamentos": pagamentos,
+                        "contas": contas,
+                        "recebimentos": recebimentos,
+                        "fluxos": fluxos,
+                    },
+                    default=str,
+                ),
                 "new": json.dumps(plano),
                 "details": "Reclassifica baixa de R$ 166,45 como parcial e vincula o recebimento à conta original vencida.",
             },

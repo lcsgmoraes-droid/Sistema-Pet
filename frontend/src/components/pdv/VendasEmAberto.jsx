@@ -135,9 +135,8 @@ export default function VendasEmAberto({ cliente, clienteId, clienteNome, onClos
     .sort((a, b) => new Date(a.data_venda) - new Date(b.data_venda));
 
   const valorPagamentoCentavos = Math.round(Number(valorPagamento || 0) * 100);
-  let valorRestantePrevisao = valorPagamentoCentavos > 0
-    ? valorPagamentoCentavos
-    : totalSelecionadoCentavos;
+  let valorRestantePrevisao =
+    valorPagamentoCentavos > 0 ? valorPagamentoCentavos : totalSelecionadoCentavos;
   const vendasPrevistasQuitadas = [];
 
   for (const venda of vendasSelecionadasOrdenadas) {

@@ -29,9 +29,7 @@ def _money(value) -> Decimal:
 
 
 def _saldo_venda(venda) -> tuple[Decimal, Decimal]:
-    valor_pago = sum(
-        (_money(p.valor) for p in venda.pagamentos or []), Decimal("0.00")
-    )
+    valor_pago = sum((_money(p.valor) for p in venda.pagamentos or []), Decimal("0.00"))
     return valor_pago, _money(venda.total) - valor_pago
 
 

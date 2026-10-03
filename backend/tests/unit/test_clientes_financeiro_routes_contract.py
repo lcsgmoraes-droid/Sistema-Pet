@@ -201,7 +201,10 @@ def test_baixa_lote_compara_centavos_exatos_para_quitacao():
 
     vendas = [
         SimpleNamespace(total=Decimal("100.01"), pagamentos=[]),
-        SimpleNamespace(total=Decimal("100.00"), pagamentos=[SimpleNamespace(valor=Decimal("33.55"))]),
+        SimpleNamespace(
+            total=Decimal("100.00"),
+            pagamentos=[SimpleNamespace(valor=Decimal("33.55"))],
+        ),
     ]
     saldos = [_saldo_venda(venda)[1] for venda in vendas]
     assert saldos == [Decimal("100.01"), Decimal("66.45")]
