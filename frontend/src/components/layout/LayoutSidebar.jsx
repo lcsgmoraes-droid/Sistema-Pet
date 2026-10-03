@@ -84,8 +84,7 @@ export default function LayoutSidebar({
   const novidadesNaoVistas = useNovidadesNaoVistas();
   const { isDark, toggleTheme } = useTheme();
 
-  const { tenantLabel, displayName, userLabel, avatarInitial } =
-    resolveLayoutSessionIdentity(user);
+  const { tenantLabel, displayName, userLabel, avatarInitial } = resolveLayoutSessionIdentity(user);
 
   useEffect(() => {
     if (!menuUsuarioAberto) return undefined;
