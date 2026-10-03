@@ -206,6 +206,11 @@ export function createLayoutMenuItems({
           permission: "produtos.visualizar",
         },
         {
+          path: "/produtos/demanda-nao-atendida",
+          label: "Demanda não atendida",
+          permission: "produtos.visualizar",
+        },
+        {
           path: "/produtos/valorizacao-estoque",
           label: "Valorizacao de Estoque",
           permission: "produtos.visualizar",

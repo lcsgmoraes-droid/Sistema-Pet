@@ -4,6 +4,7 @@ import {
   AnaliseProdutos,
   AlertasEstoque,
   CalculadoraRacao,
+  DemandaNaoAtendida,
   EstoqueFullNF,
   EstoqueTransferenciaParceiro,
   Lembretes,
@@ -63,6 +64,14 @@ export function createProductInventoryRoutes() {
         element={
           <ProtectedRoute permission="produtos.visualizar">
             <ProdutosRelatorio />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="produtos/demanda-nao-atendida"
+        element={
+          <ProtectedRoute permission="produtos.visualizar">
+            <DemandaNaoAtendida />
           </ProtectedRoute>
         }
       />
