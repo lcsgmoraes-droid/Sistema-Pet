@@ -110,7 +110,10 @@ const Login = () => {
         </div>
 
         {senhaAlterada && !error ? (
-          <div role="status" className="mb-6 rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800">
+          <div
+            role="status"
+            className="mb-6 rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800"
+          >
             Senha alterada com sucesso. Entre com sua nova senha.
           </div>
         ) : null}

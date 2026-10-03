@@ -78,7 +78,9 @@ def change_password(
     if not verify_password(payload.senha_atual, current_user.hashed_password or ""):
         raise HTTPException(status_code=400, detail="Senha atual incorreta")
     if verify_password(payload.nova_senha, current_user.hashed_password or ""):
-        raise HTTPException(status_code=400, detail="A nova senha deve ser diferente da atual")
+        raise HTTPException(
+            status_code=400, detail="A nova senha deve ser diferente da atual"
+        )
 
     current_user.hashed_password = hash_password(payload.nova_senha)
     current_user.reset_token = None

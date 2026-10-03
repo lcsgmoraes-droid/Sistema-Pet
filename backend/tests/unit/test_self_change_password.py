@@ -40,7 +40,9 @@ def test_change_password_requires_current_password_and_revokes_sessions(monkeypa
     with pytest.raises(HTTPException, match="Senha atual incorreta"):
         routes.change_password(
             ChangePasswordRequest(senha_atual="errada", nova_senha="NovaSenha123"),
-            request=object(), db=db, current_user=user,
+            request=object(),
+            db=db,
+            current_user=user,
         )
     assert verify_password("SenhaAntiga123", user.hashed_password)
     assert events == []
@@ -48,7 +50,9 @@ def test_change_password_requires_current_password_and_revokes_sessions(monkeypa
 
     routes.change_password(
         ChangePasswordRequest(senha_atual="SenhaAntiga123", nova_senha="NovaSenha123"),
-        request=object(), db=db, current_user=user,
+        request=object(),
+        db=db,
+        current_user=user,
     )
     assert verify_password("NovaSenha123", user.hashed_password)
     assert not verify_password("SenhaAntiga123", user.hashed_password)
@@ -63,8 +67,12 @@ def test_change_password_rejects_reused_or_short_password(monkeypatch):
     db = FakeDb()
     with pytest.raises(HTTPException, match="diferente da atual"):
         routes.change_password(
-            ChangePasswordRequest(senha_atual="SenhaAtual123", nova_senha="SenhaAtual123"),
-            request=object(), db=db, current_user=user,
+            ChangePasswordRequest(
+                senha_atual="SenhaAtual123", nova_senha="SenhaAtual123"
+            ),
+            request=object(),
+            db=db,
+            current_user=user,
         )
     with pytest.raises(ValidationError):
         ChangePasswordRequest(senha_atual="SenhaAtual123", nova_senha="curta")
