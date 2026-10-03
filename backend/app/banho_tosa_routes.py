@@ -4,7 +4,7 @@ As rotas ficam separadas por responsabilidade para evitar arquivos grandes e
 facilitar evolucao incremental do modulo.
 """
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 
 from app.banho_tosa_api.agenda_routes import router as agenda_router
 from app.banho_tosa_api.agenda_capacity_routes import router as agenda_capacity_router
@@ -30,9 +30,14 @@ from app.banho_tosa_api.retornos_templates_routes import (
 from app.banho_tosa_api.servicos_routes import router as servicos_router
 from app.banho_tosa_api.taxi_routes import router as taxi_router
 from app.banho_tosa_api.vendas_routes import router as vendas_router
+from app.security.permissions_decorator import require_permission_dependency
 
 
-router = APIRouter(prefix="/banho-tosa", tags=["Banho & Tosa"])
+router = APIRouter(
+    prefix="/banho-tosa",
+    tags=["Banho & Tosa"],
+    dependencies=[Depends(require_permission_dependency("banho_tosa.acessar"))],
+)
 
 router.include_router(apoios_router)
 router.include_router(config_router)

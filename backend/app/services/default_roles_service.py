@@ -60,6 +60,7 @@ FINANCEIRO_PERMISSIONS = frozenset(
 
 GERENTE_PERMISSIONS = frozenset(
     {
+        "banho_tosa.acessar",
         "cadastros.bancos",
         "cadastros.cargos",
         "cadastros.categorias_financeiras",
@@ -111,6 +112,7 @@ GERENTE_PERMISSIONS = frozenset(
         "vendas.editar",
         "vendas.excluir",
         "vendas.visualizar",
+        "veterinario.acessar",
     }
 )
 
