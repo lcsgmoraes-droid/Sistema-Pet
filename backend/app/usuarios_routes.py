@@ -1,7 +1,9 @@
 import secrets
+from datetime import datetime, timezone
+from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import func
+from sqlalchemy import func, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, EmailStr, Field, model_validator
@@ -11,12 +13,23 @@ from app.auth import get_current_user_and_tenant
 from app.auth.core import hash_password
 from app.security.permissions_decorator import require_permission
 from app.clientes.common import gerar_codigo_cliente
-from app.models import Cliente, User, UserTenant, Role
+from app.models import (
+    AppAccessProfile,
+    Cliente,
+    Role,
+    User,
+    UserPushDevice,
+    UserSession,
+    UserTenant,
+)
+from app.routes.ecommerce_auth_cliente import _digits_only, _phone_digits
+from app.routes.ecommerce_auth_profiles import _anonymize_ecommerce_user
 from app.usuario_menu_favoritos_models import UsuarioMenuFavorito
 from app.services.business_audit_service import (
     build_user_access_metadata,
     log_business_event,
 )
+from app.services.pessoa_merge_service import executar_fusao_pessoas
 from app.services.auth_security import register_password_changed
 from app.services.user_account_service import (
     UserAccountError,
@@ -114,6 +127,10 @@ class UserCredentialsUpdate(BaseModel):
         if self.new_password is not None and self.generate_password:
             raise ValueError("Escolha uma senha ou gere uma senha, nao as duas opcoes")
         return self
+
+
+class UserDelete(BaseModel):
+    confirmacao: Literal["EXCLUIR"]
 
 
 def _serializar_menu_favorito(favorito: UsuarioMenuFavorito) -> dict:
@@ -277,6 +294,87 @@ def _usuario_tem_pessoa_vinculada(db: Session, *, tenant_id, user_id: int) -> bo
     )
 
 
+def _pessoa_operacional_existente(
+    db: Session, *, tenant_id, user: User
+) -> Cliente | None:
+    phone = _phone_digits(user.login_phone or user.telefone)
+    if not phone:
+        return None
+    candidates = (
+        db.query(Cliente)
+        .filter(
+            Cliente.tenant_id == tenant_id,
+            Cliente.ativo.is_not(False),
+            Cliente.auth_user_id.is_(None),
+            Cliente.tipo_cadastro.in_(["funcionario", "veterinario"]),
+        )
+        .all()
+    )
+    matches = [
+        person
+        for person in candidates
+        if phone in {_phone_digits(person.celular), _phone_digits(person.telefone)}
+        and (
+            not user.cpf_cnpj
+            or not person.cpf
+            or _digits_only(user.cpf_cnpj) == _digits_only(person.cpf)
+        )
+    ]
+    if len(matches) > 1:
+        raise UserAccountError(
+            "Ha mais de uma pessoa operacional com este telefone. Funda as fichas em Pessoas antes de alterar o acesso.",
+            status_code=409,
+        )
+    return matches[0] if matches else None
+
+
+def _vincular_pessoa_operacional_existente(
+    db: Session, *, tenant_id, user: User
+) -> bool:
+    pessoa = _pessoa_operacional_existente(db, tenant_id=tenant_id, user=user)
+    if not pessoa:
+        return False
+    pessoa.auth_user_id = user.id
+    return True
+
+
+def _fundir_pessoa_de_cliente_com_operacional(
+    db: Session, *, tenant_id, user: User, actor_user_id: int
+) -> bool:
+    cliente = (
+        db.query(Cliente)
+        .filter(
+            Cliente.tenant_id == tenant_id,
+            Cliente.auth_user_id == user.id,
+            Cliente.ativo.is_not(False),
+        )
+        .first()
+    )
+    if not cliente or cliente.tipo_cadastro in {"funcionario", "veterinario"}:
+        return False
+    if cliente.is_entregador:
+        return False
+    operacional = _pessoa_operacional_existente(db, tenant_id=tenant_id, user=user)
+    if not operacional:
+        return False
+    try:
+        executar_fusao_pessoas(
+            db,
+            tenant_id=tenant_id,
+            principal_id=operacional.id,
+            duplicado_id=cliente.id,
+            decisoes_campos={},
+            user_id=actor_user_id,
+            observacao="Consolidacao de pessoa na promocao de acesso pelo ERP.",
+            modo="promocao_usuario_erp",
+            motivo="telefone_e_cpf_compativeis",
+            commit=False,
+        )
+    except ValueError as exc:
+        raise UserAccountError(str(exc), status_code=409) from exc
+    return True
+
+
 @router.get("", response_model=list[UsuarioListResponse])
 @require_permission("usuarios.manage")
 def listar_usuarios(
@@ -395,6 +493,120 @@ def criar_usuario(
     return user
 
 
+@router.delete("/{user_id}")
+@require_permission("usuarios.manage")
+def excluir_usuario(
+    user_id: int,
+    payload: UserDelete,
+    db: Session = Depends(get_session),
+    user_and_tenant=Depends(get_current_user_and_tenant),
+):
+    actor, tenant_id = user_and_tenant
+    if actor.id == user_id:
+        raise HTTPException(
+            status_code=400, detail="Nao e possivel excluir o proprio acesso."
+        )
+
+    row = (
+        db.query(User, UserTenant)
+        .join(UserTenant, UserTenant.user_id == User.id)
+        .filter(
+            User.id == user_id,
+            User.tenant_id == tenant_id,
+            UserTenant.tenant_id == tenant_id,
+        )
+        .first()
+    )
+    if not row:
+        raise HTTPException(
+            status_code=404, detail="Usuario nao encontrado nesta loja."
+        )
+    user, vinculo = row
+
+    # O filtro automatico de tenant esconde vinculos de outras lojas. A politica
+    # RLS permite que a propria conta veja seus vinculos; restauramos o ator logo apos.
+    sync_rls_auth_user(db, user_id)
+    try:
+        account_tenants = db.execute(
+            text("SELECT tenant_id FROM user_tenants WHERE user_id = :user_id"),
+            {"user_id": user_id},
+        ).all()
+    finally:
+        sync_rls_auth_user(db, actor.id)
+    current_tenant_key = str(tenant_id).replace("-", "")
+    tenant_keys = {str(row[0]).replace("-", "") for row in account_tenants}
+    if current_tenant_key not in tenant_keys:
+        raise HTTPException(
+            status_code=409,
+            detail="Nao foi possivel confirmar os vinculos desta conta. Tente novamente.",
+        )
+    if tenant_keys - {current_tenant_key}:
+        raise HTTPException(
+            status_code=409,
+            detail="Esta conta pertence a mais de uma loja. Revise os vinculos antes de excluir.",
+        )
+
+    now = datetime.now(timezone.utc)
+    linked_people = (
+        db.query(Cliente)
+        .filter(Cliente.tenant_id == tenant_id, Cliente.auth_user_id == user_id)
+        .all()
+    )
+    for pessoa in linked_people:
+        pessoa.auth_user_id = None
+
+    db.query(AppAccessProfile).filter(
+        AppAccessProfile.tenant_id == tenant_id,
+        AppAccessProfile.user_id == user_id,
+    ).update({"is_active": False}, synchronize_session=False)
+    db.query(UserPushDevice).filter(
+        UserPushDevice.tenant_id == tenant_id,
+        UserPushDevice.user_id == user_id,
+    ).delete(synchronize_session=False)
+    db.query(UsuarioMenuFavorito).filter(
+        UsuarioMenuFavorito.tenant_id == tenant_id,
+        UsuarioMenuFavorito.user_id == user_id,
+    ).delete(synchronize_session=False)
+    db.query(UserSession).filter(UserSession.user_id == user_id).update(
+        {
+            "revoked": True,
+            "revoked_at": now,
+            "revoke_reason": "account_removed_by_admin",
+        },
+        synchronize_session=False,
+    )
+    db.delete(vinculo)
+    _anonymize_ecommerce_user(user, now=now)
+    log_business_event(
+        db=db,
+        tenant_id=tenant_id,
+        user_id=actor.id,
+        event="access.user_removed",
+        entity_type="users",
+        entity_id=user_id,
+        metadata={
+            "actor_user_id": actor.id,
+            "target_user_id": user_id,
+            "unlinked_people": [pessoa.id for pessoa in linked_people],
+        },
+        details=f"Acesso do usuario #{user_id} removido em definitivo",
+        commit=False,
+    )
+    try:
+        db.commit()
+    except IntegrityError as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=409,
+            detail="Nao foi possivel remover esta conta. Revise os vinculos e tente novamente.",
+        ) from exc
+    return {
+        "status": "ok",
+        "user_id": user_id,
+        "pessoas_desvinculadas": len(linked_people),
+    }
+
+
 @router.patch("/{user_id}/credenciais")
 @require_permission("usuarios.manage")
 def atualizar_credenciais_usuario(
@@ -480,17 +692,25 @@ def atualizar_credenciais_usuario(
             role_changed = vinculo.role_id != selected_role.id
             vinculo.role_id = selected_role.id
 
+        if role_changed:
+            _fundir_pessoa_de_cliente_com_operacional(
+                db, tenant_id=tenant_id, user=target_user, actor_user_id=actor.id
+            )
+
         if not _usuario_tem_pessoa_vinculada(
             db,
             tenant_id=tenant_id,
             user_id=target_user.id,
         ):
-            _criar_pessoa_operacional_para_usuario(
-                db,
-                actor=actor,
-                tenant_id=tenant_id,
-                user=target_user,
-            )
+            if not _vincular_pessoa_operacional_existente(
+                db, tenant_id=tenant_id, user=target_user
+            ):
+                _criar_pessoa_operacional_para_usuario(
+                    db,
+                    actor=actor,
+                    tenant_id=tenant_id,
+                    user=target_user,
+                )
 
         if password_changed or role_changed or login_phone_changed:
             sessions_revoked = revoke_all_sessions(

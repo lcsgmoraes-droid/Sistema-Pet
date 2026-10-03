@@ -142,6 +142,26 @@ export default function useUsuariosPage() {
     }
   }
 
+  async function excluirUsuario(usuario) {
+    const nome = usuario.nome || usuario.login_phone || usuario.email || `ID ${usuario.user_id}`;
+    if (
+      !(await confirmarCorePet(
+        `Excluir definitivamente o acesso de ${nome}? A conta sai da lista e o celular/e-mail ficam livres. O historico de operacoes sera preservado.`,
+      ))
+    )
+      return;
+
+    try {
+      await api.delete(`/usuarios/${usuario.user_id}`, {
+        data: { confirmacao: "EXCLUIR" },
+      });
+      toast.success("Acesso excluido. Celular e e-mail liberados.");
+      await carregarUsuarios();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || "Nao foi possivel excluir o acesso.");
+    }
+  }
+
   async function forcarLogout(userId) {
     if (
       !(await confirmarCorePet(
@@ -332,6 +352,7 @@ export default function useUsuariosPage() {
     setInitialAccessCredentials,
     tenantLoginReference,
     toggleStatus,
+    excluirUsuario,
     usuarioFormError,
     usuarioCredenciais,
     usuarios,
