@@ -189,6 +189,8 @@ def test_baixa_lote_garante_conta_receber_antes_de_registrar_recebimento():
 
     assert "if not conta_receber:" in bloco
     assert "_criar_conta_receber_faltante_baixa_lote(" in bloco
+    assert "ContaReceber.tenant_id == tenant_id" in bloco
+    assert '"vencido", "vencida"' in bloco
 
 
 def test_baixa_lote_compara_centavos_exatos_para_quitacao():

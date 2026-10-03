@@ -328,7 +328,10 @@ async def baixar_vendas_lote(
                 db.query(ContaReceber)
                 .filter(
                     ContaReceber.venda_id == venda.id,
-                    ContaReceber.status.in_(["pendente", "baixa_parcial", "parcial"]),
+                    ContaReceber.tenant_id == tenant_id,
+                    ContaReceber.status.in_(
+                        ["pendente", "baixa_parcial", "parcial", "vencido", "vencida"]
+                    ),
                 )
                 .first()
             )
