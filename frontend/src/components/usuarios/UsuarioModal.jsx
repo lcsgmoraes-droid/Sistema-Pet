@@ -90,7 +90,8 @@ export default function UsuarioModal({
               inputMode="tel"
             />
             <p className="mt-1 text-xs text-slate-500">
-              A pessoa usara este celular e a senha no ERP e no aplicativo CorePet, apos selecionar a loja.
+              A pessoa usara este celular e a senha no ERP e no aplicativo CorePet, apos selecionar
+              a loja.
             </p>
           </div>
 
