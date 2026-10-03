@@ -25,18 +25,49 @@ from importar_simplesvet_utils import gtin_valido
 
 
 CLIENT_COLUMNS = {
-    "source_id", "nome", "tipo_pessoa", "documento", "telefone", "telefone2",
-    "celular", "email", "endereco", "numero", "bairro", "cep", "cidade", "uf",
-    "inativo", "data_nascimento", "data_cadastro",
+    "source_id",
+    "nome",
+    "tipo_pessoa",
+    "documento",
+    "telefone",
+    "telefone2",
+    "celular",
+    "email",
+    "endereco",
+    "numero",
+    "bairro",
+    "cep",
+    "cidade",
+    "uf",
+    "inativo",
+    "data_nascimento",
+    "data_cadastro",
 }
 PRODUCT_COLUMNS = {
-    "source_id", "nome", "grupo_id", "grupo_nome", "codigo_barras",
-    "preco_venda", "preco_custo", "unidade", "inativo", "servico", "ncm",
-    "estoque_minimo", "estoque_maximo", "estoque_raw", "data_cadastro",
+    "source_id",
+    "nome",
+    "grupo_id",
+    "grupo_nome",
+    "codigo_barras",
+    "preco_venda",
+    "preco_custo",
+    "unidade",
+    "inativo",
+    "servico",
+    "ncm",
+    "estoque_minimo",
+    "estoque_maximo",
+    "estoque_raw",
+    "data_cadastro",
 }
 GENERIC_NAMES = {
-    "VARIADOS", "DIVERSOS", "PRODUTO GENERICO", "CLIENTE GENERICO",
-    "CONSUMIDOR FINAL", "CLIENTE PADRAO", "SEM CADASTRO",
+    "VARIADOS",
+    "DIVERSOS",
+    "PRODUTO GENERICO",
+    "CLIENTE GENERICO",
+    "CONSUMIDOR FINAL",
+    "CLIENTE PADRAO",
+    "SEM CADASTRO",
 }
 EXPECTED_FILES = {
     "clientes.csv": CLIENT_COLUMNS,
@@ -55,7 +86,9 @@ def normalize_cnpj(value: object) -> str:
 
 def _normalized_name(value: str) -> str:
     folded = unicodedata.normalize("NFKD", value)
-    without_accents = "".join(char for char in folded if not unicodedata.combining(char))
+    without_accents = "".join(
+        char for char in folded if not unicodedata.combining(char)
+    )
     return " ".join(without_accents.upper().split())
 
 
@@ -82,11 +115,16 @@ def _read_csv(path: Path, required: set[str]) -> list[dict[str, str]]:
     return rows
 
 
-def load_source(source_dir: Path, expected_cnpj: str, expected_backup_sha256: str) -> tuple[dict, dict[str, list[dict[str, str]]]]:
+def load_source(
+    source_dir: Path, expected_cnpj: str, expected_backup_sha256: str
+) -> tuple[dict, dict[str, list[dict[str, str]]]]:
     source_dir = source_dir.resolve()
     manifest_path = source_dir / "manifest.json"
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-    if manifest.get("schema_version") != 1 or manifest.get("source_system") != "jn_moura":
+    if (
+        manifest.get("schema_version") != 1
+        or manifest.get("source_system") != "jn_moura"
+    ):
         raise JnmImportError("Manifesto de origem invalido")
     if normalize_cnpj(manifest.get("source_cnpj")) != normalize_cnpj(expected_cnpj):
         raise JnmImportError("CNPJ de origem divergente")
@@ -98,7 +136,9 @@ def load_source(source_dir: Path, expected_cnpj: str, expected_backup_sha256: st
     for filename, columns in EXPECTED_FILES.items():
         path = source_dir / filename
         recorded = manifest["files"][filename]
-        if path.stat().st_size != recorded.get("bytes") or _sha256_file(path) != recorded.get("sha256"):
+        if path.stat().st_size != recorded.get("bytes") or _sha256_file(
+            path
+        ) != recorded.get("sha256"):
             raise JnmImportError(f"Arquivo alterado desde a exportacao: {filename}")
         rows = _read_csv(path, columns)
         if len(rows) != recorded.get("rows"):
@@ -142,7 +182,9 @@ def _source_id(row: dict[str, str]) -> str:
     return value
 
 
-def prepare_rows(source: dict[str, list[dict[str, str]]]) -> tuple[list[dict], list[dict], dict]:
+def prepare_rows(
+    source: dict[str, list[dict[str, str]]],
+) -> tuple[list[dict], list[dict], dict]:
     clients: list[dict] = []
     products: list[dict] = []
     metrics = Counter()
@@ -180,7 +222,9 @@ def prepare_rows(source: dict[str, list[dict[str, str]]]) -> tuple[list[dict], l
                     "tipo_pessoa": person_type,
                     "cpf": doc if person_type == "PF" and len(doc) == 11 else None,
                     "cnpj": doc if person_type == "PJ" and len(doc) == 14 else None,
-                    "telefone": _clean(row["telefone"] or row["telefone2"], max_length=50),
+                    "telefone": _clean(
+                        row["telefone"] or row["telefone2"], max_length=50
+                    ),
                     "celular": _clean(row["celular"], max_length=50),
                     "email": _clean(row["email"], max_length=255),
                     "endereco": _clean(row["endereco"]),
@@ -239,13 +283,21 @@ def prepare_rows(source: dict[str, list[dict[str, str]]]) -> tuple[list[dict], l
     metrics.update(
         {
             "clientes_origem": len(source["clientes.csv"]),
-            "clientes_importaveis": sum(c["tipo_cadastro"] == "cliente" for c in clients),
+            "clientes_importaveis": sum(
+                c["tipo_cadastro"] == "cliente" for c in clients
+            ),
             "fornecedores_origem": len(source["fornecedores.csv"]),
-            "fornecedores_importaveis": sum(c["tipo_cadastro"] == "fornecedor" for c in clients),
+            "fornecedores_importaveis": sum(
+                c["tipo_cadastro"] == "fornecedor" for c in clients
+            ),
             "produtos_origem": len(source["produtos.csv"]),
             "produtos_importaveis": len(products),
-            "categorias_importaveis": len({p["grupo_nome"].casefold() for p in products if p["grupo_nome"]}),
-            "produtos_com_estoque_positivo": sum(p["estoque_atual"] > 0 for p in products),
+            "categorias_importaveis": len(
+                {p["grupo_nome"].casefold() for p in products if p["grupo_nome"]}
+            ),
+            "produtos_com_estoque_positivo": sum(
+                p["estoque_atual"] > 0 for p in products
+            ),
         }
     )
     metrics["saldo_estoque_importavel"] = str(
@@ -254,22 +306,36 @@ def prepare_rows(source: dict[str, list[dict[str, str]]]) -> tuple[list[dict], l
     return clients, products, dict(metrics)
 
 
-def insert_catalog(db, *, tenant_id: str, user_id: int, clients: list[dict], products: list[dict]) -> dict:
+def insert_catalog(
+    db, *, tenant_id: str, user_id: int, clients: list[dict], products: list[dict]
+) -> dict:
     tenant_uuid = UUID(tenant_id)
-    if db.scalar(select(func.count()).select_from(Cliente).where(Cliente.tenant_id == tenant_uuid)):
+    if db.scalar(
+        select(func.count())
+        .select_from(Cliente)
+        .where(Cliente.tenant_id == tenant_uuid)
+    ):
         raise JnmImportError("Destino ja possui clientes")
-    if db.scalar(select(func.count()).select_from(Produto).where(Produto.tenant_id == tenant_uuid)):
+    if db.scalar(
+        select(func.count())
+        .select_from(Produto)
+        .where(Produto.tenant_id == tenant_uuid)
+    ):
         raise JnmImportError("Destino ja possui produtos")
 
     categories = {
         category.nome.casefold(): category
-        for category in db.scalars(select(Categoria).where(Categoria.tenant_id == tenant_uuid)).all()
+        for category in db.scalars(
+            select(Categoria).where(Categoria.tenant_id == tenant_uuid)
+        ).all()
     }
     created_categories = 0
     for product in products:
         name = product["grupo_nome"]
         if name and name.casefold() not in categories:
-            category = Categoria(tenant_id=tenant_uuid, user_id=user_id, nome=name, ativo=True)
+            category = Categoria(
+                tenant_id=tenant_uuid, user_id=user_id, nome=name, ativo=True
+            )
             db.add(category)
             categories[name.casefold()] = category
             created_categories += 1
@@ -286,15 +352,27 @@ def insert_catalog(db, *, tenant_id: str, user_id: int, clients: list[dict], pro
         )
     db.flush()
     for row in products:
-        values = {key: value for key, value in row.items() if key != "grupo_nome" and value is not None}
+        values = {
+            key: value
+            for key, value in row.items()
+            if key != "grupo_nome" and value is not None
+        }
         stock = float(values["estoque_atual"])
-        for key in ("preco_venda", "preco_custo", "estoque_atual", "estoque_minimo", "estoque_maximo"):
+        for key in (
+            "preco_venda",
+            "preco_custo",
+            "estoque_atual",
+            "estoque_minimo",
+            "estoque_maximo",
+        ):
             values[key] = float(values[key])
         db.add(
             Produto(
                 tenant_id=tenant_uuid,
                 user_id=user_id,
-                categoria_id=categories[row["grupo_nome"].casefold()].id if row["grupo_nome"] else None,
+                categoria_id=categories[row["grupo_nome"].casefold()].id
+                if row["grupo_nome"]
+                else None,
                 estoque_fisico=stock,
                 **values,
             )
@@ -303,6 +381,8 @@ def insert_catalog(db, *, tenant_id: str, user_id: int, clients: list[dict], pro
     return {
         "categorias_criadas": created_categories,
         "clientes_criados": sum(c["tipo_cadastro"] == "cliente" for c in clients),
-        "fornecedores_criados": sum(c["tipo_cadastro"] == "fornecedor" for c in clients),
+        "fornecedores_criados": sum(
+            c["tipo_cadastro"] == "fornecedor" for c in clients
+        ),
         "produtos_criados": len(products),
     }

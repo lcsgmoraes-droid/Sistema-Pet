@@ -98,7 +98,9 @@ def _target(db, tenant_id: str, user_id: int, expected_cnpj: str) -> dict:
 
 def _material_hash(payload: dict) -> str:
     material = {key: value for key, value in payload.items() if key != "plan_id"}
-    encoded = json.dumps(material, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    encoded = json.dumps(
+        material, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+    )
     return hashlib.sha256(encoded.encode("utf-8")).hexdigest()
 
 
@@ -125,7 +127,9 @@ def _run(
     try:
         with tenant_context(tenant_id):
             sync_rls_tenant(db, tenant_id)
-            db.execute(select(Tenant.id).where(Tenant.id == tenant_id).with_for_update()).first()
+            db.execute(
+                select(Tenant.id).where(Tenant.id == tenant_id).with_for_update()
+            ).first()
             result = insert_catalog(
                 db,
                 tenant_id=tenant_id,
@@ -196,7 +200,10 @@ def _apply(args: argparse.Namespace) -> dict:
     plan = json.loads(args.plan_file.read_text(encoding="utf-8"))
     if plan.get("version") != 1 or plan.get("status") != "simulation_complete":
         raise JnmImportError("Plano de importacao invalido")
-    if plan.get("plan_id") != _material_hash(plan) or plan["plan_id"] != args.confirm_plan_id:
+    if (
+        plan.get("plan_id") != _material_hash(plan)
+        or plan["plan_id"] != args.confirm_plan_id
+    ):
         raise JnmImportError("Identificador ou integridade do plano divergente")
     tenant_id = _normalize_uuid(args.confirm_tenant_id)
     if tenant_id != plan["target"]["tenant_id"]:
@@ -225,8 +232,12 @@ def _apply(args: argparse.Namespace) -> dict:
             not args.allow_production_apply
             or args.confirm_production != f"IMPORTAR-JNM-PRODUCAO-{tenant_id}"
         ):
-            raise JnmImportError("Aplicacao em producao exige liberacao e frase de confirmacao")
-        target = _target(db, tenant_id, plan["target"]["user_id"], plan["target"]["tenant_cnpj"])
+            raise JnmImportError(
+                "Aplicacao em producao exige liberacao e frase de confirmacao"
+            )
+        target = _target(
+            db, tenant_id, plan["target"]["user_id"], plan["target"]["tenant_cnpj"]
+        )
         if target != plan["target"]:
             raise JnmImportError("Cadastro do destino mudou apos a simulacao")
         created = _run(
@@ -263,7 +274,10 @@ def main() -> int:
         print(json.dumps(result, ensure_ascii=False, sort_keys=True))
         return 0
     except JnmImportError as exc:
-        print(json.dumps({"ok": False, "error": str(exc)}, ensure_ascii=False), file=sys.stderr)
+        print(
+            json.dumps({"ok": False, "error": str(exc)}, ensure_ascii=False),
+            file=sys.stderr,
+        )
         return 1
     except Exception:
         print("Falha na importacao; transacao revertida.", file=sys.stderr)
