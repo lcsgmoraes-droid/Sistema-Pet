@@ -424,11 +424,12 @@ def _get_or_create_customer_role(db: Session, tenant_id: str) -> Role:
 
 
 def _ensure_active_store_access(db: Session, user: User, tenant_id: str) -> UserTenant:
+    tenant_uuid = UUID(str(tenant_id))
     vinculo = (
         db.query(UserTenant)
         .filter(
             UserTenant.user_id == user.id,
-            UserTenant.tenant_id == tenant_id,
+            UserTenant.tenant_id == tenant_uuid,
         )
         .first()
     )
@@ -436,16 +437,17 @@ def _ensure_active_store_access(db: Session, user: User, tenant_id: str) -> User
     if vinculo and vinculo.is_active:
         return vinculo
 
-    role = _get_or_create_customer_role(db, tenant_id)
-
     if vinculo:
-        vinculo.role_id = role.id
-        vinculo.is_active = True
-        return vinculo
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Acesso a esta loja desativado",
+        )
+
+    role = _get_or_create_customer_role(db, tenant_uuid)
 
     vinculo = UserTenant(
         user_id=user.id,
-        tenant_id=tenant_id,
+        tenant_id=tenant_uuid,
         role_id=role.id,
         is_active=True,
     )

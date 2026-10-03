@@ -70,6 +70,9 @@ export default function UsuarioAcessoInicialModal({ credentials, onClose }) {
             Copie a senha inicial agora. Ela nao sera mostrada novamente depois que esta janela for
             fechada.
           </p>
+          <p className="text-sm text-slate-600">
+            Para entrar no aplicativo CorePet, selecione esta loja e use o mesmo {credentials.loginPhone ? "celular" : "nome de usuario"} e a mesma senha do ERP. Nao precisa criar outra conta.
+          </p>
 
           {credentials.loginPhone ? (
             <CredentialRow

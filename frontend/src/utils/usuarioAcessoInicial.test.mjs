@@ -61,6 +61,7 @@ assert.equal(
     "Celular: 18997401641",
     "Senha inicial: Senha Inicial 123",
     "Login: https://corepet.com.br/login",
+    "Aplicativo CorePet: selecione a loja e use o mesmo acesso. Nao crie outra conta.",
   ].join("\n"),
 );
 assert.equal(
@@ -71,6 +72,7 @@ assert.equal(
     "Nome de usuario: maria.silva",
     "Senha inicial: Senha Inicial 123",
     "Login: https://corepet.com.br/login",
+    "Aplicativo CorePet: selecione a loja e use o mesmo acesso. Nao crie outra conta.",
   ].join("\n"),
 );
 
