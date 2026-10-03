@@ -34,6 +34,7 @@ export default function UsuariosPage() {
     setInitialAccessCredentials,
     tenantLoginReference,
     toggleStatus,
+    excluirUsuario,
     usuarioFormError,
     usuarioCredenciais,
     usuarios,
@@ -59,6 +60,7 @@ export default function UsuariosPage() {
         onForcarLogout={forcarLogout}
         onManageCredentials={onAbrirCredenciais}
         onToggleStatus={toggleStatus}
+        onDelete={excluirUsuario}
         usuarios={usuarios}
       />
 
