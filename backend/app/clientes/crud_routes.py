@@ -33,6 +33,7 @@ from app.vendas_models import Venda
 from app.partner_utils import get_all_accessible_tenant_ids
 from app.security.permissions_decorator import require_permission
 from app.security.permissions_service import check_permission
+from app.security.crediario_override import definir_liberacao_crediario
 from app.services.cliente_alertas_pdv import normalizar_alertas_pdv
 from app.services.cliente_origem import (
     filtrar_origem_periodo,
@@ -69,7 +70,12 @@ def create_cliente(
 ):
     """Criar novo cliente/fornecedor."""
     current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
-    access_fields = {"auth_user_id", "app_login", "app_access_profiles"}
+    access_fields = {
+        "auth_user_id",
+        "app_login",
+        "app_access_profiles",
+        "pode_liberar_venda_crediario_atrasado",
+    }
     if access_fields.intersection(cliente_data.model_fields_set):
         check_permission(
             db,
@@ -88,6 +94,9 @@ def create_cliente(
     auth_user_id = dados_payload.pop("auth_user_id", None)
     app_login = dados_payload.pop("app_login", None)
     app_access_profiles = dados_payload.pop("app_access_profiles", [])
+    pode_liberar_crediario = dados_payload.pop(
+        "pode_liberar_venda_crediario_atrasado", False
+    )
     if auth_user_id is not None and app_login is not None:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -164,6 +173,14 @@ def create_cliente(
             granted_by_user_id=current_user.id,
             linked_user_id=novo_cliente.auth_user_id,
         )
+        if pode_liberar_crediario:
+            definir_liberacao_crediario(
+                db,
+                tenant_id=tenant_id,
+                user_id=novo_cliente.auth_user_id,
+                autorizado=True,
+                actor_user_id=current_user.id,
+            )
         db.commit()
     except IntegrityError as exc:
         db.rollback()
@@ -210,7 +227,7 @@ def listar_usuarios_para_acesso_app(
         .all()
     )
     usuarios: dict[int, dict] = {}
-    for user, _vinculo, role in rows:
+    for user, vinculo, role in rows:
         item = usuarios.setdefault(
             user.id,
             {
@@ -218,6 +235,9 @@ def listar_usuarios_para_acesso_app(
                 "nome": user.nome,
                 "email": user.email,
                 "username": user.username,
+                "pode_liberar_venda_crediario_atrasado": bool(
+                    vinculo.pode_liberar_venda_crediario_atrasado
+                ),
                 "perfis_sistema": [],
             },
         )
@@ -358,7 +378,12 @@ def update_cliente(
     dados_payload = cliente_data.model_dump(exclude_unset=True)
     auth_user_informado = "auth_user_id" in dados_payload
     perfis_informados = "app_access_profiles" in dados_payload
-    if {"auth_user_id", "app_login", "app_access_profiles"}.intersection(dados_payload):
+    if {
+        "auth_user_id",
+        "app_login",
+        "app_access_profiles",
+        "pode_liberar_venda_crediario_atrasado",
+    }.intersection(dados_payload):
         check_permission(
             db,
             current_user.id,
@@ -369,6 +394,9 @@ def update_cliente(
     auth_user_id = dados_payload.pop("auth_user_id", None)
     app_login = dados_payload.pop("app_login", None)
     app_access_profiles = dados_payload.pop("app_access_profiles", None)
+    pode_liberar_crediario = dados_payload.pop(
+        "pode_liberar_venda_crediario_atrasado", None
+    )
     if auth_user_id is not None and app_login is not None:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -483,6 +511,15 @@ def update_cliente(
             profile_types=perfis_para_sincronizar or [],
             granted_by_user_id=current_user.id,
             linked_user_id=cliente.auth_user_id,
+        )
+
+    if pode_liberar_crediario is not None:
+        definir_liberacao_crediario(
+            db,
+            tenant_id=tenant_id,
+            user_id=cliente.auth_user_id,
+            autorizado=pode_liberar_crediario,
+            actor_user_id=current_user.id,
         )
 
     if cliente.ativo and not cliente.codigo:
@@ -1042,6 +1079,9 @@ def _montar_resposta_update(cliente: Cliente) -> dict:
         "auth_user_email": getattr(cliente, "auth_user_email", None),
         "auth_user_username": getattr(cliente, "auth_user_username", None),
         "app_access_profiles": getattr(cliente, "app_access_profiles", []),
+        "pode_liberar_venda_crediario_atrasado": getattr(
+            cliente, "pode_liberar_venda_crediario_atrasado", False
+        ),
     }
 
 

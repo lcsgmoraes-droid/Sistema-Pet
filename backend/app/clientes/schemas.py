@@ -160,6 +160,7 @@ class ClienteCreate(BaseModel):
     auth_user_id: Optional[int] = None
     app_login: Optional[AppLoginCreate] = None
     app_access_profiles: List[str] = Field(default_factory=list)
+    pode_liberar_venda_crediario_atrasado: bool = False
 
     # Pessoa Física
     cpf: Optional[str] = None
@@ -296,6 +297,7 @@ class ClienteUpdate(BaseModel):
     auth_user_id: Optional[int] = None
     app_login: Optional[AppLoginCreate] = None
     app_access_profiles: Optional[List[str]] = None
+    pode_liberar_venda_crediario_atrasado: Optional[bool] = None
 
     # Campos PJ
     cnpj: Optional[str] = None
@@ -423,6 +425,7 @@ class ClienteResponse(BaseModel):
     auth_user_email: Optional[str] = None
     auth_user_username: Optional[str] = None
     app_access_profiles: List[str] = Field(default_factory=list)
+    pode_liberar_venda_crediario_atrasado: bool = False
     merged_into_id: Optional[int] = None
 
     # Campos PJ

@@ -31,6 +31,7 @@ from app.services.business_audit_service import (
 )
 from app.services.pessoa_merge_service import executar_fusao_pessoas
 from app.services.auth_security import register_password_changed
+from app.security.crediario_override import definir_liberacao_crediario
 from app.services.user_account_service import (
     UserAccountError,
     create_tenant_user_account,
@@ -75,6 +76,7 @@ class UsuarioListResponse(BaseModel):
     role_id: int
     role: str
     is_active: bool
+    pode_liberar_venda_crediario_atrasado: bool = False
     pessoa_id: int | None = None
     pessoa_codigo: str | None = None
     pessoa_nome: str | None = None
@@ -131,6 +133,10 @@ class UserCredentialsUpdate(BaseModel):
 
 class UserDelete(BaseModel):
     confirmacao: Literal["EXCLUIR"]
+
+
+class LiberacaoCrediarioUpdate(BaseModel):
+    autorizado: bool
 
 
 def _serializar_menu_favorito(favorito: UsuarioMenuFavorito) -> dict:
@@ -394,6 +400,7 @@ def listar_usuarios(
             Role.id.label("role_id"),
             Role.name.label("role"),
             UserTenant.is_active,
+            UserTenant.pode_liberar_venda_crediario_atrasado,
             Cliente.id.label("pessoa_id"),
             Cliente.codigo.label("pessoa_codigo"),
             Cliente.nome.label("pessoa_nome"),
@@ -412,6 +419,26 @@ def listar_usuarios(
     )
 
     return rows
+
+
+@router.patch("/{user_id}/liberacao-crediario")
+@require_permission("usuarios.manage")
+def atualizar_liberacao_crediario_usuario(
+    user_id: int,
+    payload: LiberacaoCrediarioUpdate,
+    db: Session = Depends(get_session),
+    user_and_tenant=Depends(get_current_user_and_tenant),
+):
+    actor, tenant_id = user_and_tenant
+    definir_liberacao_crediario(
+        db,
+        tenant_id=tenant_id,
+        user_id=user_id,
+        autorizado=payload.autorizado,
+        actor_user_id=actor.id,
+    )
+    db.commit()
+    return {"autorizado": payload.autorizado}
 
 
 @router.post("", response_model=UserResponse)
