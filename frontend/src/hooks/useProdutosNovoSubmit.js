@@ -18,22 +18,38 @@ export default function useProdutosNovoSubmit({
   salvarFiscal,
   salvando,
   setSalvando,
-  produtoOrigemGranel,
+  produtosOrigemGranel,
+  setProdutosOrigemGranel,
   granelVinculos,
+  setGranelVinculos,
 }) {
   const [dadosPendentes, setDadosPendentes] = useState(null);
   const [previewPrecosCompostos, setPreviewPrecosCompostos] = useState(null);
   const [precosCompostosSelecionados, setPrecosCompostosSelecionados] = useState([]);
 
-  const salvarVinculoGranel = async (produtoId) => {
-    if (!formData.e_granel || !produtoOrigemGranel?.id) return;
-    if (granelVinculos.some((vinculo) => vinculo.produto_origem_id === produtoOrigemGranel.id)) {
-      return;
+  const salvarVinculosGranel = async (produtoId) => {
+    if (!formData.e_granel) return;
+    const falhas = [];
+    for (const origem of produtosOrigemGranel) {
+      if (granelVinculos.some((vinculo) => vinculo.produto_origem_id === origem.id)) {
+        setProdutosOrigemGranel((atuais) => atuais.filter((produto) => produto.id !== origem.id));
+        continue;
+      }
+      try {
+        const { data } = await api.post("/estoque/granel/vinculos", {
+          produto_origem_id: origem.id,
+          produto_granel_id: Number(produtoId),
+        });
+        setGranelVinculos((atuais) =>
+          atuais.some((vinculo) => vinculo.id === data.id) ? atuais : [...atuais, data],
+        );
+        setProdutosOrigemGranel((atuais) => atuais.filter((produto) => produto.id !== origem.id));
+      } catch (error) {
+        const detalhe = error.response?.data?.detail || "tente novamente";
+        falhas.push(`${origem.nome}: ${detalhe}`);
+      }
     }
-    await api.post("/estoque/granel/vinculos", {
-      produto_origem_id: produtoOrigemGranel.id,
-      produto_granel_id: Number(produtoId),
-    });
+    if (falhas.length > 0) throw new Error(falhas.join("; "));
   };
 
   const salvarEdicao = async (dados, produtosCompostosIds) => {
@@ -47,10 +63,10 @@ export default function useProdutosNovoSubmit({
           };
     await updateProduto(id, payload);
     try {
-      await salvarVinculoGranel(id);
+      await salvarVinculosGranel(id);
     } catch (error) {
       alert(
-        `Produto atualizado, mas o vínculo de granel não foi salvo: ${error.response?.data?.detail || "tente novamente"}`,
+        `Produto atualizado. Alguns vínculos não foram salvos: ${error.message}. Os demais foram mantidos.`,
       );
       return;
     }
@@ -239,10 +255,10 @@ export default function useProdutosNovoSubmit({
       const response = await createProduto(dados);
       const produtoId = response.data.id;
       try {
-        await salvarVinculoGranel(produtoId);
+        await salvarVinculosGranel(produtoId);
       } catch (error) {
         alert(
-          `Produto cadastrado, mas o vínculo de granel não foi salvo: ${error.response?.data?.detail || "tente novamente"}`,
+          `Produto cadastrado. Alguns vínculos não foram salvos: ${error.message}. Confira os vínculos na edição.`,
         );
         navigate(`/produtos/${produtoId}/editar?aba=7`);
         return;

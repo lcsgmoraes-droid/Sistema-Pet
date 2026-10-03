@@ -9,8 +9,8 @@ import ProdutoSelector from "../produtos/ProdutoSelector";
 export default function ProdutosNovoRacaoTab({
   formData,
   handleChange,
-  produtoOrigemGranel,
-  setProdutoOrigemGranel,
+  produtosOrigemGranel = [],
+  setProdutosOrigemGranel,
   granelVinculos = [],
   handleApresentacaoPesoChange,
   handleClassificacaoRacaoChange,
@@ -82,11 +82,18 @@ export default function ProdutosNovoRacaoTab({
     return () => document.removeEventListener("mousedown", fecharAoClicarFora);
   }, []);
 
+  const origemJaSelecionada = (produtoId) =>
+    granelVinculos.some((vinculo) => vinculo.produto_origem_id === produtoId) ||
+    produtosOrigemGranel.some((produto) => produto.id === produtoId);
   const opcoesOrigemDisponiveis = opcoesOrigem.filter(
-    (produto) => !granelVinculos.some((vinculo) => vinculo.produto_origem_id === produto.id),
+    (produto) => !origemJaSelecionada(produto.id),
   );
   const selecionarOrigem = (produto) => {
-    setProdutoOrigemGranel(produto);
+    if (!origemJaSelecionada(produto.id)) {
+      setProdutosOrigemGranel((atuais) =>
+        atuais.some((item) => item.id === produto.id) ? atuais : [...atuais, produto],
+      );
+    }
     buscaOrigemAtualRef.current = "";
     setBuscaOrigem("");
     setMostrarSugestoesOrigem(false);
@@ -103,7 +110,7 @@ export default function ProdutosNovoRacaoTab({
         });
         if (buscaOrigemAtualRef.current !== termo) return;
         produtos = (Array.isArray(data) ? data : []).filter(
-          (produto) => !granelVinculos.some((vinculo) => vinculo.produto_origem_id === produto.id),
+          (produto) => !origemJaSelecionada(produto.id),
         );
         setOpcoesOrigem(Array.isArray(data) ? data : []);
       } catch (_error) {
@@ -237,7 +244,7 @@ export default function ProdutosNovoRacaoTab({
                   handleChange("eh_racao", true);
                   handleChange("unidade", "KG");
                 } else {
-                  setProdutoOrigemGranel(null);
+                  setProdutosOrigemGranel([]);
                 }
               }}
               className="mt-1 h-4 w-4 rounded border-gray-300 text-orange-600 focus:ring-orange-500"
@@ -258,11 +265,11 @@ export default function ProdutosNovoRacaoTab({
         <div className="space-y-3 rounded-lg border border-cyan-200 bg-cyan-50 p-4 text-sm text-cyan-900">
           <div>
             <label htmlFor="busca-origem-granel" className="block font-semibold">
-              Vincular produto fechado de origem
+              Vincular produtos fechados de origem
             </label>
             <p className="mt-1 text-xs text-cyan-800">
-              Escolha a embalagem unitária que será aberta para abastecer este granel. O vínculo é
-              salvo junto com o produto.
+              Adicione as embalagens que podem abastecer este granel, como 10, 15 ou 25 kg. Os
+              vínculos são salvos junto com o produto.
             </p>
           </div>
           {granelVinculos.length > 0 && (
@@ -278,19 +285,33 @@ export default function ProdutosNovoRacaoTab({
               </ul>
             </div>
           )}
-          {produtoOrigemGranel && (
-            <div className="flex items-center justify-between gap-3 rounded-md border border-cyan-300 bg-white px-3 py-2">
-              <span>
-                A vincular: {produtoOrigemGranel.nome} ({produtoOrigemGranel.codigo}) ·{" "}
-                {produtoOrigemGranel.peso_embalagem} kg
-              </span>
-              <button
-                type="button"
-                onClick={() => setProdutoOrigemGranel(null)}
-                className="font-semibold text-cyan-700 hover:underline"
-              >
-                Remover
-              </button>
+          {produtosOrigemGranel.length > 0 && (
+            <div>
+              <span className="font-medium">A vincular ao salvar:</span>
+              <ul className="mt-1 space-y-1">
+                {produtosOrigemGranel.map((produto) => (
+                  <li
+                    key={produto.id}
+                    className="flex items-center justify-between gap-3 rounded-md border border-cyan-300 bg-white px-3 py-2"
+                  >
+                    <span>
+                      {produto.nome} ({produto.codigo}) · {produto.peso_embalagem} kg
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setProdutosOrigemGranel((atuais) =>
+                          atuais.filter((item) => item.id !== produto.id),
+                        )
+                      }
+                      className="font-semibold text-cyan-700 hover:underline"
+                      aria-label={`Remover ${produto.nome} da vinculação`}
+                    >
+                      Remover
+                    </button>
+                  </li>
+                ))}
+              </ul>
             </div>
           )}
           <ProdutoSelector
@@ -348,8 +369,8 @@ export default function ProdutosNovoRacaoTab({
               </p>
             )}
           <p className="text-xs text-cyan-800">
-            Depois de vincular, use "Lançar granel" nas movimentações do produto fechado para
-            transferir o estoque em kg.
+            Para transferir estoque em kg, abra "Lançar granel" nas movimentações da embalagem que
+            será usada naquele momento.
           </p>
         </div>
       )}
