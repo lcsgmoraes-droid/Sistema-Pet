@@ -84,15 +84,7 @@ export default function LayoutSidebar({
   const novidadesNaoVistas = useNovidadesNaoVistas();
   const { isDark, toggleTheme } = useTheme();
 
-  const nomeUsuario = user?.nome || user?.username || user?.email;
-  const identificadorUsuario = user?.username || user?.email;
-  const inicialUsuario = (
-    user?.nome?.[0] ||
-    user?.username?.[0] ||
-    user?.email?.[0] ||
-    ""
-  ).toUpperCase();
-  const { tenantLabel } = resolveLayoutSessionIdentity(user);
+  const { tenantLabel, displayName, userLabel, avatarInitial } = resolveLayoutSessionIdentity(user);
 
   useEffect(() => {
     if (!menuUsuarioAberto) return undefined;
@@ -333,10 +325,10 @@ export default function LayoutSidebar({
           aria-haspopup="menu"
           aria-expanded={menuUsuarioAberto}
           className="flex w-full items-center gap-2.5 px-3 py-3 text-left transition-all hover:bg-white/70 dark:hover:bg-slate-900/60"
-          title={!sidebarOpen ? `${nomeUsuario} · Loja: ${tenantLabel}` : ""}
+          title={!sidebarOpen ? `${displayName} · Loja: ${tenantLabel}` : ""}
         >
           <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-[#0f5f63] text-sm font-bold text-white">
-            {inicialUsuario}
+            {avatarInitial}
           </span>
           {sidebarOpen && (
             <>
@@ -347,10 +339,17 @@ export default function LayoutSidebar({
                 >
                   {tenantLabel}
                 </span>
-                <span className="block truncate text-sm font-medium text-gray-900 dark:text-slate-100">
-                  {nomeUsuario}
+                <span
+                  className="block truncate text-sm font-medium text-gray-900 dark:text-slate-100"
+                  title={`Usuário ativo: ${displayName}`}
+                >
+                  {displayName}
                 </span>
-                <span className="v2-texto-ajuda block truncate">{identificadorUsuario}</span>
+                {userLabel !== displayName && (
+                  <span className="v2-texto-ajuda block truncate" title={userLabel}>
+                    {userLabel}
+                  </span>
+                )}
               </span>
               {menuUsuarioAberto ? (
                 <FiChevronUp className="flex-shrink-0 text-gray-400 dark:text-slate-500" />
