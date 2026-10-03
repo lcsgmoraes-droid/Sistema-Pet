@@ -6,9 +6,7 @@ import pytest
 from fastapi import HTTPException
 from pydantic import ValidationError
 
-from app.campaigns import (
-    models as campaign_models,
-)  # noqa: F401 - registra FKs do schema de teste
+from app.campaigns import models as campaign_models  # noqa: F401 - registra FKs do schema de teste
 from app.empresa_config_geral_models import EmpresaConfigGeral
 from app.empresa_config_routes import EmpresaConfigGeralUpdate
 from app.financeiro_models import ContaReceber, FormaPagamento
