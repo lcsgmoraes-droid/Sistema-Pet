@@ -91,6 +91,7 @@ class CaixaService:
         tenant_id: Optional[str] = None,
         caixa_id: Optional[int] = None,
         permitir_caixa_tenant: bool = False,
+        permitir_fechado: bool = False,
     ) -> Dict[str, Any]:
         """
         Valida se existe um caixa aberto para o usuário.
@@ -130,7 +131,13 @@ class CaixaService:
         if tenant_id and not compartilhado:
             compartilhado = caixa_compartilhado_habilitado(db, tenant_id)
 
-        query = db.query(Caixa).filter(Caixa.status == "aberto")
+        if permitir_fechado and caixa_id is None:
+            raise HTTPException(
+                status_code=400, detail="Informe o caixa fechado da revisão."
+            )
+        query = db.query(Caixa).filter(
+            Caixa.status == ("fechado" if permitir_fechado else "aberto")
+        )
         if tenant_id:
             query = query.filter(Caixa.tenant_id == tenant_id)
 
@@ -205,6 +212,7 @@ class CaixaService:
         user_nome: str,
         tenant_id,  # UUID do tenant (obrigatório para isolamento)
         db: Session,
+        data_movimento=None,
     ) -> Dict[str, Any]:
         """
         Registra movimentação de ENTRADA no caixa referente a venda em DINHEIRO.
@@ -269,6 +277,7 @@ class CaixaService:
             usuario_nome=user_nome
             or "Usuário",  # fallback: usuario sem nome cadastrado
             tenant_id=tenant_id,  # ✅ Garantir isolamento entre empresas
+            data_movimento=data_movimento,
         )
 
         db.add(movimentacao)

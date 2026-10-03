@@ -170,6 +170,7 @@ export default function OpsTenantsPage() {
             onOfferSegmentChange={handleBillingOfferSegmentChange}
             onOfferToggleModule={handleBillingOfferToggleModule}
             onOfferSubmit={handleBillingOfferSubmit}
+            onProofUpdated={loadTenants}
           />
         ) : null}
 

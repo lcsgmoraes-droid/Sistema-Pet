@@ -115,6 +115,7 @@ export default function OperadoraCartaoTaxasEditor({ formData, setFormData, taxa
             {[
               ["credito", "Credito"],
               ["debito", "Debito"],
+              ["link", "Link de pagamento"],
             ].map(([codigo, nome]) => (
               <button
                 key={codigo}

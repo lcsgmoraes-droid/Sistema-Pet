@@ -191,6 +191,7 @@ export function FuncionarioPdvContent({
     pix: "qr-code-outline",
     credito: "card-outline",
     debito: "card-outline",
+    link: "link-outline",
     crediario: "calendar-outline",
     boleto: "document-text-outline",
     transferencia: "swap-horizontal-outline",
@@ -878,7 +879,7 @@ export function FuncionarioPdvContent({
               style={styles.input}
             />
 
-            {formaPagamento === "credito" &&
+            {(formaPagamento === "credito" || formaPagamento === "link") &&
             (parcelasCredito.length > 1 || parcelasCredito[0] !== 1) ? (
               <View style={styles.parcelasBox}>
                 <Text style={styles.label}>Parcelamento</Text>

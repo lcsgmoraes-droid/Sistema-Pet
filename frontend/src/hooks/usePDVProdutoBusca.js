@@ -1,9 +1,16 @@
 import { useEffect, useRef, useState } from "react";
+import toast from "react-hot-toast";
 import { getProdutosVendaveis } from "../api/produtos";
+import {
+  encontrarProdutosGranelDaEtiqueta,
+  lerEtiquetaBalanca,
+  produtoAceitaEtiquetaBalanca,
+} from "../utils/pdvEtiquetaBalanca";
 import {
   deveAdicionarProdutoAutomaticamente,
   encontrarProdutoPorCodigo,
   normalizarCodigoProdutoBusca,
+  produtoCorrespondeCodigoBalanca,
 } from "../utils/pdvProdutoBuscaUtils";
 
 function isBuscaCancelada(error) {
@@ -25,6 +32,7 @@ export function usePDVProdutoBusca({
   const [buscarProduto, setBuscarProduto] = useState("");
   const [produtosSugeridos, setProdutosSugeridos] = useState([]);
   const [mostrarSugestoesProduto, setMostrarSugestoesProduto] = useState(false);
+  const [etiquetaPendente, setEtiquetaPendente] = useState(null);
 
   const inputProdutoRef = useRef(null);
   const buscaProdutoContainerRef = useRef(null);
@@ -33,6 +41,9 @@ export function usePDVProdutoBusca({
   const sequenciaRapidaProdutoRef = useRef(0);
   const leituraScannerDetectadaRef = useRef(false);
   const adicionandoProdutoPorEnterRef = useRef(false);
+  const processandoEtiquetaBalancaRef = useRef(false);
+  const etiquetaPendenteCodigoRef = useRef("");
+  const ultimoErroEtiquetaRef = useRef("");
   const buscaProdutoAtualRef = useRef("");
   const focoProdutoTimeoutRef = useRef(null);
   const adicionarProdutoAoCarrinhoRef = useRef(adicionarProdutoAoCarrinho);
@@ -144,7 +155,10 @@ export function usePDVProdutoBusca({
   };
 
   const adicionarProduto = (produto, options) => {
-    const adicionou = adicionarProdutoAoCarrinhoRef.current?.(produto);
+    const adicionou = adicionarProdutoAoCarrinhoRef.current?.(
+      produto,
+      options?.etiquetaBalanca || null,
+    );
 
     if (adicionou === false) {
       return false;
@@ -154,8 +168,74 @@ export function usePDVProdutoBusca({
     return true;
   };
 
+  const mostrarErroEtiqueta = (etiqueta, mensagem) => {
+    if (ultimoErroEtiquetaRef.current === etiqueta.codigo) return;
+    ultimoErroEtiquetaRef.current = etiqueta.codigo;
+    toast.error(mensagem);
+  };
+
+  const processarEtiquetaBalanca = async (etiqueta) => {
+    if (processandoEtiquetaBalancaRef.current || etiquetaPendenteCodigoRef.current) {
+      return true;
+    }
+    if (etiqueta.erro) {
+      mostrarErroEtiqueta(etiqueta, etiqueta.erro);
+      return true;
+    }
+
+    processandoEtiquetaBalancaRef.current = true;
+    try {
+      // Preserva produtos comuns cujo EAN tambem comeca com 2.
+      const produtosCodigoCompleto = await buscarProdutosAtualizados(etiqueta.codigo);
+      const produtoCodigoCompleto = encontrarProdutoPorCodigo(
+        produtosCodigoCompleto,
+        etiqueta.codigo,
+      );
+      if (produtoCodigoCompleto && !produtoAceitaEtiquetaBalanca(produtoCodigoCompleto)) {
+        if (!modoVisualizacao) adicionarProduto(produtoCodigoCompleto, { focarInput: true });
+        return true;
+      }
+
+      // A busca por "150" pode preencher a pagina antes de chegar ao SKU "0150".
+      const response = await getProdutosVendaveis({
+        codigo_balanca: etiqueta.codigoProduto,
+        page_size: 100,
+        contar_total: false,
+        incluir_imagens: false,
+      });
+      const produtos = response.data.items || [];
+      const correspondentes = produtos.filter((produto) =>
+        produtoCorrespondeCodigoBalanca(produto, etiqueta.codigoProduto),
+      );
+      const candidatos = encontrarProdutosGranelDaEtiqueta(produtos, etiqueta.codigoProduto);
+      if (candidatos.length !== 1) {
+        mostrarErroEtiqueta(
+          etiqueta,
+          candidatos.length > 1
+            ? "Mais de um produto granel usa o codigo desta etiqueta. Corrija o cadastro."
+            : correspondentes.length > 0
+              ? "O produto desta etiqueta precisa estar marcado como granel e com unidade KG."
+              : `Produto ${etiqueta.codigoProdutoSemZeros} nao encontrado para esta etiqueta. Confira o codigo cadastrado na balanca e no produto.`,
+        );
+        return true;
+      }
+
+      const produto = candidatos[0];
+      if (!modoVisualizacao) {
+        etiquetaPendenteCodigoRef.current = etiqueta.codigo;
+        limparSugestoesProduto();
+        setEtiquetaPendente({ etiqueta, produto });
+      }
+      return true;
+    } finally {
+      processandoEtiquetaBalancaRef.current = false;
+    }
+  };
+
   useEffect(() => {
     setBuscarProduto("");
+    setEtiquetaPendente(null);
+    etiquetaPendenteCodigoRef.current = "";
     limparSugestoesProduto();
     resetScannerState();
   }, [vendaContextKey]);
@@ -168,6 +248,12 @@ export function usePDVProdutoBusca({
       setMostrarSugestoesProduto(true);
       const timer = setTimeout(async () => {
         try {
+          const etiqueta = lerEtiquetaBalanca(termoAtual);
+          if (etiqueta) {
+            await processarEtiquetaBalanca(etiqueta);
+            return;
+          }
+
           const produtos = await buscarProdutosAtualizados(termoAtual);
 
           if (buscaProdutoAtualRef.current !== termoAtual) {
@@ -259,6 +345,12 @@ export function usePDVProdutoBusca({
 
     adicionandoProdutoPorEnterRef.current = true;
     try {
+      const etiqueta = lerEtiquetaBalanca(termo);
+      if (etiqueta) {
+        await processarEtiquetaBalanca(etiqueta);
+        return;
+      }
+
       const produtos = await buscarProdutosAtualizados(termo);
       const produtoSelecionado = encontrarProdutoPorCodigo(produtos, termo) || produtos[0] || null;
 
@@ -278,6 +370,9 @@ export function usePDVProdutoBusca({
   };
 
   const handleBuscarProdutoChange = (valor) => {
+    if (String(valor || "").trim() !== ultimoErroEtiquetaRef.current) {
+      ultimoErroEtiquetaRef.current = "";
+    }
     setBuscarProduto(valor);
     if (!String(valor || "").trim()) {
       limparSugestoesProduto();
@@ -325,11 +420,33 @@ export function usePDVProdutoBusca({
     adicionarProduto(produto, { focarInput: true });
   };
 
+  const cancelarEtiquetaBalanca = () => {
+    etiquetaPendenteCodigoRef.current = "";
+    setEtiquetaPendente(null);
+    limparBuscaProduto({ focarInput: true });
+  };
+
+  const confirmarEtiquetaBalanca = (itemEtiqueta) => {
+    if (!etiquetaPendente || itemEtiqueta?.codigo !== etiquetaPendente.etiqueta.codigo) {
+      return false;
+    }
+    const adicionou = adicionarProduto(etiquetaPendente.produto, {
+      focarInput: true,
+      etiquetaBalanca: itemEtiqueta,
+    });
+    if (adicionou) {
+      etiquetaPendenteCodigoRef.current = "";
+      setEtiquetaPendente(null);
+    }
+    return adicionou;
+  };
+
   return {
     buscaProduto: buscarProduto,
     buscaProdutoContainerRef,
     inputProdutoRef,
     mostrarSugestoesProduto,
+    etiquetaPendente,
     produtosSugeridos,
     adicionarProduto,
     handleBuscarProdutoChange,
@@ -337,5 +454,7 @@ export function usePDVProdutoBusca({
     handleBuscarProdutoKeyDown,
     limparBuscaProduto,
     selecionarProdutoSugerido,
+    cancelarEtiquetaBalanca,
+    confirmarEtiquetaBalanca,
   };
 }

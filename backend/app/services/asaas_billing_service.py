@@ -491,14 +491,33 @@ def apply_payment_event(
             .first()
         )
 
+    normalized_event = (event_type or "").strip().upper()
+    if (
+        normalized_event in PAYMENT_PAST_DUE_EVENTS
+        and payment_id
+        and payment_id == tenant.billing_provider_payment_id
+        and str(tenant.billing_payment_status or "").upper()
+        in {"CONFIRMED", "RECEIVED", "RECEIVED_IN_CASH"}
+    ):
+        # Um webhook atrasado nao pode reabrir uma cobranca ja quitada.
+        return tenant
+
     _apply_payment_snapshot(tenant, payment)
     tenant.subscription_source = "asaas"
-    normalized_event = (event_type or "").strip().upper()
+    manual_approval = False
+    if normalized_event in PAYMENT_PAST_DUE_EVENTS and not _trial_active(tenant):
+        from app.services.billing_payment_proof_service import (
+            approved_proof_for_invoice,
+        )
+
+        manual_approval = approved_proof_for_invoice(db, tenant) is not None
     if normalized_event in PAYMENT_SUCCESS_EVENTS:
         tenant.billing_status = "active"
         tenant.subscription_activated_at = datetime.now(timezone.utc)
     elif normalized_event in PAYMENT_PAST_DUE_EVENTS:
-        if not _trial_active(tenant):
+        if manual_approval:
+            tenant.billing_status = "active"
+        elif not _trial_active(tenant):
             tenant.billing_status = "past_due"
     elif normalized_event in PAYMENT_BLOCK_EVENTS:
         if not _trial_active(tenant):
@@ -507,7 +526,7 @@ def apply_payment_event(
             )
     elif tenant.billing_status not in {"active", "trial"}:
         tenant.billing_status = "pending"
-    if offer is not None:
+    if offer is not None and not manual_approval:
         apply_offer_payment_event(
             db,
             offer=offer,

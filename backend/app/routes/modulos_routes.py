@@ -21,6 +21,7 @@ from app.services.business_audit_service import (
     build_plan_activation_metadata,
     log_business_event,
 )
+from app.services.billing_access import overdue_grace_state
 from app.services.modulo_activation_service import (
     ModuloActivationError,
     ativar_modulo_manual,
@@ -28,6 +29,7 @@ from app.services.modulo_activation_service import (
 from app.services.plan_catalog import PLAN_CATALOG, get_plan, segment_plan_field
 from app.services.plan_limits import active_session_usage, monthly_sales_usage
 from app.tenancy.context import set_current_tenant
+from app.utils.timezone import BRASILIA_TZ
 
 logger = logging.getLogger(__name__)
 
@@ -128,6 +130,16 @@ def _assinatura_resumo_tenant(tenant: Tenant, agora: datetime) -> dict:
     if status_raw == "trial" and trial_ends_at and trial_ends_at < agora:
         status_efetivo = "expired"
 
+    data_brasilia = (
+        agora.astimezone(BRASILIA_TZ).date()
+        if agora.tzinfo is not None
+        else agora.date()
+    )
+    tolerancia = overdue_grace_state(tenant, data_brasilia)
+    acesso_operacional_ativo = (
+        status_efetivo in {"active", "trial"} or tolerancia["access_allowed"]
+    )
+
     origem = getattr(tenant, "subscription_source", None) or "manual"
     pagamento_integrado = bool(
         getattr(tenant, "billing_provider_subscription_id", None)
@@ -137,6 +149,12 @@ def _assinatura_resumo_tenant(tenant: Tenant, agora: datetime) -> dict:
     return {
         "status": status_raw,
         "status_efetivo": status_efetivo,
+        "acesso_operacional_ativo": acesso_operacional_ativo,
+        "tolerancia_atraso": {
+            "em_vigor": tolerancia["in_grace"],
+            "dias_restantes": tolerancia["days_until_block"],
+            "bloqueio_em": tolerancia["block_on"],
+        },
         "origem": origem,
         "trial_inicio": _iso_datetime(getattr(tenant, "trial_started_at", None)),
         "trial_fim": _iso_datetime(trial_ends_at),
@@ -319,7 +337,10 @@ def get_modulos_status(
     )
 
     assinatura_resumo = _assinatura_resumo_tenant(tenant, agora)
-    acesso_liberado = assinatura_resumo["status_efetivo"] in {"active", "trial"}
+    # acesso_operacional_ativo ja incorpora a tolerancia de 15 dias pra
+    # cobranca em atraso (ver billing_access.overdue_grace_state) — e esse,
+    # nao o status_efetivo cru, que deve gatear as 3 fontes de modulo.
+    acesso_liberado = assinatura_resumo["acesso_operacional_ativo"]
     planos_segmento = _planos_segmento_tenant(tenant)
 
     modulos_do_tenant = _resolver_modulos_ativos(

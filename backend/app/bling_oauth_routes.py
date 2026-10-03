@@ -24,6 +24,7 @@ from sqlalchemy.orm import Session
 
 from app.auth.dependencies import get_current_user_and_tenant
 from app.bling_integration_parts.core import (
+    BLING_API_BASE_URL,
     BLING_ENABLE_JWT_HEADER,
     BLING_OAUTH_TOKEN_URL,
     _bling_token_lock,
@@ -168,6 +169,30 @@ def _salvar_tokens(
     if not resolved_tenant:
         raise RuntimeError("Tenant nao identificado para salvar tokens do Bling")
 
+    webhook_company_id = None
+    if not increment_renewal:
+        try:
+            response = requests.get(
+                f"{BLING_API_BASE_URL}/empresas/me/dados-basicos",
+                headers={
+                    "Authorization": f"Bearer {access_token}",
+                    "enable-jwt": BLING_ENABLE_JWT_HEADER,
+                },
+                timeout=5,
+            )
+            response.raise_for_status()
+            webhook_company_id = str(
+                (response.json().get("data") or {}).get("id") or ""
+            ).strip()
+            if len(webhook_company_id) != 32 or any(
+                char not in "0123456789abcdef" for char in webhook_company_id.lower()
+            ):
+                raise ValueError("ID oficial da empresa invalido")
+        except (requests.RequestException, ValueError, AttributeError) as exc:
+            raise RuntimeError(
+                "Nao foi possivel confirmar a empresa do Bling para receber webhooks"
+            ) from exc
+
     if lock_held:
         save_bling_tokens(
             tenant_id=resolved_tenant,
@@ -175,6 +200,7 @@ def _salvar_tokens(
             refresh_token=refresh_token,
             expires_in=expires_in,
             increment_renewal=increment_renewal,
+            webhook_company_id=webhook_company_id,
             db=db,
         )
     else:
@@ -185,6 +211,7 @@ def _salvar_tokens(
                 refresh_token=refresh_token,
                 expires_in=expires_in,
                 increment_renewal=increment_renewal,
+                webhook_company_id=webhook_company_id,
                 db=db,
             )
 

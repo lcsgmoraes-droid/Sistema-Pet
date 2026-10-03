@@ -59,6 +59,8 @@ class EmpresaConfigGeralCreate(BaseModel):
     crediario_encargos_automaticos: bool = False
     crediario_multa_percentual: float = Field(default=2.0, ge=0, le=2)
     crediario_juros_mensal_percentual: float = Field(default=1.0, ge=0, le=100)
+    bloquear_venda_crediario_atrasado: bool = False
+    dias_atraso_bloqueio_venda: int = Field(default=30, ge=1, le=3650)
     meta_faturamento_mensal: float = 0
     alerta_estoque_percentual: int = 20
     dias_produto_parado: int = 90
@@ -97,6 +99,8 @@ class EmpresaConfigGeralUpdate(BaseModel):
     crediario_juros_mensal_percentual: Optional[float] = Field(
         default=None, ge=0, le=100
     )
+    bloquear_venda_crediario_atrasado: Optional[bool] = None
+    dias_atraso_bloqueio_venda: Optional[int] = Field(default=None, ge=1, le=3650)
     meta_faturamento_mensal: Optional[float] = None
     alerta_estoque_percentual: Optional[int] = None
     dias_produto_parado: Optional[int] = None
@@ -123,6 +127,8 @@ class EmpresaConfigGeralResponse(BaseModel):
     crediario_encargos_automaticos: bool
     crediario_multa_percentual: float
     crediario_juros_mensal_percentual: float
+    bloquear_venda_crediario_atrasado: bool = False
+    dias_atraso_bloqueio_venda: int = 30
     meta_faturamento_mensal: Optional[float] = 0
     alerta_estoque_percentual: Optional[int] = 20
     dias_produto_parado: Optional[int] = 90
@@ -175,6 +181,12 @@ def _serializar_config(
         crediario_multa_percentual=float(config.crediario_multa_percentual or 0),
         crediario_juros_mensal_percentual=float(
             config.crediario_juros_mensal_percentual or 0
+        ),
+        bloquear_venda_crediario_atrasado=bool(
+            getattr(config, "bloquear_venda_crediario_atrasado", False)
+        ),
+        dias_atraso_bloqueio_venda=(
+            getattr(config, "dias_atraso_bloqueio_venda", None) or 30
         ),
         meta_faturamento_mensal=float(config.meta_faturamento_mensal or 0),
         alerta_estoque_percentual=(
@@ -382,6 +394,8 @@ def get_config_empresa(
             crediario_encargos_automaticos=False,
             crediario_multa_percentual=2.0,
             crediario_juros_mensal_percentual=1.0,
+            bloquear_venda_crediario_atrasado=False,
+            dias_atraso_bloqueio_venda=30,
             meta_faturamento_mensal=0,
             alerta_estoque_percentual=20,
             dias_produto_parado=90,

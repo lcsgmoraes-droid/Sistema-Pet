@@ -46,6 +46,7 @@ export function usePDVVendaAcoes({
       funcionario_id: null,
       entregador_id: entregadorSelecionado?.id || null,
       tem_entrega: false,
+      pagamento_entrega_previsto: null,
       entrega: criarEntregaVazia(),
     });
     limparComissao();

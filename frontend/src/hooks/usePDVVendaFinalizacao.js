@@ -315,15 +315,21 @@ export function usePDVVendaFinalizacao({
     carregarVendasRecentes();
   };
 
-  const handleVendaAtualizadaAposPagamento = async () => {
-    if (!vendaAtual.id) {
+  const handleVendaAtualizadaAposPagamento = async (vendaId = vendaAtual.id) => {
+    if (!vendaId) {
       return;
     }
 
-    const vendaAtualizada = await recarregarVendaAtualComPagamentos(vendaAtual.id);
+    if (vendaId !== vendaAtual.id) {
+      await carregarVendaEspecifica(vendaId);
+      carregarVendasRecentes();
+      return;
+    }
+
+    const vendaAtualizada = await recarregarVendaAtualComPagamentos(vendaId);
     await recarregarContextoClienteAtual?.();
     setModoVisualizacao(
-      vendaAtualizada.status === "finalizada" || vendaAtualizada.status === "baixa_parcial",
+      ["finalizada", "baixa_parcial", "pago_nf"].includes(vendaAtualizada.status),
     );
     carregarVendasRecentes();
   };

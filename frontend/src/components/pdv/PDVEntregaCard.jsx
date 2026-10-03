@@ -1,4 +1,6 @@
 import { Plus } from "lucide-react";
+import CurrencyInput from "../CurrencyInput";
+import { formatMoneyBRL } from "../../utils/formatters";
 import Panel from "../ui/Panel";
 
 export default function PDVEntregaCard({
@@ -11,6 +13,7 @@ export default function PDVEntregaCard({
   onObservacoesEntregaChange,
   onSelecionarEndereco,
   onSelecionarEntregador,
+  onPagamentoEntregaPrevistoChange,
   onTaxaEntregaTotalChange,
   onTaxaEntregadorChange,
   onTaxaLojaChange,
@@ -212,6 +215,79 @@ export default function PDVEntregaCard({
           </div>
 
           <div className="space-y-3">
+            {entregadorSelecionado && (
+              <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 space-y-3">
+                {Number(vendaAtual.total || 0) > 0 &&
+                  Number(vendaAtual.total_pago || 0) >= Number(vendaAtual.total || 0) - 0.01 && (
+                    <p className="text-sm font-semibold text-green-800">
+                      Pago
+                      {vendaAtual.pagamentos?.[0]?.forma_pagamento
+                        ? ` • ${vendaAtual.pagamentos[0].forma_pagamento}`
+                        : ""}
+                    </p>
+                  )}
+                <div>
+                  <label className="block text-sm font-semibold text-blue-950 mb-1">
+                    Como o cliente vai pagar na entrega?
+                  </label>
+                  <select
+                    value={vendaAtual.pagamento_entrega_previsto?.forma || ""}
+                    onChange={(e) =>
+                      onPagamentoEntregaPrevistoChange(
+                        e.target.value ? { forma: e.target.value } : null,
+                      )
+                    }
+                    disabled={modoVisualizacao}
+                    className="w-full px-3 py-2 rounded border border-blue-300 bg-white disabled:bg-gray-50"
+                  >
+                    <option value="">Ainda não informado</option>
+                    <option value="dinheiro">Dinheiro na entrega</option>
+                    <option value="cartao_debito">Cartão de débito na entrega</option>
+                    <option value="cartao_credito">Cartão de crédito na entrega</option>
+                    <option value="pix">PIX a fazer</option>
+                  </select>
+                </div>
+                {vendaAtual.pagamento_entrega_previsto?.forma === "dinheiro" && (
+                  <div>
+                    <label className="block text-sm font-medium text-blue-950 mb-1">
+                      Cliente vai pagar com quanto? (opcional)
+                    </label>
+                    <CurrencyInput
+                      value={vendaAtual.pagamento_entrega_previsto.valor_para_troco || 0}
+                      onChange={(valor) =>
+                        onPagamentoEntregaPrevistoChange({
+                          forma: "dinheiro",
+                          valor_para_troco: valor,
+                        })
+                      }
+                      disabled={modoVisualizacao}
+                      className="w-full px-3 py-2 rounded border border-blue-300 bg-white disabled:bg-gray-50"
+                    />
+                    {Number(vendaAtual.pagamento_entrega_previsto.valor_para_troco) > 0 && (
+                      <p className="text-sm text-blue-900 mt-1">
+                        Troco previsto:{" "}
+                        {formatMoneyBRL(
+                          Math.max(
+                            0,
+                            Number(vendaAtual.pagamento_entrega_previsto.valor_para_troco) -
+                              Math.max(
+                                0,
+                                Number(vendaAtual.total || 0) - Number(vendaAtual.total_pago || 0),
+                              ),
+                          ),
+                        )}
+                      </p>
+                    )}
+                  </div>
+                )}
+                <p className="text-xs text-blue-900">
+                  Isto é só uma instrução para o entregador. O pedido continuará pendente até
+                  registrar o recebimento.
+                  {vendaAtual.pagamento_entrega_previsto?.forma === "pix" &&
+                    " Se o PIX já foi confirmado, use Registrar recebimento no PDV; o app mostrará PAGO."}
+                </p>
+              </div>
+            )}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Taxa de Entrega Total

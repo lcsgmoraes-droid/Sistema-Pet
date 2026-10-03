@@ -101,6 +101,23 @@ def test_pagamento_confirmado_ativa_assinatura():
     assert tenant.subscription_source == "asaas"
 
 
+def test_webhook_atrasado_nao_reabre_cobranca_confirmada():
+    tenant = _tenant(
+        billing_status="active",
+        billing_provider_payment_id="pay_quitado",
+        billing_payment_status="CONFIRMED",
+    )
+
+    apply_payment_event(
+        _FakeSession(tenant),
+        "PAYMENT_OVERDUE",
+        {"id": "pay_quitado", "externalReference": tenant.id, "status": "OVERDUE"},
+    )
+
+    assert tenant.billing_status == "active"
+    assert tenant.billing_payment_status == "CONFIRMED"
+
+
 def test_atraso_nao_interrompe_trial_ainda_ativo():
     tenant = _tenant(
         billing_status="trial",

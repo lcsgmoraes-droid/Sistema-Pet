@@ -6,6 +6,7 @@ import ModalPadrao from "../../components/v2/ModalPadrao/ModalPadrao";
 import OpsTenantsBadge from "./OpsTenantsBadge";
 import OpsTenantsCommercialEditPanel from "./OpsTenantsCommercialEditPanel";
 import OpsTenantBillingOfferPanel from "./OpsTenantBillingOfferPanel";
+import OpsTenantPaymentProofPanel from "./OpsTenantPaymentProofPanel";
 import {
   billingBadge,
   formatDate,
@@ -38,6 +39,7 @@ export default function OpsTenantsBillingTab({
   onOfferSegmentChange,
   onOfferToggleModule,
   onOfferSubmit,
+  onProofUpdated,
 }) {
   return (
     <>
@@ -159,6 +161,7 @@ export default function OpsTenantsBillingTab({
       {modalOpen && selectedTenant ? (
         <ModalPadrao titulo={`Manutencao comercial — ${selectedTenant.name}`} tamanho="grande" onFechar={onCloseManage}>
           <div className="space-y-4">
+            <OpsTenantPaymentProofPanel tenant={selectedTenant} onUpdated={onProofUpdated} />
             <OpsTenantBillingOfferPanel
               tenant={selectedTenant}
               form={offerForm}
@@ -189,5 +192,6 @@ export default function OpsTenantsBillingTab({
         </ModalPadrao>
       ) : null}
     </>
+
   );
 }

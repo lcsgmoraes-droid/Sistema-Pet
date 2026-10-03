@@ -19,6 +19,7 @@ import {
 } from "../data/billingContract";
 import { buildSalesContactUrl, publicPlans, serviceInvoiceAddon } from "../data/publicPlans";
 import { api } from "../services/api";
+import BillingPaymentProofPanel from "./BillingPaymentProofPanel";
 import { formatMoneyBRL } from "../utils/formatters";
 
 const WHATSAPP_NUMERO = "5518997401641";
@@ -59,6 +60,19 @@ function getStatusInfo(assinatura) {
       tone: "emerald",
       icon: CheckCircle2,
       text: "A empresa está ativa no plano contratado.",
+    };
+  }
+
+  if (status === "past_due" && assinatura?.tolerancia_atraso?.em_vigor) {
+    const dias = assinatura.tolerancia_atraso.dias_restantes;
+    return {
+      label: "Pagamento em atraso",
+      tone: "amber",
+      icon: AlertTriangle,
+      text:
+        dias == null
+          ? "O acesso continua liberado enquanto confirmamos a data de vencimento."
+          : `O acesso continua liberado. Faltam ${dias} ${dias === 1 ? "dia" : "dias"} para o bloqueio das funções caso o pagamento não seja regularizado.`,
     };
   }
 
@@ -278,6 +292,8 @@ export default function MeuPlano() {
             Atualizar status
           </button>
         </header>
+
+        <BillingPaymentProofPanel billing={billing} onRefresh={carregarModulos} />
 
         <section className="grid gap-4 lg:grid-cols-[1fr_0.8fr]">
           <article className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">

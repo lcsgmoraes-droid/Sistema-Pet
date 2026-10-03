@@ -23,7 +23,9 @@ export function obterPrecoVendaPDV(produto) {
 }
 
 export function colocarItemProdutoNoTopo(itens, itemAtualizado) {
-  const outrosItens = itens.filter((item) => item.produto_id !== itemAtualizado.produto_id);
+  const outrosItens = itens.filter(
+    (item) => item.produto_id !== itemAtualizado.produto_id || item.etiqueta_balanca,
+  );
   return [itemAtualizado, ...outrosItens];
 }
 

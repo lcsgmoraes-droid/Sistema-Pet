@@ -23,6 +23,10 @@ from app.services.venda_rentabilidade_snapshot_service import (
 from app.utils.logger import logger as struct_logger
 from app.vendas.comissoes import _gerar_comissoes_pendentes_venda, _total_pago_venda
 from app.vendas.edicao_estoque import ajustar_estoque_edicao_venda
+from app.vendas.pagamento_entrega_previsto import (
+    normalizar_pagamento_entrega_previsto,
+    validar_valor_para_troco,
+)
 from app.vendas.regras import (
     _resolver_status_entrega_atualizacao,
     calcular_totais_venda,
@@ -193,6 +197,17 @@ async def criar_venda(
 
     current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
 
+    from app.caixa.revisao import validar_revisao_caixa
+
+    caixa_revisao = validar_revisao_caixa(
+        db,
+        caixa_id=dados.caixa_revisao_id,
+        data_ocorrencia=dados.data_ocorrencia,
+        motivo=dados.motivo_revisao,
+        usuario=current_user,
+        tenant_id=tenant_id,
+    )
+
     # ========================================
     # 🔒 TRAVA 1 — VALIDAÇÃO: PRODUTO PAI NÃO PODE SER VENDIDO
     # ========================================
@@ -233,6 +248,9 @@ async def criar_venda(
 
     # Preparar payload para o service
     payload = {
+        "caixa_id": caixa_revisao.id if caixa_revisao else None,
+        "data_venda": dados.data_ocorrencia if caixa_revisao else None,
+        "motivo_revisao": dados.motivo_revisao.strip() if caixa_revisao else None,
         "cliente_id": dados.cliente_id,
         "vendedor_id": dados.vendedor_id,
         "funcionario_id": dados.funcionario_id,
@@ -252,6 +270,9 @@ async def criar_venda(
         "distancia_km": dados.distancia_km,
         "valor_por_km": dados.valor_por_km,
         "observacoes_entrega": dados.observacoes_entrega,
+        "pagamento_entrega_previsto": normalizar_pagamento_entrega_previsto(
+            dados.pagamento_entrega_previsto, tem_entrega=dados.tem_entrega
+        ),
         "tenant_id": tenant_id,
     }
 
@@ -409,6 +430,10 @@ def atualizar_venda(
         dados.desconto_percentual or 0,
         taxa_entrega,
     )
+    previsto = normalizar_pagamento_entrega_previsto(
+        dados.pagamento_entrega_previsto, tem_entrega=tem_entrega
+    )
+    validar_valor_para_troco(previsto, saldo=totais["total"])
 
     logger.info(f"\n🔄 ATUALIZANDO VENDA {venda_id}:")
     logger.info(f"   funcionario_id recebido: {dados.funcionario_id}")
@@ -442,6 +467,7 @@ def atualizar_venda(
     venda.distancia_km = dados.distancia_km if tem_entrega else None
     venda.valor_por_km = dados.valor_por_km if tem_entrega else None
     venda.observacoes_entrega = dados.observacoes_entrega if tem_entrega else None
+    venda.pagamento_entrega_previsto = previsto
     venda.status_entrega = _resolver_status_entrega_atualizacao(
         tem_entrega, venda.status_entrega
     )

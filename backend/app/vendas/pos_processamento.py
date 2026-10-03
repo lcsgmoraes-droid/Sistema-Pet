@@ -442,6 +442,8 @@ def processar_contas_pagar_taxas(
             "credito": "Taxas de Cartao de Credito",
             "Cartão Crédito": "Taxas de Cartao de Credito",
             "cartao_debito": "Taxas de Cartao de Debito",
+            "link_pagamento": "Taxas de Cartao de Credito",
+            "link": "Taxas de Cartao de Credito",
             "debito": "Taxas de Cartao de Debito",
             "Cartão Débito": "Taxas de Cartao de Debito",
             "pix": "Taxa de PIX",

@@ -57,6 +57,17 @@ async def finalizar_venda(
     """
     current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
 
+    from app.caixa.revisao import validar_revisao_caixa
+
+    caixa_revisao = validar_revisao_caixa(
+        db,
+        caixa_id=dados.caixa_revisao_id,
+        data_ocorrencia=dados.data_ocorrencia,
+        motivo=dados.motivo_revisao,
+        usuario=current_user,
+        tenant_id=tenant_id,
+    )
+
     # 🔒 HARDENING 1: Logs estruturados e validação de estado
     set_user_id(current_user.id)
     struct_logger.info(
@@ -98,6 +109,10 @@ async def finalizar_venda(
         cupom_code=dados.cupom_code,
         cupom_discount_applied=dados.cupom_discount_applied,
         db=db,
+        caixa_id=caixa_revisao.id if caixa_revisao else None,
+        data_ocorrencia=dados.data_ocorrencia if caixa_revisao else None,
+        motivo_revisao=dados.motivo_revisao.strip() if caixa_revisao else None,
+        motivo_liberacao_crediario=dados.motivo_liberacao_crediario,
     )
 
     # Log de sucesso

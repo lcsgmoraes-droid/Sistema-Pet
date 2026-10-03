@@ -74,7 +74,7 @@ def _principal_user(db: Session, tenant_id: str) -> dict[str, Any] | None:
             SELECT id, email, nome, is_active, is_admin, email_verified, last_login_at
             FROM users
             WHERE CAST(tenant_id AS TEXT) = :tenant_id
-            ORDER BY is_admin DESC, id ASC
+            ORDER BY is_active DESC, is_admin DESC, id ASC
             LIMIT 1
             """),
             {"tenant_id": tenant_id},
@@ -92,7 +92,8 @@ def _principal_user(db: Session, tenant_id: str) -> dict[str, Any] | None:
                 FROM user_tenants ut
                 JOIN users u ON u.id = ut.user_id
                 WHERE CAST(ut.tenant_id AS TEXT) = :tenant_id
-                ORDER BY u.is_admin DESC, u.id ASC
+                ORDER BY ut.is_active DESC, u.is_active DESC,
+                         u.is_admin DESC, u.id ASC
                 LIMIT 1
                 """),
                 {"tenant_id": tenant_id},

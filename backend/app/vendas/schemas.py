@@ -1,6 +1,6 @@
 """Schemas Pydantic usados pelas rotas de vendas."""
 
-from datetime import date
+from datetime import date, datetime
 from typing import List, Literal, Optional
 
 from pydantic import BaseModel, Field, model_validator
@@ -54,6 +54,9 @@ class VendaPagamentoSchema(BaseModel):
 
 
 class CriarVendaRequest(BaseModel):
+    caixa_revisao_id: Optional[int] = None
+    data_ocorrencia: Optional[datetime] = None
+    motivo_revisao: Optional[str] = None
     cliente_id: Optional[int] = None
     vendedor_id: Optional[int] = None
     funcionario_id: Optional[int] = None
@@ -73,12 +76,17 @@ class CriarVendaRequest(BaseModel):
     distancia_km: Optional[float] = None
     valor_por_km: Optional[float] = None
     observacoes_entrega: Optional[str] = None
+    pagamento_entrega_previsto: Optional[dict] = None
 
 
 class FinalizarVendaRequest(BaseModel):
+    caixa_revisao_id: Optional[int] = None
+    data_ocorrencia: Optional[datetime] = None
+    motivo_revisao: Optional[str] = None
     pagamentos: List[VendaPagamentoSchema]
     cupom_code: Optional[str] = None
     cupom_discount_applied: Optional[float] = None
+    motivo_liberacao_crediario: Optional[str] = Field(default=None, max_length=500)
 
 
 class CancelarVendaRequest(BaseModel):

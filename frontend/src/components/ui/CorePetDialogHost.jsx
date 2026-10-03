@@ -33,6 +33,7 @@ const VARIANTES = {
 export default function CorePetDialogHost() {
   const [dialogo, setDialogo] = useState(null);
   const [valor, setValor] = useState("");
+  const [opcaoMarcada, setOpcaoMarcada] = useState(false);
   const [erro, setErro] = useState("");
   const campoRef = useRef(null);
   const confirmarRef = useRef(null);
@@ -42,6 +43,7 @@ export default function CorePetDialogHost() {
   useEffect(() => {
     if (!dialogo) return;
     setValor(dialogo.valorInicial || "");
+    setOpcaoMarcada(false);
     setErro("");
 
     const timer = window.setTimeout(() => {
@@ -72,7 +74,7 @@ export default function CorePetDialogHost() {
 
   const confirmar = () => {
     if (dialogo.tipo !== "entrada") {
-      resolverCorePetDialog(true);
+      resolverCorePetDialog(dialogo.rotuloOpcao ? { confirmado: true, opcaoMarcada } : true);
       return;
     }
 
@@ -134,6 +136,18 @@ export default function CorePetDialogHost() {
             <X className="h-5 w-5" />
           </button>
         </div>
+
+        {dialogo.rotuloOpcao && (
+          <label className="mx-6 flex cursor-pointer items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-slate-800 dark:border-amber-900 dark:bg-amber-950/30 dark:text-slate-100">
+            <input
+              type="checkbox"
+              checked={opcaoMarcada}
+              onChange={(event) => setOpcaoMarcada(event.target.checked)}
+              className="mt-0.5 h-4 w-4"
+            />
+            <span>{dialogo.rotuloOpcao}</span>
+          </label>
+        )}
 
         {dialogo.tipo === "entrada" && (
           <div className="px-6 pb-2">

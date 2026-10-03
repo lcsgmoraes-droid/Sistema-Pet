@@ -9,6 +9,7 @@ import { useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { buscarClientePorId } from "../api/clientes";
 import PDVDriveAlertBanner from "../components/pdv/PDVDriveAlertBanner";
+import PDVEtiquetaBalancaModal from "../components/pdv/PDVEtiquetaBalancaModal";
 import PDVMainArea from "../components/pdv/PDVMainArea";
 import PDVOverlays from "../components/pdv/PDVOverlays";
 import { useAuth } from "../contexts/AuthContext";
@@ -32,11 +33,13 @@ import { usePDVVendaAtual } from "../hooks/usePDVVendaAtual";
 import { useTour } from "../hooks/useTour";
 import { tourPDV } from "../tours/tourDefinitions";
 import { getGuiaClassNames } from "../utils/guiaHighlight";
+import { obterContextoRevisaoCaixa } from "../utils/caixaRevisao";
 
 export default function PDV() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const searchParamsString = searchParams.toString();
+  const contextoRevisao = obterContextoRevisaoCaixa();
   const guiaAtiva = searchParams.get("guia");
   const novoPetIdRetorno = searchParams.get("novo_pet_id");
   const tutorIdRetorno = searchParams.get("tutor_id");
@@ -69,6 +72,7 @@ export default function PDV() {
     funcionario_id: null, // ✅ Funcionário para comissão
     entregador_id: null, // 🚚 Entregador para entrega
     tem_entrega: false,
+    pagamento_entrega_previsto: null,
     entrega: {
       endereco_completo: "",
       taxa_entrega_total: 0,
@@ -352,6 +356,9 @@ export default function PDV() {
     itensKitExpandidos,
     mostrarSugestoesProduto,
     produtosSugeridos,
+    etiquetaPendente,
+    cancelarEtiquetaBalanca,
+    confirmarEtiquetaBalanca,
     alterarQuantidade,
     atualizarPetDoItem,
     atualizarProtocoloDoItem,
@@ -457,6 +464,7 @@ export default function PDV() {
     emitirNotaVendaFinalizada,
     mudarStatusParaAberta,
     habilitarEdicao,
+    carregarVendaEspecifica,
     setMostrarModalCliente,
     setMostrarHistoricoCliente,
     setMostrarModalAdicionarCredito,
@@ -610,10 +618,43 @@ export default function PDV() {
 
   return (
     <>
+      {contextoRevisao && (
+        <div className="flex items-center justify-between gap-4 bg-amber-100 px-5 py-3 text-amber-950">
+          <div>
+            <strong>Revisão do caixa #{contextoRevisao.caixa_revisao_id}</strong>
+            {" — ocorrência em "}
+            {contextoRevisao.data_ocorrencia.replace("T", " às ")}
+            <p className="text-sm">
+              Cadastre a venda que faltou ou localize uma venda pelo número e registre o pagamento.
+              O caixa de hoje continua aberto.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => navigate("/meus-caixas")}
+            className="rounded bg-white px-3 py-2 font-medium"
+          >
+            Sair da revisão
+          </button>
+        </div>
+      )}
       <PDVDriveAlertBanner {...driveAlertProps} />
-      <div className="flex h-screen bg-gray-50" style={containerStyle}>
+      <div
+        className={`flex bg-gray-50 ${contextoRevisao ? "h-[calc(100vh-76px)]" : "h-screen"}`}
+        style={containerStyle}
+      >
         <PDVMainArea {...mainAreaProps} />
-        <PDVOverlays {...overlayProps} />
+        <PDVOverlays
+          {...overlayProps}
+          mostrarVendasEmAberto={contextoRevisao ? false : overlayProps.mostrarVendasEmAberto}
+        />
+        {etiquetaPendente && (
+          <PDVEtiquetaBalancaModal
+            pendencia={etiquetaPendente}
+            onConfirmar={confirmarEtiquetaBalanca}
+            onCancelar={cancelarEtiquetaBalanca}
+          />
+        )}
       </div>
     </>
   );

@@ -9,13 +9,23 @@ import os
 from datetime import datetime, timezone
 from typing import Literal
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
+from fastapi import (
+    APIRouter,
+    Depends,
+    File,
+    Header,
+    HTTPException,
+    Request,
+    UploadFile,
+    Response,
+    status,
+)
 from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, defer
 
 from app.auth.dependencies import get_current_user_and_tenant
-from app.billing_models import BillingOffer, BillingWebhookEvent
+from app.billing_models import BillingOffer, BillingPaymentProof, BillingWebhookEvent
 from app.config import settings
 from app.db import get_session
 from app.middlewares.request_context import get_request_id
@@ -41,6 +51,14 @@ from app.services.billing_offer_service import (
     offer_combined_plan_code,
     offer_to_public,
 )
+from app.services.billing_payment_proof_service import (
+    MAX_PROOF_BYTES,
+    PaymentProofError,
+    proof_to_public,
+    submit_proof,
+)
+from app.tenancy.context import tenant_context
+from uuid import UUID
 
 
 router = APIRouter(prefix="/billing/asaas", tags=["Assinaturas Asaas"])
@@ -79,7 +97,7 @@ def _require_billing_admin(user: User) -> None:
     ):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Somente um administrador pode contratar ou alterar o plano.",
+            detail="Somente um administrador da empresa pode gerenciar a assinatura e os comprovantes.",
         )
 
 
@@ -117,6 +135,87 @@ def get_billing_status(
             )
         )
     return result
+
+
+@router.get("/payment-proofs")
+def list_own_payment_proofs(
+    auth=Depends(get_current_user_and_tenant),
+    db: Session = Depends(get_session),
+):
+    user, tenant_id = auth
+    _require_billing_admin(user)
+    with tenant_context(tenant_id):
+        proofs = (
+            db.query(BillingPaymentProof)
+            .options(defer(BillingPaymentProof.content))
+            .filter(BillingPaymentProof.tenant_id == UUID(str(tenant_id)))
+            .order_by(BillingPaymentProof.submitted_at.desc())
+            .limit(10)
+            .all()
+        )
+        return {"items": [proof_to_public(proof) for proof in proofs]}
+
+
+@router.post("/payment-proofs", status_code=201)
+async def upload_payment_proof(
+    file: UploadFile = File(...),
+    auth=Depends(get_current_user_and_tenant),
+    db: Session = Depends(get_session),
+):
+    user, tenant_id = auth
+    _require_billing_admin(user)
+    tenant = (
+        db.query(Tenant).filter(Tenant.id == str(tenant_id)).with_for_update().first()
+    )
+    if tenant is None:
+        raise HTTPException(status_code=404, detail="Empresa nao encontrada")
+    content = await file.read(MAX_PROOF_BYTES + 1)
+    try:
+        proof = submit_proof(
+            db,
+            tenant=tenant,
+            user_id=user.id,
+            filename=file.filename or "comprovante",
+            content=content,
+        )
+        result = proof_to_public(proof)
+        db.commit()
+        return result
+    except PaymentProofError as exc:
+        db.rollback()
+        raise HTTPException(status_code=exc.status_code, detail=str(exc)) from exc
+
+
+@router.get("/payment-proofs/{proof_id}/file")
+def download_own_payment_proof(
+    proof_id: int,
+    auth=Depends(get_current_user_and_tenant),
+    db: Session = Depends(get_session),
+):
+    user, tenant_id = auth
+    _require_billing_admin(user)
+    with tenant_context(tenant_id):
+        proof = (
+            db.query(BillingPaymentProof)
+            .filter(
+                BillingPaymentProof.id == proof_id,
+                BillingPaymentProof.tenant_id == UUID(str(tenant_id)),
+            )
+            .first()
+        )
+        if proof is None:
+            raise HTTPException(status_code=404, detail="Comprovante nao encontrado.")
+        extension = {"application/pdf": "pdf", "image/jpeg": "jpg", "image/png": "png"}[
+            proof.content_type
+        ]
+        return Response(
+            content=proof.content,
+            media_type=proof.content_type,
+            headers={
+                "Content-Disposition": f'attachment; filename="comprovante-{proof.id}.{extension}"',
+                "Cache-Control": "private, no-store",
+            },
+        )
 
 
 @router.get("/offers/public/{token}")

@@ -9,9 +9,10 @@ from app.security import module_access
 
 
 class _TrialQuery:
-    def __init__(self, model, tenant):
+    def __init__(self, model, tenant, modules=None):
         self.model = model
         self.tenant = tenant
+        self.modules = modules or []
 
     def filter(self, *criteria):
         self.criteria = criteria
@@ -23,15 +24,16 @@ class _TrialQuery:
         return None
 
     def all(self):
-        return []
+        return self.modules
 
 
 class _TrialDb:
-    def __init__(self, tenant):
+    def __init__(self, tenant, modules=None):
         self.tenant = tenant
+        self.modules = modules or []
 
     def query(self, model):
-        return _TrialQuery(model, self.tenant)
+        return _TrialQuery(model, self.tenant, self.modules)
 
 
 def _user(**overrides):
@@ -93,6 +95,25 @@ def test_load_active_modules_libera_experiencia_completa_durante_trial():
     assert "veterinario" in ativos
     assert "banho_tosa" in ativos
     assert "bling" not in ativos
+
+
+def test_modulo_extra_da_proposta_vence_apos_quinze_dias():
+    tenant = SimpleNamespace(
+        plan="pet-start",
+        modulos_ativos="[]",
+        billing_status="past_due",
+        billing_next_due_date=datetime(2026, 7, 1).date(),
+        trial_ends_at=None,
+    )
+    extra = SimpleNamespace(modulo="veterinario", gateway="asaas_offer", data_fim=None)
+    db = _TrialDb(tenant, [extra])
+
+    assert "veterinario" in module_access._load_active_modules(
+        db, "tenant-1", datetime(2026, 7, 16, 12, tzinfo=timezone.utc)
+    )
+    assert "veterinario" not in module_access._load_active_modules(
+        db, "tenant-1", datetime(2026, 7, 17, 12, tzinfo=timezone.utc)
+    )
 
 
 @pytest.mark.asyncio

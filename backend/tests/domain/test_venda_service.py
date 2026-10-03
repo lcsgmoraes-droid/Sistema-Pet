@@ -14,6 +14,7 @@ Foco em REGRAS DE NEGÓCIO e EVENTOS DE DOMÍNIO.
 import pytest
 from unittest.mock import MagicMock, patch
 from decimal import Decimal
+from datetime import datetime
 
 from app.vendas.service import VendaService
 from app.domain.events import VendaCriada, VendaFinalizada, VendaCancelada
@@ -26,6 +27,39 @@ from app.domain.events import VendaCriada, VendaFinalizada, VendaCancelada
 
 class TestCriarVenda:
     """Testes para VendaService.criar_venda()"""
+
+    def test_venda_esquecida_usa_data_e_caixa_revisados(
+        self, mock_db_session, fake_venda_data, fake_venda_model
+    ):
+        momento = datetime(2026, 9, 4, 15, 30)
+        payload = {
+            **fake_venda_data,
+            "caixa_id": 12,
+            "data_venda": momento,
+            "motivo_revisao": "Venda esquecida no fechamento",
+        }
+        with (
+            patch("app.vendas_models.Venda") as mock_venda,
+            patch("app.vendas_models.VendaItem"),
+            patch("app.financeiro_models.LancamentoManual"),
+            patch("app.financeiro_models.CategoriaFinanceira"),
+            patch("app.audit_log.log_action"),
+            patch("app.vendas.service.enforce_monthly_sales_limit"),
+            patch.object(
+                VendaService, "_gerar_numero_venda", return_value="202610010001"
+            ),
+            patch("app.services.business_audit_service.log_business_event") as audit,
+        ):
+            mock_venda.return_value = fake_venda_model
+            mock_db_session.query.return_value.filter.return_value.first.return_value = MagicMock(
+                id=1
+            )
+            VendaService.criar_venda(payload=payload, user_id=1, db=mock_db_session)
+
+        assert mock_venda.call_args.kwargs["caixa_id"] == 12
+        assert mock_venda.call_args.kwargs["data_venda"] == momento
+        audit.assert_called_once()
+        assert audit.call_args.kwargs["metadata"]["motivo"] == payload["motivo_revisao"]
 
     def test_criar_venda_simples_sucesso(
         self, mock_db_session, mock_event_dispatcher, fake_venda_data, fake_venda_model

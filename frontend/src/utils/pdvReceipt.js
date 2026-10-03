@@ -365,12 +365,19 @@ function montarResumoVenda(venda = {}) {
   return linhas;
 }
 
+function observacoesParaCupom(observacoes) {
+  return String(observacoes || "")
+    .replace(/(?:^|\r?\n)JUSTIFICATIVA\s*\(Margem Cr[ií]tica\)\s*:[\s\S]*$/i, "")
+    .trim();
+}
+
 export function montarCupomVenda(venda = {}, empresa = {}) {
   const dataVenda = formatarDataHoraVenda(venda.data_venda);
   const numeroVenda = venda.numero_venda || venda.id || "-";
   const cliente = montarDadosCliente(venda);
   const enderecoEntrega = venda?.entrega?.endereco_completo || venda.endereco_entrega || "";
   const observacoesEntrega = venda?.entrega?.observacoes_entrega || venda.observacoes_entrega || "";
+  const observacoes = observacoesParaCupom(venda.observacoes);
   const linhas = [
     ...montarCabecalhoEmpresa(empresa),
     "-".repeat(RECEIPT_WIDTH),
@@ -419,6 +426,7 @@ export function montarCupomVenda(venda = {}, empresa = {}) {
     }
     linhas.push("-".repeat(RECEIPT_WIDTH));
     linhas.push(linePair("VALOR PAGO:", formatMoneyBRL(valorPagoCentavos / 100)));
+    if (valorAReceberCentavos === 0) linhas.push("STATUS: PAGO");
     if (valorAReceberCentavos > 0) {
       linhas.push(linePair("VALOR A RECEBER:", formatMoneyBRL(valorAReceberCentavos / 100)));
     } else if (trocoCentavos > 0) {
@@ -432,6 +440,31 @@ export function montarCupomVenda(venda = {}, empresa = {}) {
     linhas.push("-".repeat(RECEIPT_WIDTH));
   }
 
+  const previsto = venda.pagamento_entrega_previsto;
+  if (venda.tem_entrega && previsto?.forma) {
+    const pago = obterValorPagoCentavos(venda, venda.pagamentos || []);
+    const restante = Math.max(0, valorEmCentavos(venda.total) - pago);
+    if (restante > 0) {
+      const nomes = {
+        dinheiro: "DINHEIRO NA ENTREGA",
+        cartao_debito: "CARTAO DE DEBITO NA ENTREGA",
+        cartao_credito: "CARTAO DE CREDITO NA ENTREGA",
+        pix: "PIX A FAZER",
+      };
+      linhas.push("PAGAMENTO NA ENTREGA (PENDENTE)");
+      linhas.push(linePair(nomes[previsto.forma] || "A COMBINAR", formatMoneyBRL(restante / 100)));
+      if (previsto.forma === "dinheiro" && Number(previsto.valor_para_troco) > 0) {
+        const valorCliente = valorEmCentavos(previsto.valor_para_troco);
+        linhas.push(linePair("CLIENTE PAGA COM:", formatMoneyBRL(valorCliente / 100)));
+        if (valorCliente >= restante) {
+          linhas.push(linePair("LEVAR TROCO:", formatMoneyBRL((valorCliente - restante) / 100)));
+        }
+      }
+      if (previsto.forma.startsWith("cartao")) linhas.push("LEVAR MAQUININHA DE CARTAO");
+      linhas.push("-".repeat(RECEIPT_WIDTH));
+    }
+  }
+
   if (venda.tem_entrega && (enderecoEntrega || observacoesEntrega)) {
     linhas.push("ENTREGA:");
     if (enderecoEntrega) linhas.push(...wrap(enderecoEntrega));
@@ -439,8 +472,8 @@ export function montarCupomVenda(venda = {}, empresa = {}) {
     linhas.push("-".repeat(RECEIPT_WIDTH));
   }
 
-  if (venda.observacoes) {
-    linhas.push("OBSERVACOES:", ...wrap(venda.observacoes), "-".repeat(RECEIPT_WIDTH));
+  if (observacoes) {
+    linhas.push("OBSERVACOES:", ...wrap(observacoes), "-".repeat(RECEIPT_WIDTH));
   }
 
   linhas.push(...montarRodapeEmpresa(empresa));
