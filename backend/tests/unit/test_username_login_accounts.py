@@ -3,6 +3,8 @@ from pathlib import Path
 from types import SimpleNamespace
 from uuid import UUID, uuid4
 
+import pytest
+from fastapi import HTTPException
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 from starlette.requests import Request
@@ -449,6 +451,89 @@ def test_mobile_login_accepts_username_without_email(monkeypatch):
     assert response["user"]["id"] == user.id
     assert response["user"]["email"] is None
     assert response["user"]["username"] == "joao.silva"
+
+
+def test_mobile_login_accepts_erp_phone_and_password(monkeypatch):
+    db = _session()
+    tenant = _tenant(db)
+    role = Role(tenant_id=tenant.id, name="Caixa")
+    db.add(role)
+    db.commit()
+    user, _ = create_tenant_user_account(
+        db,
+        tenant_id=UUID(str(tenant.id)),
+        username=None,
+        email=None,
+        login_phone="(18) 99740-1641",
+        password="SenhaForte123",
+        role_id=role.id,
+        nome="Maria da Silva",
+    )
+    db.commit()
+
+    monkeypatch.setattr(
+        "app.routes.ecommerce_auth_public.register_successful_login",
+        lambda *_args: None,
+    )
+    monkeypatch.setattr(
+        "app.routes.ecommerce_auth_public._create_ecommerce_session_tokens",
+        lambda *_args: {"access_token": "mobile-token", "token_type": "bearer"},
+    )
+    monkeypatch.setattr(
+        "app.routes.ecommerce_auth_public._get_or_create_cliente_for_user",
+        lambda *_args: SimpleNamespace(id=10),
+    )
+    monkeypatch.setattr(
+        "app.routes.ecommerce_auth_public._serialize_profile",
+        lambda target, *_args: {"id": target.id},
+    )
+    request = Request(
+        {
+            "type": "http",
+            "headers": [(b"x-tenant-id", str(tenant.id).encode("ascii"))],
+        }
+    )
+
+    for identifier in ("18997401641", "+55 (18) 99740-1641"):
+        response = login_cliente(
+            payload=EcommerceLoginRequest(
+                identifier=identifier,
+                password="SenhaForte123",
+            ),
+            request=request,
+            db=db,
+        )
+        assert response["access_token"] == "mobile-token"
+        assert response["user"]["id"] == user.id
+
+
+def test_mobile_login_does_not_reactivate_disabled_erp_access():
+    db = _session()
+    tenant = _tenant(db)
+    user, _ = _account(db, tenant)
+    db.commit()
+    vinculo = db.query(UserTenant).filter(UserTenant.user_id == user.id).one()
+    vinculo.is_active = False
+    db.commit()
+
+    request = Request(
+        {
+            "type": "http",
+            "headers": [(b"x-tenant-id", str(tenant.id).encode("ascii"))],
+        }
+    )
+    with pytest.raises(HTTPException) as exc:
+        login_cliente(
+            payload=EcommerceLoginRequest(
+                identifier="joao.silva",
+                password="SenhaForte123",
+            ),
+            request=request,
+            db=db,
+        )
+
+    assert exc.value.status_code == 403
+    assert vinculo.is_active is False
 
 
 def test_admin_generated_password_updates_hash_and_returns_plaintext_once(monkeypatch):

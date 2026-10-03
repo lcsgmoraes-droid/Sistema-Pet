@@ -38,6 +38,11 @@ from app.services.auth_security import (
     remaining_lock_seconds,
 )
 from app.services.sales_channel import normalize_online_sales_channel
+from app.services.user_account_service import (
+    UserAccountError,
+    looks_like_login_phone,
+    normalize_login_phone,
+)
 from app.tenancy.rls import sync_rls_auth_email
 
 
@@ -169,14 +174,22 @@ def login_cliente(
 ):
     tenant_id = _extract_tenant_id_from_request(request)
     identifier = str(payload.identifier or "").strip().lower()
+    login_identifiers = [
+        func.lower(User.email) == identifier,
+        User.username == identifier,
+    ]
+    if looks_like_login_phone(identifier):
+        try:
+            login_identifiers.append(
+                User.login_phone == normalize_login_phone(identifier)
+            )
+        except UserAccountError:
+            pass
     user = (
         db.query(User)
         .filter(
             User.tenant_id == tenant_id,
-            or_(
-                func.lower(User.email) == identifier,
-                User.username == identifier,
-            ),
+            or_(*login_identifiers),
         )
         .first()
     )
@@ -194,7 +207,7 @@ def login_cliente(
             db.commit()
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="E-mail, usuario ou senha invalidos",
+            detail="Celular, e-mail, usuario ou senha invalidos",
             headers={"WWW-Authenticate": "Bearer"},
         )
 

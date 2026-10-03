@@ -32,7 +32,7 @@ class EcommerceLoginRequest(BaseModel):
     def validate_identifier(self):
         identifier = str(self.identifier or self.email or "").strip()
         if not identifier:
-            raise ValueError("Informe o e-mail ou nome de usuario")
+            raise ValueError("Informe o celular, e-mail ou nome de usuario")
         self.identifier = identifier
         return self
 
