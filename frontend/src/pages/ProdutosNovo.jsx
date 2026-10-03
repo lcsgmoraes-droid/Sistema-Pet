@@ -169,6 +169,24 @@ export default function ProdutosNovo() {
   const [opcoesTratamentos, setOpcoesTratamentos] = useState([]);
   const [opcoesSabores, setOpcoesSabores] = useState([]);
   const [opcoesApresentacoes, setOpcoesApresentacoes] = useState([]);
+  const [produtoOrigemGranel, setProdutoOrigemGranel] = useState(null);
+  const [granelVinculos, setGranelVinculos] = useState([]);
+
+  useEffect(() => {
+    if (!isEdicao) return;
+    let ativo = true;
+    api
+      .get(`/estoque/granel/vinculos/granel/${id}`)
+      .then(({ data }) => {
+        if (ativo) setGranelVinculos(Array.isArray(data) ? data : []);
+      })
+      .catch((error) => {
+        console.error("Erro ao carregar vínculos de granel:", error);
+      });
+    return () => {
+      ativo = false;
+    };
+  }, [id, isEdicao]);
 
   const [loading, setLoading] = useState(false);
   const [erroCarregamento, setErroCarregamento] = useState(null);
@@ -422,6 +440,8 @@ export default function ProdutosNovo() {
     salvarFiscal,
     salvando,
     setSalvando,
+    produtoOrigemGranel,
+    granelVinculos,
   });
 
   const { handleGerarSKU, handleGerarCodigoBarras } = useProdutosNovoCodigos({
@@ -656,6 +676,9 @@ export default function ProdutosNovo() {
       removerRegraRecorrencia,
     },
     racaoState: {
+      produtoOrigemGranel,
+      setProdutoOrigemGranel,
+      granelVinculos,
       handleCriarOpcaoRacao,
       handleApresentacaoPesoChange,
       handleClassificacaoRacaoChange,

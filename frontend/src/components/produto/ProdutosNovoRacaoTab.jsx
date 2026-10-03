@@ -1,11 +1,17 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Plus, Save, X } from "lucide-react";
+import api from "../../api";
 import { formatarPrecoPorKg } from "../../utils/racaoPrecoKg";
+import { encontrarProdutoPorCodigo } from "../../utils/pdvProdutoBuscaUtils";
 import TabelaConsumoEditor from "../TabelaConsumoEditor";
+import ProdutoSelector from "../produtos/ProdutoSelector";
 
 export default function ProdutosNovoRacaoTab({
   formData,
   handleChange,
+  produtoOrigemGranel,
+  setProdutoOrigemGranel,
+  granelVinculos = [],
   handleApresentacaoPesoChange,
   handleClassificacaoRacaoChange,
   handleCriarOpcaoRacao,
@@ -23,6 +29,93 @@ export default function ProdutosNovoRacaoTab({
   const [descricaoOpcao, setDescricaoOpcao] = useState("");
   const [erroOpcao, setErroOpcao] = useState("");
   const [salvandoOpcao, setSalvandoOpcao] = useState(false);
+  const [buscaOrigem, setBuscaOrigem] = useState("");
+  const [opcoesOrigem, setOpcoesOrigem] = useState([]);
+  const [buscandoOrigem, setBuscandoOrigem] = useState(false);
+  const [erroBuscaOrigem, setErroBuscaOrigem] = useState(false);
+  const [mostrarSugestoesOrigem, setMostrarSugestoesOrigem] = useState(false);
+  const buscaOrigemContainerRef = useRef(null);
+  const buscaOrigemAtualRef = useRef("");
+
+  useEffect(() => {
+    const termo = buscaOrigem.trim();
+    if (!formData.e_granel || termo.length < 2) {
+      setOpcoesOrigem([]);
+      setBuscandoOrigem(false);
+      setErroBuscaOrigem(false);
+      return undefined;
+    }
+    let ativo = true;
+    const controller = new AbortController();
+    const timer = setTimeout(async () => {
+      setBuscandoOrigem(true);
+      setErroBuscaOrigem(false);
+      try {
+        const { data } = await api.get("/estoque/granel/produtos-origem", {
+          params: { busca: termo },
+          signal: controller.signal,
+        });
+        if (ativo) setOpcoesOrigem(Array.isArray(data) ? data : []);
+      } catch (error) {
+        if (ativo && error?.code !== "ERR_CANCELED") {
+          setOpcoesOrigem([]);
+          setErroBuscaOrigem(true);
+        }
+      } finally {
+        if (ativo) setBuscandoOrigem(false);
+      }
+    }, 300);
+    return () => {
+      ativo = false;
+      clearTimeout(timer);
+      controller.abort();
+    };
+  }, [formData.e_granel, buscaOrigem]);
+
+  useEffect(() => {
+    const fecharAoClicarFora = (event) => {
+      if (!buscaOrigemContainerRef.current?.contains(event.target)) {
+        setMostrarSugestoesOrigem(false);
+      }
+    };
+    document.addEventListener("mousedown", fecharAoClicarFora);
+    return () => document.removeEventListener("mousedown", fecharAoClicarFora);
+  }, []);
+
+  const opcoesOrigemDisponiveis = opcoesOrigem.filter(
+    (produto) => !granelVinculos.some((vinculo) => vinculo.produto_origem_id === produto.id),
+  );
+  const selecionarOrigem = (produto) => {
+    setProdutoOrigemGranel(produto);
+    buscaOrigemAtualRef.current = "";
+    setBuscaOrigem("");
+    setMostrarSugestoesOrigem(false);
+  };
+  const selecionarOrigemPorEnter = async (termo) => {
+    if (!termo) return;
+    let produtos = opcoesOrigemDisponiveis;
+    if (produtos.length === 0) {
+      setBuscandoOrigem(true);
+      setErroBuscaOrigem(false);
+      try {
+        const { data } = await api.get("/estoque/granel/produtos-origem", {
+          params: { busca: termo },
+        });
+        if (buscaOrigemAtualRef.current !== termo) return;
+        produtos = (Array.isArray(data) ? data : []).filter(
+          (produto) => !granelVinculos.some((vinculo) => vinculo.produto_origem_id === produto.id),
+        );
+        setOpcoesOrigem(Array.isArray(data) ? data : []);
+      } catch (_error) {
+        if (buscaOrigemAtualRef.current === termo) setErroBuscaOrigem(true);
+        return;
+      } finally {
+        if (buscaOrigemAtualRef.current === termo) setBuscandoOrigem(false);
+      }
+    }
+    const produto = encontrarProdutoPorCodigo(produtos, termo) || produtos[0];
+    if (produto && buscaOrigemAtualRef.current === termo) selecionarOrigem(produto);
+  };
 
   const linhaSelecionada = opcoesLinhas.find(
     (linha) => String(linha.id) === String(formData.linha_racao_id || ""),
@@ -143,6 +236,8 @@ export default function ProdutosNovoRacaoTab({
                 if (marcado) {
                   handleChange("eh_racao", true);
                   handleChange("unidade", "KG");
+                } else {
+                  setProdutoOrigemGranel(null);
                 }
               }}
               className="mt-1 h-4 w-4 rounded border-gray-300 text-orange-600 focus:ring-orange-500"
@@ -160,10 +255,102 @@ export default function ProdutosNovoRacaoTab({
       </div>
 
       {formData.e_granel && (
-        <div className="rounded-lg border border-cyan-200 bg-cyan-50 p-4 text-sm text-cyan-800">
-          Para abastecer este granel, abra o produto fechado de origem e use "Lancar granel". O
-          sistema baixa pacote(s) do produto fechado e entra kg aqui usando o peso da embalagem da
-          racao.
+        <div className="space-y-3 rounded-lg border border-cyan-200 bg-cyan-50 p-4 text-sm text-cyan-900">
+          <div>
+            <label htmlFor="busca-origem-granel" className="block font-semibold">
+              Vincular produto fechado de origem
+            </label>
+            <p className="mt-1 text-xs text-cyan-800">
+              Escolha a embalagem unitária que será aberta para abastecer este granel. O vínculo é
+              salvo junto com o produto.
+            </p>
+          </div>
+          {granelVinculos.length > 0 && (
+            <div>
+              <span className="font-medium">Já vinculados:</span>
+              <ul className="mt-1 list-inside list-disc">
+                {granelVinculos.map((vinculo) => (
+                  <li key={vinculo.id}>
+                    {vinculo.produto_origem_nome} ({vinculo.produto_origem_codigo}) ·{" "}
+                    {vinculo.peso_por_unidade_kg} kg
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {produtoOrigemGranel && (
+            <div className="flex items-center justify-between gap-3 rounded-md border border-cyan-300 bg-white px-3 py-2">
+              <span>
+                A vincular: {produtoOrigemGranel.nome} ({produtoOrigemGranel.codigo}) ·{" "}
+                {produtoOrigemGranel.peso_embalagem} kg
+              </span>
+              <button
+                type="button"
+                onClick={() => setProdutoOrigemGranel(null)}
+                className="font-semibold text-cyan-700 hover:underline"
+              >
+                Remover
+              </button>
+            </div>
+          )}
+          <ProdutoSelector
+            containerRef={buscaOrigemContainerRef}
+            inputId="busca-origem-granel"
+            value={buscaOrigem}
+            onChange={(valor) => {
+              buscaOrigemAtualRef.current = valor.trim();
+              setBuscaOrigem(valor);
+              setOpcoesOrigem([]);
+              setBuscandoOrigem(valor.trim().length >= 2);
+              setMostrarSugestoesOrigem(true);
+            }}
+            onFocus={() => setMostrarSugestoesOrigem(true)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") {
+                event.preventDefault();
+                void selecionarOrigemPorEnter(event.currentTarget.value.trim());
+              } else if (event.key === "Escape") {
+                setMostrarSugestoesOrigem(false);
+              }
+            }}
+            onSelect={selecionarOrigem}
+            placeholder="Digite nome, SKU ou código de barras..."
+            renderSuggestion={(produto) => (
+              <button
+                key={produto.id}
+                type="button"
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={() => selecionarOrigem(produto)}
+                className="w-full border-b px-4 py-3 text-left last:border-b-0 hover:bg-gray-50"
+              >
+                <span className="block font-medium text-gray-900">{produto.nome}</span>
+                <span className="block text-xs text-gray-600">
+                  Cód: {produto.codigo} · Embalagem: {produto.peso_embalagem} kg
+                </span>
+              </button>
+            )}
+            showSuggestions={mostrarSugestoesOrigem}
+            suggestions={opcoesOrigemDisponiveis}
+          />
+          {buscandoOrigem && <p>Buscando produtos...</p>}
+          {erroBuscaOrigem && (
+            <p role="alert" className="text-red-700">
+              Não foi possível buscar os produtos fechados.
+            </p>
+          )}
+          {mostrarSugestoesOrigem &&
+            buscaOrigem.trim().length >= 2 &&
+            !buscandoOrigem &&
+            !erroBuscaOrigem &&
+            opcoesOrigemDisponiveis.length === 0 && (
+              <p className="text-slate-600">
+                Nenhum produto fechado com peso cadastrado encontrado.
+              </p>
+            )}
+          <p className="text-xs text-cyan-800">
+            Depois de vincular, use "Lançar granel" nas movimentações do produto fechado para
+            transferir o estoque em kg.
+          </p>
         </div>
       )}
 

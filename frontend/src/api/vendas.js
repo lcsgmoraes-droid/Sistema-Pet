@@ -48,6 +48,7 @@ export const finalizarVenda = async (vendaId, pagamentos, options = {}) => {
     pagamentos,
     cupom_code: options.cupom_code || null,
     cupom_discount_applied: options.cupom_discount_applied ?? null,
+    motivo_liberacao_crediario: options.motivo_liberacao_crediario || null,
     ...obterContextoRevisaoCaixa(),
   });
   return response.data;

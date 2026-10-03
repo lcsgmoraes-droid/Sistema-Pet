@@ -711,7 +711,4 @@ def detalhes_venda_entregador(
         forma_pagamento = baixa_recente.forma_pagamento
 
     data["forma_pagamento"] = forma_pagamento
-    if forma_pagamento and data.get("status_pagamento") == "pendente":
-        data["status_pagamento"] = "parcial"
-
     return data

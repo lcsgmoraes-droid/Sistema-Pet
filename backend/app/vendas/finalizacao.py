@@ -30,6 +30,7 @@ from app.vendas.finalizacao_recebiveis import (
     criar_recebiveis_dos_novos_pagamentos,
 )
 from app.vendas.pos_processamento import gerar_dre_competencia_venda
+from app.vendas.bloqueio_crediario import validar_bloqueio_crediario
 
 logger = logging.getLogger(__name__)
 
@@ -52,6 +53,7 @@ def finalizar_venda(
     permitir_caixa_tenant: bool = False,
     data_ocorrencia=None,
     motivo_revisao: Optional[str] = None,
+    motivo_liberacao_crediario: Optional[str] = None,
     *,
     processar_baixa_estoque_item: Callable[..., List[Dict[str, Any]]],
 ) -> Dict[str, Any]:
@@ -194,6 +196,15 @@ def finalizar_venda(
                 status_code=400,
                 detail=f"Apenas vendas abertas ou com baixa parcial podem receber pagamentos (status atual: {venda.status})",
             )
+
+        validar_bloqueio_crediario(
+            db,
+            tenant_id,
+            venda.cliente_id,
+            venda_id=venda.id,
+            user_id=user_id,
+            motivo_liberacao=motivo_liberacao_crediario,
+        )
 
         # Calcular totais
         pagamentos_existentes = (

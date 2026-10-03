@@ -58,5 +58,6 @@ export function montarPayloadVenda(vendaAtual, entregadorSelecionado = null) {
     valor_por_km: temEntrega ? normalizarNumero(vendaAtual.entrega?.valor_por_km) : null,
     loja_origem: temEntrega ? vendaAtual.entrega?.loja_origem || null : null,
     entregador_id: entregadorId,
+    pagamento_entrega_previsto: temEntrega ? vendaAtual.pagamento_entrega_previsto || null : null,
   };
 }

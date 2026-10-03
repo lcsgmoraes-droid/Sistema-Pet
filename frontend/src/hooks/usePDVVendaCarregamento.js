@@ -107,6 +107,7 @@ export function usePDVVendaCarregamento({
           funcionario_id: venda.funcionario_id || null,
           entregador_id: venda.entregador_id || null,
           tem_entrega: venda.tem_entrega || false,
+          pagamento_entrega_previsto: venda.pagamento_entrega_previsto || null,
           entrega: venda.entrega || criarEntregaVazia(),
           pagamentos,
           total_pago: totalPago,
@@ -243,6 +244,7 @@ export function usePDVVendaCarregamento({
         observacoes: vendaCompleta.observacoes || "",
         status: vendaCompleta.status,
         tem_entrega: vendaCompleta.tem_entrega || false,
+        pagamento_entrega_previsto: vendaCompleta.pagamento_entrega_previsto || null,
         entregador_id: vendaCompleta.entregador_id || null,
         entrega: {
           endereco_completo: vendaCompleta.endereco_entrega || "",

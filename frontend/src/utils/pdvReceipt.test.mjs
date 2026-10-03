@@ -105,6 +105,32 @@ test("recibo sem CPF ou CNPJ continua sendo gerado normalmente", () => {
   assert.doesNotMatch(recibo, /CPF\/CNPJ:/);
 });
 
+test("recibo de entrega mostra PIX previsto sem declarar recebimento", () => {
+  const recibo = montarCupomVenda({
+    ...vendaBase,
+    tem_entrega: true,
+    pagamentos: [],
+    pagamento_entrega_previsto: { forma: "pix" },
+  });
+  assert.match(recibo, /PAGAMENTO NA ENTREGA \(PENDENTE\)/);
+  assert.match(recibo, /PIX A FAZER/);
+  assert.doesNotMatch(recibo, /VALOR PAGO:/);
+});
+
+test("recibo calcula troco previsto e deixa de cobrá-lo depois de pago", () => {
+  const venda = {
+    ...vendaBase,
+    tem_entrega: true,
+    pagamentos: [],
+    pagamento_entrega_previsto: { forma: "dinheiro", valor_para_troco: 400 },
+  };
+  const pendente = montarCupomVenda(venda);
+  assert.match(pendente, /CLIENTE PAGA COM:\s+R\$ 400,00/);
+  assert.match(pendente, /LEVAR TROCO:\s+R\$ 10,00/);
+  const pago = montarCupomVenda({ ...venda, pagamentos: [{ forma_pagamento: "PIX", valor: 390 }] });
+  assert.doesNotMatch(pago, /PAGAMENTO NA ENTREGA \(PENDENTE\)/);
+});
+
 test("justificativa interna de margem critica nao aparece no cupom nem na reimpressao", () => {
   const observacoes =
     "Separar pedido para retirada\n\nJUSTIFICATIVA (Margem Critica): Desconto autorizado pelo gerente\nMotivo interno detalhado";

@@ -76,6 +76,7 @@ class CriarVendaRequest(BaseModel):
     distancia_km: Optional[float] = None
     valor_por_km: Optional[float] = None
     observacoes_entrega: Optional[str] = None
+    pagamento_entrega_previsto: Optional[dict] = None
 
 
 class FinalizarVendaRequest(BaseModel):
@@ -85,6 +86,7 @@ class FinalizarVendaRequest(BaseModel):
     pagamentos: List[VendaPagamentoSchema]
     cupom_code: Optional[str] = None
     cupom_discount_applied: Optional[float] = None
+    motivo_liberacao_crediario: Optional[str] = Field(default=None, max_length=500)
 
 
 class CancelarVendaRequest(BaseModel):

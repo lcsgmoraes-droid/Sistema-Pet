@@ -83,6 +83,7 @@ class Venda(BaseTenantModel):
     endereco_entrega = Column(Text, nullable=True)
     distancia_km = Column(DECIMAL(10, 2), nullable=True)
     valor_por_km = Column(DECIMAL(10, 2), nullable=True)
+    pagamento_entrega_previsto = Column(JSON, nullable=True)
     observacoes_entrega = Column(Text, nullable=True)
     status_entrega = Column(
         String(20), nullable=True
@@ -278,6 +279,7 @@ class Venda(BaseTenantModel):
             "valor_pago": valor_pago,
             "valor_restante": valor_restante,
             "tem_entrega": self.tem_entrega,
+            "pagamento_entrega_previsto": self.pagamento_entrega_previsto,
             "taxa_entrega": safe_decimal_to_float(self.taxa_entrega) or 0,
             "entrega": {
                 "endereco_completo": self.endereco_entrega,

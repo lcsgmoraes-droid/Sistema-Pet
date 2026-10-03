@@ -112,6 +112,7 @@ class RotaEntregaParadaResponse(BaseModel):
     data_venda: Optional[datetime] = None
     forma_pagamento: Optional[str] = None
     status_pagamento: Optional[str] = None
+    pagamento_entrega_previsto: Optional[dict] = None
     valor_pago: Optional[Decimal] = None
     pagamentos: List[PagamentoEntregaResponse] = Field(default_factory=list)
     observacoes_entrega: Optional[str] = None

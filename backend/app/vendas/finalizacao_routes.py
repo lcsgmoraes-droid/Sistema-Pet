@@ -112,6 +112,7 @@ async def finalizar_venda(
         caixa_id=caixa_revisao.id if caixa_revisao else None,
         data_ocorrencia=dados.data_ocorrencia if caixa_revisao else None,
         motivo_revisao=dados.motivo_revisao.strip() if caixa_revisao else None,
+        motivo_liberacao_crediario=dados.motivo_liberacao_crediario,
     )
 
     # Log de sucesso
