@@ -6,10 +6,12 @@ from sqlalchemy.orm import Session
 
 from app.auth import hash_password, verify_password
 from app.db import get_session
-from app.models import User
+from app.models import Cliente, User
 from app.routes.ecommerce_auth_cliente import (
     _digits_only,
     _get_or_create_cliente_for_user,
+    _phone_digits,
+    _select_preferred_cliente,
 )
 from app.routes.ecommerce_auth_common import (
     _create_ecommerce_session_tokens,
@@ -37,11 +39,35 @@ from app.services.auth_security import (
     register_successful_login,
     remaining_lock_seconds,
 )
+from app.services.pessoa_merge_service import executar_fusao_pessoas
 from app.services.sales_channel import normalize_online_sales_channel
 from app.tenancy.rls import sync_rls_auth_email
 
 
 router = APIRouter()
+
+
+def _existing_user_for_phone(db: Session, tenant_id, phone: str) -> User | None:
+    """A public signup must not claim a phone already owned by an ERP/app account."""
+    digits = _digits_only(phone)
+    if len(digits) == 13 and digits.startswith("55"):
+        digits = digits[2:]
+    stored_phone = User.telefone
+    for character in (" ", "+", "-", "(", ")", ".", "/"):
+        stored_phone = func.replace(stored_phone, character, "")
+    return (
+        db.query(User)
+        .filter(
+            User.tenant_id == tenant_id,
+            or_(
+                User.login_phone == digits,
+                stored_phone == digits,
+                stored_phone == f"55{digits}",
+            ),
+        )
+        .order_by(User.is_active.desc(), User.id.desc())
+        .first()
+    )
 
 
 @router.post("/registrar")
@@ -84,6 +110,60 @@ def registrar_cliente(
             status_code=status.HTTP_400_BAD_REQUEST, detail="Telefone obrigatorio"
         )
 
+    existing_phone_user = _existing_user_for_phone(db, tenant_id, telefone)
+    if existing_phone_user:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                "Este telefone ja possui uma conta nesta loja. Entre com o acesso existente "
+                "ou solicite ao ERP a revisao do cadastro."
+            ),
+        )
+
+    phone_digits = _phone_digits(telefone)
+    people = [
+        person
+        for person in (
+            db.query(Cliente)
+            .filter(
+                Cliente.tenant_id == tenant_id,
+                Cliente.ativo.is_not(False),
+                or_(Cliente.telefone.isnot(None), Cliente.celular.isnot(None)),
+            )
+            .all()
+        )
+        if phone_digits
+        in {_phone_digits(person.telefone), _phone_digits(person.celular)}
+        and not person.merged_into_id
+    ]
+    if any(person.auth_user_id for person in people):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                "Este telefone ja esta vinculado a uma pessoa com acesso nesta loja. "
+                "Entre com a conta existente ou solicite ao ERP a revisao do cadastro."
+            ),
+        )
+    if any(
+        person.tipo_cadastro in {"funcionario", "veterinario"} or person.is_entregador
+        for person in people
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="O acesso desta pessoa deve ser criado e gerenciado pelo ERP.",
+        )
+    if any(_digits_only(person.cpf) not in {"", cpf_normalizado} for person in people):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Este telefone pertence a uma pessoa com CPF diferente. Revise o cadastro no ERP.",
+        )
+    existing_person = _select_preferred_cliente(
+        people,
+        email=None,
+        cpf=cpf_normalizado,
+        telefone=telefone,
+    )
+
     user = User(
         email=email,
         hashed_password=hash_password(payload.password),
@@ -98,6 +178,35 @@ def registrar_cliente(
     )
     _mark_user_consent(user, request, payload.terms_version, payload.privacy_version)
     db.add(user)
+    db.flush()
+    if existing_person:
+        cliente = existing_person
+        cliente.auth_user_id = user.id
+        for duplicate in people:
+            if duplicate.id == cliente.id:
+                continue
+            executar_fusao_pessoas(
+                db,
+                tenant_id=tenant_id,
+                principal_id=cliente.id,
+                duplicado_id=duplicate.id,
+                decisoes_campos={},
+                user_id=user.id,
+                observacao="Unificacao por telefone no cadastro publico.",
+                modo="ecommerce_cadastro",
+                motivo="telefone_e_cpf_compativeis",
+                commit=False,
+            )
+    else:
+        cliente = _get_or_create_cliente_for_user(
+            db, user, origem_cliente=canal_registro
+        )
+    if nome:
+        cliente.nome = nome
+    if cpf_normalizado and not cliente.cpf:
+        cliente.cpf = cpf_normalizado
+    cliente.telefone = telefone
+    _ensure_active_store_access(db, user, str(tenant_id))
     if EMAIL_VERIFICATION_REQUIRED:
         enviado = _send_email_verification(user, canal_registro)
         if not enviado:
@@ -106,18 +215,9 @@ def registrar_cliente(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
                 detail="Nao foi possivel enviar o e-mail de confirmacao agora. Tente novamente em instantes.",
             )
-    db.commit()
-    db.refresh(user)
-
-    cliente = _get_or_create_cliente_for_user(db, user, origem_cliente=canal_registro)
-    if nome:
-        cliente.nome = nome
-    if cpf_normalizado and not cliente.cpf:
-        cliente.cpf = cpf_normalizado
-    cliente.telefone = telefone
-    _ensure_active_store_access(db, user, str(tenant_id))
     register_account_created(db, user, request, canal_registro)
     db.commit()
+    db.refresh(user)
     db.refresh(cliente)
 
     # 🎯 CAMPANHAS — Publicar evento customer_registered na fila
@@ -169,17 +269,24 @@ def login_cliente(
 ):
     tenant_id = _extract_tenant_id_from_request(request)
     identifier = str(payload.identifier or "").strip().lower()
-    user = (
-        db.query(User)
-        .filter(
-            User.tenant_id == tenant_id,
-            or_(
-                func.lower(User.email) == identifier,
-                User.username == identifier,
-            ),
+    phone_digits = _digits_only(identifier)
+    if len(phone_digits) == 13 and phone_digits.startswith("55"):
+        phone_digits = phone_digits[2:]
+    phone_identifier = phone_digits if len(phone_digits) in {10, 11} else None
+    if phone_identifier:
+        user = _existing_user_for_phone(db, tenant_id, phone_identifier)
+    else:
+        user = (
+            db.query(User)
+            .filter(
+                User.tenant_id == tenant_id,
+                or_(
+                    func.lower(User.email) == identifier,
+                    User.username == identifier,
+                ),
+            )
+            .first()
         )
-        .first()
-    )
 
     if user and is_user_locked(user):
         raise HTTPException(
@@ -194,7 +301,7 @@ def login_cliente(
             db.commit()
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="E-mail, usuario ou senha invalidos",
+            detail="E-mail, celular, usuario ou senha invalidos",
             headers={"WWW-Authenticate": "Bearer"},
         )
 

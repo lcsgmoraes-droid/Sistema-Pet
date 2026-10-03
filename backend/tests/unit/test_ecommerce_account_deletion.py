@@ -5,7 +5,7 @@ import pytest
 from fastapi import HTTPException
 
 from app.auth import hash_password
-from app.models import Cliente
+from app.models import Cliente, Role
 from app.routes import ecommerce_auth_profiles
 from app.routes.ecommerce_auth_profiles import excluir_conta
 from app.routes.ecommerce_auth_schemas import EcommerceAccountDeletionRequest
@@ -19,6 +19,12 @@ class _Query:
 
     def filter(self, *_args, **_kwargs):
         return self
+
+    def join(self, *_args, **_kwargs):
+        return self
+
+    def first(self):
+        return next(iter(self.db.rows.get(self.model, [])), None)
 
     def order_by(self, *_args, **_kwargs):
         return self
@@ -164,6 +170,51 @@ def test_account_deletion_anonymizes_user_and_revokes_access(monkeypatch):
     assert [name for name, _payload in calls] == ["create", "anonymize"]
     assert db.updates
     assert db.deletes
+
+
+def test_employee_cannot_delete_erp_account_from_app():
+    tenant_id = uuid4()
+    user = _user(tenant_id)
+    db = _Db(rows={Role: [SimpleNamespace(name="Administrador")]})
+
+    with pytest.raises(HTTPException) as error:
+        excluir_conta(
+            payload=EcommerceAccountDeletionRequest(
+                password="senha-segura", confirmation="EXCLUIR"
+            ),
+            request=SimpleNamespace(headers={}, client=None),
+            current_user=user,
+            db=db,
+        )
+
+    assert error.value.status_code == 403
+    assert user.is_active is True
+    assert not db.deletes
+
+
+def test_employee_person_with_customer_role_is_managed_by_erp():
+    tenant_id = uuid4()
+    user = _user(tenant_id)
+    db = _Db(
+        rows={
+            Cliente: [
+                SimpleNamespace(id=42, tipo_cadastro="funcionario", is_entregador=False)
+            ]
+        }
+    )
+
+    with pytest.raises(HTTPException) as error:
+        excluir_conta(
+            payload=EcommerceAccountDeletionRequest(
+                password="senha-segura", confirmation="EXCLUIR"
+            ),
+            request=SimpleNamespace(headers={}, client=None),
+            current_user=user,
+            db=db,
+        )
+
+    assert error.value.status_code == 403
+    assert user.is_active is True
 
 
 def test_account_deletion_removes_local_pet_photo(monkeypatch, tmp_path):

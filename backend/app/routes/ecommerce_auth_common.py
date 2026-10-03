@@ -409,43 +409,45 @@ def _get_current_ecommerce_user(
 
 
 def _get_or_create_customer_role(db: Session, tenant_id: str) -> Role:
+    tenant_uuid = _normalize_tenant_uuid(str(tenant_id))
     role = (
         db.query(Role)
-        .filter(Role.tenant_id == tenant_id, Role.name == "Cliente")
+        .filter(Role.tenant_id == tenant_uuid, Role.name == "Cliente")
         .first()
     )
     if role:
         return role
 
-    role = Role(name="Cliente", tenant_id=tenant_id)
+    role = Role(name="Cliente", tenant_id=tenant_uuid)
     db.add(role)
     db.flush()
     return role
 
 
 def _ensure_active_store_access(db: Session, user: User, tenant_id: str) -> UserTenant:
+    tenant_uuid = _normalize_tenant_uuid(str(tenant_id))
     vinculo = (
         db.query(UserTenant)
         .filter(
             UserTenant.user_id == user.id,
-            UserTenant.tenant_id == tenant_id,
+            UserTenant.tenant_id == tenant_uuid,
         )
         .first()
     )
 
-    if vinculo and vinculo.is_active:
+    if vinculo:
+        if not vinculo.is_active:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Acesso desativado nesta loja. Procure o administrador do ERP.",
+            )
         return vinculo
 
     role = _get_or_create_customer_role(db, tenant_id)
 
-    if vinculo:
-        vinculo.role_id = role.id
-        vinculo.is_active = True
-        return vinculo
-
     vinculo = UserTenant(
         user_id=user.id,
-        tenant_id=tenant_id,
+        tenant_id=tenant_uuid,
         role_id=role.id,
         is_active=True,
     )

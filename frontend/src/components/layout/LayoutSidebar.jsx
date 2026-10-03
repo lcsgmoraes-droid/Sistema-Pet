@@ -5,6 +5,7 @@ import {
   FiCreditCard,
   FiHelpCircle,
   FiLogOut,
+  FiLock,
   FiMoon,
   FiSun,
   FiX,
@@ -15,6 +16,7 @@ import { Link } from "react-router-dom";
 import useNovidadesNaoVistas from "../../hooks/useNovidadesNaoVistas";
 import { useTheme } from "../../theme/ThemeContext";
 import SidebarMenu from "./SidebarMenu";
+import ChangePasswordModal from "./ChangePasswordModal";
 import { resolveLayoutSessionIdentity } from "./layoutSessionIdentity";
 
 const COREPET_LOGO = "/brand/corepet/corepet-horizontal.png";
@@ -77,19 +79,12 @@ export default function LayoutSidebar({
   const resizeRef = useRef(null);
   const [redimensionando, setRedimensionando] = useState(false);
   const [menuUsuarioAberto, setMenuUsuarioAberto] = useState(false);
+  const [alterandoSenha, setAlterandoSenha] = useState(false);
   const userMenuRef = useRef(null);
   const novidadesNaoVistas = useNovidadesNaoVistas();
   const { isDark, toggleTheme } = useTheme();
 
-  const nomeUsuario = user?.nome || user?.username || user?.email;
-  const identificadorUsuario = user?.username || user?.email;
-  const inicialUsuario = (
-    user?.nome?.[0] ||
-    user?.username?.[0] ||
-    user?.email?.[0] ||
-    ""
-  ).toUpperCase();
-  const { tenantLabel } = resolveLayoutSessionIdentity(user);
+  const { tenantLabel, displayName, userLabel, avatarInitial } = resolveLayoutSessionIdentity(user);
 
   useEffect(() => {
     if (!menuUsuarioAberto) return undefined;
@@ -302,6 +297,18 @@ export default function LayoutSidebar({
               role="menuitem"
               onClick={() => {
                 setMenuUsuarioAberto(false);
+                setAlterandoSenha(true);
+              }}
+              className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-gray-700 transition-all hover:bg-gray-50 dark:text-slate-300 dark:hover:bg-slate-800"
+            >
+              <FiLock className="flex-shrink-0 text-lg" />
+              <span className="v2-menu-item font-medium">Alterar minha senha</span>
+            </button>
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => {
+                setMenuUsuarioAberto(false);
                 logout();
               }}
               className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-gray-700 transition-all hover:bg-red-50 hover:text-red-600 dark:text-slate-300 dark:hover:bg-red-500/10 dark:hover:text-red-200"
@@ -318,10 +325,10 @@ export default function LayoutSidebar({
           aria-haspopup="menu"
           aria-expanded={menuUsuarioAberto}
           className="flex w-full items-center gap-2.5 px-3 py-3 text-left transition-all hover:bg-white/70 dark:hover:bg-slate-900/60"
-          title={!sidebarOpen ? `${nomeUsuario} · Loja: ${tenantLabel}` : ""}
+          title={!sidebarOpen ? `${displayName} · Loja: ${tenantLabel}` : ""}
         >
           <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-[#0f5f63] text-sm font-bold text-white">
-            {inicialUsuario}
+            {avatarInitial}
           </span>
           {sidebarOpen && (
             <>
@@ -332,10 +339,17 @@ export default function LayoutSidebar({
                 >
                   {tenantLabel}
                 </span>
-                <span className="block truncate text-sm font-medium text-gray-900 dark:text-slate-100">
-                  {nomeUsuario}
+                <span
+                  className="block truncate text-sm font-medium text-gray-900 dark:text-slate-100"
+                  title={`Usuário ativo: ${displayName}`}
+                >
+                  {displayName}
                 </span>
-                <span className="v2-texto-ajuda block truncate">{identificadorUsuario}</span>
+                {userLabel !== displayName && (
+                  <span className="v2-texto-ajuda block truncate" title={userLabel}>
+                    {userLabel}
+                  </span>
+                )}
               </span>
               {menuUsuarioAberto ? (
                 <FiChevronUp className="flex-shrink-0 text-gray-400 dark:text-slate-500" />
@@ -346,6 +360,8 @@ export default function LayoutSidebar({
           )}
         </button>
       </div>
+
+      {alterandoSenha && <ChangePasswordModal onClose={() => setAlterandoSenha(false)} />}
 
       {!isMobile && sidebarOpen && (
         <button
