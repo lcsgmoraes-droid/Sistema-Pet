@@ -152,7 +152,9 @@ def gerar_pdf_orcamento_vet(orcamento, clinica):
     vinculo = (
         f"Internação #{orcamento.internacao_id}"
         if orcamento.internacao_id
-        else f"Consulta #{orcamento.consulta_id}" if orcamento.consulta_id else None
+        else f"Consulta #{orcamento.consulta_id}"
+        if orcamento.consulta_id
+        else None
     )
     meta = f"Nº {orcamento.id}   ·   Emissão: {emissao}"
     if vinculo:

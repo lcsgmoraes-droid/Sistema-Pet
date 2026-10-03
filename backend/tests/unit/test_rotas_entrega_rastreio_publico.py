@@ -80,7 +80,9 @@ def test_parada_publica_oculta_dados_de_outros_clientes():
         endereco="Rua Particular, 123",
         status="pendente",
         data_entrega=None,
-        venda=SimpleNamespace(numero_venda="VEN-123", cliente=SimpleNamespace(nome="Maria")),
+        venda=SimpleNamespace(
+            numero_venda="VEN-123", cliente=SimpleNamespace(nome="Maria")
+        ),
     )
     resultado = _montar_parada_publica(parada, {})
     assert resultado["endereco"] == "Entrega 2"
