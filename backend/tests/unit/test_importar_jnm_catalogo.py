@@ -3,6 +3,7 @@
 from copy import deepcopy
 
 from importar_jnm_catalogo import is_generic_name, prepare_rows
+from enriquecer_jnm_imagens import unique_image_matches
 
 
 def _person(source_id, name):
@@ -79,3 +80,21 @@ def test_prepare_rows_preserves_roles_and_zeroes_only_negative_stock():
 def test_generic_names_require_exact_match():
     assert is_generic_name("  diversós ")
     assert not is_generic_name("Brinquedos diversos")
+
+
+def test_images_require_unique_exact_name_and_matching_reference_path():
+    prefix = "https://img.corepet.com.br/produtos/180d9cbf-5dcb-4676-bf11-dcbd91ed444b"
+    targets = [
+        {"id": 1, "codigo": "6", "nome": "RAC SPECIAL DOG ADULTOS CARNE 20 KG", "tipo": "produto"},
+        {"id": 2, "codigo": "7", "nome": "RAC SPECIAL DOG ADULTOS CARNE 15 KG", "tipo": "produto"},
+        {"id": 3, "codigo": "9", "nome": "SIMPARIC 20KG", "tipo": "produto"},
+    ]
+    references = [
+        {"id": 10, "nome": "Racao Special Dog Carne Adultos 20kg",
+         "imagem_principal": f"{prefix}/10/originais/a.webp"},
+        {"id": 11, "nome": "Racao Special Dog Carne Adultos 15kg",
+         "imagem_principal": f"{prefix}/11/originais/b.webp"},
+        {"id": 12, "nome": "Simparic 20kg", "imagem_principal": f"{prefix}/99/originais/c.webp"},
+    ]
+    matches = unique_image_matches(targets, references)
+    assert [(match["target_id"], match["reference_id"]) for match in matches] == [(1, 10), (2, 11)]

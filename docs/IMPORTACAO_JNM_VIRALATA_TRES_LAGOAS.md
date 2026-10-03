@@ -16,6 +16,10 @@ O cadastro da empresa ja existente no tenant de destino prevalece. O CNPJ e o
 endereco antigos do backup nao sao copiados. A origem diferente foi confirmada
 pelo responsavel como uma mudanca real da empresa.
 
+O tenant ja possui os modelos operacionais de cadastro e cinco formas de
+pagamento ativas (credito, debito, crediario, dinheiro e PIX). A importacao nao
+duplica esses registros.
+
 ## Resultado esperado da conversao
 
 | Registro | Quantidade |
@@ -60,6 +64,16 @@ produtos para evitar que a leitura escolha o item errado.
 6. Conferir as contagens gravadas, o CNPJ do tenant preservado, ausencia de
    estoque negativo e o recibo de aplicacao. A segunda aplicacao e recusada
    porque o destino deixa de estar vazio.
+7. Executar `python enriquecer_jnm_imagens.py plan` no backend com `--tenant-id`,
+   `--user-id`, `--expected-target-cnpj` e `--report-dir`. Conferir o numero de
+   correspondencias e o plano gravado. Depois, executar `apply` com `--plan-file`,
+   `--confirm-tenant-id` e `--confirm-plan-id`; em producao adicionar
+   `--allow-production-apply` e
+   `--confirm-production IMPORTAR-JNM-IMAGENS-cb731f87-2a2e-4e05-a09d-153dd9371854`.
+   As imagens sao copiadas para caminhos exclusivos do tenant de destino e
+   vinculadas apenas a produtos com descricao normalizada identica e unica no
+   catalogo padrao. Codigos de barras isolados nao sao suficientes, pois alguns
+   apontam para sabores ou embalagens diferentes.
 
 O importador valida hashes dos arquivos, banco, tenant, usuario administrador e
 prazo do plano antes de gravar. A aplicacao usa uma unica transacao. CSVs,
