@@ -5,6 +5,7 @@ import {
   FiCreditCard,
   FiHelpCircle,
   FiLogOut,
+  FiLock,
   FiMoon,
   FiSun,
   FiX,
@@ -15,6 +16,7 @@ import { Link } from "react-router-dom";
 import useNovidadesNaoVistas from "../../hooks/useNovidadesNaoVistas";
 import { useTheme } from "../../theme/ThemeContext";
 import SidebarMenu from "./SidebarMenu";
+import ChangePasswordModal from "./ChangePasswordModal";
 import { resolveLayoutSessionIdentity } from "./layoutSessionIdentity";
 
 const COREPET_LOGO = "/brand/corepet/corepet-horizontal.png";
@@ -77,6 +79,7 @@ export default function LayoutSidebar({
   const resizeRef = useRef(null);
   const [redimensionando, setRedimensionando] = useState(false);
   const [menuUsuarioAberto, setMenuUsuarioAberto] = useState(false);
+  const [alterandoSenha, setAlterandoSenha] = useState(false);
   const userMenuRef = useRef(null);
   const novidadesNaoVistas = useNovidadesNaoVistas();
   const { isDark, toggleTheme } = useTheme();
@@ -302,6 +305,18 @@ export default function LayoutSidebar({
               role="menuitem"
               onClick={() => {
                 setMenuUsuarioAberto(false);
+                setAlterandoSenha(true);
+              }}
+              className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-gray-700 transition-all hover:bg-gray-50 dark:text-slate-300 dark:hover:bg-slate-800"
+            >
+              <FiLock className="flex-shrink-0 text-lg" />
+              <span className="v2-menu-item font-medium">Alterar minha senha</span>
+            </button>
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => {
+                setMenuUsuarioAberto(false);
                 logout();
               }}
               className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-gray-700 transition-all hover:bg-red-50 hover:text-red-600 dark:text-slate-300 dark:hover:bg-red-500/10 dark:hover:text-red-200"
@@ -346,6 +361,8 @@ export default function LayoutSidebar({
           )}
         </button>
       </div>
+
+      {alterandoSenha && <ChangePasswordModal onClose={() => setAlterandoSenha(false)} />}
 
       {!isMobile && sidebarOpen && (
         <button
