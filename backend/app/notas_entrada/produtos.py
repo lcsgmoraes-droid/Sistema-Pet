@@ -628,7 +628,7 @@ def encontrar_produto_similar(
                 Produto.gtin_ean == referencia,
                 Produto.gtin_ean_tributario == referencia,
                 Produto.codigos_barras_alternativos.ilike(f"%{referencia}%"),
-            )
+            ),
         )
         if tenant_id is not None:
             query = query.filter(Produto.tenant_id == tenant_id)
