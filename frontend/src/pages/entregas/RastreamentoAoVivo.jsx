@@ -1,5 +1,6 @@
 import { Activity, Clock3, Radio, RefreshCw, WifiOff } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import toast from "react-hot-toast";
 
 import api from "../../api";
@@ -7,7 +8,7 @@ import RastreamentoLista from "./RastreamentoLista";
 import RastreamentoMapa from "./RastreamentoMapa";
 import RastreamentoSimulador from "./RastreamentoSimulador";
 import "./RastreamentoAoVivo.css";
-import { filtrarRotasEmAndamento } from "./rotasEntregaUtils";
+import { filtrarRotasEmAndamento, ordenarRotasRecentes } from "./rotasEntregaUtils";
 import {
   adicionarPontoTrilha,
   coordenadasDaRota,
@@ -38,9 +39,11 @@ function obterLocalizacaoNavegador() {
 }
 
 export default function RastreamentoAoVivo() {
+  const [searchParams] = useSearchParams();
+  const rotaInicialId = searchParams.get("rota");
   const [rotas, setRotas] = useState([]);
   const [trilhas, setTrilhas] = useState({});
-  const [rotaSelecionadaId, setRotaSelecionadaId] = useState(null);
+  const [rotaSelecionadaId, setRotaSelecionadaId] = useState(rotaInicialId);
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState("");
   const [ultimaConsulta, setUltimaConsulta] = useState(null);
@@ -53,7 +56,9 @@ export default function RastreamentoAoVivo() {
     if (consultaEmAndamentoRef.current) return;
     consultaEmAndamentoRef.current = true;
     try {
-      const response = await api.get("/rotas-entrega/");
+      const response = await api.get("/rotas-entrega/", {
+        params: { direcao: "desc", limite: 500 },
+      });
       const emAndamento = filtrarRotasEmAndamento(response.data);
       if (!montadoRef.current) return;
       setRotas(emAndamento);
@@ -104,12 +109,7 @@ export default function RastreamentoAoVivo() {
     };
   }, [rotas, ultimaConsulta]);
 
-  const rotasOrdenadas = useMemo(() => {
-    const prioridade = { ao_vivo: 0, atrasado: 1, offline: 2, sem_sinal: 3 };
-    return [...rotas].sort(
-      (a, b) => prioridade[obterEstadoSinal(a).key] - prioridade[obterEstadoSinal(b).key],
-    );
-  }, [rotas, ultimaConsulta]);
+  const rotasOrdenadas = useMemo(() => ordenarRotasRecentes(rotas), [rotas]);
 
   const selecionarRota = useCallback((rotaId) => setRotaSelecionadaId(rotaId), []);
 

@@ -103,3 +103,4 @@ def test_rotas_de_orcamento_veterinario_estao_registradas():
     assert ("/vet/orcamentos", "POST") in routes
     assert ("/vet/orcamentos/{orcamento_id}", "GET") in routes
     assert ("/vet/orcamentos/{orcamento_id}", "PATCH") in routes
+    assert ("/vet/orcamentos/{orcamento_id}/pdf", "GET") in routes
