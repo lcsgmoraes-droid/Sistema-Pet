@@ -169,7 +169,7 @@ export default function ProdutosNovo() {
   const [opcoesTratamentos, setOpcoesTratamentos] = useState([]);
   const [opcoesSabores, setOpcoesSabores] = useState([]);
   const [opcoesApresentacoes, setOpcoesApresentacoes] = useState([]);
-  const [produtoOrigemGranel, setProdutoOrigemGranel] = useState(null);
+  const [produtosOrigemGranel, setProdutosOrigemGranel] = useState([]);
   const [granelVinculos, setGranelVinculos] = useState([]);
 
   useEffect(() => {
@@ -440,8 +440,10 @@ export default function ProdutosNovo() {
     salvarFiscal,
     salvando,
     setSalvando,
-    produtoOrigemGranel,
+    produtosOrigemGranel,
+    setProdutosOrigemGranel,
     granelVinculos,
+    setGranelVinculos,
   });
 
   const { handleGerarSKU, handleGerarCodigoBarras } = useProdutosNovoCodigos({
@@ -676,8 +678,8 @@ export default function ProdutosNovo() {
       removerRegraRecorrencia,
     },
     racaoState: {
-      produtoOrigemGranel,
-      setProdutoOrigemGranel,
+      produtosOrigemGranel,
+      setProdutosOrigemGranel,
       granelVinculos,
       handleCriarOpcaoRacao,
       handleApresentacaoPesoChange,
