@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { X } from "lucide-react";
 import toast from "react-hot-toast";
-import { createProduto } from "../../api/produtos";
+import { createProduto, gerarSKU } from "../../api/produtos";
 import { calcularMargemSobreVenda, calcularPrecoVendaPorMargem } from "../../utils/produtoMargem";
 import CurrencyInput from "../CurrencyInput";
 
@@ -27,6 +27,7 @@ export default function PDVProdutoRapidoModal({ onClose, onCreated }) {
   const [precoVenda, setPrecoVenda] = useState(0);
   const [ean, setEan] = useState("");
   const [salvando, setSalvando] = useState(false);
+  const [gerandoSku, setGerandoSku] = useState(false);
 
   useEffect(() => {
     const fecharComEscape = (event) => {
@@ -59,9 +60,24 @@ export default function PDVProdutoRapidoModal({ onClose, onCreated }) {
     if (precoCalculado !== null) setPrecoVenda(Math.round(precoCalculado * 100) / 100);
   }
 
+  async function handleGerarSKU() {
+    if (gerandoSku || salvando) return;
+    try {
+      setGerandoSku(true);
+      const { data } = await gerarSKU("PROD");
+      setCodigo(data.sku);
+      toast.success("SKU gerado com sucesso.");
+    } catch (error) {
+      console.error("Erro ao gerar SKU:", error);
+      toast.error("Não foi possível gerar o SKU. Tente novamente.");
+    } finally {
+      setGerandoSku(false);
+    }
+  }
+
   async function salvar(event) {
     event.preventDefault();
-    if (salvando) return;
+    if (salvando || gerandoSku) return;
 
     const codigoLimpo = codigo.trim().toUpperCase();
     const nomeLimpo = nome.trim();
@@ -142,17 +158,30 @@ export default function PDVProdutoRapidoModal({ onClose, onCreated }) {
         </div>
 
         <div className="grid gap-4 sm:grid-cols-2">
-          <label className="block text-sm font-medium text-gray-700">
-            Código (SKU) *
-            <input
-              className={`${campoClasses} mt-1`}
-              value={codigo}
-              onChange={(event) => setCodigo(event.target.value)}
-              maxLength={50}
-              autoFocus
-              required
-            />
-          </label>
+          <div>
+            <label htmlFor="pdv-produto-sku" className="block text-sm font-medium text-gray-700">
+              Código (SKU) *
+            </label>
+            <div className="mt-1 flex gap-2">
+              <input
+                id="pdv-produto-sku"
+                className={`${campoClasses} min-w-0 flex-1`}
+                value={codigo}
+                onChange={(event) => setCodigo(event.target.value)}
+                maxLength={50}
+                autoFocus
+                required
+              />
+              <button
+                type="button"
+                onClick={handleGerarSKU}
+                disabled={gerandoSku || salvando}
+                className="rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+              >
+                {gerandoSku ? "Gerando..." : "Gerar"}
+              </button>
+            </div>
+          </div>
           <label className="block text-sm font-medium text-gray-700">
             EAN (opcional)
             <input
@@ -235,7 +264,7 @@ export default function PDVProdutoRapidoModal({ onClose, onCreated }) {
           </button>
           <button
             type="submit"
-            disabled={salvando}
+            disabled={salvando || gerandoSku}
             className="rounded-lg bg-green-600 px-4 py-2 text-sm font-semibold text-white hover:bg-green-700 disabled:opacity-50"
           >
             {salvando ? "Salvando..." : "Cadastrar produto"}
