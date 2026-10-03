@@ -16,6 +16,11 @@ from decimal import Decimal
 from pathlib import Path
 
 
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+BACKUP_FILE = Path.home() / "Downloads" / "VIRALATA_21451_2026-10-02 11-45-01.jnmbak"
+OUTPUT_DIR = PROJECT_ROOT / "runtime" / "viralata-migration" / "source-20261002"
+
+
 CLIENT_COLUMNS = (
     "source_id",
     "nome",
@@ -131,7 +136,13 @@ def write_csv(path: Path, columns: tuple[str, ...], cursor) -> dict:
     return {"rows": count, "bytes": path.stat().st_size, "sha256": sha256_file(path)}
 
 
-def export(connection, output_dir: Path, backup_file: Path, expected_cnpj: str) -> dict:
+def export(
+    connection,
+    output_dir: Path,
+    backup_sha256: str,
+    backup_bytes: int,
+    expected_cnpj: str,
+) -> dict:
     with connection.cursor(as_dict=True) as cursor:
         cursor.execute("SELECT CNPJ FROM dbo.Empresa")
         companies = cursor.fetchall()
@@ -140,8 +151,6 @@ def export(connection, output_dir: Path, backup_file: Path, expected_cnpj: str) 
     source_cnpj = normalize_cnpj(companies[0]["CNPJ"])
     if source_cnpj != normalize_cnpj(expected_cnpj):
         raise ValueError("CNPJ da empresa no backup difere do esperado")
-    if not backup_file.is_file():
-        raise ValueError("Arquivo original do backup nao encontrado")
     output_dir.mkdir(parents=True, exist_ok=True)
     files = {}
     for filename, columns, query in (
@@ -156,8 +165,8 @@ def export(connection, output_dir: Path, backup_file: Path, expected_cnpj: str) 
         "schema_version": 1,
         "source_system": "jn_moura",
         "source_cnpj": source_cnpj,
-        "backup_sha256": sha256_file(backup_file),
-        "backup_bytes": backup_file.stat().st_size,
+        "backup_sha256": backup_sha256,
+        "backup_bytes": backup_bytes,
         "exported_at": datetime.now(timezone.utc).isoformat(),
         "files": files,
     }
@@ -178,12 +187,17 @@ def main() -> int:
     parser.add_argument("--database", required=True)
     parser.add_argument("--user", default="sa")
     parser.add_argument("--expected-source-cnpj", required=True)
-    parser.add_argument("--backup-file", required=True, type=Path)
-    parser.add_argument("--output-dir", required=True, type=Path)
+    parser.add_argument("--expected-backup-sha256", required=True)
     args = parser.parse_args()
     password = os.environ.get("JNM_SQL_PASSWORD")
     if not password:
         parser.error("JNM_SQL_PASSWORD nao configurada")
+    backup_file = BACKUP_FILE.resolve(strict=True)
+    if not backup_file.is_relative_to((Path.home() / "Downloads").resolve()):
+        parser.error("Backup precisa estar no diretorio Downloads")
+    backup_sha256 = sha256_file(backup_file)
+    if backup_sha256.lower() != args.expected_backup_sha256.lower():
+        parser.error("Hash do backup original divergente")
     import pymssql
 
     with pymssql.connect(
@@ -198,8 +212,9 @@ def main() -> int:
     ) as connection:
         manifest = export(
             connection,
-            args.output_dir,
-            args.backup_file,
+            OUTPUT_DIR,
+            backup_sha256,
+            backup_file.stat().st_size,
             args.expected_source_cnpj,
         )
     print(
@@ -207,8 +222,10 @@ def main() -> int:
             {
                 "source_cnpj": manifest["source_cnpj"],
                 "backup_sha256": manifest["backup_sha256"],
-                "files": {name: info["rows"] for name, info in manifest["files"].items()},
-                "output_dir": str(args.output_dir),
+                "files": {
+                    name: info["rows"] for name, info in manifest["files"].items()
+                },
+                "output_dir": str(OUTPUT_DIR),
             },
             ensure_ascii=False,
         )

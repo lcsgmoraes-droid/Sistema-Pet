@@ -39,8 +39,11 @@ produtos para evitar que a leitura escolha o item errado.
 ## Procedimento
 
 1. Restaurar o backup apenas em banco isolado e exportar os tres CSVs com
-   `scripts/exportar_jnm_catalogo.py`. Guardar CSVs e `manifest.json` em diretorio
-   fora do Git; conferir o hash do backup e as contagens.
+   `scripts/exportar_jnm_catalogo.py`. O extrator le somente o arquivo
+   `VIRALATA_21451_2026-10-02 11-45-01.jnmbak` em Downloads, confere o hash
+   informado em `--expected-backup-sha256` e grava apenas em
+   `runtime/viralata-migration/source-20261002`, fora do Git. Conferir as
+   contagens do manifesto.
 2. Fazer backup do banco de destino antes da aplicacao em producao. Confirmar
    que o tenant ainda nao tem clientes ou produtos cadastrados.
 3. Depois do merge e deploy do codigo pelo fluxo oficial, copiar apenas os tres
