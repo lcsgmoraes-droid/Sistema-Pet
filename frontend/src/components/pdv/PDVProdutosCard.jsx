@@ -14,6 +14,8 @@ import toast from "react-hot-toast";
 import QuantidadeInput from "../QuantidadeInput";
 import SubtotalInput from "../SubtotalInput";
 import { formatMoneyBRL } from "../../utils/formatters";
+import { isAdminRole } from "../../auth/userRole";
+import { useAuth } from "../../contexts/AuthContext";
 import { resolveMediaUrl } from "../../utils/mediaUrl";
 import { obterResumoPrecoPorKg } from "../../utils/racaoPrecoKg";
 import { formatarVariacao } from "../../utils/variacoes";
@@ -21,8 +23,10 @@ import ProdutoSelector from "../produtos/ProdutoSelector";
 import CopyableCode from "../ui/CopyableCode";
 import CopyableValue from "../ui/CopyableValue";
 import Panel from "../ui/Panel";
+import ActionButton from "../ui/ActionButton";
 import { ehRacao } from "../../helpers/deteccaoRacao";
 import ModalPrevisaoFimRacao from "./ModalPrevisaoFimRacao";
+import PDVProdutoRapidoModal from "./PDVProdutoRapidoModal";
 import { resumirPrevisaoFimRacao } from "./pdvPrevisaoFimRacao";
 import { rotuloProtocoloRecorrencia } from "../../utils/pdvProtocolosRecorrencia";
 
@@ -179,6 +183,10 @@ export default function PDVProdutosCard({
   vendaAtual,
 }) {
   const [previsaoEditando, setPrevisaoEditando] = useState(null);
+  const [cadastroRapidoAberto, setCadastroRapidoAberto] = useState(false);
+  const { user } = useAuth();
+  const podeCriarProduto =
+    user?.is_admin === true || isAdminRole(user) || user?.permissions?.includes("produtos.criar");
 
   function abrirPrevisaoFimRacao(item, index, event) {
     event.stopPropagation();
@@ -206,31 +214,53 @@ export default function PDVProdutosCard({
         Produtos e Servicos
       </h2>
 
-      <ProdutoSelector
-        id="tour-pdv-busca"
-        autoFocus={!modoVisualizacao}
-        className="mb-4"
-        containerRef={buscaProdutoContainerRef}
-        disabled={modoVisualizacao}
-        inputRef={inputProdutoRef}
-        onChange={onBuscarProdutoChange}
-        onFocus={onBuscarProdutoFocus}
-        onKeyDown={onBuscarProdutoKeyDown}
-        onSelect={onSelecionarProdutoSugerido}
-        placeholder="Digite o nome do produto, codigo de barras ou servico..."
-        renderSuggestion={(produto) => (
-          <ProdutoSugestaoPDV
-            key={produto.id}
-            onAdicionarNaListaEsperaRapido={onAdicionarNaListaEsperaRapido}
-            onSelecionarProdutoSugerido={onSelecionarProdutoSugerido}
-            produto={produto}
-            vendaAtual={vendaAtual}
-          />
+      <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center">
+        <ProdutoSelector
+          id="tour-pdv-busca"
+          autoFocus={!modoVisualizacao}
+          className="w-full sm:flex-1"
+          containerRef={buscaProdutoContainerRef}
+          disabled={modoVisualizacao}
+          inputRef={inputProdutoRef}
+          onChange={onBuscarProdutoChange}
+          onFocus={onBuscarProdutoFocus}
+          onKeyDown={onBuscarProdutoKeyDown}
+          onSelect={onSelecionarProdutoSugerido}
+          placeholder="Digite o nome do produto, codigo de barras ou servico..."
+          renderSuggestion={(produto) => (
+            <ProdutoSugestaoPDV
+              key={produto.id}
+              onAdicionarNaListaEsperaRapido={onAdicionarNaListaEsperaRapido}
+              onSelecionarProdutoSugerido={onSelecionarProdutoSugerido}
+              produto={produto}
+              vendaAtual={vendaAtual}
+            />
+          )}
+          showSuggestions={mostrarSugestoesProduto}
+          suggestions={produtosSugeridos}
+          value={buscaProduto}
+        />
+        {podeCriarProduto && (
+          <ActionButton
+            type="button"
+            onClick={() => setCadastroRapidoAberto(true)}
+            disabled={modoVisualizacao}
+            icon={Plus}
+            intent="create"
+            size="md"
+            className="w-full whitespace-nowrap sm:w-auto"
+          >
+            Novo
+          </ActionButton>
         )}
-        showSuggestions={mostrarSugestoesProduto}
-        suggestions={produtosSugeridos}
-        value={buscaProduto}
-      />
+      </div>
+
+      {cadastroRapidoAberto && (
+        <PDVProdutoRapidoModal
+          onClose={() => setCadastroRapidoAberto(false)}
+          onCreated={onSelecionarProdutoSugerido}
+        />
+      )}
 
       {vendaAtual.itens.length === 0 ? (
         <div className="text-center py-12 text-gray-400">
