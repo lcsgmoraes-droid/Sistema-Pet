@@ -48,6 +48,7 @@ function buildNovoClienteFormData(tipoCadastro, tipoPessoa) {
     auth_user_id: null,
     app_login: null,
     app_access_profiles: perfilInicial,
+    pode_liberar_venda_crediario_atrasado: false,
     cnpj: "",
     inscricao_estadual: "",
     razao_social: "",
@@ -106,6 +107,7 @@ function buildClienteFormData(cliente) {
     auth_user_id: cliente.auth_user_id || null,
     app_login: null,
     app_access_profiles: cliente.app_access_profiles || [],
+    pode_liberar_venda_crediario_atrasado: Boolean(cliente.pode_liberar_venda_crediario_atrasado),
     cnpj: cliente.cnpj || "",
     inscricao_estadual: cliente.inscricao_estadual || "",
     razao_social: cliente.razao_social || "",
@@ -553,6 +555,7 @@ export function useClientesNovoCadastro({
         delete clienteData.auth_user_id;
         delete clienteData.app_login;
         delete clienteData.app_access_profiles;
+        delete clienteData.pode_liberar_venda_crediario_atrasado;
       }
 
       if (clienteData.is_entregador) {

@@ -4,7 +4,7 @@ from fastapi import HTTPException, status
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from app.models import AppAccessProfile, Cliente, User
+from app.models import AppAccessProfile, Cliente, User, UserTenant
 
 
 def _somente_digitos_coluna(coluna):
@@ -102,10 +102,19 @@ def _anexar_metadados_criacao_cliente(db: Session, clientes):
         if getattr(cliente, "auth_user_id", None)
     }
     usuarios_app_por_id = {}
+    liberacao_crediario_por_conta = {}
     if auth_user_ids:
         usuarios_app_por_id = {
             usuario.id: usuario
             for usuario in db.query(User).filter(User.id.in_(auth_user_ids)).all()
+        }
+        liberacao_crediario_por_conta = {
+            (str(vinculo.tenant_id), vinculo.user_id): bool(
+                vinculo.pode_liberar_venda_crediario_atrasado
+            )
+            for vinculo in db.query(UserTenant)
+            .filter(UserTenant.user_id.in_(auth_user_ids))
+            .all()
         }
 
     cliente_ids = [cliente.id for cliente in lista if getattr(cliente, "id", None)]
@@ -163,6 +172,13 @@ def _anexar_metadados_criacao_cliente(db: Session, clientes):
             cliente,
             "app_access_profiles",
             perfis_por_cliente.get(getattr(cliente, "id", None), []),
+        )
+        setattr(
+            cliente,
+            "pode_liberar_venda_crediario_atrasado",
+            liberacao_crediario_por_conta.get(
+                (str(cliente.tenant_id), cliente.auth_user_id), False
+            ),
         )
     return clientes
 

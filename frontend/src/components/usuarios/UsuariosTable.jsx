@@ -17,6 +17,8 @@ export default function UsuariosTable({
   onManageCredentials,
   onToggleStatus,
   onDelete,
+  onToggleCrediario,
+  savingLiberacaoId,
   usuarios,
 }) {
   const columns = [
@@ -67,6 +69,24 @@ export default function UsuariosTable({
         <StatusBadge intent="info" size="sm">
           {usuario.role || "Sem perfil"}
         </StatusBadge>
+      ),
+    },
+    {
+      key: "liberacao_crediario",
+      header: "Pode liberar venda bloqueada",
+      align: "center",
+      render: (usuario) => (
+        <label className="inline-flex cursor-pointer items-center gap-2 text-xs text-slate-700">
+          <input
+            type="checkbox"
+            aria-label={`Autorizar ${usuario.nome || usuario.email || usuario.user_id} a liberar venda com crediário atrasado`}
+            checked={Boolean(usuario.pode_liberar_venda_crediario_atrasado)}
+            disabled={savingLiberacaoId === usuario.user_id}
+            onChange={(event) => onToggleCrediario(usuario, event.target.checked)}
+            className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+          />
+          {usuario.pode_liberar_venda_crediario_atrasado ? "Concedida" : "Não concedida"}
+        </label>
       ),
     },
     {
@@ -124,7 +144,7 @@ export default function UsuariosTable({
         getRowKey={(usuario) => usuario.user_id}
         loading={loading}
         loadingMessage="Carregando usuarios..."
-        tableClassName="min-w-[860px]"
+        tableClassName="min-w-[1060px]"
       />
     </Panel>
   );

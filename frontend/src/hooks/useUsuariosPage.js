@@ -97,6 +97,7 @@ export default function useUsuariosPage() {
   const [credenciaisError, setCredenciaisError] = useState("");
   const [generatedPassword, setGeneratedPassword] = useState("");
   const [savingCredentials, setSavingCredentials] = useState(false);
+  const [savingLiberacaoId, setSavingLiberacaoId] = useState(null);
   const [initialAccessCredentials, setInitialAccessCredentials] = useState(null);
   const tenantLoginReference = resolveTenantLoginReference(
     user,
@@ -123,6 +124,27 @@ export default function useUsuariosPage() {
     } catch (error) {
       console.error("Erro ao carregar perfis:", error);
       toast.error("Nao foi possivel carregar os perfis de acesso.");
+    }
+  }
+
+  async function alterarLiberacaoCrediario(usuario, autorizado) {
+    setSavingLiberacaoId(usuario.user_id);
+    try {
+      await api.patch(`/usuarios/${usuario.user_id}/liberacao-crediario`, { autorizado });
+      setUsuarios((atuais) =>
+        atuais.map((item) =>
+          item.user_id === usuario.user_id
+            ? { ...item, pode_liberar_venda_crediario_atrasado: autorizado }
+            : item,
+        ),
+      );
+      toast.success(
+        autorizado ? "Usuário autorizado a liberar vendas bloqueadas." : "Autorização removida.",
+      );
+    } catch (error) {
+      toast.error(error.response?.data?.detail || "Não foi possível alterar a autorização.");
+    } finally {
+      setSavingLiberacaoId(null);
     }
   }
 
@@ -349,9 +371,11 @@ export default function useUsuariosPage() {
     showPassword,
     salvarCredenciais,
     savingCredentials,
+    savingLiberacaoId,
     setInitialAccessCredentials,
     tenantLoginReference,
     toggleStatus,
+    alterarLiberacaoCrediario,
     excluirUsuario,
     usuarioFormError,
     usuarioCredenciais,

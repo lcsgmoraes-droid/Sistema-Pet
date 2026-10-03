@@ -262,7 +262,7 @@ export function useModalPagamentoActions({
         }
         const motivo = await perguntarCorePet({
           titulo: "Liberar venda bloqueada",
-          mensagem: `${detalhe}\n\nUm usuário com permissão para editar configurações pode liberar esta venda. Informe o motivo:`,
+          mensagem: `${detalhe}\n\nUm administrador ou usuário autorizado em Administração > Usuários pode liberar esta venda. Informe o motivo:`,
           placeholder: "Motivo da liberação (mínimo de 10 caracteres)",
           confirmarTexto: "Liberar esta venda",
         });
