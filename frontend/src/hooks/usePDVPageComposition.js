@@ -291,6 +291,8 @@ export function usePDVPageComposition({
     onObservacoesEntregaChange: handleObservacoesEntregaChange,
     onSelecionarEndereco: handleSelecionarEnderecoEntrega,
     onSelecionarEntregador: handleSelecionarEntregador,
+    onPagamentoEntregaPrevistoChange: (pagamento_entrega_previsto) =>
+      setVendaAtual((prev) => ({ ...prev, pagamento_entrega_previsto })),
     onTaxaEntregaTotalChange: handleTaxaEntregaTotalChange,
     onTaxaEntregadorChange: handleTaxaEntregadorChange,
     onTaxaLojaChange: handleTaxaLojaChange,

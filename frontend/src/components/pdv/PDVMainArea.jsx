@@ -93,6 +93,7 @@ export default function PDVMainArea(props) {
     onObservacoesEntregaChange,
     onSelecionarEndereco,
     onSelecionarEntregador,
+    onPagamentoEntregaPrevistoChange,
     onTaxaEntregaTotalChange,
     onTaxaEntregadorChange,
     onTaxaLojaChange,
@@ -277,6 +278,7 @@ export default function PDVMainArea(props) {
             onObservacoesEntregaChange={onObservacoesEntregaChange}
             onSelecionarEndereco={onSelecionarEndereco}
             onSelecionarEntregador={onSelecionarEntregador}
+            onPagamentoEntregaPrevistoChange={onPagamentoEntregaPrevistoChange}
             onTaxaEntregaTotalChange={onTaxaEntregaTotalChange}
             onTaxaEntregadorChange={onTaxaEntregadorChange}
             onTaxaLojaChange={onTaxaLojaChange}

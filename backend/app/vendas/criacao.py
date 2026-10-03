@@ -65,6 +65,7 @@ def criar_venda(
         obter_protocolo_ativo_do_produto,
     )
     from app.vendas.racao_previsao import validar_previsao_fim_racao
+    from app.vendas.pagamento_entrega_previsto import validar_valor_para_troco
 
     logger.info(f"📝 Criando nova venda para user_id={user_id}")
 
@@ -108,6 +109,7 @@ def criar_venda(
         tem_entrega = bool(payload.get("tem_entrega", False))
         taxa_entrega = (payload.get("taxa_entrega", 0) or 0) if tem_entrega else 0
         total = subtotal_itens + taxa_entrega
+        validar_valor_para_troco(payload.get("pagamento_entrega_previsto"), saldo=total)
 
         # 🚚 Calcular distribuição da taxa de entrega
         percentual_taxa_entregador = (
@@ -181,6 +183,9 @@ def criar_venda(
             distancia_km=payload.get("distancia_km") if tem_entrega else None,
             valor_por_km=payload.get("valor_por_km") if tem_entrega else None,
             observacoes_entrega=payload.get("observacoes_entrega")
+            if tem_entrega
+            else None,
+            pagamento_entrega_previsto=payload.get("pagamento_entrega_previsto")
             if tem_entrega
             else None,
             status_entrega="pendente" if tem_entrega else None,

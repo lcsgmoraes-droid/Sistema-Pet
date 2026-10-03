@@ -113,9 +113,7 @@ def listar_produtos_origem_granel(
     for palavra in termo.split():
         query = query.filter(_produto_search_conditions_fast(palavra))
     ordenacao = (
-        _build_produto_search_order_clause(termo)
-        if termo
-        else [Produto.nome.asc()]
+        _build_produto_search_order_clause(termo) if termo else [Produto.nome.asc()]
     )
     produtos = query.order_by(*ordenacao).limit(limite).all()
     return [

@@ -24,6 +24,8 @@ const DEFAULT_FORM = {
   crediario_encargos_automaticos: false,
   crediario_multa_percentual: 2,
   crediario_juros_mensal_percentual: 1,
+  bloquear_venda_crediario_atrasado: false,
+  dias_atraso_bloqueio_venda: 30,
   meta_faturamento_mensal: 0,
   alerta_estoque_percentual: 20,
   dias_produto_parado: 90,
@@ -69,6 +71,8 @@ export default function ConfiguracaoGeralNegocio() {
           crediario_encargos_automaticos: Boolean(data.crediario_encargos_automaticos),
           crediario_multa_percentual: Number(data.crediario_multa_percentual ?? 2),
           crediario_juros_mensal_percentual: Number(data.crediario_juros_mensal_percentual ?? 1),
+          bloquear_venda_crediario_atrasado: Boolean(data.bloquear_venda_crediario_atrasado),
+          dias_atraso_bloqueio_venda: Number(data.dias_atraso_bloqueio_venda ?? 30),
           meta_faturamento_mensal: Number(data.meta_faturamento_mensal ?? 0),
           alerta_estoque_percentual: Number(data.alerta_estoque_percentual ?? 20),
           dias_produto_parado: Number(data.dias_produto_parado ?? 90),
@@ -132,6 +136,15 @@ export default function ConfiguracaoGeralNegocio() {
       return;
     }
 
+    if (
+      !Number.isInteger(form.dias_atraso_bloqueio_venda) ||
+      form.dias_atraso_bloqueio_venda < 1 ||
+      form.dias_atraso_bloqueio_venda > 3650
+    ) {
+      toast.error("Informe de 1 a 3650 dias para bloquear a venda");
+      return;
+    }
+
     setSalvando(true);
     try {
       const response = await api.put("/empresa/config/", {
@@ -148,6 +161,8 @@ export default function ConfiguracaoGeralNegocio() {
         crediario_encargos_automaticos: Boolean(form.crediario_encargos_automaticos),
         crediario_multa_percentual: Number(form.crediario_multa_percentual),
         crediario_juros_mensal_percentual: Number(form.crediario_juros_mensal_percentual),
+        bloquear_venda_crediario_atrasado: Boolean(form.bloquear_venda_crediario_atrasado),
+        dias_atraso_bloqueio_venda: Number(form.dias_atraso_bloqueio_venda),
         meta_faturamento_mensal: Number(form.meta_faturamento_mensal),
         alerta_estoque_percentual: Number(form.alerta_estoque_percentual),
         dias_produto_parado: Number(form.dias_produto_parado),
@@ -416,6 +431,40 @@ export default function ConfiguracaoGeralNegocio() {
           Informe estas condicoes ao cliente na venda a prazo. A multa de mora fica limitada a 2% no
           sistema.
         </p>
+        <div className="mt-5 border-t border-gray-200 pt-5">
+          <label className="inline-flex cursor-pointer items-center gap-2 text-sm font-semibold text-gray-800">
+            <input
+              type="checkbox"
+              checked={form.bloquear_venda_crediario_atrasado}
+              onChange={(e) => onChange("bloquear_venda_crediario_atrasado", e.target.checked)}
+              className="h-4 w-4"
+            />
+            Bloquear vendas para clientes com crediário em atraso
+          </label>
+          <div className="mt-3 max-w-xs">
+            <label
+              htmlFor="dias-atraso-bloqueio-venda"
+              className="mb-1 block text-sm font-medium text-gray-700"
+            >
+              Bloquear a partir de quantos dias de atraso?
+            </label>
+            <input
+              id="dias-atraso-bloqueio-venda"
+              type="number"
+              min="1"
+              max="3650"
+              step="1"
+              value={form.dias_atraso_bloqueio_venda}
+              onChange={(e) => onChange("dias_atraso_bloqueio_venda", e.target.value, true)}
+              className={campoClass("dias_atraso_bloqueio_venda")}
+            />
+          </div>
+          <p className="mt-2 text-xs leading-relaxed text-gray-500">
+            Considera parcelas de crediário ainda não quitadas. O bloqueio vale para qualquer forma
+            de pagamento e é removido após a quitação. Um responsável com acesso às configurações
+            pode liberar uma venda com motivo registrado.
+          </p>
+        </div>
       </div>
 
       <div className={blocoClass(["margem_saudavel_minima", "margem_alerta_minima"])}>

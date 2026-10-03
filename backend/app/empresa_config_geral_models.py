@@ -97,6 +97,12 @@ class EmpresaConfigGeral(BaseTenantModel):
     crediario_juros_mensal_percentual = Column(
         Numeric(6, 3), default=1.0, nullable=False
     )
+    bloquear_venda_crediario_atrasado = Column(
+        Boolean, default=False, nullable=False, server_default="false"
+    )
+    dias_atraso_bloqueio_venda = Column(
+        Integer, default=30, nullable=False, server_default="30"
+    )
 
     # Meta de faturamento mensal (para dashboard)
     meta_faturamento_mensal = Column(Numeric(12, 2), default=0)
@@ -175,6 +181,10 @@ class EmpresaConfigGeral(BaseTenantModel):
             "crediario_juros_mensal_percentual": float(
                 self.crediario_juros_mensal_percentual or 0
             ),
+            "bloquear_venda_crediario_atrasado": bool(
+                self.bloquear_venda_crediario_atrasado
+            ),
+            "dias_atraso_bloqueio_venda": self.dias_atraso_bloqueio_venda,
             "meta_faturamento_mensal": (
                 float(self.meta_faturamento_mensal)
                 if self.meta_faturamento_mensal

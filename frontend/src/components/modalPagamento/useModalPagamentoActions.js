@@ -22,7 +22,7 @@ import {
   persistirVendaAbertaParaPagamento,
   validarPagamentoParaAdicionar,
 } from "../modalPagamentoUtils";
-import { confirmarCorePet } from "../../services/corepetDialog";
+import { confirmarCorePet, perguntarCorePet } from "../../services/corepetDialog";
 
 export function useModalPagamentoActions({
   bandeira,
@@ -244,10 +244,34 @@ export function useModalPagamentoActions({
       }
 
       const vendaId = await salvarVendaAbertaParaPagamento();
-      const resultado = await finalizarVenda(vendaId, pagamentos, {
+      const opcoesFinalizacao = {
         cupom_code: cupomParaFinalizar?.code || null,
         cupom_discount_applied: cupomParaFinalizar?.discount_applied ?? null,
-      });
+      };
+      let resultado;
+      try {
+        resultado = await finalizarVenda(vendaId, pagamentos, opcoesFinalizacao);
+      } catch (erroBloqueio) {
+        const detalhe = erroBloqueio.response?.data?.detail;
+        if (
+          erroBloqueio.response?.status !== 409 ||
+          typeof detalhe !== "string" ||
+          !detalhe.startsWith("Venda bloqueada:")
+        ) {
+          throw erroBloqueio;
+        }
+        const motivo = await perguntarCorePet({
+          titulo: "Liberar venda bloqueada",
+          mensagem: `${detalhe}\n\nUm usuário com permissão para editar configurações pode liberar esta venda. Informe o motivo:`,
+          placeholder: "Motivo da liberação (mínimo de 10 caracteres)",
+          confirmarTexto: "Liberar esta venda",
+        });
+        if (motivo === null) throw erroBloqueio;
+        resultado = await finalizarVenda(vendaId, pagamentos, {
+          ...opcoesFinalizacao,
+          motivo_liberacao_crediario: motivo.trim(),
+        });
+      }
 
       const tiposPorFormaId = new Map(
         pagamentos

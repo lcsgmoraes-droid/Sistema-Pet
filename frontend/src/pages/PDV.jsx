@@ -72,6 +72,7 @@ export default function PDV() {
     funcionario_id: null, // ✅ Funcionário para comissão
     entregador_id: null, // 🚚 Entregador para entrega
     tem_entrega: false,
+    pagamento_entrega_previsto: null,
     entrega: {
       endereco_completo: "",
       taxa_entrega_total: 0,
