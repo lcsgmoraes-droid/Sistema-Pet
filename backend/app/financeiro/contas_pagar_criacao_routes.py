@@ -247,6 +247,8 @@ async def criar_conta_pagar(
         # RECONCILIAÇÃO DAS SIMPLES NACIONAL
         # ============================
         for conta_criada in contas_criadas:
+            if not conta_criada.afeta_dre:
+                continue
             try:
                 # Verificar se é DAS Simples Nacional
                 categoria = (
@@ -298,6 +300,8 @@ async def criar_conta_pagar(
         # RECONCILIAÇÃO DE PROVISÕES TRABALHISTAS
         # ============================
         for conta_criada in contas_criadas:
+            if not conta_criada.afeta_dre:
+                continue
             try:
                 categoria = (
                     db.query(CategoriaFinanceira)

@@ -142,6 +142,8 @@ def _sincronizar_recorrencia_pos_pagamento(
         hoje=date.today(),
     )
     for conta_recorrente in contas_recorrentes:
+        if not conta_recorrente.afeta_dre:
+            continue
         try:
             atualizar_dre_por_lancamento(
                 db=db,

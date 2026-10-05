@@ -117,7 +117,7 @@ export function useModalNovaContaPagarController({ isOpen, onClose, onSave, cont
   const handleCategoriaChange = (categoriaIdValue) => {
     const categoriaId = categoriaIdValue ? parseInt(categoriaIdValue, 10) : null;
     const categoria = safeArray(categorias).find((item) => item.id === categoriaId) || null;
-    const dreSubcategoriaId = categoria?.dre_subcategoria_id || null;
+    const dreSubcategoriaId = dados.afeta_dre ? categoria?.dre_subcategoria_id || null : null;
 
     setDados((dadosAtuais) => ({
       ...dadosAtuais,
@@ -125,7 +125,7 @@ export function useModalNovaContaPagarController({ isOpen, onClose, onSave, cont
       dre_subcategoria_id: dreSubcategoriaId,
     }));
 
-    if (categoria && !dreSubcategoriaId) {
+    if (dados.afeta_dre && categoria && !dreSubcategoriaId) {
       abrirModalVinculoDRE(categoria.id);
     }
   };
@@ -287,7 +287,12 @@ export function useModalNovaContaPagarController({ isOpen, onClose, onSave, cont
   const handleSubmit = async (event) => {
     event.preventDefault();
 
-    if (!dados.descricao || !dados.valor_original || !dados.data_vencimento) {
+    if (
+      !dados.descricao ||
+      !dados.valor_original ||
+      !dados.data_emissao ||
+      !dados.data_vencimento
+    ) {
       toast.error("Preencha todos os campos obrigatórios");
       return;
     }
