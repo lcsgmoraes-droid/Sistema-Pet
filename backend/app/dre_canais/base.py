@@ -10,7 +10,10 @@ from sqlalchemy import func, or_
 from app.dre_plano_contas_models import DRESubcategoria
 from app.financeiro_models import ContaPagar
 from app.vendas_models import Venda, VendaItem
-from app.services.venda_rentabilidade_snapshot_service import SNAPSHOT_VERSION
+from app.services.venda_rentabilidade_snapshot_service import (
+    SNAPSHOT_VERSION,
+    ajustar_snapshot_taxa_mista,
+)
 
 
 CANAIS_CONFIG = {
@@ -129,7 +132,11 @@ def _snapshot_pronto(venda: Venda) -> Optional[Dict[str, Any]]:
         version = int(snapshot.get("snapshot_version") or 0)
     except (TypeError, ValueError):
         version = 0
-    return snapshot if version >= SNAPSHOT_VERSION else None
+    return (
+        ajustar_snapshot_taxa_mista(venda, snapshot)
+        if version >= SNAPSHOT_VERSION
+        else None
+    )
 
 
 def _campo_zero() -> Decimal:
