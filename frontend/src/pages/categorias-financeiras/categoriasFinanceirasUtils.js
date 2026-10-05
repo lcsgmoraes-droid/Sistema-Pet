@@ -125,6 +125,15 @@ export function countCategoriasByTipo(categorias, tipo) {
   return categorias.filter((categoria) => categoria.tipo === tipo).length;
 }
 
+export function podeClassificarCustoPeDRE(categoria, subcategoria) {
+  return (
+    categoria.pode_editar === true &&
+    categoria.tipo_custo === "ambos" &&
+    (subcategoria.categoria_financeira_id == null ||
+      subcategoria.categoria_financeira_id === categoria.id)
+  );
+}
+
 export function getFilhasFinanceiras(categorias, categoriaPaiId) {
   return categorias.filter((categoria) => categoria.categoria_pai_id === categoriaPaiId);
 }

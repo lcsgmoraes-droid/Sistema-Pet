@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 
 from app.audit_log import log_action
 from app.auth.dependencies import get_current_user_and_tenant
+from app.categorias_integridade import normalizar_nome_categoria
 from app.caixa.service import CaixaService
 from app.caixa.escopo import buscar_caixa_acessivel
 from app.db import get_session
@@ -45,6 +46,32 @@ def _validar_saldo_devolucao(
             ),
         )
     return quantidade_disponivel
+
+
+def _buscar_categoria_devolucoes(db: Session, tenant_id):
+    """Reutiliza a categoria de devolução, inclusive o nome plural legado."""
+    from app.financeiro_models import CategoriaFinanceira
+
+    candidatas = (
+        db.query(CategoriaFinanceira)
+        .filter(
+            CategoriaFinanceira.tenant_id == tenant_id,
+            CategoriaFinanceira.tipo == "despesa",
+            CategoriaFinanceira.ativo.is_(True),
+            CategoriaFinanceira.nome.ilike("%devolu%"),
+        )
+        .order_by(CategoriaFinanceira.id)
+        .all()
+    )
+    return next(
+        (
+            categoria
+            for categoria in candidatas
+            if normalizar_nome_categoria(categoria.nome).startswith("devoluc")
+            and "venda" in normalizar_nome_categoria(categoria.nome)
+        ),
+        None,
+    )
 
 
 @router.post("/{venda_id}/devolucao")
@@ -414,15 +441,7 @@ def registrar_devolucao(
             # Criar lançamento manual de saída (estorno no fluxo de caixa)
             from app.financeiro_models import LancamentoManual, CategoriaFinanceira
 
-            categoria_devolucoes = (
-                db.query(CategoriaFinanceira)
-                .filter(
-                    CategoriaFinanceira.nome.ilike("%devolução%"),
-                    CategoriaFinanceira.tipo == "despesa",
-                    CategoriaFinanceira.tenant_id == tenant_id,
-                )
-                .first()
-            )
+            categoria_devolucoes = _buscar_categoria_devolucoes(db, tenant_id)
 
             if not categoria_devolucoes:
                 categoria_devolucoes = CategoriaFinanceira(
