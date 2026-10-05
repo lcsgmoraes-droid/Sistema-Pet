@@ -25,6 +25,22 @@ def _moeda(valor) -> Decimal:
     return _decimal(valor).quantize(CENTAVO, rounding=ROUND_HALF_UP)
 
 
+def _assinatura_item(item) -> tuple:
+    return (
+        getattr(item, "produto_id", None),
+        _decimal(getattr(item, "quantidade", 0)),
+        _moeda(getattr(item, "preco_unitario", 0)),
+    )
+
+
+def _assinatura_fotografia(fotografia) -> tuple:
+    return (
+        fotografia.get("produto_id"),
+        _decimal(fotografia.get("quantidade")),
+        _moeda(fotografia.get("preco_unitario")),
+    )
+
+
 def _custo_snapshot(venda, item, quantidade: Decimal) -> Decimal | None:
     snapshot = getattr(venda, "rentabilidade_snapshot", None)
     if isinstance(snapshot, str):
@@ -34,38 +50,38 @@ def _custo_snapshot(venda, item, quantidade: Decimal) -> Decimal | None:
             return None
     if not isinstance(snapshot, dict):
         return None
-    if int(snapshot.get("snapshot_version") or 0) < SNAPSHOT_VERSION:
+    try:
+        versao = int(snapshot.get("snapshot_version") or 0)
+    except (TypeError, ValueError):
+        return None
+    if versao < SNAPSHOT_VERSION:
         return None
 
     itens_venda = list(getattr(venda, "itens", []) or [])
     itens_snapshot = snapshot.get("itens")
     if not isinstance(itens_snapshot, list) or len(itens_venda) != len(itens_snapshot):
         return None
-    for indice, item_venda in enumerate(itens_venda):
-        if getattr(item_venda, "id", None) != getattr(item, "id", None):
-            continue
-        fotografia = itens_snapshot[indice]
-        if not isinstance(fotografia, dict):
-            return None
-        if fotografia.get("produto_id") != getattr(item, "produto_id", None):
-            return None
-        quantidade_original = _decimal(getattr(item, "quantidade", 0))
-        if (
-            quantidade_original <= 0
-            or _decimal(fotografia.get("quantidade")) != quantidade_original
-        ):
-            return None
-        if _moeda(fotografia.get("preco_unitario")) != _moeda(
-            getattr(item, "preco_unitario", 0)
-        ):
-            return None
-        custo_original = _moeda(fotografia.get("custo_total"))
-        return (
-            _moeda(custo_original * quantidade / quantidade_original)
-            if custo_original > 0
-            else None
-        )
-    return None
+    assinatura = _assinatura_item(item)
+    quantidade_original = assinatura[1]
+    if quantidade_original <= 0 or quantidade > quantidade_original:
+        return None
+    if sum(_assinatura_item(outro) == assinatura for outro in itens_venda) != 1:
+        return None
+    if not all(isinstance(fotografia, dict) for fotografia in itens_snapshot):
+        return None
+    correspondencias = [
+        fotografia
+        for fotografia in itens_snapshot
+        if _assinatura_fotografia(fotografia) == assinatura
+    ]
+    if len(correspondencias) != 1:
+        return None
+    custo_original = _moeda(correspondencias[0].get("custo_total"))
+    return (
+        _moeda(custo_original * quantidade / quantidade_original)
+        if custo_original > 0
+        else None
+    )
 
 
 def custo_original_item_devolvido(
@@ -78,6 +94,17 @@ def custo_original_item_devolvido(
 
     produto_id = getattr(item, "produto_id", None)
     if str(getattr(item, "tipo", "") or "").lower() != "produto" or not produto_id:
+        return Decimal("0"), "sem_custo_original", True
+
+    # A saída de estoque é vinculada ao produto e à venda, não à linha vendida.
+    # Com mais de uma linha do mesmo produto, o custo individual é ambíguo.
+    if (
+        sum(
+            getattr(outro, "produto_id", None) == produto_id
+            for outro in (getattr(venda, "itens", []) or [])
+        )
+        != 1
+    ):
         return Decimal("0"), "sem_custo_original", True
 
     tenant_estoque, _ = resolver_tenant_estoque_item(item, tenant_id)

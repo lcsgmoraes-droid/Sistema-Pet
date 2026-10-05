@@ -90,6 +90,73 @@ def test_custo_original_usa_snapshot_por_item_e_nao_cadastro_atual():
     assert _custo_snapshot(venda, item, Decimal("1")) == Decimal("30.00")
 
 
+def test_snapshot_nao_depende_da_ordem_da_relacao_de_itens():
+    primeiro = SimpleNamespace(id=7, produto_id=11, quantidade=2, preco_unitario=50)
+    segundo = SimpleNamespace(id=8, produto_id=12, quantidade=1, preco_unitario=80)
+    venda = SimpleNamespace(
+        itens=[segundo, primeiro],
+        rentabilidade_snapshot={
+            "snapshot_version": 5,
+            "itens": [
+                {
+                    "produto_id": 11,
+                    "quantidade": 2,
+                    "preco_unitario": 50,
+                    "custo_total": 60,
+                },
+                {
+                    "produto_id": 12,
+                    "quantidade": 1,
+                    "preco_unitario": 80,
+                    "custo_total": 25,
+                },
+            ],
+        },
+    )
+
+    assert _custo_snapshot(venda, primeiro, Decimal("1")) == Decimal("30.00")
+    assert _custo_snapshot(venda, segundo, Decimal("1")) == Decimal("25.00")
+
+
+def test_snapshot_duplicado_com_custos_diferentes_fica_pendente_sem_saida_rastreavel():
+    item = SimpleNamespace(
+        id=7, tipo="produto", produto_id=11, quantidade=1, preco_unitario=50
+    )
+    repetido = SimpleNamespace(
+        id=8, tipo="produto", produto_id=11, quantidade=1, preco_unitario=50
+    )
+    venda = SimpleNamespace(
+        id=123,
+        itens=[repetido, item],
+        rentabilidade_snapshot={
+            "snapshot_version": 5,
+            "itens": [
+                {
+                    "produto_id": 11,
+                    "quantidade": 1,
+                    "preco_unitario": 50,
+                    "custo_total": 30,
+                },
+                {
+                    "produto_id": 11,
+                    "quantidade": 1,
+                    "preco_unitario": 50,
+                    "custo_total": 40,
+                },
+            ],
+        },
+    )
+    db = MagicMock()
+
+    assert _custo_snapshot(venda, item, Decimal("1")) is None
+    custo, origem, pendente = devolucao_dre.custo_original_item_devolvido(
+        db, venda, item, Decimal("1"), "tenant"
+    )
+
+    assert (custo, origem, pendente) == (Decimal("0"), "sem_custo_original", True)
+    db.query.assert_not_called()
+
+
 def test_sem_snapshot_usa_saida_historica_do_estoque(monkeypatch):
     item = SimpleNamespace(id=7, tipo="produto", produto_id=11, quantidade=2)
     venda = SimpleNamespace(id=123, rentabilidade_snapshot=None, itens=[item])
