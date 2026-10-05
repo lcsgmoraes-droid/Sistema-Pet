@@ -87,6 +87,19 @@ test("classifica CMV novo como custo no plano DRE", async () => {
   assert.deepEqual(payload, { nome: "CMV", natureza: "custo" });
 });
 
+test("classifica custo dos serviços prestados como custo no plano DRE", async () => {
+  let payload;
+  const api = {
+    get: async () => ({ data: [] }),
+    post: async (_url, data) => {
+      payload = data;
+      return { data: { id: 10 } };
+    },
+  };
+  await garantirCategoriaDRE(api, { nome: "Custo dos Serviços Prestados", tipo: "despesa" });
+  assert.deepEqual(payload, { nome: "Custo dos Serviços Prestados", natureza: "custo" });
+});
+
 test("reutiliza categoria DRE de custo existente para CMV", () => {
   assert.equal(
     resolverCategoriaDREId({

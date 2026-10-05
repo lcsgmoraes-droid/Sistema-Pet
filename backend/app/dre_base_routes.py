@@ -4,12 +4,14 @@ from decimal import Decimal
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import and_, extract
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from .auth.dependencies import get_current_user_and_tenant
 from .db import get_session
+from .dre_canais.base import _separar_receita_produto_servico
 from .dre_calculos import (
     calcular_cmv,
+    calcular_custo_servicos,
     calcular_frete_notas_entrada,
     calcular_taxas_cartao,
     obter_despesas_por_categoria,
@@ -63,6 +65,7 @@ def gerar_dre(
     # Vendas de produtos e serviços
     vendas = (
         db.query(Venda)
+        .options(selectinload(Venda.itens))
         .filter(
             and_(
                 extract("month", Venda.data_venda) == mes,
@@ -74,14 +77,29 @@ def gerar_dre(
         .all()
     )
 
-    receita_bruta = sum([v.subtotal + (v.taxa_entrega or 0) for v in vendas])
-    vendas_produtos = receita_bruta  # Por enquanto, tudo como produtos
+    vendas_produtos = Decimal("0")
     vendas_servicos = Decimal("0")
-    outras_receitas = Decimal("0")  # Pode buscar de lançamentos manuais
+    receita_frete = Decimal("0")
+    outras_receitas = Decimal("0")  # Lançamentos manuais estão na DRE por canais.
+    for venda in vendas:
+        desconto_itens = sum(
+            (
+                Decimal(str(getattr(item, "desconto_item", 0) or 0))
+                for item in venda.itens
+            ),
+            Decimal("0"),
+        )
+        # Desconto global não reduz Venda.subtotal; desconto rateado por item reduz.
+        subtotal_bruto = Decimal(str(venda.subtotal or 0)) + desconto_itens
+        produtos, servicos = _separar_receita_produto_servico(venda, subtotal_bruto)
+        vendas_produtos += produtos
+        vendas_servicos += servicos
+        receita_frete += Decimal(str(venda.taxa_entrega or 0))
+    receita_bruta = vendas_produtos + vendas_servicos + receita_frete + outras_receitas
 
     # ========== 2. DEDUÇÕES ==========
 
-    descontos = sum([v.desconto_valor or 0 for v in vendas])
+    descontos = sum((Decimal(str(v.desconto_valor or 0)) for v in vendas), Decimal("0"))
     devolucoes = Decimal("0")  # Implementar quando tiver sistema de devoluções
     deducoes_total = descontos + devolucoes
 
@@ -89,13 +107,14 @@ def gerar_dre(
 
     receita_liquida = receita_bruta - deducoes_total
 
-    # ========== 4. CMV ==========
+    # ========== 4. CUSTOS DIRETOS ==========
 
     cmv = calcular_cmv(db, mes, ano, tenant_id)
+    custo_servicos = calcular_custo_servicos(db, mes, ano, tenant_id)
 
     # ========== 5. LUCRO BRUTO ==========
 
-    lucro_bruto = receita_liquida - cmv
+    lucro_bruto = receita_liquida - cmv - custo_servicos
     margem_bruta = float(
         (lucro_bruto / receita_bruta * 100) if receita_bruta > 0 else 0
     )
@@ -152,12 +171,14 @@ def gerar_dre(
         receita_bruta=receita_bruta,
         vendas_produtos=vendas_produtos,
         vendas_servicos=vendas_servicos,
+        receita_frete=receita_frete,
         outras_receitas=outras_receitas,
         deducoes_total=deducoes_total,
         descontos=descontos,
         devolucoes=devolucoes,
         receita_liquida=receita_liquida,
         cmv=cmv,
+        custo_servicos=custo_servicos,
         lucro_bruto=lucro_bruto,
         margem_bruta=margem_bruta,
         despesas_operacionais=despesas_operacionais,

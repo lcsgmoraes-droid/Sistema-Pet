@@ -376,6 +376,59 @@ def _complementar_snapshot_com_custos_reais(
     return snapshot_ajustado
 
 
+def _separar_custo_produto_servico(
+    venda: Venda, snapshot: Dict[str, Any]
+) -> tuple[Decimal, Decimal]:
+    """Classifica o custo da venda sem alterar sua fotografia financeira."""
+    custo_total = _moeda(snapshot.get("custo_produtos", 0))
+    itens_venda = list(getattr(venda, "itens", []) or [])
+    if not itens_venda:
+        return custo_total, Decimal("0")
+
+    tipos = [str(getattr(item, "tipo", "") or "").lower() for item in itens_venda]
+    if all(tipo == "servico" for tipo in tipos):
+        return Decimal("0"), custo_total
+    if "servico" not in tipos:
+        return custo_total, Decimal("0")
+
+    itens_snapshot = snapshot.get("itens")
+    if not isinstance(itens_snapshot, list) or len(itens_snapshot) != len(itens_venda):
+        return custo_total, Decimal("0")
+
+    # Fotografias antigas não guardam o tipo. Prefere a ordem original dos
+    # itens; se a consulta vier em outra ordem, usa o produto quando seu tipo
+    # for inequívoco nesta venda.
+    if any(not isinstance(item_snapshot, dict) for item_snapshot in itens_snapshot):
+        return custo_total, Decimal("0")
+    if any(
+        item_snapshot.get("produto_id") != getattr(item, "produto_id", None)
+        for item, item_snapshot in zip(itens_venda, itens_snapshot)
+    ):
+        tipos_por_produto: Dict[int | None, set[str]] = {}
+        for item, tipo in zip(itens_venda, tipos):
+            tipos_por_produto.setdefault(getattr(item, "produto_id", None), set()).add(
+                tipo
+            )
+        tipos_snapshot = [
+            tipos_por_produto.get(item_snapshot.get("produto_id"), set())
+            for item_snapshot in itens_snapshot
+        ]
+        if any(len(tipos_item) != 1 for tipos_item in tipos_snapshot):
+            return custo_total, Decimal("0")
+        tipos = [next(iter(tipos_item)) for tipos_item in tipos_snapshot]
+
+    custo_servicos = sum(
+        (
+            _moeda(item_snapshot.get("custo_total", 0))
+            for tipo, item_snapshot in zip(tipos, itens_snapshot)
+            if tipo == "servico"
+        ),
+        Decimal("0"),
+    )
+    custo_servicos = min(max(custo_servicos, Decimal("0")), custo_total)
+    return custo_total - custo_servicos, custo_servicos
+
+
 def _registrar_base_estimativa_cmv(
     venda: Venda,
     canal: str,
@@ -577,13 +630,15 @@ def obter_vendas_por_canal(
         receita_produtos, receita_servicos = _separar_receita_produto_servico(
             venda, receita_bruta
         )
+        cmv_produtos, custo_servicos = _separar_custo_produto_servico(venda, snapshot)
 
         dados["receita_produtos"] += receita_produtos
         dados["receita_servicos"] += receita_servicos
         dados["receita_frete"] += _decimal(snapshot.get("taxa_loja", 0))
         dados["descontos"] += _decimal(snapshot.get("desconto", 0))
         dados["impostos"] += _decimal(snapshot.get("imposto", 0))
-        dados["cmv"] += _decimal(snapshot.get("custo_produtos", 0))
+        dados["cmv"] += cmv_produtos
+        dados["custo_servicos"] += custo_servicos
         dados["taxas_cartao"] += _decimal(snapshot.get("taxa_cartao", 0))
         dados["repasse_entrega"] += _decimal(snapshot.get("taxa_entrega", 0))
         dados["taxa_operacional_entrega"] += _decimal(
@@ -862,11 +917,14 @@ def _valor_snapshot_campo(
         )
         return receita_produtos if campo == "receita_produtos" else receita_servicos
 
+    if campo in {"cmv", "custo_servicos"}:
+        cmv_produtos, custo_servicos = _separar_custo_produto_servico(venda, snapshot)
+        return cmv_produtos if campo == "cmv" else custo_servicos
+
     mapa_snapshot = {
         "receita_frete": "taxa_loja",
         "descontos": "desconto",
         "impostos": "imposto",
-        "cmv": "custo_produtos",
         "taxas_cartao": "taxa_cartao",
         "repasse_entrega": "taxa_entrega",
         "taxa_operacional_entrega": "taxa_operacional",

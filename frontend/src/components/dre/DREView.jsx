@@ -61,6 +61,10 @@ export default function DREView({
     return <LoadingState className="min-h-screen" label="Carregando DRE..." />;
   }
 
+  const cmv = dados?.totais?.cmv ?? 0;
+  const custoServicos = dados?.totais?.custo_servicos ?? 0;
+  const custosDiretos = dados?.totais?.custos_diretos ?? cmv + custoServicos;
+
   return (
     <div className="space-y-4 p-3 md:space-y-6 md:p-6">
       {/* Header */}
@@ -180,11 +184,21 @@ export default function DREView({
                 <MetricCard
                   intent="red"
                   icon={<TrendingDown className="h-5 w-5" />}
-                  label="CMV"
-                  value={<MoneyCell value={dados.totais?.cmv || 0} />}
-                  subtitle={`${formatarPercentual(
-                    calcularPercentual(dados.totais?.cmv, dados.totais?.receita_bruta),
-                  )} da receita`}
+                  label="Custos Diretos"
+                  value={<MoneyCell value={custosDiretos} />}
+                  subtitle={
+                    <>
+                      <span className="block">
+                        CMV <MoneyCell value={cmv} /> · Serviços <MoneyCell value={custoServicos} />
+                      </span>
+                      <span className="block">
+                        {formatarPercentual(
+                          calcularPercentual(custosDiretos, dados.totais?.receita_bruta),
+                        )}{" "}
+                        da receita
+                      </span>
+                    </>
+                  }
                 />
                 <MetricCard
                   intent="blue"
