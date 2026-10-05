@@ -37,5 +37,6 @@ class VendaDevolucao(BaseTenantModel):
     custo_produtos_estornado = Column(Numeric(12, 2), nullable=False)
     custo_servicos_estornado = Column(Numeric(12, 2), nullable=False)
     custo_pendente = Column(Boolean, nullable=False, default=False)
+    historico_pre_evento = Column(Boolean, nullable=False, default=False)
     itens = Column(JSON, nullable=False)
     movimentacao_caixa_id = Column(ForeignKey("movimentacoes_caixa.id"), nullable=True)

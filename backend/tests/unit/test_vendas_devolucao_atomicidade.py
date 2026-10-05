@@ -9,7 +9,6 @@ from fastapi import HTTPException
 
 from app.financeiro_models import CategoriaFinanceira, ContaReceber, LancamentoManual
 from app.models import Cliente
-from app.produtos_models import Produto
 from app.vendas.devolucoes_routes import _validar_saldo_devolucao, registrar_devolucao
 from app.vendas_devolucoes_models import VendaDevolucao
 from app.vendas.edicao_estoque import calcular_diferencas_estoque_edicao
@@ -279,26 +278,178 @@ def test_devolucao_parcial_em_dinheiro_registra_deducao_e_custo_servico(monkeypa
     db.commit.assert_called_once()
 
 
-def test_componente_de_kit_registra_deducao_mas_deixa_cmv_pendente(monkeypatch):
-    tenant_id = uuid4()
-    atendente = SimpleNamespace(id=22, nome="Atendente")
-    cliente = SimpleNamespace(id=47, user_id=11, nome="Cliente", credito=Decimal("0"))
-    item_kit = SimpleNamespace(produto_id=500, quantidade=1)
-    venda = SimpleNamespace(
+@pytest.mark.parametrize("preco_unitario,quantidade", [(20, 1), (1000, 99)])
+def test_componente_de_kit_sem_preco_original_comprovado_nao_gera_credito(
+    preco_unitario, quantidade
+):
+    db = MagicMock()
+    db.query.return_value.filter_by.return_value.with_for_update.return_value.first.return_value = SimpleNamespace(
         id=8,
-        cliente_id=cliente.id,
+        status="finalizada",
+        cliente_id=47,
         numero_venda="VEN-8",
         total=Decimal("20"),
-        observacoes="",
-        status="finalizada",
-        canal="loja_fisica",
+    )
+
+    with pytest.raises(HTTPException) as erro:
+        registrar_devolucao(
+            venda_id=8,
+            dados={
+                "itens": [
+                    {
+                        "is_componente_kit": True,
+                        "kit_item_id": 3,
+                        "produto_id": 11,
+                        "quantidade": quantidade,
+                        "preco_unitario": preco_unitario,
+                    }
+                ],
+                "motivo": "Componente devolvido",
+                "gerar_credito": True,
+            },
+            db=db,
+            user_and_tenant=(SimpleNamespace(id=22), uuid4()),
+        )
+
+    assert erro.value.status_code == 400
+    assert "preço original" in erro.value.detail
+    db.add.assert_not_called()
+    db.commit.assert_not_called()
+
+
+@pytest.mark.parametrize("eventos", [[], [SimpleNamespace(historico_pre_evento=True)]])
+def test_servico_com_devolucao_historica_sem_saldo_rastreavel_e_bloqueado(eventos):
+    tenant_id = uuid4()
+    venda = SimpleNamespace(
+        id=8,
+        status="finalizada_devolucao",
+        cliente_id=47,
+        numero_venda="VEN-8",
+        total=Decimal("100"),
+    )
+    item = SimpleNamespace(id=3, tipo="servico", produto_id=None, quantidade=2)
+    consultas = {}
+    for modelo, resultado in (
+        (Venda, venda),
+        (VendaItem, [item]),
+        (VendaDevolucao, eventos),
+    ):
+        consulta = MagicMock()
+        consulta.filter.return_value = consulta
+        consulta.filter_by.return_value = consulta
+        consulta.with_for_update.return_value = consulta
+        consulta.first.return_value = resultado
+        consulta.all.return_value = resultado if isinstance(resultado, list) else []
+        consultas[modelo] = consulta
+    db = MagicMock()
+    db.query.side_effect = lambda modelo: consultas[modelo]
+
+    with pytest.raises(HTTPException) as erro:
+        registrar_devolucao(
+            venda_id=venda.id,
+            dados={
+                "itens": [{"item_id": item.id, "quantidade": 1}],
+                "motivo": "Ajuste",
+                "gerar_credito": True,
+            },
+            db=db,
+            user_and_tenant=(SimpleNamespace(id=22), tenant_id),
+        )
+
+    assert erro.value.status_code == 400
+    assert "sem saldo rastreável" in erro.value.detail
+    db.add.assert_not_called()
+    db.commit.assert_not_called()
+
+
+def test_valor_acumulado_das_devolucoes_nao_excede_total_pago():
+    tenant_id = uuid4()
+    venda = SimpleNamespace(
+        id=8,
+        status="finalizada_devolucao",
+        cliente_id=47,
+        numero_venda="VEN-8",
+        total=Decimal("100"),
+    )
+    item = SimpleNamespace(
+        id=3,
+        tipo="servico",
+        produto_id=None,
+        produto=None,
+        quantidade=2,
+        preco_unitario=Decimal("60"),
+        servico_descricao="Serviço",
+    )
+    evento_anterior = SimpleNamespace(
+        valor_devolvido=Decimal("50"),
+        historico_pre_evento=False,
+        itens=[{"venda_item_id": 3, "quantidade": "1", "is_componente_kit": False}],
     )
     consultas = {}
     for modelo, resultado in (
         (Venda, venda),
-        (VendaItem, [item_kit]),
-        (VendaDevolucao, []),
-        (Produto, SimpleNamespace(nome="Componente")),
+        (VendaItem, [item]),
+        (VendaDevolucao, [evento_anterior]),
+    ):
+        consulta = MagicMock()
+        consulta.filter.return_value = consulta
+        consulta.filter_by.return_value = consulta
+        consulta.with_for_update.return_value = consulta
+        consulta.first.return_value = resultado
+        consulta.all.return_value = resultado if isinstance(resultado, list) else []
+        consultas[modelo] = consulta
+    db = MagicMock()
+    db.query.side_effect = lambda modelo: consultas[modelo]
+
+    with pytest.raises(HTTPException) as erro:
+        registrar_devolucao(
+            venda_id=8,
+            dados={
+                "itens": [{"item_id": 3, "quantidade": 1}],
+                "motivo": "Ajuste",
+                "gerar_credito": True,
+            },
+            db=db,
+            user_and_tenant=(SimpleNamespace(id=22), tenant_id),
+        )
+
+    assert erro.value.status_code == 400
+    assert "total pago" in erro.value.detail
+    db.add.assert_not_called()
+    db.commit.assert_not_called()
+
+
+def test_devolucoes_parciais_acumuladas_marcam_venda_totalmente_devolvida(monkeypatch):
+    tenant_id = uuid4()
+    atendente = SimpleNamespace(id=22, nome="Atendente")
+    cliente = SimpleNamespace(id=47, nome="Cliente", credito=Decimal("0"))
+    venda = SimpleNamespace(
+        id=8,
+        cliente_id=cliente.id,
+        numero_venda="VEN-8",
+        total=Decimal("100"),
+        observacoes="",
+        status="finalizada_devolucao",
+    )
+    item = SimpleNamespace(
+        id=3,
+        tipo="servico",
+        produto_id=None,
+        produto=None,
+        quantidade=2,
+        preco_unitario=Decimal("50"),
+        servico_descricao="Serviço",
+    )
+    evento_anterior = SimpleNamespace(
+        valor_devolvido=Decimal("50"),
+        historico_pre_evento=False,
+        itens=[{"venda_item_id": 3, "quantidade": "1", "is_componente_kit": False}],
+    )
+    consultas = {}
+    for modelo, resultado in (
+        (Venda, venda),
+        (VendaItem, [item]),
+        (VendaDevolucao, [evento_anterior]),
         (Cliente, cliente),
         (ContaReceber, []),
         (LancamentoManual, []),
@@ -315,44 +466,22 @@ def test_componente_de_kit_registra_deducao_mas_deixa_cmv_pendente(monkeypatch):
     monkeypatch.setattr(
         "app.vendas.devolucoes_routes.log_action", lambda **_kwargs: None
     )
-    monkeypatch.setattr(
-        "app.vendas.devolucoes_routes.resolver_tenant_estoque_item",
-        lambda *_args: (tenant_id, False),
-    )
-    monkeypatch.setattr(
-        "app.vendas.devolucoes_routes.EstoqueService.estornar_estoque",
-        lambda **_kwargs: {"sucesso": True},
-    )
 
-    registrar_devolucao(
-        venda_id=venda.id,
+    resultado = registrar_devolucao(
+        venda_id=8,
         dados={
-            "itens": [
-                {
-                    "is_componente_kit": True,
-                    "kit_item_id": 3,
-                    "produto_id": 11,
-                    "quantidade": 1,
-                    "preco_unitario": 20,
-                }
-            ],
-            "motivo": "Componente devolvido",
+            "itens": [{"item_id": 3, "quantidade": 1}],
+            "motivo": "Ajuste",
             "gerar_credito": True,
         },
         db=db,
         user_and_tenant=(atendente, tenant_id),
     )
 
-    evento = next(
-        call.args[0]
-        for call in db.add.call_args_list
-        if isinstance(call.args[0], VendaDevolucao)
-    )
-    assert evento.valor_devolvido == Decimal("20.00")
-    assert evento.custo_produtos_estornado == 0
-    assert evento.custo_pendente is True
-    assert evento.itens[0]["origem_custo"] == "kit_componente_sem_rateio_original"
-    assert cliente.credito == Decimal("20")
+    assert resultado["status_venda"] == "devolvida_total"
+    assert resultado["valor_total_devolucao"] == 50.0
+    assert cliente.credito == Decimal("50")
+    db.commit.assert_called_once()
 
 
 def test_falha_ao_gravar_evento_impede_credito_ao_cliente():

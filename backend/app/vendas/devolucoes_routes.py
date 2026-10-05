@@ -145,6 +145,17 @@ def registrar_devolucao(
                 status_code=400, detail="Nenhum item selecionado para devolução"
             )
 
+        # A venda guarda apenas o preço do kit, sem composição e rateio originais.
+        # O preço enviado pelo navegador não comprova o valor do componente.
+        if any(item.get("is_componente_kit") for item in itens_devolucao):
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    "Devolução por componente de KIT indisponível: a venda não "
+                    "registra o preço original de cada componente. Devolva o KIT inteiro."
+                ),
+            )
+
         if not motivo:
             logger.info("❌ Motivo não fornecido")
             raise HTTPException(
@@ -208,6 +219,25 @@ def registrar_devolucao(
             )
             .all()
         )
+        historico_pre_evento = (
+            str(venda.status or "").lower()
+            in {"finalizada_devolucao", "finalizada_devolucao_parcial"}
+            and not eventos_anteriores
+        ) or any(
+            bool(getattr(evento, "historico_pre_evento", False))
+            for evento in eventos_anteriores
+        )
+        if historico_pre_evento and any(
+            str(getattr(item, "tipo", "") or "").lower() == "servico"
+            for item in itens_venda
+        ):
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    "Devolução de serviço indisponível nesta venda: houve "
+                    "devolução anterior sem saldo rastreável. Confira o histórico."
+                ),
+            )
         devolvido_por_item = defaultdict(Decimal)
         for evento_anterior in eventos_anteriores:
             for item_anterior in evento_anterior.itens or []:
@@ -479,6 +509,23 @@ def registrar_devolucao(
                 status_code=400, detail="A devolução precisa ter valor positivo"
             )
 
+        valor_total_devolucao = valor_total_devolucao.quantize(Decimal("0.01"))
+        valor_ja_devolvido = sum(
+            (
+                Decimal(str(getattr(evento, "valor_devolvido", 0) or 0))
+                for evento in eventos_anteriores
+            ),
+            Decimal("0"),
+        )
+        valor_acumulado_devolvido = valor_ja_devolvido + valor_total_devolucao
+        if valor_acumulado_devolvido > Decimal(str(venda.total or 0)).quantize(
+            Decimal("0.01")
+        ):
+            raise HTTPException(
+                status_code=400,
+                detail="Valor acumulado das devoluções excede o total pago na venda",
+            )
+
         # O evento é a fonte da dedução na DRE. Caixa e crédito são apenas formas
         # de liquidá-la; tudo abaixo participa da mesma transação e do mesmo commit.
         evento_dre = VendaDevolucao(
@@ -489,10 +536,11 @@ def registrar_devolucao(
             canal=getattr(venda, "canal", None) or "loja_fisica",
             forma_estorno="credito" if gerar_credito else "dinheiro",
             motivo=motivo,
-            valor_devolvido=valor_total_devolucao.quantize(Decimal("0.01")),
+            valor_devolvido=valor_total_devolucao,
             custo_produtos_estornado=custo_produtos_estornado,
             custo_servicos_estornado=custo_servicos_estornado,
             custo_pendente=any(item["custo_pendente"] for item in itens_evento_dre),
+            historico_pre_evento=historico_pre_evento,
             itens=itens_evento_dre,
         )
         db.add(evento_dre)
@@ -631,9 +679,7 @@ def registrar_devolucao(
             logger.info(f"💸 LancamentoManual #{lanc.id} marcado como estornado")
 
         # 🆕 ATUALIZAR STATUS DA VENDA
-        if (
-            float(valor_total_devolucao) >= float(venda.total) * 0.99
-        ):  # 99% devolvido = total
+        if valor_acumulado_devolvido >= Decimal(str(venda.total or 0)):
             venda.status = "devolvida_total"
         else:
             venda.status = "finalizada_devolucao"
@@ -642,7 +688,7 @@ def registrar_devolucao(
         from datetime import datetime
 
         # Determinar tipo de devolução
-        if float(valor_total_devolucao) >= float(venda.total) * 0.99:
+        if valor_acumulado_devolvido >= Decimal(str(venda.total or 0)):
             tipo_desc = "Devolução total"
         else:
             # Verificar se tem componentes de KIT

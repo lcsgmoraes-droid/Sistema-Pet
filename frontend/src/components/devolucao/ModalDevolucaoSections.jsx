@@ -271,20 +271,21 @@ export default function ModalDevolucaoSections({
                                   </div>
                                 </label>
 
-                                <label className="flex items-start gap-3 cursor-pointer group">
+                                <label className="flex items-start gap-3 opacity-60">
                                   <input
                                     type="radio"
                                     name={`modo-kit-${item.id}`}
                                     checked={modoKit === "componentes"}
-                                    onChange={() => handleEscolhaModoKit(item.id, "componentes")}
+                                    disabled
                                     className="mt-1 w-4 h-4 text-purple-600 focus:ring-2 focus:ring-purple-500"
                                   />
                                   <div className="flex-1">
-                                    <div className="font-medium text-gray-800 group-hover:text-purple-700 transition-colors">
-                                      🧩 Selecionar Componentes
+                                    <div className="font-medium text-gray-800">
+                                      🧩 Selecionar Componentes (indisponível)
                                     </div>
                                     <p className="text-xs text-gray-600 mt-1">
-                                      Escolha quais componentes do KIT devolver
+                                      A venda não registra o preço original de cada componente.
+                                      Devolva o KIT inteiro.
                                     </p>
                                   </div>
                                 </label>
