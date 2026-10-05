@@ -30,12 +30,17 @@ from app.dre_canais.base import (
     _periodo_meses,
     _texto_conta,
 )
+from app.dre_canais.contas import (
+    classificacoes_contas_pagar,
+    eh_compra_estoque,
+    filtros_contas_pagar_dre,
+    ids_fretes_sobre_compras,
+)
 from app.dre_canais.folha import (
     calcular_resumo_folha_gerencial,
     canal_provisao_folha,
 )
 from app.dre_canais.schemas import DREDetalheItem, DREDetalheResponse
-from app.dre_plano_contas_models import DRESubcategoria
 from app.financeiro_models import ContaPagar, ContaReceber
 from app.vendas_models import Venda, VendaItem
 
@@ -281,53 +286,40 @@ def _detalhes_contas_campo(
     data_final: Optional[date] = None,
 ) -> List[DREDetalheItem]:
     inicio, fim = _periodo_meses(mes_inicial or mes, mes, ano, data_final)
+    frete_ids = ids_fretes_sobre_compras(db, tenant_id)
     if campo == "fretes_compras":
-        if canal != "loja_fisica":
-            return []
-        subcategoria_frete_compras = (
-            db.query(DRESubcategoria)
-            .filter(
-                DRESubcategoria.tenant_id == tenant_id,
-                DRESubcategoria.nome == "Fretes sobre Compras",
-            )
-            .first()
-        )
-        if not subcategoria_frete_compras:
+        if not frete_ids:
             return []
         contas = (
             db.query(ContaPagar)
             .options(selectinload(ContaPagar.fornecedor))
             .filter(
-                and_(
-                    ContaPagar.tenant_id == tenant_id,
-                    ContaPagar.data_emissao >= inicio,
-                    ContaPagar.data_emissao < fim,
-                    ContaPagar.status != "cancelado",
-                    ContaPagar.dre_subcategoria_id == subcategoria_frete_compras.id,
-                )
+                *filtros_contas_pagar_dre(tenant_id, inicio, fim),
+                ContaPagar.dre_subcategoria_id.in_(frete_ids),
             )
             .all()
         )
-        subcategorias = {subcategoria_frete_compras.id: subcategoria_frete_compras}
+        contas = [
+            conta
+            for conta in contas
+            if _normalizar_canal(getattr(conta, "canal", None)) == canal
+        ]
+        subcategorias = _subcategorias_contas_map(db, tenant_id, contas)
     else:
         contas_base = (
             db.query(ContaPagar)
             .options(selectinload(ContaPagar.fornecedor))
-            .filter(
-                and_(
-                    ContaPagar.tenant_id == tenant_id,
-                    ContaPagar.data_emissao >= inicio,
-                    ContaPagar.data_emissao < fim,
-                    ContaPagar.status != "cancelado",
-                    ContaPagar.afeta_dre.is_(True),
-                    ContaPagar.nota_entrada_id.is_(None),
-                )
-            )
+            .filter(*filtros_contas_pagar_dre(tenant_id, inicio, fim))
             .all()
         )
         subcategorias = _subcategorias_contas_map(db, tenant_id, contas_base)
+        tipos, categorias = classificacoes_contas_pagar(db, tenant_id, contas_base)
         contas = []
         for conta in contas_base:
+            if conta.dre_subcategoria_id in frete_ids or eh_compra_estoque(
+                conta, tipos, categorias
+            ):
+                continue
             if _normalizar_canal(getattr(conta, "canal", None)) != canal:
                 continue
             subcategoria = subcategorias.get(

@@ -29,6 +29,12 @@ from app.dre_canais.base import (
     _snapshot_pronto,
     _texto_conta,
 )
+from app.dre_canais.contas import (
+    classificacoes_contas_pagar,
+    eh_compra_estoque,
+    filtros_contas_pagar_dre,
+    ids_fretes_sobre_compras,
+)
 from app.dre_canais.folha import calcular_resumo_folha_gerencial
 
 
@@ -706,19 +712,7 @@ def agregar_contas_pagar_por_canal(
     inicio, fim = _periodo_meses(mes_inicial or mes, mes, ano, data_final)
     contas = (
         db.query(ContaPagar)
-        .outerjoin(
-            DRESubcategoria, ContaPagar.dre_subcategoria_id == DRESubcategoria.id
-        )
-        .filter(
-            and_(
-                ContaPagar.tenant_id == tenant_id,
-                ContaPagar.data_emissao >= inicio,
-                ContaPagar.data_emissao < fim,
-                ContaPagar.status != "cancelado",
-                ContaPagar.afeta_dre.is_(True),
-                ContaPagar.nota_entrada_id.is_(None),
-            )
-        )
+        .filter(*filtros_contas_pagar_dre(tenant_id, inicio, fim))
         .all()
     )
 
@@ -740,7 +734,15 @@ def agregar_contas_pagar_por_canal(
             .all()
         }
 
+    tipos, categorias = classificacoes_contas_pagar(db, tenant_id, contas)
+    frete_ids = ids_fretes_sobre_compras(db, tenant_id)
+    contas_folha = []
     for conta in contas:
+        if conta.dre_subcategoria_id in frete_ids or eh_compra_estoque(
+            conta, tipos, categorias
+        ):
+            continue
+        contas_folha.append(conta)
         subcategoria = subcategorias.get(getattr(conta, "dre_subcategoria_id", None))
 
         texto = _texto_conta(conta, subcategoria)
@@ -757,7 +759,7 @@ def agregar_contas_pagar_por_canal(
         mes,
         ano,
         tenant_id,
-        contas,
+        contas_folha,
         subcategorias,
         mes_inicial=mes_inicial,
         data_final=data_final,
@@ -777,35 +779,22 @@ def agregar_fretes_sobre_compras(
     data_final: Optional[date] = None,
 ) -> None:
     inicio, fim = _periodo_meses(mes_inicial or mes, mes, ano, data_final)
-    subcategoria_frete_compras = (
-        db.query(DRESubcategoria)
-        .filter(
-            DRESubcategoria.tenant_id == tenant_id,
-            DRESubcategoria.nome == "Fretes sobre Compras",
-        )
-        .first()
-    )
-
-    if not subcategoria_frete_compras:
+    frete_ids = ids_fretes_sobre_compras(db, tenant_id)
+    if not frete_ids:
         return
 
-    total = (
-        db.query(func.coalesce(func.sum(ContaPagar.valor_original), 0))
+    contas = (
+        db.query(ContaPagar)
         .filter(
-            and_(
-                ContaPagar.tenant_id == tenant_id,
-                ContaPagar.data_emissao >= inicio,
-                ContaPagar.data_emissao < fim,
-                ContaPagar.status != "cancelado",
-                ContaPagar.dre_subcategoria_id == subcategoria_frete_compras.id,
-            )
+            *filtros_contas_pagar_dre(tenant_id, inicio, fim),
+            ContaPagar.dre_subcategoria_id.in_(frete_ids),
         )
-        .scalar()
+        .all()
     )
-
-    if total:
-        dados_canais.setdefault("loja_fisica", _novo_canal())["fretes_compras"] += (
-            _decimal(total)
+    for conta in contas:
+        canal = _normalizar_canal(getattr(conta, "canal", None))
+        dados_canais.setdefault(canal, _novo_canal())["fretes_compras"] += _decimal(
+            conta.valor_original
         )
 
 
