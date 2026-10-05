@@ -1,7 +1,22 @@
 import { safeArray } from "../../utils/safeArray";
 import { confirmarCorePet } from "../../services/corepetDialog";
 
-const hojeISO = () => new Date().toISOString().split("T")[0];
+export const dataAtualBrasiliaISO = (instante = new Date()) => {
+  const partes = Object.fromEntries(
+    new Intl.DateTimeFormat("en-US", {
+      timeZone: "America/Sao_Paulo",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    })
+      .formatToParts(instante)
+      .filter(({ type }) => ["year", "month", "day"].includes(type))
+      .map(({ type, value }) => [type, value]),
+  );
+  return `${partes.year}-${partes.month}-${partes.day}`;
+};
+
+const hojeISO = () => dataAtualBrasiliaISO();
 
 export const criarDadosPadraoContaPagar = () => ({
   descricao: "",

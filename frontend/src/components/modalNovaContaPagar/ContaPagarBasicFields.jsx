@@ -232,6 +232,23 @@ export default function ContaPagarBasicFields({ controller, onOpenCategoria }) {
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1">
           <Calendar size={16} className="inline mr-1" />
+          Data de emissão / competência da DRE *
+        </label>
+        <input
+          type="date"
+          value={dados.data_emissao}
+          onChange={(event) => setDados({ ...dados, data_emissao: event.target.value })}
+          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
+          required
+        />
+        <p className="mt-1 text-xs text-gray-500">
+          Define o mês da despesa na DRE. O vencimento informa quando ela será paga.
+        </p>
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          <Calendar size={16} className="inline mr-1" />
           Data Vencimento *
         </label>
         <input

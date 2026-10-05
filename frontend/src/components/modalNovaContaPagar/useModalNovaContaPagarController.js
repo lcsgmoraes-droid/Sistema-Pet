@@ -287,7 +287,12 @@ export function useModalNovaContaPagarController({ isOpen, onClose, onSave, cont
   const handleSubmit = async (event) => {
     event.preventDefault();
 
-    if (!dados.descricao || !dados.valor_original || !dados.data_vencimento) {
+    if (
+      !dados.descricao ||
+      !dados.valor_original ||
+      !dados.data_emissao ||
+      !dados.data_vencimento
+    ) {
       toast.error("Preencha todos os campos obrigatórios");
       return;
     }
