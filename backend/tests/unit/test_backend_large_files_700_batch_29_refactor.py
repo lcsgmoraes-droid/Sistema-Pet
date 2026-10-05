@@ -65,9 +65,14 @@ def test_dre_ia_fachada_preserva_funcoes_e_schemas_extraidos():
 def test_dre_ia_fachada_preserva_ordem_das_rotas_publicas():
     from app import dre_ia_routes
 
+    rotas = [
+        contexto
+        for inclusao in dre_ia_routes.router.routes
+        for contexto in inclusao.effective_route_contexts()
+    ]
     route_names = [
         route.name
-        for route in dre_ia_routes.router.routes
+        for route in rotas
         if "GET" in getattr(route, "methods", set())
         or "POST" in getattr(route, "methods", set())
     ]
@@ -100,7 +105,7 @@ def test_dre_ia_fachada_preserva_ordem_das_rotas_publicas():
 
     canais_routes = [
         route.name
-        for route in dre_ia_routes.router.routes
+        for route in rotas
         if route.path == "/ia/dre/canais" and "GET" in getattr(route, "methods", set())
     ]
     assert canais_routes == ["listar_canais", "listar_canais_disponiveis"]

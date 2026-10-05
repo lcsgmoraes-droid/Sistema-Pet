@@ -29,6 +29,10 @@ def test_helpers_dre_legado_exigem_tenant_id():
     assert "tenant_id" in inspect.signature(dre_calculos.calcular_cmv).parameters
     assert (
         "tenant_id"
+        in inspect.signature(dre_calculos.calcular_custo_servicos).parameters
+    )
+    assert (
+        "tenant_id"
         in inspect.signature(dre_calculos.calcular_frete_notas_entrada).parameters
     )
     assert (
@@ -41,13 +45,13 @@ def test_helpers_dre_legado_exigem_tenant_id():
 
 
 def test_helpers_dre_legado_filtram_modelos_por_tenant():
-    cmv = inspect.getsource(dre_calculos.calcular_cmv)
+    custos = inspect.getsource(dre_calculos._calcular_custo_itens_por_natureza)
     frete = inspect.getsource(dre_calculos.calcular_frete_notas_entrada)
     despesas = inspect.getsource(dre_calculos.obter_despesas_por_categoria)
     taxas = inspect.getsource(dre_calculos.calcular_taxas_cartao)
 
-    assert "Venda.tenant_id == tenant_id" in cmv
-    assert "VendaItem.tenant_id == tenant_id" in cmv
+    assert "Venda.tenant_id == tenant_id" in custos
+    assert "VendaItem.tenant_id == tenant_id" in custos
     assert "NotaEntrada.tenant_id == tenant_id" in frete
     assert "DRESubcategoria.tenant_id == tenant_id" in despesas
     assert "ContaPagar.tenant_id == tenant_id" in despesas

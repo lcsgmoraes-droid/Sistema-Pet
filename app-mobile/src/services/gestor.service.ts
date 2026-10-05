@@ -46,6 +46,7 @@ export interface GestorDREResumo {
   deducoes_total: number;
   receita_liquida: number;
   cmv: number;
+  custo_servicos?: number;
   despesas_variaveis: number;
   despesas_operacionais: number;
   despesas_fixas_operacionais: number;

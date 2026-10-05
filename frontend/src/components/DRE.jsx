@@ -290,7 +290,13 @@ const DRE = () => {
       toast.loading("Gerando PDF...", { id: "pdf" });
 
       const response = await api.get(`/financeiro/dre/export/pdf`, {
-        params: { ano, mes },
+        params: {
+          ano,
+          mes,
+          mes_inicial: mesInicial || undefined,
+          data_final: dataFinal || undefined,
+          canais: canaisSelecionados.join(","),
+        },
         responseType: "blob",
         timeout: DRE_REQUEST_TIMEOUT_MS,
       });
@@ -316,7 +322,13 @@ const DRE = () => {
       toast.loading("Gerando Excel...", { id: "excel" });
 
       const response = await api.get(`/financeiro/dre/export/excel`, {
-        params: { ano, mes },
+        params: {
+          ano,
+          mes,
+          mes_inicial: mesInicial || undefined,
+          data_final: dataFinal || undefined,
+          canais: canaisSelecionados.join(","),
+        },
         responseType: "blob",
         timeout: DRE_REQUEST_TIMEOUT_MS,
       });

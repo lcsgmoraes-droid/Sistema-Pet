@@ -49,6 +49,7 @@ CAMPOS_DETALHE_VENDAS = {
     "descontos",
     "impostos",
     "cmv",
+    "custo_servicos",
     "cmv_estimado",
     "taxas_cartao",
     "repasse_entrega",

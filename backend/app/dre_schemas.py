@@ -16,6 +16,7 @@ class DREResponse(BaseModel):
     receita_bruta: Decimal
     vendas_produtos: Decimal
     vendas_servicos: Decimal
+    receita_frete: Decimal
     outras_receitas: Decimal
 
     # DEDUÇÕES
@@ -28,6 +29,7 @@ class DREResponse(BaseModel):
 
     # CUSTOS
     cmv: Decimal  # Custo das Mercadorias Vendidas
+    custo_servicos: Decimal  # Custo direto dos serviços prestados
 
     # LUCRO BRUTO
     lucro_bruto: Decimal

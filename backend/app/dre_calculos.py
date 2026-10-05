@@ -10,11 +10,10 @@ from .financeiro_models import ContaPagar
 from .vendas_models import Venda, VendaItem
 
 
-def calcular_cmv(db: Session, mes: int, ano: int, tenant_id: str) -> Decimal:
-    """
-    Calcula o Custo das Mercadorias Vendidas (CMV)
-    CMV = Custo real dos produtos vendidos no período
-    """
+def _calcular_custo_itens_por_natureza(
+    db: Session, mes: int, ano: int, tenant_id: str, *, servicos: bool
+) -> Decimal:
+    """Separa custos de mercadorias e serviços sem alterar o custo total da venda."""
     # Busca todas as vendas do período
     vendas = (
         db.query(Venda)
@@ -29,7 +28,7 @@ def calcular_cmv(db: Session, mes: int, ano: int, tenant_id: str) -> Decimal:
         .all()
     )
 
-    cmv_total = Decimal("0")
+    custo_total = Decimal("0")
 
     for venda in vendas:
         # Soma o custo de cada item vendido
@@ -43,11 +42,23 @@ def calcular_cmv(db: Session, mes: int, ano: int, tenant_id: str) -> Decimal:
         )
 
         for item in itens:
+            if (str(item.tipo or "").lower() == "servico") != servicos:
+                continue
             if item.produto and item.produto.preco_custo:
                 custo_item = Decimal(str(item.produto.preco_custo)) * item.quantidade
-                cmv_total += custo_item
+                custo_total += custo_item
 
-    return cmv_total
+    return custo_total
+
+
+def calcular_cmv(db: Session, mes: int, ano: int, tenant_id: str) -> Decimal:
+    """Custo das mercadorias vendidas; não inclui itens de serviço."""
+    return _calcular_custo_itens_por_natureza(db, mes, ano, tenant_id, servicos=False)
+
+
+def calcular_custo_servicos(db: Session, mes: int, ano: int, tenant_id: str) -> Decimal:
+    """Custo direto dos serviços vendidos no período."""
+    return _calcular_custo_itens_por_natureza(db, mes, ano, tenant_id, servicos=True)
 
 
 def calcular_frete_notas_entrada(
