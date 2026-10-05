@@ -24,6 +24,12 @@ export default function CategoriaFinanceiraFormFields({
         <label className="block text-sm font-medium text-gray-700 mb-1">Tipo *</label>
         <select
           value={formData.tipo}
+          disabled={Boolean(editando)}
+          title={
+            editando
+              ? "O tipo não pode ser alterado após criar a categoria e seus vínculos DRE."
+              : undefined
+          }
           onChange={(e) =>
             setFormData({
               ...formData,
@@ -37,6 +43,12 @@ export default function CategoriaFinanceiraFormFields({
           <option value="despesa">Despesa</option>
           <option value="receita">Receita</option>
         </select>
+        {editando && (
+          <p className="text-xs text-gray-500 mt-1">
+            Para mudar a natureza na DRE, crie uma nova categoria e revise os lançamentos
+            vinculados.
+          </p>
+        )}
       </div>
 
       {formData.tipo === "despesa" && (

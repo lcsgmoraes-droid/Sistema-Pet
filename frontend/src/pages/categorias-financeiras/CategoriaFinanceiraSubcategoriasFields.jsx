@@ -31,9 +31,16 @@ export default function CategoriaFinanceiraSubcategoriasFields({
                 value={sub.nome}
                 onChange={(e) => atualizarSubcategoriaNova(index, "nome", e.target.value)}
                 onKeyDown={(e) => handleKeyDownSubcategoria(e, index)}
+                readOnly={sub.somenteVinculo}
+                title={
+                  sub.somenteVinculo
+                    ? "Vínculo DRE legado. Remover aqui desvincula sem apagar a subcategoria."
+                    : undefined
+                }
                 placeholder="Nome da subcategoria (Tab para adicionar mais)"
                 className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-blue-500"
               />
+              {sub.somenteVinculo && <span className="text-xs text-gray-500">Vínculo</span>}
               <button
                 type="button"
                 onClick={() => removerSubcategoriaNova(index)}

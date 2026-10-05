@@ -141,6 +141,7 @@ def _novo_canal() -> Dict:
         "receita_produtos": _campo_zero(),
         "receita_servicos": _campo_zero(),
         "receita_frete": _campo_zero(),
+        "receita_outras": _campo_zero(),
         "descontos": _campo_zero(),
         "impostos": _campo_zero(),
         "cmv": _campo_zero(),
@@ -349,10 +350,11 @@ def _classificar_conta_dre(texto: str) -> str:
 
 
 ORIGENS_DRE = {
-    "receita_bruta_total": "Soma de produtos, servicos e frete das vendas do periodo nos canais selecionados. Usa a data da venda no regime de competencia.",
+    "receita_bruta_total": "Soma das vendas e das contas a receber manuais classificadas como receita no periodo, sem duplicar contas geradas pelo PDV.",
     "receita_produtos": "Vem dos itens de produto vendidos no periodo. Frete, servicos e descontos ficam em linhas separadas.",
     "receita_servicos": "Vem dos itens marcados como servico nas vendas do periodo.",
     "receita_frete": "Frete/taxa de entrega cobrada do cliente na venda, tratado como receita do periodo.",
+    "receita_outras": "Contas a receber sem venda vinculada, classificadas em subcategoria de receita pela data de emissao.",
     "deducoes_total": "Soma dos descontos comerciais e dos impostos estimados sobre as vendas.",
     "descontos": "Descontos concedidos na venda. Cupons/cashback identificados como campanha sao reclassificados na linha de campanhas.",
     "impostos": "Imposto por competencia, calculado pela aliquota fiscal configurada sobre venda bruta e frete.",

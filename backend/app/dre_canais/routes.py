@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from app.auth.dependencies import get_current_user_and_tenant
 from app.db import get_session
 from app.dre_canais.agregacao import (
+    agregar_contas_receber_manuais_por_canal,
     agregar_contas_pagar_por_canal,
     agregar_fretes_sobre_compras,
     obter_vendas_por_canal,
@@ -154,6 +155,15 @@ def gerar_dre_por_canais(
         mes,
         ano,
         tenant_id,
+        mes_inicial=mes_inicial,
+        data_final=data_final,
+    )
+    agregar_contas_receber_manuais_por_canal(
+        db,
+        mes,
+        ano,
+        tenant_id,
+        dados_canais_calculados,
         mes_inicial=mes_inicial,
         data_final=data_final,
     )

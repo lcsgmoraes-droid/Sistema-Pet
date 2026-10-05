@@ -104,8 +104,12 @@ def montar_linhas_dre_competencia(
     receita_produtos_total = _somar(dados_canais, "receita_produtos")
     receita_servicos_total = _somar(dados_canais, "receita_servicos")
     receita_frete_total = _somar(dados_canais, "receita_frete")
+    receita_outras_total = _somar(dados_canais, "receita_outras")
     receita_bruta_total = (
-        receita_produtos_total + receita_servicos_total + receita_frete_total
+        receita_produtos_total
+        + receita_servicos_total
+        + receita_frete_total
+        + receita_outras_total
     )
 
     descontos_total = _somar(dados_canais, "descontos")
@@ -174,6 +178,14 @@ def montar_linhas_dre_competencia(
         receita_bruta_total,
         "receita_frete",
         "Receita de Frete",
+        "receita",
+    )
+    _adicionar_linhas_campo(
+        linhas,
+        dados_canais,
+        receita_bruta_total,
+        "receita_outras",
+        "Outras Receitas (Contas a Receber)",
         "receita",
     )
 
@@ -400,6 +412,7 @@ def montar_linhas_dre_competencia(
         "vendas_produtos": float(receita_produtos_total),
         "vendas_servicos": float(receita_servicos_total),
         "receita_frete": float(receita_frete_total),
+        "outras_receitas": float(receita_outras_total),
         "descontos": float(descontos_total),
         "impostos": float(impostos_total),
         "deducoes_total": float(deducoes_total),

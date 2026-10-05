@@ -251,15 +251,22 @@ export default function useModalPagamentoController({
   const valorTotal = venda.total;
   const modalidadeCartao = obterModalidadeCartao(formaPagamentoSelecionada);
   const bandeirasDisponiveis = useMemo(
-    () => obterBandeirasDisponiveis({ taxas: taxasOperadora, modalidade: modalidadeCartao }),
-    [modalidadeCartao, taxasOperadora],
+    () =>
+      obterBandeirasDisponiveis({
+        taxas: taxasOperadora,
+        modalidade: modalidadeCartao,
+        bandeiraLegada: formaPagamentoSelecionada?.bandeira,
+      }),
+    [formaPagamentoSelecionada?.bandeira, modalidadeCartao, taxasOperadora],
   );
   const parcelasDisponiveis = useMemo(() => {
     if (!ehFormaPagamentoCartao(formaPagamentoSelecionada)) {
       return obterParcelasPermitidasParaForma(formaPagamentoSelecionada);
     }
-    const maxParcelas =
-      operadoraSelecionada?.max_parcelas || formaPagamentoSelecionada?.parcelas_maximas || 12;
+    const maxParcelas = Math.min(
+      Number(operadoraSelecionada?.max_parcelas || 12),
+      Number(formaPagamentoSelecionada?.parcelas_maximas || 12),
+    );
     return obterParcelasDisponiveis({
       taxas: taxasOperadora,
       modalidade: modalidadeCartao,
