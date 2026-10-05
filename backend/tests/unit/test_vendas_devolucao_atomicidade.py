@@ -9,7 +9,11 @@ from fastapi import HTTPException
 
 from app.financeiro_models import CategoriaFinanceira, ContaReceber, LancamentoManual
 from app.models import Cliente
-from app.vendas.devolucoes_routes import _validar_saldo_devolucao, registrar_devolucao
+from app.vendas.devolucoes_routes import (
+    _validar_saldo_devolucao,
+    prever_devolucao,
+    registrar_devolucao,
+)
 from app.vendas_devolucoes_models import VendaDevolucao
 from app.vendas.edicao_estoque import calcular_diferencas_estoque_edicao
 from app.vendas_models import Venda, VendaItem
@@ -24,7 +28,7 @@ def test_credito_sem_cliente_e_validado_antes_de_movimentar_estoque():
     )
 
     prevalidacao = source.index("if gerar_credito and not venda.cliente_id:")
-    processamento = source.index("for item_dev in itens_devolucao:")
+    processamento = source.index("for indice, item_dev in enumerate(itens_devolucao):")
 
     assert prevalidacao < processamento
 
@@ -71,7 +75,9 @@ def test_venda_cancelada_nao_gera_evento_de_devolucao():
 
 def test_devolucao_repetida_de_servico_usa_saldo_dos_eventos():
     tenant_id = uuid4()
-    item = SimpleNamespace(id=3, produto_id=None, quantidade=Decimal("2"))
+    item = SimpleNamespace(
+        id=3, produto_id=None, quantidade=Decimal("2"), subtotal=Decimal("100")
+    )
     venda = SimpleNamespace(
         id=8,
         cliente_id=47,
@@ -111,7 +117,7 @@ def test_devolucao_repetida_de_servico_usa_saldo_dos_eventos():
         )
 
     assert erro.value.status_code == 400
-    assert "saldo deste item" in erro.value.detail
+    assert "Quantidade devolvida fora do saldo vendido" in erro.value.detail
     db.add.assert_not_called()
 
 
@@ -472,6 +478,14 @@ def test_devolucoes_parciais_com_desconto_pagam_liquido_e_fecham_venda(monkeypat
         "motivo": "Ajuste",
         "gerar_credito": True,
     }
+    primeira_previa = prever_devolucao(
+        venda_id=8,
+        dados=dados,
+        db=db,
+        user_and_tenant=(atendente, tenant_id),
+    )
+    assert primeira_previa["valor_total_devolucao"] == 45.0
+    dados["valor_previsto"] = primeira_previa["valor_total_devolucao"]
     primeira = registrar_devolucao(
         venda_id=8,
         dados=dados,
@@ -488,6 +502,15 @@ def test_devolucoes_parciais_com_desconto_pagam_liquido_e_fecham_venda(monkeypat
     assert evento_primeiro.valor_devolvido == Decimal("45.00")
     consultas[VendaDevolucao].all.return_value = [evento_primeiro]
 
+    segunda_previa = prever_devolucao(
+        venda_id=8,
+        dados=dados,
+        db=db,
+        user_and_tenant=(atendente, tenant_id),
+    )
+    assert segunda_previa["valor_total_devolucao"] == 45.0
+    assert segunda_previa["valor_acumulado"] == 90.0
+    dados["valor_previsto"] = segunda_previa["valor_total_devolucao"]
     segunda = registrar_devolucao(
         venda_id=8,
         dados=dados,
@@ -499,6 +522,65 @@ def test_devolucoes_parciais_com_desconto_pagam_liquido_e_fecham_venda(monkeypat
     assert segunda["valor_total_devolucao"] == 45.0
     assert cliente.credito == Decimal("90")
     assert db.commit.call_count == 2
+
+
+def test_registro_rejeita_valor_diferente_da_previa_antes_do_credito():
+    tenant_id = uuid4()
+    venda = SimpleNamespace(
+        id=8,
+        status="finalizada",
+        cliente_id=47,
+        numero_venda="VEN-8",
+        total=Decimal("90"),
+    )
+    item = SimpleNamespace(
+        id=3,
+        tipo="servico",
+        produto_id=None,
+        quantidade=2,
+        preco_unitario=Decimal("50"),
+        subtotal=Decimal("100"),
+    )
+    consultas = {}
+    for modelo, resultado in (
+        (Venda, venda),
+        (VendaItem, [item]),
+        (VendaDevolucao, []),
+    ):
+        consulta = MagicMock()
+        consulta.filter.return_value = consulta
+        consulta.filter_by.return_value = consulta
+        consulta.with_for_update.return_value = consulta
+        consulta.first.return_value = resultado
+        consulta.all.return_value = resultado if isinstance(resultado, list) else []
+        consultas[modelo] = consulta
+    db = MagicMock()
+    db.query.side_effect = lambda modelo: consultas[modelo]
+
+    previa = prever_devolucao(
+        venda_id=8,
+        dados={"itens": [{"item_id": 3, "quantidade": 1}]},
+        db=db,
+        user_and_tenant=(SimpleNamespace(id=22), tenant_id),
+    )
+    assert previa["valor_total_devolucao"] == 45.0
+
+    with pytest.raises(HTTPException) as erro:
+        registrar_devolucao(
+            venda_id=8,
+            dados={
+                "itens": [{"item_id": 3, "quantidade": 1}],
+                "motivo": "Ajuste",
+                "gerar_credito": True,
+                "valor_previsto": 50,
+            },
+            db=db,
+            user_and_tenant=(SimpleNamespace(id=22), tenant_id),
+        )
+
+    assert erro.value.status_code == 409
+    db.add.assert_not_called()
+    db.commit.assert_not_called()
 
 
 def test_falha_ao_gravar_evento_impede_credito_ao_cliente():

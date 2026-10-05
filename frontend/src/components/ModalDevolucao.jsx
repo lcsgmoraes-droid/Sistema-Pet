@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { X, RotateCcw } from "lucide-react";
 import api from "../api";
+import { confirmarCorePet } from "../services/corepetDialog";
 import ModalDevolucaoSections from "./devolucao/ModalDevolucaoSections";
 import { getStatusBuscaDevolucao } from "../utils/pdvReturnEligibility";
 
@@ -325,24 +326,43 @@ export default function ModalDevolucao({ caixaId, vendaInicial = null, onClose, 
     setErro("");
 
     try {
+      const previa = await api.post(`/vendas/${vendaSelecionada.id}/devolucao/previa`, {
+        itens: itensDevolucao,
+      });
+      const valorPrevisto = previa.data.valor_total_devolucao;
+      if (!Number.isFinite(Number(valorPrevisto)) || Number(valorPrevisto) <= 0) {
+        throw new Error("Não foi possível conferir o valor líquido da devolução");
+      }
+      const valorFormatado = Number(valorPrevisto).toLocaleString("pt-BR", {
+        style: "currency",
+        currency: "BRL",
+      });
+      const confirmado = await confirmarCorePet({
+        titulo: "Confirmar devolução",
+        mensagem: `Confirmar ${gerarCredito ? "crédito ao cliente" : "reembolso em dinheiro"} de ${valorFormatado}? Este é o valor líquido após os descontos da venda.`,
+        confirmarTexto: "Confirmar devolução",
+      });
+      if (!confirmado) return;
+
       await api.post(`/vendas/${vendaSelecionada.id}/devolucao`, {
         caixa_id: caixaId,
         itens: itensDevolucao,
         motivo: motivo,
         gerar_credito: gerarCredito,
+        valor_previsto: valorPrevisto,
       });
 
       alert("Devolução registrada com sucesso!");
       onSucesso();
     } catch (error) {
       console.error("Erro ao registrar devolução:", error);
-      setErro(error.response?.data?.detail || "Erro ao registrar devolução");
+      setErro(error.response?.data?.detail || error.message || "Erro ao registrar devolução");
     } finally {
       setLoading(false);
     }
   };
 
-  const calcularTotalDevolucao = () => {
+  const calcularValorBrutoSelecionado = () => {
     if (!vendaSelecionada) return 0;
 
     let total = 0;
@@ -415,7 +435,7 @@ export default function ModalDevolucao({ caixaId, vendaInicial = null, onClose, 
         </div>
 
         <ModalDevolucaoSections
-          calcularTotalDevolucao={calcularTotalDevolucao}
+          calcularValorBrutoSelecionado={calcularValorBrutoSelecionado}
           componentesSelecionados={componentesSelecionados}
           erro={erro}
           filtros={filtros}

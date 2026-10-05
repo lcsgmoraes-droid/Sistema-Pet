@@ -21,7 +21,7 @@ function getVendaStatusDevolucaoInfo(status) {
 }
 
 export default function ModalDevolucaoSections({
-  calcularTotalDevolucao,
+  calcularValorBrutoSelecionado,
   componentesSelecionados,
   erro,
   filtros,
@@ -488,15 +488,18 @@ export default function ModalDevolucaoSections({
               )}
             </div>
 
-            {/* Total */}
+            {/* O valor líquido exato será mostrado antes da confirmação. */}
             <div
               className={`border-2 rounded-lg p-4 ${gerarCredito ? "bg-purple-50 border-purple-300" : "bg-orange-50 border-orange-200"}`}
             >
               <div className="flex justify-between items-center">
                 <div>
                   <span className="text-lg font-semibold text-gray-900">
-                    {gerarCredito ? "Crédito a Gerar:" : "Total da Devolução:"}
+                    Valor bruto selecionado:
                   </span>
+                  <p className="text-xs text-gray-600 mt-1">
+                    A prévia líquida com os descontos será exibida antes de confirmar.
+                  </p>
                   {gerarCredito && vendaSelecionada?.cliente && (
                     <p className="text-xs text-gray-600 mt-1">
                       <CustomerIdentity
@@ -511,7 +514,7 @@ export default function ModalDevolucaoSections({
                 <span
                   className={`text-2xl font-bold ${gerarCredito ? "text-purple-600" : "text-orange-600"}`}
                 >
-                  {formatMoneyBRL(calcularTotalDevolucao())}
+                  {formatMoneyBRL(calcularValorBrutoSelecionado())}
                 </span>
               </div>
             </div>

@@ -1,5 +1,7 @@
 """Rateio determinístico do valor pago pelos itens de uma venda devolvida."""
 
+from collections import defaultdict
+from dataclasses import dataclass
 from decimal import Decimal, ROUND_FLOOR, ROUND_HALF_UP
 
 
@@ -77,3 +79,80 @@ def valor_devolvido_por_quantidade(
         valor_item * (quantidade_anterior + quantidade_atual) / quantidade_vendida
     )
     return depois - antes
+
+
+@dataclass(frozen=True)
+class CotacaoDevolucao:
+    valor_total: Decimal
+    valor_ja_devolvido: Decimal
+    valores_itens: tuple[Decimal, ...]
+
+    @property
+    def valor_acumulado(self) -> Decimal:
+        return self.valor_ja_devolvido + self.valor_total
+
+
+def cotar_devolucao(venda, itens_venda, eventos_anteriores, itens_solicitados):
+    """Fonte única do valor mostrado na prévia e gravado no reembolso."""
+    if not itens_solicitados:
+        raise ValueError("Selecione ao menos um item para devolução")
+    if any(item.get("is_componente_kit") for item in itens_solicitados):
+        raise ValueError(
+            "Devolução por componente de KIT indisponível: a venda não registra "
+            "o preço original de cada componente. Devolva o KIT inteiro."
+        )
+    status = str(getattr(venda, "status", "") or "").lower()
+    if status not in {
+        "finalizada",
+        "pago_nf",
+        "baixa_parcial",
+        "finalizada_devolucao",
+        "finalizada_devolucao_parcial",
+    }:
+        raise ValueError("A venda não está em situação que permita devolução")
+    if status in {"finalizada_devolucao", "finalizada_devolucao_parcial"} and not (
+        eventos_anteriores
+    ):
+        raise ValueError(
+            "Esta venda tem devolução anterior sem valor rastreável. "
+            "Concilie manualmente o histórico antes de nova devolução."
+        )
+
+    itens_por_id = {item.id: item for item in itens_venda}
+    valor_pago_por_item = ratear_valor_pago_por_item(venda, itens_venda)
+    quantidade_anterior = defaultdict(Decimal)
+    for evento in eventos_anteriores:
+        for devolvido in evento.itens or []:
+            if devolvido.get("is_componente_kit"):
+                continue
+            item_id = devolvido.get("venda_item_id")
+            quantidade_anterior[item_id] += _decimal(devolvido.get("quantidade"))
+
+    quantidade_atual = defaultdict(Decimal)
+    valores_itens = []
+    for solicitado in itens_solicitados:
+        item_id = solicitado.get("item_id")
+        item = itens_por_id.get(item_id)
+        if item is None:
+            raise ValueError(f"Item {item_id} não encontrado na venda")
+        quantidade = _decimal(solicitado.get("quantidade"))
+        valor = valor_devolvido_por_quantidade(
+            item,
+            valor_pago_por_item[item_id],
+            quantidade_anterior[item_id] + quantidade_atual[item_id],
+            quantidade,
+        )
+        quantidade_atual[item_id] += quantidade
+        valores_itens.append(valor)
+
+    valor_total = sum(valores_itens, Decimal("0"))
+    if valor_total <= 0:
+        raise ValueError("A devolução precisa ter valor positivo")
+    valor_ja_devolvido = sum(
+        (_decimal(evento.valor_devolvido) for evento in eventos_anteriores),
+        Decimal("0"),
+    )
+    if valor_ja_devolvido + valor_total > _moeda(venda.total):
+        raise ValueError("Valor acumulado das devoluções excede o total pago na venda")
+
+    return CotacaoDevolucao(valor_total, valor_ja_devolvido, tuple(valores_itens))

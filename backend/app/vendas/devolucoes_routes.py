@@ -3,7 +3,7 @@
 import logging
 from collections import defaultdict
 from datetime import date
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import func
@@ -23,10 +23,7 @@ from app.estoque.service import EstoqueService
 from app.produtos_models import EstoqueMovimentacao
 from app.utils.timezone import now_brasilia
 from app.vendas.devolucao_dre import custo_original_item_devolvido
-from app.vendas.devolucao_valores import (
-    ratear_valor_pago_por_item,
-    valor_devolvido_por_quantidade,
-)
+from app.vendas.devolucao_valores import cotar_devolucao
 from app.vendas.routes_common import (
     _obter_cliente_ou_404,
     _validar_tenant_e_obter_usuario,
@@ -79,6 +76,51 @@ def _buscar_categoria_devolucoes(db: Session, tenant_id):
         ),
         None,
     )
+
+
+@router.post("/{venda_id}/devolucao/previa")
+def prever_devolucao(
+    venda_id: int,
+    dados: dict,
+    db: Session = Depends(get_session),
+    user_and_tenant=Depends(get_current_user_and_tenant),
+):
+    """Mostra o mesmo valor líquido que será usado no registro da devolução."""
+    _, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
+    venda = db.query(Venda).filter_by(id=venda_id, tenant_id=tenant_id).first()
+    if not venda:
+        raise HTTPException(status_code=404, detail="Venda não encontrada")
+    itens_venda = (
+        db.query(VendaItem)
+        .filter(VendaItem.venda_id == venda_id, VendaItem.tenant_id == tenant_id)
+        .all()
+    )
+    eventos_anteriores = (
+        db.query(VendaDevolucao)
+        .filter(
+            VendaDevolucao.tenant_id == tenant_id,
+            VendaDevolucao.venda_id == venda_id,
+        )
+        .all()
+    )
+    try:
+        cotacao = cotar_devolucao(
+            venda, itens_venda, eventos_anteriores, dados.get("itens") or []
+        )
+    except ValueError as erro:
+        raise HTTPException(status_code=400, detail=str(erro)) from erro
+    return {
+        "valor_total_devolucao": float(cotacao.valor_total),
+        "valor_ja_devolvido": float(cotacao.valor_ja_devolvido),
+        "valor_acumulado": float(cotacao.valor_acumulado),
+        "itens": [
+            {
+                "item_id": item.get("item_id"),
+                "valor_devolvido": float(valor),
+            }
+            for item, valor in zip(dados.get("itens") or [], cotacao.valores_itens)
+        ],
+    }
 
 
 @router.post("/{venda_id}/devolucao")
@@ -223,19 +265,31 @@ def registrar_devolucao(
             )
             .all()
         )
-        historico_sem_evento = (
-            str(venda.status or "").lower()
-            in {"finalizada_devolucao", "finalizada_devolucao_parcial"}
-            and not eventos_anteriores
+        todos_itens_venda = (
+            db.query(VendaItem)
+            .filter(VendaItem.venda_id == venda_id, VendaItem.tenant_id == tenant_id)
+            .all()
         )
-        if historico_sem_evento:
-            raise HTTPException(
-                status_code=400,
-                detail=(
-                    "Esta venda tem devolução anterior sem valor rastreável. "
-                    "Concilie manualmente o histórico antes de nova devolução."
-                ),
+        try:
+            cotacao = cotar_devolucao(
+                venda, todos_itens_venda, eventos_anteriores, itens_devolucao
             )
+        except ValueError as erro:
+            raise HTTPException(status_code=400, detail=str(erro)) from erro
+        if dados.get("valor_previsto") is not None:
+            try:
+                valor_previsto = Decimal(str(dados["valor_previsto"])).quantize(
+                    Decimal("0.01")
+                )
+            except (InvalidOperation, ValueError, TypeError) as erro:
+                raise HTTPException(
+                    status_code=400, detail="Valor previsto da devolução inválido"
+                ) from erro
+            if valor_previsto != cotacao.valor_total:
+                raise HTTPException(
+                    status_code=409,
+                    detail="O valor da devolução mudou. Revise a prévia antes de confirmar.",
+                )
         devolvido_por_item = defaultdict(Decimal)
         for evento_anterior in eventos_anteriores:
             for item_anterior in evento_anterior.itens or []:
@@ -244,7 +298,6 @@ def registrar_devolucao(
                         str(item_anterior.get("quantidade") or 0)
                     )
 
-        todos_itens_venda = db.query(VendaItem).filter_by(venda_id=venda_id).all()
         vendido_por_produto = defaultdict(float)
         for item_venda in todos_itens_venda:
             if item_venda.produto_id:
@@ -310,23 +363,14 @@ def registrar_devolucao(
                 quantidade_solicitada,
             )
 
-        try:
-            valor_pago_por_item = ratear_valor_pago_por_item(venda, todos_itens_venda)
-        except ValueError as erro:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Não foi possível conferir o valor pago pelos itens: {erro}",
-            ) from erro
-
         valor_total_devolucao = Decimal("0")
         itens_devolvidos = []
         itens_evento_dre = []
         custo_produtos_estornado = Decimal("0")
         custo_servicos_estornado = Decimal("0")
-        processado_por_item = defaultdict(Decimal)
 
         # Processar cada item devolvido
-        for item_dev in itens_devolucao:
+        for indice, item_dev in enumerate(itens_devolucao):
             # 🆕 Verificar se é componente de KIT
             is_componente_kit = item_dev.get("is_componente_kit", False)
 
@@ -464,23 +508,9 @@ def registrar_devolucao(
                         logger.error(f"Erro ao devolver estoque: {e}")
                         raise HTTPException(status_code=400, detail=str(e)) from e
 
-                # O valor líquido é cumulativo por item para que devoluções
-                # parciais sucessivas fechem nos mesmos centavos do rateio.
+                # A prévia e o registro usam exatamente a mesma cotação.
                 quantidade_decimal = Decimal(str(quantidade_devolvida))
-                try:
-                    valor_item = valor_devolvido_por_quantidade(
-                        item_venda,
-                        valor_pago_por_item[item_venda.id],
-                        devolvido_por_item[item_venda.id]
-                        + processado_por_item[item_venda.id],
-                        quantidade_decimal,
-                    )
-                except (KeyError, ValueError) as erro:
-                    raise HTTPException(
-                        status_code=400,
-                        detail=f"Valor ou quantidade da devolução não conferem: {erro}",
-                    ) from erro
-                processado_por_item[item_venda.id] += quantidade_decimal
+                valor_item = cotacao.valores_itens[indice]
                 valor_total_devolucao += valor_item
                 custo_item, origem_custo, custo_pendente = (
                     custo_original_item_devolvido(
@@ -533,22 +563,8 @@ def registrar_devolucao(
                 status_code=400, detail="A devolução precisa ter valor positivo"
             )
 
-        valor_total_devolucao = valor_total_devolucao.quantize(Decimal("0.01"))
-        valor_ja_devolvido = sum(
-            (
-                Decimal(str(getattr(evento, "valor_devolvido", 0) or 0))
-                for evento in eventos_anteriores
-            ),
-            Decimal("0"),
-        )
-        valor_acumulado_devolvido = valor_ja_devolvido + valor_total_devolucao
-        if valor_acumulado_devolvido > Decimal(str(venda.total or 0)).quantize(
-            Decimal("0.01")
-        ):
-            raise HTTPException(
-                status_code=400,
-                detail="Valor acumulado das devoluções excede o total pago na venda",
-            )
+        if valor_total_devolucao != cotacao.valor_total:
+            raise RuntimeError("Cotação e itens da devolução divergiram")
 
         # O evento é a fonte da dedução na DRE. Caixa e crédito são apenas formas
         # de liquidá-la; tudo abaixo participa da mesma transação e do mesmo commit.
@@ -702,7 +718,7 @@ def registrar_devolucao(
             logger.info(f"💸 LancamentoManual #{lanc.id} marcado como estornado")
 
         # 🆕 ATUALIZAR STATUS DA VENDA
-        if valor_acumulado_devolvido >= Decimal(str(venda.total or 0)):
+        if cotacao.valor_acumulado >= Decimal(str(venda.total or 0)):
             venda.status = "devolvida_total"
         else:
             venda.status = "finalizada_devolucao"
@@ -711,7 +727,7 @@ def registrar_devolucao(
         from datetime import datetime
 
         # Determinar tipo de devolução
-        if valor_acumulado_devolvido >= Decimal(str(venda.total or 0)):
+        if cotacao.valor_acumulado >= Decimal(str(venda.total or 0)):
             tipo_desc = "Devolução total"
         else:
             # Verificar se tem componentes de KIT
