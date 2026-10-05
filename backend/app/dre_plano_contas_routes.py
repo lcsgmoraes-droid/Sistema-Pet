@@ -519,6 +519,21 @@ def deletar_subcategoria(
         db, db_subcategoria.categoria_financeira_id, tenant_id, current_user.id
     )
 
+    categoria_em_uso = (
+        db.query(CategoriaFinanceira)
+        .filter(
+            CategoriaFinanceira.dre_subcategoria_id == subcategoria_id,
+            CategoriaFinanceira.tenant_id == tenant_id,
+            CategoriaFinanceira.ativo.is_(True),
+        )
+        .first()
+    )
+    if categoria_em_uso:
+        raise HTTPException(
+            status_code=409,
+            detail="Desvincule a subcategoria DRE das categorias financeiras ativas antes de excluir",
+        )
+
     # Verificar se há lançamentos (contas_pagar ou contas_receber)
     from app.financeiro_models import ContaPagar, ContaReceber
 
@@ -552,9 +567,7 @@ def deletar_subcategoria(
         )
 
     # Sem lançamentos: pode deletar fisicamente
-    # Antes, limpar referências em categorias_financeiras para não violar FK
-    from app.financeiro_models import CategoriaFinanceira
-
+    # Apenas vínculos de categorias inativas podem restar neste ponto.
     db.query(CategoriaFinanceira).filter(
         CategoriaFinanceira.dre_subcategoria_id == subcategoria_id,
         CategoriaFinanceira.tenant_id == tenant_id,

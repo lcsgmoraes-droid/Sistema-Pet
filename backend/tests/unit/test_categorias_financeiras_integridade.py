@@ -36,7 +36,7 @@ from app.dre_plano_contas_routes import (
     criar_subcategoria as criar_subcategoria_dre,
     deletar_subcategoria as deletar_subcategoria_dre,
 )
-from app.financeiro_models import CategoriaFinanceira
+from app.financeiro_models import CategoriaFinanceira, ContaPagar, ContaReceber
 from app.models import User
 from app.tenancy.context import clear_current_tenant, set_current_tenant
 from app.vendas.devolucoes_routes import _buscar_categoria_devolucoes
@@ -53,6 +53,8 @@ def db():
             CategoriaFinanceira.__table__,
             DRECategoria.__table__,
             DRESubcategoria.__table__,
+            ContaPagar.__table__,
+            ContaReceber.__table__,
         ],
     )
     with Session(engine, expire_on_commit=False) as session:
@@ -366,6 +368,55 @@ def test_subcategoria_dre_vinculada_respeita_dono_e_geral_e_compartilhada(db):
         user_and_tenant=_contexto(tenant, 10),
     )
     assert atualizada.custo_pe == "variavel"
+
+
+def test_nao_exclui_subcategoria_dre_geral_usada_por_categoria_ativa(db):
+    tenant = uuid4()
+    categoria_dre = criar_categoria_dre(
+        DRECategoriaCreate(nome="Serviços", natureza=NaturezaDRE.DESPESA),
+        db=db,
+        user_and_tenant=_contexto(tenant, 10),
+    )
+    geral = criar_subcategoria_dre(
+        DRESubcategoriaCreate(
+            categoria_id=categoria_dre.id,
+            nome="Hospedagem",
+            tipo_custo=TipoCusto.DIRETO,
+            escopo_rateio=EscopoRateio.AMBOS,
+        ),
+        db=db,
+        user_and_tenant=_contexto(tenant, 10),
+    )
+    categoria_financeira = _categoria(db, tenant, nome="Hospedagem", user_id=20)
+    categoria_financeira.dre_subcategoria_id = geral.id
+    db.commit()
+
+    for usuario_id in (10, 20):
+        with pytest.raises(HTTPException) as erro:
+            deletar_subcategoria_dre(
+                geral.id,
+                db=db,
+                user_and_tenant=_contexto(tenant, usuario_id),
+            )
+        assert erro.value.status_code == 409
+        assert "Desvincule" in erro.value.detail
+        assert (
+            db.get(CategoriaFinanceira, categoria_financeira.id).dre_subcategoria_id
+            == geral.id
+        )
+        assert db.get(DRESubcategoria, geral.id).ativo is True
+
+    categoria_financeira.ativo = False
+    db.commit()
+    deletar_subcategoria_dre(
+        geral.id,
+        db=db,
+        user_and_tenant=_contexto(tenant, 10),
+    )
+    assert db.get(DRESubcategoria, geral.id) is None
+    assert (
+        db.get(CategoriaFinanceira, categoria_financeira.id).dre_subcategoria_id is None
+    )
 
 
 def test_devolucao_reutiliza_categoria_plural_no_mesmo_tenant(db):
