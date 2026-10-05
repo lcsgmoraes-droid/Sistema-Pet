@@ -74,6 +74,41 @@ test("cria categoria DRE antes de permitir cadastrar subcategorias", async () =>
   ]);
 });
 
+test("reutiliza categoria DRE com acento e espaços equivalentes", async () => {
+  const api = {
+    get: async () => ({
+      data: [{ id: 71, nome: "Marketing Digital", natureza: "despesa", ativo: true }],
+    }),
+    post: async () => {
+      throw new Error("Não deveria criar categoria duplicada");
+    },
+  };
+  assert.equal(
+    await garantirCategoriaDRE(api, { nome: "  Márketing   DIGITAL ", tipo: "despesa" }),
+    71,
+  );
+});
+
+test("continua após 409 de criação DRE concorrente e propaga conflito real", async () => {
+  const conflito = Object.assign(new Error("Já existe"), { response: { status: 409 } });
+  let buscas = 0;
+  const api = {
+    get: async () => ({
+      data: ++buscas === 1 ? [] : [{ id: 72, nome: "Marketing", natureza: "despesa", ativo: true }],
+    }),
+    post: async () => {
+      throw conflito;
+    },
+  };
+  assert.equal(await garantirCategoriaDRE(api, { nome: "Márketing", tipo: "despesa" }), 72);
+
+  api.get = async () => ({ data: [] });
+  await assert.rejects(
+    garantirCategoriaDRE(api, { nome: "Márketing", tipo: "despesa" }),
+    (error) => error === conflito,
+  );
+});
+
 test("classifica CMV novo como custo no plano DRE", async () => {
   let payload;
   const api = {

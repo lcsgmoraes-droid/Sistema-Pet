@@ -96,20 +96,26 @@ export default function CategoriasFinanceirasRow({
         </div>
 
         <div className="flex items-center gap-2 ml-4">
-          <button
-            onClick={() => handleEdit(cat)}
-            className="p-2 text-gray-600 hover:bg-gray-100 rounded-md"
-            title="Editar"
-          >
-            <FiEdit2 size={18} />
-          </button>
-          <button
-            onClick={() => handleDelete(cat.id)}
-            className="p-2 text-red-600 hover:bg-red-50 rounded-md"
-            title="Excluir"
-          >
-            <FiTrash2 size={18} />
-          </button>
+          {cat.pode_editar ? (
+            <>
+              <button
+                onClick={() => handleEdit(cat)}
+                className="p-2 text-gray-600 hover:bg-gray-100 rounded-md"
+                title="Editar"
+              >
+                <FiEdit2 size={18} />
+              </button>
+              <button
+                onClick={() => handleDelete(cat.id)}
+                className="p-2 text-red-600 hover:bg-red-50 rounded-md"
+                title="Excluir"
+              >
+                <FiTrash2 size={18} />
+              </button>
+            </>
+          ) : (
+            <span className="text-xs text-gray-500">Somente leitura</span>
+          )}
         </div>
       </div>
 
