@@ -327,6 +327,108 @@ def test_devolucao_parcial_em_dinheiro_registra_deducao_e_custo_servico(monkeypa
     db.commit.assert_called_once()
 
 
+def test_entrada_de_estoque_usa_custo_original_da_mesma_parcela_da_dre(monkeypatch):
+    tenant_id = uuid4()
+    atendente = SimpleNamespace(id=22, nome="Atendente")
+    cliente = SimpleNamespace(id=47, nome="Cliente", credito=Decimal("0"))
+    produto = SimpleNamespace(id=11, nome="Produto", preco_custo=Decimal("99"))
+    item = SimpleNamespace(
+        id=3,
+        produto_id=produto.id,
+        produto=produto,
+        tipo="produto",
+        quantidade=Decimal("2"),
+        preco_unitario=Decimal("50"),
+        subtotal=Decimal("100"),
+    )
+    venda = SimpleNamespace(
+        id=8,
+        cliente_id=cliente.id,
+        cliente=cliente,
+        numero_venda="VEN-8",
+        total=Decimal("100"),
+        taxa_entrega=Decimal("0"),
+        observacoes="",
+        status="finalizada",
+        itens=[item],
+        rentabilidade_snapshot={
+            "snapshot_version": 5,
+            "itens": [
+                {
+                    "produto_id": produto.id,
+                    "quantidade": 2,
+                    "preco_unitario": 50,
+                    "custo_total": 30,
+                }
+            ],
+        },
+    )
+    consultas = {}
+    for modelo, resultado in (
+        (Venda, venda),
+        (VendaItem, [item]),
+        (VendaDevolucao, []),
+        (Cliente, cliente),
+        (ContaReceber, []),
+    ):
+        consulta = MagicMock()
+        consulta.filter.return_value = consulta
+        consulta.filter_by.return_value = consulta
+        consulta.with_for_update.return_value = consulta
+        consulta.first.return_value = None if modelo is VendaDevolucao else resultado
+        consulta.all.return_value = resultado if isinstance(resultado, list) else []
+        consultas[modelo] = consulta
+    consulta_agregada = MagicMock()
+    consulta_agregada.filter.return_value = consulta_agregada
+    consulta_agregada.scalar.return_value = 0
+    db = MagicMock()
+    db.query.side_effect = lambda modelo: consultas.get(modelo, consulta_agregada)
+
+    entradas = []
+    monkeypatch.setattr(
+        "app.vendas.devolucoes_routes._validar_estoque_devolucao_seguro",
+        lambda *_args: None,
+    )
+    monkeypatch.setattr(
+        "app.vendas.devolucoes_routes.resolver_tenant_estoque_item",
+        lambda *_args: (tenant_id, False),
+    )
+    monkeypatch.setattr(
+        "app.vendas.devolucoes_routes.contexto_tenant_estoque",
+        lambda *_args: nullcontext(tenant_id),
+    )
+    monkeypatch.setattr(
+        "app.vendas.devolucoes_routes.EstoqueService.estornar_estoque",
+        lambda **kwargs: entradas.append(kwargs),
+    )
+    monkeypatch.setattr(
+        "app.vendas.devolucoes_routes.log_action", lambda **_kwargs: None
+    )
+
+    registrar_devolucao(
+        venda_id=venda.id,
+        dados={
+            "itens": [{"item_id": item.id, "quantidade": 1}],
+            "motivo": "Troca",
+            "gerar_credito": True,
+            "chave_operacao": str(uuid4()),
+        },
+        db=db,
+        user_and_tenant=(atendente, tenant_id),
+    )
+
+    evento = next(
+        call.args[0]
+        for call in db.add.call_args_list
+        if isinstance(call.args[0], VendaDevolucao)
+    )
+    assert produto.preco_custo == Decimal("99")
+    assert evento.custo_produtos_estornado == Decimal("15.00")
+    assert entradas[0]["custo_unitario_override"] == 15.0
+    assert entradas[0]["valor_total_override"] == 15.0
+    db.commit.assert_called_once()
+
+
 @pytest.mark.parametrize(
     "status,valor_final,valor_recebido",
     [

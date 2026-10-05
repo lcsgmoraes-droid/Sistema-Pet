@@ -625,12 +625,34 @@ def registrar_devolucao(
                     continue
 
                 item_venda = itens_normais_por_id[item_id]
+                quantidade_decimal = Decimal(str(quantidade_devolvida))
+                valor_item = cotacao.valores_itens[indice]
+                custo_item, origem_custo, custo_pendente = (
+                    custo_original_item_devolvido(
+                        db,
+                        venda,
+                        item_venda,
+                        quantidade_decimal,
+                        tenant_id,
+                        devolvido_por_item[item_id] + processado_por_item[item_id],
+                    )
+                )
 
                 # Devolver ao estoque
                 if item_venda.produto_id:
                     try:
                         tenant_estoque, compartilhado = resolver_tenant_estoque_item(
                             item_venda, tenant_id
+                        )
+                        custo_estoque = (
+                            {}
+                            if custo_pendente
+                            else {
+                                "custo_unitario_override": float(
+                                    custo_item / quantidade_decimal
+                                ),
+                                "valor_total_override": float(custo_item),
+                            }
                         )
                         with contexto_tenant_estoque(
                             tenant_estoque, tenant_id
@@ -650,6 +672,7 @@ def registrar_devolucao(
                                     if compartilhado
                                     else motivo
                                 ),
+                                **custo_estoque,
                             )
                         # Registrar auditoria
                         log_action(
@@ -666,19 +689,7 @@ def registrar_devolucao(
                         raise HTTPException(status_code=400, detail=str(e)) from e
 
                 # A prévia e o registro usam exatamente a mesma cotação.
-                quantidade_decimal = Decimal(str(quantidade_devolvida))
-                valor_item = cotacao.valores_itens[indice]
                 valor_total_devolucao += valor_item
-                custo_item, origem_custo, custo_pendente = (
-                    custo_original_item_devolvido(
-                        db,
-                        venda,
-                        item_venda,
-                        Decimal(str(quantidade_devolvida)),
-                        tenant_id,
-                        devolvido_por_item[item_id] + processado_por_item[item_id],
-                    )
-                )
                 processado_por_item[item_id] += quantidade_decimal
                 tipo_item = str(
                     getattr(item_venda, "tipo", "produto") or "produto"
