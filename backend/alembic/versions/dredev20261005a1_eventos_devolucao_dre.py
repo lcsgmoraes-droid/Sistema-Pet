@@ -54,9 +54,6 @@ def upgrade() -> None:
         sa.Column(
             "custo_pendente", sa.Boolean(), nullable=False, server_default=sa.false()
         ),
-        sa.Column(
-            "historico_pre_evento", sa.Boolean(), nullable=False, server_default=sa.false()
-        ),
         sa.Column("itens", sa.JSON(), nullable=False),
         sa.Column(
             "movimentacao_caixa_id",

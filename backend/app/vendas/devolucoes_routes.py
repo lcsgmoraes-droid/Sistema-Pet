@@ -219,23 +219,17 @@ def registrar_devolucao(
             )
             .all()
         )
-        historico_pre_evento = (
+        historico_sem_evento = (
             str(venda.status or "").lower()
             in {"finalizada_devolucao", "finalizada_devolucao_parcial"}
             and not eventos_anteriores
-        ) or any(
-            bool(getattr(evento, "historico_pre_evento", False))
-            for evento in eventos_anteriores
         )
-        if historico_pre_evento and any(
-            str(getattr(item, "tipo", "") or "").lower() == "servico"
-            for item in itens_venda
-        ):
+        if historico_sem_evento:
             raise HTTPException(
                 status_code=400,
                 detail=(
-                    "Devolução de serviço indisponível nesta venda: houve "
-                    "devolução anterior sem saldo rastreável. Confira o histórico."
+                    "Esta venda tem devolução anterior sem valor rastreável. "
+                    "Concilie manualmente o histórico antes de nova devolução."
                 ),
             )
         devolvido_por_item = defaultdict(Decimal)
@@ -540,7 +534,6 @@ def registrar_devolucao(
             custo_produtos_estornado=custo_produtos_estornado,
             custo_servicos_estornado=custo_servicos_estornado,
             custo_pendente=any(item["custo_pendente"] for item in itens_evento_dre),
-            historico_pre_evento=historico_pre_evento,
             itens=itens_evento_dre,
         )
         db.add(evento_dre)

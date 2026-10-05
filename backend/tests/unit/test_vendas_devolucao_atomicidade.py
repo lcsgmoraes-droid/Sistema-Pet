@@ -317,8 +317,10 @@ def test_componente_de_kit_sem_preco_original_comprovado_nao_gera_credito(
     db.commit.assert_not_called()
 
 
-@pytest.mark.parametrize("eventos", [[], [SimpleNamespace(historico_pre_evento=True)]])
-def test_servico_com_devolucao_historica_sem_saldo_rastreavel_e_bloqueado(eventos):
+@pytest.mark.parametrize("tipo,produto_id", [("servico", None), ("produto", 11)])
+def test_venda_com_devolucao_historica_sem_valor_rastreavel_e_bloqueada(
+    tipo, produto_id
+):
     tenant_id = uuid4()
     venda = SimpleNamespace(
         id=8,
@@ -327,12 +329,12 @@ def test_servico_com_devolucao_historica_sem_saldo_rastreavel_e_bloqueado(evento
         numero_venda="VEN-8",
         total=Decimal("100"),
     )
-    item = SimpleNamespace(id=3, tipo="servico", produto_id=None, quantidade=2)
+    item = SimpleNamespace(id=3, tipo=tipo, produto_id=produto_id, quantidade=2)
     consultas = {}
     for modelo, resultado in (
         (Venda, venda),
         (VendaItem, [item]),
-        (VendaDevolucao, eventos),
+        (VendaDevolucao, []),
     ):
         consulta = MagicMock()
         consulta.filter.return_value = consulta
@@ -357,7 +359,7 @@ def test_servico_com_devolucao_historica_sem_saldo_rastreavel_e_bloqueado(evento
         )
 
     assert erro.value.status_code == 400
-    assert "sem saldo rastreável" in erro.value.detail
+    assert "Concilie manualmente" in erro.value.detail
     db.add.assert_not_called()
     db.commit.assert_not_called()
 
@@ -382,7 +384,6 @@ def test_valor_acumulado_das_devolucoes_nao_excede_total_pago():
     )
     evento_anterior = SimpleNamespace(
         valor_devolvido=Decimal("50"),
-        historico_pre_evento=False,
         itens=[{"venda_item_id": 3, "quantidade": "1", "is_componente_kit": False}],
     )
     consultas = {}
@@ -442,7 +443,6 @@ def test_devolucoes_parciais_acumuladas_marcam_venda_totalmente_devolvida(monkey
     )
     evento_anterior = SimpleNamespace(
         valor_devolvido=Decimal("50"),
-        historico_pre_evento=False,
         itens=[{"venda_item_id": 3, "quantidade": "1", "is_componente_kit": False}],
     )
     consultas = {}
