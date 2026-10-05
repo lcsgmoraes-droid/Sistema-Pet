@@ -71,7 +71,8 @@ def calcular_frete_notas_entrada(
 ) -> Decimal:
     """
     Calcula o total de frete das notas de entrada do período
-    O frete é despesa operacional, não CMV
+    Consulta informativa. O frete integra o custo de aquisição dos produtos
+    e não deve ser somado novamente às despesas da DRE.
     """
     from .produtos_models import NotaEntrada
 
@@ -253,6 +254,9 @@ def calcular_taxas_cartao(db: Session, mes: int, ano: int, tenant_id: str) -> De
                 ContaPagar.tenant_id == tenant_id,
                 ContaPagar.dre_subcategoria_id.in_(subcategoria_ids),
                 ContaPagar.status != "cancelado",
+                ContaPagar.status != "parcelado",
+                ContaPagar.afeta_dre.is_(True),
+                ContaPagar.nota_entrada_id.is_(None),
             )
         )
         .all()

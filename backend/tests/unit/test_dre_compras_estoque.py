@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 from uuid import UUID
 
@@ -6,11 +6,16 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from app.db import Base
-from app.dre_canais import agregacao
+from app import dre_base_routes
+from app.dre_canais import agregacao, detalhes
 from app.dre_canais.contas import classificacoes_contas_pagar, eh_compra_estoque
 from app.dre_canais.detalhes import _detalhes_contas_campo
 from app.dre_canais.linhas import montar_linhas_dre_competencia
-from app.dre_calculos import obter_despesas_por_categoria
+from app.dre_calculos import (
+    calcular_frete_notas_entrada,
+    calcular_taxas_cartao,
+    obter_despesas_por_categoria,
+)
 from app.dre_plano_contas_models import (
     DRECategoria,
     DRESubcategoria,
@@ -19,7 +24,9 @@ from app.dre_plano_contas_models import (
     TipoCusto,
 )
 from app.financeiro_models import CategoriaFinanceira, ContaPagar, TipoDespesa
+from app.produtos_models import NotaEntrada
 from app.tenancy.context import clear_current_tenant, set_current_tenant
+from app.vendas_models import Venda
 
 
 TENANT_ID = UUID("11111111-1111-1111-1111-111111111111")
@@ -39,6 +46,7 @@ def _conta(
     status: str = "pendente",
     afeta_dre: bool = True,
     nota_entrada_id: int | None = None,
+    fornecedor_id: int | None = None,
     conta_principal_id: int | None = None,
     numero_parcela: int | None = None,
 ) -> ContaPagar:
@@ -58,6 +66,7 @@ def _conta(
         status=status,
         afeta_dre=afeta_dre,
         nota_entrada_id=nota_entrada_id,
+        fornecedor_id=fornecedor_id,
         eh_parcelado=conta_principal_id is not None or status == "parcelado",
         conta_principal_id=conta_principal_id,
         numero_parcela=numero_parcela,
@@ -91,6 +100,7 @@ def test_compra_de_estoque_e_contas_parceladas_nao_duplicam_dre(
             CategoriaFinanceira.__table__,
             TipoDespesa.__table__,
             ContaPagar.__table__,
+            NotaEntrada.__table__,
         ],
     )
     db = sessionmaker(bind=engine)()
@@ -375,6 +385,189 @@ def test_compra_de_estoque_e_contas_parceladas_nao_duplicam_dre(
             "Despesas com Vendas": Decimal("80"),
             "Outras Despesas": Decimal("90"),
         }
+
+        # O complemento de folha usa as mesmas contas no total e no detalhe.
+        _inserir(
+            db,
+            ContaPagar,
+            [
+                _conta(
+                    40,
+                    "Folha de produtos para revenda",
+                    "100",
+                    subcategoria_id=1,
+                    tipo_id=1,
+                    categoria_id=11,
+                )
+            ],
+        )
+        db.commit()
+
+        def resumo_folha_fake(
+            _db, _mes, _ano, _tenant_id, contas, _subcategorias, **_kwargs
+        ):
+            lancado = sum(
+                (
+                    conta.valor_original
+                    for conta in contas
+                    if "folha" in conta.descricao.lower()
+                ),
+                Decimal("0"),
+            )
+            complemento = max(Decimal("0"), Decimal("100") - lancado)
+            return {
+                "ajustes_por_canal": {"loja_fisica": complemento},
+                "provisoes": [],
+                "complemento_loja_fisica": complemento,
+                "quantidade_funcionarios": 1,
+                "folha_lancada_por_canal": {"loja_fisica": lancado},
+                "provisoes_por_canal": {"loja_fisica": Decimal("0")},
+                "estimado": Decimal("100"),
+            }
+
+        monkeypatch.setattr(
+            agregacao, "calcular_resumo_folha_gerencial", resumo_folha_fake
+        )
+        monkeypatch.setattr(
+            detalhes, "calcular_resumo_folha_gerencial", resumo_folha_fake
+        )
+        dados_folha = {}
+        agregacao.agregar_contas_pagar_por_canal(db, 10, 2026, TENANT_ID, dados_folha)
+        detalhe_folha = _detalhes_contas_campo(
+            db, 10, 2026, TENANT_ID, "loja_fisica", "despesas_pessoal"
+        )
+        assert dados_folha["loja_fisica"]["despesas_pessoal"] == Decimal("100")
+        assert sum(item.valor for item in detalhe_folha) == 100.0
+
+        # Taxas parceladas: somente as parcelas elegíveis entram no DRE.
+        _inserir(
+            db,
+            DRECategoria,
+            [
+                DRECategoria(
+                    id=7,
+                    tenant_id=TENANT_ID,
+                    nome="Taxas Financeiras",
+                    natureza=NaturezaDRE.DESPESA,
+                )
+            ],
+        )
+        _inserir(
+            db,
+            DRESubcategoria,
+            [
+                DRESubcategoria(
+                    id=8,
+                    tenant_id=TENANT_ID,
+                    categoria_id=7,
+                    nome="Taxas de Cartão",
+                    tipo_custo=TipoCusto.DIRETO,
+                    escopo_rateio=EscopoRateio.AMBOS,
+                )
+            ],
+        )
+        _inserir(
+            db,
+            ContaPagar,
+            [
+                _conta(
+                    60, "Taxa de cartão", "20", subcategoria_id=8, status="parcelado"
+                ),
+                _conta(
+                    61,
+                    "Taxa de cartão 1/2",
+                    "10",
+                    subcategoria_id=8,
+                    conta_principal_id=60,
+                ),
+                _conta(
+                    62,
+                    "Taxa de cartão 2/2",
+                    "10",
+                    subcategoria_id=8,
+                    conta_principal_id=60,
+                ),
+                _conta(
+                    63, "Taxa fora da DRE", "50", subcategoria_id=8, afeta_dre=False
+                ),
+                _conta(
+                    64,
+                    "Taxa vinculada à NF",
+                    "60",
+                    subcategoria_id=8,
+                    nota_entrada_id=901,
+                ),
+                _conta(
+                    70,
+                    "Material de limpeza com fornecedor",
+                    "12",
+                    subcategoria_id=4,
+                    fornecedor_id=999,
+                ),
+            ],
+        )
+        _inserir(
+            db,
+            NotaEntrada,
+            [
+                NotaEntrada(
+                    id=901,
+                    tenant_id=TENANT_ID,
+                    user_id=1,
+                    numero_nota="901",
+                    serie="1",
+                    chave_acesso="9" * 44,
+                    fornecedor_cnpj="00000000000000",
+                    fornecedor_nome="Fornecedor teste",
+                    data_emissao=datetime(2026, 10, 5),
+                    valor_produtos=100,
+                    valor_frete=400,
+                    valor_total=500,
+                    xml_content="<xml/>",
+                )
+            ],
+        )
+        db.commit()
+
+        assert calcular_taxas_cartao(db, 10, 2026, TENANT_ID) == Decimal("20")
+        assert calcular_frete_notas_entrada(db, 10, 2026, TENANT_ID) == Decimal("400")
+
+        class ConsultaSemVendas:
+            def options(self, *_args):
+                return self
+
+            def filter(self, *_args):
+                return self
+
+            def all(self):
+                return []
+
+        consulta_original = db.query
+        monkeypatch.setattr(
+            db,
+            "query",
+            lambda modelo: (
+                ConsultaSemVendas() if modelo is Venda else consulta_original(modelo)
+            ),
+        )
+        dre_detalhado = dre_base_routes.gerar_dre_detalhado(
+            ano=2026, mes=10, db=db, user_and_tenant=(object(), TENANT_ID)
+        )
+        assert dre_detalhado.dre.despesas_operacionais == Decimal("252")
+        assert any(
+            item["descricao"] == "Material de limpeza com fornecedor"
+            for item in dre_detalhado.detalhes_despesas
+        )
+        assert (
+            sum(
+                (
+                    Decimal(str(item["valor"]))
+                    for item in dre_detalhado.detalhes_despesas
+                ),
+                Decimal("0"),
+            )
+            == dre_detalhado.dre.despesas_operacionais
+        )
     finally:
         clear_current_tenant()
         db.close()

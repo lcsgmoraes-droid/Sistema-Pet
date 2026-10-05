@@ -315,11 +315,13 @@ def _detalhes_contas_campo(
         subcategorias = _subcategorias_contas_map(db, tenant_id, contas_base)
         tipos, categorias = classificacoes_contas_pagar(db, tenant_id, contas_base)
         contas = []
+        contas_folha = []
         for conta in contas_base:
             if conta.dre_subcategoria_id in frete_ids or eh_compra_estoque(
                 conta, tipos, categorias
             ):
                 continue
+            contas_folha.append(conta)
             if _normalizar_canal(getattr(conta, "canal", None)) != canal:
                 continue
             subcategoria = subcategorias.get(
@@ -376,7 +378,7 @@ def _detalhes_contas_campo(
             mes,
             ano,
             tenant_id,
-            contas_base,
+            contas_folha,
             subcategorias,
             mes_inicial=mes_inicial,
             data_final=data_final,
