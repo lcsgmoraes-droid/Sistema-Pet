@@ -35,9 +35,13 @@ def test_criar_passivo_nao_exige_dre_e_mantem_previsao_de_caixa(monkeypatch):
     def nao_deve_chamar(*args, **kwargs):
         raise AssertionError("Passivo não deve ser classificado na DRE")
 
-    monkeypatch.setattr(routes, "_resolver_dre_subcategoria_conta_pagar", nao_deve_chamar)
+    monkeypatch.setattr(
+        routes, "_resolver_dre_subcategoria_conta_pagar", nao_deve_chamar
+    )
     monkeypatch.setattr(routes, "atualizar_dre_por_lancamento", nao_deve_chamar)
-    monkeypatch.setattr(routes, "aplicar_classificacao_aprendida_conta_pagar", nao_deve_chamar)
+    monkeypatch.setattr(
+        routes, "aplicar_classificacao_aprendida_conta_pagar", nao_deve_chamar
+    )
 
     db = FakeSession()
     conta = ContaPagarCreate(
