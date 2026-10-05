@@ -2,7 +2,10 @@ import { toast } from "react-hot-toast";
 import api from "../../api.js";
 import { buildCategoriaPayload, buildSubcategoriaDREPayload } from "./categoriasFinanceirasUtils";
 import { confirmarCorePet } from "../../services/corepetDialog";
-import { garantirCategoriaDRE } from "../../utils/dreCategoriaFinanceira";
+import {
+  garantirCategoriaDRE,
+  prevalidarSubcategoriasDRE,
+} from "../../utils/dreCategoriaFinanceira";
 
 export function createCategoriasFinanceirasPersistence({
   carregarDados,
@@ -33,6 +36,14 @@ export function createCategoriasFinanceirasPersistence({
 
     let categoriaId;
     try {
+      await prevalidarSubcategoriasDRE(api, {
+        nomeCategoria: formData.nome,
+        tipoCategoria: formData.tipo,
+        categoriaFinanceiraId: editando,
+        categoriaDREId: editando ? resolverCategoriaDREId(editando) : null,
+        subcategorias: formData.novasSubcategorias,
+      });
+
       if (editando) {
         categoriaId = await atualizarCategoria();
       } else {
@@ -57,7 +68,7 @@ export function createCategoriasFinanceirasPersistence({
       toast.error(
         categoriaId && !editando
           ? "Categoria criada, mas houve erro nas subcategorias. Reabra a categoria para concluir."
-          : error.response?.data?.detail || "Erro ao salvar categoria",
+          : error.response?.data?.detail || error.message || "Erro ao salvar categoria",
       );
       if (categoriaId) carregarDados();
       return null;

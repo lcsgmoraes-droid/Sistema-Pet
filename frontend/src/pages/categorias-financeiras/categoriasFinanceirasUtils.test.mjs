@@ -4,9 +4,124 @@ import test from "node:test";
 import {
   buildSubcategoriasExistentes,
   getSubcategoriasDREDaCategoria,
+  podeClassificarCustoPeDRE,
   resolverCategoriaDREId,
 } from "./categoriasFinanceirasUtils.js";
-import { garantirCategoriaDRE } from "../../utils/dreCategoriaFinanceira.js";
+import {
+  garantirCategoriaDRE,
+  prevalidarSubcategoriasDRE,
+} from "../../utils/dreCategoriaFinanceira.js";
+
+test("classificação DRE no painel exige categoria financeira editável", () => {
+  const propria = { categoria_financeira_id: 10 };
+  const geral = { categoria_financeira_id: null };
+  const vinculoDeOutra = { categoria_financeira_id: 11 };
+  const editavel = { id: 10, tipo_custo: "ambos", pode_editar: true };
+
+  assert.equal(podeClassificarCustoPeDRE({ ...editavel, pode_editar: false }, propria), false);
+  assert.equal(podeClassificarCustoPeDRE(editavel, propria), true);
+  assert.equal(podeClassificarCustoPeDRE(editavel, geral), true);
+  assert.equal(podeClassificarCustoPeDRE(editavel, vinculoDeOutra), false);
+  assert.equal(podeClassificarCustoPeDRE({ ...editavel, tipo_custo: "fixo" }, propria), false);
+});
+
+test("rejeita subcategoria DRE duplicada antes de qualquer gravação financeira", async () => {
+  const chamadas = [];
+  const api = {
+    get: async (url) => {
+      chamadas.push(url);
+      return {
+        data:
+          url === "/dre/categorias"
+            ? [{ id: 7, nome: "Operações", natureza: "despesa", ativo: true }]
+            : [{ id: 31, categoria_id: 7, nome: "Internet", ativo: true }],
+      };
+    },
+    post: async () => {
+      throw new Error("Pré-validação não deve gravar dados");
+    },
+    put: async () => {
+      throw new Error("Pré-validação não deve gravar dados");
+    },
+  };
+
+  await assert.rejects(
+    prevalidarSubcategoriasDRE(api, {
+      nomeCategoria: "Operações",
+      tipoCategoria: "despesa",
+      categoriaFinanceiraId: null,
+      categoriaDREId: null,
+      subcategorias: [{ nome: "  INTERNÉT  " }],
+    }),
+    /Subcategoria DRE.*já existe/,
+  );
+  assert.deepEqual(chamadas.sort(), ["/dre/categorias", "/dre/subcategorias"]);
+});
+
+test("rejeita renomeação DRE conflitante e preserva duplicatas históricas sem edição", async () => {
+  const api = {
+    get: async (url) => ({
+      data:
+        url === "/dre/categorias"
+          ? []
+          : [
+              {
+                id: 31,
+                categoria_id: 7,
+                categoria_financeira_id: 10,
+                nome: "Internet",
+                ativo: true,
+              },
+              {
+                id: 32,
+                categoria_id: 7,
+                categoria_financeira_id: 11,
+                nome: "Energia",
+                ativo: true,
+              },
+              {
+                id: 33,
+                categoria_id: 7,
+                categoria_financeira_id: 11,
+                nome: "Energia",
+                ativo: true,
+              },
+            ],
+    }),
+  };
+  const base = {
+    nomeCategoria: "Operações",
+    tipoCategoria: "despesa",
+    categoriaFinanceiraId: 10,
+    categoriaDREId: 7,
+  };
+
+  await assert.rejects(
+    prevalidarSubcategoriasDRE(api, {
+      ...base,
+      subcategorias: [{ id: 31, nome: " ENÉRGIA " }],
+    }),
+    /Subcategoria DRE.*já existe/,
+  );
+  await prevalidarSubcategoriasDRE(api, {
+    ...base,
+    subcategorias: [{ id: 31, nome: "Internet" }],
+  });
+});
+
+test("rejeita nomes duplicados entre novas subcategorias antes do cadastro", async () => {
+  const api = { get: async () => ({ data: [] }) };
+  await assert.rejects(
+    prevalidarSubcategoriasDRE(api, {
+      nomeCategoria: "Nova categoria",
+      tipoCategoria: "despesa",
+      categoriaFinanceiraId: null,
+      categoriaDREId: null,
+      subcategorias: [{ nome: "Alimentação" }, { nome: " ALIMENTACAO " }],
+    }),
+    /Subcategoria DRE.*já existe/,
+  );
+});
 
 test("mostra apenas subcategorias pertencentes à categoria financeira", () => {
   const categoria = { id: 10, dre_subcategoria_id: 1 };

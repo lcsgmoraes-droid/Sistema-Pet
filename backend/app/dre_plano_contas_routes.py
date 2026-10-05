@@ -19,6 +19,7 @@ from app.dre_plano_contas_models import (
     BaseRateio,
     EscopoRateio,
 )
+from app.financeiro_models import CategoriaFinanceira
 from pydantic import BaseModel, Field, validator
 from datetime import datetime
 
@@ -155,6 +156,26 @@ def _nome_subcategoria_dre_duplicado(
         and normalizar_nome_categoria(subcategoria.nome) == nome_normalizado
         for subcategoria in existentes
     )
+
+
+def _validar_proprietario_categoria_financeira_vinculada(
+    db: Session, categoria_financeira_id: int | None, tenant_id, usuario_id: int
+) -> None:
+    if categoria_financeira_id is None:
+        return
+    categoria = (
+        db.query(CategoriaFinanceira)
+        .filter(
+            CategoriaFinanceira.id == categoria_financeira_id,
+            CategoriaFinanceira.tenant_id == tenant_id,
+            CategoriaFinanceira.user_id == usuario_id,
+        )
+        .first()
+    )
+    if not categoria:
+        raise HTTPException(
+            status_code=404, detail="Categoria financeira vinculada não encontrada"
+        )
 
 
 @router.get("/categorias", response_model=List[DRECategoriaResponse])
@@ -352,6 +373,10 @@ def criar_subcategoria(
             status_code=400, detail="Categoria inválida ou não pertence a este tenant"
         )
 
+    _validar_proprietario_categoria_financeira_vinculada(
+        db, subcategoria.categoria_financeira_id, tenant_id, current_user.id
+    )
+
     nome = subcategoria.nome.strip()
     if not normalizar_nome_categoria(nome):
         raise HTTPException(
@@ -399,6 +424,10 @@ def atualizar_subcategoria(
 
     if not db_subcategoria:
         raise HTTPException(status_code=404, detail="Subcategoria não encontrada")
+
+    _validar_proprietario_categoria_financeira_vinculada(
+        db, db_subcategoria.categoria_financeira_id, tenant_id, current_user.id
+    )
 
     nome_novo = (
         subcategoria.nome.strip()
@@ -485,6 +514,10 @@ def deletar_subcategoria(
 
     if not db_subcategoria:
         raise HTTPException(status_code=404, detail="Subcategoria não encontrada")
+
+    _validar_proprietario_categoria_financeira_vinculada(
+        db, db_subcategoria.categoria_financeira_id, tenant_id, current_user.id
+    )
 
     # Verificar se há lançamentos (contas_pagar ou contas_receber)
     from app.financeiro_models import ContaPagar, ContaReceber

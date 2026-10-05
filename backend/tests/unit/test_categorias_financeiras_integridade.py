@@ -34,6 +34,7 @@ from app.dre_plano_contas_routes import (
     atualizar_subcategoria as atualizar_subcategoria_dre,
     criar_categoria as criar_categoria_dre,
     criar_subcategoria as criar_subcategoria_dre,
+    deletar_subcategoria as deletar_subcategoria_dre,
 )
 from app.financeiro_models import CategoriaFinanceira
 from app.models import User
@@ -293,6 +294,78 @@ def test_plano_dre_rejeita_duplicatas_novas_e_preserva_antigas(db):
         == categoria.id
     )
     assert db.get(DRESubcategoria, subcategoria.id).ativo is True
+
+
+def test_subcategoria_dre_vinculada_respeita_dono_e_geral_e_compartilhada(db):
+    tenant = uuid4()
+    categoria_financeira = _categoria(db, tenant, nome="Operações", user_id=10)
+    categoria_dre = criar_categoria_dre(
+        DRECategoriaCreate(nome="Operações", natureza=NaturezaDRE.DESPESA),
+        db=db,
+        user_and_tenant=_contexto(tenant, 10),
+    )
+    vinculada = criar_subcategoria_dre(
+        DRESubcategoriaCreate(
+            categoria_id=categoria_dre.id,
+            categoria_financeira_id=categoria_financeira.id,
+            nome="Internet",
+            tipo_custo=TipoCusto.DIRETO,
+            escopo_rateio=EscopoRateio.AMBOS,
+        ),
+        db=db,
+        user_and_tenant=_contexto(tenant, 10),
+    )
+
+    with pytest.raises(HTTPException) as criar_de_outro_dono:
+        criar_subcategoria_dre(
+            DRESubcategoriaCreate(
+                categoria_id=categoria_dre.id,
+                categoria_financeira_id=categoria_financeira.id,
+                nome="Energia",
+                tipo_custo=TipoCusto.DIRETO,
+                escopo_rateio=EscopoRateio.AMBOS,
+            ),
+            db=db,
+            user_and_tenant=_contexto(tenant, 20),
+        )
+    assert criar_de_outro_dono.value.status_code == 404
+
+    with pytest.raises(HTTPException) as editar_de_outro_dono:
+        atualizar_subcategoria_dre(
+            vinculada.id,
+            DRESubcategoriaUpdate(custo_pe="fixo"),
+            db=db,
+            user_and_tenant=_contexto(tenant, 20),
+        )
+    assert editar_de_outro_dono.value.status_code == 404
+    assert db.get(DRESubcategoria, vinculada.id).custo_pe is None
+
+    with pytest.raises(HTTPException) as excluir_de_outro_dono:
+        deletar_subcategoria_dre(
+            vinculada.id,
+            db=db,
+            user_and_tenant=_contexto(tenant, 20),
+        )
+    assert excluir_de_outro_dono.value.status_code == 404
+    assert db.get(DRESubcategoria, vinculada.id).ativo is True
+
+    geral = criar_subcategoria_dre(
+        DRESubcategoriaCreate(
+            categoria_id=categoria_dre.id,
+            nome="Compartilhada",
+            tipo_custo=TipoCusto.DIRETO,
+            escopo_rateio=EscopoRateio.AMBOS,
+        ),
+        db=db,
+        user_and_tenant=_contexto(tenant, 20),
+    )
+    atualizada = atualizar_subcategoria_dre(
+        geral.id,
+        DRESubcategoriaUpdate(custo_pe="variavel"),
+        db=db,
+        user_and_tenant=_contexto(tenant, 10),
+    )
+    assert atualizada.custo_pe == "variavel"
 
 
 def test_devolucao_reutiliza_categoria_plural_no_mesmo_tenant(db):

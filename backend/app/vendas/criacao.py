@@ -375,7 +375,6 @@ def criar_venda(
             .filter(
                 CategoriaFinanceira.nome.ilike("%vendas%"),
                 CategoriaFinanceira.tipo == "receita",
-                CategoriaFinanceira.user_id == user_id,
                 CategoriaFinanceira.tenant_id == tenant_id,
             )
             .first()

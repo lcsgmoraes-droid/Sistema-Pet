@@ -1,4 +1,4 @@
-import { normalizeDisplayText } from "./categoriasFinanceirasUtils";
+import { normalizeDisplayText, podeClassificarCustoPeDRE } from "./categoriasFinanceirasUtils";
 
 export default function CategoriasFinanceirasExpandedPanel({
   cat,
@@ -94,7 +94,7 @@ export default function CategoriasFinanceirasExpandedPanel({
                     {sub.custo_pe === "fixo" ? "🔒 Fixo" : "📈 Variável"}
                   </span>
                 )}
-                {cat.tipo_custo === "ambos" && (
+                {podeClassificarCustoPeDRE(cat, sub) && (
                   <div className="flex gap-1">
                     <button
                       onClick={() =>
