@@ -25,6 +25,11 @@ export function createCategoriasFinanceirasPersistence({
       toast.error("Preencha nome e tipo");
       return;
     }
+    const categoriaOriginal = categorias.find((categoria) => categoria.id === editando);
+    if (categoriaOriginal && formData.tipo !== categoriaOriginal.tipo) {
+      toast.error("O tipo da categoria não pode ser alterado após a criação.");
+      return;
+    }
 
     let categoriaId;
     try {

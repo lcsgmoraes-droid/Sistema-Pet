@@ -67,7 +67,7 @@ def test_dre_inclui_recebivel_manual_sem_duplicar_venda():
                 dre_subcategoria_id=subcategoria_id,
                 canal="loja_fisica",
                 valor_original=Decimal("20"),
-                valor_final=Decimal("20"),
+                valor_final=kwargs.pop("valor_final", Decimal("20")),
                 data_emissao=date(2026, 10, 5),
                 data_vencimento=date(2026, 10, 10),
                 status=kwargs.pop("status", "pendente"),
@@ -76,11 +76,12 @@ def test_dre_inclui_recebivel_manual_sem_duplicar_venda():
 
         db.add_all(
             [
-                conta(1),
+                conta(1, valor_final=Decimal("23")),
                 conta(2, venda_id=123),
                 conta(3, status="cancelado"),
                 conta(4, status="parcelado"),
                 conta(5, subcategoria_id=2),
+                conta(6, status="cancelada"),
             ]
         )
         db.commit()

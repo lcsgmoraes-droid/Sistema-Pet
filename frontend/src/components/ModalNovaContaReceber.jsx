@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import api from "../api";
 import { toast } from "react-hot-toast";
 import ModalNovaContaReceberContent from "./contasReceber/ModalNovaContaReceberContent";
+import { normalizarListaClientes } from "./contasReceber/contasReceberFilterHelpers";
 import { garantirCategoriaDRE } from "../utils/dreCategoriaFinanceira";
 
 const ModalNovaContaReceber = ({ isOpen, onClose, onSave }) => {
@@ -66,7 +67,7 @@ const ModalNovaContaReceber = ({ isOpen, onClose, onSave }) => {
 
       console.log("📦 Categorias recebidas:", categoriasRes.data);
 
-      setClientes(clientesRes.data);
+      setClientes(normalizarListaClientes(clientesRes.data));
 
       // Filtrar categorias: Mostrar APENAS receitas/entradas
       const categoriasReceita = categoriasRes.data.filter((c) => {

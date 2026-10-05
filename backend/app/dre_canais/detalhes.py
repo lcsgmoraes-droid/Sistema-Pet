@@ -10,6 +10,7 @@ from app.auth.dependencies import get_current_user_and_tenant
 from app.db import get_session
 from app.dre_canais.agregacao import (
     _contas_receber_manuais_query,
+    _valor_recebivel_competencia,
     _preparar_snapshots_vendas,
     _subcategorias_contas_map,
     _valor_snapshot_campo,
@@ -246,7 +247,7 @@ def _detalhes_recebiveis_manuais(
     for conta in contas:
         if _normalizar_canal(getattr(conta, "canal", None)) != canal:
             continue
-        valor = _conta_valor(conta)
+        valor = _valor_recebivel_competencia(conta)
         if abs(valor) <= Decimal("0.004"):
             continue
         detalhes.append(

@@ -608,12 +608,17 @@ def _contas_receber_manuais_query(db: Session, tenant_id: str, inicio, fim):
             ContaReceber.data_emissao >= inicio,
             ContaReceber.data_emissao < fim,
             ContaReceber.venda_id.is_(None),
-            ContaReceber.status.notin_(("cancelado", "parcelado")),
+            ContaReceber.status.notin_(("cancelado", "cancelada", "parcelado")),
             DRESubcategoria.tenant_id == tenant_id,
             DRECategoria.tenant_id == tenant_id,
             DRECategoria.natureza == NaturezaDRE.RECEITA,
         )
     )
+
+
+def _valor_recebivel_competencia(conta: ContaReceber) -> Decimal:
+    """Mantém a receita na emissão, sem juros ou descontos aplicados na baixa."""
+    return _moeda(getattr(conta, "valor_original", 0))
 
 
 def agregar_contas_receber_manuais_por_canal(
@@ -628,8 +633,8 @@ def agregar_contas_receber_manuais_por_canal(
     inicio, fim = _periodo_meses(mes_inicial or mes, mes, ano, data_final)
     for conta in _contas_receber_manuais_query(db, tenant_id, inicio, fim).all():
         canal = _normalizar_canal(getattr(conta, "canal", None))
-        dados_canais.setdefault(canal, _novo_canal())["receita_outras"] += _conta_valor(
-            conta
+        dados_canais.setdefault(canal, _novo_canal())["receita_outras"] += (
+            _valor_recebivel_competencia(conta)
         )
 
 

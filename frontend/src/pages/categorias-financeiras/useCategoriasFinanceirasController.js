@@ -114,7 +114,10 @@ export function useCategoriasFinanceirasController() {
   }
 
   function handleEdit(categoria) {
-    const subsExistentes = buildSubcategoriasExistentes(getSubcategoriasDREDaCategoria(categoria));
+    const subsExistentes = buildSubcategoriasExistentes(
+      getSubcategoriasDREDaCategoria(categoria),
+      categoria.id,
+    );
     setFormData({
       nome: normalizeDisplayText(categoria.nome),
       tipo: categoria.tipo,

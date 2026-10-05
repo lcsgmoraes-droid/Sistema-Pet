@@ -36,8 +36,7 @@ export function getSubcategoriasDREDaCategoria(categoria, subcategoriasDRE) {
     (subcategoria) => subcategoria.categoria_financeira_id === categoria.id,
   );
   const principal = subcategoriasDRE.find(
-    (subcategoria) =>
-      subcategoria.id === categoria.dre_subcategoria_id && !subcategoria.categoria_financeira_id,
+    (subcategoria) => subcategoria.id === categoria.dre_subcategoria_id,
   );
   // O vínculo com a categoria DRE não dá propriedade das subcategorias irmãs.
   // O vínculo legado principal pode ser exibido, mas não deve ser apagado.
@@ -102,7 +101,7 @@ export function buildSubcategoriaDREPayload({ categoriaDREId, nome, categoriaFin
   };
 }
 
-export function buildSubcategoriasExistentes(subcategorias) {
+export function buildSubcategoriasExistentes(subcategorias, categoriaFinanceiraId) {
   return subcategorias.map((subcategoria) => ({
     id: subcategoria.id,
     nome: subcategoria.nome,
@@ -110,7 +109,7 @@ export function buildSubcategoriasExistentes(subcategorias) {
     ativo: subcategoria.ativo,
     tipo_custo: subcategoria.tipo_custo,
     escopo_rateio: subcategoria.escopo_rateio,
-    somenteVinculo: !subcategoria.categoria_financeira_id,
+    somenteVinculo: subcategoria.categoria_financeira_id !== categoriaFinanceiraId,
   }));
 }
 

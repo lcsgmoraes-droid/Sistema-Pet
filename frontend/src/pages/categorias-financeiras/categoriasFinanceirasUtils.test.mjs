@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  buildSubcategoriasExistentes,
   getSubcategoriasDREDaCategoria,
   resolverCategoriaDREId,
 } from "./categoriasFinanceirasUtils.js";
@@ -17,6 +18,23 @@ test("mostra apenas subcategorias pertencentes à categoria financeira", () => {
   assert.deepEqual(
     getSubcategoriasDREDaCategoria(categoria, subs).map((sub) => sub.id),
     [2, 1],
+  );
+});
+
+test("preserva vínculo principal divergente sem permitir editar subcategoria de outra categoria", () => {
+  const categoria = { id: 10, dre_subcategoria_id: 3 };
+  const subs = [
+    { id: 2, categoria_financeira_id: 10, nome: "Própria" },
+    { id: 3, categoria_financeira_id: 11, nome: "Vínculo legado" },
+  ];
+  const selecionadas = getSubcategoriasDREDaCategoria(categoria, subs);
+  assert.deepEqual(
+    selecionadas.map((sub) => sub.id),
+    [2, 3],
+  );
+  assert.deepEqual(
+    buildSubcategoriasExistentes(selecionadas, categoria.id).map((sub) => sub.somenteVinculo),
+    [false, true],
   );
 });
 
