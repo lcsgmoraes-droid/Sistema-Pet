@@ -325,40 +325,47 @@ export default function ModalDevolucao({ caixaId, vendaInicial = null, onClose, 
 
     setLoading(true);
     setErro("");
+    const assinaturaOperacao = JSON.stringify({
+      vendaId: vendaSelecionada.id,
+      itens: itensDevolucao,
+      motivo,
+      gerarCredito,
+      caixaId,
+    });
+    let registroEnviado = false;
 
     try {
-      const previa = await api.post(`/vendas/${vendaSelecionada.id}/devolucao/previa`, {
-        itens: itensDevolucao,
-      });
-      const valorPrevisto = previa.data.valor_total_devolucao;
-      if (!Number.isFinite(Number(valorPrevisto)) || Number(valorPrevisto) <= 0) {
-        throw new Error("Não foi possível conferir o valor líquido da devolução");
-      }
-      const valorFormatado = Number(valorPrevisto).toLocaleString("pt-BR", {
-        style: "currency",
-        currency: "BRL",
-      });
-      const confirmado = await confirmarCorePet({
-        titulo: "Confirmar devolução",
-        mensagem: `Confirmar ${gerarCredito ? "crédito ao cliente" : "reembolso em dinheiro"} de ${valorFormatado}? Este é o valor líquido após os descontos da venda.`,
-        confirmarTexto: "Confirmar devolução",
-      });
-      if (!confirmado) return;
+      let valorPrevisto;
+      if (operacaoDevolucaoRef.current?.assinatura === assinaturaOperacao) {
+        // A resposta pode ter se perdido depois do commit. Reenvie a mesma operação.
+        valorPrevisto = operacaoDevolucaoRef.current.valorPrevisto;
+      } else {
+        const previa = await api.post(`/vendas/${vendaSelecionada.id}/devolucao/previa`, {
+          itens: itensDevolucao,
+        });
+        valorPrevisto = previa.data.valor_total_devolucao;
+        if (!Number.isFinite(Number(valorPrevisto)) || Number(valorPrevisto) <= 0) {
+          throw new Error("Não foi possível conferir o valor líquido da devolução");
+        }
+        const valorFormatado = Number(valorPrevisto).toLocaleString("pt-BR", {
+          style: "currency",
+          currency: "BRL",
+        });
+        const confirmado = await confirmarCorePet({
+          titulo: "Confirmar devolução",
+          mensagem: `Confirmar ${gerarCredito ? "crédito ao cliente" : "reembolso em dinheiro"} de ${valorFormatado}? Este é o valor líquido após os descontos da venda.`,
+          confirmarTexto: "Confirmar devolução",
+        });
+        if (!confirmado) return;
 
-      const assinaturaOperacao = JSON.stringify({
-        vendaId: vendaSelecionada.id,
-        itens: itensDevolucao,
-        motivo,
-        gerarCredito,
-        caixaId,
-      });
-      if (operacaoDevolucaoRef.current?.assinatura !== assinaturaOperacao) {
         operacaoDevolucaoRef.current = {
           assinatura: assinaturaOperacao,
           chave: globalThis.crypto.randomUUID(),
+          valorPrevisto,
         };
       }
 
+      registroEnviado = true;
       await api.post(`/vendas/${vendaSelecionada.id}/devolucao`, {
         caixa_id: caixaId,
         itens: itensDevolucao,
@@ -372,6 +379,9 @@ export default function ModalDevolucao({ caixaId, vendaInicial = null, onClose, 
       alert("Devolução registrada com sucesso!");
       onSucesso();
     } catch (error) {
+      if (registroEnviado && error.response?.status >= 400 && error.response.status < 500) {
+        operacaoDevolucaoRef.current = null;
+      }
       console.error("Erro ao registrar devolução:", error);
       setErro(error.response?.data?.detail || error.message || "Erro ao registrar devolução");
     } finally {
