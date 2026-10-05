@@ -247,8 +247,7 @@ def get_fluxo_caixa(
     ids_espelhos = {
         conta_id
         for lancamento in (*lancamentos_realizados, *lancamentos_previstos)
-        if (conta_id := _conta_pagar_de_lancamento_automatico(lancamento))
-        is not None
+        if (conta_id := _conta_pagar_de_lancamento_automatico(lancamento)) is not None
     }
     contas_espelhadas = {}
     espelhos_com_pagamento = set()
