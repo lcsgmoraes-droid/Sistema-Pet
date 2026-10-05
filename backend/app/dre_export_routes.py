@@ -69,7 +69,7 @@ def _dre_para_exportacao(
         outras_receitas=valor_total("outras_receitas"),
         deducoes_total=valor_total("deducoes_total"),
         descontos=valor_total("descontos"),
-        devolucoes=Decimal("0"),
+        devolucoes=valor_total("devolucoes"),
         receita_liquida=receita_liquida,
         cmv=valor_total("cmv"),
         custo_servicos=valor_total("custo_servicos"),
@@ -222,9 +222,10 @@ async def exportar_dre_pdf(
             f"-{(float(dre.deducoes_total) / float(dre.receita_bruta) * 100 if float(dre.receita_bruta) > 0 else 0):.2f}%",
         ],
         ["  Descontos", formatar_moeda(dre.descontos), ""],
+        ["  Devoluções de Vendas", formatar_moeda(dre.devolucoes), ""],
         [
             "  Impostos sobre Vendas",
-            formatar_moeda(dre.deducoes_total - dre.descontos),
+            formatar_moeda(dre.deducoes_total - dre.descontos - dre.devolucoes),
             "",
         ],
         ["", "", ""],
@@ -537,7 +538,10 @@ async def exportar_dre_excel(
         f"-{(float(dre.deducoes_total) / float(dre.receita_bruta) * 100 if float(dre.receita_bruta) > 0 else 0):.2f}%",
     )
     add_row("  Descontos", dre.descontos)
-    add_row("  Impostos sobre Vendas", dre.deducoes_total - dre.descontos)
+    add_row("  Devoluções de Vendas", dre.devolucoes)
+    add_row(
+        "  Impostos sobre Vendas", dre.deducoes_total - dre.descontos - dre.devolucoes
+    )
     row += 1
     add_row(
         "(=) RECEITA LÍQUIDA",

@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session, selectinload
 from app.auth.dependencies import get_current_user_and_tenant
 from app.db import get_session
 from app.dre_canais.agregacao import (
+    _devolucoes_periodo_query,
     _contas_receber_manuais_query,
     _valor_recebivel_competencia,
     _preparar_snapshots_vendas,
@@ -75,6 +76,55 @@ CAMPOS_DETALHE_CONTAS = {
 }
 
 CAMPOS_DETALHE_RECEBIVEIS = {"receita_outras"}
+CAMPOS_DETALHE_DEVOLUCOES = {"devolucoes"}
+
+
+def _detalhes_devolucoes_campo(
+    db: Session,
+    mes: int,
+    ano: int,
+    tenant_id: str,
+    canal: str,
+    campo: str,
+    mes_inicial: Optional[int] = None,
+    data_final: Optional[date] = None,
+) -> List[DREDetalheItem]:
+    inicio, fim = _periodo_meses(mes_inicial or mes, mes, ano, data_final)
+    eventos = _devolucoes_periodo_query(db, tenant_id, inicio, fim).all()
+    detalhes = []
+    for evento in eventos:
+        if _normalizar_canal(evento.canal) != canal:
+            continue
+        if campo == "devolucoes":
+            valor = _decimal(evento.valor_devolvido)
+        elif campo == "cmv":
+            valor = -_decimal(evento.custo_produtos_estornado)
+        else:
+            valor = -_decimal(evento.custo_servicos_estornado)
+        if abs(valor) <= Decimal("0.004"):
+            continue
+        detalhes.append(
+            DREDetalheItem(
+                id=f"devolucao-{evento.id}",
+                origem_tipo="devolucao_venda",
+                origem_label="Devolucao de venda",
+                data=_data_iso(evento.data_competencia),
+                descricao=f"Devolucao da venda #{evento.venda_id}",
+                contraparte=evento.forma_estorno,
+                documento=str(evento.venda_id),
+                valor=float(valor),
+                valor_auxiliar=float(_decimal(evento.valor_devolvido)),
+                link="/financeiro/vendas",
+                meta={
+                    "canal": canal,
+                    "devolucao_id": evento.id,
+                    "motivo": evento.motivo,
+                    "custo_pendente": bool(evento.custo_pendente),
+                    "itens": evento.itens or [],
+                },
+            )
+        )
+    return detalhes
 
 
 def _paginar_detalhes(
@@ -227,6 +277,20 @@ def _detalhes_vendas_campo(
                     "cupom": getattr(venda, "cupom_code", None),
                     "pagamentos": ", ".join(pagamentos),
                 },
+            )
+        )
+
+    if campo in {"cmv", "custo_servicos"}:
+        detalhes.extend(
+            _detalhes_devolucoes_campo(
+                db,
+                mes,
+                ano,
+                tenant_id,
+                canal,
+                campo,
+                mes_inicial=mes_inicial,
+                data_final=data_final,
             )
         )
 
@@ -478,6 +542,7 @@ def detalhar_linha_dre_por_canal(
         campo not in CAMPOS_DETALHE_VENDAS
         and campo not in CAMPOS_DETALHE_CONTAS
         and campo not in CAMPOS_DETALHE_RECEBIVEIS
+        and campo not in CAMPOS_DETALHE_DEVOLUCOES
     ):
         raise HTTPException(
             status_code=400, detail="Linha da DRE sem detalhamento disponivel"
@@ -502,6 +567,17 @@ def detalhar_linha_dre_por_canal(
             ano,
             tenant_id,
             canal,
+            mes_inicial=mes_inicial,
+            data_final=data_final,
+        )
+    elif campo in CAMPOS_DETALHE_DEVOLUCOES:
+        detalhes = _detalhes_devolucoes_campo(
+            db,
+            mes,
+            ano,
+            tenant_id,
+            canal,
+            campo,
             mes_inicial=mes_inicial,
             data_final=data_final,
         )

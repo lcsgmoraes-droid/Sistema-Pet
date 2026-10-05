@@ -42,6 +42,7 @@ import app.fiscal_models  # Models fiscais (diretório fiscal_models/)
 import app.variacao_config_fiscal_models  # variacao_config_fiscal (top-level, sem cópia em fiscal_models/)
 import app.produtos_models
 import app.vendas_models
+import app.vendas_devolucoes_models
 import app.caixa_models
 import app.financeiro_models
 import app.financeiro.models_imobilizado

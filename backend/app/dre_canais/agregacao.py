@@ -12,6 +12,7 @@ from app.financeiro_models import ContaPagar, ContaReceber, FormaPagamento
 from app.models import Cliente
 from app.produtos_models import EstoqueMovimentacao, Produto
 from app.vendas_models import Venda, VendaItem
+from app.vendas_devolucoes_models import VendaDevolucao
 from app.services.venda_rentabilidade_snapshot_service import (
     build_venda_rentabilidade_snapshot,
 )
@@ -656,6 +657,34 @@ def obter_vendas_por_canal(
 
     _aplicar_estimativas_cmv(dados_por_canal, bases_estimativa, pendencias_estimativa)
     return dados_por_canal
+
+
+def _devolucoes_periodo_query(db: Session, tenant_id: str, inicio, fim):
+    return db.query(VendaDevolucao).filter(
+        VendaDevolucao.tenant_id == tenant_id,
+        VendaDevolucao.data_competencia >= inicio.date(),
+        VendaDevolucao.data_competencia < fim.date(),
+    )
+
+
+def agregar_devolucoes_por_canal(
+    db: Session,
+    mes: int,
+    ano: int,
+    tenant_id: str,
+    dados_canais: Dict[str, Dict],
+    mes_inicial: Optional[int] = None,
+    data_final: Optional[date] = None,
+) -> None:
+    inicio, fim = _periodo_meses(mes_inicial or mes, mes, ano, data_final)
+    for devolucao in _devolucoes_periodo_query(db, tenant_id, inicio, fim).all():
+        canal = _normalizar_canal(devolucao.canal)
+        dados = dados_canais.setdefault(canal, _novo_canal())
+        dados["devolucoes"] += _moeda(devolucao.valor_devolvido)
+        dados["cmv"] -= _moeda(devolucao.custo_produtos_estornado)
+        dados["custo_servicos"] -= _moeda(devolucao.custo_servicos_estornado)
+        if devolucao.custo_pendente:
+            dados.setdefault("devolucoes_custo_pendente", []).append(devolucao)
 
 
 def _contas_receber_manuais_query(db: Session, tenant_id: str, inicio, fim):

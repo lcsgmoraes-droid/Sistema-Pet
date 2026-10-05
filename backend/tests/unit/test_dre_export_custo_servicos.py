@@ -44,16 +44,17 @@ def _dre_mista() -> DREPorCanalResponse:
             "vendas_servicos": 130,
             "receita_frete": 0,
             "outras_receitas": 50,
-            "deducoes_total": 10,
+            "deducoes_total": 13,
             "descontos": 5,
-            "receita_liquida": 270,
+            "devolucoes": 3,
+            "receita_liquida": 267,
             "cmv": 45,
             "custo_servicos": 65,
-            "lucro_bruto": 160,
+            "lucro_bruto": 157,
             "margem_bruta": 59.26,
             "despesas_operacionais": 12.45,
-            "resultado_operacional": 147.55,
-            "lucro_liquido": 147.55,
+            "resultado_operacional": 144.55,
+            "lucro_liquido": 144.55,
             "margem_liquida": 54.65,
         },
     )
@@ -112,9 +113,10 @@ def test_exportacao_pdf_e_excel_separam_cmv_e_custo_servicos(monkeypatch):
         assert linhas["(-) CMV (Custo Mercadorias Vendidas)"] == 45
         assert linhas["(-) Custo dos Serviços Prestados"] == 65
         assert linhas["  Outras Receitas"] == 50
+        assert linhas["  Devoluções de Vendas"] == 3
         assert linhas["  Impostos sobre Vendas"] == 5
         assert linhas["  Taxas de Cartão"] == 2.45
-        assert linhas["(=) LUCRO BRUTO"] == 160
-        assert linhas["(=) LUCRO LÍQUIDO"] == 147.55
+        assert linhas["(=) LUCRO BRUTO"] == 157
+        assert linhas["(=) LUCRO LÍQUIDO"] == 144.55
     finally:
         planilha.close()

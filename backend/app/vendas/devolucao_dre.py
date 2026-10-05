@@ -1,0 +1,108 @@
+"""Captura o custo original comprovável dos itens devolvidos."""
+
+import json
+from decimal import Decimal, ROUND_HALF_UP
+
+from sqlalchemy import func
+from sqlalchemy.orm import Session
+
+from app.empresa_grupo_estoque_compartilhado_service import (
+    contexto_tenant_estoque,
+    resolver_tenant_estoque_item,
+)
+from app.produtos_models import EstoqueMovimentacao
+from app.services.venda_rentabilidade_snapshot_service import SNAPSHOT_VERSION
+
+
+CENTAVO = Decimal("0.01")
+
+
+def _decimal(valor) -> Decimal:
+    return Decimal(str(valor or 0))
+
+
+def _moeda(valor) -> Decimal:
+    return _decimal(valor).quantize(CENTAVO, rounding=ROUND_HALF_UP)
+
+
+def _custo_snapshot(venda, item, quantidade: Decimal) -> Decimal | None:
+    snapshot = getattr(venda, "rentabilidade_snapshot", None)
+    if isinstance(snapshot, str):
+        try:
+            snapshot = json.loads(snapshot)
+        except (TypeError, ValueError):
+            return None
+    if not isinstance(snapshot, dict):
+        return None
+    if int(snapshot.get("snapshot_version") or 0) < SNAPSHOT_VERSION:
+        return None
+
+    itens_venda = list(getattr(venda, "itens", []) or [])
+    itens_snapshot = snapshot.get("itens")
+    if not isinstance(itens_snapshot, list) or len(itens_venda) != len(itens_snapshot):
+        return None
+    for indice, item_venda in enumerate(itens_venda):
+        if getattr(item_venda, "id", None) != getattr(item, "id", None):
+            continue
+        fotografia = itens_snapshot[indice]
+        if not isinstance(fotografia, dict):
+            return None
+        if fotografia.get("produto_id") != getattr(item, "produto_id", None):
+            return None
+        quantidade_original = _decimal(getattr(item, "quantidade", 0))
+        if (
+            quantidade_original <= 0
+            or _decimal(fotografia.get("quantidade")) != quantidade_original
+        ):
+            return None
+        if _moeda(fotografia.get("preco_unitario")) != _moeda(
+            getattr(item, "preco_unitario", 0)
+        ):
+            return None
+        custo_original = _moeda(fotografia.get("custo_total"))
+        return (
+            _moeda(custo_original * quantidade / quantidade_original)
+            if custo_original > 0
+            else None
+        )
+    return None
+
+
+def custo_original_item_devolvido(
+    db: Session, venda, item, quantidade: Decimal, tenant_id
+) -> tuple[Decimal, str, bool]:
+    """Nunca usa o preço de custo atual como se fosse o custo na data da venda."""
+    custo_snapshot = _custo_snapshot(venda, item, quantidade)
+    if custo_snapshot is not None:
+        return custo_snapshot, "snapshot_venda", False
+
+    produto_id = getattr(item, "produto_id", None)
+    if str(getattr(item, "tipo", "") or "").lower() != "produto" or not produto_id:
+        return Decimal("0"), "sem_custo_original", True
+
+    tenant_estoque, _ = resolver_tenant_estoque_item(item, tenant_id)
+    with contexto_tenant_estoque(tenant_estoque, tenant_id) as tenant_estoque_uuid:
+        quantidade_saida, valor_saida = (
+            db.query(
+                func.coalesce(func.sum(EstoqueMovimentacao.quantidade), 0),
+                func.coalesce(func.sum(EstoqueMovimentacao.valor_total), 0),
+            )
+            .filter(
+                EstoqueMovimentacao.tenant_id == tenant_estoque_uuid,
+                EstoqueMovimentacao.referencia_tipo == "venda",
+                EstoqueMovimentacao.referencia_id == venda.id,
+                EstoqueMovimentacao.produto_id == produto_id,
+                EstoqueMovimentacao.tipo == "saida",
+                EstoqueMovimentacao.status != "cancelado",
+            )
+            .one()
+        )
+    quantidade_saida = abs(_decimal(quantidade_saida))
+    valor_saida = abs(_decimal(valor_saida))
+    if quantidade_saida > 0 and valor_saida > 0:
+        return (
+            _moeda(valor_saida * quantidade / quantidade_saida),
+            "saida_estoque_venda",
+            False,
+        )
+    return Decimal("0"), "sem_custo_original", True

@@ -21,11 +21,14 @@ from app.empresa_grupo_estoque_compartilhado_service import (
 )
 from app.estoque.service import EstoqueService
 from app.produtos_models import EstoqueMovimentacao
+from app.utils.timezone import now_brasilia
+from app.vendas.devolucao_dre import custo_original_item_devolvido
 from app.vendas.routes_common import (
     _obter_cliente_ou_404,
     _validar_tenant_e_obter_usuario,
 )
 from app.vendas_models import Venda, VendaItem
+from app.vendas_devolucoes_models import VendaDevolucao
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -103,6 +106,18 @@ def registrar_devolucao(
         if not venda:
             logger.info(f"❌ Venda #{venda_id} não encontrada")
             raise HTTPException(status_code=404, detail="Venda não encontrada")
+
+        if str(venda.status or "").lower() not in {
+            "finalizada",
+            "pago_nf",
+            "baixa_parcial",
+            "finalizada_devolucao",
+            "finalizada_devolucao_parcial",
+        }:
+            raise HTTPException(
+                status_code=400,
+                detail="A venda não está em situação que permita devolução",
+            )
 
         logger.info(
             f"✅ Venda encontrada: #{venda.numero_venda} - Total: R$ {venda.total}"
@@ -185,6 +200,22 @@ def registrar_devolucao(
                 detail=f"Item {item_id} não encontrado na venda",
             )
 
+        eventos_anteriores = (
+            db.query(VendaDevolucao)
+            .filter(
+                VendaDevolucao.tenant_id == tenant_id,
+                VendaDevolucao.venda_id == venda_id,
+            )
+            .all()
+        )
+        devolvido_por_item = defaultdict(Decimal)
+        for evento_anterior in eventos_anteriores:
+            for item_anterior in evento_anterior.itens or []:
+                if not item_anterior.get("is_componente_kit"):
+                    devolvido_por_item[item_anterior.get("venda_item_id")] += Decimal(
+                        str(item_anterior.get("quantidade") or 0)
+                    )
+
         vendido_por_produto = defaultdict(float)
         for item_venda in db.query(VendaItem).filter_by(venda_id=venda_id).all():
             if item_venda.produto_id:
@@ -196,6 +227,7 @@ def registrar_devolucao(
                 )
 
         solicitado_por_produto = defaultdict(float)
+        solicitado_por_item = defaultdict(Decimal)
         for item_dev in itens_normais:
             item_venda = itens_normais_por_id[item_dev.get("item_id")]
             quantidade_devolvida = float(item_dev.get("quantidade", 0) or 0)
@@ -206,6 +238,14 @@ def registrar_devolucao(
                         f"Quantidade devolvida ({quantidade_devolvida}) maior que "
                         f"quantidade vendida ({item_venda.quantidade})"
                     ),
+                )
+            solicitado_por_item[item_venda.id] += Decimal(str(quantidade_devolvida))
+            if devolvido_por_item[item_venda.id] + solicitado_por_item[
+                item_venda.id
+            ] > Decimal(str(item_venda.quantidade)):
+                raise HTTPException(
+                    status_code=400,
+                    detail="Quantidade de devolução excede o saldo deste item",
                 )
             if item_venda.produto_id:
                 origem, _compartilhado = resolver_tenant_estoque_item(
@@ -241,8 +281,11 @@ def registrar_devolucao(
                 quantidade_solicitada,
             )
 
-        valor_total_devolucao = 0
+        valor_total_devolucao = Decimal("0")
         itens_devolvidos = []
+        itens_evento_dre = []
+        custo_produtos_estornado = Decimal("0")
+        custo_servicos_estornado = Decimal("0")
 
         # Processar cada item devolvido
         for item_dev in itens_devolucao:
@@ -307,6 +350,21 @@ def registrar_devolucao(
                     str(quantidade_devolvida)
                 )
                 valor_total_devolucao += valor_componente
+                itens_evento_dre.append(
+                    {
+                        "venda_item_id": kit_item_id,
+                        "produto_id": produto_id,
+                        "tipo": "produto",
+                        "is_componente_kit": True,
+                        "quantidade": str(Decimal(str(quantidade_devolvida))),
+                        "valor_devolvido": str(
+                            valor_componente.quantize(Decimal("0.01"))
+                        ),
+                        "custo_estornado": "0.00",
+                        "origem_custo": "kit_componente_sem_rateio_original",
+                        "custo_pendente": True,
+                    }
+                )
 
                 itens_devolvidos.append(
                     {
@@ -373,6 +431,35 @@ def registrar_devolucao(
                     str(quantidade_devolvida)
                 )
                 valor_total_devolucao += valor_item
+                custo_item, origem_custo, custo_pendente = (
+                    custo_original_item_devolvido(
+                        db,
+                        venda,
+                        item_venda,
+                        Decimal(str(quantidade_devolvida)),
+                        tenant_id,
+                    )
+                )
+                tipo_item = str(
+                    getattr(item_venda, "tipo", "produto") or "produto"
+                ).lower()
+                if tipo_item == "servico":
+                    custo_servicos_estornado += custo_item
+                else:
+                    custo_produtos_estornado += custo_item
+                itens_evento_dre.append(
+                    {
+                        "venda_item_id": item_venda.id,
+                        "produto_id": item_venda.produto_id,
+                        "tipo": tipo_item,
+                        "is_componente_kit": False,
+                        "quantidade": str(Decimal(str(quantidade_devolvida))),
+                        "valor_devolvido": str(valor_item.quantize(Decimal("0.01"))),
+                        "custo_estornado": str(custo_item),
+                        "origem_custo": origem_custo,
+                        "custo_pendente": custo_pendente,
+                    }
+                )
 
                 itens_devolvidos.append(
                     {
@@ -386,6 +473,30 @@ def registrar_devolucao(
                         "tipo": "item_normal",
                     }
                 )
+
+        if valor_total_devolucao <= 0 or not itens_evento_dre:
+            raise HTTPException(
+                status_code=400, detail="A devolução precisa ter valor positivo"
+            )
+
+        # O evento é a fonte da dedução na DRE. Caixa e crédito são apenas formas
+        # de liquidá-la; tudo abaixo participa da mesma transação e do mesmo commit.
+        evento_dre = VendaDevolucao(
+            tenant_id=tenant_id,
+            venda_id=venda_id,
+            user_id=current_user.id,
+            data_competencia=now_brasilia().date(),
+            canal=getattr(venda, "canal", None) or "loja_fisica",
+            forma_estorno="credito" if gerar_credito else "dinheiro",
+            motivo=motivo,
+            valor_devolvido=valor_total_devolucao.quantize(Decimal("0.01")),
+            custo_produtos_estornado=custo_produtos_estornado,
+            custo_servicos_estornado=custo_servicos_estornado,
+            custo_pendente=any(item["custo_pendente"] for item in itens_evento_dre),
+            itens=itens_evento_dre,
+        )
+        db.add(evento_dre)
+        db.flush()
 
         # 💰 OPÇÃO 1: GERAR CRÉDITO PARA O CLIENTE
         if gerar_credito:
@@ -437,6 +548,7 @@ def registrar_devolucao(
                 tenant_id=tenant_id,  # 🔒 Isolamento multi-tenant
                 db=db,
             )
+            evento_dre.movimentacao_caixa_id = movimentacao["movimentacao_id"]
 
             # Criar lançamento manual de saída (estorno no fluxo de caixa)
             from app.financeiro_models import LancamentoManual, CategoriaFinanceira
@@ -610,6 +722,8 @@ def registrar_devolucao(
             "tipo_devolucao": tipo_devolucao,
             "status_venda": venda.status,
             "itens_devolvidos": itens_devolvidos,
+            "devolucao_id": evento_dre.id,
+            "custo_pendente_dre": evento_dre.custo_pendente,
         }
 
         if gerar_credito:
