@@ -9,10 +9,14 @@ from sqlalchemy.orm import Session, selectinload
 from .auth.dependencies import get_current_user_and_tenant
 from .db import get_session
 from .dre_canais.base import _separar_receita_produto_servico
+from .dre_canais.contas import (
+    classificacoes_contas_pagar,
+    eh_compra_estoque,
+    ids_fretes_sobre_compras,
+)
 from .dre_calculos import (
     calcular_cmv,
     calcular_custo_servicos,
-    calcular_frete_notas_entrada,
     calcular_taxas_cartao,
     obter_despesas_por_categoria,
 )
@@ -123,9 +127,6 @@ def gerar_dre(
 
     categorias_despesas = obter_despesas_por_categoria(db, mes, ano, tenant_id)
     taxas_cartao = calcular_taxas_cartao(db, mes, ano, tenant_id)
-    frete_compras = calcular_frete_notas_entrada(
-        db, mes, ano, tenant_id
-    )  # Frete de notas de entrada
 
     despesas_pessoal = categorias_despesas["Despesas com Pessoal"]
     despesas_administrativas = (
@@ -135,7 +136,6 @@ def gerar_dre(
     outras_despesas = (
         categorias_despesas["Despesas com Vendas"]
         + categorias_despesas["Outras Despesas"]
-        + frete_compras  # Adiciona frete das notas de entrada
     )
 
     despesas_operacionais = (
@@ -213,7 +213,7 @@ def gerar_dre_detalhado(
     _current_user, tenant_id = user_and_tenant
     dre = gerar_dre(ano=ano, mes=mes, db=db, user_and_tenant=user_and_tenant)
 
-    # Busca detalhes das despesas (EXCLUINDO fornecedores)
+    # Busca detalhes das despesas pela mesma elegibilidade do total.
     # ✅ USA DATA_EMISSAO (regime de competência)
     contas_pagar = (
         db.query(ContaPagar)
@@ -222,12 +222,16 @@ def gerar_dre_detalhado(
                 extract("month", ContaPagar.data_emissao) == mes,  # ✅ Competência
                 extract("year", ContaPagar.data_emissao) == ano,
                 ContaPagar.tenant_id == tenant_id,
-                ContaPagar.fornecedor_id.is_(None),  # EXCLUI pagamentos a fornecedores
                 ContaPagar.status != "cancelado",
+                ContaPagar.status != "parcelado",
+                ContaPagar.afeta_dre.is_(True),
+                ContaPagar.nota_entrada_id.is_(None),
             )
         )
         .all()
     )
+    tipos, categorias = classificacoes_contas_pagar(db, tenant_id, contas_pagar)
+    frete_ids = ids_fretes_sobre_compras(db, tenant_id)
 
     detalhes_despesas = [
         {
@@ -239,6 +243,8 @@ def gerar_dre_detalhado(
             "pago": conta.status == "pago",
         }
         for conta in contas_pagar
+        if conta.dre_subcategoria_id in frete_ids
+        or not eh_compra_estoque(conta, tipos, categorias)
     ]
 
     # Busca detalhes das receitas (vendas)

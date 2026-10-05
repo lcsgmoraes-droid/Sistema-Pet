@@ -11,9 +11,7 @@ def test_dre_legado_filtra_receitas_e_despesas_por_tenant():
     assert "calcular_cmv(db, mes, ano, tenant_id)" in source
     assert "obter_despesas_por_categoria(db, mes, ano, tenant_id)" in source
     assert "calcular_taxas_cartao(db, mes, ano, tenant_id)" in source
-    bloco_frete = source.split("frete_compras = calcular_frete_notas_entrada(", 1)[1]
-    bloco_frete = bloco_frete.split(")  # Frete de notas de entrada", 1)[0]
-    assert "tenant_id" in bloco_frete
+    assert "calcular_frete_notas_entrada" not in source
 
 
 def test_dre_detalhado_filtra_despesas_e_receitas_por_tenant():

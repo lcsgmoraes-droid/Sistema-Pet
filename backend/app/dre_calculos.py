@@ -5,6 +5,11 @@ from decimal import Decimal
 from sqlalchemy import and_, extract, or_
 from sqlalchemy.orm import Session
 
+from .dre_canais.contas import (
+    classificacoes_contas_pagar,
+    eh_compra_estoque,
+    ids_fretes_sobre_compras,
+)
 from .dre_plano_contas_models import DRESubcategoria
 from .financeiro_models import ContaPagar
 from .vendas_models import Venda, VendaItem
@@ -66,7 +71,8 @@ def calcular_frete_notas_entrada(
 ) -> Decimal:
     """
     Calcula o total de frete das notas de entrada do período
-    O frete é despesa operacional, não CMV
+    Consulta informativa. O frete integra o custo de aquisição dos produtos
+    e não deve ser somado novamente às despesas da DRE.
     """
     from .produtos_models import NotaEntrada
 
@@ -125,6 +131,8 @@ def obter_despesas_por_categoria(
         ContaPagar.tenant_id == tenant_id,
         ContaPagar.nota_entrada_id.is_(None),  # EXCLUI compras de mercadorias (CMV)
         ContaPagar.status != "cancelado",
+        ContaPagar.status != "parcelado",
+        ContaPagar.afeta_dre.is_(True),
     ]
     if subcategorias_taxas_ids:
         filtros.append(
@@ -135,6 +143,8 @@ def obter_despesas_por_categoria(
         )
 
     contas_pagar = db.query(ContaPagar).filter(and_(*filtros)).all()
+    tipos, categorias_estoque = classificacoes_contas_pagar(db, tenant_id, contas_pagar)
+    frete_ids = ids_fretes_sobre_compras(db, tenant_id)
 
     categorias = {
         "Despesas com Pessoal": Decimal("0"),
@@ -189,6 +199,10 @@ def obter_despesas_por_categoria(
     ]
 
     for conta in contas_pagar:
+        if conta.dre_subcategoria_id not in frete_ids and eh_compra_estoque(
+            conta, tipos, categorias_estoque
+        ):
+            continue
         descricao_lower = (conta.descricao or "").lower()
         valor = conta.valor_original
 
@@ -240,6 +254,9 @@ def calcular_taxas_cartao(db: Session, mes: int, ano: int, tenant_id: str) -> De
                 ContaPagar.tenant_id == tenant_id,
                 ContaPagar.dre_subcategoria_id.in_(subcategoria_ids),
                 ContaPagar.status != "cancelado",
+                ContaPagar.status != "parcelado",
+                ContaPagar.afeta_dre.is_(True),
+                ContaPagar.nota_entrada_id.is_(None),
             )
         )
         .all()

@@ -67,7 +67,6 @@ def test_dre_base_separa_receita_e_custo_de_servicos(
         },
     )
     monkeypatch.setattr(dre_base_routes, "calcular_taxas_cartao", lambda *_: 0)
-    monkeypatch.setattr(dre_base_routes, "calcular_frete_notas_entrada", lambda *_: 0)
 
     dre = dre_base_routes.gerar_dre(
         ano=2026, mes=10, db=db, user_and_tenant=(object(), "tenant-teste")
