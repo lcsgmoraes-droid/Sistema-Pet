@@ -23,6 +23,10 @@ from app.estoque.service import EstoqueService
 from app.produtos_models import EstoqueMovimentacao
 from app.utils.timezone import now_brasilia
 from app.vendas.devolucao_dre import custo_original_item_devolvido
+from app.vendas.devolucao_valores import (
+    ratear_valor_pago_por_item,
+    valor_devolvido_por_quantidade,
+)
 from app.vendas.routes_common import (
     _obter_cliente_ou_404,
     _validar_tenant_e_obter_usuario,
@@ -240,8 +244,9 @@ def registrar_devolucao(
                         str(item_anterior.get("quantidade") or 0)
                     )
 
+        todos_itens_venda = db.query(VendaItem).filter_by(venda_id=venda_id).all()
         vendido_por_produto = defaultdict(float)
-        for item_venda in db.query(VendaItem).filter_by(venda_id=venda_id).all():
+        for item_venda in todos_itens_venda:
             if item_venda.produto_id:
                 origem, _compartilhado = resolver_tenant_estoque_item(
                     item_venda, tenant_id
@@ -305,11 +310,20 @@ def registrar_devolucao(
                 quantidade_solicitada,
             )
 
+        try:
+            valor_pago_por_item = ratear_valor_pago_por_item(venda, todos_itens_venda)
+        except ValueError as erro:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Não foi possível conferir o valor pago pelos itens: {erro}",
+            ) from erro
+
         valor_total_devolucao = Decimal("0")
         itens_devolvidos = []
         itens_evento_dre = []
         custo_produtos_estornado = Decimal("0")
         custo_servicos_estornado = Decimal("0")
+        processado_por_item = defaultdict(Decimal)
 
         # Processar cada item devolvido
         for item_dev in itens_devolucao:
@@ -450,10 +464,23 @@ def registrar_devolucao(
                         logger.error(f"Erro ao devolver estoque: {e}")
                         raise HTTPException(status_code=400, detail=str(e)) from e
 
-                # Calcular valor devolvido
-                valor_item = item_venda.preco_unitario * Decimal(
-                    str(quantidade_devolvida)
-                )
+                # O valor líquido é cumulativo por item para que devoluções
+                # parciais sucessivas fechem nos mesmos centavos do rateio.
+                quantidade_decimal = Decimal(str(quantidade_devolvida))
+                try:
+                    valor_item = valor_devolvido_por_quantidade(
+                        item_venda,
+                        valor_pago_por_item[item_venda.id],
+                        devolvido_por_item[item_venda.id]
+                        + processado_por_item[item_venda.id],
+                        quantidade_decimal,
+                    )
+                except (KeyError, ValueError) as erro:
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"Valor ou quantidade da devolução não conferem: {erro}",
+                    ) from erro
+                processado_por_item[item_venda.id] += quantidade_decimal
                 valor_total_devolucao += valor_item
                 custo_item, origem_custo, custo_pendente = (
                     custo_original_item_devolvido(
@@ -478,7 +505,7 @@ def registrar_devolucao(
                         "tipo": tipo_item,
                         "is_componente_kit": False,
                         "quantidade": str(Decimal(str(quantidade_devolvida))),
-                        "valor_devolvido": str(valor_item.quantize(Decimal("0.01"))),
+                        "valor_devolvido": str(valor_item),
                         "custo_estornado": str(custo_item),
                         "origem_custo": origem_custo,
                         "custo_pendente": custo_pendente,
@@ -492,7 +519,10 @@ def registrar_devolucao(
                         if item_venda.produto
                         else item_venda.servico_descricao,
                         "quantidade": quantidade_devolvida,
-                        "valor_unitario": item_venda.preco_unitario,
+                        "valor_unitario": (valor_item / quantidade_decimal).quantize(
+                            Decimal("0.01")
+                        ),
+                        "preco_unitario_original": item_venda.preco_unitario,
                         "valor_total": valor_item,
                         "tipo": "item_normal",
                     }

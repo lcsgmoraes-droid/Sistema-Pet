@@ -133,6 +133,7 @@ def test_credito_devolucao_aceita_cliente_criado_por_outro_funcionario(monkeypat
         produto=None,
         quantidade=1,
         preco_unitario=Decimal("59.89"),
+        subtotal=Decimal("59.89"),
         servico_descricao="Item devolvido",
     )
     consultas = {}
@@ -196,6 +197,7 @@ def test_devolucao_parcial_em_dinheiro_registra_deducao_e_custo_servico(monkeypa
         tipo="servico",
         quantidade=Decimal("2"),
         preco_unitario=Decimal("50"),
+        subtotal=Decimal("100"),
         servico_descricao="Serviço",
         desconto_item=Decimal("0"),
     )
@@ -380,10 +382,11 @@ def test_valor_acumulado_das_devolucoes_nao_excede_total_pago():
         produto=None,
         quantidade=2,
         preco_unitario=Decimal("60"),
+        subtotal=Decimal("120"),
         servico_descricao="Serviço",
     )
     evento_anterior = SimpleNamespace(
-        valor_devolvido=Decimal("50"),
+        valor_devolvido=Decimal("60"),
         itens=[{"venda_item_id": 3, "quantidade": "1", "is_componente_kit": False}],
     )
     consultas = {}
@@ -420,7 +423,7 @@ def test_valor_acumulado_das_devolucoes_nao_excede_total_pago():
     db.commit.assert_not_called()
 
 
-def test_devolucoes_parciais_acumuladas_marcam_venda_totalmente_devolvida(monkeypatch):
+def test_devolucoes_parciais_com_desconto_pagam_liquido_e_fecham_venda(monkeypatch):
     tenant_id = uuid4()
     atendente = SimpleNamespace(id=22, nome="Atendente")
     cliente = SimpleNamespace(id=47, nome="Cliente", credito=Decimal("0"))
@@ -428,9 +431,9 @@ def test_devolucoes_parciais_acumuladas_marcam_venda_totalmente_devolvida(monkey
         id=8,
         cliente_id=cliente.id,
         numero_venda="VEN-8",
-        total=Decimal("100"),
+        total=Decimal("90"),
         observacoes="",
-        status="finalizada_devolucao",
+        status="finalizada",
     )
     item = SimpleNamespace(
         id=3,
@@ -439,17 +442,14 @@ def test_devolucoes_parciais_acumuladas_marcam_venda_totalmente_devolvida(monkey
         produto=None,
         quantidade=2,
         preco_unitario=Decimal("50"),
+        subtotal=Decimal("100"),
         servico_descricao="Serviço",
-    )
-    evento_anterior = SimpleNamespace(
-        valor_devolvido=Decimal("50"),
-        itens=[{"venda_item_id": 3, "quantidade": "1", "is_componente_kit": False}],
     )
     consultas = {}
     for modelo, resultado in (
         (Venda, venda),
         (VendaItem, [item]),
-        (VendaDevolucao, [evento_anterior]),
+        (VendaDevolucao, []),
         (Cliente, cliente),
         (ContaReceber, []),
         (LancamentoManual, []),
@@ -467,21 +467,38 @@ def test_devolucoes_parciais_acumuladas_marcam_venda_totalmente_devolvida(monkey
         "app.vendas.devolucoes_routes.log_action", lambda **_kwargs: None
     )
 
-    resultado = registrar_devolucao(
+    dados = {
+        "itens": [{"item_id": 3, "quantidade": 1}],
+        "motivo": "Ajuste",
+        "gerar_credito": True,
+    }
+    primeira = registrar_devolucao(
         venda_id=8,
-        dados={
-            "itens": [{"item_id": 3, "quantidade": 1}],
-            "motivo": "Ajuste",
-            "gerar_credito": True,
-        },
+        dados=dados,
+        db=db,
+        user_and_tenant=(atendente, tenant_id),
+    )
+    evento_primeiro = next(
+        call.args[0]
+        for call in db.add.call_args_list
+        if isinstance(call.args[0], VendaDevolucao)
+    )
+    assert primeira["status_venda"] == "finalizada_devolucao"
+    assert primeira["valor_total_devolucao"] == 45.0
+    assert evento_primeiro.valor_devolvido == Decimal("45.00")
+    consultas[VendaDevolucao].all.return_value = [evento_primeiro]
+
+    segunda = registrar_devolucao(
+        venda_id=8,
+        dados=dados,
         db=db,
         user_and_tenant=(atendente, tenant_id),
     )
 
-    assert resultado["status_venda"] == "devolvida_total"
-    assert resultado["valor_total_devolucao"] == 50.0
-    assert cliente.credito == Decimal("50")
-    db.commit.assert_called_once()
+    assert segunda["status_venda"] == "devolvida_total"
+    assert segunda["valor_total_devolucao"] == 45.0
+    assert cliente.credito == Decimal("90")
+    assert db.commit.call_count == 2
 
 
 def test_falha_ao_gravar_evento_impede_credito_ao_cliente():
@@ -502,6 +519,7 @@ def test_falha_ao_gravar_evento_impede_credito_ao_cliente():
         produto=None,
         quantidade=1,
         preco_unitario=Decimal("20"),
+        subtotal=Decimal("20"),
         servico_descricao="Serviço",
     )
     consultas = {}
