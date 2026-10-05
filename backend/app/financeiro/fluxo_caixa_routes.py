@@ -2,6 +2,7 @@
 
 from datetime import date, datetime
 from decimal import Decimal
+import re
 from typing import Optional
 from uuid import UUID
 
@@ -12,6 +13,7 @@ from sqlalchemy.orm import Session, joinedload
 from app.auth.dependencies import get_current_user_and_tenant
 from app.db import get_session
 from app.financeiro.common import financeiro_erp_required
+from app.financeiro.fluxo_caixa_pagamentos import movimentacoes_pagamentos_contas_pagar
 from app.financeiro.fluxo_caixa_periodos import _agrupar_por_periodo
 from app.financeiro.fluxo_caixa_schemas import (
     FluxoCaixaMovimentacao,
@@ -20,6 +22,22 @@ from app.financeiro.fluxo_caixa_schemas import (
 from app.tenancy.context import set_current_tenant
 
 router = APIRouter()
+
+
+def _conta_pagar_de_lancamento_automatico(lancamento) -> int | None:
+    """Identifica o espelho criado pelo cadastro da conta, inclusive recorrências."""
+    if not lancamento.gerado_automaticamente or lancamento.tipo != "saida":
+        return None
+
+    documento = re.fullmatch(r"CONTA-PAGAR-(\d+)", lancamento.documento or "")
+    if documento:
+        return int(documento.group(1))
+
+    observacao = re.match(
+        r"Gerado automaticamente da conta a pagar #(\d+)(?:$|[ .(])",
+        lancamento.observacoes or "",
+    )
+    return int(observacao.group(1)) if observacao else None
 
 
 def _mapa_numeros_venda_por_conta(db: Session, tenant_id, conta_ids) -> dict[int, str]:
@@ -194,39 +212,16 @@ def get_fluxo_caixa(
             ))
     """
 
-    # 3. CONTAS A PAGAR PAGAS (Saídas Realizadas)
-    contas_pagas = (
-        db.query(ContaPagar)
-        .options(joinedload(ContaPagar.fornecedor))
-        .filter(
-            and_(
-                ContaPagar.tenant_id == tenant_id,
-                ContaPagar.data_pagamento >= dt_inicio,
-                ContaPagar.data_pagamento <= dt_fim,
-                ContaPagar.status == "pago",
-            )
-        )
-        .all()
+    # 3. PAGAMENTOS DE CONTAS A PAGAR (Saídas Realizadas)
+    from app.financeiro_models import Pagamento
+
+    movimentacoes.extend(
+        movimentacoes_pagamentos_contas_pagar(db, tenant_id, dt_inicio, dt_fim)
     )
 
-    for conta in contas_pagas:
-        fornecedor_nome = conta.fornecedor.nome if conta.fornecedor else "Fornecedor"
-        movimentacoes.append(
-            FluxoCaixaMovimentacao(
-                data=conta.data_pagamento
-                if isinstance(conta.data_pagamento, date)
-                else conta.data_pagamento.date(),
-                tipo="saida",
-                descricao=f"Pagamento - {fornecedor_nome}",
-                categoria="Fornecedores",
-                valor=float(conta.valor_pago or 0),
-                origem_tipo="conta_pagar",
-                origem_id=conta.id,
-                status="realizado",
-            )
-        )
-
     # 4. LANÇAMENTOS MANUAIS REALIZADOS
+    from app.ia.aba5_models import FluxoCaixa
+
     lancamentos_realizados = (
         db.query(LancamentoManual)
         .options(joinedload(LancamentoManual.categoria))
@@ -240,8 +235,64 @@ def get_fluxo_caixa(
         )
         .all()
     )
+    lancamentos_previstos = (
+        db.query(LancamentoManual)
+        .options(joinedload(LancamentoManual.categoria))
+        .filter(
+            LancamentoManual.tenant_id == tenant_id,
+            LancamentoManual.data_lancamento >= dt_inicio,
+            LancamentoManual.data_lancamento <= dt_fim,
+            LancamentoManual.status == "previsto",
+        )
+        .all()
+    )
+    ids_espelhos = {
+        conta_id
+        for lancamento in (*lancamentos_realizados, *lancamentos_previstos)
+        if (conta_id := _conta_pagar_de_lancamento_automatico(lancamento)) is not None
+    }
+    contas_espelhadas = {}
+    espelhos_com_pagamento = set()
+    espelhos_com_fluxo_realizado = set()
+    if ids_espelhos:
+        contas_espelhadas = {
+            conta.id: conta
+            for conta in db.query(ContaPagar)
+            .filter(ContaPagar.tenant_id == tenant_id, ContaPagar.id.in_(ids_espelhos))
+            .all()
+        }
+        espelhos_com_pagamento = {
+            conta_id
+            for (conta_id,) in db.query(Pagamento.conta_pagar_id)
+            .filter(
+                Pagamento.tenant_id == tenant_id,
+                Pagamento.conta_pagar_id.in_(contas_espelhadas),
+            )
+            .all()
+        }
+        espelhos_com_fluxo_realizado = {
+            conta_id
+            for (conta_id,) in db.query(FluxoCaixa.origem_id)
+            .filter(
+                FluxoCaixa.tenant_id == tenant_id,
+                FluxoCaixa.origem_tipo == "conta_pagar",
+                FluxoCaixa.origem_id.in_(contas_espelhadas),
+                FluxoCaixa.status == "realizado",
+                FluxoCaixa.tipo != "entrada",
+            )
+            .all()
+        }
 
     for lanc in lancamentos_realizados:
+        conta_id = _conta_pagar_de_lancamento_automatico(lanc)
+        conta_espelhada = contas_espelhadas.get(conta_id)
+        # Sem baixa rastreável, preservamos o lançamento realizado legado.
+        if conta_espelhada and (
+            conta_id in espelhos_com_pagamento
+            or conta_id in espelhos_com_fluxo_realizado
+            or (conta_espelhada.status == "pago" and conta_espelhada.data_pagamento)
+        ):
+            continue
         movimentacoes.append(
             FluxoCaixaMovimentacao(
                 data=lanc.data_lancamento
@@ -258,8 +309,6 @@ def get_fluxo_caixa(
         )
 
     # 🆕 LANÇAMENTOS DA TABELA FLUXO_CAIXA (REALIZADOS)
-    from app.ia.aba5_models import FluxoCaixa
-
     # Converter para datetime para pegar horário completo
     dt_inicio_datetime = datetime.combine(dt_inicio, datetime.min.time())
     dt_fim_datetime = datetime.combine(dt_fim, datetime.max.time())
@@ -286,7 +335,45 @@ def get_fluxo_caixa(
         ),
     )
 
+    ids_fluxo_cp_realizado = {
+        fluxo.origem_id
+        for fluxo in fluxos_realizados
+        if fluxo.origem_tipo == "conta_pagar" and fluxo.origem_id is not None
+    }
+    contas_fluxo_realizado = {}
+    contas_fluxo_com_pagamento = set()
+    if ids_fluxo_cp_realizado:
+        contas_fluxo_realizado = {
+            conta.id: conta
+            for conta in db.query(ContaPagar)
+            .filter(
+                ContaPagar.tenant_id == tenant_id,
+                ContaPagar.id.in_(ids_fluxo_cp_realizado),
+            )
+            .all()
+        }
+        contas_fluxo_com_pagamento = {
+            conta_id
+            for (conta_id,) in db.query(Pagamento.conta_pagar_id)
+            .filter(
+                Pagamento.tenant_id == tenant_id,
+                Pagamento.conta_pagar_id.in_(contas_fluxo_realizado),
+            )
+            .all()
+        }
+
     for fluxo in fluxos_realizados:
+        conta_fluxo = (
+            contas_fluxo_realizado.get(fluxo.origem_id)
+            if fluxo.origem_tipo == "conta_pagar"
+            else None
+        )
+        if conta_fluxo and (
+            (conta_fluxo.status == "pago" and conta_fluxo.data_pagamento is not None)
+            or conta_fluxo.id in contas_fluxo_com_pagamento
+        ):
+            # O fluxo é espelho da baixa. Mantemos um fluxo legado sem baixa.
+            continue
         numero_venda_fluxo = numeros_venda_por_conta.get(fluxo.origem_id)
 
         movimentacoes.append(
@@ -364,11 +451,22 @@ def get_fluxo_caixa(
         for fluxo in fluxos_previstos
         if fluxo.origem_tipo == "conta_receber"
     }
-    contas_pagar_com_fluxo_previsto = {
+    ids_contas_fluxo_previsto = {
         fluxo.origem_id
         for fluxo in fluxos_previstos
-        if fluxo.origem_tipo == "conta_pagar"
+        if fluxo.origem_tipo == "conta_pagar" and fluxo.origem_id is not None
     }
+    contas_pagar_com_fluxo_previsto = set()
+    if ids_contas_fluxo_previsto:
+        contas_pagar_com_fluxo_previsto = {
+            conta_id
+            for (conta_id,) in db.query(ContaPagar.id)
+            .filter(
+                ContaPagar.tenant_id == tenant_id,
+                ContaPagar.id.in_(ids_contas_fluxo_previsto),
+            )
+            .all()
+        }
 
     contas_receber_pendentes = (
         db.query(ContaReceber)
@@ -424,16 +522,13 @@ def get_fluxo_caixa(
                 ContaPagar.tenant_id == tenant_id,
                 ContaPagar.data_vencimento >= dt_inicio,
                 ContaPagar.data_vencimento <= dt_fim,
-                ContaPagar.status.in_(["pendente", "atrasado"]),
+                ContaPagar.status.in_(["pendente", "atrasado", "vencido", "parcial"]),
             )
         )
         .all()
     )
 
     for conta in contas_pagar_pendentes:
-        if conta.id in contas_pagar_com_fluxo_previsto:
-            continue
-
         valor_restante = (conta.valor_final or 0) - (conta.valor_pago or 0)
         if valor_restante > 0:
             fornecedor_nome = (
@@ -453,21 +548,9 @@ def get_fluxo_caixa(
             )
 
     # 7. LANÇAMENTOS MANUAIS PREVISTOS
-    lancamentos_previstos = (
-        db.query(LancamentoManual)
-        .options(joinedload(LancamentoManual.categoria))
-        .filter(
-            and_(
-                LancamentoManual.tenant_id == tenant_id,
-                LancamentoManual.data_lancamento >= dt_inicio,
-                LancamentoManual.data_lancamento <= dt_fim,
-                LancamentoManual.status == "previsto",
-            )
-        )
-        .all()
-    )
-
     for lanc in lancamentos_previstos:
+        if _conta_pagar_de_lancamento_automatico(lanc) in contas_espelhadas:
+            continue
         movimentacoes.append(
             FluxoCaixaMovimentacao(
                 data=lanc.data_lancamento,
@@ -495,6 +578,11 @@ def get_fluxo_caixa(
     )
 
     for fluxo in fluxos_previstos:
+        if (
+            fluxo.origem_tipo == "conta_pagar"
+            and fluxo.origem_id in contas_pagar_com_fluxo_previsto
+        ):
+            continue
         numero_venda_fluxo = numeros_venda_por_conta.get(fluxo.origem_id)
 
         movimentacoes.append(
