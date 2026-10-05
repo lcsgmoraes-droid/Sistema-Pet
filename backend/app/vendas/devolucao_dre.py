@@ -126,7 +126,9 @@ def custo_original_item_devolvido(
         )
     quantidade_saida = abs(_decimal(quantidade_saida))
     valor_saida = abs(_decimal(valor_saida))
-    if quantidade_saida > 0 and valor_saida > 0:
+    # Movimentos extras do mesmo produto (inclusive componentes de kit) não
+    # podem ser atribuídos com segurança à linha devolvida.
+    if quantidade_saida == _decimal(getattr(item, "quantidade", 0)) and valor_saida > 0:
         return (
             _moeda(valor_saida * quantidade / quantidade_saida),
             "saida_estoque_venda",

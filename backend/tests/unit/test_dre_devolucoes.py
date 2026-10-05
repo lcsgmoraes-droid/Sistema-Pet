@@ -178,6 +178,25 @@ def test_sem_snapshot_usa_saida_historica_do_estoque(monkeypatch):
     assert pendente is False
 
 
+def test_saida_estoque_com_quantidade_extra_nao_prova_custo_da_linha(monkeypatch):
+    item = SimpleNamespace(id=7, tipo="produto", produto_id=11, quantidade=2)
+    venda = SimpleNamespace(id=123, rentabilidade_snapshot=None, itens=[item])
+    db = MagicMock()
+    db.query.return_value.filter.return_value.one.return_value = (3, 60)
+    monkeypatch.setattr(
+        devolucao_dre, "resolver_tenant_estoque_item", lambda *_args: ("tenant", False)
+    )
+    monkeypatch.setattr(
+        devolucao_dre, "contexto_tenant_estoque", lambda *_args: nullcontext("tenant")
+    )
+
+    custo, origem, pendente = devolucao_dre.custo_original_item_devolvido(
+        db, venda, item, Decimal("1"), "tenant"
+    )
+
+    assert (custo, origem, pendente) == (Decimal("0"), "sem_custo_original", True)
+
+
 def test_custo_pendente_fica_explicito_sem_estorno_inventado(monkeypatch):
     evento = _evento(1, "20.00", "0.00", pendente=True)
     monkeypatch.setattr(
