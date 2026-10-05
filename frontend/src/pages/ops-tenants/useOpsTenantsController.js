@@ -295,6 +295,22 @@ export default function useOpsTenantsController() {
     }
   }
 
+  async function handleConfirmarCredencialRepassada() {
+    if (!selectedTenant) return;
+    setOnboardingSaving(true);
+    setOnboardingError("");
+    setOnboardingSuccess("");
+    try {
+      await api.patch(`/admin/tenants/${selectedTenant.id}/credencial-email/confirmar`);
+      setOnboardingSuccess("Credenciais marcadas como repassadas.");
+      await loadTenants();
+    } catch (err) {
+      setOnboardingError(extractError(err, "Nao foi possivel confirmar o repasse das credenciais."));
+    } finally {
+      setOnboardingSaving(false);
+    }
+  }
+
   function handleBillingOfferChange(field, value) {
     setBillingOfferForm((current) => ({ ...current, [field]: value }));
     setBillingOfferError("");
@@ -428,6 +444,7 @@ export default function useOpsTenantsController() {
     handleOnboardingNoteChange,
     handleOnboardingNoteSubmit,
     handleOnboardingSubmit,
+    handleConfirmarCredencialRepassada,
     handleBillingOfferChange,
     handleBillingOfferSegmentChange,
     handleBillingOfferSubmit,

@@ -88,7 +88,7 @@ export default function useProdutosNovoCarregamento({
         getMarcas(),
         getDepartamentos(),
         api.get("/clientes/", {
-          params: { tipo_cadastro: "fornecedor", apenas_ativos: true },
+          params: { is_fornecedor: true, apenas_ativos: true },
         }),
         carregarOpcoesRacao(),
       ]);

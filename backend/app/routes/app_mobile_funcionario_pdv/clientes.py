@@ -8,7 +8,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.audit_log import log_create
-from app.clientes.common import gerar_codigo_cliente
+from app.clientes.common import gerar_codigo_cliente, tipos_cadastro_da_pessoa
 from app.db import get_session
 from app.evolucao_corepet import registrar_uso_funcionalidade
 from app.models import Cliente, User
@@ -78,7 +78,7 @@ def _serialize_funcionario_pdv_cliente(cliente: Cliente) -> dict:
         "telefone": cliente.telefone,
         "celular": cliente.celular,
         "documento": documento,
-        "tipo_cadastro": cliente.tipo_cadastro,
+        "tipos_cadastro": tipos_cadastro_da_pessoa(cliente),
         "email": cliente.email,
         "endereco": endereco,
         "credito": float(credito or 0),
@@ -176,7 +176,7 @@ def criar_cliente_rapido_funcionario_pdv(
     """Cria uma pessoa sem tirar o funcionario da venda atual."""
 
     _funcionario, tenant_id = _get_funcionario_operacional_or_403(db, current_user)
-    codigo = gerar_codigo_cliente(db, "cliente", "PF", tenant_id)
+    codigo = gerar_codigo_cliente(db, "PF", tenant_id)
     nome = (payload.nome or "").strip() or f"Cliente {codigo}"
     telefone = _somente_digitos_funcionario_pdv(payload.telefone) or None
     endereco = (payload.endereco or "").strip() or None
@@ -185,7 +185,7 @@ def criar_cliente_rapido_funcionario_pdv(
         tenant_id=tenant_id,
         user_id=current_user.id,
         codigo=codigo,
-        tipo_cadastro="cliente",
+        is_cliente=True,
         tipo_pessoa="PF",
         nome=nome,
         telefone=telefone,

@@ -106,12 +106,12 @@ def _serialize_profile(
     is_entregador = bool(getattr(cliente, "is_entregador", False)) if cliente else False
     is_veterinario = bool(
         cliente
-        and getattr(cliente, "tipo_cadastro", None) == "veterinario"
+        and getattr(cliente, "is_veterinario", False)
         and getattr(cliente, "ativo", True) is not False
     )
     is_funcionario = bool(
         cliente
-        and getattr(cliente, "tipo_cadastro", None) == "funcionario"
+        and getattr(cliente, "is_funcionario", False)
         and getattr(cliente, "ativo", True) is not False
     )
     if is_veterinario:

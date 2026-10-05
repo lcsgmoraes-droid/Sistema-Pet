@@ -70,6 +70,9 @@ def criar_fornecedor_automatico(
     )
 
     if fornecedor:
+        if not fornecedor.is_fornecedor:
+            fornecedor.is_fornecedor = True
+
         if not fornecedor.ativo:
             logger.info("Reativando fornecedor inativo: %s", fornecedor.nome)
             fornecedor.ativo = True
@@ -86,8 +89,7 @@ def criar_fornecedor_automatico(
             fornecedor.telefone = dados_xml.get("fornecedor_telefone", "")
 
             if not fornecedor.codigo:
-                fornecedor.codigo = gerar_codigo_cliente(
-                    db, "fornecedor", "PJ", tenant_id
+                fornecedor.codigo = gerar_codigo_cliente(db, "PJ", tenant_id
                 )
 
             db.commit()
@@ -100,7 +102,7 @@ def criar_fornecedor_automatico(
             return (fornecedor, True)
 
         if not fornecedor.codigo:
-            fornecedor.codigo = gerar_codigo_cliente(db, "fornecedor", "PJ", tenant_id)
+            fornecedor.codigo = gerar_codigo_cliente(db, "PJ", tenant_id)
             db.commit()
             db.refresh(fornecedor)
             logger.info(
@@ -108,13 +110,16 @@ def criar_fornecedor_automatico(
                 fornecedor.nome,
                 fornecedor.codigo,
             )
+        elif db.is_modified(fornecedor):
+            db.commit()
+            db.refresh(fornecedor)
 
         return (fornecedor, False)
 
-    codigo = gerar_codigo_cliente(db, "fornecedor", "PJ", tenant_id)
+    codigo = gerar_codigo_cliente(db, "PJ", tenant_id)
 
     fornecedor = Cliente(
-        tipo_cadastro="fornecedor",
+        is_fornecedor=True,
         tipo_pessoa="PJ",
         nome=dados_xml["fornecedor_nome"],
         razao_social=dados_xml["fornecedor_nome"],

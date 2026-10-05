@@ -398,6 +398,14 @@ def _ensure_cargo(
     )
 
 
+CAMPO_FLAG_POR_TIPO = {
+    "cliente": "is_cliente",
+    "fornecedor": "is_fornecedor",
+    "veterinario": "is_veterinario",
+    "funcionario": "is_funcionario",
+}
+
+
 def _ensure_person(
     db,
     *,
@@ -439,7 +447,6 @@ def _ensure_person(
         "tenant_id": tenant_id,
         "user_id": user_id,
         "code": code,
-        "kind": kind,
         "tipo_pessoa": tipo_pessoa,
         "name": name,
         "email": email,
@@ -466,8 +473,7 @@ def _ensure_person(
             text(
                 """
                 UPDATE clientes
-                SET tipo_cadastro = :kind,
-                    tipo_pessoa = :tipo_pessoa,
+                SET tipo_pessoa = :tipo_pessoa,
                     nome = :name,
                     cnpj = :cnpj,
                     razao_social = :razao_social,
@@ -536,14 +542,20 @@ def _ensure_person(
             ),
             {**payload, "id": existing},
         )
+        # kind e sempre um literal interno fixo deste script (nunca entrada
+        # de usuario), seguro pra entrar no nome da coluna.
+        db.execute(
+            text(f"UPDATE clientes SET {CAMPO_FLAG_POR_TIPO[kind]} = true WHERE id = :id"),
+            {"id": existing},
+        )
         return int(existing)
 
-    return int(
+    novo_id = int(
         _scalar(
             db,
             """
             INSERT INTO clientes (
-                user_id, codigo, tipo_cadastro, tipo_pessoa, nome,
+                user_id, codigo, tipo_pessoa, nome,
                 cnpj, razao_social, nome_fantasia, responsavel, inscricao_estadual,
                 email,
                 telefone, celular, endereco, endereco_entrega, numero, bairro,
@@ -559,7 +571,7 @@ def _ensure_person(
                 moto_propria, ativo, credito, tenant_id, created_at, updated_at
             )
             VALUES (
-                :user_id, :code, :kind, :tipo_pessoa, :name,
+                :user_id, :code, :tipo_pessoa, :name,
                 :cnpj, :razao_social, :nome_fantasia, :responsavel, :inscricao_estadual,
                 :email,
                 :phone, :phone, :address,
@@ -589,6 +601,11 @@ def _ensure_person(
             payload,
         )
     )
+    db.execute(
+        text(f"UPDATE clientes SET {CAMPO_FLAG_POR_TIPO[kind]} = true WHERE id = :id"),
+        {"id": novo_id},
+    )
+    return novo_id
 
 
 def _ensure_delivery_config(

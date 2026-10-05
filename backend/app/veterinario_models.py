@@ -251,7 +251,7 @@ class AgendamentoVet(BaseTenantModel):
     cliente_id = Column(Integer, ForeignKey("clientes.id"), nullable=False, index=True)
     veterinario_id = Column(
         Integer, ForeignKey("clientes.id"), nullable=True, index=True
-    )  # Cliente com tipo_cadastro=veterinario
+    )  # Cliente com is_veterinario=True
     consultorio_id = Column(
         Integer, ForeignKey("vet_consultorios.id"), nullable=True, index=True
     )

@@ -15,6 +15,14 @@ def one(db, sql: str, params: dict[str, Any]) -> dict[str, Any] | None:
     return dict(row) if row else None
 
 
+CAMPO_FLAG_POR_TIPO = {
+    "cliente": "is_cliente",
+    "fornecedor": "is_fornecedor",
+    "veterinario": "is_veterinario",
+    "funcionario": "is_funcionario",
+}
+
+
 def ensure_person(
     db,
     *,
@@ -25,12 +33,15 @@ def ensure_person(
     tipo: str,
     is_entregador: bool = False,
 ) -> int:
+    # tipo e sempre um literal interno fixo deste script (nunca entrada de
+    # usuario), seguro pra entrar no nome da coluna.
+    campo_flag = CAMPO_FLAG_POR_TIPO[tipo]
     return int(
         db.execute(
             text(
-                """
+                f"""
                 INSERT INTO clientes (
-                    tenant_id, user_id, codigo, tipo_cadastro, tipo_pessoa, nome,
+                    tenant_id, user_id, codigo, {campo_flag}, tipo_pessoa, nome,
                     telefone, endereco, numero, bairro, cidade, estado, cep,
                     is_entregador, is_terceirizado, recebe_repasse,
                     gera_conta_pagar, recebe_comissao_entrega, entregador_ativo,
@@ -39,7 +50,7 @@ def ensure_person(
                     complemento_fixo_valor, parceiro_ativo, parceiro_tipo_acerto,
                     parceiro_dia_acerto, parceiro_notificar, ativo, credito
                 ) VALUES (
-                    :tenant_id, :user_id, :codigo, :tipo, 'PF', :nome,
+                    :tenant_id, :user_id, :codigo, true, 'PF', :nome,
                     '(11) 90000-0000', 'Rua das Acacias', '120', 'Centro',
                     'Sao Paulo', 'SP', '01001-000', :is_entregador, false,
                     :is_entregador, :is_entregador, :is_entregador,
@@ -48,7 +59,7 @@ def ensure_person(
                 )
                 ON CONFLICT (tenant_id, codigo) DO UPDATE SET
                     nome = EXCLUDED.nome,
-                    tipo_cadastro = EXCLUDED.tipo_cadastro,
+                    {campo_flag} = true,
                     is_entregador = EXCLUDED.is_entregador,
                     entregador_ativo = true,
                     ativo = true,
@@ -61,7 +72,6 @@ def ensure_person(
                 "user_id": user_id,
                 "codigo": codigo,
                 "nome": nome,
-                "tipo": tipo,
                 "is_entregador": is_entregador,
             },
         ).scalar_one()

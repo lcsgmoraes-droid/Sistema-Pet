@@ -2,6 +2,19 @@ import { formatarMoeda } from "../../api/produtos";
 import { ResumoTransferenciaCard } from "./transferenciaParceiroComponents";
 import { formatarQuantidade } from "./transferenciaParceiroUtils";
 
+function tiposCadastroLabel(pessoa) {
+  const lista = Array.isArray(pessoa?.tipos_cadastro) ? pessoa.tipos_cadastro.filter(Boolean) : [];
+  if (lista.length > 0) return lista.join(" / ");
+  const dasFlags = [
+    pessoa?.is_cliente && "cliente",
+    pessoa?.is_fornecedor && "fornecedor",
+    pessoa?.is_veterinario && "veterinario",
+    pessoa?.is_funcionario && "funcionario",
+  ].filter(Boolean);
+  if (dasFlags.length > 0) return dasFlags.join(" / ");
+  return "pessoa";
+}
+
 export default function LancamentoTransferenciaParceiro({
   parceiroRef,
   destinosGrupo,
@@ -166,7 +179,7 @@ export default function LancamentoTransferenciaParceiro({
                         : ""}
                     </p>
                     <p className="mt-1 text-xs text-blue-800">
-                      Tipo: {parceiroSelecionado.tipo_cadastro || "pessoa"}
+                      Tipo: {tiposCadastroLabel(parceiroSelecionado)}
                       {parceiroSelecionado.parceiro_ativo ? " | Parceiro ativo" : ""}
                     </p>
                     {parceiroSelecionado.email ? (
@@ -212,7 +225,7 @@ export default function LancamentoTransferenciaParceiro({
                               {parceiro.celular ? ` | ${parceiro.celular}` : ""}
                             </span>
                             <span className="mt-1 text-xs text-gray-500">
-                              {parceiro.tipo_cadastro || "pessoa"}
+                              {tiposCadastroLabel(parceiro)}
                               {parceiro.parceiro_ativo ? " | Parceiro ativo" : ""}
                             </span>
                           </button>

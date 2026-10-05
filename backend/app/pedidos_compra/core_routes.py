@@ -102,7 +102,7 @@ def listar_pedidos(
         termo = f"%{busca.strip()}%"
         fornecedor_ids = db.query(Cliente.id).filter(
             Cliente.tenant_id == tenant_id,
-            Cliente.tipo_cadastro == "fornecedor",
+            Cliente.is_fornecedor.is_(True),
             or_(
                 Cliente.nome.ilike(termo),
                 Cliente.razao_social.ilike(termo),
@@ -175,7 +175,7 @@ def buscar_rascunho_fornecedor(
         .filter(
             Cliente.id == fornecedor_id,
             Cliente.tenant_id == tenant_id,
-            Cliente.tipo_cadastro == "fornecedor",
+            Cliente.is_fornecedor.is_(True),
         )
         .first()
     )

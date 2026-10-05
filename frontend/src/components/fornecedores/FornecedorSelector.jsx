@@ -80,7 +80,7 @@ function NovoFornecedorRapidoModal({ nomeInicial, onClose, onCreated }) {
 
     try {
       const fornecedor = await criarCliente({
-        tipo_cadastro: "fornecedor",
+        is_fornecedor: true,
         tipo_pessoa: tipoPessoa,
         nome,
         razao_social: tipoPessoa === "PJ" ? nome : null,
@@ -311,7 +311,7 @@ export default function FornecedorSelector({
     const timer = setTimeout(async () => {
       try {
         const resultado = await buscarClientes({
-          tipo_cadastro: "fornecedor",
+          is_fornecedor: true,
           search: consulta,
           limit: 20,
         });

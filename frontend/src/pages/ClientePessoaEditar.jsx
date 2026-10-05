@@ -27,7 +27,6 @@ import { normalizeClienteAlertasPdv } from "../utils/clienteAlertasPdv";
 
 function buildFormDataFromCliente(cliente) {
   return {
-    tipo_cadastro: cliente.tipo_cadastro || "cliente",
     is_cliente: cliente.is_cliente || false,
     is_fornecedor: cliente.is_fornecedor || false,
     is_veterinario: cliente.is_veterinario || false,

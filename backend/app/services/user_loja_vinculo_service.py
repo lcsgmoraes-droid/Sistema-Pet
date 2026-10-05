@@ -11,6 +11,7 @@ from __future__ import annotations
 
 from uuid import UUID
 
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.grupo_comercial_models import GrupoComercialMembro
@@ -151,7 +152,10 @@ def vincular_usuario_a_loja_do_grupo(
             is_active=True,
         )
         db.add(vinculo)
-        db.flush()
+        try:
+            db.flush()
+        except IntegrityError as exc:
+            raise VinculoLojaError(400, "Usuario ja vinculado a esta loja.") from exc
         if commit:
             db.commit()
 
@@ -261,6 +265,7 @@ def desvincular_usuario_de_loja(
     """Remove o acesso de ``usuario`` a ``tenant_destino_id`` (desativa o
     ``UserTenant``, nao apaga). Nunca deixa o usuario sem nenhuma loja ativa
     no grupo, e nunca remove o acesso do master do grupo comercial."""
+    tenant_origem_id = str(tenant_origem_id)
     tenant_destino_id = str(tenant_destino_id)
 
     if usuario.master_grupo_id is not None:
@@ -269,6 +274,9 @@ def desvincular_usuario_de_loja(
             "Este usuario e o master do grupo comercial — nao pode perder "
             "acesso a nenhuma loja.",
         )
+
+    if not _mesmo_grupo_comercial(db, tenant_origem_id, tenant_destino_id):
+        raise VinculoLojaError(403, "Essa loja nao pertence ao mesmo grupo comercial.")
 
     lojas = listar_lojas_do_grupo_com_vinculo(
         db, tenant_origem_id=tenant_origem_id, usuario_id=usuario.id

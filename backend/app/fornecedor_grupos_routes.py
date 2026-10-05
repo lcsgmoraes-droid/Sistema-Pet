@@ -58,7 +58,7 @@ def _payload_grupo(db: Session, grupo: FornecedorGrupo, tenant_id) -> dict:
         db.query(Cliente)
         .filter(
             Cliente.tenant_id == tenant_id,
-            Cliente.tipo_cadastro == "fornecedor",
+            Cliente.is_fornecedor.is_(True),
             Cliente.fornecedor_grupo_id == grupo.id,
         )
         .order_by(Cliente.nome)
@@ -121,7 +121,7 @@ def _buscar_fornecedores_validos(
         db.query(Cliente)
         .filter(
             Cliente.tenant_id == tenant_id,
-            Cliente.tipo_cadastro == "fornecedor",
+            Cliente.is_fornecedor.is_(True),
             Cliente.id.in_(ids_unicos),
         )
         .all()
@@ -151,7 +151,7 @@ def _aplicar_fornecedores_no_grupo(
         db.query(Cliente)
         .filter(
             Cliente.tenant_id == tenant_id,
-            Cliente.tipo_cadastro == "fornecedor",
+            Cliente.is_fornecedor.is_(True),
             Cliente.fornecedor_grupo_id == grupo.id,
         )
         .all()
@@ -296,7 +296,7 @@ def excluir_grupo_fornecedor(
         db.query(Cliente)
         .filter(
             Cliente.tenant_id == tenant_id,
-            Cliente.tipo_cadastro == "fornecedor",
+            Cliente.is_fornecedor.is_(True),
             Cliente.fornecedor_grupo_id == grupo.id,
         )
         .update({Cliente.fornecedor_grupo_id: None}, synchronize_session=False)

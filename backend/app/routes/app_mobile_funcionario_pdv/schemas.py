@@ -30,7 +30,7 @@ class FuncionarioPdvClienteResponse(BaseModel):
     telefone: Optional[str] = None
     celular: Optional[str] = None
     documento: Optional[str] = None
-    tipo_cadastro: Optional[str] = None
+    tipos_cadastro: list[str] = []
     email: Optional[str] = None
     endereco: Optional[str] = None
     credito: float = 0

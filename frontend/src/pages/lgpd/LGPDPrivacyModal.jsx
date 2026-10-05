@@ -5,7 +5,7 @@ import CustomerIdentity from "../../components/ui/CustomerIdentity";
 import EmptyState from "../../components/ui/EmptyState";
 import StatusBadge from "../../components/ui/StatusBadge";
 import { PREFERENCES } from "./lgpdConstants";
-import { formatDate } from "./lgpdUtils";
+import { formatDate, getTiposCadastroLabel } from "./lgpdUtils";
 
 function PreferenceToggle({ description, label, name, onChange, value }) {
   return (
@@ -96,7 +96,7 @@ export default function LGPDPrivacyModal({
                       Telefone: {selectedCustomer?.telefone || selectedCustomer?.celular || "-"}
                     </span>
                     <span>Codigo: {selectedCustomer?.codigo || "-"}</span>
-                    <span>Tipo: {selectedCustomer?.tipo_cadastro || "-"}</span>
+                    <span>Tipo: {getTiposCadastroLabel(selectedCustomer)}</span>
                     <span>Gerado em: {formatDate(dossie?.generated_at)}</span>
                   </div>
                   <div className="mt-3 flex flex-wrap items-center gap-2">

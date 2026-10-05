@@ -97,7 +97,7 @@ def test_employee_count_allows_optional_supplier_search():
 
     assert '"/funcionario/contagens/fornecedores/buscar"' in source
     assert "Cliente.tenant_id == tenant_id" in supplier_block
-    assert "Cliente.tipo_cadastro" in supplier_block
+    assert "Cliente.is_fornecedor" in supplier_block
     assert '"fornecedor"' in supplier_block or "'fornecedor'" in supplier_block
     assert "fornecedor_id" in source
     assert "fornecedor_nome_snapshot" in source

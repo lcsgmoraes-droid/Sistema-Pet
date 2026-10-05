@@ -8,7 +8,7 @@ from openpyxl import Workbook, load_workbook
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 import io
 
-from .clientes.common import gerar_codigo_cliente
+from .clientes.common import CAMPO_FLAG_POR_TIPO_CADASTRO, gerar_codigo_cliente
 from .models import Cliente
 from .db import get_session as get_db
 from .auth import get_current_user, get_current_user_and_tenant
@@ -87,7 +87,7 @@ async def criar_template_pessoas(current_user=Depends(get_current_user)):
 
     # Headers (linha 2)
     headers = [
-        "Tipo Cadastro",  # A - cliente, fornecedor, veterinario
+        "Tipo Cadastro",  # A - cliente, fornecedor, veterinario, funcionario
         "Tipo Pessoa",  # B - PF ou PJ
         "Código",  # C - Código único
         "Nome",  # D - Nome (PF) ou Nome Fantasia (PJ)
@@ -197,7 +197,7 @@ async def criar_template_pessoas(current_user=Depends(get_current_user)):
     orientacoes = [
         ("CAMPO", "DESCRIÇÃO"),
         ("", ""),
-        ("Tipo Cadastro", "Obrigatório. Valores: cliente, fornecedor, veterinario"),
+        ("Tipo Cadastro", "Obrigatório. Valores: cliente, fornecedor, veterinario, funcionario"),
         (
             "Tipo Pessoa",
             "Obrigatório. Valores: PF (Pessoa Física) ou PJ (Pessoa Jurídica)",
@@ -295,8 +295,9 @@ async def importar_pessoas(
 
                 # Validações
                 tipo_cadastro = str(tipo_cadastro).strip().lower()
-                if tipo_cadastro not in ["cliente", "fornecedor", "veterinario"]:
+                if tipo_cadastro not in CAMPO_FLAG_POR_TIPO_CADASTRO:
                     raise ValueError(f"Tipo cadastro inválido: {tipo_cadastro}")
+                campo_flag = CAMPO_FLAG_POR_TIPO_CADASTRO[tipo_cadastro]
 
                 tipo_pessoa = str(tipo_pessoa).strip().upper()
                 if tipo_pessoa not in ["PF", "PJ"]:
@@ -340,8 +341,9 @@ async def importar_pessoas(
 
                 # Criar ou atualizar
                 if pessoa_existente:
-                    # Atualizar
-                    pessoa_existente.tipo_cadastro = tipo_cadastro
+                    # Atualizar: liga a flag de forma aditiva, sem desligar papeis
+                    # que a pessoa ja tinha antes desta importacao.
+                    setattr(pessoa_existente, campo_flag, True)
                     pessoa_existente.tipo_pessoa = tipo_pessoa
                     pessoa_existente.nome = str(nome).strip()
 
@@ -386,14 +388,13 @@ async def importar_pessoas(
                     # Criar novo
                     codigo_pessoa = str(codigo or "").strip() or gerar_codigo_cliente(
                         db,
-                        tipo_cadastro,
                         tipo_pessoa,
                         tenant_id,
                     )
                     nova_pessoa = Cliente(
                         tenant_id=tenant_id,
                         codigo=codigo_pessoa,
-                        tipo_cadastro=tipo_cadastro,
+                        **{campo_flag: True},
                         tipo_pessoa=tipo_pessoa,
                         nome=str(nome).strip(),
                         cpf=cpf.strip() if cpf else None,

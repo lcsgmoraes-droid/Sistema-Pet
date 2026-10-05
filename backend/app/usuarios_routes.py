@@ -20,7 +20,7 @@ from app.auth.auth_multitenant_support import (
 from app.security.permissions_decorator import require_permission
 from app.models import AppAccessProfile, Cliente, User, UserTenant, Role
 from app.usuario_menu_favoritos_models import UsuarioMenuFavorito
-from app.clientes.common import gerar_codigo_cliente
+from app.clientes.common import gerar_codigo_cliente, tipos_cadastro_da_pessoa
 from app.services.app_access_profile_service import sync_cliente_app_access_profiles
 from app.services.business_audit_service import (
     build_user_access_metadata,
@@ -111,7 +111,7 @@ class UsuarioListResponse(BaseModel):
     pessoa_id: int | None = None
     pessoa_codigo: str | None = None
     pessoa_nome: str | None = None
-    pessoa_tipo_cadastro: str | None = None
+    pessoa_tipos_cadastro: list[str] = []
 
     class Config:
         from_attributes = True
@@ -299,8 +299,7 @@ def _vincular_ou_criar_pessoa_para_usuario(
         tenant_id=tenant_id,
         user_id=actor.id,
         auth_user_id=user.id,
-        codigo=gerar_codigo_cliente(db, "funcionario", tipo_pessoa, tenant_id),
-        tipo_cadastro="funcionario",
+        codigo=gerar_codigo_cliente(db, tipo_pessoa, tenant_id),
         tipo_pessoa=tipo_pessoa,
         is_funcionario=True,
         nome=nome_pessoa,
@@ -353,8 +352,8 @@ def _criar_pessoa_operacional_para_usuario(
         tenant_id=tenant_id,
         user_id=actor.id,
         auth_user_id=user.id,
-        codigo=gerar_codigo_cliente(db, "funcionario", "PF", tenant_id),
-        tipo_cadastro="funcionario",
+        codigo=gerar_codigo_cliente(db, "PF", tenant_id),
+        is_funcionario=True,
         tipo_pessoa="PF",
         nome=_nome_pessoa_para_usuario(user),
         celular=user.login_phone,
@@ -403,7 +402,10 @@ def listar_usuarios(
             Cliente.id.label("pessoa_id"),
             Cliente.codigo.label("pessoa_codigo"),
             Cliente.nome.label("pessoa_nome"),
-            Cliente.tipo_cadastro.label("pessoa_tipo_cadastro"),
+            Cliente.is_cliente,
+            Cliente.is_fornecedor,
+            Cliente.is_veterinario,
+            Cliente.is_funcionario,
         )
         .join(UserTenant, UserTenant.user_id == User.id)
         .join(Role, Role.id == UserTenant.role_id)
@@ -417,7 +419,23 @@ def listar_usuarios(
         .all()
     )
 
-    return rows
+    return [
+        {
+            "user_id": row.user_id,
+            "username": row.username,
+            "email": row.email,
+            "login_phone": row.login_phone,
+            "nome": row.nome,
+            "role_id": row.role_id,
+            "role": row.role,
+            "is_active": row.is_active,
+            "pessoa_id": row.pessoa_id,
+            "pessoa_codigo": row.pessoa_codigo,
+            "pessoa_nome": row.pessoa_nome,
+            "pessoa_tipos_cadastro": tipos_cadastro_da_pessoa(row),
+        }
+        for row in rows
+    ]
 
 
 @router.post("", response_model=UserResponse)

@@ -6,6 +6,7 @@ import {
   FiUserCheck,
 } from "react-icons/fi";
 
+import BotaoInteracao from "../../components/v2/BotaoInteracao/BotaoInteracao";
 import { buildOpsTenantOnboardingForm, buildOpsTenantOnboardingPayload } from "../opsTenantsUtils";
 
 import { ONBOARDING_SATISFACTION_OPTIONS } from "./opsTenantsConstants";
@@ -19,6 +20,7 @@ export default function OpsTenantsOnboardingPanel({
   saving,
   onChange,
   onSubmit,
+  onConfirmarCredencial,
   notes,
   notesLoading,
   noteText,
@@ -63,6 +65,23 @@ export default function OpsTenantsOnboardingPanel({
           {tenant.pilot?.next_action || "Revisar o onboarding desta empresa."}
         </div>
       </div>
+
+      {tenant?.pilot?.attention_reasons?.some((motivo) => motivo.code === "credential_email_failed") ? (
+        <div className="mt-4 space-y-2 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-100">
+          <p>
+            O e-mail de definição de senha do titular não foi enviado. Depois de repassar
+            as credenciais por outro canal, confirme aqui.
+          </p>
+          <BotaoInteracao
+            icon={FiCheckCircle}
+            onClick={onConfirmarCredencial}
+            disabled={saving}
+            loading={saving}
+          >
+            Credenciais repassadas
+          </BotaoInteracao>
+        </div>
+      ) : null}
 
       <form onSubmit={onSubmit} className="mt-4 space-y-3">
         <label className="block">

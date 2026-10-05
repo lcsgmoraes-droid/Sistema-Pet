@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import bindparam, text
 
 from app.auth.dependencies import get_current_user_and_tenant
+from app.clientes.common import tipos_cadastro_da_pessoa
 from app.comissoes_avancadas.common import logger, struct_logger
 from app.comissoes_avancadas_models import (
     ComissaoItemSchema,
@@ -80,7 +81,7 @@ def conferencia_com_filtros_avancados(
             # 1. Buscar dados do funcionário
             result = execute_tenant_safe(
                 db,
-                "SELECT id, nome, tipo_cadastro FROM clientes WHERE id = :funcionario_id AND {tenant_filter}",
+                "SELECT id, nome, is_cliente, is_fornecedor, is_veterinario, is_funcionario FROM clientes WHERE id = :funcionario_id AND {tenant_filter}",
                 {"funcionario_id": funcionario_id},
                 tenant_id=tenant_id,
             )
@@ -269,7 +270,7 @@ def conferencia_com_filtros_avancados(
                 funcionario={
                     "id": func_row.id,
                     "nome": func_row.nome,
-                    "tipo": func_row.tipo_cadastro,
+                    "tipos": tipos_cadastro_da_pessoa(func_row),
                 },
                 periodo_selecionado=periodo,
                 resumo=resumo,

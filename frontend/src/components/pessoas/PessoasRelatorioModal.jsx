@@ -48,7 +48,7 @@ export default function PessoasRelatorioModal({
       setErro("");
       try {
         const resultado = await buscarPessoasParaRelatorio({
-          tipo_cadastro: tipo === "todos" ? undefined : tipo,
+          tipo: tipo === "todos" ? undefined : tipo,
           search: busca.trim() || undefined,
         });
         if (requisicao === requisicaoAtual.current) {

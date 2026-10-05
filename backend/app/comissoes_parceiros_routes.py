@@ -21,6 +21,7 @@ async def listar_funcionarios(user_and_tenant=Depends(get_current_user_and_tenan
     Lista todas as pessoas parceiras ativas que podem receber comissões
     """
     try:
+        from .clientes.common import tipos_cadastro_da_pessoa
         from .db import SessionLocal
         from .models import Cliente
         from sqlalchemy import and_
@@ -32,7 +33,10 @@ async def listar_funcionarios(user_and_tenant=Depends(get_current_user_and_tenan
                     Cliente.id,
                     Cliente.nome,
                     Cliente.email,
-                    Cliente.tipo_cadastro.label("cargo"),
+                    Cliente.is_cliente,
+                    Cliente.is_fornecedor,
+                    Cliente.is_veterinario,
+                    Cliente.is_funcionario,
                     Cliente.data_fechamento_comissao,
                 )
                 .filter(and_(Cliente.parceiro_ativo.is_(True), Cliente.ativo.is_(True)))
@@ -41,12 +45,14 @@ async def listar_funcionarios(user_and_tenant=Depends(get_current_user_and_tenan
 
             funcionarios = []
             for row in funcionarios_query.all():
+                tipos = tipos_cadastro_da_pessoa(row)
                 funcionarios.append(
                     {
                         "id": row.id,
                         "nome": row.nome,
                         "email": row.email,
-                        "cargo": row.cargo,
+                        "cargo": " / ".join(tipos),
+                        "tipos_cadastro": tipos,
                         "data_fechamento_comissao": row.data_fechamento_comissao,
                     }
                 )
@@ -71,6 +77,7 @@ async def listar_funcionarios_com_comissao(
     Lista todas as pessoas parceiras ativas com contagem de configurações
     """
     try:
+        from .clientes.common import tipos_cadastro_da_pessoa
         from .db import SessionLocal
         from .tenancy.context import set_tenant_context
 
@@ -87,11 +94,14 @@ async def listar_funcionarios_com_comissao(
             result = execute_tenant_safe(
                 db,
                 """
-                SELECT 
+                SELECT
                     c.id,
                     c.nome,
                     c.email,
-                    c.tipo_cadastro as cargo,
+                    c.is_cliente,
+                    c.is_fornecedor,
+                    c.is_veterinario,
+                    c.is_funcionario,
                     COUNT(cc.id) as total_configuracoes,
                     COUNT(CASE WHEN cc.tipo = 'categoria' THEN 1 END) as categorias,
                     COUNT(CASE WHEN cc.tipo = 'subcategoria' THEN 1 END) as subcategorias,
@@ -101,7 +111,7 @@ async def listar_funcionarios_com_comissao(
                 LEFT JOIN comissoes_configuracao cc ON cc.funcionario_id = c.id AND cc.ativo = true AND cc.tenant_id = c.tenant_id
                 WHERE c.parceiro_ativo = true
                 AND c.{tenant_filter}
-                GROUP BY c.id, c.nome, c.email, c.tipo_cadastro
+                GROUP BY c.id, c.nome, c.email, c.is_cliente, c.is_fornecedor, c.is_veterinario, c.is_funcionario
                 ORDER BY c.nome
             """,
                 {},
@@ -109,17 +119,19 @@ async def listar_funcionarios_com_comissao(
 
             funcionarios = []
             for row in result:
+                tipos = tipos_cadastro_da_pessoa(row)
                 funcionarios.append(
                     {
                         "id": row[0],
                         "nome": row[1],
                         "email": row[2] or "",
-                        "cargo": row[3] or "funcionario",
-                        "total_configuracoes": row[4],
-                        "categorias": row[5],
-                        "subcategorias": row[6],
-                        "produtos": row[7],
-                        "gerais": row[8],
+                        "cargo": " / ".join(tipos) or "funcionario",
+                        "tipos_cadastro": tipos,
+                        "total_configuracoes": row[7],
+                        "categorias": row[8],
+                        "subcategorias": row[9],
+                        "produtos": row[10],
+                        "gerais": row[11],
                     }
                 )
 

@@ -47,6 +47,13 @@ export const styleGuideCatalog = [
           "Aparência de botão, label centralizada. InputRadio aceita prop opcional tom (pet/vet/grooming, azul por padrão) para blocos de segmento comercial visualmente distintos — ver proposta comercial em /ops-tenants.",
       },
       {
+        nome: "InputCheckbox",
+        status: "pronto",
+        arquivo: "components/v2/InputCheckbox/InputCheckbox.jsx",
+        descricao:
+          "Checkbox quadrado para seleção em tabela/lista (sem label visível, exige rotulo para o leitor de tela). Repassa o evento original no onChange (usado por seleção com Shift). Área de toque de 44px.",
+      },
+      {
         nome: "LegendaBolinha",
         status: "pronto",
         arquivo: "components/v2/LegendaBolinha/LegendaBolinha.jsx",

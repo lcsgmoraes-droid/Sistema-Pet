@@ -101,7 +101,7 @@ export function createPedidosCompraDataController({
       const [pedidosResultado, fornecedoresResultado, gruposResultado, envioStatusResultado] =
         await Promise.allSettled([
           api.get("/pedidos-compra/", { params }),
-          api.get("/clientes/?tipo_cadastro=fornecedor&apenas_ativos=true"),
+          api.get("/clientes/?is_fornecedor=true&apenas_ativos=true"),
           api.get("/fornecedor-grupos/"),
           api.get("/pedidos-compra/envio/status"),
         ]);

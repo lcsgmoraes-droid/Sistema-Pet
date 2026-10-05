@@ -396,7 +396,6 @@ export default function useTransferenciaLancamentoController({ setAbaAtiva } = {
       nome: registro.parceiro_nome,
       codigo: registro.parceiro_codigo,
       email: registro.parceiro_email,
-      tipo_cadastro: "pessoa",
     };
 
     setTransferenciaEditando(registro);

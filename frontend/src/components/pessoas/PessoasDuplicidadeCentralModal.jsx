@@ -21,6 +21,11 @@ function valorOuTraco(valor) {
   return String(valor || "").trim() || "-";
 }
 
+function tiposCadastroLabel(pessoa) {
+  const lista = Array.isArray(pessoa?.tipos_cadastro) ? pessoa.tipos_cadastro.filter(Boolean) : [];
+  return valorOuTraco(lista.join(" / "));
+}
+
 function PessoaCompacta({ pessoa, destaque }) {
   return (
     <div className={`min-w-0 rounded-lg border p-3 ${destaque}`}>
@@ -28,7 +33,7 @@ function PessoaCompacta({ pessoa, destaque }) {
         {pessoa?.nome || "Pessoa sem nome"}
       </div>
       <div className="mt-1 text-xs text-slate-500">
-        Código {valorOuTraco(pessoa?.codigo)} · {valorOuTraco(pessoa?.tipo_cadastro)}
+        Código {valorOuTraco(pessoa?.codigo)} · {tiposCadastroLabel(pessoa)}
       </div>
       <div className="mt-2 grid gap-1 text-xs text-slate-600">
         <span>Documento: {valorOuTraco(pessoa?.documento)}</span>

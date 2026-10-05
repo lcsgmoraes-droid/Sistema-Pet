@@ -145,7 +145,7 @@ def listar_clientes_inativos(
         )
         .filter(
             Cliente.tenant_id == tenant_id,
-            Cliente.tipo_cadastro == "cliente",
+            Cliente.is_cliente.is_(True),
             Cliente.merged_into_id.is_(None),
             or_(Cliente.ativo.is_(True), Cliente.ativo.is_(None)),
             Venda.status == "finalizada",

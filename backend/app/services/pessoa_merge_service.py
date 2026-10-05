@@ -9,6 +9,7 @@ from typing import Any
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
+from app.clientes.common import tipos_cadastro_da_pessoa
 from app.models import AppAccessProfile, Cliente, PessoaMergeLog
 from app.produtos_models import ProdutoFornecedor
 from app.services.app_access_profile_service import sync_cliente_app_access_profiles
@@ -17,7 +18,10 @@ logger = logging.getLogger(__name__)
 
 
 CAMPOS_CADASTRAIS_PESSOA: list[tuple[str, str]] = [
-    ("tipo_cadastro", "Tipo de cadastro"),
+    ("is_cliente", "Cliente"),
+    ("is_fornecedor", "Fornecedor"),
+    ("is_veterinario", "Veterinario"),
+    ("is_funcionario", "Funcionario"),
     ("origem_cliente", "Origem do cliente"),
     ("tipo_pessoa", "Tipo de pessoa"),
     ("fornecedor_grupo_id", "Grupo de fornecedor"),
@@ -81,6 +85,10 @@ TABELAS_FK_ESPECIAIS = {
 }
 
 CAMPOS_BOOLEANOS_UNIAO = {
+    "is_cliente",
+    "is_fornecedor",
+    "is_veterinario",
+    "is_funcionario",
     "parceiro_ativo",
     "is_entregador",
     "entregador_padrao",
@@ -148,7 +156,7 @@ def _pessoa_resumo(pessoa: Cliente) -> dict[str, Any]:
         "id": pessoa.id,
         "codigo": pessoa.codigo,
         "nome": pessoa.nome,
-        "tipo_cadastro": pessoa.tipo_cadastro,
+        "tipos_cadastro": tipos_cadastro_da_pessoa(pessoa),
         "tipo_pessoa": pessoa.tipo_pessoa,
         "documento": pessoa.cnpj or pessoa.cpf,
         "email": pessoa.email,
@@ -415,9 +423,12 @@ def _unir_textos(valor_a: Any, valor_b: Any) -> str | None:
 
 def _perfis_inerentes(pessoa: Cliente) -> set[str]:
     perfis: set[str] = set()
-    tipo = str(getattr(pessoa, "tipo_cadastro", "") or "").strip().casefold()
-    if tipo in {"cliente", "funcionario", "veterinario"}:
-        perfis.add(tipo)
+    if bool(getattr(pessoa, "is_cliente", False)):
+        perfis.add("cliente")
+    if bool(getattr(pessoa, "is_funcionario", False)):
+        perfis.add("funcionario")
+    if bool(getattr(pessoa, "is_veterinario", False)):
+        perfis.add("veterinario")
     if bool(getattr(pessoa, "is_entregador", False)):
         perfis.add("entregador")
     return perfis

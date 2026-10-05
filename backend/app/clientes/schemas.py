@@ -147,12 +147,6 @@ class AppLoginCreate(BaseModel):
 
 class ClienteCreate(BaseModel):
     origem_cliente: OrigemCliente = "loja_fisica"
-    # Tipo de cadastro
-    # tipo_cadastro é OBSOLETO (mantido só para compatibilidade com
-    # consumidores ainda não migrados — ver .claude/skills/pessoas/SKILL.md).
-    # Uma pessoa pode ser vários tipos ao mesmo tempo: usar is_cliente/
-    # is_fornecedor/is_veterinario/is_funcionario abaixo.
-    tipo_cadastro: str = "cliente"  # cliente, fornecedor, veterinario, funcionario
     is_cliente: Optional[bool] = False
     is_fornecedor: Optional[bool] = False
     is_veterinario: Optional[bool] = False
@@ -283,18 +277,9 @@ class ClienteCreate(BaseModel):
             raise ValueError("tipo_pessoa deve ser PF ou PJ")
         return v
 
-    @validator("tipo_cadastro")
-    def validate_tipo_cadastro(cls, v):
-        if v not in ["cliente", "fornecedor", "veterinario", "funcionario"]:
-            raise ValueError(
-                "tipo_cadastro deve ser cliente, fornecedor, veterinario ou funcionario"
-            )
-        return v
-
 
 class ClienteUpdate(BaseModel):
     origem_cliente: OrigemCliente = None
-    tipo_cadastro: Optional[str] = None  # OBSOLETO, ver ClienteCreate
     is_cliente: Optional[bool] = None
     is_fornecedor: Optional[bool] = None
     is_veterinario: Optional[bool] = None
@@ -422,7 +407,6 @@ class ClienteResponse(BaseModel):
     origem_cliente: Optional[str] = None
     id: int
     codigo: Optional[str] = None
-    tipo_cadastro: str  # OBSOLETO, ver ClienteCreate
     is_cliente: bool = False
     is_fornecedor: bool = False
     is_veterinario: bool = False

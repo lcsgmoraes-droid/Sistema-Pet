@@ -17,7 +17,8 @@ from app.services.user_loja_vinculo_service import (
     vincular_usuario_a_loja_do_grupo,
     vincular_usuario_a_qualquer_loja_do_grupo,
 )
-from app.tenancy.context import clear_current_tenant, set_current_tenant
+from app.tenancy.context import clear_current_tenant, set_current_tenant, tenant_context
+from uuid import UUID
 
 TENANT_A1 = "11111111-1111-1111-1111-111111111111"
 TENANT_A2 = "22222222-2222-2222-2222-222222222222"
@@ -299,3 +300,42 @@ def test_vincular_a_qualquer_loja_resolve_origem_sozinho(db):
     )
 
     assert str(vinculo.tenant_id) == TENANT_A3
+
+
+def test_rejeita_desvincular_loja_de_outro_grupo_e_mantem_vinculo(db):
+    usuario = _usuario(db, email="titular@grupo-a.com", tenant_id=TENANT_A1)
+    _grupo_abc(db, usuario)
+    _criar_tenant(db, TENANT_B1, "Loja de outro grupo")
+    _criar_role_e_vinculo(db, tenant_id=TENANT_A1, usuario_id=usuario.id)
+    _criar_role_e_vinculo(db, tenant_id=TENANT_A2, usuario_id=usuario.id)
+    _criar_role_e_vinculo(db, tenant_id=TENANT_B1, usuario_id=usuario.id)
+    db.commit()
+
+    with pytest.raises(VinculoLojaError) as excinfo:
+        desvincular_usuario_de_loja(
+            db, usuario=usuario, tenant_origem_id=TENANT_A1, tenant_destino_id=TENANT_B1
+        )
+
+    assert excinfo.value.status_code == 403
+    with tenant_context(UUID(TENANT_B1)):
+        vinculo_b1 = (
+            db.query(UserTenant)
+            .filter(UserTenant.user_id == usuario.id, UserTenant.tenant_id == UUID(TENANT_B1))
+            .first()
+        )
+    assert vinculo_b1.is_active is True
+
+
+def test_banco_rejeita_segundo_vinculo_do_mesmo_usuario_na_mesma_loja(db):
+    from sqlalchemy.exc import IntegrityError
+
+    usuario = _usuario(db, email="titular@grupo-a.com", tenant_id=TENANT_A1)
+    _grupo_abc(db, usuario)
+    role_id = _criar_role_e_vinculo(db, tenant_id=TENANT_A1, usuario_id=usuario.id).id
+    db.commit()
+
+    with tenant_context(UUID(TENANT_A1)):
+        db.add(UserTenant(user_id=usuario.id, tenant_id=UUID(TENANT_A1), role_id=role_id, is_active=True))
+        with pytest.raises(IntegrityError):
+            db.flush()
+    db.rollback()

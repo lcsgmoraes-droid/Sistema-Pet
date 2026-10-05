@@ -16,11 +16,12 @@ from app.clientes.common import (
     _anexar_metadados_criacao_cliente,
     _obter_cliente_ou_404,
     _somente_digitos_coluna,
-    _validar_e_normalizar_flags_tipo_criacao,
-    _validar_e_normalizar_flags_tipo_update,
+    _validar_flags_tipo_criacao,
+    _validar_flags_tipo_update,
     _validar_telefone_cliente_obrigatorio,
     _validar_tenant_e_obter_usuario,
     gerar_codigo_cliente,
+    tipos_cadastro_da_pessoa,
 )
 from app.clientes.schemas import (
     ClienteCreate,
@@ -80,13 +81,11 @@ def create_cliente(
             tenant_id,
             current_user=current_user,
         )
-    _validar_e_normalizar_flags_tipo_criacao(cliente_data)
+    _validar_flags_tipo_criacao(cliente_data)
     _validar_telefone_cliente_obrigatorio(cliente_data)
     _validar_documentos_unicos_criacao(db, cliente_data, tenant_id)
 
-    codigo = gerar_codigo_cliente(
-        db, cliente_data.tipo_cadastro, cliente_data.tipo_pessoa, tenant_id
-    )
+    codigo = gerar_codigo_cliente(db, cliente_data.tipo_pessoa, tenant_id)
     dados_payload = cliente_data.model_dump()
     auth_user_id = dados_payload.pop("auth_user_id", None)
     app_login = dados_payload.pop("app_login", None)
@@ -272,7 +271,6 @@ def list_clientes(
     search: Optional[str] = None,
     ativo: Optional[bool] = None,
     incluir_inativos: bool = False,
-    tipo_cadastro: Optional[List[str]] = Query(None),
     is_entregador: Optional[bool] = None,
     is_cliente: Optional[bool] = None,
     is_fornecedor: Optional[bool] = None,
@@ -293,7 +291,6 @@ def list_clientes(
         query = _montar_query_listagem_clientes(
             db,
             tenant_id=tenant_id,
-            tipo_cadastro=tipo_cadastro,
             is_entregador=is_entregador,
             is_cliente=is_cliente,
             is_fornecedor=is_fornecedor,
@@ -363,7 +360,7 @@ def update_cliente(
     logger.info("[update_cliente] Dados de configuracao de entrega recebidos")
 
     cliente = _obter_cliente_ou_404(db, cliente_id, tenant_id)
-    _validar_e_normalizar_flags_tipo_update(cliente_data, cliente)
+    _validar_flags_tipo_update(cliente_data, cliente)
     _validar_telefone_cliente_obrigatorio(cliente_data, cliente)
     _validar_documentos_unicos_update(db, cliente, cliente_data, cliente_id, tenant_id)
 
@@ -498,9 +495,7 @@ def update_cliente(
         )
 
     if cliente.ativo and not cliente.codigo:
-        cliente.codigo = gerar_codigo_cliente(
-            db, cliente.tipo_cadastro, cliente.tipo_pessoa, tenant_id
-        )
+        cliente.codigo = gerar_codigo_cliente(db, cliente.tipo_pessoa, tenant_id)
 
     cliente.updated_at = dt.utcnow()
     db.commit()
@@ -606,7 +601,7 @@ def _validar_documentos_unicos_criacao(
             tenant_id=tenant_id,
             campo=Cliente.cpf,
             valor=cliente_data.cpf,
-            detail=f"Já existe um {cliente_data.tipo_cadastro} cadastrado com este CPF",
+            detail=f"Já existe um {' / '.join(tipos_cadastro_da_pessoa(cliente_data)) or 'cadastro'} com este CPF",
         )
     elif cliente_data.tipo_pessoa == "PJ":
         if not cliente_data.cnpj:
@@ -619,7 +614,7 @@ def _validar_documentos_unicos_criacao(
             tenant_id=tenant_id,
             campo=Cliente.cnpj,
             valor=cliente_data.cnpj,
-            detail=f"Já existe um {cliente_data.tipo_cadastro} cadastrado com este CNPJ",
+            detail=f"Já existe um {' / '.join(tipos_cadastro_da_pessoa(cliente_data)) or 'cadastro'} com este CNPJ",
         )
 
     if cliente_data.crmv and cliente_data.is_veterinario:
@@ -786,7 +781,6 @@ def _montar_query_listagem_clientes(
     db: Session,
     *,
     tenant_id: int,
-    tipo_cadastro,
     is_entregador,
     search,
     ativo,
@@ -799,11 +793,6 @@ def _montar_query_listagem_clientes(
 ):
     access_ids = get_all_accessible_tenant_ids(db, tenant_id)
     query = db.query(Cliente).filter(Cliente.tenant_id.in_(access_ids))
-    if tipo_cadastro:
-        if isinstance(tipo_cadastro, list):
-            query = query.filter(Cliente.tipo_cadastro.in_(tipo_cadastro))
-        else:
-            query = query.filter(Cliente.tipo_cadastro == tipo_cadastro)
     if is_entregador is not None:
         query = query.filter(Cliente.is_entregador == is_entregador)
     if is_cliente is not None:
@@ -821,7 +810,7 @@ def _montar_query_listagem_clientes(
     if visao_dashboard == "ativos":
         query = query.filter(
             Cliente.tenant_id == tenant_id,
-            Cliente.tipo_cadastro == "cliente",
+            Cliente.is_cliente.is_(True),
         )
     elif visao_dashboard == "vip_em_risco":
         query = query.join(
@@ -832,7 +821,7 @@ def _montar_query_listagem_clientes(
             ),
         ).filter(
             Cliente.tenant_id == tenant_id,
-            Cliente.tipo_cadastro == "cliente",
+            Cliente.is_cliente.is_(True),
             ClienteSegmento.segmento == "VIP",
             cast(ClienteSegmento.metricas["ultima_compra_dias"].astext, Integer) > 20,
         )
@@ -850,7 +839,7 @@ def _montar_query_listagem_clientes(
             ultima_venda, ultima_venda.c.cliente_id == Cliente.id
         ).filter(
             Cliente.tenant_id == tenant_id,
-            Cliente.tipo_cadastro == "cliente",
+            Cliente.is_cliente.is_(True),
             or_(
                 ultima_venda.c.ultima_venda.is_(None),
                 ultima_venda.c.ultima_venda < dt.utcnow() - timedelta(days=90),
@@ -865,14 +854,14 @@ def _montar_query_listagem_clientes(
             ),
         ).filter(
             Cliente.tenant_id == tenant_id,
-            Cliente.tipo_cadastro == "cliente",
+            Cliente.is_cliente.is_(True),
             ClienteSegmento.segmento == "Novo",
             cast(ClienteSegmento.metricas["ticket_medio"].astext, Float) > 200,
         )
     elif visao_dashboard == "sem_whatsapp":
         query = query.filter(
             Cliente.tenant_id == tenant_id,
-            Cliente.tipo_cadastro == "cliente",
+            Cliente.is_cliente.is_(True),
             or_(Cliente.celular.is_(None), func.trim(Cliente.celular) == ""),
         )
     return query
@@ -1043,7 +1032,7 @@ def _montar_resposta_update(cliente: Cliente) -> dict:
         "id": cliente.id,
         "codigo": cliente.codigo,
         "nome": cliente.nome,
-        "tipo_cadastro": cliente.tipo_cadastro,
+        "tipos_cadastro": tipos_cadastro_da_pessoa(cliente),
         "tipo_pessoa": cliente.tipo_pessoa,
         "cpf": cliente.cpf,
         "cnpj": cliente.cnpj,

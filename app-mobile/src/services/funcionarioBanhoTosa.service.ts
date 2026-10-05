@@ -18,7 +18,7 @@ export interface BanhoTosaRecursoResumo {
 export interface BanhoTosaFuncionarioResumo {
   id: number;
   nome: string;
-  tipo_cadastro?: string | null;
+  tipos_cadastro?: string[] | null;
 }
 
 export interface BanhoTosaPetResumo {

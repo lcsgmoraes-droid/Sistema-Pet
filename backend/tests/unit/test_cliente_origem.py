@@ -209,7 +209,7 @@ def test_correcao_manual_grava_valor_anterior_e_novo_antes_do_commit(monkeypatch
         codigo="1",
         nome="Cliente",
         telefone="11999999999",
-        tipo_cadastro="cliente",
+        is_cliente=True,
         ativo=True,
         origem_cliente="app",
     )

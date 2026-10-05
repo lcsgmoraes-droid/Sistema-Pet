@@ -183,7 +183,7 @@ def _preparar(db: Session):
             fornecedor = Cliente(
                 user_id=1,
                 nome=f"Fornecedor {prefixo}",
-                tipo_cadastro="fornecedor",
+                is_fornecedor=True,
             )
             produto_ean = _produto(f"Ração {prefixo}", f"RACAO-{prefixo}", ean, 5)
             produto_manual = _produto(

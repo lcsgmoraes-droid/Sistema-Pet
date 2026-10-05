@@ -10,6 +10,7 @@ import unicodedata
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
+from app.clientes.common import tipos_cadastro_da_pessoa
 from app.models import Cliente
 from app.services.pessoa_merge_service import executar_fusao_pessoas
 
@@ -283,10 +284,9 @@ def _score_completude(pessoa: Any) -> int:
 def _prioridade_perfil_pessoa(pessoa: Any) -> int:
     if not bool(getattr(pessoa, "ativo", False)):
         return 0
-    tipo_cadastro = str(getattr(pessoa, "tipo_cadastro", "") or "").strip().casefold()
-    if tipo_cadastro == "funcionario":
+    if bool(getattr(pessoa, "is_funcionario", False)):
         return 3
-    if tipo_cadastro == "veterinario":
+    if bool(getattr(pessoa, "is_veterinario", False)):
         return 2
     if bool(getattr(pessoa, "is_entregador", False)):
         return 1
@@ -385,7 +385,7 @@ def _resumo_sugestao(pessoa: Cliente) -> dict[str, Any]:
         "id": pessoa.id,
         "codigo": pessoa.codigo,
         "nome": pessoa.nome,
-        "tipo_cadastro": pessoa.tipo_cadastro,
+        "tipos_cadastro": tipos_cadastro_da_pessoa(pessoa),
         "tipo_pessoa": pessoa.tipo_pessoa,
         "documento": pessoa.cnpj or pessoa.cpf,
         "email": pessoa.email,

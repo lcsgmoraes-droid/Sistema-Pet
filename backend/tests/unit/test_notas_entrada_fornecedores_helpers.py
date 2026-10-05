@@ -60,7 +60,7 @@ def test_criar_fornecedor_automatico_cria_com_codigo_user_e_tenant(monkeypatch):
     monkeypatch.setattr(
         fornecedores,
         "gerar_codigo_cliente",
-        lambda db, tipo, pessoa, tenant_id: f"{tipo}-{pessoa}-{tenant_id}",
+        lambda db, pessoa, tenant_id: f"{pessoa}-{tenant_id}",
     )
     monkeypatch.setattr(fornecedores, "Cliente", _FakeCliente)
     db = _FakeDb()
@@ -88,8 +88,8 @@ def test_criar_fornecedor_automatico_cria_com_codigo_user_e_tenant(monkeypatch):
     assert criado is True
     assert db.adicionado is fornecedor
     assert db.commits == 1
-    assert fornecedor.codigo == "fornecedor-PJ-7"
+    assert fornecedor.codigo == "PJ-7"
     assert fornecedor.user_id == 42
     assert fornecedor.tenant_id == 7
-    assert fornecedor.tipo_cadastro == "fornecedor"
+    assert fornecedor.is_fornecedor is True
     assert fornecedor.nome_fantasia == "Special Dog"

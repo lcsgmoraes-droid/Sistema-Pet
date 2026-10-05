@@ -23,6 +23,11 @@ function documentoPessoa(pessoa) {
   return pessoa?.cnpj || pessoa?.cpf || pessoa?.documento || "-";
 }
 
+function tiposCadastroPessoa(pessoa) {
+  const lista = Array.isArray(pessoa?.tipos_cadastro) ? pessoa.tipos_cadastro.filter(Boolean) : [];
+  return lista.join(" / ") || "-";
+}
+
 function PessoaResumo({ label, pessoa, selected, onSelect }) {
   return (
     <button
@@ -47,7 +52,7 @@ function PessoaResumo({ label, pessoa, selected, onSelect }) {
       </div>
       <div className="mt-2 grid grid-cols-2 gap-2 text-xs text-slate-600">
         <span>
-          Tipo: <strong>{pessoa?.tipo_cadastro || "-"}</strong>
+          Tipo: <strong>{tiposCadastroPessoa(pessoa)}</strong>
         </span>
         <span>
           Status: <strong>{pessoa?.ativo === false ? "Inativo" : "Ativo"}</strong>

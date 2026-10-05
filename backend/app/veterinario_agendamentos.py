@@ -80,7 +80,7 @@ def _validar_veterinario_agendamento(
         .filter(
             Cliente.id == veterinario_id,
             Cliente.tenant_id == tenant_id,
-            Cliente.tipo_cadastro == "veterinario",
+            Cliente.is_veterinario.is_(True),
             Cliente.ativo.is_(True),
         )
         .first()

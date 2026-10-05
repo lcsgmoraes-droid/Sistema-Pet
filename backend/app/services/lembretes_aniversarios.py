@@ -124,7 +124,7 @@ def get_birthday_target(
             .filter(
                 Cliente.id == reference_id,
                 Cliente.tenant_id == tenant_id,
-                Cliente.tipo_cadastro == "cliente",
+                Cliente.is_cliente.is_(True),
                 Cliente.ativo.isnot(False),
                 Cliente.data_nascimento.isnot(None),
             )
@@ -272,7 +272,7 @@ def list_upcoming_birthdays(
         db.query(Cliente)
         .filter(
             Cliente.tenant_id == tenant_id,
-            Cliente.tipo_cadastro == "cliente",
+            Cliente.is_cliente.is_(True),
             Cliente.ativo.isnot(False),
             Cliente.data_nascimento.isnot(None),
             _birthday_window_filter(Cliente.data_nascimento, start=base, end=end),

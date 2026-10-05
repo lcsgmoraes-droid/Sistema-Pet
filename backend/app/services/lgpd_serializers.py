@@ -1,5 +1,6 @@
 from typing import Any
 
+from app.clientes.common import tipos_cadastro_da_pessoa
 from app.lgpd_models import DataSubjectRequest
 from app.services.lgpd_utils import iso, json_load, num
 from app.whatsapp.security import DataPrivacyConsent
@@ -10,7 +11,7 @@ class PrivacySerializationMixin:
         return {
             "id": cliente.id,
             "codigo": cliente.codigo,
-            "tipo_cadastro": cliente.tipo_cadastro,
+            "tipos_cadastro": tipos_cadastro_da_pessoa(cliente),
             "tipo_pessoa": cliente.tipo_pessoa,
             "nome": cliente.nome,
             "cpf": cliente.cpf,

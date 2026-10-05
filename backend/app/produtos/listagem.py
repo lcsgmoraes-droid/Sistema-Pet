@@ -464,7 +464,7 @@ def _resolver_fornecedor_ids_filtro_produto(
             for (fornecedor_id_grupo,) in db.query(Cliente.id)
             .filter(
                 Cliente.tenant_id.in_(tenant_refs),
-                Cliente.tipo_cadastro == "fornecedor",
+                Cliente.is_fornecedor.is_(True),
                 Cliente.fornecedor_grupo_id == grupo.id,
                 Cliente.ativo.is_(True),
             )

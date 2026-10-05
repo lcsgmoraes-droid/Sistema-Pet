@@ -2,7 +2,9 @@
 
 O mais sensível dos quatro domínios (dado pessoal, LGPD) e o mais
 complexo (a mesma tabela `clientes` local cobre cliente/fornecedor/
-veterinário via `tipo_cadastro`). Por isso o vínculo aqui é sempre
+veterinário/funcionário ao mesmo tempo, via as flags `is_cliente`/
+`is_fornecedor`/`is_veterinario`/`is_funcionario`). Por isso o vínculo
+aqui é sempre
 sugestão + confirmação manual, nunca automático — mesmo quando um CPF
 bate exatamente, é uma ação explícita do usuário que efetiva o vínculo
 (ver Documentacao/Dominio/Plano-Camada-Geral.md, Checkpoint 4).
@@ -24,6 +26,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.sql import func
 
+from app.clientes.common import tipos_cadastro_da_pessoa
 from app.db import Base
 
 
@@ -44,7 +47,10 @@ class PessoaMestre(Base):
 
     nome = Column(String(255), nullable=False)
     tipo_pessoa = Column(String(2), nullable=True)  # PF | PJ
-    tipo_cadastro = Column(String(50), nullable=True)  # cliente | fornecedor | veterinario
+    is_cliente = Column(Boolean, nullable=False, default=False, server_default="0")
+    is_fornecedor = Column(Boolean, nullable=False, default=False, server_default="0")
+    is_veterinario = Column(Boolean, nullable=False, default=False, server_default="0")
+    is_funcionario = Column(Boolean, nullable=False, default=False, server_default="0")
     cpf = Column(String(14), nullable=True, index=True)
     cnpj = Column(String(18), nullable=True, index=True)
     inscricao_estadual = Column(String(20), nullable=True)
@@ -77,3 +83,7 @@ class PessoaMestre(Base):
         server_default=func.now(),
         onupdate=func.now(),
     )
+
+    @property
+    def tipos_cadastro(self) -> list[str]:
+        return tipos_cadastro_da_pessoa(self)

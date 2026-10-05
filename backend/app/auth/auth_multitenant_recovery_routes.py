@@ -34,6 +34,7 @@ from app.services.auth_security import (
     register_password_reset_requested,
 )
 from app.services.email_service import send_email
+from app.services.onboarding_credencial_service import confirmar_credenciais_do_usuario
 from app.session_manager import revoke_all_sessions
 from app.tenancy.rls import sync_rls_auth_email
 
@@ -203,6 +204,7 @@ def reset_password(
     user.reset_token_expires = None
     register_password_changed(db, user, request, "password_reset")
     revoke_all_sessions(db, user.id, reason="password_reset")
+    confirmar_credenciais_do_usuario(db, user_id=user.id)
     db.commit()
 
     return {"message": "Senha atualizada com sucesso"}

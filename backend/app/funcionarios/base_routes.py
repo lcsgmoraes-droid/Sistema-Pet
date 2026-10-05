@@ -45,7 +45,7 @@ async def listar_funcionarios(
     query = (
         db.query(Cliente)
         .outerjoin(Cargo, Cliente.cargo_id == Cargo.id)
-        .filter(Cliente.tenant_id == tenant_id, Cliente.tipo_cadastro == "funcionario")
+        .filter(Cliente.tenant_id == tenant_id, Cliente.is_funcionario.is_(True))
     )
 
     if ativo is not None:
@@ -102,7 +102,7 @@ async def obter_funcionario(
         .filter(
             Cliente.id == funcionario_id,
             Cliente.tenant_id == tenant_id,
-            Cliente.tipo_cadastro == "funcionario",
+            Cliente.is_funcionario.is_(True),
         )
         .first()
     )
@@ -136,7 +136,7 @@ async def obter_remuneracao_funcionario(
         .filter(
             Cliente.id == funcionario_id,
             Cliente.tenant_id == tenant_id,
-            Cliente.tipo_cadastro == "funcionario",
+            Cliente.is_funcionario.is_(True),
         )
         .first()
     )
@@ -199,7 +199,7 @@ async def criar_funcionario(
 
     from app.clientes_routes import gerar_codigo_cliente
 
-    codigo = gerar_codigo_cliente(db, "funcionario", "PF", tenant_id)
+    codigo = gerar_codigo_cliente(db, "PF", tenant_id)
     funcionario = Cliente(
         tenant_id=tenant_id,
         user_id=user.id,
@@ -208,7 +208,7 @@ async def criar_funcionario(
         email=funcionario_data.email,
         telefone=funcionario_data.telefone,
         cpf=funcionario_data.cpf,
-        tipo_cadastro="funcionario",
+        is_funcionario=True,
         tipo_pessoa="PF",
         cargo_id=funcionario_data.cargo_id,
         data_fechamento_comissao=funcionario_data.data_fechamento_comissao,
@@ -269,7 +269,7 @@ async def atualizar_funcionario(
         .filter(
             Cliente.id == funcionario_id,
             Cliente.tenant_id == tenant_id,
-            Cliente.tipo_cadastro == "funcionario",
+            Cliente.is_funcionario.is_(True),
         )
         .first()
     )
@@ -351,7 +351,7 @@ async def ativar_funcionario(
         .filter(
             Cliente.id == funcionario_id,
             Cliente.tenant_id == tenant_id,
-            Cliente.tipo_cadastro == "funcionario",
+            Cliente.is_funcionario.is_(True),
         )
         .first()
     )
@@ -388,7 +388,7 @@ async def deletar_funcionario(
         .filter(
             Cliente.id == funcionario_id,
             Cliente.tenant_id == tenant_id,
-            Cliente.tipo_cadastro == "funcionario",
+            Cliente.is_funcionario.is_(True),
         )
         .first()
     )

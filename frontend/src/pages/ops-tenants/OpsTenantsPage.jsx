@@ -39,6 +39,7 @@ export default function OpsTenantsPage() {
     handleOnboardingNoteChange,
     handleOnboardingNoteSubmit,
     handleOnboardingSubmit,
+    handleConfirmarCredencialRepassada,
     groupedItems,
     items,
     loadTenants,
@@ -191,6 +192,7 @@ export default function OpsTenantsPage() {
             onSelectTenant={setSelectedTenantId}
             onChange={handleOnboardingChange}
             onSubmit={handleOnboardingSubmit}
+            onConfirmarCredencial={handleConfirmarCredencialRepassada}
             notes={onboardingNotes}
             notesLoading={onboardingNotesLoading}
             noteText={onboardingNoteText}

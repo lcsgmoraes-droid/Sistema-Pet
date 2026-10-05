@@ -43,6 +43,7 @@ from app.banho_tosa_taxi_fluxo import (
     validar_transicao_status_taxi_dog,
 )
 from app.db import get_session
+from app.clientes.common import tipos_cadastro_da_pessoa
 from app.models import Cliente, Pet, User
 from app.routes.ecommerce_auth import (
     _activate_user_tenant_context,
@@ -234,7 +235,7 @@ def listar_apoios_banho_tosa_mobile(
         .filter(
             Cliente.tenant_id == tenant_id,
             Cliente.ativo.is_(True),
-            Cliente.tipo_cadastro.in_(["funcionario", "veterinario", "outro"]),
+            or_(Cliente.is_funcionario.is_(True), Cliente.is_veterinario.is_(True)),
         )
         .order_by(Cliente.nome.asc())
         .limit(300)
@@ -279,7 +280,11 @@ def listar_apoios_banho_tosa_mobile(
         "fluxo_etapas": list(config.fluxo_etapas or []),
         "funcionario_id": funcionario.id,
         "funcionarios": [
-            {"id": item.id, "nome": item.nome, "tipo_cadastro": item.tipo_cadastro}
+            {
+                "id": item.id,
+                "nome": item.nome,
+                "tipos_cadastro": tipos_cadastro_da_pessoa(item),
+            }
             for item in funcionarios
         ],
         "recursos": [

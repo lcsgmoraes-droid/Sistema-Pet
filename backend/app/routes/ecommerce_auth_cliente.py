@@ -18,7 +18,8 @@ def _is_operational_cliente(cliente: Cliente | None) -> bool:
     if not cliente or getattr(cliente, "ativo", True) is False:
         return False
     return bool(
-        getattr(cliente, "tipo_cadastro", None) in {"funcionario", "veterinario"}
+        getattr(cliente, "is_funcionario", False)
+        or getattr(cliente, "is_veterinario", False)
         or getattr(cliente, "is_entregador", False)
     )
 
@@ -196,7 +197,8 @@ def _find_operational_cliente_match(
             Cliente.tenant_id == tenant_id,
             Cliente.ativo.is_(True),
             or_(
-                Cliente.tipo_cadastro.in_(["funcionario", "veterinario"]),
+                Cliente.is_funcionario.is_(True),
+                Cliente.is_veterinario.is_(True),
                 Cliente.is_entregador.is_(True),
             ),
         )
@@ -405,12 +407,12 @@ def _get_or_create_cliente_for_user(
             tenant_id=tenant_id,
             user_id=user.id,
             auth_user_id=user.id,
-            codigo=gerar_codigo_cliente(db, "cliente", "PF", tenant_id),
+            codigo=gerar_codigo_cliente(db, "PF", tenant_id),
             nome=user.nome or getattr(user, "username", None) or user.email,
             email=user.email,
             telefone=user.telefone,
             cpf=user.cpf_cnpj,
-            tipo_cadastro="cliente",
+            is_cliente=True,
             tipo_pessoa="PF",
             ativo=True,
         )

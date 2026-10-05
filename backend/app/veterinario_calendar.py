@@ -66,7 +66,7 @@ def resolver_veterinario_por_usuario(
         db.query(Cliente)
         .filter(
             Cliente.tenant_id == tenant_id,
-            Cliente.tipo_cadastro == "veterinario",
+            Cliente.is_veterinario.is_(True),
             Cliente.ativo.is_(True),
             func.lower(Cliente.email) == email,
         )

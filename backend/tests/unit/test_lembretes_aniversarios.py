@@ -47,7 +47,7 @@ def test_upcoming_list_combines_tutor_pet_and_app_availability(
         email=user.email,
         celular="18999990000",
         data_nascimento=datetime(1990, 9, 19),
-        tipo_cadastro="cliente",
+        is_cliente=True,
         ativo=True,
     )
     db_session.add(customer)

@@ -13,6 +13,11 @@ export function formatDate(value) {
   });
 }
 
+export function getTiposCadastroLabel(pessoa) {
+  const lista = Array.isArray(pessoa?.tipos_cadastro) ? pessoa.tipos_cadastro.filter(Boolean) : [];
+  return lista.join(" / ") || "-";
+}
+
 export function onlyDefinedParams(params) {
   return Object.fromEntries(
     Object.entries(params).filter(([, value]) => value !== "" && value != null),

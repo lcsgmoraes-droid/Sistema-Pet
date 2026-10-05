@@ -5,10 +5,15 @@ import Panel from "../ui/Panel";
 import StatusBadge from "../ui/StatusBadge";
 import { formatBrazilianLoginPhone } from "../../utils/loginPhone";
 
-function formatPessoaTipo(tipoCadastro) {
-  const value = (tipoCadastro || "").trim();
+function formatUmTipo(tipo) {
+  const value = (tipo || "").trim();
   if (!value) return "";
   return value.charAt(0).toUpperCase() + value.slice(1).replaceAll("_", " ");
+}
+
+function formatPessoaTipo(tiposCadastro) {
+  const lista = Array.isArray(tiposCadastro) ? tiposCadastro.filter(Boolean) : [];
+  return lista.map(formatUmTipo).join(" / ");
 }
 
 export default function UsuariosTable({
@@ -92,7 +97,7 @@ export default function UsuariosTable({
             <p className="truncate text-xs text-slate-500">
               {[
                 usuario.pessoa_codigo ? `Codigo ${usuario.pessoa_codigo}` : null,
-                formatPessoaTipo(usuario.pessoa_tipo_cadastro),
+                formatPessoaTipo(usuario.pessoa_tipos_cadastro),
               ]
                 .filter(Boolean)
                 .join(" - ")}

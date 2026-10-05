@@ -442,7 +442,7 @@ export interface FuncionarioPdvCliente {
   telefone?: string | null;
   celular?: string | null;
   documento?: string | null;
-  tipo_cadastro?: string | null;
+  tipos_cadastro?: string[] | null;
   email?: string | null;
   endereco?: string | null;
   credito?: number;

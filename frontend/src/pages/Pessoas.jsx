@@ -17,18 +17,38 @@ import LoadingState from "../components/ui/LoadingState";
 import PageHeader from "../components/ui/PageHeader";
 import Panel from "../components/ui/Panel";
 import StatusBadge from "../components/ui/StatusBadge";
+import InputCheckbox from "../components/v2/InputCheckbox/InputCheckbox";
+import InputTexto from "../components/v2/InputTexto/InputTexto";
+import SeletorOpcoes from "../components/v2/SeletorOpcoes/SeletorOpcoes";
 import { useTour } from "../hooks/useTour";
 import useShiftRangeSelection from "../hooks/useShiftRangeSelection";
 import { tourPessoas } from "../tours/tourDefinitions";
+
+const OPCOES_TIPO_FILTRO = [
+  { valor: "todos", rotulo: "Todos" },
+  { valor: "cliente", rotulo: "Clientes" },
+  { valor: "fornecedor", rotulo: "Fornecedores" },
+  { valor: "veterinario", rotulo: "Veterinarios" },
+  { valor: "funcionario", rotulo: "Funcionarios" },
+];
 
 const TIPOS_CADASTRO = {
   cliente: { intent: "info", label: "Cliente" },
   fornecedor: { intent: "success", label: "Fornecedor" },
   veterinario: { intent: "purple", label: "Veterinario" },
+  funcionario: { intent: "warning", label: "Funcionario" },
 };
 
-function getTipoBadge(tipo) {
-  return TIPOS_CADASTRO[tipo] || TIPOS_CADASTRO.cliente;
+// Uma pessoa pode ser mais de um tipo ao mesmo tempo (ex. cliente e
+// funcionario) — retorna um badge por flag marcada, nao so um.
+function getTiposBadges(pessoa) {
+  const tipos = [];
+  if (pessoa?.is_cliente) tipos.push("cliente");
+  if (pessoa?.is_fornecedor) tipos.push("fornecedor");
+  if (pessoa?.is_veterinario) tipos.push("veterinario");
+  if (pessoa?.is_funcionario) tipos.push("funcionario");
+  if (tipos.length === 0) tipos.push("cliente");
+  return tipos.map((tipo) => TIPOS_CADASTRO[tipo]);
 }
 
 function getTipoPessoa(tipo) {
@@ -56,6 +76,7 @@ export default function Pessoas() {
   const [loading, setLoading] = useState(true);
   const [tipoFiltro, setTipoFiltro] = useState("todos");
   const [buscaTexto, setBuscaTexto] = useState("");
+  const [buscaAplicada, setBuscaAplicada] = useState("");
   const [modalImportacao, setModalImportacao] = useState(false);
   const [modalFusao, setModalFusao] = useState(false);
   const [selecionados, setSelecionados] = useState([]);
@@ -71,10 +92,10 @@ export default function Pessoas() {
 
       const params = {};
       if (tipoFiltro !== "todos") {
-        params.tipo_cadastro = tipoFiltro;
+        params[`is_${tipoFiltro}`] = true;
       }
-      if (buscaTexto) {
-        params.search = buscaTexto;
+      if (buscaAplicada) {
+        params.search = buscaAplicada;
       }
 
       const response = await api.get("/clientes/", { params });
@@ -90,8 +111,13 @@ export default function Pessoas() {
   };
 
   useEffect(() => {
+    const timer = setTimeout(() => setBuscaAplicada(buscaTexto), 300);
+    return () => clearTimeout(timer);
+  }, [buscaTexto]);
+
+  useEffect(() => {
     carregarPessoas();
-  }, [tipoFiltro, buscaTexto]);
+  }, [tipoFiltro, buscaAplicada]);
 
   useEffect(() => {
     setSelecionados((prev) => prev.filter((id) => pessoas.some((pessoa) => pessoa.id === id)));
@@ -125,26 +151,35 @@ export default function Pessoas() {
   const pessoasColumns = useMemo(
     () => [
       {
+        key: "acoes",
+        header: "Acoes",
+        align: "center",
+        render: (pessoa) => (
+          <IconActionButton
+            icon={Pencil}
+            intent="edit"
+            onClick={() => navigate(`/pessoas/${pessoa.id}/editar`)}
+            title="Editar pessoa"
+          />
+        ),
+      },
+      {
         key: "selecao",
         align: "center",
-        headerClassName: "w-10",
-        className: "w-10",
+        headerClassName: "w-11",
+        className: "w-11",
         renderHeader: () => (
-          <input
-            type="checkbox"
+          <InputCheckbox
             checked={todosVisiveisSelecionados}
             onChange={selecionarTodosVisiveis}
-            className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-            title="Selecionar pessoas visiveis"
+            rotulo="Selecionar pessoas visiveis"
           />
         ),
         render: (pessoa) => (
-          <input
-            type="checkbox"
+          <InputCheckbox
             checked={selecionados.includes(pessoa.id)}
             onChange={(event) => selecionarPessoa(pessoa.id, event)}
-            className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-            aria-label={`Selecionar ${pessoa.nome}`}
+            rotulo={`Selecionar ${pessoa.nome}`}
           />
         ),
       },
@@ -162,16 +197,17 @@ export default function Pessoas() {
         ),
       },
       {
-        key: "tipo_cadastro",
+        key: "tipos_cadastro",
         header: "Tipo",
-        render: (pessoa) => {
-          const tipoBadge = getTipoBadge(pessoa.tipo_cadastro);
-          return (
-            <StatusBadge intent={tipoBadge.intent} size="sm">
-              {tipoBadge.label}
-            </StatusBadge>
-          );
-        },
+        render: (pessoa) => (
+          <div className="flex flex-wrap gap-1">
+            {getTiposBadges(pessoa).map((tipoBadge) => (
+              <StatusBadge key={tipoBadge.label} intent={tipoBadge.intent} size="sm">
+                {tipoBadge.label}
+              </StatusBadge>
+            ))}
+          </div>
+        ),
       },
       {
         key: "tipo_pessoa",
@@ -197,19 +233,6 @@ export default function Pessoas() {
             {pessoa.celular ? <div className="text-slate-500">{pessoa.celular}</div> : null}
             {!pessoa.email && !pessoa.celular ? "-" : null}
           </div>
-        ),
-      },
-      {
-        key: "acoes",
-        header: "Acoes",
-        align: "center",
-        render: (pessoa) => (
-          <IconActionButton
-            icon={Pencil}
-            intent="edit"
-            onClick={() => navigate(`/pessoas/${pessoa.id}/editar`)}
-            title="Editar pessoa"
-          />
         ),
       },
     ],
@@ -269,24 +292,19 @@ export default function Pessoas() {
         subtitle="Localize cadastros por nome, documento ou tipo."
       >
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          <input
-            type="text"
-            placeholder="Buscar por nome, CPF, CNPJ..."
+          <InputTexto
+            label="Buscar"
+            placeholder="Nome, CPF, CNPJ..."
             value={buscaTexto}
-            onChange={(event) => setBuscaTexto(event.target.value)}
-            className="h-9 rounded-lg border border-slate-300 px-3 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+            onChange={setBuscaTexto}
           />
 
-          <select
-            value={tipoFiltro}
-            onChange={(event) => setTipoFiltro(event.target.value)}
-            className="h-9 rounded-lg border border-slate-300 px-3 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-          >
-            <option value="todos">Todos os tipos</option>
-            <option value="cliente">Clientes</option>
-            <option value="fornecedor">Fornecedores</option>
-            <option value="veterinario">Veterinarios</option>
-          </select>
+          <SeletorOpcoes
+            rotulo="Tipo"
+            opcoes={OPCOES_TIPO_FILTRO}
+            valorSelecionado={tipoFiltro}
+            aoSelecionar={setTipoFiltro}
+          />
         </div>
       </Panel>
 

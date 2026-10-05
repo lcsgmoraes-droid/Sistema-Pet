@@ -110,7 +110,7 @@ const ContasPagar = () => {
         tiposRes,
       ] = await Promise.allSettled([
         api.get(`/contas-pagar/?${montarParamsFiltrosContasPagar(filtros)}`),
-        api.get(`/clientes/?tipo_cadastro=fornecedor`),
+        api.get(`/clientes/?is_fornecedor=true`),
         carregarFormasPagamento(),
         api.get(`/contas-bancarias?apenas_ativas=true`),
         api.get("/categorias-financeiras"),

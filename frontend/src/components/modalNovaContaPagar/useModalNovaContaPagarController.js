@@ -51,7 +51,7 @@ export function useModalNovaContaPagarController({ isOpen, onClose, onSave, cont
     try {
       const [fornecedoresRes, categoriasRes, subcategoriasDRERes, tiposDespesaRes] =
         await Promise.all([
-          api.get("/clientes/?tipo_cadastro=fornecedor"),
+          api.get("/clientes/?is_fornecedor=true"),
           api.get("/categorias-financeiras"),
           api.get("/dre/subcategorias"),
           api.get("/cadastros/tipo-despesa/"),

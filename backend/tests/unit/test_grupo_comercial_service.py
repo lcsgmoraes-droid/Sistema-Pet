@@ -92,7 +92,7 @@ def db(monkeypatch):
     # e o que estes testes cobrem, entao troca por um contador simples.
     contador_codigo = {"n": 10000}
 
-    def _codigo_fake(_db, _tipo_cadastro, _tipo_pessoa, _tenant_id):
+    def _codigo_fake(_db, _tipo_pessoa, _tenant_id):
         contador_codigo["n"] += 1
         return str(contador_codigo["n"])
 

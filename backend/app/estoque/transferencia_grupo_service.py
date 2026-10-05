@@ -453,12 +453,14 @@ def _obter_ou_criar_parceiro_empresa(
         parceiro.parceiro_ativo = True
         if parceiro.parceiro_desde is None:
             parceiro.parceiro_desde = datetime.now(timezone.utc)
+        if not parceiro.is_fornecedor:
+            parceiro.is_fornecedor = True
         return parceiro
     parceiro = Cliente(
         tenant_id=tenant_id,
         user_id=user_id,
         codigo=_codigo_parceiro_empresa(db, str(empresa_representada.id)),
-        tipo_cadastro="fornecedor",
+        is_fornecedor=True,
         tipo_pessoa="PJ",
         nome=empresa_representada.name,
         razao_social=empresa_representada.razao_social,

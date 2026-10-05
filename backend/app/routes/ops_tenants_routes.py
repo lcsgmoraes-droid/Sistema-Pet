@@ -13,6 +13,7 @@ from app.db import get_session
 from app.models import Tenant
 from app.platform_auth import require_platform_admin
 from app.platform_auth_models import PlatformAdmin
+from app.services.onboarding_credencial_service import confirmar_credencial_repassada
 from app.services.billing_payment_proof_service import (
     PaymentProofError,
     proof_to_public,
@@ -233,6 +234,24 @@ def atualizar_estado_comercial_tenant(
     except Exception:
         db.rollback()
         raise
+
+
+@router.patch("/{tenant_id}/credencial-email/confirmar")
+def confirmar_credencial_email_repassada(
+    tenant_id: str,
+    _current_admin: PlatformAdmin = Depends(require_platform_admin),
+    db: Session = Depends(get_session),
+) -> dict[str, Any]:
+    try:
+        confirmar_credencial_repassada(db, tenant_id=tenant_id)
+        db.commit()
+    except LookupError as exc:
+        db.rollback()
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except Exception:
+        db.rollback()
+        raise
+    return {"tenant_id": tenant_id, "credencial_email_pendente": False}
 
 
 @router.patch("/{tenant_id}/onboarding-follow-up")

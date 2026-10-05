@@ -12,6 +12,7 @@ from app.services.acerto_entrega_service import (
     processar_acertos_do_dia,
     ajustar_media_entregas_mensal,
 )
+from app.clientes.common import tipos_cadastro_da_pessoa
 from app.models import Cliente
 
 router = APIRouter(prefix="/acertos-entrega", tags=["Acertos de Entrega"])
@@ -117,7 +118,7 @@ def listar_acertos_pendentes(
                 {
                     "id": entregador.id,
                     "nome": entregador.nome,
-                    "tipo_cadastro": entregador.tipo_cadastro,
+                    "tipos_cadastro": tipos_cadastro_da_pessoa(entregador),
                     "tipo_acerto": entregador.tipo_acerto_entrega,
                     "ultimo_acerto": entregador.data_ultimo_acerto.isoformat()
                     if entregador.data_ultimo_acerto
@@ -173,7 +174,7 @@ def historico_acerto(
         "entregador": {
             "id": entregador.id,
             "nome": entregador.nome,
-            "tipo_cadastro": entregador.tipo_cadastro,
+            "tipos_cadastro": tipos_cadastro_da_pessoa(entregador),
             "controla_rh": entregador.controla_rh,
             "gera_cp_custo": entregador.gera_conta_pagar_custo_entrega,
             "tipo_acerto": entregador.tipo_acerto_entrega,

@@ -24,7 +24,7 @@ router = APIRouter(prefix="/pessoa-mestre", tags=["Pessoa mestre"])
 class PessoaMestreSugestaoResponse(BaseModel):
     id: int
     nome: str
-    tipo_cadastro: Optional[str] = None
+    tipos_cadastro: list[str] = []
 
 
 class VincularPessoaMestreRequest(BaseModel):

@@ -835,7 +835,7 @@ def test_serialize_profile_marks_veterinario_as_mobile_operational_profile():
     )
     cliente = SimpleNamespace(
         id=456,
-        tipo_cadastro="veterinario",
+        is_veterinario=True,
         ativo=True,
         is_entregador=True,
         telefone=None,

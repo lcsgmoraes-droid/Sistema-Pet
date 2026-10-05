@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 from app.auth.dependencies import get_current_user_and_tenant
 from app.db import get_session
 from app.models import Cliente, PessoaMergeLog, Role, UserTenant
-from app.clientes.common import _somente_digitos_coluna
+from app.clientes.common import _somente_digitos_coluna, tipos_cadastro_da_pessoa
 from app.security.permissions_decorator import require_permission
 from app.services.pessoa_duplicate_service import (
     executar_fusoes_automaticas_pessoas_duplicadas,
@@ -122,7 +122,7 @@ def verificar_duplicata(
                 "id": cliente.id,
                 "codigo": cliente.codigo,
                 "nome": cliente.nome,
-                "tipo_cadastro": cliente.tipo_cadastro,
+                "tipos_cadastro": tipos_cadastro_da_pessoa(cliente),
                 "tipo_pessoa": cliente.tipo_pessoa,
                 "cpf": cliente.cpf,
                 "telefone": cliente.telefone,
@@ -149,7 +149,7 @@ def verificar_duplicata(
                 "id": cliente.id,
                 "codigo": cliente.codigo,
                 "nome": cliente.nome,
-                "tipo_cadastro": cliente.tipo_cadastro,
+                "tipos_cadastro": tipos_cadastro_da_pessoa(cliente),
                 "tipo_pessoa": cliente.tipo_pessoa,
                 "cnpj": cliente.cnpj,
                 "razao_social": cliente.razao_social,
@@ -227,7 +227,7 @@ def verificar_duplicata(
                 "id": cliente.id,
                 "codigo": cliente.codigo,
                 "nome": cliente.nome,
-                "tipo_cadastro": cliente.tipo_cadastro,
+                "tipos_cadastro": tipos_cadastro_da_pessoa(cliente),
                 "tipo_pessoa": cliente.tipo_pessoa,
                 "cpf": cliente.cpf,
                 "telefone": cliente.telefone,
@@ -254,7 +254,7 @@ def verificar_duplicata(
                 "id": cliente.id,
                 "codigo": cliente.codigo,
                 "nome": cliente.nome,
-                "tipo_cadastro": cliente.tipo_cadastro,
+                "tipos_cadastro": tipos_cadastro_da_pessoa(cliente),
                 "crmv": cliente.crmv,
                 "telefone": cliente.telefone,
                 "celular": cliente.celular,
