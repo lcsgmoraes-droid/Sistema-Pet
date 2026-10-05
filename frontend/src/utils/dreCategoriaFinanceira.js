@@ -1,9 +1,7 @@
 export function inferirNaturezaDRE({ nome, tipo }) {
   if (tipo === "receita") return "receita";
-  const nomeComparacao = String(nome || "")
-    .trim()
-    .toLocaleLowerCase("pt-BR");
-  return /^(cmv|cpv|custo das mercadorias vendidas|custo dos produtos vendidos|custo dos serviços prestados)$/.test(
+  const nomeComparacao = normalizarNomeCategoria(nome);
+  return /^(cmv|cpv|custo das mercadorias vendidas|custo dos produtos vendidos|custo dos servicos prestados)$/.test(
     nomeComparacao,
   )
     ? "custo"

@@ -135,6 +135,19 @@ test("classifica custo dos serviços prestados como custo no plano DRE", async (
   assert.deepEqual(payload, { nome: "Custo dos Serviços Prestados", natureza: "custo" });
 });
 
+test("classifica custo dos servicos prestados sem acento como custo", async () => {
+  let payload;
+  const api = {
+    get: async () => ({ data: [] }),
+    post: async (_url, data) => {
+      payload = data;
+      return { data: { id: 11 } };
+    },
+  };
+  await garantirCategoriaDRE(api, { nome: "Custo dos Servicos Prestados", tipo: "despesa" });
+  assert.deepEqual(payload, { nome: "Custo dos Servicos Prestados", natureza: "custo" });
+});
+
 test("reutiliza categoria DRE de custo existente para CMV", () => {
   assert.equal(
     resolverCategoriaDREId({
