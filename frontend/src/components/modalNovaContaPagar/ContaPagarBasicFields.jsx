@@ -79,16 +79,16 @@ export default function ContaPagarBasicFields({ controller, onOpenCategoria }) {
                 ...atual,
                 afeta_dre: event.target.checked,
                 ...(event.target.checked
-                  ? {}
-                  : { categoria_id: null, dre_subcategoria_id: null, tipo_despesa_id: null }),
+                  ? { dre_subcategoria_id: categoriaSelecionada?.dre_subcategoria_id || null }
+                  : { dre_subcategoria_id: null, tipo_despesa_id: null }),
               }))
             }
           />
           Afeta a DRE
         </label>
         <p className="mt-1 text-xs text-gray-500">
-          Desmarque para amortização de empréstimos e pagamento de fatura de cartão, que devem
-          aparecer no contas a pagar sem virar despesa na DRE.
+          Desmarque para o principal de empréstimos ou pagamento de fatura de cartão. Lance juros e
+          taxas separadamente como despesa na DRE.
         </p>
       </div>
 
@@ -100,7 +100,6 @@ export default function ContaPagarBasicFields({ controller, onOpenCategoria }) {
         <div className="flex min-w-0 gap-2">
           <select
             value={dados.categoria_id || ""}
-            disabled={!dados.afeta_dre}
             onChange={(event) => handleCategoriaChange(event.target.value)}
             className="min-w-0 flex-1 px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
           >
@@ -121,7 +120,7 @@ export default function ContaPagarBasicFields({ controller, onOpenCategoria }) {
             <Plus size={16} /> Adicionar
           </button>
         </div>
-        {categoriaSelecionada?.tipo_custo && (
+        {dados.afeta_dre && categoriaSelecionada?.tipo_custo && (
           <p
             className={`text-xs font-semibold mt-1 ${
               categoriaSelecionada.tipo_custo === "fixo"
@@ -152,7 +151,7 @@ export default function ContaPagarBasicFields({ controller, onOpenCategoria }) {
         )}
       </div>
 
-      <div>
+      <div hidden={!dados.afeta_dre}>
         <label className="block text-sm font-medium text-gray-700 mb-1">
           🏷️ Subcategoria DRE (Demonstrativo de Resultado)
         </label>
@@ -177,7 +176,7 @@ export default function ContaPagarBasicFields({ controller, onOpenCategoria }) {
         <p className="text-xs text-gray-500 mt-1">Classifique para melhor análise gerencial</p>
       </div>
 
-      <div>
+      <div hidden={!dados.afeta_dre}>
         <label className="block text-sm font-medium text-gray-700 mb-1">Tipo de despesa</label>
         <select
           value={dados.tipo_despesa_id || ""}
@@ -232,7 +231,7 @@ export default function ContaPagarBasicFields({ controller, onOpenCategoria }) {
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1">
           <Calendar size={16} className="inline mr-1" />
-          Data de emissão / competência da DRE *
+          {dados.afeta_dre ? "Data de emissão / competência da DRE *" : "Data de emissão *"}
         </label>
         <input
           type="date"
@@ -242,7 +241,9 @@ export default function ContaPagarBasicFields({ controller, onOpenCategoria }) {
           required
         />
         <p className="mt-1 text-xs text-gray-500">
-          Define o mês da despesa na DRE. O vencimento informa quando ela será paga.
+          {dados.afeta_dre
+            ? "Define o mês da despesa na DRE. O vencimento informa quando ela será paga."
+            : "Registra a origem da obrigação. O vencimento informa quando ela será paga."}
         </p>
       </div>
 
