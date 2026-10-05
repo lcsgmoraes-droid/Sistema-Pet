@@ -1,5 +1,12 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import api from "../api";
+import { formatBRL, formatMoneyBRL } from "../utils/formatters";
+import {
+  compararPeriodosDRE,
+  dadosCorrespondemParametrosDRE,
+  extrairIndicadoresDRE,
+  obterParametrosMesAnterior,
+} from "./dre/analiseInteligenteUtils";
 import {
   TrendingUp,
   TrendingDown,
@@ -17,18 +24,34 @@ import {
   Info,
 } from "lucide-react";
 
-const AnaliseInteligente = ({ dados, periodo }) => {
+const AnaliseInteligente = ({ dados, parametrosDRE }) => {
   const [analise, setAnalise] = useState(null);
   const [loading, setLoading] = useState(true);
   const [comparacao, setComparacao] = useState(null);
   const [indicesMercado, setIndicesMercado] = useState(null);
+  const analiseRequestRef = useRef(0);
 
   useEffect(() => {
-    if (dados) {
-      carregarAnalise();
+    const requestId = ++analiseRequestRef.current;
+    if (dadosCorrespondemParametrosDRE(dados, parametrosDRE)) {
+      carregarAnalise(requestId);
       carregarIndicesMercado();
+    } else {
+      setAnalise(null);
+      setComparacao(null);
+      setLoading(false);
     }
-  }, [dados, periodo]);
+    return () => {
+      if (analiseRequestRef.current === requestId) analiseRequestRef.current++;
+    };
+  }, [
+    dados,
+    parametrosDRE?.ano,
+    parametrosDRE?.mes,
+    parametrosDRE?.mes_inicial,
+    parametrosDRE?.data_final,
+    parametrosDRE?.canais,
+  ]);
 
   const carregarIndicesMercado = async () => {
     try {
@@ -41,85 +64,42 @@ const AnaliseInteligente = ({ dados, periodo }) => {
     }
   };
 
-  const carregarAnalise = async () => {
+  const carregarAnalise = async (requestId) => {
     setLoading(true);
+    setComparacao(null);
     try {
-      // Simular análise IA (substituir por endpoint real)
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-
       const analiseGerada = gerarAnaliseIA(dados);
       setAnalise(analiseGerada);
 
-      // Comparação com período anterior
-      if (periodo.mes > 1) {
-        const mesAnterior = await buscarDREMesAnterior(periodo);
-        if (mesAnterior) {
-          setComparacao(compararPeriodos(dados, mesAnterior));
+      const parametrosMesAnterior = obterParametrosMesAnterior(parametrosDRE);
+      if (parametrosMesAnterior) {
+        const response = await api.get("/financeiro/dre/canais", {
+          params: parametrosMesAnterior,
+        });
+        if (requestId === analiseRequestRef.current) {
+          setComparacao(compararPeriodosDRE(dados, response.data));
         }
       }
     } catch (error) {
       console.error("Erro ao carregar análise:", error);
     } finally {
-      setLoading(false);
+      if (requestId === analiseRequestRef.current) setLoading(false);
     }
-  };
-
-  const buscarDREMesAnterior = async (periodo) => {
-    try {
-      const mesAnterior = periodo.mes === 1 ? 12 : periodo.mes - 1;
-      const anoAnterior = periodo.mes === 1 ? periodo.ano - 1 : periodo.ano;
-
-      const response = await api.get("/financeiro/dre", {
-        params: { ano: anoAnterior, mes: mesAnterior },
-      });
-      return response.data;
-    } catch {
-      return null;
-    }
-  };
-
-  const compararPeriodos = (atual, anterior) => {
-    const calcularVariacao = (valorAtual, valorAnterior) => {
-      if (!valorAnterior || valorAnterior === 0) return null;
-      return ((valorAtual - valorAnterior) / Math.abs(valorAnterior)) * 100;
-    };
-
-    return {
-      receita: {
-        atual: atual.receita_bruta || 0,
-        anterior: anterior.receita_bruta || 0,
-        variacao: calcularVariacao(atual.receita_bruta, anterior.receita_bruta),
-      },
-      lucro: {
-        atual: atual.lucro_liquido || 0,
-        anterior: anterior.lucro_liquido || 0,
-        variacao: calcularVariacao(atual.lucro_liquido, anterior.lucro_liquido),
-      },
-      despesas: {
-        atual: atual.total_despesas || 0,
-        anterior: anterior.total_despesas || 0,
-        variacao: calcularVariacao(atual.total_despesas, anterior.total_despesas),
-      },
-      margem: {
-        atual: atual.margem_liquida || 0,
-        anterior: anterior.margem_liquida || 0,
-        variacao: calcularVariacao(atual.margem_liquida, anterior.margem_liquida),
-      },
-    };
   };
 
   const gerarAnaliseIA = (dados) => {
     const insights = [];
     const recomendacoes = [];
     const alertas = [];
+    const { margemLiquida, receitaLiquida, despesasOperacionais, margemBruta, lucroLiquido } =
+      extrairIndicadoresDRE(dados);
 
     // Análise de Margem
-    const margemLiquida = dados.margem_liquida || 0;
-    if (margemLiquida < 5) {
+    if (receitaLiquida > 0 && margemLiquida < 5) {
       alertas.push({
         tipo: "critico",
         titulo: "Margem líquida crítica",
-        descricao: `Margem de apenas ${margemLiquida.toFixed(1)}%. Ideal: acima de 10%`,
+        descricao: `Margem de apenas ${formatBRL(margemLiquida)}%. Ideal: acima de 10%`,
         icon: AlertTriangle,
       });
       recomendacoes.push({
@@ -128,59 +108,57 @@ const AnaliseInteligente = ({ dados, periodo }) => {
         descricao:
           "Margem muito baixa. Considere: aumentar preços, reduzir custos fixos, ou renegociar com fornecedores.",
       });
-    } else if (margemLiquida < 10) {
+    } else if (receitaLiquida > 0 && margemLiquida < 10) {
       insights.push({
         tipo: "atencao",
         titulo: "Margem líquida abaixo do ideal",
-        descricao: `${margemLiquida.toFixed(1)}% - Há espaço para melhoria`,
+        descricao: `${formatBRL(margemLiquida)}% - Há espaço para melhoria`,
         icon: TrendingDown,
       });
-    } else {
+    } else if (receitaLiquida > 0) {
       insights.push({
         tipo: "positivo",
         titulo: "Margem líquida saudável",
-        descricao: `${margemLiquida.toFixed(1)}% - Acima da média do setor`,
+        descricao: `${formatBRL(margemLiquida)}% - Acima do patamar de referência`,
         icon: CheckCircle,
       });
     }
 
     // Análise de Receita vs Despesas
-    const receita = dados.receita_bruta || 0;
-    const despesas = dados.total_despesas || 0;
-    if (despesas > receita * 0.8) {
+    const receita = receitaLiquida;
+    const despesas = despesasOperacionais;
+    if (receita > 0 && despesas > receita * 0.8) {
       alertas.push({
         tipo: "atencao",
         titulo: "Despesas elevadas",
-        descricao: `Despesas representam ${((despesas / receita) * 100).toFixed(0)}% da receita`,
+        descricao: `Despesas representam ${formatBRL((despesas / receita) * 100)}% da receita`,
         icon: AlertTriangle,
       });
     }
 
-    // Análise de CMV
-    const cmv = dados.cmv || 0;
-    const margemBruta = ((receita - cmv) / receita) * 100;
-    if (margemBruta < 30) {
+    // A margem bruta canônica já considera deduções e custos diretos.
+    if (receita > 0 && margemBruta < 30) {
       recomendacoes.push({
         prioridade: "media",
-        titulo: "Revisar custo dos produtos",
-        descricao: `Margem bruta de ${margemBruta.toFixed(1)}%. Considere negociar com fornecedores ou ajustar preços.`,
+        titulo: "Revisar custos diretos",
+        descricao: `Margem bruta de ${formatBRL(margemBruta)}%. Confira custos de produtos e serviços e a precificação.`,
       });
     }
 
     // Insight de Lucro
-    const lucro = dados.lucro_liquido || 0;
+    const lucro = lucroLiquido;
     if (lucro > 0) {
       insights.push({
         tipo: "positivo",
         titulo: "Resultado positivo",
-        descricao: `Lucro de R$ ${lucro.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`,
+        descricao: `Lucro de ${formatMoneyBRL(lucro)}`,
         icon: TrendingUp,
       });
-    } else {
+    } else if (lucro < 0) {
       alertas.push({
         tipo: "critico",
         titulo: "Prejuízo no período",
-        descricao: `Resultado negativo de R$ ${Math.abs(lucro).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`,
+        descricao: `Resultado negativo de ${formatMoneyBRL(Math.abs(lucro))}`,
         icon: TrendingDown,
       });
       recomendacoes.push({
@@ -273,14 +251,23 @@ const AnaliseInteligente = ({ dados, periodo }) => {
     if (!indicesMercado || !dados) return null;
 
     const benchmarks = indicesMercado.benchmarks;
-    const receita = dados.receita_liquida || 0;
+    if (!benchmarks) return null;
+    const {
+      receitaLiquida: receita,
+      cmv,
+      margemBruta,
+      margemLiquida,
+      despesasAdmin,
+      despesasOperacionais,
+    } = extrairIndicadoresDRE(dados);
+    if (receita <= 0) return null;
 
     // Calcular percentuais atuais
-    const cmvAtual = receita > 0 ? ((dados.cmv || 0) / receita) * 100 : 0;
-    const margemBrutaAtual = dados.margem_bruta || 0;
-    const margemLiquidaAtual = dados.margem_liquida || 0;
-    const despesasAdminAtual = receita > 0 ? ((dados.despesas_admin || 0) / receita) * 100 : 0;
-    const despesasTotaisAtual = receita > 0 ? ((dados.total_despesas || 0) / receita) * 100 : 0;
+    const cmvAtual = receita > 0 ? (cmv / receita) * 100 : 0;
+    const margemBrutaAtual = margemBruta;
+    const margemLiquidaAtual = margemLiquida;
+    const despesasAdminAtual = receita > 0 ? (despesasAdmin / receita) * 100 : 0;
+    const despesasTotaisAtual = receita > 0 ? (despesasOperacionais / receita) * 100 : 0;
 
     const indicadores = [
       {
@@ -387,12 +374,12 @@ const AnaliseInteligente = ({ dados, periodo }) => {
                             : "text-red-600"
                       }`}
                     >
-                      {ind.seu.toFixed(1)}
+                      {formatBRL(ind.seu)}
                       {ind.unidade}
                     </span>
                     <span className="text-sm text-gray-500">
-                      Ideal: {ind.idealMin > 0 ? `${ind.idealMin.toFixed(0)}-` : ""}
-                      {ind.idealMax.toFixed(0)}
+                      Ideal: {ind.idealMin > 0 ? `${formatBRL(ind.idealMin)}-` : ""}
+                      {formatBRL(ind.idealMax)}
                       {ind.unidade}
                     </span>
                   </div>
@@ -434,7 +421,7 @@ const AnaliseInteligente = ({ dados, periodo }) => {
                     <>
                       <TrendDown size={16} className="text-orange-600" />
                       <span className="text-orange-600">
-                        Abaixo do ideal ({(ind.idealMin - ind.seu).toFixed(1)}
+                        Abaixo do ideal ({formatBRL(ind.idealMin - ind.seu)}
                         {ind.unidade} a menos)
                       </span>
                     </>
@@ -442,7 +429,7 @@ const AnaliseInteligente = ({ dados, periodo }) => {
                     <>
                       <AlertTriangle size={16} className="text-red-600" />
                       <span className="text-red-600">
-                        Acima do ideal (+{(ind.seu - ind.idealMax).toFixed(1)}
+                        Acima do ideal (+{formatBRL(ind.seu - ind.idealMax)}
                         {ind.unidade})
                       </span>
                     </>
@@ -503,14 +490,30 @@ const AnaliseInteligente = ({ dados, periodo }) => {
               <div key={chave} className="bg-gray-50 rounded-lg p-4">
                 <p className="text-sm text-gray-600 mb-1 capitalize">{chave}</p>
                 <p className="text-xl font-bold text-gray-800 mb-2">
-                  R$ {valor.atual.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                  {chave === "margem" ? `${formatBRL(valor.atual)}%` : formatMoneyBRL(valor.atual)}
+                </p>
+                <p className="text-xs text-gray-500 mb-2">
+                  Anterior:{" "}
+                  {chave === "margem"
+                    ? `${formatBRL(valor.anterior)}%`
+                    : formatMoneyBRL(valor.anterior)}
                 </p>
                 {valor.variacao !== null && (
                   <div
-                    className={`flex items-center gap-1 text-sm ${valor.variacao > 0 ? "text-green-600" : "text-red-600"}`}
+                    className={`flex items-center gap-1 text-sm ${
+                      valor.variacao === 0
+                        ? "text-gray-500"
+                        : (chave === "despesas" ? valor.variacao < 0 : valor.variacao > 0)
+                          ? "text-green-600"
+                          : "text-red-600"
+                    }`}
                   >
-                    {valor.variacao > 0 ? <ArrowUpRight size={16} /> : <ArrowDownRight size={16} />}
-                    <span className="font-semibold">{Math.abs(valor.variacao).toFixed(1)}%</span>
+                    {valor.variacao > 0 && <ArrowUpRight size={16} />}
+                    {valor.variacao < 0 && <ArrowDownRight size={16} />}
+                    <span className="font-semibold">
+                      {formatBRL(Math.abs(valor.variacao))}
+                      {chave === "margem" ? " p.p." : "%"}
+                    </span>
                   </div>
                 )}
               </div>

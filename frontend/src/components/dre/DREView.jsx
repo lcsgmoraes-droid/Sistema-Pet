@@ -49,6 +49,7 @@ export default function DREView({
   loading,
   loadingDetalhes,
   modalClassificarOpen,
+  parametrosDRE,
   periodo,
   periodoAcumulado,
   setChatIAAberto,
@@ -426,9 +427,7 @@ export default function DREView({
       {tabAtiva === "extrato" && <ExtratoBancario />}
 
       {/* Conteúdo da Tab Análise Inteligente */}
-      {tabAtiva === "analise" && (
-        <AnaliseInteligente dados={dados} periodo={{ mes: periodo.mes, ano: periodo.ano }} />
-      )}
+      {tabAtiva === "analise" && <AnaliseInteligente dados={dados} parametrosDRE={parametrosDRE} />}
 
       {/* Modal Chat IA */}
       <ChatIAModal
