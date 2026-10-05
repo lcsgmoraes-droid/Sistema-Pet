@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session, selectinload
 from app.auth.dependencies import get_current_user_and_tenant
 from app.db import get_session
 from app.dre_canais.agregacao import (
+    _contas_receber_manuais_query,
     _preparar_snapshots_vendas,
     _subcategorias_contas_map,
     _valor_snapshot_campo,
@@ -34,7 +35,7 @@ from app.dre_canais.folha import (
 )
 from app.dre_canais.schemas import DREDetalheItem, DREDetalheResponse
 from app.dre_plano_contas_models import DRESubcategoria
-from app.financeiro_models import ContaPagar
+from app.financeiro_models import ContaPagar, ContaReceber
 from app.vendas_models import Venda, VendaItem
 
 router = APIRouter()
@@ -65,6 +66,8 @@ CAMPOS_DETALHE_CONTAS = {
     "despesas_financeiras",
     "outras_despesas",
 }
+
+CAMPOS_DETALHE_RECEBIVEIS = {"receita_outras"}
 
 
 def _paginar_detalhes(
@@ -220,6 +223,47 @@ def _detalhes_vendas_campo(
             )
         )
 
+    detalhes.sort(key=lambda item: item.data or "", reverse=True)
+    return detalhes
+
+
+def _detalhes_recebiveis_manuais(
+    db: Session,
+    mes: int,
+    ano: int,
+    tenant_id: str,
+    canal: str,
+    mes_inicial: Optional[int] = None,
+    data_final: Optional[date] = None,
+) -> List[DREDetalheItem]:
+    inicio, fim = _periodo_meses(mes_inicial or mes, mes, ano, data_final)
+    contas = (
+        _contas_receber_manuais_query(db, tenant_id, inicio, fim)
+        .options(selectinload(ContaReceber.cliente))
+        .all()
+    )
+    detalhes = []
+    for conta in contas:
+        if _normalizar_canal(getattr(conta, "canal", None)) != canal:
+            continue
+        valor = _conta_valor(conta)
+        if abs(valor) <= Decimal("0.004"):
+            continue
+        detalhes.append(
+            DREDetalheItem(
+                id=f"conta-receber-{conta.id}",
+                origem_tipo="conta_receber",
+                origem_label="Conta a receber",
+                data=_data_iso(getattr(conta, "data_emissao", None)),
+                descricao=getattr(conta, "descricao", "") or f"Conta #{conta.id}",
+                contraparte=getattr(getattr(conta, "cliente", None), "nome", None),
+                documento=getattr(conta, "documento", None),
+                status=getattr(conta, "status", None),
+                valor=float(valor),
+                link="/financeiro/contas-receber",
+                meta={"canal": canal},
+            )
+        )
     detalhes.sort(key=lambda item: item.data or "", reverse=True)
     return detalhes
 
@@ -434,7 +478,11 @@ def detalhar_linha_dre_por_canal(
 
     campo = (campo or "").strip()
     canal = _normalizar_canal(canal)
-    if campo not in CAMPOS_DETALHE_VENDAS and campo not in CAMPOS_DETALHE_CONTAS:
+    if (
+        campo not in CAMPOS_DETALHE_VENDAS
+        and campo not in CAMPOS_DETALHE_CONTAS
+        and campo not in CAMPOS_DETALHE_RECEBIVEIS
+    ):
         raise HTTPException(
             status_code=400, detail="Linha da DRE sem detalhamento disponivel"
         )
@@ -448,6 +496,16 @@ def detalhar_linha_dre_por_canal(
             tenant_id,
             canal,
             campo,
+            mes_inicial=mes_inicial,
+            data_final=data_final,
+        )
+    elif campo in CAMPOS_DETALHE_RECEBIVEIS:
+        detalhes = _detalhes_recebiveis_manuais(
+            db,
+            mes,
+            ano,
+            tenant_id,
+            canal,
             mes_inicial=mes_inicial,
             data_final=data_final,
         )

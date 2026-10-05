@@ -76,6 +76,36 @@ def test_custo_real_cadastrado_depois_substitui_estimativa_sem_mudar_snapshot():
     assert produto.preco_custo == Decimal("25")
 
 
+def test_cmv_reconstroi_total_zerado_quando_itens_ja_tem_custo():
+    item = SimpleNamespace(quantidade=Decimal("2"), produto_id=10, produto=None)
+    venda = SimpleNamespace(itens=[item])
+    snapshot_original = {
+        "custo_produtos": 0,
+        "itens": [{"custo_total": 145.98, "custo_unitario": 72.99}],
+    }
+
+    ajustado = _complementar_snapshot_com_custos_reais(venda, snapshot_original, {})
+
+    assert ajustado["custo_produtos"] == 145.98
+    assert snapshot_original["custo_produtos"] == 0
+
+
+def test_cmv_preserva_total_quando_itens_antigos_nao_tem_custo():
+    item = SimpleNamespace(quantidade=Decimal("1"), produto_id=10, produto=None)
+    venda = SimpleNamespace(itens=[item])
+    snapshot_original = {"custo_produtos": 72.99, "itens": [{"custo_total": 0}]}
+
+    assert _complementar_snapshot_com_custos_reais(venda, snapshot_original, {}) is snapshot_original
+
+
+def test_cmv_preserva_total_quando_snapshot_tem_menos_itens():
+    item = SimpleNamespace(quantidade=Decimal("1"), produto_id=10, produto=None)
+    venda = SimpleNamespace(itens=[item, item])
+    snapshot_original = {"custo_produtos": 72.99, "itens": [{"custo_total": 0}]}
+
+    assert _complementar_snapshot_com_custos_reais(venda, snapshot_original, {}) is snapshot_original
+
+
 def test_cmv_total_inclui_parcela_provisoria_de_forma_transparente():
     canal = _novo_canal()
     canal["receita_produtos"] = Decimal("200")

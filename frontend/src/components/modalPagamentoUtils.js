@@ -62,9 +62,13 @@ export function ehFormaPagamentoCartao(formaPagamento = null) {
   return Boolean(obterModalidadeCartao(formaPagamento));
 }
 
-export function obterBandeirasDisponiveis({ taxas = [], modalidade = "" } = {}) {
+export function obterBandeirasDisponiveis({ taxas = [], modalidade = "", bandeiraLegada = "" } = {}) {
   const regrasModalidade = (taxas || []).filter((taxa) => taxa.modalidade === modalidade);
-  if (!regrasModalidade.length) return taxas.length ? [] : BANDEIRAS_CARTAO;
+  if (!regrasModalidade.length) {
+    if (taxas.length) return [];
+    const codigo = normalizarBandeiraCartao(bandeiraLegada);
+    return codigo ? [BANDEIRA_POR_CODIGO[codigo] || bandeiraLegada] : BANDEIRAS_CARTAO;
+  }
 
   const codigosExatos = [...new Set(regrasModalidade.map((taxa) => taxa.bandeira))].filter(
     (codigo) => codigo !== "outros",

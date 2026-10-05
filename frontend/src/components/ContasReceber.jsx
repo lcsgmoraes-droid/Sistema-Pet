@@ -18,6 +18,7 @@ import MoneyCell, { formatMoneyCellValue } from "./ui/MoneyCell";
 import PageHeader from "./ui/PageHeader";
 import StatusBadge from "./ui/StatusBadge";
 import ComprovanteRecebimentoModal from "./contasReceber/ComprovanteRecebimentoModal";
+import ModalNovaContaReceber from "./ModalNovaContaReceber";
 import {
   ContasReceberDetalhesModal,
   ContasReceberFilters,
@@ -85,6 +86,7 @@ const ContasReceber = () => {
   const [contaSelecionada, setContaSelecionada] = useState(null);
   const [detalhesCompletos, setDetalhesCompletos] = useState(null);
   const [mostrarModalRecebimento, setMostrarModalRecebimento] = useState(false);
+  const [mostrarModalNovaConta, setMostrarModalNovaConta] = useState(false);
   const [mostrarModalRecebimentoLote, setMostrarModalRecebimentoLote] = useState(false);
   const [mostrarDetalhes, setMostrarDetalhes] = useState(false);
   const [contasSelecionadas, setContasSelecionadas] = useState(() => new Set());
@@ -709,7 +711,12 @@ const ContasReceber = () => {
                 Baixar selecionadas ({contasSelecionadasDetalhes.length})
               </ActionButton>
             )}
-            <ActionButton intent="create" size="md" icon={Plus}>
+            <ActionButton
+              intent="create"
+              size="md"
+              icon={Plus}
+              onClick={() => setMostrarModalNovaConta(true)}
+            >
               Nova Conta
             </ActionButton>
           </>
@@ -791,6 +798,12 @@ const ContasReceber = () => {
           </div>
         </>
       )}
+
+      <ModalNovaContaReceber
+        isOpen={mostrarModalNovaConta}
+        onClose={() => setMostrarModalNovaConta(false)}
+        onSave={aplicarFiltros}
+      />
 
       <ContasReceberRecebimentoModal
         calculoEncargos={calculoEncargos}

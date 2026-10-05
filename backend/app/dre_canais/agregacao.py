@@ -6,9 +6,9 @@ from sqlalchemy import and_, extract, func
 from sqlalchemy.orm import Session, selectinload
 
 from app.comissoes_models import ComissaoItem
-from app.dre_plano_contas_models import DRESubcategoria
+from app.dre_plano_contas_models import DRECategoria, DRESubcategoria, NaturezaDRE
 from app.empresa_config_fiscal_models import EmpresaConfigFiscal
-from app.financeiro_models import ContaPagar, FormaPagamento
+from app.financeiro_models import ContaPagar, ContaReceber, FormaPagamento
 from app.models import Cliente
 from app.produtos_models import EstoqueMovimentacao, Produto
 from app.vendas_models import Venda, VendaItem
@@ -323,7 +323,11 @@ def _complementar_snapshot_com_custos_reais(
     """Preenche apenas custos zerados que passaram a ter uma origem real confiável."""
     itens_venda = list(getattr(venda, "itens", []) or [])
     itens_snapshot_originais = snapshot.get("itens")
-    if not isinstance(itens_snapshot_originais, list) or not itens_venda:
+    if (
+        not isinstance(itens_snapshot_originais, list)
+        or not itens_venda
+        or len(itens_snapshot_originais) != len(itens_venda)
+    ):
         return snapshot
 
     itens_snapshot = [
@@ -353,15 +357,22 @@ def _complementar_snapshot_com_custos_reais(
         item_snapshot["custo_origem_complemento_dre"] = origem
         custo_adicional += custo_real
 
-    if custo_adicional <= 0:
+    custo_itens = sum(
+        (_moeda(item.get("custo_total", 0)) for item in itens_snapshot),
+        Decimal("0"),
+    )
+    custo_original = _moeda(snapshot.get("custo_produtos", 0))
+    if custo_itens <= 0 or (custo_adicional <= 0 and custo_itens == custo_original):
         return snapshot
 
     snapshot_ajustado = dict(snapshot)
     snapshot_ajustado["itens"] = itens_snapshot
-    snapshot_ajustado["custo_produtos"] = float(
-        _moeda(_decimal(snapshot.get("custo_produtos", 0)) + custo_adicional)
+    # Fotografias antigas podem ter custo nos itens e total zerado. A soma dos
+    # itens é a mesma base usada ao criar a fotografia e evita omitir esse CMV.
+    snapshot_ajustado["custo_produtos"] = float(custo_itens)
+    snapshot_ajustado["custo_complementado_dre"] = float(
+        _moeda(custo_itens - custo_original)
     )
-    snapshot_ajustado["custo_complementado_dre"] = float(_moeda(custo_adicional))
     return snapshot_ajustado
 
 
@@ -584,6 +595,40 @@ def obter_vendas_por_canal(
 
     _aplicar_estimativas_cmv(dados_por_canal, bases_estimativa, pendencias_estimativa)
     return dados_por_canal
+
+
+def _contas_receber_manuais_query(db: Session, tenant_id: str, inicio, fim):
+    """Receitas sem venda vinculada, para não duplicar o faturamento do PDV."""
+    return (
+        db.query(ContaReceber)
+        .join(DRESubcategoria, ContaReceber.dre_subcategoria_id == DRESubcategoria.id)
+        .join(DRECategoria, DRESubcategoria.categoria_id == DRECategoria.id)
+        .filter(
+            ContaReceber.tenant_id == tenant_id,
+            ContaReceber.data_emissao >= inicio,
+            ContaReceber.data_emissao < fim,
+            ContaReceber.venda_id.is_(None),
+            ContaReceber.status.notin_(("cancelado", "parcelado")),
+            DRESubcategoria.tenant_id == tenant_id,
+            DRECategoria.tenant_id == tenant_id,
+            DRECategoria.natureza == NaturezaDRE.RECEITA,
+        )
+    )
+
+
+def agregar_contas_receber_manuais_por_canal(
+    db: Session,
+    mes: int,
+    ano: int,
+    tenant_id: str,
+    dados_canais: Dict[str, Dict],
+    mes_inicial: Optional[int] = None,
+    data_final: Optional[date] = None,
+) -> None:
+    inicio, fim = _periodo_meses(mes_inicial or mes, mes, ano, data_final)
+    for conta in _contas_receber_manuais_query(db, tenant_id, inicio, fim).all():
+        canal = _normalizar_canal(getattr(conta, "canal", None))
+        dados_canais.setdefault(canal, _novo_canal())["receita_outras"] += _conta_valor(conta)
 
 
 def agregar_contas_pagar_por_canal(
