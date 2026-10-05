@@ -55,12 +55,14 @@ const ModalNovaContaReceber = ({ isOpen, onClose, onSave }) => {
 
   const carregarDados = async () => {
     try {
-      const [clientesRes, categoriasRes, subcategoriasDRERes, categoriasDRERes] = await Promise.all([
-        api.get("/clientes/?tipo_cadastro=cliente"),
-        api.get("/categorias-financeiras"),
-        api.get("/dre/subcategorias"),
-        api.get("/dre/categorias"),
-      ]);
+      const [clientesRes, categoriasRes, subcategoriasDRERes, categoriasDRERes] = await Promise.all(
+        [
+          api.get("/clientes/?tipo_cadastro=cliente"),
+          api.get("/categorias-financeiras"),
+          api.get("/dre/subcategorias"),
+          api.get("/dre/categorias"),
+        ],
+      );
 
       console.log("📦 Categorias recebidas:", categoriasRes.data);
 
@@ -135,10 +137,7 @@ const ModalNovaContaReceber = ({ isOpen, onClose, onSave }) => {
   const adicionarSubcategoriaNova = () => {
     setFormCategoria((atual) => ({
       ...atual,
-      novasSubcategorias: [
-        ...atual.novasSubcategorias,
-        { nome: "", descricao: "", ativo: true },
-      ],
+      novasSubcategorias: [...atual.novasSubcategorias, { nome: "", descricao: "", ativo: true }],
     }));
   };
 
@@ -291,10 +290,13 @@ const ModalNovaContaReceber = ({ isOpen, onClose, onSave }) => {
   };
 
   const idsCategoriasReceita = new Set(
-    categoriasDRE.filter((categoria) => categoria.natureza === "receita").map((categoria) => categoria.id),
+    categoriasDRE
+      .filter((categoria) => categoria.natureza === "receita")
+      .map((categoria) => categoria.id),
   );
   const subcategoriasReceita = subcategoriasDRE.filter(
-    (subcategoria) => subcategoria.ativo !== false && idsCategoriasReceita.has(subcategoria.categoria_id),
+    (subcategoria) =>
+      subcategoria.ativo !== false && idsCategoriasReceita.has(subcategoria.categoria_id),
   );
 
   const resetForm = () => {

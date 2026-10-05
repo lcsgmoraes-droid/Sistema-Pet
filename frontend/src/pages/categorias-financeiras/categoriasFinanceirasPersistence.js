@@ -40,7 +40,9 @@ export function createCategoriasFinanceirasPersistence({
         }
       }
 
-      toast.success(editando ? "Categoria atualizada com sucesso!" : "Categoria criada com sucesso!");
+      toast.success(
+        editando ? "Categoria atualizada com sucesso!" : "Categoria criada com sucesso!",
+      );
       setShowModal(false);
       resetForm();
       carregarDados();

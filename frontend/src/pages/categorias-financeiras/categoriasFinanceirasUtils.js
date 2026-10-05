@@ -37,8 +37,7 @@ export function getSubcategoriasDREDaCategoria(categoria, subcategoriasDRE) {
   );
   const principal = subcategoriasDRE.find(
     (subcategoria) =>
-      subcategoria.id === categoria.dre_subcategoria_id &&
-      !subcategoria.categoria_financeira_id,
+      subcategoria.id === categoria.dre_subcategoria_id && !subcategoria.categoria_financeira_id,
   );
   // O vínculo com a categoria DRE não dá propriedade das subcategorias irmãs.
   // O vínculo legado principal pode ser exibido, mas não deve ser apagado.
@@ -71,8 +70,12 @@ export function resolverCategoriaDREId({
       (categoria) =>
         categoria.natureza === natureza &&
         categoria.ativo !== false &&
-        String(categoria.nome || "").trim().toLocaleLowerCase("pt-BR") ===
-          String(categoriaFinanceira.nome || "").trim().toLocaleLowerCase("pt-BR"),
+        String(categoria.nome || "")
+          .trim()
+          .toLocaleLowerCase("pt-BR") ===
+          String(categoriaFinanceira.nome || "")
+            .trim()
+            .toLocaleLowerCase("pt-BR"),
     )?.id || null
   );
 }

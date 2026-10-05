@@ -46,7 +46,11 @@ export function useCategoriasFinanceirasController() {
   async function carregarDados() {
     setLoading(true);
     try {
-      await Promise.all([carregarCategorias(), carregarSubcategoriasDRE(), carregarCategoriasDRE()]);
+      await Promise.all([
+        carregarCategorias(),
+        carregarSubcategoriasDRE(),
+        carregarCategoriasDRE(),
+      ]);
     } finally {
       setLoading(false);
     }

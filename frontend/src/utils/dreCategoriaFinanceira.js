@@ -1,6 +1,8 @@
 export function inferirNaturezaDRE({ nome, tipo }) {
   if (tipo === "receita") return "receita";
-  const nomeComparacao = String(nome || "").trim().toLocaleLowerCase("pt-BR");
+  const nomeComparacao = String(nome || "")
+    .trim()
+    .toLocaleLowerCase("pt-BR");
   return /^(cmv|cpv|custo das mercadorias vendidas|custo dos produtos vendidos|custo dos serviços prestados)$/.test(
     nomeComparacao,
   )
@@ -19,7 +21,9 @@ export async function garantirCategoriaDRE(api, { nome, tipo, categoriasDRE = []
     (categoria) =>
       categoria.ativo !== false &&
       categoria.natureza === natureza &&
-      String(categoria.nome || "").trim().toLocaleLowerCase("pt-BR") === nomeComparacao,
+      String(categoria.nome || "")
+        .trim()
+        .toLocaleLowerCase("pt-BR") === nomeComparacao,
   );
   if (correspondente) return correspondente.id;
 

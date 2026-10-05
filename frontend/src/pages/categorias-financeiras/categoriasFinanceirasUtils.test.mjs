@@ -14,7 +14,10 @@ test("mostra apenas subcategorias pertencentes à categoria financeira", () => {
     { id: 2, categoria_id: 7, categoria_financeira_id: 10, nome: "Própria" },
     { id: 3, categoria_id: 7, categoria_financeira_id: 11, nome: "De outra" },
   ];
-  assert.deepEqual(getSubcategoriasDREDaCategoria(categoria, subs).map((sub) => sub.id), [2, 1]);
+  assert.deepEqual(
+    getSubcategoriasDREDaCategoria(categoria, subs).map((sub) => sub.id),
+    [2, 1],
+  );
 });
 
 test("não usa categoria DRE genérica para categoria financeira sem vínculo", () => {

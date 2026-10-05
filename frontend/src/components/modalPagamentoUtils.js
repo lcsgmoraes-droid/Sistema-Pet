@@ -62,7 +62,11 @@ export function ehFormaPagamentoCartao(formaPagamento = null) {
   return Boolean(obterModalidadeCartao(formaPagamento));
 }
 
-export function obterBandeirasDisponiveis({ taxas = [], modalidade = "", bandeiraLegada = "" } = {}) {
+export function obterBandeirasDisponiveis({
+  taxas = [],
+  modalidade = "",
+  bandeiraLegada = "",
+} = {}) {
   const regrasModalidade = (taxas || []).filter((taxa) => taxa.modalidade === modalidade);
   if (!regrasModalidade.length) {
     if (taxas.length) return [];
