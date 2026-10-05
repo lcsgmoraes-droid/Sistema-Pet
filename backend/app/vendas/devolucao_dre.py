@@ -41,7 +41,30 @@ def _assinatura_fotografia(fotografia) -> tuple:
     )
 
 
-def _custo_snapshot(venda, item, quantidade: Decimal) -> Decimal | None:
+def _custo_parcela(
+    custo_original: Decimal,
+    quantidade_original: Decimal,
+    quantidade_anterior: Decimal,
+    quantidade: Decimal,
+) -> Decimal | None:
+    """Diferenca de cotas cumulativas para preservar o custo ate o ultimo centavo."""
+    if (
+        quantidade_original <= 0
+        or quantidade_anterior < 0
+        or quantidade <= 0
+        or quantidade_anterior + quantidade > quantidade_original
+    ):
+        return None
+    antes = _moeda(custo_original * quantidade_anterior / quantidade_original)
+    depois = _moeda(
+        custo_original * (quantidade_anterior + quantidade) / quantidade_original
+    )
+    return depois - antes
+
+
+def _custo_snapshot(
+    venda, item, quantidade: Decimal, quantidade_anterior: Decimal = Decimal("0")
+) -> Decimal | None:
     snapshot = getattr(venda, "rentabilidade_snapshot", None)
     if isinstance(snapshot, str):
         try:
@@ -63,7 +86,12 @@ def _custo_snapshot(venda, item, quantidade: Decimal) -> Decimal | None:
         return None
     assinatura = _assinatura_item(item)
     quantidade_original = assinatura[1]
-    if quantidade_original <= 0 or quantidade > quantidade_original:
+    if (
+        quantidade_original <= 0
+        or quantidade_anterior < 0
+        or quantidade <= 0
+        or quantidade_anterior + quantidade > quantidade_original
+    ):
         return None
     if sum(_assinatura_item(outro) == assinatura for outro in itens_venda) != 1:
         return None
@@ -78,17 +106,24 @@ def _custo_snapshot(venda, item, quantidade: Decimal) -> Decimal | None:
         return None
     custo_original = _moeda(correspondencias[0].get("custo_total"))
     return (
-        _moeda(custo_original * quantidade / quantidade_original)
+        _custo_parcela(
+            custo_original, quantidade_original, quantidade_anterior, quantidade
+        )
         if custo_original > 0
         else None
     )
 
 
 def custo_original_item_devolvido(
-    db: Session, venda, item, quantidade: Decimal, tenant_id
+    db: Session,
+    venda,
+    item,
+    quantidade: Decimal,
+    tenant_id,
+    quantidade_anterior: Decimal = Decimal("0"),
 ) -> tuple[Decimal, str, bool]:
     """Nunca usa o preço de custo atual como se fosse o custo na data da venda."""
-    custo_snapshot = _custo_snapshot(venda, item, quantidade)
+    custo_snapshot = _custo_snapshot(venda, item, quantidade, quantidade_anterior)
     if custo_snapshot is not None:
         return custo_snapshot, "snapshot_venda", False
 
@@ -129,9 +164,9 @@ def custo_original_item_devolvido(
     # Movimentos extras do mesmo produto (inclusive componentes de kit) não
     # podem ser atribuídos com segurança à linha devolvida.
     if quantidade_saida == _decimal(getattr(item, "quantidade", 0)) and valor_saida > 0:
-        return (
-            _moeda(valor_saida * quantidade / quantidade_saida),
-            "saida_estoque_venda",
-            False,
+        custo_parcela = _custo_parcela(
+            valor_saida, quantidade_saida, quantidade_anterior, quantidade
         )
+        if custo_parcela is not None:
+            return custo_parcela, "saida_estoque_venda", False
     return Decimal("0"), "sem_custo_original", True

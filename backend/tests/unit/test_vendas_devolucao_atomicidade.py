@@ -1,4 +1,5 @@
 from decimal import Decimal
+from contextlib import nullcontext
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock
@@ -10,6 +11,8 @@ from fastapi import HTTPException
 from app.financeiro_models import CategoriaFinanceira, ContaReceber, LancamentoManual
 from app.models import Cliente
 from app.vendas.devolucoes_routes import (
+    _recebivel_exige_conciliacao,
+    _validar_estoque_devolucao_seguro,
     _validar_saldo_devolucao,
     prever_devolucao,
     registrar_devolucao,
@@ -98,7 +101,7 @@ def test_devolucao_repetida_de_servico_usa_saldo_dos_eventos():
         consulta.filter.return_value = consulta
         consulta.filter_by.return_value = consulta
         consulta.with_for_update.return_value = consulta
-        consulta.first.return_value = resultado
+        consulta.first.return_value = None if modelo is VendaDevolucao else resultado
         consulta.all.return_value = resultado if isinstance(resultado, list) else []
         consultas[modelo] = consulta
     db = MagicMock()
@@ -111,6 +114,7 @@ def test_devolucao_repetida_de_servico_usa_saldo_dos_eventos():
                 "itens": [{"item_id": 3, "quantidade": 1}],
                 "motivo": "Ajuste",
                 "gerar_credito": True,
+                "chave_operacao": str(uuid4()),
             },
             db=db,
             user_and_tenant=(SimpleNamespace(id=22), tenant_id),
@@ -155,7 +159,7 @@ def test_credito_devolucao_aceita_cliente_criado_por_outro_funcionario(monkeypat
         consulta.filter.return_value = consulta
         consulta.filter_by.return_value = consulta
         consulta.with_for_update.return_value = consulta
-        consulta.first.return_value = resultado
+        consulta.first.return_value = None if modelo is VendaDevolucao else resultado
         consulta.all.return_value = resultado if isinstance(resultado, list) else []
         consultas[modelo] = consulta
 
@@ -165,13 +169,15 @@ def test_credito_devolucao_aceita_cliente_criado_por_outro_funcionario(monkeypat
         "app.vendas.devolucoes_routes.log_action", lambda **_kwargs: None
     )
 
+    dados = {
+        "itens": [{"item_id": item.id, "quantidade": 1}],
+        "motivo": "Tamanho errado",
+        "gerar_credito": True,
+        "chave_operacao": str(uuid4()),
+    }
     resultado = registrar_devolucao(
         venda_id=venda.id,
-        dados={
-            "itens": [{"item_id": item.id, "quantidade": 1}],
-            "motivo": "Tamanho errado",
-            "gerar_credito": True,
-        },
+        dados=dados,
         db=db,
         user_and_tenant=(atendente, tenant_id),
     )
@@ -191,6 +197,30 @@ def test_credito_devolucao_aceita_cliente_criado_por_outro_funcionario(monkeypat
     assert evento.forma_estorno == "credito"
     assert evento.custo_pendente is True
     db.commit.assert_called_once()
+
+    consultas[VendaDevolucao].first.return_value = evento
+    operacoes_gravadas = db.add.call_count
+    repeticao = registrar_devolucao(
+        venda_id=venda.id,
+        dados=dados,
+        db=db,
+        user_and_tenant=(atendente, tenant_id),
+    )
+    assert repeticao == resultado
+    assert cliente.credito == Decimal("59.89")
+    assert db.add.call_count == operacoes_gravadas
+    db.commit.assert_called_once()
+
+    with pytest.raises(HTTPException) as erro:
+        registrar_devolucao(
+            venda_id=venda.id,
+            dados={**dados, "motivo": "Outra operacao"},
+            db=db,
+            user_and_tenant=(atendente, tenant_id),
+        )
+    assert erro.value.status_code == 409
+    assert "dados diferentes" in erro.value.detail
+    assert db.add.call_count == operacoes_gravadas
 
 
 def test_devolucao_parcial_em_dinheiro_registra_deducao_e_custo_servico(monkeypatch):
@@ -229,21 +259,27 @@ def test_devolucao_parcial_em_dinheiro_registra_deducao_e_custo_servico(monkeypa
             ],
         },
     )
+    conta_quitada = SimpleNamespace(
+        status="recebido", valor_final=Decimal("100"), valor_recebido=Decimal("100")
+    )
+    entrada_realizada = SimpleNamespace(
+        status="realizado", valor=Decimal("100"), documento="VENDA-8"
+    )
     consultas = {}
     for modelo, resultado in (
         (Venda, venda),
         (VendaItem, [item]),
         (VendaDevolucao, []),
         (CategoriaFinanceira, SimpleNamespace(id=9)),
-        (ContaReceber, []),
-        (LancamentoManual, []),
+        (ContaReceber, [conta_quitada]),
+        (LancamentoManual, [entrada_realizada]),
     ):
         consulta = MagicMock()
         consulta.filter.return_value = consulta
         consulta.filter_by.return_value = consulta
         consulta.with_for_update.return_value = consulta
         consulta.order_by.return_value = consulta
-        consulta.first.return_value = resultado
+        consulta.first.return_value = None if modelo is VendaDevolucao else resultado
         consulta.all.return_value = resultado if isinstance(resultado, list) else []
         consultas[modelo] = consulta
     db = MagicMock()
@@ -267,6 +303,7 @@ def test_devolucao_parcial_em_dinheiro_registra_deducao_e_custo_servico(monkeypa
             "itens": [{"item_id": item.id, "quantidade": 1}],
             "motivo": "Ajuste",
             "gerar_credito": False,
+            "chave_operacao": str(uuid4()),
         },
         db=db,
         user_and_tenant=(atendente, tenant_id),
@@ -283,7 +320,235 @@ def test_devolucao_parcial_em_dinheiro_registra_deducao_e_custo_servico(monkeypa
     assert evento.movimentacao_caixa_id == 17
     assert evento.custo_pendente is False
     assert resultado["status_venda"] == "finalizada_devolucao"
+    assert conta_quitada.status == "recebido"
+    assert conta_quitada.valor_final == Decimal("100")
+    assert entrada_realizada.status == "realizado"
+    assert entrada_realizada.valor == Decimal("100")
     db.commit.assert_called_once()
+
+
+@pytest.mark.parametrize(
+    "status,valor_final,valor_recebido",
+    [
+        ("pendente", "100", "0"),
+        ("parcial", "100", "50"),
+        ("vencido", "100", "0"),
+        ("recebido", "100", "90"),
+    ],
+)
+def test_recebivel_aberto_exige_conciliacao_antes_de_reembolso(
+    status, valor_final, valor_recebido
+):
+    conta = SimpleNamespace(
+        status=status,
+        valor_final=Decimal(valor_final),
+        valor_recebido=Decimal(valor_recebido),
+    )
+
+    assert _recebivel_exige_conciliacao(conta) is True
+
+
+def test_recebivel_quitado_preserva_a_entrada_historica():
+    conta = SimpleNamespace(
+        status="recebido",
+        valor_final=Decimal("100"),
+        valor_recebido=Decimal("100"),
+    )
+
+    assert _recebivel_exige_conciliacao(conta) is False
+
+
+@pytest.mark.parametrize("operacao", [prever_devolucao, registrar_devolucao])
+def test_previa_e_registro_bloqueiam_reembolso_com_recebivel_aberto(operacao):
+    tenant_id = uuid4()
+    venda = SimpleNamespace(
+        id=8,
+        cliente_id=47,
+        numero_venda="VEN-8",
+        total=Decimal("100"),
+        status="finalizada",
+    )
+    item = SimpleNamespace(id=3, produto_id=None, quantidade=1, subtotal=Decimal("100"))
+    conta = SimpleNamespace(
+        status="pendente", valor_final=Decimal("100"), valor_recebido=Decimal("0")
+    )
+    consultas = {}
+    for modelo, resultado in (
+        (Venda, venda),
+        (VendaItem, [item]),
+        (VendaDevolucao, []),
+        (ContaReceber, [conta]),
+    ):
+        consulta = MagicMock()
+        consulta.filter.return_value = consulta
+        consulta.filter_by.return_value = consulta
+        consulta.with_for_update.return_value = consulta
+        consulta.first.return_value = None if modelo is VendaDevolucao else resultado
+        consulta.all.return_value = resultado if isinstance(resultado, list) else []
+        consultas[modelo] = consulta
+    db = MagicMock()
+    db.query.side_effect = lambda modelo: consultas[modelo]
+
+    with pytest.raises(HTTPException) as erro:
+        operacao(
+            venda_id=venda.id,
+            dados={
+                "itens": [{"item_id": item.id, "quantidade": 1}],
+                "motivo": "Teste",
+                "gerar_credito": True,
+                "chave_operacao": str(uuid4()),
+            },
+            db=db,
+            user_and_tenant=(SimpleNamespace(id=22), tenant_id),
+        )
+
+    assert erro.value.status_code == 409
+    assert "recebivel em aberto" in erro.value.detail
+    db.add.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    "tipo_produto,tipo_kit,lote_id,erro_esperado",
+    [
+        ("KIT", "VIRTUAL", None, "KIT virtual"),
+        ("SIMPLES", None, 12, "item com lote"),
+    ],
+)
+def test_estoque_nao_recompoe_kit_virtual_ou_lote_sem_conciliacao(
+    monkeypatch, tipo_produto, tipo_kit, lote_id, erro_esperado
+):
+    item = SimpleNamespace(
+        id=3,
+        produto_id=11,
+        quantidade=1,
+        lote_id=lote_id,
+        produto=SimpleNamespace(tipo_produto=tipo_produto, tipo_kit=tipo_kit),
+    )
+    monkeypatch.setattr(
+        "app.vendas.devolucoes_routes.resolver_tenant_estoque_item",
+        lambda *_args: ("estoque", False),
+    )
+    db = MagicMock()
+
+    with pytest.raises(HTTPException) as erro:
+        _validar_estoque_devolucao_seguro(
+            db, 8, "tenant", [item], [{"item_id": 3, "quantidade": 1}]
+        )
+
+    assert erro.value.status_code == 409
+    assert erro_esperado in erro.value.detail
+    db.query.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    "lotes_consumidos,quantidade_saida,tipo_produto,erro_esperado",
+    [
+        ('[{"lote_id": 12, "quantidade": 1}]', 1, "SIMPLES", "item com lote"),
+        (None, 0.5, "SIMPLES", "Saida original"),
+        (None, 1, "SIMPLES", None),
+        (None, 1, "KIT", None),
+    ],
+)
+def test_estoque_exige_saida_original_sem_fifo_de_lote(
+    monkeypatch, lotes_consumidos, quantidade_saida, tipo_produto, erro_esperado
+):
+    item = SimpleNamespace(
+        id=3,
+        produto_id=11,
+        quantidade=1,
+        lote_id=None,
+        produto=SimpleNamespace(
+            tipo_produto=tipo_produto,
+            tipo_kit="FISICO" if tipo_produto == "KIT" else None,
+        ),
+    )
+    saida = SimpleNamespace(
+        quantidade=quantidade_saida, lotes_consumidos=lotes_consumidos
+    )
+    db = MagicMock()
+    db.query.return_value.filter.return_value.all.return_value = [saida]
+    monkeypatch.setattr(
+        "app.vendas.devolucoes_routes.resolver_tenant_estoque_item",
+        lambda *_args: ("estoque", False),
+    )
+    monkeypatch.setattr(
+        "app.vendas.devolucoes_routes.contexto_tenant_estoque",
+        lambda *_args: nullcontext("estoque"),
+    )
+
+    if erro_esperado:
+        with pytest.raises(HTTPException) as erro:
+            _validar_estoque_devolucao_seguro(
+                db, 8, "tenant", [item], [{"item_id": 3, "quantidade": 1}]
+            )
+        assert erro.value.status_code == 409
+        assert erro_esperado in erro.value.detail
+    else:
+        _validar_estoque_devolucao_seguro(
+            db, 8, "tenant", [item], [{"item_id": 3, "quantidade": 1}]
+        )
+
+
+@pytest.mark.parametrize("operacao", [prever_devolucao, registrar_devolucao])
+@pytest.mark.parametrize(
+    "tipo_produto,tipo_kit,lote_id",
+    [("KIT", "VIRTUAL", None), ("SIMPLES", None, 12)],
+)
+def test_previa_e_registro_bloqueiam_estoque_que_nao_pode_ser_recomposto(
+    monkeypatch, operacao, tipo_produto, tipo_kit, lote_id
+):
+    tenant_id = uuid4()
+    venda = SimpleNamespace(
+        id=8,
+        cliente_id=47,
+        numero_venda="VEN-8",
+        total=Decimal("100"),
+        status="finalizada",
+    )
+    item = SimpleNamespace(
+        id=3,
+        produto_id=11,
+        produto=SimpleNamespace(tipo_produto=tipo_produto, tipo_kit=tipo_kit),
+        lote_id=lote_id,
+        quantidade=1,
+        subtotal=Decimal("100"),
+    )
+    consultas = {}
+    for modelo, resultado in (
+        (Venda, venda),
+        (VendaItem, [item]),
+        (VendaDevolucao, []),
+        (ContaReceber, []),
+    ):
+        consulta = MagicMock()
+        consulta.filter.return_value = consulta
+        consulta.filter_by.return_value = consulta
+        consulta.with_for_update.return_value = consulta
+        consulta.first.return_value = None if modelo is VendaDevolucao else resultado
+        consulta.all.return_value = resultado if isinstance(resultado, list) else []
+        consultas[modelo] = consulta
+    db = MagicMock()
+    db.query.side_effect = lambda modelo: consultas[modelo]
+    monkeypatch.setattr(
+        "app.vendas.devolucoes_routes.resolver_tenant_estoque_item",
+        lambda *_args: ("estoque", False),
+    )
+
+    with pytest.raises(HTTPException) as erro:
+        operacao(
+            venda_id=venda.id,
+            dados={
+                "itens": [{"item_id": item.id, "quantidade": 1}],
+                "motivo": "Teste",
+                "gerar_credito": True,
+                "chave_operacao": str(uuid4()),
+            },
+            db=db,
+            user_and_tenant=(SimpleNamespace(id=22), tenant_id),
+        )
+
+    assert erro.value.status_code == 409
+    db.add.assert_not_called()
 
 
 @pytest.mark.parametrize("preco_unitario,quantidade", [(20, 1), (1000, 99)])
@@ -314,6 +579,7 @@ def test_componente_de_kit_sem_preco_original_comprovado_nao_gera_credito(
                 ],
                 "motivo": "Componente devolvido",
                 "gerar_credito": True,
+                "chave_operacao": str(uuid4()),
             },
             db=db,
             user_and_tenant=(SimpleNamespace(id=22), uuid4()),
@@ -343,12 +609,13 @@ def test_venda_com_devolucao_historica_sem_valor_rastreavel_e_bloqueada(
         (Venda, venda),
         (VendaItem, [item]),
         (VendaDevolucao, []),
+        (ContaReceber, []),
     ):
         consulta = MagicMock()
         consulta.filter.return_value = consulta
         consulta.filter_by.return_value = consulta
         consulta.with_for_update.return_value = consulta
-        consulta.first.return_value = resultado
+        consulta.first.return_value = None if modelo is VendaDevolucao else resultado
         consulta.all.return_value = resultado if isinstance(resultado, list) else []
         consultas[modelo] = consulta
     db = MagicMock()
@@ -361,6 +628,7 @@ def test_venda_com_devolucao_historica_sem_valor_rastreavel_e_bloqueada(
                 "itens": [{"item_id": item.id, "quantidade": 1}],
                 "motivo": "Ajuste",
                 "gerar_credito": True,
+                "chave_operacao": str(uuid4()),
             },
             db=db,
             user_and_tenant=(SimpleNamespace(id=22), tenant_id),
@@ -405,7 +673,7 @@ def test_valor_acumulado_das_devolucoes_nao_excede_total_pago():
         consulta.filter.return_value = consulta
         consulta.filter_by.return_value = consulta
         consulta.with_for_update.return_value = consulta
-        consulta.first.return_value = resultado
+        consulta.first.return_value = None if modelo is VendaDevolucao else resultado
         consulta.all.return_value = resultado if isinstance(resultado, list) else []
         consultas[modelo] = consulta
     db = MagicMock()
@@ -418,6 +686,7 @@ def test_valor_acumulado_das_devolucoes_nao_excede_total_pago():
                 "itens": [{"item_id": 3, "quantidade": 1}],
                 "motivo": "Ajuste",
                 "gerar_credito": True,
+                "chave_operacao": str(uuid4()),
             },
             db=db,
             user_and_tenant=(SimpleNamespace(id=22), tenant_id),
@@ -464,7 +733,7 @@ def test_devolucoes_parciais_com_desconto_pagam_liquido_e_fecham_venda(monkeypat
         consulta.filter.return_value = consulta
         consulta.filter_by.return_value = consulta
         consulta.with_for_update.return_value = consulta
-        consulta.first.return_value = resultado
+        consulta.first.return_value = None if modelo is VendaDevolucao else resultado
         consulta.all.return_value = resultado if isinstance(resultado, list) else []
         consultas[modelo] = consulta
     db = MagicMock()
@@ -477,6 +746,7 @@ def test_devolucoes_parciais_com_desconto_pagam_liquido_e_fecham_venda(monkeypat
         "itens": [{"item_id": 3, "quantidade": 1}],
         "motivo": "Ajuste",
         "gerar_credito": True,
+        "chave_operacao": str(uuid4()),
     }
     primeira_previa = prever_devolucao(
         venda_id=8,
@@ -511,6 +781,7 @@ def test_devolucoes_parciais_com_desconto_pagam_liquido_e_fecham_venda(monkeypat
     assert segunda_previa["valor_total_devolucao"] == 45.0
     assert segunda_previa["valor_acumulado"] == 90.0
     dados["valor_previsto"] = segunda_previa["valor_total_devolucao"]
+    dados["chave_operacao"] = str(uuid4())
     segunda = registrar_devolucao(
         venda_id=8,
         dados=dados,
@@ -546,12 +817,13 @@ def test_registro_rejeita_valor_diferente_da_previa_antes_do_credito():
         (Venda, venda),
         (VendaItem, [item]),
         (VendaDevolucao, []),
+        (ContaReceber, []),
     ):
         consulta = MagicMock()
         consulta.filter.return_value = consulta
         consulta.filter_by.return_value = consulta
         consulta.with_for_update.return_value = consulta
-        consulta.first.return_value = resultado
+        consulta.first.return_value = None if modelo is VendaDevolucao else resultado
         consulta.all.return_value = resultado if isinstance(resultado, list) else []
         consultas[modelo] = consulta
     db = MagicMock()
@@ -573,6 +845,7 @@ def test_registro_rejeita_valor_diferente_da_previa_antes_do_credito():
                 "motivo": "Ajuste",
                 "gerar_credito": True,
                 "valor_previsto": 50,
+                "chave_operacao": str(uuid4()),
             },
             db=db,
             user_and_tenant=(SimpleNamespace(id=22), tenant_id),
@@ -614,7 +887,7 @@ def test_falha_ao_gravar_evento_impede_credito_ao_cliente():
         consulta.filter.return_value = consulta
         consulta.filter_by.return_value = consulta
         consulta.with_for_update.return_value = consulta
-        consulta.first.return_value = resultado
+        consulta.first.return_value = None if modelo is VendaDevolucao else resultado
         consulta.all.return_value = resultado if isinstance(resultado, list) else []
         consultas[modelo] = consulta
     db = MagicMock()
@@ -628,6 +901,7 @@ def test_falha_ao_gravar_evento_impede_credito_ao_cliente():
                 "itens": [{"item_id": item.id, "quantidade": 1}],
                 "motivo": "Ajuste",
                 "gerar_credito": True,
+                "chave_operacao": str(uuid4()),
             },
             db=db,
             user_and_tenant=(atendente, tenant_id),

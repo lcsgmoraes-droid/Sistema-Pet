@@ -1,11 +1,14 @@
 """Rotas de devolução de vendas."""
 
+import hashlib
+import json
 import logging
 from collections import defaultdict
-from datetime import date
 from decimal import Decimal, InvalidOperation
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.encoders import jsonable_encoder
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
@@ -20,10 +23,11 @@ from app.empresa_grupo_estoque_compartilhado_service import (
     resolver_tenant_estoque_item,
 )
 from app.estoque.service import EstoqueService
+from app.financeiro_models import ContaReceber
 from app.produtos_models import EstoqueMovimentacao
 from app.utils.timezone import now_brasilia
 from app.vendas.devolucao_dre import custo_original_item_devolvido
-from app.vendas.devolucao_valores import cotar_devolucao
+from app.vendas.devolucao_valores import cotar_devolucao, validar_itens_devolucao
 from app.vendas.routes_common import (
     _obter_cliente_ou_404,
     _validar_tenant_e_obter_usuario,
@@ -78,6 +82,127 @@ def _buscar_categoria_devolucoes(db: Session, tenant_id):
     )
 
 
+def _recebivel_exige_conciliacao(conta: ContaReceber) -> bool:
+    """Um saldo aberto impede desembolso e abatimento simultaneos ao cliente."""
+    status = str(getattr(conta, "status", "") or "").lower()
+    if status in {"cancelado", "cancelada"}:
+        return False
+    if status != "recebido":
+        return True
+    valor_final = Decimal(str(getattr(conta, "valor_final", 0) or 0))
+    valor_recebido = Decimal(str(getattr(conta, "valor_recebido", 0) or 0))
+    return valor_final > valor_recebido
+
+
+def _validar_recebiveis_liquidados(db: Session, venda_id: int, tenant_id) -> None:
+    contas_receber = (
+        db.query(ContaReceber)
+        .filter(
+            ContaReceber.venda_id == venda_id,
+            ContaReceber.tenant_id == tenant_id,
+        )
+        .all()
+    )
+    if any(_recebivel_exige_conciliacao(conta) for conta in contas_receber):
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                "A venda tem recebivel em aberto. Concilie o valor recebido "
+                "antes de registrar a devolucao."
+            ),
+        )
+
+
+def _validar_estoque_devolucao_seguro(
+    db: Session, venda_id: int, tenant_id, itens_venda, itens_solicitados
+) -> None:
+    """Exige saida rastreavel e evita recompor KIT virtual ou FIFO sem lote."""
+    itens_por_id = {item.id: item for item in itens_venda}
+    grupos_solicitados = set()
+    quantidades_vendidas = defaultdict(Decimal)
+    for item in itens_venda:
+        if not getattr(item, "produto_id", None):
+            continue
+        tenant_estoque, _ = resolver_tenant_estoque_item(item, tenant_id)
+        quantidades_vendidas[(item.produto_id, tenant_estoque)] += Decimal(
+            str(item.quantidade or 0)
+        )
+
+    for solicitado in itens_solicitados:
+        item = itens_por_id.get(solicitado.get("item_id"))
+        if item is None or not getattr(item, "produto_id", None):
+            continue
+        produto = getattr(item, "produto", None)
+        if produto is None:
+            raise HTTPException(
+                status_code=409,
+                detail="Produto original indisponivel. Concilie o estoque manualmente.",
+            )
+        if getattr(item, "lote_id", None) is not None:
+            raise HTTPException(
+                status_code=409,
+                detail="Devolucao de item com lote exige recomposicao manual do estoque.",
+            )
+        if (
+            getattr(produto, "tipo_produto", None) == "KIT"
+            and (getattr(produto, "tipo_kit", None) or "VIRTUAL") != "FISICO"
+        ):
+            raise HTTPException(
+                status_code=409,
+                detail="KIT virtual exige devolucao e recomposicao manual dos componentes.",
+            )
+        tenant_estoque, _ = resolver_tenant_estoque_item(item, tenant_id)
+        grupos_solicitados.add((item.produto_id, tenant_estoque))
+
+    for produto_id, tenant_estoque in grupos_solicitados:
+        with contexto_tenant_estoque(tenant_estoque, tenant_id) as tenant_estoque_uuid:
+            saidas = (
+                db.query(EstoqueMovimentacao)
+                .filter(
+                    EstoqueMovimentacao.tenant_id == tenant_estoque_uuid,
+                    EstoqueMovimentacao.produto_id == produto_id,
+                    EstoqueMovimentacao.referencia_tipo == "venda",
+                    EstoqueMovimentacao.referencia_id == venda_id,
+                    EstoqueMovimentacao.tipo == "saida",
+                    EstoqueMovimentacao.status != "cancelado",
+                )
+                .all()
+            )
+        if any(saida.lotes_consumidos for saida in saidas):
+            raise HTTPException(
+                status_code=409,
+                detail="Devolucao de item com lote exige recomposicao manual do estoque.",
+            )
+        quantidade_saida = sum(
+            (abs(Decimal(str(saida.quantidade or 0))) for saida in saidas),
+            Decimal("0"),
+        )
+        if abs(
+            quantidade_saida - quantidades_vendidas[(produto_id, tenant_estoque)]
+        ) > Decimal("0.000001"):
+            raise HTTPException(
+                status_code=409,
+                detail=(
+                    "Saida original de estoque nao rastreavel para o produto. "
+                    "Concilie o estoque manualmente."
+                ),
+            )
+
+
+def _hash_requisicao_devolucao(venda_id: int, dados: dict, itens: list) -> str:
+    corpo = {
+        "venda_id": venda_id,
+        "itens": itens,
+        "motivo": dados.get("motivo"),
+        "gerar_credito": dados.get("gerar_credito", False),
+        "caixa_id": dados.get("caixa_id"),
+    }
+    canonico = json.dumps(
+        corpo, ensure_ascii=False, sort_keys=True, separators=(",", ":"), default=str
+    )
+    return hashlib.sha256(canonico.encode("utf-8")).hexdigest()
+
+
 @router.post("/{venda_id}/devolucao/previa")
 def prever_devolucao(
     venda_id: int,
@@ -109,6 +234,10 @@ def prever_devolucao(
         )
     except ValueError as erro:
         raise HTTPException(status_code=400, detail=str(erro)) from erro
+    _validar_recebiveis_liquidados(db, venda_id, tenant_id)
+    _validar_estoque_devolucao_seguro(
+        db, venda_id, tenant_id, itens_venda, dados.get("itens") or []
+    )
     return {
         "valor_total_devolucao": float(cotacao.valor_total),
         "valor_ja_devolvido": float(cotacao.valor_ja_devolvido),
@@ -153,16 +282,57 @@ def registrar_devolucao(
             logger.info(f"❌ Venda #{venda_id} não encontrada")
             raise HTTPException(status_code=404, detail="Venda não encontrada")
 
-        if str(venda.status or "").lower() not in {
+        status_venda = str(venda.status or "").lower()
+        if status_venda not in {
             "finalizada",
             "pago_nf",
             "baixa_parcial",
             "finalizada_devolucao",
             "finalizada_devolucao_parcial",
+            "devolvida_total",
         }:
             raise HTTPException(
                 status_code=400,
                 detail="A venda não está em situação que permita devolução",
+            )
+
+        itens_devolucao = dados.get("itens", [])
+        try:
+            validar_itens_devolucao(itens_devolucao)
+        except ValueError as erro:
+            raise HTTPException(status_code=400, detail=str(erro)) from erro
+
+        try:
+            chave_operacao = str(UUID(str(dados.get("chave_operacao"))))
+        except (TypeError, ValueError, AttributeError) as erro:
+            raise HTTPException(
+                status_code=400, detail="Chave da operacao de devolucao invalida"
+            ) from erro
+        requisicao_hash = _hash_requisicao_devolucao(venda_id, dados, itens_devolucao)
+        evento_existente = (
+            db.query(VendaDevolucao)
+            .filter(
+                VendaDevolucao.tenant_id == tenant_id,
+                VendaDevolucao.chave_operacao == chave_operacao,
+            )
+            .first()
+        )
+        if evento_existente:
+            if evento_existente.venda_id != venda_id:
+                raise HTTPException(
+                    status_code=409,
+                    detail="Chave de operacao ja utilizada em outra venda",
+                )
+            if evento_existente.requisicao_hash != requisicao_hash:
+                raise HTTPException(
+                    status_code=409,
+                    detail="Chave de operacao reutilizada com dados diferentes",
+                )
+            return evento_existente.resposta
+        if status_venda == "devolvida_total":
+            raise HTTPException(
+                status_code=400,
+                detail="A venda nao possui saldo para outra devolucao",
             )
 
         logger.info(
@@ -170,7 +340,6 @@ def registrar_devolucao(
         )
 
         caixa_id = dados.get("caixa_id")
-        itens_devolucao = dados.get("itens", [])
         motivo = dados.get("motivo", "")
         gerar_credito = dados.get("gerar_credito", False)  # 🆕 Nova opção
 
@@ -183,23 +352,6 @@ def registrar_devolucao(
             raise HTTPException(
                 status_code=400,
                 detail="ID do caixa é obrigatório para devolução em dinheiro",
-            )
-
-        if not itens_devolucao:
-            logger.info("❌ Nenhum item selecionado")
-            raise HTTPException(
-                status_code=400, detail="Nenhum item selecionado para devolução"
-            )
-
-        # A venda guarda apenas o preço do kit, sem composição e rateio originais.
-        # O preço enviado pelo navegador não comprova o valor do componente.
-        if any(item.get("is_componente_kit") for item in itens_devolucao):
-            raise HTTPException(
-                status_code=400,
-                detail=(
-                    "Devolução por componente de KIT indisponível: a venda não "
-                    "registra o preço original de cada componente. Devolva o KIT inteiro."
-                ),
             )
 
         if not motivo:
@@ -290,6 +442,10 @@ def registrar_devolucao(
                     status_code=409,
                     detail="O valor da devolução mudou. Revise a prévia antes de confirmar.",
                 )
+        _validar_recebiveis_liquidados(db, venda_id, tenant_id)
+        _validar_estoque_devolucao_seguro(
+            db, venda_id, tenant_id, todos_itens_venda, itens_devolucao
+        )
         devolvido_por_item = defaultdict(Decimal)
         for evento_anterior in eventos_anteriores:
             for item_anterior in evento_anterior.itens or []:
@@ -368,6 +524,7 @@ def registrar_devolucao(
         itens_evento_dre = []
         custo_produtos_estornado = Decimal("0")
         custo_servicos_estornado = Decimal("0")
+        processado_por_item = defaultdict(Decimal)
 
         # Processar cada item devolvido
         for indice, item_dev in enumerate(itens_devolucao):
@@ -519,8 +676,10 @@ def registrar_devolucao(
                         item_venda,
                         Decimal(str(quantidade_devolvida)),
                         tenant_id,
+                        devolvido_por_item[item_id] + processado_por_item[item_id],
                     )
                 )
+                processado_por_item[item_id] += quantidade_decimal
                 tipo_item = str(
                     getattr(item_venda, "tipo", "produto") or "produto"
                 ).lower()
@@ -571,6 +730,9 @@ def registrar_devolucao(
         evento_dre = VendaDevolucao(
             tenant_id=tenant_id,
             venda_id=venda_id,
+            chave_operacao=chave_operacao,
+            requisicao_hash=requisicao_hash,
+            resposta={},
             user_id=current_user.id,
             data_competencia=now_brasilia().date(),
             canal=getattr(venda, "canal", None) or "loja_fisica",
@@ -656,7 +818,7 @@ def registrar_devolucao(
                 tipo="saida",
                 valor=Decimal(str(valor_total_devolucao)),
                 descricao=f"Devolução venda {venda.numero_venda} - {motivo}",
-                data_lancamento=date.today(),
+                data_lancamento=evento_dre.data_competencia,
                 status="realizado",
                 categoria_id=categoria_devolucoes.id,
                 documento=f"DEVOLUCAO-{venda_id}",
@@ -671,51 +833,8 @@ def registrar_devolucao(
                 f"📊 Lançamento de devolução criado: R$ {valor_total_devolucao:.2f}"
             )
 
-        # 🆕 AJUSTAR CONTAS A RECEBER (sempre, independente de crédito ou dinheiro)
-        from app.financeiro_models import (
-            ContaReceber,
-            LancamentoManual,
-            CategoriaFinanceira,
-        )
-
-        contas_receber = db.query(ContaReceber).filter_by(venda_id=venda_id).all()
-        if contas_receber:
-            # Reduzir proporcionalmente o valor das contas pendentes ou estornar pagas
-            for conta in contas_receber:
-                if conta.status in ["pendente", "parcial"]:
-                    proporcao = float(valor_total_devolucao) / float(venda.total)
-                    reducao = float(conta.valor_original) * proporcao
-
-                    conta.valor_original -= Decimal(str(reducao))
-                    conta.valor_final -= Decimal(str(reducao))
-
-                    # Se ficou zerada, marcar como cancelada
-                    if conta.valor_final <= 0:
-                        conta.status = "cancelada"
-
-                    logger.info(
-                        f"💳 Ajustando ContaReceber #{conta.id}: -R$ {reducao:.2f}"
-                    )
-                elif conta.status == "pago":
-                    # Cancelar a conta paga (estorno)
-                    conta.status = "estornada"
-                    logger.info(f"💳 Estornando ContaReceber #{conta.id} (paga)")
-
-        # 🆕 MARCAR LANÇAMENTOS MANUAIS REALIZADOS COMO ESTORNADOS (Fluxo de Caixa)
-        # Não criar novos lançamentos de estorno — o DEVOLUCAO acima já registra a saída.
-        # Apenas marcar os lançamentos de entrada da venda como estornados para controle.
-        lancamentos_entrada = (
-            db.query(LancamentoManual)
-            .filter(
-                LancamentoManual.documento == f"VENDA-{venda_id}",
-                LancamentoManual.tipo == "entrada",
-                LancamentoManual.status == "realizado",
-            )
-            .all()
-        )
-        for lanc in lancamentos_entrada:
-            lanc.status = "estornado"
-            logger.info(f"💸 LancamentoManual #{lanc.id} marcado como estornado")
+        # Recebimentos e entradas realizados permanecem como historico. O evento
+        # da devolucao registra a deducao da DRE e a saida de caixa, se houver.
 
         # 🆕 ATUALIZAR STATUS DA VENDA
         if cotacao.valor_acumulado >= Decimal(str(venda.total or 0)):
@@ -798,8 +917,6 @@ def registrar_devolucao(
             commit=False,
         )
 
-        db.commit()
-
         resultado = {
             "message": "Devolução registrada com sucesso",
             "venda_id": venda_id,
@@ -817,9 +934,13 @@ def registrar_devolucao(
         else:
             resultado["movimentacao_caixa_id"] = movimentacao["movimentacao_id"]
 
+        resposta = jsonable_encoder(resultado)
+        evento_dre.resposta = resposta
+        db.commit()
+
         logger.info("✅ Devolução concluída com sucesso!")
         logger.info(f"{'=' * 80}\n")
-        return resultado
+        return resposta
 
     except HTTPException:
         db.rollback()

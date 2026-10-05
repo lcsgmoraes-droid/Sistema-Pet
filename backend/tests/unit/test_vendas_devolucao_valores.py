@@ -1,8 +1,11 @@
 from decimal import Decimal
 from types import SimpleNamespace
 
+import pytest
+
 from app.vendas.devolucao_valores import (
     ratear_valor_pago_por_item,
+    validar_itens_devolucao,
     valor_devolvido_por_quantidade,
 )
 
@@ -69,3 +72,19 @@ def test_duas_devolucoes_parciais_de_venda_com_desconto_somam_liquido_pago():
 
     assert valor_devolvido_por_quantidade(item, valor_item, 0, 1) == Decimal("45.00")
     assert valor_devolvido_por_quantidade(item, valor_item, 1, 1) == Decimal("45.00")
+
+
+@pytest.mark.parametrize(
+    "itens",
+    [
+        {"item_id": 1, "quantidade": 1},
+        ["item inválido"],
+        [{"item_id": 1, "quantidade": "NaN"}],
+        [{"item_id": 1, "quantidade": "Infinity"}],
+        [{"item_id": 1, "quantidade": "valor"}],
+        [{"item_id": True, "quantidade": 1}],
+    ],
+)
+def test_corpo_malformado_nao_chega_ao_reembolso(itens):
+    with pytest.raises(ValueError):
+        validar_itens_devolucao(itens)

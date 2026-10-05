@@ -19,6 +19,12 @@ class VendaDevolucao(BaseTenantModel):
     __tablename__ = "vendas_devolucoes"
     __table_args__ = (
         Index(
+            "uq_vendas_devolucoes_tenant_chave",
+            "tenant_id",
+            "chave_operacao",
+            unique=True,
+        ),
+        Index(
             "ix_vendas_devolucoes_tenant_data_canal",
             "tenant_id",
             "data_competencia",
@@ -28,6 +34,9 @@ class VendaDevolucao(BaseTenantModel):
     )
 
     venda_id = Column(ForeignKey("vendas.id", ondelete="RESTRICT"), nullable=False)
+    chave_operacao = Column(String(36), nullable=False)
+    requisicao_hash = Column(String(64), nullable=False)
+    resposta = Column(JSON, nullable=False)
     user_id = Column(ForeignKey("users.id", ondelete="RESTRICT"), nullable=False)
     data_competencia = Column(Date, nullable=False)
     canal = Column(String(50), nullable=False)

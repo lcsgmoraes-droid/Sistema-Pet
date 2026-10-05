@@ -2,14 +2,20 @@
 
 from collections import defaultdict
 from dataclasses import dataclass
-from decimal import Decimal, ROUND_FLOOR, ROUND_HALF_UP
+from decimal import Decimal, InvalidOperation, ROUND_FLOOR, ROUND_HALF_UP
 
 
 CENTAVO = Decimal("0.01")
 
 
 def _decimal(valor) -> Decimal:
-    return Decimal(str(valor if valor is not None else 0))
+    try:
+        numero = Decimal(str(valor if valor is not None else 0))
+    except (InvalidOperation, ValueError, TypeError) as erro:
+        raise ValueError("Valor numerico invalido na devolucao") from erro
+    if not numero.is_finite():
+        raise ValueError("Valor numerico invalido na devolucao")
+    return numero
 
 
 def _moeda(valor) -> Decimal:
@@ -92,15 +98,29 @@ class CotacaoDevolucao:
         return self.valor_ja_devolvido + self.valor_total
 
 
-def cotar_devolucao(venda, itens_venda, eventos_anteriores, itens_solicitados):
-    """Fonte única do valor mostrado na prévia e gravado no reembolso."""
-    if not itens_solicitados:
+def validar_itens_devolucao(itens_solicitados) -> None:
+    """Rejeita corpo malformado antes de qualquer conversao ou escrita."""
+    if not isinstance(itens_solicitados, list) or not itens_solicitados:
         raise ValueError("Selecione ao menos um item para devolução")
+    if any(not isinstance(item, dict) for item in itens_solicitados):
+        raise ValueError("Itens da devolução inválidos")
     if any(item.get("is_componente_kit") for item in itens_solicitados):
         raise ValueError(
             "Devolução por componente de KIT indisponível: a venda não registra "
             "o preço original de cada componente. Devolva o KIT inteiro."
         )
+    if any(
+        not isinstance(item.get("item_id"), int)
+        or isinstance(item.get("item_id"), bool)
+        or _decimal(item.get("quantidade")) <= 0
+        for item in itens_solicitados
+    ):
+        raise ValueError("Item ou quantidade da devolução inválido")
+
+
+def cotar_devolucao(venda, itens_venda, eventos_anteriores, itens_solicitados):
+    """Fonte única do valor mostrado na prévia e gravado no reembolso."""
+    validar_itens_devolucao(itens_solicitados)
     status = str(getattr(venda, "status", "") or "").lower()
     if status not in {
         "finalizada",

@@ -38,6 +38,9 @@ def upgrade() -> None:
             sa.ForeignKey("vendas.id", ondelete="RESTRICT"),
             nullable=False,
         ),
+        sa.Column("chave_operacao", sa.String(length=36), nullable=False),
+        sa.Column("requisicao_hash", sa.String(length=64), nullable=False),
+        sa.Column("resposta", sa.JSON(), nullable=False),
         sa.Column(
             "user_id",
             sa.Integer(),
@@ -73,6 +76,12 @@ def upgrade() -> None:
         ["tenant_id", "venda_id"],
     )
     op.create_index(
+        "uq_vendas_devolucoes_tenant_chave",
+        "vendas_devolucoes",
+        ["tenant_id", "chave_operacao"],
+        unique=True,
+    )
+    op.create_index(
         "ix_vendas_devolucoes_tenant_id", "vendas_devolucoes", ["tenant_id"]
     )
     if op.get_bind().dialect.name == "postgresql":
@@ -93,6 +102,7 @@ def downgrade() -> None:
         op.execute("ALTER TABLE vendas_devolucoes NO FORCE ROW LEVEL SECURITY")
         op.execute("ALTER TABLE vendas_devolucoes DISABLE ROW LEVEL SECURITY")
     op.drop_index("ix_vendas_devolucoes_tenant_id", table_name="vendas_devolucoes")
+    op.drop_index("uq_vendas_devolucoes_tenant_chave", table_name="vendas_devolucoes")
     op.drop_index("ix_vendas_devolucoes_tenant_venda", table_name="vendas_devolucoes")
     op.drop_index(
         "ix_vendas_devolucoes_tenant_data_canal", table_name="vendas_devolucoes"

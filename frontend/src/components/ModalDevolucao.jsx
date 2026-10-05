@@ -18,6 +18,7 @@ export default function ModalDevolucao({ caixaId, vendaInicial = null, onClose, 
   const [loading, setLoading] = useState(false);
   const [erro, setErro] = useState("");
   const vendaInicialCarregadaRef = useRef(null);
+  const operacaoDevolucaoRef = useRef(null);
 
   // 🆕 Estados para devolução de KIT
   const [modoDevolucaoKit, setModoDevolucaoKit] = useState({}); // {itemId: 'kit_inteiro' | 'componentes'}
@@ -344,14 +345,30 @@ export default function ModalDevolucao({ caixaId, vendaInicial = null, onClose, 
       });
       if (!confirmado) return;
 
+      const assinaturaOperacao = JSON.stringify({
+        vendaId: vendaSelecionada.id,
+        itens: itensDevolucao,
+        motivo,
+        gerarCredito,
+        caixaId,
+      });
+      if (operacaoDevolucaoRef.current?.assinatura !== assinaturaOperacao) {
+        operacaoDevolucaoRef.current = {
+          assinatura: assinaturaOperacao,
+          chave: globalThis.crypto.randomUUID(),
+        };
+      }
+
       await api.post(`/vendas/${vendaSelecionada.id}/devolucao`, {
         caixa_id: caixaId,
         itens: itensDevolucao,
         motivo: motivo,
         gerar_credito: gerarCredito,
         valor_previsto: valorPrevisto,
+        chave_operacao: operacaoDevolucaoRef.current.chave,
       });
 
+      operacaoDevolucaoRef.current = null;
       alert("Devolução registrada com sucesso!");
       onSucesso();
     } catch (error) {

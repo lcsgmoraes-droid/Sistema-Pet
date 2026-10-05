@@ -90,6 +90,32 @@ def test_custo_original_usa_snapshot_por_item_e_nao_cadastro_atual():
     assert _custo_snapshot(venda, item, Decimal("1")) == Decimal("30.00")
 
 
+def test_custo_snapshot_parcial_preserva_centavos_ate_ultima_devolucao():
+    item = SimpleNamespace(id=7, produto_id=11, quantidade=3, preco_unitario=10)
+    venda = SimpleNamespace(
+        itens=[item],
+        rentabilidade_snapshot={
+            "snapshot_version": 5,
+            "itens": [
+                {
+                    "produto_id": 11,
+                    "quantidade": 3,
+                    "preco_unitario": 10,
+                    "custo_total": "0.02",
+                }
+            ],
+        },
+    )
+
+    parcelas = [
+        _custo_snapshot(venda, item, Decimal("1"), Decimal(anterior))
+        for anterior in range(3)
+    ]
+
+    assert parcelas == [Decimal("0.01"), Decimal("0.00"), Decimal("0.01")]
+    assert sum(parcelas) == Decimal("0.02")
+
+
 def test_snapshot_nao_depende_da_ordem_da_relacao_de_itens():
     primeiro = SimpleNamespace(id=7, produto_id=11, quantidade=2, preco_unitario=50)
     segundo = SimpleNamespace(id=8, produto_id=12, quantidade=1, preco_unitario=80)
@@ -176,6 +202,29 @@ def test_sem_snapshot_usa_saida_historica_do_estoque(monkeypatch):
     assert custo == Decimal("20.00")
     assert origem == "saida_estoque_venda"
     assert pendente is False
+
+
+def test_saida_estoque_parcial_preserva_centavos_ate_ultima_devolucao(monkeypatch):
+    item = SimpleNamespace(id=7, tipo="produto", produto_id=11, quantidade=3)
+    venda = SimpleNamespace(id=123, rentabilidade_snapshot=None, itens=[item])
+    db = MagicMock()
+    db.query.return_value.filter.return_value.one.return_value = (3, Decimal("0.02"))
+    monkeypatch.setattr(
+        devolucao_dre, "resolver_tenant_estoque_item", lambda *_args: ("tenant", False)
+    )
+    monkeypatch.setattr(
+        devolucao_dre, "contexto_tenant_estoque", lambda *_args: nullcontext("tenant")
+    )
+
+    parcelas = [
+        devolucao_dre.custo_original_item_devolvido(
+            db, venda, item, Decimal("1"), "tenant", Decimal(anterior)
+        )[0]
+        for anterior in range(3)
+    ]
+
+    assert parcelas == [Decimal("0.01"), Decimal("0.00"), Decimal("0.01")]
+    assert sum(parcelas) == Decimal("0.02")
 
 
 def test_saida_estoque_com_quantidade_extra_nao_prova_custo_da_linha(monkeypatch):

@@ -206,6 +206,8 @@ export default function ModalDevolucaoSections({
               <div className="space-y-2">
                 {vendaSelecionada.itens.map((item) => {
                   const isKit = isItemKit(item);
+                  const isKitVirtual =
+                    item.tipo_produto === "KIT" && (item.tipo_kit || "VIRTUAL") !== "FISICO";
                   const modoKit = modoDevolucaoKit[item.id];
 
                   return (
@@ -222,6 +224,7 @@ export default function ModalDevolucaoSections({
                           type="checkbox"
                           checked={itensSelecionados[item.id] || false}
                           onChange={() => toggleItem(item.id)}
+                          disabled={isKitVirtual}
                           className="mt-1 w-5 h-5 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
                         />
 
@@ -243,6 +246,12 @@ export default function ModalDevolucaoSections({
                             Preço unitário: R$ {item.preco_unitario.toFixed(2)} | Qtd vendida:{" "}
                             {item.quantidade}
                           </div>
+                          {isKitVirtual && (
+                            <p className="mt-2 text-sm text-amber-700">
+                              KIT virtual: a devolução exige conciliação manual dos componentes e do
+                              estoque.
+                            </p>
+                          )}
 
                           {/* 🆕 ESCOLHA: KIT INTEIRO OU COMPONENTES */}
                           {itensSelecionados[item.id] && isKit && (
