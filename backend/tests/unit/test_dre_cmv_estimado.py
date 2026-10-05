@@ -95,7 +95,10 @@ def test_cmv_preserva_total_quando_itens_antigos_nao_tem_custo():
     venda = SimpleNamespace(itens=[item])
     snapshot_original = {"custo_produtos": 72.99, "itens": [{"custo_total": 0}]}
 
-    assert _complementar_snapshot_com_custos_reais(venda, snapshot_original, {}) is snapshot_original
+    assert (
+        _complementar_snapshot_com_custos_reais(venda, snapshot_original, {})
+        is snapshot_original
+    )
 
 
 def test_cmv_preserva_total_quando_snapshot_tem_menos_itens():
@@ -103,7 +106,10 @@ def test_cmv_preserva_total_quando_snapshot_tem_menos_itens():
     venda = SimpleNamespace(itens=[item, item])
     snapshot_original = {"custo_produtos": 72.99, "itens": [{"custo_total": 0}]}
 
-    assert _complementar_snapshot_com_custos_reais(venda, snapshot_original, {}) is snapshot_original
+    assert (
+        _complementar_snapshot_com_custos_reais(venda, snapshot_original, {})
+        is snapshot_original
+    )
 
 
 def test_cmv_total_inclui_parcela_provisoria_de_forma_transparente():

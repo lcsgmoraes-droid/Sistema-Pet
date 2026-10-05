@@ -106,7 +106,10 @@ def montar_linhas_dre_competencia(
     receita_frete_total = _somar(dados_canais, "receita_frete")
     receita_outras_total = _somar(dados_canais, "receita_outras")
     receita_bruta_total = (
-        receita_produtos_total + receita_servicos_total + receita_frete_total + receita_outras_total
+        receita_produtos_total
+        + receita_servicos_total
+        + receita_frete_total
+        + receita_outras_total
     )
 
     descontos_total = _somar(dados_canais, "descontos")

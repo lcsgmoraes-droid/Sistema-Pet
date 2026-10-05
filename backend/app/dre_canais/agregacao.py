@@ -628,7 +628,9 @@ def agregar_contas_receber_manuais_por_canal(
     inicio, fim = _periodo_meses(mes_inicial or mes, mes, ano, data_final)
     for conta in _contas_receber_manuais_query(db, tenant_id, inicio, fim).all():
         canal = _normalizar_canal(getattr(conta, "canal", None))
-        dados_canais.setdefault(canal, _novo_canal())["receita_outras"] += _conta_valor(conta)
+        dados_canais.setdefault(canal, _novo_canal())["receita_outras"] += _conta_valor(
+            conta
+        )
 
 
 def agregar_contas_pagar_por_canal(

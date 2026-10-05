@@ -19,19 +19,41 @@ def test_dre_inclui_recebivel_manual_sem_duplicar_venda():
     engine = create_engine("sqlite:///:memory:")
     Base.metadata.create_all(
         engine,
-        tables=[DRECategoria.__table__, DRESubcategoria.__table__, ContaReceber.__table__],
+        tables=[
+            DRECategoria.__table__,
+            DRESubcategoria.__table__,
+            ContaReceber.__table__,
+        ],
     )
     db = sessionmaker(bind=engine)()
     set_current_tenant(tenant_id)
     try:
-        receita = DRECategoria(id=1, tenant_id=tenant_id, nome="Receita", natureza=NaturezaDRE.RECEITA)
-        despesa = DRECategoria(id=2, tenant_id=tenant_id, nome="Despesa", natureza=NaturezaDRE.DESPESA)
+        receita = DRECategoria(
+            id=1, tenant_id=tenant_id, nome="Receita", natureza=NaturezaDRE.RECEITA
+        )
+        despesa = DRECategoria(
+            id=2, tenant_id=tenant_id, nome="Despesa", natureza=NaturezaDRE.DESPESA
+        )
         db.add_all([receita, despesa])
         db.flush()
         db.add_all(
             [
-                DRESubcategoria(id=1, tenant_id=tenant_id, categoria_id=1, nome="Outras receitas", tipo_custo="DIRETO", escopo_rateio="AMBOS"),
-                DRESubcategoria(id=2, tenant_id=tenant_id, categoria_id=2, nome="Energia", tipo_custo="DIRETO", escopo_rateio="AMBOS"),
+                DRESubcategoria(
+                    id=1,
+                    tenant_id=tenant_id,
+                    categoria_id=1,
+                    nome="Outras receitas",
+                    tipo_custo="DIRETO",
+                    escopo_rateio="AMBOS",
+                ),
+                DRESubcategoria(
+                    id=2,
+                    tenant_id=tenant_id,
+                    categoria_id=2,
+                    nome="Energia",
+                    tipo_custo="DIRETO",
+                    escopo_rateio="AMBOS",
+                ),
             ]
         )
         db.flush()
@@ -69,9 +91,14 @@ def test_dre_inclui_recebivel_manual_sem_duplicar_venda():
 
         assert dados["loja_fisica"]["receita_outras"] == Decimal("20")
         assert totais["receita_bruta"] == 20.0
-        assert next(linha for linha in linhas if linha.campo == "receita_outras").valor == 20.0
+        assert (
+            next(linha for linha in linhas if linha.campo == "receita_outras").valor
+            == 20.0
+        )
         detalhes = _detalhes_recebiveis_manuais(db, 10, 2026, tenant_id, "loja_fisica")
-        assert [(item.id, item.valor) for item in detalhes] == [("conta-receber-1", 20.0)]
+        assert [(item.id, item.valor) for item in detalhes] == [
+            ("conta-receber-1", 20.0)
+        ]
     finally:
         clear_current_tenant()
         db.close()
