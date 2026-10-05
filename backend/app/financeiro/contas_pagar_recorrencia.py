@@ -119,6 +119,7 @@ def _gerar_contas_recorrentes_ate_janela(
             fornecedor_id=conta_origem.fornecedor_id,
             categoria_id=conta_origem.categoria_id,
             dre_subcategoria_id=conta_origem.dre_subcategoria_id,
+            afeta_dre=conta_origem.afeta_dre,
             canal=conta_origem.canal,
             tipo_despesa_id=conta_origem.tipo_despesa_id,
             valor_original=conta_origem.valor_original,

@@ -6,6 +6,7 @@ export default function ContaPagarBasicFields({ controller, onOpenCategoria }) {
   const {
     categorias,
     dados,
+    isEditando,
     fornecedorSelecionado,
     fornecedores,
     handleCategoriaChange,
@@ -67,6 +68,30 @@ export default function ContaPagarBasicFields({ controller, onOpenCategoria }) {
         />
       </div>
 
+      <div className="md:col-span-2">
+        <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
+          <input
+            type="checkbox"
+            checked={dados.afeta_dre}
+            disabled={isEditando}
+            onChange={(event) =>
+              setDados((atual) => ({
+                ...atual,
+                afeta_dre: event.target.checked,
+                ...(event.target.checked
+                  ? {}
+                  : { categoria_id: null, dre_subcategoria_id: null, tipo_despesa_id: null }),
+              }))
+            }
+          />
+          Afeta a DRE
+        </label>
+        <p className="mt-1 text-xs text-gray-500">
+          Desmarque para amortização de empréstimos e pagamento de fatura de cartão,
+          que devem aparecer no contas a pagar sem virar despesa na DRE.
+        </p>
+      </div>
+
       <div className="min-w-0">
         <label className="block text-sm font-medium text-gray-700 mb-1">
           <Tag size={16} className="inline mr-1" />
@@ -75,6 +100,7 @@ export default function ContaPagarBasicFields({ controller, onOpenCategoria }) {
         <div className="flex min-w-0 gap-2">
           <select
             value={dados.categoria_id || ""}
+            disabled={!dados.afeta_dre}
             onChange={(event) => handleCategoriaChange(event.target.value)}
             className="min-w-0 flex-1 px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
           >
@@ -87,6 +113,7 @@ export default function ContaPagarBasicFields({ controller, onOpenCategoria }) {
           </select>
           <button
             type="button"
+            disabled={!dados.afeta_dre}
             onClick={onOpenCategoria}
             className="shrink-0 px-3 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 flex items-center gap-1 whitespace-nowrap"
             title="Adicionar nova categoria"
@@ -111,7 +138,7 @@ export default function ContaPagarBasicFields({ controller, onOpenCategoria }) {
                 : "↕ Custo Misto (Fixo + Variável)"}
           </p>
         )}
-        {categoriaSelecionada && !categoriaSelecionada.dre_subcategoria_id && (
+        {dados.afeta_dre && categoriaSelecionada && !categoriaSelecionada.dre_subcategoria_id && (
           <div className="mt-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900 flex items-center justify-between gap-3">
             <span>Esta categoria ainda não está vinculada ao DRE.</span>
             <button
@@ -131,6 +158,7 @@ export default function ContaPagarBasicFields({ controller, onOpenCategoria }) {
         </label>
         <select
           value={dados.dre_subcategoria_id || ""}
+          disabled={!dados.afeta_dre}
           onChange={(event) =>
             setDados({
               ...dados,
@@ -153,6 +181,7 @@ export default function ContaPagarBasicFields({ controller, onOpenCategoria }) {
         <label className="block text-sm font-medium text-gray-700 mb-1">Tipo de despesa</label>
         <select
           value={dados.tipo_despesa_id || ""}
+          disabled={!dados.afeta_dre}
           onChange={(event) =>
             setDados({
               ...dados,

@@ -610,6 +610,7 @@ def buscar_conta_pagar(
         else None,
         "categoria_id": conta.categoria_id,
         "dre_subcategoria_id": conta.dre_subcategoria_id,
+        "afeta_dre": conta.afeta_dre,
         "tipo_despesa_id": conta.tipo_despesa_id,
         "canal": conta.canal,
         "valores": {
