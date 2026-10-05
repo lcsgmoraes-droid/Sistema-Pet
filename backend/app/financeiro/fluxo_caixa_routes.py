@@ -220,6 +220,8 @@ def get_fluxo_caixa(
     )
 
     # 4. LANÇAMENTOS MANUAIS REALIZADOS
+    from app.ia.aba5_models import FluxoCaixa
+
     lancamentos_realizados = (
         db.query(LancamentoManual)
         .options(joinedload(LancamentoManual.categoria))
@@ -251,6 +253,7 @@ def get_fluxo_caixa(
     }
     contas_espelhadas = {}
     espelhos_com_pagamento = set()
+    espelhos_com_fluxo_realizado = set()
     if ids_espelhos:
         contas_espelhadas = {
             conta.id: conta
@@ -267,6 +270,18 @@ def get_fluxo_caixa(
             )
             .all()
         }
+        espelhos_com_fluxo_realizado = {
+            conta_id
+            for (conta_id,) in db.query(FluxoCaixa.origem_id)
+            .filter(
+                FluxoCaixa.tenant_id == tenant_id,
+                FluxoCaixa.origem_tipo == "conta_pagar",
+                FluxoCaixa.origem_id.in_(contas_espelhadas),
+                FluxoCaixa.status == "realizado",
+                FluxoCaixa.tipo != "entrada",
+            )
+            .all()
+        }
 
     for lanc in lancamentos_realizados:
         conta_id = _conta_pagar_de_lancamento_automatico(lanc)
@@ -274,6 +289,7 @@ def get_fluxo_caixa(
         # Sem baixa rastreável, preservamos o lançamento realizado legado.
         if conta_espelhada and (
             conta_id in espelhos_com_pagamento
+            or conta_id in espelhos_com_fluxo_realizado
             or (conta_espelhada.status == "pago" and conta_espelhada.data_pagamento)
         ):
             continue
@@ -293,8 +309,6 @@ def get_fluxo_caixa(
         )
 
     # 🆕 LANÇAMENTOS DA TABELA FLUXO_CAIXA (REALIZADOS)
-    from app.ia.aba5_models import FluxoCaixa
-
     # Converter para datetime para pegar horário completo
     dt_inicio_datetime = datetime.combine(dt_inicio, datetime.min.time())
     dt_fim_datetime = datetime.combine(dt_fim, datetime.max.time())

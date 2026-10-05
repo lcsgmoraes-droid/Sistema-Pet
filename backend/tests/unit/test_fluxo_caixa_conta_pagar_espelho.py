@@ -202,6 +202,40 @@ def test_conta_historica_paga_sem_baixa_preserva_saida_uma_vez(
     assert outubro.movimentacoes[0].data == date(2026, 10, 21)
 
 
+def test_parcial_legado_com_fluxo_realizado_nao_repete_espelho_manual(
+    db_session, tenant_factory, user_factory
+):
+    FluxoCaixa.__table__.create(bind=db_session.get_bind(), checkfirst=True)
+    tenant = tenant_factory(nome="Fluxo parcial legado")
+    usuario = user_factory(tenant_id=tenant.id, email="fluxo.parcial.legado@test.com")
+    conta = _conta(db_session, tenant, usuario)
+    conta.status = "parcial"
+    conta.valor_pago = Decimal("40.00")
+    _espelho(db_session, tenant, usuario, conta, status="realizado")
+    db_session.add(
+        FluxoCaixa(
+            tenant_id=tenant.id,
+            usuario_id=usuario.id,
+            tipo="saida",
+            categoria="Fornecedores",
+            descricao="Baixa parcial legada",
+            valor=40.0,
+            data_movimentacao=datetime(2026, 10, 15),
+            status="realizado",
+            origem_tipo="conta_pagar",
+            origem_id=conta.id,
+        )
+    )
+    db_session.flush()
+
+    outubro = _fluxo(db_session, tenant, usuario, "2026-10-01", "2026-10-31")
+    novembro = _fluxo(db_session, tenant, usuario, "2026-11-01", "2026-11-30")
+    assert outubro.total_realizado_saidas == 40.0
+    assert len(outubro.movimentacoes) == 1
+    assert outubro.movimentacoes[0].data == date(2026, 10, 15)
+    assert novembro.total_previsto_saidas == 60.0
+
+
 def test_espelho_so_e_ignorado_quando_a_conta_pertence_ao_mesmo_tenant(
     db_session, tenant_factory, user_factory
 ):
