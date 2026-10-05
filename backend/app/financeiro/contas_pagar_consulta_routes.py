@@ -285,6 +285,7 @@ def listar_contas_pagar(
             "nota_entrada_id": conta.nota_entrada_id,
             "canal": conta.canal,
             "dre_subcategoria_id": conta.dre_subcategoria_id,
+            "afeta_dre": conta.afeta_dre,
             "dre_subcategoria_nome": None,
             "tipo_despesa_id": conta.tipo_despesa_id,
             "tipo_despesa_nome": conta.tipo_despesa.nome

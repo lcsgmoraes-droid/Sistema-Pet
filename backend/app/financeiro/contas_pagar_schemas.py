@@ -21,6 +21,7 @@ class ContaPagarCreate(BaseModel):
         "loja_fisica"  # OBRIGATORIO - loja_fisica, mercado_livre, shopee, amazon
     )
     tipo_despesa_id: Optional[int] = None  # FK para TipoDespesa (fixo/variável)
+    afeta_dre: bool = True
 
     valor_original: float
     data_emissao: date
@@ -164,6 +165,7 @@ class ContaPagarResponse(BaseModel):
     nota_entrada_id: Optional[int] = None
     canal: Optional[str] = None
     dre_subcategoria_id: Optional[int] = None
+    afeta_dre: bool = True
     dre_subcategoria_nome: Optional[str] = None
     tipo_despesa_id: Optional[int] = None
     tipo_despesa_nome: Optional[str] = None

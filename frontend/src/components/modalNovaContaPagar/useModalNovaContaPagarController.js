@@ -292,7 +292,7 @@ export function useModalNovaContaPagarController({ isOpen, onClose, onSave, cont
       return;
     }
 
-    if (categoriaSelecionada && !categoriaSelecionada.dre_subcategoria_id) {
+    if (dados.afeta_dre && categoriaSelecionada && !categoriaSelecionada.dre_subcategoria_id) {
       abrirModalVinculoDRE(categoriaSelecionada.id);
       return;
     }
