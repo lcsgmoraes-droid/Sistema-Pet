@@ -87,8 +87,8 @@ export default function ContaPagarBasicFields({ controller, onOpenCategoria }) {
           Afeta a DRE
         </label>
         <p className="mt-1 text-xs text-gray-500">
-          Desmarque para amortização de empréstimos e pagamento de fatura de cartão,
-          que devem aparecer no contas a pagar sem virar despesa na DRE.
+          Desmarque para amortização de empréstimos e pagamento de fatura de cartão, que devem
+          aparecer no contas a pagar sem virar despesa na DRE.
         </p>
       </div>
 
