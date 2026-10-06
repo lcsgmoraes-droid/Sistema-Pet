@@ -84,9 +84,7 @@ def test_refinalization_grants_only_the_part_revoked_on_reopen(monkeypatch):
         id=3, tenant_id="tenant-a", params={"bronze_percent": 10}
     )
 
-    rewarded = cashback_handler.CashbackHandler()._process(
-        db, campaign, 42, 99, Decimal("100.00"), 123
-    )
+    rewarded = cashback_handler.CashbackHandler()._process(db, campaign, 42, 99, 123)
 
     assert rewarded == 1
     assert len(db.added) == 1
@@ -101,9 +99,7 @@ def test_duplicate_purchase_event_does_not_grant_twice(monkeypatch):
     )
     campaign = SimpleNamespace(id=3, tenant_id="tenant-a")
 
-    rewarded = cashback_handler.CashbackHandler()._process(
-        db, campaign, 42, 99, Decimal("100.00"), 123
-    )
+    rewarded = cashback_handler.CashbackHandler()._process(db, campaign, 42, 99, 123)
 
     assert rewarded == 0
     assert db.added == []

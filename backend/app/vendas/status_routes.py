@@ -204,7 +204,13 @@ def reabrir_venda(
     return venda.to_dict()
 
 
-@router.patch("/{venda_id}/status")
+@router.patch(
+    "/{venda_id}/status",
+    responses={
+        400: {"description": "Status inválido ou reativação de venda cancelada"},
+        404: {"description": "Venda não encontrada"},
+    },
+)
 def atualizar_status_venda(
     venda_id: int,
     status_data: dict,

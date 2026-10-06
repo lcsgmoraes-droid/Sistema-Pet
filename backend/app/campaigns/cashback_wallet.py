@@ -8,8 +8,8 @@ scheduled job posted an entry early, late, or for the wrong amount.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 from collections import defaultdict
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from decimal import Decimal
 from heapq import heappop, heappush
@@ -48,134 +48,137 @@ class CashbackWallet:
     effective_time_by_transaction: dict[int, datetime]
 
 
-def replay_cashback_transactions(
-    transactions: Iterable[object], *, as_of: datetime | None = None
-) -> CashbackWallet:
-    """Replay transactions through ``as_of`` without trusting expiration debits.
-
-    ``expected_expiration_by_credit`` records the amount left when each lot
-    actually reached its expiry. ``posted_expiration_by_credit`` records what
-    the scheduler posted, including premature and excessive entries. Both
-    amounts are positive. A linked credit reversal can consume only that
-    credit's unspent portion; its excess is reported instead of taking funds
-    from another lot.
-    """
-    cutoff = _utc(as_of or datetime.now(timezone.utc))
-    rows = [tx for tx in transactions if _utc(tx.created_at) <= cutoff]
-    # BIGSERIAL ids follow INSERT order. A legacy created_at=now() records the
-    # transaction start, which can precede a credit committed before this
-    # debit was inserted. Sorting by created_at would invert that causality.
-    rows.sort(key=lambda tx: int(tx.id))
-    by_id = {int(tx.id): tx for tx in rows}
-    remaining: dict[int, Decimal] = {}
-    spendable_heap: list[tuple[datetime, datetime, int]] = []
-    expiration_heap: list[tuple[datetime, int]] = []
-    expected: dict[int, Decimal] = {}
-    posted: dict[int, Decimal] = {}
-    excess = Decimal("0.00")
-    allocations: dict[int, dict[int, Decimal]] = {}
-    balances: dict[int, Decimal] = {}
-    effective_times: dict[int, datetime] = {}
-    balance = Decimal("0.00")
-
-    def expire_due(instant: datetime) -> None:
-        nonlocal balance
-        while expiration_heap and expiration_heap[0][0] <= instant:
-            _, credit_id = heappop(expiration_heap)
-            expected[credit_id] = remaining[credit_id]
-            balance -= remaining[credit_id]
-            remaining[credit_id] = Decimal("0.00")
-
-    # Clamp retrograde legacy timestamps to the previous INSERT. This repairs
-    # a debit ordered before its funding credit by transaction-start time. An
-    # exact historical INSERT instant lost by now() cannot be reconstructed;
-    # the new clock_timestamp() default prevents that ambiguity going forward.
+@dataclass
+class _ReplayState:
+    by_id: dict[int, object]
+    remaining: dict[int, Decimal] = field(default_factory=dict)
+    spendable_heap: list[tuple[datetime, datetime, int]] = field(default_factory=list)
+    expiration_heap: list[tuple[datetime, int]] = field(default_factory=list)
+    expected: dict[int, Decimal] = field(default_factory=dict)
+    posted: dict[int, Decimal] = field(default_factory=dict)
+    allocations: dict[int, dict[int, Decimal]] = field(default_factory=dict)
+    balances: dict[int, Decimal] = field(default_factory=dict)
+    effective_times: dict[int, datetime] = field(default_factory=dict)
+    excess: Decimal = Decimal("0.00")
+    balance: Decimal = Decimal("0.00")
     last_insert_time: datetime | None = None
-    for tx in rows:
-        tx_id = int(tx.id)
-        event_time = _utc(tx.created_at)
-        if last_insert_time is not None:
-            event_time = max(event_time, last_insert_time)
-        expire_due(event_time)
-        last_insert_time = event_time
-        effective_times[tx_id] = event_time
 
+    def expire_due(self, instant: datetime) -> None:
+        while self.expiration_heap and self.expiration_heap[0][0] <= instant:
+            _, credit_id = heappop(self.expiration_heap)
+            unspent = self.remaining[credit_id]
+            self.expected[credit_id] = unspent
+            self.balance -= unspent
+            self.remaining[credit_id] = Decimal("0.00")
+
+    def _advance_time(self, tx: object) -> datetime:
+        event_time = _utc(tx.created_at)
+        if self.last_insert_time is not None:
+            event_time = max(event_time, self.last_insert_time)
+        self.expire_due(event_time)
+        self.last_insert_time = event_time
+        self.effective_times[int(tx.id)] = event_time
+        return event_time
+
+    def _record_expiration(self, amount: Decimal, source_id: int | None) -> None:
+        if amount <= 0 and source_id is not None:
+            self.posted[source_id] = (
+                self.posted.get(source_id, Decimal("0.00")) - amount
+            )
+
+    def _is_expiration_reversal(
+        self, amount: Decimal, source_type: str, source_id: int | None
+    ) -> bool:
+        if amount <= 0 or source_type != "reversal" or source_id is None:
+            return False
+        origin = self.by_id.get(source_id)
+        return origin is not None and _source_type(origin) == "expiration"
+
+    def _credit(self, tx: object, amount: Decimal, event_time: datetime) -> None:
+        credit_id = int(tx.id)
+        expiry_value = getattr(tx, "expires_at", None)
+        expiry = _utc(expiry_value) if expiry_value is not None else None
+        self.remaining[credit_id] = amount
+        self.balance += amount
+        heappush(self.spendable_heap, (expiry or _NO_EXPIRATION, event_time, credit_id))
+        if expiry is not None:
+            heappush(self.expiration_heap, (expiry, credit_id))
+            self.expire_due(event_time)
+
+    def _consume_reversal(self, source_id: int, amount: Decimal) -> None:
+        # Revoking a partly used reward cannot take unrelated credits.
+        active = self.remaining.get(source_id, Decimal("0.00"))
+        consumed = min(amount, active)
+        if consumed:
+            self.remaining[source_id] = active - consumed
+            self.balance -= consumed
+        self.excess += amount - consumed
+
+    def _consume_fefo(self, debit_id: int, amount: Decimal) -> None:
+        to_consume = amount
+        while to_consume > 0 and self.spendable_heap:
+            lot = heappop(self.spendable_heap)
+            credit_id = lot[2]
+            active = self.remaining[credit_id]
+            if active <= 0:
+                continue
+            consumed = min(to_consume, active)
+            self.remaining[credit_id] = active - consumed
+            self.balance -= consumed
+            to_consume -= consumed
+            self.allocations.setdefault(debit_id, {})[credit_id] = consumed
+            if self.remaining[credit_id] > 0:
+                heappush(self.spendable_heap, lot)
+        self.excess += to_consume
+
+    def apply(self, tx: object) -> None:
+        event_time = self._advance_time(tx)
         amount = _money(tx.amount)
         source_type = _source_type(tx)
         source_id = getattr(tx, "source_id", None)
         source_id = int(source_id) if source_id is not None else None
-
         if source_type == "expiration":
-            if amount <= 0 and source_id is not None:
-                posted[source_id] = posted.get(source_id, Decimal("0.00")) - amount
-            balances[tx_id] = balance
-            continue
+            self._record_expiration(amount, source_id)
+        elif self._is_expiration_reversal(amount, source_type, source_id):
+            pass  # Compensation fixes ledger arithmetic, not spendable credit.
+        elif amount > 0:
+            self._credit(tx, amount, event_time)
+        elif amount < 0 and source_type == "reversal" and source_id is not None:
+            self._consume_reversal(source_id, -amount)
+        elif amount < 0:
+            self._consume_fefo(int(tx.id), -amount)
+        self.balances[int(tx.id)] = self.balance
 
-        # A positive reversal of a bad expiration repairs the append-only
-        # ledger's arithmetic. It does not create another spendable credit.
-        if amount > 0 and source_type == "reversal" and source_id is not None:
-            origin = by_id.get(source_id)
-            if origin is not None and _source_type(origin) == "expiration":
-                balances[tx_id] = balance
-                continue
+    def wallet(self) -> CashbackWallet:
+        return CashbackWallet(
+            available=self.balance,
+            remaining_by_credit=self.remaining,
+            expected_expiration_by_credit=self.expected,
+            posted_expiration_by_credit=self.posted,
+            excess_debits=self.excess,
+            allocations_by_debit=self.allocations,
+            balance_by_transaction=self.balances,
+            effective_time_by_transaction=self.effective_times,
+        )
 
-        if amount > 0:
-            expiry_value = getattr(tx, "expires_at", None)
-            expiry = _utc(expiry_value) if expiry_value is not None else None
-            remaining[tx_id] = amount
-            balance += amount
-            heappush(spendable_heap, (expiry or _NO_EXPIRATION, event_time, tx_id))
-            if expiry is not None:
-                heappush(expiration_heap, (expiry, tx_id))
-                expire_due(event_time)
-            balances[tx_id] = balance
-            continue
 
-        if amount >= 0:
-            balances[tx_id] = balance
-            continue
+def replay_cashback_transactions(
+    transactions: Iterable[object], *, as_of: datetime | None = None
+) -> CashbackWallet:
+    """Replay a customer ledger through ``as_of`` without double expiration.
 
-        to_consume = -amount
-        if source_type == "reversal" and source_id is not None:
-            # A campaign reward revoked after partial use cannot claw the
-            # already redeemed amount back from unrelated credits.
-            active = remaining.get(source_id, Decimal("0.00"))
-            consumed = min(to_consume, active)
-            if consumed:
-                remaining[source_id] = active - consumed
-                balance -= consumed
-            excess += to_consume - consumed
-            balances[tx_id] = balance
-            continue
-
-        while to_consume > 0 and spendable_heap:
-            lot = heappop(spendable_heap)
-            credit_id = lot[2]
-            active = remaining[credit_id]
-            if active <= 0:
-                continue
-            consumed = min(to_consume, active)
-            remaining[credit_id] = active - consumed
-            balance -= consumed
-            to_consume -= consumed
-            allocations.setdefault(tx_id, {})[credit_id] = consumed
-            if remaining[credit_id] > 0:
-                heappush(spendable_heap, lot)
-        excess += to_consume
-        balances[tx_id] = balance
-
-    expire_due(cutoff)
-
-    return CashbackWallet(
-        available=balance,
-        remaining_by_credit=remaining,
-        expected_expiration_by_credit=expected,
-        posted_expiration_by_credit=posted,
-        excess_debits=excess,
-        allocations_by_debit=allocations,
-        balance_by_transaction=balances,
-        effective_time_by_transaction=effective_times,
-    )
+    BIGSERIAL ids preserve INSERT order even when a legacy ``created_at=now()``
+    predates a credit committed before a later debit was inserted. Historical
+    event times are clamped to that causal order; new rows use the INSERT clock.
+    """
+    cutoff = _utc(as_of or datetime.now(timezone.utc))
+    rows = [tx for tx in transactions if _utc(tx.created_at) <= cutoff]
+    rows.sort(key=lambda tx: int(tx.id))
+    state = _ReplayState(by_id={int(tx.id): tx for tx in rows})
+    for tx in rows:
+        state.apply(tx)
+    state.expire_due(cutoff)
+    return state.wallet()
 
 
 def get_cashback_wallet(db, *, tenant_id, customer_id, as_of=None) -> CashbackWallet:

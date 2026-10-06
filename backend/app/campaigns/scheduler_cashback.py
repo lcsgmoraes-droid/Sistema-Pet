@@ -28,7 +28,6 @@ def run_cashback_expiration_check(*, db_factory: DbFactory, logger) -> None:
     try:
         now_utc = datetime.now(timezone.utc)
         today_start = now_utc.replace(hour=0, minute=0, second=0, microsecond=0)
-        today_end = today_start + timedelta(days=1)
 
         tenants = db.query(Tenant).filter(Tenant.status == "active").all()
 
@@ -40,7 +39,6 @@ def run_cashback_expiration_check(*, db_factory: DbFactory, logger) -> None:
                     tenant,
                     now_utc=now_utc,
                     today_start=today_start,
-                    today_end=today_end,
                     logger=logger,
                 )
                 db.commit()
@@ -68,7 +66,7 @@ def run_cashback_expiration_check(*, db_factory: DbFactory, logger) -> None:
 
 
 def _process_cashback_expiration_for_tenant(
-    db, tenant, *, now_utc, today_start, today_end, logger
+    db, tenant, *, now_utc, today_start, logger
 ) -> tuple[int, int]:
     alert_days = _cashback_alert_days(db, tenant.id)
     expired_due = _cashback_credits_expiring_today(db, tenant.id, now_utc)

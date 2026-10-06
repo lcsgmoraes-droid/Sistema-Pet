@@ -119,7 +119,13 @@ class CashbackManualBody(BaseModel):
     description: str = "Ajuste manual"
 
 
-@router.post("/cashback/manual")
+@router.post(
+    "/cashback/manual",
+    responses={
+        400: {"description": "Valor inválido ou cashback insuficiente"},
+        404: {"description": "Cliente não encontrado"},
+    },
+)
 def cashback_manual(
     body: CashbackManualBody,
     db: Session = Depends(get_db),

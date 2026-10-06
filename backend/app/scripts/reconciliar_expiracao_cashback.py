@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import argparse
 import json
-from collections import defaultdict
+from collections import Counter, defaultdict
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from decimal import Decimal
@@ -33,6 +33,43 @@ class Correction:
     amount: Decimal
 
 
+def _customer_corrections(db, *, tenant_id, customer_id, rows, now) -> list[Correction]:
+    wallet = get_cashback_wallet(
+        db, tenant_id=tenant_id, customer_id=customer_id, as_of=now
+    )
+    reversals = (
+        db.query(CashbackTransaction)
+        .filter(
+            CashbackTransaction.tenant_id == tenant_id,
+            CashbackTransaction.customer_id == customer_id,
+            CashbackTransaction.source_type == CashbackSourceTypeEnum.reversal,
+            CashbackTransaction.source_id.in_([row.id for row in rows]),
+            CashbackTransaction.amount > 0,
+        )
+        .all()
+    )
+    corrected_by_expiration: dict[int, Decimal] = defaultdict(lambda: Decimal("0.00"))
+    for reversal in reversals:
+        corrected_by_expiration[reversal.source_id] += Decimal(str(reversal.amount))
+    source_counts = Counter(row.source_id for row in rows)
+    plan: list[Correction] = []
+    for row in rows:
+        if row.source_id is None:
+            raise ValueError(f"Expiração {row.id} sem crédito de origem")
+        if source_counts[row.source_id] != 1:
+            raise ValueError(
+                f"Crédito {row.source_id} com múltiplas expirações; revisão manual"
+            )
+        expected = wallet.expected_expiration_by_credit.get(
+            row.source_id, Decimal("0.00")
+        )
+        posted = wallet.posted_expiration_by_credit.get(row.source_id, Decimal("0.00"))
+        excess = posted - corrected_by_expiration[row.id] - expected
+        if excess > 0:
+            plan.append(Correction(customer_id, row.source_id, row.id, excess))
+    return plan
+
+
 def build_plan(db, *, tenant_id, as_of=None) -> list[Correction]:
     """Return only excess expiration amounts, without changing the database."""
     now = as_of or datetime.now(timezone.utc)
@@ -45,60 +82,16 @@ def build_plan(db, *, tenant_id, as_of=None) -> list[Correction]:
         )
         .all()
     )
-    if not expiration_rows:
-        return []
     by_customer: dict[int, list] = defaultdict(list)
     for row in expiration_rows:
         by_customer[row.customer_id].append(row)
-
     plan: list[Correction] = []
     for customer_id, rows in sorted(by_customer.items()):
-        wallet = get_cashback_wallet(
-            db, tenant_id=tenant_id, customer_id=customer_id, as_of=now
+        plan.extend(
+            _customer_corrections(
+                db, tenant_id=tenant_id, customer_id=customer_id, rows=rows, now=now
+            )
         )
-        expiration_ids = [row.id for row in rows]
-        reversals = (
-            db.query(CashbackTransaction)
-            .filter(
-                CashbackTransaction.tenant_id == tenant_id,
-                CashbackTransaction.customer_id == customer_id,
-                CashbackTransaction.source_type == CashbackSourceTypeEnum.reversal,
-                CashbackTransaction.source_id.in_(expiration_ids),
-                CashbackTransaction.amount > 0,
-            )
-            .all()
-        )
-        corrections_by_expiration: dict[int, Decimal] = defaultdict(
-            lambda: Decimal("0.00")
-        )
-        for reversal in reversals:
-            corrections_by_expiration[reversal.source_id] += Decimal(
-                str(reversal.amount)
-            )
-        for row in rows:
-            if row.source_id is None:
-                raise ValueError(f"Expiração {row.id} sem crédito de origem")
-            expected = wallet.expected_expiration_by_credit.get(
-                row.source_id, Decimal("0.00")
-            )
-            posted = wallet.posted_expiration_by_credit.get(
-                row.source_id, Decimal("0.00")
-            )
-            corrected = sum(
-                (
-                    corrections_by_expiration[peer.id]
-                    for peer in rows
-                    if peer.source_id == row.source_id
-                ),
-                Decimal("0.00"),
-            )
-            if sum(peer.source_id == row.source_id for peer in rows) != 1:
-                raise ValueError(
-                    f"Crédito {row.source_id} com múltiplas expirações; revisão manual"
-                )
-            excess = posted - corrected - expected
-            if excess > 0:
-                plan.append(Correction(customer_id, row.source_id, row.id, excess))
     return sorted(plan, key=lambda item: item.expiration_id)
 
 

@@ -61,6 +61,124 @@ _RANK_PARAM_KEY = {
 }
 
 
+def _retained_cashback_after_reopening(
+    db: Session,
+    campaign: Campaign,
+    customer_id: int,
+    execution: CampaignExecution,
+) -> Decimal:
+    """Return the prior award that remained with the customer after reopening."""
+    prior_credits = (
+        db.query(CashbackTransaction)
+        .filter(
+            CashbackTransaction.tenant_id == campaign.tenant_id,
+            CashbackTransaction.customer_id == customer_id,
+            CashbackTransaction.source_type == CashbackSourceTypeEnum.campaign,
+            CashbackTransaction.source_id == execution.id,
+            CashbackTransaction.amount > 0,
+        )
+        .all()
+    )
+    prior_ids = [credit.id for credit in prior_credits]
+    refunded_credits = (
+        db.query(CashbackTransaction)
+        .filter(
+            CashbackTransaction.tenant_id == campaign.tenant_id,
+            CashbackTransaction.customer_id == customer_id,
+            CashbackTransaction.origin_credit_id.in_(prior_ids),
+            CashbackTransaction.amount > 0,
+        )
+        .all()
+        if prior_ids
+        else []
+    )
+    wallet = get_cashback_wallet(
+        db, tenant_id=campaign.tenant_id, customer_id=customer_id
+    )
+    retained = sum(
+        (Decimal(str(credit.amount)) for credit in prior_credits),
+        Decimal("0.00"),
+    )
+    for prior in [*prior_credits, *refunded_credits]:
+        revoked = sum(
+            (
+                -Decimal(str(row[0]))
+                for row in db.query(CashbackTransaction.amount)
+                .filter(
+                    CashbackTransaction.tenant_id == campaign.tenant_id,
+                    CashbackTransaction.customer_id == customer_id,
+                    CashbackTransaction.source_type == CashbackSourceTypeEnum.reversal,
+                    CashbackTransaction.source_id == prior.id,
+                    CashbackTransaction.amount < 0,
+                )
+                .all()
+            ),
+            Decimal("0.00"),
+        )
+        retained -= revoked
+        retained -= wallet.expected_expiration_by_credit.get(prior.id, Decimal("0.00"))
+    return max(Decimal("0.00"), retained)
+
+
+def _notify_cashback_award(
+    db: Session,
+    campaign: Campaign,
+    customer_id: int,
+    venda_id: int,
+    reference_period: str,
+    canal: str,
+    amount: Decimal,
+    rank: RankLevelEnum,
+) -> None:
+    from app.models import Cliente
+
+    cliente = db.query(Cliente).filter(Cliente.id == customer_id).first()
+    if cliente:
+        amount_label = f"{amount:.2f}".replace(".", ",")
+        push_body = (
+            f"Ola, {cliente.nome}! Voce ganhou R$ {amount_label} de cashback "
+            "na sua ultima compra. Veja seus beneficios no app."
+        )
+        enqueue_campaign_push(
+            db,
+            tenant_id=campaign.tenant_id,
+            customer_id=customer_id,
+            title="Voce ganhou cashback",
+            body=push_body,
+            idempotency_key=(
+                f"cashback:{campaign.id}:{customer_id}:{reference_period}:push"
+            ),
+            kind="cashback",
+            campaign=campaign,
+            payload={
+                "target": "benefits",
+                "customer_id": customer_id,
+                "venda_id": venda_id,
+                "cashback_amount": float(amount),
+                "rank": rank.value,
+                "canal": canal,
+                "reward_type": "cashback",
+            },
+        )
+    if cliente and cliente.email:
+        amount_label = f"{amount:.2f}".replace(".", ",")
+        body = (
+            f"Olá, {cliente.nome}! Você ganhou R$ {amount_label} de cashback "
+            "na sua última compra. Seu saldo será aplicado na próxima compra."
+        )
+        enqueue_email(
+            db,
+            tenant_id=campaign.tenant_id,
+            customer_id=customer_id,
+            subject="Você ganhou cashback! 💰",
+            body=body,
+            email_address=cliente.email,
+            idempotency_key=(
+                f"cashback:{campaign.id}:{customer_id}:{reference_period}:email"
+            ),
+        )
+
+
 class CashbackHandler:
     """Handler para cashback baseado em nível de ranking."""
 
@@ -97,7 +215,6 @@ class CashbackHandler:
 
         customer_id = int(customer_id)
         venda_id = int(venda_id)
-        venda_total = Decimal(str(venda_total))
         canal = normalize_benefit_channel(payload.get("canal") or "loja_fisica")
 
         try:
@@ -106,7 +223,6 @@ class CashbackHandler:
                 campaign=campaign,
                 customer_id=customer_id,
                 venda_id=venda_id,
-                venda_total=venda_total,
                 source_event_id=event.id,
                 canal=canal,
             )
@@ -122,7 +238,6 @@ class CashbackHandler:
         campaign,
         customer_id,
         venda_id,
-        venda_total,
         source_event_id,
         canal="pdv",
     ) -> int:
@@ -202,59 +317,10 @@ class CashbackHandler:
         if existing:
             # Part of a prior award may already have been redeemed before the
             # sale was reopened. It cannot be clawed back or granted again.
-            prior_credits = (
-                db.query(CashbackTransaction)
-                .filter(
-                    CashbackTransaction.tenant_id == campaign.tenant_id,
-                    CashbackTransaction.customer_id == customer_id,
-                    CashbackTransaction.source_type == CashbackSourceTypeEnum.campaign,
-                    CashbackTransaction.source_id == existing.id,
-                    CashbackTransaction.amount > 0,
-                )
-                .all()
+            retained = _retained_cashback_after_reopening(
+                db, campaign, customer_id, existing
             )
-            prior_ids = [credit.id for credit in prior_credits]
-            refunded_credits = (
-                db.query(CashbackTransaction)
-                .filter(
-                    CashbackTransaction.tenant_id == campaign.tenant_id,
-                    CashbackTransaction.customer_id == customer_id,
-                    CashbackTransaction.origin_credit_id.in_(prior_ids),
-                    CashbackTransaction.amount > 0,
-                )
-                .all()
-                if prior_ids
-                else []
-            )
-            wallet = get_cashback_wallet(
-                db, tenant_id=campaign.tenant_id, customer_id=customer_id
-            )
-            retained = sum(
-                (Decimal(str(credit.amount)) for credit in prior_credits),
-                Decimal("0.00"),
-            )
-            for prior in [*prior_credits, *refunded_credits]:
-                revoked = sum(
-                    (
-                        -Decimal(str(row[0]))
-                        for row in db.query(CashbackTransaction.amount)
-                        .filter(
-                            CashbackTransaction.tenant_id == campaign.tenant_id,
-                            CashbackTransaction.customer_id == customer_id,
-                            CashbackTransaction.source_type
-                            == CashbackSourceTypeEnum.reversal,
-                            CashbackTransaction.source_id == prior.id,
-                            CashbackTransaction.amount < 0,
-                        )
-                        .all()
-                    ),
-                    Decimal("0.00"),
-                )
-                retained -= revoked
-                retained -= wallet.expected_expiration_by_credit.get(
-                    prior.id, Decimal("0.00")
-                )
-            amount = max(Decimal("0.00"), amount - max(Decimal("0.00"), retained))
+            amount = max(Decimal("0.00"), amount - retained)
             existing.reward_meta = {
                 **(existing.reward_meta or {}),
                 "cashback_sale_revoked": False,
@@ -310,50 +376,9 @@ class CashbackHandler:
         db.flush()
         cashback_tx.source_id = execution.id
 
-        # Notificação
-        from app.models import Cliente
-
-        cliente = db.query(Cliente).filter(Cliente.id == customer_id).first()
-        if cliente:
-            amount_label = f"{amount:.2f}".replace(".", ",")
-            push_body = (
-                f"Ola, {cliente.nome}! Voce ganhou R$ {amount_label} de cashback "
-                "na sua ultima compra. Veja seus beneficios no app."
-            )
-            enqueue_campaign_push(
-                db,
-                tenant_id=campaign.tenant_id,
-                customer_id=customer_id,
-                title="Voce ganhou cashback",
-                body=push_body,
-                idempotency_key=f"cashback:{campaign.id}:{customer_id}:{ref_period}:push",
-                kind="cashback",
-                campaign=campaign,
-                payload={
-                    "target": "benefits",
-                    "customer_id": customer_id,
-                    "venda_id": venda_id,
-                    "cashback_amount": float(amount),
-                    "rank": rank.value,
-                    "canal": canal,
-                    "reward_type": "cashback",
-                },
-            )
-        if cliente and cliente.email:
-            amount_label = f"{amount:.2f}".replace(".", ",")
-            body = (
-                f"Olá, {cliente.nome}! Você ganhou R$ {amount_label} de cashback "
-                f"na sua última compra. Seu saldo será aplicado na próxima compra."
-            )
-            enqueue_email(
-                db,
-                tenant_id=campaign.tenant_id,
-                customer_id=customer_id,
-                subject="Você ganhou cashback! 💰",
-                body=body,
-                email_address=cliente.email,
-                idempotency_key=f"cashback:{campaign.id}:{customer_id}:{ref_period}:email",
-            )
+        _notify_cashback_award(
+            db, campaign, customer_id, venda_id, ref_period, canal, amount, rank
+        )
 
         logger.info(
             "[CashbackHandler] customer=%d venda=%d rank=%s pct=%s amount=%s",
