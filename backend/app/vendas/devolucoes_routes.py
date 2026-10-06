@@ -505,9 +505,9 @@ def registrar_devolucao(
                 origem, _compartilhado = resolver_tenant_estoque_item(
                     item_venda, tenant_id
                 )
-                solicitado_por_produto[
-                    (item_venda.produto_id, origem)
-                ] += quantidade_devolvida
+                solicitado_por_produto[(item_venda.produto_id, origem)] += (
+                    quantidade_devolvida
+                )
 
         for (
             produto_id,
