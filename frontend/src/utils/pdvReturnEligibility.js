@@ -31,14 +31,14 @@ export function getTextoDevolucaoVendaPDV(venda) {
   const tipo = getTipoDevolucaoVenda(venda);
   if (tipo === "parcial") {
     return {
-      situacao: "com Devolução Parcial",
-      orientacao: "Use Devolução para registrar o saldo restante.",
+      situacao: "com Devolução",
+      orientacao: "Consulte o saldo disponível em Devolução.",
     };
   }
   if (tipo === "total") {
     return {
-      situacao: "Devolvida Integralmente",
-      orientacao: "Todos os itens foram devolvidos.",
+      situacao: "com Todos os Itens Devolvidos",
+      orientacao: "O reembolso dos itens não inclui o frete.",
     };
   }
   return null;

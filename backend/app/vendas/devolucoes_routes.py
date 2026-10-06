@@ -1024,8 +1024,14 @@ def registrar_devolucao(
         # Recebimentos e entradas realizados permanecem como historico. O evento
         # da devolucao registra a deducao da DRE e a saida de caixa, se houver.
 
-        # 🆕 ATUALIZAR STATUS DA VENDA
-        if cotacao.valor_acumulado >= Decimal(str(venda.total or 0)):
+        # O frete não é reembolsado na devolução dos itens; o status total
+        # depende da quantidade devolvida, não do valor total com frete.
+        todos_itens_devolvidos = bool(todos_itens_venda) and all(
+            devolvido_por_item[item.id] + solicitado_por_item[item.id]
+            >= Decimal(str(item.quantidade))
+            for item in todos_itens_venda
+        )
+        if todos_itens_devolvidos:
             venda.status = "devolvida_total"
         else:
             venda.status = "finalizada_devolucao"

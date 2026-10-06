@@ -24,12 +24,12 @@ test("inclui devolucao parcial na busca do modal de devolucao", () => {
 
 test("PDV informa o estado da devolução sem chamar a venda de aberta", () => {
   assert.deepEqual(getTextoDevolucaoVendaPDV({ status: "finalizada_devolucao" }), {
-    situacao: "com Devolução Parcial",
-    orientacao: "Use Devolução para registrar o saldo restante.",
+    situacao: "com Devolução",
+    orientacao: "Consulte o saldo disponível em Devolução.",
   });
   assert.deepEqual(getTextoDevolucaoVendaPDV({ status: "devolvida_total" }), {
-    situacao: "Devolvida Integralmente",
-    orientacao: "Todos os itens foram devolvidos.",
+    situacao: "com Todos os Itens Devolvidos",
+    orientacao: "O reembolso dos itens não inclui o frete.",
   });
   assert.equal(getTextoDevolucaoVendaPDV({ status: "finalizada" }), null);
 });
