@@ -296,24 +296,10 @@ class CashbackHandler:
         pct_key = _RANK_PARAM_KEY.get(rank, "bronze_percent")
         pct = Decimal(str(params.get(pct_key, 0) or 0))
 
-        # Bônus adicional por canal de compra (PDV / App / Ecommerce)
-        _CANAL_BONUS_KEY = {
-            "pdv": "pdv_bonus_percent",
-            "loja_fisica": "pdv_bonus_percent",
-            "banho_tosa": "pdv_bonus_percent",
-            "veterinario": "pdv_bonus_percent",
-            "app": "app_bonus_percent",
-            "ecommerce": "ecommerce_bonus_percent",
-            "aplicativo": "app_bonus_percent",
-        }
-        bonus_key = _CANAL_BONUS_KEY.get(canal, "pdv_bonus_percent")
-        bonus_pct = Decimal(str(params.get(bonus_key, 0) or 0))
-        pct_total = pct + bonus_pct
+        if pct <= 0:
+            return 0  # sem cashback configurado para este nível
 
-        if pct_total <= 0:
-            return 0  # sem cashback configurado para este nível/canal
-
-        amount = (venda_total * pct_total / Decimal("100")).quantize(Decimal("0.01"))
+        amount = (venda_total * pct / Decimal("100")).quantize(Decimal("0.01"))
         if existing:
             # Part of a prior award may already have been redeemed before the
             # sale was reopened. It cannot be clawed back or granted again.
@@ -327,10 +313,6 @@ class CashbackHandler:
             }
         if amount <= 0:
             return 0
-
-        canal_label = (
-            f"+{bonus_pct}% canal {canal}" if bonus_pct > 0 else f"canal {canal}"
-        )
 
         # Prazo de validade do cashback (em dias, configurável em campaign.params)
         valid_days = int(params.get("cashback_valid_days") or 0)
@@ -347,7 +329,7 @@ class CashbackHandler:
             amount=amount,
             source_type=CashbackSourceTypeEnum.campaign,
             source_id=None,  # será preenchido após flush da execution
-            description=f"Cashback {pct_total}% na venda #{venda_id} (rank {rank.value}, {canal_label})",
+            description=f"Cashback {pct}% na venda #{venda_id} (rank {rank.value}, canal {canal})",
             expires_at=expires_at,
             tx_type="credit",
         )
@@ -364,12 +346,11 @@ class CashbackHandler:
                 reward_type="cashback",
                 reward_value=amount,
                 reward_meta={
-                    "percent": float(pct_total),
+                    "percent": float(pct),
                     "rank": rank.value,
                     "venda_id": venda_id,
                     "venda_total_base": float(venda_total),
                     "canal": canal,
-                    "bonus_percent": float(bonus_pct),
                 },
                 source_event_id=source_event_id,
             )

@@ -19,6 +19,7 @@ from app.empresa_grupo_models import (
 from app.estoque.service import EstoqueService
 from app.models import Tenant, User
 from app.produto_config_fiscal_models import ProdutoConfigFiscal
+from app.kit_config_fiscal_models import KitConfigFiscal
 from app.produtos_models import (
     EstoqueMovimentacao,
     Produto,
@@ -59,6 +60,7 @@ def db(monkeypatch):
             ProdutoLote.__table__,
             ProdutoFornecedor.__table__,
             ProdutoConfigFiscal.__table__,
+            KitConfigFiscal.__table__,
             EstoqueMovimentacao.__table__,
             EmpresaGrupo.__table__,
             EmpresaGrupoMembro.__table__,
@@ -380,6 +382,73 @@ def test_tela_compartilhada_le_lotes_fornecedores_e_fiscal_da_origem(db):
     assert fiscal_atualizado["cst_icms"] == "900"
     assert fiscal_atualizado["pis_cst"] == "49"
     assert fiscal_atualizado["cofins_cst"] == "49"
+
+
+def test_fiscal_do_pdv_atualiza_cadastro_do_produto(db):
+    from app.api.v1.produto_fiscal_v2 import get_fiscal_produto, put_fiscal_produto
+
+    session, _syncs = db
+    _grupo, produto, _usuario = _preparar_cenario(session)
+    payload = {
+        "ncm": "23099020",
+        "cest": "0100200",
+        "origem_mercadoria": "0",
+        "cfop": "5102",
+        "cst_icms": "102",
+        "icms_aliquota": "7.5",
+        "pis_cst": "49",
+        "pis_aliquota": "1.65",
+        "cofins_cst": "49",
+        "cofins_aliquota": "7.6",
+    }
+
+    with tenant_context(ORIGEM):
+        put_fiscal_produto(produto.id, payload, db=session, tenant_id=UUID(ORIGEM))
+        fiscal = get_fiscal_produto(produto.id, db=session, tenant_id=UUID(ORIGEM))
+        session.refresh(produto)
+
+    assert fiscal["cfop_venda"] == "5102"
+    assert fiscal["cst_icms"] == "102"
+    assert produto.cfop == "5102"
+    assert produto.ncm == "23099020"
+    assert produto.cest == "0100200"
+    assert produto.origem == "0"
+    assert float(produto.aliquota_icms) == 7.5
+    assert float(produto.aliquota_pis) == 1.65
+    assert float(produto.aliquota_cofins) == 7.6
+
+
+def test_fiscal_de_kit_atualiza_cadastro_do_produto(db):
+    from app.api.v1.produto_fiscal_v2 import get_fiscal_kit, put_fiscal_kit
+
+    session, _syncs = db
+    _grupo, produto, _usuario = _preparar_cenario(session)
+    with tenant_context(ORIGEM):
+        produto.tipo_produto = "KIT"
+        session.commit()
+        put_fiscal_kit(
+            produto.id,
+            {
+                "ncm": "23099020",
+                "cest": "0100200",
+                "origem_mercadoria": "0",
+                "cfop": "5102",
+                "cst_icms": "102",
+                "pis_cst": "49",
+                "cofins_cst": "49",
+            },
+            db=session,
+            tenant_id=UUID(ORIGEM),
+        )
+        fiscal = get_fiscal_kit(produto.id, db=session, tenant_id=UUID(ORIGEM))
+        session.refresh(produto)
+
+    assert fiscal["cfop"] == "5102"
+    assert fiscal["cst_icms"] == "102"
+    assert produto.cfop == "5102"
+    assert produto.ncm == "23099020"
+    assert produto.cest == "0100200"
+    assert produto.origem == "0"
 
 
 def test_remover_compartilhamento_bloqueia_nova_venda_sem_apagar_historico(db):

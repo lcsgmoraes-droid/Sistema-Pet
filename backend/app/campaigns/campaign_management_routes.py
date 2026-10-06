@@ -1,5 +1,6 @@
 """Rotas de listagem e gestao das campanhas base."""
 
+from decimal import Decimal, InvalidOperation
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -7,7 +8,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.auth.dependencies import get_current_user_and_tenant
-from app.campaigns.models import Campaign, CampaignStatusEnum
+from app.campaigns.models import Campaign, CampaignStatusEnum, CampaignTypeEnum
 from app.campaigns.routes_common import get_db
 
 
@@ -102,6 +103,20 @@ def atualizar_parametros(
     )
     if not campanha:
         raise HTTPException(status_code=404, detail="Campanha não encontrada")
+
+    if campanha.campaign_type == CampaignTypeEnum.cashback:
+        value = body.params.get("cashback_use_limit_percent")
+        if value is not None and value != "":
+            try:
+                percent = Decimal(str(value))
+            except (InvalidOperation, ValueError) as exc:
+                raise HTTPException(
+                    status_code=400, detail="Informe um limite entre 0% e 100%."
+                ) from exc
+            if not percent.is_finite() or not 0 <= percent <= 100:
+                raise HTTPException(
+                    status_code=400, detail="Informe um limite entre 0% e 100%."
+                )
 
     campanha.params = {**(campanha.params or {}), **body.params}
     if body.name:

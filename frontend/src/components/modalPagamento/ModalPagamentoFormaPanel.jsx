@@ -2,7 +2,7 @@ import { Wallet, AlertCircle } from "lucide-react";
 
 import CurrencyInput from "../CurrencyInput";
 import PaymentMethodIcon from "../PaymentMethodIcon";
-import { formatMoneyBRL } from "../../utils/formatters";
+import { formatMoneyBRL, formatPercent } from "../../utils/formatters";
 import {
   gerarPlanoCrediario,
   mascararDataCrediario,
@@ -21,6 +21,8 @@ export default function ModalPagamentoFormaPanel({
   setValorRecebido,
   valorRestante,
   saldoCashback,
+  saldoCashbackTotal,
+  cashbackLimitPercent,
   saldoCreditoDisponivel,
   formasPagamento,
   valorRecebido,
@@ -99,8 +101,9 @@ export default function ModalPagamentoFormaPanel({
             )}
 
             {/* Cashback de campanhas (exibir se disponível) */}
-            {venda.cliente && saldoCashback > 0 && (
+            {venda.cliente && saldoCashbackTotal > 0 && (
               <button
+                disabled={saldoCashback <= 0}
                 onClick={() => {
                   setFormaPagamentoSelecionada({
                     id: "cashback",
@@ -113,7 +116,7 @@ export default function ModalPagamentoFormaPanel({
                   setNsuCartao("");
                   setValorRecebido(Math.min(saldoCashback, valorRestante));
                 }}
-                className={`p-4 rounded-lg border-2 transition-all ${
+                className={`p-4 rounded-lg border-2 transition-all disabled:opacity-60 disabled:cursor-not-allowed ${
                   formaPagamentoSelecionada?.id === "cashback"
                     ? "border-green-500 bg-green-50"
                     : "border-green-200 bg-green-50/50 hover:border-green-300"
@@ -130,8 +133,13 @@ export default function ModalPagamentoFormaPanel({
                   Cashback
                 </div>
                 <div className="text-xs text-green-600 mt-1 font-semibold">
-                  {formatMoneyBRL(saldoCashback)}
+                  Até {formatMoneyBRL(Math.min(saldoCashback, valorRestante))}
                 </div>
+                {cashbackLimitPercent !== null && (
+                  <div className="text-xs text-green-700 mt-1">
+                    Limite: {formatPercent(cashbackLimitPercent)} da compra
+                  </div>
+                )}
               </button>
             )}
 
@@ -206,6 +214,12 @@ export default function ModalPagamentoFormaPanel({
                 <div className="text-lg font-bold text-green-600">
                   {formatMoneyBRL(saldoCashback)}
                 </div>
+                {cashbackLimitPercent !== null && (
+                  <p className="text-xs text-green-700 mt-1">
+                    Limite de {formatPercent(cashbackLimitPercent)} da compra. Saldo acumulado:{" "}
+                    {formatMoneyBRL(saldoCashbackTotal)}.
+                  </p>
+                )}
                 <p className="text-xs text-green-700 mt-1">
                   💡 Saldo acumulado em campanhas — não gera movimentação de caixa
                 </p>

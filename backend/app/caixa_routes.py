@@ -16,6 +16,7 @@ from app.idempotency import idempotent  # ← IDEMPOTÊNCIA
 from app.caixa_models import Caixa, MovimentacaoCaixa
 from app.caixa.conferencia import (
     instante_fechamento_sql,
+    indicadores_vendas_recebimentos,
     moeda,
     referencia_fechamento,
     snapshot_abertura,
@@ -572,7 +573,7 @@ def obter_resumo_caixa(
     ]
 
     data_da_venda = func.date(Venda.data_venda)
-    pagamentos_por_data = (
+    pagamentos_query = (
         db.query(
             data_da_venda.label("data_venda"),
             VendaPagamento.forma_pagamento,
@@ -586,10 +587,16 @@ def obter_resumo_caixa(
             VendaPagamento.tenant_id == tenant_id,
             Venda.status.in_(["finalizada", "baixa_parcial", "pago_nf"]),
             func.lower(func.trim(VendaPagamento.forma_pagamento)) != "dinheiro",
+            VendaPagamento.data_pagamento >= caixa.data_abertura,
         )
-        .group_by(data_da_venda, VendaPagamento.forma_pagamento)
-        .all()
     )
+    if caixa.data_fechamento:
+        pagamentos_query = pagamentos_query.filter(
+            VendaPagamento.data_pagamento <= caixa.data_fechamento
+        )
+    pagamentos_por_data = pagamentos_query.group_by(
+        data_da_venda, VendaPagamento.forma_pagamento
+    ).all()
 
     vendas_por_forma = {}
     recebimentos_por_data_venda = {}
@@ -626,11 +633,23 @@ def obter_resumo_caixa(
     for data_venda, forma, quantidade, total in pagamentos_por_data:
         somar_recebimento(data_venda, forma, quantidade, total, "pagamento")
 
+    total_vendido = (
+        db.query(func.sum(Venda.total))
+        .filter(
+            Venda.caixa_id == caixa_id,
+            Venda.tenant_id == tenant_id,
+            Venda.status.in_(["finalizada", "baixa_parcial", "pago_nf"]),
+        )
+        .scalar()
+    )
+    indicadores = indicadores_vendas_recebimentos(total_vendido, vendas_por_forma)
+
     return {
         "caixa": _serializar_caixa(caixa, compartilhado=compartilhado),
         "totais": totais,
         "vendas_por_forma_pagamento": vendas_por_forma,
         "recebimentos_por_data_venda": recebimentos_por_data_venda,
+        **indicadores,
     }
 
 
@@ -842,6 +861,7 @@ def gerar_pdf_caixa(
         .all()
     )
 
+    resumo = obter_resumo_caixa(caixa_id, db, current_user_and_tenant)
     # Preparar dados do caixa
     caixa_data = {
         "numero_caixa": caixa.numero_caixa,
@@ -850,13 +870,15 @@ def gerar_pdf_caixa(
         "responsavel": caixa.usuario_nome,
         "status": caixa.status,
         "saldo_inicial": float(caixa.valor_abertura),
-        "total_entradas": float(caixa.total_entradas or 0),
-        "total_saidas": float(caixa.total_saidas or 0),
-        "saldo_final": float(caixa.saldo_final or 0),
-        "saldo_fechamento": float(caixa.valor_fechamento)
-        if caixa.valor_fechamento
+        "total_vendido": resumo["total_vendido"],
+        "total_recebido": resumo["total_recebido"],
+        "vendas_por_forma_pagamento": resumo["vendas_por_forma_pagamento"],
+        "recebimentos_por_forma_pagamento": resumo["recebimentos_por_forma_pagamento"],
+        "totais": resumo["totais"],
+        "saldo_fechamento": float(caixa.valor_informado)
+        if caixa.valor_informado is not None
         else None,
-        "diferenca": float(caixa.diferenca) if caixa.diferenca else None,
+        "diferenca": float(caixa.diferenca) if caixa.diferenca is not None else None,
     }
 
     # Preparar dados das movimentações

@@ -555,8 +555,8 @@ test("calcula previa de cashback, carimbos e recompra elegiveis por canal", () =
     cashbackPrevisto: [
       {
         campanha: "Cashback Ouro",
-        percentual: 5,
-        valor: 5,
+        percentual: 3,
+        valor: 3,
       },
     ],
     carimbosPrevistos: [

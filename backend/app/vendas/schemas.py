@@ -61,6 +61,7 @@ class CriarVendaRequest(BaseModel):
     cliente_id: Optional[int] = None
     vendedor_id: Optional[int] = None
     funcionario_id: Optional[int] = None
+    vendedor_funcionario_id: Optional[int] = None
     itens: List[VendaItemSchema]
     desconto_valor: Optional[float] = 0
     desconto_percentual: Optional[float] = 0
@@ -88,6 +89,10 @@ class FinalizarVendaRequest(BaseModel):
     cupom_code: Optional[str] = None
     cupom_discount_applied: Optional[float] = None
     motivo_liberacao_crediario: Optional[str] = Field(default=None, max_length=500)
+    nao_gerar_beneficios: bool = False
+    justificativa_nao_gerar_beneficios: Optional[str] = Field(
+        default=None, max_length=500
+    )
 
 
 class CancelarVendaRequest(BaseModel):

@@ -9,9 +9,12 @@ import {
   CheckCircle,
   RefreshCw,
   Download,
+  Printer,
   Users,
 } from "lucide-react";
-import { listarCaixas, obterCaixaAberto, reabrirCaixa } from "../api/caixa";
+import { listarCaixas, obterCaixaAberto, obterResumoCaixa, reabrirCaixa } from "../api/caixa";
+import ImpressaoTermicaCaixa from "../components/caixa/ImpressaoTermicaCaixa";
+import ModalMovimentacoesCaixa from "../components/ModalMovimentacoesCaixa";
 import { getAccessToken } from "../auth/tokenStorage";
 import { confirmarCorePet } from "../services/corepetDialog";
 import { useAuth } from "../contexts/AuthContext";
@@ -26,6 +29,8 @@ export default function MeusCaixas() {
   const [dataOcorrencia, setDataOcorrencia] = useState("");
   const [motivoRevisao, setMotivoRevisao] = useState("");
   const [loading, setLoading] = useState(true);
+  const [resumoImpressao, setResumoImpressao] = useState(null);
+  const [caixaExtrato, setCaixaExtrato] = useState(null);
   const [filtros, setFiltros] = useState({
     data_inicio: "",
     data_fim: "",
@@ -112,6 +117,15 @@ export default function MeusCaixas() {
     } catch (error) {
       console.error("Erro ao baixar PDF:", error);
       alert("Erro ao gerar PDF do caixa");
+    }
+  };
+
+  const handleImprimirTermico = async (caixaId) => {
+    try {
+      setResumoImpressao(await obterResumoCaixa(caixaId));
+    } catch (error) {
+      console.error("Erro ao carregar relatório térmico:", error);
+      alert("Erro ao carregar o relatório do caixa");
     }
   };
 
@@ -388,6 +402,18 @@ export default function MeusCaixas() {
                         <Download className="w-4 h-4" />
                         Baixar PDF
                       </button>
+                      <button
+                        onClick={() => handleImprimirTermico(caixa.id)}
+                        className="flex items-center gap-2 px-4 py-2 bg-gray-800 hover:bg-gray-900 text-white rounded-lg transition-colors"
+                      >
+                        <Printer className="w-4 h-4" /> Imprimir na térmica
+                      </button>
+                      <button
+                        onClick={() => setCaixaExtrato(caixa.id)}
+                        className="rounded-lg border border-gray-300 px-4 py-2 font-medium text-gray-700"
+                      >
+                        Movimentações e comprovantes
+                      </button>
                     </div>
                   )}
                 </div>
@@ -449,6 +475,13 @@ export default function MeusCaixas() {
             </div>
           </form>
         </div>
+      )}
+      <ImpressaoTermicaCaixa
+        documento={resumoImpressao ? { resumo: resumoImpressao } : null}
+        onAfterPrint={() => setResumoImpressao(null)}
+      />
+      {caixaExtrato && (
+        <ModalMovimentacoesCaixa caixaId={caixaExtrato} onClose={() => setCaixaExtrato(null)} />
       )}
     </div>
   );

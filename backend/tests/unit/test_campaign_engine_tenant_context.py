@@ -73,3 +73,43 @@ def test_purchase_without_sale_id_cannot_grant_quick_repurchase_coupon():
 
     assert event.status == "skipped"
     assert db.committed is True
+
+
+def test_purchase_event_skips_campaigns_when_sale_blocks_benefits():
+    tenant_id = uuid4()
+    checks = []
+
+    class _Query:
+        def filter(self, *conditions):
+            return self
+
+        def first(self):
+            return SimpleNamespace(nao_gerar_beneficios=True)
+
+    class _BlockedSaleDb(_Db):
+        def query(self, model):
+            return _Query()
+
+    class _Engine(CampaignEngine):
+        def _get_active_campaigns(self, **kwargs):
+            checks.append("campaigns")
+            return []
+
+    db = _BlockedSaleDb()
+    event = SimpleNamespace(
+        id=124,
+        tenant_id=tenant_id,
+        event_type="purchase_completed",
+        event_depth=0,
+        payload={"venda_id": 123, "customer_id": 456},
+        status="pending",
+        processed_at=None,
+    )
+
+    _Engine(db).process_event(event)
+
+    assert event.status == "skipped"
+    assert event.processed_at is not None
+    assert db.committed is True
+    assert checks == []
+    assert get_current_tenant() is None

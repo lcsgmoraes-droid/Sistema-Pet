@@ -107,17 +107,11 @@ export function CampanhasParametrosCashbackSection({ num, set }) {
     { key: "diamond_percent", label: "Diamante" },
     { key: "platinum_percent", label: "Platina" },
   ];
-  const channels = [
-    { key: "pdv_bonus_percent", label: "PDV (bonus %)" },
-    { key: "app_bonus_percent", label: "App (bonus %)" },
-    { key: "ecommerce_bonus_percent", label: "E-commerce (bonus %)" },
-  ];
-
   return (
     <div className="space-y-4">
       <div>
         <p className="text-xs text-gray-500 mb-2">
-          % base por nivel de ranking (credito automatico em toda compra).
+          Percentual de cashback por nível de ranking (crédito automático em cada compra).
         </p>
         <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
           {levels.map((level) => (
@@ -131,22 +125,22 @@ export function CampanhasParametrosCashbackSection({ num, set }) {
           ))}
         </div>
       </div>
-      <div>
-        <p className="text-xs text-gray-500 mb-2">
-          Bonus adicional por canal (somado ao % do nivel). Ex.: App +1% incentiva o uso do
-          aplicativo.
+      <div className="border-t pt-4">
+        <CampanhaField
+          label="Limitar uso do cashback a quantos % da compra?"
+          id="p-cashback_use_limit_percent"
+          min="0"
+          max="100"
+          value={num("cashback_use_limit_percent")}
+          placeholder="Em branco = sem limite"
+          onChange={(e) =>
+            set("cashback_use_limit_percent", e.target.value === "" ? null : Number(e.target.value))
+          }
+        />
+        <p className="text-xs text-gray-500 mt-1">
+          Ex.: 20% permite usar até R$ 20 de cashback numa compra de R$ 100. Em branco, não há
+          limite percentual.
         </p>
-        <div className="grid grid-cols-3 gap-3">
-          {channels.map((channel) => (
-            <CampanhaField
-              key={channel.key}
-              label={channel.label}
-              id={`p-${channel.key}`}
-              value={num(channel.key)}
-              onChange={(e) => set(channel.key, Number.parseFloat(e.target.value) || 0)}
-            />
-          ))}
-        </div>
       </div>
       <div className="border-t pt-4">
         <p className="text-xs font-semibold text-gray-700 mb-2">Validade e alertas</p>
