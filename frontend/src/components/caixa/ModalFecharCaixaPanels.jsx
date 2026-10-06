@@ -459,13 +459,30 @@ export function PaymentBreakdownPanel({
             <style>{`
             @media screen { #caixa-formas-impressao { display: none; } }
             @media print {
-              @page { margin: 15mm; }
+              @page { margin: 2mm; }
               body.imprimindo-formas-caixa > :not(#caixa-formas-impressao) { display: none !important; }
-              #caixa-formas-impressao { display: block !important; font: 12px Arial, sans-serif; color: #111; }
-              #caixa-formas-impressao h1 { font-size: 18px; margin-bottom: 8px; }
-              #caixa-formas-impressao table { width: 100%; border-collapse: collapse; margin-top: 18px; }
-              #caixa-formas-impressao th, #caixa-formas-impressao td { border-bottom: 1px solid #bbb; padding: 8px; text-align: left; }
-              #caixa-formas-impressao th:last-child, #caixa-formas-impressao td:last-child { text-align: right; }
+              #caixa-formas-impressao {
+                display: block !important;
+                box-sizing: border-box;
+                width: 100%;
+                max-width: 72mm;
+                color: #111;
+                font: 10pt/1.3 Arial, sans-serif;
+              }
+              #caixa-formas-impressao h1 { font-size: 12pt; margin: 0 0 2mm; }
+              #caixa-formas-impressao h2 { font-size: 10pt; margin: 3mm 0 1mm; }
+              #caixa-formas-impressao p { margin: 2mm 0; overflow-wrap: anywhere; }
+              #caixa-formas-impressao .linha {
+                display: flex;
+                justify-content: space-between;
+                gap: 2mm;
+                border-bottom: 1px solid #bbb;
+                padding: 1mm 0;
+                break-inside: avoid;
+              }
+              #caixa-formas-impressao .linha span { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+              #caixa-formas-impressao .linha strong { flex-shrink: 0; white-space: nowrap; }
+              #caixa-formas-impressao .grupo-data { break-inside: avoid; }
             }
           `}</style>
             <h1>Resumo do caixa</h1>
@@ -473,63 +490,41 @@ export function PaymentBreakdownPanel({
               Caixa #{resumo.caixa.numero_caixa} — {resumo.caixa.usuario_nome}
             </div>
             <div>Abertura: {new Date(resumo.caixa.data_abertura).toLocaleString("pt-BR")}</div>
-            <table>
-              <tbody>
-                {itensResumo.map(([titulo, valor]) => (
-                  <tr key={titulo}>
-                    <td>{titulo}</td>
-                    <td>{formatMoneyBRL(valor)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            {itensResumo.map(([titulo, valor]) => (
+              <div className="linha" key={titulo}>
+                <span>{titulo}</span>
+                <strong>{formatMoneyBRL(valor)}</strong>
+              </div>
+            ))}
             <h2>Formas de pagamento</h2>
-            <table>
-              <thead>
-                <tr>
-                  <th>Forma</th>
-                  <th>Registros</th>
-                  <th>Valor</th>
-                </tr>
-              </thead>
-              <tbody>
-                {formas.map(([forma, dados]) => (
-                  <tr key={forma}>
-                    <td>{forma}</td>
-                    <td>
-                      {dados.quantidade} {dados.tipo_contagem || "pagamento"}
-                      {dados.quantidade !== 1 ? "s" : ""}
-                    </td>
-                    <td>{formatMoneyBRL(dados.total)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            {formas.map(([forma, dados]) => (
+              <div className="linha" key={forma}>
+                <span>
+                  {forma} · {dados.quantidade} {dados.tipo_contagem || "pagamento"}
+                  {dados.quantidade !== 1 ? "s" : ""}
+                </span>
+                <strong>{formatMoneyBRL(dados.total)}</strong>
+              </div>
+            ))}
             {recebimentosPorData.length > 0 && (
               <>
                 <h2>Conferência por data da venda</h2>
-                <table>
-                  <thead>
-                    <tr>
-                      <th>Data da venda</th>
-                      <th>Forma</th>
-                      <th>Registros</th>
-                      <th>Valor</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {recebimentosPorData.flatMap(([data, formasDoDia]) =>
-                      Object.entries(formasDoDia).map(([forma, dados]) => (
-                        <tr key={`${data}-${forma}`}>
-                          <td>{rotuloData(data)}</td>
-                          <td>{forma}</td>
-                          <td>{dados.quantidade}</td>
-                          <td>{formatMoneyBRL(dados.total)}</td>
-                        </tr>
-                      )),
-                    )}
-                  </tbody>
-                </table>
+                {recebimentosPorData.map(([data, formasDoDia]) => (
+                  <div className="grupo-data" key={data}>
+                    <div className="linha">
+                      <strong>{rotuloData(data)}</strong>
+                      <strong>{formatMoneyBRL(totalPorData(formasDoDia))}</strong>
+                    </div>
+                    {Object.entries(formasDoDia).map(([forma, dados]) => (
+                      <div className="linha" key={forma}>
+                        <span>
+                          {forma} · {dados.quantidade}
+                        </span>
+                        <strong>{formatMoneyBRL(dados.total)}</strong>
+                      </div>
+                    ))}
+                  </div>
+                ))}
               </>
             )}
             <p>
