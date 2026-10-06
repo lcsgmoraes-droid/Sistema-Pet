@@ -150,6 +150,13 @@ def reconcile(db, *, tenant_id, apply=False, expected_count=None, expected_total
 
 
 def main() -> None:
+    # Register all ORM models before a customer row lock configures mappers.
+    # This command runs outside the API startup path, which normally does it.
+    import app.main  # noqa: F401
+    from sqlalchemy.orm import configure_mappers
+
+    configure_mappers()
+
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--tenant-id", required=True)
     parser.add_argument("--apply", action="store_true")
