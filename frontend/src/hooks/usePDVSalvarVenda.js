@@ -66,8 +66,12 @@ export function usePDVSalvarVenda({
     try {
       const vendaParaPayload = {
         ...vendaAtual,
-        vendedor_funcionario_id: vendaComissionada || vendedorObrigatorio ? funcionarioComissao?.id || null : null,
-        funcionario_id: (vendaComissionada || vendedorObrigatorio) && gerarComissao ? funcionarioComissao?.id || null : null,
+        vendedor_funcionario_id:
+          vendaComissionada || vendedorObrigatorio ? funcionarioComissao?.id || null : null,
+        funcionario_id:
+          (vendaComissionada || vendedorObrigatorio) && gerarComissao
+            ? funcionarioComissao?.id || null
+            : null,
       };
       const payloadVenda = montarPayloadVenda(vendaParaPayload, entregadorSelecionado);
 

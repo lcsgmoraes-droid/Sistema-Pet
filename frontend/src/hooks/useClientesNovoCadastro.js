@@ -492,7 +492,9 @@ export function useClientesNovoCadastro({
 
       const numerosAdicionais = formData.contatos_adicionais || [];
       const numerosVistos = new Set(
-        [formData.celular, formData.telefone].map((numero) => String(numero || "").replace(/\D/g, "")),
+        [formData.celular, formData.telefone].map((numero) =>
+          String(numero || "").replace(/\D/g, ""),
+        ),
       );
       for (const contato of numerosAdicionais) {
         const digitos = String(contato.numero || "").replace(/\D/g, "");

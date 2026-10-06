@@ -33,7 +33,8 @@ const ClientesNovoContatosStep = ({
         <div>
           <h4 className="text-sm font-semibold text-gray-900">Celulares adicionais</h4>
           <p className="text-xs text-gray-500">
-            Cadastre o celular da mãe, irmã ou de outra pessoa. No PDV, esse número encontra o cadastro principal e seus benefícios.
+            Cadastre o celular da mãe, irmã ou de outra pessoa. No PDV, esse número encontra o
+            cadastro principal e seus benefícios.
           </p>
         </div>
         {(formData.contatos_adicionais || []).map((contato, index) => (
@@ -66,10 +67,12 @@ const ClientesNovoContatosStep = ({
             />
             <button
               type="button"
-              onClick={() => setFormData({
-                ...formData,
-                contatos_adicionais: formData.contatos_adicionais.filter((_, i) => i !== index),
-              })}
+              onClick={() =>
+                setFormData({
+                  ...formData,
+                  contatos_adicionais: formData.contatos_adicionais.filter((_, i) => i !== index),
+                })
+              }
               className="rounded-lg px-3 py-2 text-sm text-red-700 hover:bg-red-50"
             >
               Remover
@@ -78,10 +81,15 @@ const ClientesNovoContatosStep = ({
         ))}
         <button
           type="button"
-          onClick={() => setFormData({
-            ...formData,
-            contatos_adicionais: [...(formData.contatos_adicionais || []), { numero: "", vinculo: "" }],
-          })}
+          onClick={() =>
+            setFormData({
+              ...formData,
+              contatos_adicionais: [
+                ...(formData.contatos_adicionais || []),
+                { numero: "", vinculo: "" },
+              ],
+            })
+          }
           className="rounded-lg border border-blue-300 px-3 py-2 text-sm font-medium text-blue-700 hover:bg-blue-50"
         >
           + Adicionar celular

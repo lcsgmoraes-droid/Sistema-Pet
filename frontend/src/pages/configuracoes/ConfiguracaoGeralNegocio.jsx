@@ -271,8 +271,8 @@ export default function ConfiguracaoGeralNegocio() {
           Exigir indicação do vendedor em cada venda
         </label>
         <p className="mt-2 text-sm text-gray-600">
-          Quando ativado, a venda só pode ser salva após selecionar um vendedor. A comissão
-          continua opcional e é configurada separadamente na venda.
+          Quando ativado, a venda só pode ser salva após selecionar um vendedor. A comissão continua
+          opcional e é configurada separadamente na venda.
         </p>
       </div>
 

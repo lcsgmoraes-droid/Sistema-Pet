@@ -14,11 +14,15 @@ export function usePDVFuncionariosBusca() {
       if (parceirosResult.status === "rejected" && funcionariosResult.status === "rejected") {
         throw parceirosResult.reason;
       }
-      const parceiros = parceirosResult.status === "fulfilled" ? parceirosResult.value.data.data || [] : [];
-      const funcionariosAtivos = funcionariosResult.status === "fulfilled" ? funcionariosResult.value.data || [] : [];
-      const funcionarios = [...new Map(
-        [...parceiros, ...funcionariosAtivos].map((funcionario) => [funcionario.id, funcionario]),
-      ).values()];
+      const parceiros =
+        parceirosResult.status === "fulfilled" ? parceirosResult.value.data.data || [] : [];
+      const funcionariosAtivos =
+        funcionariosResult.status === "fulfilled" ? funcionariosResult.value.data || [] : [];
+      const funcionarios = [
+        ...new Map(
+          [...parceiros, ...funcionariosAtivos].map((funcionario) => [funcionario.id, funcionario]),
+        ).values(),
+      ];
       const termo = String(busca || "")
         .trim()
         .toLowerCase();

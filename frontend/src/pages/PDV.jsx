@@ -59,14 +59,17 @@ export default function PDV() {
 
   useEffect(() => {
     let ativo = true;
-    api.get("/empresa/config/pdv")
+    api
+      .get("/empresa/config/pdv")
       .then(({ data }) => {
         if (ativo) setVendedorObrigatorio(Boolean(data.vendedor_obrigatorio_pdv));
       })
       .catch(() => {
         if (ativo) toast.error("Não foi possível carregar a regra de vendedor do PDV.");
       });
-    return () => { ativo = false; };
+    return () => {
+      ativo = false;
+    };
   }, []);
 
   // 🔒 Controle de visibilidade de dados gerenciais (lucro, margem, custos)
