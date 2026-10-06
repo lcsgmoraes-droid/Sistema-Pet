@@ -13,6 +13,23 @@ from app.produtos.validators import _resolver_tenant_produto_catalogo
 router = APIRouter(prefix="/produtos", tags=["Fiscal Produto V2"])
 
 
+def _sincronizar_fiscal_no_cadastro(produto, fiscal, payload):
+    """Mantém os campos fiscais do cadastro alinhados à configuração V2."""
+    campos = {
+        "ncm": ("ncm", "ncm"),
+        "cest": ("cest", "cest"),
+        "origem_mercadoria": ("origem", "origem_mercadoria"),
+        "icms_aliquota": ("aliquota_icms", "icms_aliquota"),
+        "pis_aliquota": ("aliquota_pis", "pis_aliquota"),
+        "cofins_aliquota": ("aliquota_cofins", "cofins_aliquota"),
+    }
+    for chave, (campo_produto, campo_fiscal) in campos.items():
+        if chave in payload:
+            setattr(produto, campo_produto, getattr(fiscal, campo_fiscal))
+    if "cfop" in payload or "cfop_venda" in payload:
+        produto.cfop = fiscal.cfop_venda
+
+
 @router.get("/{produto_id}/fiscal")
 def get_fiscal_produto(
     produto_id: int,
@@ -231,6 +248,14 @@ def put_fiscal_produto(
     """
     tenant_id, _ = _resolver_tenant_produto_catalogo(db, tenant_id, produto_id)
 
+    produto = (
+        db.query(Produto)
+        .filter(Produto.id == produto_id, Produto.tenant_id == tenant_id)
+        .first()
+    )
+    if produto is None:
+        raise HTTPException(status_code=404, detail="Produto não encontrado")
+
     fiscal = (
         db.query(ProdutoConfigFiscal)
         .filter(
@@ -252,7 +277,8 @@ def put_fiscal_produto(
     fiscal.origem_mercadoria = payload.get("origem_mercadoria") or None
     fiscal.ncm = payload.get("ncm") or None
     fiscal.cest = payload.get("cest") or None
-    fiscal.cfop_venda = payload.get("cfop") or None
+    cfop = payload["cfop"] if "cfop" in payload else payload.get("cfop_venda")
+    fiscal.cfop_venda = cfop or None
 
     fiscal.cst_icms = payload.get("cst_icms") or None
     # Converter strings vazias para None em campos numéricos
@@ -276,6 +302,7 @@ def put_fiscal_produto(
     )
 
     fiscal.herdado_da_empresa = False
+    _sincronizar_fiscal_no_cadastro(produto, fiscal, payload)
 
     db.commit()
     db.refresh(fiscal)
@@ -333,7 +360,8 @@ def put_fiscal_kit(
     fiscal.origem_mercadoria = payload.get("origem_mercadoria")
     fiscal.ncm = payload.get("ncm")
     fiscal.cest = payload.get("cest")
-    fiscal.cfop_venda = payload.get("cfop")
+    cfop = payload["cfop"] if "cfop" in payload else payload.get("cfop_venda")
+    fiscal.cfop_venda = cfop or None
 
     fiscal.cst_icms = payload.get("cst_icms")
     fiscal.icms_aliquota = payload.get("icms_aliquota")
@@ -345,6 +373,7 @@ def put_fiscal_kit(
     fiscal.cofins_aliquota = payload.get("cofins_aliquota")
 
     fiscal.herdado_da_empresa = False
+    _sincronizar_fiscal_no_cadastro(produto, fiscal, payload)
 
     db.commit()
     db.refresh(fiscal)

@@ -113,6 +113,8 @@ async def finalizar_venda(
         data_ocorrencia=dados.data_ocorrencia if caixa_revisao else None,
         motivo_revisao=dados.motivo_revisao.strip() if caixa_revisao else None,
         motivo_liberacao_crediario=dados.motivo_liberacao_crediario,
+        nao_gerar_beneficios=dados.nao_gerar_beneficios,
+        justificativa_nao_gerar_beneficios=dados.justificativa_nao_gerar_beneficios,
     )
 
     # Log de sucesso
@@ -235,7 +237,7 @@ async def finalizar_venda(
     # 🎯 CAMPANHAS — Publicar evento purchase_completed na fila
     # Nunca bloqueia a venda em caso de falha
     # ============================================================
-    if venda.cliente_id:
+    if venda.cliente_id and not venda.nao_gerar_beneficios:
         try:
             from app.campaigns.models import CampaignEventQueue, EventOriginEnum
 

@@ -5,8 +5,8 @@ import {
   CheckCircle,
   DollarSign,
   Receipt,
-  TrendingDown,
-  TrendingUp,
+  Printer,
+  Download,
   X,
 } from "lucide-react";
 import CurrencyInput from "../CurrencyInput";
@@ -18,6 +18,7 @@ import {
 } from "./ModalFecharCaixaPanels";
 
 export default function ModalFecharCaixaContent({
+  baixarPdf,
   calcularTotalNotas,
   atualizarQuantidadeNota,
   atualizarValorMoedas,
@@ -36,6 +37,8 @@ export default function ModalFecharCaixaContent({
   notas,
   observacoes,
   onClose,
+  onSuccess,
+  imprimirTermico,
   resumo,
   salvando,
   setConfirmandoDiferenca,
@@ -65,7 +68,7 @@ export default function ModalFecharCaixaContent({
                 </p>
               </div>
               <button
-                onClick={onClose}
+                onClick={sucesso ? onSuccess : onClose}
                 className="p-2 hover:bg-white hover:bg-opacity-20 rounded-lg transition-colors"
               >
                 <X className="w-6 h-6" />
@@ -75,83 +78,6 @@ export default function ModalFecharCaixaContent({
 
           {/* Conteúdo */}
           <div className="p-6 space-y-6">
-            {/* Resumo do Caixa */}
-            <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-lg p-6 border-2 border-gray-200">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-bold text-gray-900 flex items-center">
-                  <Calculator className="w-5 h-5 mr-2 text-gray-700" />
-                  Resumo do Movimento
-                </h3>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                {/* Abertura */}
-                <div className="bg-white rounded-lg p-4 border border-gray-200">
-                  <div className="text-sm text-gray-600 mb-1">Valor de Abertura</div>
-                  <div className="text-2xl font-bold text-gray-900">
-                    R$ {formatBRL(resumo.caixa.valor_abertura)}
-                  </div>
-                  <div className="text-xs text-gray-500 mt-1">
-                    {new Date(resumo.caixa.data_abertura).toLocaleString("pt-BR")}
-                  </div>
-                </div>
-
-                {/* Entradas (renomeado de Vendas) */}
-                <div className="bg-white rounded-lg p-4 border border-green-200">
-                  <div className="flex items-center text-sm text-green-700 mb-1">
-                    <Receipt className="w-4 h-4 mr-1" />
-                    Entradas
-                  </div>
-                  <div className="text-2xl font-bold text-green-600">
-                    + R$ {formatBRL(resumo.totais.vendas)}
-                  </div>
-                  <div className="text-xs text-gray-500 mt-1">Movimento de entrada</div>
-                </div>
-
-                {/* Suprimentos */}
-                <div className="bg-white rounded-lg p-4 border border-blue-200">
-                  <div className="flex items-center text-sm text-blue-700 mb-1">
-                    <TrendingUp className="w-4 h-4 mr-1" />
-                    Suprimentos
-                  </div>
-                  <div className="text-2xl font-bold text-blue-600">
-                    + R$ {formatBRL(resumo.totais.suprimentos)}
-                  </div>
-                </div>
-
-                {/* Sangrias */}
-                <div className="bg-white rounded-lg p-4 border border-orange-200">
-                  <div className="flex items-center text-sm text-orange-700 mb-1">
-                    <TrendingDown className="w-4 h-4 mr-1" />
-                    Sangrias
-                  </div>
-                  <div className="text-2xl font-bold text-orange-600">
-                    - R$ {formatBRL(resumo.totais.sangrias)}
-                  </div>
-                </div>
-
-                {[
-                  ["Devoluções em dinheiro", resumo.totais.devolucoes],
-                  ["Transferências", resumo.totais.transferencias],
-                ].map(([titulo, valor]) => (
-                  <div key={titulo} className="bg-white rounded-lg p-4 border border-red-200">
-                    <div className="text-sm text-red-700 mb-1">{titulo}</div>
-                    <div className="text-2xl font-bold text-red-600">- R$ {formatBRL(valor)}</div>
-                  </div>
-                ))}
-                {/* Despesas */}
-                <div className="bg-white rounded-lg p-4 border border-red-200">
-                  <div className="flex items-center text-sm text-red-700 mb-1">
-                    <DollarSign className="w-4 h-4 mr-1" />
-                    Despesas
-                  </div>
-                  <div className="text-2xl font-bold text-red-600">
-                    - R$ {formatBRL(resumo.totais.despesas)}
-                  </div>
-                </div>
-              </div>
-            </div>
-
             {/* Valor Contado */}
             <div>
               <div className="flex items-center justify-between mb-2">
@@ -273,7 +199,7 @@ export default function ModalFecharCaixaContent({
                 <AlertCircle className="w-6 h-6 text-red-600 flex-shrink-0 mt-0.5" />
                 <div>
                   <div className="font-bold text-red-800 text-sm mb-1">
-                    Não foi possível fechar o caixa
+                    {sucesso ? "Não foi possível gerar o relatório" : "Não foi possível fechar o caixa"}
                   </div>
                   <div className="text-red-700 text-sm">{erro}</div>
                 </div>
@@ -282,14 +208,22 @@ export default function ModalFecharCaixaContent({
 
             {/* Mensagem de sucesso */}
             {sucesso && (
-              <div className="bg-green-50 border-2 border-green-400 rounded-xl p-4 flex items-center space-x-3">
-                <CheckCircle className="w-6 h-6 text-green-600 flex-shrink-0" />
-                <div className="font-bold text-green-800">Caixa fechado com sucesso!</div>
+              <div className="bg-green-50 border-2 border-green-400 rounded-xl p-4 space-y-3">
+                <div className="flex items-center space-x-3">
+                  <CheckCircle className="w-6 h-6 text-green-600 flex-shrink-0" />
+                  <div className="font-bold text-green-800">Caixa fechado com sucesso!</div>
+                </div>
+                <p className="text-sm text-green-900">O relatório está pronto para imprimir e assinar.</p>
+                <div className="flex flex-wrap gap-2">
+                  <button type="button" onClick={baixarPdf} className="inline-flex items-center gap-2 rounded-lg bg-white border border-green-300 px-3 py-2 font-medium text-green-900"><Download className="h-4 w-4" /> Baixar PDF</button>
+                  <button type="button" onClick={imprimirTermico} className="inline-flex items-center gap-2 rounded-lg bg-white border border-green-300 px-3 py-2 font-medium text-green-900"><Printer className="h-4 w-4" /> Imprimir na térmica</button>
+                  <button type="button" onClick={onSuccess} className="rounded-lg bg-green-700 px-3 py-2 font-medium text-white">Concluir</button>
+                </div>
               </div>
             )}
 
             {/* Botões / Confirmação de diferença */}
-            {confirmandoDiferenca ? (
+            {sucesso ? null : confirmandoDiferenca ? (
               <div className="pt-4 border-t">
                 <div className="bg-amber-50 border-2 border-amber-400 rounded-xl p-4 mb-3">
                   <div className="flex items-start space-x-3">

@@ -49,6 +49,8 @@ export const finalizarVenda = async (vendaId, pagamentos, options = {}) => {
     cupom_code: options.cupom_code || null,
     cupom_discount_applied: options.cupom_discount_applied ?? null,
     motivo_liberacao_crediario: options.motivo_liberacao_crediario || null,
+    nao_gerar_beneficios: Boolean(options.nao_gerar_beneficios),
+    justificativa_nao_gerar_beneficios: options.justificativa_nao_gerar_beneficios || null,
     ...obterContextoRevisaoCaixa(),
   });
   return response.data;

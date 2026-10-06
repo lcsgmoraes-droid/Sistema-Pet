@@ -91,6 +91,22 @@ class CampaignEngine:
 
             try:
                 if event.event_type == "purchase_completed":
+                    if (event.payload or {}).get("venda_id"):
+                        from app.vendas_models import Venda
+
+                        venda = (
+                            self.db.query(Venda)
+                            .filter(
+                                Venda.id == int(event.payload["venda_id"]),
+                                Venda.tenant_id == event.tenant_id,
+                            )
+                            .first()
+                        )
+                        if venda is not None and venda.nao_gerar_beneficios:
+                            event.status = "skipped"
+                            event.processed_at = datetime.now()
+                            self.db.commit()
+                            return
                     from app.campaigns.sale_return_service import prepare_purchase_event
 
                     effective_payload = (

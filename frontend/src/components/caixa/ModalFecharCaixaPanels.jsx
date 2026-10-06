@@ -3,7 +3,8 @@ import { createPortal } from "react-dom";
 import { Calculator, Printer, Receipt, X } from "lucide-react";
 import CustomerIdentity from "../ui/CustomerIdentity";
 import SaleReference from "../ui/SaleReference";
-import { formatMoneyBRL } from "../../utils/formatters";
+import { formatBRL, formatMoneyBRL } from "../../utils/formatters";
+import CurrencyInput from "../CurrencyInput";
 
 export function CashCountPanel({
   aplicarContagem,
@@ -187,17 +188,15 @@ export function CashCountPanel({
                   <div className="bg-gradient-to-br from-amber-500 to-amber-600 text-white px-3 py-2 rounded-lg font-bold text-sm shadow-md">
                     💰 Moedas
                   </div>
-                  <input
-                    type="text"
-                    inputMode="decimal"
+                  <CurrencyInput
                     value={notas.moedas}
-                    onChange={(e) => atualizarValorMoedas(e.target.value)}
+                    onChange={atualizarValorMoedas}
                     className="w-32 px-3 py-2 border-2 border-gray-300 rounded-lg text-center font-bold text-lg focus:border-amber-500 focus:ring-2 focus:ring-amber-200"
-                    placeholder=""
+                    aria-label="Valor das moedas"
                   />
                 </div>
                 <span className="text-lg font-bold text-amber-600">
-                  R$ {(parseFloat(notas.moedas) || 0).toFixed(2)}
+                  R$ {formatBRL(notas.moedas)}
                 </span>
               </div>
             </div>
@@ -209,7 +208,7 @@ export function CashCountPanel({
               <div className="flex items-center justify-between">
                 <span className="text-white font-semibold text-sm">TOTAL CONTADO</span>
                 <span className="text-3xl font-bold text-white">
-                  R$ {calcularTotalNotas().toFixed(2)}
+                  R$ {formatBRL(calcularTotalNotas())}
                 </span>
               </div>
             </div>
@@ -246,6 +245,15 @@ export function PaymentBreakdownPanel({
 }) {
   const [imprimindo, setImprimindo] = useState(false);
   const formas = Object.entries(resumo.vendas_por_forma_pagamento || {});
+  const itensResumo = [
+    ["Total vendido", resumo.total_vendido],
+    ["Total recebido", resumo.total_recebido],
+    ["Valor de abertura", resumo.caixa.valor_abertura],
+    ["Suprimentos", resumo.totais.suprimentos],
+    ["Sangria", resumo.totais.sangrias],
+    ["Devoluções", resumo.totais.devolucoes],
+    ["Despesas", resumo.totais.despesas],
+  ];
   const recebimentosPorData = Object.entries(resumo.recebimentos_por_data_venda || {}).sort(
     ([dataA], [dataB]) => dataB.localeCompare(dataA),
   );
@@ -271,24 +279,33 @@ export function PaymentBreakdownPanel({
 
   return (
     <>
-      {formas.length > 0 && (
         <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg p-4 border border-blue-200">
           <div className="flex items-center justify-between gap-2 mb-3">
             <h4 className="text-sm font-bold text-gray-700 flex items-center">
               <Receipt className="w-4 h-4 mr-1.5 text-blue-600" />
-              Recebimentos por Forma de Pagamento
+              Resumo do Caixa
             </h4>
             <button
               type="button"
               onClick={() => setImprimindo(true)}
               className="inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold text-blue-700 bg-white border border-blue-300 rounded hover:bg-blue-50"
-              title="Imprimir recebimentos por forma de pagamento"
+              title="Imprimir resumo do caixa e formas de pagamento"
             >
               <Printer className="w-4 h-4" />
               Imprimir
             </button>
           </div>
 
+          <div className="grid grid-cols-2 gap-2">
+            {itensResumo.map(([titulo, valor]) => (
+              <div key={titulo} className="bg-white rounded-lg p-3 border border-gray-200">
+                <div className="text-xs font-semibold text-gray-700">{titulo}</div>
+                <div className="mt-1 text-sm font-bold text-gray-900">{formatMoneyBRL(valor)}</div>
+              </div>
+            ))}
+          </div>
+
+          <h5 className="mt-4 mb-2 text-sm font-bold text-gray-700">Formas de Pagamento</h5>
           <div className="grid grid-cols-2 gap-2">
             {formas.map(([forma, dados]) => {
               const ehDinheiro = forma === "Dinheiro";
@@ -342,6 +359,9 @@ export function PaymentBreakdownPanel({
                 </div>
               );
             })}
+            {formas.length === 0 && (
+              <p className="col-span-2 text-xs text-gray-600">Nenhum pagamento registrado.</p>
+            )}
           </div>
 
           {recebimentosPorData.length > 0 && (
@@ -433,7 +453,6 @@ export function PaymentBreakdownPanel({
             caixa. As demais formas são informativas.
           </div>
         </div>
-      )}
       {imprimindo &&
         createPortal(
           <div id="caixa-formas-impressao">
@@ -449,11 +468,22 @@ export function PaymentBreakdownPanel({
               #caixa-formas-impressao th:last-child, #caixa-formas-impressao td:last-child { text-align: right; }
             }
           `}</style>
-            <h1>Recebimentos por forma de pagamento</h1>
+            <h1>Resumo do caixa</h1>
             <div>
               Caixa #{resumo.caixa.numero_caixa} — {resumo.caixa.usuario_nome}
             </div>
             <div>Abertura: {new Date(resumo.caixa.data_abertura).toLocaleString("pt-BR")}</div>
+            <table>
+              <tbody>
+                {itensResumo.map(([titulo, valor]) => (
+                  <tr key={titulo}>
+                    <td>{titulo}</td>
+                    <td>{formatMoneyBRL(valor)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <h2>Formas de pagamento</h2>
             <table>
               <thead>
                 <tr>

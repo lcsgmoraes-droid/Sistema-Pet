@@ -247,7 +247,7 @@ async def baixar_vendas_lote(
                         "saldo_anterior": saldo_devedor,
                     }
                 )
-                if venda.cliente_id:
+                if venda.cliente_id and not venda.nao_gerar_beneficios:
                     try:
                         from app.campaigns.models import (
                             CampaignEventQueue,

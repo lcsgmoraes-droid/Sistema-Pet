@@ -33,6 +33,8 @@ export function useModalPagamentoActions({
   justificativaTexto,
   margemCriticaAtual,
   moduloFiscalAtivo,
+  naoGerarBeneficios,
+  justificativaBeneficios,
   nsuCartao,
   numeroParcelas,
   onConfirmar,
@@ -247,6 +249,10 @@ export function useModalPagamentoActions({
       const opcoesFinalizacao = {
         cupom_code: cupomParaFinalizar?.code || null,
         cupom_discount_applied: cupomParaFinalizar?.discount_applied ?? null,
+        nao_gerar_beneficios: naoGerarBeneficios,
+        justificativa_nao_gerar_beneficios: naoGerarBeneficios
+          ? justificativaBeneficios.trim()
+          : null,
       };
       let resultado;
       try {

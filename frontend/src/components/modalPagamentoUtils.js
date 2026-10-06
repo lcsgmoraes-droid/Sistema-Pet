@@ -1,7 +1,4 @@
-import {
-  campaignAllowsSaleChannel,
-  getCashbackBonusParamKey,
-} from "../utils/campaignChannelScope.js";
+import { campaignAllowsSaleChannel } from "../utils/campaignChannelScope.js";
 import { formatMoneyBRL } from "../utils/formatters.js";
 
 export const BANDEIRAS_CARTAO = [
@@ -333,6 +330,26 @@ export function calcularSaldoBeneficioDisponivel({ saldo = 0, pagamentos = [], t
     return total + (corresponde ? Math.round(Number(pagamento.valor || 0) * 100) : 0);
   }, 0);
   return Math.max(0, saldoCentavos - reservadoCentavos) / 100;
+}
+
+export function calcularCashbackDisponivelNaVenda({
+  saldo,
+  valorTotal,
+  limitePercentual,
+  pagamentos = [],
+  pagamentosExistentes = [],
+}) {
+  const saldoDisponivel = calcularSaldoBeneficioDisponivel({ saldo, pagamentos, tipo: "cashback" });
+  if (limitePercentual === null || limitePercentual === undefined) return saldoDisponivel;
+  const limiteCentavos = Math.floor(
+    (Math.round(Number(valorTotal || 0) * 100) * Number(limitePercentual)) / 100 + 1e-9,
+  );
+  const usadoCentavos = [...pagamentos, ...pagamentosExistentes].reduce((total, pagamento) => {
+    const ehCashback =
+      pagamento.is_cashback || String(pagamento.forma_pagamento || "").toLowerCase() === "cashback";
+    return total + (ehCashback ? Math.round(Number(pagamento.valor || 0) * 100) : 0);
+  }, 0);
+  return Math.min(saldoDisponivel, Math.max(0, limiteCentavos - usadoCentavos) / 100);
 }
 
 export function montarCupomParaFinalizar({ cupomAplicado, venda = {} }) {
@@ -874,15 +891,13 @@ export function calcularBeneficiosCampanhaPreview({
       const params = campanha.params || {};
       const chaveRank = `${rankCliente}_percent`;
       const percentualBase = Number(params[chaveRank] ?? params.bronze_percent ?? 0);
-      const bonusCanal = Number(params[getCashbackBonusParamKey(canal)] ?? 0);
-      const percentualTotal = percentualBase + bonusCanal;
-      const valor = (valorBaseNumerico * percentualTotal) / 100;
+      const valor = (valorBaseNumerico * percentualBase) / 100;
 
       if (valor <= 0) return null;
 
       return {
         campanha: campanha.name,
-        percentual: percentualTotal,
+        percentual: percentualBase,
         valor,
       };
     })

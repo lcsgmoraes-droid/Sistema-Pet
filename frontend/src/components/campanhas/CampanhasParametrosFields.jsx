@@ -4,6 +4,7 @@ export function CampanhaField({
   type = "number",
   step = "any",
   min,
+  max,
   value,
   onChange,
   placeholder,
@@ -19,6 +20,7 @@ export function CampanhaField({
         type={type}
         step={step}
         min={min}
+        max={max}
         value={value}
         placeholder={placeholder}
         onChange={onChange}

@@ -6,6 +6,11 @@ export default function ModalPagamentoResumoLateral({
   valorPago,
   valorRestante,
   moduloCampanhasAtivo,
+  naoGerarBeneficios,
+  setNaoGerarBeneficios,
+  justificativaBeneficios,
+  setJustificativaBeneficios,
+  bloqueioBeneficiosSalvo,
   clienteId,
   loadingBeneficiosCampanha,
   carimbosPrevistos,
@@ -49,7 +54,44 @@ export default function ModalPagamentoResumoLateral({
             Prévia para o cliente com base nas campanhas ativas no momento.
           </p>
 
-          {!clienteId ? (
+          <label className="flex items-center gap-2 text-sm font-medium text-indigo-900 mb-2">
+            <input
+              type="checkbox"
+              checked={naoGerarBeneficios}
+              onChange={(event) => setNaoGerarBeneficios(event.target.checked)}
+              disabled={loading || bloqueioBeneficiosSalvo || pagamentosExistentes.length > 0}
+              className="h-4 w-4 accent-indigo-700"
+            />
+            Não gerar benefícios para esta venda
+          </label>
+          {pagamentosExistentes.length > 0 && !bloqueioBeneficiosSalvo && (
+            <p className="text-xs text-indigo-700 mb-2">
+              Disponível somente antes do primeiro recebimento.
+            </p>
+          )}
+          {naoGerarBeneficios && (
+            <div className="mb-3">
+              <p className="text-sm text-indigo-900 mb-2">
+                Esta venda não gerará carimbos, cashback nem cupons de campanhas.
+                {bloqueioBeneficiosSalvo && " Opção já registrada na venda."}
+              </p>
+              <label htmlFor="justificativa-beneficios" className="text-xs text-indigo-800">
+                Justificativa (opcional)
+              </label>
+              <textarea
+                id="justificativa-beneficios"
+                value={justificativaBeneficios}
+                onChange={(event) => setJustificativaBeneficios(event.target.value)}
+                maxLength={500}
+                rows={2}
+                disabled={loading || bloqueioBeneficiosSalvo}
+                placeholder="Ex.: desconto especial concedido ao cliente"
+                className="mt-1 w-full rounded-md border border-indigo-300 p-2 text-sm text-gray-900"
+              />
+            </div>
+          )}
+
+          {naoGerarBeneficios ? null : !clienteId ? (
             <p className="text-sm text-indigo-800">
               Associe um cliente para visualizar os benefícios de campanhas.
             </p>

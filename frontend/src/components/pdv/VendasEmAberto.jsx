@@ -4,10 +4,7 @@ import { toast } from "react-hot-toast";
 import api from "../../api";
 import { formatBRL, formatMoneyBRL } from "../../utils/formatters";
 import CurrencyInput from "../CurrencyInput";
-import {
-  campaignAllowsSaleChannel,
-  getCashbackBonusParamKey,
-} from "../../utils/campaignChannelScope";
+import { campaignAllowsSaleChannel } from "../../utils/campaignChannelScope";
 import { useModulos } from "../../contexts/ModulosContext";
 import CustomerIdentity from "../ui/CustomerIdentity";
 import SaleReference from "../ui/SaleReference";
@@ -178,20 +175,16 @@ export default function VendasEmAberto({ cliente, clienteId, clienteNome, onClos
 
       const chaveRank = `${rankCliente}_percent`;
       const percentualBase = Number(params[chaveRank] ?? params.bronze_percent ?? 0);
-      const percentuais = new Set();
       const valorCashback = vendasElegiveis.reduce((acc, venda) => {
-        const bonusKey = getCashbackBonusParamKey(venda.canal || "loja_fisica");
-        const percentualTotal = percentualBase + Number(params[bonusKey] ?? 0);
-        percentuais.add(percentualTotal);
         const totalVenda = parseFloat(venda.total || 0);
-        return acc + (totalVenda * percentualTotal) / 100;
+        return acc + (totalVenda * percentualBase) / 100;
       }, 0);
 
       if (valorCashback <= 0) return null;
 
       return {
         campanha: campanha.name,
-        percentual: percentuais.size === 1 ? [...percentuais][0] : null,
+        percentual: percentualBase,
         valor: valorCashback,
       };
     })

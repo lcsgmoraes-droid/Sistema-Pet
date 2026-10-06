@@ -9,6 +9,7 @@ from sqlalchemy import func as sqlfunc, or_ as sql_or_
 from sqlalchemy.orm import Session
 
 from app.auth.dependencies import get_current_user_and_tenant
+from app.campaigns.cashback_limit import cashback_use_limit_percent
 from app.campaigns.loyalty_service import summarize_loyalty_balances_for_customer
 from app.campaigns.cashback_wallet import (
     get_cashback_wallet,
@@ -268,6 +269,7 @@ def saldo_cliente(
     saldo_cashback = float(
         get_cashback_wallet(db, tenant_id=tenant_id, customer_id=customer_id).available
     )
+    cashback_limit_percent = cashback_use_limit_percent(db, tenant_id)
     now_utc = datetime.now(timezone.utc)
 
     loyalty_summary = summarize_loyalty_balances_for_customer(
@@ -316,6 +318,9 @@ def saldo_cliente(
     return {
         "customer_id": customer_id,
         "saldo_cashback": saldo_cashback,
+        "cashback_use_limit_percent": (
+            float(cashback_limit_percent) if cashback_limit_percent is not None else None
+        ),
         "total_carimbos": loyalty_summary["total_carimbos"],
         "total_carimbos_brutos": loyalty_summary["total_carimbos_brutos"],
         "carimbos_comprometidos_total": loyalty_summary["carimbos_comprometidos_total"],

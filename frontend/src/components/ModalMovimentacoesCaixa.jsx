@@ -1,13 +1,16 @@
 import { useState, useEffect } from "react";
-import { X, RefreshCw, TrendingUp, TrendingDown } from "lucide-react";
+import { X, RefreshCw, TrendingUp, TrendingDown, Printer } from "lucide-react";
 import api from "../api";
 import toast from "react-hot-toast";
 import SaleReference from "./ui/SaleReference";
+import ImpressaoTermicaCaixa from "./caixa/ImpressaoTermicaCaixa";
+import { formatMoneyBRL } from "../utils/formatters";
 
 export default function ModalMovimentacoesCaixa({ caixaId, onClose }) {
   const [movimentacoes, setMovimentacoes] = useState([]);
   const [caixa, setCaixa] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [movimentoImpressao, setMovimentoImpressao] = useState(null);
 
   useEffect(() => {
     carregarMovimentacoes();
@@ -60,7 +63,7 @@ export default function ModalMovimentacoesCaixa({ caixaId, onClose }) {
             </h2>
             {caixa && (
               <p className="text-sm text-gray-600 mt-1">
-                Caixa #{caixa.id} - {caixa.nome} | Status: {caixa.status}
+                Caixa #{caixa.numero_caixa} - {caixa.usuario_nome} | Status: {caixa.status}
               </p>
             )}
           </div>
@@ -149,8 +152,17 @@ export default function ModalMovimentacoesCaixa({ caixaId, onClose }) {
                       >
                         {mov.natureza === "entrada" && "+"}
                         {mov.natureza === "saida" && "-"}
-                        R$ {mov.valor.toFixed(2)}
+                        {formatMoneyBRL(mov.valor)}
                       </div>
+                      {(mov.tipo === "sangria" || mov.tipo === "suprimento") && (
+                        <button
+                          type="button"
+                          onClick={() => setMovimentoImpressao(mov)}
+                          className="mt-2 inline-flex items-center gap-1 rounded border border-gray-300 bg-white px-2 py-1 text-xs font-medium text-gray-700"
+                        >
+                          <Printer className="h-3 w-3" /> Reimprimir comprovante
+                        </button>
+                      )}
                       <div className="text-xs text-gray-500 mt-1">
                         {mov.natureza === "entrada" ? (
                           <span className="flex items-center gap-1 justify-end">
@@ -187,6 +199,10 @@ export default function ModalMovimentacoesCaixa({ caixaId, onClose }) {
           </div>
         </div>
       </div>
+      <ImpressaoTermicaCaixa
+        documento={movimentoImpressao ? { movimento: movimentoImpressao, numeroCaixa: caixa?.numero_caixa } : null}
+        onAfterPrint={() => setMovimentoImpressao(null)}
+      />
     </div>
   );
 }

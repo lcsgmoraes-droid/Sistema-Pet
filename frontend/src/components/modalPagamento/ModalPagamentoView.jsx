@@ -18,6 +18,8 @@ export default function ModalPagamentoView({
   setValorRecebido,
   valorRestante,
   saldoCashback,
+  saldoCashbackTotal,
+  cashbackLimitPercent,
   saldoCreditoDisponivel,
   formasPagamento,
   valorRecebido,
@@ -34,6 +36,10 @@ export default function ModalPagamentoView({
   valorTotal,
   valorPago,
   moduloCampanhasAtivo,
+  naoGerarBeneficios,
+  setNaoGerarBeneficios,
+  justificativaBeneficios,
+  setJustificativaBeneficios,
   loadingBeneficiosCampanha,
   carimbosPrevistos,
   cashbackPrevisto,
@@ -109,6 +115,8 @@ export default function ModalPagamentoView({
                 setValorRecebido={setValorRecebido}
                 valorRestante={valorRestante}
                 saldoCashback={saldoCashback}
+                saldoCashbackTotal={saldoCashbackTotal}
+                cashbackLimitPercent={cashbackLimitPercent}
                 saldoCreditoDisponivel={saldoCreditoDisponivel}
                 formasPagamento={formasPagamento}
                 valorRecebido={valorRecebido}
@@ -137,6 +145,11 @@ export default function ModalPagamentoView({
                   valorPago={valorPago}
                   valorRestante={valorRestante}
                   moduloCampanhasAtivo={moduloCampanhasAtivo}
+                  naoGerarBeneficios={naoGerarBeneficios}
+                  setNaoGerarBeneficios={setNaoGerarBeneficios}
+                  justificativaBeneficios={justificativaBeneficios}
+                  setJustificativaBeneficios={setJustificativaBeneficios}
+                  bloqueioBeneficiosSalvo={Boolean(venda.nao_gerar_beneficios)}
                   clienteId={venda.cliente?.id}
                   loadingBeneficiosCampanha={loadingBeneficiosCampanha}
                   carimbosPrevistos={carimbosPrevistos}

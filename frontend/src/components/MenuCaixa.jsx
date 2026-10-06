@@ -421,6 +421,7 @@ export default function MenuCaixa({
       {modalAtivo === "suprimento" && (
         <ModalSuprimento
           caixaId={caixaAberto.id}
+          numeroCaixa={caixaAberto.numero_caixa}
           onClose={() => setModalAtivo(null)}
           onSucesso={handleOperacaoSucesso}
         />
@@ -429,6 +430,7 @@ export default function MenuCaixa({
       {modalAtivo === "sangria" && (
         <ModalSangria
           caixaId={caixaAberto.id}
+          numeroCaixa={caixaAberto.numero_caixa}
           saldoAtual={resumo?.totais?.saldo_atual || 0}
           onClose={() => setModalAtivo(null)}
           onSucesso={handleOperacaoSucesso}

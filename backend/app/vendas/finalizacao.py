@@ -55,6 +55,8 @@ def finalizar_venda(
     data_ocorrencia=None,
     motivo_revisao: Optional[str] = None,
     motivo_liberacao_crediario: Optional[str] = None,
+    nao_gerar_beneficios: bool = False,
+    justificativa_nao_gerar_beneficios: Optional[str] = None,
     *,
     processar_baixa_estoque_item: Callable[..., List[Dict[str, Any]]],
 ) -> Dict[str, Any]:
@@ -213,6 +215,31 @@ def finalizar_venda(
             .filter_by(venda_id=venda.id, tenant_id=tenant_id)
             .all()
         )
+        if nao_gerar_beneficios and not venda.nao_gerar_beneficios:
+            if pagamentos_existentes:
+                raise HTTPException(
+                    status_code=409,
+                    detail="A opção de não gerar benefícios só pode ser marcada antes do primeiro recebimento.",
+                )
+            venda.nao_gerar_beneficios = True
+            venda.justificativa_nao_gerar_beneficios = (
+                justificativa_nao_gerar_beneficios.strip()
+                if justificativa_nao_gerar_beneficios and justificativa_nao_gerar_beneficios.strip()
+                else None
+            )
+            venda.beneficios_bloqueados_em = now_brasilia()
+            venda.beneficios_bloqueados_por_id = user_id
+            log_business_event(
+                db=db,
+                tenant_id=tenant_id,
+                user_id=user_id,
+                event="sale.campaign_benefits_blocked",
+                entity_type="vendas",
+                entity_id=venda.id,
+                metadata={"reason": venda.justificativa_nao_gerar_beneficios},
+                details=f"Benefícios de campanha desativados na venda #{venda.numero_venda}",
+                commit=False,
+            )
         total_venda = float(venda.total)
         totais_pagamento = _calcular_pagamentos_finalizacao(
             total_venda=total_venda,

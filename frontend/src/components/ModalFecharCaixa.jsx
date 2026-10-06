@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
 import { AlertCircle, X } from "lucide-react";
-import { fecharCaixa, obterResumoCaixa, obterVendasCaixa, validarCaixaAtual } from "../api/caixa";
+import { baixarPdfCaixa, fecharCaixa, obterResumoCaixa, obterVendasCaixa, validarCaixaAtual } from "../api/caixa";
 import ModalFecharCaixaContent from "./caixa/ModalFecharCaixaContent";
+import ImpressaoTermicaCaixa from "./caixa/ImpressaoTermicaCaixa";
 import { atualizarObservacaoComContagem } from "../utils/caixaContagem";
 
 export default function ModalFecharCaixa({ caixaId, onClose, onSuccess }) {
@@ -12,6 +13,7 @@ export default function ModalFecharCaixa({ caixaId, onClose, onSuccess }) {
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState(null);
   const [sucesso, setSucesso] = useState(false);
+  const [imprimirRelatorio, setImprimirRelatorio] = useState(false);
   const [mostrarContagem, setMostrarContagem] = useState(false);
   const [formaExpandida, setFormaExpandida] = useState(null);
   const [vendasDetalhe, setVendasDetalhe] = useState({});
@@ -73,16 +75,7 @@ export default function ModalFecharCaixa({ caixaId, onClose, onSuccess }) {
   };
 
   const atualizarValorMoedas = (valor) => {
-    const somenteDecimal = String(valor || "")
-      .replace(",", ".")
-      .replace(/[^\d.]/g, "");
-    const [inteiros, ...decimais] = somenteDecimal.split(".");
-    const casasDecimais = decimais.join("").slice(0, 2);
-
-    setNotas((prev) => ({
-      ...prev,
-      moedas: decimais.length ? `${inteiros}.${casasDecimais}` : inteiros,
-    }));
+    setNotas((prev) => ({ ...prev, moedas: valor }));
   };
 
   const carregarVendasForma = async (forma) => {
@@ -94,7 +87,7 @@ export default function ModalFecharCaixa({ caixaId, onClose, onSuccess }) {
     if (vendasDetalhe[forma]) return;
     setLoadingVendas(forma);
     try {
-      await validarCaixaAtual(caixaId);
+      if (!sucesso) await validarCaixaAtual(caixaId);
       const data = await obterVendasCaixa(caixaId, forma);
       setVendasDetalhe((prev) => ({ ...prev, [forma]: data }));
     } catch (err) {
@@ -148,16 +141,17 @@ export default function ModalFecharCaixa({ caixaId, onClose, onSuccess }) {
     setErro(null);
     try {
       await validarCaixaAtual(caixaId);
-      await fecharCaixa(caixaId, {
+      const caixaFechado = await fecharCaixa(caixaId, {
         valor_informado: valorContado,
         observacoes_fechamento: observacoes || null,
       });
 
+      const resumoFechado = await obterResumoCaixa(caixaId).catch(() => ({
+        ...resumo,
+        caixa: caixaFechado,
+      }));
+      setResumo(resumoFechado);
       setSucesso(true);
-      // Aguarda 1s mostrando sucesso antes de fechar
-      setTimeout(() => {
-        onSuccess();
-      }, 800);
     } catch (error) {
       console.error("Erro ao fechar caixa:", error);
       const mensagem =
@@ -235,6 +229,7 @@ export default function ModalFecharCaixa({ caixaId, onClose, onSuccess }) {
   const diferenca = calcularDiferenca();
 
   return (
+    <>
     <ModalFecharCaixaContent
       {...{
         calcularTotalNotas,
@@ -255,6 +250,9 @@ export default function ModalFecharCaixa({ caixaId, onClose, onSuccess }) {
         notas,
         observacoes,
         onClose,
+        onSuccess,
+        baixarPdf: () => baixarPdfCaixa(caixaId, resumo.caixa.numero_caixa).catch(() => setErro("Não foi possível gerar o PDF.")),
+        imprimirTermico: () => setImprimirRelatorio(true),
         resumo,
         salvando,
         setConfirmandoDiferenca,
@@ -268,5 +266,10 @@ export default function ModalFecharCaixa({ caixaId, onClose, onSuccess }) {
         vendasDetalhe,
       }}
     />
+    <ImpressaoTermicaCaixa
+      documento={imprimirRelatorio ? { resumo } : null}
+      onAfterPrint={() => setImprimirRelatorio(false)}
+    />
+    </>
   );
 }
