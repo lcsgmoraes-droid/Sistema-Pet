@@ -348,6 +348,7 @@ export function useModalNovaContaPagarController({ isOpen, onClose, onSave, cont
     categorias,
     categoriaSelecionada,
     dados,
+    ehPrincipalParcelado: isEditando && contaEdicao?.status === "parcelado",
     fecharComReset,
     formCategoria,
     fornecedorSelecionado,

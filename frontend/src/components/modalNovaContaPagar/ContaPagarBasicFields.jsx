@@ -6,7 +6,7 @@ export default function ContaPagarBasicFields({ controller, onOpenCategoria }) {
   const {
     categorias,
     dados,
-    isEditando,
+    ehPrincipalParcelado,
     fornecedorSelecionado,
     fornecedores,
     handleCategoriaChange,
@@ -73,7 +73,6 @@ export default function ContaPagarBasicFields({ controller, onOpenCategoria }) {
           <input
             type="checkbox"
             checked={dados.afeta_dre}
-            disabled={isEditando}
             onChange={(event) =>
               setDados((atual) => ({
                 ...atual,
@@ -90,6 +89,12 @@ export default function ContaPagarBasicFields({ controller, onOpenCategoria }) {
           Desmarque para o principal de empréstimos ou pagamento de fatura de cartão. Lance juros e
           taxas separadamente como despesa na DRE.
         </p>
+        {ehPrincipalParcelado && (
+          <p className="mt-1 text-xs text-amber-700">
+            Alterações na classificação serão aplicadas a todas as parcelas, inclusive as pagas. Os
+            valores e vencimentos das parcelas não serão alterados.
+          </p>
+        )}
       </div>
 
       <div className="min-w-0">
@@ -112,7 +117,6 @@ export default function ContaPagarBasicFields({ controller, onOpenCategoria }) {
           </select>
           <button
             type="button"
-            disabled={!dados.afeta_dre}
             onClick={onOpenCategoria}
             className="shrink-0 px-3 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 flex items-center gap-1 whitespace-nowrap"
             title="Adicionar nova categoria"

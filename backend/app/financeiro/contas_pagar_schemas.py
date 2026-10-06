@@ -57,6 +57,7 @@ class ContaPagarUpdate(BaseModel):
     fornecedor_id: Optional[int] = None
     categoria_id: Optional[int] = None
     dre_subcategoria_id: Optional[int] = None
+    afeta_dre: Optional[bool] = None
     tipo_despesa_id: Optional[int] = None
     canal: Optional[str] = None
     valor_original: Optional[float] = None
