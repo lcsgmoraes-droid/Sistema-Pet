@@ -86,7 +86,7 @@ export function usePDVVendaCarregamento({
 
         const { pagamentos, totalPago } = await carregarPagamentosVenda(vendaIdNormalizado);
 
-        await sincronizarComissaoDaVenda(venda.funcionario_id);
+        await sincronizarComissaoDaVenda(venda.vendedor_funcionario_id || venda.funcionario_id, venda.funcionario_id);
 
         const vendaCarregada = {
           id: venda.id,
@@ -105,6 +105,7 @@ export function usePDVVendaCarregamento({
           total: venda.total || 0,
           observacoes: venda.observacoes || "",
           funcionario_id: venda.funcionario_id || null,
+          vendedor_funcionario_id: venda.vendedor_funcionario_id || venda.funcionario_id || null,
           entregador_id: venda.entregador_id || null,
           tem_entrega: venda.tem_entrega || false,
           pagamento_entrega_previsto: venda.pagamento_entrega_previsto || null,
@@ -225,7 +226,7 @@ export function usePDVVendaCarregamento({
 
       const { pagamentos, totalPago } = await carregarPagamentosVenda(venda.id);
 
-      await sincronizarComissaoDaVenda(vendaCompleta.funcionario_id);
+      await sincronizarComissaoDaVenda(vendaCompleta.vendedor_funcionario_id || vendaCompleta.funcionario_id, vendaCompleta.funcionario_id);
 
       const vendaParaSetar = {
         id: vendaCompleta.id,
@@ -243,6 +244,8 @@ export function usePDVVendaCarregamento({
         total: parseFloat(vendaCompleta.total),
         observacoes: vendaCompleta.observacoes || "",
         status: vendaCompleta.status,
+        funcionario_id: vendaCompleta.funcionario_id || null,
+        vendedor_funcionario_id: vendaCompleta.vendedor_funcionario_id || vendaCompleta.funcionario_id || null,
         tem_entrega: vendaCompleta.tem_entrega || false,
         pagamento_entrega_previsto: vendaCompleta.pagamento_entrega_previsto || null,
         entregador_id: vendaCompleta.entregador_id || null,

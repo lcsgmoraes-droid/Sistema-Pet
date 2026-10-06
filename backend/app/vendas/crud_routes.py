@@ -34,10 +34,31 @@ from app.vendas.regras import (
 )
 from app.vendas.routes_common import _validar_tenant_e_obter_usuario
 from app.vendas.schemas import CriarVendaRequest
+from app.vendas.vendedor_obrigatorio import exigir_vendedor_pdv
 from app.vendas_models import Venda, VendaItem
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
+
+
+def validar_vendedor_funcionario(db: Session, tenant_id, vendedor_funcionario_id: Optional[int]):
+    if vendedor_funcionario_id is None:
+        return
+    existe = (
+        db.query(Cliente.id)
+        .filter(
+            Cliente.id == vendedor_funcionario_id,
+            Cliente.tenant_id == tenant_id,
+            Cliente.ativo.is_(True),
+            or_(
+                Cliente.tipo_cadastro == "funcionario",
+                Cliente.parceiro_ativo.is_(True),
+            ),
+        )
+        .first()
+    )
+    if not existe:
+        raise HTTPException(status_code=400, detail="Vendedor não encontrado nesta empresa")
 
 
 def normalizar_status_filtro_vendas(status: Optional[str]) -> list[str]:
@@ -200,6 +221,12 @@ async def criar_venda(
 
     from app.caixa.revisao import validar_revisao_caixa
 
+    vendedor_informado_id = dados.vendedor_funcionario_id or dados.funcionario_id
+    exigir_vendedor_pdv(db, tenant_id, vendedor_informado_id)
+    validar_vendedor_funcionario(db, tenant_id, vendedor_informado_id)
+    if dados.funcionario_id and dados.vendedor_funcionario_id and dados.funcionario_id != dados.vendedor_funcionario_id:
+        raise HTTPException(status_code=400, detail="O vendedor e o comissionado devem ser a mesma pessoa")
+
     caixa_revisao = validar_revisao_caixa(
         db,
         caixa_id=dados.caixa_revisao_id,
@@ -255,6 +282,7 @@ async def criar_venda(
         "cliente_id": dados.cliente_id,
         "vendedor_id": dados.vendedor_id,
         "funcionario_id": dados.funcionario_id,
+        "vendedor_funcionario_id": vendedor_informado_id,
         "itens": [item.dict() for item in dados.itens],
         "desconto_valor": dados.desconto_valor,
         "desconto_percentual": dados.desconto_percentual,
@@ -331,12 +359,19 @@ def atualizar_venda(
 ):
     """Atualiza uma venda existente (somente vendas abertas)"""
     current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
+    if dados.funcionario_id and dados.vendedor_funcionario_id and dados.funcionario_id != dados.vendedor_funcionario_id:
+        raise HTTPException(status_code=400, detail="O vendedor e o comissionado devem ser a mesma pessoa")
 
     # Buscar venda
     venda = db.query(Venda).filter_by(id=venda_id, tenant_id=tenant_id).first()
 
     if not venda:
         raise HTTPException(status_code=404, detail="Venda não encontrada")
+
+    vendedor_informado_id = dados.vendedor_funcionario_id or dados.funcionario_id
+    exigir_vendedor_pdv(db, tenant_id, vendedor_informado_id, canal=venda.canal)
+    if vendedor_informado_id != (venda.vendedor_funcionario_id or venda.funcionario_id):
+        validar_vendedor_funcionario(db, tenant_id, vendedor_informado_id)
 
     # Só permite atualizar vendas abertas
     if venda.status != "aberta":
@@ -446,6 +481,7 @@ def atualizar_venda(
     venda.funcionario_id = (
         dados.funcionario_id
     )  # ✅ Funcionário/Veterinário que recebe comissão
+    venda.vendedor_funcionario_id = vendedor_informado_id
 
     logger.info(f"   funcionario_id novo: {venda.funcionario_id}")
 

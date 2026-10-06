@@ -145,6 +145,30 @@ class AppLoginCreate(BaseModel):
     role_id: int
 
 
+class ClienteContatoInput(BaseModel):
+    numero: str = Field(min_length=1, max_length=50)
+    vinculo: str = Field(min_length=1, max_length=60)
+
+    @validator("numero", "vinculo")
+    def nao_aceitar_campo_vazio(cls, valor):
+        valor = valor.strip()
+        if not valor:
+            raise ValueError("Informe o numero e o vinculo do contato")
+        return valor
+
+    @validator("numero")
+    def validar_celular(cls, valor):
+        if len("".join(c for c in valor if c.isdigit())) != 11:
+            raise ValueError("Informe um celular com DDD (11 digitos)")
+        return valor
+
+
+class ClienteContatoResponse(ClienteContatoInput):
+    id: int
+
+    model_config = {"from_attributes": True}
+
+
 class ClienteCreate(BaseModel):
     origem_cliente: OrigemCliente = "loja_fisica"
     # Tipo de cadastro
@@ -156,6 +180,7 @@ class ClienteCreate(BaseModel):
     data_nascimento: Optional[date] = None
     telefone: Optional[str] = None
     celular: Optional[str] = None
+    contatos_adicionais: List[ClienteContatoInput] = Field(default_factory=list)
     email: Optional[str] = None
     auth_user_id: Optional[int] = None
     app_login: Optional[AppLoginCreate] = None
@@ -294,6 +319,7 @@ class ClienteUpdate(BaseModel):
     email: Optional[EmailStr] = None
     telefone: Optional[str] = None
     celular: Optional[str] = None
+    contatos_adicionais: Optional[List[ClienteContatoInput]] = None
     auth_user_id: Optional[int] = None
     app_login: Optional[AppLoginCreate] = None
     app_access_profiles: Optional[List[str]] = None
@@ -420,6 +446,7 @@ class ClienteResponse(BaseModel):
     email: Optional[str] = None
     telefone: Optional[str] = None
     celular: Optional[str] = None
+    contatos_adicionais: List[ClienteContatoResponse] = Field(default_factory=list)
     auth_user_id: Optional[int] = None
     auth_user_nome: Optional[str] = None
     auth_user_email: Optional[str] = None

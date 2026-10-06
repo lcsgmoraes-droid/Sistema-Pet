@@ -44,6 +44,7 @@ function buildNovoClienteFormData(tipoCadastro, tipoPessoa) {
     email: "",
     telefone: "",
     celular: "",
+    contatos_adicionais: [],
     celular_whatsapp: true,
     auth_user_id: null,
     app_login: null,
@@ -103,6 +104,10 @@ function buildClienteFormData(cliente) {
     email: cliente.email || "",
     telefone: cliente.telefone || "",
     celular: cliente.celular || "",
+    contatos_adicionais: (cliente.contatos_adicionais || []).map(({ numero, vinculo }) => ({
+      numero,
+      vinculo,
+    })),
     celular_whatsapp: true,
     auth_user_id: cliente.auth_user_id || null,
     app_login: null,
@@ -483,6 +488,23 @@ export function useClientesNovoCadastro({
         alert(mensagem);
         setError(mensagem);
         return;
+      }
+
+      const numerosAdicionais = formData.contatos_adicionais || [];
+      const numerosVistos = new Set(
+        [formData.celular, formData.telefone].map((numero) => String(numero || "").replace(/\D/g, "")),
+      );
+      for (const contato of numerosAdicionais) {
+        const digitos = String(contato.numero || "").replace(/\D/g, "");
+        if (digitos.length !== 11 || !String(contato.vinculo || "").trim()) {
+          setError("Informe um celular com DDD e identifique o vínculo de cada contato adicional.");
+          return;
+        }
+        if (numerosVistos.has(digitos)) {
+          setError("Há um celular repetido entre os contatos desta pessoa.");
+          return;
+        }
+        numerosVistos.add(digitos);
       }
 
       if (formData.is_entregador) {

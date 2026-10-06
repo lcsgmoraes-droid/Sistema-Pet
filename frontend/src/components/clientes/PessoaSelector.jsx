@@ -7,7 +7,18 @@ function defaultPessoaLabel(pessoa) {
   return pessoa?.nome || pessoa?.razao_social || pessoa?.fantasia || "Pessoa";
 }
 
-function defaultPessoaMeta(pessoa) {
+function defaultPessoaMeta(pessoa, searchValue = "") {
+  const digitosBusca = String(searchValue).replace(/\D/g, "");
+  const textoBusca = String(searchValue).trim().toLocaleLowerCase("pt-BR");
+  const contatoEncontrado = (pessoa?.contatos_adicionais || []).find((contato) => {
+    const numero = String(contato.numero || "").replace(/\D/g, "");
+    const vinculo = String(contato.vinculo || "").toLocaleLowerCase("pt-BR");
+    return (digitosBusca.length >= 4 && numero.includes(digitosBusca)) ||
+      (textoBusca.length >= 2 && vinculo.includes(textoBusca));
+  });
+  if (contatoEncontrado) {
+    return `Celular de ${contatoEncontrado.vinculo}: ${contatoEncontrado.numero} · cadastro principal`;
+  }
   return [pessoa?.cpf || pessoa?.cnpj, pessoa?.telefone || pessoa?.celular]
     .filter(Boolean)
     .join(" - ");
@@ -91,8 +102,8 @@ export default function PessoaSelector({
                     </div>
                   )}
                 </div>
-                {defaultPessoaMeta(pessoa) && (
-                  <div className="text-sm text-gray-500">{defaultPessoaMeta(pessoa)}</div>
+                {defaultPessoaMeta(pessoa, searchValue) && (
+                  <div className="text-sm text-gray-500">{defaultPessoaMeta(pessoa, searchValue)}</div>
                 )}
                 {pessoa?.pets?.length > 0 && (
                   <div className="mt-1 text-xs text-blue-600">{pessoa.pets.length} pet(s)</div>

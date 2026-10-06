@@ -7,6 +7,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import { toast } from "react-hot-toast";
+import api from "../api";
 import { buscarClientePorId } from "../api/clientes";
 import PDVDriveAlertBanner from "../components/pdv/PDVDriveAlertBanner";
 import PDVEtiquetaBalancaModal from "../components/pdv/PDVEtiquetaBalancaModal";
@@ -53,6 +55,19 @@ export default function PDV() {
   const vendaGuiaClasses = getGuiaClassNames(destaqueVenda);
   const { user } = useAuth();
   const { iniciarTour } = useTour("pdv", tourPDV, { delay: 1200 });
+  const [vendedorObrigatorio, setVendedorObrigatorio] = useState(null);
+
+  useEffect(() => {
+    let ativo = true;
+    api.get("/empresa/config/pdv")
+      .then(({ data }) => {
+        if (ativo) setVendedorObrigatorio(Boolean(data.vendedor_obrigatorio_pdv));
+      })
+      .catch(() => {
+        if (ativo) toast.error("Não foi possível carregar a regra de vendedor do PDV.");
+      });
+    return () => { ativo = false; };
+  }, []);
 
   // 🔒 Controle de visibilidade de dados gerenciais (lucro, margem, custos)
   const podeVerMargem = user?.is_admin === true;
@@ -70,6 +85,7 @@ export default function PDV() {
     total: 0,
     observacoes: "",
     funcionario_id: null, // ✅ Funcionário para comissão
+    vendedor_funcionario_id: null,
     entregador_id: null, // 🚚 Entregador para entrega
     tem_entrega: false,
     pagamento_entrega_previsto: null,
@@ -276,6 +292,8 @@ export default function PDV() {
   } = usePDVEntrega(vendaAtual, setVendaAtual);
   const {
     vendaComissionada,
+    gerarComissao,
+    setGerarComissao,
     funcionarioComissao,
     funcionariosSugeridos,
     buscaFuncionario,
@@ -302,6 +320,9 @@ export default function PDV() {
     setModoVisualizacao,
     setMostrarModalPagamento,
     entregadorSelecionado,
+    vendedorObrigatorio,
+    vendaComissionada,
+    funcionarioComissao,
     limparComissao,
     sincronizarComissaoDaVenda,
     sincronizarEntregadorDaVenda,
@@ -314,6 +335,8 @@ export default function PDV() {
     temCaixaAberto,
     entregadorSelecionado,
     vendaComissionada,
+    vendedorObrigatorio,
+    gerarComissao,
     funcionarioComissao,
     limparVenda,
     carregarVendasRecentes: () => carregarVendasRecentes(),
@@ -534,6 +557,9 @@ export default function PDV() {
     handleSelecionarFuncionarioComissao,
     handleToggleVendaComissionada,
     vendaComissionada,
+    vendedorObrigatorio,
+    gerarComissao,
+    setGerarComissao,
     handleNovaVenda,
     painelClienteAberto,
     setPainelClienteAberto,

@@ -32,6 +32,7 @@ from app.vendas.finalizacao_recebiveis import (
 )
 from app.vendas.pos_processamento import gerar_dre_competencia_venda
 from app.vendas.bloqueio_crediario import validar_bloqueio_crediario
+from app.vendas.vendedor_obrigatorio import exigir_vendedor_pdv
 
 logger = logging.getLogger(__name__)
 
@@ -199,6 +200,13 @@ def finalizar_venda(
                 status_code=400,
                 detail=f"Apenas vendas abertas ou com baixa parcial podem receber pagamentos (status atual: {venda.status})",
             )
+
+        exigir_vendedor_pdv(
+            db,
+            tenant_id,
+            venda.vendedor_funcionario_id or venda.funcionario_id,
+            canal=venda.canal,
+        )
 
         validar_bloqueio_crediario(
             db,
