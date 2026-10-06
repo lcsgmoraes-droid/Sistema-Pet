@@ -449,7 +449,13 @@ def processar_pagamentos_finalizacao(
                     detail="Crédito só pode ser usado em vendas com cliente vinculado",
                 )
 
-            cliente = db.query(Cliente).filter_by(id=venda.cliente_id).first()
+            cliente = (
+                db.query(Cliente)
+                .filter_by(id=venda.cliente_id, tenant_id=tenant_id)
+                .populate_existing()
+                .with_for_update()
+                .first()
+            )
             if not cliente:
                 raise HTTPException(status_code=404, detail="Cliente não encontrado")
 

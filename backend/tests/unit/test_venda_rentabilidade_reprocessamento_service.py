@@ -1,4 +1,5 @@
 from datetime import datetime
+from decimal import Decimal
 from types import SimpleNamespace
 
 import pytest
@@ -6,6 +7,7 @@ import pytest
 from app import dre_plano_contas_models  # noqa: F401
 from app.produtos_models import EstoqueMovimentacao
 from app.services import venda_rentabilidade_reprocessamento_service as service
+from app.vendas.devolucao_dre import custo_original_item_devolvido
 from app.vendas_models import Venda
 
 
@@ -82,6 +84,20 @@ def test_reprocessamento_usa_custo_atual_e_corrige_movimentacao(monkeypatch):
         referencia_id=venda.id,
         status="confirmado",
     )
+    item = venda.itens[0]
+    item.id = 7
+    item.tipo = "produto"
+    item.custo_original_saida = {
+        "versao": 1,
+        "origem": "baixa_estoque_venda",
+        "venda_id": venda.id,
+        "venda_item_id": item.id,
+        "produto_id": produto.id,
+        "tenant_estoque_id": tenant_id,
+        "movimentacao_id": 91,
+        "quantidade": "2",
+        "custo_total": "10.00",
+    }
 
     def fake_get_or_build(venda_arg, _db, tenant_arg, **kwargs):
         assert venda_arg is venda
@@ -117,3 +133,6 @@ def test_reprocessamento_usa_custo_atual_e_corrige_movimentacao(monkeypatch):
     assert venda.rentabilidade_snapshot["itens"][0]["custo_unitario"] == pytest.approx(
         12.5
     )
+    assert custo_original_item_devolvido(
+        None, venda, item, Decimal("1"), tenant_id
+    ) == (Decimal("5.00"), "baixa_estoque_venda", False)

@@ -9,6 +9,7 @@ from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
 from app.utils.timezone import now_brasilia
+from app.vendas.custo_original import registrar_custo_original_saida
 
 logger = logging.getLogger(__name__)
 
@@ -482,6 +483,9 @@ def criar_venda(
                             venda_item=item if not compartilhado else None,
                         )
 
+                    registrar_custo_original_saida(
+                        item, resultados, tenant_estoque_uuid
+                    )
                     estoque_baixado.extend(resultados)
                     logger.info(
                         f"📦 Estoque baixado ao criar venda: {produto.nome} -{item.quantidade}"

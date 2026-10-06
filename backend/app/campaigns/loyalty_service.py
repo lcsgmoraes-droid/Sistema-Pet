@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime, timezone
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from typing import Any
 
 from sqlalchemy import func
@@ -38,6 +38,26 @@ def calculate_loyalty_stamp_count(venda_total: Any, stamp_value: Any) -> int:
     if sale_total <= 0 or step_value <= 0:
         return 0
     return int(sale_total // step_value)
+
+
+def historical_stamp_value_for_sale(stamps: list[LoyaltyStamp]) -> Decimal | None:
+    """Return the proven earning step shared by every stamp of one sale."""
+    if not stamps:
+        return None
+    try:
+        steps = {
+            Decimal(str(stamp.stamp_value_snapshot))
+            for stamp in stamps
+            if stamp.stamp_value_snapshot is not None
+        }
+    except (InvalidOperation, ValueError, TypeError) as exc:
+        raise ValueError("Passo historico do carimbo invalido") from exc
+    if any(stamp.stamp_value_snapshot is None for stamp in stamps) or len(steps) != 1:
+        raise ValueError("Passo historico do carimbo nao comprovado")
+    step = next(iter(steps))
+    if not step.is_finite() or step <= 0:
+        raise ValueError("Passo historico do carimbo invalido")
+    return step
 
 
 def build_loyalty_reward_refs(
@@ -292,11 +312,9 @@ def sync_loyalty_stamps_for_sale(
     venda_total: Any,
     source_event_id: int | None = None,
     reason: str | None = None,
+    stamp_value_override: Any | None = None,
 ) -> dict[str, int]:
     params = campaign.params or {}
-    stamp_value = params.get("min_purchase_value", 0) or 0
-    expected_stamps = calculate_loyalty_stamp_count(venda_total, stamp_value)
-
     existing_auto_stamps = (
         db.query(LoyaltyStamp)
         .filter(
@@ -309,6 +327,21 @@ def sync_loyalty_stamps_for_sale(
         .order_by(LoyaltyStamp.stamp_index.asc(), LoyaltyStamp.id.asc())
         .all()
     )
+    historical_step = (
+        historical_stamp_value_for_sale(existing_auto_stamps)
+        if stamp_value_override is None and Decimal(str(venda_total or 0)) > 0
+        else None
+    )
+    stamp_value = (
+        stamp_value_override
+        if stamp_value_override is not None
+        else (
+            historical_step
+            if historical_step is not None
+            else params.get("min_purchase_value", 0) or 0
+        )
+    )
+    expected_stamps = calculate_loyalty_stamp_count(venda_total, stamp_value)
 
     stamps_by_index = {
         int(stamp.stamp_index or 1): stamp for stamp in existing_auto_stamps
@@ -328,6 +361,7 @@ def sync_loyalty_stamps_for_sale(
                     venda_id=venda_id,
                     campaign_id=campaign.id,
                     stamp_index=stamp_index,
+                    stamp_value_snapshot=Decimal(str(stamp_value)),
                     is_manual=False,
                     notes=reason,
                 )
@@ -335,8 +369,12 @@ def sync_loyalty_stamps_for_sale(
             added += 1
             continue
 
-        if stamp.voided_at is not None:
+        if (
+            stamp.voided_at is not None
+            and getattr(stamp, "voided_origin", None) == "automatic"
+        ):
             stamp.voided_at = None
+            stamp.voided_origin = None
             if reason:
                 stamp.notes = _append_note(stamp.notes, f"Reativado: {reason}")
             reactivated += 1
@@ -345,6 +383,7 @@ def sync_loyalty_stamps_for_sale(
         stamp_index = int(stamp.stamp_index or 1)
         if stamp.voided_at is None and stamp_index > expected_stamps:
             stamp.voided_at = now
+            stamp.voided_origin = "automatic"
             if reason:
                 stamp.notes = _append_note(stamp.notes, f"Estornado: {reason}")
             voided += 1
@@ -620,6 +659,7 @@ def void_loyalty_stamps_for_sale(
                 now = datetime.now(timezone.utc)
                 for stamp in active_stamps:
                     stamp.voided_at = now
+                    stamp.voided_origin = "automatic"
                     if reason:
                         stamp.notes = _append_note(stamp.notes, f"Estornado: {reason}")
                 total_voided += len(active_stamps)

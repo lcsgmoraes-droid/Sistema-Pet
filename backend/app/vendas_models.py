@@ -410,6 +410,11 @@ class VendaItem(BaseTenantModel):
     desconto_item = Column(DECIMAL(10, 2), default=0)
     subtotal = Column(DECIMAL(10, 2), nullable=False)
 
+    # Comprovante prospectivo da baixa de estoque, gravado uma unica vez na
+    # transacao da venda. Snapshots de rentabilidade e movimentos podem ser
+    # reprocessados; este registro nao acompanha essas atualizacoes.
+    custo_original_saida = Column(JSON, nullable=True)
+
     # Referência ao lote (FIFO)
     lote_id = Column(Integer, ForeignKey("produto_lotes.id"), nullable=True)
 

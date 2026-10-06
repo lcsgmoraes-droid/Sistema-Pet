@@ -371,13 +371,14 @@ def _resolve_cashback_resgatado(
     venda_id: int,
 ) -> float:
     try:
-        from app.campaigns.models import CashbackTransaction
+        from app.campaigns.models import CashbackSourceTypeEnum, CashbackTransaction
 
         total = (
             db.query(func.sum(CashbackTransaction.amount))
             .filter(
                 CashbackTransaction.tenant_id == tenant_id,
                 CashbackTransaction.amount < 0,
+                CashbackTransaction.source_type == CashbackSourceTypeEnum.redemption,
                 CashbackTransaction.source_id == venda_id,
             )
             .scalar()
@@ -611,6 +612,7 @@ def build_venda_rentabilidade_snapshot(
         produto = getattr(item, "produto", None)
         itens_snapshot.append(
             {
+                "venda_item_id": getattr(item, "id", None),
                 "produto_id": getattr(item, "produto_id", None),
                 "produto_nome": getattr(produto, "nome", None) or "Produto removido",
                 "quantidade": _round_money(item_base["quantidade"]),

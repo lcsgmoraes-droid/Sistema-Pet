@@ -362,6 +362,7 @@ const DRE = () => {
       loading={loading}
       loadingDetalhes={loadingDetalhes}
       modalClassificarOpen={modalClassificarOpen}
+      parametrosDRE={obterParametrosDRE()}
       periodo={periodo}
       periodoAcumulado={mesInicial !== null}
       setChatIAAberto={setChatIAAberto}

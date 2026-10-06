@@ -70,6 +70,7 @@ def cancelar_venda(
         HTTPException(400): Venda já está cancelada
     """
     from app.vendas_models import Venda, VendaItem
+    from app.vendas_devolucoes_models import VendaDevolucao
     from app.estoque.service import EstoqueService
     from app.caixa_models import MovimentacaoCaixa
     from app.financeiro_models import (
@@ -96,13 +97,46 @@ def cancelar_venda(
         # ETAPA 1: VALIDAR VENDA E PERMISSÕES
         # ============================================================
 
-        venda = db.query(Venda).filter_by(id=venda_id, tenant_id=tenant_id).first()
+        # A devolucao trava a mesma linha: cancelamento e reembolso nao podem
+        # decidir sobre o saldo da venda simultaneamente.
+        venda = (
+            db.query(Venda)
+            .filter_by(id=venda_id, tenant_id=tenant_id)
+            .with_for_update()
+            .first()
+        )
 
         if not venda:
             raise HTTPException(status_code=404, detail="Venda não encontrada")
 
         if venda.status == "cancelada":
             raise HTTPException(status_code=400, detail="Venda já está cancelada")
+
+        if str(venda.status or "").lower() in {
+            "finalizada_devolucao",
+            "finalizada_devolucao_parcial",
+            "devolvida_total",
+        }:
+            raise HTTPException(
+                status_code=409,
+                detail=(
+                    "A venda possui devolucao anterior sem historico conciliado. "
+                    "Concilie a devolucao antes de cancelar a venda."
+                ),
+            )
+
+        if (
+            db.query(VendaDevolucao)
+            .filter_by(tenant_id=tenant_id, venda_id=venda_id)
+            .first()
+        ):
+            raise HTTPException(
+                status_code=409,
+                detail=(
+                    "A venda possui devolucao registrada. Concilie a devolucao "
+                    "antes de cancelar a venda."
+                ),
+            )
 
         logger.info(
             f"📋 Cancelando venda #{venda.numero_venda} (Status: {venda.status})"

@@ -55,7 +55,18 @@ class LoyaltyHandler:
             .filter(Venda.id == int(venda_id), Venda.tenant_id == campaign.tenant_id)
             .first()
         )
-        if venda is None or venda.status != "finalizada" or not venda.cliente_id:
+        if (
+            venda is None
+            or str(venda.status or "").lower()
+            not in {
+                "finalizada",
+                "pago_nf",
+                "baixa_parcial",
+                "finalizada_devolucao",
+                "finalizada_devolucao_parcial",
+            }
+            or not venda.cliente_id
+        ):
             logger.info(
                 "[LoyaltyHandler] Ignorando venda=%s porque nao esta finalizada ou nao possui cliente",
                 venda_id,
@@ -71,7 +82,7 @@ class LoyaltyHandler:
                 campaign=campaign,
                 customer_id=customer_id,
                 venda_id=int(venda.id),
-                venda_total=float(venda.total or 0),
+                venda_total=float(payload.get("venda_total", venda.total) or 0),
                 params=params,
                 source_event_id=event.id,
             )

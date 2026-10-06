@@ -29,8 +29,10 @@ class DREAlerta(BaseModel):
     mensagem: str
     quantidade_produtos: int = 0
     quantidade_itens: int = 0
+    quantidade_vendas: int = 0
     valor_vendas: float = 0
     valor_estimado: float = 0
+    valor_sem_rateio: float = 0
     percentual_custo_aplicado: float = 0
     sem_base_estimativa: bool = False
 
