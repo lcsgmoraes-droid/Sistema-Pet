@@ -4,6 +4,7 @@ from types import SimpleNamespace
 import pytest
 
 from app.vendas.devolucao_valores import (
+    quantidades_devolvidas_por_item,
     ratear_valor_pago_por_item,
     validar_itens_devolucao,
     valor_devolvido_por_quantidade,
@@ -72,6 +73,20 @@ def test_duas_devolucoes_parciais_de_venda_com_desconto_somam_liquido_pago():
 
     assert valor_devolvido_por_quantidade(item, valor_item, 0, 1) == Decimal("45.00")
     assert valor_devolvido_por_quantidade(item, valor_item, 1, 1) == Decimal("45.00")
+
+
+def test_saldo_devolvido_soma_eventos_da_linha_sem_componentes_de_kit():
+    eventos = [
+        SimpleNamespace(
+            itens=[
+                {"venda_item_id": 7, "quantidade": "1", "is_componente_kit": False},
+                {"venda_item_id": 7, "quantidade": "8", "is_componente_kit": True},
+            ]
+        ),
+        SimpleNamespace(itens=[{"venda_item_id": 7, "quantidade": "0.25"}]),
+    ]
+
+    assert quantidades_devolvidas_por_item(eventos) == {7: Decimal("1.25")}
 
 
 @pytest.mark.parametrize(

@@ -27,6 +27,23 @@ export function getTipoDevolucaoVenda(venda) {
   return null;
 }
 
+export function getTextoDevolucaoVendaPDV(venda) {
+  const tipo = getTipoDevolucaoVenda(venda);
+  if (tipo === "parcial") {
+    return {
+      situacao: "com Devolução Parcial",
+      orientacao: "Use Devolução para registrar o saldo restante.",
+    };
+  }
+  if (tipo === "total") {
+    return {
+      situacao: "Devolvida Integralmente",
+      orientacao: "Todos os itens foram devolvidos.",
+    };
+  }
+  return null;
+}
+
 export function podeAbrirDevolucaoVenda(venda) {
   return Boolean(venda?.id && STATUS_DEVOLUCAO_DIRETA.has(normalizarStatusVenda(venda.status)));
 }

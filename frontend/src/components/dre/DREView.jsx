@@ -25,6 +25,7 @@ import MetricGrid from "../ui/MetricGrid";
 import MoneyCell from "../ui/MoneyCell";
 import ModuleTabs from "../ui/ModuleTabs";
 import NumberCell from "../ui/NumberCell";
+import { getDreAlertDetail, getDreAlertMetrics } from "./dreAlertMetrics";
 
 export default function DREView({
   DRE_DETAIL_COLUMNS,
@@ -220,15 +221,20 @@ export default function DREView({
               </MetricGrid>
 
               {(dados.alertas || []).map((alerta) => {
-                const linhaEstimativa = (dados.linhas || []).find(
-                  (linha) => linha.campo === "cmv_estimado" && linha.canal === alerta.canal,
-                );
-                const semBase = Boolean(alerta.sem_base_estimativa);
+                const detalheAlerta = getDreAlertDetail(alerta);
+                const linhaAlerta = detalheAlerta
+                  ? (dados.linhas || []).find(
+                      (linha) =>
+                        linha.campo === detalheAlerta.campo && linha.canal === alerta.canal,
+                    )
+                  : null;
+                const metricas = getDreAlertMetrics(alerta);
+                const critico = alerta.nivel === "critico";
                 return (
                   <div
                     key={`${alerta.codigo}-${alerta.canal}`}
                     className={`rounded-lg border p-4 ${
-                      semBase
+                      critico
                         ? "border-red-300 bg-red-50 text-red-900"
                         : "border-amber-300 bg-amber-50 text-amber-950"
                     }`}
@@ -237,34 +243,40 @@ export default function DREView({
                       <div className="flex items-start gap-3">
                         <AlertTriangle
                           className={`mt-0.5 h-5 w-5 flex-shrink-0 ${
-                            semBase ? "text-red-600" : "text-amber-600"
+                            critico ? "text-red-600" : "text-amber-600"
                           }`}
                         />
                         <div>
                           <h3 className="font-semibold">{alerta.titulo}</h3>
                           <p className="mt-1 text-sm leading-5">{alerta.mensagem}</p>
-                          <div className="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-sm">
-                            <span>
-                              <strong>{alerta.quantidade_produtos}</strong> produto(s) sem custo
-                            </span>
-                            <span>
-                              Vendas afetadas: <MoneyCell value={alerta.valor_vendas || 0} />
-                            </span>
-                            <span>
-                              CMV provisório: <MoneyCell value={alerta.valor_estimado || 0} />
-                            </span>
-                          </div>
+                          {metricas.length > 0 && (
+                            <div className="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-sm">
+                              {metricas.map((metrica) => (
+                                <span key={metrica.rotulo}>
+                                  {metrica.tipo === "moeda" ? (
+                                    <>
+                                      {metrica.rotulo}: <MoneyCell value={metrica.valor || 0} />
+                                    </>
+                                  ) : (
+                                    <>
+                                      <strong>{metrica.valor || 0}</strong> {metrica.rotulo}
+                                    </>
+                                  )}
+                                </span>
+                              ))}
+                            </div>
+                          )}
                         </div>
                       </div>
-                      {linhaEstimativa && (
+                      {linhaAlerta && (
                         <ActionButton
-                          onClick={() => abrirDetalhesLinha(linhaEstimativa)}
+                          onClick={() => abrirDetalhesLinha(linhaAlerta)}
                           intent="warning"
                           tone="soft"
                           size="sm"
                           className="flex-shrink-0"
                         >
-                          Ver produtos e vendas
+                          {detalheAlerta.rotulo}
                         </ActionButton>
                       )}
                     </div>

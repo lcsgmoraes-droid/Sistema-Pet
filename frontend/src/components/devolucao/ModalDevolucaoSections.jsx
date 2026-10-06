@@ -3,6 +3,7 @@ import CustomerIdentity from "../ui/CustomerIdentity";
 import ProductIdentity from "../ui/ProductIdentity";
 import SaleReference from "../ui/SaleReference";
 import { formatMoneyBRL } from "../../utils/formatters";
+import { quantidadeDisponivelDevolucao } from "../../utils/pdvReturnBalance";
 
 function getVendaStatusDevolucaoInfo(status) {
   if (status === "finalizada") {
@@ -39,6 +40,7 @@ export default function ModalDevolucaoSections({
   onClose,
   passo,
   quantidades,
+  saldosItens,
   quantidadesComponentes,
   selecionarVenda,
   setErro,
@@ -209,6 +211,8 @@ export default function ModalDevolucaoSections({
                   const isKitVirtual =
                     item.tipo_produto === "KIT" && (item.tipo_kit || "VIRTUAL") !== "FISICO";
                   const modoKit = modoDevolucaoKit[item.id];
+                  const quantidadeDisponivel = quantidadeDisponivelDevolucao(saldosItens, item.id);
+                  const quantidadeDevolvida = saldosItens[item.id]?.quantidade_devolvida || 0;
 
                   return (
                     <div
@@ -224,7 +228,7 @@ export default function ModalDevolucaoSections({
                           type="checkbox"
                           checked={itensSelecionados[item.id] || false}
                           onChange={() => toggleItem(item.id)}
-                          disabled={isKitVirtual}
+                          disabled={isKitVirtual || quantidadeDisponivel <= 0}
                           className="mt-1 w-5 h-5 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
                         />
 
@@ -243,8 +247,9 @@ export default function ModalDevolucaoSections({
                             )}
                           </ProductIdentity>
                           <div className="text-sm text-gray-600">
-                            Preço unitário: R$ {item.preco_unitario.toFixed(2)} | Qtd vendida:{" "}
-                            {item.quantidade}
+                            Preço unitário: {formatMoneyBRL(item.preco_unitario)} | Qtd vendida:{" "}
+                            {item.quantidade} | Já devolvida: {quantidadeDevolvida} | Disponível:{" "}
+                            {quantidadeDisponivel}
                           </div>
                           {isKitVirtual && (
                             <p className="mt-2 text-sm text-amber-700">
@@ -312,7 +317,7 @@ export default function ModalDevolucaoSections({
                                 type="number"
                                 step="0.01"
                                 min="0"
-                                max={item.quantidade}
+                                max={quantidadeDisponivel}
                                 value={quantidades[item.id]}
                                 onChange={(e) => handleQuantidadeChange(item.id, e.target.value)}
                                 className="w-32 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
@@ -334,7 +339,7 @@ export default function ModalDevolucaoSections({
                                 type="number"
                                 step="0.01"
                                 min="0"
-                                max={item.quantidade}
+                                max={quantidadeDisponivel}
                                 value={quantidades[item.id]}
                                 onChange={(e) => handleQuantidadeChange(item.id, e.target.value)}
                                 className="w-32 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"

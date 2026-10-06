@@ -3,6 +3,7 @@ import test from "node:test";
 
 import {
   getStatusBuscaDevolucao,
+  getTextoDevolucaoVendaPDV,
   podeAbrirDevolucaoVenda,
   STATUS_DEVOLUCAO_DIRETA,
 } from "./pdvReturnEligibility.js";
@@ -19,4 +20,16 @@ test("inclui devolucao parcial na busca do modal de devolucao", () => {
     "finalizada_devolucao",
   ]);
   assert.equal(STATUS_DEVOLUCAO_DIRETA.has("finalizada_devolucao"), true);
+});
+
+test("PDV informa o estado da devolução sem chamar a venda de aberta", () => {
+  assert.deepEqual(getTextoDevolucaoVendaPDV({ status: "finalizada_devolucao" }), {
+    situacao: "com Devolução Parcial",
+    orientacao: "Use Devolução para registrar o saldo restante.",
+  });
+  assert.deepEqual(getTextoDevolucaoVendaPDV({ status: "devolvida_total" }), {
+    situacao: "Devolvida Integralmente",
+    orientacao: "Todos os itens foram devolvidos.",
+  });
+  assert.equal(getTextoDevolucaoVendaPDV({ status: "finalizada" }), null);
 });

@@ -3,7 +3,10 @@ import { AlertCircle, FileText, Pencil, RotateCcw, X } from "lucide-react";
 import { useModulos } from "../../contexts/ModulosContext";
 import ImprimirCupom from "../ImprimirCupom";
 import ActionButton from "../ui/ActionButton";
-import { podeAbrirDevolucaoVenda } from "../../utils/pdvReturnEligibility";
+import {
+  getTextoDevolucaoVendaPDV,
+  podeAbrirDevolucaoVenda,
+} from "../../utils/pdvReturnEligibility";
 import ImprimirDocumentoFiscalButton from "./ImprimirDocumentoFiscalButton";
 import ModalSelecaoDocumentoFiscal from "./ModalSelecaoDocumentoFiscal";
 import ModalDadosVendaFinalizada from "./ModalDadosVendaFinalizada";
@@ -29,11 +32,13 @@ export default function PDVModoVisualizacaoBanner({
   }
 
   const podeAbrirDevolucao = podeAbrirDevolucaoVenda(vendaAtual);
+  const textoDevolucao = getTextoDevolucaoVendaPDV(vendaAtual);
   const notaRejeitada =
     vendaAtual.status === "pago_nf" &&
     String(vendaAtual.nfe_status || "").toLowerCase() === "rejeitada";
   const situacaoVenda =
-    vendaAtual.status === "finalizada"
+    textoDevolucao?.situacao ||
+    (vendaAtual.status === "finalizada"
       ? "Finalizada"
       : vendaAtual.status === "baixa_parcial"
         ? "com Baixa Parcial"
@@ -41,12 +46,14 @@ export default function PDVModoVisualizacaoBanner({
           ? "com NF rejeitada"
           : vendaAtual.status === "pago_nf"
             ? "com NF emitida"
-            : "Aberta";
-  const orientacao = notaRejeitada
-    ? "Clique em Corrigir erro no aviso da nota para revisar os dados fiscais."
-    : vendaAtual.status === "aberta"
-      ? "Clique em Editar para modificar."
-      : "Reabra a venda para modificar.";
+            : "Aberta");
+  const orientacao =
+    textoDevolucao?.orientacao ||
+    (notaRejeitada
+      ? "Clique em Corrigir erro no aviso da nota para revisar os dados fiscais."
+      : vendaAtual.status === "aberta"
+        ? "Clique em Editar para modificar."
+        : "Reabra a venda para modificar.");
 
   return (
     <>

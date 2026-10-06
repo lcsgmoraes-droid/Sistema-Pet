@@ -4,6 +4,7 @@ import api from "../api";
 import { confirmarCorePet } from "../services/corepetDialog";
 import ModalDevolucaoSections from "./devolucao/ModalDevolucaoSections";
 import { getStatusBuscaDevolucao } from "../utils/pdvReturnEligibility";
+import { criarMapaSaldosDevolucao, quantidadeDisponivelDevolucao } from "../utils/pdvReturnBalance";
 
 const STATUS_BUSCA_DEVOLUCAO = getStatusBuscaDevolucao().join(",");
 
@@ -11,6 +12,7 @@ export default function ModalDevolucao({ caixaId, vendaInicial = null, onClose, 
   const [passo, setPasso] = useState(1); // 1: listar vendas, 2: selecionar itens
   const [vendas, setVendas] = useState([]);
   const [vendaSelecionada, setVendaSelecionada] = useState(null);
+  const [saldosItens, setSaldosItens] = useState({});
   const [itensSelecionados, setItensSelecionados] = useState({});
   const [quantidades, setQuantidades] = useState({});
   const [motivo, setMotivo] = useState("");
@@ -90,8 +92,13 @@ export default function ModalDevolucao({ caixaId, vendaInicial = null, onClose, 
 
     try {
       // Buscar detalhes completos da venda
-      const response = await api.get(`/vendas/${venda.id}`);
+      const [response, respostaSaldos] = await Promise.all([
+        api.get(`/vendas/${venda.id}`),
+        api.get(`/vendas/${venda.id}/devolucao/saldos`),
+      ]);
+      const saldos = criarMapaSaldosDevolucao(response.data, respostaSaldos.data);
       setVendaSelecionada(response.data);
+      setSaldosItens(saldos);
       setItensSelecionados({});
       setModoDevolucaoKit({});
       setComponentesSelecionados({});
@@ -99,10 +106,10 @@ export default function ModalDevolucao({ caixaId, vendaInicial = null, onClose, 
       setMotivo("");
       setErro("");
 
-      // Inicializar quantidades com o máximo disponível
+      // Inicializar cada item com o saldo que ainda pode ser devolvido.
       const qtds = {};
       response.data.itens.forEach((item) => {
-        qtds[item.id] = item.quantidade;
+        qtds[item.id] = quantidadeDisponivelDevolucao(saldos, item.id);
       });
       setQuantidades(qtds);
 
@@ -116,6 +123,7 @@ export default function ModalDevolucao({ caixaId, vendaInicial = null, onClose, 
   };
 
   const toggleItem = (itemId) => {
+    if (quantidadeDisponivelDevolucao(saldosItens, itemId) <= 0) return;
     const wasSelected = itensSelecionados[itemId];
 
     setItensSelecionados((prev) => ({
@@ -144,8 +152,7 @@ export default function ModalDevolucao({ caixaId, vendaInicial = null, onClose, 
   };
 
   const handleQuantidadeChange = (itemId, valor) => {
-    const item = vendaSelecionada.itens.find((i) => i.id === itemId);
-    const qtdMaxima = item.quantidade;
+    const qtdMaxima = quantidadeDisponivelDevolucao(saldosItens, itemId);
     const qtdNova = Math.min(Math.max(0, parseFloat(valor) || 0), qtdMaxima);
 
     setQuantidades((prev) => ({
@@ -310,6 +317,15 @@ export default function ModalDevolucao({ caixaId, vendaInicial = null, onClose, 
     const temQuantidadeInvalida = itensDevolucao.some((item) => item.quantidade <= 0);
     if (temQuantidadeInvalida) {
       setErro("Todas as quantidades devem ser maiores que zero");
+      return;
+    }
+
+    if (
+      itensDevolucao.some(
+        (item) => item.quantidade > quantidadeDisponivelDevolucao(saldosItens, item.item_id),
+      )
+    ) {
+      setErro("A quantidade selecionada supera o saldo disponível para devolução");
       return;
     }
 
@@ -480,6 +496,7 @@ export default function ModalDevolucao({ caixaId, vendaInicial = null, onClose, 
           onClose={onClose}
           passo={passo}
           quantidades={quantidades}
+          saldosItens={saldosItens}
           quantidadesComponentes={quantidadesComponentes}
           selecionarVenda={selecionarVenda}
           setErro={setErro}

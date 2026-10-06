@@ -4,7 +4,6 @@ from collections import defaultdict
 from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation, ROUND_FLOOR, ROUND_HALF_UP
 
-
 CENTAVO = Decimal("0.01")
 
 
@@ -118,6 +117,19 @@ def validar_itens_devolucao(itens_solicitados) -> None:
         raise ValueError("Item ou quantidade da devolução inválido")
 
 
+def quantidades_devolvidas_por_item(eventos_anteriores) -> dict[int, Decimal]:
+    """Soma apenas os itens rastreáveis dos eventos desta venda."""
+    quantidades = defaultdict(Decimal)
+    for evento in eventos_anteriores:
+        for item in evento.itens or []:
+            if item.get("is_componente_kit"):
+                continue
+            item_id = item.get("venda_item_id")
+            if item_id is not None:
+                quantidades[item_id] += _decimal(item.get("quantidade"))
+    return dict(quantidades)
+
+
 def cotar_devolucao(venda, itens_venda, eventos_anteriores, itens_solicitados):
     """Fonte única do valor mostrado na prévia e gravado no reembolso."""
     validar_itens_devolucao(itens_solicitados)
@@ -140,13 +152,9 @@ def cotar_devolucao(venda, itens_venda, eventos_anteriores, itens_solicitados):
 
     itens_por_id = {item.id: item for item in itens_venda}
     valor_pago_por_item = ratear_valor_pago_por_item(venda, itens_venda)
-    quantidade_anterior = defaultdict(Decimal)
-    for evento in eventos_anteriores:
-        for devolvido in evento.itens or []:
-            if devolvido.get("is_componente_kit"):
-                continue
-            item_id = devolvido.get("venda_item_id")
-            quantidade_anterior[item_id] += _decimal(devolvido.get("quantidade"))
+    quantidade_anterior = defaultdict(
+        Decimal, quantidades_devolvidas_por_item(eventos_anteriores)
+    )
 
     quantidade_atual = defaultdict(Decimal)
     valores_itens = []

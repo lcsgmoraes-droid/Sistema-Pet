@@ -28,7 +28,11 @@ from app.financeiro_models import ContaReceber
 from app.produtos_models import EstoqueMovimentacao, Produto
 from app.utils.timezone import now_brasilia
 from app.vendas.devolucao_dre import custo_original_item_devolvido
-from app.vendas.devolucao_valores import cotar_devolucao, validar_itens_devolucao
+from app.vendas.devolucao_valores import (
+    cotar_devolucao,
+    quantidades_devolvidas_por_item,
+    validar_itens_devolucao,
+)
 from app.vendas.routes_common import (
     _obter_cliente_ou_404,
     _validar_tenant_e_obter_usuario,
@@ -254,6 +258,67 @@ def _hash_requisicao_devolucao(venda_id: int, dados: dict, itens: list) -> str:
         corpo, ensure_ascii=False, sort_keys=True, separators=(",", ":"), default=str
     )
     return hashlib.sha256(canonico.encode("utf-8")).hexdigest()
+
+
+@router.get("/{venda_id}/devolucao/saldos")
+def consultar_saldos_devolucao(
+    venda_id: int,
+    db: Session = Depends(get_session),
+    user_and_tenant=Depends(get_current_user_and_tenant),
+):
+    """Mostra o saldo de cada linha da venda antes de selecionar a devolução."""
+    _, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
+    venda = db.query(Venda).filter_by(id=venda_id, tenant_id=tenant_id).first()
+    if not venda:
+        raise HTTPException(status_code=404, detail="Venda não encontrada")
+
+    itens_venda = (
+        db.query(VendaItem)
+        .filter(VendaItem.venda_id == venda_id, VendaItem.tenant_id == tenant_id)
+        .all()
+    )
+    eventos_anteriores = (
+        db.query(VendaDevolucao)
+        .filter(
+            VendaDevolucao.tenant_id == tenant_id,
+            VendaDevolucao.venda_id == venda_id,
+        )
+        .all()
+    )
+    if (
+        str(venda.status or "").lower()
+        in {
+            "finalizada_devolucao",
+            "finalizada_devolucao_parcial",
+        }
+        and not eventos_anteriores
+    ):
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                "Esta venda tem devolução anterior sem saldo rastreável. "
+                "Concilie manualmente o histórico antes de nova devolução."
+            ),
+        )
+
+    devolvidas = quantidades_devolvidas_por_item(eventos_anteriores)
+    return {
+        "venda_id": venda_id,
+        "itens": [
+            {
+                "item_id": item.id,
+                "quantidade_vendida": float(item.quantidade),
+                "quantidade_devolvida": float(devolvidas.get(item.id, 0)),
+                "quantidade_disponivel": float(
+                    max(
+                        Decimal("0"),
+                        Decimal(str(item.quantidade)) - devolvidas.get(item.id, 0),
+                    )
+                ),
+            }
+            for item in itens_venda
+        ],
+    }
 
 
 @router.post("/{venda_id}/devolucao/previa")
@@ -569,9 +634,9 @@ def registrar_devolucao(
                 origem, _compartilhado = resolver_tenant_estoque_item(
                     item_venda, tenant_id
                 )
-                solicitado_por_produto[(item_venda.produto_id, origem)] += (
-                    quantidade_devolvida
-                )
+                solicitado_por_produto[
+                    (item_venda.produto_id, origem)
+                ] += quantidade_devolvida
 
         for (
             produto_id,
