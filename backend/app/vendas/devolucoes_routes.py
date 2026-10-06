@@ -1040,8 +1040,8 @@ def registrar_devolucao(
         from datetime import datetime
 
         # Determinar tipo de devolução
-        if cotacao.valor_acumulado >= Decimal(str(venda.total or 0)):
-            tipo_desc = "Devolução total"
+        if todos_itens_devolvidos:
+            tipo_desc = "Devolução total dos itens"
         else:
             # Verificar se tem componentes de KIT
             tem_componentes = any(

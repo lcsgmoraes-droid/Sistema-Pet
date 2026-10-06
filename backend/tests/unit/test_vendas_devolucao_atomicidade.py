@@ -1355,6 +1355,7 @@ def test_devolucoes_parciais_com_desconto_pagam_liquido_e_fecham_venda(
 
     assert segunda["status_venda"] == "devolvida_total"
     assert segunda["valor_total_devolucao"] == 45.0
+    assert "Tipo: Devolução total dos itens" in venda.observacoes
     assert cliente.credito == Decimal("90")
     assert db.commit.call_count == 2
 
