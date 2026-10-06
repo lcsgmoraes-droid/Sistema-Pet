@@ -26,13 +26,15 @@ from app.campaigns.loyalty_service import sync_loyalty_stamps_for_sale
 from app.campaigns.handlers.quick_repurchase import QuickRepurchaseHandler
 from app.campaigns.sale_return_service import (
     _cashback_reversal_amount,
+    _reconcile_cashback,
     _reconcile_loyalty,
     _reconcile_quick_repurchase,
     prepare_purchase_event,
     preflight_purchase_benefits_on_return,
     reconcile_purchase_benefits_on_return,
 )
-from app.campaigns.scheduler_jobs import _expire_cashback_credit_if_needed
+from app.campaigns.scheduler_cashback import _expire_cashback_credit_if_needed
+from app.campaigns.cashback_wallet import replay_cashback_transactions
 from app.campaigns.statement_service_parts.cashback import _add_cashback_events
 
 
@@ -58,6 +60,37 @@ def test_cashback_refund_reverses_only_unearned_unexpired_balance(
     ) == Decimal(expected)
 
 
+def test_return_reverses_only_unspent_part_of_its_cashback_grant(monkeypatch):
+    execution = SimpleNamespace(id=21, reward_meta={"venda_total_base": 100})
+    grant = SimpleNamespace(id=12, amount=Decimal("10.00"))
+    queries = [_Query(rows=[execution]), _Query(rows=[grant]), _Query(rows=[])]
+    added = []
+    locked = []
+    monkeypatch.setattr(
+        "app.campaigns.cashback_wallet.lock_cashback_customer",
+        lambda db, **kwargs: locked.append(kwargs),
+    )
+    monkeypatch.setattr(
+        "app.campaigns.cashback_wallet.get_cashback_wallet",
+        lambda db, **kwargs: SimpleNamespace(remaining_by_credit={12: Decimal("2.00")}),
+    )
+    db = SimpleNamespace(
+        query=lambda model: queries.pop(0), add=added.append, flush=lambda: None
+    )
+
+    reversed_amount = _reconcile_cashback(
+        db,
+        tenant_id="tenant",
+        venda=SimpleNamespace(id=42, cliente_id=8, total=Decimal("100")),
+        evento_devolucao=SimpleNamespace(id=3),
+        retained=Decimal("0"),
+    )
+
+    assert reversed_amount == Decimal("2.00")
+    assert added[0].amount == Decimal("-2.00")
+    assert locked == [{"tenant_id": "tenant", "customer_id": 8}]
+
+
 class _Query:
     def __init__(self, row=None, rows=None):
         self.row = row
@@ -76,6 +109,12 @@ class _Query:
 
     def all(self):
         return self.rows
+
+    def order_by(self, *args):
+        return self
+
+    def yield_per(self, count):
+        return iter(self.rows)
 
 
 def test_pending_purchase_event_uses_retained_value_under_sale_lock(monkeypatch):
@@ -711,25 +750,51 @@ def test_quick_repurchase_coupon_keeps_minimum_used_at_issue(monkeypatch):
     [("5.00", Decimal("-5.00")), ("10.00", None)],
 )
 def test_cashback_expiration_accounts_for_prior_return_reversals(
-    reversed_amount, expected_expiration
+    reversed_amount, expected_expiration, monkeypatch
 ):
-    grant = SimpleNamespace(id=12, customer_id=8, amount=Decimal("10.00"))
-    queries = [
-        _Query(row=grant),
-        _Query(row=None),
-        _Query(rows=[(-Decimal(reversed_amount),)]),
-        _Query(row=None),
-    ]
+    now = datetime(2026, 10, 6, 12, 0)
+    grant = SimpleNamespace(
+        id=12,
+        customer_id=8,
+        amount=Decimal("10.00"),
+        source_type="campaign",
+        source_id=21,
+        tx_type="credit",
+        created_at=now - timedelta(days=2),
+        expires_at=now - timedelta(days=1),
+    )
+    reversal = SimpleNamespace(
+        id=13,
+        customer_id=8,
+        amount=-Decimal(reversed_amount),
+        source_type="reversal",
+        source_id=12,
+        tx_type="debit",
+        created_at=now - timedelta(days=1, hours=1),
+        expires_at=None,
+    )
+    monkeypatch.setattr(
+        "app.campaigns.cashback_wallet.lock_cashback_customer",
+        lambda *args, **kwargs: None,
+    )
+    monkeypatch.setattr(
+        "app.campaigns.cashback_wallet.get_cashback_wallet",
+        lambda *args, **kwargs: replay_cashback_transactions(
+            [grant, reversal], as_of=now
+        ),
+    )
     added = []
-
-    def query(model):
-        return queries.pop(0)
-
-    db = SimpleNamespace(query=query, add=added.append)
-    _expire_cashback_credit_if_needed(db, SimpleNamespace(id="tenant"), grant)
+    db = SimpleNamespace(
+        query=lambda model: _Query(row=None), add=added.append, flush=lambda: None
+    )
+    _expire_cashback_credit_if_needed(
+        db, SimpleNamespace(id="tenant"), grant, now_utc=now
+    )
 
     if expected_expiration is None:
-        assert added == []
+        assert len(added) == 1
+        assert added[0].amount == Decimal("0.00")
+        assert added[0].tx_type == "closed"
     else:
         assert len(added) == 1
         assert added[0].amount == expected_expiration
@@ -825,7 +890,7 @@ def test_anonymous_partial_return_keeps_coupon_redemption(monkeypatch):
     assert result["coupon_redemptions_reversed"] == 0
 
 
-def test_campaign_report_does_not_count_reversal_as_sale_redemption():
+def test_campaign_report_does_not_count_reversal_as_sale_redemption(monkeypatch):
     now = datetime(2026, 10, 5, 12, 0)
     transactions = [
         SimpleNamespace(
@@ -872,6 +937,14 @@ def test_campaign_report_does_not_count_reversal_as_sale_redemption():
             if model.__name__ == "Cliente"
             else _ReportQuery(rows=[SimpleNamespace(id=42, numero_venda="V-42")])
         )
+    )
+    monkeypatch.setattr(
+        "app.vendas.cashback_financeiro.cashback_resgatado_liquido_por_transacao",
+        lambda *args, **kwargs: {13: Decimal("2.00")},
+    )
+    monkeypatch.setattr(
+        "app.campaigns.clientes_routes.get_tenant_cashback_liability",
+        lambda *args, **kwargs: Decimal("3.00"),
     )
 
     report = relatorio_campanhas(

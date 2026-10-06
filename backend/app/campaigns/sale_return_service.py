@@ -123,6 +123,18 @@ def _reconcile_cashback(
     evento_devolucao,
     retained: Decimal,
 ) -> Decimal:
+    from app.campaigns.cashback_wallet import (
+        get_cashback_wallet,
+        lock_cashback_customer,
+    )
+
+    # Keep a return, redemption and expiration on the same customer lock.
+    lock_cashback_customer(db, tenant_id=tenant_id, customer_id=venda.cliente_id)
+    remaining_by_credit = dict(
+        get_cashback_wallet(
+            db, tenant_id=tenant_id, customer_id=venda.cliente_id
+        ).remaining_by_credit
+    )
     executions = (
         db.query(CampaignExecution)
         .filter(
@@ -192,8 +204,12 @@ def _reconcile_cashback(
                 base_sale_total=base,
                 retained_sale_total=retained,
             )
+            # A used or expired part of this grant belongs to the customer;
+            # a return may revoke only the amount still in this same lot.
+            delta = min(delta, remaining_by_credit.get(grant_tx.id, Decimal("0.00")))
             if delta <= 0:
                 continue
+            remaining_by_credit[grant_tx.id] -= delta
             db.add(
                 CashbackTransaction(
                     tenant_id=tenant_id,

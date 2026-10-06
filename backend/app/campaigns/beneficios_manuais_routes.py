@@ -2,15 +2,16 @@
 
 import logging
 from datetime import datetime, timezone
+from decimal import Decimal
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
-from sqlalchemy import func as sqlfunc
 from sqlalchemy.orm import Session
 
 from app.auth.dependencies import get_current_user_and_tenant
 from app.campaigns.audit import build_loyalty_stamp_audit_metadata, log_campaign_event
+from app.campaigns.cashback_wallet import get_cashback_wallet, lock_cashback_customer
 from app.campaigns.loyalty_service import (
     build_consumed_loyalty_stamp_ids,
     get_loyalty_balance_for_campaign,
@@ -118,7 +119,13 @@ class CashbackManualBody(BaseModel):
     description: str = "Ajuste manual"
 
 
-@router.post("/cashback/manual")
+@router.post(
+    "/cashback/manual",
+    responses={
+        400: {"description": "Valor inválido ou cashback insuficiente"},
+        404: {"description": "Cliente não encontrado"},
+    },
+)
 def cashback_manual(
     body: CashbackManualBody,
     db: Session = Depends(get_db),
@@ -130,46 +137,58 @@ def cashback_manual(
     Usado no Gestor de Benefícios para corригir ou ajustar saldo.
     """
     _, tenant_id = user_and_tenant
-    if body.amount == 0:
+    amount_raw = Decimal(str(body.amount))
+    if not amount_raw.is_finite():
+        raise HTTPException(status_code=400, detail="Informe um valor válido.")
+    amount = amount_raw.quantize(Decimal("0.01"))
+    if amount == 0:
         raise HTTPException(
             status_code=400, detail="O valor do ajuste não pode ser zero."
         )
+    try:
+        lock_cashback_customer(db, tenant_id=tenant_id, customer_id=body.customer_id)
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail="Cliente não encontrado") from exc
+
+    if amount < 0:
+        saldo = get_cashback_wallet(
+            db, tenant_id=tenant_id, customer_id=body.customer_id
+        ).available
+        if -amount > saldo:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Cashback insuficiente. Disponível: R$ {saldo:.2f}",
+            )
 
     transacao = CashbackTransaction(
         tenant_id=tenant_id,
         customer_id=body.customer_id,
-        amount=round(body.amount, 2),
+        amount=amount,
         source_type=CashbackSourceTypeEnum.manual,
         description=body.description,
-        tx_type="debit" if body.amount < 0 else "credit",
+        tx_type="debit" if amount < 0 else "credit",
     )
     db.add(transacao)
+    db.flush()
+    novo_saldo = get_cashback_wallet(
+        db, tenant_id=tenant_id, customer_id=body.customer_id
+    ).available
     db.commit()
     db.refresh(transacao)
-
-    novo_saldo = float(
-        db.query(sqlfunc.sum(CashbackTransaction.amount))
-        .filter(
-            CashbackTransaction.tenant_id == tenant_id,
-            CashbackTransaction.customer_id == body.customer_id,
-        )
-        .scalar()
-        or 0
-    )
 
     logger.info(
         "[Campanhas] Cashback manual: customer_id=%d amount=%.2f tenant=%s novo_saldo=%.2f",
         body.customer_id,
-        body.amount,
+        float(amount),
         tenant_id,
         novo_saldo,
     )
     return {
         "ok": True,
         "transaction_id": transacao.id,
-        "amount": float(body.amount),
+        "amount": float(amount),
         "description": body.description,
-        "novo_saldo": round(novo_saldo, 2),
+        "novo_saldo": float(novo_saldo),
     }
 
 

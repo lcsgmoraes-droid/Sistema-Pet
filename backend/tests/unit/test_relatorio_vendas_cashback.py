@@ -1,4 +1,5 @@
 from uuid import uuid4
+from datetime import datetime, timezone
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
@@ -24,6 +25,7 @@ def test_relatorio_vendas_nao_atribui_reversal_a_venda_com_id_coincidente():
                     amount=-5,
                     source_type=CashbackSourceTypeEnum.reversal,
                     source_id=11,
+                    created_at=datetime.now(timezone.utc),
                 ),
                 dict(
                     id=2,
@@ -32,6 +34,7 @@ def test_relatorio_vendas_nao_atribui_reversal_a_venda_com_id_coincidente():
                     amount=-7,
                     source_type=CashbackSourceTypeEnum.redemption,
                     source_id=11,
+                    created_at=datetime.now(timezone.utc),
                 ),
                 dict(
                     id=3,
@@ -40,6 +43,7 @@ def test_relatorio_vendas_nao_atribui_reversal_a_venda_com_id_coincidente():
                     amount=-9,
                     source_type=CashbackSourceTypeEnum.redemption,
                     source_id=11,
+                    created_at=datetime.now(timezone.utc),
                 ),
             ],
         )

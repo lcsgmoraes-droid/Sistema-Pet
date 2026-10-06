@@ -5,7 +5,6 @@ from uuid import UUID
 from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from app.security.jwt_compat import JWTError, jwt
-from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from app.auth import create_access_token, create_refresh_token
@@ -291,14 +290,6 @@ def _is_expired_or_equal(dt: datetime | None, now_ref: datetime) -> bool:
 def _remaining_days_until(dt: datetime, now_ref: datetime) -> int:
     aligned_now = _align_reference_datetime(dt, now_ref)
     return max(0, (dt - aligned_now).days)
-
-
-def _cashback_disponivel_clause(cashback_model, now_ref: datetime):
-    return or_(
-        cashback_model.expires_at.is_(None),
-        cashback_model.expires_at > now_ref,
-        cashback_model.tx_type != "credit",
-    )
 
 
 def _extract_tenant_id_from_request(request: Request) -> UUID:

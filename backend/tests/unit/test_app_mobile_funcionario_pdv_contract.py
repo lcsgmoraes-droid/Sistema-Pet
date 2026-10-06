@@ -275,7 +275,7 @@ def test_funcionario_pdv_supports_campaign_benefits_preview_contract():
 
     assert '"/funcionario/pdv/beneficios/preview"' in backend
     assert "preview_coupon_redemption" in backend
-    assert "CashbackTransaction" in backend
+    assert "get_cashback_wallet" in backend
     assert "FuncionarioPdvBeneficiosPreviewRequest" in backend
     assert "FuncionarioPdvBeneficiosPreviewResponse" in backend
 

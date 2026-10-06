@@ -1,12 +1,14 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
-from decimal import Decimal
+from datetime import datetime
 from typing import Any
 
-from sqlalchemy import or_ as sql_or_
 from sqlalchemy.orm import Session
 
+from app.campaigns.cashback_wallet import (
+    get_cashback_wallet,
+    replay_cashback_transactions,
+)
 from app.campaigns.models import Campaign, CampaignExecution, CashbackTransaction
 from app.campaigns.statement_service_parts.common import (
     _append_event,
@@ -34,8 +36,11 @@ def _add_cashback_events(
             CashbackTransaction.tenant_id == tenant_id,
             CashbackTransaction.customer_id == customer_id,
         )
+        .order_by(CashbackTransaction.id)
         .all()
     )
+    wallet = replay_cashback_transactions(transactions)
+    balances = wallet.balance_by_transaction
     transaction_map = {int(tx.id): tx for tx in transactions}
     execution_ids = [
         int(tx.source_id)
@@ -55,7 +60,10 @@ def _add_cashback_events(
         execution_map = {int(execution.id): execution for execution in executions}
 
     for tx in transactions:
-        if not _date_in_range(tx.created_at, start_dt, end_dt):
+        if tx.tx_type == "closed":
+            continue
+        event_time = wallet.effective_time_by_transaction.get(tx.id, tx.created_at)
+        if not _date_in_range(event_time, start_dt, end_dt):
             continue
         amount = _money(tx.amount) or 0
         source_type = _enum_value(tx.source_type)
@@ -95,13 +103,14 @@ def _add_cashback_events(
             events,
             {
                 "id": f"cashback:{tx.id}",
-                "data": _iso(tx.created_at),
+                "data": _iso(event_time),
                 "categoria": "cashback",
                 "tipo": tx_type,
                 "direcao": "credito" if amount >= 0 else "debito",
                 "titulo": title,
                 "descricao": tx.description,
                 "valor": amount,
+                "saldo_cashback": float(balances.get(tx.id, 0)),
                 "venda_id": venda_id,
                 "status": "expirado" if tx_type == "expired" else "registrado",
                 "origem": source_type,
@@ -118,19 +127,6 @@ def _add_cashback_events(
 
 
 def _current_cashback_balance(db: Session, *, tenant_id, customer_id: int) -> float:
-    now = datetime.now(timezone.utc)
-    total = (
-        db.query(CashbackTransaction.amount)
-        .filter(
-            CashbackTransaction.tenant_id == tenant_id,
-            CashbackTransaction.customer_id == customer_id,
-            sql_or_(
-                CashbackTransaction.expires_at.is_(None),
-                CashbackTransaction.expires_at > now,
-                CashbackTransaction.tx_type != "credit",
-            ),
-        )
-        .all()
+    return float(
+        get_cashback_wallet(db, tenant_id=tenant_id, customer_id=customer_id).available
     )
-    saldo = sum((Decimal(str(row[0] or 0)) for row in total), Decimal("0.00"))
-    return float(saldo.quantize(Decimal("0.01")))

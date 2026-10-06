@@ -1,10 +1,9 @@
 """Cupons, cashback e beneficios previstos para o PDV mobile."""
 
-from datetime import datetime, timezone
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import func, or_
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from app.campaigns.channel_scope import (
@@ -12,11 +11,11 @@ from app.campaigns.channel_scope import (
     normalize_benefit_channel,
 )
 from app.campaigns.coupon_service import preview_coupon_redemption
+from app.campaigns.cashback_wallet import get_cashback_wallet
 from app.campaigns.models import (
     Campaign,
     CampaignStatusEnum,
     CampaignTypeEnum,
-    CashbackTransaction,
     Coupon,
     CouponChannelEnum,
     CouponStatusEnum,
@@ -25,7 +24,6 @@ from app.db import get_session
 from app.models import User
 from app.produtos_models import Produto
 from app.routes.ecommerce_auth import (
-    _cashback_disponivel_clause,
     _get_current_ecommerce_user,
 )
 
@@ -108,18 +106,8 @@ def _saldo_cashback_funcionario_pdv(
 ) -> float:
     if not cliente_id:
         return 0.0
-    saldo_raw = (
-        db.query(func.sum(CashbackTransaction.amount))
-        .filter(
-            CashbackTransaction.tenant_id == tenant_id,
-            CashbackTransaction.customer_id == cliente_id,
-            _cashback_disponivel_clause(
-                CashbackTransaction, datetime.now(timezone.utc)
-            ),
-        )
-        .scalar()
-    )
-    return max(0.0, _round_money_funcionario_pdv(saldo_raw))
+    wallet = get_cashback_wallet(db, tenant_id=tenant_id, customer_id=cliente_id)
+    return _round_money_funcionario_pdv(wallet.available)
 
 
 def _cashback_bonus_param_key_funcionario_pdv(sale_channel: str) -> str:

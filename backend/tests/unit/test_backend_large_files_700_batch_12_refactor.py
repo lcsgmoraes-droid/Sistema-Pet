@@ -13,6 +13,7 @@ EXPECTED_JOB_IDS = {
     "campaign_auto_drawings",
     "campaign_destaque_mensal",
     "campaign_cashback_expiration",
+    "product_recurrence_notification_tick",
 }
 
 

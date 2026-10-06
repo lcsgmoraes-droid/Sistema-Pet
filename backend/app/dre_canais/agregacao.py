@@ -192,25 +192,19 @@ def _bulk_cashback_por_venda(
 ) -> Dict[int, float]:
     if not venda_ids:
         return {}
-    from app.campaigns.models import CashbackSourceTypeEnum, CashbackTransaction
+    try:
+        from app.vendas.cashback_financeiro import (
+            cashback_resgatado_liquido_por_venda,
+        )
 
-    rows = (
-        db.query(
-            CashbackTransaction.source_id,
-            func.coalesce(func.sum(CashbackTransaction.amount), 0),
-        )
-        .filter(
-            CashbackTransaction.tenant_id == tenant_id,
-            CashbackTransaction.amount < 0,
-            CashbackTransaction.source_type == CashbackSourceTypeEnum.redemption,
-            CashbackTransaction.source_id.in_(venda_ids),
-        )
-        .group_by(CashbackTransaction.source_id)
-        .all()
-    )
-    return {
-        int(venda_id): abs(float(total or 0)) for venda_id, total in rows if venda_id
-    }
+        return {
+            venda_id: float(total)
+            for venda_id, total in cashback_resgatado_liquido_por_venda(
+                db, tenant_id=tenant_id, venda_ids=venda_ids
+            ).items()
+        }
+    except Exception:
+        return {}
 
 
 def _bulk_taxa_operacional_por_venda(
