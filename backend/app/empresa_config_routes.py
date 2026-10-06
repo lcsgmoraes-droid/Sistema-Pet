@@ -174,7 +174,9 @@ def _serializar_config(
             or "🚨 CRÍTICO: Margem muito baixa! Venda com prejuízo!"
         ),
         caixa_compartilhado=bool(getattr(config, "caixa_compartilhado", False)),
-        vendedor_obrigatorio_pdv=bool(getattr(config, "vendedor_obrigatorio_pdv", False)),
+        vendedor_obrigatorio_pdv=bool(
+            getattr(config, "vendedor_obrigatorio_pdv", False)
+        ),
         aliquota_imposto_padrao=float(config.aliquota_imposto_padrao or 7),
         dias_tolerancia_atraso=(
             config.dias_tolerancia_atraso
@@ -422,7 +424,9 @@ def get_config_pdv(
         .filter(EmpresaConfigGeral.tenant_id == tenant_id)
         .first()
     )
-    return {"vendedor_obrigatorio_pdv": bool(config and config.vendedor_obrigatorio_pdv)}
+    return {
+        "vendedor_obrigatorio_pdv": bool(config and config.vendedor_obrigatorio_pdv)
+    }
 
 
 @router.post("/", response_model=EmpresaConfigGeralResponse)

@@ -272,7 +272,9 @@ class Cliente(BaseTenantModel):
 
     pets = relationship("Pet", back_populates="cliente", cascade="all, delete-orphan")
     contatos_adicionais = relationship(
-        "ClienteContato", back_populates="cliente", cascade="all, delete-orphan",
+        "ClienteContato",
+        back_populates="cliente",
+        cascade="all, delete-orphan",
         order_by="ClienteContato.id",
     )
 
@@ -282,10 +284,17 @@ class ClienteContato(BaseTenantModel):
 
     __tablename__ = "cliente_contatos"
     __table_args__ = (
-        UniqueConstraint("tenant_id", "numero_digitos", name="uq_cliente_contatos_tenant_numero"),
+        UniqueConstraint(
+            "tenant_id", "numero_digitos", name="uq_cliente_contatos_tenant_numero"
+        ),
     )
 
-    cliente_id = Column(Integer, ForeignKey("clientes.id", ondelete="CASCADE"), nullable=False, index=True)
+    cliente_id = Column(
+        Integer,
+        ForeignKey("clientes.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
     numero = Column(String(50), nullable=False)
     numero_digitos = Column(String(20), nullable=False, index=True)
     vinculo = Column(String(60), nullable=False)

@@ -20,7 +20,10 @@ from app.clientes.common import (
     _validar_tenant_e_obter_usuario,
     gerar_codigo_cliente,
 )
-from app.clientes.contatos import validar_contatos_adicionais, salvar_contatos_adicionais
+from app.clientes.contatos import (
+    validar_contatos_adicionais,
+    salvar_contatos_adicionais,
+)
 from app.clientes.schemas import (
     ClienteCreate,
     ClienteResponse,
@@ -95,7 +98,12 @@ def create_cliente(
     contatos_adicionais = cliente_data.contatos_adicionais
     dados_payload.pop("contatos_adicionais", None)
     validar_contatos_adicionais(
-        db, tenant_id, None, contatos_adicionais, cliente_data.celular, cliente_data.telefone
+        db,
+        tenant_id,
+        None,
+        contatos_adicionais,
+        cliente_data.celular,
+        cliente_data.telefone,
     )
     auth_user_id = dados_payload.pop("auth_user_id", None)
     app_login = dados_payload.pop("app_login", None)
@@ -383,13 +391,24 @@ def update_cliente(
     _validar_documentos_unicos_update(db, cliente, cliente_data, cliente_id, tenant_id)
 
     dados_payload = cliente_data.model_dump(exclude_unset=True)
-    contatos_adicionais = cliente_data.contatos_adicionais if "contatos_adicionais" in dados_payload else None
+    contatos_adicionais = (
+        cliente_data.contatos_adicionais
+        if "contatos_adicionais" in dados_payload
+        else None
+    )
     dados_payload.pop("contatos_adicionais", None)
     if contatos_adicionais is not None:
         validar_contatos_adicionais(
-            db, tenant_id, cliente_id, contatos_adicionais,
-            cliente_data.celular if cliente_data.celular is not None else cliente.celular,
-            cliente_data.telefone if cliente_data.telefone is not None else cliente.telefone,
+            db,
+            tenant_id,
+            cliente_id,
+            contatos_adicionais,
+            cliente_data.celular
+            if cliente_data.celular is not None
+            else cliente.celular,
+            cliente_data.telefone
+            if cliente_data.telefone is not None
+            else cliente.telefone,
         )
     auth_user_informado = "auth_user_id" in dados_payload
     perfis_informados = "app_access_profiles" in dados_payload
@@ -929,7 +948,10 @@ def _aplicar_filtro_busca(query, search):
             Cliente.celular.ilike(like),
             Cliente.contatos_adicionais.any(
                 (ClienteContato.tenant_id == Cliente.tenant_id)
-                & (ClienteContato.numero.ilike(like) | ClienteContato.vinculo.ilike(like))
+                & (
+                    ClienteContato.numero.ilike(like)
+                    | ClienteContato.vinculo.ilike(like)
+                )
             ),
         ]
         palavra_digitos = "".join(ch for ch in palavra if ch.isdigit())

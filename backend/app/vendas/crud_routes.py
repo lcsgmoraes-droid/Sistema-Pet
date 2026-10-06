@@ -41,7 +41,9 @@ router = APIRouter()
 logger = logging.getLogger(__name__)
 
 
-def validar_vendedor_funcionario(db: Session, tenant_id, vendedor_funcionario_id: Optional[int]):
+def validar_vendedor_funcionario(
+    db: Session, tenant_id, vendedor_funcionario_id: Optional[int]
+):
     if vendedor_funcionario_id is None:
         return
     existe = (
@@ -58,7 +60,9 @@ def validar_vendedor_funcionario(db: Session, tenant_id, vendedor_funcionario_id
         .first()
     )
     if not existe:
-        raise HTTPException(status_code=400, detail="Vendedor não encontrado nesta empresa")
+        raise HTTPException(
+            status_code=400, detail="Vendedor não encontrado nesta empresa"
+        )
 
 
 def normalizar_status_filtro_vendas(status: Optional[str]) -> list[str]:
@@ -224,8 +228,15 @@ async def criar_venda(
     vendedor_informado_id = dados.vendedor_funcionario_id or dados.funcionario_id
     exigir_vendedor_pdv(db, tenant_id, vendedor_informado_id)
     validar_vendedor_funcionario(db, tenant_id, vendedor_informado_id)
-    if dados.funcionario_id and dados.vendedor_funcionario_id and dados.funcionario_id != dados.vendedor_funcionario_id:
-        raise HTTPException(status_code=400, detail="O vendedor e o comissionado devem ser a mesma pessoa")
+    if (
+        dados.funcionario_id
+        and dados.vendedor_funcionario_id
+        and dados.funcionario_id != dados.vendedor_funcionario_id
+    ):
+        raise HTTPException(
+            status_code=400,
+            detail="O vendedor e o comissionado devem ser a mesma pessoa",
+        )
 
     caixa_revisao = validar_revisao_caixa(
         db,
@@ -359,8 +370,15 @@ def atualizar_venda(
 ):
     """Atualiza uma venda existente (somente vendas abertas)"""
     current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
-    if dados.funcionario_id and dados.vendedor_funcionario_id and dados.funcionario_id != dados.vendedor_funcionario_id:
-        raise HTTPException(status_code=400, detail="O vendedor e o comissionado devem ser a mesma pessoa")
+    if (
+        dados.funcionario_id
+        and dados.vendedor_funcionario_id
+        and dados.funcionario_id != dados.vendedor_funcionario_id
+    ):
+        raise HTTPException(
+            status_code=400,
+            detail="O vendedor e o comissionado devem ser a mesma pessoa",
+        )
 
     # Buscar venda
     venda = db.query(Venda).filter_by(id=venda_id, tenant_id=tenant_id).first()

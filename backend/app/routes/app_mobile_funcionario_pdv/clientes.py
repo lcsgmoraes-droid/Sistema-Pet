@@ -140,7 +140,10 @@ def buscar_clientes_funcionario_pdv(
         Cliente.celular.ilike(f"%{termo}%"),
         Cliente.contatos_adicionais.any(
             (ClienteContato.tenant_id == Cliente.tenant_id)
-            & (ClienteContato.numero.ilike(f"%{termo}%") | ClienteContato.vinculo.ilike(f"%{termo}%"))
+            & (
+                ClienteContato.numero.ilike(f"%{termo}%")
+                | ClienteContato.vinculo.ilike(f"%{termo}%")
+            )
         ),
     ]
     if termo_digits:
@@ -174,7 +177,9 @@ def buscar_clientes_funcionario_pdv(
                     0,
                 ),
                 else_=1,
-            ) if termo_digits else Cliente.nome.asc(),
+            )
+            if termo_digits
+            else Cliente.nome.asc(),
             Cliente.nome.asc(),
             Cliente.id.asc(),
         )

@@ -15,7 +15,9 @@ class FakeQuery:
 
     def filter(self, condition):
         tenant_id = condition.right.value
-        self.configs = [config for config in self.configs if config.tenant_id == tenant_id]
+        self.configs = [
+            config for config in self.configs if config.tenant_id == tenant_id
+        ]
         return self
 
     def first(self):
@@ -34,10 +36,14 @@ class FakeSession:
 def test_regra_de_vendedor_e_isolada_por_empresa():
     tenant_obrigatorio = uuid4()
     tenant_opcional = uuid4()
-    db = FakeSession([
-        SimpleNamespace(tenant_id=tenant_obrigatorio, vendedor_obrigatorio_pdv=True),
-        SimpleNamespace(tenant_id=tenant_opcional, vendedor_obrigatorio_pdv=False),
-    ])
+    db = FakeSession(
+        [
+            SimpleNamespace(
+                tenant_id=tenant_obrigatorio, vendedor_obrigatorio_pdv=True
+            ),
+            SimpleNamespace(tenant_id=tenant_opcional, vendedor_obrigatorio_pdv=False),
+        ]
+    )
 
     with pytest.raises(HTTPException) as exc_info:
         exigir_vendedor_pdv(db, tenant_obrigatorio, None)
@@ -47,12 +53,12 @@ def test_regra_de_vendedor_e_isolada_por_empresa():
     exigir_vendedor_pdv(db, tenant_obrigatorio, 123)
     exigir_vendedor_pdv(db, tenant_obrigatorio, None, canal="ecommerce")
     exigir_vendedor_pdv(db, tenant_opcional, None)
-    assert get_config_pdv.__wrapped__(user_and_tenant=(None, tenant_opcional), db=db) == {
-        "vendedor_obrigatorio_pdv": False
-    }
-    assert get_config_pdv.__wrapped__(user_and_tenant=(None, tenant_obrigatorio), db=db) == {
-        "vendedor_obrigatorio_pdv": True
-    }
+    assert get_config_pdv.__wrapped__(
+        user_and_tenant=(None, tenant_opcional), db=db
+    ) == {"vendedor_obrigatorio_pdv": False}
+    assert get_config_pdv.__wrapped__(
+        user_and_tenant=(None, tenant_obrigatorio), db=db
+    ) == {"vendedor_obrigatorio_pdv": True}
 
 
 def test_preferencia_e_opcional_por_padrao():

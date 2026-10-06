@@ -161,7 +161,8 @@ def criar_venda(
             cliente_id=payload.get("cliente_id"),
             vendedor_id=payload.get("vendedor_id") or user_id,
             funcionario_id=payload.get("funcionario_id"),
-            vendedor_funcionario_id=payload.get("vendedor_funcionario_id") or payload.get("funcionario_id"),
+            vendedor_funcionario_id=payload.get("vendedor_funcionario_id")
+            or payload.get("funcionario_id"),
             subtotal=float(subtotal_itens),
             desconto_valor=float(desconto_valor),  # Desconto aplicado na venda
             desconto_percentual=payload.get("desconto_percentual", 0) or 0,
