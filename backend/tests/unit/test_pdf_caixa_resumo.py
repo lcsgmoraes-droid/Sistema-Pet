@@ -32,7 +32,14 @@ def test_pdf_fechamento_mostra_vendido_recebido_formas_e_saldo_zerado():
             "saldo_fechamento": 0,
             "diferenca": 0,
         },
-        [{"tipo": "suprimento", "descricao": None, "forma_pagamento_nome": None, "valor": 20}],
+        [
+            {
+                "tipo": "suprimento",
+                "descricao": None,
+                "forma_pagamento_nome": None,
+                "valor": 20,
+            }
+        ],
     )
     texto = " ".join(page.extract_text() for page in PdfReader(pdf).pages)
 

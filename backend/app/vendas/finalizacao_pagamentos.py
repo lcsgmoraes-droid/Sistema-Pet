@@ -222,7 +222,9 @@ def processar_pagamentos_finalizacao(
         str(pagamento.get("forma_pagamento") or "").strip().lower() == "cashback"
         for pagamento in pagamentos
     )
-    cashback_percent = cashback_use_limit_percent(db, tenant_id) if tem_cashback else None
+    cashback_percent = (
+        cashback_use_limit_percent(db, tenant_id) if tem_cashback else None
+    )
     cashback_ja_usado = Decimal("0")
     if cashback_percent is not None:
         cashback_ja_usado = Decimal(

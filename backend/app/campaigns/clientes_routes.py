@@ -319,7 +319,9 @@ def saldo_cliente(
         "customer_id": customer_id,
         "saldo_cashback": saldo_cashback,
         "cashback_use_limit_percent": (
-            float(cashback_limit_percent) if cashback_limit_percent is not None else None
+            float(cashback_limit_percent)
+            if cashback_limit_percent is not None
+            else None
         ),
         "total_carimbos": loyalty_summary["total_carimbos"],
         "total_carimbos_brutos": loyalty_summary["total_carimbos_brutos"],

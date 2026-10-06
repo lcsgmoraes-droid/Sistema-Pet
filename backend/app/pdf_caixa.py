@@ -119,7 +119,12 @@ def gerar_pdf_fechamento_caixa(caixa_data: dict, movimentacoes: list) -> BytesIO
         ["Total recebido no caixa", formatar_moeda(caixa_data.get("total_recebido"))],
         ["Vendas recebidas em dinheiro", formatar_moeda(totais.get("vendas"))],
         ["Suprimentos (entradas avulsas)", formatar_moeda(totais.get("suprimentos"))],
-        ["Total de entradas em dinheiro", formatar_moeda(float(totais.get("vendas", 0)) + float(totais.get("suprimentos", 0)))],
+        [
+            "Total de entradas em dinheiro",
+            formatar_moeda(
+                float(totais.get("vendas", 0)) + float(totais.get("suprimentos", 0))
+            ),
+        ],
         ["Sangrias", formatar_moeda(totais.get("sangrias"))],
         ["Despesas", formatar_moeda(totais.get("despesas"))],
         ["Devoluções", formatar_moeda(totais.get("devolucoes"))],
@@ -160,7 +165,9 @@ def gerar_pdf_fechamento_caixa(caixa_data: dict, movimentacoes: list) -> BytesIO
     ]
 
     # Destacar saldo esperado
-    table_style.append(("BACKGROUND", (0, saldo_row), (-1, saldo_row), colors.HexColor("#dbeafe")))
+    table_style.append(
+        ("BACKGROUND", (0, saldo_row), (-1, saldo_row), colors.HexColor("#dbeafe"))
+    )
     table_style.append(("FONTNAME", (0, saldo_row), (-1, saldo_row), "Helvetica-Bold"))
 
     # Destacar diferença se houver
@@ -202,27 +209,40 @@ def gerar_pdf_fechamento_caixa(caixa_data: dict, movimentacoes: list) -> BytesIO
 
     elements.append(Paragraph("PAGAMENTOS POR FORMA", style_heading))
     formas_data = [["FORMA", "VALOR"]]
-    for forma, dados in sorted(caixa_data.get("vendas_por_forma_pagamento", {}).items()):
+    for forma, dados in sorted(
+        caixa_data.get("vendas_por_forma_pagamento", {}).items()
+    ):
         prazo = forma.strip().casefold() in {"crediario", "crediário", "boleto"}
-        formas_data.append([f"{forma} (a prazo)" if prazo else forma, formatar_moeda(dados.get("total"))])
+        formas_data.append(
+            [
+                f"{forma} (a prazo)" if prazo else forma,
+                formatar_moeda(dados.get("total")),
+            ]
+        )
     if len(formas_data) == 1:
         formas_data.append(["Nenhum recebimento", formatar_moeda(0)])
     formas_table = Table(formas_data, colWidths=[12 * cm, 5 * cm])
-    formas_table.setStyle(TableStyle([
-        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1e40af")),
-        ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
-        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-        ("ALIGN", (1, 0), (1, -1), "RIGHT"),
-        ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
-        ("TOPPADDING", (0, 0), (-1, -1), 8),
-    ]))
+    formas_table.setStyle(
+        TableStyle(
+            [
+                ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1e40af")),
+                ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+                ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                ("ALIGN", (1, 0), (1, -1), "RIGHT"),
+                ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
+                ("TOPPADDING", (0, 0), (-1, -1), 8),
+            ]
+        )
+    )
     elements.append(formas_table)
     elements.append(Spacer(1, 0.5 * cm))
-    elements.append(Paragraph(
-        "Vendido e recebido são indicadores separados. Formas a prazo não entram no recebido. Suprimentos e abertura não são vendas.",
-        style_normal,
-    ))
+    elements.append(
+        Paragraph(
+            "Vendido e recebido são indicadores separados. Formas a prazo não entram no recebido. Suprimentos e abertura não são vendas.",
+            style_normal,
+        )
+    )
 
     # ===== MOVIMENTAÇÕES DETALHADAS =====
     if movimentacoes and len(movimentacoes) > 0:
@@ -235,8 +255,11 @@ def gerar_pdf_fechamento_caixa(caixa_data: dict, movimentacoes: list) -> BytesIO
         for mov in movimentacoes:
             data_hora = formatar_datetime(mov.get("created_at"))
             tipo = {
-                "venda": "VENDA", "suprimento": "SUPRIMENTO", "sangria": "SANGRIA",
-                "despesa": "DESPESA", "transferencia": "TRANSFERÊNCIA",
+                "venda": "VENDA",
+                "suprimento": "SUPRIMENTO",
+                "sangria": "SANGRIA",
+                "despesa": "DESPESA",
+                "transferencia": "TRANSFERÊNCIA",
                 "devolucao": "DEVOLUÇÃO",
             }.get(mov.get("tipo"), str(mov.get("tipo") or "OUTRO").upper())
             descricao = str(mov.get("descricao") or "")[:40]

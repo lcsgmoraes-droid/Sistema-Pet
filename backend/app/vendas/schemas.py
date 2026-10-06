@@ -90,7 +90,9 @@ class FinalizarVendaRequest(BaseModel):
     cupom_discount_applied: Optional[float] = None
     motivo_liberacao_crediario: Optional[str] = Field(default=None, max_length=500)
     nao_gerar_beneficios: bool = False
-    justificativa_nao_gerar_beneficios: Optional[str] = Field(default=None, max_length=500)
+    justificativa_nao_gerar_beneficios: Optional[str] = Field(
+        default=None, max_length=500
+    )
 
 
 class CancelarVendaRequest(BaseModel):

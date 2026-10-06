@@ -42,7 +42,9 @@ def cashback_sale_limit(total, percent):
 
 
 def cashback_available_in_sale(total, percent, already_used):
-    return max(Decimal("0"), cashback_sale_limit(total, percent) - Decimal(str(already_used)))
+    return max(
+        Decimal("0"), cashback_sale_limit(total, percent) - Decimal(str(already_used))
+    )
 
 
 def cashback_amount_brl(value):

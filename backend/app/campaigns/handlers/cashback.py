@@ -314,7 +314,6 @@ class CashbackHandler:
         if amount <= 0:
             return 0
 
-
         # Prazo de validade do cashback (em dias, configurável em campaign.params)
         valid_days = int(params.get("cashback_valid_days") or 0)
         expires_at = None

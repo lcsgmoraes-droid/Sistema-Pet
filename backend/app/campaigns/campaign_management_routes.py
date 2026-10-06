@@ -110,9 +110,13 @@ def atualizar_parametros(
             try:
                 percent = Decimal(str(value))
             except (InvalidOperation, ValueError) as exc:
-                raise HTTPException(status_code=400, detail="Informe um limite entre 0% e 100%.") from exc
+                raise HTTPException(
+                    status_code=400, detail="Informe um limite entre 0% e 100%."
+                ) from exc
             if not percent.is_finite() or not 0 <= percent <= 100:
-                raise HTTPException(status_code=400, detail="Informe um limite entre 0% e 100%.")
+                raise HTTPException(
+                    status_code=400, detail="Informe um limite entre 0% e 100%."
+                )
 
     campanha.params = {**(campanha.params or {}), **body.params}
     if body.name:

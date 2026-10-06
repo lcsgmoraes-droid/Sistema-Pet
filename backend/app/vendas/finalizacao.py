@@ -224,7 +224,8 @@ def finalizar_venda(
             venda.nao_gerar_beneficios = True
             venda.justificativa_nao_gerar_beneficios = (
                 justificativa_nao_gerar_beneficios.strip()
-                if justificativa_nao_gerar_beneficios and justificativa_nao_gerar_beneficios.strip()
+                if justificativa_nao_gerar_beneficios
+                and justificativa_nao_gerar_beneficios.strip()
                 else None
             )
             venda.beneficios_bloqueados_em = now_brasilia()
