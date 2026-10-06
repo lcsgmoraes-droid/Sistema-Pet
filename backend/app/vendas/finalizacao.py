@@ -18,6 +18,7 @@ from app.services.venda_rentabilidade_snapshot_service import (
     invalidate_venda_rentabilidade_snapshot,
 )
 from app.utils.timezone import now_brasilia
+from app.vendas.custo_original import registrar_custo_original_saida
 from app.vendas.finalizacao_eventos import publicar_eventos_finalizacao
 from app.vendas.finalizacao_pagamentos import (
     _calcular_pagamentos_finalizacao,
@@ -397,6 +398,7 @@ def finalizar_venda(
                     item, tenant_id
                 )
 
+                resultados = []
                 with contexto_tenant_estoque(
                     tenant_estoque, tenant_id
                 ) as tenant_estoque_uuid:
@@ -445,7 +447,8 @@ def finalizar_venda(
                             ),
                             venda_item=item if not compartilhado else None,
                         )
-                        estoque_baixado.extend(resultados)
+                registrar_custo_original_saida(item, resultados, tenant_estoque_uuid)
+                estoque_baixado.extend(resultados)
 
         # ============================================================
         # ETAPA 5: VINCULAR AO CAIXA

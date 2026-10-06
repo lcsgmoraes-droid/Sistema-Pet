@@ -49,6 +49,7 @@ def upgrade() -> None:
         ),
         sa.Column("data_competencia", sa.Date(), nullable=False),
         sa.Column("canal", sa.String(length=50), nullable=False),
+        sa.Column("status_original_venda", sa.String(length=30), nullable=False),
         sa.Column("forma_estorno", sa.String(length=20), nullable=False),
         sa.Column("motivo", sa.Text(), nullable=False),
         sa.Column("valor_devolvido", sa.Numeric(12, 2), nullable=False),

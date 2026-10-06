@@ -191,7 +191,7 @@ def _carregar_cashback_por_venda(db: Session, tenant_id, venda_ids: list[int]) -
         return {}
 
     try:
-        from app.campaigns.models import CashbackTransaction
+        from app.campaigns.models import CashbackSourceTypeEnum, CashbackTransaction
 
         resgates = (
             db.query(
@@ -200,6 +200,7 @@ def _carregar_cashback_por_venda(db: Session, tenant_id, venda_ids: list[int]) -
             .filter(
                 CashbackTransaction.tenant_id == tenant_id,
                 CashbackTransaction.amount < 0,
+                CashbackTransaction.source_type == CashbackSourceTypeEnum.redemption,
                 CashbackTransaction.source_id.in_(venda_ids),
             )
             .group_by(CashbackTransaction.source_id)

@@ -389,12 +389,15 @@ class LoyaltyStamp(TenantScoped, Base):
     venda_id = Column(BigInteger, nullable=True)
     campaign_id = Column(BigInteger, nullable=False)
     stamp_index = Column(Integer, nullable=False, default=1)
+    # Regra usada quando a venda recebeu o carimbo. NULL indica legado sem prova.
+    stamp_value_snapshot = Column(Numeric(12, 2), nullable=True)
     is_manual = Column(Boolean, nullable=False, default=False)
     notes = Column(String(500), nullable=True)
     created_at = Column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )
     voided_at = Column(DateTime(timezone=True), nullable=True)  # Estorno
+    voided_origin = Column(String(20), nullable=True)  # manual | automatic
 
     __table_args__ = (
         UniqueConstraint(

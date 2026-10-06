@@ -615,7 +615,9 @@ def relatorio_campanhas(
     if tipo == "credito":
         q = q.filter(CashbackTransaction.amount > 0)
     elif tipo == "resgate":
-        q = q.filter(CashbackTransaction.amount < 0)
+        q = q.filter(
+            CashbackTransaction.source_type == CashbackSourceTypeEnum.redemption
+        )
 
     transacoes = q.order_by(CashbackTransaction.created_at.desc()).limit(500).all()
 
@@ -634,7 +636,13 @@ def relatorio_campanhas(
         clientes_map = {c.id: c.nome for c in clientes}
 
     # Buscar números de venda em lote (source_id é venda_id para resgates)
-    venda_ids = list({t.source_id for t in transacoes if t.source_id and t.amount < 0})
+    venda_ids = list(
+        {
+            t.source_id
+            for t in transacoes
+            if t.source_id and t.source_type == CashbackSourceTypeEnum.redemption
+        }
+    )
     vendas_map = {}
     if venda_ids:
         vendas = (
@@ -649,7 +657,18 @@ def relatorio_campanhas(
 
     resultado = []
     for t in transacoes:
-        eh_resgate = t.amount < 0
+        eh_resgate = t.source_type == CashbackSourceTypeEnum.redemption
+        tipo_movimento = (
+            "resgate"
+            if eh_resgate
+            else "estorno"
+            if t.source_type == CashbackSourceTypeEnum.reversal
+            else "expiracao"
+            if t.source_type == CashbackSourceTypeEnum.expiration
+            else "credito"
+            if t.amount >= 0
+            else "ajuste"
+        )
         resultado.append(
             {
                 "id": t.id,
@@ -658,7 +677,7 @@ def relatorio_campanhas(
                 "cliente_nome": clientes_map.get(
                     t.customer_id, f"Cliente #{t.customer_id}"
                 ),
-                "tipo": "resgate" if eh_resgate else "credito",
+                "tipo": tipo_movimento,
                 "valor": float(abs(t.amount)),
                 "source_type": t.source_type.value if t.source_type else None,
                 "venda_id": t.source_id if eh_resgate else None,
@@ -677,7 +696,7 @@ def relatorio_campanhas(
         "transacoes": resultado,
         "total_creditado": round(total_creditado, 2),
         "total_resgatado": round(total_resgatado, 2),
-        "saldo_total": round(total_creditado - total_resgatado, 2),
+        "saldo_total": round(sum(float(t.amount) for t in transacoes), 2),
     }
 
 

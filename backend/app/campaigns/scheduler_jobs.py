@@ -555,6 +555,19 @@ def _expire_cashback_credit_if_needed(db, tenant, tx) -> None:
     from app.campaigns.models import CashbackSourceTypeEnum, CashbackTransaction
     from app.campaigns.notification_service import enqueue_email
     from app.models import Cliente
+    from decimal import Decimal
+
+    # Serialize expiration with proportional reversals on returned purchases.
+    tx = (
+        db.query(CashbackTransaction)
+        .filter(
+            CashbackTransaction.tenant_id == tenant.id, CashbackTransaction.id == tx.id
+        )
+        .with_for_update()
+        .first()
+    )
+    if tx is None:
+        return
 
     already_expired = (
         db.query(CashbackTransaction.id)
@@ -569,14 +582,32 @@ def _expire_cashback_credit_if_needed(db, tenant, tx) -> None:
     if already_expired:
         return
 
+    reversals = (
+        db.query(CashbackTransaction.amount)
+        .filter(
+            CashbackTransaction.tenant_id == tenant.id,
+            CashbackTransaction.customer_id == tx.customer_id,
+            CashbackTransaction.source_type == CashbackSourceTypeEnum.reversal,
+            CashbackTransaction.source_id == tx.id,
+        )
+        .all()
+    )
+    amount_to_expire = max(
+        Decimal("0"),
+        Decimal(str(tx.amount or 0))
+        + sum((Decimal(str(row[0] or 0)) for row in reversals), Decimal("0")),
+    )
+    if amount_to_expire <= 0:
+        return
+
     db.add(
         CashbackTransaction(
             tenant_id=tenant.id,
             customer_id=tx.customer_id,
-            amount=-tx.amount,
+            amount=-amount_to_expire,
             source_type=CashbackSourceTypeEnum.expiration,
             source_id=tx.id,
-            description=f"Expiração do cashback #CBTX-{tx.id} (R$ {float(tx.amount):.2f})",
+            description=f"Expiração do cashback #CBTX-{tx.id} (R$ {float(amount_to_expire):.2f})",
             tx_type="expired",
         )
     )
@@ -590,7 +621,7 @@ def _expire_cashback_credit_if_needed(db, tenant, tx) -> None:
             customer_id=tx.customer_id,
             title="Seu cashback expirou",
             body=(
-                f"Ola, {cliente.nome}! R$ {float(tx.amount):.2f} de cashback "
+                f"Ola, {cliente.nome}! R$ {float(amount_to_expire):.2f} de cashback "
                 "venceu hoje."
             ),
             idempotency_key=f"cashback_expired:{tenant.id}:{tx.id}:push",
@@ -599,7 +630,7 @@ def _expire_cashback_credit_if_needed(db, tenant, tx) -> None:
             payload={
                 "target": "benefits",
                 "customer_id": tx.customer_id,
-                "cashback_amount": float(tx.amount),
+                "cashback_amount": float(amount_to_expire),
                 "cashback_tx_id": tx.id,
             },
         )
@@ -610,7 +641,7 @@ def _expire_cashback_credit_if_needed(db, tenant, tx) -> None:
             customer_id=tx.customer_id,
             subject="Seu cashback expirou hoje 😢",
             body=(
-                f"Olá, {cliente.nome}! Infelizmente R$ {float(tx.amount):.2f} "
+                f"Olá, {cliente.nome}! Infelizmente R$ {float(amount_to_expire):.2f} "
                 f"de cashback venceu hoje sem ser utilizado. "
                 f"Continue comprando para acumular novos créditos!"
             ),

@@ -353,7 +353,7 @@ export default function ModalDevolucao({ caixaId, vendaInicial = null, onClose, 
         });
         const confirmado = await confirmarCorePet({
           titulo: "Confirmar devolução",
-          mensagem: `Confirmar ${gerarCredito ? "crédito ao cliente" : "reembolso em dinheiro"} de ${valorFormatado}? Este é o valor líquido após os descontos da venda.`,
+          mensagem: `Confirmar ${gerarCredito ? "crédito ao cliente" : "reembolso em dinheiro"} de ${valorFormatado}? Este é o valor líquido após os descontos da venda.${vendaSelecionada.cliente_id ? " Os benefícios de cashback e fidelidade desta venda serão recalculados." : ""} O imposto da venda não será estornado automaticamente na DRE; confira o documento fiscal.`,
           confirmarTexto: "Confirmar devolução",
         });
         if (!confirmado) return;

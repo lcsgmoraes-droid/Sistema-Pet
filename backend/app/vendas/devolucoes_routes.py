@@ -3,6 +3,7 @@
 import hashlib
 import json
 import logging
+import unicodedata
 from collections import defaultdict
 from decimal import Decimal, InvalidOperation
 from uuid import UUID
@@ -111,6 +112,28 @@ def _validar_recebiveis_liquidados(db: Session, venda_id: int, tenant_id) -> Non
                 "antes de registrar a devolucao."
             ),
         )
+
+
+def _validar_pagamentos_beneficio(venda: Venda, tenant_id) -> None:
+    """Impede converter cashback ou crédito usado no pagamento em espécie."""
+    for pagamento in getattr(venda, "pagamentos", []) or []:
+        if str(getattr(pagamento, "tenant_id", tenant_id)) != str(tenant_id):
+            continue
+        nome = str(getattr(pagamento, "forma_pagamento", "") or "")
+        normalizado = "".join(
+            caractere
+            for caractere in unicodedata.normalize("NFKD", nome.lower())
+            if not unicodedata.combining(caractere)
+        )
+        normalizado = normalizado.replace(" ", "_").replace("-", "_")
+        if normalizado in {"cashback", "credito_cliente"}:
+            raise HTTPException(
+                status_code=409,
+                detail=(
+                    "A venda foi paga com cashback ou Credito Cliente. "
+                    "Concilie a devolucao na forma original de pagamento."
+                ),
+            )
 
 
 def _item_controlava_estoque_na_venda(item) -> bool:
@@ -245,6 +268,7 @@ def prever_devolucao(
     venda = db.query(Venda).filter_by(id=venda_id, tenant_id=tenant_id).first()
     if not venda:
         raise HTTPException(status_code=404, detail="Venda não encontrada")
+    _validar_pagamentos_beneficio(venda, tenant_id)
     itens_venda = (
         db.query(VendaItem)
         .filter(VendaItem.venda_id == venda_id, VendaItem.tenant_id == tenant_id)
@@ -264,6 +288,16 @@ def prever_devolucao(
         )
     except ValueError as erro:
         raise HTTPException(status_code=400, detail=str(erro)) from erro
+    from app.campaigns.sale_return_service import (
+        preflight_purchase_benefits_on_return,
+    )
+
+    preflight_purchase_benefits_on_return(
+        db,
+        tenant_id=tenant_id,
+        venda=venda,
+        valor_acumulado=cotacao.valor_acumulado,
+    )
     _validar_recebiveis_liquidados(db, venda_id, tenant_id)
     _validar_estoque_devolucao_seguro(
         db, venda_id, tenant_id, itens_venda, dados.get("itens") or []
@@ -364,6 +398,7 @@ def registrar_devolucao(
                 status_code=400,
                 detail="A venda nao possui saldo para outra devolucao",
             )
+        _validar_pagamentos_beneficio(venda, tenant_id)
 
         logger.info(
             f"✅ Venda encontrada: #{venda.numero_venda} - Total: R$ {venda.total}"
@@ -446,6 +481,21 @@ def registrar_devolucao(
                 VendaDevolucao.venda_id == venda_id,
             )
             .all()
+        )
+        status_original_venda = (
+            str(
+                getattr(
+                    min(
+                        eventos_anteriores,
+                        key=lambda evento: getattr(evento, "id", 0),
+                    ),
+                    "status_original_venda",
+                    "",
+                )
+                or ""
+            ).lower()
+            if eventos_anteriores
+            else status_venda
         )
         todos_itens_venda = (
             db.query(VendaItem)
@@ -795,6 +845,7 @@ def registrar_devolucao(
             user_id=current_user.id,
             data_competencia=now_brasilia().date(),
             canal=getattr(venda, "canal", None) or "loja_fisica",
+            status_original_venda=status_original_venda,
             forma_estorno="credito" if gerar_credito else "dinheiro",
             motivo=motivo,
             valor_devolvido=valor_total_devolucao,
@@ -805,6 +856,17 @@ def registrar_devolucao(
         )
         db.add(evento_dre)
         db.flush()
+        from app.campaigns.sale_return_service import (
+            reconcile_purchase_benefits_on_return,
+        )
+
+        reconcile_purchase_benefits_on_return(
+            db,
+            tenant_id=tenant_id,
+            venda=venda,
+            evento_devolucao=evento_dre,
+            valor_acumulado=cotacao.valor_acumulado,
+        )
 
         # 💰 OPÇÃO 1: GERAR CRÉDITO PARA O CLIENTE
         if gerar_credito:

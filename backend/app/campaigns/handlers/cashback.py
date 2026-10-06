@@ -217,6 +217,7 @@ class CashbackHandler:
                 "percent": float(pct_total),
                 "rank": rank.value,
                 "venda_id": venda_id,
+                "venda_total_base": float(venda_total),
                 "canal": canal,
                 "bonus_percent": float(bonus_pct),
             },

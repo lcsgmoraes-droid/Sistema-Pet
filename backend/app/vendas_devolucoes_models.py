@@ -40,6 +40,7 @@ class VendaDevolucao(BaseTenantModel):
     user_id = Column(ForeignKey("users.id", ondelete="RESTRICT"), nullable=False)
     data_competencia = Column(Date, nullable=False)
     canal = Column(String(50), nullable=False)
+    status_original_venda = Column(String(30), nullable=False)
     forma_estorno = Column(String(20), nullable=False)  # dinheiro ou credito
     motivo = Column(Text, nullable=False)
     valor_devolvido = Column(Numeric(12, 2), nullable=False)

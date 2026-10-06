@@ -25,6 +25,29 @@ from app.vendas_models import Venda, VendaItem
 ROOT = Path(__file__).resolve().parents[2]
 
 
+@pytest.fixture
+def preflight_beneficios_mock(monkeypatch):
+    """Testes de estoque/recebiveis isolam as regras de campanhas."""
+    monkeypatch.setattr(
+        "app.campaigns.sale_return_service.preflight_purchase_benefits_on_return",
+        lambda *_args, **_kwargs: None,
+    )
+
+
+def _comprovante_custo(item, venda_id, tenant_estoque, custo_total):
+    return {
+        "versao": 1,
+        "origem": "baixa_estoque_venda",
+        "venda_id": venda_id,
+        "venda_item_id": item.id,
+        "produto_id": item.produto_id,
+        "tenant_estoque_id": str(tenant_estoque),
+        "movimentacao_id": 91,
+        "quantidade": str(item.quantidade),
+        "custo_total": str(custo_total),
+    }
+
+
 def test_credito_sem_cliente_e_validado_antes_de_movimentar_estoque():
     source = (ROOT / "app" / "vendas" / "devolucoes_routes.py").read_text(
         encoding="utf-8"
@@ -72,6 +95,125 @@ def test_venda_cancelada_nao_gera_evento_de_devolucao():
         )
 
     assert erro.value.status_code == 400
+    db.add.assert_not_called()
+    db.commit.assert_not_called()
+
+
+@pytest.mark.parametrize("operacao", [prever_devolucao, registrar_devolucao])
+@pytest.mark.parametrize("forma", ["Cashback", "Crédito Cliente", "credito_cliente"])
+def test_pagamento_com_beneficio_exige_conciliacao_da_forma_original(operacao, forma):
+    tenant_id = uuid4()
+    venda = SimpleNamespace(
+        id=8,
+        status="finalizada",
+        pagamentos=[SimpleNamespace(tenant_id=tenant_id, forma_pagamento=forma)],
+    )
+    consulta_venda = MagicMock()
+    consulta_venda.filter_by.return_value.first.return_value = venda
+    consulta_venda.filter_by.return_value.with_for_update.return_value.first.return_value = venda
+    consulta_evento = MagicMock()
+    consulta_evento.filter.return_value.first.return_value = None
+    db = MagicMock()
+    db.query.side_effect = lambda modelo: (
+        consulta_venda if modelo is Venda else consulta_evento
+    )
+
+    with pytest.raises(HTTPException) as erro:
+        operacao(
+            venda_id=8,
+            dados={
+                "itens": [{"item_id": 3, "quantidade": 1}],
+                "motivo": "Teste",
+                "chave_operacao": str(uuid4()),
+            },
+            db=db,
+            user_and_tenant=(SimpleNamespace(id=1), tenant_id),
+        )
+
+    assert erro.value.status_code == 409
+    assert "forma original" in erro.value.detail
+    db.add.assert_not_called()
+    db.commit.assert_not_called()
+
+
+@pytest.mark.parametrize("regra_legada", [True, False])
+def test_previa_exibe_409_de_regra_legada_antes_da_confirmacao(
+    monkeypatch, regra_legada
+):
+    tenant_id = uuid4()
+    venda = SimpleNamespace(
+        id=8,
+        cliente_id=47,
+        status="finalizada",
+        total=Decimal("100"),
+        pagamentos=[],
+    )
+    item = SimpleNamespace(id=3)
+    consultas = {}
+    for modelo, resultado in (
+        (Venda, venda),
+        (VendaItem, [item]),
+        (VendaDevolucao, []),
+    ):
+        consulta = MagicMock()
+        consulta.filter_by.return_value = consulta
+        consulta.filter.return_value = consulta
+        consulta.first.return_value = resultado
+        consulta.all.return_value = resultado if isinstance(resultado, list) else []
+        consultas[modelo] = consulta
+    db = MagicMock()
+    db.query.side_effect = lambda modelo: consultas[modelo]
+    monkeypatch.setattr(
+        "app.vendas.devolucoes_routes.cotar_devolucao",
+        lambda *_args: SimpleNamespace(
+            valor_total=Decimal("50"),
+            valor_ja_devolvido=Decimal("0"),
+            valor_acumulado=Decimal("50"),
+            valores_itens=[Decimal("50")],
+        ),
+    )
+    monkeypatch.setattr(
+        "app.vendas.devolucoes_routes._validar_recebiveis_liquidados",
+        lambda *_args: None,
+    )
+    monkeypatch.setattr(
+        "app.vendas.devolucoes_routes._validar_estoque_devolucao_seguro",
+        lambda *_args: None,
+    )
+    chamadas = []
+
+    def preflight(_db, *, tenant_id, venda, valor_acumulado):
+        chamadas.append((tenant_id, venda.id, valor_acumulado))
+        if regra_legada:
+            raise HTTPException(
+                status_code=409,
+                detail="Passo historico do cartao fidelidade nao comprovado",
+            )
+
+    monkeypatch.setattr(
+        "app.campaigns.sale_return_service.preflight_purchase_benefits_on_return",
+        preflight,
+    )
+
+    if regra_legada:
+        with pytest.raises(HTTPException) as erro:
+            prever_devolucao(
+                venda_id=8,
+                dados={"itens": [{"item_id": 3, "quantidade": 1}]},
+                db=db,
+                user_and_tenant=(SimpleNamespace(id=1), tenant_id),
+            )
+        assert erro.value.status_code == 409
+        assert "historico" in erro.value.detail
+    else:
+        previa = prever_devolucao(
+            venda_id=8,
+            dados={"itens": [{"item_id": 3, "quantidade": 1}]},
+            db=db,
+            user_and_tenant=(SimpleNamespace(id=1), tenant_id),
+        )
+        assert previa["valor_total_devolucao"] == 50.0
+    assert chamadas == [(tenant_id, 8, Decimal("50"))]
     db.add.assert_not_called()
     db.commit.assert_not_called()
 
@@ -127,6 +269,10 @@ def test_devolucao_repetida_de_servico_usa_saldo_dos_eventos():
 
 
 def test_credito_devolucao_aceita_cliente_criado_por_outro_funcionario(monkeypatch):
+    monkeypatch.setattr(
+        "app.campaigns.sale_return_service.reconcile_purchase_benefits_on_return",
+        lambda *_args, **_kwargs: None,
+    )
     tenant_id = uuid4()
     atendente = SimpleNamespace(id=22, nome="Atendente")
     cliente = SimpleNamespace(id=47, user_id=11, nome="Cliente", credito=Decimal("0"))
@@ -198,8 +344,9 @@ def test_credito_devolucao_aceita_cliente_criado_por_outro_funcionario(monkeypat
         if isinstance(call.args[0], VendaDevolucao)
     )
     assert evento.valor_devolvido == Decimal("59.89")
+    assert evento.status_original_venda == "finalizada"
     assert evento.forma_estorno == "credito"
-    assert evento.custo_pendente is True
+    assert evento.custo_pendente is False
     db.commit.assert_called_once()
 
     consultas[VendaDevolucao].first.return_value = evento
@@ -322,7 +469,7 @@ def test_devolucao_parcial_em_dinheiro_registra_deducao_e_custo_servico(monkeypa
     assert evento.valor_devolvido == Decimal("50.00")
     assert evento.custo_servicos_estornado == Decimal("0")
     assert evento.custo_produtos_estornado == 0
-    assert evento.itens[0]["custo_original"] == "15.00"
+    assert evento.itens[0]["custo_original"] == "0"
     assert evento.itens[0]["custo_estornado"] == "0"
     assert evento.itens[0]["origem_custo"] == "servico_custo_mantido"
     assert evento.movimentacao_caixa_id == 17
@@ -377,6 +524,10 @@ def test_entrada_de_estoque_usa_custo_original_ou_zero_provisorio(
             ],
         },
     )
+    if custo_comprovado:
+        item.custo_original_saida = _comprovante_custo(
+            item, venda.id, tenant_id, "30.00"
+        )
     consultas = {}
     for modelo, resultado in (
         (Venda, venda),
@@ -419,12 +570,6 @@ def test_entrada_de_estoque_usa_custo_original_ou_zero_provisorio(
     monkeypatch.setattr(
         "app.vendas.devolucoes_routes.log_action", lambda **_kwargs: None
     )
-    if not custo_comprovado:
-        monkeypatch.setattr(
-            "app.vendas.devolucoes_routes.custo_original_item_devolvido",
-            lambda *_args: (Decimal("0"), "sem_custo_original", True),
-        )
-
     registrar_devolucao(
         venda_id=venda.id,
         dados={
@@ -451,7 +596,13 @@ def test_entrada_de_estoque_usa_custo_original_ou_zero_provisorio(
     db.commit.assert_called_once()
 
 
-def test_servico_de_catalogo_com_produto_id_devolve_sem_movimentar_estoque(monkeypatch):
+def test_servico_de_catalogo_com_produto_id_devolve_sem_movimentar_estoque(
+    monkeypatch, preflight_beneficios_mock
+):
+    monkeypatch.setattr(
+        "app.campaigns.sale_return_service.reconcile_purchase_benefits_on_return",
+        lambda *_args, **_kwargs: None,
+    )
     tenant_id = uuid4()
     atendente = SimpleNamespace(id=22, nome="Atendente")
     cliente = SimpleNamespace(id=47, nome="Cliente", credito=Decimal("0"))
@@ -552,7 +703,7 @@ def test_servico_de_catalogo_com_produto_id_devolve_sem_movimentar_estoque(monke
     assert cliente.credito == Decimal("50")
     assert evento.custo_servicos_estornado == Decimal("0")
     assert evento.custo_produtos_estornado == 0
-    assert evento.itens[0]["custo_original"] == "15.00"
+    assert evento.itens[0]["custo_original"] == "0"
     assert evento.itens[0]["custo_estornado"] == "0"
     db.commit.assert_called_once()
 
@@ -589,7 +740,9 @@ def test_recebivel_quitado_preserva_a_entrada_historica():
 
 
 @pytest.mark.parametrize("operacao", [prever_devolucao, registrar_devolucao])
-def test_previa_e_registro_bloqueiam_reembolso_com_recebivel_aberto(operacao):
+def test_previa_e_registro_bloqueiam_reembolso_com_recebivel_aberto(
+    operacao, preflight_beneficios_mock
+):
     tenant_id = uuid4()
     venda = SimpleNamespace(
         id=8,
@@ -778,6 +931,9 @@ def test_previa_e_registro_aceitam_produto_de_estoque_compartilhado(monkeypatch)
             ],
         },
     )
+    item.custo_original_saida = _comprovante_custo(
+        item, venda.id, tenant_estoque, "15.00"
+    )
     consultas = {}
     for modelo, resultado in (
         (Venda, venda),
@@ -887,7 +1043,7 @@ def test_previa_e_registro_aceitam_produto_de_estoque_compartilhado(monkeypatch)
     [("KIT", "VIRTUAL", None), ("SIMPLES", None, 12)],
 )
 def test_previa_e_registro_bloqueiam_estoque_que_nao_pode_ser_recomposto(
-    monkeypatch, operacao, tipo_produto, tipo_kit, lote_id
+    monkeypatch, operacao, tipo_produto, tipo_kit, lote_id, preflight_beneficios_mock
 ):
     tenant_id = uuid4()
     venda = SimpleNamespace(
@@ -1097,7 +1253,13 @@ def test_valor_acumulado_das_devolucoes_nao_excede_total_pago():
     db.commit.assert_not_called()
 
 
-def test_devolucoes_parciais_com_desconto_pagam_liquido_e_fecham_venda(monkeypatch):
+def test_devolucoes_parciais_com_desconto_pagam_liquido_e_fecham_venda(
+    monkeypatch, preflight_beneficios_mock
+):
+    monkeypatch.setattr(
+        "app.campaigns.sale_return_service.reconcile_purchase_benefits_on_return",
+        lambda *_args, **_kwargs: None,
+    )
     tenant_id = uuid4()
     atendente = SimpleNamespace(id=22, nome="Atendente")
     cliente = SimpleNamespace(id=47, nome="Cliente", credito=Decimal("0"))
@@ -1195,7 +1357,9 @@ def test_devolucoes_parciais_com_desconto_pagam_liquido_e_fecham_venda(monkeypat
     assert db.commit.call_count == 2
 
 
-def test_registro_rejeita_valor_diferente_da_previa_antes_do_credito():
+def test_registro_rejeita_valor_diferente_da_previa_antes_do_credito(
+    preflight_beneficios_mock,
+):
     tenant_id = uuid4()
     venda = SimpleNamespace(
         id=8,

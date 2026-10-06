@@ -156,6 +156,7 @@ def _novo_canal() -> Dict:
         "custo_servicos": _campo_zero(),
         "cmv_estimado": _campo_zero(),
         "itens_cmv_estimado": [],
+        "itens_cmv_atribuido": [],
         "percentual_cmv_estimado": _campo_zero(),
         "origem_percentual_cmv_estimado": None,
         "fretes_compras": _campo_zero(),

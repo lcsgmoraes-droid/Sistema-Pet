@@ -34,8 +34,8 @@ const AnaliseInteligente = ({ dados, parametrosDRE }) => {
   useEffect(() => {
     const requestId = ++analiseRequestRef.current;
     if (dadosCorrespondemParametrosDRE(dados, parametrosDRE)) {
-      carregarAnalise(requestId);
-      carregarIndicesMercado();
+      void carregarAnalise(requestId);
+      void carregarIndicesMercado();
     } else {
       setAnalise(null);
       setComparacao(null);

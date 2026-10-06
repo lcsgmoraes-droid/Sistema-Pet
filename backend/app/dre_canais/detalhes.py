@@ -15,6 +15,7 @@ from app.dre_canais.agregacao import (
     _preparar_snapshots_vendas,
     _subcategorias_contas_map,
     _valor_snapshot_campo,
+    agregar_devolucoes_por_canal,
     obter_vendas_por_canal,
 )
 from app.dre_canais.base import (
@@ -157,24 +158,50 @@ def _detalhes_cmv_estimado(
         mes_inicial=mes_inicial,
         data_final=data_final,
     )
-    itens = list(dados_canais.get(canal, {}).get("itens_cmv_estimado", []) or [])
+    agregar_devolucoes_por_canal(
+        db,
+        mes,
+        ano,
+        tenant_id,
+        dados_canais,
+        mes_inicial=mes_inicial,
+        data_final=data_final,
+    )
+    dados = dados_canais.get(canal, {})
+    itens = list(dados.get("itens_cmv_estimado", []) or [])
+    itens.extend(dados.get("itens_cmv_estornado", []) or [])
     detalhes = []
     for indice, item in enumerate(itens):
         codigo = item.get("produto_codigo")
         nome = item.get("produto_nome") or "Produto removido"
         numero_venda = item.get("numero_venda") or f"#{item.get('venda_id')}"
         percentual = _decimal(item.get("percentual_custo", 0))
+        devolucao_id = item.get("devolucao_id")
+        origem_estorno = item.get("origem_cmv_estornado")
+        if origem_estorno == "custo_atribuido_sem_comprovante":
+            origem_label = "Estorno provisório de CMV sem custo comprovado"
+        elif devolucao_id:
+            origem_label = "Estorno de custo provisório"
+        else:
+            origem_label = "Custo provisório"
+        contraparte = (
+            f"Venda {numero_venda} • CMV anterior sem comprovante"
+            if origem_estorno == "custo_atribuido_sem_comprovante"
+            else f"Venda {numero_venda} • custo aplicado {float(percentual):.2f}%"
+        )
         detalhes.append(
             DREDetalheItem(
                 id=(
                     f"cmv-estimado-{item.get('venda_id')}-"
-                    f"{item.get('produto_id')}-{indice}"
+                    f"{item.get('venda_item_id')}-{devolucao_id or 'venda'}-{indice}"
                 ),
-                origem_tipo="estimativa_cmv",
-                origem_label="Custo provisório",
+                origem_tipo=(
+                    "estorno_estimativa_cmv" if devolucao_id else "estimativa_cmv"
+                ),
+                origem_label=origem_label,
                 data=item.get("data"),
                 descricao=f"{codigo} - {nome}" if codigo else nome,
-                contraparte=f"Venda {numero_venda} • custo aplicado {float(percentual):.2f}%",
+                contraparte=contraparte,
                 documento=str(numero_venda),
                 valor=float(_decimal(item.get("valor_estimado", 0))),
                 valor_auxiliar=float(_decimal(item.get("valor_venda", 0))),
@@ -186,6 +213,8 @@ def _detalhes_cmv_estimado(
                     "percentual_custo": float(percentual),
                     "origem_percentual": item.get("origem_percentual"),
                     "provisorio": True,
+                    "devolucao_id": devolucao_id,
+                    "origem_cmv_estornado": origem_estorno,
                 },
             )
         )
