@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session
 from app import caixa_models, produtos_models  # noqa: F401 - relacionamentos
 from app.caixa_models import Caixa, MovimentacaoCaixa
 from app.caixa.service import CaixaService
+from app.empresa_config_geral_models import EmpresaConfigGeral
 from app.financeiro import ContasReceberService
 from app.financeiro_models import (
     CategoriaFinanceira,
@@ -54,6 +55,7 @@ def cenario(monkeypatch, tenant_context):
         AuditLog,
         Caixa,
         MovimentacaoCaixa,
+        EmpresaConfigGeral,
     ):
         if pg_url:
             for coluna in model.__table__.columns:

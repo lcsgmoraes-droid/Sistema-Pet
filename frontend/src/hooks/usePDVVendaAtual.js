@@ -10,6 +10,9 @@ export function usePDVVendaAtual({
   setModoVisualizacao,
   setMostrarModalPagamento,
   entregadorSelecionado,
+  vendedorObrigatorio,
+  vendaComissionada,
+  funcionarioComissao,
   limparComissao,
   sincronizarComissaoDaVenda,
   sincronizarEntregadorDaVenda,
@@ -32,6 +35,9 @@ export function usePDVVendaAtual({
     setModoVisualizacao,
     setMostrarModalPagamento,
     entregadorSelecionado,
+    vendedorObrigatorio,
+    vendaComissionada,
+    funcionarioComissao,
     limparComissao,
   });
 

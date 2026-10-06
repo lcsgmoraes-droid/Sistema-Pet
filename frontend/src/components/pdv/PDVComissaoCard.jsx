@@ -15,10 +15,14 @@ export default function PDVComissaoCard({
   onSelecionarFuncionario,
   onToggleVendaComissionada,
   vendaComissionada,
+  vendedorObrigatorio,
+  gerarComissao,
+  onGerarComissaoChange,
 }) {
   const panelRef = useRef(null);
+  const mostrarVendedor = vendaComissionada || vendedorObrigatorio;
   const mostrarSugestoes =
-    vendaComissionada && !funcionarioComissao && funcionariosSugeridos.length > 0;
+    mostrarVendedor && !funcionarioComissao && funcionariosSugeridos.length > 0;
 
   useRevealFloatingPanel({
     enabled: mostrarSugestoes && !modoVisualizacao,
@@ -33,16 +37,18 @@ export default function PDVComissaoCard({
         <label className="flex items-center gap-2 cursor-pointer">
           <input
             type="checkbox"
-            checked={vendaComissionada}
+            checked={Boolean(mostrarVendedor)}
             onChange={(e) => onToggleVendaComissionada(e.target.checked)}
-            disabled={modoVisualizacao}
+            disabled={modoVisualizacao || vendedorObrigatorio}
             className="w-5 h-5 text-blue-600 rounded focus:ring-2 focus:ring-blue-500 disabled:cursor-not-allowed"
           />
-          <span className="text-sm font-medium text-gray-700">Indicar vendedor?</span>
+          <span className="text-sm font-medium text-gray-700">
+            {vendedorObrigatorio ? "Vendedor obrigatório" : "Indicar vendedor?"}
+          </span>
         </label>
       </div>
 
-      {vendaComissionada && (
+      {mostrarVendedor && (
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
             Vendedor *{" "}
@@ -104,8 +110,17 @@ export default function PDVComissaoCard({
           )}
 
           <p className="text-xs text-gray-500 mt-2">
-            ℹ️ As regras configuradas serão aplicadas automaticamente ao vendedor selecionado
+            O vendedor fica registrado na venda para consulta e relatórios.
           </p>
+          <label className="flex items-center gap-2 mt-3 text-sm text-gray-700">
+            <input
+              type="checkbox"
+              checked={gerarComissao}
+              onChange={(e) => onGerarComissaoChange(e.target.checked)}
+              disabled={modoVisualizacao || !funcionarioComissao}
+            />
+            Aplicar comissão configurada para este vendedor
+          </label>
         </div>
       )}
     </Panel>

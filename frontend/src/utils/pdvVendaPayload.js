@@ -45,6 +45,7 @@ export function montarPayloadVenda(vendaAtual, entregadorSelecionado = null) {
   return {
     cliente_id: vendaAtual.cliente?.id || null,
     funcionario_id: vendaAtual.funcionario_id || null,
+    vendedor_funcionario_id: vendaAtual.vendedor_funcionario_id || null,
     itens: montarItensVendaPayload(vendaAtual),
     desconto_valor: normalizarNumero(vendaAtual.desconto_valor),
     desconto_percentual: normalizarNumero(vendaAtual.desconto_percentual),
