@@ -451,6 +451,7 @@ class VendaItem(BaseTenantModel):
 
         result = {
             "id": self.id,
+            "venda_id": self.venda_id,
             "tipo": self.tipo,
             "produto_id": self.produto_id,
             "estoque_compartilhado": bool(self.estoque_origem_tenant_id),

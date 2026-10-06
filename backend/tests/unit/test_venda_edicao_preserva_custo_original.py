@@ -1,6 +1,9 @@
 from decimal import Decimal
 from types import SimpleNamespace
 
+import pytest
+from fastapi import HTTPException
+
 from app.vendas.edicao_itens import atualizar_itens_venda_aberta
 from app.vendas.schemas import VendaItemSchema
 
@@ -43,8 +46,9 @@ def _antigo(item_id=7, quantidade="2", preco="100", comprovante=None):
     )
 
 
-def _novo(produto_id=11, quantidade=2, preco=100):
+def _novo(produto_id=11, quantidade=2, preco=100, item_id=None):
     return VendaItemSchema(
+        item_id=item_id,
         tipo="produto",
         produto_id=produto_id,
         quantidade=quantidade,
@@ -100,12 +104,54 @@ def test_linhas_iguais_preservam_comprovantes_individuais():
     primeiro = _antigo(item_id=7, quantidade="1", comprovante={"movimentacao_id": 91})
     segundo = _antigo(item_id=8, quantidade="1", comprovante={"movimentacao_id": 92})
 
-    db = _editar([segundo, primeiro], [_novo(quantidade=1), _novo(quantidade=1)])
+    db = _editar(
+        [segundo, primeiro],
+        [_novo(quantidade=1, item_id=7), _novo(quantidade=1, item_id=8)],
+    )
 
     assert db.adicionados == []
     assert db.excluidos == []
     assert primeiro.custo_original_saida["movimentacao_id"] == 91
     assert segundo.custo_original_saida["movimentacao_id"] == 92
+
+
+def test_remover_uma_de_duas_linhas_sem_id_nao_atribui_custo_da_outra():
+    primeiro = _antigo(item_id=7, quantidade="1", comprovante={"movimentacao_id": 91})
+    segundo = _antigo(item_id=8, quantidade="1", comprovante={"movimentacao_id": 92})
+
+    db = _editar([primeiro, segundo], [_novo(quantidade=1)])
+
+    assert db.excluidos == [primeiro, segundo]
+    assert len(db.adicionados) == 1
+    assert db.adicionados[0].custo_original_saida is None
+
+
+def test_linhas_do_mesmo_produto_com_quantidades_distintas_exigem_id():
+    primeiro = _antigo(item_id=7, quantidade="1", comprovante={"movimentacao_id": 91})
+    segundo = _antigo(item_id=8, quantidade="2", comprovante={"movimentacao_id": 92})
+
+    db = _editar([primeiro, segundo], [_novo(quantidade=1)])
+
+    assert db.excluidos == [primeiro, segundo]
+    assert db.adicionados[0].custo_original_saida is None
+
+
+def test_remover_uma_de_duas_linhas_com_id_preserva_custo_correto():
+    primeiro = _antigo(item_id=7, quantidade="1", comprovante={"movimentacao_id": 91})
+    segundo = _antigo(item_id=8, quantidade="1", comprovante={"movimentacao_id": 92})
+
+    db = _editar([primeiro, segundo], [_novo(quantidade=1, item_id=8)])
+
+    assert db.excluidos == [primeiro]
+    assert db.adicionados == []
+    assert segundo.custo_original_saida["movimentacao_id"] == 92
+
+
+def test_id_de_item_que_nao_pertence_a_venda_exige_recarregar():
+    with pytest.raises(HTTPException) as erro:
+        _editar([_antigo()], [_novo(item_id=999)])
+
+    assert erro.value.status_code == 409
 
 
 def test_produto_adicionado_na_edicao_captura_custo_da_nova_baixa():

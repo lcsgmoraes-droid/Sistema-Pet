@@ -5,6 +5,12 @@ function normalizarNumero(valor) {
 
 export function montarItensVendaPayload(vendaAtual) {
   return (vendaAtual.itens || []).map((item) => ({
+    item_id:
+      item.venda_id != null &&
+      vendaAtual.id != null &&
+      Number(item.venda_id) === Number(vendaAtual.id)
+        ? item.id
+        : null,
     tipo: item.tipo,
     produto_id: item.produto_id,
     servico_descricao: item.servico_descricao,
