@@ -157,7 +157,12 @@ def gestor_clientes_por_tipo(
             .all()
         )
         rows = [
-            (cliente, get_cashback_wallet(db, tenant_id=tenant_id, customer_id=cliente.id).available)
+            (
+                cliente,
+                get_cashback_wallet(
+                    db, tenant_id=tenant_id, customer_id=cliente.id
+                ).available,
+            )
             for cliente in clientes
         ]
         rows = [(cliente, saldo) for cliente, saldo in rows if saldo > 0]
@@ -634,10 +639,13 @@ def relatorio_campanhas(
         clientes_map = {c.id: c.nome for c in clientes}
 
     # Buscar números de venda em lote (source_id é venda_id para resgates)
-    venda_ids = list({
-        t.source_id for t in transacoes
-        if t.source_id and t.source_type == CashbackSourceTypeEnum.redemption
-    })
+    venda_ids = list(
+        {
+            t.source_id
+            for t in transacoes
+            if t.source_id and t.source_type == CashbackSourceTypeEnum.redemption
+        }
+    )
     vendas_map = {}
     if venda_ids:
         vendas = (

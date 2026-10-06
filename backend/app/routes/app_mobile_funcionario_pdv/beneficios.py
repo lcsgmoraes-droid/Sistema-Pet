@@ -106,9 +106,7 @@ def _saldo_cashback_funcionario_pdv(
 ) -> float:
     if not cliente_id:
         return 0.0
-    wallet = get_cashback_wallet(
-        db, tenant_id=tenant_id, customer_id=cliente_id
-    )
+    wallet = get_cashback_wallet(db, tenant_id=tenant_id, customer_id=cliente_id)
     return _round_money_funcionario_pdv(wallet.available)
 
 

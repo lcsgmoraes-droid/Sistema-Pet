@@ -196,6 +196,7 @@ def _bulk_cashback_por_venda(
         from app.vendas.cashback_financeiro import (
             cashback_resgatado_liquido_por_venda,
         )
+
         return {
             venda_id: float(total)
             for venda_id, total in cashback_resgatado_liquido_por_venda(

@@ -374,6 +374,7 @@ def _resolve_cashback_resgatado(
         from app.vendas.cashback_financeiro import (
             cashback_resgatado_liquido_por_venda,
         )
+
         total = cashback_resgatado_liquido_por_venda(
             db, tenant_id=tenant_id, venda_ids=[venda_id]
         ).get(venda_id, 0)

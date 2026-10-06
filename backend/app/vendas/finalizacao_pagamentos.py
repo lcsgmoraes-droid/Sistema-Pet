@@ -486,7 +486,9 @@ def processar_pagamentos_finalizacao(
                     db, tenant_id=tenant_id, customer_id=venda.cliente_id
                 )
             except LookupError as exc:
-                raise HTTPException(status_code=404, detail="Cliente não encontrado") from exc
+                raise HTTPException(
+                    status_code=404, detail="Cliente não encontrado"
+                ) from exc
             saldo_disponivel = get_cashback_wallet(
                 db, tenant_id=tenant_id, customer_id=venda.cliente_id
             ).available

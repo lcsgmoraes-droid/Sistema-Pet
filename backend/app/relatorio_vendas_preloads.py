@@ -194,6 +194,7 @@ def _carregar_cashback_por_venda(db: Session, tenant_id, venda_ids: list[int]) -
         from app.vendas.cashback_financeiro import (
             cashback_resgatado_liquido_por_venda,
         )
+
         return {
             venda_id: float(total)
             for venda_id, total in cashback_resgatado_liquido_por_venda(
