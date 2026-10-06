@@ -23,6 +23,7 @@ from app.services.venda_rentabilidade_snapshot_service import (
 from app.utils.logger import logger as struct_logger
 from app.vendas.comissoes import _gerar_comissoes_pendentes_venda, _total_pago_venda
 from app.vendas.edicao_estoque import ajustar_estoque_edicao_venda
+from app.vendas.edicao_itens import atualizar_itens_venda_aberta
 from app.vendas.pagamento_entrega_previsto import (
     normalizar_pagamento_entrega_previsto,
     validar_valor_para_troco,
@@ -478,6 +479,7 @@ def atualizar_venda(
     # Ajustar o estoque pela diferença entre os itens antigos e os novos.
     # A finalização não baixa novamente vendas que já estavam abertas.
     itens_antigos = db.query(VendaItem).filter_by(venda_id=venda.id).all()
+    saidas_ajuste = {}
     resolucoes_produtos = ajustar_estoque_edicao_venda(
         venda=venda,
         itens_antigos=itens_antigos,
@@ -485,70 +487,18 @@ def atualizar_venda(
         current_user=current_user,
         tenant_id=tenant_id,
         db=db,
+        saidas_ajuste=saidas_ajuste,
     )
-
-    # Excluir itens antigos
-    db.query(VendaItem).filter_by(venda_id=venda.id).delete()
-
-    # Criar novos itens
-    from app.vendas.racao_previsao import validar_previsao_fim_racao
-
-    for item_data in dados.itens:
-        produto_catalogo = None
-        if item_data.produto_id:
-            produto_resolvido = resolucoes_produtos.get(int(item_data.produto_id))
-            produto_catalogo = produto_resolvido.produto if produto_resolvido else None
-        else:
-            produto_resolvido = None
-        previsao_racao = validar_previsao_fim_racao(
-            item_data,
-            produto=produto_catalogo,
-            cliente_id=dados.cliente_id,
-        )
-
-        # 🔒 ISOLAMENTO MULTI-TENANT: tenant_id obrigatório
-        item = VendaItem(
-            venda_id=venda.id,
-            tenant_id=tenant_id,  # ✅ Garantir isolamento entre empresas
-            tipo=item_data.tipo,
-            produto_id=item_data.produto_id,
-            servico_descricao=item_data.servico_descricao
-            or (
-                produto_catalogo.nome
-                if produto_resolvido is not None and produto_resolvido.compartilhado
-                else None
-            ),
-            estoque_origem_tenant_id=(
-                produto_resolvido.tenant_origem_id
-                if produto_resolvido is not None and produto_resolvido.compartilhado
-                else None
-            ),
-            estoque_compartilhado_id=(
-                produto_resolvido.compartilhamento_id
-                if produto_resolvido is not None
-                else None
-            ),
-            estoque_origem_nome=(
-                produto_resolvido.empresa_origem_nome
-                if produto_resolvido is not None
-                else None
-            ),
-            quantidade=item_data.quantidade,
-            preco_unitario=item_data.preco_unitario,
-            desconto_item=item_data.desconto_item or 0,
-            subtotal=item_data.subtotal,
-            lote_id=item_data.lote_id,
-            pet_id=item_data.pet_id,
-            protocolo_recorrencia_id=(
-                None
-                if item_data.ignorar_recorrencia
-                else item_data.protocolo_recorrencia_id
-            ),
-            ignorar_recorrencia=item_data.ignorar_recorrencia,
-            racao_data_prevista_fim=previsao_racao.data_prevista,
-            racao_prazo_estimado_dias=previsao_racao.prazo_dias,
-        )
-        db.add(item)
+    atualizar_itens_venda_aberta(
+        venda_id=venda.id,
+        cliente_id=dados.cliente_id,
+        tenant_id=tenant_id,
+        itens_antigos=itens_antigos,
+        itens_novos=dados.itens,
+        resolucoes_produtos=resolucoes_produtos,
+        saidas_ajuste=saidas_ajuste,
+        db=db,
+    )
 
     db.commit()
     db.refresh(venda)
