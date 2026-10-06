@@ -419,7 +419,8 @@ def test_full_return_voids_legacy_stamp_without_historical_step(monkeypatch):
         },
     )
     monkeypatch.setattr(
-        "app.campaigns.loyalty_service.log_campaign_event", lambda **kwargs: None,
+        "app.campaigns.loyalty_service.log_campaign_event",
+        lambda **kwargs: None,
     )
 
     result = _reconcile_loyalty(
@@ -461,9 +462,7 @@ def test_return_preflight_rejects_legacy_loyalty_without_mutation():
 
 
 def test_full_return_preflight_accepts_legacy_stamp_without_mutation(monkeypatch):
-    stamps = [
-        SimpleNamespace(campaign_id=9, stamp_value_snapshot=None, voided_at=None)
-    ]
+    stamps = [SimpleNamespace(campaign_id=9, stamp_value_snapshot=None, voided_at=None)]
     campaign = SimpleNamespace(id=9, params={"min_purchase_value": 50})
     db = SimpleNamespace(
         query=lambda model: (
