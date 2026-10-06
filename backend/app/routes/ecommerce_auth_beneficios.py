@@ -74,7 +74,6 @@ def meus_beneficios(
     a tela 'Meus Benefícios': ranking, carimbos, cashback e cupons ativos.
     """
     from app.campaigns.models import (
-        CashbackTransaction,
         Campaign,
         CampaignTypeEnum,
         Coupon,
