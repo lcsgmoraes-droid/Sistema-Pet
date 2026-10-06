@@ -113,6 +113,14 @@ def _validar_recebiveis_liquidados(db: Session, venda_id: int, tenant_id) -> Non
         )
 
 
+def _item_controlava_estoque_na_venda(item) -> bool:
+    """O tipo salvo na venda distingue servico de catalogo com produto_id."""
+    return (
+        bool(getattr(item, "produto_id", None))
+        and str(getattr(item, "tipo", "produto") or "").lower() == "produto"
+    )
+
+
 def _validar_estoque_devolucao_seguro(
     db: Session, venda_id: int, tenant_id, itens_venda, itens_solicitados
 ) -> None:
@@ -121,7 +129,7 @@ def _validar_estoque_devolucao_seguro(
     grupos_solicitados = set()
     quantidades_vendidas = defaultdict(Decimal)
     for item in itens_venda:
-        if not getattr(item, "produto_id", None):
+        if not _item_controlava_estoque_na_venda(item):
             continue
         tenant_estoque, _ = resolver_tenant_estoque_item(item, tenant_id)
         quantidades_vendidas[(item.produto_id, tenant_estoque)] += Decimal(
@@ -130,13 +138,21 @@ def _validar_estoque_devolucao_seguro(
 
     for solicitado in itens_solicitados:
         item = itens_por_id.get(solicitado.get("item_id"))
-        if item is None or not getattr(item, "produto_id", None):
+        if item is None or not _item_controlava_estoque_na_venda(item):
             continue
         produto = getattr(item, "produto", None)
         if produto is None:
             raise HTTPException(
                 status_code=409,
                 detail="Produto original indisponivel. Concilie o estoque manualmente.",
+            )
+        if getattr(produto, "controlar_estoque", True) is False:
+            raise HTTPException(
+                status_code=409,
+                detail=(
+                    "Produto nao controla estoque atualmente. "
+                    "Concilie a devolucao e o estoque manualmente."
+                ),
             )
         if getattr(item, "lote_id", None) is not None:
             raise HTTPException(
@@ -456,7 +472,7 @@ def registrar_devolucao(
 
         vendido_por_produto = defaultdict(float)
         for item_venda in todos_itens_venda:
-            if item_venda.produto_id:
+            if _item_controlava_estoque_na_venda(item_venda):
                 origem, _compartilhado = resolver_tenant_estoque_item(
                     item_venda, tenant_id
                 )
@@ -485,7 +501,7 @@ def registrar_devolucao(
                     status_code=400,
                     detail="Quantidade de devolução excede o saldo deste item",
                 )
-            if item_venda.produto_id:
+            if _item_controlava_estoque_na_venda(item_venda):
                 origem, _compartilhado = resolver_tenant_estoque_item(
                     item_venda, tenant_id
                 )
@@ -627,7 +643,10 @@ def registrar_devolucao(
                 item_venda = itens_normais_por_id[item_id]
                 quantidade_decimal = Decimal(str(quantidade_devolvida))
                 valor_item = cotacao.valores_itens[indice]
-                custo_item, origem_custo, custo_pendente = (
+                tipo_item = str(
+                    getattr(item_venda, "tipo", "produto") or "produto"
+                ).lower()
+                custo_original, origem_custo, custo_pendente = (
                     custo_original_item_devolvido(
                         db,
                         venda,
@@ -637,9 +656,13 @@ def registrar_devolucao(
                         devolvido_por_item[item_id] + processado_por_item[item_id],
                     )
                 )
+                # Reembolso de serviço não comprova reversão de mão de obra/insumos.
+                custo_item = Decimal("0") if tipo_item == "servico" else custo_original
+                if tipo_item == "servico":
+                    origem_custo = "servico_custo_mantido"
 
                 # Devolver ao estoque
-                if item_venda.produto_id:
+                if _item_controlava_estoque_na_venda(item_venda):
                     try:
                         tenant_estoque, compartilhado = resolver_tenant_estoque_item(
                             item_venda, tenant_id
@@ -691,9 +714,6 @@ def registrar_devolucao(
                 # A prévia e o registro usam exatamente a mesma cotação.
                 valor_total_devolucao += valor_item
                 processado_por_item[item_id] += quantidade_decimal
-                tipo_item = str(
-                    getattr(item_venda, "tipo", "produto") or "produto"
-                ).lower()
                 if tipo_item == "servico":
                     custo_servicos_estornado += custo_item
                 else:
@@ -706,6 +726,9 @@ def registrar_devolucao(
                         "is_componente_kit": False,
                         "quantidade": str(Decimal(str(quantidade_devolvida))),
                         "valor_devolvido": str(valor_item),
+                        "custo_original": (
+                            str(custo_original) if not custo_pendente else None
+                        ),
                         "custo_estornado": str(custo_item),
                         "origem_custo": origem_custo,
                         "custo_pendente": custo_pendente,
@@ -767,7 +790,9 @@ def registrar_devolucao(
                 )
 
             # O criador do cadastro pode ser outro funcionário da mesma loja.
-            cliente = _obter_cliente_ou_404(db, venda.cliente_id, tenant_id)
+            cliente = _obter_cliente_ou_404(
+                db, venda.cliente_id, tenant_id, bloquear_credito=True
+            )
 
             # Adicionar crédito ao cliente
             cliente.credito = (cliente.credito or Decimal("0")) + Decimal(

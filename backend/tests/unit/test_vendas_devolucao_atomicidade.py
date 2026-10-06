@@ -101,6 +101,7 @@ def test_devolucao_repetida_de_servico_usa_saldo_dos_eventos():
         consulta.filter.return_value = consulta
         consulta.filter_by.return_value = consulta
         consulta.with_for_update.return_value = consulta
+        consulta.populate_existing.return_value = consulta
         consulta.first.return_value = None if modelo is VendaDevolucao else resultado
         consulta.all.return_value = resultado if isinstance(resultado, list) else []
         consultas[modelo] = consulta
@@ -159,6 +160,7 @@ def test_credito_devolucao_aceita_cliente_criado_por_outro_funcionario(monkeypat
         consulta.filter.return_value = consulta
         consulta.filter_by.return_value = consulta
         consulta.with_for_update.return_value = consulta
+        consulta.populate_existing.return_value = consulta
         consulta.first.return_value = None if modelo is VendaDevolucao else resultado
         consulta.all.return_value = resultado if isinstance(resultado, list) else []
         consultas[modelo] = consulta
@@ -185,6 +187,8 @@ def test_credito_devolucao_aceita_cliente_criado_por_outro_funcionario(monkeypat
     consultas[Cliente].filter_by.assert_called_once_with(
         id=cliente.id, tenant_id=tenant_id
     )
+    consultas[Cliente].populate_existing.assert_called_once()
+    consultas[Cliente].with_for_update.assert_called_once()
     assert cliente.credito == Decimal("59.89")
     assert resultado["credito_cliente"] == 59.89
     assert resultado["status_venda"] == "devolvida_total"
@@ -278,6 +282,7 @@ def test_devolucao_parcial_em_dinheiro_registra_deducao_e_custo_servico(monkeypa
         consulta.filter.return_value = consulta
         consulta.filter_by.return_value = consulta
         consulta.with_for_update.return_value = consulta
+        consulta.populate_existing.return_value = consulta
         consulta.order_by.return_value = consulta
         consulta.first.return_value = None if modelo is VendaDevolucao else resultado
         consulta.all.return_value = resultado if isinstance(resultado, list) else []
@@ -315,8 +320,11 @@ def test_devolucao_parcial_em_dinheiro_registra_deducao_e_custo_servico(monkeypa
         if isinstance(call.args[0], VendaDevolucao)
     )
     assert evento.valor_devolvido == Decimal("50.00")
-    assert evento.custo_servicos_estornado == Decimal("15.00")
+    assert evento.custo_servicos_estornado == Decimal("0")
     assert evento.custo_produtos_estornado == 0
+    assert evento.itens[0]["custo_original"] == "15.00"
+    assert evento.itens[0]["custo_estornado"] == "0"
+    assert evento.itens[0]["origem_custo"] == "servico_custo_mantido"
     assert evento.movimentacao_caixa_id == 17
     assert evento.custo_pendente is False
     assert resultado["status_venda"] == "finalizada_devolucao"
@@ -375,6 +383,7 @@ def test_entrada_de_estoque_usa_custo_original_da_mesma_parcela_da_dre(monkeypat
         consulta.filter.return_value = consulta
         consulta.filter_by.return_value = consulta
         consulta.with_for_update.return_value = consulta
+        consulta.populate_existing.return_value = consulta
         consulta.first.return_value = None if modelo is VendaDevolucao else resultado
         consulta.all.return_value = resultado if isinstance(resultado, list) else []
         consultas[modelo] = consulta
@@ -426,6 +435,112 @@ def test_entrada_de_estoque_usa_custo_original_da_mesma_parcela_da_dre(monkeypat
     assert evento.custo_produtos_estornado == Decimal("15.00")
     assert entradas[0]["custo_unitario_override"] == 15.0
     assert entradas[0]["valor_total_override"] == 15.0
+    db.commit.assert_called_once()
+
+
+def test_servico_de_catalogo_com_produto_id_devolve_sem_movimentar_estoque(monkeypatch):
+    tenant_id = uuid4()
+    atendente = SimpleNamespace(id=22, nome="Atendente")
+    cliente = SimpleNamespace(id=47, nome="Cliente", credito=Decimal("0"))
+    produto = SimpleNamespace(
+        id=11, nome="Banho", tipo_produto="SERVICO", controlar_estoque=False
+    )
+    item = SimpleNamespace(
+        id=3,
+        produto_id=produto.id,
+        produto=produto,
+        tipo="servico",
+        quantidade=Decimal("2"),
+        preco_unitario=Decimal("50"),
+        subtotal=Decimal("100"),
+        servico_descricao="Banho",
+    )
+    venda = SimpleNamespace(
+        id=8,
+        cliente_id=cliente.id,
+        cliente=cliente,
+        numero_venda="VEN-8",
+        total=Decimal("100"),
+        taxa_entrega=Decimal("0"),
+        observacoes="",
+        status="finalizada",
+        itens=[item],
+        rentabilidade_snapshot={
+            "snapshot_version": 5,
+            "itens": [
+                {
+                    "produto_id": produto.id,
+                    "quantidade": 2,
+                    "preco_unitario": 50,
+                    "custo_total": 30,
+                }
+            ],
+        },
+    )
+    consultas = {}
+    for modelo, resultado in (
+        (Venda, venda),
+        (VendaItem, [item]),
+        (VendaDevolucao, []),
+        (Cliente, cliente),
+        (ContaReceber, []),
+    ):
+        consulta = MagicMock()
+        consulta.filter.return_value = consulta
+        consulta.filter_by.return_value = consulta
+        consulta.with_for_update.return_value = consulta
+        consulta.populate_existing.return_value = consulta
+        consulta.first.return_value = None if modelo is VendaDevolucao else resultado
+        consulta.all.return_value = resultado if isinstance(resultado, list) else []
+        consultas[modelo] = consulta
+    db = MagicMock()
+    db.query.side_effect = lambda modelo: consultas[modelo]
+
+    def sem_estoque(*_args, **_kwargs):
+        raise AssertionError("Serviço não deve acessar estoque")
+
+    monkeypatch.setattr(
+        "app.vendas.devolucoes_routes.resolver_tenant_estoque_item", sem_estoque
+    )
+    monkeypatch.setattr(
+        "app.vendas.devolucoes_routes.EstoqueService.estornar_estoque", sem_estoque
+    )
+    monkeypatch.setattr(
+        "app.vendas.devolucoes_routes.log_action", lambda **_kwargs: None
+    )
+    itens = [{"item_id": item.id, "quantidade": 1}]
+
+    previa = prever_devolucao(
+        venda_id=venda.id,
+        dados={"itens": itens},
+        db=db,
+        user_and_tenant=(atendente, tenant_id),
+    )
+    resultado = registrar_devolucao(
+        venda_id=venda.id,
+        dados={
+            "itens": itens,
+            "motivo": "Troca",
+            "gerar_credito": True,
+            "valor_previsto": previa["valor_total_devolucao"],
+            "chave_operacao": str(uuid4()),
+        },
+        db=db,
+        user_and_tenant=(atendente, tenant_id),
+    )
+
+    evento = next(
+        call.args[0]
+        for call in db.add.call_args_list
+        if isinstance(call.args[0], VendaDevolucao)
+    )
+    assert previa["valor_total_devolucao"] == 50
+    assert resultado["valor_total_devolucao"] == 50
+    assert cliente.credito == Decimal("50")
+    assert evento.custo_servicos_estornado == Decimal("0")
+    assert evento.custo_produtos_estornado == 0
+    assert evento.itens[0]["custo_original"] == "15.00"
+    assert evento.itens[0]["custo_estornado"] == "0"
     db.commit.assert_called_once()
 
 
@@ -485,6 +600,7 @@ def test_previa_e_registro_bloqueiam_reembolso_com_recebivel_aberto(operacao):
         consulta.filter.return_value = consulta
         consulta.filter_by.return_value = consulta
         consulta.with_for_update.return_value = consulta
+        consulta.populate_existing.return_value = consulta
         consulta.first.return_value = None if modelo is VendaDevolucao else resultado
         consulta.all.return_value = resultado if isinstance(resultado, list) else []
         consultas[modelo] = consulta
@@ -510,21 +626,26 @@ def test_previa_e_registro_bloqueiam_reembolso_com_recebivel_aberto(operacao):
 
 
 @pytest.mark.parametrize(
-    "tipo_produto,tipo_kit,lote_id,erro_esperado",
+    "tipo_produto,tipo_kit,lote_id,controlar_estoque,erro_esperado",
     [
-        ("KIT", "VIRTUAL", None, "KIT virtual"),
-        ("SIMPLES", None, 12, "item com lote"),
+        ("KIT", "VIRTUAL", None, True, "KIT virtual"),
+        ("SIMPLES", None, 12, True, "item com lote"),
+        ("SIMPLES", None, None, False, "nao controla estoque"),
     ],
 )
 def test_estoque_nao_recompoe_kit_virtual_ou_lote_sem_conciliacao(
-    monkeypatch, tipo_produto, tipo_kit, lote_id, erro_esperado
+    monkeypatch, tipo_produto, tipo_kit, lote_id, controlar_estoque, erro_esperado
 ):
     item = SimpleNamespace(
         id=3,
         produto_id=11,
         quantidade=1,
         lote_id=lote_id,
-        produto=SimpleNamespace(tipo_produto=tipo_produto, tipo_kit=tipo_kit),
+        produto=SimpleNamespace(
+            tipo_produto=tipo_produto,
+            tipo_kit=tipo_kit,
+            controlar_estoque=controlar_estoque,
+        ),
     )
     monkeypatch.setattr(
         "app.vendas.devolucoes_routes.resolver_tenant_estoque_item",
@@ -626,6 +747,7 @@ def test_previa_e_registro_bloqueiam_estoque_que_nao_pode_ser_recomposto(
         consulta.filter.return_value = consulta
         consulta.filter_by.return_value = consulta
         consulta.with_for_update.return_value = consulta
+        consulta.populate_existing.return_value = consulta
         consulta.first.return_value = None if modelo is VendaDevolucao else resultado
         consulta.all.return_value = resultado if isinstance(resultado, list) else []
         consultas[modelo] = consulta
@@ -717,6 +839,7 @@ def test_venda_com_devolucao_historica_sem_valor_rastreavel_e_bloqueada(
         consulta.filter.return_value = consulta
         consulta.filter_by.return_value = consulta
         consulta.with_for_update.return_value = consulta
+        consulta.populate_existing.return_value = consulta
         consulta.first.return_value = None if modelo is VendaDevolucao else resultado
         consulta.all.return_value = resultado if isinstance(resultado, list) else []
         consultas[modelo] = consulta
@@ -775,6 +898,7 @@ def test_valor_acumulado_das_devolucoes_nao_excede_total_pago():
         consulta.filter.return_value = consulta
         consulta.filter_by.return_value = consulta
         consulta.with_for_update.return_value = consulta
+        consulta.populate_existing.return_value = consulta
         consulta.first.return_value = None if modelo is VendaDevolucao else resultado
         consulta.all.return_value = resultado if isinstance(resultado, list) else []
         consultas[modelo] = consulta
@@ -835,6 +959,7 @@ def test_devolucoes_parciais_com_desconto_pagam_liquido_e_fecham_venda(monkeypat
         consulta.filter.return_value = consulta
         consulta.filter_by.return_value = consulta
         consulta.with_for_update.return_value = consulta
+        consulta.populate_existing.return_value = consulta
         consulta.first.return_value = None if modelo is VendaDevolucao else resultado
         consulta.all.return_value = resultado if isinstance(resultado, list) else []
         consultas[modelo] = consulta
@@ -925,6 +1050,7 @@ def test_registro_rejeita_valor_diferente_da_previa_antes_do_credito():
         consulta.filter.return_value = consulta
         consulta.filter_by.return_value = consulta
         consulta.with_for_update.return_value = consulta
+        consulta.populate_existing.return_value = consulta
         consulta.first.return_value = None if modelo is VendaDevolucao else resultado
         consulta.all.return_value = resultado if isinstance(resultado, list) else []
         consultas[modelo] = consulta
@@ -989,6 +1115,7 @@ def test_falha_ao_gravar_evento_impede_credito_ao_cliente():
         consulta.filter.return_value = consulta
         consulta.filter_by.return_value = consulta
         consulta.with_for_update.return_value = consulta
+        consulta.populate_existing.return_value = consulta
         consulta.first.return_value = None if modelo is VendaDevolucao else resultado
         consulta.all.return_value = resultado if isinstance(resultado, list) else []
         consultas[modelo] = consulta
