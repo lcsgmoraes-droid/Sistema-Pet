@@ -56,6 +56,15 @@ export default function ModalDevolucaoSections({
   vendaSelecionada,
   vendas,
 }) {
+  const erroHistoricoCarimbos =
+    typeof erro === "string" &&
+    (erro.startsWith("Devolução parcial bloqueada: os carimbos antigos") ||
+      erro.startsWith("Passo historico do cartao fidelidade"));
+  const codigoCliente = vendaSelecionada?.cliente?.codigo || vendaSelecionada?.cliente_codigo;
+  const urlGestor = `/campanhas?aba=gestor${
+    codigoCliente ? `&cliente_codigo=${encodeURIComponent(codigoCliente)}` : ""
+  }`;
+
   return (
     <>
       {/* Content */}
@@ -534,9 +543,21 @@ export default function ModalDevolucaoSections({
             </div>
 
             {erro && (
-              <div className="p-4 bg-red-50 border border-red-200 rounded-lg flex items-center gap-2 text-red-700">
-                <AlertCircle className="w-5 h-5" />
-                <span>{erro}</span>
+              <div className="p-4 bg-red-50 border border-red-200 rounded-lg text-red-700">
+                <div className="flex items-start gap-2">
+                  <AlertCircle className="w-5 h-5 shrink-0" />
+                  <span>{erro}</span>
+                </div>
+                {erroHistoricoCarimbos && (
+                  <a
+                    className="mt-3 inline-flex rounded-lg border border-red-300 bg-white px-3 py-2 text-sm font-semibold hover:bg-red-100"
+                    href={urlGestor}
+                    rel="noopener noreferrer"
+                    target="_blank"
+                  >
+                    Abrir carimbos e extrato da cliente
+                  </a>
+                )}
               </div>
             )}
           </div>
