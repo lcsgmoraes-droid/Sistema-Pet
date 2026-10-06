@@ -256,16 +256,23 @@ def _reconcile_loyalty(
         # Nesse caso não há benefício ativo da venda para recalcular ou reativar.
         if all(getattr(stamp, "voided_at", None) is not None for stamp in sale_stamps):
             continue
-        try:
-            historical_step = historical_stamp_value_for_sale(sale_stamps)
-        except ValueError as exc:
-            raise HTTPException(
-                status_code=409,
-                detail=(
-                    "Passo historico do cartao fidelidade nao comprovado "
-                    "para esta venda. Concilie os carimbos antes da devolucao."
-                ),
-            ) from exc
+        # Uma devolucao integral sempre deixa zero carimbos desta venda.
+        # O valor historico de cada carimbo so e necessario para recalcular
+        # quantos permanecem numa devolucao parcial.
+        historical_step = None
+        if retained > 0:
+            try:
+                historical_step = historical_stamp_value_for_sale(sale_stamps)
+            except ValueError as exc:
+                raise HTTPException(
+                    status_code=409,
+                    detail=(
+                        "Devolução parcial bloqueada: os carimbos antigos desta venda "
+                        "não registram o valor mínimo usado para gerá-los. "
+                        "Abra os carimbos da cliente no Gestor de Benefícios "
+                        "e confira os desta venda antes de continuar."
+                    ),
+                ) from exc
         campaign = (
             db.query(Campaign)
             .filter(Campaign.tenant_id == tenant_id, Campaign.id == campaign_id)

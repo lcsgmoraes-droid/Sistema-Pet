@@ -376,6 +376,65 @@ def test_loyalty_reconciliation_blocks_legacy_stamp_without_step(monkeypatch):
     assert calls == []
 
 
+def test_full_return_voids_legacy_stamp_without_historical_step(monkeypatch):
+    class _StampQuery(_Query):
+        def order_by(self, *args):
+            return self
+
+    stamps = [
+        SimpleNamespace(
+            id=11,
+            campaign_id=9,
+            stamp_index=1,
+            stamp_value_snapshot=None,
+            voided_at=None,
+            voided_origin=None,
+            notes=None,
+        )
+    ]
+    campaign = SimpleNamespace(
+        id=9,
+        tenant_id="tenant",
+        name="Fidelidade",
+        params={"min_purchase_value": 50},
+    )
+    db = SimpleNamespace(
+        query=lambda model: (
+            _StampQuery(rows=stamps)
+            if model.__name__ == "LoyaltyStamp"
+            else _Query(row=campaign)
+        ),
+        add=lambda obj: pytest.fail("Devolução integral não deve criar carimbos"),
+        flush=lambda: None,
+    )
+    monkeypatch.setattr(
+        "app.campaigns.loyalty_service.sync_loyalty_rewards_for_customer",
+        lambda db, **kwargs: {
+            "awarded": 0,
+            "revoked": 0,
+            "total_stamps": 0,
+            "available_stamps": 0,
+            "converted_stamps": 0,
+            "debt_stamps": 0,
+        },
+    )
+    monkeypatch.setattr(
+        "app.campaigns.loyalty_service.log_campaign_event", lambda **kwargs: None,
+    )
+
+    result = _reconcile_loyalty(
+        db,
+        tenant_id="tenant",
+        venda=SimpleNamespace(id=42, cliente_id=8),
+        retained=Decimal("0"),
+        evento_devolucao=SimpleNamespace(id=3),
+    )
+
+    assert result == {"stamps_voided": 1, "rewards_revoked": 0}
+    assert stamps[0].voided_at is not None
+    assert stamps[0].voided_origin == "automatic"
+
+
 def test_return_preflight_rejects_legacy_loyalty_without_mutation():
     stamps = [
         SimpleNamespace(
@@ -399,6 +458,35 @@ def test_return_preflight_rejects_legacy_loyalty_without_mutation():
         )
 
     assert exc.value.status_code == 409
+
+
+def test_full_return_preflight_accepts_legacy_stamp_without_mutation(monkeypatch):
+    stamps = [
+        SimpleNamespace(campaign_id=9, stamp_value_snapshot=None, voided_at=None)
+    ]
+    campaign = SimpleNamespace(id=9, params={"min_purchase_value": 50})
+    db = SimpleNamespace(
+        query=lambda model: (
+            _Query(rows=stamps)
+            if model.__name__ == "LoyaltyStamp"
+            else _Query(row=campaign)
+        ),
+        add=lambda obj: pytest.fail("Prévia não deve adicionar benefícios"),
+        flush=lambda: pytest.fail("Prévia não deve alterar a transação"),
+    )
+    monkeypatch.setattr(
+        "app.campaigns.sale_return_service._reconcile_quick_repurchase",
+        lambda *args, **kwargs: 0,
+    )
+
+    retained = preflight_purchase_benefits_on_return(
+        db,
+        tenant_id="tenant",
+        venda=SimpleNamespace(id=42, cliente_id=8, total=Decimal("70")),
+        valor_acumulado=Decimal("70"),
+    )
+
+    assert retained == Decimal("0.00")
 
 
 def test_return_preflight_accepts_historical_loyalty_step_without_mutation():
