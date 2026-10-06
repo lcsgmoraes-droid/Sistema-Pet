@@ -4,6 +4,10 @@ import api from "../../api";
 import { safeArray } from "../../utils/safeArray";
 import { garantirCategoriaDRE } from "../../utils/dreCategoriaFinanceira";
 import {
+  dadosAoSelecionarCategoria,
+  ehCategoriaCompraRevendaPadrao,
+} from "./categoriaCompraRevenda";
+import {
   criarDadosPadraoContaPagar,
   criarFormCategoriaPadrao,
   filtrarCategoriasDespesa,
@@ -116,16 +120,13 @@ export function useModalNovaContaPagarController({ isOpen, onClose, onSave, cont
 
   const handleCategoriaChange = (categoriaIdValue) => {
     const categoriaId = categoriaIdValue ? parseInt(categoriaIdValue, 10) : null;
-    const categoria = safeArray(categorias).find((item) => item.id === categoriaId) || null;
-    const dreSubcategoriaId = dados.afeta_dre ? categoria?.dre_subcategoria_id || null : null;
+    const categoria =
+      safeArray(categorias).find((item) => String(item.id) === String(categoriaId)) || null;
+    const compraRevenda = ehCategoriaCompraRevendaPadrao(categoria);
 
-    setDados((dadosAtuais) => ({
-      ...dadosAtuais,
-      categoria_id: categoriaId,
-      dre_subcategoria_id: dreSubcategoriaId,
-    }));
+    setDados((dadosAtuais) => dadosAoSelecionarCategoria(dadosAtuais, categoria, categoriaId));
 
-    if (dados.afeta_dre && categoria && !dreSubcategoriaId) {
+    if (dados.afeta_dre && categoria && !compraRevenda && !categoria.dre_subcategoria_id) {
       abrirModalVinculoDRE(categoria.id);
     }
   };

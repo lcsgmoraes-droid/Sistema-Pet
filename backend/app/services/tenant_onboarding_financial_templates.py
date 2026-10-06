@@ -63,7 +63,6 @@ _DRE_SUBCATEGORY_TEMPLATES = (
         "direto",
         None,
     ),
-    ("dre_cmv_servicos", "dre_cmv", "CMV - Materiais e Serviços", "direto", None),
     ("dre_fretes_compras", "dre_cmv", "Fretes sobre Compras", "direto", None),
     (
         "dre_comissoes_vendas",
@@ -504,7 +503,6 @@ _EXPENSE_TYPE_TEMPLATES = (
     ("expense_software", "Sistema / Software", True, "dre_software"),
     ("expense_insurance", "Seguro", True, "dre_seguros"),
     ("expense_fixed_marketing", "Marketing / Publicidade Fixo", True, "dre_marketing"),
-    ("expense_resale_products", "Produto para Revenda", False, "dre_cmv_produtos"),
     ("expense_purchase_freight", "Frete de Compra", False, "dre_fretes_compras"),
     ("expense_sales_commission", "Comissões de Vendas", False, "dre_comissoes_vendas"),
     ("expense_packaging", "Embalagens", False, "dre_embalagens"),
