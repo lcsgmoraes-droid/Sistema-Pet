@@ -6,6 +6,7 @@ export default function ContaPagarBasicFields({ controller, onOpenCategoria }) {
   const {
     categorias,
     dados,
+    ehPrincipalParcelado,
     fornecedorSelecionado,
     fornecedores,
     handleCategoriaChange,
@@ -88,6 +89,12 @@ export default function ContaPagarBasicFields({ controller, onOpenCategoria }) {
           Desmarque para o principal de empréstimos ou pagamento de fatura de cartão. Lance juros e
           taxas separadamente como despesa na DRE.
         </p>
+        {ehPrincipalParcelado && (
+          <p className="mt-1 text-xs text-amber-700">
+            Alterações na classificação serão aplicadas a todas as parcelas, inclusive as pagas. Os
+            valores e vencimentos das parcelas não serão alterados.
+          </p>
+        )}
       </div>
 
       <div className="min-w-0">

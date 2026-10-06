@@ -16,8 +16,9 @@ from app.financeiro_models import CategoriaFinanceira, ContaPagar, LancamentoMan
 
 
 class FakeQuery:
-    def __init__(self, result=None):
+    def __init__(self, result=None, rows=None):
         self.result = result
+        self.rows = rows or []
 
     def filter(self, *args):
         return self
@@ -25,12 +26,16 @@ class FakeQuery:
     def first(self):
         return self.result
 
+    def all(self):
+        return self.rows
+
 
 class FakeSession:
-    def __init__(self, categoria=None, conta=None):
+    def __init__(self, categoria=None, conta=None, filhas=None):
         self.added = []
         self.categoria = categoria
         self.conta = conta
+        self.filhas = filhas or []
 
     def add(self, item):
         self.added.append(item)
@@ -39,7 +44,7 @@ class FakeSession:
         result = self.categoria if args == (CategoriaFinanceira,) else None
         if args == (ContaPagar,):
             result = self.conta
-        return FakeQuery(result)
+        return FakeQuery(result, self.filhas)
 
     def commit(self):
         pass
@@ -194,16 +199,84 @@ def test_editar_principal_parcelado_nao_cria_obrigacao_duplicada():
         valor_multa=0,
         valor_desconto=0,
     )
+    parcelas = [
+        ContaPagar(
+            id=26 + indice,
+            tenant_id=3,
+            conta_principal_id=25,
+            status=status,
+            categoria_id=19,
+            dre_subcategoria_id=8,
+            afeta_dre=True,
+            tipo_despesa_id=2,
+            canal="loja_fisica",
+            valor_original=100,
+            valor_pago=valor_pago,
+        )
+        for indice, (status, valor_pago) in enumerate([("pago", 100), ("pendente", 0)])
+    ]
     resposta = manutencao_routes.atualizar_conta_pagar(
         25,
         ContaPagarUpdate(afeta_dre=False),
-        db=FakeSession(conta=principal),
+        db=FakeSession(conta=principal, filhas=parcelas),
         user_and_tenant=(SimpleNamespace(id=7), 3),
     )
 
     assert resposta["status"] == "parcelado"
+    assert resposta["parcelas_classificadas"] == 2
     assert principal.afeta_dre is False
     assert principal.dre_subcategoria_id is None
+    assert all(parcela.afeta_dre is False for parcela in parcelas)
+    assert all(parcela.dre_subcategoria_id is None for parcela in parcelas)
+    assert [parcela.categoria_id for parcela in parcelas] == [19, 19]
+    assert [parcela.tipo_despesa_id for parcela in parcelas] == [2, 2]
+    assert [parcela.canal for parcela in parcelas] == ["loja_fisica", "loja_fisica"]
+    assert [parcela.status for parcela in parcelas] == ["pago", "pendente"]
+    assert [parcela.valor_pago for parcela in parcelas] == [100, 0]
+
+
+def test_editar_descricao_do_principal_nao_sobrescreve_parcela_classificada(
+    monkeypatch,
+):
+    monkeypatch.setattr(
+        manutencao_routes,
+        "_resolver_dre_subcategoria_conta_pagar",
+        lambda *args, **kwargs: 8,
+    )
+    principal = ContaPagar(
+        id=30,
+        tenant_id=3,
+        descricao="Parcelado",
+        eh_parcelado=True,
+        total_parcelas=2,
+        status="parcelado",
+        afeta_dre=True,
+        categoria_id=19,
+        dre_subcategoria_id=8,
+        valor_original=200,
+        valor_pago=0,
+        valor_juros=0,
+        valor_multa=0,
+        valor_desconto=0,
+    )
+    parcela = ContaPagar(
+        id=31,
+        tenant_id=3,
+        conta_principal_id=30,
+        categoria_id=20,
+        dre_subcategoria_id=9,
+        afeta_dre=True,
+    )
+    resposta = manutencao_routes.atualizar_conta_pagar(
+        30,
+        ContaPagarUpdate(descricao="Parcelado revisado", afeta_dre=True),
+        db=FakeSession(conta=principal, filhas=[parcela]),
+        user_and_tenant=(SimpleNamespace(id=7), 3),
+    )
+    assert resposta["status"] == "parcelado"
+    assert resposta["parcelas_classificadas"] == 0
+    assert parcela.categoria_id == 20
+    assert parcela.dre_subcategoria_id == 9
 
 
 def test_reativar_dre_em_conta_existente_resolve_classificacao(monkeypatch):

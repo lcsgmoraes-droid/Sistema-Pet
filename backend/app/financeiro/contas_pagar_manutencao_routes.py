@@ -77,6 +77,17 @@ def atualizar_conta_pagar(
     if not conta:
         raise HTTPException(status_code=404, detail="Conta nao encontrada")
 
+    classificacao_original = {
+        campo: getattr(conta, campo)
+        for campo in (
+            "categoria_id",
+            "dre_subcategoria_id",
+            "afeta_dre",
+            "tipo_despesa_id",
+            "canal",
+        )
+    }
+
     if "descricao" in campos:
         descricao = (payload.descricao or "").strip()
         if not descricao:
@@ -331,6 +342,36 @@ def atualizar_conta_pagar(
                 campos=campos,
             )
 
+    campos_classificacao_alterados = {
+        campo
+        for campo, valor_original in classificacao_original.items()
+        if getattr(conta, campo) != valor_original
+    }
+    if "afeta_dre" in campos_classificacao_alterados:
+        campos_classificacao_alterados.add("dre_subcategoria_id")
+    parcelas_classificadas = 0
+    if (
+        conta.status == "parcelado"
+        and conta.eh_parcelado
+        and conta.conta_principal_id is None
+        and conta.numero_parcela is None
+        and campos_classificacao_alterados
+    ):
+        parcelas = (
+            db.query(ContaPagar)
+            .filter(
+                ContaPagar.tenant_id == tenant_id,
+                ContaPagar.conta_principal_id == conta.id,
+            )
+            .all()
+        )
+        for parcela in parcelas:
+            for campo in campos_classificacao_alterados:
+                setattr(parcela, campo, getattr(conta, campo))
+            if not parcela.afeta_dre:
+                parcela.dre_subcategoria_id = None
+        parcelas_classificadas = len(parcelas)
+
     db.commit()
     db.refresh(conta)
 
@@ -361,6 +402,7 @@ def atualizar_conta_pagar(
         "proxima_recorrencia": conta.proxima_recorrencia,
         "recorrencias_criadas": len(recorrencias_criadas),
         "recorrencias_atualizadas": recorrencias_atualizadas,
+        "parcelas_classificadas": parcelas_classificadas,
     }
 
 
