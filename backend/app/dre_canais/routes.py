@@ -111,7 +111,10 @@ def _montar_alertas_devolucoes(dados_canais: dict) -> list[dict]:
                 "mensagem": (
                     f"{len(pendentes)} devolucao(oes) tiveram a receita deduzida, "
                     "mas ao menos um item nao possui custo original comprovado. "
-                    "O custo direto nao foi estornado para esses itens; confira o detalhe da devolucao."
+                    "O custo direto nao foi estornado para esses itens. Se houve "
+                    "retorno de produto ao estoque, a entrada recebeu valor "
+                    "provisorio zero. Confira o detalhe e ajuste manualmente "
+                    "o custo quando aplicavel."
                 ),
                 "quantidade_itens": sum(
                     sum(

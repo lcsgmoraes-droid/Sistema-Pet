@@ -21,7 +21,6 @@ from app.vendas_devolucoes_models import VendaDevolucao
 from app.vendas.edicao_estoque import calcular_diferencas_estoque_edicao
 from app.vendas_models import Venda, VendaItem
 
-
 ROOT = Path(__file__).resolve().parents[2]
 
 
@@ -335,7 +334,13 @@ def test_devolucao_parcial_em_dinheiro_registra_deducao_e_custo_servico(monkeypa
     db.commit.assert_called_once()
 
 
-def test_entrada_de_estoque_usa_custo_original_da_mesma_parcela_da_dre(monkeypatch):
+@pytest.mark.parametrize(
+    ("custo_comprovado", "custo_esperado"),
+    [(True, Decimal("15.00")), (False, Decimal("0.00"))],
+)
+def test_entrada_de_estoque_usa_custo_original_ou_zero_provisorio(
+    monkeypatch, custo_comprovado, custo_esperado
+):
     tenant_id = uuid4()
     atendente = SimpleNamespace(id=22, nome="Atendente")
     cliente = SimpleNamespace(id=47, nome="Cliente", credito=Decimal("0"))
@@ -413,6 +418,11 @@ def test_entrada_de_estoque_usa_custo_original_da_mesma_parcela_da_dre(monkeypat
     monkeypatch.setattr(
         "app.vendas.devolucoes_routes.log_action", lambda **_kwargs: None
     )
+    if not custo_comprovado:
+        monkeypatch.setattr(
+            "app.vendas.devolucoes_routes.custo_original_item_devolvido",
+            lambda *_args: (Decimal("0"), "sem_custo_original", True),
+        )
 
     registrar_devolucao(
         venda_id=venda.id,
@@ -432,9 +442,11 @@ def test_entrada_de_estoque_usa_custo_original_da_mesma_parcela_da_dre(monkeypat
         if isinstance(call.args[0], VendaDevolucao)
     )
     assert produto.preco_custo == Decimal("99")
-    assert evento.custo_produtos_estornado == Decimal("15.00")
-    assert entradas[0]["custo_unitario_override"] == 15.0
-    assert entradas[0]["valor_total_override"] == 15.0
+    assert evento.custo_produtos_estornado == custo_esperado
+    assert evento.custo_pendente is (not custo_comprovado)
+    assert evento.itens[0]["custo_pendente"] is (not custo_comprovado)
+    assert entradas[0]["custo_unitario_override"] == float(custo_esperado)
+    assert entradas[0]["valor_total_override"] == float(custo_esperado)
     db.commit.assert_called_once()
 
 

@@ -505,9 +505,9 @@ def registrar_devolucao(
                 origem, _compartilhado = resolver_tenant_estoque_item(
                     item_venda, tenant_id
                 )
-                solicitado_por_produto[(item_venda.produto_id, origem)] += (
-                    quantidade_devolvida
-                )
+                solicitado_por_produto[
+                    (item_venda.produto_id, origem)
+                ] += quantidade_devolvida
 
         for (
             produto_id,
@@ -574,6 +574,8 @@ def registrar_devolucao(
                         db=db,
                         documento=None,
                         observacao=f"{motivo} - Componente de KIT (Item #{kit_item_id})",
+                        custo_unitario_override=0.0,
+                        valor_total_override=0.0,
                     )
 
                     # Buscar nome do produto
@@ -667,16 +669,19 @@ def registrar_devolucao(
                         tenant_estoque, compartilhado = resolver_tenant_estoque_item(
                             item_venda, tenant_id
                         )
-                        custo_estoque = (
-                            {}
-                            if custo_pendente
-                            else {
-                                "custo_unitario_override": float(
-                                    custo_item / quantidade_decimal
-                                ),
-                                "valor_total_override": float(custo_item),
-                            }
-                        )
+                        # Sem custo original comprovado, a entrada fica com
+                        # valor zero provisório e exige ajuste manual. Nunca
+                        # usa o preço de custo atual como custo histórico.
+                        custo_estoque = {
+                            "custo_unitario_override": (
+                                0.0
+                                if custo_pendente
+                                else float(custo_item / quantidade_decimal)
+                            ),
+                            "valor_total_override": (
+                                0.0 if custo_pendente else float(custo_item)
+                            ),
+                        }
                         with contexto_tenant_estoque(
                             tenant_estoque, tenant_id
                         ) as tenant_estoque_uuid:
@@ -738,9 +743,11 @@ def registrar_devolucao(
                 itens_devolvidos.append(
                     {
                         "produto_id": item_venda.produto_id,
-                        "produto_nome": item_venda.produto.nome
-                        if item_venda.produto
-                        else item_venda.servico_descricao,
+                        "produto_nome": (
+                            item_venda.produto.nome
+                            if item_venda.produto
+                            else item_venda.servico_descricao
+                        ),
                         "quantidade": quantidade_devolvida,
                         "valor_unitario": (valor_item / quantidade_decimal).quantize(
                             Decimal("0.01")
@@ -858,9 +865,9 @@ def registrar_devolucao(
                 status="realizado",
                 categoria_id=categoria_devolucoes.id,
                 documento=f"DEVOLUCAO-{venda_id}",
-                fornecedor_cliente=venda.cliente.nome
-                if venda.cliente
-                else "Cliente Avulso",
+                fornecedor_cliente=(
+                    venda.cliente.nome if venda.cliente else "Cliente Avulso"
+                ),
                 user_id=current_user.id,
                 tenant_id=tenant_id,
             )

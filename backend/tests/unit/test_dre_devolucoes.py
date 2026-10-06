@@ -261,6 +261,8 @@ def test_custo_pendente_fica_explicito_sem_estorno_inventado(monkeypatch):
     assert dados["loja_fisica"]["cmv"] == 0
     assert alertas[0]["codigo"] == "devolucao_custo_original_pendente"
     assert alertas[0]["quantidade_itens"] == 1
+    assert "provisorio zero" in alertas[0]["mensagem"]
+    assert "ajuste manualmente" in alertas[0]["mensagem"]
 
 
 def test_detalhe_da_devolucao_exibe_deducao_e_estorno_cmv(monkeypatch):
