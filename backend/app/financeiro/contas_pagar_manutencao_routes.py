@@ -12,6 +12,7 @@ from app.dre_plano_contas_models import DRESubcategoria
 from app.financeiro.contas_pagar_common import (
     _decimal_monetario,
     _registrar_observacao_operacao_conta_pagar,
+    _resolver_dre_subcategoria_conta_pagar,
 )
 from app.financeiro.contas_pagar_recorrencia import (
     _aplicar_edicao_recorrencia_futura,
@@ -157,6 +158,22 @@ def atualizar_conta_pagar(
                     status_code=422, detail="Tipo de despesa invalido para este tenant"
                 )
             conta.tipo_despesa_id = payload.tipo_despesa_id
+
+    if "afeta_dre" in campos:
+        if payload.afeta_dre is None:
+            raise HTTPException(
+                status_code=422, detail="Afeta a DRE deve ser verdadeiro ou falso"
+            )
+        conta.afeta_dre = payload.afeta_dre
+        if conta.afeta_dre:
+            conta.dre_subcategoria_id = _resolver_dre_subcategoria_conta_pagar(
+                db,
+                tenant_id,
+                dre_subcategoria_id=conta.dre_subcategoria_id,
+                categoria_id=conta.categoria_id,
+            )
+        else:
+            conta.dre_subcategoria_id = None
 
     if "canal" in campos:
         conta.canal = payload.canal
@@ -316,6 +333,7 @@ def atualizar_conta_pagar(
         "fornecedor_id": conta.fornecedor_id,
         "categoria_id": conta.categoria_id,
         "dre_subcategoria_id": conta.dre_subcategoria_id,
+        "afeta_dre": conta.afeta_dre,
         "tipo_despesa_id": conta.tipo_despesa_id,
         "canal": conta.canal,
         "valor_original": float(conta.valor_original),

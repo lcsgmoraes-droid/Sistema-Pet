@@ -6,7 +6,6 @@ export default function ContaPagarBasicFields({ controller, onOpenCategoria }) {
   const {
     categorias,
     dados,
-    isEditando,
     fornecedorSelecionado,
     fornecedores,
     handleCategoriaChange,
@@ -73,7 +72,6 @@ export default function ContaPagarBasicFields({ controller, onOpenCategoria }) {
           <input
             type="checkbox"
             checked={dados.afeta_dre}
-            disabled={isEditando}
             onChange={(event) =>
               setDados((atual) => ({
                 ...atual,
@@ -112,7 +110,6 @@ export default function ContaPagarBasicFields({ controller, onOpenCategoria }) {
           </select>
           <button
             type="button"
-            disabled={!dados.afeta_dre}
             onClick={onOpenCategoria}
             className="shrink-0 px-3 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 flex items-center gap-1 whitespace-nowrap"
             title="Adicionar nova categoria"

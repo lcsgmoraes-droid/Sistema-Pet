@@ -5,10 +5,13 @@ from datetime import date
 from types import SimpleNamespace
 
 import pytest
+from fastapi import HTTPException
 
 from app.financeiro import contas_pagar_criacao_routes as routes
+from app.financeiro import contas_pagar_manutencao_routes as manutencao_routes
 from app.financeiro import contas_pagar_pagamento_service as pagamento_service
-from app.financeiro.contas_pagar_schemas import ContaPagarCreate
+from app.financeiro import contas_pagar_recorrencia as recorrencia
+from app.financeiro.contas_pagar_schemas import ContaPagarCreate, ContaPagarUpdate
 from app.financeiro_models import CategoriaFinanceira, ContaPagar, LancamentoManual
 
 
@@ -24,17 +27,24 @@ class FakeQuery:
 
 
 class FakeSession:
-    def __init__(self, categoria=None):
+    def __init__(self, categoria=None, conta=None):
         self.added = []
         self.categoria = categoria
+        self.conta = conta
 
     def add(self, item):
         self.added.append(item)
 
     def query(self, *args):
-        return FakeQuery(self.categoria if args == (CategoriaFinanceira,) else None)
+        result = self.categoria if args == (CategoriaFinanceira,) else None
+        if args == (ContaPagar,):
+            result = self.conta
+        return FakeQuery(result)
 
     def commit(self):
+        pass
+
+    def refresh(self, item):
         pass
 
 
@@ -138,3 +148,130 @@ def test_recorrencia_de_passivo_pago_nao_sincroniza_dre(monkeypatch):
     )
 
     assert quantidade == 1
+
+
+def test_editar_conta_para_passivo_preserva_categoria_e_retira_classificacao_dre():
+    conta = ContaPagar(
+        id=21,
+        tenant_id=3,
+        descricao="Principal emprestimo",
+        categoria_id=19,
+        dre_subcategoria_id=8,
+        afeta_dre=True,
+        valor_original=1000,
+        valor_pago=0,
+        valor_juros=0,
+        valor_multa=0,
+        valor_desconto=0,
+    )
+    resposta = manutencao_routes.atualizar_conta_pagar(
+        21,
+        ContaPagarUpdate(afeta_dre=False),
+        db=FakeSession(conta=conta),
+        user_and_tenant=(SimpleNamespace(id=7), 3),
+    )
+
+    assert resposta["afeta_dre"] is False
+    assert conta.categoria_id == 19
+    assert conta.dre_subcategoria_id is None
+    assert conta.valor_original == 1000
+
+
+def test_reativar_dre_em_conta_existente_resolve_classificacao(monkeypatch):
+    conta = ContaPagar(
+        id=22,
+        tenant_id=3,
+        descricao="Despesa classificada",
+        categoria_id=19,
+        dre_subcategoria_id=None,
+        afeta_dre=False,
+        valor_original=100,
+        valor_pago=0,
+        valor_juros=0,
+        valor_multa=0,
+        valor_desconto=0,
+    )
+    chamadas = []
+
+    def resolver(db, tenant_id, *, dre_subcategoria_id, categoria_id):
+        chamadas.append((tenant_id, dre_subcategoria_id, categoria_id))
+        return 8
+
+    monkeypatch.setattr(
+        manutencao_routes, "_resolver_dre_subcategoria_conta_pagar", resolver
+    )
+    resposta = manutencao_routes.atualizar_conta_pagar(
+        22,
+        ContaPagarUpdate(afeta_dre=True),
+        db=FakeSession(conta=conta),
+        user_and_tenant=(SimpleNamespace(id=7), 3),
+    )
+
+    assert chamadas == [(3, None, 19)]
+    assert resposta["afeta_dre"] is True
+    assert conta.dre_subcategoria_id == 8
+
+
+def test_reativar_dre_sem_categoria_ou_subcategoria_e_rejeitado():
+    conta = ContaPagar(
+        id=24,
+        tenant_id=3,
+        descricao="Passivo sem categoria",
+        categoria_id=None,
+        dre_subcategoria_id=None,
+        afeta_dre=False,
+    )
+    with pytest.raises(HTTPException) as erro:
+        manutencao_routes.atualizar_conta_pagar(
+            24,
+            ContaPagarUpdate(afeta_dre=True),
+            db=FakeSession(conta=conta),
+            user_and_tenant=(SimpleNamespace(id=7), 3),
+        )
+    assert erro.value.status_code == 400
+
+
+def test_edicao_rejeita_afeta_dre_nulo():
+    conta = ContaPagar(id=23, tenant_id=3, descricao="Conta", afeta_dre=False)
+    with pytest.raises(HTTPException) as erro:
+        manutencao_routes.atualizar_conta_pagar(
+            23,
+            ContaPagarUpdate(afeta_dre=None),
+            db=FakeSession(conta=conta),
+            user_and_tenant=(SimpleNamespace(id=7), 3),
+        )
+    assert erro.value.status_code == 422
+
+
+def test_edicao_de_recorrencia_propaga_flag_so_para_contas_futuras_nao_pagas(
+    monkeypatch,
+):
+    futura = SimpleNamespace(
+        afeta_dre=True, dre_subcategoria_id=8, data_vencimento=date(2026, 11, 10)
+    )
+
+    class QueryFuturas:
+        def filter(self, *args):
+            return self
+
+        def all(self):
+            return [futura]
+
+    monkeypatch.setattr(
+        recorrencia, "_obter_origem_recorrencia", lambda *args: SimpleNamespace(id=21)
+    )
+    origem = SimpleNamespace(
+        id=21,
+        data_vencimento=date(2026, 10, 10),
+        afeta_dre=False,
+        dre_subcategoria_id=None,
+    )
+    atualizadas = recorrencia._aplicar_edicao_recorrencia_futura(
+        db=SimpleNamespace(query=lambda *args: QueryFuturas()),
+        tenant_id=3,
+        conta=origem,
+        campos={"afeta_dre"},
+    )
+    assert atualizadas == 1
+    assert futura.afeta_dre is False
+    assert futura.dre_subcategoria_id is None

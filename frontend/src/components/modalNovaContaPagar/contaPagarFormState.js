@@ -188,6 +188,7 @@ export const montarPayloadEdicaoContaPagar = (payloadNormalizado) => ({
   fornecedor_id: payloadNormalizado.fornecedor_id,
   categoria_id: payloadNormalizado.categoria_id,
   dre_subcategoria_id: payloadNormalizado.dre_subcategoria_id,
+  afeta_dre: payloadNormalizado.afeta_dre,
   tipo_despesa_id: payloadNormalizado.tipo_despesa_id,
   canal: payloadNormalizado.canal,
   valor_original: payloadNormalizado.valor_original,
