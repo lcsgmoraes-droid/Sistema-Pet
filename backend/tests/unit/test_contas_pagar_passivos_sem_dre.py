@@ -177,6 +177,35 @@ def test_editar_conta_para_passivo_preserva_categoria_e_retira_classificacao_dre
     assert conta.valor_original == 1000
 
 
+def test_editar_principal_parcelado_nao_cria_obrigacao_duplicada():
+    principal = ContaPagar(
+        id=25,
+        tenant_id=3,
+        descricao="Emprestimo parcelado (controle)",
+        categoria_id=19,
+        dre_subcategoria_id=8,
+        afeta_dre=True,
+        eh_parcelado=True,
+        total_parcelas=3,
+        status="parcelado",
+        valor_original=300,
+        valor_pago=0,
+        valor_juros=0,
+        valor_multa=0,
+        valor_desconto=0,
+    )
+    resposta = manutencao_routes.atualizar_conta_pagar(
+        25,
+        ContaPagarUpdate(afeta_dre=False),
+        db=FakeSession(conta=principal),
+        user_and_tenant=(SimpleNamespace(id=7), 3),
+    )
+
+    assert resposta["status"] == "parcelado"
+    assert principal.afeta_dre is False
+    assert principal.dre_subcategoria_id is None
+
+
 def test_reativar_dre_em_conta_existente_resolve_classificacao(monkeypatch):
     conta = ContaPagar(
         id=22,

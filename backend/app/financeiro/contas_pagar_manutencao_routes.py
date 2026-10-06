@@ -294,7 +294,16 @@ def atualizar_conta_pagar(
     conta.valor_final = valor_original + valor_juros + valor_multa - valor_desconto
 
     valor_pago = conta.valor_pago or Decimal("0")
-    if valor_pago <= 0:
+    if (
+        conta.eh_parcelado
+        and conta.conta_principal_id is None
+        and conta.numero_parcela is None
+        and (conta.total_parcelas or 0) > 1
+    ):
+        # O registro principal é apenas controle; as parcelas são as obrigações.
+        conta.status = "parcelado"
+        conta.data_pagamento = None
+    elif valor_pago <= 0:
         conta.status = "pendente"
         conta.data_pagamento = None
     elif valor_pago >= conta.valor_final:
