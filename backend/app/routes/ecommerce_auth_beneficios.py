@@ -7,12 +7,11 @@ from app.db import get_session
 from app.models import User
 from app.routes.ecommerce_auth_cliente import _get_or_create_cliente_for_user
 from app.routes.ecommerce_auth_common import (
-    _cashback_disponivel_clause,
     _get_current_ecommerce_user,
     _is_expired,
-    _is_expired_or_equal,
     _remaining_days_until,
 )
+from app.campaigns.cashback_wallet import get_cashback_wallet
 
 
 router = APIRouter()
@@ -74,7 +73,6 @@ def meus_beneficios(
     Retorna em uma única chamada tudo que o app precisa para montar
     a tela 'Meus Benefícios': ranking, carimbos, cashback e cupons ativos.
     """
-    from sqlalchemy import func as sqlfunc
     from app.campaigns.models import (
         CashbackTransaction,
         Campaign,
@@ -90,16 +88,11 @@ def meus_beneficios(
     now = datetime.now(timezone.utc)
 
     # --- Cashback ---
-    saldo_raw = (
-        db.query(sqlfunc.sum(CashbackTransaction.amount))
-        .filter(
-            CashbackTransaction.tenant_id == tenant_id,
-            CashbackTransaction.customer_id == cliente.id,
-            _cashback_disponivel_clause(CashbackTransaction, now),
-        )
-        .scalar()
+    saldo_cashback = float(
+        get_cashback_wallet(
+            db, tenant_id=tenant_id, customer_id=cliente.id, as_of=now
+        ).available
     )
-    saldo_cashback = float(saldo_raw or 0)
 
     # --- Carimbos ---
     loyalty_summary = summarize_loyalty_balances_for_customer(
@@ -241,7 +234,6 @@ def meu_extrato_cashback(
     """
     Retorna o extrato de cashback do cliente autenticado no app.
     """
-    from sqlalchemy import func as sqlfunc
     from app.campaigns.models import CashbackTransaction
 
     cliente = _get_or_create_cliente_for_user(db, current_user)
@@ -253,30 +245,21 @@ def meu_extrato_cashback(
         .filter(
             CashbackTransaction.tenant_id == tenant_id,
             CashbackTransaction.customer_id == cliente.id,
+            CashbackTransaction.tx_type != "closed",
         )
-        .order_by(CashbackTransaction.created_at.desc())
+        .order_by(CashbackTransaction.id.desc())
         .limit(min(limit, 100))
         .all()
     )
 
-    saldo_raw = (
-        db.query(sqlfunc.sum(CashbackTransaction.amount))
-        .filter(
-            CashbackTransaction.tenant_id == tenant_id,
-            CashbackTransaction.customer_id == cliente.id,
-            _cashback_disponivel_clause(CashbackTransaction, now),
-        )
-        .scalar()
+    wallet = get_cashback_wallet(
+        db, tenant_id=tenant_id, customer_id=cliente.id, as_of=now
     )
-    saldo_atual = float(saldo_raw or 0)
+    saldo_atual = float(wallet.available)
 
     items = []
     for t in txs:
-        is_expired_credit = (
-            getattr(t, "tx_type", "credit") == "credit"
-            and t.expires_at is not None
-            and _is_expired_or_equal(t.expires_at, now)
-        )
+        is_expired_credit = wallet.expected_expiration_by_credit.get(t.id, 0) > 0
         items.append(
             {
                 "id": t.id,
@@ -306,23 +289,16 @@ def minha_sugestao_cashback(
     """
     Retorna sugestão de compra baseada no padrão do cliente + saldo de cashback.
     """
-    from sqlalchemy import func as sqlfunc
     from app.campaigns.models import CashbackTransaction, CashbackSourceTypeEnum
 
     cliente = _get_or_create_cliente_for_user(db, current_user)
     tenant_id = current_user.tenant_id
     now = datetime.now(timezone.utc)
 
-    saldo_raw = (
-        db.query(sqlfunc.sum(CashbackTransaction.amount))
-        .filter(
-            CashbackTransaction.tenant_id == tenant_id,
-            CashbackTransaction.customer_id == cliente.id,
-            _cashback_disponivel_clause(CashbackTransaction, now),
-        )
-        .scalar()
+    wallet = get_cashback_wallet(
+        db, tenant_id=tenant_id, customer_id=cliente.id, as_of=now
     )
-    saldo = float(saldo_raw or 0)
+    saldo = float(wallet.available)
 
     # Ticket médio estimado pelas últimas compras com cashback
     ultimas = (
@@ -347,14 +323,17 @@ def minha_sugestao_cashback(
 
     valor_com_cashback = max(0.0, round(ticket_sugerido - saldo, 2))
 
+    creditos_com_saldo = [
+        credit_id
+        for credit_id, restante in wallet.remaining_by_credit.items()
+        if restante > 0
+    ]
     proximo_expirando = (
         db.query(CashbackTransaction)
         .filter(
             CashbackTransaction.tenant_id == tenant_id,
             CashbackTransaction.customer_id == cliente.id,
-            CashbackTransaction.tx_type == "credit"
-            if hasattr(CashbackTransaction, "tx_type")
-            else True,
+            CashbackTransaction.id.in_(creditos_com_saldo),
             CashbackTransaction.expires_at.isnot(None),
             CashbackTransaction.expires_at > now,
         )
@@ -368,7 +347,7 @@ def minha_sugestao_cashback(
         "valor_com_cashback": valor_com_cashback,
         "economia": min(saldo, ticket_sugerido),
         "proximo_expirando": {
-            "amount": float(proximo_expirando.amount),
+            "amount": float(wallet.remaining_by_credit[proximo_expirando.id]),
             "expires_at": proximo_expirando.expires_at.isoformat(),
             "dias_restantes": _remaining_days_until(proximo_expirando.expires_at, now),
         }

@@ -193,25 +193,14 @@ def _bulk_cashback_por_venda(
     if not venda_ids:
         return {}
     try:
-        from app.campaigns.models import CashbackTransaction
-
-        rows = (
-            db.query(
-                CashbackTransaction.source_id,
-                func.coalesce(func.sum(CashbackTransaction.amount), 0),
-            )
-            .filter(
-                CashbackTransaction.tenant_id == tenant_id,
-                CashbackTransaction.amount < 0,
-                CashbackTransaction.source_id.in_(venda_ids),
-            )
-            .group_by(CashbackTransaction.source_id)
-            .all()
+        from app.vendas.cashback_financeiro import (
+            cashback_resgatado_liquido_por_venda,
         )
         return {
-            int(venda_id): abs(float(total or 0))
-            for venda_id, total in rows
-            if venda_id
+            venda_id: float(total)
+            for venda_id, total in cashback_resgatado_liquido_por_venda(
+                db, tenant_id=tenant_id, venda_ids=venda_ids
+            ).items()
         }
     except Exception:
         return {}

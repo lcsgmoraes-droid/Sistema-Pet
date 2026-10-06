@@ -86,5 +86,8 @@ def _apply_running_balances(events: list[dict[str, Any]]) -> None:
             saldo_carimbos += int(event.get("quantidade") or 0)
             event["saldo_carimbos"] = saldo_carimbos
         elif event.get("categoria") == "cashback":
-            saldo_cashback += Decimal(str(event.get("valor") or 0))
+            if event.get("saldo_cashback") is not None:
+                saldo_cashback = Decimal(str(event["saldo_cashback"]))
+            else:
+                saldo_cashback += Decimal(str(event.get("valor") or 0))
             event["saldo_cashback"] = float(saldo_cashback.quantize(Decimal("0.01")))

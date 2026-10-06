@@ -371,18 +371,13 @@ def _resolve_cashback_resgatado(
     venda_id: int,
 ) -> float:
     try:
-        from app.campaigns.models import CashbackTransaction
-
-        total = (
-            db.query(func.sum(CashbackTransaction.amount))
-            .filter(
-                CashbackTransaction.tenant_id == tenant_id,
-                CashbackTransaction.amount < 0,
-                CashbackTransaction.source_id == venda_id,
-            )
-            .scalar()
+        from app.vendas.cashback_financeiro import (
+            cashback_resgatado_liquido_por_venda,
         )
-        return _round_money(abs(total or 0))
+        total = cashback_resgatado_liquido_por_venda(
+            db, tenant_id=tenant_id, venda_ids=[venda_id]
+        ).get(venda_id, 0)
+        return _round_money(total)
     except Exception as exc:
         logger.warning("Falha ao buscar cashback da venda %s: %s", venda_id, exc)
         return 0.0

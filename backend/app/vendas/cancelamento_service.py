@@ -10,7 +10,6 @@ from sqlalchemy.orm import Session
 
 from app.db.transaction import transactional_session
 from app.services.venda_rentabilidade_snapshot_service import (
-    get_or_build_venda_rentabilidade_snapshot,
     invalidate_venda_rentabilidade_snapshot,
 )
 from app.produtos.tipos import tipo_controla_estoque
@@ -96,7 +95,12 @@ def cancelar_venda(
         # ETAPA 1: VALIDAR VENDA E PERMISSÕES
         # ============================================================
 
-        venda = db.query(Venda).filter_by(id=venda_id, tenant_id=tenant_id).first()
+        venda = (
+            db.query(Venda)
+            .filter_by(id=venda_id, tenant_id=tenant_id)
+            .with_for_update()
+            .first()
+        )
 
         if not venda:
             raise HTTPException(status_code=404, detail="Venda não encontrada")
@@ -341,18 +345,8 @@ def cancelar_venda(
         venda.data_cancelamento = now_brasilia()
         venda.updated_at = now_brasilia()
 
-        if status_anterior in ["baixa_parcial", "finalizada"]:
-            get_or_build_venda_rentabilidade_snapshot(
-                venda,
-                db,
-                tenant_id,
-                persist_if_missing=True,
-                force_refresh=True,
-            )
-        else:
-            invalidate_venda_rentabilidade_snapshot(venda)
-
         from app.campaigns.coupon_service import reverse_coupon_redemptions_for_sale
+        from app.campaigns.cashback_sale_reversal import reverse_cashback_for_sale
         from app.campaigns.loyalty_service import void_loyalty_stamps_for_sale
 
         reverse_coupon_redemptions_for_sale(
@@ -368,6 +362,21 @@ def cancelar_venda(
             venda_id=venda_id,
             reason=f"Venda cancelada: {motivo}",
         )
+        if venda.cliente_id:
+            reverse_cashback_for_sale(
+                db,
+                tenant_id=tenant_id,
+                sale_id=venda_id,
+                customer_id=venda.cliente_id,
+            )
+        from app.vendas.cashback_financeiro import cancelar_despesas_cashback_venda
+
+        cancelar_despesas_cashback_venda(
+            db, tenant_id=tenant_id, numero_venda=venda.numero_venda
+        )
+        # Vendas canceladas saem da DRE; o snapshot anterior ao estorno não
+        # pode continuar disponível para um recálculo ou leitura posterior.
+        invalidate_venda_rentabilidade_snapshot(venda)
 
         db.flush()
 

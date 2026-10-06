@@ -12,8 +12,9 @@ from decimal import Decimal
 from typing import Any, Dict, List, Optional
 
 from fastapi import HTTPException
-from sqlalchemy import func
 from sqlalchemy.orm import Session
+
+from app.campaigns.cashback_wallet import get_cashback_wallet, lock_cashback_customer
 
 logger = logging.getLogger(__name__)
 
@@ -480,17 +481,18 @@ def processar_pagamentos_finalizacao(
                     detail="Cashback só pode ser usado em vendas com cliente vinculado",
                 )
 
-            saldo_raw = (
-                db.query(func.sum(CashbackTransaction.amount))
-                .filter(
-                    CashbackTransaction.tenant_id == tenant_id,
-                    CashbackTransaction.customer_id == venda.cliente_id,
+            try:
+                lock_cashback_customer(
+                    db, tenant_id=tenant_id, customer_id=venda.cliente_id
                 )
-                .scalar()
-            )
-            saldo_disponivel = float(saldo_raw or 0)
+            except LookupError as exc:
+                raise HTTPException(status_code=404, detail="Cliente não encontrado") from exc
+            saldo_disponivel = get_cashback_wallet(
+                db, tenant_id=tenant_id, customer_id=venda.cliente_id
+            ).available
 
-            if pag_data["valor"] > saldo_disponivel + 0.01:
+            valor_cashback = Decimal(str(pag_data["valor"])).quantize(Decimal("0.01"))
+            if valor_cashback <= 0 or valor_cashback > saldo_disponivel:
                 raise HTTPException(
                     status_code=400,
                     detail=f"Cashback insuficiente. Disponível: R$ {saldo_disponivel:.2f}",
@@ -499,13 +501,14 @@ def processar_pagamentos_finalizacao(
             debit = CashbackTransaction(
                 tenant_id=tenant_id,
                 customer_id=venda.cliente_id,
-                amount=-Decimal(str(pag_data["valor"])),
+                amount=-valor_cashback,
                 source_type=CashbackSourceTypeEnum.redemption,
                 source_id=venda.id,
                 description=f"Resgate em venda {venda.numero_venda}",
                 tx_type="debit",
             )
             db.add(debit)
+            db.flush()
 
             cat_campanha = (
                 db.query(CategoriaFinanceira)

@@ -8,10 +8,10 @@ from sqlalchemy import func as sqlfunc
 from sqlalchemy.orm import Session
 
 from app.auth.dependencies import get_current_user_and_tenant
+from app.campaigns.cashback_wallet import get_tenant_cashback_liability
 from app.campaigns.models import (
     Campaign,
     CampaignStatusEnum,
-    CashbackTransaction,
     Coupon,
     CouponRedemption,
     CouponStatusEnum,
@@ -87,12 +87,7 @@ def dashboard_campanhas(
         .scalar()
     ) or 0
 
-    saldo_passivo = float(
-        db.query(sqlfunc.sum(CashbackTransaction.amount))
-        .filter(CashbackTransaction.tenant_id == tenant_id)
-        .scalar()
-        or 0
-    )
+    saldo_passivo = float(get_tenant_cashback_liability(db, tenant_id=tenant_id))
 
     todos_clientes = []
     aniversarios_clientes = []
