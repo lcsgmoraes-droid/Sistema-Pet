@@ -132,6 +132,9 @@ export default function ModalPagamentoFormaPanel({
                 >
                   Cashback
                 </div>
+                <div className="text-xs text-green-700 mt-1">
+                  Saldo: {formatMoneyBRL(saldoCashbackTotal)}
+                </div>
                 <div className="text-xs text-green-600 mt-1 font-semibold">
                   Até {formatMoneyBRL(Math.min(saldoCashback, valorRestante))}
                 </div>
