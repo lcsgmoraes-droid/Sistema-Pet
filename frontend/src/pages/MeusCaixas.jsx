@@ -13,6 +13,7 @@ import {
   Users,
 } from "lucide-react";
 import { listarCaixas, obterCaixaAberto, obterResumoCaixa, reabrirCaixa } from "../api/caixa";
+import ImpressaoResumoCaixa from "../components/caixa/ImpressaoResumoCaixa";
 import ImpressaoTermicaCaixa from "../components/caixa/ImpressaoTermicaCaixa";
 import ModalMovimentacoesCaixa from "../components/ModalMovimentacoesCaixa";
 import { getAccessToken } from "../auth/tokenStorage";
@@ -30,6 +31,7 @@ export default function MeusCaixas() {
   const [motivoRevisao, setMotivoRevisao] = useState("");
   const [loading, setLoading] = useState(true);
   const [resumoImpressao, setResumoImpressao] = useState(null);
+  const [resumoTermico, setResumoTermico] = useState(null);
   const [caixaExtrato, setCaixaExtrato] = useState(null);
   const [filtros, setFiltros] = useState({
     data_inicio: "",
@@ -120,9 +122,18 @@ export default function MeusCaixas() {
     }
   };
 
-  const handleImprimirTermico = async (caixaId) => {
+  const handleImprimirResumo = async (caixaId) => {
     try {
       setResumoImpressao(await obterResumoCaixa(caixaId));
+    } catch (error) {
+      console.error("Erro ao carregar resumo para impressão:", error);
+      alert("Erro ao carregar o relatório do caixa");
+    }
+  };
+
+  const handleImprimirTermico = async (caixaId) => {
+    try {
+      setResumoTermico(await obterResumoCaixa(caixaId));
     } catch (error) {
       console.error("Erro ao carregar relatório térmico:", error);
       alert("Erro ao carregar o relatório do caixa");
@@ -372,7 +383,7 @@ export default function MeusCaixas() {
 
                   {/* Ações */}
                   {caixa.status === "fechado" && (
-                    <div className="border-t pt-4 flex gap-3">
+                    <div className="border-t pt-4 flex flex-wrap gap-3">
                       {!caixaAberto && (
                         <button
                           onClick={() => handleReabrir(caixa.id)}
@@ -407,6 +418,13 @@ export default function MeusCaixas() {
                         className="flex items-center gap-2 px-4 py-2 bg-gray-800 hover:bg-gray-900 text-white rounded-lg transition-colors"
                       >
                         <Printer className="w-4 h-4" /> Imprimir na térmica
+                      </button>
+                      <button
+                        onClick={() => handleImprimirResumo(caixa.id)}
+                        className="flex items-center gap-2 px-4 py-2 bg-gray-800 hover:bg-gray-900 text-white rounded-lg transition-colors"
+                        title="Imprimir o resumo do caixa na térmica ou salvar em PDF"
+                      >
+                        <Printer className="w-4 h-4" /> Imprimir resumo
                       </button>
                       <button
                         onClick={() => setCaixaExtrato(caixa.id)}
@@ -476,9 +494,15 @@ export default function MeusCaixas() {
           </form>
         </div>
       )}
+      {resumoImpressao && (
+        <ImpressaoResumoCaixa
+          resumo={resumoImpressao}
+          onAfterPrint={() => setResumoImpressao(null)}
+        />
+      )}
       <ImpressaoTermicaCaixa
-        documento={resumoImpressao ? { resumo: resumoImpressao } : null}
-        onAfterPrint={() => setResumoImpressao(null)}
+        documento={resumoTermico ? { resumo: resumoTermico } : null}
+        onAfterPrint={() => setResumoTermico(null)}
       />
       {caixaExtrato && (
         <ModalMovimentacoesCaixa caixaId={caixaExtrato} onClose={() => setCaixaExtrato(null)} />
