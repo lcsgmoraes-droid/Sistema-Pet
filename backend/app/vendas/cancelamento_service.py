@@ -112,6 +112,19 @@ def cancelar_venda(
         if venda.status == "cancelada":
             raise HTTPException(status_code=400, detail="Venda já está cancelada")
 
+        if str(venda.status or "").lower() in {
+            "finalizada_devolucao",
+            "finalizada_devolucao_parcial",
+            "devolvida_total",
+        }:
+            raise HTTPException(
+                status_code=409,
+                detail=(
+                    "A venda possui devolucao anterior sem historico conciliado. "
+                    "Concilie a devolucao antes de cancelar a venda."
+                ),
+            )
+
         if (
             db.query(VendaDevolucao)
             .filter_by(tenant_id=tenant_id, venda_id=venda_id)

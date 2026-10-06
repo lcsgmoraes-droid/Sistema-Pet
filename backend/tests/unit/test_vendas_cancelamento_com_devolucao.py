@@ -16,7 +16,7 @@ from app.vendas_models import Venda
 
 def test_cancelamento_com_devolucao_bloqueia_antes_de_estoque_dre_e_caixa(monkeypatch):
     tenant_id = uuid4()
-    venda = SimpleNamespace(id=12, numero_venda="VEN-12", status="finalizada_devolucao")
+    venda = SimpleNamespace(id=12, numero_venda="VEN-12", status="finalizada")
     evento = SimpleNamespace(
         tenant_id=tenant_id,
         venda_id=venda.id,
@@ -77,7 +77,7 @@ def test_cancelamento_com_devolucao_bloqueia_antes_de_estoque_dre_e_caixa(monkey
     db.flush.assert_not_called()
     db.commit.assert_not_called()
     db.rollback.assert_called_once()
-    assert venda.status == "finalizada_devolucao"
+    assert venda.status == "finalizada"
     assert estoque.quantidade == 10
     assert caixa.valor == Decimal("20.00")
 
@@ -85,3 +85,48 @@ def test_cancelamento_com_devolucao_bloqueia_antes_de_estoque_dre_e_caixa(monkey
     agregacao.agregar_devolucoes_por_canal(db, 10, 2026, tenant_id, dados_dre)
     assert dados_dre["loja_fisica"]["devolucoes"] == Decimal("20.00")
     assert dados_dre["loja_fisica"]["cmv"] == Decimal("-8.00")
+
+
+@pytest.mark.parametrize(
+    "status_venda",
+    ["finalizada_devolucao", "finalizada_devolucao_parcial", "devolvida_total"],
+)
+def test_cancelamento_de_devolucao_legada_sem_evento_nao_estorna_venda(
+    monkeypatch, status_venda
+):
+    tenant_id = uuid4()
+    venda = SimpleNamespace(id=12, numero_venda="VEN-12", status=status_venda)
+    consulta_venda = MagicMock()
+    consulta_venda.filter_by.return_value = consulta_venda
+    consulta_venda.with_for_update.return_value = consulta_venda
+    consulta_venda.first.return_value = venda
+    db = MagicMock()
+
+    def consultar(modelo):
+        if modelo is Venda:
+            return consulta_venda
+        raise AssertionError(f"Consulta posterior ao bloqueio: {modelo}")
+
+    db.query.side_effect = consultar
+    monkeypatch.setattr("app.tenancy.context.set_tenant_context", lambda *_args: None)
+
+    with patch("app.estoque.service.EstoqueService.estornar_estoque") as estornar:
+        with pytest.raises(HTTPException) as erro:
+            cancelar_venda(
+                venda_id=venda.id,
+                motivo="Teste",
+                user_id=7,
+                tenant_id=tenant_id,
+                db=db,
+            )
+
+    assert erro.value.status_code == 409
+    assert "devolucao anterior" in erro.value.detail
+    assert venda.status == status_venda
+    assert [call.args[0] for call in db.query.call_args_list] == [Venda]
+    estornar.assert_not_called()
+    db.add.assert_not_called()
+    db.delete.assert_not_called()
+    db.flush.assert_not_called()
+    db.commit.assert_not_called()
+    db.rollback.assert_called_once()
