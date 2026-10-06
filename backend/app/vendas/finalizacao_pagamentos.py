@@ -12,6 +12,7 @@ from decimal import Decimal
 from typing import Any, Dict, List, Optional
 
 from fastapi import HTTPException
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.campaigns.cashback_wallet import get_cashback_wallet, lock_cashback_customer

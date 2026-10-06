@@ -216,7 +216,8 @@ export default function ModalPagamentoFormaPanel({
                 </div>
                 {cashbackLimitPercent !== null && (
                   <p className="text-xs text-green-700 mt-1">
-                    Limite de {formatPercent(cashbackLimitPercent)} da compra. Saldo acumulado: {formatMoneyBRL(saldoCashbackTotal)}.
+                    Limite de {formatPercent(cashbackLimitPercent)} da compra. Saldo acumulado:{" "}
+                    {formatMoneyBRL(saldoCashbackTotal)}.
                   </p>
                 )}
                 <p className="text-xs text-green-700 mt-1">

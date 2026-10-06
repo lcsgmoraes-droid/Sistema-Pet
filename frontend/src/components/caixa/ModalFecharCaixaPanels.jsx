@@ -279,180 +279,180 @@ export function PaymentBreakdownPanel({
 
   return (
     <>
-        <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg p-4 border border-blue-200">
-          <div className="flex items-center justify-between gap-2 mb-3">
-            <h4 className="text-sm font-bold text-gray-700 flex items-center">
-              <Receipt className="w-4 h-4 mr-1.5 text-blue-600" />
-              Resumo do Caixa
-            </h4>
-            <button
-              type="button"
-              onClick={() => setImprimindo(true)}
-              className="inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold text-blue-700 bg-white border border-blue-300 rounded hover:bg-blue-50"
-              title="Imprimir resumo do caixa e formas de pagamento"
-            >
-              <Printer className="w-4 h-4" />
-              Imprimir
-            </button>
-          </div>
+      <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg p-4 border border-blue-200">
+        <div className="flex items-center justify-between gap-2 mb-3">
+          <h4 className="text-sm font-bold text-gray-700 flex items-center">
+            <Receipt className="w-4 h-4 mr-1.5 text-blue-600" />
+            Resumo do Caixa
+          </h4>
+          <button
+            type="button"
+            onClick={() => setImprimindo(true)}
+            className="inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold text-blue-700 bg-white border border-blue-300 rounded hover:bg-blue-50"
+            title="Imprimir resumo do caixa e formas de pagamento"
+          >
+            <Printer className="w-4 h-4" />
+            Imprimir
+          </button>
+        </div>
 
-          <div className="grid grid-cols-2 gap-2">
-            {itensResumo.map(([titulo, valor]) => (
-              <div key={titulo} className="bg-white rounded-lg p-3 border border-gray-200">
-                <div className="text-xs font-semibold text-gray-700">{titulo}</div>
-                <div className="mt-1 text-sm font-bold text-gray-900">{formatMoneyBRL(valor)}</div>
-              </div>
-            ))}
-          </div>
+        <div className="grid grid-cols-2 gap-2">
+          {itensResumo.map(([titulo, valor]) => (
+            <div key={titulo} className="bg-white rounded-lg p-3 border border-gray-200">
+              <div className="text-xs font-semibold text-gray-700">{titulo}</div>
+              <div className="mt-1 text-sm font-bold text-gray-900">{formatMoneyBRL(valor)}</div>
+            </div>
+          ))}
+        </div>
 
-          <h5 className="mt-4 mb-2 text-sm font-bold text-gray-700">Formas de Pagamento</h5>
-          <div className="grid grid-cols-2 gap-2">
-            {formas.map(([forma, dados]) => {
-              const ehDinheiro = forma === "Dinheiro";
-              return (
-                <div
-                  key={forma}
-                  className={`bg-white rounded-lg p-3 border ${
-                    formaExpandida === forma
-                      ? "border-blue-400 bg-blue-50 shadow-md"
-                      : ehDinheiro
-                        ? "border-green-300 bg-green-50"
-                        : "border-gray-200"
-                  } hover:shadow-sm transition-shadow cursor-pointer select-none`}
-                  title="Clique para ver detalhes dos recebimentos"
-                  onClick={() => carregarVendasForma(forma)}
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center space-x-2">
-                        <div
-                          className={`w-2 h-2 rounded-full ${
-                            forma === "Dinheiro"
-                              ? "bg-green-500"
-                              : forma === "PIX"
-                                ? "bg-purple-500"
-                                : forma.includes("Débito")
-                                  ? "bg-blue-500"
-                                  : forma.includes("Crédito")
-                                    ? "bg-orange-500"
-                                    : "bg-gray-400"
-                          }`}
-                        ></div>
-                        <span className="text-xs font-semibold text-gray-700">{forma}</span>
-                        {ehDinheiro && (
-                          <span className="text-xs bg-green-600 text-white px-1.5 py-0.5 rounded">
-                            CAIXA
-                          </span>
-                        )}
-                      </div>
-                      <div className="text-xs text-gray-500 mt-0.5">
-                        {dados.quantidade} {dados.tipo_contagem || "pagamento"}
-                        {dados.quantidade !== 1 ? "s" : ""}
-                      </div>
+        <h5 className="mt-4 mb-2 text-sm font-bold text-gray-700">Formas de Pagamento</h5>
+        <div className="grid grid-cols-2 gap-2">
+          {formas.map(([forma, dados]) => {
+            const ehDinheiro = forma === "Dinheiro";
+            return (
+              <div
+                key={forma}
+                className={`bg-white rounded-lg p-3 border ${
+                  formaExpandida === forma
+                    ? "border-blue-400 bg-blue-50 shadow-md"
+                    : ehDinheiro
+                      ? "border-green-300 bg-green-50"
+                      : "border-gray-200"
+                } hover:shadow-sm transition-shadow cursor-pointer select-none`}
+                title="Clique para ver detalhes dos recebimentos"
+                onClick={() => carregarVendasForma(forma)}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex-1">
+                    <div className="flex items-center space-x-2">
+                      <div
+                        className={`w-2 h-2 rounded-full ${
+                          forma === "Dinheiro"
+                            ? "bg-green-500"
+                            : forma === "PIX"
+                              ? "bg-purple-500"
+                              : forma.includes("Débito")
+                                ? "bg-blue-500"
+                                : forma.includes("Crédito")
+                                  ? "bg-orange-500"
+                                  : "bg-gray-400"
+                        }`}
+                      ></div>
+                      <span className="text-xs font-semibold text-gray-700">{forma}</span>
+                      {ehDinheiro && (
+                        <span className="text-xs bg-green-600 text-white px-1.5 py-0.5 rounded">
+                          CAIXA
+                        </span>
+                      )}
                     </div>
-                    <div className="text-right">
-                      <div className="text-sm font-bold text-gray-900">
-                        {formatMoneyBRL(dados.total)}
-                      </div>
+                    <div className="text-xs text-gray-500 mt-0.5">
+                      {dados.quantidade} {dados.tipo_contagem || "pagamento"}
+                      {dados.quantidade !== 1 ? "s" : ""}
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-sm font-bold text-gray-900">
+                      {formatMoneyBRL(dados.total)}
                     </div>
                   </div>
                 </div>
-              );
-            })}
-            {formas.length === 0 && (
-              <p className="col-span-2 text-xs text-gray-600">Nenhum pagamento registrado.</p>
+              </div>
+            );
+          })}
+          {formas.length === 0 && (
+            <p className="col-span-2 text-xs text-gray-600">Nenhum pagamento registrado.</p>
+          )}
+        </div>
+
+        {recebimentosPorData.length > 0 && (
+          <details className="mt-3 rounded border border-blue-200 bg-white px-3 py-2 text-xs">
+            <summary className="cursor-pointer font-semibold text-blue-800">
+              Conferir por data da venda
+            </summary>
+            <p className="mt-2 text-gray-600">
+              O total do caixa pode incluir pagamentos de vendas feitas em outras datas.
+            </p>
+            <div className="mt-2 space-y-2">
+              {recebimentosPorData.map(([data, formasDoDia]) => (
+                <div key={data} className="rounded border border-gray-200 p-2">
+                  <div className="flex justify-between font-bold text-gray-800">
+                    <span>{rotuloData(data)}</span>
+                    <span>{formatMoneyBRL(totalPorData(formasDoDia))}</span>
+                  </div>
+                  {Object.entries(formasDoDia).map(([forma, dados]) => (
+                    <div key={forma} className="flex justify-between text-gray-600">
+                      <span>
+                        {forma} · {dados.quantidade}
+                      </span>
+                      <span>{formatMoneyBRL(dados.total)}</span>
+                    </div>
+                  ))}
+                </div>
+              ))}
+            </div>
+          </details>
+        )}
+
+        {/* Painel de detalhes dos recebimentos por forma */}
+        {formaExpandida && (
+          <div className="mt-3 border-t border-blue-200 pt-3">
+            <div className="flex items-center justify-between mb-2">
+              <h5 className="text-xs font-bold text-gray-700">Recebimentos — {formaExpandida}</h5>
+              <button
+                onClick={() => setFormaExpandida(null)}
+                className="text-xs text-gray-400 hover:text-gray-600"
+              >
+                ✕ fechar
+              </button>
+            </div>
+            {loadingVendas === formaExpandida ? (
+              <div className="text-xs text-gray-500 py-2">Carregando...</div>
+            ) : (
+              <div className="space-y-1 max-h-44 overflow-y-auto">
+                {(vendasDetalhe[formaExpandida] || []).length === 0 ? (
+                  <div className="text-xs text-gray-400">Nenhuma venda encontrada.</div>
+                ) : (
+                  (vendasDetalhe[formaExpandida] || []).map((v) => (
+                    <div
+                      key={v.id}
+                      className="flex justify-between items-center text-xs py-1.5 px-2 rounded bg-white border border-gray-100"
+                    >
+                      <div>
+                        <SaleReference
+                          sale={v}
+                          showPrefix={false}
+                          valueClassName="font-semibold text-gray-700"
+                        />
+                        <CustomerIdentity
+                          className="ml-1.5"
+                          fallback="Consumidor"
+                          layout="inline"
+                          nameClassName="text-gray-500"
+                          venda={v}
+                        />
+                      </div>
+                      <div className="text-right">
+                        <span className="text-gray-400 mr-2">
+                          {v.data_venda ? `${rotuloData(v.data_venda)} ` : ""}
+                          {v.hora_venda}
+                        </span>
+                        <span className="font-bold text-gray-800">
+                          {formatMoneyBRL(v.valor_nesta_forma ?? v.total)}
+                        </span>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
             )}
           </div>
+        )}
 
-          {recebimentosPorData.length > 0 && (
-            <details className="mt-3 rounded border border-blue-200 bg-white px-3 py-2 text-xs">
-              <summary className="cursor-pointer font-semibold text-blue-800">
-                Conferir por data da venda
-              </summary>
-              <p className="mt-2 text-gray-600">
-                O total do caixa pode incluir pagamentos de vendas feitas em outras datas.
-              </p>
-              <div className="mt-2 space-y-2">
-                {recebimentosPorData.map(([data, formasDoDia]) => (
-                  <div key={data} className="rounded border border-gray-200 p-2">
-                    <div className="flex justify-between font-bold text-gray-800">
-                      <span>{rotuloData(data)}</span>
-                      <span>{formatMoneyBRL(totalPorData(formasDoDia))}</span>
-                    </div>
-                    {Object.entries(formasDoDia).map(([forma, dados]) => (
-                      <div key={forma} className="flex justify-between text-gray-600">
-                        <span>
-                          {forma} · {dados.quantidade}
-                        </span>
-                        <span>{formatMoneyBRL(dados.total)}</span>
-                      </div>
-                    ))}
-                  </div>
-                ))}
-              </div>
-            </details>
-          )}
-
-          {/* Painel de detalhes dos recebimentos por forma */}
-          {formaExpandida && (
-            <div className="mt-3 border-t border-blue-200 pt-3">
-              <div className="flex items-center justify-between mb-2">
-                <h5 className="text-xs font-bold text-gray-700">Recebimentos — {formaExpandida}</h5>
-                <button
-                  onClick={() => setFormaExpandida(null)}
-                  className="text-xs text-gray-400 hover:text-gray-600"
-                >
-                  ✕ fechar
-                </button>
-              </div>
-              {loadingVendas === formaExpandida ? (
-                <div className="text-xs text-gray-500 py-2">Carregando...</div>
-              ) : (
-                <div className="space-y-1 max-h-44 overflow-y-auto">
-                  {(vendasDetalhe[formaExpandida] || []).length === 0 ? (
-                    <div className="text-xs text-gray-400">Nenhuma venda encontrada.</div>
-                  ) : (
-                    (vendasDetalhe[formaExpandida] || []).map((v) => (
-                      <div
-                        key={v.id}
-                        className="flex justify-between items-center text-xs py-1.5 px-2 rounded bg-white border border-gray-100"
-                      >
-                        <div>
-                          <SaleReference
-                            sale={v}
-                            showPrefix={false}
-                            valueClassName="font-semibold text-gray-700"
-                          />
-                          <CustomerIdentity
-                            className="ml-1.5"
-                            fallback="Consumidor"
-                            layout="inline"
-                            nameClassName="text-gray-500"
-                            venda={v}
-                          />
-                        </div>
-                        <div className="text-right">
-                          <span className="text-gray-400 mr-2">
-                            {v.data_venda ? `${rotuloData(v.data_venda)} ` : ""}
-                            {v.hora_venda}
-                          </span>
-                          <span className="font-bold text-gray-800">
-                            {formatMoneyBRL(v.valor_nesta_forma ?? v.total)}
-                          </span>
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </div>
-              )}
-            </div>
-          )}
-
-          <div className="mt-3 pt-3 border-t border-blue-200 text-xs text-gray-600">
-            💡 <strong>Dica:</strong> Apenas <strong>Dinheiro</strong> afeta o saldo físico do
-            caixa. As demais formas são informativas.
-          </div>
+        <div className="mt-3 pt-3 border-t border-blue-200 text-xs text-gray-600">
+          💡 <strong>Dica:</strong> Apenas <strong>Dinheiro</strong> afeta o saldo físico do caixa.
+          As demais formas são informativas.
         </div>
+      </div>
       {imprimindo &&
         createPortal(
           <div id="caixa-formas-impressao">

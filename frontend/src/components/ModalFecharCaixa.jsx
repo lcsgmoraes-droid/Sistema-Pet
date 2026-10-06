@@ -1,6 +1,12 @@
 import { useState, useEffect } from "react";
 import { AlertCircle, X } from "lucide-react";
-import { baixarPdfCaixa, fecharCaixa, obterResumoCaixa, obterVendasCaixa, validarCaixaAtual } from "../api/caixa";
+import {
+  baixarPdfCaixa,
+  fecharCaixa,
+  obterResumoCaixa,
+  obterVendasCaixa,
+  validarCaixaAtual,
+} from "../api/caixa";
 import ModalFecharCaixaContent from "./caixa/ModalFecharCaixaContent";
 import ImpressaoTermicaCaixa from "./caixa/ImpressaoTermicaCaixa";
 import { atualizarObservacaoComContagem } from "../utils/caixaContagem";
@@ -230,46 +236,49 @@ export default function ModalFecharCaixa({ caixaId, onClose, onSuccess }) {
 
   return (
     <>
-    <ModalFecharCaixaContent
-      {...{
-        calcularTotalNotas,
-        atualizarQuantidadeNota,
-        atualizarValorMoedas,
-        aplicarContagem,
-        limparContagem,
-        carregarVendasForma,
-        confirmandoDiferenca,
-        diferenca,
-        erro,
-        executarFechamento,
-        formaExpandida,
-        handleFechar,
-        loadingVendas,
-        mostrarContagem,
-        mostrarDicasDiferenca,
-        notas,
-        observacoes,
-        onClose,
-        onSuccess,
-        baixarPdf: () => baixarPdfCaixa(caixaId, resumo.caixa.numero_caixa).catch(() => setErro("Não foi possível gerar o PDF.")),
-        imprimirTermico: () => setImprimirRelatorio(true),
-        resumo,
-        salvando,
-        setConfirmandoDiferenca,
-        setFormaExpandida,
-        setMostrarContagem,
-        setMostrarDicasDiferenca,
-        setObservacoes,
-        setValorContado,
-        sucesso,
-        valorContado,
-        vendasDetalhe,
-      }}
-    />
-    <ImpressaoTermicaCaixa
-      documento={imprimirRelatorio ? { resumo } : null}
-      onAfterPrint={() => setImprimirRelatorio(false)}
-    />
+      <ModalFecharCaixaContent
+        {...{
+          calcularTotalNotas,
+          atualizarQuantidadeNota,
+          atualizarValorMoedas,
+          aplicarContagem,
+          limparContagem,
+          carregarVendasForma,
+          confirmandoDiferenca,
+          diferenca,
+          erro,
+          executarFechamento,
+          formaExpandida,
+          handleFechar,
+          loadingVendas,
+          mostrarContagem,
+          mostrarDicasDiferenca,
+          notas,
+          observacoes,
+          onClose,
+          onSuccess,
+          baixarPdf: () =>
+            baixarPdfCaixa(caixaId, resumo.caixa.numero_caixa).catch(() =>
+              setErro("Não foi possível gerar o PDF."),
+            ),
+          imprimirTermico: () => setImprimirRelatorio(true),
+          resumo,
+          salvando,
+          setConfirmandoDiferenca,
+          setFormaExpandida,
+          setMostrarContagem,
+          setMostrarDicasDiferenca,
+          setObservacoes,
+          setValorContado,
+          sucesso,
+          valorContado,
+          vendasDetalhe,
+        }}
+      />
+      <ImpressaoTermicaCaixa
+        documento={imprimirRelatorio ? { resumo } : null}
+        onAfterPrint={() => setImprimirRelatorio(false)}
+      />
     </>
   );
 }

@@ -134,10 +134,7 @@ export function CampanhasParametrosCashbackSection({ num, set }) {
           value={num("cashback_use_limit_percent")}
           placeholder="Em branco = sem limite"
           onChange={(e) =>
-            set(
-              "cashback_use_limit_percent",
-              e.target.value === "" ? null : Number(e.target.value),
-            )
+            set("cashback_use_limit_percent", e.target.value === "" ? null : Number(e.target.value))
           }
         />
         <p className="text-xs text-gray-500 mt-1">

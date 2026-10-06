@@ -200,7 +200,11 @@ export default function ModalMovimentacoesCaixa({ caixaId, onClose }) {
         </div>
       </div>
       <ImpressaoTermicaCaixa
-        documento={movimentoImpressao ? { movimento: movimentoImpressao, numeroCaixa: caixa?.numero_caixa } : null}
+        documento={
+          movimentoImpressao
+            ? { movimento: movimentoImpressao, numeroCaixa: caixa?.numero_caixa }
+            : null
+        }
         onAfterPrint={() => setMovimentoImpressao(null)}
       />
     </div>

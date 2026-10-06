@@ -3,7 +3,7 @@ import { createPortal } from "react-dom";
 import { formatMoneyBRL } from "../../utils/formatters";
 import { useDadosCupomEmpresa } from "../../hooks/useDadosCupomEmpresa";
 
-const dataHora = (valor) => valor ? new Date(valor).toLocaleString("pt-BR") : "—";
+const dataHora = (valor) => (valor ? new Date(valor).toLocaleString("pt-BR") : "—");
 
 export default function ImpressaoTermicaCaixa({ documento, onAfterPrint }) {
   const { carregandoEmpresa, dadosEmpresa } = useDadosCupomEmpresa();
@@ -21,24 +21,28 @@ export default function ImpressaoTermicaCaixa({ documento, onAfterPrint }) {
   if (!documento) return null;
 
   const { movimento, resumo } = documento;
-  const linhas = resumo ? [
-    ["Abertura", resumo.caixa.valor_abertura],
-    ["Total vendido", resumo.total_vendido],
-    ["Total recebido", resumo.total_recebido],
-    ...Object.entries(resumo.vendas_por_forma_pagamento || {}).map(([forma, dados]) => [
-      ["crediario", "crediário", "boleto"].includes(forma.trim().toLocaleLowerCase("pt-BR")) ? `${forma} (a prazo)` : forma,
-      dados.total,
-    ]),
-    ["Suprimentos", resumo.totais.suprimentos],
-    ["Entradas em dinheiro", resumo.totais.vendas + resumo.totais.suprimentos],
-    ["Sangrias", resumo.totais.sangrias],
-    ["Despesas", resumo.totais.despesas],
-    ["Devoluções", resumo.totais.devolucoes],
-    ["Transferências", resumo.totais.transferencias],
-    ["Saldo esperado em dinheiro", resumo.totais.saldo_atual],
-    ["Valor contado", resumo.caixa.valor_informado],
-    ["Diferença", resumo.caixa.diferenca],
-  ] : [];
+  const linhas = resumo
+    ? [
+        ["Abertura", resumo.caixa.valor_abertura],
+        ["Total vendido", resumo.total_vendido],
+        ["Total recebido", resumo.total_recebido],
+        ...Object.entries(resumo.vendas_por_forma_pagamento || {}).map(([forma, dados]) => [
+          ["crediario", "crediário", "boleto"].includes(forma.trim().toLocaleLowerCase("pt-BR"))
+            ? `${forma} (a prazo)`
+            : forma,
+          dados.total,
+        ]),
+        ["Suprimentos", resumo.totais.suprimentos],
+        ["Entradas em dinheiro", resumo.totais.vendas + resumo.totais.suprimentos],
+        ["Sangrias", resumo.totais.sangrias],
+        ["Despesas", resumo.totais.despesas],
+        ["Devoluções", resumo.totais.devolucoes],
+        ["Transferências", resumo.totais.transferencias],
+        ["Saldo esperado em dinheiro", resumo.totais.saldo_atual],
+        ["Valor contado", resumo.caixa.valor_informado],
+        ["Diferença", resumo.caixa.diferenca],
+      ]
+    : [];
 
   return createPortal(
     <div id="documento-termico-caixa">
@@ -62,33 +66,67 @@ export default function ImpressaoTermicaCaixa({ documento, onAfterPrint }) {
           <h1>{dadosEmpresa.nome_fantasia || dadosEmpresa.razao_social || "ESTABELECIMENTO"}</h1>
           {dadosEmpresa.cnpj && <p style={{ textAlign: "center" }}>CNPJ: {dadosEmpresa.cnpj}</p>}
           <h1>COMPROVANTE DE {movimento.tipo === "sangria" ? "SANGRIA" : "SUPRIMENTO"}</h1>
-          <p>Caixa #{documento.numeroCaixa} · Lançamento #{movimento.id}</p>
+          <p>
+            Caixa #{documento.numeroCaixa} · Lançamento #{movimento.id}
+          </p>
           <p>Data: {dataHora(movimento.data_movimento)}</p>
           <p>Responsável: {movimento.usuario_nome}</p>
           <hr />
-          <div className="linha"><strong>Valor</strong><strong>{formatMoneyBRL(movimento.valor)}</strong></div>
-          <p>{movimento.tipo === "sangria" ? "Destino" : "Origem"}: {(movimento.tipo === "sangria" ? movimento.conta_destino_nome : movimento.conta_origem_nome) || "Não informado"}</p>
+          <div className="linha">
+            <strong>Valor</strong>
+            <strong>{formatMoneyBRL(movimento.valor)}</strong>
+          </div>
+          <p>
+            {movimento.tipo === "sangria" ? "Destino" : "Origem"}:{" "}
+            {(movimento.tipo === "sangria"
+              ? movimento.conta_destino_nome
+              : movimento.conta_origem_nome) || "Não informado"}
+          </p>
           <p>Motivo: {movimento.descricao || "Não informado"}</p>
           <hr />
-          <div className="assinatura">____________________________<br />Assinatura de quem entregou</div>
-          <div className="assinatura">____________________________<br />Assinatura de quem recebeu</div>
+          <div className="assinatura">
+            ____________________________
+            <br />
+            Assinatura de quem entregou
+          </div>
+          <div className="assinatura">
+            ____________________________
+            <br />
+            Assinatura de quem recebeu
+          </div>
         </>
       ) : (
         <>
           <h1>{dadosEmpresa.nome_fantasia || dadosEmpresa.razao_social || "ESTABELECIMENTO"}</h1>
           {dadosEmpresa.cnpj && <p style={{ textAlign: "center" }}>CNPJ: {dadosEmpresa.cnpj}</p>}
           <h1>FECHAMENTO DE CAIXA</h1>
-          <p>Caixa #{resumo.caixa.numero_caixa} · {resumo.caixa.usuario_nome}</p>
+          <p>
+            Caixa #{resumo.caixa.numero_caixa} · {resumo.caixa.usuario_nome}
+          </p>
           <p>Abertura: {dataHora(resumo.caixa.data_abertura)}</p>
           <p>Fechamento: {dataHora(resumo.caixa.data_fechamento)}</p>
           <hr />
           {linhas.map(([rotulo, valor]) => (
-            <div className="linha" key={rotulo}><span>{rotulo}</span><strong>{formatMoneyBRL(valor ?? 0)}</strong></div>
+            <div className="linha" key={rotulo}>
+              <span>{rotulo}</span>
+              <strong>{formatMoneyBRL(valor ?? 0)}</strong>
+            </div>
           ))}
           <hr />
-          <p>Vendido e recebido são indicadores separados. Formas a prazo não entram no recebido. Abertura e suprimentos não são vendas.</p>
-          <div className="assinatura">____________________________<br />Responsável pelo caixa</div>
-          <div className="assinatura">____________________________<br />Conferente</div>
+          <p>
+            Vendido e recebido são indicadores separados. Formas a prazo não entram no recebido.
+            Abertura e suprimentos não são vendas.
+          </p>
+          <div className="assinatura">
+            ____________________________
+            <br />
+            Responsável pelo caixa
+          </div>
+          <div className="assinatura">
+            ____________________________
+            <br />
+            Conferente
+          </div>
         </>
       )}
     </div>,

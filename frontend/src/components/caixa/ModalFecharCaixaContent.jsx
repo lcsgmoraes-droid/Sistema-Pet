@@ -199,7 +199,9 @@ export default function ModalFecharCaixaContent({
                 <AlertCircle className="w-6 h-6 text-red-600 flex-shrink-0 mt-0.5" />
                 <div>
                   <div className="font-bold text-red-800 text-sm mb-1">
-                    {sucesso ? "Não foi possível gerar o relatório" : "Não foi possível fechar o caixa"}
+                    {sucesso
+                      ? "Não foi possível gerar o relatório"
+                      : "Não foi possível fechar o caixa"}
                   </div>
                   <div className="text-red-700 text-sm">{erro}</div>
                 </div>
@@ -213,11 +215,31 @@ export default function ModalFecharCaixaContent({
                   <CheckCircle className="w-6 h-6 text-green-600 flex-shrink-0" />
                   <div className="font-bold text-green-800">Caixa fechado com sucesso!</div>
                 </div>
-                <p className="text-sm text-green-900">O relatório está pronto para imprimir e assinar.</p>
+                <p className="text-sm text-green-900">
+                  O relatório está pronto para imprimir e assinar.
+                </p>
                 <div className="flex flex-wrap gap-2">
-                  <button type="button" onClick={baixarPdf} className="inline-flex items-center gap-2 rounded-lg bg-white border border-green-300 px-3 py-2 font-medium text-green-900"><Download className="h-4 w-4" /> Baixar PDF</button>
-                  <button type="button" onClick={imprimirTermico} className="inline-flex items-center gap-2 rounded-lg bg-white border border-green-300 px-3 py-2 font-medium text-green-900"><Printer className="h-4 w-4" /> Imprimir na térmica</button>
-                  <button type="button" onClick={onSuccess} className="rounded-lg bg-green-700 px-3 py-2 font-medium text-white">Concluir</button>
+                  <button
+                    type="button"
+                    onClick={baixarPdf}
+                    className="inline-flex items-center gap-2 rounded-lg bg-white border border-green-300 px-3 py-2 font-medium text-green-900"
+                  >
+                    <Download className="h-4 w-4" /> Baixar PDF
+                  </button>
+                  <button
+                    type="button"
+                    onClick={imprimirTermico}
+                    className="inline-flex items-center gap-2 rounded-lg bg-white border border-green-300 px-3 py-2 font-medium text-green-900"
+                  >
+                    <Printer className="h-4 w-4" /> Imprimir na térmica
+                  </button>
+                  <button
+                    type="button"
+                    onClick={onSuccess}
+                    className="rounded-lg bg-green-700 px-3 py-2 font-medium text-white"
+                  >
+                    Concluir
+                  </button>
                 </div>
               </div>
             )}
