@@ -28,7 +28,11 @@ from app.financeiro_models import ContaReceber
 from app.produtos_models import EstoqueMovimentacao, Produto
 from app.utils.timezone import now_brasilia
 from app.vendas.devolucao_dre import custo_original_item_devolvido
-from app.vendas.devolucao_valores import cotar_devolucao, validar_itens_devolucao
+from app.vendas.devolucao_valores import (
+    cotar_devolucao,
+    quantidades_devolvidas_por_item,
+    validar_itens_devolucao,
+)
 from app.vendas.routes_common import (
     _obter_cliente_ou_404,
     _validar_tenant_e_obter_usuario,
@@ -254,6 +258,67 @@ def _hash_requisicao_devolucao(venda_id: int, dados: dict, itens: list) -> str:
         corpo, ensure_ascii=False, sort_keys=True, separators=(",", ":"), default=str
     )
     return hashlib.sha256(canonico.encode("utf-8")).hexdigest()
+
+
+@router.get("/{venda_id}/devolucao/saldos")
+def consultar_saldos_devolucao(
+    venda_id: int,
+    db: Session = Depends(get_session),
+    user_and_tenant=Depends(get_current_user_and_tenant),
+):
+    """Mostra o saldo de cada linha da venda antes de selecionar a devolução."""
+    _, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
+    venda = db.query(Venda).filter_by(id=venda_id, tenant_id=tenant_id).first()
+    if not venda:
+        raise HTTPException(status_code=404, detail="Venda não encontrada")
+
+    itens_venda = (
+        db.query(VendaItem)
+        .filter(VendaItem.venda_id == venda_id, VendaItem.tenant_id == tenant_id)
+        .all()
+    )
+    eventos_anteriores = (
+        db.query(VendaDevolucao)
+        .filter(
+            VendaDevolucao.tenant_id == tenant_id,
+            VendaDevolucao.venda_id == venda_id,
+        )
+        .all()
+    )
+    if (
+        str(venda.status or "").lower()
+        in {
+            "finalizada_devolucao",
+            "finalizada_devolucao_parcial",
+        }
+        and not eventos_anteriores
+    ):
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                "Esta venda tem devolução anterior sem saldo rastreável. "
+                "Concilie manualmente o histórico antes de nova devolução."
+            ),
+        )
+
+    devolvidas = quantidades_devolvidas_por_item(eventos_anteriores)
+    return {
+        "venda_id": venda_id,
+        "itens": [
+            {
+                "item_id": item.id,
+                "quantidade_vendida": float(item.quantidade),
+                "quantidade_devolvida": float(devolvidas.get(item.id, 0)),
+                "quantidade_disponivel": float(
+                    max(
+                        Decimal("0"),
+                        Decimal(str(item.quantidade)) - devolvidas.get(item.id, 0),
+                    )
+                ),
+            }
+            for item in itens_venda
+        ],
+    }
 
 
 @router.post("/{venda_id}/devolucao/previa")
@@ -959,8 +1024,14 @@ def registrar_devolucao(
         # Recebimentos e entradas realizados permanecem como historico. O evento
         # da devolucao registra a deducao da DRE e a saida de caixa, se houver.
 
-        # 🆕 ATUALIZAR STATUS DA VENDA
-        if cotacao.valor_acumulado >= Decimal(str(venda.total or 0)):
+        # O frete não é reembolsado na devolução dos itens; o status total
+        # depende da quantidade devolvida, não do valor total com frete.
+        todos_itens_devolvidos = bool(todos_itens_venda) and all(
+            devolvido_por_item[item.id] + solicitado_por_item[item.id]
+            >= Decimal(str(item.quantidade))
+            for item in todos_itens_venda
+        )
+        if todos_itens_devolvidos:
             venda.status = "devolvida_total"
         else:
             venda.status = "finalizada_devolucao"
@@ -969,8 +1040,8 @@ def registrar_devolucao(
         from datetime import datetime
 
         # Determinar tipo de devolução
-        if cotacao.valor_acumulado >= Decimal(str(venda.total or 0)):
-            tipo_desc = "Devolução total"
+        if todos_itens_devolvidos:
+            tipo_desc = "Devolução total dos itens"
         else:
             # Verificar se tem componentes de KIT
             tem_componentes = any(

@@ -172,7 +172,7 @@ def _montar_alertas_devolucoes(dados_canais: dict) -> list[dict]:
                     "codigo": "devolucao_custo_original_pendente",
                     "nivel": "atencao",
                     "canal": canal,
-                    "titulo": f"Custo de devolucao a conferir — {config['nome']}",
+                    "titulo": f"Custo de devolução a conferir — {config['nome']}",
                     "mensagem": (
                         f"{len(pendentes)} devolucao(oes) tiveram a receita deduzida, "
                         "mas ao menos um item nao possui custo original comprovado. "
@@ -205,7 +205,7 @@ def _montar_alertas_devolucoes(dados_canais: dict) -> list[dict]:
                     "codigo": "devolucao_imposto_a_conciliar",
                     "nivel": "atencao",
                     "canal": canal,
-                    "titulo": f"Imposto de devolucao a conferir — {config['nome']}",
+                    "titulo": f"Imposto de devolução a conferir — {config['nome']}",
                     "mensagem": (
                         "A devolucao nao estorna automaticamente os impostos "
                         "estimados sobre a venda. Confirme o documento fiscal e "

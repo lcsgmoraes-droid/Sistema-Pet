@@ -1253,8 +1253,9 @@ def test_valor_acumulado_das_devolucoes_nao_excede_total_pago():
     db.commit.assert_not_called()
 
 
+@pytest.mark.parametrize("taxa_entrega", [Decimal("0"), Decimal("10")])
 def test_devolucoes_parciais_com_desconto_pagam_liquido_e_fecham_venda(
-    monkeypatch, preflight_beneficios_mock
+    monkeypatch, preflight_beneficios_mock, taxa_entrega
 ):
     monkeypatch.setattr(
         "app.campaigns.sale_return_service.reconcile_purchase_benefits_on_return",
@@ -1267,7 +1268,8 @@ def test_devolucoes_parciais_com_desconto_pagam_liquido_e_fecham_venda(
         id=8,
         cliente_id=cliente.id,
         numero_venda="VEN-8",
-        total=Decimal("90"),
+        total=Decimal("90") + taxa_entrega,
+        taxa_entrega=taxa_entrega,
         observacoes="",
         status="finalizada",
     )
@@ -1353,6 +1355,7 @@ def test_devolucoes_parciais_com_desconto_pagam_liquido_e_fecham_venda(
 
     assert segunda["status_venda"] == "devolvida_total"
     assert segunda["valor_total_devolucao"] == 45.0
+    assert "Tipo: Devolução total dos itens" in venda.observacoes
     assert cliente.credito == Decimal("90")
     assert db.commit.call_count == 2
 
