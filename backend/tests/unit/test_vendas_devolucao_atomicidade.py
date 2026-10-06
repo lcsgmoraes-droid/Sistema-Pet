@@ -1,5 +1,5 @@
 from decimal import Decimal
-from contextlib import nullcontext
+from contextlib import contextmanager, nullcontext
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock
@@ -10,6 +10,7 @@ from fastapi import HTTPException
 
 from app.financeiro_models import CategoriaFinanceira, ContaReceber, LancamentoManual
 from app.models import Cliente
+from app.produtos_models import EstoqueMovimentacao, Produto
 from app.vendas.devolucoes_routes import (
     _recebivel_exige_conciliacao,
     _validar_estoque_devolucao_seguro,
@@ -663,6 +664,10 @@ def test_estoque_nao_recompoe_kit_virtual_ou_lote_sem_conciliacao(
         "app.vendas.devolucoes_routes.resolver_tenant_estoque_item",
         lambda *_args: ("estoque", False),
     )
+    monkeypatch.setattr(
+        "app.vendas.devolucoes_routes._produto_estoque_original",
+        lambda _db, item_venda, _tenant: (item_venda.produto, "estoque"),
+    )
     db = MagicMock()
 
     with pytest.raises(HTTPException) as erro:
@@ -707,6 +712,10 @@ def test_estoque_exige_saida_original_sem_fifo_de_lote(
         lambda *_args: ("estoque", False),
     )
     monkeypatch.setattr(
+        "app.vendas.devolucoes_routes._produto_estoque_original",
+        lambda _db, item_venda, _tenant: (item_venda.produto, "estoque"),
+    )
+    monkeypatch.setattr(
         "app.vendas.devolucoes_routes.contexto_tenant_estoque",
         lambda *_args: nullcontext("estoque"),
     )
@@ -722,6 +731,154 @@ def test_estoque_exige_saida_original_sem_fifo_de_lote(
         _validar_estoque_devolucao_seguro(
             db, 8, "tenant", [item], [{"item_id": 3, "quantidade": 1}]
         )
+
+
+def test_previa_e_registro_aceitam_produto_de_estoque_compartilhado(monkeypatch):
+    tenant_venda = uuid4()
+    tenant_estoque = uuid4()
+    usuario = SimpleNamespace(id=22, nome="Atendente")
+    produto = SimpleNamespace(
+        id=11,
+        nome="Produto do grupo",
+        controlar_estoque=True,
+        tipo_produto="SIMPLES",
+    )
+    item = SimpleNamespace(
+        id=3,
+        produto_id=produto.id,
+        produto=None,
+        tipo="produto",
+        lote_id=None,
+        estoque_origem_tenant_id=tenant_estoque,
+        quantidade=Decimal("1"),
+        preco_unitario=Decimal("50"),
+        subtotal=Decimal("50"),
+        servico_descricao=None,
+    )
+    cliente = SimpleNamespace(id=47, nome="Cliente", credito=Decimal("0"))
+    venda = SimpleNamespace(
+        id=8,
+        cliente_id=cliente.id,
+        cliente=cliente,
+        numero_venda="VEN-8",
+        total=Decimal("50"),
+        taxa_entrega=Decimal("0"),
+        observacoes="",
+        status="finalizada",
+        itens=[item],
+        rentabilidade_snapshot={
+            "snapshot_version": 5,
+            "itens": [
+                {
+                    "produto_id": produto.id,
+                    "quantidade": 1,
+                    "preco_unitario": 50,
+                    "custo_total": 15,
+                }
+            ],
+        },
+    )
+    consultas = {}
+    for modelo, resultado in (
+        (Venda, venda),
+        (VendaItem, [item]),
+        (VendaDevolucao, []),
+        (Cliente, cliente),
+        (ContaReceber, []),
+    ):
+        consulta = MagicMock()
+        consulta.filter.return_value = consulta
+        consulta.filter_by.return_value = consulta
+        consulta.with_for_update.return_value = consulta
+        consulta.populate_existing.return_value = consulta
+        consulta.first.return_value = None if modelo is VendaDevolucao else resultado
+        consulta.all.return_value = resultado if isinstance(resultado, list) else []
+        consultas[modelo] = consulta
+
+    tenant_ativo = {"valor": None}
+    contextos = []
+
+    @contextmanager
+    def contexto_estoque(origem, venda_tenant):
+        assert str(origem) == str(tenant_estoque)
+        assert str(venda_tenant) == str(tenant_venda)
+        contextos.append(str(origem))
+        tenant_ativo["valor"] = str(origem)
+        try:
+            yield tenant_estoque
+        finally:
+            tenant_ativo["valor"] = None
+
+    consulta_produto = MagicMock()
+    consulta_produto.filter.return_value = consulta_produto
+    consulta_produto.first.side_effect = lambda: (
+        produto if tenant_ativo["valor"] == str(tenant_estoque) else None
+    )
+    consulta_saida = MagicMock()
+    consulta_saida.filter.return_value = consulta_saida
+    consulta_saida.all.return_value = [
+        SimpleNamespace(quantidade=1, lotes_consumidos=None)
+    ]
+    consulta_agregada = MagicMock()
+    consulta_agregada.filter.return_value = consulta_agregada
+    consulta_agregada.scalar.return_value = 0
+    db = MagicMock()
+
+    def consultar(modelo):
+        if modelo is Produto:
+            assert tenant_ativo["valor"] == str(tenant_estoque)
+            return consulta_produto
+        if modelo is EstoqueMovimentacao:
+            assert tenant_ativo["valor"] == str(tenant_estoque)
+            return consulta_saida
+        return consultas.get(modelo, consulta_agregada)
+
+    db.query.side_effect = consultar
+    entradas = []
+    monkeypatch.setattr(
+        "app.vendas.devolucoes_routes.contexto_tenant_estoque", contexto_estoque
+    )
+    monkeypatch.setattr(
+        "app.vendas.devolucoes_routes.EstoqueService.estornar_estoque",
+        lambda **kwargs: entradas.append(kwargs) or {"produto_nome": produto.nome},
+    )
+    monkeypatch.setattr(
+        "app.vendas.devolucoes_routes.log_action", lambda **_kwargs: None
+    )
+    itens = [{"item_id": item.id, "quantidade": 1}]
+
+    previa = prever_devolucao(
+        venda_id=venda.id,
+        dados={"itens": itens},
+        db=db,
+        user_and_tenant=(usuario, tenant_venda),
+    )
+    resultado = registrar_devolucao(
+        venda_id=venda.id,
+        dados={
+            "itens": itens,
+            "motivo": "Troca",
+            "gerar_credito": True,
+            "valor_previsto": previa["valor_total_devolucao"],
+            "chave_operacao": str(uuid4()),
+        },
+        db=db,
+        user_and_tenant=(usuario, tenant_venda),
+    )
+
+    assert previa["valor_total_devolucao"] == 50
+    assert resultado["valor_total_devolucao"] == 50
+    assert resultado["itens_devolvidos"][0]["produto_nome"] == produto.nome
+    assert cliente.credito == Decimal("50")
+    assert entradas[0]["tenant_id"] == tenant_estoque
+    assert entradas[0]["user_id"] == 0
+    assert entradas[0]["valor_total_override"] == 15.0
+    assert item.produto is None
+    assert len(consulta_produto.filter.call_args_list) == 2
+    for chamada in consulta_produto.filter.call_args_list:
+        assert chamada.args[0].right.value == produto.id
+        assert str(chamada.args[1].right.value) == str(tenant_estoque)
+    assert len(contextos) >= 4
 
 
 @pytest.mark.parametrize("operacao", [prever_devolucao, registrar_devolucao])
@@ -768,6 +925,10 @@ def test_previa_e_registro_bloqueiam_estoque_que_nao_pode_ser_recomposto(
     monkeypatch.setattr(
         "app.vendas.devolucoes_routes.resolver_tenant_estoque_item",
         lambda *_args: ("estoque", False),
+    )
+    monkeypatch.setattr(
+        "app.vendas.devolucoes_routes._produto_estoque_original",
+        lambda _db, item_venda, _tenant: (item_venda.produto, "estoque"),
     )
 
     with pytest.raises(HTTPException) as erro:

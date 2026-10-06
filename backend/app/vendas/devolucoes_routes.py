@@ -24,7 +24,7 @@ from app.empresa_grupo_estoque_compartilhado_service import (
 )
 from app.estoque.service import EstoqueService
 from app.financeiro_models import ContaReceber
-from app.produtos_models import EstoqueMovimentacao
+from app.produtos_models import EstoqueMovimentacao, Produto
 from app.utils.timezone import now_brasilia
 from app.vendas.devolucao_dre import custo_original_item_devolvido
 from app.vendas.devolucao_valores import cotar_devolucao, validar_itens_devolucao
@@ -121,6 +121,21 @@ def _item_controlava_estoque_na_venda(item) -> bool:
     )
 
 
+def _produto_estoque_original(db: Session, item, tenant_id):
+    """Busca o produto no tenant dono do estoque, inclusive quando compartilhado."""
+    tenant_estoque, _ = resolver_tenant_estoque_item(item, tenant_id)
+    with contexto_tenant_estoque(tenant_estoque, tenant_id) as tenant_estoque_uuid:
+        produto = (
+            db.query(Produto)
+            .filter(
+                Produto.id == item.produto_id,
+                Produto.tenant_id == tenant_estoque_uuid,
+            )
+            .first()
+        )
+    return produto, tenant_estoque
+
+
 def _validar_estoque_devolucao_seguro(
     db: Session, venda_id: int, tenant_id, itens_venda, itens_solicitados
 ) -> None:
@@ -140,7 +155,7 @@ def _validar_estoque_devolucao_seguro(
         item = itens_por_id.get(solicitado.get("item_id"))
         if item is None or not _item_controlava_estoque_na_venda(item):
             continue
-        produto = getattr(item, "produto", None)
+        produto, tenant_estoque = _produto_estoque_original(db, item, tenant_id)
         if produto is None:
             raise HTTPException(
                 status_code=409,
@@ -167,7 +182,6 @@ def _validar_estoque_devolucao_seguro(
                 status_code=409,
                 detail="KIT virtual exige devolucao e recomposicao manual dos componentes.",
             )
-        tenant_estoque, _ = resolver_tenant_estoque_item(item, tenant_id)
         grupos_solicitados.add((item.produto_id, tenant_estoque))
 
     for produto_id, tenant_estoque in grupos_solicitados:
@@ -664,6 +678,7 @@ def registrar_devolucao(
                     origem_custo = "servico_custo_mantido"
 
                 # Devolver ao estoque
+                produto_nome_estoque = None
                 if _item_controlava_estoque_na_venda(item_venda):
                     try:
                         tenant_estoque, compartilhado = resolver_tenant_estoque_item(
@@ -685,7 +700,7 @@ def registrar_devolucao(
                         with contexto_tenant_estoque(
                             tenant_estoque, tenant_id
                         ) as tenant_estoque_uuid:
-                            EstoqueService.estornar_estoque(
+                            resultado_estoque = EstoqueService.estornar_estoque(
                                 produto_id=item_venda.produto_id,
                                 quantidade=quantidade_devolvida,
                                 motivo="devolucao",
@@ -702,6 +717,8 @@ def registrar_devolucao(
                                 ),
                                 **custo_estoque,
                             )
+                        if isinstance(resultado_estoque, dict):
+                            produto_nome_estoque = resultado_estoque.get("produto_nome")
                         # Registrar auditoria
                         log_action(
                             db=db,
@@ -743,7 +760,8 @@ def registrar_devolucao(
                 itens_devolvidos.append(
                     {
                         "produto_id": item_venda.produto_id,
-                        "produto_nome": (
+                        "produto_nome": produto_nome_estoque
+                        or (
                             item_venda.produto.nome
                             if item_venda.produto
                             else item_venda.servico_descricao
