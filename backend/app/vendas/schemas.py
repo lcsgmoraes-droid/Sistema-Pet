@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field, model_validator
 
 
 class VendaItemSchema(BaseModel):
+    item_id: Optional[int] = Field(default=None, gt=0)
     tipo: str
     produto_id: Optional[int] = None
     servico_descricao: Optional[str] = None
