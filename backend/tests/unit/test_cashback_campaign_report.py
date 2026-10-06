@@ -60,7 +60,8 @@ def test_report_does_not_call_expiration_a_redemption(db_session, tenant_context
         user_and_tenant=(None, tenant_id),
     )
 
-    assert [item["id"] for item in report["transacoes"]] == [802, 801]
+    assert [item["id"] for item in report["transacoes"]] == [803, 802, 801]
+    assert report["transacoes"][0]["tipo"] == "expiracao"
     assert report["total_creditado"] == 7.0
     assert report["total_resgatado"] == 5.0
     assert report["saldo_total"] == 2.0

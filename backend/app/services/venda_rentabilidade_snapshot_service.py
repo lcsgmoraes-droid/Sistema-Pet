@@ -607,6 +607,7 @@ def build_venda_rentabilidade_snapshot(
         produto = getattr(item, "produto", None)
         itens_snapshot.append(
             {
+                "venda_item_id": getattr(item, "id", None),
                 "produto_id": getattr(item, "produto_id", None),
                 "produto_nome": getattr(produto, "nome", None) or "Produto removido",
                 "quantidade": _round_money(item_base["quantidade"]),

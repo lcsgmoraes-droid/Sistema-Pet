@@ -5,7 +5,7 @@ from decimal import Decimal
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import and_ as sql_and_, func as sqlfunc, or_ as sql_or_
+from sqlalchemy import func as sqlfunc, or_ as sql_or_
 from sqlalchemy.orm import Session
 
 from app.auth.dependencies import get_current_user_and_tenant
@@ -579,19 +579,7 @@ def relatorio_campanhas(
 
     _, tenant_id = user_and_tenant
 
-    q = db.query(CashbackTransaction).filter(
-        CashbackTransaction.tenant_id == tenant_id,
-        sql_or_(
-            sql_and_(
-                CashbackTransaction.source_type == CashbackSourceTypeEnum.campaign,
-                CashbackTransaction.amount > 0,
-            ),
-            sql_and_(
-                CashbackTransaction.source_type == CashbackSourceTypeEnum.redemption,
-                CashbackTransaction.amount < 0,
-            ),
-        ),
-    )
+    q = db.query(CashbackTransaction).filter(CashbackTransaction.tenant_id == tenant_id)
 
     if data_inicio:
         q = q.filter(
@@ -604,9 +592,11 @@ def relatorio_campanhas(
             <= datetime.combine(data_fim, datetime.max.time())
         )
     if tipo == "credito":
-        q = q.filter(CashbackTransaction.amount > 0)
+        q = q.filter(CashbackTransaction.source_type == CashbackSourceTypeEnum.campaign)
     elif tipo == "resgate":
-        q = q.filter(CashbackTransaction.amount < 0)
+        q = q.filter(
+            CashbackTransaction.source_type == CashbackSourceTypeEnum.redemption
+        )
 
     transacoes = []
     total_creditado = Decimal("0.00")
@@ -614,7 +604,7 @@ def relatorio_campanhas(
     for t in q.order_by(CashbackTransaction.id.desc()).yield_per(500):
         if t.source_type == CashbackSourceTypeEnum.campaign:
             total_creditado += Decimal(str(t.amount))
-        else:
+        elif t.source_type == CashbackSourceTypeEnum.redemption:
             resgate_ids.append(t.id)
         if len(transacoes) < 500:
             transacoes.append(t)
@@ -664,6 +654,17 @@ def relatorio_campanhas(
         valor = resgate_liquido.get(t.id, 0) if eh_resgate else abs(t.amount)
         if eh_resgate and valor <= 0:
             continue
+        tipo_movimento = (
+            "resgate"
+            if eh_resgate
+            else "estorno"
+            if t.source_type == CashbackSourceTypeEnum.reversal
+            else "expiracao"
+            if t.source_type == CashbackSourceTypeEnum.expiration
+            else "credito"
+            if t.source_type == CashbackSourceTypeEnum.campaign
+            else "ajuste"
+        )
         resultado.append(
             {
                 "id": t.id,
@@ -672,7 +673,7 @@ def relatorio_campanhas(
                 "cliente_nome": clientes_map.get(
                     t.customer_id, f"Cliente #{t.customer_id}"
                 ),
-                "tipo": "resgate" if eh_resgate else "credito",
+                "tipo": tipo_movimento,
                 "valor": float(valor),
                 "source_type": t.source_type.value if t.source_type else None,
                 "venda_id": t.source_id if eh_resgate else None,

@@ -365,6 +365,7 @@ def estornar_carimbo(
         raise HTTPException(status_code=409, detail="Carimbo já foi estornado")
 
     stamp.voided_at = datetime.now(timezone.utc)
+    stamp.voided_origin = "manual"
     if motivo:
         stamp.notes = f"{stamp.notes or ''} [ESTORNO: {motivo}]".strip()
 

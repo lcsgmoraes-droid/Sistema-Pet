@@ -3,6 +3,7 @@ import CustomerIdentity from "../ui/CustomerIdentity";
 import ProductIdentity from "../ui/ProductIdentity";
 import SaleReference from "../ui/SaleReference";
 import { formatMoneyBRL } from "../../utils/formatters";
+import { quantidadeDisponivelDevolucao } from "../../utils/pdvReturnBalance";
 
 function getVendaStatusDevolucaoInfo(status) {
   if (status === "finalizada") {
@@ -21,7 +22,7 @@ function getVendaStatusDevolucaoInfo(status) {
 }
 
 export default function ModalDevolucaoSections({
-  calcularTotalDevolucao,
+  calcularValorBrutoSelecionado,
   componentesSelecionados,
   erro,
   filtros,
@@ -39,6 +40,7 @@ export default function ModalDevolucaoSections({
   onClose,
   passo,
   quantidades,
+  saldosItens,
   quantidadesComponentes,
   selecionarVenda,
   setErro,
@@ -206,7 +208,11 @@ export default function ModalDevolucaoSections({
               <div className="space-y-2">
                 {vendaSelecionada.itens.map((item) => {
                   const isKit = isItemKit(item);
+                  const isKitVirtual =
+                    item.tipo_produto === "KIT" && (item.tipo_kit || "VIRTUAL") !== "FISICO";
                   const modoKit = modoDevolucaoKit[item.id];
+                  const quantidadeDisponivel = quantidadeDisponivelDevolucao(saldosItens, item.id);
+                  const quantidadeDevolvida = saldosItens[item.id]?.quantidade_devolvida || 0;
 
                   return (
                     <div
@@ -222,6 +228,7 @@ export default function ModalDevolucaoSections({
                           type="checkbox"
                           checked={itensSelecionados[item.id] || false}
                           onChange={() => toggleItem(item.id)}
+                          disabled={isKitVirtual || quantidadeDisponivel <= 0}
                           className="mt-1 w-5 h-5 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
                         />
 
@@ -240,9 +247,16 @@ export default function ModalDevolucaoSections({
                             )}
                           </ProductIdentity>
                           <div className="text-sm text-gray-600">
-                            Preço unitário: R$ {item.preco_unitario.toFixed(2)} | Qtd vendida:{" "}
-                            {item.quantidade}
+                            Preço unitário: {formatMoneyBRL(item.preco_unitario)} | Qtd vendida:{" "}
+                            {item.quantidade} | Já devolvida: {quantidadeDevolvida} | Disponível:{" "}
+                            {quantidadeDisponivel}
                           </div>
+                          {isKitVirtual && (
+                            <p className="mt-2 text-sm text-amber-700">
+                              KIT virtual: a devolução exige conciliação manual dos componentes e do
+                              estoque.
+                            </p>
+                          )}
 
                           {/* 🆕 ESCOLHA: KIT INTEIRO OU COMPONENTES */}
                           {itensSelecionados[item.id] && isKit && (
@@ -271,20 +285,21 @@ export default function ModalDevolucaoSections({
                                   </div>
                                 </label>
 
-                                <label className="flex items-start gap-3 cursor-pointer group">
+                                <label className="flex items-start gap-3 opacity-60">
                                   <input
                                     type="radio"
                                     name={`modo-kit-${item.id}`}
                                     checked={modoKit === "componentes"}
-                                    onChange={() => handleEscolhaModoKit(item.id, "componentes")}
+                                    disabled
                                     className="mt-1 w-4 h-4 text-purple-600 focus:ring-2 focus:ring-purple-500"
                                   />
                                   <div className="flex-1">
-                                    <div className="font-medium text-gray-800 group-hover:text-purple-700 transition-colors">
-                                      🧩 Selecionar Componentes
+                                    <div className="font-medium text-gray-800">
+                                      🧩 Selecionar Componentes (indisponível)
                                     </div>
                                     <p className="text-xs text-gray-600 mt-1">
-                                      Escolha quais componentes do KIT devolver
+                                      A venda não registra o preço original de cada componente.
+                                      Devolva o KIT inteiro.
                                     </p>
                                   </div>
                                 </label>
@@ -302,7 +317,7 @@ export default function ModalDevolucaoSections({
                                 type="number"
                                 step="0.01"
                                 min="0"
-                                max={item.quantidade}
+                                max={quantidadeDisponivel}
                                 value={quantidades[item.id]}
                                 onChange={(e) => handleQuantidadeChange(item.id, e.target.value)}
                                 className="w-32 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
@@ -324,7 +339,7 @@ export default function ModalDevolucaoSections({
                                 type="number"
                                 step="0.01"
                                 min="0"
-                                max={item.quantidade}
+                                max={quantidadeDisponivel}
                                 value={quantidades[item.id]}
                                 onChange={(e) => handleQuantidadeChange(item.id, e.target.value)}
                                 className="w-32 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
@@ -487,15 +502,18 @@ export default function ModalDevolucaoSections({
               )}
             </div>
 
-            {/* Total */}
+            {/* O valor líquido exato será mostrado antes da confirmação. */}
             <div
               className={`border-2 rounded-lg p-4 ${gerarCredito ? "bg-purple-50 border-purple-300" : "bg-orange-50 border-orange-200"}`}
             >
               <div className="flex justify-between items-center">
                 <div>
                   <span className="text-lg font-semibold text-gray-900">
-                    {gerarCredito ? "Crédito a Gerar:" : "Total da Devolução:"}
+                    Valor bruto selecionado:
                   </span>
+                  <p className="text-xs text-gray-600 mt-1">
+                    A prévia líquida com os descontos será exibida antes de confirmar.
+                  </p>
                   {gerarCredito && vendaSelecionada?.cliente && (
                     <p className="text-xs text-gray-600 mt-1">
                       <CustomerIdentity
@@ -510,7 +528,7 @@ export default function ModalDevolucaoSections({
                 <span
                   className={`text-2xl font-bold ${gerarCredito ? "text-purple-600" : "text-orange-600"}`}
                 >
-                  {formatMoneyBRL(calcularTotalDevolucao())}
+                  {formatMoneyBRL(calcularValorBrutoSelecionado())}
                 </span>
               </div>
             </div>

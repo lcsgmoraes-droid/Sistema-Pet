@@ -41,6 +41,7 @@ def _add_cashback_events(
     )
     wallet = replay_cashback_transactions(transactions)
     balances = wallet.balance_by_transaction
+    transaction_map = {int(tx.id): tx for tx in transactions}
     execution_ids = [
         int(tx.source_id)
         for tx in transactions
@@ -65,9 +66,20 @@ def _add_cashback_events(
         if not _date_in_range(event_time, start_dt, end_dt):
             continue
         amount = _money(tx.amount) or 0
-        execution = execution_map.get(int(tx.source_id)) if tx.source_id else None
-        campaign = campaign_map.get(int(execution.campaign_id)) if execution else None
         source_type = _enum_value(tx.source_type)
+        source_execution_id = tx.source_id
+        if source_type in {"reversal", "expiration"} and tx.source_id:
+            original_credit = transaction_map.get(int(tx.source_id))
+            source_execution_id = (
+                original_credit.source_id
+                if original_credit is not None
+                and _enum_value(original_credit.source_type) == "campaign"
+                else None
+            )
+        execution = (
+            execution_map.get(int(source_execution_id)) if source_execution_id else None
+        )
+        campaign = campaign_map.get(int(execution.campaign_id)) if execution else None
         reward_meta = dict(execution.reward_meta or {}) if execution else {}
         try:
             venda_id = int(reward_meta.get("venda_id") or 0) or None

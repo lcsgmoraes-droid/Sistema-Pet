@@ -8,6 +8,7 @@ from app.auth.dependencies import get_current_user_and_tenant
 from app.db import get_session
 from app.dre_canais.agregacao import (
     agregar_contas_receber_manuais_por_canal,
+    agregar_devolucoes_por_canal,
     agregar_contas_pagar_por_canal,
     agregar_fretes_sobre_compras,
     obter_vendas_por_canal,
@@ -31,6 +32,70 @@ def _montar_alertas_cmv_estimado(dados_canais: dict) -> list[dict]:
     alertas = []
     for canal, dados in dados_canais.items():
         itens = list(dados.get("itens_cmv_estimado") or [])
+        itens_ambiguos = [
+            item
+            for item in dados.get("itens_cmv_atribuido", []) or []
+            if item.get("rateio_ambiguo")
+        ]
+        custos_sem_rateio = [
+            item
+            for item in dados.get("itens_cmv_atribuido", []) or []
+            if item.get("conciliacao_pendente")
+        ]
+        if itens_ambiguos:
+            config = CANAIS_CONFIG.get(canal, CANAIS_CONFIG["loja_fisica"])
+            alertas.append(
+                {
+                    "codigo": "cmv_rateio_ambiguo",
+                    "nivel": "atencao",
+                    "canal": canal,
+                    "titulo": f"Rateio provisório de CMV a conferir — {config['nome']}",
+                    "mensagem": (
+                        "O snapshot legado nao identifica o custo individual das linhas. "
+                        "O CMV agregado foi rateado apenas "
+                        "para a DRE; nao comprova o custo original de cada item "
+                        "nem altera o estoque. Confira antes de conciliar devolucoes."
+                    ),
+                    "quantidade_itens": len(itens_ambiguos),
+                    "valor_estimado": float(
+                        sum(
+                            (
+                                _decimal(item.get("valor_cmv_atribuido", 0))
+                                for item in itens_ambiguos
+                            ),
+                            _decimal(0),
+                        )
+                    ),
+                }
+            )
+        if custos_sem_rateio:
+            config = CANAIS_CONFIG.get(canal, CANAIS_CONFIG["loja_fisica"])
+            alertas.append(
+                {
+                    "codigo": "cmv_agregado_sem_rateio",
+                    "nivel": "critico",
+                    "canal": canal,
+                    "titulo": f"CMV agregado a conciliar — {config['nome']}",
+                    "mensagem": (
+                        "O snapshot legado tem CMV total sem vinculo seguro aos "
+                        "itens da venda. A DRE preserva esse total e nao soma nova "
+                        "estimativa; uma devolucao pode deixar custo residual ate "
+                        "conciliacao manual."
+                    ),
+                    "quantidade_vendas": len(
+                        {item.get("venda_id") for item in custos_sem_rateio}
+                    ),
+                    "valor_sem_rateio": float(
+                        sum(
+                            (
+                                _decimal(item.get("custo_total_sem_rateio", 0))
+                                for item in custos_sem_rateio
+                            ),
+                            _decimal(0),
+                        )
+                    ),
+                }
+            )
         if not itens:
             continue
 
@@ -91,6 +156,64 @@ def _montar_alertas_cmv_estimado(dados_canais: dict) -> list[dict]:
                 "sem_base_estimativa": sem_base,
             }
         )
+    return alertas
+
+
+def _montar_alertas_devolucoes(dados_canais: dict) -> list[dict]:
+    alertas = []
+    for canal, dados in dados_canais.items():
+        pendentes = dados.get("devolucoes_custo_pendente") or []
+        if not pendentes and _decimal(dados.get("devolucoes", 0)) <= 0:
+            continue
+        config = CANAIS_CONFIG.get(canal, CANAIS_CONFIG["loja_fisica"])
+        if pendentes:
+            alertas.append(
+                {
+                    "codigo": "devolucao_custo_original_pendente",
+                    "nivel": "atencao",
+                    "canal": canal,
+                    "titulo": f"Custo de devolução a conferir — {config['nome']}",
+                    "mensagem": (
+                        f"{len(pendentes)} devolucao(oes) tiveram a receita deduzida, "
+                        "mas ao menos um item nao possui custo original comprovado. "
+                        "A DRE pode reverter provisoriamente o CMV que havia atribuido "
+                        "a esses itens, sem tratar esse valor como custo historico. "
+                        "Se o vinculo com a linha da venda for ambiguo, o CMV anterior "
+                        "permanece ate a conciliacao. "
+                        "Se houve retorno de produto ao estoque, a entrada recebeu valor "
+                        "provisorio zero. Confira o detalhe e ajuste manualmente "
+                        "o custo quando aplicavel."
+                    ),
+                    "quantidade_itens": sum(
+                        sum(
+                            bool(item.get("custo_pendente"))
+                            for item in (evento.itens or [])
+                        )
+                        for evento in pendentes
+                    ),
+                    "valor_vendas": float(
+                        sum(
+                            (_decimal(evento.valor_devolvido) for evento in pendentes),
+                            _decimal(0),
+                        )
+                    ),
+                }
+            )
+        if _decimal(dados.get("devolucoes", 0)) > 0:
+            alertas.append(
+                {
+                    "codigo": "devolucao_imposto_a_conciliar",
+                    "nivel": "atencao",
+                    "canal": canal,
+                    "titulo": f"Imposto de devolução a conferir — {config['nome']}",
+                    "mensagem": (
+                        "A devolucao nao estorna automaticamente os impostos "
+                        "estimados sobre a venda. Confirme o documento fiscal e "
+                        "o direito ao credito tributario antes de ajustar a DRE."
+                    ),
+                    "valor_vendas": float(_decimal(dados.get("devolucoes", 0))),
+                }
+            )
     return alertas
 
 
@@ -158,6 +281,15 @@ def gerar_dre_por_canais(
         mes_inicial=mes_inicial,
         data_final=data_final,
     )
+    agregar_devolucoes_por_canal(
+        db,
+        mes,
+        ano,
+        tenant_id,
+        dados_canais_calculados,
+        mes_inicial=mes_inicial,
+        data_final=data_final,
+    )
     agregar_contas_receber_manuais_por_canal(
         db,
         mes,
@@ -202,5 +334,8 @@ def gerar_dre_por_canais(
         linhas=linhas,
         totais=totais,
         canais_encontrados=list(dados_canais_resultado.keys()),
-        alertas=_montar_alertas_cmv_estimado(dados_canais_resultado),
+        alertas=(
+            _montar_alertas_cmv_estimado(dados_canais_resultado)
+            + _montar_alertas_devolucoes(dados_canais_resultado)
+        ),
     )

@@ -12,7 +12,10 @@ from app.financeiro_models import ContaPagar, ContaReceber, FormaPagamento
 from app.models import Cliente
 from app.produtos_models import EstoqueMovimentacao, Produto
 from app.vendas_models import Venda, VendaItem
+from app.vendas_devolucoes_models import VendaDevolucao
+from app.vendas.devolucao_dre import custo_original_item_devolvido
 from app.services.venda_rentabilidade_snapshot_service import (
+    _round_money,
     build_venda_rentabilidade_snapshot,
 )
 from app.dre_canais.base import (
@@ -164,26 +167,23 @@ def _bulk_cupons_por_venda(
     ]
     if not ids_sem_valor:
         return resultado
-    try:
-        from app.campaigns.models import CouponRedemption
+    from app.campaigns.models import CouponRedemption
 
-        rows = (
-            db.query(
-                CouponRedemption.venda_id,
-                func.coalesce(func.sum(CouponRedemption.discount_applied), 0),
-            )
-            .filter(
-                CouponRedemption.tenant_id == tenant_id,
-                CouponRedemption.venda_id.in_(ids_sem_valor),
-                CouponRedemption.voided_at.is_(None),
-            )
-            .group_by(CouponRedemption.venda_id)
-            .all()
+    rows = (
+        db.query(
+            CouponRedemption.venda_id,
+            func.coalesce(func.sum(CouponRedemption.discount_applied), 0),
         )
-        for venda_id, total in rows:
-            resultado[int(venda_id)] = float(total or 0)
-    except Exception:
-        pass
+        .filter(
+            CouponRedemption.tenant_id == tenant_id,
+            CouponRedemption.venda_id.in_(ids_sem_valor),
+            CouponRedemption.voided_at.is_(None),
+        )
+        .group_by(CouponRedemption.venda_id)
+        .all()
+    )
+    for venda_id, total in rows:
+        resultado[int(venda_id)] = float(total or 0)
     return resultado
 
 
@@ -311,12 +311,174 @@ def _custo_confirmado_atual_item(
     return Decimal("0"), None
 
 
+def _quantidade_snapshot_legado(valor: Any) -> Decimal:
+    """Repete o arredondamento salvo pelo builder v5, inclusive em meios centavos."""
+    return Decimal(str(_round_money(valor)))
+
+
+def _indice_snapshot_item(
+    item: VendaItem, itens_venda: list[VendaItem], itens_snapshot: list[dict]
+) -> int | None:
+    """Relaciona linha e fotografia sem depender da ordem da relacao ORM."""
+    item_id = getattr(item, "id", None)
+    if item_id is not None:
+        indices = [
+            indice
+            for indice, fotografia in enumerate(itens_snapshot)
+            if fotografia.get("venda_item_id") == item_id
+        ]
+        if len(indices) == 1:
+            return indices[0]
+    if any(
+        fotografia.get("venda_item_id") is not None for fotografia in itens_snapshot
+    ):
+        return None
+
+    def assinatura(linha):
+        return (
+            getattr(linha, "produto_id", None),
+            # Snapshot v5 guarda a quantidade arredondada a centesimos.
+            _quantidade_snapshot_legado(getattr(linha, "quantidade", 0)),
+            _moeda(getattr(linha, "preco_unitario", 0)),
+        )
+
+    def assinatura_fotografia(fotografia):
+        return (
+            fotografia.get("produto_id"),
+            _quantidade_snapshot_legado(fotografia.get("quantidade", 0)),
+            _moeda(fotografia.get("preco_unitario", 0)),
+        )
+
+    chave = assinatura(item)
+    if sum(assinatura(linha) == chave for linha in itens_venda) != 1:
+        return None
+    indices = [
+        indice
+        for indice, fotografia in enumerate(itens_snapshot)
+        if assinatura_fotografia(fotografia) == chave
+    ]
+    if len(indices) == 1:
+        return indices[0]
+    if len(itens_venda) == len(itens_snapshot) == 1:
+        return 0
+    return None
+
+
+def _rateio_grupo_snapshot_sem_ids(
+    item: VendaItem, itens_venda: list[VendaItem], itens_snapshot: list[dict]
+) -> tuple[Decimal, Decimal] | None:
+    """Rateia apenas na DRE custo agregado de linhas legadas indistinguiveis."""
+    if any(
+        fotografia.get("venda_item_id") is not None for fotografia in itens_snapshot
+    ):
+        return None
+    chave = (
+        getattr(item, "produto_id", None),
+        _quantidade_snapshot_legado(getattr(item, "quantidade", 0)),
+        _moeda(getattr(item, "preco_unitario", 0)),
+    )
+    grupo_itens = sorted(
+        (
+            linha
+            for linha in itens_venda
+            if (
+                getattr(linha, "produto_id", None),
+                _quantidade_snapshot_legado(getattr(linha, "quantidade", 0)),
+                _moeda(getattr(linha, "preco_unitario", 0)),
+            )
+            == chave
+        ),
+        key=lambda linha: getattr(linha, "id", 0) or 0,
+    )
+    grupo_fotografias = [
+        fotografia
+        for fotografia in itens_snapshot
+        if (
+            fotografia.get("produto_id"),
+            _quantidade_snapshot_legado(fotografia.get("quantidade", 0)),
+            _moeda(fotografia.get("preco_unitario", 0)),
+        )
+        == chave
+    ]
+    if len(grupo_itens) < 2 or len(grupo_itens) != len(grupo_fotografias):
+        return None
+    custo_grupo = sum(
+        (_moeda(fotografia.get("custo_total", 0)) for fotografia in grupo_fotografias),
+        Decimal("0"),
+    )
+    indice = grupo_itens.index(item)
+    quantidade_linhas = Decimal(len(grupo_itens))
+    parcela = _moeda(custo_grupo * (indice + 1) / quantidade_linhas) - _moeda(
+        custo_grupo * indice / quantidade_linhas
+    )
+    return parcela, custo_grupo
+
+
+def _rateio_cmv_agregado_legado(
+    venda: Venda, snapshot: Dict[str, Any]
+) -> Dict[int, Decimal] | None:
+    """Atribui apenas na DRE um total legado sem custo suficiente por linha.
+
+    Nao comprova custo historico para entrada no estoque. O total ja integra o
+    CMV da venda; distribui-lo evita somar uma segunda estimativa e permite
+    estorno cumulativo por item, inclusive em devolucoes de outro mes.
+    """
+    itens = list(getattr(venda, "itens", []) or [])
+    if not itens or any(
+        str(getattr(item, "tipo", "") or "").lower() == "servico" for item in itens
+    ):
+        return None
+    custo_total = _moeda(snapshot.get("custo_produtos", 0))
+    if custo_total <= 0:
+        return None
+    fotografias = snapshot.get("itens")
+    fotografias_validas = (
+        isinstance(fotografias, list)
+        and len(fotografias) == len(itens)
+        and all(isinstance(fotografia, dict) for fotografia in fotografias)
+    )
+    custo_itens = (
+        sum(
+            (_moeda(fotografia.get("custo_total", 0)) for fotografia in fotografias),
+            Decimal("0"),
+        )
+        if fotografias_validas
+        else Decimal("0")
+    )
+    if fotografias_validas and custo_itens >= custo_total:
+        return None
+
+    ordenados = sorted(itens, key=lambda item: getattr(item, "id", 0) or 0)
+    pesos = [
+        max(
+            _decimal(getattr(item, "subtotal", 0)),
+            _decimal(getattr(item, "quantidade", 0))
+            * _decimal(getattr(item, "preco_unitario", 0)),
+            Decimal("0"),
+        )
+        for item in ordenados
+    ]
+    if sum(pesos) <= 0:
+        pesos = [Decimal("1") for _ in ordenados]
+    total_pesos = sum(pesos)
+    acumulado = Decimal("0")
+    anterior = Decimal("0")
+    atribuicoes = {}
+    for item, peso in zip(ordenados, pesos):
+        acumulado += peso
+        atual = _moeda(custo_total * acumulado / total_pesos)
+        atribuicoes[id(item)] = atual - anterior
+        anterior = atual
+    return atribuicoes
+
+
 def _complementar_snapshot_com_custos_reais(
     venda: Venda,
     snapshot: Dict[str, Any],
     estoque_custos_por_produto: Dict[int, Dict[str, float]],
+    tenant_id: str | None = None,
 ) -> Dict[str, Any]:
-    """Preenche apenas custos zerados que passaram a ter uma origem real confiável."""
+    """Prefere o comprovante da baixa e completa custos zerados na DRE."""
     itens_venda = list(getattr(venda, "itens", []) or [])
     itens_snapshot_originais = snapshot.get("itens")
     if (
@@ -330,12 +492,41 @@ def _complementar_snapshot_com_custos_reais(
         dict(item) if isinstance(item, dict) else {}
         for item in itens_snapshot_originais
     ]
+    custo_original = _moeda(snapshot.get("custo_produtos", 0))
+    custo_itens_originais = sum(
+        (_moeda(item.get("custo_total", 0)) for item in itens_snapshot), Decimal("0")
+    )
+    if custo_original > custo_itens_originais and not any(
+        getattr(item, "custo_original_saida", None) for item in itens_venda
+    ):
+        # Um total agregado legado ja integra a DRE. O custo atual do cadastro
+        # nao pode substitui-lo retroativamente nem justificar custo de estoque.
+        return snapshot
     custo_adicional = Decimal("0")
+    custo_comprovado_ajustado = False
 
-    for indice, item in enumerate(itens_venda):
-        if indice >= len(itens_snapshot):
-            break
+    for item in itens_venda:
+        indice = _indice_snapshot_item(item, itens_venda, itens_snapshot)
+        if indice is None:
+            continue
         item_snapshot = itens_snapshot[indice]
+        if tenant_id is not None and getattr(item, "custo_original_saida", None):
+            custo_comprovado, _origem, pendente = custo_original_item_devolvido(
+                None,
+                venda,
+                item,
+                _decimal(getattr(item, "quantidade", 0)),
+                tenant_id,
+            )
+            if not pendente and custo_comprovado > 0:
+                quantidade = _decimal(getattr(item, "quantidade", 0))
+                item_snapshot["custo_total"] = float(custo_comprovado)
+                item_snapshot["custo_unitario"] = float(
+                    _moeda(custo_comprovado / quantidade)
+                )
+                item_snapshot["custo_origem_complemento_dre"] = "baixa_estoque_venda"
+                custo_comprovado_ajustado = True
+                continue
         if _decimal(item_snapshot.get("custo_total", 0)) > Decimal("0.004"):
             continue
 
@@ -357,8 +548,11 @@ def _complementar_snapshot_com_custos_reais(
         (_moeda(item.get("custo_total", 0)) for item in itens_snapshot),
         Decimal("0"),
     )
-    custo_original = _moeda(snapshot.get("custo_produtos", 0))
-    if custo_itens <= 0 or (custo_adicional <= 0 and custo_itens == custo_original):
+    if custo_itens <= 0 or (
+        custo_adicional <= 0
+        and not custo_comprovado_ajustado
+        and custo_itens == custo_original
+    ):
         return snapshot
 
     snapshot_ajustado = dict(snapshot)
@@ -370,6 +564,37 @@ def _complementar_snapshot_com_custos_reais(
         _moeda(custo_itens - custo_original)
     )
     return snapshot_ajustado
+
+
+def _conciliar_custo_campanha_snapshot(
+    snapshot: Dict[str, Any] | None,
+    custo_campanha: float,
+    cupom_desconto: float,
+    desconto_bruto: Any,
+) -> Dict[str, Any] | None:
+    """Reclassifica desconto/campanha sem recalcular outros custos historicos."""
+    if snapshot is None:
+        return None
+    custo_ledger = _moeda(custo_campanha)
+    cupom_atual = _moeda(cupom_desconto)
+    desconto_total = _moeda(
+        max(
+            _moeda(desconto_bruto) - min(cupom_atual, _moeda(desconto_bruto)),
+            Decimal("0"),
+        )
+    )
+    if (
+        _moeda(snapshot.get("custo_campanha", 0)) == custo_ledger
+        and _moeda(snapshot.get("cupom_desconto", 0)) == cupom_atual
+        and _moeda(snapshot.get("desconto", 0)) == desconto_total
+    ):
+        return snapshot
+    ajustado = dict(snapshot)
+    ajustado["custo_campanha"] = float(custo_ledger)
+    ajustado["cupom_desconto"] = float(cupom_atual)
+    ajustado["desconto"] = float(desconto_total)
+    ajustado["custo_campanha_origem_dre"] = "ledger_campanha_cupom"
+    return ajustado
 
 
 def _separar_custo_produto_servico(
@@ -431,37 +656,98 @@ def _registrar_base_estimativa_cmv(
     snapshot: Dict[str, Any],
     bases_por_canal: Dict[str, Dict[str, Decimal]],
     pendencias_por_canal: Dict[str, List[Dict[str, Any]]],
+    custos_atribuidos: List[Dict[str, Any]],
 ) -> None:
     """Separa itens com custo confirmado dos produtos que ainda precisam de estimativa."""
     itens_venda = list(getattr(venda, "itens", []) or [])
     itens_snapshot = snapshot.get("itens")
-    if not isinstance(itens_snapshot, list) or len(itens_snapshot) < len(itens_venda):
-        return
+    if not isinstance(itens_snapshot, list):
+        itens_snapshot = []
+    snapshot_completo = len(itens_snapshot) == len(itens_venda) and all(
+        isinstance(fotografia, dict) for fotografia in itens_snapshot
+    )
+    custo_agregado = _rateio_cmv_agregado_legado(venda, snapshot)
+    custo_itens = (
+        sum(
+            (_moeda(fotografia.get("custo_total", 0)) for fotografia in itens_snapshot),
+            Decimal("0"),
+        )
+        if snapshot_completo
+        else Decimal("0")
+    )
+    custo_sem_rateio = (
+        custo_agregado is None
+        and _moeda(snapshot.get("custo_produtos", 0)) > custo_itens
+        and any(
+            str(getattr(item, "tipo", "") or "").lower() != "servico"
+            for item in itens_venda
+        )
+    )
 
     base = bases_por_canal.setdefault(
         canal,
         {"receita_confirmada": Decimal("0"), "custo_confirmado": Decimal("0")},
     )
     pendencias = pendencias_por_canal.setdefault(canal, [])
+    if custo_sem_rateio:
+        custos_atribuidos.append(
+            {
+                "venda_id": getattr(venda, "id", None),
+                "venda_item_id": None,
+                "valor_cmv_atribuido": 0.0,
+                "custo_total_sem_rateio": float(
+                    _moeda(snapshot.get("custo_produtos", 0)) - custo_itens
+                ),
+                "conciliacao_pendente": True,
+            }
+        )
 
-    for indice, item in enumerate(itens_venda):
+    for item in itens_venda:
         if str(getattr(item, "tipo", "") or "").lower() == "servico":
             continue
 
-        item_snapshot = itens_snapshot[indice]
-        if not isinstance(item_snapshot, dict):
-            continue
+        indice = (
+            _indice_snapshot_item(item, itens_venda, itens_snapshot)
+            if snapshot_completo and custo_agregado is None
+            else None
+        )
+        rateio_ambiguo = False
+        if custo_agregado is not None:
+            custo_rateado = custo_agregado[id(item)]
+            item_snapshot = {
+                "venda_bruta": getattr(item, "subtotal", 0),
+                "custo_total": custo_rateado,
+            }
+            custo_grupo = _moeda(snapshot.get("custo_produtos", 0))
+            rateio_ambiguo = True
+        elif indice is None and snapshot_completo:
+            grupo = _rateio_grupo_snapshot_sem_ids(item, itens_venda, itens_snapshot)
+            if grupo is None:
+                if not custo_sem_rateio:
+                    continue
+                item_snapshot = {"venda_bruta": getattr(item, "subtotal", 0)}
+                custo_grupo = Decimal("0")
+            else:
+                custo_rateado, custo_grupo = grupo
+                item_snapshot = {
+                    "venda_bruta": getattr(item, "subtotal", None)
+                    or _decimal(getattr(item, "quantidade", 0))
+                    * _decimal(getattr(item, "preco_unitario", 0)),
+                    "custo_total": custo_rateado,
+                }
+                rateio_ambiguo = True
+        elif indice is not None:
+            item_snapshot = itens_snapshot[indice]
+            custo_grupo = Decimal("0")
+        else:
+            # Fotografia incompleta sem CMV agregado: ainda estimar o produto
+            # vendido pela linha real, sem inventar custo historico.
+            item_snapshot = {"venda_bruta": getattr(item, "subtotal", 0)}
+            custo_grupo = Decimal("0")
 
         valor_venda = _moeda(
             item_snapshot.get("venda_bruta", getattr(item, "subtotal", 0))
         )
-        custo_confirmado = _moeda(item_snapshot.get("custo_total", 0))
-        if custo_confirmado > Decimal("0.004"):
-            if valor_venda > 0:
-                base["receita_confirmada"] += valor_venda
-                base["custo_confirmado"] += custo_confirmado
-            continue
-
         produto = getattr(item, "produto", None)
         data_venda = getattr(venda, "data_venda", None)
         data_iso = None
@@ -471,20 +757,36 @@ def _registrar_base_estimativa_cmv(
                 if hasattr(data_venda, "date")
                 else data_venda.isoformat()
             )
-        pendencias.append(
-            {
-                "venda_id": getattr(venda, "id", None),
-                "numero_venda": getattr(venda, "numero_venda", None),
-                "data": data_iso,
-                "produto_id": getattr(item, "produto_id", None),
-                "produto_codigo": getattr(produto, "codigo", None),
-                "produto_nome": getattr(produto, "nome", None) or "Produto removido",
-                "quantidade": float(_decimal(getattr(item, "quantidade", 0))),
-                "valor_venda": float(valor_venda),
-                "valor_estimado": 0.0,
-                "canal": canal,
-            }
-        )
+        identificacao = {
+            "venda_id": getattr(venda, "id", None),
+            "venda_item_id": getattr(item, "id", None),
+            "numero_venda": getattr(venda, "numero_venda", None),
+            "data": data_iso,
+            "produto_id": getattr(item, "produto_id", None),
+            "produto_codigo": getattr(produto, "codigo", None),
+            "produto_nome": getattr(produto, "nome", None) or "Produto removido",
+            "quantidade": float(_decimal(getattr(item, "quantidade", 0))),
+            "valor_venda": float(valor_venda),
+            "canal": canal,
+            "rateio_ambiguo": rateio_ambiguo,
+        }
+        custo_confirmado = _moeda(item_snapshot.get("custo_total", 0))
+        if custo_sem_rateio and custo_confirmado <= 0:
+            continue
+        if custo_confirmado > Decimal("0.004") or (rateio_ambiguo and custo_grupo > 0):
+            custos_atribuidos.append(
+                {
+                    **identificacao,
+                    "valor_cmv_atribuido": float(custo_confirmado),
+                    "rateio_ambiguo": rateio_ambiguo,
+                }
+            )
+            if valor_venda > 0 and not rateio_ambiguo:
+                base["receita_confirmada"] += valor_venda
+                base["custo_confirmado"] += custo_confirmado
+            continue
+
+        pendencias.append({**identificacao, "valor_estimado": 0.0})
 
 
 def _aplicar_estimativas_cmv(
@@ -589,13 +891,12 @@ def obter_vendas_por_canal(
         dados = dados_por_canal.setdefault(canal, _novo_canal())
         cupom_desconto = cupons_por_venda.get(venda.id, 0.0)
         custo_campanha = cupom_desconto + cashback_por_venda.get(venda.id, 0.0)
-        snapshot = _snapshot_pronto(venda)
-        if (
-            snapshot
-            and custo_campanha > 0
-            and _decimal(snapshot.get("custo_campanha", 0)) <= 0
-        ):
-            snapshot = None
+        snapshot = _conciliar_custo_campanha_snapshot(
+            _snapshot_pronto(venda),
+            custo_campanha,
+            cupom_desconto,
+            getattr(venda, "desconto_valor", 0),
+        )
         if snapshot is None:
             snapshot = build_venda_rentabilidade_snapshot(
                 venda,
@@ -613,6 +914,7 @@ def obter_vendas_por_canal(
             venda,
             snapshot,
             estoque_custos_por_venda.get(venda.id, {}),
+            tenant_id,
         )
         _registrar_base_estimativa_cmv(
             venda,
@@ -620,6 +922,7 @@ def obter_vendas_por_canal(
             snapshot,
             bases_estimativa,
             pendencias_estimativa,
+            dados["itens_cmv_atribuido"],
         )
 
         receita_bruta = _decimal(snapshot.get("venda_bruta", 0))
@@ -646,6 +949,170 @@ def obter_vendas_por_canal(
 
     _aplicar_estimativas_cmv(dados_por_canal, bases_estimativa, pendencias_estimativa)
     return dados_por_canal
+
+
+def _devolucoes_periodo_query(db: Session, tenant_id: str, inicio, fim):
+    return db.query(VendaDevolucao).filter(
+        VendaDevolucao.tenant_id == tenant_id,
+        VendaDevolucao.data_competencia >= inicio.date(),
+        VendaDevolucao.data_competencia < fim.date(),
+    )
+
+
+def _estimativas_por_item(dados_canais: Dict[str, Dict]) -> Dict[tuple, Dict]:
+    """Indexa o CMV exibido pela DRE quando a linha da venda é inequívoca."""
+    estimativas = {}
+    for dados in dados_canais.values():
+        for campo, origem in (
+            ("itens_cmv_estimado", "estimativa"),
+            ("itens_cmv_atribuido", "custo_atribuido_sem_comprovante"),
+        ):
+            for item in dados.get(campo, []) or []:
+                venda_id = item.get("venda_id")
+                venda_item_id = item.get("venda_item_id")
+                if venda_id is not None and venda_item_id is not None:
+                    estimativas[(venda_id, venda_item_id)] = {
+                        **item,
+                        "origem_cmv_estornado": origem,
+                    }
+    return estimativas
+
+
+def _estornar_cmv_estimado_devolucoes(
+    db: Session,
+    tenant_id: str,
+    inicio,
+    fim,
+    dados_canais: Dict[str, Dict],
+    eventos_periodo: list[VendaDevolucao],
+) -> None:
+    """Estorna no mês da devolução o CMV provisório da linha original.
+
+    A estimativa é dinâmica na DRE, então o estorno usa a mesma estimativa da
+    venda. O rateio cumulativo fecha os centavos em devoluções parciais.
+    """
+    venda_ids = {
+        evento.venda_id
+        for evento in eventos_periodo
+        if any(
+            item.get("venda_item_id") is not None
+            and item.get("custo_pendente")
+            and item.get("tipo") == "produto"
+            and not item.get("is_componente_kit")
+            for item in (getattr(evento, "itens", None) or [])
+        )
+    }
+    if not venda_ids:
+        return
+
+    vendas = (
+        db.query(Venda)
+        .filter(Venda.tenant_id == tenant_id, Venda.id.in_(venda_ids))
+        .all()
+    )
+    vendas_por_id = {venda.id: venda for venda in vendas}
+    estimativas_periodo = _estimativas_por_item(dados_canais)
+    estimativas_por_mes = {}
+
+    def estimativa_original(venda_id, venda_item_id):
+        venda = vendas_por_id.get(venda_id)
+        if venda is None or venda.data_venda is None:
+            return None
+        data_venda = (
+            venda.data_venda.date()
+            if hasattr(venda.data_venda, "date")
+            else venda.data_venda
+        )
+        if inicio.date() <= data_venda < fim.date():
+            return estimativas_periodo.get((venda_id, venda_item_id))
+        chave_mes = (data_venda.year, data_venda.month)
+        if chave_mes not in estimativas_por_mes:
+            dados_mes = obter_vendas_por_canal(
+                db, data_venda.month, data_venda.year, tenant_id
+            )
+            estimativas_por_mes[chave_mes] = _estimativas_por_item(dados_mes)
+        return estimativas_por_mes[chave_mes].get((venda_id, venda_item_id))
+
+    eventos_vendas = (
+        db.query(VendaDevolucao)
+        .filter(
+            VendaDevolucao.tenant_id == tenant_id,
+            VendaDevolucao.venda_id.in_(venda_ids),
+        )
+        .all()
+    )
+    ids_periodo = {evento.id for evento in eventos_periodo}
+    quantidades_anteriores: Dict[tuple, Decimal] = {}
+    for evento in sorted(
+        eventos_vendas, key=lambda atual: (atual.data_competencia, atual.id)
+    ):
+        for item in evento.itens or []:
+            venda_item_id = item.get("venda_item_id")
+            if venda_item_id is None or item.get("is_componente_kit"):
+                continue
+            chave = (evento.venda_id, venda_item_id)
+            quantidade = _decimal(item.get("quantidade", 0))
+            anterior = quantidades_anteriores.get(chave, Decimal("0"))
+            quantidades_anteriores[chave] = anterior + quantidade
+            if (
+                evento.id not in ids_periodo
+                or item.get("tipo") != "produto"
+                or not item.get("custo_pendente")
+                or quantidade <= 0
+            ):
+                continue
+            estimativa = estimativa_original(*chave)
+            if not estimativa:
+                continue
+            quantidade_original = _decimal(estimativa.get("quantidade", 0))
+            if quantidade_original <= 0 or anterior + quantidade > quantidade_original:
+                continue
+            custo_original_estimado = _moeda(
+                estimativa.get(
+                    "valor_estimado", estimativa.get("valor_cmv_atribuido", 0)
+                )
+            )
+            estorno = _moeda(
+                custo_original_estimado * (anterior + quantidade) / quantidade_original
+            ) - _moeda(custo_original_estimado * anterior / quantidade_original)
+            if estorno <= 0:
+                continue
+            canal = _normalizar_canal(evento.canal)
+            dados = dados_canais.setdefault(canal, _novo_canal())
+            dados["cmv_estimado"] -= estorno
+            dados.setdefault("itens_cmv_estornado", []).append(
+                {
+                    **estimativa,
+                    "devolucao_id": evento.id,
+                    "data": evento.data_competencia.isoformat(),
+                    "valor_estimado": -float(estorno),
+                    "valor_venda": -float(_decimal(item.get("valor_devolvido", 0))),
+                }
+            )
+
+
+def agregar_devolucoes_por_canal(
+    db: Session,
+    mes: int,
+    ano: int,
+    tenant_id: str,
+    dados_canais: Dict[str, Dict],
+    mes_inicial: Optional[int] = None,
+    data_final: Optional[date] = None,
+) -> None:
+    inicio, fim = _periodo_meses(mes_inicial or mes, mes, ano, data_final)
+    devolucoes = _devolucoes_periodo_query(db, tenant_id, inicio, fim).all()
+    for devolucao in devolucoes:
+        canal = _normalizar_canal(devolucao.canal)
+        dados = dados_canais.setdefault(canal, _novo_canal())
+        dados["devolucoes"] += _moeda(devolucao.valor_devolvido)
+        dados["cmv"] -= _moeda(devolucao.custo_produtos_estornado)
+        dados["custo_servicos"] -= _moeda(devolucao.custo_servicos_estornado)
+        if devolucao.custo_pendente:
+            dados.setdefault("devolucoes_custo_pendente", []).append(devolucao)
+    _estornar_cmv_estimado_devolucoes(
+        db, tenant_id, inicio, fim, dados_canais, devolucoes
+    )
 
 
 def _contas_receber_manuais_query(db: Session, tenant_id: str, inicio, fim):
@@ -857,13 +1324,12 @@ def _preparar_snapshots_vendas(
     for venda in vendas:
         cupom_desconto = cupons_por_venda.get(venda.id, 0.0)
         custo_campanha = cupom_desconto + cashback_por_venda.get(venda.id, 0.0)
-        snapshot = _snapshot_pronto(venda)
-        if (
-            snapshot
-            and custo_campanha > 0
-            and _decimal(snapshot.get("custo_campanha", 0)) <= 0
-        ):
-            snapshot = None
+        snapshot = _conciliar_custo_campanha_snapshot(
+            _snapshot_pronto(venda),
+            custo_campanha,
+            cupom_desconto,
+            getattr(venda, "desconto_valor", 0),
+        )
         if snapshot is None:
             snapshot = build_venda_rentabilidade_snapshot(
                 venda,
@@ -881,6 +1347,7 @@ def _preparar_snapshots_vendas(
             venda,
             snapshot,
             estoque_custos_por_venda.get(venda.id, {}),
+            tenant_id,
         )
         snapshots[int(venda.id)] = snapshot
     return snapshots

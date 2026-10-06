@@ -16,6 +16,7 @@ from app.dre_calculos import (
     calcular_taxas_cartao,
     obter_despesas_por_categoria,
 )
+from app.dre_schemas import DREResponse
 from app.dre_plano_contas_models import (
     DRECategoria,
     DRESubcategoria,
@@ -549,6 +550,18 @@ def test_compra_de_estoque_e_contas_parceladas_nao_duplicam_dre(
             lambda modelo: (
                 ConsultaSemVendas() if modelo is Venda else consulta_original(modelo)
             ),
+        )
+        dados_dre = {campo: 0 for campo in DREResponse.model_fields}
+        dados_dre.update(
+            periodo="Outubro/2026",
+            mes=10,
+            ano=2026,
+            despesas_operacionais=Decimal("252"),
+        )
+        monkeypatch.setattr(
+            dre_base_routes,
+            "_dre_para_exportacao",
+            lambda **_kwargs: DREResponse(**dados_dre),
         )
         dre_detalhado = dre_base_routes.gerar_dre_detalhado(
             ano=2026, mes=10, db=db, user_and_tenant=(object(), TENANT_ID)

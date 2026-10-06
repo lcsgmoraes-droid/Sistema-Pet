@@ -6,12 +6,9 @@ from app import dre_base_routes, dre_calculos
 def test_dre_legado_filtra_receitas_e_despesas_por_tenant():
     source = inspect.getsource(dre_base_routes.gerar_dre)
 
-    assert "_current_user, tenant_id = user_and_tenant" in source
-    assert "Venda.tenant_id == tenant_id" in source
-    assert "calcular_cmv(db, mes, ano, tenant_id)" in source
-    assert "obter_despesas_por_categoria(db, mes, ano, tenant_id)" in source
-    assert "calcular_taxas_cartao(db, mes, ano, tenant_id)" in source
-    assert "calcular_frete_notas_entrada" not in source
+    assert "_dre_para_exportacao(" in source
+    assert "user_and_tenant=user_and_tenant" in source
+    assert 'canais=",".join(CANAIS_CONFIG)' in source
 
 
 def test_dre_detalhado_filtra_despesas_e_receitas_por_tenant():

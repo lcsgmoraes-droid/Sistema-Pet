@@ -429,6 +429,11 @@ function DashboardCards({ summary }: { summary: GestorResumo }) {
               />
               <DreCalculationRow
                 operator="−"
+                label="Devoluções de vendas"
+                value={dre.devolucoes ?? 0}
+              />
+              <DreCalculationRow
+                operator="−"
                 label="Impostos"
                 value={dre.impostos}
               />

@@ -7,7 +7,7 @@ from typing import Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import and_
+from sqlalchemy import and_, or_
 from sqlalchemy.orm import Session, joinedload
 
 from app.auth.dependencies import get_current_user_and_tenant
@@ -15,6 +15,13 @@ from app.db import get_session
 from app.financeiro.common import financeiro_erp_required
 from app.financeiro.fluxo_caixa_pagamentos import movimentacoes_pagamentos_contas_pagar
 from app.financeiro.fluxo_caixa_periodos import _agrupar_por_periodo
+from app.financeiro.fluxo_caixa_vendas import (
+    lancamentos_cashback_sem_saida_caixa,
+    valores_nao_monetarios_por_venda,
+    valores_entradas_venda_realizadas,
+    vendas_com_lancamento,
+    vendas_devolvidas_com_entrada_integral,
+)
 from app.financeiro.fluxo_caixa_schemas import (
     FluxoCaixaMovimentacao,
     FluxoCaixaResponse,
@@ -131,34 +138,51 @@ def get_fluxo_caixa(
                 Venda.tenant_id == tenant_id,
                 Venda.data_venda >= dt_inicio,
                 Venda.data_venda <= dt_fim,
-                Venda.status == "finalizada",
+                or_(
+                    Venda.status == "finalizada",
+                    and_(Venda.status == "pago_nf", Venda.data_finalizacao.isnot(None)),
+                    Venda.status.in_(
+                        [
+                            "finalizada_devolucao",
+                            "finalizada_devolucao_parcial",
+                            "devolvida_total",
+                        ]
+                    ),
+                ),
             )
         )
         .all()
     )
 
-    vendas_com_lancamento_manual = set()
-    if vendas:
-        documentos_venda = [f"VENDA-{venda.id}" for venda in vendas]
-        documentos_lancados = (
-            db.query(LancamentoManual.documento)
-            .filter(
-                and_(
-                    LancamentoManual.tenant_id == tenant_id,
-                    LancamentoManual.documento.in_(documentos_venda),
-                )
-            )
-            .all()
-        )
-        vendas_com_lancamento_manual = {
-            int(str(documento).split("-")[1])
-            for (documento,) in documentos_lancados
-            if str(documento or "").startswith("VENDA-")
-            and str(documento).split("-")[1].isdigit()
+    devolvidas_com_entrada = vendas_devolvidas_com_entrada_integral(
+        db, tenant_id, vendas
+    )
+    vendas = [
+        venda
+        for venda in vendas
+        if venda.status
+        not in {
+            "finalizada_devolucao",
+            "finalizada_devolucao_parcial",
+            "devolvida_total",
         }
+        or venda.id in devolvidas_com_entrada
+    ]
+    venda_ids = {venda.id for venda in vendas}
+    vendas_com_lancamento_manual = vendas_com_lancamento(db, tenant_id, venda_ids)
+    pagamentos_nao_monetarios = valores_nao_monetarios_por_venda(
+        db, tenant_id, venda_ids
+    )
 
     for venda in vendas:
         if venda.id in vendas_com_lancamento_manual:
+            continue
+        valor_entrada = max(
+            Decimal(str(venda.total or 0))
+            - pagamentos_nao_monetarios.get(venda.id, Decimal("0")),
+            Decimal("0"),
+        )
+        if valor_entrada == 0:
             continue
 
         movimentacoes.append(
@@ -169,7 +193,7 @@ def get_fluxo_caixa(
                 tipo="entrada",
                 descricao=f"Venda #{venda.id}",
                 categoria="Vendas",
-                valor=float(venda.total or 0),
+                valor=float(valor_entrada),
                 origem_tipo="venda",
                 origem_id=venda.id,
                 status="realizado",
@@ -246,6 +270,12 @@ def get_fluxo_caixa(
         )
         .all()
     )
+    valores_entrada_venda = valores_entradas_venda_realizadas(
+        db, tenant_id, lancamentos_realizados, dt_fim
+    )
+    espelhos_cashback = lancamentos_cashback_sem_saida_caixa(
+        db, tenant_id, lancamentos_realizados
+    )
     ids_espelhos = {
         conta_id
         for lancamento in (*lancamentos_realizados, *lancamentos_previstos)
@@ -284,6 +314,8 @@ def get_fluxo_caixa(
         }
 
     for lanc in lancamentos_realizados:
+        if lanc.id in espelhos_cashback:
+            continue
         conta_id = _conta_pagar_de_lancamento_automatico(lanc)
         conta_espelhada = contas_espelhadas.get(conta_id)
         # Sem baixa rastreável, preservamos o lançamento realizado legado.
@@ -293,6 +325,9 @@ def get_fluxo_caixa(
             or (conta_espelhada.status == "pago" and conta_espelhada.data_pagamento)
         ):
             continue
+        valor_entrada = valores_entrada_venda.get(lanc.id, Decimal(str(lanc.valor)))
+        if valor_entrada <= 0:
+            continue
         movimentacoes.append(
             FluxoCaixaMovimentacao(
                 data=lanc.data_lancamento
@@ -301,7 +336,7 @@ def get_fluxo_caixa(
                 tipo=lanc.tipo,
                 descricao=lanc.descricao,
                 categoria=lanc.categoria.nome if lanc.categoria else "Sem Categoria",
-                valor=float(lanc.valor),
+                valor=float(valor_entrada),
                 origem_tipo="lancamento_manual",
                 origem_id=lanc.id,
                 status="realizado",
