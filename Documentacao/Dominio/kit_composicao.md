@@ -1,31 +1,45 @@
 ---
 tipo: dominio-tabela
-atualizado: 2026-09-13
+atualizado: 2026-10-07
 ---
 
-# Tabela — kit_composicao
+# kit_composicao — removida (código órfão, nunca existiu no banco)
 
 Ver [[produto_kit_componentes]], [[Produto]].
 
-## Definição
-⚠️ **Tabela existente no banco (via migration Alembic) mas sem nenhum uso confirmado em código de aplicação vivo.** A lógica real de composição de kits usa [[produto_kit_componentes]].
+## Status
 
-## Confirmado no código
-Dois arquivos diferentes definem `class KitComposicao` com o mesmo `__tablename__ = "kit_composicao"`:
-- `app/kit_composicao_models.py:6-33` — herda `.db.Base` diretamente (**não** `BaseTenantModel`), `tenant_id` é `Integer` simples (não UUID — foge do padrão multi-tenant do resto do sistema), FKs reais `produto_kit_id`/`produto_item_id`/`variacao_item_id → produtos.id`.
-- `app/fiscal_models/kit_composicao.py:1-32` — mesma estrutura, mas com FKs **desabilitadas** (comentário literal na linha 12: `"TEMPORÁRIO: FKs desabilitadas - tabelas não existem ainda"`); os mesmos três campos são `Integer` soltos, sem `ForeignKey`.
+🟢 **Removida.** `app/kit_composicao_models.py` foi apagado, e a reexportação em
+`app/fiscal_models/__init__.py` / `app/db/base.py` também. A lógica real de
+composição de kits usa [[produto_kit_componentes]] — nada muda para quem já usa
+kits no sistema.
 
-### Investigação de uso real
-- `grep` por import de `app.kit_composicao_models` em todo `app/`: zero resultados — nunca importado.
-- `app/fiscal_models/__init__.py:14` importa a segunda versão, e `app/db/base.py:16` a importa por sua vez — mas só para o Alembic enxergar a tabela no metadata (comentário no arquivo confirma essa intenção).
-- `grep` por uso real da classe (query/insert/update) em qualquer service/rota: zero resultados.
-- A lógica de kit realmente ativa é [[produto_kit_componentes]] (`kit_custo_service.py`, `kit_estoque_service.py`, `kit_preco_venda_service.py`), que não tem suporte a "variação" (`variacao_item_id`) como esta tabela morta tinha.
+## Por que foi removida
 
-## Relacionamentos
-- Nenhum uso vivo confirmado.
+Era uma classe ORM (`class KitComposicao`, `__tablename__ = "kit_composicao"`)
+sem nenhum uso em rota ou serviço — confirmado por `grep` em todo o `app/` antes
+da remoção. A tabela **nunca existiu em nenhum banco real** (nem produção, nem
+dev, nem um banco migrado do zero com a cadeia completa de Alembic): nenhuma
+migração jamais criou `kit_composicao`. Por isso a remoção não precisou de
+migração nenhuma — não havia nada para dropar no banco, só a classe Python.
 
-## Utilizado por
-- Nada em produção.
+Ela também não herdava `BaseTenantModel`/`TenantScoped`, então não entrava no
+filtro automático de loja. Como não existe nenhuma consulta real a essa classe,
+isso nunca foi um risco em produção — só uma armadilha para o futuro (se alguém
+reaproveitasse essa classe parada como base de uma feature nova, sem repor o
+filtro de tenant). Removida a classe, o risco deixa de existir.
 
-## Não identificado
-- 🔴 **Risco latente**: se algum dia alguém importar `app/kit_composicao_models.py` junto com `app/fiscal_models/kit_composicao.py`, ambos declaram o mesmo `__tablename__` na mesma `Base.metadata` — colisão que quebraria o boot da aplicação. Recomenda-se remover o arquivo órfão (`app/kit_composicao_models.py`) e decidir se a tabela `kit_composicao` deve ser dropada ou se o suporte a "variação de kit" deveria ser migrado para [[produto_kit_componentes]].
+Uma segunda versão divergente, `app/fiscal_models/kit_composicao.py` (com FKs
+desabilitadas), mencionada numa revisão anterior deste documento, já tinha sido
+consolidada/removida numa limpeza anterior — só restava a reexportação em
+`app/fiscal_models/__init__.py` apontando para `app/kit_composicao_models.py`,
+também removida agora.
+
+## Confirmação
+
+- `grep -rn "KitComposicao" app/ tests/` não retorna nenhum uso real (só o
+  comentário deste histórico, se procurado em `fiscal_models/__init__.py`).
+- `tests/multi_tenant/test_tenant_model_registry.py::test_nenhum_modelo_novo_com_tenant_id_herda_base_direto`
+  deixou de listar `kit_composicao` entre os modelos expostos sem filtro de
+  tenant.
+- A aplicação importa normalmente (`import app.main`) sem a classe.

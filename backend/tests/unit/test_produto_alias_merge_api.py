@@ -1,6 +1,8 @@
 from types import SimpleNamespace
 from uuid import uuid4
 
+import os
+
 import pytest
 from fastapi import FastAPI, HTTPException
 from fastapi.testclient import TestClient
@@ -151,6 +153,15 @@ def test_create_and_rename_cannot_reuse_preserved_sku(api, case):
     assert third.codigo == "THIRD"
 
 
+@pytest.mark.skipif(
+    not os.getenv("COREPET_MERGE_PG_URL"),
+    reason=(
+        "A checagem de SKU/codigo de barras unico no grupo usa SQL so de "
+        "Postgres (::text, ANY()), de proposito, para aceitar tenant_id "
+        "uuid e varchar (esquemas historicos). Requer banco descartavel "
+        "local via COREPET_MERGE_PG_URL — ver docs/PRODUTOS_FUSAO_IDENTIDADES_SKU.md."
+    ),
+)
 def test_barcode_or_alternate_code_cannot_collide_with_preserved_sku(api, case):
     client, _, _ = api
     merge(case)

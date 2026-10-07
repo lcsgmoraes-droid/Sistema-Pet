@@ -128,5 +128,12 @@ Abrange concorrencia de saldo/preview, namespace de aliases, objetos ORM antigos
 nas entradas Bling, e a migracao com upgrade/downgrade, unicidade e RLS. Os dados
 sao sinteticos; esse teste nao valida dados ou credenciais de uma loja real.
 
+Pelo mesmo motivo (dialeto), `test_produto_alias_merge_api.py::test_barcode_or_alternate_code_cannot_collide_with_preserved_sku`
+so roda com `COREPET_MERGE_PG_URL` definida (mesmo banco descartavel acima); sem
+isso, o teste e pulado (skip), nao falha. Essa checagem valida que SKU e codigo de
+barras nao se repetem entre lojas do mesmo grupo comercial — o validador usa SQL
+so de Postgres (`::text`, `ANY()`) de proposito, para aceitar tanto `tenant_id`
+uuid quanto varchar (esquemas historicos); SQLite nao entende essa sintaxe.
+
 Antes de publicar, executar o gate oficial `FLUXO_UNICO.bat release-check` em
 branch de tarefa limpa, apos os testes focados e revisao do diff conjunto.

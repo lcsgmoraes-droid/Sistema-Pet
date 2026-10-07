@@ -13,7 +13,6 @@ from app.fiscal_models import (  # noqa
     EmpresaConfigFiscal,
     FiscalCatalogoProdutos,
     FiscalEstadoPadrao,
-    KitComposicao,
     KitConfigFiscal,
     ProdutoConfigFiscal,
 )
