@@ -77,37 +77,10 @@ class GrupoComercialMembro(Base):
     removido_em = Column(DateTime(timezone=True), nullable=True)
 
 
-class GrupoComercialGestor(Base):
-    """Usuario com acesso a tela de gestao do grupo (ver/gerenciar lojas,
-    billing consolidado). So o usuario master do grupo concede ou revoga
-    esta linha - nao e um vinculo que o proprio gestor possa repassar.
-    """
-
-    __tablename__ = "grupo_comercial_gestores"
-    __table_args__ = (
-        UniqueConstraint(
-            "grupo_id", "user_id", name="uq_grupo_comercial_gestor_usuario"
-        ),
-    )
-
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    grupo_id = Column(
-        Integer,
-        ForeignKey("grupos_comerciais.id", ondelete="CASCADE"),
-        nullable=False,
-        index=True,
-    )
-    user_id = Column(
-        Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
-    )
-    concedido_por_user_id = Column(
-        Integer, ForeignKey("users.id", ondelete="RESTRICT"), nullable=False
-    )
-    status = Column(String(20), nullable=False, default="ativo", server_default="ativo")
-    concedido_em = Column(
-        DateTime(timezone=True), nullable=False, server_default=func.now()
-    )
-    revogado_em = Column(DateTime(timezone=True), nullable=True)
+# GrupoComercialGestor (grupo_comercial_gestores) foi removida: feature de
+# "gestor concedido pelo master" sem uso real (decisao de negocio de
+# 21/09/2026 - so o master controla o grupo). Ver migration
+# zzzx20261007a1_drop_grupo_comercial_gestores.py.
 
 
 class GrupoComercialTransferencia(Base):

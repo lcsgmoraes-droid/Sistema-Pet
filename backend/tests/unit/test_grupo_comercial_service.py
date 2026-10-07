@@ -14,7 +14,6 @@ from app.db import base as _base  # noqa: F401 - registra Produto etc. no metada
 from app.grupo_comercial_models import (
     GrupoComercial,
     GrupoComercialEstoqueCompartilhado,
-    GrupoComercialGestor,
     GrupoComercialMembro,
 )
 from app.grupo_comercial_service import GrupoComercialService
@@ -44,7 +43,6 @@ def db(monkeypatch):
             Permission.__table__,
             GrupoComercial.__table__,
             GrupoComercialMembro.__table__,
-            GrupoComercialGestor.__table__,
             GrupoComercialEstoqueCompartilhado.__table__,
             Cliente.__table__,
             PessoaMestre.__table__,
@@ -144,36 +142,6 @@ def test_usuario_sem_acesso_de_gestao_nao_ve_o_grupo_no_resumo(db):
     assert len(resumo_master["grupos"]) == 1
 
 
-def test_somente_master_concede_e_revoga_acesso_de_gestao(db):
-    service = GrupoComercialService(db, agora=AGORA)
-    grupo = service.criar_grupo(EMPRESA_A, 10, "Grupo Centro")
-    master = _usuario(db, 10)
-    funcionaria = _usuario(db, 99)
-
-    with pytest.raises(HTTPException) as sem_permissao:
-        service.conceder_gestor(grupo["id"], EMPRESA_A, funcionaria, 99)
-    assert sem_permissao.value.status_code == 403
-
-    service.conceder_gestor(grupo["id"], EMPRESA_A, master, 99)
-    assert service.tem_acesso_gestao(grupo["id"], funcionaria) is True
-
-    gestores = service.listar_gestores(grupo["id"], master)
-    assert [g["user_id"] for g in gestores] == [99]
-
-    # quem recebeu o acesso nao pode repassar pra outro usuario
-    db.execute(
-        User.__table__.insert(),
-        [{"id": 98, "tenant_id": UUID(EMPRESA_A), "email": "outra@teste.com", "nome": "Outra"}],
-    )
-    db.commit()
-    with pytest.raises(HTTPException) as gestor_nao_repassa:
-        service.conceder_gestor(grupo["id"], EMPRESA_A, funcionaria, 98)
-    assert gestor_nao_repassa.value.status_code == 403
-
-    service.revogar_gestor(grupo["id"], EMPRESA_A, master, 99)
-    assert service.tem_acesso_gestao(grupo["id"], funcionaria) is False
-
-
 def test_adicionar_loja_provisiona_tenant_e_anexa_como_membro(db, monkeypatch):
     """adicionar_loja (self-service e onboarding de ops) chama provision_tenant
     e anexa o resultado como membro comum — nunca como responsavel, mesmo
@@ -257,62 +225,10 @@ def test_adicionar_loja_provisiona_tenant_e_anexa_como_membro(db, monkeypatch):
     assert cliente_loja_nova.pessoa_mestre_id == cliente_loja_fundadora.pessoa_mestre_id
 
 
-def test_adicionar_loja_por_gestor_diferente_do_master_da_acesso_ao_master(db, monkeypatch):
-    """Quando quem adiciona a loja NAO e o master (e sim um gestor com acesso
-    concedido), o master do grupo precisa ganhar acesso administrativo
-    automatico na loja nova mesmo assim — sem isso ele ficaria de fora de
-    lojas que ele nunca tocou diretamente."""
-    from app import grupo_comercial_service as modulo
-
-    nova_loja_id = "55555555-5555-5555-5555-555555555555"
-
-    class _TenantFake:
-        id = nova_loja_id
-        name = "Loja da Gestora"
-
-    def _provision_tenant_fake(_db, **kwargs):
-        class _Resultado:
-            tenant = _TenantFake()
-            tenant_id = UUID(nova_loja_id)
-            user = kwargs["user"]
-            login_name = "loja-da-gestora"
-
-        return _Resultado()
-
-    monkeypatch.setattr(modulo, "provision_tenant", _provision_tenant_fake)
-
-    service = GrupoComercialService(db, agora=AGORA)
-    grupo = service.criar_grupo(EMPRESA_A, 10, "Grupo Dono Unico")
-    master = _usuario(db, 10)
-    gestora = _usuario(db, 99)
-    service.conceder_gestor(grupo["id"], EMPRESA_A, master, 99)
-
-    service.adicionar_loja(
-        grupo_id=grupo["id"],
-        usuario=gestora,
-        nome_loja="Loja da Gestora",
-        empresa_acionadora_id=EMPRESA_A,
-        restore_tenant_id=EMPRESA_A,
-    )
-    clear_tenant_context()
-
-    vinculo_master = (
-        db.query(UserTenant)
-        .filter(UserTenant.user_id == master.id, UserTenant.tenant_id == UUID(nova_loja_id))
-        .one()
-    )
-    assert vinculo_master.is_active is True
-
-    set_tenant_context(UUID(nova_loja_id))
-    role_master = db.query(Role).filter(Role.id == vinculo_master.role_id).one()
-    clear_tenant_context()
-    assert role_master.name == "Administrador (Grupo)"
-
-
 def test_adicionar_loja_exige_acesso_de_gestao_mesmo_sendo_empresa_responsavel(db, monkeypatch):
     """Antes, qualquer usuario com permissao generica de configuracoes na
     empresa responsavel conseguia adicionar loja. Agora precisa tambem ter
-    acesso de gestao do grupo (ser master ou gestor concedido)."""
+    acesso de gestao do grupo (ser o master)."""
     from app import grupo_comercial_service as modulo
 
     monkeypatch.setattr(

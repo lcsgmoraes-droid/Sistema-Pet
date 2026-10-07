@@ -452,7 +452,8 @@ class GrupoComercialService:
     def tem_acesso_gestao(self, grupo_id: int, usuario: User) -> bool:
         # Único papel com controle sobre o grupo é o usuário master (decisão de
         # negócio de 21/09/2026 — o antigo acesso de "gestor" concedível a
-        # outros usuários foi eliminado; GrupoComercialGestor fica sem uso).
+        # outros usuários foi eliminado; a tabela grupo_comercial_gestores foi
+        # removida em zzzx20261007a1).
         return self._e_master(grupo_id, usuario)
 
     def exigir_acesso_gestao(self, grupo_id: int, usuario: User) -> None:

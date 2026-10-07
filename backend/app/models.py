@@ -55,7 +55,6 @@ from app.models_authz import (
 from app.grupo_comercial_models import (
     GrupoComercial,
     GrupoComercialEstoqueCompartilhado,
-    GrupoComercialGestor,
     GrupoComercialMembro,
     GrupoComercialTransferencia,
 )
